@@ -4,7 +4,9 @@
 \section[WwLib]{A library for the ``worker\/wrapper'' back-end to the strictness analyser}
 
 \begin{code}
-module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs, deepSplitProductType_maybe ) where
+module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
+             , deepSplitProductType_maybe, findTypeShape
+ ) where
 
 #include "HsVersions.h"
 
@@ -506,6 +508,12 @@ match the number of constructor arguments; this happened in Trac #8037.
 If so, the worker/wrapper split doesn't work right and we get a Core Lint
 bug.  The fix here is simply to decline to do w/w if that happens.
 
+%************************************************************************
+%*                                                                      *
+         Type scrutiny that is specfic to demand analysis
+%*                                                                      *
+%************************************************************************
+
 \begin{code}
 deepSplitProductType_maybe :: FamInstEnvs -> Type -> Maybe (DataCon, [Type], [Type], Coercion)
 -- If    deepSplitProductType_maybe ty = Just (dc, tys, arg_tys, co)
@@ -534,6 +542,27 @@ deepSplitCprType_maybe fam_envs con_tag ty
   , let con  = cons !! (con_tag - fIRST_TAG)
   = Just (con, tc_args, dataConInstArgTys con tc_args, co)
 deepSplitCprType_maybe _ _ _ = Nothing
+
+findTypeShape :: FamInstEnvs -> Type -> TypeShape
+-- Uncover the arrow and product shape of a type
+-- The data type TypeShape is defined in Demand
+-- See Note [Trimming a demand to a type] in Demand
+findTypeShape fam_envs ty
+  | Just (_, ty') <- splitForAllTy_maybe ty
+  = findTypeShape fam_envs ty'
+
+  | Just (tc, tc_args)  <- splitTyConApp_maybe ty
+  , Just con <- isDataProductTyCon_maybe tc
+  = TsProd (map (findTypeShape fam_envs) $ dataConInstArgTys con tc_args)
+
+  | Just (_, res) <- splitFunTy_maybe ty
+  = TsFun (findTypeShape fam_envs res)
+
+  | Just (_, ty') <- topNormaliseType_maybe fam_envs ty
+  = findTypeShape fam_envs ty'
+
+  | otherwise
+  = TsUnk
 \end{code}
 
 

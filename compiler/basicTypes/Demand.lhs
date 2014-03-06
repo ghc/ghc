@@ -44,6 +44,7 @@ module Demand (
         splitProdDmd, splitProdDmd_maybe, peelCallDmd, mkCallDmd,
         dmdTransformSig, dmdTransformDataConSig, dmdTransformDictSelSig,
         argOneShots, argsOneShots,
+        trimToType, TypeShape(..),
 
         isSingleUsed, reuseEnv, zapDemand, zapStrictSig,
 
@@ -67,6 +68,7 @@ import Maybes           ( orElse )
 import Type            ( Type )
 import TyCon           ( isNewTyCon, isClassTyCon )
 import DataCon         ( splitDataProductType_maybe )
+import FastString
 \end{code}
 
 %************************************************************************
@@ -442,7 +444,7 @@ seqMaybeUsed _          = ()
 splitUseProdDmd :: Int -> UseDmd -> [MaybeUsed]
 splitUseProdDmd n Used          = replicate n useTop
 splitUseProdDmd n UHead         = replicate n Abs
-splitUseProdDmd n (UProd ds)    = ASSERT2( ds `lengthIs` n, ppr n $$ ppr ds ) ds
+splitUseProdDmd n (UProd ds)    = ASSERT2( ds `lengthIs` n, text "splitUseProdDmd" $$ ppr n $$ ppr ds ) ds
 splitUseProdDmd _ d@(UCall _ _) = pprPanic "attempt to prod-split usage call demand" (ppr d)
 \end{code}
   
@@ -638,7 +640,65 @@ isSingleUsed (JD {absd=a}) = is_used_once a
     is_used_once Abs         = True
     is_used_once (Use One _) = True
     is_used_once _           = False
+
+
+data TypeShape = TsFun TypeShape
+               | TsProd [TypeShape]
+               | TsUnk
+
+instance Outputable TypeShape where
+  ppr TsUnk        = ptext (sLit "TsUnk")
+  ppr (TsFun ts)   = ptext (sLit "TsFun") <> parens (ppr ts)
+  ppr (TsProd tss) = parens (hsep $ punctuate comma $ map ppr tss)
+
+trimToType :: JointDmd -> TypeShape -> JointDmd
+-- See Note [Trimming a demand to a type]
+trimToType (JD ms mu) ts
+  = JD (go_ms ms ts) (go_mu mu ts)
+  where
+    go_ms :: MaybeStr -> TypeShape -> MaybeStr
+    go_ms Lazy    _  = Lazy
+    go_ms (Str s) ts = Str (go_s s ts)
+
+    go_s :: StrDmd -> TypeShape -> StrDmd
+    go_s HyperStr    _            = HyperStr
+    go_s (SCall s)   (TsFun ts)   = SCall (go_s s ts)
+    go_s (SProd mss) (TsProd tss)
+      | equalLength mss tss       = SProd (zipWith go_ms mss tss)
+    go_s _           _            = HeadStr
+
+    go_mu :: MaybeUsed -> TypeShape -> MaybeUsed
+    go_mu Abs _ = Abs
+    go_mu (Use c u) ts = Use c (go_u u ts)
+
+    go_u :: UseDmd -> TypeShape -> UseDmd
+    go_u UHead       _          = UHead
+    go_u (UCall c u) (TsFun ts) = UCall c (go_u u ts)
+    go_u (UProd mus) (TsProd tss)
+      | equalLength mus tss      = UProd (zipWith go_mu mus tss)
+    go_u _           _           = Used
 \end{code}
+
+Note [Trimming a demand to a type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+
+  f :: a -> Bool
+  f x = case ... of
+          A g1 -> case (x |> g1) of (p,q) -> ...
+          B    -> error "urk"
+
+where A,B are the constructors of a GADT.  We'll get a U(U,U) demand
+on x from the A branch, but that's a stupid demand for x itself, which
+has type 'a'. Indeed we get ASSERTs going off (notably in
+splitUseProdDmd, Trac #8569).
+
+Bottom line: we really don't want to have a binder whose demand is more
+deeply-nested than its type.  There are various ways to tackle this.
+When processing (x |> g1), we could "trim" the incoming demand U(U,U)
+to match x's type.  But I'm currently doing so just at the moment when
+we pin a demand on a binder, in DmdAnal.findBndrDmd.
+
 
 Note [Threshold demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1451,7 +1511,7 @@ dmdTransformDataConSig :: Arity -> StrictSig -> CleanDemand -> DmdType
 -- which has a special kind of demand transformer.
 -- If the constructor is saturated, we feed the demand on 
 -- the result into the constructor arguments.
-dmdTransformDataConSig arity (StrictSig (DmdType _ _ con_res)) 
+dmdTransformDataConSig arity (StrictSig (DmdType _ _ con_res))
                              (CD { sd = str, ud = abs })
   | Just str_dmds <- go_str arity str
   , Just abs_dmds <- go_abs arity abs

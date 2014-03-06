@@ -13,9 +13,8 @@ module DmdAnal ( dmdAnalProgram ) where
 
 #include "HsVersions.h"
 
-import Var		( isTyVar )
 import DynFlags
-import WwLib            ( deepSplitProductType_maybe )
+import WwLib            ( findTypeShape, deepSplitProductType_maybe )
 import Demand	-- All of it
 import CoreSyn
 import Outputable
@@ -26,11 +25,8 @@ import Data.List
 import DataCon
 import Id
 import CoreUtils	( exprIsHNF, exprType, exprIsTrivial )
--- import PprCore	
 import TyCon
-import Type		( eqType )
--- import Pair
--- import Coercion         ( coercionKind )
+import Type
 import FamInstEnv
 import Util
 import Maybes		( isJust )
@@ -492,8 +488,7 @@ dmdTransform :: AnalEnv		-- The strictness environment
 
 dmdTransform env var dmd
   | isDataConWorkId var		                 -- Data constructor
-  = dmdTransformDataConSig 
-       (idArity var) (idStrictness var) dmd
+  = dmdTransformDataConSig (idArity var) (idStrictness var) dmd
 
   | gopt Opt_DmdTxDictSel (ae_dflags env),
     Just _ <- isClassOpId_maybe var -- Dictionary component selector
@@ -728,9 +723,8 @@ addLazyFVs dmd_ty lazy_fvs
 	-- call to f.  So we just get an L demand for x for g.
 \end{code}
 
-Note [do not strictify the argument dictionaries of a dfun]
+Note [Do not strictify the argument dictionaries of a dfun]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The typechecker can tie recursive knots involving dfuns, so we do the
 conservative thing and refrain from strictifying a dfun's argument
 dictionaries.
@@ -742,17 +736,10 @@ annotateBndr :: AnalEnv -> DmdType -> Var -> (DmdType, Var)
 -- according to the result demand of the provided demand type
 -- No effect on the argument demands
 annotateBndr env dmd_ty var
-  | isTyVar var = (dmd_ty, var)
-  | otherwise   = (dmd_ty', set_idDemandInfo env var dmd')
+  | isId var  = (dmd_ty', setIdDemandInfo var dmd)
+  | otherwise = (dmd_ty, var)
   where
-    (dmd_ty', dmd) = peelFV dmd_ty var
-
-    dmd' | gopt Opt_DictsStrict (ae_dflags env)
-             -- We never want to strictify a recursive let. At the moment
-             -- annotateBndr is only call for non-recursive lets; if that
-             -- changes, we need a RecFlag parameter and another guard here.
-         = strictifyDictDmd (idType var) dmd
-         | otherwise = dmd
+    (dmd_ty', dmd) = findBndrDmd env False dmd_ty var
 
 annotateBndrs :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Var])
 annotateBndrs env = mapAccumR (annotateBndr env)
@@ -777,7 +764,7 @@ annotateLamIdBndr env arg_of_dfun dmd_ty one_shot id
 -- Only called for Ids
   = ASSERT( isId id )
     -- pprTrace "annLamBndr" (vcat [ppr id, ppr _dmd_ty]) $
-    (final_ty, setOneShotness one_shot (set_idDemandInfo env id dmd'))
+    (final_ty, setOneShotness one_shot (setIdDemandInfo id dmd))
   where
       -- Watch out!  See note [Lambda-bound unfoldings]
     final_ty = case maybeUnfoldingTemplate (idUnfolding id) of
@@ -787,13 +774,7 @@ annotateLamIdBndr env arg_of_dfun dmd_ty one_shot id
                              (unf_ty, _) = dmdAnalStar env dmd unf
 
     main_ty = addDemand dmd dmd_ty'
-    (dmd_ty', dmd) = peelFV dmd_ty id
-
-    dmd' | gopt Opt_DictsStrict (ae_dflags env),
-           -- see Note [do not strictify the argument dictionaries of a dfun]
-           not arg_of_dfun
-         = strictifyDictDmd (idType id) dmd
-         | otherwise = dmd
+    (dmd_ty', dmd) = findBndrDmd env arg_of_dfun dmd_ty id
 
 deleteFVs :: DmdType -> [Var] -> DmdType
 deleteFVs (DmdType fvs dmds res) bndrs
@@ -1079,18 +1060,39 @@ extendSigsWithLam :: AnalEnv -> Id -> AnalEnv
 -- Extend the AnalEnv when we meet a lambda binder
 extendSigsWithLam env id
   | isId id
-  , isStrictDmd (idDemandInfo id) || ae_virgin env  
+  , isStrictDmd (idDemandInfo id) || ae_virgin env
        -- See Note [Optimistic CPR in the "virgin" case]
        -- See Note [Initial CPR for strict binders]
   , Just (dc,_,_,_) <- deepSplitProductType_maybe (ae_fam_envs env) $ idType id
   = extendAnalEnv NotTopLevel env id (cprProdSig (dataConRepArity dc))
 
-  | otherwise 
+  | otherwise
   = env
 
-set_idDemandInfo :: AnalEnv -> Id -> Demand -> Id
-set_idDemandInfo env id dmd 
-  = setIdDemandInfo id (zapDemand (ae_dflags env) dmd)
+findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
+-- See Note [Trimming a demand to a type] in Demand.lhs
+findBndrDmd env arg_of_dfun dmd_ty id
+  = (dmd_ty', dmd')
+  where
+    dmd' = zapDemand (ae_dflags env) $
+           strictify $
+           trimToType starting_dmd (findTypeShape fam_envs id_ty)
+
+    (dmd_ty', starting_dmd) = peelFV dmd_ty id
+
+    id_ty = idType id
+
+    strictify dmd
+      | gopt Opt_DictsStrict (ae_dflags env)
+             -- We never want to strictify a recursive let. At the moment
+             -- annotateBndr is only call for non-recursive lets; if that
+             -- changes, we need a RecFlag parameter and another guard here.
+      , not arg_of_dfun -- See Note [Do not strictify the argument dictionaries of a dfun]
+      = strictifyDictDmd id_ty dmd
+      | otherwise
+      = dmd
+
+    fam_envs = ae_fam_envs env
 
 set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
 set_idStrictness env id sig
