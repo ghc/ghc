@@ -1,4 +1,4 @@
 
-unidir.hs:1:1:
+unidir.hs:4:18:
     Right-hand side of bidirectional pattern synonym cannot be used as an expression
       x : _
