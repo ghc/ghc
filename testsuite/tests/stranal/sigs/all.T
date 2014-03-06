@@ -8,7 +8,7 @@ setTestOpts(extra_hc_opts('-ddump-strsigs'))
 setTestOpts(only_ways(['optasm']))
 
 test('StrAnalExample', normal, compile, [''])
-test('T8569', expect_broken(8569), compile, [''])
+test('T8569', normal, compile, [''])
 test('HyperStrUse', normal, compile, [''])
 test('T8598', normal, compile, [''])
 test('FacState', expect_broken(1600), compile, [''])
