@@ -323,10 +323,10 @@ this transformation.  So we try to limit it as much as possible:
      going to diverge eventually anyway then getting the best arity 
      isn't an issue, so we might as well play safe
 
- (3) Do NOT move a lambda outside a case unless 
+ (3) Do NOT move a lambda outside a case unless
      (a) The scrutinee is ok-for-speculation, or
-     (b) more liberally: the scrutinee is cheap and -fpedantic-bottoms is not
-         enforced
+     (b) more liberally: the scrutinee is cheap (e.g. a variable), and
+         -fpedantic-bottoms is not enforced (see Trac #2915 for an example)
 
 Of course both (1) and (2) are readily defeated by disguising the bottoms.
 
@@ -753,10 +753,10 @@ arityType env (Case scrut _ _ alts)
      	     | otherwise -> ABot 0     -- if RHS is bottomming
     			               -- See Note [Dealing with bottom (2)]
 
-     ATop as | not (ae_ped_bot env)    -- Check -fpedantic-bottoms
+     ATop as | not (ae_ped_bot env)    -- See Note [Dealing with bottom (3)]
              , ae_cheap_fn env scrut Nothing -> ATop as
-             | exprOkForSpeculation scrut -> ATop as
-             | otherwise                  -> ATop (takeWhile isOneShotInfo as)
+             | exprOkForSpeculation scrut    -> ATop as
+             | otherwise                     -> ATop (takeWhile isOneShotInfo as)
   where
     alts_type = foldr1 andArityType [arityType env rhs | (_,_,rhs) <- alts]
 
