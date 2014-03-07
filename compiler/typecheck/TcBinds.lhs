@@ -9,7 +9,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
                  tcHsBootSigs, tcPolyCheck,
                  PragFun, tcSpecPrags, tcVectDecls, mkPragFun, 
                  TcSigInfo(..), TcSigFun, 
-                 instTcTySig, instTcTySigFromId,
+                 instTcTySig, instTcTySigFromId, findScopedTyVars,
                  badBootDeclErr ) where
 
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
@@ -520,7 +520,7 @@ tcPolyCheck rec_tc prag_fn
   = do { ev_vars <- newEvVars theta
        ; let skol_info = SigSkol (FunSigCtxt (idName poly_id)) (mkPhiTy theta tau)
              prag_sigs = prag_fn (idName poly_id)
-       ; tvs <- mapM (skolemiseSigTv . snd) tvs_w_scoped
+             tvs = map snd tvs_w_scoped
        ; (ev_binds, (binds', [mono_info])) 
             <- setSrcSpan loc $  
                checkConstraints skol_info tvs ev_vars $
@@ -1162,18 +1162,6 @@ However, we do *not* support this
         f :: forall a. a->a
         (f,g) = e
 
-Note [More instantiated than scoped]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There may be more instantiated type variables than lexically-scoped 
-ones.  For example:
-        type T a = forall b. b -> (a,b)
-        f :: forall c. T c
-Here, the signature for f will have one scoped type variable, c,
-but two instantiated type variables, c' and b'.  
-
-We assume that the scoped ones are at the *front* of sig_tvs,
-and remember the names from the original HsForAllTy in the TcSigFun.
-
 Note [Signature skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 When instantiating a type signature, we do so with either skolems or
@@ -1248,42 +1236,25 @@ tcTySig _ = return []
 
 instTcTySigFromId :: SrcSpan -> Id -> TcM TcSigInfo
 instTcTySigFromId loc id
-  = do { (tvs, theta, tau) <- tcInstType inst_sig_tyvars (idType id)
+  = do { (tvs, theta, tau) <- tcInstType (tcInstSigTyVarsLoc loc)
+                                         (idType id)
        ; return (TcSigInfo { sig_id = id, sig_loc = loc
                            , sig_tvs = [(Nothing, tv) | tv <- tvs]
                            , sig_theta = theta, sig_tau = tau }) }
   where
     -- Hack: in an instance decl we use the selector id as
-    -- the template; but we do *not* want the SrcSpan on the Name of 
+    -- the template; but we do *not* want the SrcSpan on the Name of
     -- those type variables to refer to the class decl, rather to
-    -- the instance decl 
-    inst_sig_tyvars tvs = tcInstSigTyVars (map set_loc tvs)
-    set_loc tv = setTyVarName tv (mkInternalName (nameUnique n) (nameOccName n) loc)
-      where
-        n = tyVarName tv
+    -- the instance decl
 
 instTcTySig :: LHsType Name -> TcType    -- HsType and corresponding TcType
             -> Name -> TcM TcSigInfo
 instTcTySig hs_ty@(L loc _) sigma_ty name
   = do { (inst_tvs, theta, tau) <- tcInstType tcInstSigTyVars sigma_ty
-       ; return (TcSigInfo { sig_id = poly_id, sig_loc = loc
-                           , sig_tvs = zipEqual "instTcTySig" scoped_tvs inst_tvs
+       ; return (TcSigInfo { sig_id = mkLocalId name sigma_ty
+                           , sig_loc = loc
+                           , sig_tvs = findScopedTyVars hs_ty sigma_ty inst_tvs
                            , sig_theta = theta, sig_tau = tau }) }
-  where
-    poly_id      = mkLocalId name sigma_ty
-
-    scoped_names = hsExplicitTvs hs_ty
-    (sig_tvs,_)  = tcSplitForAllTys sigma_ty
-
-    scoped_tvs :: [Maybe Name]
-    scoped_tvs = mk_scoped scoped_names sig_tvs
-
-    mk_scoped :: [Name] -> [TyVar] -> [Maybe Name]
-    mk_scoped []     tvs      = [Nothing | _ <- tvs]
-    mk_scoped (n:ns) (tv:tvs)
-           | n == tyVarName tv = Just n  : mk_scoped ns     tvs
-           | otherwise         = Nothing : mk_scoped (n:ns) tvs
-    mk_scoped (n:ns) [] = pprPanic "mk_scoped" (ppr name $$ ppr (n:ns) $$ ppr hs_ty $$ ppr sigma_ty)
 
 -------------------------------
 data GeneralisationPlan
@@ -1449,6 +1420,8 @@ strictBindErr flavour unlifted_bndrs binds
         | otherwise      = ptext (sLit "bang-pattern or unboxed-tuple bindings")
 \end{code}
 
+Note [Binding scoped type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 %************************************************************************
 %*                                                                      *
