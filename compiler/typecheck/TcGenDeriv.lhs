@@ -1714,10 +1714,10 @@ foldDataConArgs :: FFoldType a -> DataCon -> [a]
 foldDataConArgs ft con
   = map (functorLikeTraverse tv ft) (dataConOrigArgTys con)
   where
-    tv = last (dataConUnivTyVars con)
-                    -- Argument to derive for, 'a in the above description
-                    -- The validity checks have ensured that con is
-                    -- a vanilla data constructor
+    Just tv = getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con)))
+        -- Argument to derive for, 'a in the above description
+        -- The validity and kind checks have ensured that
+        -- the Just will match and a::*
 
 -- Make a HsLam using a fresh variable from a State monad
 mkSimpleLam :: (LHsExpr id -> State [id] (LHsExpr id)) -> State [id] (LHsExpr id)

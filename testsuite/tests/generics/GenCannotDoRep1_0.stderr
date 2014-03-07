@@ -1,5 +1,6 @@
 
 GenCannotDoRep1_0.hs:9:49:
     Can't make a derived instance of ‘Generic1 Dynamic’:
-      Dynamic must be a vanilla data constructor
+      Constructor ‘Dynamic’ has existentials or constraints in its type
+      Possible fix: use a standalone deriving declaration instead
     In the data declaration for ‘Dynamic’

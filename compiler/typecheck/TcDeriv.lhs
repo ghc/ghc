@@ -1060,7 +1060,7 @@ inferConstraints cls inst_tys rep_tc rep_tc_args
         | data_con <- tyConDataCons rep_tc,
           (arg_n, arg_ty) <-
                 ASSERT( isVanillaDataCon data_con )
-                zip [1..] $
+                zip [1..] $  -- ASSERT is precondition of dataConInstOrigArgTys
                 get_constrained_tys $
                 dataConInstOrigArgTys data_con all_rep_tc_args,
           not (isUnLiftedType arg_ty) ]
@@ -1171,21 +1171,30 @@ sideConditions mtheta cls
   | cls_key == ixClassKey          = Just (cond_std `andCond` cond_enumOrProduct cls)
   | cls_key == boundedClassKey     = Just (cond_std `andCond` cond_enumOrProduct cls)
   | cls_key == dataClassKey        = Just (checkFlag Opt_DeriveDataTypeable `andCond`
-                                           cond_std `andCond` cond_args cls)
+                                           cond_std `andCond`
+                                           cond_args cls)
   | cls_key == functorClassKey     = Just (checkFlag Opt_DeriveFunctor `andCond`
-                                           cond_functorOK True)  -- NB: no cond_std!
+                                           cond_vanilla `andCond`
+                                           cond_functorOK True)
   | cls_key == foldableClassKey    = Just (checkFlag Opt_DeriveFoldable `andCond`
+                                           cond_vanilla `andCond`
                                            cond_functorOK False) -- Functor/Fold/Trav works ok for rank-n types
   | cls_key == traversableClassKey = Just (checkFlag Opt_DeriveTraversable `andCond`
+                                           cond_vanilla `andCond`
                                            cond_functorOK False)
-  | cls_key == genClassKey         = Just (cond_RepresentableOk `andCond`
-                                           checkFlag Opt_DeriveGeneric)
-  | cls_key == gen1ClassKey        = Just (cond_Representable1Ok `andCond`
-                                           checkFlag Opt_DeriveGeneric)
+  | cls_key == genClassKey         = Just (checkFlag Opt_DeriveGeneric `andCond`
+                                           cond_vanilla `andCond`
+                                           cond_RepresentableOk)
+  | cls_key == gen1ClassKey        = Just (checkFlag Opt_DeriveGeneric `andCond`
+                                           cond_vanilla `andCond`
+                                           cond_Representable1Ok)
   | otherwise = Nothing
   where
     cls_key = getUnique cls
-    cond_std = cond_stdOK mtheta
+    cond_std     = cond_stdOK mtheta False  -- Vanilla data constructors, at least one,
+                                            --    and monotype arguments
+    cond_vanilla = cond_stdOK mtheta True   -- Vanilla data constructors but
+                                            --   allow no data cons or polytype arguments
 
 type Condition = (DynFlags, TyCon, [Type]) -> Maybe SDoc
         -- first Bool is whether or not we are allowed to derive Data and Typeable
@@ -1208,13 +1217,18 @@ andCond c1 c2 tc = case c1 tc of
                      Nothing -> c2 tc   -- c1 succeeds
                      Just x  -> Just x  -- c1 fails
 
-cond_stdOK :: DerivContext -> Condition
-cond_stdOK (Just _) _
+cond_stdOK :: DerivContext -- Says whether this is standalone deriving or not;
+                           --     if standalone, we just say "yes, go for it"
+           -> Bool         -- True <=> permissive: allow higher rank
+                           --          args and no data constructors
+           -> Condition
+cond_stdOK (Just _) _ _
   = Nothing     -- Don't check these conservative conditions for
                 -- standalone deriving; just generate the code
                 -- and let the typechecker handle the result
-cond_stdOK Nothing (_, rep_tc, _)
-  | null data_cons      = Just (no_cons_why rep_tc $$ suggestion)
+cond_stdOK Nothing permissive (_, rep_tc, _)
+  | null data_cons
+  , not permissive      = Just (no_cons_why rep_tc $$ suggestion)
   | not (null con_whys) = Just (vcat con_whys $$ suggestion)
   | otherwise           = Nothing
   where
@@ -1224,9 +1238,12 @@ cond_stdOK Nothing (_, rep_tc, _)
 
     check_con :: DataCon -> Maybe SDoc
     check_con con
-      | isVanillaDataCon con
-      , all isTauTy (dataConOrigArgTys con) = Nothing
-      | otherwise = Just (badCon con (ptext (sLit "must have a Haskell-98 type")))
+      | not (isVanillaDataCon con)
+      = Just (badCon con (ptext (sLit "has existentials or constraints in its type")))
+      | not (permissive || all isTauTy (dataConOrigArgTys con))
+      = Just (badCon con (ptext (sLit "has a higher-rank type")))
+      | otherwise
+      = Nothing
 
 no_cons_why :: TyCon -> SDoc
 no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+>
@@ -1244,7 +1261,7 @@ cond_enumOrProduct cls = cond_isEnumeration `orCond`
 
 cond_args :: Class -> Condition
 -- For some classes (eg Eq, Ord) we allow unlifted arg types
--- by generating specilaised code.  For others (eg Data) we don't.
+-- by generating specialised code.  For others (eg Data) we don't.
 cond_args cls (_, tc, _)
   = case bad_args of
       []      -> Nothing
@@ -1342,11 +1359,16 @@ cond_functorOK allowFunctions (_, rep_tc, _)
     is_bad pred       = last_tv `elemVarSet` tyVarsOfType pred
 
     data_cons = tyConDataCons rep_tc
-    check_con con = msum (check_vanilla con : foldDataConArgs (ft_check con) con)
+    check_con con = msum (check_universal con : foldDataConArgs (ft_check con) con)
 
-    check_vanilla :: DataCon -> Maybe SDoc
-    check_vanilla con | isVanillaDataCon con = Nothing
-                      | otherwise            = Just (badCon con existential)
+    check_universal :: DataCon -> Maybe SDoc
+    check_universal con
+      | Just tv <- getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con)))
+      , tv `elem` dataConUnivTyVars con
+      , not (tv `elemVarSet` tyVarsOfTypes (dataConTheta con))
+      = Nothing   -- See Note [Check that the type variable is truly universal]
+      | otherwise
+      = Just (badCon con existential)
 
     ft_check :: DataCon -> FFoldType (Maybe SDoc)
     ft_check con = FT { ft_triv = Nothing, ft_var = Nothing
@@ -1358,7 +1380,7 @@ cond_functorOK allowFunctions (_, rep_tc, _)
                       , ft_bad_app = Just (badCon con wrong_arg)
                       , ft_forall = \_ x   -> x }
 
-    existential = ptext (sLit "must not have existential arguments")
+    existential = ptext (sLit "must be truly polymorphic in the last argument of the data type")
     covariant   = ptext (sLit "must not use the type variable in a function argument")
     functions   = ptext (sLit "must not contain function types")
     wrong_arg   = ptext (sLit "must use the type variable only as the last argument of a data type")
@@ -1419,6 +1441,28 @@ new_dfun_name clas tycon        -- Just a simple wrapper
 badCon :: DataCon -> SDoc -> SDoc
 badCon con msg = ptext (sLit "Constructor") <+> quotes (ppr con) <+> msg
 \end{code}
+
+Note [Check that the type variable is truly universal]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For Functor, Foldable, Traversable, we must check that the *last argument*
+of the type constructor is used truly universally.  Example
+
+   data T a b where
+     T1 :: a -> b -> T a b      -- Fine! Vanilla H-98
+     T2 :: b -> c -> T a b      -- Fine! Existential c, but we can still map over 'b'
+     T3 :: b -> T Int b         -- Fine! Constraint 'a', but 'b' is still polymorphic
+     T4 :: Ord b => b -> T a b  -- No!  'b' is constrained
+     T5 :: b -> T b b           -- No!  'b' is constrained
+     T6 :: T a (b,b)            -- No!  'b' is constrained
+
+Notice that only the first of these constructors is vanilla H-98. We only
+need to take care about the last argument (b in this case).  See Trac #8678.
+Eg. for T1-T3 we can write
+
+     fmap f (T1 a b) = T1 a (f b)
+     fmap f (T2 b c) = T2 (f b) c
+     fmap f (T3 x)   = T3 (f x)
+
 
 Note [Superclasses of derived instance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -4,7 +4,8 @@ GenCannotDoRep0_0.hs:6:14: Warning:
 
 GenCannotDoRep0_0.hs:13:45:
     Can't make a derived instance of ‘Generic Dynamic’:
-      Dynamic must be a vanilla data constructor
+      Constructor ‘Dynamic’ has existentials or constraints in its type
+      Possible fix: use a standalone deriving declaration instead
     In the data declaration for ‘Dynamic’
 
 GenCannotDoRep0_0.hs:17:1:

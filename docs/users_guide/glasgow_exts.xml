@@ -3803,6 +3803,13 @@ data type declaration for <literal>T</literal>,
 because <literal>T</literal> is a GADT, but you <emphasis>can</emphasis> generate
 the instance declaration using stand-alone deriving.
 </para>
+<para>
+The down-side is that,
+if the boilerplate code fails to typecheck, you will get an error message about that
+code, which you did not write.  Whereas, with a <literal>deriving</literal> clause
+the side-conditions are necessarily more conservative, but any error message
+may be more comprehensible.
+</para>
 </listitem>
 
 <listitem>
