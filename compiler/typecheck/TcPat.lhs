@@ -13,7 +13,8 @@ TcPat: Typechecking patterns
 --     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-module TcPat ( tcLetPat, TcSigFun, TcSigInfo(..), TcPragFun 
+module TcPat ( tcLetPat, TcSigFun, TcPragFun
+             , TcSigInfo(..), findScopedTyVars
              , LetBndrSpec(..), addInlinePrags, warnPrags
              , tcPat, tcPats, newNoSigLetBndr
 	     , addDataConStupidTheta, badFieldCon, polyPatSig ) where
@@ -29,6 +30,7 @@ import Inst
 import Id
 import Var
 import Name
+import NameSet
 import TcEnv
 --import TcExpr
 import TcMType
@@ -146,8 +148,7 @@ data TcSigInfo
         sig_tvs    :: [(Maybe Name, TcTyVar)],    
                            -- Instantiated type and kind variables
                            -- Just n <=> this skolem is lexically in scope with name n
-                           -- See Note [Kind vars in sig_tvs]
-                     	   -- See Note [More instantiated than scoped] in TcBinds
+                           -- See Note [Binding scoped type variables]
 
         sig_theta  :: TcThetaType,  -- Instantiated theta
 
@@ -157,21 +158,56 @@ data TcSigInfo
         sig_loc    :: SrcSpan       -- The location of the signature
     }
 
+findScopedTyVars  -- See Note [Binding scoped type variables]
+  :: LHsType Name             -- The HsType
+  -> TcType                   -- The corresponding Type:
+                              --   uses same Names as the HsType
+  -> [TcTyVar]                -- The instantiated forall variables of the Type
+  -> [(Maybe Name, TcTyVar)]  -- In 1-1 correspondence with the instantiated vars
+findScopedTyVars hs_ty sig_ty inst_tvs
+  = zipWith find sig_tvs inst_tvs
+  where
+    find sig_tv inst_tv
+      | tv_name `elemNameSet` scoped_names = (Just tv_name, inst_tv)
+      | otherwise                          = (Nothing,      inst_tv)
+      where
+        tv_name = tyVarName sig_tv
+
+    scoped_names = mkNameSet (hsExplicitTvs hs_ty)
+    (sig_tvs,_)  = tcSplitForAllTys sig_ty
+
 instance Outputable TcSigInfo where
     ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau})
         = ppr id <+> dcolon <+> vcat [ pprSigmaType (mkSigmaTy (map snd tyvars) theta tau)
                                      , ppr (map fst tyvars) ]
 \end{code}
 
-Note [Kind vars in sig_tvs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-With kind polymorphism a signature like
-  f :: forall f a. f a -> f a
-may actuallly give rise to 
-  f :: forall k. forall (f::k -> *) (a:k). f a -> f a
-So the sig_tvs will be [k,f,a], but only f,a are scoped.
-So the scoped ones are not necessarily the *inital* ones!
+Note [Binding scoped type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The type variables *brought into lexical scope* by a type signature may
+be a subset of the *quantified type variables* of the signatures, for two reasons:
 
+* With kind polymorphism a signature like
+    f :: forall f a. f a -> f a
+  may actuallly give rise to
+    f :: forall k. forall (f::k -> *) (a:k). f a -> f a
+  So the sig_tvs will be [k,f,a], but only f,a are scoped.
+  NB: the scoped ones are not necessarily the *inital* ones!
+
+* Even aside from kind polymorphism, tere may be more instantiated
+  type variables than lexically-scoped ones.  For example:
+        type T a = forall b. b -> (a,b)
+        f :: forall c. T c
+  Here, the signature for f will have one scoped type variable, c,
+  but two instantiated type variables, c' and b'.
+
+The function findScopedTyVars takes
+  * hs_ty:    the original HsForAllTy
+  * sig_ty:   the corresponding Type (which is guaranteed to use the same Names
+              as the HsForAllTy)
+  * inst_tvs: the skolems instantiated from the forall's in sig_ty
+It returns a [(Maybe Name, TcTyVar)], in 1-1 correspondence with inst_tvs
+but with a (Just n) for the lexically scoped name of each in-scope tyvar.
 
 Note [sig_tau may be polymorphic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

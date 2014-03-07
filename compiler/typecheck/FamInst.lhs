@@ -60,7 +60,7 @@ newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcRnIf gbl lcl FamInst
 -- Called from the vectoriser monad too, hence the rather general type
 newFamInst flavor axiom@(CoAxiom { co_ax_branches = FirstBranch branch
                                  , co_ax_tc = fam_tc })
-  = do { (subst, tvs') <- tcInstSkolTyVarsLoc loc tvs
+  = do { (subst, tvs') <- tcInstSigTyVarsLoc loc tvs
        ; return (FamInst { fi_fam      = fam_tc_name
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs

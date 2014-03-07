@@ -250,29 +250,19 @@ Note [Signature skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this
 
-  x :: [a]
-  y :: b
-  (x,y,z) = ([y,z], z, head x)
+  f :: forall a. [a] -> Int
+  f (x::b : xs) = 3
 
-Here, x and y have type sigs, which go into the environment.  We used to
-instantiate their types with skolem constants, and push those types into
-the RHS, so we'd typecheck the RHS with type
-        ( [a*], b*, c )
-where a*, b* are skolem constants, and c is an ordinary meta type varible.
+Here 'b' is a lexically scoped type variable, but it turns out to be
+the same as the skolem 'a'.  So we have a special kind of skolem
+constant, SigTv, which can unify with other SigTvs. They are used
+*only* for pattern type signatures.
 
-The trouble is that the occurrences of z in the RHS force a* and b* to
-be the *same*, so we can't make them into skolem constants that don't unify
-with each other.  Alas.
-
-One solution would be insist that in the above defn the programmer uses
-the same type variable in both type signatures.  But that takes explanation.
-
-The alternative (currently implemented) is to have a special kind of skolem
-constant, SigTv, which can unify with other SigTvs.  These are *not* treated
-as rigid for the purposes of GADTs.  And they are used *only* for pattern
-bindings and mutually recursive function bindings.  See the function
-TcBinds.tcInstSig, and its use_skols parameter.
-
+Similarly consider
+  data T (a:k1) = MkT (S a)
+  data S (b:k2) = MkS (T b)
+When doing kind inference on {S,T} we don't want *skolems* for k1,k2,
+because they end up unifying; we want those SigTvs again.
 
 \begin{code}
 -- A TyVarDetails is inside a TyVar

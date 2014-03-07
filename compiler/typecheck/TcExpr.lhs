@@ -221,11 +221,14 @@ tcExpr e@(HsLamCase _ matches) res_ty
 tcExpr (ExprWithTySig expr sig_ty) res_ty
  = do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
 
-      -- Remember to extend the lexical type-variable environment
       ; (gen_fn, expr')
             <- tcGen ExprSigCtxt sig_tc_ty $ \ skol_tvs res_ty ->
-               tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` skol_tvs) $
-                                -- See Note [More instantiated than scoped] in TcBinds
+
+                  -- Remember to extend the lexical type-variable environment
+                  -- See Note [More instantiated than scoped] in TcBinds
+               tcExtendTyVarEnv2 
+                  [(n,tv) | (Just n, tv) <- findScopedTyVars sig_ty sig_tc_ty skol_tvs] $
+
                tcMonoExprNC expr res_ty
 
       ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty

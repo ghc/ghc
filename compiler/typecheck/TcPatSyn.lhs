@@ -199,7 +199,7 @@ tc_pat_syn_wrapper_from_expr :: Located Name
                              -> TcM (Id, LHsBinds Id)
 tc_pat_syn_wrapper_from_expr (L loc name) lexpr args univ_tvs ex_tvs theta pat_ty
   = do { let qtvs = univ_tvs ++ ex_tvs
-       ; (subst, qtvs') <- tcInstSigTyVars qtvs
+       ; (subst, qtvs') <- tcInstSkolTyVars qtvs
        ; let theta' = substTheta subst theta
              pat_ty' = substTy subst pat_ty
              args' = map (\arg -> setVarType arg $ substTy subst (varType arg)) args
