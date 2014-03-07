@@ -200,7 +200,7 @@ test('T8209', [ only_ways(threaded_ways), ignore_output ],
 test('T8242', [ only_ways(threaded_ways), ignore_output ],
               compile_and_run, [''])
 
-test('T8124', [ omit_ways(prof_ways + ['ghci']),
+test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
                  extra_clean(['T8124_c.o']),
                  pre_cmd('$MAKE -s --no-print-directory T8124_setup') ],
                  # The T8124_setup hack is to ensure that we generate
