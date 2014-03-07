@@ -19,6 +19,8 @@ my $bare_flag = ""; # NOT the opposite of checked_out_flag (describes local repo
 
 my %tags;
 
+my $GITHUB = qr!(?:git@|git://|https://)github.com!;
+
 sub inDir {
     my $dir = shift;
     my $code = shift;
@@ -262,7 +264,7 @@ sub gitall {
 
     my ($repo_base, $checked_out_tree, $repo_local) = getrepo();
 
-    my $is_github_repo = $repo_base =~ m/(git@|git:\/\/|https:\/\/)github.com/;
+    my $is_github_repo = $repo_base =~ $GITHUB;
 
     @args = ();
 
@@ -584,8 +586,8 @@ sub gitInitSubmodules {
 
     my $submodulespaths = &readgit(".", "config", "--get-regexp", "^submodule[.].*[.]url");
     # if we came from github, change the urls appropriately
-    while ($submodulespaths =~ m!^(submodule.libraries/[a-zA-Z0-9]+.url) git://github.com/ghc/packages/([a-zA-Z0-9]+).git$!gm) {
-        &git(".", "config", $1, "git://github.com/ghc/packages-$2");
+    while ($submodulespaths =~ m!^(submodule.libraries/[a-zA-Z0-9]+.url) ($GITHUB)/ghc/packages/([a-zA-Z0-9]+).git$!gm) {
+        &git(".", "config", $1, "$2/ghc/packages-$3");
     }
 
     # if we came from a local repository, grab our submodules from their
