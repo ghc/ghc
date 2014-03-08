@@ -32,7 +32,6 @@ module Haddock.Options (
 ) where
 
 
-import Data.Maybe
 import Distribution.Verbosity
 import Haddock.Utils
 import Haddock.Types
@@ -219,16 +218,16 @@ optCssFile flags = optLast [ str | Flag_CSS str <- flags ]
 
 sourceUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
 sourceUrls flags =
-  (listToMaybe [str | Flag_SourceBaseURL   str <- flags]
-  ,listToMaybe [str | Flag_SourceModuleURL str <- flags]
-  ,listToMaybe [str | Flag_SourceEntityURL str <- flags])
+  (optLast [str | Flag_SourceBaseURL   str <- flags]
+  ,optLast [str | Flag_SourceModuleURL str <- flags]
+  ,optLast [str | Flag_SourceEntityURL str <- flags])
 
 
 wikiUrls :: [Flag] -> (Maybe String, Maybe String, Maybe String)
 wikiUrls flags =
-  (listToMaybe [str | Flag_WikiBaseURL   str <- flags]
-  ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
-  ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
+  (optLast [str | Flag_WikiBaseURL   str <- flags]
+  ,optLast [str | Flag_WikiModuleURL str <- flags]
+  ,optLast [str | Flag_WikiEntityURL str <- flags])
 
 
 optDumpInterfaceFile :: [Flag] -> Maybe FilePath
