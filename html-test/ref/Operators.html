@@ -1,0 +1,379 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><title
+    >Operators</title
+    ><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean"
+     /><script src="haddock-util.js" type="text/javascript"
+    ></script
+    ><script type="text/javascript"
+    >//<![CDATA[
+window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
+//]]>
+</script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><ul class="links" id="page-menu"
+      ><li
+	><a href="index.html"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="doc-index.html"
+	  >Index</a
+	  ></li
+	></ul
+      ><p class="caption empty"
+      >&nbsp;</p
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>Operators</p
+	></div
+      ><div id="description"
+      ><p class="caption"
+	>Description</p
+	><div class="doc"
+	><p
+	  >Test operators with or without fixity declarations</p
+	  ></div
+	></div
+      ><div id="synopsis"
+      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
+	>Synopsis</p
+	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
+	><li class="src short"
+	  ><a href="#v:-43--45-"
+	    >(+-)</a
+	    > ::  a -&gt; a -&gt; a</li
+	  ><li class="src short"
+	  ><a href="#v:-42--47-"
+	    >(*/)</a
+	    > ::  a -&gt; a -&gt; a</li
+	  ><li class="src short"
+	  ><a href="#v:foo"
+	    >foo</a
+	    > ::  a -&gt; a -&gt; a</li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >data</span
+	    > <a href="#t:Foo"
+	    >Foo</a
+	    ><ul class="subs"
+	    ><li
+	      >= <a href="Operators.html#t:Foo"
+		>Foo</a
+		> <a href="#v:Bar"
+		>`Bar`</a
+		> <a href="Operators.html#t:Foo"
+		>Foo</a
+		></li
+	      ><li
+	      >| <a href="Operators.html#t:Foo"
+		>Foo</a
+		> <a href="#v::-45-"
+		>:-</a
+		> <a href="Operators.html#t:Foo"
+		>Foo</a
+		></li
+	      ></ul
+	    ></li
+	  ><li class="src short"
+	  >pattern  <a href="#v::-43-"
+	    >(:+)</a
+	    > t t ::  [t]</li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >data</span
+	    > a <a href="#t:-60--45--62-"
+	    >&lt;-&gt;</a
+	    > b <span class="keyword"
+	    >where</span
+	    ><ul class="subs"
+	    ><li
+	      ><a href="#v::-60--45--62-"
+		>(:&lt;-&gt;)</a
+		> ::  a -&gt; b -&gt; a <a href="Operators.html#t:-60--45--62-"
+		>&lt;-&gt;</a
+		> b</li
+	      ></ul
+	    ></li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >type family</span
+	    > a <a href="#t:-43--43-"
+	    >++</a
+	    > b</li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >data family</span
+	    > a <a href="#t:-42--42-"
+	    >**</a
+	    > b</li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >class</span
+	    > a <a href="#t:-62--60--62-"
+	    >&gt;&lt;&gt;</a
+	    > b <span class="keyword"
+	    >where</span
+	    ><ul class="subs"
+	    ><li
+	      ><span class="keyword"
+		>type</span
+		> a <a href="#t:-60--62--60-"
+		>&lt;&gt;&lt;</a
+		> b :: *</li
+	      ><li
+	      ><span class="keyword"
+		>data</span
+		> a <a href="#t:-62--60--60-"
+		>&gt;&lt;&lt;</a
+		> b</li
+	      ><li
+	      ><a href="#v:-62--62--60-"
+		>(&gt;&gt;&lt;)</a
+		> :: a -&gt; b -&gt; ()</li
+	      ></ul
+	    ></li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >type</span
+	    > <a href="#t:-62--45--60-"
+	    >(&gt;-&lt;)</a
+	    > a b = a <a href="Operators.html#t:-60--45--62-"
+	    >&lt;-&gt;</a
+	    > b</li
+	  ></ul
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><a name="v:-43--45-" class="def"
+	    >(+-)</a
+	    > ::  a -&gt; a -&gt; a</p
+	  ><div class="doc"
+	  ><p
+	    >Operator with no fixity</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >infixr 7 */<br
+	     /><a name="v:-42--47-" class="def"
+	    >(*/)</a
+	    > ::  a -&gt; a -&gt; a</p
+	  ><div class="doc"
+	  ><p
+	    >Operator with infixr 7</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >infixl 3 `foo`<br
+	     /><a name="v:foo" class="def"
+	    >foo</a
+	    > ::  a -&gt; a -&gt; a</p
+	  ><div class="doc"
+	  ><p
+	    >Named function with infixl 3</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a name="t:Foo" class="def"
+	    >Foo</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Data type with operator constructors</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		>infixl 3 `Bar`<br
+		   /><a href="Operators.html#t:Foo"
+		  >Foo</a
+		  > <a name="v:Bar" class="def"
+		  >`Bar`</a
+		  > <a href="Operators.html#t:Foo"
+		  >Foo</a
+		  ></td
+		><td class="doc"
+		><p
+		  >Has infixl 3</p
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		>infixr 5 :-<br
+		   /><a href="Operators.html#t:Foo"
+		  >Foo</a
+		  > <a name="v::-45-" class="def"
+		  >:-</a
+		  > <a href="Operators.html#t:Foo"
+		  >Foo</a
+		  ></td
+		><td class="doc"
+		><p
+		  >Has infixr 5</p
+		  ></td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >infixr 3 :+<br
+	     />pattern  <a name="v::-43-" class="def"
+	    >(:+)</a
+	    > t t ::  [t]</p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym, infixr 3</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >infixl 6 &lt;-&gt;<br
+	     /><span class="keyword"
+	    >data</span
+	    > a <a name="t:-60--45--62-" class="def"
+	    >&lt;-&gt;</a
+	    > b <span class="keyword"
+	    >where</span
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Type name, infixl 6 and GADT constructor</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		>infixr 6 :&lt;-&gt;<br
+		   /><a name="v::-60--45--62-" class="def"
+		  >(:&lt;-&gt;)</a
+		  > ::  a -&gt; b -&gt; a <a href="Operators.html#t:-60--45--62-"
+		  >&lt;-&gt;</a
+		  > b</td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >infix 3 ++<br
+	     /><span class="keyword"
+	    >type family</span
+	    > a <a name="t:-43--43-" class="def"
+	    >++</a
+	    > b</p
+	  ><div class="doc"
+	  ><p
+	    >Type family with fixity</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >infix 9 **<br
+	     /><span class="keyword"
+	    >data family</span
+	    > a <a name="t:-42--42-" class="def"
+	    >**</a
+	    > b</p
+	  ><div class="doc"
+	  ><p
+	    >Data family with fixity</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >infixr 1 &gt;&lt;&gt;<br
+	     /><span class="keyword"
+	    >class</span
+	    > a <a name="t:-62--60--62-" class="def"
+	    >&gt;&lt;&gt;</a
+	    > b <span class="keyword"
+	    >where</span
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Class with fixity, including associated types</p
+	    ></div
+	  ><div class="subs associated-types"
+	  ><p class="caption"
+	    >Associated Types</p
+	    ><p class="src"
+	    >infixl 2 &lt;&gt;&lt;<br
+	       /><span class="keyword"
+	      >type</span
+	      > a <a name="t:-60--62--60-" class="def"
+	      >&lt;&gt;&lt;</a
+	      > b :: *</p
+	    ><p class="src"
+	    >infixl 3 &gt;&lt;&lt;<br
+	       /><span class="keyword"
+	      >data</span
+	      > a <a name="t:-62--60--60-" class="def"
+	      >&gt;&lt;&lt;</a
+	      > b</p
+	    ></div
+	  ><div class="subs methods"
+	  ><p class="caption"
+	    >Methods</p
+	    ><p class="src"
+	    >infixr 4 &gt;&gt;&lt;<br
+	       /><a name="v:-62--62--60-" class="def"
+	      >(&gt;&gt;&lt;)</a
+	      > :: a -&gt; b -&gt; ()</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  >infixl 6 &gt;-&lt;<br
+	     /><span class="keyword"
+	    >type</span
+	    > <a name="t:-62--45--60-" class="def"
+	    >(&gt;-&lt;)</a
+	    > a b = a <a href="Operators.html#t:-60--45--62-"
+	    >&lt;-&gt;</a
+	    > b</p
+	  ><div class="doc"
+	  ><p
+	    >Type synonym with fixity</p
+	    ></div
+	  ></div
+	></div
+      ></div
+    ><div id="footer"
+    ><p
+      >Produced by <a href="http://www.haskell.org/haddock/"
+	>Haddock</a
+	> version 2.14.0</p
+      ></div
+    ></body
+  ></html
+>

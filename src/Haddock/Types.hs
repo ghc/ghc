@@ -18,6 +18,7 @@
 module Haddock.Types (
   module Haddock.Types
   , HsDocString, LHsDocString
+  , Fixity(..)
  ) where
 
 import Data.Foldable
@@ -28,6 +29,7 @@ import Control.DeepSeq
 import Data.Typeable
 import Data.Map (Map)
 import qualified Data.Map as Map
+import BasicTypes (Fixity(..))
 import GHC hiding (NoLink)
 import DynFlags (ExtensionFlag, Language)
 import OccName
@@ -47,6 +49,7 @@ type ArgMap a      = Map Name (Map Int (Doc a))
 type SubMap        = Map Name [Name]
 type DeclMap       = Map Name [LHsDecl Name]
 type InstMap       = Map SrcSpan Name
+type FixMap        = Map Name Fixity
 type SrcMap        = Map PackageId FilePath
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 
@@ -195,6 +198,9 @@ data ExportItem name
         -- | Instances relevant to this declaration, possibly with
         -- documentation.
       , expItemInstances :: ![DocInstance name]
+
+        -- | Fixity decls relevant to this declaration (including subordinates).
+      , expItemFixities :: ![(name, Fixity)]
       }
 
   -- | An exported entity for which we have no documentation (perhaps because it

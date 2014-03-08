@@ -177,7 +177,7 @@ string_txt (LStr s1 _) s2 = unpackLitString s1 ++ s2
 
 
 exportListItem :: ExportItem DocName -> LaTeX
-exportListItem (ExportDecl decl _doc subdocs _insts)
+exportListItem (ExportDecl decl _doc subdocs _insts _fixities)
   = sep (punctuate comma . map ppDocBinder $ declNames decl) <>
      case subdocs of
        [] -> empty
@@ -212,7 +212,7 @@ processExports (e : es) =
 
 isSimpleSig :: ExportItem DocName -> Maybe ([DocName], HsType DocName)
 isSimpleSig (ExportDecl (L _ (SigD (TypeSig lnames (L _ t))))
-                        (Documentation Nothing Nothing, argDocs) _ _)
+                        (Documentation Nothing Nothing, argDocs) _ _ _)
   | Map.null argDocs = Just (map unLoc lnames, t)
 isSimpleSig _ = Nothing
 
@@ -225,8 +225,8 @@ isExportModule _ = Nothing
 processExport :: ExportItem DocName -> LaTeX
 processExport (ExportGroup lev _id0 doc)
   = ppDocGroup lev (docToLaTeX doc)
-processExport (ExportDecl decl doc subdocs insts)
-  = ppDecl decl doc insts subdocs
+processExport (ExportDecl decl doc subdocs insts fixities)
+  = ppDecl decl doc insts subdocs fixities
 processExport (ExportNoDecl y [])
   = ppDocName y
 processExport (ExportNoDecl y subs)
@@ -279,9 +279,10 @@ ppDecl :: LHsDecl DocName
        -> DocForDecl DocName
        -> [DocInstance DocName]
        -> [(DocName, DocForDecl DocName)]
+       -> [(DocName, Fixity)]
        -> LaTeX
 
-ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs = case decl of
+ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs _fixities = case decl of
   TyClD d@(FamDecl {})          -> ppTyFam False loc doc d unicode
   TyClD d@(DataDecl {})
                                 -> ppDataDecl instances subdocs loc (Just doc) d unicode

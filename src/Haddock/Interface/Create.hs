@@ -81,6 +81,7 @@ createInterface tm flags modMap instIfaceMap = do
   (!info, mbDoc) <- liftErrMsg $ processModuleHeader dflags gre safety mayDocHeader
 
   let declsWithDocs = topDecls group_
+      fixMap = mkFixMap group_
       (decls, _) = unzip declsWithDocs
       localInsts = filter (nameIsLocalOrFrom mdl) $  map getName instances
                                                   ++ map getName fam_instances
@@ -97,7 +98,7 @@ createInterface tm flags modMap instIfaceMap = do
 
   let allWarnings = M.unions (warningMap : map ifaceWarningMap (M.elems modMap))
 
-  exportItems <- mkExportItems modMap mdl allWarnings gre exportedNames decls maps exports
+  exportItems <- mkExportItems modMap mdl allWarnings gre exportedNames decls maps fixMap exports
                    instIfaceMap dflags
 
   let !visibleNames = mkVisibleNames maps exportItems opts
@@ -369,6 +370,11 @@ classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
 topDecls :: HsGroup Name -> [(LHsDecl Name, [HsDocString])]
 topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 
+-- | Extract a map of fixity declarations only
+mkFixMap :: HsGroup Name -> FixMap
+mkFixMap group_ = M.fromList [ (n,f)
+                             | L _ (FixitySig (L _ n) f) <- hs_fixds group_ ]
+
 
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup Name -> [LHsDecl Name]
@@ -470,15 +476,16 @@ mkExportItems
   -> [Name]             -- exported names (orig)
   -> [LHsDecl Name]
   -> Maps
+  -> FixMap
   -> Maybe [IE Name]
   -> InstIfaceMap
   -> DynFlags
   -> ErrMsgGhc [ExportItem Name]
 mkExportItems
   modMap thisMod warnings gre exportedNames decls
-  (maps@(docMap, argMap, subMap, declMap, instMap)) optExports instIfaceMap dflags =
+  maps@(docMap, argMap, subMap, declMap, instMap) fixMap optExports instIfaceMap dflags =
   case optExports of
-    Nothing -> fullModuleContents dflags warnings gre maps decls
+    Nothing -> fullModuleContents dflags warnings gre maps fixMap decls
     Just exports -> liftM concat $ mapM lookupExport exports
   where
     lookupExport (IEVar x)             = declWith x
@@ -486,7 +493,7 @@ mkExportItems
     lookupExport (IEThingAll t)        = declWith t
     lookupExport (IEThingWith t _)     = declWith t
     lookupExport (IEModuleContents m)  =
-      moduleExports thisMod m dflags warnings gre exportedNames decls modMap instIfaceMap maps
+      moduleExports thisMod m dflags warnings gre exportedNames decls modMap instIfaceMap maps fixMap
     lookupExport (IEGroup lev docStr)  = liftErrMsg $
       ifDoc (processDocString dflags gre docStr)
             (\doc -> return [ ExportGroup lev "" doc ])
@@ -511,7 +518,7 @@ mkExportItems
       case findDecl t of
         ([L _ (ValD _)], (doc, _)) -> do
           -- Top-level binding without type signature
-          export <- hiValExportItem dflags t doc
+          export <- hiValExportItem dflags t doc $ M.lookup t fixMap
           return [export]
         (ds, docs_) | decl : _ <- filter (not . isValD . unLoc) ds ->
           let declNames = getMainDeclBinder (unL decl)
@@ -568,12 +575,13 @@ mkExportItems
 
 
     mkExportDecl :: Name -> LHsDecl Name -> (DocForDecl Name, [(Name, DocForDecl Name)]) -> ExportItem Name
-    mkExportDecl n decl (doc, subs) = decl'
+    mkExportDecl name decl (doc, subs) = decl'
       where
-        decl' = ExportDecl (restrictTo sub_names (extractDecl n mdl decl)) doc subs' []
-        mdl = nameModule n
+        decl' = ExportDecl (restrictTo sub_names (extractDecl name mdl decl)) doc subs' [] fixities
+        mdl = nameModule name
         subs' = filter (isExported . fst) subs
         sub_names = map fst subs'
+        fixities = [ (n, f) | n <- name:sub_names, Just f <- [M.lookup n fixMap] ]
 
 
     isExported = (`elem` exportedNames)
@@ -600,12 +608,16 @@ hiDecl dflags t = do
     Just x -> return (Just (tyThingToLHsDecl x))
 
 
-hiValExportItem :: DynFlags -> Name -> DocForDecl Name -> ErrMsgGhc (ExportItem Name)
-hiValExportItem dflags name doc = do
+hiValExportItem :: DynFlags -> Name -> DocForDecl Name -> Maybe Fixity -> ErrMsgGhc (ExportItem Name)
+hiValExportItem dflags name doc fixity = do
   mayDecl <- hiDecl dflags name
   case mayDecl of
     Nothing -> return (ExportNoDecl name [])
-    Just decl -> return (ExportDecl decl doc [] [])
+    Just decl -> return (ExportDecl decl doc [] [] fixities)
+  where
+    fixities = case fixity of
+      Just f  -> [(name, f)]
+      Nothing -> []
 
 
 -- | Lookup docs for a declaration from maps.
@@ -643,9 +655,10 @@ moduleExports :: Module           -- ^ Module A
               -> IfaceMap         -- ^ Already created interfaces
               -> InstIfaceMap     -- ^ Interfaces in other packages
               -> Maps
+              -> FixMap
               -> ErrMsgGhc [ExportItem Name] -- ^ Resulting export items
-moduleExports thisMod expMod dflags warnings gre _exports decls ifaceMap instIfaceMap maps
-  | m == thisMod = fullModuleContents dflags warnings gre maps decls
+moduleExports thisMod expMod dflags warnings gre _exports decls ifaceMap instIfaceMap maps fixMap
+  | m == thisMod = fullModuleContents dflags warnings gre maps fixMap decls
   | otherwise =
     case M.lookup m ifaceMap of
       Just iface
@@ -683,8 +696,9 @@ moduleExports thisMod expMod dflags warnings gre _exports decls ifaceMap instIfa
 -- (For more information, see Trac #69)
 
 
-fullModuleContents :: DynFlags -> WarningMap -> GlobalRdrEnv -> Maps -> [LHsDecl Name] -> ErrMsgGhc [ExportItem Name]
-fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap) decls =
+fullModuleContents :: DynFlags -> WarningMap -> GlobalRdrEnv -> Maps -> FixMap
+                   -> [LHsDecl Name] -> ErrMsgGhc [ExportItem Name]
+fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap) fixMap decls =
   liftM catMaybes $ mapM mkExportItem (expandSig decls)
   where
     -- A type signature can have multiple names, like:
@@ -711,17 +725,20 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
       | name:_ <- collectHsBindBinders d, Just [L _ (ValD _)] <- M.lookup name declMap =
           -- Top-level binding without type signature.
           let (doc, _) = lookupDocs name warnings docMap argMap subMap in
-          fmap Just (hiValExportItem dflags name doc)
+          fmap Just (hiValExportItem dflags name doc $ M.lookup name fixMap)
       | otherwise = return Nothing
     mkExportItem decl@(L _ (InstD d))
       | Just name <- M.lookup (getInstLoc d) instMap =
         let (doc, subs) = lookupDocs name warnings docMap argMap subMap in
-        return $ Just (ExportDecl decl doc subs [])
+        return $ Just (ExportDecl decl doc subs [] (fixities name subs))
     mkExportItem decl
       | name:_ <- getMainDeclBinder (unLoc decl) =
         let (doc, subs) = lookupDocs name warnings docMap argMap subMap in
-        return $ Just (ExportDecl decl doc subs [])
+        return $ Just (ExportDecl decl doc subs [] (fixities name subs))
       | otherwise = return Nothing
+
+    fixities name subs = [ (n,f) | n <- name : map fst subs
+                                 , Just f <- [M.lookup n fixMap] ]
 
 
 -- | Sometimes the declaration we want to export is not the "main" declaration:

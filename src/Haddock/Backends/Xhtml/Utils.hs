@@ -17,13 +17,13 @@ module Haddock.Backends.Xhtml.Utils (
   spliceURL,
   groupId,
 
-  (<+>), char,
+  (<+>), (<=>), char,
   keyword, punctuate,
 
   braces, brackets, pabrackets, parens, parenList, ubxParenList,
   arrow, comma, dcolon, dot, darrow, equals, forallSymbol, quote,
 
-  hsep,
+  hsep, vcat,
 
   collapseSection, collapseToggle, collapseControl,
 ) where
@@ -100,12 +100,25 @@ hsep :: [Html] -> Html
 hsep [] = noHtml
 hsep htmls = foldr1 (\a b -> a+++" "+++b) htmls
 
+-- | Concatenate a series of 'Html' values vertically, with linebreaks in between.
+vcat :: [Html] -> Html
+vcat [] = noHtml
+vcat htmls = foldr1 (\a b -> a+++br+++b) htmls
+
 
 infixr 8 <+>
 (<+>) :: Html -> Html -> Html
 a <+> b = a +++ sep +++ b
   where
     sep = if isNoHtml a || isNoHtml b then noHtml else toHtml " "
+
+-- | Join two 'Html' values together with a linebreak in between.
+--   Has 'noHtml' as left identity.
+infixr 8 <=>
+(<=>) :: Html -> Html -> Html
+a <=> b = a +++ sep +++ b
+  where
+    sep = if isNoHtml a then noHtml else br
 
 
 keyword :: String -> Html
