@@ -144,7 +144,19 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	      ><li
 	      ><a href="#v:-62--62--60-"
 		>(&gt;&gt;&lt;)</a
+		>, <a href="#v:-60--60--62-"
+		>(&lt;&lt;&gt;)</a
 		> :: a -&gt; b -&gt; ()</li
+	      ><li
+	      ><a href="#v:-42--42--62-"
+		>(**&gt;)</a
+		>, <a href="#v:-60--42--42-"
+		>(&lt;**)</a
+		>, <a href="#v:-62--42--42-"
+		>(&gt;**)</a
+		>, <a href="#v:-42--42--60-"
+		>(**&lt;)</a
+		> :: a -&gt; a -&gt; ()</li
 	      ></ul
 	    ></li
 	  ><li class="src short"
@@ -345,10 +357,29 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	  ><p class="caption"
 	    >Methods</p
 	    ><p class="src"
-	    >infixr 4 &gt;&gt;&lt;<br
+	    >infixl 5 &lt;&lt;&gt;<br
+	       />infixr 4 &gt;&gt;&lt;<br
 	       /><a name="v:-62--62--60-" class="def"
 	      >(&gt;&gt;&lt;)</a
+	      >, <a name="v:-60--60--62-" class="def"
+	      >(&lt;&lt;&gt;)</a
 	      > :: a -&gt; b -&gt; ()</p
+	    ><p class="src"
+	    >infixr 8 **&gt;, &gt;**<br
+	       />infixl 8 &lt;**, **&lt;<br
+	       /><a name="v:-42--42--62-" class="def"
+	      >(**&gt;)</a
+	      >, <a name="v:-60--42--42-" class="def"
+	      >(&lt;**)</a
+	      >, <a name="v:-62--42--42-" class="def"
+	      >(&gt;**)</a
+	      >, <a name="v:-42--42--60-" class="def"
+	      >(**&lt;)</a
+	      > :: a -&gt; a -&gt; ()</p
+	    ><div class="doc"
+	    ><p
+	      >Multiple fixities</p
+	      ></div
 	    ></div
 	  ></div
 	><div class="top"

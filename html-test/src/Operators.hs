@@ -45,11 +45,19 @@ infix 9 **
 class a ><> b where
   type a <>< b :: *
   data a ><< b
-  (>><) :: a -> b -> ()
+  (>><), (<<>) :: a -> b -> ()
+
+  -- | Multiple fixities
+  (**>), (**<), (>**), (<**) :: a -> a -> ()
+
 infixr 1 ><>
 infixl 2 <><
 infixl 3 ><<
 infixr 4 >><
+infixl 5 <<>
+
+infixr 8 **>, >**
+infixl 8 **<, <**
 
 -- | Type synonym with fixity
 type (a >-< b) = a <-> b

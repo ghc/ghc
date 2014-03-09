@@ -1,3 +1,4 @@
+{-# LANGUAGE TransformListComp #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Backends.Html.Decl
@@ -34,6 +35,7 @@ import           Data.Monoid           ( mempty )
 import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC
+import GHC.Exts
 import Name
 
 
@@ -158,14 +160,19 @@ ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep)
       = [(leader <+> ppType unicode qual t, argDoc n, [])]
 
 ppFixities :: [(DocName, Fixity)] -> Qualification -> Html
-ppFixities fs qual = vcat $ map ppFix fs
+ppFixities fs qual = vcat $ map ppFix uniq_fs
   where
-    ppFix (n, Fixity p d) = toHtml (ppDir d) <+> toHtml (show p)
-                            <+> ppDocName qual Infix False n
+    ppFix (ns, p, d) = toHtml d <+> toHtml (show p) <+> ppNames ns
 
     ppDir InfixR = "infixr"
     ppDir InfixL = "infixl"
     ppDir InfixN = "infix"
+
+    ppNames = concatHtml . intersperse (stringToHtml ", ") . map (ppDocName qual Infix False)
+
+    uniq_fs = [ (n, the p, the d') | (n, Fixity p d) <- fs
+                                   , let d' = ppDir d
+                                   , then group by Down (p,d') using groupWith ]
 
 
 ppTyVars :: LHsTyVarBndrs DocName -> [Html]
