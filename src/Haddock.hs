@@ -242,9 +242,11 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     pkgStr           = Just (packageIdString pkgId)
     (pkgName,pkgVer) = modulePackageInfo pkgMod
 
-    (srcBase, srcModule, srcEntity) = sourceUrls flags
+    (srcBase, srcModule, srcEntity, srcLEntity) = sourceUrls flags
     srcMap' = maybe srcMap (\path -> Map.insert pkgId path srcMap) srcEntity
-    sourceUrls' = (srcBase, srcModule, srcMap')
+    -- TODO: Get these from the interface files as with srcMap
+    srcLMap' = maybe Map.empty (\path -> Map.singleton pkgId path) srcLEntity
+    sourceUrls' = (srcBase, srcModule, srcMap', srcLMap')
 
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue dflags flags

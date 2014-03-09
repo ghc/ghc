@@ -177,7 +177,7 @@ string_txt (LStr s1 _) s2 = unpackLitString s1 ++ s2
 
 
 exportListItem :: ExportItem DocName -> LaTeX
-exportListItem (ExportDecl decl _doc subdocs _insts _fixities)
+exportListItem (ExportDecl decl _doc subdocs _insts _fixities _splice)
   = sep (punctuate comma . map ppDocBinder $ declNames decl) <>
      case subdocs of
        [] -> empty
@@ -212,7 +212,7 @@ processExports (e : es) =
 
 isSimpleSig :: ExportItem DocName -> Maybe ([DocName], HsType DocName)
 isSimpleSig (ExportDecl (L _ (SigD (TypeSig lnames (L _ t))))
-                        (Documentation Nothing Nothing, argDocs) _ _ _)
+                        (Documentation Nothing Nothing, argDocs) _ _ _ _)
   | Map.null argDocs = Just (map unLoc lnames, t)
 isSimpleSig _ = Nothing
 
@@ -225,7 +225,7 @@ isExportModule _ = Nothing
 processExport :: ExportItem DocName -> LaTeX
 processExport (ExportGroup lev _id0 doc)
   = ppDocGroup lev (docToLaTeX doc)
-processExport (ExportDecl decl doc subdocs insts fixities)
+processExport (ExportDecl decl doc subdocs insts fixities _splice)
   = ppDecl decl doc insts subdocs fixities
 processExport (ExportNoDecl y [])
   = ppDocName y

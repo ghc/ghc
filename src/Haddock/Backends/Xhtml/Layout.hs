@@ -190,11 +190,15 @@ declElem = paragraph ! [theclass "src"]
 
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box
-topDeclElem :: LinksInfo -> SrcSpan -> [DocName] -> Html -> Html
-topDeclElem ((_,_,sourceMap), (_,_,maybe_wiki_url)) loc names html =
+topDeclElem :: LinksInfo -> SrcSpan -> Bool -> [DocName] -> Html -> Html
+topDeclElem ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice names html =
     declElem << (srcLink <+> wikiLink <+> html)
-  where srcLink =
-          case Map.lookup origPkg sourceMap of
+  where srcLink = let nameUrl = Map.lookup origPkg sourceMap
+                      lineUrl = Map.lookup origPkg lineMap
+                      mUrl | splice    = lineUrl
+                                         -- Use the lineUrl as a backup
+                           | otherwise = maybe lineUrl Just nameUrl in
+          case mUrl of
             Nothing  -> noHtml
             Just url -> let url' = spliceURL (Just fname) (Just origMod)
                                                (Just n) (Just loc) url

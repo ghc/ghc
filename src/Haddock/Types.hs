@@ -201,6 +201,10 @@ data ExportItem name
 
         -- | Fixity decls relevant to this declaration (including subordinates).
       , expItemFixities :: ![(name, Fixity)]
+
+        -- | Whether the ExportItem is from a TH splice or not, for generating
+        -- the appropriate type of Source link.
+      , expItemSpliced :: !Bool
       }
 
   -- | An exported entity for which we have no documentation (perhaps because it
