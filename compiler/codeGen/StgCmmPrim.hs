@@ -90,10 +90,11 @@ cgOpApp (StgPrimOp primop) args res_ty = do
     dflags <- getDynFlags
     cmm_args <- getNonVoidArgAmodes args
     case shouldInlinePrimOp dflags primop cmm_args of
-        Nothing -> do let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
-                      emitCall (NativeNodeCall, NativeReturn) fun cmm_args
+        Nothing -> do  -- out-of-line
+          let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
+          emitCall (NativeNodeCall, NativeReturn) fun cmm_args
 
-        Just f
+        Just f  -- inline
           | ReturnsPrim VoidRep <- result_info
           -> do f []
                 emitReturn []
@@ -1533,36 +1534,24 @@ doNewArrayOp :: CmmFormal -> Integer -> CmmExpr -> FCode ()
 doNewArrayOp res_r n init = do
     dflags <- getDynFlags
 
-    let card_bytes = cardRoundUp dflags (fromInteger n)
-        size = fromInteger n + bytesToWordsRoundUp dflags card_bytes
-        words = arrPtrsHdrSizeWords dflags + size
+    let info_ptr = mkLblExpr mkMAP_DIRTY_infoLabel
 
-    -- If the allocation is of small, statically-known size, we reuse
-    -- the existing heap check to allocate inline.
-    virt_hp <- getVirtHp
-
-    -- FIND THE OFFSET OF THE INFO-PTR WORD
-    let   info_offset = virt_hp + 1
-          -- info_offset is the VirtualHpOffset of the first
-          -- word of the new object
-          -- Remember, virtHp points to last allocated word,
-          -- ie 1 *before* the info-ptr word of new object.
-    base <- getHpRelOffset info_offset
-    setVirtHp (virt_hp + fromIntegral words)  -- check n < big
-    arr <- CmmLocal `fmap` newTemp (bWord dflags)
-    emit $ mkAssign arr base
+    -- ToDo: this probably isn't right (card size?)
     tickyAllocPrim (mkIntExpr dflags (arrPtrsHdrSize dflags))
-        (cmmMulWord dflags (mkIntExpr dflags (fromInteger n)) (wordSize dflags))
+        (mkIntExpr dflags (fromInteger n * wORD_SIZE dflags))
         (zeroExpr dflags)
 
-    emitSetDynHdr base (mkLblExpr mkMAP_DIRTY_infoLabel) curCCS
-    emit $ mkStore (cmmOffsetB dflags base
-                    (fixedHdrSize dflags * wORD_SIZE dflags +
-                     oFFSET_StgMutArrPtrs_ptrs dflags))
-                   (mkIntExpr dflags (fromInteger n))
-    emit $ mkStore (cmmOffsetB dflags base
-                    (fixedHdrSize dflags * wORD_SIZE dflags +
-                     oFFSET_StgMutArrPtrs_size dflags)) (mkIntExpr dflags size)
+    let rep = arrPtrsRep dflags (fromIntegral n)
+        hdr_size = fixedHdrSize dflags * wORD_SIZE dflags
+    base <- allocHeapClosure rep info_ptr curCCS
+                     [ (mkIntExpr dflags (fromInteger n),
+                        hdr_size + oFFSET_StgMutArrPtrs_ptrs dflags)
+                     , (mkIntExpr dflags (nonHdrSizeW rep),
+                        hdr_size + oFFSET_StgMutArrPtrs_size dflags)
+                     ]
+
+    arr <- CmmLocal `fmap` newTemp (bWord dflags)
+    emit $ mkAssign arr base
 
     -- Initialise all elements of the the array
     p <- assignTemp $ cmmOffsetB dflags (CmmReg arr) (arrPtrsHdrSize dflags)
@@ -1577,25 +1566,11 @@ doNewArrayOp res_r n init = do
          (cmmOffsetW dflags (CmmReg arr) (fromInteger n)))
         (catAGraphs loopBody)
 
-    -- Initialise the mark bits with 0. This will be unrolled in the
-    -- backend to e.g. a single assignment since the arguments are
-    -- statically known.
-    emitMemsetCall
-        (cmmOffsetExprW dflags (CmmReg (CmmLocal p))
-         (mkIntExpr dflags (fromInteger n)))
-        (mkIntExpr dflags 0)
-        (mkIntExpr dflags card_bytes)
-        (mkIntExpr dflags (wORD_SIZE dflags))
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 
 -- | The inline allocation limit is 128 bytes, expressed in words.
 maxInlineAllocThreshold :: DynFlags -> Integer
 maxInlineAllocThreshold dflags = toInteger (128 `quot` wORD_SIZE dflags)
-
-arrPtrsHdrSizeWords :: DynFlags -> WordOff
-arrPtrsHdrSizeWords dflags =
-    fixedHdrSize dflags +
-    (sIZEOF_StgMutArrPtrs_NoHdr dflags `div` wORD_SIZE dflags)
 
 -- ----------------------------------------------------------------------------
 -- Copying pointer arrays
@@ -1723,18 +1698,6 @@ emitCloneArray info_p res_r src0 src_off0 n0 = do
         card_bytes
         (mkIntExpr dflags (wORD_SIZE dflags))
     emit $ mkAssign (CmmLocal res_r) arr
-
-card :: DynFlags -> Int -> Int
-card dflags i = i `shiftR` mUT_ARR_PTRS_CARD_BITS dflags
-
--- Convert a number of elements to a number of cards, rounding up
-cardRoundUp :: DynFlags -> Int -> Int
-cardRoundUp dflags i =
-    card dflags (i + ((1 `shiftL` mUT_ARR_PTRS_CARD_BITS dflags) - 1))
-
-bytesToWordsRoundUp :: DynFlags -> Int -> Int
-bytesToWordsRoundUp dflags e =
-    (e + wORD_SIZE dflags - 1) `quot` (wORD_SIZE dflags)
 
 -- | Takes and offset in the destination array, the base address of
 -- the card table, and the number of elements affected (*not* the

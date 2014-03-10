@@ -149,7 +149,7 @@ profDynAlloc :: SMRep -> CmmExpr -> FCode ()
 profDynAlloc rep ccs
   = ifProfiling $
     do dflags <- getDynFlags
-       profAlloc (mkIntExpr dflags (heapClosureSize dflags rep)) ccs
+       profAlloc (mkIntExpr dflags (heapClosureSizeW dflags rep)) ccs
 
 -- | Record the allocation of a closure (size is given by a CmmExpr)
 -- The size must be in words, because the allocation counter in a CCS counts

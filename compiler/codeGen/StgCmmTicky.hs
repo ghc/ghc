@@ -415,7 +415,7 @@ tickyDynAlloc :: Maybe Id -> SMRep -> LambdaFormInfo -> FCode ()
 --
 -- TODO what else to count while we're here?
 tickyDynAlloc mb_id rep lf = ifTicky $ getDynFlags >>= \dflags ->
-  let bytes = wORD_SIZE dflags * heapClosureSize dflags rep
+  let bytes = wORD_SIZE dflags * heapClosureSizeW dflags rep
 
       countGlobal tot ctr = do
         bumpTickyCounterBy tot bytes
