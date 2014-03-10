@@ -262,7 +262,7 @@ BUILD_DOCBOOK_PDF  = NO
 
 endif
 
-# ---------------- Perf build using LLVM --------------------------------------
+# ---------------- Bench build using LLVM --------------------------------------
 
 ifeq "$(BuildFlavour)" "bench-llvm"
 
@@ -278,7 +278,7 @@ BUILD_DOCBOOK_PDF  = NO
 
 endif
 
-# ------- A Perf build configured for cross-compilation ----------------------
+# ------- A Bench build configured for cross-compilation ----------------------
 
 ifeq "$(BuildFlavour)" "bench-cross"
 
