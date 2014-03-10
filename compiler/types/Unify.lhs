@@ -22,7 +22,7 @@ module Unify (
 	typesCantMatch,
 
         -- Side-effect free unification
-        tcUnifyTys, BindFlag(..),
+        tcUnifyTy, tcUnifyTys, BindFlag(..),
         niFixTvSubst, niSubstTvSet,
 
         UnifyResultM(..), UnifyResult, tcUnifyTysFG
@@ -417,17 +417,24 @@ may later be instantiated with a unifyable type. So, we return maybeApart
 in these cases.
 
 \begin{code}
+tcUnifyTy :: Type -> Type       -- All tyvars are bindable
+	  -> Maybe TvSubst	-- A regular one-shot (idempotent) substitution
+-- Simple unification of two types; all type variables are bindable
+tcUnifyTy ty1 ty2
+  = case initUM (const BindMe) (unify emptyTvSubstEnv ty1 ty2) of
+      Unifiable subst_env -> Just (niFixTvSubst subst_env)
+      _other              -> Nothing
+
+-----------------
 tcUnifyTys :: (TyVar -> BindFlag)
 	   -> [Type] -> [Type]
 	   -> Maybe TvSubst	-- A regular one-shot (idempotent) substitution
 -- The two types may have common type variables, and indeed do so in the
 -- second call to tcUnifyTys in FunDeps.checkClsFD
---
 tcUnifyTys bind_fn tys1 tys2
-  | Unifiable subst <- tcUnifyTysFG bind_fn tys1 tys2
-  = Just subst
-  | otherwise
-  = Nothing
+  = case tcUnifyTysFG bind_fn tys1 tys2 of
+      Unifiable subst -> Just subst
+      _               -> Nothing
 
 -- This type does double-duty. It is used in the UM (unifier monad) and to
 -- return the final result. See Note [Fine-grained unification]
@@ -670,9 +677,9 @@ instance Monad UM where
                                other        -> other
                            SurelyApart -> SurelyApart)
 
-initUM :: (TyVar -> BindFlag) -> UM TvSubst -> UnifyResult
+initUM :: (TyVar -> BindFlag) -> UM a -> UnifyResultM a
 initUM badtvs um = unUM um badtvs
-    
+
 tvBindFlag :: TyVar -> UM BindFlag
 tvBindFlag tv = UM (\tv_fn -> Unifiable (tv_fn tv))
 
