@@ -141,6 +141,7 @@ createInterface tm flags modMap instIfaceMap = do
   , ifaceVisibleExports  = visibleNames
   , ifaceDeclMap         = declMap
   , ifaceSubMap          = subMap
+  , ifaceFixMap          = fixMap
   , ifaceModuleAliases   = aliases
   , ifaceInstances       = instances
   , ifaceFamInstances    = fam_instances

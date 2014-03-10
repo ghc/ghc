@@ -16,10 +16,12 @@ module Haddock.Interface.AttachInstances (attachInstances) where
 
 import Haddock.Types
 import Haddock.Convert
+import Haddock.GhcUtils
 
 import Control.Arrow
 import Data.List
 import Data.Ord (comparing)
+import Data.Function (on)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -45,6 +47,7 @@ type ExportedNames = Set.Set Name
 type Modules = Set.Set Module
 type ExportInfo = (ExportedNames, Modules)
 
+-- Also attaches fixities
 attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> Ghc [Interface]
 attachInstances expInfo ifaces instIfaceMap = mapM attach ifaces
   where
@@ -59,19 +62,19 @@ attachInstances expInfo ifaces instIfaceMap = mapM attach ifaces
 
 attachToExportItem :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap -> ExportItem Name -> Ghc (ExportItem Name)
 attachToExportItem expInfo iface ifaceMap instIfaceMap export =
-  case export of
-    ExportDecl { expItemDecl = L _ (TyClD d) } -> do
+  case attachFixities export of
+    e@ExportDecl { expItemDecl = L _ (TyClD d) } -> do
       mb_info <- getAllInfo (tcdName d)
       let export' =
-            export {
+            e {
               expItemInstances =
                 case mb_info of
                   Just (_, _, cls_instances, fam_instances) ->
                     let fam_insts = [ (synifyFamInst i, n)
                                     | i <- sortBy (comparing instFam) fam_instances
-                                    , let n = lookupInstDoc (getName i) iface ifaceMap instIfaceMap
+                                    , let n = instLookup instDocMap (getName i) iface ifaceMap instIfaceMap
                                     ]
-                        cls_insts = [ (synifyInstHead i, lookupInstDoc n iface ifaceMap instIfaceMap)
+                        cls_insts = [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap)
                                     | let is = [ (instanceHead' i, getName i) | i <- cls_instances ]
                                     , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
                                     , not $ isInstanceHidden expInfo cls tys
@@ -80,28 +83,28 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
                   Nothing -> []
             }
       return export'
-    _ -> return export
-
-
-lookupInstDoc :: Name -> Interface -> IfaceMap -> InstIfaceMap -> Maybe (Doc Name)
--- TODO: capture this pattern in a function (when we have streamlined the
--- handling of instances)
-lookupInstDoc name iface ifaceMap instIfaceMap =
-  case Map.lookup name (ifaceDocMap iface) of
-    Just doc -> Just doc
-    Nothing ->
-      case Map.lookup modName ifaceMap of
-        Just iface2 ->
-          case Map.lookup name (ifaceDocMap iface2) of
-            Just doc -> Just doc
-            Nothing -> Nothing
-        Nothing ->
-          case Map.lookup modName instIfaceMap of
-            Just instIface -> Map.lookup name (instDocMap instIface)
-            Nothing -> Nothing
+    e -> return e
   where
-    modName = nameModule name
+    attachFixities e@ExportDecl{ expItemDecl = L _ d } = e { expItemFixities =
+      nubBy ((==) `on` fst) $ expItemFixities e ++
+      [ (n',f) | n <- getMainDeclBinder d
+              , Just subs <- [instLookup instSubMap n iface ifaceMap instIfaceMap]
+              , n' <- n : subs
+              , Just f <- [instLookup instFixMap n' iface ifaceMap instIfaceMap]
+      ] }
 
+    attachFixities e = e
+
+
+instLookup :: (InstalledInterface -> Map.Map Name a) -> Name
+            -> Interface -> IfaceMap -> InstIfaceMap -> Maybe a
+instLookup f name iface ifaceMap instIfaceMap =
+  case Map.lookup name (f $ toInstalledIface iface) of
+    res@(Just _) -> res
+    Nothing -> do
+      let ifaceMaps = Map.union (fmap toInstalledIface ifaceMap) instIfaceMap
+      iface' <- Map.lookup (nameModule name) ifaceMaps
+      Map.lookup name (f iface')
 
 -- | Like GHC's 'instanceHead' but drops "silent" arguments.
 instanceHead' :: ClsInst -> ([TyVar], ThetaType, Class, [Type])

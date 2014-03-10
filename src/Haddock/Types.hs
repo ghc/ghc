@@ -100,6 +100,7 @@ data Interface = Interface
   , ifaceRnArgMap        :: !(ArgMap DocName)
 
   , ifaceSubMap          :: !(Map Name [Name])
+  , ifaceFixMap          :: !(Map Name Fixity)
 
   , ifaceExportItems     :: ![ExportItem Name]
   , ifaceRnExportItems   :: ![ExportItem DocName]
@@ -158,6 +159,7 @@ data InstalledInterface = InstalledInterface
   , instOptions        :: [DocOption]
 
   , instSubMap         :: Map Name [Name]
+  , instFixMap         :: Map Name Fixity
   }
 
 
@@ -172,6 +174,7 @@ toInstalledIface interface = InstalledInterface
   , instVisibleExports = ifaceVisibleExports interface
   , instOptions        = ifaceOptions        interface
   , instSubMap         = ifaceSubMap         interface
+  , instFixMap         = ifaceFixMap         interface
   }
 
 
