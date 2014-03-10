@@ -29,7 +29,7 @@ Changes in version 2.14.0
 
  * Print type/data family instances
 
- * Fix display of poly-kinded type operators
+ * Fix display of poly-kinded type operators (#189)
 
  * PatternSynonyms support
 
@@ -39,6 +39,13 @@ Changes in version 2.14.0
 
  * Fix documentation duplication on record fields (#195)
 
+ * Add `--source-entity-line` for exact line links (eg. things defined
+   inside TH splices) (#79)
+
+ * Display fixity information for names with nonstandard fixities
+
+ * Bird tracks specified like "> code" no longer suffer from an extra leading
+   space in the code output
 
 Changes in version 2.13.2
 
