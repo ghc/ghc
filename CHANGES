@@ -31,6 +31,15 @@ Changes in version 2.14.0
 
  * Fix display of poly-kinded type operators
 
+ * PatternSynonyms support
+
+ * Fix display of implicit parameters (#260)
+
+ * Fix rendering of Contents when links are present (#276)
+
+ * Fix documentation duplication on record fields (#195)
+
+
 Changes in version 2.13.2
 
  * Handle HsExplicitListTy in renamer (#213)
