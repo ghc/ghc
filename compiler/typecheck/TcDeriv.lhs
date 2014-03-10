@@ -36,7 +36,7 @@ import RnSource   ( addTcgDUs )
 import HscTypes
 import Avail
 
-import Unify( tcMatchTy )
+import Unify( tcUnifyTy )
 import Id( idType )
 import Class
 import Type
@@ -676,29 +676,30 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
         ; let cls_tyvars     = classTyVars cls
         ; checkTc (not (null cls_tyvars)) derivingNullaryErr
 
-        ; let kind            = tyVarKind (last cls_tyvars)
-              (arg_kinds, _)  = splitKindFunTys kind
+        ; let cls_arg_kind    = tyVarKind (last cls_tyvars)
+              (arg_kinds, _)  = splitKindFunTys cls_arg_kind
               n_args_to_drop  = length arg_kinds
               n_args_to_keep  = tyConArity tc - n_args_to_drop
               args_to_drop    = drop n_args_to_keep tc_args
               tc_args_to_keep = take n_args_to_keep tc_args
               inst_ty_kind    = typeKind (mkTyConApp tc tc_args_to_keep)
               dropped_tvs     = tyVarsOfTypes args_to_drop
-              tv_set          = mkVarSet tvs
-              mb_match        = tcMatchTy tv_set inst_ty_kind kind
-              Just subst      = mb_match   -- See Note [Match kinds in deriving]
+              mb_match        = tcUnifyTy inst_ty_kind cls_arg_kind
+              Just subst      = mb_match   -- See Note [Unify kinds in deriving]
+              -- We are assuming the tycon tyvars and the class tyvars are distinct
 
               final_tc_args   = substTys subst tc_args_to_keep
+              final_cls_tys   = substTys subst cls_tys
               univ_tvs        = mkVarSet deriv_tvs `unionVarSet` tyVarsOfTypes final_tc_args
 
         ; traceTc "derivTyData1" (vcat [ pprTvBndrs tvs, ppr tc, ppr tc_args
                                        , pprTvBndrs (varSetElems $ tyVarsOfTypes tc_args)
                                        , ppr n_args_to_keep, ppr n_args_to_drop
-                                       , ppr inst_ty_kind, ppr kind, ppr mb_match ])
+                                       , ppr inst_ty_kind, ppr cls_arg_kind, ppr mb_match ])
 
         -- Check that the result really is well-kinded
         ; checkTc (n_args_to_keep >= 0 && isJust mb_match)
-                  (derivingKindErr tc cls cls_tys kind)
+                  (derivingKindErr tc cls cls_tys cls_arg_kind)
 
         ; traceTc "derivTyData2" (vcat [ ppr univ_tvs ])
 
@@ -717,7 +718,7 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
                 --              newtype K a a = ... deriving( Monad )
 
         ; mkEqnHelp (varSetElemsKvsFirst univ_tvs)
-                    cls cls_tys tc final_tc_args Nothing } }
+                    cls final_cls_tys tc final_tc_args Nothing } }
 
 derivePolyKindedTypeable :: Class -> [Type]
                          -> [TyVar] -> TyCon -> [Type]
@@ -745,7 +746,7 @@ derivePolyKindedTypeable cls cls_tys _tvs tc tc_args
                         | otherwise   =     kindVarsOnly ts
 \end{code}
 
-Note [Match kinds in deriving]
+Note [Unify kinds in deriving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider (Trac #8534)
     data T a b = MkT a deriving( Functor )
@@ -755,13 +756,27 @@ So T :: forall k. * -> k -> *.   We want to get
     instance Functor (T * (a:*)) where ...
 Notice the '*' argument to T.
 
-So we need to (a) drop arguments from (T a b) to match the number of
-arrows in the (last argument of the) class; and then match kind of the
-remaining type against the expected kind, to figur out how to
-instantiate T's kind arguments.  Hence we match 
-   kind( T k (a:k) ) ~ (* -> *)
-to find k:=*.  Tricky stuff.
+Moreover, as well as instantiating T's kind arguments, we may need to instantiate
+C's kind args.  Consider (Trac #8865):
+  newtype T a b = MkT (Either a b) deriving( Category )
+where
+  Category :: forall k. (k -> k -> *) -> Constraint
+We need to generate the instance
+  insatnce Category * (Either a) where ...
+Notice the '*' argument to Cagegory.
 
+So we need to
+ * drop arguments from (T a b) to match the number of
+   arrows in the (last argument of the) class;
+ * and then *unify* kind of the remaining type against the
+   expected kind, to figure out how to instantiate C's and T's
+   kind arguments.
+
+In the two examples,
+ * we unify ( T k (a:k) ) ~ (* -> *) to find k:=*.
+ * we unify ( Either ~ (k -> k -> k) ) to find k:=*.
+
+Tricky stuff.
 
 \begin{code}
 mkEqnHelp :: [TyVar]
