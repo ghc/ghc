@@ -3752,19 +3752,21 @@ GHC now allows stand-alone <literal>deriving</literal> declarations, enabled by 
 </programlisting>
 The syntax is identical to that of an ordinary instance declaration apart from (a) the keyword
 <literal>deriving</literal>, and (b) the absence of the <literal>where</literal> part.
-Note the following points:
+</para>
+<para>
+However, standalone deriving differs from a <literal>deriving</literal> clause in a number
+of important ways:
 <itemizedlist>
+<listitem><para>The standalone deriving declaration does not need to be in the
+same module as the data type declaration.  (But be aware of the dangers of
+orphan instances (<xref linkend="orphan-modules"/>).
+</para></listitem>
+
 <listitem><para>
 You must supply an explicit context (in the example the context is <literal>(Eq a)</literal>),
 exactly as you would in an ordinary instance declaration.
 (In contrast, in a <literal>deriving</literal> clause
 attached to a data type declaration, the context is inferred.)
-</para></listitem>
-
-<listitem><para>
-A <literal>deriving instance</literal> declaration
-must obey the same rules concerning form and termination as ordinary instance declarations,
-controlled by the same flags; see <xref linkend="instance-decls"/>.
 </para></listitem>
 
 <listitem><para>
@@ -3789,6 +3791,8 @@ declaration attached to a <literal>data</literal> declaration,
 GHC does not restrict the form of the data type.  Instead, GHC simply generates the appropriate
 boilerplate code for the specified class, and typechecks it. If there is a type error, it is
 your problem. (GHC will show you the offending code if it has a type error.)
+</para>
+<para>
 The merit of this is that you can derive instances for GADTs and other exotic
 data types, providing only that the boilerplate code does indeed typecheck.  For example:
 <programlisting>
@@ -3804,6 +3808,16 @@ because <literal>T</literal> is a GADT, but you <emphasis>can</emphasis> generat
 the instance declaration using stand-alone deriving.
 </para>
 </listitem>
+</itemizedlist></para>
+
+<para>
+In other ways, however, a standalone deriving obeys the same rules as ordinary deriving:
+<itemizedlist>
+<listitem><para>
+A <literal>deriving instance</literal> declaration
+must obey the same rules concerning form and termination as ordinary instance declarations,
+controlled by the same flags; see <xref linkend="instance-decls"/>.
+</para></listitem>
 
 <listitem>
 <para>The stand-alone syntax is generalised for newtypes in exactly the same
