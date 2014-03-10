@@ -40,6 +40,17 @@
 # A development build, working on the stage 2 compiler:
 #BuildFlavour = devel2
 
+# A build with max optimisation that still builds the stage2 compiler
+# quickly. Compiled code will be the same as with "perf". Programs
+# will compile more slowly.
+#BuildFlavour = bench
+
+# As above but build GHC using the LLVM backend
+#BuildFlavour = bench-llvm
+
+# Bench build configured for a cross-compiler
+#BuildFlavour = bench-cross
+
 # -------- Miscellaneous variables --------------------------------------------
 
 # Set to V = 0 to get prettier build output.
@@ -232,6 +243,59 @@ BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
 LAX_DEPENDENCIES   = YES
+
+endif
+
+# -------- A bench build with optimised libs -----------------------------------
+
+ifeq "$(BuildFlavour)" "bench"
+
+SRC_HC_OPTS        = -O -H64m
+GhcStage1HcOpts    = -O -fasm
+GhcStage2HcOpts    = -O0 -fasm
+GhcLibHcOpts       = -O2 -fasm
+SplitObjs          = NO
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
+
+endif
+
+# ---------------- Perf build using LLVM --------------------------------------
+
+ifeq "$(BuildFlavour)" "bench-llvm"
+
+SRC_HC_OPTS        = -O -H64m
+GhcStage1HcOpts    = -O -fllvm
+GhcStage2HcOpts    = -O0 -fllvm
+GhcLibHcOpts       = -O2 -fllvm
+SplitObjs          = NO
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
+
+endif
+
+# ------- A Perf build configured for cross-compilation ----------------------
+
+ifeq "$(BuildFlavour)" "bench-cross"
+
+SRC_HC_OPTS        = -O -H64m
+GhcStage1HcOpts    = -O -fasm
+GhcStage2HcOpts    = -O0 -fasm
+GhcLibHcOpts       = -O2 -fasm
+SplitObjs          = NO
+INTEGER_LIBRARY    = integer-simple
+Stage1Only         = YES
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
+
+DYNAMIC_BY_DEFAULT   = NO
+DYNAMIC_GHC_PROGRAMS = NO
 
 endif
 
