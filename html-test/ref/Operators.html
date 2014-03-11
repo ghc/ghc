@@ -184,10 +184,13 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	  ></div
 	><div class="top"
 	><p class="src"
-	  >infixr 7 */<br
-	     /><a name="v:-42--47-" class="def"
+	  ><a name="v:-42--47-" class="def"
 	    >(*/)</a
-	    > ::  a -&gt; a -&gt; a</p
+	    > ::  a -&gt; a -&gt; a <span class="fixity"
+	    >infixr 7</span
+	    ><span class="rightedge"
+	    ></span
+	    ></p
 	  ><div class="doc"
 	  ><p
 	    >Operator with infixr 7</p
@@ -195,10 +198,13 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	  ></div
 	><div class="top"
 	><p class="src"
-	  >infixl 3 `foo`<br
-	     /><a name="v:foo" class="def"
+	  ><a name="v:foo" class="def"
 	    >foo</a
-	    > ::  a -&gt; a -&gt; a</p
+	    > ::  a -&gt; a -&gt; a <span class="fixity"
+	    >infixl 3</span
+	    ><span class="rightedge"
+	    ></span
+	    ></p
 	  ><div class="doc"
 	  ><p
 	    >Named function with infixl 3</p
@@ -221,13 +227,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	    ><table
 	    ><tr
 	      ><td class="src"
-		>infixl 3 `Bar`<br
-		   /><a href="Operators.html#t:Foo"
+		><a href="Operators.html#t:Foo"
 		  >Foo</a
 		  > <a name="v:Bar" class="def"
 		  >`Bar`</a
 		  > <a href="Operators.html#t:Foo"
 		  >Foo</a
+		  > <span class="fixity"
+		  >infixl 3</span
+		  ><span class="rightedge"
+		  ></span
 		  ></td
 		><td class="doc"
 		><p
@@ -236,13 +245,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 		></tr
 	      ><tr
 	      ><td class="src"
-		>infixr 5 :-<br
-		   /><a href="Operators.html#t:Foo"
+		><a href="Operators.html#t:Foo"
 		  >Foo</a
 		  > <a name="v::-45-" class="def"
 		  >:-</a
 		  > <a href="Operators.html#t:Foo"
 		  >Foo</a
+		  > <span class="fixity"
+		  >infixr 5</span
+		  ><span class="rightedge"
+		  ></span
 		  ></td
 		><td class="doc"
 		><p
@@ -254,10 +266,13 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	  ></div
 	><div class="top"
 	><p class="src"
-	  >infixr 3 :+<br
-	     />pattern  <a name="v::-43-" class="def"
+	  >pattern  <a name="v::-43-" class="def"
 	    >(:+)</a
-	    > t t ::  [t]</p
+	    > t t ::  [t] <span class="fixity"
+	    >infixr 3</span
+	    ><span class="rightedge"
+	    ></span
+	    ></p
 	  ><div class="doc"
 	  ><p
 	    >Pattern synonym, infixr 3</p
@@ -265,13 +280,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	  ></div
 	><div class="top"
 	><p class="src"
-	  >infixl 6 &lt;-&gt;<br
-	     /><span class="keyword"
+	  ><span class="keyword"
 	    >data</span
 	    > a <a name="t:-60--45--62-" class="def"
 	    >&lt;-&gt;</a
 	    > b <span class="keyword"
 	    >where</span
+	    > <span class="fixity"
+	    >infixl 6</span
+	    ><span class="rightedge"
+	    ></span
 	    ></p
 	  ><div class="doc"
 	  ><p
@@ -283,12 +301,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	    ><table
 	    ><tr
 	      ><td class="src"
-		>infixr 6 :&lt;-&gt;<br
-		   /><a name="v::-60--45--62-" class="def"
+		><a name="v::-60--45--62-" class="def"
 		  >(:&lt;-&gt;)</a
 		  > ::  a -&gt; b -&gt; a <a href="Operators.html#t:-60--45--62-"
 		  >&lt;-&gt;</a
-		  > b</td
+		  > b <span class="fixity"
+		  >infixr 6</span
+		  ><span class="rightedge"
+		  ></span
+		  ></td
 		><td class="doc empty"
 		>&nbsp;</td
 		></tr
@@ -297,12 +318,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	  ></div
 	><div class="top"
 	><p class="src"
-	  >infix 3 ++<br
-	     /><span class="keyword"
+	  ><span class="keyword"
 	    >type family</span
 	    > a <a name="t:-43--43-" class="def"
 	    >++</a
-	    > b</p
+	    > b <span class="fixity"
+	    >infix 3</span
+	    ><span class="rightedge"
+	    ></span
+	    ></p
 	  ><div class="doc"
 	  ><p
 	    >Type family with fixity</p
@@ -310,12 +334,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	  ></div
 	><div class="top"
 	><p class="src"
-	  >infix 9 **<br
-	     /><span class="keyword"
+	  ><span class="keyword"
 	    >data family</span
 	    > a <a name="t:-42--42-" class="def"
 	    >**</a
-	    > b</p
+	    > b <span class="fixity"
+	    >infix 9</span
+	    ><span class="rightedge"
+	    ></span
+	    ></p
 	  ><div class="doc"
 	  ><p
 	    >Data family with fixity</p
@@ -323,13 +350,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	  ></div
 	><div class="top"
 	><p class="src"
-	  >infixr 1 &gt;&lt;&gt;<br
-	     /><span class="keyword"
+	  ><span class="keyword"
 	    >class</span
 	    > a <a name="t:-62--60--62-" class="def"
 	    >&gt;&lt;&gt;</a
 	    > b <span class="keyword"
 	    >where</span
+	    > <span class="fixity"
+	    >infixr 1</span
+	    ><span class="rightedge"
+	    ></span
 	    ></p
 	  ><div class="doc"
 	  ><p
@@ -339,35 +369,43 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	  ><p class="caption"
 	    >Associated Types</p
 	    ><p class="src"
-	    >infixl 2 &lt;&gt;&lt;<br
-	       /><span class="keyword"
+	    ><span class="keyword"
 	      >type</span
 	      > a <a name="t:-60--62--60-" class="def"
 	      >&lt;&gt;&lt;</a
-	      > b :: *</p
+	      > b :: * <span class="fixity"
+	      >infixl 2</span
+	      ><span class="rightedge"
+	      ></span
+	      ></p
 	    ><p class="src"
-	    >infixl 3 &gt;&lt;&lt;<br
-	       /><span class="keyword"
+	    ><span class="keyword"
 	      >data</span
 	      > a <a name="t:-62--60--60-" class="def"
 	      >&gt;&lt;&lt;</a
-	      > b</p
+	      > b <span class="fixity"
+	      >infixl 3</span
+	      ><span class="rightedge"
+	      ></span
+	      ></p
 	    ></div
 	  ><div class="subs methods"
 	  ><p class="caption"
 	    >Methods</p
 	    ><p class="src"
-	    >infixl 5 &lt;&lt;&gt;<br
-	       />infixr 4 &gt;&gt;&lt;<br
-	       /><a name="v:-62--62--60-" class="def"
+	    ><a name="v:-62--62--60-" class="def"
 	      >(&gt;&gt;&lt;)</a
 	      >, <a name="v:-60--60--62-" class="def"
 	      >(&lt;&lt;&gt;)</a
-	      > :: a -&gt; b -&gt; ()</p
+	      > :: a -&gt; b -&gt; () <span class="fixity"
+	      >infixl 5 &lt;&lt;&gt;</span
+	      ><span class="fixity"
+	      >infixr 4 &gt;&gt;&lt;</span
+	      ><span class="rightedge"
+	      ></span
+	      ></p
 	    ><p class="src"
-	    >infixr 8 **&gt;, &gt;**<br
-	       />infixl 8 &lt;**, **&lt;<br
-	       /><a name="v:-42--42--62-" class="def"
+	    ><a name="v:-42--42--62-" class="def"
 	      >(**&gt;)</a
 	      >, <a name="v:-60--42--42-" class="def"
 	      >(&lt;**)</a
@@ -375,7 +413,13 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	      >(&gt;**)</a
 	      >, <a name="v:-42--42--60-" class="def"
 	      >(**&lt;)</a
-	      > :: a -&gt; a -&gt; ()</p
+	      > :: a -&gt; a -&gt; () <span class="fixity"
+	      >infixr 8 **&gt;, &gt;**</span
+	      ><span class="fixity"
+	      >infixl 8 &lt;**, **&lt;</span
+	      ><span class="rightedge"
+	      ></span
+	      ></p
 	    ><div class="doc"
 	    ><p
 	      >Multiple fixities</p
@@ -384,14 +428,17 @@ window.onload = function () {pageLoad();setSynopsis("mini_Operators.html");};
 	  ></div
 	><div class="top"
 	><p class="src"
-	  >infixl 6 &gt;-&lt;<br
-	     /><span class="keyword"
+	  ><span class="keyword"
 	    >type</span
 	    > <a name="t:-62--45--60-" class="def"
 	    >(&gt;-&lt;)</a
 	    > a b = a <a href="Operators.html#t:-60--45--62-"
 	    >&lt;-&gt;</a
-	    > b</p
+	    > b <span class="fixity"
+	    >infixl 6</span
+	    ><span class="rightedge"
+	    ></span
+	    ></p
 	  ><div class="doc"
 	  ><p
 	    >Type synonym with fixity</p

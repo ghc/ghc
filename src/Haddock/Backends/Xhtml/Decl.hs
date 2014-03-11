@@ -88,7 +88,7 @@ ppPatSig :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName ->
 ppPatSig summary links loc (doc, _argDocs) docname args typ prov req fixities
          splice unicode qual
   | summary = pref1
-  | otherwise = topDeclElem links loc splice [docname] (ppFixities fixities qual <=> pref1)
+  | otherwise = topDeclElem links loc splice [docname] (pref1 <+> ppFixities fixities qual)
                 +++ docSection qual doc
   where
     pref1 = hsep [ toHtml "pattern"
@@ -122,7 +122,7 @@ ppSigLike summary links loc leader doc docnames fixities (typ, pp_typ)
     occnames = map (nameOccName . getName) docnames
     addFixities html
       | summary   = html
-      | otherwise = ppFixities fixities qual <=> html
+      | otherwise = html <+> ppFixities fixities qual
 
 
 ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> [DocName] -> HsType DocName
@@ -160,19 +160,25 @@ ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep)
       = [(leader <+> ppType unicode qual t, argDoc n, [])]
 
 ppFixities :: [(DocName, Fixity)] -> Qualification -> Html
-ppFixities fs qual = vcat $ map ppFix uniq_fs
+ppFixities [] _ = noHtml
+ppFixities fs qual = foldr1 (+++) (map ppFix uniq_fs) +++ rightEdge
   where
-    ppFix (ns, p, d) = toHtml d <+> toHtml (show p) <+> ppNames ns
+    ppFix (ns, p, d) = thespan ! [theclass "fixity"] <<
+                         (toHtml d <+> toHtml (show p) <+> ppNames ns)
 
     ppDir InfixR = "infixr"
     ppDir InfixL = "infixl"
     ppDir InfixN = "infix"
 
-    ppNames = concatHtml . intersperse (stringToHtml ", ") . map (ppDocName qual Infix False)
+    ppNames = case fs of
+      _:[] -> const noHtml -- Don't display names for fixities on single names
+      _    -> concatHtml . intersperse (stringToHtml ", ") . map (ppDocName qual Infix False)
 
     uniq_fs = [ (n, the p, the d') | (n, Fixity p d) <- fs
                                    , let d' = ppDir d
                                    , then group by Down (p,d') using groupWith ]
+
+    rightEdge = thespan ! [theclass "rightedge"] << noHtml
 
 
 ppTyVars :: LHsTyVarBndrs DocName -> [Html]
@@ -200,7 +206,7 @@ ppTySyn summary links fixities loc doc (SynDecl { tcdLName = L _ name, tcdTyVars
                                                 , tcdRhs = ltype })
         splice unicode qual
   = ppTypeOrFunSig summary links loc [name] (unLoc ltype) doc
-                   (fixs <=> full, fixs <=> hdr, spaceHtml +++ equals)
+                   (full <+> fixs, hdr <+> fixs, spaceHtml +++ equals)
                    splice unicode qual
   where
     hdr  = hsep ([keyword "type", ppBinder summary occ] ++ ppTyVars ltyvars)
@@ -263,7 +269,7 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
     docname = unLoc $ fdLName decl
 
     header_ = topDeclElem links loc splice [docname] $
-      ppFixities fixities qual <=> ppTyFamHeader summary associated decl unicode qual
+       ppTyFamHeader summary associated decl unicode qual <+> ppFixities fixities qual
 
     instancesBit
       | FamilyDecl { fdInfo = ClosedTypeFamily eqns } <- decl
@@ -438,8 +444,8 @@ ppClassDecl summary links instances fixities loc d subdocs
                   +++ atBit +++ methodBit  +++ instancesBit
   where
     classheader
-      | null lsigs = topDeclElem links loc splice [nm] (fixs <=> hdr unicode qual)
-      | otherwise  = topDeclElem links loc splice [nm] (fixs <=> hdr unicode qual <+> keyword "where")
+      | null lsigs = topDeclElem links loc splice [nm] (hdr unicode qual <+> fixs)
+      | otherwise  = topDeclElem links loc splice [nm] (hdr unicode qual <+> keyword "where" <+> fixs)
 
     -- Only the fixity relevant to the class header
     fixs = ppFixities [ f | f@(n,_) <- fixities, n == unLoc lname ] qual
@@ -538,8 +544,8 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
     cons      = dd_cons (tcdDataDefn dataDecl)
     resTy     = (con_res . unLoc . head) cons
 
-    header_ = topDeclElem links loc splice [docname] (fix
-             <=> ppDataHeader summary dataDecl unicode qual <+> whereBit)
+    header_ = topDeclElem links loc splice [docname] $
+             ppDataHeader summary dataDecl unicode qual <+> whereBit <+> fix
 
     fix = ppFixities (filter (\(n,_) -> n == docname) fixities) qual
 
@@ -551,7 +557,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
 
     constrBit = subConstructors qual
       [ ppSideBySideConstr subdocs subfixs unicode qual c
-      | c  <- cons
+      | c <- cons
       , let subfixs = filter (\(n,_) -> n == unLoc (con_name (unLoc c))) fixities
       ]
 
@@ -635,13 +641,15 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con) = (decl, mbDoc, field
         PrefixCon args ->
           hsep ((header_ +++ ppBinder False occ)
             : map (ppLParendType unicode qual) args)
+          <+> fixity
 
-        RecCon _ -> header_ +++ ppBinder False occ
+        RecCon _ -> header_ +++ ppBinder False occ <+> fixity
 
         InfixCon arg1 arg2 ->
           hsep [header_ +++ ppLParendType unicode qual arg1,
             ppBinderInfix False occ,
             ppLParendType unicode qual arg2]
+          <+> fixity
 
       ResTyGADT resTy -> case con_details con of
         -- prefix & infix could also use hsConDeclArgTys if it seemed to
@@ -657,13 +665,13 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con) = (decl, mbDoc, field
     doRecordFields fields = subFields qual
       (map (ppSideBySideField subdocs unicode qual) fields)
     doGADTCon :: [LHsType DocName] -> Located (HsType DocName) -> Html
-    doGADTCon args resTy = fixity <=>
-      ppBinder False occ <+> dcolon unicode
+    doGADTCon args resTy = ppBinder False occ <+> dcolon unicode
         <+> hsep [ppForAll forall_ ltvs (con_cxt con) unicode qual,
                   ppLType unicode qual (foldr mkFunTy resTy args) ]
+        <+> fixity
 
     fixity  = ppFixities fixities qual
-    header_ = fixity <=> ppConstrHdr forall_ tyVars context unicode qual
+    header_ = ppConstrHdr forall_ tyVars context unicode qual
     occ     = nameOccName . getName . unLoc . con_name $ con
     ltvs    = con_qvars con
     tyVars  = tyvarNames (con_qvars con)
@@ -676,7 +684,7 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con) = (decl, mbDoc, field
 
 
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Unicode -> Qualification
-                  -> ConDeclField DocName ->  SubDecl
+                  -> ConDeclField DocName -> SubDecl
 ppSideBySideField subdocs unicode qual (ConDeclField (L _ name) ltype _) =
   (ppBinder False (nameOccName . getName $ name) <+> dcolon unicode <+> ppLType unicode qual ltype,
     mbDoc,
