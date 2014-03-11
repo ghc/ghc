@@ -192,7 +192,7 @@ declElem = paragraph ! [theclass "src"]
 -- it adds a source and wiki link at the right hand side of the box
 topDeclElem :: LinksInfo -> SrcSpan -> Bool -> [DocName] -> Html -> Html
 topDeclElem ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice names html =
-    declElem << (srcLink <+> wikiLink <+> html)
+    declElem << (html <+> srcLink <+> wikiLink)
   where srcLink = let nameUrl = Map.lookup origPkg sourceMap
                       lineUrl = Map.lookup origPkg lineMap
                       mUrl | splice    = lineUrl
