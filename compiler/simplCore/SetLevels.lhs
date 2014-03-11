@@ -479,7 +479,8 @@ lvlMFE strict_ctxt env ann_expr@(fvs, _)
        ; return (Let (NonRec (TB var (FloatMe dest_lvl)) expr')
                      (mkVarApps (Var var) abs_vars)) }
   where
-    is_bot   = exprIsBottom (deAnnotate ann_expr) -- Note [Bottoming floats]
+    expr     = deAnnotate ann_expr
+    is_bot   = exprIsBottom expr      -- Note [Bottoming floats]
     dest_lvl = destLevel env fvs (isFunction ann_expr) is_bot
     abs_vars = abstractVars dest_lvl env fvs
 
