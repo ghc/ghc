@@ -1,5 +1,5 @@
 {- |
-  Implementation of fixed-size hash tables, with a type 
+  Implementation of fixed-size hash tables, with a type
   class for constructing hash values for structured types.
 -}
 module Hash (
@@ -30,7 +30,7 @@ insert = undefined
 
 -- | Looks up a key in the hash table, returns @'Just' val@ if the key
 -- was found, or 'Nothing' otherwise.
-lookup 	:: Hash key => key -> IO (Maybe val)
+lookup :: Hash key => key -> IO (Maybe val)
 lookup = undefined
 
 -- | A class of types which can be hashed.

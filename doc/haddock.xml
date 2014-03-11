@@ -38,69 +38,69 @@
 
     <itemizedlist>
       <listitem>
-	<para>When documenting APIs, it is desirable to keep the
-	documentation close to the actual interface or implementation
-	of the API, preferably in the same file, to reduce the risk
-	that the two become out of sync.  Haddock therefore lets you
-	write the documentation for an entity (function, type, or
-	class) next to the definition of the entity in the source
-	code.</para>
+        <para>When documenting APIs, it is desirable to keep the
+        documentation close to the actual interface or implementation
+        of the API, preferably in the same file, to reduce the risk
+        that the two become out of sync.  Haddock therefore lets you
+        write the documentation for an entity (function, type, or
+        class) next to the definition of the entity in the source
+        code.</para>
       </listitem>
       <listitem>
-	<para>There is a tremendous amount of useful API documentation
-	that can be extracted from just the bare source code,
-	including types of exported functions, definitions of data
-	types and classes, and so on.  Haddock can therefore generate
-	documentation from a set of straight Haskell 98 modules, and
-	the documentation will contain precisely the interface that is
-	available to a programmer using those modules.</para>
+        <para>There is a tremendous amount of useful API documentation
+        that can be extracted from just the bare source code,
+        including types of exported functions, definitions of data
+        types and classes, and so on.  Haddock can therefore generate
+        documentation from a set of straight Haskell 98 modules, and
+        the documentation will contain precisely the interface that is
+        available to a programmer using those modules.</para>
       </listitem>
       <listitem>
-	<para>Documentation annotations in the source code should be
-	easy on the eye when editing the source code itself, so as not
-	to obscure the code and to make reading and writing
-	documentation annotations easy.  The easier it is to write
-	documentation, the more likely the programmer is to do it.
-	Haddock therefore uses lightweight markup in its annotations,
-	taking several ideas from <ulink
-	url="http://www.cse.unsw.edu.au/~chak/haskell/idoc/">IDoc</ulink>.
-	In fact, Haddock can understand IDoc-annotated source
-	code.</para>
+        <para>Documentation annotations in the source code should be
+        easy on the eye when editing the source code itself, so as not
+        to obscure the code and to make reading and writing
+        documentation annotations easy.  The easier it is to write
+        documentation, the more likely the programmer is to do it.
+        Haddock therefore uses lightweight markup in its annotations,
+        taking several ideas from <ulink
+        url="http://www.cse.unsw.edu.au/~chak/haskell/idoc/">IDoc</ulink>.
+        In fact, Haddock can understand IDoc-annotated source
+        code.</para>
       </listitem>
       <listitem>
-	<para>The documentation should not expose any of the structure
-	of the implementation, or to put it another way, the
-	implementer of the API should be free to structure the
-	implementation however he or she wishes, without exposing any
-	of that structure to the consumer.  In practical terms, this
-	means that while an API may internally consist of several
-	Haskell modules, we often only want to expose a single module
-	to the user of the interface, where this single module just
-	re-exports the relevant parts of the implementation
-	modules.</para>
+        <para>The documentation should not expose any of the structure
+        of the implementation, or to put it another way, the
+        implementer of the API should be free to structure the
+        implementation however he or she wishes, without exposing any
+        of that structure to the consumer.  In practical terms, this
+        means that while an API may internally consist of several
+        Haskell modules, we often only want to expose a single module
+        to the user of the interface, where this single module just
+        re-exports the relevant parts of the implementation
+        modules.</para>
 
-	<para>Haddock therefore understands the Haskell module system
-	and can generate documentation which hides not only
-	non-exported entities from the interface, but also the
-	internal module structure of the interface.  A documentation
-	annotation can still be placed next to the implementation, and
-	it will be propagated to the external module in the generated
-	documentation.</para>
+        <para>Haddock therefore understands the Haskell module system
+        and can generate documentation which hides not only
+        non-exported entities from the interface, but also the
+        internal module structure of the interface.  A documentation
+        annotation can still be placed next to the implementation, and
+        it will be propagated to the external module in the generated
+        documentation.</para>
       </listitem>
       <listitem>
-	<para>Being able to move around the documentation by following
-	hyperlinks is essential.  Documentation generated by Haddock
-	is therefore littered with hyperlinks: every type and class
-	name is a link to the corresponding definition, and
-	user-written documentation annotations can contain identifiers
-	which are linked automatically when the documentation is
-	generated.</para>
+        <para>Being able to move around the documentation by following
+        hyperlinks is essential.  Documentation generated by Haddock
+        is therefore littered with hyperlinks: every type and class
+        name is a link to the corresponding definition, and
+        user-written documentation annotations can contain identifiers
+        which are linked automatically when the documentation is
+        generated.</para>
       </listitem>
       <listitem>
-	<para>We might want documentation in multiple formats - online
-	and printed, for example.  Haddock comes with HTML, LaTeX,
+        <para>We might want documentation in multiple formats - online
+        and printed, for example.  Haddock comes with HTML, LaTeX,
   and Hoogle backends, and it is structured in such a way that adding new
-	backends is straightforward.</para>
+        backends is straightforward.</para>
       </listitem>
     </itemizedlist>
 
@@ -125,27 +125,27 @@
       Haddock source code, except where otherwise indicated.</para>
 
       <blockquote>
-	<para>Copyright 2002-2010, Simon Marlow.  All rights reserved.</para>
+        <para>Copyright 2002-2010, Simon Marlow.  All rights reserved.</para>
 
-	<para>Redistribution and use in source and binary forms, with
+        <para>Redistribution and use in source and binary forms, with
         or without modification, are permitted provided that the
         following conditions are met:</para>
 
-	<itemizedlist>
-	  <listitem>
-	    <para>Redistributions of source code must retain the above
+        <itemizedlist>
+          <listitem>
+            <para>Redistributions of source code must retain the above
             copyright notice, this list of conditions and the
             following disclaimer.</para>
-	  </listitem>
-	  <listitem>
-	    <para>Redistributions in binary form must reproduce the
+          </listitem>
+          <listitem>
+            <para>Redistributions in binary form must reproduce the
             above copyright notice, this list of conditions and the
             following disclaimer in the documentation and/or other
             materials provided with the distribution.</para>
-	  </listitem>
-	</itemizedlist>
+          </listitem>
+        </itemizedlist>
 
-	<para>THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS
+        <para>THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS
         IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
         LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
         FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
@@ -170,9 +170,9 @@
       us.
       </para>
       <itemizedlist>
-	<listitem><simpara>Ashley Yakeley</simpara></listitem>
-	<listitem><simpara>Benjamin Franksen</simpara></listitem>
-	<listitem><simpara>Brett Letner</simpara></listitem>
+        <listitem><simpara>Ashley Yakeley</simpara></listitem>
+        <listitem><simpara>Benjamin Franksen</simpara></listitem>
+        <listitem><simpara>Brett Letner</simpara></listitem>
         <listitem><simpara>Clemens Fruhwirth</simpara></listitem>
         <listitem><simpara>Conal Elliott</simpara></listitem>
         <listitem><simpara>David Waern</simpara></listitem>
@@ -214,19 +214,19 @@
       Haddock, most notably:</para>
 
       <itemizedlist>
-	<listitem>
-	  <para><ulink
+        <listitem>
+          <para><ulink
           url="http://www.cse.unsw.edu.au/~chak/haskell/idoc/">
           IDoc</ulink></para>
-	</listitem>
-	<listitem>
-	  <para><ulink
-	  url="http://www.fmi.uni-passau.de/~groessli/hdoc/">HDoc</ulink></para>
-	</listitem>
-	<listitem>
-	  <para><ulink url="http://www.stack.nl/~dimitri/doxygen/">
+        </listitem>
+        <listitem>
+          <para><ulink
+          url="http://www.fmi.uni-passau.de/~groessli/hdoc/">HDoc</ulink></para>
+        </listitem>
+        <listitem>
+          <para><ulink url="http://www.stack.nl/~dimitri/doxygen/">
           Doxygen</ulink></para>
-	</listitem>
+        </listitem>
       </itemizedlist>
 
       <para>and probably several others I've forgotten.</para>
@@ -286,165 +286,165 @@
     <variablelist>
 
       <varlistentry>
-	<term>
+        <term>
           <indexterm><primary><option>-B</option></primary></indexterm>
           <option>-B</option> <replaceable>dir</replaceable>
         </term>
-	<listitem>
-	  <para>Tell GHC that that its lib directory is
+        <listitem>
+          <para>Tell GHC that that its lib directory is
     <replaceable>dir</replaceable>. Can be used to override the default path.</para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <indexterm><primary><option>-o</option></primary></indexterm>
           <option>-o</option> <replaceable>dir</replaceable>
         </term>
-	<term>
+        <term>
           <indexterm><primary><option>--odir</option></primary></indexterm>
           <option>--odir</option>=<replaceable>dir</replaceable>
         </term>
-	<listitem>
-	  <para>Generate files into <replaceable>dir</replaceable>
-	  instead of the current directory.</para>
-	</listitem>
+        <listitem>
+          <para>Generate files into <replaceable>dir</replaceable>
+          instead of the current directory.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>-l</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-l</option></primary></indexterm>
           <option>-l</option> <replaceable>dir</replaceable>
         </term>
-	<term>
-	  <indexterm><primary><option>--lib</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--lib</option></primary></indexterm>
           <option>--lib</option>=<replaceable>dir</replaceable>
         </term>
-	<listitem>
-	  <para>Use Haddock auxiliary files (themes, javascript, etc...) in <replaceable>dir</replaceable>.</para>
-	</listitem>
+        <listitem>
+          <para>Use Haddock auxiliary files (themes, javascript, etc...) in <replaceable>dir</replaceable>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>-i</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-i</option></primary></indexterm>
           <option>-i</option> <replaceable>path</replaceable>,<replaceable>file</replaceable>
         </term>
-	<term>
-	  <indexterm><primary><option>--read-interface</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--read-interface</option></primary></indexterm>
           <option>--read-interface</option>=<replaceable>path</replaceable>,<replaceable>file</replaceable>
         </term>
-	<listitem>
-	  <para>Read the interface file in
-	  <replaceable>file</replaceable>, which must have been
-	  produced by running Haddock with the
-	  <option>--dump-interface</option> option.  The interface
-	  describes a set of modules whose HTML documentation is
-	  located in <replaceable>path</replaceable> (which may be a
-	  relative pathname).  The <replaceable>path</replaceable> is
-	  optional, and defaults to <quote>.</quote>.</para>
+        <listitem>
+          <para>Read the interface file in
+          <replaceable>file</replaceable>, which must have been
+          produced by running Haddock with the
+          <option>--dump-interface</option> option.  The interface
+          describes a set of modules whose HTML documentation is
+          located in <replaceable>path</replaceable> (which may be a
+          relative pathname).  The <replaceable>path</replaceable> is
+          optional, and defaults to <quote>.</quote>.</para>
 
-	  <para>This option allows Haddock to produce separate sets of
-	  documentation with hyperlinks between them.  The
-	  <replaceable>path</replaceable> is used to direct hyperlinks
-	  to point to the right files; so make sure you don't move the
-	  HTML files later or these links will break.  Using a
-	  relative <replaceable>path</replaceable> means that a
-	  documentation subtree can still be moved around without
-	  breaking links.</para>
+          <para>This option allows Haddock to produce separate sets of
+          documentation with hyperlinks between them.  The
+          <replaceable>path</replaceable> is used to direct hyperlinks
+          to point to the right files; so make sure you don't move the
+          HTML files later or these links will break.  Using a
+          relative <replaceable>path</replaceable> means that a
+          documentation subtree can still be moved around without
+          breaking links.</para>
 
-	  <para>Multiple <option>--read-interface</option> options may
-	  be given.</para>
-	</listitem>
+          <para>Multiple <option>--read-interface</option> options may
+          be given.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-  	  <indexterm><primary><option>-D</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-D</option></primary></indexterm>
           <option>-D</option> <replaceable>file</replaceable>
         </term>
-	<term>
-	  <indexterm><primary><option>--dump-interface</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--dump-interface</option></primary></indexterm>
           <option>--dump-interface</option>=<replaceable>file</replaceable>
         </term>
-	<listitem>
-	  <para>Produce an <firstterm>interface
-	  file</firstterm><footnote><para>Haddock interface files are
-	  not the same as Haskell interface files, I just couldn't
-	  think of a better name.</para> </footnote>
-	  in the file <replaceable>file</replaceable>.  An interface
-	  file contains information Haddock needs to produce more
-	  documentation that refers to the modules currently being
-	  processed - see the <option>--read-interface</option> option
-	  for more details.  The interface file is in a binary format;
-	  don't try to read it.</para>
-	</listitem>
+        <listitem>
+          <para>Produce an <firstterm>interface
+          file</firstterm><footnote><para>Haddock interface files are
+          not the same as Haskell interface files, I just couldn't
+          think of a better name.</para> </footnote>
+          in the file <replaceable>file</replaceable>.  An interface
+          file contains information Haddock needs to produce more
+          documentation that refers to the modules currently being
+          processed - see the <option>--read-interface</option> option
+          for more details.  The interface file is in a binary format;
+          don't try to read it.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>-h</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-h</option></primary></indexterm>
           <option>-h</option>
         </term>
-	<term>
-	  <indexterm><primary><option>--html</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--html</option></primary></indexterm>
           <option>--html</option>
         </term>
-	<listitem>
-	  <para>Generate documentation in HTML format.  Several files
-	  will be generated into the current directory (or the
-	  specified directory if the <option>-o</option> option is
-	  given), including the following:</para>
-	  <variablelist>
-	    <varlistentry>
-	      <term><filename><replaceable>module</replaceable>.html</filename></term>
-	      <term><filename>mini_<replaceable>module</replaceable>.html</filename></term>
-	      <listitem>
-		<para>An HTML page for each
-		<replaceable>module</replaceable>, and a "mini" page for
-		each used when viewing in frames.</para>
-	      </listitem>
-	    </varlistentry>
-	    <varlistentry>
-	      <term><filename>index.html</filename></term>
-	      <listitem>
-		<para>The top level page of the documentation: lists
-		the modules available, using indentation to represent
-		the hierarchy if the modules are hierarchical.</para>
-	      </listitem>
-	    </varlistentry>
-	    <varlistentry>
-	      <term><filename>doc-index.html</filename></term>
-	      <term><filename>doc-index-<replaceable>X</replaceable>.html</filename></term>
-	      <listitem>
-		<para>The alphabetic index, possibly split into multiple
-		pages if big enough.</para>
-	      </listitem>
-	    </varlistentry>
-	    <varlistentry>
-	      <term><filename>frames.html</filename></term>
-	      <listitem>
-		<para>The top level document when viewing in frames.</para>
-	      </listitem>
-	    </varlistentry>
-	    <varlistentry>
-	      <term><filename><replaceable>some</replaceable>.css</filename></term>
-	      <term><filename><replaceable>etc...</replaceable></filename></term>
-	      <listitem>
-		<para>Files needed for the themes used. Specify your themes
-		using the <option>--theme</option> option.</para>
-	      </listitem>
-	    </varlistentry>
-	    <varlistentry>
-	      <term><filename>haddock-util.js</filename></term>
-	      <listitem>
-		<para>Some JavaScript utilities used to implement some of the
-		dynamic features like collapsible sections, and switching to
-		frames view.</para>
-	      </listitem>
-	    </varlistentry>
-	  </variablelist>
-	</listitem>
+        <listitem>
+          <para>Generate documentation in HTML format.  Several files
+          will be generated into the current directory (or the
+          specified directory if the <option>-o</option> option is
+          given), including the following:</para>
+          <variablelist>
+            <varlistentry>
+              <term><filename><replaceable>module</replaceable>.html</filename></term>
+              <term><filename>mini_<replaceable>module</replaceable>.html</filename></term>
+              <listitem>
+                <para>An HTML page for each
+                <replaceable>module</replaceable>, and a "mini" page for
+                each used when viewing in frames.</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><filename>index.html</filename></term>
+              <listitem>
+                <para>The top level page of the documentation: lists
+                the modules available, using indentation to represent
+                the hierarchy if the modules are hierarchical.</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><filename>doc-index.html</filename></term>
+              <term><filename>doc-index-<replaceable>X</replaceable>.html</filename></term>
+              <listitem>
+                <para>The alphabetic index, possibly split into multiple
+                pages if big enough.</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><filename>frames.html</filename></term>
+              <listitem>
+                <para>The top level document when viewing in frames.</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><filename><replaceable>some</replaceable>.css</filename></term>
+              <term><filename><replaceable>etc...</replaceable></filename></term>
+              <listitem>
+                <para>Files needed for the themes used. Specify your themes
+                using the <option>--theme</option> option.</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><filename>haddock-util.js</filename></term>
+              <listitem>
+                <para>Some JavaScript utilities used to implement some of the
+                dynamic features like collapsible sections, and switching to
+                frames view.</para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -458,10 +458,10 @@
             specified directory if the <option>-o</option> option is
             given), including the following:</para>
 
-	  <variablelist>
-	    <varlistentry>
-	      <term><filename><replaceable>package</replaceable>.tex</filename></term>
-	      <listitem>
+          <variablelist>
+            <varlistentry>
+              <term><filename><replaceable>package</replaceable>.tex</filename></term>
+              <listitem>
                 <para>The top-level LaTeX source file; to format the
                 documentation into PDF you might run something like
                   this:</para>
@@ -512,110 +512,110 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>-S</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-S</option></primary></indexterm>
           <option>-S</option>
         </term>
-	<term>
-	  <indexterm><primary><option>--docbook</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--docbook</option></primary></indexterm>
           <option>--docbook</option>
         </term>
-	<listitem>
-	  <para>Reserved for future use (output documentation in DocBook XML
-	  format).</para>
-	</listitem>
+        <listitem>
+          <para>Reserved for future use (output documentation in DocBook XML
+          format).</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>--source-base</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--source-base</option></primary></indexterm>
           <option>--source-base</option>=<replaceable>URL</replaceable>
         </term>
-	<term>
-	  <indexterm><primary><option>--source-module</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--source-module</option></primary></indexterm>
           <option>--source-module</option>=<replaceable>URL</replaceable>
         </term>
-	<term>
-	  <indexterm><primary><option>--source-entity</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--source-entity</option></primary></indexterm>
           <option>--source-entity</option>=<replaceable>URL</replaceable>
         </term>
         <term>
-	  <indexterm><primary><option>--source-entity-line</option></primary></indexterm>
-	  <option>--source-entity-line</option>=<replaceable>URL</replaceable>
+          <indexterm><primary><option>--source-entity-line</option></primary></indexterm>
+          <option>--source-entity-line</option>=<replaceable>URL</replaceable>
         </term>
-	<listitem>
-	  <para>Include links to the source files in the generated
-	  documentation. Use the <option>--source-base</option> option to add a
-	  source code link in the header bar of the contents and index pages.
-	  Use the <option>--source-module</option> to add a source code link in
-	  the header bar of each module page. Use the
-	  <option>--source-entity</option> option to add a source code link
-	  next to the documentation for every value and type in each module.
-	  <option>--source-entity-line</option> is a flag that gets used for
-	  entities that need to link to an exact source location rather than a
-	  name, eg. since they were defined inside a Template Haskell splice.
-	  </para>
+        <listitem>
+          <para>Include links to the source files in the generated
+          documentation. Use the <option>--source-base</option> option to add a
+          source code link in the header bar of the contents and index pages.
+          Use the <option>--source-module</option> to add a source code link in
+          the header bar of each module page. Use the
+          <option>--source-entity</option> option to add a source code link
+          next to the documentation for every value and type in each module.
+          <option>--source-entity-line</option> is a flag that gets used for
+          entities that need to link to an exact source location rather than a
+          name, eg. since they were defined inside a Template Haskell splice.
+          </para>
 
-	  <para>In each case <replaceable>URL</replaceable> is the base URL
-	  where the source files can be found.  For the per-module and
-	  per-entity URLs, the following substitutions are made within the
-	  string <replaceable>URL</replaceable>:</para>
+          <para>In each case <replaceable>URL</replaceable> is the base URL
+          where the source files can be found.  For the per-module and
+          per-entity URLs, the following substitutions are made within the
+          string <replaceable>URL</replaceable>:</para>
 
-	  <itemizedlist>
-	    <listitem>
-	      <para>The string <literal>%M</literal> or <literal>%{MODULE}</literal>
-	      is replaced by the module name. Note that for the per-entity URLs
-	      this is the name of the <emphasis>exporting</emphasis> module.</para>
-	    </listitem>
-	    <listitem>
-	      <para>The string <literal>%F</literal> or <literal>%{FILE}</literal>
-	      is replaced by the original source file name. Note that for the
-	      per-entity URLs this is the name of the <emphasis>defining</emphasis>
-	      module.</para>
-	    </listitem>
-	    <listitem>
-	      <para>The string <literal>%N</literal> or <literal>%{NAME}</literal>
-	      is replaced by the name of the exported value or type. This is
-	      only valid for the <option>--source-entity</option> option.</para>
-	    </listitem>
-	    <listitem>
-	      <para>The string <literal>%K</literal> or <literal>%{KIND}</literal>
-	      is replaced by a flag indicating whether the exported name is a value
-	      '<literal>v</literal>' or a type '<literal>t</literal>'. This is
-	      only valid for the <option>--source-entity</option> option.</para>
-	    </listitem>
-	    <listitem>
-	      <para>The string <literal>%L</literal> or <literal>%{LINE}</literal>
-	      is replaced by the number of the line where the exported value or
-	      type is defined. This is only valid for the
-	      <option>--source-entity</option> option.</para>
-	    </listitem>
-	    <listitem>
-	      <para>The string <literal>%%</literal> is replaced by
-	      <literal>%</literal>.</para>
+          <itemizedlist>
+            <listitem>
+              <para>The string <literal>%M</literal> or <literal>%{MODULE}</literal>
+              is replaced by the module name. Note that for the per-entity URLs
+              this is the name of the <emphasis>exporting</emphasis> module.</para>
+            </listitem>
+            <listitem>
+              <para>The string <literal>%F</literal> or <literal>%{FILE}</literal>
+              is replaced by the original source file name. Note that for the
+              per-entity URLs this is the name of the <emphasis>defining</emphasis>
+              module.</para>
+            </listitem>
+            <listitem>
+              <para>The string <literal>%N</literal> or <literal>%{NAME}</literal>
+              is replaced by the name of the exported value or type. This is
+              only valid for the <option>--source-entity</option> option.</para>
+            </listitem>
+            <listitem>
+              <para>The string <literal>%K</literal> or <literal>%{KIND}</literal>
+              is replaced by a flag indicating whether the exported name is a value
+              '<literal>v</literal>' or a type '<literal>t</literal>'. This is
+              only valid for the <option>--source-entity</option> option.</para>
+            </listitem>
+            <listitem>
+              <para>The string <literal>%L</literal> or <literal>%{LINE}</literal>
+              is replaced by the number of the line where the exported value or
+              type is defined. This is only valid for the
+              <option>--source-entity</option> option.</para>
+            </listitem>
+            <listitem>
+              <para>The string <literal>%%</literal> is replaced by
+              <literal>%</literal>.</para>
       </listitem>
 
-	  </itemizedlist>
+          </itemizedlist>
 
-	  <para>For example, if your sources are online under some directory,
-	  you would say
-	  <literal>haddock --source-base=<replaceable>url</replaceable>/
-	  --source-module=<replaceable>url</replaceable>/%F</literal></para>
+          <para>For example, if your sources are online under some directory,
+          you would say
+          <literal>haddock --source-base=<replaceable>url</replaceable>/
+          --source-module=<replaceable>url</replaceable>/%F</literal></para>
 
-	  <para>If you have html versions of your sources online with anchors
-	  for each type and function name, you would say
-	  <literal>haddock --source-base=<replaceable>url</replaceable>/
-	  --source-module=<replaceable>url</replaceable>/%M.html
-	  --source-entity=<replaceable>url</replaceable>/%M.html#%N</literal></para>
+          <para>If you have html versions of your sources online with anchors
+          for each type and function name, you would say
+          <literal>haddock --source-base=<replaceable>url</replaceable>/
+          --source-module=<replaceable>url</replaceable>/%M.html
+          --source-entity=<replaceable>url</replaceable>/%M.html#%N</literal></para>
 
-	  <para>For the <literal>%{MODULE}</literal> substitution you may want to
-	  replace the '<literal>.</literal>' character in the module names with
-	  some other character (some web servers are known to get confused by
-	  multiple '<literal>.</literal>' characters in a file name). To
-	  replace it with a character <replaceable>c</replaceable> use
-	  <literal>%{MODULE/./<replaceable>c</replaceable>}</literal>.</para>
+          <para>For the <literal>%{MODULE}</literal> substitution you may want to
+          replace the '<literal>.</literal>' character in the module names with
+          some other character (some web servers are known to get confused by
+          multiple '<literal>.</literal>' characters in a file name). To
+          replace it with a character <replaceable>c</replaceable> use
+          <literal>%{MODULE/./<replaceable>c</replaceable>}</literal>.</para>
 
-	  <para>Similarly, for the <literal>%{FILE}</literal> substitution
+          <para>Similarly, for the <literal>%{FILE}</literal> substitution
           you may want to replace the '<literal>/</literal>' character in
           the file names with some other character (especially for links
           to colourised entity source code with a shared css file).  To replace
@@ -627,155 +627,155 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           from haddock, is
           <ulink url="http://www.cs.york.ac.uk/fp/darcs/hscolour">hscolour</ulink>.</para>
 
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>-s</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-s</option></primary></indexterm>
           <option>-s</option> <replaceable>URL</replaceable>
         </term>
-	<term>
-	  <indexterm><primary><option>--source</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--source</option></primary></indexterm>
           <option>--source</option>=<replaceable>URL</replaceable>
         </term>
-	<listitem>
-	  <para>Deprecated aliases for <option>--source-module</option></para>
-	</listitem>
+        <listitem>
+          <para>Deprecated aliases for <option>--source-module</option></para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>--comments-base</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--comments-base</option></primary></indexterm>
           <option>--comments-base</option>=<replaceable>URL</replaceable>
         </term>
-	<term>
-	  <indexterm><primary><option>--comments-module</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--comments-module</option></primary></indexterm>
           <option>--comments-module</option>=<replaceable>URL</replaceable>
         </term>
-	<term>
-	  <indexterm><primary><option>--comments-entity</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--comments-entity</option></primary></indexterm>
           <option>--comments-entity</option>=<replaceable>URL</replaceable>
         </term>
-	<listitem>
-	  <para>Include links to pages where readers may comment on the
-	  documentation. This feature would typically be used in conjunction
-	  with a Wiki system.</para>
+        <listitem>
+          <para>Include links to pages where readers may comment on the
+          documentation. This feature would typically be used in conjunction
+          with a Wiki system.</para>
 
-	  <para>Use the <option>--comments-base</option> option to add a
-	  user comments link in the header bar of the contents and index pages.
-	  Use the <option>--comments-module</option> to add a user comments
-	  link in the header bar of each module page. Use the
-	  <option>--comments-entity</option> option to add a comments link
-	  next to the documentation for every value and type in each module.
-	  </para>
+          <para>Use the <option>--comments-base</option> option to add a
+          user comments link in the header bar of the contents and index pages.
+          Use the <option>--comments-module</option> to add a user comments
+          link in the header bar of each module page. Use the
+          <option>--comments-entity</option> option to add a comments link
+          next to the documentation for every value and type in each module.
+          </para>
 
-	  <para>In each case <replaceable>URL</replaceable> is the base URL
-	  where the corresponding comments page can be found.  For the
-	  per-module and per-entity URLs the same substitutions are made as
-	  with the <option>--source-module</option> and
-	  <option>--source-entity</option> options above.</para>
+          <para>In each case <replaceable>URL</replaceable> is the base URL
+          where the corresponding comments page can be found.  For the
+          per-module and per-entity URLs the same substitutions are made as
+          with the <option>--source-module</option> and
+          <option>--source-entity</option> options above.</para>
 
-	  <para>For example, if you want to link the contents page to a wiki
-	  page, and every module to subpages, you would say
-	  <literal>haddock --comments-base=<replaceable>url</replaceable>
-	  --comments-module=<replaceable>url</replaceable>/%M</literal></para>
+          <para>For example, if you want to link the contents page to a wiki
+          page, and every module to subpages, you would say
+          <literal>haddock --comments-base=<replaceable>url</replaceable>
+          --comments-module=<replaceable>url</replaceable>/%M</literal></para>
 
-	  <para>If your Wiki system doesn't like the '<literal>.</literal>' character
-	  in Haskell module names, you can replace it with a different character. For
-	  example to replace the '<literal>.</literal>' characters with
-	  '<literal>_</literal>' use <literal>haddock
-	  --comments-base=<replaceable>url</replaceable>
-	  --comments-module=<replaceable>url</replaceable>/%{MODULE/./_}</literal>
-	  Similarly, you can replace the '<literal>/</literal>' in a file name (may
-	  be useful for entity comments, but probably not.) </para>
+          <para>If your Wiki system doesn't like the '<literal>.</literal>' character
+          in Haskell module names, you can replace it with a different character. For
+          example to replace the '<literal>.</literal>' characters with
+          '<literal>_</literal>' use <literal>haddock
+          --comments-base=<replaceable>url</replaceable>
+          --comments-module=<replaceable>url</replaceable>/%{MODULE/./_}</literal>
+          Similarly, you can replace the '<literal>/</literal>' in a file name (may
+          be useful for entity comments, but probably not.) </para>
 
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>--theme</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--theme</option></primary></indexterm>
           <option>--theme</option>=<replaceable>path</replaceable>
         </term>
-	<listitem>
-	  <para>Specify a theme to be used for HTML (<option>--html</option>)
-	  documentation. If given multiple times then the pages will use the
-	  first theme given by default, and have alternate style sheets for
-	  the others. The reader can switch between themes with browsers that
-	  support alternate style sheets, or with the "Style" menu that gets
-	  added when the page is loaded. If
-	  no themes are specified, then just the default built-in theme
-	  ("Ocean") is used.
-	  </para>
+        <listitem>
+          <para>Specify a theme to be used for HTML (<option>--html</option>)
+          documentation. If given multiple times then the pages will use the
+          first theme given by default, and have alternate style sheets for
+          the others. The reader can switch between themes with browsers that
+          support alternate style sheets, or with the "Style" menu that gets
+          added when the page is loaded. If
+          no themes are specified, then just the default built-in theme
+          ("Ocean") is used.
+          </para>
 
-	  <para>The <replaceable>path</replaceable> parameter can be one of:
-	  </para>
+          <para>The <replaceable>path</replaceable> parameter can be one of:
+          </para>
 
-	  <itemizedlist>
-	    <listitem>
-	      <para>A <emphasis>directory</emphasis>: The base name of
-	      the directory becomes the name of the theme. The directory
-	      must contain exactly one
-	      <filename><replaceable>some</replaceable>.css</filename> file.
-	      Other files, usually image files, will be copied, along with
-	      the <filename><replaceable>some</replaceable>.css</filename>
-	      file, into the generated output directory.</para>
-	    </listitem>
-	    <listitem>
-	      <para>A <emphasis>CSS file</emphasis>: The base name of
-	      the file becomes the name of the theme.</para>
-	    </listitem>
-	    <listitem>
-	      <para>The <emphasis>name</emphasis> of a built-in theme
-	      ("Ocean" or "Classic").</para>
-	    </listitem>
-	  </itemizedlist>
-	</listitem>
+          <itemizedlist>
+            <listitem>
+              <para>A <emphasis>directory</emphasis>: The base name of
+              the directory becomes the name of the theme. The directory
+              must contain exactly one
+              <filename><replaceable>some</replaceable>.css</filename> file.
+              Other files, usually image files, will be copied, along with
+              the <filename><replaceable>some</replaceable>.css</filename>
+              file, into the generated output directory.</para>
+            </listitem>
+            <listitem>
+              <para>A <emphasis>CSS file</emphasis>: The base name of
+              the file becomes the name of the theme.</para>
+            </listitem>
+            <listitem>
+              <para>The <emphasis>name</emphasis> of a built-in theme
+              ("Ocean" or "Classic").</para>
+            </listitem>
+          </itemizedlist>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>--built-in-themes</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--built-in-themes</option></primary></indexterm>
           <option>--built-in-themes</option>
         </term>
-	<listitem>
-	  <para>Includes the built-in themes ("Ocean" and "Classic").
-	  Can be combined with <option>--theme</option>. Note that order
-	  matters: The first specified theme will be the default.</para>
-	</listitem>
+        <listitem>
+          <para>Includes the built-in themes ("Ocean" and "Classic").
+          Can be combined with <option>--theme</option>. Note that order
+          matters: The first specified theme will be the default.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>-c</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-c</option></primary></indexterm>
           <option>-c</option> <replaceable>file</replaceable>
         </term>
-	<term>
-	  <indexterm><primary><option>--css</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--css</option></primary></indexterm>
           <option>--css</option>=<replaceable>file</replaceable>
         </term>
-	<listitem>
-	  <para>Deprecated aliases for <option>--theme</option></para>
-	</listitem>
+        <listitem>
+          <para>Deprecated aliases for <option>--theme</option></para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>-p</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>-p</option></primary></indexterm>
           <option>-p</option> <replaceable>file</replaceable>
         </term>
-	<term>
-	  <indexterm><primary><option>--prologue</option></primary></indexterm>
+        <term>
+          <indexterm><primary><option>--prologue</option></primary></indexterm>
           <option>--prologue</option>=<replaceable>file</replaceable>
         </term>
-	<listitem>
-	  <para>Specify a file containing documentation which is
-	  placed on the main contents page under the heading
-	  &ldquo;Description&rdquo;.  The file is parsed as a normal
-	  Haddock doc comment (but the comment markers are not
-	  required).</para>
-	</listitem>
+        <listitem>
+          <para>Specify a file containing documentation which is
+          placed on the main contents page under the heading
+          &ldquo;Description&rdquo;.  The file is parsed as a normal
+          Haddock doc comment (but the comment markers are not
+          required).</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -787,14 +787,14 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <indexterm><primary><option>--title</option></primary></indexterm>
           <option>--title</option>=<replaceable>title</replaceable>
         </term>
-	<listitem>
-	  <para>Use <replaceable>title</replaceable> as the page
-	  heading for each page in the documentation.This will
-	  normally be the name of the library being documented.</para>
+        <listitem>
+          <para>Use <replaceable>title</replaceable> as the page
+          heading for each page in the documentation.This will
+          normally be the name of the library being documented.</para>
 
-	  <para>The title should be a plain string (no markup
-	  please!).</para>
-	</listitem>
+          <para>The title should be a plain string (no markup
+          please!).</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -848,8 +848,8 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
                         <simpara>relative: x, B.y, C.z</simpara>
                     </listitem>
                 </itemizedlist>
-	        </para>
-	    </listitem>
+                </para>
+            </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -861,9 +861,9 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <indexterm><primary><option>--help</option></primary></indexterm>
           <option>--help</option>
         </term>
-	<listitem>
-	  <para>Display help and exit.</para>
-	</listitem>
+        <listitem>
+          <para>Display help and exit.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -875,9 +875,9 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <indexterm><primary><option>--version</option></primary></indexterm>
           <option>--version</option>
         </term>
-	<listitem>
-	  <para>Output version information and exit.</para>
-	</listitem>
+        <listitem>
+          <para>Output version information and exit.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -889,13 +889,13 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <indexterm><primary><option>--verbose</option></primary></indexterm>
           <option>--verbose</option>
         </term>
-	<listitem>
-	  <para>Increase verbosity.  Currently this will cause Haddock
-	  to emit some extra warnings, in particular about modules
-	  which were imported but it had no information about (this is
-	  often quite normal; for example when there is no information
-	  about the <literal>Prelude</literal>).</para>
-	</listitem>
+        <listitem>
+          <para>Increase verbosity.  Currently this will cause Haddock
+          to emit some extra warnings, in particular about modules
+          which were imported but it had no information about (this is
+          often quite normal; for example when there is no information
+          about the <literal>Prelude</literal>).</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -907,15 +907,15 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <indexterm><primary><option>--use-index</option></primary></indexterm>
           <option>--use-index=<replaceable>URL</replaceable></option>
         </term>
-	<listitem>
-	  <para>When generating HTML, do not generate an index.
-	  Instead, redirect the Contents and/or Index link on each page to
-	  <replaceable>URL</replaceable>.  This option is intended for
-	  use in conjunction with <option>--gen-contents</option> and/or
-	  <option>--gen-index</option> for
-	  generating a separate contents and/or index covering multiple
-	  libraries.</para>
-	</listitem>
+        <listitem>
+          <para>When generating HTML, do not generate an index.
+          Instead, redirect the Contents and/or Index link on each page to
+          <replaceable>URL</replaceable>.  This option is intended for
+          use in conjunction with <option>--gen-contents</option> and/or
+          <option>--gen-index</option> for
+          generating a separate contents and/or index covering multiple
+          libraries.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -927,64 +927,64 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <indexterm><primary><option>--gen-index</option></primary></indexterm>
           <option>--gen-index</option>
         </term>
-	<listitem>
-	  <para>Generate an HTML contents and/or index containing entries pulled
-	  from all the specified interfaces (interfaces are specified using
-	  <option>-i</option> or <option>--read-interface</option>).
-	  This is used to generate a single contents and/or index for multiple
-	  sets of Haddock documentation.</para>
-	</listitem>
+        <listitem>
+          <para>Generate an HTML contents and/or index containing entries pulled
+          from all the specified interfaces (interfaces are specified using
+          <option>-i</option> or <option>--read-interface</option>).
+          This is used to generate a single contents and/or index for multiple
+          sets of Haddock documentation.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>--ignore-all-exports</option></primary>
-	  </indexterm>
-	  <option>--ignore-all-exports</option>
-	</term>
-	<listitem>
-	  <para>Causes Haddock to behave as if every module has the
-	    <literal>ignore-exports</literal> attribute (<xref
-	      linkend="module-attributes" />).  This might be useful for
-	    generating implementation documentation rather than interface
-	    documentation, for example.</para>
-	</listitem>
+        <term>
+          <indexterm><primary><option>--ignore-all-exports</option></primary>
+          </indexterm>
+          <option>--ignore-all-exports</option>
+        </term>
+        <listitem>
+          <para>Causes Haddock to behave as if every module has the
+            <literal>ignore-exports</literal> attribute (<xref
+              linkend="module-attributes" />).  This might be useful for
+            generating implementation documentation rather than interface
+            documentation, for example.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>--hide</option></primary>
-	  </indexterm>
-	  <option>--hide</option>&nbsp;<replaceable>module</replaceable>
-	</term>
-	<listitem>
-	  <para>Causes Haddock to behave as if module
-	    <replaceable>module</replaceable> has the <literal>hide</literal>
-	    attribute. (<xref linkend="module-attributes" />).</para>
-	</listitem>
+        <term>
+          <indexterm><primary><option>--hide</option></primary>
+          </indexterm>
+          <option>--hide</option>&nbsp;<replaceable>module</replaceable>
+        </term>
+        <listitem>
+          <para>Causes Haddock to behave as if module
+            <replaceable>module</replaceable> has the <literal>hide</literal>
+            attribute. (<xref linkend="module-attributes" />).</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
-	  <indexterm><primary><option>--show-extensions</option></primary>
-	  </indexterm>
-	  <option>--show-extensions</option>&nbsp;<replaceable>module</replaceable>
-	</term>
-	<listitem>
-	  <para>Causes Haddock to behave as if module
-	    <replaceable>module</replaceable> has the <literal>show-extensions</literal>
-	    attribute. (<xref linkend="module-attributes" />).</para>
-	</listitem>
+        <term>
+          <indexterm><primary><option>--show-extensions</option></primary>
+          </indexterm>
+          <option>--show-extensions</option>&nbsp;<replaceable>module</replaceable>
+        </term>
+        <listitem>
+          <para>Causes Haddock to behave as if module
+            <replaceable>module</replaceable> has the <literal>show-extensions</literal>
+            attribute. (<xref linkend="module-attributes" />).</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>
+        <term>
           <indexterm><primary><option>--optghc</option></primary></indexterm>
           <option>--optghc</option>=<replaceable>option</replaceable>
         </term>
-	<listitem>
-	  <para>Pass <replaceable>option</replaceable> to GHC. Note that there is a double dash there, unlike for GHC.</para>
-	</listitem>
+        <listitem>
+          <para>Pass <replaceable>option</replaceable> to GHC. Note that there is a double dash there, unlike for GHC.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -996,9 +996,9 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <indexterm><primary><option>--no-warnings</option></primary></indexterm>
           <option>--no-warnings</option>
         </term>
-	<listitem>
-	  <para>Turn off all warnings.</para>
-	</listitem>
+        <listitem>
+          <para>Turn off all warnings.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -1006,12 +1006,12 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <indexterm><primary><option>--compatible-interface-versions</option></primary></indexterm>
           <option>--compatible-interface-versions</option>
         </term>
-	<listitem>
+        <listitem>
           <para>
             Prints out space-separated versions of binary Haddock interface files that this version is compatible
             with.
           </para>
-	</listitem>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -1019,7 +1019,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           <indexterm><primary><option>--no-tmp-comp-dir</option></primary></indexterm>
           <option>--no-tmp-comp-dir</option>
         </term>
-	<listitem>
+        <listitem>
           <para>
           Do not use a temporary directory for reading and writing compilation output files
           (<literal>.o</literal>, <literal>.hi</literal>, and stub files). Instead, use the
@@ -1031,7 +1031,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           Compilation files are produced when Haddock has to process modules that make use of
           Template Haskell, in which case Haddock compiles the modules using the GHC API.
           </para>
-	</listitem>
+        </listitem>
       </varlistentry>
     </variablelist>
 
@@ -1090,21 +1090,21 @@ square x = x * x
       <para>The declaration following a documentation annotation
       should be one of the following:</para>
       <itemizedlist>
-	<listitem>
-	  <para>A type signature for a top-level function,</para>
-	</listitem>
-	<listitem>
-	  <para>A <literal>data</literal> declaration,</para>
-	</listitem>
-	<listitem>
-	  <para>A <literal>newtype</literal> declaration,</para>
-	</listitem>
-	<listitem>
-	  <para>A <literal>type</literal> declaration</para>
-	</listitem>
-	<listitem>
-	  <para>A <literal>class</literal> declaration,</para>
-	</listitem>
+        <listitem>
+          <para>A type signature for a top-level function,</para>
+        </listitem>
+        <listitem>
+          <para>A <literal>data</literal> declaration,</para>
+        </listitem>
+        <listitem>
+          <para>A <literal>newtype</literal> declaration,</para>
+        </listitem>
+        <listitem>
+          <para>A <literal>type</literal> declaration</para>
+        </listitem>
+        <listitem>
+          <para>A <literal>class</literal> declaration,</para>
+        </listitem>
         <listitem>
           <para>A <literal>data family</literal> or
             <literal>type family</literal> declaration, or</para>
@@ -1166,13 +1166,13 @@ square x = x * x
       declaration.</para>
 
       <section>
-	<title>Class methods</title>
+        <title>Class methods</title>
 
-	<para>Class methods are documented in the same way as top
-	level type signatures, by using either the
-	<quote><literal>--&nbsp;|</literal></quote> or
-	<quote><literal>--&nbsp;^</literal></quote>
-	annotations:</para>
+        <para>Class methods are documented in the same way as top
+        level type signatures, by using either the
+        <quote><literal>--&nbsp;|</literal></quote> or
+        <quote><literal>--&nbsp;^</literal></quote>
+        annotations:</para>
 
 <programlisting>
 class C a where
@@ -1184,9 +1184,9 @@ class C a where
       </section>
 
       <section>
-	<title>Constructors and record fields</title>
+        <title>Constructors and record fields</title>
 
-	<para>Constructors are documented like so:</para>
+        <para>Constructors are documented like so:</para>
 
 <programlisting>
 data T a b
@@ -1196,7 +1196,7 @@ data T a b
   | C2 a b
 </programlisting>
 
-	<para>or like this:</para>
+        <para>or like this:</para>
 
 <programlisting>
 data T a b
@@ -1204,8 +1204,8 @@ data T a b
   | C2 a b  -- ^ This is the documentation for the 'C2' constructor
 </programlisting>
 
-	<para>Record fields are documented using one of these
-	styles:</para>
+        <para>Record fields are documented using one of these
+        styles:</para>
 
 <programlisting>
 data R a b =
@@ -1251,10 +1251,10 @@ data T a = A { someField :: a -- ^ Doc for someField of A
       </section>
 
       <section>
-	<title>Function arguments</title>
+        <title>Function arguments</title>
 
-	<para>Individual arguments to a function may be documented
-	like this:</para>
+        <para>Individual arguments to a function may be documented
+        like this:</para>
 
 <programlisting>
 f  :: Int      -- ^ The 'Int' argument
@@ -1406,12 +1406,12 @@ module Foo (
 </programlisting>
 
       <section>
-	<title>Re-exporting an entire module</title>
+        <title>Re-exporting an entire module</title>
 
-	<para>Haskell allows you to re-export the entire contents of a
-	module (or at least, everything currently in scope that was
-	imported from a given module) by listing it in the export
-	list:</para>
+        <para>Haskell allows you to re-export the entire contents of a
+        module (or at least, everything currently in scope that was
+        imported from a given module) by listing it in the export
+        list:</para>
 
 <programlisting>
 module A (
@@ -1420,15 +1420,15 @@ module A (
  ) where
 </programlisting>
 
-	<para>What will the Haddock-generated documentation for this
-	module look like?  Well, it depends on how the modules
-	<literal>B</literal> and <literal>C</literal> are imported.
-	If they are imported wholly and without any
-	<literal>hiding</literal> qualifiers, then the documentation
-	will just contain a cross-reference to the documentation for
-	<literal>B</literal> and <literal>C</literal>.  However, if
-	the modules are not <emphasis>completely</emphasis>
-	re-exported, for example:</para>
+        <para>What will the Haddock-generated documentation for this
+        module look like?  Well, it depends on how the modules
+        <literal>B</literal> and <literal>C</literal> are imported.
+        If they are imported wholly and without any
+        <literal>hiding</literal> qualifiers, then the documentation
+        will just contain a cross-reference to the documentation for
+        <literal>B</literal> and <literal>C</literal>.  However, if
+        the modules are not <emphasis>completely</emphasis>
+        re-exported, for example:</para>
 
 <programlisting>
 module A (
@@ -1440,37 +1440,37 @@ import B hiding (f)
 import C (a, b)
 </programlisting>
 
-	<para>then Haddock behaves as if the set of entities
-	re-exported from <literal>B</literal> and <literal>C</literal>
-	had been listed explicitly in the export
-	list<footnote><para>NOTE: this is not fully implemented at the
-	time of writing (version 0.2).  At the moment, Haddock always
-	inserts a cross-reference.</para>
-	  </footnote>.</para>
+        <para>then Haddock behaves as if the set of entities
+        re-exported from <literal>B</literal> and <literal>C</literal>
+        had been listed explicitly in the export
+        list<footnote><para>NOTE: this is not fully implemented at the
+        time of writing (version 0.2).  At the moment, Haddock always
+        inserts a cross-reference.</para>
+          </footnote>.</para>
 
-	<para>The exception to this rule is when the re-exported
-	module is declared with the <literal>hide</literal> attribute
-	(<xref linkend="module-attributes"/>), in which case the module
-	is never cross-referenced; the contents are always expanded in
-	place in the re-exporting module.</para>
+        <para>The exception to this rule is when the re-exported
+        module is declared with the <literal>hide</literal> attribute
+        (<xref linkend="module-attributes"/>), in which case the module
+        is never cross-referenced; the contents are always expanded in
+        place in the re-exporting module.</para>
       </section>
 
       <section>
-	<title>Omitting the export list</title>
+        <title>Omitting the export list</title>
 
-	<para>If there is no export list in the module, how does
-	Haddock generate documentation?  Well, when the export list is
-	omitted, e.g.:</para>
+        <para>If there is no export list in the module, how does
+        Haddock generate documentation?  Well, when the export list is
+        omitted, e.g.:</para>
 
 <programlisting>module Foo where</programlisting>
 
-	<para>this is equivalent to an export list which mentions
-	every entity defined at the top level in this module, and
-	Haddock treats it in the same way.  Furthermore, the generated
-	documentation will retain the order in which entities are
-	defined in the module.  In this special case the module body
-	may also include section headings (normally they would be
-	ignored by Haddock).</para>
+        <para>this is equivalent to an export list which mentions
+        every entity defined at the top level in this module, and
+        Haddock treats it in the same way.  Furthermore, the generated
+        documentation will retain the order in which entities are
+        defined in the module.  In this special case the module body
+        may also include section headings (normally they would be
+        ignored by Haddock).</para>
 
 <programlisting>
 module Foo where
@@ -1493,9 +1493,9 @@ foo = 5
       declaration.  There are two ways to do this:</para>
 
       <itemizedlist>
-	<listitem>
-	  <para>The documentation can be included in the export list
-	  directly, e.g.:</para>
+        <listitem>
+          <para>The documentation can be included in the export list
+          directly, e.g.:</para>
 
 <programlisting>
 module Foo (
@@ -1505,15 +1505,15 @@ module Foo (
    ...
  ) where
 </programlisting>
-	</listitem>
+        </listitem>
 
-	<listitem>
-	  <para>If the documentation is large and placing it inline in
-	  the export list might bloat the export list and obscure the
-	  structure, then it can be given a name and placed out of
-	  line in the body of the module.  This is achieved with a
-	  special form of documentation annotation
-	  <quote><literal>--&nbsp;$</literal></quote>:</para>
+        <listitem>
+          <para>If the documentation is large and placing it inline in
+          the export list might bloat the export list and obscure the
+          structure, then it can be given a name and placed out of
+          line in the body of the module.  This is achieved with a
+          special form of documentation annotation
+          <quote><literal>--&nbsp;$</literal></quote>:</para>
 
 <programlisting>
 module Foo (
@@ -1528,11 +1528,11 @@ module Foo (
 -- the name $doc.
 </programlisting>
 
-	  <para>The documentation chunk is given a name, which is the
-	  sequence of alphanumeric characters directly after the
-	  <quote><literal>--&nbsp;$</literal></quote>, and it may be
-	  referred to by the same name in the export list.</para>
-	</listitem>
+          <para>The documentation chunk is given a name, which is the
+          sequence of alphanumeric characters directly after the
+          <quote><literal>--&nbsp;$</literal></quote>, and it may be
+          referred to by the same name in the export list.</para>
+        </listitem>
       </itemizedlist>
     </section>
 
@@ -1570,49 +1570,49 @@ import B
       <literal>T</literal>.  Module <literal>B</literal> imports
       <literal>A</literal> and exports a function <literal>f</literal>
       whose type refers to <literal>T</literal>.  Also, both
-	<literal>T</literal> and <literal>f</literal> are re-exported from
-	module C.</para>
+        <literal>T</literal> and <literal>f</literal> are re-exported from
+        module C.</para>
 
       <para>Haddock takes the view that each entity has a
-	<emphasis>home</emphasis> module; that is, the module that the library
-	designer would most like to direct the user to, to find the
-	documentation for that entity.  So, Haddock makes all links to an entity
-	point to the home module.  The one exception is when the entity is also
+        <emphasis>home</emphasis> module; that is, the module that the library
+        designer would most like to direct the user to, to find the
+        documentation for that entity.  So, Haddock makes all links to an entity
+        point to the home module.  The one exception is when the entity is also
       exported by the current module: Haddock makes a local link if it
-	can.</para>
+        can.</para>
 
       <para>How is the home module for an entity determined?
-	Haddock uses the following rules:</para>
+        Haddock uses the following rules:</para>
 
       <itemizedlist>
-	<listitem>
-	  <para>If modules A and B both export the entity, and module A imports
-	    (directly or indirectly) module B, then B is preferred.</para>
-	</listitem>
-	<listitem>
-	  <para>A module with the <literal>hide</literal> attribute is never
-	    chosen as the home.</para>
-	</listitem>
-	<listitem>
-	  <para>A module with the <literal>not-home</literal> attribute is only
-	    chosen if there are no other modules to choose.</para>
-	</listitem>
+        <listitem>
+          <para>If modules A and B both export the entity, and module A imports
+            (directly or indirectly) module B, then B is preferred.</para>
+        </listitem>
+        <listitem>
+          <para>A module with the <literal>hide</literal> attribute is never
+            chosen as the home.</para>
+        </listitem>
+        <listitem>
+          <para>A module with the <literal>not-home</literal> attribute is only
+            chosen if there are no other modules to choose.</para>
+        </listitem>
       </itemizedlist>
 
       <para>If multiple modules fit the criteria, then one is chosen at
-	random.  If no modules fit the criteria (because the candidates are all
+        random.  If no modules fit the criteria (because the candidates are all
       hidden), then Haddock will issue a warning for each reference to an
-	entity without a home.</para>
+        entity without a home.</para>
 
       <para>In the example above, module <literal>A</literal> is chosen as the
-	home for <literal>T</literal> because it does not import any other
-	module that exports <literal>T</literal>.  The link from
-	<literal>f</literal>'s
-	type in module <literal>B</literal> will therefore point to
-	<literal>A.T</literal>.  However, <literal>C</literal> also exports
-	<literal>T</literal> and <literal>f</literal>, and the link from
-	<literal>f</literal>'s type in <literal>C</literal> will therefore
-	point locally to <literal>C.T</literal>.</para>
+        home for <literal>T</literal> because it does not import any other
+        module that exports <literal>T</literal>.  The link from
+        <literal>f</literal>'s
+        type in module <literal>B</literal> will therefore point to
+        <literal>A.T</literal>.  However, <literal>C</literal> also exports
+        <literal>T</literal> and <literal>f</literal>, and the link from
+        <literal>f</literal>'s type in <literal>C</literal> will therefore
+        point locally to <literal>C.T</literal>.</para>
     </section>
 
     <section id="module-attributes">
@@ -1639,68 +1639,68 @@ module A where
       Haddock:</para>
 
       <variablelist>
-	<varlistentry>
+        <varlistentry>
           <term>
             <indexterm><primary><literal>hide</literal></primary></indexterm>
             <literal>hide</literal>
           </term>
-	  <listitem>
-	    <para>Omit this module from the generated documentation,
-	    but nevertheless propagate definitions and documentation
-	    from within this module to modules that re-export those
-	    definitions.</para>
-	  </listitem>
-	</varlistentry>
+          <listitem>
+            <para>Omit this module from the generated documentation,
+            but nevertheless propagate definitions and documentation
+            from within this module to modules that re-export those
+            definitions.</para>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
+        <varlistentry>
           <term>
             <indexterm><primary><literal>hide</literal></primary></indexterm>
             <literal>prune</literal>
           </term>
-	  <listitem>
-	    <para>Omit definitions that have no documentation
-	    annotations from the generated documentation.</para>
-	  </listitem>
-	</varlistentry>
+          <listitem>
+            <para>Omit definitions that have no documentation
+            annotations from the generated documentation.</para>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
+        <varlistentry>
           <term>
             <indexterm><primary><literal>ignore-exports</literal></primary></indexterm>
             <literal>ignore-exports</literal>
           </term>
-	  <listitem>
-	    <para>Ignore the export list.  Generate documentation as
-	    if the module had no export list - i.e. all the top-level
-	    declarations are exported, and section headings may be
-	    given in the body of the module.</para>
-	  </listitem>
-	</varlistentry>
+          <listitem>
+            <para>Ignore the export list.  Generate documentation as
+            if the module had no export list - i.e. all the top-level
+            declarations are exported, and section headings may be
+            given in the body of the module.</para>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
-	    <indexterm><primary><literal>not-home</literal></primary></indexterm>
+        <varlistentry>
+          <term>
+            <indexterm><primary><literal>not-home</literal></primary></indexterm>
       <literal>not-home</literal>
-	  </term>
-	  <listitem>
-	    <para>Indicates that the current module should not be considered to
-	      be the home module for each entity it exports,
-	      unless that entity is not exported from any other module.  See
-	      <xref linkend="hyperlinking" /> for more details.</para>
-	  </listitem>
-	</varlistentry>
+          </term>
+          <listitem>
+            <para>Indicates that the current module should not be considered to
+              be the home module for each entity it exports,
+              unless that entity is not exported from any other module.  See
+              <xref linkend="hyperlinking" /> for more details.</para>
+          </listitem>
+        </varlistentry>
 
-	<varlistentry>
-	  <term>
-	    <indexterm><primary><literal>show-extensions</literal></primary></indexterm>
+        <varlistentry>
+          <term>
+            <indexterm><primary><literal>show-extensions</literal></primary></indexterm>
       <literal>show-extensions</literal>
-	  </term>
-	  <listitem>
-	    <para>Indicates that we should render the extensions used in this module in the
+          </term>
+          <listitem>
+            <para>Indicates that we should render the extensions used in this module in the
             resulting documentation. This will only render if the output format supports it.
             If Language is set, it will be shown as well and all the extensions implied by it won't.
             All enabled extensions will be rendered, including those implied by their more powerful versions.</para>
-	  </listitem>
-	</varlistentry>
+          </listitem>
+        </varlistentry>
 
       </variablelist>
 
@@ -1717,22 +1717,22 @@ module A where
       when editing documentation comments.</para>
 
       <section>
-	<title>Paragraphs</title>
+        <title>Paragraphs</title>
 
-	<para>One or more blank lines separates two paragraphs in a
-	documentation comment.</para>
+        <para>One or more blank lines separates two paragraphs in a
+        documentation comment.</para>
       </section>
 
       <section>
-	<title>Special characters</title>
+        <title>Special characters</title>
 
-	<para>The following characters have special meanings in
-	documentation comments: <literal>\</literal>, <literal>/</literal>,
-	<literal>'</literal>, <literal>`</literal>,
-	<literal>"</literal>, <literal>@</literal>,
-	<literal>&lt;</literal>.  To insert a literal occurrence of
-	one of these special characters, precede it with a backslash
-	(<literal>\</literal>).</para>
+        <para>The following characters have special meanings in
+        documentation comments: <literal>\</literal>, <literal>/</literal>,
+        <literal>'</literal>, <literal>`</literal>,
+        <literal>"</literal>, <literal>@</literal>,
+        <literal>&lt;</literal>.  To insert a literal occurrence of
+        one of these special characters, precede it with a backslash
+        (<literal>\</literal>).</para>
 
         <para>Additionally, the character <literal>&gt;</literal> has
         a special meaning at the beginning of a line, and the
@@ -1748,35 +1748,35 @@ module A where
       </section>
 
       <section>
-	<title>Character references</title>
+        <title>Character references</title>
 
-	<para>Although Haskell source files may contain any character
-	from the Unicode character set, the encoding of these characters
-	as bytes varies between systems, so that only source files
-	restricted to the ASCII character set are portable.  Other
-	characters may be specified in character and string literals
-	using Haskell character escapes.  To represent such characters
-	in documentation comments, Haddock supports SGML-style numeric
-	character references of the forms
-	<literal>&amp;#</literal><replaceable>D</replaceable><literal>;</literal>
-	and
-	<literal>&amp;#x</literal><replaceable>H</replaceable><literal>;</literal>
-	where <replaceable>D</replaceable> and <replaceable>H</replaceable>
-	are decimal and hexadecimal numbers denoting a code position
-	in Unicode (or ISO 10646).  For example, the references
-	<literal>&amp;#x3BB;</literal>, <literal>&amp;#x3bb;</literal>
-	and <literal>&amp;#955;</literal> all represent the lower-case
-	letter lambda.</para>
+        <para>Although Haskell source files may contain any character
+        from the Unicode character set, the encoding of these characters
+        as bytes varies between systems, so that only source files
+        restricted to the ASCII character set are portable.  Other
+        characters may be specified in character and string literals
+        using Haskell character escapes.  To represent such characters
+        in documentation comments, Haddock supports SGML-style numeric
+        character references of the forms
+        <literal>&amp;#</literal><replaceable>D</replaceable><literal>;</literal>
+        and
+        <literal>&amp;#x</literal><replaceable>H</replaceable><literal>;</literal>
+        where <replaceable>D</replaceable> and <replaceable>H</replaceable>
+        are decimal and hexadecimal numbers denoting a code position
+        in Unicode (or ISO 10646).  For example, the references
+        <literal>&amp;#x3BB;</literal>, <literal>&amp;#x3bb;</literal>
+        and <literal>&amp;#955;</literal> all represent the lower-case
+        letter lambda.</para>
       </section>
 
       <section>
-	<title>Code Blocks</title>
+        <title>Code Blocks</title>
 
-	<para>Displayed blocks of code are indicated by surrounding a
-	paragraph with <literal>@...@</literal> or by preceding each
-	line of a paragraph with <literal>&gt;</literal> (we often
-	call these &ldquo;bird tracks&rdquo;).  For
-	example:</para>
+        <para>Displayed blocks of code are indicated by surrounding a
+        paragraph with <literal>@...@</literal> or by preceding each
+        line of a paragraph with <literal>&gt;</literal> (we often
+        call these &ldquo;bird tracks&rdquo;).  For
+        example:</para>
 
 <programlisting>
 -- | This documentation includes two blocks of code:
@@ -1788,7 +1788,7 @@ module A where
 -- &gt;  g x = x * 42
 </programlisting>
 
-	<para>There is an important difference between the two forms
+        <para>There is an important difference between the two forms
         of code block: in the bird-track form, the text to the right
         of the &lsquo;<literal>></literal>&rsquo; is interpreted
         literally, whereas the <literal>@...@</literal> form
@@ -1796,13 +1796,13 @@ module A where
       </section>
 
       <section>
-	<title>Examples</title>
+        <title>Examples</title>
 
-	<para> Haddock has markup support for examples of interaction with a
+        <para> Haddock has markup support for examples of interaction with a
   <emphasis>read-eval-print loop (REPL)</emphasis>.  An
-	example is introduced with
-	<literal>&gt;&gt;&gt;</literal> followed by an expression followed
-	by zero or more result lines:</para>
+        example is introduced with
+        <literal>&gt;&gt;&gt;</literal> followed by an expression followed
+        by zero or more result lines:</para>
 
 <programlisting>
 -- | Two examples are given below:
@@ -1814,13 +1814,13 @@ module A where
 -- foo
 -- bar
 </programlisting>
-	<para>Result lines that only contain the string
-	<literal>&lt;BLANKLINE&gt;</literal> are rendered as blank lines in the
-	generated documentation.</para>
+        <para>Result lines that only contain the string
+        <literal>&lt;BLANKLINE&gt;</literal> are rendered as blank lines in the
+        generated documentation.</para>
       </section>
 
       <section>
-	<title>Properties</title>
+        <title>Properties</title>
         <para>
           Haddock provides markup for properties:
 <programlisting>
@@ -1833,60 +1833,60 @@ module A where
       </section>
 
       <section>
-	<title>Hyperlinked Identifiers</title>
+        <title>Hyperlinked Identifiers</title>
 
-	<para>Referring to a Haskell identifier, whether it be a type,
-	class, constructor, or function, is done by surrounding it
-	with single quotes:</para>
+        <para>Referring to a Haskell identifier, whether it be a type,
+        class, constructor, or function, is done by surrounding it
+        with single quotes:</para>
 
 <programlisting>
 -- | This module defines the type 'T'.
 </programlisting>
 
-	<para>If there is an entity <literal>T</literal> in scope in
-	the current module, then the documentation will hyperlink the
-	reference in the text to the definition of
-	<literal>T</literal> (if the output format supports
-	hyperlinking, of course; in a printed format it might instead
-	insert a page reference to the definition).</para>
+        <para>If there is an entity <literal>T</literal> in scope in
+        the current module, then the documentation will hyperlink the
+        reference in the text to the definition of
+        <literal>T</literal> (if the output format supports
+        hyperlinking, of course; in a printed format it might instead
+        insert a page reference to the definition).</para>
 
-	<para>It is also possible to refer to entities that are not in
-	scope in the current module, by giving the full qualified name
-	of the entity:</para>
+        <para>It is also possible to refer to entities that are not in
+        scope in the current module, by giving the full qualified name
+        of the entity:</para>
 
 <programlisting>
 -- | The identifier 'M.T' is not in scope
 </programlisting>
 
-	<para>If <literal>M.T</literal> is not otherwise in scope,
-	then Haddock will simply emit a link pointing to the entity
-	<literal>T</literal> exported from module <literal>M</literal>
-	(without checking to see whether either <literal>M</literal>
-	or <literal>M.T</literal> exist).</para>
+        <para>If <literal>M.T</literal> is not otherwise in scope,
+        then Haddock will simply emit a link pointing to the entity
+        <literal>T</literal> exported from module <literal>M</literal>
+        (without checking to see whether either <literal>M</literal>
+        or <literal>M.T</literal> exist).</para>
 
-	<para>To make life easier for documentation writers, a quoted
-	identifier is only interpreted as such if the quotes surround
-	a lexically valid Haskell identifier.  This means, for
-	example, that it normally isn't necessary to escape the single
-	quote when used as an apostrophe:</para>
+        <para>To make life easier for documentation writers, a quoted
+        identifier is only interpreted as such if the quotes surround
+        a lexically valid Haskell identifier.  This means, for
+        example, that it normally isn't necessary to escape the single
+        quote when used as an apostrophe:</para>
 
 <programlisting>
 -- | I don't have to escape my apostrophes; great, isn't it?
 </programlisting>
 
-	<para>For compatibility with other systems, the following
-	alternative form of markup is accepted<footnote><para>
-	We chose not to use this as the primary markup for
-	identifiers because strictly speaking the <literal>`</literal>
-	character should not be used as a left quote, it is a grave accent.</para>
-	  </footnote>: <literal>`T'</literal>.</para>
+        <para>For compatibility with other systems, the following
+        alternative form of markup is accepted<footnote><para>
+        We chose not to use this as the primary markup for
+        identifiers because strictly speaking the <literal>`</literal>
+        character should not be used as a left quote, it is a grave accent.</para>
+          </footnote>: <literal>`T'</literal>.</para>
       </section>
 
       <section>
-	<title>Emphasis, Bold and Monospaced text</title>
+        <title>Emphasis, Bold and Monospaced text</title>
 
-	<para>Emphasis may be added by surrounding text with
-	<literal>/.../</literal>. Other markup is valid inside emphasis. To have a forward
+        <para>Emphasis may be added by surrounding text with
+        <literal>/.../</literal>. Other markup is valid inside emphasis. To have a forward
         slash inside of emphasis, just escape it: <literal>/fo\/o/</literal></para>
 
         <para>Bold (strong) text is indicated by surrounding it with <literal>__...__</literal>.
@@ -1895,18 +1895,18 @@ module A where
         <literal>__This_text_with_underscores_is_bold__</literal>.
         </para>
 
-	<para>Monospaced (or typewriter) text is indicated by
-	surrounding it with <literal>@...@</literal>.  Other markup is
-	valid inside a monospaced span: for example
-	<literal>@'f'&nbsp;a&nbsp;b@</literal> will hyperlink the
-	identifier <literal>f</literal> inside the code fragment.</para>
+        <para>Monospaced (or typewriter) text is indicated by
+        surrounding it with <literal>@...@</literal>.  Other markup is
+        valid inside a monospaced span: for example
+        <literal>@'f'&nbsp;a&nbsp;b@</literal> will hyperlink the
+        identifier <literal>f</literal> inside the code fragment.</para>
       </section>
 
       <section>
-	<title>Linking to modules</title>
+        <title>Linking to modules</title>
 
-	<para>Linking to a module is done by surrounding the module
-	name with double quotes:</para>
+        <para>Linking to a module is done by surrounding the module
+        name with double quotes:</para>
 
 <programlisting>
 -- | This is a reference to the "Foo" module.
@@ -1920,13 +1920,13 @@ module A where
       </section>
 
       <section>
-	<title>Itemized and Enumerated lists</title>
+        <title>Itemized and Enumerated lists</title>
 
-	<para>A bulleted item is represented by preceding a paragraph
-	with either <quote><literal>*</literal></quote> or
-	<quote><literal>-</literal></quote>.  A sequence of bulleted
-	paragraphs is rendered as an itemized list in the generated
-	documentation, eg.:</para>
+        <para>A bulleted item is represented by preceding a paragraph
+        with either <quote><literal>*</literal></quote> or
+        <quote><literal>-</literal></quote>.  A sequence of bulleted
+        paragraphs is rendered as an itemized list in the generated
+        documentation, eg.:</para>
 
 <programlisting>
 -- | This is a bulleted list:
@@ -1936,12 +1936,12 @@ module A where
 --     * second item
 </programlisting>
 
-	<para>An enumerated list is similar, except each paragraph
-	must be preceded by either
-	<quote><literal>(<replaceable>n</replaceable>)</literal></quote>
-	or
-	<quote><literal><replaceable>n</replaceable>.</literal></quote>
-	where <replaceable>n</replaceable> is any integer.  e.g.</para>
+        <para>An enumerated list is similar, except each paragraph
+        must be preceded by either
+        <quote><literal>(<replaceable>n</replaceable>)</literal></quote>
+        or
+        <quote><literal><replaceable>n</replaceable>.</literal></quote>
+        where <replaceable>n</replaceable> is any integer.  e.g.</para>
 
 <programlisting>
 -- | This is an enumerated list:
@@ -2006,9 +2006,9 @@ This belongs to the list above!
       </section>
 
       <section>
-	<title>Definition lists</title>
+        <title>Definition lists</title>
 
-	<para>Definition lists are written as follows:</para>
+        <para>Definition lists are written as follows:</para>
 
 <programlisting>
 -- | This is a definition list:
@@ -2018,32 +2018,32 @@ This belongs to the list above!
 --   [@bar@] The description of @bar@.
 </programlisting>
 
-	<para>To produce output something like this:</para>
+        <para>To produce output something like this:</para>
 
-	<variablelist>
-	  <varlistentry>
-	    <term><literal>foo</literal></term>
-	    <listitem>
-	      <para>The description of <literal>foo</literal>.</para>
-	    </listitem>
-	  </varlistentry>
-	  <varlistentry>
-	    <term><literal>bar</literal></term>
-	    <listitem>
-	      <para>The description of <literal>bar</literal>.</para>
-	    </listitem>
-	  </varlistentry>
-	</variablelist>
+        <variablelist>
+          <varlistentry>
+            <term><literal>foo</literal></term>
+            <listitem>
+              <para>The description of <literal>foo</literal>.</para>
+            </listitem>
+          </varlistentry>
+          <varlistentry>
+            <term><literal>bar</literal></term>
+            <listitem>
+              <para>The description of <literal>bar</literal>.</para>
+            </listitem>
+          </varlistentry>
+        </variablelist>
 
-	<para>Each paragraph should be preceded by the
-	&ldquo;definition term&rdquo; enclosed in square brackets.
-	The square bracket characters have no special meaning outside
-	the beginning of a definition paragraph.  That is, if a
-	paragraph begins with a <literal>[</literal> character, then
-	it is assumed to be a definition paragraph, and the next
-	<literal>]</literal> character found will close the definition
-	term.  Other markup operators may be used freely within the
-	definition term. You can escape <literal>]</literal> with a backslash as usual.</para>
+        <para>Each paragraph should be preceded by the
+        &ldquo;definition term&rdquo; enclosed in square brackets.
+        The square bracket characters have no special meaning outside
+        the beginning of a definition paragraph.  That is, if a
+        paragraph begins with a <literal>[</literal> character, then
+        it is assumed to be a definition paragraph, and the next
+        <literal>]</literal> character found will close the definition
+        term.  Other markup operators may be used freely within the
+        definition term. You can escape <literal>]</literal> with a backslash as usual.</para>
 
       <para>Same rules about nesting and no newline separation as for bulleted and numbered lists apply.
       </para>
@@ -2051,13 +2051,13 @@ This belongs to the list above!
       </section>
 
       <section>
-	<title>URLs</title>
+        <title>URLs</title>
 
-	<para>A URL can be included in a documentation comment by
-	surrounding it in angle brackets:
-	<literal>&lt;...&gt;</literal>.  If the output format supports
-	it, the URL will be turned into a hyperlink when
-	rendered.</para>
+        <para>A URL can be included in a documentation comment by
+        surrounding it in angle brackets:
+        <literal>&lt;...&gt;</literal>.  If the output format supports
+        it, the URL will be turned into a hyperlink when
+        rendered.</para>
 
         <para>The URL can be followed by an optional label:</para>
 <programlisting>
@@ -2072,12 +2072,12 @@ This belongs to the list above!
       </section>
 
       <section>
-	<title>Images</title>
+        <title>Images</title>
 
-	<para>An image can be included in a documentation comment by
-	surrounding it in double angle brackets:
-	<literal>&lt;&lt;...&gt;&gt;</literal>.  If the output format supports
-	it, the image will be rendered inside the documentation.</para>
+        <para>An image can be included in a documentation comment by
+        surrounding it in double angle brackets:
+        <literal>&lt;&lt;...&gt;&gt;</literal>.  If the output format supports
+        it, the image will be rendered inside the documentation.</para>
 
         <para>Title text can be included using an optional label:</para>
 <programlisting>
@@ -2087,26 +2087,26 @@ This belongs to the list above!
       </section>
 
       <section>
-	<title>Anchors</title>
+        <title>Anchors</title>
 
-	<para>Sometimes it is useful to be able to link to a point in
-	the documentation which doesn't correspond to a particular
-	entity.  For that purpose, we allow <emphasis>anchors</emphasis> to be
-	included in a documentation comment.  The syntax is
-	<literal>#<replaceable>label</replaceable>#</literal>, where
-	<replaceable>label</replaceable> is the name of the anchor.
-	An anchor is invisible in the generated documentation.</para>
+        <para>Sometimes it is useful to be able to link to a point in
+        the documentation which doesn't correspond to a particular
+        entity.  For that purpose, we allow <emphasis>anchors</emphasis> to be
+        included in a documentation comment.  The syntax is
+        <literal>#<replaceable>label</replaceable>#</literal>, where
+        <replaceable>label</replaceable> is the name of the anchor.
+        An anchor is invisible in the generated documentation.</para>
 
-	<para>To link to an anchor from elsewhere, use the syntax
-	<literal>"<replaceable>module</replaceable>#<replaceable>label</replaceable>"</literal>
-	where <replaceable>module</replaceable> is the module name
-	containing the anchor, and <replaceable>label</replaceable> is
-	the anchor label.  The module does not have to be local, it
-	can be imported via an interface.</para>
+        <para>To link to an anchor from elsewhere, use the syntax
+        <literal>"<replaceable>module</replaceable>#<replaceable>label</replaceable>"</literal>
+        where <replaceable>module</replaceable> is the module name
+        containing the anchor, and <replaceable>label</replaceable> is
+        the anchor label.  The module does not have to be local, it
+        can be imported via an interface.</para>
       </section>
 
       <section>
-	<title>Headings</title>
+        <title>Headings</title>
         <para>Headings inside of comment documentation are possible be preceding them with
         a number of <literal>=</literal>s. From 1 to 6 are accepted. Extra <literal>=</literal>s will
         be treated as belonging to the text of the heading. Note that it's up to the output format to decide
