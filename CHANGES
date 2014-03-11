@@ -27,7 +27,7 @@ Changes in version 2.14.0
 
  * Properly render License field (#271)
 
- * Print type/data family instances
+ * Print type/data family instances (for exported types only)
 
  * Fix display of poly-kinded type operators (#189)
 

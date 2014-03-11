@@ -73,6 +73,10 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
                     let fam_insts = [ (synifyFamInst i, n)
                                     | i <- sortBy (comparing instFam) fam_instances
                                     , let n = instLookup instDocMap (getName i) iface ifaceMap instIfaceMap
+                                    , not $ isNameHidden expInfo (fi_fam i)
+                                    , not $ any (isTypeHidden expInfo) (fi_tys i)
+                                    -- Should we check for hidden RHS as well?
+                                    -- Ideally, in that case the RHS should simply not show up
                                     ]
                         cls_insts = [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap)
                                     | let is = [ (instanceHead' i, getName i) | i <- cls_instances ]
@@ -199,11 +203,11 @@ isInstanceHidden expInfo cls tys =
     instClassHidden = isNameHidden expInfo $ getName cls
 
     instTypeHidden :: Bool
-    instTypeHidden = any typeHidden tys
+    instTypeHidden = any (isTypeHidden expInfo) tys
 
-    nameHidden :: Name -> Bool
-    nameHidden = isNameHidden expInfo
-
+isTypeHidden :: ExportInfo -> Type -> Bool
+isTypeHidden expInfo = typeHidden
+  where
     typeHidden :: Type -> Bool
     typeHidden t =
       case t of
@@ -213,3 +217,6 @@ isInstanceHidden expInfo cls tys =
         FunTy t1 t2 -> typeHidden t1 || typeHidden t2
         ForAllTy _ ty -> typeHidden ty
         LitTy _ -> False
+
+    nameHidden :: Name -> Bool
+    nameHidden = isNameHidden expInfo
