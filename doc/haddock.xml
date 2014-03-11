@@ -539,6 +539,10 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	  <indexterm><primary><option>--source-entity</option></primary></indexterm>
           <option>--source-entity</option>=<replaceable>URL</replaceable>
         </term>
+        <term>
+	  <indexterm><primary><option>--source-entity-line</option></primary></indexterm>
+	  <option>--source-entity-line</option>=<replaceable>URL</replaceable>
+        </term>
 	<listitem>
 	  <para>Include links to the source files in the generated
 	  documentation. Use the <option>--source-base</option> option to add a
@@ -547,6 +551,9 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	  the header bar of each module page. Use the
 	  <option>--source-entity</option> option to add a source code link
 	  next to the documentation for every value and type in each module.
+	  <option>--source-entity-line</option> is a flag that gets used for
+	  entities that need to link to an exact source location rather than a
+	  name, eg. since they were defined inside a Template Haskell splice.
 	  </para>
 
 	  <para>In each case <replaceable>URL</replaceable> is the base URL
