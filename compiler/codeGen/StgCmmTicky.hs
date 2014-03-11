@@ -485,7 +485,9 @@ tickyAllocHeap genuine hp
 
 -- the units are bytes
 
-tickyAllocPrim :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+tickyAllocPrim :: CmmExpr  -- ^ size of the full header, in bytes
+               -> CmmExpr  -- ^ size of the payload, in bytes
+               -> CmmExpr -> FCode ()
 tickyAllocPrim _hdr _goods _slop = ifTicky $ do
   bumpTickyCounter    (fsLit "ALLOC_PRIM_ctr")
   bumpTickyCounterByE (fsLit "ALLOC_PRIM_adm") _hdr

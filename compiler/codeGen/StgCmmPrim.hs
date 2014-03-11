@@ -1535,14 +1535,14 @@ doNewArrayOp res_r n init = do
     dflags <- getDynFlags
 
     let info_ptr = mkLblExpr mkMAP_DIRTY_infoLabel
+        rep = arrPtrsRep dflags (fromIntegral n)
 
-    -- ToDo: this probably isn't right (card size?)
     tickyAllocPrim (mkIntExpr dflags (arrPtrsHdrSize dflags))
-        (mkIntExpr dflags (fromInteger n * wORD_SIZE dflags))
+        (mkIntExpr dflags (wordsToBytes dflags (heapClosureSizeW dflags rep)))
         (zeroExpr dflags)
 
-    let rep = arrPtrsRep dflags (fromIntegral n)
-        hdr_size = fixedHdrSize dflags * wORD_SIZE dflags
+    let hdr_size = wordsToBytes dflags (fixedHdrSize dflags)
+
     base <- allocHeapClosure rep info_ptr curCCS
                      [ (mkIntExpr dflags (fromInteger n),
                         hdr_size + oFFSET_StgMutArrPtrs_ptrs dflags)
@@ -1563,7 +1563,8 @@ doNewArrayOp res_r n init = do
             , mkBranch for ]
     emit =<< mkCmmIfThen
         (cmmULtWord dflags (CmmReg (CmmLocal p))
-         (cmmOffsetW dflags (CmmReg arr) (fromInteger n)))
+         (cmmOffsetW dflags (CmmReg arr)
+          (arrPtrsHdrSizeW dflags + fromInteger n)))
         (catAGraphs loopBody)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)

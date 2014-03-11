@@ -99,7 +99,6 @@ allocDynClosureCmm mb_id info_tbl lf_info use_cc _blame_cc amodes_w_offsets = do
   -- SAY WHAT WE ARE ABOUT TO DO
   let rep = cit_rep info_tbl
   tickyDynAlloc mb_id rep lf_info
-  profDynAlloc rep use_cc
   let info_ptr = CmmLit (CmmLabel (cit_lbl info_tbl))
   allocHeapClosure rep info_ptr use_cc amodes_w_offsets
 
@@ -112,6 +111,8 @@ allocHeapClosure
   -> [(CmmExpr,ByteOff)]              -- ^ payload
   -> FCode CmmExpr                    -- ^ returns the address of the object
 allocHeapClosure rep info_ptr use_cc payload = do
+  profDynAlloc rep use_cc
+
   virt_hp <- getVirtHp
 
   -- Find the offset of the info-ptr word
@@ -122,7 +123,7 @@ allocHeapClosure rep info_ptr use_cc payload = do
             -- ie 1 *before* the info-ptr word of new object.
 
   base <- getHpRelOffset info_offset
-  emitComment $ mkFastString "allocDynClosure"
+  emitComment $ mkFastString "allocHeapClosure"
   emitSetDynHdr base info_ptr use_cc
 
   -- Fill in the fields
