@@ -10,6 +10,7 @@
 -- code.
 module Main where
 
+import Control.Monad
 import GHC.Exts
 import GHC.IO
 import Prelude hiding (read)
@@ -47,7 +48,9 @@ main = do
         let marrs = [marr0, marr1, marr2, marr3, marr4, marr5, marr6, marr7,
                      marr8, marr9, marr10, marr11, marr12, marr13, marr14,
                      marr15, marr16, marr17]
-        print `fmap` sumManyArrays marrs
+        total <- sumManyArrays marrs
+        unless (total == 153) $
+            putStrLn "incorrect sum"
         loop (i-1)
 
 sumManyArrays :: [MArray] -> IO Int
