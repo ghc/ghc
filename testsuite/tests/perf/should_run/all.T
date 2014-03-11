@@ -331,3 +331,9 @@ test('T7619',
      compile_and_run,
      ['-O'])
 
+test('InlineArrayAlloc',
+     [stats_num_field('bytes allocated',
+                      [ (wordsize(64), 1600040960, 5)]),
+      only_ways(['normal'])],
+     compile_and_run,
+     ['-O2'])
