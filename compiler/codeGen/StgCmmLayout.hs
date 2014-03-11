@@ -15,7 +15,7 @@ module StgCmmLayout (
 
         slowCall, directCall,
 
-        mkVirtHeapOffsets, mkVirtConstrOffsets, getHpRelOffset, hpRel,
+        mkVirtHeapOffsets, mkVirtConstrOffsets, getHpRelOffset, 
 
         ArgRep(..), toArgRep, argRepSizeW -- re-exported from StgCmmArgRep
   ) where
@@ -366,13 +366,14 @@ slowArgs dflags args -- careful: reps contains voids (V), but args does not
 ----        Laying out objects on the heap and stack
 -------------------------------------------------------------------------
 
--- The heap always grows upwards, so hpRel is easy
+-- The heap always grows upwards, so hpRel is easy to compute
 hpRel :: VirtualHpOffset         -- virtual offset of Hp
       -> VirtualHpOffset         -- virtual offset of The Thing
       -> WordOff                -- integer word offset
 hpRel hp off = off - hp
 
 getHpRelOffset :: VirtualHpOffset -> FCode CmmExpr
+-- See Note [Virtual and real heap pointers] in StgCmmMonad
 getHpRelOffset virtual_offset
   = do dflags <- getDynFlags
        hp_usg <- getHpUsage

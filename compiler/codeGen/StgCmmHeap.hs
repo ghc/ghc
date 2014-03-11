@@ -8,7 +8,7 @@
 
 module StgCmmHeap (
         getVirtHp, setVirtHp, setRealHp,
-        getHpRelOffset, hpRel,
+        getHpRelOffset,
 
         entryHeapCheck, altHeapCheck, noEscapeHeapCheck, altHeapCheckReturnsTo,
         heapStackCheckGen,
