@@ -18,7 +18,7 @@ module CoreSyn (
 	-- * Main data types
         Expr(..), Alt, Bind(..), AltCon(..), Arg, Tickish(..),
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
-        TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..),
+        TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
 
         -- ** 'Expr' construction
 	mkLets, mkLams,
@@ -1106,6 +1106,25 @@ instance Outputable b => OutputableBndr (TaggedBndr b) where
   pprBndr _ b = ppr b	-- Simple
   pprInfixOcc  b = ppr b
   pprPrefixOcc b = ppr b
+
+deTagExpr :: TaggedExpr t -> CoreExpr
+deTagExpr (Var v)                   = Var v
+deTagExpr (Lit l)                   = Lit l
+deTagExpr (Type ty)                 = Type ty
+deTagExpr (Coercion co)             = Coercion co
+deTagExpr (App e1 e2)               = App (deTagExpr e1) (deTagExpr e2)
+deTagExpr (Lam (TB b _) e)          = Lam b (deTagExpr e)
+deTagExpr (Let bind body)           = Let (deTagBind bind) (deTagExpr body)
+deTagExpr (Case e (TB b _) ty alts) = Case (deTagExpr e) b ty (map deTagAlt alts)
+deTagExpr (Tick t e)                = Tick t (deTagExpr e)
+deTagExpr (Cast e co)               = Cast (deTagExpr e) co
+
+deTagBind :: TaggedBind t -> CoreBind
+deTagBind (NonRec (TB b _) rhs) = NonRec b (deTagExpr rhs)
+deTagBind (Rec prs)             = Rec [(b, deTagExpr rhs) | (TB b _, rhs) <- prs]
+
+deTagAlt :: TaggedAlt t -> CoreAlt
+deTagAlt (con, bndrs, rhs) = (con, [b | TB b _ <- bndrs], deTagExpr rhs)
 \end{code}
 
 

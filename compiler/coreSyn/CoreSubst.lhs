@@ -23,7 +23,7 @@ module CoreSubst (
 	substTy, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
 	lookupIdSubst, lookupTvSubst, lookupCvSubst, substIdOcc,
-        substTickish,
+        substTickish, substVarSet,
 
         -- ** Operations on substitutions
 	emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, substInScope, isEmptySubst, 
