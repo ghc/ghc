@@ -132,9 +132,12 @@ shouldInlinePrimOp :: DynFlags
                    -> PrimOp     -- ^ The primop
                    -> [CmmExpr]  -- ^ The primop arguments
                    -> Maybe ([LocalReg] -> FCode ())
+shouldInlinePrimOp _ NewByteArrayOp_Char [(CmmLit (CmmInt n _))]
+  | fromInteger n <= maxInlineAllocThreshold =
+      Just $ \ [res] -> doNewByteArrayOp res (fromInteger n)
 shouldInlinePrimOp dflags NewArrayOp [(CmmLit (CmmInt n _)), init]
-  | n <= maxInlineAllocThreshold dflags =
-      Just $ \ [res] -> doNewArrayOp res n init
+  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocThreshold =
+      Just $ \ [res] -> doNewArrayOp res (fromInteger n) init
 shouldInlinePrimOp dflags primop args
   | primOpOutOfLine primop = Nothing
   | otherwise = Just $ \ regs -> emitPrimOp dflags regs primop args
@@ -1437,6 +1440,32 @@ mkBasicPrefetch locality off res base idx
           _     -> panic "StgCmmPrim: mkBasicPrefetch"
 
 -- ----------------------------------------------------------------------------
+-- Allocating byte arrays
+
+-- | Takes a register to return the newly allocated array in and the
+-- size of the new array in bytes. Allocates a new
+-- 'MutableByteArray#'.
+doNewByteArrayOp :: CmmFormal -> ByteOff -> FCode ()
+doNewByteArrayOp res_r n = do
+    dflags <- getDynFlags
+
+    let info_ptr = mkLblExpr mkArrWords_infoLabel
+        rep = arrWordsRep dflags n
+
+    tickyAllocPrim (mkIntExpr dflags (arrWordsHdrSize dflags))
+        (mkIntExpr dflags (nonHdrSize dflags rep))
+        (zeroExpr dflags)
+
+    let hdr_size = wordsToBytes dflags (fixedHdrSize dflags)
+
+    base <- allocHeapClosure rep info_ptr curCCS
+                     [ (mkIntExpr dflags n,
+                        hdr_size + oFFSET_StgArrWords_bytes dflags)
+                     ]
+
+    emit $ mkAssign (CmmLocal res_r) base
+
+-- ----------------------------------------------------------------------------
 -- Copying byte arrays
 
 -- | Takes a source 'ByteArray#', an offset in the source array, a
@@ -1530,21 +1559,21 @@ doSetByteArrayOp ba off len c
 -- | Takes a register to return the newly allocated array in, the size
 -- of the new array, and an initial value for the elements. Allocates
 -- a new 'MutableArray#'.
-doNewArrayOp :: CmmFormal -> Integer -> CmmExpr -> FCode ()
+doNewArrayOp :: CmmFormal -> WordOff -> CmmExpr -> FCode ()
 doNewArrayOp res_r n init = do
     dflags <- getDynFlags
 
     let info_ptr = mkLblExpr mkMAP_DIRTY_infoLabel
-        rep = arrPtrsRep dflags (fromIntegral n)
+        rep = arrPtrsRep dflags n
 
     tickyAllocPrim (mkIntExpr dflags (arrPtrsHdrSize dflags))
-        (mkIntExpr dflags (wordsToBytes dflags (heapClosureSizeW dflags rep)))
+        (mkIntExpr dflags (nonHdrSize dflags rep))
         (zeroExpr dflags)
 
     let hdr_size = wordsToBytes dflags (fixedHdrSize dflags)
 
     base <- allocHeapClosure rep info_ptr curCCS
-                     [ (mkIntExpr dflags (fromInteger n),
+                     [ (mkIntExpr dflags n,
                         hdr_size + oFFSET_StgMutArrPtrs_ptrs dflags)
                      , (mkIntExpr dflags (nonHdrSizeW rep),
                         hdr_size + oFFSET_StgMutArrPtrs_size dflags)
@@ -1564,14 +1593,14 @@ doNewArrayOp res_r n init = do
     emit =<< mkCmmIfThen
         (cmmULtWord dflags (CmmReg (CmmLocal p))
          (cmmOffsetW dflags (CmmReg arr)
-          (arrPtrsHdrSizeW dflags + fromInteger n)))
+          (arrPtrsHdrSizeW dflags + n)))
         (catAGraphs loopBody)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 
--- | The inline allocation limit is 128 bytes, expressed in words.
-maxInlineAllocThreshold :: DynFlags -> Integer
-maxInlineAllocThreshold dflags = toInteger (128 `quot` wORD_SIZE dflags)
+-- | The inline allocation limit is 128 bytes.
+maxInlineAllocThreshold :: ByteOff
+maxInlineAllocThreshold = 128
 
 -- ----------------------------------------------------------------------------
 -- Copying pointer arrays
