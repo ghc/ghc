@@ -78,3 +78,6 @@ a thunk (function type), in mutual recursion, still calls once, d part of mutual
     go 1
     d 1
     n 0
+a thunk (non-function-type) co-calls with the body (d 1 would be bad):
+    x 0
+    d 0

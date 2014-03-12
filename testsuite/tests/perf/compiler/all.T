@@ -133,7 +133,7 @@ test('T3294',
            # 2012-10-08:  1373514844 (x86/Linux)
            # 2013-11-13: 1478325844  (x86/Windows, 64bit machine)
            # 2014-01-12: 1565185140  (x86/Linux)
-           (wordsize(64), 2897630040, 5)]),
+           (wordsize(64), 2705289664, 5)]),
             # old:        1357587088 (amd64/Linux)
             # 29/08/2012: 2961778696 (amd64/Linux)
             # (^ increase due to new codegen, see #7198)
@@ -141,6 +141,7 @@ test('T3294',
             # 08/06/2013: 2901451552 (amd64/Linux) (reason unknown)
             # 12/12/2013: 3083825616 (amd64/Linux) (reason unknown)
             # 18/02/2014: 2897630040 (amd64/Linux) (call arity improvements)
+            # 12/03/2014: 2705289664 (amd64/Linux) (more call arity improvements)
       conf_3294
       ],
      compile,

@@ -348,7 +348,8 @@ callArityTopLvl exported int1 (b:bs)
     exported' = filter isExportedId int2 ++ exported
     int' = int1 `addInterestingBinds` b
     (ae1, bs') = callArityTopLvl exported' int' bs
-    (ae2, b')  = callArityBind ae1 int1 b
+    ae1' = fakeBoringCalls int' b ae1
+    (ae2, b')  = callArityBind ae1' int1 b
 
 
 callArityRHS :: CoreExpr -> CoreExpr
@@ -434,7 +435,8 @@ callArityAnal arity int (Let bind e)
   where
     int_body = int `addInterestingBinds` bind
     (ae_body, e') = callArityAnal arity int_body e
-    (final_ae, bind') = callArityBind ae_body int bind
+    ae_body' = fakeBoringCalls int_body bind ae_body
+    (final_ae, bind') = callArityBind ae_body' int bind
 
 -- This is a variant of callArityAnal that is additionally told whether
 -- the expression is called once or multiple times, and treats thunks appropriately.
@@ -467,6 +469,16 @@ addInterestingBinds :: VarSet -> CoreBind -> VarSet
 addInterestingBinds int bind
     = int `delVarSetList`    bindersOf bind -- Possible shadowing
           `extendVarSetList` interestingBinds bind
+
+-- For every boring variable in the binder, this amends the CallArityRes to
+-- report safe information about them (co-called with everything else, arity 0).
+fakeBoringCalls :: VarSet -> CoreBind -> CallArityRes -> CallArityRes
+fakeBoringCalls int bind res
+    = addCrossCoCalls (domRes boring) (domRes res) $ (boring `lubRes` res)
+  where
+    boring = ( emptyUnVarGraph
+             ,  mkVarEnv [ (v, 0) | v <- bindersOf bind, not (v `elemVarSet` int)])
+
 
 -- Used for both local and top-level binds
 -- First argument is the demand from the body

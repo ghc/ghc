@@ -163,6 +163,10 @@ exprs =
              , (n, Var go `mkApps` [d `mkLApps` [1]])
              , (go, mkLams [x] $ mkACase (Var n) (Var go `mkApps` [Var n `mkVarApps` [x]]) ) ]) $
         Var go `mkApps` [mkLit 0, go `mkLApps` [0,1]]
+  , ("a thunk (non-function-type) co-calls with the body (d 1 would be bad)",) $
+    mkLet d (f `mkLApps` [0]) $
+        mkLet x (d `mkLApps` [1]) $
+            Var d `mkVarApps` [x]
   ]
 
 main = do
