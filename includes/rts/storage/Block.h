@@ -9,16 +9,26 @@
 #ifndef RTS_STORAGE_BLOCK_H
 #define RTS_STORAGE_BLOCK_H
 
+#include "ghcconfig.h"
+
 /* The actual block and megablock-size constants are defined in
  * includes/Constants.h, all constants here are derived from these.
  */
 
 /* Block related constants (BLOCK_SHIFT is defined in Constants.h) */
 
+#if SIZEOF_LONG == SIZEOF_VOID_P
+#define UNIT 1UL
+#elif SIZEOF_LONG_LONG == SIZEOF_VOID_P
+#define UNIT 1ULL
+#else
+#error "Size of pointer is suspicious."
+#endif
+
 #ifdef CMINUSMINUS
 #define BLOCK_SIZE   (1<<BLOCK_SHIFT)
 #else
-#define BLOCK_SIZE   (1UL<<BLOCK_SHIFT)
+#define BLOCK_SIZE   (UNIT<<BLOCK_SHIFT)
 // Note [integer overflow]
 #endif
 
@@ -33,7 +43,7 @@
 #ifdef CMINUSMINUS
 #define MBLOCK_SIZE    (1<<MBLOCK_SHIFT)
 #else
-#define MBLOCK_SIZE    (1UL<<MBLOCK_SHIFT)
+#define MBLOCK_SIZE    (UNIT<<MBLOCK_SHIFT)
 // Note [integer overflow]
 #endif
 
