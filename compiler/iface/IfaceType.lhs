@@ -22,7 +22,7 @@ module IfaceType (
         toIfaceCoercion,
 
         -- Printing
-        pprIfaceType, pprParendIfaceType, pprIfaceContext,
+        pprIfaceType, pprParendIfaceType, pprIfaceContext, pprIfaceContextArr,
         pprIfaceIdBndr, pprIfaceTvBndr, pprIfaceTvBndrs,
         pprIfaceBndrs,
         tOP_PREC, tYCON_PREC, noParens, maybeParen, pprIfaceForAllPart,
@@ -253,7 +253,7 @@ ppr_ty ctxt_prec ty@(IfaceForAllTy _ _)
 -- generality
 pprIfaceForAllPart :: Outputable a => [IfaceTvBndr] -> [a] -> SDoc -> SDoc
 pprIfaceForAllPart tvs ctxt doc
-  = sep [ppr_tvs, pprIfaceContext ctxt, doc]
+  = sep [ppr_tvs, pprIfaceContextArr ctxt, doc]
   where
     ppr_tvs | null tvs  = empty
             | otherwise = ptext (sLit "forall") <+> pprIfaceTvBndrs tvs <> dot
@@ -386,14 +386,14 @@ instance Binary IfaceTyLit where
          _ -> panic ("get IfaceTyLit " ++ show tag)
 
 -------------------
-pprIfaceContext :: Outputable a => [a] -> SDoc
+pprIfaceContextArr :: Outputable a => [a] -> SDoc
 -- Prints "(C a, D b) =>", including the arrow
-pprIfaceContext []    = empty
-pprIfaceContext theta = ppr_preds theta <+> darrow
+pprIfaceContextArr []    = empty
+pprIfaceContextArr theta = pprIfaceContext theta <+> darrow
 
-ppr_preds :: Outputable a => [a] -> SDoc
-ppr_preds [pred] = ppr pred    -- No parens
-ppr_preds preds  = parens (sep (punctuate comma (map ppr preds)))
+pprIfaceContext :: Outputable a => [a] -> SDoc
+pprIfaceContext [pred] = ppr pred    -- No parens
+pprIfaceContext preds  = parens (sep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
     put_ bh (IfaceForAllTy aa ab) = do

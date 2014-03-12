@@ -1152,7 +1152,7 @@ instance Outputable IfaceAT where
 
 pprIfaceDeclHead :: IfaceContext -> OccName -> [IfaceTvBndr] -> SDoc
 pprIfaceDeclHead context thing tyvars
-  = hsep [pprIfaceContext context, parenSymOcc thing (ppr thing),
+  = hsep [pprIfaceContextArr context, parenSymOcc thing (ppr thing),
           pprIfaceTvBndrs tyvars]
 
 pp_condecls :: OccName -> IfaceConDecls -> SDoc
