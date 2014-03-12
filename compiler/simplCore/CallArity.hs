@@ -304,6 +304,19 @@ called, i.e. variables bound in a pattern match. So interesting are variables th
  * top-level or let bound
  * and possibly functions (typeArity > 0)
 
+Note [Information about boring variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If we decide that the variable bound in `let x = e1 in e2` is not interesting,
+the analysis of `e2` will not report anything about `x`. To ensure that
+`callArityBind` does still do the right thing we have to extend the result from
+`e2` with a safe approximation.
+
+This is done using `fakeBoringCalls` and has the effect of analysing
+   x `seq` x `seq` e2
+instead, i.e. with `both` the result from `e2` with the most conservative
+result about the uninteresting value.
+
 Note [Recursion and fixpointing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -348,7 +361,7 @@ callArityTopLvl exported int1 (b:bs)
     exported' = filter isExportedId int2 ++ exported
     int' = int1 `addInterestingBinds` b
     (ae1, bs') = callArityTopLvl exported' int' bs
-    ae1' = fakeBoringCalls int' b ae1
+    ae1' = fakeBoringCalls int' b ae1 -- See Note [Information about boring variables]
     (ae2, b')  = callArityBind ae1' int1 b
 
 
@@ -435,7 +448,7 @@ callArityAnal arity int (Let bind e)
   where
     int_body = int `addInterestingBinds` bind
     (ae_body, e') = callArityAnal arity int_body e
-    ae_body' = fakeBoringCalls int_body bind ae_body
+    ae_body' = fakeBoringCalls int_body bind ae_body -- See Note [Information about boring variables]
     (final_ae, bind') = callArityBind ae_body' int bind
 
 -- This is a variant of callArityAnal that is additionally told whether
@@ -470,14 +483,14 @@ addInterestingBinds int bind
     = int `delVarSetList`    bindersOf bind -- Possible shadowing
           `extendVarSetList` interestingBinds bind
 
--- For every boring variable in the binder, this amends the CallArityRes to
--- report safe information about them (co-called with everything else, arity 0).
+-- For every boring variable in the binder, add a safe approximation
+-- See Note [Information about boring variables]
 fakeBoringCalls :: VarSet -> CoreBind -> CallArityRes -> CallArityRes
-fakeBoringCalls int bind res
-    = addCrossCoCalls (domRes boring) (domRes res) $ (boring `lubRes` res)
+fakeBoringCalls int bind res = boring `both` res
   where
-    boring = ( emptyUnVarGraph
-             ,  mkVarEnv [ (v, 0) | v <- bindersOf bind, not (v `elemVarSet` int)])
+    boring = calledMultipleTimes $
+        ( emptyUnVarGraph
+        ,  mkVarEnv [ (v, 0) | v <- bindersOf bind, not (v `elemVarSet` int)])
 
 
 -- Used for both local and top-level binds
