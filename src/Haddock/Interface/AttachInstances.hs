@@ -70,13 +70,12 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
               expItemInstances =
                 case mb_info of
                   Just (_, _, cls_instances, fam_instances) ->
-                    let fam_insts = [ (synifyFamInst i, n)
+                    let fam_insts = [ (synifyFamInst i opaque, n)
                                     | i <- sortBy (comparing instFam) fam_instances
                                     , let n = instLookup instDocMap (getName i) iface ifaceMap instIfaceMap
                                     , not $ isNameHidden expInfo (fi_fam i)
                                     , not $ any (isTypeHidden expInfo) (fi_tys i)
-                                    -- Should we check for hidden RHS as well?
-                                    -- Ideally, in that case the RHS should simply not show up
+                                    , let opaque = isTypeHidden expInfo (fi_rhs i)
                                     ]
                         cls_insts = [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap)
                                     | let is = [ (instanceHead' i, getName i) | i <- cls_instances ]

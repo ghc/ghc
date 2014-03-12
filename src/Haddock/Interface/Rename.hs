@@ -264,7 +264,7 @@ renameInstHead (className, k, types, rest) = do
   types' <- mapM renameType types
   rest' <- case rest of
     ClassInst cs -> ClassInst <$> mapM renameType cs
-    TypeInst  ts -> TypeInst  <$> renameType ts
+    TypeInst  ts -> TypeInst  <$> traverse renameType ts
     DataInst  dd -> DataInst  <$> renameTyClD dd
   return (className', k', types', rest')
 

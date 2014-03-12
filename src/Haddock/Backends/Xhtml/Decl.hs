@@ -488,7 +488,7 @@ ppInstances instances baseName unicode qual
         <+> ppAppNameTypes n ks ts unicode qual
     instHead (n, ks, ts, TypeInst rhs) = keyword "type"
         <+> ppAppNameTypes n ks ts unicode qual
-        <+> equals <+> ppType unicode qual rhs
+        <+> maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
     instHead (n, ks, ts, DataInst dd) = keyword "data"
         <+> ppAppNameTypes n ks ts unicode qual
         <+> ppShortDataDecl False True dd unicode qual

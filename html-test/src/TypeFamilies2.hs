@@ -6,18 +6,34 @@
 --
 -- The other families and instances that are not exported should not
 -- show up at all
-module TypeFamilies2 (X, Foo, Bar) where
+module TypeFamilies2 (W, Foo, Bar) where
 
-data X
-data Y
+-- | Exported type
+data W
 
+-- | Hidden type
+data Z
+
+-- | Exported type family
 type family Foo a
-type instance Foo X = Y
-type instance Foo Y = X -- Should be hidden
 
+-- | Should be visible, but with a hidden right hand side
+type instance Foo W = Z
+
+-- | Should be hidden
+type instance Foo Z = W
+
+-- | Exported data family
 data family Bar a
-data instance Bar X = BarX Y
 
+-- | Shown because BarX is still exported despite Z being hidden
+data instance Bar W = BarX Z
+
+-- | Should be completely invisible, including instances
 type family Invisible a
-type instance Invisible X = Y
-type instance Invisible Y = X
+type instance Invisible W = Z
+type instance Invisible Z = W
+
+data family Invisible2 a
+data instance Invisible2 W = Invis  Z
+data instance Invisible2 Z = Invis' W

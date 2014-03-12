@@ -563,7 +563,8 @@ ppInstDecl unicode instHead = keyword "instance" <+> ppInstHead unicode instHead
 ppInstHead :: Bool -> InstHead DocName -> LaTeX
 ppInstHead unicode (n, ks, ts, ClassInst ctx) = ppContextNoLocs ctx unicode <+> ppAppNameTypes n ks ts unicode
 ppInstHead unicode (n, ks, ts, TypeInst rhs) = keyword "type"
-  <+> ppAppNameTypes n ks ts unicode <+> equals <+> ppType unicode rhs
+  <+> ppAppNameTypes n ks ts unicode
+  <+> maybe empty (\t -> equals <+> ppType unicode t) rhs
 ppInstHead _unicode (_n, _ks, _ts, DataInst _dd) =
   error "data instances not supported by --latex yet"
 

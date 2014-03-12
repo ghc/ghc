@@ -291,9 +291,9 @@ instance NamedThing DocName where
 
 -- | The three types of instances
 data InstType name
-  = ClassInst [HsType name]  -- ^ Context
-  | TypeInst  (HsType name)  -- ^ Body (right-hand side)
-  | DataInst (TyClDecl name) -- ^ Data constructors
+  = ClassInst [HsType name]         -- ^ Context
+  | TypeInst  (Maybe (HsType name)) -- ^ Body (right-hand side)
+  | DataInst (TyClDecl name)        -- ^ Data constructors
 
 instance OutputableBndr a => Outputable (InstType a) where
   ppr (ClassInst a) = text "ClassInst" <+> ppr a

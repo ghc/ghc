@@ -41,6 +41,30 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies2.html");}
 	><p class="caption"
 	>TypeFamilies2</p
 	></div
+      ><div id="synopsis"
+      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
+	>Synopsis</p
+	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
+	><li class="src short"
+	  ><span class="keyword"
+	    >data</span
+	    > <a href="#t:W"
+	    >W</a
+	    ></li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >type family</span
+	    > <a href="#t:Foo"
+	    >Foo</a
+	    > a</li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >data family</span
+	    > <a href="#t:Bar"
+	    >Bar</a
+	    > a</li
+	  ></ul
+	></div
       ><div id="interface"
       ><h1
 	>Documentation</h1
@@ -48,13 +72,17 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies2.html");}
 	><p class="src"
 	  ><span class="keyword"
 	    >data</span
-	    > <a name="t:X" class="def"
-	    >X</a
+	    > <a name="t:W" class="def"
+	    >W</a
 	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Exported type</p
+	    ></div
 	  ><div class="subs instances"
-	  ><p id="control.i:X" class="caption collapser" onclick="toggleSection('i:X')"
+	  ><p id="control.i:W" class="caption collapser" onclick="toggleSection('i:W')"
 	    >Instances</p
-	    ><div id="section.i:X" class="show"
+	    ><div id="section.i:W" class="show"
 	    ><table
 	      ><tr
 		><td class="src"
@@ -62,13 +90,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies2.html");}
 		    >data</span
 		    > <a href="TypeFamilies2.html#t:Bar"
 		    >Bar</a
-		    > <a href="TypeFamilies2.html#t:X"
-		    >X</a
+		    > <a href="TypeFamilies2.html#t:W"
+		    >W</a
 		    > = <a name="v:BarX" class="def"
 		    >BarX</a
-		    > Y</td
-		  ><td class="doc empty"
-		  >&nbsp;</td
+		    > Z</td
+		  ><td class="doc"
+		  ><p
+		    >Shown because BarX is still exported despite Z being hidden</p
+		    ></td
 		  ></tr
 		><tr
 		><td class="src"
@@ -76,11 +106,13 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies2.html");}
 		    >type</span
 		    > <a href="TypeFamilies2.html#t:Foo"
 		    >Foo</a
-		    > <a href="TypeFamilies2.html#t:X"
-		    >X</a
-		    > = Y</td
-		  ><td class="doc empty"
-		  >&nbsp;</td
+		    > <a href="TypeFamilies2.html#t:W"
+		    >W</a
+		    ></td
+		  ><td class="doc"
+		  ><p
+		    >Should be visible, but with a hidden right hand side</p
+		    ></td
 		  ></tr
 		></table
 	      ></div
@@ -93,6 +125,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies2.html");}
 	    > <a name="t:Foo" class="def"
 	    >Foo</a
 	    > a</p
+	  ><div class="doc"
+	  ><p
+	    >Exported type family</p
+	    ></div
 	  ><div class="subs instances"
 	  ><p id="control.i:Foo" class="caption collapser" onclick="toggleSection('i:Foo')"
 	    >Instances</p
@@ -104,11 +140,13 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies2.html");}
 		    >type</span
 		    > <a href="TypeFamilies2.html#t:Foo"
 		    >Foo</a
-		    > <a href="TypeFamilies2.html#t:X"
-		    >X</a
-		    > = Y</td
-		  ><td class="doc empty"
-		  >&nbsp;</td
+		    > <a href="TypeFamilies2.html#t:W"
+		    >W</a
+		    ></td
+		  ><td class="doc"
+		  ><p
+		    >Should be visible, but with a hidden right hand side</p
+		    ></td
 		  ></tr
 		><tr
 		><td class="src"
@@ -137,6 +175,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies2.html");}
 	    > <a name="t:Bar" class="def"
 	    >Bar</a
 	    > a</p
+	  ><div class="doc"
+	  ><p
+	    >Exported data family</p
+	    ></div
 	  ><div class="subs instances"
 	  ><p id="control.i:Bar" class="caption collapser" onclick="toggleSection('i:Bar')"
 	    >Instances</p
@@ -148,13 +190,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies2.html");}
 		    >data</span
 		    > <a href="TypeFamilies2.html#t:Bar"
 		    >Bar</a
-		    > <a href="TypeFamilies2.html#t:X"
-		    >X</a
+		    > <a href="TypeFamilies2.html#t:W"
+		    >W</a
 		    > = <a name="v:BarX" class="def"
 		    >BarX</a
-		    > Y</td
-		  ><td class="doc empty"
-		  >&nbsp;</td
+		    > Z</td
+		  ><td class="doc"
+		  ><p
+		    >Shown because BarX is still exported despite Z being hidden</p
+		    ></td
 		  ></tr
 		><tr
 		><td class="src"

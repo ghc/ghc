@@ -380,13 +380,14 @@ synifyInstHead (_, preds, cls, types) =
   where (ks,ts) = break (not . isKind) types
 
 -- Convert a family instance, this could be a type family or data family
-synifyFamInst :: FamInst -> InstHead Name
-synifyFamInst fi =
+synifyFamInst :: FamInst -> Bool -> InstHead Name
+synifyFamInst fi opaque =
   ( fi_fam fi
   , map (unLoc . synifyType WithinType) ks
   , map (unLoc . synifyType WithinType) ts
   , case fi_flavor fi of
-      SynFamilyInst -> TypeInst . unLoc . synifyType WithinType $ fi_rhs fi
+      SynFamilyInst | opaque -> TypeInst Nothing
+      SynFamilyInst -> TypeInst . Just . unLoc . synifyType WithinType $ fi_rhs fi
       DataFamilyInst c -> DataInst $ synifyTyCon (Just $ famInstAxiom fi) c
   )
   where (ks,ts) = break (not . isKind) $ fi_tys fi
