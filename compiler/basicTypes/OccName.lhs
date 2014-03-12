@@ -261,6 +261,11 @@ instance Data OccName where
 instance Outputable OccName where
     ppr = pprOccName
 
+instance OutputableBndr OccName where
+    pprBndr _ = ppr
+    pprInfixOcc n = pprInfixVar (isSymOcc n) (ppr n)
+    pprPrefixOcc n = pprPrefixVar (isSymOcc n) (ppr n)
+
 pprOccName :: OccName -> SDoc
 pprOccName (OccName sp occ) 
   = getPprStyle $ \ sty ->
