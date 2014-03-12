@@ -5,12 +5,12 @@ Usage:
 To compile and link a complete Haskell program, run the compiler like
 so:
 
-    $$ --make Main
+    $$ Main
 
 where the module Main is in a file named Main.hs (or Main.lhs) in the
 current directory.  The other modules in the program will be located
 and compiled automatically, and the linked program will be placed in
-the file `a.out' (or `Main.exe' on Windows).
+the file `Main' (or `Main.exe' on Windows).
 
 Alternatively, $$ can be used to compile files individually.  Each
 input file is guided through (some of the) possible phases of a
