@@ -652,7 +652,7 @@ PIC			= pic
 RANLIB_CMD = @RANLIB_CMD@
 REAL_RANLIB_CMD = @REAL_RANLIB_CMD@
 SED			= @SedCmd@
-SHELL			= /bin/sh
+SHELL			= @SHELL@
 
 HaveDtrace		= @HaveDtrace@
 USE_DTRACE = $(HaveDtrace)
