@@ -1,3 +1,11 @@
+Changes in version 2.14.1
+
+ * Render * and -> with their UnicodeSyntax equivalents if -U is enabled
+
+ * Display minimal complete definitions for type classes
+
+ * Hide right hand side of TF instances with hidden names on the RHS
+
 Changes in version 2.14.0
 
  * Print entities with missing documentation (#258)
