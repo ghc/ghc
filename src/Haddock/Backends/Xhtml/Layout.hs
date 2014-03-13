@@ -33,6 +33,7 @@ module Haddock.Backends.Xhtml.Layout (
   subFields,
   subInstances,
   subMethods,
+  subMinimal,
 
   topDeclElem, declElem,
 ) where
@@ -181,6 +182,9 @@ subInstances qual nm = maybe noHtml wrap . instTable
 
 subMethods :: [Html] -> Html
 subMethods = divSubDecls "methods" "Methods" . subBlock
+
+subMinimal :: Html -> Html
+subMinimal = divSubDecls "minimal" "Minimal complete definition" . Just . declElem
 
 
 -- a box for displaying code

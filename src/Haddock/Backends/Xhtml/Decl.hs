@@ -28,7 +28,7 @@ import Haddock.GhcUtils
 import Haddock.Types
 import Haddock.Doc (combineDocumentation)
 
-import           Data.List             ( intersperse )
+import           Data.List             ( intersperse, sort )
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid           ( mempty )
@@ -37,6 +37,7 @@ import           Text.XHtml hiding     ( name, title, p, quote )
 import GHC
 import GHC.Exts
 import Name
+import BooleanFormula
 
 
 ppDecl :: Bool -> LinksInfo -> LHsDecl DocName
@@ -406,7 +407,7 @@ ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan
 ppShortClassDecl summary links (ClassDecl { tcdCtxt = lctxt, tcdLName = lname, tcdTyVars = tvs
                                           , tcdFDs = fds, tcdSigs = sigs, tcdATs = ats }) loc
     subdocs splice unicode qual =
-  if null sigs && null ats
+  if not (any isVanillaLSig sigs) && null ats
     then (if summary then id else topDeclElem links loc splice [nm]) hdr
     else (if summary then id else topDeclElem links loc splice [nm]) (hdr <+> keyword "where")
       +++ shortSubDecls
@@ -441,11 +442,11 @@ ppClassDecl summary links instances fixities loc d subdocs
             splice unicode qual
   | summary = ppShortClassDecl summary links decl loc subdocs splice unicode qual
   | otherwise = classheader +++ docSection qual d
-                  +++ atBit +++ methodBit  +++ instancesBit
+                  +++ minimalBit +++ atBit +++ methodBit +++ instancesBit
   where
     classheader
-      | null lsigs = topDeclElem links loc splice [nm] (hdr unicode qual <+> fixs)
-      | otherwise  = topDeclElem links loc splice [nm] (hdr unicode qual <+> keyword "where" <+> fixs)
+      | any isVanillaLSig lsigs = topDeclElem links loc splice [nm] (hdr unicode qual <+> keyword "where" <+> fixs)
+      | otherwise = topDeclElem links loc splice [nm] (hdr unicode qual <+> fixs)
 
     -- Only the fixity relevant to the class header
     fixs = ppFixities [ f | f@(n,_) <- fixities, n == unLoc lname ] qual
@@ -471,6 +472,23 @@ ppClassDecl summary links instances fixities loc d subdocs
                            -- FIXME: is taking just the first name ok? Is it possible that
                            -- there are different subdocs for different names in a single
                            -- type signature?
+
+    minimalBit = case [ s | L _ (MinimalSig s) <- lsigs ] of
+      -- Miminal complete definition = every method
+      And xs : _ | sort [getName n | Var (L _ n) <- xs] ==
+                   sort [getName n | L _ (TypeSig ns _) <- lsigs, L _ n <- ns]
+        -> noHtml
+
+      -- Minimal complete definition = nothing
+      And [] : _ -> subMinimal $ toHtml "Nothing"
+
+      m : _  -> subMinimal $ ppMinimal False m
+      _ -> noHtml
+
+    ppMinimal _ (Var (L _ n)) = ppDocName qual Prefix True n
+    ppMinimal _ (And fs) = foldr1 (\a b -> a+++", "+++b) $ map (ppMinimal True) fs
+    ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a+++" | "+++b) $ map (ppMinimal False) fs
+      where wrap | p = parens | otherwise = id
 
     instancesBit = ppInstances instances nm unicode qual
 

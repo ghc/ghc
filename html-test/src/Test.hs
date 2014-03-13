@@ -171,6 +171,7 @@ class (D a) => C a  where
    b :: [a]
    -- ^ this is a description of the 'b' method
    c :: a -- c is hidden in the export list
+   c = undefined
 
 -- ^ This comment applies to the /previous/ declaration (the 'C' class)
 

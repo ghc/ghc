@@ -437,7 +437,7 @@ filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x
                       | x@(L loc d, doc) <- decls ]
   where
     filterClass (TyClD c) =
-      TyClD $ c { tcdSigs = filter isVanillaLSig $ tcdSigs c }
+      TyClD $ c { tcdSigs = filter (liftA2 (||) isVanillaLSig isMinimalLSig) $ tcdSigs c }
     filterClass _ = error "expected TyClD"
 
 
@@ -547,17 +547,23 @@ mkExportItems
                    return []
 
               -- normal case
-              | otherwise -> return [ mkExportDecl t newDecl docs_ ]
-                  where
-                    -- A single signature might refer to many names, but we
-                    -- create an export item for a single name only.  So we
-                    -- modify the signature to contain only that single name.
-                    newDecl = case decl of
-                      (L loc (SigD sig)) ->
-                        L loc . SigD . fromJust $ filterSigNames (== t) sig
-                        -- fromJust is safe since we already checked in guards
-                        -- that 't' is a name declared in this declaration.
-                      _                  -> decl
+              | otherwise -> case decl of
+                  -- A single signature might refer to many names, but we
+                  -- create an export item for a single name only.  So we
+                  -- modify the signature to contain only that single name.
+                  L loc (SigD sig) ->
+                    -- fromJust is safe since we already checked in guards
+                    -- that 't' is a name declared in this declaration.
+                    let newDecl = L loc . SigD . fromJust $ filterSigNames (== t) sig
+                    in return [ mkExportDecl t newDecl docs_ ]
+
+                  L loc (TyClD cl@ClassDecl{}) -> do
+                    mdef <- liftGhcToErrMsgGhc $ minimalDef t
+                    let sig = maybeToList $ fmap (noLoc . MinimalSig . fmap noLoc) mdef
+                    return [ mkExportDecl t
+                      (L loc $ TyClD cl { tcdSigs = sig ++ tcdSigs cl }) docs_ ]
+
+                  _ -> return [ mkExportDecl t decl docs_ ]
 
         -- Declaration from another package
         ([], _) -> do
@@ -737,14 +743,19 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
       | Just name <- M.lookup (getInstLoc d) instMap =
         let (doc, subs) = lookupDocs name warnings docMap argMap subMap in
         return $ Just (ExportDecl decl doc subs [] (fixities name subs) (l `elem` splices))
+    mkExportItem (L l (TyClD cl@ClassDecl{ tcdLName = L _ name, tcdSigs = sigs })) = do
+      mdef <- liftGhcToErrMsgGhc $ minimalDef name
+      let sig = maybeToList $ fmap (noLoc . MinimalSig . fmap noLoc) mdef
+      expDecl (L l (TyClD cl { tcdSigs = sig ++ sigs })) l name
     mkExportItem decl@(L l d)
-      | name:_ <- getMainDeclBinder d =
-        let (doc, subs) = lookupDocs name warnings docMap argMap subMap in
-        return $ Just (ExportDecl decl doc subs [] (fixities name subs) (l `elem` splices))
+      | name:_ <- getMainDeclBinder d = expDecl decl l name
       | otherwise = return Nothing
 
     fixities name subs = [ (n,f) | n <- name : map fst subs
                                  , Just f <- [M.lookup n fixMap] ]
+
+    expDecl decl l name = return $ Just (ExportDecl decl doc subs [] (fixities name subs) (l `elem` splices))
+      where (doc, subs) = lookupDocs name warnings docMap argMap subMap
 
 
 -- | Sometimes the declaration we want to export is not the "main" declaration:

@@ -73,8 +73,9 @@ tyThingToLHsDecl t = noLoc $ case t of
          , tcdFDs = map (\ (l,r) -> noLoc
                         (map getName l, map getName r) ) $
                          snd $ classTvsFds cl
-         , tcdSigs = map (noLoc . synifyIdSig DeleteTopLevelQuantification)
-                         (classMethods cl)
+         , tcdSigs = noLoc (MinimalSig . fmap noLoc $ classMinimalDef cl) :
+                      map (noLoc . synifyIdSig DeleteTopLevelQuantification)
+                        (classMethods cl)
          , tcdMeths = emptyBag --ignore default method definitions, they don't affect signature
          -- class associated-types are a subset of TyCon:
          , tcdATs = atFamDecls

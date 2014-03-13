@@ -1,0 +1,273 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><title
+    >Minimal</title
+    ><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean"
+     /><script src="haddock-util.js" type="text/javascript"
+    ></script
+    ><script type="text/javascript"
+    >//<![CDATA[
+window.onload = function () {pageLoad();setSynopsis("mini_Minimal.html");};
+//]]>
+</script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><ul class="links" id="page-menu"
+      ><li
+	><a href=""
+	  >Contents</a
+	  ></li
+	><li
+	><a href=""
+	  >Index</a
+	  ></li
+	></ul
+      ><p class="caption empty"
+      >&nbsp;</p
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>Minimal</p
+	></div
+      ><div id="description"
+      ><p class="caption"
+	>Description</p
+	><div class="doc"
+	><p
+	  >This tests the new MINIMAL pragma present in GHC 7.8</p
+	  ></div
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    > <a name="t:Foo" class="def"
+	    >Foo</a
+	    > a <span class="keyword"
+	    >where</span
+	    ></p
+	  ><div class="subs minimal"
+	  ><p class="caption"
+	    >Minimal complete definition</p
+	    ><p class="src"
+	    ><a href=""
+	      >foo</a
+	      >, <a href=""
+	      >bar</a
+	      > | <a href=""
+	      >bar</a
+	      >, <a href=""
+	      >bat</a
+	      > | <a href=""
+	      >foo</a
+	      >, <a href=""
+	      >bat</a
+	      > | <a href=""
+	      >fooBarBat</a
+	      ></p
+	    ></div
+	  ><div class="subs methods"
+	  ><p class="caption"
+	    >Methods</p
+	    ><p class="src"
+	    ><a name="v:foo" class="def"
+	      >foo</a
+	      >, <a name="v:bat" class="def"
+	      >bat</a
+	      >, <a name="v:bar" class="def"
+	      >bar</a
+	      > :: a</p
+	    ><div class="doc"
+	    ><p
+	      >Any two of these are required...</p
+	      ></div
+	    ><p class="src"
+	    ><a name="v:fooBarBat" class="def"
+	      >fooBarBat</a
+	      > :: (a, a, a)</p
+	    ><div class="doc"
+	    ><p
+	      >.. or just this</p
+	      ></div
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    > <a name="t:Weird" class="def"
+	    >Weird</a
+	    > a <span class="keyword"
+	    >where</span
+	    ></p
+	  ><div class="subs minimal"
+	  ><p class="caption"
+	    >Minimal complete definition</p
+	    ><p class="src"
+	    ><a href=""
+	      >a</a
+	      >, <a href=""
+	      >b</a
+	      >, <a href=""
+	      >c</a
+	      > | <a href=""
+	      >d</a
+	      > | <a href=""
+	      >e</a
+	      >, (<a href=""
+	      >f</a
+	      > | <a href=""
+	      >g</a
+	      >)</p
+	    ></div
+	  ><div class="subs methods"
+	  ><p class="caption"
+	    >Methods</p
+	    ><p class="src"
+	    ><a name="v:a" class="def"
+	      >a</a
+	      >, <a name="v:g" class="def"
+	      >g</a
+	      >, <a name="v:f" class="def"
+	      >f</a
+	      >, <a name="v:e" class="def"
+	      >e</a
+	      >, <a name="v:d" class="def"
+	      >d</a
+	      >, <a name="v:c" class="def"
+	      >c</a
+	      >, <a name="v:b" class="def"
+	      >b</a
+	      > :: a</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    > <a name="t:NoMins" class="def"
+	    >NoMins</a
+	    > a <span class="keyword"
+	    >where</span
+	    ></p
+	  ><div class="subs minimal"
+	  ><p class="caption"
+	    >Minimal complete definition</p
+	    ><p class="src"
+	    ><a href=""
+	      >x</a
+	      >, <a href=""
+	      >y</a
+	      ></p
+	    ></div
+	  ><div class="subs methods"
+	  ><p class="caption"
+	    >Methods</p
+	    ><p class="src"
+	    ><a name="v:x" class="def"
+	      >x</a
+	      >, <a name="v:z" class="def"
+	      >z</a
+	      >, <a name="v:y" class="def"
+	      >y</a
+	      > :: a</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    > <a name="t:FullMin" class="def"
+	    >FullMin</a
+	    > a <span class="keyword"
+	    >where</span
+	    ></p
+	  ><div class="subs methods"
+	  ><p class="caption"
+	    >Methods</p
+	    ><p class="src"
+	    ><a name="v:aaa" class="def"
+	      >aaa</a
+	      >, <a name="v:bbb" class="def"
+	      >bbb</a
+	      > :: a</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    > <a name="t:PartialMin" class="def"
+	    >PartialMin</a
+	    > a <span class="keyword"
+	    >where</span
+	    ></p
+	  ><div class="subs minimal"
+	  ><p class="caption"
+	    >Minimal complete definition</p
+	    ><p class="src"
+	    ><a href=""
+	      >ccc</a
+	      >, ddd</p
+	    ></div
+	  ><div class="subs methods"
+	  ><p class="caption"
+	    >Methods</p
+	    ><p class="src"
+	    ><a name="v:ccc" class="def"
+	      >ccc</a
+	      > :: a</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    > <a name="t:EmptyMin" class="def"
+	    >EmptyMin</a
+	    > a <span class="keyword"
+	    >where</span
+	    ></p
+	  ><div class="subs minimal"
+	  ><p class="caption"
+	    >Minimal complete definition</p
+	    ><p class="src"
+	    >Nothing</p
+	    ></div
+	  ><div class="subs methods"
+	  ><p class="caption"
+	    >Methods</p
+	    ><p class="src"
+	    ><a name="v:eee" class="def"
+	      >eee</a
+	      >, <a name="v:fff" class="def"
+	      >fff</a
+	      > :: a</p
+	    ></div
+	  ></div
+	></div
+      ></div
+    ><div id="footer"
+    ><p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.15.0</p
+      ></div
+    ></body
+  ></html
+>

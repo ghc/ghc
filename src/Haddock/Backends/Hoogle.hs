@@ -110,7 +110,10 @@ operator x = x
 -- How to print each export
 
 ppExport :: DynFlags -> ExportItem Name -> [String]
-ppExport dflags (ExportDecl decl dc subdocs _ _ _) = ppDocumentation dflags (fst dc) ++ f (unL decl)
+ppExport dflags ExportDecl { expItemDecl    = L _ decl
+                           , expItemMbDoc   = (dc, _)
+                           , expItemSubDocs = subdocs
+                           } = ppDocumentation dflags dc ++ f decl
     where
         f (TyClD d@DataDecl{})  = ppData dflags d subdocs
         f (TyClD d@SynDecl{})   = ppSynonym dflags d
@@ -139,6 +142,7 @@ ppClass dflags x = out dflags x{tcdSigs=[]} :
             concatMap (ppSig dflags . addContext . unL) (tcdSigs x)
     where
         addContext (TypeSig name (L l sig)) = TypeSig name (L l $ f sig)
+        addContext (MinimalSig sig) = MinimalSig sig
         addContext _ = error "expected TypeSig"
 
         f (HsForAllTy a b con d) = HsForAllTy a b (reL (context : unLoc con)) d

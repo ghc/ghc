@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
@@ -35,6 +35,7 @@ import GhcMonad (withSession)
 import HscTypes
 import UniqFM
 import GHC
+import Class
 
 
 moduleString :: Module -> String
@@ -114,6 +115,7 @@ filterSigNames :: (name -> Bool) -> Sig name -> Maybe (Sig name)
 filterSigNames p orig@(SpecSig n _ _)          = ifTrueJust (p $ unLoc n) orig
 filterSigNames p orig@(InlineSig n _)          = ifTrueJust (p $ unLoc n) orig
 filterSigNames p orig@(FixSig (FixitySig n _)) = ifTrueJust (p $ unLoc n) orig
+filterSigNames _ orig@(MinimalSig _)           = Just orig
 filterSigNames p (TypeSig ns ty)               =
   case filter (p . unLoc) ns of
     []       -> Nothing
@@ -279,6 +281,13 @@ modifySessionDynFlags f = do
 gbracket_ :: ExceptionMonad m => m a -> m b -> m c -> m c
 gbracket_ before_ after thing = gbracket before_ (const after) (const thing)
 
+-- Extract the minimal complete definition of a Name, if one exists
+minimalDef :: GhcMonad m => Name -> m (Maybe ClassMinimalDef)
+minimalDef n = do
+  mty <- lookupGlobalName n
+  case mty of
+    Just (ATyCon (tyConClass_maybe -> Just c)) -> return . Just $ classMinimalDef c
+    _ -> return Nothing
 
 -------------------------------------------------------------------------------
 -- * DynFlags
