@@ -762,9 +762,13 @@ primop  UnsafeThawArrayOp  "unsafeThawArray#" GenPrimOp
 
 primop  CopyArrayOp "copyArray#" GenPrimOp
   Array# a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
-  {Copy a range of the Array# to the specified region in the MutableArray#.
-   Both arrays must fully contain the specified ranges, but this is not checked.
-   The two arrays must not be the same array in different states, but this is not checked either.}
+  {Given a source array, an offset into the source array, a
+   destination array, an offset into the destination array, and a
+   number of elements to copy, copy the elements from the source array
+   to the destination array. Both arrays must fully contain the
+   specified ranges, but this is not checked. The two arrays must not
+   be the same array in different states, but this is not checked
+   either.}
   with
   has_side_effects = True
   can_fail         = True
@@ -772,8 +776,12 @@ primop  CopyArrayOp "copyArray#" GenPrimOp
 
 primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
   MutableArray# s a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
-  {Copy a range of the first MutableArray# to the specified region in the second MutableArray#.
-   Both arrays must fully contain the specified ranges, but this is not checked.}
+  {Given a source array, an offset into the source array, a
+   destination array, an offset into the destination array, and a
+   number of elements to copy, copy the elements from the source array
+   to the destination array. The source and destination arrays can
+   refer to the same array. Both arrays must fully contain the
+   specified ranges, but this is not checked.}
   with
   has_side_effects = True
   can_fail         = True
@@ -781,32 +789,40 @@ primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
 
 primop  CloneArrayOp "cloneArray#" GenPrimOp
   Array# a -> Int# -> Int# -> Array# a
-  {Return a newly allocated Array# with the specified subrange of the provided Array#.
-   The provided Array# should contain the full subrange specified by the two Int#s, but this is not checked.}
+  {Given a source array, an offset into the source array, and a number
+   of elements to copy, create a new array with the elements from the
+   source array. The provided array must fully contain the specified
+   range, but this is not checked.}
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
 primop  CloneMutableArrayOp "cloneMutableArray#" GenPrimOp
   MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
-  {Return a newly allocated Array# with the specified subrange of the provided Array#.
-   The provided MutableArray# should contain the full subrange specified by the two Int#s, but this is not checked.}
+  {Given a source array, an offset into the source array, and a number
+   of elements to copy, create a new array with the elements from the
+   source array. The provided array must fully contain the specified
+   range, but this is not checked.}
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
 primop  FreezeArrayOp "freezeArray#" GenPrimOp
   MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, Array# a #)
-  {Return a newly allocated Array# with the specified subrange of the provided MutableArray#.
-   The provided MutableArray# should contain the full subrange specified by the two Int#s, but this is not checked.}
+  {Given a source array, an offset into the source array, and a number
+   of elements to copy, create a new array with the elements from the
+   source array. The provided array must fully contain the specified
+   range, but this is not checked.}
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
 primop  ThawArrayOp "thawArray#" GenPrimOp
   Array# a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
-  {Return a newly allocated Array# with the specified subrange of the provided MutableArray#.
-   The provided Array# should contain the full subrange specified by the two Int#s, but this is not checked.}
+  {Given a source array, an offset into the source array, and a number
+   of elements to copy, create a new array with the elements from the
+   source array. The provided array must fully contain the specified
+   range, but this is not checked.}
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
