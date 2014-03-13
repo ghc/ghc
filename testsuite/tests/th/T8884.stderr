@@ -1,0 +1,3 @@
+type family T8884.Foo (a_0 :: k_1) :: k_1 where T8884.Foo x_2 = x_2
+type family T8884.Baz (a_0 :: k_1) :: *
+type instance T8884.Baz x_0 = x_0

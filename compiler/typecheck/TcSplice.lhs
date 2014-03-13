@@ -1194,7 +1194,8 @@ reifyThing thing = pprPanic "reifyThing" (pprTcTyThingCategory thing)
 -------------------------------------------
 reifyAxBranch :: CoAxBranch -> TcM TH.TySynEqn
 reifyAxBranch (CoAxBranch { cab_lhs = args, cab_rhs = rhs })
-  = do { args' <- mapM reifyType args
+            -- remove kind patterns (#8884)
+  = do { args' <- mapM reifyType (filter (not . isKind) args)
        ; rhs'  <- reifyType rhs
        ; return (TH.TySynEqn args' rhs') }
 
@@ -1210,10 +1211,15 @@ reifyTyCon tc
   = return (TH.PrimTyConI (reifyName tc) (tyConArity tc) (isUnLiftedTyCon tc))
 
   | isFamilyTyCon tc
-  = do { let tvs     = tyConTyVars tc
-             kind    = tyConKind tc
-       ; kind' <- if isLiftedTypeKind kind then return Nothing
-                  else fmap Just (reifyKind kind)
+  = do { let tvs      = tyConTyVars tc
+             kind     = tyConKind tc
+
+             -- we need the *result kind* (see #8884)
+             (kvs, mono_kind) = splitForAllTys kind
+                                -- tyConArity includes *kind* params
+             (_, res_kind)    = splitKindFunTysN (tyConArity tc - length kvs)
+                                                 mono_kind
+       ; kind' <- fmap Just (reifyKind res_kind)
 
        ; tvs' <- reifyTyVars tvs
        ; flav' <- reifyFamFlavour tc
@@ -1315,7 +1321,8 @@ reifyFamilyInstance (FamInst { fi_flavor = flavor
                              , fi_rhs = rhs })
   = case flavor of
       SynFamilyInst ->
-        do { th_lhs <- reifyTypes lhs
+               -- remove kind patterns (#8884)
+        do { th_lhs <- reifyTypes (filter (not . isKind) lhs)
            ; th_rhs <- reifyType  rhs
            ; return (TH.TySynInstD (reifyName fam) (TH.TySynEqn th_lhs th_rhs)) }
 

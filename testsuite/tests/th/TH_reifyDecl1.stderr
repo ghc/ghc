@@ -21,15 +21,15 @@ class TH_reifyDecl1.C2 a_0
 instance TH_reifyDecl1.C2 GHC.Types.Int
 class TH_reifyDecl1.C3 a_0
 instance TH_reifyDecl1.C3 GHC.Types.Int
-type family TH_reifyDecl1.AT1 a_0 :: * -> *
+type family TH_reifyDecl1.AT1 a_0 :: *
 type instance TH_reifyDecl1.AT1 GHC.Types.Int = GHC.Types.Bool
-data family TH_reifyDecl1.AT2 a_0 :: * -> *
+data family TH_reifyDecl1.AT2 a_0 :: *
 data instance TH_reifyDecl1.AT2 GHC.Types.Int
     = TH_reifyDecl1.AT2Int
-type family TH_reifyDecl1.TF1 a_0 :: * -> *
-type family TH_reifyDecl1.TF2 a_0 :: * -> *
+type family TH_reifyDecl1.TF1 a_0 :: *
+type family TH_reifyDecl1.TF2 a_0 :: *
 type instance TH_reifyDecl1.TF2 GHC.Types.Bool = GHC.Types.Bool
-data family TH_reifyDecl1.DF1 a_0 :: * -> *
-data family TH_reifyDecl1.DF2 a_0 :: * -> *
+data family TH_reifyDecl1.DF1 a_0 :: *
+data family TH_reifyDecl1.DF2 a_0 :: *
 data instance TH_reifyDecl1.DF2 GHC.Types.Bool
     = TH_reifyDecl1.DBool
