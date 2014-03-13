@@ -3020,7 +3020,7 @@
         </thead>
         <tbody>
           <row>
-            <entry><option>-j <replaceable>N</replaceable></option></entry>
+            <entry><option>-j<replaceable>N</replaceable></option></entry>
             <entry>When compiling with <literal>--make</literal>, compile <replaceable>N</replaceable> modules in parallel.</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
