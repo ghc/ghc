@@ -437,6 +437,9 @@ instance Bits Integer where
    complement = complementInteger
    shift x i@(I# i#) | i >= 0    = shiftLInteger x i#
                      | otherwise = shiftRInteger x (negateInt# i#)
+   shiftL x (I# i#) = shiftLInteger x i#
+   shiftR x (I# i#) = shiftRInteger x i#
+
    testBit x (I# i) = testBitInteger x i
 
    zeroBits   = 0
