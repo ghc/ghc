@@ -400,6 +400,17 @@ mapFB c f = \x ys -> c (f x) ys
 "mapList"   [1]  forall f.      foldr (mapFB (:) f) []  = map f
 "mapFB"     forall c f g.       mapFB (mapFB c f) g     = mapFB c (f.g)
   #-}
+
+-- There's also a rule for Map and Data.Coerce. See "Safe Coercions",
+-- section 6.4:
+--
+--   http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf
+--
+-- We rewrite late so the optimiser has as many chances as possible to
+-- turn up instances of map coerce.
+
+{-# RULES "map/coerce" map coerce = coerce #-}
+
 \end{code}
 
 
