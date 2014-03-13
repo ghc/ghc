@@ -1,0 +1,12 @@
+
+T8851.hs:24:12:
+    Could not coerce from ‘Monad Parser’ to ‘Monad MyParser’
+      because the first type argument of ‘Monad’ has role Nominal,
+      but the arguments ‘Parser’ and ‘MyParser’ differ
+      arising from the coercion of the method ‘notFollowedBy’ from type
+                   ‘forall a. (Monad Parser, Show a) => Parser a -> Parser ()’ to type
+                   ‘forall a. (Monad MyParser, Show a) => MyParser a -> MyParser ()’
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Parsing MyParser)
