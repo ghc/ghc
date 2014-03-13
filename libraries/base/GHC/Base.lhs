@@ -694,6 +694,8 @@ a `shiftL#` b   | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
 
 -- | Shift the argument right by the specified number of bits
 -- (which must be non-negative).
+-- The "RL" means "right, logical" (as opposed to RA for arithmetic)
+-- (although an arithmetic right shift wouldn't make sense for Word#)
 shiftRL# :: Word# -> Int# -> Word#
 a `shiftRL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
                 | otherwise                          = a `uncheckedShiftRL#` b
@@ -706,6 +708,7 @@ a `iShiftL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
 
 -- | Shift the argument right (signed) by the specified number of bits
 -- (which must be non-negative).
+-- The "RA" means "right, arithmetic" (as opposed to RL for logical)
 iShiftRA# :: Int# -> Int# -> Int#
 a `iShiftRA#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = if isTrue# (a <# 0#)
                                                           then (-1#)
@@ -714,6 +717,7 @@ a `iShiftRA#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = if isTrue# (a <# 0#)
 
 -- | Shift the argument right (unsigned) by the specified number of bits
 -- (which must be non-negative).
+-- The "RL" means "right, logical" (as opposed to RA for arithmetic)
 iShiftRL# :: Int# -> Int# -> Int#
 a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
                 | otherwise                          = a `uncheckedIShiftRL#` b
