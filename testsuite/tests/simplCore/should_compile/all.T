@@ -198,4 +198,7 @@ test('T5996',
      run_command,
      ['$MAKE -s --no-print-directory T5996'])
 test('T8537', normal, compile, [''])
-test('T8714', normal, compile, [''])
+test('T8832',
+     extra_clean(['T8832.hi', 'T8832a.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T8832'])
