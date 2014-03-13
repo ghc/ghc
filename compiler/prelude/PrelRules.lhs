@@ -111,6 +111,8 @@ primOpRules nm OrIOp       = mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
 primOpRules nm XorIOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 xor)
                                                , identityDynFlags zeroi
                                                , equalArgs >> retLit zeroi ]
+primOpRules nm NotIOp      = mkPrimOpRule nm 1 [ unaryLit complementOp
+                                               , inversePrimOp NotIOp ]
 primOpRules nm IntNegOp    = mkPrimOpRule nm 1 [ unaryLit negOp
                                                , inversePrimOp IntNegOp ]
 primOpRules nm ISllOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 Bits.shiftL)
@@ -141,6 +143,8 @@ primOpRules nm OrOp        = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
 primOpRules nm XorOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
                                                , identityDynFlags zerow
                                                , equalArgs >> retLit zerow ]
+primOpRules nm NotOp       = mkPrimOpRule nm 1 [ unaryLit complementOp
+                                               , inversePrimOp NotOp ]
 primOpRules nm SllOp       = mkPrimOpRule nm 2 [ wordShiftRule Bits.shiftL ]
 primOpRules nm SrlOp       = mkPrimOpRule nm 2 [ wordShiftRule shiftRightLogical ]
 
@@ -344,6 +348,11 @@ negOp _      (MachDouble 0.0) = Nothing
 negOp dflags (MachDouble d)   = Just (mkDoubleVal dflags (-d))
 negOp dflags (MachInt i)      = intResult dflags (-i)
 negOp _      _                = Nothing
+
+complementOp :: DynFlags -> Literal -> Maybe CoreExpr  -- Binary complement
+complementOp dflags (MachWord i) = wordResult dflags (complement i)
+complementOp dflags (MachInt i)  = intResult  dflags (complement i)
+complementOp _      _            = Nothing
 
 --------------------------
 intOp2 :: (Integral a, Integral b)
