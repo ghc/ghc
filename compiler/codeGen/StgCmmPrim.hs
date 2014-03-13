@@ -8,8 +8,9 @@
 
 module StgCmmPrim (
    cgOpApp,
-   cgPrimOp -- internal(ish), used by cgCase to get code for a
-            -- comparison without also turning it into a Bool.
+   cgPrimOp, -- internal(ish), used by cgCase to get code for a
+             -- comparison without also turning it into a Bool.
+   shouldInlinePrimOp
  ) where
 
 #include "HsVersions.h"
@@ -41,7 +42,6 @@ import Outputable
 import Util
 
 import Control.Monad (liftM, when)
-import Data.Bits
 
 ------------------------------------------------------------------------
 --      Primitive operations and foreign calls
@@ -132,12 +132,31 @@ shouldInlinePrimOp :: DynFlags
                    -> PrimOp     -- ^ The primop
                    -> [CmmExpr]  -- ^ The primop arguments
                    -> Maybe ([LocalReg] -> FCode ())
-shouldInlinePrimOp _ NewByteArrayOp_Char [(CmmLit (CmmInt n _))]
-  | fromInteger n <= maxInlineAllocThreshold =
+
+shouldInlinePrimOp dflags NewByteArrayOp_Char [(CmmLit (CmmInt n _))]
+  | fromInteger n <= maxInlineAllocSize dflags =
       Just $ \ [res] -> doNewByteArrayOp res (fromInteger n)
+
 shouldInlinePrimOp dflags NewArrayOp [(CmmLit (CmmInt n _)), init]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocThreshold =
+  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
       Just $ \ [res] -> doNewArrayOp res (fromInteger n) init
+
+shouldInlinePrimOp dflags CloneArrayOp [src, src_off, (CmmLit (CmmInt n _))]
+  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+      Just $ \ [res] -> emitCloneArray mkMAP_FROZEN_infoLabel res src src_off (fromInteger n)
+
+shouldInlinePrimOp dflags CloneMutableArrayOp [src, src_off, (CmmLit (CmmInt n _))]
+  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+      Just $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
+
+shouldInlinePrimOp dflags FreezeArrayOp [src, src_off, (CmmLit (CmmInt n _))]
+  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+      Just $ \ [res] -> emitCloneArray mkMAP_FROZEN_infoLabel res src src_off (fromInteger n)
+
+shouldInlinePrimOp dflags ThawArrayOp [src, src_off, (CmmLit (CmmInt n _))]
+  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+      Just $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
+
 shouldInlinePrimOp dflags primop args
   | primOpOutOfLine primop = Nothing
   | otherwise = Just $ \ regs -> emitPrimOp dflags regs primop args
@@ -328,11 +347,11 @@ emitPrimOp dflags [res] DataToTagOp [arg]
 --      }
 emitPrimOp _      [res] UnsafeFreezeArrayOp [arg]
    = emit $ catAGraphs
-   [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_infoLabel)),
+   [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN0_infoLabel)),
      mkAssign (CmmLocal res) arg ]
 emitPrimOp _      [res] UnsafeFreezeArrayArrayOp [arg]
    = emit $ catAGraphs
-   [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_infoLabel)),
+   [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN0_infoLabel)),
      mkAssign (CmmLocal res) arg ]
 
 --  #define unsafeFreezzeByteArrayzh(r,a)       r=(a)
@@ -345,15 +364,6 @@ emitPrimOp _      [] CopyArrayOp [src,src_off,dst,dst_off,n] =
     doCopyArrayOp src src_off dst dst_off n
 emitPrimOp _      [] CopyMutableArrayOp [src,src_off,dst,dst_off,n] =
     doCopyMutableArrayOp src src_off dst dst_off n
-emitPrimOp _      [res] CloneArrayOp [src,src_off,n] =
-    emitCloneArray mkMAP_FROZEN_infoLabel res src src_off n
-emitPrimOp _      [res] CloneMutableArrayOp [src,src_off,n] =
-    emitCloneArray mkMAP_DIRTY_infoLabel res src src_off n
-emitPrimOp _      [res] FreezeArrayOp [src,src_off,n] =
-    emitCloneArray mkMAP_FROZEN_infoLabel res src src_off n
-emitPrimOp _      [res] ThawArrayOp [src,src_off,n] =
-    emitCloneArray mkMAP_DIRTY_infoLabel res src src_off n
-
 emitPrimOp _      [] CopyArrayArrayOp [src,src_off,dst,dst_off,n] =
     doCopyArrayOp src src_off dst dst_off n
 emitPrimOp _      [] CopyMutableArrayArrayOp [src,src_off,dst,dst_off,n] =
@@ -1598,10 +1608,6 @@ doNewArrayOp res_r n init = do
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 
--- | The inline allocation limit is 128 bytes.
-maxInlineAllocThreshold :: ByteOff
-maxInlineAllocThreshold = 128
-
 -- ----------------------------------------------------------------------------
 -- Copying pointer arrays
 
@@ -1689,45 +1695,40 @@ emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 = do
 -- allocated array in, a source array, an offset in the source array,
 -- and the number of elements to copy. Allocates a new array and
 -- initializes it from the source array.
-emitCloneArray :: CLabel -> CmmFormal -> CmmExpr -> CmmExpr -> CmmExpr
+emitCloneArray :: CLabel -> CmmFormal -> CmmExpr -> CmmExpr -> WordOff
                -> FCode ()
-emitCloneArray info_p res_r src0 src_off0 n0 = do
+emitCloneArray info_p res_r src src_off n = do
     dflags <- getDynFlags
-    let arrPtrsHdrSizeW dflags = mkIntExpr dflags (fixedHdrSize dflags +
-                                     (sIZEOF_StgMutArrPtrs_NoHdr dflags `div` wORD_SIZE dflags))
-        myCapability = cmmSubWord dflags (CmmReg baseReg) (mkIntExpr dflags (oFFSET_Capability_r dflags))
-    -- Passed as arguments (be careful)
-    src     <- assignTempE src0
-    src_off <- assignTempE src_off0
-    n       <- assignTempE n0
 
-    card_bytes <- assignTempE $ cardRoundUpCmm dflags n
-    size <- assignTempE $ cmmAddWord dflags n (bytesToWordsRoundUpCmm dflags card_bytes)
-    words <- assignTempE $ cmmAddWord dflags (arrPtrsHdrSizeW dflags) size
+    let info_ptr = mkLblExpr info_p
+        rep = arrPtrsRep dflags n
 
-    arr_r <- newTemp (bWord dflags)
-    emitAllocateCall arr_r myCapability words
-    tickyAllocPrim (mkIntExpr dflags (arrPtrsHdrSize dflags)) (cmmMulWord dflags n (wordSize dflags))
-                   (zeroExpr dflags)
+    tickyAllocPrim (mkIntExpr dflags (arrPtrsHdrSize dflags))
+        (mkIntExpr dflags (nonHdrSize dflags rep))
+        (zeroExpr dflags)
 
-    let arr = CmmReg (CmmLocal arr_r)
-    emitSetDynHdr arr (CmmLit (CmmLabel info_p)) curCCS
-    emit $ mkStore (cmmOffsetB dflags arr (fixedHdrSize dflags * wORD_SIZE dflags +
-                                           oFFSET_StgMutArrPtrs_ptrs dflags)) n
-    emit $ mkStore (cmmOffsetB dflags arr (fixedHdrSize dflags * wORD_SIZE dflags +
-                                           oFFSET_StgMutArrPtrs_size dflags)) size
+    let hdr_size = wordsToBytes dflags (fixedHdrSize dflags)
 
-    dst_p <- assignTempE $ cmmOffsetB dflags arr (arrPtrsHdrSize dflags)
-    src_p <- assignTempE $ cmmOffsetExprW dflags (cmmOffsetB dflags src (arrPtrsHdrSize dflags))
-             src_off
+    base <- allocHeapClosure rep info_ptr curCCS
+                     [ (mkIntExpr dflags n,
+                        hdr_size + oFFSET_StgMutArrPtrs_ptrs dflags)
+                     , (mkIntExpr dflags (nonHdrSizeW rep),
+                        hdr_size + oFFSET_StgMutArrPtrs_size dflags)
+                     ]
 
-    emitMemcpyCall dst_p src_p (cmmMulWord dflags n (wordSize dflags)) (mkIntExpr dflags (wORD_SIZE dflags))
+    arr <- CmmLocal `fmap` newTemp (bWord dflags)
+    emit $ mkAssign arr base
 
-    emitMemsetCall (cmmOffsetExprW dflags dst_p n)
-        (mkIntExpr dflags 1)
-        card_bytes
+    dst_p <- assignTempE $ cmmOffsetB dflags (CmmReg arr)
+             (arrPtrsHdrSize dflags)
+    src_p <- assignTempE $ cmmOffsetExprW dflags src
+             (cmmAddWord dflags
+              (mkIntExpr dflags (arrPtrsHdrSizeW dflags)) src_off)
+
+    emitMemcpyCall dst_p src_p (mkIntExpr dflags (wordsToBytes dflags n))
         (mkIntExpr dflags (wORD_SIZE dflags))
-    emit $ mkAssign (CmmLocal res_r) arr
+
+    emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 
 -- | Takes and offset in the destination array, the base address of
 -- the card table, and the number of elements affected (*not* the
@@ -1747,22 +1748,6 @@ emitSetCards dst_start dst_cards_start n = do
 cardCmm :: DynFlags -> CmmExpr -> CmmExpr
 cardCmm dflags i =
     cmmUShrWord dflags i (mkIntExpr dflags (mUT_ARR_PTRS_CARD_BITS dflags))
-
--- Convert a number of elements to a number of cards, rounding up
-cardRoundUpCmm :: DynFlags -> CmmExpr -> CmmExpr
-cardRoundUpCmm dflags i =
-    cardCmm dflags (cmmAddWord dflags i
-                    (mkIntExpr dflags
-                     ((1 `shiftL` mUT_ARR_PTRS_CARD_BITS dflags) - 1)))
-
-bytesToWordsRoundUpCmm :: DynFlags -> CmmExpr -> CmmExpr
-bytesToWordsRoundUpCmm dflags e =
-    cmmQuotWord dflags (cmmAddWord dflags e
-                        (mkIntExpr dflags
-                         (wORD_SIZE dflags - 1))) (wordSize dflags)
-
-wordSize :: DynFlags -> CmmExpr
-wordSize dflags = mkIntExpr dflags (wORD_SIZE dflags)
 
 -- | Emit a call to @memcpy@.
 emitMemcpyCall :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
@@ -1788,19 +1773,6 @@ emitMemsetCall dst c n align = do
         [ {- no results -} ]
         MO_Memset
         [ dst, c, n, align ]
-
--- | Emit a call to @allocate@.
-emitAllocateCall :: LocalReg -> CmmExpr -> CmmExpr -> FCode ()
-emitAllocateCall res cap n = do
-    emitCCall
-        [ (res, AddrHint) ]
-        allocate
-        [ (cap, AddrHint)
-        , (n, NoHint)
-        ]
-  where
-    allocate = CmmLit (CmmLabel (mkForeignLabel (fsLit "allocate") Nothing
-                                 ForeignLabelInExternalPackage IsFunction))
 
 emitBSwapCall :: LocalReg -> CmmExpr -> Width -> FCode ()
 emitBSwapCall res x width = do

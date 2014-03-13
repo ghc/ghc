@@ -347,6 +347,10 @@ RTS_FUN_DECL(stg_casIntArrayzh);
 RTS_FUN_DECL(stg_fetchAddIntArrayzh);
 RTS_FUN_DECL(stg_newArrayzh);
 RTS_FUN_DECL(stg_newArrayArrayzh);
+RTS_FUN_DECL(stg_cloneArrayzh);
+RTS_FUN_DECL(stg_cloneMutableArrayzh);
+RTS_FUN_DECL(stg_freezzeArrayzh);
+RTS_FUN_DECL(stg_thawArrayzh);
 
 RTS_FUN_DECL(stg_newMutVarzh);
 RTS_FUN_DECL(stg_atomicModifyMutVarzh);

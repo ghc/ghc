@@ -1887,6 +1887,19 @@
             <entry><option>-fno-unfolding-use-threshold</option></entry>
           </row>
 
+          <row>
+            <entry><option>-fmax-inline-alloc-size</option>=<replaceable>n</replaceable></entry>
+            <entry>Set the maximum size of inline array allocations to
+            <replaceable>n</replaceable> bytes (default: 128). GHC
+            will allocate non-pinned arrays of statically known size
+            in the current nursery block if they're no bigger than
+            <replaceable>n</replaceable> bytes, ignoring GC overheap.
+            This value should be quite a bit smaller than the block
+            size (typically: 4096).</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
         </tbody>
       </tgroup>
     </informaltable>

@@ -54,6 +54,7 @@ module CLabel (
         mkIndStaticInfoLabel,
         mkMainCapabilityLabel,
         mkMAP_FROZEN_infoLabel,
+        mkMAP_FROZEN0_infoLabel,
         mkMAP_DIRTY_infoLabel,
         mkEMPTY_MVAR_infoLabel,
         mkArrWords_infoLabel,
@@ -401,7 +402,7 @@ mkStaticConEntryLabel name  c     = IdLabel name c StaticConEntry
 -- Constructing Cmm Labels
 mkDirty_MUT_VAR_Label, mkSplitMarkerLabel, mkUpdInfoLabel,
     mkBHUpdInfoLabel, mkIndStaticInfoLabel, mkMainCapabilityLabel,
-    mkMAP_FROZEN_infoLabel, mkMAP_DIRTY_infoLabel,
+    mkMAP_FROZEN_infoLabel, mkMAP_FROZEN0_infoLabel, mkMAP_DIRTY_infoLabel,
     mkEMPTY_MVAR_infoLabel, mkTopTickyCtrLabel,
     mkCAFBlackHoleInfoTableLabel, mkCAFBlackHoleEntryLabel,
     mkArrWords_infoLabel :: CLabel
@@ -411,7 +412,8 @@ mkUpdInfoLabel                  = CmmLabel rtsPackageId (fsLit "stg_upd_frame") 
 mkBHUpdInfoLabel                = CmmLabel rtsPackageId (fsLit "stg_bh_upd_frame" )     CmmInfo
 mkIndStaticInfoLabel            = CmmLabel rtsPackageId (fsLit "stg_IND_STATIC")        CmmInfo
 mkMainCapabilityLabel           = CmmLabel rtsPackageId (fsLit "MainCapability")        CmmData
-mkMAP_FROZEN_infoLabel          = CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_FROZEN0") CmmInfo
+mkMAP_FROZEN_infoLabel          = CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_FROZEN") CmmInfo
+mkMAP_FROZEN0_infoLabel         = CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_FROZEN0") CmmInfo
 mkMAP_DIRTY_infoLabel           = CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_DIRTY") CmmInfo
 mkEMPTY_MVAR_infoLabel          = CmmLabel rtsPackageId (fsLit "stg_EMPTY_MVAR")        CmmInfo
 mkTopTickyCtrLabel              = CmmLabel rtsPackageId (fsLit "top_ct")                CmmData

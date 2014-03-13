@@ -225,6 +225,27 @@ stg_unsafeThawArrayzh ( gcptr arr )
   }
 }
 
+stg_cloneArrayzh ( gcptr src, W_ offset, W_ n )
+{
+  cloneArray(stg_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
+}
+
+stg_cloneMutableArrayzh ( gcptr src, W_ offset, W_ n )
+{
+  cloneArray(stg_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
+}
+
+// We have to escape the "z" in the name.
+stg_freezzeArrayzh ( gcptr src, W_ offset, W_ n )
+{
+  cloneArray(stg_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
+}
+
+stg_thawArrayzh ( gcptr src, W_ offset, W_ n )
+{
+  cloneArray(stg_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
+}
+
 // RRN: Uses the ticketed approach; see casMutVar
 stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
 /* MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, Any a #) */

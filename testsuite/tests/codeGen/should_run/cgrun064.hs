@@ -9,15 +9,20 @@ import GHC.Exts hiding (IsList(..))
 import GHC.Prim
 import GHC.ST
 
+main :: IO ()
 main = putStr
        (test_copyArray
         ++ "\n" ++ test_copyMutableArray
         ++ "\n" ++ test_copyMutableArrayOverlap
         ++ "\n" ++ test_cloneArray
+        ++ "\n" ++ test_cloneArrayStatic
         ++ "\n" ++ test_cloneMutableArray
         ++ "\n" ++ test_cloneMutableArrayEmpty
+        ++ "\n" ++ test_cloneMutableArrayStatic
         ++ "\n" ++ test_freezeArray
+        ++ "\n" ++ test_freezeArrayStatic
         ++ "\n" ++ test_thawArray
+        ++ "\n" ++ test_thawArrayStatic
         ++ "\n"
        )
 
@@ -31,6 +36,10 @@ len = 130
 -- We copy these many elements
 copied :: Int
 copied = len - 2
+
+copiedStatic :: Int
+copiedStatic = 16
+{-# INLINE copiedStatic #-}  -- to make sure optimization triggers
 
 ------------------------------------------------------------------------
 -- copyArray#
@@ -90,8 +99,19 @@ test_cloneArray =
             fill src 0 len
             src <- unsafeFreezeArray src
             -- Don't include the first and last element.
-            return $ cloneArray src 1 copied
+            return $! cloneArray src 1 copied
     in shows (toList dst copied) "\n"
+
+--  Check that the static-size optimization works.
+test_cloneArrayStatic :: String
+test_cloneArrayStatic =
+    let dst = runST $ do
+            src <- newArray len 0
+            fill src 0 len
+            src <- unsafeFreezeArray src
+            -- Don't include the first and last element.
+            return $! cloneArray src 1 copiedStatic
+    in shows (toList dst copiedStatic) "\n"
 
 ------------------------------------------------------------------------
 -- cloneMutableArray#
@@ -117,6 +137,17 @@ test_cloneMutableArrayEmpty =
             unsafeFreezeArray dst
     in shows (toList dst 0) "\n"
 
+--  Check that the static-size optimization works.
+test_cloneMutableArrayStatic :: String
+test_cloneMutableArrayStatic =
+    let dst = runST $ do
+            src <- newArray len 0
+            fill src 0 len
+            -- Don't include the first and last element.
+            dst <- cloneMutableArray src 1 copiedStatic
+            unsafeFreezeArray dst
+    in shows (toList dst copiedStatic) "\n"
+
 ------------------------------------------------------------------------
 -- freezeArray#
 
@@ -130,6 +161,16 @@ test_freezeArray =
             -- Don't include the first and last element.
             freezeArray src 1 copied
     in shows (toList dst copied) "\n"
+
+--  Check that the static-size optimization works.
+test_freezeArrayStatic :: String
+test_freezeArrayStatic =
+    let dst = runST $ do
+            src <- newArray len 0
+            fill src 0 len
+            -- Don't include the first and last element.
+            freezeArray src 1 copiedStatic
+    in shows (toList dst copiedStatic) "\n"
 
 ------------------------------------------------------------------------
 -- thawArray#
@@ -146,6 +187,18 @@ test_thawArray =
             dst <- thawArray src 1 copied
             unsafeFreezeArray dst
     in shows (toList dst copied) "\n"
+
+--  Check that the static-size optimization works.
+test_thawArrayStatic :: String
+test_thawArrayStatic =
+    let dst = runST $ do
+            src <- newArray len 0
+            fill src 0 len
+            src <- unsafeFreezeArray src
+            -- Don't include the first and last element.
+            dst <- thawArray src 1 copiedStatic
+            unsafeFreezeArray dst
+    in shows (toList dst copiedStatic) "\n"
 
 ------------------------------------------------------------------------
 -- Test helpers
@@ -181,13 +234,27 @@ newArray (I# n#) a = ST $ \s# -> case newArray# n# a s# of
     (# s2#, marr# #) -> (# s2#, MArray marr# #)
 
 indexArray :: Array a -> Int -> a
-indexArray arr (I# i#) = case indexArray# (unArray arr) i# of
-    (# a #) -> a
+indexArray arr i@(I# i#)
+  | i < 0 || i >= len =
+      error $ "bounds error, offset " ++ show i ++ ", length " ++ show len
+  | otherwise = case indexArray# (unArray arr) i# of
+      (# a #) -> a
+  where len = lengthArray arr
 
 writeArray :: MArray s a -> Int -> a -> ST s ()
-writeArray marr (I# i#) a = ST $ \ s# ->
+writeArray marr i@(I# i#) a
+  | i < 0 || i >= len =
+      error $ "bounds error, offset " ++ show i ++ ", length " ++ show len
+  | otherwise = ST $ \ s# ->
     case writeArray# (unMArray marr) i# a s# of
         s2# -> (# s2#, () #)
+  where len = lengthMArray marr
+
+lengthArray :: Array a -> Int
+lengthArray arr = I# (sizeofArray# (unArray arr))
+
+lengthMArray :: MArray s a -> Int
+lengthMArray marr = I# (sizeofMutableArray# (unMArray marr))
 
 unsafeFreezeArray :: MArray s a -> ST s (Array a)
 unsafeFreezeArray marr = ST $ \ s# ->
@@ -206,21 +273,25 @@ copyMutableArray src (I# six#) dst (I# dix#) (I# n#) = ST $ \ s# ->
 
 cloneArray :: Array a -> Int -> Int -> Array a
 cloneArray src (I# six#) (I# n#) = Array (cloneArray# (unArray src) six# n#)
+{-# INLINE cloneArray #-}  -- to make sure optimization triggers
 
 cloneMutableArray :: MArray s a -> Int -> Int -> ST s (MArray s a)
 cloneMutableArray src (I# six#) (I# n#) = ST $ \ s# ->
     case cloneMutableArray# (unMArray src) six# n# s# of
         (# s2#, marr# #) -> (# s2#, MArray marr# #)
+{-# INLINE cloneMutableArray #-}  -- to make sure optimization triggers
 
 freezeArray :: MArray s a -> Int -> Int -> ST s (Array a)
 freezeArray src (I# six#) (I# n#) = ST $ \ s# ->
     case freezeArray# (unMArray src) six# n# s# of
         (# s2#, arr# #) -> (# s2#, Array arr# #)
+{-# INLINE freezeArray #-}  -- to make sure optimization triggers
 
 thawArray :: Array a -> Int -> Int -> ST s (MArray s a)
 thawArray src (I# six#) (I# n#) = ST $ \ s# ->
     case thawArray# (unArray src) six# n# s# of
         (# s2#, marr# #) -> (# s2#, MArray marr# #)
+{-# INLINE thawArray #-}  -- to make sure optimization triggers
 
 toList :: Array a -> Int -> [a]
 toList arr n = go 0

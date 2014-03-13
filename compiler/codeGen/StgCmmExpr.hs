@@ -422,8 +422,8 @@ cgCase scrut bndr alt_type alts
        ; up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
              alt_regs  = map (idToReg dflags) ret_bndrs
-             simple_scrut = isSimpleScrut scrut alt_type
-             do_gc  | not simple_scrut = True
+       ; simple_scrut <- isSimpleScrut scrut alt_type
+       ; let do_gc  | not simple_scrut = True
                     | isSingleton alts = False
                     | up_hp_usg > 0    = False
                     | otherwise        = True
@@ -450,6 +450,13 @@ recover any unused heap before passing control to the sequel.  If we
 don't do this, then any unused heap will become slop because the heap
 check will reset the heap usage. Slop in the heap breaks LDV profiling
 (+RTS -hb) which needs to do a linear sweep through the nursery.
+
+
+Note [Inlining out-of-line primops and heap checks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If shouldInlinePrimOp returns True when called from StgCmmExpr for the
+purpose of heap check placement, we *must* inline the primop later in
+StgCmmPrim. If we don't things will go wrong.
 -}
 
 -----------------
@@ -460,21 +467,25 @@ maybeSaveCostCentre simple_scrut
 
 
 -----------------
-isSimpleScrut :: StgExpr -> AltType -> Bool
+isSimpleScrut :: StgExpr -> AltType -> FCode Bool
 -- Simple scrutinee, does not block or allocate; hence safe to amalgamate
 -- heap usage from alternatives into the stuff before the case
 -- NB: if you get this wrong, and claim that the expression doesn't allocate
 --     when it does, you'll deeply mess up allocation
-isSimpleScrut (StgOpApp op _ _) _          = isSimpleOp op
-isSimpleScrut (StgLit _)       _           = True       -- case 1# of { 0# -> ..; ... }
-isSimpleScrut (StgApp _ [])    (PrimAlt _) = True       -- case x# of { 0# -> ..; ... }
-isSimpleScrut _                _           = False
+isSimpleScrut (StgOpApp op args _) _       = isSimpleOp op args
+isSimpleScrut (StgLit _)       _           = return True       -- case 1# of { 0# -> ..; ... }
+isSimpleScrut (StgApp _ [])    (PrimAlt _) = return True       -- case x# of { 0# -> ..; ... }
+isSimpleScrut _                _           = return False
 
-isSimpleOp :: StgOp -> Bool
+isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
 -- True iff the op cannot block or allocate
-isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) = not (playSafe safe)
-isSimpleOp (StgPrimOp op)                              = not (primOpOutOfLine op)
-isSimpleOp (StgPrimCallOp _)                           = False
+isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _ = return $! not (playSafe safe)
+isSimpleOp (StgPrimOp op) stg_args                  = do
+    arg_exprs <- getNonVoidArgAmodes stg_args
+    dflags <- getDynFlags
+    -- See Note [Inlining out-of-line primops and heap checks]
+    return $! isJust $ shouldInlinePrimOp dflags op arg_exprs
+isSimpleOp (StgPrimCallOp _) _                           = return False
 
 -----------------
 chooseReturnBndrs :: Id -> AltType -> [StgAlt] -> [NonVoid Id]

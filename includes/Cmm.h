@@ -806,4 +806,35 @@
       __gen = TO_W_(bdescr_gen_no(__bd));                       \
       if (__gen > 0) { recordMutableCap(__p, __gen); }
 
+/* Complete function body for the clone family of (mutable) array ops.
+   Defined as a macro to avoid function call overhead or code
+   duplication. */
+#define cloneArray(info, src, offset, n)                       \
+    W_ words, size;                                            \
+    gcptr dst, dst_p, src_p;                                   \
+                                                               \
+    again: MAYBE_GC(again);                                    \
+                                                               \
+    size = n + mutArrPtrsCardWords(n);                         \
+    words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;         \
+    ("ptr" dst) = ccall allocate(MyCapability() "ptr", words); \
+    TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(size), 0);       \
+                                                               \
+    SET_HDR(dst, info, CCCS);                                  \
+    StgMutArrPtrs_ptrs(dst) = n;                               \
+    StgMutArrPtrs_size(dst) = size;                            \
+                                                               \
+    dst_p = dst + SIZEOF_StgMutArrPtrs;                        \
+    src_p = src + SIZEOF_StgMutArrPtrs + WDS(offset);          \
+  while:                                                       \
+    if (n != 0) {                                              \
+        n = n - 1;                                             \
+        W_[dst_p] = W_[src_p];                                 \
+        dst_p = dst_p + WDS(1);                                \
+        src_p = src_p + WDS(1);                                \
+        goto while;                                            \
+    }                                                          \
+                                                               \
+    return (dst);
+
 #endif /* CMM_H */

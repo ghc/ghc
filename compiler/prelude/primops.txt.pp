@@ -794,6 +794,7 @@ primop  CloneArrayOp "cloneArray#" GenPrimOp
    source array. The provided array must fully contain the specified
    range, but this is not checked.}
   with
+  out_of_line      = True
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
@@ -804,6 +805,7 @@ primop  CloneMutableArrayOp "cloneMutableArray#" GenPrimOp
    source array. The provided array must fully contain the specified
    range, but this is not checked.}
   with
+  out_of_line      = True
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
@@ -814,6 +816,7 @@ primop  FreezeArrayOp "freezeArray#" GenPrimOp
    source array. The provided array must fully contain the specified
    range, but this is not checked.}
   with
+  out_of_line      = True
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
@@ -824,6 +827,7 @@ primop  ThawArrayOp "thawArray#" GenPrimOp
    source array. The provided array must fully contain the specified
    range, but this is not checked.}
   with
+  out_of_line      = True
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
