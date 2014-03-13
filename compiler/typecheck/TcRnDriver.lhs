@@ -13,6 +13,7 @@ module TcRnDriver (
         getModuleInterface,
         tcRnDeclsi,
         isGHCiMonad,
+        runTcInteractive,    -- Used by GHC API clients (Trac #8878)
 #endif
         tcRnLookupName,
         tcRnGetInfo,
