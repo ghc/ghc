@@ -1019,7 +1019,9 @@ tcFamTyPats :: Name -- of the family ToCon
             -> Kind -- of the family TyCon
             -> HsWithBndrs [LHsType Name] -- patterns
             -> (TcKind -> TcM ())         -- kind-checker for RHS
-            -> ([TKVar] -> [TcType] -> Kind -> TcM a)
+            -> ([TKVar]              -- Kind and type variables
+                -> [TcType]          -- Kind and type arguments
+                -> Kind -> TcM a)
             -> TcM a
 tcFamTyPats fam_tc_name kind pats kind_checker thing_inside
   = do { (fam_arg_kinds, typats, res_kind)
