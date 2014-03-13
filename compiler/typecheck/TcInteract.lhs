@@ -1922,11 +1922,10 @@ getCoercibleInst loc ty1 ty2 = do
       -- Get some global stuff in scope, for nice pattern-guard based code in `go`
       rdr_env <- getGlobalRdrEnvTcS
       famenv <- getFamInstEnvs
-      safeMode <- safeLanguageOn `fmap` getDynFlags
-      go safeMode famenv rdr_env
+      go famenv rdr_env
   where
-  go :: Bool -> FamInstEnvs -> GlobalRdrEnv -> TcS LookupInstResult
-  go safeMode famenv rdr_env
+  go :: FamInstEnvs -> GlobalRdrEnv -> TcS LookupInstResult
+  go famenv rdr_env
     -- Coercible a a                             (see case 1 in [Coercible Instances])
     | ty1 `tcEqType` ty2
     = do return $ GenInst []
@@ -1946,11 +1945,8 @@ getCoercibleInst loc ty1 ty2 = do
     | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
       Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
       tc1 == tc2,
-      nominalArgsAgree tc1 tyArgs1 tyArgs2,
-      not safeMode || all (dataConsInScope rdr_env) (tyConsOfTyCon tc1)
-    = do -- Mark all used data constructors as used
-         when safeMode $ mapM_ (markDataConsAsUsed rdr_env) (tyConsOfTyCon tc1)
-         -- We want evidence for all type arguments of role R
+      nominalArgsAgree tc1 tyArgs1 tyArgs2
+    = do -- We want evidence for all type arguments of role R
          arg_stuff <- forM (zip3 (tyConRoles tc1) tyArgs1 tyArgs2) $ \(r,ta1,ta2) ->
            case r of Nominal -> do
                           return
@@ -2059,13 +2055,6 @@ air, in getCoercibleInst. The following “instances” are present:
 
     The type constructor can be used undersaturated; then the Coercible
     instance is at a higher kind. This does not cause problems.
-
-    Furthermore in Safe Haskell code, we check that
-     * the data constructors of C are in scope and
-     * the data constructors of all type constructors used in the definition of
-     * C are in scope.
-       This is required as otherwise the previous check can be circumvented by
-       just adding a local data type around C.
 
  4. instance Coercible r b => Coercible (NT t1 t2 ...) b
     instance Coercible a r => Coercible a (NT t1 t2 ...)
