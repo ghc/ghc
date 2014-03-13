@@ -769,10 +769,10 @@ ppCtxType    unicode qual ty = ppr_mono_ty pREC_CTX ty unicode qual
 ppParendType unicode qual ty = ppr_mono_ty pREC_CON ty unicode qual
 ppFunLhType  unicode qual ty = ppr_mono_ty pREC_FUN ty unicode qual
 
-ppLKind :: Unicode -> Qualification-> LHsKind DocName -> Html
+ppLKind :: Unicode -> Qualification -> LHsKind DocName -> Html
 ppLKind unicode qual y = ppKind unicode qual (unLoc y)
 
-ppKind :: Unicode -> Qualification-> HsKind DocName -> Html
+ppKind :: Unicode -> Qualification -> HsKind DocName -> Html
 ppKind unicode qual ki = ppr_mono_ty pREC_TOP ki unicode qual
 
 -- Drop top-level for-all type variables in user style
@@ -797,6 +797,11 @@ ppr_mono_ty :: Int -> HsType DocName -> Unicode -> Qualification -> Html
 ppr_mono_ty ctxt_prec (HsForAllTy expl tvs ctxt ty) unicode qual
   = maybeParen ctxt_prec pREC_FUN $
     hsep [ppForAll expl tvs ctxt unicode qual, ppr_mono_lty pREC_TOP ty unicode qual]
+
+-- UnicodeSyntax alternatives
+ppr_mono_ty _ (HsTyVar name) True _
+  | getOccString (getName name) == "*"    = toHtml "★"
+  | getOccString (getName name) == "(->)" = toHtml "(→)"
 
 ppr_mono_ty _         (HsBangTy b ty)     u q = ppBang b +++ ppLParendType u q ty
 ppr_mono_ty _         (HsTyVar name)      _ q = ppDocName q Prefix True name
