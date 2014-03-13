@@ -739,7 +739,8 @@ tcSpecPrags :: Id -> [LSig Name]
 -- Pre-condition: the poly_id is zonked
 -- Reason: required by tcSubExp
 tcSpecPrags poly_id prag_sigs
-  = do { unless (null bad_sigs) warn_discarded_sigs
+  = do { traceTc "tcSpecPrags" (ppr poly_id <+> ppr spec_sigs)
+       ; unless (null bad_sigs) warn_discarded_sigs
        ; mapAndRecoverM (wrapLocM (tcSpec poly_id)) spec_sigs }
   where
     spec_sigs = filter isSpecLSig prag_sigs

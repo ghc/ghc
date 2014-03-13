@@ -585,7 +585,7 @@ decomposeRuleLhs :: [Var] -> CoreExpr -> Either SDoc ([Var], Id, [CoreExpr])
 -- may add some extra dictionary binders (see Note [Constant rule dicts])
 --
 -- Returns Nothing if the LHS isn't of the expected shape
-decomposeRuleLhs bndrs lhs 
+decomposeRuleLhs bndrs lhs
   =  -- Note [Simplifying the left-hand side of a RULE]
     case collectArgs opt_lhs of
         (Var fn, args) -> check_bndrs fn args
@@ -595,8 +595,8 @@ decomposeRuleLhs bndrs lhs
 		-> check_bndrs seqId (args' ++ args)
 		where
 		   args' = [Type (idType bndr), Type ty, scrut, body]
-	   
-	_other -> Left bad_shape_msg
+
+        _other -> Left bad_shape_msg
  where
    opt_lhs = simpleOptExpr lhs
 
@@ -614,9 +614,9 @@ decomposeRuleLhs bndrs lhs
                           | d <- varSetElems (arg_fvs `delVarSetList` bndrs)
          	          , isDictId d]
 
-
    bad_shape_msg = hang (ptext (sLit "RULE left-hand side too complicated to desugar"))
-                      2 (ppr opt_lhs)
+                      2 (vcat [ text "Optimised lhs:" <+> ppr opt_lhs
+                              , text "Orig lhs:" <+> ppr lhs])
    dead_msg bndr = hang (sep [ ptext (sLit "Forall'd") <+> pp_bndr bndr
 			     , ptext (sLit "is not bound in RULE lhs")])
                       2 (ppr opt_lhs)
