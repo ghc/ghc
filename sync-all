@@ -7,6 +7,7 @@ use English;
 $| = 1; # autoflush stdout after each print, to avoid output after die
 
 my $initial_working_directory;
+my $exit_via_die;
 
 my $defaultrepo;
 my @packages;
@@ -956,6 +957,11 @@ BEGIN {
     }
     $initial_working_directory = getcwd();
 
+    $SIG{__DIE__} = sub {
+      die @_ if $^S;
+      $exit_via_die = 1;
+    };
+
     #message "== Checking for left-over testsuite/.git folder";
     if (-d "testsuite/.git") {
         print <<EOF;
@@ -974,6 +980,7 @@ EOF
 }
 
 END {
+    return if $exit_via_die;
     my $ec = $?;
 
     chdir($initial_working_directory);
