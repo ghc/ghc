@@ -3,10 +3,6 @@
 import GHC.Exts
 import Unsafe.Coerce
 
-{-# RULES
-"map/coerce"  map coerce = coerce
- #-}
-
 newtype Age = Age Int
 
 fooAge :: [Int] -> [Age]
