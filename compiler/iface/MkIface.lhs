@@ -1461,7 +1461,7 @@ tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
 tyThingToIfaceDecl (ATyCon tycon) = tyConToIfaceDecl emptyTidyEnv tycon
 tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
 tyThingToIfaceDecl (AConLike cl)  = case cl of
-    RealDataCon dc -> pprPanic "toIfaceDecl" (ppr dc) -- Should be trimmed out earlier
+    RealDataCon dc -> dataConToIfaceDecl dc -- for ppr purposes only
     PatSynCon ps   -> patSynToIfaceDecl ps
 
 --------------------------
@@ -1475,6 +1475,14 @@ idToIfaceDecl id
               ifType      = toIfaceType (idType id),
               ifIdDetails = toIfaceIdDetails (idDetails id),
               ifIdInfo    = toIfaceIdInfo (idInfo id) }
+
+--------------------------
+dataConToIfaceDecl :: DataCon -> IfaceDecl
+dataConToIfaceDecl dataCon
+  = IfaceId { ifName      = getOccName dataCon,
+              ifType      = toIfaceType (dataConUserType dataCon),
+              ifIdDetails = IfVanillaId,
+              ifIdInfo    = NoInfo }
 
 --------------------------
 patSynToIfaceDecl :: PatSyn -> IfaceDecl
