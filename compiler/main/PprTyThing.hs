@@ -23,20 +23,18 @@ module PprTyThing (
   ) where
 
 import TypeRep ( TyThing(..) )
-import ConLike
 import DataCon
-import PatSyn
 import Id
 import TyCon
 import Class
-import Coercion( pprCoAxiom, pprCoAxBranch )
+import Coercion( pprCoAxBranch )
 import CoAxiom( CoAxiom(..), brListMap )
 import HscTypes( tyThingParent_maybe )
-import HsBinds( pprPatSynSig )
 import Type( tidyTopType, tidyOpenType, splitForAllTys, funResultTy )
 import Kind( synTyConResKind )
 import TypeRep( pprTvBndrs, pprForAll, suppressKinds )
 import TysPrim( alphaTyVars )
+import MkIface ( tyThingToIfaceDecl )
 import TcType
 import Name
 import VarEnv( emptyTidyEnv )
@@ -44,7 +42,6 @@ import StaticFlags( opt_PprStyle_Debug )
 import DynFlags
 import Outputable
 import FastString
-import Data.Maybe
 
 -- -----------------------------------------------------------------------------
 -- Pretty-printing entities that we get from the GHC API
@@ -76,7 +73,7 @@ pprTyThingLoc tyThing
 
 -- | Pretty-prints a 'TyThing'.
 pprTyThing :: TyThing -> SDoc
-pprTyThing thing = ppr_ty_thing showAll thing
+pprTyThing thing = ppr_ty_thing (Just showAll) thing
 
 -- | Pretty-prints a 'TyThing' in context: that is, if the entity
 -- is a data constructor, record selector, or class method, then
@@ -88,7 +85,7 @@ pprTyThingInContext thing
   where
     go ss thing = case tyThingParent_maybe thing of
                     Just parent -> go (getName thing : ss) parent
-                    Nothing     -> ppr_ty_thing ss thing
+                    Nothing     -> ppr_ty_thing (Just ss) thing
 
 -- | Like 'pprTyThingInContext', but adds the defining location.
 pprTyThingInContextLoc :: TyThing -> SDoc
@@ -100,21 +97,17 @@ pprTyThingInContextLoc tyThing
 -- the function is equivalent to 'pprTyThing' but for type constructors
 -- and classes it prints only the header part of the declaration.
 pprTyThingHdr :: TyThing -> SDoc
-pprTyThingHdr (AnId id)          = pprId         id
-pprTyThingHdr (AConLike conLike) = case conLike of
-    RealDataCon dataCon -> pprDataConSig dataCon
-    PatSynCon patSyn    -> pprPatSyn     patSyn
-pprTyThingHdr (ATyCon tyCon)     = pprTyConHdr   tyCon
-pprTyThingHdr (ACoAxiom ax)      = pprCoAxiom ax
+pprTyThingHdr = ppr_ty_thing Nothing
 
 ------------------------
-ppr_ty_thing :: ShowSub -> TyThing -> SDoc
-ppr_ty_thing _  (AnId id)          = pprId         id
-ppr_ty_thing _  (AConLike conLike) = case conLike of
-    RealDataCon dataCon -> pprDataConSig dataCon
-    PatSynCon patSyn    -> pprPatSyn     patSyn
-ppr_ty_thing ss (ATyCon tyCon)     = pprTyCon      ss tyCon
-ppr_ty_thing _  (ACoAxiom ax)      = pprCoAxiom    ax
+-- NOTE: We pretty-print 'TyThing' via 'IfaceDecl' so that we can reuse the
+-- 'TyCon' tidying happening in 'tyThingToIfaceDecl'. See #8776 for details.
+ppr_ty_thing :: Maybe ShowSub -> TyThing -> SDoc
+ppr_ty_thing mss tyThing = case tyThing of
+    ATyCon tyCon -> case mss of
+        Nothing -> pprTyConHdr tyCon
+        Just ss -> pprTyCon ss tyCon
+    _ -> ppr $ tyThingToIfaceDecl tyThing
 
 pprTyConHdr :: TyCon -> SDoc
 pprTyConHdr tyCon
@@ -143,10 +136,6 @@ pprTyConHdr tyCon
 	| isAlgTyCon tyCon = pprThetaArrowTy (tyConStupidTheta tyCon)
 	| otherwise	   = empty	-- Returns 'empty' if null theta
 
-pprDataConSig :: DataCon -> SDoc
-pprDataConSig dataCon
-  = ppr_bndr dataCon <+> dcolon <+> pprTypeForUser (dataConUserType dataCon)
-
 pprClassHdr :: Class -> SDoc
 pprClassHdr cls
   = sdocWithDynFlags $ \dflags ->
@@ -157,28 +146,6 @@ pprClassHdr cls
         , pprFundeps funDeps ]
   where
      (tvs, funDeps) = classTvsFds cls
-
-pprId :: Var -> SDoc
-pprId ident
-  = hang (ppr_bndr ident <+> dcolon)
-	 2 (pprTypeForUser (idType ident))
-
-pprPatSyn :: PatSyn -> SDoc
-pprPatSyn patSyn
-  = pprPatSynSig ident is_bidir args (pprTypeForUser rhs_ty) prov req
-  where
-    ident = patSynId patSyn
-    is_bidir = isJust $ patSynWrapper patSyn
-
-    args = fmap pprParendType (patSynTyDetails patSyn)
-    prov = pprThetaOpt prov_theta
-    req = pprThetaOpt req_theta
-
-    pprThetaOpt [] = Nothing
-    pprThetaOpt theta = Just $ pprTheta theta
-
-    (_univ_tvs, _ex_tvs, (prov_theta, req_theta)) = patSynSig patSyn
-    rhs_ty = patSynType patSyn
 
 pprTypeForUser :: Type -> SDoc
 -- We do two things here.
