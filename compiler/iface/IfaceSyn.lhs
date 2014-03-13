@@ -1100,7 +1100,7 @@ pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
                 sep (map ppr sigs)])
 
 pprIfaceDecl (IfaceAxiom {ifName = name, ifTyCon = tycon, ifAxBranches = branches })
-  = hang (ptext (sLit "axiom") <+> ppr name <> colon)
+  = hang (ptext (sLit "axiom") <+> ppr name <> dcolon)
        2 (vcat $ map (pprAxBranch $ Just tycon) branches)
 
 pprIfaceDecl (IfacePatSyn { ifName = name, ifPatHasWrapper = has_wrap,
