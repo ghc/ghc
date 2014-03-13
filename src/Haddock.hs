@@ -4,7 +4,8 @@
 -- |
 -- Module      :  Haddock
 -- Copyright   :  (c) Simon Marlow 2003-2006,
---                    David Waern  2006-2010
+--                    David Waern  2006-2010,
+--                    Mateusz Kowalczyk 2014
 -- License     :  BSD-like
 --
 -- Maintainer  :  haddock@projects.haskell.org
@@ -447,10 +448,13 @@ getPrologue dflags flags =
   case [filename | Flag_Prologue filename <- flags ] of
     [] -> return Nothing
     [filename] -> do
-      str <- readFile filename
-      case parseParasMaybe dflags str of
-        Nothing -> throwE $ "failed to parse haddock prologue from file: " ++ filename
-        Just doc -> return (Just doc)
+      withFile filename ReadMode $ \h -> do
+        hSetEncoding h utf8
+        str <- hGetContents h
+        case parseParasMaybe dflags str of
+          Nothing ->
+            throwE $ "failed to parse haddock prologue from file: " ++ filename
+          Just doc -> return (Just doc)
     _otherwise -> throwE "multiple -p/--prologue options"
 
 
