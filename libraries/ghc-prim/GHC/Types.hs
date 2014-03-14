@@ -81,15 +81,34 @@ or the '>>' and '>>=' operations from the 'Monad' class.
 newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
 
 
+{-
+Note [Kind-changing of (~) and Coercible]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(~) and Coercible are tricky to define. To the user, they must appear as
+constraints, but we cannot define them as such in Haskell. But we also cannot
+just define them only in GHC.Prim (like (->)), because we need a real module
+for them, e.g. to compile the constructor's info table.
+
+Furthermore the type of MkCoercible cannot be written in Haskell (no syntax for
+~#R).
+
+So we define them as regular data types in GHC.Types, but do /not/ export them.
+This ensures we have a home module. We then define them with the types and
+kinds that we actually want, in TysWiredIn, and export them in GHC.Prim.
+
+Haddock still takes the documentation from GHC.Types (and not from the fake
+module created from primops.txt.pp), so we have the user-facing documentation
+here.
+-}
+
+
 -- | A data constructor used to box up all unlifted equalities
 --
 -- The type constructor is special in that GHC pretends that it
 -- has kind (? -> ? -> Fact) rather than (* -> * -> *)
 data (~) a b = Eq# ((~#) a b)
 
-
--- Despite this not being exported here, the documentation will
--- be used by haddock, hence the user-facing blurb here, and not in primops.txt.pp:
 
 -- | This two-parameter class has instances for types @a@ and @b@ if
 --      the compiler can infer that they have the same representation. This class
@@ -135,6 +154,7 @@ data (~) a b = Eq# ((~#) a b)
 --
 --      /Since: 4.7.0.0/
 data Coercible a b = MkCoercible ((~#) a b)
+-- Also see Note [Kind-changing of (~) and Coercible]
 
 -- | Alias for tagToEnum#. Returns True of its parameter is 1# and False
 --   if it is 0#.
