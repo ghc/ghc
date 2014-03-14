@@ -31,6 +31,8 @@ module IfaceType (
     ) where
 
 import Coercion
+import TcType
+import DynFlags
 import TypeRep hiding( maybeParen )
 import Unique( hasKey )
 import TyCon
@@ -248,7 +250,7 @@ ppr_ty ctxt_prec ty@(IfaceForAllTy _ _)
  where
     (tvs, theta, tau) = splitIfaceSigmaTy ty
 
- -------------------
+-------------------
 -- needs to handle type contexts and coercion contexts, hence the
 -- generality
 pprIfaceForAllPart :: Outputable a => [IfaceTvBndr] -> [a] -> SDoc -> SDoc
@@ -256,7 +258,10 @@ pprIfaceForAllPart tvs ctxt doc
   = sep [ppr_tvs, pprIfaceContextArr ctxt, doc]
   where
     ppr_tvs | null tvs  = empty
-            | otherwise = ptext (sLit "forall") <+> pprIfaceTvBndrs tvs <> dot
+            | otherwise = sdocWithDynFlags $ \ dflags ->
+            if gopt Opt_PrintExplicitForalls dflags
+            then ptext (sLit "forall") <+> pprIfaceTvBndrs tvs <> dot
+            else empty
 
 -------------------
 ppr_tc_app :: (Int -> a -> SDoc) -> Int -> IfaceTyCon -> [a] -> SDoc
