@@ -104,6 +104,7 @@ pprTyThingHdr = ppr_ty_thing Nothing
 -- 'TyCon' tidying happening in 'tyThingToIfaceDecl'. See #8776 for details.
 ppr_ty_thing :: Maybe ShowSub -> TyThing -> SDoc
 ppr_ty_thing mss tyThing = case tyThing of
+    AnId id -> pprId id
     ATyCon tyCon -> case mss of
         Nothing -> pprTyConHdr tyCon
         Just ss -> pprTyCon ss tyCon
@@ -146,6 +147,11 @@ pprClassHdr cls
         , pprFundeps funDeps ]
   where
      (tvs, funDeps) = classTvsFds cls
+
+pprId :: Var -> SDoc
+pprId ident
+  = hang (ppr_bndr ident <+> dcolon)
+	 2 (pprTypeForUser (idType ident))
 
 pprTypeForUser :: Type -> SDoc
 -- We do two things here.
