@@ -6708,6 +6708,21 @@ class (F a ~ b) => C a b where
       with the class head.  Method signatures are not affected by that
       process.
     </para>
+
+  <sect2 id="coercible">
+  <title>The <literal>Coercible</literal> constraint</title>
+  <para>
+  The constraint <literal>Coercible t1 t2</literal> is similar to <literal>t1 ~
+  t2</literal>, but denotes representational equality between
+  <literal>t1</literal> and <literal>t2</literal> in the sense of Roles
+  (<xref linkend="roles"/>). It is exported by
+  <ulink url="&libraryBaseLocation;/Data-Coerce.html"><literal>Data.Coerce</literal></ulink>,
+  which also contains the documentation. More details and discussion can be found in
+  the paper
+  <ulink href="http://www.cis.upenn.edu/~eir/papers/2014/coercible/coercible.pdf">Safe Coercions"</ulink>.
+  </para>
+  </sect2>
+
   </sect1>
 
 <sect1 id="constraint-kind">
