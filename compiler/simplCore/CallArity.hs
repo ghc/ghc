@@ -168,7 +168,7 @@ The interesting cases of the analysis:
    cardinality consistent with the final result (this is the fixed-pointing).
    Again we can use the results from all subexpressions.
    In addition, for every variable vᵢ, we need to find out what it is called
-   with (calls this set Sᵢ). There are two cases:
+   with (call this set Sᵢ). There are two cases:
     * If vᵢ is a function, we need to go through all right-hand-sides and bodies,
       and collect every variable that is called together with any variable from V:
       Sᵢ = {v' | j ∈ {1,...,n},      {v',vⱼ} ∈ C'(rhs₁) ∪ ... ∪ C'(rhsₙ) ∪ C(body) }
@@ -332,6 +332,26 @@ For a mutually recursive let, we begin by
  5. If nothing had to be reanalized, we are done.
     Otherwise, repeat from step 3.
 
+
+Note [Thunks in recursive groups]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We never eta-expand a thunk in a recursive group, on the grounds that if it is
+part of a recursive group, then it will be called multipe times.
+
+This is not necessarily true, e.g.  it would be safe to eta-expand t2 (but not
+t1) in the follwing code:
+
+  let go x = t1
+      t1 = if ... then t2 else ...
+      t2 = if ... then go 1 else ...
+  in go 0
+
+Detecting this would reqiure finding out what variables are only ever called
+from thunks. While this is certainly possible, we yet have to see this to be
+relevant in the wild.
+
+
 Note [Analysing top-level binds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -451,27 +471,6 @@ callArityAnal arity int (Let bind e)
     ae_body' = fakeBoringCalls int_body bind ae_body -- See Note [Information about boring variables]
     (final_ae, bind') = callArityBind ae_body' int bind
 
--- This is a variant of callArityAnal that is additionally told whether
--- the expression is called once or multiple times, and treats thunks appropriately.
--- It also returns the actual arity that can be used for this expression.
-callArityBound :: Bool -> Arity -> VarSet -> CoreExpr -> (CallArityRes, Arity, CoreExpr)
-callArityBound called_once arity int e
-    = -- pprTrace "callArityBound" (vcat [ppr (called_once, arity), ppr is_thunk, ppr safe_arity]) $
-      (final_ae, safe_arity, e')
- where
-    is_thunk = not (exprIsHNF e)
-
-    safe_arity | called_once = arity
-               | is_thunk    = 0      -- A thunk! Do not eta-expand
-               | otherwise   = arity
-
-    (ae, e') = callArityAnal safe_arity int e
-
-    final_ae | called_once     = ae
-             | safe_arity == 0 = ae -- If it is not a function, its body is evaluated only once
-             | otherwise       = calledMultipleTimes ae
-
-
 -- Which bindings should we look at?
 -- See Note [Which variables are interesting]
 interestingBinds :: CoreBind -> [Var]
@@ -503,10 +502,22 @@ callArityBind ae_body int (NonRec v rhs)
     --          (vcat [ppr v, ppr ae_body, ppr int, ppr ae_rhs, ppr safe_arity])
     (final_ae, NonRec v' rhs')
   where
+    is_thunk = not (exprIsHNF rhs)
+
     (arity, called_once)  = lookupCallArityRes ae_body v
-    (ae_rhs, safe_arity, rhs') = callArityBound called_once arity int rhs
-    final_ae = callArityNonRecEnv v ae_rhs ae_body
+    safe_arity | called_once = arity
+               | is_thunk    = 0      -- A thunk! Do not eta-expand
+               | otherwise   = arity
+    (ae_rhs, rhs') = callArityAnal safe_arity int rhs
+
+    ae_rhs'| called_once     = ae_rhs
+           | safe_arity == 0 = ae_rhs -- If it is not a function, its body is evaluated only once
+           | otherwise       = calledMultipleTimes ae_rhs
+
+    final_ae = callArityNonRecEnv v ae_rhs' ae_body
     v' = v `setIdCallArity` safe_arity
+
+
 
 -- Recursive let. See Note [Recursion and fixpointing]
 callArityBind ae_body int b@(Rec binds)
@@ -544,8 +555,18 @@ callArityBind ae_body int b@(Rec binds)
 
             | otherwise
             -- We previously analized this with a different arity (or not at all)
-            = let (ae_rhs, safe_arity, rhs') = callArityBound called_once new_arity int_body rhs
-              in (True, (i `setIdCallArity` safe_arity, Just (called_once, new_arity, ae_rhs), rhs'))
+            = let is_thunk = not (exprIsHNF rhs)
+
+                  safe_arity | is_thunk    = 0  -- See Note [Thunks in recursive groups]
+                             | otherwise   = new_arity
+
+                  (ae_rhs, rhs') = callArityAnal safe_arity int_body rhs
+
+                  ae_rhs' | called_once     = ae_rhs
+                          | safe_arity == 0 = ae_rhs -- If it is not a function, its body is evaluated only once
+                          | otherwise       = calledMultipleTimes ae_rhs
+
+              in (True, (i `setIdCallArity` safe_arity, Just (called_once, new_arity, ae_rhs'), rhs'))
           where
             (new_arity, called_once)  = lookupCallArityRes ae i
 

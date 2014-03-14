@@ -26,16 +26,10 @@ go2 (using surrounding boring let):
 two calls, one from let and from body (d 1 would be bad):
     go 2
     d 0
-two recursions:
-    d 1
-    n 1
-two recursions (semantically like the previous case):
-    d 1
-    n 1
-two thunks, one called multiple times (both arity 1 would be bad!):
+a thunk in a recursion (d 1 would be bad):
     d 0
-    n 1
-two thunks (recursive), one called multiple times (both arity 1 would be bad!):
+    n 0
+two thunks, one called multiple times (both arity 1 would be bad!):
     d 0
     n 1
 two functions, not thunks:
@@ -71,10 +65,6 @@ a thunk (non-function-type), in mutual recursion, still calls once (d 1 would be
     x 0
     d 1
 a thunk (function type), in mutual recursion, still calls once (d 1 would be good):
-    go 1
-    d 1
-    n 0
-a thunk (function type), in mutual recursion, still calls once, d part of mutual recursion (d 1 would be good):
     go 1
     d 1
     n 0
