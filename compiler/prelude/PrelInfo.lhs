@@ -121,8 +121,10 @@ primOpId op = primOpIds ! primOpTag op
 %*									*
 %************************************************************************
 
-GHC.Prim "exports" all the primops and primitive types, some 
+GHC.Prim "exports" all the primops and primitive types, some
 wired-in Ids.
+
+See Note [Kind-changing of (~) and Coerciblea] for why we export coercibleTyCon here.
 
 \begin{code}
 ghcPrimExports :: [IfaceExport]
@@ -132,6 +134,7 @@ ghcPrimExports
    [ AvailTC n [n] 
    | tc <- funTyCon : coercibleTyCon : primTyCons, let n = tyConName tc  ]
 \end{code}
+
 
 
 %************************************************************************
