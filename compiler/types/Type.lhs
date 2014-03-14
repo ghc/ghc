@@ -1365,7 +1365,7 @@ emptyTvSubst :: TvSubst
 emptyTvSubst = TvSubst emptyInScopeSet emptyTvSubstEnv
 
 isEmptyTvSubst :: TvSubst -> Bool
-         -- See Note [Extending the TvSubstEnv]
+         -- See Note [Extending the TvSubstEnv] in TypeRep
 isEmptyTvSubst (TvSubst _ tenv) = isEmptyVarEnv tenv
 
 mkTvSubst :: InScopeSet -> TvSubstEnv -> TvSubst
@@ -1559,7 +1559,7 @@ subst_ty subst ty
 substTyVar :: TvSubst -> TyVar  -> Type
 substTyVar (TvSubst _ tenv) tv
   | Just ty  <- lookupVarEnv tenv tv      = ty  -- See Note [Apply Once]
-  | otherwise = ASSERT( isTyVar tv ) TyVarTy tv
+  | otherwise = ASSERT( isTyVar tv ) TyVarTy tv --     in TypeRep
   -- We do not require that the tyvar is in scope
   -- Reason: we do quite a bit of (substTyWith [tv] [ty] tau)
   -- and it's a nuisance to bring all the free vars of tau into
@@ -1570,7 +1570,7 @@ substTyVars :: TvSubst -> [TyVar] -> [Type]
 substTyVars subst tvs = map (substTyVar subst) tvs
 
 lookupTyVar :: TvSubst -> TyVar  -> Maybe Type
-        -- See Note [Extending the TvSubst]
+        -- See Note [Extending the TvSubst] in TypeRep
 lookupTyVar (TvSubst _ tenv) tv = lookupVarEnv tenv tv
 
 substTyVarBndr :: TvSubst -> TyVar -> (TvSubst, TyVar)
@@ -1589,7 +1589,7 @@ substTyVarBndr subst@(TvSubst in_scope tenv) old_var
     no_change = no_kind_change && (new_var == old_var)
         -- no_change means that the new_var is identical in
         -- all respects to the old_var (same unique, same kind)
-        -- See Note [Extending the TvSubst]
+        -- See Note [Extending the TvSubst] in TypeRep
         --
         -- In that case we don't need to extend the substitution
         -- to map old to new.  But instead we must zap any
