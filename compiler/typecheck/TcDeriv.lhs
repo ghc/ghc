@@ -652,6 +652,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
 
 ------------------------------------------------------------------
 deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
+                                             --   Can be a data instance, hence [Type] args
              -> LHsType Name                 -- The deriving predicate
              -> TcM EarlyDerivSpec
 -- The deriving clause of a data or newtype declaration
@@ -692,10 +693,11 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
               final_cls_tys   = substTys subst cls_tys
               univ_tvs        = mkVarSet deriv_tvs `unionVarSet` tyVarsOfTypes final_tc_args
 
-        ; traceTc "derivTyData1" (vcat [ pprTvBndrs tvs, ppr tc, ppr tc_args
+        ; traceTc "derivTyData1" (vcat [ pprTvBndrs tvs, ppr tc, ppr tc_args, ppr deriv_pred
                                        , pprTvBndrs (varSetElems $ tyVarsOfTypes tc_args)
                                        , ppr n_args_to_keep, ppr n_args_to_drop
-                                       , ppr inst_ty_kind, ppr cls_arg_kind, ppr mb_match ])
+                                       , ppr inst_ty_kind, ppr cls_arg_kind, ppr mb_match
+                                       , ppr final_tc_args, ppr final_cls_tys ])
 
         -- Check that the result really is well-kinded
         ; checkTc (n_args_to_keep >= 0 && isJust mb_match)
