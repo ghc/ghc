@@ -12,7 +12,9 @@ $(error base library does not seem to be installed)
 endif
 
 # Now find the "tests" directories of those libraries, where they exist
-LIBRARY_TEST_PATHS := $(wildcard $(patsubst %, $(TOP)/../libraries/%/tests, $(LIBRARIES)))
+LIBRARY_TEST_PATHS := $(wildcard $(patsubst %, $(TOP)/../libraries/%/tests, $(LIBRARIES))) \
+      $(wildcard $(patsubst %, $(TOP)/../libraries/%/tests-ghc, $(LIBRARIES)))
+
 
 # Add tests from packages
 RUNTEST_OPTS += $(patsubst %, --rootdir=%, $(LIBRARY_TEST_PATHS))
