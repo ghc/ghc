@@ -162,6 +162,10 @@ data (~) a b = Eq# ((~#) a b)
 --
 --      @type role Set nominal@
 --
+--      For more details about this feature, please refer to
+--      <http://www.cis.upenn.edu/~eir/papers/2014/coercible/coercible.pdf Safe Coercions>
+--      by Joachim Breitner, Richard A. Eisenberg, Simon Peyton Jones and Stephanie Weirich.
+--
 --      /Since: 4.7.0.0/
 data Coercible a b = MkCoercible ((~#) a b)
 -- Also see Note [Kind-changing of (~) and Coercible]
