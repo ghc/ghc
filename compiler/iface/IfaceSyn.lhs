@@ -1047,7 +1047,7 @@ instance Outputable IfaceDecl where
 pprIfaceDecl :: IfaceDecl -> SDoc
 pprIfaceDecl (IfaceId {ifName = var, ifType = ty,
                        ifIdDetails = details, ifIdInfo = info})
-  = sep [ ppr var <+> dcolon <+> ppr ty,
+  = sep [ pprPrefixOcc var <+> dcolon <+> ppr ty,
           nest 2 (ppr details),
           nest 2 (ppr info) ]
 
