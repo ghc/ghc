@@ -253,17 +253,12 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        ; ev_binds_var <- newTcEvBinds
        ; wanted_transformed_incl_derivs
                <- solveWantedsTcMWithEvBinds ev_binds_var wanteds solve_wanteds
-                               -- Post: wanted_transformed are zonked
+                  -- Post: wanted_transformed_incl_derivs are zonked
 
               -- Step 4) Candidates for quantification are an approximation of wanted_transformed
               -- NB: Already the fixpoint of any unifications that may have happened
               -- NB: We do not do any defaulting when inferring a type, this can lead
               -- to less polymorphic types, see Note [Default while Inferring]
-
-              -- Step 5) Minimize the quantification candidates
-              -- Step 6) Final candidates for quantification
-              -- We discard bindings, insolubles etc, because all we are
-              -- care aout it
 
        ; tc_lcl_env <- TcRnMonad.getLclEnv
        ; let untch = tcl_untch tc_lcl_env
@@ -271,21 +266,37 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        ; quant_pred_candidates   -- Fully zonked
            <- if insolubleWC wanted_transformed_incl_derivs
               then return []   -- See Note [Quantification with errors]
-                               -- NB: must include derived errors
-              else do { gbl_tvs <- tcGetGlobalTyVars
-                      ; let quant_cand = approximateWC wanted_transformed
+                               -- NB: must include derived errors in this test, 
+                               --     hence "incl_derivs"
+
+              else do { let quant_cand = approximateWC wanted_transformed
                             meta_tvs   = filter isMetaTyVar (varSetElems (tyVarsOfCts quant_cand))
-                      ; ((flats, _insols), _extra_binds) <- runTcS $
+                      ; gbl_tvs <- tcGetGlobalTyVars
+                      ; null_ev_binds_var <- newTcEvBinds
+                            -- Miminise quant_cand.  We are not interested in any evidence
+                            -- produced, because we are going to simplify wanted_transformed
+                            -- again later. All we want here is the predicates over which to
+                            -- quantify.  
+                            --
+                            -- If any meta-tyvar unifications take place (unlikely), we'll
+                            -- pick that up later.
+
+                      ; (flats, _insols) <- runTcSWithEvBinds null_ev_binds_var $
                         do { mapM_ (promoteAndDefaultTyVar untch gbl_tvs) meta_tvs
                                  -- See Note [Promote _and_ default when inferring]
                            ; _implics <- solveInteract quant_cand
                            ; getInertUnsolved }
-                      ; return (map ctPred $ filter isWantedCt (bagToList flats)) }
-                   -- NB: Dimitrios is slightly worried that we will get
-                   -- family equalities (F Int ~ alpha) in the quantification
-                   -- candidates, as we have performed no further unflattening
-                   -- at this point. Nothing bad, but inferred contexts might
-                   -- look complicated.
+
+                      ; flats' <- zonkFlats null_ev_binds_var untch $
+                                  filterBag isWantedCt flats
+                           -- The quant_cand were already fully zonked, so this zonkFlats
+                           -- really only unflattens the flattening that solveInteract
+                           -- may have done (Trac #8889).  
+                           -- E.g. quant_cand = F a, where F :: * -> Constraint
+                           --      We'll flatten to   (alpha, F a ~ alpha)
+                           -- fail to make any further progress and must unflatten again 
+
+                      ; return (map ctPred $ bagToList flats') }
 
        -- NB: quant_pred_candidates is already the fixpoint of any
        --     unifications that may have happened
@@ -326,6 +337,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
       {     -- Step 7) Emit an implication
          let minimal_flat_preds = mkMinimalBySCs bound
+                  -- See Note [Minimize by Superclasses]
              skol_info = InferSkol [ (name, mkSigmaTy [] minimal_flat_preds ty)
                                    | (name, ty) <- name_taus ]
                         -- Don't add the quantified variables here, because
