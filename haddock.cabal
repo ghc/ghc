@@ -6,7 +6,7 @@ description:          Haddock is a documentation-generation tool for Haskell
 license:              BSD3
 license-file:         LICENSE
 author:               Simon Marlow, David Waern
-maintainer:           Simon Hengel <sol@typeful.net>
+maintainer:           Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
 homepage:             http://www.haskell.org/haddock/
 bug-reports:          http://trac.haskell.org/haddock
 copyright:            (c) Simon Marlow, David Waern
