@@ -410,7 +410,7 @@ ppShortClassDecl summary links (ClassDecl { tcdCtxt = lctxt, tcdLName = lname, t
   if not (any isVanillaLSig sigs) && null ats
     then (if summary then id else topDeclElem links loc splice [nm]) hdr
     else (if summary then id else topDeclElem links loc splice [nm]) (hdr <+> keyword "where")
-      +++ shortSubDecls
+      +++ shortSubDecls False
           (
             [ ppAssocType summary links doc at [] splice unicode qual | at <- ats
               , let doc = lookupAnySubdoc (unL $ fdLName $ unL at) subdocs ]  ++
@@ -532,14 +532,14 @@ ppShortDataDecl summary dataInst dataDecl unicode qual
   | [] <- cons = dataHeader
 
   | [lcon] <- cons, ResTyH98 <- resTy,
-    (cHead,cBody,cFoot) <- ppShortConstrParts summary (unLoc lcon) unicode qual
+    (cHead,cBody,cFoot) <- ppShortConstrParts summary dataInst (unLoc lcon) unicode qual
        = (dataHeader <+> equals <+> cHead) +++ cBody +++ cFoot
 
   | ResTyH98 <- resTy = dataHeader
-      +++ shortSubDecls (zipWith doConstr ('=':repeat '|') cons)
+      +++ shortSubDecls dataInst (zipWith doConstr ('=':repeat '|') cons)
 
   | otherwise = (dataHeader <+> keyword "where")
-      +++ shortSubDecls (map doGADTConstr cons)
+      +++ shortSubDecls dataInst (map doGADTConstr cons)
 
   where
     dataHeader
@@ -591,13 +591,13 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
 ppShortConstr :: Bool -> ConDecl DocName -> Unicode -> Qualification -> Html
 ppShortConstr summary con unicode qual = cHead <+> cBody <+> cFoot
   where
-    (cHead,cBody,cFoot) = ppShortConstrParts summary con unicode qual
+    (cHead,cBody,cFoot) = ppShortConstrParts summary False con unicode qual
 
 
 -- returns three pieces: header, body, footer so that header & footer can be
 -- incorporated into the declaration
-ppShortConstrParts :: Bool -> ConDecl DocName -> Unicode -> Qualification -> (Html, Html, Html)
-ppShortConstrParts summary con unicode qual = case con_res con of
+ppShortConstrParts :: Bool -> Bool -> ConDecl DocName -> Unicode -> Qualification -> (Html, Html, Html)
+ppShortConstrParts summary dataInst con unicode qual = case con_res con of
   ResTyH98 -> case con_details con of
     PrefixCon args ->
       (header_ unicode qual +++ hsep (ppBinder summary occ
@@ -626,7 +626,7 @@ ppShortConstrParts summary con unicode qual = case con_res con of
     InfixCon arg1 arg2 -> (doGADTCon [arg1, arg2] resTy, noHtml, noHtml)
 
   where
-    doRecordFields fields = shortSubDecls (map (ppShortField summary unicode qual) fields)
+    doRecordFields fields = shortSubDecls dataInst (map (ppShortField summary unicode qual) fields)
     doGADTCon args resTy = ppBinder summary occ <+> dcolon unicode <+> hsep [
                              ppForAll forall_ ltvs lcontext unicode qual,
                              ppLType unicode qual (foldr mkFunTy resTy args) ]

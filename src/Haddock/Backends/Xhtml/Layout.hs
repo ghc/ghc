@@ -104,8 +104,12 @@ shortDeclList :: [Html] -> Html
 shortDeclList items = ulist << map (li ! [theclass "src short"] <<) items
 
 
-shortSubDecls :: [Html] -> Html
-shortSubDecls items = ulist ! [theclass "subs"] << map (li <<) items
+shortSubDecls :: Bool -> [Html] -> Html
+shortSubDecls inst items = ulist ! [theclass c] << map (i <<) items
+  where i | inst      = li ! [theclass "inst"]
+          | otherwise = li
+        c | inst      = "inst"
+          | otherwise = "subs"
 
 
 divTopDecl :: Html -> Html

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, UndecidableInstances, PolyKinds, TypeOperators, DataKinds, MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies, UndecidableInstances, PolyKinds, TypeOperators, DataKinds, MultiParamTypeClasses, GADTs #-}
 
 -- | Doc for: module TypeFamilies
 module TypeFamilies where
@@ -13,6 +13,9 @@ data X
 
 -- | Doc for: data Y
 data Y
+
+-- | Doc for: data Z
+data Z = ZA | ZB
 
 -- | Doc for: class Test a
 class Test a
@@ -31,7 +34,7 @@ type instance Foo X = Y
 type instance Foo Y = X
 
 -- | Doc for: data family Bat a
-data family Bat a :: *
+data family Bat (a :: k) :: *
 
 -- | Doc for: data instance Bat X
 data instance Bat X
@@ -39,9 +42,12 @@ data instance Bat X
   | BatXX { aaa :: X , bbb :: Y } -- ^ Doc for: BatXX { ... }
 
 -- | Doc for: data instance Bat Y
-data instance Bat Y
-  = BatY Y -- ^ Doc for: BatY Y
-  | X :+ X -- X :+ X
+data instance Bat Y = BatY Y -- ^ Doc for: BatY Y
+
+-- | Doc for: data instance Bat Z
+data instance Bat (z :: Z) where
+  BatZ1 :: Z -> Bat ZA
+  BatZ2 :: { batx :: X, baty :: Y } -> Bat ZB
 
 -- | Doc for: class Assoc a
 class Assoc a where

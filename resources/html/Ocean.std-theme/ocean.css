@@ -433,18 +433,17 @@ div#style-menu-holder {
   margin: 0;
 }
 
-.subs ul {
+/* Render short-style data instances */
+.inst ul {
   height: 100%;
   padding: 0.5em;
   margin: 0;
 }
 
-.subs ul,
-.subs ul li.src {
+.inst, .inst li {
   list-style: none;
   margin-left: 1em;
 }
-
 
 .top p.src {
   border-top: 1px solid #ccc;
