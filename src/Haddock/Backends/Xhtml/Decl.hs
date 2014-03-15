@@ -474,9 +474,14 @@ ppClassDecl summary links instances fixities loc d subdocs
                            -- type signature?
 
     minimalBit = case [ s | L _ (MinimalSig s) <- lsigs ] of
-      -- Miminal complete definition = every method
+      -- Miminal complete definition = every shown method
       And xs : _ | sort [getName n | Var (L _ n) <- xs] ==
                    sort [getName n | L _ (TypeSig ns _) <- lsigs, L _ n <- ns]
+        -> noHtml
+
+      -- Minimal complete definition = the only shown method
+      Var (L _ n) : _ | [getName n] ==
+                        [getName n' | L _ (TypeSig ns _) <- lsigs, L _ n' <- ns]
         -> noHtml
 
       -- Minimal complete definition = nothing
