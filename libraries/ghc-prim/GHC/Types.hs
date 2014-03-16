@@ -20,7 +20,8 @@ module GHC.Types (
         Float(..), Double(..),
         Ordering(..), IO(..),
         isTrue#,
-        SPEC(..)
+        SPEC(..),
+        Coercible,
     ) where
 
 import GHC.Prim
@@ -93,23 +94,8 @@ for them, e.g. to compile the constructor's info table.
 Furthermore the type of MkCoercible cannot be written in Haskell (no syntax for
 ~#R).
 
-So we define them as regular data types in GHC.Types, but do /not/ export them.
-This ensures we have a home module. We then define them with the types and
-kinds that we actually want, in TysWiredIn.
-
-We also export coercibleTyCon in PrelInfo's ghcPrimExports.
-(This is not needed for (~), as that is not importable and handled specially by
-the parser).
-Why not export it in GHC.Types? Because then ghci and haddock would, for some
-reason, display it as a data type, and not as a constraint.
-
-Haddock still takes the documentation from GHC.Types (and not from the fake
-module created from primops.txt.pp), so we have the user-facing documentation
-here.
-
-(This this note merely documents what is implemented because it happens to
-work, and should not be taken as an indication of good design. Cleanup is
-appreciated).
+So we define them as regular data types in GHC.Types, and do magic in GHC to
+change the kind and type, in tysWiredIn.
 -}
 
 
