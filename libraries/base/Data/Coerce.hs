@@ -24,4 +24,5 @@ module Data.Coerce
         ( -- * Safe coercions
           coerce, Coercible,
         ) where
-import GHC.Prim (coerce, Coercible)
+import GHC.Prim (coerce)
+import GHC.Types (Coercible)

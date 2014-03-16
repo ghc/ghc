@@ -116,10 +116,10 @@ import Control.Monad
 -- Imports for the instances
 import Data.Int              -- So we can give Data instance for Int8, ...
 import Data.Type.Coercion
+import Data.Coerce
 import Data.Word             -- So we can give Data instance for Word8, ...
 import GHC.Real( Ratio(..) ) -- So we can give Data instance for Ratio
 --import GHC.IOBase            -- So we can give Data instance for IO, Handle
-import GHC.Prim
 import GHC.Ptr               -- So we can give Data instance for Ptr
 import GHC.ForeignPtr        -- So we can give Data instance for ForeignPtr
 --import GHC.Stable            -- So we can give Data instance for StablePtr

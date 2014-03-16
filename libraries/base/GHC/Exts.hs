@@ -73,8 +73,8 @@ module GHC.Exts
 
 import Prelude
 
-import GHC.Prim hiding (coerce, Coercible)
-import GHC.Base hiding (coerce, Coercible) -- implicitly comes from GHC.Prim
+import GHC.Prim hiding (coerce)
+import GHC.Base hiding (coerce) -- implicitly comes from GHC.Prim
 import GHC.Word
 import GHC.Int
 import GHC.Ptr
