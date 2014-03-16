@@ -2380,8 +2380,6 @@ pseudoop   "coerce"
      concrete types.
    }
 
-primclass Coercible a b
-
 ------------------------------------------------------------------------
 section "SIMD Vectors"
 	{Operations on SIMD vectors.}

@@ -252,6 +252,7 @@ gen_hs_source (Info defaults entries) =
     ++ "{-\n"
         ++ unlines (map opt defaults)
     ++ "-}\n"
+    ++ "import GHC.Types (Coercible)\n"
         ++ unlines (concatMap ent entries') ++ "\n\n\n"
      where entries' = concatMap desugarVectorSpec entries
 

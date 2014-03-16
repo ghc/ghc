@@ -124,15 +124,13 @@ primOpId op = primOpIds ! primOpTag op
 GHC.Prim "exports" all the primops and primitive types, some
 wired-in Ids.
 
-See Note [Kind-changing of (~) and Coerciblea] for why we export coercibleTyCon here.
-
 \begin{code}
 ghcPrimExports :: [IfaceExport]
 ghcPrimExports
  = map (Avail . idName) ghcPrimIds ++
    map (Avail . idName . primOpId) allThePrimOps ++
    [ AvailTC n [n] 
-   | tc <- funTyCon : coercibleTyCon : primTyCons, let n = tyConName tc  ]
+   | tc <- funTyCon : primTyCons, let n = tyConName tc  ]
 \end{code}
 
 
