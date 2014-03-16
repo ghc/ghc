@@ -1,5 +1,5 @@
-# At one point, :info Coercible would not report it as a constraint, but as a
-# data type. So this test case ensures that this is broken later.
+-- At one point, :info Coercible would not report it as a constraint, but as a
+-- data type. So this test case ensures that this is broken later.
 
 :m + Data.Coerce
 :info Coercible
