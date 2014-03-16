@@ -269,8 +269,6 @@ gen_hs_source (Info defaults entries) =
            hdr (PseudoOpSpec { name = n })                       = wrapOp n ++ ","
            hdr (PrimTypeSpec { ty = TyApp (TyCon n) _ })         = wrapTy n ++ ","
            hdr (PrimTypeSpec {})                                 = error $ "Illegal type spec"
-           hdr (PrimClassSpec { cls = TyApp (TyCon n) _ })       = wrapTy n ++ ","
-           hdr (PrimClassSpec {})                                = error "Illegal class spec"
            hdr (PrimVecTypeSpec { ty = TyApp (VecTyCon n _) _ }) = wrapTy n ++ ","
            hdr (PrimVecTypeSpec {})                              = error $ "Illegal type spec"
 
@@ -278,7 +276,6 @@ gen_hs_source (Info defaults entries) =
            ent o@(PrimOpSpec {})      = spec o
            ent o@(PrimVecOpSpec {})   = spec o
            ent o@(PrimTypeSpec {})    = spec o
-           ent o@(PrimClassSpec {})   = spec o
            ent o@(PrimVecTypeSpec {}) = spec o
            ent o@(PseudoOpSpec {})    = spec o
 
@@ -302,8 +299,6 @@ gen_hs_source (Info defaults entries) =
                               wrapOp n ++ " = let x = x in x" ]
                         PrimTypeSpec { ty = t }   ->
                             [ "data " ++ pprTy t ]
-                        PrimClassSpec { cls = t }   ->
-                            [ "class " ++ pprTy t ]
                         PrimVecTypeSpec { ty = t }   ->
                             [ "data " ++ pprTy t ]
                         Section { } -> []
@@ -492,13 +487,6 @@ gen_latex_doc (Info defaults entries)
                  ++ d ++ "}\n"
            mk_entry (PrimTypeSpec {ty=t,desc=d,opts=o}) =
                  "\\primtypespec{"
-                 ++ latex_encode (mk_source_ty t) ++ "}{"
-                 ++ latex_encode (mk_core_ty t) ++ "}{"
-                 ++ d ++ "}{"
-                 ++ mk_options o
-                 ++ "}\n"
-           mk_entry (PrimClassSpec {cls=t,desc=d,opts=o}) =
-                 "\\primclassspec{"
                  ++ latex_encode (mk_source_ty t) ++ "}{"
                  ++ latex_encode (mk_core_ty t) ++ "}{"
                  ++ d ++ "}{"

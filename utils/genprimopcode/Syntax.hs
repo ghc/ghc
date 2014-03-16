@@ -35,9 +35,6 @@ data Entry
     | PrimTypeSpec { ty    :: Ty,      -- name in prog text
                      desc  :: String,      -- description
                      opts  :: [Option] }   -- default overrides
-    | PrimClassSpec { cls   :: Ty,      -- name in prog text
-                      desc  :: String,      -- description
-                      opts  :: [Option] }   -- default overrides
     | PrimVecTypeSpec { ty    :: Ty,      -- name in prog text
                         prefix  :: String,    -- prefix for generated names
                         veclen  :: Int,       -- vector length
