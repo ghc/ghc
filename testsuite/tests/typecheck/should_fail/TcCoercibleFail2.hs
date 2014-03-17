@@ -1,4 +1,4 @@
-import GHC.Prim (Coercible)
+import Data.Coerce (Coercible)
 
 instance Coercible () ()
 

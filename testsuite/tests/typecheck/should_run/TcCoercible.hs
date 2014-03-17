@@ -1,6 +1,6 @@
 {-# LANGUAGE RoleAnnotations, StandaloneDeriving, FlexibleContexts, UndecidableInstances, GADTs, TypeFamilies #-}
 
-import GHC.Prim (Coercible, coerce)
+import Data.Coerce (Coercible, coerce)
 import Data.Monoid (mempty, First(First), Last())
 
 newtype Age = Age Int deriving Show

@@ -1,6 +1,6 @@
 {-# LANGUAGE RoleAnnotations, RankNTypes, ScopedTypeVariables #-}
 
-import GHC.Prim (coerce, Coercible)
+import Data.Coerce (coerce, Coercible)
 
 newtype List a = List [a]
 data T f = T (f Int)
