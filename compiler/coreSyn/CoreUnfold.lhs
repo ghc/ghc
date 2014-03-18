@@ -98,8 +98,11 @@ mkSimpleUnfolding :: DynFlags -> CoreExpr -> Unfolding
 mkSimpleUnfolding dflags = mkUnfolding dflags InlineRhs False False
 
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
-mkDFunUnfolding bndrs con ops 
-  = DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = ops }
+mkDFunUnfolding bndrs con ops
+  = DFunUnfolding { df_bndrs = bndrs
+                  , df_con = con
+                  , df_args = map occurAnalyseExpr ops }
+                  -- See Note [Occurrrence analysis of unfoldings]
 
 mkWwInlineRule :: CoreExpr -> Arity -> Unfolding
 mkWwInlineRule expr arity
@@ -143,6 +146,7 @@ mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
 -- Occurrence-analyses the expression before capturing it
 mkCoreUnfolding src top_lvl expr arity guidance 
   = CoreUnfolding { uf_tmpl   	    = occurAnalyseExpr expr,
+                      -- See Note [Occurrrence analysis of unfoldings]
     		    uf_src          = src,
     		    uf_arity        = arity,
 		    uf_is_top 	    = top_lvl,
@@ -162,6 +166,7 @@ mkUnfolding dflags src top_lvl is_bottoming expr
   = NoUnfolding    -- See Note [Do not inline top-level bottoming functions]
   | otherwise
   = CoreUnfolding { uf_tmpl   	    = occurAnalyseExpr expr,
+                      -- See Note [Occurrrence analysis of unfoldings]
     		    uf_src          = src,
     		    uf_arity        = arity,
 		    uf_is_top 	    = top_lvl,
@@ -175,6 +180,24 @@ mkUnfolding dflags src top_lvl is_bottoming expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
 	-- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 \end{code}
+
+Note [Occurrence analysis of unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do occurrence-analysis of unfoldings once and for all, when the
+unfolding is built, rather than each time we inline them.
+
+But given this decision it's vital that we do
+*always* do it.  Consider this unfolding
+    \x -> letrec { f = ...g...; g* = f } in body
+where g* is (for some strange reason) the loop breaker.  If we don't
+occ-anal it when reading it in, we won't mark g as a loop breaker, and
+we may inline g entirely in body, dropping its binding, and leaving
+the occurrence in f out of scope. This happened in Trac #8892, where
+the unfolding in question was a DFun unfolding.
+
+But more generally, the simplifier is designed on the
+basis that it is looking at occurrence-analysed expressions, so better
+ensure that they acutally are.
 
 Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
