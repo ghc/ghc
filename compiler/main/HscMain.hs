@@ -407,19 +407,20 @@ tcRnModule' hsc_env sum save_rn_syntax mod = do
 
     tcSafeOK <- liftIO $ readIORef (tcg_safeInfer tcg_res)
     dflags   <- getDynFlags
+    let allSafeOK = safeInferred dflags && tcSafeOK
 
-    -- end of the Safe Haskell line, how to respond to user?
-    if not (safeHaskellOn dflags) || (safeInferOn dflags && not tcSafeOK)
-        -- if safe haskell off or safe infer failed, wipe trust
-        then wipeTrust tcg_res emptyBag
+    -- end of the safe haskell line, how to respond to user?
+    if not (safeHaskellOn dflags) || (safeInferOn dflags && not allSafeOK)
+        -- if safe Haskell off or safe infer failed, mark unsafe
+        then markUnsafe tcg_res emptyBag
 
-        -- module safe, throw warning if needed
+        -- module (could be) safe, throw warning if needed
         else do
             tcg_res' <- hscCheckSafeImports tcg_res
             safe <- liftIO $ readIORef (tcg_safeInfer tcg_res')
             when (safe && wopt Opt_WarnSafe dflags)
-                 (logWarnings $ unitBag $
-                     mkPlainWarnMsg dflags (warnSafeOnLoc dflags) $ errSafe tcg_res')
+                 (logWarnings $ unitBag $ mkPlainWarnMsg dflags
+                     (warnSafeOnLoc dflags) $ errSafe tcg_res')
             return tcg_res'
   where
     pprMod t  = ppr $ moduleName $ tcg_mod t
@@ -773,16 +774,15 @@ hscCheckSafeImports tcg_env = do
     tcg_env' <- checkSafeImports dflags tcg_env
     case safeLanguageOn dflags of
         True -> do
-            -- we nuke user written RULES in -XSafe
+            -- XSafe: we nuke user written RULES
             logWarnings $ warns dflags (tcg_rules tcg_env')
             return tcg_env' { tcg_rules = [] }
         False
-              -- user defined RULES, so not safe or already unsafe
-            | safeInferOn dflags && not (null $ tcg_rules tcg_env') ||
-              safeHaskell dflags == Sf_None
-            -> wipeTrust tcg_env' $ warns dflags (tcg_rules tcg_env')
+              -- SafeInferred: user defined RULES, so not safe
+            | safeInferOn dflags && not (null $ tcg_rules tcg_env')
+            -> markUnsafe tcg_env' $ warns dflags (tcg_rules tcg_env')
 
-              -- trustworthy OR safe inferred with no RULES
+              -- Trustworthy OR SafeInferred: with no RULES
             | otherwise
             -> return tcg_env'
 
@@ -828,7 +828,7 @@ checkSafeImports dflags tcg_env
             True ->
                 -- did we fail safe inference or fail -XSafe?
                 case safeInferOn dflags of
-                    True  -> wipeTrust tcg_env errs
+                    True  -> markUnsafe tcg_env errs
                     False -> liftIO . throwIO . mkSrcErr $ errs
 
             -- All good matey!
@@ -849,7 +849,9 @@ checkSafeImports dflags tcg_env
     condense (m, x:xs) = do (_,_,l,s) <- foldlM cond' x xs
                             -- we turn all imports into safe ones when
                             -- inference mode is on.
-                            let s' = if safeInferOn dflags then True else s
+                            let s' = if safeInferOn dflags &&
+                                        safeHaskell dflags == Sf_None
+                                        then True else s
                             return (m, l, s')
 
     -- ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
@@ -915,7 +917,7 @@ hscCheckSafe' dflags m l = do
                 let trust = getSafeMode $ mi_trust iface'
                     trust_own_pkg = mi_trust_pkg iface'
                     -- check module is trusted
-                    safeM = trust `elem` [Sf_SafeInferred, Sf_Safe, Sf_Trustworthy]
+                    safeM = trust `elem` [Sf_Safe, Sf_Trustworthy]
                     -- check package is trusted
                     safeP = packageTrusted trust trust_own_pkg m
                     -- pkg trust reqs
@@ -951,7 +953,6 @@ hscCheckSafe' dflags m l = do
     packageTrusted _ _ _
         | not (packageTrustOn dflags)      = True
     packageTrusted Sf_Safe         False _ = True
-    packageTrusted Sf_SafeInferred False _ = True
     packageTrusted _ _ m
         | isHomePkg m = True
         | otherwise   = trusted $ getPackageDetails (pkgState dflags)
@@ -998,12 +999,13 @@ checkPkgTrust dflags pkgs =
                    $ text "The package (" <> ppr pkg <> text ") is required" <>
                      text " to be trusted but it isn't!"
 
--- | Set module to unsafe and wipe trust information.
+-- | Set module to unsafe and (potentially) wipe trust information.
 --
 -- Make sure to call this method to set a module to inferred unsafe,
--- it should be a central and single failure method.
-wipeTrust :: TcGblEnv -> WarningMessages -> Hsc TcGblEnv
-wipeTrust tcg_env whyUnsafe = do
+-- it should be a central and single failure method. We only wipe the trust
+-- information when we aren't in a specific Safe Haskell mode.
+markUnsafe :: TcGblEnv -> WarningMessages -> Hsc TcGblEnv
+markUnsafe tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
     when (wopt Opt_WarnUnsafe dflags)
@@ -1011,7 +1013,12 @@ wipeTrust tcg_env whyUnsafe = do
              mkPlainWarnMsg dflags (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) False
-    return $ tcg_env { tcg_imports = wiped_trust }
+    -- NOTE: Only wipe trust when not in an explicity safe haskell mode. Other
+    -- times inference may be on but we are in Trustworthy mode -- so we want
+    -- to record safe-inference failed but not wipe the trust dependencies.
+    case safeHaskell dflags == Sf_None of
+      True  -> return $ tcg_env { tcg_imports = wiped_trust }
+      False -> return tcg_env
 
   where
     wiped_trust   = (tcg_imports tcg_env) { imp_trust_pkgs = [] }
@@ -1021,7 +1028,7 @@ wipeTrust tcg_env whyUnsafe = do
                          , nest 4 $ (vcat $ badFlags df) $+$
                                     (vcat $ pprErrMsgBagWithLoc whyUnsafe)
                          ]
-    badFlags df   = concat $ map (badFlag df) unsafeFlags
+    badFlags df   = concat $ map (badFlag df) unsafeFlagsForInfer
     badFlag df (str,loc,on,_)
         | on df     = [mkLocMessage SevOutput (loc df) $
                             text str <+> text "is not allowed in Safe Haskell"]

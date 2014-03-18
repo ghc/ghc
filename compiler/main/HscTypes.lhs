@@ -2494,14 +2494,15 @@ trustInfoToNum it
             Sf_Unsafe       -> 1
             Sf_Trustworthy  -> 2
             Sf_Safe         -> 3
-            Sf_SafeInferred -> 4
 
 numToTrustInfo :: Word8 -> IfaceTrustInfo
 numToTrustInfo 0 = setSafeMode Sf_None
 numToTrustInfo 1 = setSafeMode Sf_Unsafe
 numToTrustInfo 2 = setSafeMode Sf_Trustworthy
 numToTrustInfo 3 = setSafeMode Sf_Safe
-numToTrustInfo 4 = setSafeMode Sf_SafeInferred
+numToTrustInfo 4 = setSafeMode Sf_Safe -- retained for backwards compat, used
+                                       -- to be Sf_SafeInfered but we no longer
+                                       -- differentiate.
 numToTrustInfo n = error $ "numToTrustInfo: bad input number! (" ++ show n ++ ")"
 
 instance Outputable IfaceTrustInfo where
@@ -2509,7 +2510,6 @@ instance Outputable IfaceTrustInfo where
     ppr (TrustInfo Sf_Unsafe)        = ptext $ sLit "unsafe"
     ppr (TrustInfo Sf_Trustworthy)   = ptext $ sLit "trustworthy"
     ppr (TrustInfo Sf_Safe)          = ptext $ sLit "safe"
-    ppr (TrustInfo Sf_SafeInferred)  = ptext $ sLit "safe-inferred"
 
 instance Binary IfaceTrustInfo where
     put_ bh iftrust = putByte bh $ trustInfoToNum iftrust

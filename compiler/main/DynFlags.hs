@@ -61,7 +61,7 @@ module DynFlags (
         safeHaskellOn, safeImportsOn, safeLanguageOn, safeInferOn,
         packageTrustOn,
         safeDirectImpsReq, safeImplicitImpsReq,
-        unsafeFlags,
+        unsafeFlags, unsafeFlagsForInfer,
 
         -- ** System tool settings and locations
         Settings(..),
@@ -480,7 +480,6 @@ data SafeHaskellMode
    | Sf_Unsafe
    | Sf_Trustworthy
    | Sf_Safe
-   | Sf_SafeInferred
    deriving (Eq)
 
 instance Show SafeHaskellMode where
@@ -488,7 +487,6 @@ instance Show SafeHaskellMode where
     show Sf_Unsafe       = "Unsafe"
     show Sf_Trustworthy  = "Trustworthy"
     show Sf_Safe         = "Safe"
-    show Sf_SafeInferred = "Safe-Inferred"
 
 instance Outputable SafeHaskellMode where
     ppr = text . show
@@ -737,11 +735,14 @@ data DynFlags = DynFlags {
   language              :: Maybe Language,
   -- | Safe Haskell mode
   safeHaskell           :: SafeHaskellMode,
+  safeInfer             :: Bool,
+  safeInferred          :: Bool,
   -- We store the location of where some extension and flags were turned on so
   -- we can produce accurate error messages when Safe Haskell fails due to
   -- them.
   thOnLoc               :: SrcSpan,
   newDerivOnLoc         :: SrcSpan,
+  overlapInstLoc        :: SrcSpan,
   pkgTrustOnLoc         :: SrcSpan,
   warnSafeOnLoc         :: SrcSpan,
   warnUnsafeOnLoc       :: SrcSpan,
@@ -1416,9 +1417,12 @@ defaultDynFlags mySettings =
         warningFlags = IntSet.fromList (map fromEnum standardWarnings),
         ghciScripts = [],
         language = Nothing,
-        safeHaskell = Sf_SafeInferred,
+        safeHaskell = Sf_None,
+        safeInfer   = True,
+        safeInferred = True,
         thOnLoc = noSrcSpan,
         newDerivOnLoc = noSrcSpan,
+        overlapInstLoc = noSrcSpan,
         pkgTrustOnLoc = noSrcSpan,
         warnSafeOnLoc = noSrcSpan,
         warnUnsafeOnLoc = noSrcSpan,
@@ -1701,7 +1705,7 @@ packageTrustOn = gopt Opt_PackageTrust
 
 -- | Is Safe Haskell on in some way (including inference mode)
 safeHaskellOn :: DynFlags -> Bool
-safeHaskellOn dflags = safeHaskell dflags /= Sf_None
+safeHaskellOn dflags = safeHaskell dflags /= Sf_None || safeInferOn dflags
 
 -- | Is the Safe Haskell safe language in use
 safeLanguageOn :: DynFlags -> Bool
@@ -1709,7 +1713,7 @@ safeLanguageOn dflags = safeHaskell dflags == Sf_Safe
 
 -- | Is the Safe Haskell safe inference mode active
 safeInferOn :: DynFlags -> Bool
-safeInferOn dflags = safeHaskell dflags == Sf_SafeInferred
+safeInferOn = safeInfer
 
 -- | Test if Safe Imports are on in some form
 safeImportsOn :: DynFlags -> Bool
@@ -1723,7 +1727,11 @@ setSafeHaskell s = updM f
     where f dfs = do
               let sf = safeHaskell dfs
               safeM <- combineSafeFlags sf s
-              return $ dfs { safeHaskell = safeM }
+              return $ case (s == Sf_Safe || s == Sf_Unsafe) of
+                True  -> dfs { safeHaskell = safeM, safeInfer = False }
+                -- leave safe inferrence on in Trustworthy mode so we can warn
+                -- if it could have been inferred safe.
+                False -> dfs { safeHaskell = safeM }
 
 -- | Are all direct imports required to be safe for this Safe Haskell mode?
 -- Direct imports are when the code explicitly imports a module
@@ -1740,9 +1748,7 @@ safeImplicitImpsReq d = safeLanguageOn d
 -- want to export this functionality from the module but do want to export the
 -- type constructors.
 combineSafeFlags :: SafeHaskellMode -> SafeHaskellMode -> DynP SafeHaskellMode
-combineSafeFlags a b | a == Sf_SafeInferred = return b
-                     | b == Sf_SafeInferred = return a
-                     | a == Sf_None         = return b
+combineSafeFlags a b | a == Sf_None         = return b
                      | b == Sf_None         = return a
                      | a == b               = return a
                      | otherwise            = addErr errm >> return (panic errm)
@@ -1754,13 +1760,19 @@ combineSafeFlags a b | a == Sf_SafeInferred = return b
 --     * function to get srcspan that enabled the flag
 --     * function to test if the flag is on
 --     * function to turn the flag off
-unsafeFlags :: [(String, DynFlags -> SrcSpan, DynFlags -> Bool, DynFlags -> DynFlags)]
+unsafeFlags, unsafeFlagsForInfer
+  :: [(String, DynFlags -> SrcSpan, DynFlags -> Bool, DynFlags -> DynFlags)]
 unsafeFlags = [("-XGeneralizedNewtypeDeriving", newDerivOnLoc,
                    xopt Opt_GeneralizedNewtypeDeriving,
                    flip xopt_unset Opt_GeneralizedNewtypeDeriving),
                ("-XTemplateHaskell", thOnLoc,
                    xopt Opt_TemplateHaskell,
                    flip xopt_unset Opt_TemplateHaskell)]
+unsafeFlagsForInfer = unsafeFlags ++
+              -- TODO: Can we do better than this for inference?
+              [("-XOverlappingInstances", overlapInstLoc,
+                  xopt Opt_OverlappingInstances,
+                  flip xopt_unset Opt_OverlappingInstances)]
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
@@ -2042,43 +2054,41 @@ updateWays dflags
 -- The bool is to indicate if we are parsing command line flags (false means
 -- file pragma). This allows us to generate better warnings.
 safeFlagCheck :: Bool -> DynFlags -> (DynFlags, [Located String])
-safeFlagCheck _  dflags | not (safeLanguageOn dflags || safeInferOn dflags)
-                        = (dflags, [])
+safeFlagCheck _ dflags | safeLanguageOn dflags = (dflagsUnset, warns)
+  where
+    -- Handle illegal flags under safe language.
+    (dflagsUnset, warns) = foldl check_method (dflags, []) unsafeFlags
 
--- safe or safe-infer ON
+    check_method (df, warns) (str,loc,test,fix)
+        | test df   = (fix df, warns ++ safeFailure (loc df) str)
+        | otherwise = (df, warns)
+
+    safeFailure loc str
+       = [L loc $ str ++ " is not allowed in Safe Haskell; ignoring "
+           ++ str]
+
 safeFlagCheck cmdl dflags =
-    case safeLanguageOn dflags of
-        True -> (dflags', warns)
+  case (safeInferOn dflags) of
+    True | safeFlags -> (dflags', warn)
+    True             -> (dflags' { safeInferred = False }, warn)
+    False            -> (dflags', warn)
 
-        -- throw error if -fpackage-trust by itself with no safe haskell flag
-        False | not cmdl && packageTrustOn dflags
-              -> (gopt_unset dflags' Opt_PackageTrust,
-                  [L (pkgTrustOnLoc dflags') $
-                      "-fpackage-trust ignored;" ++
-                      " must be specified with a Safe Haskell flag"]
-                  )
+  where
+    -- dynflags and warn for when -fpackage-trust by itself with no safe
+    -- haskell flag
+    (dflags', warn)
+      | safeHaskell dflags == Sf_None && not cmdl && packageTrustOn dflags
+      = (gopt_unset dflags Opt_PackageTrust, pkgWarnMsg)
+      | otherwise = (dflags, [])
 
-        False | null warns && safeInfOk
-              -> (dflags', [])
+    pkgWarnMsg = [L (pkgTrustOnLoc dflags') $
+                    "-fpackage-trust ignored;" ++
+                    " must be specified with a Safe Haskell flag"]
 
-              | otherwise
-              -> (dflags' { safeHaskell = Sf_None }, [])
-                -- Have we inferred Unsafe?
-                -- See Note [HscMain . Safe Haskell Inference]
-    where
-        -- TODO: Can we do better than this for inference?
-        safeInfOk = not $ xopt Opt_OverlappingInstances dflags
+    safeFlags = all (\(_,_,t,_) -> not $ t dflags) unsafeFlagsForInfer
+    -- Have we inferred Unsafe?
+    -- See Note [HscMain . Safe Haskell Inference]
 
-        (dflags', warns) = foldl check_method (dflags, []) unsafeFlags
-
-        check_method (df, warns) (str,loc,test,fix)
-            | test df   = (apFix fix df, warns ++ safeFailure (loc dflags) str)
-            | otherwise = (df, warns)
-
-        apFix f = if safeInferOn dflags then id else f
-
-        safeFailure loc str
-           = [L loc $ str ++ " is not allowed in Safe Haskell; ignoring " ++ str]
 
 {- **********************************************************************
 %*                                                                      *
@@ -2477,7 +2487,7 @@ dynamic_flags = [
 
         ------ Safe Haskell flags -------------------------------------------
   , Flag "fpackage-trust"   (NoArg setPackageTrust)
-  , Flag "fno-safe-infer"   (NoArg (setSafeHaskell Sf_None))
+  , Flag "fno-safe-infer"   (noArg (\d -> d { safeInfer = False  } ))
   , Flag "fPIC"             (NoArg (setGeneralFlag Opt_PIC))
   , Flag "fno-PIC"          (NoArg (unSetGeneralFlag Opt_PIC))
  ]
