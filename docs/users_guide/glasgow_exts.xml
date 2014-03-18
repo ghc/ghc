@@ -6583,50 +6583,6 @@ Note that this requires <option>-XTypeOperators</option>.
 </para>
 </sect2>
 
-<sect2 id="promoted-literals">
-<title>Promoted Literals</title>
-<para>
-Numeric and string literals are promoted to the type level, giving convenient
-access to a large number of predefined type-level constants.  Numeric literals
-are of kind <literal>Nat</literal>, while string literals are of kind
-<literal>Symbol</literal>.  These kinds are defined in the module
-<literal>GHC.TypeLits</literal>.
-</para>
-
-<para>
-Here is an exampe of using type-level numeric literals to provide a safe
-interface to a low-level function:
-<programlisting>
-import GHC.TypeLits
-import Data.Word
-import Foreign
-
-newtype ArrPtr (n :: Nat) a = ArrPtr (Ptr a)
-
-clearPage :: ArrPtr 4096 Word8 -> IO ()
-clearPage (ArrPtr p) = ...
-</programlisting>
-</para>
-
-<para>
-Here is an example of using type-level string literals to simulate
-simple record operations:
-<programlisting>
-data Label (l :: Symbol) = Get
-
-class Has a l b | a l -> b where
-  from :: a -> Label l -> b
-
-data Point = Point Int Int deriving Show
-
-instance Has Point "x" Int where from (Point x _) _ = x
-instance Has Point "y" Int where from (Point _ y) _ = y
-
-example = from (Point 1 2) (Get :: Label "x")
-</programlisting>
-</para>
-</sect2>
-
 <sect2 id="promotion-existentials">
 <title>Promoting existential data constructors</title>
 <para>
@@ -6675,6 +6631,142 @@ tried to write <literal>Either * Bool</literal>, would it be <literal>Either</li
 applied to <literal>*</literal> and <literal>Bool</literal>? Or would it be
 <literal>*</literal> applied to <literal>Either</literal> and <literal>Bool</literal>.
 To avoid this quagmire, we simply forbid promoting type operators to the kind level.
+</para>
+</sect2>
+
+
+</sect1>
+
+<sect1 id="type-level-literals">
+<title>Type-Level Literals</title>
+<para>
+GHC supports numeric and string literals at the type level, giving convenient
+access to a large number of predefined type-level constants.
+Numeric literals are of kind <literal>Nat</literal>, while string literals
+are of kind <literal>Symbol</literal>.
+This feature is enabled by the <literal>XDataKinds</literal>
+language extension.
+</para>
+
+<para>
+The kinds of the literals and all other low-level operations for this feature
+are defined in module <literal>GHC.TypeLits</literal>. Note that the module
+defines some type-level operators that clash with their value-level
+counterparts (e.g. <literal>(+)</literal>).  Import and export declarations
+referring to these operators require an explicit namespace
+annotation (see <xref linkend="explicit-namespaces"/>).
+</para>
+
+<para>
+Here is an exampe of using type-level numeric literals to provide a safe
+interface to a low-level function:
+<programlisting>
+import GHC.TypeLits
+import Data.Word
+import Foreign
+
+newtype ArrPtr (n :: Nat) a = ArrPtr (Ptr a)
+
+clearPage :: ArrPtr 4096 Word8 -> IO ()
+clearPage (ArrPtr p) = ...
+</programlisting>
+</para>
+
+<para>
+Here is an example of using type-level string literals to simulate
+simple record operations:
+<programlisting>
+data Label (l :: Symbol) = Get
+
+class Has a l b | a l -> b where
+  from :: a -> Label l -> b
+
+data Point = Point Int Int deriving Show
+
+instance Has Point "x" Int where from (Point x _) _ = x
+instance Has Point "y" Int where from (Point _ y) _ = y
+
+example = from (Point 1 2) (Get :: Label "x")
+</programlisting>
+</para>
+
+<sect2 id="typelit-runtime">
+<title>Runtime Values for Type-Level Literals</title>
+<para>
+Sometimes it is useful to access the value-level literal assocaited with
+a type-level literal.  This is done with the functions
+<literal>natVal</literal> and <literal>symbolVal</literal>. For example:
+<programlisting>
+GHC.TypeLits> natVal (Proxy :: Proxy 2)
+2
+</programlisting>
+These functions are overloaded because they need to return a different
+result, depending on the type at which they are instantiated.
+<programlisting>
+natVal :: KnownNat n => proxy n -> Integer
+
+-- instance KnownNat 0
+-- instance KnownNat 1
+-- instance KnownNat 2
+-- ...
+</programlisting>
+GHC discharges the constraint as soon as it knows what concrete
+type-level literal is being used in the program.  Note that this works
+only for <emphasis>literals</emphasis> and not arbitrary type expressions.
+For example, a constraint of the form <literal>KnownNat (a + b)</literal>
+will <emphasis>not</emphasis> be simplified to
+<literal>(KnownNat a, KnownNat b)</literal>; instead, GHC will keep the
+constraint as is, until it can simplify <literal>a + b</literal> to
+a constant value.
+</para>
+</sect2>
+
+<para>
+It is also possible to convert a run-time integer or string value to
+the corresponding type-level literal.  Of course, the resulting type
+literal will be unknown at compile-time, so it is hidden in an existential
+type.   The conversion may be performed using <literal>someNatVal</literal>
+for integers and <literal>someSymbolVal</literal> for strings:
+<programlisting>
+someNatVal :: Integer -> Maybe SomeNat
+SomeNat    :: KnownNat n => Proxy n -> SomeNat
+</programlisting>
+The operations on strings are similar.
+</para>
+
+<sect2 id="typelit-tyfuns">
+<title>Computing With Type-Level Naturals</title>
+<para>
+GHC 7.8 can evaluate arithmetic expressions involving type-level natural
+numbers.  Such expressions may be constructed using the type-families
+<literal>(+), (*), (^)</literal> for addition, multiplication,
+and exponentiation.  Numbers may be compared using <literal>(&lt;=?)</literal>,
+which returns a promoted boolean value, or <literal>(&lt;=)</literal>, which
+compares numbers as a constraint.  For example:
+<programlisting>
+GHC.TypeLits> natVal (Proxy :: Proxy (2 + 3))
+5
+</programlisting>
+</para>
+<para>
+At present, GHC is quite limited in its reasoning about arithmetic:
+it will only evalute the arithmetic type functions and compare the results---
+in the same way that it does for any other type function.  In particular,
+it does not know more general facts about arithmetic, such as the commutativity
+and associativity of <literal>(+)</literal>, for example.
+</para>
+
+<para>
+However, it is possible to perform a bit of "backwards" evaluation.
+For example, here is how we could get GHC to compute arbitrary logarithms
+at the type level:
+<programlisting>
+lg :: Proxy base -> Proxy (base ^ pow) -> Proxy pow
+lg _ _ = Proxy
+
+GHC.TypeLits> natVal (lg (Proxy :: Proxy 2) (Proxy :: Proxy 8))
+3
+</programlisting>
 </para>
 </sect2>
 
