@@ -1472,6 +1472,7 @@ rep1TyConKey = mkPreludeTyConUnique 156
 typeNatKindConNameKey, typeSymbolKindConNameKey,
   typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
   typeNatLeqTyFamNameKey, typeNatSubTyFamNameKey
+  , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey
   :: Unique
 typeNatKindConNameKey     = mkPreludeTyConUnique 160
 typeSymbolKindConNameKey  = mkPreludeTyConUnique 161
@@ -1480,6 +1481,8 @@ typeNatMulTyFamNameKey    = mkPreludeTyConUnique 163
 typeNatExpTyFamNameKey    = mkPreludeTyConUnique 164
 typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 165
 typeNatSubTyFamNameKey    = mkPreludeTyConUnique 166
+typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 167
+typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 168
 
 ntTyConKey:: Unique
 ntTyConKey = mkPreludeTyConUnique 174

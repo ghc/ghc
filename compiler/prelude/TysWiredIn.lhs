@@ -20,6 +20,8 @@ module TysWiredIn (
         ltDataCon, ltDataConId,
         eqDataCon, eqDataConId,
         gtDataCon, gtDataConId,
+        promotedOrderingTyCon,
+        promotedLTDataCon, promotedEQDataCon, promotedGTDataCon,
 
         -- * Char
         charTyCon, charDataCon, charTyCon_RDR,
@@ -829,6 +831,20 @@ promotedBoolTyCon, promotedFalseDataCon, promotedTrueDataCon :: TyCon
 promotedBoolTyCon     = promoteTyCon boolTyCon
 promotedTrueDataCon   = promoteDataCon trueDataCon
 promotedFalseDataCon  = promoteDataCon falseDataCon
+\end{code}
+
+Promoted Ordering
+
+\begin{code}
+promotedOrderingTyCon
+  , promotedLTDataCon
+  , promotedEQDataCon
+  , promotedGTDataCon
+  :: TyCon
+promotedOrderingTyCon = promoteTyCon orderingTyCon
+promotedLTDataCon     = promoteDataCon ltDataCon
+promotedEQDataCon     = promoteDataCon eqDataCon
+promotedGTDataCon     = promoteDataCon gtDataCon
 \end{code}
 
 
