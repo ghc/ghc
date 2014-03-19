@@ -14,7 +14,7 @@ TYPE CONSTRUCTORS
     No C type associated
     Roles: [representational]
     RecFlag NonRecursive, Promotable
-    = L :: forall a. [a] -> ListColl a Stricts: _
+    = L :: [a] -> ListColl a Stricts: _
     FamilyInstance: none
 COERCION AXIOMS
   axiom Foo.TFCo:R:ElemListColl :: Elem (ListColl a) = a
