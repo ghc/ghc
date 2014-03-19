@@ -501,7 +501,7 @@ isDataSymOcc _                    = False
 -- it is a data constructor or variable or whatever)
 isSymOcc :: OccName -> Bool
 isSymOcc (OccName DataName s)  = isLexConSym s
-isSymOcc (OccName TcClsName s) = isLexConSym s || isLexVarSym s
+isSymOcc (OccName TcClsName s) = isLexSym s
 isSymOcc (OccName VarName s)   = isLexSym s
 isSymOcc (OccName TvName s)    = isLexSym s
 -- Pretty inefficient!
@@ -869,6 +869,15 @@ isTupleOcc_maybe (OccName ns fs)
 These functions test strings to see if they fit the lexical categories
 defined in the Haskell report.
 
+Note [Classification of generated names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Some names generated for internal use can show up in debugging output,
+e.g.  when using -ddump-simpl. These generated names start with a $
+but should still be pretty-printed using prefix notation. We make sure
+this is the case in isLexVarSym by only classifying a name as a symbol
+if all its characters are symbols, not just its first one.
+
 \begin{code}
 isLexCon,   isLexVar,    isLexId,    isLexSym    :: FastString -> Bool
 isLexConId, isLexConSym, isLexVarId, isLexVarSym :: FastString -> Bool
@@ -895,19 +904,23 @@ isLexConSym cs				-- Infix type or data constructors
   | cs == (fsLit "->") = True
   | otherwise	       = startsConSym (headFS cs)
 
-isLexVarSym cs				-- Infix identifiers
-  | nullFS cs	      = False		-- 	e.g. "+"
-  | otherwise         = startsVarSym (headFS cs)
+isLexVarSym fs				-- Infix identifiers e.g. "+"
+  = case (if nullFS fs then [] else unpackFS fs) of
+      [] -> False
+      (c:cs) -> startsVarSym c && all isVarSymChar cs
 
 -------------
 startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool
-startsVarSym c = isSymbolASCII c || (ord c > 0x7f && isSymbol c) -- Infix Ids
-startsConSym c = c == ':'				-- Infix data constructors
+startsVarSym c = isSymbolASCII c || (ord c > 0x7f && isSymbol c)  -- Infix Ids
+startsConSym c = c == ':'		-- Infix data constructors
 startsVarId c  = isLower c || c == '_'	-- Ordinary Ids
 startsConId c  = isUpper c || c == '('	-- Ordinary type constructors and data constructors
 
 isSymbolASCII :: Char -> Bool
 isSymbolASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
+
+isVarSymChar :: Char -> Bool
+isVarSymChar c = c == ':' || startsVarSym c
 \end{code}
 
 %************************************************************************
