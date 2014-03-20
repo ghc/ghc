@@ -54,3 +54,6 @@
 	path = libraries/random
 	url = ../packages/random.git
 	ignore = untracked
+[submodule "utils/haddock"]
+	path = utils/haddock
+	url = ../haddock.git

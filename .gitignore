@@ -71,7 +71,6 @@ _darcs/
 /libraries/unix/
 /libraries/utf8-string/
 /nofib/
-/utils/haddock/
 /utils/hsc2hs/
 
 # -----------------------------------------------------------------------------
