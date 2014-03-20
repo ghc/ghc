@@ -643,6 +643,10 @@ AC_ARG_WITH($2,
     else
         $1=$withval
     fi
+
+    # Remember that we set this manually.  Used to override CC_STAGE0
+    # and friends later, if we are not cross-compiling.
+    With_$2=$withval
 ],
 [
     if test "$HostOS" != "mingw32"
@@ -685,6 +689,10 @@ AC_ARG_WITH($2,
     else
         $1=$withval
     fi
+
+    # Remember that we set this manually.  Used to override CC_STAGE0
+    # and friends later, if we are not cross-compiling.
+    With_$2=$withval
 ],
 [
     if test "$HostOS" != "mingw32"
@@ -2058,7 +2066,8 @@ AC_DEFUN([FIND_GCC],[
         $1="$CC"
     else
         FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
-        # From Xcode 5 on, OS X command line tools do not include gcc anymore. Use clang.
+        # From Xcode 5 on, OS X command line tools do not include gcc
+        # anymore. Use clang.
         if test -z "$$1"
         then
             FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [clang], [clang])
@@ -2069,6 +2078,13 @@ AC_DEFUN([FIND_GCC],[
         fi
     fi
     AC_SUBST($1)
+])
+
+AC_DEFUN([MAYBE_OVERRIDE_STAGE0],[
+  if test ! -z "$With_$1" -a "$CrossCompiling" != "YES"; then
+      AC_MSG_NOTICE([Not cross-compiling, so --with-$1 also sets $2])
+      $2=$With_$1
+  fi
 ])
 
 # LocalWords:  fi
