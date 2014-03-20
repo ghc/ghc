@@ -455,13 +455,18 @@ runGHCi paths maybe_exprs = do
    canonicalizePath' fp = liftM Just (canonicalizePath fp)
                 `catchIO` \_ -> return Nothing
 
-   sourceConfigFile :: FilePath -> GHCi ()
-   sourceConfigFile file = do
+   sourceConfigFile :: (FilePath, Bool) -> GHCi ()
+   sourceConfigFile (file, check_perms) = do
      exists <- liftIO $ doesFileExist file
      when exists $ do
-       dir_ok  <- liftIO $ checkPerms (getDirectory file)
-       file_ok <- liftIO $ checkPerms file
-       when (dir_ok && file_ok) $ do
+       perms_ok <-
+         if not check_perms
+            then return True
+            else do
+              dir_ok  <- liftIO $ checkPerms (getDirectory file)
+              file_ok <- liftIO $ checkPerms file
+              return (dir_ok && file_ok)
+       when perms_ok $ do
          either_hdl <- liftIO $ tryIO (openFile file ReadMode)
          case either_hdl of
            Left _e   -> return ()
@@ -479,9 +484,14 @@ runGHCi paths maybe_exprs = do
   setGHCContextFromGHCiState
 
   when (read_dot_files) $ do
-    mcfgs0 <- sequence $ [ current_dir, app_user_dir, home_dir ] ++ map (return . Just ) (ghciScripts dflags)
-    mcfgs <- liftIO $ mapM canonicalizePath' (catMaybes mcfgs0)
-    mapM_ sourceConfigFile $ nub $ catMaybes mcfgs
+    mcfgs0 <- catMaybes <$> sequence [ current_dir, app_user_dir, home_dir ]
+    let mcfgs1 = zip mcfgs0 (repeat True)
+              ++ zip (ghciScripts dflags) (repeat False)
+         -- False says "don't check permissions".  We don't
+         -- require that a script explicitly added by
+         -- -ghci-script is owned by the current user. (#6017)
+    mcfgs <- liftIO $ mapM (\(f, b) -> (,b) <$> canonicalizePath' f) mcfgs1
+    mapM_ sourceConfigFile $ nub $ [ (f,b) | (Just f, b) <- mcfgs ]
         -- nub, because we don't want to read .ghci twice if the
         -- CWD is $HOME.
 
