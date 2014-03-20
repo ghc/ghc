@@ -142,8 +142,7 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
 stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 /* MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
 {
-    gcptr p;
-    W_ h;
+    W_ p, h;
 
     p = arr + SIZEOF_StgArrWords + WDS(ind);
     (h) = ccall cas(p, old, new);
@@ -155,8 +154,7 @@ stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 stg_fetchAddIntArrayzh( gcptr arr, W_ ind, W_ incr )
 /* MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
 {
-    gcptr p;
-    W_ h;
+    W_ p, h;
 
     p = arr + SIZEOF_StgArrWords + WDS(ind);
     (h) = ccall atomic_inc(p, incr);
@@ -167,8 +165,8 @@ stg_fetchAddIntArrayzh( gcptr arr, W_ ind, W_ incr )
 
 stg_newArrayzh ( W_ n /* words */, gcptr init )
 {
-    W_ words, size;
-    gcptr p, arr;
+    W_ words, size, p;
+    gcptr arr;
 
     again: MAYBE_GC(again);
 
@@ -231,8 +229,8 @@ stg_unsafeThawArrayzh ( gcptr arr )
 stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
 /* MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, Any a #) */
 {
-    gcptr p, h;
-    W_ len;
+    gcptr h;
+    W_ p, len;
 
     p = arr + SIZEOF_StgMutArrPtrs + WDS(ind);
     (h) = ccall cas(p, old, new);
@@ -252,8 +250,8 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
 
 stg_newArrayArrayzh ( W_ n /* words */ )
 {
-    W_ words, size;
-    gcptr p, arr;
+    W_ words, size, p;
+    gcptr arr;
 
     MAYBE_GC_N(stg_newArrayArrayzh, n);
 
