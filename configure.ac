@@ -367,7 +367,7 @@ AS_IF([test "x$with_system_libffi" = "xyes"],
 AC_SUBST(UseSystemLibFFI)
 
 AC_ARG_WITH([ffi-includes],
-[AC_HELP_STRING([--with-ffi-includes=ARG]
+[AC_HELP_STRING([--with-ffi-includes=ARG],
   [Find includes for libffi in ARG [default=system default]])
 ],
 [
@@ -382,7 +382,7 @@ AC_ARG_WITH([ffi-includes],
 AC_SUBST(FFIIncludeDir)
 
 AC_ARG_WITH([ffi-libraries],
-[AC_HELP_STRING([--with-ffi-libraries=ARG]
+[AC_HELP_STRING([--with-ffi-libraries=ARG],
   [Find libffi in ARG [default=system default]])
 ],
 [
