@@ -168,4 +168,4 @@ test('T8674', normal, ghci_script, ['T8674.script'])
 test('T8696', normal, ghci_script, ['T8696.script'])
 test('T8776', normal, ghci_script, ['T8776.script'])
 test('ghci059', normal, ghci_script, ['ghci059.script'])
-
+test('T8831', normal, ghci_script, ['T8831.script'])
