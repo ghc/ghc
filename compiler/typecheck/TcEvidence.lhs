@@ -82,7 +82,7 @@ differences
   * The kind of a TcCoercion is  t1 ~  t2  (resp. Coercible t1 t2)
              of a Coercion   is  t1 ~# t2  (resp. t1 ~#R t2)
 
-  * UnsafeCo aren't required, but we do have TcPhandomCo
+  * UnsafeCo aren't required, but we do have TcPhantomCo
 
   * Representation invariants are weaker:
      - we are allowed to have type synonyms in TcTyConAppCo
