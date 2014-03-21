@@ -385,22 +385,9 @@ canIrred old_ev
        ; case classifyPredType (ctEvPred new_ev) of
            ClassPred cls tys -> canClassNC new_ev cls tys
            TuplePred tys     -> canTuple   new_ev tys
-           EqPred ty1 ty2
-              | something_changed old_ty ty1 ty2 -> canEqNC new_ev ty1 ty2
-           _  -> continueWith $
-                 CIrredEvCan { cc_ev = new_ev } } } }
-  where
-    -- If the constraint was a kind-mis-matched equality, we must
-    -- retry canEqNC only if something has changed, otherwise we
-    -- get an infinite loop
-    something_changed old_ty new_ty1 new_ty2
-       | EqPred old_ty1 old_ty2 <- classifyPredType old_ty
-       = not (            new_ty1 `tcEqType`          old_ty1
-              && typeKind new_ty1 `tcEqKind` typeKind old_ty1
-              &&          new_ty2 `tcEqType`          old_ty2
-              && typeKind new_ty2 `tcEqKind` typeKind old_ty2)
-       | otherwise
-       = True
+           EqPred ty1 ty2    -> canEqNC new_ev ty1 ty2
+           _                 -> continueWith $
+                                CIrredEvCan { cc_ev = new_ev } } } }
 
 canHole :: CtEvidence -> OccName -> TcS StopOrContinue
 canHole ev occ
@@ -1216,7 +1203,7 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
                        -> continueWith (CTyEqCan { cc_ev = new_ev
                                                  , cc_tyvar = tv1, cc_rhs = xi2 })
                        | otherwise
-                       -> checkKind ev xi1 k1 xi2 k2 } 
+                       -> checkKind new_ev xi1 k1 xi2 k2 } 
   where
     reorient_me 
       | k1 `tcEqKind` k2    = tv2 `better_than` tv1
@@ -1250,15 +1237,14 @@ checkKind new_ev s1 k1 s2 k2   -- See Note [Equalities with incompatible kinds]
   = ASSERT( isKind k1 && isKind k2 )
     do { traceTcS "canEqLeaf: incompatible kinds" (vcat [ppr k1, ppr k2])
 
-         -- Put the not-currently-soluble thing back onto the work list
-       ; updWorkListTcS $ extendWorkListNonEq $
-         CIrredEvCan { cc_ev = new_ev }
-
          -- Create a derived kind-equality, and solve it
        ; mw <- newDerived kind_co_loc (mkEqPred k1 k2)
        ; case mw of
-           Nothing  -> return Stop
-           Just kev -> canEqNC kev k1 k2 }
+           Nothing  -> return ()
+           Just kev -> emitWorkNC [kev]
+
+         -- Put the not-currently-soluble thing into the inert set
+       ; continueWith (CIrredEvCan { cc_ev = new_ev }) }
   where
     loc = ctev_loc new_ev
     kind_co_loc = setCtLocOrigin loc (KindEqOrigin s1 s2 (ctLocOrigin loc))
@@ -1298,8 +1284,8 @@ a well-kinded type ill-kinded; and that is bad (eg typeKind can crash, see
 Trac #7696).
 
 So instead for these ill-kinded equalities we generate a CIrredCan,
-which keeps it out of the way until a subsequent substitution (on kind
-variables, say) re-activates it.
+and put it in the inert set, which keeps it out of the way until a
+subsequent substitution (on kind variables, say) re-activates it.
 
 NB: it is important that the types s1,s2 are flattened and zonked
     so that their kinds k1, k2 are inert wrt the substitution.  That
@@ -1307,6 +1293,11 @@ NB: it is important that the types s1,s2 are flattened and zonked
     set, which in turn will kick out the irreducible equality
     E.g. it is WRONG to make an irred (a:k1)~(b:k2)
          if we already have a substitution k1:=k2
+
+NB: it's important that the new CIrredCan goes in the inert set rather
+than back into the work list. We used to do the latter, but that led
+to an infinite loop when we encountered it again, and put it back it
+the work list again.
 
 See also Note [Kind orientation for CTyEqCan] and
          Note [Kind orientation for CFunEqCan] in TcRnTypes
