@@ -25,7 +25,7 @@ module TcEvidence (
   mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcSubCo,
   mkTcAxiomRuleCo,
   tcCoercionKind, coVarsOfTcCo, isEqVar, mkTcCoVarCo, 
-  isTcReflCo, isTcReflCo_maybe, getTcCoVar_maybe,
+  isTcReflCo, getTcCoVar_maybe,
   tcCoercionRole, eqVarRole,
   coercionToTcCoercion
   ) where
