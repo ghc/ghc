@@ -1525,7 +1525,7 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
 
 -- 2nd parameter is the list of branch LHSs, for conversion from incompatible branches
 -- to incompatible indices
--- See [Storing compatibility] in CoAxiom
+-- See Note [Storing compatibility] in CoAxiom
 coAxBranchToIfaceBranch :: TidyEnv -> [[Type]] -> CoAxBranch -> IfaceAxBranch
 coAxBranchToIfaceBranch env0 lhs_s
                         branch@(CoAxBranch { cab_incomps = incomps })

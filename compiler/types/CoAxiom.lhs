@@ -327,6 +327,7 @@ isImplicitCoAxiom = co_ax_implicit
 coAxBranchIncomps :: CoAxBranch -> [CoAxBranch]
 coAxBranchIncomps = cab_incomps
 
+-- See Note [Compatibility checking] in FamInstEnv
 placeHolderIncomps :: [CoAxBranch]
 placeHolderIncomps = panic "placeHolderIncomps"
 

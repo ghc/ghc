@@ -439,7 +439,7 @@ only when we can be sure that 'a' is not Int.
 To achieve this, after finding a possible match within the equations, we have to
 go back to all previous equations and check that, under the
 substitution induced by the match, other branches are surely apart. (See
-[Apartness].) This is similar to what happens with class
+Note [Apartness].) This is similar to what happens with class
 instance selection, when we need to guarantee that there is only a match and
 no unifiers. The exact algorithm is different here because the the
 potentially-overlapping group is closed.
@@ -475,6 +475,7 @@ irrelevant (clause 1 of compatible) or benign (clause 2 of compatible).
 
 \begin{code}
 
+-- See Note [Compatibility]
 compatibleBranches :: CoAxBranch -> CoAxBranch -> Bool
 compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                    (CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
@@ -487,6 +488,7 @@ compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
 
 -- takes a CoAxiom with unknown branch incompatibilities and computes
 -- the compatibilities
+-- See Note [Storing compatibility] in CoAxiom
 computeAxiomIncomps :: CoAxiom br -> CoAxiom br
 computeAxiomIncomps ax@(CoAxiom { co_ax_branches = branches })
   = ax { co_ax_branches = go [] branches }
