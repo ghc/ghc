@@ -611,12 +611,14 @@ flattenTyVar f ctxt tv
   = do { mb_yes <- flattenTyVarOuter f ctxt tv
        ; case mb_yes of
            Left tv'         -> -- Done 
-                               return (ty, mkTcNomReflCo ty)
+                               do { traceTcS "flattenTyVar1" (ppr tv $$ ppr (tyVarKind tv'))
+                                  ; return (ty', mkTcNomReflCo ty') }
                             where
-                               ty = mkTyVarTy tv'
+                               ty' = mkTyVarTy tv'
 
            Right (ty1, co1) -> -- Recurse
                                do { (ty2, co2) <- flatten f ctxt ty1
+                                  ; traceTcS "flattenTyVar2" (ppr tv $$ ppr ty2)
                                   ; return (ty2, co2 `mkTcTransCo` co1) }
        }
 
