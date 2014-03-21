@@ -1,6 +1,6 @@
 
 T7019.hs:14:10:
-    Malformed predicate ‘C c’
+    Illegal polymorphic or qualified type: C c
     In the context: (C c)
     While checking an instance declaration
     In the instance declaration for ‘Monad (Free c)’

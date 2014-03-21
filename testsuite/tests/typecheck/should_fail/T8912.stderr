@@ -1,0 +1,6 @@
+
+T8912.hs:7:10:
+    Illegal implict parameter ‘?imp::Int’
+    In the context: (?imp::Int)
+    While checking an instance declaration
+    In the instance declaration for ‘C [a]’

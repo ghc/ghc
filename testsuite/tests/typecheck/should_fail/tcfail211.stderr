@@ -1,6 +1,6 @@
 
-tcfail211.hs:16:13:
-    Unbound implicit parameter (?imp::Int) arising from a use of ‘test’
-    In the first argument of ‘print’, namely ‘test’
-    In the expression: print test
-    In an equation for ‘use’: use = print test
+tcfail211.hs:5:1:
+    Illegal implict parameter ‘?imp::Int’
+    In the context: (?imp::Int)
+    While checking the super-classes of class ‘D’
+    In the class declaration for ‘D’
