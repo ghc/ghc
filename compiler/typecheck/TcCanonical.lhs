@@ -475,14 +475,6 @@ flatten :: FlattenMode
 --
 -- Postcondition: Coercion :: Xi ~ TcType
 
-flatten f ctxt ty
-  | Just ty' <- tcView ty
-  = do { (xi, co) <- flatten f ctxt ty'
-       ; if xi `tcEqType` ty' then return (ty,co) 
-                              else return (xi,co) }
-       -- Small tweak for better error messages
-       -- by preserving type synonyms where possible
-
 flatten _ _ xi@(LitTy {}) = return (xi, mkTcNomReflCo xi)
 
 flatten f ctxt (TyVarTy tv)
@@ -500,7 +492,9 @@ flatten f ctxt (FunTy ty1 ty2)
        ; return (mkFunTy xi1 xi2, mkTcFunCo Nominal co1 co2) }
 
 flatten f ctxt (TyConApp tc tys)
-  -- For a normal type constructor or data family application,
+  -- For * a normal data type application
+  --     * type synonym application  See Note [Flattening synonyms]
+  --     * data family application
   -- we just recursively flatten the arguments.
   | not (isSynFamilyTyCon tc)
     = do { (xis,cos) <- flattenMany f ctxt tys
@@ -537,6 +531,17 @@ flatten _f ctxt ty@(ForAllTy {})
                          -- See Note [Flattening under a forall]
        ; return (mkForAllTys tvs rho', foldr mkTcForAllCo co tvs) }
 \end{code}
+
+Note [Flattening synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose
+   type T a = a -> a
+and we want to flatten the type (T (F a)).  Then we can safely flatten
+the (F a) to a skolem, and return (T fsk).  We don't need to expand the
+synonym.  This works because TcTyConAppCo can deal with synonyms
+(unlike TyConAppCo), see Note [TcCoercions] in TcEvidence.
+
+Not expanding synonyms aggressively improves error messages.
 
 Note [Flattening under a forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

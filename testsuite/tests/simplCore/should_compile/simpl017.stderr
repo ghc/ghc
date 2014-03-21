@@ -12,11 +12,8 @@ simpl017.hs:44:12:
     In a stmt of a 'do' block: return f
 
 simpl017.hs:63:5:
-    Couldn't match type ‘forall v.
-                         [E' RValue (ST s) Int] -> E' v (ST s) Int’
-                  with ‘[E (ST t0) Int] -> E' RValue (ST s) Int’
-    Expected type: [E (ST t0) Int] -> E (ST s) Int
-      Actual type: forall v. [E (ST s) Int] -> E' v (ST s) Int
+    Couldn't match expected type ‘[E (ST t0) Int] -> E (ST s) Int’
+                with actual type ‘forall v. [E (ST s) Int] -> E' v (ST s) Int’
     Relevant bindings include
       a :: forall v. [E (ST s) Int] -> E' v (ST s) Int
         (bound at simpl017.hs:60:5)
@@ -28,11 +25,8 @@ simpl017.hs:63:5:
     In a stmt of a 'do' block: a [one] `plus` a [one]
 
 simpl017.hs:63:19:
-    Couldn't match type ‘forall v.
-                         [E' RValue (ST s) Int] -> E' v (ST s) Int’
-                  with ‘[E (ST t1) Int] -> E' RValue (ST s) Int’
-    Expected type: [E (ST t1) Int] -> E (ST s) Int
-      Actual type: forall v. [E (ST s) Int] -> E' v (ST s) Int
+    Couldn't match expected type ‘[E (ST t1) Int] -> E (ST s) Int’
+                with actual type ‘forall v. [E (ST s) Int] -> E' v (ST s) Int’
     Relevant bindings include
       a :: forall v. [E (ST s) Int] -> E' v (ST s) Int
         (bound at simpl017.hs:60:5)
