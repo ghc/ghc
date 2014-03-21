@@ -1724,7 +1724,18 @@ Main purpose: create new evidence for new_pred;
 
         Given           Already in inert               Nothing
                         Not                            Just new_evidence
--}
+
+Note [Rewriting with Refl]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the coercion is just reflexivity then you may re-use the same
+variable.  But be careful!  Although the coercion is Refl, new_pred
+may reflect the result of unification alpha := ty, so new_pred might
+not _look_ the same as old_pred, and it's vital to proceed from now on
+using new_pred.
+
+The flattener preserves type synonyms, so they should appear in new_pred
+as well as in old_pred; that is important for good error messages.
+ -}
 
 
 rewriteEvidence (CtDerived { ctev_loc = loc }) new_pred _co
@@ -1738,15 +1749,8 @@ rewriteEvidence (CtDerived { ctev_loc = loc }) new_pred _co
     newDerived loc new_pred
 
 rewriteEvidence old_ev new_pred co
-  | isTcReflCo co -- If just reflexivity then you may re-use the same variable
-  = return (Just (if ctEvPred old_ev `tcEqType` new_pred
-                  then old_ev
-                  else old_ev { ctev_pred = new_pred }))
-       -- Even if the coercion is Refl, it might reflect the result of unification alpha := ty
-       -- so old_pred and new_pred might not *look* the same, and it's vital to proceed from
-       -- now on using new_pred.
-       -- However, if they *do* look the same, we'd prefer to stick with old_pred
-       -- then retain the old type, so that error messages come out mentioning synonyms
+  | isTcReflCo co -- See Note [Rewriting with Refl]
+  = return (Just (old_ev { ctev_pred = new_pred }))
 
 rewriteEvidence (CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
   = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
@@ -1789,12 +1793,9 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
   = newDerived loc (mkEqPred nlhs nrhs)
 
   | NotSwapped <- swapped
-  , isTcReflCo lhs_co
+  , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
   , isTcReflCo rhs_co
-  , let new_pred = mkTcEqPred nlhs nrhs
-  = return (Just (if ctEvPred old_ev `tcEqType` new_pred
-                  then old_ev
-                  else old_ev { ctev_pred = new_pred }))
+  = return (Just (old_ev { ctev_pred = new_pred }))
 
   | CtGiven { ctev_evtm = old_tm , ctev_loc = loc } <- old_ev
   = do { let new_tm = EvCoercion (lhs_co 
