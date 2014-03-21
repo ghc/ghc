@@ -31,9 +31,9 @@ extra-source-files:
   src/haddock.sh
   html-test/src/*.hs
   html-test/ref/*.html
-  latex-test/src/*.hs
-  latex-test/ref/*/*.tex
-  latex-test/ref/*/*.sty
+  latex-test/src/Simple/*.hs
+  latex-test/ref/Simple/*.tex
+  latex-test/ref/Simple/*.sty
 
 data-dir:   resources
 data-files: html/frames.html
