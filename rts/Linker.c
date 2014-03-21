@@ -1718,6 +1718,18 @@ typedef
 
 /* A list thereof. */
 static OpenedDLL* opened_dlls = NULL;
+
+/* A record for storing indirectly linked functions from DLLs. */
+typedef
+   struct _IndirectAddr {
+      void*                 addr;
+      struct _IndirectAddr* next;
+   }
+   IndirectAddr;
+
+/* A list thereof. */
+static IndirectAddr* indirects = NULL;
+
 #endif
 
 #  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
@@ -2189,6 +2201,15 @@ void freeObjectCode (ObjectCode *oc)
     stgFree(oc->image);
 #else
     VirtualFree(oc->image - PEi386_IMAGE_OFFSET, 0, MEM_RELEASE);
+
+    IndirectAddr *ia, *ia_next;
+    ia = indirects;
+    while (ia != NULL) {
+      ia_next = ia->next;
+      stgFree(ia);
+      ia = ia_next;
+    }
+
 #endif
 
 #if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH)
@@ -3698,15 +3719,20 @@ lookupSymbolInDLLs ( UChar *lbl )
            Long description: http://support.microsoft.com/kb/132044
            tl;dr:
              If C/C++ compiler sees __declspec(dllimport) ... foo ...
-             it generates call __imp_foo, and __imp_foo here has exactly
+             it generates call *__imp_foo, and __imp_foo here has exactly
              the same semantics as in __imp_foo = GetProcAddress(..., "foo")
          */
         if (sym == NULL && strncmp ((const char*)lbl, "__imp_", 6) == 0) {
             sym = GetProcAddress(o_dll->instance, (char*)(lbl+6));
             if (sym != NULL) {
+                IndirectAddr* ret;
+                ret = stgMallocBytes( sizeof(IndirectAddr), "lookupSymbolInDLLs" );
+                ret->addr = sym;
+                ret->next = indirects;
+                indirects = ret;
                 errorBelch("warning: %s from %S is linked instead of %s",
                               (char*)(lbl+6), o_dll->name, (char*)lbl);
-                return sym;
+                return (void*) & ret->addr;
                }
         }
 
