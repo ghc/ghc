@@ -38,7 +38,6 @@ import Name
 import VarEnv
 import VarSet
 import ErrUtils
-import PrelNames
 import DynFlags
 import Util
 import ListSetOps
@@ -436,9 +435,21 @@ If we do both, we get exponential behaviour!!
 %*                                                                      *
 %************************************************************************
 
+Note [Implicit parameters in instance decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Implicit parameters _only_ allowed in type signatures; not in instance
+decls, superclasses etc. The reason for not allowing implicit params in
+instances is a bit subtle.  If we allowed
+  instance (?x::Int, Eq a) => Foo [a] where ...
+then when we saw
+     (e :: (?x::Int) => t)
+it would be unclear how to discharge all the potential usas of the ?x
+in e.  For example, a constraint Foo [Int] might come out of e,and
+applying the instance decl would show up two uses of ?x.  Trac #8912.
+
 \begin{code}
 checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
-checkValidTheta ctxt theta 
+checkValidTheta ctxt theta
   = addErrCtxt (checkThetaCtxt ctxt theta) (check_valid_theta ctxt theta)
 
 -------------------------
@@ -460,35 +471,20 @@ check_pred_ty :: DynFlags -> UserTypeCtxt -> PredType -> TcM ()
 -- type synonyms have been checked at their definition site
 
 check_pred_ty dflags ctxt pred
-  | Just (tc,tys) <- tcSplitTyConApp_maybe pred
-  = case () of 
-      _ | Just cls <- tyConClass_maybe tc
-        -> check_class_pred dflags ctxt cls tys
+  = case classifyPredType pred of
+      ClassPred cls tys -> check_class_pred dflags ctxt pred cls tys
+      EqPred ty1 ty2    -> check_eq_pred    dflags ctxt pred ty1 ty2
+      TuplePred tys     -> check_tuple_pred dflags ctxt pred tys
+      IrredPred _       -> check_irred_pred dflags ctxt pred
 
-        | tc `hasKey` eqTyConKey
-        , let [_, ty1, ty2] = tys
-        -> check_eq_pred dflags ctxt ty1 ty2
 
-        | isTupleTyCon tc
-        -> check_tuple_pred dflags ctxt pred tys
-  
-        | otherwise   -- X t1 t2, where X is presumably a
-                      -- type/data family returning ConstraintKind
-        -> check_irred_pred dflags ctxt pred tys
-
-  | (TyVarTy _, arg_tys) <- tcSplitAppTys pred
-  = check_irred_pred dflags ctxt pred arg_tys
-
-  | otherwise
-  = badPred pred
-
-badPred :: PredType -> TcM ()
-badPred pred = failWithTc (ptext (sLit "Malformed predicate") <+> quotes (ppr pred))
-
-check_class_pred :: DynFlags -> UserTypeCtxt -> Class -> [TcType] -> TcM ()
-check_class_pred dflags ctxt cls tys
+check_class_pred :: DynFlags -> UserTypeCtxt -> PredType -> Class -> [TcType] -> TcM ()
+check_class_pred dflags ctxt pred cls tys
   = do {        -- Class predicates are valid in all contexts
        ; checkTc (arity == n_tys) arity_err
+
+       ; checkTc (not (isIPClass cls) || okIPCtxt ctxt)
+                 (badIPPred pred)
 
                 -- Check the form of the argument types
        ; mapM_ checkValidMonoType tys
@@ -502,13 +498,23 @@ check_class_pred dflags ctxt cls tys
     arity_err  = arityErr "Class" class_name arity n_tys
     how_to_allow = parens (ptext (sLit "Use FlexibleContexts to permit this"))
 
+okIPCtxt :: UserTypeCtxt -> Bool
+  -- See Note [Implicit parameters in instance decls]
+okIPCtxt (ClassSCCtxt {})  = False
+okIPCtxt (InstDeclCtxt {}) = False
+okIPCtxt (SpecInstCtxt {}) = False
+okIPCtxt _                 = True
 
-check_eq_pred :: DynFlags -> UserTypeCtxt -> TcType -> TcType -> TcM ()
-check_eq_pred dflags _ctxt ty1 ty2
+badIPPred :: PredType -> SDoc
+badIPPred pred = ptext (sLit "Illegal implict parameter") <+> quotes (ppr pred)
+
+
+check_eq_pred :: DynFlags -> UserTypeCtxt -> PredType -> TcType -> TcType -> TcM ()
+check_eq_pred dflags _ctxt pred ty1 ty2
   = do {        -- Equational constraints are valid in all contexts if type
                 -- families are permitted
        ; checkTc (xopt Opt_TypeFamilies dflags || xopt Opt_GADTs dflags) 
-                 (eqPredTyErr (mkEqPred ty1 ty2))
+                 (eqPredTyErr pred)
 
                 -- Check the form of the argument types
        ; checkValidMonoType ty1
@@ -523,8 +529,8 @@ check_tuple_pred dflags ctxt pred ts
     -- This case will not normally be executed because 
     -- without -XConstraintKinds tuple types are only kind-checked as *
 
-check_irred_pred :: DynFlags -> UserTypeCtxt -> PredType -> [TcType] -> TcM ()
-check_irred_pred dflags ctxt pred arg_tys
+check_irred_pred :: DynFlags -> UserTypeCtxt -> PredType -> TcM ()
+check_irred_pred dflags ctxt pred
     -- The predicate looks like (X t1 t2) or (x t1 t2) :: Constraint
     -- But X is not a synonym; that's been expanded already
     --
@@ -541,9 +547,9 @@ check_irred_pred dflags ctxt pred arg_tys
     --
     -- It is equally dangerous to allow them in instance heads because in that case the
     -- Paterson conditions may not detect duplication of a type variable or size change.
-  = do { checkTc (xopt Opt_ConstraintKinds dflags)
+  = do { checkValidMonoType pred
+       ; checkTc (xopt Opt_ConstraintKinds dflags)
                  (predIrredErr pred)
-       ; mapM_ checkValidMonoType arg_tys
        ; unless (xopt Opt_UndecidableInstances dflags) $
                  -- Make sure it is OK to have an irred pred in this context
          checkTc (case ctxt of ClassSCCtxt _ -> False; InstDeclCtxt -> False; _ -> True)
