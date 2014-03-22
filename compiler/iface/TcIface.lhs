@@ -574,8 +574,7 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
   = do { tc_name     <- lookupIfaceTop ax_occ
        ; tc_tycon    <- tcIfaceTyCon tc
        ; tc_branches <- tc_ax_branches tc_tycon branches
-       ; let axiom = computeAxiomIncomps $
-                     CoAxiom { co_ax_unique   = nameUnique tc_name
+       ; let axiom = CoAxiom { co_ax_unique   = nameUnique tc_name
                              , co_ax_name     = tc_name
                              , co_ax_tc       = tc_tycon
                              , co_ax_role     = role
