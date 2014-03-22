@@ -1140,10 +1140,13 @@ The details are a bit tricky though:
    package to which :load'ed modules are added to.
 
  * So how do we arrange that declarations at the command prompt get
-   to be in the 'interactive' package?  By setting 'thisPackage' just
-   before the typecheck/rename step for command-line processing;
-   see the calls to HscTypes.setInteractivePackage in
-   HscMain.hscDeclsWithLocation and hscStmtWithLocation.
+   to be in the 'interactive' package?  Simply by setting the tcg_mod
+   field of the TcGblEnv to "interactive:Ghci1".  This is done by the
+   call to initTc in initTcInteractive, initTcForLookup, which in 
+   turn get the module from it 'icInteractiveModule' field of the 
+   interactive context.
+
+   The 'thisPackage' field stays as 'main' (or whatever -package-name says.
 
  * The main trickiness is that the type environment (tcg_type_env and
    fixity envt (tcg_fix_env) now contains entities from all the
