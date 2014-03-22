@@ -684,13 +684,19 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
               tc_args_to_keep = take n_args_to_keep tc_args
               inst_ty_kind    = typeKind (mkTyConApp tc tc_args_to_keep)
               dropped_tvs     = tyVarsOfTypes args_to_drop
-              mb_match        = tcUnifyTy inst_ty_kind cls_arg_kind
-              Just subst      = mb_match   -- See Note [Unify kinds in deriving]
-              -- We are assuming the tycon tyvars and the class tyvars are distinct
 
-              final_tc_args   = substTys subst tc_args_to_keep
-              final_cls_tys   = substTys subst cls_tys
-              univ_tvs        = mkVarSet deriv_tvs `unionVarSet` tyVarsOfTypes final_tc_args
+              -- Match up the kinds, and apply the resulting kind substitution
+              -- to the types.  See Note [Unify kinds in deriving]
+              -- We are assuming the tycon tyvars and the class tyvars are distinct
+              mb_match        = tcUnifyTy inst_ty_kind cls_arg_kind
+              Just kind_subst = mb_match 
+              (univ_kvs, univ_tvs) = partition isKindVar $ varSetElems $
+                                     mkVarSet deriv_tvs `unionVarSet` 
+                                     tyVarsOfTypes tc_args_to_keep
+              univ_kvs'           = filter (`notElemTvSubst` kind_subst) univ_kvs
+              (subst', univ_tvs') = mapAccumL substTyVarBndr kind_subst univ_tvs
+              final_tc_args       = substTys subst' tc_args_to_keep
+              final_cls_tys       = substTys subst' cls_tys
 
         ; traceTc "derivTyData1" (vcat [ pprTvBndrs tvs, ppr tc, ppr tc_args
                                        , pprTvBndrs (varSetElems $ tyVarsOfTypes tc_args)
@@ -703,9 +709,9 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
 
         ; traceTc "derivTyData2" (vcat [ ppr univ_tvs ])
 
-        ; checkTc (allDistinctTyVars args_to_drop &&            -- (a) and (b)
-                   univ_tvs `disjointVarSet` dropped_tvs)       -- (c)
-                  (derivingEtaErr cls cls_tys (mkTyConApp tc final_tc_args))
+        ; checkTc (allDistinctTyVars args_to_drop &&              -- (a) and (b)
+                   not (any (`elemVarSet` dropped_tvs) univ_tvs)) -- (c)
+                  (derivingEtaErr cls final_cls_tys (mkTyConApp tc final_tc_args))
                 -- Check that
                 --  (a) The args to drop are all type variables; eg reject:
                 --              data instance T a Int = .... deriving( Monad )
@@ -717,7 +723,7 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
                 --              newtype T a s = ... deriving( ST s )
                 --              newtype K a a = ... deriving( Monad )
 
-        ; mkEqnHelp (varSetElemsKvsFirst univ_tvs)
+        ; mkEqnHelp (univ_kvs' ++ univ_tvs')
                     cls final_cls_tys tc final_tc_args Nothing } }
 
 derivePolyKindedTypeable :: Class -> [Type]
@@ -773,10 +779,34 @@ So we need to
    kind arguments.
 
 In the two examples,
- * we unify ( T k (a:k) ) ~ (* -> *) to find k:=*.
- * we unify ( Either ~ (k -> k -> k) ) to find k:=*.
+ * we unify   kind-of( T k (a:k) ) ~ kind-of( Functor )
+         i.e.      (k -> *) ~ (* -> *)   to find k:=*.
+         yielding  k:=*
 
-Tricky stuff.
+ * we unify   kind-of( Either ) ~ kind-of( Category )
+         i.e.      (* -> * -> *)  ~ (k -> k -> k)
+         yielding  k:=*
+
+Now we get a kind substition.  We then need to:
+
+  1. Remove the substituted-out kind variables from the quantifed kind vars
+
+  2. Apply the substitution to the kinds of quantified *type* vars
+     (and extend the substitution to reflect this change)
+
+  3. Apply that extended substitution to the non-dropped args (types and
+     kinds) of the type and class
+
+Forgetting step (2) caused Trac #8893:
+  data V a = V [a] deriving Functor
+  data P (x::k->*) (a:k) = P (x a) deriving Functor
+  data C (x::k->*) (a:k) = C (V (P x a)) deriving Functor
+
+When deriving Functor for P, we unify k to *, but we then want
+an instance   $df :: forall (x:*->*). Functor x => Functor (P * (x:*->*))
+and similarly for C.  Notice the modifed kind of x, both at binding
+and occurrence sites.
+
 
 \begin{code}
 mkEqnHelp :: [TyVar]
