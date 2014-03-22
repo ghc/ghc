@@ -317,19 +317,18 @@ readInterfaceFiles name_cache_accessor pairs = do
 withGhc :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
 withGhc libDir flags ghcActs = runGhc (Just libDir) $ do
   dynflags  <- getSessionDynFlags
-  let dynflags' = gopt_set dynflags Opt_Haddock
-  let dynflags'' = dynflags' {
-      hscTarget = HscNothing,
-      ghcMode   = CompManager,
-      ghcLink   = NoLink
+  dynflags' <- parseGhcFlags (gopt_set dynflags Opt_Haddock) {
+    hscTarget = HscNothing,
+    ghcMode   = CompManager,
+    ghcLink   = NoLink
     }
-  dynflags''' <- parseGhcFlags dynflags''
-  defaultCleanupHandler dynflags''' $ do
+  let dynflags'' = gopt_unset dynflags' Opt_SplitObjs
+  defaultCleanupHandler dynflags'' $ do
       -- ignore the following return-value, which is a list of packages
       -- that may need to be re-linked: Haddock doesn't do any
       -- dynamic or static linking at all!
-      _ <- setSessionDynFlags dynflags'''
-      ghcActs dynflags'''
+      _ <- setSessionDynFlags dynflags''
+      ghcActs dynflags''
   where
     parseGhcFlags :: MonadIO m => DynFlags -> m DynFlags
     parseGhcFlags dynflags = do
