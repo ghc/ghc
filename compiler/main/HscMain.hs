@@ -1357,11 +1357,7 @@ hscStmtWithLocation hsc_env0 stmt source linenumber =
         Just parsed_stmt -> do
             -- Rename and typecheck it
             hsc_env <- getHscEnv
-            let interactive_hsc_env = setInteractivePackage hsc_env
-                  -- Bindings created here belong to the interactive package
-                  -- See Note [The interactive package] in HscTypes
-                  -- (NB: maybe not necessary, since Stmts bind only Ids)
-            (ids, tc_expr, fix_env) <- ioMsgMaybe $ tcRnStmt interactive_hsc_env parsed_stmt
+            (ids, tc_expr, fix_env) <- ioMsgMaybe $ tcRnStmt hsc_env parsed_stmt
 
             -- Desugar it
             ds_expr <- ioMsgMaybe $ deSugarExpr hsc_env tc_expr
@@ -1397,10 +1393,7 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
 
     {- Rename and typecheck it -}
     hsc_env <- getHscEnv
-    let interactive_hsc_env = setInteractivePackage hsc_env
-            -- Bindings created here belong to the interactive package
-            -- See Note [The interactive package] in HscTypes
-    tc_gblenv <- ioMsgMaybe $ tcRnDeclsi interactive_hsc_env decls
+    tc_gblenv <- ioMsgMaybe $ tcRnDeclsi hsc_env decls
 
     {- Grab the new instances -}
     -- We grab the whole environment because of the overlapping that may have
