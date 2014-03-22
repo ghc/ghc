@@ -54,6 +54,60 @@
 	path = libraries/random
 	url = ../packages/random.git
 	ignore = untracked
+[submodule "libraries/array"]
+	path = libraries/array
+	url = ../packages/array.git
+[submodule "libraries/deepseq"]
+	path = libraries/deepseq
+	url = ../packages/deepseq.git
+[submodule "libraries/directory"]
+	path = libraries/directory
+	url = ../packages/directory.git
+[submodule "libraries/filepath"]
+	path = libraries/filepath
+	url = ../packages/filepath.git
+[submodule "libraries/haskell98"]
+	path = libraries/haskell98
+	url = ../packages/haskell98.git
+[submodule "libraries/haskell2010"]
+	path = libraries/haskell2010
+	url = ../packages/haskell2010.git
+[submodule "libraries/hoopl"]
+	path = libraries/hoopl
+	url = ../packages/hoopl.git
+[submodule "libraries/hpc"]
+	path = libraries/hpc
+	url = ../packages/hpc.git
+[submodule "libraries/old-locale"]
+	path = libraries/old-locale
+	url = ../packages/old-locale.git
+[submodule "libraries/old-time"]
+	path = libraries/old-time
+	url = ../packages/old-time.git
+[submodule "libraries/process"]
+	path = libraries/process
+	url = ../packages/process.git
+[submodule "libraries/unix"]
+	path = libraries/unix
+	url = ../packages/unix.git
+[submodule "libraries/parallel"]
+	path = libraries/parallel
+	url = ../packages/parallel.git
+[submodule "libraries/stm"]
+	path = libraries/stm
+	url = ../packages/stm.git
+[submodule "libraries/dph"]
+	path = libraries/dph
+	url = ../packages/dph.git
 [submodule "utils/haddock"]
 	path = utils/haddock
 	url = ../haddock.git
+[submodule "nofib"]
+	path = nofib
+	url = ../nofib.git
+[submodule "utils/hsc2hs"]
+	path = utils/hsc2hs
+	url = ../hsc2hs.git
+[submodule "libffi-tarballs"]
+	path = libffi-tarballs
+	url = ../libffi-tarballs.git

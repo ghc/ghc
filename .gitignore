@@ -46,27 +46,6 @@ _darcs/
 # sub-repositories
 
 /ghc-tarballs/
-/libffi-tarballs/
-/libraries/array/
-/libraries/deepseq/
-/libraries/directory/
-/libraries/dph/
-/libraries/extensible-exceptions/
-/libraries/filepath/
-/libraries/haskell2010/
-/libraries/haskell98/
-/libraries/hoopl/
-/libraries/hpc/
-/libraries/mtl/
-/libraries/old-locale/
-/libraries/old-time/
-/libraries/parallel/
-/libraries/process/
-/libraries/stm/
-/libraries/unix/
-/libraries/utf8-string/
-/nofib/
-/utils/hsc2hs/
 
 # -----------------------------------------------------------------------------
 # Cabal dist directories
