@@ -22,14 +22,14 @@ StgWord64 hs_bswap64(StgWord64 x);
 /* TODO: longlong.c */
 
 /* libraries/ghc-prim/cbits/popcnt.c */
-StgWord hs_popcnt8(StgWord8 x);
-StgWord hs_popcnt16(StgWord16 x);
-StgWord hs_popcnt32(StgWord32 x);
+StgWord hs_popcnt8(StgWord x);
+StgWord hs_popcnt16(StgWord x);
+StgWord hs_popcnt32(StgWord x);
 StgWord hs_popcnt64(StgWord64 x);
 #ifdef i386_HOST_ARCH
-StgWord hs_popcnt(StgWord32 x);
+StgWord hs_popcnt(StgWord x);
 #else
-StgWord hs_popcnt(StgWord64 x);
+StgWord hs_popcnt(StgWord x);
 #endif
 
 /* libraries/ghc-prim/cbits/word2float.c */
