@@ -957,9 +957,9 @@ normaliseTcApp env role tc tys
 
   | otherwise   -- No unique matching family instance exists;
                 -- we do not do anything
-  = (Refl role ty, ty)
-  where
-    ty = mkTyConApp tc tys
+  = let (co, ntys) = normaliseTcArgs env role tc tys in
+    (co, mkTyConApp tc ntys)
+    
 
 ---------------
 normaliseTcArgs :: FamInstEnvs            -- environment with family instances
