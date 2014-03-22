@@ -1840,10 +1840,13 @@ matchFam tycon args
                 in return $ Just (co, ty) }
 
   | Just ax <- isClosedSynFamilyTyCon_maybe tycon
-  , Just (ind, inst_tys) <- chooseBranch ax args
-  = let co = mkTcAxInstCo Nominal ax ind inst_tys
-        ty = pSnd (tcCoercionKind co)
-    in return $ Just (co, ty)
+  = do { envs <- getFamInstEnvs
+       ; case chooseBranch envs ax args of
+           Just (ind, inst_tys) ->
+             let co = mkTcAxInstCo Nominal ax ind inst_tys
+                 ty = pSnd (tcCoercionKind co)
+             in return $ Just (co, ty)
+           Nothing -> return Nothing }
 
   | Just ops <- isBuiltInSynFamTyCon_maybe tycon =
     return $ do (r,ts,ty) <- sfMatchFam ops args

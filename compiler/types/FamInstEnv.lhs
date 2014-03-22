@@ -473,6 +473,69 @@ is apart from every previous *incompatible* branch. We don't check the
 branches that are compatible with the matching branch, because they are either
 irrelevant (clause 1 of compatible) or benign (clause 2 of compatible).
 
+Note [Recursive compatibility]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The compatibility check described in Note [Compatibility] is all well and good,
+but we can do better. Take the following very useful definition:
+
+data Nat = Zero | Succ Nat
+type family a + b where
+  Zero + a     = a                   -- (1)
+  b + Zero     = b                   -- (2)
+  (Succ c) + d = Succ (c + d)        -- (3)
+  e + (Succ f) = Succ (e + f)        -- (4)
+
+Under the original compatibility check, (3) is not compatible with (2). Let's
+see why. The unifier of the LHSs is {b |-> Succ c, d |-> Zero}. We apply this
+unifier to the RHSs to get (Succ c) and (Succ (c + Zero)). These two are
+syntactically different, so we conclude that the equations aren't compatible.
+This means that targets like (Succ Zero + Zero) don't reduce! This is terrible.
+
+The recursive compatibility check does a better job in two distinct ways than
+the original compatibility check:
+1) It unifies the previous equation with the target (not the later equation)
+to get the subst to use on the RHS. This leads to a more specific type on the
+right and might prove to be helpful during the check.
+2) It **normalises** the RHSs before checking. (Well, it checks for equality
+before normalising, too, but this is just an optimisation.)
+
+So, the enhanced rule is like this:
+
+Say we have a target t, matching equation e (with matching subst 'es')
+and previous equation d.
+
+- Unify d_lhs with t, producing subst ds. (If this unification fails, the
+check returns "not compatible".)
+- Check normalise(ds(d_rhs)) = normalise(ds(es(e_rhs))). If these equal, then
+return "compatible"; otherwise, return "not compatible".
+
+There is a subtle but vitally important point here. When we normalise the
+RHSs, we might encounter the very same closed type family that we're trying to
+reduce. To reduce that type family, we would have to find an equation to fire
+and perhaps do a compatibility check. If we then normalise during this
+recursive check, we'll fall into a black hole. So, we don't. Thus, **during
+normalisation of RHSs, the recursive compatibility check does not apply**.
+This is the reason for passing around NormalisationStrategy.
+
+NOTE: As of the original implementation (March 22, 2014), there are two
+important caveats.
+
+1) This is not compatible with -dcore-lint. So, expect -dcore-lint to complain
+if this feature comes into play.
+
+2) This is probably not type safe with UndecidableInstances. As noted in
+"Closed Type Families with Overlapping Equations" (POPL '14), we don't
+actually have a proof of type safety with non-linear patterns and
+non-terminating type families. But, we do have a proof with *either* linear
+patterns *or* terminating type families. (The latter proof appears in the
+paper.) We conjecture type safety for the combined system. However, the proof
+with linear patterns and non-termination *breaks* with this extra
+compatibility check. This breakage (which is quite fundamental, it seems)
+leads me (Richard E) to believe that, in fact, this check is not type safe
+with non-terminating type families. (The proof with non-linear patterns and
+terminating type families does not break at first glance, but I have not
+Thought Hard about it.)
+
 \begin{code}
 
 -- See Note [Compatibility]
@@ -789,6 +852,7 @@ but we also need to handle closed ones when normalising a type:
 
 \begin{code}
 reduceTyFamApp_maybe :: FamInstEnvs -> Role -> TyCon -> [Type] -> Maybe (Coercion, Type)
+reduceTyFamApp_maybe envs = reduce_ty_fam_app_maybe envs Normalise
 -- Attempt to do a *one-step* reduction of a type-family application
 -- It first normalises the type arguments, wrt functions but *not* newtypes,
 -- to be sure that nested calls like
@@ -798,7 +862,9 @@ reduceTyFamApp_maybe :: FamInstEnvs -> Role -> TyCon -> [Type] -> Maybe (Coercio
 -- The TyCon can be oversaturated.
 -- Works on both open and closed families
 
-reduceTyFamApp_maybe envs role tc tys
+reduce_ty_fam_app_maybe :: FamInstEnvs -> NormalisationStrategy
+                        -> Role -> TyCon -> [Type] -> Maybe (Coercion, Type)
+reduce_ty_fam_app_maybe envs ns role tc tys
   | isOpenFamilyTyCon tc
   , [FamInstMatch { fim_instance = fam_inst
                   , fim_tys =      inst_tys }] <- lookupFamInstEnv envs tc ntys
@@ -808,7 +874,7 @@ reduceTyFamApp_maybe envs role tc tys
     in Just (args_co `mkTransCo` co, ty)
 
   | Just ax <- isClosedSynFamilyTyCon_maybe tc
-  , Just (ind, inst_tys) <- chooseBranch ax ntys
+  , Just (ind, inst_tys) <- choose_branch envs ns ax ntys
   = let co     = mkAxInstCo role ax ind inst_tys
         ty     = pSnd (coercionKind co)
     in Just (args_co `mkTransCo` co, ty)
@@ -822,45 +888,90 @@ reduceTyFamApp_maybe envs role tc tys
   = Nothing
 
   where
-    (args_co, ntys) = normaliseTcArgs envs role tc tys
+    (args_co, ntys) = normalise_tc_args envs ns role tc tys
 
 
 -- The axiom can be oversaturated. (Closed families only.)
-chooseBranch :: CoAxiom Branched -> [Type] -> Maybe (BranchIndex, [Type])
-chooseBranch axiom tys
+chooseBranch :: FamInstEnvs -> CoAxiom Branched -> [Type] -> Maybe (BranchIndex, [Type])
+chooseBranch envs = choose_branch envs Normalise
+
+choose_branch :: FamInstEnvs -> NormalisationStrategy
+              -> CoAxiom Branched -> [Type] -> Maybe (BranchIndex, [Type])
+choose_branch envs ns axiom tys
   = do { let num_pats = coAxiomNumPats axiom
              (target_tys, extra_tys) = splitAt num_pats tys
              branches = coAxiomBranches axiom
-       ; (ind, inst_tys) <- findBranch (fromBranchList branches) 0 target_tys
-       ; return (ind, inst_tys ++ extra_tys) }
+       ; (ind, inst_tys) <- findBranch envs ns (fromBranchList branches) 0 target_tys
+       ; return (ind, inst_tys `chkAppend` extra_tys) }
+
+-- when doing the call-site compatibility check,
+-- we sometimes wish to normalise the RHSs.
+-- During this normalisation, we must be careful not to use the compatibility
+-- check with normalisation, lest we fall into a black hole.
+-- See Note [Recursive compatibility]
+data NormalisationStrategy = Normalise
+                           | Don'tNormalise
+instance Outputable NormalisationStrategy where
+  ppr Normalise      = text "normalise"
+  ppr Don'tNormalise = text "don't normalise"
 
 -- The axiom must *not* be oversaturated
-findBranch :: [CoAxBranch]             -- branches to check
+findBranch :: FamInstEnvs
+           -> NormalisationStrategy
+           -> [CoAxBranch]             -- branches to check
            -> BranchIndex              -- index of current branch
            -> [Type]                   -- target types
            -> Maybe (BranchIndex, [Type])
-findBranch (CoAxBranch { cab_tvs = tpl_tvs, cab_lhs = tpl_lhs, cab_incomps = incomps }
-              : rest) ind target_tys
+findBranch envs ns (CoAxBranch { cab_tvs = tpl_tvs, cab_lhs = tpl_lhs
+                               , cab_incomps = incomps, cab_rhs = br_rhs }
+                   : rest) ind target_tys
   = case tcMatchTys (mkVarSet tpl_tvs) tpl_lhs target_tys of
       Just subst -- matching worked. now, check for apartness.
-        |  all (isSurelyApart
-                . tcUnifyTysFG instanceBindFun flattened_target
-                . coAxBranchLHS) incomps
+        |  all (no_conflict subst) incomps
         -> -- matching worked & we're apart from all incompatible branches. success
            Just (ind, substTyVars subst tpl_tvs)
 
       -- failure. keep looking
-      _ -> findBranch rest (ind+1) target_tys
+      _ -> findBranch envs ns rest (ind+1) target_tys
 
-  where isSurelyApart SurelyApart = True
-        isSurelyApart _           = False
+  where
+    isSurelyApart SurelyApart = True
+    isSurelyApart _           = False
 
-        flattened_target = flattenTys in_scope target_tys
-        in_scope = mkInScopeSet (unionVarSets $
-                                 map (tyVarsOfTypes . coAxBranchLHS) incomps)
+    flattened_target = flattenTys in_scope target_tys
+    in_scope = mkInScopeSet (unionVarSets $
+                             map (tyVarsOfTypes . coAxBranchLHS) incomps)
 
+    no_conflict br_subst (CoAxBranch { cab_lhs = prev_lhs, cab_rhs = prev_rhs })
+      = nc_apart || nc_compatible
+      where
+        nc_apart = isSurelyApart $
+                   tcUnifyTysFG instanceBindFun flattened_target prev_lhs
+
+        -- See Note [Recursive compatibility]
+        nc_compatible
+          = case tcUnifyTys instanceBindFun target_tys prev_lhs of
+              Nothing -> False
+              Just prev_subst ->
+                let substed_prev_rhs = Type.substTy prev_subst prev_rhs
+                    substed_br_rhs   = Type.substTy prev_subst $
+                                       Type.substTy br_subst br_rhs
+                    unnormalised_compat = substed_prev_rhs `eqType` substed_br_rhs
+
+                      -- with Don'tNormalise, these will never be forced
+                    normalised_prev_rhs = normalise substed_prev_rhs
+                    normalised_br_rhs   = normalise substed_br_rhs
+                    normalised_compat
+                      = case ns of
+                          Normalise -> normalised_prev_rhs `eqType` normalised_br_rhs
+                          Don'tNormalise -> False
+                in
+                unnormalised_compat || normalised_compat
+
+    normalise ty = snd $ normalise_type envs ns Nominal ty
+    
 -- fail if no branches left
-findBranch [] _ _ = Nothing
+findBranch _ _ [] _ _ = Nothing
 
 \end{code}
 
@@ -950,29 +1061,33 @@ topNormaliseType_maybe env ty
 
 ---------------
 normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
-normaliseTcApp env role tc tys
-  | Just (first_co, ty') <- reduceTyFamApp_maybe env role tc tys
+normaliseTcApp env = normalise_tc_app env Normalise
+
+normalise_tc_app :: FamInstEnvs -> NormalisationStrategy
+                 -> Role -> TyCon -> [Type] -> (Coercion, Type)
+normalise_tc_app env ns role tc tys
+  | Just (first_co, ty') <- reduce_ty_fam_app_maybe env ns role tc tys
   = let    -- A reduction is possible
-        (rest_co,nty) = normaliseType env role ty'
+        (rest_co,nty) = normalise_type env ns role ty'
     in
     (first_co `mkTransCo` rest_co, nty)
 
   | otherwise   -- No unique matching family instance exists;
-                -- we do not do anything
-  = let (co, ntys) = normaliseTcArgs env role tc tys in
+                -- we recur
+  = let (co, ntys) = normalise_tc_args env ns role tc tys in
     (co, mkTyConApp tc ntys)
-    
 
 ---------------
-normaliseTcArgs :: FamInstEnvs            -- environment with family instances
-                -> Role                   -- desired role of output coercion
-                -> TyCon -> [Type]        -- tc tys
-                -> (Coercion, [Type])      -- (co, new_tys), where
-                                          -- co :: tc tys ~ tc new_tys
-normaliseTcArgs env role tc tys
+normalise_tc_args :: FamInstEnvs            -- environment with family instances
+                  -> NormalisationStrategy
+                  -> Role                   -- desired role of output coercion
+                  -> TyCon -> [Type]        -- tc tys
+                  -> (Coercion, [Type])     -- (co, new_tys), where
+                                            -- co :: tc tys ~ tc new_tys
+normalise_tc_args env ns role tc tys
   = (mkTyConAppCo role tc cois, ntys)
   where
-    (cois, ntys) = zipWithAndUnzip (normaliseType env) (tyConRolesX role tc) tys
+    (cois, ntys) = zipWithAndUnzip (normalise_type env ns) (tyConRolesX role tc) tys
 
 ---------------
 normaliseType :: FamInstEnvs            -- environment with family instances
@@ -980,26 +1095,34 @@ normaliseType :: FamInstEnvs            -- environment with family instances
               -> Type                   -- old type
               -> (Coercion, Type)       -- (coercion,new type), where
                                         -- co :: old-type ~ new_type
+normaliseType envs = normalise_type envs Normalise
+
+normalise_type :: FamInstEnvs            -- environment with family instances
+               -> NormalisationStrategy  -- use compatibility?
+               -> Role                   -- desired role of output coercion
+               -> Type                   -- old type
+               -> (Coercion, Type)       -- (coercion,new type), where
+                                         -- co :: old-type ~ new_type
 -- Normalise the input type, by eliminating *all* type-function redexes
 -- Returns with Refl if nothing happens
 
-normaliseType env role ty
-  | Just ty' <- coreView ty = normaliseType env role ty'
-normaliseType env role (TyConApp tc tys)
-  = normaliseTcApp env role tc tys
-normaliseType _env role ty@(LitTy {}) = (Refl role ty, ty)
-normaliseType env role (AppTy ty1 ty2)
-  = let (coi1,nty1) = normaliseType env role    ty1
-        (coi2,nty2) = normaliseType env Nominal ty2
+normalise_type env ns role ty
+  | Just ty' <- coreView ty = normalise_type env ns role ty'
+normalise_type env ns role (TyConApp tc tys)
+  = normalise_tc_app env ns role tc tys
+normalise_type _env _ns role ty@(LitTy {}) = (Refl role ty, ty)
+normalise_type env ns role (AppTy ty1 ty2)
+  = let (coi1,nty1) = normalise_type env ns role    ty1
+        (coi2,nty2) = normalise_type env ns Nominal ty2
     in  (mkAppCo coi1 coi2, mkAppTy nty1 nty2)
-normaliseType env role (FunTy ty1 ty2)
-  = let (coi1,nty1) = normaliseType env role ty1
-        (coi2,nty2) = normaliseType env role ty2
+normalise_type env ns role (FunTy ty1 ty2)
+  = let (coi1,nty1) = normalise_type env ns role ty1
+        (coi2,nty2) = normalise_type env ns role ty2
     in  (mkFunCo role coi1 coi2, mkFunTy nty1 nty2)
-normaliseType env role (ForAllTy tyvar ty1)
-  = let (coi,nty1) = normaliseType env role ty1
+normalise_type env ns role (ForAllTy tyvar ty1)
+  = let (coi,nty1) = normalise_type env ns role ty1
     in  (mkForAllCo tyvar coi, ForAllTy tyvar nty1)
-normaliseType _  role ty@(TyVarTy _)
+normalise_type _ _ role ty@(TyVarTy _)
   = (Refl role ty,ty)
 \end{code}
 
