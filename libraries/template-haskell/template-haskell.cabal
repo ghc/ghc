@@ -1,6 +1,6 @@
 name:           template-haskell
-version:        2.9.0.0
--- GHC 7.6.1 released with 2.8.0.0
+version:        2.10.0.0
+-- GHC 7.8.1 released with 2.9.0.0
 license:        BSD3
 license-file:   LICENSE
 category:       Template Haskell
@@ -23,7 +23,7 @@ source-repository head
 source-repository this
     type:     git
     location: http://git.haskell.org/packages/template-haskell.git
-    tag:      template-haskell-2.9.0.0-release
+    tag:      template-haskell-2.10.0.0-release
 
 Library
     default-language: Haskell2010
