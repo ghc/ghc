@@ -100,7 +100,7 @@ Changes in version 2.11.0
 
  * Improved --qual option (no crashes, proper error messages)
 
- * A new --qual option "aliased" which qualifies identifers by the module alias
+ * A new --qual option "aliased" which qualifies identifiers by the module alias
    used in the source code
 
  * The Haddock API restores GHC's static flags after invocation
@@ -279,7 +279,7 @@ Changed in version 2.5.0:
 
   * Add --use-unicode flag for displaying prettier versions of common symbols
 
-  * Mutiple verbosity levels: remove --verbose and add --verbosity=n
+  * Multiple verbosity levels: remove --verbose and add --verbosity=n
 
 -----------------------------------------------------------------------------
 
@@ -308,7 +308,7 @@ Changed in version 2.4.2:
 
   * Do not indicate that a constructor argument is unboxed
 
-  * Fix problem with with non-working links to ghc-prim
+  * Fix problem with non-working links to ghc-prim
 
   * Allow referring to a specific section within a module in a module link
     (#65)
@@ -404,7 +404,7 @@ Changes in version 2.0.0.0:
   * Haddock can generate documentation for some of the language extensions
     in GHC 6.8.2
 
-  * Format of module attributes has changed. The only way of specifiying
+  * Format of module attributes has changed. The only way of specifying
     module attributes is via a new OPTIONS_HADDOCK pragma. Example:
     {-# OPTIONS_HADDOCK hide, prune #-}
 
