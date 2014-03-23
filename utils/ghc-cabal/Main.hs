@@ -452,7 +452,8 @@ generate directory distdir dll0Modules config_args
                 "$(eval $(" ++ directory ++ "_PACKAGE_MAGIC))"
                 ]
       writeFile (distdir ++ "/package-data.mk") $ unlines xs
-      writeFile (distdir ++ "/haddock-prologue.txt") $
+
+      writeFileUtf8 (distdir ++ "/haddock-prologue.txt") $
           if null (description pd) then synopsis pd
                                    else description pd
       unless (null dll0Modules) $
@@ -475,3 +476,8 @@ generate directory distdir dll0Modules config_args
      mkSearchPath = intercalate [searchPathSeparator]
      boolToYesNo True = "YES"
      boolToYesNo False = "NO"
+
+     -- | Version of 'writeFile' that always uses UTF8 encoding
+     writeFileUtf8 f txt = withFile f WriteMode $ \hdl -> do
+         hSetEncoding hdl utf8
+         hPutStr hdl txt
