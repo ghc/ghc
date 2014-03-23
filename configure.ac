@@ -498,7 +498,6 @@ dnl --------------------------------------------------------------
 FP_ARG_WITH_PATH_GNU_PROG([RANLIB], [ranlib], [ranlib])
 RanlibCmd="$RANLIB"
 RANLIB="$RanlibCmd"
-AC_SUBST([RanlibCmd])
 
 
 # Note: we may not have objdump on OS X, and we only need it on Windows (for DLL checks)
