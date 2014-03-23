@@ -10,7 +10,7 @@ import Utils
 import Tar
 
 -- We can't just compare plain filenames, because versions numbers of GHC
--- and the libaries will vary. So we use FilenameDescr instead, which
+-- and the libraries will vary. So we use FilenameDescr instead, which
 -- abstracts out the version numbers.
 type FilenameDescr = [FilenameDescrBit]
 data FilenameDescrBit = VersionOf String
