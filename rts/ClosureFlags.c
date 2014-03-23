@@ -81,9 +81,13 @@ StgWord16 closure_flags[] = {
  [ATOMICALLY_FRAME]     =  (     _BTM                                  ),
  [CATCH_RETRY_FRAME]    =  (     _BTM                                  ),
  [CATCH_STM_FRAME]      =  (     _BTM                                  ),
- [WHITEHOLE]            =  ( 0                                         )
+ [WHITEHOLE]            =  ( 0                                         ),
+ [SMALL_MUT_ARR_PTRS_CLEAN]   =  (_HNF|     _NS|         _MUT|_UPT           ),
+ [SMALL_MUT_ARR_PTRS_DIRTY]   =  (_HNF|     _NS|         _MUT|_UPT           ),
+ [SMALL_MUT_ARR_PTRS_FROZEN0] =  (_HNF|     _NS|         _MUT|_UPT           ),
+ [SMALL_MUT_ARR_PTRS_FROZEN]  =  (_HNF|     _NS|              _UPT           )
 };
 
-#if N_CLOSURE_TYPES != 61
+#if N_CLOSURE_TYPES != 65
 #error Closure types changed: update ClosureFlags.c!
 #endif

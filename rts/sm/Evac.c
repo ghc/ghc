@@ -716,6 +716,14 @@ loop:
       copy(p,info,q,mut_arr_ptrs_sizeW((StgMutArrPtrs *)q),gen_no);
       return;
 
+  case SMALL_MUT_ARR_PTRS_CLEAN:
+  case SMALL_MUT_ARR_PTRS_DIRTY:
+  case SMALL_MUT_ARR_PTRS_FROZEN:
+  case SMALL_MUT_ARR_PTRS_FROZEN0:
+      // just copy the block 
+      copy(p,info,q,small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)q),gen_no);
+      return;
+
   case TSO:
       copy(p,info,q,sizeofW(StgTSO),gen_no);
       return;

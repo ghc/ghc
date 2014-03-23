@@ -806,6 +806,10 @@
       __gen = TO_W_(bdescr_gen_no(__bd));                       \
       if (__gen > 0) { recordMutableCap(__p, __gen); }
 
+/* -----------------------------------------------------------------------------
+   Arrays
+   -------------------------------------------------------------------------- */
+
 /* Complete function body for the clone family of (mutable) array ops.
    Defined as a macro to avoid function call overhead or code
    duplication. */
@@ -889,5 +893,34 @@
     __end_card = mutArrPtrCardDown((dst_off) + (n) - 1);       \
     __cards = __end_card - __start_card + 1;                   \
     prim %memset((dst_cards_p) + __start_card, 1, __cards, 1);
+
+/* Complete function body for the clone family of small (mutable)
+   array ops. Defined as a macro to avoid function call overhead or
+   code duplication. */
+#define cloneSmallArray(info, src, offset, n)                  \
+    W_ words, size;                                            \
+    gcptr dst, dst_p, src_p;                                   \
+                                                               \
+    again: MAYBE_GC(again);                                    \
+                                                               \
+    words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;       \
+    ("ptr" dst) = ccall allocate(MyCapability() "ptr", words); \
+    TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);     \
+                                                               \
+    SET_HDR(dst, info, CCCS);                                  \
+    StgSmallMutArrPtrs_ptrs(dst) = n;                          \
+                                                               \
+    dst_p = dst + SIZEOF_StgSmallMutArrPtrs;                   \
+    src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(offset);     \
+  while:                                                       \
+    if (n != 0) {                                              \
+        n = n - 1;                                             \
+        W_[dst_p] = W_[src_p];                                 \
+        dst_p = dst_p + WDS(1);                                \
+        src_p = src_p + WDS(1);                                \
+        goto while;                                            \
+    }                                                          \
+                                                               \
+    return (dst);
 
 #endif /* CMM_H */

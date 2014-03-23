@@ -26,7 +26,7 @@ module SMRep (
 
         -- ** Construction
         mkHeapRep, blackHoleRep, indStaticRep, mkStackRep, mkRTSRep, arrPtrsRep,
-        arrWordsRep,
+        smallArrPtrsRep, arrWordsRep,
 
         -- ** Predicates
         isStaticRep, isConRep, isThunkRep, isFunRep, isStaticNoCafCon,
@@ -34,8 +34,10 @@ module SMRep (
 
         -- ** Size-related things
         heapClosureSizeW,
-        fixedHdrSize, arrWordsHdrSize, arrWordsHdrSizeW, arrPtrsHdrSize,
+        fixedHdrSizeW, arrWordsHdrSize, arrWordsHdrSizeW, arrPtrsHdrSize,
         arrPtrsHdrSizeW, profHdrSize, thunkHdrSize, nonHdrSize, nonHdrSizeW,
+        smallArrPtrsHdrSize, smallArrPtrsHdrSizeW, hdrSize, hdrSizeW,
+        fixedHdrSize,
 
         -- ** RTS closure types
         rtsClosureType, rET_SMALL, rET_BIG,
@@ -158,6 +160,9 @@ data SMRep
         !WordOff        -- # ptr words
         !WordOff        -- # card table words
 
+  | SmallArrayPtrsRep
+        !WordOff        -- # ptr words
+
   | ArrayWordsRep
         !WordOff        -- # bytes expressed in words, rounded up
 
@@ -245,6 +250,9 @@ indStaticRep = HeapRep True 1 0 IndStatic
 arrPtrsRep :: DynFlags -> WordOff -> SMRep
 arrPtrsRep dflags elems = ArrayPtrsRep elems (cardTableSizeW dflags elems)
 
+smallArrPtrsRep :: WordOff -> SMRep
+smallArrPtrsRep elems = SmallArrayPtrsRep elems
+
 arrWordsRep :: DynFlags -> ByteOff -> SMRep
 arrWordsRep dflags bytes = ArrayWordsRep (bytesToWordsRoundUp dflags bytes)
 
@@ -286,9 +294,12 @@ isStaticNoCafCon _                           = False
 -----------------------------------------------------------------------------
 -- Size-related things
 
+fixedHdrSize :: DynFlags -> ByteOff
+fixedHdrSize dflags = wordsToBytes dflags (fixedHdrSizeW dflags)
+
 -- | Size of a closure header (StgHeader in includes/rts/storage/Closures.h)
-fixedHdrSize :: DynFlags -> WordOff
-fixedHdrSize dflags = sTD_HDR_SIZE dflags + profHdrSize dflags
+fixedHdrSizeW :: DynFlags -> WordOff
+fixedHdrSizeW dflags = sTD_HDR_SIZE dflags + profHdrSize dflags
 
 -- | Size of the profiling part of a closure header
 -- (StgProfHeader in includes/rts/storage/Closures.h)
@@ -300,31 +311,50 @@ profHdrSize dflags
 -- | The garbage collector requires that every closure is at least as
 --   big as this.
 minClosureSize :: DynFlags -> WordOff
-minClosureSize dflags = fixedHdrSize dflags + mIN_PAYLOAD_SIZE dflags
+minClosureSize dflags = fixedHdrSizeW dflags + mIN_PAYLOAD_SIZE dflags
 
 arrWordsHdrSize :: DynFlags -> ByteOff
 arrWordsHdrSize dflags
- = fixedHdrSize dflags * wORD_SIZE dflags + sIZEOF_StgArrWords_NoHdr dflags
+ = fixedHdrSize dflags + sIZEOF_StgArrWords_NoHdr dflags
 
 arrWordsHdrSizeW :: DynFlags -> WordOff
 arrWordsHdrSizeW dflags =
-    fixedHdrSize dflags +
+    fixedHdrSizeW dflags +
     (sIZEOF_StgArrWords_NoHdr dflags `quot` wORD_SIZE dflags)
 
 arrPtrsHdrSize :: DynFlags -> ByteOff
 arrPtrsHdrSize dflags
- = fixedHdrSize dflags * wORD_SIZE dflags + sIZEOF_StgMutArrPtrs_NoHdr dflags
+ = fixedHdrSize dflags + sIZEOF_StgMutArrPtrs_NoHdr dflags
 
 arrPtrsHdrSizeW :: DynFlags -> WordOff
 arrPtrsHdrSizeW dflags =
-    fixedHdrSize dflags +
+    fixedHdrSizeW dflags +
     (sIZEOF_StgMutArrPtrs_NoHdr dflags `quot` wORD_SIZE dflags)
+
+smallArrPtrsHdrSize :: DynFlags -> ByteOff
+smallArrPtrsHdrSize dflags
+ = fixedHdrSize dflags + sIZEOF_StgSmallMutArrPtrs_NoHdr dflags
+
+smallArrPtrsHdrSizeW :: DynFlags -> WordOff
+smallArrPtrsHdrSizeW dflags =
+    fixedHdrSizeW dflags +
+    (sIZEOF_StgSmallMutArrPtrs_NoHdr dflags `quot` wORD_SIZE dflags)
 
 -- Thunks have an extra header word on SMP, so the update doesn't
 -- splat the payload.
 thunkHdrSize :: DynFlags -> WordOff
-thunkHdrSize dflags = fixedHdrSize dflags + smp_hdr
+thunkHdrSize dflags = fixedHdrSizeW dflags + smp_hdr
         where smp_hdr = sIZEOF_StgSMPThunkHeader dflags `quot` wORD_SIZE dflags
+
+hdrSize :: DynFlags -> SMRep -> ByteOff
+hdrSize dflags rep = wordsToBytes dflags (hdrSizeW dflags rep)
+
+hdrSizeW :: DynFlags -> SMRep -> WordOff
+hdrSizeW dflags (HeapRep _ _ _ ty)    = closureTypeHdrSize dflags ty
+hdrSizeW dflags (ArrayPtrsRep _ _)    = arrPtrsHdrSizeW dflags
+hdrSizeW dflags (SmallArrayPtrsRep _) = smallArrPtrsHdrSizeW dflags
+hdrSizeW dflags (ArrayWordsRep _)     = arrWordsHdrSizeW dflags
+hdrSizeW _ _                          = panic "SMRep.hdrSizeW"
 
 nonHdrSize :: DynFlags -> SMRep -> ByteOff
 nonHdrSize dflags rep = wordsToBytes dflags (nonHdrSizeW rep)
@@ -332,6 +362,7 @@ nonHdrSize dflags rep = wordsToBytes dflags (nonHdrSizeW rep)
 nonHdrSizeW :: SMRep -> WordOff
 nonHdrSizeW (HeapRep _ p np _) = p + np
 nonHdrSizeW (ArrayPtrsRep elems ct) = elems + ct
+nonHdrSizeW (SmallArrayPtrsRep elems) = elems
 nonHdrSizeW (ArrayWordsRep words) = words
 nonHdrSizeW (StackRep bs)      = length bs
 nonHdrSizeW (RTSRep _ rep)     = nonHdrSizeW rep
@@ -342,6 +373,8 @@ heapClosureSizeW dflags (HeapRep _ p np ty)
  = closureTypeHdrSize dflags ty + p + np
 heapClosureSizeW dflags (ArrayPtrsRep elems ct)
  = arrPtrsHdrSizeW dflags + elems + ct
+heapClosureSizeW dflags (SmallArrayPtrsRep elems)
+ = smallArrPtrsHdrSizeW dflags + elems
 heapClosureSizeW dflags (ArrayWordsRep words)
  = arrWordsHdrSizeW dflags + words
 heapClosureSizeW _ _ = panic "SMRep.heapClosureSize"
@@ -352,7 +385,7 @@ closureTypeHdrSize dflags ty = case ty of
                   ThunkSelector{} -> thunkHdrSize dflags
                   BlackHole{}     -> thunkHdrSize dflags
                   IndStatic{}     -> thunkHdrSize dflags
-                  _               -> fixedHdrSize dflags
+                  _               -> fixedHdrSizeW dflags
         -- All thunks use thunkHdrSize, even if they are non-updatable.
         -- this is because we don't have separate closure types for
         -- updatable vs. non-updatable thunks, so the GC can't tell the
@@ -471,6 +504,8 @@ instance Outputable SMRep where
        pp_n s n = int n <+> text s
 
    ppr (ArrayPtrsRep size _) = ptext (sLit "ArrayPtrsRep") <+> ppr size
+
+   ppr (SmallArrayPtrsRep size) = ptext (sLit "SmallArrayPtrsRep") <+> ppr size
 
    ppr (ArrayWordsRep words) = ptext (sLit "ArrayWordsRep") <+> ppr words
 

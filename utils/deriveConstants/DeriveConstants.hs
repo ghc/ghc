@@ -391,6 +391,9 @@ wanteds = concat
           ,closureField Both "StgMutArrPtrs" "ptrs"
           ,closureField Both "StgMutArrPtrs" "size"
 
+          ,closureSize  Both "StgSmallMutArrPtrs"
+          ,closureField Both "StgSmallMutArrPtrs" "ptrs"
+
           ,closureSize    Both "StgArrWords"
           ,closureField   Both "StgArrWords" "bytes"
           ,closurePayload C    "StgArrWords" "payload"

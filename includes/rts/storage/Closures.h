@@ -158,6 +158,12 @@ typedef struct {
 
 typedef struct {
     StgHeader   header;
+    StgWord     ptrs;
+    StgClosure *payload[FLEXIBLE_ARRAY];
+} StgSmallMutArrPtrs;
+
+typedef struct {
+    StgHeader   header;
     StgClosure *var;
 } StgMutVar;
 

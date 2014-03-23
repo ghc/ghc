@@ -287,7 +287,7 @@ mkRhsClosure    dflags bndr _cc _bi
     maybe_offset          = assocMaybe params_w_offsets (NonVoid selectee)
     Just the_offset       = maybe_offset
     offset_into_int       = bytesToWordsRoundUp dflags the_offset
-                             - fixedHdrSize dflags
+                             - fixedHdrSizeW dflags
 
 ---------- Note [Ap thunks] ------------------
 mkRhsClosure    dflags bndr _cc _bi
@@ -621,7 +621,7 @@ emitBlackHoleCode node = do
              -- work with profiling.
 
   when eager_blackholing $ do
-    emitStore (cmmOffsetW dflags node (fixedHdrSize dflags))
+    emitStore (cmmOffsetW dflags node (fixedHdrSizeW dflags))
                   (CmmReg (CmmGlobal CurrentTSO))
     emitPrimCall [] MO_WriteBarrier []
     emitStore node (CmmReg (CmmGlobal EagerBlackholeInfo))
@@ -673,7 +673,7 @@ pushUpdateFrame lbl updatee body
        updfr  <- getUpdFrameOff
        dflags <- getDynFlags
        let
-           hdr         = fixedHdrSize dflags * wORD_SIZE dflags
+           hdr         = fixedHdrSize dflags
            frame       = updfr + hdr + sIZEOF_StgUpdateFrame_NoHdr dflags
        --
        emitUpdateFrame dflags (CmmStackSlot Old frame) lbl updatee
@@ -682,7 +682,7 @@ pushUpdateFrame lbl updatee body
 emitUpdateFrame :: DynFlags -> CmmExpr -> CLabel -> CmmExpr -> FCode ()
 emitUpdateFrame dflags frame lbl updatee = do
   let
-           hdr         = fixedHdrSize dflags * wORD_SIZE dflags
+           hdr         = fixedHdrSize dflags
            off_updatee = hdr + oFFSET_StgUpdateFrame_updatee dflags
   --
   emitStore frame (mkLblExpr lbl)

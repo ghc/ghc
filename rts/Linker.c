@@ -1168,6 +1168,15 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_thawArrayzh)                                    \
       SymI_HasProto(stg_newArrayArrayzh)                                \
       SymI_HasProto(stg_casArrayzh)                                     \
+      SymI_HasProto(stg_newSmallArrayzh)                                \
+      SymI_HasProto(stg_unsafeThawSmallArrayzh)                         \
+      SymI_HasProto(stg_cloneSmallArrayzh)                              \
+      SymI_HasProto(stg_cloneSmallMutableArrayzh)                       \
+      SymI_HasProto(stg_freezzeSmallArrayzh)                            \
+      SymI_HasProto(stg_thawSmallArrayzh)                               \
+      SymI_HasProto(stg_copySmallArrayzh)                               \
+      SymI_HasProto(stg_copySmallMutableArrayzh)                        \
+      SymI_HasProto(stg_casSmallArrayzh)                                \
       SymI_HasProto(stg_newBCOzh)                                       \
       SymI_HasProto(stg_newByteArrayzh)                                 \
       SymI_HasProto(stg_casIntArrayzh)                                  \

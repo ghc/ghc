@@ -933,6 +933,11 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
                              code <- parg_ArrayishRep (fromIntegral (arrPtrsHdrSize dflags)) d p a
                              return ((code,AddrRep):rest)
 
+                     | t == smallArrayPrimTyCon || t == smallMutableArrayPrimTyCon
+                       -> do rest <- pargs (d + fromIntegral addr_sizeW) az
+                             code <- parg_ArrayishRep (fromIntegral (smallArrPtrsHdrSize dflags)) d p a
+                             return ((code,AddrRep):rest)
+
                      | t == byteArrayPrimTyCon || t == mutableByteArrayPrimTyCon
                        -> do rest <- pargs (d + fromIntegral addr_sizeW) az
                              code <- parg_ArrayishRep (fromIntegral (arrWordsHdrSize dflags)) d p a

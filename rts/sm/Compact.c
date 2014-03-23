@@ -495,6 +495,21 @@ update_fwd_large( bdescr *bd )
           continue;
       }
 
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN:
+    case SMALL_MUT_ARR_PTRS_FROZEN0:
+      // follow everything 
+      {
+          StgSmallMutArrPtrs *a;
+
+          a = (StgSmallMutArrPtrs*)p;
+          for (p = (P_)a->payload; p < (P_)&a->payload[a->ptrs]; p++) {
+              thread((StgClosure **)p);
+          }
+          continue;
+      }
+
     case STACK:
     {
         StgStack *stack = (StgStack*)p;
@@ -679,6 +694,22 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	}
 
 	return (StgPtr)a + mut_arr_ptrs_sizeW(a);
+    }
+
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN:
+    case SMALL_MUT_ARR_PTRS_FROZEN0:
+	// follow everything 
+    {
+        StgSmallMutArrPtrs *a;
+
+        a = (StgSmallMutArrPtrs *)p;
+	for (p = (P_)a->payload; p < (P_)&a->payload[a->ptrs]; p++) {
+	    thread((StgClosure **)p);
+	}
+
+	return (StgPtr)a + small_mut_arr_ptrs_sizeW(a);
     }
     
     case TSO:

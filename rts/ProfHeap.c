@@ -1025,6 +1025,14 @@ heapCensusChain( Census *census, bdescr *bd )
 		prim = rtsTrue;
 		size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
 		break;
+
+	    case SMALL_MUT_ARR_PTRS_CLEAN:
+	    case SMALL_MUT_ARR_PTRS_DIRTY:
+	    case SMALL_MUT_ARR_PTRS_FROZEN:
+	    case SMALL_MUT_ARR_PTRS_FROZEN0:
+		prim = rtsTrue;
+		size = small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)p);
+		break;
 		
 	    case TSO:
 		prim = rtsTrue;

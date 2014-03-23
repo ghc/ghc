@@ -404,7 +404,7 @@ mkVirtHeapOffsets dflags is_thunk things
     )
   where
     hdr_words | is_thunk   = thunkHdrSize dflags
-              | otherwise  = fixedHdrSize dflags
+              | otherwise  = fixedHdrSizeW dflags
     hdr_bytes = wordsToBytes dflags hdr_words
 
     non_void_things    = filterOut (isVoidRep . fst)  things

@@ -796,7 +796,7 @@ primop  CloneArrayOp "cloneArray#" GenPrimOp
   with
   out_of_line      = True
   has_side_effects = True
-  code_size = { primOpCodeSizeForeignCall + 4 }
+  can_fail         = True
 
 primop  CloneMutableArrayOp "cloneMutableArray#" GenPrimOp
   MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
@@ -807,7 +807,7 @@ primop  CloneMutableArrayOp "cloneMutableArray#" GenPrimOp
   with
   out_of_line      = True
   has_side_effects = True
-  code_size = { primOpCodeSizeForeignCall + 4 }
+  can_fail         = True
 
 primop  FreezeArrayOp "freezeArray#" GenPrimOp
   MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, Array# a #)
@@ -818,7 +818,7 @@ primop  FreezeArrayOp "freezeArray#" GenPrimOp
   with
   out_of_line      = True
   has_side_effects = True
-  code_size = { primOpCodeSizeForeignCall + 4 }
+  can_fail         = True
 
 primop  ThawArrayOp "thawArray#" GenPrimOp
   Array# a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
@@ -829,7 +829,7 @@ primop  ThawArrayOp "thawArray#" GenPrimOp
   with
   out_of_line      = True
   has_side_effects = True
-  code_size = { primOpCodeSizeForeignCall + 4 }
+  can_fail         = True
 
 primop CasArrayOp  "casArray#" GenPrimOp
    MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
@@ -838,6 +838,154 @@ primop CasArrayOp  "casArray#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+
+------------------------------------------------------------------------
+section "Small Arrays"
+
+	{Operations on {\tt SmallArray\#}. A {\tt SmallArray\#} works
+         just like an {\tt Array\#}, except that its implementation is
+         optimized for small arrays (i.e. no more than 128 elements.)}
+
+------------------------------------------------------------------------
+
+primtype SmallArray# a
+
+primtype SmallMutableArray# s a
+
+primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
+   Int# -> a -> State# s -> (# State# s, SmallMutableArray# s a #)
+   {Create a new mutable array with the specified number of elements,
+    in the specified state thread,
+    with each element containing the specified initial value.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+primop  SameSmallMutableArrayOp "sameSmallMutableArray#" GenPrimOp
+   SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
+
+primop  ReadSmallArrayOp "readSmallArray#" GenPrimOp
+   SmallMutableArray# s a -> Int# -> State# s -> (# State# s, a #)
+   {Read from specified index of mutable array. Result is not yet evaluated.}
+   with
+   has_side_effects = True
+   can_fail         = True
+
+primop  WriteSmallArrayOp "writeSmallArray#" GenPrimOp
+   SmallMutableArray# s a -> Int# -> a -> State# s -> State# s
+   {Write to specified index of mutable array.}
+   with
+   has_side_effects = True
+   can_fail         = True
+
+primop  SizeofSmallArrayOp "sizeofSmallArray#" GenPrimOp
+   SmallArray# a -> Int#
+   {Return the number of elements in the array.}
+
+primop  SizeofSmallMutableArrayOp "sizeofSmallMutableArray#" GenPrimOp
+   SmallMutableArray# s a -> Int#
+   {Return the number of elements in the array.}
+
+primop  IndexSmallArrayOp "indexSmallArray#" GenPrimOp
+   SmallArray# a -> Int# -> (# a #)
+   {Read from specified index of immutable array. Result is packaged into
+    an unboxed singleton; the result itself is not yet evaluated.}
+   with
+   can_fail         = True
+
+primop  UnsafeFreezeSmallArrayOp "unsafeFreezeSmallArray#" GenPrimOp
+   SmallMutableArray# s a -> State# s -> (# State# s, SmallArray# a #)
+   {Make a mutable array immutable, without copying.}
+   with
+   has_side_effects = True
+
+primop  UnsafeThawSmallArrayOp  "unsafeThawSmallArray#" GenPrimOp
+   SmallArray# a -> State# s -> (# State# s, SmallMutableArray# s a #)
+   {Make an immutable array mutable, without copying.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+-- The code_size is only correct for the case when the copy family of
+-- primops aren't inlined. It would be nice to keep track of both.
+
+primop  CopySmallArrayOp "copySmallArray#" GenPrimOp
+  SmallArray# a -> Int# -> SmallMutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  {Given a source array, an offset into the source array, a
+   destination array, an offset into the destination array, and a
+   number of elements to copy, copy the elements from the source array
+   to the destination array. Both arrays must fully contain the
+   specified ranges, but this is not checked. The two arrays must not
+   be the same array in different states, but this is not checked
+   either.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
+primop  CopySmallMutableArrayOp "copySmallMutableArray#" GenPrimOp
+  SmallMutableArray# s a -> Int# -> SmallMutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  {Given a source array, an offset into the source array, a
+   destination array, an offset into the destination array, and a
+   number of elements to copy, copy the elements from the source array
+   to the destination array. The source and destination arrays can
+   refer to the same array. Both arrays must fully contain the
+   specified ranges, but this is not checked.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
+primop  CloneSmallArrayOp "cloneSmallArray#" GenPrimOp
+  SmallArray# a -> Int# -> Int# -> SmallArray# a
+  {Given a source array, an offset into the source array, and a number
+   of elements to copy, create a new array with the elements from the
+   source array. The provided array must fully contain the specified
+   range, but this is not checked.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
+primop  CloneSmallMutableArrayOp "cloneSmallMutableArray#" GenPrimOp
+  SmallMutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, SmallMutableArray# s a #)
+  {Given a source array, an offset into the source array, and a number
+   of elements to copy, create a new array with the elements from the
+   source array. The provided array must fully contain the specified
+   range, but this is not checked.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
+primop  FreezeSmallArrayOp "freezeSmallArray#" GenPrimOp
+  SmallMutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, SmallArray# a #)
+  {Given a source array, an offset into the source array, and a number
+   of elements to copy, create a new array with the elements from the
+   source array. The provided array must fully contain the specified
+   range, but this is not checked.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
+primop  ThawSmallArrayOp "thawSmallArray#" GenPrimOp
+  SmallArray# a -> Int# -> Int# -> State# s -> (# State# s, SmallMutableArray# s a #)
+  {Given a source array, an offset into the source array, and a number
+   of elements to copy, create a new array with the elements from the
+   source array. The provided array must fully contain the specified
+   range, but this is not checked.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
+primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
+   SmallMutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
+   {Unsafe, machine-level atomic compare and swap on an element within an array.}
+   with
+   out_of_line = True
+   has_side_effects = True
 
 ------------------------------------------------------------------------
 section "Byte Arrays"

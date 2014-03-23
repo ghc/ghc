@@ -322,6 +322,124 @@ stg_newArrayArrayzh ( W_ n /* words */ )
 
 
 /* -----------------------------------------------------------------------------
+   SmallArray primitives
+   -------------------------------------------------------------------------- */
+
+stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
+{
+    W_ words, size, p;
+    gcptr arr;
+
+    again: MAYBE_GC(again);
+
+    words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;
+    ("ptr" arr) = ccall allocate(MyCapability() "ptr",words);
+    TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
+
+    SET_HDR(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info, CCCS);
+    StgSmallMutArrPtrs_ptrs(arr) = n;
+
+    // Initialise all elements of the the array with the value in R2
+    p = arr + SIZEOF_StgSmallMutArrPtrs;
+  for:
+    if (p < arr + SIZEOF_StgSmallMutArrPtrs + WDS(n)) {
+        W_[p] = init;
+        p = p + WDS(1);
+        goto for;
+    }
+
+    return (arr);
+}
+
+stg_unsafeThawSmallArrayzh ( gcptr arr )
+{
+    // See stg_unsafeThawArrayzh
+    if (StgHeader_info(arr) != stg_SMALL_MUT_ARR_PTRS_FROZEN0_info) {
+        SET_INFO(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
+        recordMutable(arr);
+        // must be done after SET_INFO, because it ASSERTs closure_MUTABLE()
+        return (arr);
+    } else {
+        SET_INFO(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
+        return (arr);
+    }
+}
+
+stg_cloneSmallArrayzh ( gcptr src, W_ offset, W_ n )
+{
+    cloneSmallArray(stg_SMALL_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
+}
+
+stg_cloneSmallMutableArrayzh ( gcptr src, W_ offset, W_ n )
+{
+    cloneSmallArray(stg_SMALL_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
+}
+
+// We have to escape the "z" in the name.
+stg_freezzeSmallArrayzh ( gcptr src, W_ offset, W_ n )
+{
+    cloneSmallArray(stg_SMALL_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
+}
+
+stg_thawSmallArrayzh ( gcptr src, W_ offset, W_ n )
+{
+    cloneSmallArray(stg_SMALL_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
+}
+
+stg_copySmallArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n)
+{
+    W_ dst_p, src_p, bytes;
+
+    SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
+
+    dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
+    src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
+    bytes = WDS(n);
+    prim %memcpy(dst_p, src_p, bytes, WDS(1));
+
+    return ();
+}
+
+stg_copySmallMutableArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n)
+{
+    W_ dst_p, src_p, bytes;
+
+    SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
+
+    dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
+    src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
+    bytes = WDS(n);
+    if (src == dst) {
+        prim %memmove(dst_p, src_p, bytes, WDS(1));
+    } else {
+        prim %memcpy(dst_p, src_p, bytes, WDS(1));
+    }
+
+    return ();
+}
+
+// RRN: Uses the ticketed approach; see casMutVar
+stg_casSmallArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
+/* SmallMutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, Any a #) */
+{
+    gcptr h;
+    W_ p, len;
+
+    p = arr + SIZEOF_StgSmallMutArrPtrs + WDS(ind);
+    (h) = ccall cas(p, old, new);
+
+    if (h != old) {
+        // Failure, return what was there instead of 'old':
+        return (1,h);
+    } else {
+        // Compare and Swap Succeeded:
+        SET_HDR(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info, CCCS);
+        return (0,new);
+    }
+}
+
+
+/* -----------------------------------------------------------------------------
    MutVar primitives
    -------------------------------------------------------------------------- */
 

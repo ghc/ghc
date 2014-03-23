@@ -322,6 +322,21 @@ printClosure( StgClosure *obj )
 	debugBelch("MUT_ARR_PTRS_FROZEN(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+	debugBelch("SMALL_MUT_ARR_PTRS_CLEAN(size=%" FMT_Word ")\n",
+                   (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
+	break;
+
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+	debugBelch("SMALL_MUT_ARR_PTRS_DIRTY(size=%" FMT_Word ")\n",
+                   (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
+	break;
+
+    case SMALL_MUT_ARR_PTRS_FROZEN:
+	debugBelch("SMALL_MUT_ARR_PTRS_FROZEN(size=%" FMT_Word ")\n",
+                   (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
+	break;
+
     case MVAR_CLEAN:
     case MVAR_DIRTY:
         {
