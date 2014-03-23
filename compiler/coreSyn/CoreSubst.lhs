@@ -355,7 +355,7 @@ instance Outputable Subst where
 %************************************************************************
 
 \begin{code}
--- | Apply a substititon to an entire 'CoreExpr'. Rememeber, you may only 
+-- | Apply a substitution to an entire 'CoreExpr'. Remember, you may only 
 -- apply the substitution /once/: see "CoreSubst#apply_once"
 --
 -- Do *not* attempt to short-cut in the case of an empty substitution!
@@ -402,8 +402,8 @@ subst_expr subst expr
 				 where
 				   (subst', bndrs') = substBndrs subst bndrs
 
--- | Apply a substititon to an entire 'CoreBind', additionally returning an updated 'Subst'
--- that should be used by subsequent substitutons.
+-- | Apply a substitution to an entire 'CoreBind', additionally returning an updated 'Subst'
+-- that should be used by subsequent substitutions.
 substBind, substBindSC :: Subst -> CoreBind -> (Subst, CoreBind)
 
 substBindSC subst bind 	  -- Short-cut if the substitution is empty
@@ -460,7 +460,7 @@ preserve occ info in rules.
 
 \begin{code}
 -- | Substitutes a 'Var' for another one according to the 'Subst' given, returning
--- the result and an updated 'Subst' that should be used by subsequent substitutons.
+-- the result and an updated 'Subst' that should be used by subsequent substitutions.
 -- 'IdInfo' is preserved by this process, although it is substituted into appropriately.
 substBndr :: Subst -> Var -> (Subst, Var)
 substBndr subst bndr
@@ -484,7 +484,7 @@ substRecBndrs subst bndrs
 \begin{code}
 substIdBndr :: SDoc 
             -> Subst		-- ^ Substitution to use for the IdInfo
-	    -> Subst -> Id 	-- ^ Substitition and Id to transform
+	    -> Subst -> Id 	-- ^ Substitution and Id to transform
 	    -> (Subst, Id)	-- ^ Transformed pair
 				-- NB: unfolding may be zapped
 
@@ -555,7 +555,7 @@ cloneRecIdBndrs subst us ids
 -- Just like substIdBndr, except that it always makes a new unique
 -- It is given the unique to use
 clone_id    :: Subst			-- Substitution for the IdInfo
-	    -> Subst -> (Id, Unique)	-- Substitition and Id to transform
+	    -> Subst -> (Id, Unique)	-- Substitution and Id to transform
 	    -> (Subst, Id)		-- Transformed pair
 
 clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)

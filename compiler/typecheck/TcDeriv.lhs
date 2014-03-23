@@ -789,9 +789,9 @@ In the two examples,
          i.e.      (* -> * -> *)  ~ (k -> k -> k)
          yielding  k:=*
 
-Now we get a kind substition.  We then need to:
+Now we get a kind substitution.  We then need to:
 
-  1. Remove the substituted-out kind variables from the quantifed kind vars
+  1. Remove the substituted-out kind variables from the quantified kind vars
 
   2. Apply the substitution to the kinds of quantified *type* vars
      (and extend the substitution to reflect this change)
@@ -806,7 +806,7 @@ Forgetting step (2) caused Trac #8893:
 
 When deriving Functor for P, we unify k to *, but we then want
 an instance   $df :: forall (x:*->*). Functor x => Functor (P * (x:*->*))
-and similarly for C.  Notice the modifed kind of x, both at binding
+and similarly for C.  Notice the modified kind of x, both at binding
 and occurrence sites.
 
 

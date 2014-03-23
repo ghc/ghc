@@ -415,7 +415,7 @@ instance NamedThing TyThing where	-- Can't put this with the type
 -- 2. In particular, the /kind/ of the type variables in 
 -- the in-scope set is not relevant
 --
--- 3. The substition is only applied ONCE! This is because
+-- 3. The substitution is only applied ONCE! This is because
 -- in general such application will not reached a fixed point.
 data TvSubst 		
   = TvSubst InScopeSet 	-- The in-scope type and kind variables
@@ -423,7 +423,7 @@ data TvSubst
 	-- See Note [Apply Once]
 	-- and Note [Extending the TvSubstEnv]
 
--- | A substitition of 'Type's for 'TyVar's
+-- | A substitution of 'Type's for 'TyVar's
 --                 and 'Kind's for 'KindVar's
 type TvSubstEnv = TyVarEnv Type
 	-- A TvSubstEnv is used both inside a TvSubst (with the apply-once
@@ -439,10 +439,10 @@ We use TvSubsts to instantiate things, and we might instantiate
 	forall a b. ty
 \with the types
 	[a, b], or [b, a].
-So the substition might go [a->b, b->a].  A similar situation arises in Core
+So the substitution might go [a->b, b->a].  A similar situation arises in Core
 when we find a beta redex like
 	(/\ a /\ b -> e) b a
-Then we also end up with a substition that permutes type variables. Other
+Then we also end up with a substitution that permutes type variables. Other
 variations happen to; for example [a -> (a, b)].  
 
 	***************************************************

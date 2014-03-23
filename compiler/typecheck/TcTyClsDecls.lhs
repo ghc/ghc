@@ -1155,7 +1155,7 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
                        (arg_tys, stricts)           = unzip btys
                  ; return (ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) }
 
-             -- Generalise the kind variables (returning quantifed TcKindVars)
+             -- Generalise the kind variables (returning quantified TcKindVars)
              -- and quantify the type variables (substituting their kinds)
              -- REMEMBER: 'tkvs' are:
              --    ResTyH98:  the *existential* type variables only
