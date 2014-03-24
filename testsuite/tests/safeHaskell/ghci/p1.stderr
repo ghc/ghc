@@ -1,3 +1,6 @@
 
 <no location info>: Warning:
     -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell
+
+<no location info>: Warning:
+    -XGeneralizedNewtypeDeriving is not allowed in Safe Haskell; ignoring -XGeneralizedNewtypeDeriving

@@ -1741,7 +1741,10 @@ combineSafeFlags a b | a == Sf_SafeInferred = return b
 --     * function to test if the flag is on
 --     * function to turn the flag off
 unsafeFlags :: [(String, DynFlags -> SrcSpan, DynFlags -> Bool, DynFlags -> DynFlags)]
-unsafeFlags = [("-XTemplateHaskell", thOnLoc,
+unsafeFlags = [("-XGeneralizedNewtypeDeriving", newDerivOnLoc,
+                   xopt Opt_GeneralizedNewtypeDeriving,
+                   flip xopt_unset Opt_GeneralizedNewtypeDeriving),
+               ("-XTemplateHaskell", thOnLoc,
                    xopt Opt_TemplateHaskell,
                    flip xopt_unset Opt_TemplateHaskell)]
 
