@@ -403,6 +403,9 @@ callClobberedRegs       :: Platform -> [Reg]
 -- caller-saves registers
 callClobberedRegs platform
  | target32Bit platform = [eax,ecx,edx] ++ map regSingle (floatregnos platform)
+ | platformOS platform == OSMinGW32
+   = [rax,rcx,rdx,r8,r9,r10,r11]
+   ++ map regSingle (floatregnos platform)
  | otherwise
     -- all xmm regs are caller-saves
     -- caller-saves registers
