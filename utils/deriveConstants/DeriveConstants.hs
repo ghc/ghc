@@ -638,7 +638,7 @@ getWanted verbose tmpdir gccProgram gccFlags nmProgram
              oFile = tmpdir </> "tmp.o"
          writeFile cFile cStuff
          execute verbose gccProgram (gccFlags ++ ["-c", cFile, "-o", oFile])
-         xs <- readProcess nmProgram ["-P", oFile] ""
+         xs <- readProcess nmProgram [oFile] ""
          let ls = lines xs
              ms = map parseNmLine ls
              m = Map.fromList $ catMaybes ms
@@ -707,17 +707,27 @@ getWanted verbose tmpdir gccProgram gccFlags nmProgram
           doWanted (ClosurePayloadMacro {}) = []
           doWanted (FieldTypeGcptrMacro {}) = []
 
-          -- parseNmLine parses "nm -P" output that looks like
-          -- "_derivedConstantMAX_Vanilla_REG C b 0" Mac OS X
-          -- "derivedConstantMAX_Vanilla_REG C 0000000b 0000000b" GNU
-          -- "derivedConstantMAX_Vanilla_REG D        1        b" Solaris
+          -- parseNmLine parses nm output that looks like
+          -- "0000000b C derivedConstantMAX_Vanilla_REG"
           -- and returns ("MAX_Vanilla_REG", 11)
-          parseNmLine xs0 = case words xs0 of
-                            [x0, x1, x2, x3] -> case stripPrefix prefix $ dropWhile (== '_') x0 of
-                              Just name -> case readHex $ if x1 == "C" then x2 else x3 of
-                                [(size, "")] -> Just (name, size)
+          parseNmLine xs0 = case break (' ' ==) xs0 of
+                            (x1, ' ' : xs1) ->
+                                case break (' ' ==) xs1 of
+                                (x2, ' ' : x3) ->
+                                    case readHex x1 of
+                                    [(size, "")] ->
+                                        case x2 of
+                                        "C" ->
+                                            let x3' = case x3 of
+                                                      '_' : rest -> rest
+                                                      _          -> x3
+                                            in case stripPrefix prefix x3' of
+                                               Just name ->
+                                                   Just (name, size)
+                                               _ -> Nothing
+                                        _ -> Nothing
+                                    _ -> Nothing
                                 _ -> Nothing
-                              _ -> Nothing
                             _ -> Nothing
 
           -- If an Int value is larger than 2^28 or smaller
