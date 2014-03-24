@@ -1734,10 +1734,10 @@ case-binder is evaluated *next*.  Previously we just asked that
 the case-binder is used strictly; but that can change
     case x of { _ -> error "bad" }
     --> error "bad"
-which is very puzzling if 'x' is later bound to (error "good").
-Where the order of evaluation is specified (via seq or case)
-we should respect it.
-See also Note [Empty case alternatives] in CoreSyn.
+which is very puzzling if 'x' currently lambda-bound, but later gets
+let-bound to (error "good").  Where the order of evaluation is
+specified (via seq or case) we should respect it.  See also Note
+[Empty case alternatives] in CoreSyn.
 
 So instead we use case_bndr_evald_next to see when f is the *next*
 thing to be eval'd.  This came up when fixing Trac #7542.
@@ -1751,7 +1751,7 @@ See also Note [Eta reduction of an eval'd function] in CoreUtils.
       scrut_is_var _          = False
 
       -- True if evaluation of the case_bndr is the next
-      -- thing to be eval'd.  Then dropping the case
+      -- thing to be eval'd.  Then dropping the case is fine.
 
 Note [Case elimination: unlifted case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
