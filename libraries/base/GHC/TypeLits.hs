@@ -153,13 +153,16 @@ infixr 8 ^
 -- | Comparison of type-level naturals, as a constraint.
 type x <= y = (x <=? y) ~ True
 
--- | Comparison of type-level naturals, as a function.
+-- | Comparison of type-level symbols, as a function.
 type family CmpSymbol (m :: Symbol) (n :: Symbol) :: Ordering
 
--- | Comparison of type-level symbols, as a function.
+-- | Comparison of type-level naturals, as a function.
 type family CmpNat    (m :: Nat)    (n :: Nat)    :: Ordering
 
--- | Comparison of type-level naturals, as a function.
+{- | Comparison of type-level naturals, as a function.
+NOTE: The functionality for this function should be subsumed
+by 'CmpNat', so this might go away in the future.
+Please let us know, if you encounter discrepancies between the two. -}
 type family (m :: Nat) <=? (n :: Nat) :: Bool
 
 -- | Addition of type-level naturals.
