@@ -108,11 +108,6 @@
 
                 For more information, see <xref linkend="roles"/>.
           </para>
-           <para>
-                As a result of this change,
-                <literal>GeneralizedNewtypeDeriving</literal> can now
-                be used with Safe Haskell.
-          </para>
        </listitem>
 
         <listitem>
