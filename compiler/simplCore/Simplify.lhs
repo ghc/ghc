@@ -28,7 +28,7 @@ import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
 --import TyCon            ( isEnumerationTyCon ) -- temporalily commented out. See #8326
 import CoreMonad        ( Tick(..), SimplifierMode(..) )
 import CoreSyn
-import Demand           ( StrictSig(..), dmdTypeDepth )
+import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd )
 import PprCore          ( pprParendExpr, pprCoreExpr )
 import CoreUnfold
 import CoreUtils
@@ -1701,22 +1701,26 @@ comparison operations (e.g. in (>=) for Int.Int32)
 
 Note [Case elimination: lifted case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We also make sure that we deal with this very common case,
-where x has a lifted type:
+If a case over a lifted type has a single alternative, and is being used
+as a strict 'let' (all isDeadBinder bndrs), we may want to do this
+transformation:
 
-        case e of
-          x -> ...x...
+    case e of r       ===>   let r = e in ...r...
+      _ -> ...r...
 
-Here we are using the case as a strict let; if x is used only once
-then we want to inline it.  We have to be careful that this doesn't
-make the program terminate when it would have diverged before, so we
-check that
         (a) 'e' is already evaluated (it may so if e is a variable)
-            Specifically we check (exprIsHNF e)
+            Specifically we check (exprIsHNF e).  In this case
+            we can just allocate the WHNF directly with a let.
 or
         (b) 'x' is not used at all and e is ok-for-speculation
+             The ok-for-spec bit checks that we don't lose any
+             exceptions or divergence
+or
+        (c) 'x' is used strictly in the body, and 'e' is a variable
+            Then we can just subtitute 'e' for 'x' in the body.
+            See Note [Eliminating redundant seqs]
 
-For the (b), consider
+For (b), the "not used at all" test is important.  Consider
    case (case a ># b of { True -> (p,q); False -> (q,p) }) of
      r -> blah
 The scrutinee is ok-for-speculation (it looks inside cases), but we do
@@ -1725,33 +1729,42 @@ not want to transform to
    in blah
 because that builds an unnecessary thunk.
 
-Note [Case binder next]
-~~~~~~~~~~~~~~~~~~~~~~~
-If we have
-   case e of f { _ -> f e1 e2 }
-then we can safely do CaseElim.   The main criterion is that the
-case-binder is evaluated *next*.  Previously we just asked that
-the case-binder is used strictly; but that can change
+Note [Eliminating redundant seqs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have this:
+   case x of r { _ -> ..r.. }
+where 'r' is used strictly in (..r..), the case is effectively a 'seq'
+on 'x', but since 'r' is used strictly anyway, we can safely transform to
+   (...x...)
+
+Note that this can change the error behaviour.  For example, we might
+transform
     case x of { _ -> error "bad" }
     --> error "bad"
-which is very puzzling if 'x' currently lambda-bound, but later gets
-let-bound to (error "good").  Where the order of evaluation is
-specified (via seq or case) we should respect it.  See also Note
-[Empty case alternatives] in CoreSyn.
+which is might be puzzling if 'x' currently lambda-bound, but later gets
+let-bound to (error "good").
 
-So instead we use case_bndr_evald_next to see when f is the *next*
-thing to be eval'd.  This came up when fixing Trac #7542.
-See also Note [Eta reduction of an eval'd function] in CoreUtils.
+Nevertheless, the paper "A semantics for impecise exceptions" allows
+this transformation. If you want to fix the evaluation order, use
+'pseq'.  See Trac #8900 for an example where the loss of this
+transformation bit us in practice. 
 
-  For reference, the old code was an extra disjunct in elim_lifted
-       || (strict_case_bndr && scrut_is_var scrut)
-      strict_case_bndr = isStrictDmd (idDemandInfo case_bndr)
-      scrut_is_var (Cast s _) = scrut_is_var s
-      scrut_is_var (Var _)    = True
-      scrut_is_var _          = False
+See also Note [Empty case alternatives] in CoreSyn.
 
-      -- True if evaluation of the case_bndr is the next
-      -- thing to be eval'd.  Then dropping the case is fine.
+Just for reference, the original code (added Jan 13) looked like this:
+     || case_bndr_evald_next rhs
+
+    case_bndr_evald_next :: CoreExpr -> Bool
+      -- See Note [Case binder next]
+    case_bndr_evald_next (Var v)         = v == case_bndr
+    case_bndr_evald_next (Cast e _)      = case_bndr_evald_next e
+    case_bndr_evald_next (App e _)       = case_bndr_evald_next e
+    case_bndr_evald_next (Case e _ _ _)  = case_bndr_evald_next e
+    case_bndr_evald_next _               = False
+
+(This came up when fixing Trac #7542. See also Note [Eta reduction of
+an eval'd function] in CoreUtils.)
+
 
 Note [Case elimination: unlifted case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1875,8 +1888,9 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
     elim_lifted   -- See Note [Case elimination: lifted case]
       = exprIsHNF scrut
      || (is_plain_seq && ok_for_spec)
-              -- Note: not the same as exprIsHNF
-     || case_bndr_evald_next rhs
+            -- Note: not the same as exprIsHNF
+     || (strict_case_bndr && scrut_is_var scrut)
+            -- See Note [Eliminating redundant seqs]
 
     elim_unlifted
       | is_plain_seq = exprOkForSideEffects scrut
@@ -1889,16 +1903,13 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
 
     ok_for_spec      = exprOkForSpeculation scrut
     is_plain_seq     = isDeadBinder case_bndr -- Evaluation *only* for effect
+    strict_case_bndr = isStrictDmd (idDemandInfo case_bndr)
 
-    case_bndr_evald_next :: CoreExpr -> Bool
-      -- See Note [Case binder next]
-    case_bndr_evald_next (Var v)         = v == case_bndr
-    case_bndr_evald_next (Cast e _)      = case_bndr_evald_next e
-    case_bndr_evald_next (App e _)       = case_bndr_evald_next e
-    case_bndr_evald_next (Case e _ _ _)  = case_bndr_evald_next e
-    case_bndr_evald_next _               = False
-      -- Could add a case for Let,
-      -- but I'm worried it could become expensive
+    scrut_is_var :: CoreExpr -> Bool
+    scrut_is_var (Cast s _) = scrut_is_var s
+    scrut_is_var (Var _)    = True
+    scrut_is_var _          = False
+
 
 --------------------------------------------------
 --      3. Try seq rules; see Note [User-defined RULES for seq] in MkId
