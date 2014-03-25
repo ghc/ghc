@@ -202,3 +202,5 @@ test('T8832',
      extra_clean(['T8832.hi', 'T8832a.o']),
      run_command,
      ['$MAKE -s --no-print-directory T8832'])
+test('T8848', only_ways(['optasm']), compile, ['-ddump-rule-firings'])
+test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules'])
