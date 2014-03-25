@@ -1492,7 +1492,7 @@ badCon con msg = ptext (sLit "Constructor") <+> quotes (ppr con) <+> msg
 Note [Check that the type variable is truly universal]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For Functor, Foldable, Traversable, we must check that the *last argument*
-of the type constructor is used truly universally.  Example
+of the type constructor is used truly universally quantified.  Example
 
    data T a b where
      T1 :: a -> b -> T a b      -- Fine! Vanilla H-98

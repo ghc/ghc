@@ -493,7 +493,7 @@ This only half-works, but then let-generalisation only half-works.
 *                                                                                 *
 ***********************************************************************************
 
-See note [Simplifying RULE consraints] in TcRule
+See note [Simplifying RULE constraints] in TcRule
 
 Note [RULE quanfification over equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1118,11 +1118,10 @@ to remain visible until Phase 1
 
 Note [Unfold compulsory unfoldings in LHSs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When the user writes `map coerce = coerce` as a rule, the rule will only ever
 match if we replace coerce by its unfolding on the LHS, because that is the
 core that the rule matching engine will find. So do that for everything that
-has a compulsory unfolding. Also see Note [Desugaring coerce as cast]
+has a compulsory unfolding. Also see Note [Desugaring coerce as cast] in Desugar
 
 %************************************************************************
 %*                                                                      *
@@ -1302,10 +1301,9 @@ exprIsLiteral_maybe env@(_, id_unf) e
       _         -> Nothing
 \end{code}
 
-Note [exprIsLiteral_maybe]
+Note [exprIsLambda_maybe]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-This function will, given an expression `e`, try to turn it into the form
+exprIsLambda_maybe will, given an expression `e`, try to turn it into the form
 `Lam v e'` (returned as `Just (v,e')`). Besides using lambdas, it looks through
 casts (using the Push rule), and it unfolds function calls if the unfolding
 has a greater arity than arguments are present.
@@ -1314,10 +1312,10 @@ Currently, it is used in Rules.match, and is required to make
 "map coerce = coerce" match.
 
 \begin{code}
--- See Note [exprIsLiteral_maybe]
 exprIsLambda_maybe :: InScopeEnv -> CoreExpr -> Maybe (Var, CoreExpr)
+    -- See Note [exprIsLambda_maybe]
 
--- The simpe case: It is a lambda
+-- The simple case: It is a lambda already
 exprIsLambda_maybe _ (Lam x e)
     = Just (x, e)
 
