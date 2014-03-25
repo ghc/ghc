@@ -1,4 +1,4 @@
 
 simpl016.hs:5:1: Warning:
     Forall'd constraint ‘Num b’ is not bound in RULE lhs
-      delta' @ Int @ b $dEq_aYH
+      delta' @ Int @ b $dEq
