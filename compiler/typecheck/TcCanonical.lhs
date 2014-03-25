@@ -1303,7 +1303,7 @@ NB: it is important that the types s1,s2 are flattened and zonked
 
 NB: it's important that the new CIrredCan goes in the inert set rather
 than back into the work list. We used to do the latter, but that led
-to an infinite loop when we encountered it again, and put it back it
+to an infinite loop when we encountered it again, and put it back in
 the work list again.
 
 See also Note [Kind orientation for CTyEqCan] and

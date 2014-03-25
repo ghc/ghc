@@ -1717,7 +1717,7 @@ or
              exceptions or divergence
 or
         (c) 'x' is used strictly in the body, and 'e' is a variable
-            Then we can just subtitute 'e' for 'x' in the body.
+            Then we can just substitute 'e' for 'x' in the body.
             See Note [Eliminating redundant seqs]
 
 For (b), the "not used at all" test is important.  Consider
@@ -1744,7 +1744,7 @@ transform
 which is might be puzzling if 'x' currently lambda-bound, but later gets
 let-bound to (error "good").
 
-Nevertheless, the paper "A semantics for impecise exceptions" allows
+Nevertheless, the paper "A semantics for imprecise exceptions" allows
 this transformation. If you want to fix the evaluation order, use
 'pseq'.  See Trac #8900 for an example where the loss of this
 transformation bit us in practice. 

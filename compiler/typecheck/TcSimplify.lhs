@@ -495,9 +495,9 @@ This only half-works, but then let-generalisation only half-works.
 
 See note [Simplifying RULE constraints] in TcRule
 
-Note [RULE quanfification over equalities]
+Note [RULE quantification over equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Decideing which equalities to quantify over is tricky:
+Deciding which equalities to quantify over is tricky:
  * We do not want to quantify over insoluble equalities (Int ~ Bool)
     (a) because we prefer to report a LHS type error
     (b) because if such things end up in 'givens' we get a bogus

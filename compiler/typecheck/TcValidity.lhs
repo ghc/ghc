@@ -443,8 +443,8 @@ instances is a bit subtle.  If we allowed
   instance (?x::Int, Eq a) => Foo [a] where ...
 then when we saw
      (e :: (?x::Int) => t)
-it would be unclear how to discharge all the potential usas of the ?x
-in e.  For example, a constraint Foo [Int] might come out of e,and
+it would be unclear how to discharge all the potential uses of the ?x
+in e.  For example, a constraint Foo [Int] might come out of e, and
 applying the instance decl would show up two uses of ?x.  Trac #8912.
 
 \begin{code}
