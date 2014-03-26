@@ -803,9 +803,17 @@ data DynFlags = DynFlags {
 
   -- Constants used to control the amount of optimization done.
 
-  -- ^ Max size, in bytes, of inline array allocations.
-  maxInlineAllocSize    :: Int
- }
+  -- | Max size, in bytes, of inline array allocations.
+  maxInlineAllocSize    :: Int,
+
+  -- | Only inline memcpy if it generates no more than this many
+  -- pseudo (roughly: Cmm) instructions.
+  maxInlineMemcpyInsns  :: Int,
+
+  -- | Only inline memset if it generates no more than this many
+  -- pseudo (roughly: Cmm) instructions.
+  maxInlineMemsetInsns  :: Int
+}
 
 class HasDynFlags m where
     getDynFlags :: m DynFlags
@@ -1455,7 +1463,9 @@ defaultDynFlags mySettings =
         rtldInfo = panic "defaultDynFlags: no rtldInfo",
         rtccInfo = panic "defaultDynFlags: no rtccInfo",
 
-        maxInlineAllocSize = 128
+        maxInlineAllocSize = 128,
+        maxInlineMemcpyInsns = 32,
+        maxInlineMemsetInsns = 32
       }
 
 defaultWays :: Settings -> [Way]
@@ -2439,6 +2449,8 @@ dynamic_flags = [
 
   , Flag "fghci-hist-size" (intSuffix (\n d -> d {ghciHistSize = n}))
   , Flag "fmax-inline-alloc-size"      (intSuffix (\n d -> d{ maxInlineAllocSize = n }))
+  , Flag "fmax-inline-memcpy-insns"    (intSuffix (\n d -> d{ maxInlineMemcpyInsns = n }))
+  , Flag "fmax-inline-memset-insns"    (intSuffix (\n d -> d{ maxInlineMemsetInsns = n }))
 
         ------ Profiling ----------------------------------------------------
 

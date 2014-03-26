@@ -159,7 +159,7 @@ stmtToInstrs stmt = do
               size = cmmTypeSize ty
 
     CmmUnsafeForeignCall target result_regs args
-       -> genCCall is32Bit target result_regs args
+       -> genCCall dflags is32Bit target result_regs args
 
     CmmBranch id          -> genBranch id
     CmmCondBranch arg true false -> do b1 <- genCondJump true arg
@@ -1559,7 +1559,8 @@ genCondJump id bool = do
 -- register allocator.
 
 genCCall
-    :: Bool                     -- 32 bit platform?
+    :: DynFlags
+    -> Bool                     -- 32 bit platform?
     -> ForeignTarget            -- function to call
     -> [CmmFormal]        -- where to put the result
     -> [CmmActual]        -- arguments (of mixed type)
@@ -1570,21 +1571,27 @@ genCCall
 -- Unroll memcpy calls if the source and destination pointers are at
 -- least DWORD aligned and the number of bytes to copy isn't too
 -- large.  Otherwise, call C's memcpy.
-genCCall is32Bit (PrimTarget MO_Memcpy) _
+genCCall dflags is32Bit (PrimTarget MO_Memcpy) _
          [dst, src,
           (CmmLit (CmmInt n _)),
           (CmmLit (CmmInt align _))]
-    | n <= maxInlineSizeThreshold && align .&. 3 == 0 = do
+    | fromInteger insns <= maxInlineMemcpyInsns dflags && align .&. 3 == 0 = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat size
         code_src <- getAnyReg src
         src_r <- getNewRegNat size
         tmp_r <- getNewRegNat size
         return $ code_dst dst_r `appOL` code_src src_r `appOL`
-            go dst_r src_r tmp_r n
+            go dst_r src_r tmp_r (fromInteger n)
   where
+    -- The number of instructions we will generate (approx). We need 2
+    -- instructions per move.
+    insns = 2 * ((n + sizeBytes - 1) `div` sizeBytes)
+
     size = if align .&. 4 /= 0 then II32 else (archWordSize is32Bit)
 
+    -- The size of each move, in bytes.
+    sizeBytes :: Integer
     sizeBytes = fromIntegral (sizeInBytes size)
 
     go :: Reg -> Reg -> Reg -> Integer -> OrdList Instr
@@ -1613,15 +1620,15 @@ genCCall is32Bit (PrimTarget MO_Memcpy) _
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall _ (PrimTarget MO_Memset) _
+genCCall dflags _ (PrimTarget MO_Memset) _
          [dst,
           CmmLit (CmmInt c _),
           CmmLit (CmmInt n _),
           CmmLit (CmmInt align _)]
-    | n <= maxInlineSizeThreshold && align .&. 3 == 0 = do
+    | fromInteger insns <= maxInlineMemsetInsns dflags && align .&. 3 == 0 = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat size
-        return $ code_dst dst_r `appOL` go dst_r n
+        return $ code_dst dst_r `appOL` go dst_r (fromInteger n)
   where
     (size, val) = case align .&. 3 of
         2 -> (II16, c2)
@@ -1630,6 +1637,12 @@ genCCall _ (PrimTarget MO_Memset) _
     c2 = c `shiftL` 8 .|. c
     c4 = c2 `shiftL` 16 .|. c2
 
+    -- The number of instructions we will generate (approx). We need 1
+    -- instructions per move.
+    insns = (n + sizeBytes - 1) `div` sizeBytes
+
+    -- The size of each move, in bytes.
+    sizeBytes :: Integer
     sizeBytes = fromIntegral (sizeInBytes size)
 
     go :: Reg -> Integer -> OrdList Instr
@@ -1652,13 +1665,13 @@ genCCall _ (PrimTarget MO_Memset) _
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall _ (PrimTarget MO_WriteBarrier) _ _ = return nilOL
+genCCall _ _ (PrimTarget MO_WriteBarrier) _ _ = return nilOL
         -- write barrier compiles to no code on x86/x86-64;
         -- we keep it this long in order to prevent earlier optimisations.
 
-genCCall _ (PrimTarget MO_Touch) _ _ = return nilOL
+genCCall _ _ (PrimTarget MO_Touch) _ _ = return nilOL
 
-genCCall is32bit (PrimTarget (MO_Prefetch_Data n )) _  [src] =
+genCCall _ is32bit (PrimTarget (MO_Prefetch_Data n )) _  [src] =
         case n of
             0 -> genPrefetch src $ PREFETCH NTA  size
             1 -> genPrefetch src $ PREFETCH Lvl2 size
@@ -1679,8 +1692,7 @@ genCCall is32bit (PrimTarget (MO_Prefetch_Data n )) _  [src] =
                               ((AddrBaseIndex (EABaseReg src_r )   EAIndexNone (ImmInt 0))))  ))
                   -- prefetch always takes an address
 
-genCCall is32Bit (PrimTarget (MO_BSwap width)) [dst] [src] = do
-    dflags <- getDynFlags
+genCCall dflags is32Bit (PrimTarget (MO_BSwap width)) [dst] [src] = do
     let platform = targetPlatform dflags
     let dst_r = getRegisterReg platform False (CmmLocal dst)
     case width of
@@ -1702,10 +1714,9 @@ genCCall is32Bit (PrimTarget (MO_BSwap width)) [dst] [src] = do
   where
     size = intSize width
 
-genCCall is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
+genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
          args@[src] = do
     sse4_2 <- sse4_2Enabled
-    dflags <- getDynFlags
     let platform = targetPlatform dflags
     if sse4_2
         then do code_src <- getAnyReg src
@@ -1725,23 +1736,22 @@ genCCall is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                                            [NoHint] [NoHint]
                                                            CmmMayReturn)
-            genCCall is32Bit target dest_regs args
+            genCCall dflags is32Bit target dest_regs args
   where
     size = intSize width
     lbl = mkCmmCodeLabel primPackageId (fsLit (popCntLabel width))
 
-genCCall is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args = do
-    dflags <- getDynFlags
+genCCall dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args = do
     targetExpr <- cmmMakeDynamicReference dflags
                   CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                            [NoHint] [NoHint]
                                            CmmMayReturn)
-    genCCall is32Bit target dest_regs args
+    genCCall dflags is32Bit target dest_regs args
   where
     lbl = mkCmmCodeLabel primPackageId (fsLit (word2FloatLabel width))
 
-genCCall is32Bit target dest_regs args
+genCCall _ is32Bit target dest_regs args
  | is32Bit   = genCCall32 target dest_regs args
  | otherwise = genCCall64 target dest_regs args
 
@@ -2303,12 +2313,6 @@ maybePromoteCArg dflags wto arg
  | otherwise   = arg
  where
    wfrom = cmmExprWidth dflags arg
-
--- | We're willing to inline and unroll memcpy/memset calls that touch
--- at most these many bytes.  This threshold is the same as the one
--- used by GCC and LLVM.
-maxInlineSizeThreshold :: Integer
-maxInlineSizeThreshold = 128
 
 outOfLineCmmOp :: CallishMachOp -> Maybe CmmFormal -> [CmmActual] -> NatM InstrBlock
 outOfLineCmmOp mop res args

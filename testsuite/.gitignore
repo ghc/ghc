@@ -139,6 +139,7 @@ tests/codeGen/should_compile/T2578
 tests/codeGen/should_gen_asm/memcpy-unroll-conprop.s
 tests/codeGen/should_gen_asm/memcpy-unroll.s
 tests/codeGen/should_gen_asm/memcpy.s
+tests/codeGen/should_gen_asm/memset-unroll.s
 tests/codeGen/should_run/1852
 tests/codeGen/should_run/1861
 tests/codeGen/should_run/2080

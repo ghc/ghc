@@ -1900,6 +1900,30 @@
             <entry>-</entry>
           </row>
 
+          <row>
+            <entry>
+            <option>-fmax-inline-memcpy-insns</option>=<replaceable>n</replaceable>
+            </entry>
+            <entry>Inline memcpy calls if they would generate no more
+            than <replaceable>n</replaceable> pseudo instructions
+            (default: 32).
+            </entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry>
+            <option>-fmax-inline-memset-insns</option>=<replaceable>n</replaceable>
+            </entry>
+            <entry>Inline memset calls if they would generate no more
+            than <replaceable>n</replaceable> pseudo instructions
+            (default: 32).
+            </entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
         </tbody>
       </tgroup>
     </informaltable>
