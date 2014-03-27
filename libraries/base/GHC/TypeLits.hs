@@ -154,9 +154,13 @@ infixr 8 ^
 type x <= y = (x <=? y) ~ True
 
 -- | Comparison of type-level symbols, as a function.
+--
+-- /Since: 4.7.0.0/
 type family CmpSymbol (m :: Symbol) (n :: Symbol) :: Ordering
 
 -- | Comparison of type-level naturals, as a function.
+--
+-- /Since: 4.7.0.0/
 type family CmpNat    (m :: Nat)    (n :: Nat)    :: Ordering
 
 {- | Comparison of type-level naturals, as a function.
