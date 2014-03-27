@@ -225,6 +225,26 @@ stg_unsafeThawArrayzh ( gcptr arr )
   }
 }
 
+stg_copyArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n )
+{
+    copyArray(src, src_off, dst, dst_off, n)
+}
+
+stg_copyMutableArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n )
+{
+    copyMutableArray(src, src_off, dst, dst_off, n)
+}
+
+stg_copyArrayArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n )
+{
+    copyArray(src, src_off, dst, dst_off, n)
+}
+
+stg_copyMutableArrayArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n )
+{
+    copyMutableArray(src, src_off, dst, dst_off, n)
+}
+
 stg_cloneArrayzh ( gcptr src, W_ offset, W_ n )
 {
   cloneArray(stg_MUT_ARR_PTRS_FROZEN_info, src, offset, n)

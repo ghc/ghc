@@ -770,9 +770,9 @@ primop  CopyArrayOp "copyArray#" GenPrimOp
    be the same array in different states, but this is not checked
    either.}
   with
+  out_of_line      = True
   has_side_effects = True
   can_fail         = True
-  code_size = { primOpCodeSizeForeignCall + 4 }
 
 primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
   MutableArray# s a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
@@ -783,9 +783,9 @@ primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
    refer to the same array. Both arrays must fully contain the
    specified ranges, but this is not checked.}
   with
+  out_of_line      = True
   has_side_effects = True
   can_fail         = True
-  code_size = { primOpCodeSizeForeignCall + 4 }
 
 primop  CloneArrayOp "cloneArray#" GenPrimOp
   Array# a -> Int# -> Int# -> Array# a
@@ -1299,9 +1299,9 @@ primop  CopyArrayArrayOp "copyArrayArray#" GenPrimOp
    Both arrays must fully contain the specified ranges, but this is not checked.
    The two arrays must not be the same array in different states, but this is not checked either.}
   with
+  out_of_line      = True
   has_side_effects = True
-  can_fail = True
-  code_size = { primOpCodeSizeForeignCall }
+  can_fail         = True
 
 primop  CopyMutableArrayArrayOp "copyMutableArrayArray#" GenPrimOp
   MutableArrayArray# s -> Int# -> MutableArrayArray# s -> Int# -> Int# -> State# s -> State# s
@@ -1309,9 +1309,9 @@ primop  CopyMutableArrayArrayOp "copyMutableArrayArray#" GenPrimOp
    MutableArrayArray#.
    Both arrays must fully contain the specified ranges, but this is not checked.}
   with
+  out_of_line      = True
   has_side_effects = True
-  code_size = { primOpCodeSizeForeignCall }
-  can_fail = True
+  can_fail         = True
 
 ------------------------------------------------------------------------
 section "Addr#"

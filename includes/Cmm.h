@@ -837,4 +837,57 @@
                                                                \
     return (dst);
 
+#define copyArray(src, src_off, dst, dst_off, n)                  \
+  W_ dst_elems_p, dst_p, src_p, dst_cards_p, bytes;               \
+                                                                  \
+    if ((n) != 0) {                                               \
+        SET_HDR(dst, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);          \
+                                                                  \
+        dst_elems_p = (dst) + SIZEOF_StgMutArrPtrs;               \
+        dst_p = dst_elems_p + WDS(dst_off);                       \
+        src_p = (src) + SIZEOF_StgMutArrPtrs + WDS(src_off);      \
+        bytes = WDS(n);                                           \
+                                                                  \
+        prim %memcpy(dst_p, src_p, bytes, WDS(1));                \
+                                                                  \
+        dst_cards_p = dst_elems_p + WDS(StgMutArrPtrs_ptrs(dst)); \
+        setCards(dst_cards_p, dst_off, n);                        \
+    }                                                             \
+                                                                  \
+    return ();
+
+#define copyMutableArray(src, src_off, dst, dst_off, n)           \
+  W_ dst_elems_p, dst_p, src_p, dst_cards_p, bytes;               \
+                                                                  \
+    if ((n) != 0) {                                               \
+        SET_HDR(dst, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);          \
+                                                                  \
+        dst_elems_p = (dst) + SIZEOF_StgMutArrPtrs;               \
+        dst_p = dst_elems_p + WDS(dst_off);                       \
+        src_p = (src) + SIZEOF_StgMutArrPtrs + WDS(src_off);      \
+        bytes = WDS(n);                                           \
+                                                                  \
+        if ((src) == (dst)) {                                     \
+            prim %memmove(dst_p, src_p, bytes, WDS(1));           \
+        } else {                                                  \
+            prim %memcpy(dst_p, src_p, bytes, WDS(1));            \
+        }                                                         \
+                                                                  \
+        dst_cards_p = dst_elems_p + WDS(StgMutArrPtrs_ptrs(dst)); \
+        setCards(dst_cards_p, dst_off, n);                        \
+    }                                                             \
+                                                                  \
+    return ();
+
+/*
+ * Set the cards in the cards table pointed to by dst_cards_p for an
+ * update to n elements, starting at element dst_off.
+ */
+#define setCards(dst_cards_p, dst_off, n)                      \
+    W_ __start_card, __end_card, __cards;                      \
+    __start_card = mutArrPtrCardDown(dst_off);                 \
+    __end_card = mutArrPtrCardDown((dst_off) + (n) - 1);       \
+    __cards = __end_card - __start_card + 1;                   \
+    prim %memset((dst_cards_p) + __start_card, 1, __cards, 1);
+
 #endif /* CMM_H */

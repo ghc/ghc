@@ -141,6 +141,22 @@ shouldInlinePrimOp dflags NewArrayOp [(CmmLit (CmmInt n _)), init]
   | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
       Just $ \ [res] -> doNewArrayOp res (fromInteger n) init
 
+shouldInlinePrimOp _ CopyArrayOp
+    [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] =
+        Just $ \ [] -> doCopyArrayOp src src_off dst dst_off (fromInteger n)
+
+shouldInlinePrimOp _ CopyMutableArrayOp
+    [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] =
+        Just $ \ [] -> doCopyMutableArrayOp src src_off dst dst_off (fromInteger n)
+
+shouldInlinePrimOp _ CopyArrayArrayOp
+    [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] =
+        Just $ \ [] -> doCopyArrayOp src src_off dst dst_off (fromInteger n)
+
+shouldInlinePrimOp _ CopyMutableArrayArrayOp
+    [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] =
+        Just $ \ [] -> doCopyMutableArrayOp src src_off dst dst_off (fromInteger n)
+
 shouldInlinePrimOp dflags CloneArrayOp [src, src_off, (CmmLit (CmmInt n _))]
   | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
       Just $ \ [res] -> emitCloneArray mkMAP_FROZEN_infoLabel res src src_off (fromInteger n)
@@ -357,17 +373,6 @@ emitPrimOp _      [res] UnsafeFreezeArrayArrayOp [arg]
 --  #define unsafeFreezzeByteArrayzh(r,a)       r=(a)
 emitPrimOp _      [res] UnsafeFreezeByteArrayOp [arg]
    = emitAssign (CmmLocal res) arg
-
--- Copying pointer arrays
-
-emitPrimOp _      [] CopyArrayOp [src,src_off,dst,dst_off,n] =
-    doCopyArrayOp src src_off dst dst_off n
-emitPrimOp _      [] CopyMutableArrayOp [src,src_off,dst,dst_off,n] =
-    doCopyMutableArrayOp src src_off dst dst_off n
-emitPrimOp _      [] CopyArrayArrayOp [src,src_off,dst,dst_off,n] =
-    doCopyArrayOp src src_off dst dst_off n
-emitPrimOp _      [] CopyMutableArrayArrayOp [src,src_off,dst,dst_off,n] =
-    doCopyMutableArrayOp src src_off dst dst_off n
 
 -- Reading/writing pointer arrays
 
@@ -1629,7 +1634,7 @@ assignTempE e = do
 -- destination 'MutableArray#', an offset into the destination array,
 -- and the number of elements to copy.  Copies the given number of
 -- elements from the source array to the destination array.
-doCopyArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+doCopyArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
               -> FCode ()
 doCopyArrayOp = emitCopyArray copy
   where
@@ -1637,14 +1642,15 @@ doCopyArrayOp = emitCopyArray copy
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
         do dflags <- getDynFlags
-           emitMemcpyCall dst_p src_p bytes (mkIntExpr dflags (wORD_SIZE dflags))
+           emitMemcpyCall dst_p src_p (mkIntExpr dflags bytes)
+               (mkIntExpr dflags (wORD_SIZE dflags))
 
 
 -- | Takes a source 'MutableArray#', an offset in the source array, a
 -- destination 'MutableArray#', an offset into the destination array,
 -- and the number of elements to copy.  Copies the given number of
 -- elements from the source array to the destination array.
-doCopyMutableArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+doCopyMutableArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
                      -> FCode ()
 doCopyMutableArrayOp = emitCopyArray copy
   where
@@ -1654,42 +1660,46 @@ doCopyMutableArrayOp = emitCopyArray copy
     copy src dst dst_p src_p bytes = do
         dflags <- getDynFlags
         [moveCall, cpyCall] <- forkAlts [
-            getCode $ emitMemmoveCall dst_p src_p bytes (mkIntExpr dflags (wORD_SIZE dflags)),
-            getCode $ emitMemcpyCall  dst_p src_p bytes (mkIntExpr dflags (wORD_SIZE dflags))
+            getCode $ emitMemmoveCall dst_p src_p (mkIntExpr dflags bytes)
+            (mkIntExpr dflags (wORD_SIZE dflags)),
+            getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr dflags bytes)
+            (mkIntExpr dflags (wORD_SIZE dflags))
             ]
         emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
 
-emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
-                  -> FCode ())
-              -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
+                  -> FCode ())  -- ^ copy function
+              -> CmmExpr        -- ^ source array
+              -> CmmExpr        -- ^ offset in source array
+              -> CmmExpr        -- ^ destination array
+              -> CmmExpr        -- ^ offset in destination array
+              -> WordOff        -- ^ number of elements to copy
               -> FCode ()
-emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 = do
+emitCopyArray copy src0 src_off dst0 dst_off0 n = do
     dflags <- getDynFlags
-    n       <- assignTempE n0
-    nonzero <- getCode $ do
+    when (n /= 0) $ do
         -- Passed as arguments (be careful)
         src     <- assignTempE src0
-        src_off <- assignTempE src_off0
         dst     <- assignTempE dst0
         dst_off <- assignTempE dst_off0
 
         -- Set the dirty bit in the header.
         emit (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
 
-        dst_elems_p <- assignTempE $ cmmOffsetB dflags dst (arrPtrsHdrSize dflags)
+        dst_elems_p <- assignTempE $ cmmOffsetB dflags dst
+                       (arrPtrsHdrSize dflags)
         dst_p <- assignTempE $ cmmOffsetExprW dflags dst_elems_p dst_off
-        src_p <- assignTempE $ cmmOffsetExprW dflags (cmmOffsetB dflags src (arrPtrsHdrSize dflags)) src_off
-        bytes <- assignTempE $ cmmMulWord dflags n (mkIntExpr dflags (wORD_SIZE dflags))
+        src_p <- assignTempE $ cmmOffsetExprW dflags
+                 (cmmOffsetB dflags src (arrPtrsHdrSize dflags)) src_off
+        let bytes = wordsToBytes dflags n
 
         copy src dst dst_p src_p bytes
 
         -- The base address of the destination card table
-        dst_cards_p <- assignTempE $ cmmOffsetExprW dflags dst_elems_p (loadArrPtrsSize dflags dst)
+        dst_cards_p <- assignTempE $ cmmOffsetExprW dflags dst_elems_p
+                       (loadArrPtrsSize dflags dst)
 
         emitSetCards dst_off dst_cards_p n
-
-    -- TODO: Figure out if this branch is really neccesary.
-    emit =<< mkCmmIfThen (cmmNeWord dflags n (mkIntExpr dflags 0)) nonzero
 
 -- | Takes an info table label, a register to return the newly
 -- allocated array in, a source array, an offset in the source array,
@@ -1734,11 +1744,14 @@ emitCloneArray info_p res_r src src_off n = do
 -- the card table, and the number of elements affected (*not* the
 -- number of cards). The number of elements may not be zero.
 -- Marks the relevant cards as dirty.
-emitSetCards :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+emitSetCards :: CmmExpr -> CmmExpr -> WordOff -> FCode ()
 emitSetCards dst_start dst_cards_start n = do
     dflags <- getDynFlags
     start_card <- assignTempE $ cardCmm dflags dst_start
-    let end_card = cardCmm dflags (cmmSubWord dflags (cmmAddWord dflags dst_start n) (mkIntExpr dflags 1))
+    let end_card = cardCmm dflags
+                   (cmmSubWord dflags
+                    (cmmAddWord dflags dst_start (mkIntExpr dflags n))
+                    (mkIntExpr dflags 1))
     emitMemsetCall (cmmAddWord dflags dst_cards_start start_card)
         (mkIntExpr dflags 1)
         (cmmAddWord dflags (cmmSubWord dflags end_card start_card) (mkIntExpr dflags 1))
