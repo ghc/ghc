@@ -207,7 +207,7 @@ test('T3064',
             # expected value: 14 (x86/Linux 28-06-2012):
             # 2013-11-13:     18 (x86/Windows, 64bit machine)
             # 2014-01-22:     23 (x86/Linux)
-           (wordsize(64), 37, 20)]),
+           (wordsize(64), 42, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
