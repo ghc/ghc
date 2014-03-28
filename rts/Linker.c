@@ -47,6 +47,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <libgen.h>
 
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
@@ -2313,7 +2314,7 @@ loadArchive( pathchar *path )
     size_t thisFileNameSize;
     char *fileName;
     size_t fileNameSize;
-    int isObject, isGnuIndex;
+    int isObject, isGnuIndex, isThin;
     char tmp[20];
     char *gnuFileIndex;
     int gnuFileIndexSize;
@@ -2349,6 +2350,8 @@ loadArchive( pathchar *path )
     fileNameSize = 32;
     fileName = stgMallocBytes(fileNameSize, "loadArchive(fileName)");
 
+    isThin = 0;
+
     f = pathopen(path, WSTR("rb"));
     if (!f)
         barf("loadObj: can't read `%s'", path);
@@ -2375,53 +2378,55 @@ loadArchive( pathchar *path )
     n = fread ( tmp, 1, 8, f );
     if (n != 8)
         barf("loadArchive: Failed reading header from `%s'", path);
-    if (strncmp(tmp, "!<arch>\n", 8) != 0) {
-
+    if (strncmp(tmp, "!<arch>\n", 8) == 0) {}
+    else if (strncmp(tmp, "!<thin>\n", 8) == 0) {
+        isThin = 1;
+    }
 #if defined(darwin_HOST_OS)
-        /* Not a standard archive, look for a fat archive magic number: */
-        if (ntohl(*(uint32_t *)tmp) == FAT_MAGIC) {
-            nfat_arch = ntohl(*(uint32_t *)(tmp + 4));
-            IF_DEBUG(linker, debugBelch("loadArchive: found a fat archive containing %d architectures\n", nfat_arch));
-            nfat_offset = 0;
+    /* Not a standard archive, look for a fat archive magic number: */
+    else if (ntohl(*(uint32_t *)tmp) == FAT_MAGIC) {
+        nfat_arch = ntohl(*(uint32_t *)(tmp + 4));
+        IF_DEBUG(linker, debugBelch("loadArchive: found a fat archive containing %d architectures\n", nfat_arch));
+        nfat_offset = 0;
 
-            for (i = 0; i < (int)nfat_arch; i++) {
-                /* search for the right arch */
-                n = fread( tmp, 1, 20, f );
-                if (n != 8)
-                    barf("loadArchive: Failed reading arch from `%s'", path);
-                cputype = ntohl(*(uint32_t *)tmp);
-                cpusubtype = ntohl(*(uint32_t *)(tmp + 4));
+        for (i = 0; i < (int)nfat_arch; i++) {
+            /* search for the right arch */
+            n = fread( tmp, 1, 20, f );
+            if (n != 8)
+                barf("loadArchive: Failed reading arch from `%s'", path);
+            cputype = ntohl(*(uint32_t *)tmp);
+            cpusubtype = ntohl(*(uint32_t *)(tmp + 4));
 
-                if (cputype == mycputype && cpusubtype == mycpusubtype) {
-                    IF_DEBUG(linker, debugBelch("loadArchive: found my archive in a fat archive\n"));
-                    nfat_offset = ntohl(*(uint32_t *)(tmp + 8));
-                    break;
-                }
+            if (cputype == mycputype && cpusubtype == mycpusubtype) {
+                IF_DEBUG(linker, debugBelch("loadArchive: found my archive in a fat archive\n"));
+                nfat_offset = ntohl(*(uint32_t *)(tmp + 8));
+                break;
             }
+        }
 
-            if (nfat_offset == 0) {
-               barf ("loadArchive: searched %d architectures, but no host arch found", (int)nfat_arch);
-            }
-            else {
-                n = fseek( f, nfat_offset, SEEK_SET );
-                if (n != 0)
-                    barf("loadArchive: Failed to seek to arch in `%s'", path);
-                n = fread ( tmp, 1, 8, f );
-                if (n != 8)
-                    barf("loadArchive: Failed reading header from `%s'", path);
-                if (strncmp(tmp, "!<arch>\n", 8) != 0) {
-                    barf("loadArchive: couldn't find archive in `%s' at offset %d", path, nfat_offset);
-                }
-            }
+        if (nfat_offset == 0) {
+           barf ("loadArchive: searched %d architectures, but no host arch found", (int)nfat_arch);
         }
         else {
-            barf("loadArchive: Neither an archive, nor a fat archive: `%s'", path);
+            n = fseek( f, nfat_offset, SEEK_SET );
+            if (n != 0)
+                barf("loadArchive: Failed to seek to arch in `%s'", path);
+            n = fread ( tmp, 1, 8, f );
+            if (n != 8)
+                barf("loadArchive: Failed reading header from `%s'", path);
+            if (strncmp(tmp, "!<arch>\n", 8) != 0) {
+                barf("loadArchive: couldn't find archive in `%s' at offset %d", path, nfat_offset);
+            }
         }
-
-#else
-        barf("loadArchive: Not an archive: `%s'", path);
-#endif
     }
+    else {
+        barf("loadArchive: Neither an archive, nor a fat archive: `%s'", path);
+    }
+#else
+    else {
+        barf("loadArchive: Not an archive: `%s'", path);
+    }
+#endif
 
     IF_DEBUG(linker, debugBelch("loadArchive: loading archive contents\n"));
 
@@ -2527,8 +2532,8 @@ loadArchive( pathchar *path )
                 if (n != 0 && gnuFileIndex[n - 1] != '\n') {
                     barf("loadArchive: GNU-variant filename offset %d invalid (range [0..%d]) while reading filename from `%s'", n, gnuFileIndexSize, path);
                 }
-                for (i = n; gnuFileIndex[i] != '/'; i++);
-                thisFileNameSize = i - n;
+                for (i = n; gnuFileIndex[i] != '\n'; i++);
+                thisFileNameSize = i - n - 1;
                 if (thisFileNameSize >= fileNameSize) {
                     /* Double it to avoid potentially continually
                        increasing it by 1 */
@@ -2616,9 +2621,43 @@ loadArchive( pathchar *path )
 #else
             image = stgMallocBytes(memberSize, "loadArchive(image)");
 #endif
-            n = fread ( image, 1, memberSize, f );
-            if (n != memberSize) {
-                barf("loadArchive: error whilst reading `%s'", path);
+
+            if (isThin) {
+                FILE *member;
+                char *pathCopy, *dirName, *memberPath;
+
+                /* Allocate and setup the dirname of the archive.  We'll need
+                   this to locate the thin member */
+                pathCopy = stgMallocBytes(strlen(path) + 1, "loadArchive(file)");
+                strcpy(pathCopy, path);
+                dirName = dirname(pathCopy);
+
+                /* Append the relative member name to the dirname.  This should be
+                   be the full path to the actual thin member. */
+                memberPath = stgMallocBytes(
+                    strlen(path) + 1 + strlen(fileName) + 1, "loadArchive(file)");
+                strcpy(memberPath, dirName);
+                memberPath[strlen(dirName)] = '/';
+                strcpy(memberPath + strlen(dirName) + 1, fileName);
+
+                member = pathopen(memberPath, WSTR("rb"));
+                if (!member)
+                    barf("loadObj: can't read `%s'", path);
+
+                n = fread ( image, 1, memberSize, member );
+                if (n != memberSize) {
+                    barf("loadArchive: error whilst reading `%s'", fileName);
+                }
+
+                fclose(member);
+                stgFree(memberPath);
+                stgFree(pathCopy);
+            }
+            else {
+                n = fread ( image, 1, memberSize, f );
+                if (n != memberSize) {
+                    barf("loadArchive: error whilst reading `%s'", path);
+                }
             }
 
             archiveMemberName = stgMallocBytes(pathlen(path) + thisFileNameSize + 3,
@@ -2660,14 +2699,16 @@ loadArchive( pathchar *path )
         }
         else {
             IF_DEBUG(linker, debugBelch("loadArchive: '%s' does not appear to be an object file\n", fileName));
-            n = fseek(f, memberSize, SEEK_CUR);
-            if (n != 0)
-                barf("loadArchive: error whilst seeking by %d in `%s'",
-                     memberSize, path);
+            if (!isThin || thisFileNameSize == 0) {
+                n = fseek(f, memberSize, SEEK_CUR);
+                if (n != 0)
+                    barf("loadArchive: error whilst seeking by %d in `%s'",
+                         memberSize, path);
+            }
         }
 
         /* .ar files are 2-byte aligned */
-        if (memberSize % 2) {
+        if (!(isThin && thisFileNameSize > 0) && memberSize % 2) {
             IF_DEBUG(linker, debugBelch("loadArchive: trying to read one pad byte\n"));
             n = fread ( tmp, 1, 1, f );
             if (n != 1) {
