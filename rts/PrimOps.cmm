@@ -196,33 +196,33 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
 
 stg_unsafeThawArrayzh ( gcptr arr )
 {
-  // SUBTLETY TO DO WITH THE OLD GEN MUTABLE LIST
-  //
-  // A MUT_ARR_PTRS lives on the mutable list, but a MUT_ARR_PTRS_FROZEN
-  // normally doesn't.  However, when we freeze a MUT_ARR_PTRS, we leave
-  // it on the mutable list for the GC to remove (removing something from
-  // the mutable list is not easy).
-  //
-  // So that we can tell whether a MUT_ARR_PTRS_FROZEN is on the mutable list,
-  // when we freeze it we set the info ptr to be MUT_ARR_PTRS_FROZEN0
-  // to indicate that it is still on the mutable list.
-  //
-  // So, when we thaw a MUT_ARR_PTRS_FROZEN, we must cope with two cases:
-  // either it is on a mut_list, or it isn't.  We adopt the convention that
-  // the closure type is MUT_ARR_PTRS_FROZEN0 if it is on the mutable list,
-  // and MUT_ARR_PTRS_FROZEN otherwise.  In fact it wouldn't matter if
-  // we put it on the mutable list more than once, but it would get scavenged
-  // multiple times during GC, which would be unnecessarily slow.
-  //
-  if (StgHeader_info(arr) != stg_MUT_ARR_PTRS_FROZEN0_info) {
+    // SUBTLETY TO DO WITH THE OLD GEN MUTABLE LIST
+    //
+    // A MUT_ARR_PTRS lives on the mutable list, but a MUT_ARR_PTRS_FROZEN
+    // normally doesn't.  However, when we freeze a MUT_ARR_PTRS, we leave
+    // it on the mutable list for the GC to remove (removing something from
+    // the mutable list is not easy).
+    //
+    // So that we can tell whether a MUT_ARR_PTRS_FROZEN is on the mutable list,
+    // when we freeze it we set the info ptr to be MUT_ARR_PTRS_FROZEN0
+    // to indicate that it is still on the mutable list.
+    //
+    // So, when we thaw a MUT_ARR_PTRS_FROZEN, we must cope with two cases:
+    // either it is on a mut_list, or it isn't.  We adopt the convention that
+    // the closure type is MUT_ARR_PTRS_FROZEN0 if it is on the mutable list,
+    // and MUT_ARR_PTRS_FROZEN otherwise.  In fact it wouldn't matter if
+    // we put it on the mutable list more than once, but it would get scavenged
+    // multiple times during GC, which would be unnecessarily slow.
+    //
+    if (StgHeader_info(arr) != stg_MUT_ARR_PTRS_FROZEN0_info) {
         SET_INFO(arr,stg_MUT_ARR_PTRS_DIRTY_info);
         recordMutable(arr);
         // must be done after SET_INFO, because it ASSERTs closure_MUTABLE()
         return (arr);
-  } else {
+    } else {
         SET_INFO(arr,stg_MUT_ARR_PTRS_DIRTY_info);
         return (arr);
-  }
+    }
 }
 
 stg_copyArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n )
@@ -247,23 +247,23 @@ stg_copyMutableArrayArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n
 
 stg_cloneArrayzh ( gcptr src, W_ offset, W_ n )
 {
-  cloneArray(stg_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
+    cloneArray(stg_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
 }
 
 stg_cloneMutableArrayzh ( gcptr src, W_ offset, W_ n )
 {
-  cloneArray(stg_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
+    cloneArray(stg_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
 }
 
 // We have to escape the "z" in the name.
 stg_freezzeArrayzh ( gcptr src, W_ offset, W_ n )
 {
-  cloneArray(stg_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
+    cloneArray(stg_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
 }
 
 stg_thawArrayzh ( gcptr src, W_ offset, W_ n )
 {
-  cloneArray(stg_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
+    cloneArray(stg_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
 }
 
 // RRN: Uses the ticketed approach; see casMutVar
@@ -466,13 +466,12 @@ stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
 {
     gcptr h;
 
-    (h) = ccall cas(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var,
-                          old, new);
+    (h) = ccall cas(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, old, new);
     if (h != old) {
         return (1,h);
     } else {
         if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
-           ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
+            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
         }
         return (0,new);
     }
@@ -516,44 +515,44 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
 
 #define SIZE (THUNK_2_SIZE + THUNK_1_SIZE + THUNK_1_SIZE)
 
-   HP_CHK_GEN_TICKY(SIZE);
+    HP_CHK_GEN_TICKY(SIZE);
 
-   TICK_ALLOC_THUNK_2();
-   CCCS_ALLOC(THUNK_2_SIZE);
-   z = Hp - THUNK_2_SIZE + WDS(1);
-   SET_HDR(z, stg_ap_2_upd_info, CCCS);
-   LDV_RECORD_CREATE(z);
-   StgThunk_payload(z,0) = f;
+    TICK_ALLOC_THUNK_2();
+    CCCS_ALLOC(THUNK_2_SIZE);
+    z = Hp - THUNK_2_SIZE + WDS(1);
+    SET_HDR(z, stg_ap_2_upd_info, CCCS);
+    LDV_RECORD_CREATE(z);
+    StgThunk_payload(z,0) = f;
 
-   TICK_ALLOC_THUNK_1();
-   CCCS_ALLOC(THUNK_1_SIZE);
-   y = z - THUNK_1_SIZE;
-   SET_HDR(y, stg_sel_0_upd_info, CCCS);
-   LDV_RECORD_CREATE(y);
-   StgThunk_payload(y,0) = z;
+    TICK_ALLOC_THUNK_1();
+    CCCS_ALLOC(THUNK_1_SIZE);
+    y = z - THUNK_1_SIZE;
+    SET_HDR(y, stg_sel_0_upd_info, CCCS);
+    LDV_RECORD_CREATE(y);
+    StgThunk_payload(y,0) = z;
 
-   TICK_ALLOC_THUNK_1();
-   CCCS_ALLOC(THUNK_1_SIZE);
-   r = y - THUNK_1_SIZE;
-   SET_HDR(r, stg_sel_1_upd_info, CCCS);
-   LDV_RECORD_CREATE(r);
-   StgThunk_payload(r,0) = z;
+    TICK_ALLOC_THUNK_1();
+    CCCS_ALLOC(THUNK_1_SIZE);
+    r = y - THUNK_1_SIZE;
+    SET_HDR(r, stg_sel_1_upd_info, CCCS);
+    LDV_RECORD_CREATE(r);
+    StgThunk_payload(r,0) = z;
 
- retry:
-   x = StgMutVar_var(mv);
-   StgThunk_payload(z,1) = x;
+  retry:
+    x = StgMutVar_var(mv);
+    StgThunk_payload(z,1) = x;
 #ifdef THREADED_RTS
-   (h) = ccall cas(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y);
-   if (h != x) { goto retry; }
+    (h) = ccall cas(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y);
+    if (h != x) { goto retry; }
 #else
-   StgMutVar_var(mv) = y;
+    StgMutVar_var(mv) = y;
 #endif
 
-   if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
-     ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
-   }
+    if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
+        ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
+    }
 
-   return (r);
+    return (r);
 }
 
 /* -----------------------------------------------------------------------------
@@ -566,31 +565,31 @@ stg_mkWeakzh ( gcptr key,
                gcptr value,
                gcptr finalizer /* or stg_NO_FINALIZER_closure */ )
 {
-  gcptr w;
+    gcptr w;
 
-  ALLOC_PRIM (SIZEOF_StgWeak)
+    ALLOC_PRIM (SIZEOF_StgWeak)
 
-  w = Hp - SIZEOF_StgWeak + WDS(1);
-  SET_HDR(w, stg_WEAK_info, CCCS);
+    w = Hp - SIZEOF_StgWeak + WDS(1);
+    SET_HDR(w, stg_WEAK_info, CCCS);
 
-  StgWeak_key(w)         = key;
-  StgWeak_value(w)       = value;
-  StgWeak_finalizer(w)   = finalizer;
-  StgWeak_cfinalizers(w) = stg_NO_FINALIZER_closure;
+    StgWeak_key(w)         = key;
+    StgWeak_value(w)       = value;
+    StgWeak_finalizer(w)   = finalizer;
+    StgWeak_cfinalizers(w) = stg_NO_FINALIZER_closure;
 
-  ACQUIRE_LOCK(sm_mutex);
-  StgWeak_link(w) = generation_weak_ptr_list(W_[g0]);
-  generation_weak_ptr_list(W_[g0]) = w;
-  RELEASE_LOCK(sm_mutex);
+    ACQUIRE_LOCK(sm_mutex);
+    StgWeak_link(w) = generation_weak_ptr_list(W_[g0]);
+    generation_weak_ptr_list(W_[g0]) = w;
+    RELEASE_LOCK(sm_mutex);
 
-  IF_DEBUG(weak, ccall debugBelch(stg_weak_msg,w));
+    IF_DEBUG(weak, ccall debugBelch(stg_weak_msg,w));
 
-  return (w);
+    return (w);
 }
 
 stg_mkWeakNoFinalizzerzh ( gcptr key, gcptr value )
 {
-  jump stg_mkWeakzh (key, value, stg_NO_FINALIZER_closure);
+    jump stg_mkWeakzh (key, value, stg_NO_FINALIZER_closure);
 }
 
 STRING(stg_cfinalizer_msg,"Adding a finalizer to %p\n")
@@ -601,110 +600,110 @@ stg_addCFinalizzerToWeakzh ( W_ fptr,   // finalizer
                              W_ eptr,
                              gcptr w )
 {
-  W_ c, info;
+    W_ c, info;
 
-  ALLOC_PRIM (SIZEOF_StgCFinalizerList)
+    ALLOC_PRIM (SIZEOF_StgCFinalizerList)
 
-  c = Hp - SIZEOF_StgCFinalizerList + WDS(1);
-  SET_HDR(c, stg_C_FINALIZER_LIST_info, CCCS);
+    c = Hp - SIZEOF_StgCFinalizerList + WDS(1);
+    SET_HDR(c, stg_C_FINALIZER_LIST_info, CCCS);
 
-  StgCFinalizerList_fptr(c) = fptr;
-  StgCFinalizerList_ptr(c) = ptr;
-  StgCFinalizerList_eptr(c) = eptr;
-  StgCFinalizerList_flag(c) = flag;
+    StgCFinalizerList_fptr(c) = fptr;
+    StgCFinalizerList_ptr(c) = ptr;
+    StgCFinalizerList_eptr(c) = eptr;
+    StgCFinalizerList_flag(c) = flag;
 
-  LOCK_CLOSURE(w, info);
+    LOCK_CLOSURE(w, info);
 
-  if (info == stg_DEAD_WEAK_info) {
-    // Already dead.
+    if (info == stg_DEAD_WEAK_info) {
+        // Already dead.
+        unlockClosure(w, info);
+        return (0);
+    }
+
+    StgCFinalizerList_link(c) = StgWeak_cfinalizers(w);
+    StgWeak_cfinalizers(w) = c;
+
     unlockClosure(w, info);
-    return (0);
-  }
 
-  StgCFinalizerList_link(c) = StgWeak_cfinalizers(w);
-  StgWeak_cfinalizers(w) = c;
+    recordMutable(w);
 
-  unlockClosure(w, info);
+    IF_DEBUG(weak, ccall debugBelch(stg_cfinalizer_msg,w));
 
-  recordMutable(w);
-
-  IF_DEBUG(weak, ccall debugBelch(stg_cfinalizer_msg,w));
-
-  return (1);
+    return (1);
 }
 
 stg_finalizzeWeakzh ( gcptr w )
 {
-  gcptr f, list;
-  W_ info;
+    gcptr f, list;
+    W_ info;
 
-  LOCK_CLOSURE(w, info);
+    LOCK_CLOSURE(w, info);
 
-  // already dead?
-  if (info == stg_DEAD_WEAK_info) {
-      unlockClosure(w, info);
-      return (0,stg_NO_FINALIZER_closure);
-  }
+    // already dead?
+    if (info == stg_DEAD_WEAK_info) {
+        unlockClosure(w, info);
+        return (0,stg_NO_FINALIZER_closure);
+    }
 
-  f    = StgWeak_finalizer(w);
-  list = StgWeak_cfinalizers(w);
+    f    = StgWeak_finalizer(w);
+    list = StgWeak_cfinalizers(w);
 
-  // kill it
+    // kill it
 #ifdef PROFILING
-  // @LDV profiling
-  // A weak pointer is inherently used, so we do not need to call
-  // LDV_recordDead_FILL_SLOP_DYNAMIC():
-  //    LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)w);
-  // or, LDV_recordDead():
-  //    LDV_recordDead((StgClosure *)w, sizeofW(StgWeak) - sizeofW(StgProfHeader));
-  // Furthermore, when PROFILING is turned on, dead weak pointers are exactly as
-  // large as weak pointers, so there is no need to fill the slop, either.
-  // See stg_DEAD_WEAK_info in StgMiscClosures.hc.
+    // @LDV profiling
+    // A weak pointer is inherently used, so we do not need to call
+    // LDV_recordDead_FILL_SLOP_DYNAMIC():
+    //    LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)w);
+    // or, LDV_recordDead():
+    //    LDV_recordDead((StgClosure *)w, sizeofW(StgWeak) - sizeofW(StgProfHeader));
+    // Furthermore, when PROFILING is turned on, dead weak pointers are exactly as
+    // large as weak pointers, so there is no need to fill the slop, either.
+    // See stg_DEAD_WEAK_info in StgMiscClosures.hc.
 #endif
 
-  //
-  // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
-  //
-  unlockClosure(w, stg_DEAD_WEAK_info);
+    //
+    // Todo: maybe use SET_HDR() and remove LDV_recordCreate()?
+    //
+    unlockClosure(w, stg_DEAD_WEAK_info);
 
-  LDV_RECORD_CREATE(w);
+    LDV_RECORD_CREATE(w);
 
-  if (list != stg_NO_FINALIZER_closure) {
-    ccall runCFinalizers(list);
-  }
+    if (list != stg_NO_FINALIZER_closure) {
+      ccall runCFinalizers(list);
+    }
 
-  /* return the finalizer */
-  if (f == stg_NO_FINALIZER_closure) {
-      return (0,stg_NO_FINALIZER_closure);
-  } else {
-      return (1,f);
-  }
+    /* return the finalizer */
+    if (f == stg_NO_FINALIZER_closure) {
+        return (0,stg_NO_FINALIZER_closure);
+    } else {
+        return (1,f);
+    }
 }
 
 stg_deRefWeakzh ( gcptr w )
 {
-  W_ code, info;
-  gcptr val;
+    W_ code, info;
+    gcptr val;
 
-  info = GET_INFO(w);
+    info = GET_INFO(w);
 
-  if (info == stg_WHITEHOLE_info) {
-    // w is locked by another thread. Now it's not immediately clear if w is
-    // alive or not. We use lockClosure to wait for the info pointer to become
-    // something other than stg_WHITEHOLE_info.
+    if (info == stg_WHITEHOLE_info) {
+        // w is locked by another thread. Now it's not immediately clear if w is
+        // alive or not. We use lockClosure to wait for the info pointer to become
+        // something other than stg_WHITEHOLE_info.
 
-    LOCK_CLOSURE(w, info);
-    unlockClosure(w, info);
-  }
+        LOCK_CLOSURE(w, info);
+        unlockClosure(w, info);
+    }
 
-  if (info == stg_WEAK_info) {
-    code = 1;
-    val = StgWeak_value(w);
-  } else {
-    code = 0;
-    val = w;
-  }
-  return (code,val);
+    if (info == stg_WEAK_info) {
+        code = 1;
+        val = StgWeak_value(w);
+    } else {
+        code = 0;
+        val = w;
+    }
+    return (code,val);
 }
 
 /* -----------------------------------------------------------------------------
@@ -720,14 +719,14 @@ stg_decodeFloatzuIntzh ( F_ arg )
 
     reserve 2 = tmp {
 
-      mp_tmp1  = tmp + WDS(1);
-      mp_tmp_w = tmp;
+        mp_tmp1  = tmp + WDS(1);
+        mp_tmp_w = tmp;
 
-      /* Perform the operation */
-      ccall __decodeFloat_Int(mp_tmp1 "ptr", mp_tmp_w "ptr", arg);
+        /* Perform the operation */
+        ccall __decodeFloat_Int(mp_tmp1 "ptr", mp_tmp_w "ptr", arg);
 
-      r1 = W_[mp_tmp1];
-      r2 = W_[mp_tmp_w];
+        r1 = W_[mp_tmp1];
+        r2 = W_[mp_tmp_w];
     }
 
     /* returns: (Int# (mantissa), Int# (exponent)) */
@@ -744,20 +743,20 @@ stg_decodeDoublezu2Intzh ( D_ arg )
 
     reserve 4 = tmp {
 
-      mp_tmp1    = tmp + WDS(3);
-      mp_tmp2    = tmp + WDS(2);
-      mp_result1 = tmp + WDS(1);
-      mp_result2 = tmp;
+        mp_tmp1    = tmp + WDS(3);
+        mp_tmp2    = tmp + WDS(2);
+        mp_result1 = tmp + WDS(1);
+        mp_result2 = tmp;
   
-      /* Perform the operation */
-      ccall __decodeDouble_2Int(mp_tmp1 "ptr", mp_tmp2 "ptr",
-                                      mp_result1 "ptr", mp_result2 "ptr",
-                                      arg);
+        /* Perform the operation */
+        ccall __decodeDouble_2Int(mp_tmp1 "ptr", mp_tmp2 "ptr",
+                                  mp_result1 "ptr", mp_result2 "ptr",
+                                  arg);
 
-      r1 = W_[mp_tmp1];
-      r2 = W_[mp_tmp2];
-      r3 = W_[mp_result1];
-      r4 = W_[mp_result2];
+        r1 = W_[mp_tmp1];
+        r2 = W_[mp_tmp2];
+        r3 = W_[mp_result1];
+        r4 = W_[mp_result2];
     }
 
     /* returns:
@@ -771,80 +770,81 @@ stg_decodeDoublezu2Intzh ( D_ arg )
 
 stg_forkzh ( gcptr closure )
 {
-  MAYBE_GC_P(stg_forkzh, closure);
+    MAYBE_GC_P(stg_forkzh, closure);
 
-  gcptr threadid;
+    gcptr threadid;
 
-  ("ptr" threadid) = ccall createIOThread( MyCapability() "ptr",
-                                RtsFlags_GcFlags_initialStkSize(RtsFlags),
-                                closure "ptr");
+    ("ptr" threadid) = ccall createIOThread( MyCapability() "ptr",
+                                  RtsFlags_GcFlags_initialStkSize(RtsFlags),
+                                  closure "ptr");
 
-  /* start blocked if the current thread is blocked */
-  StgTSO_flags(threadid) = %lobits16(
-     TO_W_(StgTSO_flags(threadid)) |
-     TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE));
+    /* start blocked if the current thread is blocked */
+    StgTSO_flags(threadid) = %lobits16(
+        TO_W_(StgTSO_flags(threadid)) |
+        TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE));
 
-  ccall scheduleThread(MyCapability() "ptr", threadid "ptr");
+    ccall scheduleThread(MyCapability() "ptr", threadid "ptr");
 
-  // context switch soon, but not immediately: we don't want every
-  // forkIO to force a context-switch.
-  Capability_context_switch(MyCapability()) = 1 :: CInt;
+    // context switch soon, but not immediately: we don't want every
+    // forkIO to force a context-switch.
+    Capability_context_switch(MyCapability()) = 1 :: CInt;
 
-  return (threadid);
+    return (threadid);
 }
 
 stg_forkOnzh ( W_ cpu, gcptr closure )
 {
 again: MAYBE_GC(again);
 
-  gcptr threadid;
+    gcptr threadid;
 
-  ("ptr" threadid) = ccall createIOThread( MyCapability() "ptr",
-                                RtsFlags_GcFlags_initialStkSize(RtsFlags),
-                                closure "ptr");
+    ("ptr" threadid) = ccall createIOThread(
+        MyCapability() "ptr",
+        RtsFlags_GcFlags_initialStkSize(RtsFlags),
+        closure "ptr");
 
-  /* start blocked if the current thread is blocked */
-  StgTSO_flags(threadid) = %lobits16(
-     TO_W_(StgTSO_flags(threadid)) |
-     TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE));
+    /* start blocked if the current thread is blocked */
+    StgTSO_flags(threadid) = %lobits16(
+        TO_W_(StgTSO_flags(threadid)) |
+        TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE));
 
-  ccall scheduleThreadOn(MyCapability() "ptr", cpu, threadid "ptr");
+    ccall scheduleThreadOn(MyCapability() "ptr", cpu, threadid "ptr");
 
-  // context switch soon, but not immediately: we don't want every
-  // forkIO to force a context-switch.
-  Capability_context_switch(MyCapability()) = 1 :: CInt;
+    // context switch soon, but not immediately: we don't want every
+    // forkIO to force a context-switch.
+    Capability_context_switch(MyCapability()) = 1 :: CInt;
 
-  return (threadid);
+    return (threadid);
 }
 
 stg_yieldzh ()
 {
-  // when we yield to the scheduler, we have to tell it to put the
-  // current thread to the back of the queue by setting the
-  // context_switch flag.  If we don't do this, it will run the same
-  // thread again.
-  Capability_context_switch(MyCapability()) = 1 :: CInt;
-  jump stg_yield_noregs();
+    // when we yield to the scheduler, we have to tell it to put the
+    // current thread to the back of the queue by setting the
+    // context_switch flag.  If we don't do this, it will run the same
+    // thread again.
+    Capability_context_switch(MyCapability()) = 1 :: CInt;
+    jump stg_yield_noregs();
 }
 
 stg_myThreadIdzh ()
 {
-  return (CurrentTSO);
+    return (CurrentTSO);
 }
 
 stg_labelThreadzh ( gcptr threadid, W_ addr )
 {
 #if defined(DEBUG) || defined(TRACING) || defined(DTRACE)
-  ccall labelThread(MyCapability() "ptr", threadid "ptr", addr "ptr");
+    ccall labelThread(MyCapability() "ptr", threadid "ptr", addr "ptr");
 #endif
-  return ();
+    return ();
 }
 
 stg_isCurrentThreadBoundzh (/* no args */)
 {
-  W_ r;
-  (r) = ccall isThreadBound(CurrentTSO);
-  return (r);
+    W_ r;
+    (r) = ccall isThreadBound(CurrentTSO);
+    return (r);
 }
 
 stg_threadStatuszh ( gcptr tso )
@@ -945,11 +945,11 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
 
 // This must match StgAtomicallyFrame in Closures.h
 #define ATOMICALLY_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,code,next,result)  \
-  w_ info_ptr,                                                          \
-  PROF_HDR_FIELDS(w_,p1,p2)                                             \
-  p_ code,                                                              \
-  p_ next,                                                              \
-  p_ result
+    w_ info_ptr,                                                        \
+    PROF_HDR_FIELDS(w_,p1,p2)                                           \
+    p_ code,                                                            \
+    p_ next,                                                            \
+    p_ result
 
 
 INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
@@ -961,63 +961,64 @@ INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
                                        frame_result))
     return (P_ result) // value returned to the frame
 {
-  W_ valid;
-  gcptr trec, outer, next_invariant, q;
+    W_ valid;
+    gcptr trec, outer, next_invariant, q;
 
-  trec   = StgTSO_trec(CurrentTSO);
-  outer  = StgTRecHeader_enclosing_trec(trec);
+    trec   = StgTSO_trec(CurrentTSO);
+    outer  = StgTRecHeader_enclosing_trec(trec);
 
-  if (outer == NO_TREC) {
-    /* First time back at the atomically frame -- pick up invariants */
-    ("ptr" next_invariant) =
-        ccall stmGetInvariantsToCheck(MyCapability() "ptr", trec "ptr");
-    frame_result = result;
+    if (outer == NO_TREC) {
+        /* First time back at the atomically frame -- pick up invariants */
+        ("ptr" next_invariant) =
+            ccall stmGetInvariantsToCheck(MyCapability() "ptr", trec "ptr");
+        frame_result = result;
 
-  } else {
-    /* Second/subsequent time back at the atomically frame -- abort the
-     * tx that's checking the invariant and move on to the next one */
-    StgTSO_trec(CurrentTSO) = outer;
-    StgInvariantCheckQueue_my_execution(next_invariant) = trec;
-    ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
-    /* Don't free trec -- it's linked from q and will be stashed in the
-     * invariant if we eventually commit. */
-    next_invariant =
-       StgInvariantCheckQueue_next_queue_entry(next_invariant);
-    trec = outer;
-  }
-
-  if (next_invariant != END_INVARIANT_CHECK_QUEUE) {
-    /* We can't commit yet: another invariant to check */
-    ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", trec "ptr");
-    StgTSO_trec(CurrentTSO) = trec;
-    q = StgInvariantCheckQueue_invariant(next_invariant);
-    jump stg_ap_v_fast
-        (ATOMICALLY_FRAME_FIELDS(,,info_ptr,p1,p2,
-                                 code,next_invariant,frame_result))
-        (StgAtomicInvariant_code(q));
-
-  } else {
-
-    /* We've got no more invariants to check, try to commit */
-    (valid) = ccall stmCommitTransaction(MyCapability() "ptr", trec "ptr");
-    if (valid != 0) {
-      /* Transaction was valid: commit succeeded */
-      StgTSO_trec(CurrentTSO) = NO_TREC;
-      return (frame_result);
     } else {
-      /* Transaction was not valid: try again */
-      ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
-      StgTSO_trec(CurrentTSO) = trec;
-      next_invariant = END_INVARIANT_CHECK_QUEUE;
-
-      jump stg_ap_v_fast
-          // push the StgAtomicallyFrame again: the code generator is
-          // clever enough to only assign the fields that have changed.
-          (ATOMICALLY_FRAME_FIELDS(,,info_ptr,p1,p2,
-                                   code,next_invariant,frame_result))
-          (code);
+        /* Second/subsequent time back at the atomically frame -- abort the
+         * tx that's checking the invariant and move on to the next one */
+        StgTSO_trec(CurrentTSO) = outer;
+        StgInvariantCheckQueue_my_execution(next_invariant) = trec;
+        ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
+        /* Don't free trec -- it's linked from q and will be stashed in the
+         * invariant if we eventually commit. */
+        next_invariant =
+           StgInvariantCheckQueue_next_queue_entry(next_invariant);
+        trec = outer;
     }
-  }
+
+    if (next_invariant != END_INVARIANT_CHECK_QUEUE) {
+        /* We can't commit yet: another invariant to check */
+        ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", trec "ptr");
+        StgTSO_trec(CurrentTSO) = trec;
+        q = StgInvariantCheckQueue_invariant(next_invariant);
+        jump stg_ap_v_fast
+            (ATOMICALLY_FRAME_FIELDS(,,info_ptr,p1,p2,
+                                     code,next_invariant,frame_result))
+            (StgAtomicInvariant_code(q));
+
+    } else {
+
+        /* We've got no more invariants to check, try to commit */
+        (valid) = ccall stmCommitTransaction(MyCapability() "ptr", trec "ptr");
+        if (valid != 0) {
+            /* Transaction was valid: commit succeeded */
+            StgTSO_trec(CurrentTSO) = NO_TREC;
+            return (frame_result);
+        } else {
+            /* Transaction was not valid: try again */
+            ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr",
+                                                     NO_TREC "ptr");
+            StgTSO_trec(CurrentTSO) = trec;
+            next_invariant = END_INVARIANT_CHECK_QUEUE;
+
+            jump stg_ap_v_fast
+                // push the StgAtomicallyFrame again: the code generator is
+                // clever enough to only assign the fields that have changed.
+                (ATOMICALLY_FRAME_FIELDS(,,info_ptr,p1,p2,
+                                         code,next_invariant,frame_result))
+                (code);
+        }
+    }
 }
 
 
@@ -1030,27 +1031,27 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
                                        frame_result))
     return (/* no return values */)
 {
-  W_ trec, valid;
+    W_ trec, valid;
 
-  /* The TSO is currently waiting: should we stop waiting? */
-  (valid) = ccall stmReWait(MyCapability() "ptr", CurrentTSO "ptr");
-  if (valid != 0) {
-      /* Previous attempt is still valid: no point trying again yet */
-      jump stg_block_noregs
-          (ATOMICALLY_FRAME_FIELDS(,,info_ptr, p1, p2,
-                                   code,next_invariant,frame_result))
-          ();
-  } else {
-    /* Previous attempt is no longer valid: try again */
-    ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
-    StgTSO_trec(CurrentTSO) = trec;
+    /* The TSO is currently waiting: should we stop waiting? */
+    (valid) = ccall stmReWait(MyCapability() "ptr", CurrentTSO "ptr");
+    if (valid != 0) {
+        /* Previous attempt is still valid: no point trying again yet */
+        jump stg_block_noregs
+            (ATOMICALLY_FRAME_FIELDS(,,info_ptr, p1, p2,
+                                     code,next_invariant,frame_result))
+            ();
+    } else {
+        /* Previous attempt is no longer valid: try again */
+        ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
+        StgTSO_trec(CurrentTSO) = trec;
 
-    // change the frame header to stg_atomically_frame_info
-    jump stg_ap_v_fast
-        (ATOMICALLY_FRAME_FIELDS(,,stg_atomically_frame_info, p1, p2,
-                                 code,next_invariant,frame_result))
-        (code);
-  }
+        // change the frame header to stg_atomically_frame_info
+        jump stg_ap_v_fast
+            (ATOMICALLY_FRAME_FIELDS(,,stg_atomically_frame_info, p1, p2,
+                                     code,next_invariant,frame_result))
+            (code);
+    }
 }
 
 // STM catch frame -------------------------------------------------------------
@@ -1061,10 +1062,10 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
  */
 
 #define CATCH_STM_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,code,handler) \
-  w_ info_ptr,                                                  \
-  PROF_HDR_FIELDS(w_,p1,p2)                                     \
-  p_ code,                                                      \
-  p_ handler
+    w_ info_ptr,                                                  \
+    PROF_HDR_FIELDS(w_,p1,p2)                                     \
+    p_ code,                                                      \
+    p_ handler
 
 INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
                // layout of the frame, and bind the field names
@@ -1097,34 +1098,34 @@ INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
 
 stg_atomicallyzh (P_ stm)
 {
-  P_ old_trec;
-  P_ new_trec;
-  P_ code, next_invariant, frame_result;
+    P_ old_trec;
+    P_ new_trec;
+    P_ code, next_invariant, frame_result;
 
-  // stmStartTransaction may allocate
-  MAYBE_GC_P(stg_atomicallyzh, stm);
+    // stmStartTransaction may allocate
+    MAYBE_GC_P(stg_atomicallyzh, stm);
 
-  STK_CHK_GEN();
+    STK_CHK_GEN();
 
-  old_trec = StgTSO_trec(CurrentTSO);
+    old_trec = StgTSO_trec(CurrentTSO);
 
-  /* Nested transactions are not allowed; raise an exception */
-  if (old_trec != NO_TREC) {
-     jump stg_raisezh(base_ControlziExceptionziBase_nestedAtomically_closure);
-  }
+    /* Nested transactions are not allowed; raise an exception */
+    if (old_trec != NO_TREC) {
+        jump stg_raisezh(base_ControlziExceptionziBase_nestedAtomically_closure);
+    }
 
-  code = stm;
-  next_invariant = END_INVARIANT_CHECK_QUEUE;
-  frame_result = NO_TREC;
+    code = stm;
+    next_invariant = END_INVARIANT_CHECK_QUEUE;
+    frame_result = NO_TREC;
 
-  /* Start the memory transcation */
-  ("ptr" new_trec) = ccall stmStartTransaction(MyCapability() "ptr", old_trec "ptr");
-  StgTSO_trec(CurrentTSO) = new_trec;
+    /* Start the memory transcation */
+    ("ptr" new_trec) = ccall stmStartTransaction(MyCapability() "ptr", old_trec "ptr");
+    StgTSO_trec(CurrentTSO) = new_trec;
 
-  jump stg_ap_v_fast
-      (ATOMICALLY_FRAME_FIELDS(,,stg_atomically_frame_info, CCCS, 0,
-                               code,next_invariant,frame_result))
-      (stm);
+    jump stg_ap_v_fast
+        (ATOMICALLY_FRAME_FIELDS(,,stg_atomically_frame_info, CCCS, 0,
+                                 code,next_invariant,frame_result))
+        (stm);
 }
 
 // A closure representing "atomically x".  This is used when a thread
@@ -1161,99 +1162,99 @@ stg_catchSTMzh (P_ code    /* :: STM a */,
 stg_catchRetryzh (P_ first_code, /* :: STM a */
                   P_ alt_code    /* :: STM a */)
 {
-  W_ new_trec;
+    W_ new_trec;
 
-  // stmStartTransaction may allocate
-  MAYBE_GC_PP (stg_catchRetryzh, first_code, alt_code);
+    // stmStartTransaction may allocate
+    MAYBE_GC_PP (stg_catchRetryzh, first_code, alt_code);
 
-  STK_CHK_GEN();
+    STK_CHK_GEN();
 
-  /* Start a nested transaction within which to run the first code */
-  ("ptr" new_trec) = ccall stmStartTransaction(MyCapability() "ptr",
-                                               StgTSO_trec(CurrentTSO) "ptr");
-  StgTSO_trec(CurrentTSO) = new_trec;
+    /* Start a nested transaction within which to run the first code */
+    ("ptr" new_trec) = ccall stmStartTransaction(MyCapability() "ptr",
+                                                 StgTSO_trec(CurrentTSO) "ptr");
+    StgTSO_trec(CurrentTSO) = new_trec;
 
-  // push the CATCH_RETRY stack frame, and apply first_code to realWorld#
-  jump stg_ap_v_fast
-      (CATCH_RETRY_FRAME_FIELDS(,, stg_catch_retry_frame_info, CCCS, 0,
-                                0, /* not running_alt_code */
-                                first_code,
-                                alt_code))
-      (first_code);
+    // push the CATCH_RETRY stack frame, and apply first_code to realWorld#
+    jump stg_ap_v_fast
+        (CATCH_RETRY_FRAME_FIELDS(,, stg_catch_retry_frame_info, CCCS, 0,
+                                  0, /* not running_alt_code */
+                                  first_code,
+                                  alt_code))
+        (first_code);
 }
 
 
 stg_retryzh /* no arg list: explicit stack layout */
 {
-  W_ frame_type;
-  W_ frame;
-  W_ trec;
-  W_ outer;
-  W_ r;
+    W_ frame_type;
+    W_ frame;
+    W_ trec;
+    W_ outer;
+    W_ r;
 
-  // STM operations may allocate
-  MAYBE_GC_ (stg_retryzh); // NB. not MAYBE_GC(), we cannot make a
-                           // function call in an explicit-stack proc
+    // STM operations may allocate
+    MAYBE_GC_ (stg_retryzh); // NB. not MAYBE_GC(), we cannot make a
+                             // function call in an explicit-stack proc
 
-  // Find the enclosing ATOMICALLY_FRAME or CATCH_RETRY_FRAME
+    // Find the enclosing ATOMICALLY_FRAME or CATCH_RETRY_FRAME
 retry_pop_stack:
-  SAVE_THREAD_STATE();
-  (frame_type) = ccall findRetryFrameHelper(MyCapability(), CurrentTSO "ptr");
-  LOAD_THREAD_STATE();
-  frame = Sp;
-  trec = StgTSO_trec(CurrentTSO);
-  outer  = StgTRecHeader_enclosing_trec(trec);
-
-  if (frame_type == CATCH_RETRY_FRAME) {
-    // The retry reaches a CATCH_RETRY_FRAME before the atomic frame
-    ASSERT(outer != NO_TREC);
-    // Abort the transaction attempting the current branch
-    ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
-    ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
-    if (!StgCatchRetryFrame_running_alt_code(frame) != 0) {
-      // Retry in the first branch: try the alternative
-      ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", outer "ptr");
-      StgTSO_trec(CurrentTSO) = trec;
-      StgCatchRetryFrame_running_alt_code(frame) = 1 :: CInt; // true;
-      R1 = StgCatchRetryFrame_alt_code(frame);
-      jump stg_ap_v_fast [R1];
-    } else {
-      // Retry in the alternative code: propagate the retry
-      StgTSO_trec(CurrentTSO) = outer;
-      Sp = Sp + SIZEOF_StgCatchRetryFrame;
-      goto retry_pop_stack;
-    }
-  }
-
-  // We've reached the ATOMICALLY_FRAME: attempt to wait
-  ASSERT(frame_type == ATOMICALLY_FRAME);
-  if (outer != NO_TREC) {
-    // We called retry while checking invariants, so abort the current
-    // invariant check (merging its TVar accesses into the parents read
-    // set so we'll wait on them)
-    ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
-    ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
-    trec = outer;
-    StgTSO_trec(CurrentTSO) = trec;
+    SAVE_THREAD_STATE();
+    (frame_type) = ccall findRetryFrameHelper(MyCapability(), CurrentTSO "ptr");
+    LOAD_THREAD_STATE();
+    frame = Sp;
+    trec = StgTSO_trec(CurrentTSO);
     outer  = StgTRecHeader_enclosing_trec(trec);
-  }
-  ASSERT(outer == NO_TREC);
 
-  (r) = ccall stmWait(MyCapability() "ptr", CurrentTSO "ptr", trec "ptr");
-  if (r != 0) {
-    // Transaction was valid: stmWait put us on the TVars' queues, we now block
-    StgHeader_info(frame) = stg_atomically_waiting_frame_info;
-    Sp = frame;
-    R3 = trec; // passing to stmWaitUnblock()
-    jump stg_block_stmwait [R3];
-  } else {
-    // Transaction was not valid: retry immediately
-    ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", outer "ptr");
-    StgTSO_trec(CurrentTSO) = trec;
-    Sp = frame;
-    R1 = StgAtomicallyFrame_code(frame);
-    jump stg_ap_v_fast [R1];
-  }
+    if (frame_type == CATCH_RETRY_FRAME) {
+        // The retry reaches a CATCH_RETRY_FRAME before the atomic frame
+        ASSERT(outer != NO_TREC);
+        // Abort the transaction attempting the current branch
+        ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
+        ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
+        if (!StgCatchRetryFrame_running_alt_code(frame) != 0) {
+            // Retry in the first branch: try the alternative
+            ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", outer "ptr");
+            StgTSO_trec(CurrentTSO) = trec;
+            StgCatchRetryFrame_running_alt_code(frame) = 1 :: CInt; // true;
+            R1 = StgCatchRetryFrame_alt_code(frame);
+            jump stg_ap_v_fast [R1];
+        } else {
+            // Retry in the alternative code: propagate the retry
+            StgTSO_trec(CurrentTSO) = outer;
+            Sp = Sp + SIZEOF_StgCatchRetryFrame;
+            goto retry_pop_stack;
+        }
+    }
+
+    // We've reached the ATOMICALLY_FRAME: attempt to wait
+    ASSERT(frame_type == ATOMICALLY_FRAME);
+    if (outer != NO_TREC) {
+        // We called retry while checking invariants, so abort the current
+        // invariant check (merging its TVar accesses into the parents read
+        // set so we'll wait on them)
+        ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
+        ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
+        trec = outer;
+        StgTSO_trec(CurrentTSO) = trec;
+        outer  = StgTRecHeader_enclosing_trec(trec);
+    }
+    ASSERT(outer == NO_TREC);
+
+    (r) = ccall stmWait(MyCapability() "ptr", CurrentTSO "ptr", trec "ptr");
+    if (r != 0) {
+        // Transaction was valid: stmWait put us on the TVars' queues, we now block
+        StgHeader_info(frame) = stg_atomically_waiting_frame_info;
+        Sp = frame;
+        R3 = trec; // passing to stmWaitUnblock()
+        jump stg_block_stmwait [R3];
+    } else {
+        // Transaction was not valid: retry immediately
+        ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", outer "ptr");
+        StgTSO_trec(CurrentTSO) = trec;
+        Sp = frame;
+        R1 = StgAtomicallyFrame_code(frame);
+        jump stg_ap_v_fast [R1];
+    }
 }
 
 stg_checkzh (P_ closure /* STM a */)
@@ -1289,16 +1290,16 @@ stg_newTVarzh (P_ init)
 
 stg_readTVarzh (P_ tvar)
 {
-  P_ trec;
-  P_ result;
+    P_ trec;
+    P_ result;
 
-  // Call to stmReadTVar may allocate
-  MAYBE_GC_P (stg_readTVarzh, tvar);
+    // Call to stmReadTVar may allocate
+    MAYBE_GC_P (stg_readTVarzh, tvar);
 
-  trec = StgTSO_trec(CurrentTSO);
-  ("ptr" result) = ccall stmReadTVar(MyCapability() "ptr", trec "ptr",
-                                     tvar "ptr");
-  return (result);
+    trec = StgTSO_trec(CurrentTSO);
+    ("ptr" result) = ccall stmReadTVar(MyCapability() "ptr", trec "ptr",
+                                       tvar "ptr");
+    return (result);
 }
 
 stg_readTVarIOzh ( P_ tvar /* :: TVar a */ )
@@ -1975,9 +1976,9 @@ for2:
 #define APPEND_TO_BLOCKED_QUEUE(tso)                    \
     ASSERT(StgTSO__link(tso) == END_TSO_QUEUE);         \
     if (W_[blocked_queue_hd] == END_TSO_QUEUE) {        \
-      W_[blocked_queue_hd] = tso;                       \
+        W_[blocked_queue_hd] = tso;                     \
     } else {                                            \
-      ccall setTSOLink(MyCapability() "ptr", W_[blocked_queue_tl] "ptr", tso); \
+        ccall setTSOLink(MyCapability() "ptr", W_[blocked_queue_tl] "ptr", tso); \
     }                                                   \
     W_[blocked_queue_tl] = tso;
 
@@ -2277,64 +2278,64 @@ stg_traceCcszh ( P_ obj, P_ ret )
 
 stg_getSparkzh ()
 {
-   W_ spark;
+    W_ spark;
 
 #ifndef THREADED_RTS
-   return (0,ghczmprim_GHCziTypes_False_closure);
+    return (0,ghczmprim_GHCziTypes_False_closure);
 #else
-   (spark) = ccall findSpark(MyCapability());
-   if (spark != 0) {
-      return (1,spark);
-   } else {
-      return (0,ghczmprim_GHCziTypes_False_closure);
-   }
+    (spark) = ccall findSpark(MyCapability());
+    if (spark != 0) {
+        return (1,spark);
+    } else {
+        return (0,ghczmprim_GHCziTypes_False_closure);
+    }
 #endif
 }
 
 stg_numSparkszh ()
 {
-  W_ n;
+    W_ n;
 #ifdef THREADED_RTS
-  (n) = ccall dequeElements(Capability_sparks(MyCapability()));
+    (n) = ccall dequeElements(Capability_sparks(MyCapability()));
 #else
-  n = 0;
+    n = 0;
 #endif
-  return (n);
+    return (n);
 }
 
 stg_traceEventzh ( W_ msg )
 {
 #if defined(TRACING) || defined(DEBUG)
 
-   ccall traceUserMsg(MyCapability() "ptr", msg "ptr");
+    ccall traceUserMsg(MyCapability() "ptr", msg "ptr");
 
 #elif defined(DTRACE)
 
-   W_ enabled;
+    W_ enabled;
 
-   // We should go through the macro HASKELLEVENT_USER_MSG_ENABLED from
-   // RtsProbes.h, but that header file includes unistd.h, which doesn't
-   // work in Cmm
+    // We should go through the macro HASKELLEVENT_USER_MSG_ENABLED from
+    // RtsProbes.h, but that header file includes unistd.h, which doesn't
+    // work in Cmm
 #if !defined(solaris2_TARGET_OS)
    (enabled) = ccall __dtrace_isenabled$HaskellEvent$user__msg$v1();
 #else
-   // Solaris' DTrace can't handle the
-   //     __dtrace_isenabled$HaskellEvent$user__msg$v1
-   // call above. This call is just for testing whether the user__msg
-   // probe is enabled, and is here for just performance optimization.
-   // Since preparation for the probe is not that complex I disable usage of
-   // this test above for Solaris and enable the probe usage manually
-   // here. Please note that this does not mean that the probe will be
-   // used during the runtime! You still need to enable it by consumption
-   // in your dtrace script as you do with any other probe.
-   enabled = 1;
+    // Solaris' DTrace can't handle the
+    //     __dtrace_isenabled$HaskellEvent$user__msg$v1
+    // call above. This call is just for testing whether the user__msg
+    // probe is enabled, and is here for just performance optimization.
+    // Since preparation for the probe is not that complex I disable usage of
+    // this test above for Solaris and enable the probe usage manually
+    // here. Please note that this does not mean that the probe will be
+    // used during the runtime! You still need to enable it by consumption
+    // in your dtrace script as you do with any other probe.
+    enabled = 1;
 #endif
-   if (enabled != 0) {
-     ccall dtraceUserMsgWrapper(MyCapability() "ptr", msg "ptr");
-   }
+    if (enabled != 0) {
+      ccall dtraceUserMsgWrapper(MyCapability() "ptr", msg "ptr");
+    }
 
 #endif
-   return ();
+    return ();
 }
 
 // Same code as stg_traceEventzh above but a different kind of event
@@ -2343,22 +2344,22 @@ stg_traceMarkerzh ( W_ msg )
 {
 #if defined(TRACING) || defined(DEBUG)
 
-   ccall traceUserMarker(MyCapability() "ptr", msg "ptr");
+    ccall traceUserMarker(MyCapability() "ptr", msg "ptr");
 
 #elif defined(DTRACE)
 
-   W_ enabled;
+    W_ enabled;
 
 #if !defined(solaris2_TARGET_OS)
-   (enabled) = ccall __dtrace_isenabled$HaskellEvent$user__marker$v1();
+    (enabled) = ccall __dtrace_isenabled$HaskellEvent$user__marker$v1();
 #else
-   enabled = 1;
+    enabled = 1;
 #endif
-   if (enabled != 0) {
-     ccall dtraceUserMarkerWrapper(MyCapability() "ptr", msg "ptr");
-   }
+    if (enabled != 0) {
+        ccall dtraceUserMarkerWrapper(MyCapability() "ptr", msg "ptr");
+    }
 
 #endif
-   return ();
+    return ();
 }
 
