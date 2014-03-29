@@ -1279,6 +1279,9 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_MUT_ARR_PTRS_DIRTY_info)                        \
       SymI_HasProto(stg_MUT_ARR_PTRS_FROZEN_info)                       \
       SymI_HasProto(stg_MUT_ARR_PTRS_FROZEN0_info)                      \
+      SymI_HasProto(stg_SMALL_MUT_ARR_PTRS_DIRTY_info)                  \
+      SymI_HasProto(stg_SMALL_MUT_ARR_PTRS_FROZEN_info)                 \
+      SymI_HasProto(stg_SMALL_MUT_ARR_PTRS_FROZEN0_info)                \
       SymI_HasProto(stg_MUT_VAR_CLEAN_info)                             \
       SymI_HasProto(stg_MUT_VAR_DIRTY_info)                             \
       SymI_HasProto(stg_WEAK_info)                                      \
