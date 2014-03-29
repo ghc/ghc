@@ -1162,9 +1162,13 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_myThreadIdzh)                                   \
       SymI_HasProto(stg_labelThreadzh)                                  \
       SymI_HasProto(stg_newArrayzh)                                     \
+      SymI_HasProto(stg_copyArrayzh)                                    \
+      SymI_HasProto(stg_copyMutableArrayzh)                             \
+      SymI_HasProto(stg_copyArrayArrayzh)                               \
+      SymI_HasProto(stg_copyMutableArrayArrayzh)                        \
       SymI_HasProto(stg_cloneArrayzh)                                   \
       SymI_HasProto(stg_cloneMutableArrayzh)                            \
-      SymI_HasProto(stg_freezzeArrayzh)                                  \
+      SymI_HasProto(stg_freezzeArrayzh)                                 \
       SymI_HasProto(stg_thawArrayzh)                                    \
       SymI_HasProto(stg_newArrayArrayzh)                                \
       SymI_HasProto(stg_casArrayzh)                                     \
