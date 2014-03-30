@@ -189,6 +189,14 @@ shouldInlinePrimOp dflags NewSmallArrayOp [(CmmLit (CmmInt n _)), init]
       ]
       (fromInteger n) init
 
+shouldInlinePrimOp _ CopySmallArrayOp
+    [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] =
+        Just $ \ [] -> doCopySmallArrayOp src src_off dst dst_off (fromInteger n)
+
+shouldInlinePrimOp _ CopySmallMutableArrayOp
+    [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] =
+        Just $ \ [] -> doCopySmallMutableArrayOp src src_off dst dst_off (fromInteger n)
+
 shouldInlinePrimOp dflags CloneSmallArrayOp [src, src_off, (CmmLit (CmmInt n _))]
   | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
       Just $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_infoLabel res src src_off (fromInteger n)
@@ -1746,6 +1754,61 @@ emitCopyArray copy src0 src_off dst0 dst_off0 n = do
                        (loadArrPtrsSize dflags dst)
 
         emitSetCards dst_off dst_cards_p n
+
+doCopySmallArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
+                   -> FCode ()
+doCopySmallArrayOp = emitCopySmallArray copy
+  where
+    -- Copy data (we assume the arrays aren't overlapping since
+    -- they're of different types)
+    copy _src _dst dst_p src_p bytes =
+        do dflags <- getDynFlags
+           emitMemcpyCall dst_p src_p (mkIntExpr dflags bytes)
+               (mkIntExpr dflags (wORD_SIZE dflags))
+
+
+doCopySmallMutableArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> WordOff
+                          -> FCode ()
+doCopySmallMutableArrayOp = emitCopySmallArray copy
+  where
+    -- The only time the memory might overlap is when the two arrays
+    -- we were provided are the same array!
+    -- TODO: Optimize branch for common case of no aliasing.
+    copy src dst dst_p src_p bytes = do
+        dflags <- getDynFlags
+        [moveCall, cpyCall] <- forkAlts
+            [ getCode $ emitMemmoveCall dst_p src_p (mkIntExpr dflags bytes)
+              (mkIntExpr dflags (wORD_SIZE dflags))
+            , getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr dflags bytes)
+              (mkIntExpr dflags (wORD_SIZE dflags))
+            ]
+        emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
+
+emitCopySmallArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
+                       -> FCode ())  -- ^ copy function
+                   -> CmmExpr        -- ^ source array
+                   -> CmmExpr        -- ^ offset in source array
+                   -> CmmExpr        -- ^ destination array
+                   -> CmmExpr        -- ^ offset in destination array
+                   -> WordOff        -- ^ number of elements to copy
+                   -> FCode ()
+emitCopySmallArray copy src0 src_off dst0 dst_off n = do
+    dflags <- getDynFlags
+
+    -- Passed as arguments (be careful)
+    src     <- assignTempE src0
+    dst     <- assignTempE dst0
+
+    -- Set the dirty bit in the header.
+    emit (setInfo dst (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
+
+    dst_p <- assignTempE $ cmmOffsetExprW dflags
+             (cmmOffsetB dflags dst (smallArrPtrsHdrSize dflags)) dst_off
+    src_p <- assignTempE $ cmmOffsetExprW dflags
+             (cmmOffsetB dflags src (smallArrPtrsHdrSize dflags)) src_off
+    let bytes = wordsToBytes dflags n
+
+    copy src dst dst_p src_p bytes
 
 -- | Takes an info table label, a register to return the newly
 -- allocated array in, a source array, an offset in the source array,
