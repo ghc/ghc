@@ -1350,7 +1350,7 @@ validate_build_xhtml:
 	cd libraries/xhtml && ./Setup configure --with-ghc="$(BINDIST_PREFIX)/bin/ghc" $(BINDIST_HADDOCK_FLAG) $(BINDIST_LIBRARY_FLAGS) --global --builddir=dist-bindist --prefix="$(BINDIST_PREFIX)"
 	cd libraries/xhtml && ./Setup build   --builddir=dist-bindist
 ifeq "$(HADDOCK_DOCS)" "YES"
-	cd libraries/xhtml && ./Setup haddock --builddir=dist-bindist
+	cd libraries/xhtml && ./Setup haddock --ghc-options=-optP-P --builddir=dist-bindist
 endif
 	cd libraries/xhtml && ./Setup install --builddir=dist-bindist
 	cd libraries/xhtml && ./Setup clean   --builddir=dist-bindist
