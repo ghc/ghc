@@ -767,21 +767,33 @@ extractDecl name mdl decl
   | name `elem` getMainDeclBinder (unLoc decl) = decl
   | otherwise  =
     case unLoc decl of
-      TyClD d | isClassDecl d ->
+      TyClD d@ClassDecl {} ->
         let matches = [ sig | sig <- tcdSigs d, name `elem` sigName sig,
                         isVanillaLSig sig ] -- TODO: document fixity
         in case matches of
-          [s0] -> let (n, tyvar_names) = name_and_tyvars d
+          [s0] -> let (n, tyvar_names) = (tcdName d, getTyVars d)
                       L pos sig = extractClassDecl n tyvar_names s0
                   in L pos (SigD sig)
-          _ -> error "internal: extractDecl"
-      TyClD d | isDataDecl d ->
-        let (n, tyvar_names) = name_and_tyvars d
-            L pos sig = extractRecSel name mdl n tyvar_names (dd_cons (tcdDataDefn d))
-        in L pos (SigD sig)
+          _ -> error "internal: extractDecl (ClassDecl)"
+      TyClD d@DataDecl {} ->
+        let (n, tyvar_names) = (tcdName d, map toTypeNoLoc $ getTyVars d)
+        in SigD <$> extractRecSel name mdl n tyvar_names (dd_cons (tcdDataDefn d))
+      InstD (DataFamInstD DataFamInstDecl { dfid_tycon = L _ n
+                                          , dfid_pats = HsWB { hswb_cts = tys }
+                                          , dfid_defn = defn }) ->
+        SigD <$> extractRecSel name mdl n tys (dd_cons defn)
+      InstD (ClsInstD ClsInstDecl { cid_datafam_insts = insts }) ->
+        let matches = [ d | L _ d <- insts
+                          , L _ ConDecl { con_details = RecCon rec } <- dd_cons (dfid_defn d)
+                          , ConDeclField { cd_fld_name = L _ n } <- rec
+                          , n == name
+                      ]
+        in case matches of
+          [d0] -> extractDecl name mdl (noLoc . InstD $ DataFamInstD d0)
+          _ -> error "internal: extractDecl (ClsInstD)"
       _ -> error "internal: extractDecl"
   where
-    name_and_tyvars d = (tcdName d, hsLTyVarLocNames (tyClDeclTyVars d))
+    getTyVars = hsLTyVarLocNames . tyClDeclTyVars
 
 
 toTypeNoLoc :: Located Name -> LHsType Name
@@ -799,7 +811,7 @@ extractClassDecl c tvs0 (L pos (TypeSig lname ltype)) = case ltype of
 extractClassDecl _ _ _ = error "extractClassDecl: unexpected decl"
 
 
-extractRecSel :: Name -> Module -> Name -> [Located Name] -> [LConDecl Name]
+extractRecSel :: Name -> Module -> Name -> [LHsType Name] -> [LConDecl Name]
               -> LSig Name
 extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
 
@@ -810,7 +822,9 @@ extractRecSel nm mdl t tvs (L _ con : rest) =
     _ -> extractRecSel nm mdl t tvs rest
  where
   matching_fields flds = [ f | f@(ConDeclField n _ _) <- flds, unLoc n == nm ]
-  data_ty = foldl (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar t)) (map toTypeNoLoc tvs)
+  data_ty
+    | ResTyGADT ty <- con_res con = ty
+    | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar t)) tvs
 
 
 -- | Keep export items with docs.
