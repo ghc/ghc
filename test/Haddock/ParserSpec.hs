@@ -432,12 +432,34 @@ spec = before initStaticOpts $ do
           ] `shouldParseTo` DocCodeBlock "foo\n@\nbar\n"
 
       it "accepts horizontal space before the @" $ do
-        unlines [ " @"
-                , " foo"
+        unlines [ "     @"
+                , "foo"
                 , ""
-                , " bar"
+                , "bar"
+                , "@"
+                ] `shouldParseTo` DocCodeBlock "foo\n\nbar\n"
+
+      it "strips a leading space from a @ block if present" $ do
+        unlines [ " @"
+                , " hello"
+                , " world"
                 , " @"
-                ] `shouldParseTo` DocCodeBlock " foo\n\n bar\n "
+                ] `shouldParseTo` DocCodeBlock "hello\nworld\n"
+
+        unlines [ " @"
+                , " hello"
+                , ""
+                , " world"
+                , " @"
+                ] `shouldParseTo` DocCodeBlock "hello\n\nworld\n"
+
+      it "only drops whitespace if there's some before closing @" $ do
+        unlines [ "@"
+                , "    Formatting"
+                , "        matters."
+                , "@"
+                ]
+          `shouldParseTo` DocCodeBlock "    Formatting\n        matters.\n"
 
       it "accepts unicode" $ do
         "@foo 灼眼のシャナ bar@" `shouldParseTo` DocCodeBlock "foo 灼眼のシャナ bar"

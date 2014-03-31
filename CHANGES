@@ -4,6 +4,8 @@ Changes in version 2.15.0
 
  * Print kind signatures GADTs (#85)
 
+ * Drop single leading whitespace when reasonable from @-style blocks (#201)
+
 Changes in version 2.14.1
 
  * Render * and -> with their UnicodeSyntax equivalents if -U is enabled
