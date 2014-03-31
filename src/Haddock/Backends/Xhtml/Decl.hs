@@ -39,7 +39,6 @@ import GHC.Exts
 import Name
 import BooleanFormula
 
-
 ppDecl :: Bool -> LinksInfo -> LHsDecl DocName
        -> DocForDecl DocName -> [DocInstance DocName] -> [(DocName, Fixity)]
        -> [(DocName, DocForDecl DocName)] -> Splice -> Unicode -> Qualification -> Html
@@ -311,7 +310,6 @@ ppFamDeclBinderWithVars summ (FamilyDecl { fdLName = lname, fdTyVars = tvs }) =
 ppDataBinderWithVars :: Bool -> TyClDecl DocName -> Html
 ppDataBinderWithVars summ decl =
   ppAppDocNameNames summ (tcdName decl) (tyvarNames $ tcdTyVars decl)
-
 
 --------------------------------------------------------------------------------
 -- * Type applications
@@ -726,17 +724,23 @@ ppShortField summary unicode qual (ConDeclField (L _ name) ltype _)
 -- | Print the LHS of a data\/newtype declaration.
 -- Currently doesn't handle 'data instance' decls or kind signatures
 ppDataHeader :: Bool -> TyClDecl DocName -> Unicode -> Qualification -> Html
-ppDataHeader summary decl@(DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd
-                                                               , dd_ctxt = ctxt } })
+ppDataHeader summary decl@(DataDecl { tcdDataDefn =
+                                         HsDataDefn { dd_ND = nd
+                                                    , dd_ctxt = ctxt
+                                                    , dd_kindSig = ks } })
              unicode qual
   = -- newtype or data
-    (case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" }) <+>
+    (case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" })
+    <+>
     -- context
     ppLContext ctxt unicode qual <+>
     -- T a b c ..., or a :+: b
     ppDataBinderWithVars summary decl
-ppDataHeader _ _ _ _ = error "ppDataHeader: illegal argument"
+    <+> case ks of
+      Nothing -> mempty
+      Just (L _ x) -> dcolon unicode <+> ppKind unicode qual x
 
+ppDataHeader _ _ _ _ = error "ppDataHeader: illegal argument"
 
 --------------------------------------------------------------------------------
 -- * Types and contexts

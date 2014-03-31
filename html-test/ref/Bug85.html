@@ -3,13 +3,13 @@
 ><head
   ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
      /><title
-    >AdvanceTypes</title
+    >Bug85</title
     ><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean"
      /><script src="haddock-util.js" type="text/javascript"
     ></script
     ><script type="text/javascript"
     >//<![CDATA[
-window.onload = function () {pageLoad();setSynopsis("mini_AdvanceTypes.html");};
+window.onload = function () {pageLoad();setSynopsis("mini_Bug85.html");};
 //]]>
 </script
     ></head
@@ -39,7 +39,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_AdvanceTypes.html");};
 	    ></tr
 	  ></table
 	><p class="caption"
-	>AdvanceTypes</p
+	>Bug85</p
 	></div
       ><div id="interface"
       ><h1
@@ -48,9 +48,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_AdvanceTypes.html");};
 	><p class="src"
 	  ><span class="keyword"
 	    >data</span
-	    > <a name="t:Pattern" class="def"
-	    >Pattern</a
-	    > :: [*] -&gt; * <span class="keyword"
+	    > <a name="t:Foo" class="def"
+	    >Foo</a
+	    > :: (* -&gt; *) -&gt; * -&gt; * <span class="keyword"
 	    >where</span
 	    ></p
 	  ><div class="subs constructors"
@@ -59,25 +59,63 @@ window.onload = function () {pageLoad();setSynopsis("mini_AdvanceTypes.html");};
 	    ><table
 	    ><tr
 	      ><td class="src"
-		><a name="v:Nil" class="def"
-		  >Nil</a
-		  > ::  <a href=""
-		  >Pattern</a
-		  > []</td
+		><a name="v:Bar" class="def"
+		  >Bar</a
+		  > ::  f x -&gt; <a href=""
+		  >Foo</a
+		  > f (f x)</td
 		><td class="doc empty"
 		>&nbsp;</td
 		></tr
-	      ><tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a name="t:Baz" class="def"
+	    >Baz</a
+	    > :: * <span class="keyword"
+	    >where</span
+	    ></p
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
 	      ><td class="src"
-		><a name="v:Cons" class="def"
-		  >Cons</a
+		><a name="v:Baz-39-" class="def"
+		  >Baz'</a
 		  > ::  <a href=""
-		  >Maybe</a
-		  > h -&gt; <a href=""
-		  >Pattern</a
-		  > t -&gt; <a href=""
-		  >Pattern</a
-		  > (h : t)</td
+		  >Baz</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a name="t:Qux" class="def"
+	    >Qux</a
+	    > <span class="keyword"
+	    >where</span
+	    ></p
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a name="v:Quux" class="def"
+		  >Quux</a
+		  > ::  <a href=""
+		  >Qux</a
+		  ></td
 		><td class="doc empty"
 		>&nbsp;</td
 		></tr
