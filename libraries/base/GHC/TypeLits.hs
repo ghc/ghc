@@ -62,7 +62,7 @@ data Symbol
 class KnownNat (n :: Nat) where
   natSing :: SNat n
 
--- | This class gives the integer associated with a type-level symbol.
+-- | This class gives the string associated with a type-level symbol.
 -- There are instances of the class for every concrete literal: "hello", etc.
 --
 -- /Since: 4.7.0.0/
