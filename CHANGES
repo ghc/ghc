@@ -2,9 +2,15 @@ Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)
 
+Changes in version 2.14.2
+
+ * Always drop --split-objs GHC flag for performance reasons (#292)
+
  * Print kind signatures GADTs (#85)
 
  * Drop single leading whitespace when reasonable from @-style blocks (#201)
+
+ * Fix crashes associated with exporting data family record selectors (#294)
 
 Changes in version 2.14.1
 
