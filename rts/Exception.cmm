@@ -157,7 +157,7 @@ stg_maskAsyncExceptionszh /* explicit stack */
 stg_maskUninterruptiblezh /* explicit stack */
 {
     /* Args: R1 :: IO a */
-    STK_CHK_P_LL (WDS(1)/* worst case */, stg_maskAsyncExceptionszh, R1);
+    STK_CHK_P_LL (WDS(1)/* worst case */, stg_maskUninterruptiblezh, R1);
 
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
         /* avoid growing the stack unnecessarily */
