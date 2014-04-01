@@ -81,21 +81,31 @@ Time getProcessCPUTime(void)
 
 StgWord64 getMonotonicNSec(void)
 {
-#ifdef HAVE_CLOCK_GETTIME
+#if defined(HAVE_CLOCK_GETTIME)
     struct timespec ts;
+    int res;
 
-    clock_gettime(CLOCK_ID, &ts);
+    res = clock_gettime(CLOCK_ID, &ts);
+    if (res != 0) {
+        sysErrorBelch("clock_gettime");
+        stg_exit(EXIT_FAILURE);
+    }
     return (StgWord64)ts.tv_sec * 1000000000 +
            (StgWord64)ts.tv_nsec;
+
 #elif defined(darwin_HOST_OS)
+
     uint64_t time = mach_absolute_time();
     return (time * timer_scaling_factor_numer) / timer_scaling_factor_denom;
-#else
+
+#else // use gettimeofday()
+
     struct timeval tv;
 
     gettimeofday(&tv, (struct timezone *) NULL);
     return (StgWord64)tv.tv_sec * 1000000000 +
            (StgWord64)tv.tv_usec * 1000;
+
 #endif
 }
 
