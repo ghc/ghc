@@ -228,7 +228,10 @@ test-suite spec
     , vendor/attoparsec-0.10.4.0
 
   other-modules:
+      Helper
       Haddock.ParserSpec
+      Haddock.Utf8Spec
+      Haddock.Parser.UtilSpec
 
   build-depends:
       base
