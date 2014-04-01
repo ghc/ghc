@@ -16,7 +16,7 @@ import TcMType as TcM
 import TcType
 import TcSMonad as TcS
 import TcInteract
-import Kind     ( defaultKind_maybe )
+import Kind     ( isKind, defaultKind_maybe )
 import Inst
 import FunDeps  ( growThetaTyVars )
 import Type     ( classifyPredType, PredTree(..), getClassPredTys_maybe )
@@ -1249,16 +1249,22 @@ findDefaultableGroups
     -> Cts              -- Unsolved (wanted or derived)
     -> [[(Ct,Class,TcTyVar)]]
 findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
-  | null default_tys             = []
-  | otherwise = filter is_defaultable_group (equivClasses cmp_tv unaries)
+  | null default_tys = []
+  | otherwise        = defaultable_groups
   where
+    defaultable_groups = filter is_defaultable_group groups
+    groups             = equivClasses cmp_tv unaries
     unaries     :: [(Ct, Class, TcTyVar)]  -- (C tv) constraints
     non_unaries :: [Ct]             -- and *other* constraints
 
     (unaries, non_unaries) = partitionWith find_unary (bagToList wanteds)
         -- Finds unary type-class constraints
+        -- But take account of polykinded classes like Typeable,
+        -- which may look like (Typeable * (a:*))   (Trac #8931)
     find_unary cc
-        | Just (cls,[ty]) <- getClassPredTys_maybe (ctPred cc)
+        | Just (cls,tys)   <- getClassPredTys_maybe (ctPred cc)
+        , Just (kinds, ty) <- snocView tys
+        , all isKind kinds
         , Just tv <- tcGetTyVar_maybe ty
         , isMetaTyVar tv  -- We might have runtime-skolems in GHCi, and
                           -- we definitely don't want to try to assign to those!
