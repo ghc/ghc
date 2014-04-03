@@ -586,8 +586,6 @@ tidy1 _ non_interesting_pat
 
 --------------------
 tidy_bang_pat :: Id -> SrcSpan -> Pat Id -> DsM (DsWrapper, Pat Id)
--- BangPatterns: Pattern matching is already strict in constructors,
--- tuples etc, so the last case strips off the bang for those patterns.
 
 -- Discard bang around strict pattern
 tidy_bang_pat v _ p@(ListPat {})   = tidy1 v p
@@ -596,8 +594,7 @@ tidy_bang_pat v _ p@(PArrPat {})   = tidy1 v p
 tidy_bang_pat v _ p@(ConPatOut {}) = tidy1 v p
 tidy_bang_pat v _ p@(LitPat {})    = tidy1 v p
 
--- Discard lazy/par/sig under a bang
-tidy_bang_pat v _ (LazyPat (L l p))     = tidy_bang_pat v l p
+-- Discard par/sig under a bang
 tidy_bang_pat v _ (ParPat (L l p))      = tidy_bang_pat v l p
 tidy_bang_pat v _ (SigPatOut (L l p) _) = tidy_bang_pat v l p
 
@@ -607,7 +604,10 @@ tidy_bang_pat v l (AsPat v' p)  = tidy1 v (AsPat v' (L l (BangPat p)))
 tidy_bang_pat v l (CoPat w p t) = tidy1 v (CoPat w (BangPat (L l p)) t)
 
 -- Default case, leave the bang there:
--- VarPat, WildPat, ViewPat, NPat, NPlusKPat
+-- VarPat, LazyPat, WildPat, ViewPat, NPat, NPlusKPat
+-- For LazyPat, remember that it's semantically like a VarPat
+--  i.e.  !(~p) is not like ~p, or p!  (Trac #8952)
+
 tidy_bang_pat _ l p = return (idDsWrapper, BangPat (L l p))
   -- NB: SigPatIn, ConPatIn should not happen
 \end{code}
