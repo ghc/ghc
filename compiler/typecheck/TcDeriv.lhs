@@ -158,6 +158,10 @@ earlyDSLoc :: EarlyDerivSpec -> SrcSpan
 earlyDSLoc (InferTheta spec) = ds_loc spec
 earlyDSLoc (GivenTheta spec) = ds_loc spec
 
+earlyDSClass :: EarlyDerivSpec -> Class
+earlyDSClass (InferTheta spec) = ds_cls spec
+earlyDSClass (GivenTheta spec) = ds_cls spec
+
 splitEarlyDerivSpec :: [EarlyDerivSpec] -> ([DerivSpec ThetaOrigin], [DerivSpec ThetaType])
 splitEarlyDerivSpec [] = ([],[])
 splitEarlyDerivSpec (InferTheta spec : specs) =
@@ -532,8 +536,10 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
         -- If AutoDeriveTypeable is set, we automatically add Typeable instances
         -- for every data type and type class declared in the module
         ; isAutoTypeable <- xoptM Opt_AutoDeriveTypeable
-        ; let eqns4 = if isAutoTypeable then deriveTypeable tycl_decls eqns else []
-        ; eqns4' <- mapAndRecoverM deriveStandalone eqns4
+        ; eqns4 <- if isAutoTypeable then concatMapM (deriveTypeable eqns) tycl_decls
+                                     else return []
+        ; eqns4' <- setXOptM Opt_PolyKinds $
+                    mapAndRecoverM deriveStandalone eqns4
         ; let eqns' = eqns ++ eqns4'
 
         ; if is_boot then   -- No 'deriving' at all in hs-boot files
@@ -541,49 +547,46 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
                  ; return [] }
           else return eqns' }
   where
-    deriveTypeable :: [LTyClDecl Name] -> [EarlyDerivSpec] -> [LDerivDecl Name]
-    deriveTypeable tys dss =
-      [ L l (DerivDecl (L l (HsAppTy (noLoc (HsTyVar typeableClassName))
-                                     (L l (HsTyVar (tcdName t))))))
-      | L l t <- tys
-        -- Don't add Typeable instances for type synonyms and type families
-      , not (isSynDecl t), not (isTypeFamilyDecl t)
-        -- ... nor if the user has already given a deriving clause
-      , not (hasInstance (tcdName t) dss) ]
-
-    -- Check if an automatically generated DS for deriving Typeable should be
-    -- ommitted because the user had manually requested for an instance
-    hasInstance :: Name -> [EarlyDerivSpec] -> Bool
-    hasInstance n = any (\ds -> n == tyConName (earlyDSTyCon ds))
-
     add_deriv_err eqn
        = setSrcSpan (earlyDSLoc eqn) $
          addErr (hang (ptext (sLit "Deriving not permitted in hs-boot file"))
                     2 (ptext (sLit "Use an instance declaration instead")))
 
+    deriveTypeable :: [EarlyDerivSpec] -> LTyClDecl Name -> TcM [LDerivDecl Name]
+    deriveTypeable dss (L l decl)
+      = do { tc <- tcLookupTyCon (tcdName decl)
+           ; let prom_dcs    = mapMaybe promoteDataCon_maybe (tyConDataCons tc) 
+                 deriv_decls = mapMaybe mk_typeable_deriv_decl (tc : prom_dcs)
+           ; return deriv_decls }
+
+      where
+        mk_typeable_deriv_decl :: TyCon -> Maybe (LDerivDecl Name)
+        mk_typeable_deriv_decl tc
+          | not (isSynTyCon tc)
+          , not (hasInstance tc) -- avoid duplicate instances
+          = Just $ L l (DerivDecl (L l (HsAppTy (noLoc (HsTyVar typeableClassName))
+                                                (L l (HsTyVar (tyConName tc))))))
+          | otherwise
+          = Nothing
+            
+        -- Check if an automatically generated DS for deriving Typeable should be
+        -- ommitted because the user had manually requested for an instance
+        hasInstance :: TyCon -> Bool
+        hasInstance tc = any (\ds -> tc == earlyDSTyCon ds
+                                  && typeableClassName == className (earlyDSClass ds))
+                             dss
+
 ------------------------------------------------------------------
 deriveTyDecl :: LTyClDecl Name -> TcM [EarlyDerivSpec]
-deriveTyDecl (L _ decl@(DataDecl { tcdLName = L loc tc_name
+deriveTyDecl (L _ decl@(DataDecl { tcdLName = L _ tc_name
                                  , tcdDataDefn = HsDataDefn { dd_derivs = preds } }))
   = tcAddDeclCtxt decl $
     do { tc <- tcLookupTyCon tc_name
        ; let tvs  = tyConTyVars tc
              tys  = mkTyVarTys tvs
-             pdcs :: [LDerivDecl Name]
-             pdcs = [ L loc (DerivDecl (L loc (HsAppTy (noLoc (HsTyVar typeableClassName))
-                                       (L loc (HsTyVar (tyConName pdc))))))
-                    | Just pdc <- map promoteDataCon_maybe (tyConDataCons tc) ]
-        -- If AutoDeriveTypeable and DataKinds is set, we add Typeable instances
-        -- for every promoted data constructor of datatypes in this module
-       ; isAutoTypeable <- xoptM Opt_AutoDeriveTypeable
-       ; isDataKinds    <- xoptM Opt_DataKinds
-       ; prom_dcs_Typeable_instances <- if isAutoTypeable && isDataKinds
-                                        then mapM deriveStandalone pdcs
-                                        else return []
-       ; other_instances <- case preds of
-                              Just preds' -> mapM (deriveTyData tvs tc tys) preds'
-                              Nothing     -> return []
-       ; return (prom_dcs_Typeable_instances ++ other_instances) }
+       ; case preds of
+           Just preds' -> mapM (deriveTyData tvs tc tys) preds'
+           Nothing     -> return [] }
 
 deriveTyDecl _ = return []
 
@@ -623,7 +626,8 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
-       ; (tvs, theta, cls, inst_tys) <- tcHsInstHead TcType.InstDeclCtxt deriv_ty
+       ; (tvs, theta, cls, inst_tys) <- setXOptM Opt_DataKinds $ -- for polykinded typeable
+                                        tcHsInstHead TcType.InstDeclCtxt deriv_ty
        ; traceTc "Standalone deriving;" $ vcat
               [ text "tvs:" <+> ppr tvs
               , text "theta:" <+> ppr theta
