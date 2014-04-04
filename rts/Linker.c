@@ -2379,9 +2379,12 @@ loadArchive( pathchar *path )
     if (n != 8)
         barf("loadArchive: Failed reading header from `%s'", path);
     if (strncmp(tmp, "!<arch>\n", 8) == 0) {}
+#if !defined(mingw32_HOST_OS)
+    /* See Note [thin archives on Windows] */
     else if (strncmp(tmp, "!<thin>\n", 8) == 0) {
         isThin = 1;
     }
+#endif
 #if defined(darwin_HOST_OS)
     /* Not a standard archive, look for a fat archive magic number: */
     else if (ntohl(*(uint32_t *)tmp) == FAT_MAGIC) {
@@ -2622,6 +2625,14 @@ loadArchive( pathchar *path )
             image = stgMallocBytes(memberSize, "loadArchive(image)");
 #endif
 
+#if !defined(mingw32_HOST_OS)
+            /*
+             * Note [thin archives on Windows]
+             * This doesn't compile on Windows because it assumes
+             * char* pathnames, and we use wchar_t* on Windows.  It's
+             * not trivial to fix, so I'm leaving it disabled on
+             * Windows for now --SDM
+             */
             if (isThin) {
                 FILE *member;
                 char *pathCopy, *dirName, *memberPath;
@@ -2653,7 +2664,9 @@ loadArchive( pathchar *path )
                 stgFree(memberPath);
                 stgFree(pathCopy);
             }
-            else {
+            else
+#endif
+            {
                 n = fread ( image, 1, memberSize, f );
                 if (n != memberSize) {
                     barf("loadArchive: error whilst reading `%s'", path);
