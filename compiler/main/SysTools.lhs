@@ -602,6 +602,42 @@ figureLlvmVersion dflags = do
                 return Nothing)
   return ver
 
+{- Note [Windows stack usage]
+
+See: Trac #8870 (and #8834 for related info)
+
+On Windows, occasionally we need to grow the stack. In order to do
+this, we would normally just bump the stack pointer - but there's a
+catch on Windows.
+
+If the stack pointer is bumped by more than a single page, then the
+pages between the initial pointer and the resulting location must be
+properly committed by the Windows virtual memory subsystem. This is
+only needed in the event we bump by more than one page (i.e 4097 bytes
+or more).
+
+Windows compilers solve this by emitting a call to a special function
+called _chkstk, which does this committing of the pages for you.
+
+The reason this was causing a segfault was because due to the fact the
+new code generator tends to generate larger functions, we needed more
+stack space in GHC itself. In the x86 codegen, we needed approximately
+~12kb of stack space in one go, which caused the process to segfault,
+as the intervening pages were not committed.
+
+In the future, we should do the same thing, to make the problem
+completely go away. In the mean time, we're using a workaround: we
+instruct the linker to specify the generated PE as having an initial
+reserved stack size of 8mb, as well as a initial *committed* stack
+size of 8mb. The default committed size was previously only 4k.
+
+Theoretically it's possible to still hit this problem if you request a
+stack bump of more than 8mb in one go. But the amount of code
+necessary is quite large, and 8mb "should be more than enough for
+anyone" right now (he said, before millions of lines of code cried out
+in terror).
+
+-}
 
 {- Note [Run-time linker info]
 
@@ -698,8 +734,13 @@ getLinkerInfo' dflags = do
                  -- GHC doesn't support anything but GNU ld on Windows anyway.
                  -- Process creation is also fairly expensive on win32, so
                  -- we short-circuit here.
-                 return $ GnuLD $ map Option ["-Wl,--hash-size=31",
-                                              "-Wl,--reduce-memory-overheads"]
+                 return $ GnuLD $ map Option
+                   [ -- Reduce ld memory usage
+                     "-Wl,--hash-size=31"
+                   , "-Wl,--reduce-memory-overheads"
+                     -- Increase default stack, see
+                     -- Note [Windows stack usage]
+                   , "-Xlinker", "--stack=0x800000,0x800000" ]
                _ -> do
                  -- In practice, we use the compiler as the linker here. Pass
                  -- -Wl,--version to get linker version info.
