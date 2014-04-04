@@ -3,8 +3,6 @@ module CmmSink (
      cmmSink
   ) where
 
-import CodeGen.Platform (callerSaves)
-
 import Cmm
 import CmmOpt
 import BlockId
@@ -238,11 +236,9 @@ some tool like perf or VTune and make decisions what to inline based on that.
 -- global) and literals.
 --
 isTrivial :: CmmExpr -> Bool
-isTrivial (CmmReg (CmmLocal _)) = True
--- isTrivial (CmmLit _) = True  -- Disabled because it used to make thing worse.
-                                -- Needs further investigation
-isTrivial _ = False
-
+isTrivial (CmmReg _) = True
+isTrivial (CmmLit _) = True
+isTrivial _          = False
 
 --
 -- annotate each node with the set of registers live *after* the node
@@ -505,7 +501,8 @@ regsUsedIn ls e = wrapRecExpf f e False
 -- nor the NCG can do it.  See Note [Register parameter passing]
 -- See also StgCmmForeign:load_args_into_temps.
 okToInline :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
-okToInline dflags expr CmmUnsafeForeignCall{} = not (anyCallerSavesRegs dflags expr)
+okToInline dflags expr node@(CmmUnsafeForeignCall{}) =
+    not (globalRegistersConflict dflags expr node)
 okToInline _ _ _ = True
 
 -- -----------------------------------------------------------------------------
@@ -518,22 +515,22 @@ okToInline _ _ _ = True
 conflicts :: DynFlags -> Assignment -> CmmNode O x -> Bool
 conflicts dflags (r, rhs, addr) node
 
-  -- (1) an assignment to a register conflicts with a use of the register
-  | CmmAssign reg  _ <- node, reg `regUsedIn` rhs                 = True
+  -- (1) node defines registers used by rhs of assignment. This catches
+  -- assignmnets and all three kinds of calls. See Note [Sinking and calls]
+  | globalRegistersConflict dflags rhs node                       = True
+  | localRegistersConflict  dflags rhs node                       = True
+
+  -- (2) node uses register defined by assignment
   | foldRegsUsed dflags (\b r' -> r == r' || b) False node        = True
 
-  -- (2) a store to an address conflicts with a read of the same memory
+  -- (3) a store to an address conflicts with a read of the same memory
   | CmmStore addr' e <- node
   , memConflicts addr (loadAddr dflags addr' (cmmExprWidth dflags e)) = True
 
-  -- (3) an assignment to Hp/Sp conflicts with a heap/stack read respectively
+  -- (4) an assignment to Hp/Sp conflicts with a heap/stack read respectively
   | HeapMem    <- addr, CmmAssign (CmmGlobal Hp) _ <- node        = True
   | StackMem   <- addr, CmmAssign (CmmGlobal Sp) _ <- node        = True
   | SpMem{}    <- addr, CmmAssign (CmmGlobal Sp) _ <- node        = True
-
-  -- (4) assignments that read caller-saves GlobalRegs conflict with a
-  -- foreign call.  See Note [Unsafe foreign calls clobber caller-save registers]
-  | CmmUnsafeForeignCall{} <- node, anyCallerSavesRegs dflags rhs = True
 
   -- (5) foreign calls clobber heap: see Note [Foreign calls clobber heap]
   | CmmUnsafeForeignCall{} <- node, memConflicts addr AnyMem      = True
@@ -544,11 +541,57 @@ conflicts dflags (r, rhs, addr) node
   -- (7) otherwise, no conflict
   | otherwise = False
 
-anyCallerSavesRegs :: DynFlags -> CmmExpr -> Bool
-anyCallerSavesRegs dflags e = wrapRecExpf f e False
-  where f (CmmReg (CmmGlobal r)) _
-         | callerSaves (targetPlatform dflags) r = True
-        f _ z = z
+-- Returns True if node defines any global registers that are used in the
+-- Cmm expression
+globalRegistersConflict :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
+globalRegistersConflict dflags expr node =
+    foldRegsDefd dflags (\b r -> b || (CmmGlobal r) `regUsedIn` expr) False node
+
+-- Returns True if node defines any local registers that are used in the
+-- Cmm expression
+localRegistersConflict :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
+localRegistersConflict dflags expr node =
+    foldRegsDefd dflags (\b r -> b || (CmmLocal  r) `regUsedIn` expr) False node
+
+-- Note [Sinking and calls]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- We have three kinds of calls: normal (CmmCall), safe foreign (CmmForeignCall)
+-- and unsafe foreign (CmmUnsafeForeignCall). We perform sinking pass after
+-- stack layout (see Note [Sinking after stack layout]) which leads to two
+-- invariants related to calls:
+--
+--   a) during stack layout phase all safe foreign calls are turned into
+--      unsafe foreign calls (see Note [Lower safe foreign calls]). This
+--      means that we will never encounter CmmForeignCall node when running
+--      sinking after stack layout
+--
+--   b) stack layout saves all variables live across a call on the stack
+--      just before making a call (remember we are not sinking assignments to
+--      stack):
+--
+--       L1:
+--          x = R1
+--          P64[Sp - 16] = L2
+--          P64[Sp - 8]  = x
+--          Sp = Sp - 16
+--          call f() returns L2
+--       L2:
+--
+--      We will attempt to sink { x = R1 } but we will detect conflict with
+--      { P64[Sp - 8]  = x } and hence we will drop { x = R1 } without even
+--      checking whether it conflicts with { call f() }. In this way we will
+--      never need to check any assignment conflicts with CmmCall. Remember
+--      that we still need to check for potential memory conflicts.
+--
+-- So the result is that we only need to worry about CmmUnsafeForeignCall nodes
+-- when checking conflicts (see Note [Unsafe foreign calls clobber caller-save registers]).
+-- This assumption holds only when we do sinking after stack layout. If we run
+-- it before stack layout we need to check for possible conflicts with all three
+-- kinds of calls. Our `conflicts` function does that by using a generic
+-- foldRegsDefd and foldRegsUsed functions defined in DefinerOfRegs and
+-- UserOfRegs typeclasses.
+--
 
 -- An abstraction of memory read or written.
 data AbsMem
