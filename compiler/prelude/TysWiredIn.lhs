@@ -8,7 +8,7 @@
 --   must be wired into the compiler nonetheless.  C.f module TysPrim
 module TysWiredIn (
         -- * All wired in things
-        wiredInTyCons,
+        wiredInTyCons, isBuiltInOcc_maybe,
 
         -- * Bool
         boolTy, boolTyCon, boolTyCon_RDR, boolTyConName,
@@ -333,11 +333,11 @@ typeSymbolKind = TyConApp (promoteTyCon typeSymbolKindCon) []
 
 %************************************************************************
 %*                                                                      *
-\subsection[TysWiredIn-tuples]{The tuple types}
+                Stuff for dealing with tuples
 %*                                                                      *
 %************************************************************************
 
-Note [How tuples work]
+Note [How tuples work]  See also Note [Known-key names] in PrelNames
 ~~~~~~~~~~~~~~~~~~~~~~
 * There are three families of tuple TyCons and corresponding
   DataCons, (boxed, unboxed, and constraint tuples), expressed by the
@@ -356,6 +356,68 @@ Note [How tuples work]
   are not serialised into interface files using OccNames at all.
 
 \begin{code}
+isBuiltInOcc_maybe :: OccName -> Maybe Name
+-- Built in syntax isn't "in scope" so these OccNames 
+-- map to wired-in Names with BuiltInSyntax
+isBuiltInOcc_maybe occ
+  = case occNameString occ of
+        "[]"             -> choose_ns listTyCon nilDataCon
+        ":"              -> Just consDataConName
+        "[::]"           -> Just parrTyConName
+        "(##)"           -> choose_ns unboxedUnitTyCon unboxedUnitDataCon
+        "()"             -> choose_ns unitTyCon        unitDataCon
+        '(':'#':',':rest -> parse_tuple UnboxedTuple 2 rest
+        '(':',':rest     -> parse_tuple BoxedTuple   2 rest
+        _other           -> Nothing
+  where
+    ns = occNameSpace occ
+
+    parse_tuple sort n rest
+      | (',' : rest2) <- rest   = parse_tuple sort (n+1) rest2
+      | tail_matches sort rest  = choose_ns (tupleTyCon sort n)
+                                            (tupleCon   sort n)
+      | otherwise               = Nothing
+
+    tail_matches BoxedTuple   ")"  = True
+    tail_matches UnboxedTuple "#)" = True
+    tail_matches _            _    = False
+  
+    choose_ns tc dc
+      | isTcClsNameSpace ns   = Just (getName tc)
+      | isDataConNameSpace ns = Just (getName dc)
+      | otherwise             = Just (getName (dataConWorkId dc))
+
+mkTupleOcc :: NameSpace -> TupleSort -> Arity -> OccName
+mkTupleOcc ns sort ar = mkOccName ns str
+  where
+    -- No need to cache these, the caching is done in mk_tuple
+    str = case sort of
+                UnboxedTuple    -> '(' : '#' : commas ++ "#)"
+                BoxedTuple      -> '(' : commas ++ ")"
+                ConstraintTuple -> '(' : commas ++ ")"
+
+    commas = take (ar-1) (repeat ',')
+
+    -- Cute hack: we reuse the standard tuple OccNames (and hence code)
+    -- for fact tuples, but give them different Uniques so they are not equal.
+    --
+    -- You might think that this will go wrong because isBuiltInOcc_maybe won't
+    -- be able to tell the difference between boxed tuples and constraint tuples. BUT:
+    --  1. Constraint tuples never occur directly in user code, so it doesn't matter
+    --     that we can't detect them in Orig OccNames originating from the user
+    --     programs (or those built by setRdrNameSpace used on an Exact tuple Name)
+    --  2. Interface files have a special representation for tuple *occurrences*
+    --     in IfaceTyCons, their workers (in IfaceSyn) and their DataCons (in case
+    --     alternatives). Thus we don't rely on the OccName to figure out what kind
+    --     of tuple an occurrence was trying to use in these situations.
+    --  3. We *don't* represent tuple data type declarations specially, so those
+    --     are still turned into wired-in names via isBuiltInOcc_maybe. But that's OK
+    --     because we don't actually need to declare constraint tuples thanks to this hack.
+    --
+    -- So basically any OccName like (,,) flowing to isBuiltInOcc_maybe will always
+    -- refer to the standard boxed tuple. Cool :-)
+
+
 tupleTyCon :: TupleSort -> Arity -> TyCon
 tupleTyCon sort i | i > mAX_TUPLE_SIZE = fst (mk_tuple sort i)  -- Build one specially
 tupleTyCon BoxedTuple   i = fst (boxedTupleArr   ! i)
@@ -388,7 +450,7 @@ mk_tuple sort arity = (tycon, tuple_con)
           UnboxedTuple    -> Nothing
           ConstraintTuple -> Nothing
 
-        modu    = mkTupleModule sort arity
+        modu    = mkTupleModule sort
         tc_name = mkWiredInName modu (mkTupleOcc tcName sort arity) tc_uniq
                                 (ATyCon tycon) BuiltInSyntax
         tc_kind = mkArrowKinds (map tyVarKind tyvars) res_kind

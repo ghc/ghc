@@ -51,7 +51,6 @@ module OccName (
 	mkTcOcc, mkTcOccFS,
 	mkClsOcc, mkClsOccFS,
         mkDFunOcc,
-	mkTupleOcc, 
 	setOccNameSpace,
         demoteOccName,
         HasOccName(..),
@@ -82,8 +81,6 @@ module OccName (
 	
 	isTcClsNameSpace, isTvNameSpace, isDataConNameSpace, isVarNameSpace, isValNameSpace,
 
-	isTupleOcc_maybe,
-
 	-- * The 'OccEnv' type
 	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
 	lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
@@ -108,7 +105,6 @@ module OccName (
 
 import Util
 import Unique
-import BasicTypes
 import DynFlags
 import UniqFM
 import UniqSet
@@ -809,55 +805,6 @@ tidyOccName env occ@(OccName occ_sp fs)
        where
          n1 = n+1
          new_fs = mkFastString (base ++ show n)
-\end{code}
-
-%************************************************************************
-%*									*
-		Stuff for dealing with tuples
-%*									*
-%************************************************************************
-
-\begin{code}
-mkTupleOcc :: NameSpace -> TupleSort -> Arity -> OccName
-mkTupleOcc ns sort ar = OccName ns (mkFastString str)
-  where
- 	-- no need to cache these, the caching is done in the caller
-	-- (TysWiredIn.mk_tuple)
-    str = case sort of
-		UnboxedTuple    -> '(' : '#' : commas ++ "#)"
-		BoxedTuple      -> '(' : commas ++ ")"
-                ConstraintTuple -> '(' : commas ++ ")"
-                  -- Cute hack: reuse the standard tuple OccNames (and hence code)
-                  -- for fact tuples, but give them different Uniques so they are not equal.
-                  --
-                  -- You might think that this will go wrong because isTupleOcc_maybe won't
-                  -- be able to tell the difference between boxed tuples and fact tuples. BUT:
-                  --  1. Fact tuples never occur directly in user code, so it doesn't matter
-                  --     that we can't detect them in Orig OccNames originating from the user
-                  --     programs (or those built by setRdrNameSpace used on an Exact tuple Name)
-                  --  2. Interface files have a special representation for tuple *occurrences*
-                  --     in IfaceTyCons, their workers (in IfaceSyn) and their DataCons (in case
-                  --     alternatives). Thus we don't rely on the OccName to figure out what kind
-                  --     of tuple an occurrence was trying to use in these situations.
-                  --  3. We *don't* represent tuple data type declarations specially, so those
-                  --     are still turned into wired-in names via isTupleOcc_maybe. But that's OK
-                  --     because we don't actually need to declare fact tuples thanks to this hack.
-                  --
-                  -- So basically any OccName like (,,) flowing to isTupleOcc_maybe will always
-                  -- refer to the standard boxed tuple. Cool :-)
-
-    commas = take (ar-1) (repeat ',')
-
-isTupleOcc_maybe :: OccName -> Maybe (NameSpace, TupleSort, Arity)
--- Tuples are special, because there are so many of them!
-isTupleOcc_maybe (OccName ns fs)
-  = case unpackFS fs of
-	'(':'#':',':rest     -> Just (ns, UnboxedTuple, 2 + count_commas rest)
-	'(':',':rest         -> Just (ns, BoxedTuple,   2 + count_commas rest)
-	_other               -> Nothing
-  where
-    count_commas (',':rest) = 1 + count_commas rest
-    count_commas _          = 0
 \end{code}
 
 %************************************************************************

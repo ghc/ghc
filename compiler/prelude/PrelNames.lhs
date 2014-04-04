@@ -37,55 +37,70 @@ Nota Bene: all Names defined in here should come from the base package
 
 Note [Known-key names]
 ~~~~~~~~~~~~~~~~~~~~~~
+It is *very* important that the compiler gives wired-in things and
+things with "known-key" names the correct Uniques wherever they
+occur. We have to be careful about this in exactly two places:
 
-It is *very* important that the compiler gives wired-in things and things with "known-key" names
-the correct Uniques wherever they occur. We have to be careful about this in exactly two places:
+  1. When we parse some source code, renaming the AST better yield an
+     AST whose Names have the correct uniques
 
-  1. When we parse some source code, renaming the AST better yield an AST whose Names have the
-     correct uniques
-
-  2. When we read an interface file, the read-in gubbins better have the right uniques
+  2. When we read an interface file, the read-in gubbins better have
+     the right uniques
 
 This is accomplished through a combination of mechanisms:
 
-  1. When parsing source code, the RdrName-decorated AST has some RdrNames which are Exact. These are
-     wired-in RdrNames where the we could directly tell from the parsed syntax what Name to use. For
-     example, when we parse a [] in a type we can just insert an Exact RdrName Name with the listTyConKey.
+  1. When parsing source code, the RdrName-decorated AST has some
+     RdrNames which are Exact. These are wired-in RdrNames where the
+     we could directly tell from the parsed syntax what Name to
+     use. For example, when we parse a [] in a type we can just insert
+     an Exact RdrName Name with the listTyConKey.
 
-     Currently, I believe this is just an optimisation: it would be equally valid to just output Orig
-     RdrNames that correctly record the module etc we expect the final Name to come from. However,
-     were we to eliminate isTupleOcc_maybe it would become essential (see point 3).
+     Currently, I believe this is just an optimisation: it would be
+     equally valid to just output Orig RdrNames that correctly record
+     the module etc we expect the final Name to come from. However,
+     were we to eliminate isBuiltInOcc_maybe it would become essential
+     (see point 3).
 
-  2. The knownKeyNames (which consist of the basicKnownKeyNames from the module, and those names reachable
-     via the wired-in stuff from TysWiredIn) are used to initialise the "original name cache" in IfaceEnv.
-     This initialization ensures that when the type checker or renamer (both of which use IfaceEnv) look up
-     an original name (i.e. a pair of a Module and an OccName) for a known-key name they get the correct Unique.
+  2. The knownKeyNames (which consist of the basicKnownKeyNames from
+     the module, and those names reachable via the wired-in stuff from
+     TysWiredIn) are used to initialise the "OrigNameCache" in
+     IfaceEnv.  This initialization ensures that when the type checker
+     or renamer (both of which use IfaceEnv) look up an original name
+     (i.e. a pair of a Module and an OccName) for a known-key name
+     they get the correct Unique.
 
-     This is the most important mechanism for ensuring that known-key stuff gets the right Unique, and is why
-     it is so important to place your known-key names in the appropriate lists.
+     This is the most important mechanism for ensuring that known-key
+     stuff gets the right Unique, and is why it is so important to
+     place your known-key names in the appropriate lists.
 
-  3. For "infinite families" of known-key names (i.e. tuples, Any tycons and implicit parameter TyCons), we
-     have to be extra careful. Because there are an infinite number of these things, we cannot add them to
-     the list of known-key names used to initialise the original name cache. Instead, we have to rely on
-     never having to look them up in that cache.
+  3. For "infinite families" of known-key names (i.e. tuples), we have
+     to be extra careful. Because there are an infinite number of
+     these things, we cannot add them to the list of known-key names
+     used to initialise the OrigNameCache. Instead, we have to
+     rely on never having to look them up in that cache.
 
      This is accomplished through a variety of mechanisms:
 
-       a) The known infinite families of names are specially serialised by BinIface.putName, with that special treatment
-          detected when we read back to ensure that we get back to the correct uniques.
+       a) The parser recognises them specially and generates an 
+          Exact Name (hence not looked up in the orig-name cache)
 
-       b) Most of the infinite families cannot occur in source code, so mechanism a) sufficies to ensure that they
-          always have the right Unique. In particular, implicit param TyCon names, constraint tuples and Any TyCons
-          cannot be mentioned by the user.
+       b) The known infinite families of names are specially
+          serialised by BinIface.putName, with that special treatment
+          detected when we read back to ensure that we get back to the
+          correct uniques.
 
-       c) Tuple TyCon/DataCon names have a special hack (isTupleOcc_maybe) that is used by the original name cache
-          lookup routine to detect tuple names and give them the right Unique. You might think that this is unnecessary
-          because tuple TyCon/DataCons are parsed as Exact RdrNames and *don't* appear as original names in interface files
-          (because serialization gives them special treatment), so we will never look them up in the original name cache.
+       Most of the infinite families cannot occur in source code,
+       so mechanisms (a,b) sufficies to ensure that they always have
+       the right Unique. In particular, implicit param TyCon names,
+       constraint tuples and Any TyCons cannot be mentioned by the
+       user.
 
-          However, there is a subtle reason why this is not the case: if you use setRdrNameSpace on an Exact RdrName
-          it may be turned into an Orig RdrName. So if the original name was an Exact tuple Name we might end up with
-          an Orig instead, which *will* lead to an original name cache query.
+       c) IfaceEnv.lookupOrigNameCache uses isBuiltInOcc_maybe to map
+          built-in syntax directly onto the corresponding name, rather
+          than trying to find it in the original-name cache.
+
+          See also Note [Built-in syntax and the OrigNameCache]
+
 \begin{code}
 module PrelNames (
         Unique, Uniquable(..), hasKey,  -- Re-exported for convenience
@@ -473,10 +488,10 @@ mkMainModule_ m = mkModule mainPackageId m
 %************************************************************************
 
 \begin{code}
-mkTupleModule :: TupleSort -> Arity -> Module
-mkTupleModule BoxedTuple   _ = gHC_TUPLE
-mkTupleModule ConstraintTuple    _ = gHC_TUPLE
-mkTupleModule UnboxedTuple _ = gHC_PRIM
+mkTupleModule :: TupleSort -> Module
+mkTupleModule BoxedTuple      = gHC_TUPLE
+mkTupleModule ConstraintTuple = gHC_TUPLE
+mkTupleModule UnboxedTuple    = gHC_PRIM
 \end{code}
 
 
