@@ -1112,8 +1112,10 @@ thRdrName loc ctxt_ns th_occ th_name
      TH.NameQ mod  -> (mkRdrQual  $! mk_mod mod) $! occ
      TH.NameL uniq -> nameRdrName $! (((Name.mkInternalName $! mk_uniq uniq) $! occ) loc)
      TH.NameU uniq -> nameRdrName $! (((Name.mkSystemNameAt $! mk_uniq uniq) $! occ) loc)
-     TH.NameS | Just name <- isBuiltInOcc ctxt_ns th_occ -> nameRdrName $! name
-              | otherwise                                -> mkRdrUnqual $! occ
+     TH.NameS | Just name <- isBuiltInOcc_maybe occ -> nameRdrName $! name
+              | otherwise                           -> mkRdrUnqual $! occ
+              -- We check for built-in syntax here, because the TH
+              -- user might have written a (NameS "(,,)"), for example
   where
     occ :: OccName.OccName
     occ = mk_occ ctxt_ns th_occ
@@ -1132,25 +1134,6 @@ thRdrNameGuesses (TH.Name occ flavour)
     guessed_nss | isLexCon (mkFastString occ_str) = [OccName.tcName,  OccName.dataName]
                 | otherwise                       = [OccName.varName, OccName.tvName]
     occ_str = TH.occString occ
-
-isBuiltInOcc :: OccName.NameSpace -> String -> Maybe Name.Name
--- Built in syntax isn't "in scope" so an Unqual RdrName won't do
--- We must generate an Exact name, just as the parser does
-isBuiltInOcc ctxt_ns occ
-  = case occ of
-        ":"              -> Just (Name.getName consDataCon)
-        "[]"             -> Just (Name.getName nilDataCon)
-        "()"             -> Just (tup_name 0)
-        '(' : ',' : rest -> go_tuple 2 rest
-        _                -> Nothing
-  where
-    go_tuple n ")"          = Just (tup_name n)
-    go_tuple n (',' : rest) = go_tuple (n+1) rest
-    go_tuple _ _            = Nothing
-
-    tup_name n
-        | OccName.isTcClsNameSpace ctxt_ns = Name.getName (tupleTyCon BoxedTuple n)
-        | otherwise                        = Name.getName (tupleCon BoxedTuple n)
 
 -- The packing and unpacking is rather turgid :-(
 mk_occ :: OccName.NameSpace -> String -> OccName.OccName

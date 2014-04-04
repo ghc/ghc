@@ -28,13 +28,10 @@ module IfaceEnv (
 import TcRnMonad
 import TysWiredIn
 import HscTypes
-import TyCon
 import Type
-import DataCon
 import Var
 import Name
 import Avail
-import PrelNames
 import Module
 import UniqFM
 import FastString
@@ -183,23 +180,34 @@ lookupOrig mod occ
 
 See Note [The Name Cache] above.
 
+Note [Built-in syntax and the OrigNameCache]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You might think that usin isBuiltInOcc_maybe in lookupOrigNameCache is
+unnecessary because tuple TyCon/DataCons are parsed as Exact RdrNames
+and *don't* appear as original names in interface files (because
+serialization gives them special treatment), so we will never look
+them up in the original name cache.
+
+However, there are two reasons why we might look up an Orig RdrName:
+
+  * If you use setRdrNameSpace on an Exact RdrName it may be
+    turned into an Orig RdrName. 
+
+  * Template Haskell turns a BuiltInSyntax Name into a TH.NameG
+    (DsMeta.globalVar), and parses a NameG into an Orig RdrName
+    (Convert.thRdrName).  So, eg $(do { reify '(,); ... }) will
+    go this route (Trac #8954).
+
 \begin{code}
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
-lookupOrigNameCache _ mod occ
-  -- Don't need to mention gHC_UNIT here because it is explicitly
-  -- included in TysWiredIn.wiredInTyCons
-  | mod == gHC_TUPLE || mod == gHC_PRIM,		-- Boxed tuples from one, 
-    Just tup_info <- isTupleOcc_maybe occ	-- unboxed from the other
-  = 	-- Special case for tuples; there are too many
+lookupOrigNameCache nc mod occ
+  | Just name <- isBuiltInOcc_maybe occ
+  = 	-- See Note [Known-key names], 3(c) in PrelNames
+        -- Special case for tuples; there are too many
 	-- of them to pre-populate the original-name cache
-    Just (mk_tup_name tup_info)
-  where
-    mk_tup_name (ns, sort, arity)
-	| ns == tcName   = tyConName (tupleTyCon sort arity)
-	| ns == dataName = dataConName (tupleCon sort arity)
-	| otherwise      = Var.varName (dataConWorkId (tupleCon sort arity))
+    Just name
 
-lookupOrigNameCache nc mod occ	-- The normal case
+  | otherwise
   = case lookupModuleEnv nc mod of
 	Nothing      -> Nothing
 	Just occ_env -> lookupOccEnv occ_env occ
