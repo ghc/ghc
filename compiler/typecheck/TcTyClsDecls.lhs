@@ -780,7 +780,8 @@ tcDataDefn rec_info tc_name tvs kind
   = do { extra_tvs <- tcDataKindSig kind
        ; let final_tvs  = tvs ++ extra_tvs
              roles      = rti_roles rec_info tc_name
-       ; stupid_theta <- tcHsContext ctxt
+       ; stupid_tc_theta <- tcHsContext ctxt
+       ; stupid_theta    <- zonkTcTypeToTypes emptyZonkEnv stupid_tc_theta
        ; kind_signatures <- xoptM Opt_KindSignatures
        ; is_boot         <- tcIsHsBoot  -- Are we compiling an hs-boot file?
 
