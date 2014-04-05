@@ -709,6 +709,8 @@ irTyCon tc
        ; unless (all (== Nominal) old_roles) $  -- also catches data families,
                                                 -- which don't want or need role inference
     do { whenIsJust (tyConClass_maybe tc) (irClass tc_name)
+       ; addRoleInferenceInfo tc_name (tyConTyVars tc) $
+         mapM_ (irType emptyVarSet) (tyConStupidTheta tc)  -- See #8958
        ; mapM_ (irDataCon tc_name) (visibleDataCons $ algTyConRhs tc) }}
 
   | Just (SynonymTyCon ty) <- synTyConRhs_maybe tc
@@ -778,7 +780,7 @@ lookupRoles tc
            Just roles -> return roles
            Nothing    -> return $ tyConRoles tc }
 
--- tries to update a role; won't even update a role "downwards"
+-- tries to update a role; won't ever update a role "downwards"
 updateRole :: Role -> TyVar -> RoleM ()
 updateRole role tv
   = do { var_ns <- getVarNs

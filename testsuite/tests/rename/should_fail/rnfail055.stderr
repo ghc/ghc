@@ -32,9 +32,10 @@ RnFail055.hs-boot:12:1:
 RnFail055.hs-boot:14:1:
     Type constructor ‘T2’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: type role T2 representational phantom
+    Main module: type role T2 representational nominal
                  data Eq b => T2 a b = T2 a
-    Boot file:   data Eq a => T2 a b = T2 a
+    Boot file:   type role T2 nominal representational
+                 data Eq a => T2 a b = T2 a
 
 RnFail055.hs-boot:16:11:
     T3 is exported by the hs-boot file, but not exported by the module

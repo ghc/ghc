@@ -1,0 +1,49 @@
+
+T8958.hs:1:31: Warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+TYPE SIGNATURES
+TYPE CONSTRUCTORS
+  Map :: * -> * -> *
+  newtype (Nominal k, Representational v) => Map k v
+    No C type associated
+    Roles: [nominal, representational]
+    RecFlag NonRecursive, Promotable
+    = MkMap :: [(k, v)] -> Map k v Stricts: _
+    FamilyInstance: none
+  Nominal :: * -> Constraint
+  class Nominal a
+    Roles: [nominal]
+    RecFlag NonRecursive
+  Representational :: * -> Constraint
+  class Representational a
+    Roles: [representational]
+    RecFlag NonRecursive
+COERCION AXIOMS
+  axiom T8958.NTCo:Map :: Map k v = [(k, v)]
+INSTANCES
+  instance [incoherent] Representational a
+    -- Defined at T8958.hs:10:10
+  instance [incoherent] Nominal a -- Defined at T8958.hs:7:10
+Dependent modules: []
+Dependent packages: [base, ghc-prim, integer-gmp]
+
+==================== Typechecker ====================
+AbsBinds [a] []
+  {Exports: [T8958.$fRepresentationala <= $dRepresentational_aJ6
+               <>]
+   Exported types: T8958.$fRepresentationala [InlPrag=[ALWAYS] CONLIKE]
+                     :: forall a. Representational a
+                   [LclIdX[DFunId],
+                    Str=DmdType,
+                    Unf=DFun: \ (@ a) -> T8958.D:Representational TYPE a]
+   Binds: $dRepresentational_aJ6 = T8958.D:Representational}
+AbsBinds [a] []
+  {Exports: [T8958.$fNominala <= $dNominal_aJ7
+               <>]
+   Exported types: T8958.$fNominala [InlPrag=[ALWAYS] CONLIKE]
+                     :: forall a. Nominal a
+                   [LclIdX[DFunId],
+                    Str=DmdType,
+                    Unf=DFun: \ (@ a) -> T8958.D:Nominal TYPE a]
+   Binds: $dNominal_aJ7 = T8958.D:Nominal}
+
