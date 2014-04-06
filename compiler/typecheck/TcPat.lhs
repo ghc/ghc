@@ -813,14 +813,12 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 
         ; prov_dicts' <- newEvVars prov_theta'
 
-          {-
+        -- Using a pattern synonym requires the PatternSynonyms
+        -- language flag to keep consistent with #2905
         ; patsyns_on <- xoptM Opt_PatternSynonyms
 	; checkTc patsyns_on
                   (ptext (sLit "A pattern match on a pattern synonym requires PatternSynonyms"))
-		  -- Trac #2905 decided that a *pattern-match* of a GADT
-		  -- should require the GADT language flag.
-                  -- Re TypeFamilies see also #7156
--}
+
         ; let skol_info = case pe_ctxt penv of
                             LamPat mc -> PatSkol (PatSynCon pat_syn) mc
                             LetPat {} -> UnkSkol -- Doesn't matter

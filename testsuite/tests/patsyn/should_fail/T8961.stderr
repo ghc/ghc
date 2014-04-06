@@ -1,0 +1,7 @@
+[1 of 2] Compiling T8961a           ( T8961a.hs, T8961a.o )
+[2 of 2] Compiling ShouldFail       ( T8961.hs, T8961.o )
+
+T8961.hs:6:9:
+    A pattern match on a pattern synonym requires PatternSynonyms
+    In the pattern: Single x
+    In an equation for ‘single’: single (Single x) = Just x
