@@ -324,3 +324,5 @@ test('T7021',
 test('T8807', normal, compile, ['-v0'])
 test('T8884', normal, compile, ['-v0'])
 test('T8954', normal, compile, ['-v0'])
+test('T8932', normal, compile_fail, ['-v0'])
+
