@@ -1,35 +1,32 @@
 
    ==============================================================
-    The (Interactive) Glasgow Haskell Compiler -- version 6.10.1
+    The (Interactive) Glasgow Haskell Compiler -- version 7.8.1
    ==============================================================
 
 The GHC Team is pleased to announce a new major release of GHC. There
 have been a number of significant changes since the last major release,
 including:
 
- * Some new language features have been implemented:
-   * Record syntax: wild-card patterns, punning, and field disambiguation
-   * Generalised quasi-quotes
-   * Generalised list comprehensions
-   * View patterns
-
- * Type families have been completely re-implemented
-
- * Now comes with Haddock 2, which supports all GHC extensions
-
- * Parallel garbage collection
-
- * Base provides extensible exceptions
-
- * The GHC API is easier to use
-
- * External core (output only) now works again
-
- * Data Parallel Haskell (DPH) comes as part of GHC
+  * New type-system features
+    * Closed type families
+    * Role checking
+    * An improved solver for type naturals
+  * Better support for cross compilation
+  * Full iOS support
+  * Massive scalability improvements to the I/O manager
+  * Dynamic linking for GHCi
+  * Several language improvements
+    * Pattern synonyms
+    * Overloaded list syntax
+    * Kind-polymorphic 'Typeable' class
+  * A new parallel --make mode
+  * Preliminary SIMD intrinsic support
+  * A brand-new low level code generator
+  * Many bugfixes and other performance improvements.
 
 The full release notes are here:
 
-  http://haskell.org/ghc/docs/6.10.1/html/users_guide/release-6-10-1.html
+  http://haskell.org/ghc/docs/7.8.1/html/users_guide/release-7-8-1.html
 
 How to get it
 ~~~~~~~~~~~~~
