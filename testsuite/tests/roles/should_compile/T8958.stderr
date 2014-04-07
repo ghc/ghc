@@ -29,21 +29,21 @@ Dependent packages: [base, ghc-prim, integer-gmp]
 
 ==================== Typechecker ====================
 AbsBinds [a] []
-  {Exports: [T8958.$fRepresentationala <= $dRepresentational_aJ6
+  {Exports: [T8958.$fRepresentationala <= $dRepresentational_aIo
                <>]
    Exported types: T8958.$fRepresentationala [InlPrag=[ALWAYS] CONLIKE]
                      :: forall a. Representational a
                    [LclIdX[DFunId],
                     Str=DmdType,
                     Unf=DFun: \ (@ a) -> T8958.D:Representational TYPE a]
-   Binds: $dRepresentational_aJ6 = T8958.D:Representational}
+   Binds: $dRepresentational_aIo = T8958.D:Representational}
 AbsBinds [a] []
-  {Exports: [T8958.$fNominala <= $dNominal_aJ7
+  {Exports: [T8958.$fNominala <= $dNominal_aIp
                <>]
    Exported types: T8958.$fNominala [InlPrag=[ALWAYS] CONLIKE]
                      :: forall a. Nominal a
                    [LclIdX[DFunId],
                     Str=DmdType,
                     Unf=DFun: \ (@ a) -> T8958.D:Nominal TYPE a]
-   Binds: $dNominal_aJ7 = T8958.D:Nominal}
+   Binds: $dNominal_aIp = T8958.D:Nominal}
 
