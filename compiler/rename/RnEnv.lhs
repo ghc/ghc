@@ -270,8 +270,16 @@ lookupExactOcc name
                        ; return name
                        }
 
-           [gre] -> return (gre_name gre)
-           _     -> pprPanic "lookupExactOcc" (ppr name $$ ppr gres) }
+           (gre:_) -> return (gre_name gre) }
+           -- We can get more than one GRE here, if there are multiple 
+           -- bindings for the same name; but there will already be a 
+           -- reported error for the duplicate.  (If we add the error 
+           -- rather than stopping when we encounter it.) 
+           -- So all we need do here is not crash.  
+           -- Example is Trac #8932:
+           --    $( [d| foo :: a->a; foo x = x |])
+           --    foo = True
+           -- Here the 'foo' in the splice turns into an Exact Name
 
   where
     exact_nm_err = hang (ptext (sLit "The exact Name") <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
