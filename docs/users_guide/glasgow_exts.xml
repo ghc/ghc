@@ -856,9 +856,11 @@ y)</literal> will not be coalesced.
 </title>
 
 <para>
-Pattern synonyms are enabled by the flag <literal>-XPatternSynonyms</literal>.
-More information and examples of view patterns can be found on the
-<ulink url="http://ghc.haskell.org/trac/ghc/wiki/PatternSynonyms">Wiki
+Pattern synonyms are enabled by the flag
+<literal>-XPatternSynonyms</literal>, which is required for both
+defining them <emphasis>and</emphasis> using them.  More information
+and examples of view patterns can be found on the <ulink
+url="http://ghc.haskell.org/trac/ghc/wiki/PatternSynonyms">Wiki
 page</ulink>.
 </para>
 
