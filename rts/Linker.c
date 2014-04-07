@@ -158,6 +158,7 @@ ObjectCode *unloaded_objects = NULL; /* initially empty */
 /* Type of the initializer */
 typedef void (*init_t) (int argc, char **argv, char **env);
 
+static HsInt isAlreadyLoaded( pathchar *path );
 static HsInt loadOc( ObjectCode* oc );
 static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
                          char *archiveMemberName
@@ -2303,6 +2304,23 @@ mkOc( pathchar *path, char *image, int imageSize,
    return oc;
 }
 
+/* -----------------------------------------------------------------------------
+ * Check if an object or archive is already loaded.
+ *
+ * Returns: 1 if the path is already loaded, 0 otherwise.
+ */
+static HsInt
+isAlreadyLoaded( pathchar *path )
+{
+    ObjectCode *o;
+    for (o = objects; o; o = o->next) {
+       if (0 == pathcmp(o->fileName, path)) {
+           return 1; /* already loaded */
+       }
+    }
+    return 0; /* not loaded yet */
+}
+
 HsInt
 loadArchive( pathchar *path )
 {
@@ -2341,8 +2359,18 @@ loadArchive( pathchar *path )
 #endif
 #endif
 
+    initLinker();
+
     IF_DEBUG(linker, debugBelch("loadArchive: start\n"));
     IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%" PATH_FMT" '\n", path));
+
+    /* Check that we haven't already loaded this archive.
+       Ignore requests to load multiple times */
+    if (isAlreadyLoaded(path)) {
+        IF_DEBUG(linker,
+                 debugBelch("ignoring repeated load of %" PATH_FMT "\n", path));
+        return 1; /* success */
+    }
 
     gnuFileIndex = NULL;
     gnuFileIndexSize = 0;
@@ -2782,24 +2810,10 @@ loadObj( pathchar *path )
 
    /* Check that we haven't already loaded this object.
       Ignore requests to load multiple times */
-   {
-       ObjectCode *o;
-       int is_dup = 0;
-       for (o = objects; o; o = o->next) {
-          if (0 == pathcmp(o->fileName, path)) {
-             is_dup = 1;
-             break; /* don't need to search further */
-          }
-       }
-       if (is_dup) {
-          IF_DEBUG(linker, debugBelch(
-            "GHCi runtime linker: warning: looks like you're trying to load the\n"
-            "same object file twice:\n"
-            "   %" PATH_FMT "\n"
-            "GHCi will ignore this, but be warned.\n"
-            , path));
-          return 1; /* success */
-       }
+   if (isAlreadyLoaded(path)) {
+       IF_DEBUG(linker,
+                debugBelch("ignoring repeated load of %" PATH_FMT "\n", path));
+       return 1; /* success */
    }
 
    r = pathstat(path, &st);
