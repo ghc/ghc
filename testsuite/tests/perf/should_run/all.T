@@ -60,7 +60,9 @@ test('T876',
           [(wordsize(64), 63216 , 5),
               # 2013-02-14: 1263712 (x86_64/Linux)
               # 2014-02-10:   63216 (x86_64/Linux), call arity analysis
-           (wordsize(32), 663712, 5)]),
+           (wordsize(32), 56820, 5) ]),
+              # some date:  663712  (Windows, 64-bit machine)
+              # 2014-04-04:  56820  (Windows, 64-bit machine)
       only_ways(['normal']),
       extra_run_opts('10000')
       ],
@@ -289,7 +291,9 @@ test('T7797',
 
 test('T7954',
       [stats_num_field('bytes allocated',
-                      [(wordsize(32), 1380051408, 10),
+                      [(wordsize(32), 920045264, 10),
+              # some date:  1380051408    (64-bit Windows machine)
+              # 2014-04-04:  920045264    (64-bit Windows machine)
                        (wordsize(64), 1680051336, 10)]),
               # 2014-02-10: 1680051336 (x86_64/Linux), call arity analysis
       only_ways(['normal'])
@@ -307,7 +311,8 @@ test('T7850',
 
 test('T5949',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64), 201008, 10)]),
+                      [ (wordsize(32), 101000, 10),
+                        (wordsize(64), 201008, 10)]),
                       # previously, it was >400000 bytes
       only_ways(['normal'])],
      compile_and_run,
@@ -315,7 +320,8 @@ test('T5949',
 
 test('T4267',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64), 40992, 10)]),
+                      [ (wordsize(32), 20992, 10)
+                      , (wordsize(64), 40992, 10) ]),
                       # previously, it was >170000 bytes
                       # 2014-01-17: 130000
                       # 2014-02-10: 40992 (x86_64/Linux), call arity analysis
@@ -325,7 +331,8 @@ test('T4267',
 
 test('T7619',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64), 40992, 10)]),
+                      [ (wordsize(32), 20992, 10)
+                      , (wordsize(64), 40992, 10) ]),
                       # previously, it was >400000 bytes
       only_ways(['normal'])],
      compile_and_run,
@@ -333,21 +340,24 @@ test('T7619',
 
 test('InlineArrayAlloc',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64), 1600040960, 5)]),
+                      [ (wordsize(32), 800040960, 5)
+                      , (wordsize(64), 1600040960, 5) ]),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
 
 test('InlineByteArrayAlloc',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64), 1440040960, 5)]),
+                      [ (wordsize(32),  720040960, 5)
+                      , (wordsize(64), 1440040960, 5) ]),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
 
 test('InlineCloneArrayAlloc',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64), 1600041120, 5)]),
+                      [ (wordsize(32), 800041120, 5) 
+                      , (wordsize(64), 1600041120, 5) ]),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])

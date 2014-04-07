@@ -58,11 +58,12 @@ test('T1969',
                # hence 10% range.
                # See Note [residency] to get an accurate view.
       compiler_stats_num_field('bytes allocated',
-          [(platform('i386-unknown-mingw32'), 317975916, 5),
+          [(platform('i386-unknown-mingw32'), 301784492, 5),
                                  #            215582916 (x86/Windows)
                                  # 2012-10-29 298921816 (x86/Windows)
                                  # 2013-02-10 310633884 (x86/Windows)
                                  # 2013-11-13 317975916 (x86/Windows, 64bit machine)
+                                 # 2014-04-04 301784492 (x86/Windows, 64bit machine)
            (wordsize(32), 316103268, 1),
              #            221667908 (x86/OS X)
              #            274932264 (x86/Linux)
@@ -127,12 +128,13 @@ test('T3294',
              #  (reason for increase back to earlier value unknown)
 
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 1565185140, 5),
+          [(wordsize(32), 1377050640, 5),
            # previous:     815479800  (x86/Linux)
            # (^ increase due to new codegen, see #7198)
            # 2012-10-08:  1373514844 (x86/Linux)
            # 2013-11-13: 1478325844  (x86/Windows, 64bit machine)
            # 2014-01-12: 1565185140  (x86/Linux)
+           # 2013-04-04: 1377050640  (x86/Windows, 64bit machine)
            (wordsize(64), 2705289664, 5)]),
             # old:        1357587088 (amd64/Linux)
             # 29/08/2012: 2961778696 (amd64/Linux)
@@ -233,10 +235,11 @@ test('T3064',
             # (amd64/Linux) (11/02/2014): 308422280, optimize Coercions in simpleOptExpr
 
       compiler_stats_num_field('max_bytes_used',
-          [(wordsize(32), 7218200 , 20),
-            # 2011-06-28: 2247016 (x86/Linux) (28/6/2011):
-            #(some date): 5511604
-            # 2013-11-13: 7218200 (x86/Windows, 64bit machine)
+          [(wordsize(32), 11202304, 20),
+            # 2011-06-28:  2247016 (x86/Linux) (28/6/2011):
+            #(some date):  5511604
+            # 2013-11-13:  7218200 (x86/Windows, 64bit machine)
+            # 2014-04-04: 11202304 (x86/Windows, 64bit machine)
            (wordsize(64), 19821544, 20)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
@@ -282,8 +285,9 @@ test('T5030',
 
 test('T5631',
      [compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 392904228, 10),
+          [(wordsize(32), 346389856, 10),
         # expected value: 392904228 (x86/Linux)
+        # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
            (wordsize(64), 690742040, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
@@ -307,10 +311,11 @@ test('T783',
      [ only_ways(['normal']),  # no optimisation for this one
       # expected value: 175,569,928 (x86/Linux)
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 333833658, 2),
+          [(wordsize(32), 319179104, 5),
             # 2012-10-08: 226907420 (x86/Linux)
             # 2013-02-10: 329202116 (x86/Windows)
             # 2013-02-10: 338465200 (x86/OSX)
+            # 2014-04-04: 319179104 (x86 Windows, 64 bit machine)
            (wordsize(64), 654804144, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
@@ -390,9 +395,10 @@ test('T5837',
 test('T6048',
      [ only_ways(['optasm']),
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 48887164, 10),
+          [(wordsize(32), 62618072, 10),
             # prev:       38000000 (x86/Linux)
             # 2012-10-08: 48887164 (x86/Linux)
+            # 2014-04-04: 62618072 (x86 Windows, 64 bit machine)
            (wordsize(64), 110646312, 10)])
              # 18/09/2012 97247032 amd64/Linux
              # 16/01/2014 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
