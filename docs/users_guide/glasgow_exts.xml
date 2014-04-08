@@ -4070,47 +4070,52 @@ the newtype and its representation.
 
 <sect3> <title> A more precise specification </title>
 <para>
-Derived instance declarations are constructed as follows. Consider the
-declaration (after expansion of any type synonyms)
+A derived instance is derived only for declarations of these forms (after expansion of any type synonyms)
 
 <programlisting>
-  newtype T v1...vn = T' (t vk+1...vn) deriving (c1...cm)
+  newtype T v1..vn                   = MkT (t vk+1..vn) deriving (C t1..tj)
+  newtype instance T s1..sk vk+1..vn = MkT (t vk+1..vn) deriving (C t1..tj)
 </programlisting>
-
 where
  <itemizedlist>
 <listitem><para>
-  The <literal>ci</literal> are partial applications of
-  classes of the form <literal>C t1'...tj'</literal>, where the arity of <literal>C</literal>
+<literal>v1..vn</literal> are type variables, and <literal>t</literal>, 
+<literal>s1..sk</literal>, <literal>t1..tj</literal> are types.
+</para></listitem>
+<listitem><para>
+  The <literal>(C t1..tj)</literal> is a partial applications of the class <literal>C</literal>,
+  where the arity of <literal>C</literal>
   is exactly <literal>j+1</literal>.  That is, <literal>C</literal> lacks exactly one type argument.
 </para></listitem>
 <listitem><para>
-  The <literal>k</literal> is chosen so that <literal>ci (T v1...vk)</literal> is well-kinded.
+  <literal>k</literal> is chosen so that <literal>C t1..tj (T v1...vk)</literal> is well-kinded.
+(Or, in the case of a <literal>data instance</literal>, so that <literal>C t1..tj (T s1..sk)</literal> is
+well kinded.)
 </para></listitem>
 <listitem><para>
   The type <literal>t</literal> is an arbitrary type.
 </para></listitem>
 <listitem><para>
-  The type variables <literal>vk+1...vn</literal> do not occur in <literal>t</literal>,
-  nor in the <literal>ci</literal>, and
+  The type variables <literal>vk+1...vn</literal> do not occur in the types <literal>t</literal>,
+  <literal>s1..sk</literal>, or <literal>t1..tj</literal>.
 </para></listitem>
 <listitem><para>
-  None of the <literal>ci</literal> is <literal>Read</literal>, <literal>Show</literal>,
+  <literal>C</literal> is not <literal>Read</literal>, <literal>Show</literal>,
 		<literal>Typeable</literal>, or <literal>Data</literal>.  These classes
 		should not "look through" the type or its constructor.  You can still
 		derive these classes for a newtype, but it happens in the usual way, not
 		via this new mechanism.
 </para></listitem>
 <listitem><para>
-  It is safe to coerce each of the methods of <literal>ci</literal>. That is,
-  the missing last argument to each of the <literal>ci</literal> is not used
-  at a nominal role in any of the <literal>ci</literal>'s methods.
+  It is safe to coerce each of the methods of <literal>C</literal>. That is,
+  the missing last argument to <literal>C</literal> is not used
+  at a nominal role in any of the <literal>C</literal>'s methods.
   (See <xref linkend="roles"/>.)</para></listitem>
 </itemizedlist>
-Then, for each <literal>ci</literal>, the derived instance
+Then the derived instance is of form
 declaration is:
 <programlisting>
-  instance ci t => ci (T v1...vk)
+  instance C t1..tj t => C t1..tj (T v1...vk)
 </programlisting>
 As an example which does <emphasis>not</emphasis> work, consider
 <programlisting>
