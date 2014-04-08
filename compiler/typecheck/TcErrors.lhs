@@ -48,7 +48,7 @@ import DynFlags
 import ListSetOps       ( equivClasses )
 
 import Data.Maybe
-import Data.List        ( partition, mapAccumL, zip4 )
+import Data.List        ( partition, mapAccumL, zip4, nub )
 \end{code}
 
 %************************************************************************
@@ -728,14 +728,15 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_env = env, ic_given = given, ic_info = skol_info } <- implic
   = do { let msg = misMatchMsg oriented ty1 ty2
-             untch_extra 
+             untch_extra
                 = nest 2 $
                   sep [ quotes (ppr tv1) <+> ptext (sLit "is untouchable")
                       , nest 2 $ ptext (sLit "inside the constraints") <+> pprEvVarTheta given
                       , nest 2 $ ptext (sLit "bound by") <+> ppr skol_info
                       , nest 2 $ ptext (sLit "at") <+> ppr (tcl_loc env) ]
              tv_extra = extraTyVarInfo ctxt ty1 ty2
-       ; mkErrorMsg ctxt ct (vcat [msg, untch_extra, tv_extra, extra]) }
+             add_sig  = suggestAddSig ctxt ty1 ty2
+       ; mkErrorMsg ctxt ct (vcat [msg, untch_extra, tv_extra, add_sig, extra]) }
 
   | otherwise
   = reportEqErr ctxt extra ct oriented (mkTyVarTy tv1) ty2
@@ -815,29 +816,42 @@ pp_givens givens
                        , ptext (sLit "at") <+> ppr loc])
 
 extraTyVarInfo :: ReportErrCtxt -> TcType -> TcType -> SDoc
--- Add on extra info about the types themselves
+-- Add on extra info about skolem constants
 -- NB: The types themselves are already tidied
 extraTyVarInfo ctxt ty1 ty2
-  = nest 2 (extra1 $$ extra2)
+  = nest 2 (tv_extra ty1 $$ tv_extra ty2)
   where
-    extra1 = tyVarExtraInfoMsg (cec_encl ctxt) ty1
-    extra2 = tyVarExtraInfoMsg (cec_encl ctxt) ty2
+    implics = cec_encl ctxt
+    tv_extra ty | Just tv <- tcGetTyVar_maybe ty
+                , isTcTyVar tv, isSkolemTyVar tv
+                , let pp_tv = quotes (ppr tv)
+                = case tcTyVarDetails tv of
+                    SkolemTv {}   -> pp_tv <+> pprSkol (getSkolemInfo implics tv) (getSrcLoc tv)
+                    FlatSkol {}   -> pp_tv <+> ptext (sLit "is a flattening type variable")
+                    RuntimeUnk {} -> pp_tv <+> ptext (sLit "is an interactive-debugger skolem")
+                    MetaTv {}     -> empty
 
-tyVarExtraInfoMsg :: [Implication] -> Type -> SDoc
--- Shows a bit of extra info about skolem constants
-tyVarExtraInfoMsg implics ty
-  | Just tv <- tcGetTyVar_maybe ty
-  , isTcTyVar tv, isSkolemTyVar tv
-  , let pp_tv = quotes (ppr tv)
- = case tcTyVarDetails tv of
-    SkolemTv {}   -> pp_tv <+> pprSkol (getSkolemInfo implics tv) (getSrcLoc tv)
-    FlatSkol {}   -> pp_tv <+> ptext (sLit "is a flattening type variable")
-    RuntimeUnk {} -> pp_tv <+> ptext (sLit "is an interactive-debugger skolem")
-    MetaTv {}     -> empty
+                | otherwise             -- Normal case
+                = empty
 
- | otherwise             -- Normal case
- = empty
- 
+suggestAddSig :: ReportErrCtxt -> TcType -> TcType -> SDoc
+-- See Note [Suggest adding a type signature]
+suggestAddSig ctxt ty1 ty2
+  | null inferred_bndrs
+  = empty
+  | [bndr] <- inferred_bndrs
+  = ptext (sLit "Possible fix: add a type signature for") <+> quotes (ppr bndr)
+  | otherwise
+  = ptext (sLit "Possible fix: add type signatures for some or all of") <+> (ppr inferred_bndrs)
+  where
+    inferred_bndrs = nub (get_inf ty1 ++ get_inf ty2)
+    get_inf ty | Just tv <- tcGetTyVar_maybe ty
+               , isTcTyVar tv, isSkolemTyVar tv
+               , InferSkol prs <- getSkolemInfo (cec_encl ctxt) tv
+               = map fst prs
+               | otherwise
+               = []
+
 kindErrorMsg :: TcType -> TcType -> SDoc   -- Types are already tidy
 kindErrorMsg ty1 ty2
   = vcat [ ptext (sLit "Kind incompatibility when matching types:")
@@ -906,6 +920,23 @@ sameOccExtra ty1 ty2
          mod = nameModule nm
          loc = nameSrcSpan nm
 \end{code}
+
+Note [Suggest adding a type signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The OutsideIn algorithm rejects GADT programs that don't have a principal
+type, and indeed some that do.  Example:
+   data T a where
+     MkT :: Int -> T Int
+
+   f (MkT n) = n
+
+Does this have type f :: T a -> a, or f :: T a -> Int?
+The error that shows up tends to be an attempt to unify an
+untouchable type variable.  So suggestAddSig sees if the offending
+type variable is bound by an *inferred* signature, and suggests
+adding a declared signature instead.
+
+This initially came up in Trac #8968, concerning pattern synonyms.
 
 Note [Disambiguating (X ~ X) errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

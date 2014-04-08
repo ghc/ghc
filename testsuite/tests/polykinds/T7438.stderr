@@ -11,6 +11,7 @@ T7438.hs:6:14:
           the inferred type of go :: Thrist t2 t3 -> t -> t1 at T7438.hs:6:1
       ‘t1’ is a rigid type variable bound by
            the inferred type of go :: Thrist t2 t3 -> t -> t1 at T7438.hs:6:1
+    Possible fix: add a type signature for ‘go’
     Relevant bindings include
       acc :: t (bound at T7438.hs:6:8)
       go :: Thrist t2 t3 -> t -> t1 (bound at T7438.hs:6:1)

@@ -7,6 +7,7 @@ T7594.hs:33:12:
         at T7594.hs:33:8-19
       ‘b’ is a rigid type variable bound by
           the inferred type of bar2 :: b at T7594.hs:33:1
+    Possible fix: add a type signature for ‘bar2’
     Expected type: a -> b
       Actual type: a -> IO ()
     Relevant bindings include bar2 :: b (bound at T7594.hs:33:1)
