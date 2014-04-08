@@ -498,8 +498,8 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
          | otherwise = Persistent
 
         stop_phase' = case stop_phase of
-                        As | split -> SplitAs
-                        _          -> stop_phase
+                        As _ | split -> SplitAs
+                        _            -> stop_phase
 
    ( _, out_file) <- runPipeline stop_phase' hsc_env
                             (src, fmap RealPhase mb_phase) Nothing output
@@ -730,7 +730,7 @@ getOutputFilename stop_phase output basename dflags next_phase maybe_location
           -- sometimes, we keep output from intermediate stages
           keep_this_output =
                case next_phase of
-                       As      | keep_s     -> True
+                       As _    | keep_s     -> True
                        LlvmOpt | keep_bc    -> True
                        HCc     | keep_hc    -> True
                        _other               -> False
@@ -1078,7 +1078,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
                    | otherwise            = []
 
         -- Decide next phase
-        let next_phase = As
+        let next_phase = As False
         output_fn <- phaseOutputFilename next_phase
 
         let
@@ -1190,7 +1190,7 @@ runPhase (RealPhase Splitter) input_fn dflags
 -- As, SpitAs phase : Assembler
 
 -- This is for calling the assembler on a regular assembly file (not split).
-runPhase (RealPhase As) input_fn dflags
+runPhase (RealPhase (As with_cpp)) input_fn dflags
   = do
         -- LLVM from version 3.0 onwards doesn't support the OS X system
         -- assembler, so we use clang as the assembler instead. (#5636)
@@ -1231,7 +1231,10 @@ runPhase (RealPhase As) input_fn dflags
                            then [SysTools.Option "-mcpu=v9"]
                            else [])
 
-                       ++ [ SysTools.Option "-x", SysTools.Option "assembler-with-cpp"
+                       ++ [ SysTools.Option "-x"
+                          , if with_cpp
+                              then SysTools.Option "assembler-with-cpp"
+                              else SysTools.Option "assembler"
                           , SysTools.Option "-c"
                           , SysTools.FileOption "" inputFilename
                           , SysTools.Option "-o"
@@ -1385,7 +1388,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
     let next_phase = case gopt Opt_NoLlvmMangler dflags of
                          False                            -> LlvmMangle
                          True | gopt Opt_SplitObjs dflags -> Splitter
-                         True                             -> As
+                         True                             -> As False
                         
     output_fn <- phaseOutputFilename next_phase
 
@@ -1454,7 +1457,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
 
 runPhase (RealPhase LlvmMangle) input_fn dflags
   = do
-      let next_phase = if gopt Opt_SplitObjs dflags then Splitter else As
+      let next_phase = if gopt Opt_SplitObjs dflags then Splitter else As False
       output_fn <- phaseOutputFilename next_phase
       liftIO $ llvmFixupAsm dflags input_fn output_fn
       return (RealPhase next_phase, output_fn)
@@ -2186,7 +2189,7 @@ hscPostBackendPhase dflags _ hsc_lang =
   case hsc_lang of
         HscC -> HCc
         HscAsm | gopt Opt_SplitObjs dflags -> Splitter
-               | otherwise                 -> As
+               | otherwise                 -> As False
         HscLlvm        -> LlvmOpt
         HscNothing     -> StopLn
         HscInterpreted -> StopLn

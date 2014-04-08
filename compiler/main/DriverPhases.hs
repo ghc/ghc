@@ -82,7 +82,7 @@ data Phase
         | HCc           -- Haskellised C (as opposed to vanilla C) compilation
         | Splitter      -- Assembly file splitter (part of '-split-objs')
         | SplitAs       -- Assembler for split assembly files (part of '-split-objs')
-        | As            -- Assembler for regular assembly files
+        | As Bool       -- Assembler for regular assembly files (Bool: with-cpp)
         | LlvmOpt       -- Run LLVM opt tool over llvm assembly
         | LlvmLlc       -- LLVM bitcode to native assembly
         | LlvmMangle    -- Fix up TNTC by processing assembly produced by LLVM
@@ -119,7 +119,7 @@ eqPhase Cobjcpp     Cobjcpp    = True
 eqPhase HCc         HCc        = True
 eqPhase Splitter    Splitter   = True
 eqPhase SplitAs     SplitAs    = True
-eqPhase As          As         = True
+eqPhase (As x)      (As y)     = x == y
 eqPhase LlvmOpt     LlvmOpt    = True
 eqPhase LlvmLlc     LlvmLlc    = True
 eqPhase LlvmMangle  LlvmMangle = True
@@ -150,21 +150,21 @@ nextPhase dflags p
       Splitter   -> SplitAs
       LlvmOpt    -> LlvmLlc
       LlvmLlc    -> LlvmMangle
-      LlvmMangle -> As
+      LlvmMangle -> As False
       SplitAs    -> MergeStub
-      As         -> MergeStub
-      Ccpp       -> As
-      Cc         -> As
-      Cobjc      -> As
-      Cobjcpp    -> As
+      As _       -> MergeStub
+      Ccpp       -> As False
+      Cc         -> As False
+      Cobjc      -> As False
+      Cobjcpp    -> As False
       CmmCpp     -> Cmm
       Cmm        -> maybeHCc
-      HCc        -> As
+      HCc        -> As False
       MergeStub  -> StopLn
       StopLn     -> panic "nextPhase: nothing after StopLn"
     where maybeHCc = if platformUnregisterised (targetPlatform dflags)
                      then HCc
-                     else As
+                     else As False
 
 -- the first compilation phase for a given file is determined
 -- by its suffix.
@@ -186,8 +186,8 @@ startPhase "mm"       = Cobjcpp
 startPhase "cc"       = Ccpp
 startPhase "cxx"      = Ccpp
 startPhase "split_s"  = Splitter
-startPhase "s"        = As
-startPhase "S"        = As
+startPhase "s"        = As False
+startPhase "S"        = As True
 startPhase "ll"       = LlvmOpt
 startPhase "bc"       = LlvmLlc
 startPhase "lm_s"     = LlvmMangle
@@ -215,7 +215,8 @@ phaseInputExt Cobjc               = "m"
 phaseInputExt Cobjcpp             = "mm"
 phaseInputExt Cc                  = "c"
 phaseInputExt Splitter            = "split_s"
-phaseInputExt As                  = "s"
+phaseInputExt (As True)           = "S"
+phaseInputExt (As False)          = "s"
 phaseInputExt LlvmOpt             = "ll"
 phaseInputExt LlvmLlc             = "bc"
 phaseInputExt LlvmMangle          = "lm_s"

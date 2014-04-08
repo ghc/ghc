@@ -562,7 +562,7 @@ mode_flags =
   , Flag "M"            (PassFlag (setMode doMkDependHSMode))
   , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
   , Flag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
-  , Flag "S"            (PassFlag (setMode (stopBeforeMode As)))
+  , Flag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
   , Flag "-make"        (PassFlag (setMode doMakeMode))
   , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
   , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
@@ -629,7 +629,8 @@ doMake srcs  = do
         haskellish (f,Nothing) =
           looksLikeModuleName f || isHaskellUserSrcFilename f || '.' `notElem` f
         haskellish (_,Just phase) =
-          phase `notElem` [As, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm, StopLn]
+          phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm
+                          , StopLn]
 
     hsc_env <- GHC.getSession
 
