@@ -11769,14 +11769,18 @@ to be at role nominal. This would be done with a declaration</para>
 </programlisting>
 
 <para>Role annotations can also be used should a programmer wish to write
-a class with a representational (or phantom) role.</para>
+a class with a representational (or phantom) role. However, as a class
+with non-nominal roles can quickly lead to class instance incoherence,
+it is necessary to also specify <option>-XIncoherentInstances</option>
+to allow non-nominal roles for classes.</para>
 
 <para>The other place where role annotations may be necessary are in
 <literal>hs-boot</literal> files (<xref linkend="mutual-recursion"/>), where
 the right-hand sides of definitions can be omitted. As usual, the
 types/classes declared in an <literal>hs-boot</literal> file must match up
 with the definitions in the <literal>hs</literal> file, including down to the
-roles. The default role is representational in <literal>hs-boot</literal> files,
+roles. The default role for datatypes
+is representational in <literal>hs-boot</literal> files,
 corresponding to the common use case.</para>
 
 <para>
@@ -11805,7 +11809,7 @@ Here are some examples:</para>
   type role T4 nominal
   data T4 a = MkT4 (a Int) -- OK, but nominal is higher than necessary
 
-  type role C representational _
+  type role C representational _   -- OK, with -XIncoherentInstances
   class C a b where ...    -- OK, b will get a nominal role
 
   type role X nominal
