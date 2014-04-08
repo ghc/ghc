@@ -19,7 +19,6 @@ module CoreLint ( lintCoreBindings, lintUnfolding, lintExpr ) where
 
 #include "HsVersions.h"
 
-import Demand
 import CoreSyn
 import CoreFVs
 import CoreUtils
@@ -239,9 +238,13 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
 
       -- Check whether arity and demand type are consistent (only if demand analysis
       -- already happened)
-       ; checkL (case dmdTy of
-                  StrictSig dmd_ty -> idArity binder >= dmdTypeDepth dmd_ty || exprIsTrivial rhs)
-           (mkArityMsg binder)
+      --
+      -- Note (Apr 2014): this is actually ok.  See Note [Demand analysis for trivial right-hand sides]
+      --                  in DmdAnal.  After eta-expansion in CorePrep the rhs is no longer trivial.
+      --       ; let dmdTy = idStrictness binder
+      --       ; checkL (case dmdTy of
+      --                  StrictSig dmd_ty -> idArity binder >= dmdTypeDepth dmd_ty || exprIsTrivial rhs)
+      --           (mkArityMsg binder)
 
        ; lintIdUnfolding binder binder_ty (idUnfolding binder) }
 
@@ -249,7 +252,6 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
         -- the unfolding is a SimplifiableCoreExpr. Give up for now.
    where
     binder_ty                  = idType binder
-    dmdTy                      = idStrictness binder
     bndr_vars                  = varSetElems (idFreeVars binder)
 
     -- If you edit this function, you may need to update the GHC formalism
@@ -1421,6 +1423,7 @@ mkKindErrMsg tyvar arg_ty
           hang (ptext (sLit "Arg type:"))
                  4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
+{- Not needed now
 mkArityMsg :: Id -> MsgDoc
 mkArityMsg binder
   = vcat [hsep [ptext (sLit "Demand type has"),
@@ -1433,7 +1436,7 @@ mkArityMsg binder
 
          ]
            where (StrictSig dmd_ty) = idStrictness binder
-
+-}
 mkCastErr :: CoreExpr -> Coercion -> Type -> Type -> MsgDoc
 mkCastErr expr co from_ty expr_ty
   = vcat [ptext (sLit "From-type of Cast differs from type of enclosed expression"),
