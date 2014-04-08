@@ -36,6 +36,27 @@ import BuildTyCl
 #include "HsVersions.h"
 \end{code}
 
+Note [Pattern synonym typechecking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider the following pattern synonym declaration
+
+        pattern P x = MkT [x] (Just 42)
+
+where
+        data T a where
+              MkT :: (Show a, Ord b) => [b] -> a -> T a
+
+The pattern synonym's type is described with five axes, given here for
+the above example:
+
+  Pattern type: T (Maybe t)
+  Arguments: [x :: b]
+  Universal type variables: [t]
+  Required theta: (Eq t, Num t)
+  Existential type variables: [b]
+  Provided theta: (Show (Maybe t), Ord b)
+
 \begin{code}
 tcPatSynDecl :: Located Name
              -> HsPatSynDetails (Located Name)
@@ -104,6 +125,44 @@ tcPatSynDecl lname@(L _ name) details lpat dir
                         matcher_id (fmap fst m_wrapper)
        ; return (patSyn, binds) }
 
+\end{code}
+
+Note [Matchers and wrappers for pattern synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For each pattern synonym, we generate a single matcher function which
+implements the actual matching. For the above example, the matcher
+will have type:
+
+        $mP :: forall r t. (Eq t, Num t)
+            => T (Maybe t)
+            -> (forall b. (Show (Maybe t), Ord b) => b -> r)
+            -> r
+            -> r
+
+with the following implementation:
+
+        $mP @r @t $dEq $dNum scrut cont fail = case scrut of
+            MkT @b $dShow $dOrd [x] (Just 42) -> cont @b $dShow $dOrd x
+            _                                 -> fail
+
+For bidirectional pattern synonyms, we also generate a single wrapper
+function which implements the pattern synonym in an expression
+context. For our running example, it will be:
+
+        $WP :: forall t b. (Show (Maybe t), Ord b, Eq t, Num t)
+            => b -> T (Maybe t)
+        $WP x = MkT [x] (Just 42)
+
+N.b. the existential/universal and required/provided split does not
+apply to the wrapper since you are only putting stuff in, not getting
+stuff out.
+
+Injectivity of bidirectional pattern synonyms is checked in
+tcPatToExpr which walks the pattern and returns its corresponding
+expression when available.
+
+\begin{code}
 tcPatSynMatcher :: Located Name
                 -> LPat Id
                 -> [Var]
@@ -227,14 +286,29 @@ tc_pat_syn_wrapper_from_expr (L loc name) lexpr args univ_tvs ex_tvs theta pat_t
        ; traceTc "tcPatSynDecl wrapper type" $ ppr (varType wrapper_id)
        ; return (wrapper_id, wrapper_binds) }
 
-tcNothing :: MaybeT TcM a
-tcNothing = MaybeT (return Nothing)
+\end{code}
 
-withLoc :: (a -> MaybeT TcM b) -> Located a -> MaybeT TcM (Located b)
-withLoc fn (L loc x) = MaybeT $ setSrcSpan loc $
-    do { y <- runMaybeT $ fn x
-       ; return (fmap (L loc) y) }
+Note [As-patterns in pattern synonym definitions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Beside returning the inverted pattern (when injectivity holds), we
+also check the pattern on its own here. In particular, we reject
+as-patterns.
+
+The rationale for that is that an as-pattern would introduce
+nonindependent pattern synonym arguments, e.g. given a pattern synonym
+like:
+
+        pattern K x y = x@(Just y)
+
+one could write a nonsensical function like
+
+        f (K Nothing x) = ...
+
+or
+        g (K (Just True) False) = ...
+
+\begin{code}
 tcPatToExpr :: NameSet -> LPat Name -> MaybeT TcM (LHsExpr Name)
 tcPatToExpr lhsVars = go
   where
@@ -287,6 +361,20 @@ cannotInvertPatSynErr (L loc pat)
     hang (ptext (sLit "Right-hand side of bidirectional pattern synonym cannot be used as an expression"))
        2 (ppr pat)
 
+tcNothing :: MaybeT TcM a
+tcNothing = MaybeT (return Nothing)
+
+withLoc :: (a -> MaybeT TcM b) -> Located a -> MaybeT TcM (Located b)
+withLoc fn (L loc x) = MaybeT $ setSrcSpan loc $
+    do { y <- runMaybeT $ fn x
+       ; return (fmap (L loc) y) }
+
+-- Walk the whole pattern and for all ConPatOuts, collect the
+-- existentially-bound type variables and evidence binding variables.
+--
+-- These are used in computing the type of a pattern synonym and also
+-- in generating matcher functions, since success continuations need
+-- to be passed these pattern-bound evidences.
 tcCollectEx :: LPat Id -> TcM (TyVarSet, [EvVar])
 tcCollectEx = return . go
   where
