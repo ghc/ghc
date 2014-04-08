@@ -1195,9 +1195,9 @@ tryEtaExpandRhs env bndr rhs
   = do { dflags <- getDynFlags
        ; (new_arity, new_rhs) <- try_expand dflags
 
-       ; WARN( new_arity < old_arity || new_arity < _dmd_arity,
+       ; WARN( new_arity < old_arity,
                (ptext (sLit "Arity decrease:") <+> (ppr bndr <+> ppr old_arity
-                <+> ppr new_arity <+> ppr _dmd_arity) $$ ppr new_rhs) )
+                <+> ppr new_arity) $$ ppr new_rhs) )
                         -- Note [Arity decrease]
          return (new_arity, new_rhs) }
   where
@@ -1215,7 +1215,6 @@ tryEtaExpandRhs env bndr rhs
 
     manifest_arity = manifestArity rhs
     old_arity  = idArity bndr
-    _dmd_arity = length $ fst $ splitStrictSig $ idStrictness bndr
 \end{code}
 
 Note [Eta-expanding at let bindings]
