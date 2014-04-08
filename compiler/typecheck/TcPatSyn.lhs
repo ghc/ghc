@@ -47,28 +47,28 @@ tcPatSynDecl lname@(L _ name) details lpat dir
        ; pat_ty <- newFlexiTyVarTy openTypeKind
 
        ; let (arg_names, is_infix) = case details of
-                 PrefixPatSyn names -> (map unLoc names, False)
+                 PrefixPatSyn names      -> (map unLoc names, False)
                  InfixPatSyn name1 name2 -> (map unLoc [name1, name2], True)
-       ; ((lpat', args), wanted) <- captureConstraints $
-                                      tcPat PatSyn lpat pat_ty $ mapM tcLookupId arg_names
+       ; ((lpat', args), wanted) <- captureConstraints       $
+                                    tcPat PatSyn lpat pat_ty $
+                                    mapM tcLookupId arg_names
        ; let named_taus = (name, pat_ty):map (\arg -> (getName arg, varType arg)) args
 
        ; traceTc "tcPatSynDecl::wanted" (ppr named_taus $$ ppr wanted)
-       ; (qtvs, given_dicts, _mr_bites, ev_binds) <- simplifyInfer True False named_taus wanted
-       ; let req_dicts = given_dicts
+       ; (qtvs, req_dicts, _mr_bites, ev_binds) <- simplifyInfer True False named_taus wanted
 
        ; (ex_vars, prov_dicts) <- tcCollectEx lpat'
-       ; let univ_tvs = filter (not . (`elemVarSet` ex_vars)) qtvs
-             ex_tvs = varSetElems ex_vars
+       ; let univ_tvs   = filter (not . (`elemVarSet` ex_vars)) qtvs
+             ex_tvs     = varSetElems ex_vars
+             prov_theta = map evVarPred prov_dicts
+             req_theta  = map evVarPred req_dicts
 
-       ; pat_ty <- zonkTcType pat_ty
-       ; args <- mapM zonkId args
-
-       ; univ_tvs <- mapM zonkQuantifiedTyVar univ_tvs
-       ; let prov_theta = map evVarPred prov_dicts
-             req_theta = map evVarPred req_dicts
+       ; univ_tvs   <- mapM zonkQuantifiedTyVar univ_tvs
+       ; ex_tvs     <- mapM zonkQuantifiedTyVar ex_tvs
        ; prov_theta <- zonkTcThetaType prov_theta
-       ; req_theta <- zonkTcThetaType req_theta
+       ; req_theta  <- zonkTcThetaType req_theta
+       ; pat_ty     <- zonkTcType pat_ty
+       ; args       <- mapM zonkId args
 
        ; traceTc "tcPatSynDecl: ex" (ppr ex_tvs $$
                                      ppr prov_theta $$
@@ -92,7 +92,7 @@ tcPatSynDecl lname@(L _ name) details lpat dir
                                          prov_theta req_theta
                                          pat_ty
        ; m_wrapper <- tcPatSynWrapper lname lpat dir args
-                        univ_tvs ex_tvs theta pat_ty
+                                      univ_tvs ex_tvs theta pat_ty
        ; let binds = matcher_bind `unionBags` maybe emptyBag snd m_wrapper
 
        ; traceTc "tcPatSynDecl }" $ ppr name
