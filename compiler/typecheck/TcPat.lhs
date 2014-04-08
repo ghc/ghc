@@ -733,10 +733,11 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
         ; let pat_ty' = mkTyConApp tycon ctxt_res_tys
 	      -- pat_ty' is type of the actual constructor application
               -- pat_ty' /= pat_ty iff coi /= IdCo
-              
+
 	      arg_tys' = substTys tenv arg_tys
 
-        ; traceTc "tcConPat" (ppr con_name $$ ppr ex_tvs' $$ ppr pat_ty' $$ ppr arg_tys')
+        ; traceTc "tcConPat" (vcat [ ppr con_name, ppr univ_tvs, ppr ex_tvs, ppr eq_spec
+                                   , ppr ex_tvs', ppr pat_ty', ppr arg_tys' ])
 	; if null ex_tvs && null eq_spec && null theta
 	  then do { -- The common case; no class bindings etc 
                     -- (see Note [Arrows and patterns])
