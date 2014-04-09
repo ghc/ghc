@@ -130,13 +130,28 @@ test('T5423',
      run_command,
      ['$MAKE -s --no-print-directory T5423'])
 
+# Workaround bug #8458: old dlopen opens sections in the wrong order,
+# so we just accept both orders.
+def checkDynAsm(actual_file, normaliser):
+    actual_raw = read_no_crs(actual_file)
+    actual_str = normaliser(actual_raw)
+    actual = actual_str.split()
+    if actual == ['initArray1', 'initArray2', 'ctors1', 'ctors2', 'success']:
+        return 1
+    elif actual == ['ctors1', 'ctors2', 'initArray1', 'initArray2', 'success']:
+        if_verbose(1, 'T5435_dyn_asm detected old-style dlopen, see #8458')
+        return 1
+    else:
+        if_verbose(1, 'T5435_dyn_asm failed with %s, see all.T for details' % actual)
+        return 0
+
 # These should have extra_clean() arguments, but I need
 # to somehow extract out the name of DLLs to do that
 
 test('T5435_v_asm', normal, run_command, ['$MAKE -s --no-print-directory T5435_v_asm'])
 test('T5435_v_gcc', normal, run_command, ['$MAKE -s --no-print-directory T5435_v_gcc'])
-test('T5435_dyn_asm', normal, run_command, ['$MAKE -s --no-print-directory T5435_dyn_asm'])
-test('T5435_dyn_gcc', normal, run_command, ['$MAKE -s --no-print-directory T5435_dyn_gcc'])
+test('T5435_dyn_asm', check_stdout(checkDynAsm), run_command, ['$MAKE -s --no-print-directory T5435_dyn_asm'])
+test('T5435_dyn_gcc', normal , run_command, ['$MAKE -s --no-print-directory T5435_dyn_gcc'])
 
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 

@@ -468,6 +468,14 @@ def _compile_cmd_prefix( name, opts, prefix ):
 
 # ----
 
+def check_stdout( f ):
+    return lambda name, opts, f=f: _check_stdout(name, opts, f)
+
+def _check_stdout( name, opts, f ):
+    opts.check_stdout = f
+
+# ----
+
 def normalise_slashes( name, opts ):
     opts.extra_normaliser = normalise_slashes_
 
@@ -1487,8 +1495,14 @@ def check_stdout_ok( name ):
       else:
          return normalise_output(str)
 
+   two_norm = two_normalisers(norm, getTestOpts().extra_normaliser)
+
+   check_stdout = getTestOpts().check_stdout
+   if check_stdout:
+      return check_stdout(actual_stdout_file, two_norm)
+
    return compare_outputs('stdout', \
-                          two_normalisers(norm, getTestOpts().extra_normaliser), \
+                          two_norm, \
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
