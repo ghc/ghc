@@ -492,13 +492,21 @@ flatten f ctxt (FunTy ty1 ty2)
        ; return (mkFunTy xi1 xi2, mkTcFunCo Nominal co1 co2) }
 
 flatten f ctxt (TyConApp tc tys)
+
+  -- Expand type synonyms that mention type families 
+  -- on the RHS; see Note [Flattening synonyms]
+  | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys
+  , any isSynFamilyTyCon (tyConsOfType rhs)
+  = flatten f ctxt (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
+
   -- For * a normal data type application
-  --     * type synonym application  See Note [Flattening synonyms]
   --     * data family application
+  --     * type synonym application whose RHS does not mention type families
+  --             See Note [Flattening synonyms]
   -- we just recursively flatten the arguments.
   | not (isSynFamilyTyCon tc)
-    = do { (xis,cos) <- flattenMany f ctxt tys
-         ; return (mkTyConApp tc xis, mkTcTyConAppCo Nominal tc cos) }
+  = do { (xis,cos) <- flattenMany f ctxt tys
+       ; return (mkTyConApp tc xis, mkTcTyConAppCo Nominal tc cos) }
 
   -- Otherwise, it's a type function application, and we have to
   -- flatten it away as well, and generate a new given equality constraint
@@ -534,6 +542,9 @@ flatten _f ctxt ty@(ForAllTy {})
 
 Note [Flattening synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+Not expanding synonyms aggressively improves error messages, and
+keeps types smaller. But we need to take care.
+
 Suppose
    type T a = a -> a
 and we want to flatten the type (T (F a)).  Then we can safely flatten
@@ -541,12 +552,16 @@ the (F a) to a skolem, and return (T fsk).  We don't need to expand the
 synonym.  This works because TcTyConAppCo can deal with synonyms
 (unlike TyConAppCo), see Note [TcCoercions] in TcEvidence.
 
-Not expanding synonyms aggressively improves error messages.
+But (Trac #8979) for
+   type T a = (F a, a)    where F is a type function
+we must expand the synonym in (say) T Int, to expose the type functoin
+to the flattener.
+
 
 Note [Flattening under a forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Under a forall, we
-  (a) MUST apply the inert subsitution
+  (a) MUST apply the inert substitution
   (b) MUST NOT flatten type family applications
 Hence FMSubstOnly.
 

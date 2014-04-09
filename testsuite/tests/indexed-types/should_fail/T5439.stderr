@@ -1,6 +1,7 @@
 
 T5439.hs:83:28:
-    Couldn't match type ‘Attempt (HNth n0 l0) -> Attempt (HElemOf l0)’
+    Couldn't match type ‘Attempt (HHead (HDrop n0 l0))
+                         -> Attempt (HElemOf l0)’
                   with ‘Attempt (WaitOpResult (WaitOps rs))’
     Expected type: f (Attempt (HNth n0 l0) -> Attempt (HElemOf l0))
       Actual type: f (Attempt (WaitOpResult (WaitOps rs)))
