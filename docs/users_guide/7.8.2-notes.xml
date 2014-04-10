@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-8-2">
+  <title>Release notes for version 7.8.2</title>
+
+  <para>
+    The 7.8.2 release is a bugfix release. The changes relative to
+    7.8.1 are listed below.
+  </para>
+
+  <sect2>
+    <title>GHC</title>
+
+    <itemizedlist>
+       <listitem>
+          <para>
+            A bug which could cause GHC to reject programs which use a
+            type family on the right-hand side (RHS) of a type synonym
+            has been fixed.
+          </para>
+       </listitem>
+    </itemizedlist>
+  </sect2>
+</sect1>
