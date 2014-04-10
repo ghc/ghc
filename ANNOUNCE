@@ -1,32 +1,15 @@
 
    ==============================================================
-    The (Interactive) Glasgow Haskell Compiler -- version 7.8.1
+    The (Interactive) Glasgow Haskell Compiler -- version 7.8.2
    ==============================================================
 
-The GHC Team is pleased to announce a new major release of GHC. There
-have been a number of significant changes since the last major release,
-including:
+The GHC Team is pleased to announce a new patchlevel release of GHC, 7.8.2.
 
-  * New type-system features
-    * Closed type families
-    * Role checking
-    * An improved solver for type naturals
-  * Better support for cross compilation
-  * Full iOS support
-  * Massive scalability improvements to the I/O manager
-  * Dynamic linking for GHCi
-  * Several language improvements
-    * Pattern synonyms
-    * Overloaded list syntax
-    * Kind-polymorphic 'Typeable' class
-  * A new parallel --make mode
-  * Preliminary SIMD intrinsic support
-  * A brand-new low level code generator
-  * Many bugfixes and other performance improvements.
+This is a bugfix release relative to 7.8.1, so we recommend upgrading.
 
 The full release notes are here:
 
-  http://haskell.org/ghc/docs/7.8.1/html/users_guide/release-7-8-1.html
+  http://haskell.org/ghc/docs/7.8.1/html/users_guide/release-7-8-2.html
 
 How to get it
 ~~~~~~~~~~~~~
@@ -79,7 +62,8 @@ Supported Platforms
 The list of platforms we support, and the people responsible for them,
 is here:
 
-   http://ghc.haskell.org/trac/ghc/wiki/Contributors
+   http://ghc.haskell.org/trac/ghc/wiki/Platforms
+   http://ghc.haskell.org/trac/ghc/wiki/CodeOwners
 
 Ports to other platforms are possible with varying degrees of
 difficulty.  The Building Guide describes how to go about porting to a
