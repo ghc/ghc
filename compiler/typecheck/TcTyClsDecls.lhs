@@ -1578,13 +1578,12 @@ checkValidClass :: Class -> TcM ()
 checkValidClass cls
   = do  { constrained_class_methods <- xoptM Opt_ConstrainedClassMethods
         ; multi_param_type_classes <- xoptM Opt_MultiParamTypeClasses
-        ; nullary_type_classes <- xoptM Opt_NullaryTypeClasses
         ; fundep_classes <- xoptM Opt_FunctionalDependencies
 
-        -- Check that the class is unary, unless multiparameter or
-        -- nullary type classes are enabled
-        ; checkTc (nullary_type_classes || notNull tyvars) (nullaryClassErr cls)
-        ; checkTc (multi_param_type_classes || arity <= 1) (classArityErr cls)
+        -- Check that the class is unary, unless multiparameter type classes
+        -- are enabled (which allows nullary type classes)
+        ; checkTc (multi_param_type_classes || arity == 1)
+                  (classArityErr arity cls)
         ; checkTc (fundep_classes || null fundeps) (classFunDepsErr cls)
 
         -- Check the super-classes
@@ -2054,15 +2053,15 @@ classOpCtxt :: Var -> Type -> SDoc
 classOpCtxt sel_id tau = sep [ptext (sLit "When checking the class method:"),
                               nest 2 (pprPrefixOcc sel_id <+> dcolon <+> ppr tau)]
 
-nullaryClassErr :: Class -> SDoc
-nullaryClassErr cls
-  = vcat [ptext (sLit "No parameters for class") <+> quotes (ppr cls),
-          parens (ptext (sLit "Use NullaryTypeClasses to allow no-parameter classes"))]
-
-classArityErr :: Class -> SDoc
-classArityErr cls
-  = vcat [ptext (sLit "Too many parameters for class") <+> quotes (ppr cls),
-          parens (ptext (sLit "Use MultiParamTypeClasses to allow multi-parameter classes"))]
+classArityErr :: Int -> Class -> SDoc
+classArityErr n cls
+    | n == 0 = mkErr "No" "no-parameter"
+    | otherwise = mkErr "Too many" "multi-parameter"
+  where
+    mkErr howMany allowWhat =
+        vcat [ptext (sLit $ howMany ++ " parameters for class") <+> quotes (ppr cls),
+              parens (ptext (sLit $ "Use MultiParamTypeClasses to allow "
+                                    ++ allowWhat ++ " classes"))]
 
 classFunDepsErr :: Class -> SDoc
 classFunDepsErr cls

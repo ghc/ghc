@@ -4317,7 +4317,9 @@ We use default signatures to simplify generic programming in GHC
 
 <sect3 id="nullary-type-classes">
 <title>Nullary type classes</title>
-Nullary (no parameter) type classes are enabled with <option>-XNullaryTypeClasses</option>.
+Nullary (no parameter) type classes are enabled with
+<option>-XMultiTypeClasses</option>; historically, they were enabled with the
+(now deprecated) <option>-XNullaryTypeClasses</option>.
 Since there are no available parameters, there can be at most one instance
 of a nullary class. A nullary type class might be used to document some assumption
 in a type signature (such as reliance on the Riemann hypothesis) or add some

@@ -1,4 +1,4 @@
-{-# LANGUAGE NullaryTypeClasses, StandaloneDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses, StandaloneDeriving #-}
 module T7959 where
 
 class A
