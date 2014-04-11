@@ -142,6 +142,11 @@ test('driver042',
      run_command,
      ['$MAKE -s --no-print-directory test042'])
 
+test('driver042stub',
+     extra_clean(['B042stub/C.hi', 'obj042stub/B042stub/C.o', 'obj042stub/B042stub/', 'obj042stub/']),
+     run_command,
+     ['$MAKE -s --no-print-directory test042stub'])
+
 test('driver043',
      extra_clean(['B043/C.hi', 'B043/C.o',
                   'hi043/B043/C.hi', 'hi043/B043', 'hi043']),

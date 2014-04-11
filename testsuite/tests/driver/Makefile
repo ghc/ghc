@@ -222,6 +222,14 @@ test042:
 	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -v0 --make B042/C.hs -odir obj042
 	test -f obj042/B042/C$(OBJSUFFIX)
 
+# test -odir with stubs
+test042stub:
+	$(RM) -rf obj042stub
+	mkdir obj042stub
+	$(RM) B042stub/C.hi
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -v0 --make B042stub/C.hs -odir obj042stub
+	test -f obj042stub/B042stub/C$(OBJSUFFIX)
+
 # test -hidir
 test043:
 	$(RM) -f B043/C$(OBJSUFFIX)
