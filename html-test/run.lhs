@@ -134,9 +134,21 @@ check modules strict = do
       else do
         putStrLn $ "Pass: " ++ mod ++ " (no .ref file)"
 
+-- | A rather nasty way to drop the Haddock version string from the
+-- end of the generated HTML files so that we don't have to change
+-- every single test every time we change versions. We rely on the the
+-- last paragraph of the document to be the version. We end up with
+-- malformed HTML but we don't care as we never look at it ourselves.
+dropVersion :: String -> String
+dropVersion = reverse . dropTillP . reverse
+  where
+    dropTillP [] = []
+    dropTillP ('p':'<':xs) = xs
+    dropTillP (_:xs) = dropTillP xs
 
 haddockEq :: String -> String -> Bool
-haddockEq file1 file2 = stripLinks file1 == stripLinks file2
+haddockEq file1 file2 =
+  stripLinks (dropVersion file1) == stripLinks (dropVersion file2)
 
 stripLinks :: String -> String
 stripLinks str =
