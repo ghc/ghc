@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs, KindSignatures #-}
-{-# OPTIONS_HADDOCK use-unicode #-}
 module Bug85 where
 
 -- explicitly stated non-trivial kind
