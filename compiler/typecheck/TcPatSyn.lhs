@@ -200,18 +200,21 @@ tcPatSynMatcher (L loc name) lpat args univ_tvs ex_tvs ev_binds prov_dicts req_d
                     MG{ mg_alts = cases
                       , mg_arg_tys = [pat_ty]
                       , mg_res_ty = res_ty
+                      , mg_origin = Generated
                       }
              body' = noLoc $
                      HsLam $
                      MG{ mg_alts = [mkSimpleMatch args body]
                        , mg_arg_tys = [pat_ty, cont_ty, res_ty]
                        , mg_res_ty = res_ty
+                       , mg_origin = Generated
                        }
 
              match = mkMatch [] (mkHsLams (res_tv:univ_tvs) req_dicts body') EmptyLocalBinds
              mg = MG{ mg_alts = [match]
                     , mg_arg_tys = []
                     , mg_res_ty = res_ty
+                    , mg_origin = Generated
                     }
 
        ; let bind = FunBind{ fun_id = matcher_lid
@@ -220,7 +223,7 @@ tcPatSynMatcher (L loc name) lpat args univ_tvs ex_tvs ev_binds prov_dicts req_d
                            , fun_co_fn = idHsWrapper
                            , bind_fvs = emptyNameSet
                            , fun_tick = Nothing }
-             matcher_bind = unitBag (Generated, noLoc bind)
+             matcher_bind = unitBag (noLoc bind)
 
        ; traceTc "tcPatSynMatcher" (ppr matcher_bind)
 
@@ -272,7 +275,7 @@ tc_pat_syn_wrapper_from_expr (L loc name) lexpr args univ_tvs ex_tvs theta pat_t
 
        ; let wrapper_args = map (noLoc . VarPat . Var.varName) args'
              wrapper_match = mkMatch wrapper_args lexpr EmptyLocalBinds
-             bind = mkTopFunBind wrapper_lname [wrapper_match]
+             bind = mkTopFunBind Generated wrapper_lname [wrapper_match]
              lbind = noLoc bind
        ; let sig = TcSigInfo{ sig_id = wrapper_id
                             , sig_tvs = map (\tv -> (Nothing, tv)) wrapper_tvs
@@ -280,7 +283,7 @@ tc_pat_syn_wrapper_from_expr (L loc name) lexpr args univ_tvs ex_tvs theta pat_t
                             , sig_tau = wrapper_tau
                             , sig_loc = loc
                             }
-       ; (wrapper_binds, _, _) <- tcPolyCheck NonRecursive (const []) sig (Generated, lbind)
+       ; (wrapper_binds, _, _) <- tcPolyCheck NonRecursive (const []) sig lbind
        ; traceTc "tcPatSynDecl wrapper" $ ppr wrapper_binds
        ; traceTc "tcPatSynDecl wrapper type" $ ppr (varType wrapper_id)
        ; return (wrapper_id, wrapper_binds) }

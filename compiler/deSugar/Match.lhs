@@ -40,7 +40,7 @@ import Maybes
 import Util
 import Name
 import Outputable
-import BasicTypes ( boxityNormalTupleSort )
+import BasicTypes ( boxityNormalTupleSort, isGenerated )
 import FastString
 
 import Control.Monad( when )
@@ -752,18 +752,24 @@ JJQC 30-Nov-1997
 \begin{code}
 matchWrapper ctxt (MG { mg_alts = matches
                       , mg_arg_tys = arg_tys
-                      , mg_res_ty = rhs_ty })
+                      , mg_res_ty = rhs_ty
+                      , mg_origin = origin })
   = do  { eqns_info   <- mapM mk_eqn_info matches
         ; new_vars    <- case matches of
                            []    -> mapM newSysLocalDs arg_tys
                            (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
-        ; result_expr <- matchEquations ctxt new_vars eqns_info rhs_ty
+        ; result_expr <- handleWarnings $
+                         matchEquations ctxt new_vars eqns_info rhs_ty
         ; return (new_vars, result_expr) }
   where
     mk_eqn_info (L _ (Match pats _ grhss))
       = do { let upats = map unLoc pats
            ; match_result <- dsGRHSs ctxt upats grhss rhs_ty
            ; return (EqnInfo { eqn_pats = upats, eqn_rhs  = match_result}) }
+
+    handleWarnings = if isGenerated origin
+                     then discardWarningsDs
+                     else id
 
 
 matchEquations  :: HsMatchContext Name

@@ -60,7 +60,6 @@ import Outputable
 import FastString
 import Bag
 import Pair
-import BasicTypes (Origin(..))
 
 import Control.Monad
 import Data.List
@@ -441,7 +440,7 @@ commonAuxiliaries = foldM snoc ([], emptyBag) where
 
 renameDeriv :: Bool
             -> [InstInfo RdrName]
-            -> Bag ((Origin, LHsBind RdrName), LSig RdrName)
+            -> Bag (LHsBind RdrName, LSig RdrName)
             -> TcM (Bag (InstInfo Name), HsValBinds Name, DefUses)
 renameDeriv is_boot inst_infos bagBinds
   | is_boot     -- If we are compiling a hs-boot file, don't generate any derived bindings

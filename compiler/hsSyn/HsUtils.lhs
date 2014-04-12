@@ -132,8 +132,8 @@ unguardedGRHSs rhs = GRHSs (unguardedRHS rhs) emptyLocalBinds
 unguardedRHS :: Located (body id) -> [LGRHS id (Located (body id))]
 unguardedRHS rhs@(L loc _) = [L loc (GRHS [] rhs)]
 
-mkMatchGroup :: [LMatch id (Located (body id))] -> MatchGroup id (Located (body id))
-mkMatchGroup matches = MG { mg_alts = matches, mg_arg_tys = [], mg_res_ty = placeHolderType }
+mkMatchGroup :: Origin -> [LMatch id (Located (body id))] -> MatchGroup id (Located (body id))
+mkMatchGroup origin matches = MG { mg_alts = matches, mg_arg_tys = [], mg_res_ty = placeHolderType, mg_origin = origin }
 
 mkHsAppTy :: LHsType name -> LHsType name -> LHsType name
 mkHsAppTy t1 t2 = addCLoc t1 t2 (HsAppTy t1 t2)
@@ -144,7 +144,7 @@ mkHsApp e1 e2 = addCLoc e1 e2 (HsApp e1 e2)
 mkHsLam :: [LPat id] -> LHsExpr id -> LHsExpr id
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
 	where
-          matches = mkMatchGroup [mkSimpleMatch pats body]
+          matches = mkMatchGroup Generated [mkSimpleMatch pats body]
 
 mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr Id -> LHsExpr Id
 mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars <.> mkWpLams dicts) expr
@@ -351,11 +351,11 @@ nlHsIf   :: LHsExpr id -> LHsExpr id -> LHsExpr id -> LHsExpr id
 nlHsCase :: LHsExpr id -> [LMatch id (LHsExpr id)] -> LHsExpr id
 nlList   :: [LHsExpr id] -> LHsExpr id
 
-nlHsLam	match		= noLoc (HsLam (mkMatchGroup [match]))
-nlHsPar e		= noLoc (HsPar e)
-nlHsIf cond true false	= noLoc (mkHsIf cond true false)
-nlHsCase expr matches	= noLoc (HsCase expr (mkMatchGroup matches))
-nlList exprs		= noLoc (ExplicitList placeHolderType Nothing exprs)
+nlHsLam	match          = noLoc (HsLam (mkMatchGroup Generated [match]))
+nlHsPar e              = noLoc (HsPar e)
+nlHsIf cond true false = noLoc (mkHsIf cond true false)
+nlHsCase expr matches  = noLoc (HsCase expr (mkMatchGroup Generated matches))
+nlList exprs           = noLoc (ExplicitList placeHolderType Nothing exprs)
 
 nlHsAppTy :: LHsType name -> LHsType name -> LHsType name
 nlHsTyVar :: name                         -> LHsType name
@@ -478,20 +478,20 @@ l
 mkFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> HsBind RdrName
 -- Not infix, with place holders for coercion and free vars
 mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False
-                          , fun_matches = mkMatchGroup ms
-			  , fun_co_fn = idHsWrapper
+                          , fun_matches = mkMatchGroup Generated ms
+                          , fun_co_fn = idHsWrapper
                           , bind_fvs = placeHolderNames
-			  , fun_tick = Nothing }
+                          , fun_tick = Nothing }
 
-mkTopFunBind :: Located Name -> [LMatch Name (LHsExpr Name)] -> HsBind Name
+mkTopFunBind :: Origin -> Located Name -> [LMatch Name (LHsExpr Name)] -> HsBind Name
 -- In Name-land, with empty bind_fvs
-mkTopFunBind fn ms = FunBind { fun_id = fn, fun_infix = False
-                             , fun_matches = mkMatchGroup ms
-			     , fun_co_fn = idHsWrapper
-                             , bind_fvs = emptyNameSet	-- NB: closed binding
-			     , fun_tick = Nothing }
+mkTopFunBind origin fn ms = FunBind { fun_id = fn, fun_infix = False
+                                    , fun_matches = mkMatchGroup origin ms
+                                    , fun_co_fn = idHsWrapper
+                                    , bind_fvs = emptyNameSet	-- NB: closed binding
+                                    , fun_tick = Nothing }
 
-mkHsVarBind :: SrcSpan -> RdrName -> LHsExpr RdrName -> (Origin, LHsBind RdrName)
+mkHsVarBind :: SrcSpan -> RdrName -> LHsExpr RdrName -> LHsBind RdrName
 mkHsVarBind loc var rhs = mk_easy_FunBind loc var [] rhs
 
 mkVarBind :: id -> LHsExpr id -> LHsBind id
@@ -507,9 +507,9 @@ mkPatSynBind name details lpat dir = PatSynBind{ patsyn_id = name
 
 ------------
 mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat RdrName]
-		-> LHsExpr RdrName -> (Origin, LHsBind RdrName)
+		-> LHsExpr RdrName -> LHsBind RdrName
 mk_easy_FunBind loc fun pats expr
-  = (Generated, L loc $ mkFunBind (L loc fun) [mkMatch pats expr emptyLocalBinds])
+  = L loc $ mkFunBind (L loc fun) [mkMatch pats expr emptyLocalBinds]
 
 ------------
 mkMatch :: [LPat id] -> LHsExpr id -> HsLocalBinds id -> LMatch id (LHsExpr id)
@@ -580,11 +580,11 @@ collectHsBindListBinders :: [LHsBindLR idL idR] -> [idL]
 collectHsBindListBinders = foldr (collect_bind . unLoc) []
 
 collect_binds :: LHsBindsLR idL idR -> [idL] -> [idL]
-collect_binds binds acc = foldrBag (collect_bind . unLoc . snd) acc binds
+collect_binds binds acc = foldrBag (collect_bind . unLoc) acc binds
 
 collectMethodBinders :: LHsBindsLR RdrName idR -> [Located RdrName]
 -- Used exclusively for the bindings of an instance decl which are all FunBinds
-collectMethodBinders binds = foldrBag (get . unLoc . snd) [] binds
+collectMethodBinders binds = foldrBag (get . unLoc) [] binds
   where
     get (FunBind { fun_id = f }) fs = f : fs
     get _                        fs = fs	
@@ -808,7 +808,7 @@ hsValBindsImplicits (ValBindsIn binds _)
   = lhsBindsImplicits binds
 
 lhsBindsImplicits :: LHsBindsLR Name idR -> NameSet
-lhsBindsImplicits = foldBag unionNameSets (lhs_bind . unLoc . snd) emptyNameSet
+lhsBindsImplicits = foldBag unionNameSets (lhs_bind . unLoc) emptyNameSet
   where
     lhs_bind (PatBind { pat_lhs = lpat }) = lPatImplicits lpat
     lhs_bind _ = emptyNameSet

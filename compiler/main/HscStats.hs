@@ -132,7 +132,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     class_info decl@(ClassDecl {})
         = (classops, addpr (sum3 (map count_bind methods)))
       where
-        methods = map (unLoc . snd) $ bagToList (tcdMeths decl)
+        methods = map unLoc $ bagToList (tcdMeths decl)
         (_, classops, _, _, _) = count_sigs (map unLoc (tcdSigs decl))
     class_info _ = (0,0)
 
@@ -147,7 +147,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
                   (addpr (sum3 (map count_bind methods)),
                    ss, is, length ats, length adts)
       where
-        methods = map (unLoc . snd) $ bagToList inst_meths
+        methods = map unLoc $ bagToList inst_meths
 
     -- TODO: use Sum monoid
     addpr :: (Int,Int,Int) -> Int

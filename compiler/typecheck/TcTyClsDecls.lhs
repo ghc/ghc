@@ -1835,7 +1835,7 @@ mkRecSelBinds tycons
 
 mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, LHsBinds Name)
 mkRecSelBind (tycon, sel_name)
-  = (L loc (IdSig sel_id), unitBag (Generated, L loc sel_bind))
+  = (L loc (IdSig sel_id), unitBag (L loc sel_bind))
   where
     loc    = getSrcSpan sel_name
     sel_id = Var.mkExportedLocalVar rec_details sel_name
@@ -1864,8 +1864,10 @@ mkRecSelBind (tycon, sel_name)
     -- Make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
     --    where cons_w_field = [C2,C7]
-    sel_bind | is_naughty = mkTopFunBind sel_lname [mkSimpleMatch [] unit_rhs]
-             | otherwise  = mkTopFunBind sel_lname (map mk_match cons_w_field ++ deflt)
+    sel_bind = mkTopFunBind Generated sel_lname alts
+      where
+        alts | is_naughty = [mkSimpleMatch [] unit_rhs]
+             | otherwise =  map mk_match cons_w_field ++ deflt
     mk_match con = mkSimpleMatch [L loc (mk_sel_pat con)]
                                  (L loc (HsVar field_var))
     mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)

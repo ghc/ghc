@@ -47,7 +47,7 @@ import NameSet
 import RdrName          ( RdrName, rdrNameOcc )
 import SrcLoc
 import ListSetOps	( findDupsEq )
-import BasicTypes	( RecFlag(..), Origin )
+import BasicTypes	( RecFlag(..) )
 import Digraph		( SCC(..) )
 import Bag
 import Outputable
@@ -275,7 +275,7 @@ rnValBindsLHS :: NameMaker
               -> HsValBinds RdrName
               -> RnM (HsValBindsLR Name RdrName)
 rnValBindsLHS topP (ValBindsIn mbinds sigs)
-  = do { mbinds' <- mapBagM (wrapOriginLocM (rnBindLHS topP doc)) mbinds
+  = do { mbinds' <- mapBagM (wrapLocM (rnBindLHS topP doc)) mbinds
        ; return $ ValBindsIn mbinds' sigs }
   where
     bndrs = collectHsBindsBinders mbinds
@@ -448,12 +448,12 @@ rnBindLHS name_maker _ bind@(PatSynBind{ patsyn_id = rdrname@(L nameLoc _) })
 rnBindLHS _ _ b = pprPanic "rnBindHS" (ppr b)
 
 rnLBind :: (Name -> [Name])		-- Signature tyvar function
-        -> (Origin, LHsBindLR Name RdrName)
-        -> RnM ((Origin, LHsBind Name), [Name], Uses)
-rnLBind sig_fn (origin, (L loc bind))
+        -> LHsBindLR Name RdrName
+        -> RnM (LHsBind Name, [Name], Uses)
+rnLBind sig_fn (L loc bind)
   = setSrcSpan loc $
     do { (bind', bndrs, dus) <- rnBind sig_fn bind
-       ; return ((origin, L loc bind'), bndrs, dus) }
+       ; return (L loc bind', bndrs, dus) }
 
 -- assumes the left-hands-side vars are in scope
 rnBind :: (Name -> [Name])		-- Signature tyvar function
@@ -581,7 +581,7 @@ trac ticket #1136.
 -}
 
 ---------------------
-depAnalBinds :: Bag ((Origin, LHsBind Name), [Name], Uses)
+depAnalBinds :: Bag (LHsBind Name, [Name], Uses)
 	     -> ([(RecFlag, LHsBinds Name)], DefUses)
 -- Dependency analysis; this is important so that 
 -- unused-binding reporting is accurate
@@ -666,10 +666,9 @@ rnMethodBinds cls sig_fn binds
        ; foldlM do_one (emptyBag, emptyFVs) (bagToList binds) }
   where 
     meth_names  = collectMethodBinders binds
-    do_one (binds,fvs) (origin,bind)
+    do_one (binds,fvs) bind
        = do { (bind', fvs_bind) <- rnMethodBind cls sig_fn bind
-            ; let bind'' = mapBag (\bind -> (origin,bind)) bind'
-	    ; return (binds `unionBags` bind'', fvs_bind `plusFV` fvs) }
+	    ; return (binds `unionBags` bind', fvs_bind `plusFV` fvs) }
 
 rnMethodBind :: Name
 	      -> (Name -> [Name])
@@ -677,7 +676,7 @@ rnMethodBind :: Name
 	      -> RnM (Bag (LHsBindLR Name Name), FreeVars)
 rnMethodBind cls sig_fn 
              (L loc bind@(FunBind { fun_id = name, fun_infix = is_infix 
-				  , fun_matches = MG { mg_alts = matches } }))
+				  , fun_matches = MG { mg_alts = matches, mg_origin = origin } }))
   = setSrcSpan loc $ do
     sel_name <- wrapLocM (lookupInstDeclBndr cls (ptext (sLit "method"))) name
     let plain_name = unLoc sel_name
@@ -685,7 +684,7 @@ rnMethodBind cls sig_fn
 
     (new_matches, fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
                           mapFvRn (rnMatch (FunRhs plain_name is_infix) rnLExpr) matches
-    let new_group = mkMatchGroup new_matches
+    let new_group = mkMatchGroup origin new_matches
 
     when is_infix $ checkPrecMatch plain_name new_group
     return (unitBag (L loc (bind { fun_id      = sel_name 
@@ -889,11 +888,11 @@ rnMatchGroup :: Outputable (body RdrName) => HsMatchContext Name
              -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
              -> MatchGroup RdrName (Located (body RdrName))
              -> RnM (MatchGroup Name (Located (body Name)), FreeVars)
-rnMatchGroup ctxt rnBody (MG { mg_alts = ms }) 
+rnMatchGroup ctxt rnBody (MG { mg_alts = ms, mg_origin = origin }) 
   = do { empty_case_ok <- xoptM Opt_EmptyCase
        ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
-       ; return (mkMatchGroup new_ms, ms_fvs) }
+       ; return (mkMatchGroup origin new_ms, ms_fvs) }
 
 rnMatch :: Outputable (body RdrName) => HsMatchContext Name
         -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))

@@ -405,10 +405,8 @@ warnMissingSig msg id
 zonkMonoBinds :: ZonkEnv -> SigWarn -> LHsBinds TcId -> TcM (LHsBinds Id)
 zonkMonoBinds env sig_warn binds = mapBagM (zonk_lbind env sig_warn) binds
 
-zonk_lbind :: ZonkEnv -> SigWarn -> (Origin, LHsBind TcId) -> TcM (Origin, LHsBind Id)
-zonk_lbind env sig_warn (origin, lbind)
-  = do  { lbind' <- wrapLocM (zonk_bind env sig_warn) lbind
-        ; return (origin, lbind') }
+zonk_lbind :: ZonkEnv -> SigWarn -> LHsBind TcId -> TcM (LHsBind Id)
+zonk_lbind env sig_warn = wrapLocM (zonk_bind env sig_warn)
 
 zonk_bind :: ZonkEnv -> SigWarn -> HsBind TcId -> TcM (HsBind Id)
 zonk_bind env sig_warn bind@(PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty})
@@ -506,11 +504,11 @@ zonkLTcSpecPrags env ps
 zonkMatchGroup :: ZonkEnv
                -> (ZonkEnv -> Located (body TcId) -> TcM (Located (body Id)))
                -> MatchGroup TcId (Located (body TcId)) -> TcM (MatchGroup Id (Located (body Id)))
-zonkMatchGroup env zBody (MG { mg_alts = ms, mg_arg_tys = arg_tys, mg_res_ty = res_ty })
+zonkMatchGroup env zBody (MG { mg_alts = ms, mg_arg_tys = arg_tys, mg_res_ty = res_ty, mg_origin = origin })
   = do  { ms' <- mapM (zonkMatch env zBody) ms
         ; arg_tys' <- zonkTcTypeToTypes env arg_tys
         ; res_ty'  <- zonkTcTypeToType env res_ty
-        ; return (MG { mg_alts = ms', mg_arg_tys = arg_tys', mg_res_ty = res_ty' }) }
+        ; return (MG { mg_alts = ms', mg_arg_tys = arg_tys', mg_res_ty = res_ty', mg_origin = origin }) }
 
 zonkMatch :: ZonkEnv
           -> (ZonkEnv -> Located (body TcId) -> TcM (Located (body Id)))

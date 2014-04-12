@@ -909,7 +909,8 @@ patterns in each equation.
 data MatchGroup id body
   = MG { mg_alts    :: [LMatch id body]  -- The alternatives
        , mg_arg_tys :: [PostTcType]      -- Types of the arguments, t1..tn
-       , mg_res_ty  :: PostTcType  }     -- Type of the result, tr 
+       , mg_res_ty  :: PostTcType        -- Type of the result, tr 
+       , mg_origin  :: Origin }
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
      -- where there are n patterns
