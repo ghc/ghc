@@ -213,7 +213,7 @@ typedef StgFunPtr       F_;
 #define II_(X)          static StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
 #define IF_(f)    static StgFunPtr GNUC3_ATTRIBUTE(used) f(void)
 #define FN_(f)    StgFunPtr f(void)
-#define EF_(f)    extern StgFunPtr f(void)
+#define EF_(f)    extern StgFunPtr f()
 
 /* -----------------------------------------------------------------------------
    Tail calls
