@@ -364,7 +364,7 @@ classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
     docs  = mkDecls tcdDocs DocD class_
-    defs  = mkDecls (map snd . bagToList . tcdMeths) ValD class_
+    defs  = mkDecls (bagToList . tcdMeths) ValD class_
     sigs  = mkDecls tcdSigs SigD class_
     ats   = mkDecls tcdATs (TyClD . FamDecl) class_
 
@@ -384,13 +384,13 @@ mkFixMap group_ = M.fromList [ (n,f)
 ungroup :: HsGroup Name -> [LHsDecl Name]
 ungroup group_ =
   mkDecls (tyClGroupConcat . hs_tyclds) TyClD  group_ ++
-  mkDecls hs_derivds                       DerivD group_ ++
-  mkDecls hs_defds                         DefD   group_ ++
-  mkDecls hs_fords                         ForD   group_ ++
-  mkDecls hs_docs                          DocD   group_ ++
-  mkDecls hs_instds                        InstD  group_ ++
-  mkDecls (typesigs . hs_valds)            SigD   group_ ++
-  mkDecls (map snd . valbinds . hs_valds)  ValD   group_
+  mkDecls hs_derivds             DerivD group_ ++
+  mkDecls hs_defds               DefD   group_ ++
+  mkDecls hs_fords               ForD   group_ ++
+  mkDecls hs_docs                DocD   group_ ++
+  mkDecls hs_instds              InstD  group_ ++
+  mkDecls (typesigs . hs_valds)  SigD   group_ ++
+  mkDecls (valbinds . hs_valds)  ValD   group_
   where
     typesigs (ValBindsOut _ sigs) = filter isVanillaLSig sigs
     typesigs _ = error "expected ValBindsOut"
