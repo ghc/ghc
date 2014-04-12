@@ -300,7 +300,7 @@ cvt_ci_decs doc decs
         ; unless (null bads) (failWith (mkBadDecMsg doc bads))
           --We use FromSource as the origin of the bind
           -- because the TH declaration is user-written
-        ; return (listToBag (map (\bind -> (FromSource, bind)) binds'), sigs', fams', ats', adts') }
+        ; return (listToBag binds', sigs', fams', ats', adts') }
 
 ----------------
 cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
@@ -535,9 +535,7 @@ cvtLocalDecs doc ds
        ; let (binds, prob_sigs) = partitionWith is_bind ds'
        ; let (sigs, bads) = partitionWith is_sig prob_sigs
        ; unless (null bads) (failWith (mkBadDecMsg doc bads))
-       ; return (HsValBinds (ValBindsIn (toBindBag binds) sigs)) }
-  where
-    toBindBag = listToBag . map (\bind -> (FromSource, bind))
+       ; return (HsValBinds (ValBindsIn (listToBag binds) sigs)) }
 
 cvtClause :: TH.Clause -> CvtM (Hs.LMatch RdrName (LHsExpr RdrName))
 cvtClause (Clause ps body wheres)
@@ -562,10 +560,10 @@ cvtl e = wrapL (cvt e)
 
     cvt (AppE x y)     = do { x' <- cvtl x; y' <- cvtl y; return $ HsApp x' y' }
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
-                            ; return $ HsLam (mkMatchGroup [mkSimpleMatch ps' e']) }
+                            ; return $ HsLam (mkMatchGroup FromSource [mkSimpleMatch ps' e']) }
     cvt (LamCaseE ms)  = do { ms' <- mapM cvtMatch ms
                             ; return $ HsLamCase placeHolderType
-                                                 (mkMatchGroup ms')
+                                                 (mkMatchGroup FromSource ms')
                             }
     cvt (TupE [e])     = do { e' <- cvtl e; return $ HsPar e' }
                                  -- Note [Dropping constructors]
@@ -581,7 +579,7 @@ cvtl e = wrapL (cvt e)
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (ptext (sLit "a let expression")) ds
                             ; e' <- cvtl e; return $ HsLet ds' e' }
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM cvtMatch ms
-                            ; return $ HsCase e' (mkMatchGroup ms') }
+                            ; return $ HsCase e' (mkMatchGroup FromSource ms') }
     cvt (DoE ss)       = cvtHsDo DoExpr ss
     cvt (CompE ss)     = cvtHsDo ListComp ss
     cvt (ArithSeqE dd) = do { dd' <- cvtDD dd; return $ ArithSeq noPostTcExpr Nothing dd' }

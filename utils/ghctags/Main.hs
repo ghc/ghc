@@ -257,7 +257,7 @@ boundValues mod group =
   let vals = case hs_valds group of
                ValBindsOut nest _sigs ->
                    [ x | (_rec, binds) <- nest
-                       , (_, bind) <- bagToList binds
+                       , bind <- bagToList binds
                        , x <- boundThings mod bind ]
                _other -> error "boundValues"
       tys = [ n | ns <- map hsLTyClDeclBinders (tyClGroupConcat (hs_tyclds group))

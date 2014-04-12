@@ -35,7 +35,7 @@ import NameEnv
 import Avail
 import Outputable
 import Bag
-import BasicTypes       ( RuleName, Origin(..) )
+import BasicTypes       ( RuleName )
 import FastString
 import SrcLoc
 import DynFlags
@@ -1518,7 +1518,7 @@ add_role_annot d (tycls@(TyClGroup { group_roles = roles }) : rest)
   = tycls { group_roles = d : roles } : rest
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
-add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` (FromSource, b)) sigs
+add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs
 add_bind _ (ValBindsOut {})     = panic "RdrHsSyn:add_bind"
 
 add_sig :: LSig a -> HsValBinds a -> HsValBinds a

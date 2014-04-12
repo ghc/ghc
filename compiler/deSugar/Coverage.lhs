@@ -117,7 +117,7 @@ guessSourceFile :: LHsBinds Id -> FilePath -> FilePath
 guessSourceFile binds orig_file =
      -- Try look for a file generated from a .hsc file to a
      -- .hs file, by peeking ahead.
-     let top_pos = catMaybes $ foldrBag (\ (_, (L pos _)) rest ->
+     let top_pos = catMaybes $ foldrBag (\ (L pos _) rest ->
                                  srcSpanFileName_maybe pos : rest) [] binds
      in
      case top_pos of
@@ -229,11 +229,7 @@ shouldTickPatBind density top_lev
 -- Adding ticks to bindings
 
 addTickLHsBinds :: LHsBinds Id -> TM (LHsBinds Id)
-addTickLHsBinds binds = mapBagM addTick binds
-  where
-    addTick (origin, bind) = do
-        bind' <- addTickLHsBind bind
-        return (origin, bind')
+addTickLHsBinds = mapBagM addTickLHsBind
 
 addTickLHsBind :: LHsBind Id -> TM (LHsBind Id)
 addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,

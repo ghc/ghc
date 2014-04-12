@@ -1476,18 +1476,18 @@ infixexp :: { LHsExpr RdrName }
 
 exp10 :: { LHsExpr RdrName }
         : '\\' apat apats opt_asig '->' exp
-                        { LL $ HsLam (mkMatchGroup [LL $ Match ($2:$3) $4
+                        { LL $ HsLam (mkMatchGroup FromSource [LL $ Match ($2:$3) $4
                                                                 (unguardedGRHSs $6)
-                                                            ]) }
+                                                              ]) }
         | 'let' binds 'in' exp                  { LL $ HsLet (unLoc $2) $4 }
         | '\\' 'lcase' altslist
-            { LL $ HsLamCase placeHolderType (mkMatchGroup (unLoc $3)) }
+            { LL $ HsLamCase placeHolderType (mkMatchGroup FromSource (unLoc $3)) }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp
                                         {% checkDoAndIfThenElse $2 $3 $5 $6 $8 >>
                                            return (LL $ mkHsIf $2 $5 $8) }
         | 'if' ifgdpats                 {% hintMultiWayIf (getLoc $1) >>
                                            return (LL $ HsMultiIf placeHolderType (reverse $ unLoc $2)) }
-        | 'case' exp 'of' altslist              { LL $ HsCase $2 (mkMatchGroup (unLoc $4)) }
+        | 'case' exp 'of' altslist              { LL $ HsCase $2 (mkMatchGroup FromSource (unLoc $4)) }
         | '-' fexp                              { LL $ NegApp $2 noSyntaxExpr }
 
         | 'do' stmtlist                 { L (comb2 $1 $2) (mkHsDo DoExpr  (unLoc $2)) }

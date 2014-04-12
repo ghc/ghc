@@ -121,7 +121,7 @@ tcClassSigs clas sigs def_methods
     vanilla_sigs = [L loc (nm,ty) | L loc (TypeSig    nm ty) <- sigs]
     gen_sigs     = [L loc (nm,ty) | L loc (GenericSig nm ty) <- sigs]
     dm_bind_names :: [Name]	-- These ones have a value binding in the class decl
-    dm_bind_names = [op | (_, L _ (FunBind {fun_id = L _ op})) <- bagToList def_methods]
+    dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
     tc_sig genop_env (op_names, op_hs_ty)
       = do { traceTc "ClsSig 1" (ppr op_names)
@@ -238,18 +238,18 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn (sel_id, dm_info)
 ---------------
 tcInstanceMethodBody :: SkolemInfo -> [TcTyVar] -> [EvVar]
                      -> Id -> TcSigInfo
-          	     -> TcSpecPrags -> (Origin, LHsBind Name)
-          	     -> TcM (Origin, LHsBind Id)
+          	     -> TcSpecPrags -> LHsBind Name
+          	     -> TcM (LHsBind Id)
 tcInstanceMethodBody skol_info tyvars dfun_ev_vars
                      meth_id local_meth_sig
-		     specs (origin, (L loc bind))
+		     specs (L loc bind)
   = do	{ let local_meth_id = sig_id local_meth_sig
               lm_bind = L loc (bind { fun_id = L loc (idName local_meth_id) })
                              -- Substitute the local_meth_name for the binder
 			     -- NB: the binding is always a FunBind
 	; (ev_binds, (tc_bind, _, _)) 
                <- checkConstraints skol_info tyvars dfun_ev_vars $
-	          tcPolyCheck NonRecursive no_prag_fn local_meth_sig (origin, lm_bind)
+	          tcPolyCheck NonRecursive no_prag_fn local_meth_sig lm_bind
 
         ; let export = ABE { abe_wrap = idHsWrapper, abe_poly = meth_id
                            , abe_mono = local_meth_id, abe_prags = specs }
@@ -258,7 +258,7 @@ tcInstanceMethodBody skol_info tyvars dfun_ev_vars
                                    , abs_ev_binds = ev_binds
                                    , abs_binds = tc_bind }
 
-        ; return (origin, L loc full_bind) } 
+        ; return (L loc full_bind) } 
   where
     no_prag_fn  _ = []		-- No pragmas for local_meth_id; 
     		    		-- they are all for meth_id
@@ -326,14 +326,14 @@ lookupHsSig = lookupNameEnv
 ---------------------------
 findMethodBind	:: Name  	        -- Selector name
           	-> LHsBinds Name 	-- A group of bindings
-		-> Maybe ((Origin, LHsBind Name), SrcSpan)
+		-> Maybe (LHsBind Name, SrcSpan)
           	-- Returns the binding, and the binding 
                 -- site of the method binder
 findMethodBind sel_name binds
   = foldlBag mplus Nothing (mapBag f binds)
-  where 
-    f bind@(_, L _ (FunBind { fun_id = L bndr_loc op_name }))
-             | op_name == sel_name
+  where
+    f bind@(L _ (FunBind { fun_id = L bndr_loc op_name }))
+      | op_name == sel_name
     	     = Just (bind, bndr_loc)
     f _other = Nothing
 

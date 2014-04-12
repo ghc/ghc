@@ -89,7 +89,7 @@ type LHsBind  id = LHsBindLR  id id
 type LHsBinds id = LHsBindsLR id id
 type HsBind   id = HsBindLR   id id
 
-type LHsBindsLR idL idR = Bag (Origin, LHsBindLR idL idR)
+type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
 type LHsBindLR  idL idR = Located (HsBindLR idL idR)
 
 data HsBindLR idL idR
@@ -322,7 +322,7 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsValBindsLR id
 pprLHsBinds :: (OutputableBndr idL, OutputableBndr idR) => LHsBindsLR idL idR -> SDoc
 pprLHsBinds binds
   | isEmptyLHsBinds binds = empty
-  | otherwise = pprDeclList (map (ppr . snd) (bagToList binds))
+  | otherwise = pprDeclList (map ppr (bagToList binds))
 
 pprLHsBindsForUser :: (OutputableBndr idL, OutputableBndr idR, OutputableBndr id2)
                    => LHsBindsLR idL idR -> [LSig id2] -> [SDoc]
@@ -338,7 +338,7 @@ pprLHsBindsForUser binds sigs
 
     decls :: [(SrcSpan, SDoc)]
     decls = [(loc, ppr sig)  | L loc sig <- sigs] ++
-            [(loc, ppr bind) | (_, L loc bind) <- bagToList binds]
+            [(loc, ppr bind) | L loc bind <- bagToList binds]
 
     sort_by_loc decls = sortBy (comparing fst) decls
 
