@@ -2928,8 +2928,8 @@ unloadObj( pathchar *path )
     IF_DEBUG(linker, debugBelch("unloadObj: %" PATH_FMT "\n", path));
 
     prev = NULL;
-    for (oc = objects; oc; prev = oc, oc = next) {
-        next = oc->next;
+    for (oc = objects; oc; oc = next) {
+        next = oc->next; // oc might be freed
 
         if (!pathcmp(oc->fileName,path)) {
 
@@ -2987,6 +2987,8 @@ unloadObj( pathchar *path )
             /* This could be a member of an archive so continue
              * unloading other members. */
             unloadedAnyObj = HS_BOOL_TRUE;
+        } else {
+            prev = oc;
         }
     }
 

@@ -290,7 +290,7 @@ void checkUnload (StgClosure *static_objects)
   // marked as unreferenced can be physically unloaded, because we
   // have no references to it.
   prev = NULL;
-  for (oc = unloaded_objects; oc; prev = oc, oc = next) {
+  for (oc = unloaded_objects; oc; oc = next) {
       next = oc->next;
       if (oc->referenced == 0) {
           if (prev == NULL) {
@@ -304,6 +304,7 @@ void checkUnload (StgClosure *static_objects)
       } else {
           IF_DEBUG(linker, debugBelch("Object file still in use: %"
                                       PATH_FMT "\n", oc->fileName));
+          prev = oc;
       }
   }
 
