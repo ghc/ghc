@@ -516,7 +516,7 @@ conflicts :: DynFlags -> Assignment -> CmmNode O x -> Bool
 conflicts dflags (r, rhs, addr) node
 
   -- (1) node defines registers used by rhs of assignment. This catches
-  -- assignmnets and all three kinds of calls. See Note [Sinking and calls]
+  -- assignments and all three kinds of calls. See Note [Sinking and calls]
   | globalRegistersConflict dflags rhs node                       = True
   | localRegistersConflict  dflags rhs node                       = True
 

@@ -554,7 +554,7 @@ synonym.  This works because TcTyConAppCo can deal with synonyms
 
 But (Trac #8979) for
    type T a = (F a, a)    where F is a type function
-we must expand the synonym in (say) T Int, to expose the type functoin
+we must expand the synonym in (say) T Int, to expose the type function
 to the flattener.
 
 
