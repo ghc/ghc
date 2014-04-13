@@ -45,7 +45,7 @@ static void  initMBlock(void *mblock);
    bd->free is either:
       - zero for a non-group-head; bd->link points to the head
       - (-1) for the head of a free block group
-      - or it points within the block
+      - or it points within the block (group)
 
    bd->blocks is either:
       - zero for a non-group-head; bd->link points to the head
