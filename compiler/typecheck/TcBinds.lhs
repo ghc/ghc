@@ -30,7 +30,6 @@ import TcMType
 import PatSyn
 import ConLike
 import Type( tidyOpenType )
-import FunDeps( growThetaTyVars )
 import TyCon
 import TcType
 import TysPrim
@@ -553,7 +552,8 @@ tcPolyInfer
   -> [(Origin, LHsBind Name)]
   -> TcM (LHsBinds TcId, [TcId], TopLevelFlag)
 tcPolyInfer rec_tc prag_fn tc_sig_fn mono closed bind_list
-  = do { ((binds', mono_infos), wanted)
+  = tcPushUntouchables $
+    do { ((binds', mono_infos), wanted)
              <- captureConstraints $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
 
@@ -609,10 +609,9 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
               -- In the inference case (no signature) this stuff figures out
               -- the right type variables and theta to quantify over
               -- See Note [Impedence matching]
-              my_tvs2 = closeOverKinds (growThetaTyVars theta (tyVarsOfType mono_ty))
+              (my_tvs2, my_theta) = growThetaTyVars (const True) (tyVarsOfType mono_ty) theta
+              my_tvs   = filter (`elemVarSet` closeOverKinds my_tvs2) qtvs   -- Maintain original order
                             -- Include kind variables!  Trac #7916
-              my_tvs   = filter (`elemVarSet` my_tvs2) qtvs   -- Maintain original order
-              my_theta = filter (quantifyPred my_tvs2) theta
               inferred_poly_ty = mkSigmaTy my_tvs my_theta mono_ty
 
         ; poly_id <- addInlinePrags poly_id prag_sigs

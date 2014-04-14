@@ -1126,12 +1126,18 @@ captureUntouchables thing_inside
                 thing_inside
        ; return (res, untch') }
 
-getUntouchables :: TcM Untouchables
-getUntouchables = do { env <- getLclEnv
+tcPushUntouchables :: TcM a -> TcM a
+tcPushUntouchables thing_inside
+  = do { env <- getLclEnv
+       ; let untch' = pushUntouchables (tcl_untch env)
+       ; setLclEnv (env { tcl_untch = untch' }) thing_inside }
+
+tcGetUntouchables :: TcM Untouchables
+tcGetUntouchables = do { env <- getLclEnv
                      ; return (tcl_untch env) }
 
-setUntouchables :: Untouchables -> TcM a -> TcM a
-setUntouchables untch thing_inside 
+tcSetUntouchables :: Untouchables -> TcM a -> TcM a
+tcSetUntouchables untch thing_inside 
   = updLclEnv (\env -> env { tcl_untch = untch }) thing_inside
 
 isTouchableTcM :: TcTyVar -> TcM Bool

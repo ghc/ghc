@@ -1125,7 +1125,7 @@ nestImplicTcS ref inner_untch inerts (TcS thing_inside)
                                , tcs_implics     = panic "nextImplicTcS: implics"
                                -- NB: Both these are initialised by withWorkList
                                }
-       ; res <- TcM.setUntouchables inner_untch $
+       ; res <- TcM.tcSetUntouchables inner_untch $
                 thing_inside nest_env
 
 #ifdef DEBUG
@@ -1250,7 +1250,7 @@ getTcEvBinds :: TcS EvBindsVar
 getTcEvBinds = TcS (return . tcs_ev_binds)
 
 getUntouchables :: TcS Untouchables
-getUntouchables = wrapTcS TcM.getUntouchables
+getUntouchables = wrapTcS TcM.tcGetUntouchables
 
 getGivenInfo :: TcS a -> TcS (Bool, [TcTyVar], a)
 -- Run thing_inside, returning info on

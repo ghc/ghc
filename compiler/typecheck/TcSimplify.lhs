@@ -1,6 +1,6 @@
 \begin{code}
 module TcSimplify(
-       simplifyInfer, quantifyPred,
+       simplifyInfer, growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,
        simplifyRule, simplifyTop, simplifyInteractive,
@@ -18,7 +18,6 @@ import TcSMonad as TcS
 import TcInteract
 import Kind     ( isKind, defaultKind_maybe )
 import Inst
-import FunDeps  ( growThetaTyVars )
 import Type     ( classifyPredType, PredTree(..), getClassPredTys_maybe )
 import Class    ( Class )
 import Var
@@ -266,7 +265,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        ; quant_pred_candidates   -- Fully zonked
            <- if insolubleWC wanted_transformed_incl_derivs
               then return []   -- See Note [Quantification with errors]
-                               -- NB: must include derived errors in this test, 
+                               -- NB: must include derived errors in this test,
                                --     hence "incl_derivs"
 
               else do { let quant_cand = approximateWC wanted_transformed
@@ -276,7 +275,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                             -- Miminise quant_cand.  We are not interested in any evidence
                             -- produced, because we are going to simplify wanted_transformed
                             -- again later. All we want here is the predicates over which to
-                            -- quantify.  
+                            -- quantify.
                             --
                             -- If any meta-tyvar unifications take place (unlikely), we'll
                             -- pick that up later.
@@ -291,10 +290,10 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                                   filterBag isWantedCt flats
                            -- The quant_cand were already fully zonked, so this zonkFlats
                            -- really only unflattens the flattening that solveInteract
-                           -- may have done (Trac #8889).  
+                           -- may have done (Trac #8889).
                            -- E.g. quant_cand = F a, where F :: * -> Constraint
                            --      We'll flatten to   (alpha, F a ~ alpha)
-                           -- fail to make any further progress and must unflatten again 
+                           -- fail to make any further progress and must unflatten again
 
                       ; return (map ctPred $ bagToList flats') }
 
@@ -302,33 +301,46 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        --     unifications that may have happened
        ; gbl_tvs        <- tcGetGlobalTyVars
        ; zonked_tau_tvs <- TcM.zonkTyVarsAndFV (tyVarsOfTypes (map snd name_taus))
-       ; let poly_qtvs = growThetaTyVars quant_pred_candidates zonked_tau_tvs
-                         `minusVarSet` gbl_tvs
-             pbound    = filter (quantifyPred poly_qtvs) quant_pred_candidates
+       ; let constrained_tvs
+                | apply_mr  = tyVarsOfTypes quant_pred_candidates
+                | otherwise = tyVarsOfTypes (snd (growThetaTyVars (const True) gbl_tvs (filter isEqPred quant_pred_candidates)))
+
+             all_constrained_tvs = gbl_tvs `unionVarSet` constrained_tvs
+
+             (poly_qtvs, bound)
+                 | apply_mr  = (zonked_tau_tvs `minusVarSet` all_constrained_tvs, [])
+                 | otherwise = growThetaTyVars (\tv -> not (tv `elemVarSet` all_constrained_tvs))
+                                               zonked_tau_tvs quant_pred_candidates
 
              -- Monomorphism restriction
-             constrained_tvs = tyVarsOfTypes pbound `unionVarSet` gbl_tvs
-             mr_bites        = apply_mr && not (null pbound)
+             mr_bites = not (constrained_tvs `subVarSet` gbl_tvs)
 
-       ; (qtvs, bound) <- if mr_bites
-                          then do { qtvs <- quantifyTyVars constrained_tvs zonked_tau_tvs
-                                  ; return (qtvs, []) }
-                          else do { qtvs <- quantifyTyVars gbl_tvs poly_qtvs
-                                  ; return (qtvs, pbound) }
+#ifdef DEBUG
+       ; let check_untch str bad_tvs
+               = WARN( not (null bad_tvs),
+                       hang (text ("Bad generalisation: " ++ str))
+                          2 (vcat [ppr untch, ppr bad_tvs]) )
+                 return ()
+
+       ; check_untch "gbl tvs" (filter (isTouchableMetaTyVar untch) (varSetElems gbl_tvs))
+       ; check_untch "qtvs"    (filterOut (isTouchableMetaTyVar untch) (varSetElems poly_qtvs))
+#endif
+
+       ; qtvs <- quantifyTyVars all_constrained_tvs poly_qtvs
 
        ; traceTc "simplifyWithApprox" $
          vcat [ ptext (sLit "quant_pred_candidates =") <+> ppr quant_pred_candidates
+              , ptext (sLit "mr_bites =") <+> ppr mr_bites
               , ptext (sLit "gbl_tvs=") <+> ppr gbl_tvs
               , ptext (sLit "zonked_tau_tvs=") <+> ppr zonked_tau_tvs
-              , ptext (sLit "pbound =") <+> ppr pbound
-              , ptext (sLit "bbound =") <+> ppr bound
+              , ptext (sLit "bound =") <+> ppr bound
               , ptext (sLit "poly_qtvs =") <+> ppr poly_qtvs
               , ptext (sLit "constrained_tvs =") <+> ppr constrained_tvs
-              , ptext (sLit "mr_bites =") <+> ppr mr_bites
               , ptext (sLit "qtvs =") <+> ppr qtvs ]
 
        ; if null qtvs && null bound
          then do { traceTc "} simplifyInfer/no implication needed" empty
+                 ; mapM_ (promoteTyVarTcM (popUntouchables untch)) (varSetElems constrained_tvs)
                  ; emitConstraints wanted_transformed
                     -- Includes insolubles (if -fdefer-type-errors)
                     -- as well as flats and implications
@@ -345,7 +357,12 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                         -- tidied uniformly
 
        ; minimal_bound_ev_vars <- mapM TcM.newEvVar minimal_flat_preds
-       ; let implic = Implic { ic_untch    = pushUntouchables untch
+
+       ; mapM_ (promoteTyVarTcM (popUntouchables untch)) $
+         varSetElems ((zonked_tau_tvs `unionVarSet` tyVarsOfTypes minimal_flat_preds) `minusVarSet` poly_qtvs)
+
+       ; unless (isEmptyWC wanted_transformed) $
+         do { let implic = Implic { ic_untch    = untch
                              , ic_skols    = qtvs
                              , ic_no_eqs   = False
                              , ic_fsks     = []  -- wanted_tansformed arose only from solveWanteds
@@ -356,24 +373,46 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                              , ic_binds    = ev_binds_var
                              , ic_info     = skol_info
                              , ic_env      = tc_lcl_env }
-       ; emitImplication implic
 
-       ; traceTc "} simplifyInfer/produced residual implication for quantification" $
-             vcat [ ptext (sLit "implic =") <+> ppr implic
-                       -- ic_skols, ic_given give rest of result
-                  , ptext (sLit "qtvs =") <+> ppr qtvs
-                  , ptext (sLit "spb =") <+> ppr quant_pred_candidates
-                  , ptext (sLit "bound =") <+> ppr bound ]
+            ; emitImplication implic
+            ; traceTc "} simplifyInfer/produced residual implication for quantification" $
+                  vcat [ ptext (sLit "implic =") <+> ppr implic
+                            -- ic_skols, ic_given give rest of result
+                       , ptext (sLit "qtvs =") <+> ppr qtvs
+                       , ptext (sLit "spb =") <+> ppr quant_pred_candidates
+                       , ptext (sLit "bound =") <+> ppr bound ] }
 
        ; return ( qtvs, minimal_bound_ev_vars
                 , mr_bites,  TcEvBinds ev_binds_var) } }
 
-quantifyPred :: TyVarSet           -- Quantifying over these
-             -> PredType -> Bool   -- True <=> quantify over this wanted
-quantifyPred qtvs pred
-  | isIPPred pred = True  -- Note [Inheriting implicit parameters]
-  | otherwise     = tyVarsOfType pred `intersectsVarSet` qtvs
+growThetaTyVars :: (TcTyVar -> Bool) -> TyVarSet -> ThetaType -> (TyVarSet, ThetaType)
+-- See Note [Growing the tau-tvs using constraints]
+growThetaTyVars quantify_tv tvs theta
+  = go (filterVarSet quantify_tv tvs) [] [] theta
+  where
+    go tvs _           q_preds [] = (tvs, q_preds)
+    go tvs non_q_preds q_preds (pred:preds)
+      | not quantify_me          = go tvs (pred:non_q_preds) q_preds preds
+      | pred_tvs `subVarSet` tvs = go tvs non_q_preds (pred:q_preds) preds
+      | otherwise                = go (tvs `unionVarSet` pred_tvs)
+                                      [] (pred:q_preds)
+                                      (non_q_preds ++ preds)
+      where
+        pred_tvs = filterVarSet quantify_tv (tyVarsOfType pred)
+        quantify_me = isIPPred pred || pred_tvs `intersectsVarSet` tvs
 \end{code}
+
+Note [Growing the tau-tvs using constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(growThetaTyVars insts tvs) is the result of extending the set
+    of tyvars tvs using all conceivable links from pred
+
+E.g. tvs = {a}, preds = {H [a] b, K (b,Int) c, Eq e}
+Then growThetaTyVars preds tvs = {a,b,c}
+
+Notice that
+   growThetaTyVars is conservative       if v might be fixed by vs
+                                         => v `elem` grow(vs,C)
 
 Note [Inheriting implicit parameters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -860,6 +899,15 @@ promoteTyVar untch tv
   | otherwise
   = return ()
 
+promoteTyVarTcM :: Untouchables -> TcTyVar  -> TcM ()
+promoteTyVarTcM untch tv
+  | isFloatedTouchableMetaTyVar untch tv
+  = do { cloned_tv <- TcM.cloneMetaTyVar tv
+       ; let rhs_tv = setMetaTyVarUntouchables cloned_tv untch
+       ; writeMetaTyVar tv (mkTyVarTy rhs_tv) }
+  | otherwise
+  = return ()
+
 promoteAndDefaultTyVar :: Untouchables -> TcTyVarSet -> TyVar -> TcS ()
 -- See Note [Promote _and_ default when inferring]
 promoteAndDefaultTyVar untch gbl_tvs tv
@@ -1155,14 +1203,16 @@ with two implications and a class with a functional dependency.
     class C x y | x -> y
     instance C [a] [a]
 
-    (I1)      [untch=beta]forall b. 0 => F Int ~ [beta]
-    (I2)      [untch=beta]forall c. 0 => F Int ~ [[alpha]] /\ C beta [c]
+    (I1)      forall(1) b. 0 => F Int ~ [beta(0)]
+    (I2)      forall(1) c. 0 => F Int ~ [[alpha(1)]] /\ C beta(0) [c]
 
 We float (F Int ~ [beta]) out of I1, and we float (F Int ~ [[alpha]]) out of I2.
 They may react to yield that (beta := [alpha]) which can then be pushed inwards
-the leftover of I2 to get (C [alpha] [a]) which, using the FunDep, will mean that
-(alpha := a). In the end we will have the skolem 'b' escaping in the untouchable
-beta! Concrete example is in indexed_types/should_fail/ExtraTcsUntch.hs:
+the leftover of I2 to get (C [alpha] [c]) which, using the FunDep, will mean that
+(alpha := c). In the end we will have the skolem 'c' escaping. By promoting alpha
+to level 0, we stop this happening.
+
+Concrete example is in indexed_types/should_fail/ExtraTcsUntch.hs:
 
     class C x y | x -> y where
      op :: x -> y -> ()

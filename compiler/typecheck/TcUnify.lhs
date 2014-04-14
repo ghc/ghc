@@ -557,7 +557,7 @@ uType_defer origin ty1 ty2
 --------------
 -- unify_np (short for "no push" on the origin stack) does the work
 uType origin orig_ty1 orig_ty2
-  = do { untch <- getUntouchables
+  = do { untch <- tcGetUntouchables
        ; traceTc "u_tys " $ vcat 
               [ text "untch" <+> ppr untch
               , sep [ ppr orig_ty1, text "~", ppr orig_ty2]

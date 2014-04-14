@@ -22,7 +22,7 @@ module TcType (
   TcTyVar, TcTyVarSet, TcKind, TcCoVar,
 
   -- Untouchables
-  Untouchables(..), noUntouchables, pushUntouchables, isTouchable,
+  Untouchables(..), noUntouchables, pushUntouchables, popUntouchables, isTouchable,
 
   --------------------------------
   -- MetaDetails
@@ -434,6 +434,9 @@ noUntouchables = Untouchables 0   -- 0 = outermost level
 
 pushUntouchables :: Untouchables -> Untouchables
 pushUntouchables (Untouchables us) = Untouchables (us+1)
+
+popUntouchables :: Untouchables -> Untouchables
+popUntouchables (Untouchables us) = ASSERT( us > 0 ) Untouchables (us-1)
 
 isFloatedTouchable :: Untouchables -> Untouchables -> Bool
 isFloatedTouchable (Untouchables ctxt_untch) (Untouchables tv_untch)

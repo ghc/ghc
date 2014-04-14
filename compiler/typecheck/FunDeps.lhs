@@ -13,7 +13,7 @@ module FunDeps (
         Equation(..), pprEquation,
         improveFromInstEnv, improveFromAnother,
         checkInstCoverage, checkFunDeps,
-        growThetaTyVars, pprFundeps
+        pprFundeps
     ) where
 
 #include "HsVersions.h"
@@ -33,46 +33,6 @@ import FastString
 
 import Data.List        ( nubBy )
 import Data.Maybe       ( isJust )
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
-\subsection{Close type variables}
-%*                                                                      *
-%************************************************************************
-
-Note [Growing the tau-tvs using constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(growThetaTyVars insts tvs) is the result of extending the set
-    of tyvars tvs using all conceivable links from pred
-
-E.g. tvs = {a}, preds = {H [a] b, K (b,Int) c, Eq e}
-Then growThetaTyVars preds tvs = {a,b,c}
-
-Notice that
-   growThetaTyVars is conservative       if v might be fixed by vs
-                                         => v `elem` grow(vs,C)
-
-\begin{code}
-growThetaTyVars :: ThetaType -> TyVarSet -> TyVarSet
--- See Note [Growing the tau-tvs using constraints]
-growThetaTyVars theta tvs
-  | null theta = tvs
-  | otherwise  = fixVarSet mk_next tvs
-  where
-    mk_next tvs = foldr grow_one tvs theta
-    grow_one pred tvs = growPredTyVars pred tvs `unionVarSet` tvs
-
-growPredTyVars :: PredType
-               -> TyVarSet      -- The set to extend
-               -> TyVarSet      -- TyVars of the predicate if it intersects the set,
-growPredTyVars pred tvs
-   | isIPPred pred                   = pred_tvs   -- Always quantify over implicit parameers
-   | pred_tvs `intersectsVarSet` tvs = pred_tvs
-   | otherwise                       = emptyVarSet
-  where
-    pred_tvs = tyVarsOfType pred
 \end{code}
 
 

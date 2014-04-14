@@ -284,7 +284,7 @@ newSigTyVar name kind
 newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
 newMetaDetails info 
   = do { ref <- newMutVar Flexi
-       ; untch <- getUntouchables
+       ; untch <- tcGetUntouchables
        ; return (MetaTv { mtv_info = info, mtv_ref = ref, mtv_untch = untch }) }
 \end{code}
 
@@ -755,7 +755,7 @@ zonkEvVar var = do { ty' <- zonkTcType (varType var)
 zonkWC :: EvBindsVar -- May add new bindings for wanted family equalities in here
        -> WantedConstraints -> TcM WantedConstraints
 zonkWC binds_var wc
-  = do { untch <- getUntouchables
+  = do { untch <- tcGetUntouchables
        ; zonkWCRec binds_var untch wc }
 
 zonkWCRec :: EvBindsVar

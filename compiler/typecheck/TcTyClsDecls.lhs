@@ -29,7 +29,7 @@ import TcEnv
 import TcValidity
 import TcHsSyn
 import TcBinds( tcRecSelBinds )
-import FunDeps( growThetaTyVars )
+import TcSimplify( growThetaTyVars )
 import TcTyDecls
 import TcClassDcl
 import TcHsType
@@ -1619,7 +1619,7 @@ checkValidClass cls
                 -- Here, MonadState has a fundep m->b, so newBoard is fine
                 -- The check is disabled for nullary type classes,
                 -- since there is no possible ambiguity
-        ; let grown_tyvars = growThetaTyVars theta (mkVarSet tyvars)
+        ; let (grown_tyvars, _) = growThetaTyVars (const True) (mkVarSet tyvars) theta
         ; checkTc (arity == 0 || tyVarsOfType tau `intersectsVarSet` grown_tyvars)
                   (noClassTyVarErr cls sel_id)
 
