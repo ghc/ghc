@@ -24,7 +24,6 @@ import Module
 import RdrName
 import Name
 import Type
-import Kind ( isSuperKind )
 
 import TcType
 import InstEnv
@@ -1131,10 +1130,6 @@ setUntouchables untch thing_inside
 
 isTouchableTcM :: TcTyVar -> TcM Bool
 isTouchableTcM tv
-    -- Kind variables are always touchable
-  | isSuperKind (tyVarKind tv) 
-  = return False
-  | otherwise 
   = do { env <- getLclEnv
        ; return (isTouchableMetaTyVar (tcl_untch env) tv) }
 
