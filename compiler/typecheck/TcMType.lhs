@@ -385,34 +385,34 @@ writeMetaTyVar tyvar ty
 
 --------------------
 writeMetaTyVarRef :: TcTyVar -> TcRef MetaDetails -> TcType -> TcM ()
--- Here the tyvar is for error checking only; 
+-- Here the tyvar is for error checking only;
 -- the ref cell must be for the same tyvar
 writeMetaTyVarRef tyvar ref ty
-  | not debugIsOn 
+  | not debugIsOn
   = do { traceTc "writeMetaTyVar" (ppr tyvar <+> text ":=" <+> ppr ty)
        ; writeMutVar ref (Indirect ty) }
 
 -- Everything from here on only happens if DEBUG is on
   | otherwise
-  = do { meta_details <- readMutVar ref; 
+  = do { meta_details <- readMutVar ref;
        -- Zonk kinds to allow the error check to work
-       ; zonked_tv_kind <- zonkTcKind tv_kind 
+       ; zonked_tv_kind <- zonkTcKind tv_kind
        ; zonked_ty_kind <- zonkTcKind ty_kind
 
        -- Check for double updates
-       ; ASSERT2( isFlexi meta_details, 
+       ; ASSERT2( isFlexi meta_details,
                   hang (text "Double update of meta tyvar")
                    2 (ppr tyvar $$ ppr meta_details) )
 
          traceTc "writeMetaTyVar" (ppr tyvar <+> text ":=" <+> ppr ty)
-       ; writeMutVar ref (Indirect ty) 
-       ; when (   not (isPredTy tv_kind) 
+       ; writeMutVar ref (Indirect ty)
+       ; when (   not (isPredTy tv_kind)
                     -- Don't check kinds for updates to coercion variables
                && not (zonked_ty_kind `tcIsSubKind` zonked_tv_kind))
        $ WARN( True, hang (text "Ill-kinded update to meta tyvar")
-                        2 (    ppr tyvar <+> text "::" <+> ppr tv_kind 
-                           <+> text ":=" 
-                           <+> ppr ty    <+> text "::" <+> ppr ty_kind) )
+                        2 (    ppr tyvar <+> text "::" <+> (ppr tv_kind $$ ppr zonked_tv_kind)
+                           <+> text ":="
+                           <+> ppr ty    <+> text "::" <+> (ppr ty_kind $$ ppr zonked_ty_kind) ) )
          (return ()) }
   where
     tv_kind = tyVarKind tyvar
