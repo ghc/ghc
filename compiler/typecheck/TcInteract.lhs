@@ -1830,7 +1830,7 @@ matchClassInst _ clas [ ty ] _
 
 matchClassInst _ clas [ _k, ty1, ty2 ] loc
   | clas == coercibleClass =  do
-      traceTcS "matchClassInst for" $ ppr clas <+> ppr ty1 <+> ppr ty2 <+> text "at depth" <+> ppr (ctLocDepth loc)
+      traceTcS "matchClassInst for" $ quotes (pprClassPred clas [ty1,ty2]) <+> text "at depth" <+> ppr (ctLocDepth loc)
       ev <- getCoercibleInst loc ty1 ty2
       traceTcS "matchClassInst returned" $ ppr ev
       return ev
