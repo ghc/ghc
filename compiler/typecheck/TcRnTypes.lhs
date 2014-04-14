@@ -1850,9 +1850,9 @@ pprO (DerivOriginDC dc n)  = hsep [ ptext (sLit "the"), speakNth n,
                                     parens (ptext (sLit "type") <+> quotes (ppr ty)) ]
     where ty = dataConOrigArgTys dc !! (n-1)
 pprO (DerivOriginCoerce meth ty1 ty2)
-                           = fsep [ ptext (sLit "the coercion"), ptext (sLit "of the method")
-                                  , quotes (ppr meth), ptext (sLit "from type"), quotes (ppr ty1)
-                                  , ptext (sLit "to type"), quotes (ppr ty2) ]
+                           = sep [ ptext (sLit "the coercion of the method") <+> quotes (ppr meth)
+                                 , ptext (sLit "from type") <+> quotes (ppr ty1)
+                                 , nest 2 (ptext (sLit "to type") <+> quotes (ppr ty2)) ]
 pprO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
 pprO DefaultOrigin         = ptext (sLit "a 'default' declaration")
 pprO DoOrigin              = ptext (sLit "a do statement")

@@ -1083,8 +1083,9 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     no_inst_msg
       | clas == coercibleClass
       = let (ty1, ty2) = getEqPredTys pred
-        in ptext (sLit "Could not coerce from") <+> quotes (ppr ty1) <+>
-           ptext (sLit "to") <+> quotes (ppr ty2)
+        in sep [ ptext (sLit "Could not coerce from") <+> quotes (ppr ty1)
+               , nest 19 (ptext (sLit "to") <+> quotes (ppr ty2)) ]
+                 -- The nesting makes the types line up
       | null givens && null matches
       = ptext (sLit "No instance for")  <+> pprParendType pred
       | otherwise
@@ -1192,9 +1193,9 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
         Just msg <- coercible_msg_for_tycon rdr_env tc
       = msg
       | otherwise
-      = nest 2 $ hsep [ ptext $ sLit "because", quotes (ppr ty1),
-                        ptext $ sLit "and", quotes (ppr ty2),
-                        ptext $ sLit "are different types." ]
+      = nest 2 $ sep [ ptext (sLit "because") <+> quotes (ppr ty1)
+                     , nest 4 (vcat [ ptext (sLit "and") <+> quotes (ppr ty2)
+                                    , ptext (sLit "are different types.") ]) ]
       where
         (ty1, ty2) = getEqPredTys pred
 
