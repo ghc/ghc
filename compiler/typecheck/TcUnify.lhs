@@ -824,8 +824,8 @@ uUnfilledVars origin swapped tv1 details1 tv2 details2
 	   -- k1 = k2, so we are free to update either way
            (EQ, MetaTv { mtv_info = i1, mtv_ref = ref1 }, 
                 MetaTv { mtv_info = i2, mtv_ref = ref2 })
-                | nicer_to_update_tv1 i1 i2 -> updateMeta tv1 ref1 ty2
-                | otherwise                 -> updateMeta tv2 ref2 ty1
+                | nicer_to_update_tv1 tv1 i1 i2 -> updateMeta tv1 ref1 ty2
+                | otherwise                     -> updateMeta tv2 ref2 ty1
            (EQ, MetaTv { mtv_ref = ref1 }, _) -> updateMeta tv1 ref1 ty2
            (EQ, _, MetaTv { mtv_ref = ref2 }) -> updateMeta tv2 ref2 ty1
 
@@ -838,9 +838,10 @@ uUnfilledVars origin swapped tv1 details1 tv2 details2
     ty1 = mkTyVarTy tv1
     ty2 = mkTyVarTy tv2
 
-    nicer_to_update_tv1 _     SigTv = True
-    nicer_to_update_tv1 SigTv _     = False
-    nicer_to_update_tv1 _         _ = isSystemName (Var.varName tv1)
+nicer_to_update_tv1 :: TcTyVar -> MetaInfo -> MetaInfo -> Bool
+nicer_to_update_tv1 _   _     SigTv = True
+nicer_to_update_tv1 _   SigTv _     = False
+nicer_to_update_tv1 tv1 _     _     = isSystemName (Var.varName tv1)
         -- Try not to update SigTvs; and try to update sys-y type
         -- variables in preference to ones gotten (say) by
         -- instantiating a polymorphic function with a user-written
@@ -1069,6 +1070,31 @@ one of argTypeKind or openTypeKind.
 The situation is different in the core of the compiler, where we are perfectly
 happy to have types of kind Constraint on either end of an arrow.
 
+Note [Kind variables can be untouchable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must use the careful function lookupTcTyVar to see if a kind
+variable is filled or unifiable.  It checks for touchablity, and kind
+variables can certainly be untouchable --- for example the variable
+might be bound outside an enclosing existental pattern match that
+binds an inner kind variable, which we don't want ot escape outside.
+
+This, or something closely related, was teh cause of Trac #8985.
+
+Note [Unifying kind variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Rather hackily, kind variables can be TyVars not just TcTyVars.
+Main reason is in
+   data instance T (D (x :: k)) = ...con-decls...
+Here we bring into scope a kind variable 'k', and use it in the
+con-decls.  BUT the con-decls will be finished and frozen, and
+are not amenable to subsequent substitution, so it makes sense
+to have the *final* kind-variable (a KindVar, not a TcKindVar) in
+scope.  So at least during kind unification we can encounter a
+KindVar.
+
+Hence the isTcTyVar tests before calling lookupTcTyVar.
+
+
 \begin{code}
 matchExpectedFunKind :: TcKind -> TcM (Maybe (TcKind, TcKind))
 -- Like unifyFunTy, but does not fail; instead just returns Nothing
@@ -1117,37 +1143,66 @@ unifyKindX (TyConApp kc1 []) (TyConApp kc2 [])
 unifyKindX k1 k2 = unifyKindEq k1 k2
   -- In all other cases, let unifyKindEq do the work
 
+-------------------
 uKVar :: SwapFlag -> (TcKind -> TcKind -> TcM (Maybe Ordering))
       -> MetaKindVar -> TcKind -> TcM (Maybe Ordering)
 uKVar swapped unify_kind kv1 k2
-  | isTcTyVar kv1, isMetaTyVar kv1       -- See Note [Unifying kind variables]
-  = do  { mb_k1 <- readMetaTyVar kv1
-        ; case mb_k1 of
-            Flexi -> uUnboundKVar kv1 k2
-            Indirect k1 -> unSwap swapped unify_kind k1 k2 }
-  | TyVarTy kv2 <- k2, kv1 == kv2 
+  | isTcTyVar kv1
+  = do { lookup_res <- lookupTcTyVar kv1  -- See Note [Kind variables can be untouchable]
+       ; case lookup_res of
+           Filled k1    -> unSwap swapped unify_kind k1 k2
+           Unfilled ds1 -> uUnfilledKVar kv1 ds1 k2 }
+
+  | otherwise   -- See Note [Unifying kind variables]
+  = uUnfilledKVar kv1 vanillaSkolemTv k2
+
+-------------------
+uUnfilledKVar :: MetaKindVar -> TcTyVarDetails -> TcKind -> TcM (Maybe Ordering)
+uUnfilledKVar kv1 ds1 (TyVarTy kv2)
+  | kv1 == kv2
   = return (Just EQ)
 
-  | TyVarTy kv2 <- k2, isTcTyVar kv2, isMetaTyVar kv2
-  = uKVar (flipSwap swapped) unify_kind kv2 (TyVarTy kv1)
+  | isTcTyVar kv2
+  = do { lookup_res <- lookupTcTyVar kv2
+       ; case lookup_res of
+           Filled k2    -> uUnfilledKVar  kv1 ds1 k2
+           Unfilled ds2 -> uUnfilledKVars kv1 ds1 kv2 ds2 }
 
-  | otherwise 
-  = return Nothing
+  | otherwise  -- See Note [Unifying kind variables]
+  = uUnfilledKVars kv1 ds1 kv2 vanillaSkolemTv
 
-{- Note [Unifying kind variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Rather hackily, kind variables can be TyVars not just TcTyVars.
-Main reason is in 
-   data instance T (D (x :: k)) = ...con-decls...
-Here we bring into scope a kind variable 'k', and use it in the 
-con-decls.  BUT the con-decls will be finished and frozen, and
-are not amenable to subsequent substitution, so it makes sense
-to have the *final* kind-variable (a KindVar, not a TcKindVar) in 
-scope.  So at least during kind unification we can encounter a
-KindVar. 
+uUnfilledKVar kv1 ds1 non_var_k2
+  = case ds1 of
+      MetaTv { mtv_info = SigTv }
+        -> return Nothing
+      MetaTv { mtv_ref = ref1 }
+        -> do { k2a <- zonkTcKind non_var_k2
+              ; let k2b = defaultKind k2a
+                     -- MetaKindVars must be bound only to simple kinds
 
-Hence the isTcTyVar tests before using isMetaTyVar.
--}
+              ; dflags <- getDynFlags
+              ; case occurCheckExpand dflags kv1 k2b of
+                   OC_OK k2c -> do { writeMetaTyVarRef kv1 ref1 k2c; return (Just EQ) }
+                   _         -> return Nothing }
+      _ -> return Nothing
+
+-------------------
+uUnfilledKVars :: MetaKindVar -> TcTyVarDetails
+               -> MetaKindVar -> TcTyVarDetails
+               -> TcM (Maybe Ordering)
+-- kv1 /= kv2
+uUnfilledKVars kv1 ds1 kv2 ds2
+  = case (ds1, ds2) of
+      (MetaTv { mtv_info = i1, mtv_ref = r1 },
+       MetaTv { mtv_info = i2, mtv_ref = r2 })
+              | nicer_to_update_tv1 kv1 i1 i2 -> do_update kv1 r1 kv2
+              | otherwise                     -> do_update kv2 r2 kv1
+      (MetaTv { mtv_ref = r1 }, _) -> do_update kv1 r1 kv2
+      (_, MetaTv { mtv_ref = r2 }) -> do_update kv2 r2 kv1
+      _ -> return Nothing
+  where
+    do_update kv1 r1 kv2
+      = do { writeMetaTyVarRef kv1 r1 (mkTyVarTy kv2); return (Just EQ) }
 
 ---------------------------
 unifyKindEq :: TcKind -> TcKind -> TcM (Maybe Ordering)
@@ -1159,41 +1214,16 @@ unifyKindEq k1 (TyVarTy kv2) = uKVar IsSwapped  unifyKindEq kv2 k1
 unifyKindEq (FunTy a1 r1) (FunTy a2 r2)
   = do { mb1 <- unifyKindEq a1 a2; mb2 <- unifyKindEq r1 r2
        ; return (if isJust mb1 && isJust mb2 then Just EQ else Nothing) }
-  
+
 unifyKindEq (TyConApp kc1 k1s) (TyConApp kc2 k2s)
   | kc1 == kc2
   = ASSERT(length k1s == length k2s)
-       -- Should succeed since the kind constructors are the same, 
+       -- Should succeed since the kind constructors are the same,
        -- and the kinds are sort-checked, thus fully applied
     do { mb_eqs <- zipWithM unifyKindEq k1s k2s
-       ; return (if all isJust mb_eqs 
-                 then Just EQ 
+       ; return (if all isJust mb_eqs
+                 then Just EQ
                  else Nothing) }
 
 unifyKindEq _ _ = return Nothing
-
-----------------
-uUnboundKVar :: MetaKindVar -> TcKind -> TcM (Maybe Ordering)
-uUnboundKVar kv1 k2@(TyVarTy kv2)
-  | kv1 == kv2 = return (Just EQ)
-  | isTcTyVar kv2, isMetaTyVar kv2   -- Distinct kind variables
-  = do  { mb_k2 <- readMetaTyVar kv2
-        ; case mb_k2 of
-            Indirect k2 -> uUnboundKVar kv1 k2
-            Flexi       -> do { writeMetaTyVar kv1 k2; return (Just EQ) } }
-  | otherwise 
-  = do { writeMetaTyVar kv1 k2; return (Just EQ) }
-
-uUnboundKVar kv1 non_var_k2
-  | isSigTyVar kv1
-  = return Nothing
-  | otherwise
-  = do { k2a <- zonkTcKind non_var_k2
-       ; let k2b = defaultKind k2a
-                -- MetaKindVars must be bound only to simple kinds
-
-       ; dflags <- getDynFlags 
-       ; case occurCheckExpand dflags kv1 k2b of
-           OC_OK k2c -> do { writeMetaTyVar kv1 k2c; return (Just EQ) }
-           _         -> return Nothing }
 \end{code}
