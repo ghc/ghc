@@ -5317,7 +5317,7 @@ class IsList l where
   fromListN _ = fromList
 </programlisting>
 
-<para>The <literal>FromList</literal> class and its methods are intended to be
+<para>The <literal>IsList</literal> class and its methods are intended to be
 used in conjunction with the <option>OverloadedLists</option> extension.
 <itemizedlist>
 <listitem> <para> The type function
@@ -5349,32 +5349,32 @@ of <literal>IsList</literal>, so that list notation becomes
 useful for completely new data types.
 Here are several example instances:
 <programlisting>
-instance FromList [a] where
+instance IsList [a] where
   type Item [a] = a
   fromList = id
   toList = id
 
-instance (Ord a) => FromList (Set a) where
+instance (Ord a) => IsList (Set a) where
   type Item (Set a) = a
   fromList = Set.fromList
   toList = Set.toList
 
-instance (Ord k) => FromList (Map k v) where
+instance (Ord k) => IsList (Map k v) where
   type Item (Map k v) = (k,v)
   fromList = Map.fromList
   toList = Map.toList
 
-instance FromList (IntMap v) where
+instance IsList (IntMap v) where
   type Item (IntMap v) = (Int,v)
   fromList = IntMap.fromList
   toList = IntMap.toList
 
-instance FromList Text where
+instance IsList Text where
   type Item Text = Char
   fromList = Text.pack
   toList = Text.unpack
 
-instance FromList (Vector a) where
+instance IsList (Vector a) where
   type Item (Vector a) = a
   fromList  = Vector.fromList
   fromListN = Vector.fromListN
