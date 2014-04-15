@@ -20,7 +20,6 @@ import SrcLoc
 
 import Distribution.Simple.GHC ( componentGhcOptions )
 import Distribution.Simple.Configure ( getPersistBuildConfig )
-import Distribution.Simple.Compiler ( compilerVersion )
 import Distribution.Simple.Program.GHC ( renderGhcOptions )
 import Distribution.PackageDescription ( library, libBuildInfo )
 import Distribution.Simple.LocalBuildInfo
@@ -191,8 +190,7 @@ flagsFromCabal distPref = do
       let bi = libBuildInfo lib
           odir = buildDir lbi
           opts = componentGhcOptions V.normal lbi bi clbi odir
-          version = compilerVersion (compiler lbi)
-      in return $ renderGhcOptions version opts
+      in return $ renderGhcOptions (compiler lbi) opts
     _ -> error "no library"
 
 ----------------------------------------------------------------

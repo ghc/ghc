@@ -12,6 +12,7 @@ import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Program
 import Distribution.Simple.Program.HcPkg
+import Distribution.Simple.Setup (ConfigFlags(configStripLibs), fromFlag, toFlag)
 import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic, toUTF8)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
@@ -174,8 +175,17 @@ doCopy directory distDir
             let lbi' = lbi {
                                withPrograms = progs',
                                installDirTemplates = idts,
+                               configFlags = cfg,
+                               stripLibs = fromFlag (configStripLibs cfg),
                                withSharedLib = withSharedLibs
                            }
+
+                -- This hack allows to interpret the "strip"
+                -- command-line argument being set to ':' to signify
+                -- disabled library stripping
+                cfg | strip == ":" = (configFlags lbi) { configStripLibs = toFlag False }
+                    | otherwise    = configFlags lbi
+
             f pd lbi' us flags
 
 doRegister :: FilePath -> FilePath -> FilePath -> FilePath

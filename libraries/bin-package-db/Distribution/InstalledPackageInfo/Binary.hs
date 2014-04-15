@@ -132,7 +132,9 @@ instance Binary License where
   put OtherLicense         = do putWord8 7
   put (Apache v)           = do putWord8 8; put v
   put (AGPL v)             = do putWord8 9; put v
-  put (UnknownLicense str) = do putWord8 10; put str
+  put BSD2                 = do putWord8 10
+  put (MPL v)              = do putWord8 11; put v
+  put (UnknownLicense str) = do putWord8 12; put str
 
   get = do
     n <- getWord8
@@ -147,6 +149,8 @@ instance Binary License where
       7 -> return OtherLicense
       8 -> do v <- get; return (Apache v)
       9 -> do v <- get; return (AGPL v)
+      10 -> return BSD2
+      11 -> do v <- get; return (MPL v)
       _ -> do str <- get; return (UnknownLicense str)
 
 instance Binary Version where
