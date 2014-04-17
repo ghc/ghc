@@ -845,6 +845,12 @@ like that.  Here's how it's processed:
     (qReport True s) by using addErr to add an error message to the bag of errors.
     The 'fail' in TcM raises an IOEnvFailure exception
 
+ * 'qReport' forces the message to ensure any exception hidden in unevaluated
+   thunk doesn't get into the bag of errors. Otherwise the following splice
+   will triger panic (Trac #8987):
+        $(fail undefined)
+   See also Note [Concealed TH exceptions]
+
   * So, when running a splice, we catch all exceptions; then for
         - an IOEnvFailure exception, we assume the error is already
                 in the error-bag (above)
@@ -875,8 +881,10 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
                   ; let i = getKey u
                   ; return (TH.mkNameU s i) }
 
-  qReport True msg  = addErr  (text msg)
-  qReport False msg = addWarn (text msg)
+  -- 'msg' is forced to ensure exceptions don't escape,
+  -- see Note [Exceptions in TH]
+  qReport True msg  = seqList msg $ addErr  (text msg)
+  qReport False msg = seqList msg $ addWarn (text msg)
 
   qLocation = do { m <- getModule
                  ; l <- getSrcSpanM
