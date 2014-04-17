@@ -1,6 +1,12 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.7.0.0  *Feb 2014*
+## 4.7.1.0 *TBA*
+
+  * Bundled with GHC 7.10.1
+
+  * Add reverse application operator `Data.Function.(&)`
+
+## 4.7.0.0  *Apr 2014*
 
   * Bundled with GHC 7.8.1
 

@@ -4,6 +4,7 @@
 -- |
 -- Module      :  Data.Function
 -- Copyright   :  Nils Anders Danielsson 2006
+--             ,  Alexander Berntsen     2014
 -- License     :  BSD-style (see the LICENSE file in the distribution)
 --
 -- Maintainer  :  libraries@haskell.org
@@ -18,6 +19,7 @@ module Data.Function
   ( -- * "Prelude" re-exports
     id, const, (.), flip, ($)
     -- * Other combinators
+  , (&)
   , fix
   , on
   ) where
@@ -25,6 +27,7 @@ module Data.Function
 import Prelude
 
 infixl 0 `on`
+infixl 1 &
 
 -- | @'fix' f@ is the least fixed point of the function @f@,
 -- i.e. the least defined @x@ such that @f x = x@.
@@ -86,3 +89,11 @@ fix f = let x = f x in x
 on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
 (.*.) `on` f = \x y -> f x .*. f y
 
+
+-- | '&' is a reverse application operator.  This provides notational
+-- convenience.  Its precedence is one higher than that of the forward
+-- application operator '$', which allows '&' to be nested in '$'.
+--
+-- /Since: 4.7.1.0/
+(&) :: a -> (a -> b) -> b
+x & f = f x
