@@ -10,29 +10,19 @@ maintainer: glasgow-haskell-users@haskell.org
 stability: stable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
-synopsis:
-description: A Test Package
+description:
+    A Test Package
 category: none
 author: simonmar@microsoft.com
 exposed: True
-exposed-modules: A
+exposed-modules:
+    A
 hidden-modules: B C.D
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
-extra-libraries:
-extra-ghci-libraries:
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
-includes:
-depends:
-hugs-options:
-cc-options:
-ld-options:
-framework-dirs:
-frameworks:
-haddock-interfaces:
-haddock-html:
 pkgroot: 
 
 name: testpkg
@@ -44,29 +34,19 @@ maintainer: glasgow-haskell-users@haskell.org
 stability: stable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
-synopsis:
-description: A Test Package
+description:
+    A Test Package
 category: none
 author: simonmar@microsoft.com
 exposed: True
-exposed-modules: A
+exposed-modules:
+    A
 hidden-modules: B C.D
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
-extra-libraries:
-extra-ghci-libraries:
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
-includes:
-depends:
-hugs-options:
-cc-options:
-ld-options:
-framework-dirs:
-frameworks:
-haddock-interfaces:
-haddock-html:
 pkgroot: 
 
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
@@ -84,29 +64,19 @@ maintainer: glasgow-haskell-users@haskell.org
 stability: unstable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
-synopsis:
-description: A Test Package (new version)
+description:
+    A Test Package (new version)
 category: none
 author: simonmar@microsoft.com
 exposed: False
-exposed-modules: A
+exposed-modules:
+    A
 hidden-modules: B C.D C.E
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-2.0
-extra-libraries:
-extra-ghci-libraries:
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
-includes:
-depends:
-hugs-options:
-cc-options:
-ld-options:
-framework-dirs:
-frameworks:
-haddock-interfaces:
-haddock-html:
 pkgroot: 
 
 name: testpkg
@@ -118,29 +88,19 @@ maintainer: glasgow-haskell-users@haskell.org
 stability: unstable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
-synopsis:
-description: A Test Package (new version)
+description:
+    A Test Package (new version)
 category: none
 author: simonmar@microsoft.com
 exposed: False
-exposed-modules: A
+exposed-modules:
+    A
 hidden-modules: B C.D C.E
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-2.0
-extra-libraries:
-extra-ghci-libraries:
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
-includes:
-depends:
-hugs-options:
-cc-options:
-ld-options:
-framework-dirs:
-frameworks:
-haddock-interfaces:
-haddock-html:
 pkgroot: 
 ---
 name: testpkg
@@ -152,29 +112,19 @@ maintainer: glasgow-haskell-users@haskell.org
 stability: stable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
-synopsis:
-description: A Test Package
+description:
+    A Test Package
 category: none
 author: simonmar@microsoft.com
 exposed: True
-exposed-modules: A
+exposed-modules:
+    A
 hidden-modules: B C.D
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
-extra-libraries:
-extra-ghci-libraries:
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
-includes:
-depends:
-hugs-options:
-cc-options:
-ld-options:
-framework-dirs:
-frameworks:
-haddock-interfaces:
-haddock-html:
 pkgroot: 
 
 version: 2.0
@@ -193,29 +143,19 @@ maintainer: glasgow-haskell-users@haskell.org
 stability: stable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
-synopsis:
-description: A Test Package
+description:
+    A Test Package
 category: none
 author: simonmar@microsoft.com
 exposed: False
-exposed-modules: A
+exposed-modules:
+    A
 hidden-modules: B C.D
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
-extra-libraries:
-extra-ghci-libraries:
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
-includes:
-depends:
-hugs-options:
-cc-options:
-ld-options:
-framework-dirs:
-frameworks:
-haddock-interfaces:
-haddock-html:
 pkgroot: 
 
 local01.package.conf:
