@@ -572,6 +572,29 @@ the environment, and then process the type instances.
 @filterImports@ takes the @ExportEnv@ telling what the imported module makes
 available, and filters it through the import spec (if any).
 
+Note [Dealing with imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For import M( ies ), we take the mi_exports of M, and make 
+   imp_occ_env :: OccEnv (Name, AvailInfo, Maybe Name) 
+One entry for each Name that M exports; the AvailInfo describes just
+that Name.   
+
+The situation is made more complicated by associated types. E.g.
+   module M where
+     class    C a    where { data T a }
+     instance C Int  where { data T Int = T1 | T2 }
+     instance C Bool where { data T Int = T3 }
+Then M's export_avails are (recall the AvailTC invariant from Avails.hs)
+  C(C,T), T(T,T1,T2,T3)
+Notice that T appears *twice*, once as a child and once as a parent.
+From this we construct the imp_occ_env
+   C  -> (C,  C(C,T),        Nothing
+   T  -> (T,  T(T,T1,T2,T3), Just C)
+   T1 -> (T1, T(T1,T2,T3),   Nothing)   -- similarly T2,T3
+
+Note that the imp_occ_env will have entries for data constructors too,
+although we never look up data constructors.
+
 \begin{code}
 filterImports :: ModIface
               -> ImpDeclSpec                    -- The span for the entire import decl
@@ -605,34 +628,22 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
   where
     all_avails = mi_exports iface
 
-        -- This environment is how we map names mentioned in the import
-        -- list to the actual Name they correspond to, and the name family
-        -- that the Name belongs to (the AvailInfo).  The situation is
-        -- complicated by associated families, which introduce a three-level
-        -- hierachy, where class = grand parent, assoc family = parent, and
-        -- data constructors = children.  The occ_env entries for associated
-        -- families needs to capture all this information; hence, we have the
-        -- third component of the environment that gives the class name (=
-        -- grand parent) in case of associated families.
-        --
-        -- This env will have entries for data constructors too,
-        -- they won't make any difference because naked entities like T
-        -- in an import list map to TcOccs, not VarOccs.
-    occ_env :: OccEnv (Name,        -- the name
-                       AvailInfo,   -- the export item providing the name
-                       Maybe Name)  -- the parent of associated types
-    occ_env = mkOccEnv_C combine [ (nameOccName n, (n, a, Nothing))
-                                 | a <- all_avails, n <- availNames a]
+        -- See Note [Dealing with imports]
+    imp_occ_env :: OccEnv (Name,        -- the name
+                           AvailInfo,   -- the export item providing the name
+                           Maybe Name)  -- the parent of associated types
+    imp_occ_env = mkOccEnv_C combine [ (nameOccName n, (n, a, Nothing))
+                                     | a <- all_avails, n <- availNames a]
       where
-        -- we know that (1) there are at most 2 entries for one name, (2) their
-        -- first component is identical, (3) they are for tys/cls, and (4) one
-        -- entry has the name in its parent position (the other doesn't)
-        combine (name, AvailTC p1 subs1, Nothing)
-                (_   , AvailTC p2 subs2, Nothing)
-          = let
-              (parent, subs) = if p1 == name then (p2, subs1) else (p1, subs2)
-            in
-            (name, AvailTC name subs, Just parent)
+        -- See example in Note [Dealing with imports]
+        -- 'combine' is only called for associated types which appear twice
+        -- in the all_avails. In the example, we combine
+        --    T(T,T1,T2,T3) and C(C,T)  to give   (T, T(T,T1,T2,T3), Just C)
+        combine (name1, a1@(AvailTC p1 _), mp1)
+                (name2, a2@(AvailTC p2 _), mp2)
+          = ASSERT( name1 == name2 && isNothing mp1 && isNothing mp2 )
+            if p1 == name1 then (name1, a1, Just p2)
+                           else (name1, a2, Just p1)
         combine x y = pprPanic "filterImports/combine" (ppr x $$ ppr y)
 
     lookup_name :: RdrName -> IELookupM (Name, AvailInfo, Maybe Name)
@@ -640,7 +651,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
                     | Just succ <- mb_success = return succ
                     | otherwise               = failLookupWith BadImport
       where
-        mb_success = lookupOccEnv occ_env (rdrNameOcc rdr)
+        mb_success = lookupOccEnv imp_occ_env (rdrNameOcc rdr)
 
     lookup_lie :: LIE RdrName -> TcRn [(LIE Name, AvailInfo)]
     lookup_lie (L loc ieRdr)
@@ -677,7 +688,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
         -- type/class and a data constructor.  Moreover, when we import
         -- data constructors of an associated family, we need separate
         -- AvailInfos for the data constructors and the family (as they have
-        -- different parents).  See the discussion at occ_env.
+        -- different parents).  See Note [Dealing with imports]
     lookup_ie :: IE RdrName -> IELookupM ([(IE Name, AvailInfo)], [IELookupWarning])
     lookup_ie ie = handle_bad_import $ do
       case ie of
@@ -713,11 +724,16 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
             -> do nameAvail <- lookup_name tc
                   return ([mkIEThingAbs nameAvail], [])
 
-        IEThingWith tc ns -> do
-           (name, AvailTC _ subnames, mb_parent) <- lookup_name tc
+        IEThingWith rdr_tc rdr_ns -> do
+           (name, AvailTC _ ns, mb_parent) <- lookup_name rdr_tc
 
            -- Look up the children in the sub-names of the parent
-           let mb_children = lookupChildren subnames ns
+           let subnames = case ns of   -- The tc is first in ns, 
+                            [] -> []   -- if it is there at all
+                                       -- See the AvailTC Invariant in Avail.hs
+                            (n1:ns1) | n1 == name -> ns1
+                                     | otherwise  -> ns
+               mb_children = lookupChildren subnames rdr_ns
 
            children <- if any isNothing mb_children
                        then failLookupWith BadImport
