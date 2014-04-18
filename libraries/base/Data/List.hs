@@ -164,6 +164,7 @@ module Data.List
 
    -- ** Ordered lists
    , sort
+   , sortOn
    , insert
 
    -- * Generalized functions
@@ -207,6 +208,8 @@ module Data.List
 
 import Data.Maybe
 import Data.Char        ( isSpace )
+import Data.Ord         ( comparing )
+import Data.Tuple       ( fst, snd )
 
 import GHC.Num
 import GHC.Real
@@ -956,6 +959,17 @@ rqpart cmp x (y:ys) rle rgt r =
 -}
 
 #endif /* USE_REPORT_PRELUDE */
+
+-- | Sort a list by comparing the results of a key function applied to each
+-- element.  @sortOn f@ is equivalent to @sortBy . comparing f@, but has the
+-- performance advantage of only evaluating @f@ once for each element in the
+-- input list.  This is called the decorate-sort-undecorate paradigm, or
+-- Schwartzian transform.
+--
+-- /Since: 4.7.1.0/
+sortOn :: Ord b => (a -> b) -> [a] -> [a]
+sortOn f =
+  map snd . sortBy (comparing fst) . map (\x -> let y = f x in y `seq` (y, x))
 
 -- | The 'unfoldr' function is a \`dual\' to 'foldr': while 'foldr'
 -- reduces a list to a summary value, 'unfoldr' builds a list from
