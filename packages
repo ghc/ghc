@@ -49,7 +49,6 @@ libffi-tarballs              -           libffi-tarballs.git             -
 utils/hsc2hs                 -           hsc2hs.git                      -
 utils/haddock                -           -                               -
 libraries/array              -           packages/array.git              -
-libraries/base               -           packages/base.git               -
 libraries/binary             -           -                               https://github.com/kolmodin/binary.git
 libraries/bytestring         -           -                               https://github.com/haskell/bytestring.git
 libraries/Cabal              -           -                               https://github.com/haskell/cabal.git
@@ -57,19 +56,15 @@ libraries/containers         -           -                               https:/
 libraries/deepseq            -           packages/deepseq.git            -
 libraries/directory          -           packages/directory.git          -
 libraries/filepath           -           packages/filepath.git           -
-libraries/ghc-prim           -           packages/ghc-prim.git           -
 libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
 libraries/haskell98          -           packages/haskell98.git          -
 libraries/haskell2010        -           packages/haskell2010.git        -
 libraries/hoopl              -           packages/hoopl.git              -
 libraries/hpc                -           packages/hpc.git                -
-libraries/integer-gmp        -           packages/integer-gmp.git        -
-libraries/integer-simple     -           packages/integer-simple.git     -
 libraries/old-locale         -           packages/old-locale.git         -
 libraries/old-time           -           packages/old-time.git           -
 libraries/pretty             -           -                               https://github.com/haskell/pretty.git
 libraries/process            -           packages/process.git            -
-libraries/template-haskell   -           packages/template-haskell.git   -
 libraries/terminfo           -           -                               https://github.com/judah/terminfo.git
 libraries/time               -           -                               http://git.haskell.org/darcs-mirrors/time.git
 libraries/transformers       -           -                               http://git.haskell.org/darcs-mirrors/transformers.git
