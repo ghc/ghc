@@ -1,0 +1,64 @@
+[()]
+()
+((),())
+((),(),())
+((),(),(),())
+((),(),(),(),())
+() -> ()
+Array () ()
+Bool
+Char
+Complex ()
+Double
+Either () ()
+Float
+Handle
+Int
+Integer
+IO ()
+Maybe ()
+Ordering
+Dynamic
+IORef ()
+Int8
+Int16
+Int32
+Int64
+ST () ()
+StableName ()
+StablePtr ()
+TyCon
+TypeRep
+Word8
+Word16
+Word32
+Word64
+ArithException
+AsyncException
+IOArray () ()
+IOUArray () ()
+STArray () () ()
+STUArray () () ()
+StableName ()
+StablePtr ()
+UArray () ()
+Weak ()
+CChar
+CSChar
+CUChar
+CShort
+CUShort
+CInt
+CUInt
+CLong
+CULong
+CLLong
+CULLong
+CFloat
+CDouble
+CPtrdiff
+CSize
+CWchar
+CSigAtomic
+CClock
+CTime

@@ -1,0 +1,331 @@
+name:           base
+version:        4.7.0.0
+-- GHC 7.6.1 released with 4.6.0.0
+license:        BSD3
+license-file:   LICENSE
+maintainer:     libraries@haskell.org
+bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=libraries/base
+synopsis:       Basic libraries
+category:       Prelude
+description:
+    This package contains the "Prelude" and its support libraries,
+    and a large collection of useful libraries ranging from data
+    structures to parsing combinators and debugging utilities.
+cabal-version:  >=1.10
+build-type:     Configure
+
+extra-tmp-files:
+    autom4te.cache
+    base.buildinfo
+    config.log
+    config.status
+    include/EventConfig.h
+    include/HsBaseConfig.h
+
+extra-source-files:
+    aclocal.m4
+    base.buildinfo.in
+    changelog.md
+    config.guess
+    config.sub
+    configure
+    configure.ac
+    include/CTypes.h
+    include/EventConfig.h.in
+    include/HsBaseConfig.h.in
+    include/ieee-flpt.h
+    include/md5.h
+    install-sh
+
+source-repository head
+    type:     git
+    location: http://git.haskell.org/packages/base.git
+
+Flag integer-simple
+    Description: Use integer-simple
+
+Library
+    default-language: Haskell2010
+    other-extensions:
+        BangPatterns
+        CApiFFI
+        CPP
+        ConstraintKinds
+        DataKinds
+        DeriveDataTypeable
+        DeriveGeneric
+        ExistentialQuantification
+        ExplicitForAll
+        FlexibleContexts
+        FlexibleInstances
+        FunctionalDependencies
+        GADTs
+        GeneralizedNewtypeDeriving
+        KindSignatures
+        MagicHash
+        MultiParamTypeClasses
+        NegativeLiterals
+        NoImplicitPrelude
+        NondecreasingIndentation
+        OverlappingInstances
+        OverloadedStrings
+        ParallelArrays
+        PolyKinds
+        RankNTypes
+        RecordWildCards
+        RoleAnnotations
+        Safe
+        ScopedTypeVariables
+        StandaloneDeriving
+        Trustworthy
+        TypeFamilies
+        TypeOperators
+        TypeSynonymInstances
+        UnboxedTuples
+        UndecidableInstances
+        UnliftedFFITypes
+        Unsafe
+
+    build-depends: rts == 1.0.*, ghc-prim >= 0.3.1 && < 0.4
+    if flag(integer-simple)
+        build-depends: integer-simple >= 0.1.1 && < 0.2
+    else
+        build-depends: integer-gmp >= 0.5.1 && < 0.6
+        cpp-options: -DOPTIMISE_INTEGER_GCD_LCM
+
+    exposed-modules:
+        Control.Applicative
+        Control.Arrow
+        Control.Category
+        Control.Concurrent
+        Control.Concurrent.Chan
+        Control.Concurrent.MVar
+        Control.Concurrent.QSem
+        Control.Concurrent.QSemN
+        Control.Exception
+        Control.Exception.Base
+        Control.Monad
+        Control.Monad.Fix
+        Control.Monad.Instances
+        Control.Monad.ST
+        Control.Monad.ST.Lazy
+        Control.Monad.ST.Lazy.Safe
+        Control.Monad.ST.Lazy.Unsafe
+        Control.Monad.ST.Safe
+        Control.Monad.ST.Strict
+        Control.Monad.ST.Unsafe
+        Control.Monad.Zip
+        Data.Bits
+        Data.Bool
+        Data.Char
+        Data.Coerce
+        Data.Complex
+        Data.Data
+        Data.Dynamic
+        Data.Either
+        Data.Eq
+        Data.Fixed
+        Data.Foldable
+        Data.Function
+        Data.Functor
+        Data.IORef
+        Data.Int
+        Data.Ix
+        Data.List
+        Data.Maybe
+        Data.Monoid
+        Data.OldTypeable
+        Data.OldTypeable.Internal
+        Data.Ord
+        Data.Proxy
+        Data.Ratio
+        Data.STRef
+        Data.STRef.Lazy
+        Data.STRef.Strict
+        Data.String
+        Data.Traversable
+        Data.Tuple
+        Data.Type.Bool
+        Data.Type.Coercion
+        Data.Type.Equality
+        Data.Typeable
+        Data.Typeable.Internal
+        Data.Unique
+        Data.Version
+        Data.Word
+        Debug.Trace
+        Foreign
+        Foreign.C
+        Foreign.C.Error
+        Foreign.C.String
+        Foreign.C.Types
+        Foreign.Concurrent
+        Foreign.ForeignPtr
+        Foreign.ForeignPtr.Safe
+        Foreign.ForeignPtr.Unsafe
+        Foreign.Marshal
+        Foreign.Marshal.Alloc
+        Foreign.Marshal.Array
+        Foreign.Marshal.Error
+        Foreign.Marshal.Pool
+        Foreign.Marshal.Safe
+        Foreign.Marshal.Unsafe
+        Foreign.Marshal.Utils
+        Foreign.Ptr
+        Foreign.Safe
+        Foreign.StablePtr
+        Foreign.Storable
+        GHC.Arr
+        GHC.Base
+        GHC.Char
+        GHC.Conc
+        GHC.Conc.IO
+        GHC.Conc.Signal
+        GHC.Conc.Sync
+        GHC.ConsoleHandler
+        GHC.Constants
+        GHC.Desugar
+        GHC.Enum
+        GHC.Environment
+        GHC.Err
+        GHC.Exception
+        GHC.Exts
+        GHC.Fingerprint
+        GHC.Fingerprint.Type
+        GHC.Float
+        GHC.Float.ConversionUtils
+        GHC.Float.RealFracMethods
+        GHC.Foreign
+        GHC.ForeignPtr
+        GHC.GHCi
+        GHC.Generics
+        GHC.IO
+        GHC.IO.Buffer
+        GHC.IO.BufferedIO
+        GHC.IO.Device
+        GHC.IO.Encoding
+        GHC.IO.Encoding.CodePage
+        GHC.IO.Encoding.Failure
+        GHC.IO.Encoding.Iconv
+        GHC.IO.Encoding.Latin1
+        GHC.IO.Encoding.Types
+        GHC.IO.Encoding.UTF16
+        GHC.IO.Encoding.UTF32
+        GHC.IO.Encoding.UTF8
+        GHC.IO.Exception
+        GHC.IO.FD
+        GHC.IO.Handle
+        GHC.IO.Handle.FD
+        GHC.IO.Handle.Internals
+        GHC.IO.Handle.Text
+        GHC.IO.Handle.Types
+        GHC.IO.IOMode
+        GHC.IOArray
+        GHC.IORef
+        GHC.IP
+        GHC.Int
+        GHC.List
+        GHC.MVar
+        GHC.Num
+        GHC.PArr
+        GHC.Pack
+        GHC.Profiling
+        GHC.Ptr
+        GHC.Read
+        GHC.Real
+        GHC.ST
+        GHC.STRef
+        GHC.Show
+        GHC.Stable
+        GHC.Stack
+        GHC.Stats
+        GHC.Storable
+        GHC.TopHandler
+        GHC.TypeLits
+        GHC.Unicode
+        GHC.Weak
+        GHC.Word
+        Numeric
+        Prelude
+        System.CPUTime
+        System.Console.GetOpt
+        System.Environment
+        System.Exit
+        System.IO
+        System.IO.Error
+        System.IO.Unsafe
+        System.Info
+        System.Mem
+        System.Mem.StableName
+        System.Mem.Weak
+        System.Posix.Internals
+        System.Posix.Types
+        System.Timeout
+        Text.ParserCombinators.ReadP
+        Text.ParserCombinators.ReadPrec
+        Text.Printf
+        Text.Read
+        Text.Read.Lex
+        Text.Show
+        Text.Show.Functions
+        Unsafe.Coerce
+
+    other-modules:
+        Control.Monad.ST.Imp
+        Control.Monad.ST.Lazy.Imp
+        Foreign.ForeignPtr.Imp
+        System.Environment.ExecutablePath
+
+    c-sources:
+        cbits/DarwinUtils.c
+        cbits/PrelIOUtils.c
+        cbits/SetEnv.c
+        cbits/WCsubst.c
+        cbits/Win32Utils.c
+        cbits/consUtils.c
+        cbits/iconv.c
+        cbits/inputReady.c
+        cbits/md5.c
+        cbits/primFloat.c
+        cbits/sysconf.c
+
+    include-dirs: include
+    includes:
+        HsBase.h
+    install-includes:
+        HsBase.h
+        WCsubst.h
+        consUtils.h
+        Typeable.h
+        OldTypeable.h
+
+    -- OS Specific
+    if os(windows)
+        extra-libraries: wsock32, user32, shell32
+        exposed-modules:
+            GHC.IO.Encoding.CodePage.API
+            GHC.IO.Encoding.CodePage.Table
+            GHC.Conc.Windows
+            GHC.Windows
+    else
+        exposed-modules:
+            GHC.Event
+        other-modules:
+            GHC.Event.Arr
+            GHC.Event.Array
+            GHC.Event.Clock
+            GHC.Event.Control
+            GHC.Event.EPoll
+            GHC.Event.IntTable
+            GHC.Event.Internal
+            GHC.Event.KQueue
+            GHC.Event.Manager
+            GHC.Event.PSQ
+            GHC.Event.Poll
+            GHC.Event.Thread
+            GHC.Event.TimerManager
+            GHC.Event.Unique
+
+    -- We need to set the package name to base (without a version number)
+    -- as it's magic.
+    ghc-options: -package-name base
