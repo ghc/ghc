@@ -476,13 +476,13 @@ sub gitall {
             $ignore_failure = 1;
             if ($remotepath eq '-') {
                 $rpath = "$localpath.git"; # N.B.: $localpath lacks the .git suffix
-                if ($localpath =~ /^libraries\//) {
+                if ($localpath =~ m!^(?:libraries|utils)/!) {
                     # FIXME: This is just a simple heuristic to
                     # infer the remotepath for Git submodules. A
                     # proper solution would require to parse the
                     # .gitmodules file to obtain the actual
                     # localpath<->remotepath mapping.
-                    $rpath =~ s/^libraries\//packages\//;
+                    $rpath =~ s!^(?:libraries|utils)/!packages/!;
                 }
                 $rpath = "$repo_base/$rpath";
             } else {
@@ -587,14 +587,14 @@ sub gitInitSubmodules {
 
     my $submodulespaths = &readgit(".", "config", "--get-regexp", "^submodule[.].*[.]url");
     # if we came from github, change the urls appropriately
-    while ($submodulespaths =~ m!^(submodule.libraries/[a-zA-Z0-9]+.url) ($GITHUB)/ghc/packages/([a-zA-Z0-9]+).git$!gm) {
+    while ($submodulespaths =~ m!^(submodule.(?:libraries|utils)/[a-zA-Z0-9]+.url) ($GITHUB)/ghc/packages/([a-zA-Z0-9]+).git$!gm) {
         &git(".", "config", $1, "$2/ghc/packages-$3");
     }
 
     # if we came from a local repository, grab our submodules from their
     # checkouts over there, if they exist.
     if ($repo_local) {
-        while ($submodulespaths =~ m!^(submodule.(libraries/[a-zA-Z0-9]+).url) .*$!gm) {
+        while ($submodulespaths =~ m!^(submodule.((?:libraries|utils)/[a-zA-Z0-9]+).url) .*$!gm) {
             if (-e "$repo_base/$2/.git") {
                 &git(".", "config", $1, "$repo_base/$2");
             }
