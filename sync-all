@@ -962,102 +962,30 @@ BEGIN {
       $exit_via_die = 1;
     };
 
-    #message "== Checking for left-over testsuite/.git folder";
-    if (-d "testsuite/.git") {
-        print <<EOF;
+    my @obsolete_dirs = qw!
+        testsuite
+        libraries/base
+        libraries/ghc-prim
+        libraries/template-haskell
+        libraries/integer-gmp
+        libraries/integer-simple
+        !;
+    for my $dir (@obsolete_dirs) {
+        if (-d "$dir/.git") {
+            print <<EOF;
 ============================
 ATTENTION!
 
-You have a left-over testsuite/.git folder in your GHC tree!
+You have a left-over $dir/.git folder in your GHC tree!
 
-Please backup or remove it (e.g. "rm -r testsuite/.git") before
+Please backup or remove it (e.g. "rm -r $dir/.git") before
 proceeding as the aforesaid Git repository is now tracked as part of
 the ghc Git repository (see #8545 for more details)
 ============================
 EOF
-        die "detected obsolete testsuite/.git folder"
+            die "detected obsolete $dir/.git folder"
+        }
     }
-
-
-    if (-d "libraries/base/.git") {
-        print <<EOF;
-============================
-ATTENTION!
-
-You have a left-over libraries/base/.git folder in your GHC tree!
-
-Please backup or remove it (e.g. "rm -r libraries/base/.git") before
-proceeding as the aforesaid Git repository is now tracked as part of
-the ghc Git repository (see #8545 for more details)
-============================
-EOF
-        die "detected obsolete libraries/base/.git folder"
-    }
-
-    if (-d "libraries/ghc-prim/.git") {
-        print <<EOF;
-============================
-ATTENTION!
-
-You have a left-over libraries/ghc-prim/.git folder in your GHC tree!
-
-Please backup or remove it (e.g. "rm -r libraries/ghc-prim/.git") before
-proceeding as the aforesaid Git repository is now tracked as part of
-the ghc Git repository (see #8545 for more details)
-============================
-EOF
-        die "detected obsolete libraries/ghc-prim/.git folder"
-    }
-
-
-    if (-d "libraries/template-haskell/.git") {
-        print <<EOF;
-============================
-ATTENTION!
-
-You have a left-over libraries/template-haskell/.git folder in your GHC tree!
-
-Please backup or remove it (e.g. "rm -r libraries/template-haskell/.git") before
-proceeding as the aforesaid Git repository is now tracked as part of
-the ghc Git repository (see #8545 for more details)
-============================
-EOF
-        die "detected obsolete libraries/template-haskell/.git folder"
-    }
-
-
-    if (-d "libraries/integer-gmp/.git") {
-        print <<EOF;
-============================
-ATTENTION!
-
-You have a left-over libraries/integer-gmp/.git folder in your GHC tree!
-
-Please backup or remove it (e.g. "rm -r libraries/integer-gmp/.git") before
-proceeding as the aforesaid Git repository is now tracked as part of
-the ghc Git repository (see #8545 for more details)
-============================
-EOF
-        die "detected obsolete libraries/integer-gmp/.git folder"
-    }
-
-
-    if (-d "libraries/integer-simple/.git") {
-        print <<EOF;
-============================
-ATTENTION!
-
-You have a left-over libraries/integer-simple/.git folder in your GHC tree!
-
-Please backup or remove it (e.g. "rm -r libraries/integer-simple/.git") before
-proceeding as the aforesaid Git repository is now tracked as part of
-the ghc Git repository (see #8545 for more details)
-============================
-EOF
-        die "detected obsolete libraries/integer-simple/.git folder"
-    }
-
-
 }
 
 END {
@@ -1066,78 +994,33 @@ END {
 
     chdir($initial_working_directory);
 
-    message "== Checking for old haddock repo";
-    if (-d "utils/haddock/.git") {
-        chdir("utils/haddock");
-        if ((system "git log -1 87e2ca11c3d1b1bc49900fba0b5c5c6f85650718 > /dev/null 2> /dev/null") == 0) {
-            print <<EOF;
+    my @obsolete_dirs = (
+        ["utils/haddock",    "87e2ca11c3d1b1bc49900fba0b5c5c6f85650718"],
+        ["libraries/binary", "749ac0efbde3b14901417364a872796598747aaf"],
+        ["libraries/mtl",    "c67d8f7247c612dc35242bc67e616f7ea35eadb9"],
+        ["libraries/Cabal",  "c8ebd66a32865f72ae03ee0663c62df3d77f08fe"],
+        );
+    for (@obsolete_dirs) {
+        my ($dir, $hash) = $_;
+        my $name = basename $dir;
+        message "== Checking for old $name repo";
+        if (-d "$dir/.git") {
+            chdir($dir);
+            if ((system "git log -1 $hash > /dev/null 2> /dev/null") == 0) {
+                print <<EOF;
 ============================
 ATTENTION!
 
-You have an old haddock repository in your GHC tree!
+You have an old $name repository in your GHC tree!
 
-Please remove it (e.g. "rm -r utils/haddock"), and then run
+Please remove it (e.g. "rm -r $dir"), and then run
 "./sync-all get" to get the new repository.
 ============================
 EOF
+            }
+            chdir($initial_working_directory);
         }
-        chdir($initial_working_directory);
     }
-
-    message "== Checking for old binary repo";
-    if (-d "libraries/binary/.git") {
-        chdir("libraries/binary");
-        if ((system "git log -1 749ac0efbde3b14901417364a872796598747aaf > /dev/null 2> /dev/null") == 0) {
-            print <<EOF;
-============================
-ATTENTION!
-
-You have an old binary repository in your GHC tree!
-
-Please remove it (e.g. "rm -r libraries/binary"), and then run
-"./sync-all get" to get the new repository.
-============================
-EOF
-        }
-        chdir($initial_working_directory);
-    }
-
-    message "== Checking for old mtl repo";
-    if (-d "libraries/mtl/.git") {
-        chdir("libraries/mtl");
-        if ((system "git log -1 c67d8f7247c612dc35242bc67e616f7ea35eadb9 > /dev/null 2> /dev/null") == 0) {
-            print <<EOF;
-============================
-ATTENTION!
-
-You have an old mtl repository in your GHC tree!
-
-Please remove it (e.g. "rm -r libraries/mtl"), and then run
-"./sync-all get" to get the new repository.
-============================
-EOF
-        }
-        chdir($initial_working_directory);
-    }
-
-    message "== Checking for old Cabal repo";
-    if (-d "libraries/Cabal/.git") {
-        chdir("libraries/Cabal");
-        if ((system "git log -1 c8ebd66a32865f72ae03ee0663c62df3d77f08fe > /dev/null 2> /dev/null") == 0) {
-            print <<EOF;
-============================
-ATTENTION!
-
-You have an old Cabal repository in your GHC tree!
-
-Please remove it (e.g. "rm -r libraries/Cabal"), and then run
-"./sync-all get" to get the new repository.
-============================
-EOF
-        }
-        chdir($initial_working_directory);
-    }
-
     message "== Checking for old time from tarball";
     if (-d "libraries/time" and ! -e "libraries/time/.git") {
             print <<EOF;
