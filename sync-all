@@ -971,7 +971,7 @@ ATTENTION!
 You have a left-over testsuite/.git folder in your GHC tree!
 
 Please backup or remove it (e.g. "rm -r testsuite/.git") before
-proceeding as the testsuite Git repository is now tracked as part of
+proceeding as the aforesaid Git repository is now tracked as part of
 the ghc Git repository (see #8545 for more details)
 ============================
 EOF
@@ -987,7 +987,7 @@ ATTENTION!
 You have a left-over libraries/base/.git folder in your GHC tree!
 
 Please backup or remove it (e.g. "rm -r libraries/base/.git") before
-proceeding as the testsuite Git repository is now tracked as part of
+proceeding as the aforesaid Git repository is now tracked as part of
 the ghc Git repository (see #8545 for more details)
 ============================
 EOF
@@ -1002,7 +1002,7 @@ ATTENTION!
 You have a left-over libraries/ghc-prim/.git folder in your GHC tree!
 
 Please backup or remove it (e.g. "rm -r libraries/ghc-prim/.git") before
-proceeding as the testsuite Git repository is now tracked as part of
+proceeding as the aforesaid Git repository is now tracked as part of
 the ghc Git repository (see #8545 for more details)
 ============================
 EOF
@@ -1018,7 +1018,7 @@ ATTENTION!
 You have a left-over libraries/template-haskell/.git folder in your GHC tree!
 
 Please backup or remove it (e.g. "rm -r libraries/template-haskell/.git") before
-proceeding as the testsuite Git repository is now tracked as part of
+proceeding as the aforesaid Git repository is now tracked as part of
 the ghc Git repository (see #8545 for more details)
 ============================
 EOF
@@ -1034,7 +1034,7 @@ ATTENTION!
 You have a left-over libraries/integer-gmp/.git folder in your GHC tree!
 
 Please backup or remove it (e.g. "rm -r libraries/integer-gmp/.git") before
-proceeding as the testsuite Git repository is now tracked as part of
+proceeding as the aforesaid Git repository is now tracked as part of
 the ghc Git repository (see #8545 for more details)
 ============================
 EOF
@@ -1050,7 +1050,7 @@ ATTENTION!
 You have a left-over libraries/integer-simple/.git folder in your GHC tree!
 
 Please backup or remove it (e.g. "rm -r libraries/integer-simple/.git") before
-proceeding as the testsuite Git repository is now tracked as part of
+proceeding as the aforesaid Git repository is now tracked as part of
 the ghc Git repository (see #8545 for more details)
 ============================
 EOF
