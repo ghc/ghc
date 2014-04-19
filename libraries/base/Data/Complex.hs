@@ -58,27 +58,27 @@ data Complex a
 -- Functions over Complex
 
 -- | Extracts the real part of a complex number.
-realPart :: (RealFloat a) => Complex a -> a
+realPart :: Complex a -> a
 realPart (x :+ _) =  x
 
 -- | Extracts the imaginary part of a complex number.
-imagPart :: (RealFloat a) => Complex a -> a
+imagPart :: Complex a -> a
 imagPart (_ :+ y) =  y
 
 -- | The conjugate of a complex number.
 {-# SPECIALISE conjugate :: Complex Double -> Complex Double #-}
-conjugate        :: (RealFloat a) => Complex a -> Complex a
+conjugate        :: Num a => Complex a -> Complex a
 conjugate (x:+y) =  x :+ (-y)
 
 -- | Form a complex number from polar components of magnitude and phase.
 {-# SPECIALISE mkPolar :: Double -> Double -> Complex Double #-}
-mkPolar          :: (RealFloat a) => a -> a -> Complex a
+mkPolar          :: Floating a => a -> a -> Complex a
 mkPolar r theta  =  r * cos theta :+ r * sin theta
 
 -- | @'cis' t@ is a complex value with magnitude @1@
 -- and phase @t@ (modulo @2*'pi'@).
 {-# SPECIALISE cis :: Double -> Complex Double #-}
-cis              :: (RealFloat a) => a -> Complex a
+cis              :: Floating a => a -> Complex a
 cis theta        =  cos theta :+ sin theta
 
 -- | The function 'polar' takes a complex number and
