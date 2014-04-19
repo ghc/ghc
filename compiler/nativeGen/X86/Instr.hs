@@ -9,6 +9,7 @@
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
+{-# LANGUAGE TypeFamilies #-}
 module X86.Instr (Instr(..), Operand(..), PrefetchVariant(..), JumpDest,
                   getJumpDestBlockId, canShortcut, shortcutStatics,
                   shortcutJump, i386_insert_ffrees, allocMoreStack,

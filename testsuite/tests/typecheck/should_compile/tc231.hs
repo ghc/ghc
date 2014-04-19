@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -ddump-types #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts #-}
 
 -- See Trac #1456
 

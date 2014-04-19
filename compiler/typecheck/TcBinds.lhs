@@ -54,6 +54,7 @@ import FastString
 import Type(mkStrLitTy)
 import Class(classTyCon)
 import PrelNames(ipClassName)
+import TcValidity (checkValidTheta)
 
 import Control.Monad
 
@@ -562,6 +563,10 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono closed bind_list
                           simplifyInfer closed mono name_taus wanted
 
        ; theta <- zonkTcThetaType (map evVarPred givens)
+       -- We need to check inferred theta for validity. The reason is that we
+       -- might have inferred theta that requires language extension that is
+       -- not turned on. See #8883. Example can be found in the T8883 testcase.
+       ; checkValidTheta (InfSigCtxt (fst . head $ name_taus)) theta
        ; exports <- checkNoErrs $ mapM (mkExport prag_fn qtvs theta) mono_infos
 
        ; loc <- getSrcSpanM

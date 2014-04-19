@@ -1,7 +1,7 @@
 {-# LANGUAGE EmptyDataDecls, TypeFamilies, UndecidableInstances,
              ScopedTypeVariables, OverlappingInstances, TypeOperators,
              FlexibleInstances, NoMonomorphismRestriction,
-             MultiParamTypeClasses #-}
+             MultiParamTypeClasses, FlexibleContexts #-}
 module IndTypesPerfMerge where
 
 data a :* b = a :* b
