@@ -1002,7 +1002,7 @@ END {
         );
     for (@obsolete_dirs) {
         my ($dir, $hash) = $_;
-        my $name = basename $dir;
+        my $name = $dir =~ m!/([^/]+)$!;
         message "== Checking for old $name repo";
         if (-d "$dir/.git") {
             chdir($dir);
