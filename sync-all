@@ -20,7 +20,7 @@ my $bare_flag = ""; # NOT the opposite of checked_out_flag (describes local repo
 
 my %tags;
 
-my $GITHUB = qr!(?:git@|git://|https://|http://)github.com!;
+my $GITHUB = qr!(?:git@|git://|https://|http://|ssh://git@)github.com!;
 
 sub inDir {
     my $dir = shift;
