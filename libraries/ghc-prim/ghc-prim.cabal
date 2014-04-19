@@ -14,12 +14,8 @@ description:
 
 source-repository head
     type:     git
-    location: http://git.haskell.org/packages/ghc-prim.git
-
-source-repository this
-    type:     git
-    location: http://git.haskell.org/packages/ghc-prim.git
-    tag:      ghc-prim-0.3.1.0-release
+    location: http://git.haskell.org/ghc.git
+    subdir:   libraries/ghc-prim
 
 flag include-ghc-prim
     Description: Include GHC.Prim in exposed-modules

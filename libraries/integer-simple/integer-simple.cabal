@@ -12,7 +12,8 @@ build-type: Simple
 
 source-repository head
     type:     git
-    location: http://git.haskell.org/packages/integer-simple.git
+    location: http://git.haskell.org/ghc.git
+    subdir:   libraries/integer-simple
 
 Library {
     build-depends: ghc-prim
