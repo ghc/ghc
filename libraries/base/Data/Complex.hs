@@ -7,7 +7,7 @@
 -- Module      :  Data.Complex
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -173,4 +173,3 @@ instance  (RealFloat a) => Floating (Complex a) where
     asinh z        =  log (z + sqrt (1+z*z))
     acosh z        =  log (z + (z+1) * sqrt ((z-1)/(z+1)))
     atanh z        =  0.5 * log ((1.0+z) / (1.0-z))
-
