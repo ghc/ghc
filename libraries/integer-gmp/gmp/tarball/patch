@@ -1,0 +1,103 @@
+diff -ur gmp-5.0.2.orig/Makefile.am gmp-5.0.2/Makefile.am
+--- gmp-5.0.2.orig/Makefile.am	2011-05-08 10:49:29.000000000 +0100
++++ gmp-5.0.2/Makefile.am	2011-07-27 17:58:20.000000000 +0100
+@@ -93,7 +93,7 @@
+ LIBMP_LT_AGE =      1
+ 
+ 
+-SUBDIRS = tests mpn mpz mpq mpf printf scanf cxx mpbsd demos tune doc
++SUBDIRS = tests mpn mpz mpq mpf printf scanf cxx mpbsd demos tune
+ 
+ EXTRA_DIST = configfsf.guess configfsf.sub .gdbinit INSTALL.autoconf
+ 
+diff -ur gmp-5.0.2.orig/Makefile.in gmp-5.0.2/Makefile.in
+--- gmp-5.0.2.orig/Makefile.in	2011-05-08 10:49:35.000000000 +0100
++++ gmp-5.0.2/Makefile.in	2011-07-27 17:58:13.000000000 +0100
+@@ -435,7 +435,7 @@
+ LIBMP_LT_CURRENT = 4
+ LIBMP_LT_REVISION = 22
+ LIBMP_LT_AGE = 1
+-SUBDIRS = tests mpn mpz mpq mpf printf scanf cxx mpbsd demos tune doc
++SUBDIRS = tests mpn mpz mpq mpf printf scanf cxx mpbsd demos tune
+ 
+ # The ansi2knr setups for the build programs are the same as the normal
+ # automake ansi2knr rules, but using $(CC_FOR_BUILD) instead of $(CC).
+diff -ur gmp-5.0.2.orig/configure gmp-5.0.2/configure
+--- gmp-5.0.2.orig/configure	2011-05-08 10:49:33.000000000 +0100
++++ gmp-5.0.2/configure	2011-07-27 18:00:11.000000000 +0100
+@@ -28478,7 +28478,7 @@
+ # FIXME: Upcoming version of autoconf/automake may not like broken lines.
+ #        Right now automake isn't accepting the new AC_CONFIG_FILES scheme.
+ 
+-ac_config_files="$ac_config_files Makefile mpbsd/Makefile mpf/Makefile mpn/Makefile mpq/Makefile mpz/Makefile printf/Makefile scanf/Makefile cxx/Makefile tests/Makefile tests/devel/Makefile tests/mpbsd/Makefile tests/mpf/Makefile tests/mpn/Makefile tests/mpq/Makefile tests/mpz/Makefile tests/rand/Makefile tests/misc/Makefile tests/cxx/Makefile doc/Makefile tune/Makefile demos/Makefile demos/calc/Makefile demos/expr/Makefile gmp.h:gmp-h.in mp.h:mp-h.in"
++ac_config_files="$ac_config_files Makefile mpbsd/Makefile mpf/Makefile mpn/Makefile mpq/Makefile mpz/Makefile printf/Makefile scanf/Makefile cxx/Makefile tests/Makefile tests/devel/Makefile tests/mpbsd/Makefile tests/mpf/Makefile tests/mpn/Makefile tests/mpq/Makefile tests/mpz/Makefile tests/rand/Makefile tests/misc/Makefile tests/cxx/Makefile tune/Makefile demos/Makefile demos/calc/Makefile demos/expr/Makefile gmp.h:gmp-h.in mp.h:mp-h.in"
+ 
+ cat >confcache <<\_ACEOF
+ # This file is a shell script that caches the results of configure
+@@ -29665,7 +29665,6 @@
+     "tests/rand/Makefile") CONFIG_FILES="$CONFIG_FILES tests/rand/Makefile" ;;
+     "tests/misc/Makefile") CONFIG_FILES="$CONFIG_FILES tests/misc/Makefile" ;;
+     "tests/cxx/Makefile") CONFIG_FILES="$CONFIG_FILES tests/cxx/Makefile" ;;
+-    "doc/Makefile") CONFIG_FILES="$CONFIG_FILES doc/Makefile" ;;
+     "tune/Makefile") CONFIG_FILES="$CONFIG_FILES tune/Makefile" ;;
+     "demos/Makefile") CONFIG_FILES="$CONFIG_FILES demos/Makefile" ;;
+     "demos/calc/Makefile") CONFIG_FILES="$CONFIG_FILES demos/calc/Makefile" ;;
+Only in gmp-5.0.2.orig: doc
+diff -ur gmp-5.0.2.orig/memory.c gmp-5.0.2/memory.c
+--- gmp-5.0.2.orig/memory.c	2011-05-08 10:49:29.000000000 +0100
++++ gmp-5.0.2/memory.c	2011-07-27 15:18:21.000000000 +0100
+@@ -24,10 +24,21 @@
+ #include "gmp-impl.h"
+ 
+ 
++/* Patched for GHC: */
++void * stgAllocForGMP   (size_t size_in_bytes);
++void * stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
++void   stgDeallocForGMP (void *ptr, size_t size);
++
++void *  (*__gmp_allocate_func) __GMP_PROTO ((size_t)) = stgAllocForGMP;
++void *  (*__gmp_reallocate_func) __GMP_PROTO ((void *, size_t, size_t))
++     = stgReallocForGMP;
++void    (*__gmp_free_func) __GMP_PROTO ((void *, size_t)) = stgDeallocForGMP;
++/*
+ void *	(*__gmp_allocate_func) __GMP_PROTO ((size_t)) = __gmp_default_allocate;
+ void *	(*__gmp_reallocate_func) __GMP_PROTO ((void *, size_t, size_t))
+      = __gmp_default_reallocate;
+ void	(*__gmp_free_func) __GMP_PROTO ((void *, size_t)) = __gmp_default_free;
++*/
+ 
+ 
+ /* Default allocation functions.  In case of failure to allocate/reallocate
+--- gmp-5.0.2.orig/configure.in	2011-08-04 16:35:01.000000000 +1000
++++ gmp-5.0.2/configure.in	2011-08-04 16:39:03.000000000 +1000
+@@ -3178,6 +3178,7 @@
+           AC_DEFINE(HAVE_HOST_CPU_FAMILY_x86_64)
+ 	  case $host in
+ 	    *-*-darwin*)
++	      GMP_DEFINE_RAW(["define(<PIC_ALWAYS>,<yes>)"])
+ 	      GMP_INCLUDE_MPN(x86_64/darwin.m4) ;;
+ 	  esac
+           ;;
+--- gmp-5.0.2.orig/configure	2011-08-04 17:38:22.000000000 +1000
++++ gmp-5.0.2/configure	2011-08-04 17:39:04.000000000 +1000
+@@ -27567,6 +27567,9 @@
+ 	  case $host in
+ 	    *-*-darwin*)
+ 
++echo "define(<PIC_ALWAYS>,<yes>)" >> $gmp_tmpconfigm4
++
++
+ echo "include_mpn(\`x86_64/darwin.m4')" >> $gmp_tmpconfigm4i
+  ;;
+ 	  esac
+--- gmp-5.0.2.orig/mpn/asm-defs.m4	2011-08-04 23:11:19.000000000 +1000
++++ gmp-5.0.2/mpn/asm-defs.m4	2011-08-04 23:11:59.000000000 +1000
+@@ -1041,7 +1041,7 @@
+ dnl  systems which are always PIC.  PIC_ALWAYS established in config.m4
+ dnl  identifies these for us.
+ 
+-ifelse(`PIC_ALWAYS',`yes',`define(`PIC')')
++ifelse(PIC_ALWAYS,yes,`define(`PIC')')
+ 
+ 
+ dnl  Various possible defines passed from the Makefile that are to be tested
