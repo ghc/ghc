@@ -105,7 +105,7 @@ Keeping a list of edits doesn't stop this from happening but makes the
 amount of data that gets copied smaller.
 
 TODO: Evaluate the content of the IORef to WHNF on each insert once
-this bug is resolved: http://hackage.haskell.org/trac/ghc/ticket/3838
+this bug is resolved: http://ghc.haskell.org/trac/ghc/ticket/3838
 -}
 
 -- | An edit to apply to a 'TimeoutQueue'.

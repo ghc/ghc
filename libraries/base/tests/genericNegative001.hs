@@ -1,4 +1,4 @@
--- Test for http://hackage.haskell.org/trac/ghc/ticket/2533
+-- Test for http://ghc.haskell.org/trac/ghc/ticket/2533
 import System.Environment
 import Data.List
 main = do

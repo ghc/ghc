@@ -15,7 +15,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 
--- http://hackage.haskell.org/trac/ghc/ticket/1773
+-- http://ghc.haskell.org/trac/ghc/ticket/1773
 
 module Control.Category where
 

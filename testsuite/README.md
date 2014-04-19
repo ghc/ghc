@@ -40,4 +40,4 @@ The various ways that GHC supports are defined in `config/ghc`
 
 Please see the more extensive documentation [here][1].
 
-  [1]: http://hackage.haskell.org/trac/ghc/wiki/Building/RunningTests
+  [1]: http://ghc.haskell.org/trac/ghc/wiki/Building/RunningTests

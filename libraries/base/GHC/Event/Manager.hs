@@ -349,7 +349,7 @@ registerFd mgr cb fd evs = do
     when we register an event.
 
     For more information, please read:
-        http://hackage.haskell.org/trac/ghc/ticket/7651
+        http://ghc.haskell.org/trac/ghc/ticket/7651
 -}
 -- | Wake up the event manager.
 wakeManager :: EventManager -> IO ()
