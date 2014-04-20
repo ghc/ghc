@@ -12,77 +12,77 @@
 
 
 module Data.PackedString.Latin1 (
-	-- * The @PackedString@ type
+        -- * The @PackedString@ type
         PackedString,      -- abstract, instances: Eq, Ord, Show, Typeable
 
          -- * Converting to and from @PackedString@s
-	pack,
-	unpack,
+        pack,
+        unpack,
 
-	-- * I\/O with @PackedString@s	
-	hPut, hGet,
+        -- * I\/O with @PackedString@s
+        hPut, hGet,
 
-	-- * List-like manipulation functions
-	nil,
-	cons,
-	head,
-	tail,
-	null,
-	append,
-	length,
-	index,
-	map,
-	filter,
-	reverse,
-	concat,
-	elem,
-	substr,
-	take,
-	drop,
-	splitAt,
-	foldl,
-	foldr,
-	takeWhile,
-	dropWhile,
-	span,
-	break,
-	lines,
-	unlines,
-	words,
-	unwords,
-	split,
-	splitWith,
-	join,
---	unpackList, -- eek, otherwise it gets thrown away by the simplifier
+        -- * List-like manipulation functions
+        nil,
+        cons,
+        head,
+        tail,
+        null,
+        append,
+        length,
+        index,
+        map,
+        filter,
+        reverse,
+        concat,
+        elem,
+        substr,
+        take,
+        drop,
+        splitAt,
+        foldl,
+        foldr,
+        takeWhile,
+        dropWhile,
+        span,
+        break,
+        lines,
+        unlines,
+        words,
+        unwords,
+        split,
+        splitWith,
+        join,
+--      unpackList, -- eek, otherwise it gets thrown away by the simplifier
 
     ) where
 
 import qualified Prelude
 import Prelude hiding (
-	head,
-	tail,
-	null,
-	length,
-	(!!),
-	map,
-	filter,
-	reverse,
-	concat,
-	elem,
-	take,
-	drop,
-	foldl,
-	foldr,
-	splitAt,
-	takeWhile,
-	dropWhile,
-	span,
-	break,
-	lines,
-	unlines,
-	words,
-	unwords,
-	join
+        head,
+        tail,
+        null,
+        length,
+        (!!),
+        map,
+        filter,
+        reverse,
+        concat,
+        elem,
+        take,
+        drop,
+        foldl,
+        foldr,
+        splitAt,
+        takeWhile,
+        dropWhile,
+        span,
+        break,
+        lines,
+        unlines,
+        words,
+        unwords,
+        join
  )
 
 import GHC.Exts
@@ -99,12 +99,12 @@ import System.IO
 -- | A space-efficient representation of a 'String', which supports
 -- various efficient operations.  A 'PackedString' contains Latin1
 -- (8-bit) characters only.
-data PackedString = PS {-#UNPACK#-}!Int {-#UNPACK#-}!Int 
-		       {-#UNPACK#-}!(ForeignPtr Word8)
-	-- this is a pretty efficient representation, and can be
-	-- converted to/from a StorableArray.
-	-- When the ForeignPtr is unpacked, we get the Addr# stored
-	-- directly in the PS constructor.
+data PackedString = PS {-#UNPACK#-}!Int {-#UNPACK#-}!Int
+                       {-#UNPACK#-}!(ForeignPtr Word8)
+        -- this is a pretty efficient representation, and can be
+        -- converted to/from a StorableArray.
+        -- When the ForeignPtr is unpacked, we get the Addr# stored
+        -- directly in the PS constructor.
 
 -- Perhaps making a slice should be conditional on the ratio of the
 -- slice/string size to limit memory leaks.
@@ -117,9 +117,9 @@ instance Ord PackedString where
 
 comparePS (PS off1 len1 fp1) (PS off2 len2 fp2)
   = inlinePerformIO $
-	withForeignPtr fp1 $ \p1 -> 
-	withForeignPtr fp2 $ \p2 ->
-	cmp (p1 `plusPtr` off1) (p2 `plusPtr` off2) len1
+        withForeignPtr fp1 $ \p1 ->
+        withForeignPtr fp2 $ \p2 ->
+        cmp (p1 `plusPtr` off1) (p2 `plusPtr` off2) len1
   where
     cmp :: Ptr Word8 -> Ptr Word8 -> Int -> IO Ordering
     cmp p1 p2 n
@@ -129,9 +129,9 @@ comparePS (PS off1 len1 fp1) (PS off2 len2 fp2)
           a <- peekElemOff p1 n
           b <- peekElemOff p2 n
           case a `compare` b of
-		EQ -> cmp p1 p2 (n+1)      
-		LT -> return LT
-		GT -> return GT
+                EQ -> cmp p1 p2 (n+1)
+                LT -> return LT
+                GT -> return GT
 
 --instance Read PackedString: ToDo
 
@@ -146,8 +146,8 @@ deriving instance Typeable PackedString
 -- | The 'nilPS' value is the empty string.
 nil :: PackedString
 nil = inlinePerformIO $ do
-		fp <- newForeignPtr_ nullPtr
-		return (PS 0 0 fp)
+                fp <- newForeignPtr_ nullPtr
+                return (PS 0 0 fp)
 
 -- | The 'consPS' function prepends the given character to the
 -- given string.
@@ -156,11 +156,11 @@ cons c cs = pack (c : (unpack cs)) -- ToDo:better
 
 -- | Convert a 'String' into a 'PackedString'
 packLen :: Int -> String -> PackedString
-packLen len str = inlinePerformIO $ do 
+packLen len str = inlinePerformIO $ do
   fp <- mallocForeignPtrBytes len
-  withForeignPtr fp $ \p -> do 
-	fill_it_in p 0 str
-	return (PS 0 len fp)
+  withForeignPtr fp $ \p -> do
+        fill_it_in p 0 str
+        return (PS 0 len fp)
 
 fill_it_in p i [] = return ()
 fill_it_in p i (c:cs) = do pokeElemOff p i (c2w c); fill_it_in p (i+1) cs
@@ -186,7 +186,7 @@ length (PS _ len _) = len
 -- | The 'index' function returns the character in the string at the
 -- given position.
 index :: PackedString -> Int -> Char
-index ps i 
+index ps i
   | i >= 0 && i < len = unsafeIndex ps i
   | otherwise = error "Data.PackedString.Latin1.index: index out of range"
   where len = length ps
@@ -246,7 +246,7 @@ take :: Int -> PackedString -> PackedString
 take n ps = substr ps 0 (n-1)
 
 -- | The 'drop' function drops the first @n@ characters of a 'PackedString'.
-drop	:: Int -> PackedString -> PackedString
+drop    :: Int -> PackedString -> PackedString
 drop n ps = substr ps n (length ps - 1)
 
 -- | The 'splitWith' function splits a 'PackedString' at a given index.
@@ -316,7 +316,7 @@ join filler pss = concat (splice pss)
 {-
   Some properties that hold:
 
-  * split x ls = ls'   
+  * split x ls = ls'
       where False = any (map (x `elem`) ls')
 
   * join (pack [x]) (split x ls) = ls
@@ -334,15 +334,15 @@ splitWith' pred off len fp =
   withPackedString fp $ \p -> splitLoop pred p 0 off len fp
 
 splitLoop pred p idx off len fp
-	| p `seq` idx `seq` off `seq` fp `seq` False = undefined
+        | p `seq` idx `seq` off `seq` fp `seq` False = undefined
 splitLoop pred p idx off len fp
-	| idx >= len  = return [PS off idx fp]
-	| otherwise = do
-		w <- peekElemOff p (off+idx)
-		if pred (w2c w) 
-		   then return (PS off idx fp : 
-			          splitWith' pred (off+idx+1) (len-idx-1) fp)
-		   else splitLoop pred p (idx+1) off len fp
+        | idx >= len  = return [PS off idx fp]
+        | otherwise = do
+                w <- peekElemOff p (off+idx)
+                if pred (w2c w)
+                   then return (PS off idx fp :
+                                  splitWith' pred (off+idx+1) (len-idx-1) fp)
+                   else splitLoop pred p (idx+1) off len fp
 
 -- -----------------------------------------------------------------------------
 -- Local utility functions
@@ -373,9 +373,9 @@ hPut h (PS off l fp) =
 
 -- | Read a 'PackedString' directly from the specified 'Handle'.
 -- This is far more efficient than reading the characters into a 'String'
--- and then using 'pack'.  
+-- and then using 'pack'.
 --
--- NOTE: as with 'hPut', the string representation in the file is 
+-- NOTE: as with 'hPut', the string representation in the file is
 -- assumed to be Latin-1.
 hGet :: Handle -> Int -> IO PackedString
 hGet h i = do
@@ -399,19 +399,19 @@ unpackList :: PackedString -> [Char]
 unpackList (PS off len fp) =
    withPackedString fp $ \p -> do
       let loop p (-1) acc = return acc
-	  loop p n acc = do
+          loop p n acc = do
              a <- peekElemOff p n
-	     loop p (n-1) (w2c a : acc)
+             loop p (n-1) (w2c a : acc)
       loop (p `plusPtr` off) (len-1) []
 
 {-# INLINE [0] unpackFoldr #-}
 unpackFoldr :: PackedString -> (Char -> a -> a) -> a -> a
-unpackFoldr (PS off len fp) f c = 
+unpackFoldr (PS off len fp) f c =
    withPackedString fp $ \p -> do
       let loop p (-1) acc = return acc
-	  loop p n acc = do
+          loop p n acc = do
              a <- peekElemOff p n
-	     loop p (n-1) (w2c a `f` acc)
+             loop p (n-1) (w2c a `f` acc)
       loop (p `plusPtr` off) (len-1) c
 
 -- -----------------------------------------------------------------------------
