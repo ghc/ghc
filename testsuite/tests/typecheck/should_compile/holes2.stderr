@@ -7,7 +7,7 @@ holes2.hs:3:5: Warning:
       instance Show Float -- Defined in ‘GHC.Float’
       instance (Integral a, Show a) => Show (GHC.Real.Ratio a)
         -- Defined in ‘GHC.Real’
-      ...plus 24 others
+      ...plus 23 others
     In the expression: show _
     In an equation for ‘f’: f = show _
 

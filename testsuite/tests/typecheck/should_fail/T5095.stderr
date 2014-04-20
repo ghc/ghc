@@ -56,8 +56,6 @@ T5095.hs:9:11:
       instance Eq Ordering -- Defined in ‘GHC.Classes’
       instance Eq GHC.Types.Word -- Defined in ‘GHC.Classes’
       instance Eq a => Eq [a] -- Defined in ‘GHC.Classes’
-      instance Eq a => Eq (Control.Applicative.ZipList a)
-        -- Defined in ‘Control.Applicative’
       instance Eq Integer -- Defined in ‘integer-gmp:GHC.Integer.Type’
     (The choice depends on the instantiation of ‘a’
      To pick the first instance above, use IncoherentInstances

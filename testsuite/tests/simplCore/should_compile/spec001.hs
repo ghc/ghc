@@ -81,7 +81,8 @@ import Prelude hiding (
 	lines,
 	unlines,
 	words,
-	unwords
+	unwords,
+	join
  )
 
 import GHC.Exts
