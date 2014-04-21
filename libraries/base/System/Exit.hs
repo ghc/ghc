@@ -20,9 +20,11 @@ module System.Exit
     , exitWith
     , exitFailure
     , exitSuccess
+    , die
   ) where
 
 import Prelude
+import System.IO
 
 import GHC.IO
 import GHC.IO.Exception
@@ -74,3 +76,8 @@ exitFailure = exitWith (ExitFailure 1)
 exitSuccess :: IO a
 exitSuccess = exitWith ExitSuccess
 
+-- | Write given error message to `stderr` and terminate with `exitFailure`.
+--
+-- /Since: 4.7.1.0/
+die :: String -> IO ()
+die err = hPutStrLn stderr err >> exitFailure

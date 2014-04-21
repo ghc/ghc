@@ -8,6 +8,8 @@
 
   * Add `Data.List.sortOn` sorting function
 
+  * Add `System.Exit.die`
+
   * Weaken RealFloat constraints on some `Data.Complex` functions
 
 ## 4.7.0.0  *Apr 2014*
