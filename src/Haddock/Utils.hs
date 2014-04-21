@@ -300,11 +300,7 @@ bye :: String -> IO a
 bye s = putStr s >> exitSuccess
 
 
-die :: String -> IO a
-die s = hPutStr stderr s >> exitWith (ExitFailure 1)
-
-
-dieMsg :: String -> IO a
+dieMsg :: String -> IO ()
 dieMsg s = getProgramName >>= \prog -> die (prog ++ ": " ++ s)
 
 
