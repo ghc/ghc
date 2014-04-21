@@ -1045,7 +1045,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
         -- files; this is the Value Add(TM) that using ghc instead of
         -- gcc gives you :)
         pkg_include_dirs <- liftIO $ getPackageIncludePath dflags pkgs
-        let include_paths = foldr (\ x xs -> "-I" : x : xs) []
+        let include_paths = foldr (\ x xs -> ("-I" ++ x) : xs) []
                               (cmdline_include_paths ++ pkg_include_dirs)
 
         let gcc_extra_viac_flags = extraGccViaCFlags dflags
