@@ -3548,10 +3548,10 @@ picCCOpts dflags
           --     Don't generate "common" symbols - these are unwanted
           --     in dynamic libraries.
 
-       | gopt Opt_PIC dflags -> ["-fno-common", "-U __PIC__", "-D__PIC__"]
+       | gopt Opt_PIC dflags -> ["-fno-common", "-U__PIC__", "-D__PIC__"]
        | otherwise           -> ["-mdynamic-no-pic"]
       OSMinGW32 -- no -fPIC for Windows
-       | gopt Opt_PIC dflags -> ["-U __PIC__", "-D__PIC__"]
+       | gopt Opt_PIC dflags -> ["-U__PIC__", "-D__PIC__"]
        | otherwise           -> []
       _
       -- we need -fPIC for C files when we are compiling with -dynamic,
@@ -3560,12 +3560,12 @@ picCCOpts dflags
       -- objects, but can't without -fPIC.  See
       -- http://ghc.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
        | gopt Opt_PIC dflags || not (gopt Opt_Static dflags) ->
-          ["-fPIC", "-U __PIC__", "-D__PIC__"]
+          ["-fPIC", "-U__PIC__", "-D__PIC__"]
        | otherwise                             -> []
 
 picPOpts :: DynFlags -> [String]
 picPOpts dflags
- | gopt Opt_PIC dflags = ["-U __PIC__", "-D__PIC__"]
+ | gopt Opt_PIC dflags = ["-U__PIC__", "-D__PIC__"]
  | otherwise           = []
 
 -- -----------------------------------------------------------------------------
