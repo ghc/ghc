@@ -28,7 +28,7 @@ import Data.Maybe
 import System.IO
 import System.Directory
 import System.Environment
-import System.Exit
+import System.Exit      (exitWith, ExitCode(..))
 import System.FilePath
 
 main :: IO ()
