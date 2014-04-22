@@ -1202,6 +1202,11 @@ sdist_%:
 
 CLEAN_FILES += libraries/bootstrapping.conf
 CLEAN_FILES += libraries/integer-gmp/cbits/GmpDerivedConstants.h
+CLEAN_FILES += libraries/integer-gmp/include/HsIntegerGmp.h
+CLEAN_FILES += libraries/base/include/EventConfig.h
+CLEAN_FILES += mk/config.mk.old
+CLEAN_FILES += mk/project.mk.old
+CLEAN_FILES += compiler/ghc.cabal.old
 
 # These are no longer generated, but we still clean them for a while
 # as they may still be in old GHC trees:
@@ -1219,6 +1224,9 @@ clean : clean_files clean_libraries
 .PHONY: clean_files
 clean_files :
 	$(call removeFiles,$(CLEAN_FILES))
+# this is here since CLEAN_FILES can't handle folders
+	$(call removeTrees,includes/dist-derivedconstants)
+	$(call removeTrees,inplace)
 
 .PHONY: clean_libraries
 clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
