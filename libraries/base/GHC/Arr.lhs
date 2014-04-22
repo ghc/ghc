@@ -381,12 +381,12 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
 -- | The type of immutable non-strict (boxed) arrays
 -- with indices in @i@ and elements in @e@.
 data Array i e
-         = Array !i         -- the lower bound, l
-                 !i         -- the upper bound, u
-                 !Int       -- a cache of (rangeSize (l,u))
-                            -- used to make sure an index is
-                            -- really in range
-                 (Array# e) -- The actual elements
+   = Array            !i         -- the lower bound, l
+                      !i         -- the upper bound, u
+       {-# UNPACK #-} !Int       -- A cache of (rangeSize (l,u))
+                                 -- used to make sure an index is
+                                 -- really in range
+                      (Array# e) -- The actual elements
 
 -- | Mutable, boxed, non-strict arrays in the 'ST' monad.  The type
 -- arguments are as follows:
@@ -398,9 +398,9 @@ data Array i e
 --  * @e@: the element type of the array.
 --
 data STArray s i e
-         = STArray !i                  -- the lower bound, l
-                   !i                  -- the upper bound, u
-                   !Int                -- a cache of (rangeSize (l,u))
+  = STArray           !i               -- the lower bound, l
+                      !i               -- the upper bound, u
+      {-# UNPACK #-}  !Int             -- A cache of (rangeSize (l,u))
                                        -- used to make sure an index is
                                        -- really in range
                    (MutableArray# s e) -- The actual elements
