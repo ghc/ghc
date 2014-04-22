@@ -183,6 +183,10 @@ data Instr
         | MOV         Size Operand Operand
         | MOVZxL      Size Operand Operand -- size is the size of operand 1
         | MOVSxL      Size Operand Operand -- size is the size of operand 1
+
+        -- Special case move for Ivy Bridge processors
+        | REPMOVSB
+
         -- x86_64 note: plain mov into a 32-bit register always zero-extends
         -- into the 64-bit reg, in contrast to the 8 and 16-bit movs which
         -- don't affect the high bits of the register.
@@ -425,6 +429,8 @@ x86_regUsageOfInstr platform instr
 
     POPCNT _ src dst -> mkRU (use_R src []) [dst]
 
+    REPMOVSB -> mkRU [] []
+
     -- note: might be a better way to do this
     PREFETCH _  _ src -> mkRU (use_R src []) []
 
@@ -569,6 +575,8 @@ x86_patchRegsOfInstr instr env
     POPCNT sz src dst -> POPCNT sz (patchOp src) (env dst)
 
     PREFETCH lvl size src -> PREFETCH lvl size (patchOp src)
+
+    REPMOVSB -> REPMOVSB
 
     _other              -> panic "patchRegs: unrecognised instr"
 

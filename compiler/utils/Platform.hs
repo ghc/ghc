@@ -212,6 +212,7 @@ data IntelFeature
   | AVX1
   | ERMSB -- "Extended rep-movsb"
   | AVX2
+  deriving Eq
 
 descToCPU :: String -> Maybe CPUDesc
 descToCPU "generic"     = Just Generic

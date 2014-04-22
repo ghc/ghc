@@ -582,6 +582,8 @@ pprInstr (PREFETCH Lvl0 size src) = pprSizeOp_ (sLit "prefetcht0") size src
 pprInstr (PREFETCH Lvl1 size src) = pprSizeOp_ (sLit "prefetcht1") size src
 pprInstr (PREFETCH Lvl2 size src) = pprSizeOp_ (sLit "prefetcht2") size src
 
+pprInstr REPMOVSB = ptext (sLit "\trep movsb")
+
 pprInstr (NOT size op) = pprSizeOp (sLit "not") size op
 pprInstr (BSWAP size op) = pprSizeOp (sLit "bswap") size (OpReg op)
 pprInstr (NEGI size op) = pprSizeOp (sLit "neg") size op

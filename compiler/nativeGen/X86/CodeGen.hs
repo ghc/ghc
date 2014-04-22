@@ -1568,6 +1568,39 @@ genCCall
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+-- Do NOT unroll memcpy calls if the compiler has -mcpu=ivybridge -
+-- this can be done even better using 'enhanced rep movsb', which
+-- is nearly as fast as an AVX-based memcpy.
+--
+-- Note: this is implied with *both* -mcpu and -march. Why? -mcpu
+-- traditionally controls tuning schedules etc for the particular
+-- platform. -march controls *code generation* for that platform,
+-- including what instructions can be emitted.
+--
+-- In this case, the *instruction* does not change, it is still
+-- backwards compatible. But the actual *performance* impact and
+-- schedule of the code will change, hence why we check mcpu as well.
+genCCall dflags is32Bit (PrimTarget MO_Memcpy) _
+         [dst, src,
+          (CmmLit (CmmInt n _)),
+          (CmmLit (CmmInt _ _))]
+    | supportsERMSB dflags && not is32Bit = do
+        code_dst <- getAnyReg dst
+        dst_r <- getNewRegNat II64
+        code_src <- getAnyReg src
+        src_r <- getNewRegNat II64
+        return $ code_dst dst_r `appOL` code_src src_r `appOL`
+          unitOL (MOV II64 (OpReg src_r)          (OpReg rsi)) `appOL`
+          unitOL (MOV II64 (OpReg dst_r)          (OpReg rdi)) `appOL`
+          unitOL (MOV II64 (OpImm (ImmInteger n)) (OpReg rcx)) `appOL`
+          unitOL REPMOVSB `appOL` nilOL
+
+ where
+   supportsERMSB dflags
+     | Intel x <- march dflags = any (== ERMSB) (intelCPUFeatures x)
+     | Intel x <- mcpu  dflags = any (== ERMSB) (intelCPUFeatures x)
+     | otherwise = False
+
 -- Unroll memcpy calls if the source and destination pointers are at
 -- least DWORD aligned and the number of bytes to copy isn't too
 -- large.  Otherwise, call C's memcpy.
