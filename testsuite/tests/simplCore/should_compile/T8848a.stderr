@@ -1,8 +1,6 @@
 
 ==================== Tidy Core rules ====================
-"SPEC T8848a.f" [ALWAYS]
-    forall (@ b) ($dOrd :: GHC.Classes.Ord [GHC.Types.Int]).
-      T8848a.f @ b @ [GHC.Types.Int] $dOrd
-      = T8848a.f_$sf @ b
+"SPEC f" [ALWAYS]
+    forall (@ b) ($dOrd :: Ord [Int]). f @ b @ [Int] $dOrd = f_$sf @ b
 
 

@@ -190,31 +190,30 @@ neverQualify  = (neverQualifyNames,  neverQualifyModules)
 
 defaultUserStyle, defaultDumpStyle :: PprStyle
 
-defaultUserStyle = mkUserStyle alwaysQualify AllTheWay
+defaultUserStyle = mkUserStyle neverQualify AllTheWay
+ -- Print without qualifiers to reduce verbosity, unless -dppr-debug
 
 defaultDumpStyle |  opt_PprStyle_Debug = PprDebug
                  |  otherwise          = PprDump
+
+defaultErrStyle :: DynFlags -> PprStyle
+-- Default style for error messages, when we don't know PrintUnqualified
+-- It's a bit of a hack because it doesn't take into account what's in scope
+-- Only used for desugarer warnings, and typechecker errors in interface sigs
+-- NB that -dppr-debug will still get into PprDebug style
+defaultErrStyle dflags = mkErrStyle dflags neverQualify
 
 -- | Style for printing error messages
 mkErrStyle :: DynFlags -> PrintUnqualified -> PprStyle
 mkErrStyle dflags qual = mkUserStyle qual (PartWay (pprUserLength dflags))
 
-defaultErrStyle :: DynFlags -> PprStyle
--- Default style for error messages
--- It's a bit of a hack because it doesn't take into account what's in scope
--- Only used for desugarer warnings, and typechecker errors in interface sigs
-defaultErrStyle dflags = mkUserStyle alwaysQualify depth
-    where depth = if opt_PprStyle_Debug
-                  then AllTheWay
-                  else PartWay (pprUserLength dflags)
+cmdlineParserStyle :: PprStyle
+cmdlineParserStyle = mkUserStyle alwaysQualify AllTheWay
 
 mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
 mkUserStyle unqual depth
    | opt_PprStyle_Debug = PprDebug
    | otherwise          = PprUser unqual depth
-
-cmdlineParserStyle :: PprStyle
-cmdlineParserStyle = PprUser alwaysQualify AllTheWay
 \end{code}
 
 Orthogonal to the above printing styles are (possibly) some
@@ -979,7 +978,7 @@ assertPprPanic file line msg
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> String -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg
- = cont (showSDocDebug dflags doc)
+ = cont (showSDoc dflags doc)
  where
      doc = sep [text heading, nest 4 pretty_msg]
 \end{code}

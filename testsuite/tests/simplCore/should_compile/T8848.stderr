@@ -3,7 +3,7 @@ Rule fired: Class op fmap
 Rule fired: Class op pure
 Rule fired: Class op <*>
 Rule fired: Class op <*>
-Rule fired: SPEC T8848.map2
+Rule fired: SPEC map2
 Rule fired: Class op $p1Applicative
 Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
