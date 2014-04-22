@@ -218,15 +218,6 @@
       </varlistentry>
       <varlistentry>
         <term>
-          <option>-optm</option>  <replaceable>option</replaceable>
-          <indexterm><primary><option>-optm</option></primary></indexterm>
-        </term>
-        <listitem>
-          <para>Pass <replaceable>option</replaceable> to the mangler.</para>
-        </listitem>
-      </varlistentry>
-      <varlistentry>
-        <term>
           <option>-opta</option>  <replaceable>option</replaceable>
           <indexterm><primary><option>-opta</option></primary></indexterm>
         </term>

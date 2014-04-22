@@ -2550,12 +2550,6 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-optm</option> <replaceable>option</replaceable></entry>
-            <entry>pass <replaceable>option</replaceable> to the mangler</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-          <row>
             <entry><option>-opta</option> <replaceable>option</replaceable></entry>
             <entry>pass <replaceable>option</replaceable> to the assembler</entry>
             <entry>dynamic</entry>
@@ -2603,14 +2597,6 @@
           <row>
             <entry><option>-msse2</option></entry>
             <entry>(x86 only) Use SSE2 for floating point</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-        </tbody>
-        <tbody>
-          <row>
-            <entry><option>-monly-[432]-regs</option></entry>
-            <entry>(x86 only) give some registers back to the C compiler</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
