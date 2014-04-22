@@ -88,6 +88,7 @@ import Ctype
 import BasicTypes       ( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..) )
 import Util             ( readRational )
 
+import Control.Applicative
 import Control.Monad
 import Data.Bits
 import Data.ByteString (ByteString)
@@ -1679,6 +1680,13 @@ data ALRLayout = ALRLayoutLet
                | ALRLayoutDo
 
 newtype P a = P { unP :: PState -> ParseResult a }
+
+instance Functor P where
+  fmap = liftM
+
+instance Applicative P where
+  pure  = return
+  (<*>) = ap
 
 instance Monad P where
   return = returnP

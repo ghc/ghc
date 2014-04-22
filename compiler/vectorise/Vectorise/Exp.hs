@@ -415,11 +415,11 @@ vectExpr (_, AnnCase scrut bndr ty alts)
 
 vectExpr (_, AnnLet (AnnNonRec bndr rhs) body)
   = do
-    { traceVt "let binding (non-recursive)" empty
+    { traceVt "let binding (non-recursive)" Outputable.empty
     ; vrhs <- localV $ 
                 inBind bndr $ 
                   vectAnnPolyExpr False rhs
-    ; traceVt "let body (non-recursive)" empty
+    ; traceVt "let body (non-recursive)" Outputable.empty
     ; (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
     ; return $ vLet (vNonRec vbndr vrhs) vbody
     }
@@ -427,9 +427,9 @@ vectExpr (_, AnnLet (AnnNonRec bndr rhs) body)
 vectExpr (_, AnnLet (AnnRec bs) body)
   = do
     { (vbndrs, (vrhss, vbody)) <- vectBndrsIn bndrs $ do
-                                  { traceVt "let bindings (recursive)" empty
+                                  { traceVt "let bindings (recursive)" Outputable.empty
                                   ; vrhss <- zipWithM vect_rhs bndrs rhss
-                                  ; traceVt "let body (recursive)" empty
+                                  ; traceVt "let body (recursive)" Outputable.empty
                                   ; vbody <- vectExpr body
                                   ; return (vrhss, vbody) 
                                   }
@@ -830,28 +830,28 @@ vectAlgCase :: TyCon -> [Type] -> CoreExprWithVectInfo -> Var -> Type
             -> VM VExpr
 vectAlgCase _tycon _ty_args scrut bndr ty [(DEFAULT, [], body)]
   = do
-    { traceVt "scrutinee (DEFAULT only)" empty
+    { traceVt "scrutinee (DEFAULT only)" Outputable.empty
     ; vscrut         <- vectExpr scrut
     ; (vty, lty)     <- vectAndLiftType ty
-    ; traceVt "alternative body (DEFAULT only)" empty
+    ; traceVt "alternative body (DEFAULT only)" Outputable.empty
     ; (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
     ; return $ vCaseDEFAULT vscrut vbndr vty lty vbody
     }
 vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt _, [], body)]
   = do
-    { traceVt "scrutinee (one shot w/o binders)" empty
+    { traceVt "scrutinee (one shot w/o binders)" Outputable.empty
     ; vscrut         <- vectExpr scrut
     ; (vty, lty)     <- vectAndLiftType ty
-    ; traceVt "alternative body (one shot w/o binders)" empty
+    ; traceVt "alternative body (one shot w/o binders)" Outputable.empty
     ; (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
     ; return $ vCaseDEFAULT vscrut vbndr vty lty vbody
     }
 vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
   = do
-    { traceVt "scrutinee (one shot w/ binders)" empty
+    { traceVt "scrutinee (one shot w/ binders)" Outputable.empty
     ; vexpr      <- vectExpr scrut
     ; (vty, lty) <- vectAndLiftType ty
-    ; traceVt "alternative body (one shot w/ binders)" empty
+    ; traceVt "alternative body (one shot w/ binders)" Outputable.empty
     ; (vbndr, (vbndrs, (vect_body, lift_body)))
         <- vect_scrut_bndr
          . vectBndrsIn bndrs
@@ -876,7 +876,7 @@ vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
 
 vectAlgCase tycon _ty_args scrut bndr ty alts
   = do
-    { traceVt "scrutinee (general case)" empty
+    { traceVt "scrutinee (general case)" Outputable.empty
     ; vexpr <- vectExpr scrut
 
     ; vect_tc     <- vectTyCon tycon
@@ -887,7 +887,7 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
     ; sel_bndr <- newLocalVar (fsLit "sel") sel_ty
     ; let sel = Var sel_bndr
 
-    ; traceVt "alternatives' body (general case)" empty
+    ; traceVt "alternatives' body (general case)" Outputable.empty
     ; (vbndr, valts) <- vect_scrut_bndr
                       $ mapM (proc_alt arity sel vty lty) alts'
     ; let (vect_dcs, vect_bndrss, lift_bndrss, vbodies) = unzip4 valts

@@ -268,7 +268,7 @@ tcCheckFIType arg_tys res_ty (CImport cconv safety mh l@(CLabel _))
   = do checkCg checkCOrAsmOrLlvmOrInterp
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
-       check (isFFILabelTy (mkFunTys arg_tys res_ty)) (illegalForeignTyErr empty)
+       check (isFFILabelTy (mkFunTys arg_tys res_ty)) (illegalForeignTyErr Outputable.empty)
        cconv' <- checkCConv cconv
        return (CImport cconv' safety mh l)
 
@@ -285,7 +285,7 @@ tcCheckFIType arg_tys res_ty (CImport cconv safety mh CWrapper) = do
                         checkForeignRes mustBeIO checkSafe (isFFIDynTy arg1_ty) res_ty
                   where
                      (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
-        _ -> addErrTc (illegalForeignTyErr empty (ptext (sLit "One argument expected")))
+        _ -> addErrTc (illegalForeignTyErr Outputable.empty (ptext (sLit "One argument expected")))
     return (CImport cconv' safety mh CWrapper)
 
 tcCheckFIType arg_tys res_ty idecl@(CImport cconv safety mh (CFunction target))
@@ -294,7 +294,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport cconv safety mh (CFunction target))
       cconv' <- checkCConv cconv
       case arg_tys of           -- The first arg must be Ptr or FunPtr
         []                -> 
-          addErrTc (illegalForeignTyErr empty (ptext (sLit "At least one argument expected")))
+          addErrTc (illegalForeignTyErr Outputable.empty (ptext (sLit "At least one argument expected")))
         (arg1_ty:arg_tys) -> do
           dflags <- getDynFlags
           let curried_res_ty = foldr FunTy res_ty arg_tys

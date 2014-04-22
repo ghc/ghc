@@ -57,7 +57,9 @@ import ErrUtils
 import qualified Stream
 
 import Control.Monad (ap)
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
+#endif
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types

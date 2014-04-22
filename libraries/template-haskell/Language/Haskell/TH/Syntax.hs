@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, MagicHash, PolymorphicComponents, RoleAnnotations, UnboxedTuples #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, MagicHash, PolymorphicComponents, RoleAnnotations, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -19,7 +19,9 @@ module Language.Haskell.TH.Syntax where
 import GHC.Exts
 import Data.Data (Data(..), Typeable, mkConstr, mkDataType, constrIndex)
 import qualified Data.Data as Data
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative( Applicative(..) )
+#endif
 import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )
 import Control.Monad (liftM)

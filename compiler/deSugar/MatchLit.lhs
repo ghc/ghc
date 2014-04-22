@@ -186,7 +186,7 @@ warnAboutOverflowedLiterals dflags lit
             , i > 0
             , not (xopt Opt_NegativeLiterals dflags)
             = ptext (sLit "If you are trying to write a large negative literal, use NegativeLiterals")
-            | otherwise = empty
+            | otherwise = Outputable.empty
 \end{code}
 
 Note [Suggest NegativeLiterals]

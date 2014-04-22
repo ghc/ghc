@@ -73,7 +73,7 @@ test('T1969',
              # 2013-02-10 322937684 (x86/OSX)
              # 2014-01-22 316103268 (x86/Linux)
              # 2014-06-29 303300692 (x86/Linux)
-           (wordsize(64), 625525224, 5)]),
+           (wordsize(64), 651626680, 5)]),
              # 17/11/2009 434845560 (amd64/Linux)
              # 08/12/2009 459776680 (amd64/Linux)
              # 17/05/2010 519377728 (amd64/Linux)
@@ -90,7 +90,6 @@ test('T1969',
              # 18/10/2013 698612512 (x86_64/Linux) fix for #8456
              # 10/02/2014 660922376 (x86_64/Linux) call arity analysis
              # 17/07/2014 651626680 (x86_64/Linux) roundabout update
-
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static')
@@ -221,7 +220,7 @@ test('T3064',
             # expected value: 14 (x86/Linux 28-06-2012):
             # 2013-11-13:     18 (x86/Windows, 64bit machine)
             # 2014-01-22:     23 (x86/Linux)
-           (wordsize(64), 42, 20)]),
+           (wordsize(64), 52, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
@@ -230,6 +229,7 @@ test('T3064',
             # Increased range to 20%.  peak-usage varies from 22 to 26,
             #  depending on whether the old .hi file exists
             # (amd64/Linux) 2013-09-11: 37; better arity analysis (weird)
+            # (amd64/Linux) (09/09/2014): 42, AMP changes (larger interfaces, more loading)
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 162457940, 10),
@@ -237,7 +237,7 @@ test('T3064',
             # 2012-10-30: 111189536 (x86/Windows)
             # 2013-11-13: 146626504 (x86/Windows, 64bit machine)
             # 2014-01-22: 162457940 (x86/Linux)
-           (wordsize(64), 313638592, 5)]),
+           (wordsize(64), 407416464, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
@@ -248,6 +248,7 @@ test('T3064',
             # (amd64/Linux) (23/05/2014): 324022680, unknown cause
             # (amd64/Linux) (2014-07-17): 332702112, general round of updates
             # (amd64/Linux) (2014-08-29): 313638592, w/w for INLINABLE things
+            # (amd64/Linux) (09/09/2014): 407416464, AMP changes (larger interfaces, more loading)
 
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 11202304, 20),
@@ -255,7 +256,7 @@ test('T3064',
             #(some date):  5511604
             # 2013-11-13:  7218200 (x86/Windows, 64bit machine)
             # 2014-04-04: 11202304 (x86/Windows, 64bit machine)
-           (wordsize(64), 19821544, 20)]),
+           (wordsize(64), 24357392, 20)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
             # (amd64/Linux)         (14/02/2013):  8687360
@@ -266,6 +267,7 @@ test('T3064',
             #                                     933cdf15a2d85229d3df04b437da31fdfbf4961f
             # (amd64/Linux)         (22/11/2013): 16266992, GND via Coercible and counters for constraints solving
             # (amd64/Linux)         (12/12/2013): 19821544, better One shot analysis
+            # (amd64/Linux)         (09/09/2014): 24357392, AMP changes (larger interfaces, more loading)
        only_ways(['normal'])
       ],
      compile,
@@ -305,10 +307,11 @@ test('T5631',
           [(wordsize(32), 346389856, 10),
         # expected value: 392904228 (x86/Linux)
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
-           (wordsize(64), 690742040, 5)]),
+           (wordsize(64), 739704712, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
+        # 2014-09-09:     739704712 (amd64/Linux) AMP changes
        only_ways(['normal'])
       ],
      compile,
@@ -403,7 +406,7 @@ test('T5642',
                      # sample from x86/Linux
             # prev:        650000000
             # 2014-09-03:  753045568 
-            (wordsize(64), 1402242360, 10)])
+            (wordsize(64), 1452688392, 10)])
             # prev:        1300000000
             # 2014-07-17:  1358833928 (general round of updates)
             # 2014-08-07:  1402242360 (caused by 1fc60ea)

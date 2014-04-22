@@ -796,7 +796,7 @@ freeNamesIdExtras :: IfaceIdExtras -> NameSet
 freeNamesIdExtras (IdExtras _ rules _) = unionManyNameSets (map freeNamesIfRule rules)
 
 instance Outputable IfaceDeclExtras where
-  ppr IfaceOtherDeclExtras       = empty
+  ppr IfaceOtherDeclExtras       = Outputable.empty
   ppr (IfaceIdExtras  extras)    = ppr_id_extras extras
   ppr (IfaceSynExtras fix finsts anns) = vcat [ppr fix, ppr finsts, ppr anns]
   ppr (IfaceDataExtras fix insts anns stuff) = vcat [ppr fix, ppr_insts insts, ppr anns,
@@ -1047,7 +1047,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
         (is_direct_import, imp_safe)
             = case lookupModuleEnv direct_imports mod of
                 Just ((_,_,_,safe):_xs) -> (True, safe)
-                Just _                  -> pprPanic "mkUsage: empty direct import" empty
+                Just _                  -> pprPanic "mkUsage: empty direct import" Outputable.empty
                 Nothing                 -> (False, safeImplicitImpsReq dflags)
                 -- Nothing case is for implicit imports like 'System.IO' when 'putStrLn'
                 -- is used in the source code. We require them to be safe in Safe Haskell

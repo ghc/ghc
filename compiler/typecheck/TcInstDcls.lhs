@@ -400,7 +400,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                         -- try the deriving stuff, because that may give
                         -- more errors still
 
-       ; traceTc "tcDeriving" empty
+       ; traceTc "tcDeriving" Outputable.empty
        ; th_stage <- getStage   -- See Note [Deriving inside TH brackets ]
        ; (gbl_env, deriv_inst_info, deriv_binds)
               <- if isBrackStage th_stage 

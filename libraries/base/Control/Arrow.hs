@@ -304,10 +304,18 @@ newtype ArrowMonad a b = ArrowMonad (a () b)
 instance Arrow a => Functor (ArrowMonad a) where
     fmap f (ArrowMonad m) = ArrowMonad $ m >>> arr f
 
+instance Arrow a => Applicative (ArrowMonad a) where
+   pure x = ArrowMonad (arr (const x))
+   ArrowMonad f <*> ArrowMonad x = ArrowMonad (f &&& x >>> arr (uncurry id))
+
 instance ArrowApply a => Monad (ArrowMonad a) where
     return x = ArrowMonad (arr (\_ -> x))
     ArrowMonad m >>= f = ArrowMonad $
         m >>> arr (\x -> let ArrowMonad h = f x in (h, ())) >>> app
+
+instance ArrowPlus a => Alternative (ArrowMonad a) where
+   empty = ArrowMonad zeroArrow
+   ArrowMonad x <|> ArrowMonad y = ArrowMonad (x <+> y)
 
 instance (ArrowApply a, ArrowPlus a) => MonadPlus (ArrowMonad a) where
    mzero = ArrowMonad zeroArrow

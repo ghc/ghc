@@ -388,7 +388,7 @@ tcGen :: UserTypeCtxt -> TcType
 tcGen ctxt expected_ty thing_inside
    -- We expect expected_ty to be a forall-type
    -- If not, the call is a no-op
-  = do  { traceTc "tcGen" empty
+  = do  { traceTc "tcGen" Outputable.empty
         ; (wrap, tvs', given, rho') <- deeplySkolemise expected_ty
 
         ; when debugIsOn $
@@ -565,7 +565,7 @@ uType origin orig_ty1 orig_ty2
               , ppr origin]
        ; co <- go orig_ty1 orig_ty2
        ; if isTcReflCo co
-            then traceTc "u_tys yields no coercion" empty
+            then traceTc "u_tys yields no coercion" Outputable.empty
             else traceTc "u_tys yields coercion:" (ppr co)
        ; return co }
   where

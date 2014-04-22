@@ -7,6 +7,7 @@
 
 module M(foo) where
 
+import Control.Monad
 import Control.Monad.ST
 import Data.Array.ST
 
@@ -24,6 +25,16 @@ type V m a = E' LValue m a
 runE :: E' v m a -> m a
 runE (E t) = t
 runE (V t _) = t
+
+instance Monad m => Functor (E' RValue m) where
+    {-# INLINE fmap #-}
+    fmap f x = liftM f x
+
+instance Monad m => Applicative (E' RValue m) where
+    {-# INLINE pure #-}
+    pure x = return x
+    {-# INLINE (<*>) #-}
+    (<*>) = ap
 
 instance (Monad m) => Monad (E' RValue m) where
     {-# INLINE return #-}

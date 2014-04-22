@@ -49,9 +49,25 @@ import GHC.Base
 data  Maybe a  =  Nothing | Just a
   deriving (Eq, Ord)
 
+-- | Lift a semigroup into 'Maybe' forming a 'Monoid' according to
+-- <http://en.wikipedia.org/wiki/Monoid>: \"Any semigroup @S@ may be
+-- turned into a monoid simply by adjoining an element @e@ not in @S@
+-- and defining @e*e = e@ and @e*s = s = s*e@ for all @s ∈ S@.\" Since
+-- there is no \"Semigroup\" typeclass providing just 'mappend', we
+-- use 'Monoid' instead.
+instance Monoid a => Monoid (Maybe a) where
+  mempty = Nothing
+  Nothing `mappend` m = m
+  m `mappend` Nothing = m
+  Just m1 `mappend` Just m2 = Just (m1 `mappend` m2)
+
 instance  Functor Maybe  where
     fmap _ Nothing       = Nothing
     fmap f (Just a)      = Just (f a)
+
+instance Applicative Maybe where
+    pure = return
+    (<*>) = ap
 
 instance  Monad Maybe  where
     (Just x) >>= k      = k x

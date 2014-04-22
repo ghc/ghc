@@ -49,7 +49,9 @@ import Data.List
 import Foreign
 import Foreign.C
 
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
+#endif
 import Control.Monad
 import Data.Char
 

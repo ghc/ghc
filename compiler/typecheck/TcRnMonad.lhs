@@ -968,10 +968,10 @@ addWarnTcM (env0, msg)
         add_warn msg err_info }
 
 addWarn :: MsgDoc -> TcRn ()
-addWarn msg = add_warn msg empty
+addWarn msg = add_warn msg Outputable.empty
 
 addWarnAt :: SrcSpan -> MsgDoc -> TcRn ()
-addWarnAt loc msg = add_warn_at loc msg empty
+addWarnAt loc msg = add_warn_at loc msg Outputable.empty
 
 add_warn :: MsgDoc -> MsgDoc -> TcRn ()
 add_warn msg extra_info 
@@ -1012,7 +1012,7 @@ mkErrInfo env ctxts
  = go 0 env ctxts
  where
    go :: Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
-   go _ _   [] = return empty
+   go _ _   [] = return Outputable.empty
    go n env ((is_landmark, ctxt) : ctxts)
      | is_landmark || n < mAX_CONTEXTS -- Too verbose || opt_PprStyle_Debug
      = do { (env', msg) <- ctxt env

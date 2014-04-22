@@ -6,7 +6,7 @@
 -- Module      :  Control.Monad
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -20,11 +20,8 @@ module Control.Monad
 
       Functor(fmap)
     , Monad((>>=), (>>), return, fail)
-
-    , MonadPlus (
-          mzero
-        , mplus
-        )
+    , Alternative(empty, (<|>), some, many)
+    , MonadPlus(mzero, mplus)
     -- * Functions
 
     -- ** Naming conventions
@@ -85,6 +82,7 @@ import GHC.List
 import GHC.Base
 
 infixr 1 =<<
+infixl 3 <|>
 
 -- -----------------------------------------------------------------------------
 -- Prelude monad functions
@@ -104,7 +102,7 @@ sequence ms = foldr k (return []) ms
 
 -- | Evaluate each action in the sequence from left to right,
 -- and ignore the results.
-sequence_        :: Monad m => [m a] -> m () 
+sequence_        :: Monad m => [m a] -> m ()
 {-# INLINE sequence_ #-}
 sequence_ ms     =  foldr (>>) (return ()) ms
 
@@ -119,18 +117,64 @@ mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
 mapM_ f as      =  sequence_ (map f as)
 
 -- -----------------------------------------------------------------------------
+-- The Alternative class definition
+
+-- | A monoid on applicative functors.
+--
+-- Minimal complete definition: 'empty' and '<|>'.
+--
+-- If defined, 'some' and 'many' should be the least solutions
+-- of the equations:
+--
+-- * @some v = (:) '<$>' v '<*>' many v@
+--
+-- * @many v = some v '<|>' 'pure' []@
+class Applicative f => Alternative f where
+    -- | The identity of '<|>'
+    empty :: f a
+    -- | An associative binary operation
+    (<|>) :: f a -> f a -> f a
+
+    -- | One or more.
+    some :: f a -> f [a]
+    some v = some_v
+      where
+        many_v = some_v <|> pure []
+        some_v = (fmap (:) v) <*> many_v
+
+    -- | Zero or more.
+    many :: f a -> f [a]
+    many v = many_v
+      where
+        many_v = some_v <|> pure []
+        some_v = (fmap (:) v) <*> many_v
+
+instance Alternative Maybe where
+    empty = Nothing
+    Nothing <|> r = r
+    l       <|> _ = l
+
+instance Alternative [] where
+    empty = []
+    (<|>) = (++)
+
+
+-- -----------------------------------------------------------------------------
 -- The MonadPlus class definition
 
 -- | Monads that also support choice and failure.
-class Monad m => MonadPlus m where
+class (Alternative m, Monad m) => MonadPlus m where
    -- | the identity of 'mplus'.  It should also satisfy the equations
    --
    -- > mzero >>= f  =  mzero
    -- > v >> mzero   =  mzero
    --
-   mzero :: m a 
+   mzero :: m a
+   mzero = empty
+
    -- | an associative operation
    mplus :: m a -> m a -> m a
+   mplus = (<|>)
 
 instance MonadPlus [] where
    mzero = []
@@ -199,12 +243,6 @@ void = fmap (const ())
 
 -- -----------------------------------------------------------------------------
 -- Other monad functions
-
--- | The 'join' function is the conventional monad join operator. It is used to
--- remove one level of monadic structure, projecting its bound argument into the
--- outer level.
-join              :: (Monad m) => m (m a) -> m a
-join x            =  x >>= id
 
 -- | The 'mapAndUnzipM' function maps its first argument over a list, returning
 -- the result as a pair of lists. This function is mainly used with complicated
@@ -292,64 +330,6 @@ unless            :: (Monad m) => Bool -> m () -> m ()
 {-# SPECIALISE unless :: Bool -> IO () -> IO () #-}
 {-# SPECIALISE unless :: Bool -> Maybe () -> Maybe () #-}
 unless p s        =  if p then return () else s
-
--- | Promote a function to a monad.
-liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
-liftM f m1              = do { x1 <- m1; return (f x1) }
-
--- | Promote a function to a monad, scanning the monadic arguments from
--- left to right.  For example,
---
--- >    liftM2 (+) [0,1] [0,2] = [0,2,1,3]
--- >    liftM2 (+) (Just 1) Nothing = Nothing
---
-liftM2  :: (Monad m) => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
-liftM2 f m1 m2          = do { x1 <- m1; x2 <- m2; return (f x1 x2) }
-
--- | Promote a function to a monad, scanning the monadic arguments from
--- left to right (cf. 'liftM2').
-liftM3  :: (Monad m) => (a1 -> a2 -> a3 -> r) -> m a1 -> m a2 -> m a3 -> m r
-liftM3 f m1 m2 m3       = do { x1 <- m1; x2 <- m2; x3 <- m3; return (f x1 x2 x3) }
-
--- | Promote a function to a monad, scanning the monadic arguments from
--- left to right (cf. 'liftM2').
-liftM4  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m r
-liftM4 f m1 m2 m3 m4    = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; return (f x1 x2 x3 x4) }
-
--- | Promote a function to a monad, scanning the monadic arguments from
--- left to right (cf. 'liftM2').
-liftM5  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> a5 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m a5 -> m r
-liftM5 f m1 m2 m3 m4 m5 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; x5 <- m5; return (f x1 x2 x3 x4 x5) }
-
-{-# INLINEABLE liftM #-}
-{-# SPECIALISE liftM :: (a1->r) -> IO a1 -> IO r #-}
-{-# SPECIALISE liftM :: (a1->r) -> Maybe a1 -> Maybe r #-}
-{-# INLINEABLE liftM2 #-}
-{-# SPECIALISE liftM2 :: (a1->a2->r) -> IO a1 -> IO a2 -> IO r #-}
-{-# SPECIALISE liftM2 :: (a1->a2->r) -> Maybe a1 -> Maybe a2 -> Maybe r #-}
-{-# INLINEABLE liftM3 #-}
-{-# SPECIALISE liftM3 :: (a1->a2->a3->r) -> IO a1 -> IO a2 -> IO a3 -> IO r #-}
-{-# SPECIALISE liftM3 :: (a1->a2->a3->r) -> Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe r #-}
-{-# INLINEABLE liftM4 #-}
-{-# SPECIALISE liftM4 :: (a1->a2->a3->a4->r) -> IO a1 -> IO a2 -> IO a3 -> IO a4 -> IO r #-}
-{-# SPECIALISE liftM4 :: (a1->a2->a3->a4->r) -> Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe a4 -> Maybe r #-}
-{-# INLINEABLE liftM5 #-}
-{-# SPECIALISE liftM5 :: (a1->a2->a3->a4->a5->r) -> IO a1 -> IO a2 -> IO a3 -> IO a4 -> IO a5 -> IO r #-}
-{-# SPECIALISE liftM5 :: (a1->a2->a3->a4->a5->r) -> Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe a4 -> Maybe a5 -> Maybe r #-}
-
-{- | In many situations, the 'liftM' operations can be replaced by uses of
-'ap', which promotes function application. 
-
->       return f `ap` x1 `ap` ... `ap` xn
-
-is equivalent to 
-
->       liftMn f x1 x2 ... xn
-
--}
-
-ap                :: (Monad m) => m (a -> b) -> m a -> m b
-ap                =  liftM2 id
 
 infixl 4 <$!>
 

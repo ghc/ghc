@@ -4,9 +4,17 @@
 
 module Main (main) where
 
+import Control.Monad
 import Control.Monad.Fix
 
 data X a = X a deriving Show
+
+instance Functor X where
+  fmap f (X a) = X (f a)
+
+instance Applicative X where
+  pure  = return
+  (<*>) = ap
 
 instance Monad X where
   return      = X

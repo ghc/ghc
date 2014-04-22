@@ -14,11 +14,13 @@ newtype T = MkT S deriving( C a )
 class (Monad m) => MonadState s m | m -> s where
 
 newtype State s a = State { runState :: s -> (a, s) }
+instance Functor (State s) where {}
+instance Applicative (State s) where {}
 instance Monad (State s) where {}
 instance MonadState s (State s) where {}
 
 newtype WrappedState s a = WS { runWS :: State s a }
-   deriving (Monad, MonadState state)
+   deriving (Functor, Applicative, Monad, MonadState state)
 --   deriving (Monad)
 
 deriving instance (MonadState state (State s))

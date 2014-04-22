@@ -2176,7 +2176,7 @@ derivingThingErr newtype_deriving clas tys ty why
          nest 2 why]
   where
     extra | newtype_deriving = ptext (sLit "(even with cunning newtype deriving)")
-          | otherwise        = empty
+          | otherwise        = Outputable.empty
     pred = mkClassPred clas (tys ++ [ty])
 
 derivingHiddenErr :: TyCon -> SDoc

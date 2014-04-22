@@ -37,7 +37,9 @@ import Outputable
 import FastString
 import State
 
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
+#endif
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map

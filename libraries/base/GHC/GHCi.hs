@@ -21,7 +21,7 @@ module GHC.GHCi {-# WARNING "This is an unstable interface." #-} (
         GHCiSandboxIO(..), NoIO()
     ) where
 
-import GHC.Base (IO(), Monad, (>>=), return, id, (.))
+import GHC.Base (IO(), Monad, Functor(fmap), Applicative(..), (>>=), return, id, (.), ap)
 
 -- | A monad that can execute GHCi statements by lifting them out of
 -- m into the IO monad. (e.g state monads)
@@ -33,6 +33,13 @@ instance GHCiSandboxIO IO where
 
 -- | A monad that doesn't allow any IO.
 newtype NoIO a = NoIO { noio :: IO a }
+
+instance Functor NoIO where
+  fmap f (NoIO a) = NoIO (fmap f a)
+
+instance Applicative NoIO where
+  pure  = return
+  (<*>) = ap
 
 instance Monad NoIO where
     return a  = NoIO (return a)

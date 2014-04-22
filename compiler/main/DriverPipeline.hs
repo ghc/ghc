@@ -1593,7 +1593,7 @@ mkExtraObjToLinkIntoBinary dflags = do
 
   where
     main
-      | gopt Opt_NoHsMain dflags = empty
+      | gopt Opt_NoHsMain dflags = Outputable.empty
       | otherwise = vcat [
              ptext (sLit "#include \"Rts.h\""),
              ptext (sLit "extern StgClosure ZCMain_main_closure;"),
@@ -1603,7 +1603,7 @@ mkExtraObjToLinkIntoBinary dflags = do
              ptext (sLit "    __conf.rts_opts_enabled = ")
                  <> text (show (rtsOptsEnabled dflags)) <> semi,
              case rtsOpts dflags of
-                Nothing   -> empty
+                Nothing   -> Outputable.empty
                 Just opts -> ptext (sLit "    __conf.rts_opts= ") <>
                                text (show opts) <> semi,
              ptext (sLit "    __conf.rts_hs_main = rtsTrue;"),
@@ -1639,7 +1639,7 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
           -- where we need to do this.
           (if platformHasGnuNonexecStack (targetPlatform dflags)
            then text ".section .note.GNU-stack,\"\",@progbits\n"
-           else empty)
+           else Outputable.empty)
 
            ]
           where

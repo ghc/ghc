@@ -54,7 +54,9 @@ import Data.Word
 import System.IO
 import qualified Data.Map as Map
 import Control.Monad (liftM, ap)
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
+#endif
 
 import qualified Data.Array.Unsafe as U ( castSTUArray )
 import Data.Array.ST

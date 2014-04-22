@@ -35,6 +35,7 @@ instance Functor Maybe -- Defined in ‘Data.Maybe’
 instance Ord a => Ord (Maybe a) -- Defined in ‘Data.Maybe’
 instance Read a => Read (Maybe a) -- Defined in ‘GHC.Read’
 instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
+instance Applicative Maybe -- Defined in ‘Data.Maybe’
 type instance A (Maybe a) a = a 	-- Defined at T4175.hs:9:1
 data Int = I# Int# 	-- Defined in ‘GHC.Types’
 instance C Int -- Defined at T4175.hs:18:10

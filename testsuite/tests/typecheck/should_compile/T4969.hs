@@ -8,7 +8,7 @@
 
 module Q where
 
-import Control.Monad (foldM)
+import Control.Monad (foldM, liftM, ap)
 
 data NameId = NameId
 data Named name a = Named
@@ -78,6 +78,13 @@ instance Monad m => MonadState TCState (TCMT m) where
 
 instance Monad m => MonadTCM (TCMT m) where
     liftTCM = undefined
+
+instance Functor (TCMT m) where
+  fmap = liftM
+
+instance Applicative (TCMT m) where
+  pure  = return
+  (<*>) = ap
 
 instance Monad (TCMT m) where
     return = undefined

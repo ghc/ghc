@@ -13,7 +13,7 @@
 {-# LANGUAGE UnicodeSyntax #-}
 
 module Main where
-import Control.Monad (Monad(..), join)
+import Control.Monad (Monad(..), join, ap)
 import Data.Monoid (Monoid(..))
 
 -- First we define the type class Monoidy:
@@ -84,6 +84,10 @@ test2 = print (Sum 1 <+> Sum 2 <+> Sum 4)  -- Sum 7
 instance Monoidy (→) (,) () m ⇒ Monoid m where
   mempty = munit ()
   mappend = curry mjoin
+
+instance Applicative Wrapper where
+  pure  = return
+  (<*>) = ap
 
 -- instance (Functor m, Monoidy NT FC Id m) ⇒ Monad m where
 instance Monad Wrapper where

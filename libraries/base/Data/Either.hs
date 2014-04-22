@@ -56,6 +56,11 @@ instance Functor (Either a) where
     fmap _ (Left x) = Left x
     fmap f (Right y) = Right (f y)
 
+instance Applicative (Either e) where
+    pure          = Right
+    Left  e <*> _ = Left e
+    Right f <*> r = fmap f r
+
 instance Monad (Either e) where
     return = Right
     Left  l >>= _ = Left l

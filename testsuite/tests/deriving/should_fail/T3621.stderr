@@ -1,5 +1,5 @@
 
-T3621.hs:21:21:
+T3621.hs:23:43:
     No instance for (MonadState state (State s))
       arising from the 'deriving' clause of a data type declaration
     Possible fix:

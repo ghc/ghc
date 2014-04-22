@@ -488,7 +488,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
     recoverM (recoveryCode binder_names sig_fn) $ do 
         -- Set up main recover; take advantage of any type sigs
 
-    { traceTc "------------------------------------------------" empty
+    { traceTc "------------------------------------------------" Outputable.empty
     ; traceTc "Bindings for {" (ppr binder_names)
     ; dflags   <- getDynFlags
     ; type_env <- getLclTypeEnv

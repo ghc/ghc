@@ -300,7 +300,7 @@ unsupportedExtnError dflags loc unsup =
   throw $ mkSrcErr $ unitBag $
     mkPlainErrMsg dflags loc $
         text "Unsupported extension: " <> text unsup $$
-        if null suggestions then empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
+        if null suggestions then Outputable.empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
   where
      suggestions = fuzzyMatch unsup supportedLanguagesAndExtensions
 

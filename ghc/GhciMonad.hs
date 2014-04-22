@@ -48,7 +48,6 @@ import Data.IORef
 import System.CPUTime
 import System.Environment
 import System.IO
-import Control.Applicative (Applicative(..))
 import Control.Monad
 import GHC.Exts
 
@@ -56,6 +55,10 @@ import System.Console.Haskeline (CompletionFunc, InputT)
 import qualified System.Console.Haskeline as Haskeline
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
+
+#if __GLASGOW_HASKELL__ < 709
+import Control.Applicative (Applicative(..))
+#endif
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -138,7 +141,7 @@ prettyLocations locs = vcat $ map (\(i, loc) -> brackets (int i) <+> ppr loc) $ 
 instance Outputable BreakLocation where
    ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+>
                 if null (onBreakCmd loc)
-                   then empty
+                   then Outputable.empty
                    else doubleQuotes (text (onBreakCmd loc))
 
 recordBreak :: BreakLocation -> GHCi (Bool{- was already present -}, Int)

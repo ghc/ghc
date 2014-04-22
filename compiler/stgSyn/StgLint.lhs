@@ -27,7 +27,9 @@ import Util
 import SrcLoc
 import Outputable
 import FastString
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ( Applicative(..) )
+#endif
 import Control.Monad
 import Data.Function
 
@@ -486,7 +488,7 @@ checkTys ty1 ty2 msg = LintM $ \loc _scope errs
 _mkCaseAltMsg :: [StgAlt] -> MsgDoc
 _mkCaseAltMsg _alts
   = ($$) (text "In some case alternatives, type of alternatives not all same:")
-            (empty) -- LATER: ppr alts
+            (Outputable.empty) -- LATER: ppr alts
 
 mkDefltMsg :: Id -> TyCon -> MsgDoc
 mkDefltMsg bndr tc

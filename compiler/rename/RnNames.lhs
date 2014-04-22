@@ -1447,13 +1447,13 @@ warnUnusedImport (L loc decl, used, unused)
                  nest 2 (ptext (sLit "except perhaps to import instances from")
                                    <+> quotes pp_mod),
                  ptext (sLit "To import instances alone, use:")
-                                   <+> ptext (sLit "import") <+> pp_mod <> parens empty ]
+                                   <+> ptext (sLit "import") <+> pp_mod <> parens Outputable.empty ]
     msg2 = sep [pp_herald <+> quotes (pprWithCommas ppr unused),
                     text "from module" <+> quotes pp_mod <+> pp_not_used]
     pp_herald  = text "The" <+> pp_qual <+> text "import of"
     pp_qual
       | ideclQualified decl = text "qualified"
-      | otherwise           = empty
+      | otherwise           = Outputable.empty
     pp_mod      = ppr (unLoc (ideclName decl))
     pp_not_used = text "is redundant"
 \end{code}
@@ -1574,7 +1574,7 @@ badImportItemErrStd iface decl_spec ie
          ptext (sLit "does not export"), quotes (ppr ie)]
   where
     source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
-                  | otherwise     = empty
+                  | otherwise     = Outputable.empty
 
 badImportItemErrDataCon :: OccName -> ModIface -> ImpDeclSpec -> IE RdrName -> SDoc
 badImportItemErrDataCon dataType iface decl_spec ie
@@ -1597,7 +1597,7 @@ badImportItemErrDataCon dataType iface decl_spec ie
     datacon_occ = rdrNameOcc $ ieName ie
     datacon = parenSymOcc datacon_occ (ppr datacon_occ)
     source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
-                  | otherwise     = empty
+                  | otherwise     = Outputable.empty
     parens_sp d = parens (space <> d <> space)  -- T( f,g )
 
 badImportItemErr :: ModIface -> ImpDeclSpec -> IE RdrName -> [AvailInfo] -> SDoc

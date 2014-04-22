@@ -25,7 +25,6 @@ module GHC.Event.Internal
 import Data.Bits ((.|.), (.&.))
 import Data.List (foldl', intercalate)
 import Data.Maybe (Maybe(..))
-import Data.Monoid (Monoid(..))
 import Foreign.C.Error (eINTR, getErrno, throwErrno)
 import System.Posix.Types (Fd)
 import GHC.Base

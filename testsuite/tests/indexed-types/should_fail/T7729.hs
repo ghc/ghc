@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts, TypeFamilies #-}
 module T7729 where
+import Control.Monad
 
 class Monad m => PrimMonad m where
   type PrimState m
@@ -15,6 +16,13 @@ class (PrimMonad (BasePrimMonad m), Monad m) => MonadPrim m where
 newtype Rand m a = Rand {
   runRand :: Maybe (m ()) -> m a
   }
+
+instance Monad m => Functor (Rand m) where
+  fmap = liftM
+
+instance Monad m => Applicative (Rand m) where
+  pure = return
+  (<*>) = ap
 
 instance (Monad m) => Monad (Rand m) where
   return           = Rand . const . return

@@ -1283,7 +1283,7 @@ dumpLoc (CasePat (con, args, _))
 dumpLoc (ImportedUnfolding locn)
   = (locn, brackets (ptext (sLit "in an imported unfolding")))
 dumpLoc TopLevelBindings
-  = (noSrcLoc, empty)
+  = (noSrcLoc, Outputable.empty)
 dumpLoc (InType ty)
   = (noSrcLoc, text "In the type" <+> quotes (ppr ty))
 dumpLoc (InCo co)

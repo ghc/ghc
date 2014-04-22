@@ -589,7 +589,7 @@ packageFlagErr dflags (ExposePackage (PackageArg pkg) _) []
 packageFlagErr dflags flag reasons
   = throwGhcExceptionIO (CmdLineError (showSDoc dflags $ err))
   where err = text "cannot satisfy " <> pprFlag flag <>
-                (if null reasons then empty else text ": ") $$
+                (if null reasons then Outputable.empty else text ": ") $$
               nest 4 (ppr_reasons $$
                       -- ToDo: this admonition seems a bit dodgy
                       text "(use -v for more information)")
@@ -608,7 +608,7 @@ pprFlag flag = case flag of
                      PackageArg    p -> text "-package " <> text p
                      PackageIdArg  p -> text "-package-id " <> text p
                      PackageKeyArg p -> text "-package-key " <> text p
-        ppr_rns Nothing = empty
+        ppr_rns Nothing = Outputable.empty
         ppr_rns (Just rns) = char '(' <> hsep (punctuate comma (map ppr_rn rns))
                                       <> char ')'
         ppr_rn (orig, new) | orig == new = text orig
@@ -1374,7 +1374,7 @@ missingPackageMsg :: Outputable pkgid => pkgid -> SDoc
 missingPackageMsg p = ptext (sLit "unknown package:") <+> ppr p
 
 missingDependencyMsg :: Maybe PackageKey -> SDoc
-missingDependencyMsg Nothing = empty
+missingDependencyMsg Nothing = Outputable.empty
 missingDependencyMsg (Just parent)
   = space <> parens (ptext (sLit "dependency of") <+> ftext (packageKeyFS parent))
 

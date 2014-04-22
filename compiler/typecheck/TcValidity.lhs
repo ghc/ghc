@@ -404,7 +404,7 @@ forAllTyErr rank ty
     suggestion = case rank of
                    LimitedRank {} -> ptext (sLit "Perhaps you intended to use RankNTypes or Rank2Types")
                    MonoType d     -> d
-                   _              -> empty      -- Polytype is always illegal
+                   _              -> Outputable.empty -- Polytype is always illegal
 
 unliftedArgErr, ubxArgTyErr :: Type -> SDoc
 unliftedArgErr  ty = sep [ptext (sLit "Illegal unlifted type:"), ppr ty]

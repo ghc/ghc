@@ -123,6 +123,8 @@ infixl 4  <$
 infixl 1  >>, >>=
 infixr 0  $
 
+infixl 4 <*>, <*, *>, <**>
+
 default ()              -- Double isn't available yet
 \end{code}
 
@@ -183,10 +185,102 @@ foldr = error "urk"
 -}
 \end{code}
 
+%*********************************************************
+%*                                                      *
+\subsection{Monoids}
+%*                                                      *
+%*********************************************************
+\begin{code}
+
+-- ---------------------------------------------------------------------------
+-- | The class of monoids (types with an associative binary operation that
+-- has an identity).  Instances should satisfy the following laws:
+--
+--  * @mappend mempty x = x@
+--
+--  * @mappend x mempty = x@
+--
+--  * @mappend x (mappend y z) = mappend (mappend x y) z@
+--
+--  * @mconcat = 'foldr' mappend mempty@
+--
+-- The method names refer to the monoid of lists under concatenation,
+-- but there are many other instances.
+--
+-- Minimal complete definition: 'mempty' and 'mappend'.
+--
+-- Some types can be viewed as a monoid in more than one way,
+-- e.g. both addition and multiplication on numbers.
+-- In such cases we often define @newtype@s and make those instances
+-- of 'Monoid', e.g. 'Sum' and 'Product'.
+
+class Monoid a where
+        mempty  :: a
+        -- ^ Identity of 'mappend'
+        mappend :: a -> a -> a
+        -- ^ An associative operation
+        mconcat :: [a] -> a
+
+        -- ^ Fold a list using the monoid.
+        -- For most types, the default definition for 'mconcat' will be
+        -- used, but the function is included in the class definition so
+        -- that an optimized version can be provided for specific types.
+
+        mconcat = foldr mappend mempty
+
+instance Monoid [a] where
+        mempty  = []
+        mappend = (++)
+
+instance Monoid b => Monoid (a -> b) where
+        mempty _ = mempty
+        mappend f g x = f x `mappend` g x
+
+instance Monoid () where
+        -- Should it be strict?
+        mempty        = ()
+        _ `mappend` _ = ()
+        mconcat _     = ()
+
+instance (Monoid a, Monoid b) => Monoid (a,b) where
+        mempty = (mempty, mempty)
+        (a1,b1) `mappend` (a2,b2) =
+                (a1 `mappend` a2, b1 `mappend` b2)
+
+instance (Monoid a, Monoid b, Monoid c) => Monoid (a,b,c) where
+        mempty = (mempty, mempty, mempty)
+        (a1,b1,c1) `mappend` (a2,b2,c2) =
+                (a1 `mappend` a2, b1 `mappend` b2, c1 `mappend` c2)
+
+instance (Monoid a, Monoid b, Monoid c, Monoid d) => Monoid (a,b,c,d) where
+        mempty = (mempty, mempty, mempty, mempty)
+        (a1,b1,c1,d1) `mappend` (a2,b2,c2,d2) =
+                (a1 `mappend` a2, b1 `mappend` b2,
+                 c1 `mappend` c2, d1 `mappend` d2)
+
+instance (Monoid a, Monoid b, Monoid c, Monoid d, Monoid e) =>
+                Monoid (a,b,c,d,e) where
+        mempty = (mempty, mempty, mempty, mempty, mempty)
+        (a1,b1,c1,d1,e1) `mappend` (a2,b2,c2,d2,e2) =
+                (a1 `mappend` a2, b1 `mappend` b2, c1 `mappend` c2,
+                 d1 `mappend` d2, e1 `mappend` e2)
+
+-- lexicographical ordering
+instance Monoid Ordering where
+        mempty         = EQ
+        LT `mappend` _ = LT
+        EQ `mappend` y = y
+        GT `mappend` _ = GT
+
+instance Monoid a => Applicative ((,) a) where
+    pure x = (mempty, x)
+    (u, f) <*> (v, x) = (u `mappend` v, f x)
+\end{code}
+
 
 %*********************************************************
 %*                                                      *
-\subsection{Monadic classes @Functor@, @Monad@ }
+\subsection{Monadic classes @Functor@, @Applicative@, @Monad@ }
 %*                                                      *
 %*********************************************************
 
@@ -209,6 +303,82 @@ class  Functor f  where
     -- overridden with a more efficient version.
     (<$)        :: a -> f b -> f a
     (<$)        =  fmap . const
+
+-- | A functor with application, providing operations to
+--
+-- * embed pure expressions ('pure'), and
+--
+-- * sequence computations and combine their results ('<*>').
+--
+-- A minimal complete definition must include implementations of these
+-- functions satisfying the following laws:
+--
+-- [/identity/]
+--
+--      @'pure' 'id' '<*>' v = v@
+--
+-- [/composition/]
+--
+--      @'pure' (.) '<*>' u '<*>' v '<*>' w = u '<*>' (v '<*>' w)@
+--
+-- [/homomorphism/]
+--
+--      @'pure' f '<*>' 'pure' x = 'pure' (f x)@
+--
+-- [/interchange/]
+--
+--      @u '<*>' 'pure' y = 'pure' ('$' y) '<*>' u@
+--
+-- The other methods have the following default definitions, which may
+-- be overridden with equivalent specialized implementations:
+--
+--   * @u '*>' v = 'pure' ('const' 'id') '<*>' u '<*>' v@
+--
+--   * @u '<*' v = 'pure' 'const' '<*>' u '<*>' v@
+--
+-- As a consequence of these laws, the 'Functor' instance for @f@ will satisfy
+--
+--   * @'fmap' f x = 'pure' f '<*>' x@
+--
+-- If @f@ is also a 'Monad', it should satisfy
+--
+--   * @'pure' = 'return'@
+--
+--   * @('<*>') = 'ap'@
+--
+-- (which implies that 'pure' and '<*>' satisfy the applicative functor laws).
+
+class Functor f => Applicative f where
+    -- | Lift a value.
+    pure :: a -> f a
+
+    -- | Sequential application.
+    (<*>) :: f (a -> b) -> f a -> f b
+
+    -- | Sequence actions, discarding the value of the first argument.
+    (*>) :: f a -> f b -> f b
+    (*>) = liftA2 (const id)
+
+    -- | Sequence actions, discarding the value of the second argument.
+    (<*) :: f a -> f b -> f a
+    (<*) = liftA2 const
+
+-- | A variant of '<*>' with the arguments reversed.
+(<**>) :: Applicative f => f a -> f (a -> b) -> f b
+(<**>) = liftA2 (flip ($))
+
+-- | Lift a function to actions.
+-- This function may be used as a value for `fmap` in a `Functor` instance.
+liftA :: Applicative f => (a -> b) -> f a -> f b
+liftA f a = pure f <*> a
+
+-- | Lift a binary function to actions.
+liftA2 :: Applicative f => (a -> b -> c) -> f a -> f b -> f c
+liftA2 f a b = (fmap f a) <*> b
+
+-- | Lift a ternary function to actions.
+liftA3 :: Applicative f => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
+liftA3 f a b c = (fmap f a) <*> b <*> c
 
 {- | The 'Monad' class defines the basic operations over a /monad/,
 a concept from a branch of mathematics known as /category theory/.
@@ -233,30 +403,95 @@ The instances of 'Monad' for lists, 'Data.Maybe.Maybe' and 'System.IO.IO'
 defined in the "Prelude" satisfy these laws.
 -}
 
-class  Monad m  where
+-- | The 'join' function is the conventional monad join operator. It
+-- is used to remove one level of monadic structure, projecting its
+-- bound argument into the outer level.
+join              :: (Monad m) => m (m a) -> m a
+join x            =  x >>= id
+
+class Applicative m => Monad m where
     -- | Sequentially compose two actions, passing any value produced
     -- by the first as an argument to the second.
     (>>=)       :: forall a b. m a -> (a -> m b) -> m b
+    m >>= f = join (fmap f m)
+
     -- | Sequentially compose two actions, discarding any value produced
     -- by the first, like sequencing operators (such as the semicolon)
     -- in imperative languages.
     (>>)        :: forall a b. m a -> m b -> m b
-        -- Explicit for-alls so that we know what order to
-        -- give type arguments when desugaring
+    m >> k = m >>= \_ -> k
+    {-# INLINE (>>) #-}
 
     -- | Inject a value into the monadic type.
     return      :: a -> m a
+
     -- | Fail with a message.  This operation is not part of the
     -- mathematical definition of a monad, but is invoked on pattern-match
     -- failure in a @do@ expression.
     fail        :: String -> m a
-
-    {-# INLINE (>>) #-}
-    m >> k      = m >>= \_ -> k
     fail s      = error s
+
+-- | Promote a function to a monad.
+liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
+liftM f m1              = do { x1 <- m1; return (f x1) }
+
+-- | Promote a function to a monad, scanning the monadic arguments from
+-- left to right.  For example,
+--
+-- >    liftM2 (+) [0,1] [0,2] = [0,2,1,3]
+-- >    liftM2 (+) (Just 1) Nothing = Nothing
+--
+liftM2  :: (Monad m) => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
+liftM2 f m1 m2          = do { x1 <- m1; x2 <- m2; return (f x1 x2) }
+
+-- | Promote a function to a monad, scanning the monadic arguments from
+-- left to right (cf. 'liftM2').
+liftM3  :: (Monad m) => (a1 -> a2 -> a3 -> r) -> m a1 -> m a2 -> m a3 -> m r
+liftM3 f m1 m2 m3       = do { x1 <- m1; x2 <- m2; x3 <- m3; return (f x1 x2 x3) }
+
+-- | Promote a function to a monad, scanning the monadic arguments from
+-- left to right (cf. 'liftM2').
+liftM4  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m r
+liftM4 f m1 m2 m3 m4    = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; return (f x1 x2 x3 x4) }
+
+-- | Promote a function to a monad, scanning the monadic arguments from
+-- left to right (cf. 'liftM2').
+liftM5  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> a5 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m a5 -> m r
+liftM5 f m1 m2 m3 m4 m5 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; x5 <- m5; return (f x1 x2 x3 x4 x5) }
+
+{-# INLINEABLE liftM #-}
+{-# SPECIALISE liftM :: (a1->r) -> IO a1 -> IO r #-}
+{-# INLINEABLE liftM2 #-}
+{-# SPECIALISE liftM2 :: (a1->a2->r) -> IO a1 -> IO a2 -> IO r #-}
+{-# INLINEABLE liftM3 #-}
+{-# SPECIALISE liftM3 :: (a1->a2->a3->r) -> IO a1 -> IO a2 -> IO a3 -> IO r #-}
+{-# INLINEABLE liftM4 #-}
+{-# SPECIALISE liftM4 :: (a1->a2->a3->a4->r) -> IO a1 -> IO a2 -> IO a3 -> IO a4 -> IO r #-}
+{-# INLINEABLE liftM5 #-}
+{-# SPECIALISE liftM5 :: (a1->a2->a3->a4->a5->r) -> IO a1 -> IO a2 -> IO a3 -> IO a4 -> IO a5 -> IO r #-}
+
+{- | In many situations, the 'liftM' operations can be replaced by uses of
+'ap', which promotes function application. 
+
+>       return f `ap` x1 `ap` ... `ap` xn
+
+is equivalent to 
+
+>       liftMn f x1 x2 ... xn
+
+-}
+
+ap                :: (Monad m) => m (a -> b) -> m a -> m b
+ap                =  liftM2 id
+
+-- instances for Prelude types
 
 instance Functor ((->) r) where
     fmap = (.)
+
+instance Applicative ((->) a) where
+    pure = const
+    (<*>) f g x = f x (g x)
 
 instance Monad ((->) r) where
     return = const
@@ -264,6 +499,7 @@ instance Monad ((->) r) where
 
 instance Functor ((,) a) where
     fmap f (x,y) = (x, f y)
+
 \end{code}
 
 
@@ -276,6 +512,10 @@ instance Functor ((,) a) where
 \begin{code}
 instance Functor [] where
     fmap = map
+
+instance Applicative [] where
+    pure = return
+    (<*>) = ap
 
 instance  Monad []  where
     m >>= k             = foldr ((++) . k) [] m
@@ -624,6 +864,10 @@ asTypeOf                =  const
 \begin{code}
 instance  Functor IO where
    fmap f x = x >>= (return . f)
+
+instance Applicative IO where
+    pure = return
+    (<*>) = ap
 
 instance  Monad IO  where
     {-# INLINE return #-}

@@ -735,8 +735,8 @@ ap_RDR                  = nameRdrName apAName
 foldable_foldr_RDR      = varQual_RDR dATA_FOLDABLE       (fsLit "foldr")
 foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
 traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
-mempty_RDR              = varQual_RDR dATA_MONOID         (fsLit "mempty")
-mappend_RDR             = varQual_RDR dATA_MONOID         (fsLit "mappend")
+mempty_RDR              = varQual_RDR gHC_BASE            (fsLit "mempty")
+mappend_RDR             = varQual_RDR gHC_BASE            (fsLit "mappend")
 
 ----------------------
 varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR
@@ -849,7 +849,7 @@ failMName          = varQual gHC_BASE (fsLit "fail")   failMClassOpKey
 
 -- Classes (Applicative, Foldable, Traversable)
 applicativeClassName, foldableClassName, traversableClassName :: Name
-applicativeClassName  = clsQual  cONTROL_APPLICATIVE (fsLit "Applicative") applicativeClassKey
+applicativeClassName  = clsQual  gHC_BASE            (fsLit "Applicative") applicativeClassKey
 foldableClassName     = clsQual  dATA_FOLDABLE       (fsLit "Foldable")    foldableClassKey
 traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") traversableClassKey
 
@@ -858,10 +858,10 @@ traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") trave
 -- AMP additions
 
 joinMName,  apAName, pureAName, alternativeClassName :: Name
-joinMName            = varQual mONAD               (fsLit "join")        joinMIdKey
-apAName              = varQual cONTROL_APPLICATIVE (fsLit "<*>")         apAClassOpKey
-pureAName            = varQual cONTROL_APPLICATIVE (fsLit "pure")        pureAClassOpKey
-alternativeClassName = clsQual cONTROL_APPLICATIVE (fsLit "Alternative") alternativeClassKey
+joinMName            = varQual gHC_BASE (fsLit "join")        joinMIdKey
+apAName              = varQual gHC_BASE (fsLit "<*>")         apAClassOpKey
+pureAName            = varQual gHC_BASE (fsLit "pure")        pureAClassOpKey
+alternativeClassName = clsQual mONAD (fsLit "Alternative") alternativeClassKey
 
 joinMIdKey, apAClassOpKey, pureAClassOpKey, alternativeClassKey :: Unique
 joinMIdKey          = mkPreludeMiscIdUnique 750

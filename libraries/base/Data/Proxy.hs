@@ -69,9 +69,20 @@ instance Bounded (Proxy s) where
     minBound = Proxy
     maxBound = Proxy
 
+instance Monoid (Proxy s) where
+    mempty = Proxy
+    mappend _ _ = Proxy
+    mconcat _ = Proxy
+
 instance Functor Proxy where
     fmap _ _ = Proxy
     {-# INLINE fmap #-}
+
+instance Applicative Proxy where
+    pure _ = Proxy
+    {-# INLINE pure #-}
+    _ <*> _ = Proxy
+    {-# INLINE (<*>) #-}
 
 instance Monad Proxy where
     return _ = Proxy

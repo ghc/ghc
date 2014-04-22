@@ -426,7 +426,7 @@ dsExpr (RecordCon (L _ data_con_id) con_expr rbinds) = do
               (rhs:rhss) -> ASSERT( null rhss )
                             dsLExpr rhs
               []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr lbl)
-        unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty empty
+        unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
 
         labels = dataConFieldLabels (idDataCon data_con_id)
         -- The data_con_id is guaranteed to be the wrapper id of the constructor

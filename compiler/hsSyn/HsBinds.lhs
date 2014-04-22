@@ -13,6 +13,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE CPP #-}
 
 module HsBinds where
 
@@ -43,7 +44,11 @@ import Data.Ord
 import Data.Foldable ( Foldable(..) )
 import Data.Traversable ( Traversable(..) )
 import Data.Monoid ( mappend )
-import Control.Applicative ( (<$>), (<*>) )
+#if __GLASGOW_HASKELL__ < 709
+import Control.Applicative hiding (empty)
+#else
+import Control.Applicative ((<$>))
+#endif
 \end{code}
 
 %************************************************************************

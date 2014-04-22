@@ -549,7 +549,7 @@ findAndReadIface doc_str mod hi_boot_file
   = do traceIf (sep [hsep [ptext (sLit "Reading"), 
                            if hi_boot_file 
                              then ptext (sLit "[boot]") 
-                             else empty,
+                             else Outputable.empty,
                            ptext (sLit "interface for"), 
                            ppr mod <> semi],
                      nest 4 (ptext (sLit "reason:") <+> doc_str)])
@@ -736,9 +736,9 @@ pprModIface :: ModIface -> SDoc
 pprModIface iface
  = vcat [ ptext (sLit "interface")
                 <+> ppr (mi_module iface) <+> pp_boot
-                <+> (if mi_orphan iface then ptext (sLit "[orphan module]") else empty)
-                <+> (if mi_finsts iface then ptext (sLit "[family instance module]") else empty)
-                <+> (if mi_hpc    iface then ptext (sLit "[hpc]") else empty)
+                <+> (if mi_orphan iface then ptext (sLit "[orphan module]") else Outputable.empty)
+                <+> (if mi_finsts iface then ptext (sLit "[family instance module]") else Outputable.empty)
+                <+> (if mi_hpc    iface then ptext (sLit "[hpc]") else Outputable.empty)
                 <+> integer hiVersion
         , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash iface))
         , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash iface))
@@ -764,7 +764,7 @@ pprModIface iface
         ]
   where
     pp_boot | mi_boot iface = ptext (sLit "[boot]")
-            | otherwise     = empty
+            | otherwise     = Outputable.empty
 \end{code}
 
 When printing export lists, we print like this:
@@ -775,12 +775,12 @@ When printing export lists, we print like this:
 \begin{code}
 pprExport :: IfaceExport -> SDoc
 pprExport (Avail n)      = ppr n
-pprExport (AvailTC _ []) = empty
+pprExport (AvailTC _ []) = Outputable.empty
 pprExport (AvailTC n (n':ns)) 
   | n==n'     = ppr n <> pp_export ns
   | otherwise = ppr n <> char '|' <> pp_export (n':ns)
   where  
-    pp_export []    = empty
+    pp_export []    = Outputable.empty
     pp_export names = braces (hsep (map ppr names))
 
 pprUsage :: Usage -> SDoc
@@ -789,7 +789,7 @@ pprUsage usage@UsagePackageModule{}
 pprUsage usage@UsageHomeModule{}
   = pprUsageImport usage usg_mod_name $$
     nest 2 (
-        maybe empty (\v -> text "exports: " <> ppr v) (usg_exports usage) $$
+        maybe Outputable.empty (\v -> text "exports: " <> ppr v) (usg_exports usage) $$
         vcat [ ppr n <+> ppr v | (n,v) <- usg_entities usage ]
         )
 pprUsage usage@UsageFile{}
@@ -815,12 +815,12 @@ pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
   where
     ppr_mod (mod_name, boot) = ppr mod_name <+> ppr_boot boot
     ppr_pkg (pkg,trust_req)  = ppr pkg <>
-                               (if trust_req then text "*" else empty)
+                               (if trust_req then text "*" else Outputable.empty)
     ppr_boot True  = text "[boot]"
-    ppr_boot False = empty
+    ppr_boot False = Outputable.empty
 
 pprFixities :: [(OccName, Fixity)] -> SDoc
-pprFixities []    = empty
+pprFixities []    = Outputable.empty
 pprFixities fixes = ptext (sLit "fixities") <+> pprWithCommas pprFix fixes
                   where
                     pprFix (occ,fix) = ppr fix <+> ppr occ 
@@ -850,7 +850,7 @@ instance Outputable Warnings where
     ppr = pprWarns
 
 pprWarns :: Warnings -> SDoc
-pprWarns NoWarnings         = empty
+pprWarns NoWarnings         = Outputable.empty
 pprWarns (WarnAll txt)  = ptext (sLit "Warn all") <+> ppr txt
 pprWarns (WarnSome prs) = ptext (sLit "Warnings")
                         <+> vcat (map pprWarning prs)
@@ -905,7 +905,7 @@ homeModError mod location
   = ptext (sLit "attempting to use module ") <> quotes (ppr mod)
     <> (case ml_hs_file location of
            Just file -> space <> parens (text file)
-           Nothing   -> empty)
+           Nothing   -> Outputable.empty)
     <+> ptext (sLit "which is not loaded")
 \end{code}
 

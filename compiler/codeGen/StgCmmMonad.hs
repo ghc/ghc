@@ -393,7 +393,7 @@ addCodeBlocksFrom :: CgState -> CgState -> CgState
 -- Add code blocks from the latter to the former
 -- (The cgs_stmts will often be empty, but not always; see codeOnly)
 s1 `addCodeBlocksFrom` s2
-  = s1 { cgs_stmts = cgs_stmts s1 <*> cgs_stmts s2,
+  = s1 { cgs_stmts = cgs_stmts s1 MkGraph.<*> cgs_stmts s2,
          cgs_tops  = cgs_tops  s1 `appOL` cgs_tops  s2 }
 
 
@@ -697,7 +697,7 @@ newLabelC = do { u <- newUnique
 emit :: CmmAGraph -> FCode ()
 emit ag
   = do  { state <- getState
-        ; setState $ state { cgs_stmts = cgs_stmts state <*> ag } }
+        ; setState $ state { cgs_stmts = cgs_stmts state MkGraph.<*> ag } }
 
 emitDecl :: CmmDecl -> FCode ()
 emitDecl decl
@@ -724,7 +724,7 @@ emitProcWithStackFrame _conv mb_info lbl _stk_args [] blocks False
 emitProcWithStackFrame conv mb_info lbl stk_args args blocks True -- do layout
   = do  { dflags <- getDynFlags
         ; let (offset, live, entry) = mkCallEntry dflags conv args stk_args
-        ; emitProc_ mb_info lbl live (entry <*> blocks) offset True
+        ; emitProc_ mb_info lbl live (entry MkGraph.<*> blocks) offset True
         }
 emitProcWithStackFrame _ _ _ _ _ _ _ = panic "emitProcWithStackFrame"
 
@@ -778,21 +778,21 @@ mkCmmIfThenElse e tbranch fbranch = do
   endif <- newLabelC
   tid   <- newLabelC
   fid   <- newLabelC
-  return $ mkCbranch e tid fid <*>
-            mkLabel tid <*> tbranch <*> mkBranch endif <*>
-            mkLabel fid <*> fbranch <*> mkLabel endif
+  return $ mkCbranch e tid fid MkGraph.<*>
+            mkLabel tid MkGraph.<*> tbranch MkGraph.<*> mkBranch endif MkGraph.<*>
+            mkLabel fid MkGraph.<*> fbranch MkGraph.<*> mkLabel endif
 
 mkCmmIfGoto :: CmmExpr -> BlockId -> FCode CmmAGraph
 mkCmmIfGoto e tid = do
   endif <- newLabelC
-  return $ mkCbranch e tid endif <*> mkLabel endif
+  return $ mkCbranch e tid endif MkGraph.<*> mkLabel endif
 
 mkCmmIfThen :: CmmExpr -> CmmAGraph -> FCode CmmAGraph
 mkCmmIfThen e tbranch = do
   endif <- newLabelC
   tid   <- newLabelC
-  return $ mkCbranch e tid endif <*>
-         mkLabel tid <*> tbranch <*> mkLabel endif
+  return $ mkCbranch e tid endif MkGraph.<*>
+         mkLabel tid MkGraph.<*> tbranch MkGraph.<*> mkLabel endif
 
 
 mkCall :: CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmActual]
@@ -803,7 +803,7 @@ mkCall f (callConv, retConv) results actuals updfr_off extra_stack = do
   let area = Young k
       (off, _, copyin) = copyInOflow dflags retConv area results []
       copyout = mkCallReturnsTo dflags f callConv actuals k off updfr_off extra_stack
-  return (copyout <*> mkLabel k <*> copyin)
+  return (copyout MkGraph.<*> mkLabel k MkGraph.<*> copyin)
 
 mkCmmCall :: CmmExpr -> [CmmFormal] -> [CmmActual] -> UpdFrameOffset
           -> FCode CmmAGraph

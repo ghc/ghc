@@ -2252,7 +2252,7 @@ addTyThingCtxt thing
                 | isDataTyCon tc        -> ptext (sLit "data")
 
              _ -> pprTrace "addTyThingCtxt strange" (ppr thing)
-                  empty
+                  Outputable.empty
 
     ctxt = hsep [ ptext (sLit "In the"), flav
                 , ptext (sLit "declaration for"), quotes (ppr name) ]

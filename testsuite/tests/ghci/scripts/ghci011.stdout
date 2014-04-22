@@ -5,6 +5,7 @@ instance Functor [] -- Defined in ‘GHC.Base’
 instance Ord a => Ord [a] -- Defined in ‘GHC.Classes’
 instance Read a => Read [a] -- Defined in ‘GHC.Read’
 instance Show a => Show [a] -- Defined in ‘GHC.Show’
+instance Applicative [] -- Defined in ‘GHC.Base’
 data () = () 	-- Defined in ‘GHC.Tuple’
 instance Bounded () -- Defined in ‘GHC.Enum’
 instance Enum () -- Defined in ‘GHC.Enum’
@@ -20,3 +21,5 @@ instance Functor ((,) a) -- Defined in ‘GHC.Base’
 instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
 instance (Read a, Read b) => Read (a, b) -- Defined in ‘GHC.Read’
 instance (Show a, Show b) => Show (a, b) -- Defined in ‘GHC.Show’
+instance GHC.Base.Monoid a => Applicative ((,) a)
+  -- Defined in ‘GHC.Base’

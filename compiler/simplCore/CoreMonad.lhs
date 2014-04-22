@@ -376,7 +376,7 @@ instance Outputable CoreToDo where
 pprPassDetails :: CoreToDo -> SDoc
 pprPassDetails (CoreDoSimplify n md) = vcat [ ptext (sLit "Max iterations =") <+> int n 
                                             , ppr md ]
-pprPassDetails _ = empty
+pprPassDetails _ = Outputable.empty
 \end{code}
 
 \begin{code}
@@ -633,7 +633,7 @@ pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
 		vcat [blankLine,
 		      ptext (sLit "Log (most recent first)"),
 		      nest 4 (vcat (map ppr l1) $$ vcat (map ppr l2))]
-	  else empty
+	  else Outputable.empty
     ]
 
 pprTickCounts :: Map Tick Int -> SDoc
@@ -734,7 +734,7 @@ pprTickCts (PreInlineUnconditionally v)	= ppr v
 pprTickCts (PostInlineUnconditionally v)= ppr v
 pprTickCts (UnfoldingDone v)		= ppr v
 pprTickCts (RuleFired v)		= ppr v
-pprTickCts LetFloatFromLet		= empty
+pprTickCts LetFloatFromLet		= Outputable.empty
 pprTickCts (EtaExpansion v)		= ppr v
 pprTickCts (EtaReduction v)		= ppr v
 pprTickCts (BetaReduction v)		= ppr v
@@ -745,7 +745,7 @@ pprTickCts (AltMerge v)			= ppr v
 pprTickCts (CaseElim v)			= ppr v
 pprTickCts (CaseIdentity v)		= ppr v
 pprTickCts (FillInCaseDefault v)	= ppr v
-pprTickCts _    			= empty
+pprTickCts _    			= Outputable.empty
 
 cmpTick :: Tick -> Tick -> Ordering
 cmpTick a b = case (tickToTag a `compare` tickToTag b) of

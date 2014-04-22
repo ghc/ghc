@@ -17,14 +17,12 @@ Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
 Rule fired: Class op <*>
 Rule fired:
-    SPEC/main@main:T8848 Control.Applicative.liftA2 _ _ _ @ (T8848.Shape
-                                                           'T8848.Z)
+    SPEC/main@main:T8848 GHC.Base.liftA2 _ _ _ @ (T8848.Shape 'T8848.Z)
 Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
 Rule fired: Class op <*>
 Rule fired:
-    SPEC/main@main:T8848 Control.Applicative.liftA2 _ _ _ @ (T8848.Shape
-                                                           'T8848.Z)
+    SPEC/main@main:T8848 GHC.Base.liftA2 _ _ _ @ (T8848.Shape 'T8848.Z)
 Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
 Rule fired: Class op <*>

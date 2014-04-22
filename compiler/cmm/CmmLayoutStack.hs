@@ -33,6 +33,10 @@ import Data.Bits
 import Data.List (nub)
 import Control.Monad (liftM)
 
+#if __GLASGOW_HASKELL__ >= 709
+import Prelude hiding ((<*>))
+#endif
+
 #include "HsVersions.h"
 
 {- Note [Stack Layout]

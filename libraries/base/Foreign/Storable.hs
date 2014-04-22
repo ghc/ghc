@@ -32,8 +32,6 @@ module Foreign.Storable
         ) where
 
 
-import Control.Monad            ( liftM )
-
 #include "MachDeps.h"
 #include "HsBaseConfig.h"
 

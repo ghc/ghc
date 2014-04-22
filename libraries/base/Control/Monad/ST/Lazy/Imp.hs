@@ -66,11 +66,15 @@ data State s = S# (State# s)
 
 instance Functor (ST s) where
     fmap f m = ST $ \ s ->
-      let 
+      let
        ST m_a = m
        (r,new_s) = m_a s
       in
       (f r,new_s)
+
+instance Applicative (ST s) where
+    pure = return
+    (<*>) = ap
 
 instance Monad (ST s) where
 

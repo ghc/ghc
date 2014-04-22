@@ -1247,7 +1247,7 @@ pprStmtCat (ParStmt {})       = ptext (sLit "parallel")
 
 ------------
 emptyInvalid :: Validity  -- Payload is the empty document
-emptyInvalid = NotValid empty
+emptyInvalid = NotValid Outputable.empty
 
 okStmt, okDoStmt, okCompStmt, okParStmt, okPArrStmt
    :: DynFlags -> HsStmtContext Name

@@ -25,6 +25,10 @@ module StgCmmLayout (
 
 #include "HsVersions.h"
 
+#if __GLASGOW_HASKELL__ >= 709
+import Prelude hiding ((<*>))
+#endif
+
 import StgCmmClosure
 import StgCmmEnv
 import StgCmmArgRep -- notably: ( slowCallPattern )

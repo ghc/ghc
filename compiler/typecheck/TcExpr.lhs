@@ -1496,15 +1496,15 @@ funResCtxt has_args fun fun_res_ty env_ty tidy_env
              (args_env, res_env) = tcSplitFunTys env'
              n_fun = length args_fun
              n_env = length args_env
-             info  | n_fun == n_env = empty
+             info  | n_fun == n_env = Outputable.empty
                    | n_fun > n_env
                    , not_fun res_env = ptext (sLit "Probable cause:") <+> quotes (ppr fun)
                                        <+> ptext (sLit "is applied to too few arguments")
                    | has_args
                    , not_fun res_fun = ptext (sLit "Possible cause:") <+> quotes (ppr fun)
                                        <+> ptext (sLit "is applied to too many arguments")
-                   | otherwise       = empty  -- Never suggest that a naked variable is
-                                             -- applied to too many args!
+                   | otherwise       = Outputable.empty  -- Never suggest that a naked variable is
+                                                         -- applied to too many args!
        ; return (tidy_env, info) }
   where
     not_fun ty   -- ty is definitely not an arrow type,
@@ -1608,8 +1608,8 @@ missingStrictFields :: DataCon -> [FieldLabel] -> SDoc
 missingStrictFields con fields
   = header <> rest
   where
-    rest | null fields = empty  -- Happens for non-record constructors
-                                -- with strict fields
+    rest | null fields = Outputable.empty  -- Happens for non-record constructors
+                                           -- with strict fields
          | otherwise   = colon <+> pprWithCommas ppr fields
 
     header = ptext (sLit "Constructor") <+> quotes (ppr con) <+>
