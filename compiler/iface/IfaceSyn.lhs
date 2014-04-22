@@ -40,8 +40,10 @@ import IfaceType
 import PprCore()            -- Printing DFunArgs
 import Demand
 import Class
+import TyCon
+import FieldLabel
 import NameSet
-import CoAxiom ( BranchIndex, Role )
+import CoAxiom ( BranchIndex )
 import Name
 import CostCentre
 import Literal
@@ -356,29 +358,29 @@ instance Binary IfaceAxBranch where
         return (IfaceAxBranch a1 a2 a3 a4 a5)
 
 data IfaceConDecls
-  = IfAbstractTyCon Bool        -- c.f TyCon.AbstractTyCon
-  | IfDataFamTyCon              -- Data family
-  | IfDataTyCon [IfaceConDecl]  -- Data type decls
-  | IfNewTyCon  IfaceConDecl    -- Newtype decls
+  = IfAbstractTyCon Bool                          -- c.f TyCon.AbstractTyCon
+  | IfDataFamTyCon                                -- Data family
+  | IfDataTyCon [IfaceConDecl] [FieldLbl OccName] -- Data type decls
+  | IfNewTyCon  IfaceConDecl   [FieldLbl OccName] -- Newtype decls
 
 instance Binary IfaceConDecls where
     put_ bh (IfAbstractTyCon d) = putByte bh 0 >> put_ bh d
-    put_ bh IfDataFamTyCon     = putByte bh 1
-    put_ bh (IfDataTyCon cs)    = putByte bh 2 >> put_ bh cs
-    put_ bh (IfNewTyCon c)      = putByte bh 3 >> put_ bh c
+    put_ bh IfDataFamTyCon      = putByte bh 1
+    put_ bh (IfDataTyCon cs fs) = putByte bh 2 >> put_ bh cs >> put_ bh fs
+    put_ bh (IfNewTyCon c fs)   = putByte bh 3 >> put_ bh c >> put_ bh fs
     get bh = do
         h <- getByte bh
         case h of
             0 -> liftM IfAbstractTyCon $ get bh
             1 -> return IfDataFamTyCon
-            2 -> liftM IfDataTyCon $ get bh
-            _ -> liftM IfNewTyCon $ get bh
+            2 -> liftM2 IfDataTyCon (get bh) (get bh)
+            _ -> liftM2 IfNewTyCon (get bh) (get bh)
 
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
 visibleIfConDecls (IfAbstractTyCon {}) = []
-visibleIfConDecls IfDataFamTyCon      = []
-visibleIfConDecls (IfDataTyCon cs)     = cs
-visibleIfConDecls (IfNewTyCon c)       = [c]
+visibleIfConDecls IfDataFamTyCon       = []
+visibleIfConDecls (IfDataTyCon cs _)   = cs
+visibleIfConDecls (IfNewTyCon c _)     = [c]
 
 data IfaceConDecl
   = IfCon {
@@ -390,7 +392,7 @@ data IfaceConDecl
         ifConEqSpec  :: [(OccName,IfaceType)],  -- Equality constraints
         ifConCtxt    :: IfaceContext,           -- Non-stupid context
         ifConArgTys  :: [IfaceType],            -- Arg types
-        ifConFields  :: [OccName],              -- ...ditto... (field labels)
+        ifConFields  :: [OccName],              -- Field labels
         ifConStricts :: [IfaceBang]}            -- Empty (meaning all lazy),
                                                 -- or 1-1 corresp with arg tys
 
@@ -969,7 +971,7 @@ ifaceDeclImplicitBndrs IfaceData {ifCons = IfAbstractTyCon {}}  = []
 -- Newtype
 ifaceDeclImplicitBndrs (IfaceData {ifName = tc_occ,
                               ifCons = IfNewTyCon (
-                                        IfCon { ifConOcc = con_occ })})
+                                        IfCon { ifConOcc = con_occ }) _})
   =   -- implicit newtype coercion
     (mkNewTyCoOcc tc_occ) : -- JPM: newtype coercions shouldn't be implicit
       -- data constructor and worker (newtypes don't have a wrapper)
@@ -977,7 +979,7 @@ ifaceDeclImplicitBndrs (IfaceData {ifName = tc_occ,
 
 
 ifaceDeclImplicitBndrs (IfaceData {ifName = _tc_occ,
-                              ifCons = IfDataTyCon cons })
+                              ifCons = IfDataTyCon cons _ })
   = -- for each data constructor in order,
     --    data constructor, worker, and (possibly) wrapper
     concatMap dc_occs cons
@@ -1086,9 +1088,9 @@ pprIfaceDecl (IfaceData {ifName = tycon, ifCType = cType,
             | otherwise = ptext (sLit "Not promotable")
     pp_nd = case condecls of
                 IfAbstractTyCon dis -> ptext (sLit "abstract") <> parens (ppr dis)
-                IfDataFamTyCon     -> ptext (sLit "data family")
-                IfDataTyCon _       -> ptext (sLit "data")
-                IfNewTyCon _        -> ptext (sLit "newtype")
+                IfDataFamTyCon      -> ptext (sLit "data family")
+                IfDataTyCon _ _     -> ptext (sLit "data")
+                IfNewTyCon _ _      -> ptext (sLit "newtype")
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
                           ifRoles = roles, ifFDs = fds, ifATs = ats, ifSigs = sigs,
@@ -1153,9 +1155,9 @@ pprIfaceDeclHead context thing tyvars
 
 pp_condecls :: OccName -> IfaceConDecls -> SDoc
 pp_condecls _  (IfAbstractTyCon {}) = empty
-pp_condecls _  IfDataFamTyCon      = empty
-pp_condecls tc (IfNewTyCon c)   = equals <+> pprIfaceConDecl tc c
-pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext (sLit " |"))
+pp_condecls _  IfDataFamTyCon       = empty
+pp_condecls tc (IfNewTyCon c _)     = equals <+> pprIfaceConDecl tc c
+pp_condecls tc (IfDataTyCon cs _)   = equals <+> sep (punctuate (ptext (sLit " |"))
                                                             (map (pprIfaceConDecl tc) cs))
 
 mkIfaceEqPred :: IfaceType -> IfaceType -> IfacePredType
@@ -1430,9 +1432,9 @@ freeNamesIfClsSig :: IfaceClassOp -> NameSet
 freeNamesIfClsSig (IfaceClassOp _n _dm ty) = freeNamesIfType ty
 
 freeNamesIfConDecls :: IfaceConDecls -> NameSet
-freeNamesIfConDecls (IfDataTyCon c) = fnList freeNamesIfConDecl c
-freeNamesIfConDecls (IfNewTyCon c)  = freeNamesIfConDecl c
-freeNamesIfConDecls _               = emptyNameSet
+freeNamesIfConDecls (IfDataTyCon c _) = fnList freeNamesIfConDecl c
+freeNamesIfConDecls (IfNewTyCon  c _) = freeNamesIfConDecl c
+freeNamesIfConDecls _                 = emptyNameSet
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
 freeNamesIfConDecl c =

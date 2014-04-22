@@ -1276,7 +1276,7 @@ reifyDataCon tys dc
        ; r_arg_tys <- reifyTypes arg_tys'
 
        ; let main_con | not (null fields)
-                      = TH.RecC name (zip3 (map reifyName fields) stricts r_arg_tys)
+                      = TH.RecC name (zip3 (map (reifyName . flSelector) fields) stricts r_arg_tys)
                       | dataConIsInfix dc
                       = ASSERT( length arg_tys == 2 )
                         TH.InfixC (s1,r_a1) name (s2,r_a2)

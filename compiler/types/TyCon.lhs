@@ -9,11 +9,14 @@ The @TyCon@ datatype
 
 module TyCon(
         -- * Main TyCon data types
-        TyCon, FieldLabel,
+        TyCon,
 
         AlgTyConRhs(..), visibleDataCons,
         TyConParent(..), isNoParent,
         SynTyConRhs(..), Role(..),
+
+        -- ** Field labels
+        tyConFieldLabels, tyConFieldLabelEnv, tyConDataConsWithFields,
 
         -- ** Constructing TyCons
         mkAlgTyCon,
@@ -75,6 +78,7 @@ module TyCon(
         algTyConRhs,
         newTyConRhs, newTyConEtadArity, newTyConEtadRhs, unwrapNewTyCon_maybe,
         tupleTyConBoxity, tupleTyConSort, tupleTyConArity,
+        algTcFields,
 
         -- ** Manipulating TyCons
         tcExpandTyCon_maybe, coreExpandTyCon_maybe,
@@ -95,7 +99,7 @@ module TyCon(
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
-import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
+import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon, dataConFieldLabels )
 
 import Var
 import Class
@@ -109,9 +113,14 @@ import PrelNames
 import Maybes
 import Outputable
 import FastString
+import FastStringEnv
+import FieldLabel
 import Constants
 import Util
+
 import qualified Data.Data as Data
+import Data.Function
+import Data.List ( nubBy )
 import Data.Typeable (Typeable)
 \end{code}
 
@@ -370,6 +379,9 @@ data TyCon
         algTcRhs :: AlgTyConRhs,  -- ^ Contains information about the
                                   -- data constructors of the algebraic type
 
+        algTcFields :: FieldLabelEnv, -- ^ Maps a label to information
+                                      -- about the field
+
         algTcRec :: RecFlag,      -- ^ Tells us whether the data type is part
                                   -- of a mutually-recursive group or not
 
@@ -456,8 +468,6 @@ data TyCon
 
   deriving Typeable
 
--- | Names of the fields in an algebraic record type
-type FieldLabel = Name
 
 -- | Represents right-hand-sides of 'TyCon's for algebraic types
 data AlgTyConRhs
@@ -891,6 +901,41 @@ primElemRepSizeB FloatElemRep  = 4
 primElemRepSizeB DoubleElemRep = 8
 \end{code}
 
+
+%************************************************************************
+%*                                                                      *
+\subsection{Field labels}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+-- | The labels for the fields of this particular 'TyCon'
+tyConFieldLabels :: TyCon -> [FieldLabel]
+tyConFieldLabels tc = fsEnvElts $ tyConFieldLabelEnv tc
+
+-- | The labels for the fields of this particular 'TyCon'
+tyConFieldLabelEnv :: TyCon -> FieldLabelEnv
+tyConFieldLabelEnv tc
+  | isAlgTyCon tc = algTcFields tc
+  | otherwise     = emptyFsEnv
+
+-- | The DataCons from this TyCon that have *all* the given fields
+tyConDataConsWithFields :: TyCon -> [FieldLabelString] -> [DataCon]
+tyConDataConsWithFields tc lbls = filter has_flds (tyConDataCons tc)
+  where has_flds dc = all (has_fld dc) lbls
+        has_fld dc lbl = any (\ fl -> flLabel fl == lbl) (dataConFieldLabels dc)
+
+-- | Make a map from strings to FieldLabels from all the data
+-- constructors of this algebraic tycon
+fieldsOfAlgTcRhs :: AlgTyConRhs -> FieldLabelEnv
+fieldsOfAlgTcRhs rhs = mkFsEnv [ (flLabel fl, fl)
+                               | fl <- dataConsFields (visibleDataCons rhs) ]
+  where
+    dataConsFields dcs = nubBy ((==) `on` flLabel)
+                               (concatMap dataConFieldLabels dcs)
+\end{code}
+
+
 %************************************************************************
 %*                                                                      *
 \subsection{TyCon Construction}
@@ -945,6 +990,7 @@ mkAlgTyCon name kind tyvars roles cType stupid rhs parent is_rec gadt_syn prom_t
         tyConCType       = cType,
         algTcStupidTheta = stupid,
         algTcRhs         = rhs,
+        algTcFields      = fieldsOfAlgTcRhs rhs,
         algTcParent      = ASSERT2( okParent name parent, ppr name $$ ppr parent ) parent,
         algTcRec         = is_rec,
         algTcGadtSyntax  = gadt_syn,

@@ -238,8 +238,11 @@ cvtDec (DataInstD ctxt tc tys constrs derivs)
                                , dd_cons = cons', dd_derivs = derivs' }
 
        ; returnL $ InstD $ DataFamInstD
-           { dfid_inst = DataFamInstDecl { dfid_tycon = tc', dfid_pats = typats'
-                                         , dfid_defn = defn, dfid_fvs = placeHolderNames } }}
+           { dfid_inst = DataFamInstDecl { dfid_tycon = tc'
+                                         , dfid_rep_tycon = placeHolderRepTyCon
+                                         , dfid_pats = typats'
+                                         , dfid_defn = defn
+                                         , dfid_fvs = placeHolderNames} }}
 
 cvtDec (NewtypeInstD ctxt tc tys constr derivs)
   = do { (ctxt', tc', typats') <- cvt_tyinst_hdr ctxt tc tys
@@ -250,8 +253,11 @@ cvtDec (NewtypeInstD ctxt tc tys constr derivs)
                                , dd_kindSig = Nothing
                                , dd_cons = [con'], dd_derivs = derivs' }
        ; returnL $ InstD $ DataFamInstD
-           { dfid_inst = DataFamInstDecl { dfid_tycon = tc', dfid_pats = typats'
-                                         , dfid_defn = defn, dfid_fvs = placeHolderNames } }}
+           { dfid_inst = DataFamInstDecl { dfid_tycon = tc'
+                                         , dfid_rep_tycon = placeHolderRepTyCon
+                                         , dfid_pats = typats'
+                                         , dfid_defn = defn
+                                         , dfid_fvs = placeHolderNames } }}
 
 cvtDec (TySynInstD tc eqn)
   = do  { tc' <- tconNameL tc
@@ -396,7 +402,8 @@ cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (ConDeclField RdrName)
 cvt_id_arg (i, str, ty)
   = do  { i' <- vNameL i
         ; ty' <- cvt_arg (str,ty)
-        ; return (ConDeclField { cd_fld_name = i', cd_fld_type =  ty', cd_fld_doc = Nothing}) }
+        ; return (ConDeclField { cd_fld_lbl = i', cd_fld_sel = error "cvt_id_arg"
+                               , cd_fld_type =  ty', cd_fld_doc = Nothing}) }
 
 cvtDerivs :: [TH.Name] -> CvtM (Maybe [LHsType RdrName])
 cvtDerivs [] = return Nothing
@@ -642,7 +649,8 @@ which we don't want.
 cvtFld :: (TH.Name, TH.Exp) -> CvtM (HsRecField RdrName (LHsExpr RdrName))
 cvtFld (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
-        ; return (HsRecField { hsRecFieldId = v', hsRecFieldArg = e', hsRecPun = False}) }
+        ; return (HsRecField { hsRecFieldLbl = v', hsRecFieldSel = hsRecFieldSelMissing
+                             , hsRecFieldArg = e', hsRecPun = False}) }
 
 cvtDD :: Range -> CvtM (ArithSeqInfo RdrName)
 cvtDD (FromR x)           = do { x' <- cvtl x; return $ From x' }
@@ -852,7 +860,8 @@ cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p; return $ ViewPat e' 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (HsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
   = do  { s' <- vNameL s; p' <- cvtPat p
-        ; return (HsRecField { hsRecFieldId = s', hsRecFieldArg = p', hsRecPun = False}) }
+        ; return (HsRecField { hsRecFieldLbl = s', hsRecFieldSel = hsRecFieldSelMissing
+                             , hsRecFieldArg = p', hsRecPun = False}) }
 
 {- | @cvtOpAppP x op y@ converts @op@ and @y@ and produces the operator application @x `op` y@.
 The produced tree of infix patterns will be left-biased, provided @x@ is.

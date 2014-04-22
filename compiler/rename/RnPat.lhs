@@ -54,20 +54,20 @@ import DynFlags
 import PrelNames
 import TyCon               ( tyConName )
 import ConLike
-import DataCon             ( dataConTyCon )
 import TypeRep             ( TyThing(..) )
 import Name
 import NameSet
 import RdrName
 import BasicTypes
 import Util
+import Maybes
 import ListSetOps          ( removeDups )
 import Outputable
 import SrcLoc
 import FastString
 import Literal             ( inCharRange )
 import TysWiredIn          ( nilDataCon )
-import DataCon             ( dataConName )
+import DataCon
 import Control.Monad       ( when, liftM, ap )
 import Data.Ratio
 \end{code}
@@ -526,8 +526,9 @@ rnHsRecFields1
 rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
   = do { pun_ok      <- xoptM Opt_RecordPuns
        ; disambig_ok <- xoptM Opt_DisambiguateRecordFields
+       ; overload_ok <- xoptM Opt_OverloadedRecordFields
        ; parent <- check_disambiguation disambig_ok mb_con
-       ; flds1 <- mapM (rn_fld pun_ok parent) flds
+       ; flds1 <- mapM (rn_fld pun_ok overload_ok parent) flds
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
        ; let all_flds | null dotdot_flds = flds1
@@ -547,15 +548,26 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
             Nothing  -> ptext (sLit "constructor field name")
             Just con -> ptext (sLit "field of constructor") <+> quotes (ppr con)
 
-    rn_fld pun_ok parent (HsRecField { hsRecFieldId = fld
-                                     , hsRecFieldArg = arg
-                                     , hsRecPun = pun })
-      = do { fld'@(L loc fld_nm) <- wrapLocM (lookupSubBndrOcc True parent doc) fld
+    rn_fld pun_ok overload_ok parent (HsRecField { hsRecFieldLbl = L loc lbl
+                                                 , hsRecFieldArg = arg
+                                                 , hsRecPun = pun })
+      = do { sel <- setSrcSpan loc $ case parent of
+                      -- Defer renaming of overloaded fields to the typechecker
+                      -- See Note [Disambiguating record updates] in TcExpr
+                      NoParent | overload_ok ->
+                          do { mb <- lookupOccRn_overloaded lbl
+                             ; case mb of
+                                 Nothing -> do { addErr (unknownSubordinateErr doc lbl)
+                                               ; return (Right []) }
+                                 Just (Left sel) -> return (Left sel)
+                                 Just (Right (_, xs)) -> return (Right xs) }
+                      _ -> fmap Left $ lookupSubBndrOcc True parent doc lbl
            ; arg' <- if pun 
-                     then do { checkErr pun_ok (badPun fld)
-                             ; return (L loc (mk_arg (mkRdrUnqual (nameOccName fld_nm)))) }
+                     then do { checkErr pun_ok (badPun (L loc lbl))
+                             ; return (L loc (mk_arg lbl)) }
                      else return arg
-           ; return (HsRecField { hsRecFieldId = fld'
+           ; return (HsRecField { hsRecFieldLbl = L loc lbl
+                                , hsRecFieldSel = sel
                                 , hsRecFieldArg = arg'
                                 , hsRecPun = pun }) }
 
@@ -575,7 +587,7 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs
            ; con_fields <- lookupConstructorFields con
-           ; let present_flds = getFieldIds flds
+           ; let present_flds = map (occNameFS . rdrNameOcc) $ getFieldLbls flds
                  parent_tc = find_tycon rdr_env con
 
                    -- For constructor uses (but not patterns)
@@ -583,32 +595,36 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
                    -- ignoring the record field itself
                    -- Eg.  data R = R { x,y :: Int }
                    --      f x = R { .. }   -- Should expand to R {x=x}, not R{x=x,y=y}
-                 arg_in_scope fld 
+                 arg_in_scope lbl 
                    = rdr `elemLocalRdrEnv` lcl_env
                    || notNull [ gre | gre <- lookupGRE_RdrName rdr rdr_env
                                     , case gre_par gre of
-                                        ParentIs p -> p /= parent_tc
-                                        _          -> True ]
+                                        ParentIs p               -> p /= parent_tc
+                                        FldParent { par_is = p } -> p /= parent_tc
+                                        NoParent                 -> True ]
                    where
-                     rdr = mkRdrUnqual (nameOccName fld)
+                     rdr = mkVarUnqual lbl
 
-                 dot_dot_gres = [ head gres
-                                | fld <- con_fields
-                                , not (fld `elem` present_flds)
-                                , let gres = lookupGRE_Name rdr_env fld
-                                , not (null gres)  -- Check field is in scope
+                 dot_dot_gres = [ (lbl, head gres)
+                                | fl <- con_fields
+                                , let lbl = flLabel fl
+                                , let sel = flSelector fl
+                                , not (lbl `elem` present_flds)
+                                , let gres = lookupGRE_Field_Name rdr_env sel lbl
+                                , not (null gres)  -- Check selector is in scope
                                 , case ctxt of
-                                    HsRecFieldCon {} -> arg_in_scope fld
+                                    HsRecFieldCon {} -> arg_in_scope lbl
                                     _other           -> True ] 
 
-           ; addUsedRdrNames (map greRdrName dot_dot_gres)
+           ; addUsedRdrNames (map (greRdrName . snd) dot_dot_gres)
            ; return [ HsRecField
-                        { hsRecFieldId  = L loc fld
+                        { hsRecFieldLbl = L loc arg_rdr
+                        , hsRecFieldSel = Left fld
                         , hsRecFieldArg = L loc (mk_arg arg_rdr)
                         , hsRecPun      = False }
-                    | gre <- dot_dot_gres
+                    | (lbl, gre) <- dot_dot_gres
                     , let fld     = gre_name gre
-                          arg_rdr = mkRdrUnqual (nameOccName fld) ] }
+                          arg_rdr = mkVarUnqual lbl ] }
 
     check_disambiguation :: Bool -> Maybe Name -> RnM Parent
     -- When disambiguation is on, 
@@ -635,10 +651,13 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
         -- Each list represents a RdrName that occurred more than once
         -- (the list contains all occurrences)
         -- Each list in dup_fields is non-empty
-    (_, dup_flds) = removeDups compare (getFieldIds flds)
+    (_, dup_flds) = removeDups compare (getFieldLbls flds)
 
 getFieldIds :: [HsRecField id arg] -> [id]
-getFieldIds flds = map (unLoc . hsRecFieldId) flds
+getFieldIds flds = mapMaybe (fmap unLoc . hsRecFieldId_maybe) flds
+
+getFieldLbls :: [HsRecField id arg] -> [RdrName]
+getFieldLbls flds = map (unLoc . hsRecFieldLbl) flds
 
 needFlagDotDot :: HsRecFieldContext -> SDoc
 needFlagDotDot ctxt = vcat [ptext (sLit "Illegal `..' in record") <+> pprRFC ctxt,

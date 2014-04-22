@@ -234,6 +234,7 @@ Library
         GHC.Ptr
         GHC.Read
         GHC.Real
+        GHC.Records
         GHC.ST
         GHC.STRef
         GHC.Show

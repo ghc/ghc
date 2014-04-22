@@ -1,0 +1,13 @@
+42
+False
+True
+True
+3
+False
+MkS {x = 3}
+False
+MkW {x = (False,False,'x'), y = True, z = True}
+MkW {x = (False,False,'x'), y = True, z = 42}
+42
+3
+True

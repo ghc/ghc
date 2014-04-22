@@ -12,7 +12,10 @@ module HsPat (
 
         HsConDetails(..),
         HsConPatDetails, hsConPatArgs,
-        HsRecFields(..), HsRecField(..), hsRecFields,
+        HsRecFields(..), HsRecField(..),
+        hsRecFieldSelMissing,
+        hsRecFieldId, hsRecFieldId_maybe,
+        hsRecFields, hsRecFieldsUnambiguous,
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
@@ -40,11 +43,13 @@ import DataCon
 import TyCon
 import Outputable
 import Type
+import RdrName
+import OccName
 import SrcLoc
 import FastString
+import Maybes
 -- libraries:
 import Data.Data hiding (TyCon)
-import Data.Maybe
 \end{code}
 
 
@@ -199,7 +204,8 @@ data HsRecFields id arg         -- A bunch of record fields
 --                     and the remainder being 'filled in' implicitly
 
 data HsRecField id arg = HsRecField {
-        hsRecFieldId  :: Located id,
+        hsRecFieldLbl :: Located RdrName,
+        hsRecFieldSel :: Either id [(id, id)],
         hsRecFieldArg :: arg,           -- Filled in by renamer
         hsRecPun      :: Bool           -- Note [Punning]
   } deriving (Data, Typeable)
@@ -207,8 +213,8 @@ data HsRecField id arg = HsRecField {
 -- Note [Punning]
 -- ~~~~~~~~~~~~~~
 -- If you write T { x, y = v+1 }, the HsRecFields will be
---      HsRecField x x True ...
---      HsRecField y (v+1) False ...
+--      HsRecField x x x True ...
+--      HsRecField y y (v+1) False ...
 -- That is, for "punned" field x is expanded (in the renamer)
 -- to x=x; but with a punning flag so we can detect it later
 -- (e.g. when pretty printing)
@@ -216,8 +222,25 @@ data HsRecField id arg = HsRecField {
 -- If the original field was qualified, we un-qualify it, thus
 --    T { A.x } means T { A.x = x }
 
-hsRecFields :: HsRecFields id arg -> [id]
-hsRecFields rbinds = map (unLoc . hsRecFieldId) (rec_flds rbinds)
+hsRecFieldSelMissing :: Either id [(id, id)]
+hsRecFieldSelMissing = error "hsRecFieldSelMissing"
+
+hsRecFields :: HsRecFields id arg -> [(FieldLabelString, Either id [(id, id)])]
+hsRecFields rbinds = map toFld (rec_flds rbinds)
+  where
+    toFld x = ( occNameFS . rdrNameOcc . unLoc . hsRecFieldLbl $ x
+              , hsRecFieldSel x)
+
+hsRecFieldsUnambiguous :: HsRecFields id arg -> [(FieldLabelString, id)]
+hsRecFieldsUnambiguous = map outOfLeftField . hsRecFields
+  where outOfLeftField (l, Left x)  = (l, x)
+        outOfLeftField (_, Right _) = error "hsRecFieldsUnambigous"
+
+hsRecFieldId_maybe :: HsRecField id arg -> Maybe (Located id)
+hsRecFieldId_maybe x = either (Just . L (getLoc (hsRecFieldLbl x))) (const Nothing) (hsRecFieldSel x)
+
+hsRecFieldId :: HsRecField id arg -> Located id
+hsRecFieldId = expectJust "hsRecFieldId" . hsRecFieldId_maybe
 \end{code}
 
 %************************************************************************
@@ -300,7 +323,7 @@ instance (OutputableBndr id, Outputable arg)
 
 instance (OutputableBndr id, Outputable arg)
       => Outputable (HsRecField id arg) where
-  ppr (HsRecField { hsRecFieldId = f, hsRecFieldArg = arg,
+  ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
                     hsRecPun = pun })
     = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
 \end{code}

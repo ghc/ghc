@@ -111,10 +111,10 @@ import SrcLoc
 import TcRnDriver
 import TcIface          ( typecheckIface )
 import TcRnMonad
-import IfaceEnv         ( initNameCache )
 import LoadIface        ( ifaceStats, initExternalPackageState )
 import PrelInfo
 import MkIface
+import IfaceEnv
 import Desugar
 import SimplCore
 import TidyPgm
@@ -1401,6 +1401,7 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     -- (ic_instances) for more details.
     let finsts = tcg_fam_insts tc_gblenv
         insts  = tcg_insts     tc_gblenv
+        axioms = tcg_axioms    tc_gblenv
 
     let defaults = tcg_default tc_gblenv
 
@@ -1440,19 +1441,23 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
 
         ext_ids = [ id | id <- bindersOfBinds core_binds
                        , isExternalName (idName id)
-                       , not (isDFunId id || isImplicitId id) ]
+                       , not (isInstDFunId id || isImplicitId id) ]
             -- We only need to keep around the external bindings
             -- (as decided by TidyPgm), since those are the only ones
             -- that might be referenced elsewhere.
-            -- The DFunIds are in 'insts' (see Note [ic_tythings] in HscTypes
+            -- Most DFunIds are in 'insts' (see Note [ic_tythings] in HscTypes
             -- Implicit Ids are implicit in tcs
 
+        isInstDFunId id = isDFunId id && id `elem` map is_dfun insts
+
         tythings =  map AnId ext_ids ++ map ATyCon tcs
+                 ++ map ACoAxiom axioms
 
     let icontext = hsc_IC hsc_env
         ictxt1   = extendInteractiveContext icontext tythings
-        ictxt    = ictxt1 { ic_instances = (insts, finsts)
-                          , ic_default   = defaults }
+        ictxt    = ictxt1 { ic_instances = (insts, finsts),
+                            ic_axioms    = axioms,
+                            ic_default   = defaults }
 
     return (tythings, ictxt)
 
@@ -1562,6 +1567,7 @@ mkModGuts mod safe binds =
         mg_tcs          = [],
         mg_insts        = [],
         mg_fam_insts    = [],
+        mg_axioms       = [],
         mg_patsyns      = [],
         mg_rules        = [],
         mg_vect_decls   = [],

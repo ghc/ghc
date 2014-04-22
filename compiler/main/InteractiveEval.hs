@@ -56,6 +56,7 @@ import Name             hiding ( varName )
 import NameSet
 import Avail
 import RdrName
+import TcRnMonad
 import VarSet
 import VarEnv
 import ByteCodeInstr
@@ -73,7 +74,6 @@ import BreakArray
 import RtClosureInspect
 import Outputable
 import FastString
-import MonadUtils
 
 import System.Mem.Weak
 import System.Directory

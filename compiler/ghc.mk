@@ -520,7 +520,9 @@ compiler_stage2_dll0_MODULES = \
 	FastFunctions \
 	FastMutInt \
 	FastString \
+	FastStringEnv \
 	FastTypes \
+	FieldLabel \
 	Finder \
 	Fingerprint \
 	FiniteMap \
@@ -585,6 +587,9 @@ compiler_stage2_dll0_MODULES = \
 	RdrName \
 	Reg \
 	RegClass \
+	RnEnv \
+	RnHsDoc \
+	RnNames \
 	Rules \
 	SMRep \
 	Serialized \
@@ -601,8 +606,10 @@ compiler_stage2_dll0_MODULES = \
 	StgSyn \
 	Stream \
 	StringBuffer \
+	TcEnv \
 	TcEvidence \
 	TcIface \
+	TcMType \
 	TcRnMonad \
 	TcRnTypes \
 	TcType \

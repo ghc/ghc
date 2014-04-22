@@ -772,14 +772,17 @@ When printing export lists, we print like this:
 
 \begin{code}
 pprExport :: IfaceExport -> SDoc
-pprExport (Avail n)      = ppr n
-pprExport (AvailTC _ []) = empty
-pprExport (AvailTC n (n':ns)) 
-  | n==n'     = ppr n <> pp_export ns
-  | otherwise = ppr n <> char '|' <> pp_export (n':ns)
-  where  
-    pp_export []    = empty
-    pp_export names = braces (hsep (map ppr names))
+pprExport (Avail n)         = ppr n
+pprExport (AvailTC _ [] []) = empty
+pprExport (AvailTC n (n':ns) fs)
+  | n==n'     = ppr n <> pp_export ns fs
+  | otherwise = ppr n <> char '|' <> pp_export (n':ns) fs
+pprExport (AvailTC n [] fs) = ppr n <> char '|' <> pp_export [] fs
+
+pp_export :: [Name] -> AvailFields -> SDoc
+pp_export []    [] = empty
+pp_export names fs = braces (hsep (map ppr names ++ map pprAvailField fs))
+
 
 pprUsage :: Usage -> SDoc
 pprUsage usage@UsagePackageModule{}

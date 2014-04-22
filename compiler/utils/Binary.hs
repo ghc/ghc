@@ -885,4 +885,3 @@ instance Binary WarningTxt where
                       return (WarningTxt w)
               _ -> do d <- get bh
                       return (DeprecatedTxt d)
-

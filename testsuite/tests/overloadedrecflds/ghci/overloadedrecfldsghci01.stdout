@@ -1,0 +1,11 @@
+foo :: GHC.Records.Accessor t t1 "foo" t2 => t t1 t2
+42
+True
+
+<interactive>:1:1:
+    Ambiguous occurrence ‘foo’
+    It could refer to either the field ‘foo’,
+                             defined at <interactive>:4:18
+                          or the field ‘foo’, defined at <interactive>:3:16
+foo :: U -> Int
+42

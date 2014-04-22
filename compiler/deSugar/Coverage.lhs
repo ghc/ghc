@@ -889,9 +889,9 @@ addTickHsRecordBinds (HsRecFields fields dd)
   = do  { fields' <- mapM process fields
         ; return (HsRecFields fields' dd) }
   where
-    process (HsRecField ids expr doc)
+    process (HsRecField lbl sel expr doc)
         = do { expr' <- addTickLHsExpr expr
-             ; return (HsRecField ids expr' doc) }
+             ; return (HsRecField lbl sel expr' doc) }
 
 addTickArithSeqInfo :: ArithSeqInfo Id -> TM (ArithSeqInfo Id)
 addTickArithSeqInfo (From e1) =

@@ -61,8 +61,8 @@ import DynFlags
 import FastString
 import ForeignCall
 import Util
+import Maybes
 
-import Data.Maybe
 import Control.Monad
 import Data.List
 
@@ -112,7 +112,7 @@ repTopP pat = do { ss <- mkGenSyms (collectPatBinders pat)
 repTopDs :: HsGroup Name -> DsM (Core (TH.Q [TH.Dec]))
 repTopDs group
  = do { let { tv_bndrs = hsSigTvBinders (hs_valds group)
-            ; bndrs = tv_bndrs ++ hsGroupBinders group } ;
+            ; bndrs = tv_bndrs ++ fst (hsGroupBinders group) } ;
         ss <- mkGenSyms bndrs ;
 
         -- Bind all the names mainly to avoid repeated use of explicit strings.

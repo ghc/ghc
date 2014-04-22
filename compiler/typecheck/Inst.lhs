@@ -21,7 +21,8 @@ module Inst (
        newOverloadedLit, mkOverLit, 
      
        tcGetInsts, tcGetInstEnvs, getOverlapFlag,
-       tcExtendLocalInstEnv, instCallConstraints, newMethodFromName,
+       tcExtendLocalInstEnv,
+       instCallConstraints, newMethodFromName,
        tcSyntaxName,
 
        -- Simple functions over evidence variables

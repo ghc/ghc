@@ -31,6 +31,7 @@ module HsDecls (
   DataFamInstDecl(..), LDataFamInstDecl, pprDataFamInstFlavour,
   TyFamInstEqn(..), LTyFamInstEqn,
   LClsInstDecl, ClsInstDecl(..),
+  placeHolderRepTyCon,
 
   -- ** Standalone deriving declarations
   DerivDecl(..), LDerivDecl,
@@ -921,12 +922,17 @@ type LDataFamInstDecl name = Located (DataFamInstDecl name)
 data DataFamInstDecl name
   = DataFamInstDecl
        { dfid_tycon :: Located name
+       , dfid_rep_tycon :: Name                     -- error thunk until renamer
        , dfid_pats  :: HsWithBndrs [LHsType name]   -- lhs
             -- ^ Type patterns (with kind and type bndrs)
             -- See Note [Family instance declaration binders]
        , dfid_defn  :: HsDataDefn  name             -- rhs
        , dfid_fvs   :: NameSet }                    -- free vars for dependency analysis
   deriving( Typeable, Data )
+
+placeHolderRepTyCon :: Name
+-- Used for the Name in DataFamInstDecl prior to the renamer
+placeHolderRepTyCon = panic "placeHolderRepTyCon"
 
 
 ----------------- Class instances -------------

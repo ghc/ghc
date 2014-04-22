@@ -755,9 +755,9 @@ tidy_con con (RecCon (HsRecFields fs _))
 
      -- pad out all the missing fields with WildPats.
     field_pats = case con of
-        RealDataCon dc -> map (\ f -> (f, nlWildPat)) (dataConFieldLabels dc)
+        RealDataCon dc -> map (\ f -> (flSelector f, nlWildPat)) (dataConFieldLabels dc)
         PatSynCon{}    -> panic "Check.tidy_con: pattern synonym with record syntax"
-    all_pats = foldr (\(HsRecField id p _) acc -> insertNm (getName (unLoc id)) p acc)
+    all_pats = foldr (\ x acc -> insertNm (getName (unLoc (hsRecFieldId x))) (hsRecFieldArg x) acc)
                      field_pats fs
 
     insertNm nm p [] = [(nm,p)]

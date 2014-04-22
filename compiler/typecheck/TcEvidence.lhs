@@ -740,6 +740,7 @@ evVarsOfTerms = foldr (unionVarSet . evVarsOfTerm) emptyVarSet
 \end{code}
 
 
+
 %************************************************************************
 %*                                                                      *
                   Pretty printing

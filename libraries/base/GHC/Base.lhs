@@ -122,6 +122,9 @@ import GHC.Tuple ()
 -- Likewise we need Integer when deriving things like Eq instances, and
 -- this is a convenient place to force it to be built
 import GHC.Integer ()
+-- We need GHC.Records before declaring datatypes with record fields
+-- (see Note [Dependency on GHC.Records] in GHC.Records).
+import GHC.Records ()
 
 infixr 9  .
 infixr 5  ++

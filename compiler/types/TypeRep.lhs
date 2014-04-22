@@ -65,7 +65,7 @@ module TypeRep (
 
 import {-# SOURCE #-} DataCon( dataConTyCon )
 import ConLike ( ConLike(..) )
-import {-# SOURCE #-} Type( noParenPred, isPredTy ) -- Transitively pulls in a LOT of stuff, better to break the loop
+import {-# SOURCE #-} Type( noParenPred, isPredTy, cmpType ) -- Transitively pulls in a LOT of stuff, better to break the loop
 
 -- friends:
 import Var
@@ -83,10 +83,12 @@ import Outputable
 import FastString
 import Pair
 import Util
+import ListSetOps
 import DynFlags
 
 -- libraries
-import Data.List( mapAccumL, partition )
+import Data.Function
+import Data.List( mapAccumL, partition, sortBy )
 import qualified Data.Data        as Data hiding ( TyCon )
 \end{code}
 
@@ -533,14 +535,41 @@ pprClassPred clas tys = pprTypeApp (classTyCon clas) tys
 ------------
 pprTheta :: ThetaType -> SDoc
 -- pprTheta [pred] = pprPred pred	 -- I'm in two minds about this
-pprTheta theta  = parens (sep (punctuate comma (map (ppr_type TopPrec) theta)))
+pprTheta theta = pprParenTheta sep theta
+
+pprParenTheta :: ([SDoc] -> SDoc) -> ThetaType -> SDoc
+pprParenTheta sepf theta = parens (sepf (punctuate comma preds))
+  where
+    (hasTriples, theta1) = partitionWith hasPred theta
+    theta0               = equivClasses (cmpType `on` fstOf3) hasTriples
+    preds                = map pprTriples theta0 ++ map (ppr_type TopPrec) theta1
+
+    hasPred (TyConApp tc [r, LitTy (StrTyLit f), t])
+        | tc `hasKey` recordHasClassNameKey = Left (r, f, t)
+    hasPred p = Right p
+
+    pprTriples rfts@((r,_,_):_) = pprHasPred r (map (\ (_, f, t) -> (f, t)) rfts)
+    pprTriples []               = empty
+
+-- Pretty-print a bunch of Has constraints using the OverloadedRecordFields
+-- syntactic sugar, e.g
+--     (Has r "foo" Int, Has r "bar" (GetResult r "bar"))
+-- becomes
+--     r { foo :: Int, bar :: ... }
+pprHasPred :: Type -> [(FastString, Type)] -> SDoc
+pprHasPred r fs = pprParendType r <+> braces (sep (punctuate comma (map pprField fs')))
+  where
+    fs' = sortBy (compare `on` fst) fs
+    pprField (f, t) = (ftext f <+> ptext (sLit "::") <+> pprTypeOrDots f t)
+    pprTypeOrDots f (TyConApp tc [_, LitTy (StrTyLit f')])
+      | tc `hasKey` fldTyFamNameKey && f == f' = ptext (sLit "...")
+    pprTypeOrDots _ t = pprType t
 
 pprThetaArrowTy :: ThetaType -> SDoc
 pprThetaArrowTy []      = empty
 pprThetaArrowTy [pred]
       | noParenPred pred = ppr_type TopPrec pred <+> darrow
-pprThetaArrowTy preds   = parens (fsep (punctuate comma (map (ppr_type TopPrec) preds)))
-                            <+> darrow
+pprThetaArrowTy preds    = pprParenTheta fsep preds <+> darrow
     -- Notice 'fsep' here rather that 'sep', so that
     -- type contexts don't get displayed in a giant column
     -- Rather than
@@ -579,6 +608,10 @@ ppr_type _ (TyVarTy tv)	      = ppr_tvar tv
 ppr_type _ (TyConApp tc [LitTy (StrTyLit n),ty])
   | tc `hasKey` ipClassNameKey
   = char '?' <> ftext n <> ptext (sLit "::") <> ppr_type TopPrec ty
+
+ppr_type _ (TyConApp tc [r, LitTy (StrTyLit f), ty])
+  | tc `hasKey` recordHasClassNameKey
+  = pprHasPred r [(f, ty)]
 
 ppr_type p (TyConApp tc tys)  = pprTyTcApp p tc tys
 

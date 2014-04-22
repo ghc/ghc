@@ -990,7 +990,7 @@ gen_Read_binds get_fixity loc tycon
         field_stmts  = zipWithEqual "lbl_stmts" read_field labels as_needed
 
         con_arity    = dataConSourceArity data_con
-        labels       = dataConFieldLabels data_con
+        labels       = map flLabel $ dataConFieldLabels data_con
         dc_nm        = getName data_con
         is_infix     = dataConIsInfix data_con
         is_record    = length labels > 0
@@ -1043,7 +1043,7 @@ gen_Read_binds get_fixity loc tycon
                  | otherwise
                  = ident_h_pat lbl_str
                  where
-                   lbl_str = occNameString (getOccName lbl)
+                   lbl_str = unpackFS lbl
 \end{code}
 
 
@@ -1104,7 +1104,7 @@ gen_Show_binds get_fixity loc tycon
              arg_tys       = dataConOrigArgTys data_con         -- Correspond 1-1 with bs_needed
              con_pat       = nlConVarPat data_con_RDR bs_needed
              nullary_con   = con_arity == 0
-             labels        = dataConFieldLabels data_con
+             labels        = map flLabel $ dataConFieldLabels data_con
              lab_fields    = length labels
              record_syntax = lab_fields > 0
 
@@ -1127,8 +1127,7 @@ gen_Show_binds get_fixity loc tycon
                         -- space after the '=' is necessary, but it
                         -- seems tidier to have them both sides.
                  where
-                   occ_nm   = getOccName l
-                   nm       = wrapOpParens (occNameString occ_nm)
+                   nm       = wrapOpParens (unpackFS l)
 
              show_args               = zipWith show_arg bs_needed arg_tys
              (show_arg1:show_arg2:_) = show_args
@@ -1380,7 +1379,7 @@ gen_Data_binds dflags loc tycon
                nlList  labels,                            -- Field labels
            nlHsVar fixity]                                -- Fixity
 
-        labels   = map (nlHsLit . mkHsString . getOccString)
+        labels   = map (nlHsLit . HsString . flLabel)
                        (dataConFieldLabels dc)
         dc_occ   = getOccName dc
         is_infix = isDataSymOcc dc_occ

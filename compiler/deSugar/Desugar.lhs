@@ -91,6 +91,7 @@ deSugar hsc_env
                             tcg_tcs          = tcs,
                             tcg_insts        = insts,
                             tcg_fam_insts    = fam_insts,
+                            tcg_axioms       = axioms,
                             tcg_hpc          = other_hpc_info })
 
   = do { let dflags = hsc_dflags hsc_env
@@ -185,6 +186,7 @@ deSugar hsc_env
                 mg_tcs          = tcs,
                 mg_insts        = insts,
                 mg_fam_insts    = fam_insts,
+                mg_axioms       = axioms,
                 mg_inst_env     = inst_env,
                 mg_fam_inst_env = fam_inst_env,
                 mg_patsyns      = map snd . filter (isExportedId . fst) $ final_patsyns,

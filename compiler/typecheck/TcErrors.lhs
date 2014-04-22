@@ -18,8 +18,10 @@ module TcErrors(
 
 import TcRnTypes
 import TcRnMonad
+import FamInst
 import TcMType
 import TcType
+import TcEnv
 import TypeRep
 import Type
 import Kind ( isKind )
@@ -31,6 +33,7 @@ import TyCon
 import DataCon
 import TcEvidence
 import TysWiredIn       ( coercibleClass )
+import RnEnv
 import Name
 import RdrName          ( lookupGRE_Name )
 import Id 
@@ -1026,9 +1029,10 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
   | null matches  -- No matches but perhaps several unifiers
   = do { let (is_ambig, ambig_msg) = mkAmbigMsg ct
        ; (ctxt, binds_msg) <- relevantBindings True ctxt ct
-       ; traceTc "mk_dict_err" (ppr ct $$ ppr is_ambig $$ ambig_msg)
+       ; records_msg <- mkRecordsMsg
+       ; traceTc "mk_dict_err" (ppr ct $$ ppr is_ambig $$ ambig_msg $$ records_msg)
        ; rdr_env <- getGlobalRdrEnv
-       ; return (ctxt, cannot_resolve_msg rdr_env is_ambig binds_msg ambig_msg) }
+       ; return (ctxt, cannot_resolve_msg rdr_env is_ambig binds_msg ambig_msg records_msg) }
 
   | not safe_haskell   -- Some matches => overlap errors
   = return (ctxt, overlap_msg)
@@ -1043,9 +1047,10 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     givens      = getUserGivens ctxt
     all_tyvars  = all isTyVarTy tys
 
-    cannot_resolve_msg rdr_env has_ambig_tvs binds_msg ambig_msg
+    cannot_resolve_msg rdr_env has_ambig_tvs binds_msg ambig_msg records_msg
       = vcat [ addArising orig (no_inst_msg $$ coercible_explanation rdr_env)
              , vcat (pp_givens givens)
+             , records_msg
              , ppWhen (has_ambig_tvs && not (null unifiers && null givens))
                (vcat [ ambig_msg, binds_msg, potential_msg ])
              , show_fixes (add_to_ctxt_fixes has_ambig_tvs ++ drv_fixes) ]
@@ -1220,6 +1225,49 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
             | dataConMissing rdr_env tc
             ]
         | otherwise = Nothing
+
+    mkRecordsMsg
+      | isRecordsClass clas
+          = do { overloaded <- xoptM Opt_OverloadedRecordFields
+               ; if not overloaded
+                 then return suggest_overloaded
+                 else case (tcSplitTyConApp_maybe r, isStrLitTy f) of
+                        (Just (tc, args), Just lbl) ->
+                            do { rep_tc <- lookupRepTyCon tc args
+                               ; let nice_ty | rep_tc == tc = mkTyConApp tc []
+                                             | otherwise    = r
+                               ; case lookupFsEnv (tyConFieldLabelEnv rep_tc) lbl of
+                                   Nothing -> return $ missing_field lbl nice_ty
+                                   Just fl ->
+                                       do { gbl_env <- getGblEnv
+                                          ; if fieldLabelInScope (tcg_rdr_env gbl_env) tc fl
+                                            then do { sel_id <- tcLookupId (flSelector fl)
+                                                    ; return $ unsuitable_field_type lbl nice_ty
+                                                                 (isNaughtyRecordSelector sel_id) }
+                                            else return $ not_in_scope lbl nice_ty } }
+                        _ -> return empty }
+      | otherwise = return empty
+      where
+        (r:f:_) = tys
+        suggest_overloaded = ptext $ sLit "Perhaps you should enable -XOverloadedRecordFields?"
+
+        missing_field lbl ty
+          = ptext (sLit "The type") <+> quotes (ppr ty)
+            <+> ptext (sLit "does not have a field") <+> quotes (ppr lbl)
+
+        not_in_scope lbl ty
+          = ptext (sLit "The field") <+> quotes (ppr lbl)
+                <+> ptext (sLit "of") <+> quotes (ppr ty)
+                <+> ptext (sLit "is not in scope")
+
+        unsuitable_field_type lbl ty is_existential
+          = hang (ptext (sLit "The field") <+> quotes (ppr lbl)
+                     <+> ptext (sLit "of") <+> quotes (ppr ty)
+                     <+> ptext (sLit "cannot be overloaded,"))
+               2 (ptext (sLit "as its type is") <+> quantifier is_existential
+                                                <+> ptext (sLit "quantified"))
+        quantifier True  = ptext (sLit "existentially")
+        quantifier False = ptext (sLit "universally")
 
 show_fixes :: [SDoc] -> SDoc
 show_fixes []     = empty

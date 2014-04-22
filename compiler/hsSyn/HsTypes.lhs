@@ -23,7 +23,7 @@ module HsTypes (
         LBangType, BangType, HsBang(..), 
         getBangType, getBangStrictness, 
 
-        ConDeclField(..), pprConDeclFields,
+        ConDeclField(..), pprConDeclFields, cd_fld_name,
         
         mkHsQTvs, hsQTvBndrs,
         mkExplicitHsForAllTy, mkImplicitHsForAllTy, hsExplicitTvs,
@@ -34,6 +34,8 @@ module HsTypes (
         splitHsFunType,
         splitHsAppTys, hsTyGetAppHead_maybe, mkHsAppTys, mkHsOpTy,
 
+        getDFunHsTypeKey,
+
         -- Printing
         pprParendHsType, pprHsForAll, pprHsContext, pprHsContextNoArrow, ppr_hs_context,
     ) where
@@ -42,10 +44,12 @@ import {-# SOURCE #-} HsExpr ( HsSplice, pprUntypedSplice )
 
 import HsLit
 
-import Name( Name )
-import RdrName( RdrName )
+import Name( Name, getOccName, occNameString )
+import RdrName( RdrName, rdrNameOcc )
 import DataCon( HsBang(..) )
 import Type
+import TysWiredIn
+import PrelNames
 import HsDoc
 import BasicTypes
 import SrcLoc
@@ -367,10 +371,14 @@ data HsTupleSort = HsUnboxedTuple
 data HsExplicitFlag = Explicit | Implicit deriving (Data, Typeable)
 
 data ConDeclField name  -- Record fields have Haddoc docs on them
-  = ConDeclField { cd_fld_name :: Located name,
+  = ConDeclField { cd_fld_lbl  :: Located RdrName,
+                   cd_fld_sel  :: name,  -- error thunk until after renaming
                    cd_fld_type :: LBangType name, 
                    cd_fld_doc  :: Maybe LHsDocString }
   deriving (Data, Typeable)
+
+cd_fld_name :: ConDeclField name -> Located name
+cd_fld_name x = L (getLoc (cd_fld_lbl x)) $ cd_fld_sel x
 
 -----------------------
 -- Combine adjacent for-alls. 
@@ -518,6 +526,39 @@ splitHsFunType other               = ([], other)
 \end{code}
 
 
+\begin{code}
+-- Get some string from a type, to be used to construct a dictionary
+-- function name (like getDFunTyKey in TcType, but for HsTypes)
+getDFunHsTypeKey :: HsType RdrName -> String
+getDFunHsTypeKey (HsForAllTy _ _ _ t)   = getDFunHsTypeKey (unLoc t)
+getDFunHsTypeKey (HsTyVar tv)           = occNameString (rdrNameOcc tv)
+getDFunHsTypeKey (HsAppTy fun _)        = getDFunHsTypeKey (unLoc fun)
+getDFunHsTypeKey (HsFunTy {})           = occNameString (getOccName funTyCon)
+getDFunHsTypeKey (HsListTy _)           = occNameString (getOccName listTyCon)
+getDFunHsTypeKey (HsPArrTy _)           = occNameString (getOccName parrTyCon)
+getDFunHsTypeKey (HsTupleTy {})         = occNameString (getOccName unitTyCon)
+getDFunHsTypeKey (HsOpTy _ (_, op) _)   = occNameString (rdrNameOcc (unLoc op))
+getDFunHsTypeKey (HsParTy ty)           = getDFunHsTypeKey (unLoc ty)
+getDFunHsTypeKey (HsIParamTy {})        = occNameString (getOccName ipClassName)
+getDFunHsTypeKey (HsEqTy {})            = occNameString (getOccName eqTyCon)
+getDFunHsTypeKey (HsKindSig ty _)       = getDFunHsTypeKey (unLoc ty)
+getDFunHsTypeKey (HsQuasiQuoteTy {})    = "quasiQuote"
+getDFunHsTypeKey (HsSpliceTy {})        = "splice"
+getDFunHsTypeKey (HsDocTy ty _)         = getDFunHsTypeKey (unLoc ty)
+getDFunHsTypeKey (HsBangTy _ ty)        = getDFunHsTypeKey (unLoc ty)
+getDFunHsTypeKey (HsRecTy {})           = "record"
+getDFunHsTypeKey (HsCoreTy {})          = "core"
+getDFunHsTypeKey (HsExplicitListTy {})  = occNameString (getOccName listTyCon)
+getDFunHsTypeKey (HsExplicitTupleTy {}) = occNameString (getOccName unitTyCon)
+getDFunHsTypeKey (HsTyLit x)            = getDFunHsTyLitKey x
+getDFunHsTypeKey (HsWrapTy _ ty)        = getDFunHsTypeKey ty
+
+getDFunHsTyLitKey :: HsTyLit -> String
+getDFunHsTyLitKey (HsNumTy n) = show n
+getDFunHsTyLitKey (HsStrTy n) = show n
+\end{code}
+
+
 %************************************************************************
 %*                                                                      *
 \subsection{Pretty printing}
@@ -568,7 +609,7 @@ ppr_hs_context cxt = parens (interpp'SP cxt)
 pprConDeclFields :: OutputableBndr name => [ConDeclField name] -> SDoc
 pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where
-    ppr_fld (ConDeclField { cd_fld_name = n, cd_fld_type = ty, 
+    ppr_fld (ConDeclField { cd_fld_lbl = n, cd_fld_type = ty, 
                             cd_fld_doc = doc })
         = ppr n <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
 \end{code}

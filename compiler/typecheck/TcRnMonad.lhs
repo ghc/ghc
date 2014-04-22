@@ -84,6 +84,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
         tvs_var      <- newIORef emptyVarSet ;
         keep_var     <- newIORef emptyNameSet ;
+        used_sel_var <- newIORef emptyNameSet ;
         used_rdr_var <- newIORef Set.empty ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
@@ -119,7 +120,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_src            = hsc_src,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
-                tcg_field_env      = RecFields emptyNameEnv emptyNameSet,
+                tcg_field_env      = emptyNameEnv,
                 tcg_default        = Nothing,
                 tcg_type_env       = emptyNameEnv,
                 tcg_type_env_var   = type_env_var,
@@ -130,6 +131,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_th_splice_used = th_splice_var,
                 tcg_exports        = [],
                 tcg_imports        = emptyImportAvails,
+                tcg_used_selectors = used_sel_var,
                 tcg_used_rdrnames  = used_rdr_var,
                 tcg_dus            = emptyDUs,
 
@@ -146,6 +148,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_tcs            = [],
                 tcg_insts          = [],
                 tcg_fam_insts      = [],
+                tcg_axioms         = [],
                 tcg_rules          = [],
                 tcg_fords          = [],
                 tcg_vects          = [],

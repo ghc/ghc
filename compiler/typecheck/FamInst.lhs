@@ -11,7 +11,7 @@ The @FamInst@ type: family instance heads
 
 module FamInst ( 
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
-	tcLookupFamInst, 
+        tcLookupFamInst, lookupRepTyCon,
         tcGetFamInstEnvs,
         newFamInst
     ) where
@@ -21,8 +21,9 @@ import FamInstEnv
 import InstEnv( roughMatchTcs )
 import Coercion( pprCoAxBranchHdr )
 import LoadIface
-import TypeRep
+import Type
 import TcRnMonad
+import Unify
 import TyCon
 import CoAxiom
 import DynFlags
@@ -35,7 +36,9 @@ import Maybes
 import TcMType
 import TcType
 import Name
+import RnEnv
 import VarSet
+import PrelNames
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -211,10 +214,15 @@ which implies that :R42T was declared as 'data instance T [a]'.
 
 \begin{code}
 tcLookupFamInst :: TyCon -> [Type] -> TcM (Maybe FamInstMatch)
-tcLookupFamInst tycon tys
+tcLookupFamInst tycon _
   | not (isOpenFamilyTyCon tycon)
   = return Nothing
-  | otherwise
+
+tcLookupFamInst fam tys
+  | isRecordsFam fam
+  = tcLookupRecordsFamInst fam tys
+
+tcLookupFamInst tycon tys
   = do { instEnv <- tcGetFamInstEnvs
        ; let mb_match = lookupFamInstEnv instEnv tycon tys 
        ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ 
@@ -225,7 +233,43 @@ tcLookupFamInst tycon tys
 	   (match:_) 
               -> return $ Just match
        }
+
+
+-- See Note [Instance scoping for OverloadedRecordFields] in TcFldInsts
+-- and the section on "Looking up record field instances" in RnEnv
+tcLookupRecordsFamInst :: TyCon -> [Type] -> TcM (Maybe FamInstMatch)
+tcLookupRecordsFamInst fam tys
+  | Just (lbl, tc, args) <- tcSplitRecordsArgs tys
+  = do { rep_tc <- lookupRepTyCon tc args
+       ; mb_ax  <- lookupFldInstAxiom lbl tc rep_tc want_get
+       ; return $ do { ax <- mb_ax
+                     ; let fam_inst = fam_inst_for tc ax
+                     ; subst <- tcMatchTys (mkVarSet (fi_tvs fam_inst)) (fi_tys fam_inst) tys
+                     ; return $ FamInstMatch fam_inst (substTyVars subst (fi_tvs fam_inst)) } }
+  where
+    want_get = isFldTyFam fam
+
+    fam_inst_for tc axiom
+      | want_get  = mkImportedFamInst fldTyFamName
+                        [Nothing, Just (tyConName tc)] (toUnbranchedAxiom axiom)
+      | otherwise = mkImportedFamInst updTyFamName
+                        [Nothing, Just (tyConName tc), Nothing] (toUnbranchedAxiom axiom)
+
+tcLookupRecordsFamInst _ _ = return Nothing
+
+lookupRepTyCon :: TyCon -> [Type] -> TcM TyCon
+-- Lookup the representation tycon given a family tycon and its
+-- arguments; returns the original tycon if it is not a data family or
+-- it doesn't have a matching instance.
+lookupRepTyCon tc args
+  | isDataFamilyTyCon tc
+      = do { mb_fi <- tcLookupFamInst tc args
+           ; return $ case mb_fi of
+                        Nothing  -> tc
+                        Just fim -> tcTyConAppTyCon (fi_rhs (fim_instance fim)) }
+  | otherwise = return tc
 \end{code}
+
 
 
 %************************************************************************
@@ -333,4 +377,3 @@ tcGetFamInstEnvs
   = do { eps <- getEps; env <- getGblEnv
        ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) }
 \end{code}
-

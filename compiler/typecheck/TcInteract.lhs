@@ -1835,6 +1835,10 @@ matchClassInst _ clas [ _k, ty1, ty2 ] loc
       traceTcS "matchClassInst returned" $ ppr ev
       return ev
 
+matchClassInst _ clas tys loc
+  | isRecordsClass clas
+  = matchRecordsClassInst clas tys loc
+
 matchClassInst inerts clas tys loc
    = do { dflags <- getDynFlags
         ; untch <- getUntouchables
@@ -1864,7 +1868,7 @@ matchClassInst inerts clas tys loc
                                 text "witness" <+> ppr dfun_id
                                                <+> ppr (idType dfun_id) ]
                                   -- Record that this dfun is needed
-                        ; match_one dfun_id inst_tys }
+                        ; match_one dfun_id inst_tys pred loc }
 
             (matches, _, _)    -- More than one matches
                                -- Defer any reactions of a multitude
@@ -1875,21 +1879,6 @@ matchClassInst inerts clas tys loc
                         ; return NoInstance } }
    where
      pred = mkClassPred clas tys
-
-     match_one :: DFunId -> [Maybe TcType] -> TcS LookupInstResult
-                  -- See Note [DFunInstType: instantiating types] in InstEnv
-     match_one dfun_id mb_inst_tys
-       = do { checkWellStagedDFun pred dfun_id loc
-            ; (tys, dfun_phi) <- instDFunType dfun_id mb_inst_tys
-            ; let (theta, _) = tcSplitPhiTy dfun_phi
-            ; if null theta then
-                  return (GenInst [] (EvDFunApp dfun_id tys []))
-              else do
-            { evc_vars <- instDFunConstraints loc theta
-            ; let new_ev_vars = freshGoals evc_vars
-                      -- new_ev_vars are only the real new variables that can be emitted
-                  dfun_app = EvDFunApp dfun_id tys (getEvTerms evc_vars)
-            ; return $ GenInst new_ev_vars dfun_app } }
 
      givens_for_this_clas :: Cts
      givens_for_this_clas
@@ -1914,6 +1903,21 @@ matchClassInst inerts clas tys loc
        | otherwise = False -- No overlap with a solved, already been taken care of
                            -- by the overlap check with the instance environment.
      matchable _tys ct = pprPanic "Expecting dictionary!" (ppr ct)
+
+match_one :: DFunId -> [Maybe TcType] -> PredType -> CtLoc -> TcS LookupInstResult
+                  -- See Note [DFunInstType: instantiating types] in InstEnv
+match_one dfun_id mb_inst_tys pred loc
+       = do { checkWellStagedDFun pred dfun_id loc
+            ; (tys, dfun_phi) <- instDFunType dfun_id mb_inst_tys
+            ; let (theta, _) = tcSplitPhiTy dfun_phi
+            ; if null theta then
+                  return (GenInst [] (EvDFunApp dfun_id tys []))
+              else do
+            { evc_vars <- instDFunConstraints loc theta
+            ; let new_ev_vars = freshGoals evc_vars
+                      -- new_ev_vars are only the real new variables that can be emitted
+                  dfun_app = EvDFunApp dfun_id tys (getEvTerms evc_vars)
+            ; return $ GenInst new_ev_vars dfun_app } }
 
 -- See Note [Coercible Instances]
 -- Changes to this logic should likely be reflected in coercible_msg in TcErrors.
@@ -2125,3 +2129,32 @@ overlapping checks. There we are interested in validating the following principl
 
 But for the Given Overlap check our goal is just related to completeness of
 constraint solving.
+
+
+\begin{code}
+-- See Note [Instance scoping for OverloadedRecordFields] in TcFldInsts
+-- and the section on "Looking up record field instances" in RnEnv
+matchRecordsClassInst :: Class -> [Type] -> CtLoc -> TcS LookupInstResult
+matchRecordsClassInst clas tys loc
+  | Just (lbl, tc, args) <- tcSplitRecordsArgs tys
+    = do { rep_tc <- lookupRepTyCon tc args
+         ; mb_dfun  <- lookupFldInstDFun lbl tc rep_tc (isHasClass clas)
+         ; case mb_dfun of
+             Nothing   -> return NoInstance
+             Just dfun ->
+                 -- We've got the right DFun, now we just need to line
+                 -- up the types correctly. For example, we might have
+                 --     dfun_72 :: forall a b c . c ~ [a] => Has (T a b) "f" c
+                 -- and want to match
+                 --     Has (T x y) "f" z
+                 -- so we split up the DFun's type and use tcMatchTys to
+                 -- generate the substitution [x |-> a, y |-> b, z |-> c].
+                 let (tvs, _, _, tmpl_tys) = tcSplitDFunTy (idType dfun)
+                 in case tcMatchTys (mkVarSet tvs) tmpl_tys tys of
+                      Just subst -> let mb_inst_tys = map (lookupTyVar subst) tvs
+                                        pred        = mkClassPred clas tys
+                                    in match_one dfun mb_inst_tys pred loc
+                      Nothing -> pprPanic "matchClassInst" (ppr clas $$ ppr tvs $$ ppr tmpl_tys $$ ppr tys) }
+
+matchRecordsClassInst _ _ _ = return NoInstance
+\end{code}

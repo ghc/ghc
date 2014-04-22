@@ -1,0 +1,20 @@
+
+overloadedrecfldsfail09.hs:6:15:
+    Illegal type instance declaration for ‘FldTy’
+      (Use -XOverloadedRecordFields instead.)
+    In the type instance declaration for ‘FldTy’
+
+overloadedrecfldsfail09.hs:7:15:
+    Illegal type instance declaration for ‘UpdTy’
+      (Use -XOverloadedRecordFields instead.)
+    In the type instance declaration for ‘UpdTy’
+
+overloadedrecfldsfail09.hs:8:10:
+    Illegal instance declaration for ‘Has Int "foo" Int’
+      The class is abstract, manual instances are not permitted.
+    In the instance declaration for ‘Has Int "foo" Int’
+
+overloadedrecfldsfail09.hs:9:10:
+    Illegal instance declaration for ‘Upd Int "foo" Int’
+      The class is abstract, manual instances are not permitted.
+    In the instance declaration for ‘Upd Int "foo" Int’

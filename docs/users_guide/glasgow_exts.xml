@@ -6967,6 +6967,313 @@ instance OkClsish () a => OkCls a where
 
 </sect1>
 
+<sect1 id="overloaded-record-fields">
+<title>Overloaded record fields</title>
+
+<para>
+A serious limitation of the Haskell record system is the inability to
+overload field names in record types: for example, if the data types
+</para>
+
+<programlisting>
+data Person  = Person  { personId :: Int, name :: String }
+data Address = Address { personId :: Int, address :: String }
+</programlisting>
+
+<para>
+are declared in the same module, there is no way to determine which
+type an occurrence of the <literal>personId</literal> record selector
+refers to.  A common workaround is to use a unique prefix for each
+record type, but this leads to less clear code and obfuscates
+relationships between fields of different records.  Qualified names
+can be used to distinguish record selectors from different modules,
+but using one module per record is often impractical.
+</para>
+
+<para>
+Instead, the <option>-XOverloadedRecordFields</option> extension
+allows record field names to be overloaded and makes record
+projections polymorphic, so that the ambiguous identifier
+<literal>personId</literal> is resolved using the type of its
+argument.  The extension introduces a new form of constraint
+<literal>r { x :: t }</literal>, meaning that type <literal>r</literal>
+has a field <literal>x</literal> of type <literal>t</literal>.  (In
+fact, the constraint <literal>r { x :: t }</literal> is syntactic
+sugar for <literal>Has r "x" t</literal>, where the
+<literal>Has</literal> typeclass is defined in <ulink
+url="&libraryBaseLocation;/GHC-Records.html"><literal>GHC.Records</literal></ulink>, as discussed below.)
+A constraint <literal>R { x :: t }</literal> will be solved if
+<literal>R</literal> is a datatype that has a field
+<literal>x</literal> of monomorphic type <literal>t</literal> in
+scope.  For example, the following declarations are accepted:
+</para>
+
+<programlisting>
+getPersonId :: r { personId :: Int } => r -> Int
+getPersonId v = personId v
+
+e = Person { personId = 0, name = "Me" }
+
+my_id = getPersonId e
+</programlisting>
+
+<para>
+An error is generated if <literal>R</literal> has no field called
+<literal>x</literal>, it has the wrong type, the type is existential
+or higher rank, or the field is not in scope.  The restriction on
+types means that fields with higher-rank, universally quantified or
+existentially quantified types cannot be used with
+<option>-XOverloadedRecordFields</option>.  More precisely, such
+fields will be in scope normally, but a constraint like
+<literal>R { x :: t }</literal> will not be solved if
+<literal>x</literal> has a quantified type.  You can manually declare
+an appropriate selector function instead.  The following declarations
+are rejected:
+</para>
+
+<programlisting>
+bad1 = personId True       -- No instance for Bool { personId :: t }
+                           -- since Bool does not have a personId field
+
+bad2 = personId e :: Bool  -- Type Int of personId e is not Bool
+
+data HR = MkHR { unHR :: forall a . a -> a }
+bad3 = unHR (MkHR id)       -- No instance for HR { unHR :: t }
+                            -- since the field is higher-rank
+
+module M where
+  data U = MkU { foo :: Int }
+  data V = MkV { foo :: Int }
+
+module N where
+  import M ( U(MkU), V(foo) )
+  bad4 = foo (MkU 42)       -- No instance for U { foo :: t }
+                            -- since the field is not in scope
+</programlisting>
+
+
+<para>
+Note that a record field name must belong to at least one datatype for
+it to be used polymorphically in an expression.  If
+<literal>g</literal> is not in scope, then the following declaration
+will be rejected:
+</para>
+
+<programlisting>
+f :: r { g :: Int } => r -> Int
+f x = g x + 1
+
+-- data T = MkT { g :: Char }
+</programlisting>
+
+<para>
+On the other hand, if the datatype declaration <literal>T</literal> is
+uncommented, then the program will be accepted, even though the type
+of the field does not match.  That is, only a field of the correct
+name need be in scope; it need not have the same type.
+</para>
+
+<para>
+The syntax for record field constraints extends to conjunctions: for
+example, <literal>r { personId :: Int, age :: Int }</literal> is a
+valid constraint.  Note also that the record and field types might be
+arbitrary types, not just variables or constructors. For example,
+<literal>(T (Maybe v)) { x :: [Maybe v] }</literal> is valid.  In
+order to support these constraints, the
+<option>-XOverloadedRecordFields</option> extension implies
+<option>-XConstraintKinds</option> and
+<option>-XFlexibleContexts</option>.
+</para>
+
+<para>
+Furthermore, the <option>-XOverloadedRecordFields</option> extension
+implies <option>-XDisambiguateRecordFields</option> (<xref
+linkend="disambiguate-fields"/>).  Thus record construction and
+pattern-matching always refer unambiguously to a single record type.
+Record updates (such as <literal>e { x = t }</literal>) also must be
+unambiguous.  If the fields being updated are not unique to a single
+record type, then either the type must be determined by the context
+(e.g. from a type signature on the entire expression) or a type
+signature given on the record value.  For example:
+</para>
+
+<programlisting>
+w = e { personId = 42 }              -- ambiguous
+x = e { personId = 42, name = "Ma" } -- unambiguous as only Person has both fields
+y = (e :: Person) { personId = 42 }  -- unambiguous due to type signature
+
+z :: Person
+z = e { personId = 42 }              -- unambiguous due to type supplied by context
+</programlisting>
+
+<para>
+The <option>-XOverloadedRecordFields</option> extension permits
+overloading for the current module, regardless of whether the module
+that originally declared the datatype had the extension enabled.
+Conversely, if a module with the extension enabled defines a datatype,
+client modules without the extension will still interpret the fields
+as selector functions in the usual way.
+</para>
+
+<sect2 id="overloaded-record-fields-implementation">
+<title>Implementation details</title>
+
+<para>
+When the extension is enabled, a field <literal>foo</literal> has the
+following type:
+</para>
+
+<programlisting>
+foo :: (r { foo :: t }, Accessor p "foo") => p r t
+</programlisting>
+
+<para>
+It is expanded by the typechecker to an application of the
+<literal>field</literal> function, defined along with
+the <literal>Accessor</literal> class in
+<ulink url="&libraryBaseLocation;/GHC-Records.html"><literal>GHC.Records</literal></ulink>.
+This class has an instance for <literal>(->)</literal>, which will be
+selected whenever a field is used as a function.  Thus
+</para>
+
+<programlisting>
+(\ x -> foo x) :: r { foo :: t } => r -> t
+</programlisting>
+
+<para>
+On the other hand, the extra polymorphism allows libraries to make
+their own use of fields.  By providing an instance for
+<literal>Accessor</literal>, a library can turn an overloaded field
+into another datatype.  This allows the library to expose overloaded
+record update.
+</para>
+
+<para>
+In all, there are two classes and two type families for which
+constraints are solved automatically. The classes are:
+<itemizedlist>
+<listitem><para>
+<literal>Has r f t</literal>, meaning that <literal>r</literal> has a
+field <literal>f</literal> of type <literal>t</literal>, used for
+desugaring <literal>r { x :: t }</literal>; and
+</para></listitem>
+<listitem><para>
+<literal>Upd r f u</literal>, meaning that <literal>r</literal> has a
+field <literal>f</literal> that can be assigned type <literal>u</literal>.
+</para></listitem>
+</itemizedlist>
+</para>
+
+<para>
+The type families are:
+<itemizedlist>
+<listitem><para>
+<literal>GetResult r f</literal>, the type of the field
+<literal>f</literal> in datatype <literal>r</literal>; and
+</para></listitem>
+<listitem><para>
+<literal>SetResult r f u</literal>, the record type that results from
+setting the field <literal>f</literal> of datatype
+<literal>r</literal> to a value of type <literal>u</literal>.
+</para></listitem>
+</itemizedlist>
+</para>
+
+<para>
+For example, the following datatype would give rise to these instances
+(although the instances do not actually exist, but are created as
+needed by the constraint solver):
+</para>
+
+<programlisting>
+data T a = MkT { foo :: [a] }
+
+type instance GetResult (T a) "foo" = [a]
+type instance SetResult (T a) "foo" [b] = T b
+instance t ~ [a] => Has (T a) "foo" t
+instance Upd (T a) "foo" [b]
+</programlisting>
+
+<para>
+The <literal>getField</literal> and <literal>setField</literal>
+methods of the <literal>Has</literal> and <literal>Upd</literal>
+classes allow polymorphic field lookup and update without requiring a
+datatype containing the field to be in scope.  Their types are:
+</para>
+
+<programlisting>
+getField :: Has r f t => proxy f -> r -> t
+setField :: Upd r f u => proxy f -> r -> u -> SetResult r f u
+</programlisting>
+
+<para>
+The proxy arguments enable the field name to be specified.  The return
+type of <literal>setField</literal> uses the
+<literal>SetResult</literal> type family to allow type-changing
+update.  With the definition of <literal>T</literal> above, the
+following is accepted:
+</para>
+
+<programlisting>
+a :: T Bool
+a = MkT [True]
+
+b :: T Int
+b = setField (Proxy :: Proxy "foo") a [3]
+</programlisting>
+
+<para>
+Type-changing update allows a type parameter of a record datatype to
+be changed provided:
+<itemizedlist>
+<listitem><para>
+It is not 'fixed', i.e. it does not occur in the type of a different
+field of a relevant data constructor (one that has the field being
+updated).
+</para></listitem>
+<listitem><para>
+It occurs in the type of the field being updated.  This means that
+'phantom' parameters may not be changed.
+</para></listitem>
+<listitem><para>
+At least one of the variable's occurrences in the field type is
+'rigid' (not under a type family).
+</para></listitem>
+</itemizedlist>
+</para>
+
+<para>
+For example:
+</para>
+
+<programlisting>
+type family Goo x
+data T a b c d = MkT { foo :: (a, Goo b, d, Goo d), bar :: a }
+</programlisting>
+
+<para>
+Here, an update to <literal>foo</literal> must:
+<itemizedlist>
+<listitem><para>
+keep <literal>a</literal> the same, since it occurs in the type of
+<literal>bar</literal>;
+</para></listitem>
+<listitem><para>
+keep <literal>b</literal> the same, since it occurs only under a type
+family; and
+</para></listitem>
+<listitem><para>
+keep <literal>c</literal> the same, since it does not occur in the
+type of <literal>foo</literal>.
+</para></listitem>
+</itemizedlist>
+However, it may change <literal>d</literal>.
+</para>
+
+</sect2>
+
+</sect1>
+
 <sect1 id="other-type-extensions">
 <title>Other type system extensions</title>
 

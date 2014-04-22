@@ -342,6 +342,16 @@ basicKnownKeyNames
 
         -- GHCi Sandbox
         , ghciIoClassName, ghciStepIoMName
+
+        -- Overloaded record fields
+        , recordHasClassName
+        , recordUpdClassName
+        , accessorClassName
+        , fldTyFamName
+        , updTyFamName
+        , getFieldName
+        , setFieldName
+        , fieldName
     ]
 
 genericTyConNames :: [Name]
@@ -378,7 +388,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     tYPEABLE, tYPEABLE_INTERNAL, oLDTYPEABLE, oLDTYPEABLE_INTERNAL, gENERICS,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
-    cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_IP :: Module
+    cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_IP, gHC_RECORDS :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -436,6 +446,7 @@ cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
 gHC_GENERICS    = mkBaseModule (fsLit "GHC.Generics")
 gHC_TYPELITS    = mkBaseModule (fsLit "GHC.TypeLits")
 gHC_IP          = mkBaseModule (fsLit "GHC.IP")
+gHC_RECORDS     = mkBaseModule (fsLit "GHC.Records")
 
 gHC_PARR' :: Module
 gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
@@ -1159,7 +1170,17 @@ knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolCl
 ipClassName :: Name
 ipClassName         = clsQual gHC_IP (fsLit "IP")      ipClassNameKey
 
-
+-- Overloaded record fields
+recordHasClassName, recordUpdClassName, accessorClassName, fldTyFamName,
+  updTyFamName, getFieldName, setFieldName, fieldName :: Name
+recordHasClassName = clsQual gHC_RECORDS (fsLit "Has")      recordHasClassNameKey
+recordUpdClassName = clsQual gHC_RECORDS (fsLit "Upd")      recordUpdClassNameKey
+accessorClassName  = clsQual gHC_RECORDS (fsLit "Accessor") accessorClassNameKey
+fldTyFamName       = tcQual  gHC_RECORDS (fsLit "FldTy")    fldTyFamNameKey
+updTyFamName       = tcQual  gHC_RECORDS (fsLit "UpdTy")    updTyFamNameKey
+getFieldName       = varQual gHC_RECORDS (fsLit "getField") getFieldNameKey
+setFieldName       = varQual gHC_RECORDS (fsLit "setField") setFieldNameKey
+fieldName          = varQual gHC_RECORDS (fsLit "field")    fieldNameKey
 
 -- dotnet interop
 objectTyConName :: Name
@@ -1300,6 +1321,12 @@ oldTypeable4ClassKey       = mkPreludeClassUnique 50
 oldTypeable5ClassKey       = mkPreludeClassUnique 51
 oldTypeable6ClassKey       = mkPreludeClassUnique 52
 oldTypeable7ClassKey       = mkPreludeClassUnique 53
+
+-- Overloaded record fields
+recordHasClassNameKey, recordUpdClassNameKey, accessorClassNameKey :: Unique
+recordHasClassNameKey = mkPreludeClassUnique 54
+recordUpdClassNameKey = mkPreludeClassUnique 55
+accessorClassNameKey  = mkPreludeClassUnique 56
 \end{code}
 
 %************************************************************************
@@ -1512,6 +1539,12 @@ specTyConKey = mkPreludeTyConUnique 177
 
 smallArrayPrimTyConKey        = mkPreludeTyConUnique  178
 smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  179
+
+-- Overloaded record fields
+fldTyFamNameKey, updTyFamNameKey :: Unique
+fldTyFamNameKey = mkPreludeTyConUnique 180
+updTyFamNameKey = mkPreludeTyConUnique 181
+
 
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299
@@ -1829,6 +1862,12 @@ toListClassOpKey = mkPreludeMiscIdUnique 501
 
 proxyHashKey :: Unique
 proxyHashKey = mkPreludeMiscIdUnique 502
+
+-- Overloaded record fields
+getFieldNameKey, setFieldNameKey, fieldNameKey :: Unique
+getFieldNameKey = mkPreludeMiscIdUnique 503
+setFieldNameKey = mkPreludeMiscIdUnique 504
+fieldNameKey    = mkPreludeMiscIdUnique 505
 
 ---------------- Template Haskell -------------------
 --      USES IdUniques 200-499

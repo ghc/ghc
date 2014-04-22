@@ -55,7 +55,9 @@ module TcSMonad (
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getTcEvBinds, getUntouchables,
-    getTcEvBindsMap, getTcSTyBindsMap,
+    getTcEvBindsMap, getTcSTyBinds, getTcSTyBindsMap,
+
+    lookupFldInstDFun, lookupRepTyCon,
 
     lookupFlatEqn, newFlattenSkolem,            -- Flatten skolems
 
@@ -100,13 +102,14 @@ import HscTypes
 
 import Inst
 import InstEnv
-import FamInst
+import qualified FamInst
 import FamInstEnv
 
 import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified TcEnv as TcM
        ( checkWellStaged, topIdLvl, tcGetDefaultTys )
+import qualified RnEnv
 import Kind
 import TcType
 import DynFlags
@@ -116,6 +119,7 @@ import CoAxiom(sfMatchFam)
 import TcEvidence
 import Class
 import TyCon
+import FieldLabel
 
 import Name
 import RdrName (RdrName, GlobalRdrEnv)
@@ -1338,6 +1342,14 @@ getGblEnv = wrapTcS $ TcM.getGblEnv
 addUsedRdrNamesTcS :: [RdrName] -> TcS ()
 addUsedRdrNamesTcS names = wrapTcS  $ addUsedRdrNames names
 
+lookupFldInstDFun :: FieldLabelString -> TyCon -> TyCon
+                  -> Bool -> TcS (Maybe DFunId)
+lookupFldInstDFun lbl tc rep_tc which
+  = wrapTcS $ RnEnv.lookupFldInstDFun lbl tc rep_tc which
+
+lookupRepTyCon :: TyCon -> [Type] -> TcS TyCon
+lookupRepTyCon tc args = wrapTcS $ FamInst.lookupRepTyCon tc args
+
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1826,7 +1838,7 @@ maybeSym NotSwapped co = co
 
 
 matchOpenFam :: TyCon -> [Type] -> TcS (Maybe FamInstMatch)
-matchOpenFam tycon args = wrapTcS $ tcLookupFamInst tycon args
+matchOpenFam tycon args = wrapTcS $ FamInst.tcLookupFamInst tycon args
 
 matchFam :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
 -- Given (F tys) return (ty, co), where co :: F tys ~ ty

@@ -35,6 +35,7 @@ import TysPrim          ( funTyConName )
 import Name
 import SrcLoc
 import NameSet
+import FieldLabel
 
 import Util
 import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
@@ -42,7 +43,7 @@ import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
 import Outputable
 import FastString
 import Maybes
-import Data.List        ( nub )
+import Data.List        ( nub, find )
 import Control.Monad    ( unless, when )
 
 #include "HsVersions.h"
@@ -176,9 +177,9 @@ rnHsTyKi isType doc (HsBangTy b ty)
        ; return (HsBangTy b ty', fvs) }
 
 rnHsTyKi _ doc ty@(HsRecTy flds)
-  = do { addErr (hang (ptext (sLit "Record syntax is illegal here:"))
-                    2 (ppr ty))
-       ; (flds', fvs) <- rnConDeclFields doc flds
+  = do { addErr (recordSyntaxIllegalErr False ty)
+       ; let bogus_con = mkUnboundName (mkRdrUnqual (mkTcOcc "bogus_con"))
+       ; (flds', fvs) <- rnConDeclFields bogus_con doc flds
        ; return (HsRecTy flds', fvs) }
 
 rnHsTyKi isType doc (HsFunTy ty1 ty2)
@@ -232,6 +233,13 @@ rnHsTyKi isType _ tyLit@(HsTyLit t)
     negLit (HsStrTy _) = False
     negLit (HsNumTy i) = i < 0
     negLitErr = ptext (sLit "Illegal literal in type (type literals must not be negative):") <+> ppr tyLit
+
+rnHsTyKi isType doc ty@(HsAppTy ty1 (L loc (HsRecTy flds)))
+  = do { overload_ok <- xoptM Opt_OverloadedRecordFields
+       ; unless (overload_ok && isType) $ addErr (recordSyntaxIllegalErr isType ty)
+       ; (ty1', fvs1) <- rnLHsTyKi isType doc ty1
+       ; (flds', fvs2) <- setSrcSpan loc $ rnOverloadedRecordFields doc flds
+       ; return (HsAppTy ty1' (L loc (HsRecTy flds')), fvs1 `plusFV` fvs2) }
 
 rnHsTyKi isType doc (HsAppTy ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi isType doc ty1
@@ -462,6 +470,16 @@ dataKindsErr is_type thing
   where
     what | is_type   = ptext (sLit "type")
          | otherwise = ptext (sLit "kind")
+
+recordSyntaxIllegalErr :: Bool -> HsType RdrName -> SDoc
+recordSyntaxIllegalErr suggest_overloaded ty
+  = hang (hang (ptext (sLit "Record syntax is illegal here:"))
+             2 (ppr ty))
+       4 suggestion
+  where
+    suggestion | suggest_overloaded
+                   = ptext (sLit "Perhaps you intended to use -XOverloadedRecordFields")
+               | otherwise = empty
 \end{code}
 
 Note [Renaming associated types]
@@ -496,21 +514,36 @@ but it seems tiresome to do so.
 %*********************************************************
 
 \begin{code}
-rnConDeclFields :: HsDocContext -> [ConDeclField RdrName]
+rnConDeclFields :: Name -> HsDocContext -> [ConDeclField RdrName]
                 -> RnM ([ConDeclField Name], FreeVars)
-rnConDeclFields doc fields = mapFvRn (rnField doc) fields
+rnConDeclFields con doc fields = mapFvRn (rnField con doc) fields
 
-rnField :: HsDocContext -> ConDeclField RdrName -> RnM (ConDeclField Name, FreeVars)
-rnField doc (ConDeclField name ty haddock_doc)
-  = do { new_name <- lookupLocatedTopBndrRn name
+rnField :: Name -> HsDocContext -> ConDeclField RdrName -> RnM (ConDeclField Name, FreeVars)
+rnField con doc (ConDeclField name _ ty haddock_doc)
+  = do { flds <- lookupConstructorFields con
+       ; let lbl = occNameFS $ rdrNameOcc $ unLoc name
+       ; let fl = expectJust "rnField" $ find ((== lbl) . flLabel) flds
        ; (new_ty, fvs) <- rnLHsType doc ty
        ; new_haddock_doc <- rnMbLHsDoc haddock_doc
-       ; return (ConDeclField new_name new_ty new_haddock_doc, fvs) }
+       ; return (ConDeclField name (flSelector fl) new_ty new_haddock_doc, fvs) }
 
 rnContext :: HsDocContext -> LHsContext RdrName -> RnM (LHsContext Name, FreeVars)
 rnContext doc (L loc cxt)
   = do { (cxt', fvs) <- rnLHsTypes doc cxt
        ; return (L loc cxt', fvs) }
+
+-- Handles r { x :: t } syntax for overloaded record field constraints
+-- Unlike rnConDeclFields, this can occur in normal types
+rnOverloadedRecordFields :: HsDocContext -> [ConDeclField RdrName]
+                         -> RnM ([ConDeclField Name], FreeVars)
+rnOverloadedRecordFields doc flds = mapFvRn (rnOverloadedField doc) flds
+
+rnOverloadedField :: HsDocContext -> ConDeclField RdrName -> RnM (ConDeclField Name, FreeVars)
+rnOverloadedField doc (ConDeclField name _ ty haddock_doc)
+  = do { (new_ty, fvs) <- rnLHsType doc ty
+       ; when (isJust haddock_doc) $
+           addErr (ptext (sLit "Haddock docs are forbidden on overloaded record fields"))
+       ; return (ConDeclField name (mkUnboundName (unLoc name)) new_ty haddock_doc, fvs) }
 \end{code}
 
 
