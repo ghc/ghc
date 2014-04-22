@@ -794,6 +794,9 @@ data DynFlags = DynFlags {
   avx512f               :: Bool, -- Enable AVX-512 instructions.
   avx512pf              :: Bool, -- Enable AVX-512 PreFetch Instructions.
 
+  march                 :: CPUDesc,
+  mcpu                  :: CPUDesc,
+
   -- | Run-time linker information (what options we need, etc.)
   rtldInfo              :: IORef (Maybe LinkerInfo),
 
@@ -1459,6 +1462,8 @@ defaultDynFlags mySettings =
         avx512er = False,
         avx512f = False,
         avx512pf = False,
+        march = Generic,
+        mcpu  = Generic,
         rtldInfo = panic "defaultDynFlags: no rtldInfo",
         rtccInfo = panic "defaultDynFlags: no rtccInfo",
 
@@ -2387,6 +2392,9 @@ dynamic_flags = [
   , Flag "mavx512er"    (noArg (\d -> d{ avx512er = True }))
   , Flag "mavx512f"     (noArg (\d -> d{ avx512f = True }))
   , Flag "mavx512pf"    (noArg (\d -> d{ avx512pf = True }))
+
+  , Flag "march"        (HasArg hasMarch)
+  , Flag "mcpu"         (HasArg hasMcpu)
 
      ------ Warning opts -------------------------------------------------
   , Flag "W"      (NoArg (mapM_ setWarningFlag minusWOpts))
@@ -3702,6 +3710,20 @@ unsafeGlobalDynFlags = unsafePerformIO $ readIORef v_unsafeGlobalDynFlags
 
 setUnsafeGlobalDynFlags :: DynFlags -> IO ()
 setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
+
+-- -----------------------------------------------------------------------------
+-- march/mcpu handling
+
+hasMarch :: String -> DynP ()
+hasMarch s = case descToCPU s of
+  Nothing -> addWarn ("Invalid argument for -march, '"++s++"'")
+  Just x  -> do
+    upd (\d -> d { march = x })
+
+hasMcpu :: String -> DynP ()
+hasMcpu s = case descToCPU s of
+  Nothing -> addWarn ("Invalid argument for -mcpu, '"++s++"'")
+  Just x  -> upd (\d -> d { mcpu = x })
 
 -- -----------------------------------------------------------------------------
 -- SSE and AVX
