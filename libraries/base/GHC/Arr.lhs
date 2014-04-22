@@ -491,7 +491,8 @@ fill marr# (I# i#, e) next
 {-# INLINE done #-}
 done :: Ix i => i -> i -> Int -> MutableArray# s e -> STRep s (Array i e)
 -- See NB on 'fill'
-done l u n marr#
+-- Make sure it is strict in 'n'
+done l u n@(I# _) marr#
   = \s1# -> case unsafeFreezeArray# marr# s1# of
               (# s2#, arr# #) -> (# s2#, Array l u n arr# #)
 
@@ -534,11 +535,13 @@ negRange = error "Negative range size"
 {-# INLINE[1] safeIndex #-}
 -- See Note [Double bounds-checking of index values]
 -- Inline *after* (!) so the rules can fire
+-- Make sure it is strict in n
 safeIndex :: Ix i => (i, i) -> Int -> i -> Int
-safeIndex (l,u) n i = let i' = index (l,u) i
-                      in if (0 <= i') && (i' < n)
-                         then i'
-                         else badSafeIndex i' n
+safeIndex (l,u) n@(I# _) i 
+  | (0 <= i') && (i' < n) = i'
+  | otherwise             = badSafeIndex i' n
+  where
+    i' = index (l,u) i
 
 -- See Note [Double bounds-checking of index values]
 {-# RULES
