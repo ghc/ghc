@@ -23,13 +23,26 @@
 # We use an FEL_ prefix for the variable names, to avoid trampling on
 # other variables, as make has no concept of local variables.
 
-# We need to handle bin-package-db specially, as it doesn't have an
-# entry in the packages file, as it isn't in its own repository.
+# We need to handle the following packages specially, as those don't
+# have an entry in the packages file, since they don't live in
+# repositories of their own:
+#
+#  - base
+#  - bin-package-db
+#  - ghc-prim
+#  - integer-gmp
+#  - integer-simple
+#  - template-haskell
 
 define foreachLibrary
 # $1 = function to call for each library
 # We will give it the package path and the tag as arguments
 $$(foreach hashline,libraries/bin-package-db#-#no-remote-repo#no-vcs        \
+                    libraries/base#-#no-remote-repo#no-vcs                  \
+                    libraries/ghc-prim#-#no-remote-repo#no-vcs              \
+                    libraries/integer-gmp#-#no-remote-repo#no-vcs           \
+                    libraries/integer-simple#-#no-remote-repo#no-vcs        \
+                    libraries/template-haskell#-#no-remote-repo#no-vcs      \
                     $$(shell grep '^libraries/' packages | sed 's/  */#/g'),\
     $$(eval FEL_line    := $$(subst #,$$(space),$$(hashline)))              \
     $$(eval FEL_libdir  := $$(word 1,$$(FEL_line)))                         \
