@@ -52,6 +52,7 @@ data Arch
           , armISAExt :: [ArmISAExt]
           , armABI    :: ArmABI
           }
+        | ArchARM64
         | ArchAlpha
         | ArchMipseb
         | ArchMipsel

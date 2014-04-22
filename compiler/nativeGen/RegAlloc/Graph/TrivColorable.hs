@@ -113,6 +113,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchSPARC     -> 14
                             ArchPPC_64    -> panic "trivColorable ArchPPC_64"
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
+                            ArchARM64     -> panic "trivColorable ArchARM64"
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
@@ -137,6 +138,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchSPARC     -> 22
                             ArchPPC_64    -> panic "trivColorable ArchPPC_64"
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
+                            ArchARM64     -> panic "trivColorable ArchARM64"
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
@@ -161,6 +163,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchSPARC     -> 11
                             ArchPPC_64    -> panic "trivColorable ArchPPC_64"
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
+                            ArchARM64     -> panic "trivColorable ArchARM64"
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
@@ -185,6 +188,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts ex
                             ArchSPARC     -> 0
                             ArchPPC_64    -> panic "trivColorable ArchPPC_64"
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
+                            ArchARM64     -> panic "trivColorable ArchARM64"
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
