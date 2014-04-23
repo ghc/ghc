@@ -332,7 +332,7 @@ GetHpTok(FILE *infp)
  *	"thefloatish").
  */
 
-static char numberstring[ NUMBER_LENGTH - 1 ];
+static char numberstring[ NUMBER_LENGTH + 1 ];
 
 token
 GetNumber(FILE *infp)
@@ -350,7 +350,7 @@ GetNumber(FILE *infp)
         ch = getc(infp);
     }   
  
-    ASSERT(i < NUMBER_LENGTH); /* did not overflow */
+    ASSERT(i <= NUMBER_LENGTH); /* did not overflow */
 
     numberstring[ i ] = '\0';
  
