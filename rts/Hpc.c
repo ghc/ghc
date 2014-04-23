@@ -151,7 +151,7 @@ readTix(void) {
     ws();
     
     lookup = lookupHashTable(moduleHash, (StgWord)tmpModule->modName);
-    if (tmpModule == NULL) {
+    if (lookup == NULL) {
         debugTrace(DEBUG_hpc,"readTix: new HpcModuleInfo for %s",
                    tmpModule->modName);
         insertHashTable(moduleHash, (StgWord)tmpModule->modName, tmpModule);
