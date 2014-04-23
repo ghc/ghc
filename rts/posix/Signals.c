@@ -574,7 +574,9 @@ set_sigtstp_action (rtsBool handle)
     }
     sa.sa_flags = 0;
     sigemptyset(&sa.sa_mask);
-    sigaction(SIGTSTP, &sa, NULL);
+    if (sigaction(SIGTSTP, &sa, NULL) != 0) {
+        sysErrorBelch("warning: failed to install SIGTSTP handler");
+    }
 }
 
 /* -----------------------------------------------------------------------------
