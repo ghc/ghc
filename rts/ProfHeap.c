@@ -331,16 +331,17 @@ void initProfiling2 (void)
     /* Initialise the log file name */
     hp_filename = stgMallocBytes(strlen(prog) + 6, "hpFileName");
     sprintf(hp_filename, "%s.hp", prog);
-    
+
     /* open the log file */
     if ((hp_file = fopen(hp_filename, "w")) == NULL) {
-      debugBelch("Can't open profiling report file %s\n", 
+      debugBelch("Can't open profiling report file %s\n",
 	      hp_filename);
       RtsFlags.ProfFlags.doHeapProfile = 0;
+      stgFree(prog);
       return;
     }
   }
-  
+
   stgFree(prog);
 
   initHeapProfiling();
