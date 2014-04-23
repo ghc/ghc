@@ -423,6 +423,8 @@ GetString(FILE *infp)
     stringbuffer[i] = '\0'; 
     thestring = copystring(stringbuffer);
 
+    free(stringbuffer);
+
     ASSERT(ch == '\"');
 
     ch = getc(infp);      /* skip the '\"' that terminates the string */
