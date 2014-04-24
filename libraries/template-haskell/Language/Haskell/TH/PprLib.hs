@@ -40,8 +40,8 @@ import Language.Haskell.TH.Syntax
 import qualified Text.PrettyPrint as HPJ
 import Control.Applicative (Applicative(..))
 import Control.Monad (liftM, liftM2, ap)
-import Data.Map ( Map )
-import qualified Data.Map as Map ( lookup, insert, empty )
+import Language.Haskell.TH.Lib.Map ( Map )
+import qualified Language.Haskell.TH.Lib.Map as Map ( lookup, insert, empty )
 import GHC.Base (Int(..))
 
 infixl 6 <> 

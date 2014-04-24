@@ -42,9 +42,11 @@ Library
         Language.Haskell.TH.Quote
         Language.Haskell.TH.Syntax
 
+    other-modules:
+        Language.Haskell.TH.Lib.Map
+
     build-depends:
         base       == 4.7.*,
-        containers == 0.5.*,
         pretty     == 1.1.*
 
     -- We need to set the package name to template-haskell (without a
