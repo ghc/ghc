@@ -407,3 +407,11 @@ test('T6048',
              # 05/03/2014 110646312 amd64/Linux Call Arity became more elaborate
       ],
       compile,[''])
+
+test('T9020',
+     [ only_ways(['optasm']),
+      compiler_stats_num_field('bytes allocated',
+          [(wordsize(32),  40000000, 10),
+           (wordsize(64), 795469104, 10)])
+      ],
+      compile,[''])

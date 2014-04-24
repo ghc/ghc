@@ -73,7 +73,8 @@ should have arity 3, regardless of f's arity.
 
 \begin{code}
 manifestArity :: CoreExpr -> Arity
--- ^ manifestArity sees how many leading value lambdas there are
+-- ^ manifestArity sees how many leading value lambdas there are,
+--   after looking through casts
 manifestArity (Lam v e) | isId v    	= 1 + manifestArity e
 			| otherwise 	= manifestArity e
 manifestArity (Tick t e) | not (tickishIsCode t) =  manifestArity e
