@@ -39,7 +39,7 @@ tcDefaults :: [LDefaultDecl Name]
 tcDefaults [] 
   = getDeclaredDefaultTys	-- No default declaration, so get the
 				-- default types from the envt; 
-				-- i.e. use the curent ones
+				-- i.e. use the current ones
 				-- (the caller will put them back there)
 	-- It's important not to return defaultDefaultTys here (which
 	-- we used to do) because in a TH program, tcDefaults [] is called

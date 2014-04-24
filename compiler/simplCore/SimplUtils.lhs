@@ -1208,7 +1208,7 @@ tryEtaExpandRhs env bndr rhs
       , let new_arity1 = findRhsArity dflags bndr rhs old_arity
             new_arity2 = idCallArity bndr
             new_arity  = max new_arity1 new_arity2
-      , new_arity > old_arity      -- And the curent manifest arity isn't enough
+      , new_arity > old_arity      -- And the current manifest arity isn't enough
       = do { tick (EtaExpansion bndr)
            ; return (new_arity, etaExpand new_arity rhs) }
       | otherwise
