@@ -95,10 +95,9 @@ simpl_top wanteds
 
     try_class_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_class_defaulting wc
-      | isEmptyWC wc || insolubleWC wc
-      = return wc  -- Don't do type-class defaulting if there are insolubles
-                   -- Doing so is not going to solve the insolubles
-      | otherwise
+      | isEmptyWC wc  
+      = return wc
+      | otherwise  -- See Note [When to do type-class defaulting]
       = do { something_happened <- applyDefaultingRules (approximateWC wc)
                                    -- See Note [Top-level Defaulting Plan]
            ; if something_happened
@@ -106,6 +105,33 @@ simpl_top wanteds
                      ; try_class_defaulting wc_residual }
              else return wc }
 \end{code}
+
+Note [When to do type-class defaulting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In GHC 7.6 and 7.8.2, we did type-class defaulting only if insolubleWC
+was false, on the grounds that defaulting can't help solve insoluble
+constraints.  But if we *don't* do defaulting we may report a whole
+lot of errors that would be solved by defaulting; these errors are
+quite spurious because fixing the single insoluble error means that
+defaulting happens again, which makes all the other errors go away.
+This is jolly confusing: Trac #9033.
+
+So it seems better to always do type-class defaulting.
+
+However, always doing defaulting does mean that we'll do it in
+situations like this (Trac #5934):
+   run :: (forall s. GenST s) -> Int
+   run = fromInteger 0 
+We don't unify the return type of fromInteger with the given function
+type, because the latter involves foralls.  So we're left with
+    (Num alpha, alpha ~ (forall s. GenST s) -> Int)
+Now we do defaulting, get alpha := Integer, and report that we can't 
+match Integer with (forall s. GenST s) -> Int.  That's not totally 
+stupid, but perhaps a little strange.
+
+Another potential alternative would be to suppress *all* non-insoluble
+errors if there are *any* insoluble errors, anywhere, but that seems
+too drastic.
 
 Note [Must simplify after defaulting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

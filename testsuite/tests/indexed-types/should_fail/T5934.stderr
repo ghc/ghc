@@ -1,8 +1,8 @@
 
 T5934.hs:12:7:
-    Cannot instantiate unification variable ‘a0’
-    with a type involving foralls:
-      (forall s. Gen (PrimState (ST s))) -> Int
-      Perhaps you want ImpredicativeTypes
+    Couldn't match type ‘Integer’
+                  with ‘(forall s. Gen (PrimState (ST s))) -> Int’
+    Expected type: Integer -> (forall s. GenST s) -> Int
+      Actual type: Integer -> Integer
     In the expression: 0
     In an equation for ‘run’: run = 0

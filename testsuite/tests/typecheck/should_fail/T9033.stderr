@@ -1,0 +1,5 @@
+
+T9033.hs:4:7:
+    Couldn't match expected type ‘Bool’ with actual type ‘()’
+    In the expression: ()
+    In an equation for ‘bad’: bad = ()
