@@ -101,10 +101,11 @@ test('haddock.Cabal',
             # 2013-11-21: 3908586784 (amd64/Linux) Cabal updated
             # 2013-12-12: 3828567272 (amd64/Linux)
             # 2014-01-12: 3979151552 (amd64/Linux) new parser
-          ,(platform('i386-unknown-mingw32'), 1966911336, 1)
+          ,(platform('i386-unknown-mingw32'), 2052220292, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)
             # 2013-02-10:                     1906532680 (x86/Windows)
             # 2014-01-28:                     1966911336 (x86/Windows)
+            # 2014-04-24:                     2052220292 (x86/Windows)
           ,(wordsize(32), 1986290624, 1)])
             # 2012-08-14: 1648610180 (x86/OSX)
             # 2014-01-22: 1986290624 (x86/Linux)

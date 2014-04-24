@@ -42,11 +42,12 @@ test('T1969',
              # 2013-02-13 27, very unstable!
              # 2013-09-11 30 (amd64/Linux)
       compiler_stats_num_field('max_bytes_used',
-          [(platform('i386-unknown-mingw32'), 7295012, 20),
+          [(platform('i386-unknown-mingw32'), 5719436, 20),
                                  # 2010-05-17 5717704 (x86/Windows)
                                  # 2013-02-10 5159748 (x86/Windows)
                                  # 2013-02-10 5030080 (x86/Windows)
                                  # 2013-11-13 7295012 (x86/Windows, 64bit machine)
+                                 # 2014-04-24 5719436 (x86/Windows, 64bit machine)
            (wordsize(32), 6429864, 1),
              #            6707308 (x86/OS X)
              # 2009-12-31 6149572 (x86/Linux)
@@ -110,12 +111,13 @@ else:
 test('T3294',
      [
       compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(32), 24009436, 15),
+          [(wordsize(32), 19882188, 15),
              #            17725476 (x86/OS X)
              #            14593500 (Windows)
              # 2013-02-10 20651576 (x86/Windows)
              # 2013-02-10 20772984 (x86/OSX)
              # 2013-11-13 24009436 (x86/Windows, 64bit machine)
+             # 2014-04-24 19882188 (x86/Windows, 64bit machine)
            (wordsize(64), 43224080, 15)]),
              # prev:           25753192 (amd64/Linux)
              # 29/08/2012:     37724352 (amd64/Linux)
@@ -411,7 +413,7 @@ test('T6048',
 test('T9020',
      [ only_ways(['optasm']),
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32),  40000000, 10),
+          [(wordsize(32), 381360728, 10),
            (wordsize(64), 795469104, 10)])
       ],
       compile,[''])

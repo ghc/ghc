@@ -311,7 +311,7 @@ test('T7850',
 
 test('T5949',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(32), 101000, 10),
+                      [ (wordsize(32), 116020, 10),
                         (wordsize(64), 201008, 10)]),
                       # previously, it was >400000 bytes
       only_ways(['normal'])],
@@ -320,7 +320,8 @@ test('T5949',
 
 test('T4267',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(32), 20992, 10)
+                      [ (wordsize(32), 36012, 10)
+                      # 32-bit value close to 64 bit; c.f. T7619
                       , (wordsize(64), 40992, 10) ]),
                       # previously, it was >170000 bytes
                       # 2014-01-17: 130000
@@ -331,7 +332,9 @@ test('T4267',
 
 test('T7619',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(32), 20992, 10)
+                      [ (wordsize(32), 36012, 10)
+                      # 32-bit close to 64-bit value; most of this very 
+                      # small number is standard start-up boilerplate I think
                       , (wordsize(64), 40992, 10) ]),
                       # previously, it was >400000 bytes
       only_ways(['normal'])],
@@ -348,8 +351,10 @@ test('InlineArrayAlloc',
 
 test('InlineByteArrayAlloc',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(32),  720040960, 5)
+                      [ (wordsize(32), 1360036012, 5)
                       , (wordsize(64), 1440040960, 5) ]),
+         # 32 and 64 bit not so different, because 
+         # we are allocating *byte* arrays
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
