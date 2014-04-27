@@ -2810,6 +2810,7 @@ loadObj( pathchar *path )
 
    /* Check that we haven't already loaded this object.
       Ignore requests to load multiple times */
+
    if (isAlreadyLoaded(path)) {
        IF_DEBUG(linker,
                 debugBelch("ignoring repeated load of %" PATH_FMT "\n", path));
@@ -2828,8 +2829,10 @@ loadObj( pathchar *path )
    /* On many architectures malloc'd memory isn't executable, so we need to use mmap. */
 
 #if defined(openbsd_HOST_OS)
+   /* coverity[toctou] */
    fd = open(path, O_RDONLY, S_IRUSR);
 #else
+   /* coverity[toctou] */
    fd = open(path, O_RDONLY);
 #endif
    if (fd == -1)
@@ -2841,6 +2844,7 @@ loadObj( pathchar *path )
 
 #else /* !USE_MMAP */
    /* load the image into memory */
+   /* coverity[toctou] */
    f = pathopen(path, WSTR("rb"));
    if (!f)
        barf("loadObj: can't read `%" PATH_FMT "'", path);
