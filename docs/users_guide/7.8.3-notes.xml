@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-8-3">
+  <title>Release notes for version 7.8.3</title>
+
+  <para>
+    The 7.8.3 release is a bugfix release. The changes relative to
+    7.8.2 are listed below.
+  </para>
+
+  <sect2>
+    <title>GHC</title>
+
+    <itemizedlist>
+       <listitem>
+          <para>
+            TODO FIXME
+          </para>
+       </listitem>
+    </itemizedlist>
+  </sect2>
+</sect1>

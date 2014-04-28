@@ -5,6 +5,7 @@
 <!ENTITY intro          SYSTEM "intro.xml" >
 <!ENTITY relnotes1      SYSTEM "7.8.1-notes.xml" >
 <!ENTITY relnotes2      SYSTEM "7.8.2-notes.xml" >
+<!ENTITY relnotes3      SYSTEM "7.8.3-notes.xml" >
 <!ENTITY using          SYSTEM "using.xml" >
 <!ENTITY code-gens      SYSTEM "codegens.xml" >
 <!ENTITY runtime        SYSTEM "runtime_control.xml" >
