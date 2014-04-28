@@ -110,6 +110,8 @@ createThread(Capability *cap, W_ size)
     tso->stackobj       = stack;
     tso->tot_stack_size = stack->stack_size;
 
+    tso->alloc_limit = 0;
+
     tso->trec = NO_TREC;
 
 #ifdef PROFILING
@@ -162,6 +164,31 @@ int
 rts_getThreadId(StgPtr tso) 
 {
   return ((StgTSO *)tso)->id;
+}
+
+/* ---------------------------------------------------------------------------
+ * Getting & setting the thread allocation limit
+ * ------------------------------------------------------------------------ */
+HsInt64 rts_getThreadAllocationCounter(StgPtr tso)
+{
+    // NB. doesn't take into account allocation in the current nursery
+    // block, so it might be off by up to 4k.
+    return ((StgTSO *)tso)->alloc_limit;
+}
+
+void rts_setThreadAllocationCounter(StgPtr tso, HsInt64 i)
+{
+    ((StgTSO *)tso)->alloc_limit = i;
+}
+
+void rts_enableThreadAllocationLimit(StgPtr tso)
+{
+    ((StgTSO *)tso)->flags |= TSO_ALLOC_LIMIT;
+}
+
+void rts_disableThreadAllocationLimit(StgPtr tso)
+{
+    ((StgTSO *)tso)->flags &= ~TSO_ALLOC_LIMIT;
 }
 
 /* -----------------------------------------------------------------------------
@@ -524,21 +551,8 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
                                  stg_min(tso->stackobj->stack + tso->stackobj->stack_size,
                                          tso->stackobj->sp+64)));
 
-        if (tso->flags & TSO_BLOCKEX) {
-            // NB. StackOverflow exceptions must be deferred if the thread is
-            // inside Control.Exception.mask.  See bug #767 and bug #8303.
-            // This implementation is a minor hack, see Note [Throw to self when masked]
-            MessageThrowTo *msg = (MessageThrowTo*)allocate(cap, sizeofW(MessageThrowTo));
-            SET_HDR(msg, &stg_MSG_THROWTO_info, CCS_SYSTEM);
-            msg->source = tso;
-            msg->target = tso;
-            msg->exception = (StgClosure *)stackOverflow_closure;
-            blockedThrowTo(cap, tso, msg);
-        } else {
-            // Send this thread the StackOverflow exception
-            throwToSingleThreaded(cap, tso, (StgClosure *)stackOverflow_closure);
-            return;
-        }
+        // Note [Throw to self when masked], also #767 and #8303.
+        throwToSelf(cap, tso, (StgClosure *)stackOverflow_closure);
     }
 
 
@@ -669,39 +683,6 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     // IF_DEBUG(scheduler,printTSO(new_tso));
 }
 
-/* Note [Throw to self when masked]
- *
- * When a StackOverflow occurs when the thread is masked, we want to
- * defer the exception to when the thread becomes unmasked/hits an
- * interruptible point.  We already have a mechanism for doing this,
- * the blocked_exceptions list, but the use here is a bit unusual,
- * because an exception is normally only added to this list upon
- * an asynchronous 'throwTo' call (with all of the relevant
- * multithreaded nonsense). Morally, a stack overflow should be an
- * asynchronous exception sent by a thread to itself, and it should
- * have the same semantics.  But there are a few key differences:
- *
- * - If you actually tried to send an asynchronous exception to
- *   yourself using throwTo, the exception would actually immediately
- *   be delivered.  This is because throwTo itself is considered an
- *   interruptible point, so the exception is always deliverable. Thus,
- *   ordinarily, we never end up with a message to onesself in the
- *   blocked_exceptions queue.
- *
- * - In the case of a StackOverflow, we don't actually care about the
- *   wakeup semantics; when an exception is delivered, the thread that
- *   originally threw the exception should be woken up, since throwTo
- *   blocks until the exception is successfully thrown.  Fortunately,
- *   it is harmless to wakeup a thread that doesn't actually need waking
- *   up, e.g. ourselves.
- *
- * - No synchronization is necessary, because we own the TSO and the
- *   capability.  You can observe this by tracing through the execution
- *   of throwTo.  We skip synchronizing the message and inter-capability
- *   communication.
- *
- * We think this doesn't break any invariants, but do be careful!
- */
 
 
 /* ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ module GHC.IO.Exception (
   BlockedIndefinitelyOnMVar(..), blockedIndefinitelyOnMVar,
   BlockedIndefinitelyOnSTM(..), blockedIndefinitelyOnSTM,
   Deadlock(..),
+  AllocationLimitExceeded(..), allocationLimitExceeded,
   AssertionFailed(..),
 
   SomeAsyncException(..),
@@ -96,6 +97,23 @@ instance Exception Deadlock
 
 instance Show Deadlock where
     showsPrec _ Deadlock = showString "<<deadlock>>"
+
+-----
+
+-- |This thread has exceeded its allocation limit.  See
+-- 'GHC.Conc.setAllocationCounter' and
+-- 'GHC.Conc.enableAllocationLimit'.
+data AllocationLimitExceeded = AllocationLimitExceeded
+    deriving Typeable
+
+instance Exception AllocationLimitExceeded
+
+instance Show AllocationLimitExceeded where
+    showsPrec _ AllocationLimitExceeded =
+      showString "allocation limit exceeded"
+
+allocationLimitExceeded :: SomeException -- for the RTS
+allocationLimitExceeded = toException AllocationLimitExceeded
 
 -----
 
@@ -175,7 +193,8 @@ data ArrayException
 
 instance Exception ArrayException
 
-stackOverflow, heapOverflow :: SomeException -- for the RTS
+-- for the RTS
+stackOverflow, heapOverflow :: SomeException
 stackOverflow = toException StackOverflow
 heapOverflow  = toException HeapOverflow
 

@@ -208,6 +208,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     getStablePtr((StgPtr)blockedIndefinitelyOnMVar_closure);
     getStablePtr((StgPtr)nonTermination_closure);
     getStablePtr((StgPtr)blockedIndefinitelyOnSTM_closure);
+    getStablePtr((StgPtr)allocationLimitExceeded_closure);
     getStablePtr((StgPtr)nestedAtomically_closure);
 
     getStablePtr((StgPtr)runSparks_closure);

@@ -61,6 +61,12 @@ module GHC.Conc.Sync
         , threadStatus
         , threadCapability
 
+        -- * Allocation counter and quota
+        , setAllocationCounter
+        , getAllocationCounter
+        , enableAllocationLimit
+        , disableAllocationLimit
+
         -- * TVars
         , STM(..)
         , atomically
@@ -177,16 +183,92 @@ instance Eq ThreadId where
 instance Ord ThreadId where
    compare = cmpThread
 
+-- | Every thread has an allocation counter that tracks how much
+-- memory has been allocated by the thread.  The counter is
+-- initialized to zero, and 'setAllocationCounter' sets the current
+-- value.  The allocation counter counts *down*, so in the absence of
+-- a call to 'setAllocationCounter' its value is the negation of the
+-- number of bytes of memory allocated by the thread.
+--
+-- There are two things that you can do with this counter:
+--
+-- * Use it as a simple profiling mechanism, with
+--   'getAllocationCounter'.
+--
+-- * Use it as a resource limit.  See 'enableAllocationLimit'.
+--
+-- Allocation accounting is accurate only to about 4Kbytes.
+--
+setAllocationCounter :: Int64 -> IO ()
+setAllocationCounter i = do
+  ThreadId t <- myThreadId
+  rts_setThreadAllocationCounter t i
+
+-- | Return the current value of the allocation counter for the
+-- current thread.
+getAllocationCounter :: IO Int64
+getAllocationCounter = do
+  ThreadId t <- myThreadId
+  rts_getThreadAllocationCounter t
+
+-- | Enables the allocation counter to be treated as a limit for the
+-- current thread.  When the allocation limit is enabled, if the
+-- allocation counter counts down below zero, the thread will be sent
+-- the 'AllocationLimitExceeded' asynchronous exception.  When this
+-- happens, the counter is reinitialised (by default
+-- to 100K, but tunable with the @+RTS -xq@ option) so that it can handle
+-- the exception and perform any necessary clean up.  If it exhausts
+-- this additional allowance, another 'AllocationLimitExceeded' exception
+-- is sent, and so forth.
+--
+-- Note that memory allocation is unrelated to /live memory/, also
+-- known as /heap residency/.  A thread can allocate a large amount of
+-- memory and retain anything between none and all of it.  It is
+-- better to think of the allocation limit as a limit on
+-- /CPU time/, rather than a limit on memory.
+--
+-- Compared to using timeouts, allocation limits don't count time
+-- spent blocked or in foreign calls.
+--
+enableAllocationLimit :: IO ()
+enableAllocationLimit = do
+  ThreadId t <- myThreadId
+  rts_enableThreadAllocationLimit t
+
+-- | Disable allocation limit processing for the current thread.
+disableAllocationLimit :: IO ()
+disableAllocationLimit = do
+  ThreadId t <- myThreadId
+  rts_disableThreadAllocationLimit t
+
+-- We cannot do these operations safely on another thread, because on
+-- a 32-bit machine we cannot do atomic operations on a 64-bit value.
+-- Therefore, we only expose APIs that allow getting and setting the
+-- limit of the current thread.
+foreign import ccall unsafe "rts_setThreadAllocationCounter"
+  rts_setThreadAllocationCounter :: ThreadId# -> Int64 -> IO ()
+
+foreign import ccall unsafe "rts_getThreadAllocationCounter"
+  rts_getThreadAllocationCounter :: ThreadId# -> IO Int64
+
+foreign import ccall unsafe "rts_enableThreadAllocationLimit"
+  rts_enableThreadAllocationLimit :: ThreadId# -> IO ()
+
+foreign import ccall unsafe "rts_disableThreadAllocationLimit"
+  rts_disableThreadAllocationLimit :: ThreadId# -> IO ()
+
 {- |
-Sparks off a new thread to run the 'IO' computation passed as the
+Creates a new thread to run the 'IO' computation passed as the
 first argument, and returns the 'ThreadId' of the newly created
 thread.
 
-The new thread will be a lightweight thread; if you want to use a foreign
-library that uses thread-local storage, use 'Control.Concurrent.forkOS' instead.
+The new thread will be a lightweight, /unbound/ thread.  Foreign calls
+made by this thread are not guaranteed to be made by any particular OS
+thread; if you need foreign calls to be made by a particular OS
+thread, then use 'Control.Concurrent.forkOS' instead.
 
-GHC note: the new thread inherits the /masked/ state of the parent
-(see 'Control.Exception.mask').
+The new thread inherits the /masked/ state of the parent (see
+'Control.Exception.mask').
 
 The newly created thread has an exception handler that discards the
 exceptions 'BlockedIndefinitelyOnMVar', 'BlockedIndefinitelyOnSTM', and

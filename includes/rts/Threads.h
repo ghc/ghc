@@ -42,8 +42,12 @@ StgRegTable * resumeThread  (void *);
 //
 // Thread operations from Threads.c
 //
-int    cmp_thread      (StgPtr tso1, StgPtr tso2);
-int    rts_getThreadId (StgPtr tso);
+int     cmp_thread                       (StgPtr tso1, StgPtr tso2);
+int     rts_getThreadId                  (StgPtr tso);
+HsInt64 rts_getThreadAllocationCounter   (StgPtr tso);
+void    rts_setThreadAllocationCounter   (StgPtr tso, HsInt64 i);
+void    rts_enableThreadAllocationLimit  (StgPtr tso);
+void    rts_disableThreadAllocationLimit (StgPtr tso);
 
 #if !defined(mingw32_HOST_OS)
 pid_t  forkProcess     (HsStablePtr *entry);
