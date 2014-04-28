@@ -2,6 +2,7 @@ module TcTypeNats
   ( typeNatTyCons
   , typeNatCoAxiomRules
   , BuiltInSynFamily(..)
+  , ExternalSolver(..), ExtSolRes(..), newExternalSolver
   ) where
 
 import Type
@@ -9,10 +10,12 @@ import Pair
 import TcType     ( TcType, tcEqType )
 import TyCon      ( TyCon, SynTyConRhs(..), mkSynTyCon, TyConParent(..)  )
 import Coercion   ( Role(..) )
-import TcRnTypes  ( Xi )
+import TcRnTypes  ( Xi, Ct(..) )
 import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..) )
-import Name       ( Name, BuiltInSyntax(..) )
-import TysWiredIn ( typeNatKind, typeSymbolKind
+import Name       ( Name, BuiltInSyntax(..), nameOccName, nameUnique )
+import OccName    ( occNameString )
+import Var        ( tyVarName, tyVarKind )
+import TysWiredIn ( typeNatKind, typeSymbolKind, typeNatKindCon
                   , mkWiredInTyConName
                   , promotedBoolTyCon
                   , promotedFalseDataCon, promotedTrueDataCon
@@ -31,9 +34,22 @@ import PrelNames  ( gHC_TYPELITS
                   , typeNatCmpTyFamNameKey
                   , typeSymbolCmpTyFamNameKey
                   )
+import Panic      (panic)
 import FastString ( FastString, fsLit )
+import UniqFM     ( UniqFM,  emptyUFM, unitUFM, plusUFM, eltsUFM )
+import           Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe ( isJust )
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import           Data.Maybe ( isJust )
+import           Data.Char  ( isSpace )
+import           Data.List ( unfoldr, mapAccumL, foldl' )
+import           Data.IORef ( newIORef, atomicModifyIORef', modifyIORef' )
+import           Control.Monad (forever)
+import           Control.Concurrent ( forkIO )
+import qualified Control.Exception as X
+import           System.Process ( runInteractiveProcess, waitForProcess )
+import           System.IO ( hPutStrLn, hFlush, hGetContents, hGetLine )
 
 {-------------------------------------------------------------------------------
 Built-in type constructors for functions on type-lelve nats
@@ -681,7 +697,366 @@ genLog x base = Just (exactLoop 0 x)
 
 
 
+--------------------------------------------------------------------------------
+-- Interface
 
+data ExternalSolver = ExternalSolver
+  { extSolPush  :: IO ()
+  , extSolPop   :: IO ()
+  , extSolSend  :: Ct -> IO Bool
+  , extSolCheck :: IO ExtSolRes
+  , extSolStop  :: IO ()
+  }
+
+data ExtSolRes = ExtSolSat [(TyVar, Type)]
+               | ExtSolUnsat
+               | ExtSolUnknown
+
+--------------------------------------------------------------------------------
+-- Concrete implementation
+
+newExternalSolver :: FilePath -> [String] -> IO ExternalSolver
+newExternalSolver exe opts =
+  do proc <- startSolverProcess exe opts
+     let ackCmd c = do res <- solverDo proc c
+                       case res of
+                         SAtom "success" -> return ()
+                         _  -> unexpected res
+         simpleCmd = ackCmd . SList . map SAtom
+
+     -- Prep the solver
+     simpleCmd [ "set-option", ":print-success", "true" ]
+     simpleCmd [ "set-option", ":produce-models", "true" ]
+     simpleCmd [ "set-logic", "QF_LIA" ]
+
+
+     viRef <- newIORef emptyVarInfo
+
+     return ExternalSolver
+       { extSolPush =
+          do simpleCmd [ "push" ]
+             modifyIORef' viRef startScope
+
+       , extSolPop =
+          do simpleCmd [ "pop" ]
+             modifyIORef' viRef endScope
+
+       , extSolSend = \ct ->
+           case knownCt ct of
+             Nothing -> return False
+             Just (vs,e) ->
+               do stmtss <- atomicModifyIORef' viRef $ \vi ->
+                              mapAccumL smtDeclarePerhaps vi (eltsUFM vs)
+                  mapM_ (mapM_ ackCmd) stmtss
+                  ackCmd $ smtAssert e
+                  return True
+
+       , extSolCheck =
+          do res <- solverDo proc (SList [ SAtom "check-sat" ])
+             case res of
+               SAtom "unsat"   -> return ExtSolUnsat
+               SAtom "unknown" -> return ExtSolUnknown
+               SAtom "sat" -> undefined
+
+               _ -> unexpected res
+
+       , extSolStop = solverStop proc
+       }
+  where
+  unexpected e = fail $ "Unexpected response by the solver: " ++
+                        (renderSExpr e "")
+
+smtDeclarePerhaps :: VarInfo -> (TyVar, String, Ty) -> (VarInfo, [SExpr])
+smtDeclarePerhaps vi (tv,x,ty) = (vi1, decls)
+  where
+  (vi1, status) = declareVar tv vi
+  decls = case status of
+            Constrained -> []
+            Declared    -> map smtAssert (smtExtraConstraints x ty)
+            Undeclared  -> smtDeclare x ty
+                         : map smtAssert (smtExtraConstraints x ty)
+
+
+
+
+--------------------------------------------------------------------------------
+-- Recognizing constraints that we can work with.
+
+
+data Ty     = TNat | TBool
+
+data Op     = Add | Sub | Mul | Leq | Eq
+              deriving Show
+
+data Expr   = Op Op [Expr]
+            | Not Expr
+            | Num Integer
+            | Bool Bool
+            | Var String
+
+type VarTypes = UniqFM (TyVar,String,Ty)
+
+-- For debugging
+instance Show Expr where
+  showsPrec p v =
+    case v of
+      Num n -> shows n
+      Var s -> showString s
+      Not v -> showParen (p > 8) $ showString "!" . showsPrec 8 v
+      Bool b -> shows b
+      Op o [a,b] -> showParen (p > pOp) $ showsPrec pL a . showString opStr
+                                        . showsPrec pR b
+        where
+          (pOp, pL, pR, opStr) =
+            case o of
+              Add -> (6, 6, 7, " + ")
+              Sub -> (6, 6, 7, " - ")
+              Mul -> (7, 7, 8, " * ")
+              Leq -> (4, 5, 5, " <= ")
+              Eq  -> (4, 5, 5, " == ")
+
+      Op o as -> showsPrec p (o,as)
+
+
+knownCt :: Ct -> Maybe (VarTypes, Expr)
+knownCt ct =
+  case ct of
+    CTyEqCan _ x xi ->
+      do (vs1,e1) <- knownVar x
+         (vs2,e2) <- knownXi xi
+         return (plusUFM vs1 vs2, Op Eq [e1,e2])
+    CFunEqCan _ f args rhs ->
+      do (vs1,e1) <- knownTerm f args
+         (vs2,e2) <- knownXi rhs
+         return (plusUFM vs1 vs2, Op Eq [e1,e2])
+    _ -> Nothing
+
+knownTerm :: TyCon -> [Xi] -> Maybe (VarTypes, Expr)
+knownTerm tc xis =
+  do op <- knownTC tc
+     as <- mapM knownXi xis
+     -- XXX: Check for linearity here?
+     let (varMaps,es) = unzip as
+     return (foldl' plusUFM emptyUFM varMaps, Op op es)
+
+knownTC :: TyCon -> Maybe Op
+knownTC tc
+  | tc == typeNatAddTyCon = Just Add
+  | tc == typeNatSubTyCon = Just Sub
+  | tc == typeNatMulTyCon = Just Mul
+  | tc == typeNatLeqTyCon = Just Leq
+  | otherwise             = Nothing
+
+knownXi :: Xi -> Maybe (VarTypes, Expr)
+knownXi xi
+  | Just x <- getTyVar_maybe xi   = knownVar x
+  | Just x <- isNumLitTy xi       = Just (emptyUFM, Num x)
+  | Just x <- isBoolLitTy xi      = Just (emptyUFM, Bool x)
+  | otherwise                     = Nothing
+
+knownVar :: TyVar -> Maybe (VarTypes, Expr)
+knownVar x =
+  do t <- knownKind (tyVarKind x)
+     let v = thyVarName x
+     return (unitUFM x (x, v, t), Var v)
+
+knownKind :: Kind -> Maybe Ty
+knownKind k =
+  case splitTyConApp_maybe k of
+    Just (tc,[])
+      | tc == promotedBoolTyCon -> Just TBool
+      | tc == typeNatKindCon    -> Just TNat
+    _ -> Nothing
+
+
+thyVarName :: TyVar -> String
+thyVarName x = occNameString (nameOccName n) ++ "_" ++ show u
+  where n = tyVarName x
+        u = nameUnique n
+
+--------------------------------------------------------------------------------
+-- SMTLIB standard
+
+smtExpr :: Expr -> SExpr
+smtExpr expr =
+  case expr of
+    Op op es -> SList (smtOp op : map smtExpr es)
+    Not e    -> SList [ SAtom "not", smtExpr e ]
+    Num n    -> SAtom (show n)
+    Bool b   -> SAtom (if b then "true" else "false")
+    Var x    -> SAtom x
+
+smtOp :: Op -> SExpr
+smtOp op =
+  SAtom $
+    case op of
+      Add -> "+"
+      Sub -> "-"
+      Mul -> "*"
+      Leq -> "<="
+      Eq  -> "="
+
+smtTy :: Ty -> SExpr
+smtTy ty =
+  SAtom $
+    case ty of
+      TNat  -> "Int"
+      TBool -> "Bool"
+
+smtExtraConstraints :: String -> Ty -> [Expr]
+smtExtraConstraints x ty =
+  case ty of
+    TNat  -> [ Op Leq [Num 0, Var x] ]
+    TBool -> [ ]
+
+smtDeclare :: String -> Ty -> SExpr
+smtDeclare x t = SList [SAtom "declare-fun", SAtom x, SList [], smtTy t]
+
+smtAssert :: Expr -> SExpr
+smtAssert e = SList [SAtom "assert", smtExpr e]
+
+--------------------------------------------------------------------------------
+
+{-
+Note [Variable Scopes]
+
+The SMTLIB format has an unfortunate "feature": push/pop commands affect
+assertions but not variable declarations.  So, if we declare a variable
+after a push, then when we pop, all assertions about the variable will go away,
+but not the variable declaration.
+
+This is particularly troublesome when variables have additional well-formedness
+constraints that go beyond their type.   In particular, we work with natural
+numbers, while the basic type supported by a solver is integers.  So, whenever
+we declare a variable, we also add an additional assertion, constraining
+the variable to be >= 0.
+
+Unfortunately, when we `pop` the well-formedness constraints are going 
+to go away, but not the variable declaration.  So, if we want to mention
+the variable again, in a new scope, then we have to add the additional
+constraint but *not* add a declaration.
+
+Thus, a variable can be in one of three states:
+  1. Declared and constrained
+  2. Declared, but not constrained
+  3. Not declared, and not constrained.
+-}
+
+data VarInfo = VarInfo
+  { smtDeclaredVars :: Map String TyVar -- ^ all declared vars
+  , smtCurScope     :: Set String       -- ^ constrained
+  , smtOtherScopes  :: [Set String]     -- ^ constrained
+  }
+
+emptyVarInfo :: VarInfo
+emptyVarInfo = VarInfo
+  { smtDeclaredVars = Map.empty
+  , smtCurScope     = Set.empty
+  , smtOtherScopes  = []
+  }
+
+startScope :: VarInfo -> VarInfo
+startScope vi = vi { smtCurScope    = Set.empty
+                   , smtOtherScopes = smtCurScope vi : smtOtherScopes vi }
+
+endScope :: VarInfo -> VarInfo
+endScope vi =
+  case smtOtherScopes vi of
+    [] -> panic "endScope with no start scope"
+    s : ss -> vi
+      { smtCurScope     = s
+      , smtOtherScopes  = ss
+      }
+
+data VarStatus = Undeclared | Declared | Constrained
+
+-- | Update var info, and indicate what declaring we need to do.
+declareVar :: TyVar -> VarInfo -> (VarInfo, VarStatus)
+declareVar tv vi
+  | x `Set.member` smtCurScope vi = (vi, Constrained)
+
+  | any (x `Set.member`) (smtOtherScopes vi) = (vi, Constrained)
+
+  | x `Map.member` smtDeclaredVars vi =
+    ( vi { smtCurScope = Set.insert x (smtCurScope vi) }, Declared )
+
+  | otherwise =
+    ( vi { smtDeclaredVars = Map.insert x tv (smtDeclaredVars vi)
+         , smtCurScope     = Set.insert x (smtCurScope vi)
+         }
+    , Undeclared
+    )
+  where x = thyVarName tv
+
+
+
+
+
+
+--------------------------------------------------------------------------------
+-- Low-level interaction with the solver process.
+
+data SExpr = SAtom String | SList [SExpr]
+
+data SolverProcess = SolverProcess
+  { solverDo   :: SExpr -> IO SExpr
+  , solverStop :: IO ()
+  }
+
+startSolverProcess :: String -> [String] -> IO SolverProcess
+startSolverProcess exe opts =
+  do (hIn, hOut, hErr, h) <- runInteractiveProcess exe opts Nothing Nothing
+
+     -- XXX: Ignore errors for now.
+     _ <- forkIO $ do forever (hGetLine hErr)
+                        `X.catch` \X.SomeException {} -> return ()
+
+     -- XXX: No real error-handling here.
+     getResponse <-
+       do txt <- hGetContents hOut
+          ref <- newIORef (unfoldr parseSExpr txt)
+          return $
+            atomicModifyIORef' ref $ \xs ->
+               case xs of
+                 []     -> (xs, Nothing)
+                 y : ys -> (ys, Just y)
+
+     let cmd' c = do hPutStrLn hIn (renderSExpr c "")
+                     hFlush hIn
+
+     return SolverProcess
+        { solverDo = \c -> do cmd' c
+                              mb <- getResponse
+                              case mb of
+                                Just res -> return res
+                                Nothing  -> fail "Missing response from solver"
+        , solverStop =
+            do cmd' (SList [SAtom "exit"])
+               _exitCode <- waitForProcess h
+               return ()
+        }
+
+renderSExpr :: SExpr -> ShowS
+renderSExpr ex =
+  case ex of
+    SAtom x  -> showString x
+    SList es -> showChar '(' .
+                foldr (\e m -> renderSExpr e . m) (showChar ')') es
+
+parseSExpr :: String -> Maybe (SExpr, String)
+parseSExpr (c : more) | isSpace c = parseSExpr more
+parseSExpr ('(' : more) = do (xs,more1) <- list more
+                             return (SList xs, more1)
+  where
+  list (c : txt) | isSpace c = list txt
+  list (')' : txt) = return ([], txt)
+  list txt         = do (v,txt1) <- parseSExpr txt
+                        (vs,txt2) <- list txt1
+                        return (v:vs, txt2)
+parseSExpr txt     = case break end txt of
+                       (as,bs) | not (null as) -> Just (SAtom as, bs)
+                       _ -> Nothing
+  where end x = x == ')' || isSpace x
 
 
 
