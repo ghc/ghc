@@ -207,3 +207,8 @@ test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
                  # T8124_stub.h before compiling T8124_c.c, which
                  # needs it.
                compile_and_run, ['T8124_c.c -no-hs-main'])
+
+# +RTS -A8k makes it fail faster
+# The ghci way gets confused by the RTS options
+test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], compile_and_run, [''])
+
