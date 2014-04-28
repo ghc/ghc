@@ -196,7 +196,8 @@ stg_gc_prim_n (W_ arg, W_ fun)
     jump fun(arg);
 }
 
-stg_gc_prim_p_ll_ret
+INFO_TABLE_RET(stg_gc_prim_p_ll, RET_SMALL, W_ info, P_ arg, W_ fun)
+    /* explicit stack */
 {
     W_ fun;
     P_ arg;
@@ -216,7 +217,7 @@ stg_gc_prim_p_ll
     Sp_adj(-3);
     Sp(2) = fun;
     Sp(1) = arg;
-    Sp(0) = stg_gc_prim_p_ll_ret;
+    Sp(0) = stg_gc_prim_p_ll_info;
     jump stg_gc_noregs [];
 }
 
