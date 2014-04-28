@@ -653,6 +653,11 @@
                     since it allows strictly more programs to be typed.
              </para>
            </listitem>
+           <listitem>
+             <para>
+                    Template Haskell now supports pattern splices.
+             </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
