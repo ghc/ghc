@@ -38,7 +38,7 @@ module Coercion (
         splitAppCo_maybe,
         splitForAllCo_maybe,
         nthRole, tyConRolesX,
-        nextRole,
+        nextRole, unSubCo_maybe,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, isCoVarType, coVarName, setCoVarName, setCoVarUnique,
@@ -1051,16 +1051,26 @@ maybeSubCo2 r1 r2 co
 
 -- if co is Nominal, returns it; otherwise, unwraps a SubCo; otherwise, fails
 unSubCo_maybe :: Coercion -> Maybe Coercion
+unSubCo_maybe co
+  | Nominal <- coercionRole co = Just co
 unSubCo_maybe (SubCo co)  = Just co
 unSubCo_maybe (Refl _ ty) = Just $ Refl Nominal ty
-unSubCo_maybe (TyConAppCo Representational tc cos)
-  = do { cos' <- mapM unSubCo_maybe cos
+unSubCo_maybe (TyConAppCo Representational tc coes)
+  = do { cos' <- mapM unSubCo_maybe coes
        ; return $ TyConAppCo Nominal tc cos' }
 unSubCo_maybe (UnivCo Representational ty1 ty2) = Just $ UnivCo Nominal ty1 ty2
   -- We do *not* promote UnivCo Phantom, as that's unsafe.
   -- UnivCo Nominal is no more unsafe than UnivCo Representational
-unSubCo_maybe co
-  | Nominal <- coercionRole co = Just co
+unSubCo_maybe (TransCo co1 co2)
+  = TransCo <$> unSubCo_maybe co1 <*> unSubCo_maybe co2
+unSubCo_maybe (AppCo co1 co2)
+  = AppCo <$> unSubCo_maybe co1 <*> pure co2
+unSubCo_maybe (ForAllCo tv co)
+  = ForAllCo tv <$> unSubCo_maybe co
+unSubCo_maybe (NthCo n co)
+  = NthCo n <$> unSubCo_maybe co
+unSubCo_maybe (InstCo co ty)
+  = InstCo <$> unSubCo_maybe co <*> pure ty
 unSubCo_maybe _ = Nothing
 
 -- takes any coercion and turns it into a Phantom coercion
