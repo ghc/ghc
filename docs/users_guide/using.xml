@@ -899,20 +899,37 @@ ghci> :set -fprint-explicit-foralls
 ghci> :t f
 f :: forall a. a -> a
 </screen>
-         Using <option>-fprint-explicit-kinds</option> makes GHC print kind-foralls and kind applications
+However, regardless of the flag setting, the quantifiers are printed under these circumstances:
+<itemizedlist>
+<listitem><para>For nested <literal>foralls</literal>, e.g.
+<screen>
+ghci> :t GHC.ST.runST
+GHC.ST.runST :: (forall s. GHC.ST.ST s a) -> a
+</screen>
+</para></listitem>
+<listitem><para>If any of the quantified type variables has a kind
+that mentions a kind variable, e.g.
+<screen>
+ghci> :i Data.Coerce.coerce
+coerce ::
+  forall (k :: BOX) (a :: k) (b :: k). Coercible a b => a -> b
+     -- Defined in GHC.Prim
+</screen>
+</para></listitem>
+</itemizedlist>
+          </para>
+          <para>
+         Using <option>-fprint-explicit-kinds</option> makes GHC print kind arguments
          in types, which are normally suppressed.  This can be important when you are using kind polymorphism.
          For example:
 <screen>
 ghci> :set -XPolyKinds
 ghci> data T a = MkT
 ghci> :t MkT
-MkT :: T b
+MkT :: forall (k :: BOX) (a :: k). T a
 ghci> :set -fprint-explicit-foralls
 ghci> :t MkT
-MkT :: forall (b::k). T b
-ghci> :set -fprint-explicit-kinds
-ghci> :t MkT
-MkT :: forall (k::BOX) (b:k). T b
+MkT :: forall (k :: BOX) (a :: k). T k a
 </screen>
          </para>
         </listitem>

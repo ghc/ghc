@@ -1741,11 +1741,14 @@ pprSkolInfo ArrowSkol       = ptext (sLit "the arrow form")
 pprSkolInfo (PatSkol cl mc) = case cl of
     RealDataCon dc -> sep [ ptext (sLit "a pattern with constructor")
                           , nest 2 $ ppr dc <+> dcolon
-                            <+> ppr (dataConUserType dc) <> comma
+                            <+> pprType (dataConUserType dc) <> comma
+                            -- pprType prints forall's regardless of -fprint-explict-foralls
+                            -- which is what we want here, since we might be saying
+                            -- type variable 't' is bound by ...
                           , ptext (sLit "in") <+> pprMatchContext mc ]
     PatSynCon ps -> sep [ ptext (sLit "a pattern with pattern synonym")
                         , nest 2 $ ppr ps <+> dcolon
-                          <+> ppr (varType (patSynId ps)) <> comma
+                          <+> pprType (varType (patSynId ps)) <> comma
                         , ptext (sLit "in") <+> pprMatchContext mc ]
 pprSkolInfo (InferSkol ids) = sep [ ptext (sLit "the inferred type of")
                                   , vcat [ ppr name <+> dcolon <+> ppr ty

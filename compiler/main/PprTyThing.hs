@@ -156,19 +156,16 @@ pprId ident
 pprTypeForUser :: Type -> SDoc
 -- We do two things here.
 -- a) We tidy the type, regardless
--- b) If Opt_PrintExplicitForAlls is True, we discard the foralls
--- 	but we do so `deeply'
+-- b) Swizzle the foralls to the top, so that without
+--    -fprint-explicit-foralls we'll suppress all the foralls
 -- Prime example: a class op might have type
 --	forall a. C a => forall b. Ord b => stuff
 -- Then we want to display
 --	(C a, Ord b) => stuff
 pprTypeForUser ty
-  = sdocWithDynFlags $ \ dflags ->
-    if gopt Opt_PrintExplicitForalls dflags
-    then ppr tidy_ty
-    else ppr (mkPhiTy ctxt ty')
+  = pprSigmaType (mkSigmaTy tvs ctxt tau)
   where
-    (_, ctxt, ty') = tcSplitSigmaTy tidy_ty
+    (tvs, ctxt, tau) = tcSplitSigmaTy tidy_ty
     (_, tidy_ty)   = tidyOpenType emptyTidyEnv ty
      -- Often the types/kinds we print in ghci are fully generalised
      -- and have no free variables, but it turns out that we sometimes
