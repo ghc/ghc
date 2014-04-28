@@ -18,8 +18,7 @@ module TcRnDriver (
         tcRnLookupName,
         tcRnGetInfo,
         tcRnModule, tcRnModuleTcRnM,
-        tcTopSrcDecls,
-        tcRnExtCore
+        tcTopSrcDecls
     ) where
 
 #ifdef GHCI
@@ -58,8 +57,6 @@ import LoadIface
 import RnNames
 import RnEnv
 import RnSource
-import PprCore
-import CoreSyn
 import ErrUtils
 import Id
 import VarEnv
@@ -82,7 +79,6 @@ import CoAxiom
 import Inst     ( tcGetInstEnvs )
 import Annotations
 import Data.List ( sortBy )
-import Data.IORef ( readIORef )
 import Data.Ord
 #ifdef GHCI
 import BasicTypes hiding( SuccessFlag(..) )
@@ -301,107 +297,6 @@ tcRnImports hsc_env import_decls
         ; checkFamInstConsistency (imp_finsts imports) dir_imp_mods ;
 
         ; getGblEnv } }
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
-        Type-checking external-core modules
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-tcRnExtCore :: HscEnv
-            -> HsExtCore RdrName
-            -> IO (Messages, Maybe ModGuts)
-        -- Nothing => some error occurred
-
-tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
-        -- The decls are IfaceDecls; all names are original names
- = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
-
-   initTc hsc_env ExtCoreFile False this_mod $ do {
-
-   let { ldecls  = map noLoc decls } ;
-
-       -- Bring the type and class decls into scope
-       -- ToDo: check that this doesn't need to extract the val binds.
-       --       It seems that only the type and class decls need to be in scope below because
-       --          (a) tcTyAndClassDecls doesn't need the val binds, and
-       --          (b) tcExtCoreBindings doesn't need anything
-       --              (in fact, it might not even need to be in the scope of
-       --               this tcg_env at all)
-   (tc_envs, _bndrs) <- getLocalNonValBinders emptyFsEnv {- no fixity decls -}
-                                              (mkFakeGroup ldecls) ;
-   setEnvs tc_envs $ do {
-
-   (rn_decls, _fvs) <- checkNoErrs $ rnTyClDecls [] [mkTyClGroup ldecls] ;
-   -- The empty list is for extra dependencies coming from .hs-boot files
-   -- See Note [Extra dependencies from .hs-boot files] in RnSource
-
-        -- Dump trace of renaming part
-   rnDump (ppr rn_decls) ;
-
-        -- Typecheck them all together so that
-        -- any mutually recursive types are done right
-        -- Just discard the auxiliary bindings; they are generated
-        -- only for Haskell source code, and should already be in Core
-   tcg_env   <- tcTyAndClassDecls emptyModDetails rn_decls ;
-   safe_mode <- liftIO $ finalSafeMode (hsc_dflags hsc_env) tcg_env ;
-   dep_files <- liftIO $ readIORef (tcg_dependent_files tcg_env) ;
-
-   setGblEnv tcg_env $ do {
-        -- Make the new type env available to stuff slurped from interface files
-
-        -- Now the core bindings
-   core_binds <- initIfaceExtCore (tcExtCoreBindings src_binds) ;
-
-
-        -- Wrap up
-   let {
-        bndrs      = bindersOfBinds core_binds ;
-        my_exports = map (Avail . idName) bndrs ;
-                -- ToDo: export the data types also?
-
-        mod_guts = ModGuts {    mg_module    = this_mod,
-                                mg_boot      = False,
-                                mg_used_names = emptyNameSet, -- ToDo: compute usage
-                                mg_used_th   = False,
-                                mg_dir_imps  = emptyModuleEnv, -- ??
-                                mg_deps      = noDependencies,  -- ??
-                                mg_exports   = my_exports,
-                                mg_tcs       = tcg_tcs tcg_env,
-                                mg_insts     = tcg_insts tcg_env,
-                                mg_fam_insts = tcg_fam_insts tcg_env,
-                                mg_inst_env  = tcg_inst_env tcg_env,
-                                mg_fam_inst_env = tcg_fam_inst_env tcg_env,
-                                mg_patsyns      = [], -- TODO
-                                mg_rules        = [],
-                                mg_vect_decls   = [],
-                                mg_anns         = [],
-                                mg_binds        = core_binds,
-
-                                -- Stubs
-                                mg_rdr_env      = emptyGlobalRdrEnv,
-                                mg_fix_env      = emptyFixityEnv,
-                                mg_warns        = NoWarnings,
-                                mg_foreign      = NoStubs,
-                                mg_hpc_info     = emptyHpcInfo False,
-                                mg_modBreaks    = emptyModBreaks,
-                                mg_vect_info    = noVectInfo,
-                                mg_safe_haskell = safe_mode,
-                                mg_trust_pkg    = False,
-                                mg_dependent_files = dep_files
-                            } } ;
-
-   tcCoreDump mod_guts ;
-
-   return mod_guts
-   }}}}
-
-mkFakeGroup :: [LTyClDecl a] -> HsGroup a
-mkFakeGroup decls -- Rather clumsy; lots of unused fields
-  = emptyRdrGroup { hs_tyclds = [mkTyClGroup decls] }
 \end{code}
 
 
@@ -1864,17 +1759,6 @@ tcDump env
         -- NB: foreign x-d's have undefined's in their types;
         --     hence can't show the tc_fords
 
-tcCoreDump :: ModGuts -> TcM ()
-tcCoreDump mod_guts
- = do { dflags <- getDynFlags ;
-        when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
-             (dumpTcRn (pprModGuts mod_guts)) ;
-
-        -- Dump bindings if -ddump-tc
-        dumpOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump) }
-  where
-    full_dump = pprCoreBindings (mg_binds mod_guts)
-
 -- It's unpleasant having both pprModGuts and pprModDetails here
 pprTcGblEnv :: TcGblEnv -> SDoc
 pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
@@ -1899,12 +1783,6 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
         = (mod_name1 `stableModuleNameCmp` mod_name2)
                   `thenCmp`
           (is_boot1 `compare` is_boot2)
-
-pprModGuts :: ModGuts -> SDoc
-pprModGuts (ModGuts { mg_tcs = tcs
-                    , mg_rules = rules })
-  = vcat [ ppr_types [] (mkTypeEnv (map ATyCon tcs)),
-           ppr_rules rules ]
 
 ppr_types :: [ClsInst] -> TypeEnv -> SDoc
 ppr_types insts type_env
@@ -1960,9 +1838,4 @@ ppr_tydecls tycons
                               -- Temporarily print the kind signature too
                            , ppr (tyThingToIfaceDecl (ATyCon tycon)) ]
 
-ppr_rules :: [CoreRule] -> SDoc
-ppr_rules [] = empty
-ppr_rules rs = vcat [ptext (sLit "{-# RULES"),
-                      nest 2 (pprRules rs),
-                      ptext (sLit "#-}")]
 \end{code}

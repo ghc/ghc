@@ -21,8 +21,7 @@ config.compile_ways       = ['normal', 'hpc']
 config.run_ways           = ['normal', 'hpc']
 
 # ways that are not enabled by default, but can always be invoked explicitly
-config.other_ways         = ['extcore','optextcore',
-                             'prof',
+config.other_ways         = ['prof',
                              'prof_hc_hb','prof_hb',
                              'prof_hd','prof_hy','prof_hr',
                              'threaded1_ls', 'threaded2_hT',
@@ -93,8 +92,6 @@ config.way_flags = lambda name : {
     'profasm'      : ['-O', '-prof', '-static', '-auto-all'],
     'profthreaded' : ['-O', '-prof', '-static', '-auto-all', '-threaded'],
     'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
-    'extcore'      : ['-fext-core'],
-    'optextcore'   : ['-O', '-fext-core'],
     'threaded1'    : ['-threaded', '-debug'],
     'threaded1_ls' : ['-threaded', '-debug'],
     'threaded2'    : ['-O', '-threaded', '-eventlog'],
@@ -127,8 +124,6 @@ config.way_rts_flags = {
     'profasm'      : ['-hc', '-p'], # test heap profiling too
     'profthreaded' : ['-p'],
     'ghci'         : [],
-    'extcore'      : [],
-    'optextcore'   : [],
     'threaded1'    : [],
     'threaded1_ls' : ['-ls'],
     'threaded2'    : ['-N2 -ls'],

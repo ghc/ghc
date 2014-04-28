@@ -23,7 +23,7 @@ module HsSyn (
         module HsDoc,
         Fixity,
 
-        HsModule(..), HsExtCore(..),
+        HsModule(..)
 ) where
 
 -- friends:
@@ -40,10 +40,9 @@ import HsDoc
 
 -- others:
 import OccName          ( HasOccName )
-import IfaceSyn         ( IfaceBinding )
 import Outputable
 import SrcLoc
-import Module           ( Module, ModuleName )
+import Module           ( ModuleName )
 import FastString
 
 -- libraries:
@@ -77,13 +76,6 @@ data HsModule name
       hsmodHaddockModHeader :: Maybe LHsDocString
         -- ^ Haddock module info and description, unparsed
    } deriving (Data, Typeable)
-
-data HsExtCore name     -- Read from Foo.hcr
-  = HsExtCore
-        Module
-        [TyClDecl name] -- Type declarations only; just as in Haskell source,
-                        -- so that we can infer kinds etc
-        [IfaceBinding]  -- And the bindings
 \end{code}
 
 

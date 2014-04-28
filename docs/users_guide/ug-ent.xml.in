@@ -12,7 +12,6 @@
 <!ENTITY sooner         SYSTEM "sooner.xml" >
 <!ENTITY lang-features  SYSTEM "lang.xml" >
 <!ENTITY glasgowexts    SYSTEM "glasgow_exts.xml" >
-<!ENTITY external-core  SYSTEM "external_core.xml" >
 <!ENTITY packages       SYSTEM "packages.xml" >
 <!ENTITY parallel       SYSTEM "parallel.xml" >
 <!ENTITY safehaskell    SYSTEM "safe_haskell.xml" >

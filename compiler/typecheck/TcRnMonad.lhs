@@ -1245,17 +1245,6 @@ initIfaceTcRn thing_inside
               ; get_type_env = readTcRef (tcg_type_env_var tcg_env) }
         ; setEnvs (if_env, ()) thing_inside }
 
-initIfaceExtCore :: IfL a -> TcRn a
-initIfaceExtCore thing_inside
-  = do  { tcg_env <- getGblEnv
-        ; let { mod = tcg_mod tcg_env
-              ; doc = ptext (sLit "External Core file for") <+> quotes (ppr mod)
-              ; if_env = IfGblEnv {
-                        if_rec_types = Just (mod, return (tcg_type_env tcg_env)) }
-              ; if_lenv = mkIfLclEnv mod doc
-          }
-        ; setEnvs (if_env, if_lenv) thing_inside }
-
 initIfaceCheck :: HscEnv -> IfG a -> IO a
 -- Used when checking the up-to-date-ness of the old Iface
 -- Initialise the environment with no useful info at all

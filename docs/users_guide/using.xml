@@ -2984,44 +2984,6 @@ data D = D !C
   </sect1>
 
 &runtime;
-
-<sect1 id="ext-core">
-  <title>Generating and compiling External Core Files</title>
-
-  <indexterm><primary>intermediate code generation</primary></indexterm>
-
-  <para>GHC can dump its optimized intermediate code (said to be in &ldquo;Core&rdquo; format)
-  to a file as a side-effect of compilation. Non-GHC back-end tools can read and process Core files; these files have the suffix
-  <filename>.hcr</filename>. The Core format is described in <ulink url="../../core.pdf">
-  <citetitle>An External Representation for the GHC Core Language</citetitle></ulink>,
-  and sample tools
-  for manipulating Core files (in Haskell) are available in the
-  <ulink url="http://hackage.haskell.org/package/extcore">extcore package on Hackage</ulink>.  Note that the format of <literal>.hcr</literal>
-  files is <emphasis>different</emphasis> from the Core output format that GHC generates
-  for debugging purposes (<xref linkend="options-debugging"/>), though the two formats appear somewhat similar.</para>
-
-  <para>The Core format natively supports notes which you can add to
-  your source code using the <literal>CORE</literal> pragma (see <xref
-  linkend="pragmas"/>).</para>
-
-    <variablelist>
-
-        <varlistentry>
-          <term>
-            <option>-fext-core</option>
-            <indexterm><primary><option>-fext-core</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Generate <literal>.hcr</literal> files.</para>
-          </listitem>
-        </varlistentry>
-
-    </variablelist>
-
-<para>Currently (as of version 6.8.2), GHC does not have the ability to read in External Core files as source. If you would like GHC to have this ability, please <ulink url="http://ghc.haskell.org/trac/ghc/wiki/MailingListsAndIRC">make your wishes known to the GHC Team</ulink>.</para>
-
-</sect1>
-
 &debug;
 &flags;
 

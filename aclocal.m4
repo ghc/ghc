@@ -875,7 +875,7 @@ else
 fi;
 changequote([, ])dnl
 ])
-if test ! -f compiler/parser/Parser.hs || test ! -f compiler/cmm/CmmParse.hs || test ! -f compiler/parser/ParserCore.hs
+if test ! -f compiler/parser/Parser.hs || test ! -f compiler/cmm/CmmParse.hs
 then
     FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.19],
       [AC_MSG_ERROR([Happy version 1.19 or later is required to compile GHC.])])[]

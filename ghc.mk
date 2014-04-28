@@ -1131,7 +1131,6 @@ sdist-ghc-prep :
 	$(call sdist_ghc_file,compiler,stage2,cmm,,CmmParse,y)
 	$(call sdist_ghc_file,compiler,stage2,parser,,Lexer,x)
 	$(call sdist_ghc_file,compiler,stage2,parser,,Parser,y.pp)
-	$(call sdist_ghc_file,compiler,stage2,parser,,ParserCore,y)
 	$(call sdist_ghc_file,utils/hpc,dist-install,,,HpcParser,y)
 	$(call sdist_ghc_file,utils/genprimopcode,dist,,,Lexer,x)
 	$(call sdist_ghc_file,utils/genprimopcode,dist,,,Parser,y)

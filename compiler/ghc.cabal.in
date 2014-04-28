@@ -232,11 +232,8 @@ Library
         CoreTidy
         CoreUnfold
         CoreUtils
-        ExternalCore
         MkCore
-        MkExternalCore
         PprCore
-        PprExternalCore
         Check
         Coverage
         Desugar
@@ -303,12 +300,9 @@ Library
         TidyPgm
         Ctype
         HaddockUtils
-        LexCore
         Lexer
         OptCoercion
         Parser
-        ParserCore
-        ParserCoreUtils
         RdrHsSyn
         ForeignCall
         PrelInfo

@@ -2624,7 +2624,7 @@
         <tbody>
           <row>
             <entry><option>-fext-core</option></entry>
-            <entry>Generate <filename>.hcr</filename> external Core files</entry>
+            <entry><emphasis>(deprecated)</emphasis> Generate <filename>.hcr</filename> external Core files</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>

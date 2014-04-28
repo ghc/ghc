@@ -11257,69 +11257,6 @@ program even if fusion doesn't happen.  More rules in <filename>GHC/List.lhs</fi
 
 </sect2>
 
-<sect2 id="core-pragma">
-  <title>CORE pragma</title>
-
-  <indexterm><primary>CORE pragma</primary></indexterm>
-  <indexterm><primary>pragma, CORE</primary></indexterm>
-  <indexterm><primary>core, annotation</primary></indexterm>
-
-<para>
-  The external core format supports <quote>Note</quote> annotations;
-  the <literal>CORE</literal> pragma gives a way to specify what these
-  should be in your Haskell source code.  Syntactically, core
-  annotations are attached to expressions and take a Haskell string
-  literal as an argument.  The following function definition shows an
-  example:
-
-<programlisting>
-f x = ({-# CORE "foo" #-} show) ({-# CORE "bar" #-} x)
-</programlisting>
-
-  Semantically, this is equivalent to:
-
-<programlisting>
-g x = show x
-</programlisting>
-</para>
-
-<para>
-  However, when external core is generated (via
-  <option>-fext-core</option>), there will be Notes attached to the
-  expressions <function>show</function> and <varname>x</varname>.
-  The core function declaration for <function>f</function> is:
-</para>
-
-<programlisting>
-  f :: %forall a . GHCziShow.ZCTShow a ->
-                   a -> GHCziBase.ZMZN GHCziBase.Char =
-    \ @ a (zddShow::GHCziShow.ZCTShow a) (eta::a) ->
-        (%note "foo"
-         %case zddShow %of (tpl::GHCziShow.ZCTShow a)
-           {GHCziShow.ZCDShow
-            (tpl1::GHCziBase.Int ->
-                   a ->
-                   GHCziBase.ZMZN GHCziBase.Char -> GHCziBase.ZMZN GHCziBase.Cha
-r)
-            (tpl2::a -> GHCziBase.ZMZN GHCziBase.Char)
-            (tpl3::GHCziBase.ZMZN a ->
-                   GHCziBase.ZMZN GHCziBase.Char -> GHCziBase.ZMZN GHCziBase.Cha
-r) ->
-              tpl2})
-        (%note "bar"
-         eta);
-</programlisting>
-
-<para>
-  Here, we can see that the function <function>show</function> (which
-  has been expanded out to a case expression over the Show dictionary)
-  has a <literal>%note</literal> attached to it, as does the
-  expression <varname>eta</varname> (which used to be called
-  <varname>x</varname>).
-</para>
-
-</sect2>
-
 </sect1>
 
 <sect1 id="special-ids">

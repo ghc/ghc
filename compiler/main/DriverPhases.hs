@@ -18,7 +18,6 @@ module DriverPhases (
    isHaskellSrcSuffix,
    isObjectSuffix,
    isCishSuffix,
-   isExtCoreSuffix,
    isDynLibSuffix,
    isHaskellUserSrcSuffix,
    isSourceSuffix,
@@ -27,7 +26,6 @@ module DriverPhases (
    isHaskellSrcFilename,
    isObjectFilename,
    isCishFilename,
-   isExtCoreFilename,
    isDynLibFilename,
    isHaskellUserSrcFilename,
    isSourceFilename
@@ -56,7 +54,7 @@ import System.FilePath
 -}
 
 data HscSource
-   = HsSrcFile | HsBootFile | ExtCoreFile
+   = HsSrcFile | HsBootFile
      deriving( Eq, Ord, Show )
         -- Ord needed for the finite maps we build in CompManager
 
@@ -64,7 +62,6 @@ data HscSource
 hscSourceString :: HscSource -> String
 hscSourceString HsSrcFile   = ""
 hscSourceString HsBootFile  = "[boot]"
-hscSourceString ExtCoreFile = "[ext core]"
 
 isHsBoot :: HscSource -> Bool
 isHsBoot HsBootFile = True
@@ -175,7 +172,6 @@ startPhase "hs"       = Cpp   HsSrcFile
 startPhase "hs-boot"  = Cpp   HsBootFile
 startPhase "hscpp"    = HsPp  HsSrcFile
 startPhase "hspp"     = Hsc   HsSrcFile
-startPhase "hcr"      = Hsc   ExtCoreFile
 startPhase "hc"       = HCc
 startPhase "c"        = Cc
 startPhase "cpp"      = Ccpp
@@ -202,7 +198,6 @@ startPhase _          = StopLn     -- all unknown file types
 phaseInputExt :: Phase -> String
 phaseInputExt (Unlit HsSrcFile)   = "lhs"
 phaseInputExt (Unlit HsBootFile)  = "lhs-boot"
-phaseInputExt (Unlit ExtCoreFile) = "lhcr"
 phaseInputExt (Cpp   _)           = "lpp"       -- intermediate only
 phaseInputExt (HsPp  _)           = "hscpp"     -- intermediate only
 phaseInputExt (Hsc   _)           = "hspp"      -- intermediate only
@@ -227,13 +222,12 @@ phaseInputExt MergeStub           = "o"
 phaseInputExt StopLn              = "o"
 
 haskellish_src_suffixes, haskellish_suffixes, cish_suffixes,
-    extcoreish_suffixes, haskellish_user_src_suffixes
+    haskellish_user_src_suffixes
  :: [String]
 haskellish_src_suffixes      = haskellish_user_src_suffixes ++
                                [ "hspp", "hscpp", "hcr", "cmm", "cmmcpp" ]
 haskellish_suffixes          = haskellish_src_suffixes ++ ["hc", "raw_s"]
 cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S", "ll", "bc", "lm_s", "m", "M", "mm" ]
-extcoreish_suffixes          = [ "hcr" ]
 -- Will not be deleted as temp files:
 haskellish_user_src_suffixes = [ "hs", "lhs", "hs-boot", "lhs-boot" ]
 
@@ -250,13 +244,12 @@ dynlib_suffixes platform = case platformOS platform of
   OSDarwin  -> ["dylib", "so"]
   _         -> ["so"]
 
-isHaskellishSuffix, isHaskellSrcSuffix, isCishSuffix, isExtCoreSuffix,
+isHaskellishSuffix, isHaskellSrcSuffix, isCishSuffix,
     isHaskellUserSrcSuffix
  :: String -> Bool
 isHaskellishSuffix     s = s `elem` haskellish_suffixes
 isHaskellSrcSuffix     s = s `elem` haskellish_src_suffixes
 isCishSuffix           s = s `elem` cish_suffixes
-isExtCoreSuffix        s = s `elem` extcoreish_suffixes
 isHaskellUserSrcSuffix s = s `elem` haskellish_user_src_suffixes
 
 isObjectSuffix, isDynLibSuffix :: Platform -> String -> Bool
@@ -267,13 +260,12 @@ isSourceSuffix :: String -> Bool
 isSourceSuffix suff  = isHaskellishSuffix suff || isCishSuffix suff
 
 isHaskellishFilename, isHaskellSrcFilename, isCishFilename,
-    isExtCoreFilename, isHaskellUserSrcFilename, isSourceFilename
+    isHaskellUserSrcFilename, isSourceFilename
  :: FilePath -> Bool
 -- takeExtension return .foo, so we drop 1 to get rid of the .
 isHaskellishFilename     f = isHaskellishSuffix     (drop 1 $ takeExtension f)
 isHaskellSrcFilename     f = isHaskellSrcSuffix     (drop 1 $ takeExtension f)
 isCishFilename           f = isCishSuffix           (drop 1 $ takeExtension f)
-isExtCoreFilename        f = isExtCoreSuffix        (drop 1 $ takeExtension f)
 isHaskellUserSrcFilename f = isHaskellUserSrcSuffix (drop 1 $ takeExtension f)
 isSourceFilename         f = isSourceSuffix         (drop 1 $ takeExtension f)
 

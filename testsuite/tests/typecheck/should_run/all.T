@@ -35,9 +35,7 @@ test('tcrun017', normal, compile_and_run, [''])
 test('tcrun018', normal, compile_and_run, [''])
 test('tcrun019', normal, compile_and_run, [''])
 test('tcrun020', normal, compile_and_run, [''])
-# Doesn't work with External Core due to datatype with no constructors
-test('tcrun021', expect_fail_for(['extcore','optextcore']),
-     compile_and_run, ['-package containers'])
+test('tcrun021', normal, compile_and_run, ['-package containers'])
 test('tcrun022', [omit_ways(['ghci']),only_compiler_types(['ghc'])],
      compile_and_run, ['-O'])
 test('tcrun023', normal, compile_and_run, ['-O'])
@@ -46,8 +44,7 @@ test('tcrun025', extra_clean(['TcRun025_B.hi', 'TcRun025_B.o']),
      multimod_compile_and_run, ['tcrun025',''])
 test('tcrun026', normal, compile_and_run, [''])
 test('tcrun027', normal, compile_and_run, [''])
-# Doesn't work with External Core due to datatype with no constructors
-test('tcrun028', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
+test('tcrun028', normal, compile_and_run, [''])
 test('tcrun029', normal, compile_and_run, [''])
 test('tcrun030', normal, compile_and_run, [''])
 test('tcrun031', only_compiler_types(['ghc']), compile_and_run, [''])
