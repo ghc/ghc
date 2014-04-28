@@ -7,13 +7,13 @@ T7230.hs:48:32:
       at T7230.hs:47:10-68
     or from (xs ~ (x : xs1))
       bound by a pattern with constructor
-                 SCons :: forall (x :: k) (xs :: [k]).
+                 SCons :: forall (k :: BOX) (x :: k) (xs :: [k]).
                           Sing x -> Sing xs -> Sing (x : xs),
                in an equation for ‘crash’
       at T7230.hs:48:8-27
     or from (xs1 ~ (x1 : xs2))
       bound by a pattern with constructor
-                 SCons :: forall (x :: k) (xs :: [k]).
+                 SCons :: forall (k :: BOX) (x :: k) (xs :: [k]).
                           Sing x -> Sing xs -> Sing (x : xs),
                in an equation for ‘crash’
       at T7230.hs:48:17-26

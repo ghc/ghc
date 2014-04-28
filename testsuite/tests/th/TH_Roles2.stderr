@@ -1,6 +1,6 @@
 TYPE SIGNATURES
 TYPE CONSTRUCTORS
-  T :: k -> *
+  T :: forall (k :: BOX). k -> *
   data T (k::BOX) (a::k)
     No C type associated
     Roles: [nominal, representational]

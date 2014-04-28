@@ -603,6 +603,8 @@ ppr_type p fun_ty@(FunTy ty1 ty2)
 ppr_forall_type :: Prec -> Type -> SDoc
 ppr_forall_type p ty
   = maybeParen p FunPrec $ ppr_sigma_type True ty
+    -- True <=> we always print the foralls on *nested* quantifiers
+    -- Opt_PrintExplicitForalls only affects top-level quantifiers
 
 ppr_tvar :: TyVar -> SDoc
 ppr_tvar tv  -- Note [Infix type variables]
@@ -618,24 +620,22 @@ ppr_tylit _ tl =
 ppr_sigma_type :: Bool -> Type -> SDoc
 -- Bool <=> Show the foralls
 ppr_sigma_type show_foralls ty
-  = sdocWithDynFlags $ \ dflags -> 
-    let filtered_tvs | gopt Opt_PrintExplicitKinds dflags 
-                     = tvs
-                     | otherwise
-                     = filterOut isKindVar tvs
-    in sep [ ppWhen show_foralls (pprForAll filtered_tvs)
-           , pprThetaArrowTy ctxt
-           , pprType tau ]
+  = sep [ ppWhen (show_foralls || any tv_has_kind_var tvs)
+                 (pprForAll tvs)
+                -- See Note [When to print foralls]
+        , pprThetaArrowTy ctxt
+        , pprType tau ]
   where
     (tvs,  rho) = split1 [] ty
     (ctxt, tau) = split2 [] rho
 
     split1 tvs (ForAllTy tv ty) = split1 (tv:tvs) ty
-    split1 tvs ty          = (reverse tvs, ty)
+    split1 tvs ty               = (reverse tvs, ty)
  
     split2 ps (ty1 `FunTy` ty2) | isPredTy ty1 = split2 (ty1:ps) ty2
     split2 ps ty                               = (reverse ps, ty)
 
+    tv_has_kind_var tv = not (isEmptyVarSet (tyVarsOfType (tyVarKind tv)))
 
 pprSigmaType :: Type -> SDoc
 pprSigmaType ty = sdocWithDynFlags $ \dflags ->
@@ -655,6 +655,24 @@ pprTvBndr tv
 	     where
 	       kind = tyVarKind tv
 \end{code}
+
+Note [When to print foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Mostly we want to print top-level foralls when (and only when) the user specifies
+-fprint-explicit-foralls.  But when kind polymorphism is at work, that suppresses
+too much information; see Trac #9018.
+
+So I'm trying out this rule: print explicit foralls if
+  a) User specifies -fprint-explicit-foralls, or
+  b) Any of the quantified type variables has a kind 
+     that mentions a kind variable
+
+This catches common situations, such as a type siguature
+     f :: m a
+which means
+      f :: forall k. forall (m :: k->*) (a :: k). m a
+We really want to see both the "forall k" and the kind signatures
+on m and a.  The latter comes from pprTvBndr.
 
 Note [Infix type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

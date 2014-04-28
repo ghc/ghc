@@ -3,7 +3,7 @@ T7786.hs:86:22:
     Couldn't match type ‘xxx’ with ‘'Empty’
     Inaccessible code in
       a pattern with constructor
-        Nil :: Sing 'Empty,
+        Nil :: forall (k :: BOX). Sing 'Empty,
       in a pattern binding in
            'do' block
     In the pattern: Nil
