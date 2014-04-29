@@ -1079,7 +1079,8 @@ renderSExpr ex =
   case ex of
     SAtom x  -> showString x
     SList es -> showChar '(' .
-                foldr (\e m -> renderSExpr e . m) (showChar ')') es
+                foldr (\e m -> renderSExpr e . showChar ' ' . m)
+                (showChar ')') es
 
 parseSExpr :: String -> Maybe (SExpr, String)
 parseSExpr (c : more) | isSpace c = parseSExpr more
