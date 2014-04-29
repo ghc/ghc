@@ -34,6 +34,7 @@ import Outputable
 import TcRnTypes
 import TcErrors
 import TcSMonad
+import TcTypeNats(evBySMT)
 import Bag
 
 import Control.Monad ( foldM )
@@ -223,8 +224,59 @@ React with (F Int ~ b) ==> IR Stop True []    -- after substituting we re-canoni
 thePipeline :: [(String,SimplifierStage)]
 thePipeline = [ ("canonicalization",        TcCanonical.canonicalize)
               , ("interact with inerts",    interactWithInertsStage)
-              , ("top-level reactions",     topReactionsStage) ]
+              , ("top-level reactions",     topReactionsStage)
+              , ("external solver",         externalSolverStage) ]
 \end{code}
+
+
+********************************************************************************
+*
+* External Solver
+*
+********************************************************************************
+
+\begin{code}
+externalSolverStage :: WorkItem -> TcS StopOrContinue
+externalSolverStage wi
+  | isGivenCt wi =
+    extSolAssume wi >>= \ours -> if not ours then return (ContinueWith wi) else
+    do res <- extSolCheck
+       case res of
+         ExtSolUnsat   -> emitInsoluble wi >> return Stop
+         ExtSolSat m   -> improveFrom m >> return (ContinueWith wi)
+         ExtSolUnknown -> return (ContinueWith wi)
+
+  | otherwise =
+    do extSolPush
+       ours <- extSolAssume wi
+       if not ours
+          then do extSolPop
+                  return (ContinueWith wi)
+          else do res <- extSolCheck
+                  extSolPop
+                  case res of
+                    ExtSolUnsat   -> emitInsoluble wi >> return Stop
+                    ExtSolSat m   -> improveFrom m >> tryToProve
+                    ExtSolUnknown -> tryToProve
+
+  where
+  tryToProve =
+    do proved <- extSolProve wi
+       if proved
+         then do when (isWantedCt wi)
+                   $ setEvBind (ctEvId $ ctEvidence wi)
+                   $ evBySMT "SMT" $ getEqPredTys $ ctPred wi
+                 return Stop
+         else do _ <- extSolAssume wi     -- Remember for later
+                 return (ContinueWith wi)
+
+  -- XXX: Add improvements
+  improveFrom m = return ()
+
+\end{code}
+
+
+
 
 
 *********************************************************************************
@@ -690,7 +742,8 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs , cc_ev 
        ; return (Nothing, True) }
 
   | otherwise
-  = do { mb_solved <- trySpontaneousSolve ev tv rhs
+  = do { _ <- extSolAssume workItem
+       ; mb_solved <- trySpontaneousSolve ev tv rhs
        ; case mb_solved of
            SPCantSolve   -- Includes givens
               -> do { untch <- getUntouchables
