@@ -501,7 +501,7 @@ wrapRole :: Maybe Role   -- desired
          -> Role         -- current
          -> Coercion -> Coercion
 wrapRole Nothing        _       = id
-wrapRole (Just desired) current = maybeSubCo2 desired current
+wrapRole (Just desired) current = downgradeRole desired current
 
 -----------
 -- takes two tyvars and builds env'ts to map them to the same tyvar

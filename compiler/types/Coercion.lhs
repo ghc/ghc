@@ -27,7 +27,7 @@ module Coercion (
         mkSymCo, mkTransCo, mkNthCo, mkNthCoRole, mkLRCo,
         mkInstCo, mkAppCo, mkAppCoFlexible, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkUnsafeCo, mkUnivCo, mkSubCo, mkPhantomCo,
-        mkNewTypeCo, maybeSubCo, maybeSubCo2,
+        mkNewTypeCo, downgradeRole,
         mkAxiomRuleCo,
 
         -- ** Decomposition
@@ -38,7 +38,7 @@ module Coercion (
         splitAppCo_maybe,
         splitForAllCo_maybe,
         nthRole, tyConRolesX,
-        nextRole, unSubCo_maybe,
+        nextRole, setNominalRole_maybe,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, isCoVarType, coVarName, setCoVarName, setCoVarUnique,
@@ -770,7 +770,7 @@ splitAppCo_maybe (AppCo co1 co2) = Just (co1, co2)
 splitAppCo_maybe (TyConAppCo r tc cos)
   | isDecomposableTyCon tc || cos `lengthExceeds` tyConArity tc
   , Just (cos', co') <- snocView cos
-  , Just co'' <- unSubCo_maybe co'
+  , Just co'' <- setNominalRole_maybe co'
   = Just (mkTyConAppCo r tc cos', co'') -- Never create unsaturated type family apps!
        -- Use mkTyConAppCo to preserve the invariant
        --  that identity coercions are always represented by Refl
@@ -829,6 +829,55 @@ isReflCo_maybe _                 = Nothing
 %*                                                                      *
 %************************************************************************
 
+Note [Role twiddling functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are a plethora of functions for twiddling roles:
+
+mkSubCo: Requires a nominal input coercion and always produces a
+representational output. This is used when you (the programmer) are sure you
+know exactly that role you have and what you want.
+
+setRole_maybe: This function takes both the input role and the output role
+as parameters. (The *output* role comes first!) It can only *downgrade* a
+role -- that is, change it from N to R or P, or from R to P. This one-way
+behavior is why there is the "_maybe". If an upgrade is requested, this
+function produces Nothing. This is used when you need to change the role of a
+coercion, but you're not sure (as you're writing the code) of which roles are
+involved.
+
+This function could have been written using coercionRole to ascertain the role
+of the input. But, that function is recursive, and the caller of setRole_maybe
+often knows the input role. So, this is more efficient.
+
+downgradeRole: This is just like setRole_maybe, but it panics if the conversion
+isn't a downgrade.
+
+setNominalRole_maybe: This is the only function that can *upgrade* a coercion. The result
+(if it exists) is always Nominal. The input can be at any role. It works on a
+"best effort" basis, as it should never be strictly necessary to upgrade a coercion
+during compilation. It is currently only used within GHC in splitAppCo_maybe. In order
+to be a proper inverse of mkAppCo, the second coercion that splitAppCo_maybe returns
+must be nominal. But, it's conceivable that splitAppCo_maybe is operating over a
+TyConAppCo that uses a representational coercion. Hence the need for setNominalRole_maybe.
+splitAppCo_maybe, in turn, is used only within coercion optimization -- thus, it is
+not absolutely critical that setNominalRole_maybe be complete.
+
+Note that setNominalRole_maybe will never upgrade a phantom UnivCo. Phantom
+UnivCos are perfectly type-safe, whereas representational and nominal ones are
+not. Indeed, `unsafeCoerce` is implemented via a representational UnivCo.
+(Nominal ones are no worse than representational ones, so this function *will*
+change a UnivCo Representational to a UnivCo Nominal.)
+
+Conal Elliott also came across a need for this function while working with the GHC
+API, as he was decomposing Core casts. The Core casts use representational coercions,
+as they must, but his use case required nominal coercions (he was building a GADT).
+So, that's why this function is exported from this module.
+
+One might ask: shouldn't setRole_maybe just use setNominalRole_maybe as appropriate?
+I (Richard E.) have decided not to do this, because upgrading a role is bizarre and
+a caller should have to ask for this behavior explicitly.
+
 \begin{code}
 mkCoVarCo :: CoVar -> Coercion
 -- cv :: s ~# t
@@ -845,9 +894,9 @@ mkAxInstCo :: Role -> CoAxiom br -> BranchIndex -> [Type] -> Coercion
 -- mkAxInstCo can legitimately be called over-staturated;
 -- i.e. with more type arguments than the coercion requires
 mkAxInstCo role ax index tys
-  | arity == n_tys = maybeSubCo2 role ax_role $ AxiomInstCo ax_br index rtys
+  | arity == n_tys = downgradeRole role ax_role $ AxiomInstCo ax_br index rtys
   | otherwise      = ASSERT( arity < n_tys )
-                     maybeSubCo2 role ax_role $
+                     downgradeRole role ax_role $
                      foldl AppCo (AxiomInstCo ax_br index (take arity rtys))
                                  (drop arity rtys)
   where
@@ -902,7 +951,7 @@ mkAppCoFlexible (Refl r ty1) _ (Refl _ ty2)
 mkAppCoFlexible (Refl r (TyConApp tc tys)) r2 co2
   = TyConAppCo r tc (zip_roles (tyConRolesX r tc) tys)
   where
-    zip_roles (r1:_)  []        = [maybeSubCo2 r1 r2 co2]
+    zip_roles (r1:_)  []        = [downgradeRole r1 r2 co2]
     zip_roles (r1:rs) (ty1:tys) = mkReflCo r1 ty1 : zip_roles rs tys
     zip_roles _       _         = panic "zip_roles" -- but the roles are infinite...
 mkAppCoFlexible (TyConAppCo r tc cos) r2 co
@@ -911,7 +960,7 @@ mkAppCoFlexible (TyConAppCo r tc cos) r2 co
                           TyConAppCo Nominal tc (cos ++ [co])
       Representational -> TyConAppCo Representational tc (cos ++ [co'])
         where new_role = (tyConRolesX Representational tc) !! (length cos)
-              co'      = maybeSubCo2 new_role r2 co
+              co'      = downgradeRole new_role r2 co
       Phantom          -> TyConAppCo Phantom tc (cos ++ [mkPhantomCo co])
 
 mkAppCoFlexible co1 _r2 co2 = ASSERT( _r2 == Nominal )
@@ -970,7 +1019,7 @@ mkTransCo co1 co2      = TransCo co1 co2
 -- sure this request is reasonable
 mkNthCoRole :: Role -> Int -> Coercion -> Coercion
 mkNthCoRole role n co
-  = maybeSubCo2 role nth_role $ nth_co
+  = downgradeRole role nth_role $ nth_co
   where
     nth_co = mkNthCo n co
     nth_role = coercionRole nth_co
@@ -1015,7 +1064,7 @@ mkUnivCo role ty1 ty2
 mkAxiomRuleCo :: CoAxiomRule -> [Type] -> [Coercion] -> Coercion
 mkAxiomRuleCo = AxiomRuleCo
 
--- input coercion is Nominal
+-- input coercion is Nominal; see also Note [Role twiddling functions]
 mkSubCo :: Coercion -> Coercion
 mkSubCo (Refl Nominal ty) = Refl Representational ty
 mkSubCo (TyConAppCo Nominal tc cos)
@@ -1024,54 +1073,51 @@ mkSubCo (UnivCo Nominal ty1 ty2) = UnivCo Representational ty1 ty2
 mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co <+> ppr (coercionRole co) )
              SubCo co
 
+-- only *downgrades* a role. See Note [Role twiddling functions]
+setRole_maybe :: Role   -- desired role
+              -> Role   -- current role
+              -> Coercion -> Maybe Coercion
+setRole_maybe Representational Nominal = Just . mkSubCo
+setRole_maybe Nominal Representational = const Nothing
+setRole_maybe Phantom Phantom          = Just
+setRole_maybe Phantom _                = Just . mkPhantomCo
+setRole_maybe _ Phantom                = const Nothing
+setRole_maybe _ _                      = Just
 
--- takes a Nominal coercion and possibly casts it into a Representational one
-maybeSubCo :: Role -> Coercion -> Coercion
-maybeSubCo Nominal          = id
-maybeSubCo Representational = mkSubCo
-maybeSubCo Phantom          = pprPanic "maybeSubCo Phantom" . ppr
-
-maybeSubCo2_maybe :: Role   -- desired role
-                  -> Role   -- current role
-                  -> Coercion -> Maybe Coercion
-maybeSubCo2_maybe Representational Nominal = Just . mkSubCo
-maybeSubCo2_maybe Nominal Representational = const Nothing
-maybeSubCo2_maybe Phantom Phantom          = Just
-maybeSubCo2_maybe Phantom _                = Just . mkPhantomCo
-maybeSubCo2_maybe _ Phantom                = const Nothing
-maybeSubCo2_maybe _ _                      = Just
-
-maybeSubCo2 :: Role  -- desired role
-            -> Role  -- current role
-            -> Coercion -> Coercion
-maybeSubCo2 r1 r2 co
-  = case maybeSubCo2_maybe r1 r2 co of
+-- panics if the requested conversion is not a downgrade.
+-- See also Note [Role twiddling functions]
+downgradeRole :: Role  -- desired role
+              -> Role  -- current role
+              -> Coercion -> Coercion
+downgradeRole r1 r2 co
+  = case setRole_maybe r1 r2 co of
       Just co' -> co'
-      Nothing  -> pprPanic "maybeSubCo2" (ppr co)
+      Nothing  -> pprPanic "downgradeRole" (ppr co)
 
--- if co is Nominal, returns it; otherwise, unwraps a SubCo; otherwise, fails
-unSubCo_maybe :: Coercion -> Maybe Coercion
-unSubCo_maybe co
+-- Converts a coercion to be nominal, if possible.
+-- See also Note [Role twiddling functions]
+setNominalRole_maybe :: Coercion -> Maybe Coercion
+setNominalRole_maybe co
   | Nominal <- coercionRole co = Just co
-unSubCo_maybe (SubCo co)  = Just co
-unSubCo_maybe (Refl _ ty) = Just $ Refl Nominal ty
-unSubCo_maybe (TyConAppCo Representational tc coes)
-  = do { cos' <- mapM unSubCo_maybe coes
+setNominalRole_maybe (SubCo co)  = Just co
+setNominalRole_maybe (Refl _ ty) = Just $ Refl Nominal ty
+setNominalRole_maybe (TyConAppCo Representational tc coes)
+  = do { cos' <- mapM setNominalRole_maybe coes
        ; return $ TyConAppCo Nominal tc cos' }
-unSubCo_maybe (UnivCo Representational ty1 ty2) = Just $ UnivCo Nominal ty1 ty2
+setNominalRole_maybe (UnivCo Representational ty1 ty2) = Just $ UnivCo Nominal ty1 ty2
   -- We do *not* promote UnivCo Phantom, as that's unsafe.
   -- UnivCo Nominal is no more unsafe than UnivCo Representational
-unSubCo_maybe (TransCo co1 co2)
-  = TransCo <$> unSubCo_maybe co1 <*> unSubCo_maybe co2
-unSubCo_maybe (AppCo co1 co2)
-  = AppCo <$> unSubCo_maybe co1 <*> pure co2
-unSubCo_maybe (ForAllCo tv co)
-  = ForAllCo tv <$> unSubCo_maybe co
-unSubCo_maybe (NthCo n co)
-  = NthCo n <$> unSubCo_maybe co
-unSubCo_maybe (InstCo co ty)
-  = InstCo <$> unSubCo_maybe co <*> pure ty
-unSubCo_maybe _ = Nothing
+setNominalRole_maybe (TransCo co1 co2)
+  = TransCo <$> setNominalRole_maybe co1 <*> setNominalRole_maybe co2
+setNominalRole_maybe (AppCo co1 co2)
+  = AppCo <$> setNominalRole_maybe co1 <*> pure co2
+setNominalRole_maybe (ForAllCo tv co)
+  = ForAllCo tv <$> setNominalRole_maybe co
+setNominalRole_maybe (NthCo n co)
+  = NthCo n <$> setNominalRole_maybe co
+setNominalRole_maybe (InstCo co ty)
+  = InstCo <$> setNominalRole_maybe co <*> pure ty
+setNominalRole_maybe _ = Nothing
 
 -- takes any coercion and turns it into a Phantom coercion
 mkPhantomCo :: Coercion -> Coercion
@@ -1566,7 +1612,7 @@ failing for reason 2) is fine. matchAxiom is trying to find a set of coercions
 that match, but it may fail, and this is healthy behavior. Bottom line: if
 you find that liftCoSubst is doing weird things (like leaving out-of-scope
 variables lying around), disable coercion optimization (bypassing matchAxiom)
-and use maybeSubCo2 instead of maybeSubCo2_maybe. The panic will then happen,
+and use downgradeRole instead of setRole_maybe. The panic will then happen,
 and you may learn something useful.
 
 \begin{code}
@@ -1576,7 +1622,7 @@ liftCoSubstTyVar (LCS _ cenv) r tv
   = do { co <- lookupVarEnv cenv tv
        ; let co_role = coercionRole co   -- could theoretically take this as
                                          -- a parameter, but painful
-       ; maybeSubCo2_maybe r co_role co } -- see Note [liftCoSubstTyVar]
+       ; setRole_maybe r co_role co } -- see Note [liftCoSubstTyVar]
 
 liftCoSubstTyVarBndr :: LiftCoSubst -> TyVar -> (LiftCoSubst, TyVar)
 liftCoSubstTyVarBndr subst@(LCS in_scope cenv) old_var
