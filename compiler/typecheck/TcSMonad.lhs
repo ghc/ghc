@@ -83,7 +83,8 @@ module TcSMonad (
     Untouchables, isTouchableMetaTyVarTcS, isFilledMetaTyVar_maybe,
     zonkTyVarsAndFV,
 
-    TN.ExtSolRes(..), extSolSend, extSolPush, extSolPop, extSolCheck,
+    TN.ExtSolRes(..), extSolAssume, extSolProve, extSolCheck,
+    extSolPush, extSolPop,
 
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
 
@@ -1069,9 +1070,8 @@ runTcSWithEvBinds ev_binds_var tcs
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef is
 
-       ; extSol <- liftIO $
-                   TN.newExternalSolver "cvc4" [ "--incremental"
-                                               , "--lang=smtlib2" ]
+       ; extSol <- liftIO $ TN.newExternalSolver "cvc4"
+                              [ "--incremental", "--lang=smtlib2" ]
 
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
                           , tcs_ty_binds = ty_binds_var
@@ -1924,11 +1924,14 @@ Interaction with an External SMT Solver
 ---------------------------------------
 
 \begin{code}
-extSolSend  :: Ct -> TcS Bool
-extSolSend ct = withExtSol (\s -> TN.extSolSend s ct)
+extSolAssume :: Ct -> TcS Bool
+extSolAssume ct = withExtSol (\s -> TN.extSolAssume s ct)
+
+extSolProve :: Ct -> TcS Bool
+extSolProve ct = withExtSol (\s -> TN.extSolProve s ct)
 
 extSolPush  :: TcS ()
-extSolPush = withExtSol TN.extSolPop
+extSolPush = withExtSol TN.extSolPush
 
 extSolPop   :: TcS ()
 extSolPop = withExtSol TN.extSolPop
