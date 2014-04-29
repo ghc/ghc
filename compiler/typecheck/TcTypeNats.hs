@@ -3,11 +3,13 @@ module TcTypeNats
   , typeNatCoAxiomRules
   , BuiltInSynFamily(..)
   , ExternalSolver(..), ExtSolRes(..), newExternalSolver
+  , evBySMT
   ) where
 
 import Type
 import Pair
 import TcType     ( TcType, tcEqType )
+import TcEvidence ( mkTcAxiomRuleCo, EvTerm(..) )
 import TyCon      ( TyCon, SynTyConRhs(..), mkSynTyCon, TyConParent(..)  )
 import Coercion   ( Role(..) )
 import TcRnTypes  ( Xi, Ct(..) )
@@ -288,9 +290,27 @@ typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
   ]
 
 
+decisionProcedure :: String -> CoAxiomRule
+decisionProcedure name =
+  CoAxiomRule
+    { coaxrName      = fsLit name
+    , coaxrTypeArity = 2
+    , coaxrAsmpRoles = []
+    , coaxrRole      = Nominal
+    , coaxrProves    = \ts cs ->
+        case (ts,cs) of
+          ([s,t],[]) -> return (s === t)
+          _          -> Nothing
+    }
 
-{-------------------------------------------------------------------------------
-Various utilities for making axioms and types
+
+evBySMT :: String -> (Type, Type) -> EvTerm
+evBySMT name (t1,t2) =
+  EvCoercion $ mkTcAxiomRuleCo (decisionProcedure name) [t1,t2] []
+
+
+
+-- Various utilities for making axioms and types
 -------------------------------------------------------------------------------}
 
 (.+.) :: Type -> Type -> Type
