@@ -294,7 +294,7 @@ data TcGblEnv
           -- ^ Allows us to choose unique DFun names.
 
         -- The next fields accumulate the payload of the module
-        -- The binds, rules and foreign-decl fiels are collected
+        -- The binds, rules and foreign-decl fields are collected
         -- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
         tcg_rn_exports :: Maybe [Located (IE Name)],
