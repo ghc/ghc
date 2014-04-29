@@ -1878,6 +1878,7 @@ addDLL( pathchar *dll_name )
             // success -- try to dlopen the first named file
             IF_DEBUG(linker, debugBelch("match%s\n",""));
             line[match[2].rm_eo] = '\0';
+            stgFree((void*)errmsg); // Free old message before creating new one
             errmsg = internal_dlopen(line+match[2].rm_so);
             break;
          }
