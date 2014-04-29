@@ -46,7 +46,8 @@ import qualified Data.Set as Set
 import           Data.Maybe ( isJust, mapMaybe )
 import           Data.Char  ( isSpace )
 import           Data.List ( unfoldr, mapAccumL, foldl' )
-import           Data.IORef ( newIORef, atomicModifyIORef', modifyIORef'
+import           Data.IORef ( newIORef, atomicModifyIORef',
+                              atomicModifyIORef, modifyIORef'
                             , readIORef
                             )
 import           Control.Monad (forever)
@@ -723,11 +724,12 @@ genLog x base = Just (exactLoop 0 x)
 -- Interface
 
 data ExternalSolver = ExternalSolver
-  { extSolPush  :: IO ()
-  , extSolPop   :: IO ()
-  , extSolSend  :: Ct -> IO Bool
-  , extSolCheck :: IO ExtSolRes
-  , extSolStop  :: IO ()
+  { extSolPush    :: IO ()          -- ^ Mark current set of assumptions
+  , extSolPop     :: IO ()          -- ^ Revert to the last marked place
+  , extSolAssume  :: Ct -> IO Bool  -- ^ Add an assumption
+  , extSolCheck   :: IO ExtSolRes   -- ^ Chkeck if assumptions are consistent
+  , extSolProve   :: Ct -> IO Bool  -- ^ Try to prove this
+  , extSolStop    :: IO ()          -- ^ Exit the solver
   }
 
 data ExtSolRes = ExtSolSat [(TyVar, Type)]
@@ -751,39 +753,57 @@ newExternalSolver exe opts =
      simpleCmd [ "set-option", ":produce-models", "true" ]
      simpleCmd [ "set-logic", "QF_LIA" ]
 
-
      viRef <- newIORef emptyVarInfo
 
-     return ExternalSolver
-       { extSolPush =
-          do simpleCmd [ "push" ]
-             modifyIORef' viRef startScope
+     let push = do simpleCmd [ "push" ]
+                   modifyIORef' viRef startScope
+         pop  = do simpleCmd [ "pop" ]
+                   modifyIORef' viRef endScope
 
-       , extSolPop =
-          do simpleCmd [ "pop" ]
-             modifyIORef' viRef endScope
-
-       , extSolSend = \ct ->
+         assume neg ct =
            case knownCt ct of
              Nothing -> return False
              Just (vs,e) ->
                do stmtss <- atomicModifyIORef' viRef $ \vi ->
                               mapAccumL smtDeclarePerhaps vi (eltsUFM vs)
                   mapM_ (mapM_ ackCmd) stmtss
-                  ackCmd $ smtAssert e
+                  ackCmd $ smtAssert $ if neg then Not e else e
                   return True
 
-       , extSolCheck =
-          do res <- solverDo proc (SList [ SAtom "check-sat" ])
-             case res of
-               SAtom "unsat"   -> return ExtSolUnsat
-               SAtom "unknown" -> return ExtSolUnknown
-               SAtom "sat" ->
-                 do vs <- readIORef viRef
-                    model <- smtGetModel proc vs
-                    return (ExtSolSat model)
+         checkSimple =
+           do res <- solverDo proc (SList [ SAtom "check-sat" ])
+              case res of
+                SAtom "unsat"   -> return ExtSolUnsat
+                SAtom "unknown" -> return ExtSolUnknown
+                SAtom "sat"     -> return (ExtSolSat [])
+                _ -> unexpected res
 
-               _ -> unexpected res
+
+
+     return ExternalSolver
+       { extSolPush   = push
+       , extSolPop    = pop
+       , extSolAssume = assume False
+       , extSolCheck  =
+           do res <- checkSimple
+              case res of
+                ExtSolSat _ ->
+                  do vs <- readIORef viRef
+                     model <- smtGetModel proc vs
+                     return (ExtSolSat model)
+                _ -> return res
+
+       , extSolProve  = \ct ->
+           do push
+              ours <- assume True ct
+              proved <- if ours
+                then do res <- checkSimple
+                        case res of
+                          ExtSolUnsat -> return True
+                          _           -> return False
+                else return False
+              pop
+              return proved
 
        , extSolStop = solverStop proc
        }
@@ -1074,12 +1094,13 @@ startSolverProcess exe opts =
        do txt <- hGetContents hOut
           ref <- newIORef (unfoldr parseSExpr txt)
           return $
-            atomicModifyIORef' ref $ \xs ->
+            atomicModifyIORef ref $ \xs ->
                case xs of
                  []     -> (xs, Nothing)
                  y : ys -> (ys, Just y)
 
-     let cmd' c = do hPutStrLn hIn (renderSExpr c "")
+     let cmd' c = do let e = renderSExpr c ""
+                     hPutStrLn hIn e
                      hFlush hIn
 
      return SolverProcess
