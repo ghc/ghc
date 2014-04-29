@@ -2618,6 +2618,7 @@ loadArchive( pathchar *path )
 
             if (0 == loadOc(oc)) {
                 stgFree(fileName);
+                fclose(f);
                 return 0;
             }
         }
