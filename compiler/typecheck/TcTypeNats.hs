@@ -41,10 +41,12 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Maybe ( isJust )
+import           Data.Maybe ( isJust, mapMaybe )
 import           Data.Char  ( isSpace )
 import           Data.List ( unfoldr, mapAccumL, foldl' )
-import           Data.IORef ( newIORef, atomicModifyIORef', modifyIORef' )
+import           Data.IORef ( newIORef, atomicModifyIORef', modifyIORef'
+                            , readIORef
+                            )
 import           Control.Monad (forever)
 import           Control.Concurrent ( forkIO )
 import qualified Control.Exception as X
@@ -756,7 +758,10 @@ newExternalSolver exe opts =
              case res of
                SAtom "unsat"   -> return ExtSolUnsat
                SAtom "unknown" -> return ExtSolUnknown
-               SAtom "sat" -> undefined
+               SAtom "sat" ->
+                 do vs <- readIORef viRef
+                    model <- smtGetModel proc vs
+                    return (ExtSolSat model)
 
                _ -> unexpected res
 
@@ -765,6 +770,16 @@ newExternalSolver exe opts =
   where
   unexpected e = fail $ "Unexpected response by the solver: " ++
                         (renderSExpr e "")
+
+smtGetModel :: SolverProcess -> VarInfo -> IO [(TyVar,Type)]
+smtGetModel proc vi =
+  do res <- solverDo proc
+          $ SList [ SAtom "get-value", SList [ SAtom v | v <- inScope vi ] ]
+     return $ mapMaybe resolve $ Map.toList $ smtVals res
+  where
+  resolve (x,se) = do tv <- Map.lookup x (smtDeclaredVars vi)
+                      ty <- knownValue se
+                      return (tv,ty)
 
 smtDeclarePerhaps :: VarInfo -> (TyVar, String, Ty) -> (VarInfo, [SExpr])
 smtDeclarePerhaps vi (tv,x,ty) = (vi1, decls)
@@ -868,6 +883,13 @@ knownKind k =
       | tc == typeNatKindCon    -> Just TNat
     _ -> Nothing
 
+knownValue :: Expr -> Maybe Xi
+knownValue expr =
+  case expr of
+    Num x  -> Just (num x)
+    Bool x -> Just (bool x)
+    _      -> Nothing
+
 
 thyVarName :: TyVar -> String
 thyVarName x = occNameString (nameOccName n) ++ "_" ++ show u
@@ -915,6 +937,19 @@ smtDeclare x t = SList [SAtom "declare-fun", SAtom x, SList [], smtTy t]
 smtAssert :: Expr -> SExpr
 smtAssert e = SList [SAtom "assert", smtExpr e]
 
+smtVals :: SExpr -> Map String Expr
+smtVals (SList xs) =
+  Map.fromList [ (x,v) | SList [ SAtom x, SAtom sa ] <- xs, v <- parse sa ]
+  where
+  parse "true"  = [Bool True]
+  parse "false" = [Bool False]
+  parse xs      = [Num x | (x,"") <- reads xs ]
+smtVals _ = Map.empty
+
+
+
+
+
 --------------------------------------------------------------------------------
 
 {-
@@ -954,6 +989,9 @@ emptyVarInfo = VarInfo
   , smtCurScope     = Set.empty
   , smtOtherScopes  = []
   }
+
+inScope :: VarInfo -> [String]
+inScope vi = Set.toList $ Set.unions $ smtCurScope vi : smtOtherScopes vi
 
 startScope :: VarInfo -> VarInfo
 startScope vi = vi { smtCurScope    = Set.empty
