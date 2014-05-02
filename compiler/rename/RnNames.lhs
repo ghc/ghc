@@ -1285,7 +1285,7 @@ type ImportDeclUsage
 warnUnusedImportDecls :: TcGblEnv -> RnM ()
 warnUnusedImportDecls gbl_env
   = do { uses <- readMutVar (tcg_used_rdrnames gbl_env)
-       ; let imports = filter explicit_import (tcg_rn_imports gbl_env)
+       ; let imports = filterOut un_warnable_import (tcg_rn_imports gbl_env)
              rdr_env = tcg_rdr_env gbl_env
 
        ; let usage :: [ImportDeclUsage]
@@ -1299,11 +1299,27 @@ warnUnusedImportDecls gbl_env
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
   where
-    explicit_import (L _ decl) = not (ideclImplicit decl)
-        -- Filter out the implicit Prelude import
-        -- which we do not want to bleat about
+    un_warnable_import (L _ decl)  -- See Note [Un-warnable import decls]
+       | ideclImplicit decl
+       = True
+       | Just (True, hides) <- ideclHiding decl
+       , not (null hides)
+       , pRELUDE_NAME == unLoc (ideclName decl)
+       = True
+       | otherwise
+       = False
 \end{code}
 
+Note [Un-warnable import decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not warn about the implicit import of Prelude, since the user can't remove it
+
+We do not warn about
+   import Prelude hiding( x, y )
+because even if nothing else from Prelude is used, it may be essential to hide
+x,y to avoid name-shadowing warnings.  Example (Trac #9061)
+   import Prelude hiding( log )
+   f x = log where log = ()
 
 Note [The ImportMap]
 ~~~~~~~~~~~~~~~~~~~~
