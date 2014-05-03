@@ -167,6 +167,7 @@ _darcs/
 /utils/runghc/runghc.cabal
 
 /extra-gcc-opts
+/sdistprep
 
 .tm_properties
 VERSION
