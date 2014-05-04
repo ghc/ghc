@@ -39,10 +39,8 @@
    new live weak pointers, then all the currently unreachable ones are
    dead.
 
-   For generational GC: we just don't try to finalize weak pointers in
-   older generations than the one we're collecting.  This could
-   probably be optimised by keeping per-generation lists of weak
-   pointers, but for a few weak pointers this scheme will work.
+   For generational GC: we don't try to finalize weak pointers in
+   older generations than the one we're collecting.
 
    There are three distinct stages to processing weak pointers:
 
