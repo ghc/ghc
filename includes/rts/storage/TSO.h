@@ -145,18 +145,15 @@ typedef struct StgTSO_ {
     */
     struct StgBlockingQueue_ *bq;
 
-    /*
-     * The allocation limit for this thread, which is updated as the
-     * thread allocates.  If the value drops below zero, and
-     * TSO_ALLOC_LIMIT is set in flags, we raise an exception in the
-     * thread, and give the thread a little more space to handle the
-     * exception before we raise the exception again.
-     *
-     * This is an integer, because we might update it in a place where
-     * it isn't convenient to raise the exception, so we want it to
-     * stay negative until we get around to checking it.
-     */
-    StgInt64  alloc_limit;     /* in bytes */
+#ifdef TICKY_TICKY
+    /* TICKY-specific stuff would go here. */
+#endif
+#ifdef PROFILING
+    StgTSOProfInfo prof;
+#endif
+#ifdef mingw32_HOST_OS
+    StgWord32 saved_winerror;
+#endif
 
     /*
      * sum of the sizes of all stack chunks (in words), used to decide
@@ -170,16 +167,6 @@ typedef struct StgTSO_ {
      * hard +RTS -K<size> limit.
      */
     StgWord32  tot_stack_size;
-
-#ifdef TICKY_TICKY
-    /* TICKY-specific stuff would go here. */
-#endif
-#ifdef PROFILING
-    StgTSOProfInfo prof;
-#endif
-#ifdef mingw32_HOST_OS
-    StgWord32 saved_winerror;
-#endif
 
 } *StgTSOPtr;
 

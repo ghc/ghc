@@ -137,7 +137,6 @@ void initRtsFlagsDefaults(void)
 #else
     RtsFlags.GcFlags.heapBase           = 0;   /* means don't care */
 #endif
-    RtsFlags.GcFlags.allocLimitGrace    = (100*1024) / BLOCK_SIZE;
 
 #ifdef DEBUG
     RtsFlags.DebugFlags.scheduler       = rtsFalse;
@@ -403,8 +402,6 @@ usage_text[] = {
 "            +PAPI_EVENT   - collect papi preset event PAPI_EVENT",
 "            #NATIVE_EVENT - collect native event NATIVE_EVENT (in hex)",
 #endif
-"  -xq       The allocation limit given to a thread after it receives",
-"            an AllocationLimitExceeded exception. (default: 100k)",
 "",
 "RTS options may also be specified using the GHCRTS environment variable.",
 "",
@@ -1362,13 +1359,6 @@ error = rtsTrue;
                     break;
 
                   /* The option prefix '-xx' is reserved for future extension.  KSW 1999-11. */
-
-                case 'q':
-                  OPTION_UNSAFE;
-                  RtsFlags.GcFlags.allocLimitGrace
-                      = decodeSize(rts_argv[arg], 3, BLOCK_SIZE, HS_INT_MAX)
-                          / BLOCK_SIZE;
-                  break;
 
                   default:
                     OPTION_SAFE;

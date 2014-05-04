@@ -1230,10 +1230,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(rts_getFunPtr)                                      \
       SymI_HasProto(rts_getStablePtr)                                   \
       SymI_HasProto(rts_getThreadId)                                    \
-      SymI_HasProto(rts_getThreadAllocationCounter)                     \
-      SymI_HasProto(rts_setThreadAllocationCounter)                     \
-      SymI_HasProto(rts_enableThreadAllocationLimit)                    \
-      SymI_HasProto(rts_disableThreadAllocationLimit)                   \
       SymI_HasProto(rts_getWord)                                        \
       SymI_HasProto(rts_getWord8)                                       \
       SymI_HasProto(rts_getWord16)                                      \

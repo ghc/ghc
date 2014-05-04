@@ -481,10 +481,6 @@ run_thread:
     // happened.  So find the new location:
     t = cap->r.rCurrentTSO;
 
-    // cap->r.rCurrentTSO is charged for calls to allocate(), so we
-    // don't want it set during scheduler operations.
-    cap->r.rCurrentTSO = NULL;
-
     // And save the current errno in this thread.
     // XXX: possibly bogus for SMP because this thread might already
     // be running again, see code below.
@@ -1080,21 +1076,6 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
             
 //            ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
         }
-    }
-
-    //
-    // If the current thread's allocation limit has run out, send it
-    // the AllocationLimitExceeded exception.
-
-    if (t->alloc_limit < 0 && (t->flags & TSO_ALLOC_LIMIT)) {
-        // Use a throwToSelf rather than a throwToSingleThreaded, because
-        // it correctly handles the case where the thread is currently
-        // inside mask.  Also the thread might be blocked (e.g. on an
-        // MVar), and throwToSingleThreaded doesn't unblock it
-        // correctly in that case.
-        throwToSelf(cap, t, allocationLimitExceeded_closure);
-        t->alloc_limit = (StgInt64)RtsFlags.GcFlags.allocLimitGrace
-            * BLOCK_SIZE;
     }
 
   /* some statistics gathering in the parallel case */

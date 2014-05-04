@@ -89,60 +89,6 @@ suspendComputation (Capability *cap, StgTSO *tso, StgUpdateFrame *stop_here)
 }
 
 /* -----------------------------------------------------------------------------
-   throwToSelf
-
-   Useful for throwing an async exception in a thread from the
-   runtime.  It handles unlocking the throwto message returned by
-   throwTo().
-
-   Note [Throw to self when masked]
-   
-   When a StackOverflow occurs when the thread is masked, we want to
-   defer the exception to when the thread becomes unmasked/hits an
-   interruptible point.  We already have a mechanism for doing this,
-   the blocked_exceptions list, but the use here is a bit unusual,
-   because an exception is normally only added to this list upon
-   an asynchronous 'throwTo' call (with all of the relevant
-   multithreaded nonsense). Morally, a stack overflow should be an
-   asynchronous exception sent by a thread to itself, and it should
-   have the same semantics.  But there are a few key differences:
-   
-   - If you actually tried to send an asynchronous exception to
-     yourself using throwTo, the exception would actually immediately
-     be delivered.  This is because throwTo itself is considered an
-     interruptible point, so the exception is always deliverable. Thus,
-     ordinarily, we never end up with a message to onesself in the
-     blocked_exceptions queue.
-   
-   - In the case of a StackOverflow, we don't actually care about the
-     wakeup semantics; when an exception is delivered, the thread that
-     originally threw the exception should be woken up, since throwTo
-     blocks until the exception is successfully thrown.  Fortunately,
-     it is harmless to wakeup a thread that doesn't actually need waking
-     up, e.g. ourselves.
-   
-   - No synchronization is necessary, because we own the TSO and the
-     capability.  You can observe this by tracing through the execution
-     of throwTo.  We skip synchronizing the message and inter-capability
-     communication.
-   
-   We think this doesn't break any invariants, but do be careful!
-   -------------------------------------------------------------------------- */
-
-void
-throwToSelf (Capability *cap, StgTSO *tso, StgClosure *exception)
-{
-    MessageThrowTo *m;
-
-    m = throwTo(cap, tso, tso, exception);
-
-    if (m != NULL) {
-        // throwTo leaves it locked
-        unlockClosure((StgClosure*)m, &stg_MSG_THROWTO_info);
-    }
-}
-
-/* -----------------------------------------------------------------------------
    throwTo
 
    This function may be used to throw an exception from one thread to

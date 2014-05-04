@@ -7,15 +7,12 @@
 -----------------------------------------------------------------------------
 
 module StgCmmForeign (
-  cgForeignCall,
+  cgForeignCall, loadThreadState, saveThreadState,
   emitPrimCall, emitCCall,
   emitForeignCall,     -- For CmmParse
-  emitSaveThreadState,
-  saveThreadState,
-  emitLoadThreadState,
-  loadThreadState,
-  emitOpenNursery,
-  emitCloseNursery,
+  emitSaveThreadState, -- will be needed by the Cmm parser
+  emitLoadThreadState, -- ditto
+  emitCloseNursery, emitOpenNursery
  ) where
 
 #include "HsVersions.h"
@@ -267,215 +264,94 @@ maybe_assign_temp e = do
 -- This stuff can't be done in suspendThread/resumeThread, because it
 -- refers to global registers which aren't available in the C world.
 
+saveThreadState :: DynFlags -> CmmAGraph
+saveThreadState dflags =
+  -- CurrentTSO->stackobj->sp = Sp;
+  mkStore (cmmOffset dflags (CmmLoad (cmmOffset dflags stgCurrentTSO (tso_stackobj dflags)) (bWord dflags)) (stack_SP dflags)) stgSp
+  <*> closeNursery dflags
+  -- and save the current cost centre stack in the TSO when profiling:
+  <*> if gopt Opt_SccProfilingOn dflags then
+        mkStore (cmmOffset dflags stgCurrentTSO (tso_CCCS dflags)) curCCS
+      else mkNop
+
 emitSaveThreadState :: FCode ()
 emitSaveThreadState = do
   dflags <- getDynFlags
-  tso <- newTemp (gcWord dflags)
-  cn <- newTemp (bWord dflags)
-  emit $ saveThreadState dflags tso cn
-
-
--- saveThreadState must be usable from the stack layout pass, where we
--- don't have FCode.  Therefore it takes LocalRegs as arguments, so
--- the caller can create these.
-saveThreadState :: DynFlags -> LocalReg -> LocalReg -> CmmAGraph
-saveThreadState dflags tso cn =
-  catAGraphs [
-    -- tso = CurrentTSO;
-    mkAssign (CmmLocal tso) stgCurrentTSO,
-    -- tso->stackobj->sp = Sp;
-    mkStore (cmmOffset dflags (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_stackobj dflags)) (bWord dflags)) (stack_SP dflags)) stgSp,
-    closeNursery dflags tso cn,
-    -- and save the current cost centre stack in the TSO when profiling:
-    if gopt Opt_SccProfilingOn dflags then
-        mkStore (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_CCCS dflags)) curCCS
-      else mkNop
-    ]
+  emit (saveThreadState dflags)
 
 emitCloseNursery :: FCode ()
 emitCloseNursery = do
-  dflags <- getDynFlags
-  tso <- newTemp (gcWord dflags)
-  cn <- newTemp (bWord dflags)
-  emit $ mkAssign (CmmLocal tso) stgCurrentTSO <*>
-         closeNursery dflags tso cn
+  df <- getDynFlags
+  emit (closeNursery df)
 
-{-
-Closing the nursery corresponds to the following code:
+   -- CurrentNursery->free = Hp+1;
+closeNursery :: DynFlags -> CmmAGraph
+closeNursery dflags = mkStore (nursery_bdescr_free dflags) (cmmOffsetW dflags stgHp 1)
 
-  tso = CurrentTSO;
-  cn = CurrentNuresry;
-
-  // Update the allocation limit for the current thread.  We don't
-  // check to see whether it has overflowed at this point, that check is
-  // made when we run out of space in the current heap block (stg_gc_noregs)
-  // and in the scheduler when context switching (schedulePostRunThread).
-  tso->alloc_limit -= Hp + WDS(1) - cn->start;
-
-  // Set cn->free to the next unoccupied word in the block
-  cn->free = Hp + WDS(1);
--}
-
-closeNursery :: DynFlags -> LocalReg -> LocalReg -> CmmAGraph
-closeNursery df tso cn =
-  let
-      tsoreg     = CmmLocal tso
-      cnreg      = CmmLocal cn
-  in
+loadThreadState :: DynFlags -> LocalReg -> LocalReg -> CmmAGraph
+loadThreadState dflags tso stack = do
   catAGraphs [
-    mkAssign cnreg stgCurrentNursery,
+        -- tso = CurrentTSO;
+        mkAssign (CmmLocal tso) stgCurrentTSO,
+        -- stack = tso->stackobj;
+        mkAssign (CmmLocal stack) (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_stackobj dflags)) (bWord dflags)),
+        -- Sp = stack->sp;
+        mkAssign sp (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal stack)) (stack_SP dflags)) (bWord dflags)),
+        -- SpLim = stack->stack + RESERVED_STACK_WORDS;
+        mkAssign spLim (cmmOffsetW dflags (cmmOffset dflags (CmmReg (CmmLocal stack)) (stack_STACK dflags))
+                                    (rESERVED_STACK_WORDS dflags)),
+        -- HpAlloc = 0;
+        --   HpAlloc is assumed to be set to non-zero only by a failed
+        --   a heap check, see HeapStackCheck.cmm:GC_GENERIC
+        mkAssign hpAlloc (zeroExpr dflags),
 
-    let alloc =
-           CmmMachOp (mo_wordSub df)
-              [ cmmOffsetW df stgHp 1
-              , CmmLoad (nursery_bdescr_start df cnreg) (bWord df)
-              ]
-
-        alloc_limit = cmmOffset df (CmmReg tsoreg) (tso_alloc_limit df)
-    in
-
-    -- tso->alloc_limit += alloc
-    mkStore alloc_limit (CmmMachOp (mo_wordSub df)
-                               [ CmmLoad alloc_limit b64
-                               , alloc ]),
-
-    -- CurrentNursery->free = Hp+1;
-    mkStore (nursery_bdescr_free df cnreg) (cmmOffsetW df stgHp 1)
-   ]
+        openNursery dflags,
+        -- and load the current cost centre stack from the TSO when profiling:
+        if gopt Opt_SccProfilingOn dflags then
+          storeCurCCS
+            (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_CCCS dflags)) (ccsType dflags))
+        else mkNop]
 
 emitLoadThreadState :: FCode ()
 emitLoadThreadState = do
   dflags <- getDynFlags
-  tso <- newTemp (gcWord dflags)
-  stack <- newTemp (gcWord dflags)
-  cn <- newTemp (bWord dflags)
-  bdfree <- newTemp (bWord dflags)
-  bdstart <- newTemp (bWord dflags)
-  emit $ loadThreadState dflags tso stack cn bdfree bdstart
-
--- loadThreadState must be usable from the stack layout pass, where we
--- don't have FCode.  Therefore it takes LocalRegs as arguments, so
--- the caller can create these.
-loadThreadState :: DynFlags
-                -> LocalReg -> LocalReg -> LocalReg -> LocalReg -> LocalReg
-                -> CmmAGraph
-loadThreadState dflags tso stack cn bdfree bdstart =
-  catAGraphs [
-    -- tso = CurrentTSO;
-    mkAssign (CmmLocal tso) stgCurrentTSO,
-    -- stack = tso->stackobj;
-    mkAssign (CmmLocal stack) (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_stackobj dflags)) (bWord dflags)),
-    -- Sp = stack->sp;
-    mkAssign sp (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal stack)) (stack_SP dflags)) (bWord dflags)),
-    -- SpLim = stack->stack + RESERVED_STACK_WORDS;
-    mkAssign spLim (cmmOffsetW dflags (cmmOffset dflags (CmmReg (CmmLocal stack)) (stack_STACK dflags))
-                                (rESERVED_STACK_WORDS dflags)),
-    -- HpAlloc = 0;
-    --   HpAlloc is assumed to be set to non-zero only by a failed
-    --   a heap check, see HeapStackCheck.cmm:GC_GENERIC
-    mkAssign hpAlloc (zeroExpr dflags),
-    openNursery dflags tso cn bdfree bdstart,
-    -- and load the current cost centre stack from the TSO when profiling:
-    if gopt Opt_SccProfilingOn dflags
-       then storeCurCCS
-              (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso))
-                 (tso_CCCS dflags)) (ccsType dflags))
-       else mkNop
-   ]
-
+  load_tso <- newTemp (gcWord dflags)
+  load_stack <- newTemp (gcWord dflags)
+  emit $ loadThreadState dflags load_tso load_stack
 
 emitOpenNursery :: FCode ()
 emitOpenNursery = do
-  dflags <- getDynFlags
-  tso <- newTemp (gcWord dflags)
-  cn <- newTemp (bWord dflags)
-  bdfree <- newTemp (bWord dflags)
-  bdstart <- newTemp (bWord dflags)
-  emit $ mkAssign (CmmLocal tso) stgCurrentTSO <*>
-         openNursery dflags tso cn bdfree bdstart
+  df <- getDynFlags
+  emit (openNursery df)
 
-{-
-Opening the nursery corresponds to the following code:
+openNursery :: DynFlags -> CmmAGraph
+openNursery dflags = catAGraphs [
+        -- Hp = CurrentNursery->free - 1;
+        mkAssign hp (cmmOffsetW dflags (CmmLoad (nursery_bdescr_free dflags) (bWord dflags)) (-1)),
 
-   tso = CurrentTSO;
-   cn = CurrentNursery;
-   bdfree = CurrentNuresry->free;
-   bdstart = CurrentNuresry->start;
-
-   // We *add* the currently occupied portion of the nursery block to
-   // the allocation limit, because we will subtract it again in
-   // closeNursery.
-   tso->alloc_limit += bdfree - bdstart;
-
-   // Set Hp to the last occupied word of the heap block.  Why not the
-   // next unocupied word?  Doing it this way means that we get to use
-   // an offset of zero more often, which might lead to slightly smaller
-   // code on some architectures.
-   Hp = bdfree - WDS(1);
-
-   // Set HpLim to the end of the current nursery block (note that this block
-   // might be a block group, consisting of several adjacent blocks.
-   HpLim = bdstart + CurrentNursery->blocks*BLOCK_SIZE_W - 1;
--}
-
-openNursery :: DynFlags
-            -> LocalReg -> LocalReg -> LocalReg -> LocalReg
-            -> CmmAGraph
-openNursery df tso cn bdfree bdstart =
-  let
-      tsoreg     = CmmLocal tso
-      cnreg      = CmmLocal cn
-      bdfreereg  = CmmLocal bdfree
-      bdstartreg = CmmLocal bdstart
-  in
-  catAGraphs [
-     mkAssign cnreg stgCurrentNursery,
-     mkAssign bdfreereg  (CmmLoad (nursery_bdescr_free df cnreg)  (bWord df)),
-     mkAssign bdstartreg (CmmLoad (nursery_bdescr_start df cnreg) (bWord df)),
-
-     -- alloc = bd->free - bd->start
-     let alloc =
-           CmmMachOp (mo_wordSub df) [CmmReg bdfreereg, CmmReg bdstartreg]
-
-         alloc_limit = cmmOffset df (CmmReg tsoreg) (tso_alloc_limit df)
-     in
-
-     -- tso->alloc_limit += alloc
-     mkStore alloc_limit (CmmMachOp (mo_wordAdd df)
-                               [ CmmLoad alloc_limit b64
-                               , alloc ]),
-
-     -- Hp = CurrentNursery->free - 1;
-     mkAssign hp (cmmOffsetW df (CmmReg bdfreereg) (-1)),
-
-     -- HpLim = CurrentNursery->start +
-     --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;
-     mkAssign hpLim
-         (cmmOffsetExpr df
-             (CmmReg bdstartreg)
-             (cmmOffset df
-               (CmmMachOp (mo_wordMul df) [
-                 CmmMachOp (MO_SS_Conv W32 (wordWidth df))
-                   [CmmLoad (nursery_bdescr_blocks df cnreg) b32],
-                 mkIntExpr df (bLOCK_SIZE df)
-                ])
-               (-1)
-             )
-         )
+        -- HpLim = CurrentNursery->start +
+        --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;
+        mkAssign hpLim
+            (cmmOffsetExpr dflags
+                (CmmLoad (nursery_bdescr_start dflags) (bWord dflags))
+                (cmmOffset dflags
+                  (CmmMachOp (mo_wordMul dflags) [
+                    CmmMachOp (MO_SS_Conv W32 (wordWidth dflags))
+                      [CmmLoad (nursery_bdescr_blocks dflags) b32],
+                    mkIntExpr dflags (bLOCK_SIZE dflags)
+                   ])
+                  (-1)
+                )
+            )
    ]
 
-nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks
-  :: DynFlags -> CmmReg -> CmmExpr
-nursery_bdescr_free   dflags cn =
-  cmmOffset dflags (CmmReg cn) (oFFSET_bdescr_free dflags)
-nursery_bdescr_start  dflags cn =
-  cmmOffset dflags (CmmReg cn) (oFFSET_bdescr_start dflags)
-nursery_bdescr_blocks dflags cn =
-  cmmOffset dflags (CmmReg cn) (oFFSET_bdescr_blocks dflags)
+nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks :: DynFlags -> CmmExpr
+nursery_bdescr_free   dflags = cmmOffset dflags stgCurrentNursery (oFFSET_bdescr_free dflags)
+nursery_bdescr_start  dflags = cmmOffset dflags stgCurrentNursery (oFFSET_bdescr_start dflags)
+nursery_bdescr_blocks dflags = cmmOffset dflags stgCurrentNursery (oFFSET_bdescr_blocks dflags)
 
-tso_stackobj, tso_CCCS, tso_alloc_limit, stack_STACK, stack_SP :: DynFlags -> ByteOff
+tso_stackobj, tso_CCCS, stack_STACK, stack_SP :: DynFlags -> ByteOff
 tso_stackobj dflags = closureField dflags (oFFSET_StgTSO_stackobj dflags)
-tso_alloc_limit dflags = closureField dflags (oFFSET_StgTSO_alloc_limit dflags)
 tso_CCCS     dflags = closureField dflags (oFFSET_StgTSO_cccs dflags)
 stack_STACK  dflags = closureField dflags (oFFSET_StgStack_stack dflags)
 stack_SP     dflags = closureField dflags (oFFSET_StgStack_sp dflags)

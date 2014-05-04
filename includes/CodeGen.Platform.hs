@@ -741,8 +741,10 @@ globalRegMaybe CurrentTSO               = Just (RealRegSingle REG_CurrentTSO)
 # ifdef REG_CurrentNursery
 globalRegMaybe CurrentNursery           = Just (RealRegSingle REG_CurrentNursery)
 # endif
-#endif
 globalRegMaybe _                        = Nothing
+#else
+globalRegMaybe = panic "globalRegMaybe not defined for this platform"
+#endif
 
 freeReg :: RegNo -> FastBool
 

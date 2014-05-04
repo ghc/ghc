@@ -988,12 +988,9 @@ lowerSafeForeignCall dflags block
     id <- newTemp (bWord dflags)
     new_base <- newTemp (cmmRegType dflags (CmmGlobal BaseReg))
     let (caller_save, caller_load) = callerSaveVolatileRegs dflags
+    load_tso <- newTemp (gcWord dflags)
     load_stack <- newTemp (gcWord dflags)
-    tso <- newTemp (gcWord dflags)
-    cn <- newTemp (bWord dflags)
-    bdfree <- newTemp (bWord dflags)
-    bdstart <- newTemp (bWord dflags)
-    let suspend = saveThreadState dflags tso cn  <*>
+    let suspend = saveThreadState dflags <*>
                   caller_save <*>
                   mkMiddle (callSuspendThread dflags id intrbl)
         midCall = mkUnsafeCall tgt res args
@@ -1002,7 +999,7 @@ lowerSafeForeignCall dflags block
                   -- might now have a different Capability!
                   mkAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)) <*>
                   caller_load <*>
-                  loadThreadState dflags tso load_stack cn bdfree bdstart
+                  loadThreadState dflags load_tso load_stack
 
         (_, regs, copyout) =
              copyOutOflow dflags NativeReturn Jump (Young succ)

@@ -81,12 +81,6 @@ test('tryReadMVar1', normal, compile_and_run, [''])
 
 test('T7970', normal, compile_and_run, [''])
 
-test('allocLimit1', exit_code(1), compile_and_run, [''])
-test('allocLimit2', normal, compile_and_run, [''])
-test('allocLimit3', exit_code(1), compile_and_run, [''])
-test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS') ],
-                    compile_and_run, [''])
-
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
@@ -251,4 +245,3 @@ test('setnumcapabilities001',
 
 # omit ghci, which can't handle unboxed tuples:
 test('compareAndSwap', [omit_ways(['ghci','hpc']), reqlib('primitive')], compile_and_run, [''])
-

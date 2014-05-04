@@ -56,14 +56,6 @@ struct GC_FLAGS {
     rtsBool doIdleGC;
 
     StgWord heapBase;           /* address to ask the OS for memory */
-
-    StgWord allocLimitGrace;    /* units: *blocks*
-                                 * After an AllocationLimitExceeded
-                                 * exception has been raised, how much
-                                 * extra space is given to the thread
-                                 * to handle the exception before we
-                                 * raise it again.
-                                 */
 };
 
 struct DEBUG_FLAGS {  

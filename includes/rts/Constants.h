@@ -275,12 +275,6 @@
 #define TSO_SQUEEZED 128
 
 /*
- * Enables the AllocationLimitExceeded exception when the thread's
- * allocation limit goes negative.
- */
-#define TSO_ALLOC_LIMIT 256
-
-/*
  * The number of times we spin in a spin lock before yielding (see
  * #3758).  To tune this value, use the benchmark in #3758: run the
  * server with -N2 and the client both on a dual-core.  Also make sure

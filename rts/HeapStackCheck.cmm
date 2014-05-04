@@ -100,9 +100,7 @@ stg_gc_noregs
             CurrentNursery = bdescr_link(CurrentNursery);
             OPEN_NURSERY();
             if (Capability_context_switch(MyCapability()) != 0 :: CInt ||
-                Capability_interrupt(MyCapability())      != 0 :: CInt ||
-                (StgTSO_alloc_limit(CurrentTSO) `lt` 0 &&
-                 (TO_W_(StgTSO_flags(CurrentTSO)) & TSO_ALLOC_LIMIT) != 0)) {
+                Capability_interrupt(MyCapability())      != 0 :: CInt) {
                 ret = ThreadYielding;
                 goto sched;
             } else {

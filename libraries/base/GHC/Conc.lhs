@@ -60,12 +60,6 @@ module GHC.Conc
         , threadWaitWriteSTM
         , closeFdWith
 
-        -- * Allocation counter and limit
-        , setAllocationCounter
-        , getAllocationCounter
-        , enableAllocationLimit
-        , disableAllocationLimit
-
         -- * TVars
         , STM(..)
         , atomically
