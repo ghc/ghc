@@ -34,7 +34,6 @@ import Outputable
 import TcRnTypes
 import TcErrors
 import TcSMonad
-import TcTypeNats(evBySMT)
 import Bag
 
 import Control.Monad ( foldM )
@@ -237,42 +236,24 @@ thePipeline = [ ("canonicalization",        TcCanonical.canonicalize)
 
 \begin{code}
 externalSolverStage :: WorkItem -> TcS StopOrContinue
-externalSolverStage wi
-  | isGivenCt wi =
-    extSolAssume wi >>= \ours -> if not ours then return (ContinueWith wi) else
-    do res <- extSolCheck
-       case res of
-         ExtSolUnsat   -> emitInsoluble wi >> return Stop
-         ExtSolSat m   -> improveFrom m >> return (ContinueWith wi)
-         ExtSolUnknown -> return (ContinueWith wi)
+externalSolverStage wi =
+  do mb <- extSolProve wi
+     case mb of
+       Just ev ->
+         do when (isWantedCt wi) $ setEvBind (ctEvId $ ctEvidence wi) ev
+            return Stop
+       Nothing ->
+          do res <- extSolAssume wi     -- Remember for later
+             case res of
 
-  | otherwise =
-    do extSolPush
-       ours <- extSolAssume wi
-       if not ours
-          then do extSolPop
-                  return (ContinueWith wi)
-          else do res <- extSolCheck
-                  extSolPop
-                  case res of
-                    ExtSolUnsat   -> emitInsoluble wi >> return Stop
-                    ExtSolSat m   -> improveFrom m >> tryToProve
-                    ExtSolUnknown -> tryToProve
+{- Perhaps we should remove constraints that lead to a contadiction?
+   As is, all constraints in this scope will be discarded (solved trivially).
+   This seems OK: after all, the program is incorrect anyway. -}
+               ExtSolContradiction -> emitInsoluble wi >> return Stop
 
-  where
-  tryToProve =
-    do proved <- extSolProve wi
-       if proved
-         then do when (isWantedCt wi)
-                   $ setEvBind (ctEvId $ ctEvidence wi)
-                   $ evBySMT "SMT" $ getEqPredTys $ ctPred wi
-                 return Stop
-         else do _ <- extSolAssume wi     -- Remember for later
-                 return (ContinueWith wi)
-
-  -- XXX: Add improvements
-  improveFrom m = return ()
-
+               ExtSolOk newWork ->
+                  do updWorkListTcS (extendWorkListEqs newWork)
+                     return (ContinueWith wi)
 \end{code}
 
 
@@ -742,7 +723,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs , cc_ev 
        ; return (Nothing, True) }
 
   | otherwise
-  = do { _ <- extSolAssume workItem
+  = do { _ <- extSolAssume workItem -- XXX: Check result?
        ; mb_solved <- trySpontaneousSolve ev tv rhs
        ; case mb_solved of
            SPCantSolve   -- Includes givens
