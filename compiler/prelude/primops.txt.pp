@@ -1082,34 +1082,42 @@ primop IndexByteArrayOp_StablePtr "indexStablePtrArray#" GenPrimOp
 
 primop IndexByteArrayOp_Int8 "indexInt8Array#" GenPrimOp
    ByteArray# -> Int# -> Int#
+   {Read 8-bit integer; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
    ByteArray# -> Int# -> Int#
+   {Read 16-bit integer; offset in 16-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
    ByteArray# -> Int# -> INT32
+   {Read 32-bit integer; offset in 32-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
    ByteArray# -> Int# -> INT64
+   {Read 64-bit integer; offset in 64-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8 "indexWord8Array#" GenPrimOp
    ByteArray# -> Int# -> Word#
+   {Read 8-bit word; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
    ByteArray# -> Int# -> Word#
+   {Read 16-bit word; offset in 16-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
    ByteArray# -> Int# -> WORD32
+   {Read 32-bit word; offset in 32-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
    ByteArray# -> Int# -> WORD64
+   {Read 64-bit word; offset in 64-bit words.}
    with can_fail = True
 
 primop  ReadByteArrayOp_Char "readCharArray#" GenPrimOp
@@ -1126,11 +1134,13 @@ primop  ReadByteArrayOp_WideChar "readWideCharArray#" GenPrimOp
 
 primop  ReadByteArrayOp_Int "readIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   {Read intger; offset in words.}
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word "readWordArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   {Read word; offset in words.}
    with has_side_effects = True
         can_fail = True
 
