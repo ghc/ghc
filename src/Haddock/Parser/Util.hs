@@ -1,26 +1,28 @@
 module Haddock.Parser.Util where
 
-import           Control.Applicative
-import           Control.Monad
-import           Data.Attoparsec.ByteString.Char8
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as BS
+import DynFlags (DynFlags)
+import FastString (mkFastString)
+import Haddock.Types
+import Haddock.Parser
+import Lexer (mkPState, unP, ParseResult(POk))
+import Parser (parseIdentifier)
+import RdrName (RdrName)
+import SrcLoc (mkRealSrcLoc, unLoc)
+import StringBuffer (stringToStringBuffer)
 
-takeUntil :: ByteString -> Parser ByteString
-takeUntil end_ = dropEnd <$> requireEnd (scan (False, end) p) >>= gotSome
-  where
-    end = BS.unpack end_
+{-# DEPRECATED parseParasMaybe "use `parseParas` instead" #-}
+parseParasMaybe :: DynFlags -> String -> Maybe (Doc RdrName)
+parseParasMaybe d = Just . overIdentifier (parseIdent d) . parseParas
 
-    p :: (Bool, String) -> Char -> Maybe (Bool, String)
-    p acc c = case acc of
-      (True, _) -> Just (False, end)
-      (_, []) -> Nothing
-      (_, x:xs) | x == c -> Just (False, xs)
-      _ -> Just (c == '\\', end)
+{-# DEPRECATED parseStringMaybe "use `parseString` instead" #-}
+parseStringMaybe :: DynFlags -> String -> Maybe (Doc RdrName)
+parseStringMaybe d = Just . overIdentifier (parseIdent d) . parseString
 
-    dropEnd = BS.reverse . BS.drop (length end) . BS.reverse
-    requireEnd = mfilter (BS.isSuffixOf end_)
-
-    gotSome xs
-      | BS.null xs = fail "didn't get any content"
-      | otherwise = return xs
+parseIdent :: DynFlags -> String -> Maybe RdrName
+parseIdent dflags str0 =
+  let buffer = stringToStringBuffer str0
+      realSrcLc = mkRealSrcLoc (mkFastString "<unknown file>") 0 0
+      pstate = mkPState dflags buffer realSrcLc
+  in case unP parseIdentifier pstate of
+    POk _ name -> Just (unLoc name)
+    _ -> Nothing

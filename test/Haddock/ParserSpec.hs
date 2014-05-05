@@ -26,20 +26,19 @@ deriving instance Show a => Show (Doc a)
 deriving instance Eq a => Eq (Header a)
 deriving instance Eq a => Eq (Doc a)
 
-instance IsString RdrName where
-  fromString = mkVarUnqual . fsLit
-
-instance IsString (Doc RdrName) where
+instance IsString (Doc String) where
   fromString = DocString
 
 instance IsString a => IsString (Maybe a) where
   fromString = Just . fromString
 
-parseParas :: String -> Doc RdrName
-parseParas = Parse.parseParas dynFlags
+parseParas :: String -> Doc String
+parseParas = Parse.toRegular . Parse.parseParas
 
-parseString :: String -> Doc RdrName
-parseString = Parse.parseString dynFlags
+parseString :: String -> Doc String
+parseString = Parse.toRegular . Parse.parseString
+
+
 
 main :: IO ()
 main = hspec spec
@@ -48,7 +47,7 @@ spec :: Spec
 spec = before initStaticOpts $ do
   describe "parseString" $ do
     let infix 1 `shouldParseTo`
-        shouldParseTo :: String -> Doc RdrName -> Expectation
+        shouldParseTo :: String -> Doc String -> Expectation
         shouldParseTo input ast = parseString input `shouldBe` ast
 
     it "is total" $ do
@@ -96,7 +95,7 @@ spec = before initStaticOpts $ do
           "don't use apostrophe's in the wrong place's"
 
     context "when parsing URLs" $ do
-      let hyperlink :: String -> Maybe String -> Doc RdrName
+      let hyperlink :: String -> Maybe String -> Doc String
           hyperlink url = DocHyperlink . Hyperlink url
 
       it "parses a URL" $ do
@@ -154,7 +153,7 @@ spec = before initStaticOpts $ do
             hyperlink "http://example.com/" Nothing <> "? Some other sentence."
 
     context "when parsing pictures" $ do
-      let picture :: String -> Maybe String -> Doc RdrName
+      let picture :: String -> Maybe String -> Doc String
           picture uri = DocPic . Picture uri
 
       it "parses a simple picture" $ do
@@ -310,7 +309,7 @@ spec = before initStaticOpts $ do
 
   describe "parseParas" $ do
     let infix 1 `shouldParseTo`
-        shouldParseTo :: String -> Doc RdrName -> Expectation
+        shouldParseTo :: String -> Doc String -> Expectation
         shouldParseTo input ast = parseParas input `shouldBe` ast
 
     it "is total" $ do

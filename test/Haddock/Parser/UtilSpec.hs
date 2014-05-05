@@ -5,7 +5,7 @@ import           Test.Hspec
 import           Data.Either
 
 import           Data.Attoparsec.ByteString.Char8
-import           Haddock.Parser.Util
+import           Haddock.Parser
 
 main :: IO ()
 main = hspec spec

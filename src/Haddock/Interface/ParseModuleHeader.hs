@@ -12,7 +12,7 @@
 module Haddock.Interface.ParseModuleHeader (parseModuleHeader) where
 
 import Haddock.Types
-import Haddock.Parser
+import Haddock.Parser.Util
 
 import RdrName
 import DynFlags

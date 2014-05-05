@@ -20,7 +20,7 @@ module Haddock.Interface.LexParseRn
 
 import qualified Data.IntSet as IS
 import Haddock.Types
-import Haddock.Parser
+import Haddock.Parser.Util
 import Haddock.Interface.ParseModuleHeader
 import Haddock.Doc
 

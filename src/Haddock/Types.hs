@@ -314,29 +314,30 @@ type InstHead name = (name, [HsType name], [HsType name], InstType name)
 
 type LDoc id = Located (Doc id)
 
+type Doc id = DocH (ModuleName, OccName) id
 
-data Doc id
+data DocH mod id
   = DocEmpty
-  | DocAppend (Doc id) (Doc id)
+  | DocAppend (DocH mod id) (DocH mod id)
   | DocString String
-  | DocParagraph (Doc id)
+  | DocParagraph (DocH mod id)
   | DocIdentifier id
-  | DocIdentifierUnchecked (ModuleName, OccName)
+  | DocIdentifierUnchecked mod
   | DocModule String
-  | DocWarning (Doc id)
-  | DocEmphasis (Doc id)
-  | DocMonospaced (Doc id)
-  | DocBold (Doc id)
-  | DocUnorderedList [Doc id]
-  | DocOrderedList [Doc id]
-  | DocDefList [(Doc id, Doc id)]
-  | DocCodeBlock (Doc id)
+  | DocWarning (DocH mod id)
+  | DocEmphasis (DocH mod id)
+  | DocMonospaced (DocH mod id)
+  | DocBold (DocH mod id)
+  | DocUnorderedList [DocH mod id]
+  | DocOrderedList [DocH mod id]
+  | DocDefList [(DocH mod id, DocH mod id)]
+  | DocCodeBlock (DocH mod id)
   | DocHyperlink Hyperlink
   | DocPic Picture
   | DocAName String
   | DocProperty String
   | DocExamples [Example]
-  | DocHeader (Header (Doc id))
+  | DocHeader (Header (DocH mod id))
   deriving (Functor, Foldable, Traversable)
 
 instance Foldable Header where
@@ -345,7 +346,8 @@ instance Foldable Header where
 instance Traversable Header where
   traverse f (Header l a) = Header l `fmap` f a
 
-instance NFData a => NFData (Doc a) where
+instance (NFData a, NFData mod)
+         => NFData (DocH mod a) where
   rnf doc = case doc of
     DocEmpty                  -> ()
     DocAppend a b             -> a `deepseq` b `deepseq` ()
