@@ -11,8 +11,8 @@ import TcType     ( TcType, tcEqType )
 import TcEvidence ( mkTcAxiomRuleCo, EvTerm(..) )
 import TyCon      ( TyCon, SynTyConRhs(..), mkSynTyCon, TyConParent(..)  )
 import Coercion   ( Role(..) )
-import TcRnTypes  ( Xi, Ct(..), ctPred, CtEvidence(..), mkNonCanonical,
-                                                                isGivenCt )
+import TcRnTypes  ( Xi, Ct(..), ctPred, CtEvidence(..), mkNonCanonical
+                  , isGivenCt, CtLoc, ctLoc )
 import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..) )
 import Name       ( Name, BuiltInSyntax(..), nameOccName, nameUnique )
 import OccName    ( occNameString )
@@ -767,20 +767,7 @@ newExternalSolver exe opts =
               debugStage proc ("assume: " ++ renderSExpr expr "") $
               do mapM_ (solverDeclare proc viRef) (eltsUFM vars)
                  solverAssume proc expr
-                 status <- solverCheck proc
-                 case status of
-                   Unsat   -> return ExtSolContradiction
-                   Unknown -> return (ExtSolOk [])
-                   Sat ->
-                     do m    <- solverGetModel proc =<< readIORef viRef
-                        imps <- solverImproveModel proc viRef m
-                        vi   <- readIORef viRef
-                        let toCt (x,e) =
-                              do tv <- Map.lookup x (smtDeclaredVars vi)
-                                 ty <- sExprToType vi e
-                                 return $ mkNonCanonical
-                                        $ mkNewFact ct (mkTyVarTy tv, ty)
-                        return $ ExtSolOk $ mapMaybe toCt imps
+                 solverNewWork proc viRef (ctLoc ct) (isGivenCt ct)
 
        , extSolProve = \ct ->
            case knownCt ct of
@@ -806,18 +793,18 @@ debugStage proc x m =
      solverDebugPrev proc
      return res
 
-mkNewFact :: Ct -> (Type,Type) -> CtEvidence
-mkNewFact ct (t1,t2)
-  | isGivenCt ct = CtGiven { ctev_pred = newPred
-                           , ctev_evtm = evBySMT "SMT" (t1,t2)
-                           , ctev_loc  = newLoc
-                           }
+
+
+mkNewFact :: CtLoc -> Bool -> (Type,Type) -> CtEvidence
+mkNewFact newLoc withEv (t1,t2)
+  | withEv = CtGiven { ctev_pred = newPred
+                     , ctev_evtm = evBySMT "SMT" (t1,t2)
+                     , ctev_loc  = newLoc
+                     }
   | otherwise = CtDerived { ctev_pred = newPred
-                          , ctev_loc  = ctev_loc origEv
+                          , ctev_loc  = newLoc
                           }
   where
-  origEv  = cc_ev ct
-  newLoc  = ctev_loc origEv
   newPred = mkEqPred t1 t2
 
 -- A command with no interesting result.
@@ -945,6 +932,22 @@ solverImproveModel proc viRef imps =
           then varEq x ((x, e) : imps)        more  ys
           else varEq x           imps  (def : more) ys
 
+
+solverNewWork :: SolverProcess -> IORef VarInfo -> CtLoc -> Bool -> IO ExtSolRes
+solverNewWork proc viRef loc withEv =
+  do status <- solverCheck proc
+     case status of
+       Unsat   -> return ExtSolContradiction
+       Unknown -> return (ExtSolOk [])
+       Sat ->
+         do m    <- solverGetModel proc =<< readIORef viRef
+            imps <- solverImproveModel proc viRef m
+            vi   <- readIORef viRef
+            let toCt (x,e) = do tv <- Map.lookup x (smtDeclaredVars vi)
+                                ty <- sExprToType vi e
+                                return $ mkNonCanonical
+                                       $ mkNewFact loc withEv (mkTyVarTy tv, ty)
+            return $ ExtSolOk $ mapMaybe toCt imps
 
 
 smtTy :: Ty -> SExpr
