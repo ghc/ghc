@@ -1,9 +1,8 @@
-module Haddock.Utf8Spec (main, spec) where
+module Documentation.Haddock.Utf8Spec (main, spec) where
 
-import           Test.Hspec
-import           Test.QuickCheck
-
-import           Haddock.Utf8
+import Test.Hspec
+import Test.QuickCheck
+import Documentation.Haddock.Utf8
 
 main :: IO ()
 main = hspec spec

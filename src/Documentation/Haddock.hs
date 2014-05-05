@@ -33,7 +33,8 @@ module Documentation.Haddock (
   InstHead,
 
   -- * Documentation comments
-  Doc(..),
+  Doc,
+  DocH(..),
   Example(..),
   Hyperlink(..),
   DocMarkup(..),

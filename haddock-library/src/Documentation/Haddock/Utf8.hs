@@ -1,4 +1,4 @@
-module Haddock.Utf8 (encodeUtf8, decodeUtf8) where
+module Documentation.Haddock.Utf8 (encodeUtf8, decodeUtf8) where
 import           Data.Bits ((.|.), (.&.), shiftL, shiftR)
 import qualified Data.ByteString as BS
 import           Data.Char (chr, ord)

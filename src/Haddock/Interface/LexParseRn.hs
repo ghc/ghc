@@ -18,30 +18,28 @@ module Haddock.Interface.LexParseRn
   , processModuleHeader
   ) where
 
-import qualified Data.IntSet as IS
-import Haddock.Types
-import Haddock.Parser.Util
-import Haddock.Interface.ParseModuleHeader
-import Haddock.Doc
-
 import Control.Applicative
+import Data.IntSet (toList)
 import Data.List
 import Data.Maybe
+import Data.Monoid ((<>))
+import DynFlags (ExtensionFlag(..), languageExtensions)
 import FastString
 import GHC
-import DynFlags (ExtensionFlag(..), languageExtensions)
+import Haddock.Interface.ParseModuleHeader
+import Haddock.Parser
+import Haddock.Types
 import Name
-import Outputable
+import Outputable (showPpr)
 import RdrName
 
 processDocStrings :: DynFlags -> GlobalRdrEnv -> [HsDocString] -> ErrMsgM (Maybe (Doc Name))
 processDocStrings dflags gre strs = do
   docs <- catMaybes <$> mapM (processDocStringParas dflags gre) strs
-  let doc = foldl' docAppend DocEmpty docs
+  let doc = foldl' (<>) DocEmpty docs
   case doc of
     DocEmpty -> return Nothing
     _ -> return (Just doc)
-
 
 processDocStringParas :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
 processDocStringParas = process parseParasMaybe
@@ -86,7 +84,7 @@ processModuleHeader dflags gre safety mayStr = do
 
   let flags :: [ExtensionFlag]
       -- We remove the flags implied by the language setting and we display the language instead
-      flags = map toEnum (IS.toList $ extensionFlags dflags) \\ languageExtensions (language dflags)
+      flags = map toEnum (toList $ extensionFlags dflags) \\ languageExtensions (language dflags)
   return (hmi { hmi_safety = Just $ showPpr dflags safety
               , hmi_language = language dflags
               , hmi_extensions = flags

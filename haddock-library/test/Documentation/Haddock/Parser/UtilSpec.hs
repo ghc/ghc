@@ -1,11 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Haddock.Parser.UtilSpec (main, spec) where
+module Documentation.Haddock.Parser.UtilSpec (main, spec) where
 
-import           Test.Hspec
-import           Data.Either
-
-import           Data.Attoparsec.ByteString.Char8
-import           Haddock.Parser
+import Data.Attoparsec.ByteString.Char8
+import Data.Either
+import Documentation.Haddock.Parser.Util
+import Test.Hspec
 
 main :: IO ()
 main = hspec spec

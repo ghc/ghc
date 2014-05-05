@@ -19,16 +19,16 @@ module Haddock.Types (
   module Haddock.Types
   , HsDocString, LHsDocString
   , Fixity(..)
+  , module Documentation.Haddock.Types
  ) where
 
-import Data.Foldable
-import Data.Traversable
 import Control.Exception
 import Control.Arrow hiding ((<+>))
 import Control.DeepSeq
 import Data.Typeable
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Documentation.Haddock.Types
 import BasicTypes (Fixity(..))
 import GHC hiding (NoLink)
 import DynFlags (ExtensionFlag, Language)
@@ -316,36 +316,6 @@ type LDoc id = Located (Doc id)
 
 type Doc id = DocH (ModuleName, OccName) id
 
-data DocH mod id
-  = DocEmpty
-  | DocAppend (DocH mod id) (DocH mod id)
-  | DocString String
-  | DocParagraph (DocH mod id)
-  | DocIdentifier id
-  | DocIdentifierUnchecked mod
-  | DocModule String
-  | DocWarning (DocH mod id)
-  | DocEmphasis (DocH mod id)
-  | DocMonospaced (DocH mod id)
-  | DocBold (DocH mod id)
-  | DocUnorderedList [DocH mod id]
-  | DocOrderedList [DocH mod id]
-  | DocDefList [(DocH mod id, DocH mod id)]
-  | DocCodeBlock (DocH mod id)
-  | DocHyperlink Hyperlink
-  | DocPic Picture
-  | DocAName String
-  | DocProperty String
-  | DocExamples [Example]
-  | DocHeader (Header (DocH mod id))
-  deriving (Functor, Foldable, Traversable)
-
-instance Foldable Header where
-  foldMap f (Header _ a) = f a
-
-instance Traversable Header where
-  traverse f (Header l a) = Header l `fmap` f a
-
 instance (NFData a, NFData mod)
          => NFData (DocH mod a) where
   rnf doc = case doc of
@@ -376,23 +346,6 @@ instance NFData Name
 instance NFData OccName
 instance NFData ModuleName
 
-
-data Hyperlink = Hyperlink
-  { hyperlinkUrl   :: String
-  , hyperlinkLabel :: Maybe String
-  } deriving (Eq, Show)
-
-
-data Picture = Picture
-  { pictureUri   :: String
-  , pictureTitle :: Maybe String
-  } deriving (Eq, Show)
-
-data Header id = Header
-  { headerLevel :: Int
-  , headerTitle :: id
-  } deriving Functor
-
 instance NFData id => NFData (Header id) where
   rnf (Header a b) = a `deepseq` b `deepseq` ()
 
@@ -401,13 +354,6 @@ instance NFData Hyperlink where
 
 instance NFData Picture where
   rnf (Picture a b) = a `deepseq` b `deepseq` ()
-
-
-data Example = Example
-  { exampleExpression :: String
-  , exampleResult     :: [String]
-  } deriving (Eq, Show)
-
 
 instance NFData Example where
   rnf (Example a b) = a `deepseq` b `deepseq` ()

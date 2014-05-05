@@ -1,0 +1,75 @@
+name:                 haddock-library
+version:              2.15.0
+synopsis:             Library exposing some functionality of Haddock.
+
+description:          Haddock is a documentation-generation tool for Haskell
+                      libraries. These modules expose some functionality of it
+                      without pulling in the GHC dependency.
+license:              BSD3
+license-file:         LICENSE
+maintainer:           Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
+homepage:             http://www.haskell.org/haddock/
+bug-reports:          http://trac.haskell.org/haddock
+category:             Documentation
+build-type:           Simple
+cabal-version:        >= 1.10
+stability:            experimental
+
+library
+  default-language:     Haskell2010
+
+  build-depends:
+    base >= 4.3 && < 4.8,
+    bytestring,
+    deepseq
+
+  hs-source-dirs:       src, vendor/attoparsec-0.10.4.0
+  ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
+
+  exposed-modules:
+    Documentation.Haddock.Parser
+    Documentation.Haddock.Types
+    Documentation.Haddock.Doc
+
+  other-modules:
+    Data.Attoparsec
+    Data.Attoparsec.ByteString
+    Data.Attoparsec.ByteString.Char8
+    Data.Attoparsec.Combinator
+    Data.Attoparsec.Number
+    Data.Attoparsec.ByteString.FastSet
+    Data.Attoparsec.ByteString.Internal
+    Data.Attoparsec.Internal
+    Data.Attoparsec.Internal.Types
+    Documentation.Haddock.Utf8
+    Documentation.Haddock.Parser.Util
+
+test-suite spec
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          Spec.hs
+  hs-source-dirs:
+      test
+    , src
+    , vendor/attoparsec-0.10.4.0
+
+  cpp-options:
+      -DTEST
+
+  other-modules:
+      Documentation.Haddock.ParserSpec
+      Documentation.Haddock.Utf8Spec
+      Documentation.Haddock.Parser.UtilSpec
+
+  build-depends:
+      base
+    , hspec
+    , bytestring
+    , deepseq
+    , QuickCheck == 2.*
+    , haddock-library
+
+
+source-repository head
+  type:     git
+  location: http://git.haskell.org/haddock.git

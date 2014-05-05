@@ -3,23 +3,16 @@
              , IncoherentInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Haddock.ParserSpec (main, spec) where
+module Documentation.Haddock.ParserSpec (main, spec) where
 
 import           Data.Monoid
 import           Data.String
-import qualified Haddock.Parser as Parse
-import           Haddock.Types
-import           Outputable (Outputable, showSDoc, ppr)
-import           RdrName (RdrName, mkVarUnqual)
-import           FastString (fsLit)
-import           StaticFlags (initStaticOpts)
+import qualified Documentation.Haddock.Parser as Parse
+import           Documentation.Haddock.Types
 import           Test.Hspec
 import           Test.QuickCheck
 
-import           Helper
-
-instance Outputable a => Show a where
-  show = showSDoc dynFlags . ppr
+type Doc id = DocH () id
 
 deriving instance Show a => Show (Header a)
 deriving instance Show a => Show (Doc a)
@@ -38,13 +31,11 @@ parseParas = Parse.toRegular . Parse.parseParas
 parseString :: String -> Doc String
 parseString = Parse.toRegular . Parse.parseString
 
-
-
 main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec = before initStaticOpts $ do
+spec = do
   describe "parseString" $ do
     let infix 1 `shouldParseTo`
         shouldParseTo :: String -> Doc String -> Expectation

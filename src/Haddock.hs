@@ -25,7 +25,7 @@ import Haddock.Backends.Xhtml.Themes (getThemes)
 import Haddock.Backends.LaTeX
 import Haddock.Backends.Hoogle
 import Haddock.Interface
-import Haddock.Parser.Util
+import Haddock.Parser
 import Haddock.Types
 import Haddock.Version
 import Haddock.InterfaceFile

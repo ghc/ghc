@@ -84,19 +84,11 @@ executable haddock
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
       ghc == 7.9.*,
-      bytestring
+      bytestring,
+      haddock-library
 
     other-modules:
       Documentation.Haddock
-      Data.Attoparsec
-      Data.Attoparsec.ByteString
-      Data.Attoparsec.ByteString.Char8
-      Data.Attoparsec.Combinator
-      Data.Attoparsec.Number
-      Data.Attoparsec.ByteString.FastSet
-      Data.Attoparsec.ByteString.Internal
-      Data.Attoparsec.Internal
-      Data.Attoparsec.Internal.Types
       Haddock
       Haddock.Interface
       Haddock.Interface.Rename
@@ -105,7 +97,6 @@ executable haddock
       Haddock.Interface.LexParseRn
       Haddock.Interface.ParseModuleHeader
       Haddock.Parser
-      Haddock.Parser.Util
       Haddock.Utf8
       Haddock.Utils
       Haddock.Backends.Xhtml
@@ -128,7 +119,7 @@ executable haddock
       Haddock.GhcUtils
       Haddock.Convert
   else
-    build-depends:  haddock
+    build-depends:  haddock, haddock-library
 
 library
   default-language:     Haskell2010
@@ -143,14 +134,15 @@ library
     array,
     xhtml >= 3000.2 && < 3000.3,
     Cabal >= 1.10,
-    ghc == 7.9.*
+    ghc == 7.9.*,
+    haddock-library
 
   if flag(in-ghc-tree)
     cpp-options: -DIN_GHC_TREE
   else
     build-depends: ghc-paths
 
-  hs-source-dirs:       src, vendor/attoparsec-0.10.4.0
+  hs-source-dirs:       src
   if flag(dev)
     ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs
   else
@@ -160,15 +152,6 @@ library
     Documentation.Haddock
 
   other-modules:
-    Data.Attoparsec
-    Data.Attoparsec.ByteString
-    Data.Attoparsec.ByteString.Char8
-    Data.Attoparsec.Combinator
-    Data.Attoparsec.Number
-    Data.Attoparsec.ByteString.FastSet
-    Data.Attoparsec.ByteString.Internal
-    Data.Attoparsec.Internal
-    Data.Attoparsec.Internal.Types
     Haddock
     Haddock.Interface
     Haddock.Interface.Rename
@@ -177,8 +160,6 @@ library
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
     Haddock.Parser
-    Haddock.Parser.Util
-    Haddock.Utf8
     Haddock.Utils
     Haddock.Backends.Xhtml
     Haddock.Backends.Xhtml.Decl
@@ -217,34 +198,6 @@ test-suite latex-test
   main-is:          run.lhs
   hs-source-dirs:   latex-test
   build-depends:    base, directory, process, filepath, Cabal
-
-test-suite spec
-  type:             exitcode-stdio-1.0
-  default-language: Haskell2010
-  main-is:          Spec.hs
-  hs-source-dirs:
-      test
-    , src
-    , vendor/attoparsec-0.10.4.0
-
-  other-modules:
-      Helper
-      Haddock.ParserSpec
-      Haddock.Utf8Spec
-      Haddock.Parser.UtilSpec
-
-  build-depends:
-      base
-    , bytestring
-    , ghc
-    , containers
-    , deepseq
-    , array
-    , hspec
-    , QuickCheck == 2.*
-
-  build-depends:
-      haddock
 
 source-repository head
   type:     git
