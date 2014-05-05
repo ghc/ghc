@@ -24,6 +24,12 @@ instance Foldable Header where
 instance Traversable Header where
   traverse f (Header l a) = Header l `fmap` f a
 
+
+deriving instance Show a => Show (Header a)
+deriving instance (Show a, Show b) => Show (DocH a b)
+deriving instance Eq a => Eq (Header a)
+deriving instance (Eq a, Eq b) => Eq (DocH a b)
+
 data Hyperlink = Hyperlink
   { hyperlinkUrl   :: String
   , hyperlinkLabel :: Maybe String

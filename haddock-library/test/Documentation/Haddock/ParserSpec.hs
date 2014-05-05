@@ -1,6 +1,5 @@
-{-# LANGUAGE OverloadedStrings, StandaloneDeriving
-             , FlexibleInstances, UndecidableInstances
-             , IncoherentInstances #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
+{-# LANGUAGE IncoherentInstances, UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Documentation.Haddock.ParserSpec (main, spec) where
@@ -13,11 +12,6 @@ import           Test.Hspec
 import           Test.QuickCheck
 
 type Doc id = DocH () id
-
-deriving instance Show a => Show (Header a)
-deriving instance Show a => Show (Doc a)
-deriving instance Eq a => Eq (Header a)
-deriving instance Eq a => Eq (Doc a)
 
 instance IsString (Doc String) where
   fromString = DocString
