@@ -1848,7 +1848,8 @@ pprO TupleOrigin           = ptext (sLit "a tuple")
 pprO NegateOrigin          = ptext (sLit "a use of syntactic negation")
 pprO ScOrigin              = ptext (sLit "the superclasses of an instance declaration")
 pprO DerivOrigin           = ptext (sLit "the 'deriving' clause of a data type declaration")
-pprO (DerivOriginDC dc n)  = hsep [ ptext (sLit "the"), speakNth n,
+pprO (DerivOriginDC dc n)  = pprTrace "dco" (ppr dc <+> ppr n) $ 
+                             hsep [ ptext (sLit "the"), speakNth n,
                                     ptext (sLit "field of"), quotes (ppr dc),
                                     parens (ptext (sLit "type") <+> quotes (ppr ty)) ]
     where ty = dataConOrigArgTys dc !! (n-1)
