@@ -37,6 +37,7 @@ import TcDeriv
 import TcEnv
 import TcHsType
 import TcUnify
+import Coercion   ( pprCoAxiom, pprCoAxBranch )
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import Type
 import TcEvidence
@@ -545,13 +546,16 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                  --            instance C [x]
                  -- Then we want to generate the decl:   type F [x] b = ()
                 | otherwise 
-                = forM defs $ \(CoAxBranch { cab_lhs = pat_tys, cab_rhs = rhs }) ->
+                = forM defs $ \br@(CoAxBranch { cab_lhs = pat_tys, cab_rhs = rhs }) ->
                   do { let pat_tys' = substTys mini_subst pat_tys
                            rhs'     = substTy  mini_subst rhs
                            tv_set'  = tyVarsOfTypes pat_tys'
-                           tvs'     = varSetElems tv_set'
+                           tvs'     = varSetElemsKvsFirst tv_set'
                      ; rep_tc_name <- newFamInstTyConName (noLoc (tyConName fam_tc)) pat_tys'
                      ; let axiom = mkSingleCoAxiom rep_tc_name tvs' fam_tc pat_tys' rhs'
+                     ; traceTc "mk_deflt_at_instance" (vcat [ ppr (tyvars, theta, clas, inst_tys)
+                                                            , pprCoAxBranch fam_tc br
+                                                            , pprCoAxiom axiom ])
                      ; ASSERT( tyVarsOfType rhs' `subVarSet` tv_set' ) 
                        newFamInst SynFamilyInst axiom }
 
