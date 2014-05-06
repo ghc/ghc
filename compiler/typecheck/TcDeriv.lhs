@@ -1094,21 +1094,23 @@ inferConstraints cls inst_tys rep_tc rep_tc_args
 
   | otherwise  -- The others are a bit more complicated
   = ASSERT2( equalLength rep_tc_tvs all_rep_tc_args, ppr cls <+> ppr rep_tc )
-    return (stupid_constraints ++ extra_constraints
-            ++ sc_constraints
-            ++ con_arg_constraints cls get_std_constrained_tys)
-
+    do { traceTc "inferConstraints" (vcat [ppr cls <+> ppr inst_tys, ppr arg_constraints])
+       ; return (stupid_constraints ++ extra_constraints
+                 ++ sc_constraints
+                 ++ arg_constraints) }
   where
+    arg_constraints = con_arg_constraints cls get_std_constrained_tys
+
        -- Constraints arising from the arguments of each constructor
     con_arg_constraints cls' get_constrained_tys
-      = [ mkPredOrigin (DerivOriginDC data_con arg_n) (mkClassPred cls' [arg_ty])
-        | data_con <- tyConDataCons rep_tc,
-          (arg_n, arg_ty) <-
-                ASSERT( isVanillaDataCon data_con )
-                zip [1..] $
-                get_constrained_tys $
-                dataConInstOrigArgTys data_con all_rep_tc_args,
-          not (isUnLiftedType arg_ty) ]
+      = [ mkPredOrigin (DerivOriginDC data_con arg_n) (mkClassPred cls' [inner_ty])
+        | data_con <- tyConDataCons rep_tc
+        , (arg_n, arg_ty) <- ASSERT( isVanillaDataCon data_con )
+                             zip [1..] $  -- ASSERT is precondition of dataConInstOrigArgTys
+                             dataConInstOrigArgTys data_con all_rep_tc_args
+        , not (isUnLiftedType arg_ty)
+        , inner_ty <- get_constrained_tys arg_ty ]
+
                 -- No constraints for unlifted types
                 -- See Note [Deriving and unboxed types]
 
@@ -1118,10 +1120,10 @@ inferConstraints cls inst_tys rep_tc rep_tc_args
                 -- (b) The rep_tc_args will be one short
     is_functor_like = getUnique cls `elem` functorLikeClassKeys
 
-    get_std_constrained_tys :: [Type] -> [Type]
-    get_std_constrained_tys tys
-        | is_functor_like = concatMap (deepSubtypesContaining last_tv) tys
-        | otherwise       = tys
+    get_std_constrained_tys :: Type -> [Type]
+    get_std_constrained_tys ty
+        | is_functor_like = deepSubtypesContaining last_tv ty
+        | otherwise       = [ty]
 
     rep_tc_tvs = tyConTyVars rep_tc
     last_tv = last rep_tc_tvs

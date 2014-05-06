@@ -50,3 +50,6 @@ test('T7800', normal, multimod_compile_fail, ['T7800',''])
 test('T5498', normal, compile_fail, [''])
 test('T6147', normal, compile_fail, [''])
 test('T8851', normal, compile_fail, [''])
+test('T9071', normal, multimod_compile_fail, ['T9071',''])
+test('T9071_2', normal, compile_fail, [''])
+
