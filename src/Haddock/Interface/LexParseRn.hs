@@ -21,8 +21,7 @@ module Haddock.Interface.LexParseRn
 import Control.Applicative
 import Data.IntSet (toList)
 import Data.List
-import Data.Maybe
-import Data.Monoid ((<>))
+import Data.Monoid (mconcat)
 import DynFlags (ExtensionFlag(..), languageExtensions)
 import FastString
 import GHC
@@ -33,34 +32,27 @@ import Name
 import Outputable (showPpr)
 import RdrName
 
-processDocStrings :: DynFlags -> GlobalRdrEnv -> [HsDocString] -> ErrMsgM (Maybe (Doc Name))
-processDocStrings dflags gre strs = do
-  docs <- catMaybes <$> mapM (processDocStringParas dflags gre) strs
-  let doc = foldl' (<>) DocEmpty docs
-  case doc of
-    DocEmpty -> return Nothing
-    _ -> return (Just doc)
-
-processDocStringParas :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
-processDocStringParas = process parseParasMaybe
+processDocStrings :: DynFlags -> GlobalRdrEnv -> [HsDocString] -> Maybe (Doc Name)
+processDocStrings dflags gre strs =
+  case mconcat $ map (processDocStringParas dflags gre) strs of
+    DocEmpty -> Nothing
+    x -> Just x
 
 
-processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
-processDocString = process parseStringMaybe
+processDocStringParas :: DynFlags -> GlobalRdrEnv -> HsDocString -> Doc Name
+processDocStringParas = process parseParas
 
-process :: (DynFlags -> String -> Maybe (Doc RdrName))
+
+processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> Doc Name
+processDocString = process parseString
+
+process :: (DynFlags -> String -> Doc RdrName)
         -> DynFlags
         -> GlobalRdrEnv
         -> HsDocString
-        -> ErrMsgM (Maybe (Doc Name))
-process parse dflags gre (HsDocString fs) = do
-   let str = unpackFS fs
-   case parse dflags str of
-     Nothing -> do
-       tell [ "doc comment parse failed: " ++ str ]
-       return Nothing
-     Just doc -> do
-       return (Just (rename dflags gre doc))
+        -> Doc Name
+process parse dflags gre (HsDocString fs) =
+  rename dflags gre $ parse dflags (unpackFS fs)
 
 
 processModuleHeader :: DynFlags -> GlobalRdrEnv -> SafeHaskellMode -> Maybe LHsDocString
@@ -68,19 +60,14 @@ processModuleHeader :: DynFlags -> GlobalRdrEnv -> SafeHaskellMode -> Maybe LHsD
 processModuleHeader dflags gre safety mayStr = do
   (hmi, doc) <-
     case mayStr of
-
       Nothing -> return failure
       Just (L _ (HsDocString fs)) -> do
         let str = unpackFS fs
-        case parseModuleHeader dflags str of
-          Left msg -> do
-            tell ["haddock module header parse failed: " ++ msg]
-            return failure
-          Right (hmi, doc) -> do
-            let !descr = rename dflags gre <$> hmi_description hmi
-                hmi' = hmi { hmi_description = descr }
-                doc' = rename dflags gre doc
-            return (hmi', Just doc')
+            (hmi, doc) = parseModuleHeader dflags str
+            !descr = rename dflags gre <$> hmi_description hmi
+            hmi' = hmi { hmi_description = descr }
+            doc' = rename dflags gre doc
+        return (hmi', Just doc')
 
   let flags :: [ExtensionFlag]
       -- We remove the flags implied by the language setting and we display the language instead

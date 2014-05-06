@@ -13,13 +13,12 @@
 -- Stability   :  experimental
 -- Portability :  portable
 
-module Haddock.Parser ( module Documentation.Haddock.Parser
-                      , parseParasMaybe
-                      , parseStringMaybe
+module Haddock.Parser ( parseParas
+                      , parseString
                       , parseIdent
                       ) where
 
-import Documentation.Haddock.Parser
+import qualified Documentation.Haddock.Parser as P
 import DynFlags (DynFlags)
 import FastString (mkFastString)
 import Documentation.Haddock.Types
@@ -29,13 +28,11 @@ import RdrName (RdrName)
 import SrcLoc (mkRealSrcLoc, unLoc)
 import StringBuffer (stringToStringBuffer)
 
-{-# DEPRECATED parseParasMaybe "use `parseParas` instead" #-}
-parseParasMaybe :: DynFlags -> String -> Maybe (DocH mod RdrName)
-parseParasMaybe d = Just . overIdentifier (parseIdent d) . parseParas
+parseParas :: DynFlags -> String -> DocH mod RdrName
+parseParas d = P.overIdentifier (parseIdent d) . P.parseParas
 
-{-# DEPRECATED parseStringMaybe "use `parseString` instead" #-}
-parseStringMaybe :: DynFlags -> String -> Maybe (DocH mod RdrName)
-parseStringMaybe d = Just . overIdentifier (parseIdent d) . parseString
+parseString :: DynFlags -> String -> DocH mod RdrName
+parseString d = P.overIdentifier (parseIdent d) . P.parseString
 
 parseIdent :: DynFlags -> String -> Maybe RdrName
 parseIdent dflags str0 =

@@ -448,11 +448,8 @@ getPrologue dflags flags =
     [filename] -> withFile filename ReadMode $ \h -> do
       hSetEncoding h utf8
       str <- hGetContents h
-      case parseParasMaybe dflags str of
-        Nothing ->
-          throwE $ "failed to parse haddock prologue from file: " ++ filename
-        Just doc -> return (Just doc)
-    _otherwise -> throwE "multiple -p/--prologue options"
+      return . Just $ parseParas dflags str
+    _ -> throwE "multiple -p/--prologue options"
 
 
 #ifdef IN_GHC_TREE

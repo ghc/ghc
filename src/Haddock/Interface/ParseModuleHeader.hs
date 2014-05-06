@@ -11,14 +11,13 @@
 -----------------------------------------------------------------------------
 module Haddock.Interface.ParseModuleHeader (parseModuleHeader) where
 
-import Haddock.Types
-import Haddock.Parser
-
-import RdrName
-import DynFlags
-
-import Data.Char
+import Control.Applicative ((<$>))
 import Control.Monad (mplus)
+import Data.Char
+import DynFlags
+import Haddock.Parser
+import Haddock.Types
+import RdrName
 
 -- -----------------------------------------------------------------------------
 -- Parsing module headers
@@ -26,7 +25,7 @@ import Control.Monad (mplus)
 -- NB.  The headers must be given in the order Module, Description,
 -- Copyright, License, Maintainer, Stability, Portability, except that
 -- any or all may be omitted.
-parseModuleHeader :: DynFlags -> String -> Either String (HaddockModInfo RdrName, Doc RdrName)
+parseModuleHeader :: DynFlags -> String -> (HaddockModInfo RdrName, Doc RdrName)
 parseModuleHeader dflags str0 =
    let
       getKey :: String -> String -> (Maybe String,String)
@@ -43,28 +42,17 @@ parseModuleHeader dflags str0 =
       (stabilityOpt,str7) = getKey "Stability" str6
       (portabilityOpt,str8) = getKey "Portability" str7
 
-      description1 :: Either String (Maybe (Doc RdrName))
-      description1 = case descriptionOpt of
-         Nothing -> Right Nothing
-         Just description -> case parseStringMaybe dflags description of
-            Nothing -> Left ("Cannot parse Description: " ++ description)
-            Just doc -> Right (Just doc)
-   in
-      case description1 of
-         Left mess -> Left mess
-         Right docOpt -> case parseParasMaybe dflags str8 of
-           Nothing -> Left "Cannot parse header documentation paragraphs"
-           Just doc -> Right (HaddockModInfo {
-            hmi_description = docOpt,
-            hmi_copyright = copyrightOpt,
-            hmi_license = licenseOpt `mplus` licenceOpt,
-            hmi_maintainer = maintainerOpt,
-            hmi_stability = stabilityOpt,
-            hmi_portability = portabilityOpt,
-            hmi_safety = Nothing,
-            hmi_language = Nothing, -- set in LexParseRn
-            hmi_extensions = [] -- also set in LexParseRn
-            }, doc)
+   in (HaddockModInfo {
+          hmi_description = parseString dflags <$> descriptionOpt,
+          hmi_copyright = copyrightOpt,
+          hmi_license = licenseOpt `mplus` licenceOpt,
+          hmi_maintainer = maintainerOpt,
+          hmi_stability = stabilityOpt,
+          hmi_portability = portabilityOpt,
+          hmi_safety = Nothing,
+          hmi_language = Nothing, -- set in LexParseRn
+          hmi_extensions = [] -- also set in LexParseRn
+          }, parseParas dflags str8)
 
 -- | This function is how we read keys.
 --
