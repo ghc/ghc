@@ -39,7 +39,8 @@ module TypeRep (
         -- Pretty-printing
 	pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
 	pprTyThing, pprTyThingCategory, pprSigmaType,
-	pprEqPred, pprTheta, pprForAll, pprThetaArrowTy, pprClassPred,
+	pprEqPred, pprTheta, pprForAll, pprUserForAll,
+        pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit, suppressKinds,
 	Prec(..), maybeParen, pprTcApp, 
         pprPrefixApp, pprArrowChain, ppr_type,
@@ -618,11 +619,11 @@ ppr_tylit _ tl =
 
 -------------------
 ppr_sigma_type :: Bool -> Type -> SDoc
--- Bool <=> Show the foralls
-ppr_sigma_type show_foralls ty
-  = sep [ ppWhen (show_foralls || any tv_has_kind_var tvs)
-                 (pprForAll tvs)
-                -- See Note [When to print foralls]
+-- Bool <=> Show the foralls unconditionally
+ppr_sigma_type show_foralls_unconditionally ty
+  = sep [ if   show_foralls_unconditionally
+          then pprForAll tvs
+          else pprUserForAll tvs
         , pprThetaArrowTy ctxt
         , pprType tau ]
   where
@@ -631,15 +632,21 @@ ppr_sigma_type show_foralls ty
 
     split1 tvs (ForAllTy tv ty) = split1 (tv:tvs) ty
     split1 tvs ty               = (reverse tvs, ty)
- 
+
     split2 ps (ty1 `FunTy` ty2) | isPredTy ty1 = split2 (ty1:ps) ty2
     split2 ps ty                               = (reverse ps, ty)
 
-    tv_has_kind_var tv = not (isEmptyVarSet (tyVarsOfType (tyVarKind tv)))
-
 pprSigmaType :: Type -> SDoc
-pprSigmaType ty = sdocWithDynFlags $ \dflags ->
-                  ppr_sigma_type (gopt Opt_PrintExplicitForalls dflags) ty
+pprSigmaType ty = ppr_sigma_type False ty
+
+pprUserForAll :: [TyVar] -> SDoc
+-- Print a user-level forall; see Note [WHen to print foralls]
+pprUserForAll tvs
+  = sdocWithDynFlags $ \dflags ->
+    ppWhen (any tv_has_kind_var tvs || gopt Opt_PrintExplicitForalls dflags) $
+    pprForAll tvs
+  where
+    tv_has_kind_var tv = not (isEmptyVarSet (tyVarsOfType (tyVarKind tv)))
 
 pprForAll :: [TyVar] -> SDoc
 pprForAll []  = empty

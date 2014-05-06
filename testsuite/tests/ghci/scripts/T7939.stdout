@@ -13,11 +13,11 @@ type family H (a :: Bool) :: Bool where H 'False = 'True
 H :: Bool -> Bool
 type family J (a :: [k]) :: Bool where
     J '[] = 'False
-    J (h : t) = 'True
+  forall (k :: BOX) (h :: k) (t :: [k]). J (h : t) = 'True
   	-- Defined at T7939.hs:17:1
 J :: [k] -> Bool
 type family K (a :: [k]) :: Maybe k where
     K '[] = 'Nothing
-    K (h : t) = 'Just h
+  forall (k :: BOX) (h :: k) (t :: [k]). K (h : t) = 'Just h
   	-- Defined at T7939.hs:21:1
 K :: [k] -> Maybe k

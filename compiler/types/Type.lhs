@@ -128,7 +128,7 @@ module Type (
 
         -- * Pretty-printing
         pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing,
-        pprTvBndr, pprTvBndrs, pprForAll, pprSigmaType,
+        pprTvBndr, pprTvBndrs, pprForAll, pprUserForAll, pprSigmaType,
         pprEqPred, pprTheta, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprSourceTyCon,
 
