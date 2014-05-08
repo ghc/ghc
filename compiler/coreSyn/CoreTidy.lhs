@@ -33,7 +33,6 @@ import Name hiding (tidyNameOcc)
 import SrcLoc
 import Maybes
 import Data.List
-import Outputable
 \end{code}
 
 
@@ -141,18 +140,48 @@ tidyBndr env var
 tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
 tidyBndrs env vars = mapAccumL tidyBndr env vars
 
+-- Non-top-level variables
+tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
+tidyIdBndr env@(tidy_env, var_env) id
+  = -- Do this pattern match strictly, otherwise we end up holding on to
+    -- stuff in the OccName.
+    case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') ->
+    let
+	-- Give the Id a fresh print-name, *and* rename its type
+	-- The SrcLoc isn't important now,
+	-- though we could extract it from the Id
+	--
+        ty'      = tidyType env (idType id)
+        name'    = mkInternalName (idUnique id) occ' noSrcSpan
+	id'      = mkLocalIdWithInfo name' ty' new_info
+	var_env' = extendVarEnv var_env id id'
+
+	-- Note [Tidy IdInfo]
+        new_info = vanillaIdInfo `setOccInfo` occInfo old_info
+                                 `setUnfoldingInfo` new_unf
+	old_info = idInfo id
+        old_unf  = unfoldingInfo old_info
+        new_unf | isEvaldUnfolding old_unf = evaldUnfolding
+                | otherwise                = noUnfolding
+          -- See Note [Preserve evaluatedness]
+    in
+    ((tidy_env', var_env'), id')
+   }
+
 tidyLetBndr :: TidyEnv	       -- Knot-tied version for unfoldings
             -> TidyEnv 	       -- The one to extend
             -> (Id, CoreExpr) -> (TidyEnv, Var)
 -- Used for local (non-top-level) let(rec)s
-tidyLetBndr rec_tidy_env env (id,rhs) 
-  = ((tidy_occ_env,new_var_env), final_id)
-  where
-    ((tidy_occ_env,var_env), new_id) = tidyIdBndr env id
-    new_var_env = extendVarEnv var_env id final_id
-       -- Override the env we get back from tidyId with the 
-       -- new IdInfo so it gets propagated to the usage sites.
+-- Just like tidyIdBndr above, but with more IdInfo
+tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
+  = case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') ->
+    let
+        ty'      = tidyType env (idType id)
+        name'    = mkInternalName (idUnique id) occ' noSrcSpan
+	id'      = mkLocalIdWithInfo name' ty' new_info
+	var_env' = extendVarEnv var_env id id'
 
+	-- Note [Tidy IdInfo]
 	-- We need to keep around any interesting strictness and
 	-- demand info because later on we may need to use it when
 	-- converting to A-normal form.
@@ -161,48 +190,27 @@ tidyLetBndr rec_tidy_env env (id,rhs)
 	--	into  case (g x) of z -> f z  by CorePrep, but only if f still
 	-- 	has its strictness info.
 	--
-	-- Similarly for the demand info - on a let binder, this tells 
+	-- Similarly for the demand info - on a let binder, this tells
 	-- CorePrep to turn the let into a case.
 	--
 	-- Similarly arity info for eta expansion in CorePrep
-	-- 
-	-- Set inline-prag info so that we preseve it across 
+	--
+	-- Set inline-prag info so that we preseve it across
 	-- separate compilation boundaries
-    final_id = new_id `setIdInfo` new_info
-    idinfo   = idInfo id
-    new_info = idInfo new_id
-		`setArityInfo`		exprArity rhs
-                `setStrictnessInfo`	strictnessInfo idinfo
-                `setDemandInfo`	        demandInfo idinfo
-		`setInlinePragInfo`	inlinePragInfo idinfo
-		`setUnfoldingInfo`	new_unf
-
-    new_unf | isStableUnfolding unf = tidyUnfolding rec_tidy_env unf (panic "tidy_unf")
-            | otherwise	            = noUnfolding
-    unf = unfoldingInfo idinfo
-
--- Non-top-level variables
-tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
-tidyIdBndr env@(tidy_env, var_env) id
-  = -- Do this pattern match strictly, otherwise we end up holding on to
-    -- stuff in the OccName.
-    case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') -> 
-    let 
-	-- Give the Id a fresh print-name, *and* rename its type
-	-- The SrcLoc isn't important now, 
-	-- though we could extract it from the Id
-	-- 
-        ty'      = tidyType env (idType id)
-        name'    = mkInternalName (idUnique id) occ' noSrcSpan
-	id'      = mkLocalIdWithInfo name' ty' new_info
-	var_env' = extendVarEnv var_env id id'
-
-	-- Note [Tidy IdInfo]
-        new_info = vanillaIdInfo `setOccInfo` occInfo old_info
 	old_info = idInfo id
+        new_info = vanillaIdInfo
+                    `setOccInfo`        occInfo old_info
+                    `setArityInfo`	exprArity rhs
+                    `setStrictnessInfo`	strictnessInfo old_info
+                    `setDemandInfo`	demandInfo old_info
+                    `setInlinePragInfo`	inlinePragInfo old_info
+                    `setUnfoldingInfo`	new_unf
+
+        new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf
+                | otherwise	            = noUnfolding
+        old_unf = unfoldingInfo old_info
     in
-    ((tidy_env', var_env'), id')
-   }
+    ((tidy_env', var_env'), id') }
 
 ------------ Unfolding  --------------
 tidyUnfolding :: TidyEnv -> Unfolding -> Unfolding -> Unfolding
@@ -234,8 +242,25 @@ two reasons:
       the benefit of that occurrence analysis when we use the rule or
       or inline the function.  In particular, it's vital not to lose
       loop-breaker info, else we get an infinite inlining loop
-      
+
 Note that tidyLetBndr puts more IdInfo back.
+
+Note [Preserve evaluatedness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data T = MkT !Bool
+  ....(case v of MkT y ->
+       let z# = case y of
+                  True -> 1#
+                  False -> 2#
+       in ...)
+
+The z# binding is ok becuase the RHS is ok-for-speculation,
+but Lint will complain unless it can *see* that.  So we
+preserve the evaluated-ness on 'y' in tidyBndr.
+
+(Another alterantive would be to tidy unboxed lets into cases,
+but that seems more indirect and surprising.)
 
 
 \begin{code}
