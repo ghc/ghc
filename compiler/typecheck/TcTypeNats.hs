@@ -932,8 +932,11 @@ solverImproveModel proc viRef imps =
           then varEq x ((x, e) : imps)        more  ys
           else varEq x           imps  (def : more) ys
 
-
-solverNewWork :: SolverProcess -> IORef VarInfo -> CtLoc -> Bool -> IO ExtSolRes
+-- Examine the current state of the solver and compute new work.
+solverNewWork :: SolverProcess -> IORef VarInfo
+              -> CtLoc      -- Source of the new constraints
+              -> Bool       -- Should generate givens?
+              -> IO ExtSolRes
 solverNewWork proc viRef loc withEv =
   do status <- solverCheck proc
      case status of
@@ -948,6 +951,32 @@ solverNewWork proc viRef loc withEv =
                                 return $ mkNonCanonical
                                        $ mkNewFact loc withEv (mkTyVarTy tv, ty)
             return $ ExtSolOk $ mapMaybe toCt imps
+
+-- Check a list of constraints for consistency, and computer derived work.
+-- Assumes that all constraints are given or all are not given.
+solverImprove :: SolverProcess -> IORef VarInfo
+              -> [Ct] -> IO ExtSolRes
+solverImprove proc viRef cts =
+  do let (ours, ourCts) =
+            unzip [ (rep,ct) | ct <- cts, Just rep <- [ knownCt ct ] ]
+     case ourCts of
+       [] -> return (ExtSolOk [])
+       oneOfOurs : _ ->
+         do solverPush proc viRef
+            mapM_ assume ours
+            let loc = ctLoc oneOfOurs -- XXX: What is a better location?
+
+            -- XXX: When we compute improvements,
+            -- we should probably limit ourselves to compute improvements
+            -- only for the variables in the current scope.
+            res <- solverNewWork proc viRef loc (isGivenCt oneOfOurs)
+            solverPop proc viRef
+            return res
+  where
+  assume (vars,expr) =
+     do mapM_ (solverDeclare proc viRef) (eltsUFM vars)
+        solverAssume proc expr
+
 
 
 smtTy :: Ty -> SExpr
