@@ -194,7 +194,7 @@ instance Outputable SimplCont where
   ppr (StrictBind b _ _ _ cont)      = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
   ppr (StrictArg ai _ cont)          = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
   ppr (Select dup bndr alts se cont) = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$
-                                         (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont
+                                       ifPprDebug (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont
   ppr (CoerceIt co cont)             = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
   ppr (TickIt t cont)                = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
 
