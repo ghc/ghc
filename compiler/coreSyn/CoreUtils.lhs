@@ -1222,7 +1222,7 @@ dataConInstPat :: [FastString]          -- A long enough list of FSs to use for 
                -> [Unique]              -- An equally long list of uniques, at least one for each binder
                -> DataCon
                -> [Type]                -- Types to instantiate the universally quantified tyvars
-               -> ([TyVar], [Id])          -- Return instantiated variables
+               -> ([TyVar], [Id])       -- Return instantiated variables
 -- dataConInstPat arg_fun fss us con inst_tys returns a triple
 -- (ex_tvs, arg_ids),
 --
@@ -1250,14 +1250,14 @@ dataConInstPat :: [FastString]          -- A long enough list of FSs to use for 
 --
 --  where the double-primed variables are created with the FastStrings and
 --  Uniques given as fss and us
-dataConInstPat fss uniqs con inst_tys 
+dataConInstPat fss uniqs con inst_tys
   = ASSERT( univ_tvs `equalLength` inst_tys )
     (ex_bndrs, arg_ids)
-  where 
+  where
     univ_tvs = dataConUnivTyVars con
     ex_tvs   = dataConExTyVars con
     arg_tys  = dataConRepArgTys con
-
+    arg_strs = dataConRepStrictness con  -- 1-1 with arg_tys
     n_ex = length ex_tvs
 
       -- split the Uniques and FastStrings
@@ -1268,7 +1268,7 @@ dataConInstPat fss uniqs con inst_tys
     univ_subst = zipOpenTvSubst univ_tvs inst_tys
 
       -- Make existential type variables, applyingn and extending the substitution
-    (full_subst, ex_bndrs) = mapAccumL mk_ex_var univ_subst 
+    (full_subst, ex_bndrs) = mapAccumL mk_ex_var univ_subst
                                        (zip3 ex_tvs ex_fss ex_uniqs)
 
     mk_ex_var :: TvSubst -> (TyVar, FastString, Unique) -> (TvSubst, TyVar)
@@ -1280,10 +1280,29 @@ dataConInstPat fss uniqs con inst_tys
         kind     = Type.substTy subst (tyVarKind tv)
 
       -- Make value vars, instantiating types
-    arg_ids = zipWith3 mk_id_var id_uniqs id_fss arg_tys
-    mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq 
-                                       (Type.substTy full_subst ty) noSrcSpan
+    arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
+    mk_id_var uniq fs ty str
+      = mkLocalIdWithInfo name (Type.substTy full_subst ty) info
+      where
+        name = mkInternalName uniq (mkVarOccFS fs) noSrcSpan
+        info | isMarkedStrict str = vanillaIdInfo `setUnfoldingInfo` evaldUnfolding
+             | otherwise          = vanillaIdInfo
+             -- See Note [Mark evaluated arguments]
 \end{code}
+
+Note [Mark evaluated arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When pattern matching on a constructor with strict fields, the binder
+can have an 'evaldUnfolding'.  Moreover, it *should* have one, so that
+when loading an interface file unfolding like:
+  data T = MkT !Int
+  f x = case x of { MkT y -> let v::Int# = case y of I# n -> n+1
+                             in ... }
+we don't want Lint to complain.  The 'y' is evaluated, so the
+case in the RHS of the binding for 'v' is fine.  But only if we
+*know* that 'y' is evaluated.
+
+c.f. add_evals in Simplify.simplAlt
 
 %************************************************************************
 %*                                                                      *
