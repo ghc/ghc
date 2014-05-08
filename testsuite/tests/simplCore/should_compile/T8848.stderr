@@ -14,4 +14,6 @@ Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
 Rule fired: Class op <*>
-Rule fired: SPEC T8848.$fFunctorShape ['T8848.Z]
+Rule fired: SPEC $cfmap @ 'T8848.Z
+Rule fired: SPEC $c<$ @ 'T8848.Z
+Rule fired: SPEC T8848.$fFunctorShape @ 'T8848.Z

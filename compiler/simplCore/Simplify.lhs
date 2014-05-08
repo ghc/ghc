@@ -744,19 +744,19 @@ simplUnfolding env top_lvl id new_rhs unf
               ; args' <- mapM (simplExpr env') args
               ; return (mkDFunUnfolding bndrs' con args') }
 
-      CoreUnfolding { uf_tmpl = expr, uf_arity = arity
-                    , uf_src = src, uf_guidance = guide }
+      CoreUnfolding { uf_tmpl = expr, uf_src = src, uf_guidance = guide }
         | isStableSource src
         -> do { expr' <- simplExpr rule_env expr
               ; case guide of
-                  UnfWhen sat_ok _    -- Happens for INLINE things
-                     -> let guide' = UnfWhen sat_ok (inlineBoringOk expr')
+                  UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok }  -- Happens for INLINE things
+                     -> let guide' = UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok
+                                             , ug_boring_ok = inlineBoringOk expr' }
                         -- Refresh the boring-ok flag, in case expr'
                         -- has got small. This happens, notably in the inlinings
                         -- for dfuns for single-method classes; see
                         -- Note [Single-method classes] in TcInstDcls.
                         -- A test case is Trac #4138
-                        in return (mkCoreUnfolding src is_top_lvl expr' arity guide')
+                        in return (mkCoreUnfolding src is_top_lvl expr' guide')
                             -- See Note [Top-level flag on inline rules] in CoreUnfold
 
                   _other              -- Happens for INLINABLE things

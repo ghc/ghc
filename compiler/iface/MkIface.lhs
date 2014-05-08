@@ -1881,14 +1881,16 @@ toIfaceIdInfo id_info
 
 --------------------------
 toIfUnfolding :: Bool -> Unfolding -> Maybe IfaceInfoItem
-toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity
-                                , uf_src = src, uf_guidance = guidance })
+toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs
+                                , uf_src = src
+                                , uf_guidance = guidance })
   = Just $ HsUnfold lb $
     case src of
         InlineStable
           -> case guidance of
-               UnfWhen unsat_ok boring_ok -> IfInlineRule arity unsat_ok boring_ok if_rhs
-               _other                     -> IfCoreUnfold True if_rhs
+               UnfWhen {ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok =  boring_ok }
+                      -> IfInlineRule arity unsat_ok boring_ok if_rhs
+               _other -> IfCoreUnfold True if_rhs
         InlineCompulsory -> IfCompulsory if_rhs
         InlineRhs        -> IfCoreUnfold False if_rhs
         -- Yes, even if guidance is UnfNever, expose the unfolding

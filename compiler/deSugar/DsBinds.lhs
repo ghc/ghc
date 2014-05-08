@@ -463,8 +463,11 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
            Right (rule_bndrs, _fn, args) -> do
 
        { dflags <- getDynFlags
-       ; let spec_unf = specUnfolding bndrs args (realIdUnfolding poly_id)
-             spec_id  = mkLocalId spec_name spec_ty 
+       ; let fn_unf    = realIdUnfolding poly_id
+             unf_fvs   = stableUnfoldingVars fn_unf `orElse` emptyVarSet
+             in_scope  = mkInScopeSet (unf_fvs `unionVarSet` exprsFreeVars args)
+             spec_unf  = specUnfolding dflags (mkEmptySubst in_scope) bndrs args fn_unf
+             spec_id   = mkLocalId spec_name spec_ty 
          	            `setInlinePragma` inl_prag
          	 	    `setIdUnfolding`  spec_unf
              rule =  mkRule False {- Not auto -} is_local_id
@@ -474,11 +477,14 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        			(mkVarApps (Var spec_id) bndrs)
 
        ; spec_rhs <- dsHsWrapper spec_co poly_rhs
-       ; let spec_pair = makeCorePair dflags spec_id False (dictArity bndrs) spec_rhs
 
        ; when (isInlinePragma id_inl && wopt Opt_WarnPointlessPragmas dflags)
               (warnDs (specOnInline poly_name))
-       ; return (Just (unitOL spec_pair, rule))
+
+       ; return (Just (unitOL (spec_id, spec_rhs), rule))
+            -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
+            --     makeCorePair overwrites the unfolding, which we have
+            --     just created using specUnfolding
        } } }
   where
     is_local_id = isJust mb_poly_rhs
@@ -514,16 +520,6 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
     rule_act | no_act_spec = inlinePragmaActivation id_inl   -- Inherit
              | otherwise   = spec_prag_act                   -- Specified by user
 
-
-specUnfolding :: [Var] -> [CoreExpr] -> Unfolding -> Unfolding
-specUnfolding new_bndrs new_args df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
-  = ASSERT2( equalLength new_args bndrs, ppr df $$ ppr new_args $$ ppr new_bndrs )
-    df { df_bndrs = new_bndrs, df_args = map (substExpr (text "specUnfolding") subst) args }
-  where
-    subst = mkOpenSubst (mkInScopeSet fvs) (bndrs `zip` new_args)
-    fvs = (exprsFreeVars args `delVarSetList` bndrs) `extendVarSetList` new_bndrs
-
-specUnfolding _ _ _ = noUnfolding
 
 specOnInline :: Name -> MsgDoc
 specOnInline f = ptext (sLit "SPECIALISE pragma on INLINE function probably won't fire:") 

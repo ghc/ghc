@@ -202,6 +202,6 @@ test('T8832',
      run_command,
      ['$MAKE -s --no-print-directory T8832 T8832_WORDSIZE_OPTS=' +
       ('-DT8832_WORDSIZE_64' if wordsize(64) else '')])
-test('T8848', only_ways(['optasm']), compile, ['-ddump-rule-firings'])
+test('T8848', only_ways(['optasm']), compile, ['-ddump-rule-firings -dsuppress-uniques'])
 test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T8331', only_ways(['optasm']), compile, ['-ddump-rules'])

@@ -1072,8 +1072,6 @@ specCalls env rules_for_me calls_for_me fn rhs
         -- Figure out whether the function has an INLINE pragma
         -- See Note [Inline specialisations]
 
-    spec_arity = unfoldingArity fn_unf - n_dicts  -- Arity of the *specialised* inline rule
-
     (rhs_tyvars, rhs_ids, rhs_body) = collectTyAndValBinders rhs
 
     rhs_dict_ids = take n_dicts rhs_ids
@@ -1123,22 +1121,24 @@ specCalls env rules_for_me calls_for_me fn rhs
                 -- spec_tyvars = [a,c]
                 -- ty_args     = [t1,b,t3]
                 spec_tv_binds = [(tv,ty) | (tv, Just ty) <- rhs_tyvars `zip` call_ts]
-                spec_ty_args  = map snd spec_tv_binds
                 env1          = extendTvSubstList env spec_tv_binds
                 (rhs_env, poly_tyvars) = substBndrs env1
                                             [tv | (tv, Nothing) <- rhs_tyvars `zip` call_ts]
 
-           ; (rhs_env2, inst_dict_ids, dx_binds) 
-                  <- bindAuxiliaryDicts rhs_env (zipEqual "bindAux" rhs_dict_ids call_ds)
-           ; let ty_args   = mk_ty_args call_ts poly_tyvars
-                 inst_args = ty_args ++ map Var inst_dict_ids
+             -- Clone rhs_dicts, including instantiating their types
+           ; inst_dict_ids <- mapM (newDictBndr rhs_env) rhs_dict_ids
+           ; let (rhs_env2, dx_binds, spec_dict_args)
+                            = bindAuxiliaryDicts rhs_env rhs_dict_ids call_ds inst_dict_ids
+                 ty_args    = mk_ty_args call_ts poly_tyvars
+                 rule_args  = ty_args ++ map Var inst_dict_ids
+                 rule_bndrs = poly_tyvars ++ inst_dict_ids
 
            ; dflags <- getDynFlags
-           ; if already_covered dflags inst_args then
+           ; if already_covered dflags rule_args then
                 return Nothing
              else do
            {    -- Figure out the type of the specialised function
-             let body_ty = applyTypeToArgs rhs fn_type inst_args
+             let body_ty = applyTypeToArgs rhs fn_type rule_args
                  (lam_args, app_args)           -- Add a dummy argument if body_ty is unlifted
                    | isUnLiftedType body_ty     -- C.f. WwLib.mkWorkerArgs
                    = (poly_tyvars ++ [voidArgId], poly_tyvars ++ [voidPrimId])
@@ -1150,13 +1150,13 @@ specCalls env rules_for_me calls_for_me fn rhs
            ; let
                 -- The rule to put in the function's specialisation is:
                 --      forall b, d1',d2'.  f t1 b t3 d1' d2' = f1 b
-                rule_name = mkFastString ("SPEC " ++ showSDocDump dflags (ppr fn <+> ppr spec_ty_args))
+                rule_name = mkFastString ("SPEC " ++ showSDocDump dflags (ppr fn <+> hsep (map ppr_call_key_ty call_ts)))
                 spec_env_rule = mkRule True {- Auto generated -} is_local
                                   rule_name
                                   inl_act       -- Note [Auto-specialisation and RULES]
                                   (idName fn)
-                                  (poly_tyvars ++ inst_dict_ids)
-                                  inst_args
+                                  rule_bndrs
+                                  rule_args
                                   (mkVarApps (Var spec_f) app_args)
 
                 -- Add the { d1' = dx1; d2' = dx2 } usage stuff
@@ -1165,20 +1165,18 @@ specCalls env rules_for_me calls_for_me fn rhs
                 --------------------------------------
                 -- Add a suitable unfolding if the spec_inl_prag says so
                 -- See Note [Inline specialisations]
-                spec_inl_prag
+                (spec_inl_prag, spec_unf)
                   | not is_local && isStrongLoopBreaker (idOccInfo fn)
-                  = neverInlinePragma   -- See Note [Specialising imported functions] in OccurAnal
-                  | otherwise
-                  = case inl_prag of
-                       InlinePragma { inl_inline = Inlinable }
-                          -> inl_prag { inl_inline = EmptyInlineSpec }
-                       _  -> inl_prag
+                  = (neverInlinePragma, noUnfolding)
+                        -- See Note [Specialising imported functions] in OccurAnal
 
-                spec_unf
-                  = case inlinePragmaSpec spec_inl_prag of
-                      Inline    -> mkInlineUnfolding (Just spec_arity) spec_rhs
-                      Inlinable -> mkInlinableUnfolding dflags spec_rhs
-                      _         -> NoUnfolding
+                  | InlinePragma { inl_inline = Inlinable } <- inl_prag
+                  = (inl_prag { inl_inline = EmptyInlineSpec }, noUnfolding)
+
+                  | otherwise
+                  = (inl_prag, specUnfolding dflags (se_subst env)
+                                             poly_tyvars (ty_args ++ spec_dict_args)
+                                             fn_unf)
 
                 --------------------------------------
                 -- Adding arity information just propagates it a bit faster
@@ -1193,34 +1191,35 @@ specCalls env rules_for_me calls_for_me fn rhs
 
 bindAuxiliaryDicts
         :: SpecEnv
-        -> [(DictId,CoreExpr)]   -- (orig_dict, dx)
-        -> SpecM (SpecEnv,             -- Substitute for all orig_dicts
-                  [DictId],            -- Cloned dict Ids
-                  [CoreBind])          -- Auxiliary bindings
+        -> [DictId] -> [CoreExpr]   -- Original dict bndrs, and the witnessing expressions
+        -> [DictId]                 -- A cloned dict-id for each dict arg
+        -> (SpecEnv,                -- Substitute for all orig_dicts
+            [CoreBind],             -- Auxiliary dict bindings
+            [CoreExpr])             -- Witnessing expressions (all trivial)
 -- Bind any dictionary arguments to fresh names, to preserve sharing
-bindAuxiliaryDicts env@(SE { se_subst = subst, se_interesting = interesting }) 
-                   dict_binds 
-  = do { inst_dict_ids <- mapM (newDictBndr env . fst) dict_binds
-                          -- Clone rhs_dicts, including instantiating their types
-       ; let triples           = inst_dict_ids `zip` dict_binds
-             (subst', binds)   = go subst [] triples
-             interesting_dicts = mkVarSet [ dx_id | (dx_id, (_, dx)) <- triples
-                                          , interestingDict env dx ]
-                  -- See Note [Make the new dictionaries interesting]
-             env' = env { se_subst = subst'
-                        , se_interesting = interesting `unionVarSet` interesting_dicts }
-
-       ; return (env', inst_dict_ids, binds) }
+bindAuxiliaryDicts env@(SE { se_subst = subst, se_interesting = interesting })
+                   orig_dict_ids call_ds inst_dict_ids
+  = (env', dx_binds, spec_dict_args)
   where
-    go subst binds []    = (subst, binds)
-    go subst binds ((dx_id, (d, dx)) : triples)
-      | exprIsTrivial dx = go (CoreSubst.extendIdSubst subst d dx) binds triples
-      | otherwise        = go (CoreSubst.extendIdSubst subst d (Var dx_id))
-                              (NonRec dx_id dx : binds) triples
+    (dx_binds, spec_dict_args) = go call_ds inst_dict_ids
+    env' = env { se_subst = CoreSubst.extendIdSubstList subst (orig_dict_ids `zip` spec_dict_args)
+               , se_interesting = interesting `unionVarSet` interesting_dicts }
+
+    interesting_dicts = mkVarSet [ dx_id | NonRec dx_id dx <- dx_binds
+                                 , interestingDict env dx ]
+                  -- See Note [Make the new dictionaries interesting]
+
+    go [] _  = ([], [])
+    go (dx:dxs) (dx_id:dx_ids)
+      | exprIsTrivial dx = (dx_binds, dx:args)
+      | otherwise        = (NonRec dx_id dx : dx_binds, Var dx_id : args)
+      where
+        (dx_binds, args) = go dxs dx_ids
              -- In the first case extend the substitution but not bindings;
              -- in the latter extend the bindings but not the substitution.
              -- For the former, note that we bind the *original* dict in the substitution,
              -- overriding any d->dx_id binding put there by substBndrs
+    go _ _ = pprPanic "bindAuxiliaryDicts" (ppr orig_dict_ids $$ ppr call_ds $$ ppr inst_dict_ids)
 \end{code}
 
 Note [Make the new dictionaries interesting]
@@ -1549,6 +1548,16 @@ type CallInfo = (CallKey, ([DictExpr], VarSet))
 instance Outputable CallInfoSet where
   ppr (CIS fn map) = hang (ptext (sLit "CIS") <+> ppr fn)
                         2 (ppr map)
+
+{-
+pprCallInfo :: Id -> CallInfo -> SDoc
+pprCallInfo fn (CallKey mb_tys, (dxs, _))
+  = hang (ppr fn) 2 (sep (map ppr_call_key_ty mb_tys ++ map pprParendExpr dxs))
+-}
+
+ppr_call_key_ty :: Maybe Type -> SDoc
+ppr_call_key_ty Nothing   = char '_'
+ppr_call_key_ty (Just ty) = char '@' <+> pprParendType ty
 
 instance Outputable CallKey where
   ppr (CallKey ts) = ppr ts

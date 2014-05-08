@@ -28,9 +28,8 @@ T4908.$wf
  Arity=2,
  Caf=NoCafRefs,
  Str=DmdType <S,1*U><L,1*U(A,U(U))>,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=2, Value=True,
-         ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [30 20] 101 20}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 20] 101 20}]
 T4908.$wf =
   \ (ww :: GHC.Prim.Int#) (w :: (GHC.Types.Int, GHC.Types.Int)) ->
     case ww of ds {
@@ -53,9 +52,9 @@ T4908.f [InlPrag=INLINE[0]]
  Arity=2,
  Caf=NoCafRefs,
  Str=DmdType <S(S),1*U(1*U)><L,1*U(A,U(U))>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Arity=2, Value=True,
-         ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: GHC.Types.Int)
                  (w1 [Occ=Once] :: (GHC.Types.Int, GHC.Types.Int)) ->
                  case w of _ [Occ=Dead] { GHC.Types.I# ww1 [Occ=Once] ->

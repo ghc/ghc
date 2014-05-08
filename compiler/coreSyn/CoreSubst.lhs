@@ -1179,8 +1179,8 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         -- and that is the business of callSiteInline.
         -- In practice, without this test, most of the "hits" were
         -- CPR'd workers getting inlined back into their wrappers,
-        | Just rhs <- expandUnfolding_maybe unfolding
-        , unfoldingArity unfolding == 0
+        | idArity fun == 0
+        , Just rhs <- expandUnfolding_maybe unfolding
         , let in_scope' = extendInScopeSetSet in_scope (exprFreeVars rhs)
         = go (Left in_scope') rhs cont
         where
@@ -1327,10 +1327,9 @@ exprIsLambda_maybe (in_scope_set, id_unf) (Cast casted_e co)
 -- Another attempt: See if we find a partial unfolding
 exprIsLambda_maybe (in_scope_set, id_unf) e
     | (Var f, as) <- collectArgs e
-    , let unfolding = id_unf f
-    , Just rhs <- expandUnfolding_maybe unfolding
+    , idArity f > length (filter isValArg as)
     -- Make sure there is hope to get a lambda
-    , unfoldingArity unfolding > length (filter isValArg as)
+    , Just rhs <- expandUnfolding_maybe (id_unf f)
     -- Optimize, for beta-reduction
     , let e' =  simpleOptExprWith (mkEmptySubst in_scope_set) (rhs `mkApps` as)
     -- Recurse, because of possible casts

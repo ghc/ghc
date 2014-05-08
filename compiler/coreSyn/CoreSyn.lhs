@@ -55,7 +55,7 @@ module CoreSyn (
 	
 	-- ** Predicates and deconstruction on 'Unfolding'
 	unfoldingTemplate, setUnfoldingTemplate, expandUnfolding_maybe,
-	maybeUnfoldingTemplate, otherCons, unfoldingArity,
+	maybeUnfoldingTemplate, otherCons, 
 	isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
         isStableUnfolding, isStableCoreUnfolding_maybe,
@@ -686,7 +686,6 @@ data Unfolding
 	uf_tmpl       :: CoreExpr,	  -- Template; occurrence info is correct
 	uf_src        :: UnfoldingSource, -- Where the unfolding came from
 	uf_is_top     :: Bool,		-- True <=> top level binding
-	uf_arity      :: Arity,		-- Number of value arguments expected
 	uf_is_value   :: Bool,		-- exprIsHNF template (cached); it is ok to discard 
 		      			--	a `seq` on this variable
         uf_is_conlike :: Bool,          -- True <=> applicn of constructor or CONLIKE function
@@ -752,6 +751,8 @@ data UnfoldingGuidance
     		-- Used (a) for small *and* cheap unfoldings
  		--      (b) for INLINE functions 
                 -- See Note [INLINE for small functions] in CoreUnfold
+      ug_arity    :: Arity,		-- Number of value arguments expected
+
       ug_unsat_ok  :: Bool,	-- True <=> ok to inline even if unsaturated
       ug_boring_ok :: Bool      -- True <=> ok to inline even if the context is boring
       		-- So True,True means "always"
@@ -846,8 +847,8 @@ seqUnfolding :: Unfolding -> ()
 seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top, 
 		uf_is_value = b1, uf_is_work_free = b2, 
 	   	uf_expandable = b3, uf_is_conlike = b4,
-                uf_arity = a, uf_guidance = g})
-  = seqExpr e `seq` top `seq` b1 `seq` a `seq` b2 `seq` b3 `seq` b4 `seq` seqGuidance g
+                uf_guidance = g})
+  = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` b3 `seq` b4 `seq` seqGuidance g
 
 seqUnfolding _ = ()
 
@@ -935,10 +936,6 @@ isStableUnfolding :: Unfolding -> Bool
 isStableUnfolding (CoreUnfolding { uf_src = src }) = isStableSource src
 isStableUnfolding (DFunUnfolding {})		   = True
 isStableUnfolding _                                = False
-
-unfoldingArity :: Unfolding -> Arity
-unfoldingArity (CoreUnfolding { uf_arity = arity }) = arity
-unfoldingArity _	      		   	    = panic "unfoldingArity"
 
 isClosedUnfolding :: Unfolding -> Bool		-- No free variables
 isClosedUnfolding (CoreUnfolding {}) = False

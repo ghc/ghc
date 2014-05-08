@@ -31,6 +31,7 @@ module CoreUnfold (
 	mkTopUnfolding, mkSimpleUnfolding,
 	mkInlineUnfolding, mkInlinableUnfolding, mkWwInlineRule,
 	mkCompulsoryUnfolding, mkDFunUnfolding,
+        specUnfolding,
 
 	interestingArg, ArgSummary(..),
 
@@ -108,27 +109,31 @@ mkDFunUnfolding bndrs con ops
 mkWwInlineRule :: CoreExpr -> Arity -> Unfolding
 mkWwInlineRule expr arity
   = mkCoreUnfolding InlineStable True
-                   (simpleOptExpr expr) arity
-                   (UnfWhen unSaturatedOk boringCxtNotOk)
+                   (simpleOptExpr expr)
+                   (UnfWhen { ug_arity = arity, ug_unsat_ok = unSaturatedOk
+                            , ug_boring_ok = boringCxtNotOk })
 
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding expr	   -- Used for things that absolutely must be unfolded
   = mkCoreUnfolding InlineCompulsory True
-                    (simpleOptExpr expr) 0    -- Arity of unfolding doesn't matter
-                    (UnfWhen unSaturatedOk boringCxtOk)
+                    (simpleOptExpr expr)
+                    (UnfWhen { ug_arity = 0    -- Arity of unfolding doesn't matter
+                             , ug_unsat_ok = unSaturatedOk, ug_boring_ok = boringCxtOk })
 
 mkInlineUnfolding :: Maybe Arity -> CoreExpr -> Unfolding
-mkInlineUnfolding mb_arity expr 
+mkInlineUnfolding mb_arity expr
   = mkCoreUnfolding InlineStable
     		    True 	 -- Note [Top-level flag on inline rules]
-                    expr' arity 
-		    (UnfWhen unsat_ok boring_ok)
+                    expr' guide
   where
     expr' = simpleOptExpr expr
-    (unsat_ok, arity) = case mb_arity of
-                          Nothing -> (unSaturatedOk, manifestArity expr')
-                          Just ar -> (needSaturated, ar)
-              
+    guide = case mb_arity of
+              Nothing    -> UnfWhen { ug_arity = manifestArity expr'
+                                    , ug_unsat_ok = unSaturatedOk
+                                    , ug_boring_ok = boring_ok }
+              Just arity -> UnfWhen { ug_arity = arity
+                                    , ug_unsat_ok = needSaturated
+                                    , ug_boring_ok = boring_ok }
     boring_ok = inlineBoringOk expr'
 
 mkInlinableUnfolding :: DynFlags -> CoreExpr -> Unfolding
@@ -137,19 +142,81 @@ mkInlinableUnfolding dflags expr
   where
     expr' = simpleOptExpr expr
     is_bot = isJust (exprBotStrictness_maybe expr')
+
+specUnfolding :: DynFlags -> Subst -> [Var] -> [CoreExpr] -> Unfolding -> Unfolding
+-- See Note [Specialising unfoldings]
+specUnfolding _ subst new_bndrs spec_args
+              df@(DFunUnfolding { df_bndrs = bndrs, df_con = con , df_args = args })
+  = ASSERT2( length bndrs >= length spec_args, ppr df $$ ppr spec_args $$ ppr new_bndrs )
+    mkDFunUnfolding (new_bndrs ++ extra_bndrs) con
+                    (map (substExpr spec_doc subst2) args)
+  where
+    subst1 = extendSubstList subst (bndrs `zip` spec_args)
+    (subst2, extra_bndrs) = substBndrs subst1 (dropList spec_args bndrs)
+
+specUnfolding _dflags subst new_bndrs spec_args
+              (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
+                             , uf_is_top = top_lvl
+                             , uf_guidance = old_guidance })
+ | isStableSource src  -- See Note [Specialising unfoldings]
+ , UnfWhen { ug_arity = old_arity
+           , ug_unsat_ok = unsat_ok
+           , ug_boring_ok = boring_ok } <- old_guidance
+ = let guidance = UnfWhen { ug_arity = old_arity - count isValArg spec_args
+                                     + count isId new_bndrs
+                          , ug_unsat_ok = unsat_ok
+                          , ug_boring_ok = boring_ok }
+       new_tmpl = simpleOptExpr $ mkLams new_bndrs $
+                  mkApps (substExpr spec_doc subst tmpl) spec_args
+                   -- The beta-redexes created here will be simplified
+                   -- away by simplOptExpr in mkUnfolding
+
+   in mkCoreUnfolding src top_lvl new_tmpl guidance
+
+specUnfolding _ _ _ _ _ = noUnfolding
+
+spec_doc :: SDoc
+spec_doc = ptext (sLit "specUnfolding")
 \end{code}
 
-Internal functions
+Note [Specialising unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we specialise a function for some given type-class arguments, we use
+specUnfolding to specialise its unfolding.  Some important points:
+
+* If the original function has a DFunUnfolding, the specialised one
+  must do so too!  Otherwise we lose the magic rules that make it
+  interact with ClassOps
+
+* There is a bit of hack for INLINABLE functions:
+     f :: Ord a => ....
+     f = <big-rhs>
+     {- INLINEABLE f #-}
+  Now if we specialise f, should the specialised version still have
+  an INLINEABLE pragma?  If it does, we'll capture a specialised copy
+  of <big-rhs> as its unfolding, and that probaby won't inline.  But
+  if we don't, the specialised version of <big-rhs> might be small
+  enough to inline at a call site. This happens with Control.Monad.liftM3,
+  and can cause a lot more allocation as a result (nofib n-body shows this).
+
+  Moreover, keeping the INLINEABLE thing isn't much help, because
+  the specialised function (probaby) isn't overloaded any more.
+
+  Conclusion: drop the INLINEALE pragma.  In practice what this means is:
+     if a stable unfolding has UnfoldingGuidance of UnfWhen,
+        we keep it (so the specialised thing too will always inline)
+     if a stable unfolding has UnfoldingGuidance of UnfIfGoodArgs
+        (which arises from INLINEABLE), we discard it
+
 
 \begin{code}
 mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
-                -> Arity -> UnfoldingGuidance -> Unfolding
+                -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
-mkCoreUnfolding src top_lvl expr arity guidance 
+mkCoreUnfolding src top_lvl expr guidance
   = CoreUnfolding { uf_tmpl   	    = occurAnalyseExpr expr,
                       -- See Note [Occurrrence analysis of unfoldings]
     		    uf_src          = src,
-    		    uf_arity        = arity,
 		    uf_is_top 	    = top_lvl,
 		    uf_is_value     = exprIsHNF        expr,
                     uf_is_conlike   = exprIsConLike    expr,
@@ -169,7 +236,6 @@ mkUnfolding dflags src top_lvl is_bottoming expr
   = CoreUnfolding { uf_tmpl   	    = occurAnalyseExpr expr,
                       -- See Note [Occurrrence analysis of unfoldings]
     		    uf_src          = src,
-    		    uf_arity        = arity,
 		    uf_is_top 	    = top_lvl,
 		    uf_is_value     = exprIsHNF        expr,
                     uf_is_conlike   = exprIsConLike    expr,
@@ -177,7 +243,7 @@ mkUnfolding dflags src top_lvl is_bottoming expr
 		    uf_is_work_free = exprIsWorkFree   expr,
 		    uf_guidance     = guidance }
   where
-    (arity, guidance) = calcUnfoldingGuidance dflags expr
+    guidance = calcUnfoldingGuidance dflags expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
 	-- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 \end{code}
@@ -256,39 +322,38 @@ inlineBoringOk e
 calcUnfoldingGuidance
         :: DynFlags
         -> CoreExpr    -- Expression to look at
-        -> (Arity, UnfoldingGuidance)
+        -> UnfoldingGuidance
 calcUnfoldingGuidance dflags expr
-  = case collectBinders expr of { (bndrs, body) ->
-    let
-        bOMB_OUT_SIZE = ufCreationThreshold dflags
-               -- Bomb out if size gets bigger than this
-        val_bndrs   = filter isId bndrs
-	n_val_bndrs = length val_bndrs
+  = case sizeExpr dflags (iUnbox bOMB_OUT_SIZE) val_bndrs body of
+      TooBig -> UnfNever
+      SizeIs size cased_bndrs scrut_discount
+        | uncondInline expr n_val_bndrs (iBox size)
+        -> UnfWhen { ug_unsat_ok = unSaturatedOk
+                   , ug_boring_ok =  boringCxtOk
+                   , ug_arity = n_val_bndrs }   -- Note [INLINE for small functions]
+        | otherwise
+        -> UnfIfGoodArgs { ug_args  = map (mk_discount cased_bndrs) val_bndrs
+                         , ug_size  = iBox size
+        	  	 , ug_res   = iBox scrut_discount }
 
-    	guidance 
-          = case sizeExpr dflags (iUnbox bOMB_OUT_SIZE) val_bndrs body of
-      	      TooBig -> UnfNever
-      	      SizeIs size cased_bndrs scrut_discount
-      	        | uncondInline expr n_val_bndrs (iBox size)
-      	        -> UnfWhen unSaturatedOk boringCxtOk   -- Note [INLINE for small functions]
-	        | otherwise
-      	        -> UnfIfGoodArgs { ug_args  = map (discount cased_bndrs) val_bndrs
-      	                         , ug_size  = iBox size
-      	        	  	 , ug_res   = iBox scrut_discount }
+  where
+    (bndrs, body) = collectBinders expr
+    bOMB_OUT_SIZE = ufCreationThreshold dflags
+           -- Bomb out if size gets bigger than this
+    val_bndrs   = filter isId bndrs
+    n_val_bndrs = length val_bndrs
 
-        discount :: Bag (Id,Int) -> Id -> Int
-        discount cbs bndr = foldlBag combine 0 cbs
+    mk_discount :: Bag (Id,Int) -> Id -> Int
+    mk_discount cbs bndr = foldlBag combine 0 cbs
            where
-             combine acc (bndr', disc) 
+             combine acc (bndr', disc)
                | bndr == bndr' = acc `plus_disc` disc
                | otherwise     = acc
-   
+
              plus_disc :: Int -> Int -> Int
              plus_disc | isFunTy (idType bndr) = max
                        | otherwise             = (+)
              -- See Note [Function and non-function discounts]
-    in
-    (n_val_bndrs, guidance) }
 \end{code}
 
 Note [Computing the size of an expression]
@@ -365,7 +430,7 @@ Things to note:
     saturated will give a lambda instead of a PAP, and will be more
     efficient at runtime.
 
-(3) However, when the function's arity > 0, we do insist that it 
+(3) However, when the function's arity > 0, we do insist that it
     has at least one value argument at the call site.  (This check is
     made in the UnfWhen case of callSiteInline.) Otherwise we find this:
          f = /\a \x:a. x
@@ -381,7 +446,7 @@ Things to note:
     single instruction, but we do not want to unconditionally replace
     every occurrence of x with (y +# z).  So we only do the
     unconditional-inline thing for *trivial* expressions.
-  
+
     NB: you might think that PostInlineUnconditionally would do this
     but it doesn't fire for top-level things; see SimplUtils
     Note [Top level and postInlineUnconditionally]
@@ -847,13 +912,13 @@ smallEnoughToInline _ _
 ----------------
 certainlyWillInline :: DynFlags -> Unfolding -> Bool
   -- Sees if the unfolding is pretty certain to inline	
-certainlyWillInline dflags (CoreUnfolding { uf_arity = n_vals, uf_guidance = guidance })
+certainlyWillInline dflags (CoreUnfolding { uf_guidance = guidance })
   = case guidance of
       UnfNever      -> False
       UnfWhen {}    -> True
-      UnfIfGoodArgs { ug_size = size} 
-                    -> n_vals > 0     -- See Note [certainlyWillInline: be caseful of thunks]
-                    && size - (10 * (n_vals +1)) <= ufUseThreshold dflags
+      UnfIfGoodArgs { ug_size = size, ug_args = args }
+                    -> not (null args)   -- See Note [certainlyWillInline: be caseful of thunks]
+                    && size - (10 * (length args +1)) <= ufUseThreshold dflags
 
 certainlyWillInline _ _
   = False
@@ -932,92 +997,101 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
       -- Things with an INLINE pragma may have an unfolding *and* 
       -- be a loop breaker  (maybe the knot is not yet untied)
 	CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top 
-		      , uf_is_work_free = is_wf, uf_arity = uf_arity
+		      , uf_is_work_free = is_wf
                       , uf_guidance = guidance, uf_expandable = is_exp }
           | active_unfolding -> tryUnfolding dflags id lone_variable 
                                     arg_infos cont_info unf_template is_top 
-                                    is_wf is_exp uf_arity guidance
-          | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
-          -> pprTrace "Inactive unfolding:" (ppr id) Nothing
-          | otherwise -> Nothing
+                                    is_wf is_exp guidance
+          | otherwise -> traceInline dflags "Inactive unfolding:" (ppr id) Nothing
 	NoUnfolding 	 -> Nothing 
 	OtherCon {} 	 -> Nothing 
 	DFunUnfolding {} -> Nothing 	-- Never unfold a DFun
 
-tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
-             -> CoreExpr -> Bool -> Bool -> Bool -> Arity -> UnfoldingGuidance
-	     -> Maybe CoreExpr	
-tryUnfolding dflags id lone_variable 
-             arg_infos cont_info unf_template is_top 
-             is_wf is_exp uf_arity guidance
-			-- uf_arity will typically be equal to (idArity id), 
-			-- but may be less for InlineRules
+traceInline :: DynFlags -> String -> SDoc -> a -> a
+traceInline dflags str doc result
  | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
- = pprTrace ("Considering inlining: " ++ showSDocDump dflags (ppr id))
-		 (vcat [text "arg infos" <+> ppr arg_infos,
-			text "uf arity" <+> ppr uf_arity,
-			text "interesting continuation" <+> ppr cont_info,
-			text "some_benefit" <+> ppr some_benefit,
-                        text "is exp:" <+> ppr is_exp,
-                        text "is work-free:" <+> ppr is_wf,
-			text "guidance" <+> ppr guidance,
-			extra_doc,
-			text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
-	         result
-  | otherwise  = result
+ = pprTrace str doc result
+ | otherwise
+ = result
+
+tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
+             -> CoreExpr -> Bool -> Bool -> Bool -> UnfoldingGuidance
+	     -> Maybe CoreExpr
+tryUnfolding dflags id lone_variable
+             arg_infos cont_info unf_template is_top
+             is_wf is_exp guidance
+ = case guidance of
+     UnfNever -> traceInline dflags str (ptext (sLit "UnfNever")) Nothing
+
+     UnfWhen { ug_arity = uf_arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
+        | enough_args && (boring_ok || some_benefit)
+                -- See Note [INLINE for small functions (3)]
+        -> traceInline dflags str (mk_doc some_benefit empty True) (Just unf_template)
+        | otherwise
+        -> traceInline dflags str (mk_doc some_benefit empty False) Nothing
+        where
+          some_benefit = calc_some_benefit uf_arity
+          enough_args = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
+
+     UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
+        | is_wf && some_benefit && small_enough
+        -> traceInline dflags str (mk_doc some_benefit extra_doc True) (Just unf_template)
+        | otherwise
+        -> traceInline dflags str (mk_doc some_benefit extra_doc False) Nothing
+        where
+          some_benefit = calc_some_benefit (length arg_discounts)
+          extra_doc = text "discounted size =" <+> int discounted_size
+          discounted_size = size - discount
+          small_enough = discounted_size <= ufUseThreshold dflags
+          discount = computeDiscount dflags arg_discounts
+                                     res_discount arg_infos cont_info
 
   where
+    mk_doc some_benefit extra_doc yes_or_no
+      = vcat [ text "arg infos" <+> ppr arg_infos
+	     , text "interesting continuation" <+> ppr cont_info
+             , text "some_benefit" <+> ppr some_benefit
+             , text "is exp:" <+> ppr is_exp
+             , text "is work-free:" <+> ppr is_wf
+             , text "guidance" <+> ppr guidance
+             , extra_doc
+             , text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"]
+
+    str = "Considering inlining: " ++ showSDocDump dflags (ppr id)
     n_val_args = length arg_infos
-    saturated  = n_val_args >= uf_arity
-    cont_info' | n_val_args > uf_arity = ValAppCtxt
-               | otherwise             = cont_info
-
-    result | yes_or_no = Just unf_template
-           | otherwise = Nothing
-
-    interesting_args = any nonTriv arg_infos 
-    	-- NB: (any nonTriv arg_infos) looks at the
-    	-- over-saturated args too which is "wrong"; 
-    	-- but if over-saturated we inline anyway.
 
            -- some_benefit is used when the RHS is small enough
            -- and the call has enough (or too many) value
            -- arguments (ie n_val_args >= arity). But there must
            -- be *something* interesting about some argument, or the
            -- result context, to make it worth inlining
-    some_benefit 
+    calc_some_benefit :: Arity -> Bool   -- The Arity is the number of args
+                                         -- expected by the unfolding
+    calc_some_benefit uf_arity
        | not saturated = interesting_args	-- Under-saturated
     	   	      		     	-- Note [Unsaturated applications]
        | otherwise = interesting_args	-- Saturated or over-saturated
                   || interesting_call
+      where
+        saturated      = n_val_args >= uf_arity
+        over_saturated = n_val_args > uf_arity
+        interesting_args = any nonTriv arg_infos
+        	-- NB: (any nonTriv arg_infos) looks at the
+        	-- over-saturated args too which is "wrong";
+        	-- but if over-saturated we inline anyway.
 
-    interesting_call 
-      = case cont_info' of
-          CaseCtxt   -> not (lone_variable && is_wf)  -- Note [Lone variables]
-          ValAppCtxt -> True			      -- Note [Cast then apply]
-          RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold info lazy contexts]
-          DiscArgCtxt -> uf_arity > 0  --
-          RhsCtxt     -> uf_arity > 0  --
-          _           -> not is_top && uf_arity > 0   -- Note [Nested functions]
+        interesting_call
+          | over_saturated
+          = True
+          | otherwise
+          = case cont_info of
+              CaseCtxt   -> not (lone_variable && is_wf)  -- Note [Lone variables]
+              ValAppCtxt -> True			      -- Note [Cast then apply]
+              RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold info lazy contexts]
+              DiscArgCtxt -> uf_arity > 0  --
+              RhsCtxt     -> uf_arity > 0  --
+              _           -> not is_top && uf_arity > 0   -- Note [Nested functions]
                                                       -- Note [Inlining in ArgCtxt]
-
-    (yes_or_no, extra_doc)
-      = case guidance of
-          UnfNever -> (False, empty)
-
-          UnfWhen unsat_ok boring_ok 
-             -> (enough_args && (boring_ok || some_benefit), empty )
-             where      -- See Note [INLINE for small functions (3)]
-               enough_args = saturated || (unsat_ok && n_val_args > 0)
-
-          UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
-      	     -> ( is_wf && some_benefit && small_enough
-                , (text "discounted size =" <+> int discounted_size) )
-    	     where
-    	       discounted_size = size - discount
-    	       small_enough = discounted_size <= ufUseThreshold dflags
-    	       discount = computeDiscount dflags uf_arity arg_discounts 
-    	         		          res_discount arg_infos cont_info'
 \end{code}
 
 Note [Unfold into lazy contexts], Note [RHS of lets]
@@ -1213,37 +1287,42 @@ This kind of thing can occur if you have
 which Roman did.
 
 \begin{code}
-computeDiscount :: DynFlags -> Arity -> [Int] -> Int -> [ArgSummary] -> CallCtxt
+computeDiscount :: DynFlags -> [Int] -> Int -> [ArgSummary] -> CallCtxt
                 -> Int
-computeDiscount dflags uf_arity arg_discounts res_discount arg_infos cont_info
+computeDiscount dflags arg_discounts res_discount arg_infos cont_info
  	-- We multiple the raw discounts (args_discount and result_discount)
 	-- ty opt_UnfoldingKeenessFactor because the former have to do with
 	--  *size* whereas the discounts imply that there's some extra 
 	--  *efficiency* to be gained (e.g. beta reductions, case reductions) 
 	-- by inlining.
 
-  = 10          -- Discount of 1 because the result replaces the call
-		-- so we count 1 for the function itself
+  = 10          -- Discount of 10 because the result replaces the call
+		-- so we count 10 for the function itself
 
-    + 10 * length (take uf_arity arg_infos)
-      	       -- Discount of (un-scaled) 1 for each arg supplied, 
+    + 10 * length actual_arg_discounts
+      	       -- Discount of 10 for each arg supplied,
    	       -- because the result replaces the call
 
     + round (ufKeenessFactor dflags *
-	     fromIntegral (arg_discount + res_discount'))
+	     fromIntegral (total_arg_discount + res_discount'))
   where
-    arg_discount = sum (zipWith mk_arg_discount arg_discounts arg_infos)
+    actual_arg_discounts = zipWith mk_arg_discount arg_discounts arg_infos
+    total_arg_discount   = sum actual_arg_discounts
 
-    mk_arg_discount _ 	     TrivArg    = 0 
+    mk_arg_discount _ 	     TrivArg    = 0
     mk_arg_discount _        NonTrivArg = 10
-    mk_arg_discount discount ValueArg   = discount 
+    mk_arg_discount discount ValueArg   = discount
 
-    res_discount' = case cont_info of
+    res_discount'
+      | LT <- arg_discounts `compareLength` arg_infos
+      = res_discount   -- Over-saturated
+      | otherwise
+      = case cont_info of
 			BoringCtxt  -> 0
 			CaseCtxt    -> res_discount  -- Presumably a constructor
 			ValAppCtxt  -> res_discount  -- Presumably a function
 			_           -> 40 `min` res_discount
-                -- ToDo: this 40 `min` res_dicount doesn't seem right
+                -- ToDo: this 40 `min` res_discount doesn't seem right
                 --   for DiscArgCtxt it shouldn't matter because the function will
                 --    get the arg discount for any non-triv arg
                 --   for RuleArgCtxt we do want to be keener to inline; but not only

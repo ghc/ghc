@@ -421,9 +421,10 @@ showAttributes stuff
 \begin{code}
 instance Outputable UnfoldingGuidance where
     ppr UnfNever  = ptext (sLit "NEVER")
-    ppr (UnfWhen unsat_ok boring_ok)
+    ppr (UnfWhen { ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok })
       = ptext (sLit "ALWAYS_IF") <>
-        parens (ptext (sLit "unsat_ok=") <> ppr unsat_ok <> comma <>
+        parens (ptext (sLit "arity=")     <> int arity    <> comma <>
+                ptext (sLit "unsat_ok=")  <> ppr unsat_ok <> comma <>
                 ptext (sLit "boring_ok=") <> ppr boring_ok)
     ppr (UnfIfGoodArgs { ug_args = cs, ug_size = size, ug_res = discount })
       = hsep [ ptext (sLit "IF_ARGS"),
@@ -446,13 +447,12 @@ instance Outputable Unfolding where
   ppr (CoreUnfolding { uf_src = src
                      , uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf
                      , uf_is_conlike=conlike, uf_is_work_free=wf
-                     , uf_expandable=exp, uf_guidance=g, uf_arity=arity})
+                     , uf_expandable=exp, uf_guidance=g })
         = ptext (sLit "Unf") <> braces (pp_info $$ pp_rhs)
     where
       pp_info = fsep $ punctuate comma
                 [ ptext (sLit "Src=")        <> ppr src
                 , ptext (sLit "TopLvl=")     <> ppr top
-                , ptext (sLit "Arity=")      <> int arity
                 , ptext (sLit "Value=")      <> ppr hnf
                 , ptext (sLit "ConLike=")    <> ppr conlike
                 , ptext (sLit "WorkFree=")   <> ppr wf
