@@ -26,6 +26,7 @@ import VarEnv
 import VarSet
 import Var
 import Id
+import MkId             ( mkDictSelRhs )
 import IdInfo
 import InstEnv
 import FamInstEnv
@@ -566,7 +567,9 @@ getTyConImplicitBinds :: TyCon -> [CoreBind]
 getTyConImplicitBinds tc = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
 
 getClassImplicitBinds :: Class -> [CoreBind]
-getClassImplicitBinds cls = map get_defn (classAllSelIds cls)
+getClassImplicitBinds cls
+  = [ NonRec op (mkDictSelRhs cls val_index)
+    | (op, val_index) <- classAllSelIds cls `zip` [0..] ]
 
 get_defn :: Id -> CoreBind
 get_defn id = NonRec id (unfoldingTemplate (realIdUnfolding id))

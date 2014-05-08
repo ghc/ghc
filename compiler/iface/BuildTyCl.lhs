@@ -254,10 +254,7 @@ type TcMethInfo = (Name, DefMethSpec, Type)
         -- A temporary intermediate, to communicate between 
         -- tcClassSigs and buildClass.
 
-buildClass :: Bool		-- True <=> do not include unfoldings 
-				--	    on dict selectors
-				-- Used when importing a class without -O
-	   -> Name -> [TyVar] -> [Role] -> ThetaType
+buildClass :: Name -> [TyVar] -> [Role] -> ThetaType
 	   -> [FunDep TyVar]		   -- Functional dependencies
 	   -> [ClassATItem]		   -- Associated types
 	   -> [TcMethInfo]                 -- Method info
@@ -265,10 +262,9 @@ buildClass :: Bool		-- True <=> do not include unfoldings
 	   -> RecFlag			   -- Info for type constructor
 	   -> TcRnIf m n Class
 
-buildClass no_unf tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
+buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
   = fixM  $ \ rec_clas -> 	-- Only name generation inside loop
     do	{ traceIf (text "buildClass")
-        ; dflags <- getDynFlags
 
 	; datacon_name <- newImplicitBinder tycon_name mkClassDataConOcc
 		-- The class name is the 'parent' for this datacon, not its tycon,
@@ -282,7 +278,7 @@ buildClass no_unf tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc
 	      -- Make selectors for the superclasses 
 	; sc_sel_names <- mapM  (newImplicitBinder tycon_name . mkSuperDictSelOcc) 
 				[1..length sc_theta]
-        ; let sc_sel_ids = [ mkDictSelId dflags no_unf sc_name rec_clas 
+        ; let sc_sel_ids = [ mkDictSelId sc_name rec_clas 
                            | sc_name <- sc_sel_names]
 	      -- We number off the Dict superclass selectors, 1, 2, 3 etc so that we 
 	      -- can construct names for the selectors. Thus
@@ -348,14 +344,13 @@ buildClass no_unf tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc
   where
     mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
     mk_op_item rec_clas (op_name, dm_spec, _) 
-      = do { dflags <- getDynFlags
-           ; dm_info <- case dm_spec of
+      = do { dm_info <- case dm_spec of
                           NoDM      -> return NoDefMeth
                           GenericDM -> do { dm_name <- newImplicitBinder op_name mkGenDefMethodOcc
 			  	          ; return (GenDefMeth dm_name) }
                           VanillaDM -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
 			  	          ; return (DefMeth dm_name) }
-           ; return (mkDictSelId dflags no_unf op_name rec_clas, dm_info) }
+           ; return (mkDictSelId op_name rec_clas, dm_info) }
 \end{code}
 
 Note [Class newtypes and equality predicates]

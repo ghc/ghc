@@ -527,7 +527,7 @@ tc_iface_decl _parent ignore_prags
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
               ; traceIf (text "tc-iface-class4" <+> ppr tc_occ)
-              ; buildClass ignore_prags tc_name tyvars roles ctxt fds ats sigs mindef tc_isrec }
+              ; buildClass tc_name tyvars roles ctxt fds ats sigs mindef tc_isrec }
     ; return (ATyCon (classTyCon cls)) }
   where
    tc_sc pred = forkM (mk_sc_doc pred) (tcIfaceType pred)
