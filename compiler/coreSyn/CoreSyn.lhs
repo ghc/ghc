@@ -869,9 +869,16 @@ unfoldingTemplate :: Unfolding -> CoreExpr
 unfoldingTemplate = uf_tmpl
 
 -- | Retrieves the template of an unfolding if possible
+-- maybeUnfoldingTemplate is used mainly wnen specialising, and we do
+-- want to specialise DFuns, so it's important to return a template
+-- for DFunUnfoldings
 maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
-maybeUnfoldingTemplate (CoreUnfolding { uf_tmpl = expr })       = Just expr
-maybeUnfoldingTemplate _                            		= Nothing
+maybeUnfoldingTemplate (CoreUnfolding { uf_tmpl = expr })
+  = Just expr
+maybeUnfoldingTemplate (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args })
+  = Just (mkLams bndrs (mkApps (Var (dataConWorkId con)) args))
+maybeUnfoldingTemplate _
+  = Nothing
 
 -- | The constructors that the unfolding could never be: 
 -- returns @[]@ if no information is available
