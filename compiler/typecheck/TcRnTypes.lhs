@@ -1282,6 +1282,8 @@ data Implication
 
       ic_fsks  :: [TcTyVar],     -- Extra flatten-skolems introduced by
                                  -- by flattening the givens
+                                 -- See Note [Given flatten-skolems]
+
       ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
                                  -- False <=> ic_givens might have equalities
 

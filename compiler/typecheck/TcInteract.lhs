@@ -101,6 +101,7 @@ solveInteractGiven loc old_fsks givens
                                                      , ctev_loc = loc }
                           | ev_id <- givens ]
 
+    -- See Note [Given flatten-skolems] in TcSMonad
     fsk_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_evtm = EvCoercion (mkTcNomReflCo tv_ty)
                                                    , ctev_pred = pred
                                                    , ctev_loc = loc }
