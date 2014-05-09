@@ -54,7 +54,7 @@ module CoreSyn (
         unSaturatedOk, needSaturated, boringCxtOk, boringCxtNotOk,
 	
 	-- ** Predicates and deconstruction on 'Unfolding'
-	unfoldingTemplate, setUnfoldingTemplate, expandUnfolding_maybe,
+	unfoldingTemplate, expandUnfolding_maybe,
 	maybeUnfoldingTemplate, otherCons, 
 	isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
@@ -867,9 +867,6 @@ isStableSource InlineRhs          = False
 -- | Retrieves the template of an unfolding: panics if none is known
 unfoldingTemplate :: Unfolding -> CoreExpr
 unfoldingTemplate = uf_tmpl
-
-setUnfoldingTemplate :: Unfolding -> CoreExpr -> Unfolding
-setUnfoldingTemplate unf rhs = unf { uf_tmpl = rhs }
 
 -- | Retrieves the template of an unfolding if possible
 maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
