@@ -28,7 +28,7 @@ module CoreUnfold (
 
 	noUnfolding, mkImplicitUnfolding,
         mkUnfolding, mkCoreUnfolding,
-	mkTopUnfolding, mkSimpleUnfolding,
+	mkTopUnfolding, mkSimpleUnfolding, mkWorkerUnfolding,
 	mkInlineUnfolding, mkInlinableUnfolding, mkWwInlineRule,
 	mkCompulsoryUnfolding, mkDFunUnfolding,
         specUnfolding,
@@ -119,6 +119,19 @@ mkCompulsoryUnfolding expr	   -- Used for things that absolutely must be unfolde
                     (simpleOptExpr expr)
                     (UnfWhen { ug_arity = 0    -- Arity of unfolding doesn't matter
                              , ug_unsat_ok = unSaturatedOk, ug_boring_ok = boringCxtOk })
+
+mkWorkerUnfolding :: DynFlags -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfolding
+-- See Note [Worker-wrapper for INLINABLE functions] in WorkWrap
+mkWorkerUnfolding dflags work_fn
+                  (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
+                                 , uf_is_top = top_lvl })
+  | isStableSource src
+  = mkCoreUnfolding src top_lvl new_tmpl guidance
+  where
+    new_tmpl = simpleOptExpr (work_fn tmpl)
+    guidance = calcUnfoldingGuidance dflags new_tmpl
+
+mkWorkerUnfolding _ _ _ = noUnfolding
 
 mkInlineUnfolding :: Maybe Arity -> CoreExpr -> Unfolding
 mkInlineUnfolding mb_arity expr
@@ -910,21 +923,39 @@ smallEnoughToInline _ _
   = False
 
 ----------------
-certainlyWillInline :: DynFlags -> Unfolding -> Bool
-  -- Sees if the unfolding is pretty certain to inline	
-certainlyWillInline dflags (CoreUnfolding { uf_guidance = guidance })
+certainlyWillInline :: DynFlags -> Unfolding -> Maybe Unfolding
+-- Sees if the unfolding is pretty certain to inline
+-- If so, return a *stable* unfolding for it, that will always inline
+certainlyWillInline dflags unf@(CoreUnfolding { uf_guidance = guidance, uf_tmpl = expr })
   = case guidance of
-      UnfNever      -> False
-      UnfWhen {}    -> True
+      UnfNever   -> Nothing
+      UnfWhen {} -> Just (unf { uf_src = InlineStable })
+
+      -- The UnfIfGoodArgs case seems important.  If we w/w small functions
+      -- binary sizes go up by 10%!  (This is with SplitObjs.)  I'm not totally
+      -- sure whyy.
       UnfIfGoodArgs { ug_size = size, ug_args = args }
-                    -> not (null args)   -- See Note [certainlyWillInline: be caseful of thunks]
-                    && size - (10 * (length args +1)) <= ufUseThreshold dflags
+         | not (null args)  -- See Note [certainlyWillInline: be careful of thunks]
+         , let arity = length args
+         , size - (10 * (arity + 1)) <= ufUseThreshold dflags
+         -> Just (unf { uf_src      = InlineStable
+                      , uf_guidance = UnfWhen { ug_arity     = arity
+                                              , ug_unsat_ok  = unSaturatedOk
+                                              , ug_boring_ok = inlineBoringOk expr } })
+                -- Note the "unsaturatedOk". A function like  f = \ab. a
+                -- will certainly inline, even if partially applied (f e), so we'd
+                -- better make sure that the transformed inlining has the same property
+
+      _  -> Nothing
+
+certainlyWillInline _ unf@(DFunUnfolding {})
+  = Just unf
 
 certainlyWillInline _ _
-  = False
+  = Nothing
 \end{code}
 
-Note [certainlyWillInline: be caseful of thunks]
+Note [certainlyWillInline: be careful of thunks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't claim that thunks will certainly inline, because that risks work
 duplication.  Even if the work duplication is not great (eg is_cheap
