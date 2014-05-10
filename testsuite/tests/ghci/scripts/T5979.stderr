@@ -1,4 +1,4 @@
 
 <no location info>:
     Could not find module ‘Control.Monad.Trans.State’
-    It is a member of the hidden package ‘transformers-0.3.0.0’.
+    It is not a module in the current program, or in any known package.
