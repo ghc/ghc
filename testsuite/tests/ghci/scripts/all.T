@@ -113,7 +113,7 @@ test('T5564', normal, ghci_script, ['T5564.script'])
 test('Defer02', normal, ghci_script, ['Defer02.script'])
 test('T5820', normal, ghci_script, ['T5820.script'])
 test('T5836', normal, ghci_script, ['T5836.script'])
-test('T5979', normalise_slashes, ghci_script, ['T5979.script'])
+test('T5979', [reqlib('transformers'), normalise_slashes], ghci_script, ['T5979.script'])
 test('T5975a',
      [pre_cmd('touch föøbàr1.hs'),
       clean_cmd('rm föøbàr1.hs')],
