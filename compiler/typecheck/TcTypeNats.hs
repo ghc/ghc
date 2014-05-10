@@ -952,6 +952,26 @@ solverNewWork proc viRef loc withEv =
                                        $ mkNewFact loc withEv (mkTyVarTy tv, ty)
             return $ ExtSolOk $ mapMaybe toCt imps
 
+
+--------------------------------------------------------------------------------
+-- Higher level operations on collections of constraints.
+
+
+-- Identify our constraints, and declare their variables in the current scope.
+solverPrepare :: SolverProcess -> IORef VarInfo ->
+                 [Ct] -> IO ([Ct], [(Ct,SExpr)])
+solverPrepare proc viRef = go [] []
+  where
+  go others ours [] = return (others, ours)
+  go others ours (ct : cts) =
+    case knownCt ct of
+      Just (vars,e) ->
+        do mapM_ (solverDeclare proc viRef) (eltsUFM vars)
+           go       others ((ct,e) : ours) cts
+      Nothing ->
+           go (ct : others)          ours  cts
+
+
 {-
 Check a list of constraints for consistency, and computer derived work.
 Does not affect set off assertions in the solver.
@@ -962,25 +982,29 @@ Assumes that either:
 solverImprove :: SolverProcess -> IORef VarInfo
               -> [Ct] -> IO ExtSolRes
 solverImprove proc viRef cts =
-  do let (ours, ourCts) =
-            unzip [ (rep,ct) | ct <- cts, Just rep <- [ knownCt ct ] ]
-     case ourCts of
-       [] -> return (ExtSolOk [])
-       oneOfOurs : _ ->
-         do solverPush proc viRef
-            mapM_ assume ours
+  do push
+     (_,ours) <- solverPrepare proc viRef cts
+     case ours of
+       [] -> do pop
+                return (ExtSolOk [])
+       (oneOfOurs,_) : _ ->
+         do mapM_ (assume . snd) ours
             let loc = ctLoc oneOfOurs -- XXX: What is a better location?
 
             -- XXX: When we compute improvements,
             -- we should probably limit ourselves to compute improvements
             -- only for the variables in the current scope.
+            -- XXX: This might be a good idea for wanteds, but not givens:
+            -- assumptions in a later scope, may give us facts about
+            -- givens in earlier scopes.
             res <- solverNewWork proc viRef loc (isGivenCt oneOfOurs)
-            solverPop proc viRef
+            pop
             return res
   where
-  assume (vars,expr) =
-     do mapM_ (solverDeclare proc viRef) (eltsUFM vars)
-        solverAssume proc expr
+  push    = solverPush    proc viRef
+  pop     = solverPop     proc viRef
+  assume  = solverAssume  proc
+
 
 {- Given a set of constraints, try to split them into:
 
@@ -992,26 +1016,15 @@ Does not change the assertion state of the solver.
 solverFindConstraidction :: SolverProcess -> IORef VarInfo ->
                             [Ct] -> IO (Maybe ([Ct], [Ct]))
 solverFindConstraidction proc viRef cts =
-  do push               -- scope for `needed`
-     prepare [] [] cts  -- declare variables, then search.
+  do push  -- scope for `needed`
+     (others,ours) <- solverPrepare proc viRef cts  -- declare vars
+     minimize others [] ours
 
   where
   check   = solverCheck   proc
   push    = solverPush    proc viRef
   pop     = solverPop     proc viRef
   assume  = solverAssume  proc
-
-  prepare notNeeded maybeNeeded [] =
-    minimize notNeeded [] maybeNeeded
-
-  prepare notNeeded maybeNeeded (ct : cts) =
-    case knownCt ct of
-      Just (vars,e) ->
-        do mapM_ (solverDeclare proc viRef) (eltsUFM vars)
-           prepare       notNeeded ((ct,e) : maybeNeeded) cts
-      Nothing ->
-           prepare (ct : notNeeded)          maybeNeeded  cts
-
 
   minimize notNeeded needed maybeNeeded =
     do res <- check
@@ -1041,6 +1054,33 @@ solverFindConstraidction proc viRef cts =
          -- No contradiction, keep searching.
          _ -> search notNeeded needed ((ct,e) : maybeNeeded) more
 
+
+
+solverSimplify :: SolverProcess -> IORef VarInfo ->
+                  [Ct] -> IO ([(EvTerm,Ct)], [Ct])
+solverSimplify proc viRef cts =
+  do push     -- `unsolved` scope
+     (others,ours) <- solverPrepare proc viRef cts
+     go others [] ours
+  where
+  push    = solverPush    proc viRef
+  pop     = solverPop     proc viRef
+  assume  = solverAssume  proc
+
+  go unsolved solved [] =
+    do pop -- remove `unsolved` scope
+       return (solved, unsolved)
+
+  go unsolved solved ((ct,e) : more) =
+    do push   -- Temporarily assume everything else.
+       mapM_ (assume . snd) more
+       proved <- solverProve proc viRef e
+       pop
+       if proved
+          then let ev = evBySMT "SMT" $ getEqPredTys $ ctPred ct
+               in go unsolved ((ev,ct) : solved) more
+          else do assume e    -- add to `unsolved`
+                  go (ct : unsolved) solved more
 
 
 smtTy :: Ty -> SExpr
