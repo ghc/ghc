@@ -952,8 +952,13 @@ solverNewWork proc viRef loc withEv =
                                        $ mkNewFact loc withEv (mkTyVarTy tv, ty)
             return $ ExtSolOk $ mapMaybe toCt imps
 
--- Check a list of constraints for consistency, and computer derived work.
--- Assumes that all constraints are given or all are not given.
+{-
+Check a list of constraints for consistency, and computer derived work.
+Does not affect set off assertions in the solver.
+Assumes that either:
+  * all constraints are given, or
+  * all are not given.
+-}
 solverImprove :: SolverProcess -> IORef VarInfo
               -> [Ct] -> IO ExtSolRes
 solverImprove proc viRef cts =
