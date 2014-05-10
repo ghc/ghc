@@ -724,14 +724,30 @@ genLog x base = Just (exactLoop 0 x)
 -- Interface
 
 data ExternalSolver = ExternalSolver
-  { extSolPush    :: IO ()                -- ^ Mark current set of assumptions
-  , extSolPop     :: IO ()                -- ^ Revert to the last marked place
-  , extSolAssume  :: Ct -> IO ExtSolRes      -- ^ Add a new fact.
-  , extSolProve   :: Ct -> IO (Maybe EvTerm) -- ^ Try to prove this
-  , extSolStop    :: IO ()                   -- ^ Exit the solver
+  { extSolPush    :: IO ()
+    -- ^ Mark current set of assumptions.
+    -- Does not change assertions.
+
+  , extSolPop     :: IO ()
+    -- ^ Revert to the last marked place.
+    -- Changes assertions.
+
+  , extSolAssert  :: [Ct] -> IO ()
+    -- ^ Add some assertions.
+    -- Changes assertions.
+
+  , extSolImprove :: [Ct] -> IO ExtSolRes
+    -- ^ Check for consistency and new work.
+    -- Does not change assertions.
+
+  , extSolSolve   :: [Ct] -> IO ([(EvTerm,Ct)], [Ct])
+    -- ^ Solve some constraints.
+    -- Does not change assertions.
+
+  , extSolStop    :: IO ()
+    -- ^ Exit the solver.
+    -- The solver should not be used after this is called.
   }
-
-
 
 data ExtSolRes
   = ExtSolContradiction {- inconsistent -} [Ct]
@@ -760,44 +776,21 @@ newExternalSolver exe opts =
        { extSolPush   = do solverDebug proc "=== PUSH ==="
                            solverDebugNext proc
                            solverPush proc viRef
+
        , extSolPop    = do solverDebugPrev proc
                            solverDebug proc "=== POP ==="
                            solverPop proc viRef
 
-       , extSolAssume = \ct ->
-          case knownCt ct of
-            Nothing -> return (ExtSolOk [])
-            Just (vars,expr) ->
-              debugStage proc ("assume: " ++ renderSExpr expr "") $
-              do mapM_ (solverDeclare proc viRef) (eltsUFM vars)
-                 solverAssume proc expr
-                 solverNewWork proc viRef (ctLoc ct) (isGivenCt ct)
+       , extSolAssert = \cts ->
+          do (_,ours) <- solverPrepare proc viRef cts
+             mapM_ (solverAssume proc . snd) ours
 
-       , extSolProve = \ct ->
-           case knownCt ct of
-             Nothing -> return Nothing
-             Just (vars,expr) ->
-               debugStage proc ("prove: " ++ renderSExpr expr "") $
-               do mapM_ (solverDeclare proc viRef) (eltsUFM vars)
-                  proved <- solverProve proc viRef expr
-                  if proved
-                     then do solverDebug proc "proved"
-                             return $ Just $ evBySMT "SMT"
-                                        $ getEqPredTys $ ctPred ct
-                     else return Nothing
+       , extSolImprove = solverImprove proc viRef
 
-       , extSolStop   = solverStop proc
+       , extSolSolve = solverSimplify proc viRef
+
+       , extSolStop = solverStop proc
        }
-
-debugStage :: SolverProcess -> String -> IO a -> IO a
-debugStage proc x m =
-  do solverDebug proc x
-     solverDebugNext proc
-     res <- m
-     solverDebugPrev proc
-     return res
-
-
 
 mkNewFact :: CtLoc -> Bool -> (Type,Type) -> CtEvidence
 mkNewFact newLoc withEv (t1,t2)
@@ -936,26 +929,6 @@ solverImproveModel proc viRef imps =
           then varEq x ((x, e) : imps)        more  ys
           else varEq x           imps  (def : more) ys
 
--- Examine the current state of the solver and compute new work.
-solverNewWork :: SolverProcess -> IORef VarInfo
-              -> CtLoc      -- Source of the new constraints
-              -> Bool       -- Should generate givens?
-              -> IO ExtSolRes
-solverNewWork proc viRef loc withEv =
-  do status <- solverCheck proc
-     case status of
-       Unsat   -> return $ ExtSolContradiction [] []
-       Unknown -> return (ExtSolOk [])
-       Sat ->
-         do m    <- solverGetModel proc =<< readIORef viRef
-            imps <- solverImproveModel proc viRef m
-            vi   <- readIORef viRef
-            let toCt (x,e) = do tv <- Map.lookup x (smtDeclaredVars vi)
-                                ty <- sExprToType vi e
-                                return $ mkNonCanonical
-                                       $ mkNewFact loc withEv (mkTyVarTy tv, ty)
-            return $ ExtSolOk $ mapMaybe toCt imps
-
 
 --------------------------------------------------------------------------------
 -- Higher level operations on collections of constraints.
@@ -983,8 +956,7 @@ Assumes that either:
   * all constraints are given, or
   * all are not given.
 -}
-solverImprove :: SolverProcess -> IORef VarInfo
-              -> [Ct] -> IO ExtSolRes
+solverImprove :: SolverProcess -> IORef VarInfo -> [Ct] -> IO ExtSolRes
 solverImprove proc viRef cts =
   do push   -- declare variables
      (others,ours) <- solverPrepare proc viRef cts
@@ -1124,6 +1096,7 @@ solverSimplify proc viRef cts =
           else do assume e    -- add to `unsolved`
                   go (ct : unsolved) solved more
 
+--------------------------------------------------------------------------------
 
 smtTy :: Ty -> SExpr
 smtTy ty =

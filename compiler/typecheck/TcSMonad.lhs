@@ -83,7 +83,8 @@ module TcSMonad (
     Untouchables, isTouchableMetaTyVarTcS, isFilledMetaTyVar_maybe,
     zonkTyVarsAndFV,
 
-    TN.ExtSolRes(..), extSolAssume, extSolProve, extSolPush, extSolPop,
+    TN.ExtSolRes(..),
+    extSolAssert, extSolImprove, extSolSolve, extSolPush, extSolPop,
 
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
 
@@ -1923,11 +1924,14 @@ Interaction with an External SMT Solver
 ---------------------------------------
 
 \begin{code}
-extSolAssume :: Ct -> TcS TN.ExtSolRes
-extSolAssume ct = withExtSol (\s -> TN.extSolAssume s ct)
+extSolAssert :: [Ct] -> TcS ()
+extSolAssert ct = withExtSol (`TN.extSolAssert` ct)
 
-extSolProve :: Ct -> TcS (Maybe EvTerm)
-extSolProve ct = withExtSol (\s -> TN.extSolProve s ct)
+extSolImprove :: [Ct] -> TcS TN.ExtSolRes
+extSolImprove ct = withExtSol (`TN.extSolImprove` ct)
+
+extSolSolve :: [Ct] -> TcS ([(EvTerm,Ct)], [Ct])
+extSolSolve ct = withExtSol (`TN.extSolSolve` ct)
 
 extSolPush  :: TcS ()
 extSolPush = withExtSol TN.extSolPush
