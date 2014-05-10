@@ -12,7 +12,7 @@ import TcEvidence ( mkTcAxiomRuleCo, EvTerm(..) )
 import TyCon      ( TyCon, SynTyConRhs(..), mkSynTyCon, TyConParent(..)  )
 import Coercion   ( Role(..) )
 import TcRnTypes  ( Xi, Ct(..), ctPred, CtEvidence(..), mkNonCanonical
-                  , isGivenCt, CtLoc, ctLoc )
+                  , CtLoc, ctLoc )
 import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..) )
 import Name       ( Name, BuiltInSyntax(..), nameOccName, nameUnique )
 import OccName    ( occNameString )
@@ -736,7 +736,7 @@ data ExternalSolver = ExternalSolver
     -- ^ Add some assertions.
     -- Changes assertions.
 
-  , extSolImprove :: [Ct] -> IO ExtSolRes
+  , extSolImprove :: Bool -> [Ct] -> IO ExtSolRes
     -- ^ Check for consistency and new work.
     -- Does not change assertions.
 
@@ -952,12 +952,13 @@ solverPrepare proc viRef = go [] []
 {-
 Check a list of constraints for consistency, and computer derived work.
 Does not affect set off assertions in the solver.
-Assumes that either:
-  * all constraints are given, or
-  * all are not given.
 -}
-solverImprove :: SolverProcess -> IORef VarInfo -> [Ct] -> IO ExtSolRes
-solverImprove proc viRef cts =
+solverImprove :: SolverProcess -> IORef VarInfo
+              -> Bool -- ^ Should we generate given constraints?
+                      -- If not, we generate derived ones.
+              -> [Ct]
+              -> IO ExtSolRes
+solverImprove proc viRef withEv cts =
   do push   -- declare variables
      (others,ours) <- solverPrepare proc viRef cts
      case ours of
@@ -992,7 +993,6 @@ solverImprove proc viRef cts =
                      vi   <- readIORef viRef
 
                      let loc    = ctLoc oneOfOurs -- XXX: Better location?
-                         withEv = isGivenCt oneOfOurs
                          toCt (x,e) =
                            do tv <- Map.lookup x (smtDeclaredVars vi)
                               ty <- sExprToType vi e
@@ -1140,10 +1140,6 @@ type VarTypes = UniqFM (TyVar,String,Ty)
 knownCt :: Ct -> Maybe (VarTypes, SExpr)
 knownCt ct =
   case ct of
-    CTyEqCan _ x xi ->
-      do (vs1,e1) <- knownVar x
-         (vs2,e2) <- knownXi xi
-         return (plusUFM vs1 vs2, smtEq e1 e2)
     CFunEqCan _ f args rhs ->
       do (vs1,e1) <- knownTerm f args
          (vs2,e2) <- knownXi rhs

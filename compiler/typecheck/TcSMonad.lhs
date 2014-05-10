@@ -75,6 +75,7 @@ module TcSMonad (
     findFunEq, findTyEqs,
     findDict, findDictsByClass, addDict, addDictsByClass, delDict, partitionDicts,
     findFunEqsByTyCon, findFunEqs, addFunEq, replaceFunEqs, partitionFunEqs,
+    emptyFunEqs, funEqsToList,
 
     instDFunType,                              -- Instantiation
     newFlexiTcSTy, instFlexiTcS, instFlexiTcSHelperTcS,
@@ -1927,8 +1928,8 @@ Interaction with an External SMT Solver
 extSolAssert :: [Ct] -> TcS ()
 extSolAssert ct = withExtSol (`TN.extSolAssert` ct)
 
-extSolImprove :: [Ct] -> TcS TN.ExtSolRes
-extSolImprove ct = withExtSol (`TN.extSolImprove` ct)
+extSolImprove :: Bool -> [Ct] -> TcS TN.ExtSolRes
+extSolImprove withEv ct = withExtSol (\s -> TN.extSolImprove s withEv ct)
 
 extSolSolve :: [Ct] -> TcS ([(EvTerm,Ct)], [Ct])
 extSolSolve ct = withExtSol (`TN.extSolSolve` ct)
