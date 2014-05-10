@@ -1095,7 +1095,9 @@ solverFindConstraidction proc viRef others ours =
 
 
 
-
+{- Try to solve as much as possible from the given list of constraints.
+Returns the solved constraints (with evidence), and all other constraints.
+-}
 solverSimplify :: SolverProcess -> IORef VarInfo ->
                   [Ct] -> IO ([(EvTerm,Ct)], [Ct])
 solverSimplify proc viRef cts =
