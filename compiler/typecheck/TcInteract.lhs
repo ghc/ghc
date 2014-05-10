@@ -223,41 +223,8 @@ React with (F Int ~ b) ==> IR Stop True []    -- after substituting we re-canoni
 thePipeline :: [(String,SimplifierStage)]
 thePipeline = [ ("canonicalization",        TcCanonical.canonicalize)
               , ("interact with inerts",    interactWithInertsStage)
-              , ("top-level reactions",     topReactionsStage)
-              , ("external solver",         externalSolverStage) ]
+              , ("top-level reactions",     topReactionsStage) ]
 \end{code}
-
-
-********************************************************************************
-*
-* External Solver
-*
-********************************************************************************
-
-\begin{code}
-externalSolverStage :: WorkItem -> TcS StopOrContinue
-externalSolverStage wi =
-  do mb <- extSolProve wi
-     case mb of
-       Just ev ->
-         do when (isWantedCt wi) $ setEvBind (ctEvId $ ctEvidence wi) ev
-            return Stop
-       Nothing ->
-          do res <- extSolAssume wi     -- Remember for later
-             case res of
-
-{- Perhaps we should remove constraints that lead to a contadiction?
-   As is, all constraints in this scope will be discarded (solved trivially).
-   This seems OK: after all, the program is incorrect anyway. -}
-               ExtSolContradiction {} -> emitInsoluble wi >> return Stop
-
-               ExtSolOk newWork ->
-                  do updWorkListTcS (extendWorkListEqs newWork)
-                     return (ContinueWith wi)
-\end{code}
-
-
-
 
 
 *********************************************************************************
@@ -723,41 +690,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs , cc_ev 
        ; return (Nothing, True) }
 
   | otherwise
-  = do { _ <- extSolAssume workItem
-          {- XXX: This is not correct in two ways:
-              1. The kicked-out constraints are not purged from the external
-                 solver!  Thus, when they go around the solver loop, they will
-                 be "solved" in terms of themselves.  Clearly wrong.
-
-              2. Even if we could remove them from the external solver,
-                 we are not "kicking-out" enough constraints.  Consider,
-                 the following example:
-
-                 A: [W]  1 <=? x   ~   True
-                 B: [W]  1 + n     ~   x
-
-                 If we process them in this order (A first, then B), then we
-                 can't solve either constraint.
-                 If we reverse their order (i.e., B first, then A), then
-                 we can solve `A` because we have more information about `x`.
-
-                 In other words, in this case `B` should have kicked-out `A`.
-
-              I think that both of these problems will be avoided, if
-              we moved the external solver outside of the pipeline, like this:
-                - Let GHC process constraints until they are "inert".
-                - Extract inert constraints relevant to the external solver,
-                  and compute "improvements" (i.e., extra equalities).
-                - If there were additional equalities, add them to the work
-                  queue and let GHC process things again until they are inert.
-                - This can be repeated a few times, but it will eventually
-                  stop, as the external solver will run out of equalities to
-                  find (this is bound by the number of variables in scope)
-                - Finally, the external solver can be run to solve
-                  any inert wanted constraintsthat it knows about.
-           -}
-
-       ; mb_solved <- trySpontaneousSolve ev tv rhs
+  = do { mb_solved <- trySpontaneousSolve ev tv rhs
        ; case mb_solved of
            SPCantSolve   -- Includes givens
               -> do { untch <- getUntouchables
