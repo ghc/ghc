@@ -982,6 +982,65 @@ solverImprove proc viRef cts =
      do mapM_ (solverDeclare proc viRef) (eltsUFM vars)
         solverAssume proc expr
 
+{- Given a set of constraints, try to split them into:
+
+  (constraints that lead to a contradiction, all the others)
+
+Does not change the assertion state of the solver.
+-}
+
+solverFindConstraidction :: SolverProcess -> IORef VarInfo ->
+                            [Ct] -> IO (Maybe ([Ct], [Ct]))
+solverFindConstraidction proc viRef cts =
+  do push               -- scope for `needed`
+     prepare [] [] cts  -- declare variables, then search.
+
+  where
+  check   = solverCheck   proc
+  push    = solverPush    proc viRef
+  pop     = solverPop     proc viRef
+  assume  = solverAssume  proc
+
+  prepare notNeeded maybeNeeded [] =
+    minimize notNeeded [] maybeNeeded
+
+  prepare notNeeded maybeNeeded (ct : cts) =
+    case knownCt ct of
+      Just (vars,e) ->
+        do mapM_ (solverDeclare proc viRef) (eltsUFM vars)
+           prepare       notNeeded ((ct,e) : maybeNeeded) cts
+      Nothing ->
+           prepare (ct : notNeeded)          maybeNeeded  cts
+
+
+  minimize notNeeded needed maybeNeeded =
+    do res <- check
+       case res of
+         Unsat -> do pop  -- remove `needed` scope.
+                     return $ Just (needed, map fst maybeNeeded ++ notNeeded)
+         _     -> do push -- scope for `maybeNeeded`
+                     search notNeeded needed [] maybeNeeded
+
+  search _ needed _ [] =
+    do pop  -- Remove `maybeNeeded`
+       pop  -- Remove `needed`
+       case needed of
+         [] -> return Nothing    -- No definite contradictions
+         _  -> fail "Bug: we found a contradiction, and then lost it!"
+
+  search notNeeded needed maybeNeeded ((ct,e) : more) =
+    do assume e    -- Add to `maybeNeeded`
+       res <- check
+       case res of
+
+         Unsat -> -- We found a contradiction using `needed` and `maybeNeeded`.
+           do pop       -- remove `maybeNedded`
+              assume e  -- add to `needed`
+              minimize (map fst more ++ notNeeded) (ct : needed) maybeNeeded
+
+         -- No contradiction, keep searching.
+         _ -> search notNeeded needed ((ct,e) : maybeNeeded) more
+
 
 
 smtTy :: Ty -> SExpr
