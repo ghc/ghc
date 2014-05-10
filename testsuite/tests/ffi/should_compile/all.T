@@ -9,9 +9,9 @@ test('cc001', normal, compile, [''])
 # Non-static C call
 # cc004 test also uses stdcall, so it only works on i386.
 if config.platform.startswith('i386-'):
-    ways = expect_fail
-else:
     ways = normal
+else:
+    ways = expect_fail
 test('cc004', ways, compile, [''])
 
 test('cc005', normal, compile, [''])
