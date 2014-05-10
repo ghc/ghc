@@ -249,7 +249,7 @@ externalSolverStage wi =
 {- Perhaps we should remove constraints that lead to a contadiction?
    As is, all constraints in this scope will be discarded (solved trivially).
    This seems OK: after all, the program is incorrect anyway. -}
-               ExtSolContradiction -> emitInsoluble wi >> return Stop
+               ExtSolContradiction {} -> emitInsoluble wi >> return Stop
 
                ExtSolOk newWork ->
                   do updWorkListTcS (extendWorkListEqs newWork)

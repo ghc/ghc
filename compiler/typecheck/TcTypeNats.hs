@@ -734,8 +734,12 @@ data ExternalSolver = ExternalSolver
 
 
 data ExtSolRes
-  = ExtSolContradiction     -- ^ There is no model for assertions
-  | ExtSolOk [Ct]           -- ^ New work (facts that will hold in all models)
+  = ExtSolContradiction {- inconsistent -} [Ct]
+                        {- all others   -} [Ct]
+    -- ^ There is no model for assertions.
+
+  | ExtSolOk [Ct]
+    -- ^ New work (facts that will hold in all models)
 
 --------------------------------------------------------------------------------
 -- Concrete implementation
@@ -940,7 +944,7 @@ solverNewWork :: SolverProcess -> IORef VarInfo
 solverNewWork proc viRef loc withEv =
   do status <- solverCheck proc
      case status of
-       Unsat   -> return ExtSolContradiction
+       Unsat   -> return $ ExtSolContradiction [] []
        Unknown -> return (ExtSolOk [])
        Sat ->
          do m    <- solverGetModel proc =<< readIORef viRef
@@ -982,42 +986,77 @@ Assumes that either:
 solverImprove :: SolverProcess -> IORef VarInfo
               -> [Ct] -> IO ExtSolRes
 solverImprove proc viRef cts =
-  do push
-     (_,ours) <- solverPrepare proc viRef cts
+  do push   -- declare variables
+     (others,ours) <- solverPrepare proc viRef cts
      case ours of
-       [] -> do pop
+       [] -> do pop -- declarations
                 return (ExtSolOk [])
-       (oneOfOurs,_) : _ ->
-         do mapM_ (assume . snd) ours
-            let loc = ctLoc oneOfOurs -- XXX: What is a better location?
 
-            -- XXX: When we compute improvements,
-            -- we should probably limit ourselves to compute improvements
-            -- only for the variables in the current scope.
-            -- XXX: This might be a good idea for wanteds, but not givens:
-            -- assumptions in a later scope, may give us facts about
-            -- givens in earlier scopes.
-            res <- solverNewWork proc viRef loc (isGivenCt oneOfOurs)
+       (oneOfOurs,_) : _ ->
+         do push
+            mapM_ (assume . snd) ours
+            status <- check
             pop
+
+            res <-
+              case status of
+
+                -- Inconsistent: find a smaller example, then stop.
+                Unsat  ->
+                  do mbRes <- solverFindConstraidction proc viRef others ours
+                     case mbRes of
+                       Nothing ->
+                         fail "Bug: Failed to reporoduce contradiciton."
+                       Just (core,rest) ->
+                         return $ ExtSolContradiction core rest
+
+                -- We don't know: treat as consistent.
+                Unknown -> return (ExtSolOk [])
+
+                -- Consistent: try to compute derived work.
+                Sat ->
+                  do m    <- solverGetModel proc =<< readIORef viRef
+                     imps <- solverImproveModel proc viRef m
+                     vi   <- readIORef viRef
+
+                     let loc    = ctLoc oneOfOurs -- XXX: Better location?
+                         withEv = isGivenCt oneOfOurs
+                         toCt (x,e) =
+                           do tv <- Map.lookup x (smtDeclaredVars vi)
+                              ty <- sExprToType vi e
+                              return $ mkNonCanonical
+                                     $ mkNewFact loc withEv (mkTyVarTy tv, ty)
+                     return $ ExtSolOk $ mapMaybe toCt imps
+
+            pop -- declarations
             return res
   where
-  push    = solverPush    proc viRef
-  pop     = solverPop     proc viRef
-  assume  = solverAssume  proc
+  push    = solverPush   proc viRef
+  pop     = solverPop    proc viRef
+  assume  = solverAssume proc
+  check   = solverCheck  proc
 
 
-{- Given a set of constraints, try to split them into:
+{- Identify a sub-set of constraints that leads to a contradiction.
 
-  (constraints that lead to a contradiction, all the others)
+We call this when we find out that a collection of constraints is
+inconsistent:  instead of marking them _all_ as insoluable,
+we identify a sub-set that is the real cause of the problem.
 
-Does not change the assertion state of the solver.
+* Assumes that the variables in our constarints have been declared.
+* Does not change the assertions in the solver.
 -}
-
-solverFindConstraidction :: SolverProcess -> IORef VarInfo ->
-                            [Ct] -> IO (Maybe ([Ct], [Ct]))
-solverFindConstraidction proc viRef cts =
+solverFindConstraidction ::
+  SolverProcess ->      -- Solver
+  IORef VarInfo ->      -- Scoping of variables
+  [Ct] ->               -- Constraints not relevant to us
+  [(Ct,SExpr)] ->       -- Our constraints
+  IO (Maybe ( [Ct]      -- Constraints that cause a contradiciotn
+            , [Ct]      -- All other constraints (both others and ours)
+            )
+     )
+solverFindConstraidction proc viRef others ours =
   do push  -- scope for `needed`
-     (others,ours) <- solverPrepare proc viRef cts  -- declare vars
      minimize others [] ours
 
   where
@@ -1053,6 +1092,7 @@ solverFindConstraidction proc viRef cts =
 
          -- No contradiction, keep searching.
          _ -> search notNeeded needed ((ct,e) : maybeNeeded) more
+
 
 
 
