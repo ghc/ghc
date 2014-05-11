@@ -54,7 +54,8 @@ import           Control.Monad (forever)
 import           Control.Concurrent ( forkIO )
 import qualified Control.Exception as X
 import           System.Process ( runInteractiveProcess, waitForProcess )
-import           System.IO ( hPutStrLn, hFlush, hGetContents, hGetLine )
+import           System.IO ( hPutStrLn, hFlush, hGetContents, hGetLine,
+                             stderr )
 
 {-------------------------------------------------------------------------------
 Built-in type constructors for functions on type-lelve nats
@@ -772,22 +773,28 @@ newExternalSolver exe opts =
      -- See Note [Variable Scopes] for an explanation of this.
      viRef <- newIORef emptyVarInfo
 
+     let dbg = solverDebug proc
+
      return ExternalSolver
-       { extSolPush   = do solverDebug proc "=== PUSH ==="
+       { extSolPush   = do dbg "=== PUSH ==="
                            solverDebugNext proc
                            solverPush proc viRef
 
        , extSolPop    = do solverDebugPrev proc
-                           solverDebug proc "=== POP ==="
+                           dbg "=== POP ==="
                            solverPop proc viRef
 
        , extSolAssert = \cts ->
-          do (_,ours) <- solverPrepare proc viRef cts
+          do dbg "=== ASSERT ==="
+             (_,ours) <- solverPrepare proc viRef cts
              mapM_ (solverAssume proc . snd) ours
+             mapM_ (solverDebug proc . show . snd) ours
 
-       , extSolImprove = solverImprove proc viRef
+       , extSolImprove = \b cts -> do dbg "=== IMPROVE ==="
+                                      solverImprove proc viRef b cts
 
-       , extSolSolve = solverSimplify proc viRef
+       , extSolSolve = \cts -> do dbg "=== SOLVE ==="
+                                  solverSimplify proc viRef cts
 
        , extSolStop = solverStop proc
        }
@@ -871,6 +878,7 @@ solverCheck proc =
 -- Prove something by concluding that a counter-example is impossible.
 solverProve :: SolverProcess -> IORef VarInfo -> SExpr -> IO Bool
 solverProve proc viRef e =
+  debug $
   do solverPush proc viRef
      solverAssume proc $ SList [ SAtom "not", e ]
      res <- solverCheck proc
@@ -878,6 +886,14 @@ solverProve proc viRef e =
      case res of
        Unsat -> return True
        _     -> return False
+
+  where
+  debug m = do solverDebug proc ("Prove: " ++ show e)
+               solverDebugNext proc
+               res <- m
+               solverDebug proc (show res)
+               solverDebugPrev proc
+               return res
 
 -- Get values for the variables that are in scope.
 solverGetModel :: SolverProcess -> VarInfo -> IO [(String,SExpr)]
@@ -1091,7 +1107,11 @@ solverSimplify proc viRef cts =
 
   go unsolved solved ((ct,e) : more) =
     do push   -- Temporarily assume everything else.
+       solverDebug proc "Temporary assuming:"
+       solverDebugNext proc
        mapM_ (assume . snd) more
+       mapM_ (solverDebug proc . show . snd) more
+       solverDebugPrev proc
        proved <- solverProve proc viRef e
        pop
        if proved
@@ -1295,6 +1315,9 @@ declareVar tv vi
 data SExpr = SAtom String | SList [SExpr]
              deriving Eq
 
+instance Show SExpr where
+  showsPrec _ = renderSExpr
+
 data SolverProcess = SolverProcess
   { solverDo   :: SExpr -> IO SExpr
   , solverStop :: IO ()
@@ -1310,8 +1333,8 @@ startSolverProcess exe opts =
   do (hIn, hOut, hErr, h) <- runInteractiveProcess exe opts Nothing Nothing
 
      dbgNest <- newIORef (0 :: Int)
-     let dbgMsg x = return () {- do n <- readIORef dbgNest 
-                       putStrLn (replicate n ' ' ++ x) -}
+     let dbgMsg x = do n <- readIORef dbgNest
+                       hPutStrLn stderr (replicate n ' ' ++ x)
          dbgNext  = modifyIORef' dbgNest (+2)
          dbgPrev  = modifyIORef' dbgNest (subtract 2)
 

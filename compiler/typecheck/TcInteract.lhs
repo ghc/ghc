@@ -85,9 +85,9 @@ solveInteractGiven loc old_fsks givens
   | null givens  -- Shortcut for common case
   = return (True, old_fsks)
   | otherwise
-  = do { implics1 <- solveInteract fsk_bag
+  = do { implics1 <- solveInteractWithExtern True fsk_bag
 
-       ; (no_eqs, more_fsks, implics2) <- getGivenInfo (solveInteract given_bag)
+       ; (no_eqs, more_fsks, implics2) <- getGivenInfo (solveInteractWithExtern True given_bag)
        ; MASSERT( isEmptyBag implics1 && isEmptyBag implics2 )
            -- empty implics because we discard Given equalities between
            -- foralls (see Note [Do not decompose given polytype equalities]
@@ -112,11 +112,16 @@ solveInteractGiven loc old_fsks givens
 
 -- The main solver loop implements Note [Basic Simplifier Plan]
 ---------------------------------------------------------------
+
 solveInteract :: Cts -> TcS (Bag Implication)
+solveInteract = solveInteractWithExtern False
+
+solveInteractWithExtern :: Bool -- ^ Are we in the given stage?
+                        -> Cts -> TcS (Bag Implication)
 -- Returns the final InertSet in TcS
 -- Has no effect on work-list or residual-iplications
-solveInteract cts
-  = {-# SCC "solveInteract" #-}
+solveInteractWithExtern inGivenStage cts
+  = {-# SCC "solveInteractWithExtern" #-}
     withWorkList cts $
     do { dyn_flags <- getDynFlags
        ; solve_loop (maxSubGoalDepth dyn_flags) }
@@ -126,15 +131,17 @@ solveInteract cts
         do { sel <- selectNextWorkItem max_depth
            ; case sel of
               NoWorkRemaining     -- Done, successfuly (modulo frozen)
-                -> return ()
+                -> do moreWork <- interactExternSolver inGivenStage
+                      if moreWork then solve_loop max_depth
+                                  else return ()
               MaxDepthExceeded cnt ct -- Failure, depth exceeded
                 -> wrapErrTcS $ solverDepthErrorTcS cnt (ctEvidence ct)
               NextWorkItem ct     -- More work, loop around!
                 -> do { runSolverPipeline thePipeline ct; solve_loop max_depth } }
 
-inertactExternSolver :: Bool      -- ^ Are we in given stage?
+interactExternSolver :: Bool      -- ^ Are we in given stage?
                      -> TcS Bool  -- ^ Did we generatew new work.
-inertactExternSolver inGivenStage =
+interactExternSolver inGivenStage =
   do iSet <- getTcSInerts
      let iCans  = inert_cans iSet
          feqs   = funEqsToList (inert_funeqs iCans)
