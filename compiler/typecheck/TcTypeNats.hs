@@ -1085,6 +1085,66 @@ solverFindConstraidction proc viRef others ours =
 {- Try to solve as much as possible from the given list of constraints.
 Returns the solved constraints (with evidence), and all other constraints.
 -}
+{-
+Consider this example:
+
+ex4 :: p a -> p b -> p ((a + a) + b) -> p (2 * a + b)
+ex4 _ = id
+
+A: a + a = u
+B: x + b = v
+C: 2 * a = w
+D: w + b = v
+
+If we solve `B` or `D` first, then we are essnetially done,
+as all the others can be substituted within each other.
+
+However, what if we happen to consider `C` first?
+
+(A,B,D) => C
+
+This goal is essentially:
+
+((a + a) + b ~ (2 * a) + b) => (a + a) ~ 2 * a
+
+which can be proved by cancelling `b` on both sides.
+
+Now, we are left with just `A,B,D`, which amounts to having
+to prove:
+
+(a + a) + b   ~   w + b
+
+We can't do this because we've lost the information about `w`.
+
+
+Perhaps the answer is to solve all goals at the same time
+(this also has the benefit of being more efficeint!).
+
+If we need to solve a collection of goals:
+
+A /\ B /\ C /\ D
+
+we look for a counter example, which amounts to finding a model for:
+
+not (A /\ B /\ C /\ D)
+
+If such a model does not exist, than we can solve all the goals.
+If it does exits, then we can't solve all the golas, at which point
+we could give up.
+
+Instead of giving up, it is nicer to try to identify a small
+subset of all goals that can't be solved, to report a more
+reasonable error.  For example, if the goals were:
+
+(x = 2,  a + 0 ~ a)
+
+We can't solve these togethere (there is no reason why `x` should be 2),
+but we could solve the `a + 0 ~ a` part.
+-}
+
+
+
+
 solverSimplify :: SolverProcess -> IORef VarInfo ->
                   [Ct] -> IO ([(EvTerm,Ct)], [Ct])
 solverSimplify proc viRef cts =
