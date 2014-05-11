@@ -41,8 +41,6 @@ import FastString ( FastString, fsLit )
 import UniqFM     ( UniqFM,  emptyUFM, unitUFM, plusUFM, eltsUFM )
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Set (Set)
-import qualified Data.Set as Set
 import           Data.Maybe ( isJust, mapMaybe )
 import           Data.Char  ( isSpace )
 import           Data.List ( unfoldr, foldl', partition )
@@ -50,7 +48,7 @@ import           Data.IORef ( IORef, newIORef, atomicModifyIORef',
                               atomicModifyIORef, modifyIORef'
                             , readIORef
                             )
-import           Control.Monad (forever)
+import           Control.Monad ( forever, msum )
 import           Control.Concurrent ( forkIO )
 import qualified Control.Exception as X
 import           System.Process ( runInteractiveProcess, waitForProcess )
@@ -770,7 +768,6 @@ newExternalSolver exe opts =
      solverSimpleCmd proc [ "set-option", ":produce-models", "true" ]
      solverSimpleCmd proc [ "set-logic", "QF_LIA" ]
 
-     -- See Note [Variable Scopes] for an explanation of this.
      viRef <- newIORef emptyVarInfo
 
      let dbg = solverDebug proc
@@ -832,13 +829,13 @@ solverSimpleCmd proc = solverAckCmd proc . SList . map SAtom
 -- Checkpoint state
 solverPush :: SolverProcess -> IORef VarInfo -> IO ()
 solverPush proc viRef =
-  do solverSimpleCmd proc [ "push" ]
+  do solverSimpleCmd proc [ "push", "1" ]
      modifyIORef' viRef startScope
 
 -- Restore to last check-point
 solverPop :: SolverProcess -> IORef VarInfo -> IO ()
 solverPop proc viRef =
-  do solverSimpleCmd proc [ "pop" ]
+  do solverSimpleCmd proc [ "pop", "1" ]
      modifyIORef' viRef endScope
 
 
@@ -851,9 +848,7 @@ solverDeclare :: SolverProcess -> IORef VarInfo -> (TyVar, String, Ty) -> IO ()
 solverDeclare proc viRef (tv,x,ty) =
   do status <- atomicModifyIORef' viRef (declareVar tv)
      case status of
-       Constrained -> return ()
-       Declared    ->
-         do mapM_ (solverAssume proc) (smtExtraConstraints x ty)
+       Declared    -> return ()
        Undeclared  ->
          do solverAckCmd proc $
                 SList [SAtom "declare-fun", SAtom x, SList [], smtTy ty]
@@ -1014,7 +1009,7 @@ solverImprove proc viRef withEv cts =
 
                      let loc    = ctLoc oneOfOurs -- XXX: Better location?
                          toCt (x,e) =
-                           do tv <- Map.lookup x (smtDeclaredVars vi)
+                           do tv <- varToTyVar x vi
                               ty <- sExprToType vi e
                               return $ mkNonCanonical
                                      $ mkNewFact loc withEv (mkTyVarTy tv, ty)
@@ -1222,7 +1217,7 @@ sExprToType vi expr =
     SAtom s
       | [(n,"")] <- reads s -> Just (num n)
     SAtom s
-      | Just v <- Map.lookup s (smtDeclaredVars vi) -> Just (mkTyVarTy v)
+      | Just v <- varToTyVar s vi -> Just (mkTyVarTy v)
     _ -> Nothing
 
 
@@ -1230,49 +1225,24 @@ sExprToType vi expr =
 
 --------------------------------------------------------------------------------
 
-{-
-Note [Variable Scopes]
-
-The SMTLIB format has an unfortunate "feature": push/pop commands affect
-assertions but not variable declarations.  So, if we declare a variable
-after a push, then when we pop, all assertions about the variable will go away,
-but not the variable declaration.
-
-This is particularly troublesome when variables have additional well-formedness
-constraints that go beyond their type.   In particular, we work with natural
-numbers, while the basic type supported by a solver is integers.  So, whenever
-we declare a variable, we also add an additional assertion, constraining
-the variable to be >= 0.
-
-Unfortunately, when we `pop` the well-formedness constraints are going 
-to go away, but not the variable declaration.  So, if we want to mention
-the variable again, in a new scope, then we have to add the additional
-constraint but *not* add a declaration.
-
-Thus, a variable can be in one of three states:
-  1. Declared and constrained
-  2. Declared, but not constrained
-  3. Not declared, and not constrained.
--}
-
+-- Information about declared variables, so that we know how to extarct
+-- models, and map them back into types.
 data VarInfo = VarInfo
-  { smtDeclaredVars :: Map String TyVar -- ^ all declared vars
-  , smtCurScope     :: Set String       -- ^ constrained
-  , smtOtherScopes  :: [Set String]     -- ^ constrained
+  { smtCurScope     :: Map String TyVar
+  , smtOtherScopes  :: [Map String TyVar]
   }
 
 emptyVarInfo :: VarInfo
 emptyVarInfo = VarInfo
-  { smtDeclaredVars = Map.empty
-  , smtCurScope     = Set.empty
+  { smtCurScope     = Map.empty
   , smtOtherScopes  = []
   }
 
 inScope :: VarInfo -> [String]
-inScope vi = Set.toList $ Set.unions $ smtCurScope vi : smtOtherScopes vi
+inScope vi = Map.keys $ Map.unions $ smtCurScope vi : smtOtherScopes vi
 
 startScope :: VarInfo -> VarInfo
-startScope vi = vi { smtCurScope    = Set.empty
+startScope vi = vi { smtCurScope    = Map.empty
                    , smtOtherScopes = smtCurScope vi : smtOtherScopes vi }
 
 endScope :: VarInfo -> VarInfo
@@ -1284,24 +1254,19 @@ endScope vi =
       , smtOtherScopes  = ss
       }
 
-data VarStatus = Undeclared | Declared | Constrained
+varToTyVar :: String -> VarInfo -> Maybe TyVar
+varToTyVar x vi = msum $ map (Map.lookup x) $ smtCurScope vi : smtOtherScopes vi
 
--- | Update var info, and indicate what declaring we need to do.
+
+data VarStatus = Undeclared | Declared
+
+-- | Update var info, and indicate if we need to declare the variable.
 declareVar :: TyVar -> VarInfo -> (VarInfo, VarStatus)
 declareVar tv vi
-  | x `Set.member` smtCurScope vi = (vi, Constrained)
-
-  | any (x `Set.member`) (smtOtherScopes vi) = (vi, Constrained)
-
-  | x `Map.member` smtDeclaredVars vi =
-    ( vi { smtCurScope = Set.insert x (smtCurScope vi) }, Declared )
-
+  | x `Map.member` smtCurScope vi            = (vi, Declared)
+  | any (x `Map.member`) (smtOtherScopes vi) = (vi, Declared)
   | otherwise =
-    ( vi { smtDeclaredVars = Map.insert x tv (smtDeclaredVars vi)
-         , smtCurScope     = Set.insert x (smtCurScope vi)
-         }
-    , Undeclared
-    )
+    ( vi { smtCurScope = Map.insert x tv (smtCurScope vi) }, Undeclared )
   where x = thyVarName tv
 
 
