@@ -969,14 +969,14 @@ solverImprove proc viRef withEv cts =
          do push
             mapM_ (assume . snd) ours
             status <- check
-            pop
 
             res <-
               case status of
 
                 -- Inconsistent: find a smaller example, then stop.
                 Unsat  ->
-                  do mbRes <- solverFindConstraidction proc viRef others ours
+                  do pop
+                     mbRes <- solverFindConstraidction proc viRef others ours
                      case mbRes of
                        Nothing ->
                          fail "Bug: Failed to reporoduce contradiciton."
@@ -984,12 +984,16 @@ solverImprove proc viRef withEv cts =
                          return $ ExtSolContradiction core rest
 
                 -- We don't know: treat as consistent.
-                Unknown -> return (ExtSolOk [])
+                Unknown -> do pop
+                              return (ExtSolOk [])
 
                 -- Consistent: try to compute derived work.
                 Sat ->
                   do m    <- solverGetModel proc =<< readIORef viRef
+
                      imps <- solverImproveModel proc viRef m
+                     pop
+
                      vi   <- readIORef viRef
 
                      let loc    = ctLoc oneOfOurs -- XXX: Better location?
