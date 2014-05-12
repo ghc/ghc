@@ -123,7 +123,7 @@ untidy_message :: (Name, [HsLit]) -> (Name, [HsLit])
 untidy_message (string, lits) = (string, map untidy_lit lits)
 \end{code}
 
-The function @untidy@ does the reverse work of the @tidy_pat@ funcion.
+The function @untidy@ does the reverse work of the @tidy_pat@ function.
 
 \begin{code}
 
