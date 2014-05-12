@@ -423,6 +423,9 @@ instance Read a => Read (Maybe a) where
   readList     = readListDefault
 
 instance Read a => Read [a] where
+  {-# SPECIALISE instance Read [String] #-}
+  {-# SPECIALISE instance Read [Char] #-}
+  {-# SPECIALISE instance Read [Int] #-}
   readPrec     = readListPrec
   readListPrec = readListPrecDefault
   readList     = readListDefault

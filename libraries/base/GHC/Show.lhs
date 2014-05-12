@@ -184,7 +184,10 @@ instance  Show ()  where
     showsPrec _ () = showString "()"
 
 instance Show a => Show [a]  where
-    showsPrec _         = showList
+  {-# SPECIALISE instance Show [String] #-}
+  {-# SPECIALISE instance Show [Char] #-}
+  {-# SPECIALISE instance Show [Int] #-}
+  showsPrec _         = showList
 
 instance Show Bool where
   showsPrec _ True  = showString "True"
