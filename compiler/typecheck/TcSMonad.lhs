@@ -487,7 +487,7 @@ givens effectively look like
     (C fsk b, F a ~ fsk)
 Then we simplify the wanteds, transforming (C (F a) beta) to (C fsk beta).
 Now, if we don't solve that wanted, we'll put it back into the residual
-implicaiton.  But where is fsk bound?
+implication.  But where is fsk bound?
 
 We solve this by recording the given flatten-skolems in the implication
 (the ic_fsks field), so it's as if we change the implication to
