@@ -650,6 +650,41 @@ instance Bounded Word where
 #else
 #error Unhandled value for WORD_SIZE_IN_BITS
 #endif
+
+instance Enum Word where
+    succ x
+        | x /= maxBound = x + 1
+        | otherwise     = succError "Word"
+    pred x
+        | x /= minBound = x - 1
+        | otherwise     = predError "Word"
+    toEnum i@(I# i#)
+        | i >= 0        = W# (int2Word# i#)
+        | otherwise     = toEnumError "Word" i (minBound::Word, maxBound::Word)
+    fromEnum x@(W# x#)
+        | x <= maxIntWord = I# (word2Int# x#)
+        | otherwise       = fromEnumError "Word" x
+
+    enumFrom n             = map integerToWordX [wordToIntegerX n .. wordToIntegerX (maxBound :: Word)]
+    enumFromTo n1 n2       = map integerToWordX [wordToIntegerX n1 .. wordToIntegerX n2]
+    enumFromThenTo n1 n2 m = map integerToWordX [wordToIntegerX n1, wordToIntegerX n2 .. wordToIntegerX m]
+    enumFromThen n1 n2     = map integerToWordX [wordToIntegerX n1, wordToIntegerX n2 .. wordToIntegerX limit]
+      where
+         limit :: Word
+         limit  | n2 >= n1  = maxBound
+                | otherwise = minBound
+
+maxIntWord :: Word
+-- The biggest word representable as an Int
+maxIntWord = W# (case maxInt of I# i -> int2Word# i)
+
+-- For some reason integerToWord and wordToInteger (GHC.Integer.Type)
+-- work over Word#
+integerToWordX :: Integer -> Word
+integerToWordX i = W# (integerToWord i)
+
+wordToIntegerX :: Word -> Integer
+wordToIntegerX (W# x#) = wordToInteger x#
 \end{code}
 
 

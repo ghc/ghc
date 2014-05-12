@@ -345,30 +345,7 @@ instance Integral Word where
     divMod  (W# x#) y@(W# y#)
         | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
         | otherwise             = divZeroError
-    toInteger (W# x#)
-        | isTrue# (i# >=# 0#)   = smallInteger i#
-        | otherwise             = wordToInteger x#
-        where
-        !i# = word2Int# x#
-
-instance Enum Word where
-    succ x
-        | x /= maxBound = x + 1
-        | otherwise     = succError "Word"
-    pred x
-        | x /= minBound = x - 1
-        | otherwise     = predError "Word"
-    toEnum i@(I# i#)
-        | i >= 0        = W# (int2Word# i#)
-        | otherwise     = toEnumError "Word" i (minBound::Word, maxBound::Word)
-    fromEnum x@(W# x#)
-        | x <= fromIntegral (maxBound::Int)
-                        = I# (word2Int# x#)
-        | otherwise     = fromEnumError "Word" x
-    enumFrom            = integralEnumFrom
-    enumFromThen        = integralEnumFromThen
-    enumFromTo          = integralEnumFromTo
-    enumFromThenTo      = integralEnumFromThenTo
+    toInteger (W# x#)           = wordToInteger x#
 \end{code}
 
 
