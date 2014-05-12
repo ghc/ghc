@@ -45,6 +45,7 @@ import HsLit
 import Name( Name )
 import RdrName( RdrName )
 import DataCon( HsBang(..) )
+import TysPrim( funTyConName )
 import Type
 import HsDoc
 import BasicTypes
@@ -506,15 +507,31 @@ splitLHsClassTy_maybe ty
         HsKindSig ty _     -> checkl ty args
         _                  -> Nothing
 
--- Splits HsType into the (init, last) parts
+-- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
 -- Breaks up any parens in the result type: 
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
-splitHsFunType :: LHsType name -> ([LHsType name], LHsType name)
-splitHsFunType (L _ (HsFunTy x y)) = (x:args, res)
-  where
-  (args, res) = splitHsFunType y
-splitHsFunType (L _ (HsParTy ty))  = splitHsFunType ty
-splitHsFunType other               = ([], other)
+-- Also deals with (->) t1 t2; that is why it only works on LHsType Name
+--   (see Trac #9096)
+splitHsFunType :: LHsType Name -> ([LHsType Name], LHsType Name)
+splitHsFunType (L _ (HsParTy ty)) 
+  = splitHsFunType ty
+
+splitHsFunType (L _ (HsFunTy x y))
+  | (args, res) <- splitHsFunType y
+  = (x:args, res)
+
+splitHsFunType orig_ty@(L _ (HsAppTy t1 t2)) 
+  = go t1 [t2]
+  where  -- Look for (->) t1 t2, possibly with parenthesisation
+    go (L _ (HsTyVar fn))    tys | fn == funTyConName
+                                 , [t1,t2] <- tys
+                                 , (args, res) <- splitHsFunType t2
+                                 = (t1:args, res)
+    go (L _ (HsAppTy t1 t2)) tys = go t1 (t2:tys)
+    go (L _ (HsParTy ty))    tys = go ty tys
+    go _                     _   = ([], orig_ty)  -- Failure to match
+
+splitHsFunType other = ([], other)
 \end{code}
 
 
