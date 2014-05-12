@@ -122,3 +122,4 @@ test('T7321',
      ['$MAKE -s --no-print-directory T7321'])
 test('T7974', normal, compile, [''])
 test('T7558', normal, compile_fail, [''])
+test('T9096', normal, compile, [''])
