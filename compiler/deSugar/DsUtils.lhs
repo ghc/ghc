@@ -64,7 +64,6 @@ import ConLike
 import DataCon
 import PatSyn
 import Type
-import Coercion
 import TysPrim
 import TysWiredIn
 import BasicTypes
@@ -638,12 +637,13 @@ mkSelectorBinds ticks pat val_expr
         -- efficient too.
 
         -- For the error message we make one error-app, to avoid duplication.
-        -- But we need it at different types... so we use coerce for that
-       ; err_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID  unitTy (ppr pat)
-       ; err_var <- newSysLocalDs unitTy
-       ; binds <- zipWithM (mk_bind val_var err_var) ticks' binders
-       ; return ( (val_var, val_expr) : 
-                  (err_var, err_expr) :
+        -- But we need it at different types, so we make it polymorphic:
+        --     err_var = /\a. iRREFUT_PAT_ERR a "blah blah blah"
+       ; err_app <- mkErrorAppDs iRREFUT_PAT_ERROR_ID alphaTy (ppr pat)
+       ; err_var <- newSysLocalDs (mkForAllTy alphaTyVar alphaTy)
+       ; binds   <- zipWithM (mk_bind val_var err_var) ticks' binders
+       ; return ( (val_var, val_expr) :
+                  (err_var, Lam alphaTyVar err_app) :
                   binds ) }
 
   | otherwise
@@ -665,14 +665,13 @@ mkSelectorBinds ticks pat val_expr
 
     mk_bind scrut_var err_var tick bndr_var = do
     -- (mk_bind sv err_var) generates
-    --          bv = case sv of { pat -> bv; other -> coerce (type-of-bv) err_var }
+    --          bv = case sv of { pat -> bv; other -> err_var @ type-of-bv }
     -- Remember, pat binds bv
         rhs_expr <- matchSimply (Var scrut_var) PatBindRhs pat
                                 (Var bndr_var) error_expr
         return (bndr_var, mkOptTickBox tick rhs_expr)
       where
-        error_expr = mkCast (Var err_var) co
-        co         = mkUnsafeCo (exprType (Var err_var)) (idType bndr_var)
+        error_expr = Var err_var `App` Type (idType bndr_var)
 
     is_simple_lpat p = is_simple_pat (unLoc p)
 

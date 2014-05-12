@@ -1048,10 +1048,9 @@ ok_tc_app ty n = case splitTyConApp_maybe ty of
 mkInstCo :: Coercion -> Type -> Coercion
 mkInstCo co ty = InstCo co ty
 
--- | Manufacture a coercion from thin air. Needless to say, this is
---   not usually safe, but it is used when we know we are dealing with
---   bottom, which is one case in which it is safe.  This is also used
---   to implement the @unsafeCoerce#@ primitive.  Optimise by pushing
+-- | Manufacture an unsafe coercion from thin air.
+--   Currently (May 14) this is used only to implement the
+--   @unsafeCoerce#@ primitive.  Optimise by pushing
 --   down through type constructors.
 mkUnsafeCo :: Type -> Type -> Coercion
 mkUnsafeCo = mkUnivCo Representational
