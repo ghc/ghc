@@ -418,8 +418,10 @@ data FloatOutSwitches = FloatOutSwitches {
 
   floatOutConstants :: Bool,       -- ^ True <=> float constants to top level,
                                    --            even if they do not escape a lambda
-  floatOutPartialApplications :: Bool -- ^ True <=> float out partial applications
-                                            --            based on arity information.
+  floatOutOverSatApps :: Bool      -- ^ True <=> float out over-saturated applications
+                                   --            based on arity information.
+                                   -- See Note [Floating over-saturated applications]
+                                   -- in SetLevels
   }
 instance Outputable FloatOutSwitches where
     ppr = pprFloatOutSwitches
@@ -430,7 +432,7 @@ pprFloatOutSwitches sw
      sep $ punctuate comma $ 
      [ ptext (sLit "Lam =")    <+> ppr (floatOutLambdas sw)
      , ptext (sLit "Consts =") <+> ppr (floatOutConstants sw)
-     , ptext (sLit "PAPs =")   <+> ppr (floatOutPartialApplications sw) ])
+     , ptext (sLit "OverSatApps =")   <+> ppr (floatOutOverSatApps sw) ])
 
 -- The core-to-core pass ordering is derived from the DynFlags:
 runWhen :: Bool -> CoreToDo -> CoreToDo

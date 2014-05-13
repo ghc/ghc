@@ -245,6 +245,20 @@ lvlTopBind env (Rec pairs)
 %*                                                                      *
 %************************************************************************
 
+Note [Floating over-saturated applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we see (f x y), and (f x) is a redex (ie f's arity is 1),
+we call (f x) an "over-saturated application"
+
+Should we float out an over-sat app, if can escape a value lambda?
+It is sometimes very beneficial (-7% runtime -4% alloc over nofib -O2).
+But we don't want to do it for class selectors, because the work saved
+is minimal, and the extra local thunks allocated cost money.
+
+Arguably we could float even class-op applications if they were going to
+top level -- but then they must be applied to a constant dictionary and
+will almost certainly be optimised away anyway.
+
 \begin{code}
 lvlExpr :: LevelEnv             -- Context
         -> CoreExprWithFVs      -- Input expression
@@ -285,13 +299,10 @@ lvlExpr env expr@(_, AnnApp _ _) = do
       (fun, args) = collectAnnArgs expr
     --
     case fun of
-         -- float out partial applications.  This is very beneficial
-         -- in some cases (-7% runtime -4% alloc over nofib -O2).
-         -- In order to float a PAP, there must be a function at the
-         -- head of the application, and the application must be
-         -- over-saturated with respect to the function's arity.
-      (_, AnnVar f) | floatPAPs env &&
-                      arity > 0 && arity < n_val_args ->
+      (_, AnnVar f) | floatOverSat env   -- See Note [Floating over-saturated applications]
+                    , arity > 0
+                    , arity < n_val_args
+                    , Nothing <- isClassOpId_maybe f ->
         do
          let (lapp, rargs) = left (n_val_args - arity) expr []
          rargs' <- mapM (lvlMFE False env) rargs
@@ -940,8 +951,8 @@ floatLams le = floatOutLambdas (le_switches le)
 floatConsts :: LevelEnv -> Bool
 floatConsts le = floatOutConstants (le_switches le)
 
-floatPAPs :: LevelEnv -> Bool
-floatPAPs le = floatOutPartialApplications (le_switches le)
+floatOverSat :: LevelEnv -> Bool
+floatOverSat le = floatOutOverSatApps (le_switches le)
 
 setCtxtLvl :: LevelEnv -> Level -> LevelEnv
 setCtxtLvl env lvl = env { le_ctxt_lvl = lvl }
