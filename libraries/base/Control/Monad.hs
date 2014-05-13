@@ -210,14 +210,17 @@ join x            =  x >>= id
 -- the result as a pair of lists. This function is mainly used with complicated
 -- data structures or a state-transforming monad.
 mapAndUnzipM      :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
+{-# INLINE mapAndUnzipM #-}
 mapAndUnzipM f xs =  sequence (map f xs) >>= return . unzip
 
 -- | The 'zipWithM' function generalizes 'zipWith' to arbitrary monads.
 zipWithM          :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+{-# INLINE zipWithM #-}
 zipWithM f xs ys  =  sequence (zipWith f xs ys)
 
 -- | 'zipWithM_' is the extension of 'zipWithM' which ignores the final result.
 zipWithM_         :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
+{-# INLINE zipWithM_ #-}
 zipWithM_ f xs ys =  sequence_ (zipWith f xs ys)
 
 {- | The 'foldM' function is analogous to 'foldl', except that its result is
@@ -240,20 +243,32 @@ If right-to-left evaluation is required, the input list should be reversed.
 -}
 
 foldM             :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
+{-# INLINEABLE foldM #-}
+{-# SPECIALISE foldM :: (a -> b -> IO a) -> a -> [b] -> IO a #-}
+{-# SPECIALISE foldM :: (a -> b -> Maybe a) -> a -> [b] -> Maybe a #-}
 foldM _ a []      =  return a
 foldM f a (x:xs)  =  f a x >>= \fax -> foldM f fax xs
 
 -- | Like 'foldM', but discards the result.
 foldM_            :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m ()
+{-# INLINEABLE foldM_ #-}
+{-# SPECIALISE foldM_ :: (a -> b -> IO a) -> a -> [b] -> IO () #-}
+{-# SPECIALISE foldM_ :: (a -> b -> Maybe a) -> a -> [b] -> Maybe () #-}
 foldM_ f a xs     = foldM f a xs >> return ()
 
 -- | @'replicateM' n act@ performs the action @n@ times,
 -- gathering the results.
 replicateM        :: (Monad m) => Int -> m a -> m [a]
+{-# INLINEABLE replicateM #-}
+{-# SPECIALISE replicateM :: Int -> IO a -> IO [a] #-}
+{-# SPECIALISE replicateM :: Int -> Maybe a -> Maybe [a] #-}
 replicateM n x    = sequence (replicate n x)
 
 -- | Like 'replicateM', but discards the result.
 replicateM_       :: (Monad m) => Int -> m a -> m ()
+{-# INLINEABLE replicateM_ #-}
+{-# SPECIALISE replicateM_ :: Int -> IO a -> IO () #-}
+{-# SPECIALISE replicateM_ :: Int -> Maybe a -> Maybe () #-}
 replicateM_ n x   = sequence_ (replicate n x)
 
 {- | Conditional execution of monadic expressions. For example, 
@@ -265,11 +280,17 @@ and otherwise do nothing.
 -}
 
 when              :: (Monad m) => Bool -> m () -> m ()
+{-# INLINEABLE when #-}
+{-# SPECIALISE when :: Bool -> IO () -> IO () #-}
+{-# SPECIALISE when :: Bool -> Maybe () -> Maybe () #-}
 when p s          =  if p then s else return ()
 
 -- | The reverse of 'when'.
 
 unless            :: (Monad m) => Bool -> m () -> m ()
+{-# INLINEABLE unless #-}
+{-# SPECIALISE unless :: Bool -> IO () -> IO () #-}
+{-# SPECIALISE unless :: Bool -> Maybe () -> Maybe () #-}
 unless p s        =  if p then return () else s
 
 -- | Promote a function to a monad.
@@ -299,6 +320,22 @@ liftM4 f m1 m2 m3 m4    = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; return (f
 -- left to right (cf. 'liftM2').
 liftM5  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> a5 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m a5 -> m r
 liftM5 f m1 m2 m3 m4 m5 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; x5 <- m5; return (f x1 x2 x3 x4 x5) }
+
+{-# INLINEABLE liftM #-}
+{-# SPECIALISE liftM :: (a1->r) -> IO a1 -> IO r #-}
+{-# SPECIALISE liftM :: (a1->r) -> Maybe a1 -> Maybe r #-}
+{-# INLINEABLE liftM2 #-}
+{-# SPECIALISE liftM2 :: (a1->a2->r) -> IO a1 -> IO a2 -> IO r #-}
+{-# SPECIALISE liftM2 :: (a1->a2->r) -> Maybe a1 -> Maybe a2 -> Maybe r #-}
+{-# INLINEABLE liftM3 #-}
+{-# SPECIALISE liftM3 :: (a1->a2->a3->r) -> IO a1 -> IO a2 -> IO a3 -> IO r #-}
+{-# SPECIALISE liftM3 :: (a1->a2->a3->r) -> Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe r #-}
+{-# INLINEABLE liftM4 #-}
+{-# SPECIALISE liftM4 :: (a1->a2->a3->a4->r) -> IO a1 -> IO a2 -> IO a3 -> IO a4 -> IO r #-}
+{-# SPECIALISE liftM4 :: (a1->a2->a3->a4->r) -> Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe a4 -> Maybe r #-}
+{-# INLINEABLE liftM5 #-}
+{-# SPECIALISE liftM5 :: (a1->a2->a3->a4->a5->r) -> IO a1 -> IO a2 -> IO a3 -> IO a4 -> IO a5 -> IO r #-}
+{-# SPECIALISE liftM5 :: (a1->a2->a3->a4->a5->r) -> Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe a4 -> Maybe a5 -> Maybe r #-}
 
 {- | In many situations, the 'liftM' operations can be replaced by uses of
 'ap', which promotes function application. 
@@ -337,6 +374,7 @@ f <$!> m = do
 -- @mfilter odd (Just 2) == Nothing@
 
 mfilter :: (MonadPlus m) => (a -> Bool) -> m a -> m a
+{-# INLINEABLE mfilter #-}
 mfilter p ma = do
   a <- ma
   if p a then return a else mzero
