@@ -948,7 +948,9 @@ mkAppCo co1 co2 = mkAppCoFlexible co1 Nominal co2
 mkAppCoFlexible :: Coercion -> Role -> Coercion -> Coercion
 mkAppCoFlexible (Refl r ty1) _ (Refl _ ty2)
   = Refl r (mkAppTy ty1 ty2)
-mkAppCoFlexible (Refl r (TyConApp tc tys)) r2 co2
+mkAppCoFlexible (Refl r ty1) r2 co2
+  | Just (tc, tys) <- splitTyConApp_maybe ty1
+    -- Expand type synonyms; a TyConAppCo can't have a type synonym (Trac #9102)
   = TyConAppCo r tc (zip_roles (tyConRolesX r tc) tys)
   where
     zip_roles (r1:_)  []        = [downgradeRole r1 r2 co2]
