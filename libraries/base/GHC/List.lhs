@@ -385,10 +385,17 @@ takeFoldr (I# n#) xs
 takeConst :: a -> Int# -> a
 takeConst x _ = x
 
-{-# NOINLINE [0] takeFB #-}
+{-# INLINE [0] takeFB #-}
 takeFB :: (a -> b -> b) -> b -> a -> (Int# -> b) -> Int# -> b
-takeFB c n x xs m | isTrue# (m <=# 1#) = x `c` n
-                  | otherwise          = x `c` xs (m -# 1#)
+-- The \m accounts for the fact that takeFB is used in a higher-order
+-- way by takeFoldr, so it's better to inline.  A good example is
+--     take n (repeat x)
+-- for which we get excellent code... but only if we inline takeFB
+-- when given four arguments
+takeFB c n x xs
+  = \ m -> if isTrue# (m <=# 1#)
+           then x `c` n
+           else x `c` xs (m -# 1#)
 
 {-# INLINE [0] take #-}
 take (I# n#) xs = takeUInt n# xs
