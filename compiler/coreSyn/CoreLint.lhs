@@ -856,6 +856,9 @@ lintCoercion co@(TyConAppCo r tc cos)
        ; checkRole co2 r r2
        ; return (rk, mkFunTy s1 s2, mkFunTy t1 t2, r) }
 
+  | isSynTyCon tc
+  = failWithL (ptext (sLit "Synonym in TyConAppCo:") <+> ppr co)
+
   | otherwise
   = do { (ks,ss,ts,rs) <- mapAndUnzip4M lintCoercion cos
        ; rk <- lint_co_app co (tyConKind tc) (ss `zip` ks)
