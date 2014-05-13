@@ -8,5 +8,5 @@
       instance Show Unary -- Defined at ../Test.hs:37:29
       instance Show a => Show (MkT2 a) -- Defined at ../Test.hs:20:12
       instance Show a => Show (MkT a) -- Defined at ../Test.hs:17:13
-      ...plus 31 others
+      ...plus 30 others
     In a stmt of an interactive GHCi command: print it
