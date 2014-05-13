@@ -326,6 +326,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                                    intermediate_iface decls
 
     -- Warn about orphans
+    -- See Note [Orphans and auto-generated rules]
     let warn_orphs      = wopt Opt_WarnOrphans dflags
         warn_auto_orphs = wopt Opt_WarnAutoOrphans dflags
         orph_warnings   --- Laziness means no work done unless -fwarn-orphans
@@ -623,7 +624,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 mi_exp_hash    = export_hash,
                 mi_orphan_hash = orphan_hash,
                 mi_flag_hash   = flag_hash,
-                mi_orphan      = not (   null orph_rules
+                mi_orphan      = not (   all ifRuleAuto orph_rules
+                                           -- See Note [Orphans and auto-generated rules]
                                       && null orph_insts
                                       && null orph_fis
                                       && isNoIfaceVectInfo (mi_vect_info iface0)),
@@ -682,6 +684,25 @@ mkIfaceAnnCache anns
     -- flipping (++), so the first argument is always short
     env = mkOccEnv_C (flip (++)) (map pair anns)
 \end{code}
+
+Note [Orphans and auto-generated rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we specialise an INLINEABLE function, or when we have
+-fspecialise-aggressively, we auto-generate RULES that are orphans.
+We don't want to warn about these, at least not by default, or we'd
+generate a lot of warnings.  Hence -fwarn-auto-orphans.
+
+Indeed, we don't even treat the module as an oprhan module if it has
+auto-generated *rule* orphans.  Orphan modules are read every time we
+compile, so they are pretty obtrusive and slow down every compilation,
+even non-optimised ones.  (Reason: for type class instances it's a
+type correctness issue.)  But specialisation rules are strictly for
+*optimisation* only so it's fine not to read the interface.
+
+What this means is that a SPEC rules from auto-specialisation in
+module M will be used in other modules only if M.hi has been read for
+some other reason, which is actually pretty likely.
+
 
 %************************************************************************
 %*                                                                      *

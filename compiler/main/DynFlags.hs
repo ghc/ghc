@@ -303,6 +303,7 @@ data GeneralFlag
    | Opt_FullLaziness
    | Opt_FloatIn
    | Opt_Specialise
+   | Opt_SpecialiseAggressively
    | Opt_StaticArgumentTransformation
    | Opt_CSE
    | Opt_LiberateCase
@@ -2671,6 +2672,7 @@ fFlags = [
   ( "strictness",                       Opt_Strictness, nop ),
   ( "late-dmd-anal",                    Opt_LateDmdAnal, nop ),
   ( "specialise",                       Opt_Specialise, nop ),
+  ( "specialise-aggressively",          Opt_SpecialiseAggressively, nop ),
   ( "float-in",                         Opt_FloatIn, nop ),
   ( "static-argument-transformation",   Opt_StaticArgumentTransformation, nop ),
   ( "full-laziness",                    Opt_FullLaziness, nop ),

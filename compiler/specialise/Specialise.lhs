@@ -5,8 +5,7 @@
 
 \begin{code}
 {-# LANGUAGE CPP #-}
-
-module Specialise ( specProgram ) where
+module Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
 
@@ -14,6 +13,7 @@ import Id
 import TcType hiding( substTy, extendTvSubstList )
 import Type   hiding( substTy, extendTvSubstList )
 import Coercion( Coercion )
+import Module( Module )
 import CoreMonad
 import qualified CoreSubst
 import CoreUnfold
@@ -21,6 +21,7 @@ import VarSet
 import VarEnv
 import CoreSyn
 import Rules
+import PprCore          ( pprParendExpr )
 import CoreUtils        ( exprIsTrivial, applyTypeToArgs )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, idFreeVars )
 import UniqSupply
@@ -569,17 +570,18 @@ Hence, the invariant is this:
 
 \begin{code}
 specProgram :: ModGuts -> CoreM ModGuts
-specProgram guts@(ModGuts { mg_rules = rules, mg_binds = binds })
-  = do { hpt_rules <- getRuleBase
-       ; dflags <- getDynFlags
-       ; let local_rules = mg_rules guts
-             rule_base = extendRuleBaseList hpt_rules rules
+specProgram guts@(ModGuts { mg_module = this_mod
+                          , mg_rules = local_rules
+                          , mg_binds = binds })
+  = do { dflags <- getDynFlags
 
              -- Specialise the bindings of this module
        ; (binds', uds) <- runSpecM dflags (go binds)
 
              -- Specialise imported functions
-       ; (new_rules, spec_binds) <- specImports dflags emptyVarSet rule_base uds
+       ; hpt_rules <- getRuleBase
+       ; let rule_base = extendRuleBaseList hpt_rules local_rules
+       ; (new_rules, spec_binds) <- specImports dflags this_mod emptyVarSet rule_base uds
 
        ; let final_binds | null spec_binds = binds'
                          | otherwise       = Rec (flattenBinds spec_binds) : binds'
@@ -603,6 +605,7 @@ specProgram guts@(ModGuts { mg_rules = rules, mg_binds = binds })
                          return (bind' ++ binds', uds')
 
 specImports :: DynFlags
+            -> Module
             -> VarSet           -- Don't specialise these ones
                                 -- See Note [Avoiding recursive specialisation]
             -> RuleBase         -- Rules from this module and the home package
@@ -610,33 +613,37 @@ specImports :: DynFlags
             -> UsageDetails     -- Calls for imported things, and floating bindings
             -> CoreM ( [CoreRule]   -- New rules
                      , [CoreBind] ) -- Specialised bindings and floating bindings
--- See Note [Specialise imported INLINABLE things]
-specImports dflags done rb uds
+specImports dflags this_mod done rule_base uds
   = do { let import_calls = varEnvElts (ud_calls uds)
-       ; (rules, spec_binds) <- go rb import_calls
+       ; (rules, spec_binds) <- go rule_base import_calls
        ; return (rules, wrapDictBinds (ud_binds uds) spec_binds) }
   where
     go _ [] = return ([], [])
     go rb (CIS fn calls_for_fn : other_calls)
-      = do { (rules1, spec_binds1) <- specImport dflags done rb fn (Map.toList calls_for_fn)
+      = do { (rules1, spec_binds1) <- specImport dflags this_mod done rb fn $
+                                      Map.toList calls_for_fn
            ; (rules2, spec_binds2) <- go (extendRuleBaseList rb rules1) other_calls
            ; return (rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
 
 specImport :: DynFlags
+           -> Module
            -> VarSet                -- Don't specialise these
                                     -- See Note [Avoiding recursive specialisation]
            -> RuleBase              -- Rules from this module
            -> Id -> [CallInfo]      -- Imported function and calls for it
            -> CoreM ( [CoreRule]    -- New rules
                     , [CoreBind] )  -- Specialised bindings
-specImport dflags done rb fn calls_for_fn
+specImport dflags this_mod done rb fn calls_for_fn
   | fn `elemVarSet` done
   = return ([], [])     -- No warning.  This actually happens all the time
                         -- when specialising a recursive function, because
                         -- the RHS of the specialised function contains a recursive
                         -- call to the original function
 
-  | isInlinablePragma (idInlinePragma fn)
+  | null calls_for_fn   -- We filtered out all the calls in deleteCallsMentioning
+  = return ([], [])
+
+  | wantSpecImport dflags fn
   , Just rhs <- maybeUnfoldingTemplate (realIdUnfolding fn)
   = do {     -- Get rules from the external package state
              -- We keep doing this in case we "page-fault in"
@@ -647,29 +654,54 @@ specImport dflags done rb fn calls_for_fn
              rules_for_fn = getRules full_rb fn
 
        ; (rules1, spec_pairs, uds) <- runSpecM dflags $
-              specCalls emptySpecEnv rules_for_fn calls_for_fn fn rhs
+              specCalls (Just this_mod) emptySpecEnv rules_for_fn calls_for_fn fn rhs
        ; let spec_binds1 = [NonRec b r | (b,r) <- spec_pairs]
              -- After the rules kick in we may get recursion, but
              -- we rely on a global GlomBinds to sort that out later
              -- See Note [Glom the bindings if imported functions are specialised]
 
               -- Now specialise any cascaded calls
-       ; (rules2, spec_binds2) <- specImports dflags (extendVarSet done fn)
+       ; (rules2, spec_binds2) <- -- pprTrace "specImport" (ppr fn $$ ppr uds $$ ppr rhs) $
+                                  specImports dflags this_mod (extendVarSet done fn)
                                                      (extendRuleBaseList rb rules1)
                                                      uds
 
        ; return (rules2 ++ rules1, spec_binds2 ++ spec_binds1) }
 
   | otherwise
-  = WARN( True, ptext (sLit "specImport discard") <+> ppr fn <+> ppr calls_for_fn )
+  = WARN( True, hang (ptext (sLit "specImport discarding:"))
+                   2 (vcat (map (pprCallInfo fn) calls_for_fn)) )
     return ([], [])
+
+wantSpecImport :: DynFlags -> Id -> Bool
+-- See Note [Specialise imported INLINABLE things]
+wantSpecImport dflags fn
+ = case idUnfolding fn of
+     NoUnfolding      -> False
+     OtherCon {}      -> False
+     DFunUnfolding {} -> True
+     CoreUnfolding { uf_src = src, uf_guidance = _guidance }
+       | gopt Opt_SpecialiseAggressively dflags -> True
+       | isStableSource src -> True
+               -- Specialise even INILNE things; it hasn't inlined yet,
+               -- so perhaps it never will.  Moreover it may have calls
+               -- inside it that we want to specialise
+       | otherwise -> False    -- Stable, not INLINE, hence INLINEABLE
 \end{code}
 
 Note [Specialise imported INLINABLE things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We specialise INLINABLE things but not INLINE things.  The latter
-should be inlined bodily, so not much point in specialising them.
-Moreover, we risk lots of orphan modules from vigorous specialisation.
+What imported functions do we specialise?  The basic set is
+ * DFuns and things with INLINABLE pragmas.
+but with -fspecialise-aggressively we add
+ * Anything with an unfolding template
+
+Trac #8874 has a good example of why we want to auto-specialise DFuns.
+
+We have the -fspecialise-aggressively flag (usually off), because we
+risk lots of orphan modules from over-vigorous specialisation.
+However it's not a big deal: anything non-recursive with an
+unfolding-template will probably have been inlined already.
 
 Note [Glom the bindings if imported functions are specialised]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1004,7 +1036,7 @@ specDefn :: SpecEnv
 specDefn env body_uds fn rhs
   = do { let (body_uds_without_me, calls_for_me) = callsForMe fn body_uds
              rules_for_me = idCoreRules fn
-       ; (rules, spec_defns, spec_uds) <- specCalls env rules_for_me
+       ; (rules, spec_defns, spec_uds) <- specCalls Nothing env rules_for_me
                                                     calls_for_me fn rhs
        ; return ( fn `addIdSpecialisations` rules
                 , spec_defns
@@ -1017,7 +1049,9 @@ specDefn env body_uds fn rhs
                 -- body_uds_without_me
 
 ---------------------------
-specCalls :: SpecEnv
+specCalls :: Maybe Module      -- Just this_mod  =>  specialising imported fn
+                               -- Nothing        =>  specialising local fn
+          -> SpecEnv
           -> [CoreRule]                 -- Existing RULES for the fn
           -> [CallInfo]
           -> Id -> CoreExpr
@@ -1029,7 +1063,7 @@ specCalls :: SpecEnv
 -- duplicate ones. So the caller does not need to do this filtering.
 -- See 'already_covered'
 
-specCalls env rules_for_me calls_for_me fn rhs
+specCalls mb_mod env rules_for_me calls_for_me fn rhs
         -- The first case is the interesting one
   |  rhs_tyvars `lengthIs`     n_tyvars -- Rhs of fn's defn has right number of big lambdas
   && rhs_ids    `lengthAtLeast` n_dicts -- and enough dict args
@@ -1048,7 +1082,7 @@ specCalls env rules_for_me calls_for_me fn rhs
        ; return (spec_rules, spec_defns, plusUDList spec_uds) }
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
-  = WARN( not (exprIsTrivial rhs) && notNull calls_for_me, 
+  = WARN( not (exprIsTrivial rhs) && notNull calls_for_me,
           ptext (sLit "Missed specialisation opportunity for")
                                  <+> ppr fn $$ _trace_doc )
           -- Note [Specialisation shape]
@@ -1150,7 +1184,14 @@ specCalls env rules_for_me calls_for_me fn rhs
            ; let
                 -- The rule to put in the function's specialisation is:
                 --      forall b, d1',d2'.  f t1 b t3 d1' d2' = f1 b
-                rule_name = mkFastString ("SPEC " ++ showSDocDump dflags (ppr fn <+> hsep (map ppr_call_key_ty call_ts)))
+                herald = case mb_mod of
+                           Nothing        -- Specialising local fn
+                               -> ptext (sLit "SPEC")
+                           Just this_mod  -- Specialising imoprted fn
+                               -> ptext (sLit "SPEC/") <> ppr this_mod
+
+                rule_name = mkFastString $ showSDocDump dflags $
+                            herald <+> ppr fn <+> hsep (map ppr_call_key_ty call_ts)
                 spec_env_rule = mkRule True {- Auto generated -} is_local
                                   rule_name
                                   inl_act       -- Note [Auto-specialisation and RULES]
@@ -1459,18 +1500,23 @@ Why (a)? Previously the idea is that the point of INLINE was
 precisely to specialise the function at its call site, and that's not
 so important for the specialised copies.  But *pragma-directed*
 specialisation now takes place in the typechecker/desugarer, with
-manually specified INLINEs.  The specialiation here is automatic.
+manually specified INLINEs.  The specialisation here is automatic.
 It'd be very odd if a function marked INLINE was specialised (because
 of some local use), and then forever after (including importing
 modules) the specialised version wasn't INLINEd.  After all, the
 programmer said INLINE!
 
-You might wonder why we don't just not-specialise INLINE functions.
-It's because even INLINE functions are sometimes not inlined, when
-they aren't applied to interesting arguments.  But perhaps the type
-arguments alone are enough to specialise (even though the args are too
-boring to trigger inlining), and it's certainly better to call the
-specialised version.
+You might wonder why we specialise INLINE functions at all.  After
+all they should be inlined, right?  Two reasons:
+
+ * Even INLINE functions are sometimes not inlined, when
+   they aren't applied to interesting arguments.  But perhaps the type
+   arguments alone are enough to specialise (even though the args are too
+   boring to trigger inlining), and it's certainly better to call the
+   specialised version.
+
+ * The RHS of an INLINE function might call another overloaded function,
+   and we'd like to generate a specialised version of that function too.
 
 Why (b)? See Trac #4874 for persuasive examples.  Suppose we have
     {-# INLINABLE f #-}
@@ -1549,11 +1595,9 @@ instance Outputable CallInfoSet where
   ppr (CIS fn map) = hang (ptext (sLit "CIS") <+> ppr fn)
                         2 (ppr map)
 
-{-
 pprCallInfo :: Id -> CallInfo -> SDoc
 pprCallInfo fn (CallKey mb_tys, (dxs, _))
   = hang (ppr fn) 2 (sep (map ppr_call_key_ty mb_tys ++ map pprParendExpr dxs))
--}
 
 ppr_call_key_ty :: Maybe Type -> SDoc
 ppr_call_key_ty Nothing   = char '_'
@@ -1606,8 +1650,14 @@ singleCall id tys dicts
         --
         -- We don't include the 'id' itself.
 
-mkCallUDs :: SpecEnv -> Id -> [CoreExpr] -> UsageDetails
+mkCallUDs, mkCallUDs' :: SpecEnv -> Id -> [CoreExpr] -> UsageDetails
 mkCallUDs env f args
+  = -- pprTrace "mkCallUDs" (vcat [ ppr f, ppr args, ppr res ])
+    res
+  where
+    res = mkCallUDs' env f args
+
+mkCallUDs' env f args
   | not (want_calls_for f)  -- Imported from elsewhere
   || null theta             -- Not overloaded
   = emptyUDs
@@ -1630,7 +1680,7 @@ mkCallUDs env f args
     constrained_tyvars = closeOverKinds (tyVarsOfTypes theta)
     n_tyvars           = length tyvars
     n_dicts            = length theta
-   
+
     spec_tys = [mk_spec_ty tv ty | (tv, Type ty) <- tyvars `zip` args]
     dicts    = [dict_expr | (_, dict_expr) <- theta `zip` (drop n_tyvars args)]
 
@@ -1638,7 +1688,12 @@ mkCallUDs env f args
         | tyvar `elemVarSet` constrained_tyvars = Just ty
         | otherwise                             = Nothing
 
-    want_calls_for f = isLocalId f || isInlinablePragma (idInlinePragma f)
+    want_calls_for f = isLocalId f || isJust (maybeUnfoldingTemplate (realIdUnfolding f))
+         -- For imported things, we gather call instances if
+         -- there is an unfolding that we could in principle specialise
+         -- We might still decide not to use it (consulting dflags)
+         -- in specImports
+         -- Use 'realIdUnfolding' to ignore the loop-breaker flag!
 
     type_determines_value pred    -- See Note [Type determines value]
         = case classifyPredType pred of
@@ -1810,11 +1865,11 @@ dumpBindUDs bndrs (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
 callsForMe :: Id -> UsageDetails -> (UsageDetails, [CallInfo])
 callsForMe fn (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
   = -- pprTrace ("callsForMe")
-    --         (vcat [ppr fn,
-    --                text "Orig dbs ="     <+> ppr (_dictBindBndrs orig_dbs),
-    --                text "Orig calls ="   <+> ppr orig_calls,
-    --                text "Dep set ="      <+> ppr dep_set,
-    --                text "Calls for me =" <+> ppr calls_for_me]) $
+    --          (vcat [ppr fn,
+    --                 text "Orig dbs ="     <+> ppr (_dictBindBndrs orig_dbs),
+    --                 text "Orig calls ="   <+> ppr orig_calls,
+    --                 text "Dep set ="      <+> ppr dep_set,
+    --                 text "Calls for me =" <+> ppr calls_for_me]) $
     (uds_without_me, calls_for_me)
   where
     uds_without_me = MkUD { ud_binds = orig_dbs, ud_calls = delVarEnv orig_calls fn }
