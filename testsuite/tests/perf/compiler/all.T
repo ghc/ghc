@@ -195,7 +195,7 @@ test('T4801',
              # 2013-02-10:  11207828 (x86/OSX)
              # (some date): 11139444
              # 2013-11-13:  11829000 (x86/Windows, 64bit machine)
-           (wordsize(64), 25002136, 10)]),
+           (wordsize(64), 21442744, 10)]),
                 # prev:       20486256 (amd64/OS X)
                 # 30/08/2012: 17305600--20391920 (varies a lot)
                 # 19/10/2012: 26882576 (-fPIC turned on)
@@ -204,6 +204,7 @@ test('T4801',
                 # 10/01/2014: 25166280 
                 # 13/01/2014: 22646000 (mostly due to #8647)
                 # 18/02/2014: 25002136 (call arity analysis changes)
+                # 12/05/2014: 25002136 (specialisation and inlining changes)
        only_ways(['normal']),
        extra_hc_opts('-static')
       ],
@@ -352,14 +353,13 @@ test('T5321Fun',
              # prev:       300000000
              # 2012-10-08: 344416344 x86/Linux
              #  (increase due to new codegen)
-            (wordsize(64), 694019152, 10)])
+            (wordsize(64), 614409344, 10)])
              # prev:       585521080
-             # 29/08/2012: 713385808
-             #  (increase due to new codegen)
-             # 15/05/2013: 628341952
-             #  (reason for decrease unknown)
-             # 24/06/2013: 694019152
-             #  (reason for re-increase unknown)
+             # 29/08/2012: 713385808     #  (increase due to new codegen)
+             # 15/05/2013: 628341952     #  (reason for decrease unknown)
+             # 24/06/2013: 694019152     #  (reason for re-increase unknown)
+             # 12/05/2014: 614409344     #  (specialisation and inlining changes)
+
       ],
       compile,[''])
 
