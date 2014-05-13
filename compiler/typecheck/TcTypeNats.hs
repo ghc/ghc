@@ -12,7 +12,7 @@ import TcEvidence ( mkTcAxiomRuleCo, EvTerm(..) )
 import TyCon      ( TyCon, SynTyConRhs(..), mkSynTyCon, TyConParent(..)  )
 import Coercion   ( Role(..) )
 import TcRnTypes  ( Xi, Ct(..), ctPred, CtEvidence(..), mkNonCanonical
-                  , CtLoc, ctLoc )
+                  , CtLoc, ctLoc, isGivenCt )
 import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..) )
 import Name       ( Name, BuiltInSyntax(..), nameOccName, nameUnique )
 import OccName    ( occNameString )
@@ -43,7 +43,7 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe ( isJust, mapMaybe )
 import           Data.Char  ( isSpace )
-import           Data.List ( unfoldr, foldl', partition )
+import           Data.List ( unfoldr, foldl', partition, sortBy, groupBy )
 import           Data.IORef ( IORef, newIORef, atomicModifyIORef',
                               atomicModifyIORef, modifyIORef'
                             , readIORef
@@ -784,8 +784,9 @@ newExternalSolver exe opts =
        , extSolAssert = \cts ->
           do dbg "=== ASSERT ==="
              (_,ours) <- solverPrepare proc viRef cts
-             mapM_ (solverAssume proc . snd) ours
-             mapM_ (solverDebug proc . show . snd) ours
+             let expr (_,e,_) = e
+             mapM_ (solverAssume proc . expr) ours
+             mapM_ (solverDebug proc . show . expr) ours
 
        , extSolImprove = \b cts -> do dbg "=== IMPROVE ==="
                                       solverImprove proc viRef b cts
@@ -947,17 +948,19 @@ solverImproveModel proc viRef imps =
 
 -- Identify our constraints, and declare their variables in the current scope.
 solverPrepare :: SolverProcess -> IORef VarInfo ->
-                 [Ct] -> IO ([Ct], [(Ct,SExpr)])
+                 [Ct] -> IO ([Ct], [(Ct,SExpr,Maybe TyVar)])
 solverPrepare proc viRef = go [] []
   where
   go others ours [] = return (others, ours)
   go others ours (ct : cts) =
     case knownCt ct of
-      Just (vars,e) ->
-        do mapM_ (solverDeclare proc viRef) (eltsUFM vars)
-           go       others ((ct,e) : ours) cts
+      Just (vars,e,mbV) ->
+        do let g = if isGivenCt ct then "[G] " else "[W/D] "
+           solverDebug proc (g ++ show e)
+           mapM_ (solverDeclare proc viRef) (eltsUFM vars)
+           go       others ((ct,e,mbV) : ours) cts
       Nothing ->
-           go (ct : others)          ours  cts
+           go (ct : others)              ours  cts
 
 
 {-
@@ -971,7 +974,8 @@ solverImprove :: SolverProcess -> IORef VarInfo
               -> IO ExtSolRes
 solverImprove proc viRef withEv cts =
   do push   -- declare variables
-     (others,ours) <- solverPrepare proc viRef cts
+     (others,ours') <- solverPrepare proc viRef cts
+     let ours = [ (ct,e) | (ct,e,_) <- ours' ]
      case ours of
        [] -> do pop -- declarations
                 return (ExtSolOk [])
@@ -1115,31 +1119,50 @@ to prove:
 (a + a) + b   ~   w + b
 
 We can't do this because we've lost the information about `w`.
+To avoid this, we first try to solve equations that have the same varibal
+on the RHS (e.g., F xs ~ a, G ys ~ a).
+
+However, this is not quite enough.  Here is another tricky example:
+
+data T :: Nat -> * where
+  Even  :: T (n + 1) -> T (2 * (n + 1))
+
+addT :: T m -> T n -> T (m + n)
+addT (Even x) (Even y) = Even (addT x y)
 
 
-Perhaps the answer is to solve all goals at the same time
-(this also has the benefit of being more efficeint!).
+x :: T (a + 1)
+y :: T (b + 1)
 
-If we need to solve a collection of goals:
+[G] m = 2 * (a + 1)
+[G] n = 2 * (b + 1)
 
-A /\ B /\ C /\ D
+addT x y :: T ((a + 1) + (b + 1))
 
-we look for a counter example, which amounts to finding a model for:
+[W] (a + 1) + (b + 1) = x + 1  -- Applying Even is OK
+[W] 2 * (x + 1) = m + n        -- The result is correct
 
-not (A /\ B /\ C /\ D)
+After canonicalization:
 
-If such a model does not exist, than we can solve all the goals.
-If it does exits, then we can't solve all the golas, at which point
-we could give up.
+[G] a + 1  = t1
+[G] b + 1  = t2
+[G] 2 * t1 = m
+[G] 2 * t2 = n
 
-Instead of giving up, it is nicer to try to identify a small
-subset of all goals that can't be solved, to report a more
-reasonable error.  For example, if the goals were:
+[W] t1 + t2 = t3
+[W] x  + 1  = t3
+[W] 2 * t3  = t4
+[W] m + n   = t4
 
-(x = 2,  a + 0 ~ a)
+The issue here seems to be that `x = a + b + 1`, but this intermediate
+value is not named anywhere.  What to do?
 
-We can't solve these togethere (there is no reason why `x` should be 2),
-but we could solve the `a + 0 ~ a` part.
+
+XXX: BUG The following incorrect program causes infinte improvement
+
+addT :: T m -> T n -> T (m + n)
+addT (Even x) (Even y) = Even (addT x x)
+
 -}
 
 
@@ -1150,7 +1173,10 @@ solverSimplify :: SolverProcess -> IORef VarInfo ->
 solverSimplify proc viRef cts =
   do push     -- `unsolved` scope
      (others,ours) <- solverPrepare proc viRef cts
-     go others [] ours
+     let r = reorder ours
+     solverDebug proc "Reordered:"
+     mapM_ (solverDebug proc . show . snd) r
+     go others [] r
   where
   push    = solverPush    proc viRef
   pop     = solverPop     proc viRef
@@ -1174,6 +1200,22 @@ solverSimplify proc viRef cts =
                in go unsolved ((ev,ct) : solved) more
           else do assume e    -- add to `unsolved`
                   go (ct : unsolved) solved more
+
+  reorder = map dropVar
+          . concat
+          . sortBy  longer    -- most vars first
+          . groupBy sameVars  -- join together eqns for same variable
+          . sortBy  cmpVars   -- first sort by variable
+
+    where
+    cmpVars  (_,_,v1) (_,_,v2) = compare v1 v2
+    sameVars (_,_,v1) (_,_,v2) = v1 == v2
+    longer xs ys               = compare (length ys) (length xs)
+    dropVar (ct,e,_) = (ct,e)
+
+
+
+
 
 --------------------------------------------------------------------------------
 
@@ -1216,13 +1258,17 @@ data Ty       = TNat | TBool
 type VarTypes = UniqFM (TyVar,String,Ty)
 
 
-knownCt :: Ct -> Maybe (VarTypes, SExpr)
+{- | See if this constraint is one ofthe ones that we understand.
+If the constraint is of the form `F ts ~ a`, where `a` is a type-variable,
+we also return `a`.  This is used to decide in what order to solve
+constraints, see `solverSimplify`. -}
+knownCt :: Ct -> Maybe (VarTypes, SExpr, Maybe TyVar)
 knownCt ct =
   case ct of
     CFunEqCan _ f args rhs ->
       do (vs1,e1) <- knownTerm f args
          (vs2,e2) <- knownXi rhs
-         return (plusUFM vs1 vs2, smtEq e1 e2)
+         return (plusUFM vs1 vs2, smtEq e1 e2, getTyVar_maybe rhs)
     _ -> Nothing
 
 knownTerm :: TyCon -> [Xi] -> Maybe (VarTypes, SExpr)
