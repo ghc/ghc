@@ -856,7 +856,7 @@ lintCoercion co@(TyConAppCo r tc cos)
        ; checkRole co2 r r2
        ; return (rk, mkFunTy s1 s2, mkFunTy t1 t2, r) }
 
-  | isSynTyCon tc
+  | Just {} <- synTyConDefn_maybe tc
   = failWithL (ptext (sLit "Synonym in TyConAppCo:") <+> ppr co)
 
   | otherwise
