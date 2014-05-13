@@ -178,14 +178,13 @@ interactExternSolver inGivenStage =
          -- During the wanted stage, we try to solve the constraints
          -- once there is no more additional work for re-writing.
          | otherwise ->
-             do (solved, unsolved) <- extSolSolve feqs
+             do let (wanteds, others) = partition isWantedCt feqs
+                (solved, unsolved) <- extSolSolve wanteds
                 case solved of
                   [] -> return False  -- Shortcut for common case.
-                  _  -> do rebuildInerts unsolved
-                           let setEv (ev,ct)
-                                 | isWantedCt ct =
-                                    setEvBind (ctev_evar (cc_ev ct)) ev
-                                 | otherwise = return ()
+                  _  -> do rebuildInerts (unsolved ++ others)
+                           let setEv (ev,ct) =
+                                          setEvBind (ctev_evar (cc_ev ct)) ev
                            mapM_ setEv solved
                            return False
 
