@@ -9,7 +9,7 @@ license:              BSD3
 license-file:         LICENSE
 maintainer:           Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
 homepage:             http://www.haskell.org/haddock/
-bug-reports:          http://trac.haskell.org/haddock
+bug-reports:          https://github.com/haskell/haddock/issues
 category:             Documentation
 build-type:           Simple
 cabal-version:        >= 1.10
