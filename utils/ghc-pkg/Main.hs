@@ -593,9 +593,9 @@ lookForPackageDBIn dir = do
   let path_dir = dir </> "package.conf.d"
   exists_dir <- doesDirectoryExist path_dir
   if exists_dir then return (Just path_dir) else do
-  let path_file = dir </> "package.conf"
-  exists_file <- doesFileExist path_file
-  if exists_file then return (Just path_file) else return Nothing
+    let path_file = dir </> "package.conf"
+    exists_file <- doesFileExist path_file
+    if exists_file then return (Just path_file) else return Nothing
 
 readParseDatabase :: Verbosity
                   -> Maybe (FilePath,Bool)
@@ -1035,34 +1035,34 @@ listPackages verbosity my_flags mPackageName mModuleName = do
   if simple_output then show_simple stack else do
 
 #if defined(mingw32_HOST_OS) || defined(BOOTSTRAPPING)
-  mapM_ show_normal stack
+    mapM_ show_normal stack
 #else
-  let
-     show_colour withF db =
-         mconcat $ map (<#> termText "\n") $
-             (termText (location db) :
-                map (termText "   " <#>) (map pp_pkg (packages db)))
-        where
-                 pp_pkg p
-                   | sourcePackageId p `elem` broken = withF Red  doc
-                   | exposed p                       = doc
-                   | otherwise                       = withF Blue doc
-                   where doc | verbosity >= Verbose
-                             = termText (printf "%s (%s)" pkg ipid)
-                             | otherwise
-                             = termText pkg
-                          where
-                          InstalledPackageId ipid = installedPackageId p
-                          pkg = display (sourcePackageId p)
+    let
+       show_colour withF db =
+           mconcat $ map (<#> termText "\n") $
+               (termText (location db) :
+                  map (termText "   " <#>) (map pp_pkg (packages db)))
+          where
+                   pp_pkg p
+                     | sourcePackageId p `elem` broken = withF Red  doc
+                     | exposed p                       = doc
+                     | otherwise                       = withF Blue doc
+                     where doc | verbosity >= Verbose
+                               = termText (printf "%s (%s)" pkg ipid)
+                               | otherwise
+                               = termText pkg
+                            where
+                            InstalledPackageId ipid = installedPackageId p
+                            pkg = display (sourcePackageId p)
 
-  is_tty <- hIsTerminalDevice stdout
-  if not is_tty
-     then mapM_ show_normal stack
-     else do tty <- Terminfo.setupTermFromEnv
-             case Terminfo.getCapability tty withForegroundColor of
-                 Nothing -> mapM_ show_normal stack
-                 Just w  -> runTermOutput tty $ mconcat $
-                                                map (show_colour w) stack
+    is_tty <- hIsTerminalDevice stdout
+    if not is_tty
+       then mapM_ show_normal stack
+       else do tty <- Terminfo.setupTermFromEnv
+               case Terminfo.getCapability tty withForegroundColor of
+                   Nothing -> mapM_ show_normal stack
+                   Just w  -> runTermOutput tty $ mconcat $
+                                                  map (show_colour w) stack
 #endif
 
 simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()

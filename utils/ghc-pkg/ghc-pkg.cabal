@@ -17,7 +17,7 @@ Executable ghc-pkg
     Default-Language: Haskell2010
     Main-Is: Main.hs
     Other-Modules: Version
-    Default-Extensions: CPP, NondecreasingIndentation
+    Other-Extensions: CPP
 
     Build-Depends: base       >= 4   && < 5,
                    directory  >= 1   && < 1.3,
