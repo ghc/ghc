@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, FlexibleInstances, UnboxedTuples, MagicHash #-}
 {-# OPTIONS_GHC -fno-cse -fno-warn-orphans #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 

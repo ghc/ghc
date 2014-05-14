@@ -45,11 +45,17 @@ Executable ghc
     if flag(ghci)
         CPP-Options: -DGHCI
         GHC-Options: -fno-warn-name-shadowing
-        Other-Modules: InteractiveUI, GhciMonad, GhciTags
+        Other-Modules:
+            InteractiveUI
+            GhciMonad
+            GhciTags
         Build-Depends: transformers, haskeline
-        Default-Extensions: UnboxedTuples,
-                    FlexibleInstances,
-                    TupleSections,
-                    MagicHash
+        Other-Extensions:
+            FlexibleInstances
+            MagicHash
+            TupleSections
+            UnboxedTuples
 
-    Default-Extensions: CPP, NondecreasingIndentation
+    Other-Extensions:
+        CPP
+        NondecreasingIndentation

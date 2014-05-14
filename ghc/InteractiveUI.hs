@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, TupleSections #-}
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 

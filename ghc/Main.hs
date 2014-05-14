@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, NondecreasingIndentation #-}
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
