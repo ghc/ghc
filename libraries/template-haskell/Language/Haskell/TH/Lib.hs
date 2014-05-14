@@ -526,6 +526,13 @@ sigT t k
 equalityT :: TypeQ
 equalityT = return EqualityT
 
+{-# DEPRECATED classP "Constraint constructors are just type constructors, frob this code as 'constraintT'." #-}
+classP :: Name -> [Q Type] -> Q Pred
+classP cla tys
+  = do
+      tysl <- sequence tys
+      return (foldl AppT (ConT cla) tysl)
+
 promotedT :: Name -> TypeQ
 promotedT = return . PromotedT
 
