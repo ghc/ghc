@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns, CPP #-}
+
 -----------------------------------------------------------------------------
 --
 -- Code generation for ticky-ticky profiling

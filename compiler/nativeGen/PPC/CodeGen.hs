@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, GADTs #-}
 
 -----------------------------------------------------------------------------
 --
@@ -12,7 +13,6 @@
 -- (c) the #if blah_TARGET_ARCH} things, the
 -- structure should not be too overwhelming.
 
-{-# LANGUAGE GADTs #-}
 module PPC.CodeGen (
         cmmTopCodeGen,
         generateJumpTableForInstr,

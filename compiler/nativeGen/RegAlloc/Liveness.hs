@@ -1,3 +1,8 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+
 -----------------------------------------------------------------------------
 --
 -- The register liveness determinator
@@ -5,7 +10,7 @@
 -- (c) The University of Glasgow 2004-2013
 --
 -----------------------------------------------------------------------------
-{-# LANGUAGE FlexibleContexts, TypeFamilies #-}
+
 module RegAlloc.Liveness (
         RegSet,
         RegMap, emptyRegMap,

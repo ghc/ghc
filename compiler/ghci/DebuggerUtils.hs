@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module DebuggerUtils (
        dataConInfoPtrToName,
   ) where

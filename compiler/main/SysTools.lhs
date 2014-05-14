@@ -7,6 +7,8 @@
 -----------------------------------------------------------------------------
 
 \begin{code}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
+
 module SysTools (
         -- Initialisation
         initSysTools,

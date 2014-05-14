@@ -6,6 +6,8 @@
 Matching guarded right-hand-sides (GRHSs)
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module DsGRHSs ( dsGuarded, dsGRHSs, dsGRHS ) where
 
 #include "HsVersions.h"

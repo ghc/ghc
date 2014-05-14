@@ -12,6 +12,8 @@ is restricted to what the outside world understands (read C), and this
 module checks to see if a foreign declaration has got a legal type.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcForeign
         ( tcForeignImports
         , tcForeignExports

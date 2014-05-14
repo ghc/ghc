@@ -6,6 +6,8 @@
 Pattern-matching literal patterns
 
 \begin{code}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
+
 module MatchLit ( dsLit, dsOverLit, hsLitKey, hsOverLitKey
                 , tidyLitPat, tidyNPat
                 , matchLiterals, matchNPlusKPats, matchNPats

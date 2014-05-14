@@ -6,6 +6,7 @@
 The @TyCon@ datatype
 
 \begin{code}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module TyCon(
         -- * Main TyCon data types

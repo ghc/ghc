@@ -4,6 +4,8 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module RnTypes (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext,

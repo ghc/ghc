@@ -6,7 +6,7 @@
 Desugaring list comprehensions, monad comprehensions and array comprehensions
 
 \begin{code}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE CPP, NamedFieldPuns #-}
 
 module DsListComp ( dsListComp, dsPArrComp, dsMonadComp ) where
 

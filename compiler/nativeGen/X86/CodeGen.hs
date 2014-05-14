@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, GADTs, NondecreasingIndentation #-}
+
 -----------------------------------------------------------------------------
 --
 -- Generating machine code (instruction selection)
@@ -10,7 +12,6 @@
 -- (a) the sectioning, and (b) the type signatures, the
 -- structure should not be too overwhelming.
 
-{-# LANGUAGE GADTs #-}
 module X86.CodeGen (
         cmmTopCodeGen,
         generateJumpTableForInstr,

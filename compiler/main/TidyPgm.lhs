@@ -4,6 +4,8 @@
 \section{Tidying up Core}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TidyPgm (
        mkBootModDetailsTc, tidyProgram, globaliseAndTidyId
    ) where

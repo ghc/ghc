@@ -1,4 +1,6 @@
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module RnSplice (
         rnTopSpliceDecls,
         rnSpliceType, rnSpliceExpr, rnSplicePat, rnSpliceDecl,

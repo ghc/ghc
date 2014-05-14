@@ -4,6 +4,8 @@
 \section[SimplCore]{Driver for simplifying @Core@ programs}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module SimplCore ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"

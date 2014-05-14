@@ -3,6 +3,8 @@ A simple homogeneous pair type with useful Functor, Applicative, and
 Traversable instances.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module Pair ( Pair(..), unPair, toPair, swap ) where
 
 #include "HsVersions.h"

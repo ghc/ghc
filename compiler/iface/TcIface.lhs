@@ -6,6 +6,8 @@
 Type checking of type signatures in interface files
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcIface (
         tcLookupImported_maybe,
         importDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface,

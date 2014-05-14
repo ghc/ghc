@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns, CPP #-}
 
 -- | Carries interesting info for debugging / profiling of the
 --   graph coloring register allocator.

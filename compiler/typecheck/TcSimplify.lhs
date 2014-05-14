@@ -1,4 +1,6 @@
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcSimplify(
        simplifyInfer, quantifyPred,
        simplifyAmbiguityCheck,

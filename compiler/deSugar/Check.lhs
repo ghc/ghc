@@ -5,6 +5,8 @@
 % Author: Juan J. Quintela    <quintela@krilin.dc.fi.udc.es>
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module Check ( check , ExhaustivePat ) where
 
 #include "HsVersions.h"

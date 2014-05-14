@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, GADTs #-}
+
 -----------------------------------------------------------------------------
 --
 -- Pretty-printing of Cmm as C, suitable for feeding gcc
@@ -16,7 +18,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GADTs #-}
 module PprC (
         writeCs,
         pprStringInCStyle

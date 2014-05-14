@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 module CmmPipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into
   -- optimized, CPS converted and native-call-less C--.  The latter

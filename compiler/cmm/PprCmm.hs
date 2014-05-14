@@ -1,3 +1,6 @@
+{-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts, FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 ----------------------------------------------------------------------------
 --
 -- Pretty-printing of Cmm as (a superset of) C--
@@ -30,8 +33,6 @@
 --
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts #-}
 module PprCmm
   ( module PprCmmDecl
   , module PprCmmExpr

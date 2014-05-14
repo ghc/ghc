@@ -6,6 +6,7 @@
 Type - public interface
 
 \begin{code}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Main functions for manipulating types and type-related things

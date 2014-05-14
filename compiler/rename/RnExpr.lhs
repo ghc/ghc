@@ -10,6 +10,8 @@ general, all of these functions return a renamed thing, and a set of
 free variables.
 
 \begin{code}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
+
 module RnExpr (
         rnLExpr, rnExpr, rnStmts
    ) where

@@ -5,6 +5,8 @@ c%
 \section[TcExpr]{Typecheck an expression}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
                 tcInferRho, tcInferRhoNC,
                 tcSyntaxOp, tcCheckId,

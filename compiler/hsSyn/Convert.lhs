@@ -6,6 +6,8 @@
 This module converts Template Haskell syntax into HsSyn
 
 \begin{code}
+{-# LANGUAGE MagicHash #-}
+
 module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
                 convertToHsType,
                 thRdrNameGuesses ) where

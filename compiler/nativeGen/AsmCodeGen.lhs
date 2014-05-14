@@ -7,7 +7,8 @@
 -- -----------------------------------------------------------------------------
 
 \begin{code}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, UnboxedTuples #-}
+
 module AsmCodeGen ( nativeCodeGen ) where
 
 #include "HsVersions.h"

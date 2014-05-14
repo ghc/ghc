@@ -4,6 +4,7 @@
 \section[ErrsUtils]{Utilities for error reporting}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
 
 module ErrUtils (
         ErrMsg, WarnMsg, Severity(..),

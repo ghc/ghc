@@ -9,6 +9,7 @@ being one that happens to be ideally suited to spineless tagless code
 generation.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
 
 module StgSyn (
         GenStgArg(..),

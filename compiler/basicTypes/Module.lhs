@@ -9,6 +9,7 @@ These are Uniquable, hence we can build Maps with Modules as
 the keys.
 
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Module
     (

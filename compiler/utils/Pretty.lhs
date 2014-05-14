@@ -152,7 +152,7 @@ Relative to John's original paper, there are the following new features:
 
 
 \begin{code}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, CPP, MagicHash #-}
 
 module Pretty (
         Doc,            -- Abstract

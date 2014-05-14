@@ -1,9 +1,8 @@
-{-# OPTIONS -fno-warn-type-defaults #-}
+{-# LANGUAGE CPP, GADTs #-}
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 -- ----------------------------------------------------------------------------
 -- | Handle conversion of CmmProc to LLVM code.
 --
-
-{-# LANGUAGE GADTs #-}
 module LlvmCodeGen.CodeGen ( genLlvmProc ) where
 
 #include "HsVersions.h"

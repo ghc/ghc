@@ -4,6 +4,8 @@
 %
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcValidity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   expectedKindInCtxt, 

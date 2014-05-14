@@ -4,6 +4,8 @@ o%
 Functions over HsSyn specialised to RdrName.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module RdrHsSyn (
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,

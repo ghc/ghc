@@ -4,6 +4,7 @@
 \section{Fast integers, etc... booleans moved to FastBool for using panic}
 
 \begin{code}
+{-# LANGUAGE CPP, MagicHash #-}
 
 --Even if the optimizer could handle boxed arithmetic equally well,
 --this helps automatically check the sources to make sure that

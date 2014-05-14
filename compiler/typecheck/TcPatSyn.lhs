@@ -5,6 +5,8 @@
 \section[TcPatSyn]{Typechecking pattern synonym declarations}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcPatSyn (tcPatSynDecl) where
 
 import HsSyn

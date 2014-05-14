@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables #-}
+
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 2005-2012

@@ -102,6 +102,8 @@ This is accomplished through a combination of mechanisms:
           See also Note [Built-in syntax and the OrigNameCache]
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module PrelNames (
         Unique, Uniquable(..), hasKey,  -- Re-exported for convenience
 

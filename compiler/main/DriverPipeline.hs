@@ -1,5 +1,5 @@
-{-# OPTIONS -fno-cse #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation #-}
+{-# OPTIONS_GHC -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 -----------------------------------------------------------------------------

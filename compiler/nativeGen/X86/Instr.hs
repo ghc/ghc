@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, TypeFamilies #-}
+
 -----------------------------------------------------------------------------
 --
 -- Machine-dependent assembly language
@@ -6,15 +8,14 @@
 --
 -----------------------------------------------------------------------------
 
-#include "HsVersions.h"
-#include "nativeGen/NCG.h"
-
-{-# LANGUAGE TypeFamilies #-}
 module X86.Instr (Instr(..), Operand(..), PrefetchVariant(..), JumpDest,
                   getJumpDestBlockId, canShortcut, shortcutStatics,
                   shortcutJump, i386_insert_ffrees, allocMoreStack,
                   maxSpillSlots, archWordSize)
 where
+
+#include "HsVersions.h"
+#include "nativeGen/NCG.h"
 
 import X86.Cond
 import X86.Regs

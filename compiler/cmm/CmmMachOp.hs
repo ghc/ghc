@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 
 module CmmMachOp
     ( MachOp(..)

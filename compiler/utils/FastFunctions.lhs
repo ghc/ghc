@@ -4,6 +4,7 @@ Z%
 \section{Fast functions}
 
 \begin{code}
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
 
 module FastFunctions (
     unsafeChr, inlinePerformIO, unsafeDupableInterleaveIO,

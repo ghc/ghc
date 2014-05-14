@@ -5,7 +5,7 @@
 \section[Literal]{@Literal@: Machine literals (unboxed, of course)}
 
 \begin{code}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module Literal
         (

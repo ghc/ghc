@@ -5,7 +5,7 @@
 Core pass to saturate constructors and PrimOps
 
 \begin{code}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, CPP #-}
 
 module CorePrep (
       corePrepPgm, corePrepExpr, cvtLitInteger,

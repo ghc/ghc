@@ -3,6 +3,8 @@
 %
 
 \begin{code}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
+
 -- | Module for (a) type kinds and (b) type coercions,
 -- as used in System FC. See 'CoreSyn.Expr' for
 -- more on System FC and how coercions fit into it.

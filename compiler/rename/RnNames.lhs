@@ -4,6 +4,8 @@
 \section[RnNames]{Extracting imported and top-level names in scope}
 
 \begin{code}
+{-# LANGUAGE CPP, NondecreasingIndentation #-}
+
 module RnNames (
         rnImports, getLocalNonValBinders,
         rnExports, extendGlobalRdrEnvRn,

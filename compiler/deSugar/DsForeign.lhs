@@ -6,6 +6,8 @@
 Desugaring foreign declarations (see also DsCCall).
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module DsForeign ( dsForeigns
                  , dsForeigns'
                  , dsFImport, dsCImport, dsFCall, dsPrimCall

@@ -15,6 +15,8 @@ The "tc" prefix is for "TypeChecker", because the type checker
 is the principal client.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcType (
   --------------------------------
   -- Types

@@ -4,7 +4,7 @@
 %
 
 \begin{code}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 -- |
 -- #name_types#

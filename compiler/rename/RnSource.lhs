@@ -4,6 +4,8 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
+
 module RnSource (
         rnSrcDecls, addTcgDUs, rnTyClDecls, findSplice
     ) where

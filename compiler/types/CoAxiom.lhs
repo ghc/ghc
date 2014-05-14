@@ -4,7 +4,7 @@
 
 \begin{code}
 
-{-# LANGUAGE GADTs, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, GADTs, ScopedTypeVariables #-}
 
 -- | Module for coercion axioms, used to represent type family instances
 -- and newtypes

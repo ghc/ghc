@@ -4,6 +4,7 @@
 \section[HscTypes]{Types for the per-module compiler}
 
 \begin{code}
+{-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
 
 -- | Types for the per-module compiler
 module HscTypes (

@@ -5,6 +5,8 @@
 \section[Id]{@Ids@: Value and constructor identifiers}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 -- |
 -- #name_types#
 -- GHC uses several kinds of name internally:

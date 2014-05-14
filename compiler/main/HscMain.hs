@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns, CPP, MagicHash, NondecreasingIndentation #-}
+
 -------------------------------------------------------------------------------
 --
 -- | Main API for compiling plain Haskell source code.

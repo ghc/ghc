@@ -2,14 +2,15 @@
 % (c) The University of Glasgow 2005-2012
 %
 \begin{code}
+{-# LANGUAGE CPP, NondecreasingIndentation #-}
+{-# OPTIONS_GHC -fno-cse #-}
+-- -fno-cse is needed for GLOBAL_VAR's to behave properly
+
 -- | The dynamic linker for GHCi.
 --
 -- This module deals with the top-level issues of dynamic linking,
 -- calling the object-code linker and the byte-code linker where
 -- necessary.
-
-{-# OPTIONS -fno-cse #-}
--- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 module Linker ( getHValue, showLinkerState,
                 linkExpr, linkDecls, unload, withExtendedLinkEnv,

@@ -2,6 +2,8 @@
 % (c) The University of Glasgow, 2006
 %
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 -- | Package manipulation
 module Packages (
         module PackageConfig,

@@ -4,6 +4,8 @@
 \section[Finder]{Module Finder}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module Finder (
     flushFinderCaches,
     FindResult(..),

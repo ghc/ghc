@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- Vectorise a modules type and class declarations.
 --
 -- This produces new type constructors and family instances top be included in the module toplevel

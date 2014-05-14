@@ -8,6 +8,8 @@ It's hard to put these functions anywhere else without causing
 some unnecessary loops in the module dependency graph.
 
 \begin{code}
+{-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
+
 module Panic (
      GhcException(..), showGhcException,
      throwGhcException, throwGhcExceptionIO,

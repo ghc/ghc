@@ -1,4 +1,6 @@
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcCanonical(
     canonicalize, emitWorkNC,
     StopOrContinue (..)

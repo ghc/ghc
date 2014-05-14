@@ -7,8 +7,9 @@ TcSplice: Template Haskell splices
 
 
 \begin{code}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP, FlexibleInstances, MagicHash, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module TcSplice(
      -- These functions are defined in stage1 and stage2
      -- The raise civilised errors in stage1

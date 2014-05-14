@@ -4,6 +4,8 @@
 \section[RnEnv]{Environment manipulation for the renamer monad}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module RnEnv (
         newTopSrcBinder,
         lookupLocatedTopBndrRn, lookupTopBndrRn,

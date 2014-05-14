@@ -4,6 +4,8 @@
 \section[WwLib]{A library for the ``worker\/wrapper'' back-end to the strictness analyser}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
              , deepSplitProductType_maybe, findTypeShape
  ) where

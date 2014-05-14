@@ -6,6 +6,8 @@
 The @match@ function
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat ) where
 
 #include "HsVersions.h"

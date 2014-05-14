@@ -5,8 +5,7 @@
 FamInstEnv: Type checked family instance declarations
 
 \begin{code}
-
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE CPP, GADTs #-}
 
 module FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,

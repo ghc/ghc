@@ -6,6 +6,8 @@
 Utility functions on @Core@ syntax
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 -- | Commonly useful utilites for manipulating the Core language
 module CoreUtils (
         -- * Constructing expressions

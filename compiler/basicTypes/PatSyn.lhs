@@ -5,6 +5,7 @@
 \section[PatSyn]{@PatSyn@: Pattern synonyms}
 
 \begin{code}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module PatSyn (
         -- * Main data types

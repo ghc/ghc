@@ -4,6 +4,8 @@
 \section{Code output phase}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module CodeOutput( codeOutput, outputForeignStubs ) where
 
 #include "HsVersions.h"

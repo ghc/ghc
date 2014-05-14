@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -- ----------------------------------------------------------------------------
 -- | Handle conversion of CmmData to LLVM code.
 --

@@ -5,6 +5,7 @@
 \section[Demand]{@Demand@: A decoupled implementation of a demand domain}
 
 \begin{code}
+{-# LANGUAGE CPP, FlexibleInstances, TypeSynonymInstances #-}
 
 module Demand (
         StrDmd, UseDmd(..), Count(..), 

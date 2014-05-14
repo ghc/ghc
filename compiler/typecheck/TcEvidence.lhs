@@ -3,6 +3,8 @@
 %
 
 \begin{code}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
+
 module TcEvidence (
 
   -- HsWrapper

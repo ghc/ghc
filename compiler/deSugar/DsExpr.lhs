@@ -6,6 +6,8 @@
 Desugaring exporessions.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 
 #include "HsVersions.h"

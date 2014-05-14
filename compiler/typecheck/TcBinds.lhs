@@ -5,6 +5,8 @@
 \section[TcBinds]{TcBinds}
 
 \begin{code}
+{-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
+
 module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
                  tcHsBootSigs, tcPolyCheck,
                  PragFun, tcSpecPrags, tcVectDecls, mkPragFun, 

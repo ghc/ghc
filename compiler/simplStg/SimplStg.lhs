@@ -4,6 +4,8 @@
 \section[SimplStg]{Driver for simplifying @STG@ programs}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module SimplStg ( stg2stg ) where
 
 #include "HsVersions.h"

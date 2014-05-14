@@ -3,6 +3,7 @@
 %
 
 \begin{code}
+{-# LANGUAGE CPP #-}
 
 -- | Highly random utility functions
 --

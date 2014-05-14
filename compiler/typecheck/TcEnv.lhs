@@ -3,7 +3,9 @@
 %
 
 \begin{code}
+{-# LANGUAGE CPP, FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module TcEnv(
         TyThing(..), TcTyThing(..), TcId,
 

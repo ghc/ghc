@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- |
 -- Package configuration information: essentially the interface to Cabal, with
 -- some utilities

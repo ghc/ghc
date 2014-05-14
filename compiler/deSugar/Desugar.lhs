@@ -6,6 +6,8 @@
 The Desugarer: turning HsSyn into Core.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module Desugar ( deSugar, deSugarExpr ) where
 
 import DynFlags

@@ -7,7 +7,8 @@
 			-----------------
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 
 module DmdAnal ( dmdAnalProgram ) where
 

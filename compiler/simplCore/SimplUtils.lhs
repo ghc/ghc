@@ -4,6 +4,8 @@
 \section[SimplUtils]{The simplifier utilities}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module SimplUtils (
         -- Rebuilding
         mkLam, mkCase, prepareAlts, tryEtaExpandRhs,

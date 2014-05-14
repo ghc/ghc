@@ -9,6 +9,8 @@ ToDo [Oct 2013]
 \section[SpecConstr]{Specialise over constructors}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module SpecConstr(
         specConstrProgram
 #ifdef GHCI

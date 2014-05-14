@@ -8,6 +8,8 @@ FunDeps - functional dependencies
 It's better to read it as: "if we know these, then we're going to know these"
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module FunDeps (
         FDEq (..),
         Equation(..), pprEquation,

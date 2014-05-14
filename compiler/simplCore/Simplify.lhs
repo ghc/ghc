@@ -4,6 +4,8 @@
 \section[Simplify]{The main module of the simplifier}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module Simplify ( simplTopBinds, simplExpr ) where
 
 #include "HsVersions.h"

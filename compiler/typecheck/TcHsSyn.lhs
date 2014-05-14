@@ -9,6 +9,8 @@ This module is an extension of @HsSyn@ syntax, for use in the type
 checker.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcHsSyn (
         mkHsConApp, mkHsDictLet, mkHsApp,
         hsLitType, hsLPatType, hsPatType,

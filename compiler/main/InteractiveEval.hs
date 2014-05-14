@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, UnboxedTuples #-}
+
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 2005-2007

@@ -1,6 +1,7 @@
 \begin{code}
+{-# LANGUAGE CPP, TypeFamilies #-}
+
 -- Type definitions for the constraint solver
-{-# LANGUAGE TypeFamilies #-}
 module TcSMonad (
 
        -- Canonical constraints, definition is now in TcRnTypes

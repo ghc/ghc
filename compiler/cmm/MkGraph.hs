@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE BangPatterns, CPP, GADTs #-}
 
 module MkGraph
   ( CmmAGraph, CgStmt(..)

@@ -4,6 +4,8 @@
 \section[TysWiredIn]{Wired-in knowledge about {\em non-primitive} types}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 -- | This module is about types that can be defined in Haskell, but which
 --   must be wired into the compiler nonetheless.  C.f module TysPrim
 module TysWiredIn (

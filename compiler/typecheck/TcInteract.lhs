@@ -1,4 +1,6 @@
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcInteract (
      solveInteractGiven,  -- Solves [EvVar],GivenLoc
      solveInteract,       -- Solves Cts

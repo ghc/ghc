@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE CPP, GADTs #-}
 
 -- See Note [Deprecations in Hoopl] in Hoopl module
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}

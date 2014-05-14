@@ -6,6 +6,8 @@
 Handles @deriving@ clauses on @data@ declarations.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcDeriv ( tcDeriving ) where
 
 #include "HsVersions.h"

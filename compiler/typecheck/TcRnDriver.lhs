@@ -5,6 +5,8 @@
 \section[TcMovectle]{Typechecking a whole module}
 
 \begin{code}
+{-# LANGUAGE CPP, NondecreasingIndentation #-}
+
 module TcRnDriver (
 #ifdef GHCI
         tcRnStmt, tcRnExpr, tcRnType,

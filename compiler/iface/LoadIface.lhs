@@ -6,6 +6,7 @@
 Loading interface files
 
 \begin{code}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module LoadIface (
         -- RnM/TcM functions

@@ -1,4 +1,6 @@
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcSplice where
 import HsSyn    ( HsSplice, HsBracket, HsQuasiQuote,
                   HsExpr, LHsType, LHsExpr, LPat, LHsDecl )
