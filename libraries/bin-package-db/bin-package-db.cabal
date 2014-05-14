@@ -14,6 +14,12 @@ source-repository head
 
 Library
     default-language: Haskell2010
+    other-extensions:
+            GeneralizedNewtypeDeriving
+            RecordWildCards
+            StandaloneDeriving
+            Trustworthy
+            TypeSynonymInstances
 
     exposed-modules:
             Distribution.InstalledPackageInfo.Binary
@@ -22,4 +28,3 @@ Library
                    binary >= 0.5 && < 0.8,
                    Cabal >= 1.20 && < 1.21
 
-    default-extensions: CPP
