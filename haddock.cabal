@@ -73,7 +73,7 @@ executable haddock
   build-depends:
     base >= 4.3 && < 4.8
   if flag(in-ghc-tree)
-    hs-source-dirs: src, vendor/attoparsec-0.10.4.0
+    hs-source-dirs: src, haddock-library/vendor/attoparsec-0.10.4.0, haddock-library/src
     cpp-options: -DIN_GHC_TREE
     build-depends:
       filepath,
@@ -84,10 +84,24 @@ executable haddock
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
       ghc == 7.9.*,
-      bytestring,
-      haddock-library
+      bytestring
 
     other-modules:
+      Documentation.Haddock.Parser
+      Documentation.Haddock.Types
+      Documentation.Haddock.Doc
+      Data.Attoparsec
+      Data.Attoparsec.ByteString
+      Data.Attoparsec.ByteString.Char8
+      Data.Attoparsec.Combinator
+      Data.Attoparsec.Number
+      Data.Attoparsec.ByteString.FastSet
+      Data.Attoparsec.ByteString.Internal
+      Data.Attoparsec.Internal
+      Data.Attoparsec.Internal.Types
+      Documentation.Haddock.Utf8
+      Documentation.Haddock.Parser.Util
+
       Documentation.Haddock
       Haddock
       Haddock.Interface
@@ -97,7 +111,6 @@ executable haddock
       Haddock.Interface.LexParseRn
       Haddock.Interface.ParseModuleHeader
       Haddock.Parser
-      Haddock.Utf8
       Haddock.Utils
       Haddock.Backends.Xhtml
       Haddock.Backends.Xhtml.Decl
@@ -134,15 +147,35 @@ library
     array,
     xhtml >= 3000.2 && < 3000.3,
     Cabal >= 1.10,
-    ghc == 7.9.*,
-    haddock-library
+    ghc == 7.9.*
 
   if flag(in-ghc-tree)
     cpp-options: -DIN_GHC_TREE
-  else
-    build-depends: ghc-paths
+    hs-source-dirs:       src, haddock-library/vendor/attoparsec-0.10.4.0, haddock-library/src
 
-  hs-source-dirs:       src
+    exposed-modules:
+      Documentation.Haddock.Parser
+      Documentation.Haddock.Types
+      Documentation.Haddock.Doc
+
+    other-modules:
+      Data.Attoparsec
+      Data.Attoparsec.ByteString
+      Data.Attoparsec.ByteString.Char8
+      Data.Attoparsec.Combinator
+      Data.Attoparsec.Number
+      Data.Attoparsec.ByteString.FastSet
+      Data.Attoparsec.ByteString.Internal
+      Data.Attoparsec.Internal
+      Data.Attoparsec.Internal.Types
+      Documentation.Haddock.Utf8
+      Documentation.Haddock.Parser.Util
+
+  else
+    build-depends: ghc-paths, haddock-library
+    hs-source-dirs:       src
+
+
   if flag(dev)
     ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs
   else
