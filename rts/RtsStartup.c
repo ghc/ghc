@@ -355,8 +355,12 @@ hs_exit_(rtsBool wait_foreign)
     resetTerminalSettings();
 #endif
 
-    // uninstall signal handlers
-    resetDefaultHandlers();
+#if defined(RTS_USER_SIGNALS)
+    if (RtsFlags.MiscFlags.install_signal_handlers) {
+        // uninstall signal handlers
+        resetDefaultHandlers();
+    }
+#endif
 
     /* stop timing the shutdown, we're about to print stats */
     stat_endExit();
