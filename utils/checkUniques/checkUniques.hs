@@ -1,5 +1,3 @@
-{-# LANGUAGE PatternGuards #-}
-
 -- Some things could be improved, e.g.:
 -- * Check that each file given contains at least one instance of the
 --   function

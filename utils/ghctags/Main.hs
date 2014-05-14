@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternGuards, ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
 import Prelude hiding ( mod, id, mapM )

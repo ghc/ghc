@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternGuards, CPP, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004-2009.

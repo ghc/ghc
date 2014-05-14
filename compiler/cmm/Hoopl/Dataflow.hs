@@ -9,7 +9,7 @@
 -- specialised to the UniqSM monad.
 --
 
-{-# LANGUAGE RankNTypes, ScopedTypeVariables, GADTs, EmptyDataDecls, PatternGuards, TypeFamilies, MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables, GADTs, TypeFamilies, MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fprof-auto-top #-}
 {-# LANGUAGE Trustworthy #-}
 

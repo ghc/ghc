@@ -1,6 +1,5 @@
 
-{-# LANGUAGE CPP, MagicHash, ForeignFunctionInterface,
-             NoImplicitPrelude, BangPatterns, UnboxedTuples,
+{-# LANGUAGE CPP, MagicHash, NoImplicitPrelude, BangPatterns, UnboxedTuples,
              UnliftedFFITypes #-}
 
 -- Commentary of Integer library is located on the wiki:

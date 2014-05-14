@@ -1,5 +1,4 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 
 -----------------------------------------------------------------------------
 --

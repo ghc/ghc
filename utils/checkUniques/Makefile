@@ -13,4 +13,4 @@ check: checkUniques
 	./checkUniques mkPreludeMiscIdUnique  $(PREL_NAMES) $(DS_META)
 
 checkUniques: checkUniques.hs
-	$(GHC) --make $@
+	$(GHC) -O -XHaskell2010 --make $@
