@@ -11,7 +11,7 @@ Description:
 	XXX
 Category: Development
 build-type: Simple
-cabal-version: >=1.2
+cabal-version: >=1.10
 
 Flag base4
     Description: Choose the even newer, even smaller, split-up base package.
@@ -20,6 +20,7 @@ Flag base3
     Description: Choose the new smaller, split-up base package.
 
 Executable hpc
+    Default-Language: Haskell2010
     Main-Is: Hpc.hs
     Other-Modules: HpcParser
                    HpcCombine
@@ -45,5 +46,5 @@ Executable hpc
                        containers >= 0.1 && < 0.6,
                        array      >= 0.1 && < 0.6
     Build-Depends: hpc
-    Extensions: CPP
+    Default-Extensions: CPP
 

@@ -18,7 +18,7 @@ Description:
     through this package.
 Category: Development
 Build-Type: Simple
-Cabal-Version: >= 1.2.3
+Cabal-Version: >=1.10
 
 Flag ghci
     Description: Build GHCi support.
@@ -41,6 +41,7 @@ Flag stage3
     Manual: True
 
 Library
+    Default-Language: Haskell2010
     Exposed: False
 
     Build-Depends: base       >= 4   && < 5,
@@ -73,13 +74,10 @@ Library
     Build-Depends: bin-package-db
     Build-Depends: hoopl
 
-    Extensions: CPP, MagicHash, UnboxedTuples, PatternGuards,
-                ForeignFunctionInterface, EmptyDataDecls,
+    Default-Extensions: CPP, MagicHash, UnboxedTuples
                 TypeSynonymInstances, MultiParamTypeClasses,
                 FlexibleInstances, RankNTypes, ScopedTypeVariables,
-                DeriveDataTypeable, BangPatterns
-    if impl(ghc >= 7.1)
-        Extensions: NondecreasingIndentation
+                DeriveDataTypeable, BangPatterns, NondecreasingIndentation
 
     Include-Dirs: . parser utils
 

@@ -10,9 +10,10 @@ Description:
 	XXX
 Category: Development
 build-type: Simple
-cabal-version: >=1.2
+cabal-version: >=1.10
 
 Executable ghc-cabal
+    Default-Language: Haskell2010
     Main-Is: ghc-cabal.hs
 
     Build-Depends: base       >= 3   && < 5,

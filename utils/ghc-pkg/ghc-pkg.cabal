@@ -11,12 +11,13 @@ Description:
 	XXX
 Category: Development
 build-type: Simple
-cabal-version: >=1.4
+cabal-version: >=1.10
 
 Executable ghc-pkg
+    Default-Language: Haskell2010
     Main-Is: Main.hs
     Other-Modules: Version
-    Extensions: CPP, ForeignFunctionInterface, NondecreasingIndentation
+    Default-Extensions: CPP, NondecreasingIndentation
 
     Build-Depends: base       >= 4   && < 5,
                    directory  >= 1   && < 1.3,

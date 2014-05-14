@@ -1,6 +1,6 @@
 name:                 compareSizes
 version:              0.1.0.0
-cabal-version:        >= 1.6
+cabal-version:        >=1.10
 license:              BSD3
 build-type:           Simple
 license-file:         LICENSE
@@ -10,6 +10,8 @@ description:          Size comparison util
 category:             Development
 
 executable compareSizes
+  default-language: Haskell2010
+
   build-depends:
     base >= 4 && < 5,
     directory,
