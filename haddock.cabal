@@ -8,7 +8,7 @@ license-file:         LICENSE
 author:               Simon Marlow, David Waern
 maintainer:           Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
 homepage:             http://www.haskell.org/haddock/
-bug-reports:          http://trac.haskell.org/haddock
+bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
