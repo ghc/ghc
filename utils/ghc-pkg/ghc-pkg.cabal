@@ -16,7 +16,7 @@ cabal-version: >=1.4
 Executable ghc-pkg
     Main-Is: Main.hs
     Other-Modules: Version
-    Extensions: CPP, ForeignFunctionInterface, NondecreasingIndentation
+    Extensions: CPP, ForeignFunctionInterface
 
     Build-Depends: base       >= 4   && < 5,
                    directory  >= 1   && < 1.3,
