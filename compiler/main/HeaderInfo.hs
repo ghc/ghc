@@ -185,8 +185,8 @@ lazyGetToks dflags filename handle = do
        -- large module names (#5981)
      nextbuf <- hGetStringBufferBlock handle new_size
      if (len nextbuf == 0) then lazyLexBuf handle state True new_size else do
-     newbuf <- appendStringBuffers (buffer state) nextbuf
-     unsafeInterleaveIO $ lazyLexBuf handle state{buffer=newbuf} False new_size
+       newbuf <- appendStringBuffers (buffer state) nextbuf
+       unsafeInterleaveIO $ lazyLexBuf handle state{buffer=newbuf} False new_size
 
 
 getToks :: DynFlags -> FilePath -> StringBuffer -> [Located Token]
