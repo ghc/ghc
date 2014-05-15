@@ -634,10 +634,9 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
        ; fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_lname
 
          -- (0) Check it's an open type family
-       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
-       ; checkTc (isSynTyCon fam_tc) (wrongKindOfFamily fam_tc)
-       ; checkTc (isOpenSynFamilyTyCon fam_tc)
-                 (notOpenFamily fam_tc)
+       ; checkTc (isFamilyTyCon fam_tc)        (notFamily fam_tc)
+       ; checkTc (isSynFamilyTyCon fam_tc)     (wrongKindOfFamily fam_tc)
+       ; checkTc (isOpenSynFamilyTyCon fam_tc) (notOpenFamily fam_tc)
 
          -- (1) do the work of verifying the synonym group
        ; co_ax_branch <- tcSynFamInstDecl fam_tc decl

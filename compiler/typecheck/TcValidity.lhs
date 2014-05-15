@@ -287,7 +287,7 @@ check_type ctxt rank (AppTy ty1 ty2)
         ; check_arg_type ctxt rank ty2 }
 
 check_type ctxt rank ty@(TyConApp tc tys)
-  | isSynTyCon tc          = check_syn_tc_app ctxt rank ty tc tys
+  | isTypeSynonymTyCon tc  = check_syn_tc_app ctxt rank ty tc tys
   | isUnboxedTupleTyCon tc = check_ubx_tuple  ctxt      ty    tys
   | otherwise              = mapM_ (check_arg_type ctxt rank) tys
 

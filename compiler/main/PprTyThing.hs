@@ -126,7 +126,7 @@ pprTyConHdr tyCon
 
     keyword | isSynTyCon tyCon = sLit "type"
             | isNewTyCon tyCon = sLit "newtype"
-            | otherwise            = sLit "data"
+            | otherwise        = sLit "data"
 
     opt_family
       | isFamilyTyCon tyCon = ptext (sLit "family")
