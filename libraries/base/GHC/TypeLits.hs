@@ -9,7 +9,8 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE UndecidableInstances #-}  -- for compiling instances of (==)
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
 for working with type-level naturals should be defined in a separate library.
