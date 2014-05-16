@@ -434,8 +434,8 @@ mkHomeModLocation2 :: DynFlags
 mkHomeModLocation2 dflags mod src_basename ext = do
    let mod_basename = moduleNameSlashes mod
 
-   obj_fn  <- mkObjPath  dflags src_basename mod_basename
-   hi_fn   <- mkHiPath   dflags src_basename mod_basename
+       obj_fn = mkObjPath  dflags src_basename mod_basename
+       hi_fn  = mkHiPath   dflags src_basename mod_basename
 
    return (ModLocation{ ml_hs_file   = Just (src_basename <.> ext),
                         ml_hi_file   = hi_fn,
@@ -445,7 +445,7 @@ mkHiOnlyModLocation :: DynFlags -> Suffix -> FilePath -> String
                     -> IO ModLocation
 mkHiOnlyModLocation dflags hisuf path basename
  = do let full_basename = path </> basename
-      obj_fn  <- mkObjPath  dflags full_basename basename
+          obj_fn = mkObjPath  dflags full_basename basename
       return ModLocation{    ml_hs_file   = Nothing,
                              ml_hi_file   = full_basename <.> hisuf,
                                 -- Remove the .hi-boot suffix from
@@ -461,16 +461,15 @@ mkObjPath
   :: DynFlags
   -> FilePath           -- the filename of the source file, minus the extension
   -> String             -- the module name with dots replaced by slashes
-  -> IO FilePath
-mkObjPath dflags basename mod_basename
-  = do  let
+  -> FilePath
+mkObjPath dflags basename mod_basename = obj_basename <.> osuf
+  where
                 odir = objectDir dflags
                 osuf = objectSuf dflags
 
                 obj_basename | Just dir <- odir = dir </> mod_basename
                              | otherwise        = basename
 
-        return (obj_basename <.> osuf)
 
 -- | Constructs the filename of a .hi file for a given source file.
 -- Does /not/ check whether the .hi file exists
@@ -478,16 +477,15 @@ mkHiPath
   :: DynFlags
   -> FilePath           -- the filename of the source file, minus the extension
   -> String             -- the module name with dots replaced by slashes
-  -> IO FilePath
-mkHiPath dflags basename mod_basename
-  = do  let
+  -> FilePath
+mkHiPath dflags basename mod_basename = hi_basename <.> hisuf
+ where
                 hidir = hiDir dflags
                 hisuf = hiSuf dflags
 
                 hi_basename | Just dir <- hidir = dir </> mod_basename
                             | otherwise         = basename
 
-        return (hi_basename <.> hisuf)
 
 
 -- -----------------------------------------------------------------------------
