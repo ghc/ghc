@@ -8112,12 +8112,30 @@ pattern binding must have the same context.  For example, this is fine:
 <para>
 An ML-style language usually generalises the type of any let-bound or where-bound variable,
 so that it is as polymorphic as possible.
-With the flag <option>-XMonoLocalBinds</option> GHC implements a slightly more conservative policy:
-<emphasis>it generalises only "closed" bindings</emphasis>.
-A binding is considered "closed" if either
+With the flag <option>-XMonoLocalBinds</option> GHC implements a slightly more conservative policy,
+using the following rules:
 <itemizedlist>
-<listitem><para>It is one of the top-level bindings of a module, or </para></listitem>
-<listitem><para>Its free variables are all themselves closed</para></listitem>
+  <listitem><para>
+  A variable is <emphasis>closed</emphasis> if and only if
+    <itemizedlist>
+    <listitem><para> the variable is let-bound</para></listitem>
+    <listitem><para> one of the following holds:
+          <itemizedlist>
+          <listitem><para>the variable has an explicit type signature that has no free type variables, or</para></listitem>
+          <listitem><para>its binding group is fully generalised (see next bullet) </para></listitem>
+         </itemizedlist>
+    </para></listitem>
+    </itemizedlist>
+  </para></listitem>
+
+  <listitem><para>
+  A binding group is <emphasis>fully generalised</emphasis> if and only if
+    <itemizedlist> 
+    <listitem><para>each of its free variables is either imported or closed, and</para></listitem>
+    <listitem><para>the binding is not affected by the monomorphism restriction 
+        (<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.5">Haskell Report, Section 4.5.5</ulink>)</para></listitem>
+    </itemizedlist>
+  </para></listitem>
 </itemizedlist>
 For example, consider
 <programlisting>
@@ -8126,15 +8144,18 @@ g x = let h y = f y * 2
           k z = z+x
       in  h x + k x
 </programlisting>
-Here <literal>f</literal> and <literal>g</literal> are closed because they are bound at top level.
-Also <literal>h</literal> is closed because its only free variable <literal>f</literal> is closed.
-But <literal>k</literal> is not closed because it mentions <literal>x</literal> which is locally bound.
-Another way to think of it is this: all closed bindings <literal>could</literal> be defined at top level.
-(In the example, we could move <literal>h</literal> to top level.)
-</para><para>
-All of this applies only to bindings that lack an explicit type signature, so that GHC has to
-infer its type.  If you supply a type signature, then that fixes type of the binding, end of story.
-</para><para>
+Here <literal>f</literal> is generalised because it has no free variables; and its binding group
+in unaffected by the monomorphism restriction; and hence <literal>f</literal> is closed.
+The same reasoning applies to <literal>g</literal>, except that it has one closed free variable, namely <literal>f</literal>.
+Similarly <literal>h</literal> is closed, <emphasis>even though it is not bound at top level</emphasis>,
+because its only free variable <literal>f</literal> is closed.
+But <literal>k</literal> is not closed because it mentions <literal>x</literal> which is not closed (because it is no let-bound).
+</para>
+<para>
+Notice that a top-level binding that is affected by the monomorphism restriction is not closed, and hence may
+in turn prevent generalisation of bindings that mention it.
+</para>
+<para>
 The rationale for this more conservative strategy is given in
 <ulink url="http://research.microsoft.com/~simonpj/papers/constraints/index.htm">the papers</ulink> "Let should not be generalised" and "Modular type inference with local assumptions", and
 a related <ulink url="http://ghc.haskell.org/trac/ghc/blog/LetGeneralisationInGhc7">blog post</ulink>.
