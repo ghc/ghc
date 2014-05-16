@@ -517,8 +517,9 @@ genericHscCompileGetFrontendResult ::
                   -> (Int,Int)       -- (i,n) = module i of n (for msgs)
                   -> IO (Either ModIface (TcGblEnv, Maybe Fingerprint))
 
-genericHscCompileGetFrontendResult always_do_basic_recompilation_check m_tc_result
-                                   mHscMessage hsc_env mod_summary source_modified mb_old_iface mod_index
+genericHscCompileGetFrontendResult
+  always_do_basic_recompilation_check m_tc_result
+  mHscMessage hsc_env mod_summary source_modified mb_old_iface mod_index
     = do
 
     let msg what = case mHscMessage of
@@ -554,16 +555,19 @@ genericHscCompileGetFrontendResult always_do_basic_recompilation_check m_tc_resu
 
             case mb_checked_iface of
                 Just iface | not (recompileRequired recomp_reqd) ->
-                    -- If the module used TH splices when it was last compiled,
-                    -- then the recompilation check is not accurate enough (#481)
-                    -- and we must ignore it. However, if the module is stable
-                    -- (none of the modules it depends on, directly or indirectly,
-                    -- changed), then we *can* skip recompilation. This is why
-                    -- the SourceModified type contains SourceUnmodifiedAndStable,
-                    -- and it's pretty important: otherwise ghc --make would
-                    -- always recompile TH modules, even if nothing at all has
-                    -- changed. Stability is just the same check that make is
-                    -- doing for us in one-shot mode.
+                    -- If the module used TH splices when it was last
+                    -- compiled, then the recompilation check is not
+                    -- accurate enough (#481) and we must ignore
+                    -- it.  However, if the module is stable (none of
+                    -- the modules it depends on, directly or
+                    -- indirectly, changed), then we *can* skip
+                    -- recompilation. This is why the SourceModified
+                    -- type contains SourceUnmodifiedAndStable, and
+                    -- it's pretty important: otherwise ghc --make
+                    -- would always recompile TH modules, even if
+                    -- nothing at all has changed. Stability is just
+                    -- the same check that make is doing for us in
+                    -- one-shot mode.
                     case m_tc_result of
                     Nothing
                      | mi_used_th iface && not stable ->

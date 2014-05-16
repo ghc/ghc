@@ -1133,27 +1133,35 @@ recompileRequired _ = True
 -- first element is a bool saying if we should recompile the object file
 -- and the second is maybe the interface file, where Nothng means to
 -- rebuild the interface file not use the exisitng one.
-checkOldIface :: HscEnv
-              -> ModSummary
-              -> SourceModified
-              -> Maybe ModIface         -- Old interface from compilation manager, if any
-              -> IO (RecompileRequired, Maybe ModIface)
+checkOldIface
+  :: HscEnv
+  -> ModSummary
+  -> SourceModified
+  -> Maybe ModIface         -- Old interface from compilation manager, if any
+  -> IO (RecompileRequired, Maybe ModIface)
 
 checkOldIface hsc_env mod_summary source_modified maybe_iface
   = do  let dflags = hsc_dflags hsc_env
         showPass dflags $
-            "Checking old interface for " ++ (showPpr dflags $ ms_mod mod_summary)
+            "Checking old interface for " ++
+              (showPpr dflags $ ms_mod mod_summary)
         initIfaceCheck hsc_env $
             check_old_iface hsc_env mod_summary source_modified maybe_iface
 
-check_old_iface :: HscEnv -> ModSummary -> SourceModified -> Maybe ModIface
-                -> IfG (RecompileRequired, Maybe ModIface)
+check_old_iface
+  :: HscEnv
+  -> ModSummary
+  -> SourceModified
+  -> Maybe ModIface
+  -> IfG (RecompileRequired, Maybe ModIface)
+
 check_old_iface hsc_env mod_summary src_modified maybe_iface
   = let dflags = hsc_dflags hsc_env
         getIface =
             case maybe_iface of
                 Just _  -> do
-                    traceIf (text "We already have the old interface for" <+> ppr (ms_mod mod_summary))
+                    traceIf (text "We already have the old interface for" <+>
+                      ppr (ms_mod mod_summary))
                     return maybe_iface
                 Nothing -> loadIface
 
