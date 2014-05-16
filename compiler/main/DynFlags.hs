@@ -2189,16 +2189,9 @@ dynamic_flags = [
 
         -------- ghc -M -----------------------------------------------------
   , Flag "dep-suffix"     (hasArg addDepSuffix)
-  , Flag "optdep-s"       (hasArgDF addDepSuffix "Use -dep-suffix instead")
   , Flag "dep-makefile"   (hasArg setDepMakefile)
-  , Flag "optdep-f"       (hasArgDF setDepMakefile "Use -dep-makefile instead")
-  , Flag "optdep-w"       (NoArg  (deprecate "doesn't do anything"))
   , Flag "include-pkg-deps"         (noArg (setDepIncludePkgDeps True))
-  , Flag "optdep--include-prelude"  (noArgDF (setDepIncludePkgDeps True) "Use -include-pkg-deps instead")
-  , Flag "optdep--include-pkg-deps" (noArgDF (setDepIncludePkgDeps True) "Use -include-pkg-deps instead")
   , Flag "exclude-module"           (hasArg addDepExcludeMod)
-  , Flag "optdep--exclude-module"   (hasArgDF addDepExcludeMod "Use -exclude-module instead")
-  , Flag "optdep-x"                 (hasArgDF addDepExcludeMod "Use -exclude-module instead")
 
         -------- Linking ----------------------------------------------------
   , Flag "no-link"            (noArg (\d -> d{ ghcLink=NoLink }))
@@ -3190,15 +3183,8 @@ noArg fn = NoArg (upd fn)
 noArgM :: (DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
 noArgM fn = NoArg (updM fn)
 
-noArgDF :: (DynFlags -> DynFlags) -> String -> OptKind (CmdLineP DynFlags)
-noArgDF fn deprec = NoArg (upd fn >> deprecate deprec)
-
 hasArg :: (String -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 hasArg fn = HasArg (upd . fn)
-
-hasArgDF :: (String -> DynFlags -> DynFlags) -> String -> OptKind (CmdLineP DynFlags)
-hasArgDF fn deprec = HasArg (\s -> do upd (fn s)
-                                      deprecate deprec)
 
 sepArg :: (String -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 sepArg fn = SepArg (upd . fn)
