@@ -533,6 +533,15 @@ classP cla tys
       tysl <- sequence tys
       return (foldl AppT (ConT cla) tysl)
 
+{-# DEPRECATED equalP "Constraint constructors are just type constructors, frob this code as 'equalT'." #-}
+equalP :: TypeQ -> TypeQ -> PredQ
+equalP tleft tright
+  = do
+      tleft1  <- tleft
+      tright1 <- tright
+      eqT <- equalityT
+      return (foldl AppT eqT [tleft1, tright1])
+
 promotedT :: Name -> TypeQ
 promotedT = return . PromotedT
 

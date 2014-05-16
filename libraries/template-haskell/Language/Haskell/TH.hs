@@ -112,7 +112,7 @@ module Language.Haskell.TH(
     -- **** Strictness
 	isStrict, notStrict, strictType, varStrictType,
     -- **** Class Contexts
-    cxt, classP, normalC, recC, infixC, forallC,
+    cxt, classP, equalP, normalC, recC, infixC, forallC,
 
     -- *** Kinds
   varK, conK, tupleK, arrowK, listK, appK, starK, constraintK,
