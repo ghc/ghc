@@ -146,7 +146,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
 	    cd gmpbuild && \
-	    CC=$(CCX) NM=$(NM) AR=$(AR_STAGE1) $(SHELL) ./configure \
+	    CC=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
 	          --enable-shared=no \
 	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
