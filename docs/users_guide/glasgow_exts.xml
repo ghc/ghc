@@ -8145,11 +8145,11 @@ g x = let h y = f y * 2
       in  h x + k x
 </programlisting>
 Here <literal>f</literal> is generalised because it has no free variables; and its binding group
-in unaffected by the monomorphism restriction; and hence <literal>f</literal> is closed.
+is unaffected by the monomorphism restriction; and hence <literal>f</literal> is closed.
 The same reasoning applies to <literal>g</literal>, except that it has one closed free variable, namely <literal>f</literal>.
 Similarly <literal>h</literal> is closed, <emphasis>even though it is not bound at top level</emphasis>,
 because its only free variable <literal>f</literal> is closed.
-But <literal>k</literal> is not closed because it mentions <literal>x</literal> which is not closed (because it is no let-bound).
+But <literal>k</literal> is not closed, because it mentions <literal>x</literal> which is not closed (because it is not let-bound).
 </para>
 <para>
 Notice that a top-level binding that is affected by the monomorphism restriction is not closed, and hence may
