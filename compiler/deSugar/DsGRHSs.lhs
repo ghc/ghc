@@ -63,10 +63,8 @@ dsGRHSs hs_ctx _ (GRHSs grhss binds) rhs_ty
   = ASSERT( notNull grhss )
     do { match_results <- mapM (dsGRHS hs_ctx rhs_ty) grhss
        ; let match_result1 = foldr1 combineMatchResults match_results
-             match_result2 = adjustMatchResultDs
-                                 (\e -> dsLocalBinds binds e)
-                                 match_result1
-                -- NB: nested dsLet inside matchResult
+             match_result2 = adjustMatchResultDs (dsLocalBinds binds) match_result1
+                             -- NB: nested dsLet inside matchResult
        ; return match_result2 }
 
 dsGRHS :: HsMatchContext Name -> Type -> LGRHS Id (LHsExpr Id) -> DsM MatchResult
