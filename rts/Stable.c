@@ -246,6 +246,7 @@ STATIC_INLINE void
 freeSnEntry(snEntry *sn)
 {
   ASSERT(sn->sn_obj == NULL);
+  removeHashTable(addrToStableHash, (W_)sn->old, NULL);
   sn->addr = (P_)stable_name_free;
   stable_name_free = sn;
 }

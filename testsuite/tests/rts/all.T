@@ -227,3 +227,6 @@ test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
 # The ghci way gets confused by the RTS options
 test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], compile_and_run, [''])
 
+# I couldn't reproduce 9078 with the -threaded runtime, but could easily
+# with the non-threaded one.
+test('T9078', [ omit_ways(threaded_ways) ], compile_and_run, ['-with-rtsopts="-DS" -debug'])
