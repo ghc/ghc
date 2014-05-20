@@ -1929,6 +1929,8 @@ getCoercibleInst loc ty1 ty2 = do
   where
   go :: FamInstEnvs -> GlobalRdrEnv -> TcS LookupInstResult
   go famenv rdr_env
+    -- Also see [Order of Coercible Instances]
+
     -- Coercible a a                             (see case 1 in [Coercible Instances])
     | ty1 `tcEqType` ty2
     = do return $ GenInst []
@@ -1944,7 +1946,19 @@ getCoercibleInst loc ty1 ty2 = do
        ev_term <- deferTcSForAllEq Representational loc (tvs1,body1) (tvs2,body2)
        return $ GenInst [] ev_term
 
-    -- Coercible (D ty1 ty2) (D ty1' ty2')       (see case 3 in [Coercible Instances])
+    -- Coercible NT a                            (see case 4 in [Coercible Instances])
+    | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
+      Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
+      dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
+    = do markDataConsAsUsed rdr_env tc
+         ct_ev <- requestCoercible loc concTy ty2
+         local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred concTy ty2
+         let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
+             tcCo = TcLetCo binds $
+                            coercionToTcCoercion ntCo `mkTcTransCo` mkTcCoVarCo local_var
+         return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
+
+    -- Coercible (D ty1 ty2) (D ty1' ty2')       (see case 2 in [Coercible Instances])
     | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
       Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
       tc1 == tc2,
@@ -1975,19 +1989,7 @@ getCoercibleInst loc ty1 ty2 = do
              tcCo = TcLetCo binds (mkTcTyConAppCo Representational tc1 arg_cos)
          return $ GenInst (catMaybes arg_new) (EvCoercion tcCo)
 
-    -- Coercible NT a                            (see case 4 in [Coercible Instances])
-    | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
-      Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
-      dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
-    = do markDataConsAsUsed rdr_env tc
-         ct_ev <- requestCoercible loc concTy ty2
-         local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred concTy ty2
-         let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
-             tcCo = TcLetCo binds $
-                            coercionToTcCoercion ntCo `mkTcTransCo` mkTcCoVarCo local_var
-         return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
-
-    -- Coercible a NT                            (see case 4 in [Coercible Instances])
+    -- Coercible a NT                            (see case 3 in [Coercible Instances])
     | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
       Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
       dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
@@ -2047,8 +2049,22 @@ air, in getCoercibleInst. The following “instances” are present:
     (which would be illegal to write like that in the source code, but we have
     it nevertheless).
 
+ 3. instance Coercible r b => Coercible (NT t1 t2 ...) b
+    instance Coercible a r => Coercible a (NT t1 t2 ...)
+    for a newtype constructor NT (or data family instance that resolves to a
+    newtype) where
+     * r is the concrete type of NT, instantiated with the arguments t1 t2 ...
+     * the constructor of NT are in scope.
 
- 3. instance (Coercible t1_r t1'_r, Coercible t2_r t2_r',...) =>
+    The newtype TyCon can appear undersaturated, but only if it has
+    enough arguments to apply the newtype coercion (which is eta-reduced). Examples:
+      newtype NT a = NT (Either a Int)
+      Coercible (NT Int) (Either Int Int) -- ok
+      newtype NT2 a b = NT2 (b -> a)
+      newtype NT3 a b = NT3 (b -> a)
+      Coercible (NT2 Int) (NT3 Int) -- cannot be derived
+
+ 4. instance (Coercible t1_r t1'_r, Coercible t2_r t2_r',...) =>
        Coercible (C t1_r  t2_r  ... t1_p  t2_p  ... t1_n t2_n ...)
                  (C t1_r' t2_r' ... t1_p' t2_p' ... t1_n t2_n ...)
     for a type constructor C where
@@ -2059,27 +2075,13 @@ air, in getCoercibleInst. The following “instances” are present:
     The type constructor can be used undersaturated; then the Coercible
     instance is at a higher kind. This does not cause problems.
 
- 4. instance Coercible r b => Coercible (NT t1 t2 ...) b
-    instance Coercible a r => Coercible a (NT t1 t2 ...)
-    for a newtype constructor NT (or data family instance that resolves to a
-    newtype) where
-     * r is the concrete type of NT, instantiated with the arguments t1 t2 ...
-     * the constructor of NT are in scope.
-
-    Again, the newtype TyCon can appear undersaturated, but only if it has
-    enough arguments to apply the newtype coercion (which is eta-reduced). Examples:
-      newtype NT a = NT (Either a Int)
-      Coercible (NT Int) (Either Int Int) -- ok
-      newtype NT2 a b = NT2 (b -> a)
-      newtype NT3 a b = NT3 (b -> a)
-      Coercible (NT2 Int) (NT3 Int) -- cannot be derived
 
 The type checker generates evidence in the form of EvCoercion, but the
 TcCoercion therein has role Representational,  which are turned into Core
 coercions by dsEvTerm in DsBinds.
 
-The evidence for the first three instance is generated here by
-getCoercibleInst, for the second instance deferTcSForAllEq is used.
+The evindence for the second case is created by deferTcSForAllEq, for the other
+cases by getCoercibleInst.
 
 When the constraint cannot be solved, it is treated as any other unsolved
 constraint, i.e. it can turn up in an inferred type signature, or reported to
@@ -2087,6 +2089,20 @@ the user as a regular "Cannot derive instance ..." error. In the latter case,
 coercible_msg in TcErrors gives additional explanations of why GHC could not
 find a Coercible instance, so it duplicates some of the logic from
 getCoercibleInst (in negated form).
+
+Note [Order of Coercible Instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+At first glance, the order of the various coercible instance doesn't matter, as
+incoherence is no issue here: We do not care how the evidence is constructed,
+as long as it is.
+
+But since the solver does not backtrack, the order does matter, as otherwise we may run
+into dead ends. If case 4 (coercing under type constructors) were tried before
+case 3 (unwrapping newtypes), which is tempting, as it yields solutions faster
+and builds smaller evidence turns, then using a role annotation this can
+prevent the solver from finding an otherwise possible solution. See T9117.hs
+for the code.
 
 
 Note [Instance and Given overlap]
