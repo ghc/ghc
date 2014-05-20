@@ -10,20 +10,20 @@ into non-C source containing this information.
 
 ------------------------------------------------------------------------ -}
 
-import Control.Monad
-import Data.Bits
-import Data.Char
-import Data.List
+import Control.Monad (when, unless)
+import Data.Bits (shiftL)
+import Data.Char (toLower)
+import Data.List (stripPrefix)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe
-import Numeric
-import System.Environment
-import System.Exit
-import System.FilePath
-import System.IO
-import System.Info
-import System.Process
+import Data.Maybe (catMaybes)
+import Numeric (readHex)
+import System.Environment (getArgs)
+import System.Exit (ExitCode(ExitSuccess), exitFailure)
+import System.FilePath ((</>))
+import System.IO (stderr, hPutStrLn)
+import System.Info (os)
+import System.Process (showCommandForUser, readProcess, rawSystem)
 
 main :: IO ()
 main = do opts <- parseArgs
