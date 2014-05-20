@@ -2040,7 +2040,7 @@ Note [Coercible Instances]
 The class Coercible is special: There are no regular instances, and the user
 cannot even define them (it is listed as an `abstractClass` in TcValidity).
 Instead, the type checker will create instances and their evidence out of thin
-air, in getCoercibleInst. The following “instances” are present:
+air, in getCoercibleInst. The following "instances" are present:
 
  1. instance Coercible a a
     for any type a at any kind k.
@@ -2054,7 +2054,7 @@ air, in getCoercibleInst. The following “instances” are present:
     for a newtype constructor NT (or data family instance that resolves to a
     newtype) where
      * r is the concrete type of NT, instantiated with the arguments t1 t2 ...
-     * the constructor of NT are in scope.
+     * the constructor of NT is in scope.
 
     The newtype TyCon can appear undersaturated, but only if it has
     enough arguments to apply the newtype coercion (which is eta-reduced). Examples:
@@ -2080,7 +2080,7 @@ The type checker generates evidence in the form of EvCoercion, but the
 TcCoercion therein has role Representational,  which are turned into Core
 coercions by dsEvTerm in DsBinds.
 
-The evindence for the second case is created by deferTcSForAllEq, for the other
+The evidence for the second case is created by deferTcSForAllEq, for the other
 cases by getCoercibleInst.
 
 When the constraint cannot be solved, it is treated as any other unsolved
@@ -2093,7 +2093,7 @@ getCoercibleInst (in negated form).
 Note [Order of Coercible Instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-At first glance, the order of the various coercible instance doesn't matter, as
+At first glance, the order of the various coercible instances doesn't matter, as
 incoherence is no issue here: We do not care how the evidence is constructed,
 as long as it is.
 
