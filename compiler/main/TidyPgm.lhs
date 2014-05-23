@@ -62,7 +62,7 @@ import qualified ErrUtils as Err
 
 import Control.Monad
 import Data.Function
-import Data.List        ( sortBy )
+import Data.List        ( sortBy, partition )
 import Data.IORef       ( atomicModifyIORef )
 \end{code}
 
@@ -335,8 +335,10 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                 -- Then pick just the ones we need to expose
                 -- See Note [Which rules to expose]
 
+        ; let { (trimmed_binds, trimmed_rules) = trimAutoRules binds ext_rules }
+
         ; (tidy_env, tidy_binds)
-                 <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env binds
+                 <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env trimmed_binds
 
         ; let { final_ids  = [ id | id <- bindersOfBinds tidy_binds,
                                     isExternalName (idName id)]
@@ -348,7 +350,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                 -- it was born, but we want Global, IdInfo-rich (or not) DFunId in the
                 -- tidy_insts.  Similarly the Ids inside a PatSyn.
 
-              ; tidy_rules = tidyRules tidy_env ext_rules
+              ; tidy_rules = tidyRules tidy_env trimmed_rules
                 -- You might worry that the tidy_env contains IdInfo-rich stuff
                 -- and indeed it does, but if omit_prags is on, ext_rules is
                 -- empty
@@ -415,14 +417,79 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                                 md_anns      = anns      -- are already tidy
                               })
         }
+  where
+    lookup_dfun :: TypeEnv -> Var -> Id
+    lookup_dfun type_env dfun_id
+      = case lookupTypeEnv type_env (idName dfun_id) of
+            Just (AnId dfun_id') -> dfun_id'
+            _other -> pprPanic "lookup_dfun" (ppr dfun_id)
 
 lookup_aux_id :: TypeEnv -> Var -> Id
 lookup_aux_id type_env id
   = case lookupTypeEnv type_env (idName id) of
         Just (AnId id') -> id'
         _other          -> pprPanic "lookup_axu_id" (ppr id)
+\end{code}
 
---------------------------
+Note [Trimming auto rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+With auto-specialisation we may specialise local or imported dfuns or
+INLINE functions, and then later inline them.  That may leave behind
+something like
+   RULE "foo" forall d. f @ Int d = f_spec
+where there is no remaining reference to f_spec except from the RULE.
+
+Now that RULE *might* be useful to an importing module, but that is
+purely speculative, and meanwhile the code is taking up space and
+codegen time.  So is seeems better to drop the bidign for f_spec if
+the auto-generated rule is the only reason that it is being kept
+alive.
+
+Notice, though, that the RULE still might have been useful; that is,
+it was the right thing to have generated it in the first place.  See
+Note [Inline specialisations] in Specialise.  But now it has served
+its purpose, and can be discarded.
+
+So trimAutoRules does this:
+  * Remove all bindings that are kept alive *only* by isAutoRule rules
+  * Remove all auto rules that mention bindings that have been removed
+So if a binding is kept alive for some other reason (e.g. f_spec is
+called in the final code), we keep th e rule too.
+
+I found that binary sizes jumped by 6-10% when I started to specialise
+INLINE functions (again, Note [Inline specialisations] in Specialise).
+Adding trimAutoRules removed all this bloat.
+
+
+\begin{code}
+trimAutoRules :: [CoreBind] -> [CoreRule] -> ([CoreBind], [CoreRule])
+-- See Note [Trimming auto rules]
+trimAutoRules binds rules
+  | null auto_rules
+  = (binds, rules)
+  | otherwise
+  = (binds', filter keep_rule auto_rules ++ user_rules)
+  where
+    (auto_rules, user_rules) = partition isAutoRule rules
+    rule_fvs = foldr (unionVarSet . ruleRhsFreeVars) emptyVarSet user_rules
+
+    (all_fvs, binds') = trim_binds binds
+
+    trim_binds :: [CoreBind] -> (VarSet, [CoreBind])
+    trim_binds []
+       = (rule_fvs, [])
+    trim_binds (bind:binds)
+       | keep_bind = (fvs `unionVarSet` bind_fvs, bind:binds')
+       | otherwise = (fvs, binds')
+       where
+         needed bndr   = isExportedId bndr || bndr `elemVarSet` fvs
+         keep_bind     = any needed (bindersOf bind)
+         (fvs, binds') = trim_binds binds
+         bind_fvs      = bindFreeVars bind
+
+    keep_rule rule = ruleFreeVars rule `subVarSet` all_fvs
+
+----------------------
 tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
             -> TypeEnv -> TypeEnv
 

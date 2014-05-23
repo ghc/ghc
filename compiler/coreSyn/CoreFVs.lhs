@@ -23,7 +23,7 @@ module CoreFVs (
         varTypeTyVars, 
         idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
-        ruleRhsFreeVars, rulesFreeVars,
+        ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
         ruleLhsOrphNames, ruleLhsFreeIds,
         vectsFreeVars,
 

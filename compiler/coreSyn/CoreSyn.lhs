@@ -81,7 +81,7 @@ module CoreSyn (
 	-- ** Operations on 'CoreRule's 
 	seqRules, ruleArity, ruleName, ruleIdName, ruleActivation,
 	setRuleIdName,
-	isBuiltinRule, isLocalRule,
+	isBuiltinRule, isLocalRule, isAutoRule,
 
 	-- * Core vectorisation declarations data type
 	CoreVect(..)
@@ -598,6 +598,10 @@ type IdUnfoldingFun = Id -> Unfolding
 isBuiltinRule :: CoreRule -> Bool
 isBuiltinRule (BuiltinRule {}) = True
 isBuiltinRule _		       = False
+
+isAutoRule :: CoreRule -> Bool
+isAutoRule (BuiltinRule {}) = False
+isAutoRule (Rule { ru_auto = is_auto }) = is_auto
 
 -- | The number of arguments the 'ru_fn' must be applied 
 -- to before the rule can match on it
