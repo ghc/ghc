@@ -678,12 +678,16 @@ unaryLit op = do
   [Lit l] <- getArgs
   liftMaybe $ op dflags (convFloating dflags l)
 
+-- Simple constant folding
 binaryLit :: (DynFlags -> Literal -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
 binaryLit op = do
   dflags <- getDynFlags
   [Lit l1, Lit l2] <- getArgs
   liftMaybe $ op dflags (convFloating dflags l1) (convFloating dflags l2)
 
+
+-- The next four functions perform reassociation
+-- See Note [Reassociation]
 assocBinaryLit :: PrimOp -> (DynFlags -> Literal -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
 assocBinaryLit primop op = do
   dflags <- getDynFlags
@@ -817,6 +821,28 @@ strengthReduction two_lit add_op = do -- Note [Strength reduction]
 -- This rule turns floating point multiplications of the form 2.0 * x and
 -- x * 2.0 into x + x addition, because addition costs less than multiplication.
 -- See #7116
+
+-- Note [Reassociation]
+-- ~~~~~~~~~~~~~~~~~~~~
+--
+-- We can simplify expressions like "(x + 8) - 1" and "((8 + x) + y) - 2" and
+-- "(8 + x) + (y - 3)", by collecting all the constants and folding them.
+--
+-- We do so by normalising the expressions:
+--  * treesToLeft ensures that we have a linear tree with subtress on the left
+--  * litsToRight commutes literals to the right
+--  * litsGoUp sorts lits to the top of the tree
+--  * assocBinaryLit then folds the literals.
+--
+-- Example:
+--
+--   x + (2 + (y + 3))
+-- = ((x + 2) + y) + 3 -- using treesToLeft
+-- = ((x + y) + 2) + 3 -- using litsGoUp
+-- = (x + y) + 5       -- using assocBinaryLit
+--
+-- An expression like "x -# 2" is turned into "x +# (-2)" (minusToPlus) and
+-- then also takes part in this scheme.
 
 -- Note [What's true and false]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
