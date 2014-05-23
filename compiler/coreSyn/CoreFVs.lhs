@@ -82,7 +82,7 @@ exprsFreeVars = foldr (unionVarSet . exprFreeVars) emptyVarSet
 
 -- | Find all locally defined free Ids in a binding group
 bindFreeVars :: CoreBind -> VarSet
-bindFreeVars (NonRec _ r) = exprFreeVars r
+bindFreeVars (NonRec b r) = rhs_fvs (b,r) isLocalVar emptyVarSet
 bindFreeVars (Rec prs)    = addBndrs (map fst prs)
                                      (foldr (union . rhs_fvs) noVars prs)
                                      isLocalVar emptyVarSet
