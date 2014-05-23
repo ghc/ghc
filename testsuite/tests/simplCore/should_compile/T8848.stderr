@@ -13,6 +13,26 @@ Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
 Rule fired: Class op <*>
+Rule fired: Class op $p1Applicative
+Rule fired: Class op fmap
+Rule fired: Class op <*>
+Rule fired:
+    SPEC/main:T8848 Control.Applicative.liftA2 _ _ _ @ (T8848.Shape
+                                                      'T8848.Z)
+Rule fired: Class op $p1Applicative
+Rule fired: Class op fmap
+Rule fired: Class op <*>
+Rule fired:
+    SPEC/main:T8848 Control.Applicative.liftA2 _ _ _ @ (T8848.Shape
+                                                      'T8848.Z)
+Rule fired: Class op $p1Applicative
+Rule fired: Class op fmap
+Rule fired: Class op <*>
+Rule fired: Class op $p1Applicative
+Rule fired: Class op fmap
+Rule fired: Class op <*>
+Rule fired: Class op fmap
+Rule fired: Class op fmap
 Rule fired: SPEC $cfmap @ 'T8848.Z
 Rule fired: SPEC $c<$ @ 'T8848.Z
 Rule fired: SPEC T8848.$fFunctorShape @ 'T8848.Z
@@ -20,3 +40,6 @@ Rule fired: Class op fmap
 Rule fired: Class op fmap
 Rule fired: SPEC $c<$ @ 'T8848.Z
 Rule fired: SPEC T8848.$fFunctorShape @ 'T8848.Z
+Rule fired: SPEC T8848.$fFunctorShape @ 'T8848.Z
+Rule fired: Class op fmap
+Rule fired: Class op fmap
