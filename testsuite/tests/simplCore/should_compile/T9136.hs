@@ -15,6 +15,9 @@ foo3 x y = ((8 + x) + y) - 2
 foo4 :: Int -> Int -> Int
 foo4 x y = (8 + x) + (y - 3)
 
+foo5 :: Int -> Int -> Int
+foo5 x y = (8 - x) + (y - 3)
+
 word1 :: Word -> Word
 word1 x = (x + 8) + 1
 
@@ -26,3 +29,6 @@ word3 x y = ((8 + x) + y) + 2
 
 word4 :: Word -> Word -> Word
 word4 x y = (8 + x) + (y + 3)
+
+word5 :: Word -> Word -> Word
+word5 x y = ((8 - x) - y - 2)

@@ -84,14 +84,11 @@ primOpRules nm DataToTagOp = mkPrimOpRule nm 2 [ dataToTagRule ]
 -- Int operations
 primOpRules nm IntAddOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (+))
                                                , identityDynFlags zeroi
-                                               , assocBinaryLit IntAddOp (intOp2 (+))
-                                               , litsToRight IntAddOp
-                                               , treesToLeft IntAddOp
-                                               , litsGoUp IntAddOp
+                                               , reassociate False False
                                                ]
 primOpRules nm IntSubOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (-))
                                                , rightIdentityDynFlags zeroi
-                                               , minusToPlus IntAddOp
+                                               , reassociate False True
                                                , equalArgs >> retLit zeroi ]
 primOpRules nm IntMulOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (*))
                                                , zeroElem zeroi
@@ -131,13 +128,11 @@ primOpRules nm ISrlOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 shiftRightLog
 -- Word operations
 primOpRules nm WordAddOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (+))
                                                , identityDynFlags zerow
-                                               , assocBinaryLit WordAddOp (wordOp2 (+))
-                                               , litsToRight WordAddOp
-                                               , treesToLeft WordAddOp
-                                               , litsGoUp WordAddOp ]
+                                               , reassociate True False
+                                               ]
 primOpRules nm WordSubOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (-))
                                                , rightIdentityDynFlags zerow
-                                               , minusToPlus WordSubOp
+                                               , reassociate True True
                                                , equalArgs >> retLit zerow ]
 primOpRules nm WordMulOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (*))
                                                , identityDynFlags onew ]
@@ -691,36 +686,6 @@ binaryLit op = do
   liftMaybe $ op dflags (convFloating dflags l1) (convFloating dflags l2)
 
 
--- The next four functions perform reassociation
--- See Note [Reassociation]
-assocBinaryLit :: PrimOp -> (DynFlags -> Literal -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
-assocBinaryLit primop op = do
-  dflags <- getDynFlags
-  [(Var primop_id `App` t) `App` Lit l1, Lit l2] <- getArgs
-  matchPrimOpId primop primop_id
-  Just r <- return $ op dflags (convFloating dflags l1) (convFloating dflags l2)
-  return $ Var primop_id `App` t `App` r
-
-litsToRight :: PrimOp -> RuleM CoreExpr
-litsToRight op = do
-  [Lit l, t] <- getArgs
-  return $ Var (mkPrimOpId op) `App` t `App` Lit l
-
-treesToLeft :: PrimOp -> RuleM CoreExpr
-treesToLeft op = do
-  [t1, (Var primop_id `App` t2) `App` t3] <- getArgs
-  matchPrimOpId op primop_id
-  return $ Var (mkPrimOpId op) `App` (Var (mkPrimOpId op) `App` t1 `App` t2)
-                               `App` t3
-
-litsGoUp :: PrimOp -> RuleM CoreExpr
-litsGoUp op = do
-  [(Var primop_id `App` t1) `App` Lit l, t2] <- getArgs
-  matchPrimOpId op primop_id
-  return $ Var (mkPrimOpId op) `App` (Var (mkPrimOpId op) `App` t1 `App` t2)
-                               `App` Lit l
-
-
 binaryCmpLit :: (forall a . Ord a => a -> a -> Bool) -> RuleM CoreExpr
 binaryCmpLit op = do
   dflags <- getDynFlags
@@ -777,13 +742,6 @@ equalArgs = do
 nonZeroLit :: Int -> RuleM ()
 nonZeroLit n = getLiteral n >>= guard . not . isZeroLit
 
-minusToPlus :: PrimOp -> RuleM CoreExpr
-minusToPlus op = do
-    [x, Lit (MachInt y)] <- getArgs
-    dflags <- getDynFlags
-    Just r <- return $ intResult dflags (-y)
-    return $ Var (mkPrimOpId op) `App` x `App` r
-
 -- When excess precision is not requested, cut down the precision of the
 -- Rational value to that of Float/Double. We confuse host architecture
 -- and target architecture here, but it's convenient (and wrong :-).
@@ -827,6 +785,93 @@ strengthReduction two_lit add_op = do -- Note [Strength reduction]
 -- x * 2.0 into x + x addition, because addition costs less than multiplication.
 -- See #7116
 
+
+-- See Note [Reassociation]
+reassociate :: Bool -> Bool -> RuleM CoreExpr
+reassociate forWord thisIsSub = do
+    [x,y] <- getArgs
+    msum
+      -- Plain constant folding
+      [ do i1 <- litToInteger x
+           i2 <- litToInteger y
+           foldThisOp i1 i2
+
+      -- Turning nested + and - in to a linear tree, with subtress on the left
+      , do guard (not thisIsSub)
+           (y1, y2) <- isAdd y
+           return $ (x `mkAdd` y1) `mkAdd` y2
+      , do guard (not thisIsSub)
+           (y1, y2) <- isSub y
+           return $ (x `mkAdd` y1) `mkSub` y2
+      , do guard thisIsSub
+           (y1, y2) <- isAdd y
+           return $ (x `mkSub` y1) `mkSub` y2
+      , do guard thisIsSub
+           (y1, y2) <- isSub y
+           return $ (x `mkSub` y1) `mkAdd` y2
+
+      -- Combine nearby constants
+      , do i2 <- litToInteger y
+           (x1, x2) <- isAdd x
+           i1 <- litToInteger x2
+           s <- foldThisOp i1 i2
+           return $ x1 `mkAdd` s
+      , do i2 <- litToInteger y
+           (x1, x2) <- isSub x
+           i1 <- litToInteger x2
+           s <- foldThisOp (-i1) i2
+           return $ x1 `mkAdd` s
+
+      -- Sort all the constants to the left (where they will be folded)
+      , do guard (not thisIsSub)
+           _ <- litToInteger y
+           (x1, x2) <- isAdd x
+           return $ (x1 `mkAdd` y) `mkAdd` x2
+      , do guard (not thisIsSub)
+           _ <- litToInteger y
+           (x1, x2) <- isSub x
+           return $ (x1 `mkAdd` y) `mkSub` x2
+      , do guard thisIsSub
+           _ <- litToInteger y
+           (x1, x2) <- isAdd x
+           return $ (x1 `mkSub` y) `mkAdd` x2
+      , do guard thisIsSub
+           _ <- litToInteger y
+           (x1, x2) <- isSub x
+           return $ (x1 `mkSub` y) `mkSub` x2
+      ]
+ where
+    foldThisOp x y = do
+        dflags <- getDynFlags
+        let r | thisIsSub = x - y
+              | otherwise = x + y
+        return $ if forWord then mkWordVal dflags r
+                            else mkIntVal dflags r
+
+    addOp | forWord   = WordAddOp
+          | otherwise = IntAddOp
+    subOp | forWord   = WordSubOp
+          | otherwise = IntSubOp
+
+    isAdd (Var primop_id `App` t1 `App` t2) = do
+        matchPrimOpId addOp primop_id
+        return (t1, t2)
+    isAdd _ = mzero
+
+    isSub (Var primop_id `App` t1 `App` t2) = do
+        matchPrimOpId subOp primop_id
+        return (t1, t2)
+    isSub _ = mzero
+
+    mkAdd e1 e2 = Var (mkPrimOpId addOp) `App` e1 `App` e2
+    mkSub e1 e2 = Var (mkPrimOpId subOp) `App` e1 `App` e2
+
+    litToInteger :: CoreExpr -> RuleM Integer
+    litToInteger (Lit (MachWord n)) | forWord     = return $ fromIntegral n
+    litToInteger (Lit (MachInt n))  | not forWord = return $ fromIntegral n
+    litToInteger _                                = mzero
+
+
 -- Note [Reassociation]
 -- ~~~~~~~~~~~~~~~~~~~~
 --
@@ -834,20 +879,18 @@ strengthReduction two_lit add_op = do -- Note [Strength reduction]
 -- "(8 + x) + (y - 3)", by collecting all the constants and folding them.
 --
 -- We do so by normalising the expressions:
---  * treesToLeft ensures that we have a linear tree with subtress on the left
---  * litsToRight commutes literals to the right
---  * litsGoUp sorts lits to the top of the tree
+--  * (c1 `op` c2) is folded directly, of course
+--  * we left-associate everything
+--  * (x `op` c1) `op` c2 is folded
+--  * (x `op` y) `op` c is reorded to (x `op` c) `op` y, to get the constants together
 --  * assocBinaryLit then folds the literals.
 --
 -- Example:
 --
 --   x + (2 + (y + 3))
--- = ((x + 2) + y) + 3 -- using treesToLeft
--- = ((x + y) + 2) + 3 -- using litsGoUp
--- = (x + y) + 5       -- using assocBinaryLit
---
--- For Ints, an expression like "x -# 2" is turned into "x +# (-2)"
--- (minusToPlus) and then also takes part in this scheme.
+-- = ((x + 2) + y) + 3
+-- = ((x + 2) + 3) + y
+-- = (x + 5) + y
 
 -- Note [What's true and false]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

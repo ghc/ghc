@@ -122,4 +122,4 @@ T5996:
 
 T9136:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T9136.hs -ddump-simpl -dsuppress-uniques -dsuppress-all > T9136.simpl
-	! grep -v 'Result size' T9136.simpl | grep -q -F 8
+	! grep -v 'Result size' T9136.simpl | grep -2 -F 8
