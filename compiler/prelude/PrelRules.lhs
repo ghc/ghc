@@ -83,9 +83,15 @@ primOpRules nm DataToTagOp = mkPrimOpRule nm 2 [ dataToTagRule ]
 
 -- Int operations
 primOpRules nm IntAddOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (+))
-                                               , identityDynFlags zeroi ]
+                                               , identityDynFlags zeroi
+                                               , assocBinaryLit IntAddOp (intOp2 (+))
+                                               , litsToRight IntAddOp
+                                               , treesToLeft IntAddOp
+                                               , litsGoUp IntAddOp
+                                               ]
 primOpRules nm IntSubOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (-))
                                                , rightIdentityDynFlags zeroi
+                                               , minusToPlus IntAddOp
                                                , equalArgs >> retLit zeroi ]
 primOpRules nm IntMulOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (*))
                                                , zeroElem zeroi
@@ -678,6 +684,34 @@ binaryLit op = do
   [Lit l1, Lit l2] <- getArgs
   liftMaybe $ op dflags (convFloating dflags l1) (convFloating dflags l2)
 
+assocBinaryLit :: PrimOp -> (DynFlags -> Literal -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
+assocBinaryLit primop op = do
+  dflags <- getDynFlags
+  [(Var primop_id `App` t) `App` Lit l1, Lit l2] <- getArgs
+  matchPrimOpId primop primop_id
+  Just r <- return $ op dflags (convFloating dflags l1) (convFloating dflags l2)
+  return $ Var primop_id `App` t `App` r
+
+litsToRight :: PrimOp -> RuleM CoreExpr
+litsToRight op = do
+  [Lit l, t] <- getArgs
+  return $ Var (mkPrimOpId op) `App` t `App` Lit l
+
+treesToLeft :: PrimOp -> RuleM CoreExpr
+treesToLeft op = do
+  [t1, (Var primop_id `App` t2) `App` t3] <- getArgs
+  matchPrimOpId op primop_id
+  return $ Var (mkPrimOpId op) `App` (Var (mkPrimOpId op) `App` t1 `App` t2)
+                               `App` t3
+
+litsGoUp :: PrimOp -> RuleM CoreExpr
+litsGoUp op = do
+  [(Var primop_id `App` t1) `App` Lit l, t2] <- getArgs
+  matchPrimOpId op primop_id
+  return $ Var (mkPrimOpId op) `App` (Var (mkPrimOpId op) `App` t1 `App` t2)
+                               `App` Lit l
+
+
 binaryCmpLit :: (forall a . Ord a => a -> a -> Bool) -> RuleM CoreExpr
 binaryCmpLit op = do
   dflags <- getDynFlags
@@ -733,6 +767,13 @@ equalArgs = do
 
 nonZeroLit :: Int -> RuleM ()
 nonZeroLit n = getLiteral n >>= guard . not . isZeroLit
+
+minusToPlus :: PrimOp -> RuleM CoreExpr
+minusToPlus op = do
+    [x, Lit (MachInt y)] <- getArgs
+    dflags <- getDynFlags
+    Just r <- return $ intResult dflags (-y)
+    return $ Var (mkPrimOpId op) `App` x `App` r
 
 -- When excess precision is not requested, cut down the precision of the
 -- Rational value to that of Float/Double. We confuse host architecture
