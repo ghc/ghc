@@ -232,7 +232,7 @@ strictness.  Eg if we have
     g :: Int -> Int
     g x = f x x            -- Provokes a specialisation for f
 
-  module Bsr where
+  module Bar where
     import Foo
 
     h :: Int -> Int
@@ -245,6 +245,10 @@ having rules on, but inlinings off.  But that's kind of lucky. It seems
 more robust to give the wrapper an Activation of (ActiveAfter 0),
 so that it becomes active in an importing module at the same time that
 it appears in the first place in the defining module.
+
+At one stage I tried making the wrapper inlining always-active, and
+that had a very bad effect on nofib/imaginary/x2n1; a wrapper was
+inlined before the specialisation fired.
 
 \begin{code}
 tryWW   :: DynFlags

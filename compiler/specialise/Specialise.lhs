@@ -1496,9 +1496,9 @@ Here is what we do with the InlinePragma of the original function
        (a) An INLINE pragma is transferred
        (b) An INLINABLE pragma is *not* transferred
 
-Why (a)? Previously the idea is that the point of INLINE was
-precisely to specialise the function at its call site, and that's not
-so important for the specialised copies.  But *pragma-directed*
+Why (a): transfer INLINE pragmas? The point of INLINE was precisely to
+specialise the function at its call site, and arguably that's not so
+important for the specialised copies.  BUT *pragma-directed*
 specialisation now takes place in the typechecker/desugarer, with
 manually specified INLINEs.  The specialisation here is automatic.
 It'd be very odd if a function marked INLINE was specialised (because
@@ -1509,16 +1509,33 @@ programmer said INLINE!
 You might wonder why we specialise INLINE functions at all.  After
 all they should be inlined, right?  Two reasons:
 
- * Even INLINE functions are sometimes not inlined, when
-   they aren't applied to interesting arguments.  But perhaps the type
-   arguments alone are enough to specialise (even though the args are too
-   boring to trigger inlining), and it's certainly better to call the
+ * Even INLINE functions are sometimes not inlined, when they aren't
+   applied to interesting arguments.  But perhaps the type arguments
+   alone are enough to specialise (even though the args are too boring
+   to trigger inlining), and it's certainly better to call the
    specialised version.
 
  * The RHS of an INLINE function might call another overloaded function,
    and we'd like to generate a specialised version of that function too.
+   This actually happens a lot. Consider
+      replicateM_ :: (Monad m) => Int -> m a -> m ()
+      {-# INLINABLE replicateM_ #-}
+      replicateM_ d x ma = ...
+   The strictness analyser may transform to
+      replicateM_ :: (Monad m) => Int -> m a -> m ()
+      {-# INLINE replicateM_ #-}
+      replicateM_ d x ma = case x of I# x' -> $wreplicateM_ d x' ma
 
-Why (b)? See Trac #4874 for persuasive examples.  Suppose we have
+      $wreplicateM_ :: (Monad m) => Int# -> m a -> m ()
+      {-# INLINABLE $wreplicateM_ #-}
+      $wreplicateM_ = ...
+   Now an importing module has a specialised call to replicateM_, say
+   (replicateM_ dMonadIO).  We certainly want to specialise $wreplicateM_!
+   This particular example had a huge effect on the call to replicateM_ 
+   in nofib/shootout/n-body.
+
+Why (b): discard INLINEABLE pragmas? See Trac #4874 for persuasive examples.
+Suppose we have
     {-# INLINABLE f #-}
     f :: Ord a => [a] -> Int
     f xs = letrec f' = ...f'... in f'

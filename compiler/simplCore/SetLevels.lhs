@@ -352,6 +352,9 @@ lvlExpr env expr@(_, AnnLam {})
 lvlExpr env (_, AnnLet bind body)
   = do { (bind', new_env) <- lvlBind env bind
        ; body' <- lvlExpr new_env body
+           -- No point in going via lvlMFE here.  If the binding is alive
+           -- (mentioned in body), and the whole let-expression doesn't
+           -- float, then neither will the body
        ; return (Let bind' body') }
 
 lvlExpr env (_, AnnCase scrut@(scrut_fvs,_) case_bndr ty alts)
