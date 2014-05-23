@@ -74,6 +74,7 @@ test('T1969',
              # 2014-01-22 316103268 (x86/Linux)
              # 2014-06-29 303300692 (x86/Linux)
            (wordsize(64), 651626680, 5)]),
+           (wordsize(64), 625525224, 5)]),
              # 17/11/2009 434845560 (amd64/Linux)
              # 08/12/2009 459776680 (amd64/Linux)
              # 17/05/2010 519377728 (amd64/Linux)
@@ -396,6 +397,11 @@ test('T5642',
             # prev:        1300000000
             # 2014-07-17:  1358833928 (general round of updates)
             # 2014-08-07:  1402242360 (caused by 1fc60ea)
+# Watch out for:
+            # 23/05/2014: 1452688392 (More aggressive specialisation means we get
+            #                         specialised copies of imported functions that
+            #                         are ultimately discarded by trimAutoRules
+            #                         It's a bizarre program with LOTS of data types)
       ],
       compile,['-O'])
 
