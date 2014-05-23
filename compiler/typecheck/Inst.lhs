@@ -477,7 +477,8 @@ traceDFuns :: [ClsInst] -> TcRn ()
 traceDFuns ispecs
   = traceTc "Adding instances:" (vcat (map pp ispecs))
   where
-    pp ispec = ppr (instanceDFunId ispec) <+> colon <+> ppr ispec
+    pp ispec = hang (ppr (instanceDFunId ispec) <+> colon)
+                  2 (ppr ispec)
 	-- Print the dfun name itself too
 
 funDepErr :: ClsInst -> [ClsInst] -> TcRn ()

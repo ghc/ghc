@@ -166,15 +166,13 @@ pprInstanceHdr :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
 pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
   = getPprStyle $ \ sty ->
-    let theta_to_print
-          | debugStyle sty = theta
-          | otherwise = drop (dfunNSilent dfun) theta
+    let dfun_ty = idType dfun
+        (tvs, theta, res_ty) = tcSplitSigmaTy dfun_ty
+        theta_to_print = drop (dfunNSilent dfun) theta
           -- See Note [Silent superclass arguments] in TcInstDcls
-    in ptext (sLit "instance") <+> ppr flag
-       <+> sep [pprThetaArrowTy theta_to_print, ppr res_ty]
-  where
-    (_, theta, res_ty) = tcSplitSigmaTy (idType dfun)
-       -- Print without the for-all, which the programmer doesn't write
+        ty_to_print | debugStyle sty = dfun_ty
+                    | otherwise      = mkSigmaTy tvs theta_to_print res_ty
+    in ptext (sLit "instance") <+> ppr flag <+> pprSigmaType ty_to_print
 
 pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)
