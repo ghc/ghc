@@ -130,9 +130,14 @@ primOpRules nm ISrlOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 shiftRightLog
 
 -- Word operations
 primOpRules nm WordAddOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (+))
-                                               , identityDynFlags zerow ]
+                                               , identityDynFlags zerow
+                                               , assocBinaryLit WordAddOp (wordOp2 (+))
+                                               , litsToRight WordAddOp
+                                               , treesToLeft WordAddOp
+                                               , litsGoUp WordAddOp ]
 primOpRules nm WordSubOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (-))
                                                , rightIdentityDynFlags zerow
+                                               , minusToPlus WordSubOp
                                                , equalArgs >> retLit zerow ]
 primOpRules nm WordMulOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (*))
                                                , identityDynFlags onew ]
@@ -841,8 +846,8 @@ strengthReduction two_lit add_op = do -- Note [Strength reduction]
 -- = ((x + y) + 2) + 3 -- using litsGoUp
 -- = (x + y) + 5       -- using assocBinaryLit
 --
--- An expression like "x -# 2" is turned into "x +# (-2)" (minusToPlus) and
--- then also takes part in this scheme.
+-- For Ints, an expression like "x -# 2" is turned into "x +# (-2)"
+-- (minusToPlus) and then also takes part in this scheme.
 
 -- Note [What's true and false]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
