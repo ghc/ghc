@@ -104,7 +104,7 @@ kindFunResult _ (ForAllTy kv res) arg = substKiWith [kv] [arg] res
 #ifdef DEBUG
 kindFunResult doc k _ = pprPanic "kindFunResult" (ppr k $$ doc)
 #else
--- Without DEUBG, doc becomes an unsed arg, and will be optimised away
+-- Without DEBUG, doc becomes an unsed arg, and will be optimised away
 kindFunResult _ _ _ = panic "kindFunResult"
 #endif
 

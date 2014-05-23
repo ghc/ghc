@@ -1653,7 +1653,7 @@ typeKind orig_ty = go orig_ty
     go (TyVarTy tyvar)      = tyVarKind tyvar
     go _ty@(FunTy _arg res)
         -- Hack alert.  The kind of (Int -> Int#) is liftedTypeKind (*),
-        --              not unliftedTypKind (#)
+        --              not unliftedTypeKind (#)
         -- The only things that can be after a function arrow are
         --   (a) types (of kind openTypeKind or its sub-kinds)
         --   (b) kinds (of super-kind TY) (e.g. * -> (* -> *))
