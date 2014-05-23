@@ -246,8 +246,6 @@ getCoreToDo dflags
                 -- but maybe we save some unnecessary to-and-fro in
                 -- the simplifier.
 
-        runWhen do_float_in CoreDoFloatInwards,
-
         simpl_phases,
 
                 -- Phase 0: allow all Ids to be inlined now
@@ -261,6 +259,13 @@ getCoreToDo dflags
                 -- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
                 -- Don't stop now!
         simpl_phase 0 ["main"] (max max_iter 3),
+
+        runWhen do_float_in CoreDoFloatInwards,
+            -- Run float-inwards immediately before the strictness analyser
+            -- Doing so pushes bindings nearer their use site and hence makes
+            -- them more likely to be strict. These bindings might only show
+            -- up after the inlining from simplification.  Example in fulsom,
+            -- Csg.calc, where an arg of timesDouble thereby becomes strict.
 
         runWhen call_arity $ CoreDoPasses
             [ CoreDoCallArity
