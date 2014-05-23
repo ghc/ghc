@@ -42,6 +42,7 @@ PRELUDE_CLOSURE(base_GHCziIOziException_blockedIndefinitelyOnMVar_closure);
 PRELUDE_CLOSURE(base_GHCziIOziException_blockedIndefinitelyOnSTM_closure);
 PRELUDE_CLOSURE(base_ControlziExceptionziBase_nonTermination_closure);
 PRELUDE_CLOSURE(base_ControlziExceptionziBase_nestedAtomically_closure);
+PRELUDE_CLOSURE(base_GHCziEventziThread_blockedOnBadFD_closure);
 
 PRELUDE_CLOSURE(base_GHCziConcziSync_runSparks_closure);
 PRELUDE_CLOSURE(base_GHCziConcziIO_ensureIOManagerIsRunning_closure);
@@ -104,6 +105,7 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define blockedIndefinitelyOnSTM_closure DLL_IMPORT_DATA_REF(base_GHCziIOziException_blockedIndefinitelyOnSTM_closure)
 #define nonTermination_closure    DLL_IMPORT_DATA_REF(base_ControlziExceptionziBase_nonTermination_closure)
 #define nestedAtomically_closure  DLL_IMPORT_DATA_REF(base_ControlziExceptionziBase_nestedAtomically_closure)
+#define blockedOnBadFD_closure    DLL_IMPORT_DATA_REF(base_GHCziEventziThread_blockedOnBadFD_closure)
 
 #define Czh_static_info           DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Czh_static_info)
 #define Fzh_static_info           DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Fzh_static_info)
