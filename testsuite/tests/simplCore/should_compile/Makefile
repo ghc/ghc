@@ -119,3 +119,7 @@ T8221:
 T5996:
 	$(RM) -f T5996.o T5996.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T5996.hs -ddump-simpl -dsuppress-uniques -dsuppress-all | grep y2
+
+T9136:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T9136.hs -ddump-simpl -dsuppress-uniques -dsuppress-all > T9136.simpl
+	! grep -v 'Result size' T9136.simpl | grep -q -F 8
