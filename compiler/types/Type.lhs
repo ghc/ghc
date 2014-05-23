@@ -1636,26 +1636,31 @@ type SimpleKind = Kind
 
 \begin{code}
 typeKind :: Type -> Kind
-typeKind (TyConApp tc tys)
-  | isPromotedTyCon tc
-  = ASSERT( tyConArity tc == length tys ) superKind
-  | otherwise
-  = kindAppResult (tyConKind tc) tys
+typeKind orig_ty = go orig_ty
+  where
+    
+    go ty@(TyConApp tc tys)
+      | isPromotedTyCon tc
+      = ASSERT( tyConArity tc == length tys ) superKind
+      | otherwise
+      = kindAppResult (ptext (sLit "typeKind 1") <+> ppr ty $$ ppr orig_ty)
+                      (tyConKind tc) tys
 
-typeKind (AppTy fun arg)      = kindAppResult (typeKind fun) [arg]
-typeKind (LitTy l)            = typeLiteralKind l
-typeKind (ForAllTy _ ty)      = typeKind ty
-typeKind (TyVarTy tyvar)      = tyVarKind tyvar
-typeKind _ty@(FunTy _arg res)
-    -- Hack alert.  The kind of (Int -> Int#) is liftedTypeKind (*),
-    --              not unliftedTypKind (#)
-    -- The only things that can be after a function arrow are
-    --   (a) types (of kind openTypeKind or its sub-kinds)
-    --   (b) kinds (of super-kind TY) (e.g. * -> (* -> *))
-    | isSuperKind k         = k
-    | otherwise             = ASSERT2( isSubOpenTypeKind k, ppr _ty $$ ppr k ) liftedTypeKind
-    where
-      k = typeKind res
+    go ty@(AppTy fun arg)   = kindAppResult (ptext (sLit "typeKind 2") <+> ppr ty $$ ppr orig_ty)
+                                            (go fun) [arg]
+    go (LitTy l)            = typeLiteralKind l
+    go (ForAllTy _ ty)      = go ty
+    go (TyVarTy tyvar)      = tyVarKind tyvar
+    go _ty@(FunTy _arg res)
+        -- Hack alert.  The kind of (Int -> Int#) is liftedTypeKind (*),
+        --              not unliftedTypKind (#)
+        -- The only things that can be after a function arrow are
+        --   (a) types (of kind openTypeKind or its sub-kinds)
+        --   (b) kinds (of super-kind TY) (e.g. * -> (* -> *))
+        | isSuperKind k         = k
+        | otherwise             = ASSERT2( isSubOpenTypeKind k, ppr _ty $$ ppr k ) liftedTypeKind
+        where
+          k = go res
 
 typeLiteralKind :: TyLit -> Kind
 typeLiteralKind l =

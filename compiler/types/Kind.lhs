@@ -63,6 +63,7 @@ import PrelNames
 import Outputable
 import Maybes( orElse )
 import Util
+import FastString
 \end{code}
 
 %************************************************************************
@@ -97,14 +98,19 @@ during type inference.  Hence cmpTc treats them as equal.
 
 \begin{code}
 -- | Essentially 'funResultTy' on kinds handling pi-types too
-kindFunResult :: Kind -> KindOrType -> Kind
-kindFunResult (FunTy _ res) _ = res
-kindFunResult (ForAllTy kv res) arg = substKiWith [kv] [arg] res
-kindFunResult k _ = pprPanic "kindFunResult" (ppr k)
+kindFunResult :: SDoc -> Kind -> KindOrType -> Kind
+kindFunResult _ (FunTy _ res)     _   = res
+kindFunResult _ (ForAllTy kv res) arg = substKiWith [kv] [arg] res
+#ifdef DEBUG
+kindFunResult doc k _ = pprPanic "kindFunResult" (ppr k $$ doc)
+#else
+-- Without DEUBG, doc becomes an unsed arg, and will be optimised away
+kindFunResult _ _ _ = panic "kindFunResult"
+#endif
 
-kindAppResult :: Kind -> [Type] -> Kind
-kindAppResult k []     = k
-kindAppResult k (a:as) = kindAppResult (kindFunResult k a) as
+kindAppResult :: SDoc -> Kind -> [Type] -> Kind
+kindAppResult _   k []     = k
+kindAppResult doc k (a:as) = kindAppResult doc (kindFunResult doc k a) as
 
 -- | Essentially 'splitFunTys' on kinds
 splitKindFunTys :: Kind -> ([Kind],Kind)
@@ -128,7 +134,8 @@ splitKindFunTysN n k = pprPanic "splitKindFunTysN" (ppr n <+> ppr k)
 -- Actually this function works fine on data types too, 
 -- but they'd always return '*', so we never need to ask
 synTyConResKind :: TyCon -> Kind
-synTyConResKind tycon = kindAppResult (tyConKind tycon) (map mkTyVarTy (tyConTyVars tycon))
+synTyConResKind tycon = kindAppResult (ptext (sLit "synTyConResKind") <+> ppr tycon)
+                                      (tyConKind tycon) (map mkTyVarTy (tyConTyVars tycon))
 
 -- | See "Type#kind_subtyping" for details of the distinction between these 'Kind's
 isOpenTypeKind, isUnliftedTypeKind,
