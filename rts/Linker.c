@@ -4145,6 +4145,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       if (0==strcmp(".text",(char*)secname) ||
           0==strcmp(".text.startup",(char*)secname) ||
+          0==strcmp(".text.unlikely", (char*)secname) ||
           0==strcmp(".rdata",(char*)secname)||
           0==strcmp(".eh_frame", (char*)secname)||
           0==strcmp(".rodata",(char*)secname))
