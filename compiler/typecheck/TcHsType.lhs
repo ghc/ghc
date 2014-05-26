@@ -208,18 +208,22 @@ tc_inst_head hs_ty
   = tc_hs_type hs_ty ekConstraint
 
 -----------------
-tcHsDeriv :: HsType Name -> TcM ([TyVar], Class, [Type])
--- Like tcHsSigTypeNC, but for the ...deriving( ty ) clause
-tcHsDeriv hs_ty 
-  = do { kind <- newMetaKindVar
-       ; ty   <- tcCheckHsTypeAndGen hs_ty kind
-                 -- Funny newtype deriving form
-                 -- 	forall a. C [a]
-                 -- where C has arity 2. Hence any-kinded result
-       ; ty   <- zonkSigType ty
+tcHsDeriv :: HsType Name -> TcM ([TyVar], Class, [Type], Kind)
+-- Like tcHsSigTypeNC, but for the ...deriving( C t1 ty2 ) clause
+-- Returns the C, [ty1, ty2, and the kind of C's *next* argument
+-- E.g.    class C (a::*) (b::k->k)
+--         data T a b = ... deriving( C Int )
+--    returns ([k], C, [k, Int],  k->k)
+-- Also checks that (C ty1 ty2 arg) :: Constraint
+-- if arg has a suitable kind
+tcHsDeriv hs_ty
+  = do { arg_kind <- newMetaKindVar
+       ; ty <- tcCheckHsTypeAndGen hs_ty (mkArrowKind arg_kind constraintKind)
+       ; ty       <- zonkSigType ty
+       ; arg_kind <- zonkSigType arg_kind
        ; let (tvs, pred) = splitForAllTys ty
        ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, cls, tys)
+           Just (cls, tys) -> return (tvs, cls, tys, arg_kind)
            Nothing -> failWithTc (ptext (sLit "Illegal deriving item") <+> quotes (ppr hs_ty)) }
 
 -- Used for 'VECTORISE [SCALAR] instance' declarations
@@ -725,17 +729,17 @@ mkNakedAppTys ty1                tys2 = foldl AppTy ty1 tys2
 
 zonkSigType :: TcType -> TcM TcType
 -- Zonk the result of type-checking a user-written type signature
--- It may have kind varaibles in it, but no meta type variables
+-- It may have kind variables in it, but no meta type variables
 -- Because of knot-typing (see Note [Zonking inside the knot])
--- it may need to establish the Type invariants; 
+-- it may need to establish the Type invariants;
 -- hence the use of mkTyConApp and mkAppTy
 zonkSigType ty
   = go ty
   where
     go (TyConApp tc tys) = do tys' <- mapM go tys
                               return (mkTyConApp tc tys')
-                -- Key point: establish Type invariants! 
-                -- See Note [Zonking inside the knot] 
+                -- Key point: establish Type invariants!
+                -- See Note [Zonking inside the knot]
 
     go (LitTy n)         = return (LitTy n)
 

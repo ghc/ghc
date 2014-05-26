@@ -705,8 +705,9 @@ deriveTyData :: Bool                         -- False <=> data/newtype
 -- I.e. not standalone deriving
 deriveTyData is_instance tvs tc tc_args (L loc deriv_pred)
   = setSrcSpan loc     $        -- Use the location of the 'deriving' item
-    do  { (deriv_tvs, cls, cls_tys) <- tcExtendTyVarEnv tvs $
-                                       tcHsDeriv deriv_pred
+    do  { (deriv_tvs, cls, cls_tys, cls_arg_kind)
+                <- tcExtendTyVarEnv tvs $
+                   tcHsDeriv deriv_pred
                 -- Deriving preds may (now) mention
                 -- the type variables for the type constructor, hence tcExtendTyVarenv
                 -- The "deriv_pred" is a LHsType to take account of the fact that for
@@ -720,12 +721,8 @@ deriveTyData is_instance tvs tc tc_args (L loc deriv_pred)
           else
 
      do {  -- Given data T a b c = ... deriving( C d ),
-          -- we want to drop type variables from T so that (C d (T a)) is well-kinded
-        ; let cls_tyvars     = classTyVars cls
-        ; checkTc (not (null cls_tyvars)) derivingNullaryErr
-
-        ; let cls_arg_kind    = tyVarKind (last cls_tyvars)
-              (arg_kinds, _)  = splitKindFunTys cls_arg_kind
+           -- we want to drop type variables from T so that (C d (T a)) is well-kinded
+          let (arg_kinds, _)  = splitKindFunTys cls_arg_kind
               n_args_to_drop  = length arg_kinds
               n_args_to_keep  = tyConArity tc - n_args_to_drop
               args_to_drop    = drop n_args_to_keep tc_args
@@ -737,9 +734,9 @@ deriveTyData is_instance tvs tc tc_args (L loc deriv_pred)
               -- to the types.  See Note [Unify kinds in deriving]
               -- We are assuming the tycon tyvars and the class tyvars are distinct
               mb_match        = tcUnifyTy inst_ty_kind cls_arg_kind
-              Just kind_subst = mb_match 
+              Just kind_subst = mb_match
               (univ_kvs, univ_tvs) = partition isKindVar $ varSetElems $
-                                     mkVarSet deriv_tvs `unionVarSet` 
+                                     mkVarSet deriv_tvs `unionVarSet`
                                      tyVarsOfTypes tc_args_to_keep
               univ_kvs'           = filter (`notElemTvSubst` kind_subst) univ_kvs
               (subst', univ_tvs') = mapAccumL substTyVarBndr kind_subst univ_tvs
@@ -1565,7 +1562,8 @@ mkNewTypeEqn :: DynFlags -> [Var] -> Class
 mkNewTypeEqn dflags tvs
              cls cls_tys tycon tc_args rep_tycon rep_tc_args mtheta
 -- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
-  | might_derive_via_coercible && (newtype_deriving || std_class_via_coercible cls)
+  | ASSERT( length cls_tys + 1 == classArity cls )
+    might_derive_via_coercible && (newtype_deriving || std_class_via_coercible cls)
   = do traceTc "newtype deriving:" (ppr tycon <+> ppr rep_tys <+> ppr all_preds)
        dfun_name <- new_dfun_name cls tycon
        loc <- getSrcSpanM
@@ -1692,14 +1690,9 @@ mkNewTypeEqn dflags tvs
         -- See Note [Determining whether newtype-deriving is appropriate]
         might_derive_via_coercible
            =  not (non_coercible_class cls)
-           && arity_ok
            && eta_ok
            && ats_ok
 --         && not (isRecursiveTyCon tycon)      -- Note [Recursive newtypes]
-
-        arity_ok = length cls_tys + 1 == classArity cls
-                -- Well kinded; eg not: newtype T ... deriving( ST )
-                --                      because ST needs *2* type params
 
         -- Check that eta reduction is OK
         eta_ok = nt_eta_arity <= length rep_tc_args
@@ -1716,13 +1709,10 @@ mkNewTypeEqn dflags tvs
                -- so for 'data' instance decls
 
         cant_derive_err
-           = vcat [ ppUnless arity_ok arity_msg
-                  , ppUnless eta_ok eta_msg
+           = vcat [ ppUnless eta_ok eta_msg
                   , ppUnless ats_ok ats_msg ]
-        arity_msg = quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "does not have arity 1")
         eta_msg   = ptext (sLit "cannot eta-reduce the representation type enough")
         ats_msg   = ptext (sLit "the class has associated types")
-
 \end{code}
 
 Note [Recursive newtypes]
