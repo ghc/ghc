@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE AutoDeriveTypeable #-}
 {-# OPTIONS -Wall -fno-warn-unused-binds #-}
 
 -----------------------------------------------------------------------------

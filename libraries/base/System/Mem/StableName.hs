@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
 {-# LANGUAGE MagicHash #-}
 #if !defined(__PARALLEL_HASKELL__)
 {-# LANGUAGE UnboxedTuples #-}

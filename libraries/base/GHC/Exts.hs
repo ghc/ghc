@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE MagicHash, UnboxedTuples, DeriveDataTypeable, TypeFamilies, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE MagicHash, UnboxedTuples, AutoDeriveTypeable, TypeFamilies, MultiParamTypeClasses, FlexibleInstances #-}
 
 -----------------------------------------------------------------------------
 -- |

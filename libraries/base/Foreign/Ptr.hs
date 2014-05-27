@@ -4,7 +4,7 @@
            , MagicHash
            , GeneralizedNewtypeDeriving
   #-}
-{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |

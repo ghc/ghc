@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |

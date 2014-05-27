@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, DeriveDataTypeable, MagicHash,
+{-# LANGUAGE NoImplicitPrelude, AutoDeriveTypeable, MagicHash,
              ExistentialQuantification #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}

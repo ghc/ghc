@@ -2,7 +2,7 @@
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , BangPatterns
-           , DeriveDataTypeable
+           , AutoDeriveTypeable
   #-}
 {-# OPTIONS_GHC -fno-warn-identities #-}
 -- Whether there are identities depends on the platform

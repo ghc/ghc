@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE DeriveDataTypeable, BangPatterns #-}
+{-# LANGUAGE AutoDeriveTypeable, BangPatterns #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -----------------------------------------------------------------------------

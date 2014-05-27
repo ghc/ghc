@@ -5,7 +5,7 @@
            , UnboxedTuples
   #-}
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |

@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE MagicHash, DeriveDataTypeable #-}
+{-# LANGUAGE MagicHash, AutoDeriveTypeable #-}
 
 -----------------------------------------------------------------------------
 -- |
