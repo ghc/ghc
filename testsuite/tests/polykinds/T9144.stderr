@@ -1,0 +1,7 @@
+
+T9144.hs:34:26:
+    Couldn't match type ‘Integer’ with ‘FooTerm’
+    Expected type: DemoteRep 'KProxy
+      Actual type: DemoteRep 'KProxy
+    In the first argument of ‘toSing’, namely ‘n’
+    In the expression: toSing n
