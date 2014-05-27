@@ -956,19 +956,8 @@ simplExprF1 env expr@(Lam {}) cont
     zap b | isTyVar b = b
           | otherwise = zapLamIdInfo b
 
-simplExprF1 env (Case scrut bndr alts_ty alts) cont
-  | sm_case_case (getMode env)
-  =     -- Simplify the scrutinee with a Select continuation
-    simplExprF env scrut (Select NoDup bndr alts env cont)
-
-  | otherwise
-  =     -- If case-of-case is off, simply simplify the case expression
-        -- in a vanilla Stop context, and rebuild the result around it
-    do  { case_expr' <- simplExprC env scrut
-                             (Select NoDup bndr alts env (mkBoringStop alts_out_ty))
-        ; rebuild env case_expr' cont }
-  where
-    alts_out_ty = substTy env alts_ty
+simplExprF1 env (Case scrut bndr _ alts) cont
+  = simplExprF env scrut (Select NoDup bndr alts env cont)
 
 simplExprF1 env (Let (Rec pairs) body) cont
   = do  { env' <- simplRecBndrs env (map fst pairs)
@@ -2326,7 +2315,9 @@ missingAlt env case_bndr _ cont
 \begin{code}
 prepareCaseCont :: SimplEnv
                 -> [InAlt] -> SimplCont
-                -> SimplM (SimplEnv, SimplCont, SimplCont)
+                -> SimplM (SimplEnv,
+                           SimplCont,   -- Non-dupable part
+                           SimplCont)   -- Dupable part
 -- We are considering
 --     K[case _ of { p1 -> r1; ...; pn -> rn }]
 -- where K is some enclosing continuation for the case
@@ -2336,12 +2327,15 @@ prepareCaseCont :: SimplEnv
 -- The idea is that we'll transform thus:
 --          Knodup[ (case _ of { p1 -> Kdup[r1]; ...; pn -> Kdup[rn] }
 --
--- We also return some extra bindings in SimplEnv (that scope over
+-- We may also return some extra bindings in SimplEnv (that scope over
 -- the entire continuation)
+--
+-- When case-of-case is off, just make the entire continuation non-dupable
 
 prepareCaseCont env alts cont
-  | many_alts alts = mkDupableCont env cont
-  | otherwise      = return (env, cont, mkBoringStop (contResultType cont))
+  | not (sm_case_case (getMode env)) = return (env, mkBoringStop (contInputType cont), cont)
+  | not (many_alts alts)             = return (env, cont, mkBoringStop (contResultType cont))
+  | otherwise                        = mkDupableCont env cont
   where
     many_alts :: [InAlt] -> Bool  -- True iff strictly > 1 non-bottom alternative
     many_alts []  = False         -- See Note [Bottom alternatives]
