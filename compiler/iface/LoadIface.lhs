@@ -416,7 +416,6 @@ loadDecl ignore_prags mod (_version, decl)
   = do  {       -- Populate the name cache with final versions of all 
                 -- the names associated with the decl
           main_name      <- lookupOrig mod (ifName decl)
---        ; traceIf (text "Loading decl for " <> ppr main_name)
 
         -- Typecheck the thing, lazily
         -- NB. Firstly, the laziness is there in case we never need the
@@ -490,6 +489,8 @@ loadDecl ignore_prags mod (_version, decl)
                              pprPanic "loadDecl" (ppr main_name <+> ppr n $$ ppr (decl))
 
         ; implicit_names <- mapM (lookupOrig mod) (ifaceDeclImplicitBndrs decl)
+
+--         ; traceIf (text "Loading decl for " <> ppr main_name $$ ppr implicit_names)
         ; return $ (main_name, thing) :
                       -- uses the invariant that implicit_names and
                       -- implictTyThings are bijective

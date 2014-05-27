@@ -789,8 +789,8 @@ tcPatSynPat :: PatEnv -> Located Name -> PatSyn
 	    -> HsConPatDetails Name -> TcM a
 	    -> TcM (Pat TcId, a)
 tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
-  = do	{ let (univ_tvs, ex_tvs, (prov_theta, req_theta)) = patSynSig pat_syn
-              arg_tys = patSynArgTys pat_syn
+  = do	{ let (univ_tvs, ex_tvs, prov_theta, req_theta) = patSynSig pat_syn
+              arg_tys = patSynArgs pat_syn
               ty = patSynType pat_syn
 
         ; (_univ_tvs', inst_tys, subst) <- tcInstTyVars univ_tvs

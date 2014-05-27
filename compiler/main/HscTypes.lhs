@@ -1504,15 +1504,17 @@ implicitTyThings :: TyThing -> [TyThing]
 implicitTyThings (AnId _)       = []
 implicitTyThings (ACoAxiom _cc) = []
 implicitTyThings (ATyCon tc)    = implicitTyConThings tc
-implicitTyThings (AConLike cl)  = case cl of
-    RealDataCon dc ->
-        -- For data cons add the worker and (possibly) wrapper
-        map AnId (dataConImplicitIds dc)
-    PatSynCon ps ->
-        -- For bidirectional pattern synonyms, add the wrapper
-        case patSynWrapper ps of
-            Nothing -> []
-            Just id -> [AnId id]
+implicitTyThings (AConLike cl)  = implicitConLikeThings cl
+
+implicitConLikeThings :: ConLike -> [TyThing]
+implicitConLikeThings (RealDataCon dc)
+  = map AnId (dataConImplicitIds dc)
+    -- For data cons add the worker and (possibly) wrapper
+
+implicitConLikeThings (PatSynCon {})
+  = []  -- Pattern synonyms have no implicit Ids; the wrapper and matcher
+        -- are not "implicit"; they are simply new top-level bindings,
+        -- and they have their own declaration in an interface fiel
 
 implicitClassThings :: Class -> [TyThing]
 implicitClassThings cl
