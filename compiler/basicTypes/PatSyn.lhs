@@ -13,7 +13,7 @@ module PatSyn (
 
         -- ** Type deconstruction
         patSynId, patSynType, patSynArity, patSynIsInfix,
-        patSynArgs, patSynArgTys, patSynTyDetails,
+        patSynArgs, patSynTyDetails,
         patSynWrapper, patSynMatcher,
         patSynExTyVars, patSynSig, patSynInstArgTys
     ) where
@@ -38,8 +38,8 @@ import Data.Function
 \end{code}
 
 
-Pattern synonym representation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Pattern synonym representation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following pattern synonym declaration
 
         pattern P x = MkT [x] (Just 42)
@@ -59,15 +59,49 @@ with the following typeclass constraints:
 
 In this case, the fields of MkPatSyn will be set as follows:
 
-  psArgs       = [x :: b]
+  psArgs       = [b]
   psArity      = 1
   psInfix      = False
 
   psUnivTyVars = [t]
   psExTyVars   = [b]
-  psTheta      = ((Show (Maybe t), Ord b), (Eq t, Num t))
+  psProvTheta  = (Show (Maybe t), Ord b)
+  psReqTheta   = (Eq t, Num t)
   psOrigResTy  = T (Maybe t)
 
+Note [Matchers and wrappers for pattern synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For each pattern synonym, we generate a single matcher function which
+implements the actual matching. For the above example, the matcher
+will have type:
+
+        $mP :: forall r t. (Eq t, Num t)
+            => T (Maybe t)
+            -> (forall b. (Show (Maybe t), Ord b) => b -> r)
+            -> r
+            -> r
+
+with the following implementation:
+
+        $mP @r @t $dEq $dNum scrut cont fail = case scrut of
+            MkT @b $dShow $dOrd [x] (Just 42) -> cont @b $dShow $dOrd x
+            _                                 -> fail
+
+For *bidirectional* pattern synonyms, we also generate a single wrapper
+function which implements the pattern synonym in an expression
+context. For our running example, it will be:
+
+        $WP :: forall t b. (Show (Maybe t), Ord b, Eq t, Num t)
+            => b -> T (Maybe t)
+        $WP x = MkT [x] (Just 42)
+
+NB: the existential/universal and required/provided split does not
+apply to the wrapper since you are only putting stuff in, not getting
+stuff out.
+
+Injectivity of bidirectional pattern synonyms is checked in
+tcPatToExpr which walks the pattern and returns its corresponding
+expression when available.
 
 %************************************************************************
 %*                                                                      *
@@ -77,21 +111,36 @@ In this case, the fields of MkPatSyn will be set as follows:
 
 \begin{code}
 -- | A pattern synonym
+-- See Note [Pattern synonym representation]
 data PatSyn
   = MkPatSyn {
         psId          :: Id,
-        psUnique      :: Unique,                 -- Cached from Name
+        psUnique      :: Unique,      -- Cached from Name
+
+        psArgs        :: [Type],
+        psArity       :: Arity,       -- == length psArgs
+        psInfix       :: Bool,        -- True <=> declared infix
+
+        psUnivTyVars  :: [TyVar],     -- Universially-quantified type variables
+        psExTyVars    :: [TyVar],     -- Existentially-quantified type vars
+        psProvTheta   :: ThetaType,   -- Provided dictionaries
+        psReqTheta    :: ThetaType,   -- Required dictionaries
+        psOrigResTy   :: Type,
+
+        -- See Note [Matchers and wrappers for pattern synonyms]
         psMatcher     :: Id,
-        psWrapper     :: Maybe Id,
+             -- Matcher function, of type
+             --   forall r univ_tvs. req_theta
+             --                   => res_ty
+             --                   -> (forall ex_tvs. prov_theta -> arg_tys -> r)
+             --                   -> r -> r
 
-        psArgs        :: [Var],
-        psArity       :: Arity,                  -- == length psArgs
-        psInfix       :: Bool,                   -- True <=> declared infix
-
-        psUnivTyVars  :: [TyVar],                -- Universially-quantified type variables
-        psExTyVars    :: [TyVar],                -- Existentially-quantified type vars
-        psTheta       :: (ThetaType, ThetaType), -- Provided and required dictionaries
-        psOrigResTy   :: Type
+        psWrapper     :: Maybe Id
+             -- Nothing  => uni-directional pattern synonym
+             -- Just wid => bi-direcitonal
+             -- Wrapper function, of type
+             --  forall univ_tvs, ex_tvs. (prov_theta, req_theta)
+             --                       =>  arg_tys -> res_ty
   }
   deriving Data.Typeable.Typeable
 \end{code}
@@ -145,7 +194,7 @@ instance Data.Data PatSyn where
 -- | Build a new pattern synonym
 mkPatSyn :: Name
          -> Bool       -- ^ Is the pattern synonym declared infix?
-         -> [Var]      -- ^ Original arguments
+         -> [Type]     -- ^ Original arguments
          -> [TyVar]    -- ^ Universially-quantified type variables
          -> [TyVar]    -- ^ Existentially-quantified type variables
          -> ThetaType  -- ^ Wanted dicts
@@ -161,7 +210,7 @@ mkPatSyn name declared_infix orig_args
          matcher wrapper
     = MkPatSyn {psId = id, psUnique = getUnique name,
                 psUnivTyVars = univ_tvs, psExTyVars = ex_tvs,
-                psTheta = (prov_theta, req_theta),
+                psProvTheta = prov_theta, psReqTheta = req_theta,
                 psInfix = declared_infix,
                 psArgs = orig_args,
                 psArity = length orig_args,
@@ -171,7 +220,7 @@ mkPatSyn name declared_infix orig_args
   where
     pat_ty = mkSigmaTy univ_tvs req_theta $
              mkSigmaTy ex_tvs prov_theta $
-             mkFunTys (map varType orig_args) orig_res_ty
+             mkFunTys orig_args orig_res_ty
     id = mkLocalId name pat_ty
 \end{code}
 
@@ -191,22 +240,21 @@ patSynIsInfix = psInfix
 patSynArity :: PatSyn -> Arity
 patSynArity = psArity
 
-patSynArgs :: PatSyn -> [Var]
+patSynArgs :: PatSyn -> [Type]
 patSynArgs = psArgs
 
-patSynArgTys :: PatSyn -> [Type]
-patSynArgTys = map varType . patSynArgs
-
 patSynTyDetails :: PatSyn -> HsPatSynDetails Type
-patSynTyDetails ps = case (patSynIsInfix ps, patSynArgTys ps) of
+patSynTyDetails ps = case (patSynIsInfix ps, patSynArgs ps) of
     (True, [left, right]) -> InfixPatSyn left right
     (_, tys) -> PrefixPatSyn tys
 
 patSynExTyVars :: PatSyn -> [TyVar]
 patSynExTyVars = psExTyVars
 
-patSynSig :: PatSyn -> ([TyVar], [TyVar], (ThetaType, ThetaType))
-patSynSig ps = (psUnivTyVars ps, psExTyVars ps, psTheta ps)
+patSynSig :: PatSyn -> ([TyVar], [TyVar], ThetaType, ThetaType)
+patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
+                    , psProvTheta = prov, psReqTheta = req })
+  = (univ_tvs, ex_tvs, prov, req)
 
 patSynWrapper :: PatSyn -> Maybe Id
 patSynWrapper = psWrapper
@@ -218,9 +266,8 @@ patSynInstArgTys :: PatSyn -> [Type] -> [Type]
 patSynInstArgTys ps inst_tys
   = ASSERT2( length tyvars == length inst_tys
           , ptext (sLit "patSynInstArgTys") <+> ppr ps $$ ppr tyvars $$ ppr inst_tys )
-    map (substTyWith tyvars inst_tys) arg_tys
+    map (substTyWith tyvars inst_tys) (psArgs ps)
   where
-    (univ_tvs, ex_tvs, _) = patSynSig ps
-    arg_tys = map varType (psArgs ps)
+    (univ_tvs, ex_tvs, _, _) = patSynSig ps
     tyvars = univ_tvs ++ ex_tvs
 \end{code}

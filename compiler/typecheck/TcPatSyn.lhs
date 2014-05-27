@@ -33,30 +33,10 @@ import Data.Monoid
 import Bag
 import TcEvidence
 import BuildTyCl
+import TypeRep
 
 #include "HsVersions.h"
 \end{code}
-
-Note [Pattern synonym typechecking]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Consider the following pattern synonym declaration
-
-        pattern P x = MkT [x] (Just 42)
-
-where
-        data T a where
-              MkT :: (Show a, Ord b) => [b] -> a -> T a
-
-The pattern synonym's type is described with five axes, given here for
-the above example:
-
-  Pattern type: T (Maybe t)
-  Arguments: [x :: b]
-  Universal type variables: [t]
-  Required theta: (Eq t, Num t)
-  Existential type variables: [b]
-  Provided theta: (Show (Maybe t), Ord b)
 
 \begin{code}
 tcPatSynDecl :: Located Name
@@ -120,7 +100,7 @@ tcPatSynDecl lname@(L _ name) details lpat dir
 
        ; traceTc "tcPatSynDecl }" $ ppr name
        ; let patSyn = mkPatSyn name is_infix
-                        args
+                        (map varType args)
                         univ_tvs ex_tvs
                         prov_theta req_theta
                         pat_ty
@@ -129,40 +109,6 @@ tcPatSynDecl lname@(L _ name) details lpat dir
 
 \end{code}
 
-Note [Matchers and wrappers for pattern synonyms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For each pattern synonym, we generate a single matcher function which
-implements the actual matching. For the above example, the matcher
-will have type:
-
-        $mP :: forall r t. (Eq t, Num t)
-            => T (Maybe t)
-            -> (forall b. (Show (Maybe t), Ord b) => b -> r)
-            -> r
-            -> r
-
-with the following implementation:
-
-        $mP @r @t $dEq $dNum scrut cont fail = case scrut of
-            MkT @b $dShow $dOrd [x] (Just 42) -> cont @b $dShow $dOrd x
-            _                                 -> fail
-
-For bidirectional pattern synonyms, we also generate a single wrapper
-function which implements the pattern synonym in an expression
-context. For our running example, it will be:
-
-        $WP :: forall t b. (Show (Maybe t), Ord b, Eq t, Num t)
-            => b -> T (Maybe t)
-        $WP x = MkT [x] (Just 42)
-
-N.b. the existential/universal and required/provided split does not
-apply to the wrapper since you are only putting stuff in, not getting
-stuff out.
-
-Injectivity of bidirectional pattern synonyms is checked in
-tcPatToExpr which walks the pattern and returns its corresponding
-expression when available.
 
 \begin{code}
 tcPatSynMatcher :: Located Name
@@ -174,12 +120,18 @@ tcPatSynMatcher :: Located Name
                 -> ThetaType -> ThetaType
                 -> TcType
                 -> TcM (Id, LHsBinds Id)
+-- See Note [Matchers and wrappers for pattern synonyms] in PatSyn
 tcPatSynMatcher (L loc name) lpat args univ_tvs ex_tvs ev_binds prov_dicts req_dicts prov_theta req_theta pat_ty
   = do { res_tv <- zonkQuantifiedTyVar =<< newFlexiTyVar liftedTypeKind
-       ; (matcher_id, res_ty, cont_ty) <- mkPatSynMatcherId name args
-                                            univ_tvs ex_tvs
-                                            prov_theta req_theta
-                                            pat_ty res_tv
+       ; matcher_name <- newImplicitBinder name mkMatcherOcc
+       ; let res_ty = TyVarTy res_tv
+             cont_ty = mkSigmaTy ex_tvs prov_theta $
+                       mkFunTys (map varType args) res_ty
+
+       ; let matcher_tau = mkFunTys [pat_ty, cont_ty, res_ty] res_ty
+             matcher_sigma = mkSigmaTy (res_tv:univ_tvs) req_theta matcher_tau
+             matcher_id = mkVanillaGlobal matcher_name matcher_sigma
+
        ; traceTc "tcPatSynMatcher" (ppr name $$ ppr (idType matcher_id))
        ; let matcher_lid = L loc matcher_id
 
@@ -243,6 +195,7 @@ tcPatSynWrapper :: Located Name
                 -> ThetaType
                 -> TcType
                 -> TcM (Maybe (Id, LHsBinds Id))
+-- See Note [Matchers and wrappers for pattern synonyms] in PatSyn
 tcPatSynWrapper lname lpat dir args univ_tvs ex_tvs theta pat_ty
   = do { let argNames = mkNameSet (map Var.varName args)
        ; case (dir, tcPatToExpr argNames lpat) of
@@ -262,18 +215,16 @@ tc_pat_syn_wrapper_from_expr :: Located Name
                              -> TcM (Id, LHsBinds Id)
 tc_pat_syn_wrapper_from_expr (L loc name) lexpr args univ_tvs ex_tvs theta pat_ty
   = do { let qtvs = univ_tvs ++ ex_tvs
-       ; (subst, qtvs') <- tcInstSkolTyVars qtvs
-       ; let theta' = substTheta subst theta
+       ; (subst, wrapper_tvs) <- tcInstSkolTyVars qtvs
+       ; let wrapper_theta = substTheta subst theta
              pat_ty' = substTy subst pat_ty
              args' = map (\arg -> setVarType arg $ substTy subst (varType arg)) args
-
-       ; wrapper_id <- mkPatSynWrapperId name args qtvs theta pat_ty
-       ; let wrapper_name = getName wrapper_id
-             wrapper_lname = L loc wrapper_name
-             -- (wrapper_tvs, wrapper_theta, wrapper_tau) = tcSplitSigmaTy (idType wrapper_id)
-             wrapper_tvs = qtvs'
-             wrapper_theta = theta'
              wrapper_tau = mkFunTys (map varType args') pat_ty'
+             wrapper_sigma = mkSigmaTy wrapper_tvs wrapper_theta wrapper_tau
+
+       ; wrapper_name <- newImplicitBinder name mkDataConWrapperOcc
+       ; let wrapper_lname = L loc wrapper_name
+             wrapper_id = mkVanillaGlobal wrapper_name wrapper_sigma
 
        ; let wrapper_args = map (noLoc . VarPat . Var.varName) args'
              wrapper_match = mkMatch wrapper_args lexpr EmptyLocalBinds

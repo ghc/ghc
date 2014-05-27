@@ -196,6 +196,7 @@ corePrepTopBinds initialCorePrepEnv binds
 
 mkDataConWorkers :: [TyCon] -> [CoreBind]
 -- See Note [Data constructor workers]
+-- c.f. Note [Injecting implicit bindings] in TidyPgm
 mkDataConWorkers data_tycons
   = [ NonRec id (Var id)        -- The ice is thin here, but it works
     | tycon <- data_tycons,     -- CorePrep will eta-expand it
