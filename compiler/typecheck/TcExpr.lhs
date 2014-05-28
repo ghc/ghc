@@ -500,7 +500,8 @@ for conditionals:
 to support expressions like this:
 
  ifThenElse :: Maybe a -> (a -> b) -> b -> b
- ifThenElse (Just a) f _ = f a  ifThenElse Nothing  _ e = e
+ ifThenElse (Just a) f _ = f a
+ ifThenElse Nothing  _ e = e
 
  example :: String
  example = if Just 2
