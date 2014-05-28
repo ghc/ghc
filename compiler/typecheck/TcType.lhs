@@ -736,7 +736,7 @@ mkTcEqPred :: TcType -> TcType -> Type
 mkTcEqPred ty1 ty2
   = mkTyConApp eqTyCon [k, ty1, ty2]
   where
-    k = defaultKind (typeKind ty1)
+    k = typeKind ty1
 \end{code}
 
 @isTauTy@ tests for nested for-alls.  It should not be called on a boxy type.
