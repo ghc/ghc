@@ -1393,7 +1393,7 @@ checkWellStagedDFun pred dfun_id loc
     bind_lvl = TcM.topIdLvl dfun_id
 
 pprEq :: TcType -> TcType -> SDoc
-pprEq ty1 ty2 = pprType $ mkEqPred ty1 ty2
+pprEq ty1 ty2 = pprParendType ty1 <+> char '~' <+> pprParendType ty2
 
 isTouchableMetaTyVarTcS :: TcTyVar -> TcS Bool
 isTouchableMetaTyVarTcS tv

@@ -1262,7 +1262,7 @@ checkKind new_ev s1 k1 s2 k2   -- See Note [Equalities with incompatible kinds]
     do { traceTcS "canEqLeaf: incompatible kinds" (vcat [ppr k1, ppr k2])
 
          -- Create a derived kind-equality, and solve it
-       ; mw <- newDerived kind_co_loc (mkEqPred k1 k2)
+       ; mw <- newDerived kind_co_loc (mkTcEqPred k1 k2)
        ; case mw of
            Nothing  -> return ()
            Just kev -> emitWorkNC [kev]

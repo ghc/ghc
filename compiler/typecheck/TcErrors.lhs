@@ -793,7 +793,7 @@ misMatchOrCND ctxt ct oriented ty1 ty2
        -- or there is no context, don't report the context
   = misMatchMsg oriented ty1 ty2
   | otherwise      
-  = couldNotDeduce givens ([mkEqPred ty1 ty2], orig)
+  = couldNotDeduce givens ([mkTcEqPred ty1 ty2], orig)
   where
     givens = getUserGivens ctxt
     orig   = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2 }
