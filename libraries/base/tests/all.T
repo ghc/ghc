@@ -114,7 +114,8 @@ test('weak001', normal, compile_and_run, [''])
 #     cat: write error: Permission denied
 # Seems to be a known problem, e.g.
 #     http://mingw-users.1079350.n2.nabble.com/Bug-re-Unicode-on-the-console-td3121717.html
-test('T4006', when(msys(), expect_fail), compile_and_run, [''])
+# May 2014: seems to work on msys2
+test('T4006', normal, compile_and_run, [''])
 
 test('T5943', normal, compile_and_run, [''])
 test('T5962', normal, compile_and_run, [''])
