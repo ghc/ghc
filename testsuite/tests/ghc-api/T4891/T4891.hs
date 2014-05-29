@@ -20,7 +20,6 @@ import Unsafe.Coerce
 import Control.Monad
 import Data.Maybe
 import Bag
-import PrelNames (iNTERACTIVE)
 import Outputable
 import GhcMonad
 import X

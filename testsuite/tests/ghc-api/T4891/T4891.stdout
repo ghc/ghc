@@ -1,20 +1,20 @@
 =====
-Name: GHC.Types.False
+Name: False
 OccString: 'False'
-DataCon: GHC.Types.False
+DataCon: False
 =====
 Name: :
 OccString: ':'
 DataCon: :
 =====
-Name: X.:->
+Name: :->
 OccString: ':->'
-DataCon: X.:->
+DataCon: :->
 =====
-Name: X.:->.
+Name: :->.
 OccString: ':->.'
-DataCon: X.:->.
+DataCon: :->.
 =====
-Name: X.:->.+
+Name: :->.+
 OccString: ':->.+'
-DataCon: X.:->.+
+DataCon: :->.+
