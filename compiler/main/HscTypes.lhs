@@ -1484,7 +1484,7 @@ Examples:
     IfaceClass decl happens to use IfaceDecl recursively for the
     associated types, but that's irrelevant here.)
 
-  * Dictionary function Ids are not implict.
+  * Dictionary function Ids are not implicit.
 
   * Axioms for newtypes are implicit (same as above), but axioms
     for data/type family instances are *not* implicit (like DFunIds).

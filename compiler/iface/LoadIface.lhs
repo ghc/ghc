@@ -392,7 +392,7 @@ compiler expects.
 -- the declaration itself, will find the fully-glorious Name
 --
 -- We handle ATs specially.  They are not main declarations, but also not
--- implict things (in particular, adding them to `implicitTyThings' would mess
+-- implicit things (in particular, adding them to `implicitTyThings' would mess
 -- things up in the renaming/type checking of source programs).
 -----------------------------------------------------
 
@@ -445,11 +445,11 @@ loadDecl ignore_prags mod (_version, decl)
         --      [ "MkT" -> <datacon MkT>, "x" -> <selector x>, ... ]
         -- (where the "MkT" is the *Name* associated with MkT, etc.)
         --
-        -- We do this by mapping the implict_names to the associated
+        -- We do this by mapping the implicit_names to the associated
         -- TyThings.  By the invariant on ifaceDeclImplicitBndrs and
         -- implicitTyThings, we can use getOccName on the implicit
         -- TyThings to make this association: each Name's OccName should
-        -- be the OccName of exactly one implictTyThing.  So the key is
+        -- be the OccName of exactly one implicitTyThing.  So the key is
         -- to define a "mini-env"
         --
         -- [ 'MkT' -> <datacon MkT>, 'x' -> <selector x>, ... ]
@@ -457,7 +457,7 @@ loadDecl ignore_prags mod (_version, decl)
         --
         -- However, there is a subtlety: due to how type checking needs
         -- to be staged, we can't poke on the forkM'd thunks inside the
-        -- implictTyThings while building this mini-env.  
+        -- implicitTyThings while building this mini-env.  
         -- If we poke these thunks too early, two problems could happen:
         --    (1) When processing mutually recursive modules across
         --        hs-boot boundaries, poking too early will do the
@@ -494,7 +494,7 @@ loadDecl ignore_prags mod (_version, decl)
 --         ; traceIf (text "Loading decl for " <> ppr main_name $$ ppr implicit_names)
         ; return $ (main_name, thing) :
                       -- uses the invariant that implicit_names and
-                      -- implictTyThings are bijective
+                      -- implicitTyThings are bijective
                       [(n, lookup n) | n <- implicit_names]
         }
   where

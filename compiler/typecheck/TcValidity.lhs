@@ -508,7 +508,7 @@ okIPCtxt (SpecInstCtxt {}) = False
 okIPCtxt _                 = True
 
 badIPPred :: PredType -> SDoc
-badIPPred pred = ptext (sLit "Illegal implict parameter") <+> quotes (ppr pred)
+badIPPred pred = ptext (sLit "Illegal implicit parameter") <+> quotes (ppr pred)
 
 
 check_eq_pred :: DynFlags -> UserTypeCtxt -> PredType -> TcType -> TcType -> TcM ()
@@ -652,7 +652,7 @@ unambiguous. See Note [Impedence matching] in TcBinds.
 This test is very conveniently implemented by calling
     tcSubType <type> <type>
 This neatly takes account of the functional dependecy stuff above, 
-and implict parameter (see Note [Implicit parameters and ambiguity]).
+and implicit parameter (see Note [Implicit parameters and ambiguity]).
 
 What about this, though?
    g :: C [a] => Int
