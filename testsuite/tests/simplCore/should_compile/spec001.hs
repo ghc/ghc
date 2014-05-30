@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP, UnboxedTuples, MagicHash, StandaloneDeriving, DeriveDataTypeable #-}
 {-# OPTIONS_GHC -O #-}
-{-# OPTIONS_GHC -fno-warn-amp #-}
 
 -- In GHC 6.4, compiling this module gave a Core Lint failure following the
 -- specialier, because a function was floated out that had a RULE that
