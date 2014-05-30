@@ -286,6 +286,9 @@ GarbageCollect (nat collect_gen,
   memInventory(DEBUG_gc);
 #endif
 
+  // do this *before* we start scavenging
+  collectFreshWeakPtrs();
+
   // check sanity *before* GC
   IF_DEBUG(sanity, checkSanity(rtsFalse /* before GC */, major_gc));
 

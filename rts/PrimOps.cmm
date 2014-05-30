@@ -577,10 +577,11 @@ stg_mkWeakzh ( gcptr key,
     StgWeak_finalizer(w)   = finalizer;
     StgWeak_cfinalizers(w) = stg_NO_FINALIZER_closure;
 
-    ACQUIRE_LOCK(sm_mutex);
-    StgWeak_link(w) = generation_weak_ptr_list(W_[g0]);
-    generation_weak_ptr_list(W_[g0]) = w;
-    RELEASE_LOCK(sm_mutex);
+    StgWeak_link(w) = Capability_weak_ptr_list_hd(MyCapability());
+    Capability_weak_ptr_list_hd(MyCapability()) = w;
+    if (Capability_weak_ptr_list_tl(MyCapability()) == NULL) {
+        Capability_weak_ptr_list_tl(MyCapability()) = w;
+    }
 
     IF_DEBUG(weak, ccall debugBelch(stg_weak_msg,w));
 

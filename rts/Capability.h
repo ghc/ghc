@@ -79,6 +79,11 @@ struct Capability_ {
     // full pinned object blocks allocated since the last GC
     bdescr *pinned_object_blocks;
 
+    // per-capability weak pointer list associated with nursery (older
+    // lists stored in generation object)
+    StgWeak *weak_ptr_list_hd;
+    StgWeak *weak_ptr_list_tl;
+
     // Context switch flag.  When non-zero, this means: stop running
     // Haskell code, and switch threads.
     int context_switch;
