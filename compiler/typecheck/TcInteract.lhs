@@ -2092,18 +2092,31 @@ getCoercibleInst (in negated form).
 
 Note [Order of Coercible Instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 At first glance, the order of the various coercible instances doesn't matter, as
 incoherence is no issue here: We do not care how the evidence is constructed,
 as long as it is.
 
-But since the solver does not backtrack, the order does matter, as otherwise we may run
-into dead ends. If case 4 (coercing under type constructors) were tried before
-case 3 (unwrapping newtypes), which is tempting, as it yields solutions faster
-and builds smaller evidence turns, then using a role annotation this can
-prevent the solver from finding an otherwise possible solution. See T9117.hs
-for the code.
+But because of role annotations, the order *can* matter:
 
+  newtype T a = MkT [a]
+  type role T nominal
+
+  type family F a
+  type instance F Int = Bool
+
+Here T's declared role is more restrictive than its inferred role
+(representational) would be.  If MkT is not in scope, so that the
+newtype-unwrapping instance is not available, then this coercible
+instance would fail:
+  Coercible (T Bool) (T (F Int)
+But MkT was in scope, *and* if we used it before decomposing on T,
+we'd unwrap the newtype (on both sides) to get
+  Coercible Bool (F Int)
+whic succeeds.
+
+So our current decision is to apply case 3 (newtype-unwrapping) first,
+followed by decomposition (case 4).  This is strictly more powerful 
+if the newtype constructor is in scope.  See Trac #9117 for a discussion.
 
 Note [Instance and Given overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
