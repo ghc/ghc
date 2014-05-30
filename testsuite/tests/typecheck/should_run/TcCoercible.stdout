@@ -14,7 +14,5 @@ List [1]
 NonEtad (Right 1)
 Left ()
 Fix (Left ())
-Left 1
-FixEither (Left (Age 1))
 FamInt True
 True

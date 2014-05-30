@@ -23,7 +23,8 @@ newtype NonEtad a b = NonEtad (Either b a) deriving Show
 newtype Fix f = Fix (f (Fix f))
 deriving instance Show (f (Fix f)) => Show (Fix f)
 
-newtype FixEither a = FixEither (Either a (FixEither a)) deriving Show
+-- Later, however, this stopped working (#9117)
+-- newtype FixEither a = FixEither (Either a (FixEither a)) deriving Show
 
 -- This ensures that explicitly given constraints are consulted, even 
 -- at higher depths
@@ -59,8 +60,8 @@ main = do
     print (coerce $ (Fix (Left ()) :: Fix (Either ())) :: Either () (Fix (Either ())))
     print (coerce $ (Left () :: Either () (Fix (Either ()))) :: Fix (Either ()))
 
-    print (coerce $ (FixEither (Left age) :: FixEither Age) :: Either Int (FixEither Int))
-    print (coerce $ (Left one :: Either Int (FixEither Age)) :: FixEither Age)
+    -- print (coerce $ (FixEither (Left age) :: FixEither Age) :: Either Int (FixEither Int))
+    -- print (coerce $ (Left one :: Either Int (FixEither Age)) :: FixEither Age)
 
     print (coerce $ True :: Fam Int)
     print (coerce $ FamInt True :: Bool)
