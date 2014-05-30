@@ -1786,6 +1786,7 @@ stg_tryReadMVarzh ( P_ mvar, /* :: MVar a */ )
     LOCK_CLOSURE(mvar, info);
 
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
+        unlockClosure(mvar, info);
         return (0, stg_NO_FINALIZER_closure);
     }
 
