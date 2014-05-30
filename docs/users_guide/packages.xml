@@ -23,7 +23,7 @@ Packages
     automates the process of configuring, building, installing and distributing
     a package.  All you need to do is write a simple configuration file, put a
     few files in the right places, and you have a package.  See the
-    <ulink url="../Cabal/index.html">Cabal documentation</ulink>
+    <ulink url="http://www.haskell.org/cabal/users-guide/">Cabal documentation</ulink>
     for details, and also the Cabal libraries (<ulink url="&libraryCabalLocation;/Distribution-Simple.html">Distribution.Simple</ulink>,
     for example).</para>
 
@@ -1126,7 +1126,7 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
       <secondary>building</secondary></indexterm>
 
     <para>We don't recommend building packages the hard way.  Instead, use the
-      <ulink url="../Cabal/index.html">Cabal</ulink> infrastructure
+      <ulink url="http://www.haskell.org/cabal/users-guide/">Cabal</ulink> infrastructure
       if possible.  If your package is particularly complicated or requires a
       lot of configuration, then you might have to fall back to the low-level
       mechanisms, so a few hints for those brave souls follow.</para>
