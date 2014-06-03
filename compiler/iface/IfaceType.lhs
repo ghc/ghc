@@ -15,7 +15,7 @@ module IfaceType (
         IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr,
 
         -- Conversion from Type -> IfaceType
-        toIfaceType, toIfaceTypes, toIfaceKind,
+        toIfaceType, toIfaceTypes, toIfaceKind, toIfaceTyVar,
         toIfaceContext, toIfaceBndr, toIfaceIdBndr,
         toIfaceTvBndrs, toIfaceTyCon, toIfaceTyCon_name,
         toIfaceTcArgs,

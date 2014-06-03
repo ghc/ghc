@@ -16,7 +16,7 @@ module IfaceSyn (
         module IfaceType,
 
         IfaceDecl(..), IfaceSynTyConRhs(..), IfaceClassOp(..), IfaceAT(..), 
-        IfaceConDecl(..), IfaceConDecls(..),
+        IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
         IfaceExpr(..), IfaceAlt, IfaceLetBndr(..),
         IfaceBinding(..), IfaceConAlt(..),
         IfaceIdInfo(..), IfaceIdDetails(..), IfaceUnfolding(..),
@@ -405,7 +405,7 @@ data IfaceConDecl
         ifConStricts :: [IfaceBang]}            -- Empty (meaning all lazy),
                                                 -- or 1-1 corresp with arg tys
 
-type IfaceEqSpec = [(OccName,IfaceType)]
+type IfaceEqSpec = [(IfLclName,IfaceType)]
 
 instance HasOccName IfaceConDecl where
   occName = ifConOcc
@@ -1183,7 +1183,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     mk_user_con_res_ty univ_tvs eq_spec
       = (filterOut done_univ_tv univ_tvs, sdocWithDynFlags pp_res_ty)
       where
-        gadt_env = mkFsEnv [(occNameFS occ, ty) | (occ,ty) <- eq_spec]
+        gadt_env = mkFsEnv eq_spec
         done_univ_tv (tv,_) = isJust (lookupFsEnv gadt_env tv)
 
         pp_res_ty dflags

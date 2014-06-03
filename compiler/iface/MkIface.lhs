@@ -1646,7 +1646,7 @@ tyConToIfaceDecl env tycon
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
                     ifConUnivTvs = toIfaceTvBndrs univ_tvs',
                     ifConExTvs   = toIfaceTvBndrs ex_tvs',
-                    ifConEqSpec  = to_eq_spec eq_spec,
+                    ifConEqSpec  = map to_eq_spec eq_spec,
                     ifConCtxt    = tidyToIfaceContext env2 theta,
                     ifConArgTys  = map (tidyToIfaceType env2) arg_tys,
                     ifConFields  = map getOccName
@@ -1659,8 +1659,7 @@ tyConToIfaceDecl env tycon
           -- data constructor is fully standalone
           (env1, univ_tvs') = tidyTyVarBndrs emptyTidyEnv univ_tvs
           (env2, ex_tvs')   = tidyTyVarBndrs env1 ex_tvs
-          to_eq_spec spec = [ (getOccName (tidyTyVar env2 tv), tidyToIfaceType env2 ty)
-                            | (tv,ty) <- spec]
+          to_eq_spec (tv,ty) = (toIfaceTyVar (tidyTyVar env2 tv), tidyToIfaceType env2 ty)
 
 toIfaceBang :: TidyEnv -> HsBang -> IfaceBang
 toIfaceBang _    HsNoBang            = IfNoBang

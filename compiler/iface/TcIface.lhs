@@ -673,11 +673,11 @@ tcIfaceDataCons tycon_name tycon _ if_cons
     tc_strict (IfUnpackCo if_co) = do { co <- tcIfaceCo if_co
                                       ; return (HsUnpack (Just co)) }
 
-tcIfaceEqSpec :: [(OccName, IfaceType)] -> IfL [(TyVar, Type)]
+tcIfaceEqSpec :: IfaceEqSpec -> IfL [(TyVar, Type)]
 tcIfaceEqSpec spec
   = mapM do_item spec
   where
-    do_item (occ, if_ty) = do { tv <- tcIfaceTyVar (occNameFS occ)
+    do_item (occ, if_ty) = do { tv <- tcIfaceTyVar occ
                               ; ty <- tcIfaceType if_ty
                               ; return (tv,ty) }
 \end{code}
