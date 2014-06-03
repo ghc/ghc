@@ -3,21 +3,12 @@ T8958.hs:1:31: Warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 TYPE SIGNATURES
 TYPE CONSTRUCTORS
-  Map :: * -> * -> *
-  newtype (Nominal k, Representational v) => Map k v
-    No C type associated
-    Roles: [nominal, representational]
-    RecFlag NonRecursive, Promotable
-    = MkMap :: [(k, v)] -> Map k v Stricts: _
-    FamilyInstance: none
-  Nominal :: * -> Constraint
+  type role Map nominal representational
+  newtype (Nominal k, Representational v) => Map k v = MkMap [(k, v)]
+    Promotable
   class Nominal a
-    Roles: [nominal]
-    RecFlag NonRecursive
-  Representational :: * -> Constraint
+  type role Representational representational
   class Representational a
-    Roles: [representational]
-    RecFlag NonRecursive
 COERCION AXIOMS
   axiom T8958.NTCo:Map :: Map k v = [(k, v)]
 INSTANCES

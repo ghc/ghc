@@ -102,7 +102,10 @@ module OccName (
 	-- * Lexical characteristics of Haskell names
 	isLexCon, isLexVar, isLexId, isLexSym,
 	isLexConId, isLexConSym, isLexVarId, isLexVarSym,
-	startsVarSym, startsVarId, startsConSym, startsConId
+	startsVarSym, startsVarId, startsConSym, startsConId,
+
+        -- FsEnv
+        FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
     ) where
 
 import Util
@@ -115,6 +118,29 @@ import Outputable
 import Binary
 import Data.Char
 import Data.Data
+\end{code}
+
+%************************************************************************
+%*									*
+              FastStringEnv
+%*									*
+%************************************************************************
+
+FastStringEnv can't be in FastString becuase the env depends on UniqFM
+
+\begin{code}
+type FastStringEnv a = UniqFM a         -- Keyed by FastString
+
+
+emptyFsEnv  :: FastStringEnv a
+lookupFsEnv :: FastStringEnv a -> FastString -> Maybe a
+extendFsEnv :: FastStringEnv a -> FastString -> a -> FastStringEnv a
+mkFsEnv     :: [(FastString,a)] -> FastStringEnv a
+
+emptyFsEnv  = emptyUFM
+lookupFsEnv = lookupUFM
+extendFsEnv = addToUFM
+mkFsEnv     = listToUFM
 \end{code}
 
 %************************************************************************
@@ -246,6 +272,9 @@ instance Data OccName where
   toConstr _   = abstractConstr "OccName"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "OccName"
+
+instance HasOccName OccName where
+  occName = id
 \end{code}
 
 

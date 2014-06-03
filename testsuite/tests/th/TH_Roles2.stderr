@@ -1,12 +1,7 @@
 TYPE SIGNATURES
 TYPE CONSTRUCTORS
-  T :: forall (k :: BOX). k -> *
-  data T (k::BOX) (a::k)
-    No C type associated
-    Roles: [nominal, representational]
-    RecFlag NonRecursive, Not promotable
-    =
-    FamilyInstance: none
+  type role T representational
+  data T (a :: k)
 COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [base, ghc-prim, integer-gmp, pretty-1.1.1.1,

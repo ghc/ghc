@@ -40,10 +40,7 @@ module RnEnv (
         warnUnusedMatches,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         dataTcOccs, kindSigErr, perhapsForallMsg,
-        HsDocContext(..), docOfHsDocContext, 
-
-        -- FsEnv
-        FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
+        HsDocContext(..), docOfHsDocContext
     ) where
 
 #include "HsVersions.h"
@@ -61,7 +58,6 @@ import NameSet
 import NameEnv
 import Avail
 import Module
-import UniqFM
 import ConLike
 import DataCon          ( dataConFieldLabels, dataConTyCon )
 import TyCon            ( isTupleTyCon, tyConArity )
@@ -1081,20 +1077,6 @@ The extended lookup is also used in other places, like resolution of
 deprecation declarations, and lookup of names in GHCi.
 
 \begin{code}
---------------------------------
-type FastStringEnv a = UniqFM a         -- Keyed by FastString
-
-
-emptyFsEnv  :: FastStringEnv a
-lookupFsEnv :: FastStringEnv a -> FastString -> Maybe a
-extendFsEnv :: FastStringEnv a -> FastString -> a -> FastStringEnv a
-mkFsEnv     :: [(FastString,a)] -> FastStringEnv a
-
-emptyFsEnv  = emptyUFM
-lookupFsEnv = lookupUFM
-extendFsEnv = addToUFM
-mkFsEnv     = listToUFM
-
 --------------------------------
 type MiniFixityEnv = FastStringEnv (Located Fixity)
         -- Mini fixity env for the names we're about

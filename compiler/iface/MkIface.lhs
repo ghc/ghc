@@ -80,6 +80,7 @@ import DataCon
 import PatSyn
 import Type
 import TcType
+import TysPrim ( alphaTyVars )
 import InstEnv
 import FamInstEnv
 import TcRnMonad
@@ -1529,18 +1530,18 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
               , ifTyCon      = toIfaceTyCon tycon
               , ifRole       = role
               , ifAxBranches = brListMap (coAxBranchToIfaceBranch
-                                            emptyTidyEnv
-                                            (brListMap coAxBranchLHS branches)) branches }
+                                            (brListMap coAxBranchLHS branches))
+                                         branches }
  where
    name = getOccName ax
 
 -- 2nd parameter is the list of branch LHSs, for conversion from incompatible branches
 -- to incompatible indices
 -- See Note [Storing compatibility] in CoAxiom
-coAxBranchToIfaceBranch :: TidyEnv -> [[Type]] -> CoAxBranch -> IfaceAxBranch
-coAxBranchToIfaceBranch env0 lhs_s
+coAxBranchToIfaceBranch :: [[Type]] -> CoAxBranch -> IfaceAxBranch
+coAxBranchToIfaceBranch lhs_s
                         branch@(CoAxBranch { cab_incomps = incomps })
-  = (coAxBranchToIfaceBranch' env0 branch) { ifaxbIncomps = iface_incomps }
+  = (coAxBranchToIfaceBranch' branch) { ifaxbIncomps = iface_incomps }
   where
     iface_incomps = map (expectJust "iface_incomps"
                         . (flip findIndex lhs_s
@@ -1548,17 +1549,16 @@ coAxBranchToIfaceBranch env0 lhs_s
                         . coAxBranchLHS) incomps
 
 -- use this one for standalone branches without incompatibles
-coAxBranchToIfaceBranch' :: TidyEnv -> CoAxBranch -> IfaceAxBranch
-coAxBranchToIfaceBranch' env0
-                        (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs
-                                    , cab_roles = roles, cab_rhs = rhs })
+coAxBranchToIfaceBranch' :: CoAxBranch -> IfaceAxBranch
+coAxBranchToIfaceBranch' (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs
+                                     , cab_roles = roles, cab_rhs = rhs })
   = IfaceAxBranch { ifaxbTyVars = toIfaceTvBndrs tv_bndrs
-                  , ifaxbLHS    = map (tidyToIfaceType env1) lhs
+                  , ifaxbLHS    = tidyToIfaceTcArgs env1 lhs
                   , ifaxbRoles  = roles
                   , ifaxbRHS    = tidyToIfaceType env1 rhs
                   , ifaxbIncomps = [] }
   where
-    (env1, tv_bndrs) = tidyTyClTyVarBndrs env0 tvs
+    (env1, tv_bndrs) = tidyTyClTyVarBndrs emptyTidyEnv tvs
     -- Don't re-bind in-scope tyvars
     -- See Note [CoAxBranch type variables] in CoAxiom
 
@@ -1587,24 +1587,48 @@ tyConToIfaceDecl env tycon
                 ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
                 ifGadtSyntax = isGadtSyntaxTyCon tycon,
                 ifPromotable = isJust (promotableTyCon_maybe tycon),
-                ifAxiom   = fmap coAxiomName (tyConFamilyCoercion_maybe tycon) }
+                ifParent  = parent }
 
   | isForeignTyCon tycon
   = IfaceForeign { ifName    = getOccName tycon,
                    ifExtName = tyConExtName tycon }
 
-  | otherwise = pprPanic "toIfaceDecl" (ppr tycon)
+  | otherwise
+  -- For pretty printing purposes only.
+  = IfaceData { ifName       = getOccName tycon,
+                ifCType      = Nothing,
+                ifTyVars     = funAndPrimTyVars,
+                ifRoles      = tyConRoles tycon,
+                ifCtxt       = [],
+                ifCons       = IfDataTyCon [],
+                ifRec        = boolToRecFlag False,
+                ifGadtSyntax = False,
+                ifPromotable = False,
+                ifParent     = IfNoParent }
   where
     (env1, tyvars) = tidyTyClTyVarBndrs env (tyConTyVars tycon)
 
-    to_ifsyn_rhs OpenSynFamilyTyCon           = IfaceOpenSynFamilyTyCon
-    to_ifsyn_rhs (ClosedSynFamilyTyCon ax)
-      = IfaceClosedSynFamilyTyCon (coAxiomName ax)
-    to_ifsyn_rhs AbstractClosedSynFamilyTyCon = IfaceAbstractClosedSynFamilyTyCon
+    funAndPrimTyVars = toIfaceTvBndrs $ take (tyConArity tycon) alphaTyVars
+
+    parent = case tyConFamInstSig_maybe tycon of
+               Just (tc, ty, ax) -> IfDataInstance (coAxiomName ax)
+                                                   (toIfaceTyCon tc)
+                                                   (toIfaceTcArgs tc ty)
+               Nothing           -> IfNoParent
+
+    to_ifsyn_rhs OpenSynFamilyTyCon        = IfaceOpenSynFamilyTyCon
+    to_ifsyn_rhs (ClosedSynFamilyTyCon ax) = IfaceClosedSynFamilyTyCon axn ibr
+      where defs = fromBranchList $ coAxiomBranches ax
+            ibr  = map coAxBranchToIfaceBranch' defs
+            axn  = coAxiomName ax
+    to_ifsyn_rhs AbstractClosedSynFamilyTyCon
+      = IfaceAbstractClosedSynFamilyTyCon
+
     to_ifsyn_rhs (SynonymTyCon ty)
       = IfaceSynonymTyCon (tidyToIfaceType env1 ty)
 
-    to_ifsyn_rhs (BuiltInSynFamTyCon {}) = pprPanic "toIfaceDecl: BuiltInFamTyCon" (ppr tycon)
+    to_ifsyn_rhs (BuiltInSynFamTyCon {})
+      = pprPanic "toIfaceDecl: BuiltInFamTyCon" (ppr tycon)
 
 
     ifaceConDecls (NewTyCon { data_con = con })     = IfNewTyCon  (ifaceConDecl con)
@@ -1665,7 +1689,7 @@ classToIfaceDecl env clas
 
     toIfaceAT :: ClassATItem -> IfaceAT
     toIfaceAT (tc, defs)
-      = IfaceAT (tyConToIfaceDecl env1 tc) (map (coAxBranchToIfaceBranch' env1) defs)
+      = IfaceAT (tyConToIfaceDecl env1 tc) (map coAxBranchToIfaceBranch' defs)
 
     toIfaceClassOp (sel_id, def_meth)
         = ASSERT(sel_tyvars == clas_tyvars)
@@ -1690,6 +1714,12 @@ classToIfaceDecl env clas
 --------------------------
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
 tidyToIfaceType env ty = toIfaceType (tidyType env ty)
+
+tidyToIfaceTcArgs :: TidyEnv -> [Type] -> IfaceTcArgs
+tidyToIfaceTcArgs _ [] = ITC_Nil
+tidyToIfaceTcArgs env (t:ts)
+  | isKind t  = ITC_Kind  (tidyToIfaceType env t) (tidyToIfaceTcArgs env ts)
+  | otherwise = ITC_Type  (tidyToIfaceType env t) (tidyToIfaceTcArgs env ts)
 
 tidyToIfaceContext :: TidyEnv -> ThetaType -> IfaceContext
 tidyToIfaceContext env theta = map (tidyToIfaceType env) theta

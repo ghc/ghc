@@ -1836,8 +1836,5 @@ ppr_tydecls tycons
         -- Print type constructor info; sort by OccName
   = vcat (map ppr_tycon (sortBy (comparing getOccName) tycons))
   where
-    ppr_tycon tycon = vcat [ ppr (tyConName tycon) <+> dcolon <+> ppr (tyConKind tycon)
-                              -- Temporarily print the kind signature too
-                           , ppr (tyThingToIfaceDecl (ATyCon tycon)) ]
-
+    ppr_tycon tycon = vcat [ ppr (tyThingToIfaceDecl (ATyCon tycon)) ]
 \end{code}

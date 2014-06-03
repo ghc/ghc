@@ -1494,7 +1494,7 @@ kindOfType norm str
   $ do
        (ty, kind) <- GHC.typeKind norm str
        printForUser $ vcat [ text str <+> dcolon <+> pprTypeForUser kind
-                           , ppWhen norm $ equals <+> ppr ty ]
+                           , ppWhen norm $ equals <+> pprTypeForUser ty ]
 
 
 -----------------------------------------------------------------------------
