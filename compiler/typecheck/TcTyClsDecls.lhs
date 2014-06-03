@@ -793,7 +793,7 @@ tcDataDefn rec_info tc_name tvs kind
                            ; checkKind kind tc_kind
                            ; return () }
 
-       ; h98_syntax <- dataDeclChecks tc_name new_or_data stupid_theta cons
+       ; gadt_syntax <- dataDeclChecks tc_name new_or_data stupid_theta cons
 
        ; tycon <- fixM $ \ tycon -> do
              { let res_ty = mkTyConApp tycon (mkTyVarTys final_tvs)
@@ -808,7 +808,7 @@ tcDataDefn rec_info tc_name tvs kind
              ; return (buildAlgTyCon tc_name final_tvs roles cType stupid_theta tc_rhs
                                      (rti_is_rec rec_info tc_name)
                                      (rti_promotable rec_info)
-                                     (not h98_syntax) NoParentTyCon) }
+                                     gadt_syntax NoParentTyCon) }
        ; return [ATyCon tycon] }
 \end{code}
 
@@ -1101,11 +1101,11 @@ dataDeclChecks :: Name -> NewOrData -> ThetaType -> [LConDecl Name] -> TcM Bool
 dataDeclChecks tc_name new_or_data stupid_theta cons
   = do {   -- Check that we don't use GADT syntax in H98 world
          gadtSyntax_ok <- xoptM Opt_GADTSyntax
-       ; let h98_syntax = consUseH98Syntax cons
-       ; checkTc (gadtSyntax_ok || h98_syntax) (badGadtDecl tc_name)
+       ; let gadt_syntax = consUseGadtSyntax cons
+       ; checkTc (gadtSyntax_ok || not gadt_syntax) (badGadtDecl tc_name)
 
            -- Check that the stupid theta is empty for a GADT-style declaration
-       ; checkTc (null stupid_theta || h98_syntax) (badStupidTheta tc_name)
+       ; checkTc (null stupid_theta || not gadt_syntax) (badStupidTheta tc_name)
 
          -- Check that a newtype has exactly one constructor
          -- Do this before checking for empty data decls, so that
@@ -1119,13 +1119,13 @@ dataDeclChecks tc_name new_or_data stupid_theta cons
        ; is_boot <- tcIsHsBoot  -- Are we compiling an hs-boot file?
        ; checkTc (not (null cons) || empty_data_decls || is_boot)
                  (emptyConDeclsErr tc_name)
-       ; return h98_syntax }
+       ; return gadt_syntax }
 
 
 -----------------------------------
-consUseH98Syntax :: [LConDecl a] -> Bool
-consUseH98Syntax (L _ (ConDecl { con_res = ResTyGADT _ }) : _) = False
-consUseH98Syntax _                                             = True
+consUseGadtSyntax :: [LConDecl a] -> Bool
+consUseGadtSyntax (L _ (ConDecl { con_res = ResTyGADT _ }) : _) = True
+consUseGadtSyntax _                                             = False
                  -- All constructors have same shape
 
 -----------------------------------
