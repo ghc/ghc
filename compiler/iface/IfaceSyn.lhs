@@ -1138,6 +1138,8 @@ isIfaceDataInstance IfNoParent = False
 isIfaceDataInstance _          = True
 
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
+-- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
+--     See Note [Pretty-printing TyThings] in PprTyThing
 pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                              ifCtxt = context, ifTyVars = tyvars,
                              ifRoles = roles, ifCons = condecls,
