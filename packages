@@ -26,7 +26,10 @@
 #   * 'remotepath' is where the repository is in the central repository.
 #     It is - for submodules.
 #   * 'upstreamurl' is the upstream Git repo location for packages
-#     maintained outside of GHC HQ.
+#     maintained outside of GHC HQ. Repositories which are hosted on
+#     GitHub and GHC developers are granted push-rights for are denoted by
+#     being specified with the `ssh://` scheme. Thus, `https://`
+#     repo urls denote read-only access.
 #
 #   * The 'tag' determines when "sync-all get" will get the
 #     repo. If the tag is "-" then it will always get it, but if there
@@ -47,7 +50,7 @@
 ghc-tarballs                 windows     ghc-tarballs.git                -
 libffi-tarballs              -           libffi-tarballs.git             -
 utils/hsc2hs                 -           hsc2hs.git                      -
-utils/haddock                -           -                               -
+utils/haddock                -           -                               ssh://git@github.com/haskell/haddock.git
 libraries/array              -           packages/array.git              -
 libraries/binary             -           -                               https://github.com/kolmodin/binary.git
 libraries/bytestring         -           -                               https://github.com/haskell/bytestring.git
