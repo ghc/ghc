@@ -163,7 +163,7 @@ mkHsWithBndrs x = HsWB { hswb_cts = x, hswb_kvs = panic "mkHsTyWithBndrs:kvs"
                                      , hswb_tvs = panic "mkHsTyWithBndrs:tvs" }
 
 
--- | These names are used eary on to store the names of implicit
+-- | These names are used early on to store the names of implicit
 -- parameters.  They completely disappear after type-checking.
 newtype HsIPName = HsIPName FastString-- ?x
   deriving( Eq, Data, Typeable )
