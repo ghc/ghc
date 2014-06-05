@@ -1874,6 +1874,11 @@ module A where
 -- | I don't have to escape my apostrophes; great, isn't it?
 </programlisting>
 
+        <para>Nothing special is needed to hyperlink identifiers which
+        contain apostrophes themselves: to hyperlink
+        <literal>foo'</literal> one would simply type
+        <literal>'foo''</literal>.</para>
+
         <para>For compatibility with other systems, the following
         alternative form of markup is accepted<footnote><para>
         We chose not to use this as the primary markup for
