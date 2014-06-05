@@ -273,13 +273,13 @@ lookupExactOcc name
                          ; return (gre_name gre)
                          }
            -- We can get more than one GRE here, if there are multiple 
-           -- bindings for the same name. Sometimes they are catched later
-           -- by findLocalDupsRdrEnv, like in the this example (Trac #8932):
+           -- bindings for the same name. Sometimes they are caught later
+           -- by findLocalDupsRdrEnv, like in this example (Trac #8932):
            --    $( [d| foo :: a->a; foo x = x |])
            --    foo = True
-           -- But when the names are totally identical, we get panic (Trac #7241):
+           -- But when the names are totally identical, we panic (Trac #7241):
            --    $(newName "Foo" >>= \o -> return [DataD [] o [] [RecC o []] [''Show]])
-           -- So, lets emit error here, even if it will lead to two errors in some cases.
+           -- So, let's emit an error here, even if it will lead to duplication in some cases.
        }
 
   where
