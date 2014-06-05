@@ -827,8 +827,8 @@ cvtp (TH.LitP l)
   | otherwise          = do { l' <- cvtLit l; return $ Hs.LitPat l' }
 cvtp (TH.VarP s)       = do { s' <- vName s; return $ Hs.VarPat s' }
 cvtp (TupP [p])        = do { p' <- cvtPat p; return $ ParPat p' } -- Note [Dropping constructors]
-cvtp (TupP ps)         = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed void }
-cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps; return $ TuplePat ps' Unboxed void }
+cvtp (TupP ps)         = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed   [] }
+cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps; return $ TuplePat ps' Unboxed [] }
 cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
                             ; return $ ConPatIn s' (PrefixCon ps') }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
