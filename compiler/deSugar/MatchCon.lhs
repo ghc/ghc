@@ -125,7 +125,7 @@ matchOneConLike :: [Id]
                 -> [EquationInfo]
                 -> DsM (CaseAlt ConLike)
 matchOneConLike vars ty (eqn1 : eqns)	-- All eqns for a single constructor
-  = do	{ arg_vars <- selectConMatchVars arg_tys args1
+  = do	{ arg_vars <- selectConMatchVars val_arg_tys args1
 	 	-- Use the first equation as a source of 
 		-- suggestions for the new variables
 
@@ -141,27 +141,24 @@ matchOneConLike vars ty (eqn1 : eqns)	-- All eqns for a single constructor
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
-    ConPatOut { pat_con = L _ con1, pat_ty = pat_ty1, pat_wrap = wrapper1,
+    ConPatOut { pat_con = L _ con1, pat_arg_tys = arg_tys, pat_wrap = wrapper1,
 	        pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
 	      = firstPat eqn1
     fields1 = case con1 of
-        RealDataCon dcon1 -> dataConFieldLabels dcon1
-	PatSynCon{} -> []
+        	RealDataCon dcon1 -> dataConFieldLabels dcon1
+        	PatSynCon{}       -> []
 
-    arg_tys  = inst inst_tys
-      where
-        inst = case con1 of
-            RealDataCon dcon1 -> dataConInstOrigArgTys dcon1
-            PatSynCon psyn1 -> patSynInstArgTys psyn1
-    inst_tys = tcTyConAppArgs pat_ty1 ++ 
-	       mkTyVarTys (takeList exVars tvs1)
-	-- Newtypes opaque, hence tcTyConAppArgs
+    val_arg_tys = case con1 of
+                    RealDataCon dcon1 -> dataConInstOrigArgTys dcon1 inst_tys
+                    PatSynCon psyn1   -> patSynInstArgTys      psyn1 inst_tys
+    inst_tys = ASSERT( tvs1 `equalLength` ex_tvs )
+               arg_tys ++ mkTyVarTys tvs1
 	-- dataConInstOrigArgTys takes the univ and existential tyvars
 	-- and returns the types of the *value* args, which is what we want
-      where
-        exVars = case con1 of
-            RealDataCon dcon1 -> dataConExTyVars dcon1
-            PatSynCon psyn1 -> patSynExTyVars psyn1
+
+    ex_tvs = case con1 of
+               RealDataCon dcon1 -> dataConExTyVars dcon1
+               PatSynCon psyn1 -> patSynExTyVars psyn1
 
     match_group :: [Id] -> [(ConArgPats, EquationInfo)] -> DsM MatchResult
     -- All members of the group have compatible ConArgPats
@@ -179,7 +176,7 @@ matchOneConLike vars ty (eqn1 : eqns)	-- All eqns for a single constructor
            return ( wrapBinds (tvs `zip` tvs1)
                   . wrapBinds (ds  `zip` dicts1)
                   . mkCoreLets ds_bind
-                  , eqn { eqn_pats = conArgPats arg_tys args ++ pats }
+                  , eqn { eqn_pats = conArgPats val_arg_tys args ++ pats }
                   )
     shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
 

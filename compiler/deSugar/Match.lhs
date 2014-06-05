@@ -554,9 +554,8 @@ tidy1 v (LazyPat pat)
 tidy1 _ (ListPat pats ty Nothing)
   = return (idDsWrapper, unLoc list_ConPat)
   where
-    list_ty     = mkListTy ty
-    list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] list_ty)
-                        (mkNilPat list_ty)
+    list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] [ty])
+                        (mkNilPat ty)
                         pats
 
 -- Introduce fake parallel array constructors to be able to handle parallel
@@ -565,13 +564,13 @@ tidy1 _ (PArrPat pats ty)
   = return (idDsWrapper, unLoc parrConPat)
   where
     arity      = length pats
-    parrConPat = mkPrefixConPat (parrFakeCon arity) pats (mkPArrTy ty)
+    parrConPat = mkPrefixConPat (parrFakeCon arity) pats [ty]
 
-tidy1 _ (TuplePat pats boxity ty)
+tidy1 _ (TuplePat pats boxity tys)
   = return (idDsWrapper, unLoc tuple_ConPat)
   where
     arity = length pats
-    tuple_ConPat = mkPrefixConPat (tupleCon (boxityNormalTupleSort boxity) arity) pats ty
+    tuple_ConPat = mkPrefixConPat (tupleCon (boxityNormalTupleSort boxity) arity) pats tys
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
 tidy1 _ (LitPat lit)
