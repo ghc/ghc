@@ -2957,6 +2957,9 @@ impliedFlags
     , (Opt_ImplicitParams, turnOn, Opt_FlexibleInstances)
 
     , (Opt_JavaScriptFFI, turnOn, Opt_InterruptibleFFI)
+    
+    , (Opt_DeriveTraversable, turnOn, Opt_DeriveFunctor)
+    , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
   ]
 
 optLevelFlags :: [([Int], GeneralFlag)]

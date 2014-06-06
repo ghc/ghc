@@ -3882,7 +3882,11 @@ defined in <literal>Data.Foldable</literal>.
 
 <listitem><para> With <option>-XDeriveTraversable</option>, you can derive instances of
 the class <literal>Traversable</literal>,
-defined in <literal>Data.Traversable</literal>.
+defined in <literal>Data.Traversable</literal>. Since the <literal>Traversable</literal>
+instance dictates the instances of <literal>Functor</literal> and 
+<literal>Foldable</literal>, you'll probably want to derive them too, so
+<option>-XDeriveTraversable</option> implies
+<option>-XDeriveFunctor</option> and <option>-XDeriveFoldable</option>.
 </para></listitem>
 </itemizedlist>
 You can also use a standalone deriving declaration instead
