@@ -1452,7 +1452,7 @@ unknownNameSuggestErr where_look tried_rdr_name
              all_possibilities
                 =  [ (showPpr dflags r, (r, Left loc))
                    | (r,loc) <- local_possibilities local_env ]
-                ++ [ (showPpr dflags r, rp) | (r,rp) <- global_possibilities global_env ]
+                ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
 
              suggest = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
              perhaps = ptext (sLit "Perhaps you meant")
@@ -1464,21 +1464,25 @@ unknownNameSuggestErr where_look tried_rdr_name
        ; return extra_err }
   where
     pp_item :: (RdrName, HowInScope) -> SDoc
-    pp_item (rdr, Left loc) = quotes (ppr rdr) <+> loc' -- Locally defined
+    pp_item (rdr, Left loc) = pp_ns rdr <+> quotes (ppr rdr) <+> loc' -- Locally defined
         where loc' = case loc of
                      UnhelpfulSpan l -> parens (ppr l)
                      RealSrcSpan l -> parens (ptext (sLit "line") <+> int (srcSpanStartLine l))
-    pp_item (rdr, Right is) = quotes (ppr rdr) <+>   -- Imported
+    pp_item (rdr, Right is) = pp_ns rdr <+> quotes (ppr rdr) <+>   -- Imported
                               parens (ptext (sLit "imported from") <+> ppr (is_mod is))
+
+    pp_ns :: RdrName -> SDoc
+    pp_ns rdr | ns /= tried_ns = pprNameSpace ns
+              | otherwise      = empty
+      where ns = rdrNameSpace rdr
 
     tried_occ     = rdrNameOcc tried_rdr_name
     tried_is_sym  = isSymOcc tried_occ
     tried_ns      = occNameSpace tried_occ
     tried_is_qual = isQual tried_rdr_name
 
-    correct_name_space occ =  occNameSpace occ == tried_ns
+    correct_name_space occ =  nameSpacesRelated (occNameSpace occ) tried_ns
                            && isSymOcc occ == tried_is_sym
-                           || toRelatedNameSpace occ == Just tried_occ
         -- Treat operator and non-operators as non-matching
         -- This heuristic avoids things like
         --      Not in scope 'f'; perhaps you meant '+' (from Prelude)
