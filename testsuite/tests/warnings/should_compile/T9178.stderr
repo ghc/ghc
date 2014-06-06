@@ -1,0 +1,8 @@
+[1 of 2] Compiling T9178DataType    ( T9178DataType.hs, T9178DataType.o )
+[2 of 2] Compiling T9178            ( T9178.hs, T9178.o )
+
+T9178.hs:8:10: Warning:
+    Orphan instance: instance Show T9178_Type
+    To avoid this
+        move the instance declaration to the module of the class or of the type, or
+        wrap the type with a newtype and declare the instance on the new type.

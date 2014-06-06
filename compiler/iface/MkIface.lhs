@@ -879,6 +879,13 @@ instOrphWarn :: DynFlags -> PrintUnqualified -> ClsInst -> WarnMsg
 instOrphWarn dflags unqual inst
   = mkWarnMsg dflags (getSrcSpan inst) unqual $
     hang (ptext (sLit "Orphan instance:")) 2 (pprInstanceHdr inst)
+    $$ text "To avoid this"
+    $$ nest 4 (vcat posibilities)
+  where
+    posibilities =
+      text "move the instance declaration to the module of the class or of the type, or" :
+      text "wrap the type with a newtype and declare the instance on the new type." :
+      []
 
 ruleOrphWarn :: DynFlags -> PrintUnqualified -> Module -> IfaceRule -> WarnMsg
 ruleOrphWarn dflags unqual mod rule
