@@ -452,41 +452,26 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
                           ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
                           ifCons = rdr_cons,
                           ifRec = is_rec, ifPromotable = is_prom,
-                          ifAxiom = mb_axiom_name })
+                          ifParent = mb_parent })
   = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
     { tc_name <- lookupIfaceTop occ_name
     ; tycon <- fixM $ \ tycon -> do
             { stupid_theta <- tcIfaceCtxt ctxt
-            ; parent' <- tc_parent tyvars mb_axiom_name
+            ; parent' <- tc_parent mb_parent
             ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
             ; return (buildAlgTyCon tc_name tyvars roles cType stupid_theta
                                     cons is_rec is_prom gadt_syn parent') }
     ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
     ; return (ATyCon tycon) }
   where
-    tc_parent :: [TyVar] -> Maybe Name -> IfL TyConParent
-    tc_parent _ Nothing = return parent
-    tc_parent tyvars (Just ax_name)
+    tc_parent :: IfaceTyConParent -> IfL TyConParent
+    tc_parent IfNoParent = return parent
+    tc_parent (IfDataInstance ax_name _ arg_tys)
       = ASSERT( isNoParent parent )
         do { ax <- tcIfaceCoAxiom ax_name
-           ; let fam_tc = coAxiomTyCon ax
+           ; let fam_tc  = coAxiomTyCon ax
                  ax_unbr = toUnbranchedAxiom ax
-                 -- data families don't have branches:
-                 branch    = coAxiomSingleBranch ax_unbr
-                 ax_tvs    = coAxBranchTyVars branch
-                 ax_lhs    = coAxBranchLHS branch
-                 tycon_tys = mkTyVarTys tyvars
-                 subst     = mkTopTvSubst (ax_tvs `zip` tycon_tys)
-                            -- The subst matches the tyvar of the TyCon
-                            -- with those from the CoAxiom.  They aren't
-                            -- necessarily the same, since the two may be
-                            -- gotten from separate interface-file declarations
-                            -- NB: ax_tvs may be shorter because of eta-reduction
-                            -- See Note [Eta reduction for data family axioms] in TcInstDcls
-                 lhs_tys = substTys subst ax_lhs `chkAppend`
-                           dropList ax_tvs tycon_tys
-                            -- The 'lhs_tys' should be 1-1 with the 'tyvars'
-                            -- but ax_tvs maybe shorter because of eta-reduction
+           ; lhs_tys <- tcIfaceTcArgs arg_tys
            ; return (FamInstTyCon ax_unbr fam_tc lhs_tys) }
 
 tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
@@ -503,7 +488,7 @@ tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
    where
      mk_doc n = ptext (sLit "Type syonym") <+> ppr n
      tc_syn_rhs IfaceOpenSynFamilyTyCon   = return OpenSynFamilyTyCon
-     tc_syn_rhs (IfaceClosedSynFamilyTyCon ax_name)
+     tc_syn_rhs (IfaceClosedSynFamilyTyCon ax_name _)
        = do { ax <- tcIfaceCoAxiom ax_name
             ; return (ClosedSynFamilyTyCon ax) }
      tc_syn_rhs IfaceAbstractClosedSynFamilyTyCon = return AbstractClosedSynFamilyTyCon
@@ -551,7 +536,7 @@ tc_iface_decl _parent ignore_prags
 
    tc_at cls (IfaceAT tc_decl defs_decls)
      = do ATyCon tc <- tc_iface_decl (AssocFamilyTyCon cls) ignore_prags tc_decl
-          defs <- forkM (mk_at_doc tc) (tc_ax_branches tc defs_decls)
+          defs <- forkM (mk_at_doc tc) (tc_ax_branches defs_decls)
                   -- Must be done lazily in case the RHS of the defaults mention
                   -- the type constructor being defined here
                   -- e.g.   type AT a; type AT b = AT [b]   Trac #8002
@@ -574,7 +559,7 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
                               , ifAxBranches = branches, ifRole = role })
   = do { tc_name     <- lookupIfaceTop ax_occ
        ; tc_tycon    <- tcIfaceTyCon tc
-       ; tc_branches <- tc_ax_branches tc_tycon branches
+       ; tc_branches <- tc_ax_branches branches
        ; let axiom = CoAxiom { co_ax_unique   = nameUnique tc_name
                              , co_ax_name     = tc_name
                              , co_ax_tc       = tc_tycon
@@ -614,16 +599,16 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
      mk_doc n = ptext (sLit "Pattern synonym") <+> ppr n
      tcExt s name = forkM (ptext (sLit s) <+> ppr name) $ tcIfaceExtId name
 
-tc_ax_branches :: TyCon -> [IfaceAxBranch] -> IfL [CoAxBranch]
-tc_ax_branches tc if_branches = foldlM (tc_ax_branch (tyConKind tc)) [] if_branches
+tc_ax_branches :: [IfaceAxBranch] -> IfL [CoAxBranch]
+tc_ax_branches if_branches = foldlM tc_ax_branch [] if_branches
 
-tc_ax_branch :: Kind -> [CoAxBranch] -> IfaceAxBranch -> IfL [CoAxBranch]
-tc_ax_branch tc_kind prev_branches
+tc_ax_branch :: [CoAxBranch] -> IfaceAxBranch -> IfL [CoAxBranch]
+tc_ax_branch prev_branches
              (IfaceAxBranch { ifaxbTyVars = tv_bndrs, ifaxbLHS = lhs, ifaxbRHS = rhs
                             , ifaxbRoles = roles, ifaxbIncomps = incomps })
   = bindIfaceTyVars_AT tv_bndrs $ \ tvs -> do
          -- The _AT variant is needed here; see Note [CoAxBranch type variables] in CoAxiom
-    { tc_lhs <- tcIfaceTcArgs tc_kind lhs   -- See Note [Checking IfaceTypes vs IfaceKinds]
+    { tc_lhs <- tcIfaceTcArgs lhs   -- See Note [Checking IfaceTypes vs IfaceKinds]
     ; tc_rhs <- tcIfaceType rhs
     ; let br = CoAxBranch { cab_loc     = noSrcSpan
                           , cab_tvs     = tvs
@@ -688,11 +673,11 @@ tcIfaceDataCons tycon_name tycon _ if_cons
     tc_strict (IfUnpackCo if_co) = do { co <- tcIfaceCo if_co
                                       ; return (HsUnpack (Just co)) }
 
-tcIfaceEqSpec :: [(OccName, IfaceType)] -> IfL [(TyVar, Type)]
+tcIfaceEqSpec :: IfaceEqSpec -> IfL [(TyVar, Type)]
 tcIfaceEqSpec spec
   = mapM do_item spec
   where
-    do_item (occ, if_ty) = do { tv <- tcIfaceTyVar (occNameFS occ)
+    do_item (occ, if_ty) = do { tv <- tcIfaceTyVar occ
                               ; ty <- tcIfaceType if_ty
                               ; return (tv,ty) }
 \end{code}
@@ -963,25 +948,38 @@ tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType (IfaceTyVar n)         = do { tv <- tcIfaceTyVar n; return (TyVarTy tv) }
 tcIfaceType (IfaceAppTy t1 t2)     = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (AppTy t1' t2') }
 tcIfaceType (IfaceLitTy l)         = do { l1 <- tcIfaceTyLit l; return (LitTy l1) }
-tcIfaceType (IfaceFunTy t1 t2)     = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (FunTy t1' t2') }
+tcIfaceType (IfaceFunTy t1 t2)     = tcIfaceTypeFun t1 t2
+tcIfaceType (IfaceDFunTy t1 t2)    = tcIfaceTypeFun t1 t2
 tcIfaceType (IfaceTyConApp tc tks) = do { tc' <- tcIfaceTyCon tc
-                                        ; tks' <- tcIfaceTcArgs (tyConKind tc') tks
+                                        ; tks' <- tcIfaceTcArgs tks
                                         ; return (mkTyConApp tc' tks') }
 tcIfaceType (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' -> do { t' <- tcIfaceType t; return (ForAllTy tv' t') }
 
-tcIfaceTypes :: [IfaceType] -> IfL [Type]
-tcIfaceTypes tys = mapM tcIfaceType tys
+tcIfaceTypeFun :: IfaceType -> IfaceType -> IfL Type
+tcIfaceTypeFun t1 t2 = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (FunTy t1' t2') }
 
-tcIfaceTcArgs :: Kind -> [IfaceType] -> IfL [Type]
-tcIfaceTcArgs _ []
-  = return []
-tcIfaceTcArgs kind (tk:tks)
-  = case splitForAllTy_maybe kind of
-      Nothing         -> tcIfaceTypes (tk:tks)
-      Just (_, kind') -> do { k'   <- tcIfaceKind tk
-                            ; tks' <- tcIfaceTcArgs kind' tks
-                            ; return (k':tks') }
+tcIfaceKind :: IfaceKind -> IfL Type
+tcIfaceKind (IfaceAppTy t1 t2)  = do { t1' <- tcIfaceKind t1; t2' <- tcIfaceKind t2; return (AppTy t1' t2') }
+tcIfaceKind (IfaceFunTy t1 t2)  = tcIfaceKindFun t1 t2
+tcIfaceKind (IfaceDFunTy t1 t2) = tcIfaceKindFun t1 t2
+tcIfaceKind (IfaceLitTy l)      = pprPanic "tcIfaceKind" (ppr l)
+tcIfaceKind k                   = tcIfaceType k
 
+tcIfaceKindFun :: IfaceKind -> IfaceKind -> IfL Type
+tcIfaceKindFun t1 t2 = do { t1' <- tcIfaceKind t1; t2' <- tcIfaceKind t2; return (FunTy t1' t2') }
+
+tcIfaceTcArgs :: IfaceTcArgs -> IfL [Type]
+tcIfaceTcArgs args
+  = case args of
+      ITC_Type t ts ->
+        do { t'  <- tcIfaceType t
+           ; ts' <- tcIfaceTcArgs ts
+           ; return (t':ts') }
+      ITC_Kind k ks ->
+        do { k'  <- tcIfaceKind k
+           ; ks' <- tcIfaceTcArgs ks
+           ; return (k':ks') }
+      ITC_Nil -> return []
 -----------------------------------------
 tcIfaceCtxt :: IfaceContext -> IfL ThetaType
 tcIfaceCtxt sts = mapM tcIfaceType sts
@@ -990,42 +988,7 @@ tcIfaceCtxt sts = mapM tcIfaceType sts
 tcIfaceTyLit :: IfaceTyLit -> IfL TyLit
 tcIfaceTyLit (IfaceNumTyLit n) = return (NumTyLit n)
 tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit n)
-
------------------------------------------
-tcIfaceKind :: IfaceKind -> IfL Kind   -- See Note [Checking IfaceTypes vs IfaceKinds]
-tcIfaceKind (IfaceTyVar n)        = do { tv <- tcIfaceTyVar n; return (TyVarTy tv) }
-tcIfaceKind (IfaceAppTy t1 t2)    = do { t1' <- tcIfaceKind t1; t2' <- tcIfaceKind t2; return (AppTy t1' t2') }
-tcIfaceKind (IfaceFunTy t1 t2)    = do { t1' <- tcIfaceKind t1; t2' <- tcIfaceKind t2; return (FunTy t1' t2') }
-tcIfaceKind (IfaceTyConApp tc ts) = do { tc' <- tcIfaceKindCon tc; ts' <- tcIfaceKinds ts; return (mkTyConApp tc' ts') }
-tcIfaceKind (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' -> do { t' <- tcIfaceKind t; return (ForAllTy tv' t') }
-tcIfaceKind t                     = pprPanic "tcIfaceKind" (ppr t)  -- IfaceCoApp, IfaceLitTy
-
-tcIfaceKinds :: [IfaceKind] -> IfL [Kind]
-tcIfaceKinds tys = mapM tcIfaceKind tys
 \end{code}
-
-Note [Checking IfaceTypes vs IfaceKinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We need to know whether we are checking a *type* or a *kind*.
-Consider   module M where
-             Proxy :: forall k. k -> *
-             data T = T
-and consider the two IfaceTypes
-      M.Proxy * M.T{tc}
-      M.Proxy 'M.T{tc} 'M.T(d}
-The first is conventional, but in the latter we use the promoted
-type constructor (as a kind) and data constructor (as a type).  However,
-the Name of the promoted type constructor is just M.T; it's the *same name*
-as the ordinary type constructor.
-
-We could add a "promoted" flag to an IfaceTyCon, but that's a bit heavy.
-Instead we use context to distinguish, as in the source language.
-  - When checking a kind, we look up M.T{tc} and promote it
-  - When checking a type, we look up M.T{tc} and don't promote it
-                                 and M.T{d}  and promote it
-    See tcIfaceKindCon and tcIfaceKTyCon respectively
-
-This context business is why we need tcIfaceTcArgs, and tcIfaceApps
 
 
 %************************************************************************
@@ -1192,7 +1155,7 @@ tcIfaceApps fun arg
     go_up fun _ [] = return fun
     go_up fun fun_ty (IfaceType t : args)
        | Just (tv,body_ty) <- splitForAllTy_maybe fun_ty
-       = do { t' <- if isKindVar tv  -- See Note [Checking IfaceTypes vs IfaceKinds]
+       = do { t' <- if isKindVar tv
                     then tcIfaceKind t
                     else tcIfaceType t
             ; let fun_ty' = substTyWith [tv] [t'] body_ty
@@ -1439,26 +1402,19 @@ tcIfaceGlobal name
 -- emasculated form (e.g. lacking data constructors).
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
-tcIfaceTyCon (IfaceTc name)
-  = do { thing <- tcIfaceGlobal name
-       ; case thing of    -- A "type constructor" can be a promoted data constructor
-                          --           c.f. Trac #5881
-           ATyCon   tc               -> return tc
-           AConLike (RealDataCon dc) -> return (promoteDataCon dc)
-           _ -> pprPanic "tcIfaceTyCon" (ppr name $$ ppr thing) }
-
-tcIfaceKindCon :: IfaceTyCon -> IfL TyCon
-tcIfaceKindCon (IfaceTc name)
-  = do { thing <- tcIfaceGlobal name
-       ; case thing of    -- A "type constructor" here is a promoted type constructor
-                          --           c.f. Trac #5881
-           ATyCon tc
-             | isSuperKind (tyConKind tc)
-             -> return tc   -- Mainly just '*' or 'AnyK'
-             | Just prom_tc <- promotableTyCon_maybe tc
-             -> return prom_tc
-
-           _ -> pprPanic "tcIfaceKindCon" (ppr name $$ ppr thing) }
+tcIfaceTyCon itc
+  = do {
+    ; thing <- tcIfaceGlobal (ifaceTyConName itc)
+    ; case itc of
+        IfaceTc _ -> return $ tyThingTyCon thing
+        IfacePromotedDataCon _ -> return $ promoteDataCon $ tyThingDataCon thing
+        IfacePromotedTyCon name ->
+          let ktycon tc
+                | isSuperKind (tyConKind tc) = return tc
+                | Just prom_tc <- promotableTyCon_maybe tc = return prom_tc
+                | otherwise = pprPanic "tcIfaceTyCon" (ppr name $$ ppr thing)
+          in ktycon (tyThingTyCon thing)
+    }
 
 tcIfaceCoAxiom :: Name -> IfL (CoAxiom Branched)
 tcIfaceCoAxiom name = do { thing <- tcIfaceGlobal name
@@ -1522,7 +1478,7 @@ bindIfaceTyVars bndrs thing_inside
     (occs,kinds) = unzip bndrs
 
 isSuperIfaceKind :: IfaceKind -> Bool
-isSuperIfaceKind (IfaceTyConApp (IfaceTc n) []) = n == superKindTyConName
+isSuperIfaceKind (IfaceTyConApp tc ITC_Nil) = ifaceTyConName tc == superKindTyConName
 isSuperIfaceKind _ = False
 
 mk_iface_tyvar :: Name -> IfaceKind -> IfL TyVar

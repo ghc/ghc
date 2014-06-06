@@ -67,7 +67,6 @@ import PrimOp
 import ForeignCall
 import DataCon
 import Id
-import Var              ( mkExportedLocalVar )
 import IdInfo
 import Demand
 import CoreSyn
@@ -955,29 +954,13 @@ mkFCallId dflags uniq fcall ty
 %*                                                                      *
 %************************************************************************
 
-Important notes about dict funs and default methods
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Dict funs and default methods]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Dict funs and default methods are *not* ImplicitIds.  Their definition
 involves user-written code, so we can't figure out their strictness etc
 based on fixed info, as we can for constructors and record selectors (say).
 
-We build them as LocalIds, but with External Names.  This ensures that
-they are taken to account by free-variable finding and dependency
-analysis (e.g. CoreFVs.exprFreeVars).
-
-Why shouldn't they be bound as GlobalIds?  Because, in particular, if
-they are globals, the specialiser floats dict uses above their defns,
-which prevents good simplifications happening.  Also the strictness
-analyser treats a occurrence of a GlobalId as imported and assumes it
-contains strictness in its IdInfo, which isn't true if the thing is
-bound in the same module as the occurrence.
-
-It's OK for dfuns to be LocalIds, because we form the instance-env to
-pass on to the next module (md_insts) in CoreTidy, afer tidying
-and globalising the top-level Ids.
-
-BUT make sure they are *exported* LocalIds (mkExportedLocalId) so 
-that they aren't discarded by the occurrence analyser.
+NB: See also Note [Exported LocalIds] in Id
 
 \begin{code}
 mkDictFunId :: Name      -- Name to use for the dict fun;
@@ -987,12 +970,12 @@ mkDictFunId :: Name      -- Name to use for the dict fun;
             -> [Type]
             -> Id
 -- Implements the DFun Superclass Invariant (see TcInstDcls)
+-- See Note [Dict funs and default methods]
 
 mkDictFunId dfun_name tvs theta clas tys
-  = mkExportedLocalVar (DFunId n_silent is_nt)
-                       dfun_name
-                       dfun_ty
-                       vanillaIdInfo
+  = mkExportedLocalId (DFunId n_silent is_nt)
+                      dfun_name
+                      dfun_ty
   where
     is_nt = isNewTyCon (classTyCon clas)
     (n_silent, dfun_ty) = mkDictFunTy tvs theta clas tys

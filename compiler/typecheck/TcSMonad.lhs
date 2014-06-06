@@ -1833,7 +1833,7 @@ rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swap
 -- It's all a form of rewwriteEvidence, specialised for equalities
 rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
   | CtDerived { ctev_loc = loc } <- old_ev
-  = newDerived loc (mkEqPred nlhs nrhs)
+  = newDerived loc (mkTcEqPred nlhs nrhs)
 
   | NotSwapped <- swapped
   , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
@@ -1860,7 +1860,7 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
   | otherwise
   = panic "rewriteEvidence"
   where
-    new_pred = mkEqPred nlhs nrhs
+    new_pred = mkTcEqPred nlhs nrhs
 
 maybeSym :: SwapFlag -> TcCoercion -> TcCoercion 
 maybeSym IsSwapped  co = mkTcSymCo co

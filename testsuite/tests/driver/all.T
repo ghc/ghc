@@ -395,3 +395,7 @@ test('T2507',
 test('T703', normal, run_command, ['$MAKE -s --no-print-directory T703'])
 test('T8101', normal, compile, ['-Wall -fno-code'])
 
+def build_T9050(name, way):
+     return simple_build(name + '.cmm', way, '-outputdir=. ', 0, '', 0, 0, 0)
+test('T9050', normal, build_T9050, [])
+

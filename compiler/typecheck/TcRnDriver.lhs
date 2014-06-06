@@ -61,6 +61,7 @@ import RnEnv
 import RnSource
 import ErrUtils
 import Id
+import IdInfo( IdDetails( VanillaId ) )
 import VarEnv
 import Module
 import UniqFM
@@ -632,7 +633,7 @@ checkHiBootIface
         where
           boot_dfun = instanceDFunId boot_inst
           boot_inst_ty = idType boot_dfun
-          local_boot_dfun = Id.mkExportedLocalId (idName boot_dfun) boot_inst_ty
+          local_boot_dfun = Id.mkExportedLocalId VanillaId (idName boot_dfun) boot_inst_ty
 
 
 -- This has to compare the TyThing from the .hi-boot file to the TyThing
@@ -1045,7 +1046,7 @@ check_main dflags tcg_env
         ; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN
                                    (mkVarOccFS (fsLit "main"))
                                    (getSrcSpan main_name)
-              ; root_main_id = Id.mkExportedLocalId root_main_name
+              ; root_main_id = Id.mkExportedLocalId VanillaId root_main_name
                                                     (mkTyConApp ioTyCon [res_ty])
               ; co  = mkWpTyApps [res_ty]
               ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) main_expr
@@ -1836,8 +1837,5 @@ ppr_tydecls tycons
         -- Print type constructor info; sort by OccName
   = vcat (map ppr_tycon (sortBy (comparing getOccName) tycons))
   where
-    ppr_tycon tycon = vcat [ ppr (tyConName tycon) <+> dcolon <+> ppr (tyConKind tycon)
-                              -- Temporarily print the kind signature too
-                           , ppr (tyThingToIfaceDecl (ATyCon tycon)) ]
-
+    ppr_tycon tycon = vcat [ ppr (tyThingToIfaceDecl (ATyCon tycon)) ]
 \end{code}

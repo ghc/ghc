@@ -1,0 +1,20 @@
+
+T9177.hs:4:13:
+    Not in scope: type variable ‘int’
+    Perhaps you meant type constructor or class ‘Int’ (imported from Prelude)
+
+T9177.hs:7:14:
+    Not in scope: type variable ‘integerr’
+    Perhaps you meant type constructor or class ‘Integer’ (imported from Prelude)
+
+T9177.hs:9:8:
+    Not in scope: ‘bar’
+    Perhaps you meant data constructor ‘Bar’ (line 16)
+
+T9177.hs:10:8:
+    Not in scope: data constructor ‘Fun’
+    Perhaps you meant variable ‘fun’ (line 17)
+
+T9177.hs:13:6:
+    Not in scope: data constructor ‘Fun’
+    Perhaps you meant variable ‘fun’ (line 17)

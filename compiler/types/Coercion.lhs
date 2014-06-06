@@ -634,7 +634,7 @@ pprCo, pprParendCo :: Coercion -> SDoc
 pprCo       co = ppr_co TopPrec   co
 pprParendCo co = ppr_co TyConPrec co
 
-ppr_co :: Prec -> Coercion -> SDoc
+ppr_co :: TyPrec -> Coercion -> SDoc
 ppr_co _ (Refl r ty) = angleBrackets (ppr ty) <> ppr_role r
 
 ppr_co p co@(TyConAppCo _ tc [_,_])
@@ -697,7 +697,7 @@ instance Outputable LeftOrRight where
   ppr CLeft    = ptext (sLit "Left")
   ppr CRight   = ptext (sLit "Right")
 
-ppr_fun_co :: Prec -> Coercion -> SDoc
+ppr_fun_co :: TyPrec -> Coercion -> SDoc
 ppr_fun_co p co = pprArrowChain p (split co)
   where
     split :: Coercion -> [SDoc]
@@ -706,7 +706,7 @@ ppr_fun_co p co = pprArrowChain p (split co)
       = ppr_co FunPrec arg : split res
     split co = [ppr_co TopPrec co]
 
-ppr_forall_co :: Prec -> Coercion -> SDoc
+ppr_forall_co :: TyPrec -> Coercion -> SDoc
 ppr_forall_co p ty
   = maybeParen p FunPrec $
     sep [pprForAll tvs, ppr_co TopPrec rho]

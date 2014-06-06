@@ -192,11 +192,8 @@ outputForeignStubs dflags mod location stubs
    stub_c <- newTempName dflags "c"
 
    case stubs of
-     NoStubs -> do
-        -- When compiling External Core files, may need to use stub
-        -- files from a previous compilation
-        stub_h_exists <- doesFileExist stub_h
-        return (stub_h_exists, Nothing)
+     NoStubs ->
+        return (False, Nothing)
 
      ForeignStubs h_code c_code -> do
         let

@@ -262,6 +262,7 @@ import InteractiveEval
 import TcRnDriver       ( runTcInteractive )
 #endif
 
+import PprTyThing       ( pprFamInst )
 import HscMain
 import GhcMake
 import DriverPipeline   ( compileOne' )
@@ -284,7 +285,7 @@ import DataCon
 import Name             hiding ( varName )
 import Avail
 import InstEnv
-import FamInstEnv
+import FamInstEnv ( FamInst )
 import SrcLoc
 import CoreSyn
 import TidyPgm

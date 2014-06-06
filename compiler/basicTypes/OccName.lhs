@@ -32,6 +32,8 @@
 module OccName (
 	-- * The 'NameSpace' type
 	NameSpace, -- Abstract
+
+        nameSpacesRelated,
 	
 	-- ** Construction
 	-- $real_vs_source_data_constructors
@@ -102,7 +104,10 @@ module OccName (
 	-- * Lexical characteristics of Haskell names
 	isLexCon, isLexVar, isLexId, isLexSym,
 	isLexConId, isLexConSym, isLexVarId, isLexVarSym,
-	startsVarSym, startsVarId, startsConSym, startsConId
+	startsVarSym, startsVarId, startsConSym, startsConId,
+
+        -- FsEnv
+        FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
     ) where
 
 import Util
@@ -115,6 +120,29 @@ import Outputable
 import Binary
 import Data.Char
 import Data.Data
+\end{code}
+
+%************************************************************************
+%*									*
+              FastStringEnv
+%*									*
+%************************************************************************
+
+FastStringEnv can't be in FastString becuase the env depends on UniqFM
+
+\begin{code}
+type FastStringEnv a = UniqFM a         -- Keyed by FastString
+
+
+emptyFsEnv  :: FastStringEnv a
+lookupFsEnv :: FastStringEnv a -> FastString -> Maybe a
+extendFsEnv :: FastStringEnv a -> FastString -> a -> FastStringEnv a
+mkFsEnv     :: [(FastString,a)] -> FastStringEnv a
+
+emptyFsEnv  = emptyUFM
+lookupFsEnv = lookupUFM
+extendFsEnv = addToUFM
+mkFsEnv     = listToUFM
 \end{code}
 
 %************************************************************************
@@ -246,6 +274,9 @@ instance Data OccName where
   toConstr _   = abstractConstr "OccName"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "OccName"
+
+instance HasOccName OccName where
+  occName = id
 \end{code}
 
 
@@ -340,6 +371,19 @@ demoteOccName :: OccName -> Maybe OccName
 demoteOccName (OccName space name) = do
   space' <- demoteNameSpace space
   return $ OccName space' name
+
+-- Name spaces are related if there is a chance to mean the one when one writes
+-- the other, i.e. variables <-> data construtors and type variables <-> type constructors
+nameSpacesRelated :: NameSpace -> NameSpace -> Bool
+nameSpacesRelated ns1 ns2 = ns1 == ns2 || otherNameSpace ns1 == ns2
+
+otherNameSpace :: NameSpace -> NameSpace
+otherNameSpace VarName = DataName
+otherNameSpace DataName = VarName
+otherNameSpace TvName = TcClsName
+otherNameSpace TcClsName = TvName
+
+
 
 {- | Other names in the compiler add aditional information to an OccName.
 This class provides a consistent way to access the underlying OccName. -}

@@ -4,4 +4,4 @@ Roles12.hs:5:1:
     and its hs-boot file
     Main module: type role T phantom
                  data T a
-    Boot file:   data T a
+    Boot file:   abstract T a

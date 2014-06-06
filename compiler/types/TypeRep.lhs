@@ -42,7 +42,7 @@ module TypeRep (
 	pprEqPred, pprTheta, pprForAll, pprUserForAll,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit, suppressKinds,
-	Prec(..), maybeParen, pprTcApp, 
+	TyPrec(..), maybeParen, pprTcApp, 
         pprPrefixApp, pprArrowChain, ppr_type,
 
         -- Free variables
@@ -493,12 +493,12 @@ parens around the type, except for the atomic cases.  @pprParendType@
 works just by setting the initial context precedence very high.
 
 \begin{code}
-data Prec = TopPrec 	-- No parens
-	  | FunPrec 	-- Function args; no parens for tycon apps
-	  | TyConPrec 	-- Tycon args; no parens for atomic
-	  deriving( Eq, Ord )
+data TyPrec = TopPrec         -- No parens
+            | FunPrec         -- Function args; no parens for tycon apps
+            | TyConPrec       -- Tycon args; no parens for atomic
+            deriving( Eq, Ord )
 
-maybeParen :: Prec -> Prec -> SDoc -> SDoc
+maybeParen :: TyPrec -> TyPrec -> SDoc -> SDoc
 maybeParen ctxt_prec inner_prec pretty
   | ctxt_prec < inner_prec = pretty
   | otherwise		   = parens pretty
@@ -574,7 +574,7 @@ instance Outputable TyLit where
 ------------------
 	-- OK, here's the main printer
 
-ppr_type :: Prec -> Type -> SDoc
+ppr_type :: TyPrec -> Type -> SDoc
 ppr_type _ (TyVarTy tv)	      = ppr_tvar tv
 
 ppr_type _ (TyConApp tc [LitTy (StrTyLit n),ty])
@@ -601,7 +601,7 @@ ppr_type p fun_ty@(FunTy ty1 ty2)
     ppr_fun_tail other_ty = [ppr_type TopPrec other_ty]
 
 
-ppr_forall_type :: Prec -> Type -> SDoc
+ppr_forall_type :: TyPrec -> Type -> SDoc
 ppr_forall_type p ty
   = maybeParen p FunPrec $ ppr_sigma_type True ty
     -- True <=> we always print the foralls on *nested* quantifiers
@@ -611,7 +611,7 @@ ppr_tvar :: TyVar -> SDoc
 ppr_tvar tv  -- Note [Infix type variables]
   = parenSymOcc (getOccName tv) (ppr tv)
 
-ppr_tylit :: Prec -> TyLit -> SDoc
+ppr_tylit :: TyPrec -> TyLit -> SDoc
 ppr_tylit _ tl =
   case tl of
     NumTyLit n -> integer n
@@ -705,7 +705,7 @@ pprTypeApp tc tys = pprTyTcApp TopPrec tc tys
         -- We have to use ppr on the TyCon (not its name)
         -- so that we get promotion quotes in the right place
 
-pprTyTcApp :: Prec -> TyCon -> [Type] -> SDoc
+pprTyTcApp :: TyPrec -> TyCon -> [Type] -> SDoc
 -- Used for types only; so that we can make a
 -- special case for type-level lists
 pprTyTcApp p tc tys
@@ -718,7 +718,7 @@ pprTyTcApp p tc tys
   | otherwise
   = pprTcApp p ppr_type tc tys
 
-pprTcApp :: Prec -> (Prec -> a -> SDoc) -> TyCon -> [a] -> SDoc
+pprTcApp :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> SDoc
 -- Used for both types and coercions, hence polymorphism
 pprTcApp _ pp tc [ty]
   | tc `hasKey` listTyConKey = pprPromotionQuote tc <> brackets   (pp TopPrec ty)
@@ -742,7 +742,7 @@ pprTcApp p pp tc tys
   | otherwise
   = sdocWithDynFlags (pprTcApp_help p pp tc tys)
 
-pprTcApp_help :: Prec -> (Prec -> a -> SDoc) -> TyCon -> [a] -> DynFlags -> SDoc
+pprTcApp_help :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> DynFlags -> SDoc
 -- This one has accss to the DynFlags
 pprTcApp_help p pp tc tys dflags
   | not (isSymOcc (nameOccName (tyConName tc)))
@@ -765,6 +765,7 @@ pprTcApp_help p pp tc tys dflags
 suppressKinds :: DynFlags -> Kind -> [a] -> [a]
 -- Given the kind of a TyCon, and the args to which it is applied,
 -- suppress the args that are kind args
+-- C.f. Note [Suppressing kinds] in IfaceType
 suppressKinds dflags kind xs
   | gopt Opt_PrintExplicitKinds dflags = xs
   | otherwise                          = suppress kind xs
@@ -774,7 +775,7 @@ suppressKinds dflags kind xs
     suppress _                 xs       = xs
 
 ----------------
-pprTyList :: Prec -> Type -> Type -> SDoc
+pprTyList :: TyPrec -> Type -> Type -> SDoc
 -- Given a type-level list (t1 ': t2), see if we can print 
 -- it in list notation [t1, ...].  
 pprTyList p ty1 ty2
@@ -798,19 +799,19 @@ pprTyList p ty1 ty2
     gather ty = ([], Just ty)
 
 ----------------
-pprInfixApp :: Prec -> (Prec -> a -> SDoc) -> SDoc -> a -> a -> SDoc
+pprInfixApp :: TyPrec -> (TyPrec -> a -> SDoc) -> SDoc -> a -> a -> SDoc
 pprInfixApp p pp pp_tc ty1 ty2
   = maybeParen p FunPrec $
     sep [pp FunPrec ty1, pprInfixVar True pp_tc <+> pp FunPrec ty2]
 
-pprPrefixApp :: Prec -> SDoc -> [SDoc] -> SDoc
+pprPrefixApp :: TyPrec -> SDoc -> [SDoc] -> SDoc
 pprPrefixApp p pp_fun pp_tys 
   | null pp_tys = pp_fun
   | otherwise   = maybeParen p TyConPrec $
                   hang pp_fun 2 (sep pp_tys)
 
 ----------------
-pprArrowChain :: Prec -> [SDoc] -> SDoc
+pprArrowChain :: TyPrec -> [SDoc] -> SDoc
 -- pprArrowChain p [a,b,c]  generates   a -> b -> c
 pprArrowChain _ []         = empty
 pprArrowChain p (arg:args) = maybeParen p FunPrec $

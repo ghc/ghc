@@ -753,7 +753,7 @@ pprModIface iface
         , vcat (map pprUsage (mi_usages iface))
         , vcat (map pprIfaceAnnotation (mi_anns iface))
         , pprFixities (mi_fixities iface)
-        , vcat (map pprIfaceDecl (mi_decls iface))
+        , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls iface]
         , vcat (map ppr (mi_insts iface))
         , vcat (map ppr (mi_fam_insts iface))
         , vcat (map ppr (mi_rules iface))
@@ -818,10 +818,6 @@ pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
                                (if trust_req then text "*" else empty)
     ppr_boot True  = text "[boot]"
     ppr_boot False = empty
-
-pprIfaceDecl :: (Fingerprint, IfaceDecl) -> SDoc
-pprIfaceDecl (ver, decl)
-  = ppr ver $$ nest 2 (ppr decl)
 
 pprFixities :: [(OccName, Fixity)] -> SDoc
 pprFixities []    = empty

@@ -353,7 +353,7 @@ pprTcCo, pprParendTcCo :: TcCoercion -> SDoc
 pprTcCo       co = ppr_co TopPrec   co
 pprParendTcCo co = ppr_co TyConPrec co
 
-ppr_co :: Prec -> TcCoercion -> SDoc
+ppr_co :: TyPrec -> TcCoercion -> SDoc
 ppr_co _ (TcRefl r ty) = angleBrackets (ppr ty) <> ppr_role r
 
 ppr_co p co@(TcTyConAppCo _ tc [_,_])
@@ -406,7 +406,7 @@ ppr_role r = underscore <> pp_role
                     Representational -> char 'R'
                     Phantom          -> char 'P'
 
-ppr_fun_co :: Prec -> TcCoercion -> SDoc
+ppr_fun_co :: TyPrec -> TcCoercion -> SDoc
 ppr_fun_co p co = pprArrowChain p (split co)
   where
     split :: TcCoercion -> [SDoc]
@@ -415,7 +415,7 @@ ppr_fun_co p co = pprArrowChain p (split co)
       = ppr_co FunPrec arg : split res
     split co = [ppr_co TopPrec co]
 
-ppr_forall_co :: Prec -> TcCoercion -> SDoc
+ppr_forall_co :: TyPrec -> TcCoercion -> SDoc
 ppr_forall_co p ty
   = maybeParen p FunPrec $
     sep [pprForAll tvs, ppr_co TopPrec rho]

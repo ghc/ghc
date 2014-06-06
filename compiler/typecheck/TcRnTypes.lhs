@@ -94,7 +94,7 @@ import Class    ( Class )
 import TyCon    ( TyCon )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
-import PatSyn   ( PatSyn, patSynId )
+import PatSyn   ( PatSyn, patSynType )
 import TcType
 import Annotations
 import InstEnv
@@ -1752,7 +1752,7 @@ pprSkolInfo (PatSkol cl mc) = case cl of
                           , ptext (sLit "in") <+> pprMatchContext mc ]
     PatSynCon ps -> sep [ ptext (sLit "a pattern with pattern synonym")
                         , nest 2 $ ppr ps <+> dcolon
-                          <+> pprType (varType (patSynId ps)) <> comma
+                          <+> pprType (patSynType ps) <> comma
                         , ptext (sLit "in") <+> pprMatchContext mc ]
 pprSkolInfo (InferSkol ids) = sep [ ptext (sLit "the inferred type of")
                                   , vcat [ ppr name <+> dcolon <+> ppr ty

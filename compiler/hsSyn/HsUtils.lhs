@@ -383,7 +383,7 @@ mkLHsVarTuple :: [a] -> LHsExpr a
 mkLHsVarTuple ids  = mkLHsTupleExpr (map nlHsVar ids)
 
 nlTuplePat :: [LPat id] -> Boxity -> LPat id
-nlTuplePat pats box = noLoc (TuplePat pats box placeHolderType)
+nlTuplePat pats box = noLoc (TuplePat pats box [])
 
 missingTupArg :: HsTupArg a
 missingTupArg = Missing placeHolderType
