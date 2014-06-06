@@ -567,7 +567,7 @@ pprHsForAll exp qtvs cxt
     show_forall =  opt_PprStyle_Debug
                 || (not (null (hsQTvBndrs qtvs)) && is_explicit)
     is_explicit = case exp of {Explicit -> True; Implicit -> False}
-    forall_part = ptext (sLit "forall") <+> ppr qtvs <> dot
+    forall_part = forAllLit <+> ppr qtvs <> dot
 
 pprHsContext :: (OutputableBndr name) => HsContext name -> SDoc
 pprHsContext []  = empty

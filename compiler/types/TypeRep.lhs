@@ -650,7 +650,7 @@ pprUserForAll tvs
 
 pprForAll :: [TyVar] -> SDoc
 pprForAll []  = empty
-pprForAll tvs = ptext (sLit "forall") <+> pprTvBndrs tvs <> dot
+pprForAll tvs = forAllLit <+> pprTvBndrs tvs <> dot
 
 pprTvBndrs :: [TyVar] -> SDoc
 pprTvBndrs tvs = sep (map pprTvBndr tvs)

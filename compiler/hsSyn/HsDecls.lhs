@@ -1236,7 +1236,7 @@ instance OutputableBndr name => Outputable (RuleDecl name) where
                nest 4 (equals <+> pprExpr (unLoc rhs) <+> text "#-}") ]
         where
           pp_forall | null ns   = empty
-                    | otherwise = text "forall" <+> fsep (map ppr ns) <> dot
+                    | otherwise = forAllLit <+> fsep (map ppr ns) <> dot
 
 instance OutputableBndr name => Outputable (RuleBndr name) where
    ppr (RuleBndr name) = ppr name
