@@ -219,7 +219,7 @@ binding variables to types that have an unacceptable shape.
 
 This helps us avoid "overlapping instance" errors in the presence of
 very general instances.   The main motivating example for this is the
-implementation of `Typeable`, which conatins the instances:
+implementation of `Typeable`, which contains the instances:
 
 ... => Typeable (f a) where ...
 ... => Typeable (a :: Nat) where ...

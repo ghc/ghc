@@ -373,7 +373,7 @@ demoteOccName (OccName space name) = do
   return $ OccName space' name
 
 -- Name spaces are related if there is a chance to mean the one when one writes
--- the other, i.e. variables <-> data construtors and type variables <-> type constructors
+-- the other, i.e. variables <-> data constructors and type variables <-> type constructors
 nameSpacesRelated :: NameSpace -> NameSpace -> Bool
 nameSpacesRelated ns1 ns2 = ns1 == ns2 || otherNameSpace ns1 == ns2
 
@@ -385,7 +385,7 @@ otherNameSpace TcClsName = TvName
 
 
 
-{- | Other names in the compiler add aditional information to an OccName.
+{- | Other names in the compiler add additional information to an OccName.
 This class provides a consistent way to access the underlying OccName. -}
 class HasOccName name where
   occName :: name -> OccName
