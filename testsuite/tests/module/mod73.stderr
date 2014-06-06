@@ -2,6 +2,6 @@
 mod73.hs:3:7:
     Not in scope: ‘Prelude.g’
     Perhaps you meant one of these:
-      data constructor ‘Prelude.GT’ (imported from Prelude),
+      data constructor ‘Prelude.LT’ (imported from Prelude),
       data constructor ‘Prelude.EQ’ (imported from Prelude),
-      data constructor ‘Prelude.LT’ (imported from Prelude)
+      data constructor ‘Prelude.GT’ (imported from Prelude)
