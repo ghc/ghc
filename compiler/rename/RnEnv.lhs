@@ -1478,6 +1478,7 @@ unknownNameSuggestErr where_look tried_rdr_name
 
     correct_name_space occ =  occNameSpace occ == tried_ns
                            && isSymOcc occ == tried_is_sym
+                           || toRelatedNameSpace occ == Just tried_occ
         -- Treat operator and non-operators as non-matching
         -- This heuristic avoids things like
         --      Not in scope 'f'; perhaps you meant '+' (from Prelude)

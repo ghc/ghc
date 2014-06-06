@@ -83,6 +83,8 @@ module OccName (
 	
 	isTcClsNameSpace, isTvNameSpace, isDataConNameSpace, isVarNameSpace, isValNameSpace,
 
+        toRelatedNameSpace,
+
 	-- * The 'OccEnv' type
 	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
 	lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
@@ -369,6 +371,29 @@ demoteOccName :: OccName -> Maybe OccName
 demoteOccName (OccName space name) = do
   space' <- demoteNameSpace space
   return $ OccName space' name
+
+-- What would this name be if used in the related name space
+-- (variables <-> data construtors, type variables <-> type constructors)
+toRelatedNameSpace :: OccName -> Maybe OccName
+toRelatedNameSpace (OccName space name) = OccName (otherNameSpace space) `fmap` name'
+  where
+    name' | name == fsLit "[]"  = Nothing -- Some special cases first
+          | name == fsLit "->"  = Nothing
+          | hd == '('           = Nothing
+          | hd == ':'           = Just tl
+          | startsVarSym hd     = Just (':' `consFS` name)
+          | isUpper hd          = Just (toLower hd `consFS` tl)
+          | isLower hd          = Just (toUpper hd `consFS` tl)
+          | otherwise           = pprTrace "toRelatedNameSpace" (ppr name)
+                                  Nothing
+    (hd,tl) = (headFS name, tailFS name)
+
+otherNameSpace :: NameSpace -> NameSpace
+otherNameSpace VarName = DataName
+otherNameSpace DataName = VarName
+otherNameSpace TvName = TcClsName
+otherNameSpace TcClsName = TvName
+
 
 {- | Other names in the compiler add aditional information to an OccName.
 This class provides a consistent way to access the underlying OccName. -}
