@@ -11571,7 +11571,7 @@ described in <ulink
 url="http://www.seas.upenn.edu/~sweirich/papers/popl163af-weirich.pdf">Generative
 type abstraction and type-level computation</ulink>, published at POPL 2011.</para>
 
-<sect2>
+<sect2 id="nominal-representational-and-phantom">
 <title>Nominal, Representational, and Phantom</title>
 
 <para>The goal of the roles system is to track when two types have the same
@@ -11628,7 +11628,7 @@ are unrelated.</para>
 
 </sect2>
 
-<sect2>
+<sect2 id="role-inference">
 <title>Role inference</title>
 
 <para>
@@ -11682,7 +11682,7 @@ but role nominal for <literal>b</literal>.</para>
 
 </sect2>
 
-<sect2>
+<sect2 id="role-annotations">
 <title>Role annotations
 <indexterm><primary>-XRoleAnnotations</primary></indexterm>
 </title>
