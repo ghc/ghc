@@ -9,5 +9,5 @@ targetPlatform       :: DynFlags -> Platform
 pprUserLength        :: DynFlags -> Int
 pprCols              :: DynFlags -> Int
 unsafeGlobalDynFlags :: DynFlags
-useUnicodeQuotes     :: DynFlags -> Bool
+useUnicode     :: DynFlags -> Bool
 useUnicodeSyntax     :: DynFlags -> Bool

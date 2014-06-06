@@ -777,7 +777,7 @@ data DynFlags = DynFlags {
   pprCols               :: Int,
   traceLevel            :: Int, -- Standard level is 1. Less verbose is 0.
 
-  useUnicodeQuotes      :: Bool,
+  useUnicode      :: Bool,
 
   -- | what kind of {-# SCC #-} to add automatically
   profAuto              :: ProfAuto,
@@ -1295,12 +1295,12 @@ initDynFlags dflags = do
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
  wrapperNum <- newIORef emptyModuleEnv
- canUseUnicodeQuotes <- do let enc = localeEncoding
-                               str = "‘’"
-                           (withCString enc str $ \cstr ->
-                                do str' <- peekCString enc cstr
-                                   return (str == str'))
-                               `catchIOError` \_ -> return False
+ canUseUnicode <- do let enc = localeEncoding
+                         str = "‘’"
+                     (withCString enc str $ \cstr ->
+                          do str' <- peekCString enc cstr
+                             return (str == str'))
+                         `catchIOError` \_ -> return False
  return dflags{
         canGenerateDynamicToo = refCanGenerateDynamicToo,
         nextTempSuffix = refNextTempSuffix,
@@ -1310,7 +1310,7 @@ initDynFlags dflags = do
         generatedDumps = refGeneratedDumps,
         llvmVersion    = refLlvmVersion,
         nextWrapperNum = wrapperNum,
-        useUnicodeQuotes = canUseUnicodeQuotes,
+        useUnicode    = canUseUnicode,
         rtldInfo      = refRtldInfo,
         rtccInfo      = refRtccInfo
         }
@@ -1449,7 +1449,7 @@ defaultDynFlags mySettings =
         flushErr = defaultFlushErr,
         pprUserLength = 5,
         pprCols = 100,
-        useUnicodeQuotes = False,
+        useUnicode = False,
         traceLevel = 1,
         profAuto = NoProfAuto,
         llvmVersion = panic "defaultDynFlags: No llvmVersion",

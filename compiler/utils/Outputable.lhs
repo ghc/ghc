@@ -74,7 +74,7 @@ module Outputable (
 
 import {-# SOURCE #-}   DynFlags( DynFlags,
                                   targetPlatform, pprUserLength, pprCols,
-                                  useUnicodeQuotes, useUnicodeSyntax,
+                                  useUnicode, useUnicodeSyntax,
                                   unsafeGlobalDynFlags )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
@@ -459,7 +459,7 @@ cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
 -- so that we don't get `foo''.  Instead we just have foo'.
 quotes d =
       sdocWithDynFlags $ \dflags ->
-      if useUnicodeQuotes dflags
+      if useUnicode dflags
       then char '‘' <> d <> char '’'
       else SDoc $ \sty ->
            let pp_d = runSDoc d sty
@@ -501,8 +501,9 @@ forAllLit = unicodeSyntax (char '∀') (ptext (sLit "forall"))
 
 unicodeSyntax :: SDoc -> SDoc -> SDoc
 unicodeSyntax unicode plain = sdocWithDynFlags $ \dflags ->
-    if useUnicodeSyntax dflags then unicode
-                               else plain
+    if useUnicode dflags && useUnicodeSyntax dflags
+    then unicode
+    else plain
 
 nest :: Int -> SDoc -> SDoc
 -- ^ Indent 'SDoc' some specified amount
