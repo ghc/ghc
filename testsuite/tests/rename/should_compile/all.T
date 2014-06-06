@@ -214,3 +214,4 @@ test('T7969',
                    'T7969.imports'])],
      run_command,
      ['$MAKE -s --no-print-directory T7969'])
+test('T9127', normal, compile, [''])

@@ -476,8 +476,9 @@ rnBind _ bind@(PatBind { pat_lhs = pat
               bndrs = collectPatBinders pat
               bind' = bind { pat_rhs  = grhss', bind_fvs = fvs' }
               is_wild_pat = case pat of
-                              L _ (WildPat {}) -> True
-                              _                -> False
+                              L _ (WildPat {})                 -> True
+                              L _ (BangPat (L _ (WildPat {}))) -> True -- #9127
+                              _                                -> False
 
         -- Warn if the pattern binds no variables, except for the
         -- entirely-explicit idiom    _ = rhs
