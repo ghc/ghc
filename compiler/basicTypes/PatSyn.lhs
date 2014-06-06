@@ -11,16 +11,18 @@ module PatSyn (
         PatSyn, mkPatSyn,
 
         -- ** Type deconstruction
-        patSynId, patSynType, patSynArity, patSynIsInfix,
-        patSynArgs, patSynTyDetails,
+        patSynName, patSynArity, patSynIsInfix,
+        patSynArgs, patSynTyDetails, patSynType,
         patSynWrapper, patSynMatcher,
-        patSynExTyVars, patSynSig, 
-        patSynInstArgTys, patSynInstResTy
+        patSynExTyVars, patSynSig,
+        patSynInstArgTys, patSynInstResTy,
+        tidyPatSynIds, patSynIds
     ) where
 
 #include "HsVersions.h"
 
 import Type
+import TcType( mkSigmaTy )
 import Name
 import Outputable
 import Unique
@@ -28,8 +30,6 @@ import Util
 import BasicTypes
 import FastString
 import Var
-import Id
-import TcType
 import HsBinds( HsPatSynDetails(..) )
 
 import qualified Data.Data as Data
@@ -114,7 +114,7 @@ expression when available.
 -- See Note [Pattern synonym representation]
 data PatSyn
   = MkPatSyn {
-        psId          :: Id,
+        psName        :: Name,
         psUnique      :: Unique,      -- Cached from Name
 
         psArgs        :: [Type],
@@ -167,7 +167,7 @@ instance Uniquable PatSyn where
     getUnique = psUnique
 
 instance NamedThing PatSyn where
-    getName = getName . psId
+    getName = patSynName
 
 instance Outputable PatSyn where
     ppr = ppr . getName
@@ -208,7 +208,7 @@ mkPatSyn name declared_infix orig_args
          prov_theta req_theta
          orig_res_ty
          matcher wrapper
-    = MkPatSyn {psId = id, psUnique = getUnique name,
+    = MkPatSyn {psName = name, psUnique = getUnique name,
                 psUnivTyVars = univ_tvs, psExTyVars = ex_tvs,
                 psProvTheta = prov_theta, psReqTheta = req_theta,
                 psInfix = declared_infix,
@@ -217,20 +217,21 @@ mkPatSyn name declared_infix orig_args
                 psOrigResTy = orig_res_ty,
                 psMatcher = matcher,
                 psWrapper = wrapper }
-  where
-    pat_ty = mkSigmaTy univ_tvs req_theta $
-             mkSigmaTy ex_tvs prov_theta $
-             mkFunTys orig_args orig_res_ty
-    id = mkLocalId name pat_ty
 \end{code}
 
 \begin{code}
 -- | The 'Name' of the 'PatSyn', giving it a unique, rooted identification
-patSynId :: PatSyn -> Id
-patSynId = psId
+patSynName :: PatSyn -> Name
+patSynName = psName
 
 patSynType :: PatSyn -> Type
-patSynType = psOrigResTy
+-- The full pattern type, used only in error messages
+patSynType (MkPatSyn { psUnivTyVars = univ_tvs, psReqTheta = req_theta
+                     , psExTyVars   = ex_tvs,   psProvTheta = prov_theta
+                     , psArgs = orig_args, psOrigResTy = orig_res_ty })
+  = mkSigmaTy univ_tvs req_theta $
+    mkSigmaTy ex_tvs prov_theta $
+    mkFunTys orig_args orig_res_ty
 
 -- | Should the 'PatSyn' be presented infix?
 patSynIsInfix :: PatSyn -> Bool
@@ -244,23 +245,36 @@ patSynArgs :: PatSyn -> [Type]
 patSynArgs = psArgs
 
 patSynTyDetails :: PatSyn -> HsPatSynDetails Type
-patSynTyDetails ps = case (patSynIsInfix ps, patSynArgs ps) of
-    (True, [left, right]) -> InfixPatSyn left right
-    (_, tys) -> PrefixPatSyn tys
+patSynTyDetails (MkPatSyn { psInfix = is_infix, psArgs = arg_tys })
+  | is_infix, [left,right] <- arg_tys
+  = InfixPatSyn left right
+  | otherwise
+  = PrefixPatSyn arg_tys
 
 patSynExTyVars :: PatSyn -> [TyVar]
 patSynExTyVars = psExTyVars
 
-patSynSig :: PatSyn -> ([TyVar], [TyVar], ThetaType, ThetaType)
+patSynSig :: PatSyn -> ([TyVar], [TyVar], ThetaType, ThetaType, [Type], Type)
 patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
-                    , psProvTheta = prov, psReqTheta = req })
-  = (univ_tvs, ex_tvs, prov, req)
+                    , psProvTheta = prov, psReqTheta = req
+                    , psArgs = arg_tys, psOrigResTy = res_ty })
+  = (univ_tvs, ex_tvs, prov, req, arg_tys, res_ty)
 
 patSynWrapper :: PatSyn -> Maybe Id
 patSynWrapper = psWrapper
 
 patSynMatcher :: PatSyn -> Id
 patSynMatcher = psMatcher
+
+patSynIds :: PatSyn -> [Id]
+patSynIds (MkPatSyn { psMatcher = match_id, psWrapper = mb_wrap_id })
+  = case mb_wrap_id of
+      Nothing      -> [match_id]
+      Just wrap_id -> [match_id, wrap_id]
+
+tidyPatSynIds :: (Id -> Id) -> PatSyn -> PatSyn
+tidyPatSynIds tidy_fn ps@(MkPatSyn { psMatcher = match_id, psWrapper = mb_wrap_id })
+  = ps { psMatcher = tidy_fn match_id, psWrapper = fmap tidy_fn mb_wrap_id }
 
 patSynInstArgTys :: PatSyn -> [Type] -> [Type]
 -- Return the types of the argument patterns
@@ -270,12 +284,13 @@ patSynInstArgTys :: PatSyn -> [Type] -> [Type]
 --          P :: forall c. forall b. (b->(c,Bool)) -> c -> b -> P c
 --   patSynInstArgTys P [Int,bb] = [bb->(Int,Bool), Int, bb]
 -- NB: the inst_tys should be both universal and existential
-patSynInstArgTys ps inst_tys
+patSynInstArgTys (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
+                           , psExTyVars = ex_tvs, psArgs = arg_tys })
+                 inst_tys
   = ASSERT2( length tyvars == length inst_tys
-          , ptext (sLit "patSynInstArgTys") <+> ppr ps $$ ppr tyvars $$ ppr inst_tys )
-    map (substTyWith tyvars inst_tys) (psArgs ps)
+          , ptext (sLit "patSynInstArgTys") <+> ppr name $$ ppr tyvars $$ ppr inst_tys )
+    map (substTyWith tyvars inst_tys) arg_tys
   where
-    (univ_tvs, ex_tvs, _, _) = patSynSig ps
     tyvars = univ_tvs ++ ex_tvs
 
 patSynInstResTy :: PatSyn -> [Type] -> Type
@@ -284,10 +299,10 @@ patSynInstResTy :: PatSyn -> [Type] -> Type
 --         P :: a -> b -> Just (a,a,b)
 --         (patSynInstResTy P [Int,Bool] = Maybe (Int,Int,Bool)
 -- NB: unlikepatSynInstArgTys, the inst_tys should be just the *universal* tyvars
-patSynInstResTy ps inst_tys
+patSynInstResTy (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
+                          , psOrigResTy = res_ty })
+                inst_tys
   = ASSERT2( length univ_tvs == length inst_tys
-           , ptext (sLit "patSynInstResTy") <+> ppr ps $$ ppr univ_tvs $$ ppr inst_tys )
-    substTyWith univ_tvs inst_tys (psOrigResTy ps)
-  where
-    (univ_tvs, _, _, _) = patSynSig ps
+           , ptext (sLit "patSynInstResTy") <+> ppr name $$ ppr univ_tvs $$ ppr inst_tys )
+    substTyWith univ_tvs inst_tys res_ty
 \end{code}

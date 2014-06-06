@@ -22,6 +22,7 @@ import Outputable
 import FastString
 import Var
 import Id
+import IdInfo( IdDetails( VanillaId ) )
 import TcBinds
 import BasicTypes
 import TcSimplify
@@ -128,7 +129,7 @@ tcPatSynMatcher (L loc name) lpat args univ_tvs ex_tvs ev_binds prov_dicts req_d
 
        ; let matcher_tau = mkFunTys [pat_ty, cont_ty, res_ty] res_ty
              matcher_sigma = mkSigmaTy (res_tv:univ_tvs) req_theta matcher_tau
-             matcher_id = mkVanillaGlobal matcher_name matcher_sigma
+             matcher_id = mkExportedLocalId VanillaId matcher_name matcher_sigma
 
        ; traceTc "tcPatSynMatcher" (ppr name $$ ppr (idType matcher_id))
        ; let matcher_lid = L loc matcher_id
@@ -222,7 +223,7 @@ tc_pat_syn_wrapper_from_expr (L loc name) lexpr args univ_tvs ex_tvs theta pat_t
 
        ; wrapper_name <- newImplicitBinder name mkDataConWrapperOcc
        ; let wrapper_lname = L loc wrapper_name
-             wrapper_id = mkVanillaGlobal wrapper_name wrapper_sigma
+             wrapper_id = mkExportedLocalId VanillaId wrapper_name wrapper_sigma
 
        ; let wrapper_args = map (noLoc . VarPat . Var.varName) args'
              wrapper_match = mkMatch wrapper_args lexpr EmptyLocalBinds

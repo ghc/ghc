@@ -66,6 +66,7 @@ import TcIface
 import PrelNames
 import TysWiredIn
 import Id
+import IdInfo( IdDetails(VanillaId) )
 import Var
 import VarSet
 import RdrName
@@ -801,7 +802,7 @@ mkStableIdFromString str sig_ty loc occ_wrapper = do
     name <- mkWrapperName "stable" str
     let occ = mkVarOccFS name :: OccName
         gnm = mkExternalName uniq mod (occ_wrapper occ) loc :: Name
-        id  = mkExportedLocalId gnm sig_ty :: Id
+        id  = mkExportedLocalId VanillaId gnm sig_ty :: Id
     return id
 
 mkStableIdFromName :: Name -> Type -> SrcSpan -> (OccName -> OccName) -> TcM TcId

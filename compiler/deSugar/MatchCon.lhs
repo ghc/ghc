@@ -157,7 +157,7 @@ matchOneConLike vars ty (eqn1 : eqns)	-- All eqns for a single constructor
 
     ex_tvs = case con1 of
                RealDataCon dcon1 -> dataConExTyVars dcon1
-               PatSynCon psyn1 -> patSynExTyVars psyn1
+               PatSynCon psyn1   -> patSynExTyVars psyn1
 
     match_group :: [Id] -> [(ConArgPats, EquationInfo)] -> DsM MatchResult
     -- All members of the group have compatible ConArgPats

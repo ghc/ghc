@@ -248,8 +248,9 @@ mkLocalIdWithInfo name ty info = Var.mkLocalVar VanillaId name ty info
 
 -- | Create a local 'Id' that is marked as exported.
 -- This prevents things attached to it from being removed as dead code.
-mkExportedLocalId :: Name -> Type -> Id
-mkExportedLocalId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaIdInfo
+-- See Note [Exported LocalIds]
+mkExportedLocalId :: IdDetails -> Name -> Type -> Id
+mkExportedLocalId details name ty = Var.mkExportedLocalVar details name ty vanillaIdInfo
         -- Note [Free type variables]
 
 
@@ -297,6 +298,40 @@ mkTemplateLocalsNum :: Int -> [Type] -> [Id]
 mkTemplateLocalsNum n tys = zipWith mkTemplateLocal [n..] tys
 \end{code}
 
+Note [Exported LocalIds]
+~~~~~~~~~~~~~~~~~~~~~~~~
+We use mkExportedLocalId for things like
+ - Dictionary functions (DFunId)
+ - Wrapper and matcher Ids for pattern synonyms
+ - Default methods for classes
+ - etc
+
+They marked as "exported" in the sense that they should be kept alive
+even if apparently unused in other bindings, and not dropped as dead
+code by the occurrence analyser.  (But "exported" here does not mean
+"brought into lexical scope by an import declaration". Indeed these
+things are always internal Ids that the user never sees.)
+
+It's very important that they are *LocalIds*, not GlobalIs, for lots
+of reasons:
+
+ * We want to treat them as free variables for the purpose of
+   dependency analysis (e.g. CoreFVs.exprFreeVars).
+
+ * Look them up in the current substitution when we come across
+   occurrences of them (in Subst.lookupIdSubst)
+
+ * Ensure that for dfuns that the specialiser does not float dict uses
+   above their defns, which would prevent good simplifications happening.
+
+ * The strictness analyser treats a occurrence of a GlobalId as
+   imported and assumes it contains strictness in its IdInfo, which
+   isn't true if the thing is bound in the same module as the
+   occurrence.
+
+In CoreTidy we must make all these LocalIds into GlobalIds, so that in
+importing modules (in --make mode) we treat them as properly global.
+That is what is happening in, say tidy_insts in TidyPgm.
 
 %************************************************************************
 %*                                                                      *

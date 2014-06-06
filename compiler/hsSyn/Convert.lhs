@@ -1160,7 +1160,7 @@ Consider this TH term construction:
      ; x3 <- TH.newName "x"
 
      ; let x = mkName "x"     -- mkName :: String -> TH.Name
-                              -- Builds a NameL
+                              -- Builds a NameS
 
      ; return (LamE (..pattern [x1,x2]..) $
                LamE (VarPat x3) $

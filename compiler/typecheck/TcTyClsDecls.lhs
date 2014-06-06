@@ -644,7 +644,7 @@ tcTyClDecl1 _parent rec_info
                ; traceTc "tcClassDecl" (ppr fundeps $$ ppr tvs' $$ ppr fds')
                ; return (clas, tvs', gen_dm_env) }
 
-       ; let { gen_dm_ids = [ AnId (mkExportedLocalId gen_dm_name gen_dm_ty)
+       ; let { gen_dm_ids = [ AnId (mkExportedLocalId VanillaId gen_dm_name gen_dm_ty)
                             | (sel_id, GenDefMeth gen_dm_name) <- classOpItems clas
                             , let gen_dm_tau = expectJust "tcTyClDecl1" $
                                                lookupNameEnv gen_dm_env (idName sel_id)
@@ -1796,7 +1796,7 @@ checkValidRoles tc
 mkDefaultMethodIds :: [TyThing] -> [Id]
 -- See Note [Default method Ids and Template Haskell]
 mkDefaultMethodIds things
-  = [ mkExportedLocalId dm_name (idType sel_id)
+  = [ mkExportedLocalId VanillaId dm_name (idType sel_id)
     | ATyCon tc <- things
     , Just cls <- [tyConClass_maybe tc]
     , (sel_id, DefMeth dm_name) <- classOpItems cls ]
@@ -1836,8 +1836,7 @@ mkRecSelBind (tycon, sel_name)
   = (L loc (IdSig sel_id), unitBag (L loc sel_bind))
   where
     loc    = getSrcSpan sel_name
-    sel_id = Var.mkExportedLocalVar rec_details sel_name
-                                    sel_ty vanillaIdInfo
+    sel_id = mkExportedLocalId rec_details sel_name sel_ty
     rec_details = RecSelId { sel_tycon = tycon, sel_naughty = is_naughty }
 
     -- Find a representative constructor, con1
