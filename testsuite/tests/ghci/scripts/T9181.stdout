@@ -1,0 +1,50 @@
+type family (GHC.TypeLits.*) (a :: GHC.TypeLits.Nat)
+                             (b :: GHC.TypeLits.Nat) ::
+  GHC.TypeLits.Nat
+type family (GHC.TypeLits.+) (a :: GHC.TypeLits.Nat)
+                             (b :: GHC.TypeLits.Nat) ::
+  GHC.TypeLits.Nat
+type family (GHC.TypeLits.-) (a :: GHC.TypeLits.Nat)
+                             (b :: GHC.TypeLits.Nat) ::
+  GHC.TypeLits.Nat
+type (GHC.TypeLits.<=) (x :: GHC.TypeLits.Nat)
+                       (y :: GHC.TypeLits.Nat) =
+  (x GHC.TypeLits.<=? y) ~ 'True
+type family (GHC.TypeLits.<=?) (a :: GHC.TypeLits.Nat)
+                               (b :: GHC.TypeLits.Nat) ::
+  Bool
+type family GHC.TypeLits.CmpNat (a :: GHC.TypeLits.Nat)
+                                (b :: GHC.TypeLits.Nat) ::
+  Ordering
+type family GHC.TypeLits.CmpSymbol (a :: GHC.TypeLits.Symbol)
+                                   (b :: GHC.TypeLits.Symbol) ::
+  Ordering
+class GHC.TypeLits.KnownNat (n :: GHC.TypeLits.Nat) where
+  GHC.TypeLits.natSing :: GHC.TypeLits.SNat n
+class GHC.TypeLits.KnownSymbol (n :: GHC.TypeLits.Symbol) where
+  GHC.TypeLits.symbolSing :: GHC.TypeLits.SSymbol n
+data GHC.TypeLits.Nat
+data GHC.TypeLits.SomeNat where
+  GHC.TypeLits.SomeNat :: GHC.TypeLits.KnownNat n =>
+                          (Data.Proxy.Proxy n) -> GHC.TypeLits.SomeNat
+data GHC.TypeLits.SomeSymbol where
+  GHC.TypeLits.SomeSymbol :: GHC.TypeLits.KnownSymbol n =>
+                             (Data.Proxy.Proxy n) -> GHC.TypeLits.SomeSymbol
+data GHC.TypeLits.Symbol
+type family (GHC.TypeLits.^) (a :: GHC.TypeLits.Nat)
+                             (b :: GHC.TypeLits.Nat) ::
+  GHC.TypeLits.Nat
+GHC.TypeLits.natVal ::
+  GHC.TypeLits.KnownNat n => proxy n -> Integer
+GHC.TypeLits.sameNat ::
+  (GHC.TypeLits.KnownNat a, GHC.TypeLits.KnownNat b) =>
+  Data.Proxy.Proxy a
+  -> Data.Proxy.Proxy b -> Maybe (a Data.Type.Equality.:~: b)
+GHC.TypeLits.sameSymbol ::
+  (GHC.TypeLits.KnownSymbol a, GHC.TypeLits.KnownSymbol b) =>
+  Data.Proxy.Proxy a
+  -> Data.Proxy.Proxy b -> Maybe (a Data.Type.Equality.:~: b)
+GHC.TypeLits.someNatVal :: Integer -> Maybe GHC.TypeLits.SomeNat
+GHC.TypeLits.someSymbolVal :: String -> GHC.TypeLits.SomeSymbol
+GHC.TypeLits.symbolVal ::
+  GHC.TypeLits.KnownSymbol n => proxy n -> String

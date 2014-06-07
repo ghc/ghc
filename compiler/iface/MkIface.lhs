@@ -1626,7 +1626,7 @@ tyConToIfaceDecl env tycon
       = IfaceSynonymTyCon (tidyToIfaceType env1 ty)
 
     to_ifsyn_rhs (BuiltInSynFamTyCon {})
-      = pprPanic "toIfaceDecl: BuiltInFamTyCon" (ppr tycon)
+      = IfaceBuiltInSynFamTyCon
 
 
     ifaceConDecls (NewTyCon { data_con = con })     = IfNewTyCon  (ifaceConDecl con)

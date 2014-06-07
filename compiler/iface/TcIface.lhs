@@ -494,6 +494,8 @@ tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
      tc_syn_rhs IfaceAbstractClosedSynFamilyTyCon = return AbstractClosedSynFamilyTyCon
      tc_syn_rhs (IfaceSynonymTyCon ty)    = do { rhs_ty <- tcIfaceType ty
                                                ; return (SynonymTyCon rhs_ty) }
+     tc_syn_rhs IfaceBuiltInSynFamTyCon   = pprPanic "tc_iface_decl"
+                                               (ptext (sLit "IfaceBuiltInSynFamTyCon in interface file"))
 
 tc_iface_decl _parent ignore_prags
             (IfaceClass {ifCtxt = rdr_ctxt, ifName = tc_occ,

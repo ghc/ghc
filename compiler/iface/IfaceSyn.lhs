@@ -275,6 +275,7 @@ data IfaceSynTyConRhs
                               [IfaceAxBranch] -- for pretty printing purposes only
   | IfaceAbstractClosedSynFamilyTyCon
   | IfaceSynonymTyCon IfaceType
+  | IfaceBuiltInSynFamTyCon -- for pretty printing purposes only
 
 instance Binary IfaceSynTyConRhs where
     put_ bh IfaceOpenSynFamilyTyCon           = putByte bh 0
@@ -282,6 +283,8 @@ instance Binary IfaceSynTyConRhs where
                                                              >> put_ bh br
     put_ bh IfaceAbstractClosedSynFamilyTyCon = putByte bh 2
     put_ bh (IfaceSynonymTyCon ty)            = putByte bh 3 >> put_ bh ty
+    put_ _ IfaceBuiltInSynFamTyCon
+        = pprPanic "Cannot serialize IfaceBuiltInSynFamTyCon, used for pretty-printing only" empty
 
     get bh = do { h <- getByte bh
                 ; case h of
@@ -1255,6 +1258,7 @@ pprIfaceDecl ss (IfaceSyn { ifName = tycon, ifTyVars = tyvars
     pp_rhs IfaceOpenSynFamilyTyCon             = ppShowIface ss (ptext (sLit "open"))
     pp_rhs IfaceAbstractClosedSynFamilyTyCon   = ppShowIface ss (ptext (sLit "closed, abstract"))
     pp_rhs (IfaceClosedSynFamilyTyCon _ (_:_)) = ptext (sLit "where")
+    pp_rhs IfaceBuiltInSynFamTyCon = ppShowIface ss (ptext (sLit "built-in"))
     pp_rhs _ = panic "pprIfaceDecl syn"
 
     pp_branches (IfaceClosedSynFamilyTyCon ax brs)
@@ -1635,6 +1639,7 @@ freeNamesIfSynRhs IfaceOpenSynFamilyTyCon           = emptyNameSet
 freeNamesIfSynRhs (IfaceClosedSynFamilyTyCon ax br)
   = unitNameSet ax &&& fnList freeNamesIfAxBranch br
 freeNamesIfSynRhs IfaceAbstractClosedSynFamilyTyCon = emptyNameSet
+freeNamesIfSynRhs IfaceBuiltInSynFamTyCon = emptyNameSet
 
 freeNamesIfContext :: IfaceContext -> NameSet
 freeNamesIfContext = fnList freeNamesIfType
