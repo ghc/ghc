@@ -116,7 +116,7 @@ import GHC.Show         ( showMultiLineString )
 \begin{code}
 
 data PprStyle
-  = PprUser PrintUnqualified Depth
+  = PprUser PrintUnqualified Depth Bool
                 -- Pretty-print in a way that will make sense to the
                 -- ordinary user; must be very close to Haskell
                 -- syntax, etc.
@@ -191,7 +191,7 @@ neverQualify  = (neverQualifyNames,  neverQualifyModules)
 
 defaultUserStyle, defaultDumpStyle :: PprStyle
 
-defaultUserStyle = mkUserStyle neverQualify AllTheWay
+defaultUserStyle = mkUserStyle neverQualify AllTheWay False
  -- Print without qualifiers to reduce verbosity, unless -dppr-debug
 
 defaultDumpStyle |  opt_PprStyle_Debug = PprDebug
@@ -202,19 +202,20 @@ defaultErrStyle :: DynFlags -> PprStyle
 -- It's a bit of a hack because it doesn't take into account what's in scope
 -- Only used for desugarer warnings, and typechecker errors in interface sigs
 -- NB that -dppr-debug will still get into PprDebug style
-defaultErrStyle dflags = mkErrStyle dflags neverQualify
+defaultErrStyle dflags = mkErrStyle dflags neverQualify (useUnicodeSyntax dflags)
 
 -- | Style for printing error messages
-mkErrStyle :: DynFlags -> PrintUnqualified -> PprStyle
-mkErrStyle dflags qual = mkUserStyle qual (PartWay (pprUserLength dflags))
+mkErrStyle :: DynFlags -> PrintUnqualified -> Bool -> PprStyle
+mkErrStyle dflags qual useUnicode =
+    mkUserStyle qual (PartWay (pprUserLength dflags)) useUnicode
 
 cmdlineParserStyle :: PprStyle
-cmdlineParserStyle = mkUserStyle alwaysQualify AllTheWay
+cmdlineParserStyle = mkUserStyle alwaysQualify AllTheWay False
 
-mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
-mkUserStyle unqual depth
+mkUserStyle :: PrintUnqualified -> Depth -> Bool -> PprStyle
+mkUserStyle unqual depth useUnicode
    | opt_PprStyle_Debug = PprDebug
-   | otherwise          = PprUser unqual depth
+   | otherwise          = PprUser unqual depth useUnicode
 \end{code}
 
 Orthogonal to the above printing styles are (possibly) some
@@ -256,9 +257,9 @@ withPprStyleDoc dflags sty d = runSDoc d (initSDocContext dflags sty)
 
 pprDeeper :: SDoc -> SDoc
 pprDeeper d = SDoc $ \ctx -> case ctx of
-  SDC{sdocStyle=PprUser _ (PartWay 0)} -> Pretty.text "..."
-  SDC{sdocStyle=PprUser q (PartWay n)} ->
-    runSDoc d ctx{sdocStyle = PprUser q (PartWay (n-1))}
+  SDC{sdocStyle=PprUser _ (PartWay 0) _} -> Pretty.text "..."
+  SDC{sdocStyle=PprUser q (PartWay n) uU} ->
+    runSDoc d ctx{sdocStyle = PprUser q (PartWay (n-1)) uU}
   _ -> runSDoc d ctx
 
 pprDeeperList :: ([SDoc] -> SDoc) -> [SDoc] -> SDoc
@@ -267,10 +268,10 @@ pprDeeperList f ds
   | null ds   = f []
   | otherwise = SDoc work
  where
-  work ctx@SDC{sdocStyle=PprUser q (PartWay n)}
+  work ctx@SDC{sdocStyle=PprUser q (PartWay n) uU}
    | n==0      = Pretty.text "..."
    | otherwise =
-      runSDoc (f (go 0 ds)) ctx{sdocStyle = PprUser q (PartWay (n-1))}
+      runSDoc (f (go 0 ds)) ctx{sdocStyle = PprUser q (PartWay (n-1)) uU}
    where
      go _ [] = []
      go i (d:ds) | i >= n    = [text "...."]
@@ -280,8 +281,8 @@ pprDeeperList f ds
 pprSetDepth :: Depth -> SDoc -> SDoc
 pprSetDepth depth doc = SDoc $ \ctx ->
     case ctx of
-        SDC{sdocStyle=PprUser q _} ->
-            runSDoc doc ctx{sdocStyle = PprUser q depth}
+        SDC{sdocStyle=PprUser q _ uU} ->
+            runSDoc doc ctx{sdocStyle = PprUser q depth uU}
         _ ->
             runSDoc doc ctx
 
@@ -297,12 +298,16 @@ sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 
 \begin{code}
 qualName :: PprStyle -> QueryQualifyName
-qualName (PprUser (qual_name,_) _)  mod occ = qual_name mod occ
-qualName _other                     mod _   = NameQual (moduleName mod)
+qualName (PprUser (qual_name,_) _ _)  mod occ = qual_name mod occ
+qualName _other                       mod _   = NameQual (moduleName mod)
 
 qualModule :: PprStyle -> QueryQualifyModule
-qualModule (PprUser (_,qual_mod) _)  m = qual_mod m
-qualModule _other                   _m = True
+qualModule (PprUser (_,qual_mod) _ _)  m = qual_mod m
+qualModule _other                     _m = True
+
+styleUseUnicode :: PprStyle -> Bool
+styleUseUnicode (PprUser _ _ b) = b
+styleUseUnicode _               = False
 
 codeStyle :: PprStyle -> Bool
 codeStyle (PprCode _)     = True
@@ -321,8 +326,8 @@ debugStyle PprDebug = True
 debugStyle _other   = False
 
 userStyle ::  PprStyle -> Bool
-userStyle (PprUser _ _) = True
-userStyle _other        = False
+userStyle (PprUser _ _ _) = True
+userStyle _other          = False
 
 ifPprDebug :: SDoc -> SDoc        -- Empty for non-debug style
 ifPprDebug d = SDoc $ \ctx ->
@@ -336,13 +341,13 @@ ifPprDebug d = SDoc $ \ctx ->
 printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser dflags handle unqual doc
   = Pretty.printDoc PageMode (pprCols dflags) handle
-      (runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay)))
+      (runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay (useUnicodeSyntax dflags))))
 
 printForUserPartWay :: DynFlags -> Handle -> Int -> PrintUnqualified -> SDoc
                     -> IO ()
 printForUserPartWay dflags handle d unqual doc
   = Pretty.printDoc PageMode (pprCols dflags) handle
-      (runSDoc doc (initSDocContext dflags (mkUserStyle unqual (PartWay d))))
+      (runSDoc doc (initSDocContext dflags (mkUserStyle unqual (PartWay d) (useUnicodeSyntax dflags))))
 
 -- printForC, printForAsm do what they sound like
 printForC :: DynFlags -> Handle -> SDoc -> IO ()
@@ -382,12 +387,12 @@ showSDocOneLine dflags d
 
 showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
 showSDocForUser dflags unqual doc
- = renderWithStyle dflags doc (mkUserStyle unqual AllTheWay)
+ = renderWithStyle dflags doc (mkUserStyle unqual AllTheWay (useUnicodeSyntax dflags))
 
 showSDocUnqual :: DynFlags -> SDoc -> String
 -- Only used by Haddock
 showSDocUnqual dflags doc
- = renderWithStyle dflags doc (mkUserStyle neverQualify AllTheWay)
+ = renderWithStyle dflags doc (mkUserStyle neverQualify AllTheWay (useUnicodeSyntax dflags))
 
 showSDocDump :: DynFlags -> SDoc -> String
 showSDocDump dflags d = renderWithStyle dflags d defaultDumpStyle
@@ -500,8 +505,10 @@ forAllLit :: SDoc
 forAllLit = unicodeSyntax (char '∀') (ptext (sLit "forall"))
 
 unicodeSyntax :: SDoc -> SDoc -> SDoc
-unicodeSyntax unicode plain = sdocWithDynFlags $ \dflags ->
-    if useUnicode dflags && useUnicodeSyntax dflags
+unicodeSyntax unicode plain =
+    sdocWithDynFlags $ \dflags ->
+    getPprStyle $ \style ->
+    if useUnicode dflags && styleUseUnicode style
     then unicode
     else plain
 

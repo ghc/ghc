@@ -65,13 +65,23 @@ type ErrorMessages   = Bag ErrMsg
 
 data ErrMsg = ErrMsg {
         errMsgSpan      :: SrcSpan,
-        errMsgContext   :: PrintUnqualified,
+        errMsgContext   :: ErrMsgContext,
         errMsgShortDoc  :: MsgDoc,   -- errMsgShort* should always
         errMsgShortString :: String, -- contain the same text
         errMsgExtraInfo :: MsgDoc,
         errMsgSeverity  :: Severity
         }
         -- The SrcSpan is used for sorting errors into line-number order
+
+-- Some information about how to print stuff needs to be taken from the context
+-- of the error message location. This includes:
+--  * How to qualifiy names (as that depends on what’s in scope)
+--  * Whether to use UnicodeSyntax (as that depends on whether UnicodeSyntax is enabled)
+data ErrMsgContext = ErrMsgContext {
+    errMsgCUnqual        :: PrintUnqualified,
+    errMsgCUnicodeSyntax :: Bool
+    }
+
 
 type WarnMsg = ErrMsg
 type MsgDoc = SDoc
@@ -116,7 +126,8 @@ makeIntoWarning err = err { errMsgSeverity = SevWarning }
 
 mk_err_msg :: DynFlags -> Severity -> SrcSpan -> PrintUnqualified -> MsgDoc -> SDoc -> ErrMsg
 mk_err_msg  dflags sev locn print_unqual msg extra
- = ErrMsg { errMsgSpan = locn, errMsgContext = print_unqual
+ = ErrMsg { errMsgSpan = locn
+          , errMsgContext = ErrMsgContext print_unqual (useUnicodeSyntax dflags)
           , errMsgShortDoc = msg , errMsgShortString = showSDoc dflags msg
           , errMsgExtraInfo = extra
           , errMsgSeverity = sev }
@@ -156,11 +167,11 @@ printBagOfErrors dflags bag_of_errors
 pprErrMsgBag :: Bag ErrMsg -> [SDoc]
 pprErrMsgBag bag
   = [ sdocWithDynFlags $ \dflags ->
-      let style = mkErrStyle dflags unqual
+      let style = mkErrStyle dflags unqual useUnicode
       in withPprStyle style (d $$ e)
     | ErrMsg { errMsgShortDoc  = d,
                errMsgExtraInfo = e,
-               errMsgContext   = unqual } <- sortMsgBag bag ]
+               errMsgContext   = ErrMsgContext unqual useUnicode} <- sortMsgBag bag ]
 
 pprErrMsgBagWithLoc :: Bag ErrMsg -> [SDoc]
 pprErrMsgBagWithLoc bag = [ pprLocErrMsg item | item <- sortMsgBag bag ]
@@ -170,19 +181,19 @@ pprLocErrMsg (ErrMsg { errMsgSpan      = s
                      , errMsgShortDoc  = d
                      , errMsgExtraInfo = e
                      , errMsgSeverity  = sev
-                     , errMsgContext   = unqual })
+                     , errMsgContext   = ErrMsgContext unqual useUnicode })
   = sdocWithDynFlags $ \dflags ->
-    withPprStyle (mkErrStyle dflags unqual) (mkLocMessage sev s (d $$ e))
+    withPprStyle (mkErrStyle dflags unqual useUnicode) (mkLocMessage sev s (d $$ e))
 
 printMsgBag :: DynFlags -> Bag ErrMsg -> IO ()
 printMsgBag dflags bag
-  = sequence_ [ let style = mkErrStyle dflags unqual
+  = sequence_ [ let style = mkErrStyle dflags unqual useUnicode
                 in log_action dflags dflags sev s style (d $$ e)
               | ErrMsg { errMsgSpan      = s,
                          errMsgShortDoc  = d,
                          errMsgSeverity  = sev,
                          errMsgExtraInfo = e,
-                         errMsgContext   = unqual } <- sortMsgBag bag ]
+                         errMsgContext   = ErrMsgContext unqual useUnicode } <- sortMsgBag bag ]
 
 sortMsgBag :: Bag ErrMsg -> [ErrMsg]
 sortMsgBag bag = sortBy (comparing errMsgSpan) $ bagToList bag
@@ -322,7 +333,7 @@ putMsgWith :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
 putMsgWith dflags print_unqual msg
   = log_action dflags dflags SevInfo noSrcSpan sty msg
   where
-    sty = mkUserStyle print_unqual AllTheWay
+    sty = mkUserStyle print_unqual AllTheWay (useUnicodeSyntax dflags)
 
 errorMsg :: DynFlags -> MsgDoc -> IO ()
 errorMsg dflags msg =

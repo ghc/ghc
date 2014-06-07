@@ -1536,7 +1536,7 @@ printInfoForUser = printSevForUser SevInfo
 
 printSevForUser :: Severity -> DynFlags -> PrintUnqualified -> SDoc -> IO ()
 printSevForUser sev dflags unqual doc
-    = log_action dflags dflags sev noSrcSpan (mkUserStyle unqual AllTheWay) doc
+    = log_action dflags dflags sev noSrcSpan (mkUserStyle unqual AllTheWay (useUnicodeSyntax dflags)) doc
 
 {-
 Note [Verbosity levels]
