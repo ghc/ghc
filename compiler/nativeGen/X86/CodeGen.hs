@@ -805,6 +805,8 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
         | is32BitInteger y = add_int rep x y
     add_code rep x y = trivialCode rep (ADD size) (Just (ADD size)) x y
       where size = intSize rep
+    -- TODO: There are other interesting patterns we want to replace
+    --     with a LEA, e.g. `(x + offset) + (y << shift)`.
 
     --------------------
     sub_code :: Width -> CmmExpr -> CmmExpr -> NatM Register
@@ -1024,6 +1026,13 @@ getAmode' is32Bit (CmmMachOp (MO_Add _rep) [x, CmmLit lit])
 getAmode' is32Bit (CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _),
                                   b@(CmmLit _)])
   = getAmode' is32Bit (CmmMachOp (MO_Add rep) [b,a])
+
+-- Matches: (x + offset) + (y << shift)
+getAmode' _ (CmmMachOp (MO_Add _) [CmmRegOff x offset,
+                                   CmmMachOp (MO_Shl _)
+                                        [y, CmmLit (CmmInt shift _)]])
+  | shift == 0 || shift == 1 || shift == 2 || shift == 3
+  = x86_complex_amode (CmmReg x) y shift (fromIntegral offset)
 
 getAmode' _ (CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Shl _)
                                         [y, CmmLit (CmmInt shift _)]])
