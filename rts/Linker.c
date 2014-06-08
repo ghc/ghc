@@ -1798,7 +1798,7 @@ internal_dlopen(const char *dll_name)
    // (see POSIX also)
 
    ACQUIRE_LOCK(&dl_mutex);
-   hdl = dlopen(dll_name, RTLD_LAZY | RTLD_GLOBAL);
+   hdl = dlopen(dll_name, RTLD_LAZY|RTLD_LOCAL); /* see Note [RTLD_LOCAL] */
 
    errmsg = NULL;
    if (hdl == NULL) {
@@ -1808,11 +1808,12 @@ internal_dlopen(const char *dll_name)
       errmsg_copy = stgMallocBytes(strlen(errmsg)+1, "addDLL");
       strcpy(errmsg_copy, errmsg);
       errmsg = errmsg_copy;
+   } else {
+      o_so = stgMallocBytes(sizeof(OpenedSO), "addDLL");
+      o_so->handle = hdl;
+      o_so->next   = openedSOs;
+      openedSOs    = o_so;
    }
-   o_so = stgMallocBytes(sizeof(OpenedSO), "addDLL");
-   o_so->handle = hdl;
-   o_so->next   = openedSOs;
-   openedSOs    = o_so;
 
    RELEASE_LOCK(&dl_mutex);
    //--------------- End critical section -------------------
@@ -1820,14 +1821,39 @@ internal_dlopen(const char *dll_name)
    return errmsg;
 }
 
+/*
+  Note [RTLD_LOCAL]
+
+  In GHCi we want to be able to override previous .so's with newly
+  loaded .so's when we recompile something.  This further implies that
+  when we look up a symbol in internal_dlsym() we have to iterate
+  through the loaded libraries (in order from most recently loaded to
+  oldest) looking up the symbol in each one until we find it.
+
+  However, this can cause problems for some symbols that are copied
+  by the linker into the executable image at runtime - see #8935 for a
+  lengthy discussion.  To solve that problem we need to look up
+  symbols in the main executable *first*, before attempting to look
+  them up in the loaded .so's.  But in order to make that work, we
+  have to always call dlopen with RTLD_LOCAL, so that the loaded
+  libraries don't populate the global symbol table.
+*/
+
 static void *
-internal_dlsym(void *hdl, const char *symbol) {
+internal_dlsym(const char *symbol) {
     OpenedSO* o_so;
     void *v;
 
     // We acquire dl_mutex as concurrent dl* calls may alter dlerror
     ACQUIRE_LOCK(&dl_mutex);
     dlerror();
+    // look in program first
+    v = dlsym(dl_prog_handle, symbol);
+    if (dlerror() == NULL) {
+        RELEASE_LOCK(&dl_mutex);
+        return v;
+    }
+
     for (o_so = openedSOs; o_so != NULL; o_so = o_so->next) {
         v = dlsym(o_so->handle, symbol);
         if (dlerror() == NULL) {
@@ -1835,7 +1861,6 @@ internal_dlsym(void *hdl, const char *symbol) {
             return v;
         }
     }
-    v = dlsym(hdl, symbol);
     RELEASE_LOCK(&dl_mutex);
     return v;
 }
@@ -2003,7 +2028,7 @@ lookupSymbol( char *lbl )
     if (!ghciLookupSymbolTable(symhash, lbl, &val)) {
         IF_DEBUG(linker, debugBelch("lookupSymbol: symbol not found\n"));
 #       if defined(OBJFORMAT_ELF)
-        return internal_dlsym(dl_prog_handle, lbl);
+        return internal_dlsym(lbl);
 #       elif defined(OBJFORMAT_MACHO)
 #       if HAVE_DLFCN_H
         /* On OS X 10.3 and later, we use dlsym instead of the old legacy
@@ -2017,7 +2042,7 @@ lookupSymbol( char *lbl )
         */
         IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s with dlsym\n", lbl));
         ASSERT(lbl[0] == '_');
-        return internal_dlsym(dl_prog_handle, lbl + 1);
+        return internal_dlsym(lbl + 1);
 #       else
         if (NSIsSymbolNameDefined(lbl)) {
             NSSymbol symbol = NSLookupAndBindSymbol(lbl);
