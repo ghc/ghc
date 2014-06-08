@@ -1141,9 +1141,10 @@ runMain s = case toArgs s of
             Left err   -> liftIO (hPutStrLn stderr err)
             Right args ->
                 do dflags <- getDynFlags
-                   case mainFunIs dflags of
-                       Nothing -> doWithArgs args "main"
-                       Just f  -> doWithArgs args f
+                   let main = fromMaybe "main" (mainFunIs dflags)
+                   -- Wrap the main function in 'void' to discard its value instead
+                   -- of printing it (#9086). See Haskell 2010 report Chapter 5.
+                   doWithArgs args $ "Control.Monad.void (" ++ main ++ ")"
 
 -----------------------------------------------------------------------------
 -- :run

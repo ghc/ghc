@@ -30,3 +30,5 @@ T3890:
 T7299:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e "Control.Concurrent.threadDelay (1000 * 1000)"
 
+T9086:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T9086.hs
