@@ -48,6 +48,8 @@ import Unique( hasKey )
 import FastString ( sLit, fsLit )
 import DynFlags
 import Util
+
+import System.IO(hPutStrLn,stderr)
 \end{code}
 
 **********************************************************************
@@ -142,7 +144,8 @@ solveInteractWithExtern inGivenStage cts
 interactExternSolver :: Bool      -- ^ Are we in given stage?
                      -> TcS Bool  -- ^ Did we generatew new work.
 interactExternSolver inGivenStage =
-  do iSet <- getTcSInerts
+  do extSol $ hPutStrLn stderr $ "=== EXT SOL: " ++ (if inGivenStage then "[G]" else "[W/D]")
+     iSet <- getTcSInerts
      let iCans  = inert_cans iSet
 
          relevantCt
@@ -168,50 +171,55 @@ interactExternSolver inGivenStage =
                 (vcat $ map ppr othersList))
 
 
-     sol <- extSol $ newExternalSolver "cvc4"
-                                    [ "--incremental", "--lang=smtlib2" ]
-
-     extSol $ extSolAssert sol othersList
+     withSol $ \sol ->
+       do extSol $ extSolAssert sol othersList
 
 
-     res <- extSol $ extSolImprove sol inGivenStage relList
-     case res of
+          res <- extSol $ extSolImprove sol inGivenStage relList
+          case res of
 
-       -- Kick-out constraints that lead to a contradiciton
-       -- and add them as insoluable.
-       ExtSolContradiction bad_feqs ok_feqs ->
-         do rebuildInerts ok_feqs
-            mapM_ emitInsoluble bad_feqs
-            return False
+            -- Kick-out constraints that lead to a contradiciton
+            -- and add them as insoluable.
+            ExtSolContradiction bad_feqs ok_feqs ->
+              do rebuildInerts ok_feqs
+                 mapM_ emitInsoluble bad_feqs
+                 return False
 
-       -- Consistent
-       ExtSolOk newWork
+            -- Consistent
+            ExtSolOk newWork
 
-          -- We found some new work to do.
-          | not (null newWork) ->
-            do updWorkListTcS (extendWorkListEqs newWork)
-               return True
+               -- We found some new work to do.
+               | not (null newWork) ->
+                 do updWorkListTcS (extendWorkListEqs newWork)
+                    return True
 
-         -- Nothing else to do.
-         | inGivenStage -> return False
+              -- Nothing else to do.
+              | inGivenStage -> return False
 
-         -- No new work, try to solve wanted constraints.
-         | otherwise ->
-             do let (wanteds, derived) = partition isWantedCt relList
-                (solved, unsolved) <- extSol $ extSolSolve sol wanteds
-                case solved of
-                  [] -> return False  -- Shortcut for common case.
-                  _  -> do rebuildInerts (unsolved ++ derived)
-                           let setEv (ev,ct) =
-                                          setEvBind (ctev_evar (cc_ev ct)) ev
-                           mapM_ setEv solved
-                           return False
+              -- No new work, try to solve wanted constraints.
+              | otherwise ->
+                  do let (wanteds, derived) = partition isWantedCt relList
+                     (solved, unsolved) <- extSol $ extSolSolve sol wanteds
+                     case solved of
+                       [] -> return False  -- Shortcut for common case.
+                       _  -> do rebuildInerts (unsolved ++ derived)
+                                let setEv (ev,ct) =
+                                       setEvBind (ctev_evar (cc_ev ct)) ev
+                                mapM_ setEv solved
+                                return False
 
   where
   addCt ct mp =
     case ct of
       CFunEqCan { cc_fun = tc, cc_tyargs = tys } -> addFunEq mp tc tys ct
       _ -> panic "Not FunEq constraint while rebuilding external work."
+
+  withSol k = do s <- extSol (newExternalSolver "cvc4"
+                                    [ "--incremental", "--lang=smtlib2" ])
+
+                 a <- k s
+                 extSol (extSolStop s)
+                 return a
 
 
 
