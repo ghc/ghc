@@ -38,8 +38,6 @@ cmmPipeline  :: HscEnv -- Compilation env including
 cmmPipeline hsc_env topSRT prog =
   do let dflags = hsc_dflags hsc_env
 
-     showPass dflags "CPSZ"
-
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
 
      (topSRT, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags topSRT tops

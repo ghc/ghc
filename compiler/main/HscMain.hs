@@ -1150,8 +1150,15 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
 
         ------------------  Code generation ------------------
 
-        cmms <- {-# SCC "NewCodeGen" #-}
-                         tryNewCodeGen hsc_env this_mod data_tycons
+        -- The back-end is streamed: each top-level function goes
+        -- from Stg all the way to asm before dealing with the next
+        -- top-level function, so showPass isn't very useful here.
+        -- Hence we have one showPass for the whole backend, the
+        -- next showPass after this will be "Assembler".
+        showPass dflags "CodeGen"
+
+        cmms <- {-# SCC "StgCmm" #-}
+                         doCodeGen hsc_env this_mod data_tycons
                              cost_centre_info
                              stg_binds hpc_info
 
@@ -1228,15 +1235,15 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
 
 -------------------- Stuff for new code gen ---------------------
 
-tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
-                -> CollectedCCs
-                -> [StgBinding]
-                -> HpcInfo
-                -> IO (Stream IO CmmGroup ())
+doCodeGen   :: HscEnv -> Module -> [TyCon]
+            -> CollectedCCs
+            -> [StgBinding]
+            -> HpcInfo
+            -> IO (Stream IO CmmGroup ())
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
-tryNewCodeGen hsc_env this_mod data_tycons
+doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
 

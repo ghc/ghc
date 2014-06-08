@@ -74,7 +74,6 @@ codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
                 ; return cmm
                 }
 
-        ; showPass dflags "CodeOutput"
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
         ; case hscTarget dflags of {
              HscAsm         -> outputAsm dflags this_mod filenm linted_cmm_stream;

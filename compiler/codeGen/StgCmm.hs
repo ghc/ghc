@@ -39,7 +39,6 @@ import DataCon
 import Name
 import TyCon
 import Module
-import ErrUtils
 import Outputable
 import Stream
 import BasicTypes
@@ -62,9 +61,7 @@ codeGen :: DynFlags
 
 codeGen dflags this_mod data_tycons
         cost_centre_info stg_binds hpc_info
-  = do  { liftIO $ showPass dflags "New CodeGen"
-
-              -- cg: run the code generator, and yield the resulting CmmGroup
+  = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer.
         ; cgref <- liftIO $ newIORef =<< initC
