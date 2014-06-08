@@ -28,6 +28,7 @@ import Debugger
 
 -- The GHC interface
 import DynFlags
+import ErrUtils
 import GhcMonad ( modifySession )
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
@@ -72,7 +73,7 @@ import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
-import Data.IORef ( IORef, readIORef, writeIORef )
+import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
                    partition, sort, sortBy )
 import Data.Maybe
@@ -103,7 +104,6 @@ import GHC.Exts ( unsafeCoerce# )
 import GHC.IO.Exception ( IOErrorType(InvalidArgument) )
 import GHC.IO.Handle ( hFlushAll )
 import GHC.TopHandler ( topHandler )
-
 
 -----------------------------------------------------------------------------
 
@@ -380,6 +380,12 @@ interactiveUI config srcs maybe_exprs = do
                $ dflags
    GHC.setInteractiveDynFlags dflags'
 
+   lastErrLocationsRef <- liftIO $ newIORef []
+   progDynFlags <- GHC.getProgramDynFlags
+   _ <- GHC.setProgramDynFlags $
+      progDynFlags { log_action = ghciLogAction lastErrLocationsRef }
+
+ 
    liftIO $ when (isNothing maybe_exprs) $ do
         -- Only for GHCi (not runghc and ghc -e):
 
@@ -400,30 +406,45 @@ interactiveUI config srcs maybe_exprs = do
 #endif
 
    default_editor <- liftIO $ findEditor
-
    startGHCi (runGHCi srcs maybe_exprs)
-        GHCiState{ progname       = default_progname,
-                   GhciMonad.args = default_args,
-                   prompt         = defPrompt config,
-                   prompt2        = defPrompt2 config,
-                   stop           = default_stop,
-                   editor         = default_editor,
-                   options        = [],
-                   line_number    = 1,
-                   break_ctr      = 0,
-                   breaks         = [],
-                   tickarrays     = emptyModuleEnv,
-                   ghci_commands  = availableCommands config,
-                   last_command   = Nothing,
-                   cmdqueue       = [],
-                   remembered_ctx = [],
-                   transient_ctx  = [],
-                   ghc_e          = isJust maybe_exprs,
-                   short_help     = shortHelpText config,
-                   long_help      = fullHelpText config
+        GHCiState{ progname           = default_progname,
+                   GhciMonad.args     = default_args,
+                   prompt             = defPrompt config,
+                   prompt2            = defPrompt2 config,
+                   stop               = default_stop,
+                   editor             = default_editor,
+                   options            = [],
+                   line_number        = 1,
+                   break_ctr          = 0,
+                   breaks             = [],
+                   tickarrays         = emptyModuleEnv,
+                   ghci_commands      = availableCommands config,
+                   last_command       = Nothing,
+                   cmdqueue           = [],
+                   remembered_ctx     = [],
+                   transient_ctx      = [],
+                   ghc_e              = isJust maybe_exprs,
+                   short_help         = shortHelpText config,
+                   long_help          = fullHelpText config,
+                   lastErrorLocations = lastErrLocationsRef
                  }
-
+    
    return ()
+
+resetLastErrorLocations :: GHCi ()
+resetLastErrorLocations = do
+    st <- getGHCiState
+    liftIO $ writeIORef (lastErrorLocations st) []
+
+ghciLogAction :: IORef [(FastString, Int)] ->  LogAction
+ghciLogAction lastErrLocations dflags severity srcSpan style msg = do
+    defaultLogAction dflags severity srcSpan style msg
+    case severity of
+        SevError -> case srcSpan of
+            RealSrcSpan rsp -> modifyIORef lastErrLocations
+                (++ [(srcLocFile (realSrcSpanStart rsp), srcLocLine (realSrcSpanStart rsp))])
+            _ -> return ()
+        _ -> return ()
 
 withGhcAppData :: (FilePath -> IO a) -> IO a -> IO a
 withGhcAppData right left = do
@@ -1170,10 +1191,18 @@ editFile :: String -> InputT GHCi ()
 editFile str =
   do file <- if null str then lift chooseEditFile else expandPath str
      st <- lift getGHCiState
+     errs <- liftIO $ readIORef $ lastErrorLocations st
      let cmd = editor st
      when (null cmd)
        $ throwGhcException (CmdLineError "editor not set, use :set editor")
-     code <- liftIO $ system (cmd ++ ' ':file)
+     lineOpt <- liftIO $ do
+         curFileErrs <- filterM (\(f, _) -> unpackFS f `sameFile` file) errs
+         return $ case curFileErrs of
+             (_, line):_ -> " +" ++ show line
+             _ -> ""
+     let cmdArgs = ' ':(file ++ lineOpt)
+     code <- liftIO $ system (cmd ++ cmdArgs)
+
      when (code == ExitSuccess)
        $ reloadModule ""
 
@@ -1364,6 +1393,7 @@ doLoad retain_context howmuch = do
   -- the ModBreaks will have gone away.
   lift discardActiveBreakPoints
 
+  lift resetLastErrorLocations
   -- Enable buffering stdout and stderr as we're compiling. Keeping these
   -- handles unbuffered will just slow the compilation down, especially when
   -- compiling in parallel.
@@ -1387,7 +1417,6 @@ afterLoad ok retain_context = do
   let loaded_mods = map GHC.ms_mod loaded_mod_summaries
   modulesLoadedMsg ok loaded_mods
   lift $ setContextAfterLoad retain_context loaded_mod_summaries
-
 
 setContextAfterLoad :: Bool -> [GHC.ModSummary] -> GHCi ()
 setContextAfterLoad keep_ctxt [] = do
@@ -3118,7 +3147,13 @@ expandPathIO p =
         tilde <- getHomeDirectory -- will fail if HOME not defined
         return (tilde ++ '/':d)
    other ->
-        return other
+        return other    
+
+sameFile :: FilePath -> FilePath -> IO Bool
+sameFile path1 path2 = do
+    absPath1 <- canonicalizePath path1
+    absPath2 <- canonicalizePath path2
+    return $ absPath1 == absPath2
 
 wantInterpretedModule :: GHC.GhcMonad m => String -> m Module
 wantInterpretedModule str = wantInterpretedModuleName (GHC.mkModuleName str)

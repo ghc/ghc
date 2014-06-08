@@ -2432,7 +2432,9 @@ Prelude> :. cmds.ghci
         <listitem>
           <para>Opens an editor to edit the file
           <replaceable>file</replaceable>, or the most recently loaded
-          module if <replaceable>file</replaceable> is omitted.  The
+          module if <replaceable>file</replaceable> is omitted.
+          If there were errors during the last loading,
+          the cursor will be positioned at the line of the first error. The
           editor to invoke is taken from the <literal>EDITOR</literal>
           environment variable, or a default editor on your system if
           <literal>EDITOR</literal> is not set.  You can change the
