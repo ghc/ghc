@@ -723,19 +723,12 @@ genLog x base = Just (exactLoop 0 x)
 -- Interface
 
 data ExternalSolver = ExternalSolver
-  { extSolPush    :: IO ()
-    -- ^ Mark current set of assumptions.
-    -- Does not change assertions.
-
-  , extSolPop     :: IO ()
-    -- ^ Revert to the last marked place.
-    -- Changes assertions.
-
-  , extSolAssert  :: [Ct] -> IO ()
+  { extSolAssert  :: [Ct] -> IO ()
     -- ^ Add some assertions.
     -- Changes assertions.
 
-  , extSolImprove :: Bool -> [Ct] -> IO ExtSolRes
+  , extSolImprove :: Bool {- are we in the given stage -}
+                                                -> [Ct] -> IO ExtSolRes
     -- ^ Check for consistency and new work.
     -- Does not change assertions.
 
@@ -773,15 +766,7 @@ newExternalSolver exe opts =
      let dbg = solverDebug proc
 
      return ExternalSolver
-       { extSolPush   = do dbg "=== PUSH ==="
-                           solverDebugNext proc
-                           solverPush proc viRef
-
-       , extSolPop    = do solverDebugPrev proc
-                           dbg "=== POP ==="
-                           solverPop proc viRef
-
-       , extSolAssert = \cts ->
+       { extSolAssert = \cts ->
           do dbg "=== ASSERT ==="
              (_,ours) <- solverPrepare proc viRef cts
              let expr (_,e,_) = e
@@ -908,7 +893,7 @@ solverGetModel proc vi =
 
 In particular, we look for facts of the form:
   * x = K, where `K` is a constant, and
-  * x = y,  where `y` is a variable.
+  * x = y, where `y` is a variable.
 
 Returns only the new facts.
 -}
@@ -981,7 +966,7 @@ solverImprove proc viRef withEv cts =
                 return (ExtSolOk [])
 
        (oneOfOurs,_) : _ ->
-         do push
+         do push -- assumptions
             mapM_ (assume . snd) ours
             status <- check
 
@@ -990,7 +975,7 @@ solverImprove proc viRef withEv cts =
 
                 -- Inconsistent: find a smaller example, then stop.
                 Unsat  ->
-                  do pop
+                  do pop -- assumptions
                      mbRes <- solverFindConstraidction proc viRef others ours
                      case mbRes of
                        Nothing ->
@@ -999,7 +984,7 @@ solverImprove proc viRef withEv cts =
                          return $ ExtSolContradiction core rest
 
                 -- We don't know: treat as consistent.
-                Unknown -> do pop
+                Unknown -> do pop -- assumptions
                               return (ExtSolOk [])
 
                 -- Consistent: try to compute derived work.
@@ -1007,7 +992,7 @@ solverImprove proc viRef withEv cts =
                   do m    <- solverGetModel proc =<< readIORef viRef
 
                      imps <- solverImproveModel proc viRef m
-                     pop
+                     pop -- assumptions
 
                      vi   <- readIORef viRef
 

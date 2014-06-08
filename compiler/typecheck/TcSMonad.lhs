@@ -84,8 +84,7 @@ module TcSMonad (
     Untouchables, isTouchableMetaTyVarTcS, isFilledMetaTyVar_maybe,
     zonkTyVarsAndFV,
 
-    TN.ExtSolRes(..),
-    extSolAssert, extSolImprove, extSolSolve, extSolPush, extSolPop,
+    extSol,
 
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
 
@@ -116,7 +115,6 @@ import TcType
 import DynFlags
 import Type
 import CoAxiom(sfMatchFam)
-import qualified TcTypeNats as TN
 
 import TcEvidence
 import Class
@@ -981,9 +979,7 @@ data TcSEnv
       -- while solving or canonicalising the current worklist.
       -- Specifically, when canonicalising (forall a. t1 ~ forall a. t2)
       -- from which we get the implication (forall a. t1 ~ t2)
-      tcs_implics  :: IORef (Bag Implication),
-
-      tcs_ext_solver :: TN.ExternalSolver
+      tcs_implics  :: IORef (Bag Implication)
     }
 \end{code}
 
@@ -1071,14 +1067,10 @@ runTcSWithEvBinds ev_binds_var tcs
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef is
 
-       ; extSol <- liftIO $ TN.newExternalSolver "cvc4"
-                              [ "--incremental", "--lang=smtlib2" ]
-
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
                           , tcs_ty_binds = ty_binds_var
                           , tcs_count    = step_count
                           , tcs_inerts   = inert_var
-                          , tcs_ext_solver = extSol
                           , tcs_worklist    = panic "runTcS: worklist"
                           , tcs_implics     = panic "runTcS: implics" }
                                -- NB: Both these are initialised by withWorkList
@@ -1098,7 +1090,6 @@ runTcSWithEvBinds ev_binds_var tcs
        ; ev_binds <- TcM.getTcEvBinds ev_binds_var
        ; checkForCyclicBinds ev_binds
 #endif
-       ; liftIO $ TN.extSolStop extSol
 
        ; return res }
   where
@@ -1128,14 +1119,11 @@ checkForCyclicBinds ev_binds
 nestImplicTcS :: EvBindsVar -> Untouchables -> InertSet -> TcS a -> TcS a
 nestImplicTcS ref inner_untch inerts (TcS thing_inside)
   = TcS $ \ TcSEnv { tcs_ty_binds = ty_binds
-                   , tcs_ext_solver = outer_solver
                    , tcs_count = count } ->
     do { new_inert_var <- TcM.newTcRef inerts
-       ; liftIO (TN.extSolPush outer_solver)
        ; let nest_env = TcSEnv { tcs_ev_binds    = ref
                                , tcs_ty_binds    = ty_binds
                                , tcs_count       = count
-                               , tcs_ext_solver  = outer_solver
                                , tcs_inerts      = new_inert_var
                                , tcs_worklist    = panic "nextImplicTcS: worklist"
                                , tcs_implics     = panic "nextImplicTcS: implics"
@@ -1143,7 +1131,6 @@ nestImplicTcS ref inner_untch inerts (TcS thing_inside)
                                }
        ; res <- TcM.setUntouchables inner_untch $
                 thing_inside nest_env
-       ; liftIO (TN.extSolPop outer_solver)
 
 #ifdef DEBUG
        -- Perform a check that the thing_inside did not cause cycles
@@ -1925,22 +1912,6 @@ Interaction with an External SMT Solver
 ---------------------------------------
 
 \begin{code}
-extSolAssert :: [Ct] -> TcS ()
-extSolAssert ct = withExtSol (`TN.extSolAssert` ct)
-
-extSolImprove :: Bool -> [Ct] -> TcS TN.ExtSolRes
-extSolImprove withEv ct = withExtSol (\s -> TN.extSolImprove s withEv ct)
-
-extSolSolve :: [Ct] -> TcS ([(EvTerm,Ct)], [Ct])
-extSolSolve ct = withExtSol (`TN.extSolSolve` ct)
-
-extSolPush  :: TcS ()
-extSolPush = withExtSol TN.extSolPush
-
-extSolPop   :: TcS ()
-extSolPop = withExtSol TN.extSolPop
-
-withExtSol :: (TN.ExternalSolver -> IO a) -> TcS a
-withExtSol m = TcS (liftIO . m . tcs_ext_solver)
-
+extSol :: IO a -> TcS a
+extSol m = TcS $ \_ -> liftIO m
 \end{code}

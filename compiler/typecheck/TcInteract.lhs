@@ -12,7 +12,6 @@ import VarSet
 import Type
 import Unify
 import InstEnv( lookupInstEnv, instanceDFunId )
-import CoAxiom(sfInteractTop, sfInteractInert)
 
 import Var
 import TcType
@@ -31,6 +30,7 @@ import FamInstEnv ( FamInstEnvs, instNewTyConTF_maybe )
 import TcEvidence
 import Outputable
 
+import TcTypeNats
 import TcRnTypes
 import TcErrors
 import TcSMonad
@@ -144,19 +144,37 @@ interactExternSolver :: Bool      -- ^ Are we in given stage?
 interactExternSolver inGivenStage =
   do iSet <- getTcSInerts
      let iCans  = inert_cans iSet
-         feqs   = funEqsToList (inert_funeqs iCans)
+
+         relevantCt
+           | inGivenStage = isGivenCt
+           | otherwise    = not . isGivenCt
+
+         (relFeqs, otherFeqs) = partitionFunEqs relevantCt (inert_funeqs iCans)
+         relList    = bagToList relFeqs
+         othersList = funEqsToList otherFeqs
 
          {- `survived` should be a sub-set of the inert funeqs.
-         This function rebuilds the inert set, when we need to
-         kick-out some constraint (e.g., because they were solved, or
-         caused a contradiciton. -}
+         This function rebuilds the inert set, after we've remove a constraint
+         (e.g., because they were solved, or caused a contradiciton. -}
 
          rebuildInerts survived =
-            do let new_feqs  = foldr addCt emptyFunEqs survived
+            do let new_feqs  = foldr addCt otherFeqs survived
                    new_iCans = iCans { inert_funeqs = new_feqs }
                setTcSInerts iSet { inert_cans = new_iCans }
 
-     res <- extSolImprove inGivenStage feqs
+     -- Sanity checking:
+     when (inGivenStage && not (null othersList)) $
+       panicTcS (text "Non given constraints in given stage" $$
+                (vcat $ map ppr othersList))
+
+
+     sol <- extSol $ newExternalSolver "cvc4"
+                                    [ "--incremental", "--lang=smtlib2" ]
+
+     extSol $ extSolAssert sol othersList
+
+
+     res <- extSol $ extSolImprove sol inGivenStage relList
      case res of
 
        -- Kick-out constraints that lead to a contradiciton
@@ -166,38 +184,34 @@ interactExternSolver inGivenStage =
             mapM_ emitInsoluble bad_feqs
             return False
 
-       -- Consistent, and no more work.
-       ExtSolOk []
+       -- Consistent
+       ExtSolOk newWork
 
-         -- Assert the givens in the solver, so that they will be used
-         -- when we solve the wanteds (and nested implications).
-         | inGivenStage ->
-            do extSolAssert feqs
-               return False
+          -- We found some new work to do.
+          | not (null newWork) ->
+            do updWorkListTcS (extendWorkListEqs newWork)
+               return True
 
-         -- During the wanted stage, we try to solve the constraints
-         -- once there is no more additional work for re-writing.
+         -- Nothing else to do.
+         | inGivenStage -> return False
+
+         -- No new work, try to solve wanted constraints.
          | otherwise ->
-             do let (wanteds, others) = partition isWantedCt feqs
-                (solved, unsolved) <- extSolSolve wanteds
+             do let (wanteds, derived) = partition isWantedCt relList
+                (solved, unsolved) <- extSol $ extSolSolve sol wanteds
                 case solved of
                   [] -> return False  -- Shortcut for common case.
-                  _  -> do rebuildInerts (unsolved ++ others)
+                  _  -> do rebuildInerts (unsolved ++ derived)
                            let setEv (ev,ct) =
                                           setEvBind (ctev_evar (cc_ev ct)) ev
                            mapM_ setEv solved
                            return False
 
-       -- We added some new work, so we should keep going.
-       ExtSolOk newWork ->
-         do updWorkListTcS (extendWorkListEqs newWork)
-            return True
-
   where
   addCt ct mp =
     case ct of
       CFunEqCan { cc_fun = tc, cc_tyargs = tys } -> addFunEq mp tc tys ct
-      _ -> mp   -- Should not happend
+      _ -> panic "Not FunEq constraint while rebuilding external work."
 
 
 
