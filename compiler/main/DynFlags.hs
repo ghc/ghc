@@ -406,8 +406,6 @@ data GeneralFlag
    | Opt_SuppressUniques
 
    -- temporary flags
-   | Opt_RunCPS
-   | Opt_RunCPSZ
    | Opt_AutoLinkPackages
    | Opt_ImplicitImportQualified
 
@@ -2668,8 +2666,6 @@ fFlags = [
   ( "break-on-error",                   Opt_BreakOnError, nop ),
   ( "print-evld-with-show",             Opt_PrintEvldWithShow, nop ),
   ( "print-bind-contents",              Opt_PrintBindContents, nop ),
-  ( "run-cps",                          Opt_RunCPS, nop ),
-  ( "run-cpsz",                         Opt_RunCPSZ, nop ),
   ( "vectorise",                        Opt_Vectorise, nop ),
   ( "vectorisation-avoidance",          Opt_VectorisationAvoidance, nop ),
   ( "regs-graph",                       Opt_RegsGraph, nop ),
