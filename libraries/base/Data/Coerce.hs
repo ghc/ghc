@@ -1,6 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE AutoDeriveTypeable #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
