@@ -31,13 +31,13 @@ import GHC.Show
 import GHC.Num
 import GHC.List ( length, replicate )
 import Numeric          ( showHex )
+import Data.Coerce
 
 #include "MachDeps.h"
 
 ------------------------------------------------------------------------
 -- Data pointers.
 
-type role Ptr representational
 data Ptr a = Ptr Addr# deriving (Eq, Ord)
 -- ^ A value of type @'Ptr' a@ represents a pointer to an object, or an
 -- array of objects, which may be marshalled to or from Haskell values
@@ -49,6 +49,10 @@ data Ptr a = Ptr Addr# deriving (Eq, Ord)
 -- to access the pointer.  For example you might write small foreign
 -- functions to get or set the fields of a C @struct@.
 
+-- The role of Ptr's parameter is phantom, as there is relation between
+-- the Haskell representation and whathever the user puts at the end of the
+-- pointer. And phantom is useful to implement castPtr (see #9163)
+
 -- |The constant 'nullPtr' contains a distinguished value of 'Ptr'
 -- that is not associated with a valid memory location.
 nullPtr :: Ptr a
@@ -56,7 +60,7 @@ nullPtr = Ptr nullAddr#
 
 -- |The 'castPtr' function casts a pointer from one type to another.
 castPtr :: Ptr a -> Ptr b
-castPtr (Ptr addr) = Ptr addr
+castPtr = coerce
 
 -- |Advances the given address by the given offset in bytes.
 plusPtr :: Ptr a -> Int -> Ptr b
@@ -123,6 +127,8 @@ data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 -- > type IntFunction = CInt -> IO ()
 -- > foreign import ccall "dynamic" 
 -- >   mkFun :: FunPtr IntFunction -> IntFunction
+
+-- The role of FunPtr is representational, to be on the safe side (see #9163)
 
 -- |The constant 'nullFunPtr' contains a
 -- distinguished value of 'FunPtr' that is not

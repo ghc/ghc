@@ -1,6 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE AutoDeriveTypeable #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,3 +25,6 @@ module Data.Coerce
         ) where
 import GHC.Prim (coerce)
 import GHC.Types (Coercible)
+
+import GHC.Base () -- for build ordering
+
