@@ -156,6 +156,8 @@ interactExternSolver inGivenStage =
          relList    = bagToList relFeqs
          othersList = funEqsToList otherFeqs
 
+         eqs = inert_eqs iCans
+
          {- `survived` should be a sub-set of the inert funeqs.
          This function rebuilds the inert set, after we've remove a constraint
          (e.g., because they were solved, or caused a contradiciton. -}
@@ -189,8 +191,11 @@ interactExternSolver inGivenStage =
             ExtSolOk newWork
 
                -- We found some new work to do.
-               | not (null newWork) ->
-                 do updWorkListTcS (extendWorkListEqs newWork)
+               | let reallyNew
+                       | inGivenStage = newWork
+                       | otherwise    = filter (notKnownEq eqs) newWork
+               , not (null reallyNew) ->
+                 do updWorkListTcS (extendWorkListEqs reallyNew)
                     return True
 
               -- Nothing else to do.
@@ -208,7 +213,17 @@ interactExternSolver inGivenStage =
                                 mapM_ setEv solved
                                 return False
 
+
   where
+  notKnownEq eqs ct =
+    case getEqPredTys_maybe (ctPred ct) of
+      Just (_,tvt,ty)
+        | Just tv <- getTyVar_maybe tvt ->
+           all (not . tcEqType ty)
+                    [ t | CTyEqCan { cc_rhs = t } <- findTyEqs eqs tv ]
+      _ -> True
+
+
   addCt ct mp =
     case ct of
       CFunEqCan { cc_fun = tc, cc_tyargs = tys } -> addFunEq mp tc tys ct
