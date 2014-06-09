@@ -1,0 +1,19 @@
+{
+  "linters": {
+    "filename": {
+      "type": "filename"
+    },
+    "generated": {
+      "type": "generated"
+    },
+    "merge-conflict": {
+      "type": "merge-conflict"
+    },
+    "nolint": {
+      "type": "nolint"
+    },
+    "text": {
+      "type": "text"
+    }
+  }
+}
