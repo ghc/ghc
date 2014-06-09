@@ -6,6 +6,7 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+#include "Hooks.h"
 
 /* Note: by the time this hook has been called, Haskell land
  * will have been shut down completely.

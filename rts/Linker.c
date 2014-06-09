@@ -1095,10 +1095,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_block_readmvar)                           \
       SymI_HasProto(stg_block_putmvar)                                  \
       MAIN_CAP_SYM                                                      \
-      SymI_HasProto(MallocFailHook)                                     \
-      SymI_HasProto(OnExitHook)                                         \
-      SymI_HasProto(OutOfHeapHook)                                      \
-      SymI_HasProto(StackOverflowHook)                                  \
       SymI_HasProto(addDLL)                                             \
       SymI_HasProto(__int_encodeDouble)                                 \
       SymI_HasProto(__word_encodeDouble)                                \
@@ -1123,7 +1119,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_decodeDoublezu2Intzh)                           \
       SymI_HasProto(stg_decodeDoublezuInt64zh)                          \
       SymI_HasProto(stg_decodeFloatzuIntzh)                             \
-      SymI_HasProto(defaultsHook)                                       \
       SymI_HasProto(stg_delayzh)                                        \
       SymI_HasProto(stg_deRefWeakzh)                                    \
       SymI_HasProto(stg_deRefStablePtrzh)                               \

@@ -1604,14 +1604,9 @@ linkDynLib dflags0 o_files dep_packages
             -------------------------------------------------------------------
 
             let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
-            let buildingRts = thisPackage dflags == rtsPackageKey
-            let bsymbolicFlag = if buildingRts
-                                then -- -Bsymbolic breaks the way we implement
-                                     -- hooks in the RTS
-                                     []
-                                else -- we need symbolic linking to resolve
-                                     -- non-PIC intra-package-relocations
-                                     ["-Wl,-Bsymbolic"]
+            let bsymbolicFlag = -- we need symbolic linking to resolve
+                                -- non-PIC intra-package-relocations
+                                ["-Wl,-Bsymbolic"]
 
             runLink dflags (
                     map Option verbFlags

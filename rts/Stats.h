@@ -27,6 +27,7 @@ struct gc_thread_;
 void      stat_startInit(void);
 void      stat_endInit(void);
 
+void      stat_startGCSync(struct gc_thread_ *_gct);
 void      stat_startGC(Capability *cap, struct gc_thread_ *_gct);
 void      stat_endGC  (Capability *cap, struct gc_thread_ *_gct,
                        W_ live, W_ copied, W_ slop, nat gen,

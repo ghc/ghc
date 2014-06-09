@@ -15,12 +15,11 @@
 /* Routines that operate-on/to-do-with RTS flags: */
 
 void initRtsFlagsDefaults (void);
-void setupRtsFlags        (int *argc, char *argv[],
-                           RtsOptsEnabledEnum rtsOptsEnabled,
-                           const char *ghc_rts_opts,
-                           HsBool is_hs_main);
+void setupRtsFlags        (int *argc, char *argv[], RtsConfig rtsConfig);
 void setProgName          (char *argv[]);
 void freeRtsArgs          (void);
+
+extern RtsConfig rtsConfig;
 
 #include "EndPrivate.h"
 

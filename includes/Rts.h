@@ -220,7 +220,6 @@ INLINE_HEADER Time fsecondsToTime (double t)
 
 /* Other RTS external APIs */
 #include "rts/Parallel.h"
-#include "rts/Hooks.h"
 #include "rts/Signals.h"
 #include "rts/BlockSignals.h"
 #include "rts/Hpc.h"

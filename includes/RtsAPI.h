@@ -60,9 +60,42 @@ typedef enum {
 // reason for using a struct is extensibility: we can add more
 // fields to this later without breaking existing client code.
 typedef struct {
+
+    // Whether to interpret +RTS options on the command line
     RtsOptsEnabledEnum rts_opts_enabled;
+
+    // additional RTS options
     const char *rts_opts;
+
+    // True if GHC was not passed -no-hs-main
     HsBool rts_hs_main;
+
+    // Called before processing command-line flags, so that default
+    // settings for RtsFlags can be provided.
+    void (* defaultsHook) (void);
+
+    // Called just before exiting
+    void (* onExitHook) (void);
+
+    // Called on a stack overflow, before exiting
+    void (* stackOverflowHook) (W_ stack_size);
+
+    // Called on heap overflow, before exiting
+    void (* outOfHeapHook) (W_ request_size, W_ heap_size);
+
+    // Called when malloc() fails, before exiting
+    void (* mallocFailHook) (W_ request_size /* in bytes */, char *msg);
+
+    // Called for every GC
+    void (* gcDoneHook) (unsigned int gen,
+                         W_ allocated_bytes, /* since last GC */
+                         W_ live_bytes,
+                         W_ copied_bytes,
+                         W_ max_copied_per_thread_bytes,
+                         W_ total_bytes,
+                         W_ slop_bytes,
+                         W_ sync_elapsed_ns, W_ elapsed_ns, W_ cpu_ns);
+
 } RtsConfig;
 
 // Clients should start with defaultRtsConfig and then customise it.

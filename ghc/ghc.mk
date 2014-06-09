@@ -51,6 +51,10 @@ ghc_stage1_C_FILES_NODEPS = ghc/hschooks.c
 ghc_stage2_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 ghc_stage3_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 
+ghc_stage1_MORE_HC_OPTS += -no-hs-main
+ghc_stage2_MORE_HC_OPTS += -no-hs-main
+ghc_stage3_MORE_HC_OPTS += -no-hs-main
+
 ifeq "$(GhcDebugged)" "YES"
 ghc_stage1_MORE_HC_OPTS += -debug
 ghc_stage2_MORE_HC_OPTS += -debug
