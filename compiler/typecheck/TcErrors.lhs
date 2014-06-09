@@ -1285,29 +1285,51 @@ flattening any further.  After all, there can be no instance declarations
 that match such things.  And flattening under a for-all is problematic
 anyway; consider C (forall a. F a)
 
+Note [Suggest -fprint-explicit-kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It can be terribly confusing to get an error message like (Trac #9171)
+    Couldn't match expected type ‘GetParam Base (GetParam Base Int)’
+                with actual type ‘GetParam Base (GetParam Base Int)’
+The reason may be that the kinds don't match up.  Typically you'll get
+more useful information, but not when it's as a result of ambiguity.
+This test suggests -fprint-explicit-kinds when all the ambiguous type
+variables are kind variables.
+
 \begin{code}
 mkAmbigMsg :: Ct -> (Bool, SDoc)
 mkAmbigMsg ct
-  | isEmptyVarSet ambig_tv_set = (False, empty)
-  | otherwise                  = (True,  msg)
+  | null ambig_tkvs = (False, empty)
+  | otherwise       = (True,  msg)
   where
-    ambig_tv_set = filterVarSet isAmbiguousTyVar (tyVarsOfCt ct)
-    ambig_tvs = varSetElems ambig_tv_set
-    
-    is_or_are | isSingleton ambig_tvs = text "is"
-              | otherwise             = text "are"
-                 
-    msg | any isRuntimeUnkSkol ambig_tvs  -- See Note [Runtime skolems]
+    ambig_tkv_set = filterVarSet isAmbiguousTyVar (tyVarsOfCt ct)
+    ambig_tkvs    = varSetElems ambig_tkv_set
+    (ambig_kvs, ambig_tvs) = partition isKindVar ambig_tkvs
+
+    msg | any isRuntimeUnkSkol ambig_tkvs  -- See Note [Runtime skolems]
         =  vcat [ ptext (sLit "Cannot resolve unknown runtime type") <> plural ambig_tvs
                      <+> pprQuotedList ambig_tvs
                 , ptext (sLit "Use :print or :force to determine these types")]
-        | otherwise
-        = vcat [ text "The type variable" <> plural ambig_tvs
-                    <+> pprQuotedList ambig_tvs
-                    <+> is_or_are <+> text "ambiguous" ]
+
+        | not (null ambig_tvs)
+        = pp_ambig (ptext (sLit "type")) ambig_tvs
+
+        | otherwise  -- All ambiguous kind variabes; suggest -fprint-explicit-kinds
+        = vcat [ pp_ambig (ptext (sLit "kind")) ambig_kvs
+               , sdocWithDynFlags suggest_explicit_kinds ]
+
+    pp_ambig what tkvs
+      = ptext (sLit "The") <+> what <+> ptext (sLit "variable") <> plural tkvs
+        <+> pprQuotedList tkvs <+> is_or_are tkvs <+> ptext (sLit "ambiguous")
+
+    is_or_are [_] = text "is"
+    is_or_are _   = text "are"
+
+    suggest_explicit_kinds dflags  -- See Note [Suggest -fprint-explicit-kinds]
+      | gopt Opt_PrintExplicitKinds dflags = empty
+      | otherwise = ptext (sLit "Use -fprint-explicit-kinds to see the kind arguments")
 
 pprSkol :: SkolemInfo -> SrcLoc -> SDoc
-pprSkol UnkSkol   _ 
+pprSkol UnkSkol   _
   = ptext (sLit "is an unknown type variable")
 pprSkol skol_info tv_loc 
   = sep [ ptext (sLit "is a rigid type variable bound by"),

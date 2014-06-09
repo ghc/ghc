@@ -1,0 +1,23 @@
+
+T9171.hs:10:1:
+    Couldn't match expected type ‘GetParam Base (GetParam Base Int)’
+                with actual type ‘GetParam Base (GetParam Base Int)’
+    NB: ‘GetParam’ is a type function, and may not be injective
+    The kind variable ‘k0’ is ambiguous
+    Use -fprint-explicit-kinds to see the kind arguments
+    When checking that ‘foo’
+      has the inferred type ‘forall (k :: BOX).
+                             GetParam Base (GetParam Base Int)’
+    Probable cause: the inferred type is ambiguous
+
+T9171.hs:10:20:
+    Couldn't match expected type ‘GetParam Base (GetParam Base Int)’
+                with actual type ‘GetParam Base (GetParam Base Int)’
+    NB: ‘GetParam’ is a type function, and may not be injective
+    The kind variable ‘k0’ is ambiguous
+    Use -fprint-explicit-kinds to see the kind arguments
+    In the ambiguity check for:
+      forall (k :: BOX). GetParam Base (GetParam Base Int)
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+    In an expression type signature: GetParam Base (GetParam Base Int)
+    In the expression: undefined :: GetParam Base (GetParam Base Int)
