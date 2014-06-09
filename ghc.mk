@@ -425,13 +425,6 @@ PACKAGES_STAGE2 += haskell98
 PACKAGES_STAGE2 += haskell2010
 endif
 
-# We normally install only the packages down to this point
-REGULAR_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
-ifeq "$(Stage1Only)" "NO"
-REGULAR_INSTALL_PACKAGES += compiler
-endif
-REGULAR_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
-
 PACKAGES_STAGE1 += xhtml
 ifeq "$(Windows_Target)" "NO"
 ifneq "$(TargetOS_CPP)" "ios"
@@ -439,6 +432,13 @@ PACKAGES_STAGE1 += terminfo
 endif
 endif
 PACKAGES_STAGE1 += haskeline
+
+# We normally install only the packages down to this point
+REGULAR_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
+ifeq "$(Stage1Only)" "NO"
+REGULAR_INSTALL_PACKAGES += compiler
+endif
+REGULAR_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 
 # If we have built the programs with dynamic libraries, then
 # ghc will be dynamically linked against haskeline.so etc, so
