@@ -57,6 +57,18 @@
             #9068).
           </para>
        </listitem>
+       <listitem>
+          <para>
+            The libraries <literal>haskeline</literal>,
+            <literal>xhtml</literal>, <literal>terminfo</literal>,
+            <literal>transformers</literal>, and
+            <literal>haskeline</literal> are now exported and
+            registered in the package database. They previously
+            shipped with GHC but were not registered, leading to
+            errors where shared objects could be overwritten. (issue
+            #8919).
+          </para>
+       </listitem>
     </itemizedlist>
   </sect2>
 </sect1>
