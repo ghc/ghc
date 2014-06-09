@@ -971,45 +971,33 @@ right-hand side.
 </para>
 
 <para>
-The semantics of a unidirectional pattern synonym declaration and
-usage are as follows:
+The syntax and semantics of pattern synonyms are elaborated in the
+following subsections.  
+See the <ulink
+url="http://ghc.haskell.org/trac/ghc/wiki/PatternSynonyms">Wiki
+page</ulink> for more details.
+</para>
 
-<itemizedlist>
-
-<listitem> Syntax:
+<sect3> <title>Syntax and scoping of pattern synonyms</title>
 <para>
 A pattern synonym declaration can be either unidirectional or
 bidirectional. The syntax for unidirectional pattern synonyms is:
-</para>
 <programlisting>
   pattern Name args &lt;- pat
 </programlisting>
-<para>
   and the syntax for bidirectional pattern synonyms is:
-</para>
 <programlisting>
   pattern Name args = pat
 </programlisting>
+  Either prefix or infix syntax can be
+  used.
+</para>
 <para>
   Pattern synonym declarations can only occur in the top level of a
   module. In particular, they are not allowed as local
   definitions. Currently, they also don't work in GHCi, but that is a
   technical restriction that will be lifted in later versions.
 </para>
-<para>
-  The name of the pattern synonym itself is in the same namespace as
-  proper data constructors. Either prefix or infix syntax can be
-  used. In export/import specifications, you have to prefix pattern
-  names with the <literal>pattern</literal> keyword, e.g.:
-</para>
-<programlisting>
-  module Example (pattern Single) where
-  pattern Single x = [x]
-</programlisting>
-</listitem>
-
-<listitem> Scoping:
-
 <para>
   The variables in the left-hand side of the definition are bound by
   the pattern on the right-hand side. For bidirectional pattern
@@ -1022,10 +1010,35 @@ bidirectional. The syntax for unidirectional pattern synonyms is:
 <para>
   Pattern synonyms cannot be defined recursively.
 </para>
+</sect3>
 
-</listitem>
+<sect3 id="patsyn-impexp"> <title>Import and export of pattern synonyms</title>
 
-<listitem> Typing:
+<para>
+  The name of the pattern synonym itself is in the same namespace as
+  proper data constructors. In an export or import specification,
+  you must prefix pattern
+  names with the <literal>pattern</literal> keyword, e.g.:
+<programlisting>
+  module Example (pattern Single) where
+  pattern Single x = [x]
+</programlisting>
+Without the <literal>pattern</literal> prefix, <literal>Single</literal> would
+be interpreted as a type constructor in the export list.
+</para>
+<para>
+You may also use the <literal>pattern</literal> keyword in an import/export
+specification to import or export an ordinary data constructor.  For example:
+<programlisting>
+  import Data.Maybe( pattern Just )
+</programlisting>
+would bring into scope the data constructor <literal>Just</literal> from the
+<literal>Maybe</literal> type, without also bringing the type constructor
+<literal>Maybe</literal> into scope.
+</para>
+</sect3>
+
+<sect3> <title>Typing of pattern synonyms</title>
 
 <para>
   Given a pattern synonym definition of the form
@@ -1100,10 +1113,9 @@ pattern (Show b) => ExNumPat b :: (Num a, Eq a) => T a
 <programlisting>
   ExNumPat :: (Show b, Num a, Eq a) => b -> T t
 </programlisting>
+</sect3>
 
-</listitem>
-
-<listitem> Matching:
+<sect3><title>Matching of pattern synonyms</title>
 
 <para>
 A pattern synonym occurrence in a pattern is evaluated by first
@@ -1125,8 +1137,6 @@ f' _                                   = False
 <para>
   Note that the strictness of <literal>f</literal> differs from that
   of <literal>g</literal> defined below:
-</para>
-
 <programlisting>
 g [True, True] = True
 g _            = False
@@ -1136,9 +1146,8 @@ g _            = False
 *Main> g (False:undefined)
 False
 </programlisting>
-</listitem>
-</itemizedlist>
 </para>
+</sect3>
 
 </sect2>
 
@@ -2464,6 +2473,12 @@ disambiguate this case, thus:
 </programlisting>
 The extension <option>-XExplicitNamespaces</option>
 is implied by <option>-XTypeOperators</option> and (for some reason) by <option>-XTypeFamilies</option>.
+</para>
+<para>
+In addition, with <option>-XPatternSynonyms</option> you can prefix the name of
+a data constructor in an import or export list with the keyword <literal>pattern</literal>,
+to allow the import or export of a data constructor without its parent type constructor
+(see <xref linkend="patsyn-impexp"/>).
 </para>
 </sect2>
 
