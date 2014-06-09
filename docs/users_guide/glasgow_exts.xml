@@ -10912,8 +10912,8 @@ not be substituted, and the rule would not fire.
 
 </sect2>
 
-<sect2 id="conlike">
-<title>How rules interact with INLINE/NOINLINE and CONLIKE pragmas</title>
+<sect2 id="rules-inline">
+<title>How rules interact with INLINE/NOINLINE pragmas</title>
 
 <para>
 Ordinary inlining happens at the same time as rule rewriting, which may lead to unexpected
@@ -10939,7 +10939,14 @@ would have been a better chance that <literal>f</literal>'s RULE might fire.
 The way to get predictable behaviour is to use a NOINLINE
 pragma, or an INLINE[<replaceable>phase</replaceable>] pragma, on <literal>f</literal>, to ensure
 that it is not inlined until its RULEs have had a chance to fire.
+The warning flag <option>-fwarn-inline-rule-shadowing</option> (see <xref linkend="options-sanity"/>)
+warns about this situation.
 </para>
+</sect2>
+
+<sect2 id="conlike">
+<title>How rules interact with CONLIKE pragmas</title>
+
 <para>
 GHC is very cautious about duplicating work.  For example, consider
 <programlisting>

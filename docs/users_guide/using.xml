@@ -1866,6 +1866,16 @@ _  = rhs3        -- No warning: lone wild-card pattern
         </listitem>
       </varlistentry>
 
+      <varlistentry>
+        <term><option>-fwarn-inline-rule-shadowing</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-inline-rule-shadowing</option></primary></indexterm>
+          <para>Warn if a rewrite RULE might fail to fire because the function might be
+                inlined before the rule has a chance to fire.  See <xref linkend="rules-inline"/>.
+              </para>
+        </listitem>
+      </varlistentry>
+
     </variablelist>
 
     <para>If you're feeling really paranoid, the
