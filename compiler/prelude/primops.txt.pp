@@ -1363,19 +1363,79 @@ primop  SetByteArrayOp "setByteArray#" GenPrimOp
   code_size = { primOpCodeSizeForeignCall + 4 }
   can_fail = True
 
+-- Atomic operations
+
+primop  AtomicReadByteArrayOp_Int "atomicReadIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array and an offset in Int units, read an element. The
+    index is assumed to be in bounds. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop  AtomicWriteByteArrayOp_Int "atomicWriteIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   {Given an array and an offset in Int units, write an element. The
+    index is assumed to be in bounds. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
 primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #)
-   {Machine-level atomic compare and swap on a word within a ByteArray.}
-   with
-   out_of_line = True
-   has_side_effects = True
+   {Given an array, an offset in Int units, the expected old value, and
+    the new value, perform an atomic compare and swap i.e. write the new
+    value if the current value matches the provided old value. Returns
+    the value of the element before the operation. Implies a full memory
+    barrier.}
+   with has_side_effects = True
+        can_fail = True
 
 primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
-   {Machine-level word-sized fetch-and-add within a ByteArray.}
-   with
-   out_of_line = True
-   has_side_effects = True
+   {Given an array, and offset in Int units, and a value to add,
+    atomically add the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchSubByteArrayOp_Int "fetchSubIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to subtract,
+    atomically substract the value to the element. Returns the value of
+    the element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchAndByteArrayOp_Int "fetchAndIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to AND,
+    atomically AND the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchNandByteArrayOp_Int "fetchNandIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to NAND,
+    atomically NAND the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchOrByteArrayOp_Int "fetchOrIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to OR,
+    atomically OR the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchXorByteArrayOp_Int "fetchXorIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to XOR,
+    atomically XOR the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
 
 
 ------------------------------------------------------------------------
