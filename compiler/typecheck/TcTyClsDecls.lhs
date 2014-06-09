@@ -1620,7 +1620,7 @@ checkValidClass cls
                 -- since there is no possible ambiguity
         ; let grown_tyvars = growThetaTyVars theta (mkVarSet tyvars)
         ; checkTc (arity == 0 || tyVarsOfType tau `intersectsVarSet` grown_tyvars)
-                  (noClassTyVarErr cls sel_id)
+                  (noClassTyVarErr cls (ptext (sLit "class method") <+> quotes (ppr sel_id)))
 
         ; case dm of
             GenDefMeth dm_name -> do { dm_id <- tcLookupId dm_name
@@ -1643,8 +1643,12 @@ checkValidClass cls
                 -- type variable.  What a mess!
 
     check_at_defs (fam_tc, defs)
-      = tcAddDefaultAssocDeclCtxt (tyConName fam_tc) $
-        mapM_ (checkValidTyFamInst mb_clsinfo fam_tc) defs
+      = do { traceTc "check-at" (ppr fam_tc $$ ppr (tyConTyVars fam_tc) $$ ppr tyvars)
+           ; checkTc (any (`elem` tyvars) (tyConTyVars fam_tc)) 
+                     (noClassTyVarErr cls (ptext (sLit "associated type") <+> quotes (ppr fam_tc)))
+                     
+           ; tcAddDefaultAssocDeclCtxt (tyConName fam_tc) $
+             mapM_ (checkValidTyFamInst mb_clsinfo fam_tc) defs }
 
     mb_clsinfo = Just (cls, mkVarEnv [ (tv, mkTyVarTy tv) | tv <- tyvars ])
 
@@ -2067,11 +2071,11 @@ classFunDepsErr cls
   = vcat [ptext (sLit "Fundeps in class") <+> quotes (ppr cls),
           parens (ptext (sLit "Use FunctionalDependencies to allow fundeps"))]
 
-noClassTyVarErr :: Class -> Var -> SDoc
-noClassTyVarErr clas op
-  = sep [ptext (sLit "The class method") <+> quotes (ppr op),
+noClassTyVarErr :: Class -> SDoc -> SDoc
+noClassTyVarErr clas what
+  = sep [ptext (sLit "The") <+> what,
          ptext (sLit "mentions none of the type variables of the class") <+>
-                ppr clas <+> hsep (map ppr (classTyVars clas))]
+                quotes (ppr clas <+> hsep (map ppr (classTyVars clas)))]
 
 recSynErr :: [LTyClDecl Name] -> TcRn ()
 recSynErr syn_decls
