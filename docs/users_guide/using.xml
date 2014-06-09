@@ -1736,15 +1736,50 @@ f "2"    = 2
           <indexterm><primary>unused binds, warning</primary></indexterm>
           <indexterm><primary>binds, unused</primary></indexterm>
           <para>Report any function definitions (and local bindings)
-          which are unused.  For top-level functions, the warning is
-          only given if the binding is not exported.</para>
-          <para>A definition is regarded as "used" if (a) it is exported, or (b) it is
-            mentioned in the right hand side of another definition that is used, or (c) the
-            function it defines begins with an underscore.  The last case provides a
-            way to suppress unused-binding warnings selectively.  </para>
-          <para> Notice that a variable
-            is reported as unused even if it appears in the right-hand side of another
-            unused binding. </para>
+          which are unused.  More precisely:
+
+          <itemizedlist>
+          <listitem><para>Warn if a binding brings into scope a variable that is not used,
+          except if the variable's name starts with an underscore.  The "starts-with-underscore"
+          condition provides a way to selectively disable the warning.
+        </para>
+          <para>
+          A variable is regarded as "used" if 
+          <itemizedlist>
+          <listitem><para>It is exported, or</para></listitem>
+          <listitem><para>It appears in the right hand side of a binding that binds at 
+                           least one used variable that is used</para></listitem>
+          </itemizedlist>
+          For example
+            <programlisting>
+module A (f) where
+f = let (p,q) = rhs1 in t p  -- Warning about unused q
+t = rhs3                     -- No warning: f is used, and hence so is t
+g = h x                      -- Warning: g unused
+h = rhs2                     -- Warning: h is only used in the right-hand side of another unused binding
+_w = True                    -- No warning: _w starts with an underscore
+            </programlisting>
+          </para></listitem>
+
+          <listitem><para>
+          Warn if a pattern binding binds no variables at all, unless it is a lone, possibly-banged, wild-card pattern.
+          For example:
+            <programlisting>
+Just _ = rhs3    -- Warning: unused pattern binding
+(_, _) = rhs4    -- Warning: unused pattern binding
+_  = rhs3        -- No warning: lone wild-card pattern
+!_ = rhs4        -- No warning: banged wild-card pattern; behaves like seq
+            </programlisting>
+          The motivation for allowing lone wild-card patterns is they
+          are not very different from <literal>_v = rhs3</literal>,
+          which elicits no warning; and they can be useful to add a type
+          constraint, e.g. <literal>_ = x::Int</literal>. A lone
+          banged wild-card pattern is is useful as an alternative 
+          (to <literal>seq</literal>) way to force evaluation.
+        </para>
+        </listitem>
+          </itemizedlist>
+          </para>
         </listitem>
       </varlistentry>
 
