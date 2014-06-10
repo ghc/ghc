@@ -1464,8 +1464,8 @@ checkValidClosedCoAxiom (CoAxiom { co_ax_branches = branches, co_ax_tc = tc })
                -- ones and hence is inaccessible
      check_accessibility prev_branches cur_branch
        = do { when (cur_branch `isDominatedBy` prev_branches) $
-              setSrcSpan (coAxBranchSpan cur_branch) $
-              addErrTc $ inaccessibleCoAxBranch tc cur_branch
+              addWarnAt (coAxBranchSpan cur_branch) $
+              inaccessibleCoAxBranch tc cur_branch
             ; return (cur_branch : prev_branches) }
 
 checkFieldCompat :: Name -> DataCon -> DataCon -> TyVarSet
@@ -2161,7 +2161,7 @@ wrongNamesInInstGroup first cur
 
 inaccessibleCoAxBranch :: TyCon -> CoAxBranch -> SDoc
 inaccessibleCoAxBranch tc fi
-  = ptext (sLit "Inaccessible family instance equation:") $$
+  = ptext (sLit "Overlapped type family instance equation:") $$
       (pprCoAxBranch tc fi)
 
 badRoleAnnot :: Name -> Role -> Role -> SDoc
