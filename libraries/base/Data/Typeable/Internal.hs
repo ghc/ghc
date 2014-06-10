@@ -50,6 +50,7 @@ module Data.Typeable.Internal (
 import GHC.Base
 import GHC.Word
 import GHC.Show
+import GHC.Read ( Read )
 import Data.Maybe
 import Data.Proxy
 import GHC.Num
@@ -57,13 +58,20 @@ import GHC.Real
 -- import GHC.IORef
 -- import GHC.IOArray
 -- import GHC.MVar
-import GHC.ST           ( ST )
+import GHC.ST           ( ST, STret )
 import GHC.STRef        ( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
 -- import GHC.Stable
-import GHC.Arr          ( Array, STArray )
+import GHC.Arr          ( Array, STArray, Ix )
 import Data.Type.Coercion
 import Data.Type.Equality
+import Text.ParserCombinators.ReadP ( ReadP )
+import Text.Read.Lex ( Lexeme, Number )
+import Text.ParserCombinators.ReadPrec ( ReadPrec )
+import GHC.Float ( FFFormat, RealFloat, Floating )
+import Data.Bits ( Bits, FiniteBits )
+import GHC.Enum ( Bounded, Enum )
+import Control.Monad ( MonadPlus )
 -- import Data.Int
 
 import GHC.Fingerprint.Type
@@ -316,6 +324,7 @@ deriving instance Typeable IO
 deriving instance Typeable Array
 
 deriving instance Typeable ST
+deriving instance Typeable STret
 deriving instance Typeable STRef
 deriving instance Typeable STArray
 
@@ -351,8 +360,54 @@ deriving instance Typeable Word64
 
 deriving instance Typeable TyCon
 deriving instance Typeable TypeRep
+deriving instance Typeable Fingerprint
 
 deriving instance Typeable RealWorld
 deriving instance Typeable Proxy
+deriving instance Typeable KProxy
 deriving instance Typeable (:~:)
 deriving instance Typeable Coercion
+
+deriving instance Typeable ReadP
+deriving instance Typeable Lexeme
+deriving instance Typeable Number
+deriving instance Typeable ReadPrec
+
+deriving instance Typeable FFFormat
+
+-------------------------------------------------------
+--
+-- Generate Typeable instances for standard classes
+--
+-------------------------------------------------------
+
+deriving instance Typeable (~)
+deriving instance Typeable Coercible
+deriving instance Typeable TestEquality
+deriving instance Typeable TestCoercion
+
+deriving instance Typeable Eq
+deriving instance Typeable Ord
+
+deriving instance Typeable Bits
+deriving instance Typeable FiniteBits
+deriving instance Typeable Num
+deriving instance Typeable Real
+deriving instance Typeable Integral
+deriving instance Typeable Fractional
+deriving instance Typeable RealFrac
+deriving instance Typeable Floating
+deriving instance Typeable RealFloat
+
+deriving instance Typeable Bounded
+deriving instance Typeable Enum
+deriving instance Typeable Ix
+
+deriving instance Typeable Show
+deriving instance Typeable Read
+
+deriving instance Typeable Functor
+deriving instance Typeable Monad
+deriving instance Typeable MonadPlus
+
+deriving instance Typeable Typeable
