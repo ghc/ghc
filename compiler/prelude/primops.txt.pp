@@ -2437,7 +2437,7 @@ pseudoop   "seq"
    { Evaluates its first argument to head normal form, and then returns its second
 	argument as the result. }
 
-primtype Any k
+primtype Any
 	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
 	lifted type, and back.
 
@@ -2462,8 +2462,11 @@ primtype Any k
 
 	{\tt length (Any *) ([] (Any *))}
 
-        Note that {\tt Any} is kind polymorphic, and takes a kind {\tt k} as its
-        first argument. The kind of {\tt Any} is thus {\tt forall k. k -> k}.}
+        Above, we print kinds explicitly, as if with
+        {\tt -fprint-explicit-kinds}.
+
+        Note that {\tt Any} is kind polymorphic; its kind is thus
+        {\tt forall k. k}.}
 
 primtype AnyK
         { The kind {\tt AnyK} is the kind level counterpart to {\tt Any}. In a

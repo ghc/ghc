@@ -701,7 +701,7 @@ threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName PtrRep
 
 Note [Any types]
 ~~~~~~~~~~~~~~~~
-The type constructor Any of kind forall k. k -> k has these properties:
+The type constructor Any of kind forall k. k has these properties:
 
   * It is defined in module GHC.Prim, and exported so that it is 
     available to users.  For this reason it's treated like any other 
@@ -714,7 +714,7 @@ The type constructor Any of kind forall k. k -> k has these properties:
              g :: ty ~ (Fst ty, Snd ty)
     If Any was a *data* type, then we'd get inconsistency because 'ty'
     could be (Any '(k1,k2)) and then we'd have an equality with Any on
-    one side and '(,) on the other
+    one side and '(,) on the other. See also #9097.
 
   * It is lifted, and hence represented by a pointer
 
@@ -771,20 +771,12 @@ anyTy :: Type
 anyTy = mkTyConTy anyTyCon
 
 anyTyCon :: TyCon
-anyTyCon = mkLiftedPrimTyCon anyTyConName kind [Nominal] PtrRep
-  where kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
-
-{-   Can't do this yet without messing up kind proxies
--- RAE: I think you can now.
-anyTyCon :: TyCon
-anyTyCon = mkSynTyCon anyTyConName kind [kKiVar] 
+anyTyCon = mkSynTyCon anyTyConName kind [kKiVar] [Nominal]
                       syn_rhs
                       NoParentTyCon
   where 
     kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
-    syn_rhs = SynFamilyTyCon { synf_open = False, synf_injective = True }
-                  -- NB Closed, injective
--}
+    syn_rhs = AbstractClosedSynFamilyTyCon
 
 anyTypeOfKind :: Kind -> Type
 anyTypeOfKind kind = TyConApp anyTyCon [kind]
