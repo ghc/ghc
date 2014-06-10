@@ -82,7 +82,7 @@ See #7730, #8776 for details   -}
 -- | Pretty-prints a 'FamInst' (type/data family instance) with its defining location.
 pprFamInst :: FamInst -> SDoc
 --  * For data instances we go via pprTyThing of the represntational TyCon,
---    becuase there is already much cleverness associated with printing
+--    because there is already much cleverness associated with printing
 --    data type declarations that I don't want to duplicate
 --  * For type instances we print directly here; there is no TyCon
 --    to give to pprTyThing

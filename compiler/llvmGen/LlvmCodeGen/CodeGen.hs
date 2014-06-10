@@ -804,7 +804,7 @@ genSwitch cond maybe_ids = do
 
     let pairs = [ (ix, id) | (ix,Just id) <- zip [0..] maybe_ids ]
     let labels = map (\(ix, b) -> (mkIntLit ty ix, blockIdToLlvm b)) pairs
-    -- out of range is undefied, so lets just branch to first label
+    -- out of range is undefined, so let's just branch to first label
     let (_, defLbl) = head labels
 
     let s1 = Switch vc defLbl labels

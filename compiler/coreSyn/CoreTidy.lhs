@@ -256,11 +256,11 @@ Consider
                   False -> 2#
        in ...)
 
-The z# binding is ok becuase the RHS is ok-for-speculation,
+The z# binding is ok because the RHS is ok-for-speculation,
 but Lint will complain unless it can *see* that.  So we
 preserve the evaluated-ness on 'y' in tidyBndr.
 
-(Another alterantive would be to tidy unboxed lets into cases,
+(Another alternative would be to tidy unboxed lets into cases,
 but that seems more indirect and surprising.)
 
 

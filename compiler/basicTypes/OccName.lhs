@@ -128,7 +128,7 @@ import Data.Data
 %*									*
 %************************************************************************
 
-FastStringEnv can't be in FastString becuase the env depends on UniqFM
+FastStringEnv can't be in FastString because the env depends on UniqFM
 
 \begin{code}
 type FastStringEnv a = UniqFM a         -- Keyed by FastString
