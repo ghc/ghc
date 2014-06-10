@@ -1,6 +1,7 @@
 TYPE SIGNATURES
 TYPE CONSTRUCTORS
   data T1 a = K1 (IO a)
+  type role T2 phantom
   data T2 a = K2 (FunPtr a)
 COERCION AXIOMS
 Dependent modules: []

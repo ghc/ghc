@@ -94,6 +94,20 @@ parameters.
 Similarly, we don't need to look in AppTy's, because nothing headed by
 an AppTy will be marshalable.
 
+Note [FFI type roles]
+~~~~~~~~~~~~~~~~~~~~~
+The 'go' helper function within normaliseFfiType' always produces
+representational coercions. But, in the "children_only" case, we need to
+use these coercions in a TyConAppCo. Accordingly, the roles on the coercions
+must be twiddled to match the expectation of the enclosing TyCon. However,
+we cannot easily go from an R coercion to an N one, so we forbid N roles
+on FFI type constructors. Currently, only two such type constructors exist:
+IO and FunPtr. Thus, this is not an onerous burden.
+
+If we ever want to lift this restriction, we would need to make 'go' take
+the target role as a parameter. This wouldn't be hard, but it's a complication
+not yet necessary and so is not yet implemented.
+
 \begin{code}
 -- normaliseFfiType takes the type from an FFI declaration, and
 -- evaluates any type synonyms, type functions, and newtypes. However,
@@ -116,7 +130,8 @@ normaliseFfiType' env ty0 = go initRecTc ty0
         -- We don't want to look through the IO newtype, even if it is
         -- in scope, so we have a special case for it:
         | tc_key `elem` [ioTyConKey, funPtrTyConKey]
-                  -- Those *must* have R roles on their parameters!
+                  -- These *must not* have nominal roles on their parameters!
+                  -- See Note [FFI type roles]
         = children_only
 
         | isNewTyCon tc         -- Expand newtypes
@@ -143,10 +158,14 @@ normaliseFfiType' env ty0 = go initRecTc ty0
         = nothing -- see Note [Don't recur in normaliseFfiType']
         where
           tc_key = getUnique tc
-          children_only 
+          children_only
             = do xs <- mapM (go rec_nts) tys
                  let (cos, tys', gres) = unzip3 xs
-                 return ( mkTyConAppCo Representational tc cos
+                        -- the (repeat Representational) is because 'go' always
+                        -- returns R coercions
+                     cos' = zipWith3 downgradeRole (tyConRoles tc)
+                                     (repeat Representational) cos
+                 return ( mkTyConAppCo Representational tc cos'
                         , mkTyConApp tc tys', unionManyBags gres)
           nt_co  = mkUnbranchedAxInstCo Representational (newTyConCo tc) tys
           nt_rhs = newTyConInstRhs tc tys
