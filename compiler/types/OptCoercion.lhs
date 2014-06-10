@@ -88,8 +88,8 @@ opt_co env sym co
  = pprTrace "opt_co {" (ppr sym <+> ppr co $$ ppr env) $
    co1 `seq`
    pprTrace "opt_co done }" (ppr co1) $
-   (WARN( not same_co_kind, ppr co  <+> dcolon <+> pprEqPred (Pair s1 t1)
-                         $$ ppr co1 <+> dcolon <+> pprEqPred (Pair s2 t2) )
+   (WARN( not same_co_kind, ppr co  <+> dcolon <+> ppr (coercionType co)
+                         $$ ppr co1 <+> dcolon <+> ppr (coercionType co1) )
     WARN( not (coreEqCoercion co1 simple_result),
            (text "env=" <+> ppr env) $$
            (text "input=" <+> ppr co) $$

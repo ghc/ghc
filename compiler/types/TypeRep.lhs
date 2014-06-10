@@ -39,7 +39,7 @@ module TypeRep (
         -- Pretty-printing
 	pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
 	pprTyThing, pprTyThingCategory, pprSigmaType,
-	pprEqPred, pprTheta, pprForAll, pprUserForAll,
+	pprTheta, pprForAll, pprUserForAll,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit, suppressKinds,
 	TyPrec(..), maybeParen, pprTcApp, 
@@ -82,7 +82,6 @@ import CoAxiom
 import PrelNames
 import Outputable
 import FastString
-import Pair
 import Util
 import DynFlags
 
@@ -514,18 +513,6 @@ pprTyLit = ppr_tylit TopPrec
 pprKind, pprParendKind :: Kind -> SDoc
 pprKind       = pprType
 pprParendKind = pprParendType
-
-------------------
-pprEqPred :: Pair Type -> SDoc
--- NB: Maybe move to Coercion? It's only called after coercionKind anyway. 
-pprEqPred (Pair ty1 ty2) 
-  = sep [ ppr_type FunPrec ty1
-        , nest 2 (ptext (sLit "~#"))
-        , ppr_type FunPrec ty2]
-    -- Precedence looks like (->) so that we get
-    --    Maybe a ~ Bool
-    --    (a->a) ~ Bool
-    -- Note parens on the latter!
 
 ------------
 pprClassPred :: Class -> [Type] -> SDoc

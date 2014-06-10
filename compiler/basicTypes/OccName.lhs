@@ -898,9 +898,12 @@ isLexConSym cs				-- Infix type or data constructors
   | otherwise	       = startsConSym (headFS cs)
 
 isLexVarSym fs				-- Infix identifiers e.g. "+"
+  | fs == (fsLit "~R#") = True
+  | otherwise
   = case (if nullFS fs then [] else unpackFS fs) of
       [] -> False
       (c:cs) -> startsVarSym c && all isVarSymChar cs
+        -- See Note [Classification of generated names]
 
 -------------
 startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool
