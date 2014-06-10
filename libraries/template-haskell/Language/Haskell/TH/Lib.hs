@@ -526,14 +526,14 @@ sigT t k
 equalityT :: TypeQ
 equalityT = return EqualityT
 
-{-# DEPRECATED classP "Constraint constructors are just type constructors, frob this code as 'constraintT'." #-}
+{-# DEPRECATED classP "As of template-haskell-2.10, constraint predicates (Pred) are just types (Type), in keeping with ConstraintKinds. Please use 'conT' and 'appT'." #-}
 classP :: Name -> [Q Type] -> Q Pred
 classP cla tys
   = do
       tysl <- sequence tys
       return (foldl AppT (ConT cla) tysl)
 
-{-# DEPRECATED equalP "Constraint constructors are just type constructors, frob this code as 'equalT'." #-}
+{-# DEPRECATED equalP "As of template-haskell-2.10, constraint predicates (Pred) are just types (Type), in keeping with ConstraintKinds. Please see 'equalityT'." #-}
 equalP :: TypeQ -> TypeQ -> PredQ
 equalP tleft tright
   = do
