@@ -2074,7 +2074,7 @@ classFunDepsErr cls
 noClassTyVarErr :: Class -> SDoc -> SDoc
 noClassTyVarErr clas what
   = sep [ptext (sLit "The") <+> what,
-         ptext (sLit "mentions none of the type variables of the class") <+>
+         ptext (sLit "mentions none of the type or kind variables of the class") <+>
                 quotes (ppr clas <+> hsep (map ppr (classTyVars clas)))]
 
 recSynErr :: [LTyClDecl Name] -> TcRn ()
