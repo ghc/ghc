@@ -122,4 +122,4 @@ test('T8518', normal, compile_fail, [''])
 test('T9036', normal, compile_fail, [''])
 test('T9167', normal, compile_fail, [''])
 test('T9171', normal, compile_fail, [''])
-
+test('T9097', normal, compile_fail, [''])
