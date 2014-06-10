@@ -9,6 +9,6 @@ T1897b.hs:16:1:
     The type variable ‘a0’ is ambiguous
     Expected type: [Depend a] -> Bool
       Actual type: [Depend a0] -> Bool
-    When checking that ‘isValid’
-      has the inferred type ‘forall a. Bug a => [Depend a] -> Bool’
+    When checking that ‘isValid’ has the inferred type
+      isValid :: forall a. Bug a => [Depend a] -> Bool
     Probable cause: the inferred type is ambiguous

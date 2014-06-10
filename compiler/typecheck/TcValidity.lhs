@@ -69,6 +69,9 @@ checkAmbiguity ctxt ty
                         -- Then :k T should work in GHCi, not complain that
                         -- (T k) is ambiguous!
 
+  | InfSigCtxt {} <- ctxt  -- See Note [Validity of inferred types] in TcBinds
+  = return () 
+
   | otherwise
   = do { traceTc "Ambiguity check for" (ppr ty)
        ; (subst, _tvs) <- tcInstSkolTyVars (varSetElems (tyVarsOfType ty))

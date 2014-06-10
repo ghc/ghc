@@ -5,9 +5,8 @@ T9171.hs:10:1:
     NB: ‘GetParam’ is a type function, and may not be injective
     The kind variable ‘k0’ is ambiguous
     Use -fprint-explicit-kinds to see the kind arguments
-    When checking that ‘foo’
-      has the inferred type ‘forall (k :: BOX).
-                             GetParam Base (GetParam Base Int)’
+    When checking that ‘foo’ has the inferred type
+      foo :: forall (k :: BOX). GetParam Base (GetParam Base Int)
     Probable cause: the inferred type is ambiguous
 
 T9171.hs:10:20:

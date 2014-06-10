@@ -6,6 +6,6 @@ T1897a.hs:9:1:
       bound by the inferred type for ‘foo’: Wob a b => b -> [b]
       at T1897a.hs:9:1-24
     The type variable ‘a0’ is ambiguous
-    When checking that ‘foo’
-      has the inferred type ‘forall a b. Wob a b => b -> [b]’
+    When checking that ‘foo’ has the inferred type
+      foo :: forall a b. Wob a b => b -> [b]
     Probable cause: the inferred type is ambiguous

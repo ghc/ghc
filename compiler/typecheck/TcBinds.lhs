@@ -39,6 +39,7 @@ import TysPrim
 import Id
 import Var
 import VarSet
+import VarEnv( TidyEnv )
 import Module
 import Name
 import NameSet
@@ -56,7 +57,7 @@ import FastString
 import Type(mkStrLitTy)
 import Class(classTyCon)
 import PrelNames(ipClassName)
-import TcValidity (checkValidTheta)
+import TcValidity (checkValidType)
 
 import Control.Monad
 
@@ -561,16 +562,11 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono closed bind_list
 
        ; let name_taus = [(name, idType mono_id) | (name, _, mono_id) <- mono_infos]
        ; traceTc "simplifyInfer call" (ppr name_taus $$ ppr wanted)
-       ; (qtvs, givens, mr_bites, ev_binds) <- 
-                          simplifyInfer closed mono name_taus wanted
+       ; (qtvs, givens, mr_bites, ev_binds)
+                 <- simplifyInfer closed mono name_taus wanted
 
-       ; theta <- zonkTcThetaType (map evVarPred givens)
-       -- We need to check inferred theta for validity. The reason is that we
-       -- might have inferred theta that requires language extension that is
-       -- not turned on. See #8883. Example can be found in the T8883 testcase.
-       ; checkValidTheta (InfSigCtxt (fst . head $ name_taus)) theta
+       ; theta   <- zonkTcThetaType (map evVarPred givens)
        ; exports <- checkNoErrs $ mapM (mkExport prag_fn qtvs theta) mono_infos
-
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
              final_closed | closed && not mr_bites = TopLevel
@@ -605,20 +601,12 @@ mkExport :: PragFun
 
 mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
   = do  { mono_ty <- zonkTcType (idType mono_id)
-        ; let poly_id  = case mb_sig of
-                           Nothing  -> mkLocalId poly_name inferred_poly_ty
-                           Just sig -> sig_id sig
-                -- poly_id has a zonked type
 
-              -- In the inference case (no signature) this stuff figures out
-              -- the right type variables and theta to quantify over
-              -- See Note [Impedence matching]
-              my_tvs2 = closeOverKinds (growThetaTyVars theta (tyVarsOfType mono_ty))
-                            -- Include kind variables!  Trac #7916
-              my_tvs   = filter (`elemVarSet` my_tvs2) qtvs   -- Maintain original order
-              my_theta = filter (quantifyPred my_tvs2) theta
-              inferred_poly_ty = mkSigmaTy my_tvs my_theta mono_ty
+        ; poly_id <- case mb_sig of
+                       Just sig -> return (sig_id sig)
+                       Nothing  -> mkInferredPolyId poly_name qtvs theta mono_ty
 
+        -- NB: poly_id has a zonked type
         ; poly_id <- addInlinePrags poly_id prag_sigs
         ; spec_prags <- tcSpecPrags poly_id prag_sigs
                 -- tcPrags requires a zonked poly_id
@@ -634,7 +622,7 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
         -- closed (unless we are doing NoMonoLocalBinds in which case all bets
         -- are off)
         -- See Note [Impedence matching]
-        ; (wrap, wanted) <- addErrCtxtM (mk_msg poly_id) $
+        ; (wrap, wanted) <- addErrCtxtM (mk_bind_msg inferred True poly_name (idType poly_id)) $
                             captureConstraints $
                             tcSubType origin sig_ctxt sel_poly_ty (idType poly_id)
         ; ev_binds <- simplifyTop wanted
@@ -645,23 +633,57 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
                       , abe_prags = SpecPrags spec_prags }) }
   where
     inferred = isNothing mb_sig
-
-    mk_msg poly_id tidy_env
-      = return (tidy_env', msg)
-      where
-        msg | inferred  = hang (ptext (sLit "When checking that") <+> pp_name)
-                             2 (ptext (sLit "has the inferred type") <+> pp_ty)
-                          $$ ptext (sLit "Probable cause: the inferred type is ambiguous")
-            | otherwise = hang (ptext (sLit "When checking that") <+> pp_name)
-                             2 (ptext (sLit "has the specified type") <+> pp_ty)
-        pp_name = quotes (ppr poly_name)
-        pp_ty   = quotes (ppr tidy_ty)
-        (tidy_env', tidy_ty) = tidyOpenType tidy_env (idType poly_id)
-
     prag_sigs = prag_fn poly_name
     origin    = AmbigOrigin sig_ctxt
     sig_ctxt  = InfSigCtxt poly_name
+
+mkInferredPolyId :: Name -> [TyVar] -> TcThetaType -> TcType -> TcM Id
+-- In the inference case (no signature) this stuff figures out
+-- the right type variables and theta to quantify over
+-- See Note [Validity of inferred types]
+mkInferredPolyId poly_name qtvs theta mono_ty
+  = addErrCtxtM (mk_bind_msg True False poly_name inferred_poly_ty) $
+    do { checkValidType (InfSigCtxt poly_name) inferred_poly_ty
+       ; return (mkLocalId poly_name inferred_poly_ty) }
+  where
+    my_tvs2 = closeOverKinds (growThetaTyVars theta (tyVarsOfType mono_ty))
+                  -- Include kind variables!  Trac #7916
+    my_tvs   = filter (`elemVarSet` my_tvs2) qtvs   -- Maintain original order
+    my_theta = filter (quantifyPred my_tvs2) theta
+    inferred_poly_ty = mkSigmaTy my_tvs my_theta mono_ty
+
+mk_bind_msg :: Bool -> Bool -> Name -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+mk_bind_msg inferred want_ambig poly_name poly_ty tidy_env
+ = return (tidy_env', msg)
+ where
+   msg = vcat [ ptext (sLit "When checking that") <+> quotes (ppr poly_name)
+                <+> ptext (sLit "has the") <+> what <+> ptext (sLit "type")
+              , nest 2 (ppr poly_name <+> dcolon <+> ppr tidy_ty)
+              , ppWhen want_ambig $
+                ptext (sLit "Probable cause: the inferred type is ambiguous") ]
+   what | inferred  = ptext (sLit "inferred")
+        | otherwise = ptext (sLit "specified")
+   (tidy_env', tidy_ty) = tidyOpenType tidy_env poly_ty
 \end{code}
+
+Note [Validity of inferred types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to check inferred type for validity, in case it uses language 
+extensions that are not turned on.  The principle is that if the user
+simply adds the inferred type to the program source, it'll compile fine.
+See #8883.
+
+Examples that might fail:
+ - an inferred theta that requires type equalities e.g. (F a ~ G b)
+                                or multi-parameter type classes
+ - an inferred type that includes unboxed tuples
+
+However we don't do the ambiguity check (checkValidType omits it for
+InfSigCtxt) because the impedence-matching stage, which follows 
+immediately, will do it and we don't want two error messages.
+Moreover, because of the impedence matching stage, the ambiguity-check
+suggestion of -XAllowAmbiguiousTypes will not work.
+
 
 Note [Impedence matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
