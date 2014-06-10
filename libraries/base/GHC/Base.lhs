@@ -406,7 +406,7 @@ mapFB c f = \x ys -> c (f x) ys
 --
 --   http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf
 
-{-# RULES [1] "map/coerce" map coerce = coerce #-}
+{-# RULES "map/coerce" [1] map coerce = coerce #-}
 
 \end{code}
 
