@@ -880,9 +880,9 @@ instOrphWarn dflags unqual inst
   = mkWarnMsg dflags (getSrcSpan inst) unqual $
     hang (ptext (sLit "Orphan instance:")) 2 (pprInstanceHdr inst)
     $$ text "To avoid this"
-    $$ nest 4 (vcat posibilities)
+    $$ nest 4 (vcat possibilities)
   where
-    posibilities =
+    possibilities =
       text "move the instance declaration to the module of the class or of the type, or" :
       text "wrap the type with a newtype and declare the instance on the new type." :
       []
