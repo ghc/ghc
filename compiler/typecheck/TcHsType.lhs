@@ -54,6 +54,7 @@ import TcType
 import Type
 import TypeRep( Type(..) )  -- For the mkNakedXXX stuff
 import Kind
+import RdrName( lookupLocalRdrOcc )
 import Var
 import VarSet
 import TyCon
@@ -73,6 +74,7 @@ import Outputable
 import FastString
 import Util
 
+import Data.Maybe( isNothing )
 import Control.Monad ( unless, when, zipWithM )
 import PrelNames( ipClassName, funTyConKey )
 \end{code}
@@ -1318,20 +1320,22 @@ tcDataKindSig kind
   = do	{ checkTc (isLiftedTypeKind res_kind) (badKindSig kind)
 	; span <- getSrcSpanM
 	; us   <- newUniqueSupply 
+        ; rdr_env <- getLocalRdrEnv
 	; let uniqs = uniqsFromSupply us
-	; return [ mk_tv span uniq str kind 
-		 | ((kind, str), uniq) <- arg_kinds `zip` dnames `zip` uniqs ] }
+              occs  = [ occ | str <- strs
+                            , let occ = mkOccName tvName str
+                            , isNothing (lookupLocalRdrOcc rdr_env occ) ]
+                 -- Note [Avoid name clashes for associated data types]
+
+	; return [ mk_tv span uniq occ kind 
+		 | ((kind, occ), uniq) <- arg_kinds `zip` occs `zip` uniqs ] }
   where
     (arg_kinds, res_kind) = splitKindFunTys kind
-    mk_tv loc uniq str kind = mkTyVar name kind
-	where
-	   name = mkInternalName uniq occ loc
-	   occ  = mkOccName tvName str
+    mk_tv loc uniq occ kind 
+      = mkTyVar (mkInternalName uniq occ loc) kind
 	  
-    dnames = map ('$' :) names	-- Note [Avoid name clashes for associated data types]
-
-    names :: [String]
-    names = [ c:cs | cs <- "" : names, c <- ['a'..'z'] ] 
+    strs :: [String]
+    strs = [ c:cs | cs <- "" : strs, c <- ['a'..'z'] ] 
 
 badKindSig :: Kind -> SDoc
 badKindSig kind 
@@ -1343,19 +1347,17 @@ Note [Avoid name clashes for associated data types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider    class C a b where
                data D b :: * -> *
-When typechecking the decl for D, we'll invent an extra type variable for D,
-to fill out its kind.  We *don't* want this type variable to be 'a', because
-in an .hi file we'd get
+When typechecking the decl for D, we'll invent an extra type variable
+for D, to fill out its kind.  Ideally we don't want this type variable
+to be 'a', because when pretty printing we'll get
             class C a b where
-               data D b a 
-which makes it look as if there are *two* type indices.  But there aren't!
-So we use $a instead, which cannot clash with a user-written type variable.
-Remember that type variable binders in interface files are just FastStrings,
-not proper Names.
+               data D b a0 
+(NB: the tidying happens in the conversion to IfaceSyn, which happens
+as part of pretty-printing a TyThing.)
 
-(The tidying phase can't help here because we don't tidy TyCons.  Another
-alternative would be to record the number of indexing parameters in the 
-interface file.)
+That's why we look in the LocalRdrEnv to see what's in scope. This is
+important only to get nice-looking output when doing ":info C" in GHCi.
+It isn't essential for correctness.
 
 
 %************************************************************************
