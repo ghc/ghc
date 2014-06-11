@@ -16,7 +16,6 @@ my $verbose = 2;
 my $try_to_resume = 0;
 my $ignore_failure = 0;
 my $checked_out_flag = 0; # NOT the opposite of bare_flag (describes remote repo state)
-my $get_mode;
 my $bare_flag = ""; # NOT the opposite of checked_out_flag (describes local repo state)
 
 my %tags;
@@ -159,11 +158,11 @@ sub readgit {
 sub configure_repository {
     my $localpath = shift;
 
-    &git($localpath, "config", "--local", "core.ignorecase", "true");
+    &git($localpath, "config", "core.ignorecase", "true");
 
     my $autocrlf = &readgitline($localpath, 'config', '--get', 'core.autocrlf');
     if ($autocrlf eq "true") {
-        &git($localpath, "config", "--local", "core.autocrlf", "false");
+        &git($localpath, "config", "core.autocrlf", "false");
         &git($localpath, "reset", "--hard");
     }
 }
@@ -182,14 +181,14 @@ sub getrepo {
         my $branch = &readgitline($git_dir, "rev-parse", "--abbrev-ref", "HEAD");
         die "Bad branch: $branch"
             unless $branch =~ m!^[a-zA-Z][a-zA-Z0-9./-]*$!;
-        my $remote = &readgitline($git_dir, "config", "branch.$branch.remote");
+        my $remote = &readgitline($git_dir, "config", "--get", "branch.$branch.remote");
         if ($remote eq "") {
             # remotes are not mandatory for branches (e.g. not recorded by default for bare repos)
             $remote = "origin";
         }
         die "Bad remote: $remote"
             unless $remote =~ m!^[a-zA-Z][a-zA-Z0-9./-]*$!;
-        $repo = &readgitline($git_dir, "config", "remote.$remote.url");
+        $repo = &readgitline($git_dir, "config", "--get", "remote.$remote.url");
     }
 
     my $repo_base;
@@ -204,11 +203,7 @@ sub getrepo {
 
         # --checked-out is needed if you want to use a checked-out repo
         # over SSH or HTTP
-        if ($checked_out_flag) {
-            $checked_out_tree = 1;
-        } else {
-            $checked_out_tree = 0;
-        }
+        $checked_out_tree = $checked_out_flag;
 
         # Don't drop the last part of the path if specified with -r, as
         # it expects repos of the form:
@@ -604,9 +599,7 @@ sub gitInitSubmodules {
 }
 
 sub checkCurrentBranchIsMaster {
-    my $branch = `git symbolic-ref HEAD`;
-    $branch =~ s/refs\/heads\///;
-    $branch =~ s/\n//;
+    my $branch = &readgitline(".", "rev-parse", "--abbrev-ref", "HEAD");
 
     if ($branch !~ /master/) {
         print "\nWarning: You are trying to 'pull' while on branch '$branch'.\n"
@@ -621,8 +614,7 @@ sub help
 
         my $tags = join ' ', sort (grep !/^-$/, keys %tags);
 
-        # Get the built in help
-        my $help = <<END;
+        print <<END;
 Usage:
 
 ./sync-all [-q] [-s] [--ignore-failure] [-r repo] [--checked-out] [--bare]
@@ -790,30 +782,9 @@ sync-all *ignores* the defaultrepo of all repos other than the root one. So the
 remote repos must be laid out in one of the two formats given by <local-path>
 and <remote-path> in the file 'packages'.
 
-Available package-tags are:
+Available package-tags are: $tags
+
 END
-
-        # Collect all the tags in the packages file
-        my %available_tags;
-        open IN, "< packages.conf"
-            or open IN, "< packages" # clashes with packages directory when using --bare
-            or die "Can't open packages file (or packages.conf)";
-        while (<IN>) {
-            chomp;
-            if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)/) {
-                if (defined($2) && $2 ne "-") {
-                    $available_tags{$2} = 1;
-                }
-            }
-            elsif (! /^(#.*)?$/) {
-                die "Bad line: $_";
-            }
-        }
-        close IN;
-
-        # Show those tags and the help text
-        my @available_tags = keys %available_tags;
-        print "$help@available_tags\n\n";
         exit $exit;
 }
 
@@ -845,9 +816,6 @@ sub main {
         }
         elsif ($arg eq "--ignore-failure") {
             $ignore_failure = 1;
-        }
-        elsif ($arg eq "--complete" || $arg eq "--partial") {
-            $get_mode = $arg;
         }
         # Use --checked-out if the _remote_ repos are a checked-out tree,
         # rather than the master trees.
