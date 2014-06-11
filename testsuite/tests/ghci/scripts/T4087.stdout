@@ -1,4 +1,4 @@
 type role Equal nominal nominal
 data Equal a b where
-  Equal :: Equal a1 a1
+  Equal :: Equal b b
   	-- Defined at T4087.hs:5:1

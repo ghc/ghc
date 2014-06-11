@@ -1534,7 +1534,7 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
  = IfaceAxiom { ifName       = name
               , ifTyCon      = toIfaceTyCon tycon
               , ifRole       = role
-              , ifAxBranches = brListMap (coAxBranchToIfaceBranch
+              , ifAxBranches = brListMap (coAxBranchToIfaceBranch tycon
                                             (brListMap coAxBranchLHS branches))
                                          branches }
  where
@@ -1543,10 +1543,10 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
 -- 2nd parameter is the list of branch LHSs, for conversion from incompatible branches
 -- to incompatible indices
 -- See Note [Storing compatibility] in CoAxiom
-coAxBranchToIfaceBranch :: [[Type]] -> CoAxBranch -> IfaceAxBranch
-coAxBranchToIfaceBranch lhs_s
+coAxBranchToIfaceBranch :: TyCon -> [[Type]] -> CoAxBranch -> IfaceAxBranch
+coAxBranchToIfaceBranch tc lhs_s
                         branch@(CoAxBranch { cab_incomps = incomps })
-  = (coAxBranchToIfaceBranch' branch) { ifaxbIncomps = iface_incomps }
+  = (coAxBranchToIfaceBranch' tc branch) { ifaxbIncomps = iface_incomps }
   where
     iface_incomps = map (expectJust "iface_incomps"
                         . (flip findIndex lhs_s
@@ -1554,11 +1554,11 @@ coAxBranchToIfaceBranch lhs_s
                         . coAxBranchLHS) incomps
 
 -- use this one for standalone branches without incompatibles
-coAxBranchToIfaceBranch' :: CoAxBranch -> IfaceAxBranch
-coAxBranchToIfaceBranch' (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs
-                                     , cab_roles = roles, cab_rhs = rhs })
+coAxBranchToIfaceBranch' :: TyCon -> CoAxBranch -> IfaceAxBranch
+coAxBranchToIfaceBranch' tc (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs
+                                        , cab_roles = roles, cab_rhs = rhs })
   = IfaceAxBranch { ifaxbTyVars = toIfaceTvBndrs tv_bndrs
-                  , ifaxbLHS    = tidyToIfaceTcArgs env1 lhs
+                  , ifaxbLHS    = tidyToIfaceTcArgs env1 tc lhs
                   , ifaxbRoles  = roles
                   , ifaxbRHS    = tidyToIfaceType env1 rhs
                   , ifaxbIncomps = [] }
@@ -1577,17 +1577,17 @@ tyConToIfaceDecl env tycon
 
   | Just syn_rhs <- synTyConRhs_maybe tycon
   = IfaceSyn {  ifName    = getOccName tycon,
-                ifTyVars  = toIfaceTvBndrs tyvars,
+                ifTyVars  = if_tc_tyvars,
                 ifRoles   = tyConRoles tycon,
                 ifSynRhs  = to_ifsyn_rhs syn_rhs,
-                ifSynKind = tidyToIfaceType env1 (synTyConResKind tycon) }
+                ifSynKind = tidyToIfaceType tc_env1 (synTyConResKind tycon) }
 
   | isAlgTyCon tycon
   = IfaceData { ifName    = getOccName tycon,
                 ifCType   = tyConCType tycon,
-                ifTyVars  = toIfaceTvBndrs tyvars,
+                ifTyVars  = if_tc_tyvars,
                 ifRoles   = tyConRoles tycon,
-                ifCtxt    = tidyToIfaceContext env1 (tyConStupidTheta tycon),
+                ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
                 ifCons    = ifaceConDecls (algTyConRhs tycon),
                 ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
                 ifGadtSyntax = isGadtSyntaxTyCon tycon,
@@ -1611,26 +1611,27 @@ tyConToIfaceDecl env tycon
                 ifPromotable = False,
                 ifParent     = IfNoParent }
   where
-    (env1, tyvars) = tidyTyClTyVarBndrs env (tyConTyVars tycon)
+    (tc_env1, tc_tyvars) = tidyTyClTyVarBndrs env (tyConTyVars tycon)
+    if_tc_tyvars = toIfaceTvBndrs tc_tyvars
 
     funAndPrimTyVars = toIfaceTvBndrs $ take (tyConArity tycon) alphaTyVars
 
     parent = case tyConFamInstSig_maybe tycon of
                Just (tc, ty, ax) -> IfDataInstance (coAxiomName ax)
                                                    (toIfaceTyCon tc)
-                                                   (toIfaceTcArgs tc ty)
+                                                   (tidyToIfaceTcArgs tc_env1 tc ty)
                Nothing           -> IfNoParent
 
     to_ifsyn_rhs OpenSynFamilyTyCon        = IfaceOpenSynFamilyTyCon
     to_ifsyn_rhs (ClosedSynFamilyTyCon ax) = IfaceClosedSynFamilyTyCon axn ibr
       where defs = fromBranchList $ coAxiomBranches ax
-            ibr  = map coAxBranchToIfaceBranch' defs
+            ibr  = map (coAxBranchToIfaceBranch' tycon) defs
             axn  = coAxiomName ax
     to_ifsyn_rhs AbstractClosedSynFamilyTyCon
       = IfaceAbstractClosedSynFamilyTyCon
 
     to_ifsyn_rhs (SynonymTyCon ty)
-      = IfaceSynonymTyCon (tidyToIfaceType env1 ty)
+      = IfaceSynonymTyCon (tidyToIfaceType tc_env1 ty)
 
     to_ifsyn_rhs (BuiltInSynFamTyCon {})
       = IfaceBuiltInSynFamTyCon
@@ -1649,22 +1650,29 @@ tyConToIfaceDecl env tycon
         = IfCon   { ifConOcc     = getOccName (dataConName data_con),
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
-                    ifConUnivTvs = toIfaceTvBndrs univ_tvs',
+                    ifConUnivTvs = if_tc_tyvars,
                     ifConExTvs   = toIfaceTvBndrs ex_tvs',
                     ifConEqSpec  = map to_eq_spec eq_spec,
-                    ifConCtxt    = tidyToIfaceContext env2 theta,
-                    ifConArgTys  = map (tidyToIfaceType env2) arg_tys,
+                    ifConCtxt    = tidyToIfaceContext con_env2 theta,
+                    ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
                     ifConFields  = map getOccName
                                        (dataConFieldLabels data_con),
-                    ifConStricts = map (toIfaceBang env2) (dataConRepBangs data_con) }
+                    ifConStricts = map (toIfaceBang con_env2) (dataConRepBangs data_con) }
         where
           (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig data_con
 
-          -- Start with 'emptyTidyEnv' not 'env1', because the type of the
-          -- data constructor is fully standalone
-          (env1, univ_tvs') = tidyTyVarBndrs emptyTidyEnv univ_tvs
-          (env2, ex_tvs')   = tidyTyVarBndrs env1 ex_tvs
-          to_eq_spec (tv,ty) = (toIfaceTyVar (tidyTyVar env2 tv), tidyToIfaceType env2 ty)
+          -- Tidy the univ_tvs of the data constructor to be identical
+          -- to the tyConTyVars of the type constructor.  This means
+          -- (a) we don't need to redundantly put them into the interface file
+          -- (b) when pretty-printing an Iface data declaration in H98-style syntax,
+          --     we know that the type variables will line up
+          -- The latter (b) is important because we pretty-print type construtors
+          -- by converting to IfaceSyn and pretty-printing that
+          con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
+                     -- A bit grimy, perhaps, but it's simple!
+
+          (con_env2, ex_tvs') = tidyTyVarBndrs con_env1 ex_tvs
+          to_eq_spec (tv,ty)  = (toIfaceTyVar (tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
 
 toIfaceBang :: TidyEnv -> HsBang -> IfaceBang
 toIfaceBang _    HsNoBang            = IfNoBang
@@ -1693,7 +1701,7 @@ classToIfaceDecl env clas
 
     toIfaceAT :: ClassATItem -> IfaceAT
     toIfaceAT (tc, defs)
-      = IfaceAT (tyConToIfaceDecl env1 tc) (map coAxBranchToIfaceBranch' defs)
+      = IfaceAT (tyConToIfaceDecl env1 tc) (map (coAxBranchToIfaceBranch' tc) defs)
 
     toIfaceClassOp (sel_id, def_meth)
         = ASSERT(sel_tyvars == clas_tyvars)
@@ -1719,11 +1727,8 @@ classToIfaceDecl env clas
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
 tidyToIfaceType env ty = toIfaceType (tidyType env ty)
 
-tidyToIfaceTcArgs :: TidyEnv -> [Type] -> IfaceTcArgs
-tidyToIfaceTcArgs _ [] = ITC_Nil
-tidyToIfaceTcArgs env (t:ts)
-  | isKind t  = ITC_Kind  (tidyToIfaceType env t) (tidyToIfaceTcArgs env ts)
-  | otherwise = ITC_Type  (tidyToIfaceType env t) (tidyToIfaceTcArgs env ts)
+tidyToIfaceTcArgs :: TidyEnv -> TyCon -> [Type] -> IfaceTcArgs
+tidyToIfaceTcArgs env tc tys = toIfaceTcArgs tc (tidyTypes env tys)
 
 tidyToIfaceContext :: TidyEnv -> ThetaType -> IfaceContext
 tidyToIfaceContext env theta = map (tidyToIfaceType env) theta
