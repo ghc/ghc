@@ -69,16 +69,6 @@ sub parsePackages {
     }
 }
 
-sub tryReadFile {
-    my $filename = shift;
-    my @lines;
-
-    open (FH, $filename) or return "";
-    @lines = <FH>;
-    close FH;
-    return join('', @lines);
-}
-
 sub message {
     if ($verbose >= 2) {
         print "@_\n";
@@ -903,17 +893,7 @@ sub main {
             &gitInitSubmodules(@submodule_args);
         }
 
-        if ($command eq "pull") {
-            my $gitConfig = &tryReadFile(".git/config");
-            if ($gitConfig !~ /submodule/) {
-                &gitInitSubmodules(@submodule_args);
-            }
-        }
         if ($command eq "get" or $command eq "pull") {
-            my $gitConfig = &tryReadFile(".git/config");
-            if ($gitConfig !~ /submodule/) {
-                &gitInitSubmodules(@submodule_args);
-            }
             &git(".", "submodule", "update", @submodule_args);
         }
     }
@@ -1030,4 +1010,3 @@ EOF
 }
 
 main(@ARGV);
-
