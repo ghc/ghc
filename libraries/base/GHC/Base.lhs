@@ -148,12 +148,12 @@ resulting in:
 
 Bottom line: we make GHC.Base depend on GHC.Integer; and everything
 else either depends on GHC.Base, or does not have NoImplicitPrelude
-(ane hence depends on Prelude).
+(and hence depends on Prelude).
 
 Note [Depend on GHC.Tuple]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Similarly, tuple syntax (or ()) creates an implicit dependency on
-GHC.Tuple, so we use the same ruse as for Integer --- see Note [Depend on
+GHC.Tuple, so we use the same rule as for Integer --- see Note [Depend on
 GHC.Integer] --- to explain this to the build system.  We make GHC.Base
 depend on GHC.Tuple, and everything else depends on GHC.Base or Prelude.
 
