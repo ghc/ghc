@@ -166,3 +166,5 @@ test('T8766',
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
+
+test('T9111', normal, compile, [''])
