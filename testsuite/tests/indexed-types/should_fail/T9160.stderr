@@ -1,0 +1,11 @@
+Loading package ghc-prim ... linking ... done.
+Loading package integer-gmp ... linking ... done.
+Loading package base ... linking ... done.
+Loading package pretty-1.1.1.1 ... linking ... done.
+Loading package template-haskell ... linking ... done.
+
+T9160.hs:18:8:
+    Type indexes must match class instance head
+    Found ‘* -> *’ but expected ‘*’
+    In the type instance declaration for ‘F’
+    In the instance declaration for ‘C (a :: *)’
