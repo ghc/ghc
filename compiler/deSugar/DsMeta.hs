@@ -63,7 +63,6 @@ import DynFlags
 import FastString
 import ForeignCall
 import Util
-import TcRnMonad( traceOptIf )
 
 import Data.Maybe
 import Control.Monad
