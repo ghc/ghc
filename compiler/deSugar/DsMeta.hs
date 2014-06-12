@@ -63,6 +63,7 @@ import DynFlags
 import FastString
 import ForeignCall
 import Util
+import TcRnMonad( traceOptIf )
 
 import Data.Maybe
 import Control.Monad
@@ -707,12 +708,14 @@ addTyVarBinds :: LHsTyVarBndrs Name                            -- the binders to
 -- the computations passed as the second argument is executed in that extended
 -- meta environment and gets the *new* names on Core-level as an argument
 
-addTyVarBinds tvs m
-  = do { freshNames <- mkGenSyms (hsLKiTyVarNames tvs)
-       ; term <- addBinds freshNames $
-                 do { kbs <- repList tyVarBndrTyConName mk_tv_bndr (hsQTvBndrs tvs `zip` freshNames)
+addTyVarBinds (HsQTvs { hsq_kvs = kvs, hsq_tvs = tvs }) m
+  = do { fresh_kv_names <- mkGenSyms kvs
+       ; fresh_tv_names <- mkGenSyms (map hsLTyVarName tvs)
+       ; let fresh_names = fresh_kv_names ++ fresh_tv_names
+       ; term <- addBinds fresh_names $
+                 do { kbs <- repList tyVarBndrTyConName mk_tv_bndr (tvs `zip` fresh_tv_names)
                     ; m kbs }
-       ; wrapGenSyms freshNames term }
+       ; wrapGenSyms fresh_names term }
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
