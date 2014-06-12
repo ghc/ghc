@@ -86,7 +86,7 @@ module OccName (
 	lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
 	occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
         extendOccEnv_Acc, filterOccEnv, delListFromOccEnv, delFromOccEnv,
-        alterOccEnv, 
+        alterOccEnv, pprOccEnv,
 
 	-- * The 'OccSet' type
 	OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet, 
@@ -416,7 +416,10 @@ filterOccEnv x (A y)       = A $ filterUFM x y
 alterOccEnv fn (A y) k     = A $ alterUFM fn y k
 
 instance Outputable a => Outputable (OccEnv a) where
-    ppr (A x) = ppr x
+    ppr x = pprOccEnv ppr x
+
+pprOccEnv :: (a -> SDoc) -> OccEnv a -> SDoc
+pprOccEnv ppr_elt (A env) = pprUniqFM ppr_elt env
 
 type OccSet = UniqSet OccName
 

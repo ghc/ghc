@@ -360,8 +360,9 @@ bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
              kvs_from_tv_bndrs = [ kv | L _ (KindedTyVar _ kind) <- tvs
                                  , let (_, kvs) = extractHsTyRdrTyVars kind
                                  , kv <- kvs ]
-             all_kvs = filterOut (`elemLocalRdrEnv` rdr_env) $
-                       nub (kv_bndrs ++ kvs_from_tv_bndrs)
+             all_kvs' = nub (kv_bndrs ++ kvs_from_tv_bndrs)
+             all_kvs  = filterOut (`elemLocalRdrEnv` rdr_env) all_kvs'
+
              overlap_kvs = [ kv | kv <- all_kvs, any ((==) kv . hsLTyVarName) tvs ]
                 -- These variables appear both as kind and type variables
                 -- in the same declaration; eg  type family  T (x :: *) (y :: x)
@@ -395,8 +396,12 @@ bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
 
        ; (tv_bndrs', fvs1) <- mapFvRn rn_tv_bndr tvs
        ; (res, fvs2) <- bindLocalNamesFV (map hsLTyVarName tv_bndrs') $
-                        do { env <- getLocalRdrEnv
-                           ; traceRn (text "bhtv" <+> (ppr tvs $$ ppr all_kvs $$ ppr env))
+                        do { inner_rdr_env <- getLocalRdrEnv
+                           ; traceRn (text "bhtv" <+> vcat
+                                 [ ppr tvs, ppr kv_bndrs, ppr kvs_from_tv_bndrs
+                                 , ppr $ map (`elemLocalRdrEnv` rdr_env) all_kvs'
+                                 , ppr $ map (getUnique . rdrNameOcc) all_kvs'
+                                 , ppr all_kvs, ppr rdr_env, ppr inner_rdr_env ])
                            ; thing_inside (HsQTvs { hsq_tvs = tv_bndrs', hsq_kvs = kv_names }) }
        ; return (res, fvs1 `plusFV` fvs2) } }
 

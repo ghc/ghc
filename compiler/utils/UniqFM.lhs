@@ -59,9 +59,10 @@ module UniqFM (
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
         eltsUFM, keysUFM, splitUFM,
         ufmToList,
-        joinUFM
+        joinUFM, pprUniqFM
     ) where
 
+import FastString
 import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
 
@@ -315,5 +316,11 @@ joinUFM eltJoin l (OldFact old) (NewFact new) = foldUFM_Directly add (NoChange, 
 
 \begin{code}
 instance Outputable a => Outputable (UniqFM a) where
-    ppr ufm = ppr (ufmToList ufm)
+    ppr ufm = pprUniqFM ppr ufm
+
+pprUniqFM :: (a -> SDoc) -> UniqFM a -> SDoc
+pprUniqFM ppr_elt ufm
+  = brackets $ fsep $ punctuate comma $
+    [ ppr uq <+> ptext (sLit ":->") <+> ppr_elt elt
+    | (uq, elt) <- ufmToList ufm ]
 \end{code}
