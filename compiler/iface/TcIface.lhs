@@ -512,7 +512,7 @@ tc_iface_decl _parent ignore_prags
     ; sigs <- mapM tc_sig rdr_sigs
     ; fds  <- mapM tc_fd rdr_fds
     ; traceIf (text "tc-iface-class3" <+> ppr tc_occ)
-    ; mindef <- traverse lookupIfaceTop mindef_occ
+    ; mindef <- traverse (lookupIfaceTop . mkVarOccFS) mindef_occ
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
               ; traceIf (text "tc-iface-class4" <+> ppr tc_occ)
@@ -621,7 +621,7 @@ tc_ax_branch prev_branches
     ; return (prev_branches ++ [br]) }
 
 tcIfaceDataCons :: Name -> TyCon -> [TyVar] -> IfaceConDecls -> IfL AlgTyConRhs
-tcIfaceDataCons tycon_name tycon _ if_cons
+tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
   = case if_cons of
         IfAbstractTyCon dis -> return (AbstractTyCon dis)
         IfDataFamTyCon  -> return DataFamilyTyCon
@@ -631,11 +631,12 @@ tcIfaceDataCons tycon_name tycon _ if_cons
                                 ; mkNewTyConRhs tycon_name tycon data_con }
   where
     tc_con_decl (IfCon { ifConInfix = is_infix,
-                         ifConUnivTvs = univ_tvs, ifConExTvs = ex_tvs,
+                         ifConExTvs = ex_tvs,
                          ifConOcc = occ, ifConCtxt = ctxt, ifConEqSpec = spec,
                          ifConArgTys = args, ifConFields = field_lbls,
                          ifConStricts = if_stricts})
-     = bindIfaceTyVars univ_tvs $ \ univ_tyvars -> do
+     = -- Universally-quantified tyvars are shared with 
+       -- parent TyCon, and are alrady in scope
        bindIfaceTyVars ex_tvs    $ \ ex_tyvars -> do
         { traceIf (text "Start interface-file tc_con_decl" <+> ppr occ)
         ; name  <- lookupIfaceTop occ
@@ -657,12 +658,12 @@ tcIfaceDataCons tycon_name tycon _ if_cons
 
         -- Remember, tycon is the representation tycon
         ; let orig_res_ty = mkFamilyTyConApp tycon
-                                (substTyVars (mkTopTvSubst eq_spec) univ_tyvars)
+                                (substTyVars (mkTopTvSubst eq_spec) tc_tyvars)
 
         ; con <- buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr name))
                        name is_infix
                        stricts lbl_names
-                       univ_tyvars ex_tyvars
+                       tc_tyvars ex_tyvars
                        eq_spec theta
                        arg_tys orig_res_ty tycon
         ; traceIf (text "Done interface-file tc_con_decl" <+> ppr name)

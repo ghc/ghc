@@ -1650,7 +1650,6 @@ tyConToIfaceDecl env tycon
         = IfCon   { ifConOcc     = getOccName (dataConName data_con),
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
-                    ifConUnivTvs = if_tc_tyvars,
                     ifConExTvs   = toIfaceTvBndrs ex_tvs',
                     ifConEqSpec  = map to_eq_spec eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
@@ -1690,7 +1689,7 @@ classToIfaceDecl env clas
                  ifFDs    = map toIfaceFD clas_fds,
                  ifATs    = map toIfaceAT clas_ats,
                  ifSigs   = map toIfaceClassOp op_stuff,
-                 ifMinDef = fmap getOccName (classMinimalDef clas),
+                 ifMinDef = fmap getFS (classMinimalDef clas),
                  ifRec    = boolToRecFlag (isRecursiveTyCon tycon) }
   where
     (clas_tyvars, clas_fds, sc_theta, _, clas_ats, op_stuff)
