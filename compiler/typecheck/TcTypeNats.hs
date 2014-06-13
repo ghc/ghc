@@ -1075,6 +1075,9 @@ solverFindConstraidction proc viRef others ours =
 Returns the solved constraints (with evidence), and all other constraints.
 -}
 {-
+Note [In What Order to Solve Wanteds?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Consider this example:
 
 ex4 :: p a -> p b -> p ((a + a) + b) -> p (2 * a + b)
@@ -1107,50 +1110,29 @@ We can't do this because we've lost the information about `w`.
 To avoid this, we first try to solve equations that have the same varibal
 on the RHS (e.g., F xs ~ a, G ys ~ a).
 
-However, this is not quite enough.  Here is another tricky example:
-
-data T :: Nat -> * where
-  Even  :: T (n + 1) -> T (2 * (n + 1))
-
-addT :: T m -> T n -> T (m + n)
-addT (Even x) (Even y) = Even (addT x y)
-
-
-x :: T (a + 1)
-y :: T (b + 1)
-
-[G] m = 2 * (a + 1)
-[G] n = 2 * (b + 1)
-
-addT x y :: T ((a + 1) + (b + 1))
-
-[W] (a + 1) + (b + 1) = x + 1  -- Applying Even is OK
-[W] 2 * (x + 1) = m + n        -- The result is correct
-
-After canonicalization:
-
-[G] a + 1  = t1
-[G] b + 1  = t2
-[G] 2 * t1 = m
-[G] 2 * t2 = n
-
-[W] t1 + t2 = t3
-[W] x  + 1  = t3
-[W] 2 * t3  = t4
-[W] m + n   = t4
-
-The issue here seems to be that `x = a + b + 1`, but this intermediate
-value is not named anywhere.  What to do?
-
-
-XXX: BUG The following incorrect program causes infinte improvement
-
-addT :: T m -> T n -> T (m + n)
-addT (Even x) (Even y) = Even (addT x x)
-
 -}
 
 
+{-
+Note [Incompleteness of the General Approach]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Another tricky example, which illustrates the incompleteness of
+the general method:
+
+x :: f (n + 2)
+x = undefined
+
+y :: f (m + 1)
+y = x
+
+The definition for `x` is accepted, but `y` is rejected.
+The reason is that to accept it we need to infer that `m` must
+be instantiated to `n + 1`.  The current system does not support this
+kind of improvement, because it only ever tries to instantiate variables
+to constants or other variables and here we need to instantiate `m`
+with a more complex expression, namely, `n + 1`.
+-}
 
 
 solverSimplify :: SolverProcess -> IORef VarInfo ->
