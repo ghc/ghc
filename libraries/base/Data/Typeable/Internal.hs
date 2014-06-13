@@ -263,7 +263,9 @@ type Typeable7 (a :: * -> * -> * -> * -> * -> * -> * -> *) = Typeable a
 
 -- | Kind-polymorphic Typeable instance for type application
 instance (Typeable s, Typeable a) => Typeable (s a) where
-  typeRep# _ = typeRep# (proxy# :: Proxy# s) `mkAppTy` typeRep# (proxy# :: Proxy# a)
+  typeRep# = \_ -> rep
+    where rep = typeRep# (proxy# :: Proxy# s)
+                   `mkAppTy` typeRep# (proxy# :: Proxy# a)
 
 ----------------- Showing TypeReps --------------------
 
