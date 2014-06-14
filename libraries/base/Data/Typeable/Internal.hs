@@ -22,6 +22,8 @@
            , PolyKinds
            , ConstraintKinds
            , DeriveDataTypeable
+           , DataKinds
+           , UndecidableInstances
            , StandaloneDeriving #-}
 
 module Data.Typeable.Internal (
@@ -63,6 +65,7 @@ import GHC.STRef        ( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
 -- import GHC.Stable
 import GHC.Arr          ( Array, STArray, Ix )
+import GHC.TypeLits ( Nat, Symbol, KnownNat, KnownSymbol, natVal', symbolVal' )
 import Data.Type.Coercion
 import Data.Type.Equality
 import Text.ParserCombinators.ReadP ( ReadP )
@@ -411,3 +414,38 @@ deriving instance Typeable Monad
 deriving instance Typeable MonadPlus
 
 deriving instance Typeable Typeable
+
+
+
+--------------------------------------------------------------------------------
+-- Instances for type literals
+
+instance KnownNat n => Typeable (n :: Nat) where
+  typeRep# p = mkTyConApp tc []
+    where
+    tc = TyCon
+           { tyConHash     = fingerprintString (mk pack modu nm)
+           , tyConPackage  = pack
+           , tyConModule   = modu
+           , tyConName     = nm
+           }
+    pack = "base"
+    modu = "GHC.TypeLits"
+    nm   = show (natVal' p)
+    mk a b c = a ++ " " ++ b ++ " " ++ c
+
+
+instance KnownSymbol s => Typeable (s :: Symbol) where
+  typeRep# p = mkTyConApp tc []
+    where
+    tc = TyCon
+           { tyConHash     = fingerprintString (mk pack modu nm)
+           , tyConPackage  = pack
+           , tyConModule   = modu
+           , tyConName     = nm
+           }
+    pack = "base"
+    modu = "GHC.TypeLits"
+    nm   = show (symbolVal' p)
+    mk a b c = a ++ " " ++ b ++ " " ++ c
+

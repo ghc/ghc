@@ -10,6 +10,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE UndecidableInstances #-}  -- for compiling instances of (==)
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE MagicHash #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -23,8 +24,8 @@ module GHC.TypeLits
     Nat, Symbol
 
     -- * Linking type and value level
-  , KnownNat, natVal
-  , KnownSymbol, symbolVal
+  , KnownNat, natVal, natVal'
+  , KnownSymbol, symbolVal, symbolVal'
   , SomeNat(..), SomeSymbol(..)
   , someNatVal, someSymbolVal
   , sameNat, sameSymbol
@@ -41,9 +42,9 @@ import GHC.Num(Integer)
 import GHC.Base(String)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
-import GHC.Prim(magicDict)
+import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
-import Data.Proxy(Proxy(..))
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality(type (==), (:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
 
@@ -78,6 +79,16 @@ natVal _ = case natSing :: SNat n of
 -- | /Since: 4.7.0.0/
 symbolVal :: forall n proxy. KnownSymbol n => proxy n -> String
 symbolVal _ = case symbolSing :: SSymbol n of
+                SSymbol x -> x
+
+-- | /Since: 4.7.0.0/
+natVal' :: forall n. KnownNat n => Proxy# n -> Integer
+natVal' _ = case natSing :: SNat n of
+             SNat x -> x
+
+-- | /Since: 4.7.0.0/
+symbolVal' :: forall n. KnownSymbol n => Proxy# n -> String
+symbolVal' _ = case symbolSing :: SSymbol n of
                 SSymbol x -> x
 
 
