@@ -423,8 +423,9 @@ deriving instance Typeable Typeable
 -- Instances for type literals
 
 instance KnownNat n => Typeable (n :: Nat) where
-  typeRep# p = mkTyConApp tc []
+  typeRep# = \_ -> rep
     where
+    rep = mkTyConApp tc []
     tc = TyCon
            { tyConHash     = fingerprintString (mk pack modu nm)
            , tyConPackage  = pack
@@ -433,13 +434,14 @@ instance KnownNat n => Typeable (n :: Nat) where
            }
     pack = "base"
     modu = "GHC.TypeLits"
-    nm   = show (natVal' p)
+    nm   = show (natVal' (proxy# :: Proxy# n))
     mk a b c = a ++ " " ++ b ++ " " ++ c
 
 
 instance KnownSymbol s => Typeable (s :: Symbol) where
-  typeRep# p = mkTyConApp tc []
+  typeRep# = \_ -> rep
     where
+    rep = mkTyConApp tc []
     tc = TyCon
            { tyConHash     = fingerprintString (mk pack modu nm)
            , tyConPackage  = pack
@@ -448,6 +450,6 @@ instance KnownSymbol s => Typeable (s :: Symbol) where
            }
     pack = "base"
     modu = "GHC.TypeLits"
-    nm   = show (symbolVal' p)
+    nm   = show (symbolVal' (proxy# :: Proxy# s))
     mk a b c = a ++ " " ++ b ++ " " ++ c
 
