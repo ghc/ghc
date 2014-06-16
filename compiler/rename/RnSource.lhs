@@ -11,9 +11,8 @@ module RnSource (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
-#ifdef GHCI
+import {-# SOURCE #-} RnSplice ( rnSpliceDecl )
 import {-# SOURCE #-} TcSplice ( runQuasiQuoteDecl )
-#endif /* GHCI */
 
 import HsSyn
 import RdrName
@@ -22,30 +21,33 @@ import RnBinds
 import RnEnv
 import RnNames
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
+import TcAnnotations    ( annCtxt )
 import TcRnMonad
 
 import ForeignCall      ( CCallTarget(..) )
 import Module
 import HscTypes         ( Warnings(..), plusWarns )
 import Class            ( FunDep )
+import PrelNames        ( isUnboundName )
 import Name
 import NameSet
 import NameEnv
 import Avail
 import Outputable
 import Bag
-import BasicTypes       ( RuleName )
+import BasicTypes       ( RuleName, Origin(..) )
 import FastString
 import SrcLoc
 import DynFlags
 import HscTypes         ( HscEnv, hsc_dflags )
-import ListSetOps       ( findDupsEq )
+import ListSetOps       ( findDupsEq, removeDups )
 import Digraph          ( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
+import Util             ( mapSnd )
 
 import Control.Monad
-import Data.List( partition )
+import Data.List( partition, sortBy )
 import Data.Traversable (traverse)
-import Maybes( orElse )
+import Maybes( orElse, mapMaybe )
 \end{code}
 
 @rnSourceDecl@ `renames' declarations.
@@ -58,7 +60,7 @@ for undefined tyvars, and tyvars in contexts that are ambiguous.
 (Some of this checking has now been moved to module @TcMonoType@,
 since we don't have functional dependency information at this point.)
 \item
-Checks that all variable occurences are defined.
+Checks that all variable occurrences are defined.
 \item
 Checks the @(..)@ etc constraints in the export list.
 \end{enumerate}
@@ -70,6 +72,7 @@ Checks the @(..)@ etc constraints in the export list.
 rnSrcDecls :: [Name] -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 -- Rename a HsGroup; used for normal source files *and* hs-boot files
 rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
+                                       hs_splcds  = splice_decls,
                                        hs_tyclds  = tycl_decls,
                                        hs_instds  = inst_decls,
                                        hs_derivds = deriv_decls,
@@ -111,6 +114,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    let { val_binders = collectHsValBinders new_lhs ;
          all_bndrs   = addListToNameSet tc_bndrs val_binders ;
          val_avails  = map Avail val_binders  } ;
+   traceRn (text "rnSrcDecls" <+> ppr val_avails) ;
    (tcg_env, tcl_env) <- extendGlobalRdrEnvRn val_avails local_fix_env ;
    traceRn (ptext (sLit "Val binders") <+> (ppr val_binders)) ;
    setEnvs (tcg_env, tcl_env) $ do {
@@ -157,12 +161,14 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    (rn_ann_decls,     src_fvs6) <- rnList rnAnnDecl       ann_decls ;
    (rn_default_decls, src_fvs7) <- rnList rnDefaultDecl   default_decls ;
    (rn_deriv_decls,   src_fvs8) <- rnList rnSrcDerivDecl  deriv_decls ;
+   (rn_splice_decls,  src_fvs9) <- rnList rnSpliceDecl    splice_decls ;
       -- Haddock docs; no free vars
    rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
 
     last_tcg_env <- getGblEnv ;
    -- (I) Compute the results and return
    let {rn_group = HsGroup { hs_valds   = rn_val_decls,
+                             hs_splcds  = rn_splice_decls,
                              hs_tyclds  = rn_tycl_decls,
                              hs_instds  = rn_inst_decls,
                              hs_derivds = rn_deriv_decls,
@@ -180,7 +186,8 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
         ford_bndrs = hsForeignDeclsBinders rn_foreign_decls ;
         other_def  = (Just (mkNameSet tycl_bndrs `unionNameSets` mkNameSet ford_bndrs), emptyNameSet) ;
         other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4,
-                              src_fvs5, src_fvs6, src_fvs7, src_fvs8] ;
+                              src_fvs5, src_fvs6, src_fvs7, src_fvs8,
+                              src_fvs9] ;
                 -- It is tiresome to gather the binders from type and class decls
 
         src_dus = [other_def] `plusDU` bind_dus `plusDU` usesOnly other_fvs ;
@@ -333,10 +340,12 @@ dupWarnDecl (L loc _) rdr_name
 
 \begin{code}
 rnAnnDecl :: AnnDecl RdrName -> RnM (AnnDecl Name, FreeVars)
-rnAnnDecl (HsAnnotation provenance expr) = do
-    (provenance', provenance_fvs) <- rnAnnProvenance provenance
-    (expr', expr_fvs) <- rnLExpr expr
-    return (HsAnnotation provenance' expr', provenance_fvs `plusFV` expr_fvs)
+rnAnnDecl ann@(HsAnnotation provenance expr)
+  = addErrCtxt (annCtxt ann) $
+    do { (provenance', provenance_fvs) <- rnAnnProvenance provenance
+       ; (expr', expr_fvs) <- setStage (Splice False) $
+                              rnLExpr expr
+       ; return (HsAnnotation provenance' expr', provenance_fvs `plusFV` expr_fvs) }
 
 rnAnnProvenance :: AnnProvenance RdrName -> RnM (AnnProvenance Name, FreeVars)
 rnAnnProvenance provenance = do
@@ -542,10 +551,9 @@ rnFamInstDecl doc mb_cls tycon pats payload rnPayload
 rnTyFamInstDecl :: Maybe (Name, [Name])
                 -> TyFamInstDecl RdrName
                 -> RnM (TyFamInstDecl Name, FreeVars)
-rnTyFamInstDecl mb_cls (TyFamInstDecl { tfid_eqns = eqns, tfid_group = group })
-  = do { (eqns', fvs) <- rnList (rnTyFamInstEqn mb_cls) eqns
-       ; return (TyFamInstDecl { tfid_eqns = eqns'
-                               , tfid_group = group
+rnTyFamInstDecl mb_cls (TyFamInstDecl { tfid_eqn = L loc eqn })
+  = do { (eqn', fvs) <- rnTyFamInstEqn mb_cls eqn
+       ; return (TyFamInstDecl { tfid_eqn = L loc eqn'
                                , tfid_fvs = fvs }, fvs) }
 
 rnTyFamInstEqn :: Maybe (Name, [Name])
@@ -609,8 +617,8 @@ type variable environment iff -fglasgow-exts
 
 \begin{code}
 extendTyVarEnvForMethodBinds :: [Name]
-                             -> RnM (Bag (LHsBind Name), FreeVars)
-                             -> RnM (Bag (LHsBind Name), FreeVars)
+                             -> RnM (LHsBinds Name, FreeVars)
+                             -> RnM (LHsBinds Name, FreeVars)
 extendTyVarEnvForMethodBinds ktv_names thing_inside
   = do  { scoped_tvs <- xoptM Opt_ScopedTypeVariables
         ; if scoped_tvs then
@@ -636,7 +644,7 @@ rnSrcDerivDecl (DerivDecl ty)
 standaloneDerivErr :: SDoc
 standaloneDerivErr
   = hang (ptext (sLit "Illegal standalone deriving declaration"))
-       2 (ptext (sLit "Use -XStandaloneDeriving to enable this extension"))
+       2 (ptext (sLit "Use StandaloneDeriving to enable this extension"))
 \end{code}
 
 %*********************************************************
@@ -863,11 +871,12 @@ isInPackage pkgId nm = case nameModule_maybe nm of
 -- there is no module name. In that case we cannot have mutual dependencies,
 -- so it's fine to return False here.
 
-rnTyClDecls :: [Name] -> [[LTyClDecl RdrName]]
-            -> RnM ([[LTyClDecl Name]], FreeVars)
+rnTyClDecls :: [Name] -> [TyClGroup RdrName]
+            -> RnM ([TyClGroup Name], FreeVars)
 -- Rename the declarations and do depedency analysis on them
 rnTyClDecls extra_deps tycl_ds
-  = do { ds_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (concat tycl_ds)
+  = do { ds_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupConcat tycl_ds)
+       ; role_annot_env <- rnRoleAnnots (concatMap group_roles tycl_ds)
        ; thisPkg  <- fmap thisPackage getDynFlags
        ; let add_boot_deps :: FreeVars -> FreeVars
              -- See Note [Extra dependencies from .hs-boot files]
@@ -876,16 +885,32 @@ rnTyClDecls extra_deps tycl_ds
                                | otherwise
                                = fvs
 
-             ds_w_fvs' = map (\(ds, fvs) -> (ds, add_boot_deps fvs)) ds_w_fvs
+             ds_w_fvs' = mapSnd add_boot_deps ds_w_fvs
 
              sccs :: [SCC (LTyClDecl Name)]
              sccs = depAnalTyClDecls ds_w_fvs'
 
              all_fvs = foldr (plusFV . snd) emptyFVs ds_w_fvs'
 
+             raw_groups = map flattenSCC sccs
+             -- See Note [Role annotations in the renamer]
+             (groups, orphan_roles)
+               = foldr (\group (groups_acc, orphans_acc) ->
+                         let names = map (tcdName . unLoc) group
+                             roles = mapMaybe (lookupNameEnv orphans_acc) names
+                             orphans' = delListFromNameEnv orphans_acc names
+                              -- there doesn't seem to be an interface to
+                              -- do the above more efficiently
+                         in ( TyClGroup { group_tyclds = group
+                                        , group_roles  = roles } : groups_acc
+                            , orphans' )
+                       )
+                       ([], role_annot_env)
+                       raw_groups
+                 
+       ; mapM_ orphanRoleAnnotErr (nameEnvElts orphan_roles)
        ; traceRn (text "rnTycl"  <+> (ppr ds_w_fvs $$ ppr sccs))
-       ; return (map flattenSCC sccs, all_fvs) }
-
+       ; return (groups, all_fvs) }
 
 rnTyClDecl :: TyClDecl RdrName 
            -> RnM (TyClDecl Name, FreeVars)
@@ -994,6 +1019,57 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls,
 rnTySyn :: HsDocContext -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
 rnTySyn doc rhs = rnLHsType doc rhs
 
+-- Renames role annotations, returning them as the values in a NameEnv
+-- and checks for duplicate role annotations.
+-- It is quite convenient to do both of these in the same place.
+-- See also Note [Role annotations in the renamer]
+rnRoleAnnots :: [LRoleAnnotDecl RdrName]
+                -> RnM (NameEnv (LRoleAnnotDecl Name))
+rnRoleAnnots role_annots
+  = do {  -- check for duplicates *before* renaming, to avoid lumping
+          -- together all the unboundNames
+         let (no_dups, dup_annots) = removeDups role_annots_cmp role_annots
+             role_annots_cmp (L _ annot1) (L _ annot2)
+               = roleAnnotDeclName annot1 `compare` roleAnnotDeclName annot2
+       ; mapM_ dupRoleAnnotErr dup_annots
+       ; role_annots' <- mapM (wrapLocM rn_role_annot1) no_dups
+          -- some of the role annots will be unbound; we don't wish
+          -- to include these
+       ; return $ mkNameEnv [ (name, ra)
+                            | ra <- role_annots'
+                            , let name = roleAnnotDeclName (unLoc ra)
+                            , not (isUnboundName name) ] }
+  where
+    rn_role_annot1 (RoleAnnotDecl tycon roles)
+      = do {  -- the name is an *occurrence*
+             tycon' <- wrapLocM lookupGlobalOccRn tycon
+           ; return $ RoleAnnotDecl tycon' roles }
+
+dupRoleAnnotErr :: [LRoleAnnotDecl RdrName] -> RnM ()
+dupRoleAnnotErr [] = panic "dupRoleAnnotErr"
+dupRoleAnnotErr list
+  = addErrAt loc $
+    hang (text "Duplicate role annotations for" <+>
+          quotes (ppr $ roleAnnotDeclName first_decl) <> colon)
+       2 (vcat $ map pp_role_annot sorted_list)
+    where
+      sorted_list = sortBy cmp_annot list
+      (L loc first_decl : _) = sorted_list
+    
+      pp_role_annot (L loc decl) = hang (ppr decl)
+                                      4 (text "-- written at" <+> ppr loc)
+
+      cmp_annot (L loc1 _) (L loc2 _) = loc1 `compare` loc2
+
+orphanRoleAnnotErr :: LRoleAnnotDecl Name -> RnM ()
+orphanRoleAnnotErr (L loc decl)
+  = addErrAt loc $
+    hang (text "Role annotation for a type previously declared:")
+       2 (ppr decl) $$
+    parens (text "The role annotation must be given where" <+>
+            quotes (ppr $ roleAnnotDeclName decl) <+>
+            text "is declared.")
+
 rnDataDefn :: HsDocContext -> HsDataDefn RdrName -> RnM (HsDataDefn Name, FreeVars)
 rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                            , dd_ctxt = context, dd_cons = condecls 
@@ -1044,16 +1120,27 @@ rnFamDecl :: Maybe Name
           -> FamilyDecl RdrName
           -> RnM (FamilyDecl Name, FreeVars)
 rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
-                             , fdFlavour = flav, fdKindSig = kind })
-  = bindHsTyVars fmly_doc mb_cls kvs tyvars $ \tyvars' ->
-    do { tycon' <- lookupLocatedTopBndrRn tycon
-       ; (kind', fv_kind) <- rnLHsMaybeKind fmly_doc kind
+                             , fdInfo = info, fdKindSig = kind })
+  = do { ((tycon', tyvars', kind'), fv1) <-
+           bindHsTyVars fmly_doc mb_cls kvs tyvars $ \tyvars' ->
+           do { tycon' <- lookupLocatedTopBndrRn tycon
+              ; (kind', fv_kind) <- rnLHsMaybeKind fmly_doc kind
+              ; return ((tycon', tyvars', kind'), fv_kind) }
+       ; (info', fv2) <- rn_info info
        ; return (FamilyDecl { fdLName = tycon', fdTyVars = tyvars'
-                            , fdFlavour = flav, fdKindSig = kind' }
-                , fv_kind ) }
+                            , fdInfo = info', fdKindSig = kind' }
+                , fv1 `plusFV` fv2) }
   where 
      fmly_doc = TyFamilyCtx tycon
      kvs = extractRdrKindSigVars kind
+
+     rn_info (ClosedTypeFamily eqns)
+       = do { (eqns', fvs) <- rnList (rnTyFamInstEqn Nothing) eqns
+                                                    -- no class context,
+            ; return (ClosedTypeFamily eqns', fvs) }
+     rn_info OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
+     rn_info DataFamily     = return (DataFamily, emptyFVs)
+     
 \end{code}
 
 Note [Stupid theta]
@@ -1109,6 +1196,35 @@ check T first, (fixing its kind) and *then* S.  If you do kind
 inference together, you might get an error reported in S, which
 is jolly confusing.  See Trac #4875
 
+Note [Role annotations in the renamer]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must ensure that a type's role annotation is put in the same group as the
+proper type declaration. This is because role annotations are needed during
+type-checking when creating the type's TyCon. So, rnRoleAnnots builds a
+NameEnv (LRoleAnnotDecl Name) that maps a name to a role annotation for that
+type, if any. Then, this map can be used to add the role annotations to the
+groups after dependency analysis.
+
+This process checks for duplicate role annotations, where we must be careful
+to do the check *before* renaming to avoid calling all unbound names duplicates
+of one another.
+
+The renaming process, as usual, might identify and report errors for unbound
+names. We exclude the annotations for unbound names in the annotation
+environment to avoid spurious errors for orphaned annotations.
+
+We then (in rnTyClDecls) do a check for orphan role annotations (role
+annotations without an accompanying type decl). The check works by folding
+over raw_groups (of type [[TyClDecl Name]]), selecting out the relevant
+role declarations for each group, as well as diminishing the annotation
+environment. After the fold is complete, anything left over in the name
+environment must be an orphan, and errors are generated.
+
+An earlier version of this algorithm short-cut the orphan check by renaming
+only with names declared in this module. But, this check is insufficient in
+the case of staged module compilation (Template Haskell, GHCi).
+See #8485. With the new lookup process (which includes types declared in other
+modules), we get better error messages, too.
 
 %*********************************************************
 %*                                                      *
@@ -1226,23 +1342,6 @@ deprecRecSyntax decl
 
 badRecResTy :: SDoc -> SDoc
 badRecResTy doc = ptext (sLit "Malformed constructor signature") $$ doc
-
--- This data decl will parse OK
---      data T = a Int
--- treating "a" as the constructor.
--- It is really hard to make the parser spot this malformation.
--- So the renamer has to check that the constructor is legal
---
--- We can get an operator as the constructor, even in the prefix form:
---      data T = :% Int Int
--- from interface files, which always print in prefix form
-
-checkConName :: RdrName -> TcRn ()
-checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
-
-badDataCon :: RdrName -> SDoc
-badDataCon name
-   = hsep [ptext (sLit "Illegal data constructor name"), quotes (ppr name)]
 \end{code}
 
 Note [Infix GADT constructors]
@@ -1267,7 +1366,7 @@ For example:
 Get the mapping from constructors to fields for this module.
 It's convenient to do this after the data type decls have been renamed
 \begin{code}
-extendRecordFieldEnv :: [[LTyClDecl RdrName]] -> [LInstDecl RdrName] -> TcM TcGblEnv
+extendRecordFieldEnv :: [TyClGroup RdrName] -> [LInstDecl RdrName] -> TcM TcGblEnv
 extendRecordFieldEnv tycl_decls inst_decls
   = do  { tcg_env <- getGblEnv
         ; field_env' <- foldrM get_con (tcg_field_env tcg_env) all_data_cons
@@ -1277,7 +1376,7 @@ extendRecordFieldEnv tycl_decls inst_decls
     --  (a) a datatype constructor
     --  (b) a record field
     -- knowing that they're from this module.
-    -- lookupLocatedTopBndrRn does this, because it does a lookupGreLocalRn,
+    -- lookupLocatedTopBndrRn does this, because it does a lookupGreLocalRn_maybe,
     -- which keeps only the local ones.
     lookup x = do { x' <- lookupLocatedTopBndrRn x
                     ; return $ unLoc x'}
@@ -1285,7 +1384,7 @@ extendRecordFieldEnv tycl_decls inst_decls
     all_data_cons :: [ConDecl RdrName]
     all_data_cons = [con | HsDataDefn { dd_cons = cons } <- all_ty_defs
                          , L _ con <- cons ]
-    all_ty_defs = [ defn | L _ (DataDecl { tcdDataDefn = defn }) <- concat tycl_decls ]
+    all_ty_defs = [ defn | L _ (DataDecl { tcdDataDefn = defn }) <- tyClGroupConcat tycl_decls ]
                ++ map dfid_defn (instDeclDataFamInsts inst_decls)  -- Do not forget associated types!
 
     get_con (ConDecl { con_name = con, con_details = RecCon flds })
@@ -1360,15 +1459,11 @@ add gp loc (SpliceD splice@(SpliceDecl _ flag)) ds
        ; return (gp, Just (splice, ds)) }
   where
     badImplicitSplice = ptext (sLit "Parse error: naked expression at top level")
+                     $$ ptext (sLit "Perhaps you intended to use TemplateHaskell")
 
-#ifndef GHCI
-add _ _ (QuasiQuoteD qq) _
-  = pprPanic "Can't do QuasiQuote declarations without GHCi" (ppr qq)
-#else
 add gp _ (QuasiQuoteD qq) ds            -- Expand quasiquotes
   = do { ds' <- runQuasiQuoteDecl qq
        ; addl gp (ds' ++ ds) }
-#endif
 
 -- Class declarations: pull out the fixity signatures to the top
 add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD d) ds
@@ -1387,6 +1482,10 @@ add gp@(HsGroup {hs_valds = ts}) l (SigD d) ds
 -- Value declarations: use add_bind
 add gp@(HsGroup {hs_valds  = ts}) l (ValD d) ds
   = addl (gp { hs_valds = add_bind (L l d) ts }) ds
+
+-- Role annotations: added to the TyClGroup
+add gp@(HsGroup {hs_tyclds = ts}) l (RoleAnnotD d) ds
+  = addl (gp { hs_tyclds = add_role_annot (L l d) ts }) ds
 
 -- The rest are routine
 add gp@(HsGroup {hs_instds = ts})  l (InstD d) ds
@@ -1408,12 +1507,18 @@ add gp@(HsGroup {hs_vects  = ts}) l (VectD d) ds
 add gp l (DocD d) ds
   = addl (gp { hs_docs = (L l d) : (hs_docs gp) })  ds
 
-add_tycld :: LTyClDecl a -> [[LTyClDecl a]] -> [[LTyClDecl a]]
-add_tycld d []       = [[d]]
-add_tycld d (ds:dss) = (d:ds) : dss
+add_tycld :: LTyClDecl a -> [TyClGroup a] -> [TyClGroup a]
+add_tycld d []       = [TyClGroup { group_tyclds = [d], group_roles = [] }]
+add_tycld d (ds@(TyClGroup { group_tyclds = tyclds }):dss)
+  = ds { group_tyclds = d : tyclds } : dss
+
+add_role_annot :: LRoleAnnotDecl a -> [TyClGroup a] -> [TyClGroup a]
+add_role_annot d [] = [TyClGroup { group_tyclds = [], group_roles = [d] }]
+add_role_annot d (tycls@(TyClGroup { group_roles = roles }) : rest)
+  = tycls { group_roles = d : roles } : rest
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
-add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs
+add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` (FromSource, b)) sigs
 add_bind _ (ValBindsOut {})     = panic "RdrHsSyn:add_bind"
 
 add_sig :: LSig a -> HsValBinds a -> HsValBinds a

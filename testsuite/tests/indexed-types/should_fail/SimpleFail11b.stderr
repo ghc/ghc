@@ -1,0 +1,10 @@
+
+SimpleFail11b.hs:7:15:
+    Conflicting family instance declarations:
+      C9 [a] Int -- Defined at SimpleFail11b.hs:7:15
+      C9 [a] Int -- Defined at SimpleFail11b.hs:9:15
+
+SimpleFail11b.hs:13:15:
+    Conflicting family instance declarations:
+      D9 [a] Int -- Defined at SimpleFail11b.hs:13:15
+      D9 [a] Int -- Defined at SimpleFail11b.hs:15:15

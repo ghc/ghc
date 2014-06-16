@@ -1,0 +1,4 @@
+ERROR "tcfail055.hs":3 - Type error in type annotation
+*** Term           : x + 1
+*** Type           : Int
+*** Does not match : Float

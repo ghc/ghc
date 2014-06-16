@@ -1,0 +1,4 @@
+
+T5716.hs:13:11:
+    ‘U’ of kind ‘*’ is not promotable
+    In the kind ‘U -> *’

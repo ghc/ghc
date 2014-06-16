@@ -1,0 +1,4 @@
+ERROR "mod52.hs":3 - Overlapping instances for class "Eq"
+*** This instance   : Eq T
+*** Overlaps with   : Eq T
+*** Common instance : Eq T

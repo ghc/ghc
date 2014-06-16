@@ -66,7 +66,7 @@ Mutex ccs_mutex;
  * Built-in cost centres and cost-centre stacks:
  *
  *    MAIN   is the root of the cost-centre stack tree.  If there are
- *           no _scc_s in the program, all costs will be attributed
+ *           no {-# SCC #-}s in the program, all costs will be attributed
  *           to MAIN.
  *
  *    SYSTEM is the RTS in general (scheduler, etc.).  All costs for
@@ -149,7 +149,7 @@ initProfiling1 (void)
     {
         nat n;
         for (n=0; n < n_capabilities; n++) {
-            capabilities[n].r.rCCCS = CCS_SYSTEM;
+            capabilities[n]->r.rCCCS = CCS_SYSTEM;
         }
     }
 

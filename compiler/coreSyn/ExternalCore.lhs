@@ -2,29 +2,22 @@
 % (c) The University of Glasgow 2001-2006
 %
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module ExternalCore where
 
 import Data.Word
 
-data Module 
+data Module
  = Module Mname [Tdef] [Vdefg]
 
-data Tdef 
+data Tdef
   = Data (Qual Tcon) [Tbind] [Cdef]
   | Newtype (Qual Tcon) (Qual Tcon) [Tbind] Ty
 
-data Cdef 
+data Cdef
   = Constr (Qual Dcon) [Tbind] [Ty]
   | GadtConstr (Qual Dcon) Ty
 
-data Vdefg 
+data Vdefg
   = Rec [Vdef]
   | Nonrec Vdef
 
@@ -32,26 +25,26 @@ data Vdefg
 -- around the module name.
 type Vdef = (Bool,Qual Var,Ty,Exp)
 
-data Exp 
+data Exp
   = Var (Qual Var)
   | Dcon (Qual Dcon)
   | Lit Lit
   | App Exp Exp
   | Appt Exp Ty
-  | Lam Bind Exp 	  
+  | Lam Bind Exp
   | Let Vdefg Exp
   | Case Exp Vbind Ty [Alt] {- non-empty list -}
-  | Cast Exp Ty
+  | Cast Exp Coercion
   | Tick String Exp {- XXX probably wrong -}
-  | External String String Ty {- target name, convention, and type -} 
-  | DynExternal String Ty {- convention and type (incl. Addr# of target as first arg) -} 
+  | External String String Ty {- target name, convention, and type -}
+  | DynExternal String Ty {- convention and type (incl. Addr# of target as first arg) -}
   | Label String
 
-data Bind 
+data Bind
   = Vb Vbind
   | Tb Tbind
 
-data Alt 
+data Alt
   = Acon (Qual Dcon) [Tbind] [Vbind] Exp
   | Alit Lit Exp
   | Adefault Exp
@@ -59,39 +52,46 @@ data Alt
 type Vbind = (Var,Ty)
 type Tbind = (Tvar,Kind)
 
--- Internally, we represent types and coercions separately; but for
--- the purposes of external core (at least for now) it's still
--- convenient to collapse them into a single type.
-data Ty 
+data Ty
   = Tvar Tvar
   | Tcon (Qual Tcon)
   | Tapp Ty Ty
-  | Tforall Tbind Ty 
+  | Tforall Tbind Ty
+
+data Coercion
 -- We distinguish primitive coercions because External Core treats
 -- them specially, so we have to print them out with special syntax.
-  | TransCoercion Ty Ty
-  | SymCoercion Ty
-  | UnsafeCoercion Ty Ty
-  | InstCoercion Ty Ty
-  | NthCoercion Int Ty
-  | AxiomCoercion (Qual Tcon) Int [Ty]
-  | LRCoercion LeftOrRight Ty
+  = ReflCoercion Role Ty
+  | SymCoercion Coercion
+  | TransCoercion Coercion Coercion
+  | TyConAppCoercion Role (Qual Tcon) [Coercion]
+  | AppCoercion Coercion Coercion
+  | ForAllCoercion Tbind Coercion
+  | CoVarCoercion Var
+  | UnivCoercion Role Ty Ty
+  | InstCoercion Coercion Ty
+  | NthCoercion Int Coercion
+  | AxiomCoercion (Qual Tcon) Int [Coercion]
+  | LRCoercion LeftOrRight Coercion
+  | SubCoercion Coercion
+
+data Role = Nominal | Representational | Phantom
 
 data LeftOrRight = CLeft | CRight
 
-data Kind 
+data Kind
   = Klifted
   | Kunlifted
   | Kunboxed
   | Kopen
   | Karrow Kind Kind
-  
-data Lit 
+
+data Lit
   = Lint Integer Ty
   | Lrational Rational Ty
   | Lchar Char Ty
   | Lstring [Word8] Ty
-  
+
 
 type Mname = Id
 type Var = Id

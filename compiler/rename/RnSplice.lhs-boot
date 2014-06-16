@@ -1,0 +1,13 @@
+\begin{code}
+module RnSplice where
+
+import HsSyn
+import TcRnMonad
+import RdrName
+import Name
+import NameSet
+
+rnSpliceType :: HsSplice RdrName   -> PostTcKind -> RnM (HsType Name, FreeVars)
+rnSplicePat  :: HsSplice RdrName   -> RnM (Pat Name, FreeVars)
+rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)
+\end{code}

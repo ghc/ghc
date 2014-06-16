@@ -1,14 +1,8 @@
 -- CmmNode type for representation using Hoopl graphs.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 module CmmNode (
      CmmNode(..), CmmFormal, CmmActual,
@@ -49,16 +43,16 @@ data CmmNode e x where
     -- Assign to memory location.  Size is
     -- given by cmmExprType of the rhs.
 
-  CmmUnsafeForeignCall ::         -- An unsafe foreign call;
-                                  -- see Note [Foreign calls]
-  		       		  -- Like a "fat machine instruction"; can occur
-				  -- in the middle of a block
-      ForeignTarget ->            -- call target
-      [CmmFormal] ->               -- zero or more results
-      [CmmActual] ->               -- zero or more arguments
+  CmmUnsafeForeignCall ::       -- An unsafe foreign call;
+                                -- see Note [Foreign calls]
+                                -- Like a "fat machine instruction"; can occur
+                                -- in the middle of a block
+      ForeignTarget ->          -- call target
+      [CmmFormal] ->            -- zero or more results
+      [CmmActual] ->            -- zero or more arguments
       CmmNode O O
       -- Semantics: clobbers any GlobalRegs for which callerSaves r == True
-      -- See Note [foreign calls clobber GlobalRegs]
+      -- See Note [Unsafe foreign calls clobber caller-save registers]
       --
       -- Invariant: the arguments and the ForeignTarget must not
       -- mention any registers for which CodeGen.Platform.callerSaves
@@ -123,12 +117,13 @@ data CmmNode e x where
   } -> CmmNode O C
 
   CmmForeignCall :: {           -- A safe foreign call; see Note [Foreign calls]
-  		    		-- Always the last node of a block
+                                -- Always the last node of a block
       tgt   :: ForeignTarget,   -- call target and convention
       res   :: [CmmFormal],     -- zero or more results
       args  :: [CmmActual],     -- zero or more arguments; see Note [Register parameter passing]
       succ  :: ULabel,          -- Label of continuation
-      updfr :: UpdFrameOffset,  -- where the update frame is (for building infotable)
+      ret_args :: ByteOff,      -- same as cml_ret_args
+      ret_off :: ByteOff,       -- same as cml_ret_off
       intrbl:: Bool             -- whether or not the call is interruptible
   } -> CmmNode O C
 
@@ -142,14 +137,14 @@ instruction".  In particular, they do *not* kill all live registers,
 just the registers they return to (there was a bit of code in GHC that
 conservatively assumed otherwise.)  However, see [Register parameter passing].
 
-Safe ones are trickier.  A safe foreign call 
+Safe ones are trickier.  A safe foreign call
      r = f(x)
 ultimately expands to
-     push "return address"	-- Never used to return to; 
-     	  	  		-- just points an info table
+     push "return address"      -- Never used to return to;
+                                -- just points an info table
      save registers into TSO
      call suspendThread
-     r = f(x)			-- Make the call
+     r = f(x)                   -- Make the call
      call resumeThread
      restore registers
      pop "return address"
@@ -163,8 +158,8 @@ made manifest in CmmLayoutStack, where they are lowered into the above
 sequence.
 -}
 
-{- Note [foreign calls clobber GlobalRegs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Unsafe foreign calls clobber caller-save registers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A foreign call is defined to clobber any GlobalRegs that are mapped to
 caller-saves machine registers (according to the prevailing C ABI).
@@ -199,20 +194,8 @@ way is done in cmm/CmmOpt.hs currently.  We should fix this!
 
 ---------------------------------------------
 -- Eq instance of CmmNode
--- It is a shame GHC cannot infer it by itself :(
 
-instance Eq (CmmNode e x) where
-  (CmmEntry a)                 == (CmmEntry a')                   = a==a'
-  (CmmComment a)               == (CmmComment a')                 = a==a'
-  (CmmAssign a b)              == (CmmAssign a' b')               = a==a' && b==b'
-  (CmmStore a b)               == (CmmStore a' b')                = a==a' && b==b'
-  (CmmUnsafeForeignCall a b c) == (CmmUnsafeForeignCall a' b' c') = a==a' && b==b' && c==c'
-  (CmmBranch a)                == (CmmBranch a')                  = a==a'
-  (CmmCondBranch a b c)        == (CmmCondBranch a' b' c')        = a==a' && b==b' && c==c'
-  (CmmSwitch a b)              == (CmmSwitch a' b')               = a==a' && b==b'
-  (CmmCall a b c d e f)          == (CmmCall a' b' c' d' e' f')   = a==a' && b==b' && c==c' && d==d' && e==e' && f==f'
-  (CmmForeignCall a b c d e f) == (CmmForeignCall a' b' c' d' e' f') = a==a' && b==b' && c==c' && d==d' && e==e' && f==f'
-  _                            == _                               = False
+deriving instance Eq (CmmNode e x)
 
 ----------------------------------------------
 -- Hoopl instances of CmmNode
@@ -346,8 +329,9 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
   foldRegsDefd dflags f z n = case n of
     CmmAssign lhs _ -> fold f z lhs
     CmmUnsafeForeignCall tgt _ _  -> fold f z (foreignTargetRegs tgt)
-    CmmCall {} -> fold f z activeRegs
-    CmmForeignCall {tgt=tgt} -> fold f z (foreignTargetRegs tgt)
+    CmmCall        {} -> fold f z activeRegs
+    CmmForeignCall {} -> fold f z activeRegs
+                      -- See Note [Safe foreign calls clobber STG registers]
     _ -> z
     where fold :: forall a b.
                    DefinerOfRegs GlobalReg a =>
@@ -361,16 +345,86 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
           foreignTargetRegs (ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns)) = []
           foreignTargetRegs _ = activeCallerSavesRegs
 
+-- Note [Safe foreign calls clobber STG registers]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- During stack layout phase every safe foreign call is expanded into a block
+-- that contains unsafe foreign call (instead of safe foreign call) and ends
+-- with a normal call (See Note [Foreign calls]). This means that we must
+-- treat safe foreign call as if it was a normal call (because eventually it
+-- will be). This is important if we try to run sinking pass before stack
+-- layout phase. Consider this example of what might go wrong (this is cmm
+-- code from stablename001 test). Here is code after common block elimination
+-- (before stack layout):
+--
+--  c1q6:
+--      _s1pf::P64 = R1;
+--      _c1q8::I64 = performMajorGC;
+--      I64[(young<c1q9> + 8)] = c1q9;
+--      foreign call "ccall" arg hints:  []  result hints:  [] (_c1q8::I64)(...)
+--                   returns to c1q9 args: ([]) ress: ([])ret_args: 8ret_off: 8;
+--  c1q9:
+--      I64[(young<c1qb> + 8)] = c1qb;
+--      R1 = _s1pc::P64;
+--      call stg_makeStableName#(R1) returns to c1qb, args: 8, res: 8, upd: 8;
+--
+-- If we run sinking pass now (still before stack layout) we will get this:
+--
+--  c1q6:
+--      I64[(young<c1q9> + 8)] = c1q9;
+--      foreign call "ccall" arg hints:  []  result hints:  [] performMajorGC(...)
+--                   returns to c1q9 args: ([]) ress: ([])ret_args: 8ret_off: 8;
+--  c1q9:
+--      I64[(young<c1qb> + 8)] = c1qb;
+--      _s1pf::P64 = R1;         <------ _s1pf sunk past safe foreign call
+--      R1 = _s1pc::P64;
+--      call stg_makeStableName#(R1) returns to c1qb, args: 8, res: 8, upd: 8;
+--
+-- Notice that _s1pf was sunk past a foreign call. When we run stack layout
+-- safe call to performMajorGC will be turned into:
+--
+--  c1q6:
+--      _s1pc::P64 = P64[Sp + 8];
+--      I64[Sp - 8] = c1q9;
+--      Sp = Sp - 8;
+--      I64[I64[CurrentTSO + 24] + 16] = Sp;
+--      P64[CurrentNursery + 8] = Hp + 8;
+--      (_u1qI::I64) = call "ccall" arg hints:  [PtrHint,]
+--                           result hints:  [PtrHint] suspendThread(BaseReg, 0);
+--      call "ccall" arg hints:  []  result hints:  [] performMajorGC();
+--      (_u1qJ::I64) = call "ccall" arg hints:  [PtrHint]
+--                           result hints:  [PtrHint] resumeThread(_u1qI::I64);
+--      BaseReg = _u1qJ::I64;
+--      _u1qK::P64 = CurrentTSO;
+--      _u1qL::P64 = I64[_u1qK::P64 + 24];
+--      Sp = I64[_u1qL::P64 + 16];
+--      SpLim = _u1qL::P64 + 192;
+--      HpAlloc = 0;
+--      Hp = I64[CurrentNursery + 8] - 8;
+--      HpLim = I64[CurrentNursery] + (%MO_SS_Conv_W32_W64(I32[CurrentNursery + 48]) * 4096 - 1);
+--      call (I64[Sp])() returns to c1q9, args: 8, res: 8, upd: 8;
+--  c1q9:
+--      I64[(young<c1qb> + 8)] = c1qb;
+--      _s1pf::P64 = R1;         <------ INCORRECT!
+--      R1 = _s1pc::P64;
+--      call stg_makeStableName#(R1) returns to c1qb, args: 8, res: 8, upd: 8;
+--
+-- Notice that c1q6 now ends with a call. Sinking _s1pf::P64 = R1 past that
+-- call is clearly incorrect. This is what would happen if we assumed that
+-- safe foreign call has the same semantics as unsafe foreign call. To prevent
+-- this we need to treat safe foreign call as if was normal call.
 
 -----------------------------------
 -- mapping Expr in CmmNode
 
-mapForeignTarget :: (CmmExpr -> CmmExpr) -> ForeignTarget -> ForeignTarget 
+mapForeignTarget :: (CmmExpr -> CmmExpr) -> ForeignTarget -> ForeignTarget
 mapForeignTarget exp   (ForeignTarget e c) = ForeignTarget (exp e) c
 mapForeignTarget _   m@(PrimTarget _)      = m
 
--- Take a transformer on expressions and apply it recursively.
 wrapRecExp :: (CmmExpr -> CmmExpr) -> CmmExpr -> CmmExpr
+-- Take a transformer on expressions and apply it recursively.
+-- (wrapRecExp f e) first recursively applies itself to sub-expressions of e
+--                  then  uses f to rewrite the resulting expression
 wrapRecExp f (CmmMachOp op es)    = f (CmmMachOp op $ map (wrapRecExp f) es)
 wrapRecExp f (CmmLoad addr ty)    = f (CmmLoad (wrapRecExp f addr) ty)
 wrapRecExp f e                    = f e
@@ -385,7 +439,7 @@ mapExp _ l@(CmmBranch _)                         = l
 mapExp f   (CmmCondBranch e ti fi)               = CmmCondBranch (f e) ti fi
 mapExp f   (CmmSwitch e tbl)                     = CmmSwitch (f e) tbl
 mapExp f   n@CmmCall {cml_target=tgt}            = n{cml_target = f tgt}
-mapExp f   (CmmForeignCall tgt fs as succ updfr intrbl) = CmmForeignCall (mapForeignTarget f tgt) fs (map f as) succ updfr intrbl
+mapExp f   (CmmForeignCall tgt fs as succ ret_args updfr intrbl) = CmmForeignCall (mapForeignTarget f tgt) fs (map f as) succ ret_args updfr intrbl
 
 mapExpDeep :: (CmmExpr -> CmmExpr) -> CmmNode e x -> CmmNode e x
 mapExpDeep f = mapExp $ wrapRecExp f
@@ -398,6 +452,8 @@ mapForeignTargetM f (ForeignTarget e c) = (\x -> ForeignTarget x c) `fmap` f e
 mapForeignTargetM _ (PrimTarget _)      = Nothing
 
 wrapRecExpM :: (CmmExpr -> Maybe CmmExpr) -> (CmmExpr -> Maybe CmmExpr)
+-- (wrapRecExpM f e) first recursively applies itself to sub-expressions of e
+--                   then  gives f a chance to rewrite the resulting expression
 wrapRecExpM f n@(CmmMachOp op es)  = maybe (f n) (f . CmmMachOp op)    (mapListM (wrapRecExpM f) es)
 wrapRecExpM f n@(CmmLoad addr ty)  = maybe (f n) (f . flip CmmLoad ty) (wrapRecExpM f addr)
 wrapRecExpM f e                    = f e
@@ -415,10 +471,10 @@ mapExpM f (CmmUnsafeForeignCall tgt fs as)
     = case mapForeignTargetM f tgt of
         Just tgt' -> Just (CmmUnsafeForeignCall tgt' fs (mapListJ f as))
         Nothing   -> (\xs -> CmmUnsafeForeignCall tgt fs xs) `fmap` mapListM f as
-mapExpM f (CmmForeignCall tgt fs as succ updfr intrbl)
+mapExpM f (CmmForeignCall tgt fs as succ ret_args updfr intrbl)
     = case mapForeignTargetM f tgt of
-        Just tgt' -> Just (CmmForeignCall tgt' fs (mapListJ f as) succ updfr intrbl)
-        Nothing   -> (\xs -> CmmForeignCall tgt fs xs succ updfr intrbl) `fmap` mapListM f as
+        Just tgt' -> Just (CmmForeignCall tgt' fs (mapListJ f as) succ ret_args updfr intrbl)
+        Nothing   -> (\xs -> CmmForeignCall tgt fs xs succ ret_args updfr intrbl) `fmap` mapListM f as
 
 -- share as much as possible
 mapListM :: (a -> Maybe a) -> [a] -> Maybe [a]
@@ -441,11 +497,13 @@ mapExpDeepM f = mapExpM $ wrapRecExpM f
 -----------------------------------
 -- folding Expr in CmmNode
 
-foldExpForeignTarget :: (CmmExpr -> z -> z) -> ForeignTarget -> z -> z 
+foldExpForeignTarget :: (CmmExpr -> z -> z) -> ForeignTarget -> z -> z
 foldExpForeignTarget exp (ForeignTarget e _) z = exp e z
 foldExpForeignTarget _   (PrimTarget _)      z = z
 
 -- Take a folder on expressions and apply it recursively.
+-- Specifically (wrapRecExpf f e z) deals with CmmMachOp and CmmLoad
+-- itself, delegating all the other CmmExpr forms to 'f'.
 wrapRecExpf :: (CmmExpr -> z -> z) -> CmmExpr -> z -> z
 wrapRecExpf f e@(CmmMachOp _ es) z = foldr (wrapRecExpf f) (f e z) es
 wrapRecExpf f e@(CmmLoad addr _) z = wrapRecExpf f addr (f e z)

@@ -5,7 +5,7 @@
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module IfaceEnv (
@@ -55,10 +55,27 @@ import Data.IORef    ( atomicModifyIORef, readIORef )
 %*							*
 %*********************************************************
 
+Note [The Name Cache]
+~~~~~~~~~~~~~~~~~~~~~
+The Name Cache makes sure that, during any invovcation of GHC, each
+External Name "M.x" has one, and only one globally-agreed Unique.
+
+* The first time we come across M.x we make up a Unique and record that
+  association in the Name Cache.
+
+* When we come across "M.x" again, we look it up in the Name Cache,
+  and get a hit.
+
+The functions newGlobalBinder, allocateGlobalBinder do the main work.
+When you make an External name, you should probably be calling one
+of them.
+
+
 \begin{code}
 newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 -- Used for source code and interface files, to make the
 -- Name for a thing, given its Module and OccName
+-- See Note [The Name Cache]
 --
 -- The cache may already already have a binding for this thing,
 -- because we may have seen an occurrence before, but now is the
@@ -74,6 +91,7 @@ allocateGlobalBinder
   :: NameCache 
   -> Module -> OccName -> SrcSpan
   -> (NameCache, Name)
+-- See Note [The Name Cache]
 allocateGlobalBinder name_supply mod occ loc
   = case lookupOrigNameCache (nsNames name_supply) mod occ of
         -- A hit in the cache!  We are at the binding site of the name.
@@ -92,12 +110,14 @@ allocateGlobalBinder name_supply mod occ loc
         -- 	      Their wired-in-ness is in their NameSort
         --	      and their Module is correct.
 
-        Just name | isWiredInName name -> (name_supply, name)
-                  | mod /= iNTERACTIVE -> (new_name_supply, name')
-                     -- Note [interactive name cache]
+        Just name | isWiredInName name
+                  -> (name_supply, name)
+                  | otherwise
+                  -> (new_name_supply, name')
                   where
                     uniq            = nameUnique name
                     name'           = mkExternalName uniq mod occ loc
+                                      -- name' is like name, but with the right SrcSpan
                     new_cache       = extendNameCache (nsNames name_supply) mod occ name'
                     new_name_supply = name_supply {nsNames = new_cache}
 
@@ -109,16 +129,6 @@ allocateGlobalBinder name_supply mod occ loc
                     name            = mkExternalName uniq mod occ loc
                     new_cache       = extendNameCache (nsNames name_supply) mod occ name
                     new_name_supply = name_supply {nsUniqs = us', nsNames = new_cache}
-
-{- Note [interactive name cache]
-
-In GHCi we always create Names with the same Module, ":Interactive".
-However, we want to be able to shadow older declarations with newer
-ones, and we don't want the Name cache giving us back the same Unique
-for the new Name as for the old, hence this special case.
-
-See also Note [Outputable Orig RdrName] in HscTypes.
--}
 
 newImplicitBinder :: Name			-- Base name
 	          -> (OccName -> OccName) 	-- Occurrence name modifier
@@ -171,6 +181,8 @@ lookupOrig mod occ
 %*									*
 %************************************************************************
 
+See Note [The Name Cache] above.
+
 \begin{code}
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache _ mod occ
@@ -215,7 +227,7 @@ updNameCache upd_fn = do
 -- | A function that atomically updates the name cache given a modifier
 -- function.  The second result of the modifier function will be the result
 -- of the IO action.
-data NameCacheUpdater = NCU { updateNameCache :: forall c. (NameCache -> (NameCache, c)) -> IO c }
+newtype NameCacheUpdater = NCU { updateNameCache :: forall c. (NameCache -> (NameCache, c)) -> IO c }
 
 -- | Return a function to atomically update the name cache.
 mkNameCacheUpdater :: TcRnIf a b NameCacheUpdater

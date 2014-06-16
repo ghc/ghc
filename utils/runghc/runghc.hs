@@ -48,14 +48,14 @@ main = do
     case parseRunGhcFlags args of
         (Help, _) -> printUsage
         (ShowVersion, _) -> printVersion
-        (RunGhcFlags (Just ghc), args') -> doIt ghc args'
+        (RunGhcFlags (Just ghc), args') -> uncurry (doIt ghc) $ getGhcArgs args'
         (RunGhcFlags Nothing, args') -> do
             mbPath <- getExecPath
             case mbPath of
                 Nothing  -> dieProg ("cannot find ghc")
                 Just path ->
                     let ghc = takeDirectory (normalise path) </> "ghc"
-                    in doIt ghc args'
+                    in uncurry (doIt ghc) $ getGhcArgs args'
 
 data RunGhcFlags = RunGhcFlags (Maybe FilePath) -- GHC location
                  | Help -- Print help text
@@ -96,9 +96,11 @@ printUsage = do
     putStrLn "    --help                Print this usage information"
     putStrLn "    --version             Print version number"
 
-doIt :: String -> [String] -> IO ()
-doIt ghc args = do
-    let (ghc_args, rest) = getGhcArgs args
+doIt :: String -- ^ path to GHC
+     -> [String] -- ^ GHC args
+     -> [String] -- ^ rest of the args
+     -> IO ()
+doIt ghc ghc_args rest = do
     case rest of
         [] -> do
            -- behave like typical perl, python, ruby interpreters:
@@ -110,7 +112,7 @@ doIt ghc args = do
              $ \(filename,h) -> do
                  getContents >>= hPutStr h
                  hClose h
-                 doIt ghc (ghc_args ++ [filename])
+                 doIt ghc ghc_args [filename]
         filename : prog_args -> do
             -- If the file exists, and is not a .lhs file, then we
             -- want to treat it as a .hs file.
@@ -136,7 +138,11 @@ getGhcArgs args
                               (xs, "--":ys) -> (xs, ys)
                               (xs, ys)      -> (xs, ys)
    in (map unescape ghcArgs, otherArgs)
-    where unescape ('-':'-':'g':'h':'c':'-':'a':'r':'g':'=':arg) = arg
+    where unescape ('-':'-':'g':'h':'c':'-':'a':'r':'g':'=':arg) =
+                case arg of
+                    -- Bug #8601: allow --ghc-arg=--ghc-arg= as a prefix as well for backwards compatibility
+                    ('-':'-':'g':'h':'c':'-':'a':'r':'g':'=':arg') -> arg'
+                    _ -> arg
           unescape arg = arg
 
 pastArgs :: String -> Bool

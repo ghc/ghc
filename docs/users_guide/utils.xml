@@ -187,7 +187,7 @@ tags:
       <variablelist>
 	<varlistentry>
 	  <term><literal>-o FILE</literal> or
-	  <literal>&ndash;&ndash;output=FILE</literal></term>
+	  <literal>--output=FILE</literal></term>
 	  <listitem>
 	    <para>Name of the Haskell file.</para>
 	  </listitem>
@@ -195,7 +195,7 @@ tags:
 
 	<varlistentry>
 	  <term><literal>-t FILE</literal> or
-	  <literal>&ndash;&ndash;template=FILE</literal></term>
+	  <literal>--template=FILE</literal></term>
 	  <listitem>
 	    <para>The template file (see below).</para>
 	  </listitem>
@@ -203,7 +203,7 @@ tags:
 
 	<varlistentry>
 	  <term><literal>-c PROG</literal> or
-	  <literal>&ndash;&ndash;cc=PROG</literal></term>
+	  <literal>--cc=PROG</literal></term>
 	  <listitem>
 	    <para>The C compiler to use (default:
 	    <command>gcc</command>)</para>
@@ -212,7 +212,7 @@ tags:
 
 	<varlistentry>
 	  <term><literal>-l PROG</literal> or
-	  <literal>&ndash;&ndash;ld=PROG</literal></term>
+	  <literal>--ld=PROG</literal></term>
 	  <listitem>
 	    <para>The linker to use (default:
 	    <command>gcc</command>).</para>
@@ -221,7 +221,7 @@ tags:
 
 	<varlistentry>
 	  <term><literal>-C FLAG</literal> or
-	  <literal>&ndash;&ndash;cflag=FLAG</literal></term>
+	  <literal>--cflag=FLAG</literal></term>
 	  <listitem>
 	    <para>An extra flag to pass to the C compiler.</para>
 	  </listitem>
@@ -236,7 +236,7 @@ tags:
 
 	<varlistentry>
 	  <term><literal>-L FLAG</literal> or
-	  <literal>&ndash;&ndash;lflag=FLAG</literal></term>
+	  <literal>--lflag=FLAG</literal></term>
 	  <listitem>
 	    <para>An extra flag to pass to the linker.</para>
 	  </listitem>
@@ -244,7 +244,7 @@ tags:
 
 	<varlistentry>
 	  <term><literal>-i FILE</literal> or
-	  <literal>&ndash;&ndash;include=FILE</literal></term>
+	  <literal>--include=FILE</literal></term>
 	  <listitem>
 	    <para>As if the appropriate <literal>#include</literal>
             directive was placed in the source.</para>
@@ -253,7 +253,7 @@ tags:
 
 	<varlistentry>
 	  <term><literal>-D NAME[=VALUE]</literal> or
-	  <literal>&ndash;&ndash;define=NAME[=VALUE]</literal></term>
+	  <literal>--define=NAME[=VALUE]</literal></term>
 	  <listitem>
 	    <para>As if the appropriate <literal>#define</literal>
             directive was placed in the source.</para>
@@ -261,7 +261,7 @@ tags:
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>&ndash;&ndash;no-compile</literal></term>
+	  <term><literal>--no-compile</literal></term>
 	  <listitem>
 	    <para>Stop after writing out the intermediate C program to disk.
 	    The file name for the intermediate C program is the input file name
@@ -271,7 +271,7 @@ tags:
 
 	<varlistentry>
 	  <term><literal>-k</literal> or
-	  <literal>&ndash;&ndash;keep-files</literal></term>
+	  <literal>--keep-files</literal></term>
 	  <listitem>
 	    <para>Proceed as normal, but do not delete any intermediate files.</para>
 	  </listitem>
@@ -279,14 +279,14 @@ tags:
 
 	<varlistentry>
 	  <term><literal>-x</literal> or
-	  <literal>&ndash;&ndash;cross-compile</literal></term>
+	  <literal>--cross-compile</literal></term>
 	  <listitem>
 	    <para>Activate cross-compilation mode (see <xref linkend="hsc2hs_cross"/>).</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>&ndash;&ndash;cross-safe</literal></term>
+	  <term><literal>--cross-safe</literal></term>
 	  <listitem>
 	    <para>Restrict the .hsc directives to those supported by the
             <literal>--cross-compile</literal> mode (see <xref linkend="hsc2hs_cross"/>).
@@ -298,14 +298,14 @@ tags:
 
 
 	<varlistentry>
-	  <term><literal>-?</literal> or <literal>&ndash;&ndash;help</literal></term>
+	  <term><literal>-?</literal> or <literal>--help</literal></term>
 	  <listitem>
 	    <para>Display a summary of the available flags and exit successfully.</para>
 	  </listitem>
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>-V</literal> or <literal>&ndash;&ndash;version</literal></term>
+	  <term><literal>-V</literal> or <literal>--version</literal></term>
 	  <listitem>
 	    <para>Output version information and exit successfully.</para>
 	  </listitem>

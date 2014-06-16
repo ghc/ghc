@@ -6,7 +6,7 @@
 \begin{code}
 module SimplUtils (
         -- Rebuilding
-        mkLam, mkCase, prepareAlts, tryEtaExpand,
+        mkLam, mkCase, prepareAlts, tryEtaExpandRhs,
 
         -- Inlining,
         preInlineUnconditionally, postInlineUnconditionally,
@@ -15,15 +15,17 @@ module SimplUtils (
         simplEnvForGHCi, updModeForInlineRules,
 
         -- The continuation type
-        SimplCont(..), DupFlag(..), ArgInfo(..),
+        SimplCont(..), DupFlag(..), 
         isSimplified,
         contIsDupable, contResultType, contInputType,
         contIsTrivial, contArgs, dropArgs,
-        pushSimplifiedArgs, countValArgs, countArgs, addArgTo,
+        pushSimplifiedArgs, countValArgs, countArgs, 
         mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
-        interestingCallContext,
+        interestingCallContext, interestingArg, 
 
-        interestingArg, mkArgInfo,
+        -- ArgInfo
+        ArgInfo(..), ArgSpec(..), mkArgInfo, addArgTo, addCastTo, 
+        argInfoExpr, argInfoValArgs,
 
         abstractFloats
     ) where
@@ -91,12 +93,14 @@ Key points:
 data SimplCont
   = Stop                -- An empty context, or <hole>
         OutType         -- Type of the <hole>
-        CallCtxt        -- True <=> There is something interesting about
+        CallCtxt        -- Tells if there is something interesting about
                         --          the context, and hence the inliner
                         --          should be a bit keener (see interestingCallContext)
                         -- Specifically:
                         --     This is an argument of a function that has RULES
                         --     Inlining the call might allow the rule to fire
+                        -- Never ValAppCxt (use ApplyTo instead)
+                        -- or CaseCtxt (use Select instead)
 
   | CoerceIt            -- <hole> `cast` co
         OutCoercion             -- The coercion simplified
@@ -132,7 +136,7 @@ data SimplCont
 data ArgInfo
   = ArgInfo {
         ai_fun   :: OutId,      -- The function
-        ai_args  :: [OutExpr],  -- ...applied to these args (which are in *reverse* order)
+        ai_args  :: [ArgSpec],  -- ...applied to these args (which are in *reverse* order)
         ai_type  :: OutType,    -- Type of (f a1 ... an)
 
         ai_rules :: [CoreRule], -- Rules for this function
@@ -149,9 +153,37 @@ data ArgInfo
                                 --   Always infinite
     }
 
+data ArgSpec = ValArg OutExpr       -- Apply to this
+             | CastBy OutCoercion   -- Cast by this
+
+instance Outputable ArgSpec where
+  ppr (ValArg e) = ptext (sLit "ValArg") <+> ppr e
+  ppr (CastBy c) = ptext (sLit "CastBy") <+> ppr c
+
 addArgTo :: ArgInfo -> OutExpr -> ArgInfo
-addArgTo ai arg = ai { ai_args = arg : ai_args ai
+addArgTo ai arg = ai { ai_args = ValArg arg : ai_args ai
                      , ai_type = applyTypeToArg (ai_type ai) arg  }
+
+addCastTo :: ArgInfo -> OutCoercion -> ArgInfo
+addCastTo ai co = ai { ai_args = CastBy co : ai_args ai
+                     , ai_type = pSnd (coercionKind co) }
+
+argInfoValArgs :: SimplEnv -> [ArgSpec] -> SimplCont -> ([OutExpr], SimplCont)
+argInfoValArgs env args cont
+  = go args [] cont
+  where
+    go :: [ArgSpec] -> [OutExpr] -> SimplCont -> ([OutExpr], SimplCont)
+    go (ValArg e  : as) acc cont = go as (e:acc) cont
+    go (CastBy co : as) acc cont = go as [] (CoerceIt co (pushSimplifiedArgs env acc cont))
+    go []               acc cont = (acc, cont)
+
+argInfoExpr :: OutId -> [ArgSpec] -> OutExpr
+argInfoExpr fun args
+  = go args
+  where
+    go []               = Var fun
+    go (ValArg a : as)  = go as `App` a
+    go (CastBy co : as) = mkCast (go as) co
 
 instance Outputable SimplCont where
   ppr (Stop ty interesting)          = ptext (sLit "Stop") <> brackets (ppr interesting) <+> ppr ty
@@ -194,7 +226,7 @@ mkBoringStop :: OutType -> SimplCont
 mkBoringStop ty = Stop ty BoringCtxt
 
 mkRhsStop :: OutType -> SimplCont       -- See Note [RHS of lets] in CoreUnfold
-mkRhsStop ty = Stop ty (ArgCtxt False)
+mkRhsStop ty = Stop ty RhsCtxt
 
 mkLazyArgStop :: OutType -> CallCtxt -> SimplCont
 mkLazyArgStop ty cci = Stop ty cci
@@ -205,6 +237,10 @@ contIsRhsOrArg (Stop {})       = True
 contIsRhsOrArg (StrictBind {}) = True
 contIsRhsOrArg (StrictArg {})  = True
 contIsRhsOrArg _               = False
+
+contIsRhs :: SimplCont -> Bool
+contIsRhs (Stop _ RhsCtxt) = True
+contIsRhs _                = False
 
 -------------------
 contIsDupable :: SimplCont -> Bool
@@ -258,20 +294,26 @@ countArgs (ApplyTo _ _ _ cont) = 1 + countArgs cont
 countArgs _                    = 0
 
 contArgs :: SimplCont -> (Bool, [ArgSummary], SimplCont)
--- Uses substitution to turn each arg into an OutExpr
-contArgs cont@(ApplyTo {})
-  = case go [] cont of { (args, cont') -> (False, args, cont') }
+-- Summarises value args, discards type args and coercions
+-- The returned continuation of the call is only used to 
+-- answer questions like "are you interesting?"
+contArgs cont
+  | lone cont = (True, [], cont)
+  | otherwise = go [] cont
   where
+    lone (ApplyTo {})  = False  -- See Note [Lone variables] in CoreUnfold
+    lone (CoerceIt {}) = False
+    lone _             = True
+
     go args (ApplyTo _ arg se cont)
-      | isTypeArg arg = go args                           cont
-      | otherwise     = go (is_interesting arg se : args) cont
-    go args cont      = (reverse args, cont)
+      | isTypeArg arg         = go args                           cont
+      | otherwise             = go (is_interesting arg se : args) cont
+    go args (CoerceIt _ cont) = go args cont
+    go args cont              = (False, reverse args, cont)
 
     is_interesting arg se = interestingArg (substExpr (text "contArgs") se arg)
                    -- Do *not* use short-cutting substitution here
                    -- because we want to get as much IdInfo as possible
-
-contArgs cont = (True, [], cont)
 
 pushSimplifiedArgs :: SimplEnv -> [CoreExpr] -> SimplCont -> SimplCont
 pushSimplifiedArgs _env []         cont = cont
@@ -325,11 +367,7 @@ interestingCallContext :: SimplCont -> CallCtxt
 interestingCallContext cont
   = interesting cont
   where
-    interesting (Select _ bndr _ _ _)
-        | isDeadBinder bndr = CaseCtxt
-        | otherwise         = ArgCtxt False     -- If the binder is used, this
-                                                -- is like a strict let
-                                                -- See Note [RHS of lets] in CoreUnfold
+    interesting (Select _ _bndr _ _ _) = CaseCtxt
 
     interesting (ApplyTo _ arg _ cont)
         | isTypeArg arg = interesting cont
@@ -469,8 +507,8 @@ interestingArgContext rules call_cont
     go (Stop _ cci)        = interesting cci
     go (TickIt _ c)        = go c
 
-    interesting (ArgCtxt rules) = rules
-    interesting _               = False
+    interesting RuleArgCtxt = True
+    interesting _           = False
 \end{code}
 
 
@@ -641,19 +679,21 @@ activeUnfolding env
   where
     mode = getMode env
 
-getUnfoldingInRuleMatch :: SimplEnv -> IdUnfoldingFun
+getUnfoldingInRuleMatch :: SimplEnv -> InScopeEnv
 -- When matching in RULE, we want to "look through" an unfolding
 -- (to see a constructor) if *rules* are on, even if *inlinings*
 -- are not.  A notable example is DFuns, which really we want to
 -- match in rules like (op dfun) in gentle mode. Another example
 -- is 'otherwise' which we want exprIsConApp_maybe to be able to
 -- see very early on
-getUnfoldingInRuleMatch env id
-  | unf_is_active = idUnfolding id
-  | otherwise     = NoUnfolding
+getUnfoldingInRuleMatch env
+  = (in_scope, id_unf)
   where
+    in_scope = seInScope env
     mode = getMode env
-    unf_is_active
+    id_unf id | unf_is_active id = idUnfolding id
+              | otherwise        = NoUnfolding
+    unf_is_active id
      | not (sm_rules mode) = active_unfolding_minimal id
      | otherwise           = isActive (sm_phase mode) (idInlineActivation id)
 
@@ -1046,14 +1086,14 @@ won't inline because 'e' is too big.
 %************************************************************************
 
 \begin{code}
-mkLam :: SimplEnv -> [OutBndr] -> OutExpr -> SimplM OutExpr
+mkLam :: [OutBndr] -> OutExpr -> SimplCont -> SimplM OutExpr
 -- mkLam tries three things
 --      a) eta reduction, if that gives a trivial expression
 --      b) eta expansion [only if there are some value lambdas]
 
-mkLam _b [] body
+mkLam [] body _cont
   = return body
-mkLam _env bndrs body
+mkLam bndrs body cont
   = do  { dflags <- getDynFlags
         ; mkLam' dflags bndrs body }
   where
@@ -1062,7 +1102,7 @@ mkLam _env bndrs body
       | not (any bad bndrs)
         -- Note [Casts and lambdas]
       = do { lam <- mkLam' dflags bndrs body
-           ; return (mkCast lam (mkPiCos bndrs co)) }
+           ; return (mkCast lam (mkPiCos Representational bndrs co)) }
       where
         co_vars  = tyCoVarsOfCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
@@ -1078,10 +1118,36 @@ mkLam _env bndrs body
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
 
+      | not (contIsRhs cont)   -- See Note [Eta-expanding lambdas]
+      , gopt Opt_DoLambdaEtaExpansion dflags
+      , any isRuntimeVar bndrs
+      , let body_arity = exprEtaExpandArity dflags body
+      , body_arity > 0
+      = do { tick (EtaExpansion (head bndrs))
+           ; return (mkLams bndrs (etaExpand body_arity body)) }
+
       | otherwise
       = return (mkLams bndrs body)
 \end{code}
 
+
+Note [Eta expanding lambdas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general we *do* want to eta-expand lambdas. Consider
+   f (\x -> case x of (a,b) -> \s -> blah)
+where 's' is a state token, and hence can be eta expanded.  This
+showed up in the code for GHc.IO.Handle.Text.hPutChar, a rather
+important function!
+
+The eta-expansion will never happen unless we do it now.  (Well, it's
+possible that CorePrep will do it, but CorePrep only has a half-baked
+eta-expander that can't deal with casts.  So it's much better to do it
+here.)
+
+However, when the lambda is let-bound, as the RHS of a let, we have a
+better eta-expander (in the form of tryEtaExpandRhs), so we don't
+bother to try expansion in mkLam in that case; hence the contIsRhs
+guard.
 
 Note [Casts and lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1122,9 +1188,10 @@ because the latter is not well-kinded.
 %************************************************************************
 
 \begin{code}
-tryEtaExpand :: SimplEnv -> OutId -> OutExpr -> SimplM (Arity, OutExpr)
+tryEtaExpandRhs :: SimplEnv -> OutId -> OutExpr -> SimplM (Arity, OutExpr)
 -- See Note [Eta-expanding at let bindings]
-tryEtaExpand env bndr rhs
+-- and Note [Eta expansion to manifest arity]
+tryEtaExpandRhs env bndr rhs
   = do { dflags <- getDynFlags
        ; (new_arity, new_rhs) <- try_expand dflags
 
@@ -1139,9 +1206,10 @@ tryEtaExpand env bndr rhs
       = return (exprArity rhs, rhs)
 
       | sm_eta_expand (getMode env)      -- Provided eta-expansion is on
-      , let new_arity = findArity dflags bndr rhs old_arity
+      , let new_arity1 = findRhsArity dflags bndr rhs old_arity
+            new_arity2 = idCallArity bndr
+            new_arity  = max new_arity1 new_arity2
       , new_arity > manifest_arity      -- And the curent manifest arity isn't enough
-                                        -- See Note [Eta expansion to manifest arity]
       = do { tick (EtaExpansion bndr)
            ; return (new_arity, etaExpand new_arity rhs) }
       | otherwise
@@ -1150,46 +1218,13 @@ tryEtaExpand env bndr rhs
     manifest_arity = manifestArity rhs
     old_arity  = idArity bndr
     _dmd_arity = length $ fst $ splitStrictSig $ idStrictness bndr
-
-findArity :: DynFlags -> Id -> CoreExpr -> Arity -> Arity
--- This implements the fixpoint loop for arity analysis
--- See Note [Arity analysis]
-findArity dflags bndr rhs old_arity
-  = go (exprEtaExpandArity dflags init_cheap_app rhs)
-       -- We always call exprEtaExpandArity once, but usually
-       -- that produces a result equal to old_arity, and then
-       -- we stop right away (since arities should not decrease)
-       -- Result: the common case is that there is just one iteration
-  where
-    init_cheap_app :: CheapAppFun
-    init_cheap_app fn n_val_args
-      | fn == bndr = True   -- On the first pass, this binder gets infinite arity
-      | otherwise  = isCheapApp fn n_val_args
-
-    go :: Arity -> Arity
-    go cur_arity
-      | cur_arity <= old_arity = cur_arity
-      | new_arity == cur_arity = cur_arity
-      | otherwise = ASSERT( new_arity < cur_arity )
-#ifdef DEBUG
-                    pprTrace "Exciting arity"
-                       (vcat [ ppr bndr <+> ppr cur_arity <+> ppr new_arity
-                             , ppr rhs])
-#endif
-                    go new_arity
-      where
-        new_arity = exprEtaExpandArity dflags cheap_app rhs
-
-        cheap_app :: CheapAppFun
-        cheap_app fn n_val_args
-          | fn == bndr = n_val_args < cur_arity
-          | otherwise  = isCheapApp fn n_val_args
 \end{code}
 
 Note [Eta-expanding at let bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We now eta expand at let-bindings, which is where the payoff
-comes.
+We now eta expand at let-bindings, which is where the payoff comes.
+The most significant thing is that we can do a simple arity analysis
+(in CoreArity.findRhsArity), which we can't do for free-floating lambdas
 
 One useful consequence is this example:
    genMap :: C a => ...
@@ -1208,50 +1243,6 @@ We do not want to eta-expand to
 because then 'genMap' will inline, and it really shouldn't: at least
 as far as the programmer is concerned, it's not applied to two
 arguments!
-
-Note [Eta expansion to manifest arity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Eta expansion does *not* eta-expand trivial RHSs, like
-    x = y
-because these will get substituted out in short order.  (Indeed
-we *eta-contract* if that yields a trivial RHS.)
-
-Otherwise we eta-expand to produce enough manifest lambdas.
-This *does* eta-expand partial applications.  eg
-      x = map g         -->    x = \v -> map g v
-      y = \_ -> map g   -->    y = \_ v -> map g v
-One benefit this is that in the definition of y there was
-a danger that full laziness would transform to
-      lvl = map g
-      y = \_ -> lvl
-which is stupid.  This doesn't happen in the eta-expanded form.
-
-Note [Arity analysis]
-~~~~~~~~~~~~~~~~~~~~~
-The motivating example for arity analysis is this:
-
-  f = \x. let g = f (x+1)
-          in \y. ...g...
-
-What arity does f have?  Really it should have arity 2, but a naive
-look at the RHS won't see that.  You need a fixpoint analysis which
-says it has arity "infinity" the first time round.
-
-This example happens a lot; it first showed up in Andy Gill's thesis,
-fifteen years ago!  It also shows up in the code for 'rnf' on lists
-in Trac #4138.
-
-The analysis is easy to achieve because exprEtaExpandArity takes an
-argument
-     type CheapFun = CoreExpr -> Maybe Type -> Bool
-used to decide if an expression is cheap enough to push inside a
-lambda.  And exprIsCheap' in turn takes an argument
-     type CheapAppFun = Id -> Int -> Bool
-which tells when an application is cheap. This makes it easy to
-write the analysis loop.
-
-The analysis is cheap-and-cheerful because it doesn't deal with
-mutual recursion.  But the self-recursive case is the important one.
 
 
 %************************************************************************
@@ -1471,7 +1462,7 @@ prepareAlts tries these things:
 
 Here "cannot match" includes knowledge from GADTs
 
-It's a good idea do do this stuff before simplifying the alternatives, to
+It's a good idea to do this stuff before simplifying the alternatives, to
 avoid simplifying alternatives we know can't happen, and to come up with
 the list of constructors that are handled, to put into the IdInfo of the
 case binder, for use when simplifying the alternatives.
@@ -1514,7 +1505,7 @@ prepareAlts scrut case_bndr' alts
                     _     -> []
 \end{code}
 
-Note [Combine identical alterantives]
+Note [Combine identical alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  If several alternatives are identical, merge them into
  a single DEFAULT alternative.  I've occasionally seen this
@@ -1559,7 +1550,7 @@ defeats combineIdenticalAlts (see Trac #7360).
 
 \begin{code}
 combineIdenticalAlts :: OutId -> [InAlt] -> SimplM [InAlt]
--- See Note [Combine identical alterantives]
+-- See Note [Combine identical alternatives]
 combineIdenticalAlts case_bndr ((_con1,bndrs1,rhs1) : con_alts)
   | all isDeadBinder bndrs1                     -- Remember the default
   , length filtered_alts < length con_alts      -- alternative comes first

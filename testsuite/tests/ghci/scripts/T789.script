@@ -1,0 +1,2 @@
+:l T789.hs
+print $ length table

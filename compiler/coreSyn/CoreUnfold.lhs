@@ -19,13 +19,13 @@ find, unsurprisingly, a Core expression.
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module CoreUnfold (
 	Unfolding, UnfoldingGuidance,	-- Abstract types
 
-	noUnfolding, mkImplicitUnfolding, 
+	noUnfolding, mkImplicitUnfolding,
         mkUnfolding, mkCoreUnfolding,
 	mkTopUnfolding, mkSimpleUnfolding,
 	mkInlineUnfolding, mkInlinableUnfolding, mkWwInlineRule,
@@ -48,7 +48,6 @@ module CoreUnfold (
 import DynFlags
 import CoreSyn
 import PprCore		()	-- Instances
-import TcType           ( tcSplitDFunTy )
 import OccurAnal        ( occurAnalyseExpr )
 import CoreSubst hiding( substTy )
 import CoreArity       ( manifestArity, exprBotStrictness_maybe )
@@ -98,17 +97,16 @@ mkImplicitUnfolding dflags expr
 mkSimpleUnfolding :: DynFlags -> CoreExpr -> Unfolding
 mkSimpleUnfolding dflags = mkUnfolding dflags InlineRhs False False
 
-mkDFunUnfolding :: Type -> [DFunArg CoreExpr] -> Unfolding
-mkDFunUnfolding dfun_ty ops 
-  = DFunUnfolding dfun_nargs data_con ops
-  where
-    (tvs, theta, cls, _) = tcSplitDFunTy dfun_ty
-    dfun_nargs = length tvs + length theta
-    data_con   = classDataCon cls
+mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
+mkDFunUnfolding bndrs con ops
+  = DFunUnfolding { df_bndrs = bndrs
+                  , df_con = con
+                  , df_args = map occurAnalyseExpr ops }
+                  -- See Note [Occurrrence analysis of unfoldings]
 
-mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding
-mkWwInlineRule id expr arity
-  = mkCoreUnfolding (InlineWrapper id) True
+mkWwInlineRule :: CoreExpr -> Arity -> Unfolding
+mkWwInlineRule expr arity
+  = mkCoreUnfolding InlineStable True
                    (simpleOptExpr expr) arity
                    (UnfWhen unSaturatedOk boringCxtNotOk)
 
@@ -148,6 +146,7 @@ mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
 -- Occurrence-analyses the expression before capturing it
 mkCoreUnfolding src top_lvl expr arity guidance 
   = CoreUnfolding { uf_tmpl   	    = occurAnalyseExpr expr,
+                      -- See Note [Occurrrence analysis of unfoldings]
     		    uf_src          = src,
     		    uf_arity        = arity,
 		    uf_is_top 	    = top_lvl,
@@ -167,6 +166,7 @@ mkUnfolding dflags src top_lvl is_bottoming expr
   = NoUnfolding    -- See Note [Do not inline top-level bottoming functions]
   | otherwise
   = CoreUnfolding { uf_tmpl   	    = occurAnalyseExpr expr,
+                      -- See Note [Occurrrence analysis of unfoldings]
     		    uf_src          = src,
     		    uf_arity        = arity,
 		    uf_is_top 	    = top_lvl,
@@ -180,6 +180,24 @@ mkUnfolding dflags src top_lvl is_bottoming expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
 	-- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 \end{code}
+
+Note [Occurrence analysis of unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do occurrence-analysis of unfoldings once and for all, when the
+unfolding is built, rather than each time we inline them.
+
+But given this decision it's vital that we do
+*always* do it.  Consider this unfolding
+    \x -> letrec { f = ...g...; g* = f } in body
+where g* is (for some strange reason) the loop breaker.  If we don't
+occ-anal it when reading it in, we won't mark g as a loop breaker, and
+we may inline g entirely in body, dropping its binding, and leaving
+the occurrence in f out of scope. This happened in Trac #8892, where
+the unfolding in question was a DFun unfolding.
+
+But more generally, the simplifier is designed on the
+basis that it is looking at occurrence-analysed expressions, so better
+ensure that they acutally are.
 
 Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -534,10 +552,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                                  (xs `unionBags` ys) 
                                  d2  -- Ignore d1
 
-    ignoringRealWorld = gopt Opt_IgnoreRealWorld dflags
-
-    isRealWorldId id = ignoringRealWorld &&
-      idType id `eqType` realWorldStatePrimTy
+    isRealWorldId id = idType id `eqType` realWorldStatePrimTy
 
     -- an expression of type State# RealWorld must be a variable
     isRealWorldExpr (Var id) = isRealWorldId id
@@ -679,7 +694,7 @@ Literal integers *can* be big (mkInteger [...coefficients...]), but
 need not be (S# n).  We just use an aribitrary big-ish constant here
 so that, in particular, we don't inline top-level defns like
    n = S# 5
-There's no point in doing so -- any optimsations will see the S#
+There's no point in doing so -- any optimisations will see the S#
 through n's unfolding.  Nor will a big size inhibit unfoldings functions
 that mention a literal Integer, because the float-out pass will float
 all those constants to top level.
@@ -889,28 +904,26 @@ instance Outputable ArgSummary where
   ppr NonTrivArg = ptext (sLit "NonTrivArg")
   ppr ValueArg   = ptext (sLit "ValueArg")
 
-data CallCtxt = BoringCtxt
+data CallCtxt
+  = BoringCtxt
+  | RhsCtxt             -- Rhs of a let-binding; see Note [RHS of lets]
+  | DiscArgCtxt         -- Argument of a fuction with non-zero arg discount
+  | RuleArgCtxt		-- We are somewhere in the argument of a function with rules
 
-	      | ArgCtxt		-- We are somewhere in the argument of a function
-                        Bool	-- True  <=> we're somewhere in the RHS of function with rules
-				-- False <=> we *are* the argument of a function with non-zero
-				-- 	     arg discount
-                                --        OR 
-                                --           we *are* the RHS of a let  Note [RHS of lets]
-                                -- In both cases, be a little keener to inline
+  | ValAppCtxt 	        -- We're applied to at least one value arg
+		        -- This arises when we have ((f x |> co) y)
+		        -- Then the (f x) has argument 'x' but in a ValAppCtxt
 
-	      | ValAppCtxt 	-- We're applied to at least one value arg
-				-- This arises when we have ((f x |> co) y)
-				-- Then the (f x) has argument 'x' but in a ValAppCtxt
-
-	      | CaseCtxt	-- We're the scrutinee of a case
-				-- that decomposes its scrutinee
+  | CaseCtxt	        -- We're the scrutinee of a case
+		        -- that decomposes its scrutinee
 
 instance Outputable CallCtxt where
-  ppr BoringCtxt      = ptext (sLit "BoringCtxt")
-  ppr (ArgCtxt rules) = ptext (sLit "ArgCtxt") <+> ppr rules
-  ppr CaseCtxt 	      = ptext (sLit "CaseCtxt")
-  ppr ValAppCtxt      = ptext (sLit "ValAppCtxt")
+  ppr CaseCtxt 	  = ptext (sLit "CaseCtxt")
+  ppr ValAppCtxt  = ptext (sLit "ValAppCtxt")
+  ppr BoringCtxt  = ptext (sLit "BoringCtxt")
+  ppr RhsCtxt     = ptext (sLit "RhsCtxt")
+  ppr DiscArgCtxt = ptext (sLit "DiscArgCtxt")
+  ppr RuleArgCtxt = ptext (sLit "RuleArgCtxt")
 
 callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
   = case idUnfolding id of 
@@ -955,6 +968,8 @@ tryUnfolding dflags id lone_variable
   where
     n_val_args = length arg_infos
     saturated  = n_val_args >= uf_arity
+    cont_info' | n_val_args > uf_arity = ValAppCtxt
+               | otherwise             = cont_info
 
     result | yes_or_no = Just unf_template
            | otherwise = Nothing
@@ -972,16 +987,18 @@ tryUnfolding dflags id lone_variable
     some_benefit 
        | not saturated = interesting_args	-- Under-saturated
     	   	      		     	-- Note [Unsaturated applications]
-       | n_val_args > uf_arity = True	-- Over-saturated
-       | otherwise = interesting_args	-- Saturated
-                  || interesting_saturated_call 
+       | otherwise = interesting_args	-- Saturated or over-saturated
+                  || interesting_call
 
-    interesting_saturated_call 
-      = case cont_info of
-          BoringCtxt -> not is_top && uf_arity > 0	  -- Note [Nested functions]
-          CaseCtxt   -> not (lone_variable && is_wf)      -- Note [Lone variables]
-          ArgCtxt {} -> uf_arity > 0     		  -- Note [Inlining in ArgCtxt]
-          ValAppCtxt -> True			          -- Note [Cast then apply]
+    interesting_call 
+      = case cont_info' of
+          CaseCtxt   -> not (lone_variable && is_wf)  -- Note [Lone variables]
+          ValAppCtxt -> True			      -- Note [Cast then apply]
+          RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold info lazy contexts]
+          DiscArgCtxt -> uf_arity > 0  --
+          RhsCtxt     -> uf_arity > 0  --
+          _           -> not is_top && uf_arity > 0   -- Note [Nested functions]
+                                                      -- Note [Inlining in ArgCtxt]
 
     (yes_or_no, extra_doc)
       = case guidance of
@@ -999,18 +1016,23 @@ tryUnfolding dflags id lone_variable
     	       discounted_size = size - discount
     	       small_enough = discounted_size <= ufUseThreshold dflags
     	       discount = computeDiscount dflags uf_arity arg_discounts 
-    	         		          res_discount arg_infos cont_info
+    	         		          res_discount arg_infos cont_info'
 \end{code}
 
-Note [RHS of lets]
-~~~~~~~~~~~~~~~~~~
-Be a tiny bit keener to inline in the RHS of a let, because that might
-lead to good thing later
+Note [Unfold into lazy contexts], Note [RHS of lets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the call is the argument of a function with a RULE, or the RHS of a let,
+we are a little bit keener to inline.  For example
      f y = (y,y,y)
      g y = let x = f y in ...(case x of (a,b,c) -> ...) ...
 We'd inline 'f' if the call was in a case context, and it kind-of-is,
-only we can't see it.  So we treat the RHS of a let as not-totally-boring.
-    
+only we can't see it.  Also
+     x = f v
+could be expensive whereas
+     x = case v of (a,b) -> a
+is patently cheap and may allow more eta expansion.
+So we treat the RHS of a let as not-totally-boring.
+
 Note [Unsaturated applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When a call is not saturated, we *still* inline if one of the
@@ -1119,7 +1141,7 @@ AND
 
 then we should not inline it (unless there is some other reason,
 e.g. is is the sole occurrence).  That is what is happening at 
-the use of 'lone_variable' in 'interesting_saturated_call'.
+the use of 'lone_variable' in 'interesting_call'.
 
 Why?  At least in the case-scrutinee situation, turning
 	let x = (a,b) in case x of y -> ...
@@ -1190,9 +1212,9 @@ This kind of thing can occur if you have
 which Roman did.
 
 \begin{code}
-computeDiscount :: DynFlags -> Int -> [Int] -> Int -> [ArgSummary] -> CallCtxt
+computeDiscount :: DynFlags -> Arity -> [Int] -> Int -> [ArgSummary] -> CallCtxt
                 -> Int
-computeDiscount dflags n_vals_wanted arg_discounts res_discount arg_infos cont_info
+computeDiscount dflags uf_arity arg_discounts res_discount arg_infos cont_info
  	-- We multiple the raw discounts (args_discount and result_discount)
 	-- ty opt_UnfoldingKeenessFactor because the former have to do with
 	--  *size* whereas the discounts imply that there's some extra 
@@ -1202,7 +1224,7 @@ computeDiscount dflags n_vals_wanted arg_discounts res_discount arg_infos cont_i
   = 10          -- Discount of 1 because the result replaces the call
 		-- so we count 1 for the function itself
 
-    + 10 * length (take n_vals_wanted arg_infos)
+    + 10 * length (take uf_arity arg_infos)
       	       -- Discount of (un-scaled) 1 for each arg supplied, 
    	       -- because the result replaces the call
 
@@ -1217,8 +1239,17 @@ computeDiscount dflags n_vals_wanted arg_discounts res_discount arg_infos cont_i
 
     res_discount' = case cont_info of
 			BoringCtxt  -> 0
-			CaseCtxt    -> res_discount
-                        _other      -> 40 `min` res_discount
+			CaseCtxt    -> res_discount  -- Presumably a constructor
+			ValAppCtxt  -> res_discount  -- Presumably a function
+			_           -> 40 `min` res_discount
+                -- ToDo: this 40 `min` res_dicount doesn't seem right
+                --   for DiscArgCtxt it shouldn't matter because the function will
+                --    get the arg discount for any non-triv arg
+                --   for RuleArgCtxt we do want to be keener to inline; but not only
+                --    constructor results
+                --   for RhsCtxt I suppose that exposing a data con is good in general
+                --   And 40 seems very arbitrary
+                --
 		-- res_discount can be very large when a function returns
 		-- constructors; but we only want to invoke that large discount
 		-- when there's a case continuation.

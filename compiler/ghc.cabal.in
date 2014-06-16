@@ -49,7 +49,7 @@ Library
                    bytestring >= 0.9 && < 0.11,
                    time                 < 1.5,
                    containers >= 0.1 && < 0.6,
-                   array      >= 0.1 && < 0.5,
+                   array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.4,
                    Cabal,
                    hpc,
@@ -68,7 +68,7 @@ Library
     if flag(ghci)
         Build-Depends: template-haskell
         CPP-Options: -DGHCI
-        Include-Dirs: ../rts/dist/build
+        Include-Dirs: ../rts/dist/build @FFIIncludeDir@
 
     Build-Depends: bin-package-db
     Build-Depends: hoopl
@@ -99,6 +99,7 @@ Library
 
     c-sources:
         ghci/keepCAFsForGHCi.c
+        cbits/genSym.c
 
     hs-source-dirs:
         basicTypes
@@ -129,15 +130,19 @@ Library
     Exposed-Modules:
         Avail
         BasicTypes
+        ConLike
         DataCon
+        PatSyn
         Demand
         Exception
         GhcMonad
+        Hooks
         Id
         IdInfo
         Literal
         Llvm
         Llvm.AbsSyn
+        Llvm.MetaData
         Llvm.PpLlvm
         Llvm.Types
         LlvmCodeGen
@@ -160,6 +165,7 @@ Library
         Var
         VarEnv
         VarSet
+        UnVarGraph
         BlockId
         CLabel
         Cmm
@@ -178,7 +184,6 @@ Library
         CmmOpt
         CmmParse
         CmmProcPoint
-        CmmRewriteAssignments
         CmmSink
         CmmType
         CmmUtils
@@ -206,7 +211,6 @@ Library
         StgCmmEnv
         StgCmmExpr
         StgCmmForeign
-        StgCmmGran
         StgCmmHeap
         StgCmmHpc
         StgCmmArgRep
@@ -275,6 +279,7 @@ Library
         Constants
         DriverMkDepend
         DriverPhases
+        PipelineMonad
         DriverPipeline
         DynFlags
         ErrUtils
@@ -288,6 +293,7 @@ Library
         HscStats
         HscTypes
         InteractiveEval
+        InteractiveEvalTypes
         PackageConfig
         Packages
         PlatformConstants
@@ -321,6 +327,7 @@ Library
         RnNames
         RnPat
         RnSource
+        RnSplice
         RnTypes
         CoreMonad
         CSE
@@ -344,6 +351,7 @@ Library
         CoreToStg
         StgLint
         StgSyn
+        CallArity
         DmdAnal
         WorkWrap
         WwLib
@@ -367,6 +375,7 @@ Library
         TcValidity
         TcMatches
         TcPat
+        TcPatSyn
         TcRnDriver
         TcRnMonad
         TcRnTypes
@@ -381,6 +390,8 @@ Library
         TcInteract
         TcCanonical
         TcSMonad
+        TcTypeNats
+        TcSplice
         Class
         Coercion
         FamInstEnv
@@ -394,6 +405,7 @@ Library
         Unify
         Bag
         Binary
+        BooleanFormula
         BufWrite
         Digraph
         Encoding
@@ -424,6 +436,8 @@ Library
         UniqFM
         UniqSet
         Util
+        ExtsCompat46
+--      ^^^  a temporary module necessary to bootstrap with GHC <= 7.6
         Vectorise.Builtins.Base
         Vectorise.Builtins.Initialise
         Vectorise.Builtins
@@ -455,7 +469,6 @@ Library
         Vectorise
         Hoopl.Dataflow
         Hoopl
-
 --        CgInfoTbls used in ghci/DebuggerUtils
 --        CgHeapery  mkVirtHeapOffsets used in ghci
 
@@ -524,7 +537,6 @@ Library
     if flag(ghci)
         Exposed-Modules:
             DsMeta
-            TcSplice
             Convert
             ByteCodeAsm
             ByteCodeGen

@@ -1,0 +1,9 @@
+
+mc23.hs:9:29:
+    Couldn't match type ‘[a0]’ with ‘a -> b’
+    Expected type: (a -> b) -> [a] -> t a
+      Actual type: [a0] -> [a0]
+    Relevant bindings include z :: t b (bound at mc23.hs:9:1)
+    Possible cause: ‘take’ is applied to too many arguments
+    In the expression: take 5
+    In a stmt of a monad comprehension: then take 5 by x

@@ -30,13 +30,12 @@ import IdInfo
 import InstEnv
 import FamInstEnv
 import Type             ( tidyTopType )
-import Demand           ( appIsBottom, isTopSig, isBottomingSig )
+import Demand           ( appIsBottom, isNopSig, isBottomingSig )
 import BasicTypes
 import Name hiding (varName)
 import NameSet
 import NameEnv
 import Avail
-import PrelNames
 import IfaceEnv
 import TcEnv
 import TcRnMonad
@@ -59,7 +58,7 @@ import qualified ErrUtils as Err
 import Control.Monad
 import Data.Function
 import Data.List        ( sortBy )
-import Data.IORef       ( readIORef, writeIORef )
+import Data.IORef       ( atomicModifyIORef )
 \end{code}
 
 
@@ -140,7 +139,8 @@ mkBootModDetailsTc hsc_env
               ; dfun_ids   = map instanceDFunId insts'
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
                                 (typeEnvIds type_env) tcs fam_insts
-              ; type_env'  = extendTypeEnvWithIds type_env1 dfun_ids
+              ; type_env2  = extendTypeEnvWithPatSyns type_env1 (typeEnvPatSyns type_env)
+              ; type_env'  = extendTypeEnvWithIds type_env2 dfun_ids
               }
         ; return (ModDetails { md_types     = type_env'
                              , md_insts     = insts'
@@ -153,7 +153,7 @@ mkBootModDetailsTc hsc_env
         }
   where
 
-mkBootTypeEnv :: NameSet -> [Id] -> [TyCon] -> [FamInst Branched] -> TypeEnv
+mkBootTypeEnv :: NameSet -> [Id] -> [TyCon] -> [FamInst] -> TypeEnv
 mkBootTypeEnv exports ids tcs fam_insts
   = tidyTypeEnv True $
        typeEnvFromEntities final_ids tcs fam_insts
@@ -216,7 +216,7 @@ Note [choosing external names]
 
 See also the section "Interface stability" in the
 RecompilationAvoidance commentary:
-  http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
+  http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
 
 First we figure out which Ids are "external" Ids.  An
 "external" Id is one that is visible from outside the compilation
@@ -297,6 +297,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_insts     = insts
                               , mg_fam_insts = fam_insts
                               , mg_binds     = binds
+                              , mg_patsyns   = patsyns
                               , mg_rules     = imp_rules
                               , mg_vect_info = vect_info
                               , mg_anns      = anns
@@ -328,13 +329,16 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                 -- See Note [Which rules to expose]
 
         ; (tidy_env, tidy_binds)
-                 <- tidyTopBinds hsc_env unfold_env tidy_occ_env binds
+                 <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env binds
 
         ; let { final_ids  = [ id | id <- bindersOfBinds tidy_binds,
                                     isExternalName (idName id)]
+              ; final_patsyns = filter (isExternalName . getName) patsyns
 
-              ; tidy_type_env = tidyTypeEnv omit_prags
-                                      (extendTypeEnvWithIds type_env final_ids)
+              ; type_env' = extendTypeEnvWithIds type_env final_ids
+              ; type_env'' = extendTypeEnvWithPatSyns type_env' final_patsyns
+
+              ; tidy_type_env = tidyTypeEnv omit_prags type_env''
 
               ; tidy_insts    = map (tidyClsInstDFun (lookup_dfun tidy_type_env)) insts
                 -- A DFunId will have a binding in tidy_binds, and so
@@ -364,7 +368,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
               }
 
-        ; endPass dflags CoreTidy all_tidy_binds tidy_rules
+        ; endPass hsc_env CoreTidy all_tidy_binds tidy_rules
 
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
@@ -559,7 +563,7 @@ See CorePrep Note [Data constructor workers].
 
 \begin{code}
 getTyConImplicitBinds :: TyCon -> [CoreBind]
-getTyConImplicitBinds tc = map get_defn (mapCatMaybes dataConWrapId_maybe (tyConDataCons tc))
+getTyConImplicitBinds tc = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
 
 getClassImplicitBinds :: Class -> [CoreBind]
 getClassImplicitBinds cls = map get_defn (classAllSelIds cls)
@@ -750,6 +754,13 @@ newtype DFFV a
       -> (VarSet, [Var])      -- Input State: (set, list) of free vars so far
       -> ((VarSet,[Var]),a))  -- Output state
 
+instance Functor DFFV where
+    fmap = liftM
+
+instance Applicative DFFV where
+    pure = return
+    (<*>) = ap
+
 instance Monad DFFV where
   return a = DFFV $ \_ st -> (st, a)
   (DFFV m) >>= k = DFFV $ \env st ->
@@ -816,14 +827,10 @@ dffvLetBndr vanilla_unfold id
        = case src of
            InlineRhs | vanilla_unfold -> dffvExpr rhs
                      | otherwise      -> return ()
-           InlineWrapper v            -> insert v
            _                          -> dffvExpr rhs
-            -- For a wrapper, externalise the wrapper id rather than the
-            -- fvs of the rhs.  The two usually come down to the same thing
-            -- but I've seen cases where we had a wrapper id $w but a
-            -- rhs where $w had been inlined; see Trac #3922
 
-    go_unf (DFunUnfolding _ _ args) = mapM_ dffvExpr (dfunArgExprs args)
+    go_unf (DFunUnfolding { df_bndrs = bndrs, df_args = args }) 
+             = extendScopeList bndrs $ mapM_ dffvExpr args
     go_unf _ = return ()
 
     go_rule (BuiltinRule {}) = return ()
@@ -857,9 +864,7 @@ tidyTopName mod nc_var maybe_ref occ_env id
   -- Now we get to the real reason that all this is in the IO Monad:
   -- we have to update the name cache in a nice atomic fashion
 
-  | local  && internal = do { nc <- readIORef nc_var
-                            ; let (nc', new_local_name) = mk_new_local nc
-                            ; writeIORef nc_var nc'
+  | local  && internal = do { new_local_name <- atomicModifyIORef nc_var mk_new_local
                             ; return (occ_env', new_local_name) }
         -- Even local, internal names must get a unique occurrence, because
         -- if we do -split-objs we externalise the name later, in the code generator
@@ -867,9 +872,7 @@ tidyTopName mod nc_var maybe_ref occ_env id
         -- Similarly, we must make sure it has a system-wide Unique, because
         -- the byte-code generator builds a system-wide Name->BCO symbol table
 
-  | local  && external = do { nc <- readIORef nc_var
-                            ; let (nc', new_external_name) = mk_new_external nc
-                            ; writeIORef nc_var nc'
+  | local  && external = do { new_external_name <- atomicModifyIORef nc_var mk_new_external
                             ; return (occ_env', new_external_name) }
 
   | otherwise = panic "tidyTopName"
@@ -979,14 +982,14 @@ rules are externalised (see init_ext_ids in function
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
 
 tidyTopBinds :: HscEnv
+             -> Module
              -> UnfoldEnv
              -> TidyOccEnv
              -> CoreProgram
              -> IO (TidyEnv, CoreProgram)
 
-tidyTopBinds hsc_env unfold_env init_occ_env binds
-  = do mkIntegerId <- liftM tyThingId
-                    $ initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
+tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
+  = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
        return $ tidy mkIntegerId init_env binds
   where
     dflags = hsc_dflags hsc_env
@@ -996,7 +999,7 @@ tidyTopBinds hsc_env unfold_env init_occ_env binds
     this_pkg = thisPackage dflags
 
     tidy _           env []     = (env, [])
-    tidy mkIntegerId env (b:bs) = let (env1, b')  = tidyTopBind dflags this_pkg mkIntegerId unfold_env env b
+    tidy mkIntegerId env (b:bs) = let (env1, b')  = tidyTopBind dflags this_pkg this_mod mkIntegerId unfold_env env b
                                       (env2, bs') = tidy mkIntegerId env1 bs
                                   in
                                       (env2, b':bs')
@@ -1004,22 +1007,23 @@ tidyTopBinds hsc_env unfold_env init_occ_env binds
 ------------------------
 tidyTopBind  :: DynFlags
              -> PackageId
+             -> Module
              -> Id
              -> UnfoldEnv
              -> TidyEnv
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind dflags this_pkg mkIntegerId unfold_env (occ_env,subst1) (NonRec bndr rhs)
+tidyTopBind dflags this_pkg this_mod mkIntegerId unfold_env (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    caf_info      = hasCafRefs dflags this_pkg (mkIntegerId, subst1) (idArity bndr) rhs
+    caf_info      = hasCafRefs dflags this_pkg this_mod (mkIntegerId, subst1) (idArity bndr) rhs
     (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 caf_info name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind dflags this_pkg mkIntegerId unfold_env (occ_env,subst1) (Rec prs)
+tidyTopBind dflags this_pkg this_mod mkIntegerId unfold_env (occ_env,subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
     prs' = [ tidyTopPair dflags show_unfold tidy_env2 caf_info name' (id,rhs)
@@ -1036,7 +1040,7 @@ tidyTopBind dflags this_pkg mkIntegerId unfold_env (occ_env,subst1) (Rec prs)
         -- the CafInfo for a recursive group says whether *any* rhs in
         -- the group may refer indirectly to a CAF (because then, they all do).
     caf_info
-        | or [ mayHaveCafRefs (hasCafRefs dflags this_pkg (mkIntegerId, subst1) (idArity bndr) rhs)
+        | or [ mayHaveCafRefs (hasCafRefs dflags this_pkg this_mod (mkIntegerId, subst1) (idArity bndr) rhs)
              | (bndr,rhs) <- prs ] = MayHaveCafRefs
         | otherwise                = NoCafRefs
 
@@ -1110,7 +1114,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     mb_bot_str = exprBotStrictness_maybe orig_rhs
 
     sig = strictnessInfo idinfo
-    final_sig | not $ isTopSig sig 
+    final_sig | not $ isNopSig sig
                  = WARN( _bottom_hidden sig , ppr name ) sig 
                  -- try a cheap-and-cheerful bottom analyser
                  | Just (_, nsig) <- mb_bot_str = nsig
@@ -1172,14 +1176,15 @@ it as a CAF.  In these cases however, we would need to use an additional
 CAF list to keep track of non-collectable CAFs.
 
 \begin{code}
-hasCafRefs :: DynFlags -> PackageId -> (Id, VarEnv Var) -> Arity -> CoreExpr
+hasCafRefs :: DynFlags -> PackageId -> Module
+           -> (Id, VarEnv Var) -> Arity -> CoreExpr
            -> CafInfo
-hasCafRefs dflags this_pkg p arity expr
+hasCafRefs dflags this_pkg this_mod p arity expr
   | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise               = NoCafRefs
  where
   mentions_cafs = isFastTrue (cafRefsE dflags p expr)
-  is_dynamic_name = isDllName dflags this_pkg
+  is_dynamic_name = isDllName dflags this_pkg this_mod
   is_caf = not (arity > 0 || rhsIsStatic (targetPlatform dflags) is_dynamic_name expr)
 
   -- NB. we pass in the arity of the expression, which is expected

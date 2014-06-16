@@ -10,6 +10,8 @@ HADDOCK_DOCS    = YES
 #####################
 # Warnings
 
+ifneq "$(GccIsClang)" "YES"
+
 # Debian doesn't turn -Werror=unused-but-set-variable on by default, so
 # we turn it on explicitly for consistency with other users
 ifeq "$(GccLT46)" "NO"
@@ -18,11 +20,20 @@ SRC_CC_WARNING_OPTS += -Werror=unused-but-set-variable
 SRC_CC_WARNING_OPTS += -Wno-error=inline
 endif
 
+else
+
+# Don't warn about unknown GCC pragmas when using clang
+SRC_CC_WARNING_OPTS += -Wno-unknown-pragmas
+
+endif
+
 SRC_CC_OPTS     += $(WERROR) -Wall
 SRC_HC_OPTS     += $(WERROR) -Wall
 
 GhcStage1HcOpts += -fwarn-tabs
 GhcStage2HcOpts += -fwarn-tabs
+GhcStage2HcOpts += -fno-warn-amp # Temporary sledgehammer until we sync upstream.
+
 utils/hpc_dist-install_EXTRA_HC_OPTS += -fwarn-tabs
 
 #####################
@@ -35,6 +46,7 @@ GhcStage2HcOpts += -O -dcore-lint
 # running of the tests, and faster building of the utils to be installed
 
 GhcLibHcOpts    += -O -dcore-lint
+GhcLibHcOpts    += -fno-warn-amp # Temporary sledgehammer until we sync upstream.
 
 # We define DefaultFastGhcLibWays in this style so that the value is
 # correct even if the user alters DYNAMIC_GHC_PROGRAMS.

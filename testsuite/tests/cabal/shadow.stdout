@@ -1,0 +1,10 @@
+localshadow1.package.conf:
+    (shadow-1)
+    (shadowdep-1)
+
+localshadow2.package.conf:
+    (shadow-1)
+
+should FAIL:
+should SUCCEED:
+should SUCCEED:

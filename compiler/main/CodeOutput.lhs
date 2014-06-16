@@ -45,6 +45,7 @@ import System.IO
 \begin{code}
 codeOutput :: DynFlags
            -> Module
+           -> FilePath
            -> ModLocation
            -> ForeignStubs
            -> [PackageId]
@@ -52,7 +53,7 @@ codeOutput :: DynFlags
            -> IO (FilePath,
                   (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}))
 
-codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
+codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
   = 
     do  {
         -- Lint each CmmGroup as it goes past
@@ -72,10 +73,9 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
                 }
 
         ; showPass dflags "CodeOutput"
-        ; let filenm = hscOutName dflags 
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
         ; case hscTarget dflags of {
-             HscAsm         -> outputAsm dflags filenm linted_cmm_stream;
+             HscAsm         -> outputAsm dflags this_mod filenm linted_cmm_stream;
              HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
              HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream;
              HscInterpreted -> panic "codeOutput: HscInterpreted";
@@ -140,8 +140,8 @@ outputC dflags filenm cmm_stream packages
 %************************************************************************
 
 \begin{code}
-outputAsm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
-outputAsm dflags filenm cmm_stream
+outputAsm :: DynFlags -> Module -> FilePath -> Stream IO RawCmmGroup () -> IO ()
+outputAsm dflags this_mod filenm cmm_stream
  | cGhcWithNativeCodeGen == "YES"
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
@@ -149,7 +149,7 @@ outputAsm dflags filenm cmm_stream
 
        _ <- {-# SCC "OutputAsm" #-} doOutput filenm $
            \h -> {-# SCC "NativeCodeGen" #-}
-                 nativeCodeGen dflags h ncg_uniqs cmm_stream
+                 nativeCodeGen dflags this_mod h ncg_uniqs cmm_stream
        return ()
 
  | otherwise
@@ -168,13 +168,9 @@ outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
 outputLlvm dflags filenm cmm_stream
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
-       -- ToDo: make the LLVM backend consume the C-- incrementally,
-       -- by pushing the cmm_stream inside (c.f. nativeCodeGen)
-       rawcmms <- Stream.collect cmm_stream
-
        {-# SCC "llvm_output" #-} doOutput filenm $
            \f -> {-# SCC "llvm_CodeGen" #-}
-                 llvmCodeGen dflags f ncg_uniqs rawcmms
+                 llvmCodeGen dflags f ncg_uniqs cmm_stream
 \end{code}
 
 

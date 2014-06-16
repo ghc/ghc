@@ -17,7 +17,6 @@ module X86.Regs (
         argRegs,
         allArgRegs,
         allIntArgRegs,
-        allHaskellArgRegs,
         callClobberedRegs,
         instrClobberedRegs,
         allMachRegNos,
@@ -52,7 +51,6 @@ import Reg
 import RegClass
 
 import Cmm
-import CmmCallConv
 import CLabel           ( CLabel )
 import DynFlags
 import Outputable
@@ -405,6 +403,9 @@ callClobberedRegs       :: Platform -> [Reg]
 -- caller-saves registers
 callClobberedRegs platform
  | target32Bit platform = [eax,ecx,edx] ++ map regSingle (floatregnos platform)
+ | platformOS platform == OSMinGW32
+   = [rax,rcx,rdx,r8,r9,r10,r11]
+   ++ map regSingle (floatregnos platform)
  | otherwise
     -- all xmm regs are caller-saves
     -- caller-saves registers
@@ -438,11 +439,6 @@ instrClobberedRegs platform
  | otherwise            = [ rax, rcx, rdx ]
 
 --
-
--- All machine registers that are used for argument-passing to Haskell functions
-allHaskellArgRegs :: DynFlags -> [Reg]
-allHaskellArgRegs dflags = [ RegReal r | Just r <- map (globalRegMaybe platform) (globalArgRegs dflags) ]
-    where platform = targetPlatform dflags
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the

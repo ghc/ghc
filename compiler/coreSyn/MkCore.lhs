@@ -3,7 +3,7 @@
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 -- | Handy functions for creating much Core syntax
@@ -25,9 +25,9 @@ module MkCore (
         -- * Floats
         FloatBind(..), wrapFloat,
 
-        -- * Constructing/deconstructing equality evidence boxes
+        -- * Constructing equality evidence boxes
         mkEqBox,
-        
+
         -- * Constructing general big tuples
         -- $big_tuples
         mkChunkified,
@@ -53,7 +53,8 @@ module MkCore (
     	mkRuntimeErrorApp, mkImpossibleExpr, errorIds,
     	rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
     	nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
-    	pAT_ERROR_ID, eRROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID
+    	pAT_ERROR_ID, eRROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID,
+        uNDEFINED_ID, undefinedName
     ) where
 
 #include "HsVersions.h"
@@ -298,12 +299,17 @@ mkStringExprFS str
 
 \begin{code}
 
+-- This take a ~# b (or a ~# R b) and returns a ~ b (or Coercible a b)
 mkEqBox :: Coercion -> CoreExpr
 mkEqBox co = ASSERT2( typeKind ty2 `eqKind` k, ppr co $$ ppr ty1 $$ ppr ty2 $$ ppr (typeKind ty1) $$ ppr (typeKind ty2) )
-             Var (dataConWorkId eqBoxDataCon) `mkTyApps` [k, ty1, ty2] `App` Coercion co
+             Var (dataConWorkId datacon) `mkTyApps` [k, ty1, ty2] `App` Coercion co
   where Pair ty1 ty2 = coercionKind co
         k = typeKind ty1
-
+        datacon = case coercionRole co of 
+            Nominal ->          eqBoxDataCon
+            Representational -> coercibleDataCon
+            Phantom ->          pprPanic "mkEqBox does not support boxing phantom coercions"
+                                         (ppr co)
 \end{code}
 
 %************************************************************************
@@ -659,6 +665,9 @@ errorIds
                   -- import its type from the interface file; we just get
                   -- the Id defined here.  Which has an 'open-tyvar' type.
 
+      uNDEFINED_ID,   -- Ditto for 'undefined'. The big deal is to give it
+                      -- an 'open-tyvar' type.
+
       rUNTIME_ERROR_ID,
       iRREFUT_PAT_ERROR_ID,
       nON_EXHAUSTIVE_GUARDS_ERROR_ID,
@@ -700,7 +709,7 @@ nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
 aBSENT_ERROR_ID                 = mkRuntimeErrorId absentErrorName
 
 mkRuntimeErrorId :: Name -> Id
-mkRuntimeErrorId name = pc_bottoming_Id name runtimeErrorTy
+mkRuntimeErrorId name = pc_bottoming_Id1 name runtimeErrorTy
 
 runtimeErrorTy :: Type
 -- The runtime error Ids take a UTF8-encoded string as argument
@@ -712,14 +721,32 @@ errorName :: Name
 errorName = mkWiredInIdName gHC_ERR (fsLit "error") errorIdKey eRROR_ID
 
 eRROR_ID :: Id
-eRROR_ID = pc_bottoming_Id errorName errorTy
+eRROR_ID = pc_bottoming_Id1 errorName errorTy
 
-errorTy  :: Type
+errorTy  :: Type   -- See Note [Error and friends have an "open-tyvar" forall]
 errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy)
-    -- Notice the openAlphaTyVar.  It says that "error" can be applied
-    -- to unboxed as well as boxed types.  This is OK because it never
-    -- returns, so the return type is irrelevant.
+
+undefinedName :: Name
+undefinedName = mkWiredInIdName gHC_ERR (fsLit "undefined") undefinedKey uNDEFINED_ID
+
+uNDEFINED_ID :: Id
+uNDEFINED_ID = pc_bottoming_Id0 undefinedName undefinedTy
+
+undefinedTy  :: Type   -- See Note [Error and friends have an "open-tyvar" forall]
+undefinedTy  = mkSigmaTy [openAlphaTyVar] [] openAlphaTy
 \end{code}
+
+Note [Error and friends have an "open-tyvar" forall]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'error' and 'undefined' have types 
+        error     :: forall (a::OpenKind). String -> a
+        undefined :: forall (a::OpenKind). a
+Notice the 'OpenKind' (manifested as openAlphaTyVar in the code). This ensures that
+"error" can be instantiated at 
+  * unboxed as well as boxed types
+  * polymorphic types
+This is OK because it never returns, so the return type is irrelevant.
+See Note [OpenTypeKind accepts foralls] in TcUnify.
 
 
 %************************************************************************
@@ -729,9 +756,9 @@ errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy
 %************************************************************************
 
 \begin{code}
-pc_bottoming_Id :: Name -> Type -> Id
+pc_bottoming_Id1 :: Name -> Type -> Id
 -- Function of arity 1, which diverges after being given one argument
-pc_bottoming_Id name ty
+pc_bottoming_Id1 name ty
  = mkVanillaGlobalWithInfo name ty bottoming_info
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo`    strict_sig
@@ -747,7 +774,15 @@ pc_bottoming_Id name ty
         -- any pc_bottoming_Id will itself have CafRefs, which bloats
         -- SRTs.
 
-    strict_sig = mkStrictSig (mkTopDmdType [evalDmd] botRes)
+    strict_sig = mkClosedStrictSig [evalDmd] botRes
     -- These "bottom" out, no matter what their arguments
+
+pc_bottoming_Id0 :: Name -> Type -> Id
+-- Same but arity zero
+pc_bottoming_Id0 name ty
+ = mkVanillaGlobalWithInfo name ty bottoming_info
+ where
+    bottoming_info = vanillaIdInfo `setStrictnessInfo` strict_sig
+    strict_sig = mkClosedStrictSig [] botRes
 \end{code}
 

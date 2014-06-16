@@ -1,0 +1,13 @@
+
+T8450.hs:8:20:
+    Couldn't match type ‘a’ with ‘Bool’
+      ‘a’ is a rigid type variable bound by
+          the type signature for run :: a at T8450.hs:7:15
+    Expected type: Either Bool ()
+      Actual type: Either a ()
+    Relevant bindings include run :: a (bound at T8450.hs:8:1)
+    In the second argument of ‘($)’, namely
+      ‘(undefined :: Either a ())’
+    In the expression: runEffect $ (undefined :: Either a ())
+    In an equation for ‘run’:
+        run = runEffect $ (undefined :: Either a ())

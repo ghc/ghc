@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -124,13 +124,9 @@ $1_$2_$3_ALL_HC_OPTS = \
  $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),$$(if $$(findstring v,$3),-dynamic-too))
 
 ifeq "$3" "dyn"
-ifneq "$4" "0"
-ifeq "$$(TargetOS_CPP)" "linux"
-$1_$2_$3_GHC_LD_OPTS += \
-    -fno-use-rpaths \
-    $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d')
-else ifeq "$$(TargetOS_CPP)" "darwin"
-$1_$2_$3_GHC_LD_OPTS += -optl-Wl,-headerpad_max_install_names
+ifeq "$$(HostOS_CPP)" "mingw32"
+ifneq "$$($1_$2_dll0_MODULES)" ""
+$1_$2_$3_ALL_HC_OPTS += -dll-split $1/$2/dll-split
 endif
 endif
 endif
@@ -140,15 +136,24 @@ $1_$2_$3_ALL_CC_OPTS = \
  $$($1_$2_DIST_GCC_CC_OPTS) \
  $$($1_$2_$3_CC_OPTS) \
  $$($$(basename $$<)_CC_OPTS) \
+ $$($1_$2_EXTRA_CC_OPTS) \
  $$(EXTRA_CC_OPTS)
 
 $1_$2_$3_GHC_CC_OPTS = \
- $$(addprefix -optc, \
-     $$(WAY_$3_CC_OPTS) \
-     $$($1_$2_DIST_CC_OPTS) \
-     $$($1_$2_$3_CC_OPTS) \
-     $$($$(basename $$<)_CC_OPTS) \
-     $$(EXTRA_CC_OPTS)) \
+ $$(addprefix -optc, $$($1_$2_$3_ALL_CC_OPTS)) \
+ $$($1_$2_$3_MOST_HC_OPTS)
+
+# Options for passing to plain ld
+$1_$2_$3_ALL_LD_OPTS = \
+ $$(WAY_$3_LD_OPTS) \
+ $$($1_$2_DIST_LD_OPTS) \
+ $$($1_$2_$3_LD_OPTS) \
+ $$($1_$2_EXTRA_LD_OPTS) \
+ $$(EXTRA_LD_OPTS)
+
+# Options for passing to GHC when we use it for linking
+$1_$2_$3_GHC_LD_OPTS = \
+ $$(addprefix -optl, $$($1_$2_$3_ALL_LD_OPTS)) \
  $$($1_$2_$3_MOST_HC_OPTS)
 
 $1_$2_$3_ALL_AS_OPTS = \
@@ -159,6 +164,20 @@ $1_$2_$3_ALL_AS_OPTS = \
  $$($1_$2_AS_OPTS) \
  $$($1_$2_$3_AS_OPTS) \
  $$(EXTRA_AS_OPTS)
+
+ifeq "$3" "dyn"
+ifneq "$4" "0"
+ifeq "$$(TargetElf)" "YES"
+$1_$2_$3_GHC_LD_OPTS += \
+    -fno-use-rpaths \
+    $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d') -optl-Wl,-zorigin
+else ifeq "$$(TargetOS_CPP)" "darwin"
+$1_$2_$3_GHC_LD_OPTS += \
+    -fno-use-rpaths \
+    $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'@loader_path/../$$d')
+endif
+endif
+endif
 
 endef
 

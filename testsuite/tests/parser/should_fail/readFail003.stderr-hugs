@@ -1,0 +1,5 @@
+ERROR "read003.hs":4 - Type error in right hand side
+*** Term           : a
+*** Type           : a
+*** Does not match : (a,[b],[c])
+*** Because        : unification would give infinite type

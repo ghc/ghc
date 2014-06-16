@@ -1,0 +1,5 @@
+EmbedAsChild m (XMLGenT n c)
+EmbedAsChild (IdentityT m) String
+EmbedAsChild m [c]
+EmbedAsChild m (Child m)
+Element (Nothing,"ul") [] [CDATA True "foo"]

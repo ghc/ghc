@@ -1,0 +1,8 @@
+AppE (ConE GHC.Types.I#) (LitE (IntPrimL 20))
+GHC.Types.I# 20#
+AppE (ConE GHC.Types.W#) (LitE (WordPrimL 32))
+GHC.Types.W# 32##
+AppE (ConE GHC.Types.F#) (LitE (FloatPrimL (123 % 10)))
+GHC.Types.F# 12.3#
+AppE (ConE GHC.Types.D#) (LitE (DoublePrimL (123 % 5)))
+GHC.Types.D# 24.6##

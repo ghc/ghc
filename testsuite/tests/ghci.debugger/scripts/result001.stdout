@@ -1,0 +1,4 @@
+Breakpoint 0 activated at result001.hs:1:13-21
+Stopped at result001.hs:1:13-21
+_result :: [b] = _
+xs :: [b] = _

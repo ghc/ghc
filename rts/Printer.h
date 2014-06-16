@@ -19,6 +19,7 @@ extern char *      closure_type_names[];
 void   	           info_hdr_type   ( StgClosure *closure, char *res );
 char  *	           info_type       ( StgClosure *closure );
 char  *	           info_type_by_ip ( StgInfoTable *ip );
+char  *            info_update_frame ( StgClosure *closure );
 
 #ifdef DEBUG
 extern void        prettyPrintClosure (StgClosure *obj);

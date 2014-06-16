@@ -1,0 +1,7 @@
+newThread started
+mainThread
+Haskell: 2
+newThread back again
+1 sec later
+
+shutting down

@@ -10,12 +10,13 @@ TcPat: Typechecking patterns
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-module TcPat ( tcLetPat, TcSigFun, TcSigInfo(..), TcPragFun 
+module TcPat ( tcLetPat, TcSigFun, TcPragFun
+             , TcSigInfo(..), findScopedTyVars
              , LetBndrSpec(..), addInlinePrags, warnPrags
-             , tcPat, tcPats, newNoSigLetBndr, newSigLetBndr
+             , tcPat, tcPats, newNoSigLetBndr
 	     , addDataConStupidTheta, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
@@ -29,6 +30,7 @@ import Inst
 import Id
 import Var
 import Name
+import NameSet
 import TcEnv
 --import TcExpr
 import TcMType
@@ -40,6 +42,8 @@ import TysWiredIn
 import TcEvidence
 import TyCon
 import DataCon
+import PatSyn
+import ConLike
 import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
 import DynFlags
@@ -112,8 +116,8 @@ data PatCtxt
   = LamPat   -- Used for lambdas, case etc
        (HsMatchContext Name) 
 
-  | LetPat   -- Used only for let(rec) bindings
-    	     -- See Note [Let binders]
+  | LetPat   -- Used only for let(rec) pattern bindings
+    	     -- See Note [Typing patterns in pattern bindings]
        TcSigFun        -- Tells type sig if any
        LetBndrSpec     -- True <=> no generalisation of this let
 
@@ -121,8 +125,10 @@ data LetBndrSpec
   = LetLclBndr		  -- The binder is just a local one;
     			  -- an AbsBinds will provide the global version
 
-  | LetGblBndr TcPragFun  -- There isn't going to be an AbsBinds;
-    	       		  -- here is the inline-pragma information
+  | LetGblBndr TcPragFun  -- Genrealisation plan is NoGen, so there isn't going 
+                          -- to be an AbsBinds; So we must bind the global version
+                          -- of the binder right away.  
+    	       		  -- Oh, and dhhere is the inline-pragma information
 
 makeLazy :: PatEnv -> PatEnv
 makeLazy penv = penv { pe_lazy = True }
@@ -142,8 +148,7 @@ data TcSigInfo
         sig_tvs    :: [(Maybe Name, TcTyVar)],    
                            -- Instantiated type and kind variables
                            -- Just n <=> this skolem is lexically in scope with name n
-                           -- See Note [Kind vars in sig_tvs]
-                     	   -- See Note [More instantiated than scoped] in TcBinds
+                           -- See Note [Binding scoped type variables]
 
         sig_theta  :: TcThetaType,  -- Instantiated theta
 
@@ -153,21 +158,56 @@ data TcSigInfo
         sig_loc    :: SrcSpan       -- The location of the signature
     }
 
+findScopedTyVars  -- See Note [Binding scoped type variables]
+  :: LHsType Name             -- The HsType
+  -> TcType                   -- The corresponding Type:
+                              --   uses same Names as the HsType
+  -> [TcTyVar]                -- The instantiated forall variables of the Type
+  -> [(Maybe Name, TcTyVar)]  -- In 1-1 correspondence with the instantiated vars
+findScopedTyVars hs_ty sig_ty inst_tvs
+  = zipWith find sig_tvs inst_tvs
+  where
+    find sig_tv inst_tv
+      | tv_name `elemNameSet` scoped_names = (Just tv_name, inst_tv)
+      | otherwise                          = (Nothing,      inst_tv)
+      where
+        tv_name = tyVarName sig_tv
+
+    scoped_names = mkNameSet (hsExplicitTvs hs_ty)
+    (sig_tvs,_)  = tcSplitForAllTys sig_ty
+
 instance Outputable TcSigInfo where
     ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau})
         = ppr id <+> dcolon <+> vcat [ pprSigmaType (mkSigmaTy (map snd tyvars) theta tau)
                                      , ppr (map fst tyvars) ]
 \end{code}
 
-Note [Kind vars in sig_tvs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-With kind polymorphism a signature like
-  f :: forall f a. f a -> f a
-may actuallly give rise to 
-  f :: forall k. forall (f::k -> *) (a:k). f a -> f a
-So the sig_tvs will be [k,f,a], but only f,a are scoped.
-So the scoped ones are not necessarily the *inital* ones!
+Note [Binding scoped type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The type variables *brought into lexical scope* by a type signature may
+be a subset of the *quantified type variables* of the signatures, for two reasons:
 
+* With kind polymorphism a signature like
+    f :: forall f a. f a -> f a
+  may actuallly give rise to
+    f :: forall k. forall (f::k -> *) (a:k). f a -> f a
+  So the sig_tvs will be [k,f,a], but only f,a are scoped.
+  NB: the scoped ones are not necessarily the *inital* ones!
+
+* Even aside from kind polymorphism, tere may be more instantiated
+  type variables than lexically-scoped ones.  For example:
+        type T a = forall b. b -> (a,b)
+        f :: forall c. T c
+  Here, the signature for f will have one scoped type variable, c,
+  but two instantiated type variables, c' and b'.
+
+The function findScopedTyVars takes
+  * hs_ty:    the original HsForAllTy
+  * sig_ty:   the corresponding Type (which is guaranteed to use the same Names
+              as the HsForAllTy)
+  * inst_tvs: the skolems instantiated from the forall's in sig_ty
+It returns a [(Maybe Name, TcTyVar)], in 1-1 correspondence with inst_tvs
+but with a (Just n) for the lexically scoped name of each in-scope tyvar.
 
 Note [sig_tau may be polymorphic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -176,15 +216,6 @@ if the original function had a signature like
    forall a. Eq a => forall b. Ord b => ....
 But that's ok: tcMatchesFun (called by tcRhs) can deal with that
 It happens, too!  See Note [Polymorphic methods] in TcClassDcl.
-
-Note [Let binders]
-~~~~~~~~~~~~~~~~~~
-eg   x :: Int
-     y :: Bool
-     (x,y) = e
-
-...more notes to add here..
-
 
 Note [Existential check]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -215,34 +246,30 @@ tcPatBndr :: PatEnv -> Name -> TcSigmaType -> TcM (TcCoercion, TcId)
 -- Then coi : pat_ty ~ typeof(xp)
 --
 tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
-  | Just sig <- lookup_sig bndr_name
-  = do { bndr_id <- newSigLetBndr no_gen bndr_name sig
+          -- See Note [Typing patterns in pattern bindings]
+  | LetGblBndr prags <- no_gen
+  , Just sig <- lookup_sig bndr_name
+  = do { bndr_id <- addInlinePrags (sig_id sig) (prags bndr_name)
+       ; traceTc "tcPatBndr(gbl,sig)" (ppr bndr_id $$ ppr (idType bndr_id)) 
        ; co <- unifyPatType (idType bndr_id) pat_ty
        ; return (co, bndr_id) }
       
-  | otherwise
+  | otherwise 
   = do { bndr_id <- newNoSigLetBndr no_gen bndr_name pat_ty
-       ; return (mkTcReflCo pat_ty, bndr_id) }
+       ; traceTc "tcPatBndr(no-sig)" (ppr bndr_id $$ ppr (idType bndr_id))
+       ; return (mkTcNomReflCo pat_ty, bndr_id) }
 
 tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
   = do { bndr <- mkLocalBinder bndr_name pat_ty
-       ; return (mkTcReflCo pat_ty, bndr) }
-
-------------
-newSigLetBndr :: LetBndrSpec -> Name -> TcSigInfo -> TcM TcId
-newSigLetBndr LetLclBndr name sig
-  = do { mono_name <- newLocalName name
-       ; mkLocalBinder mono_name (sig_tau sig) }
-newSigLetBndr (LetGblBndr prags) name sig
-  = addInlinePrags (sig_id sig) (prags name)
+       ; return (mkTcNomReflCo pat_ty, bndr) }
 
 ------------
 newNoSigLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
--- In the polymorphic case (no_gen = False), generate a "monomorphic version" 
+-- In the polymorphic case (no_gen = LetLclBndr), generate a "monomorphic version" 
 --    of the Id; the original name will be bound to the polymorphic version
 --    by the AbsBinds
--- In the monomorphic case there is no AbsBinds, and we use the original
---    name directly
+-- In the monomorphic case (no_gen = LetBglBndr) there is no AbsBinds, and we 
+--    use the original name directly
 newNoSigLetBndr LetLclBndr name ty 
   =do  { mono_name <- newLocalName name
        ; mkLocalBinder mono_name ty }
@@ -280,16 +307,34 @@ mkLocalBinder name ty
   = return (Id.mkLocalId name ty)
 \end{code}
 
-Note [Polymorphism and pattern bindings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When is_mono holds we are not generalising
-But the signature can still be polymorphic!
-     data T = MkT (forall a. a->a)
+Note [Typing patterns in pattern bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are typing a pattern binding
+    pat = rhs
+Then the PatCtxt will be (LetPat sig_fn let_bndr_spec).
+
+There can still be signatures for the binders:
+     data T = MkT (forall a. a->a) Int
      x :: forall a. a->a
-     MkT x = <rhs>
-So the no_gen flag decides whether the pattern-bound variables should
-have exactly the type in the type signature (when not generalising) or
-the instantiated version (when generalising)
+     y :: Int
+     MkT x y = <rhs>
+
+Two cases, dealt with by the LetPat case of tcPatBndr
+
+ * If we are generalising (generalisation plan is InferGen or
+   CheckGen), then the let_bndr_spec will be LetLclBndr.  In that case
+   we want to bind a cloned, local version of the variable, with the
+   type given by the pattern context, *not* by the signature (even if
+   there is one; see Trac #7268). The mkExport part of the
+   generalisation step will do the checking and impedence matching
+   against the signature.
+
+ * If for some some reason we are not generalising (plan = NoGen), the
+   LetBndrSpec will be LetGblBndr.  In that case we must bind the
+   global version of the Id, and do so with precisely the type given
+   in the signature.  (Then we unify with the type from the pattern
+   context type.
+
 
 %************************************************************************
 %*									*
@@ -652,12 +697,25 @@ tcConPat :: PatEnv -> Located Name
 	 -> TcRhoType  	       	-- Type of the pattern
 	 -> HsConPatDetails Name -> TcM a
 	 -> TcM (Pat TcId, a)
-tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
-  = do	{ data_con <- tcLookupDataCon con_name
-	; let tycon = dataConTyCon data_con
+tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
+  = do  { con_like <- tcLookupConLike con_name
+        ; case con_like of
+            RealDataCon data_con -> tcDataConPat penv con_lname data_con
+                                                 pat_ty arg_pats thing_inside
+            PatSynCon pat_syn -> tcPatSynPat penv con_lname pat_syn
+                                             pat_ty arg_pats thing_inside
+        }
+
+tcDataConPat :: PatEnv -> Located Name -> DataCon
+	     -> TcRhoType  	       	-- Type of the pattern
+	     -> HsConPatDetails Name -> TcM a
+	     -> TcM (Pat TcId, a)
+tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
+  = do	{ let tycon = dataConTyCon data_con
          	  -- For data families this is the representation tycon
 	      (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
                 = dataConFullSig data_con
+              header = L con_span (RealDataCon data_con)
 
 	  -- Instantiate the constructor type variables [a->ty]
 	  -- This may involve doing a family-instance coercion, 
@@ -678,16 +736,18 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
               
 	      arg_tys' = substTys tenv arg_tys
 
+        ; traceTc "tcConPat" (ppr con_name $$ ppr ex_tvs' $$ ppr pat_ty' $$ ppr arg_tys')
 	; if null ex_tvs && null eq_spec && null theta
 	  then do { -- The common case; no class bindings etc 
                     -- (see Note [Arrows and patterns])
-		    (arg_pats', res) <- tcConArgs data_con arg_tys' 
+		    (arg_pats', res) <- tcConArgs (RealDataCon data_con) arg_tys'
 						  arg_pats penv thing_inside
-		  ; let res_pat = ConPatOut { pat_con = L con_span data_con, 
+		  ; let res_pat = ConPatOut { pat_con = header,
 			            	      pat_tvs = [], pat_dicts = [], 
                                               pat_binds = emptyTcEvBinds,
 					      pat_args = arg_pats', 
-                                              pat_ty = pat_ty' }
+                                              pat_ty = pat_ty',
+                                              pat_wrap = idHsWrapper }
 
 		  ; return (mkHsWrapPat wrap res_pat pat_ty, res) }
 
@@ -698,13 +758,13 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
                            -- dictionary binders from theta'
 	      no_equalities = not (any isEqPred theta')
               skol_info = case pe_ctxt penv of
-                            LamPat mc -> PatSkol data_con mc
+                            LamPat mc -> PatSkol (RealDataCon data_con) mc
                             LetPat {} -> UnkSkol -- Doesn't matter
  
         ; gadts_on    <- xoptM Opt_GADTs
         ; families_on <- xoptM Opt_TypeFamilies
 	; checkTc (no_equalities || gadts_on || families_on)
-	  	  (ptext (sLit "A pattern match on a GADT requires -XGADTs or -XTypeFamilies"))
+		  (ptext (sLit "A pattern match on a GADT requires GADTs or TypeFamilies"))
 		  -- Trac #2905 decided that a *pattern-match* of a GADT
 		  -- should require the GADT language flag.  
                   -- Re TypeFamilies see also #7156 
@@ -712,16 +772,76 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
         ; given <- newEvVars theta'
         ; (ev_binds, (arg_pats', res))
 	     <- checkConstraints skol_info ex_tvs' given $
-                tcConArgs data_con arg_tys' arg_pats penv thing_inside
+                tcConArgs (RealDataCon data_con) arg_tys' arg_pats penv thing_inside
 
-        ; let res_pat = ConPatOut { pat_con   = L con_span data_con, 
+        ; let res_pat = ConPatOut { pat_con   = header,
 			            pat_tvs   = ex_tvs',
 			            pat_dicts = given,
 			            pat_binds = ev_binds,
 			            pat_args  = arg_pats', 
-                                    pat_ty    = pat_ty' }
+                                    pat_ty    = pat_ty',
+                                    pat_wrap  = idHsWrapper }
 	; return (mkHsWrapPat wrap res_pat pat_ty, res)
 	} }
+
+tcPatSynPat :: PatEnv -> Located Name -> PatSyn
+	    -> TcRhoType  	       	-- Type of the pattern
+	    -> HsConPatDetails Name -> TcM a
+	    -> TcM (Pat TcId, a)
+tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
+  = do	{ let (univ_tvs, ex_tvs, (prov_theta, req_theta)) = patSynSig pat_syn
+              arg_tys = patSynArgTys pat_syn
+              ty = patSynType pat_syn
+
+        ; (_univ_tvs', inst_tys, subst) <- tcInstTyVars univ_tvs
+
+	; checkExistentials ex_tvs penv
+        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX subst ex_tvs
+        ; let ty' = substTy tenv ty
+              arg_tys' = substTys tenv arg_tys
+              prov_theta' = substTheta tenv prov_theta
+              req_theta' = substTheta tenv req_theta
+
+        ; wrap <- coToHsWrapper <$> unifyType ty' pat_ty
+        ; traceTc "tcPatSynPat" (ppr pat_syn $$
+                                 ppr pat_ty $$
+                                 ppr ty' $$
+                                 ppr ex_tvs' $$
+                                 ppr prov_theta' $$
+                                 ppr req_theta' $$
+                                 ppr arg_tys')
+
+        ; prov_dicts' <- newEvVars prov_theta'
+
+          {-
+        ; patsyns_on <- xoptM Opt_PatternSynonyms
+	; checkTc patsyns_on
+                  (ptext (sLit "A pattern match on a pattern synonym requires PatternSynonyms"))
+		  -- Trac #2905 decided that a *pattern-match* of a GADT
+		  -- should require the GADT language flag.
+                  -- Re TypeFamilies see also #7156
+-}
+        ; let skol_info = case pe_ctxt penv of
+                            LamPat mc -> PatSkol (PatSynCon pat_syn) mc
+                            LetPat {} -> UnkSkol -- Doesn't matter
+
+        ; req_wrap <- instCall PatOrigin inst_tys req_theta'
+        ; traceTc "instCall" (ppr req_wrap)
+
+        ; traceTc "checkConstraints {" empty
+        ; (ev_binds, (arg_pats', res))
+             <- checkConstraints skol_info ex_tvs' prov_dicts' $
+                tcConArgs (PatSynCon pat_syn) arg_tys' arg_pats penv thing_inside
+
+        ; traceTc "checkConstraints }" (ppr ev_binds)
+        ; let res_pat = ConPatOut { pat_con   = L con_span $ PatSynCon pat_syn,
+			            pat_tvs   = ex_tvs',
+			            pat_dicts = prov_dicts',
+			            pat_binds = ev_binds,
+			            pat_args  = arg_pats',
+                                    pat_ty    = ty',
+                                    pat_wrap  = req_wrap }
+	; return (mkHsWrapPat wrap res_pat pat_ty, res) }
 
 ----------------------------
 matchExpectedPatTy :: (TcRhoType -> TcM (TcCoercion, a))
@@ -765,7 +885,7 @@ matchExpectedConTy data_tc pat_ty
        ; co1 <- unifyType (mkTyConApp fam_tc (substTys subst fam_args)) pat_ty
        	     -- co1 : T (ty1,ty2) ~ pat_ty
 
-       ; let co2 = mkTcUnbranchedAxInstCo co_tc tys
+       ; let co2 = mkTcUnbranchedAxInstCo Nominal co_tc tys
        	     -- co2 : T (ty1,ty2) ~ T7 ty1 ty2
 
        ; return (mkTcSymCo co2 `mkTcTransCo` co1, tys) }
@@ -803,31 +923,31 @@ Suppose (coi, tys) = matchExpectedConType data_tc pat_ty
    error messages; it's a purely internal thing
 
 \begin{code}
-tcConArgs :: DataCon -> [TcSigmaType]
+tcConArgs :: ConLike -> [TcSigmaType]
 	  -> Checker (HsConPatDetails Name) (HsConPatDetails Id)
 
-tcConArgs data_con arg_tys (PrefixCon arg_pats) penv thing_inside
+tcConArgs con_like arg_tys (PrefixCon arg_pats) penv thing_inside
   = do	{ checkTc (con_arity == no_of_args)	-- Check correct arity
-		  (arityErr "Constructor" data_con con_arity no_of_args)
+		  (arityErr "Constructor" con_like con_arity no_of_args)
 	; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
 	; (arg_pats', res) <- tcMultiple tcConArg pats_w_tys
 					      penv thing_inside 
 	; return (PrefixCon arg_pats', res) }
   where
-    con_arity  = dataConSourceArity data_con
+    con_arity  = conLikeArity con_like
     no_of_args = length arg_pats
 
-tcConArgs data_con arg_tys (InfixCon p1 p2) penv thing_inside
+tcConArgs con_like arg_tys (InfixCon p1 p2) penv thing_inside
   = do	{ checkTc (con_arity == 2)	-- Check correct arity
-	 	  (arityErr "Constructor" data_con con_arity 2)
+                  (arityErr "Constructor" con_like con_arity 2)
 	; let [arg_ty1,arg_ty2] = arg_tys	-- This can't fail after the arity check
 	; ([p1',p2'], res) <- tcMultiple tcConArg [(p1,arg_ty1),(p2,arg_ty2)]
 					      penv thing_inside
 	; return (InfixCon p1' p2', res) }
   where
-    con_arity  = dataConSourceArity data_con
+    con_arity  = conLikeArity con_like
 
-tcConArgs data_con arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
+tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
   = do	{ (rpats', res) <- tcMultiple tc_field rpats penv thing_inside
 	; return (RecCon (HsRecFields rpats' dd), res) }
   where
@@ -842,28 +962,30 @@ tcConArgs data_con arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
 	= case [ty | (f,ty) <- field_tys, f == field_lbl] of
 
 		-- No matching field; chances are this field label comes from some
-		-- other record type (or maybe none).  As well as reporting an
-		-- error we still want to typecheck the pattern, principally to
-		-- make sure that all the variables it binds are put into the
-		-- environment, else the type checker crashes later:
+		-- other record type (or maybe none).  If this happens, just fail,
+                -- otherwise we get crashes later (Trac #8570), and similar:
 		--	f (R { foo = (a,b) }) = a+b
 		-- If foo isn't one of R's fields, we don't want to crash when
 		-- typechecking the "a+b".
-	   [] -> do { addErrTc (badFieldCon data_con field_lbl)
-		    ; bogus_ty <- newFlexiTyVarTy liftedTypeKind
-		    ; return (error "Bogus selector Id", bogus_ty) }
+	   [] -> failWith (badFieldCon con_like field_lbl)
 
 		-- The normal case, when the field comes from the right constructor
-	   (pat_ty : extras) -> 
+	   (pat_ty : extras) ->
 		ASSERT( null extras )
 		do { sel_id <- tcLookupField field_lbl
 		   ; return (sel_id, pat_ty) }
 
     field_tys :: [(FieldLabel, TcType)]
-    field_tys = zip (dataConFieldLabels data_con) arg_tys
-	-- Don't use zipEqual! If the constructor isn't really a record, then
-	-- dataConFieldLabels will be empty (and each field in the pattern
-	-- will generate an error below).
+    field_tys = case con_like of
+        RealDataCon data_con -> zip (dataConFieldLabels data_con) arg_tys
+	  -- Don't use zipEqual! If the constructor isn't really a record, then
+	  -- dataConFieldLabels will be empty (and each field in the pattern
+	  -- will generate an error below).
+        PatSynCon{} -> []
+
+conLikeArity :: ConLike -> Arity
+conLikeArity (RealDataCon data_con) = dataConSourceArity data_con
+conLikeArity (PatSynCon   pat_syn)  = patSynArity pat_syn
 
 tcConArg :: Checker (LPat Name, TcSigmaType) (LPat Id)
 tcConArg (arg_pat, arg_ty) penv thing_inside
@@ -1017,7 +1139,7 @@ existentialLetPat
 	  text "I can't handle pattern bindings for existential or GADT data constructors.",
 	  text "Instead, use a case-expression, or do-notation, to unpack the constructor."]
 
-badFieldCon :: DataCon -> Name -> SDoc
+badFieldCon :: ConLike -> Name -> SDoc
 badFieldCon con field
   = hsep [ptext (sLit "Constructor") <+> quotes (ppr con),
 	  ptext (sLit "does not have field"), quotes (ppr field)]

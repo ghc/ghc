@@ -1,0 +1,4 @@
+
+T3023.hs:17:1:
+    Warning: Top-level binding with no type signature:
+               bar :: Bool -> Bool

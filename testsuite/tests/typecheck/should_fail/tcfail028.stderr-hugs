@@ -1,0 +1,1 @@
+ERROR "tcfail028.hs":4 - Illegal type "A a -> A a b" in constructor application

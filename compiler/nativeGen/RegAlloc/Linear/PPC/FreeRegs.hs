@@ -42,7 +42,7 @@ releaseReg _ _
 initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform = foldr releaseReg noFreeRegs (allocatableRegs platform)
 
-getFreeRegs :: RegClass -> FreeRegs -> [RealReg]        -- lazilly
+getFreeRegs :: RegClass -> FreeRegs -> [RealReg]        -- lazily
 getFreeRegs cls (FreeRegs g f)
     | RcDouble <- cls = go f (0x80000000) 63
     | RcInteger <- cls = go g (0x80000000) 31

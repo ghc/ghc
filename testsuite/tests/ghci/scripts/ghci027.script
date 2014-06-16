@@ -1,0 +1,8 @@
+-- Test for #1617
+:!cp ghci027_1.hs ghci027.hs
+:load ghci027
+:browse *Main
+:!sleep 1
+:!cp ghci027_2.hs ghci027.hs
+:reload
+:browse *Main

@@ -21,7 +21,7 @@
       GHC defines the abstract syntax of Haskell programs in <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/hsSyn/HsSyn.lhs"><code>HsSyn</code></a>
       using a structure that abstracts over the concrete representation of
-      bound occurences of identifiers and patterns.  The module <a
+      bound occurrences of identifiers and patterns.  The module <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcHsSyn.lhs"><code>TcHsSyn</code></a>
       defines a number of helper function required by the type checker.  Note
       that the type <a
@@ -248,7 +248,7 @@ tau   -> tyvar
       Expressions are type checked by <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcExpr.lhs"><code>TcExpr</code>.</a>  
     <p>
-      Usage occurences of identifiers are processed by the function
+      Usage occurrences of identifiers are processed by the function
       <code>tcId</code> whose main purpose is to <a href="#inst">instantiate
       overloaded identifiers.</a> It essentially calls
       <code>TcInst.instOverloadedFun</code> once for each universally
@@ -275,7 +275,7 @@ tau   -> tyvar
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/Inst.lhs"><code>Inst.lhs</code>.</a>
     <p>
       The function <code>instOverloadedFun</code> is invoked for each
-      overloaded usage occurence of an identifier, where overloaded means that
+      overloaded usage occurrence of an identifier, where overloaded means that
       the type of the idendifier contains a non-trivial type constraint.  It
       proceeds in two steps: (1) Allocation of a method instance
       (<code>newMethodWithGivenTy</code>) and (2) instantiation of functional

@@ -1,0 +1,10 @@
+:l ../shell.hs
+:def shell (\s -> do shell s; return "")
+:l
+
+:shell rm -f T6106.hs
+:shell echo "{-# OPTIONS_GHC -F -pgmF ./T6106_preproc #-}" >T6106.hs
+:shell echo "module T6106 where" >>T6106.hs
+:load T6106.hs
+-- second one should fail:
+:reload

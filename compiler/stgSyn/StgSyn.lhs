@@ -103,17 +103,17 @@ data GenStgArg occ
 -- | Does this constructor application refer to
 -- anything in a different *Windows* DLL?
 -- If so, we can't allocate it statically
-isDllConApp :: DynFlags -> DataCon -> [StgArg] -> Bool
-isDllConApp dflags con args
+isDllConApp :: DynFlags -> Module -> DataCon -> [StgArg] -> Bool
+isDllConApp dflags this_mod con args
  | platformOS (targetPlatform dflags) == OSMinGW32
-    = isDllName dflags this_pkg (dataConName con) || any is_dll_arg args
+    = isDllName dflags this_pkg this_mod (dataConName con) || any is_dll_arg args
  | otherwise = False
   where
     -- NB: typePrimRep is legit because any free variables won't have
     -- unlifted type (there are no unlifted things at top level)
     is_dll_arg :: StgArg -> Bool
     is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep (idType v))
-                             && isDllName dflags this_pkg (idName v)
+                             && isDllName dflags this_pkg this_mod (idName v)
     is_dll_arg _             = False
 
     this_pkg = thisPackage dflags

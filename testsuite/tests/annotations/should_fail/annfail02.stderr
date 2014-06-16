@@ -1,0 +1,8 @@
+
+annfail02.hs:6:1:
+    Not in scope: data constructor ‘Foo’
+    In the annotation: {-# ANN Foo (1 :: Int) #-}
+
+annfail02.hs:7:1:
+    Not in scope: type constructor or class ‘Bar’
+    In the annotation: {-# ANN type Bar (2 :: Int) #-}

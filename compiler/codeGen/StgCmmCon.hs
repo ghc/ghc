@@ -21,9 +21,10 @@ import CoreSyn  ( AltCon(..) )
 import StgCmmMonad
 import StgCmmEnv
 import StgCmmHeap
+import StgCmmLayout
 import StgCmmUtils
 import StgCmmClosure
-import StgCmmProf
+import StgCmmProf ( curCCS )
 
 import CmmExpr
 import CLabel
@@ -50,24 +51,24 @@ import Data.Char
 --      Top-level constructors
 ---------------------------------------------------------------
 
-cgTopRhsCon :: Id               -- Name of thing bound to this RHS
+cgTopRhsCon :: DynFlags
+            -> Id               -- Name of thing bound to this RHS
             -> DataCon          -- Id
             -> [StgArg]         -- Args
-            -> FCode (CgIdInfo, FCode ())
-cgTopRhsCon id con args
-  = do dflags <- getDynFlags
-       let id_info = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
-       return ( id_info, gen_code )
+            -> (CgIdInfo, FCode ())
+cgTopRhsCon dflags id con args =
+    let id_info = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
+    in (id_info, gen_code)
   where
    name          = idName id
    caffy         = idCafInfo id -- any stgArgHasCafRefs args
    closure_label = mkClosureLabel name caffy
 
    gen_code =
-     do { dflags <- getDynFlags
+     do { this_mod <- getModuleName
         ; when (platformOS (targetPlatform dflags) == OSMinGW32) $
               -- Windows DLLs have a problem with static cross-DLL refs.
-              ASSERT( not (isDllConApp dflags con args) ) return ()
+              ASSERT( not (isDllConApp dflags this_mod con args) ) return ()
         ; ASSERT( args `lengthIs` dataConRepRepArity con ) return ()
 
         -- LAY IT OUT
@@ -109,19 +110,21 @@ cgTopRhsCon id con args
 
 buildDynCon :: Id                 -- Name of the thing to which this constr will
                                   -- be bound
+            -> Bool   -- is it genuinely bound to that name, or just for profiling?
             -> CostCentreStack    -- Where to grab cost centre from;
                                   -- current CCS if currentOrSubsumedCCS
             -> DataCon            -- The data constructor
             -> [StgArg]           -- Its args
             -> FCode (CgIdInfo, FCode CmmAGraph)
                -- Return details about how to find it and initialization code
-buildDynCon binder cc con args
+buildDynCon binder actually_bound cc con args
     = do dflags <- getDynFlags
-         buildDynCon' dflags (targetPlatform dflags) binder cc con args
+         buildDynCon' dflags (targetPlatform dflags) binder actually_bound cc con args
+
 
 buildDynCon' :: DynFlags
              -> Platform
-             -> Id
+             -> Id -> Bool
              -> CostCentreStack
              -> DataCon
              -> [StgArg]
@@ -148,7 +151,7 @@ premature looking at the args will cause the compiler to black-hole!
 -- which have exclusively size-zero (VoidRep) args, we generate no code
 -- at all.
 
-buildDynCon' dflags _ binder _cc con []
+buildDynCon' dflags _ binder _ _cc con []
   = return (litIdInfo dflags binder (mkConLFInfo con)
                 (CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))),
             return mkNop)
@@ -179,7 +182,7 @@ We don't support this optimisation when compiling into Windows DLLs yet
 because they don't support cross package data references well.
 -}
 
-buildDynCon' dflags platform binder _cc con [arg]
+buildDynCon' dflags platform binder _ _cc con [arg]
   | maybeIntLikeCon con
   , platformOS platform /= OSMinGW32 || not (gopt Opt_PIC dflags)
   , StgLitArg (MachInt val) <- arg
@@ -187,13 +190,13 @@ buildDynCon' dflags platform binder _cc con [arg]
   , val >= fromIntegral (mIN_INTLIKE dflags) -- ...ditto...
   = do  { let intlike_lbl   = mkCmmClosureLabel rtsPackageId (fsLit "stg_INTLIKE")
               val_int = fromIntegral val :: Int
-              offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSize dflags + 1)
+              offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSizeW dflags + 1)
                 -- INTLIKE closures consist of a header and one word payload
               intlike_amode = cmmLabelOffW dflags intlike_lbl offsetW
         ; return ( litIdInfo dflags binder (mkConLFInfo con) intlike_amode
                  , return mkNop) }
 
-buildDynCon' dflags platform binder _cc con [arg]
+buildDynCon' dflags platform binder _ _cc con [arg]
   | maybeCharLikeCon con
   , platformOS platform /= OSMinGW32 || not (gopt Opt_PIC dflags)
   , StgLitArg (MachChar val) <- arg
@@ -201,14 +204,14 @@ buildDynCon' dflags platform binder _cc con [arg]
   , val_int <= mAX_CHARLIKE dflags
   , val_int >= mIN_CHARLIKE dflags
   = do  { let charlike_lbl   = mkCmmClosureLabel rtsPackageId (fsLit "stg_CHARLIKE")
-              offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSize dflags + 1)
+              offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSizeW dflags + 1)
                 -- CHARLIKE closures consist of a header and one word payload
               charlike_amode = cmmLabelOffW dflags charlike_lbl offsetW
         ; return ( litIdInfo dflags binder (mkConLFInfo con) charlike_amode
                  , return mkNop) }
 
 -------- buildDynCon': the general case -----------
-buildDynCon' dflags _ binder ccs con args
+buildDynCon' dflags _ binder actually_bound ccs con args
   = do  { (id_info, reg) <- rhsIdInfo binder lf_info
         ; return (id_info, gen_code reg)
         }
@@ -222,14 +225,17 @@ buildDynCon' dflags _ binder ccs con args
                 nonptr_wds = tot_wds - ptr_wds
                 info_tbl = mkDataConInfoTable dflags con False
                                 ptr_wds nonptr_wds
-          ; hp_plus_n <- allocDynClosure info_tbl lf_info
+          ; let ticky_name | actually_bound = Just binder
+                           | otherwise = Nothing
+
+          ; hp_plus_n <- allocDynClosure ticky_name info_tbl lf_info
                                           use_cc blame_cc args_w_offsets
           ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
     where
       use_cc      -- cost-centre to stick in the object
         | isCurrentCCS ccs = curCCS
         | otherwise        = panic "buildDynCon: non-current CCS not implemented"
-  
+
       blame_cc = use_cc -- cost-centre on which to blame the alloc (same)
 
 

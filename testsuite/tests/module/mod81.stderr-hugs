@@ -1,0 +1,1 @@
+ERROR "mod81.hs" - Entity "Foo" is not a constructor of type "Either"

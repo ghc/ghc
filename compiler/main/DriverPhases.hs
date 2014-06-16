@@ -240,14 +240,14 @@ objish_suffixes :: Platform -> [String]
 -- Use the appropriate suffix for the system on which
 -- the GHC-compiled code will run
 objish_suffixes platform = case platformOS platform of
-                           OSMinGW32 -> [ "o", "O", "obj", "OBJ" ]
-                           _         -> [ "o" ]
+  OSMinGW32 -> [ "o", "O", "obj", "OBJ" ]
+  _         -> [ "o" ]
 
 dynlib_suffixes :: Platform -> [String]
 dynlib_suffixes platform = case platformOS platform of
-                           OSMinGW32 -> ["dll", "DLL"]
-                           OSDarwin  -> ["dylib"]
-                           _         -> ["so"]
+  OSMinGW32 -> ["dll", "DLL"]
+  OSDarwin  -> ["dylib", "so"]
+  _         -> ["so"]
 
 isHaskellishSuffix, isHaskellSrcSuffix, isCishSuffix, isExtCoreSuffix,
     isHaskellUserSrcSuffix

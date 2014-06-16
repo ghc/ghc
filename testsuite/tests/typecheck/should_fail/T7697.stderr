@@ -1,0 +1,4 @@
+
+T7697.hs:3:6:
+    Expected a constraint, but ‘Int’ has kind ‘*’
+    In the type signature for ‘f’: f :: Int => Int

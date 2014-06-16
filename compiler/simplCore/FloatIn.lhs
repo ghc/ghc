@@ -16,7 +16,7 @@ then discover that they aren't needed in the chosen branch.
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module FloatIn ( floatInwards ) where
@@ -256,7 +256,7 @@ course.
 
 Note [extra_fvs (1): avoid floating into RHS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consdider let x=\y....t... in body.  We do not necessarily want to float 
+Consider let x=\y....t... in body.  We do not necessarily want to float 
 a binding for t into the RHS, because it'll immediately be floated out
 again.  (It won't go inside the lambda else we risk losing work.)
 In letrec, we need to be more careful still. We don't want to transform

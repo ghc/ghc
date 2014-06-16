@@ -5,12 +5,12 @@ Usage:
 To compile and link a complete Haskell program, run the compiler like
 so:
 
-    $$ --make Main
+    $$ Main
 
 where the module Main is in a file named Main.hs (or Main.lhs) in the
 current directory.  The other modules in the program will be located
 and compiled automatically, and the linked program will be placed in
-the file `a.out' (or `Main.exe' on Windows).
+the file `Main' (or `Main.exe' on Windows).
 
 Alternatively, $$ can be used to compile files individually.  Each
 input file is guided through (some of the) possible phases of a
@@ -47,8 +47,6 @@ Other commonly-used options are:
     -v[n]	    Control verbosity (n is 0--5, normal verbosity level is 1,
 	              -v alone is equivalent to -v3)
 
-    -fglasgow-exts  Allow Glasgow extensions (unboxed types, etc.)
-
     -O		    An `optimising' package of compiler flags, for faster code
 
     -prof	    Compile for cost-centre profiling
@@ -76,5 +74,8 @@ The User's Guide has more information about GHC's *many* options.  An
 online copy can be found here:
 
    http://haskell.org/haskellwiki/GHC
+
+If you *really* want to see every option, then you can pass
+'--show-options' to the compiler.
 
 ------------------------------------------------------------------------

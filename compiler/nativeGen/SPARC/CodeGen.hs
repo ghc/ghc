@@ -2,7 +2,7 @@
 --
 -- Generating machine code (instruction selection)
 --
--- (c) The University of Glasgow 1996-2004
+-- (c) The University of Glasgow 1996-2013
 --
 -----------------------------------------------------------------------------
 
@@ -392,7 +392,10 @@ genCCall
 -- In the SPARC case we don't need a barrier.
 --
 genCCall (PrimTarget MO_WriteBarrier) _ _
- = do   return nilOL
+ = return $ nilOL
+
+genCCall (PrimTarget (MO_Prefetch_Data _)) _ _
+ = return $ nilOL
 
 genCCall target dest_regs args0
  = do
@@ -538,7 +541,7 @@ move_final (v:vs) (a:az) offset
 
 
 -- | Assign results returned from the call into their
---      desination regs.
+--      destination regs.
 --
 assign_code :: Platform -> [LocalReg] -> OrdList Instr
 
@@ -588,7 +591,7 @@ outOfLineMachOp mop
                 = outOfLineMachOp_table mop
 
         dflags  <- getDynFlags
-        mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference
+        mopExpr <- cmmMakeDynamicReference dflags CallReference
                 $  mkForeignLabel functionName Nothing ForeignLabelInExternalPackage IsFunction
 
         let mopLabelOrExpr
@@ -647,6 +650,7 @@ outOfLineMachOp_table mop
         MO_Memset    -> fsLit "memset"
         MO_Memmove   -> fsLit "memmove"
 
+        MO_BSwap w   -> fsLit $ bSwapLabel w
         MO_PopCnt w  -> fsLit $ popCntLabel w
 
         MO_S_QuotRem {}  -> unsupported
@@ -656,7 +660,7 @@ outOfLineMachOp_table mop
         MO_U_Mul2 {}     -> unsupported
         MO_WriteBarrier  -> unsupported
         MO_Touch         -> unsupported
-        MO_Prefetch_Data -> unsupported
+        (MO_Prefetch_Data _) -> unsupported
     where unsupported = panic ("outOfLineCmmOp: " ++ show mop
                             ++ " not supported here")
 

@@ -1,0 +1,8 @@
+
+overloadedlistsfail04.hs:3:15:
+    No instance for (Enum [Char])
+      arising from the arithmetic sequence ‘"a" .. "b"’
+    In the first argument of ‘print’, namely
+      ‘(["a" .. "b"] :: [String])’
+    In the expression: print (["a" .. "b"] :: [String])
+    In an equation for ‘main’: main = print (["a" .. "b"] :: [String])

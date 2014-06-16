@@ -1,0 +1,8 @@
+Breakpoint 0 activated at print031.hs:7:1-19
+MkT2 [Just (Phantom 1)]
+Stopped at print031.hs:7:1-19
+_result :: Bool = _
+Stopped at print031.hs:7:7-19
+_result :: Bool = _
+x :: t (Phantom a) = [Just (Phantom 1)]
+x = [Just (Phantom 1)]

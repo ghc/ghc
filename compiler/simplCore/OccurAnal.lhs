@@ -31,10 +31,9 @@ import Coercion
 import VarSet
 import VarEnv
 import Var
-
+import Demand           ( argOneShots, argsOneShots )
 import Maybes           ( orElse )
 import Digraph          ( SCC(..), stronglyConnCompFromEdgedVerticesR )
-import PrelNames        ( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique
 import UniqFM
 import Util
@@ -73,7 +72,7 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
                              vectVars)
     -- The RULES and VECTORISE declarations keep things alive! (For VECTORISE declarations,
     -- we only get them *until* the vectoriser runs. Afterwards, these dependencies are
-    -- reflected in 'vectors' — see Note [Vectorisation declarations and occurences].)
+    -- reflected in 'vectors' — see Note [Vectorisation declarations and occurrences].)
 
     -- Note [Preventing loops due to imported functions rules]
     imp_rules_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
@@ -93,7 +92,7 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
            (final_usage, bind') = occAnalBind env env imp_rules_edges bind bs_usage
 
 occurAnalyseExpr :: CoreExpr -> CoreExpr
-        -- Do occurrence analysis, and discard occurence info returned
+        -- Do occurrence analysis, and discard occurrence info returned
 occurAnalyseExpr = occurAnalyseExpr' True -- do binder swap
 
 occurAnalyseExpr_NoBinderSwap :: CoreExpr -> CoreExpr
@@ -138,7 +137,7 @@ occAnalBind env _ imp_rules_edges (NonRec binder rhs) body_usage
   = (body_usage' +++ rhs_usage4, [NonRec tagged_binder rhs'])
   where
     (body_usage', tagged_binder) = tagBinder body_usage binder
-    (rhs_usage1, rhs')           = occAnalRhs env (Just tagged_binder) rhs
+    (rhs_usage1, rhs')           = occAnalNonRecRhs env tagged_binder rhs
     rhs_usage2 = addIdOccs rhs_usage1 (idUnfoldingVars binder)
     rhs_usage3 = addIdOccs rhs_usage2 (idRuleVars binder)
        -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
@@ -191,7 +190,7 @@ We put bindings {f = ef; g = eg } in a Rec group if "f uses g"
 and "g uses f", no matter how indirectly.  We do a SCC analysis
 with an edge f -> g if "f uses g".
 
-More precisely, "f uses g" iff g should be in scope whereever f is.
+More precisely, "f uses g" iff g should be in scope wherever f is.
 That is, g is free in:
   a) the rhs 'ef'
   b) or the RHS of a rule for f (Note [Rules are extra RHSs])
@@ -201,7 +200,7 @@ These conditions apply regardless of the activation of the RULE (eg it might be
 inactive in this phase but become active later).  Once a Rec is broken up
 it can never be put back together, so we must be conservative.
 
-The principle is that, regardless of rule firings, every variale is
+The principle is that, regardless of rule firings, every variable is
 always in scope.
 
   * Note [Rules are extra RHSs]
@@ -665,7 +664,7 @@ makeNode env imp_rules_edges bndr_set (bndr, rhs)
 
     -- Constructing the edges for the main Rec computation
     -- See Note [Forming Rec groups]
-    (rhs_usage1, rhs') = occAnalRhs env Nothing rhs
+    (rhs_usage1, rhs') = occAnalRecRhs env rhs
     rhs_usage2 = addIdOccs rhs_usage1 all_rule_fvs   -- Note [Rules are extra RHSs]
                                                      -- Note [Rule dependency info]
     rhs_usage3 = case mb_unf_fvs of
@@ -692,7 +691,7 @@ makeNode env imp_rules_edges bndr_set (bndr, rhs)
 
     -- Finding the free variables of the INLINE pragma (if any)
     unf        = realIdUnfolding bndr     -- Ignore any current loop-breaker flag
-    mb_unf_fvs = stableUnfoldingVars isLocalId unf
+    mb_unf_fvs = stableUnfoldingVars unf
 
     -- Find the "nd_inl" free vars; for the loop-breaker phase
     inl_fvs = case mb_unf_fvs of
@@ -879,14 +878,13 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
         | isDFunId bndr = 9   -- Never choose a DFun as a loop breaker
                               -- Note [DFuns should not be loop breakers]
 
-        | Just inl_source <- isStableCoreUnfolding_maybe (idUnfolding bndr)
-        = case inl_source of
-             InlineWrapper {} -> 10  -- Note [INLINE pragmas]
-             _other           ->  3  -- Data structures are more important than this
-                                     -- so that dictionary/method recursion unravels
-                -- Note that this case hits all InlineRule things, so we
-                -- never look at 'rhs' for InlineRule stuff. That's right, because
-                -- 'rhs' is irrelevant for inlining things with an InlineRule
+        | Just _ <- isStableCoreUnfolding_maybe (idUnfolding bndr)
+        = 3    -- Note [INLINE pragmas]
+               -- Data structures are more important than INLINE pragmas
+               -- so that dictionary/method recursion unravels
+               -- Note that this case hits all InlineRule things, so we
+               -- never look at 'rhs' for InlineRule stuff. That's right, because
+               -- 'rhs' is irrelevant for inlining things with an InlineRule
 
         | is_con_app rhs = 5  -- Data types help with cases: Note [Constructor applications]
 
@@ -969,32 +967,37 @@ Avoid choosing a function with an INLINE pramga as the loop breaker!
 If such a function is mutually-recursive with a non-INLINE thing,
 then the latter should be the loop-breaker.
 
-Usually this is just a question of optimisation. But a particularly
-bad case is wrappers generated by the demand analyser: if you make
-then into a loop breaker you may get an infinite inlining loop.  For
-example:
-  rec {
-        $wfoo x = ....foo x....
+   ----> Historical note, dating from when strictness wrappers
+   were generated from the strictness signatures:
 
-        {-loop brk-} foo x = ...$wfoo x...
-  }
-The interface file sees the unfolding for $wfoo, and sees that foo is
-strict (and hence it gets an auto-generated wrapper).  Result: an
-infinite inlining in the importing scope.  So be a bit careful if you
-change this.  A good example is Tree.repTree in
-nofib/spectral/minimax. If the repTree wrapper is chosen as the loop
-breaker then compiling Game.hs goes into an infinite loop.  This
-happened when we gave is_con_app a lower score than inline candidates:
+      Usually this is just a question of optimisation. But a particularly
+      bad case is wrappers generated by the demand analyser: if you make
+      then into a loop breaker you may get an infinite inlining loop.  For
+      example:
+        rec {
+              $wfoo x = ....foo x....
 
-  Tree.repTree
-    = __inline_me (/\a. \w w1 w2 ->
-                   case Tree.$wrepTree @ a w w1 w2 of
-                    { (# ww1, ww2 #) -> Branch @ a ww1 ww2 })
-  Tree.$wrepTree
-    = /\a w w1 w2 ->
-      (# w2_smP, map a (Tree a) (Tree.repTree a w1 w) (w w2) #)
+              {-loop brk-} foo x = ...$wfoo x...
+        }
+      The interface file sees the unfolding for $wfoo, and sees that foo is
+      strict (and hence it gets an auto-generated wrapper).  Result: an
+      infinite inlining in the importing scope.  So be a bit careful if you
+      change this.  A good example is Tree.repTree in
+      nofib/spectral/minimax. If the repTree wrapper is chosen as the loop
+      breaker then compiling Game.hs goes into an infinite loop.  This
+      happened when we gave is_con_app a lower score than inline candidates:
 
-Here we do *not* want to choose 'repTree' as the loop breaker.
+        Tree.repTree
+          = __inline_me (/\a. \w w1 w2 ->
+                         case Tree.$wrepTree @ a w w1 w2 of
+                          { (# ww1, ww2 #) -> Branch @ a ww1 ww2 })
+        Tree.$wrepTree
+          = /\a w w1 w2 ->
+            (# w2_smP, map a (Tree a) (Tree.repTree a w1 w) (w w2) #)
+
+      Here we do *not* want to choose 'repTree' as the loop breaker.
+
+   -----> End of historical note
 
 Note [DFuns should not be loop breakers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1065,28 +1068,36 @@ ToDo: try using the occurrence info for the inline'd binder.
 
 
 \begin{code}
-occAnalRhs :: OccEnv
-           -> Maybe Id -> CoreExpr    -- Binder and rhs
-                 -- Just b  => non-rec, and alrady tagged with occurrence info
-                 -- Nothing => Rec, no occ info
+occAnalRecRhs :: OccEnv -> CoreExpr    -- Rhs
            -> (UsageDetails, CoreExpr)
               -- Returned usage details covers only the RHS,
               -- and *not* the RULE or INLINE template for the Id
-occAnalRhs env mb_bndr rhs
-  = occAnal ctxt rhs
-  where
-    -- See Note [Cascading inlines]
-    ctxt = case mb_bndr of
-             Just b | certainly_inline b -> env
-             _other                      -> rhsCtxt env
+occAnalRecRhs env rhs = occAnal (rhsCtxt env) rhs
 
-    certainly_inline bndr  -- See Note [Cascading inlines]
+occAnalNonRecRhs :: OccEnv
+                 -> Id -> CoreExpr    -- Binder and rhs
+                     -- Binder is already tagged with occurrence info
+                 -> (UsageDetails, CoreExpr)
+              -- Returned usage details covers only the RHS,
+              -- and *not* the RULE or INLINE template for the Id
+occAnalNonRecRhs env bndr rhs
+  = occAnal rhs_env rhs
+  where
+    -- See Note [Use one-shot info]
+    env1 = env { occ_one_shots = argOneShots OneShotLam dmd }
+
+    -- See Note [Cascading inlines]
+    rhs_env | certainly_inline = env1
+            | otherwise        = rhsCtxt env1
+
+    certainly_inline -- See Note [Cascading inlines]
       = case idOccInfo bndr of
           OneOcc in_lam one_br _ -> not in_lam && one_br && active && not_stable
           _                      -> False
-      where
-        active     = isAlwaysActive (idInlineActivation bndr)
-        not_stable = not (isStableUnfolding (idUnfolding bndr))
+
+    dmd        = idDemandInfo bndr
+    active     = isAlwaysActive (idInlineActivation bndr)
+    not_stable = not (isStableUnfolding (idUnfolding bndr))
 
 addIdOccs :: UsageDetails -> VarSet -> UsageDetails
 addIdOccs usage id_set = foldVarSet add usage id_set
@@ -1223,24 +1234,14 @@ occAnal env expr@(Lam _ _)
         (final_usage, tagged_binders) = tagLamBinders body_usage binders'
                       -- Use binders' to put one-shot info on the lambdas
 
-        --      URGH!  Sept 99: we don't seem to be able to use binders' here, because
-        --      we get linear-typed things in the resulting program that we can't handle yet.
-        --      (e.g. PrelShow)  TODO
-
-        really_final_usage = if linear then
-                                final_usage
-                             else
-                                mapVarEnv markInsideLam final_usage
+        really_final_usage
+          | all isOneShotBndr binders' = final_usage
+          | otherwise = mapVarEnv markInsideLam final_usage
     in
-    (really_final_usage,
-     mkLams tagged_binders body') }
+    (really_final_usage, mkLams tagged_binders body') }
   where
-    env_body        = vanillaCtxt env
-                        -- Body is (no longer) an RhsContext
-    (binders, body) = collectBinders expr
-    binders'        = oneShotGroup env binders
-    linear          = all is_one_shot binders'
-    is_one_shot b   = isId b && isOneShotBndr b
+    (binders, body)      = collectBinders expr
+    (env_body, binders') = oneShotGroup env binders
 
 occAnal env (Case scrut bndr ty alts)
   = case occ_anal_scrut scrut alts     of { (scrut_usage, scrut') ->
@@ -1282,12 +1283,20 @@ occAnal env (Let bind body)
     case occAnalBind env env emptyVarEnv bind body_usage of { (final_usage, new_binds) ->
        (final_usage, mkLets new_binds body') }}
 
-occAnalArgs :: OccEnv -> [CoreExpr] -> (UsageDetails, [CoreExpr])
-occAnalArgs env args
-  = case mapAndUnzip (occAnal arg_env) args of  { (arg_uds_s, args') ->
-    (foldr (+++) emptyDetails arg_uds_s, args')}
-  where
-    arg_env = vanillaCtxt env
+occAnalArgs :: OccEnv -> [CoreExpr] -> [OneShots] -> (UsageDetails, [CoreExpr])
+occAnalArgs _ [] _ 
+  = (emptyDetails, [])
+
+occAnalArgs env (arg:args) one_shots
+  | isTypeArg arg
+  = case occAnalArgs env args one_shots of { (uds, args') ->
+    (uds, arg:args') }
+
+  | otherwise
+  = case argCtxt env one_shots           of { (arg_env, one_shots') ->
+    case occAnal arg_env arg             of { (uds1, arg') ->
+    case occAnalArgs env args one_shots' of { (uds2, args') ->
+    (uds1 +++ uds2, arg':args') }}}
 \end{code}
 
 Applications are dealt with specially because we want
@@ -1324,26 +1333,23 @@ occAnalApp env (Var fun, args)
     in
     (fun_uds +++ final_args_uds, mkApps (Var fun) args') }
   where
-    fun_uniq = idUnique fun
-    fun_uds  = mkOneOcc env fun (valArgCount args > 0)
-    is_exp = isExpandableApp fun (valArgCount args)
+    n_val_args = valArgCount args
+    fun_uds    = mkOneOcc env fun (n_val_args > 0)
+    is_exp     = isExpandableApp fun n_val_args
            -- See Note [CONLIKE pragma] in BasicTypes
            -- The definition of is_exp should match that in
            -- Simplify.prepareRhs
 
-                -- Hack for build, fold, runST
-    args_stuff  | fun_uniq == buildIdKey    = appSpecial env 2 [True,True]  args
-                | fun_uniq == augmentIdKey  = appSpecial env 2 [True,True]  args
-                | fun_uniq == foldrIdKey    = appSpecial env 3 [False,True] args
-                | fun_uniq == runSTRepIdKey = appSpecial env 2 [True]       args
+    one_shots  = argsOneShots (idStrictness fun) n_val_args
+                 -- See Note [Use one-shot info]
+
+    args_stuff = occAnalArgs env args one_shots
+
                         -- (foldr k z xs) may call k many times, but it never
                         -- shares a partial application of k; hence [False,True]
                         -- This means we can optimise
                         --      foldr (\x -> let v = ...x... in \y -> ...v...) z xs
                         -- by floating in the v
-
-                | otherwise = occAnalArgs env args
-
 
 occAnalApp env (fun, args)
   = case occAnal (addAppCtxt env args) fun of   { (fun_uds, fun') ->
@@ -1354,11 +1360,8 @@ occAnalApp env (fun, args)
         -- thing much like a let.  We do this by pushing some True items
         -- onto the context stack.
 
-    case occAnalArgs env args of        { (args_uds, args') ->
-    let
-        final_uds = fun_uds +++ args_uds
-    in
-    (final_uds, mkApps fun' args') }}
+    case occAnalArgs env args [] of        { (args_uds, args') ->
+    (fun_uds +++ args_uds, mkApps fun' args') }}
 
 
 markManyIf :: Bool              -- If this is true
@@ -1366,29 +1369,23 @@ markManyIf :: Bool              -- If this is true
            -> UsageDetails
 markManyIf True  uds = mapVarEnv markMany uds
 markManyIf False uds = uds
-
-appSpecial :: OccEnv
-           -> Int -> CtxtTy     -- Argument number, and context to use for it
-           -> [CoreExpr]
-           -> (UsageDetails, [CoreExpr])
-appSpecial env n ctxt args
-  = go n args
-  where
-    arg_env = vanillaCtxt env
-
-    go _ [] = (emptyDetails, [])        -- Too few args
-
-    go 1 (arg:args)                     -- The magic arg
-      = case occAnal (setCtxtTy arg_env ctxt) arg of    { (arg_uds, arg') ->
-        case occAnalArgs env args of                    { (args_uds, args') ->
-        (arg_uds +++ args_uds, arg':args') }}
-
-    go n (arg:args)
-      = case occAnal arg_env arg of     { (arg_uds, arg') ->
-        case go (n-1) args of           { (args_uds, args') ->
-        (arg_uds +++ args_uds, arg':args') }}
 \end{code}
 
+Note [Use one-shot information]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The occurrrence analyser propagates one-shot-lambda information in two situation
+  * Applications:  eg   build (\cn -> blah)
+    Propagate one-shot info from the strictness signature of 'build' to
+    the \cn
+
+  * Let-bindings:  eg   let f = \c. let ... in \n -> blah 
+                        in (build f, build f)
+    Propagate one-shot info from the demanand-info on 'f' to the
+    lambdas in its RHS (which may not be syntactically at the top)
+
+Some of this is done by the demand analyser, but this way it happens
+much earlier, taking advantage of the strictness signature of 
+imported functions.
 
 Note [Binders in case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1441,10 +1438,10 @@ wrapProxy _ _ _ body_usg body
 
 \begin{code}
 data OccEnv
-  = OccEnv { occ_encl        :: !OccEncl      -- Enclosing context information
-           , occ_ctxt        :: !CtxtTy       -- Tells about linearity
-           , occ_gbl_scrut   :: GlobalScruts
-           , occ_rule_act    :: Activation -> Bool   -- Which rules are active
+  = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
+           , occ_one_shots  :: !OneShots     -- Tells about linearity
+           , occ_gbl_scrut  :: GlobalScruts
+           , occ_rule_act   :: Activation -> Bool   -- Which rules are active
              -- See Note [Finding rule RHS free vars]
            , occ_binder_swap :: !Bool -- enable the binder_swap
              -- See CorePrep Note [Dead code in CorePrep]
@@ -1471,59 +1468,69 @@ instance Outputable OccEncl where
   ppr OccRhs     = ptext (sLit "occRhs")
   ppr OccVanilla = ptext (sLit "occVanilla")
 
-type CtxtTy = [Bool]
+type OneShots = [OneShotInfo]
         -- []           No info
         --
-        -- True:ctxt    Analysing a function-valued expression that will be
-        --                      applied just once
-        --
-        -- False:ctxt   Analysing a function-valued expression that may
-        --                      be applied many times; but when it is,
-        --                      the CtxtTy inside applies
+        -- one_shot_info:ctxt    Analysing a function-valued expression that
+        --                       will be applied as described by one_shot_info
 
 initOccEnv :: (Activation -> Bool) -> OccEnv
 initOccEnv active_rule
-  = OccEnv { occ_encl  = OccVanilla
-           , occ_ctxt  = []
+  = OccEnv { occ_encl      = OccVanilla
+           , occ_one_shots = []
            , occ_gbl_scrut = emptyVarSet --  PE emptyVarEnv emptyVarSet
-           , occ_rule_act = active_rule
+           , occ_rule_act  = active_rule
            , occ_binder_swap = True }
 
 vanillaCtxt :: OccEnv -> OccEnv
-vanillaCtxt env = env { occ_encl = OccVanilla, occ_ctxt = [] }
+vanillaCtxt env = env { occ_encl = OccVanilla, occ_one_shots = [] }
 
 rhsCtxt :: OccEnv -> OccEnv
-rhsCtxt env = env { occ_encl = OccRhs, occ_ctxt = [] }
+rhsCtxt env = env { occ_encl = OccRhs, occ_one_shots = [] }
 
-setCtxtTy :: OccEnv -> CtxtTy -> OccEnv
-setCtxtTy env ctxt = env { occ_ctxt = ctxt }
+argCtxt :: OccEnv -> [OneShots] -> (OccEnv, [OneShots])
+argCtxt env [] 
+  = (env { occ_encl = OccVanilla, occ_one_shots = [] }, [])
+argCtxt env (one_shots:one_shots_s) 
+  = (env { occ_encl = OccVanilla, occ_one_shots = one_shots }, one_shots_s)
 
 isRhsEnv :: OccEnv -> Bool
 isRhsEnv (OccEnv { occ_encl = OccRhs })     = True
 isRhsEnv (OccEnv { occ_encl = OccVanilla }) = False
 
-oneShotGroup :: OccEnv -> [CoreBndr] -> [CoreBndr]
+oneShotGroup :: OccEnv -> [CoreBndr] 
+             -> ( OccEnv
+                , [CoreBndr] )
         -- The result binders have one-shot-ness set that they might not have had originally.
         -- This happens in (build (\cn -> e)).  Here the occurrence analyser
         -- linearity context knows that c,n are one-shot, and it records that fact in
         -- the binder. This is useful to guide subsequent float-in/float-out tranformations
 
-oneShotGroup (OccEnv { occ_ctxt = ctxt }) bndrs
+oneShotGroup env@(OccEnv { occ_one_shots = ctxt }) bndrs
   = go ctxt bndrs []
   where
-    go _ [] rev_bndrs = reverse rev_bndrs
+    go ctxt [] rev_bndrs
+      = ( env { occ_one_shots = ctxt, occ_encl = OccVanilla }
+        , reverse rev_bndrs )
 
-    go (lin_ctxt:ctxt) (bndr:bndrs) rev_bndrs
-        | isId bndr = go ctxt bndrs (bndr':rev_bndrs)
-        where
-          bndr' | lin_ctxt  = setOneShotLambda bndr
-                | otherwise = bndr
+    go [] bndrs rev_bndrs
+      = ( env { occ_one_shots = [], occ_encl = OccVanilla }
+        , reverse rev_bndrs ++ bndrs )
 
-    go ctxt (bndr:bndrs) rev_bndrs = go ctxt bndrs (bndr:rev_bndrs)
+    go ctxt (bndr:bndrs) rev_bndrs
+      | isId bndr
+      
+      = case ctxt of
+          []                -> go []   bndrs (bndr : rev_bndrs)
+          (one_shot : ctxt) -> go ctxt bndrs (bndr': rev_bndrs)
+                            where
+                               bndr' = updOneShotInfo bndr one_shot
+       | otherwise
+      = go ctxt bndrs (bndr:rev_bndrs)
 
 addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
-addAppCtxt env@(OccEnv { occ_ctxt = ctxt }) args
-  = env { occ_ctxt = replicate (valArgCount args) True ++ ctxt }
+addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
+  = env { occ_one_shots = replicate (valArgCount args) OneShotLam ++ ctxt }
 \end{code}
 
 
@@ -1637,7 +1644,7 @@ When the scrutinee is a GlobalId we must take care in two ways
  i) In order to *know* whether 'x' occurs free in the RHS, we need its
     occurrence info. BUT, we don't gather occurrence info for
     GlobalIds.  That's the reason for the (small) occ_gbl_scrut env in 
-    OccEnv is for: it says "gather occurrence info for these.
+    OccEnv is for: it says "gather occurrence info for these".
 
  ii) We must call localiseId on 'x' first, in case it's a GlobalId, or
      has an External Name. See, for example, SimplEnv Note [Global Ids in
@@ -1650,7 +1657,7 @@ From the original
 we will get
      case x of cb(live) { p -> let x = cb in ...x... }
 
-Core Lint never expects to find an *occurence* of an Id marked
+Core Lint never expects to find an *occurrence* of an Id marked
 as Dead, so we must zap the OccInfo on cb before making the
 binding x = cb.  See Trac #5028.
 
@@ -1717,7 +1724,7 @@ information right.
 
 \begin{code}
 mkAltEnv :: OccEnv -> CoreExpr -> Id -> (OccEnv, Maybe (Id, CoreExpr))
--- Does two things: a) makes the occ_ctxt = OccVanilla
+-- Does two things: a) makes the occ_one_shots = OccVanilla
 --                  b) extends the GlobalScruts if possible
 --                  c) returns a proxy mapping, binding the scrutinee
 --                     to the case binder, if possible

@@ -10,13 +10,14 @@ The @Class@ datatype
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module Class (
 	Class,
         ClassOpItem, DefMeth (..),
         ClassATItem,
+        ClassMinimalDef,
 	defMethSpecOfDefMeth,
 
 	FunDep,	pprFundeps, pprFunDep,
@@ -24,10 +25,9 @@ module Class (
 	mkClass, classTyVars, classArity, 
 	classKey, className, classATs, classATItems, classTyCon, classMethods,
 	classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
-        classAllSelIds, classSCSelId
+        classAllSelIds, classSCSelId, classMinimalDef
     ) where
 
-#include "Typeable.h"
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TyCon	( TyCon, tyConName, tyConUnique )
@@ -40,6 +40,7 @@ import Unique
 import Util
 import Outputable
 import FastString
+import BooleanFormula (BooleanFormula)
 
 import Data.Typeable (Typeable)
 import qualified Data.Data as Data
@@ -79,7 +80,10 @@ data Class
         classATStuff :: [ClassATItem],	-- Associated type families
 
         -- Class operations (methods, not superclasses)
-	classOpStuff :: [ClassOpItem]	-- Ordered by tag
+	classOpStuff :: [ClassOpItem],	-- Ordered by tag
+
+	-- Minimal complete definition
+	classMinimalDef :: ClassMinimalDef
      }
   deriving Typeable
 
@@ -100,6 +104,8 @@ type ClassATItem = (TyCon,           -- See Note [Associated type tyvar names]
   -- We can have more than one default per type; see
   -- Note [Associated type defaults] in TcTyClsDecls
 
+type ClassMinimalDef = BooleanFormula Name -- Required methods
+
 -- | Convert a `DefMethSpec` to a `DefMeth`, which discards the name field in
 --   the `DefMeth` constructor of the `DefMeth`.
 defMethSpecOfDefMeth :: DefMeth -> DefMethSpec
@@ -115,24 +121,26 @@ The @mkClass@ function fills in the indirect superclasses.
 
 \begin{code}
 mkClass :: [TyVar]
-	-> [([TyVar], [TyVar])]
-	-> [PredType] -> [Id]
-	-> [ClassATItem]
-	-> [ClassOpItem]
-	-> TyCon
-	-> Class
+        -> [([TyVar], [TyVar])]
+        -> [PredType] -> [Id]
+        -> [ClassATItem]
+        -> [ClassOpItem]
+        -> ClassMinimalDef
+        -> TyCon
+        -> Class
 
 mkClass tyvars fds super_classes superdict_sels at_stuff
-	op_stuff tycon
-  = Class {	classKey     = tyConUnique tycon, 
-		className    = tyConName tycon,
-		classTyVars  = tyvars,
-		classFunDeps = fds,
-		classSCTheta = super_classes,
-		classSCSels  = superdict_sels,
-		classATStuff = at_stuff,
-		classOpStuff = op_stuff,
-		classTyCon   = tycon }
+        op_stuff mindef tycon
+  = Class { classKey     = tyConUnique tycon,
+            className    = tyConName tycon,
+            classTyVars  = tyvars,
+            classFunDeps = fds,
+            classSCTheta = super_classes,
+            classSCSels  = superdict_sels,
+            classATStuff = at_stuff,
+            classOpStuff = op_stuff,
+            classMinimalDef = mindef,
+            classTyCon   = tycon }
 \end{code}
 
 Note [Associated type tyvar names]
@@ -143,15 +151,15 @@ parent class. Thus
       type F b x a :: *
 We make F use the same Name for 'a' as C does, and similary 'b'.
 
-The only reason for this is when checking instances it's easier to match 
+The reason for this is when checking instances it's easier to match 
 them up, to ensure they match.  Eg
     instance C Int [d] where
       type F [d] x Int = ....
 we should make sure that the first and third args match the instance
 header.
 
-This is the reason we use the Name and TyVar from the parent declaration,
-in both class and instance decls: just to make this check easier.
+Having the same variables for class and tycon is also used in checkValidRoles
+(in TcTyClsDecls) when checking a class's roles.
 
 
 %************************************************************************

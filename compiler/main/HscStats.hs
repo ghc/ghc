@@ -48,6 +48,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
              ("GenericSigs      ", generic_sigs),
              ("ValBinds         ", val_bind_ds),
              ("FunBinds         ", fn_bind_ds),
+             ("PatSynBinds      ", patsyn_ds),
              ("InlineMeths      ", method_inlines),
              ("InlineBinds      ", bind_inlines),
              ("SpecialisedMeths ", method_specs),
@@ -84,24 +85,25 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     export_ds    = n_exports - export_ms
     export_all   = case exports of { Nothing -> 1; _ -> 0 }
 
-    (val_bind_ds, fn_bind_ds)
-        = foldr add2 (0,0) (map count_bind val_decls)
+    (val_bind_ds, fn_bind_ds, patsyn_ds)
+        = sum3 (map count_bind val_decls)
 
     (imp_no, imp_safe, imp_qual, imp_as, imp_all, imp_partial, imp_hiding)
-        = foldr add7 (0,0,0,0,0,0,0) (map import_info imports)
+        = sum7 (map import_info imports)
     (data_constrs, data_derivs)
-        = foldr add2 (0,0) (map data_info tycl_decls)
+        = sum2 (map data_info tycl_decls)
     (class_method_ds, default_method_ds)
-        = foldr add2 (0,0) (map class_info tycl_decls)
+        = sum2 (map class_info tycl_decls)
     (inst_method_ds, method_specs, method_inlines, inst_type_ds, inst_data_ds)
-        = foldr add5 (0,0,0,0,0) (map inst_info inst_decls)
+        = sum5 (map inst_info inst_decls)
 
-    count_bind (PatBind { pat_lhs = L _ (VarPat _) }) = (1,0)
-    count_bind (PatBind {})                           = (0,1)
-    count_bind (FunBind {})                           = (0,1)
+    count_bind (PatBind { pat_lhs = L _ (VarPat _) }) = (1,0,0)
+    count_bind (PatBind {})                           = (0,1,0)
+    count_bind (FunBind {})                           = (0,1,0)
+    count_bind (PatSynBind {})                        = (0,0,1)
     count_bind b = pprPanic "count_bind: Unhandled binder" (ppr b)
 
-    count_sigs sigs = foldr add5 (0,0,0,0,0) (map sig_info sigs)
+    count_sigs sigs = sum5 (map sig_info sigs)
 
     sig_info (FixSig _)       = (1,0,0,0,0)
     sig_info (TypeSig _ _)    = (0,1,0,0,0)
@@ -128,9 +130,10 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     data_info _ = (0,0)
 
     class_info decl@(ClassDecl {})
-        = case count_sigs (map unLoc (tcdSigs decl)) of
-            (_,classops,_,_,_) ->
-               (classops, addpr (foldr add2 (0,0) (map (count_bind.unLoc) (bagToList (tcdMeths decl)))))
+        = (classops, addpr (sum3 (map count_bind methods)))
+      where
+        methods = map (unLoc . snd) $ bagToList (tcdMeths decl)
+        (_, classops, _, _, _) = count_sigs (map unLoc (tcdSigs decl))
     class_info _ = (0,0)
 
     inst_info (TyFamInstD {}) = (0,0,0,1,0)
@@ -141,17 +144,31 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
                                                  , cid_datafam_insts = adts } })
         = case count_sigs (map unLoc inst_sigs) of
             (_,_,ss,is,_) ->
-                  (addpr (foldr add2 (0,0) 
-                           (map (count_bind.unLoc) (bagToList inst_meths))), 
+                  (addpr (sum3 (map count_bind methods)),
                    ss, is, length ats, length adts)
+      where
+        methods = map (unLoc . snd) $ bagToList inst_meths
 
-    addpr :: (Int,Int) -> Int
-    add2  :: (Int,Int) -> (Int,Int) -> (Int, Int)
-    add5  :: (Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int)
-    add7  :: (Int,Int,Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int, Int, Int)
+    -- TODO: use Sum monoid
+    addpr :: (Int,Int,Int) -> Int
+    sum2 :: [(Int, Int)] -> (Int, Int)
+    sum3 :: [(Int, Int, Int)] -> (Int, Int, Int)
+    sum5 :: [(Int, Int, Int, Int, Int)] -> (Int, Int, Int, Int, Int)
+    sum7 :: [(Int, Int, Int, Int, Int, Int, Int)] -> (Int, Int, Int, Int, Int, Int, Int)
+    add7 :: (Int, Int, Int, Int, Int, Int, Int) -> (Int, Int, Int, Int, Int, Int, Int)
+         -> (Int, Int, Int, Int, Int, Int, Int)
 
-    addpr (x,y) = x+y
-    add2 (x1,x2) (y1,y2) = (x1+y1,x2+y2)
-    add5 (x1,x2,x3,x4,x5) (y1,y2,y3,y4,y5) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5)
+    addpr (x,y,z) = x+y+z
+    sum2 = foldr add2 (0,0)
+      where
+        add2 (x1,x2) (y1,y2) = (x1+y1,x2+y2)
+    sum3 = foldr add3 (0,0,0)
+      where
+        add3 (x1,x2,x3) (y1,y2,y3) = (x1+y1,x2+y2,x3+y3)
+    sum5 = foldr add5 (0,0,0,0,0)
+      where
+        add5 (x1,x2,x3,x4,x5) (y1,y2,y3,y4,y5) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5)
+    sum7 = foldr add7 (0,0,0,0,0,0,0)
+
     add7 (x1,x2,x3,x4,x5,x6,x7) (y1,y2,y3,y4,y5,y6,y7) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5,x6+y6,x7+y7)
 

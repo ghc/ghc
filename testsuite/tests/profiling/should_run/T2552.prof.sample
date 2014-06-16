@@ -1,0 +1,40 @@
+	Wed Oct 26 13:31 2011 Time and Allocation Profiling Report  (Final)
+
+	   T2552 +RTS -p -RTS
+
+	total time  =        1.02 secs   (51 ticks @ 20 ms)
+	total alloc = 234,535,968 bytes  (excludes profiling overheads)
+
+COST CENTRE     MODULE  %time %alloc
+
+fib3'.nfib      Main     27.5   33.3
+fib2'.nfib      Main     27.5   33.3
+fib1.fib1'.nfib Main     27.5   33.3
+fib3            Main      3.9    0.0
+fib2'           Main      3.9    0.0
+fib1            Main      3.9    0.0
+nfib'           Main      2.0    0.0
+fib2            Main      2.0    0.0
+fib1.fib1'      Main      2.0    0.0
+
+
+                                                                individual     inherited
+COST CENTRE           MODULE                  no.     entries  %time %alloc   %time %alloc
+
+MAIN                  MAIN                    102           0    0.0    0.0   100.0  100.0
+ CAF                  Main                    203           0    0.0    0.0   100.0  100.0
+  fib3                Main                    212           1    0.0    0.0     0.0    0.0
+  main                Main                    204           1    0.0    0.0   100.0  100.0
+   fib3               Main                    213           0    3.9    0.0    31.4   33.3
+    fib3'             Main                    214           1    0.0    0.0    27.5   33.3
+     fib3'.nfib       Main                    215     1028457   27.5   33.3    27.5   33.3
+   fib2               Main                    209           1    2.0    0.0    33.3   33.3
+    fib2'             Main                    210           1    3.9    0.0    31.4   33.3
+     fib2'.nfib       Main                    211     1028457   27.5   33.3    27.5   33.3
+   fib1               Main                    205           1    3.9    0.0    35.3   33.3
+    fib1.fib1'        Main                    206           1    2.0    0.0    31.4   33.3
+     nfib'            Main                    207           1    2.0    0.0    29.4   33.3
+      fib1.fib1'.nfib Main                    208     1028457   27.5   33.3    27.5   33.3
+ CAF                  GHC.Conc.Signal         200           0    0.0    0.0     0.0    0.0
+ CAF                  GHC.IO.Encoding.Iconv   190           0    0.0    0.0     0.0    0.0
+ CAF                  GHC.IO.Handle.FD        182           0    0.0    0.0     0.0    0.0

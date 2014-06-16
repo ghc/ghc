@@ -1,0 +1,7 @@
+
+tcfail090.hs:11:9:
+    Kind incompatibility when matching types:
+      a0 :: *
+      ByteArray# :: #
+    In the expression: my_undefined
+    In an equation for ‘die’: die _ = my_undefined

@@ -1,0 +1,4 @@
+
+T3811g.hs:6:8:
+    The last statement in a 'do' block must be an expression
+      _ <- return ()

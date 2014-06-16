@@ -1,0 +1,4 @@
+ERROR "tcfail073.hs":8 - Overlapping instances for class "Eq"
+*** This instance   : Eq (a,b)
+*** Overlaps with   : Eq (a,b)
+*** Common instance : Eq (a,b)

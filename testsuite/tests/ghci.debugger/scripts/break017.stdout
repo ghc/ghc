@@ -1,0 +1,12 @@
+"Stopped at <exception thrown>
+_exception :: e = _
+Logged breakpoint at ../QSort.hs:6:24-38
+_result :: [Char]
+a :: Char
+as :: [Char]
+Printing 1
+as = 'b' : 'c' : (_t1::[Char])
+Forcing
+*** Exception: Prelude.undefined
+Printing 2
+as = 'b' : 'c' : (_t2::[Char])

@@ -1,28 +1,20 @@
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS -cpp #-}
 {-# OPTIONS_GHC -O #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
-
 --
 -- (c) The University of Glasgow 2002-2006
 --
 -- Unboxed mutable Ints
 
 module FastMutInt(
-	FastMutInt, newFastMutInt,
-	readFastMutInt, writeFastMutInt,
+        FastMutInt, newFastMutInt,
+        readFastMutInt, writeFastMutInt,
 
-	FastMutPtr, newFastMutPtr,
-	readFastMutPtr, writeFastMutPtr
+        FastMutPtr, newFastMutPtr,
+        readFastMutPtr, writeFastMutPtr
   ) where
 
 #ifdef __GLASGOW_HASKELL__

@@ -1,0 +1,8 @@
+
+mod90.hs:3:16:
+    In module ‘Prelude’:
+      ‘Left’ is a data constructor of ‘Either’
+    To import it use
+      ‘import’ Prelude( Either( Left ) )
+    or
+      ‘import’ Prelude( Either(..) )

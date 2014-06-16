@@ -1,0 +1,1 @@
+[InstanceD [] (AppT (ConT GHC.Base.Monad) (AppT (ConT GHC.Tuple.(,)) (VarT a_0))) [ValD (VarP GHC.Base.return) (NormalB (VarE GHC.Err.undefined)) [],ValD (VarP GHC.Base.>>=) (NormalB (VarE GHC.Err.undefined)) []]]

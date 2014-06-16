@@ -8,7 +8,7 @@ ByteCodeInstrs: Bytecode instruction definitions
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
@@ -86,7 +86,7 @@ data BCInstr
 	-- designers of the new Foreign library.  In particular it is
 	-- quite impossible to convert an Addr to any other integral
 	-- type, and it appears impossible to get hold of the bits of
-	-- an addr, even though we need to to assemble BCOs.
+	-- an addr, even though we need to assemble BCOs.
 
    -- various kinds of application
    | PUSH_APPLY_N

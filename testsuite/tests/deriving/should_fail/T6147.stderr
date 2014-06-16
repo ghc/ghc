@@ -1,0 +1,11 @@
+
+T6147.hs:13:32:
+    Could not coerce from ‘T Int’ to ‘T Foo’
+      because the first type argument of ‘T’ has role Nominal,
+      but the arguments ‘Int’ and ‘Foo’ differ
+      arising from the coercion of the method ‘foo’ from type
+                   ‘Int -> T Int’ to type ‘Foo -> T Foo’
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (C Foo)

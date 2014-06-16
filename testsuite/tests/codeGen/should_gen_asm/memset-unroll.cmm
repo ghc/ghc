@@ -1,0 +1,8 @@
+#include "Cmm.h"
+
+// Small memsets should unroll
+callMemset (W_ dst)
+{
+  prim %memset(dst, 1, 16, 4);
+  return ();
+}

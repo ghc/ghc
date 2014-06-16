@@ -11,7 +11,7 @@
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
-module Linker ( HValue, getHValue, showLinkerState,
+module Linker ( getHValue, showLinkerState,
                 linkExpr, linkDecls, unload, withExtendedLinkEnv,
                 extendLinkEnv, deleteFromLinkEnv,
                 extendLoadedPkgs,
@@ -52,7 +52,6 @@ import FastString
 import Config
 import Platform
 import SysTools
-import PrelNames
 
 -- Standard libraries
 import Control.Monad
@@ -291,15 +290,14 @@ reallyInitDynLinker dflags =
         ; pls <- linkPackages' dflags (preloadPackages (pkgState dflags)) pls0
 
           -- (c) Link libraries from the command-line
-        ; let optl = getOpts dflags opt_l
-        ; let minus_ls = [ lib | '-':'l':lib <- optl ]
+        ; let cmdline_ld_inputs = ldInputs dflags
+        ; let minus_ls = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
         ; let lib_paths = libraryPaths dflags
         ; libspecs <- mapM (locateLib dflags False lib_paths) minus_ls
 
           -- (d) Link .o files from the command-line
-        ; let cmdline_ld_inputs = ldInputs dflags
-
-        ; classified_ld_inputs <- mapM (classifyLdInput dflags) cmdline_ld_inputs
+        ; classified_ld_inputs <- mapM (classifyLdInput dflags)
+                                    [ f | FileOption _ f <- cmdline_ld_inputs ]
 
           -- (e) Link any MacOS frameworks
         ; let platform = targetPlatform dflags
@@ -380,7 +378,16 @@ preloadLib dflags lib_paths framework_paths lib_spec
              -> do maybe_errstr <- loadDLL (mkSOName platform dll_unadorned)
                    case maybe_errstr of
                       Nothing -> maybePutStrLn dflags "done"
-                      Just mm -> preloadFailed mm lib_paths lib_spec
+                      Just mm | platformOS platform /= OSDarwin ->
+                        preloadFailed mm lib_paths lib_spec
+                      Just mm | otherwise -> do
+                        -- As a backup, on Darwin, try to also load a .so file
+                        -- since (apparently) some things install that way - see
+                        -- ticket #8770.
+                        err2 <- loadDLL $ ("lib" ++ dll_unadorned) <.> "so"
+                        case err2 of
+                          Nothing -> maybePutStrLn dflags "done"
+                          Just _  -> preloadFailed mm lib_paths lib_spec
 
           DLLPath dll_path
              -> do maybe_errstr <- loadDLL dll_path
@@ -414,14 +421,14 @@ preloadLib dflags lib_paths framework_paths lib_spec
     preload_static _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else do if cDYNAMIC_GHC_PROGRAMS
+                     else do if dynamicGhc
                                  then dynLoadObjs dflags [name]
                                  else loadObj name
                              return True
     preload_static_archive _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else do if cDYNAMIC_GHC_PROGRAMS
+                     else do if dynamicGhc
                                  then panic "Loading archives not supported"
                                  else loadArchive name
                              return True
@@ -497,7 +504,7 @@ checkNonStdWay dflags srcspan =
     -- whereas we have __stginit_base_Prelude_.
       else if objectSuf dflags == normalObjectSuffix && not (null haskellWays)
       then failNonStd dflags srcspan
-      else return $ Just $ if cDYNAMIC_GHC_PROGRAMS
+      else return $ Just $ if dynamicGhc
                            then "dyn_o"
                            else "o"
     where haskellWays = filter (not . wayRTSOnly) (ways dflags)
@@ -510,7 +517,7 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
   ptext (sLit "Dynamic linking required, but this is a non-standard build (eg. prof).") $$
   ptext (sLit "You need to build the program twice: once the") <+> ghciWay <+> ptext (sLit "way, and then") $$
   ptext (sLit "in the desired way using -osuf to set the object file suffix.")
-    where ghciWay = if cDYNAMIC_GHC_PROGRAMS
+    where ghciWay = if dynamicGhc
                     then ptext (sLit "dynamic")
                     else ptext (sLit "normal")
 
@@ -526,27 +533,26 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
-        -- (omitting iINTERACTIVE, which is already linked)
-        (mods_s, pkgs_s) <- follow_deps (filter ((/=) iNTERACTIVE) mods)
+        -- (omitting modules from the interactive package, which is already linked)
+      ; (mods_s, pkgs_s) <- follow_deps (filterOut isInteractiveModule mods)
                                         emptyUniqSet emptyUniqSet;
 
-        let {
+      ; let {
         -- 2.  Exclude ones already linked
         --      Main reason: avoid findModule calls in get_linkable
             mods_needed = mods_s `minusList` linked_mods     ;
             pkgs_needed = pkgs_s `minusList` pkgs_loaded pls ;
 
             linked_mods = map (moduleName.linkableModule)
-                                (objs_loaded pls ++ bcos_loaded pls)
-        } ;
+                                (objs_loaded pls ++ bcos_loaded pls)  }
 
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
         --     compilation) we may need to use maybe_getFileLinkable
-        let { osuf = objectSuf dflags } ;
-        lnks_needed <- mapM (get_linkable osuf) mods_needed ;
+      ; let { osuf = objectSuf dflags }
+      ; lnks_needed <- mapM (get_linkable osuf) mods_needed
 
-        return (lnks_needed, pkgs_needed) }
+      ; return (lnks_needed, pkgs_needed) } 
   where
     dflags = hsc_dflags hsc_env
     this_pkg = thisPackage dflags
@@ -637,8 +643,8 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                         return lnk
 
             adjust_ul new_osuf (DotO file) = do
-                MASSERT (osuf `isSuffixOf` file)
-                let file_base = reverse (drop (length osuf + 1) (reverse file))
+                MASSERT(osuf `isSuffixOf` file)
+                let file_base = dropTail (length osuf + 1) file
                     new_file = file_base <.> new_osuf
                 ok <- doesFileExist new_file
                 if (not ok)
@@ -784,9 +790,9 @@ dynLinkObjs dflags pls objs = do
             unlinkeds                = concatMap linkableUnlinked new_objs
             wanted_objs              = map nameOfObject unlinkeds
 
-        if cDYNAMIC_GHC_PROGRAMS
+        if dynamicGhc
             then do dynLoadObjs dflags wanted_objs
-                    return (pls, Succeeded)
+                    return (pls1, Succeeded)
             else do mapM_ loadObj wanted_objs
 
                     -- Link them all together
@@ -801,6 +807,7 @@ dynLinkObjs dflags pls objs = do
                             return (pls2, Failed)
 
 dynLoadObjs :: DynFlags -> [FilePath] -> IO ()
+dynLoadObjs _      []   = return ()
 dynLoadObjs dflags objs = do
     let platform = targetPlatform dflags
     soFile <- newTempName dflags (soExt platform)
@@ -896,7 +903,7 @@ linkSomeBCOs dflags toplevs_only ie ce_in ul_bcos
                                                else ce_all_additions
             ce_out = -- make sure we're not inserting duplicate names into the
                      -- closure environment, which leads to trouble.
-                     ASSERT (all (not . (`elemNameEnv` ce_in)) (map fst ce_additions))
+                     ASSERT(all (not . (`elemNameEnv` ce_in)) (map fst ce_additions))
                      extendClosureEnv ce_in ce_additions
         return (ce_out, hvals)
 
@@ -968,6 +975,9 @@ unload_wkr _ linkables pls
     maybeUnload :: [Linkable] -> Linkable -> IO Bool
     maybeUnload keep_linkables lnk
       | linkableInSet lnk keep_linkables = return True
+      -- We don't do any cleanup when linking objects with the dynamic linker.
+      -- Doing so introduces extra complexity for not much benefit.
+      | dynamicGhc = return False
       | otherwise
       = do mapM_ unloadObj [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
@@ -1179,7 +1189,7 @@ locateLib dflags is_hs dirs lib
     --
   = findDll `orElse` findArchive `orElse` tryGcc `orElse` assumeDll
 
-  | not cDYNAMIC_GHC_PROGRAMS
+  | not dynamicGhc
     -- When the GHC package was not compiled as dynamic library
     -- (=DYNAMIC not set), we search for .o libraries or, if they
     -- don't exist, .a libraries.
@@ -1195,7 +1205,7 @@ locateLib dflags is_hs dirs lib
      mk_arch_path     dir = dir </> ("lib" ++ lib <.> "a")
 
      hs_dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
-     mk_hs_dyn_lib_path dir = dir </> mkSOName platform hs_dyn_lib_name
+     mk_hs_dyn_lib_path dir = dir </> mkHsSOName platform hs_dyn_lib_name
 
      so_name = mkSOName platform lib
      mk_dyn_lib_path dir = dir </> so_name
@@ -1272,12 +1282,13 @@ findFile mk_file_path (dir : dirs)
 
 \begin{code}
 maybePutStr :: DynFlags -> String -> IO ()
-maybePutStr dflags s | verbosity dflags > 0 = putStr s
-                     | otherwise            = return ()
+maybePutStr dflags s
+    = when (verbosity dflags > 0) $
+          do let act = log_action dflags
+             act dflags SevInteractive noSrcSpan defaultUserStyle (text s)
 
 maybePutStrLn :: DynFlags -> String -> IO ()
-maybePutStrLn dflags s | verbosity dflags > 0 = putStrLn s
-                       | otherwise            = return ()
+maybePutStrLn dflags s = maybePutStr dflags (s ++ "\n")
 \end{code}
 
 %************************************************************************

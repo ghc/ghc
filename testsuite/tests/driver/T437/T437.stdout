@@ -1,0 +1,10 @@
+[1 of 2] Compiling Test2            ( Test2.hs, Test2.o )
+[2 of 2] Compiling Test             ( Test.hs, Test.o )
+Linking Test ...
+[1 of 1] Compiling Test2            ( Test2.hs, Test2.o ) [flags changed]
+Linking Test2 ...
+"Test2.doit"
+"Test2.main"
+[1 of 1] Compiling Test2            ( Test2.hs, Test2.o ) [flags changed]
+Linking Test2 ...
+"Test2.doit"

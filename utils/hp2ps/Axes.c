@@ -203,14 +203,18 @@ Round(floatish y)
     int i;
 
     if (y > 10.0) {
-	for (i = 0; y > 10.0; y /= 10.0, i++) ;
+	for (i = 0; y > 10.0; y /= 10.0, i++)
+	    ;
 	y = OneTwoFive(y);
-	for ( ; i > 0; y = y * 10.0, i--) ;
+	for ( ; i > 0; y = y * 10.0, i--) 
+	    ;
 
     } else if (y < 1.0) {
-	for (i = 0; y < 1.0; y *= 10.0, i++) ;
+	for (i = 0; y < 1.0; y *= 10.0, i++) 
+	    ;
         y = OneTwoFive(y);
-        for ( ; i > 0; y = y / 10.0, i--) ;
+        for ( ; i > 0; y = y / 10.0, i--) 
+            ;
  
     } else {
 	y = OneTwoFive(y);

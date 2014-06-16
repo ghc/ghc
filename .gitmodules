@@ -1,42 +1,59 @@
 [submodule "libraries/binary"]
 	path = libraries/binary
-	url = http://darcs.haskell.org/libraries/binary.git/
+	url = ../packages/binary.git
+	ignore = untracked
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
-	url = http://darcs.haskell.org/libraries/bytestring.git/
+	url = ../packages/bytestring.git
+	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
-	url = http://darcs.haskell.org/libraries/Cabal.git/
+	url = ../packages/Cabal.git
+	ignore = untracked
 [submodule "libraries/containers"]
 	path = libraries/containers
-	url = http://darcs.haskell.org/libraries/containers.git/
+	url = ../packages/containers.git
+	ignore = untracked
 [submodule "libraries/haskeline"]
 	path = libraries/haskeline
-	url = http://darcs.haskell.org/libraries/haskeline.git/
+	url = ../packages/haskeline.git
+	ignore = untracked
 [submodule "libraries/pretty"]
 	path = libraries/pretty
-	url = http://darcs.haskell.org/libraries/pretty.git/
+	url = ../packages/pretty.git
+	ignore = untracked
 [submodule "libraries/terminfo"]
 	path = libraries/terminfo
-	url = http://darcs.haskell.org/libraries/terminfo.git/
+	url = ../packages/terminfo.git
+	ignore = untracked
 [submodule "libraries/transformers"]
 	path = libraries/transformers
-	url = http://darcs.haskell.org/libraries/transformers.git/
+	url = ../packages/transformers.git
+	ignore = untracked
 [submodule "libraries/xhtml"]
 	path = libraries/xhtml
-	url = http://darcs.haskell.org/libraries/xhtml.git/
+	url = ../packages/xhtml.git
+	ignore = untracked
 [submodule "libraries/Win32"]
 	path = libraries/Win32
-	url = http://darcs.haskell.org/libraries/Win32.git/
+	url = ../packages/Win32.git
+	ignore = untracked
 [submodule "libraries/primitive"]
 	path = libraries/primitive
-	url = http://darcs.haskell.org/libraries/primitive.git/
+	url = ../packages/primitive.git
+	ignore = untracked
 [submodule "libraries/vector"]
 	path = libraries/vector
-	url = http://darcs.haskell.org/libraries/vector.git/
+	url = ../packages/vector.git
+	ignore = untracked
 [submodule "libraries/time"]
 	path = libraries/time
-	url = http://darcs.haskell.org/libraries/time.git/
+	url = ../packages/time.git
+	ignore = untracked
 [submodule "libraries/random"]
 	path = libraries/random
-	url = http://darcs.haskell.org/libraries/random.git/
+	url = ../packages/random.git
+	ignore = untracked
+[submodule "utils/haddock"]
+	path = utils/haddock
+	url = ../haddock.git

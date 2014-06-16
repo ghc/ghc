@@ -1,0 +1,5 @@
+
+T3155.hs:13:18:
+    Illegal symbol '.' in type
+    Perhaps you intended to use RankNTypes or a similar language
+    extension to enable explicit-forall syntax: forall <tvs>. <type>

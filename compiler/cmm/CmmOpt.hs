@@ -7,6 +7,8 @@
 -----------------------------------------------------------------------------
 
 module CmmOpt (
+        constantFoldNode,
+        constantFoldExpr,
         cmmMachOpFold,
         cmmMachOpFoldM
  ) where
@@ -23,6 +25,16 @@ import Platform
 
 import Data.Bits
 import Data.Maybe
+
+
+constantFoldNode :: DynFlags -> CmmNode e x -> CmmNode e x
+constantFoldNode dflags = mapExp (constantFoldExpr dflags)
+
+constantFoldExpr :: DynFlags -> CmmExpr -> CmmExpr
+constantFoldExpr dflags = wrapRecExp f
+  where f (CmmMachOp op args) = cmmMachOpFold dflags op args
+        f (CmmRegOff r 0) = CmmReg r
+        f e = e
 
 -- -----------------------------------------------------------------------------
 -- MachOp constant folder
@@ -51,7 +63,7 @@ cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
       MO_S_Neg _ -> CmmLit (CmmInt (-x) rep)
       MO_Not _   -> CmmLit (CmmInt (complement x) rep)
 
-        -- these are interesting: we must first narrow to the 
+        -- these are interesting: we must first narrow to the
         -- "from" type, in order to truncate to the correct size.
         -- The final narrow/widen to the destination type
         -- is implicit in the CmmLit.
@@ -87,7 +99,7 @@ cmmMachOpFoldM dflags conv_outer [CmmMachOp conv_inner [x]]
         | otherwise ->
             Nothing
   where
-        isIntConversion (MO_UU_Conv rep1 rep2) 
+        isIntConversion (MO_UU_Conv rep1 rep2)
           = Just (rep1,rep2,False)
         isIntConversion (MO_SS_Conv rep1 rep2)
           = Just (rep1,rep2,True)
@@ -318,7 +330,7 @@ cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt n _))]
            | Just p <- exactLog2 n ->
                  Just (cmmMachOpFold dflags (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)])
         MO_S_Quot rep
-           | Just p <- exactLog2 n, 
+           | Just p <- exactLog2 n,
              CmmReg _ <- x ->   -- We duplicate x below, hence require
                                 -- it is a reg.  FIXME: remove this restriction.
                 -- shift right is not the same as quot, because it rounds
@@ -362,7 +374,7 @@ cmmMachOpFoldM _ _ _ = Nothing
 -- This algorithm for determining the $\log_2$ of exact powers of 2 comes
 -- from GCC.  It requires bit manipulation primitives, and we use GHC
 -- extensions.  Tough.
--- 
+--
 -- Used to be in MachInstrs --SDM.
 -- ToDo: remove use of unboxery --SDM.
 
@@ -387,54 +399,6 @@ exactLog2 x_
     pow2 x | x ==# _ILIT(1) = _ILIT(0)
            | otherwise = _ILIT(1) +# pow2 (x `shiftR_FastInt` _ILIT(1))
 
-
--- -----------------------------------------------------------------------------
--- Loopify for C
-
-{-
- This is a simple pass that replaces tail-recursive functions like this:
-
-   fac() {
-     ...
-     jump fac();
-   }
-
- with this:
-
-  fac() {
-   L:
-     ...
-     goto L;
-  }
-
-  the latter generates better C code, because the C compiler treats it
-  like a loop, and brings full loop optimisation to bear.
-
-  In my measurements this makes little or no difference to anything
-  except factorial, but what the hell.
--}
-
-{-
-cmmLoopifyForC :: DynFlags -> RawCmmDecl -> RawCmmDecl
--- XXX: revisit if we actually want to do this
--- cmmLoopifyForC p@(CmmProc Nothing _ _) = p  -- only if there's an info table, ignore case alts
-cmmLoopifyForC dflags (CmmProc infos entry_lbl live
-                 (ListGraph blocks@(BasicBlock top_id _ : _))) =
---  pprTrace "jump_lbl" (ppr jump_lbl <+> ppr entry_lbl) $
-  CmmProc infos entry_lbl live (ListGraph blocks')
-  where blocks' = [ BasicBlock id (map do_stmt stmts)
-                  | BasicBlock id stmts <- blocks ]
-
-        do_stmt (CmmJump (CmmLit (CmmLabel lbl)) _) | lbl == jump_lbl
-                = CmmBranch top_id
-        do_stmt stmt = stmt
-
-        jump_lbl | tablesNextToCode dflags = toInfoLbl entry_lbl
-                 | otherwise               = entry_lbl
-
-cmmLoopifyForC _ top = top
--}
-
 -- -----------------------------------------------------------------------------
 -- Utils
 
@@ -449,4 +413,3 @@ isComparisonExpr _                  = False
 isPicReg :: CmmExpr -> Bool
 isPicReg (CmmReg (CmmGlobal PicBaseReg)) = True
 isPicReg _ = False
-

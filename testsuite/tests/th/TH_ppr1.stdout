@@ -1,0 +1,14 @@
+Main.f Main.u1 Main.u2
+Main.u1 `Main.f` Main.u2
+(Main..+.) Main.u1 Main.u2
+Main.u1 Main..+. Main.u2
+(GHC.Types.:) Main.u1 Main.u2
+Main.u1 GHC.Types.: Main.u2
+\((GHC.Types.:) x_0 xs_1) -> x_0
+\(x_0 GHC.Types.: xs_1) -> x_0
+class Foo_0 a_1 b_2
+    where foo_3 :: a_1 -> b_2
+\x_0 -> (x_0, 1 `x_0` 2)
+\(+_0) -> ((+_0), 1 +_0 2)
+(Main.f, 1 `Main.f` 2)
+((Main..+.), 1 Main..+. 2)

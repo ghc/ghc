@@ -1,0 +1,8 @@
+MkT2 [Just 1]
+Breakpoint 0 activated at print029.hs:7:1-14
+Stopped at print029.hs:7:1-14
+_result :: (t Int, t Int) = _
+Stopped at print029.hs:7:10-14
+_result :: (t Int, t Int) = _
+x :: t Int = [Just 1]
+y :: t Int = _

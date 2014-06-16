@@ -1,0 +1,3 @@
+
+readFailTraditionalRecords2.hs:6:4:
+    Illegal record syntax (use TraditionalRecordSyntax): Foo {i = j}

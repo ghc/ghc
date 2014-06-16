@@ -1,0 +1,9 @@
+data B1 a = B1 a
+data instance C.F (B1 a) = B2 a
+type role D nominal
+data family D a
+class C.C1 a where
+  type role C.F nominal
+  data family C.F a
+  	-- Defined at T5417a.hs:5:5
+data C.F (B1 a) -- Defined at T5417.hs:8:10

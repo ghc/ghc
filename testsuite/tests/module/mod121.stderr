@@ -1,0 +1,4 @@
+
+mod121.hs:5:5:
+    Not in scope: ‘m2’
+    Perhaps you meant ‘m1’ (imported from Mod121_A)

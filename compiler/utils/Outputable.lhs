@@ -32,7 +32,7 @@ module Outputable (
         sep, cat,
         fsep, fcat,
         hang, punctuate, ppWhen, ppUnless,
-        speakNth, speakNTimes, speakN, speakNOf, plural,
+        speakNth, speakNTimes, speakN, speakNOf, plural, isOrAre,
 
         coloured, PprColour, colType, colCoerc, colDataCon,
         colBinder, bold, keyword,
@@ -42,8 +42,7 @@ module Outputable (
         pprCode, mkCodeStyle,
         showSDoc, showSDocOneLine,
         showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
-        showPpr,
-        showSDocUnqual,
+        showSDocUnqual, showPpr,
         renderWithStyle,
 
         pprInfixVar, pprPrefixVar,
@@ -53,7 +52,9 @@ module Outputable (
         -- * Controlling the style in which output is printed
         BindingSite(..),
 
-        PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify, neverQualify,
+        PprStyle, CodeStyle(..), PrintUnqualified,
+        alwaysQualify, alwaysQualifyNames, alwaysQualifyModules,
+        neverQualify, neverQualifyNames, neverQualifyModules,
         QualifyName(..),
         sdocWithDynFlags, sdocWithPlatform,
         getPprStyle, withPprStyle, withPprStyleDoc,
@@ -75,7 +76,7 @@ import {-# SOURCE #-}   DynFlags( DynFlags,
                                   useUnicodeQuotes,
                                   unsafeGlobalDynFlags )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
-import {-# SOURCE #-}   Name( Name, nameModule )
+import {-# SOURCE #-}   OccName( OccName )
 import {-# SOURCE #-}   StaticFlags( opt_PprStyle_Debug, opt_NoDebugOutput )
 
 import FastString
@@ -90,6 +91,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Char
 import qualified Data.Map as M
+import Data.Int
 import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -144,13 +146,20 @@ data Depth = AllTheWay
 -- purpose of the pair of functions that gets passed around
 -- when rendering 'SDoc'.
 
+type PrintUnqualified = (QueryQualifyName, QueryQualifyModule)
+
 -- | given an /original/ name, this function tells you which module
 -- name it should be qualified with when printing for the user, if
 -- any.  For example, given @Control.Exception.catch@, which is in scope
 -- as @Exception.catch@, this fuction will return @Just "Exception"@.
 -- Note that the return value is a ModuleName, not a Module, because
 -- in source code, names are qualified by ModuleNames.
-type QueryQualifyName = Name -> QualifyName
+type QueryQualifyName = Module -> OccName -> QualifyName
+
+-- | For a given module, we need to know whether to print it with
+-- a package name to disambiguate it.
+type QueryQualifyModule = Module -> Bool
+
 
 -- See Note [Printing original names] in HscTypes
 data QualifyName                        -- given P:M.T
@@ -163,18 +172,11 @@ data QualifyName                        -- given P:M.T
                 -- it is not in scope at all, and M.T is already bound in the
                 -- current scope, so we must refer to it as "P:M.T"
 
-
--- | For a given module, we need to know whether to print it with
--- a package name to disambiguate it.
-type QueryQualifyModule = Module -> Bool
-
-type PrintUnqualified = (QueryQualifyName, QueryQualifyModule)
-
 alwaysQualifyNames :: QueryQualifyName
-alwaysQualifyNames n = NameQual (moduleName (nameModule n))
+alwaysQualifyNames m _ = NameQual (moduleName m)
 
 neverQualifyNames :: QueryQualifyName
-neverQualifyNames _ = NameUnqual
+neverQualifyNames _ _ = NameUnqual
 
 alwaysQualifyModules :: QueryQualifyModule
 alwaysQualifyModules _ = True
@@ -295,8 +297,8 @@ sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 
 \begin{code}
 qualName :: PprStyle -> QueryQualifyName
-qualName (PprUser (qual_name,_) _)  n = qual_name n
-qualName _other                     n = NameQual (moduleName (nameModule n))
+qualName (PprUser (qual_name,_) _)  mod occ = qual_name mod occ
+qualName _other                     mod _   = NameQual (moduleName mod)
 
 qualModule :: PprStyle -> QueryQualifyModule
 qualModule (PprUser (_,qual_mod) _)  m = qual_mod m
@@ -363,44 +365,47 @@ mkCodeStyle = PprCode
 -- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
 showSDoc :: DynFlags -> SDoc -> String
-showSDoc dflags d =
-  Pretty.showDocWith PageMode
-    (runSDoc d (initSDocContext dflags defaultUserStyle))
+showSDoc dflags sdoc = renderWithStyle dflags sdoc defaultUserStyle
 
 renderWithStyle :: DynFlags -> SDoc -> PprStyle -> String
-renderWithStyle dflags sdoc sty =
-  Pretty.render (runSDoc sdoc (initSDocContext dflags sty))
+renderWithStyle dflags sdoc sty
+  = Pretty.showDoc PageMode (pprCols dflags) $
+    runSDoc sdoc (initSDocContext dflags sty)
 
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
 showSDocOneLine :: DynFlags -> SDoc -> String
 showSDocOneLine dflags d
- = Pretty.showDocWith PageMode
-    (runSDoc d (initSDocContext dflags defaultUserStyle))
+ = Pretty.showDoc OneLineMode (pprCols dflags) $
+   runSDoc d (initSDocContext dflags defaultUserStyle)
 
 showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
 showSDocForUser dflags unqual doc
- = show (runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay)))
+ = renderWithStyle dflags doc (mkUserStyle unqual AllTheWay)
 
 showSDocUnqual :: DynFlags -> SDoc -> String
--- Only used in the gruesome isOperator
-showSDocUnqual dflags d
- = show (runSDoc d (initSDocContext dflags (mkUserStyle neverQualify AllTheWay)))
+-- Only used by Haddock
+showSDocUnqual dflags doc
+ = renderWithStyle dflags doc (mkUserStyle neverQualify AllTheWay)
 
 showSDocDump :: DynFlags -> SDoc -> String
-showSDocDump dflags d
- = Pretty.showDocWith PageMode (runSDoc d (initSDocContext dflags defaultDumpStyle))
+showSDocDump dflags d = renderWithStyle dflags d defaultDumpStyle
+
+showSDocDebug :: DynFlags -> SDoc -> String
+showSDocDebug dflags d = renderWithStyle dflags d PprDebug
 
 showSDocDumpOneLine :: DynFlags -> SDoc -> String
 showSDocDumpOneLine dflags d
- = Pretty.showDocWith OneLineMode (runSDoc d (initSDocContext dflags PprDump))
-
-showSDocDebug :: DynFlags -> SDoc -> String
-showSDocDebug dflags d = show (runSDoc d (initSDocContext dflags PprDebug))
+ = Pretty.showDoc OneLineMode irrelevantNCols $
+   runSDoc d (initSDocContext dflags PprDump)
 
 showPpr :: Outputable a => DynFlags -> a -> String
-showPpr dflags = showSDoc dflags . ppr
+showPpr dflags thing = showSDoc dflags (ppr thing)
+
+irrelevantNCols :: Int
+-- Used for OneLineMode and LeftMode when number of cols isn't used
+irrelevantNCols = 1
 \end{code}
 
 \begin{code}
@@ -421,7 +426,10 @@ rational :: Rational   -> SDoc
 
 empty       = docToSDoc $ Pretty.empty
 char c      = docToSDoc $ Pretty.char c
+
 text s      = docToSDoc $ Pretty.text s
+{-# INLINE text #-}   -- Inline so that the RULE Pretty.text will fire
+
 ftext s     = docToSDoc $ Pretty.ftext s
 ptext s     = docToSDoc $ Pretty.ptext s
 ztext s     = docToSDoc $ Pretty.ztext s
@@ -452,7 +460,7 @@ cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
 quotes d =
       sdocWithDynFlags $ \dflags ->
       if useUnicodeQuotes dflags
-      then char '‛' <> d <> char '’'
+      then char '‘' <> d <> char '’'
       else SDoc $ \sty ->
            let pp_d = runSDoc d sty
                str  = show pp_d
@@ -615,6 +623,12 @@ instance Outputable Char where
 instance Outputable Bool where
     ppr True  = ptext (sLit "True")
     ppr False = ptext (sLit "False")
+
+instance Outputable Int32 where
+   ppr n = integer $ fromIntegral n
+
+instance Outputable Int64 where
+   ppr n = integer $ fromIntegral n
 
 instance Outputable Int where
     ppr n = int n
@@ -898,6 +912,15 @@ speakNTimes t | t == 1     = ptext (sLit "once")
 plural :: [a] -> SDoc
 plural [_] = empty  -- a bit frightening, but there you are
 plural _   = char 's'
+
+-- | Determines the form of to be appropriate for the length of a list:
+--
+-- > isOrAre [] = ptext (sLit "are")
+-- > isOrAre ["Hello"] = ptext (sLit "is")
+-- > isOrAre ["Hello", "World"] = ptext (sLit "are")
+isOrAre :: [a] -> SDoc
+isOrAre [_] = ptext (sLit "is")
+isOrAre _   = ptext (sLit "are")
 \end{code}
 
 

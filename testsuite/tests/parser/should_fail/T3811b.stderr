@@ -1,0 +1,3 @@
+
+T3811b.hs:4:14:
+    parse error in constructor in data/newtype declaration: !B

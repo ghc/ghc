@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -55,6 +55,17 @@ $1_$2_$3_NON_HS_OBJS = $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS)  $$($1_$2_$3_S_
 $1_$2_$3_ALL_OBJS = $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS)
 
 ifeq "$3" "dyn"
+
+ifneq "$$($1_$2_dll0_MODULES)" ""
+$$($1_$2_$3_LIB)  : $1/$2/dll-split.stamp
+ifneq "$$($1_$2_$3_LIB0)" ""
+$$($1_$2_$3_LIB0) : $1/$2/dll-split.stamp
+endif
+endif
+
+$1/$2/dll-split.stamp: $$($1_$2_depfile_haskell) $$$$(dll-split_INPLACE)
+	$$(dll-split_INPLACE) $$< "$$($1_$2_dll0_START_MODULE)" "$$($1_$2_dll0_MODULES)"
+	touch $$@
 
 # Link a dynamic library
 # On windows we have to supply the extra libs this one links to when building it.
@@ -158,6 +169,7 @@ define build-dll
 	    -no-auto-link-packages \
 	    -o $6
 # Now check that the DLL doesn't have too many symbols. See trac #5987.
+	SYMBOLS=`$(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | tail -n +2 | wc -l`; echo "Number of symbols in $6: $$SYMBOLS"
 	case `$(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | grep "\[ *0\]" | wc -l` in 1) echo DLL $6 OK;; 0) echo No symbols in DLL $6; exit 1;; [0-9]*) echo Too many symbols in DLL $6; $(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | tail; exit 1;; *) echo bad DLL $6; exit 1;; esac
 endef
 

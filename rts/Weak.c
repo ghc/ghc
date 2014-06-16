@@ -16,18 +16,19 @@
 #include "Prelude.h"
 #include "Trace.h"
 
-// ForeignPtrs with C finalizers rely on weak pointers inside weak_ptr_list
-// to always be in the same order.
-
-StgWeak *weak_ptr_list;
-
 void
-runCFinalizer(void *fn, void *ptr, void *env, StgWord flag)
+runCFinalizers(StgCFinalizerList *list)
 {
-    if (flag)
-	((void (*)(void *, void *))fn)(env, ptr);
-    else
-	((void (*)(void *))fn)(ptr);
+    StgCFinalizerList *head;
+    for (head = list;
+        (StgClosure *)head != &stg_NO_FINALIZER_closure;
+        head = (StgCFinalizerList *)head->link)
+    {
+        if (head->flag)
+            ((void (*)(void *, void *))head->fptr)(head->eptr, head->ptr);
+        else
+            ((void (*)(void *))head->fptr)(head->ptr);
+    }
 }
 
 void
@@ -42,15 +43,7 @@ runAllCFinalizers(StgWeak *list)
     }
 
     for (w = list; w; w = w->link) {
-	StgArrWords *farr;
-
-	farr = (StgArrWords *)UNTAG_CLOSURE(w->cfinalizer);
-
-	if ((StgClosure *)farr != &stg_NO_FINALIZER_closure)
-	    runCFinalizer((void *)farr->payload[0],
-	                  (void *)farr->payload[1],
-	                  (void *)farr->payload[2],
-	                  farr->payload[3]);
+	runCFinalizers((StgCFinalizerList *)w->cfinalizers);
     }
 
     if (task != NULL) {
@@ -91,8 +84,6 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     // count number of finalizers, and kill all the weak pointers first...
     n = 0;
     for (w = list; w; w = w->link) { 
-	StgArrWords *farr;
-
 	// Better not be a DEAD_WEAK at this stage; the garbage
 	// collector removes DEAD_WEAKs from the weak pointer list.
 	ASSERT(w->header.info != &stg_DEAD_WEAK_info);
@@ -101,13 +92,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 	    n++;
 	}
 
-	farr = (StgArrWords *)UNTAG_CLOSURE(w->cfinalizer);
-
-	if ((StgClosure *)farr != &stg_NO_FINALIZER_closure)
-	    runCFinalizer((void *)farr->payload[0],
-	                  (void *)farr->payload[1],
-	                  (void *)farr->payload[2],
-	                  farr->payload[3]);
+	runCFinalizers((StgCFinalizerList *)w->cfinalizers);
 
 #ifdef PROFILING
         // A weak pointer is inherently used, so we do not need to call

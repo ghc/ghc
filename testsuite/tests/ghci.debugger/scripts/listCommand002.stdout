@@ -1,0 +1,6 @@
+Stopped at listCommand002.hs:(3,8)-(5,24)
+_result :: IO () = _
+Stopped at listCommand002.hs:4:3-26
+_result :: IO () = _
+Stopped at listCommand002.hs:5:3-24
+_result :: IO () = _

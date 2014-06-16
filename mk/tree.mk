@@ -1,10 +1,4 @@
 
-ifneq "$(findstring 3.7, $(MAKE_VERSION))" ""
-ifeq "$(findstring 3.79.1, $(MAKE_VERSION))" ""
-$(error GNU make version 3.79.1 or later is required.)
-endif
-endif
-
 ################################################################################
 #
 #	Layout of the source tree

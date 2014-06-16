@@ -156,7 +156,7 @@ platforms.
 See: http://www.programmersheaven.com/2/Calling-conventions
 
 \begin{code}
-data CCallConv = CCallConv | CApiConv | StdCallConv | PrimCallConv
+data CCallConv = CCallConv | CApiConv | StdCallConv | PrimCallConv | JavaScriptCallConv
   deriving (Eq, Data, Typeable)
   {-! derive: Binary !-}
 
@@ -165,6 +165,7 @@ instance Outputable CCallConv where
   ppr CCallConv   = ptext (sLit "ccall")
   ppr CApiConv    = ptext (sLit "capi")
   ppr PrimCallConv = ptext (sLit "prim")
+  ppr JavaScriptCallConv = ptext (sLit "javascript")
 
 defaultCCallConv :: CCallConv
 defaultCCallConv = CCallConv
@@ -174,6 +175,7 @@ ccallConvToInt StdCallConv = 0
 ccallConvToInt CCallConv   = 1
 ccallConvToInt CApiConv    = panic "ccallConvToInt CApiConv"
 ccallConvToInt (PrimCallConv {}) = panic "ccallConvToInt PrimCallConv"
+ccallConvToInt JavaScriptCallConv = panic "ccallConvToInt JavaScriptCallConv"
 \end{code}
 
 Generate the gcc attribute corresponding to the given
@@ -185,6 +187,7 @@ ccallConvAttribute StdCallConv       = text "__attribute__((__stdcall__))"
 ccallConvAttribute CCallConv         = empty
 ccallConvAttribute CApiConv          = empty
 ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
+ccallConvAttribute JavaScriptCallConv = panic "ccallConvAttribute JavaScriptCallConv"
 \end{code}
 
 \begin{code}
@@ -324,13 +327,16 @@ instance Binary CCallConv where
             putByte bh 2
     put_ bh CApiConv = do
             putByte bh 3
+    put_ bh JavaScriptCallConv = do
+            putByte bh 4
     get bh = do
             h <- getByte bh
             case h of
               0 -> do return CCallConv
               1 -> do return StdCallConv
               2 -> do return PrimCallConv
-              _ -> do return CApiConv
+              3 -> do return CApiConv
+              _ -> do return JavaScriptCallConv
 
 instance Binary CType where
     put_ bh (CType mh fs) = do put_ bh mh

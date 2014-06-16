@@ -1,0 +1,9 @@
+
+tcfail191.hs:11:26:
+    Couldn't match type ‘a’ with ‘[a]’
+      ‘a’ is a rigid type variable bound by
+          a type expected by the context: [a] -> [[a]] at tcfail191.hs:11:9
+    Expected type: [a] -> [[a]]
+      Actual type: [a] -> [a]
+    In the expression: take 5
+    In a stmt of a list comprehension: then group using take 5

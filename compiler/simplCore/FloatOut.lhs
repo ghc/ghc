@@ -11,7 +11,7 @@
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module FloatOut ( floatOutwards ) where
@@ -290,7 +290,7 @@ floatExpr (Tick tickish expr)
     let
 	-- Annotate bindings floated outwards past an scc expression
 	-- with the cc.  We mark that cc as "duplicated", though.
-        annotated_defns = wrapTick (mkNoTick tickish) floating_defns
+        annotated_defns = wrapTick (mkNoCount tickish) floating_defns
     in
     (fs, annotated_defns, Tick tickish expr') }
 

@@ -1,0 +1,53 @@
+type family A a b :: * 	-- Defined at T4175.hs:7:1
+type instance A (B a) b -- Defined at T4175.hs:10:1
+type instance A (Maybe a) a -- Defined at T4175.hs:9:1
+type instance A Int Int -- Defined at T4175.hs:8:1
+type role B nominal
+data family B a
+  	-- Defined at T4175.hs:12:1
+instance G B -- Defined at T4175.hs:34:10
+data instance B () -- Defined at T4175.hs:13:15
+type instance A (B a) b -- Defined at T4175.hs:10:1
+class C a where
+  type family D a b :: *
+  	-- Defined at T4175.hs:16:5
+type D () () -- Defined at T4175.hs:22:5
+type D Int () -- Defined at T4175.hs:19:5
+type family E a :: * where
+    E () = Bool
+    E Int = String
+  	-- Defined at T4175.hs:24:1
+data () = () 	-- Defined in ‘GHC.Tuple’
+instance C () -- Defined at T4175.hs:21:10
+instance Bounded () -- Defined in ‘GHC.Enum’
+instance Enum () -- Defined in ‘GHC.Enum’
+instance Eq () -- Defined in ‘GHC.Classes’
+instance Ord () -- Defined in ‘GHC.Classes’
+instance Read () -- Defined in ‘GHC.Read’
+instance Show () -- Defined in ‘GHC.Show’
+type D () () -- Defined at T4175.hs:22:5
+type D Int () -- Defined at T4175.hs:19:5
+data instance B () -- Defined at T4175.hs:13:15
+data Maybe a = Nothing | Just a 	-- Defined in ‘Data.Maybe’
+instance Eq a => Eq (Maybe a) -- Defined in ‘Data.Maybe’
+instance Monad Maybe -- Defined in ‘Data.Maybe’
+instance Functor Maybe -- Defined in ‘Data.Maybe’
+instance Ord a => Ord (Maybe a) -- Defined in ‘Data.Maybe’
+instance Read a => Read (Maybe a) -- Defined in ‘GHC.Read’
+instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
+type instance A (Maybe a) a -- Defined at T4175.hs:9:1
+data Int = I# Int# 	-- Defined in ‘GHC.Types’
+instance C Int -- Defined at T4175.hs:18:10
+instance Bounded Int -- Defined in ‘GHC.Enum’
+instance Enum Int -- Defined in ‘GHC.Enum’
+instance Eq Int -- Defined in ‘GHC.Classes’
+instance Integral Int -- Defined in ‘GHC.Real’
+instance Num Int -- Defined in ‘GHC.Num’
+instance Ord Int -- Defined in ‘GHC.Classes’
+instance Read Int -- Defined in ‘GHC.Read’
+instance Real Int -- Defined in ‘GHC.Real’
+instance Show Int -- Defined in ‘GHC.Show’
+type D Int () -- Defined at T4175.hs:19:5
+type instance A Int Int -- Defined at T4175.hs:8:1
+class Z a 	-- Defined at T4175.hs:28:1
+instance F (Z a) -- Defined at T4175.hs:31:10

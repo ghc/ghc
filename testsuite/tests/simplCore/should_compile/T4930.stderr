@@ -1,0 +1,39 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 23, types: 11, coercions: 0}
+
+lvl :: [GHC.Types.Char]
+[GblId, Str=DmdType]
+lvl = GHC.CString.unpackCString# "Too small"#
+
+T4930.foo1 :: GHC.Types.Int
+[GblId, Str=DmdType b]
+T4930.foo1 = GHC.Err.error @ GHC.Types.Int lvl
+
+T4930.foo :: GHC.Types.Int -> GHC.Types.Int
+[GblId,
+ Arity=1,
+ Str=DmdType <S,1*U(U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
+         ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+         Tmpl= \ (n [Occ=Once!] :: GHC.Types.Int) ->
+                 case n of _ [Occ=Dead] { GHC.Types.I# x ->
+                 case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# x 5)
+                 of _ [Occ=Dead] {
+                   GHC.Types.False -> GHC.Types.I# (GHC.Prim.+# x 5);
+                   GHC.Types.True -> T4930.foo1
+                 }
+                 }}]
+T4930.foo =
+  \ (n :: GHC.Types.Int) ->
+    case n of _ [Occ=Dead] { GHC.Types.I# x ->
+    case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# x 5)
+    of _ [Occ=Dead] {
+      GHC.Types.False -> GHC.Types.I# (GHC.Prim.+# x 5);
+      GHC.Types.True -> T4930.foo1
+    }
+    }
+
+
+

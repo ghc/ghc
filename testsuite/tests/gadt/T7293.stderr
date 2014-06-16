@@ -1,0 +1,9 @@
+
+T7293.hs:24:5:
+    Couldn't match type ‘'False’ with ‘'True’
+    Inaccessible code in
+      a pattern with constructor
+        Nil :: forall a. Vec a 'Zero,
+      in an equation for ‘nth’
+    In the pattern: Nil
+    In an equation for ‘nth’: nth Nil _ = undefined

@@ -28,7 +28,7 @@
     <para>
         By default, GHC mainly aims to behave (mostly) like a Haskell&nbsp;2010
         compiler, although you can tell it to try to behave like a
-        particular version of the langauge with the
+        particular version of the language with the
         <literal>-XHaskell98</literal> and
         <literal>-XHaskell2010</literal> flags. The known deviations
         from the standards are described below. Unless otherwise stated,
@@ -107,7 +107,7 @@ main = do args &lt;- getArgs
   <sect3 id="infelicities-exprs-pats">
       <title>Expressions and patterns</title>
 
-    <para>In its default mode, GHC makes some programs sligtly more defined 
+    <para>In its default mode, GHC makes some programs slightly more defined 
     than they should be. For example, consider
     <programlisting>
 f :: [a] -> b -> b
@@ -457,7 +457,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
     <title>Known bugs or infelicities</title>
 
     <para>The bug tracker lists bugs that have been reported in GHC but not
-      yet fixed: see the <ulink url="http://hackage.haskell.org/trac/ghc/">GHC Trac</ulink>.  In addition to those, GHC also has the following known bugs
+      yet fixed: see the <ulink url="http://ghc.haskell.org/trac/ghc/">GHC Trac</ulink>.  In addition to those, GHC also has the following known bugs
       or  infelicities.  These bugs are more permanent; it is unlikely that
       any of them will be fixed in the short term.</para>
 

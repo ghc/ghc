@@ -1,0 +1,8 @@
+Name:    B
+Version: 0
+
+Library
+    Build-Depends:   A == 0
+    Exposed-Modules: B
+    Other-Modules:   Internal
+    Extensions: NoImplicitPrelude

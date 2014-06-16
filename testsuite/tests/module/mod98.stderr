@@ -1,0 +1,4 @@
+
+mod98.hs:3:1:
+    Invalid type signature: M.x :: Char
+    Should be of form <variable> :: <type>

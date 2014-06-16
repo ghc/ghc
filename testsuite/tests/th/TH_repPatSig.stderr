@@ -1,0 +1,4 @@
+
+TH_repPatSig.hs:10:3:
+    Type signatures in patterns not (yet) handled by Template Haskell
+      x :: Int

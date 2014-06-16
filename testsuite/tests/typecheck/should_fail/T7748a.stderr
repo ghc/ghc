@@ -1,0 +1,15 @@
+
+T7748a.hs:14:24:
+    Couldn't match expected type ‘a’ with actual type ‘Maybe t0’
+      ‘a’ is a rigid type variable bound by
+          the type signature for test :: a -> r -> () at T7748a.hs:11:9
+    Relevant bindings include
+      zd :: a (bound at T7748a.hs:12:6)
+      test :: a -> r -> () (bound at T7748a.hs:12:1)
+    In the pattern: Nothing
+    In a case alternative: Nothing -> const ()
+    In the expression:
+      case zd of {
+        Nothing -> const ()
+        Just Nothing -> const ()
+        Just (Just p) -> p }

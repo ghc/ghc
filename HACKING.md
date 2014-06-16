@@ -10,14 +10,14 @@ The GHC Developer's Wiki
 
 The home for GHC hackers is our Trac instance, located here:
 
-<http://hackage.haskell.org/trac/ghc>
+<http://ghc.haskell.org/trac/ghc>
 
 From here, you can file bugs (or look them up,) use the wiki, view the
 `git` history, among other things. Of particular note is the building
 page, which has the high level overview of the build process and how
 to get the source:
 
-<http://hackage.haskell.org/trac/ghc/wiki/Building>
+<http://ghc.haskell.org/trac/ghc/wiki/Building>
 
 Contributing patches to GHC in a hurry
 ======================================
@@ -25,14 +25,14 @@ Contributing patches to GHC in a hurry
 Make sure your system has the necessary tools to compile GHC. You can
 find an overview here:
 
-<http://hackage.haskell.org/trac/ghc/wiki/Building/Preparation>
+<http://ghc.haskell.org/trac/ghc/wiki/Building/Preparation>
 
 Next, clone the repository and all the associated libraries:
 
 ```
-$ git clone http://darcs.haskell.org/ghc.git/
+$ git clone http://git.haskell.org/ghc.git
 $ cd ghc
-$ ./sync-all --testsuite get
+$ ./sync-all get
 ```
 
 First copy `mk/build.mk.sample` to `mk/build.mk` and ensure it has
@@ -74,7 +74,7 @@ $
 
 Now create a trac ticket:
 
-<http://hackage.haskell.org/trac/ghc/newticket?type=bug>
+<http://ghc.haskell.org/trac/ghc/newticket?type=bug>
 
 And attach the files in your `patches/` directory. Set the status from
 *new* to *patch* and we'll review it as soon as we can!
@@ -85,22 +85,22 @@ Useful links:
 An overview of things like using git, the release process, filing bugs
 and more can be located here:
 
-<http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions>
+<http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions>
 
 You can find our coding conventions for the compiler and RTS here:
 
-<http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle>
-<http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Conventions>
+<http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle>
+<http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Conventions>
 
 A high level overview of the bug tracker:
 
-<http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions/BugTracker>
+<http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/BugTracker>
 
 If you're going to contribute regularly, **learning how to use the
 build system is important** and will save you lots of time. You should
 read over this page carefully:
 
-<http://hackage.haskell.org/trac/ghc/wiki/Building/Using>
+<http://ghc.haskell.org/trac/ghc/wiki/Building/Using>
 
 How to communicate with us
 ==========================
@@ -132,7 +132,7 @@ lost. But if the change is small and self contained, feel free to
 attach it to your email, and send it to `ghc-devs`.
 
 Furthermore, if you're a developer (or want to become one!) you're
-undoubtly also interested in the other mailing lists:
+undoubtedly also interested in the other mailing lists:
 
  * [glasgow-haskell-users](http://www.haskell.org/mailman/listinfo/glasgow-haskell-users)
    is where developers/users meet.

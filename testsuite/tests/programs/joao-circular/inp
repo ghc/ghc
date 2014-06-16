@@ -1,0 +1,22 @@
+int a;
+int b;
+int c;
+int a;
+
+
+fact (int x) : int
+{
+  fact = 1;
+  while ( x > 0 )
+  { fact = fact * x;
+    x = x - 1;
+  };
+};
+
+recfact (int x) : int
+{ if ( x == 0) then
+   { recfact = 1;}
+  else
+   { recfact = x * recfact (x - 1); };
+};
+

@@ -1,0 +1,8 @@
+
+ds041.hs:1:14: Warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
+ds041.hs:16:7: Warning:
+    Fields of ‘Foo’ not initialised: x
+    In the expression: Foo {}
+    In an equation for ‘foo’: foo = Foo {}

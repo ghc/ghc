@@ -1,0 +1,8 @@
+
+T2111.hs:6:23:
+    Arrow command found where an expression was expected:
+      undefined -< x
+
+T2111.hs:6:41:
+    Arrow command found where an expression was expected:
+      undefined -< x

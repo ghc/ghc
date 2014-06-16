@@ -1,0 +1,9 @@
+-- Breakpoints on binding sites that start with a List Comprehension are being coalesced, since list comp. are desugared to Lets and we coalesce bkpts for Lets (since there will be a breakpoint at body of the Let anyway)
+
+:l dynbrk008.hs
+:st f 42
+:st
+:st
+:st
+:st
+:st

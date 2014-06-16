@@ -78,5 +78,6 @@ maxSpillSlots dflags
                 ArchAlpha     -> panic "maxSpillSlots ArchAlpha"
                 ArchMipseb    -> panic "maxSpillSlots ArchMipseb"
                 ArchMipsel    -> panic "maxSpillSlots ArchMipsel"
+                ArchJavaScript-> panic "maxSpillSlots ArchJavaScript"
                 ArchUnknown   -> panic "maxSpillSlots ArchUnknown"
 

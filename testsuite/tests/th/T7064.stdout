@@ -1,0 +1,26 @@
+f1_0 x_1 = 1
+f2_0 x_1 = 2
+f3_0 x_1 = 3
+{-# INLINE f1_0 #-}
+{-# INLINE [2] f2_0 #-}
+{-# INLINE CONLIKE [~2] f3_0 #-}
+g1_0 x_1 = 1
+g2_0 x_1 = 2
+g3_0 x_1 = 3
+{-# SPECIALISE g1_0 :: GHC.Types.Int -> GHC.Types.Int #-}
+{-# SPECIALISE [2] g2_0 :: GHC.Types.Int -> GHC.Types.Int #-}
+{-# SPECIALISE INLINE [~2] g3_0 ::
+                             GHC.Types.Int -> GHC.Types.Int #-}
+data T_0 a_1 = T_2 a_1
+instance GHC.Classes.Eq a_0 => GHC.Classes.Eq (T_1 a_0)
+    where (GHC.Classes.==) (T_2 x_3) (T_2 y_4) = x_3 GHC.Classes.== y_4
+          {-# SPECIALISE instance GHC.Classes.Eq (T_1 GHC.Types.Int) #-}
+{-# RULES "rule1"
+    GHC.Real.fromIntegral
+    = GHC.Base.id :: forall a_0 . a_0 -> a_0 #-}
+{-# RULES "rule2" [1]
+    forall (x_0 :: a_1) . GHC.Real.fromIntegral x_0
+    = x_0 #-}
+{-# RULES "rule3" [~1]
+    forall (x_0 :: a_1) . GHC.Real.fromIntegral x_0
+    = x_0 #-}

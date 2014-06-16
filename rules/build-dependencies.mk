@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -31,7 +31,7 @@ ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
 # indirectly) include the generated includes files.
 $$($1_$2_depfile_haskell) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
 
-$$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$($1_$2_HC_MK_DEPEND_DEP) | $$$$(dir $$$$@)/.
+$$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$$$($1_$2_HC_MK_DEPEND_DEP) | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@.tmp)
 ifneq "$$($1_$2_HS_SRCS)" ""
 	"$$($1_$2_HC_MK_DEPEND)" -M \
@@ -49,30 +49,31 @@ endif
 #    within the build tree. On Windows this causes a problem as they look
 #    like bad rules, due to the two colons, so we filter them out.
 	grep -v ' : [a-zA-Z]:/' $$@.tmp > $$@.tmp2
-	sed '/hs$$$$/ p                                      ; \
-	     /hs$$$$/ s/o /hi /g                             ; \
-	     /hs$$$$/ s/:/ : %hi: %o /                       ; \
-	     /hs$$$$/ s/^/$$$$(eval $$$$(call hi-rule,/      ; \
-	     /hs$$$$/ s/$$$$/))/                             ; \
-	     /hs-boot$$$$/ p                                 ; \
-	     /hs-boot$$$$/ s/o-boot /hi-boot /g              ; \
-	     /hs-boot$$$$/ s/:/ : %hi-boot: %o-boot /        ; \
-	     /hs-boot$$$$/ s/^/$$$$(eval $$$$(call hi-rule,/ ; \
-	     /hs-boot$$$$/ s/$$$$/))/'                         \
-	    $$@.tmp2 > $$@
-
+# Insert the calls to hi-rule. Basically, we look for the
+#     Foo.dyn_o Foo.o : Foo.hs
+# lines, and create corresponding hi-rule lines
+#     <dollar>(eval <dollar>(call hi-rule,Foo.dyn_hi Foo.hi : %hi: %o Foo.hs))
+	sed -e '/hs$$$$/ p' -e '/hs$$$$/ s/o /hi /g' \
+             -e '/hs$$$$/ s/:/ : %hi: %o /'                       \
+             -e '/hs$$$$/ s/^/$$$$(eval $$$$(call hi-rule,/'      \
+             -e '/hs$$$$/ s/$$$$/))/'                             \
+             -e '/hs-boot$$$$/ p' -e '/hs-boot$$$$/ s/o-boot /hi-boot /g' \
+             -e '/hs-boot$$$$/ s/:/ : %hi-boot: %o-boot /'        \
+             -e '/hs-boot$$$$/ s/^/$$$$(eval $$$$(call hi-rule,/' \
+             -e '/hs-boot$$$$/ s/$$$$/))/'                        \
+             $$@.tmp2 > $$@
 # Some of the C files (directly or indirectly) include the generated
 # includes files.
 $$($1_$2_depfile_c_asm) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
 
-$$($1_$2_depfile_c_asm) : $$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES) | $$$$(dir $$$$@)/.
+$$($1_$2_depfile_c_asm) : $$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES) $$($1_$2_CMM_FILES) | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@.tmp)
-ifneq "$$(strip $$($1_$2_C_FILES_DEPS)$$($1_$2_S_FILES))" ""
+ifneq "$$(strip $$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES)) $$($1_$2_CMM_FILES))" ""
 # We ought to actually do this for each way in $$($1_$2_WAYS), but then
 # it takes a long time to make the C deps for the RTS (30 seconds rather
 # than 3), so instead we just pass the list of ways in and let addCFileDeps
 # copy the deps for each way on the assumption that they are the same
-	$$(foreach f,$$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES), \
+	$$(foreach f,$$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES) $$($1_$2_CMM_FILES), \
 	    $$(call addCFileDeps,$1,$2,$$($1_$2_depfile_c_asm),$$f,$$($1_$2_WAYS)))
 	$$(call removeFiles,$$@.bit)
 endif
@@ -135,9 +136,15 @@ endef
 #	 need to do the substitution case-insensitively on Windows. But
 #    the s///i modifier isn't portable, so we set CASE_INSENSITIVE_SED
 #    to "i" on Windows and "" on any other platform.
+
+# We use this not only for .c files, but also for .S and .cmm files.
+# As gcc doesn't know what a .cmm file is, it treats it as a linker
+# input and ignores it. We therefore tell gcc that all files are C
+# files with "-x c" so that it actually processes them all.
+
 define addCFileDeps
 
-	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_$(firstword $($1_$2_WAYS))_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM $4 -MF $3.bit
+	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_$(firstword $($1_$2_WAYS))_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM -x c $4 -MF $3.bit
 	$(foreach w,$5,sed -e 's|\\|/|g' -e 's| /$$| \\|' -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "1s|$2/build/$2/build|$2/build|g" -e "s|$(TOP)/||g$(CASE_INSENSITIVE_SED)" $3.bit >> $3.tmp &&) true
 endef
 

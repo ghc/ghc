@@ -1,0 +1,30 @@
+
+T4485.hs:47:15:
+    Overlapping instances for EmbedAsChild
+                                (IdentityT IO) (XMLGenT m0 (XML m0))
+      arising from a use of ‘asChild’
+    Matching instances:
+      instance [overlap ok] (EmbedAsChild m c, m1 ~ m) =>
+                            EmbedAsChild m (XMLGenT m1 c)
+        -- Defined at T4485.hs:29:10
+      instance [overlap ok] EmbedAsChild
+                              (IdentityT IO) (XMLGenT Identity ())
+        -- Defined at T4485.hs:42:10
+    (The choice depends on the instantiation of ‘m0’
+     To pick the first instance above, use IncoherentInstances
+     when compiling the other instance declarations)
+    In the expression: asChild
+    In the expression: asChild $ (genElement "foo")
+    In an equation for ‘asChild’:
+        asChild b = asChild $ (genElement "foo")
+
+T4485.hs:47:26:
+    No instance for (XMLGen m0) arising from a use of ‘genElement’
+    The type variable ‘m0’ is ambiguous
+    Note: there is a potential instance available:
+      instance [overlap ok] XMLGen (IdentityT m)
+        -- Defined at T4485.hs:36:10
+    In the second argument of ‘($)’, namely ‘(genElement "foo")’
+    In the expression: asChild $ (genElement "foo")
+    In an equation for ‘asChild’:
+        asChild b = asChild $ (genElement "foo")

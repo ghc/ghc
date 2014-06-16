@@ -1,0 +1,6 @@
+
+tc056.hs:16:10: Warning:
+    Duplicate constraint(s): Eq' a
+    In the context: (Eq' a, Eq' a)
+    While checking an instance declaration
+    In the instance declaration for ‘Eq' [a]’

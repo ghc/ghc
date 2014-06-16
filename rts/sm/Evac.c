@@ -7,7 +7,7 @@
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
  * 
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
  *
  * ---------------------------------------------------------------------------*/
 
@@ -716,6 +716,14 @@ loop:
       copy(p,info,q,mut_arr_ptrs_sizeW((StgMutArrPtrs *)q),gen_no);
       return;
 
+  case SMALL_MUT_ARR_PTRS_CLEAN:
+  case SMALL_MUT_ARR_PTRS_DIRTY:
+  case SMALL_MUT_ARR_PTRS_FROZEN:
+  case SMALL_MUT_ARR_PTRS_FROZEN0:
+      // just copy the block 
+      copy(p,info,q,small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)q),gen_no);
+      return;
+
   case TSO:
       copy(p,info,q,sizeofW(StgTSO),gen_no);
       return;
@@ -955,9 +963,15 @@ selector_loop:
 #ifdef PROFILING
               // For the purposes of LDV profiling, we have destroyed
               // the original selector thunk, p.
-              SET_INFO((StgClosure*)p, (StgInfoTable *)info_ptr);
-              OVERWRITING_CLOSURE((StgClosure*)p);
-              SET_INFO((StgClosure*)p, &stg_WHITEHOLE_info);
+              if (era > 0) {
+                  // Only modify the info pointer when LDV profiling is
+                  // enabled.  Note that this is incompatible with parallel GC,
+                  // because it would allow other threads to start evaluating
+                  // the same selector thunk.
+                  SET_INFO((StgClosure*)p, (StgInfoTable *)info_ptr);
+                  OVERWRITING_CLOSURE((StgClosure*)p);
+                  SET_INFO((StgClosure*)p, &stg_WHITEHOLE_info);
+              }
 #endif
 
               // the closure in val is now the "value" of the

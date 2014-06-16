@@ -5,7 +5,7 @@
 
 \begin{code}
 module PrimOp (
-        PrimOp(..), allThePrimOps,
+        PrimOp(..), PrimOpVecCat(..), allThePrimOps,
         primOpType, primOpSig,
         primOpTag, maxPrimOpTag, primOpOcc,
 
@@ -25,6 +25,7 @@ module PrimOp (
 import TysPrim
 import TysWiredIn
 
+import CmmType
 import Demand
 import Var              ( TyVar )
 import OccName          ( OccName, pprOccName, mkVarOccFS )
@@ -64,6 +65,7 @@ primOpTag op = iBox (tagOf_PrimOp op)
 -- supplies
 -- tagOf_PrimOp :: PrimOp -> FastInt
 #include "primop-tag.hs-incl"
+tagOf_PrimOp _ = error "tagOf_PrimOp: unknown primop"
 
 
 instance Eq PrimOp where
@@ -80,6 +82,12 @@ instance Ord PrimOp where
 
 instance Outputable PrimOp where
     ppr op = pprPrimOp op
+\end{code}
+
+\begin{code}
+data PrimOpVecCat = IntVec
+                  | WordVec
+                  | FloatVec
 \end{code}
 
 An @Enum@-derived list would be better; meanwhile... (ToDo)
@@ -118,9 +126,8 @@ data PrimOpInfo
                 Type
   | Monadic     OccName         -- string :: T -> T
                 Type
-  | Compare     OccName         -- string :: T -> T -> Bool
+  | Compare     OccName         -- string :: T -> T -> Int#
                 Type
-
   | GenPrimOp   OccName         -- string :: \/a1..an . T1 -> .. -> Tk -> T
                 [TyVar]
                 [Type]
@@ -174,6 +181,7 @@ else, notably a type, can be constructed) for each @PrimOp@.
 \begin{code}
 primOpInfo :: PrimOp -> PrimOpInfo
 #include "primop-primop-info.hs-incl"
+primOpInfo _ = error "primOpInfo: unknown primop"
 \end{code}
 
 Here are a load of comments from the old primOp info:
@@ -284,7 +292,7 @@ Invariants:
 -- KSW: v, the second arg in parAt# and parAtForNow#, is used only to determine
 --   `the processor containing the expression v'; it is not evaluated
 
-These primops are pretty wierd.
+These primops are pretty weird.
 
         dataToTag# :: a -> Int    (arg must be an evaluated data type)
         tagToEnum# :: Int -> a    (result type must be an enumerated type)
@@ -513,10 +521,10 @@ primOpSig op
     arity = length arg_tys
     (tyvars, arg_tys, res_ty)
       = case (primOpInfo op) of
-        Monadic   _occ ty                    -> ([],     [ty],    ty    )
-        Dyadic    _occ ty                    -> ([],     [ty,ty], ty    )
-        Compare   _occ ty                    -> ([],     [ty,ty], boolTy)
-        GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty)
+        Monadic   _occ ty                    -> ([],     [ty],    ty       )
+        Dyadic    _occ ty                    -> ([],     [ty,ty], ty       )
+        Compare   _occ ty                    -> ([],     [ty,ty], intPrimTy)
+        GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty   )
 \end{code}
 
 \begin{code}
@@ -533,7 +541,7 @@ getPrimOpResultInfo op
   = case (primOpInfo op) of
       Dyadic  _ ty                        -> ReturnsPrim (typePrimRep ty)
       Monadic _ ty                        -> ReturnsPrim (typePrimRep ty)
-      Compare _ _                         -> ReturnsAlg boolTyCon
+      Compare _ _                         -> ReturnsPrim (tyConPrimRep intPrimTyCon)
       GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep tc)
                          | otherwise      -> ReturnsAlg tc
                          where
@@ -560,7 +568,7 @@ Utils:
 dyadic_fun_ty, monadic_fun_ty, compare_fun_ty :: Type -> Type
 dyadic_fun_ty  ty = mkFunTys [ty, ty] ty
 monadic_fun_ty ty = mkFunTy  ty ty
-compare_fun_ty ty = mkFunTys [ty, ty] boolTy
+compare_fun_ty ty = mkFunTys [ty, ty] intPrimTy
 \end{code}
 
 Output stuff:

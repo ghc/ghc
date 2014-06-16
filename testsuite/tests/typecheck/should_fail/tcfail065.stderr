@@ -1,0 +1,13 @@
+
+tcfail065.hs:29:20:
+    Couldn't match expected type ‘x’ with actual type ‘x1’
+      ‘x1’ is a rigid type variable bound by
+           the type signature for setX :: x1 -> X x -> X x
+           at tcfail065.hs:29:3
+      ‘x’ is a rigid type variable bound by
+          the instance declaration at tcfail065.hs:28:10
+    Relevant bindings include
+      x :: x1 (bound at tcfail065.hs:29:8)
+      setX :: x1 -> X x -> X x (bound at tcfail065.hs:29:3)
+    In the first argument of ‘X’, namely ‘x’
+    In the expression: X x

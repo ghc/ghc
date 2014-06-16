@@ -67,7 +67,7 @@ lookupInst cls tys
 --
 lookupFamInst :: TyCon -> [Type] -> VM FamInstMatch
 lookupFamInst tycon tys
-  = ASSERT( isFamilyTyCon tycon )
+  = ASSERT( isOpenFamilyTyCon tycon )
     do { instEnv <- readGEnv global_fam_inst_env
        ; case lookupFamInstEnv instEnv tycon tys of
            [match] -> return match

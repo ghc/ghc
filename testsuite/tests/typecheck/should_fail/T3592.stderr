@@ -1,0 +1,13 @@
+
+T3592.hs:8:5:
+    No instance for (Show (T a)) arising from a use of ‘show’
+    In the expression: show
+    In an equation for ‘f’: f = show
+
+T3592.hs:11:7:
+    No instance for (Show a) arising from a use of ‘show’
+    Possible fix:
+      add (Show a) to the context of
+        the type signature for g :: T a -> String
+    In the expression: show x
+    In an equation for ‘g’: g x = show x

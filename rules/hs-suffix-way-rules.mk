@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -31,16 +31,16 @@ else
 
 ifneq "$$(BINDIST)" "YES"
 
-$1/$2/build/%.$$($3_hcsuf) : $1/$2/build/%.hs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_hcsuf) : $1/$2/build/%.hs $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -C $$< -o $$@
 
-$1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hs $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
 
-$1/$2/build/%.$$($3_hcsuf) : $1/$2/build/autogen/%.hs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_hcsuf) : $1/$2/build/autogen/%.hs $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -C $$< -o $$@
 
-$1/$2/build/%.$$($3_osuf) : $1/$2/build/autogen/%.hs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_osuf) : $1/$2/build/autogen/%.hs $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
 
 endif

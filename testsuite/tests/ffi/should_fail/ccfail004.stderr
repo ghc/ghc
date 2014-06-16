@@ -1,0 +1,26 @@
+
+
+ccfail004.hs:9:1:
+    Unacceptable argument type in foreign declaration: NInt
+    When checking declaration:
+      foreign import ccall safe "static f1" f1 :: NInt -> IO Int
+
+ccfail004.hs:10:1:
+    Unacceptable result type in foreign declaration: IO NInt
+    When checking declaration:
+      foreign import ccall safe "static f2" f2 :: Int -> IO NInt
+
+ccfail004.hs:11:1:
+    Unacceptable result type in foreign declaration: NIO Int
+    When checking declaration:
+      foreign import ccall safe "static f3" f3 :: Int -> NIO Int
+
+ccfail004.hs:14:1:
+    Unacceptable argument type in foreign declaration: [NT]
+    When checking declaration:
+      foreign import ccall safe "static f4" f4 :: NT -> IO ()
+
+ccfail004.hs:15:1:
+    Unacceptable result type in foreign declaration: IO [NT]
+    When checking declaration:
+      foreign import ccall safe "static f5" f5 :: IO NT

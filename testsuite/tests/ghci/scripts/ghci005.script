@@ -1,0 +1,18 @@
+:unset +s +t
+-- tests for :def, :undef
+:def
+let void m = m >> return ""
+let echo s = void (putStrLn s)
+:def echo echo
+:def
+:echo hello, world!
+
+let echoupper s = return (":! echo " ++ map Data.Char.toUpper s)
+:echo hello, world!
+:def echo echoupper
+:undef echo
+:def echo echoupper
+:echo hello, world!
+:def! echo echo
+:echo hello, world!
+:undef f f

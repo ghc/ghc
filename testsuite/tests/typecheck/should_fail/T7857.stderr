@@ -1,0 +1,17 @@
+
+T7857.hs:8:11:
+    Could not deduce (PrintfType s0) arising from a use of ‘printf’
+    from the context (PrintfArg t)
+      bound by the inferred type of g :: PrintfArg t => t -> b
+      at T7857.hs:8:1-21
+    The type variable ‘s0’ is ambiguous
+    Note: there are several potential instances:
+      instance [safe] (PrintfArg a, PrintfType r) => PrintfType (a -> r)
+        -- Defined in ‘Text.Printf’
+      instance [safe] a ~ () => PrintfType (IO a)
+        -- Defined in ‘Text.Printf’
+      instance [safe] IsChar c => PrintfType [c]
+        -- Defined in ‘Text.Printf’
+    In the second argument of ‘($)’, namely ‘printf "" i’
+    In the expression: f $ printf "" i
+    In an equation for ‘g’: g i = f $ printf "" i

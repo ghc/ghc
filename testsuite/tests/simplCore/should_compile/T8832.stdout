@@ -1,0 +1,10 @@
+T8832.i = GHC.Types.I# 0
+T8832.i8 = GHC.Int.I8# 0
+T8832.i16 = GHC.Int.I16# 0
+T8832.i32 = GHC.Int.I32# 0
+T8832.i64 = GHC.Int.I64# 0
+T8832.w = GHC.Types.W# (__word 0)
+T8832.w8 = GHC.Word.W8# (__word 0)
+T8832.w16 = GHC.Word.W16# (__word 0)
+T8832.w32 = GHC.Word.W32# (__word 0)
+T8832.w64 = GHC.Word.W64# (__word 0)

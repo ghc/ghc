@@ -44,15 +44,21 @@ import Outputable
 import UniqSupply
 import UniqFM
 import DynFlags
-import Maybes
 import StaticFlags
 import FastString
 import Panic
 import Util
+import Annotations
+import BasicTypes( TopLevelFlag, Origin )
 
+import Control.Exception
 import Data.IORef
 import qualified Data.Set as Set
 import Control.Monad
+
+#ifdef GHCI
+import qualified Data.Map as Map
+#endif
 \end{code}
 
 
@@ -90,6 +96,12 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                            Nothing             -> newIORef emptyNameEnv } ;
 
         dependent_files_var <- newIORef [] ;
+#ifdef GHCI
+        th_topdecls_var      <- newIORef [] ;
+        th_topnames_var      <- newIORef emptyNameSet ;
+        th_modfinalizers_var <- newIORef [] ;
+        th_state_var         <- newIORef Map.empty ;
+#endif /* GHCI */
         let {
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
@@ -97,6 +109,13 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 | otherwise      = Nothing ;
 
              gbl_env = TcGblEnv {
+#ifdef GHCI
+                tcg_th_topdecls      = th_topdecls_var,
+                tcg_th_topnames      = th_topnames_var,
+                tcg_th_modfinalizers = th_modfinalizers_var,
+                tcg_th_state         = th_state_var,
+#endif /* GHCI */
+
                 tcg_mod            = mod,
                 tcg_src            = hsc_src,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
@@ -107,6 +126,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_type_env_var   = type_env_var,
                 tcg_inst_env       = emptyInstEnv,
                 tcg_fam_inst_env   = emptyFamInstEnv,
+                tcg_ann_env        = emptyAnnEnv,
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
                 tcg_exports        = [],
@@ -130,6 +150,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_rules          = [],
                 tcg_fords          = [],
                 tcg_vects          = [],
+                tcg_patsyns        = [],
                 tcg_dfun_n         = dfun_n_var,
                 tcg_keep           = keep_var,
                 tcg_doc_hdr        = Nothing,
@@ -144,6 +165,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topStage,
+                tcl_th_bndrs   = emptyNameEnv,
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
@@ -178,16 +200,24 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
         return (msgs, final_res)
     }
 
-initTcPrintErrors       -- Used from the interactive loop only
-       :: HscEnv
-       -> Module
-       -> TcM r
-       -> IO (Messages, Maybe r)
 
-initTcPrintErrors env mod todo = initTc env HsSrcFile False mod todo
+initTcInteractive :: HscEnv -> TcM a -> IO (Messages, Maybe a)
+-- Initialise the type checker monad for use in GHCi
+initTcInteractive hsc_env thing_inside
+  = initTc hsc_env HsSrcFile False
+           (icInteractiveModule (hsc_IC hsc_env))
+           thing_inside
 
 initTcForLookup :: HscEnv -> TcM a -> IO a
-initTcForLookup hsc_env = liftM (expectJust "initTcInteractive" . snd) . initTc hsc_env HsSrcFile False iNTERACTIVE
+-- The thing_inside is just going to look up something
+-- in the environment, so we don't need much setup
+initTcForLookup hsc_env thing_inside
+    = do (msgs, m) <- initTc hsc_env HsSrcFile False
+                             (icInteractiveModule (hsc_IC hsc_env))  -- Irrelevant really
+                             thing_inside
+         case m of
+             Nothing -> throwIO $ mkSrcErr $ snd msgs
+             Just x -> return x
 \end{code}
 
 %************************************************************************
@@ -309,7 +339,7 @@ getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 withDoDynamicToo :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 withDoDynamicToo m = do env <- getEnv
                         let dflags = extractDynFlags env
-                            dflags' = doDynamicToo dflags
+                            dflags' = dynamicTooMkDynamicDynFlags dflags
                             env' = replaceDynFlags env dflags'
                         setEnv env' m
 \end{code}
@@ -493,7 +523,8 @@ setModule :: Module -> TcRn a -> TcRn a
 setModule mod thing_inside = updGblEnv (\env -> env { tcg_mod = mod }) thing_inside
 
 getIsGHCi :: TcRn Bool
-getIsGHCi = do { mod <- getModule; return (mod == iNTERACTIVE) }
+getIsGHCi = do { mod <- getModule
+               ; return (isInteractiveModule mod) }
 
 getGHCiMonad :: TcRn Name
 getGHCiMonad = do { hsc <- getTopEnv; return (ic_monad $ hsc_IC hsc) }
@@ -556,6 +587,11 @@ addLocM fn (L loc a) = setSrcSpan loc $ fn a
 
 wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
 wrapLocM fn (L loc a) = setSrcSpan loc $ do b <- fn a; return (L loc b)
+
+wrapOriginLocM :: (a -> TcM r) -> (Origin, Located a) -> TcM (Origin, Located r)
+wrapOriginLocM fn (origin, lbind)
+  = do  { lbind' <- wrapLocM fn lbind
+        ; return (origin, lbind') }
 
 wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
 wrapLocFstM fn (L loc a) =
@@ -708,6 +744,10 @@ mapAndRecoverM f (x:xs) = do { mb_r <- try_m (f x)
                                           Left _  -> rs
                                           Right r -> r:rs) }
 
+-- | Succeeds if applying the argument to all members of the lists succeeds,
+--   but nevertheless runs it on all arguments, to collect all errors.
+mapAndReportM :: (a -> TcRn b) -> [a] -> TcRn [b]
+mapAndReportM f xs = checkNoErrs (mapAndRecoverM f xs)
 
 -----------------------
 tryTc :: TcRn a -> TcRn (Messages, Maybe a)
@@ -801,6 +841,20 @@ ifErrsM bale_out normal
 failIfErrsM :: TcRn ()
 -- Useful to avoid error cascades
 failIfErrsM = ifErrsM failM (return ())
+
+checkTH :: Outputable a => a -> String -> TcRn ()
+#ifdef GHCI
+checkTH _ _ = return () -- OK
+#else
+checkTH e what = failTH e what  -- Raise an error in a stage-1 compiler
+#endif
+
+failTH :: Outputable a => a -> String -> TcRn x
+failTH e what  -- Raise an error in a stage-1 compiler
+  = failWithTc (vcat [ hang (char 'A' <+> text what
+                             <+> ptext (sLit "requires GHC with interpreter support:"))
+                          2 (ppr e)
+                     , ptext (sLit "Perhaps you are using a stage-1 compiler?") ])
 \end{code}
 
 
@@ -837,7 +891,9 @@ popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 getCtLoc :: CtOrigin -> TcM CtLoc
 getCtLoc origin
   = do { env <- getLclEnv 
-       ; return (CtLoc { ctl_origin = origin, ctl_env =  env, ctl_depth = 0 }) }
+       ; return (CtLoc { ctl_origin = origin
+                       , ctl_env = env
+                       , ctl_depth = initialSubGoalDepth }) }
 
 setCtLoc :: CtLoc -> TcM a -> TcM a
 -- Set the SrcSpan and error context from the CtLoc
@@ -1103,7 +1159,7 @@ traceTcConstraints :: String -> TcM ()
 traceTcConstraints msg
   = do { lie_var <- getConstraintVar
        ; lie     <- readTcRef lie_var
-       ; traceTc (msg ++ "LIE:") (ppr lie)
+       ; traceTc (msg ++ ": LIE:") (ppr lie)
        }
 \end{code}
 
@@ -1121,20 +1177,23 @@ recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
 recordThSpliceUse :: TcM ()
 recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
 
-keepAliveTc :: Id -> TcM ()     -- Record the name in the keep-alive set
-keepAliveTc id
-  | isLocalId id = do { env <- getGblEnv;
-                      ; updTcRef (tcg_keep env) (`addOneToNameSet` idName id) }
-  | otherwise = return ()
-
-keepAliveSetTc :: NameSet -> TcM ()     -- Record the name in the keep-alive set
-keepAliveSetTc ns = do { env <- getGblEnv;
-                       ; updTcRef (tcg_keep env) (`unionNameSets` ns) }
+keepAlive :: Name -> TcRn ()     -- Record the name in the keep-alive set
+keepAlive name
+  = do { env <- getGblEnv
+       ; traceRn (ptext (sLit "keep alive") <+> ppr name)
+       ; updTcRef (tcg_keep env) (`addOneToNameSet` name) }
 
 getStage :: TcM ThStage
 getStage = do { env <- getLclEnv; return (tcl_th_ctxt env) }
 
-setStage :: ThStage -> TcM a -> TcM a
+getStageAndBindLevel :: Name -> TcRn (Maybe (TopLevelFlag, ThLevel, ThStage))
+getStageAndBindLevel name
+  = do { env <- getLclEnv;
+       ; case lookupNameEnv (tcl_th_bndrs env) name of
+           Nothing                  -> return Nothing
+           Just (top_lvl, bind_lvl) -> return (Just (top_lvl, bind_lvl, tcl_th_ctxt env)) }
+
+setStage :: ThStage -> TcM a -> TcRn a
 setStage s = updLclEnv (\ env -> env { tcl_th_ctxt = s })
 \end{code}
 
@@ -1262,7 +1321,12 @@ forkM_maybe :: SDoc -> IfL a -> IfL (Maybe a)
 -- signatures, which is pretty benign
 
 forkM_maybe doc thing_inside
- = do { unsafeInterleaveM $
+ -- NB: Don't share the mutable env_us with the interleaved thread since env_us
+ --     does not get updated atomically (e.g. in newUnique and newUniqueSupply).
+ = do { child_us <- newUniqueSupply
+      ; child_env_us <- newMutVar child_us
+        -- see Note [Masking exceptions in forkM_maybe]
+      ; unsafeInterleaveM $ uninterruptibleMaskM_ $ updEnv (\env -> env { env_us = child_env_us }) $
         do { traceIf (text "Starting fork {" <+> doc)
            ; mb_res <- tryM $
                        updLclEnv (\env -> env { if_loc = if_loc env $$ doc }) $
@@ -1293,3 +1357,19 @@ forkM doc thing_inside
                                    -- pprPanic "forkM" doc
                         Just r  -> r) }
 \end{code}
+
+Note [Masking exceptions in forkM_maybe]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When using GHC-as-API it must be possible to interrupt snippets of code
+executed using runStmt (#1381). Since commit 02c4ab04 this is almost possible
+by throwing an asynchronous interrupt to the GHC thread. However, there is a
+subtle problem: runStmt first typechecks the code before running it, and the
+exception might interrupt the type checker rather than the code. Moreover, the
+typechecker might be inside an unsafeInterleaveIO (through forkM_maybe), and
+more importantly might be inside an exception handler inside that
+unsafeInterleaveIO. If that is the case, the exception handler will rethrow the
+asynchronous exception as a synchronous exception, and the exception will end
+up as the value of the unsafeInterleaveIO thunk (see #8006 for a detailed
+discussion).  We don't currently know a general solution to this problem, but
+we can use uninterruptibleMask_ to avoid the situation. 

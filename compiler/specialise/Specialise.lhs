@@ -10,7 +10,7 @@ module Specialise ( specProgram ) where
 
 import Id
 import TcType hiding( substTy, extendTvSubstList )
-import Type( TyVar, isDictTy, mkPiTypes )
+import Type   hiding( substTy, extendTvSubstList )
 import Coercion( Coercion )
 import CoreMonad
 import qualified CoreSubst
@@ -23,7 +23,7 @@ import CoreUtils        ( exprIsTrivial, applyTypeToArgs )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, idFreeVars )
 import UniqSupply
 import Name
-import MkId             ( voidArgId, realWorldPrimId )
+import MkId             ( voidArgId, voidPrimId )
 import Maybes           ( catMaybes, isJust )
 import BasicTypes
 import HscTypes
@@ -34,6 +34,7 @@ import Outputable
 import FastString
 import State
 
+import Control.Applicative (Applicative(..))
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -487,7 +488,7 @@ Some Ids have types like
 This seems curious at first, because we usually only have dictionary
 args whose types are of the form (C a) where a is a type variable.
 But this doesn't hold for the functions arising from instance decls,
-which sometimes get arguements with types of form (C (T a)) for some
+which sometimes get arguments with types of form (C (T a)) for some
 type constructor T.
 
 Should we specialise wrt this compound-type dictionary?  We used to say
@@ -565,9 +566,10 @@ Hence, the invariant is this:
 %************************************************************************
 
 \begin{code}
-specProgram :: DynFlags -> ModGuts -> CoreM ModGuts
-specProgram dflags guts@(ModGuts { mg_rules = rules, mg_binds = binds })
+specProgram :: ModGuts -> CoreM ModGuts
+specProgram guts@(ModGuts { mg_rules = rules, mg_binds = binds })
   = do { hpt_rules <- getRuleBase
+       ; dflags <- getDynFlags
        ; let local_rules = mg_rules guts
              rule_base = extendRuleBaseList hpt_rules rules
 
@@ -1044,7 +1046,8 @@ specCalls env rules_for_me calls_for_me fn rhs
        ; return (spec_rules, spec_defns, plusUDList spec_uds) }
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
-  = WARN( notNull calls_for_me, ptext (sLit "Missed specialisation opportunity for")
+  = WARN( not (exprIsTrivial rhs) && notNull calls_for_me, 
+          ptext (sLit "Missed specialisation opportunity for")
                                  <+> ppr fn $$ _trace_doc )
           -- Note [Specialisation shape]
     -- pprTrace "specDefn: none" (ppr fn <+> ppr calls_for_me) $
@@ -1077,8 +1080,9 @@ specCalls env rules_for_me calls_for_me fn rhs
 
     already_covered :: DynFlags -> [CoreExpr] -> Bool
     already_covered dflags args      -- Note [Specialisations already covered]
-       = isJust (lookupRule dflags (const True) realIdUnfolding
-                            (CoreSubst.substInScope (se_subst env))
+       = isJust (lookupRule dflags 
+                            (CoreSubst.substInScope (se_subst env), realIdUnfolding)
+                            (const True) 
                             fn args rules_for_me)
 
     mk_ty_args :: [Maybe Type] -> [TyVar] -> [CoreExpr]
@@ -1135,7 +1139,7 @@ specCalls env rules_for_me calls_for_me fn rhs
              let body_ty = applyTypeToArgs rhs fn_type inst_args
                  (lam_args, app_args)           -- Add a dummy argument if body_ty is unlifted
                    | isUnLiftedType body_ty     -- C.f. WwLib.mkWorkerArgs
-                   = (poly_tyvars ++ [voidArgId], poly_tyvars ++ [realWorldPrimId])
+                   = (poly_tyvars ++ [voidArgId], poly_tyvars ++ [voidPrimId])
                    | otherwise = (poly_tyvars, poly_tyvars)
                  spec_id_ty = mkPiTypes lam_args body_ty
 
@@ -1429,6 +1433,18 @@ It's a silly exapmle, but we get
 where choose doesn't have any dict arguments.  Thus far I have not
 tried to fix this (wait till there's a real example).
 
+Mind you, then 'choose' will be inlined (since RHS is trivial) so 
+it doesn't matter.  This comes up with single-method classes
+
+   class C a where { op :: a -> a }
+   instance C a => C [a] where ....
+==>
+   $fCList :: C a => C [a]
+   $fCList = $copList |> (...coercion>...)
+   ....(uses of $fCList at particular types)...
+
+So we suppress the WARN if the rhs is trivial.
+
 Note [Inline specialisations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here is what we do with the InlinePragma of the original function
@@ -1583,7 +1599,9 @@ mkCallUDs :: SpecEnv -> Id -> [CoreExpr] -> UsageDetails
 mkCallUDs env f args
   | not (want_calls_for f)  -- Imported from elsewhere
   || null theta             -- Not overloaded
-  || not (all type_determines_value theta)
+  = emptyUDs
+
+  |  not (all type_determines_value theta)
   || not (spec_tys `lengthIs` n_tyvars)
   || not ( dicts   `lengthIs` n_dicts)
   || not (any (interestingDict env) dicts)    -- Note [Interesting dictionary arguments]
@@ -1598,10 +1616,10 @@ mkCallUDs env f args
     _trace_doc = vcat [ppr f, ppr args, ppr n_tyvars, ppr n_dicts
                       , ppr (map (interestingDict env) dicts)]
     (tyvars, theta, _) = tcSplitSigmaTy (idType f)
-    constrained_tyvars = tyVarsOfTypes theta
+    constrained_tyvars = closeOverKinds (tyVarsOfTypes theta)
     n_tyvars           = length tyvars
     n_dicts            = length theta
-
+   
     spec_tys = [mk_spec_ty tv ty | (tv, Type ty) <- tyvars `zip` args]
     dicts    = [dict_expr | (_, dict_expr) <- theta `zip` (drop n_tyvars args)]
 
@@ -1611,13 +1629,35 @@ mkCallUDs env f args
 
     want_calls_for f = isLocalId f || isInlinablePragma (idInlinePragma f)
 
-    type_determines_value pred = isClassPred pred && not (isIPPred pred)
-        -- Only specialise if all overloading is on non-IP *class* params,
-        -- because these are the ones whose *type* determines their *value*.
-        -- In ptic, with implicit params, the type args
-        --  *don't* say what the value of the implicit param is!
-        -- See Trac #7101
+    type_determines_value pred    -- See Note [Type determines value]
+        = case classifyPredType pred of
+            ClassPred cls _ -> not (isIPClass cls)
+            TuplePred ps    -> all type_determines_value ps
+            EqPred {}       -> True
+            IrredPred {}    -> True   -- Things like (D []) where D is a
+                                      -- Constraint-ranged family; Trac #7785
 \end{code}
+
+Note [Type determines value]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Only specialise if all overloading is on non-IP *class* params,
+because these are the ones whose *type* determines their *value*.  In
+parrticular, with implicit params, the type args *don't* say what the
+value of the implicit param is!  See Trac #7101
+
+However, consider
+         type family D (v::*->*) :: Constraint
+         type instance D [] = ()
+         f :: D v => v Char -> Int
+If we see a call (f "foo"), we'll pass a "dictionary"
+  () |> (g :: () ~ D [])
+and it's good to specialise f at this dictionary.
+
+So the question is: can an implicit parameter "hide inside" a
+type-family constraint like (D a).  Well, no.  We don't allow
+        type instance D Maybe = ?x:Int
+Hence the IrredPred case in type_determines_value.
+See Trac #7785.
 
 Note [Interesting dictionary arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1829,6 +1869,13 @@ data SpecState = SpecState {
                      spec_dflags :: DynFlags
                  }
 
+instance Functor SpecM where
+    fmap = liftM
+
+instance Applicative SpecM where
+    pure = return
+    (<*>) = ap
+
 instance Monad SpecM where
     SpecM x >>= f = SpecM $ do y <- x
                                case f y of
@@ -1843,6 +1890,12 @@ instance MonadUnique SpecM where
                      let (us1, us2) = splitUniqSupply $ spec_uniq_supply st
                      put $ st { spec_uniq_supply = us2 }
                      return us1
+
+    getUniqueM
+        = SpecM $ do st <- get
+                     let (u,us') = takeUniqFromSupply $ spec_uniq_supply st
+                     put $ st { spec_uniq_supply = us' }
+                     return u
 
 instance HasDynFlags SpecM where
     getDynFlags = SpecM $ liftM spec_dflags get

@@ -1,0 +1,7 @@
+
+T2307.hs:11:11:
+    Functional dependencies conflict between instance declarations:
+      instance [incoherent] C Int (Maybe String) Float
+        -- Defined at T2307.hs:11:11
+      instance [incoherent] C Int (Maybe Bool) Double
+        -- Defined at T2307.hs:12:11

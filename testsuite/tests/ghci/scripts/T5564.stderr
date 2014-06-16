@@ -1,0 +1,9 @@
+
+<interactive>:3:1:
+    Not in scope: ‘git’
+    Perhaps you meant ‘it’ (line 2)
+
+<interactive>:5:1:
+    Not in scope: ‘fit’
+    Perhaps you meant one of these:
+      ‘fst’ (imported from Prelude), ‘it’ (line 4)

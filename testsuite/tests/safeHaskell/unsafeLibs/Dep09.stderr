@@ -1,0 +1,3 @@
+
+Dep09.hs:4:1:
+    GHC.Ptr: Can't be safely imported! The module itself isn't safe.

@@ -1,0 +1,9 @@
+Running with -XNoAlternativeLayoutRule
+Running with -XAlternativeLayoutRule
+
+layout003.hs:11:4: parse error on input ‘|’
+Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
+
+layout003.hs:11:4: Warning:
+    transitional layout will not be accepted in the future:
+    `|' at the same depth as implicit layout block

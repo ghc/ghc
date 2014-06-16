@@ -1,0 +1,4 @@
+
+tcfail057.hs:5:7:
+    Expected a type, but ‘RealFrac a’ has kind ‘Constraint’
+    In the type signature for ‘f’: f :: (RealFrac a) -> a -> a

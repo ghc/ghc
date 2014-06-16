@@ -1,0 +1,19 @@
+name: "testpkg"
+version: 2.0
+id: testpkg-2.0-XXX
+license: BSD3
+copyright: (c) The Univsersity of Glasgow 2004
+maintainer: glasgow-haskell-users@haskell.org
+stability: unstable
+homepage: http://www.haskell.org/ghc
+package-url: http://www.haskell.org/ghc
+description: A Test Package (new version)
+category: none
+author: simonmar@microsoft.com
+exposed: False
+exposed-modules: A
+hidden-modules: B, "C.D", "C.E"
+import-dirs: /usr/local/lib/testpkg,  "c:/Program Files/testpkg"
+library-dirs: /usr/local/lib/testpkg, "c:/Program Files/testpkg"
+include-dirs: /usr/local/include/testpkg, "c:/Program Files/testpkg"
+hs-libraries: testpkg-2.0

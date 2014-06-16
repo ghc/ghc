@@ -16,6 +16,9 @@
 
 #include "BeginPrivate.h"
 
+void blockedThrowTo (Capability *cap, 
+                     StgTSO *target, MessageThrowTo *msg);
+
 void throwToSingleThreaded (Capability *cap,
 			    StgTSO *tso,
 			    StgClosure *exception);
@@ -49,6 +52,7 @@ interruptible(StgTSO *t)
 {
   switch (t->why_blocked) {
   case BlockedOnMVar:
+  case BlockedOnMVarRead:
   case BlockedOnMsgThrowTo:
   case BlockedOnRead:
   case BlockedOnWrite:

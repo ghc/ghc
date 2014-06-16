@@ -1,0 +1,11 @@
+
+tcfail185.hs:7:46:
+    Couldn't match expected type ‘Int -> Int’ with actual type ‘Bool’
+    In the expression: x
+    In the expression:
+      let
+        y1 = y
+        y2 = y1
+        y3 = y2
+        ....
+      in x

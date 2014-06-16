@@ -1,0 +1,21 @@
+
+T3651.hs:11:11:
+    Couldn't match type ‘Bool’ with ‘()’
+    Inaccessible code in
+      a pattern with constructor U :: Z (), in an equation for ‘unsafe1’
+    In the pattern: U
+    In an equation for ‘unsafe1’: unsafe1 B U = ()
+
+T3651.hs:14:11:
+    Couldn't match type ‘Bool’ with ‘()’
+    Inaccessible code in
+      a pattern with constructor U :: Z (), in an equation for ‘unsafe2’
+    In the pattern: U
+    In an equation for ‘unsafe2’: unsafe2 B U = ()
+
+T3651.hs:17:11:
+    Couldn't match type ‘Bool’ with ‘()’
+    Inaccessible code in
+      a pattern with constructor U :: Z (), in an equation for ‘unsafe3’
+    In the pattern: U
+    In an equation for ‘unsafe3’: unsafe3 B U = True

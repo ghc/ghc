@@ -14,6 +14,7 @@
  ("touch command", "@SettingsTouchCommand@"),
  ("dllwrap command", "@SettingsDllWrapCommand@"),
  ("windres command", "@SettingsWindresCommand@"),
+ ("libtool command", "@SettingsLibtoolCommand@"),
  ("perl command", "@SettingsPerlCommand@"),
  ("target os", "@HaskellTargetOs@"),
  ("target arch", "@HaskellTargetArch@"),

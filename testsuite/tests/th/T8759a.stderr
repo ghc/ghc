@@ -1,0 +1,4 @@
+
+T8759a.hs:5:7:
+    pattern synonyms not (yet) handled by Template Haskell
+      pattern Q = False

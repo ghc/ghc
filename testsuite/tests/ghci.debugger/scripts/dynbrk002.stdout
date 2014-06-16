@@ -1,0 +1,6 @@
+Breakpoint 0 activated at ../QSort.hs:5:16-51
+Stopped at ../QSort.hs:5:16-51
+_result :: [Integer] = _
+a :: Integer = 8
+left :: [Integer] = _
+right :: [Integer] = _

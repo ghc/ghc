@@ -1,0 +1,16 @@
+-- testing ghci multiline commands :{ .. :}
+-- via stdin
+(1,2,3)
+data Maybe a = Nothing | Just a
+Data.Maybe.catMaybes :: [Maybe a] -> [a]
+Data.Maybe.fromJust :: Maybe a -> a
+Data.Maybe.fromMaybe :: a -> Maybe a -> a
+Data.Maybe.isJust :: Maybe a -> Bool
+Data.Maybe.isNothing :: Maybe a -> Bool
+Data.Maybe.listToMaybe :: [a] -> Maybe a
+Data.Maybe.mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+maybe :: b -> (a -> b) -> Maybe a -> b
+Data.Maybe.maybeToList :: Maybe a -> [a]
+-- via readFile
+(True,False)
+id :: a -> a

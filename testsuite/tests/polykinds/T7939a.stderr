@@ -1,0 +1,7 @@
+
+T7939a.hs:7:5:
+    Expecting one more argument to ‘Maybe’
+    The first argument of ‘F’ should have kind ‘*’,
+      but ‘Maybe’ has kind ‘* -> *’
+    In the type ‘Maybe’
+    In the family declaration for ‘F’

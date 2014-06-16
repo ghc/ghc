@@ -1,0 +1,17 @@
+
+T5853.hs:15:52:
+    Could not deduce (Subst (Subst fa a) b ~ Subst fa b)
+    from the context (F fa,
+                      Elem (Subst fa b) ~ b,
+                      Subst (Subst fa b) (Elem fa) ~ fa,
+                      F (Subst fa a),
+                      Elem (Subst fa a) ~ a,
+                      Subst (Subst fa a) (Elem fa) ~ fa)
+      bound by the RULE "map/map" at T5853.hs:15:2-57
+    NB: ‘Subst’ is a type function, and may not be injective
+    Relevant bindings include
+      f :: Elem fa -> b (bound at T5853.hs:15:19)
+      g :: a -> Elem fa (bound at T5853.hs:15:21)
+      xs :: Subst fa a (bound at T5853.hs:15:23)
+    In the expression: (f . g) <$> xs
+    When checking the transformation rule "map/map"

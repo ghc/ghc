@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -85,6 +85,11 @@ ifeq "$(CC_LLVM_BACKEND)" "1"
 	@echo "#define llvm_CC_FLAVOR 1" >> $@
 endif
 #
+ifeq "$(CC_CLANG_BACKEND)" "1"
+	@echo >> $@
+	@echo "#define clang_CC_FLAVOR 1" >> $@
+endif
+#
 	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $@
 	@echo "Done."
 
@@ -158,19 +163,19 @@ ifneq "$(BINDIST)" "YES"
 $(includes_DERIVEDCONSTANTS):           $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_FILES) $$(rts_H_FILES)
 $(includes_GHCCONSTANTS_HASKELL_VALUE): $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_FILES) $$(rts_H_FILES)
 
-$(includes_DERIVEDCONSTANTS): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+$(includes_DERIVEDCONSTANTS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-header -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
-$(includes_GHCCONSTANTS_HASKELL_TYPE): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+$(includes_GHCCONSTANTS_HASKELL_TYPE): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-type -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
-$(includes_GHCCONSTANTS_HASKELL_VALUE): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+$(includes_GHCCONSTANTS_HASKELL_VALUE): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-value -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
-$(includes_GHCCONSTANTS_HASKELL_WRAPPERS): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+$(includes_GHCCONSTANTS_HASKELL_WRAPPERS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-wrappers -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
-$(includes_GHCCONSTANTS_HASKELL_EXPORTS): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+$(includes_GHCCONSTANTS_HASKELL_EXPORTS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-exports -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 endif
 
@@ -180,7 +185,7 @@ endif
 $(eval $(call clean-target,includes,,\
   $(includes_H_CONFIG) $(includes_H_PLATFORM)))
 
-$(eval $(call all-target,includes,,\
+$(eval $(call all-target,includes,\
   $(includes_H_CONFIG) $(includes_H_PLATFORM) \
   $(includes_GHCCONSTANTS_HASKELL_TYPE) \
   $(includes_GHCCONSTANTS_HASKELL_VALUE) \

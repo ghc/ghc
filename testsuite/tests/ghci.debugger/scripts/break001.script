@@ -1,0 +1,14 @@
+:l ../Test2
+:b 3
+:b 5
+f (1 :: Integer)
+:st
+:st
+:st
+-- Test that the binding for x is now gone
+:show bindings
+y
+:p y
+seq y ()
+:p y
+y

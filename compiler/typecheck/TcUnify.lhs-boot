@@ -1,14 +1,11 @@
 \begin{code}
 module TcUnify where
-import TcType     ( TcTauType, Type, Kind )
-import VarEnv     ( TidyEnv )
+import TcType     ( TcTauType )
 import TcRnTypes  ( TcM )
 import TcEvidence ( TcCoercion )
-import Outputable ( SDoc )
 
 -- This boot file exists only to tie the knot between
 --              TcUnify and Inst
 
 unifyType :: TcTauType -> TcTauType -> TcM TcCoercion
-mkKindErrorCtxt :: Type -> Type -> Kind -> Kind -> TidyEnv -> TcM (TidyEnv, SDoc)
 \end{code}

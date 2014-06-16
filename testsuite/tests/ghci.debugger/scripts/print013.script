@@ -1,0 +1,10 @@
+-- Test handling of extra fields in the representation due to dictionaries
+
+:set -XGADTs -XRankNTypes
+:l ../GADT
+
+let d = DictN (1 :: Integer)
+:p d
+seq _t1 ()
+:p d
+:q

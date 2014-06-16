@@ -1,0 +1,4 @@
+ERROR "tcfail001.hs":9 - Type error in instance member binding
+*** Term           : op
+*** Type           : [b] -> [c]
+*** Does not match : [a]

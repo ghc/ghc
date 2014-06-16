@@ -1,0 +1,5 @@
+
+B.hs:7:10: Warning:
+    No explicit implementation for
+      ‘row’
+    In the instance declaration for ‘Matrix Bool Val’

@@ -7,7 +7,7 @@
  * Do not #include this file directly: #include "Rts.h" instead.
  *
  * To understand the structure of the RTS headers, see the wiki:
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * -------------------------------------------------------------------------- */
 
@@ -46,8 +46,10 @@ extern W_ top_ct[];
 #endif
 
 EXTERN StgInt ENT_VIA_NODE_ctr INIT(0);
-EXTERN StgInt ENT_STATIC_THK_ctr INIT(0);
-EXTERN StgInt ENT_DYN_THK_ctr INIT(0);
+EXTERN StgInt ENT_STATIC_THK_SINGLE_ctr INIT(0);
+EXTERN StgInt ENT_DYN_THK_SINGLE_ctr INIT(0);
+EXTERN StgInt ENT_STATIC_THK_MANY_ctr INIT(0);
+EXTERN StgInt ENT_DYN_THK_MANY_ctr INIT(0);
 EXTERN StgInt ENT_STATIC_FUN_DIRECT_ctr INIT(0);
 EXTERN StgInt ENT_DYN_FUN_DIRECT_ctr INIT(0);
 EXTERN StgInt ENT_STATIC_CON_ctr INIT(0);
@@ -128,7 +130,6 @@ EXTERN StgInt UPD_OLD_IND_ctr INIT(0);
 EXTERN StgInt UPD_OLD_PERM_IND_ctr INIT(0);
 
 EXTERN StgInt UPD_BH_UPDATABLE_ctr INIT(0);
-EXTERN StgInt UPD_BH_SINGLE_ENTRY_ctr INIT(0);
 EXTERN StgInt UPD_CAF_BH_UPDATABLE_ctr INIT(0);
 EXTERN StgInt UPD_CAF_BH_SINGLE_ENTRY_ctr INIT(0);
 

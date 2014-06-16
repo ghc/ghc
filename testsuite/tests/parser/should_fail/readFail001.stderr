@@ -1,0 +1,26 @@
+
+readFail001.hs:25:11:
+    The fixity signature for ‘+#’ lacks an accompanying binding
+
+readFail001.hs:38:32:
+    Not in scope: type constructor or class ‘Leaf’
+    A data constructor of that name is in scope; did you mean DataKinds?
+
+readFail001.hs:38:41:
+    Not in scope: type constructor or class ‘Leaf’
+    A data constructor of that name is in scope; did you mean DataKinds?
+
+readFail001.hs:87:11: Not in scope: ‘x’
+
+readFail001.hs:88:19: Not in scope: ‘x’
+
+readFail001.hs:94:19: Not in scope: ‘isSpace’
+
+readFail001.hs:95:13: Not in scope: ‘foo’
+
+readFail001.hs:107:30: Not in scope: data constructor ‘Foo’
+
+readFail001.hs:107:42: Not in scope: data constructor ‘Bar’
+
+readFail001.hs:112:23:
+    Not in scope: type constructor or class ‘Foo’

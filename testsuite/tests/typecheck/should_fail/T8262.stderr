@@ -1,0 +1,10 @@
+
+T8262.hs:5:15:
+    Kind incompatibility when matching types:
+      a :: *
+      GHC.Prim.Int# :: #
+    Relevant bindings include
+      foo :: t -> Maybe a (bound at T8262.hs:5:1)
+    In the first argument of ‘Just’, namely ‘(1#)’
+    In the expression: Just (1#)
+    In an equation for ‘foo’: foo x = Just (1#)

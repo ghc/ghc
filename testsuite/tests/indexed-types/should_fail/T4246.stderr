@@ -1,0 +1,10 @@
+
+T4246.hs:8:9:
+    Conflicting family instance declarations:
+      F a -- Defined at T4246.hs:8:9
+      F Int -- Defined at T4246.hs:11:9
+
+T4246.hs:14:15:
+    Conflicting family instance declarations:
+      G Int -- Defined at T4246.hs:14:15
+      G Int -- Defined at T4246.hs:15:15

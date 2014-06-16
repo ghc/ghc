@@ -5,12 +5,13 @@ module DynamicLoading (
         forceLoadModuleInterfaces,
         forceLoadNameModuleInterface,
         forceLoadTyCon,
-        
+
         -- * Finding names
-        lookupRdrNameInModule,
-        
+        lookupRdrNameInModuleForPlugins,
+
         -- * Loading values
         getValueSafely,
+        getHValueSafely,
         lessUnsafeCoerce
 #endif
     ) where
@@ -19,17 +20,16 @@ module DynamicLoading (
 import Linker           ( linkModule, getHValue )
 import SrcLoc           ( noSrcSpan )
 import Finder           ( findImportedModule, cannotFindModule )
-import DriverPhases     ( HscSource(HsSrcFile) )
-import TcRnMonad        ( initTc, initIfaceTcRn )
+import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
 import LoadIface        ( loadPluginInterface )
 import RdrName          ( RdrName, Provenance(..), ImportSpec(..), ImpDeclSpec(..)
                         , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName, gre_name )
 import RnNames          ( gresFromAvails )
-import PrelNames        ( iNTERACTIVE )
 import DynFlags
 
-import HscTypes         ( HscEnv(..), FindResult(..), ModIface(..), lookupTypeHscEnv )
-import TypeRep          ( TyThing(..), pprTyThingCategory )
+import HscTypes
+import BasicTypes       ( HValue )
+import TypeRep          ( pprTyThingCategory )
 import Type             ( Type, eqType )
 import TyCon            ( TyCon )
 import Name             ( Name, nameModule_maybe )
@@ -40,6 +40,7 @@ import FastString
 import ErrUtils
 import Outputable
 import Exception
+import Hooks
 
 import Data.Maybe        ( mapMaybe )
 import GHC.Exts          ( unsafeCoerce# )
@@ -49,7 +50,10 @@ import GHC.Exts          ( unsafeCoerce# )
 -- for debugging (@-ddump-if-trace@) only: it is shown as the reason why the module is being loaded.
 forceLoadModuleInterfaces :: HscEnv -> SDoc -> [Module] -> IO ()
 forceLoadModuleInterfaces hsc_env doc modules
-    = (initTc hsc_env HsSrcFile False iNTERACTIVE $ initIfaceTcRn $ mapM_ (loadPluginInterface doc) modules) >> return ()
+    = (initTcInteractive hsc_env $
+       initIfaceTcRn $
+       mapM_ (loadPluginInterface doc) modules) 
+      >> return ()
 
 -- | Force the interface for the module containing the name to be loaded. The 'SDoc' parameter is used
 -- for debugging (@-ddump-if-trace@) only: it is shown as the reason why the module is being loaded.
@@ -86,8 +90,18 @@ forceLoadTyCon hsc_env con_name = do
 
 getValueSafely :: HscEnv -> Name -> Type -> IO (Maybe a)
 getValueSafely hsc_env val_name expected_type = do
-    forceLoadNameModuleInterface hsc_env (ptext (sLit "contains a name used in an invocation of getValueSafely")) val_name
-    
+  mb_hval <- lookupHook getValueSafelyHook getHValueSafely dflags hsc_env val_name expected_type
+  case mb_hval of
+    Nothing   -> return Nothing
+    Just hval -> do
+      value <- lessUnsafeCoerce dflags "getValueSafely" hval
+      return (Just value)
+  where
+    dflags = hsc_dflags hsc_env
+
+getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
+getHValueSafely hsc_env val_name expected_type = do
+    forceLoadNameModuleInterface hsc_env (ptext (sLit "contains a name used in an invocation of getHValueSafely")) val_name
     -- Now look up the names for the value and type constructor in the type environment
     mb_val_thing <- lookupTypeHscEnv hsc_env val_name
     case mb_val_thing of
@@ -104,12 +118,10 @@ getValueSafely hsc_env val_name expected_type = do
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
                 hval <- getHValue hsc_env val_name
-                value <- lessUnsafeCoerce (hsc_dflags hsc_env) "getValueSafely" hval
-                return $ Just value
+                return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing
-  where dflags = hsc_dflags hsc_env
-
+   where dflags = hsc_dflags hsc_env
 
 -- | Coerce a value as usual, but:
 --
@@ -130,14 +142,19 @@ lessUnsafeCoerce dflags context what = do
 --
 -- * If the module could not be found
 -- * If we could not determine the imports of the module
-lookupRdrNameInModule :: HscEnv -> ModuleName -> RdrName -> IO (Maybe Name)
-lookupRdrNameInModule hsc_env mod_name rdr_name = do
+--
+-- Can only be used for lookuping up names while handling plugins.
+-- This was introduced by 57d6798.
+lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName -> IO (Maybe Name)
+lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     -- First find the package the module resides in by searching exposed packages and home modules
     found_module <- findImportedModule hsc_env mod_name Nothing
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module
-            (_, mb_iface) <- initTc hsc_env HsSrcFile False iNTERACTIVE $ initIfaceTcRn $ loadPluginInterface (ptext (sLit "contains a name used in an invocation of lookupRdrNameInModule")) mod
+            (_, mb_iface) <- initTcInteractive hsc_env $
+                             initIfaceTcRn $
+                             loadPluginInterface doc mod
             case mb_iface of
                 Just iface -> do
                     -- Try and find the required name in the exports
@@ -152,8 +169,9 @@ lookupRdrNameInModule hsc_env mod_name rdr_name = do
 
                 Nothing -> throwCmdLineErrorS dflags $ hsep [ptext (sLit "Could not determine the exports of the module"), ppr mod_name]
         err -> throwCmdLineErrorS dflags $ cannotFindModule dflags mod_name err
-  where dflags = hsc_dflags hsc_env
-
+  where
+    dflags = hsc_dflags hsc_env
+    doc = ptext (sLit "contains a name used in an invocation of lookupRdrNameInModule")
 
 wrongTyThingError :: Name -> TyThing -> SDoc
 wrongTyThingError name got_thing = hsep [ptext (sLit "The name"), ppr name, ptext (sLit "is not that of a value but rather a"), pprTyThingCategory got_thing]

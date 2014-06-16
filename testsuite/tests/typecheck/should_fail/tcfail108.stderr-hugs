@@ -1,0 +1,2 @@
+ERROR "tcfail108.hs":7 - Illegal Haskell 98 class constraint in instance declaration
+*** Constraint : Eq (a (Rec a))

@@ -1,0 +1,10 @@
+-- Test :issafe works
+:unset +s
+
+-- first without package trust
+:issafe Data.ByteString
+
+-- now with package trust
+:set -fpackage-trust
+:issafe Data.ByteString
+

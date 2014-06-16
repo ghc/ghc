@@ -1,0 +1,7 @@
+let x=undefined
+let y=3 :: Integer
+:force x
+:show bindings
+-- in 7.3 and earlier this used to print just "*** Exception:
+-- Prelude.undefined", now we see bindings for x and y, and x's value
+-- is printed as the exception.

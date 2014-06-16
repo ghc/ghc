@@ -1,0 +1,6 @@
+
+SimpleFail8.hs:9:8:
+    ‘Map’ is not a (visible) associated type of class ‘C6’
+
+SimpleFail8.hs:10:8:
+    ‘S3’ is not a (visible) associated type of class ‘C6’

@@ -1,0 +1,6 @@
+
+tcfail203a.hs:10:16:
+    A lazy (~) pattern cannot contain unlifted types: ~(c, (I# x))
+    In the pattern: ~(c, (I# x))
+    In the pattern: (b, ~(c, (I# x)))
+    In the pattern: !(b, ~(c, (I# x)))

@@ -1,0 +1,11 @@
+
+T7856.hs:4:7:
+    Couldn't match expected type ‘String -> IO ()’
+                with actual type ‘IO ()’
+    Possible cause: ‘sequence_’ is applied to too many arguments
+    In the expression: sequence_ lst
+    In an equation for ‘tmp’:
+        tmp
+          = sequence_ lst
+          where
+              lst = [putStrLn "hi"]

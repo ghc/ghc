@@ -1,0 +1,8 @@
+[1 of 5] Compiling B                ( B.hs, B.o )
+[2 of 5] Compiling A                ( A.hs, A.o )
+[3 of 5] Compiling C                ( C.hs, C.o )
+[4 of 5] Compiling D                ( D.hs, D.o )
+[5 of 5] Compiling E                ( E.hs, E.o )
+[3 of 5] Compiling C                ( C.hs, C.o )
+[4 of 5] Compiling D                ( D.hs, D.o ) [C changed]
+[5 of 5] Compiling E                ( E.hs, E.o ) [D changed]

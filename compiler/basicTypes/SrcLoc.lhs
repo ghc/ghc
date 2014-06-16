@@ -74,8 +74,6 @@ module SrcLoc (
         spans, isSubspanOf, sortLocated
     ) where
 
-#include "Typeable.h"
-
 import Util
 import Outputable
 import FastString

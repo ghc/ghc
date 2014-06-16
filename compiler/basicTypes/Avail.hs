@@ -2,29 +2,20 @@
 -- (c) The University of Glasgow
 --
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module Avail (
     Avails,
     AvailInfo(..),
     availsToNameSet,
     availsToNameEnv,
     availName, availNames,
-    stableAvailCmp,
-    gresFromAvails,
-    gresFromAvail
+    stableAvailCmp
   ) where
 
 import Name
 import NameEnv
 import NameSet
-import RdrName
 
+import Binary
 import Outputable
 import Util
 
@@ -32,24 +23,24 @@ import Util
 -- The AvailInfo type
 
 -- | Records what things are "available", i.e. in scope
-data AvailInfo = Avail Name	 -- ^ An ordinary identifier in scope
-	       | AvailTC Name
-			 [Name]  -- ^ A type or class in scope. Parameters:
-			         --
-				 --  1) The name of the type or class
-				 --  2) The available pieces of type or class.
-				 -- 
-				 -- The AvailTC Invariant:
+data AvailInfo = Avail Name      -- ^ An ordinary identifier in scope
+               | AvailTC Name
+                         [Name]  -- ^ A type or class in scope. Parameters:
+                                 --
+                                 --  1) The name of the type or class
+                                 --  2) The available pieces of type or class.
+                                 --
+                                 -- The AvailTC Invariant:
                                  --   * If the type or class is itself
-				 --     to be in scope, it must be
-				 --     *first* in this list.  Thus,
+                                 --     to be in scope, it must be
+                                 --     *first* in this list.  Thus,
                                  --     typically: @AvailTC Eq [Eq, ==, \/=]@
-		deriving( Eq )
+                deriving( Eq )
                         -- Equality used when deciding if the
                         -- interface has changed
 
 -- | A collection of 'AvailInfo' - several things that are \"available\"
-type Avails	  = [AvailInfo]
+type Avails = [AvailInfo]
 
 -- | Compare lexicographically
 stableAvailCmp :: AvailInfo -> AvailInfo -> Ordering
@@ -83,24 +74,6 @@ availNames :: AvailInfo -> [Name]
 availNames (Avail n)      = [n]
 availNames (AvailTC _ ns) = ns
 
--- | make a 'GlobalRdrEnv' where all the elements point to the same
--- Provenance (useful for "hiding" imports, or imports with
--- no details).
-gresFromAvails :: Provenance -> [AvailInfo] -> [GlobalRdrElt]
-gresFromAvails prov avails
-  = concatMap (gresFromAvail (const prov)) avails
-
-gresFromAvail :: (Name -> Provenance) -> AvailInfo -> [GlobalRdrElt]
-gresFromAvail prov_fn avail
-  = [ GRE {gre_name = n,
-           gre_par = parent n avail,
-           gre_prov = prov_fn n}
-    | n <- availNames avail ]
-  where
-    parent _ (Avail _)                 = NoParent
-    parent n (AvailTC m _) | n == m    = NoParent
-                           | otherwise = ParentIs m
-
 -- -----------------------------------------------------------------------------
 -- Printing
 
@@ -111,4 +84,20 @@ pprAvail :: AvailInfo -> SDoc
 pprAvail (Avail n)      = ppr n
 pprAvail (AvailTC n ns) = ppr n <> braces (hsep (punctuate comma (map ppr ns)))
 
+instance Binary AvailInfo where
+    put_ bh (Avail aa) = do
+            putByte bh 0
+            put_ bh aa
+    put_ bh (AvailTC ab ac) = do
+            putByte bh 1
+            put_ bh ab
+            put_ bh ac
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> do aa <- get bh
+                      return (Avail aa)
+              _ -> do ab <- get bh
+                      ac <- get bh
+                      return (AvailTC ab ac)
 

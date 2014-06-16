@@ -1,0 +1,45 @@
+:unset +s
+:unset +t
+
+:l ../shell.hs
+:def shell (\s -> do shell s; return "")
+
+-- first, clean up:
+:shell rm -f *.hi *.o *~
+:shell cp A1.hs A.hs
+
+:load D.hs
+
+-- compile A & reload
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c A.hs
+:reload
+
+B.g 42
+B.g 42
+B.g 42
+
+-- swap A2 for A, compile & reload
+:shell sleep 1
+:shell cp A2.hs A.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c A.hs
+:reload
+-- the system should ignore the compiled version and compile its own.
+
+B.g 42
+B.g 42
+B.g 42
+
+-- pick up newly compiled A
+:load D.hs
+
+B.g 42
+B.g 42
+B.g 42
+
+-- remove A.o: system should recompile A
+:shell rm A.o
+:reload
+
+B.g 42
+B.g 42
+B.g 42

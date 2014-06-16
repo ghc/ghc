@@ -1,0 +1,12 @@
+
+tcfail034.hs:17:13:
+    Could not deduce (Integral a) arising from a use of ‘mod’
+    from the context (Num a, Eq a)
+      bound by the type signature for test :: (Num a, Eq a) => a -> Bool
+      at tcfail034.hs:16:7-32
+    Possible fix:
+      add (Integral a) to the context of
+        the type signature for test :: (Num a, Eq a) => a -> Bool
+    In the first argument of ‘(==)’, namely ‘(x `mod` 3)’
+    In the expression: (x `mod` 3) == 0
+    In an equation for ‘test’: test x = (x `mod` 3) == 0

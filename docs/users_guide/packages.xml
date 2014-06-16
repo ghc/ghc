@@ -13,7 +13,7 @@ Packages
     url="http://hackage.haskell.org/packages/hackage.html">HackageDB</ulink>.</para>
 
   <para>Using a package couldn't be simpler: if you're using
-    <option>&ndash;&ndash;make</option> or GHCi, then most of the installed packages will be
+    <option>--make</option> or GHCi, then most of the installed packages will be
     automatically available to your program without any further options.  The
     exceptions to this rule are covered below in <xref
       linkend="using-packages" />.</para>
@@ -147,8 +147,8 @@ exposed-modules: Network.BSD,
             or dynamically is controlled by the flag
             pair <option>-static</option>/<option>-dynamic</option>.</para>
 
-          <para>In <option>&ndash;&ndash;make</option> mode
-            and <option>&ndash;&ndash;interactive</option> mode (see
+          <para>In <option>--make</option> mode
+            and <option>--interactive</option> mode (see
             <xref linkend="modes" />), the compiler normally
             determines which packages are required by the current
             Haskell modules, and links only those.  In batch mode
@@ -961,9 +961,9 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
 
       <varlistentry>
         <term>
-          <option>&ndash;&ndash;force</option>
+          <option>--force</option>
           <indexterm><primary>
-              <option>&ndash;&ndash;force</option>
+              <option>--force</option>
             </primary></indexterm>
         </term>
         <listitem>
@@ -977,7 +977,7 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
 
       <varlistentry>
         <term>
-          <option>&ndash;&ndash;global</option><indexterm><primary><option>&ndash;&ndash;global</option></primary>
+          <option>--global</option><indexterm><primary><option>--global</option></primary>
           </indexterm>
         </term>
         <listitem>
@@ -991,7 +991,7 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
 
       <varlistentry>
         <term>
-          <option>&ndash;&ndash;help</option><indexterm><primary><option>&ndash;&ndash;help</option></primary>
+          <option>--help</option><indexterm><primary><option>--help</option></primary>
           </indexterm>
         </term>
         <term>
@@ -1005,7 +1005,7 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
 
       <varlistentry>
         <term>
-          <option>&ndash;&ndash;user</option><indexterm><primary><option>&ndash;&ndash;user</option></primary>
+          <option>--user</option><indexterm><primary><option>--user</option></primary>
           </indexterm>
         </term>
         <listitem>
@@ -1040,7 +1040,7 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
           </indexterm>
         </term>
         <term>
-          <option>&ndash;&ndash;version</option><indexterm><primary><option>&ndash;&ndash;version</option></primary>
+          <option>--version</option><indexterm><primary><option>--version</option></primary>
           </indexterm>
         </term>
         <listitem>
@@ -1115,11 +1115,11 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
           it.  To build one manually, the following
           GNU <command>ld</command> command can be used:</para>
 
-<screen>ld -r &ndash;&ndash;whole-archive -o HSfoo.o libHSfoo.a</screen>
+<screen>ld -r --whole-archive -o HSfoo.o libHSfoo.a</screen>
 
         <para>(replace
-          <literal>&ndash;&ndash;whole-archive</literal> with
-          <literal>&ndash;all_load</literal> on MacOS X)</para>
+          <literal>--whole-archive</literal> with
+          <literal>-all_load</literal> on MacOS X)</para>
       </listitem>
       <listitem>
         <para>When building the package as shared library, GHC can be used to

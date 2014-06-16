@@ -1,0 +1,4 @@
+
+qq004.hs:8:21:
+    GHC stage restriction: parse
+      is used in a quasiquote, and must be imported, not defined locally

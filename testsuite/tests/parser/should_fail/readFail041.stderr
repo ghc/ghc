@@ -1,0 +1,5 @@
+
+readFail041.hs:6:1:
+    Fundeps in class ‘Foo’
+    (Use FunctionalDependencies to allow fundeps)
+    In the class declaration for ‘Foo’

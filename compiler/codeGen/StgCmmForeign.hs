@@ -18,7 +18,7 @@ module StgCmmForeign (
 #include "HsVersions.h"
 
 import StgSyn
-import StgCmmProf
+import StgCmmProf (storeCurCCS, ccsType, curCCS)
 import StgCmmEnv
 import StgCmmMonad
 import StgCmmUtils
@@ -225,7 +225,8 @@ emitForeignCall safety results target args
                                        , res  = results
                                        , args = args'
                                        , succ = k
-                                       , updfr = updfr_off
+                                       , ret_args = off
+                                       , ret_off = updfr_off
                                        , intrbl = playInterruptible safety })
             <*> mkLabel k
             <*> copyout
@@ -357,7 +358,7 @@ stack_SP     dflags = closureField dflags (oFFSET_StgStack_sp dflags)
 
 
 closureField :: DynFlags -> ByteOff -> ByteOff
-closureField dflags off = off + fixedHdrSize dflags * wORD_SIZE dflags
+closureField dflags off = off + fixedHdrSize dflags
 
 stgSp, stgHp, stgCurrentTSO, stgCurrentNursery :: CmmExpr
 stgSp             = CmmReg sp
@@ -403,6 +404,9 @@ add_shim :: DynFlags -> Type -> CmmExpr -> CmmExpr
 add_shim dflags arg_ty expr
   | tycon == arrayPrimTyCon || tycon == mutableArrayPrimTyCon
   = cmmOffsetB dflags expr (arrPtrsHdrSize dflags)
+
+  | tycon == smallArrayPrimTyCon || tycon == smallMutableArrayPrimTyCon
+  = cmmOffsetB dflags expr (smallArrPtrsHdrSize dflags)
 
   | tycon == byteArrayPrimTyCon || tycon == mutableByteArrayPrimTyCon
   = cmmOffsetB dflags expr (arrWordsHdrSize dflags)

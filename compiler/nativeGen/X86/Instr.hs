@@ -9,7 +9,7 @@
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
-module X86.Instr (Instr(..), Operand(..), JumpDest,
+module X86.Instr (Instr(..), Operand(..), PrefetchVariant(..), JumpDest,
                   getJumpDestBlockId, canShortcut, shortcutStatics,
                   shortcutJump, i386_insert_ffrees, allocMoreStack,
                   maxSpillSlots, archWordSize)
@@ -208,6 +208,7 @@ data Instr
         | XOR         Size Operand Operand
         | NOT         Size Operand
         | NEGI        Size Operand              -- NEG instruction (name clash with Cond)
+        | BSWAP       Size Reg
 
         -- Shifts (amount may be immediate or %cl only)
         | SHL         Size Operand{-amount-} Operand
@@ -318,7 +319,14 @@ data Instr
                                  -- 1:    popl %reg
 
     -- SSE4.2
-    | POPCNT      Size Operand Reg -- src, dst
+        | POPCNT      Size Operand Reg -- src, dst
+
+    -- prefetch
+        | PREFETCH  PrefetchVariant Size Operand -- prefetch Variant, addr size, address to prefetch
+                                        -- variant can be NTA, Lvl0, Lvl1, or Lvl2
+
+data PrefetchVariant = NTA | Lvl0 | Lvl1 | Lvl2
+
 
 data Operand
         = OpReg  Reg            -- register
@@ -351,6 +359,7 @@ x86_regUsageOfInstr platform instr
 
     XOR    _ src dst    -> usageRM src dst
     NOT    _ op         -> usageM op
+    BSWAP  _ reg        -> mkRU [reg] [reg]
     NEGI   _ op         -> usageM op
     SHL    _ imm dst    -> usageRM imm dst
     SAR    _ imm dst    -> usageRM imm dst
@@ -414,6 +423,9 @@ x86_regUsageOfInstr platform instr
     DELTA   _           -> noUsage
 
     POPCNT _ src dst -> mkRU (use_R src []) [dst]
+
+    -- note: might be a better way to do this
+    PREFETCH _  _ src -> mkRU (use_R src []) []
 
     _other              -> panic "regUsage: unrecognised instr"
 
@@ -489,6 +501,7 @@ x86_patchRegsOfInstr instr env
     OR   sz src dst     -> patch2 (OR   sz) src dst
     XOR  sz src dst     -> patch2 (XOR  sz) src dst
     NOT  sz op          -> patch1 (NOT  sz) op
+    BSWAP sz reg        -> BSWAP sz (env reg)
     NEGI sz op          -> patch1 (NEGI sz) op
     SHL  sz imm dst     -> patch1 (SHL sz imm) dst
     SAR  sz imm dst     -> patch1 (SAR sz imm) dst
@@ -553,6 +566,8 @@ x86_patchRegsOfInstr instr env
     CLTD _              -> instr
 
     POPCNT sz src dst -> POPCNT sz (patchOp src) (env dst)
+
+    PREFETCH lvl size src -> PREFETCH lvl size (patchOp src)
 
     _other              -> panic "patchRegs: unrecognised instr"
 
@@ -773,7 +788,7 @@ i386_insert_ffrees
         -> [GenBasicBlock Instr]
 
 i386_insert_ffrees blocks
-   | or (map (any is_G_instr) [ instrs | BasicBlock _ instrs <- blocks ])
+   | any (any is_G_instr) [ instrs | BasicBlock _ instrs <- blocks ]
    = map insertGFREEs blocks
    | otherwise
    = blocks
@@ -868,14 +883,8 @@ allocMoreStack
   -> UniqSM (NatCmmDecl statics X86.Instr.Instr)
 
 allocMoreStack _ _ top@(CmmData _ _) = return top
-allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
-    let
-        infos = mapKeys info
-        entries = case code of
-                    [] -> infos
-                    BasicBlock entry _ : _ -- first block is the entry point
-                       | entry `elem` infos -> infos
-                       | otherwise          -> entry : infos
+allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
+    let entries = entryBlocks proc
 
     uniqs <- replicateM (length entries) getUniqueUs
 

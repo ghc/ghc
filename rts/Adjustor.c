@@ -57,16 +57,57 @@ extern void *adjustorCode;
 #endif
 
 #if defined(USE_LIBFFI_FOR_ADJUSTORS)
+/* There are subtle differences between how libffi adjustors work on
+ * different platforms, and the situation is a little complex.
+ * 
+ * HOW ADJUSTORS/CLOSURES WORK ON LIBFFI:
+ * libffi's ffi_closure_alloc() function gives you two pointers to a closure,
+ * 1. the writable pointer, and 2. the executable pointer. You write the
+ * closure into the writable pointer (and ffi_prep_closure_loc() will do this
+ * for you) and you execute it at the executable pointer.
+ *
+ * THE PROBLEM:
+ * The RTS deals only with the executable pointer, but when it comes time to
+ * free the closure, libffi wants the writable pointer back that it gave you
+ * when you allocated it.
+ *
+ * On Linux we solve this problem by storing the address of the writable
+ * mapping into itself, then returning both writable and executable pointers
+ * plus 1 machine word for preparing the closure for use by the RTS (see the
+ * Linux version of allocateExec() in rts/sm/Storage.c). When we want to
+ * recover the writable address, we subtract 1 word from the executable
+ * address and fetch. This works because Linux kernel magic gives us two
+ * pointers with different addresses that refer to the same memory. Whatever
+ * you write into the writeable address can be read back at the executable
+ * address. This method is very efficient.
+ *
+ * On iOS this breaks for two reasons: 1. the two pointers do not refer to
+ * the same memory (so we can't retrieve anything stored into the writable
+ * pointer if we only have the exec pointer), and 2. libffi's
+ * ffi_closure_alloc() assumes the pointer it has returned you is a
+ * ffi_closure structure and treats it as such: It uses that memory to
+ * communicate with ffi_prep_closure_loc(). On Linux by contrast
+ * ffi_closure_alloc() is viewed simply as a memory allocation, and only
+ * ffi_prep_closure_loc() deals in ffi_closure structures. Each of these
+ * differences is enough make the efficient way used on Linux not work on iOS.
+ * Instead on iOS we use hash tables to recover the writable address from the
+ * executable one. This method is conservative and would almost certainly work
+ * on any platform, but on Linux it makes sense to use the faster method.
+ */
 void
 freeHaskellFunctionPtr(void* ptr)
 {
     ffi_closure *cl;
 
+#if defined(ios_HOST_OS)
+    cl = execToWritable(ptr);
+#else
     cl = (ffi_closure*)ptr;
+#endif
     freeStablePtr(cl->user_data);
     stgFree(cl->cif->arg_types);
     stgFree(cl->cif);
-    freeExec(cl);
+    freeExec(ptr);
 }
 
 static ffi_type * char_to_ffi_type(char c)
@@ -131,8 +172,8 @@ createAdjustor (int cconv,
         barf("createAdjustor: failed to allocate memory");
     }
 
-    r = ffi_prep_closure(cl, cif, (void*)wptr, hptr/*userdata*/);
-    if (r != FFI_OK) barf("ffi_prep_closure failed: %d", r);
+    r = ffi_prep_closure_loc(cl, cif, (void*)wptr, hptr/*userdata*/, code);
+    if (r != FFI_OK) barf("ffi_prep_closure_loc failed: %d", r);
 
     return (void*)code;
 }
@@ -335,7 +376,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
               )
 {
   void *adjustor = NULL;
-  void *code;
+  void *code = NULL;
 
   switch (cconv)
   {
@@ -389,7 +430,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
         int sz = totalArgumentSize(typeString);
         
         adjustorStub->call[0] = 0xe8;
-        *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)adjustorStub + 5);
+        *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)code + 5);
         adjustorStub->hptr = hptr;
         adjustorStub->wptr = wptr;
         
@@ -491,22 +532,15 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
     */
     {  
-        int i = 0;
-        int fourthFloating;
-        char *c;
         StgWord8 *adj_code;
 
         // determine whether we have 4 or more integer arguments,
         // and therefore need to flush one to the stack.
-        for (c = typeString; *c != '\0'; c++) {
-            i++;
-            if (i == 4) {
-                fourthFloating = (*c == 'f' || *c == 'd');
-                break;
-            }
-        }
+        if ((typeString[0] == '\0') ||
+            (typeString[1] == '\0') ||
+            (typeString[2] == '\0') ||
+            (typeString[3] == '\0')) {
 
-        if (i < 4) {
             adjustor = allocateExec(0x38,&code);
             adj_code = (StgWord8*)adjustor;
 
@@ -525,6 +559,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
         }
         else
         {
+            int fourthFloating;
+
+            fourthFloating = (typeString[3] == 'f' || typeString[3] == 'd');
             adjustor = allocateExec(0x58,&code);
             adj_code = (StgWord8*)adjustor;
             *(StgInt32 *)adj_code        = 0x08ec8348;

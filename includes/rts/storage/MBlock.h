@@ -5,7 +5,7 @@
  * MegaBlock Allocator interface.
  *
  * See wiki commentary at
- *  http://hackage.haskell.org/trac/ghc/wiki/Commentary/HeapAlloced
+ *  http://ghc.haskell.org/trac/ghc/wiki/Commentary/HeapAlloced
  *
  * ---------------------------------------------------------------------------*/
 
@@ -36,7 +36,7 @@ extern SpinLock gc_alloc_block_sync;
    It needs to be FAST.
 
    See wiki commentary at
-     http://hackage.haskell.org/trac/ghc/wiki/Commentary/HeapAlloced
+     http://ghc.haskell.org/trac/ghc/wiki/Commentary/HeapAlloced
 
    Implementation of HEAP_ALLOCED
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

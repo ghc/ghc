@@ -1,0 +1,8 @@
+
+T3262.hs:12:11: Warning:
+    This binding for ‘not_ignored’ shadows the existing binding
+      bound at T3262.hs:11:11
+
+T3262.hs:20:15: Warning:
+    This binding for ‘not_ignored’ shadows the existing binding
+      bound at T3262.hs:19:15

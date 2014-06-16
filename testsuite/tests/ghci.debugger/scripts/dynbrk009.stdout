@@ -1,0 +1,8 @@
+Stopped at dynbrk009.hs:8:22
+_result :: Int = _
+Stopped at dynbrk009.hs:8:27-36
+_result :: Int = _
+Stopped at dynbrk009.hs:8:31-35
+Stopped at dynbrk009.hs:6:1-9
+Stopped at dynbrk009.hs:6:9
+3

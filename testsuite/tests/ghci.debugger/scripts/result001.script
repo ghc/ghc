@@ -1,0 +1,5 @@
+-- demonstrates that _result has the wrong type sometimes
+:l result001
+:b 1 20
+f "abc"
+-- _result :: Bool is wrong, should be [a]

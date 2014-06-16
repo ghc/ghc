@@ -1,0 +1,10 @@
+
+drvfail011.hs:8:1:
+    No instance for (Eq a) arising from a use of ‘==’
+    Possible fix: add (Eq a) to the context of the instance declaration
+    In the expression: ((a1 == b1))
+    In an equation for ‘==’: (==) (T1 a1) (T1 b1) = ((a1 == b1))
+    When typechecking the code for  ‘==’
+      in a standalone derived instance for ‘Eq (T a)’:
+      To see the code I am typechecking, use -ddump-deriv
+    In the instance declaration for ‘Eq (T a)’

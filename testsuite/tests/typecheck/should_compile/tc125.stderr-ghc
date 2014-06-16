@@ -1,0 +1,25 @@
+
+tc125.hs:16:10: Warning:
+    No explicit implementation for
+      ‘add’
+    In the instance declaration for ‘Add Z a a’
+
+tc125.hs:17:10: Warning:
+    No explicit implementation for
+      ‘add’
+    In the instance declaration for ‘Add (S a) b (S c)’
+
+tc125.hs:21:10: Warning:
+    No explicit implementation for
+      ‘mul’
+    In the instance declaration for ‘Mul Z a Z’
+
+tc125.hs:22:10: Warning:
+    No explicit implementation for
+      ‘mul’
+    In the instance declaration for ‘Mul (S a) b d’
+
+tc125.hs:29:10: Warning:
+    No explicit implementation for
+      ‘add’
+    In the instance declaration for ‘Add (Q a b) (Q c d) (Q ad_bc bd)’

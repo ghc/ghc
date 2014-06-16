@@ -1,0 +1,5 @@
+
+T5976.hs:1:1:
+    Exception when trying to run compile-time code:
+      bar
+      Code: error ((++) "foo " error "bar")

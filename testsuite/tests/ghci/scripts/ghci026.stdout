@@ -1,0 +1,15 @@
+data Maybe a = Nothing | Just a
+catMaybes :: [Maybe a] -> [a]
+fromJust :: Maybe a -> a
+fromMaybe :: a -> Maybe a -> a
+isJust :: Maybe a -> Bool
+isNothing :: Maybe a -> Bool
+listToMaybe :: [a] -> Maybe a
+mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+maybe :: b -> (a -> b) -> Maybe a -> b
+maybeToList :: Maybe a -> [a]
+data T = A Int | B Float
+f :: Double -> Double
+g :: Double -> Double
+h :: Integral a => a -> a
+f :: Double -> Double

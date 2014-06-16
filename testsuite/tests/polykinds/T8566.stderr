@@ -1,0 +1,18 @@
+
+T8566.hs:31:9:
+    Could not deduce (C ('AA (t (I a ps)) as) ps fs0)
+      arising from a use of ‘c’
+    from the context (C ('AA (t (I a ps)) as) ps fs)
+      bound by the instance declaration at T8566.hs:29:10-67
+    or from ('AA t (a : as) ~ 'AA t1 as1)
+      bound by a pattern with constructor
+                 A :: forall (r :: [*]) (t :: k) (as :: [U *]). I ('AA t as) r,
+               in an equation for ‘c’
+      at T8566.hs:31:5
+    The type variable ‘fs0’ is ambiguous
+    Relevant bindings include
+      c :: I ('AA t (a : as)) ps -> I ('AA t (a : as)) ps
+        (bound at T8566.hs:31:3)
+    In the expression: c undefined
+    In an equation for ‘c’: c A = c undefined
+    In the instance declaration for ‘C ('AA t (a : as)) ps fs’

@@ -1,0 +1,9 @@
+Running with -XNoAlternativeLayoutRule
+Running with -XAlternativeLayoutRule
+
+layout001.hs:6:3: parse error on input ‘where’
+Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
+
+layout001.hs:6:3: Warning:
+    transitional layout will not be accepted in the future:
+    `where' clause at the same depth as implicit layout block

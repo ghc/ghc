@@ -121,19 +121,19 @@ is Less Cool because
 \begin{code}
 -- | A Haskell expression.
 data HsExpr id
-  = HsVar     id                        -- ^ variable
-  | HsIPVar   HsIPName                  -- ^ implicit parameter
+  = HsVar     id                        -- ^ Variable
+  | HsIPVar   HsIPName                  -- ^ Implicit parameter
   | HsOverLit (HsOverLit id)            -- ^ Overloaded literals
 
   | HsLit     HsLit                     -- ^ Simple (non-overloaded) literals
 
-  | HsLam     (MatchGroup id (LHsExpr id)) -- Currently always a single match
+  | HsLam     (MatchGroup id (LHsExpr id)) -- ^ Lambda abstraction. Currently always a single match
 
-  | HsLamCase PostTcType (MatchGroup id (LHsExpr id)) -- Lambda-case
+  | HsLamCase PostTcType (MatchGroup id (LHsExpr id)) -- ^ Lambda-case
 
-  | HsApp     (LHsExpr id) (LHsExpr id) -- Application
+  | HsApp     (LHsExpr id) (LHsExpr id) -- ^ Application
 
-  -- Operator applications:
+  -- | Operator applications:
   -- NB Bracketed ops such as (+) come out as Vars.
 
   -- NB We need an expr for the operator in an OpApp/Section since
@@ -144,17 +144,20 @@ data HsExpr id
                 Fixity          -- Renamer adds fixity; bottom until then
                 (LHsExpr id)    -- right operand
 
-  | NegApp      (LHsExpr id)    -- negated expr
-                (SyntaxExpr id) -- Name of 'negate'
+  -- | Negation operator. Contains the negated expression and the name
+  -- of 'negate'              
+  | NegApp      (LHsExpr id) 
+                (SyntaxExpr id) 
 
-  | HsPar       (LHsExpr id)    -- Parenthesised expr; see Note [Parens in HsSyn]
+  | HsPar       (LHsExpr id)    -- ^ Parenthesised expr; see Note [Parens in HsSyn]
 
   | SectionL    (LHsExpr id)    -- operand; see Note [Sections in HsSyn]
                 (LHsExpr id)    -- operator
   | SectionR    (LHsExpr id)    -- operator; see Note [Sections in HsSyn]
                 (LHsExpr id)    -- operand
 
-  | ExplicitTuple               -- Used for explicit tuples and sections thereof
+  -- | Used for explicit tuples and sections thereof
+  | ExplicitTuple               
         [HsTupArg id]
         Boxity
 
@@ -168,9 +171,11 @@ data HsExpr id
                 (LHsExpr id)    --  then part
                 (LHsExpr id)    --  else part
 
-  | HsMultiIf   PostTcType [LGRHS id (LHsExpr id)] -- Multi-way if
+  -- | Multi-way if
+  | HsMultiIf   PostTcType [LGRHS id (LHsExpr id)] 
 
-  | HsLet       (HsLocalBinds id) -- let(rec)
+  -- | let(rec)
+  | HsLet       (HsLocalBinds id) 
                 (LHsExpr  id)
 
   | HsDo        (HsStmtContext Name) -- The parameterisation is unimportant
@@ -179,22 +184,24 @@ data HsExpr id
                 [ExprLStmt id]       -- "do":one or more stmts
                 PostTcType           -- Type of the whole expression
 
-  | ExplicitList                        -- syntactic list
+  -- | Syntactic list: [a,b,c,...]
+  | ExplicitList                        
                 PostTcType              -- Gives type of components of list
                 (Maybe (SyntaxExpr id)) -- For OverloadedLists, the fromListN witness
                 [LHsExpr id]
 
-  | ExplicitPArr                -- syntactic parallel array: [:e1, ..., en:]
+  -- | Syntactic parallel array: [:e1, ..., en:]
+  | ExplicitPArr                
                 PostTcType      -- type of elements of the parallel array
                 [LHsExpr id]
 
-  -- Record construction
+  -- | Record construction
   | RecordCon   (Located id)       -- The constructor.  After type checking
                                    -- it's the dataConWrapId of the constructor
                 PostTcExpr         -- Data con Id applied to type args
                 (HsRecordBinds id)
 
-  -- Record update
+  -- | Record update
   | RecordUpd   (LHsExpr id)
                 (HsRecordBinds id)
 --              (HsMatchGroup Id)  -- Filled in by the type checker to be
@@ -207,7 +214,8 @@ data HsExpr id
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 
-  | ExprWithTySig                       -- e :: type
+  -- | Expression with an explicit type signature. @e :: type@  
+  | ExprWithTySig                       
                 (LHsExpr id)
                 (LHsType id)
 
@@ -216,12 +224,14 @@ data HsExpr id
                 (LHsType Name)          -- Retain the signature for
                                         -- round-tripping purposes
 
-  | ArithSeq                            -- Arithmetic sequence
+  -- | Arithmetic sequence
+  | ArithSeq                            
                 PostTcExpr
                 (Maybe (SyntaxExpr id))   -- For OverloadedLists, the fromList witness
                 (ArithSeqInfo id)
 
-  | PArrSeq                             -- arith. sequence for parallel array
+  -- | Arithmetic sequence for parallel array
+  | PArrSeq                             
                 PostTcExpr              -- [:e1..e2:] or [:e1, e2..e3:]
                 (ArithSeqInfo id)
 
@@ -236,13 +246,20 @@ data HsExpr id
 
   | HsBracket    (HsBracket id)
 
-  | HsBracketOut (HsBracket Name)       -- Output of the type checker is
-                                        -- the *original*
-                 [PendingSplice]        -- renamed expression, plus
-                                        -- _typechecked_ splices to be
-                                        -- pasted back in by the desugarer
+    -- See Note [Pending Splices]
+  | HsRnBracketOut
+      (HsBracket Name)     -- Output of the renamer is the *original* renamed
+                           -- expression, plus
+      [PendingRnSplice]    -- _renamed_ splices to be type checked
 
-  | HsSpliceE (HsSplice id)
+  | HsTcBracketOut
+      (HsBracket Name)     -- Output of the type checker is the *original*
+                           -- renamed expression, plus
+      [PendingTcSplice]    -- _typechecked_ splices to be
+                           -- pasted back in by the desugarer
+
+  | HsSpliceE    Bool                   -- True <=> typed splice
+                 (HsSplice id)          -- False <=> untyped
 
   | HsQuasiQuoteE (HsQuasiQuote id)
         -- See Note [Quasi-quote overview] in TcSplice
@@ -250,6 +267,7 @@ data HsExpr id
   -----------------------------------------------------------
   -- Arrow notation extension
 
+  -- | @proc@ notation for Arrows
   | HsProc      (LPat id)               -- arrow abstraction, proc
                 (LHsCmdTop id)          -- body of the abstraction
                                         -- always has an empty stack
@@ -315,22 +333,67 @@ data HsExpr id
   |  HsUnboundVar RdrName
   deriving (Data, Typeable)
 
--- HsTupArg is used for tuple sections
+-- | HsTupArg is used for tuple sections
 --  (,a,) is represented by  ExplicitTuple [Mising ty1, Present a, Missing ty3]
 --  Which in turn stands for (\x:ty1 \y:ty2. (x,a,y))
 data HsTupArg id
-  = Present (LHsExpr id)        -- The argument
-  | Missing PostTcType          -- The argument is missing, but this is its type
+  = Present (LHsExpr id)        -- ^ The argument
+  | Missing PostTcType          -- ^ The argument is missing, but this is its type
   deriving (Data, Typeable)
 
 tupArgPresent :: HsTupArg id -> Bool
 tupArgPresent (Present {}) = True
 tupArgPresent (Missing {}) = False
 
-type PendingSplice = (Name, LHsExpr Id) -- Typechecked splices, waiting to be
-                                        -- pasted back in by the desugarer
+-- See Note [Pending Splices]
+data PendingRnSplice
+  = PendingRnExpSplice        (HsSplice Name)
+  | PendingRnPatSplice        (HsSplice Name)
+  | PendingRnTypeSplice       (HsSplice Name)
+  | PendingRnDeclSplice       (HsSplice Name)
+  | PendingRnCrossStageSplice Name
+  deriving (Data, Typeable)
 
+type PendingTcSplice = (Name, LHsExpr Id)
 \end{code}
+
+Note [Pending Splices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Now that untyped brackets are not type checked, we need a mechanism to ensure
+that splices contained in untyped brackets *are* type checked. Therefore the
+renamer now renames every HsBracket into a HsRnBracketOut, which contains the
+splices that need to be type checked. There are four varieties of pending
+splices generated by the renamer:
+
+ * Pending expression splices (PendingRnExpSplice), e.g.,
+
+   [|$(f x) + 2|]
+
+ * Pending pattern splices (PendingRnPatSplice), e.g.,
+
+   [|\ $(f x) -> x|]
+
+ * Pending type splices (PendingRnTypeSplice), e.g.,
+
+   [|f :: $(g x)|]
+
+ * Pending cross-stage splices (PendingRnCrossStageSplice), e.g.,
+
+   \x -> [| x |]
+
+There is a fifth variety of pending splice, which is generated by the type
+checker:
+
+  * Pending *typed* expression splices, (PendingTcSplice), e.g.,
+
+    [||1 + $$(f 2)||]
+
+It would be possible to eliminate HsRnBracketOut and use HsBracketOut for the
+output of the renamer. However, when pretty printing the output of the renamer,
+e.g., in a type error message, we *do not* want to print out the pending
+splices. In contrast, when pretty printing the output of the type checker, we
+*do* want to print the pending splices. So splitting them up seems to make
+sense, although I hate to add another constructor to HsExpr.
 
 Note [Parens in HsSyn]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -530,17 +593,19 @@ ppr_expr (EAsPat v e)   = ppr v <> char '@' <> pprParendExpr e
 ppr_expr (EViewPat p e) = ppr p <+> ptext (sLit "->") <+> ppr e
 
 ppr_expr (HsSCC lbl expr)
-  = sep [ ptext (sLit "_scc_") <+> doubleQuotes (ftext lbl),
+  = sep [ ptext (sLit "{-# SCC") <+> doubleQuotes (ftext lbl) <+> ptext (sLit "#-}"),
           pprParendExpr expr ]
 
 ppr_expr (HsWrap co_fn e) = pprHsWrapper (pprExpr e) co_fn
 ppr_expr (HsType id)      = ppr id
 
-ppr_expr (HsSpliceE s)       = pprSplice s
-ppr_expr (HsBracket b)       = pprHsBracket b
-ppr_expr (HsBracketOut e []) = ppr e
-ppr_expr (HsBracketOut e ps) = ppr e $$ ptext (sLit "pending") <+> ppr ps
-ppr_expr (HsQuasiQuoteE qq)  = ppr qq
+ppr_expr (HsSpliceE t s)       = pprSplice t s
+ppr_expr (HsBracket b)         = pprHsBracket b
+ppr_expr (HsRnBracketOut e []) = ppr e
+ppr_expr (HsRnBracketOut e ps) = ppr e $$ ptext (sLit "pending(rn)") <+> ppr ps
+ppr_expr (HsTcBracketOut e []) = ppr e
+ppr_expr (HsTcBracketOut e ps) = ppr e $$ ptext (sLit "pending(tc)") <+> ppr ps
+ppr_expr (HsQuasiQuoteE qq)    = ppr qq
 
 ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
   = hsep [ptext (sLit "proc"), ppr pat, ptext (sLit "->"), ppr cmd]
@@ -622,7 +687,8 @@ hsExprNeedsParens (ExplicitList {})   = False
 hsExprNeedsParens (ExplicitPArr {})   = False
 hsExprNeedsParens (HsPar {})          = False
 hsExprNeedsParens (HsBracket {})      = False
-hsExprNeedsParens (HsBracketOut _ []) = False
+hsExprNeedsParens (HsRnBracketOut {}) = False
+hsExprNeedsParens (HsTcBracketOut {}) = False
 hsExprNeedsParens (HsDo sc _ _)
        | isListCompExpr sc            = False
 hsExprNeedsParens _ = True
@@ -1311,11 +1377,18 @@ data HsSplice id  = HsSplice            --  $z  or $(f 4)
   deriving (Data, Typeable)
 
 instance OutputableBndr id => Outputable (HsSplice id) where
-  ppr = pprSplice
+  ppr (HsSplice n e) = angleBrackets (ppr n <> comma <+> ppr e)
 
-pprSplice :: OutputableBndr id => HsSplice id -> SDoc
-pprSplice (HsSplice n e)
-    = char '$' <> ifPprDebug (brackets (ppr n)) <> eDoc
+pprUntypedSplice :: OutputableBndr id => HsSplice id -> SDoc
+pprUntypedSplice = pprSplice False
+
+pprTypedSplice :: OutputableBndr id => HsSplice id -> SDoc
+pprTypedSplice = pprSplice True
+
+pprSplice :: OutputableBndr id => Bool -> HsSplice id -> SDoc
+pprSplice is_typed (HsSplice n e)
+    = (if is_typed then ptext (sLit "$$") else char '$')
+      <> ifPprDebug (brackets (ppr n)) <> eDoc
     where
           -- We use pprLExpr to match pprParendExpr:
           --     Using pprLExpr makes sure that we go 'deeper'
@@ -1333,7 +1406,12 @@ data HsBracket id = ExpBr (LHsExpr id)   -- [|  expr  |]
                   | TypBr (LHsType id)   -- [t| type  |]
                   | VarBr Bool id        -- True: 'x, False: ''T
                                          -- (The Bool flag is used only in pprHsBracket)
+                  | TExpBr (LHsExpr id)  -- [||  expr  ||]
   deriving (Data, Typeable)
+
+isTypedBracket :: HsBracket id -> Bool
+isTypedBracket (TExpBr {}) = True
+isTypedBracket _           = False
 
 instance OutputableBndr id => Outputable (HsBracket id) where
   ppr = pprHsBracket
@@ -1347,10 +1425,21 @@ pprHsBracket (DecBrL ds) = thBrackets (char 'd') (vcat (map ppr ds))
 pprHsBracket (TypBr t)   = thBrackets (char 't') (ppr t)
 pprHsBracket (VarBr True n)  = char '\''         <> ppr n
 pprHsBracket (VarBr False n) = ptext (sLit "''") <> ppr n
+pprHsBracket (TExpBr e)  = thTyBrackets (ppr e)
 
 thBrackets :: SDoc -> SDoc -> SDoc
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> char '|' <+>
                              pp_body <+> ptext (sLit "|]")
+
+thTyBrackets :: SDoc -> SDoc
+thTyBrackets pp_body = ptext (sLit "[||") <+> pp_body <+> ptext (sLit "||]")
+
+instance Outputable PendingRnSplice where
+  ppr (PendingRnExpSplice s)   = ppr s
+  ppr (PendingRnPatSplice s)   = ppr s
+  ppr (PendingRnTypeSplice s)  = ppr s
+  ppr (PendingRnDeclSplice s)  = ppr s
+  ppr (PendingRnCrossStageSplice name) = ppr name
 \end{code}
 
 %************************************************************************
@@ -1407,7 +1496,9 @@ data HsMatchContext id  -- Context of a Match
   | StmtCtxt (HsStmtContext id) -- Pattern of a do-stmt, list comprehension,
                                 -- pattern guard, etc
 
+  | ThPatSplice                 -- A Template Haskell pattern splice
   | ThPatQuote                  -- A Template Haskell pattern quotation [p| (a,b) |]
+  | PatSyn                      -- A pattern synonym declaration
   deriving (Data, Typeable)
 
 data HsStmtContext id
@@ -1453,7 +1544,9 @@ matchSeparator ProcExpr     = ptext (sLit "->")
 matchSeparator PatBindRhs   = ptext (sLit "=")
 matchSeparator (StmtCtxt _) = ptext (sLit "<-")
 matchSeparator RecUpd       = panic "unused"
+matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
+matchSeparator PatSyn       = panic "unused"
 \end{code}
 
 \begin{code}
@@ -1472,12 +1565,14 @@ pprMatchContextNoun (FunRhs fun _)  = ptext (sLit "equation for")
 pprMatchContextNoun CaseAlt         = ptext (sLit "case alternative")
 pprMatchContextNoun IfAlt           = ptext (sLit "multi-way if alternative")
 pprMatchContextNoun RecUpd          = ptext (sLit "record-update construct")
+pprMatchContextNoun ThPatSplice     = ptext (sLit "Template Haskell pattern splice")
 pprMatchContextNoun ThPatQuote      = ptext (sLit "Template Haskell pattern quotation")
 pprMatchContextNoun PatBindRhs      = ptext (sLit "pattern binding")
 pprMatchContextNoun LambdaExpr      = ptext (sLit "lambda abstraction")
 pprMatchContextNoun ProcExpr        = ptext (sLit "arrow abstraction")
 pprMatchContextNoun (StmtCtxt ctxt) = ptext (sLit "pattern binding in")
                                       $$ pprStmtContext ctxt
+pprMatchContextNoun PatSyn          = ptext (sLit "pattern synonym declaration")
 
 -----------------
 pprAStmtContext, pprStmtContext :: Outputable id => HsStmtContext id -> SDoc
@@ -1524,7 +1619,9 @@ matchContextErrString PatBindRhs                 = ptext (sLit "pattern binding"
 matchContextErrString RecUpd                     = ptext (sLit "record update")
 matchContextErrString LambdaExpr                 = ptext (sLit "lambda")
 matchContextErrString ProcExpr                   = ptext (sLit "proc")
+matchContextErrString ThPatSplice                = panic "matchContextErrString"  -- Not used at runtime
 matchContextErrString ThPatQuote                 = panic "matchContextErrString"  -- Not used at runtime
+matchContextErrString PatSyn                     = panic "matchContextErrString"  -- Not used at runtime
 matchContextErrString (StmtCtxt (ParStmtCtxt c))   = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (TransStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (PatGuard _))      = ptext (sLit "pattern guard")

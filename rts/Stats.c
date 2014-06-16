@@ -346,10 +346,10 @@ calcTotalAllocated(void)
     W_ tot_alloc = 0;
     W_ n;
     for (n = 0; n < n_capabilities; n++) {
-        tot_alloc += capabilities[n].total_allocated;
-        traceEventHeapAllocated(&capabilities[n],
+        tot_alloc += capabilities[n]->total_allocated;
+        traceEventHeapAllocated(capabilities[n],
                                 CAPSET_HEAP_DEFAULT,
-                                capabilities[n].total_allocated * sizeof(W_));
+                                capabilities[n]->total_allocated * sizeof(W_));
     }
 
     return tot_alloc;
@@ -691,8 +691,8 @@ stat_exit (void)
 	    statsPrintf("%16s bytes maximum slop\n", temp);
 
 	    statsPrintf("%16" FMT_SizeT " MB total memory in use (%" FMT_SizeT " MB lost due to fragmentation)\n\n", 
-                        peak_mblocks_allocated * MBLOCK_SIZE_W / (1024 * 1024 / sizeof(W_)),
-                        (W_)(peak_mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
+                        (size_t)(peak_mblocks_allocated * MBLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)),
+                        (size_t)(peak_mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
 
 	    /* Print garbage collections in each gen */
             statsPrintf("                                    Tot time (elapsed)  Avg pause  Max pause\n");
@@ -730,12 +730,12 @@ stat_exit (void)
                 nat i;
                 SparkCounters sparks = { 0, 0, 0, 0, 0, 0};
                 for (i = 0; i < n_capabilities; i++) {
-                    sparks.created   += capabilities[i].spark_stats.created;
-                    sparks.dud       += capabilities[i].spark_stats.dud;
-                    sparks.overflowed+= capabilities[i].spark_stats.overflowed;
-                    sparks.converted += capabilities[i].spark_stats.converted;
-                    sparks.gcd       += capabilities[i].spark_stats.gcd;
-                    sparks.fizzled   += capabilities[i].spark_stats.fizzled;
+                    sparks.created   += capabilities[i]->spark_stats.created;
+                    sparks.dud       += capabilities[i]->spark_stats.dud;
+                    sparks.overflowed+= capabilities[i]->spark_stats.overflowed;
+                    sparks.converted += capabilities[i]->spark_stats.converted;
+                    sparks.gcd       += capabilities[i]->spark_stats.gcd;
+                    sparks.fizzled   += capabilities[i]->spark_stats.fizzled;
                 }
 
                 statsPrintf("  SPARKS: %" FMT_Word " (%" FMT_Word " converted, %" FMT_Word " overflowed, %" FMT_Word " dud, %" FMT_Word " GC'd, %" FMT_Word " fizzled)\n\n",
@@ -900,10 +900,10 @@ statDescribeGens(void)
 
       mut = 0;
       for (i = 0; i < n_capabilities; i++) {
-          mut += countOccupied(capabilities[i].mut_lists[g]);
+          mut += countOccupied(capabilities[i]->mut_lists[g]);
 
           // Add the pinned object block.
-          bd = capabilities[i].pinned_object_block;
+          bd = capabilities[i]->pinned_object_block;
           if (bd != NULL) {
               gen_live   += bd->free - bd->start;
               gen_blocks += bd->blocks;
@@ -999,12 +999,12 @@ extern void getSparkStats( SparkCounters *s ) {
     s->gcd = 0;
     s->fizzled = 0;
     for (i = 0; i < n_capabilities; i++) {
-        s->created   += capabilities[i].spark_stats.created;
-        s->dud       += capabilities[i].spark_stats.dud;
-        s->overflowed+= capabilities[i].spark_stats.overflowed;
-        s->converted += capabilities[i].spark_stats.converted;
-        s->gcd       += capabilities[i].spark_stats.gcd;
-        s->fizzled   += capabilities[i].spark_stats.fizzled;
+        s->created   += capabilities[i]->spark_stats.created;
+        s->dud       += capabilities[i]->spark_stats.dud;
+        s->overflowed+= capabilities[i]->spark_stats.overflowed;
+        s->converted += capabilities[i]->spark_stats.converted;
+        s->gcd       += capabilities[i]->spark_stats.gcd;
+        s->fizzled   += capabilities[i]->spark_stats.fizzled;
     }
 }
 #endif

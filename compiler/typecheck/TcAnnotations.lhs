@@ -5,7 +5,12 @@
 \section[TcAnnotations]{Typechecking annotations}
 
 \begin{code}
-module TcAnnotations ( tcAnnotations ) where
+module TcAnnotations ( tcAnnotations, annCtxt ) where
+
+#ifdef GHCI
+import {-# SOURCE #-} TcSplice ( runAnnotation )
+import Module
+#endif
 
 import HsSyn
 import Annotations
@@ -14,38 +19,44 @@ import TcRnMonad
 import SrcLoc
 import Outputable
 
-#ifdef GHCI
-import Module
-import TcExpr
-import {-# SOURCE #-} TcSplice ( runAnnotation )
 import FastString
-#endif
 \end{code}
 
 \begin{code}
+
+#ifndef GHCI
+
 tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
-tcAnnotations = mapM tcAnnotation
+-- No GHCI; emit a warning (not an error) and ignore. cf Trac #4268
+tcAnnotations [] = return []
+tcAnnotations anns@(L loc _ : _)
+  = do { setSrcSpan loc $ addWarnTc $
+             (ptext (sLit "Ignoring ANN annotation") <> plural anns <> comma
+             <+> ptext (sLit "because this is a stage-1 compiler or doesn't support GHCi"))
+       ; return [] }
+
+#else
+
+tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
+-- GHCI exists, typecheck the annotations
+tcAnnotations anns = mapM tcAnnotation anns
 
 tcAnnotation :: LAnnDecl Name -> TcM Annotation
-#ifndef GHCI
--- TODO: modify lexer so ANN pragmas are parsed as comments in a stage1 compiler, so developers don't see this error
-tcAnnotation (L _ (HsAnnotation _ expr)) = pprPanic "Cant do annotations without GHCi" (ppr expr)
-#else
-tcAnnotation ann@(L loc (HsAnnotation provenance expr)) = do
+tcAnnotation (L loc ann@(HsAnnotation provenance expr)) = do
     -- Work out what the full target of this annotation was
     mod <- getModule
     let target = annProvenanceToTarget mod provenance
-    
+
     -- Run that annotation and construct the full Annotation data structure
-    setSrcSpan loc $ addErrCtxt (annCtxt ann) $ addExprErrCtxt expr $ runAnnotation target expr
+    setSrcSpan loc $ addErrCtxt (annCtxt ann) $ runAnnotation target expr
 
 annProvenanceToTarget :: Module -> AnnProvenance Name -> AnnTarget Name
 annProvenanceToTarget _   (ValueAnnProvenance name) = NamedTarget name
 annProvenanceToTarget _   (TypeAnnProvenance name)  = NamedTarget name
 annProvenanceToTarget mod ModuleAnnProvenance       = ModuleTarget mod
+#endif
 
-annCtxt :: OutputableBndr id => LAnnDecl id -> SDoc
+annCtxt :: OutputableBndr id => AnnDecl id -> SDoc
 annCtxt ann
   = hang (ptext (sLit "In the annotation:")) 2 (ppr ann)
-#endif
 \end{code}

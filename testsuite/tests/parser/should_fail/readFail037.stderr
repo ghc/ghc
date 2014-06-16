@@ -1,0 +1,5 @@
+
+readFail037.hs:4:1:
+    Too many parameters for class ‘Foo’
+    (Use MultiParamTypeClasses to allow multi-parameter classes)
+    In the class declaration for ‘Foo’

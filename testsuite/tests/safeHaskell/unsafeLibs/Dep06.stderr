@@ -1,0 +1,3 @@
+
+Dep06.hs:4:1:
+    GHC.Conc: Can't be safely imported! The module itself isn't safe.

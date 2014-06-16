@@ -68,6 +68,10 @@ processHeapClosureForDead( StgClosure *c )
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN:
+    case SMALL_MUT_ARR_PTRS_FROZEN0:
     case ARR_WORDS:
     case WEAK:
     case MUT_VAR_CLEAN:
@@ -172,21 +176,16 @@ processHeapForDead( bdescr *bd )
 static void
 processNurseryForDead( void )
 {
-    StgPtr p, bdLimit;
+    StgPtr p;
     bdescr *bd;
 
-    bd = MainCapability.r.rNursery->blocks;
-    while (bd->start < bd->free) {
-	p = bd->start;
-	bdLimit = bd->start + BLOCK_SIZE_W;
-	while (p < bd->free && p < bdLimit) {
-	    p += processHeapClosureForDead((StgClosure *)p);
-	    while (p < bd->free && p < bdLimit && !*p)  // skip slop
-		p++;
-	}
-	bd = bd->link;
-	if (bd == NULL)
-	    break;
+    for (bd = MainCapability.r.rNursery->blocks; bd != NULL; bd = bd->link) {
+        p = bd->start;
+        while (p < bd->free) {
+            while (p < bd->free && !*p) p++; // skip slop
+            if (p >= bd->free) break;
+            p += processHeapClosureForDead((StgClosure *)p);
+        }
     }
 }
 

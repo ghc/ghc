@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -35,8 +35,12 @@ libffi_STATIC_LIB  = libffi/build/inst/lib/libffi.a
 libffi_HEADERS     = rts/dist/build/ffi.h \
                      rts/dist/build/ffitarget.h
 
-LIBFFI_WINDOWS_LIB = ffi-6
-LIBFFI_DLL = lib$(LIBFFI_WINDOWS_LIB).dll
+ifeq "$(HostOS_CPP)" "mingw32"
+LIBFFI_NAME = ffi-6
+else
+LIBFFI_NAME = ffi
+endif
+LIBFFI_DLL = lib$(LIBFFI_NAME).dll
 
 ifeq "$(OSTYPE)" "cygwin"
 LIBFFI_PATH_MANGLE = PATH=$$(cygpath "$(TOP)")/libffi:$$PATH; export PATH;
@@ -51,7 +55,7 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	$(call removeFiles,$(libffi_STAMP_STATIC_SHARED_BUILD))
 	$(call removeFiles,$(libffi_STAMP_STATIC_SHARED_INSTALL))
 	$(call removeTrees,$(LIBFFI_DIR) libffi/build)
-	cat ghc-tarballs/libffi/libffi*.tar.gz | $(GZIP_CMD) -d | { cd libffi && $(TAR_CMD) -xf - ; }
+	cat libffi-tarballs/libffi*.tar.gz | $(GZIP_CMD) -d | { cd libffi && $(TAR_CMD) -xf - ; }
 	mv libffi/libffi-* libffi/build
 
 # We have to fake a non-working ln for configure, so that the fallback
@@ -82,9 +86,10 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	    LD=$(LD) \
 	    AR=$(AR_STAGE1) \
 	    NM=$(NM) \
+	    RANLIB=$(REAL_RANLIB_CMD) \
         CFLAGS="$(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) -w" \
         LDFLAGS="$(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE1) -w" \
-        "$(SHELL)" configure \
+        "$(SHELL)" ./configure \
 	          --prefix=$(TOP)/libffi/build/inst \
 	          --libdir=$(TOP)/libffi/build/inst/lib \
 	          --enable-static=yes \

@@ -1,0 +1,9 @@
+
+ContextStack2.hs:8:6:
+    Type function application stack overflow; size = 11
+    Use -ftype-function-depth=N to increase stack size to N
+      (TF (TF (TF (TF (TF (TF (TF (TF (TF (TF (TF a)))))))))),
+       TF (TF (TF (TF (TF (TF (TF (TF (TF (TF (TF Int)))))))))))
+      ~ TF (TF (TF (TF (TF (TF (TF (TF (TF (TF a)))))))))
+    In the ambiguity check for: forall a. a ~ TF (a, Int) => Int
+    In the type signature for ‘t’: t :: a ~ TF (a, Int) => Int

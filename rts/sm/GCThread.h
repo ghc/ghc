@@ -7,7 +7,7 @@
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
  * 
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
  *
  * ---------------------------------------------------------------------------*/
 
@@ -122,7 +122,7 @@ typedef struct gc_thread_ {
     OSThreadId id;                 // The OS thread that this struct belongs to
     SpinLock   gc_spin;
     SpinLock   mut_spin;
-    volatile rtsBool wakeup;
+    volatile StgWord wakeup;       // NB not StgWord8; only StgWord is guaranteed atomic
 #endif
     nat thread_index;              // a zero based index identifying the thread
     rtsBool idle;                  // sitting out of this GC cycle

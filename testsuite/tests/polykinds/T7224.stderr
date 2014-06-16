@@ -1,0 +1,5 @@
+
+T7224.hs:6:19:
+    Kind variable ‘i’ used as a type
+    In the type ‘a -> m i i a’
+    In the class declaration for ‘PMonad'’

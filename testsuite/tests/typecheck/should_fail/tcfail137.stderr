@@ -1,0 +1,8 @@
+
+tcfail137.hs:1:14: Warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
+tcfail137.hs:8:5:
+    No instance for (Floating Bool) arising from a use of ‘Test’
+    In the expression: Test [False, True]
+    In an equation for ‘x’: x = Test [False, True]

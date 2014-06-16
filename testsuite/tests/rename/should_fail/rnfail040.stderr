@@ -1,0 +1,8 @@
+
+rnfail040.hs:7:12:
+    Conflicting exports for ‘nub’:
+       ‘module M’ exports ‘M.nub’
+         imported from ‘Data.List’ at rnfail040.hs:10:2-22
+       ‘module M’ exports ‘T.nub’
+         imported from ‘Rnfail040_A’ at rnfail040.hs:11:2-24
+         (and originally defined at Rnfail040_A.hs:2:3-5)

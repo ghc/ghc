@@ -47,8 +47,8 @@ import Name             ( Name, NamedThing(..) )
 import NameEnv
 import Unify            ( ruleMatchTyX, MatchEnv(..) )
 import BasicTypes       ( Activation, CompilerPhase, isActive )
-import DynFlags         ( DynFlags )
 import StaticFlags      ( opt_PprStyle_Debug )
+import DynFlags         ( DynFlags )
 import Outputable
 import FastString
 import Maybes
@@ -111,7 +111,7 @@ Note [Overall plumbing for rules]
   from HscEnv.
 
   [NB: we are inconsistent here.  We should do the same for external
-  pacakges, but we don't.  Same for type-class instances.]
+  packages, but we don't.  Same for type-class instances.]
 
 * So in the outer simplifier loop, we combine (b-d) into a single
   RuleBase, reading
@@ -351,16 +351,14 @@ pprRuleBase rules = vcat [ pprRules (tidyRules emptyTidyEnv rs)
 -- supplied rules to this instance of an application in a given
 -- context, returning the rule applied and the resulting expression if
 -- successful.
-lookupRule :: DynFlags
-            -> (Activation -> Bool)      -- When rule is active
-            -> IdUnfoldingFun           -- When Id can be unfolded
-            -> InScopeSet
-            -> Id -> [CoreExpr]
-            -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
+lookupRule :: DynFlags -> InScopeEnv
+           -> (Activation -> Bool)      -- When rule is active
+           -> Id -> [CoreExpr]
+           -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 
 -- See Note [Extra args in rule matching]
 -- See comments on matchRule
-lookupRule dflags is_active id_unf in_scope fn args rules
+lookupRule dflags in_scope is_active fn args rules
   = -- pprTrace "matchRules" (ppr fn <+> ppr args $$ ppr rules ) $
     case go [] rules of
         []     -> Nothing
@@ -370,7 +368,7 @@ lookupRule dflags is_active id_unf in_scope fn args rules
 
     go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
     go ms []           = ms
-    go ms (r:rs) = case (matchRule dflags fn is_active id_unf in_scope args rough_args r) of
+    go ms (r:rs) = case (matchRule dflags in_scope is_active fn args rough_args r) of
                         Just e  -> go ((r,e):ms) rs
                         Nothing -> -- pprTrace "match failed" (ppr r $$ ppr args $$
                                    --   ppr [ (arg_id, unfoldingTemplate unf)
@@ -418,7 +416,7 @@ isMoreSpecific (BuiltinRule {}) _                = False
 isMoreSpecific (Rule {})        (BuiltinRule {}) = True
 isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
                (Rule { ru_bndrs = bndrs2, ru_args = args2 })
-  = isJust (matchN id_unfolding_fun in_scope bndrs2 args2 args1)
+  = isJust (matchN (in_scope, id_unfolding_fun) bndrs2 args2 args1)
   where
    id_unfolding_fun _ = NoUnfolding     -- Don't expand in templates
    in_scope = mkInScopeSet (mkVarSet bndrs1)
@@ -447,9 +445,8 @@ to lookupRule are the result of a lazy substitution
 
 \begin{code}
 ------------------------------------
-matchRule :: DynFlags -> Id -> (Activation -> Bool) -> IdUnfoldingFun
-          -> InScopeSet
-          -> [CoreExpr] -> [Maybe Name]
+matchRule :: DynFlags -> InScopeEnv -> (Activation -> Bool)
+          -> Id -> [CoreExpr] -> [Maybe Name]
           -> CoreRule -> Maybe CoreExpr
 
 -- If (matchRule rule args) returns Just (name,rhs)
@@ -474,21 +471,21 @@ matchRule :: DynFlags -> Id -> (Activation -> Bool) -> IdUnfoldingFun
 -- Any 'surplus' arguments in the input are simply put on the end
 -- of the output.
 
-matchRule dflags fn _is_active id_unf _in_scope args _rough_args
+matchRule dflags rule_env _is_active fn args _rough_args
           (BuiltinRule { ru_try = match_fn })
 -- Built-in rules can't be switched off, it seems
-  = case match_fn dflags fn id_unf args of
+  = case match_fn dflags rule_env fn args of
         Just expr -> Just expr
         Nothing   -> Nothing
 
-matchRule _ _ is_active id_unf in_scope args rough_args
-          (Rule { ru_act = act, ru_rough = tpl_tops,
-                  ru_bndrs = tpl_vars, ru_args = tpl_args,
-                  ru_rhs = rhs })
+matchRule _ in_scope is_active _ args rough_args
+          (Rule { ru_act = act, ru_rough = tpl_tops
+                , ru_bndrs = tpl_vars, ru_args = tpl_args
+                , ru_rhs = rhs })
   | not (is_active act)               = Nothing
   | ruleCantMatch tpl_tops rough_args = Nothing
   | otherwise
-  = case matchN id_unf in_scope tpl_vars tpl_args args of
+  = case matchN in_scope tpl_vars tpl_args args of
         Nothing                        -> Nothing
         Just (bind_wrapper, tpl_vals) -> Just (bind_wrapper $
                                                rule_fn `mkApps` tpl_vals)
@@ -497,8 +494,7 @@ matchRule _ _ is_active id_unf in_scope args rough_args
         -- We could do this when putting things into the rulebase, I guess
 
 ---------------------------------------
-matchN  :: IdUnfoldingFun
-        -> InScopeSet           -- ^ In-scope variables
+matchN  :: InScopeEnv
         -> [Var]                -- ^ Match template type variables
         -> [CoreExpr]           -- ^ Match template
         -> [CoreExpr]           -- ^ Target; can have more elements than the template
@@ -508,7 +504,7 @@ matchN  :: IdUnfoldingFun
 -- the entire result and what should be substituted for each template variable.
 -- Fail if there are two few actual arguments from the target to match the template
 
-matchN id_unf in_scope tmpl_vars tmpl_es target_es
+matchN (in_scope, id_unf) tmpl_vars tmpl_es target_es
   = do  { subst <- go init_menv emptyRuleSubst tmpl_es target_es
         ; return (rs_binds subst,
                   map (lookup_tmpl subst) tmpl_vars') }
@@ -572,14 +568,18 @@ necessary; the renamed ones are the tmpl_vars'
 -- * The BindWrapper in a RuleSubst are the bindings floated out
 --   from nested matches; see the Let case of match, below
 --
-data RuleEnv = RV { rv_tmpls :: VarSet          -- Template variables
-                  , rv_lcl   :: RnEnv2          -- Renamings for *local bindings*
-                                                --   (lambda/case)
-                  , rv_fltR  :: Subst           -- Renamings for floated let-bindings
-                                                --   domain disjoint from envR of rv_lcl
-                                                -- See Note [Matching lets]
-                  , rv_unf :: IdUnfoldingFun
-                  }
+data RuleMatchEnv 
+  = RV { rv_tmpls :: VarSet          -- Template variables
+       , rv_lcl   :: RnEnv2          -- Renamings for *local bindings*
+                                     --   (lambda/case)
+       , rv_fltR  :: Subst           -- Renamings for floated let-bindings
+                                     --   domain disjoint from envR of rv_lcl
+                                     -- See Note [Matching lets]
+       , rv_unf :: IdUnfoldingFun
+       }
+
+rvInScopeEnv :: RuleMatchEnv -> InScopeEnv
+rvInScopeEnv renv = (rnInScopeSet (rv_lcl renv), rv_unf renv)
 
 data RuleSubst = RS { rs_tv_subst :: TvSubstEnv   -- Range is the
                     , rs_id_subst :: IdSubstEnv   --   template variables
@@ -604,7 +604,7 @@ emptyRuleSubst = RS { rs_tv_subst = emptyVarEnv, rs_id_subst = emptyVarEnv
 --      SLPJ July 99
 
 
-match :: RuleEnv
+match :: RuleMatchEnv
       -> RuleSubst
       -> CoreExpr               -- Template
       -> CoreExpr               -- Target
@@ -641,7 +641,8 @@ match renv subst e1 (Var v2)      -- Note [Expanding variables]
         -- because of the not-inRnEnvR
 
 match renv subst e1 (Let bind e2)
-  | okToFloat (rv_lcl renv) (bindFreeVars bind)        -- See Note [Matching lets]
+  | -- pprTrace "match:Let" (vcat [ppr bind, ppr $ okToFloat (rv_lcl renv) (bindFreeVars bind)]) $
+    okToFloat (rv_lcl renv) (bindFreeVars bind)        -- See Note [Matching lets]
   = match (renv { rv_fltR = flt_subst' })
           (subst { rs_binds = rs_binds subst . Let bind'
                  , rs_bndrs = extendVarSetList (rs_bndrs subst) new_bndrs })
@@ -674,30 +675,11 @@ match renv subst (App f1 a1) (App f2 a2)
   = do  { subst' <- match renv subst f1 f2
         ; match renv subst' a1 a2 }
 
-match renv subst (Lam x1 e1) (Lam x2 e2)
-  = match renv' subst e1 e2
-  where
-    renv' = renv { rv_lcl = rnBndr2 (rv_lcl renv) x1 x2
-                 , rv_fltR = delBndr (rv_fltR renv) x2 }
-
--- This rule does eta expansion
---              (\x.M)  ~  N    iff     M  ~  N x
--- It's important that this is *after* the let rule,
--- so that      (\x.M)  ~  (let y = e in \y.N)
--- does the let thing, and then gets the lam/lam rule above
 match renv subst (Lam x1 e1) e2
-  = match renv' subst e1 (App e2 (varToCoreExpr new_x))
-  where
-    (rn_env', new_x) = rnEtaL (rv_lcl renv) x1
-    renv' = renv { rv_lcl = rn_env' }
-
--- Eta expansion the other way
---      M  ~  (\y.N)    iff   M y     ~  N
-match renv subst e1 (Lam x2 e2)
-  = match renv' subst (App e1 (varToCoreExpr new_x)) e2
-  where
-    (rn_env', new_x) = rnEtaR (rv_lcl renv) x2
-    renv' = renv { rv_lcl = rn_env' }
+  | Just (x2, e2) <- exprIsLambda_maybe (rvInScopeEnv renv) e2
+  = let renv' = renv { rv_lcl = rnBndr2 (rv_lcl renv) x1 x2
+                     , rv_fltR = delBndr (rv_fltR renv) x2 }
+    in  match renv' subst e1 e2
 
 match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
   = do  { subst1 <- match_ty renv subst ty1 ty2
@@ -720,23 +702,43 @@ match _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text 
                     Nothing
 
 -------------
-match_co :: RuleEnv
+match_co :: RuleMatchEnv
          -> RuleSubst
          -> Coercion
          -> Coercion
          -> Maybe RuleSubst
 match_co renv subst (CoVarCo cv) co
   = match_var renv subst cv (Coercion co)
-match_co renv subst (Refl ty1) co
+match_co renv subst (Refl r1 ty1) co
   = case co of
-       Refl ty2 -> match_ty renv subst ty1 ty2
-       _        -> Nothing
-match_co _ _ co1 _
-  = pprTrace "match_co: needs more cases" (ppr co1) Nothing
-    -- Currently just deals with CoVarCo and Refl
+       Refl r2 ty2
+         | r1 == r2 -> match_ty renv subst ty1 ty2
+       _            -> Nothing
+match_co renv subst (TyConAppCo r1 tc1 cos1) co2
+  = case co2 of
+       TyConAppCo r2 tc2 cos2
+         | r1 == r2 && tc1 == tc2
+         -> match_cos renv subst cos1 cos2
+       _ -> Nothing
+match_co _ _ co1 co2
+  = pprTrace "match_co: needs more cases" (ppr co1 $$ ppr co2) Nothing
+    -- Currently just deals with CoVarCo, TyConAppCo and Refl
+
+match_cos :: RuleMatchEnv
+         -> RuleSubst
+         -> [Coercion]
+         -> [Coercion]
+         -> Maybe RuleSubst
+match_cos renv subst (co1:cos1) (co2:cos2) =
+    case match_co renv subst co1 co2 of
+       Just subst' -> match_cos renv subst' cos1 cos2
+       Nothing -> Nothing
+match_cos _ subst [] [] = Just subst
+match_cos _ _ cos1 cos2 = pprTrace "match_cos: not same length" (ppr cos1 $$ ppr cos2) Nothing
+
 
 -------------
-rnMatchBndr2 :: RuleEnv -> RuleSubst -> Var -> Var -> RuleEnv
+rnMatchBndr2 :: RuleMatchEnv -> RuleSubst -> Var -> Var -> RuleMatchEnv
 rnMatchBndr2 renv subst x1 x2
   = renv { rv_lcl  = rnBndr2 rn_env x1 x2
          , rv_fltR = delBndr (rv_fltR renv) x2 }
@@ -746,7 +748,7 @@ rnMatchBndr2 renv subst x1 x2
     -- there are some floated let-bindings
 
 ------------------------------------------
-match_alts :: RuleEnv
+match_alts :: RuleMatchEnv
            -> RuleSubst
            -> [CoreAlt]         -- Template
            -> [CoreAlt]         -- Target
@@ -772,7 +774,7 @@ okToFloat rn_env bind_fvs
     not_captured fv = not (inRnEnvR rn_env fv)
 
 ------------------------------------------
-match_var :: RuleEnv
+match_var :: RuleMatchEnv
           -> RuleSubst
           -> Var                -- Template
           -> CoreExpr        -- Target
@@ -801,7 +803,7 @@ match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
         -- template x, so we must rename first!
 
 ------------------------------------------
-match_tmpl_var :: RuleEnv
+match_tmpl_var :: RuleMatchEnv
                -> RuleSubst
                -> Var                -- Template
                -> CoreExpr              -- Target
@@ -842,7 +844,7 @@ match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
          -- because no free var of e2' is in the rnEnvR of the envt
 
 ------------------------------------------
-match_ty :: RuleEnv
+match_ty :: RuleMatchEnv
          -> RuleSubst
          -> Type                -- Template
          -> Type                -- Target
@@ -1000,6 +1002,7 @@ at all.
 That is why the 'lookupRnInScope' call in the (Var v2) case of 'match'
 is so important.
 
+
 %************************************************************************
 %*                                                                      *
                    Rule-check the program
@@ -1096,7 +1099,8 @@ ruleAppCheck_help env fn args rules
         = ptext (sLit "Rule") <+> doubleQuotes (ftext name)
 
     rule_info dflags rule
-        | Just _ <- matchRule dflags fn noBlackList (rc_id_unf env) emptyInScopeSet args rough_args rule
+        | Just _ <- matchRule dflags (emptyInScopeSet, rc_id_unf env) 
+                              noBlackList fn args rough_args rule
         = text "matches (which is very peculiar!)"
 
     rule_info _ (BuiltinRule {}) = text "does not match"

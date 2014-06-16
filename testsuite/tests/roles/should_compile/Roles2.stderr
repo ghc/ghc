@@ -1,0 +1,22 @@
+TYPE SIGNATURES
+TYPE CONSTRUCTORS
+  T1 :: * -> *
+  data T1 a
+    No C type associated
+    Roles: [representational]
+    RecFlag NonRecursive, Not promotable
+    = K1 :: forall a. (IO a) -> T1 a Stricts: _
+    FamilyInstance: none
+  T2 :: * -> *
+  data T2 a
+    No C type associated
+    Roles: [representational]
+    RecFlag NonRecursive, Not promotable
+    = K2 :: forall a. (FunPtr a) -> T2 a Stricts: _
+    FamilyInstance: none
+COERCION AXIOMS
+Dependent modules: []
+Dependent packages: [base, ghc-prim, integer-gmp]
+
+==================== Typechecker ====================
+

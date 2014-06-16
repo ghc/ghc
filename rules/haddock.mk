@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -43,9 +43,9 @@ ifneq "$$(BINDIST)" "YES"
 # We need the quadruple dollars for the dependencies, as it isn't
 # guaranteed that we are processing the packages in dependency order,
 # so we don't want to expand it yet.
-$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) : $$(INPLACE_BIN)/haddock$$(exeext) $$$$(ghc-cabal_INPLACE) $$($1_$2_HS_SRCS) $$$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_DEPS) | $$$$(dir $$$$@)/.
+$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) : $$$$(haddock_INPLACE) $$$$(ghc-cabal_INPLACE) $$($1_$2_HS_SRCS) $$$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_DEPS) | $$$$(dir $$$$@)/.
 ifeq "$$(HSCOLOUR_SRCS)" "YES"
-	"$$(ghc-cabal_INPLACE)" hscolour $2 $1
+	"$$(ghc-cabal_INPLACE)" hscolour $1 $2
 endif
 	"$$(TOP)/$$(INPLACE_BIN)/haddock" \
 	  --odir="$1/$2/doc/html/$$($1_PACKAGE)" \

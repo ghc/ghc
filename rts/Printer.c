@@ -263,7 +263,7 @@ printClosure( StgClosure *obj )
     case UPDATE_FRAME:
         {
             StgUpdateFrame* u = (StgUpdateFrame*)obj;
-            debugBelch("UPDATE_FRAME(");
+            debugBelch("%s(", info_update_frame(obj));
             printPtr((StgPtr)GET_INFO((StgClosure *)u));
             debugBelch(",");
             printPtr((StgPtr)u->updatee);
@@ -320,6 +320,21 @@ printClosure( StgClosure *obj )
 
     case MUT_ARR_PTRS_FROZEN:
 	debugBelch("MUT_ARR_PTRS_FROZEN(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
+	break;
+
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+	debugBelch("SMALL_MUT_ARR_PTRS_CLEAN(size=%" FMT_Word ")\n",
+                   (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
+	break;
+
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+	debugBelch("SMALL_MUT_ARR_PTRS_DIRTY(size=%" FMT_Word ")\n",
+                   (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
+	break;
+
+    case SMALL_MUT_ARR_PTRS_FROZEN:
+	debugBelch("SMALL_MUT_ARR_PTRS_FROZEN(size=%" FMT_Word ")\n",
+                   (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MVAR_CLEAN:
@@ -386,6 +401,24 @@ printClosure( StgClosure *obj )
                     (int)get_itbl(obj)->type );
             barf("printClosure %d",get_itbl(obj)->type);
             return;
+    }
+}
+
+// If you know you have an UPDATE_FRAME, but want to know exactly which.
+char *info_update_frame(StgClosure *closure) {
+    // Note: We intentionally don't take the info table pointer as
+    // an argument. As it will be confusing whether one should pass
+    // it pointing to the code or struct members when compiling with
+    // TABLES_NEXT_TO_CODE.
+    const StgInfoTable *info = closure->header.info;
+    if (info == &stg_upd_frame_info) {
+        return "NORMAL_UPDATE_FRAME";
+    } else if (info == &stg_bh_upd_frame_info) {
+        return "BH_UPDATE_FRAME";
+    } else if (info == &stg_marked_upd_frame_info) {
+        return "MARKED_UPDATE_FRAME";
+    } else {
+        return "ERROR: Not an update frame!!!";
     }
 }
 

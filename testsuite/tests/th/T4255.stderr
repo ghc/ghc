@@ -1,0 +1,2 @@
+ghc: T4255.hs:2:14-28: You can't use Template Haskell with a profiled compiler
+Usage: For basic information, try the `--help' option.

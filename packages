@@ -2,7 +2,7 @@
 # the *repositories* that make up GHC. It is parsed by
 # * boot
 # * sync-all
-# * rules/extra-packages.mk
+# * rules/foreachLibrary.mk
 #
 # Some of this information is duplicated elsewhere in the build system:
 #    See Trac #3896
@@ -17,21 +17,23 @@
 #    - Haddock and hsc2hs are applications, built on top of GHC,
 #        and in turn needed to bootstrap GHC
 #    - ghc-tarballs is need to build GHC
-#    - nofib and testsuite are optional helpers
+#    - nofib is an optional helpers
 #
 # The format of the lines in this file is:
-#   localpath    tag    remotepath
+#   localpath  tag  remotepath  upstreamurl
 # where
 #   * 'localpath' is where to put the repository in a checked out tree.
 #   * 'remotepath' is where the repository is in the central repository.
 #     It is - for submodules.
+#   * 'upstreamurl' is the upstream Git repo location for packages
+#     maintained outside of GHC HQ.
 #
-#   * The 'tag' determines when "darcs-all get" will get the
+#   * The 'tag' determines when "sync-all get" will get the
 #     repo. If the tag is "-" then it will always get it, but if there
-#     is a tag then a corresponding flag must be given to darcs-all, e.g.
-#     if you want to get the packages with an "extralibs" or "testsuite"
-#     tag then you need to use "darcs-all --extra --testsuite get".
-#     Support for new tags must be manually added to the darcs-all script.
+#     is a tag then a corresponding flag must be given to "sync-all", e.g.
+#     if you want to get the packages with an "extralibs"
+#     tag then you need to use "sync-all --extra get".
+#     Support for new tags must be manually added to the "sync-all" script.
 #
 #     'tag' is also used to determine which packages the build system
 #     deems to have the EXTRA_PACKAGE property: tags 'dph' and 'extra'
@@ -39,46 +41,46 @@
 #
 # Lines that start with a '#' are comments.
 #
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#    localpath                tag           remotepath
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-ghc-tarballs                    -           ghc-tarballs.git
-utils/hsc2hs                    -           hsc2hs.git
-utils/haddock                   -           haddock.git
-libraries/array                 -           packages/array.git
-libraries/base                  -           packages/base.git
-libraries/binary                -           -
-libraries/bytestring            -           -
-libraries/Cabal                 -           -
-libraries/containers            -           -
-libraries/deepseq               -           packages/deepseq.git
-libraries/directory             -           packages/directory.git
-libraries/filepath              -           packages/filepath.git
-libraries/ghc-prim              -           packages/ghc-prim.git
-libraries/haskeline             -           -
-libraries/haskell98             -           packages/haskell98.git
-libraries/haskell2010           -           packages/haskell2010.git
-libraries/hoopl                 -           packages/hoopl.git
-libraries/hpc                   -           packages/hpc.git
-libraries/integer-gmp           -           packages/integer-gmp.git
-libraries/integer-simple        -           packages/integer-simple.git
-libraries/old-locale            -           packages/old-locale.git
-libraries/old-time              -           packages/old-time.git
-libraries/pretty                -           -
-libraries/process               -           packages/process.git
-libraries/template-haskell      -           packages/template-haskell.git
-libraries/terminfo              -           -
-libraries/time                  -           -
-libraries/transformers          -           -
-libraries/unix                  -           packages/unix.git
-libraries/Win32                 -           -
-libraries/xhtml                 -           -
-testsuite                       testsuite   testsuite.git
-nofib                           nofib       nofib.git
-libraries/parallel              extra       packages/parallel.git
-libraries/stm                   extra       packages/stm.git
-libraries/random                dph         -
-libraries/primitive             dph         -
-libraries/vector                dph         -
-libraries/dph                   dph         packages/dph.git
-.                               -           ghc.git
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# localpath                  tag         remotepath                      upstreamurl
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ghc-tarballs                 windows     ghc-tarballs.git                -
+libffi-tarballs              -           libffi-tarballs.git             -
+utils/hsc2hs                 -           hsc2hs.git                      -
+utils/haddock                -           -                               -
+libraries/array              -           packages/array.git              -
+libraries/base               -           packages/base.git               -
+libraries/binary             -           -                               https://github.com/kolmodin/binary.git
+libraries/bytestring         -           -                               https://github.com/haskell/bytestring.git
+libraries/Cabal              -           -                               https://github.com/haskell/cabal.git
+libraries/containers         -           -                               https://github.com/haskell/containers.git
+libraries/deepseq            -           packages/deepseq.git            -
+libraries/directory          -           packages/directory.git          -
+libraries/filepath           -           packages/filepath.git           -
+libraries/ghc-prim           -           packages/ghc-prim.git           -
+libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
+libraries/haskell98          -           packages/haskell98.git          -
+libraries/haskell2010        -           packages/haskell2010.git        -
+libraries/hoopl              -           packages/hoopl.git              -
+libraries/hpc                -           packages/hpc.git                -
+libraries/integer-gmp        -           packages/integer-gmp.git        -
+libraries/integer-simple     -           packages/integer-simple.git     -
+libraries/old-locale         -           packages/old-locale.git         -
+libraries/old-time           -           packages/old-time.git           -
+libraries/pretty             -           -                               https://github.com/haskell/pretty.git
+libraries/process            -           packages/process.git            -
+libraries/template-haskell   -           packages/template-haskell.git   -
+libraries/terminfo           -           -                               https://github.com/judah/terminfo.git
+libraries/time               -           -                               http://git.haskell.org/darcs-mirrors/time.git
+libraries/transformers       -           -                               http://git.haskell.org/darcs-mirrors/transformers.git
+libraries/unix               -           packages/unix.git               -
+libraries/Win32              -           -                               https://github.com/haskell/win32.git
+libraries/xhtml              -           -                               https://github.com/haskell/xhtml.git
+nofib                        nofib       nofib.git                       -
+libraries/parallel           extra       packages/parallel.git           -
+libraries/stm                extra       packages/stm.git                -
+libraries/random             dph         -                               https://github.com/haskell/random.git
+libraries/primitive          dph         -                               https://github.com/haskell/primitive.git
+libraries/vector             dph         -                               https://github.com/haskell/vector.git
+libraries/dph                dph         packages/dph.git                -
+.                            -           ghc.git                         -

@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -33,7 +33,7 @@ endif
 ifneq "$$($1_$2_PROG)" ""
 $$(error $1_$2_PROG is set)
 endif
-$1_$2_PROG = $$($1_$2_PROGNAME)$$(exeext)
+$1_$2_PROG = $$($1_$2_PROGNAME)$$(exeext$3)
 endif
 
 ifeq "$$(findstring $3,0 1 2)" ""
@@ -42,6 +42,8 @@ endif
 
 $(call clean-target,$1,$2,$1/$2)
 
+$$(eval $$(call build-prog-vars,$1,$2,$3))
+
 ifneq "$$($1_$2_NOT_NEEDED)" "YES"
 $$(eval $$(call build-prog-helper,$1,$2,$3))
 endif
@@ -49,7 +51,7 @@ $(call profEnd, build-prog($1,$2,$3))
 endef
 
 
-define build-prog-helper
+define build-prog-vars
 # $1 = dir
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
@@ -80,8 +82,6 @@ else
 $1_$2_WANT_INSTALLED_WRAPPER = NO
 endif
 
-$(call package-config,$1,$2,$3)
-
 $1_$2_depfile_base = $1/$2/build/.depend
 
 ifeq "$$($1_$2_INSTALL_INPLACE)" "NO"
@@ -109,6 +109,15 @@ $1_$2_INPLACE = $$($$($1_$2_PROGNAME)_INPLACE)
 endif
 endif
 
+endef
+
+define build-prog-helper
+# $1 = dir
+# $2 = distdir
+# $3 = GHC stage to use (0 == bootstrapping compiler)
+
+$(call package-config,$1,$2,$3)
+
 ifeq "$$($1_$2_USES_CABAL)" "YES"
 $(call build-package-data,$1,$2,$3)
 ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
@@ -122,14 +131,6 @@ endif
 
 $(call all-target,$1,all_$1_$2)
 $(call all-target,$1_$2,$1/$2/build/tmp/$$($1_$2_PROG))
-
-# INPLACE_BIN might be empty if we're distcleaning
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-ifeq "$$($1_$2_INSTALL_INPLACE)" "YES"
-$$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
-	"$$(CP)" -p $$< $$@
-endif
-endif
 
 $(call shell-wrapper,$1,$2)
 
@@ -152,7 +153,7 @@ $(call c-sources,$1,$2)
 
 # --- IMPLICIT RULES
 
-$(call distdir-opts,$1,$2,,$3)
+$(call distdir-opts,$1,$2,$3)
 $(call distdir-way-opts,$1,$2,$$($1_$2_PROGRAM_WAY),$3)
 
 ifeq "$3" "0"
@@ -195,30 +196,74 @@ $1/$2/build/tmp/$$($1_$2_PROG) $1/$2/build/tmp/$$($1_$2_PROG).dll : \
             $$(error Bad build stage)))),\
         $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB)))
 
+$1_$2_PROG_NEEDS_C_WRAPPER = NO
+$1_$2_PROG_INPLACE = $$($1_$2_PROG)
 ifeq "$$(Windows_Host) $$($1_$2_PROGRAM_WAY)" "YES dyn"
-$1/$2/build/tmp/$$($1_$2_PROG) : $1/$2/build/tmp/$$($1_$2_PROG).c $1/$2/build/tmp/$$($1_$2_PROG).dll | $$$$(dir $$$$@)/.
-	$$(call cmd,$1_$2_HC) -no-hs-main -optc-g -optc-O0 $$< -o $$@
+ifneq "$$($1_$2_HS_SRCS)" ""
+$1_$2_PROG_NEEDS_C_WRAPPER = YES
+$1_$2_PROG_INPLACE = inplace-$$($1_$2_PROG)
+endif
+endif
+
+ifeq "$$($1_$2_PROG_NEEDS_C_WRAPPER)" "YES"
+
+$1_$2_RTS_OPTS_FLAG = $$(lastword $$(filter -rtsopts -rtsopts=all -rtsopts=some -rtsopts=none -no-rtsopts,$$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS)))
+ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts"
+$1_$2_RTS_OPTS = RtsOptsAll
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts=all"
+$1_$2_RTS_OPTS = RtsOptsAll
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts=some"
+$1_$2_RTS_OPTS = RtsOptsSafeOnly
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-rtsopts=none"
+$1_$2_RTS_OPTS = RtsOptsNone
+else ifeq "$$($1_$2_RTS_OPTS_FLAG)" "-no-rtsopts"
+$1_$2_RTS_OPTS = RtsOptsNone
+else
+$1_$2_RTS_OPTS = RtsOptsSafeOnly
+endif
+
+$1/$2/build/tmp/$$($1_$2_PROG)-inplace-wrapper.c: driver/utils/dynwrapper.c | $$$$(dir $$$$@)/.
+	$$(call removeFiles,$$@)
+	echo '#include <Windows.h>' >> $$@
+	echo '#include "Rts.h"' >> $$@
+	echo 'LPTSTR path_dirs[] = {' >> $$@
+	$$(foreach d,$$($1_$2_DEP_LIB_REL_DIRS),$$(call make-command,echo '    TEXT("/../../$$d")$$(comma)' >> $$@))
+	echo '    TEXT("/../../$1/$2/build/tmp/"),' >> $$@
+	echo '    NULL};' >> $$@
+	echo 'LPTSTR progDll = TEXT("../../$1/$2/build/tmp/$$($1_$2_PROG).dll");' >> $$@
+	echo 'LPTSTR rtsDll = TEXT("$$($$(WINDOWS_DYN_PROG_RTS))");' >> $$@
+	echo 'int rtsOpts = $$($1_$2_RTS_OPTS);' >> $$@
+	cat driver/utils/dynwrapper.c >> $$@
+
+$1/$2/build/tmp/$$($1_$2_PROG)-wrapper.c: driver/utils/dynwrapper.c | $$$$(dir $$$$@)/.
+	$$(call removeFiles,$$@)
+	echo '#include <Windows.h>' >> $$@
+	echo '#include "Rts.h"' >> $$@
+	echo 'LPTSTR path_dirs[] = {' >> $$@
+	$$(foreach p,$$($1_$2_TRANSITIVE_DEPS),$$(call make-command,echo '    TEXT("/../lib/$$p")$$(comma)' >> $$@))
+	echo '    TEXT("/../lib/"),' >> $$@
+	echo '    NULL};' >> $$@
+	echo 'LPTSTR progDll = TEXT("../lib/$$($1_$2_PROG).dll");' >> $$@
+	echo 'LPTSTR rtsDll = TEXT("$$($$(WINDOWS_DYN_PROG_RTS))");' >> $$@
+	echo 'int rtsOpts = $$($1_$2_RTS_OPTS);' >> $$@
+	cat driver/utils/dynwrapper.c >> $$@
+
+$1/$2/build/tmp/$$($1_$2_PROG_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG)-inplace-wrapper.c $1/$2/build/tmp/$$($1_$2_PROG).dll | $$$$(dir $$$$@)/.
+	$$(call cmd,$1_$2_HC) -no-hs-main -no-auto-link-packages -optc-g -optc-O0 -Iincludes $$< -o $$@
+
+$1/$2/build/tmp/$$($1_$2_PROG) : $1/$2/build/tmp/$$($1_$2_PROG)-wrapper.c $1/$2/build/tmp/$$($1_$2_PROG).dll | $$$$(dir $$$$@)/.
+	$$(call cmd,$1_$2_HC) -no-hs-main -no-auto-link-packages -optc-g -optc-O0 -Iincludes $$< -o $$@
 
 $1/$2/build/tmp/$$($1_$2_PROG).dll : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	$$(call build-dll,$1,$2,$$($1_$2_PROGRAM_WAY),,$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS),$$@)
 else
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
-	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
-ifeq "$$(TargetOS_CPP)" "darwin"
-ifneq "$3" "0"
-ifeq "$$($1_$2_PROGRAM_WAY)" "dyn"
-# Use relative paths for all the libraries
-	install_name_tool $$(foreach d,$$($1_$2_TRANSITIVE_DEP_NAMES), -change $$(TOP)/$$($$($$d_INSTALL_INFO)_dyn_LIB) @loader_path/../$$d-$$($$($$d_INSTALL_INFO)_VERSION)/$$($$($$d_INSTALL_INFO)_dyn_LIB_NAME)) $$@
-# Use relative paths for the RTS. Rather than try to work out which RTS
-# way is being linked, we just change it for all ways
-	install_name_tool $$(foreach w,$$(rts_WAYS), -change $$(TOP)/$$(rts_$$w_LIB) @loader_path/../rts-$$(rts_VERSION)/$$(rts_$$w_LIB_NAME)) $$@
-endif
-endif
-endif
+	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
+
 else
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
-	$$(call cmd,$1_$2_CC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_CC_OPTS) $$(LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_EXTRA_CC_OPTS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
+	$$(call cmd,$1_$2_CC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_CC_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_EXTRA_CC_OPTS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
 endif
 endif
 
@@ -232,10 +277,19 @@ ifneq "$$($1_$2_HS_SRCS)" ""
 ifeq "$$(strip $$(ALL_STAGE1_LIBS))" ""
 $$(error ordering failure in $1 ($2): ALL_STAGE1_LIBS is empty)
 endif
-endif
 $1/$2/build/tmp/$$($1_$2_PROG) : $$(ALL_STAGE1_LIBS) $$(ALL_RTS_LIBS) $$(OTHER_LIBS)
 endif
 endif
+endif
+
+# INPLACE_BIN might be empty if we're distcleaning
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifeq "$$($1_$2_INSTALL_INPLACE)" "YES"
+$$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG_INPLACE) | $$$$(dir $$$$@)/.
+	"$$(CP)" -p $$< $$@
+endif
+endif
+
 endif
 
 ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
@@ -244,6 +298,9 @@ endif
 $(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
 
 ifeq "$$($1_$2_INSTALL)" "YES"
+ifeq "$$($1_$2_PROG_NEEDS_C_WRAPPER)" "YES"
+INSTALL_LIBS     += $1/$2/build/tmp/$$($1_$2_PROG).dll
+endif
 ifeq "$$($1_$2_WANT_INSTALLED_WRAPPER)" "YES"
 INSTALL_LIBEXECS += $1/$2/build/tmp/$$($1_$2_PROG)
 else ifeq "$$($1_$2_TOPDIR)" "YES"

@@ -1,0 +1,1 @@
+ERROR "drvfail002.hs":18 - An instance of X T a is required to derive Show S

@@ -1,0 +1,31 @@
+
+Simple2.hs:21:1: Warning:
+    No explicit associated type or default declaration for ‘S3n’
+    In the instance declaration for ‘C3 Char’
+
+Simple2.hs:21:10: Warning:
+    No explicit implementation for
+      ‘foo3n’ and ‘bar3n’
+    In the instance declaration for ‘C3 Char’
+
+Simple2.hs:29:1: Warning:
+    No explicit associated type or default declaration for ‘S3n’
+    In the instance declaration for ‘C3 Bool’
+
+Simple2.hs:29:10: Warning:
+    No explicit implementation for
+      ‘foo3n’ and ‘bar3n’
+    In the instance declaration for ‘C3 Bool’
+
+Simple2.hs:39:1: Warning:
+    No explicit associated type or default declaration for ‘S3’
+    In the instance declaration for ‘C3 Float’
+
+Simple2.hs:39:1: Warning:
+    No explicit associated type or default declaration for ‘S3n’
+    In the instance declaration for ‘C3 Float’
+
+Simple2.hs:39:10: Warning:
+    No explicit implementation for
+      ‘foo3n’ and ‘bar3n’
+    In the instance declaration for ‘C3 Float’

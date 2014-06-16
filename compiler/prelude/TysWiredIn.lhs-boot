@@ -5,7 +5,7 @@ import {-# SOURCE #-} TyCon      (TyCon)
 import {-# SOURCE #-} TypeRep    (Type)
 
 
-eqTyCon :: TyCon
+eqTyCon, coercibleTyCon :: TyCon
 typeNatKind, typeSymbolKind :: Type
 mkBoxedTupleTy :: [Type] -> Type
 \end{code}

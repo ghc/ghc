@@ -1,0 +1,39 @@
+	Mon Nov 14 13:28 2011 Time and Allocation Profiling Report  (Final)
+
+	   ioprof +RTS -hc -p -RTS
+
+	total time  =        0.00 secs   (0 ticks @ 20 ms)
+	total alloc =      53,288 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE           %time %alloc
+
+main        Main               0.0   16.4
+errorM.\    Main               0.0    8.3
+CAF         GHC.IO.Handle.FD   0.0   65.5
+CAF         GHC.Conc.Signal    0.0    1.3
+CAF         GHC.IO.Encoding    0.0    5.9
+
+
+                                                          individual     inherited
+COST CENTRE     MODULE                  no.     entries  %time %alloc   %time %alloc
+
+MAIN            MAIN                     45           0    0.0    0.7     0.0  100.0
+ CAF            GHC.IO.Encoding.Iconv    76           0    0.0    0.5     0.0    0.5
+ CAF            GHC.Conc.Sync            74           0    0.0    0.5     0.0    0.5
+ CAF            GHC.IO.Encoding          65           0    0.0    5.9     0.0    5.9
+ CAF            GHC.Conc.Signal          62           0    0.0    1.3     0.0    1.3
+ CAF            GHC.IO.Handle.FD         56           0    0.0   65.5     0.0   65.5
+ CAF            GHC.Exception            55           0    0.0    0.2     0.0    0.2
+ CAF            Main                     51           0    0.0    0.6     0.0   25.6
+  main          Main                     90           1    0.0   16.4     0.0   24.9
+   runM         Main                     93           1    0.0    0.0     0.0    8.3
+    bar         Main                     94           0    0.0    0.0     0.0    8.3
+     foo        Main                     99           0    0.0    0.0     0.0    8.3
+      errorM    Main                    100           0    0.0    0.0     0.0    8.3
+       errorM.\ Main                    101           1    0.0    8.3     0.0    8.3
+     >>=        Main                     95           0    0.0    0.0     0.0    0.0
+      >>=.\     Main                     96           1    0.0    0.0     0.0    0.0
+   bar          Main                     91           1    0.0    0.2     0.0    0.2
+    foo         Main                     97           1    0.0    0.0     0.0    0.0
+     errorM     Main                     98           1    0.0    0.0     0.0    0.0
+    >>=         Main                     92           1    0.0    0.0     0.0    0.0

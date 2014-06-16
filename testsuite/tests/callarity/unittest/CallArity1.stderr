@@ -1,0 +1,73 @@
+go2:
+    go 2
+    d 1
+nested_go2:
+    go 2
+    go2 2
+    d 1
+    n 1
+d0 (go 2 would be bad):
+    go 1
+    d 0
+go2 (in case crut):
+    go 2
+    d 1
+go2 (in function call):
+    go 2
+    d 1
+go2 (using surrounding interesting let):
+    go 2
+    d 1
+    n 1
+go2 (using surrounding boring let):
+    go 2
+    d 1
+    z 0
+two calls, one from let and from body (d 1 would be bad):
+    go 2
+    d 0
+a thunk in a recursion (d 1 would be bad):
+    d 0
+    n 0
+two thunks, one called multiple times (both arity 1 would be bad!):
+    d 0
+    n 1
+two functions, not thunks:
+    go 2
+    go2 2
+a thunk, called multiple times via a forking recursion (d 1 would be bad!):
+    go2 2
+    d 0
+a function, one called multiple times via a forking recursion:
+    go 2
+    go2 2
+two functions (recursive):
+    go 2
+    go2 2
+mutual recursion (thunks), called mutiple times (both arity 1 would be bad!):
+    d 0
+    n 0
+mutual recursion (functions), but no thunks:
+    go 2
+    go2 2
+mutual recursion (functions), one boring (d 1 would be bad):
+    go 2
+    go2 2
+    d 0
+a thunk (non-function-type), called twice, still calls once:
+    x 0
+    d 1
+a thunk (function type), called multiple times, still calls once:
+    d 1
+    n 0
+a thunk (non-function-type), in mutual recursion, still calls once (d 1 would be good):
+    go 2
+    x 0
+    d 1
+a thunk (function type), in mutual recursion, still calls once (d 1 would be good):
+    go 1
+    d 1
+    n 0
+a thunk (non-function-type) co-calls with the body (d 1 would be bad):
+    x 0
+    d 0

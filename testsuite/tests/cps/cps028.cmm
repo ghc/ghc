@@ -1,0 +1,17 @@
+// Test classic dead-code elimination
+
+sum (bits32 a, bits32 n) {
+  bits32 i, p, lim, sum; 
+  sum = 0;
+  i = 0;
+  p = a;
+  lim = a + 4 * n;
+ L:
+  if (p < lim) {
+    sum = sum + bits32[p];
+    i = i + 1;
+    p = p + 4;
+    goto L;
+  }
+  return (sum);
+}

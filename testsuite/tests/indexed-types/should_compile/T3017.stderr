@@ -1,0 +1,26 @@
+TYPE SIGNATURES
+  emptyL :: forall a. ListColl a
+  test2 ::
+    forall c t t1. (Coll c, Num t1, Num t, Elem c ~ (t, t1)) => c -> c
+TYPE CONSTRUCTORS
+  Coll :: * -> Constraint
+  class Coll c
+    Roles: [nominal]
+    RecFlag NonRecursive
+    type family Elem c :: * (open)
+    empty :: c insert :: Elem c -> c -> c
+  ListColl :: * -> *
+  data ListColl a
+    No C type associated
+    Roles: [representational]
+    RecFlag NonRecursive, Promotable
+    = L :: [a] -> ListColl a Stricts: _
+    FamilyInstance: none
+COERCION AXIOMS
+  axiom Foo.TFCo:R:ElemListColl :: Elem (ListColl a) = a
+INSTANCES
+  instance Coll (ListColl a) -- Defined at T3017.hs:12:11
+FAMILY INSTANCES
+  type Elem (ListColl a) -- Defined at T3017.hs:13:4
+Dependent modules: []
+Dependent packages: [base, ghc-prim, integer-gmp]

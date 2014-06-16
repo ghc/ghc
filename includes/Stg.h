@@ -19,7 +19,7 @@
  * "Rts.h" instead.
  *
  * To understand the structure of the RTS headers, see the wiki:
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * ---------------------------------------------------------------------------*/
 
@@ -240,6 +240,7 @@ typedef StgFunPtr       F_;
 #include "stg/MiscClosures.h"
 #endif
 
+#include "stg/Prim.h" /* ghc-prim fallbacks */
 #include "stg/SMP.h" // write_barrier() inline is required
 
 /* -----------------------------------------------------------------------------

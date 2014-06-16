@@ -99,6 +99,8 @@
 #define D_   float64
 #define L_   bits64
 #define V16_ bits128
+#define V32_ bits256
+#define V64_ bits512
 
 #define SIZEOF_StgDouble 8
 #define SIZEOF_StgWord64 8
@@ -437,20 +439,32 @@
    if (0) { goto __L__; }
 
 #define GC_PRIM(fun)                            \
-        R9 = fun;                               \
-        jump stg_gc_prim();
+        jump stg_gc_prim(fun);
 
+// Version of GC_PRIM for use in low-level Cmm.  We can call
+// stg_gc_prim, because it takes one argument and therefore has a
+// platform-independent calling convention (Note [Syntax of .cmm
+// files] in CmmParse.y).
+#define GC_PRIM_LL(fun)                         \
+        R1 = fun;                               \
+        jump stg_gc_prim [R1];
+
+// We pass the fun as the second argument, because the arg is
+// usually already in the first argument position (R1), so this
+// avoids moving it to a different register / stack slot.
 #define GC_PRIM_N(fun,arg)                      \
-        R9 = fun;                               \
-        jump stg_gc_prim_n(arg);
+        jump stg_gc_prim_n(arg,fun);
 
 #define GC_PRIM_P(fun,arg)                      \
-        R9 = fun;                               \
-        jump stg_gc_prim_p(arg);
+        jump stg_gc_prim_p(arg,fun);
+
+#define GC_PRIM_P_LL(fun,arg)                   \
+        R1 = arg;                               \
+        R2 = fun;                               \
+        jump stg_gc_prim_p_ll [R1,R2];
 
 #define GC_PRIM_PP(fun,arg1,arg2)               \
-        R9 = fun;                               \
-        jump stg_gc_prim_pp(arg1,arg2);
+        jump stg_gc_prim_pp(arg1,arg2,fun);
 
 #define MAYBE_GC_(fun)                          \
     if (CHECK_GC()) {                           \
@@ -476,23 +490,26 @@
         GC_PRIM_PP(fun,arg1,arg2)               \
    }
 
-#define STK_CHK(n, fun)                         \
+#define STK_CHK_LL(n, fun)                      \
     TICK_BUMP(STK_CHK_ctr); 			\
     if (Sp - (n) < SpLim) {                     \
-        GC_PRIM(fun)                            \
+        GC_PRIM_LL(fun)                         \
     }
 
-#define STK_CHK_P(n, fun, arg)                  \
+#define STK_CHK_P_LL(n, fun, arg)               \
+    TICK_BUMP(STK_CHK_ctr);                     \
     if (Sp - (n) < SpLim) {                     \
-        GC_PRIM_P(fun,arg)                      \
+        GC_PRIM_P_LL(fun,arg)                   \
     }
 
 #define STK_CHK_PP(n, fun, arg1, arg2)          \
+    TICK_BUMP(STK_CHK_ctr);                     \
     if (Sp - (n) < SpLim) {                     \
         GC_PRIM_PP(fun,arg1,arg2)               \
     }
 
 #define STK_CHK_ENTER(n, closure)               \
+    TICK_BUMP(STK_CHK_ctr);                     \
     if (Sp - (n) < SpLim) {                     \
         jump __stg_gc_enter_1(closure);         \
     }
@@ -788,5 +805,122 @@
       __bd = Bdescr(__p);                                       \
       __gen = TO_W_(bdescr_gen_no(__bd));                       \
       if (__gen > 0) { recordMutableCap(__p, __gen); }
+
+/* -----------------------------------------------------------------------------
+   Arrays
+   -------------------------------------------------------------------------- */
+
+/* Complete function body for the clone family of (mutable) array ops.
+   Defined as a macro to avoid function call overhead or code
+   duplication. */
+#define cloneArray(info, src, offset, n)                       \
+    W_ words, size;                                            \
+    gcptr dst, dst_p, src_p;                                   \
+                                                               \
+    again: MAYBE_GC(again);                                    \
+                                                               \
+    size = n + mutArrPtrsCardWords(n);                         \
+    words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;         \
+    ("ptr" dst) = ccall allocate(MyCapability() "ptr", words); \
+    TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(size), 0);       \
+                                                               \
+    SET_HDR(dst, info, CCCS);                                  \
+    StgMutArrPtrs_ptrs(dst) = n;                               \
+    StgMutArrPtrs_size(dst) = size;                            \
+                                                               \
+    dst_p = dst + SIZEOF_StgMutArrPtrs;                        \
+    src_p = src + SIZEOF_StgMutArrPtrs + WDS(offset);          \
+  while:                                                       \
+    if (n != 0) {                                              \
+        n = n - 1;                                             \
+        W_[dst_p] = W_[src_p];                                 \
+        dst_p = dst_p + WDS(1);                                \
+        src_p = src_p + WDS(1);                                \
+        goto while;                                            \
+    }                                                          \
+                                                               \
+    return (dst);
+
+#define copyArray(src, src_off, dst, dst_off, n)                  \
+  W_ dst_elems_p, dst_p, src_p, dst_cards_p, bytes;               \
+                                                                  \
+    if ((n) != 0) {                                               \
+        SET_HDR(dst, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);          \
+                                                                  \
+        dst_elems_p = (dst) + SIZEOF_StgMutArrPtrs;               \
+        dst_p = dst_elems_p + WDS(dst_off);                       \
+        src_p = (src) + SIZEOF_StgMutArrPtrs + WDS(src_off);      \
+        bytes = WDS(n);                                           \
+                                                                  \
+        prim %memcpy(dst_p, src_p, bytes, WDS(1));                \
+                                                                  \
+        dst_cards_p = dst_elems_p + WDS(StgMutArrPtrs_ptrs(dst)); \
+        setCards(dst_cards_p, dst_off, n);                        \
+    }                                                             \
+                                                                  \
+    return ();
+
+#define copyMutableArray(src, src_off, dst, dst_off, n)           \
+  W_ dst_elems_p, dst_p, src_p, dst_cards_p, bytes;               \
+                                                                  \
+    if ((n) != 0) {                                               \
+        SET_HDR(dst, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);          \
+                                                                  \
+        dst_elems_p = (dst) + SIZEOF_StgMutArrPtrs;               \
+        dst_p = dst_elems_p + WDS(dst_off);                       \
+        src_p = (src) + SIZEOF_StgMutArrPtrs + WDS(src_off);      \
+        bytes = WDS(n);                                           \
+                                                                  \
+        if ((src) == (dst)) {                                     \
+            prim %memmove(dst_p, src_p, bytes, WDS(1));           \
+        } else {                                                  \
+            prim %memcpy(dst_p, src_p, bytes, WDS(1));            \
+        }                                                         \
+                                                                  \
+        dst_cards_p = dst_elems_p + WDS(StgMutArrPtrs_ptrs(dst)); \
+        setCards(dst_cards_p, dst_off, n);                        \
+    }                                                             \
+                                                                  \
+    return ();
+
+/*
+ * Set the cards in the cards table pointed to by dst_cards_p for an
+ * update to n elements, starting at element dst_off.
+ */
+#define setCards(dst_cards_p, dst_off, n)                      \
+    W_ __start_card, __end_card, __cards;                      \
+    __start_card = mutArrPtrCardDown(dst_off);                 \
+    __end_card = mutArrPtrCardDown((dst_off) + (n) - 1);       \
+    __cards = __end_card - __start_card + 1;                   \
+    prim %memset((dst_cards_p) + __start_card, 1, __cards, 1);
+
+/* Complete function body for the clone family of small (mutable)
+   array ops. Defined as a macro to avoid function call overhead or
+   code duplication. */
+#define cloneSmallArray(info, src, offset, n)                  \
+    W_ words, size;                                            \
+    gcptr dst, dst_p, src_p;                                   \
+                                                               \
+    again: MAYBE_GC(again);                                    \
+                                                               \
+    words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;       \
+    ("ptr" dst) = ccall allocate(MyCapability() "ptr", words); \
+    TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);     \
+                                                               \
+    SET_HDR(dst, info, CCCS);                                  \
+    StgSmallMutArrPtrs_ptrs(dst) = n;                          \
+                                                               \
+    dst_p = dst + SIZEOF_StgSmallMutArrPtrs;                   \
+    src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(offset);     \
+  while:                                                       \
+    if (n != 0) {                                              \
+        n = n - 1;                                             \
+        W_[dst_p] = W_[src_p];                                 \
+        dst_p = dst_p + WDS(1);                                \
+        src_p = src_p + WDS(1);                                \
+        goto while;                                            \
+    }                                                          \
+                                                               \
+    return (dst);
 
 #endif /* CMM_H */

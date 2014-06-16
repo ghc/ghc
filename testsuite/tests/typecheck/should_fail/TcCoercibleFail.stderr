@@ -1,0 +1,59 @@
+
+TcCoercibleFail.hs:11:8:
+    Could not coerce from ‘Int’ to ‘()’
+      because ‘Int’ and ‘()’ are different types.
+      arising from a use of ‘coerce’
+    In the expression: coerce
+    In the expression: coerce $ one :: ()
+    In an equation for ‘foo1’: foo1 = coerce $ one :: ()
+
+TcCoercibleFail.hs:14:8:
+    Could not coerce from ‘m Int’ to ‘m Age’
+      because ‘m Int’ and ‘m Age’ are different types.
+      arising from a use of ‘coerce’
+    from the context (Monad m)
+      bound by the type signature for foo2 :: Monad m => m Age
+      at TcCoercibleFail.hs:13:9-34
+    In the expression: coerce
+    In the expression: coerce $ (return one :: m Int)
+    In an equation for ‘foo2’: foo2 = coerce $ (return one :: m Int)
+
+TcCoercibleFail.hs:16:8:
+    Could not coerce from ‘Map Int ()’ to ‘Map Age ()’
+      because the first type argument of ‘Map’ has role Nominal,
+      but the arguments ‘Int’ and ‘Age’ differ
+      arising from a use of ‘coerce’
+    In the expression: coerce
+    In the expression: coerce $ Map one () :: Map Age ()
+    In an equation for ‘foo3’: foo3 = coerce $ Map one () :: Map Age ()
+
+TcCoercibleFail.hs:18:8:
+    Could not coerce from ‘Int’ to ‘Down Int’
+    because the constructor of ‘Down’ is not imported
+      arising from a use of ‘coerce’
+    In the expression: coerce
+    In the expression: coerce $ one :: Down Int
+    In an equation for ‘foo4’: foo4 = coerce $ one :: Down Int
+
+TcCoercibleFail.hs:21:8:
+    Context reduction stack overflow; size = 21
+    Use -fcontext-stack=N to increase stack size to N
+      Coercible Void ()
+    In the expression: coerce :: Void -> ()
+    In an equation for ‘foo5’: foo5 = coerce :: Void -> ()
+
+TcCoercibleFail.hs:30:8:
+    Context reduction stack overflow; size = 21
+    Use -fcontext-stack=N to increase stack size to N
+      Coercible Int Age
+    In the expression: coerce :: Fix (Either Int) -> Fix (Either Age)
+    In an equation for ‘foo6’:
+        foo6 = coerce :: Fix (Either Int) -> Fix (Either Age)
+
+TcCoercibleFail.hs:31:8:
+    Could not coerce from ‘Either Int (Fix (Either Int))’ to ‘()’
+      because ‘Either
+                 Int (Fix (Either Int))’ and ‘()’ are different types.
+      arising from a use of ‘coerce’
+    In the expression: coerce :: Fix (Either Int) -> ()
+    In an equation for ‘foo7’: foo7 = coerce :: Fix (Either Int) -> ()

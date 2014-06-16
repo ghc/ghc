@@ -1,7 +1,3 @@
-{-# LANGUAGE NoMonoLocalBinds #-}
--- Norman likes local bindings
--- If this module lives on I'd like to get rid of this extension in due course
-
 module CmmPipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into
   -- optimized, CPS converted and native-call-less C--.  The latter
@@ -62,7 +58,7 @@ cpsTop hsc_env proc =
        --
        CmmProc h l v g <- {-# SCC "cmmCfgOpts(1)" #-}
             return $ cmmCfgOptsProc splitting_proc_points proc
-       dump Opt_D_dump_cmm_cfg "Post control-flow optimsations" g
+       dump Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
 
        let !TopInfo {stack_info=StackInfo { arg_space = entry_off
                                           , do_layout = do_layout }} = h
@@ -70,7 +66,7 @@ cpsTop hsc_env proc =
        ----------- Eliminate common blocks -------------------------------------
        g <- {-# SCC "elimCommonBlocks" #-}
             condPass Opt_CmmElimCommonBlocks elimCommonBlocks g
-                     Opt_D_dump_cmm_cbe "Post common block elimination"
+                          Opt_D_dump_cmm_cbe "Post common block elimination"
 
        -- Any work storing block Labels must be performed _after_
        -- elimCommonBlocks
@@ -79,21 +75,14 @@ cpsTop hsc_env proc =
        let call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
        proc_points <-
           if splitting_proc_points
-             then {-# SCC "minimalProcPointSet" #-} runUniqSM $
+             then do
+               pp <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
                   minimalProcPointSet (targetPlatform dflags) call_pps g
+               dumpIfSet_dyn dflags Opt_D_dump_cmm "Proc points"
+                     (ppr l $$ ppr pp $$ ppr g)
+               return pp
              else
-                  return call_pps
-
-       let noncall_pps = proc_points `setDifference` call_pps
-       when (not (setNull noncall_pps) && dopt Opt_D_dump_cmm dflags) $
-         pprTrace "Non-call proc points: " (ppr noncall_pps) $ return ()
-
-       ----------- Sink and inline assignments *before* stack layout -----------
-       {-  Maybe enable this later
-       g <- {-# SCC "sink1" #-}
-            condPass Opt_CmmSink (cmmSink dflags) g
-                     Opt_D_dump_cmm_rewrite "Sink assignments (1)"
-       -}
+               return call_pps
 
        ----------- Layout the stack and manifest Sp ----------------------------
        (g, stackmaps) <-
@@ -103,66 +92,49 @@ cpsTop hsc_env proc =
                else return (g, mapEmpty)
        dump Opt_D_dump_cmm_sp "Layout Stack" g
 
-       ----------- Sink and inline assignments *after* stack layout ------------
-       g <- {-# SCC "sink2" #-}
+       ----------- Sink and inline assignments  --------------------------------
+       g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
             condPass Opt_CmmSink (cmmSink dflags) g
-                     Opt_D_dump_cmm_rewrite "Sink assignments (2)"
+                     Opt_D_dump_cmm_sink "Sink assignments"
 
        ------------- CAF analysis ----------------------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal g
        dumpIfSet_dyn dflags Opt_D_dump_cmm "CAFEnv" (ppr cafEnv)
 
-       if splitting_proc_points
-          then do
-            ------------- Split into separate procedures -----------------------
-            pp_map  <- {-# SCC "procPointAnalysis" #-} runUniqSM $
-                             procPointAnalysis proc_points g
-            dumpWith dflags Opt_D_dump_cmm_procmap "procpoint map" pp_map
-            gs <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
-                  splitAtProcPoints dflags l call_pps proc_points pp_map
-                                    (CmmProc h l v g)
-            dumps Opt_D_dump_cmm_split "Post splitting" gs
-     
-            ------------- Populate info tables with stack info -----------------
-            gs <- {-# SCC "setInfoTableStackMap" #-}
-                  return $ map (setInfoTableStackMap dflags stackmaps) gs
-            dumps Opt_D_dump_cmm_info "after setInfoTableStackMap" gs
-     
-            ----------- Control-flow optimisations -----------------------------
-            gs <- {-# SCC "cmmCfgOpts(2)" #-}
-                  return $ if optLevel dflags >= 1
-                             then map (cmmCfgOptsProc splitting_proc_points) gs
-                             else gs
-            gs <- return (map removeUnreachableBlocksProc gs)
-                -- Note [unreachable blocks]
-            dumps Opt_D_dump_cmm_cfg "Post control-flow optimsations" gs
+       g <- if splitting_proc_points
+            then do
+               ------------- Split into separate procedures -----------------------
+               pp_map  <- {-# SCC "procPointAnalysis" #-} runUniqSM $
+                          procPointAnalysis proc_points g
+               dumpWith dflags Opt_D_dump_cmm_procmap "procpoint map" pp_map
+               g <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
+                    splitAtProcPoints dflags l call_pps proc_points pp_map
+                                      (CmmProc h l v g)
+               dumps Opt_D_dump_cmm_split "Post splitting" g
+               return g
+             else do
+               -- attach info tables to return points
+               return $ [attachContInfoTables call_pps (CmmProc h l v g)]
 
-            return (cafEnv, gs)
+       ------------- Populate info tables with stack info -----------------
+       g <- {-# SCC "setInfoTableStackMap" #-}
+            return $ map (setInfoTableStackMap dflags stackmaps) g
+       dumps Opt_D_dump_cmm_info "after setInfoTableStackMap" g
 
-          else do
-            -- attach info tables to return points
-            g <- return $ attachContInfoTables call_pps (CmmProc h l v g)
+       ----------- Control-flow optimisations -----------------------------
+       g <- {-# SCC "cmmCfgOpts(2)" #-}
+            return $ if optLevel dflags >= 1
+                     then map (cmmCfgOptsProc splitting_proc_points) g
+                     else g
+       g <- return (map removeUnreachableBlocksProc g)
+            -- See Note [unreachable blocks]
+       dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
 
-            ------------- Populate info tables with stack info -----------------
-            g <- {-# SCC "setInfoTableStackMap" #-}
-                  return $ setInfoTableStackMap dflags stackmaps g
-            dump' Opt_D_dump_cmm_info "after setInfoTableStackMap" g
-     
-            ----------- Control-flow optimisations -----------------------------
-            g <- {-# SCC "cmmCfgOpts(2)" #-}
-                 return $ if optLevel dflags >= 1
-                             then cmmCfgOptsProc splitting_proc_points g
-                             else g
-            g <- return (removeUnreachableBlocksProc g)
-                -- Note [unreachable blocks]
-            dump' Opt_D_dump_cmm_cfg "Post control-flow optimsations" g
-
-            return (cafEnv, [g])
+       return (cafEnv, g)
 
   where dflags = hsc_dflags hsc_env
         platform = targetPlatform dflags
         dump = dumpGraph dflags
-        dump' = dumpWith dflags
 
         dumps flag name
            = mapM_ (dumpWith dflags flag name)
@@ -184,11 +156,138 @@ cpsTop hsc_env proc =
                              || not (tablesNextToCode dflags)
                              || -- Note [inconsistent-pic-reg]
                                 usingInconsistentPicReg
-        usingInconsistentPicReg = ( platformArch platform == ArchX86 ||
-                                    platformArch platform == ArchPPC
-                                  )
-                               && platformOS platform == OSDarwin
-                               && gopt Opt_PIC dflags
+        usingInconsistentPicReg
+           = case (platformArch platform, platformOS platform, gopt Opt_PIC dflags)
+             of   (ArchX86, OSDarwin, pic) -> pic
+                  (ArchPPC, OSDarwin, pic) -> pic
+                  _                        -> False
+
+-- Note [Sinking after stack layout]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- In the past we considered running sinking pass also before stack
+-- layout, but after making some measurements we realized that:
+--
+--   a) running sinking only before stack layout produces slower
+--      code than running sinking only before stack layout
+--
+--   b) running sinking both before and after stack layout produces
+--      code that has the same performance as when running sinking
+--      only after stack layout.
+--
+-- In other words sinking before stack layout doesn't buy as anything.
+--
+-- An interesting question is "why is it better to run sinking after
+-- stack layout"? It seems that the major reason are stores and loads
+-- generated by stack layout. Consider this code before stack layout:
+--
+--  c1E:
+--      _c1C::P64 = R3;
+--      _c1B::P64 = R2;
+--      _c1A::P64 = R1;
+--      I64[(young<c1D> + 8)] = c1D;
+--      call stg_gc_noregs() returns to c1D, args: 8, res: 8, upd: 8;
+--  c1D:
+--      R3 = _c1C::P64;
+--      R2 = _c1B::P64;
+--      R1 = _c1A::P64;
+--      call (P64[(old + 8)])(R3, R2, R1) args: 8, res: 0, upd: 8;
+--
+-- Stack layout pass will save all local variables live across a call
+-- (_c1C, _c1B and _c1A in this example) on the stack just before
+-- making a call and reload them from the stack after returning from a
+-- call:
+--
+--  c1E:
+--      _c1C::P64 = R3;
+--      _c1B::P64 = R2;
+--      _c1A::P64 = R1;
+--      I64[Sp - 32] = c1D;
+--      P64[Sp - 24] = _c1A::P64;
+--      P64[Sp - 16] = _c1B::P64;
+--      P64[Sp - 8] = _c1C::P64;
+--      Sp = Sp - 32;
+--      call stg_gc_noregs() returns to c1D, args: 8, res: 8, upd: 8;
+--  c1D:
+--      _c1A::P64 = P64[Sp + 8];
+--      _c1B::P64 = P64[Sp + 16];
+--      _c1C::P64 = P64[Sp + 24];
+--      R3 = _c1C::P64;
+--      R2 = _c1B::P64;
+--      R1 = _c1A::P64;
+--      Sp = Sp + 32;
+--      call (P64[Sp])(R3, R2, R1) args: 8, res: 0, upd: 8;
+--
+-- If we don't run sinking pass after stack layout we are basically
+-- left with such code. However, running sinking on this code can lead
+-- to significant improvements:
+--
+--  c1E:
+--      I64[Sp - 32] = c1D;
+--      P64[Sp - 24] = R1;
+--      P64[Sp - 16] = R2;
+--      P64[Sp - 8] = R3;
+--      Sp = Sp - 32;
+--      call stg_gc_noregs() returns to c1D, args: 8, res: 8, upd: 8;
+--  c1D:
+--      R3 = P64[Sp + 24];
+--      R2 = P64[Sp + 16];
+--      R1 = P64[Sp + 8];
+--      Sp = Sp + 32;
+--      call (P64[Sp])(R3, R2, R1) args: 8, res: 0, upd: 8;
+--
+-- Now we only have 9 assignments instead of 15.
+--
+-- There is one case when running sinking before stack layout could
+-- be beneficial. Consider this:
+--
+--   L1:
+--      x = y
+--      call f() returns L2
+--   L2: ...x...y...
+--
+-- Since both x and y are live across a call to f, they will be stored
+-- on the stack during stack layout and restored after the call:
+--
+--   L1:
+--      x = y
+--      P64[Sp - 24] = L2
+--      P64[Sp - 16] = x
+--      P64[Sp - 8]  = y
+--      Sp = Sp - 24
+--      call f() returns L2
+--   L2:
+--      y = P64[Sp + 16]
+--      x = P64[Sp + 8]
+--      Sp = Sp + 24
+--      ...x...y...
+--
+-- However, if we run sinking before stack layout we would propagate x
+-- to its usage place (both x and y must be local register for this to
+-- be possible - global registers cannot be floated past a call):
+--
+--   L1:
+--      x = y
+--      call f() returns L2
+--   L2: ...y...y...
+--
+-- Thus making x dead at the call to f(). If we ran stack layout now
+-- we would generate less stores and loads:
+--
+--   L1:
+--      x = y
+--      P64[Sp - 16] = L2
+--      P64[Sp - 8]  = y
+--      Sp = Sp - 16
+--      call f() returns L2
+--   L2:
+--      y = P64[Sp + 8]
+--      Sp = Sp + 16
+--      ...y...y...
+--
+-- But since we don't see any benefits from running sinking befroe stack
+-- layout, this situation probably doesn't arise too often in practice.
+--
 
 {- Note [inconsistent-pic-reg]
 
@@ -259,4 +358,3 @@ dumpWith dflags flag txt g = do
    dumpIfSet_dyn dflags flag txt (ppr g)
    when (not (dopt flag dflags)) $
       dumpIfSet_dyn dflags Opt_D_dump_cmm txt (ppr g)
-

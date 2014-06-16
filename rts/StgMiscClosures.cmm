@@ -439,6 +439,15 @@ INFO_TABLE_CONSTR(stg_DEAD_WEAK,0,5,0,CONSTR,"DEAD_WEAK","DEAD_WEAK")
 { foreign "C" barf("DEAD_WEAK object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
+   C finalizer lists
+
+   Singly linked lists that chain multiple C finalizers on a weak pointer.
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_C_FINALIZER_LIST,1,4,0,CONSTR,"C_FINALIZER_LIST","C_FINALIZER_LIST")
+{ foreign "C" barf("C_FINALIZER_LIST object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
    NO_FINALIZER
 
    This is a static nullary constructor (like []) that we use to mark an empty
@@ -547,6 +556,13 @@ INFO_TABLE_CONSTR(stg_END_TSO_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_TSO_QUEUE","E
 CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
 
 /* ----------------------------------------------------------------------------
+   GCD_CAF
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_GCD_CAF,0,0,0,CONSTR_NOCAF_STATIC,"GCD_CAF","GCD_CAF")
+{ foreign "C" barf("Evaluated a CAF that was GC'd!") never returns; }
+
+/* ----------------------------------------------------------------------------
    STM_AWOKEN
 
    This is a static nullary constructor (like []) that we use to mark a
@@ -566,7 +582,7 @@ CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
 
    ___________________________
    | Info | No. of | data....
-        |  Ptr | Words  |
+   |  Ptr | Words  |
    ---------------------------
 
    These are *unpointed* objects: i.e. they cannot be entered.
@@ -587,6 +603,18 @@ INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN, 0, 0, MUT_ARR_PTRS_FROZEN, "MUT_ARR_PTRS_FRO
 
 INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN0, 0, 0, MUT_ARR_PTRS_FROZEN0, "MUT_ARR_PTRS_FROZEN0", "MUT_ARR_PTRS_FROZEN0")
 { foreign "C" barf("MUT_ARR_PTRS_FROZEN0 object entered!") never returns; }
+
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_CLEAN, 0, 0, SMALL_MUT_ARR_PTRS_CLEAN, "SMALL_MUT_ARR_PTRS_CLEAN", "SMALL_MUT_ARR_PTRS_CLEAN")
+{ foreign "C" barf("SMALL_MUT_ARR_PTRS_CLEAN object entered!") never returns; }
+
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_DIRTY, 0, 0, SMALL_MUT_ARR_PTRS_DIRTY, "SMALL_MUT_ARR_PTRS_DIRTY", "SMALL_MUT_ARR_PTRS_DIRTY")
+{ foreign "C" barf("SMALL_MUT_ARR_PTRS_DIRTY object entered!") never returns; }
+
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN, "SMALL_MUT_ARR_PTRS_FROZEN", "SMALL_MUT_ARR_PTRS_FROZEN")
+{ foreign "C" barf("SMALL_MUT_ARR_PTRS_FROZEN object entered!") never returns; }
+
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN0, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN0, "SMALL_MUT_ARR_PTRS_FROZEN0", "SMALL_MUT_ARR_PTRS_FROZEN0")
+{ foreign "C" barf("SMALL_MUT_ARR_PTRS_FROZEN0 object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Mutable Variables

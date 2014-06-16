@@ -1,0 +1,2 @@
+ERROR "mod150.hs" - Conflicting exports of entity "id"
+*** Could refer to M.id or Hugs.Prelude.id

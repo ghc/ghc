@@ -204,7 +204,7 @@ spillCost_chaitin
 
 spillCost_chaitin info graph reg
         -- Spilling a live range that only lives for 1 instruction
-        -- isn't going to help us at all - and we definately want to avoid
+        -- isn't going to help us at all - and we definitely want to avoid
         -- trying to re-spill previously inserted spill code.
         | lifetime <= 1         = 1/0
 

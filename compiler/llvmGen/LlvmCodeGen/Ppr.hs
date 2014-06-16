@@ -11,7 +11,6 @@ module LlvmCodeGen.Ppr (
 import Llvm
 import LlvmCodeGen.Base
 import LlvmCodeGen.Data
-import LlvmCodeGen.Regs
 
 import CLabel
 import Cmm
@@ -28,12 +27,7 @@ import Unique
 
 -- | Header code for LLVM modules
 pprLlvmHeader :: SDoc
-pprLlvmHeader = sdocWithDynFlags $ \dflags ->
-    moduleLayout
-    $+$ text ""
-    $+$ ppLlvmFunctionDecls (map snd (ghcInternalFunctions dflags))
-    $+$ ppLlvmMetas stgTBAA
-    $+$ text ""
+pprLlvmHeader = moduleLayout
 
 
 -- | LLVM module layout description for the host target
@@ -61,9 +55,15 @@ moduleLayout = sdocWithPlatform $ \platform ->
     Platform { platformArch = ArchARM {}, platformOS = OSAndroid } ->
         text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32\""
         $+$ text "target triple = \"arm-unknown-linux-androideabi\""
+    Platform { platformArch = ArchARM {}, platformOS = OSQNXNTO } ->
+        text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32\""
+        $+$ text "target triple = \"arm-unknown-nto-qnx8.0.0eabi\""
     Platform { platformArch = ArchARM {}, platformOS = OSiOS } ->
         text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32\""
         $+$ text "target triple = \"arm-apple-darwin10\""
+    Platform { platformArch = ArchX86, platformOS = OSiOS } ->
+        text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:128:128-n8:16:32\""
+        $+$ text "target triple = \"i386-apple-darwin11\""
     _ ->
         -- FIX: Other targets
         empty
@@ -72,63 +72,61 @@ moduleLayout = sdocWithPlatform $ \platform ->
 -- | Pretty print LLVM data code
 pprLlvmData :: LlvmData -> SDoc
 pprLlvmData (globals, types) =
-    let tryConst (v, Just s )   = ppLlvmGlobal (v, Just s)
-        tryConst g@(_, Nothing) = ppLlvmGlobal g
-
-        ppLlvmTys (LMAlias    a) = ppLlvmAlias a
+    let ppLlvmTys (LMAlias    a) = ppLlvmAlias a
         ppLlvmTys (LMFunction f) = ppLlvmFunctionDecl f
         ppLlvmTys _other         = empty
 
         types'   = vcat $ map ppLlvmTys types
-        globals' = vcat $ map tryConst globals
+        globals' = ppLlvmGlobals globals
     in types' $+$ globals'
 
 
 -- | Pretty print LLVM code
-pprLlvmCmmDecl :: LlvmEnv -> Int -> LlvmCmmDecl -> (SDoc, [LlvmVar])
-pprLlvmCmmDecl _ _ (CmmData _ lmdata)
-  = (vcat $ map pprLlvmData lmdata, [])
+pprLlvmCmmDecl :: Int -> LlvmCmmDecl -> LlvmM (SDoc, [LlvmVar])
+pprLlvmCmmDecl _ (CmmData _ lmdata)
+  = return (vcat $ map pprLlvmData lmdata, [])
 
-pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl live (ListGraph blks))
-  = let (idoc, ivar) = case mb_info of
-                        Nothing -> (empty, [])
+pprLlvmCmmDecl count (CmmProc mb_info entry_lbl live (ListGraph blks))
+  = do (idoc, ivar) <- case mb_info of
+                        Nothing -> return (empty, [])
                         Just (Statics info_lbl dat)
-                         -> pprInfoTable env count info_lbl (Statics entry_lbl dat)
-    in (idoc $+$ (
-        let sec = mkLayoutSection (count + 1)
-            (lbl',sec') = case mb_info of
+                         -> pprInfoTable count info_lbl (Statics entry_lbl dat)
+
+       let sec = mkLayoutSection (count + 1)
+           (lbl',sec') = case mb_info of
                            Nothing                   -> (entry_lbl, Nothing)
                            Just (Statics info_lbl _) -> (info_lbl,  sec)
-            link = if externallyVisibleCLabel lbl'
+           link = if externallyVisibleCLabel lbl'
                       then ExternallyVisible
                       else Internal
-            lmblocks = map (\(BasicBlock id stmts) ->
+           lmblocks = map (\(BasicBlock id stmts) ->
                                 LlvmBlock (getUnique id) stmts) blks
-            fun = mkLlvmFunc env live lbl' link  sec' lmblocks
-        in ppLlvmFunction fun
-    ), ivar)
+
+       fun <- mkLlvmFunc live lbl' link  sec' lmblocks
+
+       return (idoc $+$ ppLlvmFunction fun, ivar)
 
 
 -- | Pretty print CmmStatic
-pprInfoTable :: LlvmEnv -> Int -> CLabel -> CmmStatics -> (SDoc, [LlvmVar])
-pprInfoTable env count info_lbl stat
-  = let dflags = getDflags env
-        unres = genLlvmData env (Text, stat)
-        (_, (ldata, ltypes)) = resolveLlvmData env unres
+pprInfoTable :: Int -> CLabel -> CmmStatics -> LlvmM (SDoc, [LlvmVar])
+pprInfoTable count info_lbl stat
+  = do (ldata, ltypes) <- genLlvmData (Text, stat)
 
-        setSection ((LMGlobalVar _ ty l _ _ c), d)
-            = let sec = mkLayoutSection count
-                  ilabel = strCLabel_llvm env info_lbl
-                              `appendFS` fsLit iTableSuf
-                  gv = LMGlobalVar ilabel ty l sec (llvmInfAlign dflags) c
-                  v = if l == Internal then [gv] else []
-              in ((gv, d), v)
-        setSection v = (v,[])
+       dflags <- getDynFlags
+       let setSection (LMGlobal (LMGlobalVar _ ty l _ _ c) d) = do
+             lbl <- strCLabel_llvm info_lbl
+             let sec = mkLayoutSection count
+                 ilabel = lbl `appendFS` fsLit iTableSuf
+                 gv = LMGlobalVar ilabel ty l sec (llvmInfAlign dflags) c
+                 v = if l == Internal then [gv] else []
+             funInsert ilabel ty
+             return (LMGlobal gv d, v)
+           setSection v = return (v,[])
 
-        (ldata', llvmUsed) = setSection (last ldata)
-    in if length ldata /= 1
+       (ldata', llvmUsed) <- setSection (last ldata)
+       if length ldata /= 1
           then Outputable.panic "LlvmCodeGen.Ppr: invalid info table!"
-          else (pprLlvmData ([ldata'], ltypes), llvmUsed)
+          else return (pprLlvmData ([ldata'], ltypes), llvmUsed)
 
 
 -- | We generate labels for info tables by converting them to the same label
@@ -139,7 +137,7 @@ iTableSuf = "_itable"
 
 -- | Create a specially crafted section declaration that encodes the order this
 -- section should be in the final object code.
--- 
+--
 -- The LlvmMangler.llvmFixupAsm pass over the assembly produced by LLVM uses
 -- this section declaration to do its processing.
 mkLayoutSection :: Int -> LMSection
@@ -151,4 +149,3 @@ mkLayoutSection n
 -- be unique since we process the assembly pattern matching this.
 infoSection :: String
 infoSection = "X98A__STRIP,__me"
-

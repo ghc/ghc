@@ -1,0 +1,3 @@
+ERROR "tcfail130.hs":10 - Unresolved top-level overloading
+*** Binding             : foo
+*** Outstanding context : (?x :: Int)

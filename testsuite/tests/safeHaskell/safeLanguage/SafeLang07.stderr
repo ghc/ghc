@@ -1,0 +1,7 @@
+
+SafeLang07.hs:2:14: Warning:
+    -XGeneralizedNewtypeDeriving is not allowed in Safe Haskell; ignoring -XGeneralizedNewtypeDeriving
+
+SafeLang07.hs:15:1:
+    Failed to load interface for ‘SafeLang07_A’
+    Use -v to see a list of the files searched for.

@@ -1,0 +1,22 @@
+
+T8603.hs:29:17:
+    Couldn't match type ‘(->) [a0]’ with ‘[t1]’
+    Expected type: [t1] -> StateT s RV t0
+      Actual type: t2 ((->) [a0]) (StateT s RV t0)
+    The function ‘lift’ is applied to two arguments,
+    but its type ‘([a0] -> StateT s RV t0)
+                  -> t2 ((->) [a0]) (StateT s RV t0)’
+    has only one
+    In a stmt of a 'do' block: prize <- lift uniform [1, 2, 3]
+    In the expression:
+      do { prize <- lift uniform [1, 2, ....];
+           return False }
+
+T8603.hs:29:22:
+    Couldn't match type ‘StateT s RV t0’ with ‘RV a0’
+    Expected type: [a0] -> StateT s RV t0
+      Actual type: [a0] -> RV a0
+    Relevant bindings include
+      testRVState1 :: RVState s Bool (bound at T8603.hs:28:1)
+    In the first argument of ‘lift’, namely ‘uniform’
+    In a stmt of a 'do' block: prize <- lift uniform [1, 2, 3]

@@ -108,7 +108,7 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- an atomic value (e.g. function args)
 
 ppr_expr _       (Var name)    = ppr name
-ppr_expr add_par (Type ty)     = add_par (ptext (sLit "TYPE") <+> ppr ty)       -- Wierd
+ppr_expr add_par (Type ty)     = add_par (ptext (sLit "TYPE") <+> ppr ty)       -- Weird
 ppr_expr add_par (Coercion co) = add_par (ptext (sLit "CO") <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
 
@@ -296,16 +296,23 @@ pprTypedLamBinder bind_site debug_on var
   = sdocWithDynFlags $ \dflags ->
     case () of
     _
-      | not debug_on && isDeadBinder var       -> char '_'
-      | not debug_on, CaseBind <- bind_site    -> -- No parens, no kind info
-                                                  pprUntypedBinder var
-      | gopt Opt_SuppressTypeSignatures dflags -> -- Suppress the signature
-                                                  pprUntypedBinder var
-      | isTyVar var                            -> parens (pprKindedTyVarBndr var)
-      | otherwise ->
-            parens (hang (pprIdBndr var)
-                         2 (vcat [ dcolon <+> pprType (idType var), pp_unf]))
+      | not debug_on            -- Even dead binders can be one-shot
+      , isDeadBinder var        -> char '_' <+> ppWhen (isId var)
+                                                (pprIdBndrInfo (idInfo var))
+
+      | not debug_on            -- No parens, no kind info
+      , CaseBind <- bind_site   -> pprUntypedBinder var
+
+      | suppress_sigs dflags    -> pprUntypedBinder var
+
+      | isTyVar var  -> parens (pprKindedTyVarBndr var)
+
+      | otherwise    -> parens (hang (pprIdBndr var)
+                                   2 (vcat [ dcolon <+> pprType (idType var)
+                                           , pp_unf]))
   where
+    suppress_sigs = gopt Opt_SuppressTypeSignatures
+
     unf_info = unfoldingInfo (idInfo var)
     pp_unf | hasSomeUnfolding unf_info = ptext (sLit "Unf=") <> ppr unf_info
            | otherwise                 = empty
@@ -340,18 +347,18 @@ pprIdBndrInfo info
     prag_info = inlinePragInfo info
     occ_info  = occInfo info
     dmd_info  = demandInfo info
-    lbv_info  = lbvarInfo info
+    lbv_info  = oneShotInfo info
 
     has_prag  = not (isDefaultInlinePragma prag_info)
     has_occ   = not (isNoOcc occ_info)
     has_dmd   = not $ isTopDmd dmd_info 
-    has_lbv   = not (hasNoLBVarInfo lbv_info)
+    has_lbv   = not (hasNoOneShotInfo lbv_info)
 
     doc = showAttributes
           [ (has_prag, ptext (sLit "InlPrag=") <> ppr prag_info)
           , (has_occ,  ptext (sLit "Occ=") <> ppr occ_info)
           , (has_dmd,  ptext (sLit "Dmd=") <> ppr dmd_info)
-          , (has_lbv , ptext (sLit "Lbv=") <> ppr lbv_info)
+          , (has_lbv , ptext (sLit "OS=") <> ppr lbv_info)
           ]
 \end{code}
 
@@ -369,12 +376,13 @@ ppIdInfo id info
     else
     showAttributes
     [ (True, pp_scope <> ppr (idDetails id))
-    , (has_arity,      ptext (sLit "Arity=") <> int arity)
-    , (has_caf_info,   ptext (sLit "Caf=") <> ppr caf_info)
-    , (True,           ptext (sLit "Str=") <> pprStrictness str_info)
-    , (has_unf,        ptext (sLit "Unf=") <> ppr unf_info)
+    , (has_arity,        ptext (sLit "Arity=") <> int arity)
+    , (has_called_arity, ptext (sLit "CallArity=") <> int called_arity)
+    , (has_caf_info,     ptext (sLit "Caf=") <> ppr caf_info)
+    , (True,             ptext (sLit "Str=") <> pprStrictness str_info)
+    , (has_unf,          ptext (sLit "Unf=") <> ppr unf_info)
     , (not (null rules), ptext (sLit "RULES:") <+> vcat (map pprRule rules))
-    ]   -- Inline pragma, occ, demand, lbvar info
+    ]   -- Inline pragma, occ, demand, one-shot info
         -- printed out with all binders (when debug is on);
         -- see PprCore.pprIdBndr
   where
@@ -384,6 +392,9 @@ ppIdInfo id info
 
     arity = arityInfo info
     has_arity = arity /= 0
+
+    called_arity = callArityInfo info
+    has_called_arity = called_arity /= 0
 
     caf_info = cafInfo info
     has_caf_info = not (mayHaveCafRefs caf_info)
@@ -422,15 +433,16 @@ instance Outputable UnfoldingGuidance where
 
 instance Outputable UnfoldingSource where
   ppr InlineCompulsory  = ptext (sLit "Compulsory")
-  ppr (InlineWrapper w) = ptext (sLit "Worker=") <> ppr w
   ppr InlineStable      = ptext (sLit "InlineStable")
   ppr InlineRhs         = ptext (sLit "<vanilla>")
 
 instance Outputable Unfolding where
   ppr NoUnfolding                = ptext (sLit "No unfolding")
   ppr (OtherCon cs)              = ptext (sLit "OtherCon") <+> ppr cs
-  ppr (DFunUnfolding ar con ops) = ptext (sLit "DFun") <> parens (ptext (sLit "arity=") <> int ar)
-                                   <+> ppr con <+> brackets (pprWithCommas ppr ops)
+  ppr (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args })
+       = hang (ptext (sLit "DFun:") <+> ptext (sLit "\\") 
+                <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
+            2 (ppr con <+> sep (map ppr args))
   ppr (CoreUnfolding { uf_src = src
                      , uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf
                      , uf_is_conlike=conlike, uf_is_work_free=wf
@@ -451,10 +463,6 @@ instance Outputable Unfolding where
              | otherwise          = empty
             -- Don't print the RHS or we get a quadratic
             -- blowup in the size of the printout!
-
-instance Outputable e => Outputable (DFunArg e) where
-  ppr (DFunPolyArg e) = braces (ppr e)
-  ppr (DFunLamArg i)  = char '<' <> int i <> char '>'
 \end{code}
 
 -----------------------------------------------------

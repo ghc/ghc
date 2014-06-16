@@ -1,0 +1,7 @@
+-- Test handling of extra fields in the representation due to existentials.
+
+:set -XGADTs -XRankNTypes
+:l ../GADT
+
+let e = Exist 1
+:p e

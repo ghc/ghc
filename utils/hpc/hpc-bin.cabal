@@ -43,7 +43,7 @@ Executable hpc
     if flag(base3) || flag(base4)
         Build-Depends: directory  >= 1   && < 1.3,
                        containers >= 0.1 && < 0.6,
-                       array      >= 0.1 && < 0.5
+                       array      >= 0.1 && < 0.6
     Build-Depends: hpc
     Extensions: CPP
 

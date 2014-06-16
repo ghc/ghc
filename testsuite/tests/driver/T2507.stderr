@@ -1,0 +1,5 @@
+
+T2507.hs:5:7:
+    Couldn't match expected type `Int' with actual type `()'
+    In the expression: ()
+    In an equation for `foo': foo = ()

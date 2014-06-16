@@ -1,0 +1,5 @@
+
+T5978.hs:22:11:
+    No instance for (C Double Char) arising from a use of ‘polyBar’
+    In the expression: polyBar id monoFoo
+    In an equation for ‘monoBar’: monoBar = polyBar id monoFoo

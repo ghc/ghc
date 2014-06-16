@@ -1,0 +1,6 @@
+
+tcfail041.hs:5:1:
+    Illegal implict parameter ‘?imp::Int’
+    In the context: (?imp::Int)
+    While checking the super-classes of class ‘D’
+    In the class declaration for ‘D’

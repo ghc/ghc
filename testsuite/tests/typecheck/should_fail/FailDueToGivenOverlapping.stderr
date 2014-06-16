@@ -1,0 +1,12 @@
+
+FailDueToGivenOverlapping.hs:27:9:
+    Overlapping instances for E [t0] arising from a use of ‘eop’
+    Matching givens (or their superclasses):
+      (E [Int])
+        bound by the type signature for bar :: E [Int] => () -> ()
+        at FailDueToGivenOverlapping.hs:26:8-26
+    Matching instances:
+      instance E [a] -- Defined at FailDueToGivenOverlapping.hs:21:10
+    (The choice depends on the instantiation of ‘t0’)
+    In the expression: eop [undefined]
+    In an equation for ‘bar’: bar _ = eop [undefined]

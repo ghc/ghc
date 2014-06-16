@@ -1,0 +1,16 @@
+
+TcMultiWayIfFail.hs:6:24:
+    Couldn't match expected type ‘Int’ with actual type ‘[Char]’
+    In the expression: "2"
+    In the expression:
+      if | True -> 1 :: Int | False -> "2" | otherwise -> [3 :: Int]
+    In an equation for ‘x1’:
+        x1 = if | True -> 1 :: Int | False -> "2" | otherwise -> [3 :: Int]
+
+TcMultiWayIfFail.hs:7:24:
+    Couldn't match expected type ‘Int’ with actual type ‘[Int]’
+    In the expression: [3 :: Int]
+    In the expression:
+      if | True -> 1 :: Int | False -> "2" | otherwise -> [3 :: Int]
+    In an equation for ‘x1’:
+        x1 = if | True -> 1 :: Int | False -> "2" | otherwise -> [3 :: Int]

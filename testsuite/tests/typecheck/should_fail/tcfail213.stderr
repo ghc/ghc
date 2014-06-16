@@ -1,0 +1,7 @@
+
+tcfail213.hs:8:1:
+    Illegal constraint ‘F a’ in a superclass/instance context
+      (Use UndecidableInstances to permit this)
+    In the context: (F a)
+    While checking the super-classes of class ‘C’
+    In the class declaration for ‘C’

@@ -1,0 +1,22 @@
+# Only compile with optimisation
+setTestOpts( only_ways(['optasm']) )
+
+test('default', normal, compile, [''])
+test('fact', normal, compile, [''])
+test('fun', normal, compile, [''])
+test('goo', normal, compile, [''])
+test('ins', normal, compile, [''])
+test('map', normal, compile, [''])
+test('sim', normal, compile, [''])
+test('str001', normal, compile, [''])
+test('str002', normal, compile, [''])
+test('syn', normal, compile, [''])
+test('test', normal, compile, [''])
+test('tst', normal, compile, [''])
+test('unu', normal, compile, [''])
+test('newtype', req_profiling, compile, ['-prof -auto-all'])
+test('T1988', normal, compile, [''])
+test('T8467', normal, compile, [''])
+test('T8037', normal, compile, [''])
+test('T8743', [ extra_clean(['T8743.o-boot', 'T8743.hi-boot']) ], multimod_compile, ['T8743', '-v0'])
+

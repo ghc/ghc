@@ -1,0 +1,7 @@
+
+annfail06.hs:22:1:
+    GHC stage restriction:
+      instance for ‘Data
+                      InstancesInWrongModule’ is used in a top-level splice or annotation,
+      and must be imported, not defined locally
+    In the annotation: {-# ANN f InstancesInWrongModule #-}

@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- See Note [Deprecations in Hoopl] in Hoopl module
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
 module CmmLive
@@ -11,11 +12,9 @@ module CmmLive
     , cmmGlobalLiveness
     , liveLattice
     , noLiveOnEntry, xferLive, gen, kill, gen_kill
-    , removeDeadAssignments
     )
 where
 
-import UniqSupply
 import DynFlags
 import BlockId
 import Cmm
@@ -98,30 +97,3 @@ xferLive dflags = mkBTransfer3 fst mid lst
         mid n f = gen_kill dflags n f
         lst :: CmmNode O C -> FactBase (CmmLive r) -> CmmLive r
         lst n f = gen_kill dflags n $ joinOutFacts liveLattice n f
-
------------------------------------------------------------------------------
--- Removing assignments to dead variables
------------------------------------------------------------------------------
-
-removeDeadAssignments :: DynFlags -> CmmGraph
-                      -> UniqSM (CmmGraph, BlockEnv CmmLocalLive)
-removeDeadAssignments dflags g =
-   dataflowPassBwd g [] $ analRewBwd liveLattice (xferLive dflags) rewrites
-   where rewrites = mkBRewrite3 nothing middle nothing
-         -- SDM: no need for deepBwdRw here, we only rewrite to empty
-         -- Beware: deepBwdRw with one polymorphic function seems more
-         -- reasonable here, but GHC panics while compiling, see bug
-         -- #4045.
-         middle :: CmmNode O O -> Fact O CmmLocalLive -> CmmReplGraph O O
-         middle (CmmAssign (CmmLocal reg') _) live
-                 | not (reg' `elemRegSet` live)
-                 = return $ Just emptyGraph
-         -- XXX maybe this should be somewhere else...
-         middle (CmmAssign lhs (CmmReg rhs))   _ | lhs == rhs
-                 = return $ Just emptyGraph
-         middle (CmmStore lhs (CmmLoad rhs _)) _ | lhs == rhs
-                 = return $ Just emptyGraph
-         middle _ _ = return Nothing
-
-         nothing :: CmmNode e x -> Fact x CmmLocalLive -> CmmReplGraph e x
-         nothing _ _ = return Nothing

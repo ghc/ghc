@@ -1,0 +1,8 @@
+[1 of 2] Compiling SafeLang14_A     ( SafeLang14_A.hs, SafeLang14_A.o )
+[2 of 2] Compiling Main             ( SafeLang14.hs, SafeLang14.o )
+
+SafeLang14.hs:14:10:
+    Can't create hand written instances of Typeable in Safe Haskell! Can only derive them
+
+SafeLang14.hs:17:10:
+    Can't create hand written instances of Typeable in Safe Haskell! Can only derive them

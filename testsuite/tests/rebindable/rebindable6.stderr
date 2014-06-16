@@ -1,0 +1,67 @@
+
+rebindable6.hs:106:17:
+    No instance for (HasSeq (IO a -> t0 -> IO b))
+      arising from a do statement
+    The type variable ‘t0’ is ambiguous
+    Relevant bindings include
+      g :: IO (Maybe b) (bound at rebindable6.hs:104:19)
+      f :: IO a (bound at rebindable6.hs:104:17)
+      test_do :: IO a -> IO (Maybe b) -> IO b
+        (bound at rebindable6.hs:104:9)
+    Note: there is a potential instance available:
+      instance HasSeq (IO a -> IO b -> IO b)
+        -- Defined at rebindable6.hs:52:18
+    In a stmt of a 'do' block: f
+    In the expression:
+      do { f;
+           Just (b :: b) <- g;
+           return b }
+    In an equation for ‘test_do’:
+        test_do f g
+          = do { f;
+                 Just (b :: b) <- g;
+                 return b }
+
+rebindable6.hs:107:17:
+    No instance for (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t0))
+      arising from a do statement
+    The type variables ‘t0’, ‘t1’ are ambiguous
+    Relevant bindings include
+      g :: IO (Maybe b) (bound at rebindable6.hs:104:19)
+      test_do :: IO a -> IO (Maybe b) -> IO b
+        (bound at rebindable6.hs:104:9)
+    Note: there is a potential instance available:
+      instance HasBind (IO a -> (a -> IO b) -> IO b)
+        -- Defined at rebindable6.hs:47:18
+    In a stmt of a 'do' block: Just (b :: b) <- g
+    In the expression:
+      do { f;
+           Just (b :: b) <- g;
+           return b }
+    In an equation for ‘test_do’:
+        test_do f g
+          = do { f;
+                 Just (b :: b) <- g;
+                 return b }
+
+rebindable6.hs:108:17:
+    No instance for (HasReturn (b -> t1))
+      arising from a use of ‘return’
+    The type variable ‘t1’ is ambiguous
+    Relevant bindings include
+      b :: b (bound at rebindable6.hs:107:23)
+      g :: IO (Maybe b) (bound at rebindable6.hs:104:19)
+      test_do :: IO a -> IO (Maybe b) -> IO b
+        (bound at rebindable6.hs:104:9)
+    Note: there is a potential instance available:
+      instance HasReturn (a -> IO a) -- Defined at rebindable6.hs:42:18
+    In a stmt of a 'do' block: return b
+    In the expression:
+      do { f;
+           Just (b :: b) <- g;
+           return b }
+    In an equation for ‘test_do’:
+        test_do f g
+          = do { f;
+                 Just (b :: b) <- g;
+                 return b }

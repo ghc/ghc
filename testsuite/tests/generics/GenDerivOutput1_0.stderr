@@ -1,0 +1,66 @@
+
+==================== Derived instances ====================
+Derived instances:
+  instance GHC.Generics.Generic1 GenDerivOutput1_0.List where
+    GHC.Generics.from1 GenDerivOutput1_0.Nil
+      = GHC.Generics.M1
+          (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1))
+    GHC.Generics.from1 (GenDerivOutput1_0.Cons g1 g2)
+      = GHC.Generics.M1
+          (GHC.Generics.R1
+             (GHC.Generics.M1
+                ((GHC.Generics.:*:)
+                   (GHC.Generics.M1 (GHC.Generics.Par1 g1))
+                   (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))))
+    GHC.Generics.to1
+      (GHC.Generics.M1 (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)))
+      = GenDerivOutput1_0.Nil
+    GHC.Generics.to1
+      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
+                                                                             (GHC.Generics.M1 g2)))))
+      = GenDerivOutput1_0.Cons
+          (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
+  
+  instance GHC.Generics.Datatype GenDerivOutput1_0.D1List where
+    GHC.Generics.datatypeName _ = "List"
+    GHC.Generics.moduleName _ = "GenDerivOutput1_0"
+  
+  instance GHC.Generics.Constructor GenDerivOutput1_0.C1_0List where
+    GHC.Generics.conName _ = "Nil"
+  
+  instance GHC.Generics.Constructor GenDerivOutput1_0.C1_1List where
+    GHC.Generics.conName _ = "Cons"
+    GHC.Generics.conIsRecord _ = GHC.Types.True
+  
+  instance GHC.Generics.Selector GenDerivOutput1_0.S1_1_0List where
+    GHC.Generics.selName _ = "element"
+  
+  instance GHC.Generics.Selector GenDerivOutput1_0.S1_1_1List where
+    GHC.Generics.selName _ = "rest"
+  
+
+Generic representation:
+  
+  Generated datatypes for meta-information:
+    GenDerivOutput1_0.D1List
+    GenDerivOutput1_0.C1_0List
+    GenDerivOutput1_0.C1_1List
+    GenDerivOutput1_0.S1_1_0List
+    GenDerivOutput1_0.S1_1_1List
+  
+  Representation types:
+    type GHC.Generics.Rep1 GenDerivOutput1_0.List = GHC.Generics.D1
+                                                      GenDerivOutput1_0.D1List
+                                                      (GHC.Generics.C1
+                                                         GenDerivOutput1_0.C1_0List GHC.Generics.U1
+                                                       GHC.Generics.:+: GHC.Generics.C1
+                                                                          GenDerivOutput1_0.C1_1List
+                                                                          (GHC.Generics.S1
+                                                                             GenDerivOutput1_0.S1_1_0List
+                                                                             GHC.Generics.Par1
+                                                                           GHC.Generics.:*: GHC.Generics.S1
+                                                                                              GenDerivOutput1_0.S1_1_1List
+                                                                                              (GHC.Generics.Rec1
+                                                                                                 GenDerivOutput1_0.List)))
+
+

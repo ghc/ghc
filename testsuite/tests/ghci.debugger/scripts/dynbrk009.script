@@ -1,0 +1,10 @@
+-- Instrumentation should not set breakpoints around unlifted values.
+-- Also unlifted types are not bound at a breakpoint currently.
+
+:l dynbrk009.hs
+:st test
+:st
+:st
+:st
+:st
+:st

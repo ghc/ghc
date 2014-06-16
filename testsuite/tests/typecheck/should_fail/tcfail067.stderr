@@ -1,0 +1,76 @@
+
+tcfail067.hs:1:14: Warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
+tcfail067.hs:12:16:
+    No instance for (Ord a) arising from a use of ‘SubRange’
+    Possible fix:
+      add (Ord a) to the context of
+        the type signature for subRangeValue :: SubRange a -> a
+    In the pattern: SubRange (lower, upper) value
+    In an equation for ‘subRangeValue’:
+        subRangeValue (SubRange (lower, upper) value) = value
+
+tcfail067.hs:15:11:
+    No instance for (Ord a) arising from a use of ‘SubRange’
+    Possible fix:
+      add (Ord a) to the context of
+        the type signature for subRange :: SubRange a -> (a, a)
+    In the pattern: SubRange r value
+    In an equation for ‘subRange’: subRange (SubRange r value) = r
+
+tcfail067.hs:46:12:
+    Could not deduce (Ord a) arising from a use of ‘SubRange’
+    from the context (Show a)
+      bound by the type signature for
+                 showRange :: Show a => SubRange a -> String
+      at tcfail067.hs:45:14-43
+    Possible fix:
+      add (Ord a) to the context of
+        the type signature for showRange :: Show a => SubRange a -> String
+    In the pattern: SubRange (lower, upper) value
+    In an equation for ‘showRange’:
+        showRange (SubRange (lower, upper) value)
+          = show value ++ " :" ++ show lower ++ ".." ++ show upper
+
+tcfail067.hs:61:12:
+    Could not deduce (Show a) arising from a use of ‘numSubRangeNegate’
+    from the context (Num a)
+      bound by the instance declaration at tcfail067.hs:60:10-34
+    Possible fix:
+      add (Show a) to the context of the instance declaration
+    In the expression: numSubRangeNegate
+    In an equation for ‘negate’: negate = numSubRangeNegate
+    In the instance declaration for ‘Num (SubRange a)’
+
+tcfail067.hs:65:19:
+    Could not deduce (Ord a) arising from a use of ‘SubRange’
+    from the context (Num a)
+      bound by the instance declaration at tcfail067.hs:60:10-34
+    Possible fix:
+      add (Ord a) to the context of the instance declaration
+    In the expression:
+      SubRange (fromInteger a, fromInteger a) (fromInteger a)
+    In an equation for ‘fromInteger’:
+        fromInteger a
+          = SubRange (fromInteger a, fromInteger a) (fromInteger a)
+    In the instance declaration for ‘Num (SubRange a)’
+
+tcfail067.hs:74:5:
+    Could not deduce (Ord a) arising from a use of ‘SubRange’
+    from the context (Num a)
+      bound by the type signature for
+                 numSubRangeBinOp :: Num a =>
+                                     (a -> a -> a) -> SubRange a -> SubRange a -> SubRange a
+      at tcfail067.hs:(71,21)-(72,58)
+    Possible fix:
+      add (Ord a) to the context of
+        the type signature for
+          numSubRangeBinOp :: Num a =>
+                              (a -> a -> a) -> SubRange a -> SubRange a -> SubRange a
+    In the expression: SubRange (result, result) result
+    In an equation for ‘numSubRangeBinOp’:
+        numSubRangeBinOp op a b
+          = SubRange (result, result) result
+          where
+              result = (subRangeValue a) `op` (subRangeValue b)

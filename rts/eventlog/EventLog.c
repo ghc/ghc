@@ -198,19 +198,13 @@ static inline void postEventHeader(EventsBuf *eb, EventTypeNum type)
 {
     postEventTypeNum(eb, type);
     postTimestamp(eb);
-}    
+}
 
 static inline void postInt8(EventsBuf *eb, StgInt8 i)
 { postWord8(eb, (StgWord8)i); }
 
-static inline void postInt16(EventsBuf *eb, StgInt16 i)
-{ postWord16(eb, (StgWord16)i); }
-
 static inline void postInt32(EventsBuf *eb, StgInt32 i)
 { postWord32(eb, (StgWord32)i); }
-
-static inline void postInt64(EventsBuf *eb, StgInt64 i)
-{ postWord64(eb, (StgWord64)i); }
 
 
 void

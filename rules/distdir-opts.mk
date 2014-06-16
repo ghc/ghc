@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -14,6 +14,10 @@
 # Set compilation flags that additionally depend on a particular way
 
 define distdir-opts # args: $1 = dir, $2 = distdir, $3 = stage
+
+ifeq "$3" ""
+$$(error Stage not given for distdir-opts $1 $2)
+endif
 
 ifeq "$3" "0"
 # This is a bit of a hack.
@@ -85,8 +89,6 @@ $1_$2_ALL_HSC2HS_OPTS = \
  $$(SRC_HSC2HS_OPTS) \
  $$(SRC_HSC2HS_OPTS_STAGE$3) \
  --cflag=-D__GLASGOW_HASKELL__=$$(if $$(filter 0,$3),$$(GhcCanonVersion),$$(ProjectVersionInt)) \
- --cflag=-D$$(HostArch_CPP)_HOST_ARCH=1 \
- --cflag=-D$$(HostOS_CPP)_HOST_OS=1 \
  $$($1_$2_HSC2HS_CC_OPTS) \
  $$($1_$2_HSC2HS_LD_OPTS) \
  --cflag=-I$1/$2/build/autogen \

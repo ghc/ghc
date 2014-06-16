@@ -52,9 +52,11 @@ import Data.Map (Map)
 import Data.Word
 import System.IO
 import qualified Data.Map as Map
+import Control.Monad (liftM, ap)
+import Control.Applicative (Applicative(..))
 
-import Data.Array.Unsafe ( castSTUArray )
-import Data.Array.ST hiding ( castSTUArray )
+import qualified Data.Array.Unsafe as U ( castSTUArray )
+import Data.Array.ST
 
 -- --------------------------------------------------------------------------
 -- Top level
@@ -189,7 +191,6 @@ pprStmt stmt =
           rep = cmmExprType dflags src
 
     CmmUnsafeForeignCall target@(ForeignTarget fn conv) results args ->
-        maybe_proto $$
         fnCall
         where
         (res_hints, arg_hints) = foreignTargetHints target
@@ -200,40 +201,30 @@ pprStmt stmt =
 
         cast_fn = parens (cCast (pprCFunType (char '*') cconv hresults hargs) fn)
 
-        real_fun_proto lbl = char ';' <>
-                        pprCFunType (ppr lbl) cconv hresults hargs <>
-                        noreturn_attr <> semi
-
-        noreturn_attr = case ret of
-                          CmmNeverReturns -> text "__attribute__ ((noreturn))"
-                          CmmMayReturn    -> empty
-
         -- See wiki:Commentary/Compiler/Backends/PprC#Prototypes
-        (maybe_proto, fnCall) =
+        fnCall =
             case fn of
               CmmLit (CmmLabel lbl)
                 | StdCallConv <- cconv ->
-                    let myCall = pprCall (ppr lbl) cconv hresults hargs
-                    in (real_fun_proto lbl, myCall)
+                    pprCall (ppr lbl) cconv hresults hargs
                         -- stdcall functions must be declared with
                         -- a function type, otherwise the C compiler
                         -- doesn't add the @n suffix to the label.  We
                         -- can't add the @n suffix ourselves, because
                         -- it isn't valid C.
                 | CmmNeverReturns <- ret ->
-                    let myCall = pprCall (ppr lbl) cconv hresults hargs
-                    in (real_fun_proto lbl, myCall)
+                    pprCall cast_fn cconv hresults hargs <> semi
                 | not (isMathFun lbl) ->
                     pprForeignCall (ppr lbl) cconv hresults hargs
               _ ->
-                   (empty {- no proto -},
-                    pprCall cast_fn cconv hresults hargs <> semi)
+                    pprCall cast_fn cconv hresults hargs <> semi
                         -- for a dynamic call, no declaration is necessary.
 
     CmmUnsafeForeignCall (PrimTarget MO_Touch) _results _args -> empty
+    CmmUnsafeForeignCall (PrimTarget (MO_Prefetch_Data _)) _results _args -> empty
 
     CmmUnsafeForeignCall target@(PrimTarget op) results args ->
-        proto $$ fn_call
+        fn_call
       where
         cconv = CCallConv
         fn = pprCallishMachOp_for_C op
@@ -242,15 +233,16 @@ pprStmt stmt =
         hresults = zip results res_hints
         hargs    = zip args arg_hints
 
-        (proto, fn_call)
+        fn_call
           -- The mem primops carry an extra alignment arg, must drop it.
           -- We could maybe emit an alignment directive using this info.
           -- We also need to cast mem primops to prevent conflicts with GCC
           -- builtins (see bug #5967).
           | op `elem` [MO_Memcpy, MO_Memset, MO_Memmove]
-          = pprForeignCall fn cconv hresults (init hargs)
+          = (ptext (sLit ";EF_(") <> fn <> char ')' <> semi) $$
+            pprForeignCall fn cconv hresults (init hargs)
           | otherwise
-          = (empty, pprCall fn cconv hresults hargs)
+          = pprCall fn cconv hresults hargs
 
     CmmBranch ident          -> pprBranch ident
     CmmCondBranch expr yes no -> pprCondBranch expr yes no
@@ -263,8 +255,8 @@ pprStmt stmt =
 type Hinted a = (a, ForeignHint)
 
 pprForeignCall :: SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted CmmActual]
-               -> (SDoc, SDoc)
-pprForeignCall fn cconv results args = (proto, fn_call)
+               -> SDoc
+pprForeignCall fn cconv results args = fn_call
   where
     fn_call = braces (
                  pprCFunType (char '*' <> text "ghcFunPtr") cconv results args <> semi
@@ -272,7 +264,6 @@ pprForeignCall fn cconv results args = (proto, fn_call)
               $$ pprCall (text "ghcFunPtr") cconv results args <> semi
              )
     cast_fn = parens (parens (pprCFunType (char '*') cconv results args) <> fn)
-    proto = ptext (sLit ";EF_(") <> fn <> char ')' <> semi
 
 pprCFunType :: SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted CmmActual] -> SDoc
 pprCFunType ppr_fn cconv ress args
@@ -661,6 +652,15 @@ pprMachOp_for_C mop = case mop of
                                 (panic $ "PprC.pprMachOp_for_C: MO_VS_Neg"
                                       ++ " should have been handled earlier!")
 
+        MO_VU_Quot {}     -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VU_Quot")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Quot"
+                                      ++ " should have been handled earlier!")
+        MO_VU_Rem {}      -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VU_Rem")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Rem"
+                                      ++ " should have been handled earlier!")
+
         MO_VF_Insert {}   -> pprTrace "offending mop:"
                                 (ptext $ sLit "MO_VF_Insert")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Insert"
@@ -750,6 +750,7 @@ pprCallishMachOp_for_C mop
         MO_Memcpy       -> ptext (sLit "memcpy")
         MO_Memset       -> ptext (sLit "memset")
         MO_Memmove      -> ptext (sLit "memmove")
+        (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
         (MO_UF_Conv w)  -> ptext (sLit $ word2FloatLabel w)
 
@@ -759,7 +760,9 @@ pprCallishMachOp_for_C mop
         MO_Add2       {} -> unsupported
         MO_U_Mul2     {} -> unsupported
         MO_Touch         -> unsupported
-        MO_Prefetch_Data -> unsupported
+        (MO_Prefetch_Data _ ) -> unsupported
+        --- we could support prefetch via "__builtin_prefetch"
+        --- Not adding it for now
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")
 
@@ -949,6 +952,7 @@ is_cishCC CCallConv    = True
 is_cishCC CApiConv     = True
 is_cishCC StdCallConv  = True
 is_cishCC PrimCallConv = False
+is_cishCC JavaScriptCallConv = False
 
 -- ---------------------------------------------------------------------
 -- Find and print local and external declarations for a list of
@@ -995,6 +999,13 @@ pprExternDecl _in_srt lbl
 
 type TEState = (UniqSet LocalReg, Map CLabel ())
 newtype TE a = TE { unTE :: TEState -> (a, TEState) }
+
+instance Functor TE where
+      fmap = liftM
+
+instance Applicative TE where
+      pure = return
+      (<*>) = ap
 
 instance Monad TE where
    TE m >>= k  = TE $ \s -> case m s of (a, s') -> unTE (k a) s'
@@ -1152,10 +1163,10 @@ big_doubles dflags
   | otherwise = panic "big_doubles"
 
 castFloatToIntArray :: STUArray s Int Float -> ST s (STUArray s Int Int)
-castFloatToIntArray = castSTUArray
+castFloatToIntArray = U.castSTUArray
 
 castDoubleToIntArray :: STUArray s Int Double -> ST s (STUArray s Int Int)
-castDoubleToIntArray = castSTUArray
+castDoubleToIntArray = U.castSTUArray
 
 -- floats are always 1 word
 floatToWord :: DynFlags -> Rational -> CmmLit

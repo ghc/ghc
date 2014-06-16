@@ -89,6 +89,19 @@ High-level only:
   - pushing stack frames:
     push (info_ptr, field1, ..., fieldN) { ... statements ... }
 
+  - reserving temporary stack space:
+
+      reserve N = x { ... }
+
+    this reserves an area of size N (words) on the top of the stack,
+    and binds its address to x (a local register).  Typically this is
+    used for allocating temporary storage for passing to foreign
+    functions.
+
+    Note that if you make any native calls or invoke the GC in the
+    scope of the reserve block, you are responsible for ensuring that
+    the stack you reserved is laid out correctly with an info table.
+
 Low-level only:
 
   - References to Sp, R1-R8, F1-F4 etc.
@@ -104,14 +117,39 @@ Both high-level and low-level code can use a raw tail-call:
 
     jump stg_fun [R1,R2]
 
-This always transfers control to a low-level Cmm function, but the
-call can be made from high-level code.  Arguments must be passed
-explicitly in R/F/D/L registers.
-
 NB. you *must* specify the list of GlobalRegs that are passed via a
 jump, otherwise the register allocator will assume that all the
 GlobalRegs are dead at the jump.
 
+
+Calling Conventions
+-------------------
+
+High-level procedures use the NativeNode calling convention, or the
+NativeReturn convention if the 'return' keyword is used (see Stack
+Frames below).
+
+Low-level procedures implement their own calling convention, so it can
+be anything at all.
+
+If a low-level procedure implements the NativeNode calling convention,
+then it can be called by high-level code using an ordinary function
+call.  In general this is hard to arrange because the calling
+convention depends on the number of physical registers available for
+parameter passing, but there are two cases where the calling
+convention is platform-independent:
+
+ - Zero arguments.
+
+ - One argument of pointer or non-pointer word type; this is always
+   passed in R1 according to the NativeNode convention.
+
+ - Returning a single value; these conventions are fixed and platform
+   independent.
+
+
+Stack Frames
+------------
 
 A stack frame is written like this:
 
@@ -162,7 +200,7 @@ convention.
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
 module CmmParse ( parseCmmFile ) where
@@ -183,6 +221,7 @@ import StgCmmLayout     hiding (ArgRep(..))
 import StgCmmTicky
 import StgCmmBind       ( emitBlackHoleCode, emitUpdateFrame )
 
+import CmmOpt
 import MkGraph
 import Cmm
 import CmmUtils
@@ -277,6 +316,7 @@ import Data.Maybe
         'foreign'       { L _ (CmmT_foreign) }
         'never'         { L _ (CmmT_never) }
         'prim'          { L _ (CmmT_prim) }
+        'reserve'       { L _ (CmmT_reserve) }
         'return'        { L _ (CmmT_return) }
         'returns'       { L _ (CmmT_returns) }
         'import'        { L _ (CmmT_import) }
@@ -289,6 +329,8 @@ import Data.Maybe
         'bits32'        { L _ (CmmT_bits32) }
         'bits64'        { L _ (CmmT_bits64) }
         'bits128'       { L _ (CmmT_bits128) }
+        'bits256'       { L _ (CmmT_bits256) }
+        'bits512'       { L _ (CmmT_bits512) }
         'float32'       { L _ (CmmT_float32) }
         'float64'       { L _ (CmmT_float64) }
         'gcptr'         { L _ (CmmT_gcptr) }
@@ -557,7 +599,7 @@ stmt    :: { CmmParse () }
         -- we tweak the syntax to avoid the conflict.  The later
         -- option is taken here because the other way would require
         -- multiple levels of expanding and get unwieldy.
-        | foreign_results 'foreign' STRING expr '(' cmm_hint_exprs0 ')' safety opt_never_returns ';'
+        | foreign_results 'foreign' STRING foreignLabel '(' cmm_hint_exprs0 ')' safety opt_never_returns ';'
                 {% foreignCall $3 $1 $4 $6 $8 $9 }
         | foreign_results 'prim' '%' NAME '(' exprs0 ')' ';'
                 {% primCall $1 $4 $6 }
@@ -587,6 +629,11 @@ stmt    :: { CmmParse () }
                 { cmmIfThenElse $2 $4 $6 }
         | 'push' '(' exprs0 ')' maybe_body
                 { pushStackFrame $3 $5 }
+        | 'reserve' expr '=' lreg maybe_body
+                { reserveStackFrame $2 $4 $5 }
+
+foreignLabel     :: { CmmParse CmmExpr }
+        : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 Nothing ForeignLabelInThisPackage IsFunction))) }
 
 opt_never_returns :: { CmmReturnInfo }
         :                               { CmmMayReturn }
@@ -774,6 +821,8 @@ typenot8 :: { CmmType }
         | 'bits32'              { b32 }
         | 'bits64'              { b64 }
         | 'bits128'             { b128 }
+        | 'bits256'             { b256 }
+        | 'bits512'             { b512 }
         | 'float32'             { f32 }
         | 'float64'             { f64 }
         | 'gcptr'               {% do dflags <- getDynFlags; return $ gcWord dflags }
@@ -920,8 +969,16 @@ callishMachOps = listToUFM $
         ( "write_barrier", MO_WriteBarrier ),
         ( "memcpy", MO_Memcpy ),
         ( "memset", MO_Memset ),
-        ( "memmove", MO_Memmove )
+        ( "memmove", MO_Memmove ),
+
+        ("prefetch0",MO_Prefetch_Data 0),
+        ("prefetch1",MO_Prefetch_Data 1),
+        ("prefetch2",MO_Prefetch_Data 2),
+        ("prefetch3",MO_Prefetch_Data 3)
+
         -- ToDo: the rest, maybe
+        -- edit: which rest?
+        -- also: how do we tell CMM Lint how to type check callish macops?
     ]
 
 parseSafety :: String -> P Safety
@@ -1002,8 +1059,7 @@ stmtMacros = listToUFM [
                                         tickyAllocPAP goods slop ),
   ( fsLit "TICK_ALLOC_UP_THK",     \[goods,slop] ->
                                         tickyAllocThunk goods slop ),
-  ( fsLit "UPD_BH_UPDATABLE",      \[reg] -> emitBlackHoleCode False reg ),
-  ( fsLit "UPD_BH_SINGLE_ENTRY",   \[reg] -> emitBlackHoleCode True  reg )
+  ( fsLit "UPD_BH_UPDATABLE",      \[reg] -> emitBlackHoleCode reg )
  ]
 
 emitPushUpdateFrame :: CmmExpr -> CmmExpr -> FCode ()
@@ -1020,6 +1076,24 @@ pushStackFrame fields body = do
                                            [] updfr_off exprs
   emit g
   withUpdFrameOff new_updfr_off body
+
+reserveStackFrame
+  :: CmmParse CmmExpr
+  -> CmmParse CmmReg
+  -> CmmParse ()
+  -> CmmParse ()
+reserveStackFrame psize preg body = do
+  dflags <- getDynFlags
+  old_updfr_off <- getUpdFrameOff
+  reg <- preg
+  esize <- psize
+  let size = case constantFoldExpr dflags esize of
+               CmmLit (CmmInt n _) -> n
+               _other -> pprPanic "CmmParse: not a compile-time integer: "
+                            (ppr esize)
+  let frame = old_updfr_off + wORD_SIZE dflags * fromIntegral size
+  emitAssign reg (CmmStackSlot Old frame)
+  withUpdFrameOff frame body
 
 profilingInfo dflags desc_str ty_str
   = if not (gopt Opt_SccProfilingOn dflags)
@@ -1260,7 +1334,7 @@ forkLabelledCode p = do
 initEnv :: DynFlags -> Env
 initEnv dflags = listToUFM [
   ( fsLit "SIZEOF_StgHeader",
-    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags * wORD_SIZE dflags)) (wordWidth dflags)) )),
+    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags)) (wordWidth dflags)) )),
   ( fsLit "SIZEOF_StgInfoTable",
     VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB dflags)) (wordWidth dflags)) ))
   ]

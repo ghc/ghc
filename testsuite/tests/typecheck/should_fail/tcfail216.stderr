@@ -1,0 +1,4 @@
+
+tcfail216.hs:5:1:
+    Cycle in class declaration (via superclasses): A -> A
+    In the class declaration for ‘A’

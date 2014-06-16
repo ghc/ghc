@@ -18,7 +18,7 @@ module CmmExpr
     , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
     , regSetToList
     , regUsedIn
-    
+
     , Area(..)
     , module CmmMachOp
     , module CmmType
@@ -50,6 +50,7 @@ data CmmExpr
   | CmmMachOp MachOp [CmmExpr]  -- Machine operation (+, -, *, etc.)
   | CmmStackSlot Area {-# UNPACK #-} !Int
                                 -- addressing expression of a stack slot
+                                -- See Note [CmmStackSlot aliasing]
   | CmmRegOff !CmmReg Int
         -- CmmRegOff reg i
         --        ** is shorthand only, meaning **
@@ -94,6 +95,74 @@ necessarily at the young end of the Old area.
 
 End of note -}
 
+
+{- Note [CmmStackSlot aliasing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When do two CmmStackSlots alias?
+
+ - T[old+N] aliases with U[young(L)+M] for all T, U, L, N and M
+ - T[old+N] aliases with U[old+M] only if the areas actually overlap
+
+Or more informally, different Areas may overlap with each other.
+
+An alternative semantics, that we previously had, was that different
+Areas do not overlap.  The problem that lead to redefining the
+semantics of stack areas is described below.
+
+e.g. if we had
+
+    x = Sp[old + 8]
+    y = Sp[old + 16]
+
+    Sp[young(L) + 8]  = L
+    Sp[young(L) + 16] = y
+    Sp[young(L) + 24] = x
+    call f() returns to L
+
+if areas semantically do not overlap, then we might optimise this to
+
+    Sp[young(L) + 8]  = L
+    Sp[young(L) + 16] = Sp[old + 8]
+    Sp[young(L) + 24] = Sp[old + 16]
+    call f() returns to L
+
+and now young(L) cannot be allocated at the same place as old, and we
+are doomed to use more stack.
+
+  - old+8  conflicts with young(L)+8
+  - old+16 conflicts with young(L)+16 and young(L)+8
+
+so young(L)+8 == old+24 and we get
+
+    Sp[-8]  = L
+    Sp[-16] = Sp[8]
+    Sp[-24] = Sp[0]
+    Sp -= 24
+    call f() returns to L
+
+However, if areas are defined to be "possibly overlapping" in the
+semantics, then we cannot commute any loads/stores of old with
+young(L), and we will be able to re-use both old+8 and old+16 for
+young(L).
+
+    x = Sp[8]
+    y = Sp[0]
+
+    Sp[8] = L
+    Sp[0] = y
+    Sp[-8] = x
+    Sp = Sp - 8
+    call f() returns to L
+
+Now, the assignments of y go away,
+
+    x = Sp[8]
+    Sp[8] = L
+    Sp[-8] = x
+    Sp = Sp - 8
+    call f() returns to L
+-}
+
 data CmmLit
   = CmmInt !Integer  Width
         -- Interpretation: the 2's complement representation of the value
@@ -119,7 +188,11 @@ data CmmLit
         -- Invariant: must be a continuation BlockId
         -- See Note [Continuation BlockId] in CmmNode.
 
-  | CmmHighStackMark -- stands for the max stack space used during a procedure
+  | CmmHighStackMark -- A late-bound constant that stands for the max
+                     -- #bytes of stack space used during a procedure.
+                     -- During the stack-layout pass, CmmHighStackMark
+                     -- is replaced by a CmmInt for the actual number
+                     -- of bytes used
   deriving Eq
 
 cmmExprType :: DynFlags -> CmmExpr -> CmmType
@@ -336,7 +409,13 @@ data GlobalReg
   | LongReg             -- long int registers (64-bit, really)
         {-# UNPACK #-} !Int     -- its number
 
-  | XmmReg                      -- 128-bit SIMD vector register 
+  | XmmReg                      -- 128-bit SIMD vector register
+        {-# UNPACK #-} !Int     -- its number
+
+  | YmmReg                      -- 256-bit SIMD vector register 
+        {-# UNPACK #-} !Int     -- its number
+
+  | ZmmReg                      -- 512-bit SIMD vector register 
         {-# UNPACK #-} !Int     -- its number
 
   -- STG registers
@@ -375,6 +454,8 @@ instance Eq GlobalReg where
    DoubleReg i == DoubleReg j = i==j
    LongReg i == LongReg j = i==j
    XmmReg i == XmmReg j = i==j
+   YmmReg i == YmmReg j = i==j
+   ZmmReg i == ZmmReg j = i==j
    Sp == Sp = True
    SpLim == SpLim = True
    Hp == Hp = True
@@ -397,6 +478,8 @@ instance Ord GlobalReg where
    compare (DoubleReg i) (DoubleReg j) = compare i j
    compare (LongReg i)   (LongReg   j) = compare i j
    compare (XmmReg i)    (XmmReg    j) = compare i j
+   compare (YmmReg i)    (YmmReg    j) = compare i j
+   compare (ZmmReg i)    (ZmmReg    j) = compare i j
    compare Sp Sp = EQ
    compare SpLim SpLim = EQ
    compare Hp Hp = EQ
@@ -420,6 +503,10 @@ instance Ord GlobalReg where
    compare _ (LongReg _)      = GT
    compare (XmmReg _) _       = LT
    compare _ (XmmReg _)       = GT
+   compare (YmmReg _) _       = LT
+   compare _ (YmmReg _)       = GT
+   compare (ZmmReg _) _       = LT
+   compare _ (ZmmReg _)       = GT
    compare Sp _ = LT
    compare _ Sp = GT
    compare SpLim _ = LT
@@ -463,6 +550,8 @@ globalRegType _      (FloatReg _)      = cmmFloat W32
 globalRegType _      (DoubleReg _)     = cmmFloat W64
 globalRegType _      (LongReg _)       = cmmBits W64
 globalRegType _      (XmmReg _)        = cmmVec 4 (cmmBits W32)
+globalRegType _      (YmmReg _)        = cmmVec 8 (cmmBits W32)
+globalRegType _      (ZmmReg _)        = cmmVec 16 (cmmBits W32)
 
 globalRegType dflags Hp                = gcWord dflags
                                             -- The initialiser for all
@@ -475,4 +564,6 @@ isArgReg (FloatReg {})   = True
 isArgReg (DoubleReg {})  = True
 isArgReg (LongReg {})    = True
 isArgReg (XmmReg {})     = True
+isArgReg (YmmReg {})     = True
+isArgReg (ZmmReg {})     = True
 isArgReg _               = False

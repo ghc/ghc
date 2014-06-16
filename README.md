@@ -1,12 +1,12 @@
 The Glasgow Haskell Compiler
 ============================
 
-This is the source tree for [GHC] [1], a compiler and interactive
+This is the source tree for [GHC][1], a compiler and interactive
 environment for the Haskell functional programming language.
 
-For more information, visit [GHC's web site] [1].
+For more information, visit [GHC's web site][1].
 
-Information for developers of GHC can be found on the [GHC Trac] [2].
+Information for developers of GHC can be found on the [GHC Trac][2].
 
 
 Getting the Source
@@ -36,7 +36,7 @@ There are two ways to get a source tree:
   This checks out the "boot" packages.
 
   **DO NOT submit pull request directly to the github repo.**
-  *See the GHC developer team's working conventions re [contributing patches](http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions/Git#Contributingpatches "hackage.haskell.org/trac/ghc/wiki/WorkingConventions/Git#Contributingpatches").*
+  *See the GHC developer team's working conventions re [contributing patches](http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/Git#Contributingpatches "ghc.haskell.org/trac/ghc/wiki/WorkingConventions/Git#Contributingpatches").*
 
 
 Building & Installing
@@ -115,20 +115,20 @@ groups from around the world. We'd like to thank them all, and invite
 you to join!
 
   [1]:  http://www.haskell.org/ghc/            "www.haskell.org/ghc/"
-  [2]:  http://hackage.haskell.org/trac/ghc    "hackage.haskell.org/trac/ghc"
-  [3]:  http://hackage.haskell.org/trac/ghc/wiki/Building
-          "hackage.haskell.org/trac/ghc/wiki/Building"
+  [2]:  http://ghc.haskell.org/trac/ghc    "ghc.haskell.org/trac/ghc"
+  [3]:  http://ghc.haskell.org/trac/ghc/wiki/Building
+          "ghc.haskell.org/trac/ghc/wiki/Building"
   [4]:  http://www.haskell.org/happy/          "www.haskell.org/happy/"
   [5]:  http://www.haskell.org/alex/           "www.haskell.org/alex/"
   [6]:  http://www.haskell.org/haddock/        "www.haskell.org/haddock/"
-  [7]:  http://hackage.haskell.org/trac/ghc/wiki/Building/SyncAll
-          "http://hackage.haskell.org/trac/ghc/wiki/Building/SyncAll"
-  [8]:  http://hackage.haskell.org/trac/ghc/wiki/Building/Preparation
-          "http://hackage.haskell.org/trac/ghc/wiki/Building/Preparation"
+  [7]:  http://ghc.haskell.org/trac/ghc/wiki/Building/SyncAll
+          "http://ghc.haskell.org/trac/ghc/wiki/Building/SyncAll"
+  [8]:  http://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
+          "http://ghc.haskell.org/trac/ghc/wiki/Building/Preparation"
   [9]:  http://www.haskell.org/cabal/          "http://www.haskell.org/cabal/"
-  [10]: http://hackage.haskell.org/trac/ghc/
-          "http://hackage.haskell.org/trac/ghc/"
+  [10]: http://ghc.haskell.org/trac/ghc/
+          "http://ghc.haskell.org/trac/ghc/"
   [11]: http://www.haskell.org/pipermail/glasgow-haskell-users/
           "http://www.haskell.org/pipermail/glasgow-haskell-users/"
-  [12]: http://hackage.haskell.org/trac/ghc/wiki/Contributors
-          "http://hackage.haskell.org/trac/ghc/wiki/Contributors"
+  [12]: http://ghc.haskell.org/trac/ghc/wiki/Contributors
+          "http://ghc.haskell.org/trac/ghc/wiki/Contributors"

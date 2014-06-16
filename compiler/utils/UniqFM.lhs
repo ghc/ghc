@@ -20,7 +20,7 @@ and ``addToUFM\_C'' and ``Data.IntMap.insertWith'' differ in the order
 of arguments of combining function.
 
 \begin{code}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveTraversable, GeneralizedNewtypeDeriving #-}
 
 {-# OPTIONS -Wall #-}
 module UniqFM (
@@ -45,6 +45,7 @@ module UniqFM (
         delListFromUFM,
         plusUFM,
         plusUFM_C,
+        plusUFM_CD,
         minusUFM,
         intersectUFM,
         intersectUFM_C,
@@ -58,6 +59,7 @@ module UniqFM (
         lookupUFM, lookupUFM_Directly,
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
         eltsUFM, keysUFM, splitUFM,
+        ufmToSet_Directly,
         ufmToList,
         joinUFM
     ) where
@@ -69,10 +71,12 @@ import Compiler.Hoopl   hiding (Unique)
 
 import Data.Function (on)
 import qualified Data.IntMap as M
+import qualified Data.IntSet as S
 import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
 import Data.Typeable
 import Data.Data
+import Data.Monoid
 \end{code}
 
 %************************************************************************
@@ -135,6 +139,20 @@ plusUFM         :: UniqFM elt -> UniqFM elt -> UniqFM elt
 plusUFM_C       :: (elt -> elt -> elt)
                 -> UniqFM elt -> UniqFM elt -> UniqFM elt
 
+-- | `plusUFM_CD f m1 d1 m2 d2` merges the maps using `f` as the
+-- combinding function and `d1` resp. `d2` as the default value if
+-- there is no entry in `m1` reps. `m2`. The domain is the union of
+-- the domains of `m1` and `m2`.
+--
+-- Representative example:
+--
+-- @
+-- plusUFM_CD f {A: 1, B: 2} 23 {B: 3, C: 4} 42
+--    == {A: f 1 42, B: f 2 3, C: f 23 4 }
+-- @
+plusUFM_CD      :: (elt -> elt -> elt)
+                -> UniqFM elt -> elt -> UniqFM elt -> elt -> UniqFM elt
+
 minusUFM        :: UniqFM elt1 -> UniqFM elt2 -> UniqFM elt1
 
 intersectUFM    :: UniqFM elt -> UniqFM elt -> UniqFM elt
@@ -166,8 +184,21 @@ lookupWithDefaultUFM_Directly
                 :: UniqFM elt -> elt -> Unique -> elt
 keysUFM         :: UniqFM elt -> [Unique]       -- Get the keys
 eltsUFM         :: UniqFM elt -> [elt]
+ufmToSet_Directly :: UniqFM elt -> S.IntSet
 ufmToList       :: UniqFM elt -> [(Unique, elt)]
 
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{Monoid interface}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+instance Monoid (UniqFM a) where
+    mempty = emptyUFM
+    mappend = plusUFM
 \end{code}
 
 %************************************************************************
@@ -224,7 +255,24 @@ delFromUFM_Directly (UFM m) u = UFM (M.delete (getKey u) m)
 
 -- M.union is left-biased, plusUFM should be right-biased.
 plusUFM (UFM x) (UFM y) = UFM (M.union y x)
+     -- Note (M.union y x), with arguments flipped
+     -- M.union is left-biased, plusUFM should be right-biased.
+
 plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
+
+plusUFM_CD f (UFM xm) dx (UFM ym) dy
+{-
+The following implementation should be used as soon as we can expect
+containers-0.5; presumably from GHC 7.9 on:
+    = UFM $ M.mergeWithKey
+        (\_ x y -> Just (x `f` y))
+        (M.map (\x -> x `f` dy))
+        (M.map (\y -> dx `f` y))
+        xm ym
+-}
+    = UFM $ M.intersectionWith f xm ym
+        `M.union` M.map (\x -> x  `f` dy) xm
+        `M.union` M.map (\y -> dx `f`  y) ym
 minusUFM (UFM x) (UFM y) = UFM (M.difference x y)
 intersectUFM (UFM x) (UFM y) = UFM (M.intersection x y)
 intersectUFM_C f (UFM x) (UFM y) = UFM (M.intersectionWith f x y)
@@ -251,6 +299,7 @@ lookupWithDefaultUFM (UFM m) v k = M.findWithDefault v (getKey $ getUnique k) m
 lookupWithDefaultUFM_Directly (UFM m) v u = M.findWithDefault v (getKey u) m
 keysUFM (UFM m) = map getUnique $ M.keys m
 eltsUFM (UFM m) = M.elems m
+ufmToSet_Directly (UFM m) = M.keysSet m
 ufmToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
 
 -- Hoopl

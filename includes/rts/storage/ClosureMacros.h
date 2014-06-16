@@ -245,12 +245,12 @@ TAG_CLOSURE(StgWord tag,StgClosure * p)
 INLINE_HEADER rtsBool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p)
 {
     StgInfoTable *info = INFO_PTR_TO_STRUCT((StgInfoTable *)p);
-    return info->type != INVALID_OBJECT && info->type < N_CLOSURE_TYPES;
+    return (info->type != INVALID_OBJECT && info->type < N_CLOSURE_TYPES) ? rtsTrue : rtsFalse;
 }
 
 INLINE_HEADER rtsBool LOOKS_LIKE_INFO_PTR (StgWord p)
 {
-    return p && (IS_FORWARDING_PTR(p) || LOOKS_LIKE_INFO_PTR_NOT_NULL(p));
+    return (p && (IS_FORWARDING_PTR(p) || LOOKS_LIKE_INFO_PTR_NOT_NULL(p))) ? rtsTrue : rtsFalse;
 }
 
 INLINE_HEADER rtsBool LOOKS_LIKE_CLOSURE_PTR (void *p)
@@ -326,6 +326,10 @@ EXTERN_INLINE StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x );
 EXTERN_INLINE StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
 { return sizeofW(StgMutArrPtrs) + x->size; }
 
+EXTERN_INLINE StgOffset small_mut_arr_ptrs_sizeW( StgSmallMutArrPtrs* x );
+EXTERN_INLINE StgOffset small_mut_arr_ptrs_sizeW( StgSmallMutArrPtrs* x )
+{ return sizeofW(StgSmallMutArrPtrs) + x->ptrs; }
+
 EXTERN_INLINE StgWord stack_sizeW ( StgStack *stack );
 EXTERN_INLINE StgWord stack_sizeW ( StgStack *stack )
 { return sizeofW(StgStack) + stack->stack_size; }
@@ -378,6 +382,11 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 	return mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN:
+    case SMALL_MUT_ARR_PTRS_FROZEN0:
+	return small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs*)p);
     case TSO:
         return sizeofW(StgTSO);
     case STACK:
@@ -457,24 +466,38 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
    OVERWRITING_CLOSURE(p) on the old closure that is about to be
    overwritten.
 
-   In PROFILING mode, LDV profiling requires that we fill the slop
-   with zeroes, and record the old closure as dead (LDV_recordDead()).
+   Note [zeroing slop]
 
-   In DEBUG mode, we must overwrite the slop with zeroes, because the
-   sanity checker wants to walk through the heap checking all the
-   pointers.
+   In some scenarios we write zero words into "slop"; memory that is
+   left unoccupied after we overwrite a closure in the heap with a
+   smaller closure.
 
-   In multicore mode, we *cannot* overwrite slop with zeroes, because
-   another thread might be reading it.  So,
+   Zeroing slop is required for:
 
-      LDV PROFILING is not compatible with +RTS -N<n> (for n > 1)
+    - full-heap sanity checks (DEBUG, and +RTS -DS)
+    - LDV profiling (PROFILING, and +RTS -hb)
 
-      THREADED_RTS can be used with DEBUG, but full heap sanity
-      checking is disabled except after major GC.
+   Zeroing slop must be disabled for:
+
+    - THREADED_RTS with +RTS -N2 and greater, because we cannot
+      overwrite slop when another thread might be reading it.
+
+   Hence, slop is zeroed when either:
+
+    - PROFILING && era <= 0 (LDV is on)
+    - !THREADED_RTS && DEBUG
+
+   And additionally:
+
+    - LDV profiling and +RTS -N2 are incompatible
+    - full-heap sanity checks are disabled for THREADED_RTS
 
    -------------------------------------------------------------------------- */
 
-#if defined(PROFILING) || (!defined(THREADED_RTS) && defined(DEBUG))
+#define ZERO_SLOP_FOR_LDV_PROF     (defined(PROFILING))
+#define ZERO_SLOP_FOR_SANITY_CHECK (defined(DEBUG) && !defined(THREADED_RTS))
+
+#if ZERO_SLOP_FOR_LDV_PROF || ZERO_SLOP_FOR_SANITY_CHECK
 #define OVERWRITING_CLOSURE(c) overwritingClosure(c)
 #else
 #define OVERWRITING_CLOSURE(c) /* nothing */
@@ -488,6 +511,11 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p);
 EXTERN_INLINE void overwritingClosure (StgClosure *p)
 {
     nat size, i;
+
+#if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
+    // see Note [zeroing slop], also #8402
+    if (era <= 0) return;
+#endif
 
     size = closure_sizeW(p);
 

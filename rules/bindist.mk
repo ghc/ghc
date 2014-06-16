@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -25,7 +25,7 @@ bindist: bindist_$1
 bindist_$1:
 	$(foreach i,$2,\
 	    $(call make-command,\
-	        for f in $i; do echo $(BIN_DIST_NAME)/$$$$f >> $(BIN_DIST_LIST); done \
+	        for f in $i; do echo $(BIN_DIST_NAME)/$$$$f >> bindist-list; done \
 	    ) \
 	    )
 endef

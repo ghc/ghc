@@ -41,6 +41,7 @@ module Module
         dphParPackageId,
         mainPackageId,
         thisGhcPackageId,
+        interactivePackageId, isInteractiveModule,
 
         -- * The Module type
         Module,
@@ -72,8 +73,6 @@ module Module
         ModuleSet,
         emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
     ) where
-
-#include "Typeable.h"
 
 import Config
 import Outputable
@@ -359,20 +358,24 @@ packageIdString = unpackFS . packageIdFS
 integerPackageId, primPackageId,
   basePackageId, rtsPackageId,
   thPackageId, dphSeqPackageId, dphParPackageId,
-  mainPackageId, thisGhcPackageId  :: PackageId
-primPackageId      = fsToPackageId (fsLit "ghc-prim")
-integerPackageId   = fsToPackageId (fsLit cIntegerLibrary)
-basePackageId      = fsToPackageId (fsLit "base")
-rtsPackageId       = fsToPackageId (fsLit "rts")
-thPackageId        = fsToPackageId (fsLit "template-haskell")
-dphSeqPackageId    = fsToPackageId (fsLit "dph-seq")
-dphParPackageId    = fsToPackageId (fsLit "dph-par")
-thisGhcPackageId   = fsToPackageId (fsLit ("ghc-" ++ cProjectVersion))
+  mainPackageId, thisGhcPackageId, interactivePackageId  :: PackageId
+primPackageId        = fsToPackageId (fsLit "ghc-prim")
+integerPackageId     = fsToPackageId (fsLit cIntegerLibrary)
+basePackageId        = fsToPackageId (fsLit "base")
+rtsPackageId         = fsToPackageId (fsLit "rts")
+thPackageId          = fsToPackageId (fsLit "template-haskell")
+dphSeqPackageId      = fsToPackageId (fsLit "dph-seq")
+dphParPackageId      = fsToPackageId (fsLit "dph-par")
+thisGhcPackageId     = fsToPackageId (fsLit ("ghc-" ++ cProjectVersion))
+interactivePackageId = fsToPackageId (fsLit "interactive")
 
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix
 -- to symbol names, since there can be only one main package per program.
 mainPackageId      = fsToPackageId (fsLit "main")
+
+isInteractiveModule :: Module -> Bool
+isInteractiveModule mod = modulePackageId mod == interactivePackageId
 \end{code}
 
 %************************************************************************

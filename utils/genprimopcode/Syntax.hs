@@ -19,6 +19,15 @@ data Entry
                    cat   :: Category,    -- category
                    desc  :: String,      -- description
                    opts  :: [Option] }   -- default overrides
+    | PrimVecOpSpec { cons    :: String,    -- PrimOp name
+                      name    :: String,    -- name in prog text
+                      prefix  :: String,    -- prefix for generated names
+                      veclen  :: Int,       -- vector length
+                      elemrep :: String,    -- vector ElemRep
+                      ty      :: Ty,        -- type
+                      cat     :: Category,  -- category
+                      desc    :: String,    -- description
+                      opts    :: [Option] } -- default overrides
     | PseudoOpSpec { name  :: String,      -- name in prog text
                      ty    :: Ty,          -- type
                      desc  :: String,      -- description
@@ -26,6 +35,12 @@ data Entry
     | PrimTypeSpec { ty    :: Ty,      -- name in prog text
                      desc  :: String,      -- description
                      opts  :: [Option] }   -- default overrides
+    | PrimVecTypeSpec { ty    :: Ty,      -- name in prog text
+                        prefix  :: String,    -- prefix for generated names
+                        veclen  :: Int,       -- vector length
+                        elemrep :: String,    -- vector ElemRep
+                        desc  :: String,      -- description
+                        opts  :: [Option] }   -- default overrides
     | Section { title :: String,         -- section title
                 desc  :: String }        -- description
     deriving Show
@@ -34,12 +49,17 @@ is_primop :: Entry -> Bool
 is_primop (PrimOpSpec _ _ _ _ _ _) = True
 is_primop _ = False
 
+is_primtype :: Entry -> Bool
+is_primtype (PrimTypeSpec {}) = True
+is_primtype _ = False
+
 -- a binding of property to value
 data Option
    = OptionFalse  String          -- name = False
    | OptionTrue   String          -- name = True
    | OptionString String String   -- name = { ... unparsed stuff ... }
    | OptionInteger String Int     -- name = <int>
+   | OptionVector [(String,String,Int)]  -- name = [(,...),...]
    | OptionFixity (Maybe Fixity)  -- fixity = infix{,l,r} <int> | Nothing
      deriving Show
 
@@ -51,6 +71,7 @@ data Category
 -- types
 data Ty
    = TyF    Ty Ty
+   | TyC    Ty Ty -- We only allow one constraint, keeps the grammar simpler
    | TyApp  TyCon [Ty]
    | TyVar  TyVar
    | TyUTup [Ty]   -- unboxed tuples; just a TyCon really, 
@@ -58,7 +79,20 @@ data Ty
    deriving (Eq,Show)
 
 type TyVar = String
-type TyCon = String
+
+data TyCon = TyCon String
+           | SCALAR
+           | VECTOR
+           | VECTUPLE
+           | VecTyCon String String
+  deriving (Eq, Ord)
+
+instance Show TyCon where
+    show (TyCon tc)      = tc
+    show SCALAR          = "SCALAR"
+    show VECTOR          = "VECTOR"
+    show VECTUPLE        = "VECTUPLE"
+    show (VecTyCon tc _) = tc
 
 -- Follow definitions of Fixity and FixityDirection in GHC
 
@@ -114,7 +148,7 @@ sanityPrimOp def_names p
 
 sane_ty :: Category -> Ty -> Bool
 sane_ty Compare (TyF t1 (TyF t2 td)) 
-   | t1 == t2 && td == TyApp "Bool" []  = True
+   | t1 == t2 && td == TyApp (TyCon "Int#") []  = True
 sane_ty Monadic (TyF t1 td) 
    | t1 == td  = True
 sane_ty Dyadic (TyF t1 (TyF t2 td))
@@ -129,6 +163,7 @@ get_attrib_name (OptionFalse nm) = nm
 get_attrib_name (OptionTrue nm)  = nm
 get_attrib_name (OptionString nm _) = nm
 get_attrib_name (OptionInteger nm _) = nm
+get_attrib_name (OptionVector _) = "vector"
 get_attrib_name (OptionFixity _) = "fixity"
 
 lookup_attrib :: String -> [Option] -> Maybe Option
@@ -136,3 +171,7 @@ lookup_attrib _ [] = Nothing
 lookup_attrib nm (a:as) 
     = if get_attrib_name a == nm then Just a else lookup_attrib nm as
 
+is_vector :: Entry -> Bool
+is_vector i = case lookup_attrib "vector" (opts i) of
+                Nothing -> False
+                _       -> True

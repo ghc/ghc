@@ -1,0 +1,14 @@
+
+NoMatchErr.hs:19:7:
+    Could not deduce (Memo d0 ~ Memo d)
+    from the context (Fun d)
+      bound by the type signature for f :: Fun d => Memo d a -> Memo d a
+      at NoMatchErr.hs:19:7-37
+    NB: ‘Memo’ is a type function, and may not be injective
+    The type variable ‘d0’ is ambiguous
+    Expected type: Memo d a -> Memo d a
+      Actual type: Memo d0 a -> Memo d0 a
+    In the ambiguity check for:
+      forall d a. Fun d => Memo d a -> Memo d a
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+    In the type signature for ‘f’: f :: Fun d => Memo d a -> Memo d a

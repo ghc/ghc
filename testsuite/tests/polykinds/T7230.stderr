@@ -1,0 +1,27 @@
+
+T7230.hs:48:32:
+    Could not deduce ((x :<<= x1) ~ 'True)
+    from the context (Increasing xs ~ 'True)
+      bound by the type signature for
+                 crash :: Increasing xs ~ 'True => SList xs -> SBool (Increasing xs)
+      at T7230.hs:47:10-68
+    or from (xs ~ (x : xs1))
+      bound by a pattern with constructor
+                 SCons :: forall (x :: k) (xs :: [k]).
+                          Sing x -> Sing xs -> Sing (x : xs),
+               in an equation for ‘crash’
+      at T7230.hs:48:8-27
+    or from (xs1 ~ (x1 : xs2))
+      bound by a pattern with constructor
+                 SCons :: forall (x :: k) (xs :: [k]).
+                          Sing x -> Sing xs -> Sing (x : xs),
+               in an equation for ‘crash’
+      at T7230.hs:48:17-26
+    Expected type: SBool (Increasing xs)
+      Actual type: SBool (x :<<= x1)
+    Relevant bindings include
+      y :: Sing x1 (bound at T7230.hs:48:23)
+      x :: Sing x (bound at T7230.hs:48:14)
+    In the expression: x %:<<= y
+    In an equation for ‘crash’:
+        crash (SCons x (SCons y xs)) = x %:<<= y

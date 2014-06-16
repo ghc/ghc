@@ -1,0 +1,5 @@
+
+PolyKinds02.hs:13:16:
+    The second argument of ‘Vec’ should have kind ‘Nat’,
+      but ‘Nat’ has kind ‘*’
+    In the type signature for ‘vec’: vec :: Vec Nat Nat

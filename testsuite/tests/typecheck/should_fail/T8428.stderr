@@ -1,0 +1,10 @@
+
+T8428.hs:11:19:
+    Couldn't match type ‘(forall s. ST s) a’ with ‘forall s. ST s a’
+    Expected type: IdentityT (forall s. ST s) a -> forall s. ST s a
+      Actual type: IdentityT (forall s. ST s) a -> (forall s. ST s) a
+    Relevant bindings include
+      runIdST :: IdentityT (forall s. ST s) a -> a
+        (bound at T8428.hs:11:1)
+    In the second argument of ‘(.)’, namely ‘runIdentityT’
+    In the expression: runST . runIdentityT

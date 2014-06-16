@@ -1,0 +1,9 @@
+
+rnfail026.hs:16:17:
+    The first argument of ‘Monad’ should have kind ‘* -> *’,
+      but ‘forall a. Eq a => Set a’ has kind ‘*’
+    In the instance declaration for ‘Monad (forall a. Eq a => Set a)’
+
+rnfail026.hs:19:10:
+    Illegal polymorphic or qualified type: forall a. [a]
+    In the instance declaration for ‘Eq (forall a. [a])’

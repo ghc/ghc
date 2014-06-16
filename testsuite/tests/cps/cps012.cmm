@@ -1,0 +1,23 @@
+// A real world example from the RTS
+// Should be checked later to see if it is right
+
+stg_ap_0_fast ("ptr" bits32 fun, "ptr" bits32 arg) {
+    bits32 _c8;
+    c6: goto c7;
+    c7: _c8 = bits32[x]; // TODO: allow I32 or print bits32
+        switch [0 .. 71] (bits16[_c8 - 4]) {
+            case 0,1,2,3,4,5,6,7,8 : { goto c9; }
+            case 9,10,11,12,13,14,15 : { goto ca; }
+            case 16,17,18,19,20,21,22,23 : { goto c9; }
+            case 24 : {goto ca;}
+            case 25 : {goto c9;}
+            case 26 : {goto ca;}
+            case 27 : {goto c9;}
+            case 28,29,30,31,32 : {goto cb;}
+            case 33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71 : {goto c9;}
+        }
+    c9: jump _c8 ();
+    cb: R1 = bits32[fun + 4 + 0];
+        goto c7;
+    ca: jump (bits32[arg + 0 * 4]) ();
+}

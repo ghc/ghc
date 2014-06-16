@@ -1,0 +1,6 @@
+
+T2394.hs:9:1:
+    Can't make a derived instance of ‘Data (a -> b)’:
+      The last argument of the instance must be a data or newtype application
+    In the stand-alone deriving instance for
+      ‘(Data a, Data b) => Data (a -> b)’

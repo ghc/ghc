@@ -57,7 +57,11 @@ module Lexer (
    extension, bangPatEnabled, datatypeContextsEnabled,
    traditionalRecordSyntaxEnabled,
    typeLiteralsEnabled,
-   explicitNamespacesEnabled, sccProfilingOn, hpcEnabled,
+   explicitForallEnabled,
+   inRulePrag,
+   explicitNamespacesEnabled,
+   patternSynonymsEnabled,
+   sccProfilingOn, hpcEnabled,
    addWarning,
    lexTokenStream
   ) where
@@ -217,16 +221,22 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- after a layout keyword (let, where, do, of), we begin a new layout
 -- context if the curly brace is missing.
 -- Careful! This stuff is quite delicate.
-<layout, layout_do> {
+<layout, layout_do, layout_if> {
   \{ / { notFollowedBy '-' }            { hopefully_open_brace }
         -- we might encounter {-# here, but {- has been handled already
   \n                                    ;
   ^\# (line)?                           { begin line_prag1 }
 }
 
+-- after an 'if', a vertical bar starts a layout context for MultiWayIf
+<layout_if> {
+  \| / { notFollowedBySymbol }          { new_layout_context True ITvbar }
+  ()                                    { pop }
+}
+
 -- do is treated in a subtly different way, see new_layout_context
-<layout>    ()                          { new_layout_context True }
-<layout_do> ()                          { new_layout_context False }
+<layout>    ()                          { new_layout_context True  ITvocurly }
+<layout_do> ()                          { new_layout_context False ITvocurly }
 
 -- after a new layout context which was found to be to the left of the
 -- previous context, we have generated a '{' token, and we now need to
@@ -307,14 +317,19 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 }
 
 <0> {
-  "[|"      / { ifExtension thEnabled } { token ITopenExpQuote }
-  "[e|"     / { ifExtension thEnabled } { token ITopenExpQuote }
-  "[p|"     / { ifExtension thEnabled } { token ITopenPatQuote }
-  "[d|"     / { ifExtension thEnabled } { layout_token ITopenDecQuote }
-  "[t|"     / { ifExtension thEnabled } { token ITopenTypQuote }
-  "|]"      / { ifExtension thEnabled } { token ITcloseQuote }
-  \$ @varid / { ifExtension thEnabled } { skip_one_varid ITidEscape }
-  "$("      / { ifExtension thEnabled } { token ITparenEscape }
+  "[|"        / { ifExtension thEnabled } { token ITopenExpQuote }
+  "[||"       / { ifExtension thEnabled } { token ITopenTExpQuote }
+  "[e|"       / { ifExtension thEnabled } { token ITopenExpQuote }
+  "[e||"      / { ifExtension thEnabled } { token ITopenTExpQuote }
+  "[p|"       / { ifExtension thEnabled } { token ITopenPatQuote }
+  "[d|"       / { ifExtension thEnabled } { layout_token ITopenDecQuote }
+  "[t|"       / { ifExtension thEnabled } { token ITopenTypQuote }
+  "|]"        / { ifExtension thEnabled } { token ITcloseQuote }
+  "||]"       / { ifExtension thEnabled } { token ITcloseTExpQuote }
+  \$ @varid   / { ifExtension thEnabled } { skip_one_varid ITidEscape }
+  "$$" @varid / { ifExtension thEnabled } { skip_two_varid ITidTyEscape }
+  "$("        / { ifExtension thEnabled } { token ITparenEscape }
+  "$$("       / { ifExtension thEnabled } { token ITparenTyEscape }
 
 -- For backward compatibility, accept the old dollar syntax
   "[$" @varid "|"  / { ifExtension qqEnabled }
@@ -385,12 +400,16 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- when trying to be close to Haskell98
 <0> {
   -- Normal integral literals (:: Num a => a, from Integer)
-  @decimal           { tok_num positive 0 0 decimal }
-  0[oO] @octal       { tok_num positive 2 2 octal }
-  0[xX] @hexadecimal { tok_num positive 2 2 hexadecimal }
+  @decimal                                                               { tok_num positive 0 0 decimal }
+  0[oO] @octal                                                           { tok_num positive 2 2 octal }
+  0[xX] @hexadecimal                                                     { tok_num positive 2 2 hexadecimal }
+  @negative @decimal           / { ifExtension negativeLiteralsEnabled } { tok_num negative 1 1 decimal }
+  @negative 0[oO] @octal       / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 octal }
+  @negative 0[xX] @hexadecimal / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 hexadecimal }
 
   -- Normal rational literals (:: Fractional a => a, from Rational)
-  @floating_point    { strtoken tok_float }
+  @floating_point                                                        { strtoken tok_float }
+  @negative @floating_point    / { ifExtension negativeLiteralsEnabled } { strtoken tok_float }
 }
 
 <0> {
@@ -452,7 +471,6 @@ data Token
   | ITthen
   | ITtype
   | ITwhere
-  | ITscc                       -- ToDo: remove (we use {-# SCC "..." #-} now)
 
   | ITforall                    -- GHC extension keywords
   | ITforeign
@@ -466,11 +484,14 @@ data Token
   | ITccallconv
   | ITcapiconv
   | ITprimcallconv
+  | ITjavascriptcallconv
   | ITmdo
   | ITfamily
+  | ITrole
   | ITgroup
   | ITby
   | ITusing
+  | ITpattern
 
   -- Pragmas
   | ITinline_prag InlineSpec RuleMatchInfo
@@ -494,6 +515,7 @@ data Token
   | ITvect_prag
   | ITvect_scalar_prag
   | ITnovect_prag
+  | ITminimal_prag
   | ITctype
 
   | ITdotdot                    -- reserved symbols
@@ -565,8 +587,12 @@ data Token
   | ITopenDecQuote              --  [d|
   | ITopenTypQuote              --  [t|
   | ITcloseQuote                --  |]
+  | ITopenTExpQuote             --  [||
+  | ITcloseTExpQuote            --  ||]
   | ITidEscape   FastString     --  $x
   | ITparenEscape               --  $(
+  | ITidTyEscape   FastString   --  $$x
+  | ITparenTyEscape             --  $$(
   | ITtyQuote                   --  ''
   | ITquasiQuote (FastString,FastString,RealSrcSpan)
     -- ITquasiQuote(quoter, quote, loc)
@@ -637,12 +663,14 @@ reservedWordsFM = listToUFM $
          ( "then",           ITthen,          0 ),
          ( "type",           ITtype,          0 ),
          ( "where",          ITwhere,         0 ),
-         ( "_scc_",          ITscc,           0 ),            -- ToDo: remove
 
          ( "forall",         ITforall,        bit explicitForallBit .|.
                                               bit inRulePragBit),
          ( "mdo",            ITmdo,           bit recursiveDoBit),
-         ( "family",         ITfamily,        bit tyFamBit),
+             -- See Note [Lexing type pseudo-keywords]
+         ( "family",         ITfamily,        0 ),
+         ( "role",           ITrole,          0 ),
+         ( "pattern",        ITpattern,       bit patternSynonymsBit),
          ( "group",          ITgroup,         bit transformComprehensionsBit),
          ( "by",             ITby,            bit transformComprehensionsBit),
          ( "using",          ITusing,         bit transformComprehensionsBit),
@@ -659,11 +687,29 @@ reservedWordsFM = listToUFM $
          ( "ccall",          ITccallconv,     bit ffiBit),
          ( "capi",           ITcapiconv,      bit cApiFfiBit),
          ( "prim",           ITprimcallconv,  bit ffiBit),
+         ( "javascript",     ITjavascriptcallconv, bit ffiBit),
 
-         ( "rec",            ITrec,           bit arrowsBit .|. 
+         ( "rec",            ITrec,           bit arrowsBit .|.
                                               bit recursiveDoBit),
          ( "proc",           ITproc,          bit arrowsBit)
      ]
+
+{-----------------------------------
+Note [Lexing type pseudo-keywords]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+One might think that we wish to treat 'family' and 'role' as regular old
+varids whenever -XTypeFamilies and -XRoleAnnotations are off, respectively.
+But, there is no need to do so. These pseudo-keywords are not stolen syntax:
+they are only used after the keyword 'type' at the top-level, where varids are
+not allowed. Furthermore, checks further downstream (TcTyClsDecls) ensure that
+type families and role annotations are never declared without their extensions
+on. In fact, by unconditionally lexing these pseudo-keywords as special, we
+can get better error messages.
+
+Also, note that these are included in the `varid` production in the parser --
+a key detail to make all this work.
+-------------------------------------}
 
 reservedSymsFM :: UniqFM (Token, Int -> Bool)
 reservedSymsFM = listToUFM $
@@ -696,8 +742,7 @@ reservedSymsFM = listToUFM $
 
        ,("∷",   ITdcolon, unicodeSyntaxEnabled)
        ,("⇒",   ITdarrow, unicodeSyntaxEnabled)
-       ,("∀",   ITforall, \i -> unicodeSyntaxEnabled i &&
-                                explicitForallEnabled i)
+       ,("∀",   ITforall, unicodeSyntaxEnabled)
        ,("→",   ITrarrow, unicodeSyntaxEnabled)
        ,("←",   ITlarrow, unicodeSyntaxEnabled)
 
@@ -731,6 +776,10 @@ idtoken f span buf len = return (L span $! (f buf len))
 skip_one_varid :: (FastString -> Token) -> Action
 skip_one_varid f span buf len
   = return (L span $! f (lexemeToFastString (stepOn buf) (len-1)))
+
+skip_two_varid :: (FastString -> Token) -> Action
+skip_two_varid f span buf len
+  = return (L span $! f (lexemeToFastString (stepOn (stepOn buf)) (len-2)))
 
 strtoken :: (String -> Token) -> Action
 strtoken f span buf len =
@@ -1115,6 +1164,7 @@ maybe_layout t = do -- If the alternative layout rule is enabled then
           f ITlet   = pushLexState layout
           f ITwhere = pushLexState layout
           f ITrec   = pushLexState layout
+          f ITif    = pushLexState layout_if
           f _       = return ()
 
 -- Pushing a new implicit layout context.  If the indentation of the
@@ -1126,11 +1176,11 @@ maybe_layout t = do -- If the alternative layout rule is enabled then
 -- by a 'do', then we allow the new context to be at the same indentation as
 -- the previous context.  This is what the 'strict' argument is for.
 --
-new_layout_context :: Bool -> Action
-new_layout_context strict span _buf _len = do
+new_layout_context :: Bool -> Token -> Action
+new_layout_context strict tok span _buf len = do
     _ <- popLexState
     (AI l _) <- getInput
-    let offset = srcLocCol l
+    let offset = srcLocCol l - len
     ctx <- getContext
     nondecreasing <- extension nondecreasingIndentation
     let strict' = strict || not nondecreasing
@@ -1141,10 +1191,10 @@ new_layout_context strict span _buf _len = do
                 -- token is indented to the left of the previous context.
                 -- we must generate a {} sequence now.
                 pushLexState layout_left
-                return (L span ITvocurly)
+                return (L span tok)
         _ -> do
                 setContext (Layout offset : ctx)
-                return (L span ITvocurly)
+                return (L span tok)
 
 do_layout_left :: Action
 do_layout_left span _buf _len = do
@@ -1554,7 +1604,7 @@ data PState = PState {
         -- This is the next token to be considered or, if it is Nothing,
         -- we need to get the next token from the input stream:
         alr_next_token :: Maybe (RealLocated Token),
-        -- This is what we consider to be the locatino of the last token
+        -- This is what we consider to be the location of the last token
         -- emitted:
         alr_last_loc :: RealSrcSpan,
         -- The stack of layout contexts:
@@ -1826,8 +1876,8 @@ explicitForallBit = 7 -- the 'forall' keyword and '.' symbol
 bangPatBit :: Int
 bangPatBit = 8  -- Tells the parser to understand bang-patterns
                 -- (doesn't affect the lexer)
-tyFamBit :: Int
-tyFamBit = 9    -- indexed type families: 'family' keyword and kind sigs
+patternSynonymsBit :: Int
+patternSynonymsBit = 9 -- pattern synonyms
 haddockBit :: Int
 haddockBit = 10 -- Lex and parse Haddock comments
 magicHashBit :: Int
@@ -1870,6 +1920,8 @@ explicitNamespacesBit :: Int
 explicitNamespacesBit = 29
 lambdaCaseBit :: Int
 lambdaCaseBit = 30
+negativeLiteralsBit :: Int
+negativeLiteralsBit = 31
 
 
 always :: Int -> Bool
@@ -1886,8 +1938,6 @@ explicitForallEnabled :: Int -> Bool
 explicitForallEnabled flags = testBit flags explicitForallBit
 bangPatEnabled :: Int -> Bool
 bangPatEnabled   flags = testBit flags bangPatBit
--- tyFamEnabled :: Int -> Bool
--- tyFamEnabled     flags = testBit flags tyFamBit
 haddockEnabled :: Int -> Bool
 haddockEnabled   flags = testBit flags haddockBit
 magicHashEnabled :: Int -> Bool
@@ -1902,8 +1952,8 @@ datatypeContextsEnabled :: Int -> Bool
 datatypeContextsEnabled flags = testBit flags datatypeContextsBit
 qqEnabled :: Int -> Bool
 qqEnabled        flags = testBit flags qqBit
--- inRulePrag :: Int -> Bool
--- inRulePrag       flags = testBit flags inRulePragBit
+inRulePrag :: Int -> Bool
+inRulePrag       flags = testBit flags inRulePragBit
 rawTokenStreamEnabled :: Int -> Bool
 rawTokenStreamEnabled flags = testBit flags rawTokenStreamBit
 alternativeLayoutRule :: Int -> Bool
@@ -1925,6 +1975,10 @@ explicitNamespacesEnabled :: Int -> Bool
 explicitNamespacesEnabled flags = testBit flags explicitNamespacesBit
 lambdaCaseEnabled :: Int -> Bool
 lambdaCaseEnabled flags = testBit flags lambdaCaseBit
+negativeLiteralsEnabled :: Int -> Bool
+negativeLiteralsEnabled flags = testBit flags negativeLiteralsBit
+patternSynonymsEnabled :: Int -> Bool
+patternSynonymsEnabled flags = testBit flags patternSynonymsBit
 
 -- PState for parsing options pragmas
 --
@@ -1967,7 +2021,6 @@ mkPState flags buf loc =
                .|. ipBit                       `setBitIf` xopt Opt_ImplicitParams           flags
                .|. explicitForallBit           `setBitIf` xopt Opt_ExplicitForAll           flags
                .|. bangPatBit                  `setBitIf` xopt Opt_BangPatterns             flags
-               .|. tyFamBit                    `setBitIf` xopt Opt_TypeFamilies             flags
                .|. haddockBit                  `setBitIf` gopt Opt_Haddock                  flags
                .|. magicHashBit                `setBitIf` xopt Opt_MagicHash                flags
                .|. kindSigsBit                 `setBitIf` xopt Opt_KindSignatures           flags
@@ -1988,6 +2041,8 @@ mkPState flags buf loc =
                .|. typeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
                .|. explicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
                .|. lambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
+               .|. negativeLiteralsBit         `setBitIf` xopt Opt_NegativeLiterals         flags
+               .|. patternSynonymsBit          `setBitIf` xopt Opt_PatternSynonyms          flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
@@ -2010,11 +2065,11 @@ setContext :: [LayoutContext] -> P ()
 setContext ctx = P $ \s -> POk s{context=ctx} ()
 
 popContext :: P ()
-popContext = P $ \ s@(PState{ buffer = buf, context = ctx,
+popContext = P $ \ s@(PState{ buffer = buf, dflags = flags, context = ctx,
                               last_len = len, last_loc = last_loc }) ->
   case ctx of
         (_:tl) -> POk s{ context = tl } ()
-        []     -> PFailed (RealSrcSpan last_loc) (srcParseErr buf len)
+        []     -> PFailed (RealSrcSpan last_loc) (srcParseErr flags buf len)
 
 -- Push a new layout context at the indentation of the last token read.
 -- This is only used at the outer level of a module when the 'module'
@@ -2036,24 +2091,26 @@ getOffside = P $ \s@PState{last_loc=loc, context=stk} ->
 -- Construct a parse error
 
 srcParseErr
-  :: StringBuffer       -- current buffer (placed just after the last token)
+  :: DynFlags
+  -> StringBuffer       -- current buffer (placed just after the last token)
   -> Int                -- length of the previous token
   -> MsgDoc
-srcParseErr buf len
-  = hcat [ if null token
-             then ptext (sLit "parse error (possibly incorrect indentation or mismatched brackets)")
-             else hcat [ptext (sLit "parse error on input "),
-                        char '`', text token, char '\'']
-    ]
+srcParseErr dflags buf len
+  = if null token
+         then ptext (sLit "parse error (possibly incorrect indentation or mismatched brackets)")
+         else ptext (sLit "parse error on input") <+> quotes (text token)
+              $$ ppWhen (not th_enabled && token == "$") -- #7396
+                        (text "Perhaps you intended to use TemplateHaskell")
   where token = lexemeToString (offsetBytes (-len) buf) len
+        th_enabled = xopt Opt_TemplateHaskell dflags
 
 -- Report a parse failure, giving the span of the previous token as
 -- the location of the error.  This is the entry point for errors
 -- detected during parsing.
 srcParseFail :: P a
-srcParseFail = P $ \PState{ buffer = buf, last_len = len,
+srcParseFail = P $ \PState{ buffer = buf, dflags = flags, last_len = len,
                             last_loc = last_loc } ->
-    PFailed (RealSrcSpan last_loc) (srcParseErr buf len)
+    PFailed (RealSrcSpan last_loc) (srcParseErr flags buf len)
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
@@ -2217,7 +2274,7 @@ alternativeLayoutRuleToken t
                  [] ->
                      do let ls = if isALRopen u
                                     then [ALRNoLayout (containsCommas u) False]
-                                    else ls
+                                    else []
                         setALRContext ls
                         -- XXX This is an error in John's code, but
                         -- it looks reachable to me at first glance
@@ -2253,16 +2310,17 @@ transitionalAlternativeLayoutWarning msg
    $$ text msg
 
 isALRopen :: Token -> Bool
-isALRopen ITcase        = True
-isALRopen ITif          = True
-isALRopen ITthen        = True
-isALRopen IToparen      = True
-isALRopen ITobrack      = True
-isALRopen ITocurly      = True
+isALRopen ITcase          = True
+isALRopen ITif            = True
+isALRopen ITthen          = True
+isALRopen IToparen        = True
+isALRopen ITobrack        = True
+isALRopen ITocurly        = True
 -- GHC Extensions:
-isALRopen IToubxparen   = True
-isALRopen ITparenEscape = True
-isALRopen _             = False
+isALRopen IToubxparen     = True
+isALRopen ITparenEscape   = True
+isALRopen ITparenTyEscape = True
+isALRopen _               = False
 
 isALRclose :: Token -> Bool
 isALRclose ITof     = True
@@ -2375,6 +2433,7 @@ oneWordPrags = Map.fromList([("rules", rulePrag),
                            ("ann", token ITann_prag),
                            ("vectorize", token ITvect_prag),
                            ("novectorize", token ITnovect_prag),
+                           ("minimal", token ITminimal_prag),
                            ("ctype", token ITctype)])
 
 twoWordPrags = Map.fromList([("inline conlike", token (ITinline_prag Inline ConLike)),

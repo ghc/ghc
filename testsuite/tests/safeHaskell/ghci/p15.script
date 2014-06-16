@@ -1,0 +1,23 @@
+-- Test restricted functionality: Data.Typeable
+:unset +s
+:set -XSafe
+:set -XDeriveDataTypeable
+:set -XStandaloneDeriving
+
+:m + Data.OldTypeable
+
+data H = H {h :: String} deriving (Typeable, Show)
+
+data G = G [Int] deriving (Show)
+
+instance Typeable G where { typeOf _ = typeOf (undefined :: H) }
+
+let x = H "Hello"
+let y = G [0]
+
+x
+y
+
+let (Just y_as_H) = (cast y) :: Maybe H
+y_as_H
+

@@ -1,0 +1,22 @@
+
+T2245.hs:4:10: Warning:
+    No explicit implementation for
+      ‘+’, ‘*’, ‘abs’, ‘signum’, ‘fromInteger’, and (either ‘negate’
+                                                            or
+                                                            ‘-’)
+    In the instance declaration for ‘Num T’
+
+T2245.hs:5:10: Warning:
+    No explicit implementation for
+      ‘fromRational’ and (either ‘recip’ or ‘/’)
+    In the instance declaration for ‘Fractional T’
+
+T2245.hs:7:38: Warning:
+    Defaulting the following constraint(s) to type ‘T’
+      (Read b0) arising from a use of ‘read’ at T2245.hs:7:38-41
+      (Ord b0) arising from a use of ‘<’ at T2245.hs:7:27
+      (Fractional b0)
+        arising from the literal ‘1e400’ at T2245.hs:7:29-33
+    In the second argument of ‘(.)’, namely ‘read’
+    In the second argument of ‘(.)’, namely ‘(< 1e400) . read’
+    In the second argument of ‘($)’, namely ‘show . (< 1e400) . read’

@@ -4,6 +4,7 @@
 
 module Llvm.AbsSyn where
 
+import Llvm.MetaData
 import Llvm.Types
 
 import Unique
@@ -32,7 +33,7 @@ data LlvmModule = LlvmModule  {
     modAliases   :: [LlvmAlias],
 
     -- | LLVM meta data.
-    modMeta      :: [LlvmMeta],
+    modMeta      :: [MetaDecl],
 
     -- | Global variables to include in the module.
     modGlobals   :: [LMGlobal],
@@ -165,11 +166,9 @@ data LlvmStatement
   {- |
     A LLVM statement with metadata attached to it.
   -}
-  | MetaStmt [MetaData] LlvmStatement
+  | MetaStmt [MetaAnnot] LlvmStatement
 
-  deriving (Show, Eq)
-
-type MetaData = (LMString, LlvmMetaUnamed)
+  deriving (Eq)
 
 
 -- | Llvm Expressions
@@ -253,6 +252,17 @@ data LlvmExpression
   | Call LlvmCallType LlvmVar [LlvmVar] [LlvmFuncAttr]
 
   {- |
+    Call a function as above but potentially taking metadata as arguments.
+      * tailJumps: CallType to signal if the function should be tail called
+      * fnptrval:  An LLVM value containing a pointer to a function to be
+                   invoked. Can be indirect. Should be LMFunction type.
+      * args:      Arguments that may include metadata.
+      * attrs:     A list of function attributes for the call. Only NoReturn,
+                   NoUnwind, ReadOnly and ReadNone are valid here.
+  -}
+  | CallM LlvmCallType LlvmVar [MetaExpr] [LlvmFuncAttr]
+
+  {- |
     Merge variables from different basic blocks which are predecessors of this
     basic block in a new variable of type tp.
       * tp:         type of the merged variable, must match the types of the
@@ -264,21 +274,21 @@ data LlvmExpression
 
   {- |
     Inline assembly expression. Syntax is very similar to the style used by GCC.
-      * assembly:   Actual inline assembly code.
-      * contraints: Operand constraints.
-      * return ty:  Return type of function.
-      * vars:       Any variables involved in the assembly code.
-      * sideeffect: Does the expression have side effects not visible from the
-                    constraints list.
-      * alignstack: Should the stack be conservatively aligned before this
-                    expression is executed.
+      * assembly:    Actual inline assembly code.
+      * constraints: Operand constraints.
+      * return ty:   Return type of function.
+      * vars:        Any variables involved in the assembly code.
+      * sideeffect:  Does the expression have side effects not visible from the
+                     constraints list.
+      * alignstack:  Should the stack be conservatively aligned before this
+                     expression is executed.
   -}
   | Asm LMString LMString LlvmType [LlvmVar] Bool Bool
 
   {- |
     A LLVM expression with metadata attached to it.
   -}
-  | MetaExpr [MetaData] LlvmExpression
+  | MExpr [MetaAnnot] LlvmExpression
 
-  deriving (Show, Eq)
+  deriving (Eq)
 

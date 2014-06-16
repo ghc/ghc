@@ -1,0 +1,8 @@
+
+T7276.hs:6:8:
+    Couldn't match type ‘[Language.Haskell.TH.Syntax.Dec]’
+                  with ‘Language.Haskell.TH.Syntax.Exp’
+    Expected type: Language.Haskell.TH.Lib.ExpQ
+      Actual type: Language.Haskell.TH.Lib.DecsQ
+    In the expression: [d| y = 3 |]
+    In the splice: $([d| y = 3 |])

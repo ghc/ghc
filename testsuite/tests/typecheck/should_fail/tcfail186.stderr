@@ -1,0 +1,8 @@
+
+tcfail186.hs:7:9:
+    Couldn't match type ‘[Char]’ with ‘Int’
+    Expected type: PhantomSyn a0
+      Actual type: [Char]
+    In the first argument of ‘f’, namely ‘"hoo"’
+    In the expression: f "hoo"
+    In an equation for ‘foo’: foo = f "hoo"

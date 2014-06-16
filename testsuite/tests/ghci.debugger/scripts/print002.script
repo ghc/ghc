@@ -1,0 +1,19 @@
+-- printing of Showables
+
+:set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
+let f = Just (1.2::Float)
+f
+:p f
+
+let i = Just (10::Integer)
+:p i
+
+case i of Just j -> Control.Exception.evaluate j
+:p i
+
+:l ../Test.hs
+
+let s = S1 'a' 'b' 'c'
+s
+:p s
+:sp s

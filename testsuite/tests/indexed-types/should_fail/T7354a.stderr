@@ -1,0 +1,6 @@
+
+T7354a.hs:5:13:
+    Couldn't match expected type ‘Base t t’ with actual type ‘()’
+    Relevant bindings include foo :: t (bound at T7354a.hs:5:1)
+    In the first argument of ‘embed’, namely ‘()’
+    In the expression: embed ()

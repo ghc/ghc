@@ -1,0 +1,30 @@
+
+T3208b.hs:15:10:
+    Could not deduce (STerm o0 ~ STerm a)
+    from the context (OTerm a ~ STerm a, OBJECT a, SUBST a)
+      bound by the type signature for
+                 fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
+      at T3208b.hs:14:9-56
+    NB: ‘STerm’ is a type function, and may not be injective
+    The type variable ‘o0’ is ambiguous
+    Expected type: STerm o0
+      Actual type: OTerm o0
+    Relevant bindings include
+      f :: a (bound at T3208b.hs:15:6)
+      fce' :: a -> c (bound at T3208b.hs:15:1)
+    In the expression: fce (apply f)
+    In an equation for ‘fce'’: fce' f = fce (apply f)
+
+T3208b.hs:15:15:
+    Could not deduce (OTerm o0 ~ STerm a)
+    from the context (OTerm a ~ STerm a, OBJECT a, SUBST a)
+      bound by the type signature for
+                 fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
+      at T3208b.hs:14:9-56
+    The type variable ‘o0’ is ambiguous
+    Relevant bindings include
+      f :: a (bound at T3208b.hs:15:6)
+      fce' :: a -> c (bound at T3208b.hs:15:1)
+    In the first argument of ‘fce’, namely ‘(apply f)’
+    In the expression: fce (apply f)
+    In an equation for ‘fce'’: fce' f = fce (apply f)

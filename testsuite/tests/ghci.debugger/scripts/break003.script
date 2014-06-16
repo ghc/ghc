@@ -1,0 +1,10 @@
+:l ../Test3
+:b 2
+main
+f
+:q
+
+-- currently gives:
+-- ghc-6.7: panic! (the 'impossible' happened)
+--   (GHC version 6.7 for x86_64-unknown-linux):
+--         ASSERT failed! file typecheck/TcMType.lhs line 362 t{tv aqh} [tv]

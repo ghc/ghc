@@ -8,13 +8,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module HeaderInfo ( getImports
                   , mkPrelImports -- used by the renamer too
                   , getOptionsFromFile, getOptions
@@ -25,7 +18,7 @@ module HeaderInfo ( getImports
 
 import RdrName
 import HscTypes
-import Parser		( parseHeader )
+import Parser           ( parseHeader )
 import Lexer
 import FastString
 import HsSyn
@@ -39,7 +32,7 @@ import Util
 import Outputable
 import Pretty           ()
 import Maybes
-import Bag		( emptyBag, listToBag, unitBag )
+import Bag              ( emptyBag, listToBag, unitBag )
 import MonadUtils
 import Exception
 
@@ -74,23 +67,23 @@ getImports dflags buf filename source_filename = do
       if errorsFound dflags ms
         then throwIO $ mkSrcErr errs
         else
-	  case rdr_module of
-	    L _ (HsModule mb_mod _ imps _ _ _) ->
-	      let
+          case rdr_module of
+            L _ (HsModule mb_mod _ imps _ _ _) ->
+              let
                 main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename) 1 1)
-		mod = mb_mod `orElse` L main_loc mAIN_NAME
-	        (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
+                mod = mb_mod `orElse` L main_loc mAIN_NAME
+                (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
 
-		     -- GHC.Prim doesn't exist physically, so don't go looking for it.
-		ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc) 
-					ord_idecls
+                     -- GHC.Prim doesn't exist physically, so don't go looking for it.
+                ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc)
+                                       ord_idecls
 
                 implicit_prelude = xopt Opt_ImplicitPrelude dflags
                 implicit_imports = mkPrelImports (unLoc mod) main_loc implicit_prelude imps
-	      in
-	      return (src_idecls, implicit_imports ++ ordinary_imps, mod)
+              in
+              return (src_idecls, implicit_imports ++ ordinary_imps, mod)
 
-mkPrelImports :: ModuleName 
+mkPrelImports :: ModuleName
               -> SrcSpan    -- Attribute the "import Prelude" to this location
               -> Bool -> [LImportDecl RdrName]
               -> [LImportDecl RdrName]
@@ -108,20 +101,20 @@ mkPrelImports this_mod loc implicit_prelude import_decls
   where
       explicit_prelude_import
        = notNull [ () | L _ (ImportDecl { ideclName = mod
-                                        , ideclPkgQual = Nothing }) 
+                                        , ideclPkgQual = Nothing })
                           <- import_decls
-	              , unLoc mod == pRELUDE_NAME ]
+                      , unLoc mod == pRELUDE_NAME ]
 
       preludeImportDecl :: LImportDecl RdrName
       preludeImportDecl
         = L loc $ ImportDecl { ideclName      = L loc pRELUDE_NAME,
-      		    	       ideclPkgQual   = Nothing,
-      		    	       ideclSource    = False,
-      		    	       ideclSafe      = False,  -- Not a safe import
-      		    	       ideclQualified = False,
-      		    	       ideclImplicit  = True,	-- Implicit!
-      		    	       ideclAs        = Nothing,
-      		    	       ideclHiding    = Nothing  }
+                               ideclPkgQual   = Nothing,
+                               ideclSource    = False,
+                               ideclSafe      = False,  -- Not a safe import
+                               ideclQualified = False,
+                               ideclImplicit  = True,   -- Implicit!
+                               ideclAs        = Nothing,
+                               ideclHiding    = Nothing  }
 
 parseError :: DynFlags -> SrcSpan -> MsgDoc -> IO a
 parseError dflags span err = throwOneError $ mkPlainErrMsg dflags span err
@@ -138,7 +131,7 @@ getOptionsFromFile :: DynFlags
                    -> IO [Located String] -- ^ Parsed options, if any.
 getOptionsFromFile dflags filename
     = Exception.bracket
-	      (openBinaryFile filename ReadMode)
+              (openBinaryFile filename ReadMode)
               (hClose)
               (\handle -> do
                   opts <- fmap (getOptions' dflags)
@@ -226,7 +219,7 @@ getOptions' :: DynFlags
             -> [Located String]     -- Options.
 getOptions' dflags toks
     = parseToks toks
-    where 
+    where
           getToken (L _loc tok) = tok
           getLoc (L loc _tok) = loc
 
@@ -298,7 +291,7 @@ languagePragParseError dflags loc =
        vcat [ text "Cannot parse LANGUAGE pragma"
             , text "Expecting comma-separated list of language options,"
             , text "each starting with a capital letter"
-            , nest 2 (text "E.g. {-# LANGUAGE RecordPuns, Generics #-}") ])
+            , nest 2 (text "E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}") ])
 
 unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
 unsupportedExtnError dflags loc unsup =
@@ -313,9 +306,9 @@ unsupportedExtnError dflags loc unsup =
 optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages
 optionsErrorMsgs dflags unhandled_flags flags_lines _filename
   = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
-  where	unhandled_flags_lines = [ L l f | f <- unhandled_flags, 
-					  L l f' <- flags_lines, f == f' ]
-        mkMsg (L flagSpan flag) = 
+  where unhandled_flags_lines = [ L l f | f <- unhandled_flags,
+                                          L l f' <- flags_lines, f == f' ]
+        mkMsg (L flagSpan flag) =
             ErrUtils.mkPlainErrMsg dflags flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 

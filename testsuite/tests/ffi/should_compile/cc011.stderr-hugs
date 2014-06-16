@@ -1,0 +1,2 @@
+cc011.c: In function `hugsprim_foo_0':
+cc011.c:16: warning: assignment makes pointer from integer without a cast

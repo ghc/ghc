@@ -1,0 +1,5 @@
+
+Overlap4.hs:7:3:
+    Number of parameters must match family declaration; expected 2
+    In the equations for closed type family ‘F’
+    In the type family declaration for ‘F’

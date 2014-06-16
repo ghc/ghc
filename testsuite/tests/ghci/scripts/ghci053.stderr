@@ -1,0 +1,16 @@
+
+<interactive>:10:12:
+    Couldn't match expected type ‘Ghci1.Planet’
+                with actual type ‘Planet’
+    NB: ‘Ghci1.Planet’ is defined at <interactive>:5:1-49
+        ‘Planet’ is defined at <interactive>:8:1-41
+    In the second argument of ‘(==)’, namely ‘Mercury’
+    In the expression: mercury == Mercury
+
+<interactive>:12:10:
+    Couldn't match expected type ‘Planet’
+                with actual type ‘Ghci1.Planet’
+    NB: ‘Planet’ is defined at <interactive>:8:1-41
+        ‘Ghci1.Planet’ is defined at <interactive>:5:1-49
+    In the second argument of ‘(==)’, namely ‘Earth’
+    In the expression: Venus == Earth

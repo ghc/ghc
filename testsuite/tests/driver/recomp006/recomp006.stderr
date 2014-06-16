@@ -1,0 +1,6 @@
+
+A.hs:8:8:
+    Couldn't match expected type ‘Int’ with actual type ‘(t0, t1)’
+    In the expression: (2, 3)
+    In the expression: (1, (2, 3))
+    In an equation for ‘f’: f = (1, (2, 3))

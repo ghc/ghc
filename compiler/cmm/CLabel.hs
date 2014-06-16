@@ -54,8 +54,13 @@ module CLabel (
         mkIndStaticInfoLabel,
         mkMainCapabilityLabel,
         mkMAP_FROZEN_infoLabel,
+        mkMAP_FROZEN0_infoLabel,
         mkMAP_DIRTY_infoLabel,
+        mkSMAP_FROZEN_infoLabel,
+        mkSMAP_FROZEN0_infoLabel,
+        mkSMAP_DIRTY_infoLabel,
         mkEMPTY_MVAR_infoLabel,
+        mkArrWords_infoLabel,
 
         mkTopTickyCtrLabel,
         mkCAFBlackHoleInfoTableLabel,
@@ -398,23 +403,30 @@ mkConEntryLabel name        c     = IdLabel name c ConEntry
 mkStaticConEntryLabel name  c     = IdLabel name c StaticConEntry
 
 -- Constructing Cmm Labels
-mkSplitMarkerLabel, mkDirty_MUT_VAR_Label, mkUpdInfoLabel,
+mkDirty_MUT_VAR_Label, mkSplitMarkerLabel, mkUpdInfoLabel,
     mkBHUpdInfoLabel, mkIndStaticInfoLabel, mkMainCapabilityLabel,
-    mkMAP_FROZEN_infoLabel, mkMAP_DIRTY_infoLabel,
+    mkMAP_FROZEN_infoLabel, mkMAP_FROZEN0_infoLabel, mkMAP_DIRTY_infoLabel,
     mkEMPTY_MVAR_infoLabel, mkTopTickyCtrLabel,
-    mkCAFBlackHoleInfoTableLabel, mkCAFBlackHoleEntryLabel :: CLabel
+    mkCAFBlackHoleInfoTableLabel, mkCAFBlackHoleEntryLabel,
+    mkArrWords_infoLabel, mkSMAP_FROZEN_infoLabel, mkSMAP_FROZEN0_infoLabel,
+    mkSMAP_DIRTY_infoLabel :: CLabel
+mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") Nothing ForeignLabelInExternalPackage IsFunction
 mkSplitMarkerLabel              = CmmLabel rtsPackageId (fsLit "__stg_split_marker")    CmmCode
-mkDirty_MUT_VAR_Label           = CmmLabel rtsPackageId (fsLit "dirty_MUT_VAR")         CmmCode
 mkUpdInfoLabel                  = CmmLabel rtsPackageId (fsLit "stg_upd_frame")         CmmInfo
 mkBHUpdInfoLabel                = CmmLabel rtsPackageId (fsLit "stg_bh_upd_frame" )     CmmInfo
 mkIndStaticInfoLabel            = CmmLabel rtsPackageId (fsLit "stg_IND_STATIC")        CmmInfo
 mkMainCapabilityLabel           = CmmLabel rtsPackageId (fsLit "MainCapability")        CmmData
-mkMAP_FROZEN_infoLabel          = CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_FROZEN0") CmmInfo
+mkMAP_FROZEN_infoLabel          = CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_FROZEN") CmmInfo
+mkMAP_FROZEN0_infoLabel         = CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_FROZEN0") CmmInfo
 mkMAP_DIRTY_infoLabel           = CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_DIRTY") CmmInfo
 mkEMPTY_MVAR_infoLabel          = CmmLabel rtsPackageId (fsLit "stg_EMPTY_MVAR")        CmmInfo
 mkTopTickyCtrLabel              = CmmLabel rtsPackageId (fsLit "top_ct")                CmmData
 mkCAFBlackHoleInfoTableLabel    = CmmLabel rtsPackageId (fsLit "stg_CAF_BLACKHOLE")     CmmInfo
 mkCAFBlackHoleEntryLabel        = CmmLabel rtsPackageId (fsLit "stg_CAF_BLACKHOLE")     CmmEntry
+mkArrWords_infoLabel            = CmmLabel rtsPackageId (fsLit "stg_ARR_WORDS")         CmmInfo
+mkSMAP_FROZEN_infoLabel         = CmmLabel rtsPackageId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN") CmmInfo
+mkSMAP_FROZEN0_infoLabel        = CmmLabel rtsPackageId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN0") CmmInfo
+mkSMAP_DIRTY_infoLabel          = CmmLabel rtsPackageId (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
 
 -----
 mkCmmInfoLabel,   mkCmmEntryLabel, mkCmmRetInfoLabel, mkCmmRetLabel,
@@ -837,13 +849,13 @@ idInfoLabelType info =
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
 
-labelDynamic :: DynFlags -> PackageId -> CLabel -> Bool
-labelDynamic dflags this_pkg lbl =
+labelDynamic :: DynFlags -> PackageId -> Module -> CLabel -> Bool
+labelDynamic dflags this_pkg this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _           -> not (gopt Opt_Static dflags) && (this_pkg /= rtsPackageId)
 
-   IdLabel n _ _        -> isDllName dflags this_pkg n
+   IdLabel n _ _        -> isDllName dflags this_pkg this_mod n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
@@ -1030,9 +1042,9 @@ pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> ptext (sLit "_fast")
 
 pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
   = hcat [ptext (sLit "stg_sel_"), text (show offset),
-                ptext (if upd_reqd
-                        then (sLit "_upd_info")
-                        else (sLit "_noupd_info"))
+          ptext (if upd_reqd
+                 then (sLit "_upd_info")
+                 else (sLit "_noupd_info"))
         ]
 
 pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))

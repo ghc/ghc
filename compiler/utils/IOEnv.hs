@@ -22,7 +22,7 @@ module IOEnv (
         -- Getting at the environment
         getEnv, setEnv, updEnv,
 
-        runIOEnv, unsafeInterleaveM,
+        runIOEnv, unsafeInterleaveM, uninterruptibleMaskM_,
         tryM, tryAllM, tryMostM, fixM,
 
         -- I/O operations
@@ -42,6 +42,7 @@ import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
 import Control.Monad
 import MonadUtils
+import Control.Applicative (Alternative(..))
 
 ----------------------------------------------------------------------
 -- Defining the monad type
@@ -148,10 +149,16 @@ tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
 unsafeInterleaveM :: IOEnv env a -> IOEnv env a
 unsafeInterleaveM (IOEnv m) = IOEnv (\ env -> unsafeInterleaveIO (m env))
 
+uninterruptibleMaskM_ :: IOEnv env a -> IOEnv env a
+uninterruptibleMaskM_ (IOEnv m) = IOEnv (\ env -> uninterruptibleMask_ (m env))
 
 ----------------------------------------------------------------------
--- MonadPlus
+-- Alternative/MonadPlus
 ----------------------------------------------------------------------
+
+instance MonadPlus IO => Alternative (IOEnv env) where
+      empty = mzero
+      (<|>) = mplus
 
 -- For use if the user has imported Control.Monad.Error from MTL
 -- Requires UndecidableInstances

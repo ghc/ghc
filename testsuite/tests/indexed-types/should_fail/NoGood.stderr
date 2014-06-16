@@ -1,0 +1,5 @@
+
+NoGood.hs:4:15:
+    Conflicting family instance declarations:
+      F a a -- Defined at NoGood.hs:4:15
+      F [a] a -- Defined at NoGood.hs:5:15

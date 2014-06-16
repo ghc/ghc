@@ -10,7 +10,7 @@ Utility functions on @Core@ syntax
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module CoreSubst (
@@ -22,8 +22,8 @@ module CoreSubst (
 	deShadowBinds, substSpec, substRulesForImportedIds,
 	substTy, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
-	substUnfoldingSource, lookupIdSubst, lookupTvSubst, lookupCvSubst, substIdOcc,
-        substTickish,
+	lookupIdSubst, lookupTvSubst, lookupCvSubst, substIdOcc,
+        substTickish, substVarSet,
 
         -- ** Operations on substitutions
 	emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, substInScope, isEmptySubst, 
@@ -40,7 +40,7 @@ module CoreSubst (
 
 	-- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprWith,
-        exprIsConApp_maybe, exprIsLiteral_maybe
+        exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
     ) where
 
 #include "HsVersions.h"
@@ -59,10 +59,9 @@ import Type     hiding ( substTy, extendTvSubst, extendTvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
 import Coercion hiding ( substTy, substCo, extendTvSubst, substTyVarBndr, substCoVarBndr )
 
-import TcType      ( tcSplitDFunTy )
 import TyCon       ( tyConArity )
 import DataCon
-import PrelNames   ( eqBoxDataConKey )
+import PrelNames   ( eqBoxDataConKey, coercibleDataConKey )
 import OptCoercion ( optCoercion )
 import PprCore     ( pprCoreBindings, pprRules )
 import Module	   ( Module )
@@ -78,7 +77,6 @@ import Maybes
 import ErrUtils
 import DynFlags
 import BasicTypes ( isAlwaysActive )
-import ListSetOps
 import Util
 import Pair
 import Outputable
@@ -291,7 +289,7 @@ delBndr (Subst in_scope ids tvs cvs) v
 delBndrs :: Subst -> [Var] -> Subst
 delBndrs (Subst in_scope ids tvs cvs) vs
   = Subst in_scope (delVarEnvList ids vs) (delVarEnvList tvs vs) (delVarEnvList cvs vs)
-      -- Easist thing is just delete all from all!
+      -- Easiest thing is just delete all from all!
 
 -- | Simultaneously substitute for a bunch of variables
 --   No left-right shadowing
@@ -357,7 +355,7 @@ instance Outputable Subst where
 %************************************************************************
 
 \begin{code}
--- | Apply a substititon to an entire 'CoreExpr'. Rememeber, you may only 
+-- | Apply a substitution to an entire 'CoreExpr'. Remember, you may only 
 -- apply the substitution /once/: see "CoreSubst#apply_once"
 --
 -- Do *not* attempt to short-cut in the case of an empty substitution!
@@ -404,8 +402,8 @@ subst_expr subst expr
 				 where
 				   (subst', bndrs') = substBndrs subst bndrs
 
--- | Apply a substititon to an entire 'CoreBind', additionally returning an updated 'Subst'
--- that should be used by subsequent substitutons.
+-- | Apply a substitution to an entire 'CoreBind', additionally returning an updated 'Subst'
+-- that should be used by subsequent substitutions.
 substBind, substBindSC :: Subst -> CoreBind -> (Subst, CoreBind)
 
 substBindSC subst bind 	  -- Short-cut if the substitution is empty
@@ -462,7 +460,7 @@ preserve occ info in rules.
 
 \begin{code}
 -- | Substitutes a 'Var' for another one according to the 'Subst' given, returning
--- the result and an updated 'Subst' that should be used by subsequent substitutons.
+-- the result and an updated 'Subst' that should be used by subsequent substitutions.
 -- 'IdInfo' is preserved by this process, although it is substituted into appropriately.
 substBndr :: Subst -> Var -> (Subst, Var)
 substBndr subst bndr
@@ -486,7 +484,7 @@ substRecBndrs subst bndrs
 \begin{code}
 substIdBndr :: SDoc 
             -> Subst		-- ^ Substitution to use for the IdInfo
-	    -> Subst -> Id 	-- ^ Substitition and Id to transform
+	    -> Subst -> Id 	-- ^ Substitution and Id to transform
 	    -> (Subst, Id)	-- ^ Transformed pair
 				-- NB: unfolding may be zapped
 
@@ -557,7 +555,7 @@ cloneRecIdBndrs subst us ids
 -- Just like substIdBndr, except that it always makes a new unique
 -- It is given the unique to use
 clone_id    :: Subst			-- Substitution for the IdInfo
-	    -> Subst -> (Id, Unique)	-- Substitition and Id to transform
+	    -> Subst -> (Id, Unique)	-- Substitution and Id to transform
 	    -> (Subst, Id)		-- Transformed pair
 
 clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
@@ -656,45 +654,23 @@ substUnfoldingSC subst unf 	 -- Short-cut version
   | isEmptySubst subst = unf
   | otherwise          = substUnfolding subst unf
 
-substUnfolding subst (DFunUnfolding ar con args)
-  = DFunUnfolding ar con (map subst_arg args)
+substUnfolding subst df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
+  = df { df_bndrs = bndrs', df_args = args' }
   where
-    subst_arg = fmap (substExpr (text "dfun-unf") subst)
+    (subst',bndrs') = substBndrs subst bndrs
+    args'           = map (substExpr (text "subst-unf:dfun") subst') args
 
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
 	-- Retain an InlineRule!
   | not (isStableSource src)  -- Zap an unstable unfolding, to save substitution work
   = NoUnfolding
   | otherwise                 -- But keep a stable one!
-  = seqExpr new_tmpl `seq` 
-    new_src `seq`
-    unf { uf_tmpl = new_tmpl, uf_src = new_src }
+  = seqExpr new_tmpl `seq`
+    unf { uf_tmpl = new_tmpl }
   where
     new_tmpl = substExpr (text "subst-unf") subst tmpl
-    new_src  = substUnfoldingSource subst src
 
 substUnfolding _ unf = unf	-- NoUnfolding, OtherCon
-
--------------------
-substUnfoldingSource :: Subst -> UnfoldingSource -> UnfoldingSource
-substUnfoldingSource (Subst in_scope ids _ _) (InlineWrapper wkr)
-  | Just wkr_expr <- lookupVarEnv ids wkr 
-  = case wkr_expr of
-      Var w1 -> InlineWrapper w1
-      _other -> -- WARN( True, text "Interesting! CoreSubst.substWorker1:" <+> ppr wkr 
-                --             <+> ifPprDebug (equals <+> ppr wkr_expr) )   
-			      -- Note [Worker inlining]
-                InlineStable  -- It's not a wrapper any more, but still inline it!
-
-  | Just w1  <- lookupInScope in_scope wkr = InlineWrapper w1
-  | otherwise = -- WARN( True, text "Interesting! CoreSubst.substWorker2:" <+> ppr wkr )
-    	      	-- This can legitimately happen.  The worker has been inlined and
-		-- dropped as dead code, because we don't treat the UnfoldingSource
-		-- as an "occurrence".
-                -- Note [Worker inlining]
-      	        InlineStable
-
-substUnfoldingSource _ src = src
 
 ------------------
 substIdOcc :: Subst -> Id -> Id
@@ -793,7 +769,7 @@ Note [Worker inlining]
 A worker can get sustituted away entirely.
 	- it might be trivial
 	- it might simply be very small
-We do not treat an InlWrapper as an 'occurrence' in the occurence 
+We do not treat an InlWrapper as an 'occurrence' in the occurrence 
 analyser, so it's possible that the worker is not even in scope any more.
 
 In all all these cases we simply drop the special case, returning to
@@ -867,7 +843,7 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 -- We also inline bindings that bind a Eq# box: see
 -- See Note [Optimise coercion boxes agressively].
 --
--- The result is NOT guaranteed occurence-analysed, because
+-- The result is NOT guaranteed occurrence-analysed, because
 -- in  (let x = y in ....) we substitute for x; so y's occ-info
 -- may change radically
 
@@ -919,12 +895,12 @@ type OutExpr = CoreExpr
 -- In these functions the substitution maps InVar -> OutExpr
 
 ----------------------
-simple_opt_expr, simple_opt_expr' :: Subst -> InExpr -> OutExpr
-simple_opt_expr s e = simple_opt_expr' s e
-
-simple_opt_expr' subst expr
+simple_opt_expr :: Subst -> InExpr -> OutExpr
+simple_opt_expr subst expr
   = go expr
   where
+    in_scope_env = (substInScope subst, simpleUnfoldingFun)
+
     go (Var v)          = lookupIdSubst (text "simpleOptExpr") subst v
     go (App e1 e2)      = simple_app subst e1 [go e2]
     go (Type ty)        = Type     (substTy subst ty)
@@ -944,7 +920,7 @@ simple_opt_expr' subst expr
     go (Case e b ty as)
        -- See Note [Optimise coercion boxes agressively]
       | isDeadBinder b
-      , Just (con, _tys, es) <- expr_is_con_app e'
+      , Just (con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
       , Just (altcon, bs, rhs) <- findAlt (DataAlt con) as
       = case altcon of
           DEFAULT -> go rhs
@@ -990,6 +966,10 @@ simple_app subst (Lam b e) (a:as)
   where
     (subst', b') = subst_opt_bndr subst b
     b2 = add_info subst' b b'
+simple_app subst (Var v) as
+  | isCompulsoryUnfolding (idUnfolding v)
+  -- See Note [Unfold compulsory unfoldings in LHSs]
+  =  simple_app subst (unfoldingTemplate (idUnfolding v)) as
 simple_app subst e as
   = foldl App (simple_opt_expr subst e) as
 
@@ -1063,7 +1043,7 @@ maybe_substitute subst b r
     trivial | exprIsTrivial r = True
             | (Var fun, args) <- collectArgs r
             , Just dc <- isDataConWorkId_maybe fun
-            , dc `hasKey` eqBoxDataConKey
+            , dc `hasKey` eqBoxDataConKey || dc `hasKey` coercibleDataConKey
             , all exprIsTrivial args = True -- See Note [Optimise coercion boxes agressively]
             | otherwise = False
 
@@ -1111,8 +1091,10 @@ add_info subst old_bndr new_bndr
  | otherwise        = maybeModifyIdInfo mb_new_info new_bndr
  where mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
 
-expr_is_con_app :: OutExpr -> Maybe (DataCon, [Type], [OutExpr])
-expr_is_con_app = exprIsConApp_maybe (\id -> if isAlwaysActive (idInlineActivation id) then idUnfolding id else noUnfolding)
+simpleUnfoldingFun :: IdUnfoldingFun
+simpleUnfoldingFun id 
+  | isAlwaysActive (idInlineActivation id) = idUnfolding id
+  | otherwise                              = noUnfolding
 \end{code}
 
 Note [Inline prag in simplOpt]
@@ -1134,6 +1116,12 @@ we don't know what phase we're in.  Here's an example
 When inlining 'foo' in 'bar' we want the let-binding for 'inner' 
 to remain visible until Phase 1
 
+Note [Unfold compulsory unfoldings in LHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the user writes `map coerce = coerce` as a rule, the rule will only ever
+match if we replace coerce by its unfolding on the LHS, because that is the
+core that the rule matching engine will find. So do that for everything that
+has a compulsory unfolding. Also see Note [Desugaring coerce as cast] in Desugar
 
 %************************************************************************
 %*                                                                      *
@@ -1160,12 +1148,10 @@ data ConCont = CC [CoreExpr] Coercion
 -- | Returns @Just (dc, [t1..tk], [x1..xn])@ if the argument expression is 
 -- a *saturated* constructor application of the form @dc t1..tk x1 .. xn@,
 -- where t1..tk are the *universally-qantified* type args of 'dc'
-exprIsConApp_maybe :: IdUnfoldingFun -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
-exprIsConApp_maybe id_unf expr
-  = go (Left in_scope) expr (CC [] (mkReflCo (exprType expr)))
+exprIsConApp_maybe :: InScopeEnv -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
+exprIsConApp_maybe (in_scope, id_unf) expr
+  = go (Left in_scope) expr (CC [] (mkReflCo Representational (exprType expr)))
   where
-    in_scope = mkInScopeSet (exprFreeVars expr)
-
     go :: Either InScopeSet Subst 
        -> CoreExpr -> ConCont 
        -> Maybe (DataCon, [Type], [CoreExpr])
@@ -1186,17 +1172,13 @@ exprIsConApp_maybe id_unf expr
     go (Left in_scope) (Var fun) cont@(CC args co)
         | Just con <- isDataConWorkId_maybe fun
         , count isValArg args == idArity fun
-        , let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars con) args
-        = dealWithCoercion co (con, stripTypeArgs univ_ty_args, rest_args)
+        = dealWithCoercion co con args
 
         -- Look through dictionary functions; see Note [Unfolding DFuns]
-        | DFunUnfolding dfun_nargs con ops <- unfolding
-        , length args == dfun_nargs    -- See Note [DFun arity check]
-        , let (dfun_tvs, _theta, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
-              subst    = zipOpenTvSubst dfun_tvs (stripTypeArgs (takeList dfun_tvs args))
-              mk_arg (DFunPolyArg e) = mkApps e args
-              mk_arg (DFunLamArg i)  = getNth args i
-        = dealWithCoercion co (con, substTys subst dfun_res_tys, map mk_arg ops)
+        | DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = dfun_args } <- unfolding
+        , bndrs `equalLength` args    -- See Note [DFun arity check]
+        , let subst = mkOpenSubst in_scope (bndrs `zip` args)
+        = dealWithCoercion co con (map (substExpr (text "exprIsConApp1") subst) dfun_args)
 
         -- Look through unfoldings, but only arity-zero one; 
 	-- if arity > 0 we are effectively inlining a function call,
@@ -1219,17 +1201,17 @@ exprIsConApp_maybe id_unf expr
     subst_co (Right s) co = CoreSubst.substCo s co
 
     subst_arg (Left {}) e = e
-    subst_arg (Right s) e = substExpr (text "exprIsConApp") s e
+    subst_arg (Right s) e = substExpr (text "exprIsConApp2") s e
 
     extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
     extend (Right s)       v e = Right (extendSubst s v e)
 
-dealWithCoercion :: Coercion
-                 -> (DataCon, [Type], [CoreExpr])
+dealWithCoercion :: Coercion -> DataCon -> [CoreExpr]
                  -> Maybe (DataCon, [Type], [CoreExpr])
-dealWithCoercion co stuff@(dc, _dc_univ_args, dc_args)
+dealWithCoercion co dc dc_args
   | isReflCo co 
-  = Just stuff
+  , let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) dc_args
+  = Just (dc, stripTypeArgs univ_ty_args, rest_args)
 
   | Pair _from_ty to_ty <- coercionKind co
   , Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
@@ -1252,23 +1234,27 @@ dealWithCoercion co stuff@(dc, _dc_univ_args, dc_args)
         dc_ex_tyvars   = dataConExTyVars dc
         arg_tys        = dataConRepArgTys dc
 
-        (ex_args, val_args) = splitAtList dc_ex_tyvars dc_args
+        non_univ_args  = dropList dc_univ_tyvars dc_args
+        (ex_args, val_args) = splitAtList dc_ex_tyvars non_univ_args
 
         -- Make the "theta" from Fig 3 of the paper
         gammas = decomposeCo tc_arity co
-        theta_subst = liftCoSubstWith 
+        theta_subst = liftCoSubstWith Representational
                          (dc_univ_tyvars ++ dc_ex_tyvars)
-                         (gammas         ++ map mkReflCo (stripTypeArgs ex_args))
+                                                -- existentials are at role N
+                         (gammas         ++ map (mkReflCo Nominal)
+                                                (stripTypeArgs ex_args))
 
           -- Cast the value arguments (which include dictionaries)
         new_val_args = zipWith cast_arg arg_tys val_args
         cast_arg arg_ty arg = mkCast arg (theta_subst arg_ty)
 
         dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
-                         ppr arg_tys, ppr dc_args,        ppr _dc_univ_args,
+                         ppr arg_tys, ppr dc_args,        
                          ppr ex_args, ppr val_args, ppr co, ppr _from_ty, ppr to_ty, ppr to_tc ]
     in
-    ASSERT2( eqType _from_ty (mkTyConApp to_tc _dc_univ_args), dump_doc )
+    ASSERT2( eqType _from_ty (mkTyConApp to_tc (stripTypeArgs $ takeList dc_univ_tyvars dc_args))
+           , dump_doc )
     ASSERT2( all isTypeArg ex_args, dump_doc )
     ASSERT2( equalLength val_args arg_tys, dump_doc )
     Just (dc, to_tc_arg_tys, ex_args ++ new_val_args)
@@ -1301,16 +1287,89 @@ type args) matches what the dfun is expecting.  This may be *less*
 than the ordinary arity of the dfun: see Note [DFun unfoldings] in CoreSyn
 
 \begin{code}
-exprIsLiteral_maybe :: IdUnfoldingFun -> CoreExpr -> Maybe Literal
+exprIsLiteral_maybe :: InScopeEnv -> CoreExpr -> Maybe Literal
 -- Same deal as exprIsConApp_maybe, but much simpler
 -- Nevertheless we do need to look through unfoldings for
 -- Integer literals, which are vigorously hoisted to top level
 -- and not subsequently inlined
-exprIsLiteral_maybe id_unf e
+exprIsLiteral_maybe env@(_, id_unf) e
   = case e of
       Lit l     -> Just l
-      Tick _ e' -> exprIsLiteral_maybe id_unf e' -- dubious?
+      Tick _ e' -> exprIsLiteral_maybe env e' -- dubious?
       Var v     | Just rhs <- expandUnfolding_maybe (id_unf v)
-                -> exprIsLiteral_maybe id_unf rhs
+                -> exprIsLiteral_maybe env rhs
       _         -> Nothing
-\end{code}       
+\end{code}
+
+Note [exprIsLambda_maybe]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+exprIsLambda_maybe will, given an expression `e`, try to turn it into the form
+`Lam v e'` (returned as `Just (v,e')`). Besides using lambdas, it looks through
+casts (using the Push rule), and it unfolds function calls if the unfolding
+has a greater arity than arguments are present.
+
+Currently, it is used in Rules.match, and is required to make
+"map coerce = coerce" match.
+
+\begin{code}
+exprIsLambda_maybe :: InScopeEnv -> CoreExpr -> Maybe (Var, CoreExpr)
+    -- See Note [exprIsLambda_maybe]
+
+-- The simple case: It is a lambda already
+exprIsLambda_maybe _ (Lam x e)
+    = Just (x, e)
+
+-- Also possible: A casted lambda. Push the coercion inside
+exprIsLambda_maybe (in_scope_set, id_unf) (Cast casted_e co)
+    | Just (x, e) <- exprIsLambda_maybe (in_scope_set, id_unf) casted_e
+    -- Only do value lambdas.
+    -- this implies that x is not in scope in gamma (makes this code simpler)
+    , not (isTyVar x) && not (isCoVar x)
+    , ASSERT( not $ x `elemVarSet` tyCoVarsOfCo co) True
+    , let res = pushCoercionIntoLambda in_scope_set x e co
+    = -- pprTrace "exprIsLambda_maybe:Cast" (vcat [ppr casted_e, ppr co, ppr res])
+      res
+
+-- Another attempt: See if we find a partial unfolding
+exprIsLambda_maybe (in_scope_set, id_unf) e
+    | (Var f, as) <- collectArgs e
+    , let unfolding = id_unf f
+    , Just rhs <- expandUnfolding_maybe unfolding
+    -- Make sure there is hope to get a lambda
+    , unfoldingArity unfolding > length (filter isValArg as)
+    -- Optimize, for beta-reduction
+    , let e' =  simpleOptExprWith (mkEmptySubst in_scope_set) (rhs `mkApps` as)
+    -- Recurse, because of possible casts
+    , Just (x', e'') <- exprIsLambda_maybe (in_scope_set, id_unf) e'
+    , let res = Just (x', e'')
+    = -- pprTrace "exprIsLambda_maybe:Unfold" (vcat [ppr e, ppr res])
+      res
+
+exprIsLambda_maybe _ _e
+    = -- pprTrace "exprIsLambda_maybe:Fail" (vcat [ppr _e])
+      Nothing
+
+
+pushCoercionIntoLambda
+    :: InScopeSet -> Var -> CoreExpr -> Coercion -> Maybe (Var, CoreExpr)
+pushCoercionIntoLambda in_scope x e co
+    -- This implements the Push rule from the paper on coercions
+    -- Compare with simplCast in Simplify
+    | ASSERT(not (isTyVar x) && not (isCoVar x)) True
+    , Pair s1s2 t1t2 <- coercionKind co
+    , Just (_s1,_s2) <- splitFunTy_maybe s1s2
+    , Just (t1,_t2) <- splitFunTy_maybe t1t2
+    = let [co1, co2] = decomposeCo 2 co
+          -- Should we optimize the coercions here?
+          -- Otherwise they might not match too well
+          x' = x `setIdType` t1
+          in_scope' = in_scope `extendInScopeSet` x'
+          subst = extendIdSubst (mkEmptySubst in_scope')
+                                x
+                                (mkCast (Var x') co1)
+      in Just (x', subst_expr subst e `mkCast` co2)
+    | otherwise
+    = pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
+      Nothing
+
+\end{code}

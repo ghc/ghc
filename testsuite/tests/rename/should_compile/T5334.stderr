@@ -1,0 +1,13 @@
+
+T5334.hs:7:5: Warning:
+    Fields of ‘T’ not initialised: b
+    In the expression: T {..}
+    In an equation for ‘t’:
+        t = T {..}
+          where
+              a = 1
+
+T5334.hs:14:5: Warning:
+    Fields of ‘S’ not initialised: y
+    In the expression: S {x = 1}
+    In an equation for ‘s’: s = S {x = 1}

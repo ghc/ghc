@@ -1,0 +1,16 @@
+
+T8518.hs:17:78:
+    Could not deduce (F a1 ~ (Z a1 -> B a1 -> F a1))
+    from the context (Continuation c)
+      bound by the type signature for
+                 callCont :: Continuation c => c -> Z c -> B c -> Maybe (F c)
+      at T8518.hs:13:13-64
+    Relevant bindings include
+      c'' :: a1 (bound at T8518.hs:17:30)
+      b' :: B a1 (bound at T8518.hs:17:21)
+      z' :: Z a1 (bound at T8518.hs:17:18)
+      c' :: a1 (bound at T8518.hs:17:15)
+      rpt :: a -> a1 -> Z a1 -> B a1 -> F a1 (bound at T8518.hs:16:9)
+    In the expression: rpt (i - 1) c''
+    In the expression:
+      let c'' = fromJust (snd <$> (continue c' z' b')) in rpt (i - 1) c''

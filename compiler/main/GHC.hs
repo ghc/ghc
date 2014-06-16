@@ -102,6 +102,7 @@ module GHC (
         parseName,
         RunResult(..),  
         runStmt, runStmtWithLocation, runDecls, runDeclsWithLocation,
+        runTcInteractive,   -- Desired by some clients (Trac #8878)
         parseImportDecl, SingleStep(..),
         resume,
         Resume(resumeStmt, resumeThreadId, resumeBreakInfo, resumeSpan,
@@ -157,7 +158,7 @@ module GHC (
         TyCon, 
         tyConTyVars, tyConDataCons, tyConArity,
         isClassTyCon, isSynTyCon, isNewTyCon, isPrimTyCon, isFunTyCon,
-        isFamilyTyCon, tyConClass_maybe,
+        isFamilyTyCon, isOpenFamilyTyCon, tyConClass_maybe,
         synTyConRhs_maybe, synTyConDefn_maybe, synTyConResKind,
 
         -- ** Type variables
@@ -182,7 +183,7 @@ module GHC (
         pprInstance, pprInstanceHdr,
         pprFamInst,
 
-        FamInst, Branched,
+        FamInst,
 
         -- ** Types and Kinds
         Type, splitForAllTys, funResultTy, 
@@ -254,10 +255,10 @@ module GHC (
 #include "HsVersions.h"
 
 #ifdef GHCI
-import Linker           ( HValue )
 import ByteCodeInstr
 import BreakArray
 import InteractiveEval
+import TcRnDriver       ( runTcInteractive )
 #endif
 
 import HscMain
@@ -296,6 +297,7 @@ import Annotations
 import Module
 import UniqFM
 import Panic
+import Platform
 import Bag              ( unitBag )
 import ErrUtils
 import MonadUtils
@@ -345,7 +347,10 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
                 Just (ioe :: IOException) ->
                   fatalErrorMsg'' fm (show ioe)
                 _ -> case fromException exception of
-                     Just UserInterrupt -> exitWith (ExitFailure 1)
+                     Just UserInterrupt ->
+                         -- Important to let this one propagate out so our
+                         -- calling process knows we were interrupted by ^C
+                         liftIO $ throwIO UserInterrupt
                      Just StackOverflow ->
                          fatalErrorMsg'' fm "stack overflow: use +RTS -K<size> to increase it"
                      _ -> case fromException exception of
@@ -442,16 +447,50 @@ runGhcT mb_top_dir ghct = do
 -- <http://hackage.haskell.org/cgi-bin/hackage-scripts/package/ghc-paths>.
 
 initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
-initGhcMonad mb_top_dir = do
-  -- catch ^C
-  liftIO $ installSignalHandlers
+initGhcMonad mb_top_dir
+  = do { env <- liftIO $
+                do { installSignalHandlers  -- catch ^C
+                   ; initStaticOpts
+                   ; mySettings <- initSysTools mb_top_dir
+                   ; dflags <- initDynFlags (defaultDynFlags mySettings)
+                   ; checkBrokenTablesNextToCode dflags
+                   ; setUnsafeGlobalDynFlags dflags
+                      -- c.f. DynFlags.parseDynamicFlagsFull, which
+                      -- creates DynFlags and sets the UnsafeGlobalDynFlags
+                   ; newHscEnv dflags }
+       ; setSession env }
 
-  liftIO $ initStaticOpts
+-- | The binutils linker on ARM emits unnecessary R_ARM_COPY relocations which
+-- breaks tables-next-to-code in dynamically linked modules. This
+-- check should be more selective but there is currently no released
+-- version where this bug is fixed.
+-- See https://sourceware.org/bugzilla/show_bug.cgi?id=16177 and
+-- https://ghc.haskell.org/trac/ghc/ticket/4210#comment:29
+checkBrokenTablesNextToCode :: MonadIO m => DynFlags -> m ()
+checkBrokenTablesNextToCode dflags
+  = do { broken <- checkBrokenTablesNextToCode' dflags
+       ; when broken
+         $ do { _ <- liftIO $ throwIO $ mkApiErr dflags invalidLdErr
+              ; fail "unsupported linker"
+              }
+       }
+  where
+    invalidLdErr = text "Tables-next-to-code not supported on ARM" <+>
+                   text "when using binutils ld (please see:" <+>
+                   text "https://sourceware.org/bugzilla/show_bug.cgi?id=16177)"
 
-  mySettings <- liftIO $ initSysTools mb_top_dir
-  dflags <- liftIO $ initDynFlags (defaultDynFlags mySettings)
-  env <- liftIO $ newHscEnv dflags
-  setSession env
+checkBrokenTablesNextToCode' :: MonadIO m => DynFlags -> m Bool
+checkBrokenTablesNextToCode' dflags
+  | not (isARM arch)              = return False
+  | WayDyn `notElem` ways dflags  = return False
+  | not (tablesNextToCode dflags) = return False
+  | otherwise                     = do
+    linkerInfo <- liftIO $ getLinkerInfo dflags
+    case linkerInfo of
+      GnuLD _  -> return True
+      _        -> return False
+  where platform = targetPlatform dflags
+        arch = platformArch platform
 
 
 -- %************************************************************************
@@ -892,8 +931,10 @@ compileToCoreSimplified = compileCore True
 -- The resulting .o, .hi, and executable files, if any, are stored in the
 -- current directory, and named according to the module name.
 -- This has only so far been tested with a single self-contained module.
-compileCoreToObj :: GhcMonad m => Bool -> CoreModule -> m ()
-compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) = do
+compileCoreToObj :: GhcMonad m
+                 => Bool -> CoreModule -> FilePath -> FilePath -> m ()
+compileCoreToObj simplify cm@(CoreModule{ cm_module = mName })
+                 output_fn extCore_filename = do
   dflags      <- getSessionDynFlags
   currentTime <- liftIO $ getCurrentTime
   cwd         <- liftIO $ getCurrentDirectory
@@ -919,7 +960,7 @@ compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) = do
       }
 
   hsc_env <- getSession
-  liftIO $ hscCompileCore hsc_env simplify (cm_safe cm) modSum (cm_binds cm)
+  liftIO $ hscCompileCore hsc_env simplify (cm_safe cm) modSum (cm_binds cm) output_fn extCore_filename
 
 
 compileCore :: GhcMonad m => Bool -> FilePath -> m CoreModule
@@ -1002,7 +1043,7 @@ getBindings = withSession $ \hsc_env ->
     return $ icInScopeTTs $ hsc_IC hsc_env
 
 -- | Return the instances for the current interactive session.
-getInsts :: GhcMonad m => m ([ClsInst], [FamInst Branched])
+getInsts :: GhcMonad m => m ([ClsInst], [FamInst])
 getInsts = withSession $ \hsc_env ->
     return $ ic_instances (hsc_IC hsc_env)
 
@@ -1309,7 +1350,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
       res <- findImportedModule hsc_env mod_name maybe_pkg
       case res of
         Found _ m -> return m
-        err       -> noModError dflags noSrcSpan mod_name err
+        err       -> throwOneError $ noModError dflags noSrcSpan mod_name err
     _otherwise -> do
       home <- lookupLoadedHomeModule mod_name
       case home of
@@ -1319,7 +1360,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
            case res of
              Found loc m | modulePackageId m /= this_pkg -> return m
                          | otherwise -> modNotLoadedError dflags m loc
-             err -> noModError dflags noSrcSpan mod_name err
+             err -> throwOneError $ noModError dflags noSrcSpan mod_name err
 
 modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
 modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc dflags $
@@ -1344,7 +1385,7 @@ lookupModule mod_name Nothing = withSession $ \hsc_env -> do
       res <- findExposedPackageModule hsc_env mod_name Nothing
       case res of
         Found _ m -> return m
-        err       -> noModError (hsc_dflags hsc_env) noSrcSpan mod_name err
+        err       -> throwOneError $ noModError (hsc_dflags hsc_env) noSrcSpan mod_name err
 
 lookupLoadedHomeModule :: GhcMonad m => ModuleName -> m (Maybe Module)
 lookupLoadedHomeModule mod_name = withSession $ \hsc_env ->

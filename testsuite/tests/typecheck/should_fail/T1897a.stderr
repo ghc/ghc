@@ -1,0 +1,11 @@
+
+T1897a.hs:9:1:
+    Could not deduce (Wob a0 b)
+      arising from the ambiguity check for ‘foo’
+    from the context (Wob a b)
+      bound by the inferred type for ‘foo’: Wob a b => b -> [b]
+      at T1897a.hs:9:1-24
+    The type variable ‘a0’ is ambiguous
+    When checking that ‘foo’
+      has the inferred type ‘forall a b. Wob a b => b -> [b]’
+    Probable cause: the inferred type is ambiguous

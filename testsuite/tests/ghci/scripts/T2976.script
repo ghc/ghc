@@ -1,0 +1,8 @@
+let test = 0 :: Integer
+:show bindings
+:force test
+:show bindings
+let test = "test"
+:show bindings
+:force test
+:show bindings

@@ -5,8 +5,8 @@
 # This file is part of the GHC build system.
 #
 # To understand how the build system works and how to modify it, see
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture
-#      http://hackage.haskell.org/trac/ghc/wiki/Building/Modifying
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
+#      http://ghc.haskell.org/trac/ghc/wiki/Building/Modifying
 #
 # -----------------------------------------------------------------------------
 
@@ -18,18 +18,23 @@ CABAL_DOTTED_VERSION := $(shell grep "^version:" libraries/Cabal/Cabal/Cabal.cab
 CABAL_VERSION := $(subst .,$(comma),$(CABAL_DOTTED_VERSION))
 CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 
-ghc-cabal_INPLACE = inplace/bin/ghc-cabal$(exeext)
+ghc-cabal_DIST_BINARY_NAME = ghc-cabal$(exeext0)
+ghc-cabal_DIST_BINARY = utils/ghc-cabal/dist/build/tmp/$(ghc-cabal_DIST_BINARY_NAME)
+ghc-cabal_INPLACE = inplace/bin/$(ghc-cabal_DIST_BINARY_NAME)
 
 ifneq "$(BINDIST)" "YES"
-$(ghc-cabal_INPLACE) : utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext) | $$(dir $$@)/.
+$(ghc-cabal_INPLACE) : $(ghc-cabal_DIST_BINARY) | $$(dir $$@)/.
 	"$(CP)" $< $@
 
-utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Cabal/Distribution/*/*/*.hs)
-utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Cabal/Distribution/*/*.hs)
-utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Cabal/Distribution/*.hs)
+$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*/*/*.hs)
+$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*/*.hs)
+$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*.hs)
 
-utils/ghc-cabal/dist/build/tmp/ghc-cabal$(exeext): utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
-	"$(GHC)" $(SRC_HC_OPTS) --make utils/ghc-cabal/Main.hs -o $@ \
+$(ghc-cabal_DIST_BINARY): utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
+	"$(GHC)" $(SRC_HC_OPTS) \
+	       $(addprefix -optc, $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)) \
+	       $(addprefix -optl, $(SRC_LD_OPTS) $(CONF_LD_OPTS_STAGE0)) \
+	       --make utils/ghc-cabal/Main.hs -o $@ \
 	       -no-user-$(GHC_PACKAGE_DB_FLAG) \
 	       -Wall -fno-warn-unused-imports -fno-warn-warnings-deprecations \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
@@ -63,4 +68,3 @@ utils/ghc-cabal_dist-install_WANT_BINDIST_WRAPPER = YES
 utils/ghc-cabal_dist-install_MODULES         = Main
 
 $(eval $(call build-prog,utils/ghc-cabal,dist-install,1))
-

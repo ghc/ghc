@@ -29,7 +29,7 @@ import CoreMonad
 import Outputable
 import FastString
 import MonadUtils
-import Control.Monad    ( when )
+import Control.Monad       ( when, liftM, ap )
 \end{code}
 
 %************************************************************************
@@ -97,6 +97,14 @@ computeMaxTicks dflags size
 {-# INLINE thenSmpl_ #-}
 {-# INLINE returnSmpl #-}
 
+
+instance Functor SimplM where
+    fmap = liftM
+
+instance Applicative SimplM where
+    pure = return
+    (<*>) = ap
+
 instance Monad SimplM where
    (>>)   = thenSmpl_
    (>>=)  = thenSmpl
@@ -145,8 +153,8 @@ instance MonadUnique SimplM where
                                 (us1, us2) -> return (us1, us2, sc))
 
     getUniqueM
-       = SM (\_st_env us sc -> case splitUniqSupply us of
-                                (us1, us2) -> return (uniqFromSupply us1, us2, sc))
+       = SM (\_st_env us sc -> case takeUniqFromSupply us of
+                                (u, us') -> return (u, us', sc))
 
     getUniquesM
         = SM (\_st_env us sc -> case splitUniqSupply us of

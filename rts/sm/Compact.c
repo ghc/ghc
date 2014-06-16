@@ -7,7 +7,7 @@
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
  * 
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
  *
  * ---------------------------------------------------------------------------*/
 
@@ -442,6 +442,7 @@ thread_TSO (StgTSO *tso)
     thread_(&tso->global_link);
 
     if (   tso->why_blocked == BlockedOnMVar
+        || tso->why_blocked == BlockedOnMVarRead
 	|| tso->why_blocked == BlockedOnBlackHole
 	|| tso->why_blocked == BlockedOnMsgThrowTo
         || tso->why_blocked == NotBlocked
@@ -488,6 +489,21 @@ update_fwd_large( bdescr *bd )
           StgMutArrPtrs *a;
 
           a = (StgMutArrPtrs*)p;
+          for (p = (P_)a->payload; p < (P_)&a->payload[a->ptrs]; p++) {
+              thread((StgClosure **)p);
+          }
+          continue;
+      }
+
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN:
+    case SMALL_MUT_ARR_PTRS_FROZEN0:
+      // follow everything 
+      {
+          StgSmallMutArrPtrs *a;
+
+          a = (StgSmallMutArrPtrs*)p;
           for (p = (P_)a->payload; p < (P_)&a->payload[a->ptrs]; p++) {
               thread((StgClosure **)p);
           }
@@ -620,7 +636,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case WEAK:
     {
 	StgWeak *w = (StgWeak *)p;
-	thread(&w->cfinalizer);
+	thread(&w->cfinalizers);
 	thread(&w->key);
 	thread(&w->value);
 	thread(&w->finalizer);
@@ -678,6 +694,22 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	}
 
 	return (StgPtr)a + mut_arr_ptrs_sizeW(a);
+    }
+
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN:
+    case SMALL_MUT_ARR_PTRS_FROZEN0:
+	// follow everything 
+    {
+        StgSmallMutArrPtrs *a;
+
+        a = (StgSmallMutArrPtrs *)p;
+	for (p = (P_)a->payload; p < (P_)&a->payload[a->ptrs]; p++) {
+	    thread((StgClosure **)p);
+	}
+
+	return (StgPtr)a + small_mut_arr_ptrs_sizeW(a);
     }
     
     case TSO:
@@ -917,19 +949,22 @@ compact(StgClosure *static_objects)
     markScheduler((evac_fn)thread_root, NULL);
 
     // the weak pointer lists...
-    if (weak_ptr_list != NULL) {
-	thread((void *)&weak_ptr_list);
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        if (generations[g].weak_ptr_list != NULL) {
+            thread((void *)&generations[g].weak_ptr_list);
+        }
     }
-    if (old_weak_ptr_list != NULL) {
-	thread((void *)&old_weak_ptr_list); // tmp
+
+    if (dead_weak_ptr_list != NULL) {
+        thread((void *)&dead_weak_ptr_list); // tmp
     }
 
     // mutable lists
     for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
-	bdescr *bd;
-	StgPtr p;
+        bdescr *bd;
+        StgPtr p;
         for (n = 0; n < n_capabilities; n++) {
-            for (bd = capabilities[n].mut_lists[g]; 
+            for (bd = capabilities[n]->mut_lists[g];
                  bd != NULL; bd = bd->link) {
                 for (p = bd->start; p < bd->free; p++) {
                     thread((StgClosure **)p);

@@ -8,7 +8,7 @@
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module PrelInfo (
@@ -42,6 +42,7 @@ import HscTypes
 import Class
 import TyCon
 import Util
+import {-# SOURCE #-} TcTypeNats ( typeNatTyCons )
 
 import Data.Array
 \end{code}
@@ -89,7 +90,8 @@ wiredInThings
 	, map (AnId . primOpId) allThePrimOps
     ]
   where
-    tycon_things = map ATyCon ([funTyCon] ++ primTyCons ++ wiredInTyCons)
+    tycon_things = map ATyCon ([funTyCon] ++ primTyCons ++ wiredInTyCons
+                                    ++ typeNatTyCons)
 \end{code}
 
 We let a lot of "non-standard" values be visible, so that we can make
@@ -119,7 +121,7 @@ primOpId op = primOpIds ! primOpTag op
 %*									*
 %************************************************************************
 
-GHC.Prim "exports" all the primops and primitive types, some 
+GHC.Prim "exports" all the primops and primitive types, some
 wired-in Ids.
 
 \begin{code}
@@ -130,6 +132,7 @@ ghcPrimExports
    [ AvailTC n [n] 
    | tc <- funTyCon : primTyCons, let n = tyConName tc  ]
 \end{code}
+
 
 
 %************************************************************************

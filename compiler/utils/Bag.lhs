@@ -21,8 +21,6 @@ module Bag (
         mapAndUnzipBagM, mapAccumBagLM
     ) where
 
-#include "Typeable.h"
-
 import Outputable
 import Util
 

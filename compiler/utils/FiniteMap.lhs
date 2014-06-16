@@ -27,10 +27,6 @@ deleteList ks m = foldl (flip Map.delete) m ks
 foldRight        :: (elt -> a -> a) -> a -> Map key elt -> a
 foldRight        = Map.fold
 foldRightWithKey :: (key -> elt -> a -> a) -> a -> Map key elt -> a
-#if (MIN_VERSION_containers(0,4,0))
 foldRightWithKey = Map.foldrWithKey
-#else
-foldRightWithKey = Map.foldWithKey
-#endif
 \end{code}
 

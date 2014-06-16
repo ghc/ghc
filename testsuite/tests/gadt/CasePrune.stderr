@@ -1,0 +1,11 @@
+
+CasePrune.hs:14:31:
+    Could not coerce from ‘T Int’ to ‘T A’
+      because the first type argument of ‘T’ has role Nominal,
+      but the arguments ‘Int’ and ‘A’ differ
+      arising from the coercion of the method ‘ic’ from type ‘T Int’
+                   to type ‘T A’
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (C A)

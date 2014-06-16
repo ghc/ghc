@@ -1,15 +1,16 @@
 name:           bin-package-db
 version:        0.0.0.0
 license:        BSD3
-maintainer:     cvs-ghc@haskell.org
+maintainer:     ghc-devs@haskell.org
 bug-reports:    glasgow-haskell-bugs@haskell.org
 synopsis:       A binary format for the package database
 cabal-version:  >=1.6
 build-type: Simple
 
 source-repository head
-    type:     darcs
-    location: http://darcs.haskell.org/ghc
+    type:     git
+    location: http://git.haskell.org/ghc.git
+    subdir:   libraries/bin-package-db
 
 Library {
     exposed-modules:
@@ -18,7 +19,7 @@ Library {
     build-depends: base >= 4 && < 5
 
     build-depends: binary >= 0.5 && < 0.8,
-                   Cabal >= 1.8 && < 1.18
+                   Cabal >= 1.18 && < 1.19
 
     extensions: CPP
 }

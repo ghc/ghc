@@ -5,7 +5,7 @@
  * Capabilities
  *
  * For details on the high-level design, see
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Scheduler
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Scheduler
  *
  * A Capability holds all the state an OS thread/task needs to run
  * Haskell code: its STG registers, a pointer to its TSO, a nursery
@@ -132,8 +132,8 @@ struct Capability_ {
     StgTRecHeader *free_trec_headers;
     nat transaction_tokens;
 } // typedef Capability is defined in RtsAPI.h
-  // Capabilities are stored in an array, so make sure that adjacent
-  // Capabilities don't share any cache-lines:
+  // We never want a Capability to overlap a cache line with anything
+  // else, so round it up to a cache line size:
 #ifndef mingw32_HOST_OS
   ATTRIBUTE_ALIGNED(64)
 #endif
@@ -181,7 +181,7 @@ void initCapabilities (void);
 
 // Add and initialise more Capabilities
 //
-Capability * moreCapabilities (nat from, nat to);
+void moreCapabilities (nat from, nat to);
 
 // Release a capability.  This is called by a Task that is exiting
 // Haskell to make a foreign call, or in various other cases when we
@@ -211,7 +211,7 @@ INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
 
 // Array of all the capabilities
 //
-extern Capability *capabilities;
+extern Capability **capabilities;
 
 // The Capability that was last free.  Used as a good guess for where
 // to assign new threads.

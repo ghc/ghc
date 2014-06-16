@@ -1,0 +1,4 @@
+
+rn064.hs:13:12: Warning:
+    This binding for ‘r’ shadows the existing binding
+      bound at rn064.hs:15:9

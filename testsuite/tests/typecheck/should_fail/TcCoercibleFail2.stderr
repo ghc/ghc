@@ -1,0 +1,5 @@
+
+TcCoercibleFail2.hs:3:10:
+    Illegal instance declaration for ‘Coercible () ()’
+      The class is abstract, manual instances are not permitted.
+    In the instance declaration for ‘Coercible () ()’

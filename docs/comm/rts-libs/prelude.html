@@ -8,7 +8,7 @@
   <body BGCOLOR="FFFFFF">
     <h1>The GHC Commentary - Cunning Prelude Code</h1>
     <p>
-      GHC's uses a many optimsations and GHC specific techniques (unboxed
+      GHC's uses a many optimisations and GHC specific techniques (unboxed
       values, RULES pragmas, and so on) to make the heavily used Prelude code
       as fast as possible.
 
@@ -106,7 +106,7 @@ mapList f (x:xs) = f x : mapList f xs
       foldr/build rules, and if no foldr/build rule matches, the "mapList"
       rule <em>closes</em> it again in a later phase of optimisation - after
       build was inlined.  As a consequence, the whole thing depends a bit on
-      the timing of the various optimsations (the map might be closed again
+      the timing of the various optimisations (the map might be closed again
       before any of the foldr/build rules fires).  To make the timing
       deterministic, <code>build</code> gets a <code>{-# INLINE 2 build
       #-}</code> pragma, which delays <code>build</code>'s inlining, and thus,

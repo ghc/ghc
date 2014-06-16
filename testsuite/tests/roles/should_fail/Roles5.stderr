@@ -1,0 +1,14 @@
+
+Roles5.hs:7:1:
+    Illegal role annotation for T;
+    did you intend to use RoleAnnotations?
+    while checking a role annotation for ‘T’
+
+Roles5.hs:8:1:
+    Illegal role annotation for C;
+    did you intend to use RoleAnnotations?
+    while checking a role annotation for ‘C’
+
+Roles5.hs:9:1:
+    Illegal role annotation for S;
+    they are allowed only for datatypes and classes.

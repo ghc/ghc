@@ -7,12 +7,12 @@
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
  *
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
  *
  * ---------------------------------------------------------------------------*/
 
 #ifndef SM_MARKSTACK_H
-#define SM_MARKSTACk_H
+#define SM_MARKSTACK_H
 
 #include "BeginPrivate.h"
 

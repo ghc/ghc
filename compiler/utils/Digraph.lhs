@@ -7,7 +7,7 @@
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -15,7 +15,8 @@ module Digraph(
         Graph, graphFromVerticesAndAdjacency, graphFromEdgedVertices,
 
         SCC(..), Node, flattenSCC, flattenSCCs,
-        stronglyConnCompG, topologicalSortG, dfsTopSortG,
+        stronglyConnCompG, stronglyConnCompFromG,
+        topologicalSortG, dfsTopSortG,
         verticesG, edgesG, hasVertexG,
         reachableG, transposeG,
         outdegreeG, indegreeG,
@@ -254,9 +255,21 @@ edges going from them to earlier ones.
 
 \begin{code}
 stronglyConnCompG :: Graph node -> [SCC node]
-stronglyConnCompG (Graph { gr_int_graph = graph, gr_vertex_to_node = vertex_fn }) = map decode forest
+stronglyConnCompG graph = decodeSccs graph forest
+  where forest = {-# SCC "Digraph.scc" #-} scc (gr_int_graph graph)
+
+-- Find the set of strongly connected components starting from the
+-- given roots.  This is a good way to discard unreachable nodes at
+-- the same time as computing SCCs.
+stronglyConnCompFromG :: Graph node -> [node] -> [SCC node]
+stronglyConnCompFromG graph roots = decodeSccs graph forest
+  where forest = {-# SCC "Digraph.scc" #-} sccFrom (gr_int_graph graph) vs
+        vs = [ v | Just v <- map (gr_node_to_vertex graph) roots ]
+
+decodeSccs :: Graph node -> Forest Vertex -> [SCC node]
+decodeSccs Graph { gr_int_graph = graph, gr_vertex_to_node = vertex_fn } forest
+  = map decode forest
   where
-    forest             = {-# SCC "Digraph.scc" #-} scc graph
     decode (Node v []) | mentions_itself v = CyclicSCC [vertex_fn v]
                        | otherwise         = AcyclicSCC (vertex_fn v)
     decode other = CyclicSCC (dec other [])
@@ -269,11 +282,12 @@ stronglyConnCompFromEdgedVertices
         :: Ord key
         => [Node key payload]
         -> [SCC payload]
-stronglyConnCompFromEdgedVertices = map (fmap get_node) . stronglyConnCompFromEdgedVerticesR
+stronglyConnCompFromEdgedVertices
+  = map (fmap get_node) . stronglyConnCompFromEdgedVerticesR
   where get_node (n, _, _) = n
 
 -- The "R" interface is used when you expect to apply SCC to
--- the (some of) the result of SCC, so you dont want to lose the dependency info
+-- (some of) the result of SCC, so you dont want to lose the dependency info
 stronglyConnCompFromEdgedVerticesR
         :: Ord key
         => [Node key payload]
@@ -534,6 +548,9 @@ postorderF ts = foldr (.) id $ map postorder ts
 postOrd :: IntGraph -> [Vertex]
 postOrd g = postorderF (dff g) []
 
+postOrdFrom :: IntGraph -> [Vertex] -> [Vertex]
+postOrdFrom g vs = postorderF (dfs g vs) []
+
 topSort :: IntGraph -> [Vertex]
 topSort = reverse . postOrd
 \end{code}
@@ -557,6 +574,9 @@ undirected g  = buildG (bounds g) (edges g ++ reverseE g)
 \begin{code}
 scc  :: IntGraph -> Forest Vertex
 scc g = dfs g (reverse (postOrd (transpose g)))
+
+sccFrom  :: IntGraph -> [Vertex] -> Forest Vertex
+sccFrom g vs = reverse (dfs (transpose g) (reverse (postOrdFrom g vs)))
 \end{code}
 
 ------------------------------------------------------------

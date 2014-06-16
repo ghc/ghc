@@ -1,0 +1,5 @@
+
+SimpleFail11d.hs:8:15:
+    Conflicting family instance declarations:
+      C9 [Int] [a] -- Defined at SimpleFail11d.hs:8:15
+      C9 [a] [Int] -- Defined at SimpleFail11d.hs:10:15

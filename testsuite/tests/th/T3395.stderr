@@ -1,0 +1,11 @@
+
+T3395.hs:6:9:
+    Illegal last statement of a list comprehension:
+      r1 <- undefined
+    (It should be an expression.)
+    When splicing a TH expression: [r1 <- undefined | undefined]
+    In the splice:
+      $(return
+        $ CompE
+            [NoBindS (VarE $ mkName "undefined"),
+             BindS (VarP $ mkName "r1") (VarE $ mkName "undefined")])

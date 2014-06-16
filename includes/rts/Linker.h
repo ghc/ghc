@@ -7,7 +7,7 @@
  * Do not #include this file directly: #include "Rts.h" instead.
  *
  * To understand the structure of the RTS headers, see the wiki:
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * ---------------------------------------------------------------------------*/
 
@@ -16,15 +16,31 @@
 
 #if defined(mingw32_HOST_OS)
 typedef wchar_t pathchar;
+#define PATH_FMT "ls"
 #else
 typedef char    pathchar;
+#define PATH_FMT "s"
 #endif
 
-/* initialize the object linker */
-void initLinker( void );
+/* Initialize the object linker. Equivalent to initLinker_(1). */
+void initLinker (void);
 
-/* insert a stable symbol in the hash table */
-void insertStableSymbol(pathchar* obj_name, char* key, StgPtr data);
+/* Initialize the object linker.
+ * The retain_cafs argument is:
+ *
+ *   non-zero => Retain CAFs unconditionally in linked Haskell code.
+ *               Note that this prevents any code from being unloaded.
+ *               It should not be necessary unless you are GHCi or
+ *               hs-plugins, which needs to be able call any function
+ *               in the compiled code.
+ *
+ *   zero     => Do not retain CAFs.  Everything reachable from foreign
+ *               exports will be retained, due to the StablePtrs
+ *               created by the module initialisation code.  unloadObj
+ *               frees these StablePtrs, which will allow the CAFs to
+ *               be GC'd and the code to be removed.
+ */
+void initLinker_ (int retain_cafs);
 
 /* insert a symbol in the hash table */
 void insertSymbol(pathchar* obj_name, char* key, void* data);
@@ -46,5 +62,8 @@ HsInt resolveObjs( void );
 
 /* load a dynamic library */
 const char *addDLL( pathchar* dll_name );
+
+/* called by the initialization code for a module, not a user API */
+StgStablePtr foreignExportStablePtr (StgPtr p);
 
 #endif /* RTS_LINKER_H */

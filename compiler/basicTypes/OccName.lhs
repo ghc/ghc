@@ -24,7 +24,7 @@
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module OccName (
@@ -58,12 +58,13 @@ module OccName (
 
 	-- ** Derived 'OccName's
         isDerivedOccName,
-	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkGenDefMethodOcc,
+	mkDataConWrapperOcc, mkWorkerOcc, mkMatcherOcc, mkDefaultMethodOcc,
+        mkGenDefMethodOcc, 
 	mkDerivedTyConOcc, mkNewTyCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
-  	mkClassDataConOcc, mkDictOcc, mkIPOcc, 
- 	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
- 	mkGenD, mkGenR, mkGen1R, mkGenRCo, mkGenC, mkGenS,
+	mkClassDataConOcc, mkDictOcc, mkIPOcc,
+	mkSpecOcc, mkForeignExportOcc, mkRepEqOcc, mkGenOcc1, mkGenOcc2,
+	mkGenD, mkGenR, mkGen1R, mkGenRCo, mkGenC, mkGenS,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
 	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc,
@@ -88,6 +89,7 @@ module OccName (
 	lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
 	occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
         extendOccEnv_Acc, filterOccEnv, delListFromOccEnv, delFromOccEnv,
+        alterOccEnv, 
 
 	-- * The 'OccSet' type
 	OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet, 
@@ -103,8 +105,6 @@ module OccName (
 	isLexConId, isLexConSym, isLexVarId, isLexVarSym,
 	startsVarSym, startsVarId, startsConSym, startsConId
     ) where
-
-#include "Typeable.h"
 
 import Util
 import Unique
@@ -261,6 +261,11 @@ instance Data OccName where
 instance Outputable OccName where
     ppr = pprOccName
 
+instance OutputableBndr OccName where
+    pprBndr _ = ppr
+    pprInfixOcc n = pprInfixVar (isSymOcc n) (ppr n)
+    pprPrefixOcc n = pprPrefixVar (isSymOcc n) (ppr n)
+
 pprOccName :: OccName -> SDoc
 pprOccName (OccName sp occ) 
   = getPprStyle $ \ sty ->
@@ -392,6 +397,7 @@ mapOccEnv      :: (a->b) -> OccEnv a -> OccEnv b
 delFromOccEnv 	   :: OccEnv a -> OccName -> OccEnv a
 delListFromOccEnv :: OccEnv a -> [OccName] -> OccEnv a
 filterOccEnv	   :: (elt -> Bool) -> OccEnv elt -> OccEnv elt
+alterOccEnv	   :: (Maybe elt -> Maybe elt) -> OccEnv elt -> OccName -> OccEnv elt
 
 emptyOccEnv  	 = A emptyUFM
 unitOccEnv x y = A $ unitUFM x y 
@@ -411,6 +417,7 @@ mkOccEnv_C comb l = A $ addListToUFM_C comb emptyUFM l
 delFromOccEnv (A x) y    = A $ delFromUFM x y
 delListFromOccEnv (A x) y  = A $ delListFromUFM x y
 filterOccEnv x (A y)       = A $ filterUFM x y
+alterOccEnv fn (A y) k     = A $ alterUFM fn y k
 
 instance Outputable a => Outputable (OccEnv a) where
     ppr (A x) = ppr x
@@ -481,18 +488,12 @@ isValOcc (OccName DataName _) = True
 isValOcc _                    = False
 
 isDataOcc (OccName DataName _) = True
-isDataOcc (OccName VarName s)  
-  | isLexCon s = pprPanic "isDataOcc: check me" (ppr s)
-		-- Jan06: I don't think this should happen
 isDataOcc _                    = False
 
 -- | Test if the 'OccName' is a data constructor that starts with
 -- a symbol (e.g. @:@, or @[]@)
 isDataSymOcc :: OccName -> Bool
 isDataSymOcc (OccName DataName s) = isLexConSym s
-isDataSymOcc (OccName VarName s)  
-  | isLexConSym s = pprPanic "isDataSymOcc: check me" (ppr s)
-		-- Jan06: I don't think this should happen
 isDataSymOcc _                    = False
 -- Pretty inefficient!
 
@@ -500,7 +501,7 @@ isDataSymOcc _                    = False
 -- it is a data constructor or variable or whatever)
 isSymOcc :: OccName -> Bool
 isSymOcc (OccName DataName s)  = isLexConSym s
-isSymOcc (OccName TcClsName s) = isLexConSym s || isLexVarSym s
+isSymOcc (OccName TcClsName s) = isLexSym s
 isSymOcc (OccName VarName s)   = isLexSym s
 isSymOcc (OccName TvName s)    = isLexSym s
 -- Pretty inefficient!
@@ -574,9 +575,9 @@ isDerivedOccName occ =
 \end{code}
 
 \begin{code}
-mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkGenDefMethodOcc,
-  	mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
- 	mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
+mkDataConWrapperOcc, mkWorkerOcc, mkMatcherOcc, mkDefaultMethodOcc,
+        mkGenDefMethodOcc, mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
+	mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkRepEqOcc, mkGenOcc1, mkGenOcc2,
  	mkGenD, mkGenR, mkGen1R, mkGenRCo,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
@@ -586,6 +587,7 @@ mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkGenDefMethodOcc,
 -- These derived variables have a prefix that no Haskell value could have
 mkDataConWrapperOcc = mk_simple_deriv varName  "$W"
 mkWorkerOcc         = mk_simple_deriv varName  "$w"
+mkMatcherOcc        = mk_simple_deriv varName  "$m"
 mkDefaultMethodOcc  = mk_simple_deriv varName  "$dm"
 mkGenDefMethodOcc   = mk_simple_deriv varName  "$gdm"
 mkClassOpAuxOcc     = mk_simple_deriv varName  "$c"
@@ -596,6 +598,7 @@ mkDictOcc	    = mk_simple_deriv varName  "$d"
 mkIPOcc		    = mk_simple_deriv varName  "$i"
 mkSpecOcc	    = mk_simple_deriv varName  "$s"
 mkForeignExportOcc  = mk_simple_deriv varName  "$f"
+mkRepEqOcc          = mk_simple_deriv tvName   "$r"      -- In RULES involving Coercible
 mkNewTyCoOcc        = mk_simple_deriv tcName   "NTCo:"	-- Coercion for newtypes
 mkInstTyCoOcc       = mk_simple_deriv tcName   "TFCo:"   -- Coercion for type functions
 mkEqPredCoOcc	    = mk_simple_deriv tcName   "$co"
@@ -623,7 +626,7 @@ mkGenR   = mk_simple_deriv tcName "Rep_"
 mkGen1R  = mk_simple_deriv tcName "Rep1_"
 mkGenRCo = mk_simple_deriv tcName "CoRep_"
 
--- data T = MkT ... deriving( Data ) needs defintions for 
+-- data T = MkT ... deriving( Data ) needs definitions for 
 --	$tT   :: Data.Generics.Basics.DataType
 --	$cMkT :: Data.Generics.Basics.Constr
 mkDataTOcc = mk_simple_deriv varName  "$t"
@@ -866,6 +869,15 @@ isTupleOcc_maybe (OccName ns fs)
 These functions test strings to see if they fit the lexical categories
 defined in the Haskell report.
 
+Note [Classification of generated names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Some names generated for internal use can show up in debugging output,
+e.g.  when using -ddump-simpl. These generated names start with a $
+but should still be pretty-printed using prefix notation. We make sure
+this is the case in isLexVarSym by only classifying a name as a symbol
+if all its characters are symbols, not just its first one.
+
 \begin{code}
 isLexCon,   isLexVar,    isLexId,    isLexSym    :: FastString -> Bool
 isLexConId, isLexConSym, isLexVarId, isLexVarSym :: FastString -> Bool
@@ -892,19 +904,23 @@ isLexConSym cs				-- Infix type or data constructors
   | cs == (fsLit "->") = True
   | otherwise	       = startsConSym (headFS cs)
 
-isLexVarSym cs				-- Infix identifiers
-  | nullFS cs	      = False		-- 	e.g. "+"
-  | otherwise         = startsVarSym (headFS cs)
+isLexVarSym fs				-- Infix identifiers e.g. "+"
+  = case (if nullFS fs then [] else unpackFS fs) of
+      [] -> False
+      (c:cs) -> startsVarSym c && all isVarSymChar cs
 
 -------------
 startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool
-startsVarSym c = isSymbolASCII c || (ord c > 0x7f && isSymbol c) -- Infix Ids
-startsConSym c = c == ':'				-- Infix data constructors
+startsVarSym c = isSymbolASCII c || (ord c > 0x7f && isSymbol c)  -- Infix Ids
+startsConSym c = c == ':'		-- Infix data constructors
 startsVarId c  = isLower c || c == '_'	-- Ordinary Ids
 startsConId c  = isUpper c || c == '('	-- Ordinary type constructors and data constructors
 
 isSymbolASCII :: Char -> Bool
 isSymbolASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
+
+isVarSymChar :: Char -> Bool
+isVarSymChar c = c == ':' || startsVarSym c
 \end{code}
 
 %************************************************************************

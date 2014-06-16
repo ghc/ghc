@@ -1,0 +1,3 @@
+ERROR "tcfail006.hs":3 - Unresolved top-level overloading
+*** Binding             : j
+*** Outstanding context : Num Bool

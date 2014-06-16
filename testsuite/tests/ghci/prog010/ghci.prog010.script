@@ -1,0 +1,33 @@
+-- test for #1205
+
+:l ../shell.hs
+:def shell (\s -> do shell s; return "")
+
+:shell rm -f A.o A.hi B.o B.hi
+
+:load A
+-- we can see both f and g (only f is exported)
+:type f
+:type g
+
+:shell $HC $HC_OPTS -fforce-recomp -c A.hs
+
+:load A
+-- we can now see only f
+:type f
+:type g
+-- this will tell us we need to load A interpreted
+:module *A
+
+-- load A interpreted
+:load *A
+:type f
+:type g
+
+:shell $HC $HC_OPTS -fforce-recomp -c B.hs
+:load B
+:module *A
+:add *A
+:module *A
+:type f
+:type g

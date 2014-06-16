@@ -1,0 +1,3 @@
+
+T2464.hs:3:16:
+    Warning: -fffi is deprecated: use -XForeignFunctionInterface or pragma {-# LANGUAGE ForeignFunctionInterface #-} instead

@@ -1,0 +1,5 @@
+[1 of 2] Compiling Check06_A        ( Check06_A.hs, Check06_A.o )
+[2 of 2] Compiling Check06          ( Check06.hs, Check06.o )
+
+<no location info>:
+    The package (base) is required to be trusted but it isn't!

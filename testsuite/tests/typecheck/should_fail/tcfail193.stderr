@@ -1,0 +1,9 @@
+
+tcfail193.hs:10:31:
+    Couldn't match type ‘a’ with ‘[a]’
+      ‘a’ is a rigid type variable bound by
+          a type expected by the context: [a] -> [a] at tcfail193.hs:10:26
+    Expected type: [a] -> [a]
+      Actual type: [a] -> [[a]]
+    In the expression: inits
+    In a stmt of a list comprehension: then inits

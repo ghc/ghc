@@ -1,0 +1,4 @@
+
+T7937.hs:8:13:
+    Not in scope: ‘***’
+    Perhaps you meant ‘**’ (imported from Prelude)

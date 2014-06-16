@@ -1,0 +1,1 @@
+ERROR "rnfail032.hs" - Unknown entity "List.map" exported from module "ShouldFail"

@@ -1077,7 +1077,7 @@ MAIN            MAIN                    102           0    0.0    0.0   100.0  1
   </sect1>
 
   <sect1 id="hp2ps">
-    <title><command>hp2ps</command>&ndash;&ndash;heap profile to PostScript</title>
+    <title><command>hp2ps</command>--heap profile to PostScript</title>
 
     <indexterm><primary><command>hp2ps</command></primary></indexterm>
     <indexterm><primary>heap profiles</primary></indexterm>
@@ -1772,7 +1772,7 @@ Options:
     <para>Because ticky-ticky profiling requires a certain familiarity
     with GHC internals, we have moved the documentation to the
     wiki. Take a look at its <ulink
-    url="http://hackage.haskell.org/trac/ghc/wiki/Commentary/Profiling">overview
+    url="http://ghc.haskell.org/trac/ghc/wiki/Commentary/Profiling">overview
     of the profiling options</ulink>, which includeds a link to the
     ticky-ticky profiling page.</para>
   </sect1>

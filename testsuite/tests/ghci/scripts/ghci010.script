@@ -1,0 +1,2 @@
+-- !!! check we can detect deadlock
+Control.Concurrent.newEmptyMVar >>= Control.Concurrent.takeMVar

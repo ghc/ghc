@@ -1,0 +1,6 @@
+
+readFail044.hs:3:16:
+    unknown flag in  {-# OPTIONS_GHC #-} pragma: -this-flag-does-not-exist
+
+readFail044.hs:3:16:
+    unknown flag in  {-# OPTIONS_GHC #-} pragma: -nor-does-this-one

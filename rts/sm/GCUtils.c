@@ -7,7 +7,7 @@
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
  * 
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
  *
  * ---------------------------------------------------------------------------*/
 
@@ -161,6 +161,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
 StgPtr
 todo_block_full (nat size, gen_workspace *ws)
 {
+    rtsBool urgent_to_push, can_extend;
     StgPtr p;
     bdescr *bd;
 
@@ -174,20 +175,49 @@ todo_block_full (nat size, gen_workspace *ws)
     ASSERT(bd->link == NULL);
     ASSERT(bd->gen == ws->gen);
 
-    // If the global list is not empty, or there's not much work in
-    // this block to push, and there's enough room in
-    // this block to evacuate the current object, then just increase
-    // the limit.
-    if (!looksEmptyWSDeque(ws->todo_q) || 
-        (ws->todo_free - bd->u.scan < WORK_UNIT_WORDS / 2)) {
-        if (ws->todo_free + size < bd->start + bd->blocks * BLOCK_SIZE_W) {
-            ws->todo_lim = stg_min(bd->start + bd->blocks * BLOCK_SIZE_W,
-                                   ws->todo_lim + stg_max(WORK_UNIT_WORDS,size));
-            debugTrace(DEBUG_gc, "increasing limit for %p to %p", bd->start, ws->todo_lim);
-            p = ws->todo_free;
-            ws->todo_free += size;
-            return p;
-        }
+    // We intentionally set ws->todo_lim lower than the full size of
+    // the block, so that we can push out some work to the global list
+    // and get the parallel threads working as soon as possible.
+    //
+    // So when ws->todo_lim is reached, we end up here and have to
+    // decide whether it's worth pushing out the work we have or not.
+    // If we have enough room in the block to evacuate the current
+    // object, and it's not urgent to push this work, then we just
+    // extend the limit and keep going.  Where "urgent" is defined as:
+    // the global pool is empty, and there's enough work in this block
+    // to make it worth pushing.
+    //
+    urgent_to_push =
+        looksEmptyWSDeque(ws->todo_q) &&
+        (ws->todo_free - bd->u.scan >= WORK_UNIT_WORDS / 2);
+
+    // We can extend the limit for the current block if there's enough
+    // room for the current object, *and* we're not into the second or
+    // subsequent block of a large block.  The second condition occurs
+    // when we evacuate an object that is larger than a block.  In
+    // that case, alloc_todo_block() sets todo_lim to be exactly the
+    // size of the large object, and we don't evacuate any more
+    // objects into this block.  The reason is that the rest of the GC
+    // is not set up to handle objects that start in the second or
+    // later blocks of a group.  We just about manage this in the
+    // nursery (see scheduleHandleHeapOverflow()) so evacuate() can
+    // handle this, but other parts of the GC can't.  We could
+    // probably fix this, but it's a rare case anyway.
+    //
+    can_extend =
+        ws->todo_free + size <= bd->start + bd->blocks * BLOCK_SIZE_W
+        && ws->todo_free < ws->todo_bd->start + BLOCK_SIZE_W;
+
+    if (!urgent_to_push && can_extend)
+    {
+        ws->todo_lim = stg_min(bd->start + bd->blocks * BLOCK_SIZE_W,
+                               ws->todo_lim + stg_max(WORK_UNIT_WORDS,size));
+        debugTrace(DEBUG_gc, "increasing limit for %p to %p",
+                   bd->start, ws->todo_lim);
+        p = ws->todo_free;
+        ws->todo_free += size;
+
+        return p;
     }
     
     gct->copied += ws->todo_free - bd->free;
@@ -201,12 +231,19 @@ todo_block_full (nat size, gen_workspace *ws)
     {
         // If this block does not have enough space to allocate the
         // current object, but it also doesn't have any work to push, then 
-        // push it on to the scanned list.  It cannot be empty, because
-        // then there would be enough room to copy the current object.
+        // push it on to the scanned list.
         if (bd->u.scan == bd->free)
         {
-            ASSERT(bd->free != bd->start);
-            push_scanned_block(bd, ws);
+            if (bd->free == bd->start) {
+                // Normally the block would not be empty, because then
+                // there would be enough room to copy the current
+                // object.  However, if the object we're copying is
+                // larger than a block, then we might have an empty
+                // block here.
+                freeGroup(bd);
+            } else {
+                push_scanned_block(bd, ws);
+            }
         }
         // Otherwise, push this block out to the global list.
         else 

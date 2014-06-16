@@ -107,10 +107,10 @@ data MachOp
   -- Vector element insertion and extraction operations
   | MO_V_Insert  Length Width   -- Insert scalar into vector
   | MO_V_Extract Length Width   -- Extract scalar from vector
-  
+
   -- Integer vector operations
-  | MO_V_Add Length Width  
-  | MO_V_Sub Length Width  
+  | MO_V_Add Length Width
+  | MO_V_Sub Length Width
   | MO_V_Mul Length Width
 
   -- Signed vector multiply/divide
@@ -118,13 +118,17 @@ data MachOp
   | MO_VS_Rem  Length Width
   | MO_VS_Neg  Length Width
 
+  -- Unsigned vector multiply/divide
+  | MO_VU_Quot Length Width
+  | MO_VU_Rem  Length Width
+
   -- Floting point vector element insertion and extraction operations
   | MO_VF_Insert  Length Width   -- Insert scalar into vector
   | MO_VF_Extract Length Width   -- Extract scalar from vector
 
   -- Floating point vector operations
-  | MO_VF_Add  Length Width  
-  | MO_VF_Sub  Length Width  
+  | MO_VF_Add  Length Width
+  | MO_VF_Sub  Length Width
   | MO_VF_Neg  Length Width             -- unary -
   | MO_VF_Mul  Length Width
   | MO_VF_Quot Length Width
@@ -375,6 +379,9 @@ machOpResultType dflags mop tys =
     MO_VS_Rem  l w      -> cmmVec l (cmmBits w)
     MO_VS_Neg  l w      -> cmmVec l (cmmBits w)
 
+    MO_VU_Quot l w      -> cmmVec l (cmmBits w)
+    MO_VU_Rem  l w      -> cmmVec l (cmmBits w)
+
     MO_VF_Insert  l w   -> cmmVec l (cmmFloat w)
     MO_VF_Extract _ w   -> cmmFloat w
 
@@ -461,6 +468,9 @@ machOpArgReps dflags op =
     MO_VS_Rem  _ r      -> [r,r]
     MO_VS_Neg  _ r      -> [r]
 
+    MO_VU_Quot _ r      -> [r,r]
+    MO_VU_Rem  _ r      -> [r,r]
+
     MO_VF_Insert  l r   -> [typeWidth (vec l (cmmFloat r)),r,wordWidth dflags]
     MO_VF_Extract l r   -> [typeWidth (vec l (cmmFloat r)),wordWidth dflags]
 
@@ -518,8 +528,14 @@ data CallishMachOp
   | MO_Touch         -- Keep variables live (when using interior pointers)
 
   -- Prefetch
-  | MO_Prefetch_Data -- Prefetch hint. May change program performance but not
+  | MO_Prefetch_Data Int -- Prefetch hint. May change program performance but not
                      -- program behavior.
+                     -- the Int can be 0-3. Needs to be known at compile time
+                     -- to interact with code generation correctly.
+                     --  TODO: add support for prefetch WRITES,
+                     --  currently only exposes prefetch reads, which
+                     -- would the majority of use cases in ghc anyways
+
 
   -- Note that these three MachOps all take 1 extra parameter than the
   -- standard C lib versions. The extra (last) parameter contains
@@ -529,6 +545,7 @@ data CallishMachOp
   | MO_Memmove
 
   | MO_PopCnt Width
+  | MO_BSwap Width
   deriving (Eq, Show)
 
 pprCallishMachOp :: CallishMachOp -> SDoc

@@ -1,0 +1,4 @@
+
+local.hs:7:5:
+    Illegal pattern synonym declaration
+      Pattern synonym declarations are only valid in the top-level scope

@@ -1,0 +1,44 @@
+
+T3330a.hs:19:34:
+    Couldn't match type ‘s’ with ‘(->) (s0 ix0 -> ix1)’
+      ‘s’ is a rigid type variable bound by
+          the type signature for children :: s ix -> PF s r ix -> [AnyF s]
+          at T3330a.hs:18:13
+    Expected type: (s0 ix0 -> ix1)
+                   -> r ix1 -> Writer [AnyF s] (r'0 ix1)
+      Actual type: s ix
+    Relevant bindings include
+      x :: PF s r ix (bound at T3330a.hs:19:12)
+      p :: s ix (bound at T3330a.hs:19:10)
+      children :: s ix -> PF s r ix -> [AnyF s] (bound at T3330a.hs:19:1)
+    In the first argument of ‘hmapM’, namely ‘p’
+    In the first argument of ‘execWriter’, namely ‘(hmapM p collect x)’
+
+T3330a.hs:19:34:
+    Couldn't match type ‘ix’ with ‘r ix1 -> Writer [AnyF s] (r'0 ix1)’
+      ‘ix’ is a rigid type variable bound by
+           the type signature for children :: s ix -> PF s r ix -> [AnyF s]
+           at T3330a.hs:18:13
+    Expected type: (s0 ix0 -> ix1)
+                   -> r ix1 -> Writer [AnyF s] (r'0 ix1)
+      Actual type: s ix
+    Relevant bindings include
+      x :: PF s r ix (bound at T3330a.hs:19:12)
+      p :: s ix (bound at T3330a.hs:19:10)
+      children :: s ix -> PF s r ix -> [AnyF s] (bound at T3330a.hs:19:1)
+    In the first argument of ‘hmapM’, namely ‘p’
+    In the first argument of ‘execWriter’, namely ‘(hmapM p collect x)’
+
+T3330a.hs:19:44:
+    Couldn't match type ‘ix’ with ‘r0 ix0 -> Writer [AnyF s0] (r0 ix0)’
+      ‘ix’ is a rigid type variable bound by
+           the type signature for children :: s ix -> PF s r ix -> [AnyF s]
+           at T3330a.hs:18:13
+    Expected type: PF s r (r0 ix0 -> Writer [AnyF s0] (r0 ix0))
+      Actual type: PF s r ix
+    Relevant bindings include
+      x :: PF s r ix (bound at T3330a.hs:19:12)
+      p :: s ix (bound at T3330a.hs:19:10)
+      children :: s ix -> PF s r ix -> [AnyF s] (bound at T3330a.hs:19:1)
+    In the third argument of ‘hmapM’, namely ‘x’
+    In the first argument of ‘execWriter’, namely ‘(hmapM p collect x)’

@@ -1,0 +1,20 @@
+
+holes2.hs:3:5: Warning:
+    No instance for (Show a0) arising from a use of ‘show’
+    The type variable ‘a0’ is ambiguous
+    Note: there are several potential instances:
+      instance Show Double -- Defined in ‘GHC.Float’
+      instance Show Float -- Defined in ‘GHC.Float’
+      instance (Integral a, Show a) => Show (GHC.Real.Ratio a)
+        -- Defined in ‘GHC.Real’
+      ...plus 24 others
+    In the expression: show _
+    In an equation for ‘f’: f = show _
+
+holes2.hs:3:10: Warning:
+    Found hole ‘_’ with type: a0
+    Where: ‘a0’ is an ambiguous type variable
+    Relevant bindings include f :: String (bound at holes2.hs:3:1)
+    In the first argument of ‘show’, namely ‘_’
+    In the expression: show _
+    In an equation for ‘f’: f = show _

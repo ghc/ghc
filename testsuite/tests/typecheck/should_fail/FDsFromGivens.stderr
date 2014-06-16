@@ -1,0 +1,10 @@
+
+FDsFromGivens.hs:21:15:
+    Could not deduce (C Char [a]) arising from a use of ‘f’
+    from the context (C Char Char)
+      bound by a pattern with constructor
+                 KCC :: C Char Char => () -> KCC,
+               in an equation for ‘bar’
+      at FDsFromGivens.hs:21:6-10
+    In the expression: f
+    In an equation for ‘bar’: bar (KCC _) = f

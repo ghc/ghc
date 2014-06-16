@@ -20,7 +20,7 @@ newtype HsDocString = HsDocString FastString
 type LHsDocString = Located HsDocString
 
 instance Outputable HsDocString where
-  ppr _ = text "<document comment>"
+  ppr (HsDocString fs) = ftext fs
 
 ppr_mbDoc :: Maybe LHsDocString -> SDoc
 ppr_mbDoc (Just doc) = ppr doc

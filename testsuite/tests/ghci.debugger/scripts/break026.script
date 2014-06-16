@@ -1,0 +1,23 @@
+:load break026
+:step foldl (+) 0 [1::Integer .. 5]
+:step
+:step
+:step
+:step
+:step
+:force c
+        -- answer should be 1
+
+:load break026
+:step foldl (+) 0 [1::Integer .. 5]
+:step
+:step
+:step
+:step
+:step
+-- a diversion to single-step the evaluation of c:
+:step c `seq` ()
+:step
+-- end diversion
+c
+        -- answer should be 1 again (not 0)

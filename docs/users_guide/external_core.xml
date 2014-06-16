@@ -27,8 +27,7 @@ I am unsure of the proper DocBook elements.
 
   <para>Andrew Tolmach, Tim Chevalier ({apt,tjc}@cs.pdx.edu) and The GHC Team</para>
 
-  <abstract>
-    <para>This document provides a precise definition for the GHC Core
+    <para>This chapter provides a precise definition for the GHC Core
     language, so that it can be used to communicate between GHC and new
     stand-alone compilation tools such as back-ends or
     optimizers.<footnote>
@@ -50,8 +49,6 @@ I am unsure of the proper DocBook elements.
   An executable typechecker and interpreter (in Haskell), which
   formally embody the static and dynamic semantics, are available
     separately.</para>
-
-  </abstract>
 
   <section id="introduction">
     <title>Introduction</title>
@@ -161,7 +158,7 @@ I am unsure of the proper DocBook elements.
     <para>Formal static and dynamic semantics in the form of an executable
     typechecker and interpreter are available separately in the GHC
     source tree
-    <footnote><ulink url="http://darcs.haskell.org/ghc">http://darcs.haskell.org/ghc</ulink></footnote>
+    <footnote><ulink url="http://git.haskell.org/ghc.git/tree">http://git.haskell.org/ghc.git</ulink></footnote>
     under <code>utils/ext-core</code>.</para>
 
   </section>
@@ -1623,7 +1620,7 @@ case (error &quot;&quot;) of
       </authorgroup>
       <citetitle pubwork="article">System FC: equality constraints and coercions</citetitle>
       <pubdate>2006</pubdate>  
-      <bibliomisc><ulink url="http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/FC">http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/FC</ulink></bibliomisc>
+      <bibliomisc><ulink url="http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/FC">http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/FC</ulink></bibliomisc>
     </biblioentry>
 
     <biblioentry>
@@ -1789,7 +1786,7 @@ case (error &quot;&quot;) of
         <state>South Carolina</state>
       </address>
       <pubdate>1993</pubdate>  
-      <bibliomisc><ulink url="citeseer.ist.psu.edu/launchbury93natural.html">citeseer.ist.psu.edu/launchbury93natural.html</ulink></bibliomisc>
+      <bibliomisc><ulink url="http://citeseer.ist.psu.edu/launchbury93natural.html">http://citeseer.ist.psu.edu/launchbury93natural.html</ulink></bibliomisc>
       <!-- booktitle = "Conference Record of the Twentieth Annual {ACM} {SIGPLAN}-{SIGACT} Symposium on Principles of Programming Languages", -->
     </biblioentry>
 

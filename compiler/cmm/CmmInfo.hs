@@ -2,7 +2,7 @@
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module CmmInfo (
@@ -23,6 +23,7 @@ module CmmInfo (
   infoTablePtrs,
   infoTableNonPtrs,
   funInfoTable,
+  funInfoArity,
 
   -- info table sizes and offsets
   stdInfoTableSizeW,
@@ -491,6 +492,22 @@ funInfoTable dflags info_ptr
   | otherwise
   = cmmOffsetW dflags info_ptr (1 + stdInfoTableSizeW dflags)
 				-- Past the entry code pointer
+
+-- Takes the info pointer of a function, returns the function's arity
+funInfoArity :: DynFlags -> CmmExpr -> CmmExpr
+funInfoArity dflags iptr
+  = cmmToWord dflags (cmmLoadIndex dflags rep fun_info (offset `div` rep_bytes))
+  where
+   fun_info = funInfoTable dflags iptr
+   rep = cmmBits (widthFromBytes rep_bytes)
+
+   (rep_bytes, offset)
+    | tablesNextToCode dflags = ( pc_REP_StgFunInfoExtraRev_arity pc
+                                , oFFSET_StgFunInfoExtraRev_arity dflags )
+    | otherwise               = ( pc_REP_StgFunInfoExtraFwd_arity pc
+                                , oFFSET_StgFunInfoExtraFwd_arity dflags )
+
+   pc = sPlatformConstants (settings dflags)
 
 -----------------------------------------------------------------------------
 --

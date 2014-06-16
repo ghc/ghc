@@ -1,0 +1,8 @@
+Breakpoint 0 activated at A.hs:4:1-9
+Stopped at A.hs:4:1-9
+_result :: a1 = _
+Stopped at A.hs:4:7-9
+_result :: () = _
+x :: () = ()
+Stopped at B.hs:5:1-7
+_result :: t = _

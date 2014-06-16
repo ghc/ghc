@@ -1,0 +1,6 @@
+
+SafeFlags26.hs:1:16: Warning:
+    ‘SafeFlags26’ has been inferred as safe!
+
+<no location info>: 
+Failing due to -Werror.

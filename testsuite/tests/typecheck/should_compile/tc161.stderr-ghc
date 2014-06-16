@@ -1,0 +1,5 @@
+
+tc161.hs:17:10: Warning:
+    No explicit implementation for
+      ‘op’
+    In the instance declaration for ‘Foo Int’

@@ -1,0 +1,6 @@
+data T = A {...} 	-- Defined at <interactive>:3:10
+data T = A {a :: Int} 	-- Defined at <interactive>:3:13
+a :: Integer 	-- Defined at <interactive>:6:5
+3
+data R = B {a :: Int} 	-- Defined at <interactive>:9:13
+data T = A {Ghci1.a :: Int} 	-- Defined at <interactive>:3:1

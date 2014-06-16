@@ -1,0 +1,6 @@
+
+T3833.hs:9:1:
+    Can't make a derived instance of ‘Monoid (DecodeMap e)’:
+      ‘Monoid’ is not a derivable class
+      Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
+    In the stand-alone deriving instance for ‘Monoid (DecodeMap e)’

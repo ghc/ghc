@@ -1,0 +1,3 @@
+ERROR "tcfail040.hs":19 - Unresolved top-level overloading
+*** Binding             : f
+*** Outstanding context : ORD b

@@ -1,0 +1,6 @@
+[1 of 2] Compiling UnsafeInfered08_A ( UnsafeInfered08_A.hs, UnsafeInfered08_A.o )
+[2 of 2] Compiling UnsafeInfered08  ( UnsafeInfered08.hs, UnsafeInfered08.o )
+
+UnsafeInfered08.hs:4:1:
+    UnsafeInfered08_A: Can't be safely imported!
+    The module itself isn't safe.

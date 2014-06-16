@@ -1,0 +1,5 @@
+
+mod53.hs:4:22:
+    Can't make a derived instance of ‘C T’:
+      ‘C’ is not a derivable class
+    In the data declaration for ‘T’

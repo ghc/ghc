@@ -84,7 +84,7 @@ createThread(Capability *cap, W_ size)
     stack_size = round_to_mblocks(size - sizeofW(StgTSO));
     stack = (StgStack *)allocate(cap, stack_size);
     TICK_ALLOC_STACK(stack_size);
-    SET_HDR(stack, &stg_STACK_info, CCS_SYSTEM);
+    SET_HDR(stack, &stg_STACK_info, cap->r.rCCCS);
     stack->stack_size   = stack_size - sizeofW(StgStack);
     stack->sp           = stack->stack + stack->stack_size;
     stack->dirty        = 1;
@@ -255,6 +255,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
     switch (tso->why_blocked)
     {
     case BlockedOnMVar:
+    case BlockedOnMVarRead:
     {
         if (tso->_link == END_TSO_QUEUE) {
             tso->block_info.closure = (StgClosure*)END_TSO_QUEUE;
@@ -498,18 +499,8 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
 
     IF_DEBUG(sanity,checkTSO(tso));
 
-    if (tso->tot_stack_size >= RtsFlags.GcFlags.maxStkSize
-        && !(tso->flags & TSO_BLOCKEX)) {
-        // NB. never raise a StackOverflow exception if the thread is
-        // inside Control.Exceptino.block.  It is impractical to protect
-        // against stack overflow exceptions, since virtually anything
-        // can raise one (even 'catch'), so this is the only sensible
-        // thing to do here.  See bug #767.
-        //
-
-        if (tso->flags & TSO_SQUEEZED) {
-            return;
-        }
+    if (RtsFlags.GcFlags.maxStkSize > 0
+        && tso->tot_stack_size >= RtsFlags.GcFlags.maxStkSize) {
         // #3677: In a stack overflow situation, stack squeezing may
         // reduce the stack size, but we don't know whether it has been
         // reduced enough for the stack check to succeed if we try
@@ -519,6 +510,9 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
         // happened, then we try running the thread again.  The
         // TSO_SQUEEZED flag is set by threadPaused() to tell us whether
         // squeezing happened or not.
+        if (tso->flags & TSO_SQUEEZED) {
+            return;
+        }
 
         debugTrace(DEBUG_gc,
                    "threadStackOverflow of TSO %ld (%p): stack too large (now %ld; max is %ld)",
@@ -530,19 +524,40 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
                                  stg_min(tso->stackobj->stack + tso->stackobj->stack_size,
                                          tso->stackobj->sp+64)));
 
-        // Send this thread the StackOverflow exception
-        throwToSingleThreaded(cap, tso, (StgClosure *)stackOverflow_closure);
+        if (tso->flags & TSO_BLOCKEX) {
+            // NB. StackOverflow exceptions must be deferred if the thread is
+            // inside Control.Exception.mask.  See bug #767 and bug #8303.
+            // This implementation is a minor hack, see Note [Throw to self when masked]
+            MessageThrowTo *msg = (MessageThrowTo*)allocate(cap, sizeofW(MessageThrowTo));
+            SET_HDR(msg, &stg_MSG_THROWTO_info, CCS_SYSTEM);
+            msg->source = tso;
+            msg->target = tso;
+            msg->exception = (StgClosure *)stackOverflow_closure;
+            blockedThrowTo(cap, tso, msg);
+        } else {
+            // Send this thread the StackOverflow exception
+            throwToSingleThreaded(cap, tso, (StgClosure *)stackOverflow_closure);
+            return;
+        }
     }
 
 
     // We also want to avoid enlarging the stack if squeezing has
     // already released some of it.  However, we don't want to get into
-    // a pathalogical situation where a thread has a nearly full stack
+    // a pathological situation where a thread has a nearly full stack
     // (near its current limit, but not near the absolute -K limit),
     // keeps allocating a little bit, squeezing removes a little bit,
     // and then it runs again.  So to avoid this, if we squeezed *and*
     // there is still less than BLOCK_SIZE_W words free, then we enlarge
     // the stack anyway.
+    //
+    // NB: This reasoning only applies if the stack has been squeezed;
+    // if no squeezing has occurred, then BLOCK_SIZE_W free space does
+    // not mean there is enough stack to run; the thread may have
+    // requested a large amount of stack (see below).  If the amount
+    // we squeezed is not enough to run the thread, we'll come back
+    // here (no squeezing will have occurred and thus we'll enlarge the
+    // stack.)
     if ((tso->flags & TSO_SQUEEZED) && 
         ((W_)(tso->stackobj->sp - tso->stackobj->stack) >= BLOCK_SIZE_W)) {
         return;
@@ -575,7 +590,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
                   chunk_size * sizeof(W_));
 
     new_stack = (StgStack*) allocate(cap, chunk_size);
-    SET_HDR(new_stack, &stg_STACK_info, CCS_SYSTEM);
+    SET_HDR(new_stack, &stg_STACK_info, old_stack->header.prof.ccs);
     TICK_ALLOC_STACK(chunk_size);
 
     new_stack->dirty = 0; // begin clean, we'll mark it dirty below
@@ -653,6 +668,40 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     IF_DEBUG(sanity,checkTSO(tso));
     // IF_DEBUG(scheduler,printTSO(new_tso));
 }
+
+/* Note [Throw to self when masked]
+ *
+ * When a StackOverflow occurs when the thread is masked, we want to
+ * defer the exception to when the thread becomes unmasked/hits an
+ * interruptible point.  We already have a mechanism for doing this,
+ * the blocked_exceptions list, but the use here is a bit unusual,
+ * because an exception is normally only added to this list upon
+ * an asynchronous 'throwTo' call (with all of the relevant
+ * multithreaded nonsense). Morally, a stack overflow should be an
+ * asynchronous exception sent by a thread to itself, and it should
+ * have the same semantics.  But there are a few key differences:
+ *
+ * - If you actually tried to send an asynchronous exception to
+ *   yourself using throwTo, the exception would actually immediately
+ *   be delivered.  This is because throwTo itself is considered an
+ *   interruptible point, so the exception is always deliverable. Thus,
+ *   ordinarily, we never end up with a message to onesself in the
+ *   blocked_exceptions queue.
+ *
+ * - In the case of a StackOverflow, we don't actually care about the
+ *   wakeup semantics; when an exception is delivered, the thread that
+ *   originally threw the exception should be woken up, since throwTo
+ *   blocks until the exception is successfully thrown.  Fortunately,
+ *   it is harmless to wakeup a thread that doesn't actually need waking
+ *   up, e.g. ourselves.
+ *
+ * - No synchronization is necessary, because we own the TSO and the
+ *   capability.  You can observe this by tracing through the execution
+ *   of throwTo.  We skip synchronizing the message and inter-capability
+ *   communication.
+ *
+ * We think this doesn't break any invariants, but do be careful!
+ */
 
 
 /* ---------------------------------------------------------------------------
@@ -734,6 +783,9 @@ printThreadBlockage(StgTSO *tso)
   case BlockedOnMVar:
     debugBelch("is blocked on an MVar @ %p", tso->block_info.closure);
     break;
+  case BlockedOnMVarRead:
+    debugBelch("is blocked on atomic MVar read @ %p", tso->block_info.closure);
+    break;
   case BlockedOnBlackHole:
       debugBelch("is blocked on a black hole %p", 
                  ((StgBlockingQueue*)tso->block_info.bh->bh));
@@ -797,7 +849,7 @@ printAllThreads(void)
   debugBelch("all threads:\n");
 
   for (i = 0; i < n_capabilities; i++) {
-      cap = &capabilities[i];
+      cap = capabilities[i];
       debugBelch("threads on capability %d:\n", cap->no);
       for (t = cap->run_queue_hd; t != END_TSO_QUEUE; t = t->_link) {
 	  printThreadStatus(t);

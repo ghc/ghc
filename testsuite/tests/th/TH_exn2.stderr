@@ -1,0 +1,6 @@
+
+TH_exn2.hs:1:1:
+    Exception when trying to run compile-time code:
+      Prelude.tail: empty list
+      Code: do { ds <- [d| |];
+                 return (tail ds) }

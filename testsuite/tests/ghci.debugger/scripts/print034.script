@@ -1,0 +1,11 @@
+-- More GADT goodness
+
+:set -XGADTs -XRankNTypes -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
+:l ../GADT
+:a ../Test
+:m +Main
+let o = O (One False Main.Nil)
+:p o
+seq _t1 ()
+:t _t1
+:p o

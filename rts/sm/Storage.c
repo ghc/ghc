@@ -7,7 +7,7 @@
  * Documentation on the architecture of the Storage Manager can be
  * found in the online commentary:
  * 
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage
  *
  * ---------------------------------------------------------------------------*/
 
@@ -29,6 +29,9 @@
 #include "Trace.h"
 #include "GC.h"
 #include "Evac.h"
+#if defined(ios_HOST_OS)
+#include "Hash.h"
+#endif
 
 #include <string.h>
 
@@ -37,8 +40,9 @@
 /* 
  * All these globals require sm_mutex to access in THREADED_RTS mode.
  */
-StgClosure    *caf_list         = NULL;
-StgClosure    *revertible_caf_list = NULL;
+StgIndStatic  *dyn_caf_list        = NULL;
+StgIndStatic  *debug_caf_list      = NULL;
+StgIndStatic  *revertible_caf_list = NULL;
 rtsBool       keepCAFs;
 
 W_ large_alloc_lim;    /* GC if n_large_blocks in any nursery
@@ -90,6 +94,8 @@ initGeneration (generation *gen, int g)
 #endif
     gen->threads = END_TSO_QUEUE;
     gen->old_threads = END_TSO_QUEUE;
+    gen->weak_ptr_list = NULL;
+    gen->old_weak_ptr_list = NULL;
 }
 
 void
@@ -166,9 +172,9 @@ initStorage (void)
 
   generations[0].max_blocks = 0;
 
-  weak_ptr_list = NULL;
-  caf_list = END_OF_STATIC_LIST;
-  revertible_caf_list = END_OF_STATIC_LIST;
+  dyn_caf_list = (StgIndStatic*)END_OF_STATIC_LIST;
+  debug_caf_list = (StgIndStatic*)END_OF_STATIC_LIST;
+  revertible_caf_list = (StgIndStatic*)END_OF_STATIC_LIST;
    
   /* initialise the allocate() interface */
   large_alloc_lim = RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W;
@@ -177,7 +183,9 @@ initStorage (void)
 
 #ifdef THREADED_RTS
   initSpinLock(&gc_alloc_block_sync);
+#ifdef PROF_SPIN
   whitehole_spin = 0;
+#endif
 #endif
 
   N = 0;
@@ -211,7 +219,7 @@ void storageAddCapabilities (nat from, nat to)
     // we've moved the nurseries, so we have to update the rNursery
     // pointers from the Capabilities.
     for (i = 0; i < to; i++) {
-        capabilities[i].r.rNursery = &nurseries[i];
+        capabilities[i]->r.rNursery = &nurseries[i];
     }
 
     /* The allocation area.  Policy: keep the allocation area
@@ -225,11 +233,11 @@ void storageAddCapabilities (nat from, nat to)
     // allocate a block for each mut list
     for (n = from; n < to; n++) {
         for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
-            capabilities[n].mut_lists[g] = allocBlock();
+            capabilities[n]->mut_lists[g] = allocBlock();
         }
     }
 
-#if defined(THREADED_RTS) && defined(llvm_CC_FLAVOR)
+#if defined(THREADED_RTS) && defined(llvm_CC_FLAVOR) && (CC_SUPPORTS_TLS == 0)
     newThreadLocalKey(&gctKey);
 #endif
 
@@ -253,21 +261,19 @@ freeStorage (rtsBool free_heap)
     closeMutex(&sm_mutex);
 #endif
     stgFree(nurseries);
-#if defined(THREADED_RTS) && defined(llvm_CC_FLAVOR)
+#if defined(THREADED_RTS) && defined(llvm_CC_FLAVOR) && (CC_SUPPORTS_TLS == 0)
     freeThreadLocalKey(&gctKey);
 #endif
     freeGcThreads();
 }
 
 /* -----------------------------------------------------------------------------
-   CAF management.
+   Note [CAF management].
 
    The entry code for every CAF does the following:
-     
-      - builds a CAF_BLACKHOLE in the heap
 
-      - calls newCaf, which atomically updates the CAF with
-        IND_STATIC pointing to the CAF_BLACKHOLE
+      - calls newCaf, which builds a CAF_BLACKHOLE on the heap and atomically
+        updates the CAF with IND_STATIC pointing to the CAF_BLACKHOLE
 
       - if newCaf returns zero, it re-enters the CAF (see Note [atomic
         CAF entry])
@@ -281,13 +287,19 @@ freeStorage (rtsBool free_heap)
    frames would also need special cases for static update frames.
 
    newCaf() does the following:
-       
+
+      - atomically locks the CAF (see [atomic CAF entry])
+
+      - it builds a CAF_BLACKHOLE on the heap
+
       - it updates the CAF with an IND_STATIC pointing to the
         CAF_BLACKHOLE, atomically.
 
       - it puts the CAF on the oldest generation's mutable list.
         This is so that we treat the CAF as a root when collecting
         younger generations.
+
+      - links the CAF onto the CAF list (see below)
 
    ------------------
    Note [atomic CAF entry]
@@ -325,9 +337,12 @@ freeStorage (rtsBool free_heap)
 
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE StgWord lockCAF (StgClosure *caf, StgClosure *bh)
+STATIC_INLINE StgInd *
+lockCAF (StgRegTable *reg, StgIndStatic *caf)
 {
     const StgInfoTable *orig_info;
+    Capability *cap = regTableToCapability(reg);
+    StgInd *bh;
 
     orig_info = caf->header.info;
 
@@ -337,7 +352,7 @@ STATIC_INLINE StgWord lockCAF (StgClosure *caf, StgClosure *bh)
     if (orig_info == &stg_IND_STATIC_info ||
         orig_info == &stg_WHITEHOLE_info) {
         // already claimed by another thread; re-enter the CAF
-        return 0;
+        return NULL;
     }
 
     cur_info = (const StgInfoTable *)
@@ -347,30 +362,38 @@ STATIC_INLINE StgWord lockCAF (StgClosure *caf, StgClosure *bh)
 
     if (cur_info != orig_info) {
         // already claimed by another thread; re-enter the CAF
-        return 0;
+        return NULL;
     }
 
     // successfully claimed by us; overwrite with IND_STATIC
 #endif
 
     // For the benefit of revertCAFs(), save the original info pointer
-    ((StgIndStatic *)caf)->saved_info  = orig_info;
+    caf->saved_info = orig_info;
 
-    ((StgIndStatic*)caf)->indirectee = bh;
+    // Allocate the blackhole indirection closure
+    bh = (StgInd *)allocate(cap, sizeofW(*bh));
+    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
+    bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
+
+    caf->indirectee = (StgClosure *)bh;
     write_barrier();
-    SET_INFO(caf,&stg_IND_STATIC_info);
+    SET_INFO((StgClosure*)caf,&stg_IND_STATIC_info);
 
-    return 1;
+    return bh;
 }
 
-StgWord
-newCAF(StgRegTable *reg, StgClosure *caf, StgClosure *bh)
+StgInd *
+newCAF(StgRegTable *reg, StgIndStatic *caf)
 {
-    if (lockCAF(caf,bh) == 0) return 0;
+    StgInd *bh;
+
+    bh = lockCAF(reg, caf);
+    if (!bh) return NULL;
 
     if(keepCAFs)
     {
-        // HACK:
+        // Note [dyn_caf_list]
         // If we are in GHCi _and_ we are using dynamic libraries,
         // then we can't redirect newCAF calls to newDynCAF (see below),
         // so we make newCAF behave almost like newDynCAF.
@@ -381,20 +404,36 @@ newCAF(StgRegTable *reg, StgClosure *caf, StgClosure *bh)
         // do another hack here and do an address range test on caf to figure
         // out whether it is from a dynamic library.
 
-        ACQUIRE_SM_LOCK; // caf_list is global, locked by sm_mutex
-        ((StgIndStatic *)caf)->static_link = caf_list;
-        caf_list = caf;
+        ACQUIRE_SM_LOCK; // dyn_caf_list is global, locked by sm_mutex
+        caf->static_link = (StgClosure*)dyn_caf_list;
+        dyn_caf_list = caf;
         RELEASE_SM_LOCK;
     }
     else
     {
         // Put this CAF on the mutable list for the old generation.
-        ((StgIndStatic *)caf)->saved_info = NULL;
         if (oldest_gen->no != 0) {
-            recordMutableCap(caf, regTableToCapability(reg), oldest_gen->no);
+            recordMutableCap((StgClosure*)caf,
+                             regTableToCapability(reg), oldest_gen->no);
         }
+
+#ifdef DEBUG
+        // In the DEBUG rts, we keep track of live CAFs by chaining them
+        // onto a list debug_caf_list.  This is so that we can tell if we
+        // ever enter a GC'd CAF, and emit a suitable barf().
+        //
+        // The saved_info field of the CAF is used as the link field for
+        // debug_caf_list, because this field is only used by newDynCAF
+        // for revertible CAFs, and we don't put those on the
+        // debug_caf_list.
+        ACQUIRE_SM_LOCK; // debug_caf_list is global, locked by sm_mutex
+        ((StgIndStatic *)caf)->saved_info = (const StgInfoTable*)debug_caf_list;
+        debug_caf_list = (StgIndStatic*)caf;
+        RELEASE_SM_LOCK;
+#endif
     }
-    return 1;
+
+    return bh;
 }
 
 // External API for setting the keepCAFs flag. see #3900.
@@ -413,19 +452,22 @@ setKeepCAFs (void)
 //
 // The linker hackily arranges that references to newCaf from dynamic
 // code end up pointing to newDynCAF.
-StgWord
-newDynCAF (StgRegTable *reg STG_UNUSED, StgClosure *caf, StgClosure *bh)
+StgInd *
+newDynCAF (StgRegTable *reg, StgIndStatic *caf)
 {
-    if (lockCAF(caf,bh) == 0) return 0;
+    StgInd *bh;
+
+    bh = lockCAF(reg, caf);
+    if (!bh) return NULL;
 
     ACQUIRE_SM_LOCK;
 
-    ((StgIndStatic *)caf)->static_link = revertible_caf_list;
+    caf->static_link = (StgClosure*)revertible_caf_list;
     revertible_caf_list = caf;
 
     RELEASE_SM_LOCK;
 
-    return 1;
+    return bh;
 }
 
 /* -----------------------------------------------------------------------------
@@ -489,8 +531,8 @@ assignNurseriesToCapabilities (nat from, nat to)
     nat i;
 
     for (i = from; i < to; i++) {
-        capabilities[i].r.rCurrentNursery = nurseries[i].blocks;
-        capabilities[i].r.rCurrentAlloc   = NULL;
+        capabilities[i]->r.rCurrentNursery = nurseries[i].blocks;
+        capabilities[i]->r.rCurrentAlloc   = NULL;
     }
 }
 
@@ -620,20 +662,22 @@ move_STACK (StgStack *src, StgStack *dest)
 }
 
 /* -----------------------------------------------------------------------------
-   allocate()
+   StgPtr allocate (Capability *cap, W_ n)
 
-   This allocates memory in the current thread - it is intended for
-   use primarily from STG-land where we have a Capability.  It is
-   better than allocate() because it doesn't require taking the
-   sm_mutex lock in the common case.
+   Allocates an area of memory n *words* large, from the nursery of
+   the supplied Capability, or from the global block pool if the area
+   requested is larger than LARGE_OBJECT_THRESHOLD.  Memory is not
+   allocated from the current nursery block, so as not to interfere
+   with Hp/HpLim.
 
-   Memory is allocated directly from the nursery if possible (but not
-   from the current nursery block, so as not to interfere with
-   Hp/HpLim).
+   The address of the allocated memory is returned. allocate() never
+   fails; if it returns, the returned value is a valid address.  If
+   the nursery is already full, then another block is allocated from
+   the global block pool.  If we need to get memory from the OS and
+   that operation fails, then the whole process will be killed.
    -------------------------------------------------------------------------- */
 
-StgPtr
-allocate (Capability *cap, W_ n)
+StgPtr allocate (Capability *cap, W_ n)
 {
     bdescr *bd;
     StgPtr p;
@@ -700,6 +744,28 @@ allocate (Capability *cap, W_ n)
             // we have a block in the nursery: take it and put
             // it at the *front* of the nursery list, and use it
             // to allocate() from.
+            //
+            // Previously the nursery looked like this:
+            //
+            //           CurrentNursery
+            //                  /
+            //                +-+    +-+
+            // nursery -> ... |A| -> |B| -> ...
+            //                +-+    +-+
+            //
+            // After doing this, it looks like this:
+            //
+            //                      CurrentNursery
+            //                            /
+            //            +-+           +-+
+            // nursery -> |B| -> ... -> |A| -> ...
+            //            +-+           +-+
+            //             |
+            //             CurrentAlloc
+            //
+            // The point is to get the block out of the way of the
+            // advancing CurrentNursery pointer, while keeping it
+            // on the nursery list so we don't lose track of it.
             cap->r.rCurrentNursery->link = bd->link;
             if (bd->link != NULL) {
                 bd->link->u.back = cap->r.rCurrentNursery;
@@ -935,7 +1001,7 @@ void updateNurseriesStats (void)
     nat i;
 
     for (i = 0; i < n_capabilities; i++) {
-        capabilities[i].total_allocated += countOccupied(nurseries[i].blocks);
+        capabilities[i]->total_allocated += countOccupied(nurseries[i].blocks);
     }
 }
 
@@ -1088,13 +1154,38 @@ calcNeeded (rtsBool force_major, memcount *blocks_needed)
          should be modified to use allocateExec instead of VirtualAlloc.
    ------------------------------------------------------------------------- */
 
+#if defined(arm_HOST_ARCH) && defined(ios_HOST_OS)
+void sys_icache_invalidate(void *start, size_t len);
+#endif
+
+/* On ARM and other platforms, we need to flush the cache after
+   writing code into memory, so the processor reliably sees it. */
+void flushExec (W_ len, AdjustorExecutable exec_addr)
+{
+#if defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+  /* x86 doesn't need to do anything, so just suppress some warnings. */
+  (void)len;
+  (void)exec_addr;
+#elif defined(arm_HOST_ARCH) && defined(ios_HOST_OS)
+  /* On iOS we need to use the special 'sys_icache_invalidate' call. */
+  sys_icache_invalidate(exec_addr, ((unsigned char*)exec_addr)+len);
+#elif defined(__GNUC__)
+  /* For all other platforms, fall back to a libgcc builtin. */
+  unsigned char* begin = (unsigned char*)exec_addr;
+  unsigned char* end   = begin + len;
+  __clear_cache((void*)begin, (void*)end);
+#else
+#error Missing support to flush the instruction cache
+#endif
+}
+
 #if defined(linux_HOST_OS)
 
 // On Linux we need to use libffi for allocating executable memory,
 // because it knows how to work around the restrictions put in place
 // by SELinux.
 
-void *allocateExec (W_ bytes, void **exec_ret)
+AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
 {
     void **ret, **exec;
     ACQUIRE_SM_LOCK;
@@ -1106,19 +1197,66 @@ void *allocateExec (W_ bytes, void **exec_ret)
     return (ret + 1);
 }
 
-// freeExec gets passed the executable address, not the writable address. 
-void freeExec (void *addr)
+// freeExec gets passed the executable address, not the writable address.
+void freeExec (AdjustorExecutable addr)
 {
-    void *writable;
+    AdjustorWritable writable;
     writable = *((void**)addr - 1);
     ACQUIRE_SM_LOCK;
     ffi_closure_free (writable);
     RELEASE_SM_LOCK
 }
 
+#elif defined(ios_HOST_OS)
+
+static HashTable* allocatedExecs;
+
+AdjustorWritable allocateExec(W_ bytes, AdjustorExecutable *exec_ret)
+{
+    AdjustorWritable writ;
+    ffi_closure* cl;
+    if (bytes != sizeof(ffi_closure)) {
+        barf("allocateExec: for ffi_closure only");
+    }
+    ACQUIRE_SM_LOCK;
+    cl = writ = ffi_closure_alloc((size_t)bytes, exec_ret);
+    if (cl != NULL) {
+        if (allocatedExecs == NULL) {
+            allocatedExecs = allocHashTable();
+        }
+        insertHashTable(allocatedExecs, (StgWord)*exec_ret, writ);
+    }
+    RELEASE_SM_LOCK;
+    return writ;
+}
+
+AdjustorWritable execToWritable(AdjustorExecutable exec)
+{
+    AdjustorWritable writ;
+    ACQUIRE_SM_LOCK;
+    if (allocatedExecs == NULL ||
+       (writ = lookupHashTable(allocatedExecs, (StgWord)exec)) == NULL) {
+        RELEASE_SM_LOCK;
+        barf("execToWritable: not found");
+    }
+    RELEASE_SM_LOCK;
+    return writ;
+}
+
+void freeExec(AdjustorExecutable exec)
+{
+    AdjustorWritable writ;
+    ffi_closure* cl;
+    cl = writ = execToWritable(exec);
+    ACQUIRE_SM_LOCK;
+    removeHashTable(allocatedExecs, (StgWord)exec, writ);
+    ffi_closure_free(cl);
+    RELEASE_SM_LOCK
+}
+
 #else
 
-void *allocateExec (W_ bytes, void **exec_ret)
+AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
 {
     void *ret;
     W_ n;
@@ -1132,7 +1270,7 @@ void *allocateExec (W_ bytes, void **exec_ret)
         barf("allocateExec: can't handle large objects");
     }
 
-    if (exec_block == NULL || 
+    if (exec_block == NULL ||
         exec_block->free + n + 1 > exec_block->start + BLOCK_SIZE_W) {
         bdescr *bd;
         W_ pagesize = getPageSize();
@@ -1190,9 +1328,9 @@ void freeExec (void *addr)
     }
 
     RELEASE_SM_LOCK
-}    
+}
 
-#endif /* mingw32_HOST_OS */
+#endif /* switch(HOST_OS) */
 
 #ifdef DEBUG
 

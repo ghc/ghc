@@ -1,0 +1,16 @@
+
+gadt13.hs:15:13:
+    Couldn't match expected type ‘t’
+                with actual type ‘String -> [Char]’
+      ‘t’ is untouchable
+        inside the constraints (t1 ~ Int)
+        bound by a pattern with constructor
+                   I :: Int -> Term Int,
+                 in an equation for ‘shw’
+        at gadt13.hs:15:6-8
+      ‘t’ is a rigid type variable bound by
+          the inferred type of shw :: Term t1 -> t at gadt13.hs:15:1
+    Relevant bindings include
+      shw :: Term t1 -> t (bound at gadt13.hs:15:1)
+    In the expression: ("I " ++) . shows t
+    In an equation for ‘shw’: shw (I t) = ("I " ++) . shows t

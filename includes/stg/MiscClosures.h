@@ -13,7 +13,7 @@
  * Do not #include this file directly: #include "Rts.h" instead.
  *
  * To understand the structure of the RTS headers, see the wiki:
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * --------------------------------------------------------------------------*/
 
@@ -98,6 +98,7 @@ RTS_FUN(stg_BCO);
 RTS_ENTRY(stg_EVACUATED);
 RTS_ENTRY(stg_WEAK);
 RTS_ENTRY(stg_DEAD_WEAK);
+RTS_ENTRY(stg_C_FINALIZER_LIST);
 RTS_ENTRY(stg_STABLE_NAME);
 RTS_ENTRY(stg_MVAR_CLEAN);
 RTS_ENTRY(stg_MVAR_DIRTY);
@@ -111,9 +112,14 @@ RTS_ENTRY(stg_MUT_ARR_PTRS_CLEAN);
 RTS_ENTRY(stg_MUT_ARR_PTRS_DIRTY);
 RTS_ENTRY(stg_MUT_ARR_PTRS_FROZEN);
 RTS_ENTRY(stg_MUT_ARR_PTRS_FROZEN0);
+RTS_ENTRY(stg_SMALL_MUT_ARR_PTRS_CLEAN);
+RTS_ENTRY(stg_SMALL_MUT_ARR_PTRS_DIRTY);
+RTS_ENTRY(stg_SMALL_MUT_ARR_PTRS_FROZEN);
+RTS_ENTRY(stg_SMALL_MUT_ARR_PTRS_FROZEN0);
 RTS_ENTRY(stg_MUT_VAR_CLEAN);
 RTS_ENTRY(stg_MUT_VAR_DIRTY);
 RTS_ENTRY(stg_END_TSO_QUEUE);
+RTS_ENTRY(stg_GCD_CAF);
 RTS_ENTRY(stg_STM_AWOKEN);
 RTS_ENTRY(stg_MSG_TRY_WAKEUP);
 RTS_ENTRY(stg_MSG_THROWTO);
@@ -224,6 +230,8 @@ RTS_RET(stg_ap_f);
 RTS_RET(stg_ap_d);
 RTS_RET(stg_ap_l);
 RTS_RET(stg_ap_v16);
+RTS_RET(stg_ap_v32);
+RTS_RET(stg_ap_v64);
 RTS_RET(stg_ap_n);
 RTS_RET(stg_ap_p);
 RTS_RET(stg_ap_pv);
@@ -241,6 +249,8 @@ RTS_FUN_DECL(stg_ap_f_fast);
 RTS_FUN_DECL(stg_ap_d_fast);
 RTS_FUN_DECL(stg_ap_l_fast);
 RTS_FUN_DECL(stg_ap_v16_fast);
+RTS_FUN_DECL(stg_ap_v32_fast);
+RTS_FUN_DECL(stg_ap_v64_fast);
 RTS_FUN_DECL(stg_ap_n_fast);
 RTS_FUN_DECL(stg_ap_p_fast);
 RTS_FUN_DECL(stg_ap_pv_fast);
@@ -271,6 +281,9 @@ RTS_FUN_DECL(stg_gc_prim_p);
 RTS_FUN_DECL(stg_gc_prim_pp);
 RTS_FUN_DECL(stg_gc_prim_n);
 
+RTS_RET(stg_gc_prim_p_ll_ret);
+RTS_FUN_DECL(stg_gc_prim_p_ll);
+
 RTS_RET(stg_enter);
 RTS_FUN_DECL(__stg_gc_enter_1);
 
@@ -292,7 +305,9 @@ RTS_FUN_DECL(stg_block_noregs);
 RTS_FUN_DECL(stg_block_blackhole);
 RTS_FUN_DECL(stg_block_blackhole_finally);
 RTS_FUN_DECL(stg_block_takemvar);
+RTS_FUN_DECL(stg_block_readmvar);
 RTS_RET(stg_block_takemvar);
+RTS_RET(stg_block_readmvar);
 RTS_FUN_DECL(stg_block_putmvar);
 RTS_RET(stg_block_putmvar);
 #ifdef mingw32_HOST_OS
@@ -324,48 +339,36 @@ RTS_FUN_DECL(StgReturn);
    PrimOps
    -------------------------------------------------------------------------- */
 
-RTS_FUN_DECL(stg_plusIntegerzh);
-RTS_FUN_DECL(stg_minusIntegerzh);
-RTS_FUN_DECL(stg_timesIntegerzh);
-RTS_FUN_DECL(stg_gcdIntegerzh);
-RTS_FUN_DECL(stg_quotRemIntegerzh);
-RTS_FUN_DECL(stg_quotIntegerzh);
-RTS_FUN_DECL(stg_remIntegerzh);
-RTS_FUN_DECL(stg_divExactIntegerzh);
-RTS_FUN_DECL(stg_divModIntegerzh);
-
-RTS_FUN_DECL(stg_cmpIntegerIntzh);
-RTS_FUN_DECL(stg_cmpIntegerzh);
-RTS_FUN_DECL(stg_integer2Intzh);
-RTS_FUN_DECL(stg_integer2Wordzh);
-RTS_FUN_DECL(stg_gcdIntegerIntzh);
-RTS_FUN_DECL(stg_gcdIntzh);
-
-RTS_FUN_DECL(stg_int2Integerzh);
-RTS_FUN_DECL(stg_word2Integerzh);
-
 RTS_FUN_DECL(stg_decodeFloatzuIntzh);
-RTS_FUN_DECL(stg_decodeDoublezh);
 RTS_FUN_DECL(stg_decodeDoublezu2Intzh);
 
-RTS_FUN_DECL(stg_andIntegerzh);
-RTS_FUN_DECL(stg_orIntegerzh);
-RTS_FUN_DECL(stg_xorIntegerzh);
-RTS_FUN_DECL(stg_complementIntegerzh);
-
-#if SIZEOF_HSINT == 4
-
-RTS_FUN_DECL(stg_int64ToIntegerzh);
-RTS_FUN_DECL(stg_word64ToIntegerzh);
-
-#endif
-
 RTS_FUN_DECL(stg_unsafeThawArrayzh);
+RTS_FUN_DECL(stg_casArrayzh);
 RTS_FUN_DECL(stg_newByteArrayzh);
 RTS_FUN_DECL(stg_newPinnedByteArrayzh);
 RTS_FUN_DECL(stg_newAlignedPinnedByteArrayzh);
+RTS_FUN_DECL(stg_casIntArrayzh);
+RTS_FUN_DECL(stg_fetchAddIntArrayzh);
 RTS_FUN_DECL(stg_newArrayzh);
 RTS_FUN_DECL(stg_newArrayArrayzh);
+RTS_FUN_DECL(stg_copyArrayzh);
+RTS_FUN_DECL(stg_copyMutableArrayzh);
+RTS_FUN_DECL(stg_copyArrayArrayzh);
+RTS_FUN_DECL(stg_copyMutableArrayArrayzh);
+RTS_FUN_DECL(stg_cloneArrayzh);
+RTS_FUN_DECL(stg_cloneMutableArrayzh);
+RTS_FUN_DECL(stg_freezzeArrayzh);
+RTS_FUN_DECL(stg_thawArrayzh);
+
+RTS_FUN_DECL(stg_newSmallArrayzh);
+RTS_FUN_DECL(stg_unsafeThawSmallArrayzh);
+RTS_FUN_DECL(stg_cloneSmallArrayzh);
+RTS_FUN_DECL(stg_cloneSmallMutableArrayzh);
+RTS_FUN_DECL(stg_freezzeSmallArrayzh);
+RTS_FUN_DECL(stg_thawSmallArrayzh);
+RTS_FUN_DECL(stg_copySmallArrayzh);
+RTS_FUN_DECL(stg_copySmallMutableArrayzh);
+RTS_FUN_DECL(stg_casSmallArrayzh);
 
 RTS_FUN_DECL(stg_newMutVarzh);
 RTS_FUN_DECL(stg_atomicModifyMutVarzh);
@@ -375,8 +378,10 @@ RTS_FUN_DECL(stg_isEmptyMVarzh);
 RTS_FUN_DECL(stg_newMVarzh);
 RTS_FUN_DECL(stg_takeMVarzh);
 RTS_FUN_DECL(stg_putMVarzh);
+RTS_FUN_DECL(stg_readMVarzh);
 RTS_FUN_DECL(stg_tryTakeMVarzh);
 RTS_FUN_DECL(stg_tryPutMVarzh);
+RTS_FUN_DECL(stg_tryReadMVarzh);
 
 RTS_FUN_DECL(stg_waitReadzh);
 RTS_FUN_DECL(stg_waitWritezh);
@@ -412,7 +417,7 @@ RTS_FUN_DECL(stg_threadStatuszh);
 RTS_FUN_DECL(stg_mkWeakzh);
 RTS_FUN_DECL(stg_mkWeakNoFinalizzerzh);
 RTS_FUN_DECL(stg_mkWeakForeignzh);
-RTS_FUN_DECL(stg_mkWeakForeignEnvzh);
+RTS_FUN_DECL(stg_addCFinalizzerToWeakzh);
 RTS_FUN_DECL(stg_finalizzeWeakzh);
 RTS_FUN_DECL(stg_deRefWeakzh);
 
@@ -465,7 +470,6 @@ extern StgWord stg_stack_save_entries[];
 // Storage.c
 extern unsigned int RTS_VAR(g0);
 extern unsigned int RTS_VAR(large_alloc_lim);
-extern StgWord RTS_VAR(weak_ptr_list);
 extern StgWord RTS_VAR(atomic_modify_mutvar_mutex);
 
 // RtsFlags
@@ -483,6 +487,11 @@ extern StgWord      RTS_VAR(CCS_LIST);         /* registered CCS list */
 extern StgWord      CCS_SYSTEM[];
 extern unsigned int RTS_VAR(CC_ID);            /* global ids */
 extern unsigned int RTS_VAR(CCS_ID);
+RTS_FUN_DECL(enterFunCCS);
+RTS_FUN_DECL(pushCostCentre);
+
+// Capability.c
+extern unsigned int n_capabilities;
 
 #endif
 

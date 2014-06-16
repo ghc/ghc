@@ -1,0 +1,18 @@
+:l ../shell.hs
+:def shell (\s -> do shell s; return "")
+:l
+
+-- example from #7231, modified: the example in the ticket did not
+-- trigger the bug, because a module containing only '"' will fail
+-- in the downsweep, which is before we unload modules.  Hence this
+-- repro case uses a module that contains an unbound identifier and
+-- fails in the renamer.
+
+:shell cp Bar1.hs Bar.hs
+
+:load Main.hs
+:shell sleep 1
+:shell cp Bar2.hs Bar.hs
+
+:reload
+foo

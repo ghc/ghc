@@ -1,0 +1,12 @@
+
+<interactive>:11:1:
+    No instance for (Show a1) arising from a use of ‘print’
+    Cannot resolve unknown runtime type ‘a1’
+    Use :print or :force to determine these types
+    Relevant bindings include it :: a1 (bound at <interactive>:11:1)
+    Note: there are several potential instances:
+      instance Show a => Show (List1 a) -- Defined at ../Test.hs:11:12
+      instance Show MyInt -- Defined at ../Test.hs:14:16
+      instance Show a => Show (MkT a) -- Defined at ../Test.hs:17:13
+      ...plus 32 others
+    In a stmt of an interactive GHCi command: print it

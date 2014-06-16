@@ -198,7 +198,10 @@ rts_apply (Capability *cap, HaskellObj f, HaskellObj arg)
     StgThunk *ap;
 
     ap = (StgThunk *)allocate(cap,sizeofW(StgThunk) + 2);
-    SET_HDR(ap, (StgInfoTable *)&stg_ap_2_upd_info, CCS_SYSTEM);
+    // Here we don't want to use CCS_SYSTEM, because it's a hidden cost centre,
+    // and evaluating Haskell code under a hidden cost centre leads to
+    // confusing profiling output. (#7753)
+    SET_HDR(ap, (StgInfoTable *)&stg_ap_2_upd_info, CCS_MAIN);
     ap->payload[0] = f;
     ap->payload[1] = arg;
     return (StgClosure *)ap;
@@ -522,7 +525,16 @@ rts_checkSchedStatus (char* site, Capability *cap)
 	stg_exit(EXIT_FAILURE);
     case Interrupted:
 	errorBelch("%s: interrupted", site);
-	stg_exit(EXIT_FAILURE);
+#ifdef THREADED_RTS
+        // The RTS is shutting down, and the process will probably
+        // soon exit.  We don't want to preempt the shutdown
+        // by exiting the whole process here, so we just terminate the
+        // current thread.  Don't forget to release the cap first though.
+        rts_unlock(cap);
+        shutdownThread();
+#else
+        stg_exit(EXIT_FAILURE);
+#endif
     default:
 	errorBelch("%s: Return code (%d) not ok",(site),(rc));	
 	stg_exit(EXIT_FAILURE);
@@ -602,3 +614,9 @@ rts_unlock (Capability *cap)
       traceTaskDelete(task);
     }
 }
+
+void rts_done (void)
+{
+    freeMyTask();
+}
+

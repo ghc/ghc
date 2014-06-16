@@ -1,0 +1,22 @@
+Name: timeout
+Version: 1
+Copyright: GHC Team
+License: BSD3
+Author: GHC Team <cvs-ghc@haskell.org>
+Maintainer: GHC Team <cvs-ghc@haskell.org>
+Synopsis: timout utility
+Description: timeout utility
+Category: Development
+build-type: Simple
+cabal-version: >=1.2
+
+Executable timeout
+    Main-Is: timeout.hs
+    Other-Modules: WinCBindings
+    Extensions: CPP
+    Build-Depends: base, process
+    if os(windows)
+        Build-Depends: Win32
+    else
+        Build-Depends: unix
+

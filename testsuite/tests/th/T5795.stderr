@@ -1,0 +1,6 @@
+
+T5795.hs:9:6:
+    GHC stage restriction:
+      ‘ty’ is used in a top-level splice or annotation,
+      and must be imported, not defined locally
+    In the splice: $ty

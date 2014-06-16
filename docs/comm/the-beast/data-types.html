@@ -147,7 +147,7 @@ top-level nullary constructors (like True and False).  Furthermore,
 what if the code generator encounters a non-saturated application of a
 worker?  E.g. <tt>(map Just xs)</tt>.  We could declare that to be an
 error (CorePrep should saturate them). But instead we currently
-generate a top-level defintion for each constructor worker, whether
+generate a top-level definition for each constructor worker, whether
 nullary or not.  It takes the form:
 <pre>
   MkT{v} = \ p q r -> MkT{v} p q r
@@ -157,7 +157,7 @@ one that generates abstract C and the byte-code generator) treats it as a specia
 allocates a MkT; it does not make a recursive call!  So now there's a top-level curried
 version of the worker which is available to anyone who wants it.
 <p>
-This strange defintion is not emitted into External Core.  Indeed, you might argue that
+This strange definition is not emitted into External Core.  Indeed, you might argue that
 we should instead pass the list of <tt>TyCon</tt>s to the code generator and have it 
 generate magic bindings directly.  As it stands, it's a real hack: see the code in
 CorePrep.mkImplicitBinds.

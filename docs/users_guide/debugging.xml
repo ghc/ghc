@@ -202,6 +202,16 @@
 
 	    <varlistentry>
 	      <term>
+	        <option>-ddump-strsigs</option>:
+                <indexterm><primary><option>-ddump-strsigs</option></primary></indexterm>
+	      </term>
+	      <listitem>
+		<para>strictness signatures</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>
 	        <option>-ddump-cse</option>:
                 <indexterm><primary><option>-ddump-cse</option></primary></indexterm>
 	      </term>

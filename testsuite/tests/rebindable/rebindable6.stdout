@@ -1,0 +1,43 @@
+start test test_do failure
+++ >>
+++ >>=
+++ fail
+-- fail
+-- >>=
+-- >>
+end test test_do failure
+start test test_do success
+++ >>
+++ >>=
+++ return
+-- return
+-- >>=
+-- >>
+end test test_do success
+start test test_fromInteger
+135
+end test test_fromInteger
+start test test_fromRational
+189%2
+end test test_fromRational
+start test test_negate
+15
+end test test_negate
+start test test_fromInteger_pattern 1
+1=5
+end test test_fromInteger_pattern 1
+start test test_fromInteger_pattern (-2)
+(-2)=10
+end test test_fromInteger_pattern (-2)
+start test test_fromInteger_pattern 9
+(a + 7)=35
+end test test_fromInteger_pattern 9
+start test test_fromRational_pattern 0.5
+0.5=3%2
+end test test_fromRational_pattern 0.5
+start test test_fromRational_pattern (-0.7)
+(-0.7)=21%10
+end test test_fromRational_pattern (-0.7)
+start test test_fromRational_pattern 1.7
+_=51%10
+end test test_fromRational_pattern 1.7

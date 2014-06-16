@@ -1,0 +1,15 @@
+
+T7989.hs:6:7:
+    No constructor has all these fields: ‘a0’, ‘b0’
+    In the expression: x {a0 = 3, a1 = 2, b0 = 4, b1 = 5}
+    In an equation for ‘f’: f x = x {a0 = 3, a1 = 2, b0 = 4, b1 = 5}
+
+T7989.hs:9:7:
+    No constructor has all these fields: ‘x’, ‘y’, ‘z’
+    In the expression: a {x = 0, y = 0, z = 0, v = 0}
+    In an equation for ‘g’: g a = a {x = 0, y = 0, z = 0, v = 0}
+
+T7989.hs:11:7:
+    No constructor has all these fields: ‘x’, ‘a0’
+    In the expression: a {x = 0, a0 = 0}
+    In an equation for ‘h’: h a = a {x = 0, a0 = 0}

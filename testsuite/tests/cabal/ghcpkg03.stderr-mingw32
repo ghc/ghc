@@ -1,0 +1,31 @@
+testpkg-1.2.3.4: Warning: library-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-1.2.3.4: Warning: include-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-1.2.3.4: import-dirs: /usr/local/lib/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-1.2.3.4: import-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory (ignoring)
+testpkg-1.2.3.4: library-dirs: /usr/local/lib/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-1.2.3.4: include-dirs: /usr/local/include/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-1.2.3.4: cannot find any of ["A.hi","A.p_hi","A.dyn_hi"] (ignoring)
+testpkg-1.2.3.4: cannot find any of ["B.hi","B.p_hi","B.dyn_hi"] (ignoring)
+testpkg-1.2.3.4: cannot find any of ["C\\D.hi","C\\D.p_hi","C\\D.dyn_hi"] (ignoring)
+testpkg-1.2.3.4: cannot find any of ["libtestpkg-1.2.3.4.a","libtestpkg-1.2.3.4.p_a","libtestpkg-1.2.3.4-ghc<VERSION>.so","libtestpkg-1.2.3.4-ghc<VERSION>.dylib","testpkg-1.2.3.4-ghc<VERSION>.dll"] on library path (ignoring)
+testpkg-2.0: Warning: library-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-2.0: Warning: include-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-2.0: import-dirs: /usr/local/lib/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-2.0: import-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory (ignoring)
+testpkg-2.0: library-dirs: /usr/local/lib/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-2.0: include-dirs: /usr/local/include/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-2.0: cannot find any of ["A.hi","A.p_hi","A.dyn_hi"] (ignoring)
+testpkg-2.0: cannot find any of ["B.hi","B.p_hi","B.dyn_hi"] (ignoring)
+testpkg-2.0: cannot find any of ["C\\D.hi","C\\D.p_hi","C\\D.dyn_hi"] (ignoring)
+testpkg-2.0: cannot find any of ["C\\E.hi","C\\E.p_hi","C\\E.dyn_hi"] (ignoring)
+testpkg-2.0: cannot find any of ["libtestpkg-2.0.a","libtestpkg-2.0.p_a","libtestpkg-2.0-ghc7.7.20121031.so","libtestpkg-2.0-ghc7.7.20121031.dylib","testpkg-2.0-ghc7.7.20121031.dll"] on library path (ignoring)
+testpkg-1.2.3.4: Warning: library-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-1.2.3.4: Warning: include-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
+testpkg-1.2.3.4: import-dirs: /usr/local/lib/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-1.2.3.4: import-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory (ignoring)
+testpkg-1.2.3.4: library-dirs: /usr/local/lib/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-1.2.3.4: include-dirs: /usr/local/include/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-1.2.3.4: cannot find any of ["A.hi","A.p_hi","A.dyn_hi"] (ignoring)
+testpkg-1.2.3.4: cannot find any of ["B.hi","B.p_hi","B.dyn_hi"] (ignoring)
+testpkg-1.2.3.4: cannot find any of ["C\\D.hi","C\\D.p_hi","C\\D.dyn_hi"] (ignoring)
+testpkg-1.2.3.4: cannot find any of ["libtestpkg-1.2.3.4.a","libtestpkg-1.2.3.4.p_a","libtestpkg-1.2.3.4-ghc7.7.20121031.so","libtestpkg-1.2.3.4-ghc7.7.20121031.dylib","testpkg-1.2.3.4-ghc7.7.20121031.dll"] on library path (ignoring)

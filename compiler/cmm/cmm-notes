@@ -64,9 +64,9 @@ Things to do:
 
  - See "CAFs" below; we want to totally refactor the way SRTs are calculated
 
- - Garbage-collect http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/CPS
+ - Garbage-collect http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/CPS
    moving good stuff into 
-   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/NewCodeGenPipeline
+   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/NewCodeGenPipeline
 
  - Currently AsmCodeGen top level calls AsmCodeGen.cmmToCmm, which is a small
    C-- optimiser.  It has quite a lot of boilerplate folding code in AsmCodeGen
@@ -79,7 +79,7 @@ Things to do:
    into separate C procedures.
 
    Short term:
-     compute and attach liveness into to LastCall
+     compute and attach liveness into LastCall
      right at end, split, cvt to old rep
      [must split before cvt, because old rep is not expressive enough]
 

@@ -13,7 +13,7 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [7.7], [glasgow-haskell-bugs@haskell.org], [ghc])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [7.9], [glasgow-haskell-bugs@haskell.org], [ghc])
 
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
@@ -155,6 +155,12 @@ FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],
                     GHC_PACKAGE_DB_FLAG=package-conf,
                     GHC_PACKAGE_DB_FLAG=package-db)
 AC_SUBST(GHC_PACKAGE_DB_FLAG)
+
+# GHC 7.7+ needs -fcmm-sink when compiling Parser.hs. See #8182
+FP_COMPARE_VERSIONS([$GhcVersion],[-gt],[7.7],
+                    CMM_SINK_BOOTSTRAP_IS_NEEDED=YES,
+                    CMM_SINK_BOOTSTRAP_IS_NEEDED=NO)
+AC_SUBST(CMM_SINK_BOOTSTRAP_IS_NEEDED)
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -328,6 +334,7 @@ then
     CC="${mingwbin}gcc.exe"
     LD="${mingwbin}ld.exe"
     NM="${mingwbin}nm.exe"
+    RANLIB="${mingwbin}ranlib.exe"
     OBJDUMP="${mingwbin}objdump.exe"
     fp_prog_ar="${mingwbin}ar.exe"
 
@@ -360,7 +367,7 @@ AS_IF([test "x$with_system_libffi" = "xyes"],
 AC_SUBST(UseSystemLibFFI)
 
 AC_ARG_WITH([ffi-includes],
-[AC_HELP_STRING([--with-ffi-includes=ARG]
+[AC_HELP_STRING([--with-ffi-includes=ARG],
   [Find includes for libffi in ARG [default=system default]])
 ],
 [
@@ -368,14 +375,14 @@ AC_ARG_WITH([ffi-includes],
     AC_MSG_WARN([--with-ffi-includes will be ignored, --with-system-libffi not set])
  else
     FFIIncludeDir="$withval"
-    LIBFFI_CFLAGS="-I $withval" 
+    LIBFFI_CFLAGS="-I$withval"
  fi
 ])
 
 AC_SUBST(FFIIncludeDir)
 
 AC_ARG_WITH([ffi-libraries],
-[AC_HELP_STRING([--with-ffi-libraries=ARG]
+[AC_HELP_STRING([--with-ffi-libraries=ARG],
   [Find libffi in ARG [default=system default]])
 ],
 [
@@ -467,6 +474,11 @@ FIND_GCC([WhatGccIsCalled], [gcc], [gcc])
 CC="$WhatGccIsCalled"
 export CC
 
+# If --with-gcc was used, and we're not cross-compiling, then it also
+# applies to the stage0 compiler.
+MAYBE_OVERRIDE_STAGE0([gcc],[CC_STAGE0])
+MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
+
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
 FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
@@ -478,6 +490,20 @@ dnl --------------------------------------------------------------
 FP_ARG_WITH_PATH_GNU_PROG([NM], [nm], [nm])
 NmCmd="$NM"
 AC_SUBST([NmCmd])
+
+dnl ** Which ar to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG([AR], [ar], [ar])
+ArCmd="$AR"
+fp_prog_ar="$AR"
+AC_SUBST([ArCmd])
+
+dnl ** Which ranlib to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG([RANLIB], [ranlib], [ranlib])
+RanlibCmd="$RANLIB"
+RANLIB="$RanlibCmd"
+
 
 # Note: we may not have objdump on OS X, and we only need it on Windows (for DLL checks)
 case $HostOS_CPP in
@@ -553,8 +579,6 @@ dnl ** look to see if we have a C compiler using an llvm back end.
 dnl
 FP_CC_LLVM_BACKEND
 
-FP_PROG_LD_HashSize31
-FP_PROG_LD_ReduceMemoryOverheads
 FP_PROG_LD_IS_GNU
 FP_PROG_LD_BUILD_ID
 FP_PROG_LD_NO_COMPACT_UNWIND
@@ -564,8 +588,8 @@ FP_PROG_LD_FILELIST
 FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])
 FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_GCC_LINKER_OPTS_STAGE0],[CONF_LD_LINKER_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
 FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE1],[CONF_GCC_LINKER_OPTS_STAGE1],[CONF_LD_LINKER_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
-# Stage 3 won't be supported by cross-compilation
 FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE2],[CONF_GCC_LINKER_OPTS_STAGE2],[CONF_LD_LINKER_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
+# Stage 3 won't be supported by cross-compilation
 
 FP_GCC_EXTRA_FLAGS
 
@@ -786,7 +810,7 @@ dnl ** check for math library
 dnl    Keep that check as early as possible.
 dnl    as we need to know whether we need libm
 dnl    for math functions or not
-dnl    (see http://hackage.haskell.org/trac/ghc/ticket/3730)
+dnl    (see http://ghc.haskell.org/trac/ghc/ticket/3730)
 AC_CHECK_LIB(m, atan, HaveLibM=YES, HaveLibM=NO)
 if test $HaveLibM = YES
 then
@@ -856,7 +880,21 @@ dnl ** check for eventfd which is needed by the I/O manager
 AC_CHECK_HEADERS([sys/eventfd.h])
 AC_CHECK_FUNCS([eventfd])
 
-# checking for PAPI
+dnl ** Check for __thread support in the compiler
+AC_MSG_CHECKING(for __thread support)
+AC_COMPILE_IFELSE(
+  [ AC_LANG_SOURCE([[__thread int tester = 0;]]) ],
+  [
+   AC_MSG_RESULT(yes)
+   AC_DEFINE([CC_SUPPORTS_TLS],[1],[Define to 1 if __thread is supported])
+  ],
+  [
+   AC_MSG_RESULT(no)
+   AC_DEFINE([CC_SUPPORTS_TLS],[0],[Define to 1 if __thread is supported])
+  ])
+
+
+dnl ** checking for PAPI
 AC_CHECK_LIB(papi, PAPI_library_init, HavePapiLib=YES, HavePapiLib=NO)
 AC_CHECK_HEADER([papi.h], [HavePapiHeader=YES], [HavePapiHeader=NO])
 AC_SUBST(HavePapiLib)
@@ -901,8 +939,7 @@ if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
    AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])
 fi
 
-AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal ghc.spec settings docs/users_guide/ug-book.xml docs/users_guide/ug-ent.xml docs/index.html libraries/prologue.txt distrib/ghc.iss distrib/configure.ac])
-AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
+AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal settings docs/users_guide/ug-book.xml docs/users_guide/ug-ent.xml docs/index.html libraries/prologue.txt distrib/configure.ac])
 AC_OUTPUT
 
 # We got caught by
@@ -991,5 +1028,5 @@ To make changes to the default build configuration, copy the file
 mk/build.mk.sample to mk/build.mk, and edit the settings in there.
 
 For more information on how to configure your GHC build, see
-   http://hackage.haskell.org/trac/ghc/wiki/Building
+   http://ghc.haskell.org/trac/ghc/wiki/Building
 "

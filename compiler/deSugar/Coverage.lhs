@@ -117,7 +117,7 @@ guessSourceFile :: LHsBinds Id -> FilePath -> FilePath
 guessSourceFile binds orig_file =
      -- Try look for a file generated from a .hsc file to a
      -- .hs file, by peeking ahead.
-     let top_pos = catMaybes $ foldrBag (\ (L pos _) rest ->
+     let top_pos = catMaybes $ foldrBag (\ (_, (L pos _)) rest ->
                                  srcSpanFileName_maybe pos : rest) [] binds
      in
      case top_pos of
@@ -229,7 +229,11 @@ shouldTickPatBind density top_lev
 -- Adding ticks to bindings
 
 addTickLHsBinds :: LHsBinds Id -> TM (LHsBinds Id)
-addTickLHsBinds binds = mapBagM addTickLHsBind binds
+addTickLHsBinds binds = mapBagM addTick binds
+  where
+    addTick (origin, bind) = do
+        bind' <- addTickLHsBind bind
+        return (origin, bind')
 
 addTickLHsBind :: LHsBind Id -> TM (LHsBind Id)
 addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
@@ -325,6 +329,7 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs, pat_rhs = rhs }))) = do
 
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind
+addTickLHsBind patsyn_bind@(L _ (PatSynBind {})) = return patsyn_bind
 
 
 bindTick :: TickDensity -> String -> SrcSpan -> FreeVars -> TM (Maybe (Tickish Id))
@@ -571,9 +576,10 @@ addTickHsExpr (HsCoreAnn nm e) =
         liftM2 HsCoreAnn
                 (return nm)
                 (addTickLHsExpr e)
-addTickHsExpr e@(HsBracket     {}) = return e
-addTickHsExpr e@(HsBracketOut  {}) = return e
-addTickHsExpr e@(HsSpliceE  {}) = return e
+addTickHsExpr e@(HsBracket     {})   = return e
+addTickHsExpr e@(HsTcBracketOut  {}) = return e
+addTickHsExpr e@(HsRnBracketOut  {}) = return e
+addTickHsExpr e@(HsSpliceE  {})      = return e
 addTickHsExpr (HsProc pat cmdtop) =
         liftM2 HsProc
                 (addTickLPat pat)
@@ -963,6 +969,13 @@ noFVs = emptyOccEnv
 data TM a = TM { unTM :: TickTransEnv -> TickTransState -> (a,FreeVars,TickTransState) }
         -- a combination of a state monad (TickTransState) and a writer
         -- monad (FreeVars).
+
+instance Functor TM where
+    fmap = liftM
+
+instance Applicative TM where
+    pure = return
+    (<*>) = ap
 
 instance Monad TM where
   return a = TM $ \ _env st -> (a,noFVs,st)

@@ -1,0 +1,16 @@
+
+T2994.hs:11:10:
+    Expecting one more argument to ‘MonadReader Int’
+    Expected a constraint,
+      but ‘MonadReader Int’ has kind ‘* -> Constraint’
+    In the instance declaration for ‘MonadReader Int’
+
+T2994.hs:13:23:
+    Expecting one more argument to ‘Reader' r’
+    The first argument of ‘MonadReader’ should have kind ‘*’,
+      but ‘Reader' r’ has kind ‘* -> *’
+    In the instance declaration for ‘MonadReader (Reader' r)’
+
+T2994.hs:15:10:
+    ‘MonadReader’ is applied to too many type arguments
+    In the instance declaration for ‘MonadReader r r (Reader' r)’

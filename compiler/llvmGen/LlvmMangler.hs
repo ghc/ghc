@@ -20,6 +20,10 @@ import System.IO
 import Data.List ( sortBy )
 import Data.Function ( on )
 
+#if x86_64_TARGET_ARCH
+#define REWRITE_AVX
+#endif
+
 -- Magic Strings
 secStmt, infoSec, newLine, textStmt, dataStmt, syntaxUnified :: B.ByteString
 secStmt       = B.pack "\t.section\t"
@@ -42,15 +46,23 @@ type Section = (B.ByteString, B.ByteString)
 -- | Read in assembly file and process
 llvmFixupAsm :: DynFlags -> FilePath -> FilePath -> IO ()
 llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-} do
-    showPass dflags "LlVM Mangler"
+    showPass dflags "LLVM Mangler"
     r <- openBinaryFile f1 ReadMode
     w <- openBinaryFile f2 WriteMode
     ss <- readSections r w
     hClose r
-    let fixed = fixTables ss
+    let fixed = (map rewriteAVX . fixTables) ss
     mapM_ (writeSection w) fixed
     hClose w
     return ()
+
+rewriteSymType :: B.ByteString -> B.ByteString
+rewriteSymType s =
+    foldl (\s' (typeFunc,typeObj)->replace typeFunc typeObj s') s types
+  where
+    types = [ (B.pack "@function", B.pack "@object")
+            , (B.pack "%function", B.pack "%object")
+            ]
 
 -- | Splits the file contents into its sections
 readSections :: Handle -> Handle -> IO [Section]
@@ -63,7 +75,7 @@ readSections r w = go B.empty [] []
       -- the first directive of the *next* section, therefore we take
       -- it over to that section.
       let (tys, ls') = span isType ls
-          cts = B.intercalate newLine $ reverse ls'
+          cts = rewriteSymType $ B.intercalate newLine $ reverse ls'
 
       -- Decide whether to directly output the section or append it
       -- to the list for resorting.
@@ -74,7 +86,7 @@ readSections r w = go B.empty [] []
                 writeSection w (hdr, cts) >> return ss
 
       case e_l of
-        Right l | l == syntaxUnified 
+        Right l | l == syntaxUnified
                   -> finishSection >>= \ss' -> writeSection w (l, B.empty)
                                    >> go B.empty ss' tys
                 | any (`B.isPrefixOf` l) [secStmt, textStmt, dataStmt]
@@ -89,6 +101,42 @@ writeSection w (hdr, cts) = do
   when (not $ B.null hdr) $
     B.hPutStrLn w hdr
   B.hPutStrLn w cts
+
+#if REWRITE_AVX
+rewriteAVX :: Section -> Section
+rewriteAVX = rewriteVmovaps . rewriteVmovdqa
+
+rewriteVmovdqa :: Section -> Section
+rewriteVmovdqa = rewriteInstructions vmovdqa vmovdqu
+  where
+    vmovdqa, vmovdqu :: B.ByteString
+    vmovdqa = B.pack "vmovdqa"
+    vmovdqu = B.pack "vmovdqu"
+
+rewriteVmovap :: Section -> Section
+rewriteVmovap = rewriteInstructions vmovap vmovup
+  where
+    vmovap, vmovup :: B.ByteString
+    vmovap = B.pack "vmovap"
+    vmovup = B.pack "vmovup"
+
+rewriteInstructions :: B.ByteString -> B.ByteString -> Section -> Section
+rewriteInstructions matchBS replaceBS (hdr, cts) =
+    (hdr, replace matchBS replaceBS cts)
+#else /* !REWRITE_AVX */
+rewriteAVX :: Section -> Section
+rewriteAVX = id
+#endif /* !REWRITE_SSE */
+
+replace :: B.ByteString -> B.ByteString -> B.ByteString -> B.ByteString
+replace matchBS replaceBS = loop
+  where
+    loop :: B.ByteString -> B.ByteString
+    loop cts =
+        case B.breakSubstring matchBS cts of
+          (hd,tl) | B.null tl -> hd
+                  | otherwise -> hd `B.append` replaceBS `B.append`
+                                 loop (B.drop (B.length matchBS) tl)
 
 -- | Reorder and convert sections so info tables end up next to the
 -- code. Also does stack fixups.
@@ -119,4 +167,3 @@ readInt :: B.ByteString -> Int
 readInt str | B.all isDigit str = (read . B.unpack) str
             | otherwise = error $ "LLvmMangler Cannot read " ++ show str
                                 ++ " as it's not an Int"
-

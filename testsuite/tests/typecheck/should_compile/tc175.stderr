@@ -1,0 +1,5 @@
+
+tc175.hs:13:10: Warning:
+    No explicit implementation for
+      either ‘showsPrec’ or ‘show’
+    In the instance declaration for ‘Show (a -> b)’

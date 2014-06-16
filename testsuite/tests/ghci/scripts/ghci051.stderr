@@ -1,0 +1,10 @@
+
+<interactive>:7:9:
+    Couldn't match type ‘T’
+                  with ‘Ghci1.T’
+    NB: ‘T’ is defined at <interactive>:6:1-16
+        ‘Ghci1.T’ is defined at <interactive>:3:1-14
+    Expected type: T'
+      Actual type: T
+    In the expression: C :: T'
+    In an equation for ‘c’: c = C :: T'

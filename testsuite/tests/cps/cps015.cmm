@@ -1,0 +1,17 @@
+// Test whether a stack check is performed even when
+// the existing stack due to on-stack arguments is big enough.
+
+// With space for a return address
+foo1 (bits32 x, bits32 y) goto GC {
+  foreign "C--" bar(x) "safe";
+  return (1);
+GC:
+  return (1);
+}
+
+// No space needed for a return address
+foo2 (bits32 x, bits32 y) goto GC {
+  jump bar(x, y);
+GC:
+  return (1);
+}

@@ -10,7 +10,8 @@ Loading interface files
 module LoadIface (
         -- RnM/TcM functions
         loadModuleInterface, loadModuleInterfaces, 
-        loadSrcInterface, loadInterfaceForName, 
+        loadSrcInterface, loadSrcInterface_maybe, 
+        loadInterfaceForName, loadInterfaceForModule,
 
         -- IfM functions
         loadInterface, loadWiredInHomeIface, 
@@ -59,6 +60,7 @@ import Panic
 import Util
 import FastString
 import Fingerprint
+import Hooks
 
 import Control.Monad
 import Data.IORef
@@ -83,23 +85,30 @@ loadSrcInterface :: SDoc
                  -> Maybe FastString    -- "package", if any
                  -> RnM ModIface
 
-loadSrcInterface doc mod want_boot maybe_pkg  = do
+loadSrcInterface doc mod want_boot maybe_pkg
+  = do { res <- loadSrcInterface_maybe doc mod want_boot maybe_pkg
+       ; case res of
+           Failed err      -> failWithTc err
+           Succeeded iface -> return iface }
+
+-- | Like loadSrcInterface, but returns a MaybeErr
+loadSrcInterface_maybe :: SDoc
+                       -> ModuleName
+                       -> IsBootInterface     -- {-# SOURCE #-} ?
+                       -> Maybe FastString    -- "package", if any
+                       -> RnM (MaybeErr MsgDoc ModIface)
+
+loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- We must first find which Module this import refers to.  This involves
   -- calling the Finder, which as a side effect will search the filesystem
   -- and create a ModLocation.  If successful, loadIface will read the
   -- interface; it will call the Finder again, but the ModLocation will be
   -- cached from the first search.
-  hsc_env <- getTopEnv
-  res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
-  case res of
-    Found _ mod -> do
-      mb_iface <- initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
-      case mb_iface of
-        Failed err      -> failWithTc err
-        Succeeded iface -> return iface
-    err ->
-        let dflags = hsc_dflags hsc_env in
-        failWithTc (cannotFindInterface dflags mod err)
+  = do { hsc_env <- getTopEnv
+       ; res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
+       ; case res of
+           Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
+           err         -> return (Failed (cannotFindInterface (hsc_dflags hsc_env) mod err)) }
 
 -- | Load interface for a module.
 loadModuleInterface :: SDoc -> Module -> TcM ModIface
@@ -125,6 +134,16 @@ loadInterfaceForName doc name
   ; ASSERT2( isExternalName name, ppr name ) 
     initIfaceTcRn $ loadSysInterface doc (nameModule name)
   }
+
+-- | Loads the interface for a given Module.
+loadInterfaceForModule :: SDoc -> Module -> TcRn ModIface
+loadInterfaceForModule doc m
+  = do
+    -- Should not be called with this module
+    when debugIsOn $ do
+      this_mod <- getModule
+      MASSERT2( this_mod /= m, ppr m <+> parens doc )
+    initIfaceTcRn $ loadSysInterface doc m
 \end{code}
 
 
@@ -494,6 +513,25 @@ bumpDeclStats name
 %*                                                      *
 %*********************************************************
 
+Note [Home module load error]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the sought-for interface is in the current package (as determined
+by -package-name flag) then it jolly well should already be in the HPT
+because we process home-package modules in dependency order.  (Except
+in one-shot mode; see notes with hsc_HPT decl in HscTypes).
+
+It is possible (though hard) to get this error through user behaviour.
+  * Suppose package P (modules P1, P2) depends on package Q (modules Q1,
+    Q2, with Q2 importing Q1)
+  * We compile both packages.  
+  * Now we edit package Q so that it somehow depends on P
+  * Now recompile Q with --make (without recompiling P).  
+  * Then Q1 imports, say, P1, which in turn depends on Q2. So Q2
+    is a home-package module which is not yet in the HPT!  Disaster.
+
+This actually happened with P=base, Q=ghc-prim, via the AMP warnings.
+See Trac #8320.
+
 \begin{code}
 findAndReadIface :: SDoc -> Module
                  -> IsBootInterface     -- True  <=> Look for a .hi-boot file
@@ -516,7 +554,9 @@ findAndReadIface doc_str mod hi_boot_file
 
        -- Check for GHC.Prim, and return its static interface
        if mod == gHC_PRIM
-           then return (Succeeded (ghcPrimIface,
+           then do
+               iface <- getHooked ghcPrimIfaceHook ghcPrimIface
+               return (Succeeded (iface,
                                    "<built in interface for GHC.Prim>"))
            else do
                dflags <- getDynFlags
@@ -530,10 +570,7 @@ findAndReadIface doc_str mod hi_boot_file
                        let file_path = addBootSuffix_maybe hi_boot_file
                                                            (ml_hi_file loc)
 
-                       -- If the interface is in the current package
-                       -- then if we could load it would already be in
-                       -- the HPT and we assume that our callers checked
-                       -- that.
+                       -- See Note [Home module load error]
                        if thisPackage dflags == modulePackageId mod &&
                           not (isOneShot (ghcMode dflags))
                            then return (Failed (homeModError mod loc))
@@ -863,6 +900,7 @@ wrongIfaceModErr iface mod_name file_path
   where iface_file = doubleQuotes (text file_path)
 
 homeModError :: Module -> ModLocation -> SDoc
+-- See Note [Home module load error]
 homeModError mod location
   = ptext (sLit "attempting to use module ") <> quotes (ppr mod)
     <> (case ml_hs_file location of

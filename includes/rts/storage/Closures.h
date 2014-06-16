@@ -80,7 +80,7 @@ typedef struct {
 typedef struct StgClosure_ {
     StgHeader   header;
     struct StgClosure_ *payload[FLEXIBLE_ARRAY];
-} *StgClosurePtr; // StgClosure defined in Rts.h
+} *StgClosurePtr; // StgClosure defined in rts/Types.h
 
 typedef struct {
     StgThunkHeader  header;
@@ -135,11 +135,18 @@ typedef struct StgBlockingQueue_ {
     struct MessageBlackHole_ *queue;
 } StgBlockingQueue;
 
+/* This struct should be called StgArrBytes rather than StgArrWords.
+ *
+ * One might be very tempted to store the number of words in the bytes field,
+ * but the garbage collector will erase your data then.
+ *
+ * It's name is for historical reasons, see #3800
+ */
 typedef struct {
     StgHeader  header;
     StgWord    bytes;
     StgWord    payload[FLEXIBLE_ARRAY];
-} StgArrWords;
+} StgArrWords; // TODO: s/StgArrWords/StgArrBytes (#8552)
 
 typedef struct {
     StgHeader   header;
@@ -148,6 +155,12 @@ typedef struct {
     StgClosure *payload[FLEXIBLE_ARRAY];
     // see also: StgMutArrPtrs macros in ClosureMacros.h
 } StgMutArrPtrs;
+
+typedef struct {
+    StgHeader   header;
+    StgWord     ptrs;
+    StgClosure *payload[FLEXIBLE_ARRAY];
+} StgSmallMutArrPtrs;
 
 typedef struct {
     StgHeader   header;
@@ -191,17 +204,21 @@ typedef struct _StgStableName {
 
 typedef struct _StgWeak {	/* Weak v */
   StgHeader header;
-  StgClosure *cfinalizer;
+  StgClosure *cfinalizers;
   StgClosure *key;
   StgClosure *value;		/* v */
   StgClosure *finalizer;
   struct _StgWeak *link;
 } StgWeak;
 
-typedef struct _StgDeadWeak {	/* Weak v */
+typedef struct _StgCFinalizerList {
   StgHeader header;
-  struct _StgWeak *link;
-} StgDeadWeak;
+  StgClosure *link;
+  void (*fptr)(void);
+  void *ptr;
+  void *eptr;
+  StgWord flag; /* has environment (0 or 1) */
+} StgCFinalizerList;
 
 /* Byte code objects.  These are fixed size objects with pointers to
  * four arrays, designed so that a BCO can be easily "re-linked" to

@@ -1,0 +1,9 @@
+
+TH_RichKinds.hs:12:3: Warning:
+    forall a_0 . a_0 :: GHC.Types.Bool
+forall a_1 . a_1 :: Constraint
+forall a_2 . a_2 :: [*]
+forall a_3 . a_3 :: (*, GHC.Types.Bool)
+forall a_4 . a_4 :: GHC.Tuple.()
+forall a_5 . a_5 :: (* -> GHC.Types.Bool) ->
+                    (*, * -> *) -> GHC.Types.Bool

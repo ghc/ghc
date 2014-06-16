@@ -1,0 +1,6 @@
+ghc-stage2: unrecognised flag: -fflul-laziness
+did you mean one of:
+  -ffull-laziness
+  -fno-full-laziness
+
+Usage: For basic information, try the `--help' option.

@@ -21,10 +21,10 @@ where
 import NameSet
 import UniqSet
 import UniqFM
-import DataCon
+import DataCon hiding (tyConsOfTyCon)
 import TyCon
 import TypeRep
-import Type
+import Type hiding (tyConsOfType)
 import PrelNames
 import Digraph
 

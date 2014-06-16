@@ -1,0 +1,8 @@
+
+arrowfail003.hs:8:7:
+    Arrow command found where an expression was expected:
+      returnA -< []
+
+arrowfail003.hs:9:7:
+    Arrow command found where an expression was expected:
+      (| zeroArrow |)

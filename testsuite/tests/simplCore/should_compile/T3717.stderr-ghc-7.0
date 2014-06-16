@@ -1,0 +1,47 @@
+
+==================== Tidy Core ====================
+lvl :: GHC.Integer.Type.Integer
+[GblId, Caf=NoCafRefs, Str=DmdType]
+lvl = GHC.Integer.Type.S# 1
+
+lvl1 :: GHC.Integer.Type.Integer
+[GblId, Caf=NoCafRefs, Str=DmdType]
+lvl1 = GHC.Integer.Type.S# 2
+
+Rec {
+T3717.$wfoo [Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int#
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType L]
+T3717.$wfoo =
+  \ (ww :: GHC.Prim.Int#) ->
+    case ww of ds {
+      __DEFAULT ->
+        case case GHC.Prim.<# ds 5 of _ {
+               GHC.Bool.False -> lvl1; GHC.Bool.True -> lvl
+             }
+        of _ { __DEFAULT ->
+        T3717.$wfoo (GHC.Prim.-# ds 1)
+        };
+      0 -> 0
+    }
+end Rec }
+
+T3717.foo [InlPrag=INLINE[0]] :: GHC.Types.Int -> GHC.Types.Int
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=DmdType U(L)m,
+ Unf=Unf{Src=Worker=T3717.$wfoo, TopLvl=True, Arity=1, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once!] :: GHC.Types.Int) ->
+                 case w of _ { GHC.Types.I# ww [Occ=Once] ->
+                 case T3717.$wfoo ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
+                 }}]
+T3717.foo =
+  \ (w :: GHC.Types.Int) ->
+    case w of _ { GHC.Types.I# ww ->
+    case T3717.$wfoo ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
+    }
+
+
+

@@ -10,7 +10,7 @@ Desugaring arrow commands
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module DsArrows ( dsProcExpr ) where
@@ -626,7 +626,7 @@ dsCmd _ids local_vars _stack_ty _res_ty (HsCmdArrForm op _ args) env_ids = do
 
 dsCmd ids local_vars stack_ty res_ty (HsCmdCast coercion cmd) env_ids = do
     (core_cmd, env_ids') <- dsCmd ids local_vars stack_ty res_ty cmd env_ids
-    wrapped_cmd <- dsHsWrapper (WpCast coercion) core_cmd
+    wrapped_cmd <- dsHsWrapper (mkWpCast coercion) core_cmd
     return (wrapped_cmd, env_ids')
 
 dsCmd _ _ _ _ _ c = pprPanic "dsCmd" (ppr c)
@@ -1171,6 +1171,7 @@ collectl (L _ pat) bndrs
     go (SigPatOut pat _)          = collectl pat bndrs
     go (CoPat _ pat _)            = collectl (noLoc pat) bndrs
     go (ViewPat _ pat _)          = collectl pat bndrs
+    go p@(SplicePat {})           = pprPanic "collectl/go" (ppr p)
     go p@(QuasiQuotePat {})       = pprPanic "collectl/go" (ppr p)
 
 collectEvBinders :: TcEvBinds -> [Id]

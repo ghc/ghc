@@ -1,0 +1,5 @@
+
+mod27.hs:3:1:
+    Cycle in type synonym declarations:
+      mod27.hs:3:1-18: type T1 = (Int, T2)
+      mod27.hs:4:1-18: type T2 = (Int, T1)

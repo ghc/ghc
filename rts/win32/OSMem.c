@@ -6,6 +6,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#define _WIN32_WINNT 0x0501
+
 #include "Rts.h"
 #include "sm/OSMem.h"
 #include "RtsUtils.h"
@@ -376,6 +378,24 @@ W_ getPageSize (void)
         pagesize = sSysInfo.dwPageSize;
         return pagesize;
     }
+}
+
+/* Returns 0 if physical memory size cannot be identified */
+StgWord64 getPhysicalMemorySize (void)
+{
+    static StgWord64 physMemSize = 0;
+    if (!physMemSize) {
+        MEMORYSTATUSEX status;
+        status.dwLength = sizeof(status);
+        if (!GlobalMemoryStatusEx(&status)) {
+#if defined(DEBUG)
+            errorBelch("warning: getPhysicalMemorySize: cannot get physical memory size");
+#endif
+            return 0;
+        }
+        physMemSize = status.ullTotalPhys;
+    }
+    return physMemSize;
 }
 
 void setExecutable (void *p, W_ len, rtsBool exec)

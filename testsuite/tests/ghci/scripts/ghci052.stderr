@@ -1,0 +1,32 @@
+
+<interactive>:9:4:
+    Couldn't match expected type ‘Ghci1.Planet’
+                with actual type ‘Planet’
+    NB: ‘Ghci1.Planet’ is defined at <interactive>:5:1-37
+        ‘Planet’ is defined at <interactive>:8:1-36
+    In the first argument of ‘pn’, namely ‘Mercury’
+    In the expression: pn Mercury
+
+<interactive>:10:4:
+    Couldn't match expected type ‘Ghci1.Planet’
+                with actual type ‘Planet’
+    NB: ‘Ghci1.Planet’ is defined at <interactive>:5:1-37
+        ‘Planet’ is defined at <interactive>:8:1-36
+    In the first argument of ‘pn’, namely ‘Venus’
+    In the expression: pn Venus
+
+<interactive>:11:4:
+    Couldn't match expected type ‘Ghci1.Planet’
+                with actual type ‘Planet’
+    NB: ‘Ghci1.Planet’ is defined at <interactive>:5:1-37
+        ‘Planet’ is defined at <interactive>:8:1-36
+    In the first argument of ‘pn’, namely ‘Mars’
+    In the expression: pn Mars
+
+<interactive>:13:44:
+    Couldn't match expected type ‘Planet’
+                with actual type ‘Ghci1.Planet’
+    NB: ‘Planet’ is defined at <interactive>:8:1-36
+        ‘Ghci1.Planet’ is defined at <interactive>:5:1-37
+    In the pattern: Earth
+    In an equation for ‘pn’: pn Earth = "E"

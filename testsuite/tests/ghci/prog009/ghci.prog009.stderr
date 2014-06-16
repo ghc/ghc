@@ -1,0 +1,8 @@
+
+A.hs:1:16: parse error on input ‘where’
+
+<interactive>:26:1:
+    Not in scope: ‘yan’
+    Perhaps you meant ‘tan’ (imported from Prelude)
+
+A.hs:1:16: parse error on input ‘where’

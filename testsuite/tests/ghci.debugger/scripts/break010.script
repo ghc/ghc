@@ -1,0 +1,6 @@
+:l ../Test6.hs
+:b 5
+main
+:abandon
+main
+-- should not hang here; we abandoned the previous computation

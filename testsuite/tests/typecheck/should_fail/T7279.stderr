@@ -1,0 +1,11 @@
+
+T7279.hs:6:10:
+    Could not deduce (Show b0)
+      arising from the ambiguity check for an instance declaration
+    from the context (Eq a, Show b)
+      bound by an instance declaration: (Eq a, Show b) => Eq (T a)
+      at T7279.hs:6:10-35
+    The type variable ‘b0’ is ambiguous
+    In the ambiguity check for: forall a b. (Eq a, Show b) => Eq (T a)
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+    In the instance declaration for ‘Eq (T a)’

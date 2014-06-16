@@ -1,0 +1,15 @@
+-- Recovery of types, polymorphic bindings inside a bkpt
+
+:l ../QSort
+:break 5
+qsort [8::Integer, 4]
+
+:p right
+seq right ()
+:p right
+:p left
+seq left ()
+:p left
+length left
+:p left
+:continue

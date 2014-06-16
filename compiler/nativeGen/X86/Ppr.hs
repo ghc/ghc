@@ -577,7 +577,13 @@ pprInstr (XOR size src dst) = pprSizeOpOp (sLit "xor")  size src dst
 
 pprInstr (POPCNT size src dst) = pprOpOp (sLit "popcnt") size src (OpReg dst)
 
+pprInstr (PREFETCH NTA size src ) =  pprSizeOp_ (sLit "prefetchnta") size src
+pprInstr (PREFETCH Lvl0 size src) = pprSizeOp_ (sLit "prefetcht0") size src
+pprInstr (PREFETCH Lvl1 size src) = pprSizeOp_ (sLit "prefetcht1") size src
+pprInstr (PREFETCH Lvl2 size src) = pprSizeOp_ (sLit "prefetcht2") size src
+
 pprInstr (NOT size op) = pprSizeOp (sLit "not") size op
+pprInstr (BSWAP size op) = pprSizeOp (sLit "bswap") size (OpReg op)
 pprInstr (NEGI size op) = pprSizeOp (sLit "neg") size op
 
 pprInstr (SHL size src dst) = pprShift (sLit "shl") size src dst
@@ -1023,6 +1029,13 @@ pprSizeImmOp name size imm op1
         pprOperand size op1
     ]
 
+
+pprSizeOp_ :: LitString -> Size -> Operand -> SDoc
+pprSizeOp_ name size op1
+  = hcat [
+        pprMnemonic_ name ,
+        pprOperand size op1
+    ]
 
 pprSizeOp :: LitString -> Size -> Operand -> SDoc
 pprSizeOp name size op1

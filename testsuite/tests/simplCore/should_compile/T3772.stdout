@@ -1,0 +1,30 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 29, types: 12, coercions: 0}
+
+Rec {
+xs :: GHC.Prim.Int# -> ()
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <L,U>]
+xs =
+  \ (m :: GHC.Prim.Int#) ->
+    case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<=# m 1)
+    of _ [Occ=Dead] {
+      GHC.Types.False -> xs (GHC.Prim.-# m 1);
+      GHC.Types.True -> GHC.Tuple.()
+    }
+end Rec }
+
+T3772.foo [InlPrag=NOINLINE] :: GHC.Types.Int -> ()
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U(U)>]
+T3772.foo =
+  \ (n :: GHC.Types.Int) ->
+    case n of _ [Occ=Dead] { GHC.Types.I# n# ->
+    case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<=# n# 0)
+    of _ [Occ=Dead] {
+      GHC.Types.False -> xs n#;
+      GHC.Types.True -> GHC.Tuple.()
+    }
+    }
+
+
+

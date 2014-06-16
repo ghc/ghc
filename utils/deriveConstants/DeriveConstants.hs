@@ -313,6 +313,18 @@ wanteds = concat
           ,fieldOffset Both "StgRegTable" "rXMM4"
           ,fieldOffset Both "StgRegTable" "rXMM5"
           ,fieldOffset Both "StgRegTable" "rXMM6"
+          ,fieldOffset Both "StgRegTable" "rYMM1"
+          ,fieldOffset Both "StgRegTable" "rYMM2"
+          ,fieldOffset Both "StgRegTable" "rYMM3"
+          ,fieldOffset Both "StgRegTable" "rYMM4"
+          ,fieldOffset Both "StgRegTable" "rYMM5"
+          ,fieldOffset Both "StgRegTable" "rYMM6"
+          ,fieldOffset Both "StgRegTable" "rZMM1"
+          ,fieldOffset Both "StgRegTable" "rZMM2"
+          ,fieldOffset Both "StgRegTable" "rZMM3"
+          ,fieldOffset Both "StgRegTable" "rZMM4"
+          ,fieldOffset Both "StgRegTable" "rZMM5"
+          ,fieldOffset Both "StgRegTable" "rZMM6"
           ,fieldOffset Both "StgRegTable" "rL1"
           ,fieldOffset Both "StgRegTable" "rSp"
           ,fieldOffset Both "StgRegTable" "rSpLim"
@@ -346,6 +358,7 @@ wanteds = concat
 
           ,structSize C  "generation"
           ,structField C "generation" "n_new_large_words"
+          ,structField C "generation" "weak_ptr_list"
 
           ,structSize Both   "CostCentreStack"
           ,structField C     "CostCentreStack" "ccsID"
@@ -378,8 +391,11 @@ wanteds = concat
           ,closureField Both "StgMutArrPtrs" "ptrs"
           ,closureField Both "StgMutArrPtrs" "size"
 
+          ,closureSize  Both "StgSmallMutArrPtrs"
+          ,closureField Both "StgSmallMutArrPtrs" "ptrs"
+
           ,closureSize    Both "StgArrWords"
-          ,closureField   C    "StgArrWords" "bytes"
+          ,closureField   Both "StgArrWords" "bytes"
           ,closurePayload C    "StgArrWords" "payload"
 
           ,closureField  C    "StgTSO"      "_link"
@@ -469,10 +485,14 @@ wanteds = concat
           ,closureField C "StgWeak" "key"
           ,closureField C "StgWeak" "value"
           ,closureField C "StgWeak" "finalizer"
-          ,closureField C "StgWeak" "cfinalizer"
+          ,closureField C "StgWeak" "cfinalizers"
 
-          ,closureSize  C "StgDeadWeak"
-          ,closureField C "StgDeadWeak" "link"
+          ,closureSize  C "StgCFinalizerList"
+          ,closureField C "StgCFinalizerList" "link"
+          ,closureField C "StgCFinalizerList" "fptr"
+          ,closureField C "StgCFinalizerList" "ptr"
+          ,closureField C "StgCFinalizerList" "eptr"
+          ,closureField C "StgCFinalizerList" "flag"
 
           ,closureSize  C "StgMVar"
           ,closureField C "StgMVar" "head"
@@ -521,13 +541,13 @@ wanteds = concat
           ,structSize   C "StgFunInfoExtraFwd"
           ,structField  C "StgFunInfoExtraFwd" "slow_apply"
           ,structField  C "StgFunInfoExtraFwd" "fun_type"
-          ,structField  C "StgFunInfoExtraFwd" "arity"
+          ,structFieldH Both "StgFunInfoExtraFwd" "arity"
           ,structField_ C "StgFunInfoExtraFwd_bitmap" "StgFunInfoExtraFwd" "b.bitmap"
 
           ,structSize   Both "StgFunInfoExtraRev"
           ,structField  C    "StgFunInfoExtraRev" "slow_apply_offset"
           ,structField  C    "StgFunInfoExtraRev" "fun_type"
-          ,structField  C    "StgFunInfoExtraRev" "arity"
+          ,structFieldH Both "StgFunInfoExtraRev" "arity"
           ,structField_ C    "StgFunInfoExtraRev_bitmap" "StgFunInfoExtraRev" "b.bitmap"
 
           ,structField C "StgLargeBitmap" "size"
@@ -571,11 +591,11 @@ wanteds = concat
           ,constantWord Haskell "MAX_Float_REG"        "MAX_FLOAT_REG"
           ,constantWord Haskell "MAX_Double_REG"       "MAX_DOUBLE_REG"
           ,constantWord Haskell "MAX_Long_REG"         "MAX_LONG_REG"
-          ,constantWord Haskell "MAX_SSE_REG"          "MAX_SSE_REG"
+          ,constantWord Haskell "MAX_XMM_REG"          "MAX_XMM_REG"
           ,constantWord Haskell "MAX_Real_Vanilla_REG" "MAX_REAL_VANILLA_REG"
           ,constantWord Haskell "MAX_Real_Float_REG"   "MAX_REAL_FLOAT_REG"
           ,constantWord Haskell "MAX_Real_Double_REG"  "MAX_REAL_DOUBLE_REG"
-          ,constantWord Haskell "MAX_Real_SSE_REG"     "MAX_REAL_SSE_REG"
+          ,constantWord Haskell "MAX_Real_XMM_REG"     "MAX_REAL_XMM_REG"
           ,constantWord Haskell "MAX_Real_Long_REG"    "MAX_REAL_LONG_REG"
 
           -- This tells the native code generator the size of the spill

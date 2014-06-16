@@ -11,6 +11,8 @@ module Stream (
     collect, fromList,
     Stream.map, Stream.mapM, Stream.mapAccumL
   ) where
+import Control.Monad
+import Control.Applicative
 
 -- |
 -- @Stream m a b@ is a computation in some Monad @m@ that delivers a sequence
@@ -36,6 +38,13 @@ module Stream (
 -- new value.
 --
 newtype Stream m a b = Stream { runStream :: m (Either b (a, Stream m a b)) }
+
+instance Monad f => Functor (Stream f a) where
+  fmap = liftM
+
+instance Monad m => Applicative (Stream m a) where
+  pure  = return
+  (<*>) = ap
 
 instance Monad m => Monad (Stream m a) where
   return a = Stream (return (Left a))
@@ -66,7 +75,7 @@ collect str = go str []
 fromList :: Monad m => [a] -> Stream m a ()
 fromList = mapM_ yield
 
--- | Apply a function to each element of a 'Stream', lazilly
+-- | Apply a function to each element of a 'Stream', lazily
 map :: Monad m => (a -> b) -> Stream m a x -> Stream m b x
 map f str = Stream $ do
    r <- runStream str
@@ -74,7 +83,7 @@ map f str = Stream $ do
      Left x -> return (Left x)
      Right (a, str') -> return (Right (f a, Stream.map f str'))
 
--- | Apply a monadic operation to each element of a 'Stream', lazilly
+-- | Apply a monadic operation to each element of a 'Stream', lazily
 mapM :: Monad m => (a -> m b) -> Stream m a x -> Stream m b x
 mapM f str = Stream $ do
    r <- runStream str

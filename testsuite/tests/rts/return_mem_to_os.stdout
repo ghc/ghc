@@ -1,0 +1,21 @@
+Iteration 1
+Last: 1000001
+GC 1 start
+GC 1 done
+Head: 1
+GC 2 start
+GC 2 done
+Iteration 2
+Last: 1000002
+GC 1 start
+GC 1 done
+Head: 2
+GC 2 start
+GC 2 done
+Iteration 3
+Last: 1000003
+GC 1 start
+GC 1 done
+Head: 3
+GC 2 start
+GC 2 done

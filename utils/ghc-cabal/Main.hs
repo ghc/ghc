@@ -34,26 +34,25 @@ main :: IO ()
 main = do hSetBuffering stdout LineBuffering
           args <- getArgs
           case args of
-              "hscolour" : distDir : dir : args' ->
-                  runHsColour distDir dir args'
+              "hscolour" : dir : distDir : args' ->
+                  runHsColour dir distDir args'
               "check" : dir : [] ->
                   doCheck dir
-              "copy" : strip : directory : distDir
-                     : myDestDir : myPrefix : myLibdir : myDocdir
-                     : args' ->
-                  doCopy strip directory distDir
-                         myDestDir myPrefix myLibdir myDocdir
+              "copy" : dir : distDir
+                     : strip : myDestDir : myPrefix : myLibdir : myDocdir
+                     : ghcLibWays : args' ->
+                  doCopy dir distDir
+                         strip myDestDir myPrefix myLibdir myDocdir
+                         ("dyn" `elem` words ghcLibWays)
                          args'
-              "register" : ghc : ghcpkg : topdir : directory : distDir
+              "register" : dir : distDir : ghc : ghcpkg : topdir
                          : myDestDir : myPrefix : myLibdir : myDocdir
                          : relocatableBuild : args' ->
-                  doRegister ghc ghcpkg topdir directory distDir
+                  doRegister dir distDir ghc ghcpkg topdir
                              myDestDir myPrefix myLibdir myDocdir
                              relocatableBuild args'
-              "configure" : args' -> case break (== "--") args' of
-                   (config_args, "--" : distdir : directories) ->
-                       mapM_ (generate config_args distdir) directories
-                   _ -> die syntax_error
+              "configure" : dir : distDir : dll0Modules : config_args ->
+                  generate dir distDir dll0Modules config_args
               "sdist" : dir : distDir : [] ->
                   doSdist dir distDir
               ["--version"] ->
@@ -124,17 +123,17 @@ doCheck directory
           isFailure _ = True
 
 runHsColour :: FilePath -> FilePath -> [String] -> IO ()
-runHsColour distdir directory args
+runHsColour directory distdir args
  = withCurrentDirectory directory
  $ defaultMainArgs ("hscolour" : "--builddir" : distdir : args)
 
 doCopy :: FilePath -> FilePath
-       -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
+       -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> Bool
        -> [String]
        -> IO ()
-doCopy strip directory distDir
-          myDestDir myPrefix myLibdir myDocdir
-          args
+doCopy directory distDir
+       strip myDestDir myPrefix myLibdir myDocdir withSharedLibs
+       args
  = withCurrentDirectory directory $ do
      let copyArgs = ["copy", "--builddir", distDir]
                  ++ (if null myDestDir
@@ -169,12 +168,13 @@ doCopy strip directory distDir
                                                  (installDirTemplates lbi)
                 progs = withPrograms lbi
                 stripProgram' = stripProgram {
-                    programFindLocation = \_ -> return (Just strip) }
+                    programFindLocation = \_ _ -> return (Just strip) }
 
             progs' <- configureProgram verbosity stripProgram' progs
             let lbi' = lbi {
                                withPrograms = progs',
-                               installDirTemplates = idts
+                               installDirTemplates = idts,
+                               withSharedLib = withSharedLibs
                            }
             f pd lbi' us flags
 
@@ -182,7 +182,7 @@ doRegister :: FilePath -> FilePath -> FilePath -> FilePath
            -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
            -> String -> [String]
            -> IO ()
-doRegister ghc ghcpkg topdir directory distDir
+doRegister directory distDir ghc ghcpkg topdir
            myDestDir myPrefix myLibdir myDocdir
            relocatableBuildStr args
  = withCurrentDirectory directory $ do
@@ -207,12 +207,13 @@ doRegister ghc ghcpkg topdir directory distDir
                 progs = withPrograms lbi
                 ghcpkgconf = topdir </> "package.conf.d"
                 ghcProgram' = ghcProgram {
-                    programPostConf = \_ _ -> return ["-B" ++ topdir],
-                    programFindLocation = \_ -> return (Just ghc) }
+                    programPostConf = \_ cp -> return cp { programDefaultArgs = ["-B" ++ topdir] },
+                    programFindLocation = \_ _ -> return (Just ghc) }
                 ghcPkgProgram' = ghcPkgProgram {
-                    programPostConf = \_ _ -> return $ ["--global-package-db", ghcpkgconf]
-                                                    ++ ["--force" | not (null myDestDir) ],
-                    programFindLocation = \_ -> return (Just ghcpkg) }
+                    programPostConf = \_ cp -> return cp { programDefaultArgs =
+                                                                ["--global-package-db", ghcpkgconf]
+                                                                ++ ["--force" | not (null myDestDir) ] },
+                    programFindLocation = \_ _ -> return (Just ghcpkg) }
                 configurePrograms ps conf = foldM (flip (configureProgram verbosity)) conf ps
 
             progs' <- configurePrograms [ghcProgram', ghcPkgProgram'] progs
@@ -300,8 +301,8 @@ mangleLbi "compiler" "stage2" lbi
                       _                  -> False
 mangleLbi _ _ lbi = lbi
 
-generate :: [String] -> FilePath -> FilePath -> IO ()
-generate config_args distdir directory
+generate :: FilePath -> FilePath -> String -> [String] -> IO ()
+generate directory distdir dll0Modules config_args
  = withCurrentDirectory directory
  $ do let verbosity = normal
       -- XXX We shouldn't just configure with the default flags
@@ -405,9 +406,12 @@ generate config_args distdir directory
       wrappedLibraryDirs <- wrap libraryDirs
 
       let variablePrefix = directory ++ '_':distdir
+          mods      = map display modules
+          otherMods = map display (otherModules bi)
+          allMods = mods ++ otherMods
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
-                variablePrefix ++ "_MODULES = " ++ unwords (map display modules),
-                variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords (map display (otherModules bi)),
+                variablePrefix ++ "_MODULES = " ++ unwords mods,
+                variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
                 variablePrefix ++ "_SYNOPSIS =" ++ synopsis pd,
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords deps,
@@ -437,6 +441,7 @@ generate config_args distdir directory
                 variablePrefix ++ "_DEP_CC_OPTS = "                    ++ unwords (forDeps Installed.ccOptions),
                 variablePrefix ++ "_DEP_LIB_DIRS_SINGLE_QUOTED = "     ++ unwords wrappedLibraryDirs,
                 variablePrefix ++ "_DEP_LIB_DIRS_SEARCHPATH = "        ++ mkSearchPath libraryDirs,
+                variablePrefix ++ "_DEP_LIB_REL_DIRS = "               ++ unwords libraryRelDirs,
                 variablePrefix ++ "_DEP_LIB_REL_DIRS_SEARCHPATH = "    ++ mkSearchPath libraryRelDirs,
                 variablePrefix ++ "_DEP_EXTRA_LIBS = "                 ++ unwords (forDeps Installed.extraLibraries),
                 variablePrefix ++ "_DEP_LD_OPTS = "                    ++ unwords (forDeps Installed.ldOptions),
@@ -447,9 +452,15 @@ generate config_args distdir directory
                 "$(eval $(" ++ directory ++ "_PACKAGE_MAGIC))"
                 ]
       writeFile (distdir ++ "/package-data.mk") $ unlines xs
-      writeFile (distdir ++ "/haddock-prologue.txt") $
+
+      writeFileUtf8 (distdir ++ "/haddock-prologue.txt") $
           if null (description pd) then synopsis pd
                                    else description pd
+      unless (null dll0Modules) $
+          do let dll0Mods = words dll0Modules
+                 dllMods = allMods \\ dll0Mods
+                 dllModSets = map unwords [dll0Mods, dllMods]
+             writeFile (distdir ++ "/dll-split") $ unlines dllModSets
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
      wrap = mapM wrap1
@@ -465,3 +476,8 @@ generate config_args distdir directory
      mkSearchPath = intercalate [searchPathSeparator]
      boolToYesNo True = "YES"
      boolToYesNo False = "NO"
+
+     -- | Version of 'writeFile' that always uses UTF8 encoding
+     writeFileUtf8 f txt = withFile f WriteMode $ \hdl -> do
+         hSetEncoding hdl utf8
+         hPutStr hdl txt

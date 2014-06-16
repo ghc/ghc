@@ -1,0 +1,5 @@
+:kind Int
+:kind Maybe
+:l GhciKinds
+:kind F [[[Int]]]
+:kind! F [[[Int]]]

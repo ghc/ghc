@@ -1,0 +1,9 @@
+
+drvfail014.hs:8:28:
+    Use deriving( Typeable ) on a data type declaration
+    In the data declaration for ‘T1’
+
+drvfail014.hs:12:1:
+    Derived Typeable instance must be of form (Typeable2 T2)
+    In the stand-alone deriving instance for
+      ‘(Typeable a, Typeable b) => Typeable (T2 a b)’

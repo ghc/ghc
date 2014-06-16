@@ -1,0 +1,24 @@
+
+GenCannotDoRep0_0.hs:6:14: Warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
+GenCannotDoRep0_0.hs:13:45:
+    Can't make a derived instance of ‘Generic Dynamic’:
+      Constructor ‘Dynamic’ has existentials or constraints in its type
+      Possible fix: use a standalone deriving declaration instead
+    In the data declaration for ‘Dynamic’
+
+GenCannotDoRep0_0.hs:17:1:
+    Can't make a derived instance of ‘Generic (P Int)’:
+      P must not be instantiated; try deriving `P a' instead
+    In the stand-alone deriving instance for ‘Generic (P Int)’
+
+GenCannotDoRep0_0.hs:26:1:
+    Can't make a derived instance of ‘Generic (D Char Char)’:
+      D must not be instantiated; try deriving `D Char b' instead
+    In the stand-alone deriving instance for ‘Generic (D Char Char)’
+
+GenCannotDoRep0_0.hs:28:1:
+    Can't make a derived instance of ‘Generic (D Int a)’:
+      D must not have a datatype context
+    In the stand-alone deriving instance for ‘Generic (D Int a)’

@@ -5,6 +5,7 @@ module HsPat where
 import SrcLoc( Located )
 
 import Data.Data
+import Outputable
 
 data Pat (i :: *)
 type LPat i = Located (Pat i)
@@ -16,4 +17,5 @@ instance Typeable1 Pat
 #endif
 
 instance Data i => Data (Pat i)
+instance (OutputableBndr name) => Outputable (Pat name)
 \end{code}

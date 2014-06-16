@@ -1,0 +1,11 @@
+// Verify jumping to the begining of the current continuation
+// is done with a branch and not a jump
+
+foo() {
+  bits32 x, y, z;
+  x = x;
+  (x) = foreign "C--" bar() "safe";
+L:
+  z = z;
+  goto L;
+}

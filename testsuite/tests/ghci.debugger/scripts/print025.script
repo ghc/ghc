@@ -1,0 +1,8 @@
+:l print025
+let i = T (1::Int)
+i
+:break f
+f i
+-- RTTI happens implicitly when the bindings at f come into context
+:step
+:step

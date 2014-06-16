@@ -1,0 +1,2 @@
+[InstanceD [AppT (AppT EqualityT (VarT y_0)) (AppT (AppT ArrowT (VarT t_1)) (VarT t_1))] (AppT (ConT Ghci1.Member) (ConT GHC.Types.Bool)) []]
+[SigD f_2 (ForallT [PlainTV y_3,PlainTV t_4] [AppT (AppT EqualityT (VarT y_3)) (AppT (AppT ArrowT (VarT t_4)) (VarT t_4))] (AppT (AppT ArrowT (VarT y_3)) (VarT t_4))),FunD f_2 [Clause [VarP x_5] (NormalB (VarE x_5)) []]]

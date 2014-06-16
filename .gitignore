@@ -25,6 +25,9 @@ Thumbs.db
 *.a
 *.o.cmd
 *.depend*
+*.dyn_o
+*.dyn_hi
+
 log
 tags
 
@@ -43,6 +46,7 @@ _darcs/
 # sub-repositories
 
 /ghc-tarballs/
+/libffi-tarballs/
 /libraries/array/
 /libraries/base/
 /libraries/deepseq/
@@ -67,8 +71,6 @@ _darcs/
 /libraries/unix/
 /libraries/utf8-string/
 /nofib/
-/testsuite/
-/utils/haddock/
 /utils/hsc2hs/
 
 # -----------------------------------------------------------------------------
@@ -159,7 +161,6 @@ _darcs/
 /mk/install.mk
 /mk/project.mk
 /mk/project.mk.old
-/mk/stamp-h
 /mk/validate.mk
 /rts/package.conf.inplace
 /rts/package.conf.inplace.raw
@@ -173,3 +174,4 @@ _darcs/
 /extra-gcc-opts
 
 .tm_properties
+VERSION

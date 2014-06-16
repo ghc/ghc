@@ -9,13 +9,6 @@ Based on @UniqFMs@ (as you would expect).
 Basically, the things need to be in class @Uniquable@.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module UniqSet (
         -- * Unique set type
         UniqSet,    -- type synonym for UniqFM a
@@ -38,6 +31,7 @@ module UniqSet (
         isEmptyUniqSet,
         lookupUniqSet,
         uniqSetToList,
+        partitionUniqSet
     ) where
 
 import UniqFM
@@ -46,9 +40,9 @@ import Unique
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{The signature of the module}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -74,12 +68,14 @@ mapUniqSet :: (a -> b) -> UniqSet a -> UniqSet b
 elementOfUniqSet :: Uniquable a => a -> UniqSet a -> Bool
 elemUniqSet_Directly :: Unique -> UniqSet a -> Bool
 filterUniqSet :: (a -> Bool) -> UniqSet a -> UniqSet a
+partitionUniqSet :: (a -> Bool) -> UniqSet a -> (UniqSet a, UniqSet a)
 
 sizeUniqSet :: UniqSet a -> Int
 isEmptyUniqSet :: UniqSet a -> Bool
 lookupUniqSet :: Uniquable a => UniqSet a -> a -> Maybe a
 uniqSetToList :: UniqSet a -> [a]
 \end{code}
+
 %************************************************************************
 %*                                                                      *
 \subsection{Implementation using ``UniqFM''}
@@ -113,6 +109,7 @@ mapUniqSet = mapUFM
 elementOfUniqSet = elemUFM
 elemUniqSet_Directly = elemUFM_Directly
 filterUniqSet = filterUFM
+partitionUniqSet = partitionUFM
 
 sizeUniqSet = sizeUFM
 isEmptyUniqSet = isNullUFM

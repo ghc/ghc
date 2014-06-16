@@ -1,0 +1,28 @@
+#!/usr/bin/env python
+
+import math
+import os
+from os import *
+from sys import *
+try:
+    from resource import *
+except:
+    # We don't have resource, so this is a non-UNIX machine.
+    # It's probably a reasonable modern x86/x86_64 machines, so we'd
+    # probably calibrate to 300 anyway; thus just print 300.
+    print 300
+    exit(0)
+
+compiler = argv[1]
+compiler_name = os.path.basename(compiler)
+
+spawnl(os.P_WAIT, compiler,
+                  compiler_name, 'TimeMe.hs', '-o', 'TimeMe', '-O2')
+spawnl(os.P_WAIT, './TimeMe', 'TimeMe')
+
+xs = getrusage(RUSAGE_CHILDREN);
+x = int(math.ceil(xs[0] + xs[1]))
+if x < 1:
+    x = 1
+print (300*x)
+

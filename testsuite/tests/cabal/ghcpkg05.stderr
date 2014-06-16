@@ -1,0 +1,18 @@
+There are problems in package testpkg-2.0:
+  Warning: library-dirs: /usr/local/lib/testpkg doesn't exist or isn't a directory
+  Warning: include-dirs: /usr/local/include/testpkg doesn't exist or isn't a directory
+  import-dirs: /usr/local/lib/testpkg doesn't exist or isn't a directory
+  import-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}.
+  library-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}.
+  include-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}.
+  cannot find any of ["A.hi","A.p_hi","A.dyn_hi"]
+  cannot find any of ["B.hi","B.p_hi","B.dyn_hi"]
+  cannot find any of ["C/D.hi","C/D.p_hi","C/D.dyn_hi"]
+  cannot find any of ["C/E.hi","C/E.p_hi","C/E.dyn_hi"]
+  cannot find any of ["libtestpkg-2.0.a","libtestpkg-2.0.p_a","libtestpkg-2.0-ghc<VERSION>.so","libtestpkg-2.0-ghc<VERSION>.dylib","testpkg-2.0-ghc<VERSION>.dll"] on library path
+
+The following packages are broken, either because they have a problem
+listed above, or because they depend on a broken package.
+testpkg-2.0
+testpkg-3.0
+ghc-pkg: unregistering testpkg-2.0 would break the following packages: testpkg-3.0 (use --force to override)

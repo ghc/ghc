@@ -10,7 +10,7 @@
  * Do not #include this file directly: #include "Rts.h" instead.
  *
  * To understand the structure of the RTS headers, see the wiki:
- *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * ---------------------------------------------------------------------------*/
 
@@ -25,5 +25,6 @@ StgStablePtr getOrSetSystemEventThreadEventManagerStore(StgStablePtr ptr);
 StgStablePtr getOrSetSystemEventThreadIOManagerThreadStore(StgStablePtr ptr);
 StgStablePtr getOrSetSystemTimerThreadEventManagerStore(StgStablePtr ptr);
 StgStablePtr getOrSetSystemTimerThreadIOManagerThreadStore(StgStablePtr ptr);
+StgStablePtr getOrSetLibHSghcFastStringTable(StgStablePtr ptr);
 
 #endif /* RTS_GLOBALS_H */

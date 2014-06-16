@@ -1,0 +1,15 @@
+Not stopped at a breakpoint; nothing to list
+module 'Data.List' is from another package;
+this command requires an interpreted module
+cannot list source code for map: module GHC.Base is not interpreted
+1  mymap f [] = []
+2  mymap f (x:xs) = f x:mymap f xs
+3  
+3  
+4  main = mapM_ putStrLn $ mymap ('a':) ["hello","bye"] 
+5  
+3  
+4  main = mapM_ putStrLn $ mymap ('a':) ["hello","bye"] 
+5  
+syntax:  :list [<line> | <module> <line> | <identifier>]
+syntax:  :list [<line> | <module> <line> | <identifier>]

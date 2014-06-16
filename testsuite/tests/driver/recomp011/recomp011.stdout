@@ -1,0 +1,10 @@
+[1 of 1] Compiling Main             ( Main.hs, Main.o )
+Linking Main ...
+42
+[1 of 1] Compiling Main             ( Main.hs, Main.o ) [B.hsinc changed]
+Linking Main ...
+43
+[1 of 1] Compiling Main             ( Main.hs, Main.o ) [A.hsinc changed]
+Linking Main ...
+4343
+4343

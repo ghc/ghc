@@ -1,0 +1,3 @@
+f_0 :: Data.Maybe.Maybe GHC.Types.Int -> GHC.Types.Int
+f_0 (Data.Maybe.Nothing) = 3
+f_0 (Data.Maybe.Just x_1) = x

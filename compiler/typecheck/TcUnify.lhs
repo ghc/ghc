@@ -10,7 +10,7 @@ Type subsumption and unification
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module TcUnify (
@@ -31,11 +31,7 @@ module TcUnify (
   matchExpectedAppTy, 
   matchExpectedFunTys,
   matchExpectedFunKind,
-  wrapFunResCoercion,
-
-  --------------------------------
-  -- Errors
-  mkKindErrorCtxt
+  wrapFunResCoercion
 
   ) where
 
@@ -135,7 +131,7 @@ matchExpectedFunTys herald arity orig_ty
     -- then   co : ty ~ t1 -> .. -> tn -> ty_r
 
     go n_req ty
-      | n_req == 0 = return (mkTcReflCo ty, [], ty)
+      | n_req == 0 = return (mkTcNomReflCo ty, [], ty)
 
     go n_req ty
       | Just ty' <- tcView ty = go n_req ty'
@@ -143,7 +139,7 @@ matchExpectedFunTys herald arity orig_ty
     go n_req (FunTy arg_ty res_ty)
       | not (isPredTy arg_ty)
       = do { (co, tys, ty_r) <- go (n_req-1) res_ty
-           ; return (mkTcFunCo (mkTcReflCo arg_ty) co, arg_ty:tys, ty_r) }
+           ; return (mkTcFunCo Nominal (mkTcNomReflCo arg_ty) co, arg_ty:tys, ty_r) }
 
     go n_req ty@(TyVarTy tv)
       | ASSERT( isTcTyVar tv) isMetaTyVar tv
@@ -153,12 +149,15 @@ matchExpectedFunTys herald arity orig_ty
 	       Flexi        -> defer n_req ty }
 
        -- In all other cases we bale out into ordinary unification
-    go n_req ty = defer n_req ty
+       -- However unlike the meta-tyvar case, we are sure that the
+       -- number of arrows doesn't match up, so we can add a bit 
+       -- more context to the error message (cf Trac #7869)
+    go n_req ty = addErrCtxtM mk_ctxt $
+                  defer n_req ty
 
     ------------
     defer n_req fun_ty 
-      = addErrCtxtM mk_ctxt $
-        do { arg_tys <- newFlexiTyVarTys n_req openTypeKind
+      = do { arg_tys <- newFlexiTyVarTys n_req openTypeKind
                         -- See Note [Foralls to left of arrow]
            ; res_ty  <- newFlexiTyVarTy openTypeKind
            ; co   <- unifyType fun_ty (mkFunTys arg_tys res_ty)
@@ -223,7 +222,7 @@ matchExpectedTyConApp tc orig_ty
 
     go ty@(TyConApp tycon args) 
        | tc == tycon  -- Common case
-       = return (mkTcReflCo ty, args)
+       = return (mkTcNomReflCo ty, args)
 
     go (TyVarTy tv)
        | ASSERT( isTcTyVar tv) isMetaTyVar tv
@@ -268,7 +267,7 @@ matchExpectedAppTy orig_ty
       | Just ty' <- tcView ty = go ty'
 
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
-      = return (mkTcReflCo orig_ty, (fun_ty, arg_ty))
+      = return (mkTcNomReflCo orig_ty, (fun_ty, arg_ty))
 
     go (TyVarTy tv)
       | ASSERT( isTcTyVar tv) isMetaTyVar tv
@@ -441,17 +440,15 @@ newImplication :: SkolemInfo -> [TcTyVar]
 newImplication skol_info skol_tvs given thing_inside
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { let no_equalities = not (hasEqualities given)
-       ; ((result, untch), wanted) <- captureConstraints  $ 
+    do { ((result, untch), wanted) <- captureConstraints  $ 
                                       captureUntouchables $
                                       thing_inside
 
-       ; if isEmptyWC wanted && no_equalities
-       	    -- Optimisation : if there are no wanteds, and the givens
-       	    -- are sufficiently simple, don't generate an implication
-       	    -- at all.  Reason for the hasEqualities test:
-	    -- we don't want to lose the "inaccessible alternative"
-	    -- error check
+       ; if isEmptyWC wanted && null given
+       	    -- Optimisation : if there are no wanteds, and no givens
+       	    -- don't generate an implication at all.
+            -- Reason for the (null given): we don't want to lose 
+            -- the "inaccessible alternative" error check
          then 
             return (emptyTcEvBinds, result)
          else do
@@ -460,6 +457,7 @@ newImplication skol_info skol_tvs given thing_inside
        ; emitImplication $ Implic { ic_untch = untch
              		     	  , ic_skols = skol_tvs
                                   , ic_fsks  = []
+                                  , ic_no_eqs = False
                              	  , ic_given = given
                                   , ic_wanted = wanted
                                   , ic_insol  = insolubleWC wanted
@@ -498,7 +496,7 @@ unifyTheta :: TcThetaType -> TcThetaType -> TcM [TcCoercion]
 unifyTheta theta1 theta2
   = do  { checkTc (equalLength theta1 theta2)
                   (vcat [ptext (sLit "Contexts differ in length"),
-                         nest 2 $ parens $ ptext (sLit "Use -XRelaxedPolyRec to allow this")])
+                         nest 2 $ parens $ ptext (sLit "Use RelaxedPolyRec to allow this")])
         ; zipWithM unifyPred theta1 theta2 }
 \end{code}
 
@@ -540,9 +538,10 @@ uType, uType_defer
 uType_defer origin ty1 ty2
   = do { eqv <- newEq ty1 ty2
        ; loc <- getCtLoc origin
-       ; let ctev = CtWanted { ctev_evar = eqv
-                             , ctev_pred = mkTcEqPred ty1 ty2 }
-       ; emitFlat $ mkNonCanonical loc ctev 
+       ; emitFlat $ mkNonCanonical $
+             CtWanted { ctev_evar = eqv
+                      , ctev_pred = mkTcEqPred ty1 ty2
+                      , ctev_loc = loc }
 
        -- Error trace only
        -- NB. do *not* call mkErrInfo unless tracing is on, because
@@ -604,7 +603,7 @@ uType origin orig_ty1 orig_ty2
     go (FunTy fun1 arg1) (FunTy fun2 arg2)
       = do { co_l <- uType origin fun1 fun2
            ; co_r <- uType origin arg1 arg2
-           ; return $ mkTcFunCo co_l co_r }
+           ; return $ mkTcFunCo Nominal co_l co_r }
 
         -- Always defer if a type synonym family (type function)
       	-- is involved.  (Data families behave rigidly.)
@@ -617,11 +616,11 @@ uType origin orig_ty1 orig_ty2
       -- See Note [Mismatched type lists and application decomposition]
       | tc1 == tc2, length tys1 == length tys2
       = do { cos <- zipWithM (uType origin) tys1 tys2
-           ; return $ mkTcTyConAppCo tc1 cos }
+           ; return $ mkTcTyConAppCo Nominal tc1 cos }
 
     go (LitTy m) ty@(LitTy n)
       | m == n
-      = return $ mkTcReflCo ty
+      = return $ mkTcNomReflCo ty
 
 	-- See Note [Care with type applications]
         -- Do not decompose FunTy against App; 
@@ -769,7 +768,7 @@ uUnfilledVar :: CtOrigin
 
 uUnfilledVar origin swapped tv1 details1 (TyVarTy tv2)
   | tv1 == tv2  -- Same type variable => no-op
-  = return (mkTcReflCo (mkTyVarTy tv1))
+  = return (mkTcNomReflCo (mkTyVarTy tv1))
 
   | otherwise  -- Distinct type variables
   = do  { lookup2 <- lookupTcTyVar tv2
@@ -1044,7 +1043,7 @@ lookupTcTyVar tyvar
 updateMeta :: TcTyVar -> TcRef MetaDetails -> TcType -> TcM TcCoercion
 updateMeta tv1 ref1 ty2
   = do { writeMetaTyVarRef tv1 ref1 ty2
-       ; return (mkTcReflCo ty2) }
+       ; return (mkTcNomReflCo ty2) }
 \end{code}
 
 Note [Unifying untouchables]
@@ -1163,7 +1162,7 @@ unifyKindEq (FunTy a1 r1) (FunTy a2 r2)
   
 unifyKindEq (TyConApp kc1 k1s) (TyConApp kc2 k2s)
   | kc1 == kc2
-  = ASSERT (length k1s == length k2s)
+  = ASSERT(length k1s == length k2s)
        -- Should succeed since the kind constructors are the same, 
        -- and the kinds are sort-checked, thus fully applied
     do { mb_eqs <- zipWithM unifyKindEq k1s k2s
@@ -1197,19 +1196,4 @@ uUnboundKVar kv1 non_var_k2
        ; case occurCheckExpand dflags kv1 k2b of
            OC_OK k2c -> do { writeMetaTyVar kv1 k2c; return (Just EQ) }
            _         -> return Nothing }
-
-mkKindErrorCtxt :: Type -> Type -> Kind -> Kind -> TidyEnv -> TcM (TidyEnv, SDoc)
-mkKindErrorCtxt ty1 ty2 k1 k2 env0
-  = let (env1, ty1') = tidyOpenType env0 ty1
-        (env2, ty2') = tidyOpenType env1 ty2
-        (env3, k1' ) = tidyOpenKind env2 k1
-        (env4, k2' ) = tidyOpenKind env3 k2
-    in do ty1 <- zonkTcType ty1'
-          ty2 <- zonkTcType ty2'
-          k1  <- zonkTcKind k1'
-          k2  <- zonkTcKind k2'
-          return (env4, 
-                  vcat [ ptext (sLit "Kind incompatibility when matching types xx:")
-                       , nest 2 (vcat [ ppr ty1 <+> dcolon <+> ppr k1
-                                      , ppr ty2 <+> dcolon <+> ppr k2 ]) ])
 \end{code}

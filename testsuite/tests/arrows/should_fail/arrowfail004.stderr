@@ -1,0 +1,7 @@
+
+arrowfail004.hs:12:15:
+    Proc patterns cannot use existential or GADT data constructors
+    In the pattern: T x
+    In the expression: proc (T x) -> do { returnA -< T x }
+    In an equation for ‘panic’:
+        panic = proc (T x) -> do { returnA -< T x }

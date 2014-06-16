@@ -1,0 +1,5 @@
+:l ../QSort
+:st qsort [1::Integer,2]
+:step
+seq left ()
+:print left

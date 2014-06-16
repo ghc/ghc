@@ -1,0 +1,12 @@
+Breakpoint 0 activated at ../Test.hs:40:1-17
+Stopped at ../Test.hs:40:1-17
+_result :: () = _
+Stopped at ../Test.hs:40:10-17
+_result :: () = _
+x :: a17 = _
+x = (_t1::a17)
+x :: a17
+()
+x = Unary
+x :: Unary
+Unary

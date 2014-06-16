@@ -1,0 +1,5 @@
+CaseE (UnboxedTupE [LitE (CharL 'b'),ConE GHC.Types.False]) [Match (UnboxedTupP [LitP (CharL 'a'),ConP GHC.Types.True []]) (NormalB (UnboxedTupE [LitE (StringL "One"),LitE (IntegerL 1)])) [],Match (UnboxedTupP [LitP (CharL 'b'),ConP GHC.Types.False []]) (NormalB (UnboxedTupE [LitE (StringL "Two"),LitE (IntegerL 2)])) [],Match (UnboxedTupP [WildP,WildP]) (NormalB (UnboxedTupE [LitE (StringL "Three"),LitE (IntegerL 3)])) []]
+case (# 'b', GHC.Types.False #) of
+    (# 'a', GHC.Types.True #) -> (# "One", 1 #)
+    (# 'b', GHC.Types.False #) -> (# "Two", 2 #)
+    (# _, _ #) -> (# "Three", 3 #)

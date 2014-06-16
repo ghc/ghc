@@ -58,7 +58,7 @@ sub sanity_check_tree {
         if (/^#/) {
             # Comment; do nothing
         }
-        elsif (/^([a-zA-Z0-9\/.-]+) +([^ ]+) +[^ ]+$/) {
+        elsif (/^([a-zA-Z0-9\/.-]+) +([^ ]+) +[^ ]+ +[^ ]+$/) {
             $dir = $1;
             $tag = $2;
 
@@ -178,7 +178,7 @@ not be what you want if you are developing GHC or the libraries, rather
 than simply building it to use it.
 
 For information on creating a mk/build.mk file, please see:
-    http://hackage.haskell.org/trac/ghc/wiki/Building/Using#Buildconfiguration
+    http://ghc.haskell.org/trac/ghc/wiki/Building/Using#Buildconfiguration
 
 EOF
     }

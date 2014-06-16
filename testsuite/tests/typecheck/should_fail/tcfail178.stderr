@@ -1,0 +1,14 @@
+
+tcfail178.hs:15:7:
+    Couldn't match type ‘()’ with ‘[a]’
+    Expected type: Bool -> [a]
+      Actual type: Bool -> ()
+    Relevant bindings include c :: [a] (bound at tcfail178.hs:15:1)
+    In the first argument of ‘a’, namely ‘y’
+    In the expression: a y
+
+tcfail178.hs:18:7:
+    Couldn't match expected type ‘Bool -> [a]’ with actual type ‘()’
+    Relevant bindings include d :: [a] (bound at tcfail178.hs:18:1)
+    In the first argument of ‘a’, namely ‘()’
+    In the expression: a ()

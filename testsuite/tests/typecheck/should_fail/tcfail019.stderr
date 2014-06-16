@@ -1,0 +1,5 @@
+
+tcfail019.hs:18:10:
+    No instance for (B [a])
+      arising from the superclasses of an instance declaration
+    In the instance declaration for ‘D [a]’

@@ -179,6 +179,7 @@ static char *thread_stop_reasons[] = {
     [ThreadFinished] = "finished",
     [THREAD_SUSPENDED_FOREIGN_CALL] = "suspended while making a foreign call",
     [6 + BlockedOnMVar]         = "blocked on an MVar",
+    [6 + BlockedOnMVarRead]     = "blocked on an atomic MVar read",
     [6 + BlockedOnBlackHole]    = "blocked on a black hole",
     [6 + BlockedOnRead]         = "blocked on a read operation",
     [6 + BlockedOnWrite]        = "blocked on a write operation",

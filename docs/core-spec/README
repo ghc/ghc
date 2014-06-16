@@ -64,7 +64,7 @@ your notation to LaTeX. Three different homs are used:
   help disambiguate otherwise-ambiguous parses. Getting these right is hard,
   so if you have trouble, you're not alone.
 
-- In one place, it was necessary to use an @ symbol to disambiguate parses. The
+- In a few places, it is necessary to use an @ symbol to disambiguate parses. The
   @ symbol is not typeset and is used solely for disambiguation. Feel free to use
   it if necessary to disambiguate other parses.
 

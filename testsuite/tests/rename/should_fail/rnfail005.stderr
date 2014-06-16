@@ -1,0 +1,8 @@
+ 
+rnfail005.hs:4:
+    Conflicting definitions for: `v'
+	Defined at rnfail005.hs:20
+	Defined at rnfail005.hs:19
+
+
+Compilation had errors

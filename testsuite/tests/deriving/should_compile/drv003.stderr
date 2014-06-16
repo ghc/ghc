@@ -1,0 +1,10 @@
+
+drv003.hs:12:10: Warning:
+    No explicit implementation for
+      either ‘==’ or ‘/=’
+    In the instance declaration for ‘Eq (Foo a)’
+
+drv003.hs:15:10: Warning:
+    No explicit implementation for
+      either ‘==’ or ‘/=’
+    In the instance declaration for ‘Eq (Bar b)’

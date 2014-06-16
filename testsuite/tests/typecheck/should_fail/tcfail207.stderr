@@ -1,0 +1,14 @@
+
+tcfail207.hs:5:7:
+    Couldn't match expected type ‘[Int] -> [Int]’
+                with actual type ‘[a1]’
+    Possible cause: ‘take’ is applied to too many arguments
+    In the expression: take x []
+    In an equation for ‘f’: f x = take x []
+
+tcfail207.hs:9:5:
+    Couldn't match expected type ‘[Int]’
+                with actual type ‘[a0] -> [a0]’
+    Probable cause: ‘take’ is applied to too few arguments
+    In the expression: take 3
+    In an equation for ‘g’: g = take 3

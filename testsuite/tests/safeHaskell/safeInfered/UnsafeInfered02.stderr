@@ -1,0 +1,6 @@
+[1 of 2] Compiling UnsafeInfered02_A ( UnsafeInfered02_A.hs, UnsafeInfered02_A.o )
+[2 of 2] Compiling UnsafeInfered02  ( UnsafeInfered02.hs, UnsafeInfered02.o )
+
+UnsafeInfered02.hs:4:1:
+    UnsafeInfered02_A: Can't be safely imported!
+    The module itself isn't safe.

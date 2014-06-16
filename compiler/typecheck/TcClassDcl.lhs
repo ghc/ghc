@@ -10,11 +10,12 @@ Typechecking class declarations
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+--     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
 		    findMethodBind, instantiateMethod, tcInstanceMethodBody,
+		    tcClassMinimalDef,
                     HsSigFun, mkHsSigFun, lookupHsSig, emptyHsSigs,
 		    tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr
 		  ) where
@@ -45,6 +46,7 @@ import Maybes
 import BasicTypes
 import Bag
 import FastString
+import BooleanFormula
 import Util
 
 import Control.Monad
@@ -119,7 +121,7 @@ tcClassSigs clas sigs def_methods
     vanilla_sigs = [L loc (nm,ty) | L loc (TypeSig    nm ty) <- sigs]
     gen_sigs     = [L loc (nm,ty) | L loc (GenericSig nm ty) <- sigs]
     dm_bind_names :: [Name]	-- These ones have a value binding in the class decl
-    dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
+    dm_bind_names = [op | (_, L _ (FunBind {fun_id = L _ op})) <- bagToList def_methods]
 
     tc_sig genop_env (op_names, op_hs_ty)
       = do { traceTc "ClsSig 1" (ppr op_names)
@@ -200,7 +202,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn (sel_id, dm_info)
     sel_name           = idName sel_id
     prags              = prag_fn sel_name
     (dm_bind,bndr_loc) = findMethodBind sel_name binds_in
-	                 `orElse` pprPanic "tcDefMeth" (ppr sel_id)
+                         `orElse` pprPanic "tcDefMeth" (ppr sel_id)
 
     -- Eg.   class C a where
     --          op :: forall b. Eq b => a -> [b] -> a
@@ -236,18 +238,18 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn (sel_id, dm_info)
 ---------------
 tcInstanceMethodBody :: SkolemInfo -> [TcTyVar] -> [EvVar]
                      -> Id -> TcSigInfo
-          	     -> TcSpecPrags -> LHsBind Name 
-          	     -> TcM (LHsBind Id)
+          	     -> TcSpecPrags -> (Origin, LHsBind Name)
+          	     -> TcM (Origin, LHsBind Id)
 tcInstanceMethodBody skol_info tyvars dfun_ev_vars
                      meth_id local_meth_sig
-		     specs (L loc bind)
+		     specs (origin, (L loc bind))
   = do	{ let local_meth_id = sig_id local_meth_sig
               lm_bind = L loc (bind { fun_id = L loc (idName local_meth_id) })
                              -- Substitute the local_meth_name for the binder
 			     -- NB: the binding is always a FunBind
 	; (ev_binds, (tc_bind, _, _)) 
                <- checkConstraints skol_info tyvars dfun_ev_vars $
-	          tcPolyCheck NotTopLevel NonRecursive no_prag_fn local_meth_sig [lm_bind]
+	          tcPolyCheck NonRecursive no_prag_fn local_meth_sig (origin, lm_bind)
 
         ; let export = ABE { abe_wrap = idHsWrapper, abe_poly = meth_id
                            , abe_mono = local_meth_id, abe_prags = specs }
@@ -256,10 +258,31 @@ tcInstanceMethodBody skol_info tyvars dfun_ev_vars
                                    , abs_ev_binds = ev_binds
                                    , abs_binds = tc_bind }
 
-        ; return (L loc full_bind) } 
+        ; return (origin, L loc full_bind) } 
   where
     no_prag_fn  _ = []		-- No pragmas for local_meth_id; 
     		    		-- they are all for meth_id
+
+---------------
+tcClassMinimalDef :: Name -> [LSig Name] -> [TcMethInfo] -> TcM ClassMinimalDef
+tcClassMinimalDef _clas sigs op_info
+  = case findMinimalDef sigs of
+      Nothing -> return defMindef
+      Just mindef -> do
+        -- Warn if the given mindef does not imply the default one
+        -- That is, the given mindef should at least ensure that the
+        -- class ops without default methods are required, since we
+        -- have no way to fill them in otherwise
+        whenIsJust (isUnsatisfied (mindef `impliesAtom`) defMindef) $
+                   (\bf -> addWarnTc (warningMinimalDefIncomplete bf))
+        return mindef
+  where
+    -- By default require all methods without a default 
+    -- implementation whose names don't start with '_'
+    defMindef :: ClassMinimalDef
+    defMindef = mkAnd [ mkVar name
+                      | (name, NoDM, _) <- op_info
+                      , not (startsWithUnderscore (getOccName name)) ]
 \end{code}
 
 \begin{code}
@@ -303,16 +326,24 @@ lookupHsSig = lookupNameEnv
 ---------------------------
 findMethodBind	:: Name  	        -- Selector name
           	-> LHsBinds Name 	-- A group of bindings
-		-> Maybe (LHsBind Name, SrcSpan)
+		-> Maybe ((Origin, LHsBind Name), SrcSpan)
           	-- Returns the binding, and the binding 
                 -- site of the method binder
 findMethodBind sel_name binds
   = foldlBag mplus Nothing (mapBag f binds)
   where 
-    f bind@(L _ (FunBind { fun_id = L bndr_loc op_name }))
+    f bind@(_, L _ (FunBind { fun_id = L bndr_loc op_name }))
              | op_name == sel_name
     	     = Just (bind, bndr_loc)
     f _other = Nothing
+
+---------------------------
+findMinimalDef :: [LSig Name] -> Maybe ClassMinimalDef
+findMinimalDef = firstJusts . map toMinimalDef
+  where
+    toMinimalDef :: LSig Name -> Maybe ClassMinimalDef
+    toMinimalDef (L _ (MinimalSig bf)) = Just (fmap unLoc bf)
+    toMinimalDef _                     = Nothing
 \end{code}
 
 Note [Polymorphic methods]
@@ -391,4 +422,10 @@ badDmPrag sel_id prag
   = addErrTc (ptext (sLit "The") <+> hsSigDoc prag <+> ptext (sLit "for default method") 
               <+> quotes (ppr sel_id) 
               <+> ptext (sLit "lacks an accompanying binding"))
+
+warningMinimalDefIncomplete :: ClassMinimalDef -> SDoc
+warningMinimalDefIncomplete mindef
+  = vcat [ ptext (sLit "The MINIMAL pragma does not require:")
+         , nest 2 (pprBooleanFormulaNice mindef)
+         , ptext (sLit "but there is no default implementation.") ]
 \end{code}

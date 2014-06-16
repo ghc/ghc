@@ -1,4 +1,5 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 -----------------------------------------------------------------------------
 --
@@ -33,8 +34,7 @@ import Config
 import Constants
 import HscTypes
 import Packages         ( dumpPackages )
-import DriverPhases     ( Phase(..), isSourceFilename, anyHsc,
-                          startPhase, isHaskellSrcFilename )
+import DriverPhases
 import BasicTypes       ( failed )
 import StaticFlags
 import DynFlags
@@ -77,8 +77,9 @@ import Data.Maybe
 
 main :: IO ()
 main = do
-   hSetBuffering stdout NoBuffering
-   hSetBuffering stderr NoBuffering
+   initGCStatistics -- See Note [-Bsymbolic and hooks]
+   hSetBuffering stdout LineBuffering
+   hSetBuffering stderr LineBuffering
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
@@ -109,6 +110,7 @@ main = do
                    ShowSupportedExtensions -> showSupportedExtensions
                    ShowVersion             -> showVersion
                    ShowNumVersion          -> putStrLn cProjectVersion
+                   ShowOptions             -> showOptions
         Right postStartupMode ->
             -- start our GHC session
             GHC.runGhc mbMinusB $ do
@@ -159,8 +161,6 @@ main' postLoadMode dflags0 args flagWarnings = do
       dflags2 = dflags1{ ghcMode   = mode,
                          hscTarget = lang,
                          ghcLink   = link,
-                         -- leave out hscOutName for now
-                         hscOutName = panic "Main.main:hscOutName not set",
                          verbosity = case postLoadMode of
                                          DoEval _ -> 0
                                          _other   -> 1
@@ -200,7 +200,8 @@ main' postLoadMode dflags0 args flagWarnings = do
     normal_fileish_paths = map (normalise . unLoc) fileish_args
     (srcs, objs)         = partition_args normal_fileish_paths [] []
 
-    dflags5 = dflags4 { ldInputs = objs ++ ldInputs dflags4 }
+    dflags5 = dflags4 { ldInputs = map (FileOption "") objs
+                                   ++ ldInputs dflags4 }
 
   -- we've finished manipulating the DynFlags, update the session
   _ <- GHC.setSessionDynFlags dflags5
@@ -372,11 +373,13 @@ data PreStartupMode
   = ShowVersion             -- ghc -V/--version
   | ShowNumVersion          -- ghc --numeric-version
   | ShowSupportedExtensions -- ghc --supported-extensions
+  | ShowOptions             -- ghc --show-options
 
-showVersionMode, showNumVersionMode, showSupportedExtensionsMode :: Mode
+showVersionMode, showNumVersionMode, showSupportedExtensionsMode, showOptionsMode :: Mode
 showVersionMode             = mkPreStartupMode ShowVersion
 showNumVersionMode          = mkPreStartupMode ShowNumVersion
 showSupportedExtensionsMode = mkPreStartupMode ShowSupportedExtensions
+showOptionsMode             = mkPreStartupMode ShowOptions
 
 mkPreStartupMode :: PreStartupMode -> Mode
 mkPreStartupMode = Left
@@ -520,6 +523,7 @@ mode_flags =
   , Flag "-version"              (PassFlag (setMode showVersionMode))
   , Flag "-numeric-version"      (PassFlag (setMode showNumVersionMode))
   , Flag "-info"                 (PassFlag (setMode showInfoMode))
+  , Flag "-show-options"         (PassFlag (setMode showOptionsMode))
   , Flag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
   , Flag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
   ] ++
@@ -623,7 +627,7 @@ doMake srcs  = do
     let (hs_srcs, non_hs_srcs) = partition haskellish srcs
 
         haskellish (f,Nothing) =
-          looksLikeModuleName f || isHaskellSrcFilename f || '.' `notElem` f
+          looksLikeModuleName f || isHaskellUserSrcFilename f || '.' `notElem` f
         haskellish (_,Just phase) =
           phase `notElem` [As, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm, StopLn]
 
@@ -640,7 +644,8 @@ doMake srcs  = do
     o_files <- mapM (\x -> liftIO $ compileFile hsc_env StopLn x)
                  non_hs_srcs
     dflags <- GHC.getSessionDynFlags
-    let dflags' = dflags { ldInputs = o_files ++ ldInputs dflags }
+    let dflags' = dflags { ldInputs = map (FileOption "") o_files
+                                      ++ ldInputs dflags }
     _ <- GHC.setSessionDynFlags dflags'
 
     targets <- mapM (uncurry GHC.guessTarget) hs_srcs
@@ -692,6 +697,21 @@ showSupportedExtensions = mapM_ putStrLn supportedLanguagesAndExtensions
 
 showVersion :: IO ()
 showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
+
+showOptions :: IO ()
+showOptions = putStr (unlines availableOptions)
+    where
+      availableOptions     = map ((:) '-') $
+                             getFlagNames mode_flags   ++
+                             getFlagNames flagsDynamic ++
+                             (filterUnwantedStatic . getFlagNames $ flagsStatic) ++
+                             flagsStaticNames
+      getFlagNames opts         = map getFlagName opts
+      getFlagName (Flag name _) = name
+      -- this is a hack to get rid of two unwanted entries that get listed
+      -- as static flags. Hopefully this hack will disappear one day together
+      -- with static flags
+      filterUnwantedStatic      = filter (\x -> not (x `elem` ["f", "fno-"]))
 
 showGhcUsage :: DynFlags -> IO ()
 showGhcUsage = showUsage False
@@ -800,3 +820,26 @@ unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
         (case fuzzyMatch f (nub allFlags) of
             [] -> ""
             suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs)) 
+
+{- Note [-Bsymbolic and hooks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-Bsymbolic is a flag that prevents the binding of references to global
+symbols to symbols outside the shared library being compiled (see `man
+ld`). When dynamically linking, we don't use -Bsymbolic on the RTS
+package: that is because we want hooks to be overridden by the user,
+we don't want to constrain them to the RTS package.
+
+Unfortunately this seems to have broken somehow on OS X: as a result,
+defaultHooks (in hschooks.c) is not called, which does not initialize
+the GC stats. As a result, this breaks things like `:set +s` in GHCi
+(#8754). As a hacky workaround, we instead call 'defaultHooks'
+directly to initalize the flags in the RTS.
+
+A byproduct of this, I believe, is that hooks are likely broken on OS
+X when dynamically linking. But this probably doesn't affect most
+people since we're linking GHC dynamically, but most things themselves
+link statically.
+-}
+
+foreign import ccall safe "initGCStatistics"
+  initGCStatistics :: IO ()

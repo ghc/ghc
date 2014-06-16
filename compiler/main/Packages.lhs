@@ -867,16 +867,19 @@ getPackageLibraryPath dflags pkgs =
 collectLibraryPaths :: [PackageConfig] -> [FilePath]
 collectLibraryPaths ps = nub (filter notNull (concatMap libraryDirs ps))
 
--- | Find all the link options in these and the preload packages
-getPackageLinkOpts :: DynFlags -> [PackageId] -> IO [String]
+-- | Find all the link options in these and the preload packages,
+-- returning (package hs lib options, extra library options, other flags)
+getPackageLinkOpts :: DynFlags -> [PackageId] -> IO ([String], [String], [String])
 getPackageLinkOpts dflags pkgs =
   collectLinkOpts dflags `fmap` getPreloadPackagesAnd dflags pkgs
 
-collectLinkOpts :: DynFlags -> [PackageConfig] -> [String]
-collectLinkOpts dflags ps = concat (map all_opts ps)
-  where
-        libs p     = packageHsLibs dflags p ++ extraLibraries p
-        all_opts p = map ("-l" ++) (libs p) ++ ldOptions p
+collectLinkOpts :: DynFlags -> [PackageConfig] -> ([String], [String], [String])
+collectLinkOpts dflags ps =
+    (
+        concatMap (map ("-l" ++) . packageHsLibs dflags) ps,
+        concatMap (map ("-l" ++) . extraLibraries) ps,
+        concatMap ldOptions ps
+    )
 
 packageHsLibs :: DynFlags -> PackageConfig -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
@@ -956,8 +959,9 @@ lookupModuleWithSuggestions dflags m
   where
     pkg_state = pkgState dflags
     suggestions
-      | gopt Opt_HelpfulErrors dflags = fuzzyLookup (moduleNameString m) all_mods
-      | otherwise                     = []
+      | gopt Opt_HelpfulErrors dflags =
+           fuzzyLookup (moduleNameString m) all_mods
+      | otherwise = []
 
     all_mods :: [(String, Module)]     -- All modules
     all_mods = [ (moduleNameString mod_nm, mkModule pkg_id mod_nm)
@@ -1039,13 +1043,36 @@ missingDependencyMsg (Just parent)
 -- -----------------------------------------------------------------------------
 
 -- | Will the 'Name' come from a dynamically linked library?
-isDllName :: DynFlags -> PackageId -> Name -> Bool
+isDllName :: DynFlags -> PackageId -> Module -> Name -> Bool
 -- Despite the "dll", I think this function just means that
 -- the synbol comes from another dynamically-linked package,
 -- and applies on all platforms, not just Windows
-isDllName dflags this_pkg name
+isDllName dflags _this_pkg this_mod name
   | gopt Opt_Static dflags = False
-  | Just mod <- nameModule_maybe name = modulePackageId mod /= this_pkg
+  | Just mod <- nameModule_maybe name
+    -- Issue #8696 - when GHC is dynamically linked, it will attempt
+    -- to load the dynamic dependencies of object files at compile
+    -- time for things like QuasiQuotes or
+    -- TemplateHaskell. Unfortunately, this interacts badly with
+    -- intra-package linking, because we don't generate indirect
+    -- (dynamic) symbols for intra-package calls. This means that if a
+    -- module with an intra-package call is loaded without its
+    -- dependencies, then GHC fails to link. This is the cause of #
+    --
+    -- In the mean time, always force dynamic indirections to be
+    -- generated: when the module name isn't the module being
+    -- compiled, references are dynamic.
+    = if mod /= this_mod
+      then True
+      else case dllSplit dflags of
+           Nothing -> False
+           Just ss ->
+               let findMod m = let modStr = moduleNameString (moduleName m)
+                               in case find (modStr `Set.member`) ss of
+                                  Just i -> i
+                                  Nothing -> panic ("Can't find " ++ modStr ++ "in DLL split")
+               in findMod mod /= findMod this_mod
+       
   | otherwise = False  -- no, it is not even an external name
 
 -- -----------------------------------------------------------------------------

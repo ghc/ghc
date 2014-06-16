@@ -84,7 +84,7 @@ static void real_main(void)
     default:
       barf("main thread completed with invalid status");
     }
-    shutdownHaskellAndExit(exit_status);
+    shutdownHaskellAndExit(exit_status, 0 /* !fastExit */);
 }
 
 /* The rts entry point from a compiled program using a Haskell main

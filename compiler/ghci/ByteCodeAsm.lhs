@@ -35,12 +35,17 @@ import Outputable
 import Platform
 import Util
 
+import Control.Applicative (Applicative(..))
 import Control.Monad
 import Control.Monad.ST ( runST )
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State.Strict
 
 import Data.Array.MArray
-import Data.Array.Unboxed ( listArray )
+
+import qualified Data.Array.Unboxed as Array
 import Data.Array.Base  ( UArray(..) )
+
 import Data.Array.Unsafe( castSTUArray )
 
 import Foreign
@@ -151,18 +156,18 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
 
   -- pass 2: run assembler and generate instructions, literals and pointers
   let initial_state = (emptySS, emptySS, emptySS)
-  (final_insns, final_lits, final_ptrs) <- execState initial_state $ runAsm dflags long_jumps env asm
+  (final_insns, final_lits, final_ptrs) <- flip execStateT initial_state $ runAsm dflags long_jumps env asm
 
   -- precomputed size should be equal to final size
-  ASSERT (n_insns == sizeSS final_insns) return ()
+  ASSERT(n_insns == sizeSS final_insns) return ()
 
   let asm_insns = ssElts final_insns
       barr a = case a of UArray _lo _hi _n b -> b
 
-      insns_arr = listArray (0, n_insns - 1) asm_insns
+      insns_arr = Array.listArray (0, n_insns - 1) asm_insns
       !insns_barr = barr insns_arr
 
-      bitmap_arr = mkBitmapArray dflags bsize bitmap
+      bitmap_arr = mkBitmapArray bsize bitmap
       !bitmap_barr = barr bitmap_arr
 
       ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits final_ptrs
@@ -174,9 +179,13 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
 
   return ul_bco
 
-mkBitmapArray :: DynFlags -> Word16 -> [StgWord] -> UArray Int StgWord
-mkBitmapArray dflags bsize bitmap
-  = listArray (0, length bitmap) (toStgWord dflags (toInteger bsize) : bitmap)
+mkBitmapArray :: Word16 -> [StgWord] -> UArray Int Word
+-- Here the return type must be an array of Words, not StgWords,
+-- because the underlying ByteArray# will end up as a component
+-- of a BCO object.
+mkBitmapArray bsize bitmap
+  = Array.listArray (0, length bitmap) $
+      fromIntegral bsize : map (fromInteger . fromStgWord) bitmap
 
 -- instrs nonptrs ptrs
 type AsmState = (SizedSeq Word16,
@@ -213,6 +222,13 @@ data Assembler a
   | Emit Word16 [Operand] (Assembler a)
   | NullAsm a
 
+instance Functor Assembler where
+    fmap = liftM
+
+instance Applicative Assembler where
+    pure = return
+    (<*>) = ap
+
 instance Monad Assembler where
   return = NullAsm
   NullAsm x >>= f = f x
@@ -245,20 +261,20 @@ largeOp long_jumps op = case op of
    LabelOp _ -> long_jumps
 -- LargeOp _ -> True
 
-runAsm :: DynFlags -> Bool -> LabelEnv -> Assembler a -> State AsmState IO a
+runAsm :: DynFlags -> Bool -> LabelEnv -> Assembler a -> StateT AsmState IO a
 runAsm dflags long_jumps e = go
   where
     go (NullAsm x) = return x
     go (AllocPtr p_io k) = do
       p <- lift p_io
-      w <- State $ \(st_i0,st_l0,st_p0) -> do
+      w <- state $ \(st_i0,st_l0,st_p0) ->
         let st_p1 = addToSS st_p0 p
-        return ((st_i0,st_l0,st_p1), sizeSS st_p0)
+        in (sizeSS st_p0, (st_i0,st_l0,st_p1))
       go $ k w
     go (AllocLit lits k) = do
-      w <- State $ \(st_i0,st_l0,st_p0) -> do
+      w <- state $ \(st_i0,st_l0,st_p0) ->
         let st_l1 = addListToSS st_l0 lits
-        return ((st_i0,st_l1,st_p0), sizeSS st_l0)
+        in (sizeSS st_l0, (st_i0,st_l1,st_p0))
       go $ k w
     go (AllocLabel _ k) = go k
     go (Emit w ops k) = do
@@ -271,9 +287,9 @@ runAsm dflags long_jumps e = go
           expand (LabelOp w) = expand (Op (e w))
           expand (Op w) = if largeOps then largeArg dflags w else [fromIntegral w]
 --        expand (LargeOp w) = largeArg dflags w
-      State $ \(st_i0,st_l0,st_p0) -> do
+      state $ \(st_i0,st_l0,st_p0) ->
         let st_i1 = addListToSS st_i0 (opcode : words)
-        return ((st_i1,st_l0,st_p0), ())
+        in ((), (st_i1,st_l0,st_p0))
       go k
 
 type LabelEnvMap = Map Word16 Word
@@ -444,6 +460,8 @@ push_alts L   = bci_PUSH_ALTS_L
 push_alts F   = bci_PUSH_ALTS_F
 push_alts D   = bci_PUSH_ALTS_D
 push_alts V16 = error "push_alts: vector"
+push_alts V32 = error "push_alts: vector"
+push_alts V64 = error "push_alts: vector"
 
 return_ubx :: ArgRep -> Word16
 return_ubx V   = bci_RETURN_V
@@ -453,6 +471,8 @@ return_ubx L   = bci_RETURN_L
 return_ubx F   = bci_RETURN_F
 return_ubx D   = bci_RETURN_D
 return_ubx V16 = error "return_ubx: vector"
+return_ubx V32 = error "return_ubx: vector"
+return_ubx V64 = error "return_ubx: vector"
 
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the

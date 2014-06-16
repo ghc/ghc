@@ -1,0 +1,8 @@
+
+T2627b.hs:20:24:
+    Occurs check: cannot construct the infinite type:
+      a0 ~ Dual (Dual a0)
+    The type variable ‘a0’ is ambiguous
+    In the expression: conn undefined undefined
+    In an equation for ‘conn’:
+        conn (Rd k) (Wr a r) = conn undefined undefined

@@ -1,0 +1,4 @@
+
+T4912.hs:10:10: Warning: Orphan instance: instance Foo TheirData
+
+T4912.hs:13:10: Warning: Orphan instance: instance Bar OurData

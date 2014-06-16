@@ -1,0 +1,4 @@
+ERROR "tcfail109.hs":16 - Cannot build superclass instance
+*** Instance            : Collects Bool Stupid
+*** Context supplied    : ()
+*** Required superclass : Eq Stupid

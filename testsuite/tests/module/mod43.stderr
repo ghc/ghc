@@ -1,0 +1,7 @@
+
+mod43.hs:3:10:
+    Illegal instance declaration for ‘Eq String’
+      (All instance types must be of the form (T t1 ... tn)
+       where T is not a synonym.
+       Use TypeSynonymInstances if you want to disable this.)
+    In the instance declaration for ‘Eq String’

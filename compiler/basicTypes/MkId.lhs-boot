@@ -9,6 +9,8 @@ data DataConBoxer
 
 mkDataConWorkId :: Name -> DataCon -> Id
 mkPrimOpId      :: PrimOp -> Id
+
+magicDictId :: Id
 \end{code}
 
 

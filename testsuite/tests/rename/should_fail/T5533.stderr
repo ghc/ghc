@@ -1,0 +1,4 @@
+
+T5533.hs:4:1:
+    The type signature for ‘f2’ lacks an accompanying binding
+      (You cannot give a type signature for a record selector or class method)
