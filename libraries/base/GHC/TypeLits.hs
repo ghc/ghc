@@ -81,12 +81,12 @@ symbolVal :: forall n proxy. KnownSymbol n => proxy n -> String
 symbolVal _ = case symbolSing :: SSymbol n of
                 SSymbol x -> x
 
--- | /Since: 4.7.0.0/
+-- | /Since: 4.7.1.0/
 natVal' :: forall n. KnownNat n => Proxy# n -> Integer
 natVal' _ = case natSing :: SNat n of
              SNat x -> x
 
--- | /Since: 4.7.0.0/
+-- | /Since: 4.7.1.0/
 symbolVal' :: forall n. KnownSymbol n => Proxy# n -> String
 symbolVal' _ = case symbolSing :: SSymbol n of
                 SSymbol x -> x
