@@ -340,10 +340,6 @@ sub gitall {
         if ($command eq "get") {
             next if $remotepath eq "-"; # "git submodule init/update" will get this later
 
-            # Skip any repositories we have not included the tag for
-            if (not defined($tags{$tag})) {
-                $tags{$tag} = 0;
-            }
             if ($tags{$tag} == 0) {
                 next;
             }
@@ -366,8 +362,8 @@ sub gitall {
 
         my $git_repo_present = 1 if -e "$localpath/.git" || ($bare_flag && -d "$localpath");
         if (not $git_repo_present) {
-            if ($tag eq "") {
-                die "Required repo $localpath is missing";
+            if ($tag eq "-") {
+                die "Required repo $localpath is missing. Please first run './sync-all get'.\n";
             }
             else {
                  message "== $localpath repo not present; skipping";
