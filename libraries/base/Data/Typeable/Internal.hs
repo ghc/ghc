@@ -1,4 +1,5 @@
 {-# LANGUAGE Unsafe             #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -263,9 +264,19 @@ type Typeable7 (a :: * -> * -> * -> * -> * -> * -> * -> *) = Typeable a
 
 -- | Kind-polymorphic Typeable instance for type application
 instance (Typeable s, Typeable a) => Typeable (s a) where
-  typeRep# = \_ -> rep
-    where rep = typeRep# (proxy# :: Proxy# s)
-                   `mkAppTy` typeRep# (proxy# :: Proxy# a)
+  typeRep# = \_ -> rep                  -- Note [Memoising typeOf]
+    where !ty1 = typeRep# (proxy# :: Proxy# s)
+          !ty2 = typeRep# (proxy# :: Proxy# a)
+          !rep = ty1 `mkAppTy` ty2
+
+{- Note [Memoising typeOf]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+See #3245, #9203
+
+IMPORTANT: we don't want to recalculate the TypeRep once per call with
+the proxy argument.  This is what went wrong in #3245 and #9203. So we
+help GHC by manually keeping the 'rep' *outside* the lambda.
+-}
 
 ----------------- Showing TypeReps --------------------
 
