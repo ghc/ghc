@@ -315,8 +315,6 @@ sub gitall {
         # Use the "remote" structure for bare git repositories
         $localpath  = ($bare_flag) ?
                       $$line{"remotepath"} : $$line{"localpath"};
-        $remotepath = ($checked_out_tree) ?
-                      $$line{"localpath"}  : $$line{"remotepath"};
 
         if (!$started) {
             if ($start_repo eq $localpath) {
@@ -334,6 +332,17 @@ sub gitall {
         rename "resume.tmp", "resume";
 
         $repo_is_submodule = $$line{"remotepath"} eq "-";
+
+        if ($checked_out_tree) {
+            $remotepath = $$line{"localpath"};
+        }
+        elsif ($repo_is_submodule) {
+            $remotepath = &readgitline(".", 'config', '-f', '.gitmodules', '--get', "submodule.$localpath.url");
+            $remotepath =~ s/\.\.\///;
+        }
+        else {
+            $remotepath = $$line{"remotepath"};
+        }
 
         # We can't create directories on GitHub, so we translate
         # "packages/foo" into "package-foo".
@@ -457,30 +466,15 @@ sub gitall {
         }
         elsif ($command eq "remote") {
             my @scm_args;
-            my $rpath;
             $ignore_failure = 1;
-            if ($repo_is_submodule) {
-                $rpath = "$localpath.git"; # N.B.: $localpath lacks the .git suffix
-                if ($localpath =~ m!^(?:libraries|utils)/!) {
-                    # FIXME: This is just a simple heuristic to
-                    # infer the remotepath for Git submodules. A
-                    # proper solution would require to parse the
-                    # .gitmodules file to obtain the actual
-                    # localpath<->remotepath mapping.
-                    $rpath =~ s!^(?:libraries|utils)/!packages/!;
-                }
-                $rpath = "$repo_base/$rpath";
-            } else {
-                $rpath = $path;
-            }
             if ($subcommand eq 'add') {
-                @scm_args = ("remote", "add", $branch_name, $rpath);
+                @scm_args = ("remote", "add", $branch_name, $path);
             } elsif ($subcommand eq 'rm') {
                 @scm_args = ("remote", "rm", $branch_name);
             } elsif ($subcommand eq 'set-branches') {
                 @scm_args = ("remote", "set-branches", $branch_name);
             } elsif ($subcommand eq 'set-url') {
-                @scm_args = ("remote", "set-url", $branch_name, $rpath);
+                @scm_args = ("remote", "set-url", $branch_name, $path);
             }
             &git($localpath, @scm_args, @args);
         }
