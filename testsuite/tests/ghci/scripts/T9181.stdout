@@ -36,6 +36,8 @@ type family (GHC.TypeLits.^) (a :: GHC.TypeLits.Nat)
   GHC.TypeLits.Nat
 GHC.TypeLits.natVal ::
   GHC.TypeLits.KnownNat n => proxy n -> Integer
+GHC.TypeLits.natVal' ::
+  GHC.TypeLits.KnownNat n => GHC.Prim.Proxy# n -> Integer
 GHC.TypeLits.sameNat ::
   (GHC.TypeLits.KnownNat a, GHC.TypeLits.KnownNat b) =>
   Data.Proxy.Proxy a
@@ -48,3 +50,5 @@ GHC.TypeLits.someNatVal :: Integer -> Maybe GHC.TypeLits.SomeNat
 GHC.TypeLits.someSymbolVal :: String -> GHC.TypeLits.SomeSymbol
 GHC.TypeLits.symbolVal ::
   GHC.TypeLits.KnownSymbol n => proxy n -> String
+GHC.TypeLits.symbolVal' ::
+  GHC.TypeLits.KnownSymbol n => GHC.Prim.Proxy# n -> String
