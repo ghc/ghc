@@ -234,4 +234,4 @@ test-suite latex-test
 
 source-repository head
   type:     git
-  location: http://git.haskell.org/haddock.git
+  location: https://github.com/haskell/haddock.git

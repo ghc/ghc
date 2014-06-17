@@ -1,5 +1,5 @@
 name:                 haddock-library
-version:              2.15.0
+version:              1.0.0
 synopsis:             Library exposing some functionality of Haddock.
 
 description:          Haddock is a documentation-generation tool for Haskell
@@ -72,4 +72,5 @@ test-suite spec
 
 source-repository head
   type:     git
-  location: http://git.haskell.org/haddock.git
+  subdir:   haddock-library
+  location: https://github.com/haskell/haddock.git
