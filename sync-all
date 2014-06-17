@@ -307,6 +307,10 @@ sub gitall {
 
     for $line (@packages) {
         $tag        = $$line{"tag"};
+        if ($tags{$tag} == 0) {
+            next;
+        }
+
         # Use the "remote" structure for bare git repositories
         $localpath  = ($bare_flag) ?
                       $$line{"remotepath"} : $$line{"localpath"};
@@ -339,10 +343,6 @@ sub gitall {
 
         if ($command eq "get") {
             next if $remotepath eq "-"; # "git submodule init/update" will get this later
-
-            if ($tags{$tag} == 0) {
-                next;
-            }
 
             if (-d $localpath) {
                 warning("$localpath already present; omitting")
