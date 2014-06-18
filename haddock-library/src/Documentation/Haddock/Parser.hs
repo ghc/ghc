@@ -38,6 +38,9 @@ import           Documentation.Haddock.Types
 import           Documentation.Haddock.Utf8
 import           Prelude hiding (takeWhile)
 
+-- $setup
+-- >>> :set -XOverloadedStrings
+
 -- | Identifier string surrounded with opening and closing quotes/backticks.
 type Identifier = (Char, String, Char)
 
