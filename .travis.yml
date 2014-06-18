@@ -18,7 +18,7 @@ install:
      "head") (cd haddock-library/ && cabal install --enable-tests
               && cd .. && cabal install --only-dependencies --enable-tests) ;;
      *)
-       (cd haddock-library/ && cabal install --only-dependencies --enable-tests && cd ..) ;;
+       (cd haddock-library/ && cabal install --only-dependencies --enable-tests) ;;
 
     esac
 
@@ -26,7 +26,8 @@ script:
   # Yes, in case of HEAD we do end up building haddock-library twice
   # but we want to see the test results.
   - (cd haddock-library/ && cabal configure --enable-tests --ghc-options=-Werror
-     && cabal build && cabal test && cabal install && cd ..)
+     && cabal build && cabal test && cabal install && cabal install doctest
+     && doctest -isrc -ivendor/attoparsec-0.10.4.0 -optP-include -optPdist/build/autogen/cabal_macros.h src/Documentation/Haddock/Parser.hs)
   - case "$GHCVER" in
      "head") (cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test) ;;
      *) ;;
