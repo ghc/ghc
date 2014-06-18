@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -- |
 -- Module      :  Documentation.Haddock.Parser.Util
 -- Copyright   :  (c) Mateusz Kowalczyk 2013-2014,
@@ -9,7 +10,14 @@
 -- Portability :  portable
 --
 -- Various utility functions used by the parser.
-module Documentation.Haddock.Parser.Util where
+module Documentation.Haddock.Parser.Util (
+  unsnoc
+, strip
+, takeUntil
+, makeLabeled
+, takeHorizontalSpace
+, skipHorizontalSpace
+) where
 
 import           Control.Applicative
 import           Control.Monad (mfilter)
@@ -17,6 +25,15 @@ import           Data.Attoparsec.ByteString.Char8 hiding (parse, take, endOfLine
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import           Prelude hiding (takeWhile)
+
+#if MIN_VERSION_bytestring(0,10,2)
+import           Data.ByteString.Char8 (unsnoc)
+#else
+unsnoc :: ByteString -> Maybe (ByteString, Char)
+unsnoc bs
+  | BS.null bs = Nothing
+  | otherwise = Just (BS.init bs, BS.last bs)
+#endif
 
 -- | Remove all leading and trailing whitespace
 strip :: String -> String

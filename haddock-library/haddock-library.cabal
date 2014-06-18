@@ -63,6 +63,7 @@ test-suite spec
 
   build-depends:
       base
+    , base-compat
     , hspec
     , bytestring
     , deepseq

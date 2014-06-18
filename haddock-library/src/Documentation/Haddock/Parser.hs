@@ -437,7 +437,7 @@ autoUrl = mkLink <$> url
   where
     url = mappend <$> ("http://" <|> "https://" <|> "ftp://") <*> takeWhile1 (not . isSpace)
     mkLink :: BS.ByteString -> DocH mod a
-    mkLink s = case BS.unsnoc s of
+    mkLink s = case unsnoc s of
       Just (xs, x) | x `elem` ",.!?" -> DocHyperlink (Hyperlink (decodeUtf8 xs) Nothing) <> DocString [x]
       _ -> DocHyperlink (Hyperlink (decodeUtf8 s) Nothing)
 
