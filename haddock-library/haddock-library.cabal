@@ -53,6 +53,8 @@ test-suite spec
     , src
     , vendor/attoparsec-0.10.4.0
 
+  ghc-options: -Wall
+
   cpp-options:
       -DTEST
 
