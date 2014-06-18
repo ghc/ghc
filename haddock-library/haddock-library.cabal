@@ -1,10 +1,12 @@
 name:                 haddock-library
 version:              1.0.0
 synopsis:             Library exposing some functionality of Haddock.
-
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries. These modules expose some functionality of it
-                      without pulling in the GHC dependency.
+                      without pulling in the GHC dependency. Please note that the
+                      API is likely to change so specify upper bounds in your
+                      project if you can't release often. For interacting with Haddock
+                      itself, see the ‘haddock’ package.
 license:              BSD3
 license-file:         LICENSE
 maintainer:           Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>

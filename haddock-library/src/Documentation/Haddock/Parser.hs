@@ -13,7 +13,12 @@
 -- Maintainer  :  haddock@projects.haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
-
+--
+-- Parser used for Haddock comments. For external users of this
+-- library, the most commonly used combination of functions is going
+-- to be
+--
+-- @'toRegular' . 'parseParas'@
 module Documentation.Haddock.Parser ( parseString, parseParas
                                     , overIdentifier, toRegular, Identifier
                                     ) where
@@ -97,15 +102,16 @@ parseStringBS :: BS.ByteString -> DocH mod Identifier
 parseStringBS = parse p
   where
     p :: Parser (DocH mod Identifier)
-    p = mconcat <$> many (monospace <|> anchor <|> identifier
-                          <|> moduleName <|> picture <|> hyperlink <|> autoUrl <|> bold
-                          <|> emphasis <|> encodedChar <|> string' <|> skipSpecialChar)
+    p = mconcat <$> many (monospace <|> anchor <|> identifier <|> moduleName
+                          <|> picture <|> hyperlink <|> autoUrl <|> bold
+                          <|> emphasis <|> encodedChar <|> string'
+                          <|> skipSpecialChar)
 
 -- | Parses and processes
 -- <https://en.wikipedia.org/wiki/Numeric_character_reference Numeric character references>
 --
--- >>> parseOnly encodedChar "&#65;&#66;&#67;"
--- Right (DocString "ABC")
+-- >>> parseOnly encodedChar "&#65;"
+-- Right (DocString "A")
 encodedChar :: Parser (DocH mod a)
 encodedChar = "&#" *> c <* ";"
   where
@@ -183,7 +189,7 @@ moduleName = DocModule <$> (char '"' *> modid <* char '"')
     modid = intercalate "." <$> conid `sepBy1` "."
     conid = (:)
       <$> satisfy isAsciiUpper
-      -- NOTE: According to Haskell 2010 we shouldd actually only
+      -- NOTE: According to Haskell 2010 we should actually only
       -- accept {small | large | digit | ' } here.  But as we can't
       -- match on unicode characters, this is currently not possible.
       <*> (decodeUtf8 <$> takeWhile (`notElem` " .&[{}(=*)+]!#|@/;,^?\"\n"))
@@ -192,9 +198,9 @@ moduleName = DocModule <$> (char '"' *> modid <* char '"')
 -- a title for the picture.
 --
 -- >>> parseOnly picture "<<hello.png>>"
--- Right (DocPic (Picture "hello.png" Nothing))
+-- Right (DocPic (Picture {pictureUri = "hello.png", pictureTitle = Nothing}))
 -- >>> parseOnly picture "<<hello.png world>>"
--- Right (DocPic (Picture "hello.png" (Just "world")))
+-- Right (DocPic (Picture {pictureUri = "hello.png", pictureTitle = Just "world"}))
 picture :: Parser (DocH mod a)
 picture = DocPic . makeLabeled Picture . decodeUtf8
           <$> disallowNewline ("<<" *> takeUntil ">>")
@@ -205,6 +211,8 @@ paragraph = examples <|> skipSpace *> (list <|> birdtracks <|> codeblock
                                        <|> property <|> header
                                        <|> textParagraph)
 
+-- | Headers inside the comment denoted with @=@ signs, up to 6 levels
+-- deep.
 header :: Parser (DocH mod Identifier)
 header = do
   let psers = map (string . encodeUtf8 . concat . flip replicate "=") [6, 5 .. 1]
@@ -330,6 +338,14 @@ takeNonEmptyLine :: Parser String
 takeNonEmptyLine = do
     (++ "\n") . decodeUtf8 <$> (takeWhile1 (/= '\n') >>= nonSpace) <* "\n"
 
+-- | Blocks of text of the form:
+--
+-- @
+-- > foo
+-- > bar
+-- > baz
+-- @
+--
 birdtracks :: Parser (DocH mod a)
 birdtracks = DocCodeBlock . DocString . intercalate "\n" . stripSpace <$> many1 line
   where
@@ -427,11 +443,14 @@ codeblock =
           | isNewline && isSpace c = Just isNewline
           | otherwise = Just $ c == '\n'
 
+-- | Parses links that were specifically marked as such.
 hyperlink :: Parser (DocH mod a)
 hyperlink = DocHyperlink . makeLabeled Hyperlink . decodeUtf8
               <$> disallowNewline ("<" *> takeUntil ">")
             <|> autoUrl
 
+-- | Looks for URL-like things to automatically hyperlink even if they
+-- weren't marked as links.
 autoUrl :: Parser (DocH mod a)
 autoUrl = mkLink <$> url
   where
