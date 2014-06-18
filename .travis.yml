@@ -1,7 +1,33 @@
 language: haskell
 
+env:
+ - GHCVER=7.6.3
+ - GHCVER=7.8.1
+ - GHCVER=7.8.2
+ - GHCVER=7.8.3
+ - GHCVER=head
+
+before_install:
+ - sudo add-apt-repository -y ppa:hvr/ghc
+ - sudo apt-get update
+ - sudo apt-get install cabal-install-1.20 ghc-$GHCVER
+ - export PATH=/opt/ghc/$GHCVER/bin:$PATH
+
 install:
-  - (cd haddock-library/ && cabal install --only-dependencies --enable-tests)
+  - case "$GHCVER" in
+     "head") (cd haddock-library/ && cabal install --enable-tests
+              && cd .. && cabal install --only-dependencies --enable-tests) ;;
+     *)
+       (cd haddock-library/ && cabal install --only-dependencies --enable-tests && cd ..) ;;
+
+    esac
 
 script:
-  - (cd haddock-library/ && cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test)
+  # Yes, in case of HEAD we do end up building haddock-library twice
+  # but we want to see the test results.
+  - (cd haddock-library/ && cabal configure --enable-tests --ghc-options=-Werror
+     && cabal build && cabal test && cabal install && cd ..)
+  - case "$GHCVER" in
+     "head") (cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test) ;;
+     *) ;;
+    esac
