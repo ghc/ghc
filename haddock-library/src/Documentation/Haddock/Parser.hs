@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE IncoherentInstances #-}
-{-# LANGUAGE LambdaCase #-}
 -- |
 -- Module      :  Documentation.Haddock.Parser
 -- Copyright   :  (c) Mateusz Kowalczyk 2013-2014,
@@ -431,8 +430,9 @@ codeblock =
     -- and we lose information about whether the last line belongs to @ or to
     -- text which we need to decide whether we actually want to be dropping
     -- anything at all.
-    splitByNl = unfoldr (\case '\n':s -> Just (span (/= '\n') s)
-                               _      -> Nothing)
+    splitByNl = unfoldr (\x -> case x of
+                                 '\n':s -> Just (span (/= '\n') s)
+                                 _      -> Nothing)
                 . ('\n' :)
 
     dropSpace "" = Just ""
