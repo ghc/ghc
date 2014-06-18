@@ -68,8 +68,6 @@ test-suite spec
     , bytestring
     , deepseq
     , QuickCheck == 2.*
-    , haddock-library
-
 
 source-repository head
   type:     git
