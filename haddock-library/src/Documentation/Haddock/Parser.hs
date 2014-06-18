@@ -342,11 +342,9 @@ takeNonEmptyLine = do
 
 -- | Blocks of text of the form:
 --
--- @
--- > foo
--- > bar
--- > baz
--- @
+-- >> foo
+-- >> bar
+-- >> baz
 --
 birdtracks :: Parser (DocH mod a)
 birdtracks = DocCodeBlock . DocString . intercalate "\n" . stripSpace <$> many1 line
@@ -409,7 +407,7 @@ property :: Parser (DocH mod a)
 property = DocProperty . strip . decodeUtf8 <$> ("prop>" *> takeWhile1 (/= '\n'))
 
 -- |
--- Paragraph level codeblock. Anything between the two delimiting @ is parsed
+-- Paragraph level codeblock. Anything between the two delimiting \@ is parsed
 -- for markup.
 codeblock :: Parser (DocH mod Identifier)
 codeblock =
