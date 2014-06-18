@@ -1,5 +1,5 @@
 name:                 haddock-library
-version:              1.0.0
+version:              1.0.1
 synopsis:             Library exposing some functionality of Haddock.
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries. These modules expose some functionality of it
