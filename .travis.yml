@@ -1,0 +1,7 @@
+language: haskell
+
+install:
+  - (cd haddock-library/ && cabal install --only-dependencies --enable-tests)
+
+script:
+  - (cd haddock-library/ && cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test)
