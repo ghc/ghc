@@ -1481,7 +1481,9 @@ doTopReactDict inerts fl cls xis
        = do { instEnvs <- getInstEnvs
             ; let fd_eqns = improveFromInstEnv instEnvs pred
             ; fd_work <- rewriteWithFunDeps fd_eqns loc
-            ; unless (null fd_work) (updWorkListTcS (extendWorkListEqs fd_work))
+            ; unless (null fd_work) $
+              do { traceTcS "Addig FD work" (ppr pred $$ vcat (map pprEquation fd_eqns) $$ ppr fd_work)
+                 ; updWorkListTcS (extendWorkListEqs fd_work) }
             ; return NoTopInt }
 
 --------------------
