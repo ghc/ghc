@@ -433,7 +433,23 @@ deriving instance Typeable Typeable
 --------------------------------------------------------------------------------
 -- Instances for type literals
 
+{- Note [Potential Collisions in `Nat` and `Symbol` instances]
+
+Kinds resulting from lifted types have finately many type-constructors.
+This is not the case for `Nat` and `Symbol`, which both contain *infinately*
+many type constructors (e.g., `Nat` has 0, 1, 2, 3, etc.).  One might think
+that this would increase the chance of hash-collisions in the type but this
+is not the case because the finger-print stored in a `TypeRep` identifies
+the whole *type* and not just the type constructor.  This is why the chance
+of collisions for `Nat` and `Symbol` is not any worse than it is for other
+lifted types with infinately many inhabitants.  Indeed, `Nat` is
+isomorphic to (lifted) `[()]`  and `Symbol` is isomprohic to `[Char]`.
+-}
+
+-- See `Note [Kinds Containing Only Literals]` in `types/Unify.hs` for
+-- an explanation of how we avoid overlap with `Typeable (f a)`.
 instance KnownNat n => Typeable (n :: Nat) where
+  -- See #9203 for an explanation of why this is written as `\_ -> rep`.
   typeRep# = \_ -> rep
     where
     rep = mkTyConApp tc []
@@ -449,7 +465,10 @@ instance KnownNat n => Typeable (n :: Nat) where
     mk a b c = a ++ " " ++ b ++ " " ++ c
 
 
+-- See `Note [Kinds Containing Only Literals]` in `types/Unify.hs` for
+-- an explanation of how we avoid overlap with `Typeable (f a)`.
 instance KnownSymbol s => Typeable (s :: Symbol) where
+  -- See #9203 for an explanation of why this is written as `\_ -> rep`.
   typeRep# = \_ -> rep
     where
     rep = mkTyConApp tc []
