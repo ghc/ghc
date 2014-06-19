@@ -51,7 +51,7 @@ module Type (
         isDictLikeTy,
         mkEqPred, mkCoerciblePred, mkPrimEqPred, mkReprPrimEqPred,
         mkClassPred,
-        noParenPred, isClassPred, isEqPred,
+        isClassPred, isEqPred,
         isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
 
         -- Deconstructing predicate types
@@ -132,6 +132,7 @@ module Type (
         pprTvBndr, pprTvBndrs, pprForAll, pprUserForAll, pprSigmaType,
         pprTheta, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprSourceTyCon,
+        TyPrec(..), maybeParen,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -833,13 +834,6 @@ applyTysD doc orig_fun_ty arg_tys
 Predicates on PredType
 
 \begin{code}
-noParenPred :: PredType -> Bool
--- A predicate that can appear without parens before a "=>"
---       C a => a -> a
---       a~b => a -> b
--- But   (?x::Int) => Int -> Int
-noParenPred p = not (isIPPred p) && isClassPred p || isEqPred p
-
 isPredTy :: Type -> Bool
   -- NB: isPredTy is used when printing types, which can happen in debug printing
   --     during type checking of not-fully-zonked types.  So it's not cool to say

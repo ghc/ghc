@@ -66,7 +66,7 @@ module TypeRep (
 
 import {-# SOURCE #-} DataCon( dataConTyCon )
 import ConLike ( ConLike(..) )
-import {-# SOURCE #-} Type( noParenPred, isPredTy ) -- Transitively pulls in a LOT of stuff, better to break the loop
+import {-# SOURCE #-} Type( isPredTy ) -- Transitively pulls in a LOT of stuff, better to break the loop
 
 -- friends:
 import Var
@@ -491,11 +491,29 @@ defined to use this.  @pprParendType@ is the same, except it puts
 parens around the type, except for the atomic cases.  @pprParendType@
 works just by setting the initial context precedence very high.
 
+Note [Precedence in types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't keep the fixity of type operators in the operator. So the pretty printer
+operates the following precedene structre:
+   Type constructor application   binds more tightly than
+   Oerator applications           which bind more tightly than
+   Function arrow
+
+So we might see  a :+: T b -> c
+meaning          (a :+: (T b)) -> c
+
+Maybe operator applications should bind a bit less tightly?
+
+Anyway, that's the current story, and it is used consistently for Type and HsType
+
 \begin{code}
-data TyPrec = TopPrec         -- No parens
-            | FunPrec         -- Function args; no parens for tycon apps
-            | TyConPrec       -- Tycon args; no parens for atomic
-            deriving( Eq, Ord )
+data TyPrec   -- See Note [Prededence in types]
+
+  = TopPrec         -- No parens
+  | FunPrec         -- Function args; no parens for tycon apps
+  | TyOpPrec        -- Infix operator
+  | TyConPrec       -- Tycon args; no parens for atomic
+  deriving( Eq, Ord )
 
 maybeParen :: TyPrec -> TyPrec -> SDoc -> SDoc
 maybeParen ctxt_prec inner_prec pretty
@@ -524,10 +542,9 @@ pprTheta :: ThetaType -> SDoc
 pprTheta theta  = parens (sep (punctuate comma (map (ppr_type TopPrec) theta)))
 
 pprThetaArrowTy :: ThetaType -> SDoc
-pprThetaArrowTy []      = empty
-pprThetaArrowTy [pred]
-      | noParenPred pred = ppr_type TopPrec pred <+> darrow
-pprThetaArrowTy preds   = parens (fsep (punctuate comma (map (ppr_type TopPrec) preds)))
+pprThetaArrowTy []     = empty
+pprThetaArrowTy [pred] = ppr_type FunPrec pred <+> darrow
+pprThetaArrowTy preds  = parens (fsep (punctuate comma (map (ppr_type TopPrec) preds)))
                             <+> darrow
     -- Notice 'fsep' here rather that 'sep', so that
     -- type contexts don't get displayed in a giant column
@@ -563,13 +580,7 @@ instance Outputable TyLit where
 
 ppr_type :: TyPrec -> Type -> SDoc
 ppr_type _ (TyVarTy tv)	      = ppr_tvar tv
-
-ppr_type _ (TyConApp tc [LitTy (StrTyLit n),ty])
-  | tc `hasKey` ipClassNameKey
-  = char '?' <> ftext n <> ptext (sLit "::") <> ppr_type TopPrec ty
-
 ppr_type p (TyConApp tc tys)  = pprTyTcApp p tc tys
-
 ppr_type p (LitTy l)          = ppr_tylit p l
 ppr_type p ty@(ForAllTy {})   = ppr_forall_type p ty
 
@@ -696,6 +707,11 @@ pprTyTcApp :: TyPrec -> TyCon -> [Type] -> SDoc
 -- Used for types only; so that we can make a
 -- special case for type-level lists
 pprTyTcApp p tc tys
+  | tc `hasKey` ipClassNameKey
+  , [LitTy (StrTyLit n),ty] <- tys
+  = maybeParen p FunPrec $
+    char '?' <> ftext n <> ptext (sLit "::") <> ppr_type TopPrec ty
+
   | tc `hasKey` consDataConKey
   , [_kind,ty1,ty2] <- tys
   = sdocWithDynFlags $ \dflags ->
@@ -788,8 +804,8 @@ pprTyList p ty1 ty2
 ----------------
 pprInfixApp :: TyPrec -> (TyPrec -> a -> SDoc) -> SDoc -> a -> a -> SDoc
 pprInfixApp p pp pp_tc ty1 ty2
-  = maybeParen p FunPrec $
-    sep [pp FunPrec ty1, pprInfixVar True pp_tc <+> pp FunPrec ty2]
+  = maybeParen p TyOpPrec $
+    sep [pp TyOpPrec ty1, pprInfixVar True pp_tc <+> pp TyOpPrec ty2]
 
 pprPrefixApp :: TyPrec -> SDoc -> [SDoc] -> SDoc
 pprPrefixApp p pp_fun pp_tys 

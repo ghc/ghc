@@ -7,4 +7,4 @@ T7609.hs:7:16:
 
 T7609.hs:10:7:
     Expected a constraint, but ‘a `X` a’ has kind ‘*’
-    In the type signature for ‘g’: g :: a `X` a => Maybe
+    In the type signature for ‘g’: g :: (a `X` a) => Maybe
