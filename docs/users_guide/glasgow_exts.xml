@@ -2400,6 +2400,35 @@ necessary to enable them.
 </sect2>
 
 <sect2 id="package-imports">
+<title>Import and export extensions</title>
+
+<sect3>
+  <title>Hiding things the imported module doesn't export</title>
+
+<para>
+Technically in Haskell 2010 this is illegal:
+<programlisting>
+module A( f ) where
+  f = True
+
+module B where
+  import A hiding( g )  -- A does not export g
+  g = f
+</programlisting>
+The <literal>import A hiding( g )</literal> in module <literal>B</literal>
+is technically an error (<ulink url="http://www.haskell.org/onlinereport/haskell2010/haskellch5.html#x11-1020005.3.1">Haskell Report, 5.3.1</ulink>)
+because <literal>A</literal> does not export <literal>g</literal>.
+However GHC allows it, in the interests of supporting backward compatibility; for example, a newer version of
+<literal>A</literal> might export <literal>g</literal>, and you want <literal>B</literal> to work
+in either case.
+</para>
+<para>
+The warning <literal>-fwarn-dodgy-imports</literal>, which is off by default but included with <literal>-W</literal>,
+warns if you hide something that the imported module does not export.
+</para>
+</sect3>
+
+<sect3>
   <title>Package-qualified imports</title>
 
   <para>With the <option>-XPackageImports</option> flag, GHC allows
@@ -2424,9 +2453,9 @@ import "network" Network.Socket
     packages when APIs change.  It can lead to fragile dependencies in
     the common case: modules occasionally move from one package to
     another, rendering any package-qualified imports broken.</para>
-</sect2>
+</sect3>
 
-<sect2 id="safe-imports-ext">
+<sect3 id="safe-imports-ext">
   <title>Safe imports</title>
 
   <para>With the <option>-XSafe</option>, <option>-XTrustworthy</option>
@@ -2444,9 +2473,9 @@ import safe qualified Network.Socket as NS
     safely imported. For a description of when a import is
     considered safe see <xref linkend="safe-haskell"/></para>
 
-</sect2>
+</sect3>
 
-<sect2 id="explicit-namespaces">
+<sect3 id="explicit-namespaces">
 <title>Explicit namespaces in import/export</title>
 
 <para> In an import or export list, such as 
@@ -2480,6 +2509,8 @@ a data constructor in an import or export list with the keyword <literal>pattern
 to allow the import or export of a data constructor without its parent type constructor
 (see <xref linkend="patsyn-impexp"/>).
 </para>
+</sect3>
+
 </sect2>
 
 <sect2 id="syntax-stolen">
