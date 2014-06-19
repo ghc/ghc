@@ -333,3 +333,5 @@ test('T8806', normal, compile_fail, [''])
 test('T8912', normal, compile_fail, [''])
 test('T9033', normal, compile_fail, [''])
 test('T8883', normal, compile_fail, [''])
+test('T9196', normal, compile_fail, [''])
+
