@@ -52,7 +52,8 @@ is the package name, the package version, and the ABI hash (nota bene,
 the diagram disagrees with this text: it shows the version of installed
 package IDs which we'd like to move towards.)  These IDs uniquely
 identify an instance of an installed package.  A mere PackageId omits
-the ABI hash.
+the ABI hash, and is used to qualify linker exported symbols: this is
+communicated to GHC using the \verb|-package-id| flag.
 
 The database entry itself contains the information from the installed package ID,
 as well as information such as what dependencies it was linked against, where
@@ -87,7 +88,7 @@ A \emph{non-goal} is to allow users to upgrade upstream libraries
 without recompiling downstream. This is an ABI concern and we're not
 going to worry about it.
 
-\section{Aside: Recent IHG work}
+\section{Aside: Recent IHG work}\label{sec:ihg}
 
 The IHG project has allocated some funds to relax the package instance
 constraint in the package database, so that multiple instances can be
@@ -101,14 +102,31 @@ select which packages should be used.  See Duncan's email for more
 details on the proposal.
 
 For the purpose of Backpack, the only relevant part of this proposal
-is the relaxation of package databases to allow multiple 
+is the relaxation of package databases so that there is no uniqueness
+constraint on PackageIds; only InstalledPackageIds are unique.
+
+To implement this:
+
+\begin{enumerate}
+
+    \item Remove the ``removal step'' when registering a package (with a flag)
+
+    \item Check \ghcfile{compiler/main/Packages.lhs}:mkPackagesState to look out for shadowing
+      within a database. We believe it already does the right thing, since
+      we already need to handle shadowing between the local and global database.
+
+\end{enumerate}
+
+Once these changes are implemented, we can program multiple instances by
+using \verb|-hide-all-packages -package-id ...|, even if there is no
+high-level tool support.
 
 \section{Adding Backpack to GHC}
 
 Backpack additions are described in red in the architectural diagrams.
 The current structure of this section is to describe the additions bottom up.
 
-\subsection{Use InstalledPackageId instead PackageId in typechecking}
+\subsection{Physical identity = InstalledPackageId + Module name}\label{sec:ipi}
 
 In Backpack, there needs to be some mechanism for assigning
 \emph{physical module identities} to modules, which are essential for
@@ -126,107 +144,237 @@ defined by different instances of the same version of a package are
 equal: this would be especially fatal if the two packages were linked
 against different underlying libraries.  Thus, a physical module name
 should be represented as an InstalledPackageId (which uniquely
-identifies an installed package) as well as the original logical name.
+identifies an installed package) as well as the original logical name
+(bottom of Figure~\ref{fig:pkgdb}).
 
-\paragraph{Note about linker symbols} Module is currently used for
-typechecking, and then once again
+To implement Backpack, we need to change the way GHC internally represents
+module to qualify these using InstalledPackageId, not PackageId.  There
+is also some user-visible changes: when GHC compiles code, it does so
+under a \emph{current PackageId} specified by \verb|-package-name|.  A
+new flag must be added to specify what the current InstalledPackageId
+is.  But see also the caveats below.
 
-Currently, InstalledPackageId is constructed of a package, version and ABI
-hash.  The use of an ABI hash is a bit of hack, mostly to make sure these
-installed package IDs are unique.  In Figure~\ref{fig:pkgdb}, an alternate
-logical representation of InstalledPackageId is suggested using 
+\paragraph{Note about linker symbols} Currently the \verb|-package-name|
+option is used both for typechecking, and then in CLabels which are used
+to assign exported linker symbols (e.g.
+\verb|base_TextziReadziLex_zdwvalDig_info|).  However, we don't really
+want to use InstalledPkgId to generate linker names, because whenever
+the extra unique signature changes, all of the exported linker names
+would also change, ensuring that nothing is ever ABI compatible, ever.
+One approach is to only use the InstalledPackageId for type-checking,
+and then use only PackageId for linker name generation.  So, it probably
+makes sense to use the old linker behavior in the short term.
 
-----
+\paragraph{Note about opaqueness of InstalledPackageId}  Currently,
+InstalledPackageId is an opaque string which is allocated by Cabal; GHC
+never parses these identifiers to determine metadata about the package
+in question.  So, if we want to preserve old exported symbols behavior,
+we still need to provide a PackageId via \verb|package-name|, so that an
+appropriate name can be output.
 
-Simon gave some nice explanations of original names in GHC
+\paragraph{Note about using the ABI hash} Currently, InstalledPackageId
+is constructed of a package, version and ABI hash
+(generateRegistrationInfo in
+\ghcfile{libraries/Cabal/Cabal/Distribution/Simple/Register.hs}).  The
+use of an ABI hash is a bit of GHC-specific hack introduced in 2009,
+intended to make sure these installed package IDs are unique.  While
+this is quite clever, using the ABI is actually a bit inflexible, as one
+might reasonably want to have multiple copies of a package with the same
+ABI but different source code changes.\footnote{In practice, our ABIs
+are so unstable that it doesn't really matter.}
 
+In Figure~\ref{fig:pkgdb}, there is an alternate logical representation
+of InstalledPackageId which attempts to extricate the notion of ABI
+compatibility from what actually might uniquely identify a package.
+We imagine these components to be:
+
+\begin{itemize}
+    \item The package and version, as before;
+    \item A hash of the source code (so one can register different
+        in-development versions without having to bump the version
+        number);
+    \item Compilation flags (such as compilation way, optimization,
+        profiling settings)\footnote{This is a little undefined on a package bases, because in principle the flags could be varied on a per-file basis. More likely this will be approximated against the relevant fields in the Cabal file as well as arguments passed to Cabal.};
+    \item InstalledPackageIds of dependencies that were linked against.
+\end{itemize}
+
+It's also important to not use ABI, because we don't know what the ABI
+is until after we compile, but when I'm using it for typechecking, I'm
+obligated to provide \emph{some} InstalledPackageId from the get-go.
+
+A historical note: in the 2012 GSoC project to allow multiple instances
+of a package to be installed at the same time, use of \emph{random
+numbers} was used to workaround the inability to get an ABI early
+enough.  This seemed a bit dodgy, so we're not going to do that here.
+
+\paragraph{Wired-in names} One annoying thing to remember is that GHC
+has wired-in names, which refer to packages without any version.  A
+suggested approach is to have a fixed table from these wired names to
+package IDs.
+
+\subsection{Exposed modules should allow external modules}\label{sec:reexport}
+
+In Backpack, the definition of a package consists of a logical context,
+which maps logical module names to physical module names.  These do not
+necessarily coincide, since some physical modules may have been defined
+in other packages and mixed into this package.  This mapping specifies
+what modules other packages including this package can access.
+However, in the current installed package database, we have exposed-modules which
+specify what modules are accessible, but we assume that the current
+package is responsible for providing these modules.
+
+To implement Backpack, we have to extend this exposed-modules (``Export declarations''
+on Figure~\ref{fig:pkgdb}).  Rather
+than a list of logical module names, we provide a new list of tuples:
+the exported logical module name and original physical module name (this
+is in two parts: the InstalledPackageId and the original module name).
+For example, an traditional module export is simply (Name, my-pkg-id, Name);
+a renamed module is (NewName, my-pkg-id, OldName), and an external module
+is (Name, external-pkg-id, Name).
+
+\subsection{Indefinite packages}
+
+In Backpack, some packages still have holes in them, to be linked in later.
+GHC cannot compile these packages, but we still need to install them because
+other packages may still type-check against them, and eventually we will
+need to compile them (once some downstream package links it against its
+dependencies.)
+
+It seems clear that we need to install packages which do not contain
+compiled code, but have all of the ingredients necessary to compile them.
+We imagine that instead of providing path to object files, an \emph{indefinite
+package} which contains just interface files as well as source. (Figure~\ref{fig:pkgdb})
+
+Creating and typechecking single instances of indefinite packages seems to
+be unproblematic: GHC can already just type-check code (without compiling it),
+and we can also type-check against an interface file, which is currently used for
+the recursive module, hs-boot mechanism. (Figure~\ref{fig:arch})
+
+When we need to compile an indefinite package (since all of its
+dependencies have been found), things get a bit knotty.  In particular,
+there seem to be two implementation paths for this compilation: one path
+closer to how GHC compilation currently works, and another which is
+conceptually closer to the Backpack formalism.  Here is a very simple
+example to consider for both cases:
+
+\begin{verbatim}
+package pkg-a where
+    A = ...
+package pgk-b where -- indefinite package
+    A :: ...
+    B = [ b = ... ]
+package pkg-c where
+    include pkg-a
+    include pkg-b
+\end{verbatim}
+
+\paragraph{The ``downstream'' proposal}  At some point, a package which
+relies on an indefinite package fills in all of its dependencies, so
+that it can be compiled.  Compilation proceeds by treating all of the
+uncompiled indefinite packages as part of a single package: the current
+package.  We maintain the invariant that any code generated will export
+symbols under the current package's namespace.  So the identifier
+\verb|b| in the example becomes a symbol \verb|pkg-c_pkg-b_B_b| rather
+than \verb|pkg-b_B_b| (package subqualification is necessary because
+package C may define its own B module after thinning out the import.)
+
+One big problem with this proposal is that it doesn't implement applicative
+semantics.  If there is another package:
+
+\begin{verbatim}
+package pkg-d where
+    include pkg-a
+    include pkg-b
+\end{verbatim}
+
+this will generate its own instance of B, even though it should be the same
+as C.  Simon was willing to entertain the idea that, well, as long as the
+type-checker is able to figure out they are the same, then it might be OK
+if we accidentally generate two copies of the code (provided they actually
+are the same).
+
+\paragraph{The ``upstream'' proposal}  Instead of treating all
+uncompiled indefinite packages as a single package, each fully linked
+package is now considered an instance of the original indefinite
+package, except its dependencies are filled in further.
+
+One big change that is necessary is that we must augment exported
+linker symbols to include a hash, or some serial number into a registry,
+of the true physical module identity of linked modules, which will
+generally be some recursive tree.  Then identifier \verb|b| becomes
+\verb|pkg-b-HASH-b_B|, where HASH represents the physical module
+identity.  These instantiations of packages are hash-consed, so if
+someone else constructs the exact same dependency change, the instance
+will be reused.
+
+\paragraph{Aliases} There are some problems with respect to what occurs when two
+distinct signatures are linked together (aliasing), we talk these problems in
+Section~\ref{sec:open-questions}.
+
+\paragraph{Aside: Original names} Original names are an important design pattern
+in GHC\@.
 Sometimes, a name can be exposed in an hi file even if its module
-wasn't exposed. Example in package R:
+wasn't exposed. Here is an example (compiled in package R):
 
-    module X where
+\begin{verbatim}
+module X where
     import Internal (f)
     g = f
 
-    module Internal where
+module Internal where
     import Internal.Total (f)
+\end{verbatim}
 
 Then in X.hi:
 
-    g = <R.id, Internal.Total, f> (this is the original name)
+\begin{verbatim}
+g = <R.id, Internal.Total, f> (this is the original name)
+\end{verbatim}
 
 (The reason we refer to the package as R.id is because it's the
 full package ID, and not just R).
 
 How might internal names work with Backpack?
 
-    package P where
-        M = ...
-        N = ...
-    package Q (M, R, T)
-        include P (N -> R)
-        T = ...
+\begin{verbatim}
+package P where
+    M = ...
+    N = ...
+package Q (M, R, T)
+    include P (N -> R)
+    T = ...
+\end{verbatim}
 
-    Q; exposed modules
+And now if we look at Q\@:
+
+\begin{verbatim}
+exposed-modules:
         M -> <P.id, M>
         R -> <P.id, N>
         T -> <Q.id, T>
+\end{verbatim}
 
 When we compile Q, and the interface file gets generated, we have
 to generate identifiers for each of the exposed modules.  These should
-be calculated to directly refer to the "original name" of each them;
+be calculated to directly refer to the ``original name'' of each them;
 so for example M and R point directly to package P, but they also
 include the original name they had in the original definition.
 
-----
 
-Differing intuitions: GHC internals versus Backpack abstraction
-
-----
-
-Refactoring necessary:
-
-    - PackageId in GHC needs to be InstalledPackageId.  I get these IDs
-      from -package-name when I build a package, and these are baked
-      into the hi files and linker names.  To the type checker, this
-      IS exactly what a package is.  But see open question about linker
-      names...
-
-        There appears to already be a conversion, probably a newtype,
-        from package name to linker names, according to Duncan.
-
-      THE PLAN: To remain BC, we have a flag named -package-name which
-      is used for both.  So now I maintain two different values,
-      -package-name sets both, and then I have another flag for setting
-      one separately.
-
-      Watch out: GHC plays tricks with wired-in names. Suggested is a
-      table from wired names to package IDs (constructed with the
-      package environment)
-
-ghc-pkg
-
-    - Remove the "removal step" when registering a package (with a flag)
-
-    - Check main/Packages.lhs:mkPackagesState to look out for shadowing
-      within a database, it might already do the right thing (key idea
-      is that we already do something sensible merging package databases
-      together, reuse that)
-
-    - Experiment using -hide-all-packages -package-id ... flags explicitly
-
-\section{Open questions}
+\section{Open questions}\label{sec:open-questions}
 
 Here are open problems about the implementation which still require
 hashing out.
 
-    - Aliasing of signatures means that it is no longer the case that
+\begin{itemize}
+    \item Aliasing of signatures means that it is no longer the case that
       original name means type equality.  We were not able to convince
       Simon of any satisfactory resolution.  Strawman proposal is to
       extending original names to also be variables probably won't work
       because it is so deeply wired, but it's difficult to construct hi
       files so that everything works out (quadratic).
 
-    - Relationship between linker names and InstalledPackageId? The reason
+  \item Relationship between linker names and InstalledPackageId? The reason
       the obvious thing to do is use all of InstalledPackageId for linker
       name, but this breaks recompilation.  So some of these things
       should go in the linker name, and not others (yes package, yes
@@ -234,20 +382,32 @@ hashing out.
       dependency package IDs, what about cabal build flags).  This is
       approximately an ABI hash, but it's computable before compilation.
       This worries Simon because now there are two names, but maybe
-      the DB can solve that problem--unfortunately, GHC doesn't ever
+      the DB can solve that problem---unfortunately, GHC doesn't ever
       register during compilation; only later.
 
         Simon also thought we should use shorter names for linker
         names and InstallPkgIds.  This appears to be orthogonal.
 
-    - In this example:
+    \item In this example:
 
-        package A where
-            A = [ ... ]
-        package A2 where
-            A2 = [ ... ]
-        package B (B)
-            ...
+\begin{verbatim}
+    package A where
+        A = ...
+    package A2 where
+        A2 = ...
+    package B (B)
+        A :: ...
+        B = ...
+    package C where
+        include A
+        include B
+    package D where
+        include A
+        include B
+    package E where
+        include C (B as CB)
+        include D (B as DB)
+\end{verbatim}
 
       Do the seperate instantiations of B exist as seperate artifacts
       in the database, or do they get constructed on the fly by
@@ -261,10 +421,10 @@ hashing out.
       You can get to it by modifying the earlier example so that C and
       D still have holes, which E does not fill.
 
-    - We have to store the preprocessed sources for indefinite packages.
+  \item We have to store the preprocessed sources for indefinite packages.
       This is hard when we're constructing packages on the fly.
 
-    - What is the impact on dependency solving in Cabal?  Old questions
+  \item What is the impact on dependency solving in Cabal?  Old questions
       of what to prefer when multiple package-versions are available
       (Cabal originally only needed to solve this between different
       versions of the same package, preferring the oldest version), but
@@ -274,6 +434,7 @@ hashing out.
       Authors may want to suggest policy for what packages should actually
       link against signatures (so a crypto library doesn't accidentally
       link against a null cipher package).
+      \end{itemize}
 
 \section{Immediate tasks}
 
@@ -282,11 +443,11 @@ of non-controversial tasks which can be started immediately.
 
 \begin{itemize}
     \item Relax the package database constraint to allow multiple
-        instances of package-version.
+        instances of package-version. (Section~\ref{sec:ihg})
     \item Propagate the use of \verb|InstalledPackageId| instead of
-        package IDs for typechecking (but not for linking, yet).
+        package IDs for typechecking. (Section~\ref{sec:ipi})
     \item Implement export declarations in package format, so
-        packages can reexport modules from other packages.
+        packages can reexport modules from other packages. (Section~\ref{sec:reexport})
 \end{itemize}
 
 The aliasing problem is probably the most important open problem
