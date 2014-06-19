@@ -5253,21 +5253,30 @@ it explicitly (for example, to give an instance declaration for it), you can imp
 from module <literal>GHC.Exts</literal>.
 </para>
 <para>
-Haskell's defaulting mechanism is extended to cover string literals, when <option>-XOverloadedStrings</option> is specified.
+Haskell's defaulting mechanism (<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.3.4">Haskell Report, Section 4.3.4</ulink>)
+is extended to cover string literals, when <option>-XOverloadedStrings</option> is specified.
 Specifically:
 <itemizedlist>
 <listitem><para>
-Each type in a default declaration must be an
+Each type in a <literal>default</literal> declaration must be an
 instance of <literal>Num</literal> <emphasis>or</emphasis> of <literal>IsString</literal>.
 </para></listitem>
 
 <listitem><para>
-The standard defaulting rule (<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.3.4">Haskell Report, Section 4.3.4</ulink>)
+If no <literal>default</literal> declaration is given, then it is just as if the module
+contained the declaration <literal>default( Integer, Double, String)</literal>.
+</para></listitem>
+
+<listitem><para>
+The standard defaulting rule
 is extended thus: defaulting applies when all the unresolved constraints involve standard classes
 <emphasis>or</emphasis> <literal>IsString</literal>; and at least one is a numeric class
 <emphasis>or</emphasis> <literal>IsString</literal>.
 </para></listitem>
 </itemizedlist>
+So, for example, the expression <literal>length "foo"</literal> will give rise
+to an ambiguous use of <literal>IsString a0</literal> which, becuase of the above
+rules, will default to <literal>String</literal>.
 </para>
 <para>
 A small example:
