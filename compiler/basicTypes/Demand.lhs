@@ -42,7 +42,7 @@ module Demand (
         deferAfterIO,
         postProcessUnsat, postProcessDmdTypeM,
 
-        splitProdDmd, splitProdDmd_maybe, peelCallDmd, mkCallDmd,
+        splitProdDmd_maybe, peelCallDmd, mkCallDmd,
         dmdTransformSig, dmdTransformDataConSig, dmdTransformDictSelSig,
         argOneShots, argsOneShots,
         trimToType, TypeShape(..),
@@ -201,11 +201,13 @@ seqMaybeStr Lazy    = ()
 seqMaybeStr (Str s) = seqStrDmd s
 
 -- Splitting polymorphic demands
-splitStrProdDmd :: Int -> StrDmd -> [MaybeStr]
-splitStrProdDmd n HyperStr     = replicate n strBot
-splitStrProdDmd n HeadStr      = replicate n strTop
-splitStrProdDmd n (SProd ds)   = ASSERT( ds `lengthIs` n) ds
-splitStrProdDmd _ d@(SCall {}) = pprPanic "attempt to prod-split strictness call demand" (ppr d)
+splitStrProdDmd :: Int -> StrDmd -> Maybe [MaybeStr]
+splitStrProdDmd n HyperStr   = Just (replicate n strBot)
+splitStrProdDmd n HeadStr    = Just (replicate n strTop)
+splitStrProdDmd n (SProd ds) = ASSERT( ds `lengthIs` n) Just ds
+splitStrProdDmd _ (SCall {}) = Nothing
+      -- This can happen when the programmer uses unsafeCoerce,
+      -- and we don't then want to crash the compiler (Trac #9208)
 \end{code}
 
 %************************************************************************
@@ -442,13 +444,15 @@ seqMaybeUsed (Use c u)  = c `seq` seqUseDmd u
 seqMaybeUsed _          = ()
 
 -- Splitting polymorphic Maybe-Used demands
-splitUseProdDmd :: Int -> UseDmd -> [MaybeUsed]
-splitUseProdDmd n Used          = replicate n useTop
-splitUseProdDmd n UHead         = replicate n Abs
-splitUseProdDmd n (UProd ds)    = ASSERT2( ds `lengthIs` n, text "splitUseProdDmd" $$ ppr n $$ ppr ds ) ds
-splitUseProdDmd _ d@(UCall _ _) = pprPanic "attempt to prod-split usage call demand" (ppr d)
+splitUseProdDmd :: Int -> UseDmd -> Maybe [MaybeUsed]
+splitUseProdDmd n Used        = Just (replicate n useTop)
+splitUseProdDmd n UHead       = Just (replicate n Abs)
+splitUseProdDmd n (UProd ds)  = ASSERT2( ds `lengthIs` n, text "splitUseProdDmd" $$ ppr n $$ ppr ds ) 
+                                Just ds
+splitUseProdDmd _ (UCall _ _) = Nothing
+      -- This can happen when the programmer uses unsafeCoerce,
+      -- and we don't then want to crash the compiler (Trac #9208)
 \end{code}
-  
 %************************************************************************
 %*                                                                      *
 \subsection{Joint domain for Strictness and Absence}
@@ -720,26 +724,18 @@ can be expanded to saturate a callee's arity.
 
 
 \begin{code}
-splitProdDmd :: Arity -> JointDmd -> [JointDmd]
-splitProdDmd n (JD {strd = s, absd = u})
-  = mkJointDmds (split_str s) (split_abs u)
-  where
-    split_str Lazy    = replicate n Lazy
-    split_str (Str s) = splitStrProdDmd n s
-
-    split_abs Abs       = replicate n Abs
-    split_abs (Use _ u) = splitUseProdDmd n u
-
 splitProdDmd_maybe :: JointDmd -> Maybe [JointDmd]
 -- Split a product into its components, iff there is any
 -- useful information to be extracted thereby
 -- The demand is not necessarily strict!
 splitProdDmd_maybe (JD {strd = s, absd = u})
   = case (s,u) of
-      (Str (SProd sx), Use _ u)          -> Just (mkJointDmds sx (splitUseProdDmd (length sx) u))
-      (Str s,          Use _ (UProd ux)) -> Just (mkJointDmds (splitStrProdDmd (length ux) s) ux)
-      (Lazy,           Use _ (UProd ux)) -> Just (mkJointDmds (replicate (length ux) Lazy)    ux)
-      _                                  -> Nothing
+      (Str (SProd sx), Use _ u)          | Just ux <- splitUseProdDmd (length sx) u
+                                         -> Just (mkJointDmds sx ux)
+      (Str s,          Use _ (UProd ux)) | Just sx <- splitStrProdDmd (length ux) s
+                                         -> Just (mkJointDmds sx ux)
+      (Lazy,           Use _ (UProd ux)) -> Just (mkJointDmds (replicate (length ux) Lazy) ux)
+      _ -> Nothing
 \end{code}
 
 %************************************************************************
@@ -1522,12 +1518,12 @@ dmdTransformDataConSig arity (StrictSig (DmdType _ _ con_res))
   | otherwise   -- Not saturated
   = nopDmdType
   where
-    go_str 0 dmd        = Just (splitStrProdDmd arity dmd)
+    go_str 0 dmd        = splitStrProdDmd arity dmd
     go_str n (SCall s') = go_str (n-1) s'
     go_str n HyperStr   = go_str (n-1) HyperStr
     go_str _ _          = Nothing
 
-    go_abs 0 dmd            = Just (splitUseProdDmd arity dmd)
+    go_abs 0 dmd            = splitUseProdDmd arity dmd
     go_abs n (UCall One u') = go_abs (n-1) u'
     go_abs _ _              = Nothing
 
