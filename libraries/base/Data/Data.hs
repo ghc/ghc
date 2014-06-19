@@ -323,7 +323,7 @@ class Typeable a => Data a where
 
   -- | A generic query that processes the immediate subterms and returns a list
   -- of results.  The list is given in the same order as originally specified
-  -- in the declaratoin of the data constructors.
+  -- in the declaration of the data constructors.
   gmapQ :: (forall d. Data d => d -> u) -> a -> [u]
   gmapQ f = gmapQr (:) [] f
 
