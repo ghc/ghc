@@ -1124,7 +1124,7 @@ An alternative we considered was to
     equalities mentions any of the ic_givens of this implication.
 This seems like the Right Thing, but it's more code, and more work
 at runtime, so we are using the FlatSkolOrigin idea intead. It's less
-obvious that it works, but I htink it does, and it's simple and efficient.
+obvious that it works, but I think it does, and it's simple and efficient.
 
 
 Note [Float equalities from under a skolem binding]
