@@ -277,19 +277,28 @@ tcValBinds :: TopLevelFlag
            -> TcM ([(RecFlag, LHsBinds TcId)], thing) 
 
 tcValBinds top_lvl binds sigs thing_inside
-  = do  {       -- Typecheck the signature
-          (poly_ids, sig_fn) <- tcTySigs sigs
+  = do  {       -- Add fake entries for pattern synonyms so that
+                -- precise error messages can be generated when
+                -- trying to use a pattern synonym as a kind
+          traceTc "Fake lifted patsyns:" (vcat (map ppr patsyns))
+                -- Typecheck the signature
+        ; (poly_ids, sig_fn) <- tcExtendKindEnv2 [(patsyn, fakePatSynCon) | patsyn <- patsyns] $
+                                tcTySigs sigs
 
         ; let prag_fn = mkPragFun sigs (foldr (unionBags . snd) emptyBag binds)
 
                 -- Extend the envt right away with all 
                 -- the Ids declared with type signatures
                 -- Use tcExtendIdEnv2 to avoid extending the TcIdBinder stack
-        ; (binds', thing) <- tcExtendIdEnv2 [(idName id, id) | id <- poly_ids] $
-                             tcBindGroups top_lvl sig_fn prag_fn 
-                                          binds thing_inside
-
-        ; return (binds', thing) }
+        ; tcExtendIdEnv2 [(idName id, id) | id <- poly_ids] $
+            tcBindGroups top_lvl sig_fn prag_fn
+                         binds thing_inside }
+  where
+    patsyns = [ name
+              | (_, lbinds) <- binds
+              , L _ (PatSynBind{ patsyn_id = L _ name }) <- bagToList lbinds
+              ]
+    fakePatSynCon = AGlobal $ AConLike $ PatSynCon $ panic "fakePatSynCon"
 
 ------------------------
 tcBindGroups :: TopLevelFlag -> TcSigFun -> PragFun
