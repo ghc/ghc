@@ -635,7 +635,7 @@ data Token
 -- facilitates using a keyword in two different extensions that can be
 -- activated independently)
 --
-reservedWordsFM :: UniqFM (Token, Int)
+reservedWordsFM :: UniqFM (Token, ExtsBitmap)
 reservedWordsFM = listToUFM $
     map (\(x, y, z) -> (mkFastString x, (y, z)))
         [( "_",              ITunderscore,    0 ),
@@ -664,34 +664,34 @@ reservedWordsFM = listToUFM $
          ( "type",           ITtype,          0 ),
          ( "where",          ITwhere,         0 ),
 
-         ( "forall",         ITforall,        bit explicitForallBit .|.
-                                              bit inRulePragBit),
-         ( "mdo",            ITmdo,           bit recursiveDoBit),
+         ( "forall",         ITforall,        xbit ExplicitForallBit .|.
+                                              xbit InRulePragBit),
+         ( "mdo",            ITmdo,           xbit RecursiveDoBit),
              -- See Note [Lexing type pseudo-keywords]
          ( "family",         ITfamily,        0 ),
          ( "role",           ITrole,          0 ),
-         ( "pattern",        ITpattern,       bit patternSynonymsBit),
-         ( "group",          ITgroup,         bit transformComprehensionsBit),
-         ( "by",             ITby,            bit transformComprehensionsBit),
-         ( "using",          ITusing,         bit transformComprehensionsBit),
+         ( "pattern",        ITpattern,       xbit PatternSynonymsBit),
+         ( "group",          ITgroup,         xbit TransformComprehensionsBit),
+         ( "by",             ITby,            xbit TransformComprehensionsBit),
+         ( "using",          ITusing,         xbit TransformComprehensionsBit),
 
-         ( "foreign",        ITforeign,       bit ffiBit),
-         ( "export",         ITexport,        bit ffiBit),
-         ( "label",          ITlabel,         bit ffiBit),
-         ( "dynamic",        ITdynamic,       bit ffiBit),
-         ( "safe",           ITsafe,          bit ffiBit .|.
-                                              bit safeHaskellBit),
-         ( "interruptible",  ITinterruptible, bit interruptibleFfiBit),
-         ( "unsafe",         ITunsafe,        bit ffiBit),
-         ( "stdcall",        ITstdcallconv,   bit ffiBit),
-         ( "ccall",          ITccallconv,     bit ffiBit),
-         ( "capi",           ITcapiconv,      bit cApiFfiBit),
-         ( "prim",           ITprimcallconv,  bit ffiBit),
-         ( "javascript",     ITjavascriptcallconv, bit ffiBit),
+         ( "foreign",        ITforeign,       xbit FfiBit),
+         ( "export",         ITexport,        xbit FfiBit),
+         ( "label",          ITlabel,         xbit FfiBit),
+         ( "dynamic",        ITdynamic,       xbit FfiBit),
+         ( "safe",           ITsafe,          xbit FfiBit .|.
+                                              xbit SafeHaskellBit),
+         ( "interruptible",  ITinterruptible, xbit InterruptibleFfiBit),
+         ( "unsafe",         ITunsafe,        xbit FfiBit),
+         ( "stdcall",        ITstdcallconv,   xbit FfiBit),
+         ( "ccall",          ITccallconv,     xbit FfiBit),
+         ( "capi",           ITcapiconv,      xbit CApiFfiBit),
+         ( "prim",           ITprimcallconv,  xbit FfiBit),
+         ( "javascript",     ITjavascriptcallconv, xbit FfiBit),
 
-         ( "rec",            ITrec,           bit arrowsBit .|.
-                                              bit recursiveDoBit),
-         ( "proc",           ITproc,          bit arrowsBit)
+         ( "rec",            ITrec,           xbit ArrowsBit .|.
+                                              xbit RecursiveDoBit),
+         ( "proc",           ITproc,          xbit ArrowsBit)
      ]
 
 {-----------------------------------
@@ -711,7 +711,7 @@ Also, note that these are included in the `varid` production in the parser --
 a key detail to make all this work.
 -------------------------------------}
 
-reservedSymsFM :: UniqFM (Token, Int -> Bool)
+reservedSymsFM :: UniqFM (Token, ExtsBitmap -> Bool)
 reservedSymsFM = listToUFM $
     map (\ (x,y,z) -> (mkFastString x,(y,z)))
       [ ("..",  ITdotdot,   always)
@@ -822,11 +822,11 @@ nextCharIs buf p = not (atEnd buf) && p (currentChar buf)
 nextCharIsNot :: StringBuffer -> (Char -> Bool) -> Bool
 nextCharIsNot buf p = not (nextCharIs buf p)
 
-notFollowedBy :: Char -> AlexAccPred Int
+notFollowedBy :: Char -> AlexAccPred ExtsBitmap
 notFollowedBy char _ _ _ (AI _ buf)
   = nextCharIsNot buf (== char)
 
-notFollowedBySymbol :: AlexAccPred Int
+notFollowedBySymbol :: AlexAccPred ExtsBitmap
 notFollowedBySymbol _ _ _ (AI _ buf)
   = nextCharIsNot buf (`elem` "!#$%&*+./<=>?@\\^|-~")
 
@@ -835,7 +835,7 @@ notFollowedBySymbol _ _ _ (AI _ buf)
 -- maximal munch, but not always, because the nested comment rule is
 -- valid in all states, but the doc-comment rules are only valid in
 -- the non-layout states.
-isNormalComment :: AlexAccPred Int
+isNormalComment :: AlexAccPred ExtsBitmap
 isNormalComment bits _ _ (AI _ buf)
   | haddockEnabled bits = notFollowedByDocOrPragma
   | otherwise           = nextCharIsNot buf (== '#')
@@ -849,10 +849,10 @@ afterOptionalSpace buf p
       then p (snd (nextChar buf))
       else p buf
 
-atEOL :: AlexAccPred Int
+atEOL :: AlexAccPred ExtsBitmap
 atEOL _ _ _ (AI _ buf) = atEnd buf || currentChar buf == '\n'
 
-ifExtension :: (Int -> Bool) -> AlexAccPred Int
+ifExtension :: (ExtsBitmap -> Bool) -> AlexAccPred ExtsBitmap
 ifExtension pred bits _ _ _ = pred bits
 
 multiline_doc_comment :: Action
@@ -954,12 +954,12 @@ withLexedDocType lexDocComment = do
 -- off again at the end of the pragma.
 rulePrag :: Action
 rulePrag span _buf _len = do
-  setExts (.|. bit inRulePragBit)
+  setExts (.|. xbit InRulePragBit)
   return (L span ITrules_prag)
 
 endPrag :: Action
 endPrag span _buf _len = do
-  setExts (.&. complement (bit inRulePragBit))
+  setExts (.&. complement (xbit InRulePragBit))
   return (L span ITclose_prag)
 
 -- docCommentEnd
@@ -1592,7 +1592,7 @@ data PState = PState {
         last_loc   :: RealSrcSpan, -- pos of previous token
         last_len   :: !Int,        -- len of previous token
         loc        :: RealSrcLoc,  -- current loc (end of prev token + 1)
-        extsBitmap :: !Int,        -- bitmap that determines permitted
+        extsBitmap :: !ExtsBitmap,    -- bitmap that determines permitted
                                    -- extensions
         context    :: [LayoutContext],
         lex_state  :: [Int],
@@ -1669,13 +1669,13 @@ withThisPackage f
  = do pkg <- liftM thisPackage getDynFlags
       return $ f pkg
 
-extension :: (Int -> Bool) -> P Bool
+extension :: (ExtsBitmap -> Bool) -> P Bool
 extension p = P $ \s -> POk s (p $! extsBitmap s)
 
-getExts :: P Int
+getExts :: P ExtsBitmap
 getExts = P $ \s -> POk s (extsBitmap s)
 
-setExts :: (Int -> Int) -> P ()
+setExts :: (ExtsBitmap -> ExtsBitmap) -> P ()
 setExts f = P $ \s -> POk s{ extsBitmap = f (extsBitmap s) } ()
 
 setSrcLoc :: RealSrcLoc -> P ()
@@ -1856,129 +1856,106 @@ setAlrExpectingOCurly b = P $ \s -> POk (s {alr_expecting_ocurly = b}) ()
 -- for reasons of efficiency, flags indicating language extensions (eg,
 -- -fglasgow-exts or -XParallelArrays) are represented by a bitmap
 -- stored in an unboxed Int
+type ExtsBitmap = Word
 
-ffiBit :: Int
-ffiBit= 0
-interruptibleFfiBit :: Int
-interruptibleFfiBit = 1
-cApiFfiBit :: Int
-cApiFfiBit = 2
-parrBit :: Int
-parrBit = 3
-arrowsBit :: Int
-arrowsBit  = 4
-thBit :: Int
-thBit = 5
-ipBit :: Int
-ipBit = 6
-explicitForallBit :: Int
-explicitForallBit = 7 -- the 'forall' keyword and '.' symbol
-bangPatBit :: Int
-bangPatBit = 8  -- Tells the parser to understand bang-patterns
-                -- (doesn't affect the lexer)
-patternSynonymsBit :: Int
-patternSynonymsBit = 9 -- pattern synonyms
-haddockBit :: Int
-haddockBit = 10 -- Lex and parse Haddock comments
-magicHashBit :: Int
-magicHashBit = 11 -- "#" in both functions and operators
-kindSigsBit :: Int
-kindSigsBit = 12 -- Kind signatures on type variables
-recursiveDoBit :: Int
-recursiveDoBit = 13 -- mdo
-unicodeSyntaxBit :: Int
-unicodeSyntaxBit = 14 -- the forall symbol, arrow symbols, etc
-unboxedTuplesBit :: Int
-unboxedTuplesBit = 15 -- (# and #)
-datatypeContextsBit :: Int
-datatypeContextsBit = 16
-transformComprehensionsBit :: Int
-transformComprehensionsBit = 17
-qqBit :: Int
-qqBit = 18 -- enable quasiquoting
-inRulePragBit :: Int
-inRulePragBit = 19
-rawTokenStreamBit :: Int
-rawTokenStreamBit = 20 -- producing a token stream with all comments included
-sccProfilingOnBit :: Int
-sccProfilingOnBit = 21
-hpcBit :: Int
-hpcBit = 22
-alternativeLayoutRuleBit :: Int
-alternativeLayoutRuleBit = 23
-relaxedLayoutBit :: Int
-relaxedLayoutBit = 24
-nondecreasingIndentationBit :: Int
-nondecreasingIndentationBit = 25
-safeHaskellBit :: Int
-safeHaskellBit = 26
-traditionalRecordSyntaxBit :: Int
-traditionalRecordSyntaxBit = 27
-typeLiteralsBit :: Int
-typeLiteralsBit = 28
-explicitNamespacesBit :: Int
-explicitNamespacesBit = 29
-lambdaCaseBit :: Int
-lambdaCaseBit = 30
-negativeLiteralsBit :: Int
-negativeLiteralsBit = 31
+xbit :: ExtBits -> ExtsBitmap
+xbit = bit . fromEnum
+
+xtest :: ExtBits -> ExtsBitmap -> Bool
+xtest ext xmap = testBit xmap (fromEnum ext)
+
+data ExtBits
+  = FfiBit
+  | InterruptibleFfiBit
+  | CApiFfiBit
+  | ParrBit
+  | ArrowsBit
+  | ThBit
+  | IpBit
+  | ExplicitForallBit -- the 'forall' keyword and '.' symbol
+  | BangPatBit -- Tells the parser to understand bang-patterns
+               -- (doesn't affect the lexer)
+  | PatternSynonymsBit -- pattern synonyms
+  | HaddockBit-- Lex and parse Haddock comments
+  | MagicHashBit -- "#" in both functions and operators
+  | KindSigsBit -- Kind signatures on type variables
+  | RecursiveDoBit -- mdo
+  | UnicodeSyntaxBit -- the forall symbol, arrow symbols, etc
+  | UnboxedTuplesBit -- (# and #)
+  | DatatypeContextsBit
+  | TransformComprehensionsBit
+  | QqBit -- enable quasiquoting
+  | InRulePragBit
+  | RawTokenStreamBit -- producing a token stream with all comments included
+  | SccProfilingOnBit
+  | HpcBit
+  | AlternativeLayoutRuleBit
+  | RelaxedLayoutBit
+  | NondecreasingIndentationBit
+  | SafeHaskellBit
+  | TraditionalRecordSyntaxBit
+  | TypeLiteralsBit
+  | ExplicitNamespacesBit
+  | LambdaCaseBit
+  | NegativeLiteralsBit
+  deriving Enum
 
 
-always :: Int -> Bool
+always :: ExtsBitmap -> Bool
 always           _     = True
-parrEnabled :: Int -> Bool
-parrEnabled      flags = testBit flags parrBit
-arrowsEnabled :: Int -> Bool
-arrowsEnabled    flags = testBit flags arrowsBit
-thEnabled :: Int -> Bool
-thEnabled        flags = testBit flags thBit
-ipEnabled :: Int -> Bool
-ipEnabled        flags = testBit flags ipBit
-explicitForallEnabled :: Int -> Bool
-explicitForallEnabled flags = testBit flags explicitForallBit
-bangPatEnabled :: Int -> Bool
-bangPatEnabled   flags = testBit flags bangPatBit
-haddockEnabled :: Int -> Bool
-haddockEnabled   flags = testBit flags haddockBit
-magicHashEnabled :: Int -> Bool
-magicHashEnabled flags = testBit flags magicHashBit
--- kindSigsEnabled :: Int -> Bool
--- kindSigsEnabled  flags = testBit flags kindSigsBit
-unicodeSyntaxEnabled :: Int -> Bool
-unicodeSyntaxEnabled flags = testBit flags unicodeSyntaxBit
-unboxedTuplesEnabled :: Int -> Bool
-unboxedTuplesEnabled flags = testBit flags unboxedTuplesBit
-datatypeContextsEnabled :: Int -> Bool
-datatypeContextsEnabled flags = testBit flags datatypeContextsBit
-qqEnabled :: Int -> Bool
-qqEnabled        flags = testBit flags qqBit
-inRulePrag :: Int -> Bool
-inRulePrag       flags = testBit flags inRulePragBit
-rawTokenStreamEnabled :: Int -> Bool
-rawTokenStreamEnabled flags = testBit flags rawTokenStreamBit
-alternativeLayoutRule :: Int -> Bool
-alternativeLayoutRule flags = testBit flags alternativeLayoutRuleBit
-hpcEnabled :: Int -> Bool
-hpcEnabled flags = testBit flags hpcBit
-relaxedLayout :: Int -> Bool
-relaxedLayout flags = testBit flags relaxedLayoutBit
-nondecreasingIndentation :: Int -> Bool
-nondecreasingIndentation flags = testBit flags nondecreasingIndentationBit
-sccProfilingOn :: Int -> Bool
-sccProfilingOn flags = testBit flags sccProfilingOnBit
-traditionalRecordSyntaxEnabled :: Int -> Bool
-traditionalRecordSyntaxEnabled flags = testBit flags traditionalRecordSyntaxBit
-typeLiteralsEnabled :: Int -> Bool
-typeLiteralsEnabled flags = testBit flags typeLiteralsBit
+parrEnabled :: ExtsBitmap -> Bool
+parrEnabled = xtest ParrBit
+arrowsEnabled :: ExtsBitmap -> Bool
+arrowsEnabled = xtest ArrowsBit
+thEnabled :: ExtsBitmap -> Bool
+thEnabled = xtest ThBit
+ipEnabled :: ExtsBitmap -> Bool
+ipEnabled = xtest IpBit
+explicitForallEnabled :: ExtsBitmap -> Bool
+explicitForallEnabled = xtest ExplicitForallBit
+bangPatEnabled :: ExtsBitmap -> Bool
+bangPatEnabled = xtest BangPatBit
+haddockEnabled :: ExtsBitmap -> Bool
+haddockEnabled = xtest HaddockBit
+magicHashEnabled :: ExtsBitmap -> Bool
+magicHashEnabled = xtest MagicHashBit
+-- kindSigsEnabled :: ExtsBitmap -> Bool
+-- kindSigsEnabled = xtest KindSigsBit
+unicodeSyntaxEnabled :: ExtsBitmap -> Bool
+unicodeSyntaxEnabled = xtest UnicodeSyntaxBit
+unboxedTuplesEnabled :: ExtsBitmap -> Bool
+unboxedTuplesEnabled = xtest UnboxedTuplesBit
+datatypeContextsEnabled :: ExtsBitmap -> Bool
+datatypeContextsEnabled = xtest DatatypeContextsBit
+qqEnabled :: ExtsBitmap -> Bool
+qqEnabled = xtest QqBit
+inRulePrag :: ExtsBitmap -> Bool
+inRulePrag = xtest InRulePragBit
+rawTokenStreamEnabled :: ExtsBitmap -> Bool
+rawTokenStreamEnabled = xtest RawTokenStreamBit
+alternativeLayoutRule :: ExtsBitmap -> Bool
+alternativeLayoutRule = xtest AlternativeLayoutRuleBit
+hpcEnabled :: ExtsBitmap -> Bool
+hpcEnabled = xtest HpcBit
+relaxedLayout :: ExtsBitmap -> Bool
+relaxedLayout = xtest RelaxedLayoutBit
+nondecreasingIndentation :: ExtsBitmap -> Bool
+nondecreasingIndentation = xtest NondecreasingIndentationBit
+sccProfilingOn :: ExtsBitmap -> Bool
+sccProfilingOn = xtest SccProfilingOnBit
+traditionalRecordSyntaxEnabled :: ExtsBitmap -> Bool
+traditionalRecordSyntaxEnabled = xtest TraditionalRecordSyntaxBit
+typeLiteralsEnabled :: ExtsBitmap -> Bool
+typeLiteralsEnabled = xtest TypeLiteralsBit
 
-explicitNamespacesEnabled :: Int -> Bool
-explicitNamespacesEnabled flags = testBit flags explicitNamespacesBit
-lambdaCaseEnabled :: Int -> Bool
-lambdaCaseEnabled flags = testBit flags lambdaCaseBit
-negativeLiteralsEnabled :: Int -> Bool
-negativeLiteralsEnabled flags = testBit flags negativeLiteralsBit
-patternSynonymsEnabled :: Int -> Bool
-patternSynonymsEnabled flags = testBit flags patternSynonymsBit
+explicitNamespacesEnabled :: ExtsBitmap -> Bool
+explicitNamespacesEnabled = xtest ExplicitNamespacesBit
+lambdaCaseEnabled :: ExtsBitmap -> Bool
+lambdaCaseEnabled = xtest LambdaCaseBit
+negativeLiteralsEnabled :: ExtsBitmap -> Bool
+negativeLiteralsEnabled = xtest NegativeLiteralsBit
+patternSynonymsEnabled :: ExtsBitmap -> Bool
+patternSynonymsEnabled = xtest PatternSynonymsBit
 
 -- PState for parsing options pragmas
 --
@@ -1999,7 +1976,7 @@ mkPState flags buf loc =
       last_loc      = mkRealSrcSpan loc loc,
       last_len      = 0,
       loc           = loc,
-      extsBitmap    = fromIntegral bitmap,
+      extsBitmap    = bitmap,
       context       = [],
       lex_state     = [bol, 0],
       srcfiles      = [],
@@ -2011,41 +1988,41 @@ mkPState flags buf loc =
       alr_justClosedExplicitLetBlock = False
     }
     where
-      bitmap =     ffiBit                      `setBitIf` xopt Opt_ForeignFunctionInterface flags
-               .|. interruptibleFfiBit         `setBitIf` xopt Opt_InterruptibleFFI         flags
-               .|. cApiFfiBit                  `setBitIf` xopt Opt_CApiFFI                  flags
-               .|. parrBit                     `setBitIf` xopt Opt_ParallelArrays           flags
-               .|. arrowsBit                   `setBitIf` xopt Opt_Arrows                   flags
-               .|. thBit                       `setBitIf` xopt Opt_TemplateHaskell          flags
-               .|. qqBit                       `setBitIf` xopt Opt_QuasiQuotes              flags
-               .|. ipBit                       `setBitIf` xopt Opt_ImplicitParams           flags
-               .|. explicitForallBit           `setBitIf` xopt Opt_ExplicitForAll           flags
-               .|. bangPatBit                  `setBitIf` xopt Opt_BangPatterns             flags
-               .|. haddockBit                  `setBitIf` gopt Opt_Haddock                  flags
-               .|. magicHashBit                `setBitIf` xopt Opt_MagicHash                flags
-               .|. kindSigsBit                 `setBitIf` xopt Opt_KindSignatures           flags
-               .|. recursiveDoBit              `setBitIf` xopt Opt_RecursiveDo              flags
-               .|. unicodeSyntaxBit            `setBitIf` xopt Opt_UnicodeSyntax            flags
-               .|. unboxedTuplesBit            `setBitIf` xopt Opt_UnboxedTuples            flags
-               .|. datatypeContextsBit         `setBitIf` xopt Opt_DatatypeContexts         flags
-               .|. transformComprehensionsBit  `setBitIf` xopt Opt_TransformListComp        flags
-               .|. transformComprehensionsBit  `setBitIf` xopt Opt_MonadComprehensions      flags
-               .|. rawTokenStreamBit           `setBitIf` gopt Opt_KeepRawTokenStream       flags
-               .|. hpcBit                      `setBitIf` gopt Opt_Hpc                      flags
-               .|. alternativeLayoutRuleBit    `setBitIf` xopt Opt_AlternativeLayoutRule    flags
-               .|. relaxedLayoutBit            `setBitIf` xopt Opt_RelaxedLayout            flags
-               .|. sccProfilingOnBit           `setBitIf` gopt Opt_SccProfilingOn           flags
-               .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
-               .|. safeHaskellBit              `setBitIf` safeImportsOn                     flags
-               .|. traditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags
-               .|. typeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
-               .|. explicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
-               .|. lambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
-               .|. negativeLiteralsBit         `setBitIf` xopt Opt_NegativeLiterals         flags
-               .|. patternSynonymsBit          `setBitIf` xopt Opt_PatternSynonyms          flags
+      bitmap =     FfiBit                      `setBitIf` xopt Opt_ForeignFunctionInterface flags
+               .|. InterruptibleFfiBit         `setBitIf` xopt Opt_InterruptibleFFI         flags
+               .|. CApiFfiBit                  `setBitIf` xopt Opt_CApiFFI                  flags
+               .|. ParrBit                     `setBitIf` xopt Opt_ParallelArrays           flags
+               .|. ArrowsBit                   `setBitIf` xopt Opt_Arrows                   flags
+               .|. ThBit                       `setBitIf` xopt Opt_TemplateHaskell          flags
+               .|. QqBit                       `setBitIf` xopt Opt_QuasiQuotes              flags
+               .|. IpBit                       `setBitIf` xopt Opt_ImplicitParams           flags
+               .|. ExplicitForallBit           `setBitIf` xopt Opt_ExplicitForAll           flags
+               .|. BangPatBit                  `setBitIf` xopt Opt_BangPatterns             flags
+               .|. HaddockBit                  `setBitIf` gopt Opt_Haddock                  flags
+               .|. MagicHashBit                `setBitIf` xopt Opt_MagicHash                flags
+               .|. KindSigsBit                 `setBitIf` xopt Opt_KindSignatures           flags
+               .|. RecursiveDoBit              `setBitIf` xopt Opt_RecursiveDo              flags
+               .|. UnicodeSyntaxBit            `setBitIf` xopt Opt_UnicodeSyntax            flags
+               .|. UnboxedTuplesBit            `setBitIf` xopt Opt_UnboxedTuples            flags
+               .|. DatatypeContextsBit         `setBitIf` xopt Opt_DatatypeContexts         flags
+               .|. TransformComprehensionsBit  `setBitIf` xopt Opt_TransformListComp        flags
+               .|. TransformComprehensionsBit  `setBitIf` xopt Opt_MonadComprehensions      flags
+               .|. RawTokenStreamBit           `setBitIf` gopt Opt_KeepRawTokenStream       flags
+               .|. HpcBit                      `setBitIf` gopt Opt_Hpc                      flags
+               .|. AlternativeLayoutRuleBit    `setBitIf` xopt Opt_AlternativeLayoutRule    flags
+               .|. RelaxedLayoutBit            `setBitIf` xopt Opt_RelaxedLayout            flags
+               .|. SccProfilingOnBit           `setBitIf` gopt Opt_SccProfilingOn           flags
+               .|. NondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
+               .|. SafeHaskellBit              `setBitIf` safeImportsOn                     flags
+               .|. TraditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags
+               .|. TypeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
+               .|. ExplicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
+               .|. LambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
+               .|. NegativeLiteralsBit         `setBitIf` xopt Opt_NegativeLiterals         flags
+               .|. PatternSynonymsBit          `setBitIf` xopt Opt_PatternSynonyms          flags
       --
-      setBitIf :: Int -> Bool -> Int
-      b `setBitIf` cond | cond      = bit b
+      setBitIf :: ExtBits -> Bool -> ExtsBitmap
+      b `setBitIf` cond | cond      = xbit b
                         | otherwise = 0
 
 addWarning :: WarningFlag -> SrcSpan -> SDoc -> P ()
@@ -2447,7 +2424,7 @@ dispatch_pragmas prags span buf len = case Map.lookup (clean_pragma (lexemeToStr
                                        Just found -> found span buf len
                                        Nothing -> lexError "unknown pragma"
 
-known_pragma :: Map String Action -> AlexAccPred Int
+known_pragma :: Map String Action -> AlexAccPred ExtsBitmap
 known_pragma prags _ (AI _ startbuf) _ (AI _ curbuf)
  = isKnown && nextCharIsNot curbuf pragmaNameChar
     where l = lexemeToString startbuf (byteDiff startbuf curbuf)
