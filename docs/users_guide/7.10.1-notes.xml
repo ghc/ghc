@@ -31,7 +31,7 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO FIXME
+                    Added support for <link linkend="binary-literals">binary integer literals</link>
                </para>
            </listitem>
        </itemizedlist>

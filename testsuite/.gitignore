@@ -1016,6 +1016,9 @@ tests/overloadedlists/should_run/overloadedlistsrun05
 tests/parser/should_compile/T5243
 tests/parser/should_compile/T7476/Main.imports
 tests/parser/should_compile/T7476/T7476
+tests/parser/should_run/BinaryLiterals0
+tests/parser/should_run/BinaryLiterals1
+tests/parser/should_run/BinaryLiterals2
 tests/parser/should_run/ParserMultiWayIf
 tests/parser/should_run/T1344
 tests/parser/should_run/operator

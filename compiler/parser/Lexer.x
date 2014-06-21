@@ -117,6 +117,7 @@ $small     = [$ascsmall $unismall \_]
 $unigraphic = \x06 -- Trick Alex into handling Unicode. See alexGetChar.
 $graphic   = [$small $large $symbol $digit $special $unigraphic \:\"\']
 
+$binit     = 0-1
 $octit     = 0-7
 $hexit     = [$decdigit A-F a-f]
 $symchar   = [$symbol \:]
@@ -134,6 +135,7 @@ $docsym    = [\| \^ \* \$]
 @consym    = \: $symchar*
 
 @decimal     = $decdigit+
+@binary      = $binit+
 @octal       = $octit+
 @hexadecimal = $hexit+
 @exponent    = [eE] [\-\+]? @decimal
@@ -401,9 +403,12 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 <0> {
   -- Normal integral literals (:: Num a => a, from Integer)
   @decimal                                                               { tok_num positive 0 0 decimal }
+  0[bB] @binary                / { ifExtension binaryLiteralsEnabled }   { tok_num positive 2 2 binary }
   0[oO] @octal                                                           { tok_num positive 2 2 octal }
   0[xX] @hexadecimal                                                     { tok_num positive 2 2 hexadecimal }
   @negative @decimal           / { ifExtension negativeLiteralsEnabled } { tok_num negative 1 1 decimal }
+  @negative 0[bB] @binary      / { ifExtension negativeLiteralsEnabled `alexAndPred`
+                                   ifExtension binaryLiteralsEnabled }   { tok_num negative 3 3 binary }
   @negative 0[oO] @octal       / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 octal }
   @negative 0[xX] @hexadecimal / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 hexadecimal }
 
@@ -417,13 +422,19 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   -- It's simpler (and faster?) to give separate cases to the negatives,
   -- especially considering octal/hexadecimal prefixes.
   @decimal                     \# / { ifExtension magicHashEnabled } { tok_primint positive 0 1 decimal }
+  0[bB] @binary                \# / { ifExtension magicHashEnabled `alexAndPred`
+                                      ifExtension binaryLiteralsEnabled } { tok_primint positive 2 3 binary }
   0[oO] @octal                 \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 octal }
   0[xX] @hexadecimal           \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 hexadecimal }
   @negative @decimal           \# / { ifExtension magicHashEnabled } { tok_primint negative 1 2 decimal }
+  @negative 0[bB] @binary      \# / { ifExtension magicHashEnabled `alexAndPred`
+                                      ifExtension binaryLiteralsEnabled } { tok_primint negative 3 4 binary }
   @negative 0[oO] @octal       \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 octal }
   @negative 0[xX] @hexadecimal \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 hexadecimal }
 
   @decimal                     \# \# / { ifExtension magicHashEnabled } { tok_primword 0 2 decimal }
+  0[bB] @binary                \# \# / { ifExtension magicHashEnabled `alexAndPred`
+                                         ifExtension binaryLiteralsEnabled } { tok_primword 2 4 binary }
   0[oO] @octal                 \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 octal }
   0[xX] @hexadecimal           \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 hexadecimal }
 
@@ -1112,6 +1123,7 @@ positive = id
 negative = negate
 decimal, octal, hexadecimal :: (Integer, Char -> Int)
 decimal = (10,octDecDigit)
+binary = (2,octDecDigit)
 octal = (8,octDecDigit)
 hexadecimal = (16,hexDigit)
 
@@ -1410,6 +1422,7 @@ lex_escape = do
 
         'x'   -> readNum is_hexdigit 16 hexDigit
         'o'   -> readNum is_octdigit  8 octDecDigit
+        'b'   -> readNum is_bindigit  2 octDecDigit
         x | is_decdigit x -> readNum2 is_decdigit 10 octDecDigit (octDecDigit x)
 
         c1 ->  do
@@ -1855,8 +1868,8 @@ setAlrExpectingOCurly b = P $ \s -> POk (s {alr_expecting_ocurly = b}) ()
 
 -- for reasons of efficiency, flags indicating language extensions (eg,
 -- -fglasgow-exts or -XParallelArrays) are represented by a bitmap
--- stored in an unboxed Int
-type ExtsBitmap = Word
+-- stored in an unboxed Word64
+type ExtsBitmap = Word64
 
 xbit :: ExtBits -> ExtsBitmap
 xbit = bit . fromEnum
@@ -1897,6 +1910,7 @@ data ExtBits
   | TypeLiteralsBit
   | ExplicitNamespacesBit
   | LambdaCaseBit
+  | BinaryLiteralsBit
   | NegativeLiteralsBit
   deriving Enum
 
@@ -1952,6 +1966,8 @@ explicitNamespacesEnabled :: ExtsBitmap -> Bool
 explicitNamespacesEnabled = xtest ExplicitNamespacesBit
 lambdaCaseEnabled :: ExtsBitmap -> Bool
 lambdaCaseEnabled = xtest LambdaCaseBit
+binaryLiteralsEnabled :: ExtsBitmap -> Bool
+binaryLiteralsEnabled = xtest BinaryLiteralsBit
 negativeLiteralsEnabled :: ExtsBitmap -> Bool
 negativeLiteralsEnabled = xtest NegativeLiteralsBit
 patternSynonymsEnabled :: ExtsBitmap -> Bool
@@ -2018,6 +2034,7 @@ mkPState flags buf loc =
                .|. TypeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
                .|. ExplicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
                .|. LambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
+               .|. BinaryLiteralsBit           `setBitIf` xopt Opt_BinaryLiterals           flags
                .|. NegativeLiteralsBit         `setBitIf` xopt Opt_NegativeLiterals         flags
                .|. PatternSynonymsBit          `setBitIf` xopt Opt_PatternSynonyms          flags
       --

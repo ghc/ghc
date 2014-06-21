@@ -32,6 +32,7 @@ check title expected got
 expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
+                             "BinaryLiterals",
                              "AlternativeLayoutRuleTransitional",
                              "JavaScriptFFI",
                              "PatternSynonyms"]

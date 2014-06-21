@@ -19,7 +19,7 @@ module Ctype
 	, is_digit	-- Char# -> Bool
 	, is_alphanum   -- Char# -> Bool
 
-	, is_decdigit, is_hexdigit, is_octdigit
+	, is_decdigit, is_hexdigit, is_octdigit, is_bindigit
 	, hexDigit, octDecDigit
 	) where
 
@@ -86,6 +86,9 @@ is_hexdigit c
 
 is_octdigit :: Char -> Bool
 is_octdigit c = c >= '0' && c <= '7'
+
+is_bindigit :: Char -> Bool
+is_bindigit c = c == '0' || c == '1'
 
 to_lower :: Char -> Char
 to_lower c

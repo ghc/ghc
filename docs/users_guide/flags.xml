@@ -763,6 +763,12 @@
             <entry><option>-XNoBangPatterns</option></entry>
           </row>
           <row>
+            <entry><option>-XBinaryLiterals</option></entry>
+            <entry>Enable support for <link linkend="binary-literals">binary literals</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoBinaryLiterals</option></entry>
+          </row>
+          <row>
             <entry><option>-XCApiFFI</option></entry>
             <entry>Enable <link linkend="ffi-capi">the CAPI calling convention</link>.</entry>
             <entry>dynamic</entry>

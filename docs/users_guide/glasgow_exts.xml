@@ -480,6 +480,26 @@ Indeed, the bindings can even be recursive.
       </para>
    </sect2>
 
+    <sect2 id="binary-literals">
+      <title>Binary integer literals</title>
+      <para>
+          Haskell 2010 and Haskell 98 allows for integer literals to
+          be given in decimal, octal (prefixed by
+          <literal>0o</literal> or <literal>0O</literal>), or
+          hexadecimal notation (prefixed by <literal>0x</literal> or
+          <literal>0X</literal>).
+      </para>
+
+      <para>
+          The language extension <option>-XBinaryLiterals</option>
+          adds support for expressing integer literals in binary
+          notation with the prefix <literal>0b</literal> or
+          <literal>0B</literal>. For instance, the binary integer
+          literal <literal>0b11001001</literal> will be desugared into
+          <literal>fromInteger 201</literal> when
+          <option>-XBinaryLiterals</option> is enabled.
+      </para>
+   </sect2>
 
     <!-- ====================== HIERARCHICAL MODULES =======================  -->
 
