@@ -625,7 +625,6 @@ tcTyVar :: Name -> TcM (TcType, TcKind)
 tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
-       ; traceTc "lk2" (ppr name <+> ppr thing)
        ; case thing of
            ATyVar _ tv 
               | isKindVar tv
