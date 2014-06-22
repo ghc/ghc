@@ -238,6 +238,7 @@ sub gitall {
     my $tag;
     my $remotepath;
     my $line;
+    my $repo_is_submodule;
     my $branch_name;
     my $subcommand;
 
@@ -332,6 +333,8 @@ sub gitall {
         close RESUME;
         rename "resume.tmp", "resume";
 
+        $repo_is_submodule = $$line{"remotepath"} eq "-";
+
         # We can't create directories on GitHub, so we translate
         # "packages/foo" into "package-foo".
         if ($is_github_repo) {
@@ -342,7 +345,7 @@ sub gitall {
         $path = "$repo_base/$remotepath";
 
         if ($command eq "get") {
-            next if $remotepath eq "-"; # "git submodule init/update" will get this later
+            next if $repo_is_submodule; # "git submodule init/update" will get this later
 
             if (-d $localpath) {
                 warning("$localpath already present; omitting")
@@ -382,7 +385,7 @@ sub gitall {
         }
         elsif ($command eq "check_submodules") {
             # If we have a submodule then check whether it is up-to-date
-            if ($remotepath eq "-") {
+            if ($repo_is_submodule) {
                 my %remote_heads;
 
                 message "== Checking sub-module $localpath";
@@ -415,14 +418,14 @@ sub gitall {
             # to push to them then you need to use a special command, as
             # described on
             # http://ghc.haskell.org/trac/ghc/wiki/Repositories/Upstream
-            if ($remotepath ne "-") {
+            if (!$repo_is_submodule) {
                 &git($localpath, "push", @args);
             }
         }
         elsif ($command eq "pull") {
             my $realcmd;
             my @realargs;
-            if ($remotepath eq "-") {
+            if ($repo_is_submodule) {
                 # Only fetch for the submodules. "git submodule update"
                 # will take care of making us point to the right commit.
                 $realcmd = "fetch";
@@ -456,7 +459,7 @@ sub gitall {
             my @scm_args;
             my $rpath;
             $ignore_failure = 1;
-            if ($remotepath eq '-') {
+            if ($repo_is_submodule) {
                 $rpath = "$localpath.git"; # N.B.: $localpath lacks the .git suffix
                 if ($localpath =~ m!^(?:libraries|utils)/!) {
                     # FIXME: This is just a simple heuristic to
@@ -521,7 +524,7 @@ sub gitall {
         elsif ($command eq "compare") {
             # Don't compare the subrepos; it doesn't work properly as
             # they aren't on a branch.
-            next if $remotepath eq "-";
+            next if $repo_is_submodule;
 
             my $compareto;
             if ($#args eq -1) {
