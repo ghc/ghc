@@ -32,7 +32,6 @@ import Data.Monoid
 import Bag
 import TcEvidence
 import BuildTyCl
-import TypeRep
 
 #include "HsVersions.h"
 \end{code}
@@ -98,7 +97,7 @@ tcPatSynDecl lname@(L _ name) details lpat dir
 
        ; traceTc "tcPatSynDecl }" $ ppr name
        ; let patSyn = mkPatSyn name is_infix
-                        (map varType args)
+                        args
                         univ_tvs ex_tvs
                         prov_theta req_theta
                         pat_ty
@@ -114,18 +113,12 @@ tcPatSynMatcher :: Located Name
                 -> ThetaType -> ThetaType
                 -> TcType
                 -> TcM (Id, LHsBinds Id)
--- See Note [Matchers and wrappers for pattern synonyms] in PatSyn
 tcPatSynMatcher (L loc name) lpat args univ_tvs ex_tvs ev_binds prov_dicts req_dicts prov_theta req_theta pat_ty
   = do { res_tv <- zonkQuantifiedTyVar =<< newFlexiTyVar liftedTypeKind
-       ; matcher_name <- newImplicitBinder name mkMatcherOcc
-       ; let res_ty = TyVarTy res_tv
-             cont_ty = mkSigmaTy ex_tvs prov_theta $
-                       mkFunTys (map varType args) res_ty
-
-       ; let matcher_tau = mkFunTys [pat_ty, cont_ty, res_ty] res_ty
-             matcher_sigma = mkSigmaTy (res_tv:univ_tvs) req_theta matcher_tau
-             matcher_id = mkVanillaGlobal matcher_name matcher_sigma
-
+       ; (matcher_id, res_ty, cont_ty) <- mkPatSynMatcherId name args
+                                            univ_tvs ex_tvs
+                                            prov_theta req_theta
+                                            pat_ty res_tv
        ; traceTc "tcPatSynMatcher" (ppr name $$ ppr (idType matcher_id))
        ; let matcher_lid = L loc matcher_id
 
@@ -186,7 +179,6 @@ tcPatSynWrapper :: Located Name
                 -> ThetaType
                 -> TcType
                 -> TcM (Maybe (Id, LHsBinds Id))
--- See Note [Matchers and wrappers for pattern synonyms] in PatSyn
 tcPatSynWrapper lname lpat dir args univ_tvs ex_tvs theta pat_ty
   = do { let argNames = mkNameSet (map Var.varName args)
        ; m_expr <- runMaybeT $ tcPatToExpr argNames lpat
@@ -207,16 +199,18 @@ tc_pat_syn_wrapper_from_expr :: Located Name
                              -> TcM (Id, LHsBinds Id)
 tc_pat_syn_wrapper_from_expr (L loc name) lexpr args univ_tvs ex_tvs theta pat_ty
   = do { let qtvs = univ_tvs ++ ex_tvs
-       ; (subst, wrapper_tvs) <- tcInstSkolTyVars qtvs
-       ; let wrapper_theta = substTheta subst theta
+       ; (subst, qtvs') <- tcInstSkolTyVars qtvs
+       ; let theta' = substTheta subst theta
              pat_ty' = substTy subst pat_ty
              args' = map (\arg -> setVarType arg $ substTy subst (varType arg)) args
-             wrapper_tau = mkFunTys (map varType args') pat_ty'
-             wrapper_sigma = mkSigmaTy wrapper_tvs wrapper_theta wrapper_tau
 
-       ; wrapper_name <- newImplicitBinder name mkDataConWrapperOcc
-       ; let wrapper_lname = L loc wrapper_name
-             wrapper_id = mkVanillaGlobal wrapper_name wrapper_sigma
+       ; wrapper_id <- mkPatSynWrapperId name args qtvs theta pat_ty
+       ; let wrapper_name = getName wrapper_id
+             wrapper_lname = L loc wrapper_name
+             -- (wrapper_tvs, wrapper_theta, wrapper_tau) = tcSplitSigmaTy (idType wrapper_id)
+             wrapper_tvs = qtvs'
+             wrapper_theta = theta'
+             wrapper_tau = mkFunTys (map varType args') pat_ty'
 
        ; let wrapper_args = map (noLoc . VarPat . Var.varName) args'
              wrapper_match = mkMatch wrapper_args lexpr EmptyLocalBinds

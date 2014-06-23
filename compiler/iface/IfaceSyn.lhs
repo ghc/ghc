@@ -59,7 +59,6 @@ import HsBinds
 
 import Control.Monad
 import System.IO.Unsafe
-import Data.Maybe (isJust)
 
 infixl 3 &&&
 \end{code}
@@ -121,16 +120,13 @@ data IfaceDecl
                    ifExtName :: Maybe FastString }
 
   | IfacePatSyn { ifName          :: OccName,           -- Name of the pattern synonym
+                  ifPatHasWrapper :: Bool,
                   ifPatIsInfix    :: Bool,
-                  ifPatMatcher    :: IfExtName,
-                  ifPatWrapper    :: Maybe IfExtName,
-                  -- Everything below is redundant,
-                  -- but needed to implement pprIfaceDecl
                   ifPatUnivTvs    :: [IfaceTvBndr],
                   ifPatExTvs      :: [IfaceTvBndr],
                   ifPatProvCtxt   :: IfaceContext,
                   ifPatReqCtxt    :: IfaceContext,
-                  ifPatArgs       :: [IfaceType],
+                  ifPatArgs       :: [IfaceIdBndr],
                   ifPatTy         :: IfaceType }
 
 -- A bit of magic going on here: there's no need to store the OccName
@@ -190,7 +186,7 @@ instance Binary IfaceDecl where
         put_ bh a3
         put_ bh a4
 
-    put_ bh (IfacePatSyn name a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
+    put_ bh (IfacePatSyn name a2 a3 a4 a5 a6 a7 a8 a9) = do
         putByte bh 6
         put_ bh (occNameFS name)
         put_ bh a2
@@ -201,7 +197,6 @@ instance Binary IfaceDecl where
         put_ bh a7
         put_ bh a8
         put_ bh a9
-        put_ bh a10
 
     get bh = do
         h <- getByte bh
@@ -258,9 +253,8 @@ instance Binary IfaceDecl where
                     a7 <- get bh
                     a8 <- get bh
                     a9 <- get bh
-                    a10 <- get bh
                     occ <- return $! mkOccNameFS dataName a1
-                    return (IfacePatSyn occ a2 a3 a4 a5 a6 a7 a8 a9 a10)
+                    return (IfacePatSyn occ a2 a3 a4 a5 a6 a7 a8 a9)
             _ -> panic (unwords ["Unknown IfaceDecl tag:", show h])
 
 data IfaceSynTyConRhs
@@ -1021,6 +1015,11 @@ ifaceDeclImplicitBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_tc_occ,
     dc_occ = mkClassDataConOcc cls_tc_occ
     is_newtype = n_sigs + n_ctxt == 1 -- Sigh
 
+ifaceDeclImplicitBndrs (IfacePatSyn{ ifName = ps_occ, ifPatHasWrapper = has_wrapper })
+  = [wrap_occ | has_wrapper]
+  where
+    wrap_occ = mkDataConWrapperOcc ps_occ  -- Id namespace
+
 ifaceDeclImplicitBndrs _ = []
 
 -- -----------------------------------------------------------------------------
@@ -1104,7 +1103,7 @@ pprIfaceDecl (IfaceAxiom {ifName = name, ifTyCon = tycon, ifAxBranches = branche
   = hang (ptext (sLit "axiom") <+> ppr name <> dcolon)
        2 (vcat $ map (pprAxBranch $ Just tycon) branches)
 
-pprIfaceDecl (IfacePatSyn { ifName = name, ifPatWrapper = wrapper,
+pprIfaceDecl (IfacePatSyn { ifName = name, ifPatHasWrapper = has_wrap,
                             ifPatIsInfix = is_infix,
                             ifPatUnivTvs = _univ_tvs, ifPatExTvs = _ex_tvs,
                             ifPatProvCtxt = prov_ctxt, ifPatReqCtxt = req_ctxt,
@@ -1112,8 +1111,7 @@ pprIfaceDecl (IfacePatSyn { ifName = name, ifPatWrapper = wrapper,
                             ifPatTy = ty })
   = pprPatSynSig name has_wrap args' ty' (pprCtxt prov_ctxt) (pprCtxt req_ctxt)
   where
-    has_wrap = isJust wrapper
-    args' = case (is_infix, args) of
+    args' = case (is_infix, map snd args) of
         (True, [left_ty, right_ty]) ->
             InfixPatSyn (pprParendIfaceType left_ty) (pprParendIfaceType right_ty)
         (_, tys) ->
@@ -1394,13 +1392,11 @@ freeNamesIfDecl d@IfaceAxiom{} =
   freeNamesIfTc (ifTyCon d) &&&
   fnList freeNamesIfAxBranch (ifAxBranches d)
 freeNamesIfDecl d@IfacePatSyn{} =
-  unitNameSet (ifPatMatcher d) &&&
-  maybe emptyNameSet unitNameSet (ifPatWrapper d) &&&
   freeNamesIfTvBndrs (ifPatUnivTvs d) &&&
   freeNamesIfTvBndrs (ifPatExTvs d) &&&
   freeNamesIfContext (ifPatProvCtxt d) &&&
   freeNamesIfContext (ifPatReqCtxt d) &&&
-  fnList freeNamesIfType (ifPatArgs d) &&&
+  fnList freeNamesIfType (map snd (ifPatArgs d)) &&&
   freeNamesIfType (ifPatTy d)
 
 freeNamesIfAxBranch :: IfaceAxBranch -> NameSet
