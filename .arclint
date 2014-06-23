@@ -13,7 +13,10 @@
       "type": "nolint"
     },
     "text": {
-      "type": "text"
+      "type": "text",
+      "severity": {
+        "5": "disabled"
+      }
     }
   }
 }
