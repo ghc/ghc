@@ -727,7 +727,7 @@ getLinkerInfo' dflags = do
                  -- that doesn't support --version. We can just assume that's
                  -- what we're using.
                  return $ DarwinLD []
-               OSiOS -> 
+               OSiOS ->
                  -- Ditto for iOS
                  return $ DarwinLD []
                OSMinGW32 ->
@@ -786,12 +786,15 @@ getCompilerInfo' dflags = do
         -- Regular clang
         | any ("clang version" `isPrefixOf`) stde =
           return Clang
+        -- XCode 5.1 clang
+        | any ("Apple LLVM version 5.1" `isPrefixOf`) stde =
+          return AppleClang51
         -- XCode 5 clang
         | any ("Apple LLVM version" `isPrefixOf`) stde =
-          return Clang
+          return AppleClang
         -- XCode 4.1 clang
         | any ("Apple clang version" `isPrefixOf`) stde =
-          return Clang
+          return AppleClang
          -- Unknown linker.
         | otherwise = fail "invalid -v output, or compiler is unsupported"
 
