@@ -439,7 +439,7 @@ rnPatAndThen mk (PArrPat pats _)
 rnPatAndThen mk (TuplePat pats boxed _)
   = do { liftCps $ checkTupSize (length pats)
        ; pats' <- rnLPatsAndThen mk pats
-       ; return (TuplePat pats' boxed []) }
+       ; return (TuplePat pats' boxed placeHolderType) }
 
 rnPatAndThen _ (SplicePat splice)
   = do { -- XXX How to deal with free variables?

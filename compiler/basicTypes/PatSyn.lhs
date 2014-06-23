@@ -14,8 +14,7 @@ module PatSyn (
         patSynId, patSynType, patSynArity, patSynIsInfix,
         patSynArgs, patSynTyDetails,
         patSynWrapper, patSynMatcher,
-        patSynExTyVars, patSynSig, 
-        patSynInstArgTys, patSynInstResTy
+        patSynExTyVars, patSynSig, patSynInstArgTys
     ) where
 
 #include "HsVersions.h"
@@ -125,7 +124,7 @@ data PatSyn
         psExTyVars    :: [TyVar],     -- Existentially-quantified type vars
         psProvTheta   :: ThetaType,   -- Provided dictionaries
         psReqTheta    :: ThetaType,   -- Required dictionaries
-        psOrigResTy   :: Type,        -- Mentions only psUnivTyVars
+        psOrigResTy   :: Type,
 
         -- See Note [Matchers and wrappers for pattern synonyms]
         psMatcher     :: Id,
@@ -263,13 +262,6 @@ patSynMatcher :: PatSyn -> Id
 patSynMatcher = psMatcher
 
 patSynInstArgTys :: PatSyn -> [Type] -> [Type]
--- Return the types of the argument patterns
--- e.g.  data D a = forall b. MkD a b (b->a)
---       pattern P f x y = MkD (x,True) y f
---          D :: forall a. forall b. a -> b -> (b->a) -> D a
---          P :: forall c. forall b. (b->(c,Bool)) -> c -> b -> P c
---   patSynInstArgTys P [Int,bb] = [bb->(Int,Bool), Int, bb]
--- NB: the inst_tys should be both universal and existential
 patSynInstArgTys ps inst_tys
   = ASSERT2( length tyvars == length inst_tys
           , ptext (sLit "patSynInstArgTys") <+> ppr ps $$ ppr tyvars $$ ppr inst_tys )
@@ -277,17 +269,4 @@ patSynInstArgTys ps inst_tys
   where
     (univ_tvs, ex_tvs, _, _) = patSynSig ps
     tyvars = univ_tvs ++ ex_tvs
-
-patSynInstResTy :: PatSyn -> [Type] -> Type
--- Return the type of whole pattern
--- E.g.  pattern P x y = Just (x,x,y)
---         P :: a -> b -> Just (a,a,b)
---         (patSynInstResTy P [Int,Bool] = Maybe (Int,Int,Bool)
--- NB: unlikepatSynInstArgTys, the inst_tys should be just the *universal* tyvars
-patSynInstResTy ps inst_tys
-  = ASSERT2( length univ_tvs == length inst_tys
-           , ptext (sLit "patSynInstResTy") <+> ppr ps $$ ppr univ_tvs $$ ppr inst_tys )
-    substTyWith univ_tvs inst_tys (psOrigResTy ps)
-  where
-    (univ_tvs, _, _, _) = patSynSig ps
 \end{code}

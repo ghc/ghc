@@ -666,7 +666,7 @@ checkAPat msg loc e0 = do
 
    ExplicitTuple es b
      | all tupArgPresent es  -> do ps <- mapM (checkLPat msg) [e | Present e <- es]
-                                   return (TuplePat ps b [])
+                                   return (TuplePat ps b placeHolderType)
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
    RecordCon c _ (HsRecFields fs dd)

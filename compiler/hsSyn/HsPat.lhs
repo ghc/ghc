@@ -75,13 +75,10 @@ data Pat id
                    -- overall type of the pattern, and the toList
                    -- function to convert the scrutinee to a list value
 
-  | TuplePat    [LPat id]    -- Tuple sub-patterns
-                Boxity       -- UnitPat is TuplePat []
-                [PostTcType] -- [] before typechecker, filled in afterwards with
-                             -- the types of the tuple components
-        -- You might think that the PostTcType was redundant, because we can 
-        -- get the pattern type by getting the types of the sub-patterns.
-        -- But it's essential
+  | TuplePat    [LPat id]               -- Tuple
+                Boxity                  -- UnitPat is TuplePat []
+                PostTcType
+        -- You might think that the PostTcType was redundant, but it's essential
         --      data T a where
         --        T1 :: Int -> T Int
         --      f :: (T a, a) -> Int
@@ -92,8 +89,6 @@ data Pat id
         -- Note the (w::a), NOT (w::Int), because we have not yet
         -- refined 'a' to Int.  So we must know that the second component
         -- of the tuple is of type 'a' not Int.  See selectMatchVar
-        -- (June 14: I'm not sure this comment is right; the sub-patterns
-        --           will be wrapped in CoPats, no?)
 
   | PArrPat     [LPat id]               -- Syntactic parallel array
                 PostTcType              -- The type of the elements
@@ -103,18 +98,14 @@ data Pat id
                 (HsConPatDetails id)
 
   | ConPatOut {
-        pat_con     :: Located ConLike,
-        pat_arg_tys :: [Type],          -- The univeral arg types, 1-1 with the universal
-                                        -- tyvars of the constructor/pattern synonym
-                                        --   Use (conLikeResTy pat_con pat_arg_tys) to get 
-                                        --   the type of the pattern
-
+        pat_con   :: Located ConLike,
         pat_tvs   :: [TyVar],           -- Existentially bound type variables (tyvars only)
         pat_dicts :: [EvVar],           -- Ditto *coercion variables* and *dictionaries*
                                         -- One reason for putting coercion variable here, I think,
                                         --      is to ensure their kinds are zonked
         pat_binds :: TcEvBinds,         -- Bindings involving those dictionaries
         pat_args  :: HsConPatDetails id,
+        pat_ty    :: Type,              -- The type of the pattern
         pat_wrap  :: HsWrapper          -- Extra wrapper to pass to the matcher
     }
 
@@ -322,18 +313,18 @@ instance (OutputableBndr id, Outputable arg)
 %************************************************************************
 
 \begin{code}
-mkPrefixConPat :: DataCon -> [OutPat id] -> [Type] -> OutPat id
+mkPrefixConPat :: DataCon -> [OutPat id] -> Type -> OutPat id
 -- Make a vanilla Prefix constructor pattern
-mkPrefixConPat dc pats tys
+mkPrefixConPat dc pats ty
   = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon dc), pat_tvs = [], pat_dicts = [],
                         pat_binds = emptyTcEvBinds, pat_args = PrefixCon pats,
-                        pat_arg_tys = tys, pat_wrap = idHsWrapper }
+                        pat_ty = ty, pat_wrap = idHsWrapper }
 
 mkNilPat :: Type -> OutPat id
-mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
+mkNilPat ty = mkPrefixConPat nilDataCon [] ty
 
 mkCharLitPat :: Char -> OutPat id
-mkCharLitPat c = mkPrefixConPat charDataCon [noLoc $ LitPat (HsCharPrim c)] []
+mkCharLitPat c = mkPrefixConPat charDataCon [noLoc $ LitPat (HsCharPrim c)] charTy
 \end{code}
 
 

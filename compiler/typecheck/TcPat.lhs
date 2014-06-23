@@ -531,9 +531,9 @@ tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
 	-- so that we can experiment with lazy tuple-matching.
 	-- This is a pretty odd place to make the switch, but
 	-- it was easy to do.
-	; let 
-              unmangled_result = TuplePat pats' boxity arg_tys
-                                 -- pat_ty /= pat_ty iff coi /= IdCo
+	; let pat_ty'          = mkTyConApp tc arg_tys
+                                     -- pat_ty /= pat_ty iff coi /= IdCo
+              unmangled_result = TuplePat pats' boxity pat_ty'
 	      possibly_mangled_result
 	        | gopt Opt_IrrefutableTuples dflags &&
                   isBoxed boxity            = LazyPat (noLoc unmangled_result)
@@ -730,14 +730,13 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
                                (zipTopTvSubst univ_tvs ctxt_res_tys) ex_tvs
                      -- Get location from monad, not from ex_tvs
 
-        ; let -- pat_ty' = mkTyConApp tycon ctxt_res_tys
+        ; let pat_ty' = mkTyConApp tycon ctxt_res_tys
 	      -- pat_ty' is type of the actual constructor application
               -- pat_ty' /= pat_ty iff coi /= IdCo
               
 	      arg_tys' = substTys tenv arg_tys
 
-        ; traceTc "tcConPat" (vcat [ ppr con_name, ppr univ_tvs, ppr ex_tvs, ppr eq_spec
-                                   , ppr ex_tvs', ppr ctxt_res_tys, ppr arg_tys' ])
+        ; traceTc "tcConPat" (ppr con_name $$ ppr ex_tvs' $$ ppr pat_ty' $$ ppr arg_tys')
 	; if null ex_tvs && null eq_spec && null theta
 	  then do { -- The common case; no class bindings etc 
                     -- (see Note [Arrows and patterns])
@@ -747,7 +746,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
 			            	      pat_tvs = [], pat_dicts = [], 
                                               pat_binds = emptyTcEvBinds,
 					      pat_args = arg_pats', 
-                                              pat_arg_tys = ctxt_res_tys,
+                                              pat_ty = pat_ty',
                                               pat_wrap = idHsWrapper }
 
 		  ; return (mkHsWrapPat wrap res_pat pat_ty, res) }
@@ -780,7 +779,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
 			            pat_dicts = given,
 			            pat_binds = ev_binds,
 			            pat_args  = arg_pats', 
-                                    pat_arg_tys = ctxt_res_tys,
+                                    pat_ty    = pat_ty',
                                     pat_wrap  = idHsWrapper }
 	; return (mkHsWrapPat wrap res_pat pat_ty, res)
 	} }
@@ -794,7 +793,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
               arg_tys = patSynArgs pat_syn
               ty = patSynType pat_syn
 
-        ; (univ_tvs', inst_tys, subst) <- tcInstTyVars univ_tvs
+        ; (_univ_tvs', inst_tys, subst) <- tcInstTyVars univ_tvs
 
 	; checkExistentials ex_tvs penv
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX subst ex_tvs
@@ -838,7 +837,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 			            pat_dicts = prov_dicts',
 			            pat_binds = ev_binds,
 			            pat_args  = arg_pats',
-                                    pat_arg_tys = mkTyVarTys univ_tvs',
+                                    pat_ty    = ty',
                                     pat_wrap  = req_wrap }
 	; return (mkHsWrapPat wrap res_pat pat_ty, res) }
 

@@ -15,7 +15,6 @@ module TcHsSyn (
         mkHsAppTy, mkSimpleHsAlt,
         nlHsIntLit,
         shortCutLit, hsOverLitName,
-        conLikeResTy,
 
         -- re-exported from TcMonad
         TcId, TcIdSet,
@@ -39,9 +38,7 @@ import TcEvidence
 import TysPrim
 import TysWiredIn
 import Type
-import ConLike
 import DataCon
-import PatSyn( patSynInstResTy )
 import Name
 import NameSet
 import Var
@@ -83,18 +80,13 @@ hsPatType (ViewPat _ _ ty)            = ty
 hsPatType (ListPat _ ty Nothing)      = mkListTy ty
 hsPatType (ListPat _ _ (Just (ty,_))) = ty
 hsPatType (PArrPat _ ty)              = mkPArrTy ty
-hsPatType (TuplePat _ bx tys)         = mkTupleTy (boxityNormalTupleSort bx) tys
-hsPatType (ConPatOut { pat_con = L _ con, pat_arg_tys = tys }) 
-                                      = conLikeResTy con tys
+hsPatType (TuplePat _ _ ty)           = ty
+hsPatType (ConPatOut { pat_ty = ty }) = ty
 hsPatType (SigPatOut _ ty)            = ty
 hsPatType (NPat lit _ _)              = overLitType lit
 hsPatType (NPlusKPat id _ _ _)        = idType (unLoc id)
 hsPatType (CoPat _ _ ty)              = ty
 hsPatType p                           = pprPanic "hsPatType" (ppr p)
-
-conLikeResTy :: ConLike -> [Type] -> Type
-conLikeResTy (RealDataCon con) tys = mkTyConApp (dataConTyCon con) tys
-conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 
 hsLitType :: HsLit -> TcType
 hsLitType (HsChar _)       = charTy
@@ -1035,16 +1027,16 @@ zonk_pat env (PArrPat pats ty)
         ; (env', pats') <- zonkPats env pats
         ; return (env', PArrPat pats' ty') }
 
-zonk_pat env (TuplePat pats boxed tys)
-  = do  { tys' <- mapM (zonkTcTypeToType env) tys
+zonk_pat env (TuplePat pats boxed ty)
+  = do  { ty' <- zonkTcTypeToType env ty
         ; (env', pats') <- zonkPats env pats
-        ; return (env', TuplePat pats' boxed tys') }
+        ; return (env', TuplePat pats' boxed ty') }
 
-zonk_pat env p@(ConPatOut { pat_arg_tys = tys, pat_tvs = tyvars
+zonk_pat env p@(ConPatOut { pat_ty = ty, pat_tvs = tyvars
                           , pat_dicts = evs, pat_binds = binds
                           , pat_args = args, pat_wrap = wrapper })
   = ASSERT( all isImmutableTyVar tyvars )
-    do  { new_tys <- mapM (zonkTcTypeToType env) tys
+    do  { new_ty <- zonkTcTypeToType env ty
         ; (env0, new_tyvars) <- zonkTyBndrsX env tyvars
           -- Must zonk the existential variables, because their
           -- /kind/ need potential zonking.
@@ -1053,7 +1045,7 @@ zonk_pat env p@(ConPatOut { pat_arg_tys = tys, pat_tvs = tyvars
         ; (env2, new_binds) <- zonkTcEvBinds env1 binds
         ; (env3, new_wrapper) <- zonkCoFn env2 wrapper
         ; (env', new_args) <- zonkConStuff env3 args
-        ; return (env', p { pat_arg_tys = new_tys,
+        ; return (env', p { pat_ty = new_ty,
                             pat_tvs = new_tyvars,
                             pat_dicts = new_evs,
                             pat_binds = new_binds,
