@@ -26,32 +26,50 @@ so please contribute!
 
 \section{Current packaging architecture}
 
-The overall architecture is described in Figure~\ref{fig:arch} (ignore
-the red and green bits for now).
+The overall architecture is described in Figure~\ref{fig:arch}.
 
 \begin{figure}[H]
     \center{\scalebox{0.8}{\includegraphics{arch.png}}}
 \label{fig:arch}\caption{Architecture of GHC, ghc-pkg and Cabal. Green bits indicate additions from upcoming IHG work, red bits indicate additions from Backpack.  Orange indicates a Haskell library.}
 \end{figure}
 
-Here, arrows indicate dependencies from one component to another.
-(insert architectural description here)
+Here, arrows indicate dependencies from one component to another.  Color
+coding is as follows: orange components are libaries, green components
+are to be added with the IHG work, red components are to be added with
+Backpack.  (Thus, black and orange can be considered the current)
 
-A particularly important component of this picture is the package
-database, sketched in Figure~\ref{fig:pkgdb}.
+\subsection{Installed package database}
+
+Starting from the bottom, we have the \emph{installed package database}
+(actually a collection of such databases), which stores information
+about what packages have been installed are thus available to be
+compiled against.  There is both a global database (for the system
+administrator) and a local database (for end users), which can be
+updated independently.  One way to think about the package database
+is as a \emph{cache of object code}.  In principle, one could compile
+any piece of code by repeatedly recompiling all of its dependencies;
+the installed package database describes when this can be bypassed.
 
 \begin{figure}[H]
     \center{\scalebox{0.8}{\includegraphics{pkgdb.png}}}
 \label{fig:pkgdb}\caption{Anatomy of a package database.}
 \end{figure}
 
-An installed package is calculated from a Cabal file through the process
-of dependency resolution and compilation.  We can think of it a
-database, whose primary key is the InstalledPackageId
+In Figure~\ref{fig:pkgdb}, we show the structure of a package database.
+The installed package are created from a Cabal file through the process
+of dependency resolution and compilation.  In database terms, the primary key
+of a package database is the InstalledPackageId
 (Figure~\ref{fig:current-pkgid}).  This ID uniquely identifies an
 instance of an installed package.  The PackageId omits the ABI hash and
 is used to qualify linker exported symbols: the current value of this
 parameter is communicated to GHC using the \verb|-package-id| flag.
+
+In principle, packages with different PackageIds should be linkable
+together in the same compiled program, whereas packages with the same
+PackageId are not (even if they have different InstalledPackageIds).  In
+practice, GHC is currently only able to select one version of a package,
+as it clears out all old versions of the package in
+\ghcfile{compiler/main/Package.lhs}:applyPackageFlag.
 
 \begin{figure}
     \center{\begin{tabular}{r l}
@@ -67,12 +85,25 @@ its compiled code and interface files live, its compilation flags, what modules
 it exposes, etc.  Much of this information is only relevant to Cabal; GHC
 uses a subset of the information in the package database.
 
-In principle, packages with different PackageIds should be linkable
-together in the same compiled program, whereas packages with the same
-PackageId are not (even if they have different InstalledPackageIds).  In
-practice, GHC is currently only able to select one version of a package,
-as it clears out all old versions of the package in
-\ghcfile{compiler/main/Package.lhs}:applyPackageFlag.
+\subsection{GHC}
+
+The two programs which access the package database directly are GHC
+proper (for compilation) and ghc-pkg (which is a general purpose
+command line tool for manipulating the database.)  GHC relies on
+the package database in the following ways:
+
+\begin{itemize}
+    \item It imports the local and global package databases into
+        its runtime database, and applies modifications to the exposed
+        and trusted status of the entries via the flags \verb|-package|
+        and others (\ghcfile{compiler/main/Packages.lhs}).  The internal
+        package state can be seen at \verb|-v4| or higher.
+    \item It uses this package database to find the location of module
+        interfaces when it attempts to load the module info of an external
+        module (\ghcfile{compiler/iface/LoadIface.hs}).
+\end{itemize}
+
+(ToDo: describe Cabal/cabal-install/sandbox)
 
 \section{Goals}
 
@@ -177,7 +208,8 @@ logical name.  But see the caveats below.
 previously, GHC is unable to select multiple packages with the same
 package name (but different PackageIds).  This restriction needs to be
 lifted.  For backwards compatibility reasons, it's probably better to
-not overload \verb|-package-id| but add a new flag, maybe \verb|-force-package-id|.
+not overload \verb|-package-id| but add a new flag, maybe \verb|-force-package-id|;
+we also need to disable the old version masking behavior.
 
 \paragraph{Linker symbols} As we increase the amount of information in
 PackageId, it's important to be careful about the length of these IDs,
@@ -355,7 +387,8 @@ variables, constructors and recursive module identities.  As we
 mentioned in Section~\ref{sec:ipi}, for concrete modules where there are
 no free variables, physical identity maps nicely to an original name.
 For packages with holes, the original names mechanism needs to be more
-flexible.
+flexible; we need to first run a shaping pass in order to figure out if
+a module is actually equal to another.
 
 The direct approach is to replace original names with Backpack's
 physical identities and use unification to do comparisons.  However,
@@ -548,6 +581,102 @@ be calculated to directly refer to the ``original name'' of each them;
 so for example M and R point directly to package P, but they also
 include the original name they had in the original definition.
 
+\section{Shaping}\label{sec:shaping}
+
+Here is a hyper-simplified picture of how Backpack in its full glory might look.
+
+Recall in Figure~\ref{fig:pkgdb}, we have Cabal which is responsible for
+taking Cabal files and invoking GHC to build an installed package.  The
+command line looks something like:
+
+\begin{verbatim}
+ghc --make
+    -package-name a-0.1
+    -hide-all-packages
+    -package-id containers-0.9-ABCD
+    Module1 Module2
+\end{verbatim}
+
+We notice a few things, first that GHC accepts some flags which
+configure its view of the package database (really it's just loaded
+in-memory), so that when we perform an import, GHC knows how to find the
+module (\verb|findModule|).
+
+The claim is that we can implement Backpack by adding an extra pass
+to Cabal which we will call the shaper, which performs the shaping pass
+as described by the Backpack paper.  In full generality, the \emph{module shape}
+is what needs to be passed from Cabal to GHC, but in our simplified example
+we're just going to deal with what SPJ calls the ``module environment'' (which
+roughly corresponds to a logical shape context in the paper.)  This module
+environment maps logical module names to the \emph{original names}, i.e.
+overloading the behavior of how we find modules on imports.
+
+We'll go by way of an example:
+
+\begin{verbatim}
+package a1 where
+    A :: [ data T; f : T -> T ]
+package a2 where
+    A :: [ data T; g : T -> T ]
+package b
+    include a1
+    include a2
+    A = [ ... ] -- call physical identity b-2.7:A
+\end{verbatim}
+
+At the end of the day, we'd like package b to be compiled with a map from
+logical name A to physical identity \verb|b-2.7:A|. But what about packages
+a1 and a2?  Since these have holes, we don't really know what their physical
+identities are; but that doesn't mean we don't talk about them; instead,
+we have a module variable for the holes.  These holes have signatures, which can be thought
+of as the interface files.  So we have:\footnote{The type signatures are not quite right because they need provenance information, but never-mind that for now.} \\
+
+\noindent
+\verb|a1:| $\forall \alpha.\ \mathrm{A} \mapsto \alpha \mbox{\texttt{\ ::\ [ data T\@; f :\ T -> T ]}}$ \\ % chktex 26
+\verb|a2:| $\forall \alpha.\ \mathrm{A} \mapsto \alpha \mbox{\texttt{\ ::\ [ data T\@; g :\ T -> T ]}}$ % chktex 26
+
+Now lets consider what happens as we do the shaping analysis on package b.
+We process each line of the module one-by-one, and initially, we start
+with an empty module environment.  When we process the first include, we
+now know about a mapping $A \mapsto \beta$, but we don't know the physical
+identity of the module so we gin up a module variable for now.  The second
+include, we have to instantiate the universal quantifier with $\beta$ because
+signature linking demands the modules be the same. Finally, when we hit the
+module definition, we see that $A \mapsto \mathtt{b-2.7:A}$.
+
+Now, importantly, remember that there were hi files associated with each
+of the signatures, and these hi files may contained original names
+corresponding to our module variables.  As we processed the mapping, we
+also built up a renaming of physical variable names to their true
+symbols, so we need to rename the respective $\alpha$s in each interface
+file to point ot \texttt{b-2.7:A}, as we ended up seeing.
+
+(SPJ and I went through a few other examples, including the case of recursive
+module linking:
+
+\begin{verbatim}
+package a1 where
+    A :: ...
+    B = [import A]
+package b where
+    include a1
+    A = [import B]
+\end{verbatim}
+
+and verified it worked.  Note that recursively linked modules do not get
+inlining! We ust need to know what the original name of what we're linking
+against is, so we can stick in the right symbols.)
+
+Now, the most paper-like thing one an do in this circumstance is to pass
+over the renaming, but we'd like to avoid having command line arguments
+that are too long.  So SPJ's proposal is that, instead, we have a \emph{module
+interface file} (or \emph{module manifest}) which collects the various information
+that we might be interested in about module providence and renaming.  Now,
+in order to program GHC to have the right logical namespace, we only need
+to list the appropriate package manifests but with the appropriate thinning
+and renaming.  This could be shorter, and maps more nicely onto the existing
+package command line flags.  We'd have to make sure this works out, but it's
+exactly analogous to how we do interface files.
 
 \section{Open questions}\label{sec:open-questions}
 
