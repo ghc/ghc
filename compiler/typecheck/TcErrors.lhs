@@ -668,10 +668,11 @@ mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> SDoc -> Ct
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   | isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
-                            -- be oriented the other way round; see TcCanonical.reOrient
+                            -- be oriented the other way round;
+                            -- see TcCanonical.canEqTyVarTyVar
   || isSigTyVar tv1 && not (isTyVarTy ty2)
   = mkErrorMsg ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
-                             , extraTyVarInfo ctxt ty1 ty2
+                             , extraTyVarInfo ctxt tv1 ty2
                              , extra ])
 
   -- So tv is a meta tyvar (or started that way before we 
@@ -701,7 +702,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   , Implic { ic_skols = skols } <- implic
   , tv1 `elem` skols
   = mkErrorMsg ctxt ct (vcat [ misMatchMsg oriented ty1 ty2
-                             , extraTyVarInfo ctxt ty1 ty2
+                             , extraTyVarInfo ctxt tv1 ty2
                              , extra ])
 
   -- Check for skolem escape
@@ -734,7 +735,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
                       , nest 2 $ ptext (sLit "inside the constraints") <+> pprEvVarTheta given
                       , nest 2 $ ptext (sLit "bound by") <+> ppr skol_info
                       , nest 2 $ ptext (sLit "at") <+> ppr (tcl_loc env) ]
-             tv_extra = extraTyVarInfo ctxt ty1 ty2
+             tv_extra = extraTyVarInfo ctxt tv1 ty2
              add_sig  = suggestAddSig ctxt ty1 ty2
        ; mkErrorMsg ctxt ct (vcat [msg, untch_extra, tv_extra, add_sig, extra]) }
 
@@ -815,15 +816,18 @@ pp_givens givens
                 2 (sep [ ptext (sLit "bound by") <+> ppr skol_info
                        , ptext (sLit "at") <+> ppr loc])
 
-extraTyVarInfo :: ReportErrCtxt -> TcType -> TcType -> SDoc
+extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
 -- Add on extra info about skolem constants
 -- NB: The types themselves are already tidied
-extraTyVarInfo ctxt ty1 ty2
-  = nest 2 (tv_extra ty1 $$ tv_extra ty2)
+extraTyVarInfo ctxt tv1 ty2
+  = nest 2 (tv_extra tv1 $$ ty_extra ty2)
   where
     implics = cec_encl ctxt
-    tv_extra ty | Just tv <- tcGetTyVar_maybe ty
-                , isTcTyVar tv, isSkolemTyVar tv
+    ty_extra ty = case tcGetTyVar_maybe ty of
+                    Just tv -> tv_extra tv
+                    Nothing -> empty
+
+    tv_extra tv | isTcTyVar tv, isSkolemTyVar tv
                 , let pp_tv = quotes (ppr tv)
                 = case tcTyVarDetails tv of
                     SkolemTv {}   -> pp_tv <+> pprSkol (getSkolemInfo implics tv) (getSrcLoc tv)
