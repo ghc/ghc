@@ -1206,6 +1206,7 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         -- might be a hierarchical module.
         liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
 
+        ccInfo <- liftIO $ getCompilerInfo dflags
         let runAssembler inputFilename outputFilename
                 = liftIO $ as_prog dflags
                        ([ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
@@ -1220,7 +1221,9 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
                        ++ (if platformArch (targetPlatform dflags) == ArchSPARC
                            then [SysTools.Option "-mcpu=v9"]
                            else [])
-
+                       ++ (if ccInfo == AppleClang51
+                            then [SysTools.Option "-Qunused-arguments"]
+                            else [])
                        ++ [ SysTools.Option "-x"
                           , if with_cpp
                               then SysTools.Option "assembler-with-cpp"
@@ -2129,26 +2132,27 @@ joinObjectFiles dflags o_files output_fn = do
   let mySettings = settings dflags
       ldIsGnuLd = sLdIsGnuLd mySettings
       osInfo = platformOS (targetPlatform dflags)
-      ld_r args ccInfo = SysTools.runLink dflags ([
-                            SysTools.Option "-nostdlib",
-                            SysTools.Option "-Wl,-r"
-                            ]
-                         ++ (if ccInfo == Clang then []
-                              else [SysTools.Option "-nodefaultlibs"])
-                         ++ (if osInfo == OSFreeBSD
-                              then [SysTools.Option "-L/usr/lib"]
-                              else [])
-                            -- gcc on sparc sets -Wl,--relax implicitly, but
-                            -- -r and --relax are incompatible for ld, so
-                            -- disable --relax explicitly.
-                         ++ (if platformArch (targetPlatform dflags) == ArchSPARC
-                             && ldIsGnuLd
-                                then [SysTools.Option "-Wl,-no-relax"]
-                                else [])
-                         ++ map SysTools.Option ld_build_id
-                         ++ [ SysTools.Option "-o",
-                              SysTools.FileOption "" output_fn ]
-                         ++ args)
+      ld_r args cc = SysTools.runLink dflags ([
+                       SysTools.Option "-nostdlib",
+                       SysTools.Option "-Wl,-r"
+                     ]
+                     ++ (if any (cc ==) [Clang, AppleClang, AppleClang51]
+                          then []
+                          else [SysTools.Option "-nodefaultlibs"])
+                     ++ (if osInfo == OSFreeBSD
+                          then [SysTools.Option "-L/usr/lib"]
+                          else [])
+                        -- gcc on sparc sets -Wl,--relax implicitly, but
+                        -- -r and --relax are incompatible for ld, so
+                        -- disable --relax explicitly.
+                     ++ (if platformArch (targetPlatform dflags) == ArchSPARC
+                         && ldIsGnuLd
+                            then [SysTools.Option "-Wl,-no-relax"]
+                            else [])
+                     ++ map SysTools.Option ld_build_id
+                     ++ [ SysTools.Option "-o",
+                          SysTools.FileOption "" output_fn ]
+                     ++ args)
 
       -- suppress the generation of the .note.gnu.build-id section,
       -- which we don't need and sometimes causes ld to emit a

@@ -3757,6 +3757,8 @@ data LinkerInfo
 data CompilerInfo
    = GCC
    | Clang
+   | AppleClang
+   | AppleClang51
    | UnknownCC
    deriving Eq
 
