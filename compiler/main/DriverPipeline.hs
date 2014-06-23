@@ -1231,7 +1231,7 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
                        ++ (if platformArch (targetPlatform dflags) == ArchSPARC
                            then [SysTools.Option "-mcpu=v9"]
                            else [])
-                       ++ (if ccInfo == AppleClang51
+                       ++ (if any (ccInfo ==) [Clang, AppleClang, AppleClang51]
                             then [SysTools.Option "-Qunused-arguments"]
                             else [])
                        ++ [ SysTools.Option "-x"
