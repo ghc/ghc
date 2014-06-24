@@ -1444,16 +1444,6 @@ cond_functorOK allowFunctions (_, rep_tc, _)
     functions   = ptext (sLit "must not contain function types")
     wrong_arg   = ptext (sLit "must use the type variable only as the last argument of a data type")
 
-allDistinctTyVars :: [KindOrType] -> Bool
-allDistinctTyVars tkvs = go emptyVarSet tkvs
-  where
-    go _      [] = True
-    go so_far (ty : tys)
-       = case getTyVar_maybe ty of
-             Nothing -> False
-             Just tv | tv `elemVarSet` so_far -> False
-                     | otherwise -> go (so_far `extendVarSet` tv) tys
-
 checkFlag :: ExtensionFlag -> Condition
 checkFlag flag (dflags, _, _)
   | xopt flag dflags = Nothing
