@@ -158,9 +158,10 @@ instance (HasResolution a) => Read (Fixed a) where
 
 convertFixed :: forall a . HasResolution a => Lexeme -> ReadPrec (Fixed a)
 convertFixed (Number n)
- | Just (i, f) <- numberToFixed r n =
-    return (fromInteger i + (fromInteger f / (10 ^ r)))
-    where r = resolution (undefined :: Fixed a)
+ | Just (i, f) <- numberToFixed e n =
+    return (fromInteger i + (fromInteger f / fromInteger r))
+    where r = resolution (undefined :: Fixed a) -- = 10^e
+          e = round (logBase 10 (fromInteger r) :: Double)
 convertFixed _ = pfail
 
 data E0 = E0
