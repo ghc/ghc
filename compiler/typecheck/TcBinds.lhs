@@ -274,6 +274,30 @@ time by defaulting.  No no no.
 However [Oct 10] this is all handled automatically by the 
 untouchable-range idea.
 
+Note [Placeholder PatSyn kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (Trac #9161)
+
+  {-# LANGUAGE PatternSynonyms, DataKinds #-}
+  pattern A = ()
+  b :: A
+  b = undefined
+
+Here, the type signature for b mentions A.  But A is a pattern
+synonym, which is typechecked (for very good reasons; a view pattern
+in the RHS may mention a value binding) as part of a group of
+bindings.  It is entirely resonable to reject this, but to do so
+we need A to be in the kind environment when kind-checking the signature for B.
+
+Hence the tcExtendKindEnv2 patsyn_placeholder_kinds, which adds a binding
+    A -> AGlobal (AConLike (PatSynCon _|_))
+to the environment. Then TcHsType.tcTyVar will find A in the kind environment,
+and will give a 'wrongThingErr' as a result.  But the lookup of A won't fail.
+
+The _|_ (= panic "fakePatSynCon") works because the wrongThingErr call, in
+tcTyVar, doesn't look inside the TcTyThing.
+
+
 \begin{code}
 tcValBinds :: TopLevelFlag 
            -> [(RecFlag, LHsBinds Name)] -> [LSig Name]
@@ -281,12 +305,9 @@ tcValBinds :: TopLevelFlag
            -> TcM ([(RecFlag, LHsBinds TcId)], thing) 
 
 tcValBinds top_lvl binds sigs thing_inside
-  = do  {       -- Add fake entries for pattern synonyms so that
-                -- precise error messages can be generated when
-                -- trying to use a pattern synonym as a kind
-          traceTc "Fake lifted patsyns:" (vcat (map ppr patsyns))
-                -- Typecheck the signature
-        ; (poly_ids, sig_fn) <- tcExtendKindEnv2 [(patsyn, fakePatSynCon) | patsyn <- patsyns] $
+  = do  {  -- Typecheck the signature
+        ; (poly_ids, sig_fn) <- tcExtendKindEnv2 patsyn_placeholder_kinds $
+                                     -- See Note [Placeholder PatSyn kinds]
                                 tcTySigs sigs
 
         ; let prag_fn = mkPragFun sigs (foldr (unionBags . snd) emptyBag binds)
@@ -298,11 +319,12 @@ tcValBinds top_lvl binds sigs thing_inside
             tcBindGroups top_lvl sig_fn prag_fn
                          binds thing_inside }
   where
-    patsyns = [ name
-              | (_, lbinds) <- binds
-              , L _ (PatSynBind{ patsyn_id = L _ name }) <- bagToList lbinds
-              ]
-    fakePatSynCon = AGlobal $ AConLike $ PatSynCon $ panic "fakePatSynCon"
+    patsyn_placeholder_kinds -- See Note [Placeholder PatSyn kinds]
+       = [ (name, placeholder_patsyn_tything)
+         | (_, lbinds) <- binds
+         , L _ (PatSynBind{ patsyn_id = L _ name }) <- bagToList lbinds ]
+    placeholder_patsyn_tything
+       = AGlobal $ AConLike $ PatSynCon $ panic "fakePatSynCon"
 
 ------------------------
 tcBindGroups :: TopLevelFlag -> TcSigFun -> PragFun
