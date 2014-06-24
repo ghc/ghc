@@ -872,6 +872,9 @@ notFound name
        }
 
 wrongThingErr :: String -> TcTyThing -> Name -> TcM a
+-- It's important that this only calls pprTcTyThingCategory, which in 
+-- turn does not look at the details of the TcTyThing.
+-- See Note [Placeholder PatSyn kinds] in TcBinds
 wrongThingErr expected thing name
   = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+> 
                 ptext (sLit "used as a") <+> text expected)
