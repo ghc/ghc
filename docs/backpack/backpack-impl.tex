@@ -103,12 +103,14 @@ the package database in the following ways:
         module (\ghcfile{compiler/iface/LoadIface.hs}).
 \end{itemize}
 
+(ToDo: describe how hs-boot mechanism works)
+
 (ToDo: describe Cabal/cabal-install/sandbox)
 
 \section{Goals}
 
 There are actually a number of different goals we have for modifying the
-packaging system.
+packaging system, some of which are subsets of the Backpack system.
 
 \begin{itemize}
     \item Support multiple instances of containers-2.9 \emph{in the
@@ -118,6 +120,18 @@ packaging system.
         compiled with different options.  It is less important to allow
         these instances to be linkable together.
 
+    \item Support typechecking a library against a module interface
+        as opposed to an actual implementation.  This would be useful
+        for moving towards a model where Cabal package dependency versions
+        are replaced with proper signature packages.  See Section~\ref{sec:signature-packages}
+        for more details.
+
+    \item Support insertion of backwards compatibility shims for packages
+        that are using old versions of packages, so that you can continue
+        using them without having to patch them manually.  This is a
+        stylized use-case of Backpack features.  See Section~LINKME for
+        more details.
+
     \item Some easy-to-implement subset of the functionality provided by
         packages with holes (Backpack proper).  This includes support
         of linking an executable containing multiple packages with the
@@ -126,9 +140,10 @@ packaging system.
 
 A lower priority goal is to actually allow multiple instances of
 containers-2.9 to be linked together in the same executable
-program.\footnote{In particular, this requires changes to how linker symbols
-are assigned. However, this feature is important to implement a number
-of Backpack features.}
+program.\footnote{In particular, this requires changes to how linker
+symbols are assigned. However, this feature is important to
+implement a number of Backpack features.}  Additionally, support for
+full mutual, recursive linking is low priority.
 
 A \emph{non-goal} is to allow users to upgrade upstream libraries
 without recompiling downstream. This is an ABI concern and we're not
@@ -194,7 +209,8 @@ module name. (See \ghcfile{compiler/basicTypes/Module.lhs:Module})
 
 However, with the current representation of PackageIds, this is
 insufficient: a package is not just its name, but also the regular
-tree representing all of its package dependencies.  Thus, we have
+tree\footnote{An ordinary tree in the absence of mutually recursive linking}
+representing all of its package dependencies.  Thus, we have
 to adjust the representation of a PackageId so that it includes this
 regular tree, as seen Figure~\ref{fig:proposed-pkgid}.  Since this
 tree in general may be quite long, it needs to be shortened in some way,
@@ -282,30 +298,51 @@ For example, an traditional module export is simply (Name, my-pkg-id, Name);
 a renamed module is (NewName, my-pkg-id, OldName), and an external module
 is (Name, external-pkg-id, Name).
 
-\subsection{Indefinite packages}\label{sec:indefinite-packages}
+\subsection{Signature packages}\label{sec:signature-packages}
 
 In Backpack, some packages still have holes in them, to be linked in
 later.  GHC cannot compile these packages, but we still need to install
 the interface files in case other packages include them and then perform
-type-checking.  Furthermore, we eventually will need to compile them
-(once some downstream package links it against its dependencies.)
+type-checking.  A \emph{signature package} is a package which is entirely
+holes; it contains no code to compile.  This special-case is easier to
+deal with than packages with both holes and code, which we consider
+in Section~\ref{sec:indefinite-packages}.
 
-It seems clear that we need to install packages which do not contain
-compiled code, but have all of the ingredients necessary to compile them.
-We imagine that instead of providing path to object files, an \emph{indefinite
-package} which contains just interface files as well as source. (Figure~\ref{fig:pkgdb})
+To compile a signature package, we simply take all of its signatures
+(which are essentially \verb|hs-boot| files) and generate interface
+files for them.  Then, we abort compilation---these interface files
+are the only files installed to a directory.
 
-Creating and typechecking single instances of indefinite packages\footnote{Perhaps we should call them incomplete packages or abstract packages, to line up with previous terminology.} seems to
-be unproblematic: GHC can already just type-check code (without compiling it),
-and we can also type-check against an interface file, which is currently used for
-the recursive module, hs-boot mechanism. (Figure~\ref{fig:arch})
+The simplest use-case for a signature package is that when it is
+included, either the new package is still a signature package (no
+code is defined) or all dependencies are filled in.  In the case of inclusion,
+we simply reexport the relevant signature files as necessary.  In
+the case of linking, all of the true package identities are known at this
+point.  So typechecking proceeds with an extra step, which verifies that
+all of the implementations match against the (renamed) versions of the
+signature packages, and then we compile as normal.  All of these capabilities
+already exist in order to work with the hs-boot mechanism.  (Figure~\ref{fig:arch})
+
+TODO work out formally what subset of Backpack this actually exercises.
+
+\paragraph{Accidental recursive linking}  I think accidental recursive linking
+is still possible here. Figure this out.
+
+\subsection{Indefinite packages}\label{sec:indefinite-packages}
+
+Indefinite packages are signature packages, but with the extra twist
+that they may also include code.  Like signature packages, these
+packages need to be installed, but unlike signature packages, it's
+insufficient to just install interface files: we must provide all of the
+ingredients necessary to compile them.  We imagine that instead of
+providing path to object files, an \emph{indefinite package} which
+contains just interface files as well as source.
+(Figure~\ref{fig:pkgdb})
 
 When we need to compile an indefinite package (since all of its
 dependencies have been found), things get a bit knotty.  In particular,
-there seem to be two implementation paths for this compilation: one path
-closer to how GHC compilation currently works, and another which is
-conceptually closer to the Backpack formalism.  Here is a very simple
-example to consider for both cases:
+there seem to be three implementation paths for this compilation.  Here
+is a very simple example to consider for the various cases:
 
 \begin{verbatim}
 package pkg-a where
@@ -343,22 +380,53 @@ type-checker is able to figure out they are the same, then it might be OK
 if we accidentally generate two copies of the code (provided they actually
 are the same).
 
-\paragraph{The ``upstream'' proposal}  Instead of treating all
+\paragraph{The ``upstream using hs-boot'' proposal}  Instead of treating all
 uncompiled indefinite packages as a single package, each fully linked
 package is now considered an instance of the original indefinite
 package, except its dependencies are filled in.  Each of these packages
 would have different PackageIds, since their dependencies are different
 in each case.
 
-While this is conceptually closer to the Backpack model, it is further
-away from our current model of compilation: to compile one of these packages,
-one essentially has to compile multiple packages, a task previously left
-to Cabal.  Fortunately, with the ability to store multiple instances in the database,
-it should be possible to place these intermediate results in the database (but
-not expose them), and leave it up to the user to decide what to do with the
+After a shaping analyses determines what all of the module environment
+of all packages with holes should be, we then compile each package separately,
+using this environment, but \emph{compiling against an hs-boot file} wherever
+there is a signature.  When we finally link everything together, the dangling
+references are resolved.
+
+There are a few problems with this proposal.  First, compiling against an
+hs-boot file results in less efficient code than direct compilation against
+an implementation, because inlining is not possible.  Furthermore, the current
+hs-boot mechanism requires that any given piece of code be \emph{actually implemented}
+in the module that its signature is describing: in full generality, Backpack
+wants implementations to possibly come from anywhere.
+
+On the other hand, compiling packages in this way gives the tanatalizing possibility
+of true separate compilation: the only thing we don't know is what the actual
+package name of an indefinite package will be, and what the correct references
+to have are.  This is a very minor change to the assembly, so one could conceive
+of dynamically rewriting these references at the linking stage.  Additionally,
+if two packages truly are mutually recursive, then we have \emph{no choice} but
+to use this compilation strategy.
+
+\paragraph{The ``upstream using topological ordering'' proposal}
+The majority of packages are not mutually recursive, and intuitively, once the
+holes are filled in, we should be able to compile them in the same fashion
+we might have compiled them normally, with no hs-boot installed.
+
+So the topological ordering is to shake the package graph until we can
+figure out some order to compile them which has all of the dependencies
+(possibly having to split up packages, and add hs-boot for true mutual
+recursion), and then compile each of these packages in order, with each
+of the previous packages being linked against.  These intermediate
+products would have to be stored in a database; fortunately, with the
+ability to store multiple instances in the database, it should be
+possible to place these intermediate results in the database (but not
+expose them), and leave it up to the user to decide what to do with the
 final package.
 
-\paragraph{Source tarball or preprocessed source?}  Another design choice
+TODO describe this in more detail
+
+\paragraph{Source tarball or preprocessed source?}  An ancillary design choice
 to be made is what the representation of the source that is saved is.  There
 are a number of possible choices:
 
