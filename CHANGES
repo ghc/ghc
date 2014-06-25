@@ -6,6 +6,8 @@ Changes in version 2.14.3
 
  * Fix parsing of identifiers with ^ or ⋆ in them (#298)
 
+ * Fix anchors (#308)
+
 Changes in version 2.14.2
 
  * Always drop --split-objs GHC flag for performance reasons (#292)

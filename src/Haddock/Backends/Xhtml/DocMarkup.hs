@@ -42,7 +42,12 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
   markupIdentifier           = thecode . ppId insertAnchors,
   markupIdentifierUnchecked  = thecode . ppUncheckedLink qual,
   markupModule               = \m -> let (mdl,ref) = break (=='#') m
-                                     in ppModuleRef (mkModuleName mdl) ref,
+                                         -- Accomodate for old style
+                                         -- foo\#bar anchors
+                                         mdl' = case reverse mdl of
+                                           '\\':_ -> init mdl
+                                           _ -> mdl
+                                     in ppModuleRef (mkModuleName mdl') ref,
   markupWarning              = thediv ! [theclass "warning"],
   markupEmphasis             = emphasize,
   markupBold                 = strong,

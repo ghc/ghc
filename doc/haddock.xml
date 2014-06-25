@@ -2106,8 +2106,11 @@ This belongs to the list above!
         <literal>"<replaceable>module</replaceable>#<replaceable>label</replaceable>"</literal>
         where <replaceable>module</replaceable> is the module name
         containing the anchor, and <replaceable>label</replaceable> is
-        the anchor label.  The module does not have to be local, it
-        can be imported via an interface.</para>
+        the anchor label. The module does not have to be local, it can
+        be imported via an interface. Please note that in Haddock
+        versions 2.13.x and earlier, the syntax was
+        <literal>"<replaceable>module</replaceable>\#<replaceable>label</replaceable>"</literal>.
+        It is considered deprecated and will be removed in the future.</para>
       </section>
 
       <section>
