@@ -103,9 +103,46 @@ the package database in the following ways:
         module (\ghcfile{compiler/iface/LoadIface.hs}).
 \end{itemize}
 
+GHC itself performs a type checking phase, which generates an interface
+file representing the module (so that later invocations of GHC can load the type
+of a module), and then after compilation projects object files and linked archives
+for programs to use.
+
+\subsection{hs-boot}
+
+\verb|hs-boot| is a special mechanism used to support recursive linking
+of modules within a package, today.  Suppose I have a recursive module
+dependency between modules and A and B. I break one of\ldots
+
 (ToDo: describe how hs-boot mechanism works)
 
-(ToDo: describe Cabal/cabal-install/sandbox)
+\subsection{Cabal}
+
+Cabal is the build system for GHC, we can think of it as parsing a Cabal
+file describing a package, and then making (possibly multiple)
+invocations to GHC to perform the appropriate compilation.  What
+information does Cabal pass onto GHC\@?  One can get an idea for this by
+looking at a prototypical command line that Cabal invokes GHC with:
+
+\begin{verbatim}
+ghc --make
+    -package-name myapp-0.1
+    -hide-all-packages
+    -package-id containers-0.9-ABCD
+    Module1 Module2
+\end{verbatim}
+
+There are a few things going on here.  First, Cabal has to tell GHC
+what the name of the package it's compiling (otherwise, GHC can't appropriately
+generate symbols that other code referring to this package might generate).
+There are also a number of commands which configure its in-memory view of
+the package database (GHC's view of the package database may not directly
+correspond to what is on disk).  There's also an optimization here: in principle,
+GHC can compile each module one-by-one, but instead we use the \verb|--make| flag
+because this allows GHC to reuse some data structures, resulting in a nontrivial
+speedup.
+
+(ToDo: describe cabal-install/sandbox)
 
 \section{Goals}
 
@@ -113,19 +150,27 @@ There are actually a number of different goals we have for modifying the
 packaging system, some of which are subsets of the Backpack system.
 
 \begin{itemize}
-    \item Support multiple instances of containers-2.9 \emph{in the
+    \item As a prerequisite, support multiple instances of containers-2.9 \emph{in the
         package database}.  These instances may be compiled against
         different dependencies, have the same dependencies but different
         source files (as when a package is being developed), or be
         compiled with different options.  It is less important to allow
-        these instances to be linkable together.
+        these instances to be linkable together.\footnote{Actually, I think
+        this is completely orthogonal to Backpack, since we are going to treat
+        dependencies as part of the package ID, so they would be considered
+        separate entries in the package database anyway.}
 
     \item Support typechecking a library against a module interface
         as opposed to an actual implementation.  This would be useful
         for moving towards a model where Cabal package dependency versions
-        are replaced with proper signature packages.  See Section~\ref{sec:signature-packages}
-        for more details.
+        are replaced with proper signature packages. %  See Section~\ref{sec:signature-packages} for more details.
 
+    \item Support compiling the aforementioned libraries with actual implementations.
+        It is \emph{not} a goal to be able to compile a library while only
+        partially providing dependencies, and it is low priority to support
+        mutually recursive implementations of these implementations.
+
+        \iffalse%
     \item Support insertion of backwards compatibility shims for packages
         that are using old versions of packages, so that you can continue
         using them without having to patch them manually.  This is a
@@ -136,14 +181,14 @@ packaging system, some of which are subsets of the Backpack system.
         packages with holes (Backpack proper).  This includes support
         of linking an executable containing multiple packages with the
         same package name but different PackageIds.
+        \fi
 \end{itemize}
 
 A lower priority goal is to actually allow multiple instances of
 containers-2.9 to be linked together in the same executable
 program.\footnote{In particular, this requires changes to how linker
 symbols are assigned. However, this feature is important to
-implement a number of Backpack features.}  Additionally, support for
-full mutual, recursive linking is low priority.
+implement a number of Backpack features.}
 
 A \emph{non-goal} is to allow users to upgrade upstream libraries
 without recompiling downstream. This is an ABI concern and we're not
@@ -162,10 +207,6 @@ unique package-version requirement, and utilize environment files to
 select which packages should be used.  See Duncan's email for more
 details on the proposal.
 
-For the purpose of Backpack, the only relevant part of this proposal
-is the relaxation of package databases so that there is no uniqueness
-constraint on PackageIds; only InstalledPackageIds are unique.
-
 To implement this:
 
 \begin{enumerate}
@@ -182,60 +223,8 @@ Once these changes are implemented, we can program multiple instances by
 using \verb|-hide-all-packages -package-id ...|, even if there is no
 high-level tool support.
 
-\section{Adding Backpack to GHC}
-
-Backpack additions are described in red in the architectural diagrams.
-The current structure of this section is to describe the additions bottom up.
-
-\subsection{Concrete physical identity = PackageId$^*$ + Module name}\label{sec:ipi}
-
-\begin{figure}
-    \center{\begin{tabular}{r l}
-        PackageId & hash of ``package name, package version, PackageIds of dependent packages'' \\
-        InstalledPackageId & hash of ``PackageId, source code, way, compiler flags'' \\
-    \end{tabular}}
-\label{fig:proposed-pkgid}\caption{Proposed new structure of package identifiers.}
-\end{figure}
-
-In Backpack, there needs to be some mechanism for assigning
-\emph{physical module identities} to modules, which are essential for
-typechecking Backpack packages, since they let us tell if two types are
-equal or not. In the paper, the physical identity was represented as the
-package that constructed it as well as some representation of the module
-source.  We can simplify this slightly: in current Cabal packages, we
-require that modules always be given a package-unique logical name;
-thus, physical identities can be simply represented as a PackageId plus
-module name. (See \ghcfile{compiler/basicTypes/Module.lhs:Module})
-
-However, with the current representation of PackageIds, this is
-insufficient: a package is not just its name, but also the regular
-tree\footnote{An ordinary tree in the absence of mutually recursive linking}
-representing all of its package dependencies.  Thus, we have
-to adjust the representation of a PackageId so that it includes this
-regular tree, as seen Figure~\ref{fig:proposed-pkgid}.  Since this
-tree in general may be quite long, it needs to be shortened in some way,
-such as by hashing.
-
-Fortunately, modulo the changes to PackageId, this coincides with how
-GHC internally represents modules, which are a pair of a PackageId and the
-logical name.  But see the caveats below.
-
-\paragraph{Relaxing package selection restrictions}  As mentioned
-previously, GHC is unable to select multiple packages with the same
-package name (but different PackageIds).  This restriction needs to be
-lifted.  For backwards compatibility reasons, it's probably better to
-not overload \verb|-package-id| but add a new flag, maybe \verb|-force-package-id|;
-we also need to disable the old version masking behavior.
-
-\paragraph{Linker symbols} As we increase the amount of information in
-PackageId, it's important to be careful about the length of these IDs,
-as they are used for exported linker symbols (e.g.
-\verb|base_TextziReadziLex_zdwvalDig_info|).  Very long symbol names
-hurt compile and link time, object file sizes, GHCi startup time,
-dynamic linking, and make gdb hard to use.  As such, the current plan is
-to do away with full package names and versions, and instead use just a
-base-62 encoded hash, perhaps with the first four characters of the package
-name for user-friendliness.
+Actually, this concern is orthogonal to the purposes of Backpack, if
+we redefine PackageId appropriately.
 
 \paragraph{The ABI hash} Currently, InstalledPackageId
 is constructed of a package, version and ABI hash
@@ -267,10 +256,75 @@ of a package to be installed at the same time, use of \emph{random
 numbers} was used to workaround the inability to get an ABI early
 enough.  We are not using this plan.
 
+\section{Infrastructural improvements}
+
+There are some infrastructural improvements that must be made before
+Backpack proper can be implemented.  These additions are described in
+red in the architectural diagrams.  The current structure of this
+section is to describe the additions bottom up.
+
+\subsection{Concrete physical identity = PackageId$^*$ + Module name}\label{sec:ipi}
+
+\begin{figure}
+    \center{\begin{tabular}{r l}
+        PackageId & hash of ``package name, package version, PackageIds of dependent packages'' \\
+        InstalledPackageId & hash of ``PackageId, source code, way, compiler flags'' \\
+    \end{tabular}}
+\label{fig:proposed-pkgid}\caption{Proposed new structure of package identifiers.}
+\end{figure}
+
+In Backpack, there needs to be some mechanism for assigning
+\emph{physical module identities} to modules, which are essential for
+typechecking Backpack packages, since they let us tell if two types are
+equal or not. In the paper, the physical identity was represented as the
+package that constructed it as well as some representation of the module
+source.  We can simplify this slightly: in current Cabal packages, we
+require that modules always be given a package-unique logical name;
+thus, physical identities can be simply represented as a PackageId plus
+module name. (See \ghcfile{compiler/basicTypes/Module.lhs:Module})
+In fact, this coincides with how GHC already internally handles
+the problem of type equality: it appeals to an \emph{original name}
+which is, presently, a PackageId and the module name.
+
+However, with the current representation of PackageIds, this is
+insufficient: a package is not just its name, but also the regular
+tree representing all of its package dependencies.  Thus, we have
+to adjust the representation of a PackageId so that it includes this
+regular tree, as seen Figure~\ref{fig:proposed-pkgid}.  Since this
+tree in general may be quite long, it needs to be shortened in some way,
+such as by hashing.
+
+And now, the complications\ldots
+
+\paragraph{Relaxing package selection restrictions}  As mentioned
+previously, GHC is unable to select multiple packages with the same
+package name (but different PackageIds).  This restriction needs to be
+lifted.  For backwards compatibility reasons, it's probably better to
+not overload \verb|-package-id| but add a new flag, maybe \verb|-force-package-id|;
+we also need to disable the old version masking behavior.  This is orthogonal
+to the IHG work, which wants to allow multiple InstalledPackageIds in the
+\emph{database} (here, we want to allow multiple PackageIds in compiled code).
+
+\paragraph{Linker symbols} As we increase the amount of information in
+PackageId, it's important to be careful about the length of these IDs,
+as they are used for exported linker symbols (e.g.
+\verb|base_TextziReadziLex_zdwvalDig_info|).  Very long symbol names
+hurt compile and link time, object file sizes, GHCi startup time,
+dynamic linking, and make gdb hard to use.  As such, the current plan is
+to do away with full package names and versions, and instead use just a
+base-62 encoded hash, perhaps with the first four characters of the package
+name for user-friendliness.
+
+Edward: I'm still partial to a short hash of the dependency bits (or
+even Simon's registry of short strings to dependency trees), and keeping
+everything else the same.
+
 \paragraph{Wired-in names} One annoying thing to remember is that GHC
-has wired-in names, which refer to packages without any version.  A
+has wired-in names, which refer to packages without any version.  Now
+these wired names also have to accomodate dependency trees. A
 suggested approach is to have a fixed table from these wired names to
-package IDs.
+package IDs; alternately we can use something like the special \verb|inplace|
+version number.
 
 \paragraph{Free variables (or, what is a non-concrete physical
 identity?)} Physical identities in their full generality are permitted
@@ -298,133 +352,158 @@ For example, an traditional module export is simply (Name, my-pkg-id, Name);
 a renamed module is (NewName, my-pkg-id, OldName), and an external module
 is (Name, external-pkg-id, Name).
 
-\subsection{Signature packages}\label{sec:signature-packages}
+\section{Simplifying Backpack}\label{sec:simplifying-backpack}
 
-In Backpack, some packages still have holes in them, to be linked in
-later.  GHC cannot compile these packages, but we still need to install
-the interface files in case other packages include them and then perform
-type-checking.  A \emph{signature package} is a package which is entirely
-holes; it contains no code to compile.  This special-case is easier to
-deal with than packages with both holes and code, which we consider
-in Section~\ref{sec:indefinite-packages}.
+Backpack as currently defined always requires a \emph{shaping} pass,
+which calculates the shapes of all modules defined in a package.
+The shaping pass is critical to the solution of the double-vision problem
+in recursive module linking, but it also presents a number of unpalatable
+implementation problems:
 
-To compile a signature package, we simply take all of its signatures
-(which are essentially \verb|hs-boot| files) and generate interface
-files for them.  Then, we abort compilation---these interface files
-are the only files installed to a directory.
+\begin{itemize}
 
-The simplest use-case for a signature package is that when it is
-included, either the new package is still a signature package (no
-code is defined) or all dependencies are filled in.  In the case of inclusion,
-we simply reexport the relevant signature files as necessary.  In
-the case of linking, all of the true package identities are known at this
-point.  So typechecking proceeds with an extra step, which verifies that
-all of the implementations match against the (renamed) versions of the
-signature packages, and then we compile as normal.  All of these capabilities
-already exist in order to work with the hs-boot mechanism.  (Figure~\ref{fig:arch})
+    \item A shaping pass means that it's not possible to compile modules
+        in a package one-by-one, even if there is \emph{no mutual
+        recursion} at all in the package.  Without mutual recursion, the
+        shaping pass should not be necessary.  (Maybe this is not true!)
+        Always enforcing two-passes means Backpack is not a ``pay as you
+        go'' language feature.
 
-TODO work out formally what subset of Backpack this actually exercises.
+    \item The calculated module shapes are quite intricate: in particular,
+        they contain information about the providences of all data types
+        and identifiers defined by a module.  To run a shape analysis, we
+        must preprocess and parse all modules\ldots and then parse them
+        again later, in the second, type-checking pass; furthermore, all
+        of this information must be passed to GHC later.
 
-\paragraph{Accidental recursive linking}  I think accidental recursive linking
-is still possible here. Figure this out.
+    \item The conclusions of the shaping pass are \emph{incompatible} with
+        what types of mutual recursion GHC can actually compile today
+        via hs-boot: primarily, GHC requires that any data type or function
+        defined in an hs-boot file also be \emph{defined} in its corresponding
+        hs file. (In this way, we can assign an original name to it immediately,
+        which simplifies compilation immensely.)
 
-\subsection{Indefinite packages}\label{sec:indefinite-packages}
+    \item The mode of program organization Backpack encourages, mutually
+        recursive modules, is less efficient than code without recursive
+        dependencies: thus programmers have good motivation to avoid
+        this design pattern when possible.
 
-Indefinite packages are signature packages, but with the extra twist
-that they may also include code.  Like signature packages, these
-packages need to be installed, but unlike signature packages, it's
-insufficient to just install interface files: we must provide all of the
-ingredients necessary to compile them.  We imagine that instead of
-providing path to object files, an \emph{indefinite package} which
-contains just interface files as well as source.
-(Figure~\ref{fig:pkgdb})
+\end{itemize}
 
-When we need to compile an indefinite package (since all of its
-dependencies have been found), things get a bit knotty.  In particular,
-there seem to be three implementation paths for this compilation.  Here
-is a very simple example to consider for the various cases:
+The shaping pass is fundamentally necessary for some types of Backpack packages.
+Here is the example which convinced Simon:
 
 \begin{verbatim}
-package pkg-a where
-    A = ...
-package pgk-b where -- indefinite package
-    A :: ...
-    B = [ b = ... ]
-package pkg-c where
-    include pkg-a
-    include pkg-b
+package p where
+    A :: [data T; f :: T -> T]
+    B = [export T(MkT), h; import A(f); data T = MkT; h x = f MkT]
+    A = [export T(MkT), f, h; import B; f MkT = MkT]
 \end{verbatim}
 
-\paragraph{The ``downstream'' proposal}  At some point, a package which
-relies on an indefinite package fills in all of its dependencies, so
-that it can be compiled.  Compilation proceeds by treating all of the
-uncompiled indefinite packages as part of a single package: the current
-package.  We maintain the invariant that any code generated will export
-symbols under the current package's namespace.  So the identifier
-\verb|b| in the example becomes a symbol \verb|pkg-c_pkg-b_B_b| rather
-than \verb|pkg-b_B_b| (package subqualification is necessary because
-package C may define its own B module after thinning out the import.)
+The key is to observe that B \emph{may or may not typecheck} depending
+on the definition of A. Because A reexports B's definition T, B will
+typecheck; but if A defined T on its own, B would not typecheck.  Thus,
+we \emph{cannot} typecheck B until we have done some analysis of A (the
+shaping analysis!)
 
-One big problem with this proposal is that it doesn't implement applicative
-semantics.  If there is another package:
+All of these restrictions point to the desirability of a subset of
+Backpack which does not allow mutually recursive modules, and
+consequently does not require a shaping pass.
+
+Here is the programming discipline, called the \textbf{linking restriction}: \emph{Module implementations
+must be declared before signatures.}  Alternately, $+ \oplus - \neq - \oplus +$.  Here's an example:
 
 \begin{verbatim}
-package pkg-d where
-    include pkg-a
-    include pkg-b
+package random where
+    System.Random = [ ... ].hs
+
+package monte-carlo where
+    System.Random :: ...
+    System.MonteCarlo = [ ... ].hs
 \end{verbatim}
 
-this will generate its own instance of B, even though it should be the same
-as C.  Simon was willing to entertain the idea that, well, as long as the
-type-checker is able to figure out they are the same, then it might be OK
-if we accidentally generate two copies of the code (provided they actually
-are the same).
+Now, to link these two applications together, only one ordering
+is permissible:
 
-\paragraph{The ``upstream using hs-boot'' proposal}  Instead of treating all
-uncompiled indefinite packages as a single package, each fully linked
-package is now considered an instance of the original indefinite
-package, except its dependencies are filled in.  Each of these packages
-would have different PackageIds, since their dependencies are different
-in each case.
+\begin{verbatim}
+package myapp where
+    include random
+    include monte-carlo
+\end{verbatim}
 
-After a shaping analyses determines what all of the module environment
-of all packages with holes should be, we then compile each package separately,
-using this environment, but \emph{compiling against an hs-boot file} wherever
-there is a signature.  When we finally link everything together, the dangling
-references are resolved.
+or even (if myapp wants to provide its own random library):
 
-There are a few problems with this proposal.  First, compiling against an
-hs-boot file results in less efficient code than direct compilation against
-an implementation, because inlining is not possible.  Furthermore, the current
-hs-boot mechanism requires that any given piece of code be \emph{actually implemented}
-in the module that its signature is describing: in full generality, Backpack
-wants implementations to possibly come from anywhere.
+\begin{verbatim}
+package myapp2 where
+    System.Random = [ ... ].hs
+    include monte-carlo
+\end{verbatim}
 
-On the other hand, compiling packages in this way gives the tanatalizing possibility
-of true separate compilation: the only thing we don't know is what the actual
-package name of an indefinite package will be, and what the correct references
-to have are.  This is a very minor change to the assembly, so one could conceive
-of dynamically rewriting these references at the linking stage.  Additionally,
-if two packages truly are mutually recursive, then we have \emph{no choice} but
-to use this compilation strategy.
+That is, all of \verb|monte-carlo|'s holes have been filled in by the time
+it is included.  The alternate ordering is not allowed, as it could have
+resulted in a recursive 
 
-\paragraph{The ``upstream using topological ordering'' proposal}
-The majority of packages are not mutually recursive, and intuitively, once the
-holes are filled in, we should be able to compile them in the same fashion
-we might have compiled them normally, with no hs-boot installed.
+Why does this discipline prevent mutually recursive modules?  Intuitively,
+the signature is the mechanism by which we can get a handle on an implementation
+before it is defined, thus allowing circularity. If there is never an earlier handle
+to an implementation, circularity is not possible.  A simple example of
+this violation is in the reordered version of \verb|myapp2|:
 
-So the topological ordering is to shake the package graph until we can
-figure out some order to compile them which has all of the dependencies
-(possibly having to split up packages, and add hs-boot for true mutual
-recursion), and then compile each of these packages in order, with each
-of the previous packages being linked against.  These intermediate
-products would have to be stored in a database; fortunately, with the
-ability to store multiple instances in the database, it should be
-possible to place these intermediate results in the database (but not
-expose them), and leave it up to the user to decide what to do with the
-final package.
+\begin{verbatim}
+package myapp2 where
+    include monte-carlo
+    System.Random = [ import System.MonteCarlo ].hs
+\end{verbatim}
 
-TODO describe this in more detail
+(Nota bene: this restriction applies to aliasing to, which can induce
+linking as well).
+
+\subsection{Why isn't shaping necessary?}
+
+(ToDo: have this formally setup and everything)
+
+In the case that we are compiling a definite package (there will be no leftover
+holes), the argument is quite simple.  In vanilla Backpack, when a
+signature is defined, we have to generate a pile of module variables
+which may get unified with physical module identities.  However, with
+the linking restriction, we only ever link a signature with a
+\emph{fully instantiated} module definition. Thus, all module variables
+can be immediately eliminated, and all we need to do is maintain an
+updating logical context (i.e., module environment) so that later
+modules know how to resolve imports.
+
+When we are typechecking an indefinite package (there may be leftover
+holes), things are a little more subtle.  When a signature is defined,
+we \emph{know} that it will never be unified against a proper module
+name.  So we can assign it some fresh original name.
+
+Edward: What I find a bit dodgy is that there still are circumstances
+where we will link a signature with a signature.  For example, if I have:
+
+\begin{verbatim}
+package a where
+    A :: [ data A ]
+    B :: [ data A ]
+    M = ...
+    A = B
+    Q = ...
+\end{verbatim}
+
+We haven't violated the linking rule, but if we chose separate original
+names for A and B, they need to be identified after the alias.
+
+Fortunately, Q should typecheck as if the As are the same, but M should
+typecheck as if they are distinct.  There is some ordering here, and our
+claim (to be formally verified) is that these unifications can be
+resolved as we process them.
+
+\subsection{Installing indefinite packages}\label{sec:indefinite-packages}
+
+If an indefinite package contains no code at all, we only need
+to install the interface file for the signatures.  However, if
+they include code, we must provide all of the
+ingredients necessary to compile them when the holes are linked against
+actual implementations.  (Figure~\ref{fig:pkgdb})
 
 \paragraph{Source tarball or preprocessed source?}  An ancillary design choice
 to be made is what the representation of the source that is saved is.  There
@@ -447,6 +526,96 @@ partway, intending to finish it later. It allows us to reuse the work
 done preprocessing or typechecking.  However, it may be the case that
 these phases work differently once library dependencies are known; typechecking
 especially, see Section~\ref{sec:variables}.
+
+\subsection{Compilation}
+
+When we need to compile an indefinite package (since all of its
+dependencies have been found), there seem to be two implementation
+strategies possible.  Here is a very simple example to consider for the
+various cases:
+
+\begin{verbatim}
+package pkg-a where
+    A = ...
+package pgk-b where -- indefinite package
+    A :: ...
+    B = [ b = ... ]
+package pkg-c where
+    include pkg-a
+    include pkg-b
+\end{verbatim}
+
+\paragraph{The ``downstream'' proposal}  This is Simon's favorite
+proposal.  Because of the linking invariant, if we traverse the Backpack
+specification, any given module we need to compile will have all of its
+dependencies compiled (since it could only depend on the dependency if
+there was a signature, and the signature could not have been linked
+unless it was implemented previously.)  So we just go ahead and compile
+everything one-by-one, as if the package was a single big package.  (Of
+course, if we encounter a definite package, don't bother recompiling
+it; just use it directly.)  In
+particular, we maintain the invariant that any code generated will
+export symbols under the current package's namespace.  So the identifier
+\verb|b| in the example becomes a symbol \verb|pkg-c_pkg-b_B_b| rather
+than \verb|pkg-b_B_b| (package subqualification is necessary because
+package C may define its own B module after thinning out the import.)
+
+One big problem with this proposal is that it doesn't implement applicative
+semantics.  If there is another package:
+
+\begin{verbatim}
+package pkg-d where
+    include pkg-a
+    include pkg-b
+\end{verbatim}
+
+this will generate its own instance of B, even though it should be the same
+as C.  Simon was willing to entertain the idea that, well, as long as the
+type-checker is able to figure out they are the same, then it might be OK
+if we accidentally generate two copies of the code (provided they actually
+are the same).
+
+\paragraph{The ``upstream'' proposal}
+The problem with the ``downstream'' proposal is that it always recompiles
+all of the indefinite parts of the package, even if some of them should
+be shared in some sense.  Hypothetically, a fully linked version of an
+indefinite package should be considered a package in its own right
+(in particular, it is associated with a physical module identity in Backpack).
+So all we need to do is store these installed packages somewhere, probably
+the local package database.  If we recompile the same dependency chain,
+the installed package can be simply reused.  These products do not have
+to be exposed.
+
+One problem with this proposal is in this previous example:
+
+\begin{verbatim}
+package myapp2 where
+    System.Random = [ ... ].hs
+    include monte-carlo
+\end{verbatim}
+
+Here, monte-carlo depends on a ``subpart of the myapp2 package'', and it's
+not entirely clear how to express this.
+
+\subsection{Restricted recursive modules ala hs-boot}
+
+It should be possible to support GHC-style mutual recursion using the
+Backpack formalism immediately using hs-boot files.  However, to avoid
+the need for a shaping pass, we must adopt an existing constraint that
+already applies to hs-boot files: \emph{at the time we define a signature,
+we must know what the original name for all data types is}.  We then
+compile modules as usual, but compiling against the signature as if it
+were an hs-boot file.
+
+(ToDo: Figure out why this eliminates the shaping pass)
+
+Compiling packages in this way gives the tantalizing possibility
+of true separate compilation: the only thing we don't know is what the actual
+package name of an indefinite package will be, and what the correct references
+to have are.  This is a very minor change to the assembly, so one could conceive
+of dynamically rewriting these references at the linking stage.
+
+\iffalse%
 
 \section{Module variables and original names}\label{sec:variables}
 
@@ -518,8 +687,6 @@ will unify in \verb|Mine|; thus, we would need to rename the original names
 in \verb|yourlib|.\footnote{Edward: I don't think this is really the
 right way to talk about this: Backpack requires a shaping pass and we should
 be talking about it}
-
-\iffalse%
 
 % ezyang: So, I thought I knew what I was talking about here, but actually
 % the text here needs to be put in the context of shaping, so I need to
