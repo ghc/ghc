@@ -265,7 +265,7 @@ innerList item = do
   (cs, items) <- more item
   let contents = docParagraph . parseString . dropNLs . unlines $ c : cs
   return $ case items of
-    Left p -> [contents `joinPara` p]
+    Left p -> [contents <> p]
     Right i -> contents : i
 
 -- | Parses definition lists.
@@ -276,20 +276,8 @@ definitionList = do
   (cs, items) <- more definitionList
   let contents = parseString . dropNLs . unlines $ c : cs
   return $ case items of
-    Left p -> [(label, contents `joinPara` p)]
+    Left p -> [(label, contents <> p)]
     Right i -> (label, contents) : i
-
--- | If possible, appends two 'Doc's under a 'DocParagraph' rather than
--- outside of it. This allows to get structures like
---
--- @DocParagraph (DocAppend … …)@
---
--- rather than
---
--- @DocAppend (DocParagraph …) …@
-joinPara :: DocH mod id -> DocH mod id -> DocH mod id
-joinPara (DocParagraph p) c = docParagraph $ p <> c
-joinPara d p = d <> p
 
 -- | Drops all trailing newlines.
 dropNLs :: String -> String

@@ -4,6 +4,8 @@ Changes in version 2.15.0
 
  * parser: don't wrap headers in DocParagraph (#307)
 
+ * parser: don't mangle append order for nested lists (pandoc #1346)
+
 Changes in version 2.14.3
 
  * Fix parsing of identifiers with ^ or ⋆ in them (#298)

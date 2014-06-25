@@ -547,34 +547,34 @@ spec = do
     context "when parsing paragraphs nested in lists" $ do
       it "can nest the same type of list" $ do
         "* foo\n\n    * bar" `shouldParseTo`
-          DocUnorderedList [ DocParagraph $ "foo"
+          DocUnorderedList [ DocParagraph "foo"
                              <> DocUnorderedList [DocParagraph "bar"]]
 
       it "can nest another type of list inside" $ do
         "* foo\n\n    1. bar" `shouldParseTo`
-          DocUnorderedList [ DocParagraph $ "foo"
+          DocUnorderedList [ DocParagraph "foo"
                              <> DocOrderedList [DocParagraph "bar"]]
 
       it "can nest a code block inside" $ do
         "* foo\n\n    @foo bar baz@" `shouldParseTo`
-          DocUnorderedList [ DocParagraph $ "foo"
+          DocUnorderedList [ DocParagraph "foo"
                              <> DocCodeBlock "foo bar baz"]
 
         "* foo\n\n    @\n    foo bar baz\n    @" `shouldParseTo`
-          DocUnorderedList [ DocParagraph $ "foo"
+          DocUnorderedList [ DocParagraph "foo"
                              <> DocCodeBlock "foo bar baz\n"]
 
       it "can nest more than one level" $ do
         "* foo\n\n    * bar\n\n        * baz\n        qux" `shouldParseTo`
-          DocUnorderedList [ DocParagraph $ "foo"
-                             <> DocUnorderedList [ DocParagraph $ "bar"
+          DocUnorderedList [ DocParagraph "foo"
+                             <> DocUnorderedList [ DocParagraph "bar"
                                                    <> DocUnorderedList [DocParagraph "baz\nqux"]
                                                  ]
                            ]
 
       it "won't fail on not fully indented paragraph" $ do
         "* foo\n\n    * bar\n\n        * qux\nquux" `shouldParseTo`
-          DocUnorderedList [ DocParagraph $ "foo"
+          DocUnorderedList [ DocParagraph "foo"
                              <> DocUnorderedList [ DocParagraph "bar" ]
                            , DocParagraph "qux\nquux"]
 
@@ -589,7 +589,7 @@ spec = do
 
       it "can come back to top level with a different list" $ do
         "* foo\n\n    * bar\n\n1. baz" `shouldParseTo`
-          DocUnorderedList [ DocParagraph $ "foo"
+          DocUnorderedList [ DocParagraph "foo"
                              <> DocUnorderedList [ DocParagraph "bar" ]
                            ]
           <> DocOrderedList [ DocParagraph "baz" ]
