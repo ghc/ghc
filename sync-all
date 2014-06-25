@@ -588,14 +588,14 @@ sub gitInitSubmodules {
 
     my $submodulespaths = &readgit(".", "config", "--get-regexp", "^submodule[.].*[.]url");
     # if we came from github, change the urls appropriately
-    while ($submodulespaths =~ m!^(submodule.(?:libraries|utils)/[a-zA-Z0-9]+.url) ($GITHUB)/ghc/packages/([a-zA-Z0-9]+).git$!gm) {
+    while ($submodulespaths =~ m!^(submodule.(?:libraries|utils)/[a-zA-Z0-9-]+.url) ($GITHUB)/ghc/packages/([a-zA-Z0-9-]+).git$!gm) {
         &git(".", "config", $1, "$2/ghc/packages-$3");
     }
 
     # if we came from a local repository, grab our submodules from their
     # checkouts over there, if they exist.
     if ($repo_local) {
-        while ($submodulespaths =~ m!^(submodule.((?:libraries|utils)/[a-zA-Z0-9]+).url) .*$!gm) {
+        while ($submodulespaths =~ m!^(submodule.((?:libraries|utils)/[a-zA-Z0-9-]+).url) .*$!gm) {
             if (-e "$repo_base/$2/.git") {
                 &git(".", "config", $1, "$repo_base/$2");
             }
