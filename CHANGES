@@ -2,6 +2,8 @@ Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)
 
+ * parser: don't wrap headers in DocParagraph (#307)
+
 Changes in version 2.14.3
 
  * Fix parsing of identifiers with ^ or ⋆ in them (#298)

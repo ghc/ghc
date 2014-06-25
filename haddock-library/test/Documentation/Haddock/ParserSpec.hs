@@ -808,16 +808,15 @@ spec = do
     context "when parsing function documentation headers" $ do
       it "can parse a simple header" $ do
         "= Header 1\nHello." `shouldParseTo`
-          DocParagraph (DocHeader (Header 1 "Header 1"))
+          (DocHeader (Header 1 "Header 1"))
           <> DocParagraph "Hello."
 
       it "allow consecutive headers" $ do
         "= Header 1\n== Header 2" `shouldParseTo`
-          DocParagraph (DocHeader (Header 1 "Header 1"))
-          <> DocParagraph (DocHeader (Header 2 "Header 2"))
+          DocHeader (Header 1 "Header 1")
+          <> DocHeader (Header 2 "Header 2")
 
       it "accepts markup in the header" $ do
         "= /Header/ __1__\nFoo" `shouldParseTo`
-          DocParagraph (DocHeader
-                        (Header 1 (DocEmphasis "Header" <> " " <> DocBold "1")))
+          DocHeader (Header 1 (DocEmphasis "Header" <> " " <> DocBold "1"))
           <> DocParagraph "Foo"

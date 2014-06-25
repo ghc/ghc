@@ -220,6 +220,11 @@ paragraph = examples <|> skipSpace *> (list <|> birdtracks <|> codeblock
 
 -- | Headers inside the comment denoted with @=@ signs, up to 6 levels
 -- deep.
+--
+-- >>> parseOnly header "= Hello"
+-- Right (DocHeader (Header {headerLevel = 1, headerTitle = DocString "Hello"}))
+-- >>> parseOnly header "== World"
+-- Right (DocHeader (Header {headerLevel = 2, headerTitle = DocString "World"}))
 header :: Parser (DocH mod Identifier)
 header = do
   let psers = map (string . encodeUtf8 . concat . flip replicate "=") [6, 5 .. 1]
@@ -227,7 +232,7 @@ header = do
   delim <- decodeUtf8 <$> pser
   line <- skipHorizontalSpace *> nonEmptyLine >>= return . parseString
   rest <- paragraph <|> return mempty
-  return $ DocParagraph (DocHeader (Header (length delim) line)) <> rest
+  return $ DocHeader (Header (length delim) line) <> rest
 
 textParagraph :: Parser (DocH mod Identifier)
 textParagraph = docParagraph . parseString . intercalate "\n" <$> many1 nonEmptyLine
