@@ -7,6 +7,8 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleInstances      #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -562,6 +564,7 @@ module GHC.Generics  (
 
 -- We use some base types
 import GHC.Types
+import GHC.TypeLits
 import Data.Maybe ( Maybe(..) )
 import Data.Either ( Either(..) )
 
@@ -750,10 +753,10 @@ deriving instance Generic1 ((,,,,,,) a b c d e f)
 --------------------------------------------------------------------------------
 
 -- Int
-data D_Int
+data D_Int (name :: Symbol)
 data C_Int
 
-instance Datatype D_Int where
+instance Datatype (D_Int "Int") where
   datatypeName _ = "Int"
   moduleName   _ = "GHC.Int"
 
@@ -761,7 +764,7 @@ instance Constructor C_Int where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Int where
-  type Rep Int = D1 D_Int (C1 C_Int (S1 NoSelector (Rec0 Int)))
+  type Rep Int = D1 (D_Int "Int") (C1 C_Int (S1 NoSelector (Rec0 Int)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 
