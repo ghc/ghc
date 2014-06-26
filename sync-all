@@ -16,7 +16,6 @@ my $verbose = 2;
 my $try_to_resume = 0;
 my $ignore_failure = 0;
 my $checked_out_flag = 0; # NOT the opposite of bare_flag (describes remote repo state)
-my $get_mode;
 my $bare_flag = ""; # NOT the opposite of checked_out_flag (describes local repo state)
 
 my %tags;
@@ -68,16 +67,6 @@ sub parsePackages {
             die "Bad content on line $lineNum of packages file: $_";
         }
     }
-}
-
-sub tryReadFile {
-    my $filename = shift;
-    my @lines;
-
-    open (FH, $filename) or return "";
-    @lines = <FH>;
-    close FH;
-    return join('', @lines);
 }
 
 sub message {
@@ -159,11 +148,11 @@ sub readgit {
 sub configure_repository {
     my $localpath = shift;
 
-    &git($localpath, "config", "--local", "core.ignorecase", "true");
+    &git($localpath, "config", "core.ignorecase", "true");
 
     my $autocrlf = &readgitline($localpath, 'config', '--get', 'core.autocrlf');
     if ($autocrlf eq "true") {
-        &git($localpath, "config", "--local", "core.autocrlf", "false");
+        &git($localpath, "config", "core.autocrlf", "false");
         &git($localpath, "reset", "--hard");
     }
 }
@@ -182,14 +171,14 @@ sub getrepo {
         my $branch = &readgitline($git_dir, "rev-parse", "--abbrev-ref", "HEAD");
         die "Bad branch: $branch"
             unless $branch =~ m!^[a-zA-Z][a-zA-Z0-9./-]*$!;
-        my $remote = &readgitline($git_dir, "config", "branch.$branch.remote");
+        my $remote = &readgitline($git_dir, "config", "--get", "branch.$branch.remote");
         if ($remote eq "") {
             # remotes are not mandatory for branches (e.g. not recorded by default for bare repos)
             $remote = "origin";
         }
         die "Bad remote: $remote"
             unless $remote =~ m!^[a-zA-Z][a-zA-Z0-9./-]*$!;
-        $repo = &readgitline($git_dir, "config", "remote.$remote.url");
+        $repo = &readgitline($git_dir, "config", "--get", "remote.$remote.url");
     }
 
     my $repo_base;
@@ -204,11 +193,7 @@ sub getrepo {
 
         # --checked-out is needed if you want to use a checked-out repo
         # over SSH or HTTP
-        if ($checked_out_flag) {
-            $checked_out_tree = 1;
-        } else {
-            $checked_out_tree = 0;
-        }
+        $checked_out_tree = $checked_out_flag;
 
         # Don't drop the last part of the path if specified with -r, as
         # it expects repos of the form:
@@ -253,6 +238,7 @@ sub gitall {
     my $tag;
     my $remotepath;
     my $line;
+    my $repo_is_submodule;
     my $branch_name;
     my $subcommand;
 
@@ -322,11 +308,13 @@ sub gitall {
 
     for $line (@packages) {
         $tag        = $$line{"tag"};
+        if ($tags{$tag} == 0) {
+            next;
+        }
+
         # Use the "remote" structure for bare git repositories
         $localpath  = ($bare_flag) ?
                       $$line{"remotepath"} : $$line{"localpath"};
-        $remotepath = ($checked_out_tree) ?
-                      $$line{"localpath"}  : $$line{"remotepath"};
 
         if (!$started) {
             if ($start_repo eq $localpath) {
@@ -343,6 +331,19 @@ sub gitall {
         close RESUME;
         rename "resume.tmp", "resume";
 
+        $repo_is_submodule = $$line{"remotepath"} eq "-";
+
+        if ($checked_out_tree) {
+            $remotepath = $$line{"localpath"};
+        }
+        elsif ($repo_is_submodule) {
+            $remotepath = &readgitline(".", 'config', '-f', '.gitmodules', '--get', "submodule.$localpath.url");
+            $remotepath =~ s/\.\.\///;
+        }
+        else {
+            $remotepath = $$line{"remotepath"};
+        }
+
         # We can't create directories on GitHub, so we translate
         # "packages/foo" into "package-foo".
         if ($is_github_repo) {
@@ -353,15 +354,7 @@ sub gitall {
         $path = "$repo_base/$remotepath";
 
         if ($command eq "get") {
-            next if $remotepath eq "-"; # "git submodule init/update" will get this later
-
-            # Skip any repositories we have not included the tag for
-            if (not defined($tags{$tag})) {
-                $tags{$tag} = 0;
-            }
-            if ($tags{$tag} == 0) {
-                next;
-            }
+            next if $repo_is_submodule; # "git submodule init/update" will get this later
 
             if (-d $localpath) {
                 warning("$localpath already present; omitting")
@@ -381,8 +374,8 @@ sub gitall {
 
         my $git_repo_present = 1 if -e "$localpath/.git" || ($bare_flag && -d "$localpath");
         if (not $git_repo_present) {
-            if ($tag eq "") {
-                die "Required repo $localpath is missing";
+            if ($tag eq "-") {
+                die "Required repo $localpath is missing. Please first run './sync-all get'.\n";
             }
             else {
                  message "== $localpath repo not present; skipping";
@@ -401,7 +394,7 @@ sub gitall {
         }
         elsif ($command eq "check_submodules") {
             # If we have a submodule then check whether it is up-to-date
-            if ($remotepath eq "-") {
+            if ($repo_is_submodule) {
                 my %remote_heads;
 
                 message "== Checking sub-module $localpath";
@@ -434,14 +427,14 @@ sub gitall {
             # to push to them then you need to use a special command, as
             # described on
             # http://ghc.haskell.org/trac/ghc/wiki/Repositories/Upstream
-            if ($remotepath ne "-") {
+            if (!$repo_is_submodule) {
                 &git($localpath, "push", @args);
             }
         }
         elsif ($command eq "pull") {
             my $realcmd;
             my @realargs;
-            if ($remotepath eq "-") {
+            if ($repo_is_submodule) {
                 # Only fetch for the submodules. "git submodule update"
                 # will take care of making us point to the right commit.
                 $realcmd = "fetch";
@@ -473,30 +466,15 @@ sub gitall {
         }
         elsif ($command eq "remote") {
             my @scm_args;
-            my $rpath;
             $ignore_failure = 1;
-            if ($remotepath eq '-') {
-                $rpath = "$localpath.git"; # N.B.: $localpath lacks the .git suffix
-                if ($localpath =~ m!^(?:libraries|utils)/!) {
-                    # FIXME: This is just a simple heuristic to
-                    # infer the remotepath for Git submodules. A
-                    # proper solution would require to parse the
-                    # .gitmodules file to obtain the actual
-                    # localpath<->remotepath mapping.
-                    $rpath =~ s!^(?:libraries|utils)/!packages/!;
-                }
-                $rpath = "$repo_base/$rpath";
-            } else {
-                $rpath = $path;
-            }
             if ($subcommand eq 'add') {
-                @scm_args = ("remote", "add", $branch_name, $rpath);
+                @scm_args = ("remote", "add", $branch_name, $path);
             } elsif ($subcommand eq 'rm') {
                 @scm_args = ("remote", "rm", $branch_name);
             } elsif ($subcommand eq 'set-branches') {
                 @scm_args = ("remote", "set-branches", $branch_name);
             } elsif ($subcommand eq 'set-url') {
-                @scm_args = ("remote", "set-url", $branch_name, $rpath);
+                @scm_args = ("remote", "set-url", $branch_name, $path);
             }
             &git($localpath, @scm_args, @args);
         }
@@ -540,7 +518,7 @@ sub gitall {
         elsif ($command eq "compare") {
             # Don't compare the subrepos; it doesn't work properly as
             # they aren't on a branch.
-            next if $remotepath eq "-";
+            next if $repo_is_submodule;
 
             my $compareto;
             if ($#args eq -1) {
@@ -604,9 +582,7 @@ sub gitInitSubmodules {
 }
 
 sub checkCurrentBranchIsMaster {
-    my $branch = `git symbolic-ref HEAD`;
-    $branch =~ s/refs\/heads\///;
-    $branch =~ s/\n//;
+    my $branch = &readgitline(".", "rev-parse", "--abbrev-ref", "HEAD");
 
     if ($branch !~ /master/) {
         print "\nWarning: You are trying to 'pull' while on branch '$branch'.\n"
@@ -621,8 +597,7 @@ sub help
 
         my $tags = join ' ', sort (grep !/^-$/, keys %tags);
 
-        # Get the built in help
-        my $help = <<END;
+        print <<END;
 Usage:
 
 ./sync-all [-q] [-s] [--ignore-failure] [-r repo] [--checked-out] [--bare]
@@ -790,30 +765,9 @@ sync-all *ignores* the defaultrepo of all repos other than the root one. So the
 remote repos must be laid out in one of the two formats given by <local-path>
 and <remote-path> in the file 'packages'.
 
-Available package-tags are:
+Available package-tags are: $tags
+
 END
-
-        # Collect all the tags in the packages file
-        my %available_tags;
-        open IN, "< packages.conf"
-            or open IN, "< packages" # clashes with packages directory when using --bare
-            or die "Can't open packages file (or packages.conf)";
-        while (<IN>) {
-            chomp;
-            if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)/) {
-                if (defined($2) && $2 ne "-") {
-                    $available_tags{$2} = 1;
-                }
-            }
-            elsif (! /^(#.*)?$/) {
-                die "Bad line: $_";
-            }
-        }
-        close IN;
-
-        # Show those tags and the help text
-        my @available_tags = keys %available_tags;
-        print "$help@available_tags\n\n";
         exit $exit;
 }
 
@@ -845,9 +799,6 @@ sub main {
         }
         elsif ($arg eq "--ignore-failure") {
             $ignore_failure = 1;
-        }
-        elsif ($arg eq "--complete" || $arg eq "--partial") {
-            $get_mode = $arg;
         }
         # Use --checked-out if the _remote_ repos are a checked-out tree,
         # rather than the master trees.
@@ -935,17 +886,7 @@ sub main {
             &gitInitSubmodules(@submodule_args);
         }
 
-        if ($command eq "pull") {
-            my $gitConfig = &tryReadFile(".git/config");
-            if ($gitConfig !~ /submodule/) {
-                &gitInitSubmodules(@submodule_args);
-            }
-        }
         if ($command eq "get" or $command eq "pull") {
-            my $gitConfig = &tryReadFile(".git/config");
-            if ($gitConfig !~ /submodule/) {
-                &gitInitSubmodules(@submodule_args);
-            }
             &git(".", "submodule", "update", @submodule_args);
         }
     }
@@ -1062,4 +1003,3 @@ EOF
 }
 
 main(@ARGV);
-
