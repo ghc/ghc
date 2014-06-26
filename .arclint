@@ -14,8 +14,17 @@
     },
     "text": {
       "type": "text",
+      "exclude": [ "(\\.xml$)" ],
       "severity": {
         "5": "disabled"
+      }
+    },
+    "text-xml": {
+      "type": "text",
+      "include": "(\\.xml$)",
+      "severity": {
+        "5": "disabled",
+        "3": "disabled"
       }
     }
   }
