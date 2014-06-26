@@ -576,7 +576,8 @@ than \verb|pkg-b_B_b| (package subqualification is necessary because
 package C may define its own B module after thinning out the import.)
 
 One big problem with this proposal is that it doesn't implement applicative
-semantics.  If there is another package:
+semantics beyond compilation units.  While modules within a single
+compilation will get reused, if there is another package:
 
 \begin{verbatim}
 package pkg-d where
@@ -584,11 +585,11 @@ package pkg-d where
     include pkg-b
 \end{verbatim}
 
-this will generate its own instance of B, even though it should be the same
-as C.  Simon was willing to entertain the idea that, well, as long as the
-type-checker is able to figure out they are the same, then it might be OK
-if we accidentally generate two copies of the code (provided they actually
-are the same).
+when it is compiled by itself, it will generate its own instance of B,
+even though it should be the same as C.  Simon was willing to entertain
+the idea that, well, as long as the type-checker is able to figure out
+they are the same, then it might be OK if we accidentally generate two
+copies of the code (provided they actually are the same).
 
 \paragraph{The ``upstream'' proposal}
 The problem with the ``downstream'' proposal is that it always recompiles
@@ -612,7 +613,9 @@ package myapp2 where
 Here, monte-carlo depends on a ``subpart of the myapp2 package'', and it's
 not entirely clear how monte-carlo should be represented in the installed
 package database: should myapp2 be carved up into pieces so that subparts
-of its package description can be installed to the database?
+of its package description can be installed to the database?  One notable
+thing to note is that these ``stubs'' will never be used by any other packages,
+they are strictly local.
 
 Another reason you might not be so keen about this proposal is the fact
 that we have to hit the package database, despite the fact that these
