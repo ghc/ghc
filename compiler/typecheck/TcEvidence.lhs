@@ -596,7 +596,7 @@ data EvTerm
                                  -- dictionaries, even though the former have no
                                  -- selector Id.  We count up from _0_
 
-  | EvLit EvLit       -- Dictionary for KnownNat and KnownLit classes.
+  | EvLit EvLit       -- Dictionary for KnownNat and KnownSymbol classes.
                       -- Note [KnownNat & KnownSymbol and EvLit]
 
   deriving( Data.Data, Data.Typeable)
@@ -653,7 +653,7 @@ Conclusion: a new wanted coercion variable should be made mutable.
 Note [KnownNat & KnownSymbol and EvLit]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A part of the type-level literals implementation are the classes
-"KnownNat" and "KnownLit", which provide a "smart" constructor for
+"KnownNat" and "KnownSymbol", which provide a "smart" constructor for
 defining singleton values.  Here is the key stuff from GHC.TypeLits
 
   class KnownNat (n :: Nat) where
@@ -694,7 +694,7 @@ especialy when the `KnowNat` evidence is packaged up in an existential.
 
 The story for kind `Symbol` is analogous:
   * class KnownSymbol
-  * newypte SSymbol
+  * newtype SSymbol
   * Evidence: EvLit (EvStr n)
 
 
