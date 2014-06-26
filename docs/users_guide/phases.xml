@@ -576,8 +576,22 @@ $ cat foo.hspp</screen>
         </term>
         <listitem>
           <para>Omit code generation (and all later phases)
-          altogether.  Might be of some use if you just want to see
-          dumps of the intermediate compilation phases.</para>
+          altogether.  This is useful if you're only interested in
+          type checking code.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-fwrite-interface</option>
+          <indexterm><primary><option>-fwrite-interface</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Always write interface files.  GHC will normally write
+          interface files automatically, but this flag is useful with
+          <option>-fno-code</code>, which normally suppresses generation
+          of interface files.  This is useful if you want to type check
+          over multiple runs of GHC without compiling dependencies.</para>
         </listitem>
       </varlistentry>
 

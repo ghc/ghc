@@ -623,7 +623,11 @@ hscCompileOneShot' hsc_env mod_summary src_changed
             guts0 <- hscDesugar' (ms_location mod_summary) tc_result
             dflags <- getDynFlags
             case hscTarget dflags of
-                HscNothing -> return HscNotGeneratingCode
+                HscNothing -> do
+                    when (gopt Opt_WriteInterface dflags) $ liftIO $ do
+                        (iface, changed, _details) <- hscSimpleIface hsc_env tc_result mb_old_hash
+                        hscWriteIface dflags iface changed mod_summary
+                    return HscNotGeneratingCode
                 _ ->
                     case ms_hsc_src mod_summary of
                     HsBootFile ->

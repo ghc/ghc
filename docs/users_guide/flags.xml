@@ -2209,6 +2209,12 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-fwrite-interface</option></entry>
+            <entry>Always write interface files</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-fbyte-code</option></entry>
             <entry>Generate byte-code</entry>
             <entry>dynamic</entry>
