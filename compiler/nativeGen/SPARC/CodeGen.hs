@@ -654,10 +654,6 @@ outOfLineMachOp_table mop
 
         MO_BSwap w   -> fsLit $ bSwapLabel w
         MO_PopCnt w  -> fsLit $ popCntLabel w
-        MO_AtomicRMW w amop -> fsLit $ atomicRMWLabel w amop
-        MO_Cmpxchg w -> fsLit $ cmpxchgLabel w
-        MO_AtomicRead w -> fsLit $ atomicReadLabel w
-        MO_AtomicWrite w -> fsLit $ atomicWriteLabel w
 
         MO_S_QuotRem {}  -> unsupported
         MO_U_QuotRem {}  -> unsupported

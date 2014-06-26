@@ -52,7 +52,6 @@ Library
         exposed-modules: GHC.Prim
 
     c-sources:
-        cbits/atomic.c
         cbits/bswap.c
         cbits/debug.c
         cbits/longlong.c

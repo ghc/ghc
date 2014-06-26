@@ -650,10 +650,6 @@ data AbsMem
 -- perhaps we ought to have a special annotation for calls that can
 -- modify heap/stack memory.  For now we just use the conservative
 -- definition here.
---
--- Some CallishMachOp imply a memory barrier e.g. AtomicRMW and
--- therefore we should never float any memory operations across one of
--- these calls.
 
 
 bothMems :: AbsMem -> AbsMem -> AbsMem

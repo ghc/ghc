@@ -19,9 +19,6 @@ module CmmMachOp
     -- CallishMachOp
     , CallishMachOp(..), callishMachOpHints
     , pprCallishMachOp
-
-    -- Atomic read-modify-write
-    , AtomicMachOp(..)
    )
 where
 
@@ -550,23 +547,7 @@ data CallishMachOp
 
   | MO_PopCnt Width
   | MO_BSwap Width
-
-  -- Atomic read-modify-write.
-  | MO_AtomicRMW Width AtomicMachOp
-  | MO_AtomicRead Width
-  | MO_AtomicWrite Width
-  | MO_Cmpxchg Width
   deriving (Eq, Show)
-
--- | The operation to perform atomically.
-data AtomicMachOp =
-      AMO_Add
-    | AMO_Sub
-    | AMO_And
-    | AMO_Nand
-    | AMO_Or
-    | AMO_Xor
-      deriving (Eq, Show)
 
 pprCallishMachOp :: CallishMachOp -> SDoc
 pprCallishMachOp mo = text (show mo)

@@ -15,7 +15,6 @@ import BlockId
 import CodeGen.Platform ( activeStgRegs, callerSaves )
 import CLabel
 import Cmm
-import CPrim
 import PprCmm
 import CmmUtils
 import Hoopl
@@ -33,7 +32,6 @@ import Unique
 import Data.List ( nub )
 import Data.Maybe ( catMaybes )
 
-type Atomic = Bool
 type LlvmStatements = OrdList LlvmStatement
 
 -- -----------------------------------------------------------------------------
@@ -229,17 +227,6 @@ genCall t@(PrimTarget (MO_PopCnt w)) dsts args =
     genCallSimpleCast w t dsts args
 genCall t@(PrimTarget (MO_BSwap w)) dsts args =
     genCallSimpleCast w t dsts args
-
-genCall (PrimTarget (MO_AtomicRead _)) [dst] [addr] = do
-  dstV <- getCmmReg (CmmLocal dst)
-  (v1, stmts, top) <- genLoad True addr (localRegType dst)
-  let stmt1 = Store v1 dstV
-  return (stmts `snocOL` stmt1, top)
-
--- TODO: implement these properly rather than calling to RTS functions.
--- genCall t@(PrimTarget (MO_AtomicWrite width)) [] [addr, val] = undefined
--- genCall t@(PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = undefined
--- genCall t@(PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] = undefined
 
 -- Handle memcpy function specifically since llvm's intrinsic version takes
 -- some extra parameters.
@@ -561,6 +548,7 @@ cmmPrimOpFunctions mop = do
 
     (MO_Prefetch_Data _ )-> fsLit "llvm.prefetch"
 
+
     MO_S_QuotRem {}  -> unsupported
     MO_U_QuotRem {}  -> unsupported
     MO_U_QuotRem2 {} -> unsupported
@@ -569,12 +557,6 @@ cmmPrimOpFunctions mop = do
     MO_WriteBarrier  -> unsupported
     MO_Touch         -> unsupported
     MO_UF_Conv _     -> unsupported
-
-    MO_AtomicRead _  -> unsupported
-
-    MO_AtomicRMW w amop -> fsLit $ atomicRMWLabel w amop
-    MO_Cmpxchg w        -> fsLit $ cmpxchgLabel w
-    MO_AtomicWrite w    -> fsLit $ atomicWriteLabel w
 
 -- | Tail function calls
 genJump :: CmmExpr -> [GlobalReg] -> LlvmM StmtData
@@ -867,7 +849,7 @@ exprToVarOpt opt e = case e of
         -> genLit opt lit
 
     CmmLoad e' ty
-        -> genLoad False e' ty
+        -> genLoad e' ty
 
     -- Cmmreg in expression is the value, so must load. If you want actual
     -- reg pointer, call getCmmReg directly.
@@ -1286,41 +1268,41 @@ genMachOp_slow _ _ _ = panic "genMachOp: More then 2 expressions in MachOp!"
 
 
 -- | Handle CmmLoad expression.
-genLoad :: Atomic -> CmmExpr -> CmmType -> LlvmM ExprData
+genLoad :: CmmExpr -> CmmType -> LlvmM ExprData
 
 -- First we try to detect a few common cases and produce better code for
 -- these then the default case. We are mostly trying to detect Cmm code
 -- like I32[Sp + n] and use 'getelementptr' operations instead of the
 -- generic case that uses casts and pointer arithmetic
-genLoad atomic e@(CmmReg (CmmGlobal r)) ty
-    = genLoad_fast atomic e r 0 ty
+genLoad e@(CmmReg (CmmGlobal r)) ty
+    = genLoad_fast e r 0 ty
 
-genLoad atomic e@(CmmRegOff (CmmGlobal r) n) ty
-    = genLoad_fast atomic e r n ty
+genLoad e@(CmmRegOff (CmmGlobal r) n) ty
+    = genLoad_fast e r n ty
 
-genLoad atomic e@(CmmMachOp (MO_Add _) [
+genLoad e@(CmmMachOp (MO_Add _) [
                             (CmmReg (CmmGlobal r)),
                             (CmmLit (CmmInt n _))])
                 ty
-    = genLoad_fast atomic e r (fromInteger n) ty
+    = genLoad_fast e r (fromInteger n) ty
 
-genLoad atomic e@(CmmMachOp (MO_Sub _) [
+genLoad e@(CmmMachOp (MO_Sub _) [
                             (CmmReg (CmmGlobal r)),
                             (CmmLit (CmmInt n _))])
                 ty
-    = genLoad_fast atomic e r (negate $ fromInteger n) ty
+    = genLoad_fast e r (negate $ fromInteger n) ty
 
 -- generic case
-genLoad atomic e ty
+genLoad e ty
     = do other <- getTBAAMeta otherN
-         genLoad_slow atomic e ty other
+         genLoad_slow e ty other
 
 -- | Handle CmmLoad expression.
 -- This is a special case for loading from a global register pointer
 -- offset such as I32[Sp+8].
-genLoad_fast :: Atomic -> CmmExpr -> GlobalReg -> Int -> CmmType
-             -> LlvmM ExprData
-genLoad_fast atomic e r n ty = do
+genLoad_fast :: CmmExpr -> GlobalReg -> Int -> CmmType
+                -> LlvmM ExprData
+genLoad_fast e r n ty = do
     dflags <- getDynFlags
     (gv, grt, s1) <- getCmmRegVal (CmmGlobal r)
     meta          <- getTBAARegMeta r
@@ -1333,7 +1315,7 @@ genLoad_fast atomic e r n ty = do
                 case grt == ty' of
                      -- were fine
                      True -> do
-                         (var, s3) <- doExpr ty' (MExpr meta $ loadInstr ptr)
+                         (var, s3) <- doExpr ty' (MExpr meta $ Load ptr)
                          return (var, s1 `snocOL` s2 `snocOL` s3,
                                      [])
 
@@ -1341,34 +1323,32 @@ genLoad_fast atomic e r n ty = do
                      False -> do
                          let pty = pLift ty'
                          (ptr', s3) <- doExpr pty $ Cast LM_Bitcast ptr pty
-                         (var, s4) <- doExpr ty' (MExpr meta $ loadInstr ptr')
+                         (var, s4) <- doExpr ty' (MExpr meta $ Load ptr')
                          return (var, s1 `snocOL` s2 `snocOL` s3
                                     `snocOL` s4, [])
 
             -- If its a bit type then we use the slow method since
             -- we can't avoid casting anyway.
-            False -> genLoad_slow atomic  e ty meta
-  where
-    loadInstr ptr | atomic    = ALoad SyncSeqCst False ptr
-                  | otherwise = Load ptr
+            False -> genLoad_slow e ty meta
+
 
 -- | Handle Cmm load expression.
 -- Generic case. Uses casts and pointer arithmetic if needed.
-genLoad_slow :: Atomic -> CmmExpr -> CmmType -> [MetaAnnot] -> LlvmM ExprData
-genLoad_slow atomic e ty meta = do
+genLoad_slow :: CmmExpr -> CmmType -> [MetaAnnot] -> LlvmM ExprData
+genLoad_slow e ty meta = do
     (iptr, stmts, tops) <- exprToVar e
     dflags <- getDynFlags
     case getVarType iptr of
          LMPointer _ -> do
                     (dvar, load) <- doExpr (cmmToLlvmType ty)
-                                           (MExpr meta $ loadInstr iptr)
+                                           (MExpr meta $ Load iptr)
                     return (dvar, stmts `snocOL` load, tops)
 
          i@(LMInt _) | i == llvmWord dflags -> do
                     let pty = LMPointer $ cmmToLlvmType ty
                     (ptr, cast)  <- doExpr pty $ Cast LM_Inttoptr iptr pty
                     (dvar, load) <- doExpr (cmmToLlvmType ty)
-                                           (MExpr meta $ loadInstr ptr)
+                                           (MExpr meta $ Load ptr)
                     return (dvar, stmts `snocOL` cast `snocOL` load, tops)
 
          other -> do dflags <- getDynFlags
@@ -1377,9 +1357,6 @@ genLoad_slow atomic e ty meta = do
                             "Size of Ptr: " ++ show (llvmPtrBits dflags) ++
                             ", Size of var: " ++ show (llvmWidthInBits dflags other) ++
                             ", Var: " ++ showSDoc dflags (ppr iptr)))
-  where
-    loadInstr ptr | atomic    = ALoad SyncSeqCst False ptr
-                  | otherwise = Load ptr
 
 
 -- | Handle CmmReg expression. This will return a pointer to the stack

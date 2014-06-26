@@ -65,8 +65,6 @@ data LlvmFunction = LlvmFunction {
 
 type LlvmFunctions = [LlvmFunction]
 
-type SingleThreaded = Bool
-
 -- | LLVM ordering types for synchronization purposes. (Introduced in LLVM
 -- 3.0). Please see the LLVM documentation for a better description.
 data LlvmSyncOrdering
@@ -224,11 +222,6 @@ data LlvmExpression
     Load the value at location ptr
   -}
   | Load LlvmVar
-
-  {- |
-    Atomic load of the value at location ptr
-  -}
-  | ALoad LlvmSyncOrdering SingleThreaded LlvmVar
 
   {- |
     Navigate in an structure, selecting elements
