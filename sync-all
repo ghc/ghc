@@ -943,8 +943,8 @@ END {
         ["libraries/Cabal",  "c8ebd66a32865f72ae03ee0663c62df3d77f08fe"],
         );
     for (@obsolete_dirs) {
-        my ($dir, $hash) = $_;
-        my $name = $dir =~ m!/([^/]+)$!;
+        my ($dir, $hash) = @$_;
+        my ($name) = $dir =~ m!/([^/]+)$!;
         message "== Checking for old $name repo";
         if (-d "$dir/.git") {
             chdir($dir);
