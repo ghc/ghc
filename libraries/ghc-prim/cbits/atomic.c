@@ -101,32 +101,58 @@ hs_atomic_and64(volatile StgWord64 *x, StgWord64 val)
 
 // FetchNandByteArrayOp_Int
 
+// Workaround for http://llvm.org/bugs/show_bug.cgi?id=8842
+#define CAS_NAND(x, val)                                            \
+  {                                                                 \
+    __typeof__ (*(x)) tmp = *(x);                                   \
+    while (!__sync_bool_compare_and_swap(x, tmp, ~(tmp & (val)))) { \
+      tmp = *(x);                                                   \
+    }                                                               \
+    return tmp;                                                     \
+  }
+
 extern StgWord hs_atomic_nand8(volatile StgWord8 *x, StgWord val);
 StgWord
 hs_atomic_nand8(volatile StgWord8 *x, StgWord val)
 {
+#ifdef __clang__
+  CAS_NAND(x, (StgWord8) val)
+#else
   return __sync_fetch_and_nand(x, (StgWord8) val);
+#endif
 }
 
 extern StgWord hs_atomic_nand16(volatile StgWord16 *x, StgWord val);
 StgWord
 hs_atomic_nand16(volatile StgWord16 *x, StgWord val)
 {
+#ifdef __clang__
+  CAS_NAND(x, (StgWord16) val);
+#else
   return __sync_fetch_and_nand(x, (StgWord16) val);
+#endif
 }
 
 extern StgWord hs_atomic_nand32(volatile StgWord32 *x, StgWord val);
 StgWord
 hs_atomic_nand32(volatile StgWord32 *x, StgWord val)
 {
+#ifdef __clang__
+  CAS_NAND(x, (StgWord32) val);
+#else
   return __sync_fetch_and_nand(x, (StgWord32) val);
+#endif
 }
 
 extern StgWord64 hs_atomic_nand64(volatile StgWord64 *x, StgWord64 val);
 StgWord64
 hs_atomic_nand64(volatile StgWord64 *x, StgWord64 val)
 {
+#ifdef __clang__
+  CAS_NAND(x, val);
+#else
   return __sync_fetch_and_nand(x, val);
+#endif
 }
 
 // FetchOrByteArrayOp_Int
