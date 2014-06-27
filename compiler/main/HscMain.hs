@@ -624,8 +624,9 @@ hscCompileOneShot' hsc_env mod_summary src_changed
             dflags <- getDynFlags
             case hscTarget dflags of
                 HscNothing -> do
-                    (iface, changed, _) <- hscSimpleIface' tc_result mb_old_hash
-                    liftIO $ hscWriteIface dflags iface changed mod_summary
+                    when (gopt Opt_WriteInterface dflags) $ liftIO $ do
+                        (iface, changed, _details) <- hscSimpleIface hsc_env tc_result mb_old_hash
+                        hscWriteIface dflags iface changed mod_summary
                     return HscNotGeneratingCode
                 _ ->
                     case ms_hsc_src mod_summary of
@@ -1106,9 +1107,7 @@ hscNormalIface' simpl_result mb_old_iface = do
 --------------------------------------------------------------
 
 hscWriteIface :: DynFlags -> ModIface -> Bool -> ModSummary -> IO ()
-hscWriteIface dflags iface no_change mod_summary
-  | not (gopt Opt_WriteInterface dflags) = return ()
-  | otherwise = do
+hscWriteIface dflags iface no_change mod_summary = do
     let ifaceFile = ml_hi_file (ms_location mod_summary)
     unless no_change $
         {-# SCC "writeIface" #-}

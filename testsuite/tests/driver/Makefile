@@ -578,9 +578,3 @@ write_interface_make:
 	$(RM) -rf write_interface_make/A011.hi
 	"$(TEST_HC)" $(TEST_HC_OPTS) -hidir write_interface_make -fno-code -fwrite-interface --make A011.hs
 	test -f write_interface_make/A011.hi
-
-.PHONY: no_write_interface
-no_write_interface:
-	$(RM) -rf no_write_interface/A011.hi
-	"$(TEST_HC)" $(TEST_HC_OPTS) -hidir no_write_interface -fno-write-interface -c A011.hs
-	! test -f no_write_interface/A011.hi

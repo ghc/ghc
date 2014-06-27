@@ -229,7 +229,8 @@ compileOne' m_tc_result mHscMessage
                                                 hm_linkable = Just linkable })
                HscNothing ->
                    do (iface, changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
-                      hscWriteIface dflags iface changed summary
+                      when (gopt Opt_WriteInterface dflags) $
+                         hscWriteIface dflags iface changed summary
                       let linkable = if isHsBoot src_flavour
                                      then maybe_old_linkable
                                      else Just (LM (ms_hs_date summary) this_mod [])
