@@ -589,7 +589,7 @@ $ cat foo.hspp</screen>
         <listitem>
           <para>Always write interface files.  GHC will normally write
           interface files automatically, but this flag is useful with
-          <option>-fno-code</code>, which normally suppresses generation
+          <option>-fno-code</option>, which normally suppresses generation
           of interface files.  This is useful if you want to type check
           over multiple runs of GHC without compiling dependencies.</para>
         </listitem>
