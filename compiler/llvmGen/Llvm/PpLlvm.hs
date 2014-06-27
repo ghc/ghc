@@ -239,6 +239,7 @@ ppLlvmExpression expr
         Insert     vec elt idx      -> ppInsert vec elt idx
         GetElemPtr inb ptr indexes  -> ppGetElementPtr inb ptr indexes
         Load       ptr              -> ppLoad ptr
+        ALoad      ord st ptr       -> ppALoad ord st ptr
         Malloc     tp amount        -> ppMalloc tp amount
         Phi        tp precessors    -> ppPhi tp precessors
         Asm        asm c ty v se sk -> ppAsm asm c ty v se sk
@@ -327,13 +328,18 @@ ppSyncOrdering SyncSeqCst    = text "seq_cst"
 -- of specifying alignment.
 
 ppLoad :: LlvmVar -> SDoc
-ppLoad var
-    | isVecPtrVar var = text "load" <+> ppr var <>
-                        comma <+> text "align 1"
-    | otherwise       = text "load" <+> ppr var
+ppLoad var = text "load" <+> ppr var <> align
   where
-    isVecPtrVar :: LlvmVar -> Bool
-    isVecPtrVar = isVector . pLower . getVarType
+    align | isVector . pLower . getVarType $ var = text ", align 1"
+          | otherwise = empty
+
+ppALoad :: LlvmSyncOrdering -> SingleThreaded -> LlvmVar -> SDoc
+ppALoad ord st var = sdocWithDynFlags $ \dflags ->
+  let alignment = (llvmWidthInBits dflags $ getVarType var) `quot` 8
+      align     = text ", align" <+> ppr alignment
+      sThreaded | st        = text " singlethread"
+                | otherwise = empty
+  in text "load atomic" <+> ppr var <> sThreaded <+> ppSyncOrdering ord <> align
 
 ppStore :: LlvmVar -> LlvmVar -> SDoc
 ppStore val dst
