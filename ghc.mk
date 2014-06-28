@@ -452,9 +452,17 @@ ifneq "$(CrossCompiling)" "YES"
 define addExtraPackage
 ifeq "$2" "-"
 # Do nothing; this package is already handled above
-else ifeq "$2 $$(GhcProfiled)" "dph YES"
-# Ignore the package: These packages need TH, which is incompatible
-# with a profiled GHC
+else ifeq "$2" "dph"
+## DPH-specific clause
+ifeq "$$(GhcProfiled)" "YES"
+# Ignore package: The DPH packages need TH, which is incompatible with
+# a profiled GHC
+else ifneq "$$(BUILD_DPH)" "YES"
+# Ignore package: DPH was disabled
+else
+PACKAGES_STAGE2 += $1
+endif
+## end of DPH-specific clause
 else
 PACKAGES_STAGE2 += $1
 endif
@@ -635,7 +643,9 @@ ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
 BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
+ifeq "$(BUILD_DPH)" "YES"
 BUILD_DIRS += $(wildcard libraries/dph)
+endif
 endif
 
 

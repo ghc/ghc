@@ -66,6 +66,9 @@ V = 1
 # working on stage 2 and want to freeze stage 1 and the libraries for
 # a while.
 
+# Uncomment the following line to disable building DPH
+#BUILD_DPH=NO
+
 GhcLibWays = $(if $(filter $(DYNAMIC_GHC_PROGRAMS),YES),v dyn,v)
 
 # ----------- A Performance/Distribution build --------------------------------
