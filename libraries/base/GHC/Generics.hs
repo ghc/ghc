@@ -758,7 +758,6 @@ deriving instance Generic1 ((,,,,,,) a b c d e f)
 --------------------------------------------------------------------------------
 
 -- Int
---data D_Int (name :: Symbol)
 data C_Int
 
 instance Datatype (Dat "Int") where
@@ -775,10 +774,9 @@ instance Generic Int where
 
 
 -- Float
-data D_Float
 data C_Float
 
-instance Datatype D_Float where
+instance Datatype (Dat "Float") where
   datatypeName _ = "Float"
   moduleName   _ = "GHC.Float"
 
@@ -786,16 +784,15 @@ instance Constructor C_Float where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Float where
-  type Rep Float = D1 D_Float (C1 C_Float (S1 NoSelector (Rec0 Float)))
+  type Rep Float = D1 (Dat "Float") (C1 C_Float (S1 NoSelector (Rec0 Float)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 
 
 -- Double
-data D_Double
 data C_Double
 
-instance Datatype D_Double where
+instance Datatype (Dat "Double") where
   datatypeName _ = "Double"
   moduleName   _ = "GHC.Float"
 
@@ -803,16 +800,15 @@ instance Constructor C_Double where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Double where
-  type Rep Double = D1 D_Double (C1 C_Double (S1 NoSelector (Rec0 Double)))
+  type Rep Double = D1 (Dat "Double") (C1 C_Double (S1 NoSelector (Rec0 Double)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 
 
 -- Char
-data D_Char
 data C_Char
 
-instance Datatype D_Char where
+instance Datatype (Dat "Char") where
   datatypeName _ = "Char"
   moduleName   _ = "GHC.Base"
 
@@ -820,7 +816,7 @@ instance Constructor C_Char where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Char where
-  type Rep Char = D1 D_Char (C1 C_Char (S1 NoSelector (Rec0 Char)))
+  type Rep Char = D1 (Dat "Char") (C1 C_Char (S1 NoSelector (Rec0 Char)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 
