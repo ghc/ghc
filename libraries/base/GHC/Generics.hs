@@ -545,6 +545,9 @@ module GHC.Generics  (
 #endif
 -----------------------------------------------------------------------------
 
+  -- * Datatype representation types
+    Dat,
+
   -- * Generic representation types
     V1, U1(..), Par1(..), Rec1(..), K1(..), M1(..)
   , (:+:)(..), (:*:)(..), (:.:)(..)
@@ -577,6 +580,8 @@ import Data.Proxy
 --------------------------------------------------------------------------------
 -- Representation types
 --------------------------------------------------------------------------------
+
+data Dat (name :: Symbol)
 
 -- | Void: used for datatypes without constructors
 data V1 p
@@ -753,10 +758,10 @@ deriving instance Generic1 ((,,,,,,) a b c d e f)
 --------------------------------------------------------------------------------
 
 -- Int
-data D_Int (name :: Symbol)
+--data D_Int (name :: Symbol)
 data C_Int
 
-instance Datatype (D_Int "Int") where
+instance Datatype (Dat "Int") where
   datatypeName _ = "Int"
   moduleName   _ = "GHC.Int"
 
@@ -764,7 +769,7 @@ instance Constructor C_Int where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Int where
-  type Rep Int = D1 (D_Int "Int") (C1 C_Int (S1 NoSelector (Rec0 Int)))
+  type Rep Int = D1 (Dat "Int") (C1 C_Int (S1 NoSelector (Rec0 Int)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 

@@ -101,12 +101,12 @@ during type inference.  Hence cmpTc treats them as equal.
 kindFunResult :: SDoc -> Kind -> KindOrType -> Kind
 kindFunResult _ (FunTy _ res)     _   = res
 kindFunResult _ (ForAllTy kv res) arg = substKiWith [kv] [arg] res
-#ifdef DEBUG
+-- #ifdef DEBUG
 kindFunResult doc k _ = pprPanic "kindFunResult" (ppr k $$ doc)
-#else
--- Without DEBUG, doc becomes an unsed arg, and will be optimised away
-kindFunResult _ _ _ = panic "kindFunResult"
-#endif
+-- ///#else
+-- //-- Without DEBUG, doc becomes an unsed arg, and will be optimised away
+-- //kindFunResult _ _ _ = panic "kindFunResult"
+-- //#endif
 
 kindAppResult :: SDoc -> Kind -> [Type] -> Kind
 kindAppResult _   k []     = k

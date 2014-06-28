@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow 2011
+% (c) The University of Glasgow 2011-2014
 %
 
 The deriving code for the Generic class
@@ -22,6 +22,7 @@ import TcType
 import TcGenDeriv
 import DataCon
 import TyCon
+import TypeRep
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
 import Module           ( Module, moduleName, moduleNameString )
@@ -78,28 +79,31 @@ genGenericMetaTyCons tc mod =
         tc_arits  = map dataConSourceArity tc_cons
 
         tc_occ    = nameOccName tc_name
-        d_occ     = mkGenD tc_occ
+        --d_occ     = mkGenD tc_occ
         c_occ m   = mkGenC tc_occ m
         s_occ m n = mkGenS tc_occ m n
 
-        mkTyCon name = ASSERT( isExternalName name )
-                       buildAlgTyCon name [] [] Nothing [] distinctAbstractTyConRhs
+        mkTyCon tyvars name = ASSERT( isExternalName name )
+                       buildAlgTyCon name tyvars [] Nothing [] distinctAbstractTyConRhs
                                           NonRecursive
                                           False          -- Not promotable
                                           False          -- Not GADT syntax
                                           NoParentTyCon
 
-      d_name  <- newGlobalBinder mod d_occ loc
+      --d_name  <- newGlobalBinder mod d_occ loc
+      --d_tycon  <- tcLookupTyCon datTyConName -- "Dat"
+      --let d_type = mkTyConApp d_tycon [LitTy . StrTyLit . fsLit $ "HEY!"] -- HEYtcLookupTyCon datTyConName -- "Dat"
+      let d_type d_tycon = mkTyConApp d_tycon [LitTy . StrTyLit $ occNameFS (nameOccName tc_name)] -- HEYtcLookupTyCon datTyConName -- "Dat"
       c_names <- forM (zip [0..] tc_cons) $ \(m,_) ->
                     newGlobalBinder mod (c_occ m) loc
       s_names <- forM (zip [0..] tc_arits) $ \(m,a) -> forM [0..a-1] $ \n ->
                     newGlobalBinder mod (s_occ m n) loc
 
-      let metaDTyCon  = mkTyCon d_name
-          metaCTyCons = map mkTyCon c_names
-          metaSTyCons = map (map mkTyCon) s_names
+      let --metaDTyCon  = d_tycon -- mkTyCon [] d_name
+          metaCTyCons = map (mkTyCon []) c_names
+          metaSTyCons = map (map (mkTyCon [])) s_names
 
-          metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
+          metaDts = MetaTyCons {-metaDTyCon-}d_type metaCTyCons metaSTyCons
 
       -- pprTrace "rep0" (ppr rep0_tycon) $
       (,) metaDts `fmap` metaTyConsToDerivStuff tc metaDts
@@ -109,6 +113,7 @@ metaTyConsToDerivStuff :: TyCon -> MetaTyCons -> TcM BagDerivStuff
 metaTyConsToDerivStuff tc metaDts =
   do  loc <- getSrcSpanM
       dflags <- getDynFlags
+      dat   <- tcLookupTyCon datTyConName -- HERE not good, wrong context!
       dClas <- tcLookupClass datatypeClassName
       let new_dfun_name clas tycon = newDFunName clas [mkTyConApp tycon []] loc
       d_dfun_name <- new_dfun_name dClas tc
@@ -128,11 +133,18 @@ metaTyConsToDerivStuff tc metaDts =
                             (NoOverlap safeOverlap)
                             [] clas tys
           where
-            tys = [mkTyConTy tc]
+            tys = [mkTyConTy tc] -- FIXME: simplify
+        mk_inst_ty clas ty dfun_name
+          = mkLocalInstance (mkDictFunId dfun_name [] [] clas tys)
+                            (NoOverlap safeOverlap)
+                            [] clas tys
+          where
+            tys = [ty]
 
         -- Datatype
-        d_metaTycon = metaD metaDts
-        d_inst   = mk_inst dClas d_metaTycon d_dfun_name
+        --d_metaTycon = undefined --metaD metaDts
+        --d_inst   = mk_inst dClas d_metaTycon d_dfun_name
+        d_inst   = mk_inst_ty dClas (metaD metaDts dat) d_dfun_name
         d_binds  = InstBindings { ib_binds = dBinds
                                 , ib_pragmas = []
                                 , ib_extensions = []
@@ -595,6 +607,7 @@ tc_mkRepTy gk_ tycon metaDts =
     plus  <- tcLookupTyCon sumTyConName
     times <- tcLookupTyCon prodTyConName
     comp  <- tcLookupTyCon compTyConName
+    dat   <- tcLookupTyCon datTyConName
 
     let mkSum' a b = mkTyConApp plus  [a,b]
         mkProd a b = mkTyConApp times [a,b]
@@ -602,7 +615,7 @@ tc_mkRepTy gk_ tycon metaDts =
         mkRec0 a   = mkTyConApp rec0  [a]
         mkRec1 a   = mkTyConApp rec1  [a]
         mkPar1     = mkTyConTy  par1
-        mkD    a   = mkTyConApp d1    [metaDTyCon, sumP (tyConDataCons a)]
+        mkD    a   = mkTyConApp d1    [metaDTyCon dat, sumP (tyConDataCons a)]
         mkC  i d a = mkTyConApp c1    [d, prod i (dataConInstOrigArgTys a $ mkTyVarTys $ tyConTyVars tycon)
                                                  (null (dataConFieldLabels a))]
         -- This field has no label
@@ -641,7 +654,9 @@ tc_mkRepTy gk_ tycon metaDts =
                ata_rec1 = mkRec1, ata_comp = mkComp}
 
 
-        metaDTyCon  = mkTyConTy (metaD metaDts)
+        --metaDTyCon  = mkTyConTy (metaD metaDts)
+        --metaDTyCon  = TyConApp (metaD metaDts) [LitTy . StrTyLit . fsLit $ "HEY!"]
+        metaDTyCon  = metaD metaDts --mkTyConApp (metaD metaDts) [LitTy . StrTyLit . fsLit $ "HEY!"]
         metaCTyCons = map mkTyConTy (metaC metaDts)
         metaSTyCons = map (map mkTyConTy) (metaS metaDts)
 
@@ -652,17 +667,17 @@ tc_mkRepTy gk_ tycon metaDts =
 --------------------------------------------------------------------------------
 
 data MetaTyCons = MetaTyCons { -- One meta datatype per dataype
-                               metaD :: TyCon
+                               metaD :: TyCon -> Type --TyCon
                                -- One meta datatype per constructor
                              , metaC :: [TyCon]
                                -- One meta datatype per selector per constructor
                              , metaS :: [[TyCon]] }
 
 instance Outputable MetaTyCons where
-  ppr (MetaTyCons d c s) = ppr d $$ vcat (map ppr c) $$ vcat (map ppr (concat s))
+  ppr (MetaTyCons d c s) = {-ppr d $$-} vcat (map ppr c) $$ vcat (map ppr (concat s))
 
 metaTyCons2TyCons :: MetaTyCons -> Bag TyCon
-metaTyCons2TyCons (MetaTyCons d c s) = listToBag (d : c ++ concat s)
+metaTyCons2TyCons (MetaTyCons d c s) = listToBag ({-d :-} c ++ concat s)
 
 
 -- Bindings for Datatype, Constructor, and Selector instances
