@@ -90,7 +90,8 @@ genGenericMetaTyCons tc mod =
                                           NoParentTyCon
 
       d_tycon  <- tcLookupTyCon datTyConName
-      let d_type = mkTyConApp d_tycon [LitTy . StrTyLit . moduleNameFS . moduleName $ mod, LitTy . StrTyLit $ occNameFS (nameOccName tc_name)]
+      let d_type = mkTyConApp d_tycon $ map (LitTy . StrTyLit)
+                    [moduleNameFS . moduleName $ mod, occNameFS . nameOccName $ tc_name]
       c_names <- forM (zip [0..] tc_cons) $ \(m,_) ->
                     newGlobalBinder mod (c_occ m) loc
       s_names <- forM (zip [0..] tc_arits) $ \(m,a) -> forM [0..a-1] $ \n ->
@@ -123,13 +124,7 @@ metaTyConsToDerivStuff tc metaDts =
       let
         safeOverlap = safeLanguageOn dflags
         (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
-        mk_inst clas tc dfun_name
-          = mkLocalInstance (mkDictFunId dfun_name [] [] clas tys)
-                            (NoOverlap safeOverlap)
-                            [] clas tys
-          where
-            tys = [mkTyConTy tc] -- FIXME: simplify
-        mk_inst_ty clas ty dfun_name
+        mk_inst clas ty dfun_name
           = mkLocalInstance (mkDictFunId dfun_name [] [] clas tys)
                             (NoOverlap safeOverlap)
                             [] clas tys
@@ -137,7 +132,7 @@ metaTyConsToDerivStuff tc metaDts =
             tys = [ty]
 
         -- Datatype
-        d_inst   = mk_inst_ty dClas (metaD metaDts) d_dfun_name
+        d_inst   = mk_inst dClas (metaD metaDts) d_dfun_name
         d_binds  = InstBindings { ib_binds = dBinds
                                 , ib_pragmas = []
                                 , ib_extensions = []
@@ -146,7 +141,7 @@ metaTyConsToDerivStuff tc metaDts =
 
         -- Constructor
         c_metaTycons = metaC metaDts
-        c_insts = [ mk_inst cClas c ds
+        c_insts = [ mk_inst cClas (mkTyConTy c) ds
                   | (c, ds) <- myZip1 c_metaTycons c_dfun_names ]
         c_binds = [ InstBindings { ib_binds = c
                                  , ib_pragmas = []
@@ -158,7 +153,7 @@ metaTyConsToDerivStuff tc metaDts =
 
         -- Selector
         s_metaTycons = metaS metaDts
-        s_insts = map (map (\(s,ds) -> mk_inst sClas s ds))
+        s_insts = map (map (\(s,ds) -> mk_inst sClas (mkTyConTy s) ds))
                       (myZip2 s_metaTycons s_dfun_names)
         s_binds = [ [ InstBindings { ib_binds = s
                                    , ib_pragmas = []
@@ -666,7 +661,7 @@ instance Outputable MetaTyCons where
   ppr (MetaTyCons d c s) = ppr d $$ vcat (map ppr c) $$ vcat (map ppr (concat s))
 
 metaTyCons2TyCons :: MetaTyCons -> Bag TyCon
-metaTyCons2TyCons (MetaTyCons d c s) = listToBag ({-d :-} c ++ concat s)
+metaTyCons2TyCons (MetaTyCons _ c s) = listToBag (c ++ concat s)
 
 
 -- Bindings for Datatype, Constructor, and Selector instances
