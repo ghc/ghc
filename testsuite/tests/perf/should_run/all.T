@@ -60,9 +60,10 @@ test('T876',
           [(wordsize(64), 63216 , 5),
               # 2013-02-14: 1263712 (x86_64/Linux)
               # 2014-02-10:   63216 (x86_64/Linux), call arity analysis
-           (wordsize(32), 56820, 5) ]),
+           (wordsize(32), 53024, 5) ]),
               # some date:  663712  (Windows, 64-bit machine)
               # 2014-04-04:  56820  (Windows, 64-bit machine)
+              # 2014-06-29:  53024  (x86_64/Linux)
       only_ways(['normal']),
       extra_run_opts('10000')
       ],
