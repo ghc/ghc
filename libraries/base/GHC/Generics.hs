@@ -546,7 +546,7 @@ module GHC.Generics  (
 -----------------------------------------------------------------------------
 
   -- * Datatype representation types
-    Dat,
+    Dat, Constr,
 
   -- * Generic representation types
     V1, U1(..), Par1(..), Rec1(..), K1(..), M1(..)
@@ -582,6 +582,8 @@ import Data.Proxy
 --------------------------------------------------------------------------------
 
 data Dat (mod :: Symbol) (name :: Symbol)
+
+data Constr ctx (name :: Symbol)
 
 -- | Void: used for datatypes without constructors
 data V1 p
@@ -758,7 +760,7 @@ deriving instance Generic1 ((,,,,,,) a b c d e f)
 --------------------------------------------------------------------------------
 
 -- Int
-data C_Int
+type C_Int = Constr (Dat "GHC.Int" "Int") ""
 
 instance Datatype (Dat "GHC.Int" "Int") where
   datatypeName _ = "Int"
@@ -774,7 +776,7 @@ instance Generic Int where
 
 
 -- Float
-data C_Float
+type C_Float = Constr (Dat "GHC.Float" "Float") ""
 
 instance Datatype (Dat "GHC.Float" "Float") where
   datatypeName _ = "Float"
@@ -790,7 +792,7 @@ instance Generic Float where
 
 
 -- Double
-data C_Double
+type C_Double = Constr (Dat "GHC.Float" "Double") ""
 
 instance Datatype (Dat "GHC.Float" "Double") where
   datatypeName _ = "Double"
@@ -806,7 +808,7 @@ instance Generic Double where
 
 
 -- Char
-data C_Char
+type C_Char = Constr (Dat "GHC.Base" "Char") ""
 
 instance Datatype (Dat "GHC.Base" "Char") where
   datatypeName _ = "Char"
