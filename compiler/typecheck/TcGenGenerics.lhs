@@ -651,7 +651,7 @@ tc_mkRepTy gk_ tycon metaDts =
 -- Meta-information
 --------------------------------------------------------------------------------
 
-data MetaTyCons = MetaTyCons { -- One meta datatype per dataype
+data MetaTyCons = MetaTyCons { -- One meta datatype per datatype
                                metaD :: TyCon
                                -- One meta datatype per constructor
                              , metaC :: [TyCon]
