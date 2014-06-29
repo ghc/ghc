@@ -581,7 +581,7 @@ import Data.Proxy
 -- Representation types
 --------------------------------------------------------------------------------
 
-data Dat (name :: Symbol)
+data Dat (mod :: Symbol) (name :: Symbol)
 
 -- | Void: used for datatypes without constructors
 data V1 p
@@ -760,7 +760,7 @@ deriving instance Generic1 ((,,,,,,) a b c d e f)
 -- Int
 data C_Int
 
-instance Datatype (Dat "Int") where
+instance Datatype (Dat "GHC.Int" "Int") where
   datatypeName _ = "Int"
   moduleName   _ = "GHC.Int"
 
@@ -768,7 +768,7 @@ instance Constructor C_Int where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Int where
-  type Rep Int = D1 (Dat "Int") (C1 C_Int (S1 NoSelector (Rec0 Int)))
+  type Rep Int = D1 (Dat "GHC.Int" "Int") (C1 C_Int (S1 NoSelector (Rec0 Int)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 
@@ -776,7 +776,7 @@ instance Generic Int where
 -- Float
 data C_Float
 
-instance Datatype (Dat "Float") where
+instance Datatype (Dat "GHC.Float" "Float") where
   datatypeName _ = "Float"
   moduleName   _ = "GHC.Float"
 
@@ -784,7 +784,7 @@ instance Constructor C_Float where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Float where
-  type Rep Float = D1 (Dat "Float") (C1 C_Float (S1 NoSelector (Rec0 Float)))
+  type Rep Float = D1 (Dat "GHC.Float" "Float") (C1 C_Float (S1 NoSelector (Rec0 Float)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 
@@ -792,7 +792,7 @@ instance Generic Float where
 -- Double
 data C_Double
 
-instance Datatype (Dat "Double") where
+instance Datatype (Dat "GHC.Float" "Double") where
   datatypeName _ = "Double"
   moduleName   _ = "GHC.Float"
 
@@ -800,7 +800,7 @@ instance Constructor C_Double where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Double where
-  type Rep Double = D1 (Dat "Double") (C1 C_Double (S1 NoSelector (Rec0 Double)))
+  type Rep Double = D1 (Dat "GHC.Float" "Double") (C1 C_Double (S1 NoSelector (Rec0 Double)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 
@@ -808,7 +808,7 @@ instance Generic Double where
 -- Char
 data C_Char
 
-instance Datatype (Dat "Char") where
+instance Datatype (Dat "GHC.Base" "Char") where
   datatypeName _ = "Char"
   moduleName   _ = "GHC.Base"
 
@@ -816,7 +816,7 @@ instance Constructor C_Char where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Char where
-  type Rep Char = D1 (Dat "Char") (C1 C_Char (S1 NoSelector (Rec0 Char)))
+  type Rep Char = D1 (Dat "GHC.Base" "Char") (C1 C_Char (S1 NoSelector (Rec0 Char)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 

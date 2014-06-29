@@ -25,7 +25,7 @@ import TyCon
 import TypeRep
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
-import Module           ( Module, moduleName, moduleNameString )
+import Module           ( Module, moduleName, moduleNameString, moduleNameFS )
 import IfaceEnv         ( newGlobalBinder )
 import Name      hiding ( varName )
 import RdrName
@@ -90,7 +90,7 @@ genGenericMetaTyCons tc mod =
                                           NoParentTyCon
 
       d_tycon  <- tcLookupTyCon datTyConName
-      let d_type = mkTyConApp d_tycon [LitTy . StrTyLit $ occNameFS (nameOccName tc_name)]
+      let d_type = mkTyConApp d_tycon [LitTy . StrTyLit . moduleNameFS . moduleName $ mod, LitTy . StrTyLit $ occNameFS (nameOccName tc_name)]
       c_names <- forM (zip [0..] tc_cons) $ \(m,_) ->
                     newGlobalBinder mod (c_occ m) loc
       s_names <- forM (zip [0..] tc_arits) $ \(m,a) -> forM [0..a-1] $ \n ->
