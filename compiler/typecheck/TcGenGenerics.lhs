@@ -79,7 +79,6 @@ genGenericMetaTyCons tc mod =
         tc_arits  = map dataConSourceArity tc_cons
 
         tc_occ    = nameOccName tc_name
-        --c_occ m   = mkGenC tc_occ m
         s_occ m n = mkGenS tc_occ m n
 
         mkTyCon tyvars name = ASSERT( isExternalName name )
@@ -92,9 +91,6 @@ genGenericMetaTyCons tc mod =
       d_tycon  <- tcLookupTyCon datTyConName
       let d_type = mkTyConApp d_tycon $ map (LitTy . StrTyLit)
                     [moduleNameFS . moduleName $ mod, occNameFS . nameOccName $ tc_name]
-      --c_names <- forM (zip [0..] tc_cons) $ \(m,_) ->
-      --              newGlobalBinder mod (c_occ m) loc
-      --let c_names = flip map (zip [0..] tc_cons) $ \(m,con) -> getName con
       let c_names = map getName tc_cons
       s_names <- forM (zip [0..] tc_arits) $ \(m,a) -> forM [0..a-1] $ \n ->
                     newGlobalBinder mod (s_occ m n) loc
