@@ -97,10 +97,11 @@ genGenericMetaTyCons tc mod =
       s_names <- forM (zip [0..] tc_arits) $ \(m,a) -> forM [0..a-1] $ \n ->
                     newGlobalBinder mod (s_occ m n) loc
 
-      let metaCTyCons = map (mkTyCon []) c_names
+      c_tycon  <- tcLookupTyCon constrTyConName
+      let metaCTys = map (\name -> mkTyConApp c_tycon [d_type, LitTy . StrTyLit . occNameFS . nameOccName $ name]) c_names
           metaSTyCons = map (map (mkTyCon [])) s_names
 
-          metaDts = MetaTyCons d_type metaCTyCons metaSTyCons
+          metaDts = MetaTyCons d_type metaCTys metaSTyCons
 
       -- pprTrace "rep0" (ppr rep0_tycon) $
       (,) metaDts `fmap` metaTyConsToDerivStuff tc metaDts
@@ -141,7 +142,7 @@ metaTyConsToDerivStuff tc metaDts =
 
         -- Constructor
         c_metaTycons = metaC metaDts
-        c_insts = [ mk_inst cClas (mkTyConTy c) ds
+        c_insts = [ mk_inst cClas c ds
                   | (c, ds) <- myZip1 c_metaTycons c_dfun_names ]
         c_binds = [ InstBindings { ib_binds = c
                                  , ib_pragmas = []
@@ -612,9 +613,9 @@ tc_mkRepTy gk_ tycon metaDts =
 
         -- Sums and products are done in the same way for both Rep and Rep1
         sumP [] = mkTyConTy v1
-        sumP l  = ASSERT(length metaCTyCons == length l)
+        sumP l  = ASSERT(length metaCTys == length l)
                     foldBal mkSum' [ mkC i d a
-                                   | (d,(a,i)) <- zip metaCTyCons (zip l [0..])]
+                                   | (d,(a,i)) <- zip metaCTys (zip l [0..])]
         -- The Bool is True if this constructor has labelled fields
         prod :: Int -> [Type] -> Bool -> Type
         prod i [] _ = ASSERT(length metaSTyCons > i)
@@ -641,7 +642,7 @@ tc_mkRepTy gk_ tycon metaDts =
                ata_rec1 = mkRec1, ata_comp = mkComp}
 
         metaDTy     = metaD metaDts
-        metaCTyCons = map mkTyConTy (metaC metaDts)
+        metaCTys    = metaC metaDts
         metaSTyCons = map (map mkTyConTy) (metaS metaDts)
 
     return (mkD tycon)
@@ -653,7 +654,7 @@ tc_mkRepTy gk_ tycon metaDts =
 data MetaTyCons = MetaTyCons { -- One meta datatype per dataype
                                metaD :: Type
                                -- One meta datatype per constructor
-                             , metaC :: [TyCon]
+                             , metaC :: [Type]
                                -- One meta datatype per selector per constructor
                              , metaS :: [[TyCon]] }
 
@@ -661,7 +662,7 @@ instance Outputable MetaTyCons where
   ppr (MetaTyCons d c s) = ppr d $$ vcat (map ppr c) $$ vcat (map ppr (concat s))
 
 metaTyCons2TyCons :: MetaTyCons -> Bag TyCon
-metaTyCons2TyCons (MetaTyCons _ c s) = listToBag (c ++ concat s)
+metaTyCons2TyCons (MetaTyCons _ _ s) = listToBag (concat s)
 
 
 -- Bindings for Datatype, Constructor, and Selector instances

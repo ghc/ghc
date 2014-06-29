@@ -353,7 +353,7 @@ genericTyConNames = [
     compTyConName, rTyConName, pTyConName, dTyConName,
     cTyConName, sTyConName, rec0TyConName, par0TyConName,
     d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
-    repTyConName, rep1TyConName, datTyConName
+    repTyConName, rep1TyConName, datTyConName, constrTyConName
   ]
 \end{code}
 
@@ -775,7 +775,8 @@ v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
   compTyConName, rTyConName, pTyConName, dTyConName,
   cTyConName, sTyConName, rec0TyConName, par0TyConName,
   d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
-  repTyConName, rep1TyConName, datTyConName :: Name
+  repTyConName, rep1TyConName, datTyConName,
+  constrTyConName :: Name
 
 v1TyConName  = tcQual gHC_GENERICS (fsLit "V1") v1TyConKey
 u1TyConName  = tcQual gHC_GENERICS (fsLit "U1") u1TyConKey
@@ -795,6 +796,7 @@ cTyConName  = tcQual gHC_GENERICS (fsLit "C") cTyConKey
 sTyConName  = tcQual gHC_GENERICS (fsLit "S") sTyConKey
 
 datTyConName  = tcQual gHC_GENERICS (fsLit "Dat") datTyConKey
+constrTyConName  = tcQual gHC_GENERICS (fsLit "Constr") constrTyConKey
 
 rec0TyConName  = tcQual gHC_GENERICS (fsLit "Rec0") rec0TyConKey
 par0TyConName  = tcQual gHC_GENERICS (fsLit "Par0") par0TyConKey
@@ -1458,7 +1460,8 @@ v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
   compTyConKey, rTyConKey, pTyConKey, dTyConKey,
   cTyConKey, sTyConKey, rec0TyConKey, par0TyConKey,
   d1TyConKey, c1TyConKey, s1TyConKey, noSelTyConKey,
-  repTyConKey, rep1TyConKey, datTyConKey :: Unique
+  repTyConKey, rep1TyConKey, datTyConKey,
+  constrTyConKey :: Unique
 
 v1TyConKey    = mkPreludeTyConUnique 135
 u1TyConKey    = mkPreludeTyConUnique 136
@@ -1487,6 +1490,7 @@ noSelTyConKey = mkPreludeTyConUnique 154
 repTyConKey  = mkPreludeTyConUnique 155
 rep1TyConKey = mkPreludeTyConUnique 156
 datTyConKey = mkPreludeTyConUnique 157
+constrTyConKey = mkPreludeTyConUnique 158
 
 -- Type-level naturals
 typeNatKindConNameKey, typeSymbolKindConNameKey,
