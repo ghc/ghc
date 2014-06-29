@@ -90,13 +90,17 @@ genGenericMetaTyCons tc mod =
 
       d_tycon  <- tcLookupTyCon datTyConName
       let d_type = mkTyConApp d_tycon $ map (LitTy . StrTyLit)
-                    [moduleNameFS . moduleName $ mod, occNameFS . nameOccName $ tc_name]
+                    [moduleNameFS . moduleName $ mod,
+                     occNameFS . nameOccName $ tc_name]
       let c_names = map getName tc_cons
       s_names <- forM (zip [0..] tc_arits) $ \(m,a) -> forM [0..a-1] $ \n ->
                     newGlobalBinder mod (s_occ m n) loc
 
       c_tycon  <- tcLookupTyCon constrTyConName
-      let metaCTys = map (\name -> mkTyConApp c_tycon [d_type, LitTy . StrTyLit . occNameFS . nameOccName $ name]) c_names
+      let metaCTys = map (\name -> mkTyConApp c_tycon
+                                    [d_type, LitTy . StrTyLit . occNameFS
+                                                   . nameOccName $ name])
+                         c_names
           metaSTyCons = map (map (mkTyCon [])) s_names
 
           metaDts = MetaTyCons d_type metaCTys metaSTyCons
