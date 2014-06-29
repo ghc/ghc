@@ -10,12 +10,13 @@ The bits common to TcInstDcls and TcDeriv.
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module InstEnv (
-        DFunId, OverlapFlag(..), InstMatch, ClsInstLookupResult,
-        ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances, 
+        DFunId, InstMatch, ClsInstLookupResult,
+        OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
+        ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
         instanceHead, instanceSig, mkLocalInstance, mkImportedInstance,
         instanceDFunId, tidyClsInstDFun, instanceRoughTcs,
 
-        InstEnv, emptyInstEnv, extendInstEnv, overwriteInstEnv, 
+        InstEnv, emptyInstEnv, extendInstEnv, overwriteInstEnv,
         extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv', lookupInstEnv, instEnvElts,
         classInstances, orphNamesOfClsInst, instanceBindFun,
         instanceCantMatch, roughMatchTcs
@@ -536,7 +537,7 @@ lookupInstEnv' ie cls tys
 
         -- Does not match, so next check whether the things unify
         -- See Note [Overlapping instances] and Note [Incoherent Instances]
-      | Incoherent _ <- oflag
+      | Incoherent <- overlapMode oflag
       = find ms us rest
 
       | otherwise
@@ -635,11 +636,10 @@ insert_overlapping new_item (item:items)
     new_beats_old = new_item `beats` item
     old_beats_new = item `beats` new_item
 
-    incoherent (inst, _) = case is_flag inst of Incoherent _ -> True
-                                                _            -> False
+    incoherent (inst, _) = overlapMode (is_flag inst) == Incoherent
 
     (instA, _) `beats` (instB, _)
-          = overlap_ok && 
+          = overlap_ok &&
             isJust (tcMatchTys (mkVarSet (is_tvs instB)) (is_tys instB) (is_tys instA))
                     -- A beats B if A is more specific than B,
                     -- (ie. if B can be instantiated to match A)
@@ -648,9 +648,10 @@ insert_overlapping new_item (item:items)
             -- Overlap permitted if *either* instance permits overlap
             -- This is a change (Trac #3877, Dec 10). It used to
             -- require that instB (the less specific one) permitted overlap.
-            overlap_ok = case (is_flag instA, is_flag instB) of
-                              (NoOverlap _, NoOverlap _) -> False
-                              _                          -> True
+            overlap_ok = case (overlapMode (is_flag instA),
+                               overlapMode (is_flag instB)) of
+                              (NoOverlap, NoOverlap) -> False
+                              _                      -> True
 \end{code}
 
 Note [Incoherent instances]

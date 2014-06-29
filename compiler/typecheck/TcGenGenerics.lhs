@@ -121,11 +121,11 @@ metaTyConsToDerivStuff tc metaDts =
       fix_env <- getFixityEnv
 
       let
-        safeOverlap = safeLanguageOn dflags
         (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
         mk_inst clas tc dfun_name
           = mkLocalInstance (mkDictFunId dfun_name [] [] clas tys)
-                            (NoOverlap safeOverlap)
+                            OverlapFlag { overlapMode   = NoOverlap
+                                        , isSafeOverlap = safeLanguageOn dflags }
                             [] clas tys
           where
             tys = [mkTyConTy tc]
