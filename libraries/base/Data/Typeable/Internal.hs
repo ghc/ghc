@@ -263,7 +263,7 @@ type Typeable7 (a :: * -> * -> * -> * -> * -> * -> * -> *) = Typeable a
 {-# DEPRECATED Typeable7 "renamed to 'Typeable'" #-} -- deprecated in 7.8
 
 -- | Kind-polymorphic Typeable instance for type application
-instance (Typeable s, Typeable a) => Typeable (s a) where
+instance {-# INCOHERENT #-} (Typeable s, Typeable a) => Typeable (s a) where
   typeRep# = \_ -> rep                  -- Note [Memoising typeOf]
     where !ty1 = typeRep# (proxy# :: Proxy# s)
           !ty2 = typeRep# (proxy# :: Proxy# a)
@@ -446,8 +446,6 @@ lifted types with infinitely many inhabitants.  Indeed, `Nat` is
 isomorphic to (lifted) `[()]`  and `Symbol` is isomorphic to `[Char]`.
 -}
 
--- See `Note [Kinds Containing Only Literals]` in `types/Unify.hs` for
--- an explanation of how we avoid overlap with `Typeable (f a)`.
 instance KnownNat n => Typeable (n :: Nat) where
   -- See #9203 for an explanation of why this is written as `\_ -> rep`.
   typeRep# = \_ -> rep
@@ -465,8 +463,6 @@ instance KnownNat n => Typeable (n :: Nat) where
     mk a b c = a ++ " " ++ b ++ " " ++ c
 
 
--- See `Note [Kinds Containing Only Literals]` in `types/Unify.hs` for
--- an explanation of how we avoid overlap with `Typeable (f a)`.
 instance KnownSymbol s => Typeable (s :: Symbol) where
   -- See #9203 for an explanation of why this is written as `\_ -> rep`.
   typeRep# = \_ -> rep

@@ -39,10 +39,8 @@ import Type
 import TyCon
 import TypeRep
 import Util
-import PrelNames(typeNatKindConNameKey, typeSymbolKindConNameKey)
-import Unique(hasKey)
 
-import Control.Monad (liftM, ap, unless, guard)
+import Control.Monad (liftM, ap)
 import Control.Applicative (Applicative(..))
 \end{code}
 
@@ -175,8 +173,6 @@ match menv subst (TyVarTy tv1) ty2
     then Nothing	-- Occurs check
     else do { subst1 <- match_kind menv subst (tyVarKind tv1) (typeKind ty2)
 			-- Note [Matching kinds]
-            ; guard (validKindShape (tyVarKind tv1) ty2)
-                        -- Note [Kinds Containing Only Literals]
 	    ; return (extendVarEnv subst1 tv1' ty2) }
 
    | otherwise	-- tv1 is not a template tyvar
@@ -209,35 +205,6 @@ match _ subst (LitTy x) (LitTy y) | x == y  = return subst
 match _ _ _ _
   = Nothing
 
-
-{- Note [Kinds Containing Only Literals]
-
-The kinds `Nat` and `Symbol` contain only literal types (e.g., 17, "Hi", etc.).
-As such, they can only ever match and unify with a type variable or a literal
-type.  We check for this during matching and unification, and reject
-binding variables to types that have an unacceptable shape.
-
-This helps us avoid "overlapping instance" errors in the presence of
-very general instances.   The main motivating example for this is the
-implementation of `Typeable`, which contains the instances:
-
-... => Typeable (f a) where ...
-... => Typeable (a :: Nat) where ...
-
-Without the explicit check these look like they overlap, and are rejected.
-The two do not overlap, however, because nothing of kind `Nat` can be
-of the form `f a`.
--}
-
-validKindShape :: Kind -> Type -> Bool
-validKindShape k ty
-  | Just (tc,[]) <- splitTyConApp_maybe k
-  , tc `hasKey` typeNatKindConNameKey ||
-    tc `hasKey` typeSymbolKindConNameKey = case ty of
-                                             TyVarTy _ -> True
-                                             LitTy _   -> True
-                                             _         -> False
-validKindShape _ _ = True
 
 
 --------------
@@ -689,9 +656,6 @@ uUnrefined subst tv1 ty2 ty2'	-- ty2 is not a type variable
   | otherwise
   = do { subst' <- unify subst k1 k2
        -- Note [Kinds Containing Only Literals]
-       ; let ki = substTy (mkOpenTvSubst subst') k1
-       ; unless (validKindShape ki ty2')
-           surelyApart
        ; bindTv subst' tv1 ty2 }	-- Bind tyvar to the synonym if poss
   where
     k1 = tyVarKind tv1
