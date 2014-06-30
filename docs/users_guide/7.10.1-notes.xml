@@ -42,7 +42,20 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO FIXME
+                    GHC now checks that all the language extensions required for
+                    the inferred type signatures are explicitly enabled. This
+                    means that if any of the type signatures inferred in your
+                    program requires some language extension you will need to
+                    enable it. The motivation is that adding a missing type
+                    signature inferred by GHC should yield a program that
+                    typechecks. Previously this was not the case.
+                </para>
+                <para>
+                    This is a breaking change. Code that used to compile in the
+                    past might fail with an error message requiring some
+                    particular language extension (most likely
+                    <option>-XTypeFamilies</option>, <option>-XGADTs</option> or
+                    <option>-XFlexibleContexts</option>).
                 </para>
            </listitem>
        </itemizedlist>
