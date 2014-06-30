@@ -941,6 +941,7 @@ data ClsInstDecl name
       , cid_sigs  :: [LSig name]                -- User-supplied pragmatic info
       , cid_tyfam_insts :: [LTyFamInstDecl name]  -- type family instances
       , cid_datafam_insts :: [LDataFamInstDecl name] -- data family instances
+      , cid_overlap_mode :: Maybe OverlapMode
       }
   deriving (Data, Typeable)
 
@@ -1013,6 +1014,7 @@ pprDataFamInstFlavour (DataFamInstDecl { dfid_defn = (HsDataDefn { dd_ND = nd })
 instance (OutputableBndr name) => Outputable (ClsInstDecl name) where
     ppr (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = binds
                      , cid_sigs = sigs, cid_tyfam_insts = ats
+                     , cid_overlap_mode = mbOverlap
                      , cid_datafam_insts = adts })
       | null sigs, null ats, null adts, isEmptyBag binds  -- No "where" part
       = top_matter
@@ -1024,7 +1026,19 @@ instance (OutputableBndr name) => Outputable (ClsInstDecl name) where
                map (pprDataFamInstDecl NotTopLevel . unLoc) adts ++
                pprLHsBindsForUser binds sigs ]
       where
-        top_matter = ptext (sLit "instance") <+> ppr inst_ty
+        top_matter = ptext (sLit "instance") <+> ppOveralapPragma mbOverlap
+                                             <+> ppr inst_ty
+
+ppOveralapPragma :: Maybe OverlapMode -> SDoc
+ppOveralapPragma mb =
+  case mb of
+    Nothing          -> empty
+    Just NoOverlap   -> ptext (sLit "{-# NO_OVERLAP #-}")
+    Just OverlapOk   -> ptext (sLit "{-# OVERLAP #-}")
+    Just Incoherent  -> ptext (sLit "{-# INCOHERENT #-}")
+
+
+
 
 instance (OutputableBndr name) => Outputable (InstDecl name) where
     ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
@@ -1052,12 +1066,14 @@ instDeclDataFamInsts inst_decls
 \begin{code}
 type LDerivDecl name = Located (DerivDecl name)
 
-data DerivDecl name = DerivDecl { deriv_type :: LHsType name }
+data DerivDecl name = DerivDecl { deriv_type :: LHsType name
+                                , deriv_overlap_mode :: Maybe OverlapMode
+                                }
   deriving (Data, Typeable)
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
-    ppr (DerivDecl ty) 
-        = hsep [ptext (sLit "deriving instance"), ppr ty]
+    ppr (DerivDecl ty o)
+        = hsep [ptext (sLit "deriving instance"), ppOveralapPragma o, ppr ty]
 \end{code}
 
 %************************************************************************

@@ -445,12 +445,14 @@ rnSrcInstDecl (ClsInstD { cid_inst = cid })
 rnClsInstDecl :: ClsInstDecl RdrName -> RnM (ClsInstDecl Name, FreeVars)
 rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
+                           , cid_overlap_mode = oflag
                            , cid_datafam_insts = adts })
         -- Used for both source and interface file decls
   = do { (inst_ty', inst_fvs) <- rnLHsInstType (text "In an instance declaration") inst_ty
        ; case splitLHsInstDeclTy_maybe inst_ty' of {
            Nothing -> return (ClsInstDecl { cid_poly_ty = inst_ty', cid_binds = emptyLHsBinds
                                           , cid_sigs = [], cid_tyfam_insts = []
+                                          , cid_overlap_mode = oflag
                                           , cid_datafam_insts = [] }
                              , inst_fvs) ;
            Just (inst_tyvars, _, L _ cls,_) ->
@@ -493,6 +495,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                           `plusFV` inst_fvs
        ; return (ClsInstDecl { cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
+                             , cid_overlap_mode = oflag
                              , cid_datafam_insts = adts' },
                  all_fvs) } } }
              -- We return the renamed associated data type declarations so
@@ -637,11 +640,11 @@ extendTyVarEnvForMethodBinds ktv_names thing_inside
 
 \begin{code}
 rnSrcDerivDecl :: DerivDecl RdrName -> RnM (DerivDecl Name, FreeVars)
-rnSrcDerivDecl (DerivDecl ty)
+rnSrcDerivDecl (DerivDecl ty overlap)
   = do { standalone_deriv_ok <- xoptM Opt_StandaloneDeriving
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
        ; (ty', fvs) <- rnLHsInstType (text "In a deriving declaration") ty
-       ; return (DerivDecl ty', fvs) }
+       ; return (DerivDecl ty' overlap, fvs) }
 
 standaloneDerivErr :: SDoc
 standaloneDerivErr

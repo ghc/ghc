@@ -93,6 +93,7 @@ data DerivSpec theta = DS { ds_loc     :: SrcSpan
                           , ds_tys     :: [Type]
                           , ds_tc      :: TyCon
                           , ds_tc_args :: [Type]
+                          , ds_overlap :: Maybe OverlapMode
                           , ds_newtype :: Bool }
         -- This spec implies a dfun declaration of the form
         --       df :: forall tvs. theta => C tys
@@ -618,7 +619,7 @@ deriveStandalone :: LDerivDecl Name -> TcM [EarlyDerivSpec]
 -- Standalone deriving declarations
 --  e.g.   deriving instance Show a => Show (T a)
 -- Rather like tcLocalInstDecl
-deriveStandalone (L loc (DerivDecl deriv_ty))
+deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
@@ -647,7 +648,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
                     ; mkPolyKindedTypeableEqn cls tc }
 
               | isAlgTyCon tc  -- All other classes
-              -> do { spec <- mkEqnHelp tvs cls cls_tys tc tc_args (Just theta)
+              -> do { spec <- mkEqnHelp overlap_mode tvs cls cls_tys tc tc_args (Just theta)
                     ; return [spec] }
 
            _  -> -- Complain about functions, primitive types, etc,
@@ -769,7 +770,7 @@ deriveTyData is_instance tvs tc tc_args (L loc deriv_pred)
                 --              newtype T a s = ... deriving( ST s )
                 --              newtype K a a = ... deriving( Monad )
 
-        ; spec <- mkEqnHelp (univ_kvs' ++ univ_tvs')
+        ; spec <- mkEqnHelp Nothing (univ_kvs' ++ univ_tvs')
                             cls final_cls_tys tc final_tc_args Nothing 
         ; return [spec] } }
 
@@ -851,7 +852,8 @@ and occurrence sites.
 
 
 \begin{code}
-mkEqnHelp :: [TyVar]
+mkEqnHelp :: Maybe OverlapMode
+          -> [TyVar]
           -> Class -> [Type]
           -> TyCon -> [Type]
           -> DerivContext       -- Just    => context supplied (standalone deriving)
@@ -862,7 +864,7 @@ mkEqnHelp :: [TyVar]
 -- where the 'theta' is optional (that's the Maybe part)
 -- Assumes that this declaration is well-kinded
 
-mkEqnHelp tvs cls cls_tys tycon tc_args mtheta
+mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
   | className cls `elem` oldTypeableClassNames
   = do { dflags <- getDynFlags
        ; case checkOldTypeableConditions (dflags, tycon, tc_args) of
@@ -898,10 +900,10 @@ mkEqnHelp tvs cls cls_tys tycon tc_args mtheta
 
        ; dflags <- getDynFlags
        ; if isDataTyCon rep_tc then
-            mkDataTypeEqn dflags tvs cls cls_tys
+            mkDataTypeEqn dflags overlap_mode tvs cls cls_tys
                           tycon tc_args rep_tc rep_tc_args mtheta
          else
-            mkNewTypeEqn dflags tvs cls cls_tys
+            mkNewTypeEqn dflags overlap_mode tvs cls cls_tys
                          tycon tc_args rep_tc rep_tc_args mtheta }
   where
      bale_out msg = failWithTc (derivingThingErr False cls cls_tys (mkTyConApp tycon tc_args) msg)
@@ -991,6 +993,7 @@ See Note [Eta reduction for data family axioms] in TcInstDcls.
 
 \begin{code}
 mkDataTypeEqn :: DynFlags
+              -> Maybe OverlapMode
               -> [Var]                  -- Universally quantified type variables in the instance
               -> Class                  -- Class for which we need to derive an instance
               -> [Type]                 -- Other parameters to the class except the last
@@ -1002,7 +1005,7 @@ mkDataTypeEqn :: DynFlags
               -> DerivContext        -- Context of the instance, for standalone deriving
               -> TcRn EarlyDerivSpec    -- Return 'Nothing' if error
 
-mkDataTypeEqn dflags tvs cls cls_tys
+mkDataTypeEqn dflags overlap_mode tvs cls cls_tys
               tycon tc_args rep_tc rep_tc_args mtheta
   = case checkSideConditions dflags mtheta cls cls_tys rep_tc rep_tc_args of
         -- NB: pass the *representation* tycon to checkSideConditions
@@ -1010,13 +1013,13 @@ mkDataTypeEqn dflags tvs cls cls_tys
         NonDerivableClass       -> bale_out (nonStdErr cls)
         DerivableClassError msg -> bale_out msg
   where
-    go_for_it    = mk_data_eqn tvs cls tycon tc_args rep_tc rep_tc_args mtheta
+    go_for_it    = mk_data_eqn overlap_mode tvs cls tycon tc_args rep_tc rep_tc_args mtheta
     bale_out msg = failWithTc (derivingThingErr False cls cls_tys (mkTyConApp tycon tc_args) msg)
 
-mk_data_eqn :: [TyVar] -> Class
+mk_data_eqn :: Maybe OverlapMode -> [TyVar] -> Class
             -> TyCon -> [TcType] -> TyCon -> [TcType] -> DerivContext
             -> TcM EarlyDerivSpec
-mk_data_eqn tvs cls tycon tc_args rep_tc rep_tc_args mtheta
+mk_data_eqn overlap_mode tvs cls tycon tc_args rep_tc rep_tc_args mtheta
   = do loc                  <- getSrcSpanM
        dfun_name            <- new_dfun_name cls tycon
        case mtheta of
@@ -1028,6 +1031,7 @@ mk_data_eqn tvs cls tycon tc_args rep_tc rep_tc_args mtheta
                    , ds_cls = cls, ds_tys = inst_tys
                    , ds_tc = rep_tc, ds_tc_args = rep_tc_args
                    , ds_theta = inferred_constraints
+                   , ds_overlap = overlap_mode
                    , ds_newtype = False }
         Just theta -> do -- Specified context
             return $ GivenTheta $ DS
@@ -1036,6 +1040,7 @@ mk_data_eqn tvs cls tycon tc_args rep_tc rep_tc_args mtheta
                    , ds_cls = cls, ds_tys = inst_tys
                    , ds_tc = rep_tc, ds_tc_args = rep_tc_args
                    , ds_theta = theta
+                   , ds_overlap = overlap_mode
                    , ds_newtype = False }
   where
     inst_tys = [mkTyConApp tycon tc_args]
@@ -1073,7 +1078,9 @@ mkOldTypeableEqn tvs cls tycon tc_args mtheta
                   DS { ds_loc = loc, ds_name = dfun_name, ds_tvs = []
                      , ds_cls = cls, ds_tys = [mkTyConApp tycon []]
                      , ds_tc = tycon, ds_tc_args = []
-                     , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
+                     , ds_theta = mtheta `orElse` []
+                     , ds_overlap = Nothing -- Or, Just NoOverlap?
+                     , ds_newtype = False })  }
 
 mkPolyKindedTypeableEqn :: Class -> TyCon -> TcM [EarlyDerivSpec]
 -- We can arrive here from a 'deriving' clause
@@ -1098,6 +1105,9 @@ mkPolyKindedTypeableEqn cls tc
                                  -- so we must instantiate it appropiately
                              , ds_tc = tc, ds_tc_args = tc_args
                              , ds_theta = []  -- Context is empty for polykinded Typeable
+                             , ds_overlap = Nothing
+                               -- Perhaps this should be `Just NoOverlap`?
+
                              , ds_newtype = False } }
         where
           (kvs,tc_app_kind) = splitForAllTys (tyConKind tc)
@@ -1545,11 +1555,11 @@ a context for the Data instances:
 %************************************************************************
 
 \begin{code}
-mkNewTypeEqn :: DynFlags -> [Var] -> Class
+mkNewTypeEqn :: DynFlags -> Maybe OverlapMode -> [Var] -> Class
              -> [Type] -> TyCon -> [Type] -> TyCon -> [Type]
              -> DerivContext
              -> TcRn EarlyDerivSpec
-mkNewTypeEqn dflags tvs
+mkNewTypeEqn dflags overlap_mode tvs
              cls cls_tys tycon tc_args rep_tycon rep_tc_args mtheta
 -- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
   | ASSERT( length cls_tys + 1 == classArity cls )
@@ -1564,6 +1574,7 @@ mkNewTypeEqn dflags tvs
             , ds_cls = cls, ds_tys = inst_tys
             , ds_tc = rep_tycon, ds_tc_args = rep_tc_args
             , ds_theta = theta
+            , ds_overlap = overlap_mode
             , ds_newtype = True }
         Nothing -> return $ InferTheta $ DS
             { ds_loc = loc
@@ -1571,6 +1582,7 @@ mkNewTypeEqn dflags tvs
             , ds_cls = cls, ds_tys = inst_tys
             , ds_tc = rep_tycon, ds_tc_args = rep_tc_args
             , ds_theta = all_preds
+            , ds_overlap = overlap_mode
             , ds_newtype = True }
   | otherwise
   = case checkSideConditions dflags mtheta cls cls_tys rep_tycon rep_tc_args of
@@ -1584,7 +1596,7 @@ mkNewTypeEqn dflags tvs
         | otherwise                  -> bale_out non_std
   where
         newtype_deriving = xopt Opt_GeneralizedNewtypeDeriving dflags
-        go_for_it        = mk_data_eqn tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
+        go_for_it        = mk_data_eqn overlap_mode tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
         bale_out msg     = failWithTc (derivingThingErr newtype_deriving cls cls_tys inst_ty msg)
 
         non_std    = nonStdErr cls
@@ -2043,9 +2055,10 @@ genInst :: Bool             -- True <=> standalone deriving
         -> OverlapFlag
         -> CommonAuxiliaries
         -> DerivSpec ThetaType -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
-genInst standalone_deriv oflag comauxs
+genInst standalone_deriv default_oflag comauxs
         spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype, ds_tys = tys
+                 , ds_overlap = overlap_mode
                  , ds_name = name, ds_cls = clas, ds_loc = loc })
   | is_newtype
   = do { inst_spec <- mkInstance oflag theta spec
@@ -2076,6 +2089,7 @@ genInst standalone_deriv oflag comauxs
                                                 , ib_standalone_deriving = standalone_deriv } }
        ; return ( inst_info, deriv_stuff, Nothing ) }
   where
+    oflag  = setOverlapModeMaybe default_oflag overlap_mode
     rhs_ty = newTyConInstRhs rep_tycon rep_tc_args
 
 genDerivStuff :: SrcSpan -> FixityEnv -> Class -> Name -> TyCon

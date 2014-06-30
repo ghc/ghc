@@ -269,6 +269,9 @@ incorrect.
  '{-# NOVECTORISE'        { L _ ITnovect_prag }
  '{-# MINIMAL'            { L _ ITminimal_prag }
  '{-# CTYPE'              { L _ ITctype }
+ '{-# NO_OVERLAP'         { L _ ITno_overlap_prag }
+ '{-# OVERLAP'            { L _ IToverlap_prag }
+ '{-# INCOHERENT'         { L _ ITincoherent_prag }
  '#-}'                                          { L _ ITclose_prag }
 
  '..'           { L _ ITdotdot }                        -- reserved symbols
@@ -654,12 +657,13 @@ ty_decl :: { LTyClDecl RdrName }
                 {% mkFamDecl (comb3 $1 $2 $4) DataFamily $3 (unLoc $4) }
 
 inst_decl :: { LInstDecl RdrName }
-        : 'instance' inst_type where_inst
-                 { let (binds, sigs, _, ats, adts, _) = cvBindsAndSigs (unLoc $3) in
-                   let cid = ClsInstDecl { cid_poly_ty = $2, cid_binds = binds
+        : 'instance' overlap_pragma inst_type where_inst
+                 { let (binds, sigs, _, ats, adts, _) = cvBindsAndSigs (unLoc $4) in
+                   let cid = ClsInstDecl { cid_poly_ty = $3, cid_binds = binds
                                          , cid_sigs = sigs, cid_tyfam_insts = ats
+                                         , cid_overlap_mode = $2
                                          , cid_datafam_insts = adts }
-                   in L (comb3 $1 $2 $3) (ClsInstD { cid_inst = cid }) }
+                   in L (comb3 $1 $3 $4) (ClsInstD { cid_inst = cid }) }
 
            -- type instance declarations
         | 'type' 'instance' ty_fam_inst_eqn
@@ -676,6 +680,13 @@ inst_decl :: { LInstDecl RdrName }
                  deriving
                 {% mkDataFamInst (comb4 $1 $4 $6 $7) (unLoc $1) $3 $4
                                      (unLoc $5) (unLoc $6) (unLoc $7) }
+
+overlap_pragma :: { Maybe OverlapMode }
+  : '{-# OVERLAP'    '#-}'    { Just OverlapOk  }
+  | '{-# INCOHERENT' '#-}'    { Just Incoherent }
+  | '{-# NO_OVERLAP' '#-}'    { Just NoOverlap  }
+  | {- empty -}               { Nothing }
+
 
 -- Closed type families
 
@@ -783,7 +794,7 @@ capi_ctype : '{-# CTYPE' STRING STRING '#-}' { Just (CType (Just (Header (getSTR
 
 -- Glasgow extension: stand-alone deriving declarations
 stand_alone_deriving :: { LDerivDecl RdrName }
-        : 'deriving' 'instance' inst_type { LL (DerivDecl $3) }
+  : 'deriving' 'instance' overlap_pragma inst_type { LL (DerivDecl $4 $3) }
 
 -----------------------------------------------------------------------------
 -- Role annotations
