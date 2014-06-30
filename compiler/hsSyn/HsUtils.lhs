@@ -4,7 +4,7 @@
 
 Here we collect a variety of helper functions that construct or
 analyse HsSyn.  All these functions deal with generic HsSyn; functions
-which deal with the intantiated versions are located elsewhere:
+which deal with the instantiated versions are located elsewhere:
 
    Parameterised by	Module
    ----------------     -------------
