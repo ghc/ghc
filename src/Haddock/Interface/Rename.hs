@@ -442,11 +442,15 @@ renameInstD (DataFamInstD { dfid_inst = d }) = do
   return (DataFamInstD { dfid_inst = d' })
 
 renameClsInstD :: ClsInstDecl Name -> RnM (ClsInstDecl DocName)
-renameClsInstD (ClsInstDecl { cid_poly_ty =ltype, cid_tyfam_insts = lATs, cid_datafam_insts = lADTs }) = do
+renameClsInstD (ClsInstDecl { cid_overlap_mode = omode
+                            , cid_poly_ty =ltype, cid_tyfam_insts = lATs
+                            , cid_datafam_insts = lADTs }) = do
   ltype' <- renameLType ltype
   lATs'  <- mapM (mapM renameTyFamInstD) lATs
   lADTs' <- mapM (mapM renameDataFamInstD) lADTs
-  return (ClsInstDecl { cid_poly_ty = ltype', cid_binds = emptyBag, cid_sigs = []
+  return (ClsInstDecl { cid_overlap_mode = omode
+                      , cid_poly_ty = ltype', cid_binds = emptyBag
+                      , cid_sigs = []
                       , cid_tyfam_insts = lATs', cid_datafam_insts = lADTs' })
 
 
