@@ -215,3 +215,8 @@ test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], c
 # I couldn't reproduce 9078 with the -threaded runtime, but could easily
 # with the non-threaded one.
 test('T9078', [ omit_ways(threaded_ways) ], compile_and_run, ['-with-rtsopts="-DS" -debug'])
+
+# 251 = RTS exit code for "out of memory"
+test('overflow1', [ exit_code(251) ], compile_and_run, [''])
+test('overflow2', [ exit_code(251) ], compile_and_run, [''])
+test('overflow3', [ exit_code(251) ], compile_and_run, [''])
