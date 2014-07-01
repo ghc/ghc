@@ -776,7 +776,9 @@ checkValidInstHead ctxt clas cls_args
                        all tcInstHeadTyAppAllTyVars ty_args)
                  (instTypeErr clas cls_args head_type_args_tyvars_msg)
             ; checkTc (xopt Opt_MultiParamTypeClasses dflags ||
-                       length ty_args == 1)  -- Only count type arguments
+                       length ty_args == 1 ||  -- Only count type arguments
+                       (xopt Opt_NullaryTypeClasses dflags &&
+                        null ty_args))
                  (instTypeErr clas cls_args head_one_type_msg) }
 
          -- May not contain type family applications

@@ -1578,11 +1578,14 @@ checkValidClass :: Class -> TcM ()
 checkValidClass cls
   = do  { constrained_class_methods <- xoptM Opt_ConstrainedClassMethods
         ; multi_param_type_classes <- xoptM Opt_MultiParamTypeClasses
+        ; nullary_type_classes <- xoptM Opt_NullaryTypeClasses
         ; fundep_classes <- xoptM Opt_FunctionalDependencies
 
         -- Check that the class is unary, unless multiparameter type classes
-        -- are enabled (which allows nullary type classes)
-        ; checkTc (multi_param_type_classes || arity == 1)
+        -- are enabled; also recognize deprecated nullary type classes
+        -- extension (subsumed by multiparameter type classes, Trac #8993)
+        ; checkTc (multi_param_type_classes || arity == 1 ||
+                    (nullary_type_classes && arity == 0))
                   (classArityErr arity cls)
         ; checkTc (fundep_classes || null fundeps) (classFunDepsErr cls)
 
