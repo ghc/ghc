@@ -184,27 +184,16 @@ packaging system, some of which are subsets of the Backpack system.
         separate entries in the package database anyway.}
 
     \item Support typechecking a library against a module interface
-        as opposed to an actual implementation.  This would be useful
-        for moving towards a model where Cabal package dependency versions
-        are replaced with proper signature packages. %  See Section~\ref{sec:signature-packages} for more details.
+        as opposed to an actual implementation.  This includes not
+        only support proper, but also toolchain support for generating
+        and keeping interface files up-to-date, and taking advantage
+        of this discipline to augment Cabal package dependency resolution
+        with proper signature packages. %  See Section~\ref{sec:signature-packages} for more details.
 
     \item Support compiling the aforementioned libraries with actual implementations.
         It is \emph{not} a goal to be able to compile a library while only
         partially providing dependencies, and it is low priority to support
         mutually recursive implementations of these implementations.
-
-        \iffalse%
-    \item Support insertion of backwards compatibility shims for packages
-        that are using old versions of packages, so that you can continue
-        using them without having to patch them manually.  This is a
-        stylized use-case of Backpack features.  See Section~LINKME for
-        more details.
-
-    \item Some easy-to-implement subset of the functionality provided by
-        packages with holes (Backpack proper).  This includes support
-        of linking an executable containing multiple packages with the
-        same package name but different PackageIds.
-        \fi
 \end{itemize}
 
 A lower priority goal is to actually allow multiple instances of
@@ -290,7 +279,7 @@ section is to describe the additions bottom up.
 
 \begin{figure}
     \center{\begin{tabular}{r l}
-        PackageId & hash of ``package name, package version, PackageIds of dependent packages'' \\
+        PackageId & hash of ``package name, package version, dependency resolution, module environment'' \\
         InstalledPackageId & hash of ``PackageId, source code, way, compiler flags'' \\
     \end{tabular}}
 \label{fig:proposed-pkgid}\caption{Proposed new structure of package identifiers.}
@@ -299,23 +288,29 @@ section is to describe the additions bottom up.
 In Backpack, there needs to be some mechanism for assigning
 \emph{physical module identities} to modules, which are essential for
 typechecking Backpack packages, since they let us tell if two types are
-equal or not. In the paper, the physical identity was represented as the
-package that constructed it as well as some representation of the module
-source.  We can simplify this slightly: in current Cabal packages, we
-require that modules always be given a package-unique logical name;
-thus, physical identities can be simply represented as a PackageId plus
-module name. (See \ghcfile{compiler/basicTypes/Module.lhs:Module})
-In fact, this coincides with how GHC already internally handles
-the problem of type equality: it appeals to an \emph{original name}
-which is, presently, a PackageId and the module name.
+equal or not.
 
-However, with the current representation of PackageIds, this is
-insufficient: a package is not just its name, but also the regular
-tree representing all of its package dependencies.  Thus, we have
-to adjust the representation of a PackageId so that it includes this
-regular tree, as seen Figure~\ref{fig:proposed-pkgid}.  Since this
-tree in general may be quite long, it needs to be shortened in some way,
-such as by hashing.
+If it looks like a duck and quacks like a duck, it is a duck.  In GHC,
+our method of testing whether or not two types are equal is by comparing
+their original names, which is a tuple of a PackageId and the module
+name.  Furthermore, we rely on ``module name'' to be some user visible
+string which they can refer to in error messages\footnote{I wonder what
+happens when you start renaming module names\ldots}, so really our only
+degree of freedom is modifying the PackageId associated with a module.
+What changes to the PackageId are necessary?
+
+Fortunately, in current Cabal packages, we require that modules always
+be given a package-unique module name, thus it's not necessary to
+disambiguate between multiple ``module literals'', as was the case in
+Paper Backpack.  However, current PackageIds are insufficient for
+another reason: a module physical identity is not just its name, but
+also the regular tree representing all of its \emph{module} dependencies.  The
+PackageId needs to include this regular tree, \emph{which may differ
+between modules in the same package (Section~\ref{sec:flatten})}, along with the
+other information about the package such as its name. (I think
+Figure~\ref{fig:proposed-pkgid} is out of date now.)  Since this tree in
+general may be quite long, it needs to be shortened in some way, such as
+by hashing.
 
 And now, the complications\ldots
 
@@ -325,8 +320,8 @@ package name (but different PackageIds).  This restriction needs to be
 lifted.  For backwards compatibility reasons, it's probably better to
 not overload \verb|-package-id| but add a new flag, maybe \verb|-force-package-id|;
 we also need to disable the old version masking behavior.  This is orthogonal
-to the IHG work, which wants to allow multiple InstalledPackageIds in the
-\emph{database} (here, we want to allow multiple PackageIds in compiled code).
+to the IHG work, which wants to allow multiple \emph{InstalledPackageIds} in the
+\emph{database} (here, we want to allow multiple \emph{PackageIds} in \emph{compiled code}).
 
 \paragraph{Linker symbols} As we increase the amount of information in
 PackageId, it's important to be careful about the length of these IDs,
@@ -349,11 +344,165 @@ suggested approach is to have a fixed table from these wired names to
 package IDs; alternately we can use something like the special \verb|inplace|
 version number.
 
+\paragraph{Version numbers}  The interaction of Backpack's package polymorphism
+(the ability to mixin different implementations to holes) and Cabal's dependency
+resolution mechanism (which permits a name libfoo to be resolved to a specific
+version libfoo-0.1) can be subtle: there are in fact \emph{two} levels of
+indirection going on here.
+
+The simplest way to think about the distinction is as follows.  When I write
+a Backpack package which does \verb|include foobar|, I have not actually
+written a Paper Backpack package.  Instead, I have written a \emph{pre-package},
+which Cabal's dependency solver then takes and rewrites all package references
+into versioned references \verb|include foobar-0.1|, which now corresponds to
+a Paper Backpack package.  For example, this is a pre-package:
+
+\begin{verbatim}
+package foo where
+    include bar
+\end{verbatim}
+
+and this is a Paper Backpack package:
+
+\begin{verbatim}
+package foo-0.3(bar-0.1) where
+    include bar-0.1(baz-0.2)
+\end{verbatim}
+
+Notably, we must \emph{rename} the package to include information about
+how we resolved all of the inner package references, and if these inner
+package references had dependencies, those must be included too!  In
+effect, the \emph{dependency resolution} must be encoded into the package ID,
+along with the existing Backpack \emph{physical identity regular tree}.
+Phew!
+
 \paragraph{Free variables (or, what is a non-concrete physical
 identity?)} Physical identities in their full generality are permitted
 to have free variables, which represent holes.  Handling this is a
 tricky question, and we defer it to Section~\ref{sec:typechecking-indefinite}, when
 we talk about packages with holes.
+
+\subsection{Flatten the package database}\label{sec:flatten}
+
+In the previous section, I implied that the \emph{module dependency regular
+tree} needed to be placed in the \emph{package ID}.  Type error? Yes!
+
+The upshot is that in some cases, compilations of separate packages may
+result in the installation of code that should be the \emph{same} (code
+that is shared at the module level, rather than the package level).
+Here is a Backpack package which demonstrates the issue:
+
+\begin{verbatim}
+package a where
+    P :: ...
+    Q :: [ x :: Int ]
+    A = [ import P; ... ]
+    B = [ import Q; ... ]
+package p where
+    P = [ ... ]
+package x where
+    include p
+    Q = [ x = 0 ]
+    include a
+package y where
+    include p
+    Q = [ x = 1 ]
+    include a
+\end{verbatim}
+
+Here, we have a package \verb|a| which probably should have been defined as
+two separate packages (since \verb|A| only relies on \verb|P| and \verb|B|
+only relies on \verb|Q|), but the functionality has been glommed together.
+Then, the downstream packages \verb|x| and \verb|y| fill in the holes using the
+same implementation of \verb|P|, but differing implementations of \verb|Q|.
+(For more explanation about how we would go about compiling this set of
+packages, please see Section~\ref{sec:compiling-definite}.)
+
+Is module \verb|A| from package \verb|x| the same as module \verb|A|
+from package \verb|y|?  In Paper Backpack, the answer is yes.
+However, presently, the installed package database acts as a cache at the \emph{package}
+level; code is only shared if it comes from the same package.  Can we share
+packages \verb|x| and \verb|y|? No!
+\verb|x:B| is \emph{not} the same module as \verb|y:B| (they are using differing
+versions of \verb|Q|).  The upshot is that we are in an awkward position,
+where package \verb|a| contains some modules which must be distinct, and other
+modules which must be unified over several installs.
+
+The solution to this conundrum is to flatten the package database, so
+that we no longer insist that all compiled code associate with a package
+live together in a single directory: instead, \emph{the installed
+    package database is a directory of physical module identities to
+objects/interfaces}.  Installed packages are represented as (possibly
+overlapping) sets over this store of modules.
+
+\paragraph{Do we really care about this use case?}  Scott gave me one
+good argument why this is a nice feature to have: it permits users to
+modularize third-party packages which were not packaged with modularity
+in mind, but happen to be modular.  For example, when libraries ship
+with test-cases, they currently have to split these test-cases to separate
+packages, so as to not introduce spurious dependencies with various
+test frameworks, which the user may not have or care about.  If dependencies
+are done on a per-module basis, as long as the user doesn't import a test
+module, they never gain the extra dependency.  Another situation is when
+a library also happens to have a helper utility module which doesn't have
+any of the dependencies of the primary library.
+
+One could argue that people already understand it is good practice to
+separate such cases into separate packages, and there is no pressing
+need to allow for sloppy habits.  The counterargument, however, is that
+you are often not in control of these third-party libraries, and the
+more control in the end-user's hands, the better.
+
+\paragraph{Operating system linking}  When the package database is flattened
+into a collection of modules, it becomes less clear how to generate library
+files corresponding to a package.  One possibility is to simply take the
+set of files corresponding to a package and wrap it up into a library.
+If an end-user links against two libraries which include the same object file,
+the linker needs to suppress the symbols associated with one of the instances
+of the object file (it's identical, right?)\footnote{It may not actually be
+possible to do this in the static linking case: one must refer to the actual object
+files}.
+
+If your modules are truly applicative, this might even work OK\@.  However, you will
+be a sad panda if there is any unsafe, mutable global state in the shared
+object (since the object files will each get separate data segments for this
+global state): a generative semantics.\footnote{Even if we did get this right,
+which would be possible when statically linking these modules together, the
+interaction could still be surprising: Backpack can remodularize modules, but
+it can't remodularize values inside a module, so if a module has a dependency
+but some global state in the module doesn't, the resulting behavior can be
+surprising.  Perhaps the moral of the story really is, ``Don't do side effects
+in an applicative module system! No really!''}
+
+\paragraph{Package slicing} Another possibility is to automatically
+slice a single package into multiple packages, so that the sliced
+packages have dependencies which accurately reflect their constitutent
+modules.  For a well modularized package, the slicing operation should
+be a no-op.  This would also be useful in some other situations (see the
+\verb|-module-env| discussion in Section~\ref{sec:compiling-definite}).
+In fact, which slice a module should be placed in can be automatically
+calculated by taking the package identity with the regular tree
+associated with the module (Section~\ref{sec:ipi}).
+
+A minor downside of package slicing is in a dynamically linked environment,
+we pay a performance cost when we have to jump from one dynamic library
+to another, and slicing could introduce are large number of separate
+dynamic libraries which need to be switched between each other.
+
+Edward likes this proposal.
+
+\paragraph{Changing Backpack to disallow fine-grained dependencies}
+
+Another perspective is that we fell into a trap when we decided that
+dependencies should be calculated per-module.  What if, instead, we
+expanded the dependency of each module to cover \emph{all signatures}
+in the package?  Then the dependency tree would always be the same and
+the package would be shared only if all holes were precisely the same.
+Our motivating example, then, would fail to witness sharing.
+
+This might be the simplest thing to do, but it is a change in the
+Backpack semantics, and rules out modularization without splitting a package
+into multiple packages.
 
 \subsection{Exposed modules should allow external modules}\label{sec:reexport}
 
@@ -400,6 +549,13 @@ to generate identifiers for each of the exposed modules.  These should
 be calculated to directly refer to the ``original name'' of each them;
 so for example M and R point directly to package P, but they also
 include the original name they had in the original definition.
+
+\paragraph{Error messages}  When it is possible for multiple physical
+entities to have the same ``user-friendly'' name, this can result in a
+very confusing situation if both entities have to be referred to in the
+same message.  This is especially true when renaming is in place:
+you not only want to print out the name in scope, but probably some indication
+of what the original name is.  In short, when it comes to error messages, tread with care!
 
 \section{Simplifying Backpack}\label{sec:simplifying-backpack}
 
@@ -543,31 +699,143 @@ against (renamed) interface files.
 
 \subsection{Compilation of definite modules}\label{sec:compiling-definite}
 
-Of course, we still have to compile the code,
-and this includes any subpackages which we have mixed in the dependencies
-to make them fully definite.  Let's take the following package as an example:
+Of course, we still have to compile the code, and this includes any
+subpackages which we have mixed in the dependencies to make them fully
+definite.  Let's take the following set of packages as an example:
 
 \begin{verbatim}
 package pkg-a where
     A = ...
+    B = ... -- this code is ignored
 package pgk-b where -- indefinite package
     A :: ...
-    B = [ b = ... ]
+    B = [ import A; ... ]
 package pkg-c where
-    include pkg-a
+    include pkg-a (A)
     include pkg-b
+    C = [ import B; ... ]
 \end{verbatim}
 
-There seem to be two schools of thought for how compilation should proceed.
+With the linking invariant, we can simply walk the Backpack package ``tree'',
+compiling each of its dependencies.  Let's walk through it explicitly.\footnote{To simplify matters, we assume that there is only one instance of any
+PackageId in the database, so we omit the unique-ifying hashes from the
+ghc-pkg registration commands; we ignore the existence of version numbers
+and Cabal's dependency solver; finally, we do the compilation in
+one-shot mode, even though Cabal in practice will use the Make mode.}
 
-\paragraph{The ``downstream'' proposal}  This is Simon's favorite
-proposal.  Because of the linking invariant, if we traverse the Backpack
-specification, any given module we need to compile will have all of its
-dependencies compiled (since it could only depend on the dependency if
-there was a signature, and the signature could not have been linked
-unless it was implemented previously.)  So we just go ahead and compile
-everything one-by-one while traversing the package tree, as if the
-package was a single big package.  (Of course, if we encounter a
+First, we have to build \verb|pkg-a|.  This package has no dependencies
+of any kind, so compiling is much like compiling ordinary Haskell.  If
+it was already installed in the database, we wouldn't even bother compiling it.
+
+\begin{verbatim}
+ADEPS =    # empty!
+ghc -c A.hs -package-name pkg-a-ADEPS
+ghc -c B.hs -package-name pkg-a-ADEPS
+# install and register pkg-a-ADEPS
+\end{verbatim}
+
+Next, we have to build \verb|pkg-b|.  This package has a hole \verb|A|,
+intuitively, it depends on package A.  This is done in two steps:
+first we check if the signature given for the hole matches up with the
+actual implementation provided, and then we build the module properly.
+
+\begin{verbatim}
+BDEPS = "A -> pkg-a-ADEPS:A"
+# This doesn't actually create an hi-boot file
+ghc -c A.hs-boot -package-name pkg-b-BDEPS -module-env BDEPS
+ghc -c B.hs      -package-name pkg-b-BDEPS -module-env BDEPS
+# install and register pkg-b-BDEPS
+\end{verbatim}
+
+Notably, these commands diverge slightly from the traditional compilation process.
+Traditionally, we would specify the flags
+\verb|-hide-all-packages| \verb|-package-id package-a-ADEPS| in order to
+let GHC know that it should look at this package to find modules,
+including \verb|A|.  However, if we did this here, we would also pull in
+module B, which is incorrect, as this module was thinned out in the parent
+package description.  Conceptually, this package is being compiled in the
+context of some module environment \verb|BDEPS| (a logical context, in Backpack lingo)
+which maps modules to original names and is utilized by the module finder to
+lookup the import in \verb|B.hs|.
+
+Finally, we created all of the necessary subpackages, and we can compile
+our package proper.
+
+\begin{verbatim}
+CDEPS =         # empty!!
+ghc -c C.hs -package-name pkg-c-CDEPS -hide-all-packages \
+    -package pkg-a-ADEPS -hide-module B \
+    -package pkg-b-BDEPS
+# install and register package pkg-c-CDEPS
+\end{verbatim}
+
+This mostly resembles traditional compilation, but there are a few
+interesting things to note.  First, GHC needs to know about thinning/renaming
+in the package description (here, it's transmitted using the \verb|-hide-module|
+command, intended to apply to the most recent package definition).\footnote{Concrete
+command line syntax is, of course, up for discussion.}  Second, even though C
+``depends'' on subpackages, these do not show in its package-name identifier,
+e.g. CDEPS\@.  This is because this package \emph{chose} the values of ADEPS and BDEPS
+explicitly (by including the packages in this particular order), so there are no
+degrees of freedom.\footnote{In the presence of a Cabal-style dependency solver
+which associates a-0.1 with a concrete identifier a, these choices need to be
+recorded in the package ID.}  Finally, in principle, we could have also used
+the \verb|-module-env| flag to communicate how to lookup the B import (notice
+that the \verb|-package pkg-a-ADEPS| argument is a bit useless because we
+never end up using the import.)  I will talk a little more about the tradeoffs
+shortly.
+
+Overall, there are a few important things to notice about this architecture.
+First, because the \verb|pkg-b-BDEPS| product is installed, if in another package
+build we instantiate the indefinite module B with exactly the same \verb|pkg-a|
+implementation, we can skip the compilation process and reuse the version.
+This is because the calculated \verb|BDEPS| will be the same, and thus the package
+IDs will be the same.
+
+\paragraph{Module environment or package flags?}  In the previous
+section, I presented two ways by which one can tweak the behavior of
+GHC's module finder, which is responsible for resolving \verb|import B|
+into an actual physical module.  The first, \verb|-module-env| is to
+explicitly describe a full mapping from module names to original names;
+the second, \verb|-package| with \verb|-hide-module| and
+\verb|-rename-module|, is to load packages as before but apply
+thinning/renaming as necessary.
+
+In general, it seems that using \verb|-package| is desirable, because its
+input size is smaller. (If a package exports 200 modules, we would be obligated
+to list all of them in a module environment.)  However, a tricky situation
+occurs when some of these modules come from a parent package:
+
+\begin{verbatim}
+package myapp2 where
+    System.Random = [ ... ].hs
+    include monte-carlo
+    App = [ ... ].hs
+\end{verbatim}
+
+Here, monte-carlo depends on a ``subpart of the myapp2 package'', and it's
+not entirely clear how monte-carlo should be represented in the installed
+package database: should myapp2 be carved up into pieces so that subparts
+of its package description can be installed to the database?  A package
+stub like this would never used by any other package, it is strictly local.
+
+On the other hand, if one uses a module environment for specifying how
+\verb|monte-carlo| should handle \verb|System.Random|, we don't actually
+have to create a stub package: all we have to do is make sure GHC knows
+how to find the module with this original name.  To make things better,
+the size of the module environment will only be as long as all of the
+holes visible to the module in the package description, so the user will
+have explicitly asked for all of this pluggability.
+
+The conclusion seems clear: package granularity for modules from includes,
+and module environments for modules from parent packages!
+
+\paragraph{An appealing but incorrect alternative}  In this section,
+we briefly describe an alternate compilation strategy that might
+sound good, but isn't so good.  The basic idea is, when compiling
+\verb|pkg-c|, to compile all of its indefinite packages as if the
+package were one single, big package.
+(Of course, if we encounter a
 definite package, don't bother recompiling it; just use it directly.)
 In particular, we maintain the invariant that any code generated will
 export symbols under the current package's namespace.  So the identifier
@@ -575,7 +843,7 @@ export symbols under the current package's namespace.  So the identifier
 than \verb|pkg-b_B_b| (package subqualification is necessary because
 package C may define its own B module after thinning out the import.)
 
-One big problem with this proposal is that it doesn't implement applicative
+The fatal problem with this proposal is that it doesn't implement applicative
 semantics beyond compilation units.  While modules within a single
 compilation will get reused, if there is another package:
 
@@ -586,40 +854,7 @@ package pkg-d where
 \end{verbatim}
 
 when it is compiled by itself, it will generate its own instance of B,
-even though it should be the same as C.  Simon was willing to entertain
-the idea that, well, as long as the type-checker is able to figure out
-they are the same, then it might be OK if we accidentally generate two
-copies of the code (provided they actually are the same).
-
-\paragraph{The ``upstream'' proposal}
-The problem with the ``downstream'' proposal is that it always recompiles
-all of the indefinite parts of the package, even if some of them should
-be shared in some sense.  Hypothetically, a fully linked version of an
-indefinite package should be considered a package in its own right
-(in particular, it is associated with a physical module identity in Backpack).
-So all we need to do is store these installed packages somewhere, probably
-the local package database.  If we recompile the same dependency chain,
-the installed package can be simply reused.  These products do not have
-to be exposed.
-
-One problem with this proposal is in this example:
-
-\begin{verbatim}
-package myapp2 where
-    System.Random = [ ... ].hs
-    include monte-carlo
-\end{verbatim}
-
-Here, monte-carlo depends on a ``subpart of the myapp2 package'', and it's
-not entirely clear how monte-carlo should be represented in the installed
-package database: should myapp2 be carved up into pieces so that subparts
-of its package description can be installed to the database?  One notable
-thing to note is that these ``stubs'' will never be used by any other packages,
-they are strictly local.
-
-Another reason you might not be so keen about this proposal is the fact
-that we have to hit the package database, despite the fact that these
-are all ostensibly local build products. (But perhaps not!)
+even though it should be the same as C.  This is bad news.
 
 \subsection{Typechecking of indefinite modules}\label{sec:typechecking-indefinite}
 
@@ -705,7 +940,7 @@ It is easy to conclude that the original names of C and B are the same.  But
 more importantly, C.A must be given the original name of p:A.A.  This can only
 be discovered by looking at the signature definition for B. In any case, it
 is worth noting that this situation parallels the situation with hs-boot
-files (although there is no mutual recursion here). See Section~\ref{sec:hs-boot-restirct}
+files (although there is no mutual recursion here). See Section~\ref{sec:hs-boot-restrict}
 for more details.
 
 \paragraph{Hey, these signature imports are kind of tricky\ldots}
@@ -777,7 +1012,119 @@ package name of an indefinite package will be, and what the correct references
 to have are.  This is a very minor change to the assembly, so one could conceive
 of dynamically rewriting these references at the linking stage.
 
-\section{Implementation plan}
+\subsection{In defense of shaping}
+
+In the introduction to this section, we argued that for the vast
+majority of programs, having to run a shaping pass would be
+onacceptable.  In this section, I attempt to debunk those claims,
+and argue that, actually, we should have a shaping pass.
+
+(XXX But I have not written this section yet.)
+
+\section{Surface syntax}
+
+In the Backpack paper, a brand new module language is presented, with
+syntax for inline modules and signatures.  This syntax is probably worth implementing,
+because it makes it easy to specify compatibility packages, whose module
+definitions in general may be very short:
+
+\begin{verbatim}
+package ishake-0.12-shake-0.13 where
+    include shake-0.13
+    Development.Shake.Sys = Development.Shake.Cmd
+    Development.Shake = [ (**>) = (&>) ; (*>>) = (|*>)]
+    Development.Shake.Rule = [ defaultPriority = rule . priority 0.5 ]
+    include ishake-0.12
+\end{verbatim}
+
+However, there are a few things that are less than ideal about the
+surface syntax proposed by Paper Backpack:
+
+\begin{itemize}
+    \item It's completely different from the current method users
+        specify packages. There's nothing wrong with this per se
+        (one simply needs to support both formats) but the smaller
+        the delta, the easier the new packaging format is to explain
+        and implement.
+
+    \item Sometimes order matters (relative ordering of signatures and
+        module implementations), and other times it does not (aliases).
+        This can be confusing for users.
+
+    \item Users have to order module definitions topologically,
+        whereas in current Cabal modules can be listed in any order, and
+        GHC figures out an appropriate order to compile them.
+\end{itemize}
+
+Here is an alternative proposal, closely based on Cabal syntax.  Given
+the following Backpack definition:
+
+\begin{verbatim}
+package libfoo(A, B, C, Foo) where
+    include base
+    -- renaming and thinning
+    include libfoo (Foo, Bar as Baz)
+    -- holes
+    A :: [ a :: Bool ].hsig
+    A2 :: [ b :: Bool ].hsig
+    -- normal module
+    B = [
+        import {-# SOURCE #-} A
+        import Foo
+        import Baz
+        ...
+    ].hs
+    -- recursively linked pair of modules, one is private
+    C :: [ data C ].hsig
+    D = [ import {-# SOURCE #-} C; data D = D C ].hs
+    C = [ import D; data C = C D ].hs
+    -- alias
+    A = A2
+\end{verbatim}
+
+We can write the following Cabal-like syntax instead (where
+all of the signatures and modules are placed in appropriately
+named files):
+
+\begin{verbatim}
+build-depends: base, libfoo (Foo, Bar as Baz)
+holes: A A2
+exposed-modules: Foo B C
+aliases: A = A2
+other-modules: D
+\end{verbatim}
+
+Notably, all of these lists are \emph{insensitive} to ordering!
+The key idea is use of the \verb|{-# SOURCE #-}| pragma, which
+is enough to solve the important ordering constraint between
+signatures and modules.
+
+Here is how the elaboration works:
+
+\begin{enumerate}
+    \item Run Cabal's constraint solver to determine which specific
+        packages we will depend on (i.e., resolve the names in \verb|build-depends|).
+        For each package $p$ in this order, record a \verb|include p| in
+        the Backpack package.  Because of the topological sorting, every
+        included package has all of its holes filled in upon inclusion,
+        preserving the linking invariant.
+    \item (XXX something wonderful)
+\end{enumerate}
+
+\paragraph{Thinning and renaming}  The elaboration above is over-simplified,
+because it cannot deal with thinning and renaming.  The obvious choice of
+simply taking the thinning/renaming and slapping it on the include does not
+work, because this renaming will affect 
+
+\paragraph{Multiple signatures}  The proposal 
+
+\paragraph{Explicit or implicit reexports}  One annoying property of
+this proposal is that, looking at the \verb|exposed-modules| list, it is
+not immediately clear what source files one would expect to find in the
+current package.  It's not obvious what the proper way to go about doing
+this is.
+
+\paragraph{Better syntax for SOURCE}
 
 \section{Open questions}\label{sec:open-questions}
 
@@ -796,11 +1143,6 @@ hashing out.
         shaping information can be, and it is unclear how best to
         accommodate this.  This is probably the most important problem
         to overcome.
-
-    \item In Section~\ref{sec:compiling-definite}, we describe two strategies
-        for compiling packages with no holes (but which depend on indefinite
-        packages).  Simon and Edward still don't agree which proposal is best (Simon
-        in the downstream camp, Edward is in the upstream camp.)
 
     \item In Section~\ref{sec:installing-indefinite}, a few choices for how to
         store source code were pitched, however, there is not consensus on which
