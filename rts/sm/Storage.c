@@ -686,12 +686,12 @@ StgPtr allocate (Capability *cap, W_ n)
     CCS_ALLOC(cap->r.rCCCS,n);
     
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-        // The largest number of bytes such that
+        // The largest number of words such that
         // the computation of req_blocks will not overflow.
-        W_ max_bytes = (HS_WORD_MAX & ~(BLOCK_SIZE-1)) / sizeof(W_);
+        W_ max_words = (HS_WORD_MAX & ~(BLOCK_SIZE-1)) / sizeof(W_);
         W_ req_blocks;
 
-        if (n > max_bytes)
+        if (n > max_words)
             req_blocks = HS_WORD_MAX; // signal overflow below
         else
             req_blocks = (W_)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
