@@ -363,7 +363,7 @@ GetNumber(FILE *infp)
            If this is an identifier line, the value might exceed
            the size of 'int', and we are going to convert it to
            a floatish anyways. */
-        thefloatish = atof(numberstring);
+        thefloatish = (floatish) atof(numberstring);
         return INTEGER_TOK;
     }
 }
