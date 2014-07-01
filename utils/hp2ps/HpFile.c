@@ -227,7 +227,7 @@ GetHpLine(FILE *infp)
 	    Error("%s, line %d: integer must follow identifier", hpfile, 
                   linenum);
 	}
-        StoreSample(GetEntry(theident), nsamples, (floatish) theinteger);
+        StoreSample(GetEntry(theident), nsamples, thefloatish);
 	GetHpTok(infp); 
         break;
 
@@ -358,8 +358,13 @@ GetNumber(FILE *infp)
         thefloatish = (floatish) atof(numberstring);
 	return FLOAT_TOK;
     } else {
-	theinteger = atoi(numberstring);
-	return INTEGER_TOK;
+        theinteger = atoi(numberstring);
+        /* Set thefloatish too.
+           If this is an identifier line, the value might exceed
+           the size of 'int', and we are going to convert it to
+           a floatish anyways. */
+        thefloatish = atof(numberstring);
+        return INTEGER_TOK;
     }
 }
 
