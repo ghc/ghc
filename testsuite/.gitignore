@@ -1293,6 +1293,9 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/rts/linker_unload
 /tests/rts/outofmem
 /tests/rts/outofmem2
+/tests/rts/overflow1
+/tests/rts/overflow2
+/tests/rts/overflow3
 /tests/rts/prep.out
 /tests/rts/return_mem_to_os
 /tests/rts/rtsflags001
