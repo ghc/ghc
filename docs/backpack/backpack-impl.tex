@@ -428,7 +428,7 @@ versions of \verb|Q|).  The upshot is that we are in an awkward position,
 where package \verb|a| contains some modules which must be distinct, and other
 modules which must be unified over several installs.
 
-The solution to this conundrum is to flatten the package database, so
+The theory, thus, demands that we flatten the package database, so
 that we no longer insist that all compiled code associate with a package
 live together in a single directory: instead, \emph{the installed
     package database is a directory of physical module identities to
@@ -472,16 +472,20 @@ interaction could still be surprising: Backpack can remodularize modules, but
 it can't remodularize values inside a module, so if a module has a dependency
 but some global state in the module doesn't, the resulting behavior can be
 surprising.  Perhaps the moral of the story really is, ``Don't do side effects
-in an applicative module system! No really!''}
+in an applicative module system! No really!''} \\
 
-\paragraph{Package slicing} Another possibility is to automatically
+\noindent Flattening the package database may be too stiff a medicine for this
+project. Here are two alternatives.
+
+\paragraph{Package slicing} Instead of changing the package database,
+we automatically
 slice a single package into multiple packages, so that the sliced
 packages have dependencies which accurately reflect their constitutent
 modules.  For a well modularized package, the slicing operation should
 be a no-op.  This would also be useful in some other situations (see the
 \verb|-module-env| discussion in Section~\ref{sec:compiling-definite}).
 In fact, which slice a module should be placed in can be automatically
-calculated by taking the package identity with the regular tree
+calculated by taking the package name with the regular tree
 associated with the module (Section~\ref{sec:ipi}).
 
 A minor downside of package slicing is in a dynamically linked environment,
@@ -502,7 +506,8 @@ Our motivating example, then, would fail to witness sharing.
 
 This might be the simplest thing to do, but it is a change in the
 Backpack semantics, and rules out modularization without splitting a package
-into multiple packages.
+into multiple packages.  Maybe Scott can give other reasons why this
+would not be so good.
 
 \subsection{Exposed modules should allow external modules}\label{sec:reexport}
 
@@ -1087,8 +1092,10 @@ all of the signatures and modules are placed in appropriately
 named files):
 
 \begin{verbatim}
+package: libfoo
+...
 build-depends: base, libfoo (Foo, Bar as Baz)
-holes: A A2
+holes: A A2 -- deferred for now
 exposed-modules: Foo B C
 aliases: A = A2
 other-modules: D
@@ -1099,24 +1106,38 @@ The key idea is use of the \verb|{-# SOURCE #-}| pragma, which
 is enough to solve the important ordering constraint between
 signatures and modules.
 
-Here is how the elaboration works:
+Here is how the elaboration works.  For simplicity, in this algorithm
+description, we assume all packages being compiled have no holes. Later,
+we'll discuss how to extend the algorithm to handle holes.
 
 \begin{enumerate}
-    \item Run Cabal's constraint solver to determine which specific
-        packages we will depend on (i.e., resolve the names in \verb|build-depends|).
-        For each package $p$ in this order, record a \verb|include p| in
-        the Backpack package.  Because of the topological sorting, every
-        included package has all of its holes filled in upon inclusion,
-        preserving the linking invariant.
-    \item (XXX something wonderful)
+
+    \item At the top-level with \verb|package| $p$ and
+        \verb|exposed-modules| $ms$, record \verb|package p (ms) where|
+
+    \item For each package $p$ with thinning/renaming $ms$ in
+        \verb|build-depends|, record a \verb|include p (ms)| in the
+        Backpack package.  The ordering of these includes does not
+        matter, since none of these packages have holes.
+
+    \item Take all modules $m$ in \verb|other-modules| and
+        \verb|exposed-modules| which were not exported by build
+        dependencies, and create a directed graph where hs and hs-boot
+        files are nodes and imports are edges (the target of an edge is
+        an hs file if it is a normal import, and an hs-boot file if it
+        is a SOURCE import).  Topologically sort this graph, erroring if
+        this graph contains cycles (even with recursive modules, the
+        cycle should have been broken by an hs-boot file).  For each
+        node, in this order, record \verb|M = [ ... ]| or \verb|M :: [ ... ]|
+        depending on whether or not it is an hs or hs-boot.
+
 \end{enumerate}
 
-\paragraph{Thinning and renaming}  The elaboration above is over-simplified,
-because it cannot deal with thinning and renaming.  The obvious choice of
-simply taking the thinning/renaming and slapping it on the include does not
-work, because this renaming will affect 
+XXX do an example
 
-\paragraph{Multiple signatures}  The proposal 
+\paragraph{Holes} XXX build-depends resolution becomes more complicated
+
+\paragraph{Multiple signatures}  XXX allow SOURCE and then refer to a specific file
 
 \paragraph{Explicit or implicit reexports}  One annoying property of
 this proposal is that, looking at the \verb|exposed-modules| list, it is
@@ -1124,7 +1145,7 @@ not immediately clear what source files one would expect to find in the
 current package.  It's not obvious what the proper way to go about doing
 this is.
 
-\paragraph{Better syntax for SOURCE}
+\paragraph{Better syntax for SOURCE}  XXX self explanatory
 
 \section{Open questions}\label{sec:open-questions}
 
