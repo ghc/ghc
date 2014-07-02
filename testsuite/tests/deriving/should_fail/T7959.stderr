@@ -4,5 +4,5 @@ T7959.hs:5:1:
     In the stand-alone deriving instance for ‘A’
 
 T7959.hs:6:17:
-    Cannot derive instances for nullary classes
+    Expected kind ‘k0 -> Constraint’, but ‘A’ has kind ‘Constraint’
     In the data declaration for ‘B’

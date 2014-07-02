@@ -47,3 +47,4 @@ test('T8758', extra_clean(['T8758a.o', 'T8758a.hi']), multimod_compile, ['T8758a
 test('T8865', normal, compile, [''])
 test('T8893', normal, compile, [''])
 test('T8963', normal, compile, [''])
+test('T7269', normal, compile, [''])
