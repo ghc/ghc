@@ -99,8 +99,6 @@ endif
 	@echo 'cGhcEnableTablesNextToCode = "$(GhcEnableTablesNextToCode)"' >> $@
 	@echo 'cLeadingUnderscore    :: String'                             >> $@
 	@echo 'cLeadingUnderscore    = "$(LeadingUnderscore)"'              >> $@
-	@echo 'cRAWCPP_FLAGS         :: String'                             >> $@
-	@echo 'cRAWCPP_FLAGS         = "$(RAWCPP_FLAGS)"'                   >> $@
 	@echo 'cGHC_UNLIT_PGM        :: String'                             >> $@
 	@echo 'cGHC_UNLIT_PGM        = "$(utils/unlit_dist_PROG)"'          >> $@
 	@echo 'cGHC_SPLIT_PGM        :: String'                             >> $@
