@@ -233,6 +233,8 @@ initSysTools mbMinusB
        -- to make that possible, so for now you can't.
        gcc_prog <- getSetting "C compiler command"
        gcc_args_str <- getSetting "C compiler flags"
+       cpp_prog <- getSetting "Haskell CPP command"
+       cpp_args_str <- getSetting "Haskell CPP flags"
        let unreg_gcc_args = if targetUnregisterised
                             then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
                             else []
@@ -241,6 +243,7 @@ initSysTools mbMinusB
             | mkTablesNextToCode targetUnregisterised
                = ["-DTABLES_NEXT_TO_CODE"]
             | otherwise = []
+           cpp_args= map Option (words cpp_args_str)
            gcc_args = map Option (words gcc_args_str
                                ++ unreg_gcc_args
                                ++ tntc_gcc_args)
@@ -283,10 +286,7 @@ initSysTools mbMinusB
        -- cpp is derived from gcc on all platforms
        -- HACK, see setPgmP below. We keep 'words' here to remember to fix
        -- Config.hs one day.
-       let cpp_prog  = gcc_prog
-           cpp_args  = Option "-E"
-                     : map Option (words cRAWCPP_FLAGS)
-                    ++ gcc_args
+
 
        -- Other things being equal, as and ld are simply gcc
        gcc_link_args_str <- getSetting "C compiler link flags"

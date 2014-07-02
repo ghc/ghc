@@ -451,6 +451,7 @@ AC_DEFUN([FP_SETTINGS],
     then
         mingw_bin_prefix=mingw/bin/
         SettingsCCompilerCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
+        SettingsHaskellCPPCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
         SettingsLdCommand="\$topdir/../${mingw_bin_prefix}ld.exe"
         SettingsArCommand="\$topdir/../${mingw_bin_prefix}ar.exe"
         SettingsPerlCommand='$topdir/../perl/perl.exe'
@@ -459,6 +460,8 @@ AC_DEFUN([FP_SETTINGS],
         SettingsTouchCommand='$topdir/touchy.exe'
     else
         SettingsCCompilerCommand="$WhatGccIsCalled"
+        SettingsHaskellCPPCommand="$HaskellCPPCmd"
+        SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$LdCmd"
         SettingsArCommand="$ArCmd"
         SettingsPerlCommand="$PerlCmd"
@@ -483,6 +486,8 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
     AC_SUBST(SettingsCCompilerCommand)
+    AC_SUBST(SettingsHaskellCPPCommand)
+    AC_SUBST(SettingsHaskellCPPFlags)
     AC_SUBST(SettingsCCompilerFlags)
     AC_SUBST(SettingsCCompilerLinkFlags)
     AC_SUBST(SettingsLdCommand)
@@ -702,6 +707,8 @@ AC_ARG_WITH($2,
 ]
 )
 ]) # FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
+
+
 
 # FP_PROG_CONTEXT_DIFF
 # --------------------
@@ -2094,5 +2101,7 @@ AC_DEFUN([MAYBE_OVERRIDE_STAGE0],[
       $2=$With_$1
   fi
 ])
+
+
 
 # LocalWords:  fi
