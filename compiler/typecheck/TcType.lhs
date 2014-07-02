@@ -961,7 +961,7 @@ tcInstHeadTyNotSynonym :: Type -> Bool
 -- are transparent, so we need a special function here
 tcInstHeadTyNotSynonym ty
   = case ty of
-        TyConApp tc _ -> not (isSynTyCon tc)
+        TyConApp tc _ -> not (isTypeSynonymTyCon tc)
         _ -> True
 
 tcInstHeadTyAppAllTyVars :: Type -> Bool
