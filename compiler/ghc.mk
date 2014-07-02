@@ -665,9 +665,9 @@ compiler_stage2_CONFIGURE_OPTS += --disable-library-for-ghci
 compiler_stage3_CONFIGURE_OPTS += --disable-library-for-ghci
 
 # after build-package, because that sets compiler_stage1_HC_OPTS:
-compiler_stage1_HC_OPTS += $(GhcStage1HcOpts)
-compiler_stage2_HC_OPTS += $(GhcStage2HcOpts)
-compiler_stage3_HC_OPTS += $(GhcStage3HcOpts)
+compiler_stage1_HC_OPTS += $(GhcHcOpts) $(GhcStage1HcOpts)
+compiler_stage2_HC_OPTS += $(GhcHcOpts) $(GhcStage2HcOpts)
+compiler_stage3_HC_OPTS += $(GhcHcOpts) $(GhcStage3HcOpts)
 
 ifneq "$(BINDIST)" "YES"
 
