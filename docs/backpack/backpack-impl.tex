@@ -513,7 +513,7 @@ Our motivating example, then, would fail to witness sharing.
 This might be the simplest thing to do, but it is a change in the
 Backpack semantics, and rules out modularization without splitting a package
 into multiple packages.  Maybe Scott can give other reasons why this
-would not be so good.
+would not be so good.  SPJ is quite keen on this plan.
 
 \subsection{Exposed modules should allow external modules}\label{sec:reexport}
 
@@ -808,6 +808,8 @@ implementation, we can skip the compilation process and reuse the version.
 This is because the calculated \verb|BDEPS| will be the same, and thus the package
 IDs will be the same.
 
+XXX ToDo: actually write down pseudocode algorithm for this
+
 \paragraph{Module environment or package flags?}  In the previous
 section, I presented two ways by which one can tweak the behavior of
 GHC's module finder, which is responsible for resolving \verb|import B|
@@ -878,17 +880,28 @@ It should be possible to support GHC-style mutual recursion using the
 Backpack formalism immediately using hs-boot files.  However, to avoid
 the need for a shaping pass, we must adopt an existing constraint that
 already applies to hs-boot files: \emph{at the time we define a signature,
-we must know what the original name for all data types is}.  We then
-compile modules as usual, but compiling against the signature as if it
-were an hs-boot file.
+we must know what the original name for all data types is}.  In practice,
+GHC enforces this by stating that: (1) an hs-boot file must be
+accompanied with an implementation, and (2) the implementation must
+in fact define (and not reexport) all of the declarations in the signature.
 
-(ToDo: Figure out why this eliminates the shaping pass)
+Why does this not require a shaping pass? The reason is that the
+signature is not really polymorphic: we require that the $\alpha$ module
+variable be resolved to a concrete module later in the same package, and
+that all the $\beta$ module variables be unified with $\alpha$. Thus, we
+know ahead of time the original names and don't need to deal with any
+renaming.\footnote{This strategy doesn't completely resolve the problem
+of cross-package mutual recursion, because we need to first compile a
+bit of the first package (signatures), then the second package, and then
+the rest of the first package.}
 
 Compiling packages in this way gives the tantalizing possibility
 of true separate compilation: the only thing we don't know is what the actual
 package name of an indefinite package will be, and what the correct references
 to have are.  This is a very minor change to the assembly, so one could conceive
-of dynamically rewriting these references at the linking stage.
+of dynamically rewriting these references at the linking stage.  But
+separate compilation achieved in this fashion would not be able to take
+advantage of cross-module optimizations.
 
 \section{Shaped Backpack}
 
@@ -1031,14 +1044,12 @@ to determine the dependency graph, so that it can have some order to compile
 modules in.  There is a specialized parser which just parses these statements,
 and then ignores the rest of the file.
 
-It is not difficult to imagine extending this parser to pick up other entities
-which a Haskell file may define, while skipping their actual definitions
-(it's enough to know if the module defines it or not.)  If this can be
-done acceptably quickly, there is no need to perform a renaming pass or
-anything complicated; that is all the preprocessing necessary.
+A bit of background: the \emph{renamer} is responsible for resolving
+imports and figuring out where all of these entities actually come from.
+SPJ would really like to avoid having to run the renamer in order to perform
+a shaping pass.
 
-(XXX maybe you can do something even more sophisticated and avoid picking
-up entities. ToDo: show a counterexample for this case.)
+XXX Primary open question here: is it possible to do shaping without renaming?
 
 \subsection{Installing indefinite packages}\label{sec:installing-indefinite}
 
@@ -1237,10 +1248,19 @@ can affect how a hole is instantiated by another entry.  This might be a
 bit weird to users, who might like to explicitly say how holes are
 filled when instantiating a package.  Food for thought, surface syntax wise.
 
-\paragraph{Holes in the package} XXX Actually, I think this is simple:
-these holes are just part of the module graph from step (3), and get
-sorted in a normal way.  You can probably just place them all up top without
-causing any problems.
+\paragraph{Holes in the package} Actually, this is quite simple: the
+ordering of includes goes as before, but some indefinite packages in the
+database are less constrained as they're ``dependencies'' are fulfilled
+by the holes at the top-level of this package.  It's also worth noting
+that some dependencies will go unresolved, since the following package
+is valid:
+
+\begin{verbatim}
+package a where
+    A :: ...
+package b where
+    include a
+\end{verbatim}
 
 \paragraph{Multiple signatures}  In Backpack syntax, it's possible to
 define a signature multiple times, which is necessary for mutually
@@ -1285,7 +1305,60 @@ abstract import Data.Foo
 \end{verbatim}
 
 which makes it clear that this module is pluggable, typechecking against
-a signature.
+a signature.  Note that this only indicates how type checking should be
+done: when actually compiling the module we will compile against the
+interface file for the true implementation of the module.
+
+It's worth noting that the SOURCE annotation was originally made a
+pragma because, in principle, it should have been possible to compile
+some recursive modules without needing the hs-boot file at all. But if
+we're moving towards boot files as signatures, this concern is less
+relevant.
+
+\section{Bits and bobs}
+
+\subsection{Abstract type synonyms}
+
+In Paper Backpack, abstract type synonyms are not permitted, because GHC doesn't
+understand how to deal with them.  The purpose of this section is to describe
+one particularly nastiness of abstract type synonyms, by way of the occurs check:
+
+\begin{verbatim}
+A :: [ type T ]
+B :: [ import qualified A; type T = [A.T] ]
+\end{verbatim}
+
+At this point, it is illegal for \verb|A = B|, otherwise this type synonym would
+fail the occurs check.  This seems like pretty bad news, since every instance
+of the occurs check in the type-checker could constitute a module inequality.
+
+\subsection{Type families}
+
+Like type classes, type families must not overlap (and this is a question of
+type safety!)
+
+A more subtle question is compatibility and apartness of type family
+equations.  Under these checks, aliasing of modules can fail if it causes
+two type families to be identified, but their definitions are not apart.
+Here is a simple example:
+
+\begin{verbatim}
+A :: [
+    type family F a :: *
+    type instance F Int = Char
+]
+B :: [
+    type family F a :: *
+    type instance F Int = Bool
+]
+\end{verbatim}
+
+Now it is illegal for \verb|A = B|, because when the type families are
+unified, the instances now fail the apartness check.  However, if the second
+instance was \verb|F Int = Char|, the families would be able to link together.
+
+It would be nice to solve this problem before getting to the linking phase. (But,
+channeling SPJ for a moment, ``Why would anyone want to do that?!'')
 
 \section{Open questions}\label{sec:open-questions}
 
