@@ -275,11 +275,11 @@ Backpack proper can be implemented.  These additions are described in
 red in the architectural diagrams.  The current structure of this
 section is to describe the additions bottom up.
 
-\subsection{Concrete physical identity = PackageId$^*$ + Module name}\label{sec:ipi}
+\subsection{Concrete physical identity = PackageId + Module name + Module dependencies}\label{sec:ipi}
 
 \begin{figure}
     \center{\begin{tabular}{r l}
-        PackageId & hash of ``package name, package version, dependency resolution, module environment'' \\
+            PackageId & hash of ``package name, package version, dependency resolution, \emph{module} environment'' \\
         InstalledPackageId & hash of ``PackageId, source code, way, compiler flags'' \\
     \end{tabular}}
 \label{fig:proposed-pkgid}\caption{Proposed new structure of package identifiers.}
@@ -290,27 +290,32 @@ In Backpack, there needs to be some mechanism for assigning
 typechecking Backpack packages, since they let us tell if two types are
 equal or not.
 
-If it looks like a duck and quacks like a duck, it is a duck.  In GHC,
-our method of testing whether or not two types are equal is by comparing
-their original names, which is a tuple of a PackageId and the module
-name.  Furthermore, we rely on ``module name'' to be some user visible
-string which they can refer to in error messages\footnote{I wonder what
-happens when you start renaming module names\ldots}, so really our only
-degree of freedom is modifying the PackageId associated with a module.
-What changes to the PackageId are necessary?
+In GHC, our method of testing whether or not two types are equal is by
+comparing their original names, which is a tuple of a PackageId and the
+module name (summarized in Figure~\ref{fig:current-pkgid}).  If it looks
+like a duck and quacks like a duck, it is a duck: we might reasonable
+imagine that \emph{concrete physical identity = PackageId and module
+name}.  But is this sufficient to represent Backpack's physical module
+identities?
 
-Fortunately, in current Cabal packages, we require that modules always
-be given a package-unique module name, thus it's not necessary to
-disambiguate between multiple ``module literals'', as was the case in
-Paper Backpack.  However, current PackageIds are insufficient for
-another reason: a module physical identity is not just its name, but
-also the regular tree representing all of its \emph{module} dependencies.  The
-PackageId needs to include this regular tree, \emph{which may differ
-between modules in the same package (Section~\ref{sec:flatten})}, along with the
-other information about the package such as its name. (I think
-Figure~\ref{fig:proposed-pkgid} is out of date now.)  Since this tree in
-general may be quite long, it needs to be shortened in some way, such as
-by hashing.
+If we look at how physical module identities are allocated in Paper Backpack,
+we can see that each module corresponds to an identity constructor (in
+Backpack this is the package name, some representation of the module
+source, and a disambiguating integer if module source is duplicated)
+\emph{as well as} physical module identities which were applied to
+this constructor.  The current PackageId + Module name scheme adequately encodes
+the constructor (in particular, a single package can't have multiple modules
+with the same name), but it does not encode the \emph{module} dependencies.
+We have to add these to our original names.  There are three ways we can do
+this:
+
+\begin{enumerate}
+    \item Augment original names to have a third component.  This is less than ideal because it requires pervasive changes to all parts of the compiler.
+    \item Augment the module name to record module dependency information.  This is a bit of an odd place to put the information, because our module names correspond quite concretely to the actual source file a user wrote some source in.
+    \item Augment the PackageId to record module dependency information.  For now, this is the regime we will use; however, see Section~\ref{sec:flatten} for why the issue is more subtle.
+\end{enumerate}
+
+(XXX Figure~\ref{fig:proposed-pkgid} is out of date now.)
 
 And now, the complications\ldots
 
@@ -384,12 +389,13 @@ we talk about packages with holes.
 
 \subsection{Flatten the package database}\label{sec:flatten}
 
-In the previous section, I implied that the \emph{module dependency regular
-tree} needed to be placed in the \emph{package ID}.  Type error? Yes!
+In the previous section, I implied that the \emph{module} dependencies
+could be recorded with the \emph{package} ID\@.  Type error? Yes!
 
-The upshot is that in some cases, compilations of separate packages may
-result in the installation of code that should be the \emph{same} (code
-that is shared at the module level, rather than the package level).
+In the old world order, we think of dependencies as being associated with
+packages as a whole.  However, Paper Backpack specifies dependency tracking
+at the \emph{module} level, which means that different compilations of
+an indefinite package may result in modules which should be identified.
 Here is a Backpack package which demonstrates the issue:
 
 \begin{verbatim}
@@ -428,12 +434,12 @@ versions of \verb|Q|).  The upshot is that we are in an awkward position,
 where package \verb|a| contains some modules which must be distinct, and other
 modules which must be unified over several installs.
 
-The theory, thus, demands that we flatten the package database, so
-that we no longer insist that all compiled code associate with a package
-live together in a single directory: instead, \emph{the installed
-    package database is a directory of physical module identities to
-objects/interfaces}.  Installed packages are represented as (possibly
-overlapping) sets over this store of modules.
+The theory, thus, demands that we flatten the package database, so that
+we no longer insist that all compiled code that is produced when a
+package is installed live together in a single directory: instead,
+\emph{the installed package database is a directory of physical module
+identities to objects/interfaces}.  Installed packages are represented
+as (possibly overlapping) sets over this store of modules.
 
 \paragraph{Do we really care about this use case?}  Scott gave me one
 good argument why this is a nice feature to have: it permits users to
@@ -562,7 +568,7 @@ same message.  This is especially true when renaming is in place:
 you not only want to print out the name in scope, but probably some indication
 of what the original name is.  In short, when it comes to error messages, tread with care!
 
-\section{Simplifying Backpack}\label{sec:simplifying-backpack}
+\section{Shapeless Backpack}\label{sec:simplifying-backpack}
 
 Backpack as currently defined always requires a \emph{shaping} pass,
 which calculates the shapes of all modules defined in a package.
@@ -575,15 +581,17 @@ implementation problems:
     \item \emph{Shaping is a lot of work.} A module shape specifies the
         providence of all data types and identifiers defined by a
         module. To calculate this, we must preprocess and parse all
-        modules, even before we do the type-checking pass.
+        modules, even before we do the type-checking pass.  (Fortunately,
+        shaping doesn't require a full parse of a module, only enough
+        to get identifiers, which makes it a slightly more expensive
+        version of \verb|ghc -M|.)
 
     \item \emph{Shaping must be done upfront.} In the current Backpack
         design, all shapes must be computed before any typechecking can
         occur.  While performing the shaping pass upfront is necessary
         in order to solve the double vision problem (where a module
-        identity may be influenced by later definitions), it also means
-        that either GHC must compile an entire package in one go, or it
-        must first do a shaping pass, and then revisit every module and
+        identity may be influenced by later definitions), it means
+        that GHC must first do a shaping pass, and then revisit every module and
         compile them proper.  Nor is it (easily) possible to skip the
         shaping pass when it is unnecessary, as one might expect to be
         the case in the absence of mutual recursion.  Shaping is not
@@ -603,11 +611,14 @@ implementation problems:
         code without recursive dependencies. Programmers should avoid
         this code organization, except when it is absolutely necessary.
 
-    \item \emph{GHC is architecturally ill-suited for shaping.}  Shaping
-        implies that GHC's internal concept of an ``original name'' be
-        extended to accommodate module variables.  This is an extremely
-        invasive change to all aspects of GHC, since the original names
-        assumption is baked quite deeply into the compiler.
+    \item \emph{GHC is architecturally ill-suited for directly
+        implementing shaping.}  Shaping implies that GHC's internal
+        concept of an ``original name'' be extended to accommodate
+        module variables.  This is an extremely invasive change to all
+        aspects of GHC, since the original names assumption is baked
+        quite deeply into the compiler.  Plausible implementations of
+        shaping requires all these variables to be skolemized outside
+        of GHC\@.
 
 \end{itemize}
 
@@ -627,8 +638,8 @@ typecheck; but if A defined T on its own, B would not typecheck.  Thus,
 we \emph{cannot} typecheck B until we have done some analysis of A (the
 shaping analysis!)
 
-So, if we want to jettison the shaping analysis, we'd like a subset
-of Backpack which does not allow mutually recursive modules.
+Thus, it is beneficial (from an optimization point of view) to
+consider a subset of Backpack for which shaping is not necessary.
 Here is a programming discipline which does just that, which we will call the \textbf{linking restriction}: \emph{Module implementations must be declared before
 signatures.}  Formally, this restriction modifies the rule for merging
 polarized module shapes ($\widetilde{\tau}_1^{m_1} \oplus \widetilde{\tau}_2^{m_2}$) so that
@@ -861,15 +872,44 @@ package pkg-d where
 when it is compiled by itself, it will generate its own instance of B,
 even though it should be the same as C.  This is bad news.
 
+\subsection{Restricted recursive modules ala hs-boot}\label{sec:hs-boot-restrict}
+
+It should be possible to support GHC-style mutual recursion using the
+Backpack formalism immediately using hs-boot files.  However, to avoid
+the need for a shaping pass, we must adopt an existing constraint that
+already applies to hs-boot files: \emph{at the time we define a signature,
+we must know what the original name for all data types is}.  We then
+compile modules as usual, but compiling against the signature as if it
+were an hs-boot file.
+
+(ToDo: Figure out why this eliminates the shaping pass)
+
+Compiling packages in this way gives the tantalizing possibility
+of true separate compilation: the only thing we don't know is what the actual
+package name of an indefinite package will be, and what the correct references
+to have are.  This is a very minor change to the assembly, so one could conceive
+of dynamically rewriting these references at the linking stage.
+
+\section{Shaped Backpack}
+
+Despite the simplicity of shapeless Backpack with the linking
+restriction in the absence of holes, we will find that when we have
+holes, it will be very difficult to do type-checking without
+some form of shaping.  This section is very much a work in progress,
+but the ability to typecheck against holes, even with the linking restriction,
+is a very important part of modular separate development, so we will need
+to support it at some ponit.
+
 \subsection{Typechecking of indefinite modules}\label{sec:typechecking-indefinite}
 
-When we are typechecking a package that contains some holes, some extra
-care must be taken.  We can no longer assume that there are no holes in
-the physical context, and while these holes will never be linked against
-a physical implementation, they may be linked against other signatures.
-(Note: while disallowing signature linking would solve our problem, it
-would disallow a wide array of useful instances of signature reuse, for
-example, a package mylib that implements both mylib-1x-sig and mylib-2x-sig.)
+Recall in our argument in the definite case, where we showed there are
+no holes in the physical context.  With indefinite modules, this is no
+longer true. While (with the linking restriction) these holes will never
+be linked against a physical implementation, they may be linked against
+other signatures.  (Note: while disallowing signature linking would
+solve our problem, it would disallow a wide array of useful instances of
+signature reuse, for example, a package mylib that implements both
+mylib-1x-sig and mylib-2x-sig.)
 
 With holes, we must handle module variables, and we sometimes must unify them:
 
@@ -928,7 +968,7 @@ package r where
     include q
 \end{verbatim}
 
-Another possibility is that it might be acceptable to do a small shaping
+Another possibility is that it might be acceptable to do a mini-shaping
 pass, without parsing modules or signatures, \emph{simply} looking at
 names and aliases.  But logical names are not the only mechanism by
 which unification may occur:
@@ -945,8 +985,10 @@ It is easy to conclude that the original names of C and B are the same.  But
 more importantly, C.A must be given the original name of p:A.A.  This can only
 be discovered by looking at the signature definition for B. In any case, it
 is worth noting that this situation parallels the situation with hs-boot
-files (although there is no mutual recursion here). See Section~\ref{sec:hs-boot-restrict}
-for more details.
+files (although there is no mutual recursion here).
+
+The conclusion is that you will probably, in fact, have to do real
+shaping in order to typecheck all of these examples.
 
 \paragraph{Hey, these signature imports are kind of tricky\ldots}
 
@@ -970,6 +1012,33 @@ A\ldots but it will not be defined prior to package p.
 
 In any case, however, it would be good to emit a warning if a package
 cannot be compiled without mutual recursion.
+
+\subsection{Efficient shaping}
+
+(These are Edward's opinion, he hasn't convinced other folks that this is
+the right way to do it.)
+
+In this section, I want to argue that, although shaping constitutes
+a pre-pass which must be run before compilation in earnest, it is only
+about as bad as the dependency resolution analysis that GHC already does
+in \verb|ghc -M| or \verb|ghc --make|.
+
+In Paper Backpack, what information does shaping compute? It looks at
+exports, imports, data declarations and value declarations (but not the
+actual expressions associated with these values.)  As a matter of fact,
+GHC already must look at the imports associated with a package in order
+to determine the dependency graph, so that it can have some order to compile
+modules in.  There is a specialized parser which just parses these statements,
+and then ignores the rest of the file.
+
+It is not difficult to imagine extending this parser to pick up other entities
+which a Haskell file may define, while skipping their actual definitions
+(it's enough to know if the module defines it or not.)  If this can be
+done acceptably quickly, there is no need to perform a renaming pass or
+anything complicated; that is all the preprocessing necessary.
+
+(XXX maybe you can do something even more sophisticated and avoid picking
+up entities. ToDo: show a counterexample for this case.)
 
 \subsection{Installing indefinite packages}\label{sec:installing-indefinite}
 
@@ -998,33 +1067,6 @@ what an indefinite package is: we have paused the compilation process
 partway, intending to finish it later.  However, our compilation strategy
 for definite packages requires us to run this step using a \emph{different}
 choice of original names, so it's unclear how much work could actually be reused.
-
-\subsection{Restricted recursive modules ala hs-boot}\label{sec:hs-boot-restrict}
-
-It should be possible to support GHC-style mutual recursion using the
-Backpack formalism immediately using hs-boot files.  However, to avoid
-the need for a shaping pass, we must adopt an existing constraint that
-already applies to hs-boot files: \emph{at the time we define a signature,
-we must know what the original name for all data types is}.  We then
-compile modules as usual, but compiling against the signature as if it
-were an hs-boot file.
-
-(ToDo: Figure out why this eliminates the shaping pass)
-
-Compiling packages in this way gives the tantalizing possibility
-of true separate compilation: the only thing we don't know is what the actual
-package name of an indefinite package will be, and what the correct references
-to have are.  This is a very minor change to the assembly, so one could conceive
-of dynamically rewriting these references at the linking stage.
-
-\subsection{In defense of shaping}
-
-In the introduction to this section, we argued that for the vast
-majority of programs, having to run a shaping pass would be
-onacceptable.  In this section, I attempt to debunk those claims,
-and argue that, actually, we should have a shaping pass.
-
-(XXX But I have not written this section yet.)
 
 \section{Surface syntax}
 
@@ -1107,8 +1149,10 @@ is enough to solve the important ordering constraint between
 signatures and modules.
 
 Here is how the elaboration works.  For simplicity, in this algorithm
-description, we assume all packages being compiled have no holes. Later,
-we'll discuss how to extend the algorithm to handle holes.
+description, we assume all packages being compiled have no holes
+(including \verb|build-depends| packages). Later, we'll discuss how to
+extend the algorithm to handle holes in both subpackages and the main
+package itself.
 
 \begin{enumerate}
 
@@ -1129,15 +1173,102 @@ we'll discuss how to extend the algorithm to handle holes.
         this graph contains cycles (even with recursive modules, the
         cycle should have been broken by an hs-boot file).  For each
         node, in this order, record \verb|M = [ ... ]| or \verb|M :: [ ... ]|
-        depending on whether or not it is an hs or hs-boot.
+        depending on whether or not it is an hs or hs-boot.  If possible,
+        sort signatures before implementations when there is no constraint
+        otherwise.
 
 \end{enumerate}
 
-XXX do an example
+Here is a simple example which shows how SOURCE can be used to disambiguate
+between two important cases. Suppose we have these modules:
 
-\paragraph{Holes} XXX build-depends resolution becomes more complicated
+\begin{verbatim}
+-- A1.hs
+import {-# SOURCE #-} B
 
-\paragraph{Multiple signatures}  XXX allow SOURCE and then refer to a specific file
+-- A2.hs
+import B
+
+-- B.hs
+x = True
+
+-- B.hs-boot
+x :: Bool
+\end{verbatim}
+
+Then we translate the following packages as follows:
+
+\begin{verbatim}
+exposed-modules: A1 B
+-- translates to
+B :: [ x :: Bool ]
+A1 = [ import B ]
+B = [ x = True ]
+\end{verbatim}
+
+but
+
+\begin{verbatim}
+exposed-modules: A2 B
+-- translates to
+B = [ x = True ]
+B :: [ x :: Bool ]
+A2 = [ import B ]
+\end{verbatim}
+
+The import controls placement between signature and module, and in A1 it
+forces B's signature to be sorted before B's implementation (whereas in
+the second section, there is no constraint so we preferentially place
+the B's implementation first)
+
+\paragraph{Holes in the database} In the presence of holes,
+\verb|build-depends| resolution becomes more complicated.  First,
+let's consider the case where the package we are building is
+definite, but the package database contains indefinite packages with holes.
+In order to maintain the linking restriction, we now have to order packages
+from step (2) of the previous elaboration.  We can do this by creating
+a directed graph, where nodes are packages and edges are from holes to the
+package which implements them.  If there is a cycle, this indicates a mutually
+recursive package.  In the absence of cycles, a topological sorting of this
+graph preserves the linking invariant.
+
+One subtlety to consider is the fact that an entry in \verb|build-depends|
+can affect how a hole is instantiated by another entry.  This might be a
+bit weird to users, who might like to explicitly say how holes are
+filled when instantiating a package.  Food for thought, surface syntax wise.
+
+\paragraph{Holes in the package} XXX Actually, I think this is simple:
+these holes are just part of the module graph from step (3), and get
+sorted in a normal way.  You can probably just place them all up top without
+causing any problems.
+
+\paragraph{Multiple signatures}  In Backpack syntax, it's possible to
+define a signature multiple times, which is necessary for mutually
+recursive signatures:
+
+\begin{verbatim}
+package a where
+    A :: [ data A ]
+    B :: [ import A; data B = B A ]
+    A :: [ import B; data A = A B ]
+\end{verbatim}
+
+Critically, notice that we can see the constructors for both module B and A
+after the signatures are linked together.  This is not possible in GHC
+today, but could be possible by permitting multiple hs-boot files.  Now
+the SOURCE pragma indicating an import must \emph{disambiguate} which
+hs-boot file it intends to include.  This might be one way of doing it:
+
+\begin{verbatim}
+-- A.hs-boot2
+data A
+
+-- B.hs-boot
+import {-# SOURCE hs-boot2 #-} A
+
+-- A.hs-boot
+import {-# SOURCE hs-boot #-} B
+\end{verbatim}
 
 \paragraph{Explicit or implicit reexports}  One annoying property of
 this proposal is that, looking at the \verb|exposed-modules| list, it is
@@ -1145,7 +1276,16 @@ not immediately clear what source files one would expect to find in the
 current package.  It's not obvious what the proper way to go about doing
 this is.
 
-\paragraph{Better syntax for SOURCE}  XXX self explanatory
+\paragraph{Better syntax for SOURCE}  If we enshrine the SOURCE import
+as a way of solving Backpack ordering problems, it would be nice to have
+some better syntax for it. One possibility is:
+
+\begin{verbatim}
+abstract import Data.Foo
+\end{verbatim}
+
+which makes it clear that this module is pluggable, typechecking against
+a signature.
 
 \section{Open questions}\label{sec:open-questions}
 
