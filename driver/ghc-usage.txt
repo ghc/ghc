@@ -73,7 +73,7 @@ Given the above, here are some TYPICAL invocations of $$:
 The User's Guide has more information about GHC's *many* options.  An
 online copy can be found here:
 
-   http://haskell.org/haskellwiki/GHC
+   http://www.haskell.org/ghc/docs/latest/html/users_guide/
 
 If you *really* want to see every option, then you can pass
 '--show-options' to the compiler.
