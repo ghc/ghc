@@ -19,6 +19,19 @@
        </listitem>
        <listitem>
           <para>
+            A handful of bugs in the pattern synonyms implementation
+            have been fixed (issues #9161, #8966, #9023, #9175).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug in runtime system which would cause
+            <literal>tryReadMVar</literal> to deadlock has been fixed
+            (issue #9148).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
             A segmentation fault for compiled programs using
             <literal>makeStableName</literal> has been fixed (issue
             #9078).
@@ -38,9 +51,22 @@
        </listitem>
        <listitem>
           <para>
+            A bug in the code generator that could cause segmentation
+            faults has been fixed (issue #9045).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
             A bug which caused <literal>gcc</literal> to error when
             compiling large assembly source files has been fixed
             (issue #8768).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug which caused a performance regression in the new
+            `Typeable` implementation (due to recomputation of known
+            values) has been fixed (issue #9203).
           </para>
        </listitem>
        <listitem>
@@ -55,6 +81,14 @@
             A bug which caused the runtime system to uninstall signal
             handlers when they were not installed was fixed (issue
             #9068).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+            A bug which could result in programs using all available
+            memory, due to a regression in the <literal>Read</literal>
+            instance for <literal>Data.Fixed.Pico</literal> has been
+            fixed (issue #9231).
           </para>
        </listitem>
        <listitem>
