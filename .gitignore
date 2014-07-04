@@ -150,3 +150,6 @@ _darcs/
 
 .tm_properties
 VERSION
+
+/libraries/integer-gmp/gmp/gmp.h
+/libraries/integer-gmp/gmp/gmpbuild/
