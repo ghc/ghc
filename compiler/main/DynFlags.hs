@@ -3588,6 +3588,7 @@ compilerInfo dflags
        ("RTS ways",                    cGhcRTSWays),
        ("Support dynamic-too",         if isWindows then "NO" else "YES"),
        ("Support parallel --make",     "YES"),
+       ("Support reexported-modules",  "YES"),
        ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
                                        then "YES" else "NO"),
        ("GHC Dynamic",                 if dynamicGhc

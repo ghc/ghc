@@ -16,6 +16,7 @@ import Distribution.ModuleName hiding (main)
 import Distribution.InstalledPackageInfo
 import Distribution.Compat.ReadP
 import Distribution.ParseUtils
+import Distribution.ModuleExport
 import Distribution.Package hiding (depends)
 import Distribution.Text
 import Distribution.Version
@@ -31,6 +32,8 @@ import Prelude
 import System.Console.GetOpt
 import qualified Control.Exception as Exception
 import Data.Maybe
+
+import qualified Data.Set as Set
 
 import Data.Char ( isSpace, toLower )
 import Data.Ord (comparing)
@@ -871,6 +874,10 @@ registerPackage input verbosity my_flags auto_ghci_libs multi_instance
   -- packages lower in the stack to refer to those higher up.
   validatePackageConfig pkg_expanded verbosity truncated_stack
                         auto_ghci_libs multi_instance update force
+
+  -- postprocess the package
+  pkg' <- resolveReexports truncated_stack pkg
+
   let 
      -- In the normal mode, we only allow one version of each package, so we
      -- remove all instances with the same source package id as the one we're
@@ -881,7 +888,7 @@ registerPackage input verbosity my_flags auto_ghci_libs multi_instance
                  p <- packages db_to_operate_on,
                  sourcePackageId p == sourcePackageId pkg ]
   --
-  changeDB verbosity (removes ++ [AddPackage pkg]) db_to_operate_on
+  changeDB verbosity (removes ++ [AddPackage pkg']) db_to_operate_on
 
 parsePackageInfo
         :: String
@@ -895,6 +902,47 @@ parsePackageInfo str =
     ParseFailed err -> case locatedErrorMsg err of
                            (Nothing, s) -> die s
                            (Just l, s) -> die (show l ++ ": " ++ s)
+
+-- | Takes the "reexported-modules" field of an InstalledPackageInfo
+-- and resolves the references so they point to the original exporter
+-- of a module (i.e. the module is in exposed-modules, not
+-- reexported-modules).  This is done by maintaining an invariant on
+-- the installed package database that a reexported-module field always
+-- points to the original exporter.
+resolveReexports :: PackageDBStack
+                 -> InstalledPackageInfo
+                 -> IO InstalledPackageInfo
+resolveReexports db_stack pkg = do
+  let dep_mask = Set.fromList (depends pkg)
+      deps = filter (flip Set.member dep_mask . installedPackageId)
+                    (allPackagesInStack db_stack)
+      matchExposed pkg_dep m = map ((,) (installedPackageId pkg_dep))
+                                   (filter (==m) (exposedModules pkg_dep))
+      worker ModuleExport{ exportOrigPackageName = Just pnm } pkg_dep
+        | pnm /= packageName (sourcePackageId pkg_dep) = []
+      -- Now, either the package matches, *or* we were asked to search the
+      -- true location ourselves.
+      worker ModuleExport{ exportOrigName = m } pkg_dep =
+            matchExposed pkg_dep m ++
+            map (fromMaybe (error $ "Impossible! Missing true location in " ++
+                                    display (installedPackageId pkg_dep))
+                    . exportCachedTrueOrig)
+                (filter ((==m) . exportName) (reexportedModules pkg_dep))
+      self_reexports ModuleExport{ exportOrigPackageName = Just pnm }
+        | pnm /= packageName (sourcePackageId pkg) = []
+      self_reexports ModuleExport{ exportName = m', exportOrigName = m }
+        -- Self-reexport without renaming doesn't make sense
+        | m == m' = []
+        -- *Only* match against exposed modules!
+        | otherwise = matchExposed pkg m
+
+  r <- forM (reexportedModules pkg) $ \me -> do
+    case nub (concatMap (worker me) deps ++ self_reexports me) of
+      [c] -> return me { exportCachedTrueOrig = Just c }
+      [] -> die $ "Couldn't resolve reexport " ++ display me
+      cs -> die $ "Found multiple possible ways to resolve reexport " ++
+                  display me ++ ": " ++ show cs
+  return (pkg { reexportedModules = r })
 
 -- -----------------------------------------------------------------------------
 -- Making changes to a package database
@@ -1316,15 +1364,19 @@ type InstalledPackageInfoString = InstalledPackageInfo_ String
 convertPackageInfoOut :: InstalledPackageInfo -> InstalledPackageInfoString
 convertPackageInfoOut
     (pkgconf@(InstalledPackageInfo { exposedModules = e,
+                                     reexportedModules = r,
                                      hiddenModules = h })) =
         pkgconf{ exposedModules = map display e,
+                 reexportedModules = map (fmap display) r,
                  hiddenModules  = map display h }
 
 convertPackageInfoIn :: InstalledPackageInfoString -> InstalledPackageInfo
 convertPackageInfoIn
     (pkgconf@(InstalledPackageInfo { exposedModules = e,
+                                     reexportedModules = r,
                                      hiddenModules = h })) =
         pkgconf{ exposedModules = map convert e,
+                 reexportedModules = map (fmap convert) r,
                  hiddenModules  = map convert h }
     where convert = fromJust . simpleParse
 
@@ -1561,6 +1613,7 @@ doesFileExistOnPath filenames paths = go fullFilenames
         go ((p, fp) : xs) = do b <- doesFileExist fp
                                if b then return (Just p) else go xs
 
+-- XXX maybe should check reexportedModules too
 checkModules :: InstalledPackageInfo -> Validate ()
 checkModules pkg = do
   mapM_ findModule (exposedModules pkg ++ hiddenModules pkg)

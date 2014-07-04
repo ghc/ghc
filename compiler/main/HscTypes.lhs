@@ -1448,15 +1448,15 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
   qual_mod mod
      | modulePackageKey mod == thisPackage dflags = False
 
-     | [pkgconfig] <- [pkg | (pkg,exposed_module) <- lookup,
-                             exposed pkg && exposed_module],
+     | [pkgconfig] <- [modConfPkg m | m <- lookup
+                                    , modConfVisible m ],
        packageConfigId pkgconfig == modulePackageKey mod
         -- this says: we are given a module P:M, is there just one exposed package
         -- that exposes a module M, and is it package P?
      = False
 
      | otherwise = True
-     where lookup = lookupModuleInAllPackages dflags (moduleName mod)
+     where lookup = eltsUFM $ lookupModuleInAllPackages dflags (moduleName mod)
 \end{code}
 
 

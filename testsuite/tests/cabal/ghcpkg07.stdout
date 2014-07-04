@@ -1,0 +1,11 @@
+Reading package info from "test.pkg" ... done.
+Reading package info from "test7a.pkg" ... done.
+reexported-modules: testpkg:A (A@testpkg-1.2.3.4-XXX)
+                    testpkg:A as A1 (A@testpkg-1.2.3.4-XXX)
+                    E as E2 (E@testpkg7a-1.0-XXX)
+Reading package info from "test7b.pkg" ... done.
+reexported-modules: testpkg:A as F1 (A@testpkg-1.2.3.4-XXX)
+                    testpkg7a:A as F2 (A@testpkg-1.2.3.4-XXX)
+                    testpkg7a:A1 as F3 (A@testpkg-1.2.3.4-XXX)
+                    testpkg7a:E as F4 (E@testpkg7a-1.0-XXX) E (E@testpkg7a-1.0-XXX)
+                    E2 as E3 (E@testpkg7a-1.0-XXX)

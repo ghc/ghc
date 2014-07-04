@@ -196,31 +196,36 @@ findExposedPackageModule hsc_env mod_name mb_pkg
                                         , fr_pkgs_hidden = []
                                         , fr_mods_hidden = []
                                         , fr_suggestions = suggest })
-       Right found
-         | null found_exposed   -- Found, but with no exposed copies
+       Right found'
+         | null found_visible   -- Found, but with no exposed copies
           -> return (NotFound { fr_paths = [], fr_pkg = Nothing
                               , fr_pkgs_hidden = pkg_hiddens
                               , fr_mods_hidden = mod_hiddens
                               , fr_suggestions = [] })
 
-         | [(pkg_conf,_)] <- found_exposed     -- Found uniquely
+         | [ModConf mod_name' pkg_conf _ _] <- found_visible -- Found uniquely
          -> let pkgid = packageConfigId pkg_conf in
-            findPackageModule_ hsc_env (mkModule pkgid mod_name) pkg_conf
+            findPackageModule_ hsc_env (mkModule pkgid mod_name') pkg_conf
 
          | otherwise           -- Found in more than one place
-         -> return (FoundMultiple (map (packageConfigId.fst) found_exposed))
+         -> return (FoundMultiple (map (packageConfigId.modConfPkg)
+                                       found_visible))
          where
+           found = eltsUFM found'
            for_this_pkg  = case mb_pkg of
                              Nothing -> found
-                             Just p  -> filter ((`matches` p) . fst) found
-           found_exposed = filter is_exposed for_this_pkg
-           is_exposed (pkg_conf,exposed_mod) = exposed pkg_conf && exposed_mod
+                             Just p  -> filter ((`matches` p).modConfPkg) found
+           found_visible = filter modConfVisible for_this_pkg
 
+           -- NB: _vis is guaranteed to be False; a non-exposed module
+           -- can never be visible.
            mod_hiddens = [ packageConfigId pkg_conf
-                         | (pkg_conf,False) <- found ]
+                         | ModConf _ pkg_conf False _vis <- found ]
 
+           -- NB: We /re-report/ non-exposed modules of hidden packages.
            pkg_hiddens = [ packageConfigId pkg_conf
-                         | (pkg_conf,_) <- found, not (exposed pkg_conf) ]
+                         | ModConf _ pkg_conf _ False <- found
+                         , not (exposed pkg_conf) ]
 
            pkg_conf  `matches` pkg
               = case packageName pkg_conf of

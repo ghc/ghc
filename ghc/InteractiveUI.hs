@@ -39,7 +39,8 @@ import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName )
 import Module
 import Name
-import Packages ( trusted, getPackageDetails, exposed, exposedModules, pkgIdMap )
+import Packages ( ModuleExport(..), trusted, getPackageDetails, exposed,
+                  exposedModules, reexportedModules, pkgIdMap )
 import PprTyThing
 import RdrName ( getGRE_NameQualifier_maybes )
 import SrcLoc
@@ -2544,11 +2545,14 @@ wrapIdentCompleterWithModifier modifChars fun = completeWordWithPrev Nothing wor
  where
   getModifier = find (`elem` modifChars)
 
+-- | Return a list of visible module names for autocompletion.
 allExposedModules :: DynFlags -> [ModuleName]
 allExposedModules dflags
- = concat (map exposedModules (filter exposed (eltsUFM pkg_db)))
+ = concatMap extract (filter exposed (eltsUFM pkg_db))
  where
   pkg_db = pkgIdMap (pkgState dflags)
+  extract pkg = exposedModules pkg ++ map exportName (reexportedModules pkg)
+  -- Extract the *new* name, because that's what is user visible
 
 completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
                         completeIdentifier

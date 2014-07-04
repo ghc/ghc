@@ -1,0 +1,29 @@
+name:                q
+version:             0.1.0.0
+license-file:        LICENSE
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+cabal-version:       >=1.21
+
+library
+  exposed-modules:     Q
+  reexported-modules:
+    -- qualified=NO, where=DEP(ORIG), renaming=NO, conflict=NO
+    --      impossible
+    -- qualified=NO, where=DEP(ORIG), renaming=NO, conflict=YES (p,s)
+    P,
+    -- qualified=NO, where=DEP(ORIG), renaming=YES, conflict=NO
+    P as QP,
+    -- qualified=NO, where=DEP(ORIG), renaming=YES, conflict=YES (r)
+    P as PMerge,
+    P2 as PMerge2,
+    -- qualified=NO, where=SELF, renaming=NO, conflict=NO
+    --      impossible
+    -- qualified=NO, where=SELF, renaming=NO, conflict=YES
+    --      should error
+    -- qualified=NO, where=SELF, renaming=YES, conflict=NO
+    Q as QQ,
+    -- qualified=NO, where=SELF, renaming=YES, conflict=YES (r)
+    Q as QMerge
+  build-depends:       base, p

@@ -236,3 +236,18 @@ ghcpkg02:
 		echo Updating $$i; \
 		$(GHC_PKG) describe --global $$i | $(GHC_PKG_ghcpkg02) update --global --force -; \
 	done
+
+PKGCONF07=local07.package.conf
+LOCAL_GHC_PKG07 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF07)
+ghcpkg07:
+	@rm -rf $(PKGCONF07)
+	$(LOCAL_GHC_PKG07) init $(PKGCONF07)
+	$(LOCAL_GHC_PKG07) register --force test.pkg 2>/dev/null
+	$(LOCAL_GHC_PKG07) register --force test7a.pkg 2>/dev/null
+	$(LOCAL_GHC_PKG07) field testpkg7a reexported-modules
+	$(LOCAL_GHC_PKG07) register --force test7b.pkg 2>/dev/null
+	$(LOCAL_GHC_PKG07) field testpkg7b reexported-modules
+
+recache_reexport:
+	@rm -rf recache_reexport_db/package.cache
+	'$(GHC_PKG)' --no-user-package-db --global-package-db=recache_reexport_db recache

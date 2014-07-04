@@ -22,6 +22,7 @@ module Distribution.InstalledPackageInfo.Binary (
 import Distribution.Version
 import Distribution.Package hiding (depends)
 import Distribution.License
+import Distribution.ModuleExport
 import Distribution.InstalledPackageInfo as IPI
 import Data.Binary as Bin
 import Control.Exception as Exception
@@ -60,6 +61,7 @@ putInstalledPackageInfo ipi = do
   put (category ipi)
   put (exposed ipi)
   put (exposedModules ipi)
+  put (reexportedModules ipi)
   put (hiddenModules ipi)
   put (trusted ipi)
   put (importDirs ipi)
@@ -94,6 +96,7 @@ getInstalledPackageInfo = do
   category <- get
   exposed <- get
   exposedModules <- get
+  reexportedModules <- get
   hiddenModules <- get
   trusted <- get
   importDirs <- get
@@ -158,3 +161,8 @@ instance Binary Version where
 
 deriving instance Binary PackageName
 deriving instance Binary InstalledPackageId
+
+instance Binary m => Binary (ModuleExport m) where
+  put (ModuleExport a b c d) = do put a; put b; put c; put d
+  get = do a <- get; b <- get; c <- get; d <- get;
+           return (ModuleExport a b c d)

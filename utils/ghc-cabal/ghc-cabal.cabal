@@ -6,8 +6,7 @@ License: BSD3
 Author: XXX
 Maintainer: XXX
 Synopsis: XXX
-Description:
-	XXX
+Description: XXX
 Category: Development
 build-type: Simple
 cabal-version: >=1.10

@@ -14,6 +14,7 @@ module Packages (
 
         -- * Reading the package config, and processing cmdline args
         PackageState(..),
+        ModuleConf(..),
         initPackages,
         getPackageDetails,
         lookupModuleInAllPackages, lookupModuleWithSuggestions,
@@ -29,6 +30,7 @@ module Packages (
 
         collectIncludeDirs, collectLibraryPaths, collectLinkOpts,
         packageHsLibs,
+        ModuleExport(..),
 
         -- * Utils
         isDllName
@@ -52,6 +54,7 @@ import System.Environment ( getEnv )
 import Distribution.InstalledPackageInfo
 import Distribution.InstalledPackageInfo.Binary
 import Distribution.Package hiding (PackageId,depends)
+import Distribution.ModuleExport
 import FastString
 import ErrUtils         ( debugTraceMsg, putMsg, MsgDoc )
 import Exception
@@ -109,6 +112,34 @@ import qualified Data.Set as Set
 -- When compiling A, we record in B's Module value whether it's
 -- in a different DLL, by setting the DLL flag.
 
+-- | The result of performing a lookup on moduleToPkgConfAll, this
+-- is one possible provider of a module.
+data ModuleConf = ModConf {
+  -- | The original name of the module
+  modConfName :: ModuleName,
+  -- | The original package (config) of the module
+  modConfPkg :: PackageConfig,
+  -- | Does the original package expose this module to its clients?  This
+  -- is cached result of whether or not the module name is in
+  -- exposed-modules or reexported-modules in the package config.  While
+  -- this isn't actually how we want to figure out if a module is visible,
+  -- this is important for error messages.
+  modConfExposed :: Bool,
+  -- | Is the module visible to our current compilation?  Interestingly,
+  -- this is not the same as if it was exposed: if the package is hidden
+  -- then exposed modules are not visible.  However, if another exposed
+  -- package reexports the module in question, it's now visible!  You
+  -- can't tell this just by looking at the original name, so we
+  -- record the calculation here.
+  modConfVisible :: Bool
+  }
+
+-- | Map from 'PackageId' (used for documentation)
+type PackageIdMap = UniqFM
+
+-- | Map from 'Module' to 'PackageId' to 'ModuleConf', see 'moduleToPkgConfAll'
+type ModuleToPkgConfAll = UniqFM (PackageIdMap ModuleConf)
+
 data PackageState = PackageState {
   pkgIdMap              :: PackageConfigMap, -- PackageKey   -> PackageConfig
         -- The exposed flags are adjusted according to -package and
@@ -119,11 +150,14 @@ data PackageState = PackageState {
         -- should be in reverse dependency order; that is, a package
         -- is always mentioned before the packages it depends on.
 
-  moduleToPkgConfAll    :: UniqFM [(PackageConfig,Bool)], -- ModuleEnv mapping
-        -- Derived from pkgIdMap.
-        -- Maps Module to (pkgconf,exposed), where pkgconf is the
-        -- PackageConfig for the package containing the module, and
-        -- exposed is True if the package exposes that module.
+  -- | ModuleEnv mapping, derived from 'pkgIdMap'.
+  -- Maps 'Module' to an original module which is providing the module name.
+  -- Since the module may be provided by multiple packages, this result
+  -- is further recorded in a map of the original package IDs to
+  -- module information.  The 'modSummaryPkgConf' should agree with
+  -- this key.  Generally, 'modSummaryName' will be the same as the
+  -- module key, unless there is renaming.
+  moduleToPkgConfAll    :: ModuleToPkgConfAll,
 
   installedPackageIdMap :: InstalledPackageIdMap
   }
@@ -811,7 +845,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 
   let pstate = PackageState{ preloadPackages     = dep_preload,
                              pkgIdMap            = pkg_db,
-                             moduleToPkgConfAll  = mkModuleMap pkg_db,
+                             moduleToPkgConfAll  = mkModuleMap pkg_db ipid_map,
                              installedPackageIdMap = ipid_map
                            }
 
@@ -819,23 +853,43 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 
 
 -- -----------------------------------------------------------------------------
--- Make the mapping from module to package info
+-- | Makes the mapping from module to package info for 'moduleToPkgConfAll'
 
 mkModuleMap
   :: PackageConfigMap
-  -> UniqFM [(PackageConfig, Bool)]
-mkModuleMap pkg_db = foldr extend_modmap emptyUFM pkgids
+  -> InstalledPackageIdMap
+  -> ModuleToPkgConfAll
+mkModuleMap pkg_db ipid_map = foldr extend_modmap emptyUFM pkgids
   where
-        pkgids = map packageConfigId (eltsUFM pkg_db)
+    pkgids = map packageConfigId (eltsUFM pkg_db)
 
-        extend_modmap pkgid modmap =
-                addListToUFM_C (++) modmap
-                   ([(m, [(pkg, True)])  | m <- exposed_mods] ++
-                    [(m, [(pkg, False)]) | m <- hidden_mods])
-          where
-                pkg = expectJust "mkModuleMap" (lookupPackage pkg_db pkgid)
-                exposed_mods = exposedModules pkg
-                hidden_mods  = hiddenModules pkg
+    extend_modmap pkgid modmap = addListToUFM_C (plusUFM_C merge) modmap es
+      where -- ASSERT(m == m' && pkg == pkg' && e == e'
+            --          && (e || not (v || v')))
+            -- Some notes about the assert. Merging only ever occurs when
+            -- we find a reexport.  The interesting condition:
+            --      e || not (v || v')
+            -- says that a non-exposed module cannot ever become visible.
+            -- However, an invisible (but exported) module may become
+            -- visible when it is reexported by a visible package,
+            -- which is why we merge visibility using logical OR.
+            merge a b = a { modConfVisible =
+                                   modConfVisible a || modConfVisible b }
+            es = [(m, unitUFM pkgid  (ModConf m pkg True (exposed pkg)))
+                 | m <- exposed_mods] ++
+                 [(m, unitUFM pkgid  (ModConf m pkg False False))
+                 | m <- hidden_mods] ++
+                 [(m, unitUFM pkgid' (ModConf m' pkg' True (exposed pkg)))
+                 | ModuleExport{ exportName = m
+                               , exportCachedTrueOrig = Just (ipid', m')}
+                        <- reexported_mods
+                 , Just pkgid' <- [Map.lookup ipid' ipid_map]
+                 , let pkg' = pkg_lookup pkgid' ]
+            pkg = pkg_lookup pkgid
+            pkg_lookup = expectJust "mkModuleMap" . lookupPackage pkg_db
+            exposed_mods = exposedModules pkg
+            reexported_mods = reexportedModules pkg
+            hidden_mods  = hiddenModules pkg
 
 pprSPkg :: PackageConfig -> SDoc
 pprSPkg p = text (display (sourcePackageId p))
@@ -940,18 +994,20 @@ getPackageFrameworks dflags pkgs = do
 -- -----------------------------------------------------------------------------
 -- Package Utils
 
--- | Takes a 'Module', and if the module is in a package returns
--- @(pkgconf, exposed)@ where pkgconf is the PackageConfig for that package,
--- and exposed is @True@ if the package exposes the module.
-lookupModuleInAllPackages :: DynFlags -> ModuleName -> [(PackageConfig,Bool)]
+-- | Takes a 'ModuleName', and if the module is in any package returns
+-- a map of package IDs to 'ModuleConf', describing where the module lives
+-- and whether or not it is exposed.
+lookupModuleInAllPackages :: DynFlags
+                          -> ModuleName
+                          -> PackageIdMap ModuleConf
 lookupModuleInAllPackages dflags m
   = case lookupModuleWithSuggestions dflags m of
       Right pbs -> pbs
-      Left  _   -> []
+      Left  _   -> emptyUFM
 
 lookupModuleWithSuggestions
   :: DynFlags -> ModuleName
-  -> Either [Module] [(PackageConfig,Bool)]
+  -> Either [Module] (PackageIdMap ModuleConf)
          -- Lookup module in all packages
          -- Right pbs   =>   found in pbs
          -- Left  ms    =>   not found; but here are sugestions
@@ -970,7 +1026,8 @@ lookupModuleWithSuggestions dflags m
     all_mods = [ (moduleNameString mod_nm, mkModule pkg_id mod_nm)
                | pkg_config <- eltsUFM (pkgIdMap pkg_state)
                , let pkg_id = packageConfigId pkg_config
-               , mod_nm <- exposedModules pkg_config ]
+               , mod_nm <- exposedModules pkg_config
+                        ++ map exportName (reexportedModules pkg_config) ]
 
 -- | Find all the 'PackageConfig' in both the preload packages from 'DynFlags' and corresponding to the list of
 -- 'PackageConfig's

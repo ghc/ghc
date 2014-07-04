@@ -66,8 +66,10 @@ packageConfigId = mkPackageKey . sourcePackageId
 packageConfigToInstalledPackageInfo :: PackageConfig -> InstalledPackageInfo
 packageConfigToInstalledPackageInfo
     (pkgconf@(InstalledPackageInfo { exposedModules = e,
+                                     reexportedModules = r,
                                      hiddenModules = h })) =
         pkgconf{ exposedModules = map convert e,
+                 reexportedModules = map (fmap convert) r,
                  hiddenModules  = map convert h }
     where convert :: Module.ModuleName -> Distribution.ModuleName.ModuleName
           convert = (expectJust "packageConfigToInstalledPackageInfo") . simpleParse . moduleNameString
@@ -77,7 +79,9 @@ packageConfigToInstalledPackageInfo
 installedPackageInfoToPackageConfig :: InstalledPackageInfo_ String -> PackageConfig
 installedPackageInfoToPackageConfig
     (pkgconf@(InstalledPackageInfo { exposedModules = e,
+                                     reexportedModules = r,
                                      hiddenModules = h })) =
         pkgconf{ exposedModules = map mkModuleName e,
+                 reexportedModules = map (fmap mkModuleName) r,
                  hiddenModules  = map mkModuleName h }
 

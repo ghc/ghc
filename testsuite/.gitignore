@@ -40,6 +40,9 @@ Thumbs.db
 *.hp
 tests/**/*.ps
 *.stats
+Setup
+dist
+tmp.d
 
 *.dyn_o
 *.dyn_hi
@@ -102,17 +105,22 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/cabal/cabal04/Setup
 /tests/cabal/cabal04/dist/
 /tests/cabal/cabal04/err
+/tests/cabal/cabal05/p-0.1.0.0/
+/tests/cabal/cabal05/q-0.1.0.0/
+/tests/cabal/cabal05/r-0.1.0.0/
 /tests/cabal/local01.package.conf/
 /tests/cabal/local03.package.conf/
 /tests/cabal/local04.package.conf/
 /tests/cabal/local05a.package.conf/
 /tests/cabal/local05b.package.conf/
 /tests/cabal/local06.package.conf/
+/tests/cabal/local07.package.conf/
 /tests/cabal/local1750.package.conf/
 /tests/cabal/localT1750.package.conf/
 /tests/cabal/localshadow1.package.conf/
 /tests/cabal/localshadow2.package.conf/
 /tests/cabal/package.conf.*/
+/tests/cabal/recache_reexport_db/package.cache
 /tests/cabal/shadow.hs
 /tests/cabal/shadow1.out
 /tests/cabal/shadow2.out
