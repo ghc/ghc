@@ -493,10 +493,7 @@ AC_ARG_WITH(hs-cpp,
     fi
 ],
 [
-    if test "$HostOS" != "mingw32"
-    then
         HaskellCPPCmd=$WhatGccIsCalled
-    fi
 ]
 )
 
