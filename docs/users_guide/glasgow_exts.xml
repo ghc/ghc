@@ -1912,7 +1912,8 @@ the comprehension being over an arbitrary monad.
 	      functions <literal>(>>=)</literal>,
 	      <literal>(>>)</literal>, and <literal>fail</literal>,
 	      are in scope (not the Prelude
-	      versions).  List comprehensions, mdo (<xref linkend="recursive-do-notation"/>), and parallel array
+	      versions).  List comprehensions, <literal>mdo</literal>
+	      (<xref linkend="recursive-do-notation"/>), and parallel array
 	      comprehensions, are unaffected.  </para></listitem>
 
 	      <listitem>
