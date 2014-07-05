@@ -1117,7 +1117,7 @@ void postThreadLabel(Capability    *cap,
 {
     EventsBuf *eb;
     int strsize = strlen(label);
-    int size = strsize + sizeof(EventCapsetID);
+    int size = strsize + sizeof(EventThreadID);
 
     eb = &capEventBuf[cap->no];
 
