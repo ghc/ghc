@@ -856,6 +856,16 @@ pattern_synonym_decl :: { LHsDecl RdrName }
             {% do { (name, args) <- splitPatSyn $2
                   ; return $ LL . ValD $ mkPatSynBind name args $4 Unidirectional
                   }}
+        | 'pattern' pat '<-' pat where_decls
+            {% do { (name, args) <- splitPatSyn $2
+                  ; mg <- toPatSynMatchGroup name $5
+                  ; return $ LL . ValD $
+                    mkPatSynBind name args $4 (ExplicitBidirectional mg)
+                  }}
+
+where_decls :: { Located (OrdList (LHsDecl RdrName)) }
+        : 'where' '{' decls '}'       { $3 }
+        | 'where' vocurly decls close { $3 }
 
 vars0 :: { [Located RdrName] }
         : {- empty -}                 { [] }

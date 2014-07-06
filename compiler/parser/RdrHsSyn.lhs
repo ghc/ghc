@@ -16,7 +16,8 @@ module RdrHsSyn (
         mkTySynonym, mkTyFamInstEqn,
         mkTyFamInst, 
         mkFamDecl, 
-        splitCon, splitPatSyn, mkInlinePragma,
+        splitCon, mkInlinePragma,
+        splitPatSyn, toPatSynMatchGroup,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
         mkTyLit,
         mkTyClD, mkInstD,
@@ -435,17 +436,48 @@ splitPatSyn pat@(L loc (ConPatIn con details)) = do
     details' <- case details of
         PrefixCon pats     -> liftM PrefixPatSyn (mapM patVar pats)
         InfixCon pat1 pat2 -> liftM2 InfixPatSyn (patVar pat1) (patVar pat2)
-        RecCon{}           -> parseErrorSDoc loc $
-                              text "record syntax not supported for pattern synonym declarations:" $$ ppr pat
+        RecCon{}           -> recordPatSynErr loc pat
     return (con, details')
   where
     patVar :: LPat RdrName -> P (Located RdrName)
     patVar (L loc (VarPat v))   = return $ L loc v
     patVar (L _   (ParPat pat)) = patVar pat
-    patVar pat@(L loc _)        = parseErrorSDoc loc $
-                                  text "Pattern synonym arguments must be variable names:" $$ ppr pat
+    patVar (L loc pat)          = parseErrorSDoc loc $
+                                  text "Pattern synonym arguments must be variable names:" $$
+                                  ppr pat
 splitPatSyn pat@(L loc _) = parseErrorSDoc loc $
                             text "invalid pattern synonym declaration:" $$ ppr pat
+
+recordPatSynErr :: SrcSpan -> LPat RdrName -> P a
+recordPatSynErr loc pat =
+    parseErrorSDoc loc $
+    text "record syntax not supported for pattern synonym declarations:" $$
+    ppr pat
+
+toPatSynMatchGroup :: Located RdrName -> Located (OrdList (LHsDecl RdrName)) -> P (MatchGroup RdrName (LHsExpr RdrName))
+toPatSynMatchGroup (L _ patsyn_name) (L _ decls) =
+    do { matches <- mapM fromDecl (fromOL decls)
+       ; return $ mkMatchGroup FromSource matches }
+  where
+    fromDecl (L loc decl@(ValD (PatBind pat@(L _ (ConPatIn (L _ name) details)) rhs _ _ _))) =
+        do { unless (name == patsyn_name) $
+               wrongNameBindingErr loc decl
+           ; match <- case details of
+               PrefixCon pats -> return $ Match pats Nothing rhs
+               InfixCon pat1 pat2 -> return $ Match [pat1, pat2] Nothing rhs
+               RecCon{} -> recordPatSynErr loc pat
+           ; return $ L loc match }
+    fromDecl (L loc decl) = extraDeclErr loc decl
+
+    extraDeclErr loc decl =
+        parseErrorSDoc loc $
+        text "pattern synonym 'where' clause must contain a single binding:" $$
+        ppr decl
+
+    wrongNameBindingErr loc decl =
+        parseErrorSDoc loc $
+        text "pattern synonym 'where' clause must bind the pattern synonym's name" <+>
+        quotes (ppr patsyn_name) $$ ppr decl
 
 mkDeprecatedGadtRecordDecl :: SrcSpan
                            -> Located RdrName

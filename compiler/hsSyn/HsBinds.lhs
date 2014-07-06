@@ -441,15 +441,18 @@ ppr_monobind (PatSynBind{ patsyn_id = L _ psyn, patsyn_args = details,
                           patsyn_def = pat, patsyn_dir = dir })
   = ppr_lhs <+> ppr_rhs
       where
-        ppr_lhs = ptext (sLit "pattern") <+> ppr_details details
+        ppr_lhs = ptext (sLit "pattern") <+> ppr_details
         ppr_simple syntax = syntax <+> ppr pat
 
-        ppr_details (InfixPatSyn v1 v2) = hsep [ppr v1, pprInfixOcc psyn, ppr v2]
-        ppr_details (PrefixPatSyn vs)   = hsep (pprPrefixOcc psyn : map ppr vs)
+        (is_infix, ppr_details) = case details of
+            InfixPatSyn v1 v2 -> (True, hsep [ppr v1, pprInfixOcc psyn, ppr v2])
+            PrefixPatSyn vs   -> (False, hsep (pprPrefixOcc psyn : map ppr vs))
 
         ppr_rhs = case dir of
-            Unidirectional         -> ppr_simple (ptext (sLit "<-"))
-            ImplicitBidirectional  -> ppr_simple equals
+            Unidirectional           -> ppr_simple (ptext (sLit "<-"))
+            ImplicitBidirectional    -> ppr_simple equals
+            ExplicitBidirectional mg -> ppr_simple (ptext (sLit "<-")) <+> ptext (sLit "where") $$
+                                          (nest 2 $ pprFunBind psyn is_infix mg)
 
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
@@ -785,10 +788,9 @@ instance Traversable HsPatSynDetails where
     traverse f (InfixPatSyn left right) = InfixPatSyn <$> f left <*> f right
     traverse f (PrefixPatSyn args) = PrefixPatSyn <$> traverse f args
 
-data HsPatSynDirLR idL idR
+data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
+  | ExplicitBidirectional (MatchGroup id (LHsExpr id))
   deriving (Data, Typeable)
-
-type HsPatSynDir id = HsPatSynDirLR id id
 \end{code}

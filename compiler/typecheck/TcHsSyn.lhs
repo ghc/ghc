@@ -489,6 +489,9 @@ zonkPatSynDetails env = traverse (wrapLocM $ zonkIdBndr env)
 zonkPatSynDir :: ZonkEnv -> HsPatSynDir TcId -> TcM (ZonkEnv, HsPatSynDir Id)
 zonkPatSynDir env Unidirectional = return (env, Unidirectional)
 zonkPatSynDir env ImplicitBidirectional = return (env, ImplicitBidirectional)
+zonkPatSynDir env (ExplicitBidirectional mg) = do
+    mg' <- zonkMatchGroup env zonkLExpr mg
+    return (env, ExplicitBidirectional mg')
 
 zonkSpecPrags :: ZonkEnv -> TcSpecPrags -> TcM TcSpecPrags
 zonkSpecPrags _   IsDefaultMethod = return IsDefaultMethod
