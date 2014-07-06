@@ -205,16 +205,27 @@ tcPatSynWrapper lname lpat dir args univ_tvs ex_tvs theta pat_ty
            (ImplicitBidirectional, Nothing) ->
                cannotInvertPatSynErr lpat
            (ImplicitBidirectional, Just lexpr) ->
-               fmap Just $ tc_pat_syn_wrapper_from_expr lname lexpr args univ_tvs ex_tvs theta pat_ty }
+               fmap Just $ mkWrapper $ \wrapper_lname args' ->
+                 do { let wrapper_args = map (noLoc . VarPat . Var.varName) args'
+                          wrapper_match = mkMatch wrapper_args lexpr EmptyLocalBinds
+                          bind = mkTopFunBind Generated wrapper_lname [wrapper_match]
+                    ; return bind }
+           (ExplicitBidirectional mg, _) ->
+               fmap Just $ mkWrapper $ \wrapper_lname _args' ->
+                 return FunBind{ fun_id = wrapper_lname
+                               , fun_infix = False
+                               , fun_matches = mg
+                               , fun_co_fn = idHsWrapper
+                               , bind_fvs = placeHolderNames
+                               , fun_tick = Nothing } }
+  where
+    mkWrapper = mkPatSynWrapper lname args univ_tvs ex_tvs theta pat_ty
 
-tc_pat_syn_wrapper_from_expr :: Located Name
-                             -> LHsExpr Name
-                             -> [Var]
-                             -> [TyVar] -> [TyVar]
-                             -> ThetaType
-                             -> Type
-                             -> TcM (Id, LHsBinds Id)
-tc_pat_syn_wrapper_from_expr (L loc name) lexpr args univ_tvs ex_tvs theta pat_ty
+mkPatSynWrapper :: Located Name
+                -> [Var] -> [TyVar] -> [TyVar] -> ThetaType -> Type
+                -> (Located Name -> [Var] -> TcM (HsBind Name))
+                -> TcM (Id, LHsBinds Id)
+mkPatSynWrapper (L loc name) args univ_tvs ex_tvs theta pat_ty mk_bind
   = do { let qtvs = univ_tvs ++ ex_tvs
        ; (subst, wrapper_tvs) <- tcInstSkolTyVars qtvs
        ; let wrapper_theta = substTheta subst theta
@@ -227,21 +238,17 @@ tc_pat_syn_wrapper_from_expr (L loc name) lexpr args univ_tvs ex_tvs theta pat_t
        ; let wrapper_lname = L loc wrapper_name
              wrapper_id = mkExportedLocalId VanillaId wrapper_name wrapper_sigma
 
-       ; let wrapper_args = map (noLoc . VarPat . Var.varName) args'
-             wrapper_match = mkMatch wrapper_args lexpr EmptyLocalBinds
-             bind = mkTopFunBind Generated wrapper_lname [wrapper_match]
-             lbind = noLoc bind
+       ; bind <- mk_bind wrapper_lname args'
        ; let sig = TcSigInfo{ sig_id = wrapper_id
                             , sig_tvs = map (\tv -> (Nothing, tv)) wrapper_tvs
                             , sig_theta = wrapper_theta
                             , sig_tau = wrapper_tau
                             , sig_loc = loc
                             }
-       ; (wrapper_binds, _, _) <- tcPolyCheck NonRecursive (const []) sig lbind
+       ; (wrapper_binds, _, _) <- tcPolyCheck NonRecursive (const []) sig (noLoc bind)
        ; traceTc "tcPatSynDecl wrapper" $ ppr wrapper_binds
        ; traceTc "tcPatSynDecl wrapper type" $ ppr (varType wrapper_id)
        ; return (wrapper_id, wrapper_binds) }
-
 \end{code}
 
 Note [As-patterns in pattern synonym definitions]
