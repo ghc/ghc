@@ -848,16 +848,18 @@ role : VARID             { L1 $ Just $ getVARID $1 }
 
 -- Glasgow extension: pattern synonyms
 pattern_synonym_decl :: { LHsDecl RdrName }
-        : 'pattern' con vars0 patsyn_token pat { LL . ValD $ mkPatSynBind $2 (PrefixPatSyn $3) $5 $4 }
-        | 'pattern' varid conop varid patsyn_token pat { LL . ValD $ mkPatSynBind $3 (InfixPatSyn $2 $4) $6 $5 }
+        : 'pattern' pat '=' pat
+            {% do { (name, args) <- splitPatSyn $2
+                  ; return $ LL . ValD $ mkPatSynBind name args $4 ImplicitBidirectional
+                  }}
+        | 'pattern' pat '<-' pat
+            {% do { (name, args) <- splitPatSyn $2
+                  ; return $ LL . ValD $ mkPatSynBind name args $4 Unidirectional
+                  }}
 
 vars0 :: { [Located RdrName] }
         : {- empty -}                 { [] }
         | varid vars0                 { $1 : $2 }
-
-patsyn_token :: { HsPatSynDir RdrName }
-        : '<-' { Unidirectional }
-        | '='  { ImplicitBidirectional }
 
 -----------------------------------------------------------------------------
 -- Nested declarations

@@ -16,7 +16,7 @@ module RdrHsSyn (
         mkTySynonym, mkTyFamInstEqn,
         mkTyFamInst, 
         mkFamDecl, 
-        splitCon, mkInlinePragma,
+        splitCon, splitPatSyn, mkInlinePragma,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
         mkTyLit,
         mkTyClD, mkInstD,
@@ -427,6 +427,25 @@ splitCon ty
 
    mk_rest [L _ (HsRecTy flds)] = RecCon flds
    mk_rest ts                   = PrefixCon ts
+
+splitPatSyn :: LPat RdrName
+      -> P (Located RdrName, HsPatSynDetails (Located RdrName))
+splitPatSyn (L _ (ParPat pat)) = splitPatSyn pat
+splitPatSyn pat@(L loc (ConPatIn con details)) = do
+    details' <- case details of
+        PrefixCon pats     -> liftM PrefixPatSyn (mapM patVar pats)
+        InfixCon pat1 pat2 -> liftM2 InfixPatSyn (patVar pat1) (patVar pat2)
+        RecCon{}           -> parseErrorSDoc loc $
+                              text "record syntax not supported for pattern synonym declarations:" $$ ppr pat
+    return (con, details')
+  where
+    patVar :: LPat RdrName -> P (Located RdrName)
+    patVar (L loc (VarPat v))   = return $ L loc v
+    patVar (L _   (ParPat pat)) = patVar pat
+    patVar pat@(L loc _)        = parseErrorSDoc loc $
+                                  text "Pattern synonym arguments must be variable names:" $$ ppr pat
+splitPatSyn pat@(L loc _) = parseErrorSDoc loc $
+                            text "invalid pattern synonym declaration:" $$ ppr pat
 
 mkDeprecatedGadtRecordDecl :: SrcSpan
                            -> Located RdrName
