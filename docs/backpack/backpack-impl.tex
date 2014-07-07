@@ -1357,8 +1357,33 @@ Now it is illegal for \verb|A = B|, because when the type families are
 unified, the instances now fail the apartness check.  However, if the second
 instance was \verb|F Int = Char|, the families would be able to link together.
 
-It would be nice to solve this problem before getting to the linking phase. (But,
-channeling SPJ for a moment, ``Why would anyone want to do that?!'')
+To make matters worse, an implementation may define more axioms than are
+visible in the signature:
+
+\begin{verbatim}
+package a where
+    A :: [
+        type family F a :: *
+        type instance F Int = Bool
+    ]
+package b where
+    include a
+    B = [
+        import A
+        type instance F Bool = Bool
+        ...
+    ]
+package c where
+    A = [
+        type family F a :: *
+        type instance F Int = Bool
+        type instance F Bool = Int
+    ]
+    include b
+\end{verbatim}
+
+It would seem that private axioms cannot be naively supported. Is
+there any way that thinning axioms could be made to work?
 
 \section{Open questions}\label{sec:open-questions}
 
