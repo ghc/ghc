@@ -275,6 +275,7 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/concurrent/should_run/T5611
 /tests/concurrent/should_run/T5866
 /tests/concurrent/should_run/T7970
+/tests/concurrent/should_run/AtomicPrimops
 /tests/concurrent/should_run/allowinterrupt001
 /tests/concurrent/should_run/async001
 /tests/concurrent/should_run/compareAndSwap
@@ -1372,6 +1373,7 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/stranal/should_run/T2756b
 /tests/stranal/should_run/T7649
 /tests/stranal/should_run/T8425/T8425
+/tests/stranal/should_run/T9254
 /tests/stranal/should_run/strun001
 /tests/stranal/should_run/strun002
 /tests/stranal/should_run/strun003
