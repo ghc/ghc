@@ -523,7 +523,7 @@ rnBind _sig_fn bind@(PatSynBind { patsyn_id = L _ name
   = do	{ pattern_synonym_ok <- xoptM Opt_PatternSynonyms
         ; unless pattern_synonym_ok (addErr patternSynonymErr)
 
-        ; ((pat', details'), fvs) <- rnPat PatSyn pat $ \pat' -> do
+        ; ((pat', details'), fvs1) <- rnPat PatSyn pat $ \pat' -> do
          -- We check the 'RdrName's instead of the 'Name's
          -- so that the binding locations are reported
          -- from the left-hand side
@@ -539,12 +539,16 @@ rnBind _sig_fn bind@(PatSynBind { patsyn_id = L _ name
                       -- ; checkPrecMatch -- TODO
                       ; return (InfixPatSyn name1 name2, mkFVs (map unLoc [name1, name2])) }
         ; return ((pat', details'), fvs) }
-        ; dir' <- case dir of
-            Unidirectional -> return Unidirectional
-            ImplicitBidirectional -> return ImplicitBidirectional
+        ; (dir', fvs2) <- case dir of
+            Unidirectional -> return (Unidirectional, emptyFVs)
+            ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
+            ExplicitBidirectional mg ->
+                do { (mg', fvs) <- rnMatchGroup PatSyn rnLExpr mg
+                   ; return (ExplicitBidirectional mg', fvs) }
 
         ; mod <- getModule
-        ; let fvs' = filterNameSet (nameIsLocalOrFrom mod) fvs
+        ; let fvs = fvs1 `plusFV` fvs2
+              fvs' = filterNameSet (nameIsLocalOrFrom mod) fvs
 	        -- Keep locally-defined Names
 		-- As well as dependency analysis, we need these for the
 		-- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
