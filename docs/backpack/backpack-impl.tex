@@ -484,7 +484,7 @@ in an applicative module system! No really!''} \\
 Flattening can be seen as one of four different representations of packages
 at the OS/library level. While it promotes maximal sharing of identical
 modules, it is perhaps too fine-grained for most purposes.
-\emph{TODO: Describe the alternatives.}
+\emph{ToDo: Describe the alternatives.}
 
 \paragraph{Package slicing} Instead of changing the package database,
 we automatically
@@ -953,14 +953,14 @@ rely on that implementation. However, the Renamer does other, harder things
 that we don't need, so ideally we could factor out the import/export
 resolution from the Renamer for use in shaping.
 
-Unfortunately the Renamer's import resolution analyzes .hi files, but for
+Unfortunately the Renamer's import resolution analyzes \verb|.hi| files, but for
 local modules, which haven't yet been typechecked, we don't have those.
-Instead, we could use a new file format, .hsi files, to store the shape of
+Instead, we could use a new file format, \verb|.hsi| files, to store the shape of
 a locally defined module. (Defined packages are bundled with their shapes,
-so included modules have .hsi files as well.) (What about the logical
+so included modules have \verb|.hsi| files as well.) (What about the logical
 vs.~physical distinction in file names?) If we refactor the import/export
 resolution code, could we rewrite it to generically operate on both
-.hi files and .hsi files?
+\verb|.hi| files and \verb|.hsi| files?
 
 Alternatively, rather than storing shapes on a per-source basis, we could
 store (in memory) the entire package shape. Similarly, included packages
@@ -1109,7 +1109,7 @@ being the same.)
 The logical shape context changed to say that \verb|A| and
 \verb|B| now map to the same physical module identity. But does the existing
 recompilation avoidance mechanism say that \verb|M| should be re-typechecked?
-It's unclear. The .hi file for \verb|M| records that it imported \verb|A| and
+It's unclear. The \verb|.hi| file for \verb|M| records that it imported \verb|A| and
 \verb|B| with particular ABIs, but does it also know about the physical module
 identities (or rather, original module names) of these modules?
 
