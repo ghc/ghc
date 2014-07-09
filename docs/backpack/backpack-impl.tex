@@ -5,6 +5,9 @@
 \usepackage{float}
 \usepackage{titling}
 \usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{arrows}
+\usetikzlibrary{positioning}
 \setlength{\droptitle}{-6em}
 
 \newcommand{\ghcfile}[1]{\textsl{#1}}
@@ -170,38 +173,52 @@ speedup.
 
 \section{Goals}
 
-There are actually a number of different goals we have for modifying the
-packaging system, some of which are subsets of the Backpack system.
+Here are some of the high-level goals which motivate our improvements to
+the module system.
 
 \begin{itemize}
-    \item As a prerequisite, support multiple instances of containers-2.9 \emph{in the
-        package database}.  These instances may be compiled against
-        different dependencies, have the same dependencies but different
-        source files (as when a package is being developed), or be
-        compiled with different options.  It is less important to allow
-        these instances to be linkable together.\footnote{Actually, I think
-        this is completely orthogonal to Backpack, since we are going to treat
-        dependencies as part of the package ID, so they would be considered
-        separate entries in the package database anyway.}
+    \item Solve \emph{Cabal hell}, a situation which occurs when conflicting
+        version ranges on a wide range of dependencies leads to a situation
+        where it is impossible to satisfy the constraints.  We're seeking
+        to solve this problem in two ways: first, we want to support
+        multiple instances of containers-2.9 in the database which are
+        compiled with different dependencies (and even link them
+        together), and second, we want to abolish (often inaccurate)
+        version ranges and move to a regime where packages depend on
+        signatures.
 
-    \item Support typechecking a library against a module interface
-        as opposed to an actual implementation.  This includes not
-        only support proper, but also toolchain support for generating
-        and keeping interface files up-to-date, and taking advantage
-        of this discipline to augment Cabal package dependency resolution
-        with proper signature packages. %  See Section~\ref{sec:signature-packages} for more details.
+    \item Support \emph{hermetic builds with sharing}.  A hermetic build
+        system is one which simulates rebuilding every package whenever
+        it is built; on the other hand, actually rebuilding every time
+        is extremely inefficient (but what happens in practice with
+        Cabal sandboxes).  We seek to solve this problem with the IHG work,
+        by allowing multiple instances of a package in the database, where
+        the only difference is compilation parameters.  We don't care
+        about being able to link these together in a single program.
 
-    \item Support compiling the aforementioned libraries with actual implementations.
-        It is \emph{not} a goal to be able to compile a library while only
-        partially providing dependencies, and it is low priority to support
-        mutually recursive implementations of these implementations.
+    \item Support \emph{module-level pluggability} as an alternative to
+        existing (poor) usage of type classes.  The canonical example are
+        strings, where a library might want to either use the convenient
+        but inefficient native strings, or the efficient packed Text data
+        type, but would really like to avoid having to say \verb|StringLike s => ...|
+        in all of their type signatures.  While we do not plan on supporting
+        separate compilation, Cabal should understand how to automatically
+        recompile these ``indefinite'' packages when they are instantiated
+        with a new plugin.
+
+    \item Support \emph{separate modular development}, where a library and
+        an application using the library can be developed and type-checked
+        separately, intermediated by an interface.  This is applicable in
+        the pluggability example as well, where we want to ensure that all
+        of the $M \times N$ configurations of libraries versus applications
+        type check, by only running the typechecker $M + N$ times.  A closely
+        related concern is related toolchain support for extracting a signature
+        from an existing implementation, as current Haskell culture is averse
+        to explicitly writing separate signature files.
+
+    \item Subsume existing support for \emph{mutually recursive modules},
+        without the double vision problem.
 \end{itemize}
-
-A lower priority goal is to actually allow multiple instances of
-containers-2.9 to be linked together in the same executable
-program.\footnote{In particular, this requires changes to how linker
-symbols are assigned. However, this feature is important to
-implement a number of Backpack features.}
 
 A \emph{non-goal} is to allow users to upgrade upstream libraries
 without recompiling downstream. This is an ABI concern and we're not
@@ -269,14 +286,7 @@ of a package to be installed at the same time, use of \emph{random
 numbers} was used to workaround the inability to get an ABI early
 enough.  We are not using this plan.
 
-\section{Infrastructural improvements}
-
-There are some infrastructural improvements that must be made before
-Backpack proper can be implemented.  These additions are described in
-red in the architectural diagrams.  The current structure of this
-section is to describe the additions bottom up.
-
-\subsection{Concrete physical identity = PackageId + Module name + Module dependencies}\label{sec:ipi}
+\section{Concrete physical identity = PackageId + Module name + Module dependencies}\label{sec:ipi}
 
 \begin{figure}
     \center{\begin{tabular}{r l}
@@ -339,10 +349,6 @@ to do away with full package names and versions, and instead use just a
 base-62 encoded hash, perhaps with the first four characters of the package
 name for user-friendliness.
 
-Edward: I'm still partial to a short hash of the dependency bits (or
-even Simon's registry of short strings to dependency trees), and keeping
-everything else the same.
-
 \paragraph{Wired-in names} One annoying thing to remember is that GHC
 has wired-in names, which refer to packages without any version.  Now
 these wired names also have to accomodate dependency trees. A
@@ -388,16 +394,17 @@ to have free variables, which represent holes.  Handling this is a
 tricky question, and we defer it to Section~\ref{sec:typechecking-indefinite}, when
 we talk about packages with holes.
 
-\subsection{Flatten the package database}\label{sec:flatten}
+\section{The granularity of packages versus system libraries}\label{sec:flatten}
 
-In the previous section, I implied that the \emph{module} dependencies
-could be recorded with the \emph{package} ID\@.  Type error? Yes!
+In the original design of GHC's packaging system, the intent was that
+a package be compiled into a system library, e.g. \verb|libHSbase-4.7.1.0.so|
+or \verb|libHSbase-4.7.1.0.a|.  Dependencies between packages translate simply
+into dependencies between system libraries.
 
-In the old world order, we think of dependencies as being associated with
-packages as a whole.  However, Paper Backpack specifies dependency tracking
-at the \emph{module} level, which means that different compilations of
-an indefinite package may result in modules which should be identified.
-Here is a Backpack package which demonstrates the issue:
+Interestingly enough, Paper Backpack specifies dependency tracking at
+the \emph{module} level, which is a finer granularity than we have been
+tracking previously.  Here is a Backpack package which demonstrates the
+issue:
 
 \begin{verbatim}
 package a where
@@ -417,48 +424,188 @@ package y where
     include a
 \end{verbatim}
 
-Here, we have a package \verb|a| which probably should have been defined as
-two separate packages (since \verb|A| only relies on \verb|P| and \verb|B|
-only relies on \verb|Q|), but the functionality has been glommed together.
-Then, the downstream packages \verb|x| and \verb|y| fill in the holes using the
-same implementation of \verb|P|, but differing implementations of \verb|Q|.
-(For more explanation about how we would go about compiling this set of
-packages, please see Section~\ref{sec:compiling-definite}.)
+Here, we have a package \verb|a| which probably should have been defined
+as two separate packages (since \verb|A| only relies on \verb|P| and
+\verb|B| only relies on \verb|Q|), but the functionality has been
+glommed together.  Then, the downstream packages \verb|x| and \verb|y|
+fill in the holes using the same implementation of \verb|P|, but
+differing implementations of \verb|Q|.  (For more explanation about how
+we would go about compiling this set of packages, please see
+Section~\ref{sec:compiling-definite}.) The operant question: is module
+\verb|A| from package \verb|x| the same as module \verb|A| from package
+\verb|y|?  In Paper Backpack, the answer is yes.
 
-Is module \verb|A| from package \verb|x| the same as module \verb|A|
-from package \verb|y|?  In Paper Backpack, the answer is yes.
-However, presently, the installed package database acts as a cache at the \emph{package}
-level; code is only shared if it comes from the same package.  Can we share
-packages \verb|x| and \verb|y|? No!
-\verb|x:B| is \emph{not} the same module as \verb|y:B| (they are using differing
-versions of \verb|Q|).  The upshot is that we are in an awkward position,
-where package \verb|a| contains some modules which must be distinct, and other
-modules which must be unified over several installs.
+From an end-user perspective, why is this desirable?  One answer is that
+it permits users to modularize third-party packages which were not
+packaged with modularity in mind, but happen to be modular.  For
+example, when libraries ship with test-cases, they currently have to
+split these test-cases to separate packages, so as to not introduce
+spurious dependencies with various test frameworks, which the user may
+not have or care about.  If dependencies are done on a per-module basis,
+as long as the user doesn't import a test module, they never gain the
+extra dependency.  Another situation is when a library also happens to
+have a helper utility module which doesn't have any of the dependencies
+of the primary library.  And yet another situation is when we want to
+define type class instances for data types without orphan instances, but
+without pulling in a pile of packages defining type classes for things
+an end user doesn't care about.
 
-The theory, thus, demands that we flatten the package database, so that
-we no longer insist that all compiled code that is produced when a
-package is installed live together in a single directory: instead,
-\emph{the installed package database is a directory of physical module
-identities to objects/interfaces}.  Installed packages are represented
-as (possibly overlapping) sets over this store of modules.
+From an implementation perspective, however, this answer is quite distressing:
 
-\paragraph{Do we really care about this use case?}  Scott gave me one
-good argument why this is a nice feature to have: it permits users to
-modularize third-party packages which were not packaged with modularity
-in mind, but happen to be modular.  For example, when libraries ship
-with test-cases, they currently have to split these test-cases to separate
-packages, so as to not introduce spurious dependencies with various
-test frameworks, which the user may not have or care about.  If dependencies
-are done on a per-module basis, as long as the user doesn't import a test
-module, they never gain the extra dependency.  Another situation is when
-a library also happens to have a helper utility module which doesn't have
-any of the dependencies of the primary library.
+\begin{enumerate}
+    \item When I install package \verb|x| and then install package
+        \verb|y|, what should happen to the installed module files for
+        \verb|A|?  Currently, the installed package database organizes
+        these files at the package level, so it is not clear where these
+        files should live---we might even accidentally duplicate them!
+        Similarly, when I typecheck, I need to ensure that the original
+        name for \verb|x:A| and \verb|y:A| are the same: thus, the
+        PackageId I assign cannot be \verb|x| or \verb|y|.
 
-One could argue that people already understand it is good practice to
-separate such cases into separate packages, and there is no pressing
-need to allow for sloppy habits.  The counterargument, however, is that
-you are often not in control of these third-party libraries, and the
-more control in the end-user's hands, the better.
+    \item When I create a \verb|libHSx.so| and a \verb|libHSy.so|, which
+        dynamic library contains the object files for \verb|A|?  Either
+        of these dynamic libraries could be used alone, so both must
+        contain \verb|A|. But an application could also use both at the
+        same time, at which point a program will see two copies of the
+        program text for \verb|A|.
+\end{enumerate}
+
+The first problem can be solved by ``flattening'' the package database,
+so that instead of organizing object files by library, the database
+is just a directory of physical module identities to objects/interfaces.
+Instaled packages are now represented as (possibly overlapping) sets over
+this store of modules.  However, the second problem is far more persistent:
+if a package is a dynamic library, we still are unable to get the sharing of
+object files necessary. (This problem isn't present for static linking, where
+one doesn't actually have to link against \verb|libHSx.a|, the object files
+are just fine.)
+
+In the next few sections, we describe a few different designs for Backpack which
+vary the granularity of packages.  In general, the coarser the granularity,
+the closer to the current package-library correspondence the design is, but
+at the cost of giving up more sharing.  Finer granularity requires smaller
+and smaller corresponding libraries.  We'll use the following running example.
+
+\begin{verbatim}
+package p where
+    A :: [ a :: Bool ]
+    B = [ import A; b = a ]
+    C = [ c = True ]
+
+package q where
+    A = [ a = False ]
+    include p
+    D = [ import C; d = c ]
+    E = [ import C; e = c ]
+\end{verbatim}
+
+As a notational convenience, we'll omit the full physical identity of a
+module when it's clear from context.  We'll start by recapping the
+finest granularity, and coarsen.
+
+\subsection{One library per physical module identity}
+
+In this world, we generate a library per physical module identity.
+Briefly, the physical module identities for our running example
+are \verb|q:A|, \verb|p:B(q:A)|, \verb|p:C|, \verb|q:D(p:C)| and \verb|q:E(p:C)|.
+This results in the following libraries (and their respective
+dependencies): \\
+
+\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=6cm,
+  thick,m/.style={rectangle,draw,font=\sffamily\Large\bfseries}]
+  \node[m] (1) {libHSq:A.so};
+  \node[m] (2) [left of=1] {libHSp:B.so};
+  \node[m] (3) [below=0.3cm of 1] {libHSp:C.so};
+  \node[m] (4) [left of=3] {libHSq:D.so};
+  \node[m] (5) [below=0.3cm of 4] {libHSq:E.so};
+  \path
+  (2) edge node {} (1)
+  (4) edge node {} (3)
+  (5) edge node {} (3)
+  ;
+\end{tikzpicture}
+
+Notice that there is no ``ordering'' that the packages could have been
+built in; rather, we walk the package tree, building modules as we encounter
+them (thus, the instantiated package \verb|p| is fully built before \verb|q|).
+
+\subsection{One library per package identity}
+
+In this world, we simplify physical module identities in the following
+way: we the module names and only consider the package components of
+physical module identities to identify what library a package should
+live in.  In the running example, the simplified physical module identities
+are as follows: \verb|q|, \verb|p(q)|, \verb|p| and \verb|q(p)|.  This
+results in a very similar module graph: \\
+
+\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=6cm,
+  thick,m/.style={rectangle,draw,font=\sffamily\Large\bfseries}]
+  \node[m] (1) {libHSq.so (A)};
+  \node[m] (2) [left of=1] {libHSp(q).so (B)};
+  \node[m] (3) [below=0.5cm] {libHSp.so (C)};
+  \node[m] (4) [left of=3] {libHSq(p).so (D,E)};
+  \path
+  (2) edge node [right] {} (1)
+  (4) edge node [right] {} (3);
+\end{tikzpicture}
+
+The primary difference seen here is that modules \verb|q:D(p:C)| and \verb|q:E(p:C)| have
+been placed in the same library, \verb|libHSq(p).so|, since they both erase
+to \verb|q(p)|.
+
+This scheme preserves all of the type-level sharing properties that Backpack
+requires, since modules with identical physical identities are guaranteed
+to be placed into the same library.  However, there are a few cases where
+one might need to add extra code to a library ``after the fact'', usually
+when renaming is involved:
+
+\begin{verbatim}
+package p where
+    A :: [ a :: Bool ]
+    B = [ import A; b = a ]
+package q where
+    A1 = [ a = True ]
+    A2 = [ a = False ]
+package linker1 where
+    include q
+    include p (A as A1, B as B1)
+\end{verbatim}
+
+Installing \verb|linker1| results in libraries \verb|libHSq.so| (A1 and A2)
+as well as \verb|libHSp(q).so| (physical identity \verb|p:B(q:A1)|---note the 1).
+
+However, now, suppose we install this package:
+
+\begin{verbatim}
+package linker2 where
+    include q
+    include p (A as A2, B as B2)
+\end{verbatim}
+
+We get a new module B with physical identity \verb|p:B(q:A2)|.
+Unfortunately, this erases to \verb|p(q)|, so we are obligated to also
+place it in \verb|libHSq(p).so|.
+
+\subsection{One library per package identity (more aggressive)}
+
+(ToDo: Remember what this did)
+
+\subsection{One library per definite package}
+
+\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=6cm,
+  thick,m/.style={rectangle,draw,font=\sffamily\Large\bfseries}]
+  \node[m] (1) {libHSq.so (A,B,C,D,E)};
+\end{tikzpicture}
+
+In this world, we create a dynamic library per definite package (package with
+no holes).  Indefinite packages don't get compiled into libraries, the code
+is duplicated and type equality is only seen if a type came from the same
+definite package.  In the running example, we only generate \verb|libHSq.so|
+which exports all of the modules (\verb|p| is indefinite), and if another
+package instantiates \verb|p|, the instances of \verb|C| will be considered
+different.
+
+(ToDo: Why is this world problematic?)
 
 \paragraph{Operating system linking}  When the package database is flattened
 into a collection of modules, it becomes less clear how to generate library
@@ -519,7 +666,7 @@ Backpack semantics, and rules out modularization without splitting a package
 into multiple packages.  Maybe Scott can give other reasons why this
 would not be so good.  SPJ is quite keen on this plan.
 
-\subsection{Exposed modules should allow external modules}\label{sec:reexport}
+\section{Exposed modules should allow external modules}\label{sec:reexport}
 
 In Backpack, the definition of a package consists of a logical context,
 which maps logical module names to physical module names.  These do not
