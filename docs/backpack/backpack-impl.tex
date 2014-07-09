@@ -480,8 +480,11 @@ but some global state in the module doesn't, the resulting behavior can be
 surprising.  Perhaps the moral of the story really is, ``Don't do side effects
 in an applicative module system! No really!''} \\
 
-\noindent Flattening the package database may be too stiff a medicine for this
-project. Here are two alternatives.
+\subsection{Alternatives to flattening package DB}
+Flattening can be seen as one of four different representations of packages
+at the OS/library level. While it promotes maximal sharing of identical
+modules, it is perhaps too fine-grained for most purposes.
+\emph{TODO: Describe the alternatives.}
 
 \paragraph{Package slicing} Instead of changing the package database,
 we automatically
@@ -913,6 +916,59 @@ but the ability to typecheck against holes, even with the linking restriction,
 is a very important part of modular separate development, so we will need
 to support it at some ponit.
 
+\subsection{Efficient shaping}
+
+(These are Edward's opinion, he hasn't convinced other folks that this is
+the right way to do it.)
+
+In this section, I want to argue that, although shaping constitutes
+a pre-pass which must be run before compilation in earnest, it is only
+about as bad as the dependency resolution analysis that GHC already does
+in \verb|ghc -M| or \verb|ghc --make|.
+
+In Paper Backpack, what information does shaping compute? It looks at
+exports, imports, data declarations and value declarations (but not the
+actual expressions associated with these values.)  As a matter of fact,
+GHC already must look at the imports associated with a package in order
+to determine the dependency graph, so that it can have some order to compile
+modules in.  There is a specialized parser which just parses these statements,
+and then ignores the rest of the file.
+
+A bit of background: the \emph{renamer} is responsible for resolving
+imports and figuring out where all of these entities actually come from.
+SPJ would really like to avoid having to run the renamer in order to perform
+a shaping pass.
+
+\paragraph{Is it necessary to run the Renamer to do shaping?}
+Edward and Scott believe the answer is no, well, partially.
+Shaping needs to know the original names of all entities exposed by a
+module/signature. Then it needs to know (a) which entities a module/signature
+defines/declares locally and (b) which entities that module/signature exports.
+The former, (a), can be determined by a straightforward inspection of a parse
+tree of the source file.\footnote{Note that no expression or type parsing
+is necessary. We only need names of local values, data types, and data
+constructors.} The latter, (b), is a bit trickier. Right now it's the Renamer
+that interprets imports and exports into original names, so we would still
+rely on that implementation. However, the Renamer does other, harder things
+that we don't need, so ideally we could factor out the import/export
+resolution from the Renamer for use in shaping.
+
+Unfortunately the Renamer's import resolution analyzes .hi files, but for
+local modules, which haven't yet been typechecked, we don't have those.
+Instead, we could use a new file format, .hsi files, to store the shape of
+a locally defined module. (Defined packages are bundled with their shapes,
+so included modules have .hsi files as well.) (What about the logical
+vs.~physical distinction in file names?) If we refactor the import/export
+resolution code, could we rewrite it to generically operate on both
+.hi files and .hsi files?
+
+Alternatively, rather than storing shapes on a per-source basis, we could
+store (in memory) the entire package shape. Similarly, included packages
+could have a single shape file for the entire package. Although this approach
+would make shaping non-incremental, since an entire package's shape would
+be recomputed any time a constituent module's shape changes, we do not expect
+shaping to be all that expensive.
+
 \subsection{Typechecking of indefinite modules}\label{sec:typechecking-indefinite}
 
 Recall in our argument in the definite case, where we showed there are
@@ -1026,30 +1082,41 @@ A\ldots but it will not be defined prior to package p.
 In any case, however, it would be good to emit a warning if a package
 cannot be compiled without mutual recursion.
 
-\subsection{Efficient shaping}
+\subsection{Incremental typechecking}
+We want to typecheck modules incrementally, i.e., when something changes in
+a package, we only want to re-typecheck the modules that care about that
+change. GHC already does this today.%
+\footnote{\url{https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance}}
+Is the same mechanism sufficient for Backpack? Edward and Scott think that it
+is, mostly. Our conjecture is that a module should be re-typechecked if the
+existing mechanism says it should \emph{or} if the logical shape
+context (which maps logical names to physical names) has changed. The latter
+condition is due to aliases that affect typechecking of modules.
 
-(These are Edward's opinion, he hasn't convinced other folks that this is
-the right way to do it.)
+Let's look again at an example from before:
+\begin{verbatim}
+package p where
+    A :: [ data A ]
+    B :: [ data A ]
+    M = [ import A; import B; ... ]
+\end{verbatim}
+Let's say that \verb|M| is typechecked successfully. Now we add an alias binding
+at the end of the package, \verb|A = B|. Does \verb|M| need to be
+re-typechecked? Yes! (Well, it seems so, but let's just assert ``yes'' for now.
+Certainly in the reverse case---if we remove the alias and then ask---this
+is true, since \verb|M| might have depended on the two \verb|A| types
+being the same.)
+The logical shape context changed to say that \verb|A| and
+\verb|B| now map to the same physical module identity. But does the existing
+recompilation avoidance mechanism say that \verb|M| should be re-typechecked?
+It's unclear. The .hi file for \verb|M| records that it imported \verb|A| and
+\verb|B| with particular ABIs, but does it also know about the physical module
+identities (or rather, original module names) of these modules?
 
-In this section, I want to argue that, although shaping constitutes
-a pre-pass which must be run before compilation in earnest, it is only
-about as bad as the dependency resolution analysis that GHC already does
-in \verb|ghc -M| or \verb|ghc --make|.
+Scott thinks this highlights the need for us to get our story straight about
+the connection between logical names, physical module identities, and file
+names!
 
-In Paper Backpack, what information does shaping compute? It looks at
-exports, imports, data declarations and value declarations (but not the
-actual expressions associated with these values.)  As a matter of fact,
-GHC already must look at the imports associated with a package in order
-to determine the dependency graph, so that it can have some order to compile
-modules in.  There is a specialized parser which just parses these statements,
-and then ignores the rest of the file.
-
-A bit of background: the \emph{renamer} is responsible for resolving
-imports and figuring out where all of these entities actually come from.
-SPJ would really like to avoid having to run the renamer in order to perform
-a shaping pass.
-
-XXX Primary open question here: is it possible to do shaping without renaming?
 
 \subsection{Installing indefinite packages}\label{sec:installing-indefinite}
 
