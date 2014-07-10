@@ -813,15 +813,6 @@ genBranch = return . toOL . mkJumpInstr
 Conditional jumps are always to local labels, so we can use branch
 instructions.  We peek at the arguments to decide what kind of
 comparison to do.
-
-SPARC: First, we have to ensure that the condition codes are set
-according to the supplied comparison operation.  We generate slightly
-different code for floating point comparisons, because a floating
-point operation cannot directly precede a @BF@.  We assume the worst
-and fill that slot with a @NOP@.
-
-SPARC: Do not fill the delay slots here; you will confuse the register
-allocator.
 -}
 
 
