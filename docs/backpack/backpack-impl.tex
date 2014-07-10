@@ -28,6 +28,8 @@ we describe the ``probably correct'' implementation plan, and finish off with
 some open design questions.  This is intended to be an evolving design document,
 so please contribute!
 
+\tableofcontents
+
 \section{Current packaging architecture}
 
 The overall architecture is described in Figure~\ref{fig:arch}.
@@ -185,7 +187,10 @@ the module system.
         compiled with different dependencies (and even link them
         together), and second, we want to abolish (often inaccurate)
         version ranges and move to a regime where packages depend on
-        signatures.
+        signatures.  Version ranges may still be used to indicate important
+        semantic changes (e.g., bugs or bad behavior on the part of package
+        authors), but they should no longer drive dependency resolution
+        and often only be recorded after the fact.
 
     \item Support \emph{hermetic builds with sharing}.  A hermetic build
         system is one which simulates rebuilding every package whenever
@@ -288,14 +293,6 @@ enough.  We are not using this plan.
 
 \section{Concrete physical identity = PackageId + Module name + Module dependencies}\label{sec:ipi}
 
-\begin{figure}
-    \center{\begin{tabular}{r l}
-            PackageId & hash of ``package name, package version, dependency resolution, \emph{module} environment'' \\
-        InstalledPackageId & hash of ``PackageId, source code, way, compiler flags'' \\
-    \end{tabular}}
-\label{fig:proposed-pkgid}\caption{Proposed new structure of package identifiers.}
-\end{figure}
-
 In Backpack, there needs to be some mechanism for assigning
 \emph{physical module identities} to modules, which are essential for
 typechecking Backpack packages, since they let us tell if two types are
@@ -325,8 +322,6 @@ this:
     \item Augment the module name to record module dependency information.  This is a bit of an odd place to put the information, because our module names correspond quite concretely to the actual source file a user wrote some source in.
     \item Augment the PackageId to record module dependency information.  For now, this is the regime we will use; however, see Section~\ref{sec:flatten} for why the issue is more subtle.
 \end{enumerate}
-
-(XXX Figure~\ref{fig:proposed-pkgid} is out of date now.)
 
 And now, the complications\ldots
 
@@ -462,6 +457,13 @@ From an implementation perspective, however, this answer is quite distressing:
         contain \verb|A|. But an application could also use both at the
         same time, at which point a program will see two copies of the
         program text for \verb|A|.
+
+    \item Now, when I'm compiling a package, I might have to refer to
+        another package which is only partially compiled (if it was my
+        parent).  A lot of early on design confusion came from trying to
+        reason about situations where modules (as opposed to packages)
+        were acting like libraries, but weren't actually being installed
+        to the package database.
 \end{enumerate}
 
 The first problem can be solved by ``flattening'' the package database,
@@ -566,7 +568,7 @@ Technically, all of the other
 modules should also record this information, but as an optimization, only
 recording the assignments for \emph{holes} is necessary.
 
-\subsection{One library per package identity}
+\subsection{One library per package identity}\label{sec:one-per-package-identity}
 
 In this world, we simplify physical module identities to ``only contain
 package information'', and not full physical module identities.  These
@@ -652,7 +654,7 @@ dependencies could cause us to fail to place two modules together which
 should be in the same package.  So\ldots I don't actually know what the
 algorithm to be used here is.
 
-\subsection{One library per definite package}
+\subsection{One library per definite package}\label{sec:one-per-definite-package}
 
 In this world, we create a dynamic library per definite package (package with
 no holes).  Indefinite packages don't get compiled into libraries, the code
@@ -803,8 +805,8 @@ implementation problems:
         module. To calculate this, we must preprocess and parse all
         modules, even before we do the type-checking pass.  (Fortunately,
         shaping doesn't require a full parse of a module, only enough
-        to get identifiers, which makes it a slightly more expensive
-        version of \verb|ghc -M|.)
+        to get identifiers.  However, it does have to understand import
+        statements at the same level of detail as GHC's renamer.)
 
     \item \emph{Shaping must be done upfront.} In the current Backpack
         design, all shapes must be computed before any typechecking can
@@ -941,16 +943,20 @@ definite.  Let's take the following set of packages as an example:
 
 \begin{verbatim}
 package pkg-a where
-    A = ...
+    A = [ a = 0; b = 0 ] -- b is not visible
     B = ... -- this code is ignored
 package pgk-b where -- indefinite package
-    A :: ...
-    B = [ import A; ... ]
+    A :: [ a :: Bool ]
+    B = [ import A; b = 1 ]
 package pkg-c where
     include pkg-a (A)
     include pkg-b
     C = [ import B; ... ]
 \end{verbatim}
+
+Note: in the following example, we will assume that we are operating
+under the packaging scheme specified in Section~\ref{sec:one-per-definite-package}
+with the indefinite package refinement.
 
 With the linking invariant, we can simply walk the Backpack package ``tree'',
 compiling each of its dependencies.  Let's walk through it explicitly.\footnote{To simplify matters, we assume that there is only one instance of any
@@ -971,28 +977,40 @@ ghc -c B.hs -package-name pkg-a-ADEPS
 \end{verbatim}
 
 Next, we have to build \verb|pkg-b|.  This package has a hole \verb|A|,
-intuitively, it depends on package A.  This is done in two steps:
+intuitively, it depends on package A.   This is done in two steps:
 first we check if the signature given for the hole matches up with the
-actual implementation provided, and then we build the module properly.
+actual implementation provided. Then we build the module properly.
 
 \begin{verbatim}
 BDEPS = "A -> pkg-a-ADEPS:A"
-# This doesn't actually create an hi-boot file
-ghc -c A.hs-boot -package-name pkg-b-BDEPS -module-env BDEPS
-ghc -c B.hs      -package-name pkg-b-BDEPS -module-env BDEPS
+ghc -c A.hs-boot -package-name pkg-b-BDEPS -hide-all-packages \
+    -package "pkg-a-ADEPS(A)"
+ghc -c B.hs      -package-name pkg-b-BDEPS -hide-all-packages \
+    -package "pkg-a-ADEPS(A)"
 # install and register pkg-b-BDEPS
 \end{verbatim}
 
-Notably, these commands diverge slightly from the traditional compilation process.
-Traditionally, we would specify the flags
-\verb|-hide-all-packages| \verb|-package-id package-a-ADEPS| in order to
-let GHC know that it should look at this package to find modules,
-including \verb|A|.  However, if we did this here, we would also pull in
-module B, which is incorrect, as this module was thinned out in the parent
-package description.  Conceptually, this package is being compiled in the
-context of some module environment \verb|BDEPS| (a logical context, in Backpack lingo)
-which maps modules to original names and is utilized by the module finder to
-lookup the import in \verb|B.hs|.
+These commands mostly resemble the traditional compilation process, but
+with some minor differences.  First, the \verb|-package| includes must
+also specify a thinning (and renaming) list.  This is because when
+\verb|pkg-b| is compiled, it only sees module \verb|A| from it, not
+module \verb|B| (as it was thinned out.)  Conceptually, this package is
+being compiled in the context of some module environment \verb|BDEPS| (a
+logical context, in Backpack lingo) which maps modules to original names
+and is utilized by the module finder to lookup the import in
+\verb|B.hs|; we load/thin/rename packages so that the package
+environment accurately reflects the module environment.
+
+Similarly, it is important that the compilation of \verb|B.hs| use \verb|A.hi-boot|
+to determine what entities in the module are visible upon import; this is
+automatically detected by \verb|GHC| when the compilation occurs.  Otherwise,
+in module \verb|pkg-b:B|, there would be a name collision between the local
+definition of \verb|b| and the identifier \verb|b| which was
+accidentally pulled in when we compiled against the actual implementation of
+\verb|A|.  It's actually a bit tempting to compile \verb|pkg-b:B| against the
+\verb|hi-boot| generated by the signature, but this would unnecessarily
+lose out on possible optimizations which are stored in the original \verb|hi|
+file, but not evident from \verb|hi-boot|.
 
 Finally, we created all of the necessary subpackages, and we can compile
 our package proper.
@@ -1000,26 +1018,20 @@ our package proper.
 \begin{verbatim}
 CDEPS =         # empty!!
 ghc -c C.hs -package-name pkg-c-CDEPS -hide-all-packages \
-    -package pkg-a-ADEPS -hide-module B \
-    -package pkg-b-BDEPS
+    -package "pkg-a-ADEPS(A)" \
+    -package "pkg-b-BDEPS"
 # install and register package pkg-c-CDEPS
 \end{verbatim}
 
-This mostly resembles traditional compilation, but there are a few
-interesting things to note.  First, GHC needs to know about thinning/renaming
-in the package description (here, it's transmitted using the \verb|-hide-module|
-command, intended to apply to the most recent package definition).\footnote{Concrete
-command line syntax is, of course, up for discussion.}  Second, even though C
-``depends'' on subpackages, these do not show in its package-name identifier,
-e.g. CDEPS\@.  This is because this package \emph{chose} the values of ADEPS and BDEPS
-explicitly (by including the packages in this particular order), so there are no
-degrees of freedom.\footnote{In the presence of a Cabal-style dependency solver
-which associates a-0.1 with a concrete identifier a, these choices need to be
-recorded in the package ID.}  Finally, in principle, we could have also used
-the \verb|-module-env| flag to communicate how to lookup the B import (notice
-that the \verb|-package pkg-a-ADEPS| argument is a bit useless because we
-never end up using the import.)  I will talk a little more about the tradeoffs
-shortly.
+This command is quite similar, although it's worth mentioning that now,
+the \verb|package| flags directly mirror the syntax in Backpack.
+Additionally, even though \verb|pkg-c| ``depends'' on subpackages, these
+do not show in its package-name identifier, e.g. CDEPS\@.  This is
+because this package \emph{chose} the values of ADEPS and BDEPS
+explicitly (by including the packages in this particular order), so
+there are no degrees of freedom.\footnote{In the presence of a
+    Cabal-style dependency solver which associates a-0.1 with a concrete
+identifier a, these choices need to be recorded in the package ID.}
 
 Overall, there are a few important things to notice about this architecture.
 First, because the \verb|pkg-b-BDEPS| product is installed, if in another package
@@ -1030,69 +1042,55 @@ IDs will be the same.
 
 XXX ToDo: actually write down pseudocode algorithm for this
 
-\paragraph{Module environment or package flags?}  In the previous
-section, I presented two ways by which one can tweak the behavior of
-GHC's module finder, which is responsible for resolving \verb|import B|
-into an actual physical module.  The first, \verb|-module-env| is to
-explicitly describe a full mapping from module names to original names;
-the second, \verb|-package| with \verb|-hide-module| and
-\verb|-rename-module|, is to load packages as before but apply
-thinning/renaming as necessary.
-
-In general, it seems that using \verb|-package| is desirable, because its
-input size is smaller. (If a package exports 200 modules, we would be obligated
-to list all of them in a module environment.)  However, a tricky situation
+\paragraph{Sometimes you need a module environment instead}  In the compilation
+description here, we've implicitly assumed that any external modules you might
+depend on exist in a package somewhere.  However, a tricky situation
 occurs when some of these modules come from a parent package:
-
 \begin{verbatim}
-package myapp2 where
-    System.Random = [ ... ].hs
-    include monte-carlo
-    App = [ ... ].hs
-\end{verbatim}
-
-Here, monte-carlo depends on a ``subpart of the myapp2 package'', and it's
-not entirely clear how monte-carlo should be represented in the installed
-package database: should myapp2 be carved up into pieces so that subparts
-of its package description can be installed to the database?  A package
-stub like this would never used by any other package, it is strictly local.
-
-On the other hand, if one uses a module environment for specifying how
-\verb|monte-carlo| should handle \verb|System.Random|, we don't actually
-have to create a stub package: all we have to do is make sure GHC knows
-how to find the module with this original name.  To make things better,
-the size of the module environment will only be as long as all of the
-holes visible to the module in the package description, so the user will
-have explicitly asked for all of this pluggability.
-
-The conclusion seems clear: package granularity for modules from includes,
-and module environments for modules from parent packages!
-
-\paragraph{An appealing but incorrect alternative}  In this section,
-we briefly describe an alternate compilation strategy that might
-sound good, but isn't so good.  The basic idea is, when compiling
-\verb|pkg-c|, to compile all of its indefinite packages as if the
-package were one single, big package.
-(Of course, if we encounter a
-definite package, don't bother recompiling it; just use it directly.)
-In particular, we maintain the invariant that any code generated will
-export symbols under the current package's namespace.  So the identifier
-\verb|b| in the example becomes a symbol \verb|pkg-c_pkg-b_B_b| rather
-than \verb|pkg-b_B_b| (package subqualification is necessary because
-package C may define its own B module after thinning out the import.)
-
-The fatal problem with this proposal is that it doesn't implement applicative
-semantics beyond compilation units.  While modules within a single
-compilation will get reused, if there is another package:
-
-\begin{verbatim}
-package pkg-d where
-    include pkg-a
+package pkg-b where
+    A :: [ a :: Bool ]
+    B = [ import A; b = 1 ]
+package pkg-c where
+    A = [ a = 0; b = 0 ]
     include pkg-b
+    C = [ import B; ... ]
 \end{verbatim}
 
-when it is compiled by itself, it will generate its own instance of B,
-even though it should be the same as C.  This is bad news.
+How this problem gets resolved depends on what our library granularity is (Section~\ref{sec:flatten}).
+
+In the ``only definite packages are compiled'' world
+(Section~\ref{sec:one-per-definite-package}), we need to pass a
+special ``module environment'' to the compilation of libraries
+in \verb|monte-carlo| to say where to find \verb|System.Random|.
+The compilation of \verb|pkg-b| now looks as follows:
+
+\begin{verbatim}
+BDEPS = "A -> pkg-a-ADEPS:A"
+ghc -c A.hs-boot -package-name pkg-a-ADEPS -module-env BDEPS
+ghc -c B.hs      -package-name pkg-a-ADEPS -subpackage-name pkg-b-BDEPS -module-env BDEPS
+\end{verbatim}
+
+The most important thing to remember here is that in the ``only definite
+packages are compiled'' world, we must create a \emph{copy} of
+\verb|pkg-b| in order to instantiate its hole with \verb|pkg-a:A|
+(otherwise, there is a circular dependency.)  These packages must be
+distinguished from the parent package (\verb|-subpackage-name|), but
+logically, they will be installed in the \verb|pkg-a| library.  The
+module environment specifies where the holes can be found, without
+referring to an actual package (since \verb|pkg-a| has, indeed, not been
+installed yet at the time we process \verb|B.hs|).  These files are
+probably looked up in the include paths.\footnote{It's worth remarking
+    that a variant of this was originally proposed as the one true
+    compilation strategy.  However, it was pointed out that this gave up
+    applicativity in all cases.  Our current refinement of this strategy
+gives up applicativity for modules which have not been placed in an
+external package.}
+
+Things are a bit different in sliced world and physical module identity
+world (Section~\ref{sec:one-per-package-identity}); here, we really do
+compile and install (perhaps to a local database) \verb|pkg-c:A| before
+starting with the compilation of \verb|pkg-b|.  So package imports will
+continue to work fine.
 
 \subsection{Restricted recursive modules ala hs-boot}\label{sec:hs-boot-restrict}
 
