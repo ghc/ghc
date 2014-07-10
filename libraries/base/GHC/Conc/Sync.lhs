@@ -219,10 +219,10 @@ forkIOWithUnmask :: ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
 forkIOWithUnmask io = forkIO (io unsafeUnmask)
 
 {- |
-Like 'forkIO', but lets you specify on which processor the thread
+Like 'forkIO', but lets you specify on which capability the thread
 should run.  Unlike a `forkIO` thread, a thread created by `forkOn`
-will stay on the same processor for its entire lifetime (`forkIO`
-threads can migrate between processors according to the scheduling
+will stay on the same capability for its entire lifetime (`forkIO`
+threads can migrate between capabilities according to the scheduling
 policy).  `forkOn` is useful for overriding the scheduling policy when
 you know in advance how best to distribute the threads.
 
