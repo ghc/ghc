@@ -1210,7 +1210,7 @@ isDecomposableTyCon :: TyCon -> Bool
 -- Ultimately we may have injective associated types
 -- in which case this test will become more interesting
 --
--- It'd be unusual to call isInjectiveTyCon on a regular H98
+-- It'd be unusual to call isDecomposableTyCon on a regular H98
 -- type synonym, because you should probably have expanded it first
 -- But regardless, it's not decomposable
 isDecomposableTyCon (SynTyCon {}) = False
