@@ -970,7 +970,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls,
             <- bindHsTyVars cls_doc Nothing kvs tyvars $ \ tyvars' -> do
                   -- Checks for distinct tyvars
              { (context', cxt_fvs) <- rnContext cls_doc context
-             ; fds'  <- rnFds (docOfHsDocContext cls_doc) fds
+             ; fds'  <- rnFds fds
                          -- The fundeps have no free variables
              ; (ats',     fv_ats)     <- rnATDecls cls' ats
              ; (at_defs', fv_at_defs) <- rnATInstDecls rnTyFamInstDecl cls' tyvars' at_defs
@@ -1409,21 +1409,20 @@ extendRecordFieldEnv tycl_decls inst_decls
 %*********************************************************
 
 \begin{code}
-rnFds :: SDoc -> [Located (FunDep RdrName)] -> RnM [Located (FunDep Name)]
-
-rnFds doc fds
+rnFds :: [Located (FunDep RdrName)] -> RnM [Located (FunDep Name)]
+rnFds fds
   = mapM (wrapLocM rn_fds) fds
   where
     rn_fds (tys1, tys2)
-      = do { tys1' <- rnHsTyVars doc tys1
-           ; tys2' <- rnHsTyVars doc tys2
+      = do { tys1' <- rnHsTyVars tys1
+           ; tys2' <- rnHsTyVars tys2
            ; return (tys1', tys2') }
 
-rnHsTyVars :: SDoc -> [RdrName] -> RnM [Name]
-rnHsTyVars doc tvs  = mapM (rnHsTyVar doc) tvs
+rnHsTyVars :: [RdrName] -> RnM [Name]
+rnHsTyVars tvs  = mapM rnHsTyVar tvs
 
-rnHsTyVar :: SDoc -> RdrName -> RnM Name
-rnHsTyVar _doc tyvar = lookupOccRn tyvar
+rnHsTyVar :: RdrName -> RnM Name
+rnHsTyVar tyvar = lookupOccRn tyvar
 \end{code}
 
 
