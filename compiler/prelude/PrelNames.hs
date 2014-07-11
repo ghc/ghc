@@ -1313,17 +1313,16 @@ ghciIoClassKey = mkPreludeClassUnique 44
 ************************************************************************
 -}
 
-addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey, byteArrayPrimTyConKey,
-    charPrimTyConKey, charTyConKey, doublePrimTyConKey, doubleTyConKey,
-    floatPrimTyConKey, floatTyConKey, funTyConKey, intPrimTyConKey,
-    intTyConKey, int8TyConKey, int16TyConKey, int32PrimTyConKey,
-    int32TyConKey, int64PrimTyConKey, int64TyConKey,
-    integerTyConKey,
-    listTyConKey, foreignObjPrimTyConKey, weakPrimTyConKey,
-    mutableArrayPrimTyConKey, mutableArrayArrayPrimTyConKey, mutableByteArrayPrimTyConKey,
-    orderingTyConKey, mVarPrimTyConKey, ratioTyConKey, rationalTyConKey,
-    realWorldTyConKey, stablePtrPrimTyConKey, stablePtrTyConKey,
-    anyTyConKey, eqTyConKey, smallArrayPrimTyConKey,
+addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey,
+    byteArrayPrimTyConKey, charPrimTyConKey, charTyConKey, doublePrimTyConKey,
+    doubleTyConKey, floatPrimTyConKey, floatTyConKey, funTyConKey,
+    intPrimTyConKey, intTyConKey, int8TyConKey, int16TyConKey,
+    int32PrimTyConKey, int32TyConKey, int64PrimTyConKey, int64TyConKey,
+    integerTyConKey, listTyConKey, foreignObjPrimTyConKey, maybeTyConKey,
+    weakPrimTyConKey, mutableArrayPrimTyConKey, mutableArrayArrayPrimTyConKey,
+    mutableByteArrayPrimTyConKey, orderingTyConKey, mVarPrimTyConKey,
+    ratioTyConKey, rationalTyConKey, realWorldTyConKey, stablePtrPrimTyConKey,
+    stablePtrTyConKey, anyTyConKey, eqTyConKey, smallArrayPrimTyConKey,
     smallMutableArrayPrimTyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
 arrayPrimTyConKey                       = mkPreludeTyConUnique  3
@@ -1348,6 +1347,7 @@ integerTyConKey                         = mkPreludeTyConUnique 22
 
 listTyConKey                            = mkPreludeTyConUnique 24
 foreignObjPrimTyConKey                  = mkPreludeTyConUnique 25
+maybeTyConKey                           = mkPreludeTyConUnique 26
 weakPrimTyConKey                        = mkPreludeTyConUnique 27
 mutableArrayPrimTyConKey                = mkPreludeTyConUnique 28
 mutableByteArrayPrimTyConKey            = mkPreludeTyConUnique 29
@@ -1560,7 +1560,7 @@ charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
     floatDataConKey, intDataConKey, integerSDataConKey, nilDataConKey,
     ratioDataConKey, stableNameDataConKey, trueDataConKey, wordDataConKey,
     word8DataConKey, ioDataConKey, integerDataConKey, eqBoxDataConKey,
-    coercibleDataConKey :: Unique
+    coercibleDataConKey, nothingDataConKey, justDataConKey :: Unique
 charDataConKey                          = mkPreludeDataConUnique  1
 consDataConKey                          = mkPreludeDataConUnique  2
 doubleDataConKey                        = mkPreludeDataConUnique  3
@@ -1568,6 +1568,8 @@ falseDataConKey                         = mkPreludeDataConUnique  4
 floatDataConKey                         = mkPreludeDataConUnique  5
 intDataConKey                           = mkPreludeDataConUnique  6
 integerSDataConKey                      = mkPreludeDataConUnique  7
+nothingDataConKey                       = mkPreludeDataConUnique  8
+justDataConKey                          = mkPreludeDataConUnique  9
 nilDataConKey                           = mkPreludeDataConUnique 11
 ratioDataConKey                         = mkPreludeDataConUnique 12
 word8DataConKey                         = mkPreludeDataConUnique 13

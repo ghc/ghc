@@ -1,0 +1,6 @@
+| r_0 -> a_1
+
+T6018th.hs:98:4:
+    Type family equations violate injectivity annotation:
+      H Int Int Int = Bool
+      H Int Char Bool = Bool

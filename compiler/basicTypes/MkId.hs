@@ -12,7 +12,7 @@ have a standard form, namely:
 - primitive operations
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, DataKinds #-}
 
 module MkId (
         mkDictFunId, mkDictFunTy, mkDictSelId, mkDictSelRhs,
@@ -911,7 +911,8 @@ wrapTypeFamInstBody :: CoAxiom br -> Int -> [Type] -> CoreExpr -> CoreExpr
 wrapTypeFamInstBody axiom ind args body
   = mkCast body (mkSymCo (mkAxInstCo Representational axiom ind args))
 
-wrapTypeUnbranchedFamInstBody :: CoAxiom Unbranched -> [Type] -> CoreExpr -> CoreExpr
+wrapTypeUnbranchedFamInstBody :: CoAxiom Unbranched -> [Type] -> CoreExpr
+                              -> CoreExpr
 wrapTypeUnbranchedFamInstBody axiom
   = wrapTypeFamInstBody axiom 0
 
@@ -926,7 +927,8 @@ unwrapTypeFamInstScrut :: CoAxiom br -> Int -> [Type] -> CoreExpr -> CoreExpr
 unwrapTypeFamInstScrut axiom ind args scrut
   = mkCast scrut (mkAxInstCo Representational axiom ind args)
 
-unwrapTypeUnbranchedFamInstScrut :: CoAxiom Unbranched -> [Type] -> CoreExpr -> CoreExpr
+unwrapTypeUnbranchedFamInstScrut :: CoAxiom Unbranched -> [Type] -> CoreExpr
+                                 -> CoreExpr
 unwrapTypeUnbranchedFamInstScrut axiom
   = unwrapTypeFamInstScrut axiom 0
 

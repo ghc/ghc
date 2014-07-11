@@ -10,7 +10,7 @@ module Language.Haskell.TH.PprLib (
 
         -- * Primitive Documents
         empty,
-        semi, comma, colon, space, equals, arrow,
+        semi, comma, colon, dcolon, space, equals, arrow,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace,
 
         -- * Converting values into documents
@@ -27,7 +27,7 @@ module Language.Haskell.TH.PprLib (
         fsep, fcat, 
         nest,
         hang, punctuate,
-        
+
         -- * Predicates on documents
         isEmpty,
 
@@ -63,6 +63,7 @@ empty   :: Doc;                 -- ^ An empty document
 semi    :: Doc;                 -- ^ A ';' character
 comma   :: Doc;                 -- ^ A ',' character
 colon   :: Doc;                 -- ^ A ':' character
+dcolon  :: Doc;                 -- ^ A "::" string
 space   :: Doc;                 -- ^ A space character
 equals  :: Doc;                 -- ^ A '=' character
 arrow   :: Doc;                 -- ^ A "->" string
@@ -171,6 +172,7 @@ empty = return HPJ.empty
 semi = return HPJ.semi
 comma = return HPJ.comma
 colon = return HPJ.colon
+dcolon = return $ HPJ.text "::"
 space = return HPJ.space
 equals = return HPJ.equals
 arrow = return $ HPJ.text "->"

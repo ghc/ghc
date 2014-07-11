@@ -4,8 +4,8 @@ overloadedlistsfail01.hs:5:8: error:
     The type variable ‘a0’ is ambiguous
     Potential instances:
       instance [safe] Show Version -- Defined in ‘Data.Version’
-      instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
       instance Show Ordering -- Defined in ‘GHC.Show’
+      instance Show Integer -- Defined in ‘GHC.Show’
       ...plus 23 others
       (use -fprint-potential-instances to see them all)
     In the expression: print [1]

@@ -52,6 +52,10 @@ module TysWiredIn (
 
         mkListTy, mkPromotedListTy,
 
+        -- * Maybe
+        maybeTyCon, maybeTyConName,
+        nothingDataCon, nothingDataConName, justDataCon, justDataConName,
+
         -- * Tuples
         mkTupleTy, mkBoxedTupleTy,
         tupleTyCon, tupleDataCon, tupleTyConName,
@@ -162,6 +166,7 @@ wiredInTyCons = [ unitTyCon     -- Not treated like other tuples, because
               , wordTyCon
               , word8TyCon
               , listTyCon
+              , maybeTyCon
               , parrTyCon
               , eqTyCon
               , coercibleTyCon
@@ -209,6 +214,19 @@ boolTyConName, falseDataConName, trueDataConName :: Name
 boolTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Bool") boolTyConKey boolTyCon
 falseDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "False") falseDataConKey falseDataCon
 trueDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "True")  trueDataConKey  trueDataCon
+
+listTyConName, nilDataConName, consDataConName :: Name
+listTyConName     = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "[]") listTyConKey listTyCon
+nilDataConName    = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") nilDataConKey nilDataCon
+consDataConName   = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
+
+maybeTyConName, nothingDataConName, justDataConName :: Name
+maybeTyConName     = mkWiredInTyConName   UserSyntax gHC_BASE (fsLit "Maybe")
+                                          maybeTyConKey maybeTyCon
+nothingDataConName = mkWiredInDataConName UserSyntax gHC_BASE (fsLit "Nothing")
+                                          nothingDataConKey nothingDataCon
+justDataConName    = mkWiredInDataConName UserSyntax gHC_BASE (fsLit "Just")
+                                          justDataConKey justDataCon
 
 wordTyConName, wordDataConName, word8TyConName, word8DataConName :: Name
 wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
@@ -713,11 +731,6 @@ gtDataConId = dataConWorkId gtDataCon
 mkListTy :: Type -> Type
 mkListTy ty = mkTyConApp listTyCon [ty]
 
-listTyConName, nilDataConName, consDataConName :: Name
-listTyConName     = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "[]") listTyConKey listTyCon
-nilDataConName    = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") nilDataConKey nilDataCon
-consDataConName   = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
-
 listTyCon :: TyCon
 listTyCon = pcTyCon False Recursive True
                     listTyConName Nothing alpha_tyvar [nilDataCon, consDataCon]
@@ -739,7 +752,20 @@ consDataCon = pcDataConWithFixity True {- Declared infix -}
 -- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
 -- gets the over-specific type (Type -> Type)
 
-{- *********************************************************************
+-- Wired-in type Maybe
+
+maybeTyCon :: TyCon
+maybeTyCon = pcTyCon True NonRecursive True maybeTyConName Nothing alpha_tyvar
+                     [nothingDataCon, justDataCon]
+
+nothingDataCon :: DataCon
+nothingDataCon = pcDataCon nothingDataConName alpha_tyvar [] maybeTyCon
+
+justDataCon :: DataCon
+justDataCon = pcDataCon justDataConName alpha_tyvar [alphaTy] maybeTyCon
+
+{-
+** *********************************************************************
 *                                                                      *
             The tuple types
 *                                                                      *

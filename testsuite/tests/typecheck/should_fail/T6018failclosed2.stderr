@@ -1,0 +1,16 @@
+
+T6018failclosed2.hs:11:5:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation is a bare type variable
+    but these LHS type and kind patterns are not bare variables: ‘'Z’
+      PClosed 'Z m = m
+    In the equations for closed type family ‘PClosed’
+    In the type family declaration for ‘PClosed’
+
+T6018failclosed2.hs:11:5:
+    Type family equations violate injectivity annotation:
+      PClosed 'Z m = m
+      PClosed ('S n) m = 'S (PClosed n m)
+    In the equations for closed type family ‘PClosed’
+    In the type family declaration for ‘PClosed’
+

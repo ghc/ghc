@@ -10,7 +10,9 @@ module TcValidity (
   expectedKindInCtxt,
   checkValidTheta, checkValidFamPats,
   checkValidInstance, validDerivPred,
-  checkInstTermination, checkValidTyFamInst, checkTyFamFreeness,
+  checkInstTermination,
+  checkValidCoAxiom, checkValidCoAxBranch,
+  checkTyFamFreeness,
   checkConsistentFamInst,
   arityErr, badATErr
   ) where
@@ -36,6 +38,9 @@ import TyCon
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
 import FunDeps
+import FamInstEnv  ( isDominatedBy, injectiveBranches,
+                     InjectivityCheckResult(..) )
+import FamInst     ( makeInjectivityErrors )
 import Name
 import VarEnv
 import VarSet
@@ -999,7 +1004,7 @@ checkValidInstance ctxt hs_type ty
 Note [Paterson conditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Termination test: the so-called "Paterson conditions" (see Section 5 of
-"Understanding functionsl dependencies via Constraint Handling Rules,
+"Understanding functional dependencies via Constraint Handling Rules,
 JFP Jan 2007).
 
 We check that each assertion in the context satisfies:
@@ -1210,12 +1215,63 @@ wrongATArgErr ty instTy =
 ************************************************************************
 -}
 
+checkValidCoAxiom :: CoAxiom Branched -> TcM ()
+checkValidCoAxiom (CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
+  = do { _ <- brListMapM (checkValidCoAxBranch Nothing fam_tc) branches
+       ; brListFoldlM_ check_branch_compat [] branches }
+  where
+    injectivity = familyTyConInjectivityInfo fam_tc
+
+    check_branch_compat :: [CoAxBranch]    -- previous branches in reverse order
+                        -> CoAxBranch      -- current branch
+                        -> TcM [CoAxBranch]-- current branch : previous branches
+    -- Check for
+    --   (a) this banch is dominated by previous ones
+    --   (b) failure of injectivity
+    check_branch_compat prev_branches cur_branch
+      | cur_branch `isDominatedBy` prev_branches
+      = do { addWarnAt (coAxBranchSpan cur_branch) $
+             inaccessibleCoAxBranch fam_tc cur_branch
+           ; return prev_branches }
+      | otherwise
+      = do { check_injectivity prev_branches cur_branch
+           ; return (cur_branch : prev_branches) }
+
+     -- Injectivity check: check whether a new (CoAxBranch) can extend
+     -- already checked equations without violating injectivity
+     -- annotation supplied by the user.
+     -- See Note [Verifying injectivity annotation] in FamInstEnv
+    check_injectivity prev_branches cur_branch
+      | Injective inj <- injectivity
+      = do { let conflicts =
+                     fst $ foldl (gather_conflicts inj prev_branches cur_branch)
+                                 ([], 0) prev_branches
+           ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err)
+                   (makeInjectivityErrors fam_tc cur_branch inj conflicts) }
+      | otherwise
+      = return ()
+
+    gather_conflicts inj prev_branches cur_branch (acc, n) branch
+               -- n is 0-based index of branch in prev_branches
+      = case injectiveBranches inj cur_branch branch of
+          InjectivityUnified ax1 ax2
+            | ax1 `isDominatedBy` (replace_br prev_branches n ax2)
+                -> (acc, n + 1)
+            | otherwise
+                -> (branch : acc, n + 1)
+          InjectivityAccepted -> (acc, n + 1)
+
+    -- Replace n-th element in the list. Assumes 0-based indexing.
+    replace_br :: [CoAxBranch] -> Int -> CoAxBranch -> [CoAxBranch]
+    replace_br brs n br = take n brs ++ [br] ++ drop (n+1) brs
+
+
 -- Check that a "type instance" is well-formed (which includes decidability
 -- unless -XUndecidableInstances is given).
 --
-checkValidTyFamInst :: Maybe ( Class, VarEnv Type )
+checkValidCoAxBranch :: Maybe ( Class, VarEnv Type )
                     -> TyCon -> CoAxBranch -> TcM ()
-checkValidTyFamInst mb_clsinfo fam_tc
+checkValidCoAxBranch mb_clsinfo fam_tc
                     (CoAxBranch { cab_tvs = tvs, cab_lhs = typats
                                 , cab_rhs = rhs, cab_loc = loc })
   = setSrcSpan loc $
@@ -1294,6 +1350,14 @@ isTyFamFree :: Type -> Bool
 isTyFamFree = null . tcTyFamInsts
 
 -- Error messages
+
+inaccessibleCoAxBranch :: TyCon -> CoAxBranch -> SDoc
+inaccessibleCoAxBranch fam_tc (CoAxBranch { cab_tvs = tvs
+                                          , cab_lhs = lhs
+                                          , cab_rhs = rhs })
+  = ptext (sLit "Type family instance equation is overlapped:") $$
+    hang (pprUserForAll tvs)
+       2 (hang (pprTypeApp fam_tc lhs) 2 (equals <+> (ppr rhs)))
 
 tyFamInstIllegalErr :: Type -> SDoc
 tyFamInstIllegalErr ty

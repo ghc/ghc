@@ -351,3 +351,4 @@ test('T10704',
      extra_clean(['T10704a.o','T10704a.hi']),
      multimod_compile_and_run,
      ['T10704', '-v0'])
+test('T6018th', normal, compile_fail, ['-v0'])

@@ -6892,6 +6892,111 @@ instance Show v => Show (GMap () v) where ...
 
 </sect2>
 
+  <sect2 id="injective-ty-fams">
+    <title>Injective type families</title>
+    <para>Starting with GHC 7.12 type families can be annotated with injectivity
+    information.  This information is then used by GHC during type checking to
+    resolve type ambiguities in situations where a type variable appears only
+    under type family applications.
+    </para>
+
+    <para>For full details on injective type families refer to Haskell Symposium
+    2015 paper <ulink
+    url="http://ics.p.lodz.pl/~stolarek/_media/pl:research:stolarek_peyton-jones_eisenberg_injectivity_extended.pdf">Injective
+    type families for Haskell</ulink>.</para>
+
+   <sect3 id="injective-ty-fams-syntax">
+     <title>Syntax of injectivity annotation</title>
+     <para>Injectivity annotation is added after type family head and consists of
+     two parts:
+     <itemizedlist>
+       <listitem><para>type variable that names the result of a type family.
+       Syntax: <literal>= tyvar</literal> or <literal>= (tyvar ::
+       kind)</literal>. Type variable must be fresh.
+       </para>
+       </listitem>
+       <listitem><para>injectivity annotation of the form <literal>| A ->
+       B</literal>, where <literal>A</literal> is the result type variable (see
+       previous bullet) and <literal>B</literal> is a list of argument type and
+       kind variables in which type family is injective. It is possible to omit
+       some variables if type family is not injective in them.</para></listitem>
+     </itemizedlist>
+     Examples:
+     <programlisting>
+type family Id a = result | result -> a where
+type family F a b c = d | d -> a c b
+type family G (a :: k) b c = foo | foo -> k b where
+     </programlisting>
+     </para>
+     <para>For open and closed type families it is OK to name the result but
+     skip the injectivity annotation. This is not the case for associated type
+     synonyms, where the named result without injectivity annotation will be
+     interpreted as associated type synonym default.</para>
+   </sect3>
+
+   <sect3 id="injective-ty-fams-typecheck">
+     <title>Verifying injectivity annotation against type family equations
+     </title>
+     <para>Once the user declares type family to be injective GHC must verify
+     that this declaration is correct, ie. type family equations don't violate
+     the injectivity annotation.  A general idea is that if at least one
+     equation (bullets (1), (2) and (3) below) or a pair of equations (bullets
+     (4) and (5) below) violates the injectivity annotation then a type family
+     is not injective in a way user claims and an error is reported.  In the
+     bullets below <emphasis>RHS</emphasis> refers to the right-hand side of the
+     type family equation being checked for injectivity.
+     <emphasis>LHS</emphasis> refers to the arguments of that type family
+     equation.  Below are the rules followed when checking injectivity of a type
+     family:
+     <orderedlist>
+       <listitem><para>If a RHS of a type family equation is a type family
+       application GHC reports that the type family is not injective.</para>
+       </listitem>
+       <listitem>If a RHS of a type family equation is a bare type variable we
+       require that all LHS variables (including implicit kind variables) are
+       also bare.  In other words, this has to be a sole equation of that type
+       family and it has to cover all possible patterns.  If the patterns are
+       not covering GHC reports that the type family is not injective.
+       </listitem>
+       <listitem>If a LHS type variable that is declared as injective is not
+       mentioned on <emphasis>injective position</emphasis> in the RHS GHC
+       reports that the type family is not injective.  Injective position means
+       either argument to a type constructor or injective argument to a type
+       family.</listitem>
+       <listitem><para><emphasis>Open type families</emphasis>Open type families
+       are typechecked incrementally.  This means that when a module is imported
+       type family instances contained in that module are checked against
+       instances present in already imported modules.</para>
+       <para>A pair of an open type family equations is checked by attempting to
+       unify their RHSs. If the RHSs don't unify this pair does not violate
+       injectivity annotation.  If unification succeeds with a substitution then
+       LHSs of unified equations must be identical under that substitution. If
+       they are not identical then GHC reports that the type family is not
+       injective.</para>
+       </listitem>
+       <listitem><para>In a <emphasis>closed type family</emphasis> all
+       equations are ordered and in one place. Equations are also checked
+       pair-wise but this time an equation has to be paired with all the
+       preceeding equations.  Of course a single-equation closed type family is
+       trivially injective (unless (1), (2) or (3) above holds).
+       </para>
+       <para>When checking a pair of closed type family equations GHC tried to
+       unify their RHSs.  If they don't unify this pair of equations does not
+       violate injectivity annotation.  If the RHSs can be unified under some
+       substitution (possibly empty) then either the LHSs unify under the same
+       substitution or the LHS of the latter equation is subsumed by earlier
+       equations.  If neither condition is met GHC reports that a type family is
+       not injective.
+       </para>
+       </listitem>
+     </orderedlist>
+     </para>
+     <para>Note that for the purpose of injectivity check in bullets (4) and (5)
+     GHC uses a special variant of unification algorithm that treats type family
+     applications as possibly unifying with anything.</para>
+   </sect3>
+  </sect2>
+
 </sect1>
 
 

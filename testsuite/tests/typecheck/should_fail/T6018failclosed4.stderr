@@ -1,0 +1,8 @@
+
+T6018failclosed4.hs:10:5:
+    Type family equation violates injectivity annotation.
+    Injective type variable ‘n’ does not appear on injective position.
+    In the RHS of type family equation:
+      KClosed ('S n) m = 'S m
+    In the equations for closed type family ‘KClosed’
+    In the type family declaration for ‘KClosed’

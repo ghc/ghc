@@ -1,0 +1,7 @@
+
+T6018failclosed11.hs:14:3:
+    Type family equations violate injectivity annotation:
+      F a IO = IO a
+      F Char b = b Int
+    In the equations for closed type family ‘F’
+    In the type family declaration for ‘F’

@@ -1,0 +1,8 @@
+
+T6018failclosed5.hs:12:2:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation cannot be a type family:
+      LClosed a = MaybeSynClosed a
+    In the equations for closed type family ‘LClosed’
+    In the type family declaration for ‘LClosed’
+

@@ -15,7 +15,8 @@ module TcTypeNats
 import Type
 import Pair
 import TcType     ( TcType, tcEqType )
-import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon, TyConParent(..)  )
+import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon
+                  , Injectivity(..), TyConParent(..)  )
 import Coercion   ( Role(..) )
 import TcRnTypes  ( Xi )
 import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..) )
@@ -107,8 +108,10 @@ typeNatLeqTyCon =
   mkFamilyTyCon name
     (mkArrowKinds [ typeNatKind, typeNatKind ] boolKind)
     (mkTemplateTyVars [ typeNatKind, typeNatKind ])
+    Nothing
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
+    NotInjective
 
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "<=?")
@@ -124,8 +127,10 @@ typeNatCmpTyCon =
   mkFamilyTyCon name
     (mkArrowKinds [ typeNatKind, typeNatKind ] orderingKind)
     (mkTemplateTyVars [ typeNatKind, typeNatKind ])
+    Nothing
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
+    NotInjective
 
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpNat")
@@ -141,8 +146,10 @@ typeSymbolCmpTyCon =
   mkFamilyTyCon name
     (mkArrowKinds [ typeSymbolKind, typeSymbolKind ] orderingKind)
     (mkTemplateTyVars [ typeSymbolKind, typeSymbolKind ])
+    Nothing
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
+    NotInjective
 
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpSymbol")
@@ -163,9 +170,10 @@ mkTypeNatFunTyCon2 op tcb =
   mkFamilyTyCon op
     (mkArrowKinds [ typeNatKind, typeNatKind ] typeNatKind)
     (mkTemplateTyVars [ typeNatKind, typeNatKind ])
+    Nothing
     (BuiltInSynFamTyCon tcb)
     NoParentTyCon
-
+    NotInjective
 
 
 

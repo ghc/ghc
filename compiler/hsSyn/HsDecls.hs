@@ -72,6 +72,9 @@ module HsDecls (
   AnnProvenance(..), annProvenanceName_maybe,
   -- ** Role annotations
   RoleAnnotDecl(..), LRoleAnnotDecl, roleAnnotDeclName,
+  -- ** Injective type families
+  FamilyResultSig(..), LFamilyResultSig, InjectivityAnn(..), LInjectivityAnn,
+  resultVariableName,
 
   -- * Grouping
   HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups
@@ -108,7 +111,6 @@ import Data.Data        hiding (TyCon,Fixity)
 import Data.Foldable ( Foldable )
 import Data.Traversable ( Traversable )
 #endif
-import Data.Maybe
 
 {-
 ************************************************************************
@@ -465,9 +467,10 @@ data TyClDecl name
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
     --             'ApiAnnotation.AnnData',
     --             'ApiAnnotation.AnnFamily','ApiAnnotation.AnnDcolon',
-    --             'ApiAnnotation.AnnWhere',
-    --             'ApiAnnotation.AnnOpen','ApiAnnotation.AnnDcolon',
-    --             'ApiAnnotation.AnnClose'
+    --             'ApiAnnotation.AnnWhere','ApiAnnotation.AnnOpenP',
+    --             'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnCloseP',
+    --             'ApiAnnotation.AnnEqual','ApiAnnotation.AnnRarrow',
+    --             'ApiAnnotation.AnnVbar'
 
     -- For details on above see note [Api annotations] in ApiAnnotation
     FamDecl { tcdFam :: FamilyDecl name }
@@ -545,28 +548,9 @@ tyClGroupConcat = concatMap group_tyclds
 mkTyClGroup :: [LTyClDecl name] -> TyClGroup name
 mkTyClGroup decls = TyClGroup { group_tyclds = decls, group_roles = [] }
 
-type LFamilyDecl name = Located (FamilyDecl name)
-data FamilyDecl name = FamilyDecl
-  { fdInfo    :: FamilyInfo name            -- type or data, closed or open
-  , fdLName   :: Located name               -- type constructor
-  , fdTyVars  :: LHsTyVarBndrs name         -- type variables
-  , fdKindSig :: Maybe (LHsKind name) }     -- result kind
-  deriving( Typeable )
-deriving instance (DataId id) => Data (FamilyDecl id)
 
-data FamilyInfo name
-  = DataFamily
-  | OpenTypeFamily
-     -- | 'Nothing' if we're in an hs-boot file and the user
-     -- said "type family Foo x where .."
-  | ClosedTypeFamily (Maybe [LTyFamInstEqn name])
-  deriving( Typeable )
-deriving instance (DataId name) => Data (FamilyInfo name)
-
-{-
-------------------------------
-Simple classifiers
--}
+-- Simple classifiers for TyClDecl
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -- | @True@ <=> argument is a @data@\/@newtype@
 -- declaration.
@@ -662,38 +646,8 @@ hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
 hsDeclHasCusk (DataDecl { tcdTyVars = tyvars })  = hsTvbAllKinded tyvars
 hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
 
--- | Does this family declaration have a complete, user-supplied kind signature?
-famDeclHasCusk :: FamilyDecl name -> Bool
-famDeclHasCusk (FamilyDecl { fdInfo = ClosedTypeFamily _
-                           , fdTyVars = tyvars
-                           , fdKindSig = m_sig })
-  = hsTvbAllKinded tyvars && isJust m_sig
-famDeclHasCusk _ = True  -- all open families have CUSKs!
-
-{-
-Note [Complete user-supplied kind signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We kind-check declarations differently if they have a complete, user-supplied
-kind signature (CUSK). This is because we can safely generalise a CUSKed
-declaration before checking all of the others, supporting polymorphic recursion.
-See https://ghc.haskell.org/trac/ghc/wiki/GhcKinds/KindInference#Proposednewstrategy
-and #9200 for lots of discussion of how we got here.
-
-A declaration has a CUSK if we can know its complete kind without doing any inference,
-at all. Here are the rules:
-
- - A class or datatype is said to have a CUSK if and only if all of its type
-variables are annotated. Its result kind is, by construction, Constraint or *
-respectively.
-
- - A type synonym has a CUSK if and only if all of its type variables and its
-RHS are annotated with kinds.
-
- - A closed type family is said to have a CUSK if and only if all of its type
-variables and its return type are annotated.
-
- - An open type family always has a CUSK -- unannotated type variables (and return type) default to *.
--}
+-- Pretty-printing TyClDecl
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
 
 instance OutputableBndr name
               => Outputable (TyClDecl name) where
@@ -729,15 +683,223 @@ instance OutputableBndr name => Outputable (TyClGroup name) where
     = ppr tyclds $$
       ppr roles
 
+pp_vanilla_decl_head :: OutputableBndr name
+   => Located name
+   -> LHsTyVarBndrs name
+   -> HsContext name
+   -> SDoc
+pp_vanilla_decl_head thing tyvars context
+ = hsep [pprHsContext context, pprPrefixOcc (unLoc thing), ppr tyvars]
+
+pprTyClDeclFlavour :: TyClDecl a -> SDoc
+pprTyClDeclFlavour (ClassDecl {})   = ptext (sLit "class")
+pprTyClDeclFlavour (SynDecl {})     = ptext (sLit "type")
+pprTyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
+  = pprFlavour info
+pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })
+  = ppr nd
+
+
+{- *********************************************************************
+*                                                                      *
+               Data and type family declarations
+*                                                                      *
+********************************************************************* -}
+
+-- Note [FamilyResultSig]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+--
+-- This data type represents the return signature of a type family.  Possible
+-- values are:
+--
+--  * NoSig - the user supplied no return signature:
+--       type family Id a where ...
+--
+--  * KindSig - the user supplied the return kind:
+--       type family Id a :: * where ...
+--
+--  * TyVarSig - user named the result with a type variable and possibly
+--    provided a kind signature for that variable:
+--       type family Id a = r where ...
+--       type family Id a = (r :: *) where ...
+--
+--    Naming result of a type family is required if we want to provide
+--    injectivity annotation for a type family:
+--       type family Id a = r | r -> a where ...
+--
+-- See also: Note [Injectivity annotation]
+
+-- Note [Injectivity annotation]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- A user can declare a type family to be injective:
+--
+--    type family Id a = r | r -> a where ...
+--
+--  * The part after the "|" is called "injectivity annotation".
+--  * "r -> a" part is called "injectivity condition"; at the moment terms
+--    "injectivity annotation" and "injectivity condition" are synonymous
+--    because we only allow a single injectivity condition.
+--  * "r" is the "LHS of injectivity condition". LHS can only contain the
+--    variable naming the result of a type family.
+
+--  * "a" is the "RHS of injectivity condition". RHS contains space-separated
+--    type and kind variables representing the arguments of a type
+--    family. Variables can be omitted if a type family is not injective in
+--    these arguments. Example:
+--          type family Foo a b c = d | d -> a c where ...
+--
+-- Note that:
+--  a) naming of type family result is required to provide injectivity
+--     annotation
+--  b) for associated types if the result was named then injectivity annotation
+--     is mandatory. Otherwise result type variable is indistinguishable from
+--     associated type default.
+--
+-- It is possible that in the future this syntax will be extended to support
+-- more complicated injectivity annotations. For example we could declare that
+-- if we know the result of Plus and one of its arguments we can determine the
+-- other argument:
+--
+--    type family Plus a b = (r :: Nat) | r a -> b, r b -> a where ...
+--
+-- Here injectivity annotation would consist of two comma-separated injectivity
+-- conditions.
+--
+-- See also Note [Injective type families] in TyCon
+
+type LFamilyResultSig name = Located (FamilyResultSig name)
+data FamilyResultSig name = -- see Note [FamilyResultSig]
+    NoSig
+  -- ^ - 'ApiAnnotation.AnnKeywordId' :
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
+
+  | KindSig  (LHsKind name)
+  -- ^ - 'ApiAnnotation.AnnKeywordId' :
+  --             'ApiAnnotation.AnnOpenP','ApiAnnotation.AnnDcolon',
+  --             'ApiAnnotation.AnnCloseP'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
+
+  | TyVarSig (LHsTyVarBndr name)
+  -- ^ - 'ApiAnnotation.AnnKeywordId' :
+  --             'ApiAnnotation.AnnOpenP','ApiAnnotation.AnnDcolon',
+  --             'ApiAnnotation.AnnCloseP', 'ApiAnnotation.AnnEqual'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
+
+  deriving ( Typeable )
+deriving instance (DataId name) => Data (FamilyResultSig name)
+
+type LFamilyDecl name = Located (FamilyDecl name)
+data FamilyDecl name = FamilyDecl
+  { fdInfo           :: FamilyInfo name              -- type/data, closed/open
+  , fdLName          :: Located name                 -- type constructor
+  , fdTyVars         :: LHsTyVarBndrs name           -- type variables
+  , fdResultSig      :: LFamilyResultSig name        -- result signature
+  , fdInjectivityAnn :: Maybe (LInjectivityAnn name) -- optional injectivity ann
+  }
+  -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
+  --             'ApiAnnotation.AnnData', 'ApiAnnotation.AnnFamily',
+  --             'ApiAnnotation.AnnWhere', 'ApiAnnotation.AnnOpenP',
+  --             'ApiAnnotation.AnnDcolon', 'ApiAnnotation.AnnCloseP',
+  --             'ApiAnnotation.AnnEqual', 'ApiAnnotation.AnnRarrow',
+  --             'ApiAnnotation.AnnVbar'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
+  deriving ( Typeable )
+
+deriving instance (DataId id) => Data (FamilyDecl id)
+
+type LInjectivityAnn name = Located (InjectivityAnn name)
+
+-- | If the user supplied an injectivity annotation it is represented using
+-- InjectivityAnn. At the moment this is a single injectivity condition - see
+-- Note [Injectivity annotation]. `Located name` stores the LHS of injectivity
+-- condition. `[Located name]` stores the RHS of injectivity condition. Example:
+--
+--   type family Foo a b c = r | r -> a c where ...
+--
+-- This will be represented as "InjectivityAnn `r` [`a`, `c`]"
+data InjectivityAnn name
+  = InjectivityAnn (Located name) [Located name]
+  -- ^ - 'ApiAnnotation.AnnKeywordId' :
+  --             'ApiAnnotation.AnnRarrow', 'ApiAnnotation.AnnVbar'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
+  deriving ( Data, Typeable )
+
+data FamilyInfo name
+  = DataFamily
+  | OpenTypeFamily
+     -- | 'Nothing' if we're in an hs-boot file and the user
+     -- said "type family Foo x where .."
+  | ClosedTypeFamily (Maybe [LTyFamInstEqn name])
+  deriving( Typeable )
+deriving instance (DataId name) => Data (FamilyInfo name)
+
+-- | Does this family declaration have a complete, user-supplied kind signature?
+famDeclHasCusk :: FamilyDecl name -> Bool
+famDeclHasCusk (FamilyDecl { fdInfo      = ClosedTypeFamily _
+                           , fdTyVars    = tyvars
+                           , fdResultSig = L _ resultSig })
+  = hsTvbAllKinded tyvars && hasReturnKindSignature resultSig
+famDeclHasCusk _ = True  -- all open families have CUSKs!
+
+-- | Does this family declaration have user-supplied return kind signature?
+hasReturnKindSignature :: FamilyResultSig a -> Bool
+hasReturnKindSignature NoSig                          = False
+hasReturnKindSignature (TyVarSig (L _ (UserTyVar _))) = False
+hasReturnKindSignature _                              = True
+
+-- | Maybe return name of the result type variable
+resultVariableName :: FamilyResultSig a -> Maybe a
+resultVariableName (TyVarSig sig) = Just $ hsLTyVarName sig
+resultVariableName _              = Nothing
+
+{-
+Note [Complete user-supplied kind signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We kind-check declarations differently if they have a complete, user-supplied
+kind signature (CUSK). This is because we can safely generalise a CUSKed
+declaration before checking all of the others, supporting polymorphic recursion.
+See ghc.haskell.org/trac/ghc/wiki/GhcKinds/KindInference#Proposednewstrategy
+and #9200 for lots of discussion of how we got here.
+
+A declaration has a CUSK if we can know its complete kind without doing any
+inference, at all. Here are the rules:
+
+ - A class or datatype is said to have a CUSK if and only if all of its type
+variables are annotated. Its result kind is, by construction, Constraint or *
+respectively.
+
+ - A type synonym has a CUSK if and only if all of its type variables and its
+RHS are annotated with kinds.
+
+ - A closed type family is said to have a CUSK if and only if all of its type
+variables and its return type are annotated.
+
+ - An open type family always has a CUSK -- unannotated type variables (and
+return type) default to *.
+-}
+
 instance (OutputableBndr name) => Outputable (FamilyDecl name) where
-  ppr (FamilyDecl { fdInfo = info, fdLName = ltycon,
-                    fdTyVars = tyvars, fdKindSig = mb_kind})
-      = vcat [ pprFlavour info <+> pp_vanilla_decl_head ltycon tyvars [] <+> pp_kind <+> pp_where
+  ppr (FamilyDecl { fdInfo = info, fdLName = ltycon
+                  , fdTyVars = tyvars, fdResultSig = L _ result
+                  , fdInjectivityAnn = mb_inj })
+      = vcat [ pprFlavour info <+> pp_vanilla_decl_head ltycon tyvars [] <+>
+               pp_kind <+> pp_inj <+> pp_where
              , nest 2 $ pp_eqns ]
         where
-          pp_kind = case mb_kind of
-                      Nothing   -> empty
-                      Just kind -> dcolon <+> ppr kind
+          pp_kind = case result of
+                      NoSig            -> empty
+                      KindSig  kind    -> dcolon <+> ppr kind
+                      TyVarSig tv_bndr -> text "=" <+> ppr tv_bndr
+          pp_inj = case mb_inj of
+                     Just (L _ (InjectivityAnn lhs rhs)) ->
+                       hsep [ text "|", ppr lhs, text "->", hsep (map ppr rhs) ]
+                     Nothing -> empty
           (pp_where, pp_eqns) = case info of
             ClosedTypeFamily mb_eqns ->
               ( ptext (sLit "where")
@@ -754,38 +916,13 @@ pprFlavour (ClosedTypeFamily {}) = ptext (sLit "type family")
 instance Outputable (FamilyInfo name) where
   ppr = pprFlavour
 
-pp_vanilla_decl_head :: OutputableBndr name
-   => Located name
-   -> LHsTyVarBndrs name
-   -> HsContext name
-   -> SDoc
-pp_vanilla_decl_head thing tyvars context
- = hsep [pprHsContext context, pprPrefixOcc (unLoc thing), ppr tyvars]
 
-pp_fam_inst_lhs :: OutputableBndr name
-   => Located name
-   -> HsTyPats name
-   -> HsContext name
-   -> SDoc
-pp_fam_inst_lhs thing (HsWB { hswb_cts = typats }) context -- explicit type patterns
-   = hsep [ pprHsContext context, pprPrefixOcc (unLoc thing)
-          , hsep (map (pprParendHsType.unLoc) typats)]
 
-pprTyClDeclFlavour :: TyClDecl a -> SDoc
-pprTyClDeclFlavour (ClassDecl {})   = ptext (sLit "class")
-pprTyClDeclFlavour (SynDecl {})     = ptext (sLit "type")
-pprTyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
-  = pprFlavour info
-pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })
-  = ppr nd
-
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection[ConDecl]{A data-constructor declaration}
+               Data types and data constructors
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 data HsDataDefn name   -- The payload of a data type defn
                        -- Used *both* for vanilla data declarations,
@@ -1030,12 +1167,13 @@ It is parameterised over its tfe_pats field:
    (or something similar for a closed family)
    It is represented by a TyFamInstEqn, with *type* in the tfe_pats field.
 
- * On the other hand, the *default instance* of an associated type looksl like
+ * On the other hand, the *default instance* of an associated type looks like
    this in source Haskell
       class C a where
         type T a b
         type T a b = a -> b   -- The default instance
-   It is represented by a TyFamDefltEqn, with *type variables8 in the tfe_pats field.
+   It is represented by a TyFamDefltEqn, with *type variables* in the tfe_pats
+   field.
 -}
 
 ----------------- Type synonym family instances -------------
@@ -1204,6 +1342,15 @@ pprDataFamInstFlavour :: DataFamInstDecl name -> SDoc
 pprDataFamInstFlavour (DataFamInstDecl { dfid_defn = (HsDataDefn { dd_ND = nd }) })
   = ppr nd
 
+pp_fam_inst_lhs :: OutputableBndr name
+   => Located name
+   -> HsTyPats name
+   -> HsContext name
+   -> SDoc
+pp_fam_inst_lhs thing (HsWB { hswb_cts = typats }) context -- explicit type patterns
+   = hsep [ pprHsContext context, pprPrefixOcc (unLoc thing)
+          , hsep (map (pprParendHsType.unLoc) typats)]
+
 instance (OutputableBndr name) => Outputable (ClsInstDecl name) where
     ppr (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = binds
                      , cid_sigs = sigs, cid_tyfam_insts = ats
@@ -1231,8 +1378,6 @@ ppOverlapPragma mb =
     Just (L _ (Overlapping _))  -> ptext (sLit "{-# OVERLAPPING #-}")
     Just (L _ (Overlaps _))     -> ptext (sLit "{-# OVERLAPS #-}")
     Just (L _ (Incoherent _))   -> ptext (sLit "{-# INCOHERENT #-}")
-
-
 
 
 instance (OutputableBndr name) => Outputable (InstDecl name) where

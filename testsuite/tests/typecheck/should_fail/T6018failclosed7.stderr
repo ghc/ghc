@@ -1,0 +1,7 @@
+
+T6018failclosed7.hs:7:5:
+    Type family equations violate injectivity annotation:
+      FClosed Char Bool Int = Int
+      FClosed Bool Int Char = Int
+    In the equations for closed type family ‘FClosed’
+    In the type family declaration for ‘FClosed’

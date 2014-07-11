@@ -836,12 +836,14 @@ ty_decl :: { LTyClDecl RdrName }
                         [mj AnnType $1,mj AnnEqual $3] }
 
            -- type family declarations
-        | 'type' 'family' type opt_kind_sig where_type_family
+        | 'type' 'family' type opt_tyfam_kind_sig opt_injective_info
+                          where_type_family
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% amms (mkFamDecl (comb4 $1 $3 $4 $5) (snd $ unLoc $5) $3
-                                   (snd $ unLoc $4))
-                        (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)++(fst $ unLoc $5)) }
+                {% amms (mkFamDecl (comb4 $1 $3 $4 $5) (snd $ unLoc $6) $3
+                                   (snd $ unLoc $4) (snd $ unLoc $5))
+                        (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)
+                           ++ (fst $ unLoc $5) ++ (fst $ unLoc $6)) }
 
           -- ordinary data type or newtype declaration
         | data_or_newtype capi_ctype tycl_hdr constrs deriving
@@ -863,8 +865,9 @@ ty_decl :: { LTyClDecl RdrName }
                     ((fst $ unLoc $1):(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
           -- data/newtype family
-        | 'data' 'family' type opt_kind_sig
-                {% amms (mkFamDecl (comb3 $1 $2 $4) DataFamily $3 (snd $ unLoc $4))
+        | 'data' 'family' type opt_datafam_kind_sig
+                {% amms (mkFamDecl (comb3 $1 $2 $4) DataFamily $3
+                                   (snd $ unLoc $4) Nothing)
                         (mj AnnData $1:mj AnnFamily $2:(fst $ unLoc $4)) }
 
 inst_decl :: { LInstDecl RdrName }
@@ -910,6 +913,22 @@ overlap_pragma :: { Maybe (Located OverlapMode) }
                                        [mo $1,mc $2] }
   | {- empty -}                 { Nothing }
 
+
+-- Injective type families
+
+opt_injective_info :: { Located ([AddAnn], Maybe (LInjectivityAnn RdrName)) }
+        : {- empty -}               { noLoc ([], Nothing) }
+        | '|' injectivity_cond      { sLL $1 $> ( mj AnnVbar $1 : fst (unLoc $2)
+                                                , Just (snd (unLoc $2))) }
+
+injectivity_cond :: { Located ([AddAnn], LInjectivityAnn RdrName) }
+        : tyvarid '->' inj_varids
+           { sLL $1 $> ( [mj AnnRarrow $2]
+                       , (sLL $1 $> (InjectivityAnn $1 (reverse (unLoc $3))))) }
+
+inj_varids :: { Located [Located RdrName] }
+        : inj_varids tyvarid  { sLL $1 $> ($2 : unLoc $1) }
+        | tyvarid             { sLL $1 $> [$1]            }
 
 -- Closed type families
 
@@ -958,20 +977,24 @@ ty_fam_inst_eqn :: { Located ([AddAnn],LTyFamInstEqn RdrName) }
 --
 at_decl_cls :: { LHsDecl RdrName }
         :  -- data family declarations, with optional 'family' keyword
-          'data' opt_family type opt_kind_sig
+          'data' opt_family type opt_datafam_kind_sig
                 {% amms (liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) DataFamily $3
-                                                  (snd $ unLoc $4)))
+                                                  (snd $ unLoc $4) Nothing))
                         (mj AnnData $1:$2++(fst $ unLoc $4)) }
 
            -- type family declarations, with optional 'family' keyword
            -- (can't use opt_instance because you get shift/reduce errors
-        | 'type' type opt_kind_sig
-               {% amms (liftM mkTyClD (mkFamDecl (comb3 $1 $2 $3)
-                                                  OpenTypeFamily $2 (snd $ unLoc $3)))
+        | 'type' type opt_at_kind_inj_sig
+               {% amms (liftM mkTyClD
+                        (mkFamDecl (comb3 $1 $2 $3) OpenTypeFamily $2
+                                   (fst . snd $ unLoc $3)
+                                   (snd . snd $ unLoc $3)))
                        (mj AnnType $1:(fst $ unLoc $3)) }
-        | 'type' 'family' type opt_kind_sig
-               {% amms (liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4)
-                                                  OpenTypeFamily $3 (snd $ unLoc $4)))
+        | 'type' 'family' type opt_at_kind_inj_sig
+               {% amms (liftM mkTyClD
+                        (mkFamDecl (comb3 $1 $3 $4) OpenTypeFamily $3
+                                   (fst . snd $ unLoc $4)
+                                   (snd . snd $ unLoc $4)))
                        (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)) }
 
            -- default type instances, with optional 'instance' keyword
@@ -1014,13 +1037,33 @@ at_decl_inst :: { LInstDecl RdrName }
                                 $3 (snd $ unLoc $4) (snd $ unLoc $5) (unLoc $6))
                         ((fst $ unLoc $1):(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
-data_or_newtype :: { Located (AddAnn,NewOrData) }
+data_or_newtype :: { Located (AddAnn, NewOrData) }
         : 'data'        { sL1 $1 (mj AnnData    $1,DataType) }
         | 'newtype'     { sL1 $1 (mj AnnNewtype $1,NewType) }
 
-opt_kind_sig :: { Located ([AddAnn],Maybe (LHsKind RdrName)) }
-        :                             { noLoc ([],Nothing) }
-        | '::' kind                   { sLL $1 $> ([mj AnnDcolon $1],Just ($2)) }
+-- Family result/return kind signatures
+
+opt_kind_sig :: { Located ([AddAnn], Maybe (LHsKind RdrName)) }
+        :               { noLoc     ([]               , Nothing) }
+        | '::' kind     { sLL $1 $> ([mj AnnDcolon $1], Just $2) }
+
+opt_datafam_kind_sig :: { Located ([AddAnn], LFamilyResultSig RdrName) }
+        :               { noLoc     ([]               , noLoc NoSig           )}
+        | '::' kind     { sLL $1 $> ([mj AnnDcolon $1], sLL $1 $> (KindSig $2))}
+
+opt_tyfam_kind_sig :: { Located ([AddAnn], LFamilyResultSig RdrName) }
+        :              { noLoc     ([]               , noLoc      NoSig       )}
+        | '::' kind    { sLL $1 $> ([mj AnnDcolon $1], sLL $1 $> (KindSig  $2))}
+        | '='  tv_bndr { sLL $1 $> ([mj AnnEqual $1] , sLL $1 $> (TyVarSig $2))}
+
+opt_at_kind_inj_sig :: { Located ([AddAnn], ( LFamilyResultSig RdrName
+                                            , Maybe (LInjectivityAnn RdrName)))}
+        :            { noLoc ([], (noLoc NoSig, Nothing)) }
+        | '::' kind  { sLL $1 $> ( [mj AnnDcolon $1]
+                                 , (sLL $2 $> (KindSig $2), Nothing)) }
+        | '='  tv_bndr '|' injectivity_cond
+                { sLL $1 $> ( mj AnnEqual $1 : mj AnnVbar $3 : fst (unLoc $4)
+                            , (sLL $1 $2 (TyVarSig $2), Just (snd (unLoc $4))))}
 
 -- tycl_hdr parses the header of a class or data type decl,
 -- which takes the form

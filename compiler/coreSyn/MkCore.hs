@@ -43,6 +43,9 @@ module MkCore (
         mkNilExpr, mkConsExpr, mkListExpr,
         mkFoldrExpr, mkBuildExpr,
 
+        -- * Constructing Maybe expressions
+        mkNothingExpr, mkJustExpr,
+
         -- * Error Ids
         mkRuntimeErrorApp, mkImpossibleExpr, errorIds,
         rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
@@ -601,6 +604,24 @@ mkBuildExpr elt_ty mk_build_inside = do
     newTyVars tyvar_tmpls = do
       uniqs <- getUniquesM
       return (zipWith setTyVarUnique tyvar_tmpls uniqs)
+
+{-
+************************************************************************
+*                                                                      *
+             Manipulating Maybe data type
+*                                                                      *
+************************************************************************
+-}
+
+
+-- | Makes a Nothing for the specified type
+mkNothingExpr :: Type -> CoreExpr
+mkNothingExpr ty = mkConApp nothingDataCon [Type ty]
+
+-- | Makes a Just from a value of the specified type
+mkJustExpr :: Type -> CoreExpr -> CoreExpr
+mkJustExpr ty val = mkConApp justDataCon [Type ty, val]
+
 
 {-
 ************************************************************************

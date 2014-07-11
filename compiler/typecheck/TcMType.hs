@@ -33,7 +33,7 @@ module TcMType (
 
   --------------------------------
   -- Instantiation
-  tcInstTyVars, tcInstTyVarX, newSigTyVar,
+  tcInstTyVars, tcInstTyVarX, newSigTyVar, newSigKindVar,
   tcInstType,
   tcInstSkolTyVars, tcInstSuperSkolTyVarsX,
   tcInstSigTyVarsLoc, tcInstSigTyVars,
@@ -290,14 +290,17 @@ newMetaTyVar meta_info kind
         ; details <- newMetaDetails meta_info
         ; return (mkTcTyVar name kind details) }
 
+newSigKindVar :: Name -> TcM TcTyVar
+newSigKindVar name = newSigTyVar name superKind
+
 newSigTyVar :: Name -> Kind -> TcM TcTyVar
 newSigTyVar name kind
-  = do { uniq <- newUnique
-       ; let name' = setNameUnique name uniq
-                      -- Use the same OccName so that the tidy-er
-                      -- doesn't gratuitously rename 'a' to 'a0' etc
-       ; details <- newMetaDetails SigTv
-       ; return (mkTcTyVar name' kind details) }
+  = do { details <- newMetaDetails SigTv
+       ; uniq    <- newUnique
+       ; let fresh_name = setNameUnique name uniq
+                 -- Use the same OccName so that the tidy-er
+                 -- doesn't gratuitously rename 'a' to 'a0' etc
+       ; return (mkTcTyVar fresh_name kind details) }
 
 newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
 newMetaDetails info
@@ -563,12 +566,12 @@ skolemiseUnboundMetaTyVar tv details
   = ASSERT2( isMetaTyVar tv, ppr tv )
     do  { span <- getSrcSpanM    -- Get the location from "here"
                                  -- ie where we are generalising
-        ; uniq <- newUnique      -- Remove it from TcMetaTyVar unique land
         ; kind <- zonkTcKind (tyVarKind tv)
-        ; let tv_name = getOccName tv
-              final_name = mkInternalName uniq tv_name span
-              final_kind = defaultKind kind
-              final_tv   = mkTcTyVar final_name final_kind details
+        ; let uniq        = getUnique tv
+              tv_name     = getOccName tv
+              final_name  = mkInternalName uniq tv_name span
+              final_kind  = defaultKind kind
+              final_tv    = mkTcTyVar final_name final_kind details
 
         ; traceTc "Skolemising" (ppr tv <+> ptext (sLit ":=") <+> ppr final_tv)
         ; writeMetaTyVar tv (mkTyVarTy final_tv)

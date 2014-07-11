@@ -7,8 +7,8 @@ tcfail181.hs:17:9: error:
       at tcfail181.hs:17:1-30
     The type variable ‘m0’ is ambiguous
     Potential instances:
-      instance Monad Maybe -- Defined in ‘GHC.Base’
       instance Monad IO -- Defined in ‘GHC.Base’
+      instance Monad Maybe -- Defined in ‘GHC.Base’
       instance Monad ((->) r) -- Defined in ‘GHC.Base’
       ...plus two others
       (use -fprint-potential-instances to see them all)

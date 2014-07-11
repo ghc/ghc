@@ -78,7 +78,7 @@ two passes over the instance decls.
 
 Note [How instance declarations are translated]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here is how we translation instance declarations into Core
+Here is how we translate instance declarations into Core
 
 Running example:
         class C a where
@@ -530,7 +530,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         ; let defined_ats = mkNameSet (map (tyFamInstDeclName . unLoc) ats)
                             `unionNameSet`
                             mkNameSet (map (unLoc . dfid_tycon . unLoc) adts)
-        ; tyfam_insts1 <- mapM (tcATDefault mini_subst defined_ats)
+        ; tyfam_insts1 <- mapM (tcATDefault loc mini_subst defined_ats)
                                (classATItems clas)
 
         -- Finally, construct the Core representation of the instance.
@@ -551,11 +551,11 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         ; return ( [inst_info], tyfam_insts0 ++ concat tyfam_insts1 ++ datafam_insts) }
 
 
-tcATDefault :: TvSubst -> NameSet -> ClassATItem -> TcM [FamInst]
+tcATDefault :: SrcSpan -> TvSubst -> NameSet -> ClassATItem -> TcM [FamInst]
 -- ^ Construct default instances for any associated types that
 -- aren't given a user definition
 -- Returns [] or singleton
-tcATDefault inst_subst defined_ats (ATI fam_tc defs)
+tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
   -- User supplied instances ==> everything is OK
   | tyConName fam_tc `elemNameSet` defined_ats
   = return []
@@ -570,7 +570,7 @@ tcATDefault inst_subst defined_ats (ATI fam_tc defs)
              rhs'     = substTy subst' rhs_ty
              tv_set'  = tyVarsOfTypes pat_tys'
              tvs'     = varSetElemsKvsFirst tv_set'
-       ; rep_tc_name <- newFamInstTyConName (noLoc (tyConName fam_tc)) pat_tys'
+       ; rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc)) pat_tys'
        ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' fam_tc pat_tys' rhs'
        ; traceTc "mk_deflt_at_instance" (vcat [ ppr fam_tc, ppr rhs_ty
                                               , pprCoAxiom axiom ])
@@ -634,15 +634,15 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
        ; fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_lname
 
          -- (0) Check it's an open type family
-       ; checkTc (isFamilyTyCon fam_tc)        (notFamily fam_tc)
-       ; checkTc (isTypeFamilyTyCon fam_tc)    (wrongKindOfFamily fam_tc)
+       ; checkTc (isFamilyTyCon fam_tc)         (notFamily fam_tc)
+       ; checkTc (isTypeFamilyTyCon fam_tc)     (wrongKindOfFamily fam_tc)
        ; checkTc (isOpenTypeFamilyTyCon fam_tc) (notOpenFamily fam_tc)
 
          -- (1) do the work of verifying the synonym group
        ; co_ax_branch <- tcTyFamInstEqn (famTyConShape fam_tc) eqn
 
          -- (2) check for validity
-       ; checkValidTyFamInst mb_clsinfo fam_tc co_ax_branch
+       ; checkValidCoAxBranch mb_clsinfo fam_tc co_ax_branch
 
          -- (3) construct coercion axiom
        ; rep_tc_name <- newFamInstAxiomName loc (unLoc fam_lname)

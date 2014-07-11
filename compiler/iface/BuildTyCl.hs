@@ -46,19 +46,23 @@ import Outputable
 buildSynonymTyCon :: Name -> [TyVar] -> [Role]
                   -> Type
                   -> Kind                   -- ^ Kind of the RHS
-                  -> TcRnIf m n TyCon
+                  -> TyCon
 buildSynonymTyCon tc_name tvs roles rhs rhs_kind
-  = return (mkSynonymTyCon tc_name kind tvs roles rhs)
+  = mkSynonymTyCon tc_name kind tvs roles rhs
   where kind = mkPiKinds tvs rhs_kind
 
 
-buildFamilyTyCon :: Name -> [TyVar]
-                 -> FamTyConFlav
-                 -> Kind                   -- ^ Kind of the RHS
-                 -> TyConParent
-                 -> TcRnIf m n TyCon
-buildFamilyTyCon tc_name tvs rhs rhs_kind parent
-  = return (mkFamilyTyCon tc_name kind tvs rhs parent)
+buildFamilyTyCon :: Name         -- ^ Type family name
+                 -> [TyVar]      -- ^ Type variables
+                 -> Maybe Name   -- ^ Result variable name
+                 -> FamTyConFlav -- ^ Open, closed or in a boot file?
+                 -> Kind         -- ^ Kind of the RHS
+                 -> TyConParent  -- ^ Parent, if exists
+                 -> Injectivity  -- ^ Injectivity annotation
+                                 -- See [Injectivity annotation] in HsDecls
+                 -> TyCon
+buildFamilyTyCon tc_name tvs res_tv rhs rhs_kind parent injectivity
+  = mkFamilyTyCon tc_name kind tvs res_tv rhs parent injectivity
   where kind = mkPiKinds tvs rhs_kind
 
 

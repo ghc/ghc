@@ -24,12 +24,15 @@ import PrelNames ( knownNatClassName, knownSymbolClassName,
                    callStackTyConKey, typeableClassName )
 import TysWiredIn ( ipClass, typeNatKind, typeSymbolKind )
 import Id( idType )
+import CoAxiom ( Eqn, CoAxiom(..), CoAxBranch(..), fromBranchList )
 import Class
 import TyCon
 import DataCon( dataConWrapId )
 import FunDeps
 import FamInst
+import FamInstEnv
 import Inst( tyVarsOfCt )
+import Unify ( tcUnifyTyWithTFs )
 
 import TcEvidence
 import Outputable
@@ -37,6 +40,7 @@ import Outputable
 import TcRnTypes
 import TcSMonad
 import Bag
+import MonadUtils ( concatMapM )
 
 import Data.List( partition, foldl', deleteFirstsBy )
 import SrcLoc
@@ -85,7 +89,7 @@ We unflatten after solving the wc_simples of an implication, and before attempti
 to float. This means that
 
  * The fsk/fmv flatten-skolems only survive during solveSimples.  We don't
-   need to worry about then across successive passes over the constraint tree.
+   need to worry about them across successive passes over the constraint tree.
    (E.g. we don't need the old ic_fsk field of an implication.
 
  * When floating an equality outwards, we don't need to worry about floating its
@@ -115,7 +119,7 @@ Note [Running plugins on unflattened wanteds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There is an annoying mismatch between solveSimpleGivens and
 solveSimpleWanteds, because the latter needs to fiddle with the inert
-set, unflatten and and zonk the wanteds.  It passes the zonked wanteds
+set, unflatten and zonk the wanteds.  It passes the zonked wanteds
 to runTcPluginsWanteds, which produces a replacement set of wanteds,
 some additional insolubles and a flag indicating whether to go round
 the loop again.  If so, prepareInertsForImplications is used to remove
@@ -215,7 +219,7 @@ See Note [Unflattening can force the solver to iterate]
 ---------------------------------------------------------------
 solveSimples :: Cts -> TcS ()
 -- Returns the final InertSet in TcS
--- Has no effect on work-list or residual-iplications
+-- Has no effect on work-list or residual-implications
 -- The constraints are initially examined in left-to-right order
 
 solveSimples cts
@@ -847,34 +851,73 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
          ; reactFunEq ev fsk ev_i fsk_i
          ; stopWith ev "Work item rewrites inert" }
 
-  | Just ops <- isBuiltInSynFamTyCon_maybe tc
-  = do { let matching_funeqs = findFunEqsByTyCon funeqs tc
-       ; let interact = sfInteractInert ops args (lookupFlattenTyVar eqs fsk)
-             do_one (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk, cc_ev = iev })
-                = mapM_ (unifyDerived (ctEvLoc iev) Nominal)
-                        (interact iargs (lookupFlattenTyVar eqs ifsk))
-             do_one ct = pprPanic "interactFunEq" (ppr ct)
-       ; mapM_ do_one matching_funeqs
-       ; traceTcS "builtInCandidates 1: " $ vcat [ ptext (sLit "Candidates:") <+> ppr matching_funeqs
-                                                 , ptext (sLit "TvEqs:") <+> ppr eqs ]
-       ; return (ContinueWith workItem) }
-
-  | otherwise
-  = return (ContinueWith workItem)
+  | otherwise   -- Try improvement
+  = do { improveLocalFunEqs loc inerts tc args fsk
+       ; continueWith workItem }
   where
-    eqs    = inert_eqs inerts
-    funeqs = inert_funeqs inerts
+    loc             = ctEvLoc ev
+    funeqs          = inert_funeqs inerts
     matching_inerts = findFunEqs funeqs tc args
 
-interactFunEq _ wi = pprPanic "interactFunEq" (ppr wi)
+interactFunEq _ workItem = pprPanic "interactFunEq" (ppr workItem)
 
-lookupFlattenTyVar :: TyVarEnv EqualCtList -> TcTyVar -> TcType
+improveLocalFunEqs :: CtLoc -> InertCans -> TyCon -> [TcType] -> TcTyVar
+                   -> TcS ()
+-- Generate derived improvement equalities, by comparing
+-- the current work item with inert CFunEqs
+-- E.g.   x + y ~ z,   x + y' ~ z   =>   [D] y ~ y'
+improveLocalFunEqs loc inerts fam_tc args fsk
+  | not (null improvement_eqns)
+  = do { traceTcS "interactFunEq improvements: " $
+         vcat [ ptext (sLit "Eqns:") <+> ppr improvement_eqns
+              , ptext (sLit "Candidates:") <+> ppr funeqs_for_tc
+              , ptext (sLit "TvEqs:") <+> ppr tv_eqs ]
+       ; mapM_ (unifyDerived loc Nominal) improvement_eqns }
+  | otherwise
+  = return ()
+  where
+    tv_eqs        = inert_model inerts
+    funeqs        = inert_funeqs inerts
+    funeqs_for_tc = findFunEqsByTyCon funeqs fam_tc
+    rhs           = lookupFlattenTyVar tv_eqs fsk
+
+    --------------------
+    improvement_eqns
+      | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
+      =    -- Try built-in families, notably for arithmethic
+         concatMap (do_one_built_in ops) funeqs_for_tc
+
+      | Injective injective_args <- familyTyConInjectivityInfo fam_tc
+      =    -- Try improvement from type families with injectivity annotations
+         concatMap (do_one_injective injective_args) funeqs_for_tc
+
+      | otherwise
+      = []
+
+    --------------------
+    do_one_built_in ops (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
+      = sfInteractInert ops args rhs iargs (lookupFlattenTyVar tv_eqs ifsk)
+    do_one_built_in _ _ = pprPanic "interactFunEq 1" (ppr fam_tc)
+
+    --------------------
+    -- See Note [Type inference for type families with injectivity]
+    do_one_injective injective_args
+                    (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
+      | rhs `tcEqType` lookupFlattenTyVar tv_eqs ifsk
+      = [Pair arg iarg | (arg, iarg, True)
+                           <- zip3 args iargs injective_args ]
+      | otherwise
+      = []
+    do_one_injective _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)
+
+-------------
+lookupFlattenTyVar :: InertModel -> TcTyVar -> TcType
 -- ^ Look up a flatten-tyvar in the inert nominal TyVarEqs;
 -- this is used only when dealing with a CFunEqCan
-lookupFlattenTyVar inert_eqs ftv
-  = case lookupVarEnv inert_eqs ftv of
-      Just (CTyEqCan { cc_rhs = rhs, cc_eq_rel = NomEq } : _) -> rhs
-      _                                                       -> mkTyVarTy ftv
+lookupFlattenTyVar model ftv
+  = case lookupVarEnv model ftv of
+      Just (CTyEqCan { cc_rhs = rhs, cc_eq_rel = NomEq }) -> rhs
+      _                                                   -> mkTyVarTy ftv
 
 reactFunEq :: CtEvidence -> TcTyVar    -- From this  :: F tys ~ fsk1
            -> CtEvidence -> TcTyVar    -- Solve this :: F tys ~ fsk2
@@ -893,6 +936,44 @@ reactFunEq from_this fuv1 ev fuv2
        ; traceTcS "reactFunEq done" (ppr from_this $$ ppr fuv1 $$ ppr ev $$ ppr fuv2) }
 
 {-
+Note [Type inference for type families with injectivity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have a type family with an injectivity annotation:
+    type family F a b = r | r -> b
+
+Then if we have two CFunEqCan constraints for F with the same RHS
+   F s1 t1 ~ rhs
+   F s2 t2 ~ rhs
+then we can use the injectivity to get a new Derived constraint on
+the injective argument
+  [D] t1 ~ t2
+
+That in turn can help GHC solve constraints that would otherwise require
+guessing.  For example, consider the ambiguity check for
+   f :: F Int b -> Int
+We get the constraint
+   [W] F Int b ~ F Int beta
+where beta is a unification variable.  Injectivity lets us pick beta ~ b.
+
+Injectivity information is also used at the call sites. For example:
+   g = f True
+gives rise to
+   [W] F Int b ~ Bool
+from which we can derive b.  This requires looking at the defining equations of
+a type family, ie. finding equation with a matching RHS (Bool in this example)
+and infering values of type variables (b in this example) from the LHS patterns
+of the matching equation.  For closed type families we have to perform
+additional apartness check for the selected equation to check that the selected
+is guaranteed to fire for given LHS arguments.
+
+These new constraints are simply *Derived* constraints; they have no evidence.
+We could go further and offer evidence from decomposing injective type-function
+applications, but that would require new evidence forms, and an extension to
+FC, so we don't do that right now (Dec 14).
+
+See also Note [Injective type families] in TyCon
+
+
 Note [Cache-caused loops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 It is very dangerous to cache a rewritten wanted family equation as 'solved' in our
@@ -1163,7 +1244,7 @@ topReactionsStage :: WorkItem -> TcS (StopOrContinue Ct)
 topReactionsStage wi
  = do { tir <- doTopReact wi
       ; case tir of
-          ContinueWith wi -> return (ContinueWith wi)
+          ContinueWith wi -> continueWith wi
           Stop ev s       -> return (Stop ev (ptext (sLit "Top react:") <+> s)) }
 
 doTopReact :: WorkItem -> TcS (StopOrContinue Ct)
@@ -1181,7 +1262,7 @@ doTopReact work_item
                               ; doTopReactDict inerts work_item }
            CFunEqCan {} -> doTopReactFunEq work_item
            _  -> -- Any other work item does not react with any top-level equations
-                 return (ContinueWith work_item)  }
+                 continueWith work_item  }
 
 --------------------
 doTopReactDict :: InertSet -> Ct -> TcS (StopOrContinue Ct)
@@ -1270,71 +1351,136 @@ doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 
 --------------------
 doTopReactFunEq :: Ct -> TcS (StopOrContinue Ct)
--- Note [Short cut for top-level reaction]
-doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
-                                     , cc_tyargs = args , cc_fsk = fsk })
-  = ASSERT(isTypeFamilyTyCon fam_tc) -- No associated data families
-                                     -- have reached this far
-    -- Look up in top-level instances, or built-in axiom
-    do { match_res <- matchFam fam_tc args   -- See Note [MATCHING-SYNONYMS]
-       ; case match_res of {
-           Nothing -> do { try_improve
-                         ; continueWith work_item } ;
-           Just (ax_co, rhs_ty)
+doTopReactFunEq work_item = do { fam_envs <- getFamInstEnvs
+                               ; do_top_fun_eq fam_envs work_item }
 
-    -- Found a top-level instance
+do_top_fun_eq :: FamInstEnvs -> Ct -> TcS (StopOrContinue Ct)
+do_top_fun_eq fam_envs work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
+                                            , cc_tyargs = args , cc_fsk = fsk })
+  | Just (ax_co, rhs_ty) <- reduceTyFamApp_maybe fam_envs Nominal fam_tc args
+                            -- Look up in top-level instances, or built-in axiom
+                            -- See Note [MATCHING-SYNONYMS]
+  = reduce_top_fun_eq old_ev fsk (TcCoercion ax_co) rhs_ty
 
-    | Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
-    , isTypeFamilyTyCon tc
-    , tc_args `lengthIs` tyConArity tc    -- Short-cut
-    -> shortCutReduction old_ev fsk ax_co tc tc_args
-         -- Try shortcut; see Note [Short cut for top-level reaction]
+  | otherwise
+  = do { improveTopFunEqs (ctEvLoc old_ev) fam_envs fam_tc args fsk
+       ; continueWith work_item }
 
-    | isGiven old_ev  -- Not shortcut
-    -> do { let final_co = mkTcSymCo (ctEvCoercion old_ev) `mkTcTransCo` ax_co
-                -- final_co :: fsk ~ rhs_ty
-          ; new_ev <- newGivenEvVar deeper_loc (mkTcEqPred (mkTyVarTy fsk) rhs_ty,
-                                                EvCoercion final_co)
-          ; emitWorkNC [new_ev]   -- Non-canonical; that will mean we flatten rhs_ty
-          ; stopWith old_ev "Fun/Top (given)" }
+do_top_fun_eq _ w = pprPanic "doTopReactFunEq" (ppr w)
 
-    | not (fsk `elemVarSet` tyVarsOfType rhs_ty)
-    -> do { dischargeFmv old_ev fsk ax_co rhs_ty
-          ; traceTcS "doTopReactFunEq" $
-            vcat [ text "old_ev:" <+> ppr old_ev
-                 , nest 2 (text ":=") <+> ppr ax_co ]
-          ; stopWith old_ev "Fun/Top (wanted)" }
+reduce_top_fun_eq :: CtEvidence -> TcTyVar -> TcCoercion -> TcType
+                  -> TcS (StopOrContinue Ct)
+-- Found an applicable top-level axiom: use it to reduce
+reduce_top_fun_eq old_ev fsk ax_co rhs_ty
+  | Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
+  , isTypeFamilyTyCon tc
+  , tc_args `lengthIs` tyConArity tc    -- Short-cut
+  = shortCutReduction old_ev fsk ax_co tc tc_args
+       -- Try shortcut; see Note [Short cut for top-level reaction]
 
-    | otherwise -- We must not assign ufsk := ...ufsk...!
-    -> do { alpha_ty <- newFlexiTcSTy (tyVarKind fsk)
-          ; new_ev <- newWantedEvVarNC loc (mkTcEqPred alpha_ty rhs_ty)
-          ; emitWorkNC [new_ev]
-              -- By emitting this as non-canonical, we deal with all
-              -- flattening, occurs-check, and ufsk := ufsk issues
-          ; let final_co = ax_co `mkTcTransCo` mkTcSymCo (ctEvCoercion new_ev)
-              --    ax_co :: fam_tc args ~ rhs_ty
-              --   new_ev :: alpha ~ rhs_ty
-              --     ufsk := alpha
-              -- final_co :: fam_tc args ~ alpha
-          ; dischargeFmv old_ev fsk final_co alpha_ty
-          ; traceTcS "doTopReactFunEq (occurs)" $
-            vcat [ text "old_ev:" <+> ppr old_ev
-                 , nest 2 (text ":=") <+> ppr final_co
-                 , text "new_ev:" <+> ppr new_ev ]
-          ; stopWith old_ev "Fun/Top (wanted)" } } }
+  | ASSERT( not (isDerived old_ev) )   -- CFunEqCan is never Derived
+    isGiven old_ev  -- Not shortcut
+  = do { let final_co = mkTcSymCo (ctEvCoercion old_ev) `mkTcTransCo` ax_co
+              -- final_co :: fsk ~ rhs_ty
+       ; new_ev <- newGivenEvVar deeper_loc (mkTcEqPred (mkTyVarTy fsk) rhs_ty,
+                                             EvCoercion final_co)
+       ; emitWorkNC [new_ev] -- Non-cannonical; that will mean we flatten rhs_ty
+       ; stopWith old_ev "Fun/Top (given)" }
+
+  | not (fsk `elemVarSet` tyVarsOfType rhs_ty)
+  = do { dischargeFmv old_ev fsk ax_co rhs_ty
+       ; traceTcS "doTopReactFunEq" $
+         vcat [ text "old_ev:" <+> ppr old_ev
+              , nest 2 (text ":=") <+> ppr ax_co ]
+       ; stopWith old_ev "Fun/Top (wanted)" }
+
+  | otherwise -- We must not assign ufsk := ...ufsk...!
+  = do { alpha_ty <- newFlexiTcSTy (tyVarKind fsk)
+       ; new_ev <- newWantedEvVarNC loc (mkTcEqPred alpha_ty rhs_ty)
+       ; emitWorkNC [new_ev]
+            -- By emitting this as non-canonical, we deal with all
+            -- flattening, occurs-check, and ufsk := ufsk issues
+       ; let final_co = ax_co `mkTcTransCo` mkTcSymCo (ctEvCoercion new_ev)
+            --    ax_co :: fam_tc args ~ rhs_ty
+            --       ev :: alpha ~ rhs_ty
+            --     ufsk := alpha
+            -- final_co :: fam_tc args ~ alpha
+       ; dischargeFmv old_ev fsk final_co alpha_ty
+       ; traceTcS "doTopReactFunEq (occurs)" $
+         vcat [ text "old_ev:" <+> ppr old_ev
+              , nest 2 (text ":=") <+> ppr final_co
+              , text "new_ev:" <+> ppr new_ev ]
+       ; stopWith old_ev "Fun/Top (wanted)" }
   where
     loc = ctEvLoc old_ev
     deeper_loc = bumpCtLocDepth loc
 
-    try_improve
-      | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
-      = do { inert_eqs <- getInertEqs
-           ; let eqns = sfInteractTop ops args (lookupFlattenTyVar inert_eqs fsk)
-           ; mapM_ (unifyDerived loc Nominal) eqns }
-      | otherwise
-      = return ()
+improveTopFunEqs :: CtLoc -> FamInstEnvs
+                 -> TyCon -> [TcType] -> TcTyVar -> TcS ()
+improveTopFunEqs loc fam_envs fam_tc args fsk
+  = do { model <- getInertModel
+       ; eqns <- improve_top_fun_eqs fam_envs fam_tc args
+                                    (lookupFlattenTyVar model fsk)
+       ; mapM_ (unifyDerived loc Nominal) eqns }
 
-doTopReactFunEq w = pprPanic "doTopReactFunEq" (ppr w)
+improve_top_fun_eqs :: FamInstEnvs
+                    -> TyCon -> [TcType] -> TcType
+                    -> TcS [Eqn]
+improve_top_fun_eqs fam_envs fam_tc args rhs_ty
+  | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
+  = return (sfInteractTop ops args rhs_ty)
+
+  -- see Note [Type inference for type families with injectivity]
+  | isOpenTypeFamilyTyCon fam_tc
+  , Injective injective_args <- familyTyConInjectivityInfo fam_tc
+  = -- it is possible to have several compatible equations in an open type
+    -- family but we only want to derive equalities from one such equation.
+    concatMapM (injImproveEqns injective_args) (take 1 $
+      buildImprovementData (lookupFamInstEnvByTyCon fam_envs fam_tc)
+                           fi_tys fi_rhs (const Nothing))
+
+  | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe fam_tc
+  , Injective injective_args <- familyTyConInjectivityInfo fam_tc
+  = concatMapM (injImproveEqns injective_args) $
+      buildImprovementData (fromBranchList (co_ax_branches ax))
+                           cab_lhs cab_rhs Just
+
+  | otherwise
+  = return []
+     where
+      buildImprovementData
+          :: [a]                     -- axioms for a TF (FamInst or CoAxBranch)
+          -> (a -> [Type])           -- get LHS of an axiom
+          -> (a -> Type)             -- get RHS of an axiom
+          -> (a -> Maybe CoAxBranch) -- Just => apartness check required
+          -> [( [Type], TvSubst, TyVarSet, Maybe CoAxBranch )]
+             -- Result:
+             -- ( [arguments of a matching axiom]
+             -- , RHS-unifying substitution
+             -- , axiom variables without substitution
+             -- , Maybe matching axiom [Nothing - open TF, Just - closed TF ] )
+      buildImprovementData axioms axiomLHS axiomRHS wrap =
+          [ (ax_args, subst, unsubstTvs, wrap axiom)
+          | axiom <- axioms
+          , let ax_args = axiomLHS axiom
+          , let ax_rhs  = axiomRHS axiom
+          , Just subst <- [tcUnifyTyWithTFs False ax_rhs rhs_ty]
+          , let tvs           = tyVarsOfTypes ax_args
+                notInSubst tv = not (tv `elemVarEnv` getTvSubstEnv subst)
+                unsubstTvs    = filterVarSet notInSubst tvs ]
+
+      injImproveEqns :: [Bool]
+                     -> ([Type], TvSubst, TyVarSet, Maybe CoAxBranch)
+                     -> TcS [Eqn]
+      injImproveEqns inj_args (ax_args, theta, unsubstTvs, cabr) = do
+        (theta', _) <- instFlexiTcS (varSetElems unsubstTvs)
+        let subst = theta `unionTvSubst` theta'
+        return [ Pair arg (substTy subst ax_arg)
+               | case cabr of
+                  Just cabr' -> apartnessCheck (substTys subst ax_args) cabr'
+                  _          -> True
+               , (arg, ax_arg, True) <- zip3 args ax_args inj_args ]
+
 
 shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion
                   -> TyCon -> [TcType] -> TcS (StopOrContinue Ct)

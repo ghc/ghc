@@ -32,7 +32,8 @@ module Outputable (
         sep, cat,
         fsep, fcat,
         hang, punctuate, ppWhen, ppUnless,
-        speakNth, speakNTimes, speakN, speakNOf, plural, isOrAre,
+        speakNth, speakNTimes, speakN, speakNOf, plural,
+        thirdPerson, isOrAre, doOrDoes,
 
         coloured, PprColour, colType, colCoerc, colDataCon,
         colBinder, bold, keyword,
@@ -994,6 +995,16 @@ plural :: [a] -> SDoc
 plural [_] = empty  -- a bit frightening, but there you are
 plural _   = char 's'
 
+-- | Determines the suffix to use in 3rd person singular depending on the length
+-- of a list:
+--
+-- > thirdPerson [] = empty
+-- > thirdPerson ["Hello"] = char 's'
+-- > thirdPerson ["Hello", "World"] = empty
+thirdPerson :: [a] -> SDoc
+thirdPerson [_] = char 's'
+thirdPerson  _  = empty
+
 -- | Determines the form of to be appropriate for the length of a list:
 --
 -- > isOrAre [] = ptext (sLit "are")
@@ -1002,6 +1013,15 @@ plural _   = char 's'
 isOrAre :: [a] -> SDoc
 isOrAre [_] = ptext (sLit "is")
 isOrAre _   = ptext (sLit "are")
+
+-- | Determines the form of to do appropriate for the length of a list:
+--
+-- > doOrDoes [] = ptext (sLit "do")
+-- > doOrDoes ["Hello"] = ptext (sLit "does")
+-- > doOrDoes ["Hello", "World"] = ptext (sLit "do")
+doOrDoes :: [a] -> SDoc
+doOrDoes [_] = ptext (sLit "does")
+doOrDoes _   = ptext (sLit "do")
 
 {-
 ************************************************************************

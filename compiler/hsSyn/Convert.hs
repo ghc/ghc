@@ -253,14 +253,11 @@ cvtDec (ForeignD ford)
   = do { ford' <- cvtForD ford
        ; returnJustL $ ForD ford' }
 
-cvtDec (FamilyD flav tc tvs kind)
+cvtDec (DataFamilyD tc tvs kind)
   = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
-       ; kind' <- cvtMaybeKind kind
+       ; result <- cvtMaybeKindToFamilyResultSig kind
        ; returnJustL $ TyClD $ FamDecl $
-         FamilyDecl (cvtFamFlavour flav) tc' tvs' kind' }
-  where
-    cvtFamFlavour TypeFam = OpenTypeFamily
-    cvtFamFlavour DataFam = DataFamily
+         FamilyDecl DataFamily tc' tvs' result Nothing }
 
 cvtDec (DataInstD ctxt tc tys constrs derivs)
   = do { (ctxt', tc', typats') <- cvt_tyinst_hdr ctxt tc tys
@@ -296,12 +293,21 @@ cvtDec (TySynInstD tc eqn)
             { tfid_inst = TyFamInstDecl { tfid_eqn = eqn'
                                         , tfid_fvs = placeHolderNames } } }
 
-cvtDec (ClosedTypeFamilyD tc tyvars mkind eqns)
-  = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tyvars
-       ; mkind' <- cvtMaybeKind mkind
-       ; eqns' <- mapM (cvtTySynEqn tc') eqns
+cvtDec (OpenTypeFamilyD tc tvs result injectivity)
+  = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
+       ; result' <- cvtFamilyResultSig result
+       ; injectivity' <- traverse cvtInjectivityAnnotation injectivity
        ; returnJustL $ TyClD $ FamDecl $
-         FamilyDecl (ClosedTypeFamily (Just eqns')) tc' tvs' mkind' }
+         FamilyDecl OpenTypeFamily tc' tvs' result' injectivity' }
+
+cvtDec (ClosedTypeFamilyD tc tyvars result injectivity eqns)
+  = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tyvars
+       ; result' <- cvtFamilyResultSig result
+       ; eqns' <- mapM (cvtTySynEqn tc') eqns
+       ; injectivity' <- traverse cvtInjectivityAnnotation injectivity
+       ; returnJustL $ TyClD $ FamDecl $
+         FamilyDecl (ClosedTypeFamily (Just eqns')) tc' tvs' result'
+                                      injectivity' }
 
 cvtDec (TH.RoleAnnotD tc roles)
   = do { tc' <- tconNameL tc
@@ -1132,10 +1138,31 @@ cvtOpAppT x op y
 cvtKind :: TH.Kind -> CvtM (LHsKind RdrName)
 cvtKind = cvtTypeKind "kind"
 
-cvtMaybeKind :: Maybe TH.Kind -> CvtM (Maybe (LHsKind RdrName))
-cvtMaybeKind Nothing = return Nothing
-cvtMaybeKind (Just ki) = do { ki' <- cvtKind ki
-                            ; return (Just ki') }
+-- | Convert Maybe Kind to a type family result signature. Used with data
+-- families where naming of the result is not possible (thus only kind or no
+-- signature is possible).
+cvtMaybeKindToFamilyResultSig :: Maybe TH.Kind
+                              -> CvtM (LFamilyResultSig RdrName)
+cvtMaybeKindToFamilyResultSig Nothing   = returnL Hs.NoSig
+cvtMaybeKindToFamilyResultSig (Just ki) = do { ki' <- cvtKind ki
+                                             ; returnL (Hs.KindSig ki') }
+
+-- | Convert type family result signature. Used with both open and closed type
+-- families.
+cvtFamilyResultSig :: TH.FamilyResultSig -> CvtM (Hs.LFamilyResultSig RdrName)
+cvtFamilyResultSig TH.NoSig           = returnL Hs.NoSig
+cvtFamilyResultSig (TH.KindSig ki)    = do { ki' <- cvtKind ki
+                                           ; returnL (Hs.KindSig ki') }
+cvtFamilyResultSig (TH.TyVarSig bndr) = do { tv <- cvt_tv bndr
+                                           ; returnL (Hs.TyVarSig tv) }
+
+-- | Convert injectivity annotation of a type family.
+cvtInjectivityAnnotation :: TH.InjectivityAnn
+                         -> CvtM (Hs.LInjectivityAnn RdrName)
+cvtInjectivityAnnotation (TH.InjectivityAnn annLHS annRHS)
+  = do { annLHS' <- tNameL annLHS
+       ; annRHS' <- mapM tNameL annRHS
+       ; returnL (Hs.InjectivityAnn annLHS' annRHS') }
 
 -----------------------------------------------------------
 cvtFixity :: TH.Fixity -> Hs.Fixity
@@ -1165,7 +1192,7 @@ cvtFractionalLit r = FL { fl_text = show (fromRational r :: Double), fl_value = 
 --------------------------------------------------------------------
 
 -- variable names
-vNameL, cNameL, vcNameL, tconNameL :: TH.Name -> CvtM (Located RdrName)
+vNameL, cNameL, vcNameL, tNameL, tconNameL :: TH.Name -> CvtM (Located RdrName)
 vName,  cName,  vcName,  tName,  tconName  :: TH.Name -> CvtM RdrName
 
 -- Variable names
@@ -1181,6 +1208,7 @@ vcNameL n = wrapL (vcName n)
 vcName n = if isVarName n then vName n else cName n
 
 -- Type variable names
+tNameL n = wrapL (tName n)
 tName n = cvtName OccName.tvName n
 
 -- Type Constructor names

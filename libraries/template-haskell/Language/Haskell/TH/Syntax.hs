@@ -1367,9 +1367,10 @@ data Dec
   -- | pragmas
   | PragmaD Pragma                -- ^ @{ {\-# INLINE [1] foo #-\} }@
 
-  -- | type families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
-  | FamilyD FamFlavour Name
-         [TyVarBndr] (Maybe Kind) -- ^ @{ type family T a b c :: * }@
+  -- | data families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
+  | DataFamilyD Name [TyVarBndr]
+               (Maybe Kind)
+         -- ^ @{ data family T a b c :: * }@
 
   | DataInstD Cxt Name [Type]
          [Con] [Name]             -- ^ @{ data instance Cxt x => T [x] = A x
@@ -1380,9 +1381,17 @@ data Dec
                                   --       deriving (Z,W)}@
   | TySynInstD Name TySynEqn      -- ^ @{ type instance ... }@
 
+  -- | open type families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
+  | OpenTypeFamilyD Name
+         [TyVarBndr] FamilyResultSig
+         (Maybe InjectivityAnn)
+         -- ^ @{ type family T a b c = (r :: *) | r -> a b }@
+
   | ClosedTypeFamilyD Name
-      [TyVarBndr] (Maybe Kind)
-      [TySynEqn]                  -- ^ @{ type family F a b :: * where ... }@
+      [TyVarBndr] FamilyResultSig
+      (Maybe InjectivityAnn)
+      [TySynEqn]
+       -- ^ @{ type family F a b = (r :: *) | r -> a where ... }@
 
   | RoleAnnotD Name [Role]        -- ^ @{ type role T nominal representational }@
   | StandaloneDerivD Cxt Type     -- ^ @{ deriving instance Ord a => Ord (Foo a) }@
@@ -1492,6 +1501,16 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
 data TyVarBndr = PlainTV  Name            -- ^ @a@
                | KindedTV Name Kind       -- ^ @(a :: k)@
       deriving( Show, Eq, Ord, Data, Typeable, Generic )
+
+-- | Type family result signature
+data FamilyResultSig = NoSig              -- ^ no signature
+                     | KindSig  Kind      -- ^ @k@
+                     | TyVarSig TyVarBndr -- ^ @= r, = (r :: k)@
+      deriving( Show, Eq, Ord, Data, Typeable, Generic )
+
+-- | Injectivity annotation
+data InjectivityAnn = InjectivityAnn Name [Name]
+  deriving ( Show, Eq, Ord, Data, Typeable, Generic )
 
 data TyLit = NumTyLit Integer             -- ^ @2@
            | StrTyLit String              -- ^ @"Hello"@

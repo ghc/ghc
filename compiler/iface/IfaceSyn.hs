@@ -55,9 +55,9 @@ import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula )
 import HsBinds
-import TyCon (Role (..))
+import TyCon ( Role (..), Injectivity(..) )
 import StaticFlags (opt_PprStyle_Debug)
-import Util( filterOut )
+import Util( filterOut, filterByList )
 import InstEnv
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 
@@ -113,9 +113,13 @@ data IfaceDecl
 
   | IfaceFamily  { ifName    :: IfaceTopBndr,      -- Type constructor
                    ifTyVars  :: [IfaceTvBndr],     -- Type variables
+                   ifResVar  :: Maybe IfLclName,   -- Result variable name, used
+                                                   -- only for pretty-printing
+                                                   -- with --show-iface
                    ifFamKind :: IfaceKind,         -- Kind of the *rhs* (not of
                                                    -- the tycon)
-                   ifFamFlav :: IfaceFamTyConFlav }
+                   ifFamFlav :: IfaceFamTyConFlav,
+                   ifFamInj  :: Injectivity }      -- injectivity information
 
   | IfaceClass { ifCtxt    :: IfaceContext,             -- Superclasses
                  ifName    :: IfaceTopBndr,             -- Name of the class TyCon
@@ -689,11 +693,22 @@ pprIfaceDecl ss (IfaceSynonym { ifName   = tc
     (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
 
 pprIfaceDecl ss (IfaceFamily { ifName = tycon, ifTyVars = tyvars
-                             , ifFamFlav = rhs, ifFamKind = kind })
-  = vcat [ hang (text "type family" <+> pprIfaceDeclHead [] ss tycon tyvars <+> dcolon)
-              2 (ppr kind <+> ppShowRhs ss (pp_rhs rhs))
+                             , ifFamFlav = rhs, ifFamKind = kind
+                             , ifResVar = res_var, ifFamInj = inj })
+  = vcat [ hang (text "type family" <+> pprIfaceDeclHead [] ss tycon tyvars)
+              2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
          , ppShowRhs ss (nest 2 (pp_branches rhs)) ]
   where
+    pp_inj Nothing    _   = dcolon <+> ppr kind
+    pp_inj (Just res) inj
+       | Injective injectivity <- inj = hsep [ equals, ppr res, dcolon, ppr kind
+                                             , pp_inj_cond res injectivity]
+       | otherwise = hsep [ equals, ppr res, dcolon, ppr kind ]
+
+    pp_inj_cond res inj = case filterByList inj tyvars of
+       []  -> empty
+       tvs -> hsep [text "|", ppr res, text "->", interppSP (map fst tvs)]
+
     pp_rhs IfaceOpenSynFamilyTyCon
       = ppShowIface ss (ptext (sLit "open"))
     pp_rhs IfaceAbstractClosedSynFamilyTyCon
@@ -1348,12 +1363,14 @@ instance Binary IfaceDecl where
         put_ bh a4
         put_ bh a5
 
-    put_ bh (IfaceFamily a1 a2 a3 a4) = do
+    put_ bh (IfaceFamily a1 a2 a3 a4 a5 a6) = do
         putByte bh 4
         put_ bh (occNameFS a1)
         put_ bh a2
         put_ bh a3
         put_ bh a4
+        put_ bh a5
+        put_ bh a6
 
     put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
         putByte bh 5
@@ -1420,8 +1437,10 @@ instance Binary IfaceDecl where
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
+                    a5 <- get bh
+                    a6 <- get bh
                     occ <- return $! mkTcOccFS a1
-                    return (IfaceFamily occ a2 a3 a4)
+                    return (IfaceFamily occ a2 a3 a4 a5 a6)
             5 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh

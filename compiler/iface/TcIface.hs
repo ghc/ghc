@@ -6,7 +6,7 @@
 Type checking of type signatures in interface files
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, DataKinds #-}
 
 module TcIface (
         tcLookupImported_maybe,
@@ -351,20 +351,23 @@ tc_iface_decl _ _ (IfaceSynonym {ifName = occ_name, ifTyVars = tv_bndrs,
      ; rhs_kind <- tcIfaceKind kind     -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $
                    tcIfaceType rhs_ty
-     ; tycon    <- buildSynonymTyCon tc_name tyvars roles rhs rhs_kind
+     ; let tycon = buildSynonymTyCon tc_name tyvars roles rhs rhs_kind
      ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type synonym") <+> ppr n
 
 tc_iface_decl parent _ (IfaceFamily {ifName = occ_name, ifTyVars = tv_bndrs,
                                      ifFamFlav = fam_flav,
-                                     ifFamKind = kind })
+                                     ifFamKind = kind,
+                                     ifResVar = res, ifFamInj = inj })
    = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
      { tc_name  <- lookupIfaceTop occ_name
      ; rhs_kind <- tcIfaceKind kind     -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $
                    tc_fam_flav fam_flav
-     ; tycon    <- buildFamilyTyCon tc_name tyvars rhs rhs_kind parent
+     ; res_name <- traverse (newIfaceName . mkTyVarOccFS) res
+     ; let tycon = buildFamilyTyCon tc_name tyvars res_name rhs rhs_kind
+                                    parent inj
      ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type synonym") <+> ppr n

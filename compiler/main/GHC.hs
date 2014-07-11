@@ -184,7 +184,7 @@ module GHC (
         isPrimTyCon, isFunTyCon,
         isFamilyTyCon, isOpenFamilyTyCon, isOpenTypeFamilyTyCon,
         tyConClass_maybe,
-        synTyConRhs_maybe, synTyConDefn_maybe, synTyConResKind,
+        synTyConRhs_maybe, synTyConDefn_maybe, tyConResKind,
 
         -- ** Type variables
         TyVar,
@@ -304,7 +304,7 @@ import RdrName
 import qualified HsSyn -- hack as we want to reexport the whole module
 import HsSyn
 import Type     hiding( typeKind )
-import Kind             ( synTyConResKind )
+import Kind             ( tyConResKind )
 import TcType           hiding( typeKind )
 import Id
 import TysPrim          ( alphaTyVars )

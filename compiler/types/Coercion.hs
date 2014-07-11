@@ -188,7 +188,8 @@ data Coercion
 
   -- These are destructors
 
-  | NthCo  Int         Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
+  | NthCo  Int         Coercion  -- Zero-indexed; decomposes (T t0 ... tn)
+                                 -- and (F t0 ... tn), assuming F is injective.
     -- :: _ -> e -> ?? (inverse of TyConAppCo, see Note [TyConAppCo roles])
     -- See Note [NthCo and newtypes]
 

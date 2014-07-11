@@ -15,7 +15,8 @@ Note [The Type-related module hierarchy]
   Coercion imports Type
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
+             DeriveTraversable, DataKinds #-}
 {-# OPTIONS_HADDOCK hide #-}
 -- We expose the relevant stuff from this module via the Type module
 
@@ -82,7 +83,7 @@ import StaticFlags( opt_PprStyle_Debug )
 
 -- libraries
 import Data.List( mapAccumL, partition )
-import qualified Data.Data        as Data hiding ( TyCon )
+import qualified Data.Data as Data hiding ( TyCon )
 
 {-
 ************************************************************************
@@ -305,9 +306,7 @@ isKindVar v = isTKVar v && isSuperKind (varType v)
 
 tyVarsOfType :: Type -> VarSet
 -- ^ NB: for type synonyms tyVarsOfType does /not/ expand the synonym
--- tyVarsOfType returns only the free variables of a type
--- For example, tyVarsOfType (a::k) returns {a}, not including the
--- kind variable {k}
+-- tyVarsOfType returns free variables of a type, including kind variables.
 tyVarsOfType (TyVarTy v)         = unitVarSet v
 tyVarsOfType (TyConApp _ tys)    = tyVarsOfTypes tys
 tyVarsOfType (LitTy {})          = emptyVarSet
@@ -407,7 +406,7 @@ instance NamedThing TyThing where       -- Can't put this with the type
 -- the in-scope set is not relevant
 --
 -- 3. The substitution is only applied ONCE! This is because
--- in general such application will not reached a fixed point.
+-- in general such application will not reach a fixed point.
 data TvSubst
   = TvSubst InScopeSet  -- The in-scope type and kind variables
             TvSubstEnv  -- Substitutes both type and kind variables

@@ -66,7 +66,7 @@ instance Ppr Info where
               case mb_d of { Nothing -> empty; Just d -> ppr d }]
 
 ppr_sig :: Name -> Type -> Doc
-ppr_sig v ty = ppr v <+> text "::" <+> ppr ty
+ppr_sig v ty = ppr v <+> dcolon <+> ppr ty
 
 pprFixity :: Name -> Fixity -> Doc
 pprFixity _ f | f == defaultFixity = empty
@@ -167,7 +167,7 @@ pprExp _ (CompE ss) = text "[" <> ppr s
           ss' = init ss
 pprExp _ (ArithSeqE d) = ppr d
 pprExp _ (ListE es) = brackets $ sep $ punctuate comma $ map ppr es
-pprExp i (SigE e t) = parensIf (i > noPrec) $ ppr e <+> text "::" <+> ppr t
+pprExp i (SigE e t) = parensIf (i > noPrec) $ ppr e <+> dcolon <+> ppr t
 pprExp _ (RecConE nm fs) = ppr nm <> braces (pprFields fs)
 pprExp _ (RecUpdE e fs) = pprExp appPrec e <> braces (pprFields fs)
 pprExp i (StaticE e) = parensIf (i >= appPrec) $
@@ -267,7 +267,7 @@ pprPat _ (RecP nm fs)
             <+> braces (sep $ punctuate comma $
                         map (\(s,p) -> ppr s <+> equals <+> ppr p) fs)
 pprPat _ (ListP ps) = brackets $ sep $ punctuate comma $ map ppr ps
-pprPat i (SigP p t) = parensIf (i > noPrec) $ ppr p <+> text "::" <+> ppr t
+pprPat i (SigP p t) = parensIf (i > noPrec) $ ppr p <+> dcolon <+> ppr t
 pprPat _ (ViewP e p) = parens $ pprExp noPrec e <+> text "->" <+> pprPat noPrec p
 
 ------------------------------
@@ -291,18 +291,17 @@ ppr_dec _  (ClassD ctxt c xs fds ds)
     $$ where_clause ds
 ppr_dec _ (InstanceD ctxt i ds) = text "instance" <+> pprCxt ctxt <+> ppr i
                                   $$ where_clause ds
-ppr_dec _ (SigD f t)    = pprPrefixOcc f <+> text "::" <+> ppr t
+ppr_dec _ (SigD f t)    = pprPrefixOcc f <+> dcolon <+> ppr t
 ppr_dec _ (ForeignD f)  = ppr f
 ppr_dec _ (InfixD fx n) = pprFixity n fx
 ppr_dec _ (PragmaD p)   = ppr p
-ppr_dec isTop (FamilyD flav tc tvs k)
-  = ppr flav <+> maybeFamily <+> ppr tc <+> hsep (map ppr tvs) <+> maybeKind
+ppr_dec isTop (DataFamilyD tc tvs kind)
+  = text "data" <+> maybeFamily <+> ppr tc <+> hsep (map ppr tvs) <+> maybeKind
   where
     maybeFamily | isTop     = text "family"
                 | otherwise = empty
-
-    maybeKind | (Just k') <- k = text "::" <+> ppr k'
-              | otherwise      = empty
+    maybeKind | (Just k') <- kind = dcolon <+> ppr k'
+              | otherwise = empty
 ppr_dec isTop (DataInstD ctxt tc tys cs decs)
   = ppr_data maybeInst ctxt tc (sep (map pprParendType tys)) cs decs
   where
@@ -318,13 +317,21 @@ ppr_dec isTop (TySynInstD tc (TySynEqn tys rhs))
   where
     maybeInst | isTop     = text "instance"
               | otherwise = empty
-ppr_dec _ (ClosedTypeFamilyD tc tvs mkind eqns)
-  = hang (hsep [ text "type family", ppr tc, hsep (map ppr tvs), maybeKind
-               , text "where" ])
+ppr_dec isTop (OpenTypeFamilyD tc tvs res inj)
+  = text "type" <+> maybeFamily <+> ppr tc <+> hsep (map ppr tvs) <+>
+    ppr res <+> maybeInj
+  where
+    maybeFamily | isTop     = text "family"
+                | otherwise = empty
+    maybeInj | (Just inj') <- inj = ppr inj'
+             | otherwise          = empty
+ppr_dec _ (ClosedTypeFamilyD tc tvs res inj eqns)
+  = hang (hsep [ text "type family", ppr tc, hsep (map ppr tvs), ppr res
+               , maybeInj, text "where" ])
       nestDepth (vcat (map ppr_eqn eqns))
   where
-    maybeKind | (Just k') <- mkind = text "::" <+> ppr k'
-              | otherwise          = empty
+    maybeInj | (Just inj') <- inj = ppr inj'
+             | otherwise          = empty
     ppr_eqn (TySynEqn lhs rhs)
       = ppr tc <+> sep (map pprParendType lhs) <+> text "=" <+> ppr rhs
 
@@ -335,7 +342,7 @@ ppr_dec _ (StandaloneDerivD cxt ty)
   = hsep [ text "deriving instance", pprCxt cxt, ppr ty ]
 
 ppr_dec _ (DefaultSigD n ty)
-  = hsep [ text "default", pprPrefixOcc n, text "::", ppr ty ]
+  = hsep [ text "default", pprPrefixOcc n, dcolon, ppr ty ]
 
 ppr_data :: Doc -> Cxt -> Name -> Doc -> [Con] -> [Name] -> Doc
 ppr_data maybeInst ctxt t argsDoc cs decs
@@ -381,6 +388,17 @@ instance Ppr FamFlavour where
     ppr TypeFam = text "type"
 
 ------------------------------
+instance Ppr FamilyResultSig where
+    ppr NoSig           = empty
+    ppr (KindSig k)     = dcolon <+> ppr k
+    ppr (TyVarSig bndr) = text "=" <+> ppr bndr
+
+------------------------------
+instance Ppr InjectivityAnn where
+    ppr (InjectivityAnn lhs rhs) =
+        char '|' <+> ppr lhs <+> text "->" <+> hsep (map ppr rhs)
+
+------------------------------
 instance Ppr Foreign where
     ppr (ImportF callconv safety impent as typ)
        = text "foreign import"
@@ -388,13 +406,13 @@ instance Ppr Foreign where
      <+> showtextl safety
      <+> text (show impent)
      <+> ppr as
-     <+> text "::" <+> ppr typ
+     <+> dcolon <+> ppr typ
     ppr (ExportF callconv expent as typ)
         = text "foreign export"
       <+> showtextl callconv
       <+> text (show expent)
       <+> ppr as
-      <+> text "::" <+> ppr typ
+      <+> dcolon <+> ppr typ
 
 ------------------------------
 instance Ppr Pragma where
@@ -409,7 +427,7 @@ instance Ppr Pragma where
        =   text "{-# SPECIALISE"
        <+> maybe empty ppr inline
        <+> ppr phases
-       <+> sep [ ppr n <+> text "::"
+       <+> sep [ ppr n <+> dcolon
                , nest 2 $ ppr ty ]
        <+> text "#-}"
     ppr (SpecialiseInstP inst)
@@ -450,7 +468,7 @@ instance Ppr Phases where
 ------------------------------
 instance Ppr RuleBndr where
     ppr (RuleVar n)         = ppr n
-    ppr (TypedRuleVar n ty) = parens $ ppr n <+> text "::" <+> ppr ty
+    ppr (TypedRuleVar n ty) = parens $ ppr n <+> dcolon <+> ppr ty
 
 ------------------------------
 instance Ppr Clause where
@@ -471,7 +489,7 @@ instance Ppr Con where
 ------------------------------
 pprVarStrictType :: (Name, Strict, Type) -> Doc
 -- Slight infelicity: with print non-atomic type with parens
-pprVarStrictType (v, str, t) = ppr v <+> text "::" <+> pprStrictType (str, t)
+pprVarStrictType (v, str, t) = ppr v <+> dcolon <+> pprStrictType (str, t)
 
 ------------------------------
 pprStrictType :: (Strict, Type) -> Doc
@@ -524,7 +542,6 @@ parens around it.  E.g. the parens are required here:
    type instance F Int = (Bool :: *)
 So we always print a SigT with parens (see Trac #10050). -}
 
-
 pprTyApp :: (Type, [Type]) -> Doc
 pprTyApp (ArrowT, [arg1,arg2]) = sep [pprFunArgType arg1 <+> text "->", ppr arg2]
 pprTyApp (EqualityT, [arg1, arg2]) =
@@ -558,7 +575,7 @@ instance Ppr TyLit where
 ------------------------------
 instance Ppr TyVarBndr where
     ppr (PlainTV nm)    = ppr nm
-    ppr (KindedTV nm k) = parens (ppr nm <+> text "::" <+> ppr k)
+    ppr (KindedTV nm k) = parens (ppr nm <+> dcolon <+> ppr k)
 
 instance Ppr Role where
     ppr NominalR          = text "nominal"

@@ -34,6 +34,7 @@
                     TODO FIXME.
                </para>
            </listitem>
+
             <listitem>
                 <para>
                     The parser now supports Haddock comments on GADT data constructors. For example,
@@ -70,6 +71,7 @@
                     <literal>CallStack</literal> type.
                </para>
             </listitem>
+
 	    <listitem>
 	      <para>
 		To conform to the common case, the default role assigned to parameters
@@ -90,6 +92,14 @@
                 linkend="data-instance-declarations"/> for more details.
               </para>
             </listitem>
+
+            <listitem>
+                <para>
+                    GHC now allows to declare type families as injective.
+                    Injectivity information can then be used by the typechecker.
+                    See <xref linkend="injective-ty-fams"/> for details.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 

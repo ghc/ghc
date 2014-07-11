@@ -1,0 +1,111 @@
+
+<interactive>:10:15:
+    Type family equations violate injectivity annotation:
+      F Char Bool Int = Int
+      F Bool Int Char = Int
+
+<interactive>:16:15:
+    Type family equations violate injectivity annotation:
+      I Int Char Bool = Bool
+      I Int Int Int = Bool
+
+<interactive>:26:15:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation cannot be a type family:
+      IdProxy a = Id a
+
+<interactive>:34:15:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation is a bare type variable
+    but these LHS type and kind patterns are not bare variables: ‘'Z’
+      P 'Z m = m
+
+<interactive>:40:15:
+    Type family equation violates injectivity annotation.
+    Injective type variable ‘b’ does not appear on injective position.
+    In the RHS of type family equation:
+      J Int b c = Char
+
+<interactive>:44:15:
+    Type family equation violates injectivity annotation.
+    Injective type variable ‘n’ does not appear on injective position.
+    In the RHS of type family equation:
+      K ('S n) m = 'S m
+
+<interactive>:49:15:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation cannot be a type family:
+      L a = MaybeSyn a
+
+<interactive>:55:41:
+    Type family equation violates injectivity annotation.
+    Injective kind variable ‘k1’ is not inferable from the RHS type variables.
+    In the RHS of type family equation:
+      PolyKindVarsF '[] = '[]
+
+<interactive>:60:15:
+    Type family equation violates injectivity annotation.
+    Injective kind variable ‘k1’ is not inferable from the RHS type variables.
+    In the RHS of type family equation:
+      PolyKindVars '[] = '[]
+
+<interactive>:64:15:
+    Type family equation violates injectivity annotation.
+    Injective kind variable ‘k’ is not inferable from the RHS type variables.
+    In the RHS of type family equation:
+    forall (k :: BOX) (a :: k) (b :: k). Fc a b = Int
+
+<interactive>:68:15:
+    Type family equation violates injectivity annotation.
+    Injective type variables ‘a’, ‘b’ do not appear on injective position.
+    Injective kind variable ‘k’ is not inferable from the RHS type variables.
+    In the RHS of type family equation:
+    forall (k :: BOX) (a :: k) (b :: k). Gc a b = Int
+
+<interactive>:81:15:
+    Type family equations violate injectivity annotation:
+      F1 [a] = Maybe (GF1 a)
+      F1 (Maybe a) = Maybe (GF2 a)
+
+<interactive>:85:15:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation is a bare type variable
+    but these LHS type and kind patterns are not bare variables: ‘[a]’
+      W1 [a] = a
+
+<interactive>:88:15:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation cannot be a type family:
+      W2 [a] = W2 a
+
+<interactive>:92:15:
+    Type family equations violate injectivity annotation:
+      Z1 [a] = (a, a)
+      Z1 (Maybe b) = (b, [b])
+
+<interactive>:96:15:
+    Type family equations violate injectivity annotation:
+      G1 [a] = [a]
+      G1 (Maybe b) = [(b, b)]
+
+<interactive>:100:15:
+    Type family equations violate injectivity annotation:
+      G3 a Int = (a, Int)
+      G3 a Bool = (Bool, a)
+
+<interactive>:104:15:
+    Type family equation violates injectivity annotation.
+    Injective type variable ‘b’ does not appear on injective position.
+    In the RHS of type family equation:
+      G4 a b = [a]
+
+<interactive>:107:15:
+    Type family equations violate injectivity annotation:
+      G5 [a] = [GF1 a]
+      G5 Int = [Bool]
+
+<interactive>:111:15:
+    Type family equation violates injectivity annotation.
+    Injective type variable ‘a’ does not appear on injective position.
+    In the RHS of type family equation:
+      G6 [a] = [HF1 a]

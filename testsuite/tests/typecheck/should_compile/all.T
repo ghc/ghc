@@ -358,6 +358,7 @@ test('tc263',
     extra_clean(['Tc263_Help.o','Tc263_Help.hi']),
     multimod_compile, ['tc263','-v0'])
 test('tc264', normal, multimod_compile, ['tc264.hsig', '-sig-of "ShouldCompile is base:Data.STRef"'])
+test('tc265', compile_timeout_multiplier(0.01), compile, [''])
 
 test('GivenOverlapping', normal, compile, [''])
 test('GivenTypeSynonym', normal, compile, [''])
@@ -385,6 +386,9 @@ test('T6055', normal, compile, [''])
 test('DfltProb1', normal, compile, [''])
 test('DfltProb2', normal, compile, [''])
 test('T6134', normal, compile, [''])
+test('T6018', extra_clean(['T6018.hi' , 'T6018.o'
+                          ,'T6018A.hi', 'T6018A.o'])
+            , multimod_compile, ['T6018', ''])
 test('TcLambdaCase', when(compiler_lt('ghc', '7.5'), skip), compile, [''])
 test('T7147', normal, compile, [''])
 test('T7171',normal,run_command,

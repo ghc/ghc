@@ -71,6 +71,7 @@ module Language.Haskell.TH(
         Pat(..), FieldExp, FieldPat,
     -- ** Types
         Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred, Syntax.Role(..),
+        FamilyResultSig(..), Syntax.InjectivityAnn(..),
 
     -- * Library functions
     -- ** Abbreviations
@@ -92,7 +93,7 @@ module Language.Haskell.TH(
         normalB, guardedB, normalG, normalGE, patG, patGE, match, clause,
 
     -- *** Expressions
-        dyn, global, varE, conE, litE, appE, uInfixE, parensE, staticE,
+        dyn, varE, conE, litE, appE, uInfixE, parensE, staticE,
         infixE, infixApp, sectionL, sectionR,
         lamE, lam1E, lamCaseE, tupE, condE, multiIfE, letE, caseE, appsE,
         listE, sigE, recConE, recUpdE, stringE, fieldExp,
@@ -113,7 +114,7 @@ module Language.Haskell.TH(
     -- **** Type literals
     numTyLit, strTyLit,
     -- **** Strictness
-        isStrict, notStrict, strictType, varStrictType,
+    isStrict, notStrict, strictType, varStrictType,
     -- **** Class Contexts
     cxt, classP, equalP, normalC, recC, infixC, forallC,
 
@@ -125,16 +126,16 @@ module Language.Haskell.TH(
 
     -- *** Top Level Declarations
     -- **** Data
-        valD, funD, tySynD, dataD, newtypeD,
+    valD, funD, tySynD, dataD, newtypeD,
     -- **** Class
     classD, instanceD, sigD, standaloneDerivD, defaultSigD,
     -- **** Role annotations
     roleAnnotD,
     -- **** Type Family / Data Family
-    familyNoKindD, familyKindD, dataInstD,
-    closedTypeFamilyNoKindD, closedTypeFamilyKindD,
+    dataFamilyD, openTypeFamilyD, closedTypeFamilyD, dataInstD,
+    familyNoKindD, familyKindD, closedTypeFamilyNoKindD, closedTypeFamilyKindD,
     newtypeInstD, tySynInstD,
-    typeFam, dataFam, tySynEqn,
+    typeFam, dataFam, tySynEqn, injectivityAnn, noSig, kindSig, tyVarSig,
     -- **** Foreign Function Interface (FFI)
     cCall, stdCall, cApi, prim, javaScript,
     unsafe, safe, forImpD,

@@ -13,7 +13,7 @@ module RnTypes (
         rnHsKind, rnLHsKind, rnLHsMaybeKind,
         rnHsSigType, rnLHsInstType, rnConDeclFields,
         newTyVarNameRn, rnLHsTypeWithWildCards,
-        rnHsSigTypeWithWildCards, collectWildCards,
+        rnHsSigTypeWithWildCards, rnLTyVar, collectWildCards,
 
         -- Precence related stuff
         mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
@@ -21,8 +21,8 @@ module RnTypes (
 
         -- Binding related stuff
         warnContextQuantification, warnUnusedForAlls,
-        bindSigTyVarsFV, bindHsTyVars, rnHsBndrSig,
-        extractHsTyRdrTyVars, extractHsTysRdrTyVars,
+        bindSigTyVarsFV, bindHsTyVars, rnHsBndrSig, rnLHsTyVarBndr,
+        extractHsTyRdrTyVars, extractHsTysRdrTyVars, extractTyVarBndrNames,
         extractRdrKindSigVars, extractDataDefnKindVars,
         filterInScope
   ) where
@@ -48,6 +48,7 @@ import Outputable
 import FastString
 import Maybes
 import Data.List        ( nub, nubBy, deleteFirstsBy )
+import qualified Data.Set as Set
 import Control.Monad    ( unless, when )
 
 #if __GLASGOW_HASKELL__ < 709
@@ -365,6 +366,10 @@ rnTyVar is_type rdr_name
   | is_type   = lookupTypeOccRn rdr_name
   | otherwise = lookupKindOccRn rdr_name
 
+rnLTyVar :: Bool -> Located RdrName -> RnM (Located Name)
+rnLTyVar is_type (L loc rdr_name) = do
+  tyvar' <- rnTyVar is_type rdr_name
+  return (L loc tyvar')
 
 --------------
 rnLHsTypes :: HsDocContext -> [LHsType RdrName]
@@ -447,22 +452,11 @@ bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
        ; bindLocalNamesFV kv_names $
     do { let tv_names_w_loc = hsLTyVarLocNames tv_bndrs
 
-             rn_tv_bndr :: LHsTyVarBndr RdrName -> RnM (LHsTyVarBndr Name, FreeVars)
-             rn_tv_bndr (L loc (UserTyVar rdr))
-               = do { nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
-                    ; return (L loc (UserTyVar nm), emptyFVs) }
-             rn_tv_bndr (L loc (KindedTyVar (L lv rdr) kind))
-               = do { sig_ok <- xoptM Opt_KindSignatures
-                    ; unless sig_ok (badSigErr False doc kind)
-                    ; nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
-                    ; (kind', fvs) <- rnLHsKind doc kind
-                    ; return (L loc (KindedTyVar (L lv nm) kind'), fvs) }
-
        -- Check for duplicate or shadowed tyvar bindrs
        ; checkDupRdrNames tv_names_w_loc
        ; when (isNothing mb_assoc) (checkShadowedRdrNames tv_names_w_loc)
 
-       ; (tv_bndrs', fvs1) <- mapFvRn rn_tv_bndr tvs
+       ; (tv_bndrs', fvs1) <- mapFvRn (rnLHsTyVarBndr doc mb_assoc rdr_env) tvs
        ; (res, fvs2) <- bindLocalNamesFV (map hsLTyVarName tv_bndrs') $
                         do { inner_rdr_env <- getLocalRdrEnv
                            ; traceRn (text "bhtv" <+> vcat
@@ -472,6 +466,18 @@ bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
                                  , ppr all_kvs, ppr rdr_env, ppr inner_rdr_env ])
                            ; thing_inside (HsQTvs { hsq_tvs = tv_bndrs', hsq_kvs = kv_names }) }
        ; return (res, fvs1 `plusFV` fvs2) } }
+
+rnLHsTyVarBndr :: HsDocContext -> Maybe a -> LocalRdrEnv
+               -> LHsTyVarBndr RdrName -> RnM (LHsTyVarBndr Name, FreeVars)
+rnLHsTyVarBndr _ mb_assoc rdr_env (L loc (UserTyVar rdr))
+  = do { nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
+       ; return (L loc (UserTyVar nm), emptyFVs) }
+rnLHsTyVarBndr doc mb_assoc rdr_env (L loc (KindedTyVar (L lv rdr) kind))
+  = do { sig_ok <- xoptM Opt_KindSignatures
+       ; unless sig_ok (badSigErr False doc kind)
+       ; nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
+       ; (kind', fvs) <- rnLHsKind doc kind
+       ; return (L loc (KindedTyVar (L lv nm) kind'), fvs) }
 
 newTyVarNameRn :: Maybe a -> LocalRdrEnv -> SrcSpan -> RdrName -> RnM Name
 newTyVarNameRn mb_assoc rdr_env loc rdr
@@ -1117,9 +1123,25 @@ extractHsTysRdrTyVars ty
   = case extract_ltys ty ([],[]) of
      (kvs, tvs) -> (nub kvs, nub tvs)
 
-extractRdrKindSigVars :: Maybe (LHsKind RdrName) -> [RdrName]
-extractRdrKindSigVars Nothing = []
-extractRdrKindSigVars (Just k) = nub (fst (extract_lkind k ([],[])))
+-- Extracts variable names used in a type variable binder. Note that HsType
+-- represents data and type constructors as type variables and so this function
+-- will also return data and type constructors.
+extractTyVarBndrNames :: LHsTyVarBndr RdrName -> Set.Set RdrName
+extractTyVarBndrNames (L _ (UserTyVar name))
+  = Set.singleton name
+extractTyVarBndrNames (L _ (KindedTyVar (L _ name) k))
+  = Set.singleton name `Set.union` (Set.fromList tvs)
+                       `Set.union` (Set.fromList kvs)
+    where (kvs, tvs) = extractHsTyRdrTyVars k
+
+extractRdrKindSigVars :: LFamilyResultSig RdrName -> [RdrName]
+extractRdrKindSigVars (L _ resultSig)
+    | KindSig k                        <- resultSig = kindRdrNameFromSig k
+    | TyVarSig (L _ (KindedTyVar _ k)) <- resultSig = kindRdrNameFromSig k
+    | TyVarSig (L _ (UserTyVar _))     <- resultSig = []
+    | otherwise = [] -- this can only be NoSig but pattern exhasutiveness
+                     -- checker complains about "NoSig <- resultSig"
+    where kindRdrNameFromSig k = nub (fst (extract_lkind k ([],[])))
 
 extractDataDefnKindVars :: HsDataDefn RdrName -> [RdrName]
 -- Get the scoped kind variables mentioned free in the constructor decls

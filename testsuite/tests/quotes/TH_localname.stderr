@@ -8,9 +8,8 @@ TH_localname.hs:3:11: error:
     Potential instances:
       instance (Lift a, Lift b) => Lift (Either a b)
         -- Defined in ‘Language.Haskell.TH.Syntax’
-      instance Lift a => Lift (Maybe a)
-        -- Defined in ‘Language.Haskell.TH.Syntax’
       instance Lift Int16 -- Defined in ‘Language.Haskell.TH.Syntax’
+      instance Lift Int32 -- Defined in ‘Language.Haskell.TH.Syntax’
       ...plus 24 others
       (use -fprint-potential-instances to see them all)
     In the expression: lift y

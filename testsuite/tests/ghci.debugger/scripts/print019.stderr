@@ -7,7 +7,7 @@
     Potential instances:
       instance Show TyCon -- Defined in ‘Data.Typeable.Internal’
       instance Show TypeRep -- Defined in ‘Data.Typeable.Internal’
-      instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
+      instance Show Ordering -- Defined in ‘GHC.Show’
       ...plus 30 others
       (use -fprint-potential-instances to see them all)
     In a stmt of an interactive GHCi command: print it

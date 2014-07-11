@@ -1,0 +1,7 @@
+
+T6018failclosed1.hs:11:5:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation cannot be a type family:
+      IdProxyClosed a = IdClosed a
+    In the equations for closed type family ‘IdProxyClosed’
+    In the type family declaration for ‘IdProxyClosed’

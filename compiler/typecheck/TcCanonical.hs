@@ -282,7 +282,7 @@ in TcSMonad, which has this example:
 Suppose we are trying to solve
   [G] d1 : Ord a
   [W] d2 : C [a]
-If we (bogusly) added the superclass of d2 as Gievn we'd have
+If we (bogusly) added the superclass of d2 as Given we'd have
   [G] d1 : Ord a
   [W] d2 : C [a]
   [G] d3 : Ord [a]   -- Superclass of d2, bogus
@@ -292,7 +292,7 @@ Then we'll use the instance decl to give
   [G] d3 : Ord [a]   -- Superclass of d2, bogus
   [W] d4: Ord [a]
 
-ANd now we could bogusly solve d4 from d3.
+And now we could bogusly solve d4 from d3.
 ---------- End of historical note -----------
 
 Note [Add superclasses only during canonicalisation]
@@ -938,7 +938,7 @@ If we see (T s1 t1 ~ T s2 t2), then we can just decompose to
   (s1 ~ s2, t1 ~ t2)
 and push those back into the work list.  But if
   s1 = K k1    s2 = K k2
-then we will jus decomopose s1~s2, and it might be better to
+then we will just decomopose s1~s2, and it might be better to
 do so on the spot.  An important special case is where s1=s2,
 and we get just Refl.
 

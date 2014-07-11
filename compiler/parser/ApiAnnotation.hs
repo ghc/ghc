@@ -22,7 +22,7 @@ Note [Api annotations]
 ~~~~~~~~~~~~~~~~~~~~~~
 In order to do source to source conversions using the GHC API, the
 locations of all elements of the original source needs to be tracked.
-The includes keywords such as 'let' / 'in' / 'do' etc as well as
+This includes keywords such as 'let' / 'in' / 'do' etc as well as
 punctuation such as commas and braces, and also comments.
 
 These are captured in a structure separate from the parse tree, and

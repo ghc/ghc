@@ -201,7 +201,7 @@ mkHsWithBndrs x = HsWB { hswb_cts = x, hswb_kvs = PlaceHolder
 --------------------------------------------------
 -- | These names are used early on to store the names of implicit
 -- parameters.  They completely disappear after type-checking.
-newtype HsIPName = HsIPName FastString-- ?x
+newtype HsIPName = HsIPName FastString
   deriving( Eq, Data, Typeable )
 
 hsIPNameFS :: HsIPName -> FastString

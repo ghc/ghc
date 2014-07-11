@@ -1,6 +1,7 @@
 -- (c) The University of Glasgow 2012
 
-{-# LANGUAGE CPP, DataKinds, DeriveDataTypeable, GADTs, KindSignatures, ScopedTypeVariables, StandaloneDeriving #-}
+{-# LANGUAGE CPP, DataKinds, DeriveDataTypeable, GADTs, KindSignatures,
+             ScopedTypeVariables, StandaloneDeriving #-}
 
 -- | Module for coercion axioms, used to represent type family instances
 -- and newtypes
@@ -9,6 +10,7 @@ module CoAxiom (
        BranchFlag, Branched, Unbranched, BranchIndex, BranchList(..),
        toBranchList, fromBranchList,
        toBranchedList, toUnbranchedList,
+       brFromUnbranchedSingleton,
        brListLength, brListNth, brListMap, brListFoldr, brListMapM,
        brListFoldlM_, brListZipWith,
 
@@ -55,7 +57,7 @@ from the axiom.
 
 For example, consider the axiom derived from the following declaration:
 
-type instance where
+type family F a where
   F [Int] = Bool
   F [a]   = Double
   F (a b) = Char
@@ -81,7 +83,7 @@ can unify with the supplied arguments. After all, it is possible that some
 of the type arguments are lambda-bound type variables whose instantiation may
 cause an earlier match among the branches. We wish to prohibit this behavior,
 so the type checker rules out the choice of a branch where a previous branch
-can unify. See also [Branched instance checking] in FamInstEnv.hs.
+can unify. See also [Apartness] in FamInstEnv.hs.
 
 For example, the following is malformed, where 'a' is a lambda-bound type
 variable:
@@ -93,7 +95,7 @@ apply, not branch 2. This is a vital consistency check; without it, we could
 derive Int ~ Bool, and that is a Bad Thing.
 
 Note [Branched axioms]
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 Although a CoAxiom has the capacity to store many branches, in certain cases,
 we want only one. These cases are in data/newtype family instances, newtype
 coercions, and type family instances declared with "type instance ...", not
@@ -132,6 +134,8 @@ data BranchList a (br :: BranchFlag) where
   FirstBranch :: a -> BranchList a br
   NextBranch :: a -> BranchList a br -> BranchList a Branched
 
+deriving instance Typeable BranchList
+
 -- convert to/from lists
 toBranchList :: [a] -> BranchList a Branched
 toBranchList [] = pprPanic "toBranchList" empty
@@ -151,6 +155,10 @@ toBranchedList (NextBranch h t) = NextBranch h t
 toUnbranchedList :: BranchList a br -> BranchList a Unbranched
 toUnbranchedList (FirstBranch b) = FirstBranch b
 toUnbranchedList _ = pprPanic "toUnbranchedList" empty
+
+-- Extract a singleton axiom from Unbranched BranchList
+brFromUnbranchedSingleton :: BranchList a Unbranched -> a
+brFromUnbranchedSingleton (FirstBranch b) = b
 
 -- length
 brListLength :: BranchList a br -> Int
@@ -257,7 +265,7 @@ data CoAxBranch
     , cab_incomps  :: [CoAxBranch]  -- The previous incompatible branches
                                     -- See Note [Storing compatibility]
     }
-  deriving Typeable
+  deriving ( Data.Data, Data.Typeable )
 
 toBranchedAxiom :: CoAxiom br -> CoAxiom Branched
 toBranchedAxiom (CoAxiom unique name role tc branches implicit)

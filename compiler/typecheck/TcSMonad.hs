@@ -1043,8 +1043,8 @@ Note [Adding an inert canonical constraint the InertCans]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Adding any constraint c *other* than a CTyEqCan (TcSMonad.addInertCan):
 
-    * If c can be rewritten by model, emit [D] c, as NonCanonical.
-      See Note [Can be rewritten by model]
+    * If c can be rewritten by model, emit the shadow constraint [D] c
+      as NonCanonical.   See Note [Emitting shadow constraints]
 
     * Reason for non-canonical: a CFunEqCan has a unique fmv on the RHS,
       so we must not duplicate it.
@@ -1062,30 +1062,33 @@ Note [Adding an inert canonical constraint the InertCans]
 
         - A Derived equality can kick out [D] constraints in inert_dicts,
           inert_irreds etc.  Nothing in inert_eqs because there are no
-          Derived constraints in inert_eqs.
+          Derived constraints in inert_eqs (they are in the model)
 
   Then, when adding:
 
-     * [Given/Wanted] a ~N ty
-        1. (GWShadow) If the model can rewrite (a~ty), then emit [D] a~ty
-           (GWModel)  Otherwise just add a~ty to the model
-                      (Reason: [D] a~ty is inert wrt model, and (K2b) holds)
-
-        2. Add it to inert_eqs
-
-     * [Given/Wanted] a ~R ty: just add it to inert_eqs
-
      * [Derived] a ~N ty
-        1. (DShadow) Emit shadow-copies (emitDerivedShadows):
+        1. Add (a~ty) to the model
+           NB: 'a' cannot be in fv(ty), because the constraint is canonical.
+
+        2. (DShadow) Emit shadow-copies (emitDerivedShadows):
              For every inert G/W constraint c, st
-               (a) (a~ty) can rewrite c (see Note [Can be rewritten]), and
-               (b) the model cannot rewrite c
+              (a) (a~ty) can rewrite c (see Note [Emitting shadow constraints]),
+                  and
+              (b) the model cannot rewrite c
              kick out a Derived *copy*, leaving the original unchanged.
              Reason for (b) if the model can rewrite c, then we have already
              generated a shadow copy
 
-        2. Add (a~ty) to the model
-           NB: 'a' cannot be in fv(ty), because the constraint is canonical.
+     * [Given/Wanted] a ~N ty
+        1. Add it to inert_eqs
+        2. If the model can rewrite (a~ty)
+           then (GWShadow) emit [D] a~ty
+           else (GWModel)  Use emitDerivedShadows just like (DShadow)
+                           and add a~ty to the model
+                           (Reason:[D] a~ty is inert wrt model, and (K2b) holds)
+
+     * [Given/Wanted] a ~R ty: just add it to inert_eqs
+
 
 * Unifying a:=ty, is like adding [G] a~ty, but we can't make a [D] a~ty, as in
   step (1) of the [G/W] case above.  So instead, do kickOutAfterUnification:
@@ -1093,17 +1096,46 @@ Note [Adding an inert canonical constraint the InertCans]
       (i.e. a=b or a in ty2).  Example:
             [G] a ~ [b],    model [D] b ~ [a]
 
-Note [Can be rewritten]
-~~~~~~~~~~~~~~~~~~~~~~~
-What does it mean to say "Constraint c can be rewritten by the model".
-See modelCanRewrite, rewritableTyVars.
+Note [Emitting shadow constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Given a new model element [D] a ~ ty, we want to emit shadow
+   [D] constraints for any inert constraints 'c' that can be
+   rewritten [D] a-> ty
 
-Basically it means fvs(c) intersects dom(model).  But can the model
-   [fmv -> ty]  rewrite  CFunEqCan   F Int ~ fmv ?
-No: we just look at the LHS of a CFunEqCan.
+ * And similarly given a new Given/Wanted 'c', we want to emit a
+   shadow 'c' if the model can rewrite [D] c
+
+See modelCanRewrite.
+
+NB the use of rewritableTyVars. ou might wonder whether, given the new
+constraint [D] fmv ~ ty and the inert [W] F alpha ~ fmv, do we want to
+emit a shadow constraint [D] F alpha ~ fmv?  No, we don't, because
+it'll literally be a duplicate (since we do not rewrite the RHS of a
+CFunEqCan) and hence immediately eliminated again.  Insetad we simply
+want to *kick-out* the [W] F alpha ~ fmv, so that it is reconsidered
+from a fudep point of view.  See Note [Kicking out CFunEqCan for
+fundeps]
+
+Note [Kicking out CFunEqCan for fundeps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider:
+   New:    [D] fmv1 ~ fmv2
+   Inert:  [W] F alpha ~ fmv1
+           [W] F beta  ~ fmv2
+
+The new (derived) equality certainly can't rewrite the inerts. But we
+*must* kick out the first one, to get:
+
+   New:   [W] F alpha ~ fmv1
+   Inert: [W] F beta ~ fmv2
+   Model: [D] fmv1 ~ fmv2
+
+and now improvement will discover [D] alpha ~ beta. This is important;
+eg in Trac #9587.
 -}
 
 addInertEq :: Ct -> TcS ()
+-- This is a key function, because of the kick-out stuff
 -- Precondition: item /is/ canonical
 addInertEq ct@(CTyEqCan { cc_ev = ev, cc_eq_rel = eq_rel, cc_tyvar = tv })
   = do { traceTcS "addInertEq {" $
@@ -1137,7 +1169,8 @@ add_inert_eq ics@(IC { inert_count = n
   | ReprEq <- eq_rel
   = return new_ics
 
-  -- Nominal equality, Given/Wanted
+  -- Nominal equality (tv ~N ty), Given/Wanted
+  -- See Note [Emitting shadow constraints]
   | modelCanRewrite old_model rw_tvs  -- Shadow of new constraint is
   = do { emitNewDerivedEq loc pred    -- not inert, so emit it
        ; return new_ics }
@@ -1184,17 +1217,25 @@ emitDerivedShadows IC { inert_eqs      = tv_eqs
                   | otherwise      = cts
 
     want_shadow ct
-      =  not (isDerivedCt ct)               -- No need for a shadow of a Derived!
-      && (new_tv `elemVarSet` rw_tvs)       -- New tv can rewrite ct
-      && not (modelCanRewrite model rw_tvs) -- We have not alrady created a shadow
+      =  not (isDerivedCt ct)              -- No need for a shadow of a Derived!
+      && (new_tv `elemVarSet` rw_tvs)      -- New tv can rewrite ct, yielding a
+                                           -- different ct
+      && not (modelCanRewrite model rw_tvs)-- We have not alrady created a
+                                           -- shadow
       where
         rw_tvs = rewritableTyVars ct
 
 modelCanRewrite :: InertModel -> TcTyVarSet -> Bool
--- True if there is any intersection between dom(model) and pred
-modelCanRewrite model tvs = foldVarSet ((||) . (`elemVarEnv` model)) False tvs
+-- See Note [Emitting shadow constraints]
+-- True if there is any intersection between dom(model) and tvs
+modelCanRewrite model tvs = not (disjointUFM model tvs)
+     -- The low-level use of disjointUFM might e surprising.
+     -- InertModel = TyVarEnv Ct, and we want to see if its domain
+     -- is disjoint from that of a TcTyVarSet.  So we drop down
+     -- to the underlying UniqFM.  A bit yukky, but efficient.
 
 rewritableTyVars :: Ct -> TcTyVarSet
+-- The tyvars of a Ct that can be rewritten
 rewritableTyVars (CFunEqCan { cc_tyargs = tys }) = tyVarsOfTypes tys
 rewritableTyVars ct                              = tyVarsOfType (ctPred ct)
 
@@ -1205,18 +1246,18 @@ addInertCan ct
          text "Trying to insert new inert item:" <+> ppr ct
 
        ; ics <- getInertCans
-       ; let ics' = add_item ics ct
-       ; setInertCans ics'
+       ; setInertCans (add_item ics ct)
 
        -- Emit shadow derived if necessary
+       -- See Note [Emitting shadow constraints]
+       ; let ev     = ctEvidence ct
+             pred   = ctEvPred ev
+             rw_tvs = rewritableTyVars ct
+
        ; when (not (isDerived ev) && modelCanRewrite (inert_model ics) rw_tvs)
               (emitNewDerived (ctEvLoc ev) pred)
 
        ; traceTcS "addInertCan }" $ empty }
-  where
-    rw_tvs = rewritableTyVars ct
-    ev     = ctEvidence ct
-    pred   = ctEvPred ev
 
 add_item :: InertCans -> Ct -> InertCans
 add_item ics item@(CFunEqCan { cc_fun = tc, cc_tyargs = tys })
@@ -1256,21 +1297,34 @@ kickOutRewritable :: CtFlavourRole  -- Flavour and role of the equality that is
    -- inert_solved_dicts, and inert_solved_funeqs
    -- optimistically. But when we lookup we have to
    -- take the substitution into account
-kickOutRewritable new_fr new_tv
-                  ics@(IC { inert_eqs      = tv_eqs
-                          , inert_dicts    = dictmap
-                          , inert_safehask = safehask
-                          , inert_funeqs   = funeqmap
-                          , inert_irreds   = irreds
-                          , inert_insols   = insols
-                          , inert_count    = n
-                          , inert_model    = model })
+kickOutRewritable new_fr new_tv ics@(IC { inert_funeqs = funeqmap })
   | not (new_fr `eqCanRewriteFR` new_fr)
-  = (emptyWorkList, ics)  -- If new_flavour can't rewrite itself, it can't rewrite
-                          -- anything else, so no need to kick out anything
-                          -- This is a common case: wanteds can't rewrite wanteds
+  = if isFlattenTyVar new_tv
+    then (emptyWorkList { wl_funeqs = feqs_out }, ics { inert_funeqs = feqs_in })
+    else (emptyWorkList,                          ics)
+        -- If new_fr can't rewrite itself, it can't rewrite
+        -- anything else, so no need to kick out anything.
+        -- (This is a common case: wanteds can't rewrite wanteds)
+        --
+        -- ExCEPT (tiresomely) that we should kick out any CFunEqCans
+        -- that we should re-examine for their fundeps, even though
+        -- they can't be *rewrittten*.
+        -- See Note [Kicking out CFunEqCan for fundeps]
+  where
+    (feqs_out, feqs_in) = partitionFunEqs kick_out_fe funeqmap
 
-  | otherwise
+    kick_out_fe :: Ct -> Bool
+    kick_out_fe (CFunEqCan { cc_fsk = fsk }) = fsk == new_tv
+    kick_out_fe _ = False  -- Can't happen
+
+kickOutRewritable new_fr new_tv (IC { inert_eqs      = tv_eqs
+                                    , inert_dicts    = dictmap
+                                    , inert_safehask = safehask
+                                    , inert_funeqs   = funeqmap
+                                    , inert_irreds   = irreds
+                                    , inert_insols   = insols
+                                    , inert_count    = n
+                                    , inert_model    = model })
   = (kicked_out, inert_cans_in)
   where
     inert_cans_in = IC { inert_eqs      = tv_eqs_in
@@ -1291,7 +1345,7 @@ kickOutRewritable new_fr new_tv
                     , wl_implics = emptyBag }
 
     (tv_eqs_out, tv_eqs_in) = foldVarEnv kick_out_eqs ([], emptyVarEnv) tv_eqs
-    (feqs_out,   feqs_in)   = partitionFunEqs  kick_out_ct funeqmap
+    (feqs_out,   feqs_in)   = partitionFunEqs  kick_out_fe funeqmap
     (dicts_out,  dicts_in)  = partitionDicts   kick_out_ct dictmap
     (irs_out,    irs_in)    = partitionBag     kick_out_irred irreds
     (insols_out, insols_in) = partitionBag     kick_out_ct    insols
@@ -1302,6 +1356,11 @@ kickOutRewritable new_fr new_tv
 
     kick_out_ct :: Ct -> Bool
     kick_out_ct ct = kick_out_ctev (ctEvidence ct)
+
+    kick_out_fe :: Ct -> Bool
+    kick_out_fe (CFunEqCan { cc_ev = ev, cc_fsk = fsk })
+      =  kick_out_ctev ev || fsk == new_tv
+    kick_out_fe _ = False  -- Can't happen
 
     kick_out_ctev :: CtEvidence -> Bool
     kick_out_ctev ev =  can_rewrite ev
@@ -1386,9 +1445,8 @@ kickOutModel new_tv ics@(IC { inert_model = model, inert_eqs = eqs })
       | not (isInInertEqs eqs tv rhs) = extendWorkListDerived (ctEvLoc ev) ev wl
     add _ wl                          = wl
 
-{-
-Note [Kicking out inert constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Kicking out inert constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given a new (a -> ty) inert, we want to kick out an existing inert
 constraint if
   a) the new constraint can rewrite the inert one

@@ -12,13 +12,13 @@ import Data.Char
 import Data.List
 import Language.Haskell.TH
 
-$(return [FamilyD TypeFam (mkName "Map") [KindedTV (mkName "f")
+$(return [OpenTypeFamilyD (mkName "Map") [KindedTV (mkName "f")
                                                    (AppT (AppT ArrowT (VarT (mkName "k1")))
                                                            (VarT (mkName "k2"))),
                                           KindedTV (mkName "l")
                                                    (AppT ListT
                                                          (VarT (mkName "k1")))]
-                                          (Just (AppT ListT (VarT (mkName "k2"))))])
+                                          (KindSig (AppT ListT (VarT (mkName "k2")))) Nothing])
 
 $( let fixKs :: String -> String -- need to remove TH renaming index from k variables
        fixKs s =

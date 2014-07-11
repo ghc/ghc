@@ -1,0 +1,8 @@
+
+T6018failclosed12.hs:7:5:
+    Type family equation violates injectivity annotation.
+    Injective kind variable ‘k’ is not inferable from the RHS type variables.
+    In the RHS of type family equation:
+      forall (k :: BOX) (a :: k) (b :: k). Gc a b = Int
+    In the equations for closed type family ‘Gc’
+    In the type family declaration for ‘Gc’

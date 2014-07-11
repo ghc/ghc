@@ -36,8 +36,8 @@ import TcMType
 import TcType
 import TysWiredIn( unitTy )
 import FamInst
-import FamInstEnv( isDominatedBy, mkCoAxBranch, mkBranchedCoAxiom )
-import Coercion( pprCoAxBranch, ltRole )
+import FamInstEnv
+import Coercion( ltRole )
 import Type
 import TypeRep   -- for checkValidRoles
 import Kind
@@ -136,7 +136,7 @@ tcTyClGroup tyclds
             -- the final TyCons and Classes
        ; let role_annots = extractRoleAnnots tyclds
              decls = group_tyclds tyclds
-       ; tyclss <- fixM $ \ rec_tyclss -> do
+       ; tyclss <- fixM $ \ ~rec_tyclss -> do
            { is_boot   <- tcIsHsBootOrSig
            ; self_boot <- tcSelfBootInfo
            ; let rec_flags = calcRecFlags self_boot is_boot
@@ -144,7 +144,7 @@ tcTyClGroup tyclds
 
                  -- Populate environment with knot-tied ATyCon for TyCons
                  -- NB: if the decls mention any ill-staged data cons
-                 -- (see Note [Recusion and promoting data constructors]
+                 -- (see Note [Recusion and promoting data constructors])
                  -- we will have failed already in kcTyClGroup, so no worries here
            ; tcExtendRecEnv (zipRecTyClss names_w_poly_kinds rec_tyclss) $
 
@@ -406,16 +406,19 @@ getFamDeclInitialKinds decls
 
 getFamDeclInitialKind :: FamilyDecl Name
                       -> TcM [(Name, TcTyThing)]
-getFamDeclInitialKind decl@(FamilyDecl { fdLName = L _ name
-                                       , fdTyVars = ktvs
-                                       , fdKindSig = ksig })
+getFamDeclInitialKind decl@(FamilyDecl { fdLName     = L _ name
+                                       , fdTyVars    = ktvs
+                                       , fdResultSig = L _ resultSig })
   = do { (fam_kind, _) <-
            kcHsTyVarBndrs (famDeclHasCusk decl) ktvs $
-           do { res_k <- case ksig of
-                           Just k  -> tcLHsKind k
-                           Nothing
-                             | famDeclHasCusk decl -> return liftedTypeKind
-                             | otherwise           -> newMetaKindVar
+           do { res_k <- case resultSig of
+                      KindSig ki                        -> tcLHsKind ki
+                      TyVarSig (L _ (KindedTyVar _ ki)) -> tcLHsKind ki
+                      _ -- open type families have * return kind by default
+                        | famDeclHasCusk decl      -> return liftedTypeKind
+                        -- closed type families have their return kind inferred
+                        -- by default
+                        | otherwise                -> newMetaKindVar
               ; return (res_k, ()) }
        ; return [ (name, AThing fam_kind) ] }
 
@@ -631,6 +634,7 @@ tcTyClDecl1 _parent rec_info
                  -- This little knot is just so we can get
                  -- hold of the name of the class TyCon, which we
                  -- need to look up its recursiveness
+               ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr tvs' $$ ppr kind)
                ; let tycon_name = tyConName (classTyCon clas)
                      tc_isrec = rti_is_rec rec_info tycon_name
                      roles = rti_roles rec_info tycon_name
@@ -662,45 +666,57 @@ tcTyClDecl1 _parent rec_info
          -- NB: Order is important due to the call to `mkGlobalThings' when
          --     tying the the type and class declaration type checking knot.
   where
-    tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM (tc_fd_tyvar . unLoc) tvs1 ;
-                                ; tvs2' <- mapM (tc_fd_tyvar . unLoc) tvs2 ;
+    tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM tcFdTyVar tvs1
+                                ; tvs2' <- mapM tcFdTyVar tvs2
                                 ; return (tvs1', tvs2') }
-    tc_fd_tyvar name   -- Scoped kind variables are bound to unification variables
-                       -- which are now fixed, so we can zonk
-      = do { tv <- tcLookupTyVar name
-           ; ty <- zonkTyVarOcc emptyZonkEnv tv
-                  -- Squeeze out any kind unification variables
-           ; case getTyVar_maybe ty of
-               Just tv' -> return tv'
-               Nothing  -> pprPanic "tc_fd_tyvar" (ppr name $$ ppr tv $$ ppr ty) }
+
+tcFdTyVar :: Located Name -> TcM TcTyVar
+-- Look up a type/kind variable in a functional dependency
+-- or injectivity annotation.  In the case of kind variables,
+-- the environment contains a binding of the kind var to a
+-- a SigTv unification variables, which has now fixed.
+-- So we must zonk to get the real thing.  Ugh!
+tcFdTyVar (L _ name)
+  = do { tv <- tcLookupTyVar name
+       ; ty <- zonkTyVarOcc emptyZonkEnv tv
+       ; case getTyVar_maybe ty of
+           Just tv' -> return tv'
+           Nothing  -> pprPanic "tcFdTyVar" (ppr name $$ ppr tv $$ ppr ty) }
 
 tcFamDecl1 :: TyConParent -> FamilyDecl Name -> TcM [TyThing]
-tcFamDecl1 parent
-            (FamilyDecl {fdInfo = OpenTypeFamily, fdLName = L _ tc_name, fdTyVars = tvs})
+tcFamDecl1 parent (FamilyDecl { fdInfo = OpenTypeFamily, fdLName = L _ tc_name
+                              , fdTyVars = tvs, fdResultSig = L _ sig
+                              , fdInjectivityAnn = inj })
   = tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
   { traceTc "open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
-  ; tycon <- buildFamilyTyCon tc_name tvs' OpenSynFamilyTyCon kind parent
+  ; inj' <- tcInjectivity tvs' inj
+  ; let tycon = buildFamilyTyCon tc_name tvs' (resultVariableName sig)
+                                 OpenSynFamilyTyCon kind parent inj'
   ; return [ATyCon tycon] }
 
 tcFamDecl1 parent
             (FamilyDecl { fdInfo = ClosedTypeFamily mb_eqns
-                        , fdLName = lname@(L _ tc_name), fdTyVars = tvs })
+                        , fdLName = L _ tc_name, fdTyVars = tvs
+                        , fdResultSig = L _ sig, fdInjectivityAnn = inj })
 -- Closed type families are a little tricky, because they contain the definition
 -- of both the type family and the equations for a CoAxiom.
-  = do { traceTc "closed type family:" (ppr tc_name)
-         -- the variables in the header have no scope:
-       ; (tvs', kind) <- tcTyClTyVars tc_name tvs $ \ tvs' kind ->
-                         return (tvs', kind)
+  = do { traceTc "Closed type family:" (ppr tc_name)
+         -- the variables in the header scope only over the injectivity
+         -- declaration but this is not involved here
+       ; (tvs', inj', kind) <- tcTyClTyVars tc_name tvs $ \ tvs' kind ->
+                               do { inj' <- tcInjectivity tvs' inj
+                                  ; return (tvs', inj', kind) }
 
        ; checkFamFlag tc_name -- make sure we have -XTypeFamilies
 
          -- If Nothing, this is an abstract family in a hs-boot file;
          -- but eqns might be empty in the Just case as well
        ; case mb_eqns of
-           Nothing   -> do { tycon <- buildFamilyTyCon tc_name tvs'
-                                        AbstractClosedSynFamilyTyCon kind parent
-                           ; return [ATyCon tycon] }
+           Nothing   ->
+               return [ATyCon $ buildFamilyTyCon tc_name tvs' Nothing
+                                     AbstractClosedSynFamilyTyCon kind parent
+                                     NotInjective ]
            Just eqns -> do {
 
          -- Process the equations, creating CoAxBranches
@@ -708,12 +724,13 @@ tcFamDecl1 parent
        ; let fam_tc_shape = (tc_name, length (hsQTvBndrs tvs), tc_kind)
 
        ; branches <- mapM (tcTyFamInstEqn fam_tc_shape) eqns
+         -- Do not attempt to drop equations dominated by earlier
+         -- ones here; in the case of mutual recursion with a data
+         -- type, we get a knot-tying failure.  Instead we check
+         -- for this afterwards, in TcValidity.checkValidCoAxiom
+         -- Example: tc265
 
-         -- we need the tycon that we will be creating, but it's in scope.
-         -- just look it up.
-       ; fam_tc <- tcLookupLocatedTyCon lname
-
-         -- create a CoAxiom, with the correct src location. It is Vitally
+         -- Create a CoAxiom, with the correct src location. It is Vitally
          -- Important that we do not pass the branches into
          -- newFamInstAxiomName. They have types that have been zonked inside
          -- the knot and we will die if we look at them. This is OK here
@@ -723,17 +740,17 @@ tcFamDecl1 parent
        ; loc <- getSrcSpanM
        ; co_ax_name <- newFamInstAxiomName loc tc_name []
 
-         -- mkBranchedCoAxiom will fail on an empty list of branches
        ; let mb_co_ax
-              | null eqns = Nothing
-              | otherwise = Just $ mkBranchedCoAxiom co_ax_name fam_tc branches
+              | null eqns = Nothing   -- mkBranchedCoAxiom fails on empty list
+              | otherwise = Just (mkBranchedCoAxiom co_ax_name fam_tc branches)
 
-         -- now, finally, build the TyCon
-       ; tycon <- buildFamilyTyCon tc_name tvs'
-                      (ClosedSynFamilyTyCon mb_co_ax) kind parent
-       ; return $ ATyCon tycon : maybeToList (fmap ACoAxiom mb_co_ax) } }
+             fam_tc = buildFamilyTyCon tc_name tvs' (resultVariableName sig)
+                      (ClosedSynFamilyTyCon mb_co_ax) kind parent inj'
+
+       ; return $ ATyCon fam_tc : maybeToList (fmap ACoAxiom mb_co_ax) } }
+
 -- We check for instance validity later, when doing validity checking for
--- the tycon
+-- the tycon. Exception: checking equations overlap done by dropDominatedAxioms
 
 tcFamDecl1 parent
            (FamilyDecl {fdInfo = DataFamily, fdLName = L _ tc_name, fdTyVars = tvs})
@@ -750,6 +767,43 @@ tcFamDecl1 parent
                               parent
   ; return [ATyCon tycon] }
 
+-- | Maybe return a list of Bools that say whether a type family was declared
+-- injective in the corresponding type arguments. Length of the list is equal to
+-- the number of arguments (including implicit kind arguments). True on position
+-- N means that a function is injective in its Nth argument. False means it is
+-- not.
+tcInjectivity :: [TyVar] -> Maybe (LInjectivityAnn Name)
+              -> TcM Injectivity
+tcInjectivity _ Nothing
+  = return NotInjective
+
+  -- User provided an injectivity annotation, so for each tyvar argument we
+  -- check whether a type family was declared injective in that argument. We
+  -- return a list of Bools, where True means that corresponding type variable
+  -- was mentioned in lInjNames (type family is injective in that argument) and
+  -- False means that it was not mentioned in lInjNames (type family is not
+  -- injective in that type variable). We also extend injectivity information to
+  -- kind variables, so if a user declares:
+  --
+  --   type family F (a :: k1) (b :: k2) = (r :: k3) | r -> a
+  --
+  -- then we mark both `a` and `k1` as injective.
+  -- NB: the return kind is considered to be *input* argument to a type family.
+  -- Since injectivity allows to infer input arguments from the result in theory
+  -- we should always mark the result kind variable (`k3` in this example) as
+  -- injective.  The reason is that result type has always an assigned kind and
+  -- therefore we can always infer the result kind if we know the result type.
+  -- But this does not seem to be useful in any way so we don't do it.  (Another
+  -- reason is that the implementation would not be straightforward.)
+tcInjectivity tvs (Just (L loc (InjectivityAnn _ lInjNames)))
+  = setSrcSpan loc $
+    do { inj_tvs <- mapM tcFdTyVar lInjNames
+       ; let inj_ktvs = closeOverKinds (mkVarSet inj_tvs)
+       ; let inj_bools = map (`elemVarSet` inj_ktvs) tvs
+       ; traceTc "tcInjectivity" (vcat [ ppr tvs, ppr lInjNames, ppr inj_tvs
+                                       , ppr inj_ktvs, ppr inj_bools ])
+       ; return $ Injective inj_bools }
+
 tcTySynRhs :: RecTyInfo
            -> Name
            -> [TyVar] -> Kind
@@ -760,7 +814,7 @@ tcTySynRhs rec_info tc_name tvs kind hs_ty
        ; rhs_ty <- tcCheckLHsType hs_ty kind
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
        ; let roles = rti_roles rec_info tc_name
-       ; tycon <- buildSynonymTyCon tc_name tvs roles rhs_ty kind
+             tycon = buildSynonymTyCon tc_name tvs roles rhs_ty kind
        ; return [ATyCon tycon] }
 
 tcDataDefn :: RecTyInfo -> Name
@@ -823,13 +877,10 @@ The following is an example of associated type defaults:
                data D a
 
                type F a b :: *
-               type F a Z = [a]        -- Default
-               type F a (S n) = F a n  -- Default
+               type F a b = [a]        -- Default
 
-Note that:
-  - We can have more than one default definition for a single associated type,
-    as long as they do not overlap (same rules as for instances)
-  - We can get default definitions only for type families, not data families
+Note that we can get default definitions only for type families, not data
+families.
 -}
 
 tcClassATs :: Name                  -- The class name (not knot-tied)
@@ -1493,7 +1544,8 @@ checkValidTyCon tc
 
   | Just fam_flav <- famTyConFlav_maybe tc
   = case fam_flav of
-    { ClosedSynFamilyTyCon (Just ax) -> checkValidClosedCoAxiom ax
+    { ClosedSynFamilyTyCon (Just ax) -> tcAddClosedTypeFamilyDeclCtxt tc $
+                                        checkValidCoAxiom ax
     ; ClosedSynFamilyTyCon Nothing   -> return ()
     ; AbstractClosedSynFamilyTyCon ->
       do { hsBoot <- tcIsHsBootOrSig
@@ -1563,23 +1615,6 @@ checkValidTyCon tc
                 ts2 = mkVarSet tvs2
                 fty2 = dataConFieldType con2 label
     check_fields [] = panic "checkValidTyCon/check_fields []"
-
-checkValidClosedCoAxiom :: CoAxiom Branched -> TcM ()
-checkValidClosedCoAxiom (CoAxiom { co_ax_branches = branches, co_ax_tc = tc })
- = tcAddClosedTypeFamilyDeclCtxt tc $
-   do { brListFoldlM_ check_accessibility [] branches
-      ; void $ brListMapM (checkValidTyFamInst Nothing tc) branches }
-   where
-     check_accessibility :: [CoAxBranch]       -- prev branches (in reverse order)
-                         -> CoAxBranch         -- cur branch
-                         -> TcM [CoAxBranch]   -- cur : prev
-               -- Check whether the branch is dominated by earlier
-               -- ones and hence is inaccessible
-     check_accessibility prev_branches cur_branch
-       = do { when (cur_branch `isDominatedBy` prev_branches) $
-              addWarnAt (coAxBranchSpan cur_branch) $
-              inaccessibleCoAxBranch tc cur_branch
-            ; return (cur_branch : prev_branches) }
 
 checkFieldCompat :: Name -> DataCon -> DataCon -> TyVarSet
                  -> Type -> Type -> Type -> Type -> TcM ()
@@ -2307,11 +2342,6 @@ wrongTyFamName fam_tc_name eqn_tc_name
   = hang (ptext (sLit "Mismatched type name in type family instance."))
        2 (vcat [ ptext (sLit "Expected:") <+> ppr fam_tc_name
                , ptext (sLit "  Actual:") <+> ppr eqn_tc_name ])
-
-inaccessibleCoAxBranch :: TyCon -> CoAxBranch -> SDoc
-inaccessibleCoAxBranch tc fi
-  = ptext (sLit "Overlapped type family instance equation:") $$
-      (pprCoAxBranch tc fi)
 
 badRoleAnnot :: Name -> Role -> Role -> SDoc
 badRoleAnnot var annot inferred
