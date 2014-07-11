@@ -213,7 +213,12 @@ the module system.
 
     \item Support \emph{separate modular development}, where a library and
         an application using the library can be developed and type-checked
-        separately, intermediated by an interface.  This is applicable in
+        separately, intermediated by an interface.  The canonical example
+        here is the \verb|ghc-api|, which is a large, complex API that
+        the library writers (GHC developers) frequently change---the ability
+        for downstream projects to say, ``Here is the API I'm relying on''
+        without requiring these projects to actually be built would greatly
+        assist in keeping the API stable. This is applicable in
         the pluggability example as well, where we want to ensure that all
         of the $M \times N$ configurations of libraries versus applications
         type check, by only running the typechecker $M + N$ times.  A closely
@@ -1597,22 +1602,257 @@ some recursive modules without needing the hs-boot file at all. But if
 we're moving towards boot files as signatures, this concern is less
 relevant.
 
-\section{Bits and bobs}
+\section{Type classes and type families}
 
-\subsection{Abstract type synonyms}
+\subsection{Background}
 
-In Paper Backpack, abstract type synonyms are not permitted, because GHC doesn't
-understand how to deal with them.  The purpose of this section is to describe
-one particularly nastiness of abstract type synonyms, by way of the occurs check:
+Before we talk about how to support type classes in Backpack, it's first
+worth talking about what we are trying to achieve in the design.  Most
+would agree that \emph{type safety} is the cardinal law that should be
+preserved (in the sense that segfaults should not be possible), but
+there are many instances of ``bad behavior'' (top level mutable state,
+weakening of abstraction guarantees, ambiguous instance resolution, etc)
+which various Haskellers may disagree on the necessity of ruling out.
+
+With this in mind, it is worth summarizing what kind of guarantees are
+presently given by GHC with regards to type classes and type families,
+as well as characterizing the \emph{cultural} expectations of the
+Haskell community.
+
+\paragraph{Type classes}  When discussing type class systems, there are
+several properties that one may talk about.
+A set of instances is \emph{confluent} if, no matter what order
+constraint solving is performed, GHC will terminate with a canonical set
+of constraints that must be satisfied for any given use of a type class.
+In other words, confluence says that we won't conclude that a program
+doesn't type check just because we swapped in a different constraint
+solving algorithm.
+
+Confluence's closely related twin is \emph{coherence} (defined in ``Type
+classes: exploring the design space''). This property states that
+``every different valid typing derivation of a program leads to a
+resulting program that has the same dynamic semantics.''  Why could
+differing typing derivations result in different dynamic semantics?  The
+answer is that context reduction, which picks out type class instances,
+elaborates into concrete choices of dictionaries in the generated code.
+Confluence is a prerequisite for coherence, since one
+can hardly talk about the dynamic semantics of a program that doesn't
+type check.
+
+In the vernacular, confluence and coherence are often incorrectly used
+to refer to another related property: \emph{global uniqueness of instances},
+which states that in a fully compiled program, for any type, there is at most one
+instance resolution for a given type class.  Languages with local type
+class instances such as Scala generally do not have this property, and
+this assumption is frequently used for abstraction.
+
+So, what properties does GHC enforce, in practice?
+In the absence of any type system extensions, GHC's employs a set of
+rules (described in ``Exploring the design space'') to ensure that type
+class resolution is confluent and coherent.  Intuitively, it achieves
+this by having a very simple constraint solving algorithm (generate
+wanted constraints and solve wanted constraints) and then requiring the
+set of instances to be \emph{nonoverlapping}, ensuring there is only
+ever one way to solve a wanted constraint.  Overlap is a
+more stringent restriction than either confluence or coherence, and
+via the \verb|OverlappingInstances| and \verb|IncoherentInstances|, GHC
+allows a user to relax this restriction ``if they know what they're doing.''
+
+Surprisingly, however, GHC does \emph{not} enforce global uniqueness of
+instances.  Imported instances are not checked for overlap until we
+attempt to use them for instance resolution.  Consider the following program:
 
 \begin{verbatim}
-A :: [ type T ]
-B :: [ import qualified A; type T = [A.T] ]
+-- T.hs
+data T = T
+-- A.hs
+import T
+instance Eq T where
+-- B.hs
+import T
+instance Eq T where
+-- C.hs
+import A
+import B
 \end{verbatim}
 
-At this point, it is illegal for \verb|A = B|, otherwise this type synonym would
-fail the occurs check.  This seems like pretty bad news, since every instance
-of the occurs check in the type-checker could constitute a module inequality.
+When compiled with one-shot compilation, \verb|C| will not report
+overlapping instances unless we actually attempt to use the \verb|Eq|
+instance in C.\footnote{When using batch compilation, GHC reuses the
+    instance database and is actually able to detect the duplicated
+    instance when compiling B.  But if you run it again, recompilation
+avoidance skips A, and it finishes compiling!  See this bug:
+\url{https://ghc.haskell.org/trac/ghc/ticket/5316}}  This is by
+design\footnote{\url{https://ghc.haskell.org/trac/ghc/ticket/2356}}:
+ensuring that there are no overlapping instances eagerly requires
+eagerly reading all the interface files a module may depend on.
+
+We might summarize these three properties in the following manner.
+Culturally, the Haskell community expects \emph{global uniqueness of instances}
+to hold: the implicit global database of instances should be
+confluent and coherent.  GHC, however, does not enforce uniqueness of
+instances: instead, it merely guarantees that the \emph{subset} of the
+instance database it uses when it compiles any given module is confluent and coherent.  GHC does do some
+tests when an instance is declared to see if it would result in overlap
+with visible instances, but the check is by no means
+perfect\footnote{\url{https://ghc.haskell.org/trac/ghc/ticket/9288}};
+truly, \emph{type-class constraint resolution} has the final word.  One
+mitigating factor is that in the absence of \emph{orphan instances}, GHC is
+guaranteed to eagerly notice when the instance database has overlap.\footnote{Assuming that the instance declaration checks actually worked\ldots}
+
+Clearly, the fact that GHC's lazy behavior is surprising to most
+Haskellers means that the lazy check is mostly good enough: a user
+is likely to discover overlapping instances one way or another.
+However, it is relatively simple to construct example programs which
+violate global uniqueness of instances in an observable way:
+
+\begin{verbatim}
+-- A.hs
+module A where
+data U = X | Y deriving (Eq, Show)
+
+-- B.hs
+module B where
+import Data.Set
+import A
+
+instance Ord U where
+compare X X = EQ
+compare X Y = LT
+compare Y X = GT
+compare Y Y = EQ
+
+ins :: U -> Set U -> Set U
+ins = insert
+
+-- C.hs
+module C where
+import Data.Set
+import A
+
+instance Ord U where
+compare X X = EQ
+compare X Y = GT
+compare Y X = LT
+compare Y Y = EQ
+
+ins' :: U -> Set U -> Set U
+ins' = insert
+
+-- D.hs
+module Main where
+import Data.Set
+import A
+import B
+import C
+
+test :: Set U
+test = ins' X $ ins X $ ins Y $ empty
+
+main :: IO ()
+main = print test
+
+-- OUTPUT
+$ ghc -Wall -XSafe -fforce-recomp --make D.hs
+[1 of 4] Compiling A ( A.hs, A.o )
+[2 of 4] Compiling B ( B.hs, B.o )
+
+B.hs:5:10: Warning: Orphan instance: instance [safe] Ord U
+[3 of 4] Compiling C ( C.hs, C.o )
+
+C.hs:5:10: Warning: Orphan instance: instance [safe] Ord U
+[4 of 4] Compiling Main ( D.hs, D.o )
+Linking D ...
+$ ./D
+fromList [X,Y,X]
+\end{verbatim}
+
+Locally, all type class resolution was coherent: in the subset of
+instances each module had visible, type class resolution could be done
+unambiguously.  Furthermore, the types of \verb|ins| and \verb|ins'|
+discharge type class resolution, so that in \verb|D| when the database
+is now overlapping, no resolution occurs, so the error is never found.
+
+It is easy to dismiss this example as an implementation wart in GHC, and
+continue pretending that global uniqueness of instances holds.  However,
+the problem with \emph{global uniqueness of instances} is that they are
+inherently nonmodular: you might find yourself unable to compose two
+components because they accidentally defined the same type class
+instance, even though these instances are plumbed deep in the
+implementation details of the components.
+
+As it turns out, there is already another feature in Haskell which
+must enforce global uniqueness, to prevent segfaults.
+We now turn to type classes' close cousin: type families.
+
+\paragraph{Type families}
+
+\subsection{Explicit instance imports}
+
+Backpack applies thinning behavior to types and values, so that an
+errant declaration doesn't cause a module which typechecked against
+a signature to stop typechecking against a concrete implementation.
+The same situation applies for type class instances:
+
+\begin{verbatim}
+package p where
+    A :: [ data T = T ]
+    B = [ import A; instance Eq T where ... ]
+
+package q where
+    A = [ data T = T; instance Eq T where ... ]
+    include p
+\end{verbatim}
+
+The instance defined in \verb|A| should be hidden from \verb|B|.  Note
+that this does \emph{not} cause incoherence: it is still unambiguous
+which instance is referred to in the text of both modules.  However,
+it does make it a lot easier to observe different choices of an
+instance downstream.
+
+\subsection{Module inequalities}
+
+So what is the big problem we have to deal with?  Here is the canonical
+example, from the Backpack paper:
+
+\begin{verbatim}
+P = [ class Eq a where ... ]
+A :: [ data T ]
+B :: [ data T ]
+C :: [
+    import P
+    import qualified A
+    import qualified B
+    instance Eq A.T where ...
+    instance Eq B.T where ...
+]
+\end{verbatim}
+
+Signature \verb|C| is only well typed if \verb|A.T != B.T|.  There have
+been two proposed solutions for this problem:
+
+\paragraph{Link-time check}  This is the solution that was described in
+the paper.  When some instances are typechecked initially, we type check
+them as if all of variable module identities were distinct.  Then, when
+we perform linking (we \verb|include| or we unify some
+module identities), we check again if to see if we've discovered some
+instance overlap.
+
+This solution is extremely inefficient, unfortunately.  Consider the following
+set of modules, as compiled by GHC today:
+
+\begin{verbatim}
+A = [ data T ]
+B = [ import A; instance Eq T ]
+C = [ import A; instance Eq T ]
+D = [ import B; import C ]
+\end{verbatim}
+
+Currently, \emph{no overlapping instance} error is thrown in module \verb|D|.
+Why? Because in order to discover overlap, GHC must compare every instance
+exported by \verb|B| with every instance against \verb|C|.
+
+\paragraph{Inequality constraints}
 
 \subsection{Type families}
 
@@ -1666,6 +1906,23 @@ package c where
 
 It would seem that private axioms cannot be naively supported. Is
 there any way that thinning axioms could be made to work?
+
+\section{Bits and bobs}
+
+\subsection{Abstract type synonyms}
+
+In Paper Backpack, abstract type synonyms are not permitted, because GHC doesn't
+understand how to deal with them.  The purpose of this section is to describe
+one particularly nastiness of abstract type synonyms, by way of the occurs check:
+
+\begin{verbatim}
+A :: [ type T ]
+B :: [ import qualified A; type T = [A.T] ]
+\end{verbatim}
+
+At this point, it is illegal for \verb|A = B|, otherwise this type synonym would
+fail the occurs check.  This seems like pretty bad news, since every instance
+of the occurs check in the type-checker could constitute a module inequality.
 
 \section{Open questions}\label{sec:open-questions}
 
