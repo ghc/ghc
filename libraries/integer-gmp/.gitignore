@@ -11,3 +11,6 @@
 /include/HsIntegerGmp.h
 /integer-gmp.buildinfo
 /mkGmpDerivedConstants/dist/
+
+/gmp/gmp.h
+/gmp/gmpbuild
