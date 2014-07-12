@@ -235,7 +235,7 @@ test('T3064',
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
             # (amd64/Linux) (11/09/2013): 290165632, increase from AMP warnings
             # (amd64/Linux) (22/11/2013): 308300448, GND via Coercible and counters for constraints solving
-	        # (amd64/Linux) (02/12/2013): 329795912, Coercible refactor
+                # (amd64/Linux) (02/12/2013): 329795912, Coercible refactor
             # (amd64/Linux) (11/02/2014): 308422280, optimize Coercions in simpleOptExpr
             # (amd64/Linux) (23/05/2014): 324022680, unknown cause
 
@@ -392,8 +392,8 @@ test('T5837',
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
              # 2013-09-18 90587232 amd64/Linux
-	     # 2013-11-21 86795752 amd64/Linux, GND via Coercible and counters
-	     #                                  for constraints solving
+             # 2013-11-21 86795752 amd64/Linux, GND via Coercible and counters
+             #                                  for constraints solving
       ],
       compile_fail,['-ftype-function-depth=50'])
 
@@ -404,7 +404,7 @@ test('T6048',
             # prev:       38000000 (x86/Linux)
             # 2012-10-08: 48887164 (x86/Linux)
             # 2014-04-04: 62618072 (x86 Windows, 64 bit machine)
-           (wordsize(64), 110646312, 10)])
+           (wordsize(64), 110646312, 12)])
              # 18/09/2012 97247032 amd64/Linux
              # 16/01/2014 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
              # 18/01/2014 95960720 amd64/Linux Call Arity improvements
