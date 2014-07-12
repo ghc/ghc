@@ -1,0 +1,36 @@
+git:
+  submodules: false
+
+notifications:
+  email:
+    - mail@joachim-breitner.de
+    - ghc-builds@haskell.org
+
+env:
+ - DEBUG_STAGE2=YES
+ - DEBUG_STAGE2=NO
+
+before_install:
+ - git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
+ - git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
+ - git config --global url."https://github.com/ghc/packages-".insteadOf   https://github.com/ghc/packages/
+ - git config --global url."ssh://git@github.com/ghc/packages-".insteadOf ssh://git@github.com/ghc/packages/
+ - git config --global url."git@github.com:/ghc/packages-".insteadOf      git@github.com:/ghc/packages/
+ - git submodule update --init --recursive
+install:
+ - sudo apt-get update
+ - sudo apt-get install haskell-platform autoconf libtool make ncurses-dev g++ dblatex docbook-xsl docbook-utils
+ - cabal update
+ - cabal install happy alex
+script:
+ - echo 'V = 0' >> mk/validate.mk # otherwise we hit log file limits on travis.
+ # do  not build docs
+ - echo 'HADDOCK_DOCS       = NO' >> mk/validate.mk
+ - echo 'BUILD_DOCBOOK_HTML = NO' >> mk/validate.mk
+ - echo 'BUILD_DOCBOOK_PS   = NO' >> mk/validate.mk
+ - echo 'BUILD_DOCBOOK_PDF  = NO' >> mk/validate.mk
+ # do not build dynamic libraries
+ - echo 'DYNAMIC_GHC_PROGRAMS = NO' >> mk/validate.mk
+ - echo 'GhcLibWays = v' >> mk/validate.mk
+ - if [ "$DEBUG_STAGE" = "YES" ]; then echo 'GhcStage2HcOpts += -DDEBUG' >> mk/validate.mk; fi
+ - CPUS=3 SKIP_PERF_TESTS=YES PATH=~/.cabal/bin:$PATH ./validate --fast --no-dph
