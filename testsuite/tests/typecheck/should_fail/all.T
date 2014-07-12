@@ -334,4 +334,4 @@ test('T8912', normal, compile_fail, [''])
 test('T9033', normal, compile_fail, [''])
 test('T8883', normal, compile_fail, [''])
 test('T9196', normal, compile_fail, [''])
-
+test('T9305', normal, compile_fail, [''])
