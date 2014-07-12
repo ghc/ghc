@@ -565,7 +565,7 @@ Note that because MkT3 doesn't contain all the fields being updated,
 its RHS is simply an error, so it doesn't impose any type constraints.
 Hence the use of 'relevant_cont'.
 
-Note [Implict type sharing]
+Note [Implicit type sharing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We also take into account any "implicit" non-update fields.  For example
         data T a b where { MkT { f::a } :: T a a; ... }
@@ -751,7 +751,7 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
                                     -- Universally-quantified tyvars that
                                     -- appear in any of the *implicit*
                                     -- arguments to the constructor are fixed
-                                    -- See Note [Implict type sharing]
+                                    -- See Note [Implicit type sharing]
 
                             fixed_tys = [ty | (fld,ty) <- zip flds arg_tys
                                             , not (fld `elem` upd_fld_names)]
