@@ -1147,8 +1147,8 @@ nestImplicTcS ref inner_untch inerts (TcS thing_inside)
                                , tcs_ty_binds    = ty_binds
                                , tcs_count       = count
                                , tcs_inerts      = new_inert_var
-                               , tcs_worklist    = panic "nextImplicTcS: worklist"
-                               , tcs_implics     = panic "nextImplicTcS: implics"
+                               , tcs_worklist    = panic "nestImplicTcS: worklist"
+                               , tcs_implics     = panic "nestImplicTcS: implics"
                                -- NB: Both these are initialised by withWorkList
                                }
        ; res <- TcM.setUntouchables inner_untch $
@@ -1176,8 +1176,8 @@ nestTcS (TcS thing_inside)
     do { inerts <- TcM.readTcRef inerts_var
        ; new_inert_var <- TcM.newTcRef inerts
        ; let nest_env = env { tcs_inerts   = new_inert_var
-                            , tcs_worklist = panic "nextImplicTcS: worklist"
-                            , tcs_implics  = panic "nextImplicTcS: implics" }
+                            , tcs_worklist = panic "nestTcS: worklist"
+                            , tcs_implics  = panic "nestTcS: implics" }
        ; thing_inside nest_env }
 
 tryTcS :: TcS a -> TcS a
@@ -1195,8 +1195,8 @@ tryTcS (TcS thing_inside)
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
                             , tcs_ty_binds = ty_binds_var
                             , tcs_inerts   = is_var
-                            , tcs_worklist = panic "nextImplicTcS: worklist"
-                            , tcs_implics  = panic "nextImplicTcS: implics" }
+                            , tcs_worklist = panic "tryTcS: worklist"
+                            , tcs_implics  = panic "tryTcS: implics" }
        ; thing_inside nest_env }
 
 -- Getters and setters of TcEnv fields
