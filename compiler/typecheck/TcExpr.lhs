@@ -202,7 +202,7 @@ tcExpr (HsIPVar x) res_ty
        ; ip_var <- emitWanted origin (mkClassPred ipClass [ip_name, ip_ty])
        ; tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var)) ip_ty res_ty }
   where
-  -- Coerces a dictionry for `IP "x" t` into `t`.
+  -- Coerces a dictionary for `IP "x" t` into `t`.
   fromDict ipClass x ty =
     case unwrapNewTyCon_maybe (classTyCon ipClass) of
       Just (_,_,ax) -> HsWrap $ mkWpCast $ mkTcUnbranchedAxInstCo Representational ax [x,ty]
@@ -807,7 +807,7 @@ tcExpr (PArrSeq _ _) _
 
 \begin{code}
 tcExpr (HsSpliceE is_ty splice)  res_ty
-  = ASSERT( is_ty )   -- Untyped splices are expanced by the renamer
+  = ASSERT( is_ty )   -- Untyped splices are expanded by the renamer
    tcSpliceExpr splice res_ty
 
 tcExpr (HsBracket brack)         res_ty = tcTypedBracket   brack res_ty
@@ -966,7 +966,7 @@ tcInferFun fun
 
          -- Zonk the function type carefully, to expose any polymorphism
          -- E.g. (( \(x::forall a. a->a). blah ) e)
-         -- We can see the rank-2 type of the lambda in time to genrealise e
+         -- We can see the rank-2 type of the lambda in time to generalise e
        ; fun_ty' <- zonkTcType fun_ty
 
        ; (wrap, rho) <- deeplyInstantiate AppOrigin fun_ty'
