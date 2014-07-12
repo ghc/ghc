@@ -264,7 +264,7 @@ this for all newtypes, we'd get infinite types.  So we figure out for
 each newtype whether it is "recursive", and add a coercion if so.  In
 effect, we are trying to "cut the loops" by identifying a loop-breaker.
 
-2.  Avoid infinite unboxing.  This is nothing to do with newtypes.
+2.  Avoid infinite unboxing.  This has nothing to do with newtypes.
 Suppose we have
         data T = MkT Int T
         f (MkT x t) = f t
