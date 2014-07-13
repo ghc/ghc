@@ -76,7 +76,7 @@ import qualified Data.Set as Set
 \begin{code}
 tcPolyExpr, tcPolyExprNC
          :: LHsExpr Name        -- Expression to type check
-         -> TcSigmaType         -- Expected type (could be a polytpye)
+         -> TcSigmaType         -- Expected type (could be a polytype)
          -> TcM (LHsExpr TcId)  -- Generalised expr with expected type
 
 -- tcPolyExpr is a convenient place (frequent but not too frequent)
