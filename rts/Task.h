@@ -171,6 +171,11 @@ isBoundTask (Task *task)
 //
 extern Task *all_tasks;
 
+// The all_tasks list is protected by the all_tasks_mutex
+#if defined(THREADED_RTS)
+extern Mutex all_tasks_mutex;
+#endif
+
 // Start and stop the task manager.
 // Requires: sched_mutex.
 //
