@@ -39,7 +39,7 @@ static Task * allocTask (void);
 static Task * newTask   (rtsBool);
 
 #if defined(THREADED_RTS)
-static Mutex all_tasks_mutex;
+Mutex all_tasks_mutex;
 #endif
 
 /* -----------------------------------------------------------------------------
