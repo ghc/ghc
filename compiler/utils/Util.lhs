@@ -47,7 +47,7 @@ module Util (
         nTimes,
 
         -- * Sorting
-        sortWith, minWith,
+        sortWith, minWith, nubSort,
 
         -- * Comparisons
         isEqual, eqListBy, eqMaybeBy,
@@ -126,6 +126,7 @@ import Data.Ord         ( comparing )
 import Data.Bits
 import Data.Word
 import qualified Data.IntMap as IM
+import qualified Data.Set as Set
 
 import Data.Time
 #if __GLASGOW_HASKELL__ < 705
@@ -490,6 +491,9 @@ sortWith get_key xs = sortBy (comparing get_key) xs
 minWith :: Ord b => (a -> b) -> [a] -> a
 minWith get_key xs = ASSERT( not (null xs) )
                      head (sortWith get_key xs)
+
+nubSort :: Ord a => [a] -> [a]
+nubSort = Set.toAscList . Set.fromList
 \end{code}
 
 %************************************************************************

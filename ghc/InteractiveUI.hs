@@ -2536,14 +2536,14 @@ unionComplete f1 f2 line = do
 
 wrapCompleter :: String -> (String -> GHCi [String]) -> CompletionFunc GHCi
 wrapCompleter breakChars fun = completeWord Nothing breakChars
-    $ fmap (map simpleCompletion) . fmap sort . fun
+    $ fmap (map simpleCompletion . nubSort) . fun
 
 wrapIdentCompleter :: (String -> GHCi [String]) -> CompletionFunc GHCi
 wrapIdentCompleter = wrapCompleter word_break_chars
 
 wrapIdentCompleterWithModifier :: String -> (Maybe Char -> String -> GHCi [String]) -> CompletionFunc GHCi
 wrapIdentCompleterWithModifier modifChars fun = completeWordWithPrev Nothing word_break_chars
-    $ \rest -> fmap (map simpleCompletion) . fmap sort . fun (getModifier rest)
+    $ \rest -> fmap (map simpleCompletion . nubSort) . fun (getModifier rest)
  where
   getModifier = find (`elem` modifChars)
 
