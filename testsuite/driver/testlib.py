@@ -1040,8 +1040,10 @@ def checkStats(stats_file, range_fields):
                 result = failBecause('no such stats field')
             val = int(m.group(1))
 
-            lowerBound = trunc(           expected * ((100 - float(dev))/100));
-            upperBound = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)));
+            lowerBound = trunc(           expected * ((100 - float(dev))/100))
+            upperBound = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)))
+
+            deviation = round(((val * 100)/ expected) - 100, 1)
 
             if val < lowerBound:
                 print field, 'value is too low:'
@@ -1064,6 +1066,8 @@ def checkStats(stats_file, range_fields):
                 display('    Lower bound ' + field + ':', lowerBound, '')
                 display('    Upper bound ' + field + ':', upperBound, '')
                 display('    Actual      ' + field + ':', val, '')
+                if val != expected:
+                    display('    Deviation   ' + field + ':', deviation, '%')
                 
     return result
 
