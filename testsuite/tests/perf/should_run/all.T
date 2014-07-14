@@ -371,9 +371,7 @@ test('InlineCloneArrayAlloc',
 test('T9203',
      [stats_num_field('bytes allocated',
                       [ (wordsize(32), 50000000, 5)
-                      , (wordsize(64), 42946176, 5) ]),
-                      # previously: 95747304
-                      # 2014-07-14: 42946176 (amd64/Linux)
+                      , (wordsize(64), 95747304, 5) ]),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
