@@ -1052,7 +1052,7 @@ def checkStats(stats_file, range_fields):
                 print field, 'value is too high:'
                 result = failBecause('stat not good enough')
 
-            if val < lowerBound or val > upperBound:
+            if val < lowerBound or val > upperBound or config.verbose >= 4:
                 valStr = str(val)
                 valLen = len(valStr)
                 expectedStr = str(expected)
