@@ -384,9 +384,13 @@ package foo-0.3(bar-0.1) where
 Notably, we must \emph{rename} the package to include information about
 how we resolved all of the inner package references, and if these inner
 package references had dependencies, those must be included too!  In
-effect, the \emph{dependency resolution} must be encoded into the package ID,
-along with the existing Backpack \emph{physical identity regular tree}.
-Phew!
+effect, the \emph{dependency resolution} must be encoded into the package ID\@.
+
+When we are operating at the package granularity with definite packages,
+this is, in fact, the only information we need to record.  However,
+in other cases, we may need to record more information, e.g., the
+\emph{physical identity regular tree}.  This, however, depends on the
+choices made in Section~\ref{sec:flatten}.
 
 \paragraph{Free variables (or, what is a non-concrete physical
 identity?)} Physical identities in their full generality are permitted
@@ -1785,14 +1789,49 @@ As it turns out, there is already another feature in Haskell which
 must enforce global uniqueness, to prevent segfaults.
 We now turn to type classes' close cousin: type families.
 
-\paragraph{Type families}
+\paragraph{Type families}  With type families, confluence is the primary
+property of interest.  (Coherence is not of much interest because type
+families are elaborated into coercions, which don't have any
+computational content.)  Rather than considering what the set of
+constraints we reduce to, confluence for type families considers the
+reduction of type families.  The overlap checks for type families
+can be quite sophisticated, especially in the case of closed type
+families.
 
-\subsection{Explicit instance imports}
+Unlike type classes, however, GHC \emph{does} check the non-overlap
+of type families eagerly.  The analogous program does \emph{not} type check:
 
-Backpack applies thinning behavior to types and values, so that an
-errant declaration doesn't cause a module which typechecked against
-a signature to stop typechecking against a concrete implementation.
-The same situation applies for type class instances:
+\begin{verbatim}
+-- F.hs
+type family F a :: *
+-- A.hs
+import F
+type instance F Bool = Int
+-- B.hs
+import F
+type instance F Bool = Bool
+-- C.hs
+import A
+import B
+\end{verbatim}
+
+The reason is that it is \emph{unsound} to ever allow any overlap
+(unlike in the case of type classes where it just leads to incoherence.)
+Thus, whereas one might imagine dropping the global uniqueness of instances
+invariant for type classes, it is absolutely necessary to perform global
+enforcement here.  There's no way around it!
+
+\subsection{Local type classes}
+
+Here, we say \textbf{NO} to global uniqueness.
+
+This design is perhaps best discussed in relation to modular type
+classes, which shares many similar properties.  Instances are now
+treated as first class objects (in MTCs, they are simply modules)---we
+may explicitly hide or include instances for type class resolution (in
+MTCs, this is done via the \verb|using| top-level declaration).  This is
+essentially what was sketched in Section 5 of the original Backpack
+paper.  As a simple example:
 
 \begin{verbatim}
 package p where
@@ -1804,108 +1843,222 @@ package q where
     include p
 \end{verbatim}
 
-The instance defined in \verb|A| should be hidden from \verb|B|.  Note
-that this does \emph{not} cause incoherence: it is still unambiguous
-which instance is referred to in the text of both modules.  However,
-it does make it a lot easier to observe different choices of an
-instance downstream.
+Here, \verb|B| does not see the extra instance declared by \verb|A|,
+because it was thinned from its signature of \verb|A| (and thus never
+declared canonical.)  To declare an instance without making it
+canonical, it must placed in a separate (unimported) module.
 
-\subsection{Module inequalities}
-
-So what is the big problem we have to deal with?  Here is the canonical
-example, from the Backpack paper:
+Like modular type classes, Backpack does not give rise to incoherence,
+because instance visibility can only be changed at the top level module
+language, where it is already considered best practice to provide
+explicit signatures.  Here is the example used in the Modular Type
+Classes paper to demonstrate the problem:
 
 \begin{verbatim}
-P = [ class Eq a where ... ]
+structure A = using EqInt1 in
+    struct ...fun f x = eq(x,x)... end
+structure B = using EqInt2 in
+    struct ...val y = A.f(3)... end
+\end{verbatim}
+
+Is the type of f \verb|int -> bool|, or does it have a type-class
+constraint?  Because type checking proceeds over the entire program, ML
+could hypothetically pick either.  However, ported to Haskell, the
+example looks like this:
+
+\begin{verbatim}
+EqInt1 :: [ instance Eq Int ]
+EqInt2 :: [ instance Eq Int ]
+A = [
+    import EqInt1
+    f x = x == x
+]
+B = [
+    import EqInt2
+    import A hiding (instance Eq Int)
+    y = f 3
+]
+\end{verbatim}
+
+There may be ambiguity, yes, but it can be easily resolved by the
+addition of a top-level type signature to \verb|f|, which is considered
+best-practice anyway.  Additionally, Haskell users are trained to expect
+a particular inference for \verb|f| in any case (the polymorphic one).
+
+Here is another example which might be considered surprising:
+
+\begin{verbatim}
+package p where
+    A :: [ data T = T ]
+    B :: [ data T = T ]
+    C = [
+        import qualified A
+        import qualified B
+        instance Show A.T where show T = "A"
+        instance Show B.T where show T = "B"
+        x :: String
+        x = show A.T ++ show B.T
+    ]
+\end{verbatim}
+
+In the original Backpack paper, it was implied that module \verb|C|
+should not type check if \verb|A.T = B.T| (failing at link time).
+However, if we set aside, for a moment, the issue that anyone who
+imports \verb|C| in such a context will now have overlapping instances,
+there is no reason in principle why the module itself should be
+problematic.  Here is the example in MTCs, which I have good word from
+Derek does type check.
+
+\begin{verbatim}
+signature SIG = sig
+    type t
+    val mk : t
+end
+signature SHOW = sig
+    type t
+    val show : t -> string
+end
+functor Example (A : SIG) (B : SIG) =
+    let structure ShowA : SHOW = struct
+        type t = A.t
+        fun show _ = "A"
+    end in
+    let structure ShowB : SHOW = struct
+        type t = B.t
+        fun show _ = "B"
+    end in
+    using ShowA, ShowB in
+    struct
+        val x = show A.mk ++ show B.mk
+    end : sig val x : string end
+\end{verbatim}
+
+The moral of the story is, even though in a later context the instances
+are overlapping, inside the functor, the type-class resolution is unambiguous
+and should be done (so \verb|x = "AB"|).
+
+Up until this point, we've argued why MTCs and this Backpack design are similar.
+However, there is an important sociological difference between modular type-classes
+and this proposed scheme for Backpack.  In the presentation ``Why Applicative
+Functors Matter'', Derek mentions the canonical example of defining a set:
+
+\begin{verbatim}
+signature ORD = sig type t; val cmp : t -> t -> bool end
+signature SET = sig type t; type elem;
+    val empty : t;
+    val insert : elem -> t -> t ...
+end
+functor MkSet (X : ORD) :> SET where type elem = X.t
+  = struct ... end
+\end{verbatim}
+
+This is actually very different from how sets tend to be defined in
+Haskell today.  If we directly encoded this in Backpack, it would
+look like this:
+
+\begin{verbatim}
+package mk-set where
+    X :: [
+        data T
+        cmp :: T -> T-> Bool
+    ]
+    Set :: [
+        data Set
+        empty :: Set
+        insert :: T -> Set -> Set
+    ]
+    Set = [
+        import X
+        ...
+    ]
+\end{verbatim}
+
+It's also informative to consider how MTCs would encode set as it is written
+today in Haskell:
+
+\begin{verbatim}
+signature ORD = sig type t; val cmp : t -> t -> bool end
+signature SET = sig type 'a t;
+    val empty : 'a t;
+    val insert : (X : ORD) => X.t -> X.t t -> X.t t
+end
+struct MkSet :> SET = struct ... end
+\end{verbatim}
+
+Here, it is clear to see that while functor instantiation occurs for
+implementation, it is not occuring for types.  This is a big limitation
+with the Haskell approach, and it explains why Haskellers, in practice,
+find global uniqueness of instances so desirable.
+
+Implementation-wise, this requires some subtle modifications to how we
+do type class resolution.  Type checking of indefinite modules works as
+before, but when go to actually compile them against explicit
+implementations, we need to ``forget'' that two types are equal when
+doing instance resolution.  This could probably be implemented by
+associating type class instances with the original name that was
+utilized when typechecking, so that we can resolve ambiguous matches
+against types which have the same original name now that we are
+compiling.
+
+As we've mentioned previously, this strategy is unsound for type families.
+
+\subsection{Globally unique}
+
+Here, we say \textbf{YES} to global uniqueness.
+
+When we require the global uniqueness of instances (either because
+that's the type class design we chose, or because we're considering
+the problem of type families), we will need to reject declarations like the
+one cited above when \verb|A.T = B.T|:
+
+\begin{verbatim}
 A :: [ data T ]
 B :: [ data T ]
 C :: [
-    import P
     import qualified A
     import qualified B
-    instance Eq A.T where ...
-    instance Eq B.T where ...
+    instance Show A.T where show T = "A"
+    instance Show B.T where show T = "B"
 ]
 \end{verbatim}
 
-Signature \verb|C| is only well typed if \verb|A.T != B.T|.  There have
-been two proposed solutions for this problem:
-
-\paragraph{Link-time check}  This is the solution that was described in
-the paper.  When some instances are typechecked initially, we type check
+The paper mentions that a link-time check is sufficient to prevent this
+case from arising.  While in the previous section, we've argued why this
+is actually unnecessary when local instances are allowed, the link-time
+check is a good match in the case of global instances, because any
+instance \emph{must} be declared in the signature.  The scheme proceeds
+as follows: when some instances are typechecked initially, we type check
 them as if all of variable module identities were distinct.  Then, when
-we perform linking (we \verb|include| or we unify some
-module identities), we check again if to see if we've discovered some
-instance overlap.
+we perform linking (we \verb|include| or we unify some module
+identities), we check again if to see if we've discovered some instance
+overlap.  This linking check is akin to the eager check that is
+performed today for type families; it would need to be implemented for
+type classes as well: however, there is a twist: we are \emph{redoing}
+the overlap check now that some identities have been unified.
 
-This solution is extremely inefficient, unfortunately.  Consider the following
-set of modules, as compiled by GHC today:
+As an implementation trick, one could deferring the check until \verb|C|
+is compiled, keeping in line with GHC's lazy ``don't check for overlap
+until the use site.''  (Once again, unsound for type families.)
 
-\begin{verbatim}
-A = [ data T ]
-B = [ import A; instance Eq T ]
-C = [ import A; instance Eq T ]
-D = [ import B; import C ]
-\end{verbatim}
+\paragraph{What about module inequalities?}  An older proposal was for
+signatures to contain ``module inequalities'', i.e., assertions that two
+modules are not equal.  (Technically: we need to be able to apply this
+assertion to $\beta$ module variables, since \verb|A != B| while
+\verb|A.T = B.T|).  Currently, Edward thinks that module inequalities
+are only marginal utility with local instances (i.e., not enough to
+justify the implementation cost) and not useful at all in the world of
+global instances!
 
-Currently, \emph{no overlapping instance} error is thrown in module \verb|D|.
-Why? Because in order to discover overlap, GHC must compare every instance
-exported by \verb|B| with every instance against \verb|C|.
-
-\paragraph{Inequality constraints}
-
-\subsection{Type families}
-
-Like type classes, type families must not overlap (and this is a question of
-type safety!)
-
-A more subtle question is compatibility and apartness of type family
-equations.  Under these checks, aliasing of modules can fail if it causes
-two type families to be identified, but their definitions are not apart.
-Here is a simple example:
-
-\begin{verbatim}
-A :: [
-    type family F a :: *
-    type instance F Int = Char
-]
-B :: [
-    type family F a :: *
-    type instance F Int = Bool
-]
-\end{verbatim}
-
-Now it is illegal for \verb|A = B|, because when the type families are
-unified, the instances now fail the apartness check.  However, if the second
-instance was \verb|F Int = Char|, the families would be able to link together.
-
-To make matters worse, an implementation may define more axioms than are
-visible in the signature:
-
-\begin{verbatim}
-package a where
-    A :: [
-        type family F a :: *
-        type instance F Int = Bool
-    ]
-package b where
-    include a
-    B = [
-        import A
-        type instance F Bool = Bool
-        ...
-    ]
-package c where
-    A = [
-        type family F a :: *
-        type instance F Int = Bool
-        type instance F Bool = Int
-    ]
-    include b
-\end{verbatim}
-
-It would seem that private axioms cannot be naively supported. Is
-there any way that thinning axioms could be made to work?
+With local instances, module inequalities could be useful to statically
+rule out examples like \verb|show A.T ++ show B.T|.  Because such uses
+are not necessarily reflected in the signature, it would be a violation
+of separate module development to try to divine the constraint from the
+implementation itself.  I claim this is of limited utility, however, because,
+as we mentioned earlier, we can compile these ``incoherent'' modules perfectly
+coherently.  With global instances, all instances must be in the signature, so
+while it might be aesthetically displeasing to have the signature impose
+extra restrictions on linking identities, we can carry this out without
+violating the linking restriction.
 
 \section{Bits and bobs}
 
