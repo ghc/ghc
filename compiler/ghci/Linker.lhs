@@ -1209,7 +1209,9 @@ locateLib dflags is_hs dirs lib
      mk_hs_dyn_lib_path dir = dir </> mkHsSOName platform hs_dyn_lib_name
 
      so_name = mkSOName platform lib
-     mk_dyn_lib_path dir = dir </> so_name
+     mk_dyn_lib_path dir = case (arch, os) of
+                             (ArchX86_64, OSSolaris2) -> dir </> ("64/" ++ so_name)
+                             _ -> dir </> so_name
 
      findObject     = liftM (fmap Object)  $ findFile mk_obj_path        dirs
      findDynObject  = liftM (fmap Object)  $ findFile mk_dyn_obj_path    dirs
@@ -1226,6 +1228,8 @@ locateLib dflags is_hs dirs lib
                            Nothing -> g
 
      platform = targetPlatform dflags
+     arch = platformArch platform
+     os = platformOS platform
 
 searchForLibUsingGcc :: DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
 searchForLibUsingGcc dflags so dirs = do

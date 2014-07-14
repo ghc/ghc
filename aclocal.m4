@@ -538,6 +538,12 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $4="$$4 -arch x86_64"
         $5="$$5 -m64"
         ;;
+    x86_64-unknown-solaris2)
+        $2="$$2 -m64"
+        $3="$$3 -m64"
+        $4="$$4 -m64"
+        $5="$$5 -m64"
+        ;;
     alpha-*)
         # For now, to suppress the gcc warning "call-clobbered
         # register used for global register variable", we simply
