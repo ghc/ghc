@@ -102,7 +102,7 @@ getInstLoc (TyFamInstD (TyFamInstDecl
   -- Since CoAxioms' Names refer to the whole line for type family instances
   -- in particular, we need to dig a bit deeper to pull out the entire
   -- equation. This does not happen for data family instances, for some reason.
-  { tfid_eqn = L _ (TyFamInstEqn { tfie_rhs = L l _ })})) = l
+  { tfid_eqn = L _ (TyFamEqn { tfe_rhs = L l _ })})) = l
 
 -- Useful when there is a signature with multiple names, e.g.
 --   foo, bar :: Types..

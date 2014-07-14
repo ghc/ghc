@@ -64,7 +64,7 @@ tyThingToLHsDecl t = noLoc $ case t of
            extractFamilyDecl _           =
              error "tyThingToLHsDecl: impossible associated tycon"
 
-           atTyClDecls = [synifyTyCon Nothing at_tc | (at_tc, _) <- classATItems cl]
+           atTyClDecls = [synifyTyCon Nothing at_tc | ATI at_tc _ <- classATItems cl]
            atFamDecls  = map extractFamilyDecl atTyClDecls in
        TyClD $ ClassDecl
          { tcdCtxt = synifyCtx (classSCTheta cl)
@@ -107,11 +107,11 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
         typats     = map (synifyType WithinType) args
         hs_rhs     = synifyType WithinType rhs
         (kvs, tvs) = partition isKindVar tkvs
-    in TyFamInstEqn { tfie_tycon = name
-                    , tfie_pats  = HsWB { hswb_cts = typats
-                                        , hswb_kvs = map tyVarName kvs
-                                        , hswb_tvs = map tyVarName tvs }
-                    , tfie_rhs   = hs_rhs }
+    in TyFamEqn { tfe_tycon = name
+                , tfe_pats  = HsWB { hswb_cts = typats
+                                    , hswb_kvs = map tyVarName kvs
+                                    , hswb_tvs = map tyVarName tvs }
+                , tfe_rhs   = hs_rhs }
 
 synifyAxiom :: CoAxiom br -> HsDecl Name
 synifyAxiom ax@(CoAxiom { co_ax_tc = tc })

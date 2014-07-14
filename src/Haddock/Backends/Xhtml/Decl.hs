@@ -280,8 +280,8 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
       = ppInstances instances docname unicode qual
 
     -- Individual equation of a closed type family
-    ppTyFamEqn TyFamInstEqn { tfie_tycon = n, tfie_rhs = rhs
-                            , tfie_pats = HsWB { hswb_cts = ts }}
+    ppTyFamEqn TyFamEqn { tfe_tycon = n, tfe_rhs = rhs
+                        , tfe_pats = HsWB { hswb_cts = ts }}
       = ( ppAppNameTypes (unLoc n) [] (map unLoc ts) unicode qual
           <+> equals <+> ppType unicode qual (unLoc rhs)
         , Nothing, [] )

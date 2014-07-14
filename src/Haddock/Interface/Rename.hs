@@ -323,7 +323,7 @@ renameTyClD d = case d of
     lfundeps' <- mapM renameLFunDep lfundeps
     lsigs'    <- mapM renameLSig lsigs
     ats'      <- mapM (renameLThing renameFamilyDecl) ats
-    at_defs'  <- mapM (mapM renameTyFamInstD) at_defs
+    at_defs'  <- mapM renameLTyFamDefltEqn at_defs
     -- we don't need the default methods or the already collected doc entities
     return (ClassDecl { tcdCtxt = lcontext', tcdLName = lname', tcdTyVars = ltyvars'
                       , tcdFDs = lfundeps', tcdSigs = lsigs', tcdMeths= emptyBag
@@ -351,7 +351,7 @@ renameFamilyInfo :: FamilyInfo Name -> RnM (FamilyInfo DocName)
 renameFamilyInfo DataFamily     = return DataFamily
 renameFamilyInfo OpenTypeFamily = return OpenTypeFamily
 renameFamilyInfo (ClosedTypeFamily eqns)
-  = do { eqns' <- mapM (renameLThing renameTyFamInstEqn) eqns
+  = do { eqns' <- mapM renameLTyFamInstEqn eqns
        ; return $ ClosedTypeFamily eqns' }
 
 renameDataDefn :: HsDataDefn Name -> RnM (HsDataDefn DocName)
@@ -456,17 +456,27 @@ renameClsInstD (ClsInstDecl { cid_overlap_mode = omode
 
 renameTyFamInstD :: TyFamInstDecl Name -> RnM (TyFamInstDecl DocName)
 renameTyFamInstD (TyFamInstDecl { tfid_eqn = eqn })
-  = do { eqn' <- renameLThing renameTyFamInstEqn eqn
+  = do { eqn' <- renameLTyFamInstEqn eqn
        ; return (TyFamInstDecl { tfid_eqn = eqn'
                                , tfid_fvs = placeHolderNames }) }
 
-renameTyFamInstEqn :: TyFamInstEqn Name -> RnM (TyFamInstEqn DocName)
-renameTyFamInstEqn (TyFamInstEqn { tfie_tycon = tc, tfie_pats = pats_w_bndrs, tfie_rhs = rhs })
+renameLTyFamInstEqn :: LTyFamInstEqn Name -> RnM (LTyFamInstEqn DocName)
+renameLTyFamInstEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = pats_w_bndrs, tfe_rhs = rhs }))
   = do { tc' <- renameL tc
        ; pats' <- mapM renameLType (hswb_cts pats_w_bndrs)
        ; rhs' <- renameLType rhs
-       ; return (TyFamInstEqn { tfie_tycon = tc', tfie_pats = pats_w_bndrs { hswb_cts = pats' }
-                              , tfie_rhs = rhs' }) }
+       ; return (L loc (TyFamEqn { tfe_tycon = tc'
+                                 , tfe_pats = pats_w_bndrs { hswb_cts = pats' }
+                                 , tfe_rhs = rhs' })) }
+
+renameLTyFamDefltEqn :: LTyFamDefltEqn Name -> RnM (LTyFamDefltEqn DocName)
+renameLTyFamDefltEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = tvs, tfe_rhs = rhs }))
+  = do { tc' <- renameL tc
+       ; tvs'  <- renameLTyVarBndrs tvs
+       ; rhs' <- renameLType rhs
+       ; return (L loc (TyFamEqn { tfe_tycon = tc'
+                                 , tfe_pats = tvs'
+                                 , tfe_rhs = rhs' })) }
 
 renameDataFamInstD :: DataFamInstDecl Name -> RnM (DataFamInstDecl DocName)
 renameDataFamInstD (DataFamInstDecl { dfid_tycon = tc, dfid_pats = pats_w_bndrs, dfid_defn = defn })
