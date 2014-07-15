@@ -5011,7 +5011,8 @@ with <option>-fcontext-stack=</option><emphasis>N</emphasis>.
 In general, as discussed in <xref linkend="instance-resolution"/>,
 <emphasis>GHC requires that it be unambiguous which instance
 declaration
-should be used to resolve a type-class constraint</emphasis>. This behaviour
+should be used to resolve a type-class constraint</emphasis>.
+This behaviour
 can be modified by two flags: <option>-XOverlappingInstances</option>
 <indexterm><primary>-XOverlappingInstances
 </primary></indexterm>
@@ -5020,6 +5021,8 @@ and <option>-XIncoherentInstances</option>
 </primary></indexterm>, as this section discusses.  Both these
 flags are dynamic flags, and can be set on a per-module basis, using
 an <literal>LANGUAGE</literal> pragma if desired (<xref linkend="language-pragma"/>).</para>
+
+
 <para>
 The <option>-XOverlappingInstances</option> flag instructs GHC to loosen
 the instance resolution described in <xref linkend="instance-resolution"/>, by
@@ -5027,18 +5030,83 @@ allowing more than one instance to match, <emphasis>provided there is a most
 specific one</emphasis>. The <option>-XIncoherentInstances</option> flag
 further loosens the resolution, by allowing more than one instance to match,
 irespective of whether there is a most specific one.
+The <option>-XIncoherentInstances</option> flag implies the
+<option>-XOverlappingInstances</option> flag, but not vice versa.
 </para>
 
 <para>
-For example, consider
+A more precise specification is as follows.
+The willingness to be overlapped or incoherent is a property of
+the <emphasis>instance declaration</emphasis> itself, controlled by the
+presence or otherwise of the <option>-XOverlappingInstances</option>
+and <option>-XIncoherentInstances</option> flags when that instance declaration is
+being compiled.  Now suppose that, in some client module, we are searching for an instance of the
+<emphasis>target constraint</emphasis> <literal>(C ty1 .. tyn)</literal>.
+The search works like this.
+<itemizedlist>
+<listitem><para>
+Find all instances I that <emphasis>match</emphasis> the target constraint;
+that is, the target constraint is a substitution instance of I.  These
+instance declarations are the <emphasis>candidates</emphasis>.
+</para></listitem>
+
+<listitem><para>
+Find all <emphasis>non-candidate</emphasis> instances 
+that <emphasis>unify</emphasis> with the target constraint.
+Such non-candidates instances might match when the target constraint is further
+instantiated.  If all of them were compiled with
+<option>-XIncoherentInstances</option>, proceed; if not, the search fails.
+</para></listitem>
+
+<listitem><para>
+Eliminate any candidate IX for which both of the following hold:
+
+<itemizedlist>
+<listitem><para>There is another candidate IY that is strictly more specific;
+that is, IY is a substitution instance of IX but not vice versa.
+</para></listitem>
+<listitem><para>Either IX or IY was compiled with 
+<option>-XOverlappingInstances</option>.
+</para></listitem>
+</itemizedlist>
+
+</para></listitem>
+
+<listitem><para>
+If only one candidate remains, pick it.
+Otherwise if all remaining candidates were compiled with
+<option>-XInccoherentInstances</option>, pick an arbitrary candidate.
+</para></listitem>
+
+</itemizedlist>
+These rules make it possible for a library author to design a library that relies on
+overlapping instances without the library client having to know.
+</para>
+<para>
+Errors are reported <emphasis>lazily</emphasis> (when attempting to solve a constraint), rather than <emphasis>eagerly</emphasis> 
+(when the instances themselves are defined).  So for example
+<programlisting>
+  instance C Int  b where ..
+  instance C a Bool where ..
+</programlisting>
+These potentially overlap, but GHC will not complain about the instance declarations
+themselves, regardless of flag settings.  If we later try to solve the constraint
+<literal>(C Int Char)</literal> then only the first instance matches, and all is well.
+Similarly with <literal>(C Bool Bool)</literal>.  But if we try to solve <literal>(C Int Bool)</literal>,
+both instances match and an error is reported.
+</para>
+
+<para>
+As a more substantial example of the rules in action, consider
 <programlisting>
   instance context1 => C Int b     where ...  -- (A)
   instance context2 => C a   Bool  where ...  -- (B)
   instance context3 => C a   [b]   where ...  -- (C)
   instance context4 => C Int [Int] where ...  -- (D)
 </programlisting>
-compiled with <option>-XOverlappingInstances</option> enabled. The constraint
-<literal>C Int [Int]</literal> matches instances (A), (C) and (D), but the last
+compiled with <option>-XOverlappingInstances</option> enabled. Now suppose that the type inference
+engine needs to solve The constraint
+<literal>C Int [Int]</literal>.  This constraint matches instances (A), (C) and (D), but the last
 is more specific, and hence is chosen.
 </para>
 <para>If (D) did not exist then (A) and (C) would still be matched, but neither is
@@ -5054,7 +5122,7 @@ the head of former is a substitution instance of the latter. For example
 substituting <literal>a:=Int</literal>.
 </para>
 <para>
-However, GHC is conservative about committing to an overlapping instance.  For example:
+GHC is conservative about committing to an overlapping instance.  For example:
 <programlisting>
   f :: [b] -> [b]
   f x = ...
@@ -5150,56 +5218,6 @@ the program prints
 (An alternative possible behaviour, not currently implemented,
 would be to reject module <literal>Help</literal>
 on the grounds that a later instance declaration might overlap the local one.)
-</para>
-<para>
-The willingness to be overlapped or incoherent is a property of
-the <emphasis>instance declaration</emphasis> itself, controlled by the
-presence or otherwise of the <option>-XOverlappingInstances</option>
-and <option>-XIncoherentInstances</option> flags when that module is
-being defined.  Suppose we are searching for an instance of the 
-<emphasis>target constraint</emphasis> <literal>(C ty1 .. tyn)</literal>.
-The search works like this.
-<itemizedlist>
-<listitem><para>
-Find all instances I that <emphasis>match</emphasis> the target constraint;
-that is, the target constraint is a substitution instance of I.  These
-instance declarations are the <emphasis>candidates</emphasis>.
-</para></listitem>
-
-<listitem><para>
-Find all <emphasis>non-candidate</emphasis> instances 
-that <emphasis>unify</emphasis> with the target constraint.
-Such non-candidates instances might match when the target constraint is further
-instantiated.  If all of them were compiled with
-<option>-XIncoherentInstances</option>, proceed; if not, the search fails.
-</para></listitem>
-
-<listitem><para>
-Eliminate any candidate IX for which both of the following hold:
-
-<itemizedlist>
-<listitem><para>There is another candidate IY that is strictly more specific;
-that is, IY is a substitution instance of IX but not vice versa.
-</para></listitem>
-<listitem><para>Either IX or IY was compiled with 
-<option>-XOverlappingInstances</option>.
-</para></listitem>
-</itemizedlist>
-
-</para></listitem>
-
-<listitem><para>
-If only one candidate remains, pick it.
-Otherwise if all remaining candidates were compiled with
-<option>-XInccoherentInstances</option>, pick an arbitrary candidate.
-</para></listitem>
-
-</itemizedlist>
-These rules make it possible for a library author to design a library that relies on
-overlapping instances without the library client having to know.
-</para>
-<para>The <option>-XIncoherentInstances</option> flag implies the
-<option>-XOverlappingInstances</option> flag, but not vice versa.
 </para>
 </sect3>
 
