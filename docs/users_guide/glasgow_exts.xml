@@ -6024,28 +6024,39 @@ instance (GMapKey a, GMapKey b) => GMapKey (Either a b) where
   data GMap (Either a b) v = GMapEither (GMap a v) (GMap b v)
   ...
 
-instance (Eq (Elem [e])) => Collects ([e]) where
+instance Eq (Elem [e]) => Collects [e] where
   type Elem [e] = e
   ...
 </programlisting>
-        The most important point about associated family instances is that the
-        type indexes corresponding to class parameters must be identical to
-        the type given in the instance head; here this is the first argument
-        of <literal>GMap</literal>, namely <literal>Either a b</literal>,
-        which coincides with the only class parameter.
-      </para>
-      <para>
-	Instances for an associated family can only appear as part of
-	instance declarations of the class in which the family was declared -
-	just as with the equations of the methods of a class.  Also in
-	correspondence to how methods are handled, declarations of associated
-	types can be omitted in class instances.  If an associated family
-	instance is omitted, the corresponding instance type is not inhabited;
+Note the following points:
+<itemizedlist>
+<listitem><para>
+        The type indexes corresponding to class parameters must have precisely the same shape
+        the type given in the instance head.  To have the same "shape" means that
+        the two types are identical modulo renaming of type variables. For example:
+<programlisting>
+instance Eq (Elem [e]) => Collects [e] where
+  -- Choose one of the following alternatives:
+  type Elem [e] = e       -- OK
+  type Elem [x] = x       -- OK
+  type Elem x   = x       -- BAD; shape of 'x' is different to '[e]'
+  type Elem [Maybe x] = x -- BAD: shape of '[Maybe x]' is different to '[e]'
+</programlisting>
+</para></listitem>
+<listitem><para>
+	An instances for an associated family can only appear as part of
+	an instance declarations of the class in which the family was declared,
+	just as with the equations of the methods of a class.
+</para></listitem>
+<listitem><para>
+     The instance for an associated type can be omitted in class instances.  In that case,
+     unless there is a default instance (see <xref linkend="assoc-decl-defs"/>), 
+     the corresponding instance type is not inhabited;
 	i.e., only diverging expressions, such
 	as <literal>undefined</literal>, can assume the type.
-      </para>
-      <para>
-        Although it is unusual, there can be <emphasis>multiple</emphasis>
+</para></listitem>
+<listitem><para>
+        Although it is unusual, there (currently) can be <emphasis>multiple</emphasis>
         instances for an associated family in a single instance declaration.
         For example, this is legitimate:
 <programlisting>
@@ -6059,8 +6070,10 @@ instance GMapKey Flob where
         Since you cannot give any <emphasis>subsequent</emphasis> instances for
         <literal>(GMap Flob ...)</literal>, this facility is most useful when
         the free indexed parameter is of a kind with a finite number of alternatives
-        (unlike <literal>*</literal>).
-      </para>
+        (unlike <literal>*</literal>).  WARNING: this facility may be withdrawn in the future.
+</para></listitem>
+</itemizedlist>
+</para>
     </sect3>
 
     <sect3 id="assoc-decl-defs">
@@ -6078,22 +6091,50 @@ class IsBoolMap v where
 instance IsBoolMap [(Int, Bool)] where
   lookupKey = lookup
 </programlisting>
-The <literal>instance</literal> keyword is optional.
-      </para>
+In an <literal>instance</literal> declaration for the class, if no explicit
+<literal>type instance</literal> declaration is given for the associated type, the default declaration
+is used instead, just as with default class methods.
+</para>
 <para>
-There can also be multiple defaults for a single type, as long as they do not
-overlap:
+Note the following points:
+<itemizedlist>
+<listitem><para>
+  The <literal>instance</literal> keyword is optional.
+</para></listitem>
+<listitem><para>
+   There can be at most one default declaration for an associated type synonym.
+</para></listitem>
+<listitem><para>
+  A default declaration is not permitted for an associated
+  <emphasis>data</emphasis> type.
+</para></listitem>
+<listitem><para>
+   The default declaration must mention only type <emphasis>variables</emphasis> on the left hand side,
+   and the right hand side must mention only type varaibels bound on the left hand side.
+   However, unlike the associated type family declaration itself,
+   the type variables of the default instance are independent of those of the parent class.
+</para></listitem>
+</itemizedlist>
+Here are some examples:
 <programlisting>
-class C a where
-  type F a b
-  type F a Int  = Bool
-  type F a Bool = Int
-</programlisting>
+  class C a where
+    type F1 a :: *
+    type instance F1 a = [a]     -- OK
+    type instance F1 a = a->a    -- BAD; only one default instance is allowed
 
-A default declaration is not permitted for an associated
-<emphasis>data</emphasis> type.
-      </para>
-    </sect3>
+    type F2 b a                  -- OK; note the family has more type
+                                 --     variables than the class
+    type instance F2 c d = c->d  -- OK; you don't have to use 'a' in the type instance
+
+    type F3 a
+    type F3 [b] = b              -- BAD; only type variables allowed on the LHS
+
+    type F4 a
+    type F4 b = a                -- BAD; 'a' is not in scope  in the RHS
+</programlisting>
+</para>
+
+</sect3>
 
     <sect3 id="scoping-class-params">
       <title>Scoping of class parameters</title>

@@ -544,13 +544,18 @@ tc_iface_decl _parent ignore_prags
                 -- it mentions unless it's necessary to do so
           ; return (op_name, dm, op_ty) }
 
-   tc_at cls (IfaceAT tc_decl defs_decls)
+   tc_at cls (IfaceAT tc_decl if_def)
      = do ATyCon tc <- tc_iface_decl (AssocFamilyTyCon cls) ignore_prags tc_decl
-          defs <- forkM (mk_at_doc tc) (tc_ax_branches defs_decls)
+          mb_def <- case if_def of
+                      Nothing  -> return Nothing
+                      Just def -> forkM (mk_at_doc tc)                 $
+                                  extendIfaceTyVarEnv (tyConTyVars tc) $
+                                  do { tc_def <- tcIfaceType def
+                                     ; return (Just tc_def) }
                   -- Must be done lazily in case the RHS of the defaults mention
                   -- the type constructor being defined here
                   -- e.g.   type AT a; type AT b = AT [b]   Trac #8002
-          return (tc, defs)
+          return (ATI tc mb_def)
 
    mk_sc_doc pred = ptext (sLit "Superclass") <+> ppr pred
    mk_at_doc tc = ptext (sLit "Associated type") <+> ppr tc

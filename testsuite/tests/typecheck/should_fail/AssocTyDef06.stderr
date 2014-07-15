@@ -1,5 +1,6 @@
 
-AssocTyDef06.hs:6:10:
-    Number of parameters must match family declaration; expected no more than 1
-    In the type instance declaration for ‘Typ’
-    In the class declaration for ‘Cls’
+AssocTyDef06.hs:6:16:
+    Unexpected type ‘Int’
+    In the default declaration for ‘Typ’
+    A default declaration should have form
+      default Typ a b = ...

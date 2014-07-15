@@ -1476,7 +1476,7 @@ checkList (check:checks) = do recompile <- check
 \begin{code}
 tyThingToIfaceDecl :: TyThing -> IfaceDecl
 tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
-tyThingToIfaceDecl (ATyCon tycon) = tyConToIfaceDecl emptyTidyEnv tycon
+tyThingToIfaceDecl (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
 tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
 tyThingToIfaceDecl (AConLike cl)  = case cl of
     RealDataCon dc -> dataConToIfaceDecl dc -- for ppr purposes only
@@ -1568,48 +1568,52 @@ coAxBranchToIfaceBranch' tc (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs
     -- See Note [CoAxBranch type variables] in CoAxiom
 
 -----------------
-tyConToIfaceDecl :: TidyEnv -> TyCon -> IfaceDecl
+tyConToIfaceDecl :: TidyEnv -> TyCon -> (TidyEnv, IfaceDecl)
 -- We *do* tidy TyCons, because they are not (and cannot
 -- conveniently be) built in tidy form
+-- The returned TidyEnv is the one after tidying the tyConTyVars
 tyConToIfaceDecl env tycon
   | Just clas <- tyConClass_maybe tycon
   = classToIfaceDecl env clas
 
   | Just syn_rhs <- synTyConRhs_maybe tycon
-  = IfaceSyn {  ifName    = getOccName tycon,
-                ifTyVars  = if_tc_tyvars,
-                ifRoles   = tyConRoles tycon,
-                ifSynRhs  = to_ifsyn_rhs syn_rhs,
-                ifSynKind = tidyToIfaceType tc_env1 (synTyConResKind tycon) }
+  = ( tc_env1
+    , IfaceSyn {  ifName    = getOccName tycon,
+                  ifTyVars  = if_tc_tyvars,
+                  ifRoles   = tyConRoles tycon,
+                  ifSynRhs  = to_ifsyn_rhs syn_rhs,
+                  ifSynKind = tidyToIfaceType tc_env1 (synTyConResKind tycon) })
 
   | isAlgTyCon tycon
-  = IfaceData { ifName    = getOccName tycon,
-                ifCType   = tyConCType tycon,
-                ifTyVars  = if_tc_tyvars,
-                ifRoles   = tyConRoles tycon,
-                ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
-                ifCons    = ifaceConDecls (algTyConRhs tycon),
-                ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
-                ifGadtSyntax = isGadtSyntaxTyCon tycon,
-                ifPromotable = isJust (promotableTyCon_maybe tycon),
-                ifParent  = parent }
+  = ( tc_env1
+    , IfaceData { ifName    = getOccName tycon,
+                  ifCType   = tyConCType tycon,
+                  ifTyVars  = if_tc_tyvars,
+                  ifRoles   = tyConRoles tycon,
+                  ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
+                  ifCons    = ifaceConDecls (algTyConRhs tycon),
+                  ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
+                  ifGadtSyntax = isGadtSyntaxTyCon tycon,
+                  ifPromotable = isJust (promotableTyCon_maybe tycon),
+                  ifParent  = parent })
 
   | isForeignTyCon tycon
-  = IfaceForeign { ifName    = getOccName tycon,
-                   ifExtName = tyConExtName tycon }
+  = (env, IfaceForeign { ifName    = getOccName tycon,
+                         ifExtName = tyConExtName tycon })
 
-  | otherwise
+  | otherwise  -- FunTyCon, PrimTyCon, promoted TyCon/DataCon
   -- For pretty printing purposes only.
-  = IfaceData { ifName       = getOccName tycon,
-                ifCType      = Nothing,
-                ifTyVars     = funAndPrimTyVars,
-                ifRoles      = tyConRoles tycon,
-                ifCtxt       = [],
-                ifCons       = IfDataTyCon [],
-                ifRec        = boolToRecFlag False,
-                ifGadtSyntax = False,
-                ifPromotable = False,
-                ifParent     = IfNoParent }
+  = ( env
+    , IfaceData { ifName       = getOccName tycon,
+                  ifCType      = Nothing,
+                  ifTyVars     = funAndPrimTyVars,
+                  ifRoles      = tyConRoles tycon,
+                  ifCtxt       = [],
+                  ifCons       = IfDataTyCon [],
+                  ifRec        = boolToRecFlag False,
+                  ifGadtSyntax = False,
+                  ifPromotable = False,
+                  ifParent     = IfNoParent })
   where
     (tc_env1, tc_tyvars) = tidyTyClTyVarBndrs env (tyConTyVars tycon)
     if_tc_tyvars = toIfaceTvBndrs tc_tyvars
@@ -1680,17 +1684,18 @@ toIfaceBang env (HsUnpack (Just co)) = IfUnpackCo (toIfaceCoercion (tidyCo env c
 toIfaceBang _   HsStrict             = IfStrict
 toIfaceBang _   (HsUserBang {})      = panic "toIfaceBang"
 
-classToIfaceDecl :: TidyEnv -> Class -> IfaceDecl
+classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas
-  = IfaceClass { ifCtxt   = tidyToIfaceContext env1 sc_theta,
-                 ifName   = getOccName (classTyCon clas),
-                 ifTyVars = toIfaceTvBndrs clas_tyvars',
-                 ifRoles  = tyConRoles (classTyCon clas),
-                 ifFDs    = map toIfaceFD clas_fds,
-                 ifATs    = map toIfaceAT clas_ats,
-                 ifSigs   = map toIfaceClassOp op_stuff,
-                 ifMinDef = fmap getFS (classMinimalDef clas),
-                 ifRec    = boolToRecFlag (isRecursiveTyCon tycon) }
+  = ( env1
+    , IfaceClass { ifCtxt   = tidyToIfaceContext env1 sc_theta,
+                   ifName   = getOccName (classTyCon clas),
+                   ifTyVars = toIfaceTvBndrs clas_tyvars',
+                   ifRoles  = tyConRoles (classTyCon clas),
+                   ifFDs    = map toIfaceFD clas_fds,
+                   ifATs    = map toIfaceAT clas_ats,
+                   ifSigs   = map toIfaceClassOp op_stuff,
+                   ifMinDef = fmap getFS (classMinimalDef clas),
+                   ifRec    = boolToRecFlag (isRecursiveTyCon tycon) })
   where
     (clas_tyvars, clas_fds, sc_theta, _, clas_ats, op_stuff)
       = classExtraBigSig clas
@@ -1699,8 +1704,10 @@ classToIfaceDecl env clas
     (env1, clas_tyvars') = tidyTyVarBndrs env clas_tyvars
 
     toIfaceAT :: ClassATItem -> IfaceAT
-    toIfaceAT (tc, defs)
-      = IfaceAT (tyConToIfaceDecl env1 tc) (map (coAxBranchToIfaceBranch' tc) defs)
+    toIfaceAT (ATI tc def)
+      = IfaceAT if_decl (fmap (tidyToIfaceType env2) def)
+      where
+        (env2, if_decl) = tyConToIfaceDecl env1 tc
 
     toIfaceClassOp (sel_id, def_meth)
         = ASSERT(sel_tyvars == clas_tyvars)

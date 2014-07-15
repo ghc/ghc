@@ -396,10 +396,10 @@ repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
        ; repTySynInst tc eqn1 }
 
 repTyFamEqn :: LTyFamInstEqn Name -> DsM (Core TH.TySynEqnQ)
-repTyFamEqn (L loc (TyFamInstEqn { tfie_pats = HsWB { hswb_cts = tys
-                                                    , hswb_kvs = kv_names
-                                                    , hswb_tvs = tv_names }
-                                 , tfie_rhs = rhs }))
+repTyFamEqn (L loc (TyFamEqn { tfe_pats = HsWB { hswb_cts = tys
+                                               , hswb_kvs = kv_names
+                                               , hswb_tvs = tv_names }
+                                 , tfe_rhs = rhs }))
   = do { let hs_tvs = HsQTvs { hsq_kvs = kv_names
                              , hsq_tvs = userHsTyVarBndrs loc tv_names }   -- Yuk
        ; addTyClTyVarBinds hs_tvs $ \ _ ->

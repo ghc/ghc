@@ -1,5 +1,5 @@
 
-AssocTyDef05.hs:6:10:
+AssocTyDef05.hs:6:5:
     Number of parameters must match family declaration; expected 1
-    In the type synonym instance default declaration for ‘Typ’
+    In the default type instance declaration for ‘Typ’
     In the class declaration for ‘Cls’

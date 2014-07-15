@@ -696,17 +696,14 @@ checkBootTyCon tc1 tc2
           (_, rho_ty2) = splitForAllTys (idType id2)
           op_ty2 = funResultTy rho_ty2
 
-       eqAT (tc1, def_ats1) (tc2, def_ats2)
+       eqAT (ATI tc1 def_ats1) (ATI tc2 def_ats2)
          = checkBootTyCon tc1 tc2 &&
-           eqListBy eqATDef def_ats1 def_ats2
+           eqATDef def_ats1 def_ats2
 
        -- Ignore the location of the defaults
-       eqATDef (CoAxBranch { cab_tvs = tvs1, cab_lhs =  ty_pats1, cab_rhs = ty1 })
-               (CoAxBranch { cab_tvs = tvs2, cab_lhs =  ty_pats2, cab_rhs = ty2 })
-         | Just env <- eqTyVarBndrs emptyRnEnv2 tvs1 tvs2
-         = eqListBy (eqTypeX env) ty_pats1 ty_pats2 &&
-           eqTypeX env ty1 ty2
-         | otherwise = False
+       eqATDef Nothing    Nothing    = True
+       eqATDef (Just ty1) (Just ty2) = eqTypeX env ty1 ty2
+       eqATDef _ _ = False           
 
        eqFD (as1,bs1) (as2,bs2) =
          eqListBy (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&

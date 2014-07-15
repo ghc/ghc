@@ -20,7 +20,7 @@ import FamInst
 import TcErrors( reportAllUnsolved )
 import TcValidity( validDerivPred )
 import TcEnv
-import TcTyClsDecls( tcFamTyPats, tcAddDataFamInstCtxt )
+import TcTyClsDecls( tcFamTyPats, famTyConShape, tcAddDataFamInstCtxt )
 import TcClassDcl( tcAddDeclCtxt )      -- Small helper
 import TcGenDeriv                       -- Deriv stuff
 import TcGenGenerics
@@ -601,7 +601,7 @@ deriveFamInst decl@(DataFamInstDecl { dfid_tycon = L _ tc_name, dfid_pats = pats
                                     , dfid_defn = HsDataDefn { dd_derivs = Just preds } })
   = tcAddDataFamInstCtxt decl $
     do { fam_tc <- tcLookupTyCon tc_name
-       ; tcFamTyPats tc_name (tyConKind fam_tc) pats (\_ -> return ()) $
+       ; tcFamTyPats (famTyConShape fam_tc) pats (\_ -> return ()) $
          \ tvs' pats' _ ->
            concatMapM (deriveTyData True tvs' fam_tc pats') preds }
         -- Tiresomely we must figure out the "lhs", which is awkward for type families

@@ -46,7 +46,6 @@ import ListSetOps
 import SrcLoc
 import Outputable
 import FastString
-import BasicTypes ( Arity )
 
 import Control.Monad
 import Data.Maybe
@@ -1165,26 +1164,18 @@ checkValidFamPats :: TyCon -> [TyVar] -> [Type] -> TcM ()
 --         type instance F (T a) = a
 -- c) Have the right number of patterns
 checkValidFamPats fam_tc tvs ty_pats
-  = do { -- A family instance must have exactly the same number of type
-         -- parameters as the family declaration.  You can't write
-         --     type family F a :: * -> *
-         --     type instance F Int y = y
-         -- because then the type (F Int) would be like (\y.y)
-         checkTc (length ty_pats == fam_arity) $
-           wrongNumberOfParmsErr (fam_arity - length fam_kvs) -- report only types
-       ; mapM_ checkTyFamFreeness ty_pats
+  = ASSERT( length ty_pats == tyConArity fam_tc )
+      -- A family instance must have exactly the same number of type
+      -- parameters as the family declaration.  You can't write
+      --     type family F a :: * -> *
+      --     type instance F Int y = y
+      -- because then the type (F Int) would be like (\y.y)
+      -- But this is checked at the time the axiom is created
+    do { mapM_ checkTyFamFreeness ty_pats
        ; let unbound_tvs = filterOut (`elemVarSet` exactTyVarsOfTypes ty_pats) tvs
        ; checkTc (null unbound_tvs) (famPatErr fam_tc unbound_tvs ty_pats) }
-  where fam_arity    = tyConArity fam_tc
-        (fam_kvs, _) = splitForAllTys (tyConKind fam_tc)
-
-wrongNumberOfParmsErr :: Arity -> SDoc
-wrongNumberOfParmsErr exp_arity
-  = ptext (sLit "Number of parameters must match family declaration; expected")
-    <+> ppr exp_arity
 
 -- Ensure that no type family instances occur in a type.
---
 checkTyFamFreeness :: Type -> TcM ()
 checkTyFamFreeness ty
   = checkTc (isTyFamFree ty) $
