@@ -76,7 +76,7 @@ import Util
 
 import Data.Maybe( isNothing )
 import Control.Monad ( unless, when, zipWithM )
-import PrelNames( ipClassName, funTyConKey )
+import PrelNames( ipClassName, funTyConKey, allNameStrings )
 \end{code}
 
 
@@ -1330,7 +1330,7 @@ tcDataKindSig kind
 	; us   <- newUniqueSupply 
         ; rdr_env <- getLocalRdrEnv
 	; let uniqs = uniqsFromSupply us
-              occs  = [ occ | str <- strs
+              occs  = [ occ | str <- allNameStrings
                             , let occ = mkOccName tvName str
                             , isNothing (lookupLocalRdrOcc rdr_env occ) ]
                  -- Note [Avoid name clashes for associated data types]
@@ -1342,9 +1342,6 @@ tcDataKindSig kind
     mk_tv loc uniq occ kind 
       = mkTyVar (mkInternalName uniq occ loc) kind
 	  
-    strs :: [String]
-    strs = [ c:cs | cs <- "" : strs, c <- ['a'..'z'] ] 
-
 badKindSig :: Kind -> SDoc
 badKindSig kind 
  = hang (ptext (sLit "Kind signature on data type declaration has non-* return kind"))
