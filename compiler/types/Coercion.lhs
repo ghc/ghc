@@ -18,7 +18,7 @@ module Coercion (
         -- ** Functions over coercions
         coVarKind, coVarRole,
         coercionType, coercionKind, coercionKinds, isReflCo,
-        isReflCo_maybe, coercionRole,
+        isReflCo_maybe, coercionRole, coercionKindRole,
         mkCoercionType,
 
         -- ** Constructing coercions
@@ -104,8 +104,10 @@ import PrelNames        ( funTyConKey, eqPrimTyConKey, eqReprPrimTyConKey )
 import Control.Applicative
 import Data.Traversable (traverse, sequenceA)
 import FastString
+import ListSetOps
 
 import qualified Data.Data as Data hiding ( TyCon )
+import Control.Arrow ( first )
 \end{code}
 
 %************************************************************************
@@ -1794,8 +1796,8 @@ seqCos (co:cos) = seqCo co `seq` seqCos cos
 
 \begin{code}
 coercionType :: Coercion -> Type
-coercionType co = case coercionKind co of
-                    Pair ty1 ty2 -> mkCoercionType (coercionRole co) ty1 ty2
+coercionType co = case coercionKindRole co of
+                    (Pair ty1 ty2, r) -> mkCoercionType r ty1 ty2
 
 ------------------
 -- | If it is the case that
@@ -1827,10 +1829,9 @@ coercionKind co = go co
     go (InstCo aco ty)       = go_app aco [ty]
     go (SubCo co)            = go co
     go (AxiomRuleCo ax tys cos) =
-      case coaxrProves ax tys (map coercionKind cos) of
+      case coaxrProves ax tys (map go cos) of
         Just res -> res
         Nothing  -> panic "coercionKind: Malformed coercion"
-
 
     go_app :: Coercion -> [Type] -> Pair Type
     -- Collect up all the arguments and apply all at once
@@ -1842,25 +1843,55 @@ coercionKind co = go co
 coercionKinds :: [Coercion] -> Pair [Type]
 coercionKinds tys = sequenceA $ map coercionKind tys
 
-coercionRole :: Coercion -> Role
-coercionRole = go
+-- | Get a coercion's kind and role. More efficient than getting
+-- each individually, but less efficient than calling just
+-- 'coercionKind' if that's all you need.
+coercionKindRole :: Coercion -> (Pair Type, Role)
+coercionKindRole = go
   where
-    go (Refl r _)           = r
-    go (TyConAppCo r _ _)   = r
-    go (AppCo co _)         = go co
-    go (ForAllCo _ co)      = go co
-    go (CoVarCo cv)         = coVarRole cv
-    go (AxiomInstCo ax _ _) = coAxiomRole ax
-    go (UnivCo r _ _)       = r
-    go (SymCo co)           = go co
-    go (TransCo co1 _)      = go co1 -- same as go co2
-    go (NthCo n co)         = let Pair ty1 _ = coercionKind co
-                                  (tc, _) = splitTyConApp ty1
-                              in nthRole (coercionRole co) tc n
-    go (LRCo _ _)           = Nominal
-    go (InstCo co _)        = go co
-    go (SubCo _)            = Representational
-    go (AxiomRuleCo c _ _)  = coaxrRole c
+    go (Refl r ty) = (Pair ty ty, r)
+    go (TyConAppCo r tc cos)
+      = (mkTyConApp tc <$> (sequenceA $ map coercionKind cos), r)
+    go (AppCo co1 co2)
+      = let (tys1, r1) = go co1 in
+        (mkAppTy <$> tys1 <*> coercionKind co2, r1)
+    go (ForAllCo tv co)
+      = let (tys, r) = go co in
+        (mkForAllTy tv <$> tys, r)
+    go (CoVarCo cv) = (toPair $ coVarKind cv, coVarRole cv)
+    go co@(AxiomInstCo ax _ _) = (coercionKind co, coAxiomRole ax)
+    go (UnivCo r ty1 ty2) = (Pair ty1 ty2, r)
+    go (SymCo co) = first swap $ go co
+    go (TransCo co1 co2)
+      = let (tys1, r) = go co1 in
+        (Pair (pFst tys1) (pSnd $ coercionKind co2), r)
+    go (NthCo d co)
+      = let (Pair t1 t2, r) = go co
+            (tc1,  args1) = splitTyConApp t1
+            (_tc2, args2) = splitTyConApp t2
+        in
+        ASSERT( tc1 == _tc2 )
+        ((`getNth` d) <$> Pair args1 args2, nthRole r tc1 d)
+    go co@(LRCo {}) = (coercionKind co, Nominal)
+    go (InstCo co ty) = go_app co [ty]
+    go (SubCo co) = (coercionKind co, Representational)
+    go co@(AxiomRuleCo ax _ _) = (coercionKind co, coaxrRole ax)
+
+    go_app :: Coercion -> [Type] -> (Pair Type, Role)
+    -- Collect up all the arguments and apply all at once
+    -- See Note [Nested InstCos]
+    go_app (InstCo co ty) tys = go_app co (ty:tys)
+    go_app co             tys
+      = let (pair, r) = go co in
+        ((`applyTys` tys) <$> pair, r)
+
+-- | Retrieve the role from a coercion.
+coercionRole :: Coercion -> Role
+coercionRole = snd . coercionKindRole
+  -- There's not a better way to do this, because NthCo needs the
+  -- *kind* and role of its argument. Luckily, laziness should
+  -- generally avoid the need for computing kinds in other cases.
+
 \end{code}
 
 Note [Nested InstCos]
