@@ -669,22 +669,98 @@ In this world, we create a dynamic library per definite package (package with
 no holes).  Indefinite packages don't get compiled into libraries, the code
 is duplicated and type equality is only seen if a type came from the same
 definite package.  In the running example, we only generate \verb|libHSq.so|
-which exports all of the modules (\verb|p| is indefinite), and if another
-package instantiates \verb|p|, the instances of \verb|C| will be considered
-different. \\
+which exports all of the modules (\verb|p| is indefinite). \\
 
 \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=6cm,
   thick,m/.style={rectangle,draw,font=\sffamily\Large\bfseries}]
   \node[m] (1) {libHSq.so (A,B,C,D,E)};
 \end{tikzpicture}
 
-As a refinement, if the instantiations of an indefinite package's holes
-live in libraries which do not have a mutually recursive dependency on
-the indefinite package, then it can be instantiated.  In the previous
-example, this was not true: hole \verb|A| in package \verb|p| was
-instantiated with \verb|q:A|, but package \verb|q| has a dependency
-on \verb|p|.  However, we could break the dependence by separating \verb|A|
-into another package:
+If another package instantiates \verb|p|, the instances of \verb|C| will
+be considered different:
+
+\begin{verbatim}
+package q2 where
+    include q (C)
+    A = [ a = True ]
+    include p # does not link, C's are different
+\end{verbatim}
+
+This scheme, by itself, is fairly unsatisfactory.  Here are some of its
+limitations:
+
+\paragraph{Limited applicativity}  Many programs which take advantage of
+Backpack's applicativity no longer work:
+
+\begin{verbatim}
+package a where
+    A = [ ... ]
+package b where
+    A :: [ ... ]
+    B = [ ... ]
+package applic-left where
+    include a
+    include b
+package applic-right where
+    include b
+    include a
+package applic-both where
+    include applic-left
+    include applic-right
+\end{verbatim}
+
+This would not link, because we would end up with original names
+\verb|applic-left:B(A)| and \verb|applic-right:B(A)|, which are
+considered separate entities.
+
+Furthermore, \emph{what} works and doesn't work can be quite confusing.
+For example, suppose we leave an unresolved hole for prelude in the example
+(as was the case in the Backpack paper):
+
+\begin{verbatim}
+package prelude-sig where
+    Prelude = [ ... ]
+package a where
+    include prelude-sig
+    A = [ ... ]
+package b where
+    include prelude-sig
+    A :: [ ... ]
+    B = [ ... ]
+package applic-left where
+    include a
+    include b
+package applic-right where
+    include b
+    include a
+package applic-both where
+    include applic-left
+    include applic-right
+\end{verbatim}
+
+Now this \emph{does} typecheck, because \verb|B| won't get assigned an
+original name until some final project links everything together.  The
+overall picture seems to be something as follows:
+
+\begin{enumerate}
+    \item If you defer linking an indefinite module with implementations
+        of its holes until all code is visible, you will get the
+        type-equality you expect.
+    \item If you compile an indefinite module as soon as possible, you
+        will unable to observe type equality of any other users who
+        reinstantiate the indefinite module in the same way.  (However,
+        if they directly use your instantiation, type equality works
+        out in the correct way.)
+\end{enumerate}
+
+\paragraph{A bridge over troubled water} As a refinement, if the
+instantiations of an indefinite package's holes live in libraries which
+do not have a mutually recursive dependency on the indefinite package,
+then it can be instantiated.  In the previous example, this was not
+true: hole \verb|A| in package \verb|p| was instantiated with
+\verb|q:A|, but package \verb|q| has a dependency on \verb|p|.  However,
+we could break the dependence by separating \verb|A| into another
+package:
 
 \begin{verbatim}
 package a where
