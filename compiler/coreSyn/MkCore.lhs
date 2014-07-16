@@ -304,9 +304,9 @@ mkStringExprFS str
 mkEqBox :: Coercion -> CoreExpr
 mkEqBox co = ASSERT2( typeKind ty2 `eqKind` k, ppr co $$ ppr ty1 $$ ppr ty2 $$ ppr (typeKind ty1) $$ ppr (typeKind ty2) )
              Var (dataConWorkId datacon) `mkTyApps` [k, ty1, ty2] `App` Coercion co
-  where Pair ty1 ty2 = coercionKind co
+  where (Pair ty1 ty2, role) = coercionKindRole co
         k = typeKind ty1
-        datacon = case coercionRole co of 
+        datacon = case role of
             Nominal ->          eqBoxDataCon
             Representational -> coercibleDataCon
             Phantom ->          pprPanic "mkEqBox does not support boxing phantom coercions"

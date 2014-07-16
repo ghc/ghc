@@ -110,9 +110,9 @@ opt_co env sym co
 
 opt_co' env _   mrole (Refl r ty) = Refl (mrole `orElse` r) (substTy env ty)
 opt_co' env sym mrole co
-  |  mrole == Just Phantom 
-  || coercionRole co == Phantom
-  , Pair ty1 ty2 <- coercionKind co
+  |  let (Pair ty1 ty2, role) = coercionKindRole co
+  ,  mrole == Just Phantom
+  || role == Phantom
   = if sym
     then opt_univ env Phantom ty2 ty1
     else opt_univ env Phantom ty1 ty2
@@ -570,8 +570,7 @@ etaAppCo_maybe :: Coercion -> Maybe (Coercion,Coercion)
 etaAppCo_maybe co
   | Just (co1,co2) <- splitAppCo_maybe co
   = Just (co1,co2)
-  | Nominal <- coercionRole co
-  , Pair ty1 ty2 <- coercionKind co
+  | (Pair ty1 ty2, Nominal) <- coercionKindRole co
   , Just (_,t1) <- splitAppTy_maybe ty1
   , Just (_,t2) <- splitAppTy_maybe ty2
   , typeKind t1 `eqType` typeKind t2      -- Note [Eta for AppCo]
