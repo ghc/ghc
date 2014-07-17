@@ -6,8 +6,9 @@
 test('T3586',
      [stats_num_field('peak_megabytes_allocated', (17, 1)),
                                  # expected value: 17 (amd64/Linux)
-      stats_num_field('bytes allocated', (16835544, 5)),
-                        # expected value: 16835544 (amd64/Linux)
+      stats_num_field('bytes allocated', (16102024, 5)),
+                        # prev:           16835544 (amd64/Linux)
+                        # 2014-07-17:     16102024 (amd64/Linux), general round of updates
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -90,9 +91,10 @@ test('T3738',
                                  # expected value: 1 (amd64/Linux)
       stats_num_field('bytes allocated',
                       [(wordsize(32), 45648, 5),
-                    # expected value: 45648 (x86/Linux)
+                    # expected value: 50520 (x86/Linux)
                        (wordsize(64), 49400, 5)]),
-                    # expected value: 49400 (amd64/Linux)
+                    # prev:           49400 (amd64/Linux)
+                    # 2014-07-17:     50520 (amd64/Linux) general round of updates
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -154,8 +156,9 @@ test('T5205',
      [stats_num_field('bytes allocated',
                       [(wordsize(32), 47088, 5),
                     # expected value: 47088 (x86/Darwin)
-                       (wordsize(64), 51320, 5)]),
+                       (wordsize(64), 52600, 5)]),
                     # expected value: 51320 (amd64/Linux)
+                    # 2014-07-17:     52600 (amd64/Linux) general round of updates
       only_ways(['normal', 'optasm'])
       ],
      compile_and_run,
@@ -253,8 +256,9 @@ test('Conversions',
                         # 2013-02-10: 77472 (x86/OSX)
                         # 2013-02-10: 79276 (x86/Windows)
                         # 2014-01-13: 76768 (x86/Linux) due to #8647
-                       (wordsize(64), 110632, 5)]),
+                       (wordsize(64), 107544, 5)]),
                         # 2012-12-18: 109608 (amd64/OS X)
+                        # 2014-07-17: 107544 (amd64/Linux)
 
       only_ways(['normal'])
      ],
