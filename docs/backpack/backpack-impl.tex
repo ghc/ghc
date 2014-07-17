@@ -2,13 +2,29 @@
 
 \usepackage{graphicx} %[pdftex] OR [dvips]
 \usepackage{fullpage}
+\usepackage{wrapfig}
 \usepackage{float}
 \usepackage{titling}
 \usepackage{hyperref}
 \usepackage{tikz}
+\usepackage{color}
 \usetikzlibrary{arrows}
 \usetikzlibrary{positioning}
 \setlength{\droptitle}{-6em}
+
+\input{commands-new-new.tex}
+
+\newcommand{\nuAA}{\nu_\mathit{AA}}
+\newcommand{\nuAB}{\nu_\mathit{AB}}
+\newcommand{\nuGA}{\nu_\mathit{GA}}
+\newcommand{\nuGB}{\nu_\mathit{GB}}
+\newcommand{\betaPL}{\beta_\mathit{PL}}
+\newcommand{\betaAA}{\beta_\mathit{AA}}
+\newcommand{\betaAS}{\beta_\mathit{AS}}
+\newcommand{\thinandalso}{\hspace{.45cm}}
+\newcommand{\thinnerandalso}{\hspace{.38cm}}
+
+\input{commands-rebindings.tex}
 
 \newcommand{\ghcfile}[1]{\textsl{#1}}
 
@@ -234,110 +250,281 @@ A \emph{non-goal} is to allow users to upgrade upstream libraries
 without recompiling downstream. This is an ABI concern and we're not
 going to worry about it.
 
-\section{Aside: Recent IHG work}\label{sec:ihg}
+\section{Module identities}
 
-The IHG project has allocated some funds to relax the package instance
-constraint in the package database, so that multiple instances can be
-stored, but now the user of GHC must explicitly list package-IDs to be
-linked against.  In the far future, it would be expected that tools like
-Cabal automatically handle instance selection among a large number of
-instances, but this is subtle and so this work is only to do some
-foundational work, allowing a package database to optionally relax the
-unique package-version requirement, and utilize environment files to
-select which packages should be used.  See Duncan's email for more
-details on the proposal.
+We are going to implement module identities slightly differently from
+the way it was described from the Backpack paper. Motivated by
+implementation considerations, we coarsen the
+granularity of dependency tracking, so that it's not necessary to
+calculate the transitive dependencies of every module: we only do it per
+package.  In this next section, we recapitulate Section 3.1 of the
+original Backpack paper, but with our new granularity.  Comparisons to
+original Backpack will be recorded in footnotes.  Then we more generally
+discuss the differing points of the design space these two occupy, and
+how this affects what programs typecheck and how things are actually
+implemented.
 
-To implement this:
+\subsection{The new scheme}
 
-\begin{enumerate}
+\begin{wrapfigure}{R}{0.5\textwidth}
+\begin{myfig}
+\[
+\begin{array}{@{}lr@{\;}c@{\;}l@{}}
+    \text{Package Names (\texttt{PkgName})} & P &\in& \mathit{PkgNames} \\
+    \text{Module Path Names (\texttt{ModName})} & p &\in& \mathit{ModPaths} \\
+    \text{Module Identity Vars} & \alpha,\beta &\in& \mathit{IdentVars} \\
+    \text{Package Key (\texttt{PackageId})} & \K &::=& P(\vec{p\mapsto\nu}) \\
+    \text{Module Identities (\texttt{Module})} & \nu &::=&
+      \alpha ~|~
+      \mu\alpha.\K\colon\! p \\
+    \text{Module Identity Substs} & \phi,\theta &::=&
+      \{\vec{\alpha \coloneqq \nu}\} \\
+\end{array}
+\]
+\caption{Module Identities}
+\label{fig:mod-idents}
+\end{myfig}
+\end{wrapfigure}
 
-    \item Remove the ``removal step'' when registering a package (with a flag)
+Physical module
+identities $\nu$, referred to in GHC as \emph{original names}, are either (1) \emph{variables} $\alpha$, which are
+used to represent holes; (2) a concrete module $p$ defined in package
+$P$, with holes instantiated with other module identities (might be
+empty)\footnote{In Paper Backpack, we would refer to just $P$:$p$ as the identity
+constructor.  However, we've written the subterms specifically next to $P$ to highlight the semantic difference of these terms.}; or (3) \emph{recursive} module identities, defined via
+$\mu$-constructors.\footnote{Actually, all concrete modules implicitly
+    define a $\mu$-constructor, and we plan on using de Bruijn indices
+    instead of variables in this case, a locally nameless
+representation.}
 
-    \item Check \ghcfile{compiler/main/Packages.lhs}:mkPackagesState to look out for shadowing
-      within a database. We believe it already does the right thing, since
-      we already need to handle shadowing between the local and global database.
+As in traditional Haskell, every package contains a number of module
+files at some module path $p$; within a package these paths are
+guaranteed to be unique.\footnote{In Paper Backpack, the module expressions themselves are used to refer to globally unique identifiers for each literal.  This makes the metatheory simpler, but for implementation purposes it is convenient to conflate the \emph{original} module path that a module is defined at with its physical identity.}  When we write inline module definitions, we assume
+that they are immediately assigned to a module path $p$ which is incorporated
+into their identity.  A module identity $\nu$ simply augments this
+with subterms $\vec{p\mapsto\nu}$ representing how \emph{all} holes in the package $P$
+were instantiated.\footnote{In Paper Backpack, we do not distinguish between holes/non-holes, and we consider all imports of the \emph{module}, not the package.}  This naming is stable because the current Backpack surface syntax does not allow a logical path in a package
+to be undefined.  A package key is $P(\vec{p\mapsto\nu})$; it is the entity
+that today is internally referred to in GHC as \texttt{PackageId}.
 
-\end{enumerate}
+Here is the very first example from
+Section 2 of the original Backpack paper, \pname{ab-1}:
 
-Once these changes are implemented, we can program multiple instances by
-using \verb|-hide-all-packages -package-id ...|, even if there is no
-high-level tool support.
+\begin{example}
+\Pdef{ab-1}{
+    \Pmod{A}{x = True}
+    \Pmod{B}{\Mimp{A}; y = not x}
+    % \Pmodd{C}{\mname{A}}
+}
+\end{example}
 
-Actually, this concern is orthogonal to the purposes of Backpack, if
-we redefine PackageId appropriately.
+The identities of \m{A} and \m{B} are
+\pname{ab-1}:\mname{A} and \pname{ab-1}:\mname{B}, respectively.\footnote{In Paper Backpack, the identity for \mname{B} records its import of \mname{A}, but since it is definite, this is strictly redundant.} In a package with holes, each
+hole gets a fresh variable (within the package definition) as its
+identity, and all of the holes associated with package $P$ are recorded. Consider \pname{abcd-holes-1}:
 
-\paragraph{The ABI hash} Currently, InstalledPackageId
-is constructed of a package, version and ABI hash
-(generateRegistrationInfo in
-\ghcfile{libraries/Cabal/Cabal/Distribution/Simple/Register.hs}).  The
-use of an ABI hash is a bit of GHC-specific hack introduced in 2009,
-intended to make sure these installed package IDs are unique.  While
-this is quite clever, using the ABI is actually a bit inflexible, as one
-might reasonably want to have multiple copies of a package with the same
-ABI but different source code changes.\footnote{In practice, our ABIs
-are so unstable that it doesn't really matter.}
+\begin{example}
+\Pdef{abcd-holes-1}{
+    \Psig{A}{x :: Bool} % chktex 26
+    \Psig{B}{y :: Bool} % chktex 26
+    \Pmod{C}{x = False}
+    \Pmodbig{D}{
+        \Mimpq{A}\\
+        \Mimpq{C}\\
+        % \Mexp{\m{A}.x, z}\\
+        z = \m{A}.x \&\& \m{C}.x
+    }
+}
+\end{example}
 
-In Figure~\ref{fig:proposed-pkgid}, there is an alternate logical
-representation of InstalledPackageId which attempts to extricate the
-notion of ABI compatibility from what actually might uniquely identify a
-package beyond its PackageId.  We imagine these components to be:
+The identities of the four modules
+are, in order, $\alpha_a$, $\alpha_b$, $\pname{abcd-holes-1}(\alpha_a,\alpha_b)$:\mname{C}, and
+$\pname{abcd-holes-1}(\alpha_a,\alpha_b)$:\mname{D}.\footnote{In Paper Backpack, the granularity is at the module level, so the subterms of \mname{C} and \mname{D} can differ.}
 
-\begin{itemize}
-    \item A hash of the source code (so one can register different
-        in-development versions without having to bump the version
-        number);
-    \item Compilation way (profiling? dynamic?)
-    \item Compilation flags (such as compilation way, optimization,
-        profiling settings)\footnote{This is a little undefined on a package bases, because in principle the flags could be varied on a per-file basis. More likely this will be approximated against the relevant fields in the Cabal file as well as arguments passed to Cabal.};
-\end{itemize}
+Consider now the module identities in the \m{Graph} instantiations in
+\pname{multinst}, shown in Figure 2 of the original Backpack paper (we have
+omitted it for brevity).
+In the definition of \pname{structures}, assume that the variables for
+\m{Prelude} and \m{Array} are $\alpha_P$ and $\alpha_A$ respectively.
+The identity of \m{Graph} is $\pname{structures}(\alpha_P, \alpha_A)$:\m{Graph}. Similarly, the identities of the two array implementations
+are $\nu_{AA} = \pname{arrays-a}(\alpha_P)$:\m{Array} and
+$\nu_{AB} = \pname{arrays-b}(\alpha_P)$:\m{Array}.\footnote{Notice that the subterms coincide with Paper Backpack!  A sign that module level granularity is not necessary for many use-cases.}
 
-A historical note: in the 2012 GSoC project to allow multiple instances
-of a package to be installed at the same time, use of \emph{random
-numbers} was used to workaround the inability to get an ABI early
-enough.  We are not using this plan.
+The package \pname{graph-a} is more interesting because it
+\emph{links} the packages \pname{arrays-a} and \pname{structures}
+together, with the implementation of \m{Array} from \pname{arrays-a}
+\emph{instantiating} the hole \m{Array} from \pname{structures}.  This
+linking is reflected in the identity of the \m{Graph} module in
+\pname{graph-a}: whereas in \pname{structures} it was $\nu_G =
+\pname{structures}(\alpha_P, \alpha_A)$:\m{Graph}, in \pname{graph-a} it is
+$\nu_{GA} = \nu_G[\nu_{AA}/\alpha_A] = \pname{structures}(\alpha_P, \nu_{AA})$:\m{Graph}.  Similarly, the identity of \m{Graph} in
+\pname{graph-b} is $\nu_{GB} = \nu_G[\nu_{AB}/\alpha_A] =
+\pname{structures}(\alpha_P, \nu_{AB})$:\m{Graph}.  Thus, linking consists
+of substituting the variable identity of a hole by the concrete
+identity of the module filling that hole.
 
-\section{Concrete physical identity = PackageId + Module name + Module dependencies}\label{sec:ipi}
+Lastly, \pname{multinst} makes use of both of these \m{Graph}
+modules, under the aliases \m{GA} and \m{GB}, respectively.
+Consequently, in the \m{Client} module, \code{\m{GA}.G} and
+\code{\m{GB}.G} will be correctly viewed as distinct types since they
+originate in modules with distinct identities.
 
-In Backpack, there needs to be some mechanism for assigning
-\emph{physical module identities} to modules, which are essential for
-typechecking Backpack packages, since they let us tell if two types are
-equal or not.
+As \pname{multinst} illustrates, module identities effectively encode
+dependency graphs at the package level.\footnote{In Paper Backpack, module identities
+encode dependency graphs at the module level.  In both cases, however, what is being
+depended on is always a module.}  Like in Paper Backpack, we have an \emph{applicative}
+semantics of instantiation, and the applicativity example in Figure 3 of the
+Backpack paper still type checks.  However, because we are operating at a coarser
+granularity, modules may have spurious dependencies on holes that they don't
+actually depend on, which means less type equalities may hold.
 
-In GHC, our method of testing whether or not two types are equal is by
-comparing their original names, which is a tuple of a PackageId and the
-module name (summarized in Figure~\ref{fig:current-pkgid}).  If it looks
-like a duck and quacks like a duck, it is a duck: we might reasonable
-imagine that \emph{concrete physical identity = PackageId and module
-name}.  But is this sufficient to represent Backpack's physical module
-identities?
+Shaping proceeds in the same way as in Paper Backpack, except that the
+shaping judgment must also accept the package key
+$P(\vec{p\mapsto\alpha})$ so we can create identifiers with
+\textsf{mkident}.  This implies we must know ahead of time what the holes
+of a package are.
 
-If we look at how physical module identities are allocated in Paper Backpack,
-we can see that each module corresponds to an identity constructor (in
-Backpack this is the package name, some representation of the module
-source, and a disambiguating integer if module source is duplicated)
-\emph{as well as} physical module identities which were applied to
-this constructor.  The current PackageId + Module name scheme adequately encodes
-the constructor (in particular, a single package can't have multiple modules
-with the same name), but it does not encode the \emph{module} dependencies.
-We have to add these to our original names.  There are three ways we can do
-this:
+\subsection{Commentary}
 
-\begin{enumerate}
-    \item Augment original names to have a third component.  This is less than ideal because it requires pervasive changes to all parts of the compiler.
-    \item Augment the module name to record module dependency information.  This is a bit of an odd place to put the information, because our module names correspond quite concretely to the actual source file a user wrote some source in.
-    \item Augment the PackageId to record module dependency information.  For now, this is the regime we will use; however, see Section~\ref{sec:flatten} for why the issue is more subtle.
-\end{enumerate}
+\begin{wrapfigure}{r}{0.4\textwidth}
+\begin{verbatim}
+package p where
+    A :: ...
+    -- B does not import A
+    B = [ data T = T; f T = T ]
+    C = [ import A; ... ]
+package q where
+    A1 = [ ... ]
+    A2 = [ ... ]
+    include p (A as A1, B as B1)
+    include p (A as A2, B as B2)
+    Main = [
+        import qualified B1
+        import qualified B2
+        y = B1.f B2.T
+    ]
+\end{verbatim}
+\caption{The difference between package and module granularity}\label{fig:granularity}
+\end{wrapfigure}
 
-And now, the complications\ldots
+\paragraph{The sliding scale of granularity}  The scheme we have described
+here is coarser-grained than Backpack's, and thus does not accept as many
+programs.  Figure~\ref{fig:granularity} is a minimal example which doesn't type
+check in our new scheme.
+In Paper Backpack, the physical module identities of \m{B1} and \m{B2} are
+both $\K_B$, and so \m{Main} typechecks.  However, in GHC Backpack,
+we assign module identities $\pname{p(q:A1)}$:$\m{B}$ and $\pname{p(q:A2)}$:$\m{B}$,
+which are not equal.
+
+Does this mean that Paper Backpack's form of granularity is \emph{better?}
+Not necessarily!  First, we can always split packages into further subpackages
+which better reflect the internal hole dependencies, so it is always possible
+to rewrite a program to make it typecheck---just with more packages.  Second,
+Paper Backpack's granularity is only one on a sliding scale; it is by no means
+the most extreme!  You could imagine a version of Backpack where we desugared
+each \emph{expression} into a separate module.\footnote{Indeed, there are some
+languages which take this stance. (See Bob Harper's work.)}  Then, even if \m{B} imported
+\m{A}, as long as it didn't use any types from \m{A} in the definition of
+\verb|T|, we would still consider the types equal.  Finally, to understand
+what the physical module identity of a module is, in Paper Backpack I must
+understand the internal dependency structure of the modules in a package. This
+is a lot of work for the developer to think about; a more granular model
+is also easier to reason about.
+
+Nevertheless, finer granularity can be desirable from an end-user perspective.
+Usually, these circumstances arise when library-writers are forced to split their
+components into many separate packages, when they would much rather have written
+a single package.  For example, if I define a data type in my library, and would
+like to define a \verb|Lens| instance for it, I would create a new package just
+for the instance, in order to avoid saddling users who aren't interested in lenses
+with an extra dependency.  Another example is test suites, which have dependencies
+on various test frameworks that a user won't care about if they are not planning
+on testing the code. (Cabal has a special case for this, allowing the user
+to write effectively multiple packages in a single Cabal file.)
+
+\paragraph{Cabal dependency resolution}  Currently, when we compile a Cabal
+package, Cabal goes ahead and resolves \verb|build-depends| entries with actual
+implementations, which we compile against.  A planned addition to the package key,
+independent of Backpack, is to record the transitive dependency tree selected
+during this dependency resolution process, so that we can install \pname{libfoo-1.0}
+twice compiled against different versions of its dependencies.
+What is the relationship to this transitive dependency tree of \emph{packages},
+with the subterms of our package identities which are \emph{modules}?  Does one
+subsume the other?  In fact, these are separate mechanisms---two levels of indirections,
+so to speak.
+
+To illustrate, suppose I write a Cabal file with \verb|build-depends: foobar|.  A reasonable assumption is that this translates into a
+Backpack package which has \verb|include foobar|.  However, this is not
+actually a Paper Backpack package: Cabal's dependency solver has to
+rewrite all of these package references into versioned references
+\verb|include foobar-0.1|.  For example, this is a pre-package:
+
+\begin{verbatim}
+package foo where
+    include bar
+\end{verbatim}
+
+and this is a Paper Backpack package:
+
+\begin{verbatim}
+package foo-0.3[bar-0.1[baz-0.2]] where
+    include bar-0.1[baz-0.2]
+\end{verbatim}
+
+This tree is very similar to the one tracking dependencies for holes,
+but we must record this tree \emph{even} when our package has no holes.
+As a final example, the full module
+identity of \m{B1} in Figure~\ref{fig:granularity} may actually be $\pname{p-0.9(q-1.0[p-0.9]:A1)}$:\m{B}.
+
+\subsection{Implementation}
+
+In GHC's current packaging system, a single package compiles into a
+single entry in the installed package database, indexed by the package
+key.  This property is preserved by package-level granularity, as we
+assign the same package key to all modules.  Package keys provide an
+easy mechanism for sharing to occur: when an indefinite package is fully
+instantiated, we can check if we already have its package key installed
+in the installed package database.  (At the end of this section, we'll
+briefly discuss some of the problems actually implementing Paper Backpack.)
+It is also important to note that we are \emph{willing to duplicate code};
+processes like this already happen in other parts of the compiler
+(such as inlining.)
+
+However, there is one major challenge for this scheme, related to
+\emph{dynamically linked libraries}.  Consider this example:
+
+\begin{verbatim}
+package p where
+    A :: [ ... ]
+    B = [ ... ]
+package q where
+    A = [ ... ]
+    include p
+    C = [ import A; import B; ... ]
+\end{verbatim}
+
+When we compile package \pname{q}, we end up compiling package keys
+\pname{q} and $\pname{p(q:A)}$, which turn into their respective libraries
+in the installed package database.  When we need to statically link against
+these libraries, it doesn't matter that \pname{q} refers to code in $\pname{p(q:A)}$,
+and vice versa: the linker is building an executable and can resolve all
+of the symbols in one go.  However, when the libraries in question are
+dynamic libraries \verb|libHSq.so| and \verb|libHSp(q:A).so|, this is now
+a \emph{circular dependency} between the two libraries, and most dynamic
+linkers will not be able to load either of these libraries.
+
+Our plan is to break the circularity by inlining the entire module \m{A}
+into $\pname{p(q:A)}$ when it is necessary (perhaps in other situations,
+\m{A} will be in another package and no inlining is necessary).  The code
+in both situations should be exactly the same, so it should be completely
+permissible to consider them type-equal.
 
 \paragraph{Relaxing package selection restrictions}  As mentioned
 previously, GHC is unable to select multiple packages with the same
-package name (but different PackageIds).  This restriction needs to be
-lifted.  For backwards compatibility reasons, it's probably better to
-not overload \verb|-package-id| but add a new flag, maybe \verb|-force-package-id|;
-we also need to disable the old version masking behavior.  This is orthogonal
-to the IHG work, which wants to allow multiple \emph{InstalledPackageIds} in the
-\emph{database} (here, we want to allow multiple \emph{PackageIds} in \emph{compiled code}).
+package name (but different package keys).  This restriction needs to be
+lifted.  We should add a new flag \verb|-package-key|.  GHC also knows
+about version numbers and will mask out old versions of a library when
+you make another version visible; this behavior needs to be modified.
 
 \paragraph{Linker symbols} As we increase the amount of information in
 PackageId, it's important to be careful about the length of these IDs,
@@ -350,530 +537,12 @@ base-62 encoded hash, perhaps with the first four characters of the package
 name for user-friendliness.
 
 \paragraph{Wired-in names} One annoying thing to remember is that GHC
-has wired-in names, which refer to packages without any version.  Now
-these wired names also have to accomodate dependency trees. A
-suggested approach is to have a fixed table from these wired names to
-package IDs; alternately we can use something like the special \verb|inplace|
-version number.
-
-\paragraph{Version numbers}  The interaction of Backpack's package polymorphism
-(the ability to mixin different implementations to holes) and Cabal's dependency
-resolution mechanism (which permits a name libfoo to be resolved to a specific
-version libfoo-0.1) can be subtle: there are in fact \emph{two} levels of
-indirection going on here.
-
-The simplest way to think about the distinction is as follows.  When I write
-a Backpack package which does \verb|include foobar|, I have not actually
-written a Paper Backpack package.  Instead, I have written a \emph{pre-package},
-which Cabal's dependency solver then takes and rewrites all package references
-into versioned references \verb|include foobar-0.1|, which now corresponds to
-a Paper Backpack package.  For example, this is a pre-package:
-
-\begin{verbatim}
-package foo where
-    include bar
-\end{verbatim}
-
-and this is a Paper Backpack package:
-
-\begin{verbatim}
-package foo-0.3(bar-0.1) where
-    include bar-0.1(baz-0.2)
-\end{verbatim}
-
-Notably, we must \emph{rename} the package to include information about
-how we resolved all of the inner package references, and if these inner
-package references had dependencies, those must be included too!  In
-effect, the \emph{dependency resolution} must be encoded into the package ID\@.
-
-When we are operating at the package granularity with definite packages,
-this is, in fact, the only information we need to record.  However,
-in other cases, we may need to record more information, e.g., the
-\emph{physical identity regular tree}.  This, however, depends on the
-choices made in Section~\ref{sec:flatten}.
-
-\paragraph{Free variables (or, what is a non-concrete physical
-identity?)} Physical identities in their full generality are permitted
-to have free variables, which represent holes.  Handling this is a
-tricky question, and we defer it to Section~\ref{sec:typechecking-indefinite}, when
-we talk about packages with holes.
-
-\section{The granularity of packages versus system libraries}\label{sec:flatten}
-
-In the original design of GHC's packaging system, the intent was that
-a package be compiled into a system library, e.g. \verb|libHSbase-4.7.1.0.so|
-or \verb|libHSbase-4.7.1.0.a|.  Dependencies between packages translate simply
-into dependencies between system libraries.
-
-Interestingly enough, Paper Backpack specifies dependency tracking at
-the \emph{module} level, which is a finer granularity than previously
-implemented by GHC\@.  Here is a Backpack package which demonstrates
-this type of module-level dependency:
-
-\begin{verbatim}
-package a where
-    P :: ...
-    Q :: [ x :: Int ]
-    A = [ import P; ... ]
-    B = [ import Q; ... ]
-package p where
-    P = [ ... ]
-package x where
-    include p
-    Q = [ x = 0 ]
-    include a
-package y where
-    include p
-    Q = [ x = 1 ]
-    include a
-\end{verbatim}
-
-The operant question: is module
-\verb|A| from package \verb|x| the same as module \verb|A| from package
-\verb|y|?  In Paper Backpack, the answer is yes.
-
-From an end-user perspective, why is this desirable?  One answer is that
-it permits users to modularize third-party packages which were not
-packaged with modularity in mind, but happen to be modular.  In this
-case, package \verb|a| could have been implemented as two separate
-packages. More generally, when libraries ship with test-cases, they currently have to
-split these test-cases to separate packages, so as to not introduce
-spurious dependencies with various test frameworks, which the user may
-not have or care about.  If dependencies are done on a per-module basis,
-as long as the user doesn't import a test module, they never gain the
-extra dependency.  Another situation is when a library also happens to
-have a helper utility module which doesn't have any of the dependencies
-of the primary library.  And yet another situation is when we want to
-define type class instances for data types without orphan instances, but
-without pulling in a pile of packages defining type classes for things
-an end user doesn't care about.
-
-From an implementation perspective, however, this answer is quite distressing:
-
-\begin{enumerate}
-    \item When I install package \verb|x| and then install package
-        \verb|y|, what should happen to the installed module files for
-        \verb|A|?  Currently, the installed package database organizes
-        these files at the package level, so it is not clear where these
-        files should live; surely they shouldn't be duplicated!
-        Similarly, when I typecheck, I need to ensure that the original
-        name for \verb|x:A| and \verb|y:A| are the same: thus, the
-        PackageId I assign cannot be \verb|x| or \verb|y|.
-
-    \item When I create a \verb|libHSx.so| and a \verb|libHSy.so|, which
-        dynamic library contains the object files for \verb|A|?  Either
-        of these dynamic libraries could be used alone, so both must
-        contain \verb|A|. But an application could also use both at the
-        same time, at which point a program will see two copies of the
-        program text for \verb|A|.
-
-    \item Now, when I'm compiling a package, I might have to refer to
-        another package which is only partially compiled (if it was my
-        parent).  A lot of early on design confusion came from trying to
-        reason about situations where modules (as opposed to packages)
-        were acting like libraries, but weren't actually being installed
-        to the package database.
-\end{enumerate}
-
-The first problem can be solved by ``flattening'' the package database,
-so that instead of organizing object files by library, the database
-is just a directory of physical module identities to objects/interfaces.
-Installed packages are now represented as (possibly overlapping) sets over
-this store of modules.  However, the second problem is far more persistent:
-if a package is a dynamic library, we still are unable to get the sharing of
-object files necessary. (This problem isn't present for static linking, where
-one doesn't actually have to link against \verb|libHSx.a|, the object files
-are just fine.)
-
-In the next few sections, we describe a few different designs for Backpack which
-vary the granularity of packages.  In general, the coarser the granularity,
-the closer to the current package-library correspondence the design is, but
-at the cost of giving up more sharing.  Finer granularity requires smaller
-and smaller corresponding libraries.  We'll use the following running example.
-
-\begin{verbatim}
-package p where
-    A :: [ a :: Bool ]
-    B = [ import A; b = a ]
-    C = [ c = True ]
-
-package q where
-    A = [ a = False ]
-    include p
-    D = [ import A; import C; d = a && c ]
-    E = [ import D; import C; e = c && d ]
-    F = [ import B; f = b ]
-\end{verbatim}
-
-As a notational convenience, we'll omit the full physical identity of a
-module when it's clear from context.  We'll start by recapping Paper Backpack,
-which has the finest granularity and coarsen.
-
-\subsection{One library per physical module identity}
-
-To truly implement a Backpack design, we must generate a library per
-physical module identity.  The physical module identities for
-our running example are:
-
-\begin{verbatim}
-     expanded                   unexpanded
-A -> q:A                        q:A
-B -> p:B(q:A)                   p:B($A)
-C -> p:C                        p:C
-D -> q:D(q:A,p:C)               q:D($A,$C)
-E -> q:E(q:D(q:A,p:C),p:C)      q:E($D,$C)
-F -> q:F(p:B(q:A))              q:F($B)
-\end{verbatim}
-
-This results in the following
-libraries (and their respective dependencies): \\
-
-\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=6cm,
-  thick,m/.style={rectangle,draw,font=\sffamily\Large\bfseries}]
-  \node[m] (1) {libHSq:A.so};
-  \node[m] (2) [left of=1,fill=blue!20] {libHSp:B(q:A).so};
-  \node[m] (3) [below=0.5cm of 1,fill=blue!20] {libHSp:C.so};
-  \node[m] (4) [left of=3] {libHSq:D.so};
-  \node[m] (5) [below=0.5cm of 4] {libHSq:E.so};
-  \node[m] (6) [left of=2] {libHSq:F.so};
-  \path
-  (2) edge node {} (1)
-  (4) edge node {} (1)
-  (4) edge node {} (3)
-  (5) edge node {} (3)
-  (5) edge node {} (4)
-  (6) edge node {} (2)
-  ;
-\end{tikzpicture}
-
-Notice that there is no ``ordering'' that the packages could have been
-built in; rather, we walk the package tree, building modules as we encounter
-them (thus, the instantiated package \verb|p| in light blue is fully built before all
-the modules of \verb|q| are finished).
-
-Also, note that in the case of module \verb|B|, we had to include its
-dependency in the name of the library.  This is because package \verb|p| could
-be instantiated a different implementation of logical module \verb|A|: the
-library must specify which one it's compiled with!  Otherwise, in the following situation:
-
-\begin{verbatim}
-package x where
-    A :: [ a :: Bool ]
-    B = [ import A; b = a ]
-package y where
-    A1 = [ a = True ]
-    A2 = [ a = False ]
-package linker1 where
-    include y
-    include x (A as A1, B as B1)
-package linker2 where
-    include y
-    include x (A as A2, B as B2)
-\end{verbatim}
-
-both instantiations of \verb|B| (\verb|x:B(y:A1)| and \verb|x:B(y:A2)|)
-would be given the same name \verb|x:B|.
-Technically, all of the other
-modules should also record this information, but as an optimization, only
-recording the assignments for \emph{holes} is necessary.
-
-\subsection{One library per package identity}\label{sec:one-per-package-identity}
-
-In this world, we simplify physical module identities to ``only contain
-package information'', and not full physical module identities.  These
-simplified identities we call \emph{package identities}. One perspective
-is that we're coalescing together the libraries created from the
-previous scheme.  However, another perspective is we are taking our
-packages and \emph{slicing} them into pieces which are actually
-considered libraries.
-
-Before we jump in earnest into specifying how package identities are
-computed, it's useful to first specify what some desirable properties
-of any such slicing scheme are:
-
-\begin{itemize}
-
-    \item \emph{No junk.} Given an assignment of a module to a library,
-        loading that library minimize the number of transitive
-        dependencies which were irrelevant for the module.  A good
-        heuristic is that it's OK to load unused code from the same
-        package (after all, the whole point is to have multiple modules
-        in a single library), but it's not OK to cause unused external packages to
-        be loaded.
-
-    \item \emph{Caching.} When compiling a package, we compile libraries
-        for a set of package identifiers. Compilation of any other
-        packages which produce overlapping identifiers must be able to
-        reuse the libraries from the original compilation.
-
-    \item \emph{Economy.} Subject to the previous two constraints, we
-        should minimize the number of package identifiers required
-        to compile any given package (otherwise, per physical module
-        identifier is a valid solution.)
-
-\end{itemize}
-
-Here is an example mapping of package identities:
-
-\begin{verbatim}
-     physical mod identity      pkg identity
-A -> q:A                        q
-B -> p:B(q:A)                   p(q:A)
-C -> p:C                        p
-D -> q:D(q:A,p:C)               q(p)
-E -> q:E(q:D(q:A,p:C),p:C)      q(p)
-F -> q:F(p:B(q:A))              q(p(q:A))
-\end{verbatim}
-
-Just as in the previous section, we still have to record the explicit
-module choice for holes.  However, it's worth noting that the
-\verb|include| induced dependency for \verb|q(p)| has \emph{not} been
-refined, since \verb|C| is not a hole in package \verb|q|.  It is not
-possible for another package to generate a compiled module that should
-be placed in \verb|q(p)|, since \verb|q| can't be reinstantiated and a
-new package would have a different package name.
-
-The process also calculates a dependency list for the package
-identities, which does not necessarily coincide with the tree structure
-of the package identities. Here is the resulting library graph: \\
-
-\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=6cm,
-  thick,m/.style={rectangle,draw,font=\sffamily\Large\bfseries}]
-  \node[m] (1) {libHSq.so (A)};
-  \node[m] (2) [left of=1,fill=blue!20] {libHSp(q:A).so (B)};
-  \node[m] (3) [below=0.5cm of 1,fill=blue!20] {libHSp.so (C)};
-  \node[m] (4) [left of=3] {libHSq(p).so (D,E)};
-  \node[m] (5) [left of=2] {libHSq(p(q:A)).so (F)};
-  \path
-  (2) edge node [right] {} (1)
-  (4) edge node [right] {} (3)
-  (4) edge node [right] {} (1)
-  (5) edge node [right] {} (2)
-  ;
-\end{tikzpicture}
-
-We can observe the following changes that \verb|D| and \verb|E| have
-been placed in the same library.  This is because they both have a
-dependency on library \verb|p|, internal dependencies not withstanding.
-
-\paragraph{So what's the algorithm?}  While intuitively, it seems like
-one could simply erase module names from physical module identities and
-get package identities, things are a bit trickier than that: internal
-dependencies could cause us to fail to place two modules together which
-should be in the same package.  So\ldots I don't actually know what the
-algorithm to be used here is.
-
-\subsection{One library per definite package}\label{sec:one-per-definite-package}
-
-In this world, we create a dynamic library per definite package (package with
-no holes).  Indefinite packages don't get compiled into libraries, the code
-is duplicated and type equality is only seen if a type came from the same
-definite package.  In the running example, we only generate \verb|libHSq.so|
-which exports all of the modules (\verb|p| is indefinite). \\
-
-\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=6cm,
-  thick,m/.style={rectangle,draw,font=\sffamily\Large\bfseries}]
-  \node[m] (1) {libHSq.so (A,B,C,D,E)};
-\end{tikzpicture}
-
-If another package instantiates \verb|p|, the instances of \verb|C| will
-be considered different:
-
-\begin{verbatim}
-package q2 where
-    include q (C)
-    A = [ a = True ]
-    include p # does not link, C's are different
-\end{verbatim}
-
-This scheme, by itself, is fairly unsatisfactory.  Here are some of its
-limitations:
-
-\paragraph{Limited applicativity}  Many programs which take advantage of
-Backpack's applicativity no longer work:
-
-\begin{verbatim}
-package a where
-    A = [ ... ]
-package b where
-    A :: [ ... ]
-    B = [ ... ]
-package applic-left where
-    include a
-    include b
-package applic-right where
-    include b
-    include a
-package applic-both where
-    include applic-left
-    include applic-right
-\end{verbatim}
-
-This would not link, because we would end up with original names
-\verb|applic-left:B(A)| and \verb|applic-right:B(A)|, which are
-considered separate entities.
-
-Furthermore, \emph{what} works and doesn't work can be quite confusing.
-For example, suppose we leave an unresolved hole for prelude in the example
-(as was the case in the Backpack paper):
-
-\begin{verbatim}
-package prelude-sig where
-    Prelude = [ ... ]
-package a where
-    include prelude-sig
-    A = [ ... ]
-package b where
-    include prelude-sig
-    A :: [ ... ]
-    B = [ ... ]
-package applic-left where
-    include a
-    include b
-package applic-right where
-    include b
-    include a
-package applic-both where
-    include applic-left
-    include applic-right
-\end{verbatim}
-
-Now this \emph{does} typecheck, because \verb|B| won't get assigned an
-original name until some final project links everything together.  The
-overall picture seems to be something as follows:
-
-\begin{enumerate}
-    \item If you defer linking an indefinite module with implementations
-        of its holes until all code is visible, you will get the
-        type-equality you expect.
-    \item If you compile an indefinite module as soon as possible, you
-        will unable to observe type equality of any other users who
-        reinstantiate the indefinite module in the same way.  (However,
-        if they directly use your instantiation, type equality works
-        out in the correct way.)
-\end{enumerate}
-
-\paragraph{A bridge over troubled water} As a refinement, if the
-instantiations of an indefinite package's holes live in libraries which
-do not have a mutually recursive dependency on the indefinite package,
-then it can be instantiated.  In the previous example, this was not
-true: hole \verb|A| in package \verb|p| was instantiated with
-\verb|q:A|, but package \verb|q| has a dependency on \verb|p|.  However,
-we could break the dependence by separating \verb|A| into another
-package:
-
-\begin{verbatim}
-package a where
-    A = [ a = False ]
-package q where
-    include a
-    include p
-    D = [ import C; d = c ]
-    E = [ import C; e = c ]
-\end{verbatim}
-
-Now the library dependencies look like: \\
-
-\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=6cm,
-  thick,m/.style={rectangle,draw,font=\sffamily\Large\bfseries}]
-  \node[m] (1) {libHSa.so (A)};
-  \node[m] (2) [below=1cm, left of=1, fill=blue!20] {libHSp(a:a).so (B,C)};
-  \node[m] (3) [above=1cm, left of=2] {libHSq.so (D,E)};
-  \path
-  (2) edge node [right] {} (1)
-  (3) edge node [right] {} (1)
-  (3) edge node [right] {} (2);
-\end{tikzpicture}
-
-Intuitively, indefinite packages can share code, if all of the holes are
-placed in standalone packages.  Otherwise, the indefinite package is
-generatively created.  Notice, as was the case in the previous section,
-that we have to keep information about specific modules in the names
-of instantiated modules.
-
-\subsection{Commentary}
-
-A library per physical module identity obviously won't work for real systems,
-so the primary choice is between a library per package identity or
-definite package.  The benefits of package identities:
-
-\begin{itemize}
-    \item More programs type-check (since type equality holds when packages
-        are reinstantiated),
-    \item Packages are automatically sliced into their most modular form,
-        allowing package writers to avoid having to manually split up modules.
-\end{itemize}
-
-The benefits of definite packages:
-
-\begin{itemize}
-    \item We actually know how to implement it (the algorithm in the other
-        case is not worked out, and we haven't even begun to talk about
-        mutual recursion),
-    \item It is the smallest delta with GHC today: e.g., \verb|cabal install|
-        always results in the installation of one library,
-    \item Monolithic library files mean that we pay less cost of
-        crossing the boundaries of dynamic libraries,
-    \item Requiring users to place hole instantiations in separate packages
-        to be shared is not a wholly unreasonable stipulation.
-\end{itemize}
-
-One major open question which could be empirically tested is this: for the
-current package ecosystem, how many subpackages would slicing create?
-This is an important experiment to run on any proposed slicing algorithm.
-
-\section{Exposed modules should allow external modules}\label{sec:reexport}
-
-In Backpack, the definition of a package consists of a logical context,
-which maps logical module names to physical module names.  These do not
-necessarily coincide, since some physical modules may have been defined
-in other packages and mixed into this package.  This mapping specifies
-what modules other packages including this package can access.
-However, in the current installed package database, we have exposed-modules which
-specify what modules are accessible, but we assume that the current
-package is responsible for providing these modules.
-
-To implement Backpack, we have to extend this exposed-modules (``Export declarations''
-on Figure~\ref{fig:pkgdb}).  Rather
-than a list of logical module names, we provide a new list of tuples:
-the exported logical module name and original physical module name (this
-is in two parts: the InstalledPackageId and the original module name).
-For example, an traditional module export is simply (Name, my-pkg-id, Name);
-a renamed module is (NewName, my-pkg-id, OldName), and an external module
-is (Name, external-pkg-id, Name).
-
-As an example:
-
-\begin{verbatim}
-package P where
-    M = ...
-    N = ...
-package Q (M, R, T)
-    include P (N -> R)
-    T = ...
-\end{verbatim}
-
-And now if we look at Q\@:
-
-\begin{verbatim}
-exposed-modules:
-        <M, P.id, M>
-        <R, P.id, N>
-        <T, Q.id, T>
-\end{verbatim}
-
-When we compile Q, and the interface file gets generated, we have
-to generate identifiers for each of the exposed modules.  These should
-be calculated to directly refer to the ``original name'' of each them;
-so for example M and R point directly to package P, but they also
-include the original name they had in the original definition.
-
-\paragraph{Error messages}  When it is possible for multiple physical
-entities to have the same ``user-friendly'' name, this can result in a
-very confusing situation if both entities have to be referred to in the
-same message.  This is especially true when renaming is in place:
-you not only want to print out the name in scope, but probably some indication
-of what the original name is.  In short, when it comes to error messages, tread with care!
+has wired-in names, which refer to packages without any version.  These
+are specially treated during compilation so that they are built using
+a package key that has no version or dependency information.  One approach
+is to continue treating these libraries specially; alternately we can
+maintain a fixed table from these wired names to
+package IDs.
 
 \section{Shapeless Backpack}\label{sec:simplifying-backpack}
 
