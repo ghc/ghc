@@ -1021,12 +1021,14 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
 
 def stats( name, way, stats_file ):
     opts = getTestOpts()
-    return checkStats(stats_file, opts.stats_range_fields)
+    return checkStats(name, way, stats_file, opts.stats_range_fields)
 
 # -----------------------------------------------------------------------------
 # Check -t stats info
 
-def checkStats(stats_file, range_fields):
+def checkStats(name, way, stats_file, range_fields):
+    full_name = name + '(' + way + ')'
+
     result = passed()
     if len(range_fields) > 0:
         f = open(in_testdir(stats_file))
@@ -1062,12 +1064,12 @@ def checkStats(stats_file, range_fields):
                 length = max(map (lambda x : len(str(x)), [expected, lowerBound, upperBound, val]))
                 def display(descr, val, extra):
                     print descr, string.rjust(str(val), length), extra
-                display('    Expected    ' + field + ':', expected, '+/-' + str(dev) + '%')
-                display('    Lower bound ' + field + ':', lowerBound, '')
-                display('    Upper bound ' + field + ':', upperBound, '')
-                display('    Actual      ' + field + ':', val, '')
+                display('    Expected    ' + full_name + ' ' + field + ':', expected, '+/-' + str(dev) + '%')
+                display('    Lower bound ' + full_name + ' ' + field + ':', lowerBound, '')
+                display('    Upper bound ' + full_name + ' ' + field + ':', upperBound, '')
+                display('    Actual      ' + full_name + ' ' + field + ':', val, '')
                 if val != expected:
-                    display('    Deviation   ' + field + ':', deviation, '%')
+                    display('    Deviation   ' + full_name + ' ' + field + ':', deviation, '%')
                 
     return result
 
@@ -1158,7 +1160,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    statsResult = checkStats(stats_file, opts.compiler_stats_range_fields)
+    statsResult = checkStats(name, way, stats_file, opts.compiler_stats_range_fields)
 
     if badResult(statsResult):
         return statsResult
@@ -1258,7 +1260,7 @@ def simple_run( name, way, prog, args ):
         if check_prof and not check_prof_ok(name):
             return failBecause('bad profile')
 
-    return checkStats(stats_file, opts.stats_range_fields)
+    return checkStats(name, way, stats_file, opts.stats_range_fields)
 
 def rts_flags(way):
     if (way == ''):
