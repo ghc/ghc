@@ -1888,9 +1888,9 @@ coercionKindRole = go
 -- | Retrieve the role from a coercion.
 coercionRole :: Coercion -> Role
 coercionRole = snd . coercionKindRole
-  -- There's not a better way to do this, because NthCo needs the
-  -- *kind* and role of its argument. Luckily, laziness should
-  -- generally avoid the need for computing kinds in other cases.
+  -- There's not a better way to do this, because NthCo needs the *kind*
+  -- and role of its argument. Luckily, laziness should generally avoid
+  -- the need for computing kinds in other cases.
 
 \end{code}
 
