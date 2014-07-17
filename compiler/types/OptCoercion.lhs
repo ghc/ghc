@@ -80,7 +80,7 @@ optCoercion :: CvSubst -> Coercion -> NormalCo
 --   *and* optimises it to reduce its size
 optCoercion env co 
   | opt_NoOptCoercion = substCo env co
-  | otherwise         = opt_co1 env False Nothing co
+  | otherwise         = opt_co1 env False co
 
 type NormalCo = Coercion
   -- Invariants: 
@@ -100,10 +100,8 @@ type ReprFlag = Bool
 -- | Optimize a coercion, making no assumptions.
 opt_co1 :: CvSubst
         -> SymFlag
-        -> Maybe Role  -- ^ @Nothing@ = no change; @Just r@ means to change role.
-                       -- MUST be a downgrade.
         -> Coercion -> NormalCo
-opt_co1 env sym mrole co = opt_co2 env sym mrole (coercionRole co) co
+opt_co1 env sym co = opt_co2 env sym (coercionRole co) co
 {-
 opt_co env sym co
  = pprTrace "opt_co {" (ppr sym <+> ppr co $$ ppr env) $
@@ -133,11 +131,10 @@ opt_co env sym co
 -- | Optimize a coercion, knowing the coercion's role. No other assumptions.
 opt_co2 :: CvSubst
         -> SymFlag
-        -> Maybe Role
         -> Role   -- ^ The role of the input coercion
         -> Coercion -> NormalCo
-opt_co2 env sym _     Phantom co = opt_phantom env sym co
-opt_co2 env sym mrole r       co = opt_co3 env sym mrole r co
+opt_co2 env sym Phantom co = opt_phantom env sym co
+opt_co2 env sym r       co = opt_co3 env sym Nothing r co
 
 -- See Note [Optimising coercion optimisation]
 -- | Optimize a coercion, knowing the coercion's non-Phantom role.
@@ -172,7 +169,7 @@ opt_co4 env sym rep r g@(TyConAppCo _r tc cos)
       (_, Representational) ->
                       -- must use opt_co2 here, because some roles may be P
                       -- See Note [Optimising coercion optimisation]
-        mkTyConAppCo r tc (zipWith (opt_co2 env sym Nothing)
+        mkTyConAppCo r tc (zipWith (opt_co2 env sym)
                                    (tyConRolesX r tc)  -- the current roles
                                    cos)
       (_, Phantom) -> pprPanic "opt_co4 sees a phantom!" (ppr g)
@@ -206,7 +203,7 @@ opt_co4 env sym rep r (AxiomInstCo con ind cos)
     wrapSym sym $
                        -- some sub-cos might be P: use opt_co2
                        -- See Note [Optimising coercion optimisation]
-    AxiomInstCo con ind (zipWith (opt_co2 env False Nothing)
+    AxiomInstCo con ind (zipWith (opt_co2 env False)
                                  (coAxBranchRoles (coAxiomNthBranch con ind))
                                  cos)
       -- Note that the_co does *not* have sym pushed into it
@@ -269,7 +266,7 @@ opt_co4 env sym rep r (AxiomRuleCo co ts cs)
     wrapRole rep r $
     wrapSym sym $
     AxiomRuleCo co (map (substTy env) ts)
-                   (zipWith (opt_co2 env False Nothing) (coaxrAsmpRoles co) cs)
+                   (zipWith (opt_co2 env False) (coaxrAsmpRoles co) cs)
 
 
 -------------
@@ -333,7 +330,7 @@ opt_nth_co env sym rep r = go []
       -- coercionRole, but as long as we don't have a long chain of
       -- NthCo's interspersed with some other coercion former, we should
       -- be OK.
-    opt_nths ns co = opt_nths' ns (opt_co1 env sym Nothing co)
+    opt_nths ns co = opt_nths' ns (opt_co1 env sym co)
 
       -- input coercion *is* sym'd and opt'd
     opt_nths' [] co
