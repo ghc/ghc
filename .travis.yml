@@ -33,4 +33,4 @@ script:
  - echo 'DYNAMIC_GHC_PROGRAMS = NO' >> mk/validate.mk
  - echo 'GhcLibWays = v' >> mk/validate.mk
  - if [ "$DEBUG_STAGE" = "YES" ]; then echo 'GhcStage2HcOpts += -DDEBUG' >> mk/validate.mk; fi
- - CPUS=3 SKIP_PERF_TESTS=YES PATH=~/.cabal/bin:$PATH ./validate --fast --no-dph
+ - CPUS=2 SKIP_PERF_TESTS=YES PATH=~/.cabal/bin:$PATH ./validate --fast --no-dph
