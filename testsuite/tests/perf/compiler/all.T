@@ -363,7 +363,7 @@ test('T5321FD',
             # prev:       213380256
             # 2012-10-08: 240302920 (x86/Linux)
             #  (increase due to new codegen)
-           (wordsize(64), 476497048, 10)])
+           (wordsize(64), 426960992, 10)])
             # prev:       418306336
             # 29/08/2012: 492905640
             #  (increase due to new codegen)
@@ -371,6 +371,10 @@ test('T5321FD',
             #  (reason for decrease unknown)
             # 08/06/2013: 476497048
             #  (reason for increase unknown)
+            # before 2014-07-17: 441997096
+            #  (with -8%, still in range, hence cause not known)
+            # 2014-07-17: 426960992 (-11% of previous value)
+            #  (due to better optCoercion, 5e7406d9, #9233)
       ],
       compile,[''])
 
