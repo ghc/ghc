@@ -1045,7 +1045,7 @@ def checkStats(name, way, stats_file, range_fields):
             lowerBound = trunc(           expected * ((100 - float(dev))/100))
             upperBound = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)))
 
-            deviation = round(((val * 100)/ expected) - 100, 1)
+            deviation = round(((float(val) * 100)/ expected) - 100, 1)
 
             if val < lowerBound:
                 print field, 'value is too low:'
