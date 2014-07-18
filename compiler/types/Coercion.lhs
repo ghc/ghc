@@ -1794,6 +1794,19 @@ seqCos (co:cos) = seqCo co `seq` seqCos cos
 %*                                                                      *
 %************************************************************************
 
+Note [Computing a coercion kind and role]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To compute a coercion's kind is straightforward: see coercionKind.
+But to compute a coercion's role, in the case for NthCo we need
+its kind as well.  So if we have two separate functions (one for kinds
+and one for roles) we can get exponentially bad behaviour, sinc each
+NthCo node makes a seaprate call to coercionKind, which traverses the
+sub-tree again.  This was part of the problem in Trac #9233.
+
+Solution: compute both together; hence coercionKindRole.  We keep a
+separate coercionKind function because it's a bit more efficient if
+the kind is all you wan.
+
 \begin{code}
 coercionType :: Coercion -> Type
 coercionType co = case coercionKindRole co of
@@ -1843,9 +1856,8 @@ coercionKind co = go co
 coercionKinds :: [Coercion] -> Pair [Type]
 coercionKinds tys = sequenceA $ map coercionKind tys
 
--- | Get a coercion's kind and role. More efficient than getting
--- each individually, but less efficient than calling just
--- 'coercionKind' if that's all you need.
+-- | Get a coercion's kind and role.
+-- Why both at once?  See Note [Computing a coercion kind and role]
 coercionKindRole :: Coercion -> (Pair Type, Role)
 coercionKindRole = go
   where
