@@ -217,9 +217,12 @@ tcLookupFamInst tycon tys
   | otherwise
   = do { instEnv <- tcGetFamInstEnvs
        ; let mb_match = lookupFamInstEnv instEnv tycon tys 
-       ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ 
-                                  pprTvBndrs (varSetElems (tyVarsOfTypes tys)) $$ 
-                                  ppr mb_match $$ ppr instEnv)
+       ; traceTc "lookupFamInst" $
+         vcat [ ppr tycon <+> ppr tys
+              , pprTvBndrs (varSetElems (tyVarsOfTypes tys))
+              , ppr mb_match
+              -- , ppr instEnv
+         ]
        ; case mb_match of
 	   [] -> return Nothing
 	   (match:_) 
@@ -297,8 +300,11 @@ checkForConflicts :: FamInstEnvs -> FamInst -> TcM Bool
 checkForConflicts inst_envs fam_inst
   = do { let conflicts = lookupFamInstEnvConflicts inst_envs fam_inst
              no_conflicts = null conflicts
-       ; traceTc "checkForConflicts" (ppr (map fim_instance conflicts) $$
-                                      ppr fam_inst $$ ppr inst_envs)
+       ; traceTc "checkForConflicts" $
+         vcat [ ppr (map fim_instance conflicts)
+              , ppr fam_inst
+              -- , ppr inst_envs
+         ]
        ; unless no_conflicts $ conflictInstErr fam_inst conflicts
        ; return no_conflicts }
 
