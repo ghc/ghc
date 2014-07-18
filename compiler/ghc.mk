@@ -437,7 +437,13 @@ ifeq "$(compiler_stage1_VERSION_MUNGED)" "YES"
 compiler_stage1_MUNGED_VERSION = $(subst .$(ProjectPatchLevel),,$(ProjectVersion))
 define compiler_PACKAGE_MAGIC
 compiler_stage1_VERSION = $(compiler_stage1_MUNGED_VERSION)
+compiler_stage1_PACKAGE_KEY = $(subst .$(ProjectPatchLevel),,$(compiler_stage1_PACKAGE_KEY))
 endef
+
+# NB: the PACKAGE_KEY munging has no effect for new-style package keys
+# (which indeed, have nothing version like in them, but are important for
+# old-style package keys which do.)  The subst operation is idempotent, so
+# as long as we do it at least once we should be good.
 
 # Don't register the non-munged package
 compiler_stage1_REGISTER_PACKAGE = NO

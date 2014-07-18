@@ -1605,13 +1605,13 @@ isSafeModule m = do
     liftIO $ putStrLn $ "Package Trust: " ++ (if packageTrustOn dflags then "On" else "Off")
     when (not $ null good)
          (liftIO $ putStrLn $ "Trusted package dependencies (trusted): " ++
-                        (intercalate ", " $ map packageKeyString good))
+                        (intercalate ", " $ map (showPpr dflags) good))
     case msafe && null bad of
         True -> liftIO $ putStrLn $ mname ++ " is trusted!"
         False -> do
             when (not $ null bad)
                  (liftIO $ putStrLn $ "Trusted package dependencies (untrusted): "
-                            ++ (intercalate ", " $ map packageKeyString bad))
+                            ++ (intercalate ", " $ map (showPpr dflags) bad))
             liftIO $ putStrLn $ mname ++ " is NOT trusted!"
 
   where
@@ -2341,6 +2341,7 @@ showPackages = do
         showFlag (HidePackage     p) = text $ "  -hide-package " ++ p
         showFlag (IgnorePackage   p) = text $ "  -ignore-package " ++ p
         showFlag (ExposePackageId p) = text $ "  -package-id " ++ p
+        showFlag (ExposePackageKey p) = text $ "  -package-key " ++ p
         showFlag (TrustPackage    p) = text $ "  -trust " ++ p
         showFlag (DistrustPackage p) = text $ "  -distrust " ++ p
 

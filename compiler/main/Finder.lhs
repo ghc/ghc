@@ -43,7 +43,7 @@ import Maybes           ( expectJust )
 import Exception        ( evaluate )
 
 import Distribution.Text
-import Distribution.Package
+import Distribution.Package hiding (PackageKey, mkPackageKey)
 import Data.IORef       ( IORef, writeIORef, readIORef, atomicModifyIORef )
 import System.Directory
 import System.FilePath

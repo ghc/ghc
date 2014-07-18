@@ -26,7 +26,8 @@ module PackageConfig (
 
 import Distribution.InstalledPackageInfo
 import Distribution.ModuleName
-import Distribution.Package
+import Distribution.Package hiding (PackageKey, mkPackageKey)
+import qualified Distribution.Package as Cabal
 import Distribution.Text
 import Distribution.Version
 
@@ -43,23 +44,23 @@ defaultPackageConfig :: PackageConfig
 defaultPackageConfig = emptyInstalledPackageInfo
 
 -- -----------------------------------------------------------------------------
--- PackageKey (package names with versions)
+-- PackageKey (package names, versions and dep hash)
 
 -- $package_naming
 -- #package_naming#
--- Mostly the compiler deals in terms of 'PackageKey's, which have the
--- form @<pkg>-<version>@. You're expected to pass in the version for
--- the @-package-name@ flag. However, for wired-in packages like @base@
--- & @rts@, we don't necessarily know what the version is, so these are
--- handled specially; see #wired_in_packages#.
+-- Mostly the compiler deals in terms of 'PackageKey's, which are md5 hashes
+-- of a package ID, keys of its dependencies, and Cabal flags. You're expected
+-- to pass in the package key in the @-this-package-key@ flag. However, for
+-- wired-in packages like @base@ & @rts@, we don't necessarily know what the
+-- version is, so these are handled specially; see #wired_in_packages#.
 
 -- | Turn a Cabal 'PackageIdentifier' into a GHC 'PackageKey'
-mkPackageKey :: PackageIdentifier -> PackageKey
+mkPackageKey :: Cabal.PackageKey -> PackageKey
 mkPackageKey = stringToPackageKey . display
 
 -- | Get the GHC 'PackageKey' right out of a Cabalish 'PackageConfig'
 packageConfigId :: PackageConfig -> PackageKey
-packageConfigId = mkPackageKey . sourcePackageId
+packageConfigId = mkPackageKey . packageKey
 
 -- | Turn a 'PackageConfig', which contains GHC 'Module.ModuleName's into a Cabal specific
 -- 'InstalledPackageInfo' which contains Cabal 'Distribution.ModuleName.ModuleName's

@@ -876,6 +876,8 @@ badIfaceFile file err
 
 hiModuleNameMismatchWarn :: Module -> Module -> MsgDoc
 hiModuleNameMismatchWarn requested_mod read_mod = 
+  -- ToDo: This will fail to have enough qualification when the package IDs
+  -- are the same
   withPprStyle (mkUserStyle alwaysQualify AllTheWay) $
     -- we want the Modules below to be qualified with package names,
     -- so reset the PrintUnqualified setting.

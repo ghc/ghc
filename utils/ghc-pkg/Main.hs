@@ -901,13 +901,13 @@ registerPackage input verbosity my_flags auto_ghci_libs multi_instance
 
   let 
      -- In the normal mode, we only allow one version of each package, so we
-     -- remove all instances with the same source package id as the one we're
+     -- remove all instances with the same source package key as the one we're
      -- adding. In the multi instance mode we don't do that, thus allowing
-     -- multiple instances with the same source package id.
+     -- multiple instances with the same source package key.
      removes = [ RemovePackage p
                | not multi_instance,
                  p <- packages db_to_operate_on,
-                 sourcePackageId p == sourcePackageId pkg ]
+                 packageKey p == packageKey pkg ]
   --
   changeDB verbosity (removes ++ [AddPackage pkg']) db_to_operate_on
 
@@ -1058,21 +1058,28 @@ modifyPackage fn pkgarg verbosity my_flags force = do
       db_name = location db
       pkgs    = packages db
 
-      pids = map sourcePackageId ps
+      pks = map packageKey ps
 
-      cmds = [ fn pkg | pkg <- pkgs, sourcePackageId pkg `elem` pids ]
+      cmds = [ fn pkg | pkg <- pkgs, packageKey pkg `elem` pks ]
       new_db = updateInternalDB db cmds
 
       -- ...but do consistency checks with regards to the full stack
       old_broken = brokenPackages (allPackagesInStack db_stack)
       rest_of_stack = filter ((/= db_name) . location) db_stack
       new_stack = new_db : rest_of_stack
-      new_broken = map sourcePackageId (brokenPackages (allPackagesInStack new_stack))
-      newly_broken = filter (`notElem` map sourcePackageId old_broken) new_broken
+      new_broken = brokenPackages (allPackagesInStack new_stack)
+      newly_broken = filter ((`notElem` map packageKey old_broken)
+                            . packageKey) new_broken
   --
+  let displayQualPkgId pkg
+        | [_] <- filter ((== pkgid) . sourcePackageId)
+                        (allPackagesInStack db_stack)
+            = display pkgid
+        | otherwise = display pkgid ++ "@" ++ display (packageKey pkg)
+        where pkgid = sourcePackageId pkg
   when (not (null newly_broken)) $
       dieOrForceAll force ("unregistering would break the following packages: "
-              ++ unwords (map display newly_broken))
+              ++ unwords (map displayQualPkgId newly_broken))
 
   changeDB verbosity cmds db
 
@@ -1114,7 +1121,10 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                    case pkgName p1 `compare` pkgName p2 of
                         LT -> LT
                         GT -> GT
-                        EQ -> pkgVersion p1 `compare` pkgVersion p2
+                        EQ -> case pkgVersion p1 `compare` pkgVersion p2 of
+                                LT -> LT
+                                GT -> GT
+                                EQ -> packageKey pkg1 `compare` packageKey pkg2
                    where (p1,p2) = (sourcePackageId pkg1, sourcePackageId pkg2)
 
       stack = reverse db_stack_sorted
@@ -1122,7 +1132,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
       match `exposedInPkg` pkg = any match (map display $ exposedModules pkg)
 
       pkg_map = allPackagesInStack db_stack
-      broken = map sourcePackageId (brokenPackages pkg_map)
+      broken = map packageKey (brokenPackages pkg_map)
 
       show_normal PackageDB{ location = db_name, packages = pkg_confs } =
           do hPutStrLn stdout (db_name ++ ":")
@@ -1133,7 +1143,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                  -- Sort using instance Ord PackageId
                  pp_pkgs = map pp_pkg . sortBy (comparing installedPackageId) $ pkg_confs
                  pp_pkg p
-                   | sourcePackageId p `elem` broken = printf "{%s}" doc
+                   | packageKey p `elem` broken = printf "{%s}" doc
                    | exposed p = doc
                    | otherwise = printf "(%s)" doc
                    where doc | verbosity >= Verbose = printf "%s (%s)" pkg ipid
@@ -1160,7 +1170,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                   map (termText "   " <#>) (map pp_pkg (packages db)))
           where
                    pp_pkg p
-                     | sourcePackageId p `elem` broken = withF Red  doc
+                     | packageKey p `elem` broken = withF Red  doc
                      | exposed p                       = doc
                      | otherwise                       = withF Blue doc
                      where doc | verbosity >= Verbose
@@ -1212,6 +1222,8 @@ showPackageDot verbosity myflags = do
 -- -----------------------------------------------------------------------------
 -- Prints the highest (hidden or exposed) version of a package
 
+-- ToDo: This is no longer well-defined with package keys, because the
+-- dependencies may be varying versions
 latestPackage ::  Verbosity -> [Flag] -> PackageIdentifier -> IO ()
 latestPackage verbosity my_flags pkgid = do
   (_, _, flag_db_stack) <- 
@@ -1500,6 +1512,7 @@ checkPackageConfig pkg verbosity db_stack auto_ghci_libs
                    multi_instance update = do
   checkInstalledPackageId pkg db_stack update
   checkPackageId pkg
+  checkPackageKey pkg
   checkDuplicates db_stack pkg multi_instance update
   mapM_ (checkDep db_stack) (depends pkg)
   checkDuplicateDepends (depends pkg)
@@ -1539,17 +1552,26 @@ checkPackageId ipi =
     []  -> verror CannotForce ("invalid package identifier: " ++ str)
     _   -> verror CannotForce ("ambiguous package identifier: " ++ str)
 
+checkPackageKey :: InstalledPackageInfo -> Validate ()
+checkPackageKey ipi =
+  let str = display (packageKey ipi) in
+  case [ x :: PackageKey | (x,ys) <- readP_to_S parse str, all isSpace ys ] of
+    [_] -> return ()
+    []  -> verror CannotForce ("invalid package key: " ++ str)
+    _   -> verror CannotForce ("ambiguous package key: " ++ str)
+
 checkDuplicates :: PackageDBStack -> InstalledPackageInfo
                 -> Bool -> Bool-> Validate ()
 checkDuplicates db_stack pkg multi_instance update = do
   let
+        pkg_key = packageKey pkg
         pkgid = sourcePackageId pkg
         pkgs  = packages (head db_stack)
   --
   -- Check whether this package id already exists in this DB
   --
   when (not update && not multi_instance
-                   && (pkgid `elem` map sourcePackageId pkgs)) $
+                   && (pkg_key `elem` map packageKey pkgs)) $
        verror CannotForce $
           "package " ++ display pkgid ++ " is already installed"
 

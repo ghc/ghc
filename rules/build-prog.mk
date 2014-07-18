@@ -240,7 +240,7 @@ $1/$2/build/tmp/$$($1_$2_PROG)-wrapper.c: driver/utils/dynwrapper.c | $$$$(dir $
 	echo '#include <Windows.h>' >> $$@
 	echo '#include "Rts.h"' >> $$@
 	echo 'LPTSTR path_dirs[] = {' >> $$@
-	$$(foreach p,$$($1_$2_TRANSITIVE_DEPS),$$(call make-command,echo '    TEXT("/../lib/$$p")$$(comma)' >> $$@))
+	$$(foreach p,$$($1_$2_TRANSITIVE_DEP_KEYS),$$(call make-command,echo '    TEXT("/../lib/$$p")$$(comma)' >> $$@))
 	echo '    TEXT("/../lib/"),' >> $$@
 	echo '    NULL};' >> $$@
 	echo 'LPTSTR progDll = TEXT("../lib/$$($1_$2_PROG).dll");' >> $$@

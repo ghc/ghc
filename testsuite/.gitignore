@@ -109,6 +109,8 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/cabal/cabal05/p-0.1.0.0/
 /tests/cabal/cabal05/q-0.1.0.0/
 /tests/cabal/cabal05/r-0.1.0.0/
+/tests/cabal/cabal06/inst-*/
+/tests/cabal/cabal06/tmp*
 /tests/cabal/local01.package.conf/
 /tests/cabal/local03.package.conf/
 /tests/cabal/local04.package.conf/

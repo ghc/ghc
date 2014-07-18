@@ -54,6 +54,7 @@ module HscTypes (
         setInteractivePrintName, icInteractiveModule,
         InteractiveImport(..), setInteractivePackage,
         mkPrintUnqualified, pprModulePrefix,
+        mkQualPackage, mkQualModule,
 
         -- * Interfaces
         ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
@@ -443,7 +444,7 @@ instance Outputable TargetId where
 -- | Helps us find information about modules in the home package
 type HomePackageTable  = ModuleNameEnv HomeModInfo
         -- Domain = modules in the home package that have been fully compiled
-        -- "home" package name cached here for convenience
+        -- "home" package key cached here for convenience
 
 -- | Helps us find information about modules in the imported packages
 type PackageIfaceTable = ModuleEnv ModIface
@@ -1138,7 +1139,7 @@ The details are a bit tricky though:
    extend the HPT.
 
  * The 'thisPackage' field of DynFlags is *not* set to 'interactive'.
-   It stays as 'main' (or whatever -package-name says), and is the
+   It stays as 'main' (or whatever -this-package-key says), and is the
    package to which :load'ed modules are added to.
 
  * So how do we arrange that declarations at the command prompt get
@@ -1148,7 +1149,7 @@ The details are a bit tricky though:
    turn get the module from it 'icInteractiveModule' field of the 
    interactive context.
 
-   The 'thisPackage' field stays as 'main' (or whatever -package-name says.
+   The 'thisPackage' field stays as 'main' (or whatever -this-package-key says.
 
  * The main trickiness is that the type environment (tcg_type_env and
    fixity envt (tcg_fix_env), and instances (tcg_insts, tcg_fam_insts)
@@ -1409,11 +1410,28 @@ exposed (say P2), so we use M.T for that, and P1:M.T for the other one.
 This is handled by the qual_mod component of PrintUnqualified, inside
 the (ppr mod) of case (3), in Name.pprModulePrefix
 
+Note [Printing package keys]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the old days, original names were tied to PackageIds, which directly
+corresponded to the entities that users wrote in Cabal files, and were perfectly
+suitable for printing when we need to disambiguate packages.  However, with
+PackageKey, the situation is different.  First, the key is not a human readable
+at all, so we need to consult the package database to find the appropriate
+PackageId to display.  Second, there may be multiple copies of a library visible
+with the same PackageId, in which case we need to disambiguate.  For now,
+we just emit the actual package key (which the user can go look up); however,
+another scheme is to (recursively) say which dependencies are different.
+
+NB: When we extend package keys to also have holes, we will have to disambiguate
+those as well.
+
 \begin{code}
 -- | Creates some functions that work out the best ways to format
--- names for the user according to a set of heuristics
+-- names for the user according to a set of heuristics.
 mkPrintUnqualified :: DynFlags -> GlobalRdrEnv -> PrintUnqualified
-mkPrintUnqualified dflags env = (qual_name, qual_mod)
+mkPrintUnqualified dflags env = QueryQualify qual_name
+                                             (mkQualModule dflags)
+                                             (mkQualPackage dflags)
   where
   qual_name mod occ
         | [gre] <- unqual_gres
@@ -1446,7 +1464,11 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
     -- "import M" would resolve unambiguously to P:M.  (if P is the
     -- current package we can just assume it is unqualified).
 
-  qual_mod mod
+-- | Creates a function for formatting modules based on two heuristics:
+-- (1) if the module is the current module, don't qualify, and (2) if there
+-- is only one exposed package which exports this module, don't qualify.
+mkQualModule :: DynFlags -> QueryQualifyModule
+mkQualModule dflags mod
      | modulePackageKey mod == thisPackage dflags = False
 
      | [pkgconfig] <- [modConfPkg m | m <- lookup
@@ -1458,6 +1480,27 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
 
      | otherwise = True
      where lookup = eltsUFM $ lookupModuleInAllPackages dflags (moduleName mod)
+
+-- | Creates a function for formatting packages based on two heuristics:
+-- (1) don't qualify if the package in question is "main", and (2) only qualify
+-- with a package key if the package ID would be ambiguous.
+mkQualPackage :: DynFlags -> QueryQualifyPackage
+mkQualPackage dflags pkg_key
+     | pkg_key == mainPackageKey
+        -- Skip the lookup if it's main, since it won't be in the package
+        -- database!
+     = False
+     | filter ((pkgid ==) . sourcePackageId)
+              (eltsUFM (pkgIdMap (pkgState dflags))) `lengthIs` 1
+        -- this says: we are given a package pkg-0.1@MMM, are there only one
+        -- exposed packages whose package ID is pkg-0.1?
+     = False
+     | otherwise
+     = True
+     where pkg = fromMaybe (pprPanic "qual_pkg" (ftext (packageKeyFS pkg_key)))
+                    (lookupPackage (pkgIdMap (pkgState dflags)) pkg_key)
+           pkgid = sourcePackageId pkg
+
 \end{code}
 
 

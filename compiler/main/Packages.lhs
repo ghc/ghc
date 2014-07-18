@@ -33,6 +33,7 @@ module Packages (
         ModuleExport(..),
 
         -- * Utils
+        packageKeyPackageIdString,
         isDllName
     )
 where
@@ -53,7 +54,7 @@ import Maybes
 import System.Environment ( getEnv )
 import Distribution.InstalledPackageInfo
 import Distribution.InstalledPackageInfo.Binary
-import Distribution.Package hiding (PackageId,depends)
+import Distribution.Package hiding (depends, PackageKey, mkPackageKey)
 import Distribution.ModuleExport
 import FastString
 import ErrUtils         ( debugTraceMsg, putMsg, MsgDoc )
@@ -383,6 +384,14 @@ applyPackageFlag dflags unusable pkgs flag =
                 ps' = hideAll (pkgName (sourcePackageId p)) (ps++qs)
          _ -> panic "applyPackageFlag"
 
+    ExposePackageKey str ->
+       case selectPackages (matchingKey str) pkgs unusable of
+         Left ps         -> packageFlagErr dflags flag ps
+         Right (p:ps,qs) -> return (p':ps')
+          where p' = p {exposed=True}
+                ps' = hideAll (pkgName (sourcePackageId p)) (ps++qs)
+         _ -> panic "applyPackageFlag"
+
     HidePackage str ->
        case selectPackages (matchingStr str) pkgs unusable of
          Left ps       -> packageFlagErr dflags flag ps
@@ -441,6 +450,9 @@ matchingStr str p
 matchingId :: String -> PackageConfig -> Bool
 matchingId str p =  InstalledPackageId str == installedPackageId p
 
+matchingKey :: String -> PackageConfig -> Bool
+matchingKey str p = str == display (packageKey p)
+
 sortByVersion :: [InstalledPackageInfo_ m] -> [InstalledPackageInfo_ m]
 sortByVersion = sortBy (flip (comparing (pkgVersion.sourcePackageId)))
 
@@ -465,12 +477,14 @@ packageFlagErr dflags flag reasons
   where err = text "cannot satisfy " <> ppr_flag <>
                 (if null reasons then empty else text ": ") $$
               nest 4 (ppr_reasons $$
+                      -- ToDo: this admonition seems a bit dodgy
                       text "(use -v for more information)")
         ppr_flag = case flag of
                      IgnorePackage p -> text "-ignore-package " <> text p
                      HidePackage p   -> text "-hide-package " <> text p
                      ExposePackage p -> text "-package " <> text p
                      ExposePackageId p -> text "-package-id " <> text p
+                     ExposePackageKey p -> text "-package-key " <> text p
                      TrustPackage p    -> text "-trust " <> text p
                      DistrustPackage p -> text "-distrust " <> text p
         ppr_reasons = vcat (map ppr_reason reasons)
@@ -520,15 +534,7 @@ findWiredInPackages dflags pkgs = do
   --
   let
         wired_in_pkgids :: [String]
-        wired_in_pkgids = map packageKeyString
-                          [ primPackageKey,
-                            integerPackageKey,
-                            basePackageKey,
-                            rtsPackageKey,
-                            thPackageKey,
-                            thisGhcPackageKey,
-                            dphSeqPackageKey,
-                            dphParPackageKey ]
+        wired_in_pkgids = map packageKeyString wiredInPackageKeys
 
         matches :: PackageConfig -> String -> Bool
         pc `matches` pid = display (pkgName (sourcePackageId pc)) == pid
@@ -588,7 +594,9 @@ findWiredInPackages dflags pkgs = do
         updateWiredInDependencies pkgs = map upd_pkg pkgs
           where upd_pkg p
                   | installedPackageId p `elem` wired_in_ids
-                  = p { sourcePackageId = (sourcePackageId p){ pkgVersion = Version [] [] } }
+                  = let pid = (sourcePackageId p) { pkgVersion = Version [] [] }
+                    in p { sourcePackageId = pid
+                         , packageKey = OldPackageKey pid }
                   | otherwise
                   = p
 
@@ -666,7 +674,7 @@ shadowPackages pkgs preferred
    in  Map.fromList shadowed
  where
  check (shadowed,pkgmap) pkg
-      | Just oldpkg <- lookupUFM pkgmap (packageConfigId pkg)
+      | Just oldpkg <- lookupUFM pkgmap pkgid
       , let
             ipid_new = installedPackageId pkg
             ipid_old = installedPackageId oldpkg
@@ -678,7 +686,8 @@ shadowPackages pkgs preferred
       | otherwise
       = (shadowed, pkgmap')
       where
-        pkgmap' = addToUFM pkgmap (packageConfigId pkg) pkg
+        pkgid = mkFastString (display (sourcePackageId pkg))
+        pkgmap' = addToUFM pkgmap pkgid pkg
 
 -- -----------------------------------------------------------------------------
 
@@ -730,12 +739,12 @@ mkPackageState dflags pkgs0 preload0 this_package = do
    1. P = transitive closure of packages selected by -package-id
 
    2. Apply shadowing.  When there are multiple packages with the same
-      sourcePackageId,
+      packageKey,
         * if one is in P, use that one
         * otherwise, use the one highest in the package stack
       [
-       rationale: we cannot use two packages with the same sourcePackageId
-       in the same program, because sourcePackageId is the symbol prefix.
+       rationale: we cannot use two packages with the same packageKey
+       in the same program, because packageKey is the symbol prefix.
        Hence we must select a consistent set of packages to use.  We have
        a default algorithm for doing this: packages higher in the stack
        shadow those lower down.  This default algorithm can be overriden
@@ -782,9 +791,15 @@ mkPackageState dflags pkgs0 preload0 this_package = do
           -- XXX this is just a variant of nub
 
       ipid_map = Map.fromList [ (installedPackageId p, p) | p <- pkgs0 ]
+      -- NB: Prefer the last one (i.e. the one highest in the package stack
+      pk_map = Map.fromList [ (packageConfigId p, p) | p <- pkgs0 ]
 
-      ipid_selected = depClosure ipid_map [ InstalledPackageId i
-                                          | ExposePackageId i <- flags ]
+      ipid_selected = depClosure ipid_map ([ InstalledPackageId i
+                                           | ExposePackageId i <- flags ]
+                                        ++ [ installedPackageId pkg
+                                           | ExposePackageKey k <- flags
+                                           , Just pkg <- [Map.lookup
+                                                (stringToPackageKey k) pk_map]])
 
       (ignore_flags, other_flags) = partition is_ignore flags
       is_ignore IgnorePackage{} = True
@@ -819,6 +834,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
          = take 1 $ sortByVersion (filter (matchingStr s) pkgs2)
          --  -package P means "the latest version of P" (#7030)
       get_exposed (ExposePackageId s) = filter (matchingId  s) pkgs2
+      get_exposed (ExposePackageKey s) = filter (matchingKey s) pkgs2
       get_exposed _                   = []
 
   -- hide packages that are subsumed by later versions
@@ -1112,6 +1128,13 @@ missingDependencyMsg (Just parent)
   = space <> parens (ptext (sLit "dependency of") <+> ftext (packageKeyFS parent))
 
 -- -----------------------------------------------------------------------------
+
+packageKeyPackageIdString :: DynFlags -> PackageKey -> String
+packageKeyPackageIdString dflags pkg_key
+    | pkg_key == mainPackageKey = "main"
+    | otherwise = maybe "(unknown)"
+                      (display . sourcePackageId)
+                      (lookupPackage (pkgIdMap (pkgState dflags)) pkg_key)
 
 -- | Will the 'Name' come from a dynamically linked library?
 isDllName :: DynFlags -> PackageKey -> Module -> Name -> Bool

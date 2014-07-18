@@ -891,6 +891,13 @@ hscGetSafe hsc_env m l = runHsc hsc_env $ do
               | otherwise      = pkgs
     return (good, pkgs')
 
+-- | A function which only qualifies package names if necessary; but
+-- qualifies all other identifiers.
+pkgQual :: DynFlags -> PrintUnqualified
+pkgQual dflags = alwaysQualify {
+        queryQualifyPackage = mkQualPackage dflags
+    }
+
 -- | Is a module trusted? If not, throw or log errors depending on the type.
 -- Return (regardless of trusted or not) if the trust type requires the modules
 -- own package be trusted and a list of other packages required to be trusted
@@ -932,13 +939,13 @@ hscCheckSafe' dflags m l = do
                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
-                    pkgTrustErr = unitBag $ mkPlainErrMsg dflags l $
+                    pkgTrustErr = unitBag $ mkErrMsg dflags l (pkgQual dflags) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package (" <> ppr (modulePackageKey m)
                                 <> text ") the module resides in isn't trusted."
                             ]
-                    modTrustErr = unitBag $ mkPlainErrMsg dflags l $
+                    modTrustErr = unitBag $ mkErrMsg dflags l (pkgQual dflags) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The module itself isn't safe." ]
@@ -995,7 +1002,7 @@ checkPkgTrust dflags pkgs =
             | trusted $ getPackageDetails (pkgState dflags) pkg
             = Nothing
             | otherwise
-            = Just $ mkPlainErrMsg dflags noSrcSpan
+            = Just $ mkErrMsg dflags noSrcSpan (pkgQual dflags)
                    $ text "The package (" <> ppr pkg <> text ") is required" <>
                      text " to be trusted but it isn't!"
 

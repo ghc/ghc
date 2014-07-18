@@ -328,6 +328,6 @@ Library
             GHC.Event.TimerManager
             GHC.Event.Unique
 
-    -- We need to set the package name to base (without a version number)
+    -- We need to set the package key to base (without a version number)
     -- as it's magic.
-    ghc-options: -package-name base
+    ghc-options: -this-package-key base

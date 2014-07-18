@@ -260,7 +260,7 @@ updateInstallDirTemplates relocatableBuild myPrefix myLibdir myDocdir idts
                           if relocatableBuild
                           then "$topdir"
                           else myLibdir,
-          libsubdir = toPathTemplate "$pkgid",
+          libsubdir = toPathTemplate "$pkgkey",
           docdir    = toPathTemplate $
                           if relocatableBuild
                           then "$topdir/../doc/html/libraries/$pkgid"
@@ -356,6 +356,7 @@ generate directory distdir dll0Modules config_args
              writeFileAtomic (distdir </> "inplace-pkg-config") (BS.pack $ toUTF8 content)
 
       let
+          comp = compiler lbi
           libBiModules lib = (libBuildInfo lib, libModules lib)
           exeBiModules exe = (buildInfo exe, ModuleName.main : exeModules exe)
           biModuless = (maybeToList $ fmap libBiModules $ library pd)
@@ -398,10 +399,25 @@ generate directory distdir dll0Modules config_args
 
           dep_ids  = map snd (externalPackageDeps lbi)
           deps     = map display dep_ids
+          dep_keys
+            | packageKeySupported comp
+                   = map (display
+                        . Installed.packageKey
+                        . fromMaybe (error "ghc-cabal: dep_keys failed")
+                        . PackageIndex.lookupInstalledPackageId
+                                                           (installedPkgs lbi)
+                        . fst)
+                   . externalPackageDeps
+                   $ lbi
+            | otherwise = deps
           depNames = map (display . packageName) dep_ids
 
           transitive_dep_ids = map Installed.sourcePackageId dep_pkgs
           transitiveDeps = map display transitive_dep_ids
+          transitiveDepKeys
+            | packageKeySupported comp
+                   = map (display . Installed.packageKey) dep_pkgs
+            | otherwise = transitiveDeps
           transitiveDepNames = map (display . packageName) transitive_dep_ids
 
           libraryDirs = forDeps Installed.libraryDirs
@@ -420,13 +436,16 @@ generate directory distdir dll0Modules config_args
           otherMods = map display (otherModules bi)
           allMods = mods ++ otherMods
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
+                variablePrefix ++ "_PACKAGE_KEY = " ++ display (pkgKey lbi),
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
                 variablePrefix ++ "_SYNOPSIS =" ++ synopsis pd,
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords deps,
+                variablePrefix ++ "_DEP_KEYS = " ++ unwords dep_keys,
                 variablePrefix ++ "_DEP_NAMES = " ++ unwords depNames,
                 variablePrefix ++ "_TRANSITIVE_DEPS = " ++ unwords transitiveDeps,
+                variablePrefix ++ "_TRANSITIVE_DEP_KEYS = " ++ unwords transitiveDepKeys,
                 variablePrefix ++ "_TRANSITIVE_DEP_NAMES = " ++ unwords transitiveDepNames,
                 variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (includeDirs bi),
                 variablePrefix ++ "_INCLUDES = " ++ unwords (includes bi),

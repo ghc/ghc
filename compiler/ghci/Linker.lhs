@@ -70,7 +70,7 @@ import System.Directory hiding (findFile)
 import System.Directory
 #endif
 
-import Distribution.Package hiding (depends)
+import Distribution.Package hiding (depends, mkPackageKey, PackageKey)
 
 import Exception
 \end{code}

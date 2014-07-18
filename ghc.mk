@@ -911,10 +911,10 @@ install_packages: rts/dist/package.conf.install
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
 	$(call removeTrees,"$(INSTALLED_PACKAGE_CONF)")
 	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
-	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts-1.0")
-	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts-1.0")
+	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts")
+	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts")
 	$(foreach p, $(INSTALL_DYNLIBS), \
-	    $(call installLibsTo, $(wildcard $p/dist-install/build/*.so $p/dist-install/build/*.dll $p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$($p_PACKAGE)-$($p_dist-install_VERSION)"))
+	    $(call installLibsTo, $(wildcard $p/dist-install/build/*.so $p/dist-install/build/*.dll $p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$($p_dist-install_PACKAGE_KEY)"))
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(ghc-cabal_INPLACE)" copy                        \

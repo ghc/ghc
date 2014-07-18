@@ -49,6 +49,7 @@ putInstalledPackageInfo :: Binary m => InstalledPackageInfo_ m -> Put
 putInstalledPackageInfo ipi = do
   put (sourcePackageId ipi)
   put (installedPackageId ipi)
+  put (packageKey ipi)
   put (license ipi)
   put (copyright ipi)
   put (maintainer ipi)
@@ -84,6 +85,7 @@ getInstalledPackageInfo :: Binary m => Get (InstalledPackageInfo_ m)
 getInstalledPackageInfo = do
   sourcePackageId <- get
   installedPackageId <- get
+  packageKey <- get
   license <- get
   copyright <- get
   maintainer <- get
@@ -166,3 +168,12 @@ instance Binary m => Binary (ModuleExport m) where
   put (ModuleExport a b c d) = do put a; put b; put c; put d
   get = do a <- get; b <- get; c <- get; d <- get;
            return (ModuleExport a b c d)
+
+instance Binary PackageKey where
+  put (PackageKey a b c) = do putWord8 0; put a; put b; put c
+  put (OldPackageKey a) = do putWord8 1; put a
+  get = do n <- getWord8
+           case n of
+            0 -> do a <- get; b <- get; c <- get; return (PackageKey a b c)
+            1 -> do a <- get; return (OldPackageKey a)
+            _ -> error ("Binary PackageKey: bad branch " ++ show n)

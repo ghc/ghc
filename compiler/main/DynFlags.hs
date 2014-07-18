@@ -90,7 +90,7 @@ module DynFlags (
         getVerbFlags,
         updOptLevel,
         setTmpDir,
-        setPackageName,
+        setPackageKey,
 
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
@@ -1023,6 +1023,7 @@ isNoLink _      = False
 data PackageFlag
   = ExposePackage   String
   | ExposePackageId String
+  | ExposePackageKey String
   | HidePackage     String
   | IgnorePackage   String
   | TrustPackage    String
@@ -2526,9 +2527,13 @@ package_flags = [
                                     removeUserPkgConf
                                     deprecate "Use -no-user-package-db instead")
 
-  , Flag "package-name"          (hasArg setPackageName)
+  , Flag "package-name"          (HasArg $ \name -> do
+                                    upd (setPackageKey name)
+                                    deprecate "Use -this-package-key instead")
+  , Flag "this-package-key"      (hasArg setPackageKey)
   , Flag "package-id"            (HasArg exposePackageId)
   , Flag "package"               (HasArg exposePackage)
+  , Flag "package-key"           (HasArg exposePackageKey)
   , Flag "hide-package"          (HasArg hidePackage)
   , Flag "hide-all-packages"     (NoArg (setGeneralFlag Opt_HideAllPackages))
   , Flag "ignore-package"        (HasArg ignorePackage)
@@ -3338,11 +3343,13 @@ removeGlobalPkgConf = upd $ \s -> s { extraPkgConfs = filter isNotGlobal . extra
 clearPkgConf :: DynP ()
 clearPkgConf = upd $ \s -> s { extraPkgConfs = const [] }
 
-exposePackage, exposePackageId, hidePackage, ignorePackage,
+exposePackage, exposePackageId, exposePackageKey, hidePackage, ignorePackage,
         trustPackage, distrustPackage :: String -> DynP ()
 exposePackage p = upd (exposePackage' p)
 exposePackageId p =
   upd (\s -> s{ packageFlags = ExposePackageId p : packageFlags s })
+exposePackageKey p =
+  upd (\s -> s{ packageFlags = ExposePackageKey p : packageFlags s })
 hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p =
@@ -3356,8 +3363,8 @@ exposePackage' :: String -> DynFlags -> DynFlags
 exposePackage' p dflags
     = dflags { packageFlags = ExposePackage p : packageFlags dflags }
 
-setPackageName :: String -> DynFlags -> DynFlags
-setPackageName p s =  s{ thisPackage = stringToPackageKey p }
+setPackageKey :: String -> DynFlags -> DynFlags
+setPackageKey p s =  s{ thisPackage = stringToPackageKey p }
 
 -- If we're linking a binary, then only targets that produce object
 -- code are allowed (requests for other target types are ignored).
@@ -3600,6 +3607,7 @@ compilerInfo dflags
        ("Support dynamic-too",         if isWindows then "NO" else "YES"),
        ("Support parallel --make",     "YES"),
        ("Support reexported-modules",  "YES"),
+       ("Uses package keys",           "YES"),
        ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
                                        then "YES" else "NO"),
        ("GHC Dynamic",                 if dynamicGhc
