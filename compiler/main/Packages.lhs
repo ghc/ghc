@@ -481,6 +481,7 @@ findWiredInPackages dflags pkgs = do
                             basePackageId,
                             rtsPackageId,
                             thPackageId,
+                            thisGhcPackageId,
                             dphSeqPackageId,
                             dphParPackageId ]
 

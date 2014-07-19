@@ -104,6 +104,13 @@ Library
 
     Include-Dirs: . parser utils
 
+    if impl( ghc >= 7.9 )
+        -- We need to set the package name to ghc (without a version number)
+        -- as it's magic.  But we can't set it for old versions of GHC (e.g.
+        -- when bootstrapping) because those versions of GHC don't understand
+        -- that GHC is wired-in.
+        GHC-Options: -package-name ghc
+
     if flag(stage1)
         Include-Dirs: stage1
     else

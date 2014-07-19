@@ -367,7 +367,7 @@ rtsPackageId         = fsToPackageId (fsLit "rts")
 thPackageId          = fsToPackageId (fsLit "template-haskell")
 dphSeqPackageId      = fsToPackageId (fsLit "dph-seq")
 dphParPackageId      = fsToPackageId (fsLit "dph-par")
-thisGhcPackageId     = fsToPackageId (fsLit ("ghc-" ++ cProjectVersion))
+thisGhcPackageId     = fsToPackageId (fsLit "ghc")
 interactivePackageId = fsToPackageId (fsLit "interactive")
 
 -- | This is the package Id for the current program.  It is the default
