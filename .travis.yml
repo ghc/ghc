@@ -20,8 +20,8 @@ before_install:
 install:
  - sudo apt-get update
  - sudo apt-get install haskell-platform autoconf libtool make ncurses-dev g++ dblatex docbook-xsl docbook-utils
- - cabal update
- - cabal install happy alex
+ - sudo cabal update
+ - sudo cabal install --global happy alex process
 script:
  - echo 'V = 0' >> mk/validate.mk # otherwise we hit log file limits on travis.
  # do  not build docs
