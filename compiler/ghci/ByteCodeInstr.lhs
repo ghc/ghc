@@ -5,23 +5,15 @@ ByteCodeInstrs: Bytecode instruction definitions
 
 \begin{code}
 {-# LANGUAGE CPP, MagicHash #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 {-# OPTIONS_GHC -funbox-strict-fields #-}
-
-module ByteCodeInstr ( 
- 	BCInstr(..), ProtoBCO(..), bciStackUse, BreakInfo (..) 
+module ByteCodeInstr (
+        BCInstr(..), ProtoBCO(..), bciStackUse, BreakInfo (..)
   ) where
 
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
-import ByteCodeItbls	( ItblPtr )
+import ByteCodeItbls    ( ItblPtr )
 
 import StgCmmLayout     ( ArgRep(..) )
 import PprCore
@@ -44,17 +36,17 @@ import Data.Word
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
 
-data ProtoBCO a 
-   = ProtoBCO { 
-	protoBCOName       :: a,	  -- name, in some sense
-	protoBCOInstrs     :: [BCInstr],  -- instrs
-	-- arity and GC info
-	protoBCOBitmap     :: [StgWord],
-	protoBCOBitmapSize :: Word16,
-	protoBCOArity	   :: Int,
-	-- what the BCO came from
-	protoBCOExpr       :: Either  [AnnAlt Id VarSet] (AnnExpr Id VarSet),
-	-- malloc'd pointers
+data ProtoBCO a
+   = ProtoBCO {
+        protoBCOName       :: a,          -- name, in some sense
+        protoBCOInstrs     :: [BCInstr],  -- instrs
+        -- arity and GC info
+        protoBCOBitmap     :: [StgWord],
+        protoBCOBitmapSize :: Word16,
+        protoBCOArity      :: Int,
+        -- what the BCO came from
+        protoBCOExpr       :: Either  [AnnAlt Id VarSet] (AnnExpr Id VarSet),
+        -- malloc'd pointers
         protoBCOPtrs       :: [Either ItblPtr (Ptr ())]
    }
 
@@ -80,14 +72,14 @@ data BCInstr
 
    -- Pushing literals
    | PUSH_UBX  (Either Literal (Ptr ())) Word16
-	-- push this int/float/double/addr, on the stack. Word16
-	-- is # of words to copy from literal pool.  Eitherness reflects
-	-- the difficulty of dealing with MachAddr here, mostly due to
-	-- the excessive (and unnecessary) restrictions imposed by the
-	-- designers of the new Foreign library.  In particular it is
-	-- quite impossible to convert an Addr to any other integral
-	-- type, and it appears impossible to get hold of the bits of
-	-- an addr, even though we need to assemble BCOs.
+        -- push this int/float/double/addr, on the stack. Word16
+        -- is # of words to copy from literal pool.  Eitherness reflects
+        -- the difficulty of dealing with MachAddr here, mostly due to
+        -- the excessive (and unnecessary) restrictions imposed by the
+        -- designers of the new Foreign library.  In particular it is
+        -- quite impossible to convert an Addr to any other integral
+        -- type, and it appears impossible to get hold of the bits of
+        -- an addr, even though we need to assemble BCOs.
 
    -- various kinds of application
    | PUSH_APPLY_N
@@ -112,8 +104,8 @@ data BCInstr
    | MKPAP     !Word16{-ptr to PAP is this far down stack-} !Word16{-number of words-}
    | UNPACK    !Word16 -- unpack N words from t.o.s Constr
    | PACK      DataCon !Word16
-			-- after assembly, the DataCon is an index into the
-			-- itbl array
+                        -- after assembly, the DataCon is an index into the
+                        -- itbl array
    -- For doing case trees
    | LABEL     LocalLabel
    | TESTLT_I  Int    LocalLabel
@@ -147,13 +139,13 @@ data BCInstr
 
    -- To Infinity And Beyond
    | ENTER
-   | RETURN		-- return a lifted value
+   | RETURN             -- return a lifted value
    | RETURN_UBX ArgRep -- return an unlifted value, here's its rep
 
-   -- Breakpoints 
+   -- Breakpoints
    | BRK_FUN          (MutableByteArray# RealWorld) Word16 BreakInfo
 
-data BreakInfo 
+data BreakInfo
    = BreakInfo
    { breakInfo_module :: Module
    , breakInfo_number :: {-# UNPACK #-} !Int
@@ -173,8 +165,8 @@ instance Outputable BreakInfo where
 
 instance Outputable a => Outputable (ProtoBCO a) where
    ppr (ProtoBCO name instrs bitmap bsize arity origin malloced)
-      = (text "ProtoBCO" <+> ppr name <> char '#' <> int arity 
-		<+> text (show malloced) <> colon)
+      = (text "ProtoBCO" <+> ppr name <> char '#' <> int arity
+                <+> text (show malloced) <> colon)
         $$ nest 3 (case origin of
                       Left alts -> vcat (zipWith (<+>) (char '{' : repeat (char ';'))
                                                        (map (pprCoreAltShort.deAnnAlt) alts)) <+> char '}'
@@ -212,8 +204,8 @@ instance Outputable BCInstr where
    ppr (PUSH_L offset)       = text "PUSH_L  " <+> ppr offset
    ppr (PUSH_LL o1 o2)       = text "PUSH_LL " <+> ppr o1 <+> ppr o2
    ppr (PUSH_LLL o1 o2 o3)   = text "PUSH_LLL" <+> ppr o1 <+> ppr o2 <+> ppr o3
-   ppr (PUSH_G nm)  	     = text "PUSH_G  " <+> ppr nm
-   ppr (PUSH_PRIMOP op)      = text "PUSH_G  " <+> text "GHC.PrimopWrappers." 
+   ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
+   ppr (PUSH_PRIMOP op)      = text "PUSH_G  " <+> text "GHC.PrimopWrappers."
                                                <> ppr op
    ppr (PUSH_BCO bco)        = hang (text "PUSH_BCO") 2 (ppr bco)
    ppr (PUSH_ALTS bco)       = hang (text "PUSH_ALTS") 2 (ppr bco)
@@ -221,23 +213,23 @@ instance Outputable BCInstr where
 
    ppr (PUSH_UBX (Left lit) nw) = text "PUSH_UBX" <+> parens (ppr nw) <+> ppr lit
    ppr (PUSH_UBX (Right aa) nw) = text "PUSH_UBX" <+> parens (ppr nw) <+> text (show aa)
-   ppr PUSH_APPLY_N		= text "PUSH_APPLY_N"
-   ppr PUSH_APPLY_V		= text "PUSH_APPLY_V"
-   ppr PUSH_APPLY_F		= text "PUSH_APPLY_F"
-   ppr PUSH_APPLY_D		= text "PUSH_APPLY_D"
-   ppr PUSH_APPLY_L		= text "PUSH_APPLY_L"
-   ppr PUSH_APPLY_P		= text "PUSH_APPLY_P"
-   ppr PUSH_APPLY_PP		= text "PUSH_APPLY_PP"
-   ppr PUSH_APPLY_PPP		= text "PUSH_APPLY_PPP"
-   ppr PUSH_APPLY_PPPP		= text "PUSH_APPLY_PPPP"
-   ppr PUSH_APPLY_PPPPP		= text "PUSH_APPLY_PPPPP"
-   ppr PUSH_APPLY_PPPPPP	= text "PUSH_APPLY_PPPPPP"
+   ppr PUSH_APPLY_N             = text "PUSH_APPLY_N"
+   ppr PUSH_APPLY_V             = text "PUSH_APPLY_V"
+   ppr PUSH_APPLY_F             = text "PUSH_APPLY_F"
+   ppr PUSH_APPLY_D             = text "PUSH_APPLY_D"
+   ppr PUSH_APPLY_L             = text "PUSH_APPLY_L"
+   ppr PUSH_APPLY_P             = text "PUSH_APPLY_P"
+   ppr PUSH_APPLY_PP            = text "PUSH_APPLY_PP"
+   ppr PUSH_APPLY_PPP           = text "PUSH_APPLY_PPP"
+   ppr PUSH_APPLY_PPPP          = text "PUSH_APPLY_PPPP"
+   ppr PUSH_APPLY_PPPPP         = text "PUSH_APPLY_PPPPP"
+   ppr PUSH_APPLY_PPPPPP        = text "PUSH_APPLY_PPPPPP"
 
    ppr (SLIDE n d)           = text "SLIDE   " <+> ppr n <+> ppr d
    ppr (ALLOC_AP sz)         = text "ALLOC_AP   " <+> ppr sz
    ppr (ALLOC_AP_NOUPD sz)   = text "ALLOC_AP_NOUPD   " <+> ppr sz
    ppr (ALLOC_PAP arity sz)  = text "ALLOC_PAP   " <+> ppr arity <+> ppr sz
-   ppr (MKAP offset sz)      = text "MKAP    " <+> ppr sz <+> text "words," 
+   ppr (MKAP offset sz)      = text "MKAP    " <+> ppr sz <+> text "words,"
                                                <+> ppr offset <+> text "stkoff"
    ppr (MKPAP offset sz)     = text "MKPAP   " <+> ppr sz <+> text "words,"
                                                <+> ppr offset <+> text "stkoff"
@@ -256,8 +248,8 @@ instance Outputable BCInstr where
    ppr (TESTEQ_P  i lab)     = text "TESTEQ_P" <+> ppr i <+> text "__" <> ppr lab
    ppr CASEFAIL              = text "CASEFAIL"
    ppr (JMP lab)             = text "JMP"      <+> ppr lab
-   ppr (CCALL off marshall_addr int) = text "CCALL   " <+> ppr off 
-						<+> text "marshall code at" 
+   ppr (CCALL off marshall_addr int) = text "CCALL   " <+> ppr off
+                                                <+> text "marshall code at"
                                                <+> text (show marshall_addr)
                                                <+> (if int == 1
                                                     then text "(interruptible)"
@@ -265,7 +257,7 @@ instance Outputable BCInstr where
    ppr (SWIZZLE stkoff n)    = text "SWIZZLE " <+> text "stkoff" <+> ppr stkoff
                                                <+> text "by" <+> ppr n
    ppr ENTER                 = text "ENTER"
-   ppr RETURN		     = text "RETURN"
+   ppr RETURN                = text "RETURN"
    ppr (RETURN_UBX pk)       = text "RETURN_UBX  " <+> ppr pk
    ppr (BRK_FUN _breakArray index info) = text "BRK_FUN" <+> text "<array>" <+> ppr index <+> ppr info
 
@@ -284,54 +276,54 @@ protoBCOStackUse bco = sum (map bciStackUse (protoBCOInstrs bco))
 
 bciStackUse :: BCInstr -> Word
 bciStackUse STKCHECK{}            = 0
-bciStackUse PUSH_L{}       	  = 1
-bciStackUse PUSH_LL{}       	  = 2
+bciStackUse PUSH_L{}              = 1
+bciStackUse PUSH_LL{}             = 2
 bciStackUse PUSH_LLL{}            = 3
-bciStackUse PUSH_G{} 		  = 1
+bciStackUse PUSH_G{}              = 1
 bciStackUse PUSH_PRIMOP{}         = 1
-bciStackUse PUSH_BCO{}    	  = 1
+bciStackUse PUSH_BCO{}            = 1
 bciStackUse (PUSH_ALTS bco)       = 2 + protoBCOStackUse bco
 bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 2 + protoBCOStackUse bco
 bciStackUse (PUSH_UBX _ nw)       = fromIntegral nw
-bciStackUse PUSH_APPLY_N{}	  = 1
-bciStackUse PUSH_APPLY_V{}	  = 1
-bciStackUse PUSH_APPLY_F{}	  = 1
-bciStackUse PUSH_APPLY_D{}	  = 1
-bciStackUse PUSH_APPLY_L{}	  = 1
-bciStackUse PUSH_APPLY_P{}	  = 1
-bciStackUse PUSH_APPLY_PP{}	  = 1
-bciStackUse PUSH_APPLY_PPP{}	  = 1
-bciStackUse PUSH_APPLY_PPPP{}	  = 1
-bciStackUse PUSH_APPLY_PPPPP{}	  = 1
-bciStackUse PUSH_APPLY_PPPPPP{}	  = 1
+bciStackUse PUSH_APPLY_N{}        = 1
+bciStackUse PUSH_APPLY_V{}        = 1
+bciStackUse PUSH_APPLY_F{}        = 1
+bciStackUse PUSH_APPLY_D{}        = 1
+bciStackUse PUSH_APPLY_L{}        = 1
+bciStackUse PUSH_APPLY_P{}        = 1
+bciStackUse PUSH_APPLY_PP{}       = 1
+bciStackUse PUSH_APPLY_PPP{}      = 1
+bciStackUse PUSH_APPLY_PPPP{}     = 1
+bciStackUse PUSH_APPLY_PPPPP{}    = 1
+bciStackUse PUSH_APPLY_PPPPPP{}   = 1
 bciStackUse ALLOC_AP{}            = 1
 bciStackUse ALLOC_AP_NOUPD{}      = 1
 bciStackUse ALLOC_PAP{}           = 1
 bciStackUse (UNPACK sz)           = fromIntegral sz
-bciStackUse LABEL{}       	  = 0
-bciStackUse TESTLT_I{}     	  = 0
-bciStackUse TESTEQ_I{}     	  = 0
-bciStackUse TESTLT_W{}     	  = 0
-bciStackUse TESTEQ_W{}     	  = 0
-bciStackUse TESTLT_F{}     	  = 0
-bciStackUse TESTEQ_F{}     	  = 0
-bciStackUse TESTLT_D{}     	  = 0
-bciStackUse TESTEQ_D{}     	  = 0
-bciStackUse TESTLT_P{}     	  = 0
-bciStackUse TESTEQ_P{}     	  = 0
-bciStackUse CASEFAIL{}		  = 0
-bciStackUse JMP{}		  = 0
-bciStackUse ENTER{}		  = 0
-bciStackUse RETURN{}		  = 0
-bciStackUse RETURN_UBX{}	  = 1
-bciStackUse CCALL{} 		  = 0
-bciStackUse SWIZZLE{}    	  = 0
-bciStackUse BRK_FUN{}    	  = 0
+bciStackUse LABEL{}               = 0
+bciStackUse TESTLT_I{}            = 0
+bciStackUse TESTEQ_I{}            = 0
+bciStackUse TESTLT_W{}            = 0
+bciStackUse TESTEQ_W{}            = 0
+bciStackUse TESTLT_F{}            = 0
+bciStackUse TESTEQ_F{}            = 0
+bciStackUse TESTLT_D{}            = 0
+bciStackUse TESTEQ_D{}            = 0
+bciStackUse TESTLT_P{}            = 0
+bciStackUse TESTEQ_P{}            = 0
+bciStackUse CASEFAIL{}            = 0
+bciStackUse JMP{}                 = 0
+bciStackUse ENTER{}               = 0
+bciStackUse RETURN{}              = 0
+bciStackUse RETURN_UBX{}          = 1
+bciStackUse CCALL{}               = 0
+bciStackUse SWIZZLE{}             = 0
+bciStackUse BRK_FUN{}             = 0
 
 -- These insns actually reduce stack use, but we need the high-tide level,
 -- so can't use this info.  Not that it matters much.
-bciStackUse SLIDE{}		  = 0
-bciStackUse MKAP{}		  = 0
-bciStackUse MKPAP{}		  = 0
-bciStackUse PACK{}		  = 1 -- worst case is PACK 0 words
+bciStackUse SLIDE{}               = 0
+bciStackUse MKAP{}                = 0
+bciStackUse MKPAP{}               = 0
+bciStackUse PACK{}                = 1 -- worst case is PACK 0 words
 \end{code}
