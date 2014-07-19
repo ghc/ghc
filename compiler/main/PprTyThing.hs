@@ -7,19 +7,12 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module PprTyThing (
-	pprTyThing,
-	pprTyThingInContext,
-	pprTyThingLoc,
-	pprTyThingInContextLoc,
-	pprTyThingHdr,
+        pprTyThing,
+        pprTyThingInContext,
+        pprTyThingLoc,
+        pprTyThingInContextLoc,
+        pprTyThingHdr,
         pprTypeForUser,
         pprFamInst
   ) where
@@ -159,9 +152,9 @@ pprTypeForUser :: Type -> SDoc
 -- b) Swizzle the foralls to the top, so that without
 --    -fprint-explicit-foralls we'll suppress all the foralls
 -- Prime example: a class op might have type
---	forall a. C a => forall b. Ord b => stuff
+--      forall a. C a => forall b. Ord b => stuff
 -- Then we want to display
---	(C a, Ord b) => stuff
+--      (C a, Ord b) => stuff
 pprTypeForUser ty
   = pprSigmaType (mkSigmaTy tvs ctxt tau)
   where
@@ -175,6 +168,6 @@ pprTypeForUser ty
 showWithLoc :: SDoc -> SDoc -> SDoc
 showWithLoc loc doc
     = hang doc 2 (char '\t' <> comment <+> loc)
-		-- The tab tries to make them line up a bit
+                -- The tab tries to make them line up a bit
   where
     comment = ptext (sLit "--")
