@@ -327,7 +327,7 @@ registerTickyCtr ctr_lbl = do
         , mkStore (CmmLit (cmmLabelOffB ctr_lbl
                                 (oFFSET_StgEntCounter_registeredp dflags)))
                    (mkIntExpr dflags 1) ]
-    ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
+    ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageKey (fsLit "ticky_entry_ctrs"))
   emit =<< mkCmmIfThen test (catAGraphs register_stmts)
 
 tickyReturnOldCon, tickyReturnNewCon :: RepArity -> FCode ()
@@ -472,12 +472,12 @@ tickyAllocHeap genuine hp
                      bytes,
             -- Bump the global allocation total ALLOC_HEAP_tot
             addToMemLbl (cLong dflags)
-                        (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_tot"))
+                        (mkCmmDataLabel rtsPackageKey (fsLit "ALLOC_HEAP_tot"))
                         bytes,
             -- Bump the global allocation counter ALLOC_HEAP_ctr
             if not genuine then mkNop
             else addToMemLbl (cLong dflags)
-                             (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_ctr"))
+                             (mkCmmDataLabel rtsPackageKey (fsLit "ALLOC_HEAP_ctr"))
                              1
             ]}
 
@@ -541,13 +541,13 @@ ifTickyDynThunk :: FCode () -> FCode ()
 ifTickyDynThunk code = tickyDynThunkIsOn >>= \b -> when b code
 
 bumpTickyCounter :: FastString -> FCode ()
-bumpTickyCounter lbl = bumpTickyLbl (mkCmmDataLabel rtsPackageId lbl)
+bumpTickyCounter lbl = bumpTickyLbl (mkCmmDataLabel rtsPackageKey lbl)
 
 bumpTickyCounterBy :: FastString -> Int -> FCode ()
-bumpTickyCounterBy lbl = bumpTickyLblBy (mkCmmDataLabel rtsPackageId lbl)
+bumpTickyCounterBy lbl = bumpTickyLblBy (mkCmmDataLabel rtsPackageKey lbl)
 
 bumpTickyCounterByE :: FastString -> CmmExpr -> FCode ()
-bumpTickyCounterByE lbl = bumpTickyLblByE (mkCmmDataLabel rtsPackageId lbl)
+bumpTickyCounterByE lbl = bumpTickyLblByE (mkCmmDataLabel rtsPackageKey lbl)
 
 bumpTickyEntryCount :: CLabel -> FCode ()
 bumpTickyEntryCount lbl = do

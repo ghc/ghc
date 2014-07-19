@@ -133,10 +133,10 @@ module GHC (
         -- * Abstract syntax elements
 
         -- ** Packages
-        PackageId,
+        PackageKey,
 
         -- ** Modules
-        Module, mkModule, pprModule, moduleName, modulePackageId,
+        Module, mkModule, pprModule, moduleName, modulePackageKey,
         ModuleName, mkModuleName, moduleNameString,
 
         -- ** Names
@@ -534,7 +534,7 @@ checkBrokenTablesNextToCode' dflags
 -- flags.  If you are not doing linking or doing static linking, you
 -- can ignore the list of packages returned.
 --
-setSessionDynFlags :: GhcMonad m => DynFlags -> m [PackageId]
+setSessionDynFlags :: GhcMonad m => DynFlags -> m [PackageKey]
 setSessionDynFlags dflags = do
   (dflags', preload) <- liftIO $ initPackages dflags
   modifySession $ \h -> h{ hsc_dflags = dflags'
@@ -543,7 +543,7 @@ setSessionDynFlags dflags = do
   return preload
 
 -- | Sets the program 'DynFlags'.
-setProgramDynFlags :: GhcMonad m => DynFlags -> m [PackageId]
+setProgramDynFlags :: GhcMonad m => DynFlags -> m [PackageKey]
 setProgramDynFlags dflags = do
   (dflags', preload) <- liftIO $ initPackages dflags
   modifySession $ \h -> h{ hsc_dflags = dflags' }
@@ -1301,7 +1301,7 @@ showRichTokenStream ts = go startLoc ts ""
 -- -----------------------------------------------------------------------------
 -- Interactive evaluation
 
--- | Takes a 'ModuleName' and possibly a 'PackageId', and consults the
+-- | Takes a 'ModuleName' and possibly a 'PackageKey', and consults the
 -- filesystem and package database to find the corresponding 'Module', 
 -- using the algorithm that is used for an @import@ declaration.
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
@@ -1311,7 +1311,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
     this_pkg = thisPackage dflags
   --
   case maybe_pkg of
-    Just pkg | fsToPackageId pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
+    Just pkg | fsToPackageKey pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule hsc_env mod_name maybe_pkg
       case res of
         Found _ m -> return m
@@ -1323,7 +1323,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
         Nothing -> liftIO $ do
            res <- findImportedModule hsc_env mod_name maybe_pkg
            case res of
-             Found loc m | modulePackageId m /= this_pkg -> return m
+             Found loc m | modulePackageKey m /= this_pkg -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError dflags noSrcSpan mod_name err
 
@@ -1368,7 +1368,7 @@ isModuleTrusted m = withSession $ \hsc_env ->
     liftIO $ hscCheckSafe hsc_env m noSrcSpan
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
-moduleTrustReqs :: GhcMonad m => Module -> m (Bool, [PackageId])
+moduleTrustReqs :: GhcMonad m => Module -> m (Bool, [PackageKey])
 moduleTrustReqs m = withSession $ \hsc_env ->
     liftIO $ hscGetSafe hsc_env m noSrcSpan
 

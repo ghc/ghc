@@ -1416,7 +1416,7 @@ globalVar name
   where
       mod = ASSERT( isExternalName name) nameModule name
       name_mod = moduleNameString (moduleName mod)
-      name_pkg = packageIdString (modulePackageId mod)
+      name_pkg = packageKeyString (modulePackageKey mod)
       name_occ = nameOccName name
       mk_varg | OccName.isDataOcc name_occ = mkNameG_dName
               | OccName.isVarOcc  name_occ = mkNameG_vName
@@ -2117,7 +2117,7 @@ thLib = mkTHModule (fsLit "Language.Haskell.TH.Lib")
 qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
 
 mkTHModule :: FastString -> Module
-mkTHModule m = mkModule thPackageId (mkModuleNameFS m)
+mkTHModule m = mkModule thPackageKey (mkModuleNameFS m)
 
 libFun, libTc, thFun, thTc, thCon, qqFun :: FastString -> Unique -> Name
 libFun = mk_known_key_name OccName.varName  thLib

@@ -23,30 +23,30 @@ module Module
         mkModuleNameFS,
         stableModuleNameCmp,
 
-        -- * The PackageId type
-        PackageId,
-        fsToPackageId,
-        packageIdFS,
-        stringToPackageId,
-        packageIdString,
-        stablePackageIdCmp,
+        -- * The PackageKey type
+        PackageKey,
+        fsToPackageKey,
+        packageKeyFS,
+        stringToPackageKey,
+        packageKeyString,
+        stablePackageKeyCmp,
 
-        -- * Wired-in PackageIds
+        -- * Wired-in PackageKeys
         -- $wired_in_packages
-        primPackageId,
-        integerPackageId,
-        basePackageId,
-        rtsPackageId,
-        thPackageId,
-        dphSeqPackageId,
-        dphParPackageId,
-        mainPackageId,
-        thisGhcPackageId,
-        interactivePackageId, isInteractiveModule,
+        primPackageKey,
+        integerPackageKey,
+        basePackageKey,
+        rtsPackageKey,
+        thPackageKey,
+        dphSeqPackageKey,
+        dphParPackageKey,
+        mainPackageKey,
+        thisGhcPackageKey,
+        interactivePackageKey, isInteractiveModule,
 
         -- * The Module type
         Module,
-        modulePackageId, moduleName,
+        modulePackageKey, moduleName,
         pprModule,
         mkModule,
         stableModuleCmp,
@@ -228,15 +228,15 @@ moduleNameColons = dots_to_colons . moduleNameString
 %************************************************************************
 
 \begin{code}
--- | A Module is a pair of a 'PackageId' and a 'ModuleName'.
+-- | A Module is a pair of a 'PackageKey' and a 'ModuleName'.
 data Module = Module {
-   modulePackageId :: !PackageId,  -- pkg-1.0
+   modulePackageKey :: !PackageKey,  -- pkg-1.0
    moduleName      :: !ModuleName  -- A.B.C
   }
   deriving (Eq, Ord, Typeable)
 
 instance Uniquable Module where
-  getUnique (Module p n) = getUnique (packageIdFS p `appendFS` moduleNameFS n)
+  getUnique (Module p n) = getUnique (packageKeyFS p `appendFS` moduleNameFS n)
 
 instance Outputable Module where
   ppr = pprModule
@@ -256,25 +256,25 @@ instance Data Module where
 -- not be stable from run to run of the compiler.
 stableModuleCmp :: Module -> Module -> Ordering
 stableModuleCmp (Module p1 n1) (Module p2 n2)
-   = (p1 `stablePackageIdCmp`  p2) `thenCmp`
+   = (p1 `stablePackageKeyCmp`  p2) `thenCmp`
      (n1 `stableModuleNameCmp` n2)
 
-mkModule :: PackageId -> ModuleName -> Module
+mkModule :: PackageKey -> ModuleName -> Module
 mkModule = Module
 
 pprModule :: Module -> SDoc
 pprModule mod@(Module p n)  =
   pprPackagePrefix p mod <> pprModuleName n
 
-pprPackagePrefix :: PackageId -> Module -> SDoc
+pprPackagePrefix :: PackageKey -> Module -> SDoc
 pprPackagePrefix p mod = getPprStyle doc
  where
    doc sty
        | codeStyle sty =
-          if p == mainPackageId
+          if p == mainPackageKey
                 then empty -- never qualify the main package in code
-                else ztext (zEncodeFS (packageIdFS p)) <> char '_'
-       | qualModule sty mod = ftext (packageIdFS (modulePackageId mod)) <> char ':'
+                else ztext (zEncodeFS (packageKeyFS p)) <> char '_'
+       | qualModule sty mod = ftext (packageKeyFS (modulePackageKey mod)) <> char ':'
                 -- the PrintUnqualified tells us which modules have to
                 -- be qualified with package names
        | otherwise = empty
@@ -288,51 +288,51 @@ class HasModule m where
 
 %************************************************************************
 %*                                                                      *
-\subsection{PackageId}
+\subsection{PackageKey}
 %*                                                                      *
 %************************************************************************
 
 \begin{code}
 -- | Essentially just a string identifying a package, including the version: e.g. parsec-1.0
-newtype PackageId = PId FastString deriving( Eq, Typeable )
+newtype PackageKey = PId FastString deriving( Eq, Typeable )
     -- here to avoid module loops with PackageConfig
 
-instance Uniquable PackageId where
- getUnique pid = getUnique (packageIdFS pid)
+instance Uniquable PackageKey where
+ getUnique pid = getUnique (packageKeyFS pid)
 
 -- Note: *not* a stable lexicographic ordering, a faster unique-based
 -- ordering.
-instance Ord PackageId where
+instance Ord PackageKey where
   nm1 `compare` nm2 = getUnique nm1 `compare` getUnique nm2
 
-instance Data PackageId where
+instance Data PackageKey where
   -- don't traverse?
-  toConstr _   = abstractConstr "PackageId"
+  toConstr _   = abstractConstr "PackageKey"
   gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNoRepType "PackageId"
+  dataTypeOf _ = mkNoRepType "PackageKey"
 
-stablePackageIdCmp :: PackageId -> PackageId -> Ordering
+stablePackageKeyCmp :: PackageKey -> PackageKey -> Ordering
 -- ^ Compares package ids lexically, rather than by their 'Unique's
-stablePackageIdCmp p1 p2 = packageIdFS p1 `compare` packageIdFS p2
+stablePackageKeyCmp p1 p2 = packageKeyFS p1 `compare` packageKeyFS p2
 
-instance Outputable PackageId where
-   ppr pid = text (packageIdString pid)
+instance Outputable PackageKey where
+   ppr pid = text (packageKeyString pid)
 
-instance Binary PackageId where
-  put_ bh pid = put_ bh (packageIdFS pid)
-  get bh = do { fs <- get bh; return (fsToPackageId fs) }
+instance Binary PackageKey where
+  put_ bh pid = put_ bh (packageKeyFS pid)
+  get bh = do { fs <- get bh; return (fsToPackageKey fs) }
 
-fsToPackageId :: FastString -> PackageId
-fsToPackageId = PId
+fsToPackageKey :: FastString -> PackageKey
+fsToPackageKey = PId
 
-packageIdFS :: PackageId -> FastString
-packageIdFS (PId fs) = fs
+packageKeyFS :: PackageKey -> FastString
+packageKeyFS (PId fs) = fs
 
-stringToPackageId :: String -> PackageId
-stringToPackageId = fsToPackageId . mkFastString
+stringToPackageKey :: String -> PackageKey
+stringToPackageKey = fsToPackageKey . mkFastString
 
-packageIdString :: PackageId -> String
-packageIdString = unpackFS . packageIdFS
+packageKeyString :: PackageKey -> String
+packageKeyString = unpackFS . packageKeyFS
 
 
 -- -----------------------------------------------------------------------------
@@ -348,7 +348,7 @@ packageIdString = unpackFS . packageIdFS
 -- versions of them installed.  However, for each invocation of GHC,
 -- only a single instance of each wired-in package will be recognised
 -- (the desired one is selected via @-package@\/@-hide-package@), and GHC
--- will use the unversioned 'PackageId' below when referring to it,
+-- will use the unversioned 'PackageKey' below when referring to it,
 -- including in .hi files and object file symbols.  Unselected
 -- versions of wired-in packages will be ignored, as will any other
 -- package that depends directly or indirectly on it (much as if you
@@ -356,27 +356,27 @@ packageIdString = unpackFS . packageIdFS
 
 -- Make sure you change 'Packages.findWiredInPackages' if you add an entry here
 
-integerPackageId, primPackageId,
-  basePackageId, rtsPackageId,
-  thPackageId, dphSeqPackageId, dphParPackageId,
-  mainPackageId, thisGhcPackageId, interactivePackageId  :: PackageId
-primPackageId        = fsToPackageId (fsLit "ghc-prim")
-integerPackageId     = fsToPackageId (fsLit cIntegerLibrary)
-basePackageId        = fsToPackageId (fsLit "base")
-rtsPackageId         = fsToPackageId (fsLit "rts")
-thPackageId          = fsToPackageId (fsLit "template-haskell")
-dphSeqPackageId      = fsToPackageId (fsLit "dph-seq")
-dphParPackageId      = fsToPackageId (fsLit "dph-par")
-thisGhcPackageId     = fsToPackageId (fsLit "ghc")
-interactivePackageId = fsToPackageId (fsLit "interactive")
+integerPackageKey, primPackageKey,
+  basePackageKey, rtsPackageKey,
+  thPackageKey, dphSeqPackageKey, dphParPackageKey,
+  mainPackageKey, thisGhcPackageKey, interactivePackageKey  :: PackageKey
+primPackageKey        = fsToPackageKey (fsLit "ghc-prim")
+integerPackageKey     = fsToPackageKey (fsLit cIntegerLibrary)
+basePackageKey        = fsToPackageKey (fsLit "base")
+rtsPackageKey         = fsToPackageKey (fsLit "rts")
+thPackageKey          = fsToPackageKey (fsLit "template-haskell")
+dphSeqPackageKey      = fsToPackageKey (fsLit "dph-seq")
+dphParPackageKey      = fsToPackageKey (fsLit "dph-par")
+thisGhcPackageKey     = fsToPackageKey (fsLit "ghc")
+interactivePackageKey = fsToPackageKey (fsLit "interactive")
 
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix
 -- to symbol names, since there can be only one main package per program.
-mainPackageId      = fsToPackageId (fsLit "main")
+mainPackageKey      = fsToPackageKey (fsLit "main")
 
 isInteractiveModule :: Module -> Bool
-isInteractiveModule mod = modulePackageId mod == interactivePackageId
+isInteractiveModule mod = modulePackageKey mod == interactivePackageKey
 \end{code}
 
 %************************************************************************

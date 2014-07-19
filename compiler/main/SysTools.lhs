@@ -1316,7 +1316,7 @@ linesPlatform xs =
 
 #endif
 
-linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
+linkDynLib :: DynFlags -> [String] -> [PackageKey] -> IO ()
 linkDynLib dflags0 o_files dep_packages
  = do
     let -- This is a rather ugly hack to fix dynamically linked
@@ -1362,7 +1362,7 @@ linkDynLib dflags0 o_files dep_packages
                       OSMinGW32 ->
                           pkgs
                       _ ->
-                          filter ((/= rtsPackageId) . packageConfigId) pkgs
+                          filter ((/= rtsPackageKey) . packageConfigId) pkgs
     let pkg_link_opts = let (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs_no_rts
                         in  package_hs_libs ++ extra_libs ++ other_flags
 
@@ -1464,7 +1464,7 @@ linkDynLib dflags0 o_files dep_packages
             -------------------------------------------------------------------
 
             let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
-            let buildingRts = thisPackage dflags == rtsPackageId
+            let buildingRts = thisPackage dflags == rtsPackageKey
             let bsymbolicFlag = if buildingRts
                                 then -- -Bsymbolic breaks the way we implement
                                      -- hooks in the RTS

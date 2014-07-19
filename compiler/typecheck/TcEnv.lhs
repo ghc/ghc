@@ -819,7 +819,7 @@ mkWrapperName what nameBase
          thisMod <- getModule
          let -- Note [Generating fresh names for ccall wrapper]
              wrapperRef = nextWrapperNum dflags
-             pkg = packageIdString  (modulePackageId thisMod)
+             pkg = packageKeyString  (modulePackageKey thisMod)
              mod = moduleNameString (moduleName      thisMod)
          wrapperNum <- liftIO $ atomicModifyIORef wrapperRef $ \mod_env ->
              let num = lookupWithDefaultModuleEnv mod_env 0 thisMod

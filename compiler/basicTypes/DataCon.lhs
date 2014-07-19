@@ -942,7 +942,7 @@ dataConRepArgTys (MkData { dcRep = rep
 -- to its info table and used by the GHCi debugger and the heap profiler
 dataConIdentity :: DataCon -> [Word8]
 -- We want this string to be UTF-8, so we get the bytes directly from the FastStrings.
-dataConIdentity dc = bytesFS (packageIdFS (modulePackageId mod)) ++ 
+dataConIdentity dc = bytesFS (packageKeyFS (modulePackageKey mod)) ++
                   fromIntegral (ord ':') : bytesFS (moduleNameFS (moduleName mod)) ++
                   fromIntegral (ord '.') : bytesFS (occNameFS (nameOccName name))
   where name = dataConName dc

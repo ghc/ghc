@@ -9,8 +9,8 @@
 module PackageConfig (
         -- $package_naming
 
-        -- * PackageId
-        mkPackageId, packageConfigId,
+        -- * PackageKey
+        mkPackageKey, packageConfigId,
 
         -- * The PackageConfig type: information about a package
         PackageConfig,
@@ -26,7 +26,7 @@ module PackageConfig (
 
 import Distribution.InstalledPackageInfo
 import Distribution.ModuleName
-import Distribution.Package hiding (PackageId)
+import Distribution.Package
 import Distribution.Text
 import Distribution.Version
 
@@ -43,23 +43,23 @@ defaultPackageConfig :: PackageConfig
 defaultPackageConfig = emptyInstalledPackageInfo
 
 -- -----------------------------------------------------------------------------
--- PackageId (package names with versions)
+-- PackageKey (package names with versions)
 
 -- $package_naming
 -- #package_naming#
--- Mostly the compiler deals in terms of 'PackageId's, which have the
+-- Mostly the compiler deals in terms of 'PackageKey's, which have the
 -- form @<pkg>-<version>@. You're expected to pass in the version for
 -- the @-package-name@ flag. However, for wired-in packages like @base@
 -- & @rts@, we don't necessarily know what the version is, so these are
 -- handled specially; see #wired_in_packages#.
 
--- | Turn a Cabal 'PackageIdentifier' into a GHC 'PackageId'
-mkPackageId :: PackageIdentifier -> PackageId
-mkPackageId = stringToPackageId . display
+-- | Turn a Cabal 'PackageIdentifier' into a GHC 'PackageKey'
+mkPackageKey :: PackageIdentifier -> PackageKey
+mkPackageKey = stringToPackageKey . display
 
--- | Get the GHC 'PackageId' right out of a Cabalish 'PackageConfig'
-packageConfigId :: PackageConfig -> PackageId
-packageConfigId = mkPackageId . sourcePackageId
+-- | Get the GHC 'PackageKey' right out of a Cabalish 'PackageConfig'
+packageConfigId :: PackageConfig -> PackageKey
+packageConfigId = mkPackageKey . sourcePackageId
 
 -- | Turn a 'PackageConfig', which contains GHC 'Module.ModuleName's into a Cabal specific
 -- 'InstalledPackageInfo' which contains Cabal 'Distribution.ModuleName.ModuleName's

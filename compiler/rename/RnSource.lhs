@@ -384,8 +384,8 @@ rnHsForeignDecl (ForeignImport name ty _ spec)
        ; (ty', fvs) <- rnLHsType (ForeignDeclCtx name) ty
 
         -- Mark any PackageTarget style imports as coming from the current package
-       ; let packageId = thisPackage $ hsc_dflags topEnv
-             spec'     = patchForeignImport packageId spec
+       ; let packageKey = thisPackage $ hsc_dflags topEnv
+             spec'      = patchForeignImport packageKey spec
 
        ; return (ForeignImport name' ty' noForeignImportCoercionYet spec', fvs) }
 
@@ -402,20 +402,20 @@ rnHsForeignDecl (ForeignExport name ty _ spec)
 --      package, so if they get inlined across a package boundry we'll still
 --      know where they're from.
 --
-patchForeignImport :: PackageId -> ForeignImport -> ForeignImport
-patchForeignImport packageId (CImport cconv safety fs spec)
-        = CImport cconv safety fs (patchCImportSpec packageId spec)
+patchForeignImport :: PackageKey -> ForeignImport -> ForeignImport
+patchForeignImport packageKey (CImport cconv safety fs spec)
+        = CImport cconv safety fs (patchCImportSpec packageKey spec)
 
-patchCImportSpec :: PackageId -> CImportSpec -> CImportSpec
-patchCImportSpec packageId spec
+patchCImportSpec :: PackageKey -> CImportSpec -> CImportSpec
+patchCImportSpec packageKey spec
  = case spec of
-        CFunction callTarget    -> CFunction $ patchCCallTarget packageId callTarget
+        CFunction callTarget    -> CFunction $ patchCCallTarget packageKey callTarget
         _                       -> spec
 
-patchCCallTarget :: PackageId -> CCallTarget -> CCallTarget
-patchCCallTarget packageId callTarget =
+patchCCallTarget :: PackageKey -> CCallTarget -> CCallTarget
+patchCCallTarget packageKey callTarget =
   case callTarget of
-  StaticTarget label Nothing isFun -> StaticTarget label (Just packageId) isFun
+  StaticTarget label Nothing isFun -> StaticTarget label (Just packageKey) isFun
   _                                -> callTarget
 
 
@@ -883,10 +883,10 @@ packages, it is safe not to add the dependencies on the .hs-boot stuff to B2.
 See also Note [Grouping of type and class declarations] in TcTyClsDecls.
 
 \begin{code}
-isInPackage :: PackageId -> Name -> Bool
+isInPackage :: PackageKey -> Name -> Bool
 isInPackage pkgId nm = case nameModule_maybe nm of
                          Nothing -> False
-                         Just m  -> pkgId == modulePackageId m
+                         Just m  -> pkgId == modulePackageKey m
 -- We use nameModule_maybe because we might be in a TH splice, in which case
 -- there is no module name. In that case we cannot have mutual dependencies,
 -- so it's fine to return False here.

@@ -1738,7 +1738,7 @@ loadUnqualIfaces hsc_env ictxt
                   , let name = gre_name gre
                   , not (isInternalName name)
                   , let mod = nameModule name
-                  , not (modulePackageId mod == this_pkg || isInteractiveModule mod)
+                  , not (modulePackageKey mod == this_pkg || isInteractiveModule mod)
                       -- Don't attempt to load an interface for stuff
                       -- from the command line, or from the home package
                   , isTcOcc (nameOccName name)   -- Types and classes only
@@ -1791,7 +1791,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , ptext (sLit "Dependent modules:") <+>
                 ppr (sortBy cmp_mp $ eltsUFM (imp_dep_mods imports))
          , ptext (sLit "Dependent packages:") <+>
-                ppr (sortBy stablePackageIdCmp $ imp_dep_pkgs imports)]
+                ppr (sortBy stablePackageKeyCmp $ imp_dep_pkgs imports)]
   where         -- The two uses of sortBy are just to reduce unnecessary
                 -- wobbling in testsuite output
     cmp_mp (mod_name1, is_boot1) (mod_name2, is_boot2)

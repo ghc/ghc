@@ -3,8 +3,8 @@ module Module where
 
 data Module
 data ModuleName
-data PackageId
+data PackageKey
 moduleName :: Module -> ModuleName
-modulePackageId :: Module -> PackageId
-packageIdString :: PackageId -> String
+modulePackageKey :: Module -> PackageKey
+packageKeyString :: PackageKey -> String
 \end{code}

@@ -41,7 +41,7 @@ import Platform
 -- Our intermediate code:
 import BasicTypes
 import BlockId
-import Module           ( primPackageId )
+import Module           ( primPackageKey )
 import PprCmm           ()
 import CmmUtils
 import Cmm
@@ -1761,7 +1761,7 @@ genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
             genCCall dflags is32Bit target dest_regs args
   where
     size = intSize width
-    lbl = mkCmmCodeLabel primPackageId (fsLit (popCntLabel width))
+    lbl = mkCmmCodeLabel primPackageKey (fsLit (popCntLabel width))
 
 genCCall dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args = do
     targetExpr <- cmmMakeDynamicReference dflags
@@ -1771,7 +1771,7 @@ genCCall dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args = do
                                            CmmMayReturn)
     genCCall dflags is32Bit target dest_regs args
   where
-    lbl = mkCmmCodeLabel primPackageId (fsLit (word2FloatLabel width))
+    lbl = mkCmmCodeLabel primPackageKey (fsLit (word2FloatLabel width))
 
 genCCall dflags is32Bit (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = do
     Amode amode addr_code <-

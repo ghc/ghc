@@ -1025,15 +1025,15 @@ cmmExprNative referenceKind expr = do
         CmmReg (CmmGlobal EagerBlackholeInfo)
           | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
-             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_EAGER_BLACKHOLE_info")))
+             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageKey (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
           | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
-             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_enter_1")))
+             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageKey (fsLit "__stg_gc_enter_1")))
         CmmReg (CmmGlobal GCFun)
           | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
-             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_fun")))
+             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageKey (fsLit "__stg_gc_fun")))
 
         other
            -> return other

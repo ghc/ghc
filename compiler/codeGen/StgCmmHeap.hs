@@ -516,7 +516,7 @@ generic_gc = mkGcLabel "stg_gc_noregs"
 
 -- | Create a CLabel for calling a garbage collector entry point
 mkGcLabel :: String -> CmmExpr
-mkGcLabel s = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit s)))
+mkGcLabel s = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageKey (fsLit s)))
 
 -------------------------------
 heapCheck :: Bool -> Bool -> CmmAGraph -> FCode a -> FCode a

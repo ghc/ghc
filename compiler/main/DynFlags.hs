@@ -630,7 +630,7 @@ data DynFlags = DynFlags {
   ctxtStkDepth          :: Int,         -- ^ Typechecker context stack depth
   tyFunStkDepth         :: Int,         -- ^ Typechecker type function stack depth
 
-  thisPackage           :: PackageId,   -- ^ name of package currently being compiled
+  thisPackage           :: PackageKey,   -- ^ name of package currently being compiled
 
   -- ways
   ways                  :: [Way],       -- ^ Way flags from the command line
@@ -1352,7 +1352,7 @@ defaultDynFlags mySettings =
         ctxtStkDepth            = mAX_CONTEXT_REDUCTION_DEPTH,
         tyFunStkDepth           = mAX_TYPE_FUNCTION_REDUCTION_DEPTH,
 
-        thisPackage             = mainPackageId,
+        thisPackage             = mainPackageKey,
 
         objectDir               = Nothing,
         dylibInstallName        = Nothing,
@@ -3346,7 +3346,7 @@ exposePackage' p dflags
     = dflags { packageFlags = ExposePackage p : packageFlags dflags }
 
 setPackageName :: String -> DynFlags -> DynFlags
-setPackageName p s =  s{ thisPackage = stringToPackageId p }
+setPackageName p s =  s{ thisPackage = stringToPackageKey p }
 
 -- If we're linking a binary, then only targets that produce object
 -- code are allowed (requests for other target types are ignored).
@@ -3398,10 +3398,10 @@ setMainIs arg
   | not (null main_fn) && isLower (head main_fn)
      -- The arg looked like "Foo.Bar.baz"
   = upd $ \d -> d{ mainFunIs = Just main_fn,
-                   mainModIs = mkModule mainPackageId (mkModuleName main_mod) }
+                   mainModIs = mkModule mainPackageKey (mkModuleName main_mod) }
 
   | isUpper (head arg)  -- The arg looked like "Foo" or "Foo.Bar"
-  = upd $ \d -> d{ mainModIs = mkModule mainPackageId (mkModuleName arg) }
+  = upd $ \d -> d{ mainModIs = mkModule mainPackageKey (mkModuleName arg) }
 
   | otherwise                   -- The arg looked like "baz"
   = upd $ \d -> d{ mainFunIs = Just arg }

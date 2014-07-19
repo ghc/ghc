@@ -634,23 +634,23 @@ type FinderCache = ModuleNameEnv FindResult
 data FindResult
   = Found ModLocation Module
         -- ^ The module was found
-  | NoPackage PackageId
+  | NoPackage PackageKey
         -- ^ The requested package was not found
-  | FoundMultiple [PackageId]
+  | FoundMultiple [PackageKey]
         -- ^ _Error_: both in multiple packages
 
         -- | Not found
   | NotFound
       { fr_paths       :: [FilePath]       -- Places where I looked
 
-      , fr_pkg         :: Maybe PackageId  -- Just p => module is in this package's
+      , fr_pkg         :: Maybe PackageKey  -- Just p => module is in this package's
                                            --           manifest, but couldn't find
                                            --           the .hi file
 
-      , fr_mods_hidden :: [PackageId]      -- Module is in these packages,
+      , fr_mods_hidden :: [PackageKey]      -- Module is in these packages,
                                            --   but the *module* is hidden
 
-      , fr_pkgs_hidden :: [PackageId]      -- Module is in these packages,
+      , fr_pkgs_hidden :: [PackageKey]      -- Module is in these packages,
                                            --   but the *package* is hidden
 
       , fr_suggestions :: [Module]         -- Possible mis-spelled modules
@@ -1067,7 +1067,7 @@ data CgGuts
                 -- as part of the code-gen of tycons
 
         cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs
-        cg_dep_pkgs  :: ![PackageId],    -- ^ Dependent packages, used to
+        cg_dep_pkgs  :: ![PackageKey],    -- ^ Dependent packages, used to
                                          -- generate #includes for C code gen
         cg_hpc_info  :: !HpcInfo,        -- ^ Program coverage tick box information
         cg_modBreaks :: !ModBreaks       -- ^ Module breakpoints
@@ -1106,7 +1106,7 @@ they were defined in modules
    interactive:Ghci2
    ...etc...
 with each bunch of declarations using a new module, all sharing a
-common package 'interactive' (see Module.interactivePackageId, and
+common package 'interactive' (see Module.interactivePackageKey, and
 PrelNames.mkInteractiveModule).
 
 This scheme deals well with shadowing.  For example:
@@ -1341,7 +1341,7 @@ extendInteractiveContext ictxt new_tythings
 setInteractivePackage :: HscEnv -> HscEnv
 -- Set the 'thisPackage' DynFlag to 'interactive'
 setInteractivePackage hsc_env
-   = hsc_env { hsc_dflags = (hsc_dflags hsc_env) { thisPackage = interactivePackageId } }
+   = hsc_env { hsc_dflags = (hsc_dflags hsc_env) { thisPackage = interactivePackageKey } }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}
@@ -1446,11 +1446,11 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
     -- current package we can just assume it is unqualified).
 
   qual_mod mod
-     | modulePackageId mod == thisPackage dflags = False
+     | modulePackageKey mod == thisPackage dflags = False
 
      | [pkgconfig] <- [pkg | (pkg,exposed_module) <- lookup,
                              exposed pkg && exposed_module],
-       packageConfigId pkgconfig == modulePackageId mod
+       packageConfigId pkgconfig == modulePackageKey mod
         -- this says: we are given a module P:M, is there just one exposed package
         -- that exposes a module M, and is it package P?
      = False
@@ -1904,7 +1904,7 @@ data Dependencies
                         -- I.e. modules that this one imports, or that are in the
                         --      dep_mods of those directly-imported modules
 
-         , dep_pkgs   :: [(PackageId, Bool)]
+         , dep_pkgs   :: [(PackageKey, Bool)]
                         -- ^ All packages transitively below this module
                         -- I.e. packages to which this module's direct imports belong,
                         --      or that are in the dep_pkgs of those modules

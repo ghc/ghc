@@ -259,7 +259,7 @@ rnImportDecl this_mod
                               imp_mod : dep_finsts deps
                | otherwise  = dep_finsts deps
 
-        pkg = modulePackageId (mi_module iface)
+        pkg = modulePackageKey (mi_module iface)
 
         -- Does this import mean we now require our own pkg
         -- to be trusted? See Note [Trust Own Package]

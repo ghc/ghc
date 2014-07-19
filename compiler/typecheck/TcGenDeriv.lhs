@@ -1220,10 +1220,10 @@ gen_old_Typeable_binds dflags loc tycon
   where
     tycon_name = tyConName tycon
     modl       = nameModule tycon_name
-    pkg        = modulePackageId modl
+    pkg        = modulePackageKey modl
 
     modl_fs    = moduleNameFS (moduleName modl)
-    pkg_fs     = packageIdFS pkg
+    pkg_fs     = packageKeyFS pkg
     name_fs    = occNameFS (nameOccName tycon_name)
 
     tycon_rep = nlHsApps oldMkTyCon_RDR
@@ -1277,10 +1277,10 @@ gen_Typeable_binds dflags loc tycon
   where
     tycon_name = tyConName tycon
     modl       = nameModule tycon_name
-    pkg        = modulePackageId modl
+    pkg        = modulePackageKey modl
 
     modl_fs    = moduleNameFS (moduleName modl)
-    pkg_fs     = packageIdFS pkg
+    pkg_fs     = packageKeyFS pkg
     name_fs    = occNameFS (nameOccName tycon_name)
 
     tycon_rep = nlHsApps mkTyCon_RDR

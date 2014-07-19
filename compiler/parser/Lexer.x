@@ -1680,7 +1680,7 @@ getPState = P $ \s -> POk s s
 instance HasDynFlags P where
     getDynFlags = P $ \s -> POk s (dflags s)
 
-withThisPackage :: (PackageId -> a) -> P a
+withThisPackage :: (PackageKey -> a) -> P a
 withThisPackage f
  = do pkg <- liftM thisPackage getDynFlags
       return $ f pkg

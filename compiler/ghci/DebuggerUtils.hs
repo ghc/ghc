@@ -46,7 +46,7 @@ dataConInfoPtrToName x = do
        modFS = mkFastStringByteList mod
        occFS = mkFastStringByteList occ
        occName = mkOccNameFS OccName.dataName occFS
-       modName = mkModule (fsToPackageId pkgFS) (mkModuleNameFS modFS) 
+       modName = mkModule (fsToPackageKey pkgFS) (mkModuleNameFS modFS)
    return (Left $ showSDoc dflags $ ppr modName <> dot <> ppr occName)
     `recoverM` (Right `fmap` lookupOrig modName occName)
 

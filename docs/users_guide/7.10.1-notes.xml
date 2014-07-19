@@ -234,6 +234,27 @@
     </sect3>
 
     <sect3>
+        <title>ghc</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Many internal functions in GHC related to package IDs have been
+                    renamed to refer to package keys, e.g. <literal>PackageId</literal>
+                    is now <literal>PackageKey</literal>, the wired-in names
+                    such as <literal>primPackageId</literal> are now
+                    <literal>primPackageKey</literal>, etc.  This reflects a distinction
+                    that we are now making: a package ID is, as before, the user-visible
+                    ID from Cabal <literal>foo-1.0</literal>; a package key is now
+                    a compiler-internal entity used for generating linking symbols, and
+                    may not correspond at all to the package ID.  In
+                    particular, there may be multiple package keys per
+                    package ID.
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
         <title>ghc-prim</title>
         <itemizedlist>
             <listitem>
