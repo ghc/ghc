@@ -7,14 +7,6 @@
 -- Pepe Iborra (supported by Google SoC) 2006
 --
 -----------------------------------------------------------------------------
-
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module RtClosureInspect(
      cvObtainTerm,      -- :: HscEnv -> Int -> Bool -> Maybe Type -> HValue -> IO Term
      cvReconstructType,
@@ -85,9 +77,9 @@ import System.IO.Unsafe
 data Term = Term { ty        :: RttiType
                  , dc        :: Either String DataCon
                                -- Carries a text representation if the datacon is
-                               -- not exported by the .hi file, which is the case 
+                               -- not exported by the .hi file, which is the case
                                -- for private constructors in -O0 compiled libraries
-                 , val       :: HValue 
+                 , val       :: HValue
                  , subTerms  :: [Term] }
 
           | Prim { ty        :: RttiType
@@ -142,20 +134,20 @@ instance Outputable (Term) where
 -------------------------------------------------------------------------
 -- Runtime Closure Datatype and functions for retrieving closure related stuff
 -------------------------------------------------------------------------
-data ClosureType = Constr 
-                 | Fun 
-                 | Thunk Int 
+data ClosureType = Constr
+                 | Fun
+                 | Thunk Int
                  | ThunkSelector
-                 | Blackhole 
-                 | AP 
-                 | PAP 
-                 | Indirection Int 
+                 | Blackhole
+                 | AP
+                 | PAP
+                 | Indirection Int
                  | MutVar Int
                  | MVar   Int
                  | Other  Int
  deriving (Show, Eq)
 
-data Closure = Closure { tipe         :: ClosureType 
+data Closure = Closure { tipe         :: ClosureType
                        , infoPtr      :: Ptr ()
                        , infoTable    :: StgInfoTable
                        , ptrs         :: Array Int HValue
@@ -163,7 +155,7 @@ data Closure = Closure { tipe         :: ClosureType
                        }
 
 instance Outputable ClosureType where
-  ppr = text . show 
+  ppr = text . show
 
 #include "../includes/rts/storage/ClosureTypes.h"
 
@@ -175,7 +167,7 @@ pAP_CODE = PAP
 
 getClosureData :: DynFlags -> a -> IO Closure
 getClosureData dflags a =
-   case unpackClosure# a of 
+   case unpackClosure# a of
      (# iptr, ptrs, nptrs #) -> do
            let iptr'
                 | ghciTablesNextToCode =
@@ -194,11 +186,11 @@ getClosureData dflags a =
                nptrs_data = [W# (indexWordArray# nptrs i)
                               | I# i <- [0.. fromIntegral (BCI.nptrs itbl)-1] ]
            ASSERT(elems >= 0) return ()
-           ptrsList `seq` 
+           ptrsList `seq`
             return (Closure tipe (Ptr iptr) itbl ptrsList nptrs_data)
 
 readCType :: Integral a => a -> ClosureType
-readCType i 
+readCType i
  | i >= CONSTR && i <= CONSTR_NOCAF_STATIC = Constr
  | i >= FUN    && i <= FUN_STATIC          = Fun
  | i >= THUNK  && i < THUNK_SELECTOR       = Thunk i'
@@ -212,7 +204,7 @@ readCType i
  | i == MVAR_CLEAN    || i == MVAR_DIRTY   = MVar i'
  | otherwise                               = Other  i'
   where i' = fromIntegral i
- 
+
 isConstr, isIndirection, isThunk :: ClosureType -> Bool
 isConstr Constr = True
 isConstr    _   = False
@@ -240,7 +232,7 @@ unsafeDeepSeq :: a -> b -> b
 unsafeDeepSeq = unsafeDeepSeq1 2
  where unsafeDeepSeq1 0 a b = seq a $! b
        unsafeDeepSeq1 i a b   -- 1st case avoids infinite loops for non reducible thunks
-        | not (isConstr tipe) = seq a $! unsafeDeepSeq1 (i-1) a b     
+        | not (isConstr tipe) = seq a $! unsafeDeepSeq1 (i-1) a b
      -- | unsafePerformIO (isFullyEvaluated a) = b
         | otherwise = case unsafePerformIO (getClosureData a) of
                         closure -> foldl' (flip unsafeDeepSeq) b (ptrs closure)
@@ -315,7 +307,7 @@ mapTermTypeM f = foldTermM TermFoldM {
 
 termTyVars :: Term -> TyVarSet
 termTyVars = foldTerm TermFold {
-            fTerm       = \ty _ _ tt   -> 
+            fTerm       = \ty _ _ tt   ->
                           tyVarsOfType ty `plusVarEnv` concatVarEnv tt,
             fSuspension = \_ ty _ _ -> tyVarsOfType ty,
             fPrim       = \ _ _ -> emptyVarEnv,
@@ -347,21 +339,21 @@ ppr_termM y p Term{dc=Left dc_tag, subTerms=tt} = do
   tt_docs <- mapM (y app_prec) tt
   return $ cparen (not (null tt) && p >= app_prec)
                   (text dc_tag <+> pprDeeperList fsep tt_docs)
-  
-ppr_termM y p Term{dc=Right dc, subTerms=tt} 
+
+ppr_termM y p Term{dc=Right dc, subTerms=tt}
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt  --TODO fixity
-  = parens (ppr_term1 True t1 <+> ppr dc <+> ppr_term1 True ppr t2) 
-    <+> hsep (map (ppr_term1 True) tt) 
+  = parens (ppr_term1 True t1 <+> ppr dc <+> ppr_term1 True ppr t2)
+    <+> hsep (map (ppr_term1 True) tt)
 -} -- TODO Printing infix constructors properly
   | null sub_terms_to_show
   = return (ppr dc)
-  | otherwise 
+  | otherwise
   = do { tt_docs <- mapM (y app_prec) sub_terms_to_show
        ; return $ cparen (p >= app_prec) $
          sep [ppr dc, nest 2 (pprDeeperList fsep tt_docs)] }
   where
-    sub_terms_to_show	-- Don't show the dictionary arguments to 
-    			-- constructors unless -dppr-debug is on
+    sub_terms_to_show   -- Don't show the dictionary arguments to
+                        -- constructors unless -dppr-debug is on
       | opt_PprStyle_Debug = tt
       | otherwise = dropList (dataConTheta dc) tt
 
@@ -378,9 +370,9 @@ ppr_termM _ _ t = ppr_termM1 t
 
 
 ppr_termM1 :: Monad m => Term -> m SDoc
-ppr_termM1 Prim{value=words, ty=ty} = 
+ppr_termM1 Prim{value=words, ty=ty} =
     return $ repPrim (tyConAppTyCon ty) words
-ppr_termM1 Suspension{ty=ty, bound_to=Nothing} = 
+ppr_termM1 Suspension{ty=ty, bound_to=Nothing} =
     return (char '_' <+> ifPprDebug (text "::" <> ppr ty))
 ppr_termM1 Suspension{ty=ty, bound_to=Just n}
 --  | Just _ <- splitFunTy_maybe ty = return$ ptext (sLit("<function>")
@@ -392,7 +384,7 @@ ppr_termM1 NewtypeWrap{} = panic "ppr_termM1 - NewtypeWrap"
 pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t}
   | Just (tc,_) <- tcSplitTyConApp_maybe ty
   , ASSERT(isNewTyCon tc) True
-  , Just new_dc <- tyConSingleDataCon_maybe tc = do 
+  , Just new_dc <- tyConSingleDataCon_maybe tc = do
              real_term <- y max_prec t
              return $ cparen (p >= app_prec) (ppr new_dc <+> real_term)
 pprNewtypeWrap _ _ _ = panic "pprNewtypeWrap"
@@ -401,11 +393,11 @@ pprNewtypeWrap _ _ _ = panic "pprNewtypeWrap"
 -- Custom Term Pretty Printers
 -------------------------------------------------------
 
--- We can want to customize the representation of a 
---  term depending on its type. 
+-- We can want to customize the representation of a
+--  term depending on its type.
 -- However, note that custom printers have to work with
 --  type representations, instead of directly with types.
--- We cannot use type classes here, unless we employ some 
+-- We cannot use type classes here, unless we employ some
 --  typerep trickery (e.g. Weirich's RepLib tricks),
 --  which I didn't. Therefore, this code replicates a lot
 --  of what type classes provide for free.
@@ -413,7 +405,7 @@ pprNewtypeWrap _ _ _ = panic "pprNewtypeWrap"
 type CustomTermPrinter m = TermPrinterM m
                          -> [Precedence -> Term -> (m (Maybe SDoc))]
 
--- | Takes a list of custom printers with a explicit recursion knot and a term, 
+-- | Takes a list of custom printers with a explicit recursion knot and a term,
 -- and returns the output of the first successful printer, or the default printer
 cPprTerm :: Monad m => CustomTermPrinter m -> Term -> m SDoc
 cPprTerm printers_ = go 0 where
@@ -430,7 +422,7 @@ cPprTerm printers_ = go 0 where
 -- Default set of custom printers. Note that the recursion knot is explicit
 cPprTermBase :: forall m. Monad m => CustomTermPrinter m
 cPprTermBase y =
-  [ ifTerm (isTupleTy.ty) (\_p -> liftM (parens . hcat . punctuate comma) 
+  [ ifTerm (isTupleTy.ty) (\_p -> liftM (parens . hcat . punctuate comma)
                                       . mapM (y (-1))
                                       . subTerms)
   , ifTerm (\t -> isTyCon listTyCon (ty t) && subTerms t `lengthIs` 2)
@@ -441,7 +433,7 @@ cPprTermBase y =
   , ifTerm (isTyCon doubleTyCon . ty) ppr_double
   , ifTerm (isIntegerTy         . ty) ppr_integer
   ]
- where 
+ where
    ifTerm :: (Term -> Bool)
           -> (Precedence -> Term -> m SDoc)
           -> Precedence -> Term -> m (Maybe SDoc)
@@ -449,11 +441,11 @@ cPprTermBase y =
        | pred t    = Just `liftM` f prec t
    ifTerm _ _ _ _  = return Nothing
 
-   isTupleTy ty    = fromMaybe False $ do 
-     (tc,_) <- tcSplitTyConApp_maybe ty 
+   isTupleTy ty    = fromMaybe False $ do
+     (tc,_) <- tcSplitTyConApp_maybe ty
      return (isBoxedTupleTyCon tc)
 
-   isTyCon a_tc ty = fromMaybe False $ do 
+   isTyCon a_tc ty = fromMaybe False $ do
      (tc,_) <- tcSplitTyConApp_maybe ty
      return (a_tc == tc)
 
@@ -461,7 +453,7 @@ cPprTermBase y =
      (tc,_) <- tcSplitTyConApp_maybe ty
      return (tyConName tc == integerTyConName)
 
-   ppr_int, ppr_char, ppr_float, ppr_double, ppr_integer 
+   ppr_int, ppr_char, ppr_float, ppr_double, ppr_integer
       :: Precedence -> Term -> m SDoc
    ppr_int     _ v = return (Ppr.int     (unsafeCoerce# (val v)))
    ppr_char    _ v = return (Ppr.char '\'' <> Ppr.char (unsafeCoerce# (val v)) <> Ppr.char '\'')
@@ -474,16 +466,16 @@ cPprTermBase y =
    ppr_list p (Term{subTerms=[h,t]}) = do
        let elems      = h : getListTerms t
            isConsLast = not(termType(last elems) `eqType` termType h)
-   	   is_string  = all (isCharTy . ty) elems
+           is_string  = all (isCharTy . ty) elems
 
        print_elems <- mapM (y cons_prec) elems
        if is_string
         then return (Ppr.doubleQuotes (Ppr.text (unsafeCoerce# (map val elems))))
         else if isConsLast
-        then return $ cparen (p >= cons_prec) 
-                    $ pprDeeperList fsep 
+        then return $ cparen (p >= cons_prec)
+                    $ pprDeeperList fsep
                     $ punctuate (space<>colon) print_elems
-        else return $ brackets 
+        else return $ brackets
                     $ pprDeeperList fcat
                     $ punctuate comma print_elems
 
@@ -524,9 +516,9 @@ repPrim t = rep where
     | t == mVarPrimTyCon             = text "<mVar>"
     | t == tVarPrimTyCon             = text "<tVar>"
     | otherwise                      = char '<' <> ppr t <> char '>'
-    where build ww = unsafePerformIO $ withArray ww (peek . castPtr) 
---   This ^^^ relies on the representation of Haskell heap values being 
---   the same as in a C array. 
+    where build ww = unsafePerformIO $ withArray ww (peek . castPtr)
+--   This ^^^ relies on the representation of Haskell heap values being
+--   the same as in a C array.
 
 -----------------------------------
 -- Type Reconstruction
@@ -537,14 +529,14 @@ The algorithm walks the heap generating a set of equations, which
 are solved with syntactic unification.
 A type reconstruction equation looks like:
 
-  <datacon reptype>  =  <actual heap contents> 
+  <datacon reptype>  =  <actual heap contents>
 
 The full equation set is generated by traversing all the subterms, starting
 from a given term.
 
 The only difficult part is that newtypes are only found in the lhs of equations.
-Right hand sides are missing them. We can either (a) drop them from the lhs, or 
-(b) reconstruct them in the rhs when possible. 
+Right hand sides are missing them. We can either (a) drop them from the lhs, or
+(b) reconstruct them in the rhs when possible.
 
 The function congruenceNewtypes takes a shot at (b)
 -}
@@ -574,7 +566,7 @@ runTR hsc_env thing = do
 
 runTR_maybe :: HscEnv -> TR a -> IO (Maybe a)
 runTR_maybe hsc_env thing_inside
-  = do { (_errs, res) <- initTc hsc_env HsSrcFile False 
+  = do { (_errs, res) <- initTc hsc_env HsSrcFile False
                                 (icInteractiveModule (hsc_IC hsc_env))
                                 thing_inside
        ; return res }
@@ -583,17 +575,17 @@ traceTR :: SDoc -> TR ()
 traceTR = liftTcM . traceOptTcRn Opt_D_dump_rtti
 
 
--- Semantically different to recoverM in TcRnMonad 
+-- Semantically different to recoverM in TcRnMonad
 -- recoverM retains the errors in the first action,
 --  whereas recoverTc here does not
 recoverTR :: TR a -> TR a -> TR a
-recoverTR recover thing = do 
+recoverTR recover thing = do
   (_,mb_res) <- tryTcErrs thing
-  case mb_res of 
+  case mb_res of
     Nothing  -> recover
     Just res -> return res
 
-trIO :: IO a -> TR a 
+trIO :: IO a -> TR a
 trIO = liftTcM . liftIO
 
 liftTcM :: TcM a -> TR a
@@ -608,17 +600,17 @@ instTyVars :: [TyVar] -> TR ([TcTyVar], [TcType], TvSubst)
 instTyVars = liftTcM . tcInstTyVars
 
 type RttiInstantiation = [(TcTyVar, TyVar)]
-   -- Associates the typechecker-world meta type variables 
-   -- (which are mutable and may be refined), to their 
+   -- Associates the typechecker-world meta type variables
+   -- (which are mutable and may be refined), to their
    -- debugger-world RuntimeUnk counterparts.
    -- If the TcTyVar has not been refined by the runtime type
    -- elaboration, then we want to turn it back into the
    -- original RuntimeUnk
 
--- | Returns the instantiated type scheme ty', and the 
+-- | Returns the instantiated type scheme ty', and the
 --   mapping from new (instantiated) -to- old (skolem) type variables
 instScheme :: QuantifiedType -> TR (TcType, RttiInstantiation)
-instScheme (tvs, ty) 
+instScheme (tvs, ty)
   = liftTcM $ do { (tvs', _, subst) <- tcInstTyVars tvs
                  ; let rtti_inst = [(tv',tv) | (tv',tv) <- tvs' `zip` tvs]
                  ; return (substTy subst ty, rtti_inst) }
@@ -698,7 +690,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
             text "Term obtained: " <> ppr term $$
             text "Type obtained: " <> ppr (termType term))
    return term
-    where 
+    where
   dflags = hsc_dflags hsc_env
 
   go :: Int -> Type -> Type -> HValue -> TcM Term
@@ -715,7 +707,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
     clos <- trIO $ getClosureData dflags a
     return (Suspension (tipe clos) my_ty a Nothing)
   go max_depth my_ty old_ty a = do
-    let monomorphic = not(isTyVarTy my_ty)   
+    let monomorphic = not(isTyVarTy my_ty)
     -- This ^^^ is a convention. The ancestor tests for
     -- monomorphism and passes a type instead of a tv
     clos <- trIO $ getClosureData dflags a
@@ -735,14 +727,14 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
       MutVar _ | Just (tycon,[world,contents_ty]) <- tcSplitTyConApp_maybe old_ty
              -> do
                   -- Deal with the MutVar# primitive
-                  -- It does not have a constructor at all, 
+                  -- It does not have a constructor at all,
                   -- so we simulate the following one
                   -- MutVar# :: contents_ty -> MutVar# s contents_ty
          traceTR (text "Following a MutVar")
          contents_tv <- newVar liftedTypeKind
          contents <- trIO$ IO$ \w -> readMutVar# (unsafeCoerce# a) w
          ASSERT(isUnliftedTypeKind $ typeKind my_ty) return ()
-         (mutvar_ty,_) <- instScheme $ quantifyType $ mkFunTy 
+         (mutvar_ty,_) <- instScheme $ quantifyType $ mkFunTy
                             contents_ty (mkTyConApp tycon [world,contents_ty])
          addConstraint (mkFunTy contents_tv my_ty) mutvar_ty
          x <- go (pred max_depth) contents_tv contents_ty contents
@@ -762,12 +754,12 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                         -- In such case, we return a best approximation:
                         --  ignore the unpointed args, and recover the pointeds
                         -- This preserves laziness, and should be safe.
-		       traceTR (text "Not constructor" <+> ppr dcname)
+                       traceTR (text "Not constructor" <+> ppr dcname)
                        let dflags = hsc_dflags hsc_env
                            tag = showPpr dflags dcname
-                       vars     <- replicateM (length$ elems$ ptrs clos) 
+                       vars     <- replicateM (length$ elems$ ptrs clos)
                                               (newVar liftedTypeKind)
-                       subTerms <- sequence [appArr (go (pred max_depth) tv tv) (ptrs clos) i 
+                       subTerms <- sequence [appArr (go (pred max_depth) tv tv) (ptrs clos) i
                                               | (i, tv) <- zip [0..] vars]
                        return (Term my_ty (Left ('<' : tag ++ ">")) a subTerms)
           Just dc -> do
@@ -875,7 +867,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
   search _ _ _ 0 = traceTR (text "Failed to reconstruct a type after " <>
                                 int max_depth <> text " steps")
   search stop expand l d =
-    case viewl l of 
+    case viewl l of
       EmptyL  -> return ()
       x :< xx -> unlessM stop $ do
                   new <- expand x
@@ -921,7 +913,7 @@ findPtrTys i ty
   | Just (tc, elem_tys) <- tcSplitTyConApp_maybe ty
   , isUnboxedTupleTyCon tc
   = findPtrTyss i elem_tys
-  
+
   | otherwise
   = case repType ty of
       UnaryRep rep_ty | typePrimRep rep_ty == PtrRep -> return (i + 1, [(i, ty)])
@@ -954,7 +946,7 @@ getDataConArgTys :: DataCon -> Type -> TR [Type]
 -- I believe that con_app_ty should not have any enclosing foralls
 getDataConArgTys dc con_app_ty
   = do { let UnaryRep rep_con_app_ty = repType con_app_ty
-       ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty 
+       ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty
                    $$ ppr (tcSplitTyConApp_maybe rep_con_app_ty)))
        ; (_, _, subst) <- instTyVars (univ_tvs ++ ex_tvs)
        ; addConstraint rep_con_app_ty (substTy subst (dataConOrigResTy dc))
@@ -975,7 +967,7 @@ Consider a GADT (cf Trac #7386)
      ...
 
 In getDataConArgTys
-* con_app_ty is the known type (from outside) of the constructor application, 
+* con_app_ty is the known type (from outside) of the constructor application,
   say D [Int] Int
 
 * The data constructor MkT has a (representation) dataConTyCon = DList,
@@ -984,7 +976,7 @@ In getDataConArgTys
       MkT :: a -> DList a (Maybe a)
       ...
 
-So the dataConTyCon of the data constructor, DList, differs from 
+So the dataConTyCon of the data constructor, DList, differs from
 the "outside" type, D. So we can't straightforwardly decompose the
 "outside" type, and we end up in the "_" branch of the case.
 
@@ -1126,9 +1118,9 @@ check2 (_, rtti_ty) (_, old_ty)
 -- Dealing with newtypes
 --------------------------
 {-
- congruenceNewtypes does a parallel fold over two Type values, 
- compensating for missing newtypes on both sides. 
- This is necessary because newtypes are not present 
+ congruenceNewtypes does a parallel fold over two Type values,
+ compensating for missing newtypes on both sides.
+ This is necessary because newtypes are not present
  in runtime, but sometimes there is evidence available.
    Evidence can come from DataCon signatures or
  from compile-time type inference.
@@ -1174,8 +1166,8 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
          return (mkFunTy r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
     | Just (tycon_l, _) <- tcSplitTyConApp_maybe lhs
-    , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs 
-    , tycon_l /= tycon_r 
+    , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs
+    , tycon_l /= tycon_r
     = upgrade tycon_l r
 
     | otherwise = return r
@@ -1185,7 +1177,7 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
             | not (isNewTyCon new_tycon) = do
               traceTR (text "(Upgrade) Not matching newtype evidence: " <>
                        ppr new_tycon <> text " for " <> ppr ty)
-              return ty 
+              return ty
             | otherwise = do
                traceTR (text "(Upgrade) upgraded " <> ppr ty <>
                         text " in presence of newtype evidence " <> ppr new_tycon)
@@ -1193,7 +1185,7 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                let ty' = mkTyConApp new_tycon vars
                    UnaryRep rep_ty = repType ty'
                _ <- liftTcM (unifyType ty rep_ty)
-        -- assumes that reptype doesn't ^^^^ touch tyconApp args 
+        -- assumes that reptype doesn't ^^^^ touch tyconApp args
                return ty'
 
 
@@ -1205,7 +1197,7 @@ zonkTerm = foldTermM (TermFoldM
                                              return (Suspension ct ty v b)
              , fNewtypeWrapM = \ty dc t -> zonkRttiType ty >>= \ty' ->
                                            return$ NewtypeWrap ty' dc t
-             , fRefWrapM     = \ty t -> return RefWrap  `ap` 
+             , fRefWrapM     = \ty t -> return RefWrap  `ap`
                                         zonkRttiType ty `ap` return t
              , fPrimM        = (return.) . Prim })
 
@@ -1214,13 +1206,13 @@ zonkRttiType :: TcType -> TcM Type
 -- by skolems, safely out of Meta-tyvar-land
 zonkRttiType = zonkTcTypeToType (mkEmptyZonkEnv zonk_unbound_meta)
   where
-    zonk_unbound_meta tv 
+    zonk_unbound_meta tv
       = ASSERT( isTcTyVar tv )
         do { tv' <- skolemiseUnboundMetaTyVar tv RuntimeUnk
-	     -- This is where RuntimeUnks are born: 
-	     -- otherwise-unconstrained unification variables are
-	     -- turned into RuntimeUnks as they leave the
-	     -- typechecker's monad
+             -- This is where RuntimeUnks are born:
+             -- otherwise-unconstrained unification variables are
+             -- turned into RuntimeUnks as they leave the
+             -- typechecker's monad
            ; return (mkTyVarTy tv') }
 
 --------------------------------------------------------------------------------
