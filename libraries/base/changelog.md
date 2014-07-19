@@ -14,6 +14,10 @@
 
   * Add `Control.Monad.(<$!>)` as a strict version of `(<$>)`
 
+  * The `Data.Monoid` module now has the `PolyKinds` extension
+    enabled, so that the `Monoid` instance for `Proxy` are polykinded
+    like `Proxy` itself is.
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3
