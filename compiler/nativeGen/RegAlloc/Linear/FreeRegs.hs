@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 
 module RegAlloc.Linear.FreeRegs (
     FR(..),

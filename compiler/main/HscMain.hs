@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns, CPP, MagicHash, NondecreasingIndentation #-}
+
 -------------------------------------------------------------------------------
 --
 -- | Main API for compiling plain Haskell source code.
@@ -146,7 +148,6 @@ import ErrUtils
 import Outputable
 import HscStats         ( ppSourceStats )
 import HscTypes
-import MkExternalCore   ( emitExternalCore )
 import FastString
 import UniqFM           ( emptyUFM )
 import UniqSupply
@@ -516,8 +517,9 @@ genericHscCompileGetFrontendResult ::
                   -> (Int,Int)       -- (i,n) = module i of n (for msgs)
                   -> IO (Either ModIface (TcGblEnv, Maybe Fingerprint))
 
-genericHscCompileGetFrontendResult always_do_basic_recompilation_check m_tc_result
-                                   mHscMessage hsc_env mod_summary source_modified mb_old_iface mod_index
+genericHscCompileGetFrontendResult
+  always_do_basic_recompilation_check m_tc_result
+  mHscMessage hsc_env mod_summary source_modified mb_old_iface mod_index
     = do
 
     let msg what = case mHscMessage of
@@ -553,16 +555,19 @@ genericHscCompileGetFrontendResult always_do_basic_recompilation_check m_tc_resu
 
             case mb_checked_iface of
                 Just iface | not (recompileRequired recomp_reqd) ->
-                    -- If the module used TH splices when it was last compiled,
-                    -- then the recompilation check is not accurate enough (#481)
-                    -- and we must ignore it. However, if the module is stable
-                    -- (none of the modules it depends on, directly or indirectly,
-                    -- changed), then we *can* skip recompilation. This is why
-                    -- the SourceModified type contains SourceUnmodifiedAndStable,
-                    -- and it's pretty important: otherwise ghc --make would
-                    -- always recompile TH modules, even if nothing at all has
-                    -- changed. Stability is just the same check that make is
-                    -- doing for us in one-shot mode.
+                    -- If the module used TH splices when it was last
+                    -- compiled, then the recompilation check is not
+                    -- accurate enough (#481) and we must ignore
+                    -- it.  However, if the module is stable (none of
+                    -- the modules it depends on, directly or
+                    -- indirectly, changed), then we *can* skip
+                    -- recompilation. This is why the SourceModified
+                    -- type contains SourceUnmodifiedAndStable, and
+                    -- it's pretty important: otherwise ghc --make
+                    -- would always recompile TH modules, even if
+                    -- nothing at all has changed. Stability is just
+                    -- the same check that make is doing for us in
+                    -- one-shot mode.
                     case m_tc_result of
                     Nothing
                      | mi_used_th iface && not stable ->
@@ -580,31 +585,25 @@ genericHscFrontend mod_summary =
   getHooked hscFrontendHook genericHscFrontend' >>= ($ mod_summary)
 
 genericHscFrontend' :: ModSummary -> Hsc TcGblEnv
-genericHscFrontend' mod_summary
-    | ExtCoreFile <- ms_hsc_src mod_summary =
-        panic "GHC does not currently support reading External Core files"
-    | otherwise =
-        hscFileFrontEnd mod_summary
+genericHscFrontend' mod_summary = hscFileFrontEnd mod_summary
 
 --------------------------------------------------------------
 -- Compilers
 --------------------------------------------------------------
 
 hscCompileOneShot :: HscEnv
-                  -> FilePath
                   -> ModSummary
                   -> SourceModified
                   -> IO HscStatus
 hscCompileOneShot env =
   lookupHook hscCompileOneShotHook hscCompileOneShot' (hsc_dflags env) env
 
--- Compile Haskell, boot and extCore in OneShot mode.
+-- Compile Haskell/boot in OneShot mode.
 hscCompileOneShot' :: HscEnv
-                   -> FilePath
                    -> ModSummary
                    -> SourceModified
                    -> IO HscStatus
-hscCompileOneShot' hsc_env extCore_filename mod_summary src_changed
+hscCompileOneShot' hsc_env mod_summary src_changed
   = do
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See TcRnTypes.TcGblEnv.tcg_type_env_var.
@@ -624,7 +623,11 @@ hscCompileOneShot' hsc_env extCore_filename mod_summary src_changed
             guts0 <- hscDesugar' (ms_location mod_summary) tc_result
             dflags <- getDynFlags
             case hscTarget dflags of
-                HscNothing -> return HscNotGeneratingCode
+                HscNothing -> do
+                    when (gopt Opt_WriteInterface dflags) $ liftIO $ do
+                        (iface, changed, _details) <- hscSimpleIface hsc_env tc_result mb_old_hash
+                        hscWriteIface dflags iface changed mod_summary
+                    return HscNotGeneratingCode
                 _ ->
                     case ms_hsc_src mod_summary of
                     HsBootFile ->
@@ -633,7 +636,7 @@ hscCompileOneShot' hsc_env extCore_filename mod_summary src_changed
                            return HscUpdateBoot
                     _ ->
                         do guts <- hscSimplify' guts0
-                           (iface, changed, _details, cgguts) <- hscNormalIface' extCore_filename guts mb_old_hash
+                           (iface, changed, _details, cgguts) <- hscNormalIface' guts mb_old_hash
                            liftIO $ hscWriteIface dflags iface changed mod_summary
                            return $ HscRecomp cgguts mod_summary
 
@@ -1070,18 +1073,16 @@ hscSimpleIface' tc_result mb_old_iface = do
     return (new_iface, no_change, details)
 
 hscNormalIface :: HscEnv
-               -> FilePath
                -> ModGuts
                -> Maybe Fingerprint
                -> IO (ModIface, Bool, ModDetails, CgGuts)
-hscNormalIface hsc_env extCore_filename simpl_result mb_old_iface =
-    runHsc hsc_env $ hscNormalIface' extCore_filename simpl_result mb_old_iface
+hscNormalIface hsc_env simpl_result mb_old_iface =
+    runHsc hsc_env $ hscNormalIface' simpl_result mb_old_iface
 
-hscNormalIface' :: FilePath
-                -> ModGuts
+hscNormalIface' :: ModGuts
                 -> Maybe Fingerprint
                 -> Hsc (ModIface, Bool, ModDetails, CgGuts)
-hscNormalIface' extCore_filename simpl_result mb_old_iface = do
+hscNormalIface' simpl_result mb_old_iface = do
     hsc_env <- getHscEnv
     (cg_guts, details) <- {-# SCC "CoreTidy" #-}
                           liftIO $ tidyProgram hsc_env simpl_result
@@ -1096,11 +1097,6 @@ hscNormalIface' extCore_filename simpl_result mb_old_iface = do
            ioMsgMaybe $
                mkIface hsc_env mb_old_iface details simpl_result
 
-    -- Emit external core
-    -- This should definitely be here and not after CorePrep,
-    -- because CorePrep produces unqualified constructor wrapper declarations,
-    -- so its output isn't valid External Core (without some preprocessing).
-    liftIO $ emitExternalCore (hsc_dflags hsc_env) extCore_filename cg_guts
     liftIO $ dumpIfaceStats hsc_env
 
     -- Return the prepared code.
@@ -1158,8 +1154,15 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
 
         ------------------  Code generation ------------------
 
-        cmms <- {-# SCC "NewCodeGen" #-}
-                         tryNewCodeGen hsc_env this_mod data_tycons
+        -- The back-end is streamed: each top-level function goes
+        -- from Stg all the way to asm before dealing with the next
+        -- top-level function, so showPass isn't very useful here.
+        -- Hence we have one showPass for the whole backend, the
+        -- next showPass after this will be "Assembler".
+        showPass dflags "CodeGen"
+
+        cmms <- {-# SCC "StgCmm" #-}
+                         doCodeGen hsc_env this_mod data_tycons
                              cost_centre_info
                              stg_binds hpc_info
 
@@ -1236,15 +1239,15 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
 
 -------------------- Stuff for new code gen ---------------------
 
-tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
-                -> CollectedCCs
-                -> [StgBinding]
-                -> HpcInfo
-                -> IO (Stream IO CmmGroup ())
+doCodeGen   :: HscEnv -> Module -> [TyCon]
+            -> CollectedCCs
+            -> [StgBinding]
+            -> HpcInfo
+            -> IO (Stream IO CmmGroup ())
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
-tryNewCodeGen hsc_env this_mod data_tycons
+doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
 
@@ -1533,11 +1536,11 @@ hscParseThingWithLocation source linenumber parser str
             return thing
 
 hscCompileCore :: HscEnv -> Bool -> SafeHaskellMode -> ModSummary
-               -> CoreProgram -> FilePath -> FilePath -> IO ()
-hscCompileCore hsc_env simplify safe_mode mod_summary binds output_filename extCore_filename
+               -> CoreProgram -> FilePath -> IO ()
+hscCompileCore hsc_env simplify safe_mode mod_summary binds output_filename
   = runHsc hsc_env $ do
         guts <- maybe_simplify (mkModGuts (ms_mod mod_summary) safe_mode binds)
-        (iface, changed, _details, cgguts) <- hscNormalIface' extCore_filename guts Nothing
+        (iface, changed, _details, cgguts) <- hscNormalIface' guts Nothing
         liftIO $ hscWriteIface (hsc_dflags hsc_env) iface changed mod_summary
         _ <- liftIO $ hscGenHardCode hsc_env cgguts mod_summary output_filename
         return ()

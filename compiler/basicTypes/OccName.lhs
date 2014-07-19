@@ -4,6 +4,8 @@
 %
 
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 -- |
 -- #name_types#
 -- GHC uses several kinds of name internally:
@@ -20,7 +22,7 @@
 --
 -- * 'Var.Var': see "Var#name_types"
 
-{-# OPTIONS -fno-warn-tabs #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -30,6 +32,8 @@
 module OccName (
 	-- * The 'NameSpace' type
 	NameSpace, -- Abstract
+
+        nameSpacesRelated,
 	
 	-- ** Construction
 	-- $real_vs_source_data_constructors
@@ -86,7 +90,7 @@ module OccName (
 	lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
 	occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
         extendOccEnv_Acc, filterOccEnv, delListFromOccEnv, delFromOccEnv,
-        alterOccEnv, 
+        alterOccEnv, pprOccEnv,
 
 	-- * The 'OccSet' type
 	OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet, 
@@ -100,7 +104,10 @@ module OccName (
 	-- * Lexical characteristics of Haskell names
 	isLexCon, isLexVar, isLexId, isLexSym,
 	isLexConId, isLexConSym, isLexVarId, isLexVarSym,
-	startsVarSym, startsVarId, startsConSym, startsConId
+	startsVarSym, startsVarId, startsConSym, startsConId,
+
+        -- FsEnv
+        FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
     ) where
 
 import Util
@@ -113,6 +120,29 @@ import Outputable
 import Binary
 import Data.Char
 import Data.Data
+\end{code}
+
+%************************************************************************
+%*									*
+              FastStringEnv
+%*									*
+%************************************************************************
+
+FastStringEnv can't be in FastString because the env depends on UniqFM
+
+\begin{code}
+type FastStringEnv a = UniqFM a         -- Keyed by FastString
+
+
+emptyFsEnv  :: FastStringEnv a
+lookupFsEnv :: FastStringEnv a -> FastString -> Maybe a
+extendFsEnv :: FastStringEnv a -> FastString -> a -> FastStringEnv a
+mkFsEnv     :: [(FastString,a)] -> FastStringEnv a
+
+emptyFsEnv  = emptyUFM
+lookupFsEnv = lookupUFM
+extendFsEnv = addToUFM
+mkFsEnv     = listToUFM
 \end{code}
 
 %************************************************************************
@@ -244,6 +274,9 @@ instance Data OccName where
   toConstr _   = abstractConstr "OccName"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "OccName"
+
+instance HasOccName OccName where
+  occName = id
 \end{code}
 
 
@@ -339,7 +372,20 @@ demoteOccName (OccName space name) = do
   space' <- demoteNameSpace space
   return $ OccName space' name
 
-{- | Other names in the compiler add aditional information to an OccName.
+-- Name spaces are related if there is a chance to mean the one when one writes
+-- the other, i.e. variables <-> data constructors and type variables <-> type constructors
+nameSpacesRelated :: NameSpace -> NameSpace -> Bool
+nameSpacesRelated ns1 ns2 = ns1 == ns2 || otherNameSpace ns1 == ns2
+
+otherNameSpace :: NameSpace -> NameSpace
+otherNameSpace VarName = DataName
+otherNameSpace DataName = VarName
+otherNameSpace TvName = TcClsName
+otherNameSpace TcClsName = TvName
+
+
+
+{- | Other names in the compiler add additional information to an OccName.
 This class provides a consistent way to access the underlying OccName. -}
 class HasOccName name where
   occName :: name -> OccName
@@ -416,7 +462,10 @@ filterOccEnv x (A y)       = A $ filterUFM x y
 alterOccEnv fn (A y) k     = A $ alterUFM fn y k
 
 instance Outputable a => Outputable (OccEnv a) where
-    ppr (A x) = ppr x
+    ppr x = pprOccEnv ppr x
+
+pprOccEnv :: (a -> SDoc) -> OccEnv a -> SDoc
+pprOccEnv ppr_elt (A env) = pprUniqFM ppr_elt env
 
 type OccSet = UniqSet OccName
 
@@ -852,9 +901,12 @@ isLexConSym cs				-- Infix type or data constructors
   | otherwise	       = startsConSym (headFS cs)
 
 isLexVarSym fs				-- Infix identifiers e.g. "+"
+  | fs == (fsLit "~R#") = True
+  | otherwise
   = case (if nullFS fs then [] else unpackFS fs) of
       [] -> False
       (c:cs) -> startsVarSym c && all isVarSymChar cs
+        -- See Note [Classification of generated names]
 
 -------------
 startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool

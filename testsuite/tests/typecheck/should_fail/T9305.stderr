@@ -1,0 +1,8 @@
+
+T9305.hs:8:48:
+    No instance for (Functor Event)
+      arising from the first field of ‘EventF’ (type ‘F (Event a)’)
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Functor EventF)

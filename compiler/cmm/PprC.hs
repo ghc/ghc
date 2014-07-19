@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, GADTs #-}
+
 -----------------------------------------------------------------------------
 --
 -- Pretty-printing of Cmm as C, suitable for feeding gcc
@@ -16,7 +18,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GADTs #-}
 module PprC (
         writeCs,
         pprStringInCStyle
@@ -752,6 +753,10 @@ pprCallishMachOp_for_C mop
         MO_Memmove      -> ptext (sLit "memmove")
         (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
+        (MO_AtomicRMW w amop) -> ptext (sLit $ atomicRMWLabel w amop)
+        (MO_Cmpxchg w)  -> ptext (sLit $ cmpxchgLabel w)
+        (MO_AtomicRead w)  -> ptext (sLit $ atomicReadLabel w)
+        (MO_AtomicWrite w) -> ptext (sLit $ atomicWriteLabel w)
         (MO_UF_Conv w)  -> ptext (sLit $ word2FloatLabel w)
 
         MO_S_QuotRem  {} -> unsupported

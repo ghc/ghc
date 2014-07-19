@@ -5,7 +5,7 @@
            , GeneralizedNewtypeDeriving
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
-{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+{-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
 -- XXX -fno-warn-unused-binds stops us warning about unused constructors,
 -- but really we should just remove them if we don't want them
 

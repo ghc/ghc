@@ -26,7 +26,10 @@
 #   * 'remotepath' is where the repository is in the central repository.
 #     It is - for submodules.
 #   * 'upstreamurl' is the upstream Git repo location for packages
-#     maintained outside of GHC HQ.
+#     maintained outside of GHC HQ. Repositories which are hosted on
+#     GitHub and GHC developers are granted push-rights for are denoted by
+#     being specified with the `ssh://` scheme. Thus, `https://`
+#     repo urls denote read-only access.
 #
 #   * The 'tag' determines when "sync-all get" will get the
 #     repo. If the tag is "-" then it will always get it, but if there
@@ -45,37 +48,37 @@
 # localpath                  tag         remotepath                      upstreamurl
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ghc-tarballs                 windows     ghc-tarballs.git                -
-libffi-tarballs              -           libffi-tarballs.git             -
-utils/hsc2hs                 -           hsc2hs.git                      -
-utils/haddock                -           -                               -
-libraries/array              -           packages/array.git              -
+libffi-tarballs              -           -                               -
+utils/hsc2hs                 -           -                               -
+utils/haddock                -           -                               ssh://git@github.com/haskell/haddock.git
+libraries/array              -           -                               -
 libraries/binary             -           -                               https://github.com/kolmodin/binary.git
 libraries/bytestring         -           -                               https://github.com/haskell/bytestring.git
 libraries/Cabal              -           -                               https://github.com/haskell/cabal.git
 libraries/containers         -           -                               https://github.com/haskell/containers.git
-libraries/deepseq            -           packages/deepseq.git            -
-libraries/directory          -           packages/directory.git          -
-libraries/filepath           -           packages/filepath.git           -
+libraries/deepseq            -           -                               -
+libraries/directory          -           -                               -
+libraries/filepath           -           -                               -
 libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
-libraries/haskell98          -           packages/haskell98.git          -
-libraries/haskell2010        -           packages/haskell2010.git        -
-libraries/hoopl              -           packages/hoopl.git              -
-libraries/hpc                -           packages/hpc.git                -
-libraries/old-locale         -           packages/old-locale.git         -
-libraries/old-time           -           packages/old-time.git           -
+libraries/haskell98          -           -                               -
+libraries/haskell2010        -           -                               -
+libraries/hoopl              -           -                               -
+libraries/hpc                -           -                               -
+libraries/old-locale         -           -                               -
+libraries/old-time           -           -                               -
 libraries/pretty             -           -                               https://github.com/haskell/pretty.git
-libraries/process            -           packages/process.git            -
+libraries/process            -           -                               -
 libraries/terminfo           -           -                               https://github.com/judah/terminfo.git
 libraries/time               -           -                               http://git.haskell.org/darcs-mirrors/time.git
 libraries/transformers       -           -                               http://git.haskell.org/darcs-mirrors/transformers.git
-libraries/unix               -           packages/unix.git               -
+libraries/unix               -           -                               ssh://git@github.com/haskell/unix.git
 libraries/Win32              -           -                               https://github.com/haskell/win32.git
 libraries/xhtml              -           -                               https://github.com/haskell/xhtml.git
-nofib                        nofib       nofib.git                       -
-libraries/parallel           extra       packages/parallel.git           -
-libraries/stm                extra       packages/stm.git                -
+nofib                        nofib       -                               -
+libraries/parallel           extra       -                               -
+libraries/stm                extra       -                               -
 libraries/random             dph         -                               https://github.com/haskell/random.git
 libraries/primitive          dph         -                               https://github.com/haskell/primitive.git
 libraries/vector             dph         -                               https://github.com/haskell/vector.git
-libraries/dph                dph         packages/dph.git                -
+libraries/dph                dph         -                               -
 .                            -           ghc.git                         -

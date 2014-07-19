@@ -1,3 +1,8 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+
 -----------------------------------------------------------------------------
 --
 -- The register liveness determinator
@@ -5,7 +10,7 @@
 -- (c) The University of Glasgow 2004-2013
 --
 -----------------------------------------------------------------------------
-{-# LANGUAGE FlexibleContexts, TypeFamilies #-}
+
 module RegAlloc.Liveness (
         RegSet,
         RegMap, emptyRegMap,
@@ -666,13 +671,19 @@ sccBlocks
 
 sccBlocks blocks entries = map (fmap get_node) sccs
   where
-        sccs = stronglyConnCompFromG graph roots
-
-        graph = graphFromEdgedVertices nodes
-
         -- nodes :: [(NatBasicBlock instr, Unique, [Unique])]
         nodes = [ (block, id, getOutEdges instrs)
                 | block@(BasicBlock id instrs) <- blocks ]
+
+        g1 = graphFromEdgedVertices nodes
+
+        reachable :: BlockSet
+        reachable = setFromList [ id | (_,id,_) <- reachablesG g1 roots ]
+
+        g2 = graphFromEdgedVertices [ node | node@(_,id,_) <- nodes
+                                           , id `setMember` reachable ]
+
+        sccs = stronglyConnCompG g2
 
         get_node (n, _, _) = n
 

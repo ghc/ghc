@@ -6,6 +6,8 @@
 This module converts Template Haskell syntax into HsSyn
 
 \begin{code}
+{-# LANGUAGE MagicHash #-}
+
 module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
                 convertToHsType,
                 thRdrNameGuesses ) where
@@ -199,13 +201,20 @@ cvtDec (ClassD ctxt cl tvs fds decs)
         ; unless (null adts')
             (failWith $ (ptext (sLit "Default data instance declarations are not allowed:"))
                    $$ (Outputable.ppr adts'))
+        ; at_defs <- mapM cvt_at_def ats'
         ; returnL $ TyClD $
           ClassDecl { tcdCtxt = cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFDs = fds', tcdSigs = sigs', tcdMeths = binds'
-                    , tcdATs = fams', tcdATDefs = ats', tcdDocs = []
+                    , tcdATs = fams', tcdATDefs = at_defs, tcdDocs = []
                     , tcdFVs = placeHolderNames }
                               -- no docs in TH ^^
         }
+  where
+    cvt_at_def :: LTyFamInstDecl RdrName -> CvtM (LTyFamDefltEqn RdrName)
+    -- Very similar to what happens in RdrHsSyn.mkClassDecl
+    cvt_at_def decl = case RdrHsSyn.mkATDefault decl of
+                        Right def     -> return def
+                        Left (_, msg) -> failWith msg
 
 cvtDec (InstanceD ctxt ty decs)
   = do  { let doc = ptext (sLit "an instance declaration")
@@ -214,7 +223,7 @@ cvtDec (InstanceD ctxt ty decs)
         ; ctxt' <- cvtContext ctxt
         ; L loc ty' <- cvtType ty
         ; let inst_ty' = L loc $ mkImplicitHsForAllTy ctxt' $ L loc ty'
-        ; returnL $ InstD (ClsInstD (ClsInstDecl inst_ty' binds' sigs' ats' adts')) }
+        ; returnL $ InstD (ClsInstD (ClsInstDecl inst_ty' binds' sigs' ats' adts' Nothing)) }
 
 cvtDec (ForeignD ford)
   = do { ford' <- cvtForD ford
@@ -278,9 +287,9 @@ cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)
 cvtTySynEqn tc (TySynEqn lhs rhs)
   = do  { lhs' <- mapM cvtType lhs
         ; rhs' <- cvtType rhs
-        ; returnL $ TyFamInstEqn { tfie_tycon = tc
-                                 , tfie_pats = mkHsWithBndrs lhs'
-                                 , tfie_rhs = rhs' } }
+        ; returnL $ TyFamEqn { tfe_tycon = tc
+                             , tfe_pats = mkHsWithBndrs lhs'
+                             , tfe_rhs = rhs' } }
 
 ----------------
 cvt_ci_decs :: MsgDoc -> [TH.Dec]
@@ -828,8 +837,8 @@ cvtp (TH.LitP l)
   | otherwise          = do { l' <- cvtLit l; return $ Hs.LitPat l' }
 cvtp (TH.VarP s)       = do { s' <- vName s; return $ Hs.VarPat s' }
 cvtp (TupP [p])        = do { p' <- cvtPat p; return $ ParPat p' } -- Note [Dropping constructors]
-cvtp (TupP ps)         = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed void }
-cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps; return $ TuplePat ps' Unboxed void }
+cvtp (TupP ps)         = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed   [] }
+cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps; return $ TuplePat ps' Unboxed [] }
 cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
                             ; return $ ConPatIn s' (PrefixCon ps') }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
@@ -1156,7 +1165,7 @@ Consider this TH term construction:
      ; x3 <- TH.newName "x"
 
      ; let x = mkName "x"     -- mkName :: String -> TH.Name
-                              -- Builds a NameL
+                              -- Builds a NameS
 
      ; return (LamE (..pattern [x1,x2]..) $
                LamE (VarPat x3) $

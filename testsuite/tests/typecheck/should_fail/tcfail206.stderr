@@ -7,9 +7,9 @@ tcfail206.hs:5:5:
     In an equation for ‘a’: a = (, True)
 
 tcfail206.hs:8:5:
-    Couldn't match type ‘(t0, Int)’ with ‘Bool -> (Int, Bool)’
+    Couldn't match type ‘(Integer, Int)’ with ‘Bool -> (Int, Bool)’
     Expected type: Int -> Bool -> (Int, Bool)
-      Actual type: Int -> (t0, Int)
+      Actual type: Int -> (Integer, Int)
     In the expression: (1,)
     In an equation for ‘b’: b = (1,)
 
@@ -32,9 +32,10 @@ tcfail206.hs:14:5:
     In an equation for ‘d’: d = (# , True #)
 
 tcfail206.hs:17:5:
-    Couldn't match type ‘(# a0, Int #)’ with ‘Bool -> (# Int, Bool #)’
+    Couldn't match type ‘(# Integer, Int #)’
+                  with ‘Bool -> (# Int, Bool #)’
     Expected type: Int -> Bool -> (# Int, Bool #)
-      Actual type: Int -> (# a0, Int #)
+      Actual type: Int -> (# Integer, Int #)
     In the expression: (# 1, #)
     In an equation for ‘e’: e = (# 1, #)
 

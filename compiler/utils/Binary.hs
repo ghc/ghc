@@ -1,4 +1,4 @@
-{-# OPTIONS -cpp #-}
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -O -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
@@ -707,14 +707,13 @@ getBS bh = do
   l <- get bh
   fp <- mallocForeignPtrBytes l
   withForeignPtr fp $ \ptr -> do
-  let
-        go n | n == l = return $ BS.fromForeignPtr fp 0 l
+    let go n | n == l = return $ BS.fromForeignPtr fp 0 l
              | otherwise = do
                 b <- getByte bh
                 pokeElemOff ptr n b
                 go (n+1)
-  --
-  go 0
+    --
+    go 0
 
 instance Binary ByteString where
   put_ bh f = putBS bh f
@@ -834,18 +833,26 @@ instance Binary RecFlag where
               0 -> do return Recursive
               _ -> do return NonRecursive
 
-instance Binary OverlapFlag where
-    put_ bh (NoOverlap  b) = putByte bh 0 >> put_ bh b
-    put_ bh (OverlapOk  b) = putByte bh 1 >> put_ bh b
-    put_ bh (Incoherent b) = putByte bh 2 >> put_ bh b
+instance Binary OverlapMode where
+    put_ bh NoOverlap   = putByte bh 0
+    put_ bh OverlapOk   = putByte bh 1
+    put_ bh Incoherent  = putByte bh 2
     get bh = do
         h <- getByte bh
-        b <- get bh
         case h of
-            0 -> return $ NoOverlap b
-            1 -> return $ OverlapOk b
-            2 -> return $ Incoherent b
-            _ -> panic ("get OverlapFlag " ++ show h)
+            0 -> return NoOverlap
+            1 -> return OverlapOk
+            2 -> return Incoherent
+            _ -> panic ("get OverlapMode" ++ show h)
+
+
+instance Binary OverlapFlag where
+    put_ bh flag = do put_ bh (overlapMode flag)
+                      put_ bh (isSafeOverlap flag)
+    get bh = do
+        h <- get bh
+        b <- get bh
+        return OverlapFlag { overlapMode = h, isSafeOverlap = b }
 
 instance Binary FixityDirection where
     put_ bh InfixL = do

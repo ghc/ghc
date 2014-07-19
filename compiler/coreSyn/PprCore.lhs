@@ -121,7 +121,7 @@ ppr_expr add_par (Cast expr co)
                if gopt Opt_SuppressCoercions dflags
                then ptext (sLit "...")
                else parens $
-                        sep [ppr co, dcolon <+> pprEqPred (coercionKind co)]
+                        sep [ppr co, dcolon <+> ppr (coercionType co)]
 
 
 ppr_expr add_par expr@(Lam _ _)

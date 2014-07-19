@@ -37,7 +37,12 @@ import Numeric          ( showHex )
 ------------------------------------------------------------------------
 -- Data pointers.
 
-type role Ptr representational
+-- The role of Ptr's parameter is phantom, as there is no relation between
+-- the Haskell representation and whathever the user puts at the end of the
+-- pointer. And phantom is useful to implement castPtr (see #9163)
+
+-- redundant role annotation checks that this doesn't change
+type role Ptr phantom  
 data Ptr a = Ptr Addr# deriving (Eq, Ord)
 -- ^ A value of type @'Ptr' a@ represents a pointer to an object, or an
 -- array of objects, which may be marshalled to or from Haskell values
@@ -56,7 +61,7 @@ nullPtr = Ptr nullAddr#
 
 -- |The 'castPtr' function casts a pointer from one type to another.
 castPtr :: Ptr a -> Ptr b
-castPtr (Ptr addr) = Ptr addr
+castPtr = coerce
 
 -- |Advances the given address by the given offset in bytes.
 plusPtr :: Ptr a -> Int -> Ptr b
@@ -82,7 +87,10 @@ minusPtr (Ptr a1) (Ptr a2) = I# (minusAddr# a1 a2)
 ------------------------------------------------------------------------
 -- Function pointers for the default calling convention.
 
-type role FunPtr representational
+-- 'FunPtr' has a phantom role for similar reasons to 'Ptr'. Note
+-- that 'FunPtr's role cannot become nominal without changes elsewhere
+-- in GHC. See Note [FFI type roles] in TcForeign.
+type role FunPtr phantom
 data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 -- ^ A value of type @'FunPtr' a@ is a pointer to a function callable
 -- from foreign code.  The type @a@ will normally be a /foreign type/,
@@ -132,7 +140,7 @@ nullFunPtr = FunPtr nullAddr#
 
 -- |Casts a 'FunPtr' to a 'FunPtr' of a different type.
 castFunPtr :: FunPtr a -> FunPtr b
-castFunPtr (FunPtr addr) = FunPtr addr
+castFunPtr = coerce
 
 -- |Casts a 'FunPtr' to a 'Ptr'.
 --

@@ -18,7 +18,7 @@ Description:
     through this package.
 Category: Development
 Build-Type: Simple
-Cabal-Version: >= 1.2.3
+Cabal-Version: >=1.10
 
 Flag ghci
     Description: Build GHCi support.
@@ -41,6 +41,7 @@ Flag stage3
     Manual: True
 
 Library
+    Default-Language: Haskell2010
     Exposed: False
 
     Build-Depends: base       >= 4   && < 5,
@@ -53,7 +54,9 @@ Library
                    filepath   >= 1   && < 1.4,
                    Cabal,
                    hpc,
-                   transformers
+                   transformers,
+                   bin-package-db,
+                   hoopl
 
     if flag(stage1) && impl(ghc < 7.5)
         Build-Depends: old-time   >= 1   && < 1.2
@@ -70,16 +73,34 @@ Library
         CPP-Options: -DGHCI
         Include-Dirs: ../rts/dist/build @FFIIncludeDir@
 
-    Build-Depends: bin-package-db
-    Build-Depends: hoopl
-
-    Extensions: CPP, MagicHash, UnboxedTuples, PatternGuards,
-                ForeignFunctionInterface, EmptyDataDecls,
-                TypeSynonymInstances, MultiParamTypeClasses,
-                FlexibleInstances, RankNTypes, ScopedTypeVariables,
-                DeriveDataTypeable, BangPatterns
-    if impl(ghc >= 7.1)
-        Extensions: NondecreasingIndentation
+    Other-Extensions:
+        BangPatterns
+        CPP
+        DataKinds
+        DeriveDataTypeable
+        DeriveFoldable
+        DeriveFunctor
+        DeriveTraversable
+        DisambiguateRecordFields
+        ExplicitForAll
+        FlexibleContexts
+        FlexibleInstances
+        GADTs
+        GeneralizedNewtypeDeriving
+        MagicHash
+        MultiParamTypeClasses
+        NamedFieldPuns
+        NondecreasingIndentation
+        RankNTypes
+        RecordWildCards
+        ScopedTypeVariables
+        StandaloneDeriving
+        Trustworthy
+        TupleSections
+        TypeFamilies
+        TypeSynonymInstances
+        UnboxedTuples
+        UndecidableInstances
 
     Include-Dirs: . parser utils
 
@@ -96,8 +117,6 @@ Library
 
     c-sources:
         parser/cutils.c
-
-    c-sources:
         ghci/keepCAFsForGHCi.c
         cbits/genSym.c
 
@@ -232,11 +251,8 @@ Library
         CoreTidy
         CoreUnfold
         CoreUtils
-        ExternalCore
         MkCore
-        MkExternalCore
         PprCore
-        PprExternalCore
         Check
         Coverage
         Desugar
@@ -303,12 +319,9 @@ Library
         TidyPgm
         Ctype
         HaddockUtils
-        LexCore
         Lexer
         OptCoercion
         Parser
-        ParserCore
-        ParserCoreUtils
         RdrHsSyn
         ForeignCall
         PrelInfo

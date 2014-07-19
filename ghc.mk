@@ -425,13 +425,6 @@ PACKAGES_STAGE2 += haskell98
 PACKAGES_STAGE2 += haskell2010
 endif
 
-# We normally install only the packages down to this point
-REGULAR_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
-ifneq "$(Stage1Only)" "YES"
-REGULAR_INSTALL_PACKAGES += compiler
-endif
-REGULAR_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
-
 PACKAGES_STAGE1 += xhtml
 ifeq "$(Windows_Target)" "NO"
 ifneq "$(TargetOS_CPP)" "ios"
@@ -439,6 +432,13 @@ PACKAGES_STAGE1 += terminfo
 endif
 endif
 PACKAGES_STAGE1 += haskeline
+
+# We normally install only the packages down to this point
+REGULAR_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
+ifneq "$(Stage1Only)" "YES"
+REGULAR_INSTALL_PACKAGES += compiler
+endif
+REGULAR_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 
 # If we have built the programs with dynamic libraries, then
 # ghc will be dynamically linked against haskeline.so etc, so
@@ -452,9 +452,17 @@ ifneq "$(CrossCompiling)" "YES"
 define addExtraPackage
 ifeq "$2" "-"
 # Do nothing; this package is already handled above
-else ifeq "$2 $$(GhcProfiled)" "dph YES"
-# Ignore the package: These packages need TH, which is incompatible
-# with a profiled GHC
+else ifeq "$2" "dph"
+## DPH-specific clause
+ifeq "$$(GhcProfiled)" "YES"
+# Ignore package: The DPH packages need TH, which is incompatible with
+# a profiled GHC
+else ifneq "$$(BUILD_DPH)" "YES"
+# Ignore package: DPH was disabled
+else
+PACKAGES_STAGE2 += $1
+endif
+## end of DPH-specific clause
 else
 PACKAGES_STAGE2 += $1
 endif
@@ -635,7 +643,9 @@ ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
 BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
+ifeq "$(BUILD_DPH)" "YES"
 BUILD_DIRS += $(wildcard libraries/dph)
+endif
 endif
 
 
@@ -1131,7 +1141,6 @@ sdist-ghc-prep :
 	$(call sdist_ghc_file,compiler,stage2,cmm,,CmmParse,y)
 	$(call sdist_ghc_file,compiler,stage2,parser,,Lexer,x)
 	$(call sdist_ghc_file,compiler,stage2,parser,,Parser,y.pp)
-	$(call sdist_ghc_file,compiler,stage2,parser,,ParserCore,y)
 	$(call sdist_ghc_file,utils/hpc,dist-install,,,HpcParser,y)
 	$(call sdist_ghc_file,utils/genprimopcode,dist,,,Lexer,x)
 	$(call sdist_ghc_file,utils/genprimopcode,dist,,,Parser,y)

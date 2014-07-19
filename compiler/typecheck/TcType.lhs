@@ -15,6 +15,8 @@ The "tc" prefix is for "TypeChecker", because the type checker
 is the principal client.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcType (
   --------------------------------
   -- Types
@@ -478,7 +480,7 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_untch = untch })
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
 pprUserTypeCtxt (FunSigCtxt n)    = ptext (sLit "the type signature for") <+> quotes (ppr n)
-pprUserTypeCtxt (RuleSigCtxt n)    = ptext (sLit "a RULE for") <+> quotes (ppr n)
+pprUserTypeCtxt (RuleSigCtxt n)   = ptext (sLit "a RULE for") <+> quotes (ppr n)
 pprUserTypeCtxt ExprSigCtxt       = ptext (sLit "an expression type signature")
 pprUserTypeCtxt (ConArgCtxt c)    = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
 pprUserTypeCtxt (TySynCtxt c)     = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
@@ -734,7 +736,7 @@ mkTcEqPred :: TcType -> TcType -> Type
 mkTcEqPred ty1 ty2
   = mkTyConApp eqTyCon [k, ty1, ty2]
   where
-    k = defaultKind (typeKind ty1)
+    k = typeKind ty1
 \end{code}
 
 @isTauTy@ tests for nested for-alls.  It should not be called on a boxy type.
@@ -961,7 +963,7 @@ tcInstHeadTyNotSynonym :: Type -> Bool
 -- are transparent, so we need a special function here
 tcInstHeadTyNotSynonym ty
   = case ty of
-        TyConApp tc _ -> not (isSynTyCon tc)
+        TyConApp tc _ -> not (isTypeSynonymTyCon tc)
         _ -> True
 
 tcInstHeadTyAppAllTyVars :: Type -> Bool

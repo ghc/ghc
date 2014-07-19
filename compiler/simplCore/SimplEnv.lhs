@@ -4,6 +4,8 @@
 \section[SimplMonad]{The simplifier Monad}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module SimplEnv (
         InId, InBind, InExpr, InAlt, InArg, InType, InBndr, InVar,
         OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBndr, OutVar,

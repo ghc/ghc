@@ -22,3 +22,4 @@ test('massive_array',
 test('T7237', normal, compile, [''])
 test('T7574', [cmm_src, omit_ways(['llvm', 'optllvm'])], compile, [''])
 test('T8205', normal, compile, ['-O0'])
+test('T9155', normal, compile, ['-O2'])

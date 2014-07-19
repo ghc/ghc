@@ -4,6 +4,8 @@
 \section{Code output phase}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module CodeOutput( codeOutput, outputForeignStubs ) where
 
 #include "HsVersions.h"
@@ -72,7 +74,6 @@ codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
                 ; return cmm
                 }
 
-        ; showPass dflags "CodeOutput"
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
         ; case hscTarget dflags of {
              HscAsm         -> outputAsm dflags this_mod filenm linted_cmm_stream;
@@ -190,11 +191,8 @@ outputForeignStubs dflags mod location stubs
    stub_c <- newTempName dflags "c"
 
    case stubs of
-     NoStubs -> do
-        -- When compiling External Core files, may need to use stub
-        -- files from a previous compilation
-        stub_h_exists <- doesFileExist stub_h
-        return (stub_h_exists, Nothing)
+     NoStubs ->
+        return (False, Nothing)
 
      ForeignStubs h_code c_code -> do
         let

@@ -1,4 +1,7 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
+
+use warnings;
+
 my $quote_open = 0;
 my $quote_char = '';
 my $accum = "";

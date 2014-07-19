@@ -338,6 +338,11 @@ EXTERN_INLINE StgWord bco_sizeW ( StgBCO *bco );
 EXTERN_INLINE StgWord bco_sizeW ( StgBCO *bco )
 { return bco->size; }
 
+/*
+ * TODO: Consider to switch return type from 'nat' to 'StgWord' #8742
+ *
+ * (Also for 'closure_sizeW' below)
+ */
 EXTERN_INLINE nat closure_sizeW_ (StgClosure *p, StgInfoTable *info);
 EXTERN_INLINE nat
 closure_sizeW_ (StgClosure *p, StgInfoTable *info)

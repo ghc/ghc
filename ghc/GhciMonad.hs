@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, FlexibleInstances, UnboxedTuples, MagicHash #-}
 {-# OPTIONS_GHC -fno-cse -fno-warn-orphans #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -32,6 +33,7 @@ import Outputable       hiding (printForUser, printForUserPartWay)
 import qualified Outputable
 import Util
 import DynFlags
+import FastString
 import HscTypes
 import SrcLoc
 import Module
@@ -104,7 +106,8 @@ data GHCiState = GHCiState
 
         -- help text to display to a user
         short_help :: String,
-        long_help  :: String
+        long_help  :: String,
+        lastErrorLocations :: IORef [(FastString, Int)]
      }
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]

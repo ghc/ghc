@@ -85,7 +85,7 @@ newtype N5 a b
 newtype N6 a b =  docs on the constructor only N6 {n6 :: a b}
 <document comment>
 newtype N7 a b =  The 'N7' constructor N7 {n7 :: a b}
-class D a => C a where
+class (D a) => C a where
   a :: IO a
   b :: [a]
   c :: a

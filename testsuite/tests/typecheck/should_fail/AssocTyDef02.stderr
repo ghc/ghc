@@ -1,6 +1,6 @@
 
-AssocTyDef02.hs:6:10:
-    Type indexes must match class instance head
-    Found ‘[b]’ but expected ‘a’
-    In the type synonym instance default declaration for ‘Typ’
-    In the class declaration for ‘Cls’
+AssocTyDef02.hs:6:14:
+    Unexpected type ‘[b]’
+    In the default declaration for ‘Typ’
+    A default declaration should have form
+      default Typ a = ...

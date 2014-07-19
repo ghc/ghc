@@ -98,7 +98,7 @@ become roots for all subsequent minor GCs.
 When the thunks eventually get evaluated they will each create a new
 intermediate 'TimeoutQueue' that immediately becomes garbage.  Since
 the thunks serve as roots until the next major GC these intermediate
-'TimeoutQueue's will get copied unnecesarily in the next minor GC,
+'TimeoutQueue's will get copied unnecessarily in the next minor GC,
 increasing GC time.  This problem is known as "floating garbage".
 
 Keeping a list of edits doesn't stop this from happening but makes the

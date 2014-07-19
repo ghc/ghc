@@ -127,6 +127,61 @@ instance TestEquality ((:~:) a) where
 type family (a :: k) == (b :: k) :: Bool
 infix 4 ==
 
+{-
+This comment explains more about why a poly-kinded instance for (==) is
+not provided. To be concrete, here would be the poly-kinded instance:
+
+type family EqPoly (a :: k) (b :: k) where
+ EqPoly a a = True
+ EqPoly a b = False
+type instance (a :: k) == (b :: k) = EqPoly a b
+
+Note that this overlaps with every other instance -- if this were defined,
+it would be the only instance for (==).
+
+Now, consider
+data Nat = Zero | Succ Nat
+
+Suppose I want
+foo :: (Succ n == Succ m) ~ True => ((n == m) :~: True)
+foo = Refl
+
+This would not type-check with the poly-kinded instance. `Succ n == Succ m`
+quickly becomes `EqPoly (Succ n) (Succ m)` but then is stuck. We don't know
+enough about `n` and `m` to reduce further.
+
+On the other hand, consider this:
+
+type family EqNat (a :: Nat) (b :: Nat) where
+ EqNat Zero     Zero     = True
+ EqNat (Succ n) (Succ m) = EqNat n m
+ EqNat n        m        = False
+type instance (a :: Nat) == (b :: Nat) = EqNat a b
+
+With this instance, `foo` type-checks fine. `Succ n == Succ m` becomes `EqNat
+(Succ n) (Succ m)` which becomes `EqNat n m`. Thus, we can conclude `(n == m)
+~ True` as desired.
+
+So, the Nat-specific instance allows strictly more reductions, and is thus
+preferable to the poly-kinded instance. But, if we introduce the poly-kinded
+instance, we are barred from writing the Nat-specific instance, due to
+overlap.
+
+Even better than the current instance for * would be one that does this sort
+of recursion for all datatypes, something like this:
+
+type family EqStar (a :: *) (b :: *) where
+ EqStar Bool Bool = True
+ EqStar (a,b) (c,d) = a == c && b == d
+ EqStar (Maybe a) (Maybe b) = a == b
+ ...
+ EqStar a b = False
+
+The problem is the (...) is extensible -- we would want to add new cases for
+all datatypes in scope. This is not currently possible for closed type
+families.
+-}
+
 -- all of the following closed type families are local to this module
 type family EqStar (a :: *) (b :: *) where
   EqStar a a = True

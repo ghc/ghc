@@ -25,7 +25,7 @@ test('T3001-2',
 test('scc001', [req_profiling,
                 extra_ways(['prof']), only_ways(prof_ways)],
      compile_and_run,
-     ['-fno-state-hack']) # Note [consistent stacks]
+     ['-fno-state-hack -fno-full-laziness']) # Note [consistent stacks]
 
 test('scc002', [req_profiling,
                 extra_ways(['prof']), only_ways(prof_ways)],

@@ -27,6 +27,8 @@ which is the Arity taking into account any expanded arguments, and corresponds t
 the number of (possibly-void) *registers* arguments will arrive in.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module UnariseStg (unarise) where
 
 #include "HsVersions.h"

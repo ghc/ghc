@@ -4,6 +4,8 @@
 \section[StgLint]{A ``lint'' pass to check for Stg correctness}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module StgLint ( lintStgBindings ) where
 
 import StgSyn

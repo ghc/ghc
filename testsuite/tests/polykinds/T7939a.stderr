@@ -4,4 +4,4 @@ T7939a.hs:7:5:
     The first argument of ‘F’ should have kind ‘*’,
       but ‘Maybe’ has kind ‘* -> *’
     In the type ‘Maybe’
-    In the family declaration for ‘F’
+    In the type family declaration for ‘F’

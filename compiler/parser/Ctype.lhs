@@ -1,7 +1,8 @@
 Character classification
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -18,7 +19,7 @@ module Ctype
 	, is_digit	-- Char# -> Bool
 	, is_alphanum   -- Char# -> Bool
 
-	, is_decdigit, is_hexdigit, is_octdigit
+	, is_decdigit, is_hexdigit, is_octdigit, is_bindigit
 	, hexDigit, octDecDigit
 	) where
 
@@ -85,6 +86,9 @@ is_hexdigit c
 
 is_octdigit :: Char -> Bool
 is_octdigit c = c >= '0' && c <= '7'
+
+is_bindigit :: Char -> Bool
+is_bindigit c = c == '0' || c == '1'
 
 to_lower :: Char -> Char
 to_lower c

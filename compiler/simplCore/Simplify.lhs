@@ -4,6 +4,8 @@
 \section[Simplify]{The main module of the simplifier}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module Simplify ( simplTopBinds, simplExpr ) where
 
 #include "HsVersions.h"
@@ -219,9 +221,7 @@ simplTopBinds env0 binds0
                 -- It's rather as if the top-level binders were imported.
                 -- See note [Glomming] in OccurAnal.
         ; env1 <- simplRecBndrs env0 (bindersOfBinds binds0)
-        ; dflags <- getDynFlags
-        ; let dump_flag = dopt Opt_D_verbose_core2core dflags
-        ; env2 <- simpl_binds dump_flag env1 binds0
+        ; env2 <- simpl_binds env1 binds0
         ; freeTick SimplifierDone
         ; return env2 }
   where
@@ -229,16 +229,10 @@ simplTopBinds env0 binds0
         -- they should have their fragile IdInfo zapped (notably occurrence info)
         -- That's why we run down binds and bndrs' simultaneously.
         --
-        -- The dump-flag emits a trace for each top-level binding, which
-        -- helps to locate the tracing for inlining and rule firing
-    simpl_binds :: Bool -> SimplEnv -> [InBind] -> SimplM SimplEnv
-    simpl_binds _    env []           = return env
-    simpl_binds dump env (bind:binds) = do { env' <- trace_bind dump bind $
-                                                     simpl_bind env bind
-                                           ; simpl_binds dump env' binds }
-
-    trace_bind True  bind = pprTrace "SimplBind" (ppr (bindersOf bind))
-    trace_bind False _    = \x -> x
+    simpl_binds :: SimplEnv -> [InBind] -> SimplM SimplEnv
+    simpl_binds env []           = return env
+    simpl_binds env (bind:binds) = do { env' <- simpl_bind env bind
+                                      ; simpl_binds env' binds }
 
     simpl_bind env (Rec pairs)  = simplRecBind      env  TopLevel pairs
     simpl_bind env (NonRec b r) = simplRecOrTopPair env' TopLevel NonRecursive b b' r
@@ -293,12 +287,21 @@ simplRecOrTopPair :: SimplEnv
                   -> SimplM SimplEnv    -- Returns an env that includes the binding
 
 simplRecOrTopPair env top_lvl is_rec old_bndr new_bndr rhs
-  = do dflags <- getDynFlags
-       -- Check for unconditional inline
-       if preInlineUnconditionally dflags env top_lvl old_bndr rhs
+  = do { dflags <- getDynFlags
+       ; trace_bind dflags $
+           if preInlineUnconditionally dflags env top_lvl old_bndr rhs
+                    -- Check for unconditional inline
            then do tick (PreInlineUnconditionally old_bndr)
                    return (extendIdSubst env old_bndr (mkContEx env rhs))
-           else simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env
+           else simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env }
+  where
+    trace_bind dflags thing_inside
+      | not (dopt Opt_D_verbose_core2core dflags)
+      = thing_inside
+      | otherwise
+      = pprTrace "SimplBind" (ppr old_bndr) thing_inside
+        -- trace_bind emits a trace for each top-level binding, which
+        -- helps to locate the tracing for inlining and rule firing
 \end{code}
 
 

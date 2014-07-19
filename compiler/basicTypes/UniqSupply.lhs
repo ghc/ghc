@@ -4,6 +4,8 @@
 %
 
 \begin{code}
+{-# LANGUAGE UnboxedTuples #-}
+
 module UniqSupply (
         -- * Main data type
         UniqSupply, -- Abstractly

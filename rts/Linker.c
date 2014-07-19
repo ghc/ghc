@@ -1186,7 +1186,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_newBCOzh)                                       \
       SymI_HasProto(stg_newByteArrayzh)                                 \
       SymI_HasProto(stg_casIntArrayzh)                                  \
-      SymI_HasProto(stg_fetchAddIntArrayzh)                             \
       SymI_HasProto(stg_newMVarzh)                                      \
       SymI_HasProto(stg_newMutVarzh)                                    \
       SymI_HasProto(stg_newTVarzh)                                      \
@@ -1900,6 +1899,7 @@ addDLL( pathchar *dll_name )
             // success -- try to dlopen the first named file
             IF_DEBUG(linker, debugBelch("match%s\n",""));
             line[match[2].rm_eo] = '\0';
+            stgFree((void*)errmsg); // Free old message before creating new one
             errmsg = internal_dlopen(line+match[2].rm_so);
             break;
          }
@@ -2718,6 +2718,7 @@ loadArchive( pathchar *path )
 
             if (0 == loadOc(oc)) {
                 stgFree(fileName);
+                fclose(f);
                 return 0;
             }
         }
@@ -4143,6 +4144,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       if (0==strcmp(".text",(char*)secname) ||
           0==strcmp(".text.startup",(char*)secname) ||
+          0==strcmp(".text.unlikely", (char*)secname) ||
           0==strcmp(".rdata",(char*)secname)||
           0==strcmp(".eh_frame", (char*)secname)||
           0==strcmp(".rodata",(char*)secname))

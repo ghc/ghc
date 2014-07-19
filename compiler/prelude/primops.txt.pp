@@ -843,8 +843,22 @@ primop CasArrayOp  "casArray#" GenPrimOp
 section "Small Arrays"
 
 	{Operations on {\tt SmallArray\#}. A {\tt SmallArray\#} works
-         just like an {\tt Array\#}, except that its implementation is
-         optimized for small arrays (i.e. no more than 128 elements.)}
+         just like an {\tt Array\#}, but with different space use and
+         performance characteristics (that are often useful with small
+         arrays). The {\tt SmallArray\#} and {\tt SmallMutableArray#}
+         lack a `card table'. The purpose of a card table is to avoid
+         having to scan every element of the array on each GC by
+         keeping track of which elements have changed since the last GC
+         and only scanning those that have changed. So the consequence
+         of there being no card table is that the representation is
+         somewhat smaller and the writes are somewhat faster (because
+         the card table does not need to be updated). The disadvantage
+         of course is that for a {\tt SmallMutableArray#} the whole
+         array has to be scanned on each GC. Thus it is best suited for
+         use cases where the mutable array is not long lived, e.g.
+         where a mutable array is initialised quickly and then frozen
+         to become an immutable {\tt SmallArray\#}.
+        }
 
 ------------------------------------------------------------------------
 
@@ -1082,34 +1096,42 @@ primop IndexByteArrayOp_StablePtr "indexStablePtrArray#" GenPrimOp
 
 primop IndexByteArrayOp_Int8 "indexInt8Array#" GenPrimOp
    ByteArray# -> Int# -> Int#
+   {Read 8-bit integer; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
    ByteArray# -> Int# -> Int#
+   {Read 16-bit integer; offset in 16-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
    ByteArray# -> Int# -> INT32
+   {Read 32-bit integer; offset in 32-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
    ByteArray# -> Int# -> INT64
+   {Read 64-bit integer; offset in 64-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8 "indexWord8Array#" GenPrimOp
    ByteArray# -> Int# -> Word#
+   {Read 8-bit word; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
    ByteArray# -> Int# -> Word#
+   {Read 16-bit word; offset in 16-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
    ByteArray# -> Int# -> WORD32
+   {Read 32-bit word; offset in 32-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
    ByteArray# -> Int# -> WORD64
+   {Read 64-bit word; offset in 64-bit words.}
    with can_fail = True
 
 primop  ReadByteArrayOp_Char "readCharArray#" GenPrimOp
@@ -1126,11 +1148,13 @@ primop  ReadByteArrayOp_WideChar "readWideCharArray#" GenPrimOp
 
 primop  ReadByteArrayOp_Int "readIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   {Read intger; offset in words.}
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word "readWordArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   {Read word; offset in words.}
    with has_side_effects = True
         can_fail = True
 
@@ -1339,19 +1363,79 @@ primop  SetByteArrayOp "setByteArray#" GenPrimOp
   code_size = { primOpCodeSizeForeignCall + 4 }
   can_fail = True
 
+-- Atomic operations
+
+primop  AtomicReadByteArrayOp_Int "atomicReadIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array and an offset in Int units, read an element. The
+    index is assumed to be in bounds. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop  AtomicWriteByteArrayOp_Int "atomicWriteIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   {Given an array and an offset in Int units, write an element. The
+    index is assumed to be in bounds. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
 primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #)
-   {Machine-level atomic compare and swap on a word within a ByteArray.}
-   with
-   out_of_line = True
-   has_side_effects = True
+   {Given an array, an offset in Int units, the expected old value, and
+    the new value, perform an atomic compare and swap i.e. write the new
+    value if the current value matches the provided old value. Returns
+    the value of the element before the operation. Implies a full memory
+    barrier.}
+   with has_side_effects = True
+        can_fail = True
 
 primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
-   {Machine-level word-sized fetch-and-add within a ByteArray.}
-   with
-   out_of_line = True
-   has_side_effects = True
+   {Given an array, and offset in Int units, and a value to add,
+    atomically add the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchSubByteArrayOp_Int "fetchSubIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to subtract,
+    atomically substract the value to the element. Returns the value of
+    the element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchAndByteArrayOp_Int "fetchAndIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to AND,
+    atomically AND the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchNandByteArrayOp_Int "fetchNandIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to NAND,
+    atomically NAND the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchOrByteArrayOp_Int "fetchOrIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to OR,
+    atomically OR the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchXorByteArrayOp_Int "fetchXorIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to XOR,
+    atomically XOR the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
 
 
 ------------------------------------------------------------------------
@@ -2413,7 +2497,7 @@ pseudoop   "seq"
    { Evaluates its first argument to head normal form, and then returns its second
 	argument as the result. }
 
-primtype Any k
+primtype Any
 	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
 	lifted type, and back.
 
@@ -2438,8 +2522,11 @@ primtype Any k
 
 	{\tt length (Any *) ([] (Any *))}
 
-        Note that {\tt Any} is kind polymorphic, and takes a kind {\tt k} as its
-        first argument. The kind of {\tt Any} is thus {\tt forall k. k -> k}.}
+        Above, we print kinds explicitly, as if with
+        {\tt -fprint-explicit-kinds}.
+
+        Note that {\tt Any} is kind polymorphic; its kind is thus
+        {\tt forall k. k}.}
 
 primtype AnyK
         { The kind {\tt AnyK} is the kind level counterpart to {\tt Any}. In a

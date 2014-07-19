@@ -5,7 +5,8 @@
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -53,6 +54,7 @@ import TcType
 import Type
 import TypeRep( Type(..) )  -- For the mkNakedXXX stuff
 import Kind
+import RdrName( lookupLocalRdrOcc )
 import Var
 import VarSet
 import TyCon
@@ -72,8 +74,9 @@ import Outputable
 import FastString
 import Util
 
+import Data.Maybe( isNothing )
 import Control.Monad ( unless, when, zipWithM )
-import PrelNames( ipClassName, funTyConKey )
+import PrelNames( ipClassName, funTyConKey, allNameStrings )
 \end{code}
 
 
@@ -207,18 +210,22 @@ tc_inst_head hs_ty
   = tc_hs_type hs_ty ekConstraint
 
 -----------------
-tcHsDeriv :: HsType Name -> TcM ([TyVar], Class, [Type])
--- Like tcHsSigTypeNC, but for the ...deriving( ty ) clause
-tcHsDeriv hs_ty 
-  = do { kind <- newMetaKindVar
-       ; ty   <- tcCheckHsTypeAndGen hs_ty kind
-                 -- Funny newtype deriving form
-                 -- 	forall a. C [a]
-                 -- where C has arity 2. Hence any-kinded result
-       ; ty   <- zonkSigType ty
+tcHsDeriv :: HsType Name -> TcM ([TyVar], Class, [Type], Kind)
+-- Like tcHsSigTypeNC, but for the ...deriving( C t1 ty2 ) clause
+-- Returns the C, [ty1, ty2, and the kind of C's *next* argument
+-- E.g.    class C (a::*) (b::k->k)
+--         data T a b = ... deriving( C Int )
+--    returns ([k], C, [k, Int],  k->k)
+-- Also checks that (C ty1 ty2 arg) :: Constraint
+-- if arg has a suitable kind
+tcHsDeriv hs_ty
+  = do { arg_kind <- newMetaKindVar
+       ; ty <- tcCheckHsTypeAndGen hs_ty (mkArrowKind arg_kind constraintKind)
+       ; ty       <- zonkSigType ty
+       ; arg_kind <- zonkSigType arg_kind
        ; let (tvs, pred) = splitForAllTys ty
        ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, cls, tys)
+           Just (cls, tys) -> return (tvs, cls, tys, arg_kind)
            Nothing -> failWithTc (ptext (sLit "Illegal deriving item") <+> quotes (ppr hs_ty)) }
 
 -- Used for 'VECTORISE [SCALAR] instance' declarations
@@ -389,13 +396,17 @@ tc_hs_type hs_ty@(HsAppTy ty1 ty2) exp_kind
     (fun_ty, arg_tys) = splitHsAppTys ty1 [ty2]
 
 --------- Foralls
-tc_hs_type hs_ty@(HsForAllTy _ hs_tvs context ty) exp_kind
-  = tcHsTyVarBndrs hs_tvs $ \ tvs' -> 
+tc_hs_type hs_ty@(HsForAllTy _ hs_tvs context ty) exp_kind@(EK exp_k _)
+  | isConstraintKind exp_k
+  = failWithTc (hang (ptext (sLit "Illegal constraint:")) 2 (ppr hs_ty))
+
+  | otherwise
+  = tcHsTyVarBndrs hs_tvs $ \ tvs' ->
     -- Do not kind-generalise here!  See Note [Kind generalisation]
     do { ctxt' <- tcHsContext context
        ; ty' <- if null (unLoc context) then  -- Plain forall, no context
                    tc_lhs_type ty exp_kind    -- Why exp_kind?  See Note [Body kind of forall]
-                else     
+                else
                    -- If there is a context, then this forall is really a
                    -- _function_, so the kind of the result really is *
                    -- The body kind (result of the function can be * or #, hence ekOpen
@@ -614,7 +625,6 @@ tcTyVar :: Name -> TcM (TcType, TcKind)
 tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
-       ; traceTc "lk2" (ppr name <+> ppr thing)
        ; case thing of
            ATyVar _ tv 
               | isKindVar tv
@@ -724,17 +734,17 @@ mkNakedAppTys ty1                tys2 = foldl AppTy ty1 tys2
 
 zonkSigType :: TcType -> TcM TcType
 -- Zonk the result of type-checking a user-written type signature
--- It may have kind varaibles in it, but no meta type variables
+-- It may have kind variables in it, but no meta type variables
 -- Because of knot-typing (see Note [Zonking inside the knot])
--- it may need to establish the Type invariants; 
+-- it may need to establish the Type invariants;
 -- hence the use of mkTyConApp and mkAppTy
 zonkSigType ty
   = go ty
   where
     go (TyConApp tc tys) = do tys' <- mapM go tys
                               return (mkTyConApp tc tys')
-                -- Key point: establish Type invariants! 
-                -- See Note [Zonking inside the knot] 
+                -- Key point: establish Type invariants!
+                -- See Note [Zonking inside the knot]
 
     go (LitTy n)         = return (LitTy n)
 
@@ -1297,6 +1307,11 @@ tcTyClTyVars tycon (HsQTvs { hsq_kvs = hs_kvs, hsq_tvs = hs_tvs }) thing_inside
        ; tvs <- zipWithM tc_hs_tv hs_tvs kinds
        ; tcExtendTyVarEnv tvs (thing_inside (kvs ++ tvs) res) }
   where
+    -- In the case of associated types, the renamer has
+    -- ensured that the names are in commmon
+    -- e.g.   class C a_29 where
+    --           type T b_30 a_29 :: *
+    -- Here the a_29 is shared
     tc_hs_tv (L _ (UserTyVar n))        kind = return (mkTyVar n kind)
     tc_hs_tv (L _ (KindedTyVar n hs_k)) kind = do { tc_kind <- tcLHsKind hs_k
                                                   ; checkKind kind tc_kind
@@ -1313,21 +1328,20 @@ tcDataKindSig kind
   = do	{ checkTc (isLiftedTypeKind res_kind) (badKindSig kind)
 	; span <- getSrcSpanM
 	; us   <- newUniqueSupply 
+        ; rdr_env <- getLocalRdrEnv
 	; let uniqs = uniqsFromSupply us
-	; return [ mk_tv span uniq str kind 
-		 | ((kind, str), uniq) <- arg_kinds `zip` dnames `zip` uniqs ] }
+              occs  = [ occ | str <- allNameStrings
+                            , let occ = mkOccName tvName str
+                            , isNothing (lookupLocalRdrOcc rdr_env occ) ]
+                 -- Note [Avoid name clashes for associated data types]
+
+	; return [ mk_tv span uniq occ kind 
+		 | ((kind, occ), uniq) <- arg_kinds `zip` occs `zip` uniqs ] }
   where
     (arg_kinds, res_kind) = splitKindFunTys kind
-    mk_tv loc uniq str kind = mkTyVar name kind
-	where
-	   name = mkInternalName uniq occ loc
-	   occ  = mkOccName tvName str
+    mk_tv loc uniq occ kind 
+      = mkTyVar (mkInternalName uniq occ loc) kind
 	  
-    dnames = map ('$' :) names	-- Note [Avoid name clashes for associated data types]
-
-    names :: [String]
-    names = [ c:cs | cs <- "" : names, c <- ['a'..'z'] ] 
-
 badKindSig :: Kind -> SDoc
 badKindSig kind 
  = hang (ptext (sLit "Kind signature on data type declaration has non-* return kind"))
@@ -1338,19 +1352,17 @@ Note [Avoid name clashes for associated data types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider    class C a b where
                data D b :: * -> *
-When typechecking the decl for D, we'll invent an extra type variable for D,
-to fill out its kind.  We *don't* want this type variable to be 'a', because
-in an .hi file we'd get
+When typechecking the decl for D, we'll invent an extra type variable
+for D, to fill out its kind.  Ideally we don't want this type variable
+to be 'a', because when pretty printing we'll get
             class C a b where
-               data D b a 
-which makes it look as if there are *two* type indices.  But there aren't!
-So we use $a instead, which cannot clash with a user-written type variable.
-Remember that type variable binders in interface files are just FastStrings,
-not proper Names.
+               data D b a0 
+(NB: the tidying happens in the conversion to IfaceSyn, which happens
+as part of pretty-printing a TyThing.)
 
-(The tidying phase can't help here because we don't tidy TyCons.  Another
-alternative would be to record the number of indexing parameters in the 
-interface file.)
+That's why we look in the LocalRdrEnv to see what's in scope. This is
+important only to get nice-looking output when doing ":info C" in GHCi.
+It isn't essential for correctness.
 
 
 %************************************************************************

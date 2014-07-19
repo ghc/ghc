@@ -3,6 +3,8 @@
 %
 
 \begin{code}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
+
 module TcEvidence (
 
   -- HsWrapper
@@ -351,7 +353,7 @@ pprTcCo, pprParendTcCo :: TcCoercion -> SDoc
 pprTcCo       co = ppr_co TopPrec   co
 pprParendTcCo co = ppr_co TyConPrec co
 
-ppr_co :: Prec -> TcCoercion -> SDoc
+ppr_co :: TyPrec -> TcCoercion -> SDoc
 ppr_co _ (TcRefl r ty) = angleBrackets (ppr ty) <> ppr_role r
 
 ppr_co p co@(TcTyConAppCo _ tc [_,_])
@@ -404,7 +406,7 @@ ppr_role r = underscore <> pp_role
                     Representational -> char 'R'
                     Phantom          -> char 'P'
 
-ppr_fun_co :: Prec -> TcCoercion -> SDoc
+ppr_fun_co :: TyPrec -> TcCoercion -> SDoc
 ppr_fun_co p co = pprArrowChain p (split co)
   where
     split :: TcCoercion -> [SDoc]
@@ -413,7 +415,7 @@ ppr_fun_co p co = pprArrowChain p (split co)
       = ppr_co FunPrec arg : split res
     split co = [ppr_co TopPrec co]
 
-ppr_forall_co :: Prec -> TcCoercion -> SDoc
+ppr_forall_co :: TyPrec -> TcCoercion -> SDoc
 ppr_forall_co p ty
   = maybeParen p FunPrec $
     sep [pprForAll tvs, ppr_co TopPrec rho]
@@ -594,7 +596,7 @@ data EvTerm
                                  -- dictionaries, even though the former have no
                                  -- selector Id.  We count up from _0_
 
-  | EvLit EvLit       -- Dictionary for KnownNat and KnownLit classes.
+  | EvLit EvLit       -- Dictionary for KnownNat and KnownSymbol classes.
                       -- Note [KnownNat & KnownSymbol and EvLit]
 
   deriving( Data.Data, Data.Typeable)
@@ -651,7 +653,7 @@ Conclusion: a new wanted coercion variable should be made mutable.
 Note [KnownNat & KnownSymbol and EvLit]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A part of the type-level literals implementation are the classes
-"KnownNat" and "KnownLit", which provide a "smart" constructor for
+"KnownNat" and "KnownSymbol", which provide a "smart" constructor for
 defining singleton values.  Here is the key stuff from GHC.TypeLits
 
   class KnownNat (n :: Nat) where
@@ -692,7 +694,7 @@ especialy when the `KnowNat` evidence is packaged up in an existential.
 
 The story for kind `Symbol` is analogous:
   * class KnownSymbol
-  * newypte SSymbol
+  * newtype SSymbol
   * Evidence: EvLit (EvStr n)
 
 

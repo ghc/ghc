@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 module CmmPipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into
   -- optimized, CPS converted and native-call-less C--.  The latter
@@ -35,8 +37,6 @@ cmmPipeline  :: HscEnv -- Compilation env including
 
 cmmPipeline hsc_env topSRT prog =
   do let dflags = hsc_dflags hsc_env
-
-     showPass dflags "CPSZ"
 
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
 

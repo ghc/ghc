@@ -1,0 +1,4 @@
+
+T9161-1.hs:6:14:
+    Pattern synonym ‘PATTERN’ used as a type
+    In the type signature for ‘wrongLift’: wrongLift :: PATTERN

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 
 module CmmType
     ( CmmType   -- Abstract

@@ -3,7 +3,8 @@
 %
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -23,7 +24,6 @@ module Unify (
 
         -- Side-effect free unification
         tcUnifyTy, tcUnifyTys, BindFlag(..),
-        niFixTvSubst, niSubstTvSet,
 
         UnifyResultM(..), UnifyResult, tcUnifyTysFG
 
@@ -204,6 +204,8 @@ match _ subst (LitTy x) (LitTy y) | x == y  = return subst
 
 match _ _ _ _
   = Nothing
+
+
 
 --------------
 match_kind :: MatchEnv -> TvSubstEnv -> Kind -> Kind -> Maybe TvSubstEnv
@@ -470,19 +472,52 @@ During unification we use a TvSubstEnv that is
   (a) non-idempotent
   (b) loop-free; ie repeatedly applying it yields a fixed point
 
+Note [Finding the substitution fixpoint]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Finding the fixpoint of a non-idempotent substitution arising from a
+unification is harder than it looks, because of kinds.  Consider
+   T k (H k (f:k)) ~ T * (g:*)
+If we unify, we get the substitution
+   [ k -> *
+   , g -> H k (f:k) ]
+To make it idempotent we don't want to get just
+   [ k -> *
+   , g -> H * (f:k) ]
+We also want to substitute inside f's kind, to get
+   [ k -> *
+   , g -> H k (f:*) ]
+If we don't do this, we may apply the substitition to something,
+and get an ill-formed type, i.e. one where typeKind will fail.
+This happened, for example, in Trac #9106.
+
+This is the reason for extending env with [f:k -> f:*], in the
+definition of env' in niFixTvSubst
+
 \begin{code}
 niFixTvSubst :: TvSubstEnv -> TvSubst
 -- Find the idempotent fixed point of the non-idempotent substitution
+-- See Note [Finding the substitution fixpoint]
 -- ToDo: use laziness instead of iteration?
 niFixTvSubst env = f env
   where
-    f e | not_fixpoint = f (mapVarEnv (substTy subst) e)
-        | otherwise    = subst
+    f env | not_fixpoint = f (mapVarEnv (substTy subst') env)
+          | otherwise    = subst
         where
-          range_tvs    = foldVarEnv (unionVarSet . tyVarsOfType) emptyVarSet e
-          subst        = mkTvSubst (mkInScopeSet range_tvs) e 
-          not_fixpoint = foldVarSet ((||) . in_domain) False range_tvs
-          in_domain tv = tv `elemVarEnv` e
+          not_fixpoint  = foldVarSet ((||) . in_domain) False all_range_tvs
+          in_domain tv  = tv `elemVarEnv` env
+
+          range_tvs     = foldVarEnv (unionVarSet . tyVarsOfType) emptyVarSet env
+          all_range_tvs = closeOverKinds range_tvs
+          subst         = mkTvSubst (mkInScopeSet all_range_tvs) env
+
+             -- env' extends env by replacing any free type with 
+             -- that same tyvar with a substituted kind
+             -- See note [Finding the substitution fixpoint]
+          env'          = extendVarEnvList env [ (rtv, mkTyVarTy $ setTyVarKind rtv $
+                                                       substTy subst $ tyVarKind rtv)
+                                               | rtv <- varSetElems range_tvs
+                                               , not (in_domain rtv) ]
+          subst'        = mkTvSubst (mkInScopeSet all_range_tvs) env'
 
 niSubstTvSet :: TvSubstEnv -> TyVarSet -> TyVarSet
 -- Apply the non-idempotent substitution to a set of type variables,
@@ -620,6 +655,7 @@ uUnrefined subst tv1 ty2 ty2'	-- ty2 is not a type variable
                                         -- See Note [Fine-grained unification]
   | otherwise
   = do { subst' <- unify subst k1 k2
+       -- Note [Kinds Containing Only Literals]
        ; bindTv subst' tv1 ty2 }	-- Bind tyvar to the synonym if poss
   where
     k1 = tyVarKind tv1

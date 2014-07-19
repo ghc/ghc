@@ -1,5 +1,5 @@
-{-# OPTIONS -fno-cse #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation #-}
+{-# OPTIONS_GHC -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 -----------------------------------------------------------------------------
@@ -54,7 +54,6 @@ import Util
 import StringBuffer     ( hGetStringBuffer )
 import BasicTypes       ( SuccessFlag(..) )
 import Maybes           ( expectJust )
-import ParserCoreUtils  ( getCoreModuleName )
 import SrcLoc
 import FastString
 import LlvmCodeGen      ( llvmFixupAsm )
@@ -169,8 +168,6 @@ compileOne' m_tc_result mHscMessage
    output_fn <- getOutputFilename next_phase
                         Temporary basename dflags next_phase (Just location)
 
-   let extCore_filename = basename ++ ".hcr"
-
    -- -fforce-recomp should also work with --make
    let force_recomp = gopt Opt_ForceRecomp dflags
        source_modified
@@ -207,7 +204,7 @@ compileOne' m_tc_result mHscMessage
                                                hm_linkable = maybe_old_linkable })
                    _ -> do guts0 <- hscDesugar hsc_env summary tc_result
                            guts <- hscSimplify hsc_env guts0
-                           (iface, _changed, details, cgguts) <- hscNormalIface hsc_env extCore_filename guts mb_old_hash
+                           (iface, _changed, details, cgguts) <- hscNormalIface hsc_env guts mb_old_hash
                            (hasStub, comp_bc, modBreaks) <- hscInteractive hsc_env cgguts summary
 
                            stub_o <- case hasStub of
@@ -231,7 +228,9 @@ compileOne' m_tc_result mHscMessage
                                                 hm_iface    = iface,
                                                 hm_linkable = Just linkable })
                HscNothing ->
-                   do (iface, _changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
+                   do (iface, changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
+                      when (gopt Opt_WriteInterface dflags) $
+                         hscWriteIface dflags iface changed summary
                       let linkable = if isHsBoot src_flavour
                                      then maybe_old_linkable
                                      else Just (LM (ms_hs_date summary) this_mod [])
@@ -251,7 +250,7 @@ compileOne' m_tc_result mHscMessage
 
                    _ -> do guts0 <- hscDesugar hsc_env summary tc_result
                            guts <- hscSimplify hsc_env guts0
-                           (iface, changed, details, cgguts) <- hscNormalIface hsc_env extCore_filename guts mb_old_hash
+                           (iface, changed, details, cgguts) <- hscNormalIface hsc_env guts mb_old_hash
                            hscWriteIface dflags iface changed summary
 
                            -- We're in --make mode: finish the compilation pipeline.
@@ -892,16 +891,11 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
         setDynFlags dflags
 
   -- gather the imports and module name
-        (hspp_buf,mod_name,imps,src_imps) <- liftIO $
-            case src_flavour of
-                ExtCoreFile -> do  -- no explicit imports in ExtCore input.
-                    m <- getCoreModuleName input_fn
-                    return (Nothing, mkModuleName m, [], [])
-
-                _           -> do
-                    buf <- hGetStringBuffer input_fn
-                    (src_imps,imps,L _ mod_name) <- getImports dflags buf input_fn (basename <.> suff)
-                    return (Just buf, mod_name, imps, src_imps)
+        (hspp_buf,mod_name,imps,src_imps) <- liftIO $ do
+          do
+            buf <- hGetStringBuffer input_fn
+            (src_imps,imps,L _ mod_name) <- getImports dflags buf input_fn (basename <.> suff)
+            return (Just buf, mod_name, imps, src_imps)
 
   -- Take -o into account if present
   -- Very like -ohi, but we must *only* do this if we aren't linking
@@ -936,8 +930,6 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                                   then return SourceUnmodified
                                   else return SourceModified
 
-        let extCore_filename = basename ++ ".hcr"
-
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
   -- Tell the finder cache about this module
@@ -957,7 +949,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                                         ms_srcimps      = src_imps }
 
   -- run the compiler!
-        result <- liftIO $ hscCompileOneShot hsc_env' extCore_filename
+        result <- liftIO $ hscCompileOneShot hsc_env'
                                mod_summary source_unchanged
 
         return (HscOut src_flavour mod_name result,
@@ -1216,6 +1208,7 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         -- might be a hierarchical module.
         liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
 
+        ccInfo <- liftIO $ getCompilerInfo dflags
         let runAssembler inputFilename outputFilename
                 = liftIO $ as_prog dflags
                        ([ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
@@ -1230,7 +1223,9 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
                        ++ (if platformArch (targetPlatform dflags) == ArchSPARC
                            then [SysTools.Option "-mcpu=v9"]
                            else [])
-
+                       ++ (if any (ccInfo ==) [Clang, AppleClang, AppleClang51]
+                            then [SysTools.Option "-Qunused-arguments"]
+                            else [])
                        ++ [ SysTools.Option "-x"
                           , if with_cpp
                               then SysTools.Option "assembler-with-cpp"
@@ -2139,26 +2134,27 @@ joinObjectFiles dflags o_files output_fn = do
   let mySettings = settings dflags
       ldIsGnuLd = sLdIsGnuLd mySettings
       osInfo = platformOS (targetPlatform dflags)
-      ld_r args ccInfo = SysTools.runLink dflags ([
-                            SysTools.Option "-nostdlib",
-                            SysTools.Option "-Wl,-r"
-                            ]
-                         ++ (if ccInfo == Clang then []
-                              else [SysTools.Option "-nodefaultlibs"])
-                         ++ (if osInfo == OSFreeBSD
-                              then [SysTools.Option "-L/usr/lib"]
-                              else [])
-                            -- gcc on sparc sets -Wl,--relax implicitly, but
-                            -- -r and --relax are incompatible for ld, so
-                            -- disable --relax explicitly.
-                         ++ (if platformArch (targetPlatform dflags) == ArchSPARC
-                             && ldIsGnuLd
-                                then [SysTools.Option "-Wl,-no-relax"]
-                                else [])
-                         ++ map SysTools.Option ld_build_id
-                         ++ [ SysTools.Option "-o",
-                              SysTools.FileOption "" output_fn ]
-                         ++ args)
+      ld_r args cc = SysTools.runLink dflags ([
+                       SysTools.Option "-nostdlib",
+                       SysTools.Option "-Wl,-r"
+                     ]
+                     ++ (if any (cc ==) [Clang, AppleClang, AppleClang51]
+                          then []
+                          else [SysTools.Option "-nodefaultlibs"])
+                     ++ (if osInfo == OSFreeBSD
+                          then [SysTools.Option "-L/usr/lib"]
+                          else [])
+                        -- gcc on sparc sets -Wl,--relax implicitly, but
+                        -- -r and --relax are incompatible for ld, so
+                        -- disable --relax explicitly.
+                     ++ (if platformArch (targetPlatform dflags) == ArchSPARC
+                         && ldIsGnuLd
+                            then [SysTools.Option "-Wl,-no-relax"]
+                            else [])
+                     ++ map SysTools.Option ld_build_id
+                     ++ [ SysTools.Option "-o",
+                          SysTools.FileOption "" output_fn ]
+                     ++ args)
 
       -- suppress the generation of the .note.gnu.build-id section,
       -- which we don't need and sometimes causes ld to emit a

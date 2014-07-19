@@ -4,6 +4,8 @@
 \section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module Specialise ( specProgram ) where
 
 #include "HsVersions.h"

@@ -899,20 +899,37 @@ ghci> :set -fprint-explicit-foralls
 ghci> :t f
 f :: forall a. a -> a
 </screen>
-         Using <option>-fprint-explicit-kinds</option> makes GHC print kind-foralls and kind applications
+However, regardless of the flag setting, the quantifiers are printed under these circumstances:
+<itemizedlist>
+<listitem><para>For nested <literal>foralls</literal>, e.g.
+<screen>
+ghci> :t GHC.ST.runST
+GHC.ST.runST :: (forall s. GHC.ST.ST s a) -> a
+</screen>
+</para></listitem>
+<listitem><para>If any of the quantified type variables has a kind
+that mentions a kind variable, e.g.
+<screen>
+ghci> :i Data.Coerce.coerce
+coerce ::
+  forall (k :: BOX) (a :: k) (b :: k). Coercible a b => a -> b
+     -- Defined in GHC.Prim
+</screen>
+</para></listitem>
+</itemizedlist>
+          </para>
+          <para>
+         Using <option>-fprint-explicit-kinds</option> makes GHC print kind arguments
          in types, which are normally suppressed.  This can be important when you are using kind polymorphism.
          For example:
 <screen>
 ghci> :set -XPolyKinds
 ghci> data T a = MkT
 ghci> :t MkT
-MkT :: T b
+MkT :: forall (k :: BOX) (a :: k). T a
 ghci> :set -fprint-explicit-foralls
 ghci> :t MkT
-MkT :: forall (b::k). T b
-ghci> :set -fprint-explicit-kinds
-ghci> :t MkT
-MkT :: forall (k::BOX) (b:k). T b
+MkT :: forall (k :: BOX) (a :: k). T k a
 </screen>
          </para>
         </listitem>
@@ -1719,15 +1736,50 @@ f "2"    = 2
           <indexterm><primary>unused binds, warning</primary></indexterm>
           <indexterm><primary>binds, unused</primary></indexterm>
           <para>Report any function definitions (and local bindings)
-          which are unused.  For top-level functions, the warning is
-          only given if the binding is not exported.</para>
-          <para>A definition is regarded as "used" if (a) it is exported, or (b) it is
-            mentioned in the right hand side of another definition that is used, or (c) the
-            function it defines begins with an underscore.  The last case provides a
-            way to suppress unused-binding warnings selectively.  </para>
-          <para> Notice that a variable
-            is reported as unused even if it appears in the right-hand side of another
-            unused binding. </para>
+          which are unused.  More precisely:
+
+          <itemizedlist>
+          <listitem><para>Warn if a binding brings into scope a variable that is not used,
+          except if the variable's name starts with an underscore.  The "starts-with-underscore"
+          condition provides a way to selectively disable the warning.
+        </para>
+          <para>
+          A variable is regarded as "used" if 
+          <itemizedlist>
+          <listitem><para>It is exported, or</para></listitem>
+          <listitem><para>It appears in the right hand side of a binding that binds at 
+                           least one used variable that is used</para></listitem>
+          </itemizedlist>
+          For example
+            <programlisting>
+module A (f) where
+f = let (p,q) = rhs1 in t p  -- Warning about unused q
+t = rhs3                     -- No warning: f is used, and hence so is t
+g = h x                      -- Warning: g unused
+h = rhs2                     -- Warning: h is only used in the right-hand side of another unused binding
+_w = True                    -- No warning: _w starts with an underscore
+            </programlisting>
+          </para></listitem>
+
+          <listitem><para>
+          Warn if a pattern binding binds no variables at all, unless it is a lone, possibly-banged, wild-card pattern.
+          For example:
+            <programlisting>
+Just _ = rhs3    -- Warning: unused pattern binding
+(_, _) = rhs4    -- Warning: unused pattern binding
+_  = rhs3        -- No warning: lone wild-card pattern
+!_ = rhs4        -- No warning: banged wild-card pattern; behaves like seq
+            </programlisting>
+          The motivation for allowing lone wild-card patterns is they
+          are not very different from <literal>_v = rhs3</literal>,
+          which elicits no warning; and they can be useful to add a type
+          constraint, e.g. <literal>_ = x::Int</literal>. A lone
+          banged wild-card pattern is is useful as an alternative 
+          (to <literal>seq</literal>) way to force evaluation.
+        </para>
+        </listitem>
+          </itemizedlist>
+          </para>
         </listitem>
       </varlistentry>
 
@@ -1811,6 +1863,16 @@ f "2"    = 2
                do { popInt 10 ; return 10 }
             </programlisting>
           </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-inline-rule-shadowing</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-inline-rule-shadowing</option></primary></indexterm>
+          <para>Warn if a rewrite RULE might fail to fire because the function might be
+                inlined before the rule has a chance to fire.  See <xref linkend="rules-inline"/>.
+              </para>
         </listitem>
       </varlistentry>
 
@@ -2967,44 +3029,6 @@ data D = D !C
   </sect1>
 
 &runtime;
-
-<sect1 id="ext-core">
-  <title>Generating and compiling External Core Files</title>
-
-  <indexterm><primary>intermediate code generation</primary></indexterm>
-
-  <para>GHC can dump its optimized intermediate code (said to be in &ldquo;Core&rdquo; format)
-  to a file as a side-effect of compilation. Non-GHC back-end tools can read and process Core files; these files have the suffix
-  <filename>.hcr</filename>. The Core format is described in <ulink url="../../core.pdf">
-  <citetitle>An External Representation for the GHC Core Language</citetitle></ulink>,
-  and sample tools
-  for manipulating Core files (in Haskell) are available in the
-  <ulink url="http://hackage.haskell.org/package/extcore">extcore package on Hackage</ulink>.  Note that the format of <literal>.hcr</literal>
-  files is <emphasis>different</emphasis> from the Core output format that GHC generates
-  for debugging purposes (<xref linkend="options-debugging"/>), though the two formats appear somewhat similar.</para>
-
-  <para>The Core format natively supports notes which you can add to
-  your source code using the <literal>CORE</literal> pragma (see <xref
-  linkend="pragmas"/>).</para>
-
-    <variablelist>
-
-        <varlistentry>
-          <term>
-            <option>-fext-core</option>
-            <indexterm><primary><option>-fext-core</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Generate <literal>.hcr</literal> files.</para>
-          </listitem>
-        </varlistentry>
-
-    </variablelist>
-
-<para>Currently (as of version 6.8.2), GHC does not have the ability to read in External Core files as source. If you would like GHC to have this ability, please <ulink url="http://ghc.haskell.org/trac/ghc/wiki/MailingListsAndIRC">make your wishes known to the GHC Team</ulink>.</para>
-
-</sect1>
-
 &debug;
 &flags;
 

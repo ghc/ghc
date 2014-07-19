@@ -1,4 +1,10 @@
 
+T8932.hs:5:3:
+    Duplicate exact Name ‘foo’
+      Probable cause: you used a unique Template Haskell name (NameU), 
+      perhaps via newName, but bound it multiple times
+      If that's it, then -ddump-splices might be useful
+
 T8932.hs:11:1:
     Multiple declarations of ‘foo’
     Declared at: T8932.hs:5:3

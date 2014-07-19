@@ -5,6 +5,8 @@
 \section[Name]{@Name@: to transmit name info from renamer to typechecker}
 
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 -- |
 -- #name_types#
 -- GHC uses several kinds of name internally:

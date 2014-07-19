@@ -3,22 +3,22 @@
 %
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
 --     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-{-# LANGUAGE ScopedTypeVariables #-}
 module Digraph(
         Graph, graphFromVerticesAndAdjacency, graphFromEdgedVertices,
 
         SCC(..), Node, flattenSCC, flattenSCCs,
-        stronglyConnCompG, stronglyConnCompFromG,
+        stronglyConnCompG,
         topologicalSortG, dfsTopSortG,
         verticesG, edgesG, hasVertexG,
-        reachableG, transposeG,
+        reachableG, reachablesG, transposeG,
         outdegreeG, indegreeG,
         vertexGroupsG, emptyG,
         componentsG,
@@ -258,14 +258,6 @@ stronglyConnCompG :: Graph node -> [SCC node]
 stronglyConnCompG graph = decodeSccs graph forest
   where forest = {-# SCC "Digraph.scc" #-} scc (gr_int_graph graph)
 
--- Find the set of strongly connected components starting from the
--- given roots.  This is a good way to discard unreachable nodes at
--- the same time as computing SCCs.
-stronglyConnCompFromG :: Graph node -> [node] -> [SCC node]
-stronglyConnCompFromG graph roots = decodeSccs graph forest
-  where forest = {-# SCC "Digraph.scc" #-} sccFrom (gr_int_graph graph) vs
-        vs = [ v | Just v <- map (gr_node_to_vertex graph) roots ]
-
 decodeSccs :: Graph node -> Forest Vertex -> [SCC node]
 decodeSccs Graph { gr_int_graph = graph, gr_vertex_to_node = vertex_fn } forest
   = map decode forest
@@ -315,7 +307,13 @@ dfsTopSortG graph =
 reachableG :: Graph node -> node -> [node]
 reachableG graph from = map (gr_vertex_to_node graph) result
   where from_vertex = expectJust "reachableG" (gr_node_to_vertex graph from)
-        result = {-# SCC "Digraph.reachable" #-} reachable (gr_int_graph graph) from_vertex
+        result = {-# SCC "Digraph.reachable" #-} reachable (gr_int_graph graph) [from_vertex]
+
+reachablesG :: Graph node -> [node] -> [node]
+reachablesG graph froms = map (gr_vertex_to_node graph) result
+  where result = {-# SCC "Digraph.reachable" #-} 
+                 reachable (gr_int_graph graph) vs
+        vs = [ v | Just v <- map (gr_node_to_vertex graph) froms ]
 
 hasVertexG :: Graph node -> node -> Bool
 hasVertexG graph node = isJust $ gr_node_to_vertex graph node
@@ -548,9 +546,6 @@ postorderF ts = foldr (.) id $ map postorder ts
 postOrd :: IntGraph -> [Vertex]
 postOrd g = postorderF (dff g) []
 
-postOrdFrom :: IntGraph -> [Vertex] -> [Vertex]
-postOrdFrom g vs = postorderF (dfs g vs) []
-
 topSort :: IntGraph -> [Vertex]
 topSort = reverse . postOrd
 \end{code}
@@ -574,9 +569,6 @@ undirected g  = buildG (bounds g) (edges g ++ reverseE g)
 \begin{code}
 scc  :: IntGraph -> Forest Vertex
 scc g = dfs g (reverse (postOrd (transpose g)))
-
-sccFrom  :: IntGraph -> [Vertex] -> Forest Vertex
-sccFrom g vs = reverse (dfs (transpose g) (reverse (postOrdFrom g vs)))
 \end{code}
 
 ------------------------------------------------------------
@@ -602,11 +594,11 @@ forward g tree pre = mapT select g
 ------------------------------------------------------------
 
 \begin{code}
-reachable    :: IntGraph -> Vertex -> [Vertex]
-reachable g v = preorderF (dfs g [v])
+reachable    :: IntGraph -> [Vertex] -> [Vertex]
+reachable g vs = preorderF (dfs g vs)
 
 path         :: IntGraph -> Vertex -> Vertex -> Bool
-path g v w    = w `elem` (reachable g v)
+path g v w    = w `elem` (reachable g [v])
 \end{code}
 
 ------------------------------------------------------------

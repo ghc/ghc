@@ -12,9 +12,10 @@ module GHC.Event.Thread
     , closeFdWith
     , threadDelay
     , registerDelay
+    , blockedOnBadFD -- used by RTS
     ) where
 
-import Control.Exception (finally)
+import Control.Exception (finally, SomeException, toException)
 import Control.Monad (forM, forM_, sequence_, zipWithM, when)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.List (zipWith3)
@@ -115,6 +116,9 @@ threadWait evt fd = mask_ $ do
     then ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
     else return ()
 
+-- used at least by RTS in 'select()' IO manager backend
+blockedOnBadFD :: SomeException
+blockedOnBadFD = toException $ errnoToIOError "awaitEvent" eBADF Nothing Nothing
 
 threadWaitSTM :: Event -> Fd -> IO (STM (), IO ())
 threadWaitSTM evt fd = mask_ $ do

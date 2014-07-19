@@ -369,7 +369,7 @@ location = Q qLocation
 -- a single 'Q' computation, but not about the order in which splices are run.
 --
 -- Note: for various murky reasons, stdout and stderr handles are not
--- necesarily flushed when the  compiler finishes running, so you should
+-- necessarily flushed when the compiler finishes running, so you should
 -- flush them yourself.
 runIO :: IO a -> Q a
 runIO m = Q (qRunIO m)

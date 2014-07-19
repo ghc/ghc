@@ -4,6 +4,8 @@
 %
 
 \begin{code}
+{-# LANGUAGE CPP, NondecreasingIndentation #-}
+
 -- | Module for constructing @ModIface@ values (interface files),
 -- writing them to disk and comparing two versions to see if
 -- recompilation is required.
@@ -78,6 +80,7 @@ import DataCon
 import PatSyn
 import Type
 import TcType
+import TysPrim ( alphaTyVars )
 import InstEnv
 import FamInstEnv
 import TcRnMonad
@@ -876,6 +879,13 @@ instOrphWarn :: DynFlags -> PrintUnqualified -> ClsInst -> WarnMsg
 instOrphWarn dflags unqual inst
   = mkWarnMsg dflags (getSrcSpan inst) unqual $
     hang (ptext (sLit "Orphan instance:")) 2 (pprInstanceHdr inst)
+    $$ text "To avoid this"
+    $$ nest 4 (vcat possibilities)
+  where
+    possibilities =
+      text "move the instance declaration to the module of the class or of the type, or" :
+      text "wrap the type with a newtype and declare the instance on the new type." :
+      []
 
 ruleOrphWarn :: DynFlags -> PrintUnqualified -> Module -> IfaceRule -> WarnMsg
 ruleOrphWarn dflags unqual mod rule
@@ -1131,27 +1141,35 @@ recompileRequired _ = True
 -- first element is a bool saying if we should recompile the object file
 -- and the second is maybe the interface file, where Nothng means to
 -- rebuild the interface file not use the exisitng one.
-checkOldIface :: HscEnv
-              -> ModSummary
-              -> SourceModified
-              -> Maybe ModIface         -- Old interface from compilation manager, if any
-              -> IO (RecompileRequired, Maybe ModIface)
+checkOldIface
+  :: HscEnv
+  -> ModSummary
+  -> SourceModified
+  -> Maybe ModIface         -- Old interface from compilation manager, if any
+  -> IO (RecompileRequired, Maybe ModIface)
 
 checkOldIface hsc_env mod_summary source_modified maybe_iface
   = do  let dflags = hsc_dflags hsc_env
         showPass dflags $
-            "Checking old interface for " ++ (showPpr dflags $ ms_mod mod_summary)
+            "Checking old interface for " ++
+              (showPpr dflags $ ms_mod mod_summary)
         initIfaceCheck hsc_env $
             check_old_iface hsc_env mod_summary source_modified maybe_iface
 
-check_old_iface :: HscEnv -> ModSummary -> SourceModified -> Maybe ModIface
-                -> IfG (RecompileRequired, Maybe ModIface)
+check_old_iface
+  :: HscEnv
+  -> ModSummary
+  -> SourceModified
+  -> Maybe ModIface
+  -> IfG (RecompileRequired, Maybe ModIface)
+
 check_old_iface hsc_env mod_summary src_modified maybe_iface
   = let dflags = hsc_dflags hsc_env
         getIface =
             case maybe_iface of
                 Just _  -> do
-                    traceIf (text "We already have the old interface for" <+> ppr (ms_mod mod_summary))
+                    traceIf (text "We already have the old interface for" <+>
+                      ppr (ms_mod mod_summary))
                     return maybe_iface
                 Nothing -> loadIface
 
@@ -1458,7 +1476,7 @@ checkList (check:checks) = do recompile <- check
 \begin{code}
 tyThingToIfaceDecl :: TyThing -> IfaceDecl
 tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
-tyThingToIfaceDecl (ATyCon tycon) = tyConToIfaceDecl emptyTidyEnv tycon
+tyThingToIfaceDecl (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
 tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
 tyThingToIfaceDecl (AConLike cl)  = case cl of
     RealDataCon dc -> dataConToIfaceDecl dc -- for ppr purposes only
@@ -1488,24 +1506,23 @@ dataConToIfaceDecl dataCon
 patSynToIfaceDecl :: PatSyn -> IfaceDecl
 patSynToIfaceDecl ps
   = IfacePatSyn { ifName          = getOccName . getName $ ps
-                , ifPatHasWrapper = isJust $ patSynWrapper ps
+                , ifPatMatcher    = matcher
+                , ifPatWrapper    = wrapper
                 , ifPatIsInfix    = patSynIsInfix ps
                 , ifPatUnivTvs    = toIfaceTvBndrs univ_tvs'
                 , ifPatExTvs      = toIfaceTvBndrs ex_tvs'
                 , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
                 , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
-                , ifPatArgs       = map toIfaceArg args
+                , ifPatArgs       = map (tidyToIfaceType env2) args
                 , ifPatTy         = tidyToIfaceType env2 rhs_ty
                 }
   where
-    toIfaceArg var = (occNameFS (getOccName var),
-                      tidyToIfaceType env2 (varType var))
-
-    (univ_tvs, ex_tvs, (prov_theta, req_theta)) = patSynSig ps
-    args = patSynArgs ps
-    rhs_ty = patSynType ps
+    (univ_tvs, ex_tvs, prov_theta, req_theta, args, rhs_ty) = patSynSig ps
     (env1, univ_tvs') = tidyTyVarBndrs emptyTidyEnv univ_tvs
     (env2, ex_tvs')   = tidyTyVarBndrs env1 ex_tvs
+
+    matcher = idName (patSynMatcher ps)
+    wrapper = fmap idName (patSynWrapper ps)
 
 
 --------------------------
@@ -1517,19 +1534,19 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
  = IfaceAxiom { ifName       = name
               , ifTyCon      = toIfaceTyCon tycon
               , ifRole       = role
-              , ifAxBranches = brListMap (coAxBranchToIfaceBranch
-                                            emptyTidyEnv
-                                            (brListMap coAxBranchLHS branches)) branches }
+              , ifAxBranches = brListMap (coAxBranchToIfaceBranch tycon
+                                            (brListMap coAxBranchLHS branches))
+                                         branches }
  where
    name = getOccName ax
 
 -- 2nd parameter is the list of branch LHSs, for conversion from incompatible branches
 -- to incompatible indices
 -- See Note [Storing compatibility] in CoAxiom
-coAxBranchToIfaceBranch :: TidyEnv -> [[Type]] -> CoAxBranch -> IfaceAxBranch
-coAxBranchToIfaceBranch env0 lhs_s
+coAxBranchToIfaceBranch :: TyCon -> [[Type]] -> CoAxBranch -> IfaceAxBranch
+coAxBranchToIfaceBranch tc lhs_s
                         branch@(CoAxBranch { cab_incomps = incomps })
-  = (coAxBranchToIfaceBranch' env0 branch) { ifaxbIncomps = iface_incomps }
+  = (coAxBranchToIfaceBranch' tc branch) { ifaxbIncomps = iface_incomps }
   where
     iface_incomps = map (expectJust "iface_incomps"
                         . (flip findIndex lhs_s
@@ -1537,63 +1554,91 @@ coAxBranchToIfaceBranch env0 lhs_s
                         . coAxBranchLHS) incomps
 
 -- use this one for standalone branches without incompatibles
-coAxBranchToIfaceBranch' :: TidyEnv -> CoAxBranch -> IfaceAxBranch
-coAxBranchToIfaceBranch' env0
-                        (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs
-                                    , cab_roles = roles, cab_rhs = rhs })
+coAxBranchToIfaceBranch' :: TyCon -> CoAxBranch -> IfaceAxBranch
+coAxBranchToIfaceBranch' tc (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs
+                                        , cab_roles = roles, cab_rhs = rhs })
   = IfaceAxBranch { ifaxbTyVars = toIfaceTvBndrs tv_bndrs
-                  , ifaxbLHS    = map (tidyToIfaceType env1) lhs
+                  , ifaxbLHS    = tidyToIfaceTcArgs env1 tc lhs
                   , ifaxbRoles  = roles
                   , ifaxbRHS    = tidyToIfaceType env1 rhs
                   , ifaxbIncomps = [] }
   where
-    (env1, tv_bndrs) = tidyTyClTyVarBndrs env0 tvs
+    (env1, tv_bndrs) = tidyTyClTyVarBndrs emptyTidyEnv tvs
     -- Don't re-bind in-scope tyvars
     -- See Note [CoAxBranch type variables] in CoAxiom
 
 -----------------
-tyConToIfaceDecl :: TidyEnv -> TyCon -> IfaceDecl
+tyConToIfaceDecl :: TidyEnv -> TyCon -> (TidyEnv, IfaceDecl)
 -- We *do* tidy TyCons, because they are not (and cannot
 -- conveniently be) built in tidy form
+-- The returned TidyEnv is the one after tidying the tyConTyVars
 tyConToIfaceDecl env tycon
   | Just clas <- tyConClass_maybe tycon
   = classToIfaceDecl env clas
 
   | Just syn_rhs <- synTyConRhs_maybe tycon
-  = IfaceSyn {  ifName    = getOccName tycon,
-                ifTyVars  = toIfaceTvBndrs tyvars,
-                ifRoles   = tyConRoles tycon,
-                ifSynRhs  = to_ifsyn_rhs syn_rhs,
-                ifSynKind = tidyToIfaceType env1 (synTyConResKind tycon) }
+  = ( tc_env1
+    , IfaceSyn {  ifName    = getOccName tycon,
+                  ifTyVars  = if_tc_tyvars,
+                  ifRoles   = tyConRoles tycon,
+                  ifSynRhs  = to_ifsyn_rhs syn_rhs,
+                  ifSynKind = tidyToIfaceType tc_env1 (synTyConResKind tycon) })
 
   | isAlgTyCon tycon
-  = IfaceData { ifName    = getOccName tycon,
-                ifCType   = tyConCType tycon,
-                ifTyVars  = toIfaceTvBndrs tyvars,
-                ifRoles   = tyConRoles tycon,
-                ifCtxt    = tidyToIfaceContext env1 (tyConStupidTheta tycon),
-                ifCons    = ifaceConDecls (algTyConRhs tycon),
-                ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
-                ifGadtSyntax = isGadtSyntaxTyCon tycon,
-                ifPromotable = isJust (promotableTyCon_maybe tycon),
-                ifAxiom   = fmap coAxiomName (tyConFamilyCoercion_maybe tycon) }
+  = ( tc_env1
+    , IfaceData { ifName    = getOccName tycon,
+                  ifCType   = tyConCType tycon,
+                  ifTyVars  = if_tc_tyvars,
+                  ifRoles   = tyConRoles tycon,
+                  ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
+                  ifCons    = ifaceConDecls (algTyConRhs tycon),
+                  ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
+                  ifGadtSyntax = isGadtSyntaxTyCon tycon,
+                  ifPromotable = isJust (promotableTyCon_maybe tycon),
+                  ifParent  = parent })
 
   | isForeignTyCon tycon
-  = IfaceForeign { ifName    = getOccName tycon,
-                   ifExtName = tyConExtName tycon }
+  = (env, IfaceForeign { ifName    = getOccName tycon,
+                         ifExtName = tyConExtName tycon })
 
-  | otherwise = pprPanic "toIfaceDecl" (ppr tycon)
+  | otherwise  -- FunTyCon, PrimTyCon, promoted TyCon/DataCon
+  -- For pretty printing purposes only.
+  = ( env
+    , IfaceData { ifName       = getOccName tycon,
+                  ifCType      = Nothing,
+                  ifTyVars     = funAndPrimTyVars,
+                  ifRoles      = tyConRoles tycon,
+                  ifCtxt       = [],
+                  ifCons       = IfDataTyCon [],
+                  ifRec        = boolToRecFlag False,
+                  ifGadtSyntax = False,
+                  ifPromotable = False,
+                  ifParent     = IfNoParent })
   where
-    (env1, tyvars) = tidyTyClTyVarBndrs env (tyConTyVars tycon)
+    (tc_env1, tc_tyvars) = tidyTyClTyVarBndrs env (tyConTyVars tycon)
+    if_tc_tyvars = toIfaceTvBndrs tc_tyvars
 
-    to_ifsyn_rhs OpenSynFamilyTyCon           = IfaceOpenSynFamilyTyCon
-    to_ifsyn_rhs (ClosedSynFamilyTyCon ax)
-      = IfaceClosedSynFamilyTyCon (coAxiomName ax)
-    to_ifsyn_rhs AbstractClosedSynFamilyTyCon = IfaceAbstractClosedSynFamilyTyCon
+    funAndPrimTyVars = toIfaceTvBndrs $ take (tyConArity tycon) alphaTyVars
+
+    parent = case tyConFamInstSig_maybe tycon of
+               Just (tc, ty, ax) -> IfDataInstance (coAxiomName ax)
+                                                   (toIfaceTyCon tc)
+                                                   (tidyToIfaceTcArgs tc_env1 tc ty)
+               Nothing           -> IfNoParent
+
+    to_ifsyn_rhs OpenSynFamilyTyCon        = IfaceOpenSynFamilyTyCon
+    to_ifsyn_rhs (ClosedSynFamilyTyCon ax) = IfaceClosedSynFamilyTyCon axn ibr
+      where defs = fromBranchList $ coAxiomBranches ax
+            ibr  = map (coAxBranchToIfaceBranch' tycon) defs
+            axn  = coAxiomName ax
+    to_ifsyn_rhs AbstractClosedSynFamilyTyCon
+      = IfaceAbstractClosedSynFamilyTyCon
+
     to_ifsyn_rhs (SynonymTyCon ty)
-      = IfaceSynonymTyCon (tidyToIfaceType env1 ty)
+      = IfaceSynonymTyCon (tidyToIfaceType tc_env1 ty)
 
-    to_ifsyn_rhs (BuiltInSynFamTyCon {}) = pprPanic "toIfaceDecl: BuiltInFamTyCon" (ppr tycon)
+    to_ifsyn_rhs (BuiltInSynFamTyCon {})
+      = IfaceBuiltInSynFamTyCon
 
 
     ifaceConDecls (NewTyCon { data_con = con })     = IfNewTyCon  (ifaceConDecl con)
@@ -1609,23 +1654,28 @@ tyConToIfaceDecl env tycon
         = IfCon   { ifConOcc     = getOccName (dataConName data_con),
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
-                    ifConUnivTvs = toIfaceTvBndrs univ_tvs',
                     ifConExTvs   = toIfaceTvBndrs ex_tvs',
-                    ifConEqSpec  = to_eq_spec eq_spec,
-                    ifConCtxt    = tidyToIfaceContext env2 theta,
-                    ifConArgTys  = map (tidyToIfaceType env2) arg_tys,
+                    ifConEqSpec  = map to_eq_spec eq_spec,
+                    ifConCtxt    = tidyToIfaceContext con_env2 theta,
+                    ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
                     ifConFields  = map getOccName
                                        (dataConFieldLabels data_con),
-                    ifConStricts = map (toIfaceBang env2) (dataConRepBangs data_con) }
+                    ifConStricts = map (toIfaceBang con_env2) (dataConRepBangs data_con) }
         where
           (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig data_con
 
-          -- Start with 'emptyTidyEnv' not 'env1', because the type of the
-          -- data constructor is fully standalone
-          (env1, univ_tvs') = tidyTyVarBndrs emptyTidyEnv univ_tvs
-          (env2, ex_tvs')   = tidyTyVarBndrs env1 ex_tvs
-          to_eq_spec spec = [ (getOccName (tidyTyVar env2 tv), tidyToIfaceType env2 ty)
-                            | (tv,ty) <- spec]
+          -- Tidy the univ_tvs of the data constructor to be identical
+          -- to the tyConTyVars of the type constructor.  This means
+          -- (a) we don't need to redundantly put them into the interface file
+          -- (b) when pretty-printing an Iface data declaration in H98-style syntax,
+          --     we know that the type variables will line up
+          -- The latter (b) is important because we pretty-print type construtors
+          -- by converting to IfaceSyn and pretty-printing that
+          con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
+                     -- A bit grimy, perhaps, but it's simple!
+
+          (con_env2, ex_tvs') = tidyTyVarBndrs con_env1 ex_tvs
+          to_eq_spec (tv,ty)  = (toIfaceTyVar (tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
 
 toIfaceBang :: TidyEnv -> HsBang -> IfaceBang
 toIfaceBang _    HsNoBang            = IfNoBang
@@ -1634,17 +1684,18 @@ toIfaceBang env (HsUnpack (Just co)) = IfUnpackCo (toIfaceCoercion (tidyCo env c
 toIfaceBang _   HsStrict             = IfStrict
 toIfaceBang _   (HsUserBang {})      = panic "toIfaceBang"
 
-classToIfaceDecl :: TidyEnv -> Class -> IfaceDecl
+classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas
-  = IfaceClass { ifCtxt   = tidyToIfaceContext env1 sc_theta,
-                 ifName   = getOccName (classTyCon clas),
-                 ifTyVars = toIfaceTvBndrs clas_tyvars',
-                 ifRoles  = tyConRoles (classTyCon clas),
-                 ifFDs    = map toIfaceFD clas_fds,
-                 ifATs    = map toIfaceAT clas_ats,
-                 ifSigs   = map toIfaceClassOp op_stuff,
-                 ifMinDef = fmap getOccName (classMinimalDef clas),
-                 ifRec    = boolToRecFlag (isRecursiveTyCon tycon) }
+  = ( env1
+    , IfaceClass { ifCtxt   = tidyToIfaceContext env1 sc_theta,
+                   ifName   = getOccName (classTyCon clas),
+                   ifTyVars = toIfaceTvBndrs clas_tyvars',
+                   ifRoles  = tyConRoles (classTyCon clas),
+                   ifFDs    = map toIfaceFD clas_fds,
+                   ifATs    = map toIfaceAT clas_ats,
+                   ifSigs   = map toIfaceClassOp op_stuff,
+                   ifMinDef = fmap getFS (classMinimalDef clas),
+                   ifRec    = boolToRecFlag (isRecursiveTyCon tycon) })
   where
     (clas_tyvars, clas_fds, sc_theta, _, clas_ats, op_stuff)
       = classExtraBigSig clas
@@ -1653,8 +1704,10 @@ classToIfaceDecl env clas
     (env1, clas_tyvars') = tidyTyVarBndrs env clas_tyvars
 
     toIfaceAT :: ClassATItem -> IfaceAT
-    toIfaceAT (tc, defs)
-      = IfaceAT (tyConToIfaceDecl env1 tc) (map (coAxBranchToIfaceBranch' env1) defs)
+    toIfaceAT (ATI tc def)
+      = IfaceAT if_decl (fmap (tidyToIfaceType env2) def)
+      where
+        (env2, if_decl) = tyConToIfaceDecl env1 tc
 
     toIfaceClassOp (sel_id, def_meth)
         = ASSERT(sel_tyvars == clas_tyvars)
@@ -1679,6 +1732,9 @@ classToIfaceDecl env clas
 --------------------------
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
 tidyToIfaceType env ty = toIfaceType (tidyType env ty)
+
+tidyToIfaceTcArgs :: TidyEnv -> TyCon -> [Type] -> IfaceTcArgs
+tidyToIfaceTcArgs env tc tys = toIfaceTcArgs tc (tidyTypes env tys)
 
 tidyToIfaceContext :: TidyEnv -> ThetaType -> IfaceContext
 tidyToIfaceContext env theta = map (tidyToIfaceType env) theta

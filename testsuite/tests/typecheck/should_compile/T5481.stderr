@@ -1,8 +1,4 @@
 
-T5481.hs:6:5:
-    The RHS of an associated type declaration mentions type variable ‘b’
-      All such variables must be bound on the LHS
+T5481.hs:6:16: Not in scope: type variable ‘b’
 
-T5481.hs:8:5:
-    The RHS of an associated type declaration mentions type variable ‘a’
-      All such variables must be bound on the LHS
+T5481.hs:8:16: Not in scope: type variable ‘a’

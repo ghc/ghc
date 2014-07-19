@@ -1,3 +1,12 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -fprof-auto-top #-}
+
 --
 -- Copyright (c) 2010, João Dias, Simon Marlow, Simon Peyton Jones,
 -- and Norman Ramsey
@@ -8,10 +17,6 @@
 -- Compiler.Hoopl.Dataflow in the hoopl package.  In particular it is
 -- specialised to the UniqSM monad.
 --
-
-{-# LANGUAGE RankNTypes, ScopedTypeVariables, GADTs, EmptyDataDecls, PatternGuards, TypeFamilies, MultiParamTypeClasses #-}
-{-# OPTIONS_GHC -fprof-auto-top #-}
-{-# LANGUAGE Trustworthy #-}
 
 module Hoopl.Dataflow
   ( DataflowLattice(..), OldFact(..), NewFact(..), Fact, mkFactBase

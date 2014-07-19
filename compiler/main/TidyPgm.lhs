@@ -4,6 +4,8 @@
 \section{Tidying up Core}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TidyPgm (
        mkBootModDetailsTc, tidyProgram, globaliseAndTidyId
    ) where
@@ -21,11 +23,14 @@ import CorePrep
 import CoreUtils
 import Literal
 import Rules
+import PatSyn
+import ConLike
 import CoreArity        ( exprArity, exprBotStrictness_maybe )
 import VarEnv
 import VarSet
 import Var
 import Id
+import MkId             ( mkDictSelRhs )
 import IdInfo
 import InstEnv
 import FamInstEnv
@@ -129,18 +134,20 @@ mkBootModDetailsTc hsc_env
         TcGblEnv{ tcg_exports   = exports,
                   tcg_type_env  = type_env, -- just for the Ids
                   tcg_tcs       = tcs,
+                  tcg_patsyns   = pat_syns,
                   tcg_insts     = insts,
                   tcg_fam_insts = fam_insts
                 }
   = do  { let dflags = hsc_dflags hsc_env
         ; showPass dflags CoreTidy
 
-        ; let { insts'     = map (tidyClsInstDFun globaliseAndTidyId) insts
-              ; dfun_ids   = map instanceDFunId insts'
+        ; let { insts'      = map (tidyClsInstDFun globaliseAndTidyId) insts
+              ; pat_syns'   = map (tidyPatSynIds   globaliseAndTidyId) pat_syns
+              ; dfun_ids    = map instanceDFunId insts'
+              ; pat_syn_ids = concatMap patSynIds pat_syns'
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
-                                (typeEnvIds type_env) tcs fam_insts
-              ; type_env2  = extendTypeEnvWithPatSyns type_env1 (typeEnvPatSyns type_env)
-              ; type_env'  = extendTypeEnvWithIds type_env2 dfun_ids
+                                           (typeEnvIds type_env) tcs fam_insts
+              ; type_env'  = extendTypeEnvWithIds type_env1 (pat_syn_ids ++ dfun_ids)
               }
         ; return (ModDetails { md_types     = type_env'
                              , md_insts     = insts'
@@ -333,19 +340,13 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
         ; let { final_ids  = [ id | id <- bindersOfBinds tidy_binds,
                                     isExternalName (idName id)]
-              ; final_patsyns = filter (isExternalName . getName) patsyns
+              ; type_env1  = extendTypeEnvWithIds type_env final_ids
 
-              ; type_env' = extendTypeEnvWithIds type_env final_ids
-              ; type_env'' = extendTypeEnvWithPatSyns type_env' final_patsyns
-
-              ; tidy_type_env = tidyTypeEnv omit_prags type_env''
-
-              ; tidy_insts    = map (tidyClsInstDFun (lookup_dfun tidy_type_env)) insts
-                -- A DFunId will have a binding in tidy_binds, and so
-                -- will now be in final_env, replete with IdInfo
-                -- Its name will be unchanged since it was born, but
-                -- we want Global, IdInfo-rich (or not) DFunId in the
-                -- tidy_insts
+              ; tidy_insts = map (tidyClsInstDFun (lookup_aux_id tidy_type_env)) insts
+                -- A DFunId will have a binding in tidy_binds, and so will now be in
+                -- tidy_type_env, replete with IdInfo.  Its name will be unchanged since
+                -- it was born, but we want Global, IdInfo-rich (or not) DFunId in the
+                -- tidy_insts.  Similarly the Ids inside a PatSyn.
 
               ; tidy_rules = tidyRules tidy_env ext_rules
                 -- You might worry that the tidy_env contains IdInfo-rich stuff
@@ -353,6 +354,16 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                 -- empty
 
               ; tidy_vect_info = tidyVectInfo tidy_env vect_info
+
+                -- Tidy the Ids inside each PatSyn, very similarly to DFunIds
+                -- and then override the PatSyns in the type_env with the new tidy ones
+                -- This is really the only reason we keep mg_patsyns at all; otherwise
+                -- they could just stay in type_env
+              ; tidy_patsyns = map (tidyPatSynIds (lookup_aux_id tidy_type_env)) patsyns
+              ; type_env2    = extendTypeEnvList type_env1
+                                    [AConLike (PatSynCon ps) | ps <- tidy_patsyns ]
+
+              ; tidy_type_env = tidyTypeEnv omit_prags type_env2
 
               -- See Note [Injecting implicit bindings]
               ; all_tidy_binds = implicit_binds ++ tidy_binds
@@ -405,11 +416,11 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               })
         }
 
-lookup_dfun :: TypeEnv -> Var -> Id
-lookup_dfun type_env dfun_id
-  = case lookupTypeEnv type_env (idName dfun_id) of
-        Just (AnId dfun_id') -> dfun_id'
-        _other -> pprPanic "lookup_dfun" (ppr dfun_id)
+lookup_aux_id :: TypeEnv -> Var -> Id
+lookup_aux_id type_env id
+  = case lookupTypeEnv type_env (idName id) of
+        Just (AnId id') -> id'
+        _other          -> pprPanic "lookup_axu_id" (ppr id)
 
 --------------------------
 tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
@@ -517,7 +528,7 @@ of exceptions, and finally I gave up the battle:
 
 Note [Injecting implicit bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We inject the implict bindings right at the end, in CoreTidy.
+We inject the implicit bindings right at the end, in CoreTidy.
 Some of these bindings, notably record selectors, are not
 constructed in an optimised form.  E.g. record selector for
         data T = MkT { x :: {-# UNPACK #-} !Int }
@@ -559,14 +570,16 @@ Oh: two other reasons for injecting them late:
 There is one sort of implicit binding that is injected still later,
 namely those for data constructor workers. Reason (I think): it's
 really just a code generation trick.... binding itself makes no sense.
-See CorePrep Note [Data constructor workers].
+See Note [Data constructor workers] in CorePrep.
 
 \begin{code}
 getTyConImplicitBinds :: TyCon -> [CoreBind]
 getTyConImplicitBinds tc = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
 
 getClassImplicitBinds :: Class -> [CoreBind]
-getClassImplicitBinds cls = map get_defn (classAllSelIds cls)
+getClassImplicitBinds cls
+  = [ NonRec op (mkDictSelRhs cls val_index)
+    | (op, val_index) <- classAllSelIds cls `zip` [0..] ]
 
 get_defn :: Id -> CoreBind
 get_defn id = NonRec id (unfoldingTemplate (realIdUnfolding id))

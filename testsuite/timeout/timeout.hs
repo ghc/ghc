@@ -33,10 +33,6 @@ main = do
           _ -> die ("Can't parse " ++ show secs ++ " as a number of seconds")
       _ -> die ("Bad arguments " ++ show args)
 
-die :: String -> IO ()
-die msg = do hPutStrLn stderr ("timeout: " ++ msg)
-             exitWith (ExitFailure 1)
-
 timeoutMsg :: String
 timeoutMsg = "Timeout happened...killing process..."
 

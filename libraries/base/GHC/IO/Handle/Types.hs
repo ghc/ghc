@@ -2,7 +2,7 @@
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , ExistentialQuantification
-           , DeriveDataTypeable
+           , AutoDeriveTypeable
   #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}

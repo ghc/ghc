@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash, DeriveDataTypeable #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, AutoDeriveTypeable #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
 

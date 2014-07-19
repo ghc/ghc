@@ -2,7 +2,7 @@
 % (c) The University of Glasgow, 1997-2006
 %
 \begin{code}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, CPP, DeriveDataTypeable, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -O -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected

@@ -198,7 +198,7 @@ test('T5996',
      ['$MAKE -s --no-print-directory T5996'])
 test('T8537', normal, compile, [''])
 test('T8832',
-     extra_clean(['T8832.hi', 'T8832a.o']),
+     [when(wordsize(32), expect_fail), extra_clean(['T8832.hi', 'T8832a.o'])],
      run_command,
      ['$MAKE -s --no-print-directory T8832'])
 test('T8848', only_ways(['optasm']), compile, ['-ddump-rule-firings'])

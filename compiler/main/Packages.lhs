@@ -2,13 +2,15 @@
 % (c) The University of Glasgow, 2006
 %
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 -- | Package manipulation
 module Packages (
         module PackageConfig,
 
         -- * The PackageConfigMap
         PackageConfigMap, emptyPackageConfigMap, lookupPackage,
-        extendPackageConfigMap, dumpPackages,
+        extendPackageConfigMap, dumpPackages, simpleDumpPackages,
 
         -- * Reading the package config, and processing cmdline args
         PackageState(..),
@@ -1078,12 +1080,26 @@ isDllName dflags _this_pkg this_mod name
 -- -----------------------------------------------------------------------------
 -- Displaying packages
 
--- | Show package info on console, if verbosity is >= 3
+-- | Show (very verbose) package info on console, if verbosity is >= 5
 dumpPackages :: DynFlags -> IO ()
-dumpPackages dflags
+dumpPackages = dumpPackages' showInstalledPackageInfo
+
+dumpPackages' :: (InstalledPackageInfo -> String) -> DynFlags -> IO ()
+dumpPackages' showIPI dflags
   = do let pkg_map = pkgIdMap (pkgState dflags)
        putMsg dflags $
-             vcat (map (text . showInstalledPackageInfo
+             vcat (map (text . showIPI
                              . packageConfigToInstalledPackageInfo)
                        (eltsUFM pkg_map))
+
+-- | Show simplified package info on console, if verbosity == 4.
+-- The idea is to only print package id, and any information that might
+-- be different from the package databases (exposure, trust)
+simpleDumpPackages :: DynFlags -> IO ()
+simpleDumpPackages = dumpPackages' showIPI
+    where showIPI ipi = let InstalledPackageId i = installedPackageId ipi
+                            e = if exposed ipi then "E" else " "
+                            t = if trusted ipi then "T" else " "
+                        in e ++ t ++ "  " ++ i
+
 \end{code}

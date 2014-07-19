@@ -48,6 +48,7 @@ Flag integer-simple
 Library
     default-language: Haskell2010
     other-extensions:
+        AutoDeriveTypeable
         BangPatterns
         CApiFFI
         CPP

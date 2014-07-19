@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- |
 -- Package configuration information: essentially the interface to Cabal, with
 -- some utilities
@@ -45,16 +47,11 @@ defaultPackageConfig = emptyInstalledPackageInfo
 
 -- $package_naming
 -- #package_naming#
--- Mostly the compiler deals in terms of 'PackageName's, which don't
--- have the version suffix. This is so that we don't need to know the
--- version for the @-package-name@ flag, or know the versions of
--- wired-in packages like @base@ & @rts@. Versions are confined to the
--- package sub-system.
---
--- This means that in theory you could have multiple base packages installed
--- (for example), and switch between them using @-package@\/@-hide-package@.
---
--- A 'PackageId' is a string of the form @<pkg>-<version>@.
+-- Mostly the compiler deals in terms of 'PackageId's, which have the
+-- form @<pkg>-<version>@. You're expected to pass in the version for
+-- the @-package-name@ flag. However, for wired-in packages like @base@
+-- & @rts@, we don't necessarily know what the version is, so these are
+-- handled specially; see #wired_in_packages#.
 
 -- | Turn a Cabal 'PackageIdentifier' into a GHC 'PackageId'
 mkPackageId :: PackageIdentifier -> PackageId

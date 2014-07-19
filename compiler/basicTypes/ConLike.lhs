@@ -5,6 +5,7 @@
 \section[ConLike]{@ConLike@: Constructor-like things}
 
 \begin{code}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module ConLike (
         ConLike(..)

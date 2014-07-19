@@ -106,6 +106,7 @@ char *EventDesc[] = {
   [EVENT_TASK_CREATE]         = "Task create",
   [EVENT_TASK_MIGRATE]        = "Task migrate",
   [EVENT_TASK_DELETE]         = "Task delete",
+  [EVENT_HACK_BUG_T9003]      = "Empty event for bug #9003",
 };
 
 // Event type. 
@@ -418,6 +419,10 @@ initEventLogging(void)
         case EVENT_BLOCK_MARKER:
             eventTypes[t].size = sizeof(StgWord32) + sizeof(EventTimestamp) + 
                 sizeof(EventCapNo);
+            break;
+
+        case EVENT_HACK_BUG_T9003:
+            eventTypes[t].size = 0;
             break;
 
         default:

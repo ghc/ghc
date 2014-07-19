@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
+
 -----------------------------------------------------------------------------
 --
 -- The register allocator

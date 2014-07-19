@@ -21,6 +21,8 @@ The program gather statistics about
 \end{enumerate}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module StgStats ( showStgStats ) where
 
 #include "HsVersions.h"

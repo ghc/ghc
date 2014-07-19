@@ -1,4 +1,5 @@
-{-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples #-}
+{-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
+             RoleAnnotations #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -80,7 +81,13 @@ at some point, directly or indirectly, from @Main.main@.
 or the '>>' and '>>=' operations from the 'Monad' class.
 -}
 newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
-
+type role IO representational
+{-
+The above role annotation is redundant but is included because this role
+is significant in the normalisation of FFI types. Specifically, if this
+role were to become nominal (which would be very strange, indeed!), changes
+elsewhere in GHC would be necessary. See [FFI type roles] in TcForeign.
+-}
 
 {-
 Note [Kind-changing of (~) and Coercible]

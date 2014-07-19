@@ -7,12 +7,7 @@
 A ``lint'' pass to check for Core correctness
 
 \begin{code}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fprof-auto #-}
 
 module CoreLint ( lintCoreBindings, lintUnfolding, lintExpr ) where
@@ -855,6 +850,9 @@ lintCoercion co@(TyConAppCo r tc cos)
        ; checkRole co1 r r1
        ; checkRole co2 r r2
        ; return (rk, mkFunTy s1 s2, mkFunTy t1 t2, r) }
+
+  | Just {} <- synTyConDefn_maybe tc
+  = failWithL (ptext (sLit "Synonym in TyConAppCo:") <+> ppr co)
 
   | otherwise
   = do { (ks,ss,ts,rs) <- mapAndUnzip4M lintCoercion cos

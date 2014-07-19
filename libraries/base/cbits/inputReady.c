@@ -25,7 +25,11 @@ fdReady(int fd, int write, int msecs, int isSock)
 	int maxfd, ready;
 	fd_set rfd, wfd;
 	struct timeval tv;
-	
+        if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
+            /* avoid memory corruption on too large FDs */
+            errno = EINVAL;
+            return -1;
+        }
 	FD_ZERO(&rfd);
 	FD_ZERO(&wfd);
         if (write) {

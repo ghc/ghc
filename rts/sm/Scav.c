@@ -32,7 +32,7 @@ static void scavenge_stack (StgPtr p, StgPtr stack_end);
 
 static void scavenge_large_bitmap (StgPtr p, 
 				   StgLargeBitmap *large_bitmap, 
-				   nat size );
+				   StgWord size );
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 # define evacuate(a) evacuate1(a)
@@ -168,6 +168,20 @@ static StgPtr scavenge_mut_arr_ptrs_marked (StgMutArrPtrs *a)
     return (StgPtr)a + mut_arr_ptrs_sizeW(a);
 }
 
+STATIC_INLINE StgPtr
+scavenge_small_bitmap (StgPtr p, StgWord size, StgWord bitmap)
+{
+    while (size > 0) {
+        if ((bitmap & 1) == 0) {
+            evacuate((StgClosure **)p);
+        }
+        p++;
+        bitmap = bitmap >> 1;
+        size--;
+    }
+    return p;
+}
+
 /* -----------------------------------------------------------------------------
    Blocks of function args occur on the stack (at the top) and
    in PAPs.
@@ -178,7 +192,7 @@ scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
 {
     StgPtr p;
     StgWord bitmap;
-    nat size;
+    StgWord size;
 
     p = (StgPtr)args;
     switch (fun_info->f.fun_type) {
@@ -195,14 +209,7 @@ scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
 	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
 	size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
-	while (size > 0) {
-	    if ((bitmap & 1) == 0) {
-		evacuate((StgClosure **)p);
-	    }
-	    p++;
-	    bitmap = bitmap >> 1;
-	    size--;
-	}
+        p = scavenge_small_bitmap(p, size, bitmap);
 	break;
     }
     return p;
@@ -234,14 +241,7 @@ scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
     default:
 	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
-	while (size > 0) {
-	    if ((bitmap & 1) == 0) {
-		evacuate((StgClosure **)p);
-	    }
-	    p++;
-	    bitmap = bitmap >> 1;
-	    size--;
-	}
+        p = scavenge_small_bitmap(p, size, bitmap);
 	break;
     }
     return p;
@@ -1498,7 +1498,7 @@ scavenge_one(StgPtr p)
       { 
 	StgPtr start = gen->scan;
 	bdescr *start_bd = gen->scan_bd;
-	nat size = 0;
+	StgWord size = 0;
 	scavenge(&gen);
 	if (start_bd != gen->scan_bd) {
 	  size += (P_)BLOCK_ROUND_UP(start) - start;
@@ -1745,7 +1745,7 @@ scavenge_static(void)
    -------------------------------------------------------------------------- */
 
 static void
-scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
+scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, StgWord size )
 {
     nat i, j, b;
     StgWord bitmap;
@@ -1765,19 +1765,6 @@ scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
     }
 }
 
-STATIC_INLINE StgPtr
-scavenge_small_bitmap (StgPtr p, nat size, StgWord bitmap)
-{
-    while (size > 0) {
-	if ((bitmap & 1) == 0) {
-	    evacuate((StgClosure **)p);
-	}
-	p++;
-	bitmap = bitmap >> 1;
-	size--;
-    }
-    return p;
-}
 
 /* -----------------------------------------------------------------------------
    scavenge_stack walks over a section of stack and evacuates all the
@@ -1790,7 +1777,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 {
   const StgRetInfoTable* info;
   StgWord bitmap;
-  nat size;
+  StgWord size;
 
   /* 
    * Each time around this loop, we are looking at a chunk of stack
@@ -1874,7 +1861,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 
     case RET_BCO: {
 	StgBCO *bco;
-	nat size;
+	StgWord size;
 
 	p++;
 	evacuate((StgClosure **)p);
@@ -1889,7 +1876,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
       // large bitmap (> 32 entries, or > 64 on a 64-bit machine) 
     case RET_BIG:
     {
-	nat size;
+	StgWord size;
 
 	size = GET_LARGE_BITMAP(&info->i)->size;
 	p++;

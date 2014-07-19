@@ -16,6 +16,8 @@ For state that is global and should be returned at the end (e.g not part
 of the stack mechanism), you should use an TcRef (= IORef) to store them.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcRnTypes(
         TcRnIf, TcRn, TcM, RnM, IfM, IfL, IfG, -- The monad is opaque outside this module
         TcRef,
@@ -92,7 +94,7 @@ import Class    ( Class )
 import TyCon    ( TyCon )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
-import PatSyn   ( PatSyn, patSynId )
+import PatSyn   ( PatSyn, patSynType )
 import TcType
 import Annotations
 import InstEnv
@@ -294,7 +296,7 @@ data TcGblEnv
           -- ^ Allows us to choose unique DFun names.
 
         -- The next fields accumulate the payload of the module
-        -- The binds, rules and foreign-decl fiels are collected
+        -- The binds, rules and foreign-decl fields are collected
         -- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
         tcg_rn_exports :: Maybe [Located (IE Name)],
@@ -1282,6 +1284,8 @@ data Implication
 
       ic_fsks  :: [TcTyVar],     -- Extra flatten-skolems introduced by
                                  -- by flattening the givens
+                                 -- See Note [Given flatten-skolems]
+
       ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
                                  -- False <=> ic_givens might have equalities
 
@@ -1741,11 +1745,14 @@ pprSkolInfo ArrowSkol       = ptext (sLit "the arrow form")
 pprSkolInfo (PatSkol cl mc) = case cl of
     RealDataCon dc -> sep [ ptext (sLit "a pattern with constructor")
                           , nest 2 $ ppr dc <+> dcolon
-                            <+> ppr (dataConUserType dc) <> comma
+                            <+> pprType (dataConUserType dc) <> comma
+                            -- pprType prints forall's regardless of -fprint-explict-foralls
+                            -- which is what we want here, since we might be saying
+                            -- type variable 't' is bound by ...
                           , ptext (sLit "in") <+> pprMatchContext mc ]
     PatSynCon ps -> sep [ ptext (sLit "a pattern with pattern synonym")
                         , nest 2 $ ppr ps <+> dcolon
-                          <+> ppr (varType (patSynId ps)) <> comma
+                          <+> pprType (patSynType ps) <> comma
                         , ptext (sLit "in") <+> pprMatchContext mc ]
 pprSkolInfo (InferSkol ids) = sep [ ptext (sLit "the inferred type of")
                                   , vcat [ ppr name <+> dcolon <+> ppr ty

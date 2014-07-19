@@ -6,6 +6,8 @@
 Desugaring exporessions.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 
 #include "HsVersions.h"
@@ -548,7 +550,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
                                          , pat_dicts = eqs_vars ++ theta_vars
                                          , pat_binds = emptyTcEvBinds
                                          , pat_args = PrefixCon $ map nlVarPat arg_ids
-                                         , pat_ty = in_ty
+                                         , pat_arg_tys = in_inst_tys
                                          , pat_wrap = idHsWrapper }
            ; let wrapped_rhs | null eq_spec = rhs
                              | otherwise    = mkLHsWrap (mkWpCast (mkTcSubCo wrap_co)) rhs

@@ -151,18 +151,6 @@ stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 }
 
 
-stg_fetchAddIntArrayzh( gcptr arr, W_ ind, W_ incr )
-/* MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
-{
-    W_ p, h;
-
-    p = arr + SIZEOF_StgArrWords + WDS(ind);
-    (h) = ccall atomic_inc(p, incr);
-
-    return(h);
-}
-
-
 stg_newArrayzh ( W_ n /* words */, gcptr init )
 {
     W_ words, size, p;
@@ -577,10 +565,11 @@ stg_mkWeakzh ( gcptr key,
     StgWeak_finalizer(w)   = finalizer;
     StgWeak_cfinalizers(w) = stg_NO_FINALIZER_closure;
 
-    ACQUIRE_LOCK(sm_mutex);
-    StgWeak_link(w) = generation_weak_ptr_list(W_[g0]);
-    generation_weak_ptr_list(W_[g0]) = w;
-    RELEASE_LOCK(sm_mutex);
+    StgWeak_link(w) = Capability_weak_ptr_list_hd(MyCapability());
+    Capability_weak_ptr_list_hd(MyCapability()) = w;
+    if (Capability_weak_ptr_list_tl(MyCapability()) == NULL) {
+        Capability_weak_ptr_list_tl(MyCapability()) = w;
+    }
 
     IF_DEBUG(weak, ccall debugBelch(stg_weak_msg,w));
 
@@ -1785,6 +1774,7 @@ stg_tryReadMVarzh ( P_ mvar, /* :: MVar a */ )
     LOCK_CLOSURE(mvar, info);
 
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
+        unlockClosure(mvar, info);
         return (0, stg_NO_FINALIZER_closure);
     }
 

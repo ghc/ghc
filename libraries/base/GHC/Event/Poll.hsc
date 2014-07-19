@@ -14,6 +14,7 @@ module GHC.Event.Poll
 
 #if !defined(HAVE_POLL_H)
 import GHC.Base
+import qualified GHC.Event.Internal as E
 
 new :: IO E.Backend
 new = error "Poll back end not implemented for this platform"

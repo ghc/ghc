@@ -4,6 +4,8 @@
 \section[RnEnv]{Environment manipulation for the renamer monad}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module RnEnv (
         newTopSrcBinder,
         lookupLocatedTopBndrRn, lookupTopBndrRn,
@@ -38,10 +40,7 @@ module RnEnv (
         warnUnusedMatches,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         dataTcOccs, kindSigErr, perhapsForallMsg,
-        HsDocContext(..), docOfHsDocContext, 
-
-        -- FsEnv
-        FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
+        HsDocContext(..), docOfHsDocContext
     ) where
 
 #include "HsVersions.h"
@@ -59,7 +58,6 @@ import NameSet
 import NameEnv
 import Avail
 import Module
-import UniqFM
 import ConLike
 import DataCon          ( dataConFieldLabels, dataConTyCon )
 import TyCon            ( isTupleTyCon, tyConArity )
@@ -270,21 +268,28 @@ lookupExactOcc name
                        ; return name
                        }
 
-           (gre:_) -> return (gre_name gre) }
+           [gre]   -> return (gre_name gre)
+           (gre:_) -> do {addErr dup_nm_err
+                         ; return (gre_name gre)
+                         }
            -- We can get more than one GRE here, if there are multiple 
-           -- bindings for the same name; but there will already be a 
-           -- reported error for the duplicate.  (If we add the error 
-           -- rather than stopping when we encounter it.) 
-           -- So all we need do here is not crash.  
-           -- Example is Trac #8932:
+           -- bindings for the same name. Sometimes they are caught later
+           -- by findLocalDupsRdrEnv, like in this example (Trac #8932):
            --    $( [d| foo :: a->a; foo x = x |])
            --    foo = True
-           -- Here the 'foo' in the splice turns into an Exact Name
+           -- But when the names are totally identical, we panic (Trac #7241):
+           --    $(newName "Foo" >>= \o -> return [DataD [] o [] [RecC o []] [''Show]])
+           -- So, let's emit an error here, even if it will lead to duplication in some cases.
+       }
 
   where
     exact_nm_err = hang (ptext (sLit "The exact Name") <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
                       2 (vcat [ ptext (sLit "Probable cause: you used a unique Template Haskell name (NameU), ")
                               , ptext (sLit "perhaps via newName, but did not bind it")
+                              , ptext (sLit "If that's it, then -ddump-splices might be useful") ])
+    dup_nm_err   = hang (ptext (sLit "Duplicate exact Name") <+> quotes (ppr $ nameOccName name))
+                      2 (vcat [ ptext (sLit "Probable cause: you used a unique Template Haskell name (NameU), ")
+                              , ptext (sLit "perhaps via newName, but bound it multiple times")
                               , ptext (sLit "If that's it, then -ddump-splices might be useful") ])
 
 -----------------------------------------------
@@ -1080,20 +1085,6 @@ deprecation declarations, and lookup of names in GHCi.
 
 \begin{code}
 --------------------------------
-type FastStringEnv a = UniqFM a         -- Keyed by FastString
-
-
-emptyFsEnv  :: FastStringEnv a
-lookupFsEnv :: FastStringEnv a -> FastString -> Maybe a
-extendFsEnv :: FastStringEnv a -> FastString -> a -> FastStringEnv a
-mkFsEnv     :: [(FastString,a)] -> FastStringEnv a
-
-emptyFsEnv  = emptyUFM
-lookupFsEnv = lookupUFM
-extendFsEnv = addToUFM
-mkFsEnv     = listToUFM
-
---------------------------------
 type MiniFixityEnv = FastStringEnv (Located Fixity)
         -- Mini fixity env for the names we're about
         -- to bind, in a single binding group
@@ -1461,7 +1452,7 @@ unknownNameSuggestErr where_look tried_rdr_name
              all_possibilities
                 =  [ (showPpr dflags r, (r, Left loc))
                    | (r,loc) <- local_possibilities local_env ]
-                ++ [ (showPpr dflags r, rp) | (r,rp) <- global_possibilities global_env ]
+                ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
 
              suggest = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
              perhaps = ptext (sLit "Perhaps you meant")
@@ -1473,19 +1464,24 @@ unknownNameSuggestErr where_look tried_rdr_name
        ; return extra_err }
   where
     pp_item :: (RdrName, HowInScope) -> SDoc
-    pp_item (rdr, Left loc) = quotes (ppr rdr) <+> loc' -- Locally defined
+    pp_item (rdr, Left loc) = pp_ns rdr <+> quotes (ppr rdr) <+> loc' -- Locally defined
         where loc' = case loc of
                      UnhelpfulSpan l -> parens (ppr l)
                      RealSrcSpan l -> parens (ptext (sLit "line") <+> int (srcSpanStartLine l))
-    pp_item (rdr, Right is) = quotes (ppr rdr) <+>   -- Imported
+    pp_item (rdr, Right is) = pp_ns rdr <+> quotes (ppr rdr) <+>   -- Imported
                               parens (ptext (sLit "imported from") <+> ppr (is_mod is))
+
+    pp_ns :: RdrName -> SDoc
+    pp_ns rdr | ns /= tried_ns = pprNameSpace ns
+              | otherwise      = empty
+      where ns = rdrNameSpace rdr
 
     tried_occ     = rdrNameOcc tried_rdr_name
     tried_is_sym  = isSymOcc tried_occ
     tried_ns      = occNameSpace tried_occ
     tried_is_qual = isQual tried_rdr_name
 
-    correct_name_space occ =  occNameSpace occ == tried_ns
+    correct_name_space occ =  nameSpacesRelated (occNameSpace occ) tried_ns
                            && isSymOcc occ == tried_is_sym
         -- Treat operator and non-operators as non-matching
         -- This heuristic avoids things like

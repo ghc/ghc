@@ -54,6 +54,79 @@
 	path = libraries/random
 	url = ../packages/random.git
 	ignore = untracked
+[submodule "libraries/array"]
+	path = libraries/array
+	url = ../packages/array.git
+	ignore = none
+[submodule "libraries/deepseq"]
+	path = libraries/deepseq
+	url = ../packages/deepseq.git
+	ignore = none
+[submodule "libraries/directory"]
+	path = libraries/directory
+	url = ../packages/directory.git
+	ignore = none
+[submodule "libraries/filepath"]
+	path = libraries/filepath
+	url = ../packages/filepath.git
+	ignore = none
+[submodule "libraries/haskell98"]
+	path = libraries/haskell98
+	url = ../packages/haskell98.git
+	ignore = none
+[submodule "libraries/haskell2010"]
+	path = libraries/haskell2010
+	url = ../packages/haskell2010.git
+	ignore = none
+[submodule "libraries/hoopl"]
+	path = libraries/hoopl
+	url = ../packages/hoopl.git
+	ignore = none
+[submodule "libraries/hpc"]
+	path = libraries/hpc
+	url = ../packages/hpc.git
+	ignore = none
+[submodule "libraries/old-locale"]
+	path = libraries/old-locale
+	url = ../packages/old-locale.git
+	ignore = none
+[submodule "libraries/old-time"]
+	path = libraries/old-time
+	url = ../packages/old-time.git
+	ignore = none
+[submodule "libraries/process"]
+	path = libraries/process
+	url = ../packages/process.git
+	ignore = none
+[submodule "libraries/unix"]
+	path = libraries/unix
+	url = ../packages/unix.git
+	ignore = none
+[submodule "libraries/parallel"]
+	path = libraries/parallel
+	url = ../packages/parallel.git
+	ignore = none
+[submodule "libraries/stm"]
+	path = libraries/stm
+	url = ../packages/stm.git
+	ignore = none
+[submodule "libraries/dph"]
+	path = libraries/dph
+	url = ../packages/dph.git
+	ignore = none
 [submodule "utils/haddock"]
 	path = utils/haddock
 	url = ../haddock.git
+	ignore = none
+[submodule "nofib"]
+	path = nofib
+	url = ../nofib.git
+	ignore = none
+[submodule "utils/hsc2hs"]
+	path = utils/hsc2hs
+	url = ../hsc2hs.git
+	ignore = none
+[submodule "libffi-tarballs"]
+	path = libffi-tarballs
+	url = ../libffi-tarballs.git
+	ignore = none

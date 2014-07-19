@@ -3,6 +3,8 @@
 % (c) University of Glasgow, 2007
 %
 \begin{code}
+{-# LANGUAGE NondecreasingIndentation #-}
+
 module Coverage (addTicksToBinds, hpcInitCode) where
 
 import Type

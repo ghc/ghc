@@ -7,7 +7,8 @@
 			-----------------
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 
 module DmdAnal ( dmdAnalProgram ) where
 
@@ -114,7 +115,7 @@ dmdAnalStar :: AnalEnv
             -> Demand 	-- This one takes a *Demand*
             -> CoreExpr -> (BothDmdArg, CoreExpr)
 dmdAnalStar env dmd e 
-  | (cd, defer_and_use) <- toCleanDmd dmd
+  | (cd, defer_and_use) <- toCleanDmd dmd (exprType e)
   , (dmd_ty, e')        <- dmdAnal env cd e
   = (postProcessDmdTypeM defer_and_use dmd_ty, e')
 
@@ -595,7 +596,16 @@ dmdAnalRhs :: TopLevelFlag
 dmdAnalRhs top_lvl rec_flag env id rhs
   | Just fn <- unpackTrivial rhs   -- See Note [Demand analysis for trivial right-hand sides]
   , let fn_str = getStrictness env fn
-  = (fn_str, emptyDmdEnv, set_idStrictness env id fn_str, rhs)
+        fn_fv | isLocalId fn = unitVarEnv fn topDmd
+              | otherwise    = emptyDmdEnv
+        -- Note [Remember to demand the function itself]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        -- fn_fv: don't forget to produce a demand for fn itself
+        -- Lacking this caused Trac #9128
+        -- The demand is very conservative (topDmd), but that doesn't
+        -- matter; trivial bindings are usually inlined, so it only 
+        -- kicks in for top-level bindings and NOINLINE bindings
+  = (fn_str, fn_fv, set_idStrictness env id fn_str, rhs)
 
   | otherwise
   = (sig_ty, lazy_fv, id', mkLams bndrs' body')

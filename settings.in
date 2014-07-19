@@ -2,6 +2,8 @@
  ("C compiler command", "@SettingsCCompilerCommand@"),
  ("C compiler flags", "@SettingsCCompilerFlags@"),
  ("C compiler link flags", "@SettingsCCompilerLinkFlags@"),
+ ("Haskell CPP command","@SettingsHaskellCPPCommand@"),
+ ("Haskell CPP flags","@SettingsHaskellCPPFlags@"),
  ("ld command", "@SettingsLdCommand@"),
  ("ld flags", "@SettingsLdFlags@"),
  ("ld supports compact unwind", "@LdHasNoCompactUnwind@"),

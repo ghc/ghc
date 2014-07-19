@@ -9,6 +9,8 @@ ToDo [Oct 2013]
 \section[SpecConstr]{Specialise over constructors}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module SpecConstr(
         specConstrProgram
 #ifdef GHCI
@@ -396,16 +398,19 @@ use the calls in the un-specialised RHS as seeds.  We call these
 
 Note [Top-level recursive groups]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If all the bindings in a top-level recursive group are not exported,
-all the calls are in the rest of the top-level bindings.
-This means we can specialise with those call patterns instead of with the RHSs
-of the recursive group.
+If all the bindings in a top-level recursive group are local (not
+exported), then all the calls are in the rest of the top-level
+bindings.  This means we can specialise with those call patterns
+instead of with the RHSs of the recursive group.
 
-To get the call usage information, we work backwards through the top-level bindings
-so we see the usage before we get to the binding of the function.
-Before we can collect the usage though, we go through all the bindings and add them
-to the environment. This is necessary because usage is only tracked for functions
-in the environment.
+(Question: maybe we should *also* use calls in the rest of the
+top-level bindings as seeds?
+
+To get the call usage information, we work backwards through the
+top-level bindings so we see the usage before we get to the binding of
+the function.  Before we can collect the usage though, we go through
+all the bindings and add them to the environment. This is necessary
+because usage is only tracked for functions in the environment.
 
 The actual seeding of the specialisation is very similar to Note [Local recursive group].
 
@@ -1323,16 +1328,14 @@ scTopBind env usage (Rec prs)
   = do  { (rhs_usgs, rhss')   <- mapAndUnzipM (scExpr env) rhss
         ; return (usage `combineUsage` (combineUsages rhs_usgs), Rec (bndrs `zip` rhss')) }
   | otherwise   -- Do specialisation
-  = do  { (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs env) (bndrs `zip` rhss)
+  = do  { (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs env) prs
         -- ; pprTrace "scTopBind" (ppr bndrs $$ ppr (map (lookupVarEnv (scu_calls usage)) bndrs)) (return ())
 
         -- Note [Top-level recursive groups]
-        ; let (usg,rest) = if   all (not . isExportedId) bndrs
-                           then -- pprTrace "scTopBind-T" (ppr bndrs $$ ppr (map (fmap (map snd) . lookupVarEnv (scu_calls usage)) bndrs))
-                                ( usage
-                                , [SI [] 0 (Just us) | us <- rhs_usgs] )
-                           else ( combineUsages rhs_usgs
-                                , [SI [] 0 Nothing   | _  <- rhs_usgs] )
+        ; let (usg,rest) | any isExportedId bndrs  -- Seed from RHSs
+                         = ( combineUsages rhs_usgs, [SI [] 0 Nothing   | _  <- rhs_usgs] )
+                         | otherwise               -- Seed from body only
+                         = ( usage,                  [SI [] 0 (Just us) | us <- rhs_usgs] )
 
         ; (usage', specs) <- specLoop (scForce env force_spec)
                                  (scu_calls usg) rhs_infos nullUsage rest
@@ -1446,11 +1449,6 @@ specialise env bind_calls (RI fn _ arg_bndrs body arg_occs)
   , notNull arg_bndrs           -- Only specialise functions
   , Just all_calls <- lookupVarEnv bind_calls fn
   = do  { (boring_call, pats) <- callsToPats env specs arg_occs all_calls
---      ; pprTrace "specialise" (vcat [ ppr fn <+> text "with" <+> int (length pats) <+> text "good patterns"
---                                      , text "arg_occs" <+> ppr arg_occs
---                                    , text "calls" <+> ppr all_calls
---                                    , text "good pats" <+> ppr pats])  $
---        return ()
 
                 -- Bale out if too many specialisations
         ; let n_pats      = length pats
@@ -1473,12 +1471,25 @@ specialise env bind_calls (RI fn _ arg_bndrs body arg_occs)
 
             _normal_case -> do {
 
-          let spec_env = decreaseSpecCount env n_pats
+--        ; if (not (null pats) || isJust mb_unspec) then
+--            pprTrace "specialise" (vcat [ ppr fn <+> text "with" <+> int (length pats) <+> text "good patterns"
+--                                        , text "mb_unspec" <+> ppr (isJust mb_unspec)
+--                                        , text "arg_occs" <+> ppr arg_occs
+--                                        , text "good pats" <+> ppr pats])  $
+--               return ()
+--          else return ()
+
+        ; let spec_env = decreaseSpecCount env n_pats
         ; (spec_usgs, new_specs) <- mapAndUnzipM (spec_one spec_env fn arg_bndrs body)
                                                  (pats `zip` [spec_count..])
                 -- See Note [Specialise original body]
 
         ; let spec_usg = combineUsages spec_usgs
+
+              -- If there were any boring calls among the seeds (= all_calls), then those
+              -- calls will call the un-specialised function.  So we should use the seeds
+              -- from the _unspecialised_ function's RHS, which are in mb_unspec, by returning
+              -- then in new_usg.
               (new_usg, mb_unspec')
                   = case mb_unspec of
                       Just rhs_usg | boring_call -> (spec_usg `combineUsage` rhs_usg, Nothing)

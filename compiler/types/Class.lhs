@@ -6,7 +6,8 @@
 The @Class@ datatype
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -16,7 +17,7 @@ The @Class@ datatype
 module Class (
 	Class,
         ClassOpItem, DefMeth (..),
-        ClassATItem,
+        ClassATItem(..),
         ClassMinimalDef,
 	defMethSpecOfDefMeth,
 
@@ -31,8 +32,7 @@ module Class (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TyCon	( TyCon, tyConName, tyConUnique )
-import {-# SOURCE #-} TypeRep	( PredType )
-import CoAxiom
+import {-# SOURCE #-} TypeRep	( Type, PredType )
 import Var
 import Name
 import BasicTypes
@@ -99,10 +99,10 @@ data DefMeth = NoDefMeth 		-- No default method
 	     | GenDefMeth Name 		-- A generic default method
              deriving Eq
 
-type ClassATItem = (TyCon,           -- See Note [Associated type tyvar names]
-                    [CoAxBranch])    -- Default associated types from these templates 
-  -- We can have more than one default per type; see
-  -- Note [Associated type defaults] in TcTyClsDecls
+data ClassATItem
+  = ATI TyCon         -- See Note [Associated type tyvar names]
+        (Maybe Type)  -- Default associated type (if any) from this template
+                      -- Note [Associated type defaults]
 
 type ClassMinimalDef = BooleanFormula Name -- Required methods
 
@@ -114,8 +114,38 @@ defMethSpecOfDefMeth meth
 	NoDefMeth	-> NoDM
 	DefMeth _	-> VanillaDM
 	GenDefMeth _	-> GenericDM
-
 \end{code}
+
+Note [Associated type defaults]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The following is an example of associated type defaults:
+   class C a where
+     data D a r
+
+     type F x a b :: *
+     type F p q r = (p,q)->r    -- Default
+
+Note that
+
+ * The TyCons for the associated types *share type variables* with the
+   class, so that we can tell which argument positions should be
+   instantiated in an instance decl.  (The first for 'D', the second
+   for 'F'.)
+
+ * We can have default definitions only for *type* families,
+   not data families
+
+ * In the default decl, the "patterns" should all be type variables,
+   but (in the source language) they don't need to be the same as in
+   the 'type' decl signature or the class.  It's more like a
+   free-standing 'type instance' declaration.
+
+ * HOWEVER, in the internal ClassATItem we rename the RHS to match the
+   tyConTyVars of the family TyCon.  So in the example above we'd get
+   a ClassATItem of
+        ATI F ((x,a) -> b)
+   So the tyConTyVars of the family TyCon bind the free vars of
+   the default Type rhs
 
 The @mkClass@ function fills in the indirect superclasses.
 
@@ -197,7 +227,7 @@ classOpItems = classOpStuff
 
 classATs :: Class -> [TyCon]
 classATs (Class { classATStuff = at_stuff })
-  = [tc | (tc, _) <- at_stuff]
+  = [tc | ATI tc _ <- at_stuff]
 
 classATItems :: Class -> [ClassATItem]
 classATItems = classATStuff

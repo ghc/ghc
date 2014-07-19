@@ -14,3 +14,4 @@ test('T2228',
 test('T2636', req_interp, run_command, ['$MAKE --no-print-directory -s T2636'])
 test('T3890', req_interp, run_command, ['$MAKE --no-print-directory -s T3890'])
 test('T7299', req_interp, run_command, ['$MAKE --no-print-directory -s T7299'])
+test('T9086', req_interp, run_command, ['$MAKE --no-print-directory -s T9086'])

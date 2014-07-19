@@ -1,7 +1,8 @@
+{-# LANGUAGE CPP #-}
+
 -- ----------------------------------------------------------------------------
 -- | Pretty print helpers for the LLVM Code generator.
 --
-
 module LlvmCodeGen.Ppr (
         pprLlvmHeader, pprLlvmCmmDecl, pprLlvmData, infoSection, iTableSuf
     ) where

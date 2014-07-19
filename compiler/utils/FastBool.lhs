@@ -4,6 +4,8 @@
 \section{Fast booleans}
 
 \begin{code}
+{-# LANGUAGE CPP, MagicHash #-}
+
 module FastBool (
     --fastBool could be called bBox; isFastTrue, bUnbox; but they're not
     FastBool, fastBool, isFastTrue, fastOr, fastAnd

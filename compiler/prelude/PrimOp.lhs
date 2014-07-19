@@ -4,6 +4,8 @@
 \section[PrimOp]{Primitive operations (machine-level)}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module PrimOp (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,
         primOpType, primOpSig,

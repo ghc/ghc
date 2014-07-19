@@ -1,4 +1,5 @@
-{-# OPTIONS -fno-cse #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 -----------------------------------------------------------------------------

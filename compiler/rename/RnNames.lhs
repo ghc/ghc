@@ -4,6 +4,8 @@
 \section[RnNames]{Extracting imported and top-level names in scope}
 
 \begin{code}
+{-# LANGUAGE CPP, NondecreasingIndentation #-}
+
 module RnNames (
         rnImports, getLocalNonValBinders,
         rnExports, extendGlobalRdrEnvRn,
@@ -1301,11 +1303,14 @@ type ImportDeclUsage
 warnUnusedImportDecls :: TcGblEnv -> RnM ()
 warnUnusedImportDecls gbl_env
   = do { uses <- readMutVar (tcg_used_rdrnames gbl_env)
-       ; let imports = filter explicit_import (tcg_rn_imports gbl_env)
+       ; let user_imports = filterOut (ideclImplicit . unLoc) (tcg_rn_imports gbl_env)
+                            -- This whole function deals only with *user* imports
+                            -- both for warning about unnecessary ones, and for
+                            -- deciding the minimal ones
              rdr_env = tcg_rdr_env gbl_env
 
        ; let usage :: [ImportDeclUsage]
-             usage = findImportUsage imports rdr_env (Set.elems uses)
+             usage = findImportUsage user_imports rdr_env (Set.elems uses)
 
        ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr (Set.elems uses)
                        , ptext (sLit "Import usage") <+> ppr usage])
@@ -1314,10 +1319,6 @@ warnUnusedImportDecls gbl_env
 
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
-  where
-    explicit_import (L _ decl) = not (ideclImplicit decl)
-        -- Filter out the implicit Prelude import
-        -- which we do not want to bleat about
 \end{code}
 
 
@@ -1433,6 +1434,11 @@ warnUnusedImport :: ImportDeclUsage -> RnM ()
 warnUnusedImport (L loc decl, used, unused)
   | Just (False,[]) <- ideclHiding decl
                 = return ()            -- Do not warn for 'import M()'
+
+  | Just (True, hides) <- ideclHiding decl
+  , not (null hides)
+  , pRELUDE_NAME == unLoc (ideclName decl)
+                = return ()            -- Note [Do not warn about Prelude hiding]
   | null used   = addWarnAt loc msg1   -- Nothing used; drop entire decl
   | null unused = return ()            -- Everything imported is used; nop
   | otherwise   = addWarnAt loc msg2   -- Some imports are unused
@@ -1452,6 +1458,19 @@ warnUnusedImport (L loc decl, used, unused)
     pp_not_used = text "is redundant"
 \end{code}
 
+Note [Do not warn about Prelude hiding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not warn about
+   import Prelude hiding( x, y )
+because even if nothing else from Prelude is used, it may be essential to hide
+x,y to avoid name-shadowing warnings.  Example (Trac #9061)
+   import Prelude hiding( log )
+   f x = log where log = ()
+
+
+
+Note [Printing minimal imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To print the minimal imports we walk over the user-supplied import
 decls, and simply trim their import lists.  NB that
 
@@ -1462,6 +1481,7 @@ decls, and simply trim their import lists.  NB that
 
 \begin{code}
 printMinimalImports :: [ImportDeclUsage] -> RnM ()
+-- See Note [Printing minimal imports]
 printMinimalImports imports_w_usage
   = do { imports' <- mapM mk_minimal imports_w_usage
        ; this_mod <- getModule

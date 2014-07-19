@@ -12,6 +12,21 @@
 
   * Weaken RealFloat constraints on some `Data.Complex` functions
 
+  * Add `Control.Monad.(<$!>)` as a strict version of `(<$>)`
+
+## 4.7.0.1  *Jul 2014*
+
+  * Bundled with GHC 7.8.3
+
+  * Unhide `Foreign.ForeignPtr` in Haddock (#8475)
+
+  * Fix recomputation of `TypeRep` in `Typeable` type-application instance
+    (#9203)
+
+  * Fix regression in Data.Fixed Read instance (#9231)
+
+  * Fix `fdReady` to honor `FD_SETSIZE` (#9168)
+
 ## 4.7.0.0  *Apr 2014*
 
   * Bundled with GHC 7.8.1

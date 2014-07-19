@@ -1,6 +1,6 @@
 \begin{code}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -668,10 +668,11 @@ mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> SDoc -> Ct
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   | isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
-                            -- be oriented the other way round; see TcCanonical.reOrient
+                            -- be oriented the other way round;
+                            -- see TcCanonical.canEqTyVarTyVar
   || isSigTyVar tv1 && not (isTyVarTy ty2)
   = mkErrorMsg ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
-                             , extraTyVarInfo ctxt ty1 ty2
+                             , extraTyVarInfo ctxt tv1 ty2
                              , extra ])
 
   -- So tv is a meta tyvar (or started that way before we 
@@ -701,7 +702,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   , Implic { ic_skols = skols } <- implic
   , tv1 `elem` skols
   = mkErrorMsg ctxt ct (vcat [ misMatchMsg oriented ty1 ty2
-                             , extraTyVarInfo ctxt ty1 ty2
+                             , extraTyVarInfo ctxt tv1 ty2
                              , extra ])
 
   -- Check for skolem escape
@@ -734,7 +735,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
                       , nest 2 $ ptext (sLit "inside the constraints") <+> pprEvVarTheta given
                       , nest 2 $ ptext (sLit "bound by") <+> ppr skol_info
                       , nest 2 $ ptext (sLit "at") <+> ppr (tcl_loc env) ]
-             tv_extra = extraTyVarInfo ctxt ty1 ty2
+             tv_extra = extraTyVarInfo ctxt tv1 ty2
              add_sig  = suggestAddSig ctxt ty1 ty2
        ; mkErrorMsg ctxt ct (vcat [msg, untch_extra, tv_extra, add_sig, extra]) }
 
@@ -793,7 +794,7 @@ misMatchOrCND ctxt ct oriented ty1 ty2
        -- or there is no context, don't report the context
   = misMatchMsg oriented ty1 ty2
   | otherwise      
-  = couldNotDeduce givens ([mkEqPred ty1 ty2], orig)
+  = couldNotDeduce givens ([mkTcEqPred ty1 ty2], orig)
   where
     givens = getUserGivens ctxt
     orig   = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2 }
@@ -815,15 +816,18 @@ pp_givens givens
                 2 (sep [ ptext (sLit "bound by") <+> ppr skol_info
                        , ptext (sLit "at") <+> ppr loc])
 
-extraTyVarInfo :: ReportErrCtxt -> TcType -> TcType -> SDoc
+extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
 -- Add on extra info about skolem constants
 -- NB: The types themselves are already tidied
-extraTyVarInfo ctxt ty1 ty2
-  = nest 2 (tv_extra ty1 $$ tv_extra ty2)
+extraTyVarInfo ctxt tv1 ty2
+  = nest 2 (tv_extra tv1 $$ ty_extra ty2)
   where
     implics = cec_encl ctxt
-    tv_extra ty | Just tv <- tcGetTyVar_maybe ty
-                , isTcTyVar tv, isSkolemTyVar tv
+    ty_extra ty = case tcGetTyVar_maybe ty of
+                    Just tv -> tv_extra tv
+                    Nothing -> empty
+
+    tv_extra tv | isTcTyVar tv, isSkolemTyVar tv
                 , let pp_tv = quotes (ppr tv)
                 = case tcTyVarDetails tv of
                     SkolemTv {}   -> pp_tv <+> pprSkol (getSkolemInfo implics tv) (getSrcLoc tv)
@@ -1285,29 +1289,51 @@ flattening any further.  After all, there can be no instance declarations
 that match such things.  And flattening under a for-all is problematic
 anyway; consider C (forall a. F a)
 
+Note [Suggest -fprint-explicit-kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It can be terribly confusing to get an error message like (Trac #9171)
+    Couldn't match expected type ‘GetParam Base (GetParam Base Int)’
+                with actual type ‘GetParam Base (GetParam Base Int)’
+The reason may be that the kinds don't match up.  Typically you'll get
+more useful information, but not when it's as a result of ambiguity.
+This test suggests -fprint-explicit-kinds when all the ambiguous type
+variables are kind variables.
+
 \begin{code}
 mkAmbigMsg :: Ct -> (Bool, SDoc)
 mkAmbigMsg ct
-  | isEmptyVarSet ambig_tv_set = (False, empty)
-  | otherwise                  = (True,  msg)
+  | null ambig_tkvs = (False, empty)
+  | otherwise       = (True,  msg)
   where
-    ambig_tv_set = filterVarSet isAmbiguousTyVar (tyVarsOfCt ct)
-    ambig_tvs = varSetElems ambig_tv_set
-    
-    is_or_are | isSingleton ambig_tvs = text "is"
-              | otherwise             = text "are"
-                 
-    msg | any isRuntimeUnkSkol ambig_tvs  -- See Note [Runtime skolems]
+    ambig_tkv_set = filterVarSet isAmbiguousTyVar (tyVarsOfCt ct)
+    ambig_tkvs    = varSetElems ambig_tkv_set
+    (ambig_kvs, ambig_tvs) = partition isKindVar ambig_tkvs
+
+    msg | any isRuntimeUnkSkol ambig_tkvs  -- See Note [Runtime skolems]
         =  vcat [ ptext (sLit "Cannot resolve unknown runtime type") <> plural ambig_tvs
                      <+> pprQuotedList ambig_tvs
                 , ptext (sLit "Use :print or :force to determine these types")]
-        | otherwise
-        = vcat [ text "The type variable" <> plural ambig_tvs
-                    <+> pprQuotedList ambig_tvs
-                    <+> is_or_are <+> text "ambiguous" ]
+
+        | not (null ambig_tvs)
+        = pp_ambig (ptext (sLit "type")) ambig_tvs
+
+        | otherwise  -- All ambiguous kind variabes; suggest -fprint-explicit-kinds
+        = vcat [ pp_ambig (ptext (sLit "kind")) ambig_kvs
+               , sdocWithDynFlags suggest_explicit_kinds ]
+
+    pp_ambig what tkvs
+      = ptext (sLit "The") <+> what <+> ptext (sLit "variable") <> plural tkvs
+        <+> pprQuotedList tkvs <+> is_or_are tkvs <+> ptext (sLit "ambiguous")
+
+    is_or_are [_] = text "is"
+    is_or_are _   = text "are"
+
+    suggest_explicit_kinds dflags  -- See Note [Suggest -fprint-explicit-kinds]
+      | gopt Opt_PrintExplicitKinds dflags = empty
+      | otherwise = ptext (sLit "Use -fprint-explicit-kinds to see the kind arguments")
 
 pprSkol :: SkolemInfo -> SrcLoc -> SDoc
-pprSkol UnkSkol   _ 
+pprSkol UnkSkol   _
   = ptext (sLit "is an unknown type variable")
 pprSkol skol_info tv_loc 
   = sep [ ptext (sLit "is a rigid type variable bound by"),

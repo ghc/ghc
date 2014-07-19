@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy, FlexibleInstances #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, PolyKinds #-}
-{-# LANGUAGE StandaloneDeriving, DeriveDataTypeable, TypeOperators,
+{-# LANGUAGE StandaloneDeriving, AutoDeriveTypeable, TypeOperators,
              GADTs #-}
 
 -----------------------------------------------------------------------------
@@ -323,7 +323,7 @@ class Typeable a => Data a where
 
   -- | A generic query that processes the immediate subterms and returns a list
   -- of results.  The list is given in the same order as originally specified
-  -- in the declaratoin of the data constructors.
+  -- in the declaration of the data constructors.
   gmapQ :: (forall d. Data d => d -> u) -> a -> [u]
   gmapQ f = gmapQr (:) [] f
 
@@ -777,12 +777,12 @@ mkCharConstr dt c = case datarep dt of
 
 ------------------------------------------------------------------------------
 --
---      Non-representations for non-presentable types
+--      Non-representations for non-representable types
 --
 ------------------------------------------------------------------------------
 
 
--- | Constructs a non-representation for a non-presentable type
+-- | Constructs a non-representation for a non-representable type
 mkNoRepType :: String -> DataType
 mkNoRepType str = DataType
                         { tycon   = str

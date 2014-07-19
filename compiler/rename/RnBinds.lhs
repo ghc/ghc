@@ -9,7 +9,7 @@ type-synonym declarations; those cannot be done at this stage because
 they may be affected by renaming (which isn't fully worked out yet).
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -476,8 +476,9 @@ rnBind _ bind@(PatBind { pat_lhs = pat
               bndrs = collectPatBinders pat
               bind' = bind { pat_rhs  = grhss', bind_fvs = fvs' }
               is_wild_pat = case pat of
-                              L _ (WildPat {}) -> True
-                              _                -> False
+                              L _ (WildPat {})                 -> True
+                              L _ (BangPat (L _ (WildPat {}))) -> True -- #9127
+                              _                                -> False
 
         -- Warn if the pattern binds no variables, except for the
         -- entirely-explicit idiom    _ = rhs

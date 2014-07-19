@@ -1,4 +1,6 @@
 type role Coercible representational representational
 class Coercible (a :: k) (b :: k)
   	-- Defined in ‘GHC.Types’
-coerce :: Coercible a b => a -> b 	-- Defined in ‘GHC.Prim’
+coerce ::
+  forall (k :: BOX) (a :: k) (b :: k). Coercible a b => a -> b
+  	-- Defined in ‘GHC.Prim’

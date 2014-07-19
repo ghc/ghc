@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2006
@@ -394,10 +396,10 @@ repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
        ; repTySynInst tc eqn1 }
 
 repTyFamEqn :: LTyFamInstEqn Name -> DsM (Core TH.TySynEqnQ)
-repTyFamEqn (L loc (TyFamInstEqn { tfie_pats = HsWB { hswb_cts = tys
-                                                    , hswb_kvs = kv_names
-                                                    , hswb_tvs = tv_names }
-                                 , tfie_rhs = rhs }))
+repTyFamEqn (L loc (TyFamEqn { tfe_pats = HsWB { hswb_cts = tys
+                                               , hswb_kvs = kv_names
+                                               , hswb_tvs = tv_names }
+                                 , tfe_rhs = rhs }))
   = do { let hs_tvs = HsQTvs { hsq_kvs = kv_names
                              , hsq_tvs = userHsTyVarBndrs loc tv_names }   -- Yuk
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
@@ -705,12 +707,14 @@ addTyVarBinds :: LHsTyVarBndrs Name                            -- the binders to
 -- the computations passed as the second argument is executed in that extended
 -- meta environment and gets the *new* names on Core-level as an argument
 
-addTyVarBinds tvs m
-  = do { freshNames <- mkGenSyms (hsLKiTyVarNames tvs)
-       ; term <- addBinds freshNames $
-                 do { kbs <- repList tyVarBndrTyConName mk_tv_bndr (hsQTvBndrs tvs `zip` freshNames)
+addTyVarBinds (HsQTvs { hsq_kvs = kvs, hsq_tvs = tvs }) m
+  = do { fresh_kv_names <- mkGenSyms kvs
+       ; fresh_tv_names <- mkGenSyms (map hsLTyVarName tvs)
+       ; let fresh_names = fresh_kv_names ++ fresh_tv_names
+       ; term <- addBinds fresh_names $
+                 do { kbs <- repList tyVarBndrTyConName mk_tv_bndr (tvs `zip` fresh_tv_names)
                     ; m kbs }
-       ; wrapGenSyms freshNames term }
+       ; wrapGenSyms fresh_names term }
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 

@@ -4,6 +4,8 @@ o%
 Functions over HsSyn specialised to RdrName.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module RdrHsSyn (
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
@@ -32,6 +34,7 @@ module RdrHsSyn (
         mkGadtDecl,          -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
         mkSimpleConDecl,
         mkDeprecatedGadtRecordDecl,
+        mkATDefault,
 
         -- Bunch of functions in the parser monad for
         -- checking and constructing values
@@ -71,7 +74,7 @@ import TysWiredIn       ( unitTyCon, unitDataCon )
 import ForeignCall
 import OccName          ( srcDataName, varName, isDataOcc, isTcOcc,
                           occNameString )
-import PrelNames        ( forall_tv_RDR )
+import PrelNames        ( forall_tv_RDR, allNameStrings )
 import DynFlags
 import SrcLoc
 import OrdList          ( OrdList, fromOL )
@@ -122,15 +125,30 @@ mkClassDecl :: SrcSpan
             -> P (LTyClDecl RdrName)
 
 mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
-  = do { let (binds, sigs, ats, at_defs, _, docs) = cvBindsAndSigs (unLoc where_cls)
+  = do { let (binds, sigs, ats, at_insts, _, docs) = cvBindsAndSigs (unLoc where_cls)
              cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams) <- checkTyClHdr tycl_hdr
-       ; tyvars <- checkTyVars (ptext (sLit "class")) whereDots
-                               cls tparams      -- Only type vars allowed
+       ; tyvars <- checkTyVarsP (ptext (sLit "class")) whereDots cls tparams
+       ; at_defs <- mapM (eitherToP . mkATDefault) at_insts
        ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, tcdTyVars = tyvars,
                                     tcdFDs = unLoc fds, tcdSigs = sigs, tcdMeths = binds,
                                     tcdATs = ats, tcdATDefs = at_defs, tcdDocs  = docs,
                                     tcdFVs = placeHolderNames })) }
+
+mkATDefault :: LTyFamInstDecl RdrName
+            -> Either (SrcSpan, SDoc) (LTyFamDefltEqn RdrName)
+-- Take a type-family instance declaration and turn it into
+-- a type-family default equation for a class declaration
+-- We parse things as the former and use this function to convert to the latter
+-- 
+-- We use the Either monad because this also called 
+-- from Convert.hs
+mkATDefault (L loc (TyFamInstDecl { tfid_eqn = L _ e }))
+      | TyFamEqn { tfe_tycon = tc, tfe_pats = pats, tfe_rhs = rhs } <- e
+      = do { tvs <- checkTyVars (ptext (sLit "default")) equalsDots tc (hswb_cts pats)
+           ; return (L loc (TyFamEqn { tfe_tycon = tc
+                                     , tfe_pats = tvs
+                                     , tfe_rhs = rhs })) }
 
 mkTyData :: SrcSpan
          -> NewOrData
@@ -142,7 +160,7 @@ mkTyData :: SrcSpan
          -> P (LTyClDecl RdrName)
 mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
-       ; tyvars <- checkTyVars (ppr new_or_data) equalsDots tc tparams
+       ; tyvars <- checkTyVarsP (ppr new_or_data) equalsDots tc tparams
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdLName = tc, tcdTyVars = tyvars,
                                    tcdDataDefn = defn,
@@ -170,7 +188,7 @@ mkTySynonym :: SrcSpan
             -> P (LTyClDecl RdrName)
 mkTySynonym loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
-       ; tyvars <- checkTyVars (ptext (sLit "type")) equalsDots tc tparams
+       ; tyvars <- checkTyVarsP (ptext (sLit "type")) equalsDots tc tparams
        ; return (L loc (SynDecl { tcdLName = tc, tcdTyVars = tyvars
                                 , tcdRhs = rhs, tcdFVs = placeHolderNames })) }
 
@@ -179,9 +197,9 @@ mkTyFamInstEqn :: LHsType RdrName
                -> P (TyFamInstEqn RdrName)
 mkTyFamInstEqn lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
-       ; return (TyFamInstEqn { tfie_tycon = tc
-                              , tfie_pats  = mkHsWithBndrs tparams
-                              , tfie_rhs   = rhs }) }
+       ; return (TyFamEqn { tfe_tycon = tc
+                          , tfe_pats  = mkHsWithBndrs tparams
+                          , tfe_rhs   = rhs }) }
 
 mkDataFamInst :: SrcSpan
          -> NewOrData
@@ -212,7 +230,7 @@ mkFamDecl :: SrcSpan
           -> P (LTyClDecl RdrName)
 mkFamDecl loc info lhs ksig
   = do { (tc, tparams) <- checkTyClHdr lhs
-       ; tyvars <- checkTyVars (ppr info) equals_or_where tc tparams
+       ; tyvars <- checkTyVarsP (ppr info) equals_or_where tc tparams
        ; return (L loc (FamDecl (FamilyDecl { fdInfo = info, fdLName = tc
                                             , fdTyVars = tyvars, fdKindSig = ksig }))) }
   where
@@ -500,26 +518,42 @@ we can bring x,y into scope.  So:
    * For RecCon we do not
 
 \begin{code}
-checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsType RdrName] -> P (LHsTyVarBndrs RdrName)
+checkTyVarsP :: SDoc -> SDoc -> Located RdrName -> [LHsType RdrName] -> P (LHsTyVarBndrs RdrName)
+-- Same as checkTyVars, but in the P monad
+checkTyVarsP pp_what equals_or_where tc tparms 
+  = eitherToP $ checkTyVars pp_what equals_or_where tc tparms 
+
+eitherToP :: Either (SrcSpan, SDoc) a -> P a
+-- Adapts the Either monad to the P monad
+eitherToP (Left (loc, doc)) = parseErrorSDoc loc doc
+eitherToP (Right thing)     = return thing
+checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsType RdrName] 
+            -> Either (SrcSpan, SDoc) (LHsTyVarBndrs RdrName)
 -- Check whether the given list of type parameters are all type variables
--- (possibly with a kind signature).
-checkTyVars pp_what equals_or_where tc tparms = do { tvs <- mapM chk tparms
-                                 ; return (mkHsQTvs tvs) }
+-- (possibly with a kind signature)
+-- We use the Either monad because it's also called (via mkATDefault) from
+-- Convert.hs
+checkTyVars pp_what equals_or_where tc tparms 
+  = do { tvs <- mapM chk tparms
+       ; return (mkHsQTvs tvs) }
   where
+        
         -- Check that the name space is correct!
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
         | isRdrTyVar tv    = return (L l (KindedTyVar tv k))
     chk (L l (HsTyVar tv))
         | isRdrTyVar tv    = return (L l (UserTyVar tv))
-    chk t@(L l _)
-        = parseErrorSDoc l $
-          vcat [ ptext (sLit "Unexpected type") <+> quotes (ppr t)
-               , ptext (sLit "In the") <+> pp_what <+> ptext (sLit "declaration for") <+> quotes (ppr tc)
-               , vcat[ (ptext (sLit "A") <+> pp_what <+> ptext (sLit "declaration should have form"))
-                     , nest 2 (pp_what <+> ppr tc <+> ptext (sLit "a b c")
-                               <+> equals_or_where) ] ]
+    chk t@(L loc _)
+        = Left (loc, 
+                vcat [ ptext (sLit "Unexpected type") <+> quotes (ppr t)
+                     , ptext (sLit "In the") <+> pp_what <+> ptext (sLit "declaration for") <+> quotes (ppr tc)
+                     , vcat[ (ptext (sLit "A") <+> pp_what <+> ptext (sLit "declaration should have form"))
+                     , nest 2 (pp_what <+> ppr tc 
+                                       <+> hsep (map text (takeList tparms allNameStrings))
+                                       <+> equals_or_where) ] ])
 
 whereDots, equalsDots :: SDoc
+-- Second argument to checkTyVars
 whereDots  = ptext (sLit "where ...")
 equalsDots = ptext (sLit "= ...")
 
@@ -666,7 +700,7 @@ checkAPat msg loc e0 = do
 
    ExplicitTuple es b
      | all tupArgPresent es  -> do ps <- mapM (checkLPat msg) [e | Present e <- es]
-                                   return (TuplePat ps b placeHolderType)
+                                   return (TuplePat ps b [])
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
    RecordCon c _ (HsRecFields fs dd)

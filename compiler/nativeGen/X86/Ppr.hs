@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -----------------------------------------------------------------------------
 --
 -- Pretty-printing assembly language
@@ -883,6 +885,14 @@ pprInstr GFREE
    = vcat [ ptext (sLit "\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)"),
             ptext (sLit "\tffree %st(4) ;ffree %st(5)")
           ]
+
+-- Atomics
+
+pprInstr LOCK = ptext (sLit "\tlock")
+
+pprInstr (XADD size src dst) = pprSizeOpOp (sLit "xadd") size src dst
+
+pprInstr (CMPXCHG size src dst) = pprSizeOpOp (sLit "cmpxchg") size src dst
 
 pprInstr _
         = panic "X86.Ppr.pprInstr: no match"

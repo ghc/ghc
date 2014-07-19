@@ -1,4 +1,5 @@
 {-# LANGUAGE Unsafe             #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -22,6 +23,8 @@
            , PolyKinds
            , ConstraintKinds
            , DeriveDataTypeable
+           , DataKinds
+           , UndecidableInstances
            , StandaloneDeriving #-}
 
 module Data.Typeable.Internal (
@@ -50,6 +53,7 @@ module Data.Typeable.Internal (
 import GHC.Base
 import GHC.Word
 import GHC.Show
+import GHC.Read ( Read )
 import Data.Maybe
 import Data.Proxy
 import GHC.Num
@@ -57,13 +61,21 @@ import GHC.Real
 -- import GHC.IORef
 -- import GHC.IOArray
 -- import GHC.MVar
-import GHC.ST           ( ST )
+import GHC.ST           ( ST, STret )
 import GHC.STRef        ( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
 -- import GHC.Stable
-import GHC.Arr          ( Array, STArray )
+import GHC.Arr          ( Array, STArray, Ix )
+import GHC.TypeLits ( Nat, Symbol, KnownNat, KnownSymbol, natVal', symbolVal' )
 import Data.Type.Coercion
 import Data.Type.Equality
+import Text.ParserCombinators.ReadP ( ReadP )
+import Text.Read.Lex ( Lexeme, Number )
+import Text.ParserCombinators.ReadPrec ( ReadPrec )
+import GHC.Float ( FFFormat, RealFloat, Floating )
+import Data.Bits ( Bits, FiniteBits )
+import GHC.Enum ( Bounded, Enum )
+import Control.Monad ( MonadPlus )
 -- import Data.Int
 
 import GHC.Fingerprint.Type
@@ -251,8 +263,20 @@ type Typeable7 (a :: * -> * -> * -> * -> * -> * -> * -> *) = Typeable a
 {-# DEPRECATED Typeable7 "renamed to 'Typeable'" #-} -- deprecated in 7.8
 
 -- | Kind-polymorphic Typeable instance for type application
-instance (Typeable s, Typeable a) => Typeable (s a) where
-  typeRep# _ = typeRep# (proxy# :: Proxy# s) `mkAppTy` typeRep# (proxy# :: Proxy# a)
+instance {-# INCOHERENT #-} (Typeable s, Typeable a) => Typeable (s a) where
+  typeRep# = \_ -> rep                  -- Note [Memoising typeOf]
+    where !ty1 = typeRep# (proxy# :: Proxy# s)
+          !ty2 = typeRep# (proxy# :: Proxy# a)
+          !rep = ty1 `mkAppTy` ty2
+
+{- Note [Memoising typeOf]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+See #3245, #9203
+
+IMPORTANT: we don't want to recalculate the TypeRep once per call with
+the proxy argument.  This is what went wrong in #3245 and #9203. So we
+help GHC by manually keeping the 'rep' *outside* the lambda.
+-}
 
 ----------------- Showing TypeReps --------------------
 
@@ -316,6 +340,7 @@ deriving instance Typeable IO
 deriving instance Typeable Array
 
 deriving instance Typeable ST
+deriving instance Typeable STret
 deriving instance Typeable STRef
 deriving instance Typeable STArray
 
@@ -351,8 +376,106 @@ deriving instance Typeable Word64
 
 deriving instance Typeable TyCon
 deriving instance Typeable TypeRep
+deriving instance Typeable Fingerprint
 
 deriving instance Typeable RealWorld
 deriving instance Typeable Proxy
+deriving instance Typeable KProxy
 deriving instance Typeable (:~:)
 deriving instance Typeable Coercion
+
+deriving instance Typeable ReadP
+deriving instance Typeable Lexeme
+deriving instance Typeable Number
+deriving instance Typeable ReadPrec
+
+deriving instance Typeable FFFormat
+
+-------------------------------------------------------
+--
+-- Generate Typeable instances for standard classes
+--
+-------------------------------------------------------
+
+deriving instance Typeable (~)
+deriving instance Typeable Coercible
+deriving instance Typeable TestEquality
+deriving instance Typeable TestCoercion
+
+deriving instance Typeable Eq
+deriving instance Typeable Ord
+
+deriving instance Typeable Bits
+deriving instance Typeable FiniteBits
+deriving instance Typeable Num
+deriving instance Typeable Real
+deriving instance Typeable Integral
+deriving instance Typeable Fractional
+deriving instance Typeable RealFrac
+deriving instance Typeable Floating
+deriving instance Typeable RealFloat
+
+deriving instance Typeable Bounded
+deriving instance Typeable Enum
+deriving instance Typeable Ix
+
+deriving instance Typeable Show
+deriving instance Typeable Read
+
+deriving instance Typeable Functor
+deriving instance Typeable Monad
+deriving instance Typeable MonadPlus
+
+deriving instance Typeable Typeable
+
+
+
+--------------------------------------------------------------------------------
+-- Instances for type literals
+
+{- Note [Potential Collisions in `Nat` and `Symbol` instances]
+
+Kinds resulting from lifted types have finitely many type-constructors.
+This is not the case for `Nat` and `Symbol`, which both contain *infinitely*
+many type constructors (e.g., `Nat` has 0, 1, 2, 3, etc.).  One might think
+that this would increase the chance of hash-collisions in the type but this
+is not the case because the fingerprint stored in a `TypeRep` identifies
+the whole *type* and not just the type constructor.  This is why the chance
+of collisions for `Nat` and `Symbol` is not any worse than it is for other
+lifted types with infinitely many inhabitants.  Indeed, `Nat` is
+isomorphic to (lifted) `[()]`  and `Symbol` is isomorphic to `[Char]`.
+-}
+
+instance KnownNat n => Typeable (n :: Nat) where
+  -- See #9203 for an explanation of why this is written as `\_ -> rep`.
+  typeRep# = \_ -> rep
+    where
+    rep = mkTyConApp tc []
+    tc = TyCon
+           { tyConHash     = fingerprintString (mk pack modu nm)
+           , tyConPackage  = pack
+           , tyConModule   = modu
+           , tyConName     = nm
+           }
+    pack = "base"
+    modu = "GHC.TypeLits"
+    nm   = show (natVal' (proxy# :: Proxy# n))
+    mk a b c = a ++ " " ++ b ++ " " ++ c
+
+
+instance KnownSymbol s => Typeable (s :: Symbol) where
+  -- See #9203 for an explanation of why this is written as `\_ -> rep`.
+  typeRep# = \_ -> rep
+    where
+    rep = mkTyConApp tc []
+    tc = TyCon
+           { tyConHash     = fingerprintString (mk pack modu nm)
+           , tyConPackage  = pack
+           , tyConModule   = modu
+           , tyConName     = nm
+           }
+    pack = "base"
+    modu = "GHC.TypeLits"
+    nm   = show (symbolVal' (proxy# :: Proxy# s))
+    mk a b c = a ++ " " ++ b ++ " " ++ c
+

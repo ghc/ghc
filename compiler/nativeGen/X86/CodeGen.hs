@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, GADTs, NondecreasingIndentation #-}
+
 -----------------------------------------------------------------------------
 --
 -- Generating machine code (instruction selection)
@@ -10,7 +12,6 @@
 -- (a) the sectioning, and (b) the type signatures, the
 -- structure should not be too overwhelming.
 
-{-# LANGUAGE GADTs #-}
 module X86.CodeGen (
         cmmTopCodeGen,
         generateJumpTableForInstr,
@@ -804,6 +805,8 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
         | is32BitInteger y = add_int rep x y
     add_code rep x y = trivialCode rep (ADD size) (Just (ADD size)) x y
       where size = intSize rep
+    -- TODO: There are other interesting patterns we want to replace
+    --     with a LEA, e.g. `(x + offset) + (y << shift)`.
 
     --------------------
     sub_code :: Width -> CmmExpr -> CmmExpr -> NatM Register
@@ -1024,6 +1027,13 @@ getAmode' is32Bit (CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _),
                                   b@(CmmLit _)])
   = getAmode' is32Bit (CmmMachOp (MO_Add rep) [b,a])
 
+-- Matches: (x + offset) + (y << shift)
+getAmode' _ (CmmMachOp (MO_Add _) [CmmRegOff x offset,
+                                   CmmMachOp (MO_Shl _)
+                                        [y, CmmLit (CmmInt shift _)]])
+  | shift == 0 || shift == 1 || shift == 2 || shift == 3
+  = x86_complex_amode (CmmReg x) y shift (fromIntegral offset)
+
 getAmode' _ (CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Shl _)
                                         [y, CmmLit (CmmInt shift _)]])
   | shift == 0 || shift == 1 || shift == 2 || shift == 3
@@ -1047,6 +1057,18 @@ getAmode' _ expr = do
   (reg,code) <- getSomeReg expr
   return (Amode (AddrBaseIndex (EABaseReg reg) EAIndexNone (ImmInt 0)) code)
 
+-- | Like 'getAmode', but on 32-bit use simple register addressing
+-- (i.e. no index register). This stops us from running out of
+-- registers on x86 when using instructions such as cmpxchg, which can
+-- use up to three virtual registers and one fixed register.
+getSimpleAmode :: DynFlags -> Bool -> CmmExpr -> NatM Amode
+getSimpleAmode dflags is32Bit addr
+    | is32Bit = do
+        addr_code <- getAnyReg addr
+        addr_r <- getNewRegNat (intSize (wordWidth dflags))
+        let amode = AddrBaseIndex (EABaseReg addr_r) EAIndexNone (ImmInt 0)
+        return $! Amode amode (addr_code addr_r)
+    | otherwise = getAmode addr
 
 x86_complex_amode :: CmmExpr -> CmmExpr -> Integer -> Integer -> NatM Amode
 x86_complex_amode base index shift offset
@@ -1751,6 +1773,99 @@ genCCall dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args = do
   where
     lbl = mkCmmCodeLabel primPackageId (fsLit (word2FloatLabel width))
 
+genCCall dflags is32Bit (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = do
+    Amode amode addr_code <-
+        if amop `elem` [AMO_Add, AMO_Sub]
+        then getAmode addr
+        else getSimpleAmode dflags is32Bit addr  -- See genCCall for MO_Cmpxchg
+    arg <- getNewRegNat size
+    arg_code <- getAnyReg n
+    use_sse2 <- sse2Enabled
+    let platform = targetPlatform dflags
+        dst_r    = getRegisterReg platform use_sse2 (CmmLocal dst)
+    code <- op_code dst_r arg amode
+    return $ addr_code `appOL` arg_code arg `appOL` code
+  where
+    -- Code for the operation
+    op_code :: Reg       -- Destination reg
+            -> Reg       -- Register containing argument
+            -> AddrMode  -- Address of location to mutate
+            -> NatM (OrdList Instr)
+    op_code dst_r arg amode = case amop of
+        -- In the common case where dst_r is a virtual register the
+        -- final move should go away, because it's the last use of arg
+        -- and the first use of dst_r.
+        AMO_Add  -> return $ toOL [ LOCK
+                                  , XADD size (OpReg arg) (OpAddr amode)
+                                  , MOV size (OpReg arg) (OpReg dst_r)
+                                  ]
+        AMO_Sub  -> return $ toOL [ NEGI size (OpReg arg)
+                                  , LOCK
+                                  , XADD size (OpReg arg) (OpAddr amode)
+                                  , MOV size (OpReg arg) (OpReg dst_r)
+                                  ]
+        AMO_And  -> cmpxchg_code (\ src dst -> unitOL $ AND size src dst)
+        AMO_Nand -> cmpxchg_code (\ src dst -> toOL [ AND size src dst
+                                                    , NOT size dst
+                                                    ])
+        AMO_Or   -> cmpxchg_code (\ src dst -> unitOL $ OR size src dst)
+        AMO_Xor  -> cmpxchg_code (\ src dst -> unitOL $ XOR size src dst)
+      where
+        -- Simulate operation that lacks a dedicated instruction using
+        -- cmpxchg.
+        cmpxchg_code :: (Operand -> Operand -> OrdList Instr)
+                     -> NatM (OrdList Instr)
+        cmpxchg_code instrs = do
+            lbl <- getBlockIdNat
+            tmp <- getNewRegNat size
+            return $ toOL
+                [ MOV size (OpAddr amode) (OpReg eax)
+                , JXX ALWAYS lbl
+                , NEWBLOCK lbl
+                  -- Keep old value so we can return it:
+                , MOV size (OpReg eax) (OpReg dst_r)
+                , MOV size (OpReg eax) (OpReg tmp)
+                ]
+                `appOL` instrs (OpReg arg) (OpReg tmp) `appOL` toOL
+                [ LOCK
+                , CMPXCHG size (OpReg tmp) (OpAddr amode)
+                , JXX NE lbl
+                ]
+
+    size = intSize width
+
+genCCall dflags _ (PrimTarget (MO_AtomicRead width)) [dst] [addr] = do
+  load_code <- intLoadCode (MOV (intSize width)) addr
+  let platform = targetPlatform dflags
+  use_sse2 <- sse2Enabled
+  return (load_code (getRegisterReg platform use_sse2 (CmmLocal dst)))
+
+genCCall _ _ (PrimTarget (MO_AtomicWrite width)) [] [addr, val] = do
+    assignMem_IntCode (intSize width) addr val
+
+genCCall dflags is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] = do
+    -- On x86 we don't have enough registers to use cmpxchg with a
+    -- complicated addressing mode, so on that architecture we
+    -- pre-compute the address first.
+    Amode amode addr_code <- getSimpleAmode dflags is32Bit addr
+    newval <- getNewRegNat size
+    newval_code <- getAnyReg new
+    oldval <- getNewRegNat size
+    oldval_code <- getAnyReg old
+    use_sse2 <- sse2Enabled
+    let platform = targetPlatform dflags
+        dst_r    = getRegisterReg platform use_sse2 (CmmLocal dst)
+        code     = toOL
+                   [ MOV size (OpReg oldval) (OpReg eax)
+                   , LOCK
+                   , CMPXCHG size (OpReg newval) (OpAddr amode)
+                   , MOV size (OpReg eax) (OpReg dst_r)
+                   ]
+    return $ addr_code `appOL` newval_code newval `appOL` oldval_code oldval
+        `appOL` code
+  where
+    size = intSize width
+
 genCCall _ is32Bit target dest_regs args
  | is32Bit   = genCCall32 target dest_regs args
  | otherwise = genCCall64 target dest_regs args
@@ -2374,6 +2489,11 @@ outOfLineCmmOp mop res args
 
               MO_PopCnt _  -> fsLit "popcnt"
               MO_BSwap _   -> fsLit "bswap"
+
+              MO_AtomicRMW _ _ -> fsLit "atomicrmw"
+              MO_AtomicRead _  -> fsLit "atomicread"
+              MO_AtomicWrite _ -> fsLit "atomicwrite"
+              MO_Cmpxchg _     -> fsLit "cmpxchg"
 
               MO_UF_Conv _ -> unsupported
 

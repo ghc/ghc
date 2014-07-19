@@ -114,7 +114,8 @@ test('weak001', normal, compile_and_run, [''])
 #     cat: write error: Permission denied
 # Seems to be a known problem, e.g.
 #     http://mingw-users.1079350.n2.nabble.com/Bug-re-Unicode-on-the-console-td3121717.html
-test('T4006', when(msys(), expect_fail), compile_and_run, [''])
+# May 2014: seems to work on msys2
+test('T4006', normal, compile_and_run, [''])
 
 test('T5943', normal, compile_and_run, [''])
 test('T5962', normal, compile_and_run, [''])
@@ -156,10 +157,14 @@ test('topHandler03',
 
 
 test('T8766',
-        [ stats_num_field('bytes allocated', (16828144, 5)),
+        [ stats_num_field('bytes allocated', 
+                          [ (wordsize(64), 16828144, 5)
 	# with GHC-7.6.3: 83937384 (but faster execution than the next line)
 	# before:         58771216 (without call-arity-analysis)
 	# expected value: 16828144 (2014-01-14)
-	only_ways(['normal'])],
+                          , (wordsize(32), 8433644, 5) ]) 
+        , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
+
+test('T9111', normal, compile, [''])

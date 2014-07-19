@@ -6,6 +6,8 @@
 Handles @deriving@ clauses on @data@ declarations.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcDeriv ( tcDeriving ) where
 
 #include "HsVersions.h"
@@ -18,7 +20,7 @@ import FamInst
 import TcErrors( reportAllUnsolved )
 import TcValidity( validDerivPred )
 import TcEnv
-import TcTyClsDecls( tcFamTyPats, tcAddDataFamInstCtxt )
+import TcTyClsDecls( tcFamTyPats, famTyConShape, tcAddDataFamInstCtxt )
 import TcClassDcl( tcAddDeclCtxt )      -- Small helper
 import TcGenDeriv                       -- Deriv stuff
 import TcGenGenerics
@@ -91,6 +93,7 @@ data DerivSpec theta = DS { ds_loc     :: SrcSpan
                           , ds_tys     :: [Type]
                           , ds_tc      :: TyCon
                           , ds_tc_args :: [Type]
+                          , ds_overlap :: Maybe OverlapMode
                           , ds_newtype :: Bool }
         -- This spec implies a dfun declaration of the form
         --       df :: forall tvs. theta => C tys
@@ -565,6 +568,7 @@ deriveAutoTypeable auto_typeable done_specs tycl_decls
     do_one cls (L _ decl)
       = do { tc <- tcLookupTyCon (tcdName decl)
            ; if (isSynTyCon tc || tyConName tc `elemNameSet` done_tcs)
+                 -- Do not derive Typeable for type synonyms or type families
              then return []
              else mkPolyKindedTypeableEqn cls tc }
 
@@ -597,7 +601,7 @@ deriveFamInst decl@(DataFamInstDecl { dfid_tycon = L _ tc_name, dfid_pats = pats
                                     , dfid_defn = HsDataDefn { dd_derivs = Just preds } })
   = tcAddDataFamInstCtxt decl $
     do { fam_tc <- tcLookupTyCon tc_name
-       ; tcFamTyPats tc_name (tyConKind fam_tc) pats (\_ -> return ()) $
+       ; tcFamTyPats (famTyConShape fam_tc) pats (\_ -> return ()) $
          \ tvs' pats' _ ->
            concatMapM (deriveTyData True tvs' fam_tc pats') preds }
         -- Tiresomely we must figure out the "lhs", which is awkward for type families
@@ -615,7 +619,7 @@ deriveStandalone :: LDerivDecl Name -> TcM [EarlyDerivSpec]
 -- Standalone deriving declarations
 --  e.g.   deriving instance Show a => Show (T a)
 -- Rather like tcLocalInstDecl
-deriveStandalone (L loc (DerivDecl deriv_ty))
+deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
@@ -644,7 +648,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
                     ; mkPolyKindedTypeableEqn cls tc }
 
               | isAlgTyCon tc  -- All other classes
-              -> do { spec <- mkEqnHelp tvs cls cls_tys tc tc_args (Just theta)
+              -> do { spec <- mkEqnHelp overlap_mode tvs cls cls_tys tc tc_args (Just theta)
                     ; return [spec] }
 
            _  -> -- Complain about functions, primitive types, etc,
@@ -702,8 +706,9 @@ deriveTyData :: Bool                         -- False <=> data/newtype
 -- I.e. not standalone deriving
 deriveTyData is_instance tvs tc tc_args (L loc deriv_pred)
   = setSrcSpan loc     $        -- Use the location of the 'deriving' item
-    do  { (deriv_tvs, cls, cls_tys) <- tcExtendTyVarEnv tvs $
-                                       tcHsDeriv deriv_pred
+    do  { (deriv_tvs, cls, cls_tys, cls_arg_kind)
+                <- tcExtendTyVarEnv tvs $
+                   tcHsDeriv deriv_pred
                 -- Deriving preds may (now) mention
                 -- the type variables for the type constructor, hence tcExtendTyVarenv
                 -- The "deriv_pred" is a LHsType to take account of the fact that for
@@ -717,12 +722,8 @@ deriveTyData is_instance tvs tc tc_args (L loc deriv_pred)
           else
 
      do {  -- Given data T a b c = ... deriving( C d ),
-          -- we want to drop type variables from T so that (C d (T a)) is well-kinded
-        ; let cls_tyvars     = classTyVars cls
-        ; checkTc (not (null cls_tyvars)) derivingNullaryErr
-
-        ; let cls_arg_kind    = tyVarKind (last cls_tyvars)
-              (arg_kinds, _)  = splitKindFunTys cls_arg_kind
+           -- we want to drop type variables from T so that (C d (T a)) is well-kinded
+          let (arg_kinds, _)  = splitKindFunTys cls_arg_kind
               n_args_to_drop  = length arg_kinds
               n_args_to_keep  = tyConArity tc - n_args_to_drop
               args_to_drop    = drop n_args_to_keep tc_args
@@ -734,9 +735,9 @@ deriveTyData is_instance tvs tc tc_args (L loc deriv_pred)
               -- to the types.  See Note [Unify kinds in deriving]
               -- We are assuming the tycon tyvars and the class tyvars are distinct
               mb_match        = tcUnifyTy inst_ty_kind cls_arg_kind
-              Just kind_subst = mb_match 
+              Just kind_subst = mb_match
               (univ_kvs, univ_tvs) = partition isKindVar $ varSetElems $
-                                     mkVarSet deriv_tvs `unionVarSet` 
+                                     mkVarSet deriv_tvs `unionVarSet`
                                      tyVarsOfTypes tc_args_to_keep
               univ_kvs'           = filter (`notElemTvSubst` kind_subst) univ_kvs
               (subst', univ_tvs') = mapAccumL substTyVarBndr kind_subst univ_tvs
@@ -769,7 +770,7 @@ deriveTyData is_instance tvs tc tc_args (L loc deriv_pred)
                 --              newtype T a s = ... deriving( ST s )
                 --              newtype K a a = ... deriving( Monad )
 
-        ; spec <- mkEqnHelp (univ_kvs' ++ univ_tvs')
+        ; spec <- mkEqnHelp Nothing (univ_kvs' ++ univ_tvs')
                             cls final_cls_tys tc final_tc_args Nothing 
         ; return [spec] } }
 
@@ -851,7 +852,8 @@ and occurrence sites.
 
 
 \begin{code}
-mkEqnHelp :: [TyVar]
+mkEqnHelp :: Maybe OverlapMode
+          -> [TyVar]
           -> Class -> [Type]
           -> TyCon -> [Type]
           -> DerivContext       -- Just    => context supplied (standalone deriving)
@@ -862,7 +864,7 @@ mkEqnHelp :: [TyVar]
 -- where the 'theta' is optional (that's the Maybe part)
 -- Assumes that this declaration is well-kinded
 
-mkEqnHelp tvs cls cls_tys tycon tc_args mtheta
+mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
   | className cls `elem` oldTypeableClassNames
   = do { dflags <- getDynFlags
        ; case checkOldTypeableConditions (dflags, tycon, tc_args) of
@@ -898,10 +900,10 @@ mkEqnHelp tvs cls cls_tys tycon tc_args mtheta
 
        ; dflags <- getDynFlags
        ; if isDataTyCon rep_tc then
-            mkDataTypeEqn dflags tvs cls cls_tys
+            mkDataTypeEqn dflags overlap_mode tvs cls cls_tys
                           tycon tc_args rep_tc rep_tc_args mtheta
          else
-            mkNewTypeEqn dflags tvs cls cls_tys
+            mkNewTypeEqn dflags overlap_mode tvs cls cls_tys
                          tycon tc_args rep_tc rep_tc_args mtheta }
   where
      bale_out msg = failWithTc (derivingThingErr False cls cls_tys (mkTyConApp tycon tc_args) msg)
@@ -991,6 +993,7 @@ See Note [Eta reduction for data family axioms] in TcInstDcls.
 
 \begin{code}
 mkDataTypeEqn :: DynFlags
+              -> Maybe OverlapMode
               -> [Var]                  -- Universally quantified type variables in the instance
               -> Class                  -- Class for which we need to derive an instance
               -> [Type]                 -- Other parameters to the class except the last
@@ -1002,7 +1005,7 @@ mkDataTypeEqn :: DynFlags
               -> DerivContext        -- Context of the instance, for standalone deriving
               -> TcRn EarlyDerivSpec    -- Return 'Nothing' if error
 
-mkDataTypeEqn dflags tvs cls cls_tys
+mkDataTypeEqn dflags overlap_mode tvs cls cls_tys
               tycon tc_args rep_tc rep_tc_args mtheta
   = case checkSideConditions dflags mtheta cls cls_tys rep_tc rep_tc_args of
         -- NB: pass the *representation* tycon to checkSideConditions
@@ -1010,13 +1013,13 @@ mkDataTypeEqn dflags tvs cls cls_tys
         NonDerivableClass       -> bale_out (nonStdErr cls)
         DerivableClassError msg -> bale_out msg
   where
-    go_for_it    = mk_data_eqn tvs cls tycon tc_args rep_tc rep_tc_args mtheta
+    go_for_it    = mk_data_eqn overlap_mode tvs cls tycon tc_args rep_tc rep_tc_args mtheta
     bale_out msg = failWithTc (derivingThingErr False cls cls_tys (mkTyConApp tycon tc_args) msg)
 
-mk_data_eqn :: [TyVar] -> Class
+mk_data_eqn :: Maybe OverlapMode -> [TyVar] -> Class
             -> TyCon -> [TcType] -> TyCon -> [TcType] -> DerivContext
             -> TcM EarlyDerivSpec
-mk_data_eqn tvs cls tycon tc_args rep_tc rep_tc_args mtheta
+mk_data_eqn overlap_mode tvs cls tycon tc_args rep_tc rep_tc_args mtheta
   = do loc                  <- getSrcSpanM
        dfun_name            <- new_dfun_name cls tycon
        case mtheta of
@@ -1028,6 +1031,7 @@ mk_data_eqn tvs cls tycon tc_args rep_tc rep_tc_args mtheta
                    , ds_cls = cls, ds_tys = inst_tys
                    , ds_tc = rep_tc, ds_tc_args = rep_tc_args
                    , ds_theta = inferred_constraints
+                   , ds_overlap = overlap_mode
                    , ds_newtype = False }
         Just theta -> do -- Specified context
             return $ GivenTheta $ DS
@@ -1036,6 +1040,7 @@ mk_data_eqn tvs cls tycon tc_args rep_tc rep_tc_args mtheta
                    , ds_cls = cls, ds_tys = inst_tys
                    , ds_tc = rep_tc, ds_tc_args = rep_tc_args
                    , ds_theta = theta
+                   , ds_overlap = overlap_mode
                    , ds_newtype = False }
   where
     inst_tys = [mkTyConApp tycon tc_args]
@@ -1073,7 +1078,9 @@ mkOldTypeableEqn tvs cls tycon tc_args mtheta
                   DS { ds_loc = loc, ds_name = dfun_name, ds_tvs = []
                      , ds_cls = cls, ds_tys = [mkTyConApp tycon []]
                      , ds_tc = tycon, ds_tc_args = []
-                     , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
+                     , ds_theta = mtheta `orElse` []
+                     , ds_overlap = Nothing -- Or, Just NoOverlap?
+                     , ds_newtype = False })  }
 
 mkPolyKindedTypeableEqn :: Class -> TyCon -> TcM [EarlyDerivSpec]
 -- We can arrive here from a 'deriving' clause
@@ -1098,6 +1105,9 @@ mkPolyKindedTypeableEqn cls tc
                                  -- so we must instantiate it appropiately
                              , ds_tc = tc, ds_tc_args = tc_args
                              , ds_theta = []  -- Context is empty for polykinded Typeable
+                             , ds_overlap = Nothing
+                               -- Perhaps this should be `Just NoOverlap`?
+
                              , ds_newtype = False } }
         where
           (kvs,tc_app_kind) = splitForAllTys (tyConKind tc)
@@ -1121,21 +1131,23 @@ inferConstraints cls inst_tys rep_tc rep_tc_args
 
   | otherwise  -- The others are a bit more complicated
   = ASSERT2( equalLength rep_tc_tvs all_rep_tc_args, ppr cls <+> ppr rep_tc )
-    return (stupid_constraints ++ extra_constraints
-            ++ sc_constraints
-            ++ con_arg_constraints cls get_std_constrained_tys)
-
+    do { traceTc "inferConstraints" (vcat [ppr cls <+> ppr inst_tys, ppr arg_constraints])
+       ; return (stupid_constraints ++ extra_constraints
+                 ++ sc_constraints
+                 ++ arg_constraints) }
   where
+    arg_constraints = con_arg_constraints cls get_std_constrained_tys
+
        -- Constraints arising from the arguments of each constructor
     con_arg_constraints cls' get_constrained_tys
-      = [ mkPredOrigin (DerivOriginDC data_con arg_n) (mkClassPred cls' [arg_ty])
-        | data_con <- tyConDataCons rep_tc,
-          (arg_n, arg_ty) <-
-                ASSERT( isVanillaDataCon data_con )
-                zip [1..] $  -- ASSERT is precondition of dataConInstOrigArgTys
-                get_constrained_tys $
-                dataConInstOrigArgTys data_con all_rep_tc_args,
-          not (isUnLiftedType arg_ty) ]
+      = [ mkPredOrigin (DerivOriginDC data_con arg_n) (mkClassPred cls' [inner_ty])
+        | data_con <- tyConDataCons rep_tc
+        , (arg_n, arg_ty) <- ASSERT( isVanillaDataCon data_con )
+                             zip [1..] $  -- ASSERT is precondition of dataConInstOrigArgTys
+                             dataConInstOrigArgTys data_con all_rep_tc_args
+        , not (isUnLiftedType arg_ty)
+        , inner_ty <- get_constrained_tys arg_ty ]
+
                 -- No constraints for unlifted types
                 -- See Note [Deriving and unboxed types]
 
@@ -1145,10 +1157,10 @@ inferConstraints cls inst_tys rep_tc rep_tc_args
                 -- (b) The rep_tc_args will be one short
     is_functor_like = getUnique cls `elem` functorLikeClassKeys
 
-    get_std_constrained_tys :: [Type] -> [Type]
-    get_std_constrained_tys tys
-        | is_functor_like = concatMap (deepSubtypesContaining last_tv) tys
-        | otherwise       = tys
+    get_std_constrained_tys :: Type -> [Type]
+    get_std_constrained_tys ty
+        | is_functor_like = deepSubtypesContaining last_tv ty
+        | otherwise       = [ty]
 
     rep_tc_tvs = tyConTyVars rep_tc
     last_tv = last rep_tc_tvs
@@ -1442,16 +1454,6 @@ cond_functorOK allowFunctions (_, rep_tc, _)
     functions   = ptext (sLit "must not contain function types")
     wrong_arg   = ptext (sLit "must use the type variable only as the last argument of a data type")
 
-allDistinctTyVars :: [KindOrType] -> Bool
-allDistinctTyVars tkvs = go emptyVarSet tkvs
-  where
-    go _      [] = True
-    go so_far (ty : tys)
-       = case getTyVar_maybe ty of
-             Nothing -> False
-             Just tv | tv `elemVarSet` so_far -> False
-                     | otherwise -> go (so_far `extendVarSet` tv) tys
-
 checkFlag :: ExtensionFlag -> Condition
 checkFlag flag (dflags, _, _)
   | xopt flag dflags = Nothing
@@ -1553,14 +1555,15 @@ a context for the Data instances:
 %************************************************************************
 
 \begin{code}
-mkNewTypeEqn :: DynFlags -> [Var] -> Class
+mkNewTypeEqn :: DynFlags -> Maybe OverlapMode -> [Var] -> Class
              -> [Type] -> TyCon -> [Type] -> TyCon -> [Type]
              -> DerivContext
              -> TcRn EarlyDerivSpec
-mkNewTypeEqn dflags tvs
+mkNewTypeEqn dflags overlap_mode tvs
              cls cls_tys tycon tc_args rep_tycon rep_tc_args mtheta
 -- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
-  | might_derive_via_coercible && (newtype_deriving || std_class_via_coercible cls)
+  | ASSERT( length cls_tys + 1 == classArity cls )
+    might_derive_via_coercible && (newtype_deriving || std_class_via_coercible cls)
   = do traceTc "newtype deriving:" (ppr tycon <+> ppr rep_tys <+> ppr all_preds)
        dfun_name <- new_dfun_name cls tycon
        loc <- getSrcSpanM
@@ -1571,6 +1574,7 @@ mkNewTypeEqn dflags tvs
             , ds_cls = cls, ds_tys = inst_tys
             , ds_tc = rep_tycon, ds_tc_args = rep_tc_args
             , ds_theta = theta
+            , ds_overlap = overlap_mode
             , ds_newtype = True }
         Nothing -> return $ InferTheta $ DS
             { ds_loc = loc
@@ -1578,6 +1582,7 @@ mkNewTypeEqn dflags tvs
             , ds_cls = cls, ds_tys = inst_tys
             , ds_tc = rep_tycon, ds_tc_args = rep_tc_args
             , ds_theta = all_preds
+            , ds_overlap = overlap_mode
             , ds_newtype = True }
   | otherwise
   = case checkSideConditions dflags mtheta cls cls_tys rep_tycon rep_tc_args of
@@ -1591,7 +1596,7 @@ mkNewTypeEqn dflags tvs
         | otherwise                  -> bale_out non_std
   where
         newtype_deriving = xopt Opt_GeneralizedNewtypeDeriving dflags
-        go_for_it        = mk_data_eqn tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
+        go_for_it        = mk_data_eqn overlap_mode tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
         bale_out msg     = failWithTc (derivingThingErr newtype_deriving cls cls_tys inst_ty msg)
 
         non_std    = nonStdErr cls
@@ -1687,14 +1692,9 @@ mkNewTypeEqn dflags tvs
         -- See Note [Determining whether newtype-deriving is appropriate]
         might_derive_via_coercible
            =  not (non_coercible_class cls)
-           && arity_ok
            && eta_ok
            && ats_ok
 --         && not (isRecursiveTyCon tycon)      -- Note [Recursive newtypes]
-
-        arity_ok = length cls_tys + 1 == classArity cls
-                -- Well kinded; eg not: newtype T ... deriving( ST )
-                --                      because ST needs *2* type params
 
         -- Check that eta reduction is OK
         eta_ok = nt_eta_arity <= length rep_tc_args
@@ -1711,13 +1711,10 @@ mkNewTypeEqn dflags tvs
                -- so for 'data' instance decls
 
         cant_derive_err
-           = vcat [ ppUnless arity_ok arity_msg
-                  , ppUnless eta_ok eta_msg
+           = vcat [ ppUnless eta_ok eta_msg
                   , ppUnless ats_ok ats_msg ]
-        arity_msg = quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "does not have arity 1")
         eta_msg   = ptext (sLit "cannot eta-reduce the representation type enough")
         ats_msg   = ptext (sLit "the class has associated types")
-
 \end{code}
 
 Note [Recursive newtypes]
@@ -2058,9 +2055,10 @@ genInst :: Bool             -- True <=> standalone deriving
         -> OverlapFlag
         -> CommonAuxiliaries
         -> DerivSpec ThetaType -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
-genInst standalone_deriv oflag comauxs
+genInst standalone_deriv default_oflag comauxs
         spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype, ds_tys = tys
+                 , ds_overlap = overlap_mode
                  , ds_name = name, ds_cls = clas, ds_loc = loc })
   | is_newtype
   = do { inst_spec <- mkInstance oflag theta spec
@@ -2091,6 +2089,7 @@ genInst standalone_deriv oflag comauxs
                                                 , ib_standalone_deriving = standalone_deriv } }
        ; return ( inst_info, deriv_stuff, Nothing ) }
   where
+    oflag  = setOverlapModeMaybe default_oflag overlap_mode
     rhs_ty = newTyConInstRhs rep_tycon rep_tc_args
 
 genDerivStuff :: SrcSpan -> FixityEnv -> Class -> Name -> TyCon

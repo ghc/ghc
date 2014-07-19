@@ -3,7 +3,8 @@
 %
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -26,7 +27,6 @@ import VarEnv
 import StaticFlags	( opt_NoOptCoercion )
 import Outputable
 import Pair
-import Maybes
 import FastString
 import Util
 import Unify
@@ -58,13 +58,29 @@ because now the co_B1 (which is really free) has been captured, and
 subsequent substitutions will go wrong.  That's why we can't use
 mkCoPredTy in the ForAll case, where this note appears.  
 
+Note [Optimising coercion optimisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Looking up a coercion's role or kind is linear in the size of the
+coercion. Thus, doing this repeatedly during the recursive descent
+of coercion optimisation is disastrous. We must be careful to avoid
+doing this if at all possible.
+
+Because it is generally easy to know a coercion's components' roles
+from the role of the outer coercion, we pass down the known role of
+the input in the algorithm below. We also keep functions opt_co2
+and opt_co3 separate from opt_co4, so that the former two do Phantom
+checks that opt_co4 can avoid. This is a big win because Phantom coercions
+rarely appear within non-phantom coercions -- only in some TyConAppCos
+and some AxiomInstCos. We handle these cases specially by calling
+opt_co2.
+
 \begin{code}
 optCoercion :: CvSubst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion, 
 --   *and* optimises it to reduce its size
 optCoercion env co 
   | opt_NoOptCoercion = substCo env co
-  | otherwise         = opt_co env False Nothing co
+  | otherwise         = opt_co1 env False co
 
 type NormalCo = Coercion
   -- Invariants: 
@@ -75,20 +91,24 @@ type NormalCo = Coercion
 
 type NormalNonIdCo = NormalCo  -- Extra invariant: not the identity
 
-opt_co, opt_co' :: CvSubst
-       		-> Bool	       -- True <=> return (sym co)
-                -> Maybe Role  -- Nothing <=> don't change; otherwise, change
-                               -- INVARIANT: the change is always a *downgrade*
-       		-> Coercion
-       		-> NormalCo	
-opt_co = opt_co' 
+-- | Do we apply a @sym@ to the result?
+type SymFlag = Bool
+
+-- | Do we force the result to be representational?
+type ReprFlag = Bool
+
+-- | Optimize a coercion, making no assumptions.
+opt_co1 :: CvSubst
+        -> SymFlag
+        -> Coercion -> NormalCo
+opt_co1 env sym co = opt_co2 env sym (coercionRole co) co
 {-
 opt_co env sym co
  = pprTrace "opt_co {" (ppr sym <+> ppr co $$ ppr env) $
    co1 `seq`
    pprTrace "opt_co done }" (ppr co1) $
-   (WARN( not same_co_kind, ppr co  <+> dcolon <+> pprEqPred (Pair s1 t1)
-                         $$ ppr co1 <+> dcolon <+> pprEqPred (Pair s2 t2) )
+   (WARN( not same_co_kind, ppr co  <+> dcolon <+> ppr (coercionType co)
+                         $$ ppr co1 <+> dcolon <+> ppr (coercionType co1) )
     WARN( not (coreEqCoercion co1 simple_result),
            (text "env=" <+> ppr env) $$
            (text "input=" <+> ppr co) $$
@@ -107,111 +127,123 @@ opt_co env sym co
                  | otherwise = substCo env co
 -}
 
-opt_co' env _   mrole (Refl r ty) = Refl (mrole `orElse` r) (substTy env ty)
-opt_co' env sym mrole co
-  |  mrole == Just Phantom 
-  || coercionRole co == Phantom
-  , Pair ty1 ty2 <- coercionKind co
-  = if sym
-    then opt_univ env Phantom ty2 ty1
-    else opt_univ env Phantom ty1 ty2
+-- See Note [Optimising coercion optimisation]
+-- | Optimize a coercion, knowing the coercion's role. No other assumptions.
+opt_co2 :: CvSubst
+        -> SymFlag
+        -> Role   -- ^ The role of the input coercion
+        -> Coercion -> NormalCo
+opt_co2 env sym Phantom co = opt_phantom env sym co
+opt_co2 env sym r       co = opt_co3 env sym Nothing r co
 
-opt_co' env sym mrole (SymCo co)  = opt_co env (not sym) mrole co
-opt_co' env sym mrole (TyConAppCo r tc cos)
-  = case mrole of
-      Nothing -> mkTyConAppCo r  tc (map (opt_co env sym Nothing) cos)
-      Just r' -> mkTyConAppCo r' tc (zipWith (opt_co env sym)
-                                             (map Just (tyConRolesX r' tc)) cos)
-opt_co' env sym mrole (AppCo co1 co2) = mkAppCo (opt_co env sym mrole   co1)
-                                                (opt_co env sym Nothing co2)
-opt_co' env sym mrole (ForAllCo tv co)
+-- See Note [Optimising coercion optimisation]
+-- | Optimize a coercion, knowing the coercion's non-Phantom role.
+opt_co3 :: CvSubst -> SymFlag -> Maybe Role -> Role -> Coercion -> NormalCo
+opt_co3 env sym (Just Phantom) _ co = opt_phantom env sym co
+opt_co3 env sym (Just Representational) r co = opt_co4 env sym True  r co
+  -- if mrole is Just Nominal, that can't be a downgrade, so we can ignore
+opt_co3 env sym _                       r co = opt_co4 env sym False r co
+
+
+-- See Note [Optimising coercion optimisation]
+-- | Optimize a non-phantom coercion.
+opt_co4 :: CvSubst -> SymFlag -> ReprFlag -> Role -> Coercion -> NormalCo
+
+opt_co4 env _   rep r (Refl _r ty)
+  = ASSERT( r == _r )
+    Refl (chooseRole rep r) (substTy env ty)
+
+opt_co4 env sym rep r (SymCo co)  = opt_co4 env (not sym) rep r co
+
+opt_co4 env sym rep r g@(TyConAppCo _r tc cos)
+  = ASSERT( r == _r )
+    case (rep, r) of
+      (True, Nominal) ->
+        mkTyConAppCo Representational tc
+                     (zipWith3 (opt_co3 env sym)
+                               (map Just (tyConRolesX Representational tc))
+                               (repeat Nominal)
+                               cos)
+      (False, Nominal) ->
+        mkTyConAppCo Nominal tc (map (opt_co4 env sym False Nominal) cos)
+      (_, Representational) ->
+                      -- must use opt_co2 here, because some roles may be P
+                      -- See Note [Optimising coercion optimisation]
+        mkTyConAppCo r tc (zipWith (opt_co2 env sym)
+                                   (tyConRolesX r tc)  -- the current roles
+                                   cos)
+      (_, Phantom) -> pprPanic "opt_co4 sees a phantom!" (ppr g)
+
+opt_co4 env sym rep r (AppCo co1 co2) = mkAppCo (opt_co4 env sym rep r co1)
+                                                (opt_co4 env sym False Nominal co2)
+opt_co4 env sym rep r (ForAllCo tv co)
   = case substTyVarBndr env tv of
-      (env', tv') -> mkForAllCo tv' (opt_co env' sym mrole co)
+      (env', tv') -> mkForAllCo tv' (opt_co4 env' sym rep r co)
      -- Use the "mk" functions to check for nested Refls
 
-opt_co' env sym mrole (CoVarCo cv)
+opt_co4 env sym rep r (CoVarCo cv)
   | Just co <- lookupCoVar env cv
-  = opt_co (zapCvSubstEnv env) sym mrole co
+  = opt_co4 (zapCvSubstEnv env) sym rep r co
 
   | Just cv1 <- lookupInScope (getCvInScope env) cv
-  = ASSERT( isCoVar cv1 ) wrapRole mrole cv_role $ wrapSym sym (CoVarCo cv1)
+  = ASSERT( isCoVar cv1 ) wrapRole rep r $ wrapSym sym (CoVarCo cv1)
                 -- cv1 might have a substituted kind!
 
   | otherwise = WARN( True, ptext (sLit "opt_co: not in scope:") <+> ppr cv $$ ppr env)
                 ASSERT( isCoVar cv )
-                wrapRole mrole cv_role $ wrapSym sym (CoVarCo cv)
-  where cv_role = coVarRole cv
+                wrapRole rep r $ wrapSym sym (CoVarCo cv)
 
-opt_co' env sym mrole (AxiomInstCo con ind cos)
+opt_co4 env sym rep r (AxiomInstCo con ind cos)
     -- Do *not* push sym inside top-level axioms
     -- e.g. if g is a top-level axiom
     --   g a : f a ~ a
     -- then (sym (g ty)) /= g (sym ty) !!
-  = wrapRole mrole (coAxiomRole con) $
+  = ASSERT( r == coAxiomRole con )
+    wrapRole rep (coAxiomRole con) $
     wrapSym sym $
-    AxiomInstCo con ind (map (opt_co env False Nothing) cos)
+                       -- some sub-cos might be P: use opt_co2
+                       -- See Note [Optimising coercion optimisation]
+    AxiomInstCo con ind (zipWith (opt_co2 env False)
+                                 (coAxBranchRoles (coAxiomNthBranch con ind))
+                                 cos)
       -- Note that the_co does *not* have sym pushed into it
 
-opt_co' env sym mrole (UnivCo r oty1 oty2)
-  = opt_univ env role a b
+opt_co4 env sym rep r (UnivCo _r oty1 oty2)
+  = ASSERT( r == _r )
+    opt_univ env (chooseRole rep r) a b
   where
     (a,b) = if sym then (oty2,oty1) else (oty1,oty2)
-    role = mrole `orElse` r
 
-opt_co' env sym mrole (TransCo co1 co2)
-  | sym       = opt_trans in_scope opt_co2 opt_co1   -- sym (g `o` h) = sym h `o` sym g
-  | otherwise = opt_trans in_scope opt_co1 opt_co2
+opt_co4 env sym rep r (TransCo co1 co2)
+                      -- sym (g `o` h) = sym h `o` sym g
+  | sym       = opt_trans in_scope co2' co1'
+  | otherwise = opt_trans in_scope co1' co2'
   where
-    opt_co1 = opt_co env sym mrole co1
-    opt_co2 = opt_co env sym mrole co2
+    co1' = opt_co4 env sym rep r co1
+    co2' = opt_co4 env sym rep r co2
     in_scope = getCvInScope env
 
--- NthCo roles are fiddly!
-opt_co' env sym mrole (NthCo n (TyConAppCo _ _ cos))
-  = opt_co env sym mrole (getNth cos n)
-opt_co' env sym mrole (NthCo n co)
-  | TyConAppCo _ _tc cos <- co'
-  , isDecomposableTyCon tc   -- Not synonym families
-  = ASSERT( n < length cos )
-    ASSERT( _tc == tc )
-    let resultCo = cos !! n
-        resultRole = coercionRole resultCo in
-    case (mrole, resultRole) of
-        -- if we just need an R coercion, try to propagate the SubCo again:
-      (Just Representational, Nominal) -> opt_co (zapCvSubstEnv env) False mrole resultCo
-      _                                -> resultCo
+opt_co4 env sym rep r co@(NthCo {}) = opt_nth_co env sym rep r co
 
-  | otherwise
-  = wrap_role $ NthCo n co'
-
-  where
-    wrap_role wrapped = wrapRole mrole (coercionRole wrapped) wrapped
-
-    tc = tyConAppTyCon $ pFst $ coercionKind co
-    co' = opt_co env sym mrole' co
-    mrole' = case mrole of
-               Just Representational
-                 | Representational <- nthRole Representational tc n
-                 -> Just Representational
-               _ -> Nothing
-
-opt_co' env sym mrole (LRCo lr co)
+opt_co4 env sym rep r (LRCo lr co)
   | Just pr_co <- splitAppCo_maybe co
-  = opt_co env sym mrole (pickLR lr pr_co)
+  = ASSERT( r == Nominal )
+    opt_co4 env sym rep Nominal (pickLR lr pr_co)
   | Just pr_co <- splitAppCo_maybe co'
-  = if mrole == Just Representational
-    then opt_co (zapCvSubstEnv env) False mrole (pickLR lr pr_co)
+  = ASSERT( r == Nominal )
+    if rep
+    then opt_co4 (zapCvSubstEnv env) False True Nominal (pickLR lr pr_co)
     else pickLR lr pr_co
   | otherwise
-  = wrapRole mrole Nominal $ LRCo lr co'
+  = wrapRole rep Nominal $ LRCo lr co'
   where
-    co' = opt_co env sym Nothing co
+    co' = opt_co4 env sym False Nominal co
 
-opt_co' env sym mrole (InstCo co ty)
+opt_co4 env sym rep r (InstCo co ty)
     -- See if the first arg is already a forall
     -- ...then we can just extend the current substitution
   | Just (tv, co_body) <- splitForAllCo_maybe co
-  = opt_co (extendTvSubst env tv ty') sym mrole co_body
+  = opt_co4 (extendTvSubst env tv ty') sym rep r co_body
 
      -- See if it is a forall after optimization
      -- If so, do an inefficient one-variable substitution
@@ -220,22 +252,34 @@ opt_co' env sym mrole (InstCo co ty)
 
   | otherwise = InstCo co' ty'
   where
-    co' = opt_co env sym mrole co
+    co' = opt_co4 env sym rep r co
     ty' = substTy env ty
 
-opt_co' env sym _ (SubCo co) = opt_co env sym (Just Representational) co
+opt_co4 env sym _ r (SubCo co)
+  = ASSERT( r == Representational )
+    opt_co4 env sym True Nominal co
 
 -- XXX: We could add another field to CoAxiomRule that
 -- would allow us to do custom simplifications.
-opt_co' env sym mrole (AxiomRuleCo co ts cs) =
-  wrapRole mrole (coaxrRole co) $
+opt_co4 env sym rep r (AxiomRuleCo co ts cs)
+  = ASSERT( r == coaxrRole co )
+    wrapRole rep r $
     wrapSym sym $
     AxiomRuleCo co (map (substTy env) ts)
-                   (zipWith (opt_co env False) (map Just (coaxrAsmpRoles co)) cs)
-
+                   (zipWith (opt_co2 env False) (coaxrAsmpRoles co) cs)
 
 
 -------------
+-- | Optimize a phantom coercion. The input coercion may not necessarily
+-- be a phantom, but the output sure will be.
+opt_phantom :: CvSubst -> SymFlag -> Coercion -> NormalCo
+opt_phantom env sym co
+  = if sym
+    then opt_univ env Phantom ty2 ty1
+    else opt_univ env Phantom ty1 ty2
+  where
+    Pair ty1 ty2 = coercionKind co
+
 opt_univ :: CvSubst -> Role -> Type -> Type -> Coercion
 opt_univ env role oty1 oty2
   | Just (tc1, tys1) <- splitTyConApp_maybe oty1
@@ -260,6 +304,45 @@ opt_univ env role oty1 oty2
 
   | otherwise
   = mkUnivCo role (substTy env oty1) (substTy env oty2)
+
+-------------
+-- NthCo must be handled separately, because it's the one case where we can't
+-- tell quickly what the component coercion's role is from the containing
+-- coercion. To avoid repeated coercionRole calls as opt_co1 calls opt_co2,
+-- we just look for nested NthCo's, which can happen in practice.
+opt_nth_co :: CvSubst -> SymFlag -> ReprFlag -> Role -> Coercion -> NormalCo
+opt_nth_co env sym rep r = go []
+  where
+    go ns (NthCo n co) = go (n:ns) co
+      -- previous versions checked if the tycon is decomposable. This
+      -- is redundant, because a non-decomposable tycon under an NthCo
+      -- is entirely bogus. See docs/core-spec/core-spec.pdf.
+    go ns co
+      = opt_nths ns co
+
+      -- input coercion is *not* yet sym'd or opt'd
+    opt_nths [] co = opt_co4 env sym rep r co
+    opt_nths (n:ns) (TyConAppCo _ _ cos) = opt_nths ns (cos `getNth` n)
+
+      -- here, the co isn't a TyConAppCo, so we opt it, hoping to get
+      -- a TyConAppCo as output. We don't know the role, so we use
+      -- opt_co1. This is slightly annoying, because opt_co1 will call
+      -- coercionRole, but as long as we don't have a long chain of
+      -- NthCo's interspersed with some other coercion former, we should
+      -- be OK.
+    opt_nths ns co = opt_nths' ns (opt_co1 env sym co)
+
+      -- input coercion *is* sym'd and opt'd
+    opt_nths' [] co
+      = if rep && (r == Nominal)
+            -- propagate the SubCo:
+        then opt_co4 (zapCvSubstEnv env) False True r co
+        else co
+    opt_nths' (n:ns) (TyConAppCo _ _ cos) = opt_nths' ns (cos `getNth` n)
+    opt_nths' ns co = wrapRole rep r (mk_nths ns co)
+
+    mk_nths [] co = co
+    mk_nths (n:ns) co = mk_nths ns (mkNthCo n co)
 
 -------------
 opt_transList :: InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
@@ -426,11 +509,11 @@ opt_trans_rule is co1 co2
     role = coercionRole co1 -- should be the same as coercionRole co2!
 
 opt_trans_rule _ co1 co2	-- Identity rule
-  | Pair ty1 _ <- coercionKind co1
+  | (Pair ty1 _, r) <- coercionKindRole co1
   , Pair _ ty2 <- coercionKind co2
   , ty1 `eqType` ty2
   = fireTransRule "RedTypeDirRefl" co1 co2 $
-    Refl (coercionRole co1) ty2
+    Refl r ty2
 
 opt_trans_rule _ _ _ = Nothing
 
@@ -493,16 +576,24 @@ checkAxInstCo (AxiomInstCo ax ind cos)
 checkAxInstCo _ = Nothing
 
 -----------
-wrapSym :: Bool -> Coercion -> Coercion
+wrapSym :: SymFlag -> Coercion -> Coercion
 wrapSym sym co | sym       = SymCo co
                | otherwise = co
 
-wrapRole :: Maybe Role   -- desired
-         -> Role         -- current
+-- | Conditionally set a role to be representational
+wrapRole :: ReprFlag
+         -> Role         -- ^ current role
          -> Coercion -> Coercion
-wrapRole Nothing        _       = id
-wrapRole (Just desired) current = maybeSubCo2 desired current
+wrapRole False _       = id
+wrapRole True  current = downgradeRole Representational current
 
+-- | If we require a representational role, return that. Otherwise,
+-- return the "default" role provided.
+chooseRole :: ReprFlag
+           -> Role    -- ^ "default" role
+           -> Role
+chooseRole True _ = Representational
+chooseRole _    r = r
 -----------
 -- takes two tyvars and builds env'ts to map them to the same tyvar
 substTyVarBndr2 :: CvSubst -> TyVar -> TyVar
@@ -569,8 +660,7 @@ etaAppCo_maybe :: Coercion -> Maybe (Coercion,Coercion)
 etaAppCo_maybe co
   | Just (co1,co2) <- splitAppCo_maybe co
   = Just (co1,co2)
-  | Nominal <- coercionRole co
-  , Pair ty1 ty2 <- coercionKind co
+  | (Pair ty1 ty2, Nominal) <- coercionKindRole co
   , Just (_,t1) <- splitAppTy_maybe ty1
   , Just (_,t2) <- splitAppTy_maybe ty2
   , typeKind t1 `eqType` typeKind t2      -- Note [Eta for AppCo]

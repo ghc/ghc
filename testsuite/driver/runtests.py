@@ -98,8 +98,8 @@ for opt,arg in opts:
         config.skip_perf_tests = True
 
     if opt == '--verbose':
-        if arg not in ["0","1","2","3"]:
-            sys.stderr.write("ERROR: requested verbosity %s not supported, use 0,1,2 or 3" % arg)
+        if arg not in ["0","1","2","3","4"]:
+            sys.stderr.write("ERROR: requested verbosity %s not supported, use 0,1,2,3 or 4" % arg)
             sys.exit(1)
         config.verbose = int(arg)
 

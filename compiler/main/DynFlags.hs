@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -------------------------------------------------------------------------------
 --
 -- | Dynamic flags
@@ -11,7 +13,7 @@
 --
 -------------------------------------------------------------------------------
 
-{-# OPTIONS -fno-cse #-}
+{-# OPTIONS_GHC -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 module DynFlags (
@@ -30,6 +32,7 @@ module DynFlags (
         wopt, wopt_set, wopt_unset,
         xopt, xopt_set, xopt_unset,
         lang_set,
+        useUnicodeSyntax,
         whenGeneratingDynamicToo, ifGeneratingDynamicToo,
         whenCannotGenerateDynamicToo,
         dynamicTooMkDynamicDynFlags,
@@ -330,6 +333,7 @@ data GeneralFlag
    | Opt_IgnoreInterfacePragmas
    | Opt_OmitInterfacePragmas
    | Opt_ExposeAllUnfoldings
+   | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
 
    -- profiling opts
    | Opt_AutoSccsOnIndividualCafs
@@ -403,8 +407,6 @@ data GeneralFlag
    | Opt_SuppressUniques
 
    -- temporary flags
-   | Opt_RunCPS
-   | Opt_RunCPSZ
    | Opt_AutoLinkPackages
    | Opt_ImplicitImportQualified
 
@@ -580,6 +582,7 @@ data ExtensionFlag
    | Opt_TraditionalRecordSyntax
    | Opt_LambdaCase
    | Opt_MultiWayIf
+   | Opt_BinaryLiterals
    | Opt_NegativeLiterals
    | Opt_EmptyCase
    | Opt_PatternSynonyms
@@ -774,7 +777,7 @@ data DynFlags = DynFlags {
   pprCols               :: Int,
   traceLevel            :: Int, -- Standard level is 1. Less verbose is 0.
 
-  useUnicodeQuotes      :: Bool,
+  useUnicode      :: Bool,
 
   -- | what kind of {-# SCC #-} to add automatically
   profAuto              :: ProfAuto,
@@ -1292,12 +1295,12 @@ initDynFlags dflags = do
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
  wrapperNum <- newIORef emptyModuleEnv
- canUseUnicodeQuotes <- do let enc = localeEncoding
-                               str = "‘’"
-                           (withCString enc str $ \cstr ->
-                                do str' <- peekCString enc cstr
-                                   return (str == str'))
-                               `catchIOError` \_ -> return False
+ canUseUnicode <- do let enc = localeEncoding
+                         str = "‘’"
+                     (withCString enc str $ \cstr ->
+                          do str' <- peekCString enc cstr
+                             return (str == str'))
+                         `catchIOError` \_ -> return False
  return dflags{
         canGenerateDynamicToo = refCanGenerateDynamicToo,
         nextTempSuffix = refNextTempSuffix,
@@ -1307,7 +1310,7 @@ initDynFlags dflags = do
         generatedDumps = refGeneratedDumps,
         llvmVersion    = refLlvmVersion,
         nextWrapperNum = wrapperNum,
-        useUnicodeQuotes = canUseUnicodeQuotes,
+        useUnicode    = canUseUnicode,
         rtldInfo      = refRtldInfo,
         rtccInfo      = refRtccInfo
         }
@@ -1446,7 +1449,7 @@ defaultDynFlags mySettings =
         flushErr = defaultFlushErr,
         pprUserLength = 5,
         pprCols = 100,
-        useUnicodeQuotes = False,
+        useUnicode = False,
         traceLevel = 1,
         profAuto = NoProfAuto,
         llvmVersion = panic "defaultDynFlags: No llvmVersion",
@@ -1681,6 +1684,9 @@ lang_set dflags lang =
             language = lang,
             extensionFlags = flattenExtensionFlags lang (extensions dflags)
           }
+
+useUnicodeSyntax :: DynFlags -> Bool
+useUnicodeSyntax = xopt Opt_UnicodeSyntax
 
 -- | Set the Haskell language standard to use
 setLanguage :: Language -> DynP ()
@@ -2187,16 +2193,9 @@ dynamic_flags = [
 
         -------- ghc -M -----------------------------------------------------
   , Flag "dep-suffix"     (hasArg addDepSuffix)
-  , Flag "optdep-s"       (hasArgDF addDepSuffix "Use -dep-suffix instead")
   , Flag "dep-makefile"   (hasArg setDepMakefile)
-  , Flag "optdep-f"       (hasArgDF setDepMakefile "Use -dep-makefile instead")
-  , Flag "optdep-w"       (NoArg  (deprecate "doesn't do anything"))
   , Flag "include-pkg-deps"         (noArg (setDepIncludePkgDeps True))
-  , Flag "optdep--include-prelude"  (noArgDF (setDepIncludePkgDeps True) "Use -include-pkg-deps instead")
-  , Flag "optdep--include-pkg-deps" (noArgDF (setDepIncludePkgDeps True) "Use -include-pkg-deps instead")
   , Flag "exclude-module"           (hasArg addDepExcludeMod)
-  , Flag "optdep--exclude-module"   (hasArgDF addDepExcludeMod "Use -exclude-module instead")
-  , Flag "optdep-x"                 (hasArgDF addDepExcludeMod "Use -exclude-module instead")
 
         -------- Linking ----------------------------------------------------
   , Flag "no-link"            (noArg (\d -> d{ ghcLink=NoLink }))
@@ -2650,6 +2649,7 @@ fFlags = [
   ( "pedantic-bottoms",                 Opt_PedanticBottoms, nop ),
   ( "ignore-interface-pragmas",         Opt_IgnoreInterfacePragmas, nop ),
   ( "omit-interface-pragmas",           Opt_OmitInterfacePragmas, nop ),
+  ( "write-interface",                  Opt_WriteInterface, nop ),
   ( "expose-all-unfoldings",            Opt_ExposeAllUnfoldings, nop ),
   ( "do-lambda-eta-expansion",          Opt_DoLambdaEtaExpansion, nop ),
   ( "ignore-asserts",                   Opt_IgnoreAsserts, nop ),
@@ -2669,8 +2669,6 @@ fFlags = [
   ( "break-on-error",                   Opt_BreakOnError, nop ),
   ( "print-evld-with-show",             Opt_PrintEvldWithShow, nop ),
   ( "print-bind-contents",              Opt_PrintBindContents, nop ),
-  ( "run-cps",                          Opt_RunCPS, nop ),
-  ( "run-cpsz",                         Opt_RunCPSZ, nop ),
   ( "vectorise",                        Opt_Vectorise, nop ),
   ( "vectorisation-avoidance",          Opt_VectorisationAvoidance, nop ),
   ( "regs-graph",                       Opt_RegsGraph, nop ),
@@ -2685,7 +2683,8 @@ fFlags = [
   ( "fun-to-thunk",                     Opt_FunToThunk, nop ),
   ( "gen-manifest",                     Opt_GenManifest, nop ),
   ( "embed-manifest",                   Opt_EmbedManifest, nop ),
-  ( "ext-core",                         Opt_EmitExternalCore, nop ),
+  ( "ext-core",                         Opt_EmitExternalCore,
+    \_ -> deprecate "it has no effect, and will be removed in GHC 7.12" ),
   ( "shared-implib",                    Opt_SharedImplib, nop ),
   ( "ghci-sandbox",                     Opt_GhciSandbox, nop ),
   ( "ghci-history",                     Opt_GhciHistory, nop ),
@@ -2869,13 +2868,15 @@ xFlags = [
   ( "FlexibleInstances",                Opt_FlexibleInstances, nop ),
   ( "ConstrainedClassMethods",          Opt_ConstrainedClassMethods, nop ),
   ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses, nop ),
-  ( "NullaryTypeClasses",               Opt_NullaryTypeClasses, nop ),
+  ( "NullaryTypeClasses",               Opt_NullaryTypeClasses,
+    deprecatedForExtension "MultiParamTypeClasses" ),
   ( "FunctionalDependencies",           Opt_FunctionalDependencies, nop ),
   ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, setGenDeriving ),
   ( "OverlappingInstances",             Opt_OverlappingInstances, nop ),
   ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
   ( "IncoherentInstances",              Opt_IncoherentInstances, nop ),
   ( "PackageImports",                   Opt_PackageImports, nop ),
+  ( "BinaryLiterals",                   Opt_BinaryLiterals, nop ),
   ( "NegativeLiterals",                 Opt_NegativeLiterals, nop ),
   ( "EmptyCase",                        Opt_EmptyCase, nop ),
   ( "PatternSynonyms",                  Opt_PatternSynonyms, nop )
@@ -2960,6 +2961,9 @@ impliedFlags
     , (Opt_ImplicitParams, turnOn, Opt_FlexibleInstances)
 
     , (Opt_JavaScriptFFI, turnOn, Opt_InterruptibleFFI)
+    
+    , (Opt_DeriveTraversable, turnOn, Opt_DeriveFunctor)
+    , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
   ]
 
 optLevelFlags :: [([Int], GeneralFlag)]
@@ -3187,15 +3191,8 @@ noArg fn = NoArg (upd fn)
 noArgM :: (DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
 noArgM fn = NoArg (updM fn)
 
-noArgDF :: (DynFlags -> DynFlags) -> String -> OptKind (CmdLineP DynFlags)
-noArgDF fn deprec = NoArg (upd fn >> deprecate deprec)
-
 hasArg :: (String -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 hasArg fn = HasArg (upd . fn)
-
-hasArgDF :: (String -> DynFlags -> DynFlags) -> String -> OptKind (CmdLineP DynFlags)
-hasArgDF fn deprec = HasArg (\s -> do upd (fn s)
-                                      deprecate deprec)
 
 sepArg :: (String -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 sepArg fn = SepArg (upd . fn)
@@ -3764,6 +3761,8 @@ data LinkerInfo
 data CompilerInfo
    = GCC
    | Clang
+   | AppleClang
+   | AppleClang51
    | UnknownCC
    deriving Eq
 

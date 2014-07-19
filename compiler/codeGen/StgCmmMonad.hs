@@ -1,4 +1,5 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE CPP, GADTs, UnboxedTuples #-}
+
 -----------------------------------------------------------------------------
 --
 -- Monad for Stg to C-- code generation

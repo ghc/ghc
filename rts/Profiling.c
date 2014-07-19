@@ -619,10 +619,8 @@ actualPush_ (CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs)
     ccsSetSelected(new_ccs);
 
     /* update the memoization table for the parent stack */
-    if (ccs != EMPTY_STACK) {
-        ccs->indexTable = addToIndexTable(ccs->indexTable, new_ccs, cc,
-                                          0/*not a back edge*/);
-    }
+    ccs->indexTable = addToIndexTable(ccs->indexTable, new_ccs, cc,
+                                      0/*not a back edge*/);
 
     /* return a pointer to the new stack */
     return new_ccs;

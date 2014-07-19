@@ -5,6 +5,7 @@
 \section[ListSetOps]{Set-like operations on lists}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
 
 module ListSetOps (
         unionLists, minusList, insertList,

@@ -4,6 +4,8 @@
 %
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcValidity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   expectedKindInCtxt, 
@@ -44,7 +46,6 @@ import ListSetOps
 import SrcLoc
 import Outputable
 import FastString
-import BasicTypes ( Arity )
 
 import Control.Monad
 import Data.Maybe
@@ -67,13 +68,21 @@ checkAmbiguity ctxt ty
                         -- Then :k T should work in GHCi, not complain that
                         -- (T k) is ambiguous!
 
+  | InfSigCtxt {} <- ctxt  -- See Note [Validity of inferred types] in TcBinds
+  = return () 
+
   | otherwise
   = do { traceTc "Ambiguity check for" (ppr ty)
-       ; (subst, _tvs) <- tcInstSkolTyVars (varSetElems (tyVarsOfType ty))
+       ; let free_tkvs = varSetElemsKvsFirst (closeOverKinds (tyVarsOfType ty))
+       ; (subst, _tvs) <- tcInstSkolTyVars free_tkvs
        ; let ty' = substTy subst ty
-              -- The type might have free TyVars,
-              -- so we skolemise them as TcTyVars
+              -- The type might have free TyVars, esp when the ambiguity check
+              -- happens during a call to checkValidType,
+              -- so we skolemise them as TcTyVars.
               -- Tiresome; but the type inference engine expects TcTyVars
+              -- NB: The free tyvar might be (a::k), so k is also free
+              --     and we must skolemise it as well. Hence closeOverKinds.
+              --     (Trac #9222)
 
          -- Solve the constraints eagerly because an ambiguous type
          -- can cause a cascade of further errors.  Since the free
@@ -285,7 +294,7 @@ check_type ctxt rank (AppTy ty1 ty2)
         ; check_arg_type ctxt rank ty2 }
 
 check_type ctxt rank ty@(TyConApp tc tys)
-  | isSynTyCon tc          = check_syn_tc_app ctxt rank ty tc tys
+  | isTypeSynonymTyCon tc  = check_syn_tc_app ctxt rank ty tc tys
   | isUnboxedTupleTyCon tc = check_ubx_tuple  ctxt      ty    tys
   | otherwise              = mapM_ (check_arg_type ctxt rank) tys
 
@@ -506,7 +515,7 @@ okIPCtxt (SpecInstCtxt {}) = False
 okIPCtxt _                 = True
 
 badIPPred :: PredType -> SDoc
-badIPPred pred = ptext (sLit "Illegal implict parameter") <+> quotes (ppr pred)
+badIPPred pred = ptext (sLit "Illegal implicit parameter") <+> quotes (ppr pred)
 
 
 check_eq_pred :: DynFlags -> UserTypeCtxt -> PredType -> TcType -> TcType -> TcM ()
@@ -650,7 +659,7 @@ unambiguous. See Note [Impedence matching] in TcBinds.
 This test is very conveniently implemented by calling
     tcSubType <type> <type>
 This neatly takes account of the functional dependecy stuff above, 
-and implict parameter (see Note [Implicit parameters and ambiguity]).
+and implicit parameter (see Note [Implicit parameters and ambiguity]).
 
 What about this, though?
    g :: C [a] => Int
@@ -765,11 +774,10 @@ checkValidInstHead ctxt clas cls_args
             ; checkTc (xopt Opt_FlexibleInstances dflags ||
                        all tcInstHeadTyAppAllTyVars ty_args)
                  (instTypeErr clas cls_args head_type_args_tyvars_msg)
-            ; checkTc (xopt Opt_NullaryTypeClasses dflags ||
-                       not (null ty_args))
-                 (instTypeErr clas cls_args head_no_type_msg)
             ; checkTc (xopt Opt_MultiParamTypeClasses dflags ||
-                       length ty_args <= 1)  -- Only count type arguments
+                       length ty_args == 1 ||  -- Only count type arguments
+                       (xopt Opt_NullaryTypeClasses dflags &&
+                        null ty_args))
                  (instTypeErr clas cls_args head_one_type_msg) }
 
          -- May not contain type family applications
@@ -799,11 +807,7 @@ checkValidInstHead ctxt clas cls_args
 
     head_one_type_msg = parens (
                 text "Only one type can be given in an instance head." $$
-                text "Use MultiParamTypeClasses if you want to allow more.")
-
-    head_no_type_msg = parens (
-                text "No parameters in the instance head." $$
-                text "Use NullaryTypeClasses if you want to allow this.")
+                text "Use MultiParamTypeClasses if you want to allow more, or zero.")
 
     abstract_class_msg =
                 text "The class is abstract, manual instances are not permitted."
@@ -1160,26 +1164,18 @@ checkValidFamPats :: TyCon -> [TyVar] -> [Type] -> TcM ()
 --         type instance F (T a) = a
 -- c) Have the right number of patterns
 checkValidFamPats fam_tc tvs ty_pats
-  = do { -- A family instance must have exactly the same number of type
-         -- parameters as the family declaration.  You can't write
-         --     type family F a :: * -> *
-         --     type instance F Int y = y
-         -- because then the type (F Int) would be like (\y.y)
-         checkTc (length ty_pats == fam_arity) $
-           wrongNumberOfParmsErr (fam_arity - length fam_kvs) -- report only types
-       ; mapM_ checkTyFamFreeness ty_pats
+  = ASSERT( length ty_pats == tyConArity fam_tc )
+      -- A family instance must have exactly the same number of type
+      -- parameters as the family declaration.  You can't write
+      --     type family F a :: * -> *
+      --     type instance F Int y = y
+      -- because then the type (F Int) would be like (\y.y)
+      -- But this is checked at the time the axiom is created
+    do { mapM_ checkTyFamFreeness ty_pats
        ; let unbound_tvs = filterOut (`elemVarSet` exactTyVarsOfTypes ty_pats) tvs
        ; checkTc (null unbound_tvs) (famPatErr fam_tc unbound_tvs ty_pats) }
-  where fam_arity    = tyConArity fam_tc
-        (fam_kvs, _) = splitForAllTys (tyConKind fam_tc)
-
-wrongNumberOfParmsErr :: Arity -> SDoc
-wrongNumberOfParmsErr exp_arity
-  = ptext (sLit "Number of parameters must match family declaration; expected")
-    <+> ppr exp_arity
 
 -- Ensure that no type family instances occur in a type.
---
 checkTyFamFreeness :: Type -> TcM ()
 checkTyFamFreeness ty
   = checkTc (isTyFamFree ty) $

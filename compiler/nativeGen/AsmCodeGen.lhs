@@ -7,7 +7,8 @@
 -- -----------------------------------------------------------------------------
 
 \begin{code}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, UnboxedTuples #-}
+
 module AsmCodeGen ( nativeCodeGen ) where
 
 #include "HsVersions.h"
@@ -605,7 +606,7 @@ makeImportsDoc dflags imports
              then text ".section .note.GNU-stack,\"\",@progbits"
              else empty)
             $$
-                -- And just because every other compiler does, lets stick in
+                -- And just because every other compiler does, let's stick in
                 -- an identifier directive: .ident "GHC x.y.z"
             (if platformHasIdentDirective platform
              then let compilerIdent = text "GHC" <+> text cProjectVersion

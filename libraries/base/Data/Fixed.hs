@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE AutoDeriveTypeable #-}
 {-# OPTIONS -Wall -fno-warn-unused-binds #-}
 
 -----------------------------------------------------------------------------
@@ -158,9 +158,13 @@ instance (HasResolution a) => Read (Fixed a) where
 
 convertFixed :: forall a . HasResolution a => Lexeme -> ReadPrec (Fixed a)
 convertFixed (Number n)
- | Just (i, f) <- numberToFixed r n =
-    return (fromInteger i + (fromInteger f / (10 ^ r)))
+ | Just (i, f) <- numberToFixed e n =
+    return (fromInteger i + (fromInteger f / (10 ^ e)))
     where r = resolution (undefined :: Fixed a)
+          -- round 'e' up to help make the 'read . show == id' property
+          -- possible also for cases where 'resolution' is not a
+          -- power-of-10, such as e.g. when 'resolution = 128'
+          e = ceiling (logBase 10 (fromInteger r) :: Double)
 convertFixed _ = pfail
 
 data E0 = E0

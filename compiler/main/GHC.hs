@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables #-}
+
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 2005-2012
@@ -53,7 +55,6 @@ module GHC (
         -- ** Compiling to Core
         CoreModule(..),
         compileToCoreModule, compileToCoreSimplified,
-        compileCoreToObj,
 
         -- * Inspecting the module structure of the program
         ModuleGraph, ModSummary(..), ms_mod_name, ModLocation(..),
@@ -261,6 +262,7 @@ import InteractiveEval
 import TcRnDriver       ( runTcInteractive )
 #endif
 
+import PprTyThing       ( pprFamInst )
 import HscMain
 import GhcMake
 import DriverPipeline   ( compileOne' )
@@ -283,7 +285,7 @@ import DataCon
 import Name             hiding ( varName )
 import Avail
 import InstEnv
-import FamInstEnv
+import FamInstEnv ( FamInst )
 import SrcLoc
 import CoreSyn
 import TidyPgm
@@ -310,7 +312,7 @@ import FastString
 import qualified Parser
 import Lexer
 
-import System.Directory ( doesFileExist, getCurrentDirectory )
+import System.Directory ( doesFileExist )
 import Data.Maybe
 import Data.List        ( find )
 import Data.Time
@@ -925,43 +927,6 @@ compileToCoreModule = compileCore False
 -- as to return simplified and tidied Core.
 compileToCoreSimplified :: GhcMonad m => FilePath -> m CoreModule
 compileToCoreSimplified = compileCore True
--- | Takes a CoreModule and compiles the bindings therein
--- to object code. The first argument is a bool flag indicating
--- whether to run the simplifier.
--- The resulting .o, .hi, and executable files, if any, are stored in the
--- current directory, and named according to the module name.
--- This has only so far been tested with a single self-contained module.
-compileCoreToObj :: GhcMonad m
-                 => Bool -> CoreModule -> FilePath -> FilePath -> m ()
-compileCoreToObj simplify cm@(CoreModule{ cm_module = mName })
-                 output_fn extCore_filename = do
-  dflags      <- getSessionDynFlags
-  currentTime <- liftIO $ getCurrentTime
-  cwd         <- liftIO $ getCurrentDirectory
-  modLocation <- liftIO $ mkHiOnlyModLocation dflags (hiSuf dflags) cwd
-                   ((moduleNameSlashes . moduleName) mName)
-
-  let modSum = ModSummary { ms_mod = mName,
-         ms_hsc_src = ExtCoreFile,
-         ms_location = modLocation,
-         -- By setting the object file timestamp to Nothing,
-         -- we always force recompilation, which is what we
-         -- want. (Thus it doesn't matter what the timestamp
-         -- for the (nonexistent) source file is.)
-         ms_hs_date = currentTime,
-         ms_obj_date = Nothing,
-         -- Only handling the single-module case for now, so no imports.
-         ms_srcimps = [],
-         ms_textual_imps = [],
-         -- No source file
-         ms_hspp_file = "",
-         ms_hspp_opts = dflags,
-         ms_hspp_buf = Nothing
-      }
-
-  hsc_env <- getSession
-  liftIO $ hscCompileCore hsc_env simplify (cm_safe cm) modSum (cm_binds cm) output_fn extCore_filename
-
 
 compileCore :: GhcMonad m => Bool -> FilePath -> m CoreModule
 compileCore simplify fn = do

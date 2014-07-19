@@ -1,6 +1,7 @@
 \begin{code}
+{-# LANGUAGE CPP, TypeFamilies #-}
+
 -- Type definitions for the constraint solver
-{-# LANGUAGE TypeFamilies #-}
 module TcSMonad (
 
        -- Canonical constraints, definition is now in TcRnTypes
@@ -461,6 +462,7 @@ data InertSet
 
        , inert_fsks :: [TcTyVar]  -- Rigid flatten-skolems (arising from givens)
                                   -- allocated in this local scope
+                                  -- See Note [Given flatten-skolems]
 
        , inert_solved_funeqs :: FunEqMap (CtEvidence, TcType)
               -- See Note [Type family equations]
@@ -478,8 +480,29 @@ data InertSet
               -- - Stored not necessarily as fully rewritten
               --   (ToDo: rewrite lazily when we lookup)
        }
+\end{code}
 
+Note [Given flatten-skolems]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we simplify the implication
+    forall b. C (F a) b => (C (F a) beta, blah)
+We'll flatten the givens, introducing a flatten-skolem, so the
+givens effectively look like
+    (C fsk b, F a ~ fsk)
+Then we simplify the wanteds, transforming (C (F a) beta) to (C fsk beta).
+Now, if we don't solve that wanted, we'll put it back into the residual
+implication.  But where is fsk bound?
 
+We solve this by recording the given flatten-skolems in the implication
+(the ic_fsks field), so it's as if we change the implication to
+    forall b, fsk. (C fsk b, F a ~ fsk) => (C fsk beta, blah)
+
+We don't need to explicitly record the (F a ~ fsk) constraint in the implication
+because we can recover it from inside the fsk TyVar itself.  But we do need
+to treat that (F a ~ fsk) as a new given.  See the fsk_bag stuff in
+TcInteract.solveInteractGiven.
+
+\begin{code}
 instance Outputable InertCans where
   ppr ics = vcat [ ptext (sLit "Equalities:")
                    <+> vcat (map ppr (varEnvElts (inert_eqs ics)))
@@ -506,9 +529,9 @@ emptyInert
                          , inert_funeqs  = emptyFunEqs
                          , inert_irreds  = emptyCts
                          , inert_insols  = emptyCts
-                         , inert_no_eqs  = True
+                         , inert_no_eqs  = True  -- See Note [inert_fsks and inert_no_eqs]
                          }
-       , inert_fsks          = []
+       , inert_fsks          = []  -- See Note [inert_fsks and inert_no_eqs]
        , inert_flat_cache    = emptyFunEqs
        , inert_solved_funeqs = emptyFunEqs
        , inert_solved_dicts  = emptyDictMap }
@@ -521,10 +544,12 @@ addInertCan ics item@(CTyEqCan { cc_ev = ev })
                               (inert_eqs ics)
                               (cc_tyvar item) [item]
         , inert_no_eqs = isFlatSkolEv ev && inert_no_eqs ics }
+    -- See Note [When does an implication have given equalities?] in TcSimplify
 
 addInertCan ics item@(CFunEqCan { cc_fun = tc, cc_tyargs = tys, cc_ev = ev })
   = ics { inert_funeqs = addFunEq (inert_funeqs ics) tc tys item
         , inert_no_eqs = isFlatSkolEv ev && inert_no_eqs ics }
+    -- See Note [When does an implication have given equalities?] in TcSimplify
 
 addInertCan ics item@(CIrredEvCan {})
   = ics { inert_irreds = inert_irreds ics `Bag.snocBag` item
@@ -601,7 +626,7 @@ prepareInertsForImplications is
            , inert_irreds  = Bag.filterBag isGivenCt irreds
            , inert_dicts   = filterDicts isGivenCt dicts
            , inert_insols  = emptyCts
-           , inert_no_eqs  = True  -- Ready for each implication
+           , inert_no_eqs  = True  -- See Note [inert_fsks and inert_no_eqs]
            }
 
     is_given_eq :: [Ct] -> Bool
@@ -1125,8 +1150,8 @@ nestImplicTcS ref inner_untch inerts (TcS thing_inside)
                                , tcs_ty_binds    = ty_binds
                                , tcs_count       = count
                                , tcs_inerts      = new_inert_var
-                               , tcs_worklist    = panic "nextImplicTcS: worklist"
-                               , tcs_implics     = panic "nextImplicTcS: implics"
+                               , tcs_worklist    = panic "nestImplicTcS: worklist"
+                               , tcs_implics     = panic "nestImplicTcS: implics"
                                -- NB: Both these are initialised by withWorkList
                                }
        ; res <- TcM.setUntouchables inner_untch $
@@ -1154,8 +1179,8 @@ nestTcS (TcS thing_inside)
     do { inerts <- TcM.readTcRef inerts_var
        ; new_inert_var <- TcM.newTcRef inerts
        ; let nest_env = env { tcs_inerts   = new_inert_var
-                            , tcs_worklist = panic "nextImplicTcS: worklist"
-                            , tcs_implics  = panic "nextImplicTcS: implics" }
+                            , tcs_worklist = panic "nestTcS: worklist"
+                            , tcs_implics  = panic "nestTcS: implics" }
        ; thing_inside nest_env }
 
 tryTcS :: TcS a -> TcS a
@@ -1173,8 +1198,8 @@ tryTcS (TcS thing_inside)
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
                             , tcs_ty_binds = ty_binds_var
                             , tcs_inerts   = is_var
-                            , tcs_worklist = panic "nextImplicTcS: worklist"
-                            , tcs_implics  = panic "nextImplicTcS: implics" }
+                            , tcs_worklist = panic "tryTcS: worklist"
+                            , tcs_implics  = panic "tryTcS: implics" }
        ; thing_inside nest_env }
 
 -- Getters and setters of TcEnv fields
@@ -1257,19 +1282,36 @@ getUntouchables :: TcS Untouchables
 getUntouchables = wrapTcS TcM.getUntouchables
 
 getGivenInfo :: TcS a -> TcS (Bool, [TcTyVar], a)
--- Run thing_inside, returning info on
---  a) whether we got any new equalities
---  b) which new (given) flatten skolems were generated
+-- See Note [inert_fsks and inert_no_eqs]
 getGivenInfo thing_inside
-  = do { updInertTcS reset_vars
-       ; res <- thing_inside
-       ; is  <- getTcSInerts
+  = do {
+       ; updInertTcS reset_vars  -- Set inert_fsks and inert_no_eqs to initial values
+       ; res <- thing_inside     -- Run thing_inside
+       ; is  <- getTcSInerts     -- Get new values of inert_fsks and inert_no_eqs
        ; return (inert_no_eqs (inert_cans is), inert_fsks is, res) }
   where
     reset_vars :: InertSet -> InertSet
     reset_vars is = is { inert_cans = (inert_cans is) { inert_no_eqs = True }
                        , inert_fsks = [] }
+\end{code}
 
+Note [inert_fsks and inert_no_eqs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The function getGivenInfo runs thing_inside to see what new flatten-skolems
+and equalities are generated by thing_inside.  To that end,
+ * it initialises inert_fsks, inert_no_eqs
+ * runs thing_inside
+ * reads out inert_fsks, inert_no_eqs
+This is the only place where it matters what inert_fsks and inert_no_eqs
+are initialised to.  In other places (eg emptyIntert), we need to set them
+to something (because they are strict) but they will never be looked at.
+
+See Note [When does an implication have given equalities?] in TcSimplify
+for more details about inert_no_eqs.
+
+See Note [Given flatten-skolems] for more details about inert_fsks.
+
+\begin{code}
 getTcSTyBinds :: TcS (IORef (Bool, TyVarEnv (TcTyVar, TcType)))
 getTcSTyBinds = TcS (return . tcs_ty_binds)
 
@@ -1354,7 +1396,7 @@ checkWellStagedDFun pred dfun_id loc
     bind_lvl = TcM.topIdLvl dfun_id
 
 pprEq :: TcType -> TcType -> SDoc
-pprEq ty1 ty2 = pprType $ mkEqPred ty1 ty2
+pprEq ty1 ty2 = pprParendType ty1 <+> char '~' <+> pprParendType ty2
 
 isTouchableMetaTyVarTcS :: TcTyVar -> TcS Bool
 isTouchableMetaTyVarTcS tv
@@ -1794,7 +1836,7 @@ rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swap
 -- It's all a form of rewwriteEvidence, specialised for equalities
 rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
   | CtDerived { ctev_loc = loc } <- old_ev
-  = newDerived loc (mkEqPred nlhs nrhs)
+  = newDerived loc (mkTcEqPred nlhs nrhs)
 
   | NotSwapped <- swapped
   , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
@@ -1821,7 +1863,7 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
   | otherwise
   = panic "rewriteEvidence"
   where
-    new_pred = mkEqPred nlhs nrhs
+    new_pred = mkTcEqPred nlhs nrhs
 
 maybeSym :: SwapFlag -> TcCoercion -> TcCoercion 
 maybeSym IsSwapped  co = mkTcSymCo co

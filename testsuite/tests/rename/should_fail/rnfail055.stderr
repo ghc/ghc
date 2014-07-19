@@ -20,8 +20,8 @@ RnFail055.hs-boot:6:1:
 RnFail055.hs-boot:8:1:
     Type constructor ‘S2’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: type S2 a b = forall a. (a, b)
-    Boot file:   type S2 a b = forall b. (a, b)
+    Main module: type S2 a b = forall a1. (a1, b)
+    Boot file:   type S2 a b = forall b1. (a, b1)
 
 RnFail055.hs-boot:12:1:
     Type constructor ‘T1’ has conflicting definitions in the module
@@ -33,9 +33,11 @@ RnFail055.hs-boot:14:1:
     Type constructor ‘T2’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type role T2 representational nominal
-                 data Eq b => T2 a b = T2 a
+                 data Eq b => T2 a b
+                   = T2 a
     Boot file:   type role T2 nominal representational
-                 data Eq a => T2 a b = T2 a
+                 data Eq a => T2 a b
+                   = T2 a
 
 RnFail055.hs-boot:16:11:
     T3 is exported by the hs-boot file, but not exported by the module
@@ -60,7 +62,7 @@ RnFail055.hs-boot:25:1:
     and its hs-boot file
     Main module: type role T7 phantom
                  data T7 a where
-                   T7 :: a -> T7 a
+                   T7 :: a1 -> T7 a
     Boot file:   data T7 a = T7 a
 
 RnFail055.hs-boot:27:22:

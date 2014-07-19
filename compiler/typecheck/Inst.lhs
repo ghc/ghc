@@ -6,7 +6,8 @@
 The @Inst@ type: dictionaries or method instances
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -382,14 +383,15 @@ syntaxNameCtxt name orig ty tidy_env
 
 \begin{code}
 getOverlapFlag :: TcM OverlapFlag
-getOverlapFlag 
+getOverlapFlag
   = do  { dflags <- getDynFlags
         ; let overlap_ok    = xopt Opt_OverlappingInstances dflags
               incoherent_ok = xopt Opt_IncoherentInstances  dflags
-              safeOverlap   = safeLanguageOn dflags
-              overlap_flag | incoherent_ok = Incoherent safeOverlap
-                           | overlap_ok    = OverlapOk safeOverlap
-                           | otherwise     = NoOverlap safeOverlap
+              use x = OverlapFlag { isSafeOverlap = safeLanguageOn dflags
+                                  , overlapMode   = x }
+              overlap_flag | incoherent_ok = use Incoherent
+                           | overlap_ok    = use OverlapOk
+                           | otherwise     = use NoOverlap
 
         ; return overlap_flag }
 
@@ -461,10 +463,10 @@ addLocalInst home_ie ispec
              False -> case dup_ispecs of
                  dup : _ -> dupInstErr ispec dup >> return (extendInstEnv home_ie ispec)
                  []      -> return (extendInstEnv home_ie ispec)
-             True  -> case (dup_ispecs, home_ie_matches, unifs, overlapFlag) of
+             True  -> case (dup_ispecs, home_ie_matches, unifs, overlapMode overlapFlag) of
                  (_, _:_, _, _)      -> return (overwriteInstEnv home_ie ispec)
                  (dup:_, [], _, _)   -> dupInstErr ispec dup >> return (extendInstEnv home_ie ispec)
-                 ([], _, u:_, NoOverlap _)    -> overlappingInstErr ispec u >> return (extendInstEnv home_ie ispec)
+                 ([], _, u:_, NoOverlap)    -> overlappingInstErr ispec u >> return (extendInstEnv home_ie ispec)
                  _                   -> return (extendInstEnv home_ie ispec)
                where (homematches, _) = lookupInstEnv' home_ie cls tys
                      home_ie_matches = [ dup_ispec 
@@ -476,7 +478,8 @@ traceDFuns :: [ClsInst] -> TcRn ()
 traceDFuns ispecs
   = traceTc "Adding instances:" (vcat (map pp ispecs))
   where
-    pp ispec = ppr (instanceDFunId ispec) <+> colon <+> ppr ispec
+    pp ispec = hang (ppr (instanceDFunId ispec) <+> colon)
+                  2 (ppr ispec)
 	-- Print the dfun name itself too
 
 funDepErr :: ClsInst -> [ClsInst] -> TcRn ()

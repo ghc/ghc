@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, GADTs #-}
 
 -----------------------------------------------------------------------------
 --
@@ -12,7 +13,6 @@
 -- (c) the #if blah_TARGET_ARCH} things, the
 -- structure should not be too overwhelming.
 
-{-# LANGUAGE GADTs #-}
 module PPC.CodeGen (
         cmmTopCodeGen,
         generateJumpTableForInstr,
@@ -813,15 +813,6 @@ genBranch = return . toOL . mkJumpInstr
 Conditional jumps are always to local labels, so we can use branch
 instructions.  We peek at the arguments to decide what kind of
 comparison to do.
-
-SPARC: First, we have to ensure that the condition codes are set
-according to the supplied comparison operation.  We generate slightly
-different code for floating point comparisons, because a floating
-point operation cannot directly precede a @BF@.  We assume the worst
-and fill that slot with a @NOP@.
-
-SPARC: Do not fill the delay slots here; you will confuse the register
-allocator.
 -}
 
 
@@ -1160,6 +1151,10 @@ genCCall' dflags gcp target dest_regs args0
 
                     MO_BSwap w   -> (fsLit $ bSwapLabel w, False)
                     MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
+                    MO_AtomicRMW w amop -> (fsLit $ atomicRMWLabel w amop, False)
+                    MO_Cmpxchg w -> (fsLit $ cmpxchgLabel w, False)
+                    MO_AtomicRead w  -> (fsLit $ atomicReadLabel w, False)
+                    MO_AtomicWrite w -> (fsLit $ atomicWriteLabel w, False)
 
                     MO_S_QuotRem {}  -> unsupported
                     MO_U_QuotRem {}  -> unsupported

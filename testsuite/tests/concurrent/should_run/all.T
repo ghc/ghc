@@ -78,8 +78,10 @@ test('readMVar1', normal, compile_and_run, [''])
 test('readMVar2', normal, compile_and_run, [''])
 test('readMVar3', normal, compile_and_run, [''])
 test('tryReadMVar1', normal, compile_and_run, [''])
+test('tryReadMVar2', normal, compile_and_run, [''])
 
 test('T7970', normal, compile_and_run, [''])
+test('AtomicPrimops', normal, compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run

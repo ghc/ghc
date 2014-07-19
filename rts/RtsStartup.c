@@ -214,6 +214,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
     getStablePtr((StgPtr)ioManagerCapabilitiesChanged_closure);
 #ifndef mingw32_HOST_OS
+    getStablePtr((StgPtr)blockedOnBadFD_closure);
     getStablePtr((StgPtr)runHandlers_closure);
 #endif
 
@@ -304,7 +305,7 @@ hs_add_root(void (*init_root)(void) STG_UNUSED)
 static void
 hs_exit_(rtsBool wait_foreign)
 {
-    nat g;
+    nat g, i;
 
     if (hs_init_count <= 0) {
 	errorBelch("warning: too many hs_exit()s");
@@ -336,6 +337,9 @@ hs_exit_(rtsBool wait_foreign)
     exitScheduler(wait_foreign);
 
     /* run C finalizers for all active weak pointers */
+    for (i = 0; i < n_capabilities; i++) {
+        runAllCFinalizers(capabilities[i]->weak_ptr_list_hd);
+    }
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         runAllCFinalizers(generations[g].weak_ptr_list);
     }
@@ -355,8 +359,12 @@ hs_exit_(rtsBool wait_foreign)
     resetTerminalSettings();
 #endif
 
-    // uninstall signal handlers
-    resetDefaultHandlers();
+#if defined(RTS_USER_SIGNALS)
+    if (RtsFlags.MiscFlags.install_signal_handlers) {
+        // uninstall signal handlers
+        resetDefaultHandlers();
+    }
+#endif
 
     /* stop timing the shutdown, we're about to print stats */
     stat_endExit();

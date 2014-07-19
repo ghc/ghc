@@ -790,24 +790,8 @@ else
 HSCOLOUR_SRCS = YES
 endif
 
-################################################################################
-#
-#		31-bit-Int Core files
-#
-################################################################################
-
-#
-# It is possible to configure the compiler and prelude to support 31-bit
-# integers, suitable for a back-end and RTS using a tag bit on a 32-bit
-# architecture.  Currently the only useful output from this option is external Core
-# files.  The following additions to your build.mk will produce the
-# 31-bit core output.  Note that this is *not* just a library "way"; the
-# compiler must be built a special way too.
-
-# GhcCppOpts +=-DWORD_SIZE_IN_BITS=31
-# GhcLibHcOpts +=-fext-core -fno-code -DWORD_SIZE_IN_BITS=31
-# GhcLibCppOpts += -DWORD_SIZE_IN_BITS=31
-# SplitObjs=NO
+# Build DPH?
+BUILD_DPH = YES
 
 ################################################################################
 #

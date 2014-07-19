@@ -4,7 +4,7 @@
 
 Here we collect a variety of helper functions that construct or
 analyse HsSyn.  All these functions deal with generic HsSyn; functions
-which deal with the intantiated versions are located elsewhere:
+which deal with the instantiated versions are located elsewhere:
 
    Parameterised by	Module
    ----------------     -------------
@@ -13,7 +13,8 @@ which deal with the intantiated versions are located elsewhere:
    Id			typecheck/TcHsSyn	
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -382,7 +383,7 @@ mkLHsVarTuple :: [a] -> LHsExpr a
 mkLHsVarTuple ids  = mkLHsTupleExpr (map nlHsVar ids)
 
 nlTuplePat :: [LPat id] -> Boxity -> LPat id
-nlTuplePat pats box = noLoc (TuplePat pats box placeHolderType)
+nlTuplePat pats box = noLoc (TuplePat pats box [])
 
 missingTupArg :: HsTupArg a
 missingTupArg = Missing placeHolderType

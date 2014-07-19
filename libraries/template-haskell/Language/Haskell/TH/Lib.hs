@@ -526,6 +526,22 @@ sigT t k
 equalityT :: TypeQ
 equalityT = return EqualityT
 
+{-# DEPRECATED classP "As of template-haskell-2.10, constraint predicates (Pred) are just types (Type), in keeping with ConstraintKinds. Please use 'conT' and 'appT'." #-}
+classP :: Name -> [Q Type] -> Q Pred
+classP cla tys
+  = do
+      tysl <- sequence tys
+      return (foldl AppT (ConT cla) tysl)
+
+{-# DEPRECATED equalP "As of template-haskell-2.10, constraint predicates (Pred) are just types (Type), in keeping with ConstraintKinds. Please see 'equalityT'." #-}
+equalP :: TypeQ -> TypeQ -> PredQ
+equalP tleft tright
+  = do
+      tleft1  <- tleft
+      tright1 <- tright
+      eqT <- equalityT
+      return (foldl AppT eqT [tleft1, tright1])
+
 promotedT :: Name -> TypeQ
 promotedT = return . PromotedT
 

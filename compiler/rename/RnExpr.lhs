@@ -10,6 +10,8 @@ general, all of these functions return a renamed thing, and a set of
 free variables.
 
 \begin{code}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
+
 module RnExpr (
         rnLExpr, rnExpr, rnStmts
    ) where
@@ -45,16 +47,6 @@ import Control.Monad
 import TysWiredIn       ( nilDataConName )
 \end{code}
 
-
-\begin{code}
--- XXX
-thenM :: Monad a => a b -> (b -> a c) -> a c
-thenM = (>>=)
-
-thenM_ :: Monad a => a b -> a c -> a c
-thenM_ = (>>)
-\end{code}
-
 %************************************************************************
 %*                                                                      *
 \subsubsection{Expressions}
@@ -66,16 +58,13 @@ rnExprs :: [LHsExpr RdrName] -> RnM ([LHsExpr Name], FreeVars)
 rnExprs ls = rnExprs' ls emptyUniqSet
  where
   rnExprs' [] acc = return ([], acc)
-  rnExprs' (expr:exprs) acc
-   = rnLExpr expr               `thenM` \ (expr', fvExpr) ->
-
+  rnExprs' (expr:exprs) acc =
+   do { (expr', fvExpr) <- rnLExpr expr
         -- Now we do a "seq" on the free vars because typically it's small
         -- or empty, especially in very long lists of constants
-    let
-        acc' = acc `plusFV` fvExpr
-    in
-    acc' `seq` rnExprs' exprs acc' `thenM` \ (exprs', fvExprs) ->
-    return (expr':exprs', fvExprs)
+      ; let  acc' = acc `plusFV` fvExpr
+      ; (exprs', fvExprs) <- acc' `seq` rnExprs' exprs acc'
+      ; return (expr':exprs', fvExprs) }
 \end{code}
 
 Variables. We look up the variable and return the resulting name.
@@ -120,27 +109,25 @@ rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)
 
 rnExpr (HsLit lit@(HsString s))
-  = do {
-         opt_OverloadedStrings <- xoptM Opt_OverloadedStrings
+  = do { opt_OverloadedStrings <- xoptM Opt_OverloadedStrings
        ; if opt_OverloadedStrings then
             rnExpr (HsOverLit (mkHsIsString s placeHolderType))
-         else -- Same as below
-            rnLit lit           `thenM_`
-            return (HsLit lit, emptyFVs)
-       }
+         else do {
+            ; rnLit lit
+            ; return (HsLit lit, emptyFVs) } }
 
 rnExpr (HsLit lit)
-  = rnLit lit           `thenM_`
-    return (HsLit lit, emptyFVs)
+  = do { rnLit lit
+       ; return (HsLit lit, emptyFVs) }
 
 rnExpr (HsOverLit lit)
-  = rnOverLit lit               `thenM` \ (lit', fvs) ->
-    return (HsOverLit lit', fvs)
+  = do { (lit', fvs) <- rnOverLit lit
+       ; return (HsOverLit lit', fvs) }
 
 rnExpr (HsApp fun arg)
-  = rnLExpr fun         `thenM` \ (fun',fvFun) ->
-    rnLExpr arg         `thenM` \ (arg',fvArg) ->
-    return (HsApp fun' arg', fvFun `plusFV` fvArg)
+  = do { (fun',fvFun) <- rnLExpr fun
+       ; (arg',fvArg) <- rnLExpr arg
+       ; return (HsApp fun' arg', fvFun `plusFV` fvArg) }
 
 rnExpr (OpApp e1 (L op_loc (HsVar op_rdr)) _ e2)
   = do  { (e1', fv_e1) <- rnLExpr e1
@@ -163,10 +150,10 @@ rnExpr (OpApp _ other_op _ _)
                    , ptext (sLit "(Probably resulting from a Template Haskell splice)") ])
 
 rnExpr (NegApp e _)
-  = rnLExpr e                   `thenM` \ (e', fv_e) ->
-    lookupSyntaxName negateName `thenM` \ (neg_name, fv_neg) ->
-    mkNegAppRn e' neg_name      `thenM` \ final_e ->
-    return (final_e, fv_e `plusFV` fv_neg)
+  = do { (e', fv_e)         <- rnLExpr e
+       ; (neg_name, fv_neg) <- lookupSyntaxName negateName
+       ; final_e            <- mkNegAppRn e' neg_name
+       ; return (final_e, fv_e `plusFV` fv_neg) }
 
 ------------------------------------------
 -- Template Haskell extensions
@@ -178,10 +165,10 @@ rnExpr (HsSpliceE is_typed splice) = rnSpliceExpr is_typed splice
 
 
 rnExpr (HsQuasiQuoteE qq)
-  = runQuasiQuoteExpr qq        `thenM` \ lexpr' ->
-    -- Wrap the result of the quasi-quoter in parens so that we don't
-    -- lose the outermost location set by runQuasiQuote (#7918) 
-    rnExpr (HsPar lexpr')
+  = do { lexpr' <- runQuasiQuoteExpr qq
+         -- Wrap the result of the quasi-quoter in parens so that we don't
+         -- lose the outermost location set by runQuasiQuote (#7918)
+       ; rnExpr (HsPar lexpr') }
 
 ---------------------------------------------
 --      Sections
@@ -205,33 +192,33 @@ rnExpr expr@(SectionR {})
 
 ---------------------------------------------
 rnExpr (HsCoreAnn ann expr)
-  = rnLExpr expr `thenM` \ (expr', fvs_expr) ->
-    return (HsCoreAnn ann expr', fvs_expr)
+  = do { (expr', fvs_expr) <- rnLExpr expr
+       ; return (HsCoreAnn ann expr', fvs_expr) }
 
 rnExpr (HsSCC lbl expr)
-  = rnLExpr expr                `thenM` \ (expr', fvs_expr) ->
-    return (HsSCC lbl expr', fvs_expr)
+  = do { (expr', fvs_expr) <- rnLExpr expr
+       ; return (HsSCC lbl expr', fvs_expr) }
 rnExpr (HsTickPragma info expr)
-  = rnLExpr expr                `thenM` \ (expr', fvs_expr) ->
-    return (HsTickPragma info expr', fvs_expr)
+  = do { (expr', fvs_expr) <- rnLExpr expr
+       ; return (HsTickPragma info expr', fvs_expr) }
 
 rnExpr (HsLam matches)
-  = rnMatchGroup LambdaExpr rnLExpr matches     `thenM` \ (matches', fvMatch) ->
-    return (HsLam matches', fvMatch)
+  = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches
+       ; return (HsLam matches', fvMatch) }
 
 rnExpr (HsLamCase arg matches)
-  = rnMatchGroup CaseAlt rnLExpr matches        `thenM` \ (matches', fvs_ms) ->
-    return (HsLamCase arg matches', fvs_ms)
+  = do { (matches', fvs_ms) <- rnMatchGroup CaseAlt rnLExpr matches
+       ; return (HsLamCase arg matches', fvs_ms) }
 
 rnExpr (HsCase expr matches)
-  = rnLExpr expr                                `thenM` \ (new_expr, e_fvs) ->
-    rnMatchGroup CaseAlt rnLExpr matches        `thenM` \ (new_matches, ms_fvs) ->
-    return (HsCase new_expr new_matches, e_fvs `plusFV` ms_fvs)
+  = do { (new_expr, e_fvs) <- rnLExpr expr
+       ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLExpr matches
+       ; return (HsCase new_expr new_matches, e_fvs `plusFV` ms_fvs) }
 
 rnExpr (HsLet binds expr)
-  = rnLocalBindsAndThen binds           $ \ binds' ->
-    rnLExpr expr                         `thenM` \ (expr',fvExpr) ->
-    return (HsLet binds' expr', fvExpr)
+  = rnLocalBindsAndThen binds $ \binds' -> do
+      { (expr',fvExpr) <- rnLExpr expr
+      ; return (HsLet binds' expr', fvExpr) }
 
 rnExpr (HsDo do_or_lc stmts _)
   = do  { ((stmts', _), fvs) <- rnStmts do_or_lc rnLExpr stmts (\ _ -> return ((), emptyFVs))
@@ -248,8 +235,8 @@ rnExpr (ExplicitList _ _  exps)
             return  (ExplicitList placeHolderType Nothing exps', fvs) }
 
 rnExpr (ExplicitPArr _ exps)
-  = rnExprs exps                        `thenM` \ (exps', fvs) ->
-    return  (ExplicitPArr placeHolderType exps', fvs)
+  = do { (exps', fvs) <- rnExprs exps
+       ; return  (ExplicitPArr placeHolderType exps', fvs) }
 
 rnExpr (ExplicitTuple tup_args boxity)
   = do { checkTupleSection tup_args
@@ -290,8 +277,8 @@ rnExpr (HsMultiIf ty alts)
        ; return (HsMultiIf ty alts', fvs) }
 
 rnExpr (HsType a)
-  = rnLHsType HsTypeCtx a       `thenM` \ (t, fvT) ->
-    return (HsType t, fvT)
+  = do { (t, fvT) <- rnLHsType HsTypeCtx a
+       ; return (HsType t, fvT) }
 
 rnExpr (ArithSeq _ _ seq)
   = do { opt_OverloadedLists <- xoptM Opt_OverloadedLists
@@ -304,8 +291,8 @@ rnExpr (ArithSeq _ _ seq)
             return (ArithSeq noPostTcExpr Nothing new_seq, fvs) }
 
 rnExpr (PArrSeq _ seq)
-  = rnArithSeq seq       `thenM` \ (new_seq, fvs) ->
-    return (PArrSeq noPostTcExpr new_seq, fvs)
+  = do { (new_seq, fvs) <- rnArithSeq seq
+       ; return (PArrSeq noPostTcExpr new_seq, fvs) }
 \end{code}
 
 These three are pattern syntax appearing in expressions.
@@ -332,9 +319,9 @@ rnExpr e@(ELazyPat {}) = patSynErr e
 \begin{code}
 rnExpr (HsProc pat body)
   = newArrowScope $
-    rnPat ProcExpr pat $ \ pat' ->
-    rnCmdTop body                `thenM` \ (body',fvBody) ->
-    return (HsProc pat' body', fvBody)
+    rnPat ProcExpr pat $ \ pat' -> do
+      { (body',fvBody) <- rnCmdTop body
+      ; return (HsProc pat' body', fvBody) }
 
 -- Ideally, these would be done in parsing, but to keep parsing simple, we do it here.
 rnExpr e@(HsArrApp {})  = arrowFail e
@@ -402,9 +389,9 @@ rnHsRecBinds ctxt rec_binds@(HsRecFields { rec_dotdot = dd })
 rnCmdArgs :: [LHsCmdTop RdrName] -> RnM ([LHsCmdTop Name], FreeVars)
 rnCmdArgs [] = return ([], emptyFVs)
 rnCmdArgs (arg:args)
-  = rnCmdTop arg        `thenM` \ (arg',fvArg) ->
-    rnCmdArgs args      `thenM` \ (args',fvArgs) ->
-    return (arg':args', fvArg `plusFV` fvArgs)
+  = do { (arg',fvArg) <- rnCmdTop arg
+       ; (args',fvArgs) <- rnCmdArgs args
+       ; return (arg':args', fvArg `plusFV` fvArgs) }
 
 rnCmdTop :: LHsCmdTop RdrName -> RnM (LHsCmdTop Name, FreeVars)
 rnCmdTop = wrapLocFstM rnCmdTop'
@@ -425,10 +412,10 @@ rnLCmd = wrapLocFstM rnCmd
 rnCmd :: HsCmd RdrName -> RnM (HsCmd Name, FreeVars)
 
 rnCmd (HsCmdArrApp arrow arg _ ho rtl)
-  = select_arrow_scope (rnLExpr arrow)  `thenM` \ (arrow',fvArrow) ->
-    rnLExpr arg                         `thenM` \ (arg',fvArg) ->
-    return (HsCmdArrApp arrow' arg' placeHolderType ho rtl,
-             fvArrow `plusFV` fvArg)
+  = do { (arrow',fvArrow) <- select_arrow_scope (rnLExpr arrow)
+       ; (arg',fvArg) <- rnLExpr arg
+       ; return (HsCmdArrApp arrow' arg' placeHolderType ho rtl,
+                 fvArrow `plusFV` fvArg) }
   where
     select_arrow_scope tc = case ho of
         HsHigherOrderApp -> tc
@@ -441,42 +428,37 @@ rnCmd (HsCmdArrApp arrow arg _ ho rtl)
 
 -- infix form
 rnCmd (HsCmdArrForm op (Just _) [arg1, arg2])
-  = escapeArrowScope (rnLExpr op)
-                        `thenM` \ (op',fv_op) ->
-    let L _ (HsVar op_name) = op' in
-    rnCmdTop arg1       `thenM` \ (arg1',fv_arg1) ->
-    rnCmdTop arg2       `thenM` \ (arg2',fv_arg2) ->
-
+  = do { (op',fv_op) <- escapeArrowScope (rnLExpr op)
+       ; let L _ (HsVar op_name) = op'
+       ; (arg1',fv_arg1) <- rnCmdTop arg1
+       ; (arg2',fv_arg2) <- rnCmdTop arg2
         -- Deal with fixity
-
-    lookupFixityRn op_name              `thenM` \ fixity ->
-    mkOpFormRn arg1' op' fixity arg2'   `thenM` \ final_e ->
-
-    return (final_e,
-              fv_arg1 `plusFV` fv_op `plusFV` fv_arg2)
+       ; fixity <- lookupFixityRn op_name
+       ; final_e <- mkOpFormRn arg1' op' fixity arg2'
+       ; return (final_e, fv_arg1 `plusFV` fv_op `plusFV` fv_arg2) }
 
 rnCmd (HsCmdArrForm op fixity cmds)
-  = escapeArrowScope (rnLExpr op)       `thenM` \ (op',fvOp) ->
-    rnCmdArgs cmds                      `thenM` \ (cmds',fvCmds) ->
-    return (HsCmdArrForm op' fixity cmds', fvOp `plusFV` fvCmds)
+  = do { (op',fvOp) <- escapeArrowScope (rnLExpr op)
+       ; (cmds',fvCmds) <- rnCmdArgs cmds
+       ; return (HsCmdArrForm op' fixity cmds', fvOp `plusFV` fvCmds) }
 
 rnCmd (HsCmdApp fun arg)
-  = rnLCmd  fun         `thenM` \ (fun',fvFun) ->
-    rnLExpr arg         `thenM` \ (arg',fvArg) ->
-    return (HsCmdApp fun' arg', fvFun `plusFV` fvArg)
+  = do { (fun',fvFun) <- rnLCmd  fun
+       ; (arg',fvArg) <- rnLExpr arg
+       ; return (HsCmdApp fun' arg', fvFun `plusFV` fvArg) }
 
 rnCmd (HsCmdLam matches)
-  = rnMatchGroup LambdaExpr rnLCmd matches     `thenM` \ (matches', fvMatch) ->
-    return (HsCmdLam matches', fvMatch)
+  = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLCmd matches
+       ; return (HsCmdLam matches', fvMatch) }
 
 rnCmd (HsCmdPar e)
   = do  { (e', fvs_e) <- rnLCmd e
         ; return (HsCmdPar e', fvs_e) }
 
 rnCmd (HsCmdCase expr matches)
-  = rnLExpr expr                        `thenM` \ (new_expr, e_fvs) ->
-    rnMatchGroup CaseAlt rnLCmd matches `thenM` \ (new_matches, ms_fvs) ->
-    return (HsCmdCase new_expr new_matches, e_fvs `plusFV` ms_fvs)
+  = do { (new_expr, e_fvs) <- rnLExpr expr
+       ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLCmd matches
+       ; return (HsCmdCase new_expr new_matches, e_fvs `plusFV` ms_fvs) }
 
 rnCmd (HsCmdIf _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
@@ -486,9 +468,9 @@ rnCmd (HsCmdIf _ p b1 b2)
        ; return (HsCmdIf mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
 
 rnCmd (HsCmdLet binds cmd)
-  = rnLocalBindsAndThen binds           $ \ binds' ->
-    rnLCmd cmd                         `thenM` \ (cmd',fvExpr) ->
-    return (HsCmdLet binds' cmd', fvExpr)
+  = rnLocalBindsAndThen binds $ \ binds' -> do
+      { (cmd',fvExpr) <- rnLCmd cmd
+      ; return (HsCmdLet binds' cmd', fvExpr) }
 
 rnCmd (HsCmdDo stmts _)
   = do  { ((stmts', _), fvs) <- rnStmts ArrowExpr rnLCmd stmts (\ _ -> return ((), emptyFVs))
@@ -578,25 +560,25 @@ methodNamesStmt (TransStmt {})                   = emptyFVs
 \begin{code}
 rnArithSeq :: ArithSeqInfo RdrName -> RnM (ArithSeqInfo Name, FreeVars)
 rnArithSeq (From expr)
- = rnLExpr expr         `thenM` \ (expr', fvExpr) ->
-   return (From expr', fvExpr)
+ = do { (expr', fvExpr) <- rnLExpr expr
+      ; return (From expr', fvExpr) }
 
 rnArithSeq (FromThen expr1 expr2)
- = rnLExpr expr1        `thenM` \ (expr1', fvExpr1) ->
-   rnLExpr expr2        `thenM` \ (expr2', fvExpr2) ->
-   return (FromThen expr1' expr2', fvExpr1 `plusFV` fvExpr2)
+ = do { (expr1', fvExpr1) <- rnLExpr expr1
+      ; (expr2', fvExpr2) <- rnLExpr expr2
+      ; return (FromThen expr1' expr2', fvExpr1 `plusFV` fvExpr2) }
 
 rnArithSeq (FromTo expr1 expr2)
- = rnLExpr expr1        `thenM` \ (expr1', fvExpr1) ->
-   rnLExpr expr2        `thenM` \ (expr2', fvExpr2) ->
-   return (FromTo expr1' expr2', fvExpr1 `plusFV` fvExpr2)
+ = do { (expr1', fvExpr1) <- rnLExpr expr1
+      ; (expr2', fvExpr2) <- rnLExpr expr2
+      ; return (FromTo expr1' expr2', fvExpr1 `plusFV` fvExpr2) }
 
 rnArithSeq (FromThenTo expr1 expr2 expr3)
- = rnLExpr expr1        `thenM` \ (expr1', fvExpr1) ->
-   rnLExpr expr2        `thenM` \ (expr2', fvExpr2) ->
-   rnLExpr expr3        `thenM` \ (expr3', fvExpr3) ->
-   return (FromThenTo expr1' expr2' expr3',
-            plusFVs [fvExpr1, fvExpr2, fvExpr3])
+ = do { (expr1', fvExpr1) <- rnLExpr expr1
+      ; (expr2', fvExpr2) <- rnLExpr expr2
+      ; (expr3', fvExpr3) <- rnLExpr expr3
+      ; return (FromThenTo expr1' expr2' expr3',
+                plusFVs [fvExpr1, fvExpr2, fvExpr3]) }
 \end{code}
 
 %************************************************************************
@@ -959,21 +941,19 @@ rn_rec_stmt rnBody _ (L loc (LastStmt body _)) _
                    L loc (LastStmt body' ret_op))] }
 
 rn_rec_stmt rnBody _ (L loc (BodyStmt body _ _ _)) _
-  = rnBody body `thenM` \ (body', fvs) ->
-    lookupSyntaxName thenMName  `thenM` \ (then_op, fvs1) ->
-    return [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
-              L loc (BodyStmt body' then_op noSyntaxExpr placeHolderType))]
+  = do { (body', fvs) <- rnBody body
+       ; (then_op, fvs1) <- lookupSyntaxName thenMName
+       ; return [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
+                 L loc (BodyStmt body' then_op noSyntaxExpr placeHolderType))] }
 
 rn_rec_stmt rnBody _ (L loc (BindStmt pat' body _ _)) fv_pat
-  = rnBody body         `thenM` \ (body', fv_expr) ->
-    lookupSyntaxName bindMName  `thenM` \ (bind_op, fvs1) ->
-    lookupSyntaxName failMName  `thenM` \ (fail_op, fvs2) ->
-    let
-        bndrs = mkNameSet (collectPatBinders pat')
-        fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
-    in
-    return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
-              L loc (BindStmt pat' body' bind_op fail_op))]
+  = do { (body', fv_expr) <- rnBody body
+       ; (bind_op, fvs1) <- lookupSyntaxName bindMName
+       ; (fail_op, fvs2) <- lookupSyntaxName failMName
+       ; let bndrs = mkNameSet (collectPatBinders pat')
+             fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
+       ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
+                  L loc (BindStmt pat' body' bind_op fail_op))] }
 
 rn_rec_stmt _ _ (L _ (LetStmt binds@(HsIPBinds _))) _
   = failWith (badIpBinds (ptext (sLit "an mdo expression")) binds)
@@ -1003,9 +983,9 @@ rn_rec_stmts :: Outputable (body RdrName) =>
              -> [Name]
              -> [(LStmtLR Name RdrName (Located (body RdrName)), FreeVars)]
              -> RnM [Segment (LStmt Name (Located (body Name)))]
-rn_rec_stmts rnBody bndrs stmts =
-    mapM (uncurry (rn_rec_stmt rnBody bndrs)) stmts     `thenM` \ segs_s ->
-    return (concat segs_s)
+rn_rec_stmts rnBody bndrs stmts
+  = do { segs_s <- mapM (uncurry (rn_rec_stmt rnBody bndrs)) stmts
+       ; return (concat segs_s) }
 
 ---------------------------------------------
 segmentRecStmts :: HsStmtContext Name 

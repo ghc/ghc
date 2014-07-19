@@ -107,7 +107,10 @@ EXTERN_INLINE StgWord
 xchg(StgPtr p, StgWord w)
 {
     StgWord result;
-#if i386_HOST_ARCH || x86_64_HOST_ARCH
+#if defined(NOSMP)
+    result = *p;
+    *p = w;
+#elif i386_HOST_ARCH || x86_64_HOST_ARCH
     result = w;
     __asm__ __volatile__ (
         // NB: the xchg instruction is implicitly locked, so we do not
@@ -154,9 +157,6 @@ xchg(StgPtr p, StgWord w)
                           : "r" (w), "r" (p)
                           : "memory"
                           );
-#elif !defined(WITHSMP)
-    result = *p;
-    *p = w;
 #else
 #error xchg() unimplemented on this architecture
 #endif
@@ -170,7 +170,14 @@ xchg(StgPtr p, StgWord w)
 EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
-#if i386_HOST_ARCH || x86_64_HOST_ARCH
+#if defined(NOSMP)
+    StgWord result;
+    result = *p;
+    if (result == o) {
+        *p = n;
+    }
+    return result;
+#elif i386_HOST_ARCH || x86_64_HOST_ARCH
     __asm__ __volatile__ (
  	  "lock\ncmpxchg %3,%1"
           :"=a"(o), "+m" (*(volatile unsigned int *)p)
@@ -224,13 +231,6 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
                 : "r"(p), "r"(o), "r"(n)
                 : "cc","memory");
 
-    return result;
-#elif !defined(WITHSMP)
-    StgWord result;
-    result = *p;
-    if (result == o) {
-        *p = n;
-    }
     return result;
 #else
 #error cas() unimplemented on this architecture
@@ -302,7 +302,9 @@ busy_wait_nop(void)
  */
 EXTERN_INLINE void
 write_barrier(void) {
-#if i386_HOST_ARCH || x86_64_HOST_ARCH
+#if defined(NOSMP)
+    return;
+#elif i386_HOST_ARCH || x86_64_HOST_ARCH
     __asm__ __volatile__ ("" : : : "memory");
 #elif powerpc_HOST_ARCH
     __asm__ __volatile__ ("lwsync" : : : "memory");
@@ -313,8 +315,6 @@ write_barrier(void) {
     __asm__ __volatile__ ("" : : : "memory");
 #elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("dmb  st" : : : "memory");
-#elif !defined(WITHSMP)
-    return;
 #else
 #error memory barriers unimplemented on this architecture
 #endif
@@ -322,7 +322,9 @@ write_barrier(void) {
 
 EXTERN_INLINE void
 store_load_barrier(void) {
-#if i386_HOST_ARCH
+#if defined(NOSMP)
+    return;
+#elif i386_HOST_ARCH
     __asm__ __volatile__ ("lock; addl $0,0(%%esp)" : : : "memory");
 #elif x86_64_HOST_ARCH
     __asm__ __volatile__ ("lock; addq $0,0(%%rsp)" : : : "memory");
@@ -332,8 +334,6 @@ store_load_barrier(void) {
     __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
 #elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("dmb" : : : "memory");
-#elif !defined(WITHSMP)
-    return;
 #else
 #error memory barriers unimplemented on this architecture
 #endif
@@ -341,7 +341,9 @@ store_load_barrier(void) {
 
 EXTERN_INLINE void
 load_load_barrier(void) {
-#if i386_HOST_ARCH
+#if defined(NOSMP)
+    return;
+#elif i386_HOST_ARCH
     __asm__ __volatile__ ("" : : : "memory");
 #elif x86_64_HOST_ARCH
     __asm__ __volatile__ ("" : : : "memory");
@@ -352,8 +354,6 @@ load_load_barrier(void) {
     __asm__ __volatile__ ("" : : : "memory");
 #elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("dmb" : : : "memory");
-#elif !defined(WITHSMP)
-    return;
 #else
 #error memory barriers unimplemented on this architecture
 #endif

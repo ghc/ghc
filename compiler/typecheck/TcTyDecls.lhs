@@ -9,7 +9,8 @@ This stuff is only used for source-code decls; it's recorded in interface
 files for imported data types.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -120,7 +121,7 @@ synTyConsOfType ty
 mkSynEdges :: [LTyClDecl Name] -> [(LTyClDecl Name, Name, [Name])]
 mkSynEdges syn_decls = [ (ldecl, name, nameSetToList fvs)
                        | ldecl@(L _ (SynDecl { tcdLName = L _ name
-                                            , tcdFVs = fvs })) <- syn_decls ]
+                                             , tcdFVs = fvs })) <- syn_decls ]
 
 calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
 calcSynCycles = stronglyConnCompFromEdgedVertices . mkSynEdges
@@ -263,7 +264,7 @@ this for all newtypes, we'd get infinite types.  So we figure out for
 each newtype whether it is "recursive", and add a coercion if so.  In
 effect, we are trying to "cut the loops" by identifying a loop-breaker.
 
-2.  Avoid infinite unboxing.  This is nothing to do with newtypes.
+2.  Avoid infinite unboxing.  This has nothing to do with newtypes.
 Suppose we have
         data T = MkT Int T
         f (MkT x t) = f t
@@ -672,10 +673,10 @@ initialRoleEnv is_boot annots = extendNameEnvList emptyNameEnv .
 
 initialRoleEnv1 :: Bool -> RoleAnnots -> TyCon -> (Name, [Role])
 initialRoleEnv1 is_boot annots_env tc
-  | isFamilyTyCon tc = (name, map (const Nominal) tyvars)
-  |  isAlgTyCon tc
-  || isSynTyCon tc   = (name, default_roles)
-  | otherwise        = pprPanic "initialRoleEnv1" (ppr tc)
+  | isFamilyTyCon tc      = (name, map (const Nominal) tyvars)
+  | isAlgTyCon tc         = (name, default_roles)
+  | isTypeSynonymTyCon tc = (name, default_roles)
+  | otherwise             = pprPanic "initialRoleEnv1" (ppr tc)
   where name         = tyConName tc
         tyvars       = tyConTyVars tc
         (kvs, tvs)   = span isKindVar tyvars

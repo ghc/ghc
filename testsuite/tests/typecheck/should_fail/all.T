@@ -331,3 +331,8 @@ test('T8570', extra_clean(['T85570a.o', 'T8570a.hi','T85570b.o', 'T8570b.hi']),
 test('T8603', normal, compile_fail, [''])
 test('T8806', normal, compile_fail, [''])
 test('T8912', normal, compile_fail, [''])
+test('T9033', normal, compile_fail, [''])
+test('T8883', normal, compile_fail, [''])
+test('T9196', normal, compile_fail, [''])
+test('T9305', normal, compile_fail, [''])
+test('T9323', normal, compile_fail, [''])

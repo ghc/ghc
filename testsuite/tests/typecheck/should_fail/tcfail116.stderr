@@ -1,6 +1,6 @@
 
 tcfail116.hs:5:1:
     The class method ‘bug’
-    mentions none of the type variables of the class Foo a
+    mentions none of the type or kind variables of the class ‘Foo a’
     When checking the class method: bug :: ()
     In the class declaration for ‘Foo’

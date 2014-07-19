@@ -22,11 +22,12 @@ module Outputable (
         char,
         text, ftext, ptext, ztext,
         int, intWithCommas, integer, float, double, rational,
-        parens, cparen, brackets, braces, quotes, quote, 
+        parens, cparen, brackets, braces, quotes, quote,
         doubleQuotes, angleBrackets, paBrackets,
-        semi, comma, colon, dcolon, space, equals, dot, arrow, darrow,
+        semi, comma, colon, dcolon, space, equals, dot,
+        arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
-        blankLine,
+        blankLine, forAllLit,
         (<>), (<+>), hcat, hsep,
         ($$), ($+$), vcat,
         sep, cat,
@@ -73,7 +74,7 @@ module Outputable (
 
 import {-# SOURCE #-}   DynFlags( DynFlags,
                                   targetPlatform, pprUserLength, pprCols,
-                                  useUnicodeQuotes,
+                                  useUnicode, useUnicodeSyntax,
                                   unsafeGlobalDynFlags )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
@@ -458,7 +459,7 @@ cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
 -- so that we don't get `foo''.  Instead we just have foo'.
 quotes d =
       sdocWithDynFlags $ \dflags ->
-      if useUnicodeQuotes dflags
+      if useUnicode dflags
       then char '‘' <> d <> char '’'
       else SDoc $ \sty ->
            let pp_d = runSDoc d sty
@@ -468,13 +469,19 @@ quotes d =
              ('\'' : _, _)       -> pp_d
              _other              -> Pretty.quotes pp_d
 
-semi, comma, colon, equals, space, dcolon, arrow, underscore, dot :: SDoc
-darrow, lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
+semi, comma, colon, equals, space, dcolon, underscore, dot :: SDoc
+arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
+lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
 blankLine  = docToSDoc $ Pretty.ptext (sLit "")
-dcolon     = docToSDoc $ Pretty.ptext (sLit "::")
-arrow      = docToSDoc $ Pretty.ptext (sLit "->")
-darrow     = docToSDoc $ Pretty.ptext (sLit "=>")
+dcolon     = unicodeSyntax (char '∷') (docToSDoc $ Pretty.ptext (sLit "::"))
+arrow      = unicodeSyntax (char '→') (docToSDoc $ Pretty.ptext (sLit "->"))
+larrow     = unicodeSyntax (char '←') (docToSDoc $ Pretty.ptext (sLit "<-"))
+darrow     = unicodeSyntax (char '⇒') (docToSDoc $ Pretty.ptext (sLit "=>"))
+arrowt     = unicodeSyntax (char '↣') (docToSDoc $ Pretty.ptext (sLit ">-"))
+larrowt    = unicodeSyntax (char '↢') (docToSDoc $ Pretty.ptext (sLit "-<"))
+arrowtt    = unicodeSyntax (char '⤜') (docToSDoc $ Pretty.ptext (sLit ">>-"))
+larrowtt   = unicodeSyntax (char '⤛') (docToSDoc $ Pretty.ptext (sLit "-<<"))
 semi       = docToSDoc $ Pretty.semi
 comma      = docToSDoc $ Pretty.comma
 colon      = docToSDoc $ Pretty.colon
@@ -488,6 +495,15 @@ lbrack     = docToSDoc $ Pretty.lbrack
 rbrack     = docToSDoc $ Pretty.rbrack
 lbrace     = docToSDoc $ Pretty.lbrace
 rbrace     = docToSDoc $ Pretty.rbrace
+
+forAllLit :: SDoc
+forAllLit = unicodeSyntax (char '∀') (ptext (sLit "forall"))
+
+unicodeSyntax :: SDoc -> SDoc -> SDoc
+unicodeSyntax unicode plain = sdocWithDynFlags $ \dflags ->
+    if useUnicode dflags && useUnicodeSyntax dflags
+    then unicode
+    else plain
 
 nest :: Int -> SDoc -> SDoc
 -- ^ Indent 'SDoc' some specified amount

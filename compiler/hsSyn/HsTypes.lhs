@@ -35,7 +35,7 @@ module HsTypes (
         splitHsAppTys, hsTyGetAppHead_maybe, mkHsAppTys, mkHsOpTy,
 
         -- Printing
-        pprParendHsType, pprHsForAll, pprHsContext, pprHsContextNoArrow, ppr_hs_context,
+        pprParendHsType, pprHsForAll, pprHsContext, pprHsContextNoArrow, 
     ) where
 
 import {-# SOURCE #-} HsExpr ( HsSplice, pprUntypedSplice )
@@ -45,6 +45,7 @@ import HsLit
 import Name( Name )
 import RdrName( RdrName )
 import DataCon( HsBang(..) )
+import TysPrim( funTyConName )
 import Type
 import HsDoc
 import BasicTypes
@@ -162,7 +163,7 @@ mkHsWithBndrs x = HsWB { hswb_cts = x, hswb_kvs = panic "mkHsTyWithBndrs:kvs"
                                      , hswb_tvs = panic "mkHsTyWithBndrs:tvs" }
 
 
--- | These names are used eary on to store the names of implicit
+-- | These names are used early on to store the names of implicit
 -- parameters.  They completely disappear after type-checking.
 newtype HsIPName = HsIPName FastString-- ?x
   deriving( Eq, Data, Typeable )
@@ -506,15 +507,31 @@ splitLHsClassTy_maybe ty
         HsKindSig ty _     -> checkl ty args
         _                  -> Nothing
 
--- Splits HsType into the (init, last) parts
+-- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
 -- Breaks up any parens in the result type: 
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
-splitHsFunType :: LHsType name -> ([LHsType name], LHsType name)
-splitHsFunType (L _ (HsFunTy x y)) = (x:args, res)
-  where
-  (args, res) = splitHsFunType y
-splitHsFunType (L _ (HsParTy ty))  = splitHsFunType ty
-splitHsFunType other               = ([], other)
+-- Also deals with (->) t1 t2; that is why it only works on LHsType Name
+--   (see Trac #9096)
+splitHsFunType :: LHsType Name -> ([LHsType Name], LHsType Name)
+splitHsFunType (L _ (HsParTy ty)) 
+  = splitHsFunType ty
+
+splitHsFunType (L _ (HsFunTy x y))
+  | (args, res) <- splitHsFunType y
+  = (x:args, res)
+
+splitHsFunType orig_ty@(L _ (HsAppTy t1 t2)) 
+  = go t1 [t2]
+  where  -- Look for (->) t1 t2, possibly with parenthesisation
+    go (L _ (HsTyVar fn))    tys | fn == funTyConName
+                                 , [t1,t2] <- tys
+                                 , (args, res) <- splitHsFunType t2
+                                 = (t1:args, res)
+    go (L _ (HsAppTy t1 t2)) tys = go t1 (t2:tys)
+    go (L _ (HsParTy ty))    tys = go ty tys
+    go _                     _   = ([], orig_ty)  -- Failure to match
+
+splitHsFunType other = ([], other)
 \end{code}
 
 
@@ -550,7 +567,7 @@ pprHsForAll exp qtvs cxt
     show_forall =  opt_PprStyle_Debug
                 || (not (null (hsQTvBndrs qtvs)) && is_explicit)
     is_explicit = case exp of {Explicit -> True; Implicit -> False}
-    forall_part = ptext (sLit "forall") <+> ppr qtvs <> dot
+    forall_part = forAllLit <+> ppr qtvs <> dot
 
 pprHsContext :: (OutputableBndr name) => HsContext name -> SDoc
 pprHsContext []  = empty
@@ -558,12 +575,8 @@ pprHsContext cxt = pprHsContextNoArrow cxt <+> darrow
 
 pprHsContextNoArrow :: (OutputableBndr name) => HsContext name -> SDoc
 pprHsContextNoArrow []         = empty
-pprHsContextNoArrow [L _ pred] = ppr pred
-pprHsContextNoArrow cxt        = ppr_hs_context cxt
-
-ppr_hs_context :: (OutputableBndr name) => HsContext name -> SDoc
-ppr_hs_context []  = empty
-ppr_hs_context cxt = parens (interpp'SP cxt)
+pprHsContextNoArrow [L _ pred] = ppr_mono_ty FunPrec pred
+pprHsContextNoArrow cxt        = parens (interpp'SP cxt)
 
 pprConDeclFields :: OutputableBndr name => [ConDeclField name] -> SDoc
 pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
@@ -585,27 +598,12 @@ and the problem doesn't show up; but having the flag on a KindedTyVar
 seems like the Right Thing anyway.)
 
 \begin{code}
-pREC_TOP, pREC_FUN, pREC_OP, pREC_CON :: Int
-pREC_TOP = 0  -- type   in ParseIface.y
-pREC_FUN = 1  -- btype  in ParseIface.y
-              -- Used for LH arg of (->)
-pREC_OP  = 2  -- Used for arg of any infix operator
-              -- (we don't keep their fixities around)
-pREC_CON = 3  -- Used for arg of type applicn:
-              -- always parenthesise unless atomic
-
-maybeParen :: Int       -- Precedence of context
-           -> Int       -- Precedence of top-level operator
-           -> SDoc -> SDoc      -- Wrap in parens if (ctxt >= op)
-maybeParen ctxt_prec op_prec p | ctxt_prec >= op_prec = parens p
-                               | otherwise            = p
-        
--- printing works more-or-less as for Types
+-- Printing works more-or-less as for Types
 
 pprHsType, pprParendHsType :: (OutputableBndr name) => HsType name -> SDoc
 
-pprHsType ty       = getPprStyle $ \sty -> ppr_mono_ty pREC_TOP (prepare sty ty)
-pprParendHsType ty = ppr_mono_ty pREC_CON ty
+pprHsType ty       = getPprStyle $ \sty -> ppr_mono_ty TopPrec (prepare sty ty)
+pprParendHsType ty = ppr_mono_ty TyConPrec ty
 
 -- Before printing a type
 -- (a) Remove outermost HsParTy parens
@@ -615,15 +613,15 @@ prepare :: PprStyle -> HsType name -> HsType name
 prepare sty (HsParTy ty)          = prepare sty (unLoc ty)
 prepare _   ty                    = ty
 
-ppr_mono_lty :: (OutputableBndr name) => Int -> LHsType name -> SDoc
+ppr_mono_lty :: (OutputableBndr name) => TyPrec -> LHsType name -> SDoc
 ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
 
-ppr_mono_ty :: (OutputableBndr name) => Int -> HsType name -> SDoc
+ppr_mono_ty :: (OutputableBndr name) => TyPrec -> HsType name -> SDoc
 ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
-  = maybeParen ctxt_prec pREC_FUN $
-    sep [pprHsForAll exp tvs ctxt, ppr_mono_lty pREC_TOP ty]
+  = maybeParen ctxt_prec FunPrec $
+    sep [pprHsForAll exp tvs ctxt, ppr_mono_lty TopPrec ty]
 
-ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr_mono_lty pREC_CON ty
+ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr_mono_lty TyConPrec ty
 ppr_mono_ty _    (HsQuasiQuoteTy qq) = ppr qq
 ppr_mono_ty _    (HsRecTy flds)      = pprConDeclFields flds
 ppr_mono_ty _    (HsTyVar name)      = pprPrefixOcc name
@@ -632,10 +630,10 @@ ppr_mono_ty _    (HsTupleTy con tys) = tupleParens std_con (interpp'SP tys)
   where std_con = case con of
                     HsUnboxedTuple -> UnboxedTuple
                     _              -> BoxedTuple
-ppr_mono_ty _    (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcolon <+> ppr kind)
-ppr_mono_ty _    (HsListTy ty)       = brackets (ppr_mono_lty pREC_TOP ty)
-ppr_mono_ty _    (HsPArrTy ty)       = paBrackets (ppr_mono_lty pREC_TOP ty)
-ppr_mono_ty prec (HsIParamTy n ty)   = maybeParen prec pREC_FUN (ppr n <+> dcolon <+> ppr_mono_lty pREC_TOP ty)
+ppr_mono_ty _    (HsKindSig ty kind) = parens (ppr_mono_lty TopPrec ty <+> dcolon <+> ppr kind)
+ppr_mono_ty _    (HsListTy ty)       = brackets (ppr_mono_lty TopPrec ty)
+ppr_mono_ty _    (HsPArrTy ty)       = paBrackets (ppr_mono_lty TopPrec ty)
+ppr_mono_ty prec (HsIParamTy n ty)   = maybeParen prec FunPrec (ppr n <+> dcolon <+> ppr_mono_lty TopPrec ty)
 ppr_mono_ty _    (HsSpliceTy s _)    = pprUntypedSplice s
 ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
 ppr_mono_ty _    (HsExplicitListTy _ tys) = quote $ brackets (interpp'SP tys)
@@ -651,45 +649,45 @@ ppr_mono_ty ctxt_prec (HsWrapTy (WpKiApps _kis) ty)
   where
     go ctxt_prec [] ty = ppr_mono_ty ctxt_prec ty
     go ctxt_prec (ki:kis) ty
-      = maybeParen ctxt_prec pREC_CON $
-        hsep [ go pREC_FUN kis ty
+      = maybeParen ctxt_prec TyConPrec $
+        hsep [ go FunPrec kis ty
              , ptext (sLit "@") <> pprParendKind ki ]
 -}
 
 ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2)
-  = maybeParen ctxt_prec pREC_OP $
-    ppr_mono_lty pREC_OP ty1 <+> char '~' <+> ppr_mono_lty pREC_OP ty2
+  = maybeParen ctxt_prec TyOpPrec $
+    ppr_mono_lty TyOpPrec ty1 <+> char '~' <+> ppr_mono_lty TyOpPrec ty2
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
-  = maybeParen ctxt_prec pREC_CON $
-    hsep [ppr_mono_lty pREC_FUN fun_ty, ppr_mono_lty pREC_CON arg_ty]
+  = maybeParen ctxt_prec TyConPrec $
+    hsep [ppr_mono_lty FunPrec fun_ty, ppr_mono_lty TyConPrec arg_ty]
 
 ppr_mono_ty ctxt_prec (HsOpTy ty1 (_wrapper, L _ op) ty2)
-  = maybeParen ctxt_prec pREC_OP $
-    sep [ ppr_mono_lty pREC_OP ty1
-        , sep [pprInfixOcc op, ppr_mono_lty pREC_OP ty2 ] ]
+  = maybeParen ctxt_prec TyOpPrec $
+    sep [ ppr_mono_lty TyOpPrec ty1
+        , sep [pprInfixOcc op, ppr_mono_lty TyOpPrec ty2 ] ]
     -- Don't print the wrapper (= kind applications)
     -- c.f. HsWrapTy
 
 ppr_mono_ty _         (HsParTy ty)
-  = parens (ppr_mono_lty pREC_TOP ty)
+  = parens (ppr_mono_lty TopPrec ty)
   -- Put the parens in where the user did
   -- But we still use the precedence stuff to add parens because
   --    toHsType doesn't put in any HsParTys, so we may still need them
 
 ppr_mono_ty ctxt_prec (HsDocTy ty doc) 
-  = maybeParen ctxt_prec pREC_OP $
-    ppr_mono_lty pREC_OP ty <+> ppr (unLoc doc)
+  = maybeParen ctxt_prec TyOpPrec $
+    ppr_mono_lty TyOpPrec ty <+> ppr (unLoc doc)
   -- we pretty print Haddock comments on types as if they were
   -- postfix operators
 
 --------------------------
-ppr_fun_ty :: (OutputableBndr name) => Int -> LHsType name -> LHsType name -> SDoc
+ppr_fun_ty :: (OutputableBndr name) => TyPrec -> LHsType name -> LHsType name -> SDoc
 ppr_fun_ty ctxt_prec ty1 ty2
-  = let p1 = ppr_mono_lty pREC_FUN ty1
-        p2 = ppr_mono_lty pREC_TOP ty2
+  = let p1 = ppr_mono_lty FunPrec ty1
+        p2 = ppr_mono_lty TopPrec ty2
     in
-    maybeParen ctxt_prec pREC_FUN $
+    maybeParen ctxt_prec FunPrec $
     sep [p1, ptext (sLit "->") <+> p2]
 
 --------------------------

@@ -1781,6 +1781,12 @@ computeRetainerSet( void )
     //
     // The following code assumes that WEAK objects are considered to be roots
     // for retainer profilng.
+    for (n = 0; n < n_capabilities; n++) {
+        // NB: after a GC, all nursery weak_ptr_lists have been migrated
+        // to the global lists living in the generations
+        ASSERT(capabilities[n]->weak_ptr_list_hd == NULL);
+        ASSERT(capabilities[n]->weak_ptr_list_tl == NULL);
+    }
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         for (weak = generations[g].weak_ptr_list; weak != NULL; weak = weak->link) {
             // retainRoot((StgClosure *)weak);

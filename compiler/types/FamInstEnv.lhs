@@ -5,13 +5,12 @@
 FamInstEnv: Type checked family instance declarations
 
 \begin{code}
-
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE CPP, GADTs #-}
 
 module FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
-        pprFamInst, pprFamInstHdr, pprFamInsts,
+        pprFamInst, pprFamInsts,
         mkImportedFamInst,
 
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
@@ -167,12 +166,13 @@ instance Outputable FamInst where
    ppr = pprFamInst
 
 -- Prints the FamInst as a family instance declaration
+-- NB: FamInstEnv.pprFamInst is used only for internal, debug printing
+--     See pprTyThing.pprFamInst for printing for the user
 pprFamInst :: FamInst -> SDoc
 pprFamInst famInst
   = hang (pprFamInstHdr famInst)
        2 (vcat [ ifPprDebug (ptext (sLit "Coercion axiom:") <+> ppr ax)
-               , ifPprDebug (ptext (sLit "RHS:") <+> ppr (famInstRHS famInst))
-               , ptext (sLit "--") <+> pprDefinedAt (getName famInst)])
+               , ifPprDebug (ptext (sLit "RHS:") <+> ppr (famInstRHS famInst)) ])
   where
     ax = fi_axiom famInst
 
@@ -199,6 +199,9 @@ pprFamInstHdr fi@(FamInst {fi_flavor = flavor})
               else pprTypeApp fam_tc (etad_lhs_tys ++ mkTyVarTys extra_tvs)
                      -- Without -dppr-debug, eta-expand
                      -- See Trac #8674
+                     -- (This is probably over the top now that we use this
+                     --  only for internal debug printing; PprTyThing.pprFamInst
+                     --  is used for user-level printing.)
             | otherwise
             = vanilla_pp_head
 

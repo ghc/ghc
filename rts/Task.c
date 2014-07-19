@@ -39,7 +39,7 @@ static Task * allocTask (void);
 static Task * newTask   (rtsBool);
 
 #if defined(THREADED_RTS)
-static Mutex all_tasks_mutex;
+Mutex all_tasks_mutex;
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -350,6 +350,20 @@ discardTasksExcept (Task *keep)
         next = task->all_next;
         if (task != keep) {
             debugTrace(DEBUG_sched, "discarding task %" FMT_SizeT "", (size_t)TASK_ID(task));
+#if defined(THREADED_RTS)
+            // It is possible that some of these tasks are currently blocked
+            // (in the parent process) either on their condition variable
+            // `cond` or on their mutex `lock`. If they are we may deadlock
+            // when `freeTask` attempts to call `closeCondition` or
+            // `closeMutex` (the behaviour of these functions is documented to
+            // be undefined in the case that there are threads blocked on
+            // them). To avoid this, we re-initialize both the condition
+            // variable and the mutex before calling `freeTask` (we do
+            // precisely the same for all global locks in `forkProcess`).
+            initCondition(&task->cond);
+            initMutex(&task->lock);
+#endif
+
             // Note that we do not traceTaskDelete here because
             // we are not really deleting a task.
             // The OS threads for all these tasks do not exist in

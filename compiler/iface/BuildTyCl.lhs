@@ -4,7 +4,8 @@
 %
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -15,7 +16,7 @@ module BuildTyCl (
         buildSynTyCon,
         buildAlgTyCon, 
         buildDataCon,
-        buildPatSyn, mkPatSynMatcherId, mkPatSynWrapperId,
+        buildPatSyn,
         TcMethInfo, buildClass,
         distinctAbstractTyConRhs, totallyAbstractTyConRhs,
         mkNewTyConRhs, mkDataTyConRhs, 
@@ -36,10 +37,9 @@ import MkId
 import Class
 import TyCon
 import Type
-import TypeRep
-import TcType
 import Id
 import Coercion
+import TcType
 
 import DynFlags
 import TcRnMonad
@@ -184,67 +184,34 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 
 
 ------------------------------------------------------
-buildPatSyn :: Name -> Bool -> Bool
-            -> [Var]
+buildPatSyn :: Name -> Bool
+            -> Id -> Maybe Id
+            -> [Type]
             -> [TyVar] -> [TyVar]     -- Univ and ext
             -> ThetaType -> ThetaType -- Prov and req
             -> Type                  -- Result type
-            -> TyVar
-            -> TcRnIf m n PatSyn
-buildPatSyn src_name declared_infix has_wrapper args univ_tvs ex_tvs prov_theta req_theta pat_ty tv
-  = do	{ (matcher, _, _) <- mkPatSynMatcherId src_name args
-                                              univ_tvs ex_tvs
-                                              prov_theta req_theta
-                                              pat_ty tv
-        ; wrapper <- case has_wrapper of
-            False -> return Nothing
-            True -> fmap Just $
-                    mkPatSynWrapperId src_name args
-                                      (univ_tvs ++ ex_tvs) (prov_theta ++ req_theta)
-                                      pat_ty
-        ; return $ mkPatSyn src_name declared_infix
-                            args
-                            univ_tvs ex_tvs
-                            prov_theta req_theta
-                            pat_ty
-                            matcher
-                            wrapper }
-
-mkPatSynMatcherId :: Name
-                  -> [Var]
-                  -> [TyVar]
-                  -> [TyVar]
-                  -> ThetaType -> ThetaType
-                  -> Type
-                  -> TyVar
-                  -> TcRnIf n m (Id, Type, Type)
-mkPatSynMatcherId name args univ_tvs ex_tvs prov_theta req_theta pat_ty res_tv
-  = do { matcher_name <- newImplicitBinder name mkMatcherOcc
-
-       ; let res_ty = TyVarTy res_tv
-             cont_ty = mkSigmaTy ex_tvs prov_theta $
-                       mkFunTys (map varType args) res_ty
-
-       ; let matcher_tau = mkFunTys [pat_ty, cont_ty, res_ty] res_ty
-             matcher_sigma = mkSigmaTy (res_tv:univ_tvs) req_theta matcher_tau
-             matcher_id = mkVanillaGlobal matcher_name matcher_sigma
-       ; return (matcher_id, res_ty, cont_ty) }
-
-mkPatSynWrapperId :: Name
-                  -> [Var]
-                  -> [TyVar]
-                  -> ThetaType
-                  -> Type
-                  -> TcRnIf n m Id
-mkPatSynWrapperId name args qtvs theta pat_ty
-  = do { wrapper_name <- newImplicitBinder name mkDataConWrapperOcc
-
-       ; let wrapper_tau = mkFunTys (map varType args) pat_ty
-             wrapper_sigma = mkSigmaTy qtvs theta wrapper_tau
-
-       ; let wrapper_id = mkVanillaGlobal wrapper_name wrapper_sigma
-       ; return wrapper_id }
-
+            -> PatSyn
+buildPatSyn src_name declared_infix matcher wrapper
+            args univ_tvs ex_tvs prov_theta req_theta pat_ty
+  = ASSERT((and [ univ_tvs == univ_tvs'
+                , ex_tvs == ex_tvs'
+                , pat_ty `eqType` pat_ty'
+                , prov_theta `eqTypes` prov_theta'
+                , req_theta `eqTypes` req_theta'
+                , args `eqTypes` args'
+                ]))
+    mkPatSyn src_name declared_infix
+             args
+             univ_tvs ex_tvs
+             prov_theta req_theta
+             pat_ty
+             matcher
+             wrapper
+  where
+    ((_:univ_tvs'), req_theta', tau) = tcSplitSigmaTy $ idType matcher
+    ([pat_ty', cont_sigma, _], _) = tcSplitFunTys tau
+    (ex_tvs', prov_theta', cont_tau) = tcSplitSigmaTy cont_sigma
+    (args', _) = tcSplitFunTys cont_tau
 \end{code}
 
 
@@ -254,10 +221,7 @@ type TcMethInfo = (Name, DefMethSpec, Type)
         -- A temporary intermediate, to communicate between 
         -- tcClassSigs and buildClass.
 
-buildClass :: Bool		-- True <=> do not include unfoldings 
-				--	    on dict selectors
-				-- Used when importing a class without -O
-	   -> Name -> [TyVar] -> [Role] -> ThetaType
+buildClass :: Name -> [TyVar] -> [Role] -> ThetaType
 	   -> [FunDep TyVar]		   -- Functional dependencies
 	   -> [ClassATItem]		   -- Associated types
 	   -> [TcMethInfo]                 -- Method info
@@ -265,10 +229,9 @@ buildClass :: Bool		-- True <=> do not include unfoldings
 	   -> RecFlag			   -- Info for type constructor
 	   -> TcRnIf m n Class
 
-buildClass no_unf tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
+buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
   = fixM  $ \ rec_clas -> 	-- Only name generation inside loop
     do	{ traceIf (text "buildClass")
-        ; dflags <- getDynFlags
 
 	; datacon_name <- newImplicitBinder tycon_name mkClassDataConOcc
 		-- The class name is the 'parent' for this datacon, not its tycon,
@@ -282,7 +245,7 @@ buildClass no_unf tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc
 	      -- Make selectors for the superclasses 
 	; sc_sel_names <- mapM  (newImplicitBinder tycon_name . mkSuperDictSelOcc) 
 				[1..length sc_theta]
-        ; let sc_sel_ids = [ mkDictSelId dflags no_unf sc_name rec_clas 
+        ; let sc_sel_ids = [ mkDictSelId sc_name rec_clas 
                            | sc_name <- sc_sel_names]
 	      -- We number off the Dict superclass selectors, 1, 2, 3 etc so that we 
 	      -- can construct names for the selectors. Thus
@@ -348,14 +311,13 @@ buildClass no_unf tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc
   where
     mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
     mk_op_item rec_clas (op_name, dm_spec, _) 
-      = do { dflags <- getDynFlags
-           ; dm_info <- case dm_spec of
+      = do { dm_info <- case dm_spec of
                           NoDM      -> return NoDefMeth
                           GenericDM -> do { dm_name <- newImplicitBinder op_name mkGenDefMethodOcc
 			  	          ; return (GenDefMeth dm_name) }
                           VanillaDM -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
 			  	          ; return (DefMeth dm_name) }
-           ; return (mkDictSelId dflags no_unf op_name rec_clas, dm_info) }
+           ; return (mkDictSelId op_name rec_clas, dm_info) }
 \end{code}
 
 Note [Class newtypes and equality predicates]

@@ -7,6 +7,8 @@
 -----------------------------------------------------------------------------
 
 \begin{code}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
+
 module SysTools (
         -- Initialisation
         initSysTools,
@@ -233,6 +235,8 @@ initSysTools mbMinusB
        -- to make that possible, so for now you can't.
        gcc_prog <- getSetting "C compiler command"
        gcc_args_str <- getSetting "C compiler flags"
+       cpp_prog <- getSetting "Haskell CPP command"
+       cpp_args_str <- getSetting "Haskell CPP flags"
        let unreg_gcc_args = if targetUnregisterised
                             then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
                             else []
@@ -241,6 +245,7 @@ initSysTools mbMinusB
             | mkTablesNextToCode targetUnregisterised
                = ["-DTABLES_NEXT_TO_CODE"]
             | otherwise = []
+           cpp_args= map Option (words cpp_args_str)
            gcc_args = map Option (words gcc_args_str
                                ++ unreg_gcc_args
                                ++ tntc_gcc_args)
@@ -283,10 +288,7 @@ initSysTools mbMinusB
        -- cpp is derived from gcc on all platforms
        -- HACK, see setPgmP below. We keep 'words' here to remember to fix
        -- Config.hs one day.
-       let cpp_prog  = gcc_prog
-           cpp_args  = Option "-E"
-                     : map Option (words cRAWCPP_FLAGS)
-                    ++ gcc_args
+
 
        -- Other things being equal, as and ld are simply gcc
        gcc_link_args_str <- getSetting "C compiler link flags"
@@ -727,7 +729,7 @@ getLinkerInfo' dflags = do
                  -- that doesn't support --version. We can just assume that's
                  -- what we're using.
                  return $ DarwinLD []
-               OSiOS -> 
+               OSiOS ->
                  -- Ditto for iOS
                  return $ DarwinLD []
                OSMinGW32 ->
@@ -786,12 +788,15 @@ getCompilerInfo' dflags = do
         -- Regular clang
         | any ("clang version" `isPrefixOf`) stde =
           return Clang
+        -- XCode 5.1 clang
+        | any ("Apple LLVM version 5.1" `isPrefixOf`) stde =
+          return AppleClang51
         -- XCode 5 clang
         | any ("Apple LLVM version" `isPrefixOf`) stde =
-          return Clang
+          return AppleClang
         -- XCode 4.1 clang
         | any ("Apple clang version" `isPrefixOf`) stde =
-          return Clang
+          return AppleClang
          -- Unknown linker.
         | otherwise = fail "invalid -v output, or compiler is unsupported"
 

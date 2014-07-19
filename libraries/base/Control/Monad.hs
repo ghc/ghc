@@ -74,6 +74,9 @@ module Control.Monad
 
     , ap
 
+    -- ** Strict monadic functions
+
+    , (<$!>)
     ) where
 
 import Data.Maybe
@@ -310,6 +313,18 @@ is equivalent to
 
 ap                :: (Monad m) => m (a -> b) -> m a -> m b
 ap                =  liftM2 id
+
+infixl 4 <$!>
+
+-- | Strict version of 'Data.Functor.<$>'.
+--
+-- /Since: 4.7.1.0/
+(<$!>) :: Monad m => (a -> b) -> m a -> m b
+{-# INLINE (<$!>) #-}
+f <$!> m = do
+  x <- m
+  let z = f x
+  z `seq` return z
 
 
 -- -----------------------------------------------------------------------------

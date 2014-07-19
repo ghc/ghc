@@ -888,6 +888,8 @@ labelDynamic dflags this_pkg this_mod lbl =
 
    PlainModuleInitLabel m -> not (gopt Opt_Static dflags) && this_pkg /= (modulePackageId m)
 
+   HpcTicksLabel m        -> not (gopt Opt_Static dflags) && this_pkg /= (modulePackageId m)
+
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _                 -> False
   where os = platformOS (targetPlatform dflags)

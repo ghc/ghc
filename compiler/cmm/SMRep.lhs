@@ -6,7 +6,7 @@
 Storage manager representation of closures
 
 \begin{code}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP,GeneralizedNewtypeDeriving #-}
 
 module SMRep (
         -- * Words and bytes

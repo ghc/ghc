@@ -3,7 +3,8 @@ T2693.hs:11:7:
     Couldn't match expected type ‘TFn a’ with actual type ‘TFn a0’
     NB: ‘TFn’ is a type function, and may not be injective
     The type variable ‘a0’ is ambiguous
-    When checking that ‘x’ has the inferred type ‘forall a. TFn a’
+    When checking that ‘x’ has the inferred type
+      x :: forall a. TFn a
     Probable cause: the inferred type is ambiguous
     In the expression:
       do { let Just x = ...;

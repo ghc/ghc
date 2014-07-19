@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 
 module CodeGen.Platform.X86_64 where
 

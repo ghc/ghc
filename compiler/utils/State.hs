@@ -1,3 +1,4 @@
+{-# LANGUAGE UnboxedTuples #-}
 
 module State (module State, mapAccumLM {- XXX hack -}) where
 

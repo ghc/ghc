@@ -2,6 +2,6 @@
 mod73.hs:3:7:
     Not in scope: ‘Prelude.g’
     Perhaps you meant one of these:
-      ‘Prelude.id’ (imported from Prelude),
-      ‘Prelude.log’ (imported from Prelude),
-      ‘Prelude.pi’ (imported from Prelude)
+      data constructor ‘Prelude.LT’ (imported from Prelude),
+      data constructor ‘Prelude.EQ’ (imported from Prelude),
+      data constructor ‘Prelude.GT’ (imported from Prelude)

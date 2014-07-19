@@ -11,6 +11,7 @@
 module GHC.Event
     ( -- * Types
       EventManager
+    , TimerManager
 
       -- * Creation
     , getSystemEventManager
@@ -39,6 +40,6 @@ module GHC.Event
 
 import GHC.Event.Manager
 import GHC.Event.TimerManager (TimeoutCallback, TimeoutKey, registerTimeout,
-                               updateTimeout, unregisterTimeout)
+                               updateTimeout, unregisterTimeout, TimerManager)
 import GHC.Event.Thread (getSystemEventManager, getSystemTimerManager)
 

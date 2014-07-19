@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternGuards, CPP, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004-2009.
@@ -114,6 +114,7 @@ data Flag
   | FlagForce
   | FlagForceFiles
   | FlagAutoGHCiLibs
+  | FlagMultiInstance
   | FlagExpandEnvVars
   | FlagExpandPkgroot
   | FlagNoExpandPkgroot
@@ -146,6 +147,8 @@ flags = [
          "ignore missing directories and libraries only",
   Option ['g'] ["auto-ghci-libs"] (NoArg FlagAutoGHCiLibs)
         "automatically build libs for GHCi (with register)",
+  Option [] ["enable-multi-instance"] (NoArg FlagMultiInstance)
+        "allow registering multiple instances of the same package version",
   Option [] ["expand-env-vars"] (NoArg FlagExpandEnvVars)
         "expand environment variables (${name}-style) in input package descriptions",
   Option [] ["expand-pkgroot"] (NoArg FlagExpandPkgroot)
@@ -309,6 +312,7 @@ runit verbosity cli nonopts = do
           | FlagForceFiles `elem` cli   = ForceFiles
           | otherwise                   = NoForce
         auto_ghci_libs = FlagAutoGHCiLibs `elem` cli
+        multi_instance = FlagMultiInstance `elem` cli
         expand_env_vars= FlagExpandEnvVars `elem` cli
         mexpand_pkgroot= foldl' accumExpandPkgroot Nothing cli
           where accumExpandPkgroot _ FlagExpandPkgroot   = Just True
@@ -355,10 +359,12 @@ runit verbosity cli nonopts = do
         initPackageDB filename verbosity cli
     ["register", filename] ->
         registerPackage filename verbosity cli
-                        auto_ghci_libs expand_env_vars False force
+                        auto_ghci_libs multi_instance
+                        expand_env_vars False force
     ["update", filename] ->
         registerPackage filename verbosity cli
-                        auto_ghci_libs expand_env_vars True force
+                        auto_ghci_libs multi_instance
+                        expand_env_vars True force
     ["unregister", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
         unregisterPackage pkgid verbosity cli force
@@ -593,9 +599,9 @@ lookForPackageDBIn dir = do
   let path_dir = dir </> "package.conf.d"
   exists_dir <- doesDirectoryExist path_dir
   if exists_dir then return (Just path_dir) else do
-  let path_file = dir </> "package.conf"
-  exists_file <- doesFileExist path_file
-  if exists_file then return (Just path_file) else return Nothing
+    let path_file = dir </> "package.conf"
+    exists_file <- doesFileExist path_file
+    if exists_file then return (Just path_file) else return Nothing
 
 readParseDatabase :: Verbosity
                   -> Maybe (FilePath,Bool)
@@ -782,11 +788,13 @@ registerPackage :: FilePath
                 -> Verbosity
                 -> [Flag]
                 -> Bool              -- auto_ghci_libs
+                -> Bool              -- multi_instance
                 -> Bool              -- expand_env_vars
                 -> Bool              -- update
                 -> Force
                 -> IO ()
-registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update force = do
+registerPackage input verbosity my_flags auto_ghci_libs multi_instance
+                expand_env_vars update force = do
   (db_stack, Just to_modify, _flag_dbs) <- 
       getPkgDatabases verbosity True True False{-expand vars-} my_flags
 
@@ -829,10 +837,16 @@ registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update f
   let truncated_stack = dropWhile ((/= to_modify).location) db_stack
   -- truncate the stack for validation, because we don't allow
   -- packages lower in the stack to refer to those higher up.
-  validatePackageConfig pkg_expanded verbosity truncated_stack auto_ghci_libs update force
+  validatePackageConfig pkg_expanded verbosity truncated_stack
+                        auto_ghci_libs multi_instance update force
   let 
+     -- In the normal mode, we only allow one version of each package, so we
+     -- remove all instances with the same source package id as the one we're
+     -- adding. In the multi instance mode we don't do that, thus allowing
+     -- multiple instances with the same source package id.
      removes = [ RemovePackage p
-               | p <- packages db_to_operate_on,
+               | not multi_instance,
+                 p <- packages db_to_operate_on,
                  sourcePackageId p == sourcePackageId pkg ]
   --
   changeDB verbosity (removes ++ [AddPackage pkg]) db_to_operate_on
@@ -1035,34 +1049,34 @@ listPackages verbosity my_flags mPackageName mModuleName = do
   if simple_output then show_simple stack else do
 
 #if defined(mingw32_HOST_OS) || defined(BOOTSTRAPPING)
-  mapM_ show_normal stack
+    mapM_ show_normal stack
 #else
-  let
-     show_colour withF db =
-         mconcat $ map (<#> termText "\n") $
-             (termText (location db) :
-                map (termText "   " <#>) (map pp_pkg (packages db)))
-        where
-                 pp_pkg p
-                   | sourcePackageId p `elem` broken = withF Red  doc
-                   | exposed p                       = doc
-                   | otherwise                       = withF Blue doc
-                   where doc | verbosity >= Verbose
-                             = termText (printf "%s (%s)" pkg ipid)
-                             | otherwise
-                             = termText pkg
-                          where
-                          InstalledPackageId ipid = installedPackageId p
-                          pkg = display (sourcePackageId p)
+    let
+       show_colour withF db =
+           mconcat $ map (<#> termText "\n") $
+               (termText (location db) :
+                  map (termText "   " <#>) (map pp_pkg (packages db)))
+          where
+                   pp_pkg p
+                     | sourcePackageId p `elem` broken = withF Red  doc
+                     | exposed p                       = doc
+                     | otherwise                       = withF Blue doc
+                     where doc | verbosity >= Verbose
+                               = termText (printf "%s (%s)" pkg ipid)
+                               | otherwise
+                               = termText pkg
+                            where
+                            InstalledPackageId ipid = installedPackageId p
+                            pkg = display (sourcePackageId p)
 
-  is_tty <- hIsTerminalDevice stdout
-  if not is_tty
-     then mapM_ show_normal stack
-     else do tty <- Terminfo.setupTermFromEnv
-             case Terminfo.getCapability tty withForegroundColor of
-                 Nothing -> mapM_ show_normal stack
-                 Just w  -> runTermOutput tty $ mconcat $
-                                                map (show_colour w) stack
+    is_tty <- hIsTerminalDevice stdout
+    if not is_tty
+       then mapM_ show_normal stack
+       else do tty <- Terminfo.setupTermFromEnv
+               case Terminfo.getCapability tty withForegroundColor of
+                   Nothing -> mapM_ show_normal stack
+                   Just w  -> runTermOutput tty $ mconcat $
+                                                  map (show_colour w) stack
 #endif
 
 simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()
@@ -1204,7 +1218,8 @@ checkConsistency verbosity my_flags = do
   let pkgs = allPackagesInStack db_stack
 
       checkPackage p = do
-         (_,es,ws) <- runValidate $ checkPackageConfig p verbosity db_stack False True
+         (_,es,ws) <- runValidate $ checkPackageConfig p verbosity db_stack
+                                                       False True True
          if null es
             then do when (not simple_output) $ do
                       _ <- reportValidateErrors [] ws "" Nothing
@@ -1354,11 +1369,15 @@ validatePackageConfig :: InstalledPackageInfo
                       -> Verbosity
                       -> PackageDBStack
                       -> Bool   -- auto-ghc-libs
+                      -> Bool   -- multi_instance
                       -> Bool   -- update, or check
                       -> Force
                       -> IO ()
-validatePackageConfig pkg verbosity db_stack auto_ghci_libs update force = do
-  (_,es,ws) <- runValidate $ checkPackageConfig pkg verbosity db_stack auto_ghci_libs update
+validatePackageConfig pkg verbosity db_stack auto_ghci_libs
+                      multi_instance update force = do
+  (_,es,ws) <- runValidate $
+                 checkPackageConfig pkg verbosity db_stack
+                                    auto_ghci_libs multi_instance update
   ok <- reportValidateErrors es ws (display (sourcePackageId pkg) ++ ": ") (Just force)
   when (not ok) $ exitWith (ExitFailure 1)
 
@@ -1366,12 +1385,14 @@ checkPackageConfig :: InstalledPackageInfo
                       -> Verbosity
                       -> PackageDBStack
                       -> Bool   -- auto-ghc-libs
+                      -> Bool   -- multi_instance
                       -> Bool   -- update, or check
                       -> Validate ()
-checkPackageConfig pkg verbosity db_stack auto_ghci_libs update = do
+checkPackageConfig pkg verbosity db_stack auto_ghci_libs
+                   multi_instance update = do
   checkInstalledPackageId pkg db_stack update
   checkPackageId pkg
-  checkDuplicates db_stack pkg update
+  checkDuplicates db_stack pkg multi_instance update
   mapM_ (checkDep db_stack) (depends pkg)
   checkDuplicateDepends (depends pkg)
   mapM_ (checkDir False "import-dirs")  (importDirs pkg)
@@ -1410,15 +1431,17 @@ checkPackageId ipi =
     []  -> verror CannotForce ("invalid package identifier: " ++ str)
     _   -> verror CannotForce ("ambiguous package identifier: " ++ str)
 
-checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> Validate ()
-checkDuplicates db_stack pkg update = do
+checkDuplicates :: PackageDBStack -> InstalledPackageInfo
+                -> Bool -> Bool-> Validate ()
+checkDuplicates db_stack pkg multi_instance update = do
   let
         pkgid = sourcePackageId pkg
         pkgs  = packages (head db_stack)
   --
   -- Check whether this package id already exists in this DB
   --
-  when (not update && (pkgid `elem` map sourcePackageId pkgs)) $
+  when (not update && not multi_instance
+                   && (pkgid `elem` map sourcePackageId pkgs)) $
        verror CannotForce $
           "package " ++ display pkgid ++ " is already installed"
 

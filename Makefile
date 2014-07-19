@@ -33,7 +33,7 @@ default : all
 help:
 	@cat MAKEHELP
 
-ifneq "$(filter clean help,$(MAKECMDGOALS))" ""
+ifneq "$(filter maintainer-clean distclean clean help,$(MAKECMDGOALS))" ""
 -include mk/config.mk
 else
 include mk/config.mk

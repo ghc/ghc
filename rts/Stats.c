@@ -173,8 +173,8 @@ initStats1 (void)
     nat i;
   
     if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
-	statsPrintf("    Alloc    Copied     Live    GC    GC     TOT     TOT  Page Flts\n");
-	statsPrintf("    bytes     bytes     bytes  user  elap    user    elap\n");
+        statsPrintf("    Alloc    Copied     Live    GC    GC     TOT     TOT  Page Flts\n");
+        statsPrintf("    bytes     bytes     bytes  user  elap    user    elap\n");
     }
     GC_coll_cpu = 
 	(Time *)stgMallocBytes(
@@ -287,51 +287,10 @@ stat_startGC (Capability *cap, gc_thread *gct)
     traceEventGcStartAtT(cap,
                          TimeToNS(gct->gc_start_elapsed - start_init_elapsed));
 
-    gct->gc_start_thread_cpu = getThreadCPUTime();
-
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS)
     {
         gct->gc_start_faults = getPageFaults();
     }
-}
-
-void
-stat_gcWorkerThreadStart (gc_thread *gct STG_UNUSED)
-{
-#if 0
-    /*
-     * We dont' collect per-thread GC stats any more, but this code
-     * could be used to do that if we want to in the future:
-     */
-    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS)
-    {
-        getProcessTimes(&gct->gc_start_cpu, &gct->gc_start_elapsed);
-        gct->gc_start_thread_cpu  = getThreadCPUTime();
-    }
-#endif
-}
-
-void
-stat_gcWorkerThreadDone (gc_thread *gct STG_UNUSED)
-{
-#if 0
-    /*
-     * We dont' collect per-thread GC stats any more, but this code
-     * could be used to do that if we want to in the future:
-     */
-    Time thread_cpu, elapsed, gc_cpu, gc_elapsed;
-
-    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS)
-    {
-        elapsed    = getProcessElapsedTime();
-        thread_cpu = getThreadCPUTime();
-
-        gc_cpu     = thread_cpu - gct->gc_start_thread_cpu;
-        gc_elapsed = elapsed    - gct->gc_start_elapsed;
-    
-        taskDoneGC(gct->cap->running_task, gc_cpu, gc_elapsed);
-    }
-#endif
 }
 
 /* -----------------------------------------------------------------------------

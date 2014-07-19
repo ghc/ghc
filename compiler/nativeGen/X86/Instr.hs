@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, TypeFamilies #-}
+
 -----------------------------------------------------------------------------
 --
 -- Machine-dependent assembly language
@@ -6,15 +8,14 @@
 --
 -----------------------------------------------------------------------------
 
-#include "HsVersions.h"
-#include "nativeGen/NCG.h"
-
-{-# LANGUAGE TypeFamilies #-}
 module X86.Instr (Instr(..), Operand(..), PrefetchVariant(..), JumpDest,
                   getJumpDestBlockId, canShortcut, shortcutStatics,
                   shortcutJump, i386_insert_ffrees, allocMoreStack,
                   maxSpillSlots, archWordSize)
 where
+
+#include "HsVersions.h"
+#include "nativeGen/NCG.h"
 
 import X86.Cond
 import X86.Regs
@@ -326,6 +327,10 @@ data Instr
         | PREFETCH  PrefetchVariant Size Operand -- prefetch Variant, addr size, address to prefetch
                                         -- variant can be NTA, Lvl0, Lvl1, or Lvl2
 
+        | LOCK  -- lock prefix
+        | XADD        Size Operand Operand  -- src (r), dst (r/m)
+        | CMPXCHG     Size Operand Operand  -- src (r), dst (r/m), eax implicit
+
 data PrefetchVariant = NTA | Lvl0 | Lvl1 | Lvl2
 
 
@@ -336,6 +341,8 @@ data Operand
 
 
 
+-- | Returns which registers are read and written as a (read, written)
+-- pair.
 x86_regUsageOfInstr :: Platform -> Instr -> RegUsage
 x86_regUsageOfInstr platform instr
  = case instr of
@@ -427,10 +434,21 @@ x86_regUsageOfInstr platform instr
 
     -- note: might be a better way to do this
     PREFETCH _  _ src -> mkRU (use_R src []) []
+    LOCK                -> noUsage
+    XADD _ src dst      -> usageMM src dst
+    CMPXCHG _ src dst   -> usageRMM src dst (OpReg eax)
 
     _other              -> panic "regUsage: unrecognised instr"
-
  where
+    -- # Definitions
+    --
+    -- Written: If the operand is a register, it's written. If it's an
+    -- address, registers mentioned in the address are read.
+    --
+    -- Modified: If the operand is a register, it's both read and
+    -- written. If it's an address, registers mentioned in the address
+    -- are read.
+
     -- 2 operand form; first operand Read; second Written
     usageRW :: Operand -> Operand -> RegUsage
     usageRW op (OpReg reg)      = mkRU (use_R op []) [reg]
@@ -442,6 +460,18 @@ x86_regUsageOfInstr platform instr
     usageRM op (OpReg reg)      = mkRU (use_R op [reg]) [reg]
     usageRM op (OpAddr ea)      = mkRUR (use_R op $! use_EA ea [])
     usageRM _ _                 = panic "X86.RegInfo.usageRM: no match"
+
+    -- 2 operand form; first operand Modified; second Modified
+    usageMM :: Operand -> Operand -> RegUsage
+    usageMM (OpReg src) (OpReg dst) = mkRU [src, dst] [src, dst]
+    usageMM (OpReg src) (OpAddr ea) = mkRU (use_EA ea [src]) [src]
+    usageMM _ _                     = panic "X86.RegInfo.usageMM: no match"
+
+    -- 3 operand form; first operand Read; second Modified; third Modified
+    usageRMM :: Operand -> Operand -> Operand -> RegUsage
+    usageRMM (OpReg src) (OpReg dst) (OpReg reg) = mkRU [src, dst, reg] [dst, reg]
+    usageRMM (OpReg src) (OpAddr ea) (OpReg reg) = mkRU (use_EA ea [src, reg]) [reg]
+    usageRMM _ _ _                               = panic "X86.RegInfo.usageRMM: no match"
 
     -- 1 operand form; operand Modified
     usageM :: Operand -> RegUsage
@@ -475,6 +505,7 @@ x86_regUsageOfInstr platform instr
         where src' = filter (interesting platform) src
               dst' = filter (interesting platform) dst
 
+-- | Is this register interesting for the register allocator?
 interesting :: Platform -> Reg -> Bool
 interesting _        (RegVirtual _)              = True
 interesting platform (RegReal (RealRegSingle i)) = isFastTrue (freeReg platform i)
@@ -482,6 +513,8 @@ interesting _        (RegReal (RealRegPair{}))   = panic "X86.interesting: no re
 
 
 
+-- | Applies the supplied function to all registers in instructions.
+-- Typically used to change virtual registers to real registers.
 x86_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 x86_patchRegsOfInstr instr env
  = case instr of
@@ -569,6 +602,10 @@ x86_patchRegsOfInstr instr env
     POPCNT sz src dst -> POPCNT sz (patchOp src) (env dst)
 
     PREFETCH lvl size src -> PREFETCH lvl size (patchOp src)
+
+    LOCK                -> instr
+    XADD sz src dst     -> patch2 (XADD sz) src dst
+    CMPXCHG sz src dst  -> patch2 (CMPXCHG sz) src dst
 
     _other              -> panic "patchRegs: unrecognised instr"
 

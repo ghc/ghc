@@ -5,7 +5,12 @@ ByteCodeLink: Bytecode assembler and linker
 
 \begin{code}
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 
 module ByteCodeLink (
         ClosureEnv, emptyClosureEnv, extendClosureEnv,
