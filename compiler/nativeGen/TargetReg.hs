@@ -1,28 +1,20 @@
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 -- | Hard wired things related to registers.
---	This is module is preventing the native code generator being able to 
---	emit code for non-host architectures.
+--      This is module is preventing the native code generator being able to
+--      emit code for non-host architectures.
 --
---	TODO: Do a better job of the overloading, and eliminate this module.
---	We'd probably do better with a Register type class, and hook this to 
---	Instruction somehow.
+--      TODO: Do a better job of the overloading, and eliminate this module.
+--      We'd probably do better with a Register type class, and hook this to
+--      Instruction somehow.
 --
---	TODO: We should also make arch specific versions of RegAlloc.Graph.TrivColorable
-
+--      TODO: We should also make arch specific versions of RegAlloc.Graph.TrivColorable
 module TargetReg (
-	targetVirtualRegSqueeze,
-	targetRealRegSqueeze,
-	targetClassOfRealReg,
-	targetMkVirtualReg,
-	targetRegDotColor,
-	targetClassOfReg
+        targetVirtualRegSqueeze,
+        targetRealRegSqueeze,
+        targetClassOfRealReg,
+        targetMkVirtualReg,
+        targetRegDotColor,
+        targetClassOfReg
 )
 
 where
@@ -132,5 +124,3 @@ targetClassOfReg platform reg
  = case reg of
    RegVirtual vr -> classOfVirtualReg vr
    RegReal rr -> targetClassOfRealReg platform rr
-
-
