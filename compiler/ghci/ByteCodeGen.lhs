@@ -6,13 +6,6 @@ ByteCodeGen: Generate bytecode from Core
 
 \begin{code}
 {-# LANGUAGE CPP, MagicHash #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module ByteCodeGen ( UnlinkedBCO, byteCodeGen, coreExprToBCOs ) where
 
 #include "HsVersions.h"
@@ -278,7 +271,7 @@ collect :: AnnExpr Id VarSet -> ([Var], AnnExpr' Id VarSet)
 collect (_, e) = go [] e
   where
     go xs e | Just e' <- bcView e = go xs e'
-    go xs (AnnLam x (_,e)) 
+    go xs (AnnLam x (_,e))
       | UbxTupleRep _ <- repType (idType x)
       = unboxedTupleException
       | otherwise
@@ -820,8 +813,8 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
              MASSERT(isAlgCase)
              rhs_code <- schemeE (d_alts + size) s p' rhs
              return (my_discr alt, unitOL (UNPACK (trunc16 size)) `appOL` rhs_code)
-	   where
-	     real_bndrs = filterOut isTyVar bndrs
+           where
+             real_bndrs = filterOut isTyVar bndrs
 
         my_discr (DEFAULT, _, _) = NoDiscr {-shouldn't really happen-}
         my_discr (DataAlt dc, _, _)
@@ -1253,8 +1246,8 @@ pushAtom d p e
    | Just e' <- bcView e
    = pushAtom d p e'
 
-pushAtom _ _ (AnnCoercion {})	-- Coercions are zero-width things, 
-   = return (nilOL, 0)	  	-- treated just like a variable V
+pushAtom _ _ (AnnCoercion {})   -- Coercions are zero-width things,
+   = return (nilOL, 0)          -- treated just like a variable V
 
 pushAtom d p (AnnVar v)
    | UnaryRep rep_ty <- repType (idType v)
@@ -1564,12 +1557,12 @@ isVAtom :: AnnExpr' Var ann -> Bool
 isVAtom e | Just e' <- bcView e = isVAtom e'
 isVAtom (AnnVar v)              = isVoidArg (bcIdArgRep v)
 isVAtom (AnnCoercion {})        = True
-isVAtom _ 	              = False
+isVAtom _                     = False
 
 atomPrimRep :: AnnExpr' Id ann -> PrimRep
 atomPrimRep e | Just e' <- bcView e = atomPrimRep e'
-atomPrimRep (AnnVar v)    	    = bcIdPrimRep v
-atomPrimRep (AnnLit l)    	    = typePrimRep (literalType l)
+atomPrimRep (AnnVar v)              = bcIdPrimRep v
+atomPrimRep (AnnLit l)              = typePrimRep (literalType l)
 atomPrimRep (AnnCoercion {})        = VoidRep
 atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate (undefined,other)))
 
