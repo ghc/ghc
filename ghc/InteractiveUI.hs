@@ -586,8 +586,9 @@ nextInputLine show_prompt is_tty
     fileLoop stdin
 
 -- NOTE: We only read .ghci files if they are owned by the current user,
--- and aren't world writable.  Otherwise, we could be accidentally
--- running code planted by a malicious third party.
+-- and aren't world writable (files owned by root are ok, see #9324).
+-- Otherwise, we could be accidentally running code planted by
+-- a malicious third party.
 
 -- Furthermore, We only read ./.ghci if . is owned by the current user
 -- and isn't writable by anyone else.  I think this is sufficient: we
@@ -602,18 +603,14 @@ checkPerms name =
   handleIO (\_ -> return False) $ do
     st <- getFileStatus name
     me <- getRealUserID
-    if fileOwner st /= me then do
-        putStrLn $ "WARNING: " ++ name ++ " is owned by someone else, IGNORING!"
-        return False
-     else do
-        let mode = System.Posix.fileMode st
-        if (groupWriteMode == (mode `intersectFileModes` groupWriteMode))
-            || (otherWriteMode == (mode `intersectFileModes` otherWriteMode))
-            then do
-                putStrLn $ "*** WARNING: " ++ name ++
-                           " is writable by someone else, IGNORING!"
-                return False
-            else return True
+    let mode = System.Posix.fileMode st
+        ok = (fileOwner st == me || fileOwner st == 0) &&
+             groupWriteMode /= mode `intersectFileModes` groupWriteMode &&
+             otherWriteMode /= mode `intersectFileModes` otherWriteMode
+    unless ok $
+      putStrLn $ "*** WARNING: " ++ name ++
+                 " is writable by someone else, IGNORING!"
+    return ok
 #endif
 
 incrementLineNo :: InputT GHCi ()
