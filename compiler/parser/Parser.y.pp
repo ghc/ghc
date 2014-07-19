@@ -16,8 +16,25 @@
 --     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module Parser ( parseModule, parseStmt, parseIdentifier, parseType,
-                parseHeader ) where
+-- | This module provides the generated Happy parser for Haskell. It exports
+-- a number of parsers which may be used in any library that uses the GHC API.
+-- A common usage pattern is to initialize the parser state with a given string
+-- and then parse that string:
+--
+-- @
+--     runParser :: DynFlags -> String -> P a -> ParseResult a
+--     runParser flags str parser = unP parser parseState
+--     where
+--       filename = "\<interactive\>"
+--       location = mkRealSrcLoc (mkFastString filename) 1 1
+--       buffer = stringToStringBuffer str
+--       parseState = mkPState flags buffer location in
+-- @
+module Parser (parseModule, parseImport, parseStatement,
+               parseDeclaration, parseExpression, parseTypeSignature,
+               parseFullStmt, parseStmt, parseIdentifier,
+               parseType, parseHeader) where
+
 
 import HsSyn
 import RdrHsSyn
@@ -363,12 +380,20 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
 %monad { P } { >>= } { return }
 %lexer { lexer } { L _ ITeof }
+%tokentype { (Located Token) }
+
+-- Exported parsers
 %name parseModule module
+%name parseImport importdecl
+%name parseStatement stmt
+%name parseDeclaration topdecl
+%name parseExpression exp
+%name parseTypeSignature sigdecl
+%name parseFullStmt   stmt
 %name parseStmt   maybe_stmt
 %name parseIdentifier  identifier
 %name parseType ctype
 %partial parseHeader header
-%tokentype { (Located Token) }
 %%
 
 -----------------------------------------------------------------------------
