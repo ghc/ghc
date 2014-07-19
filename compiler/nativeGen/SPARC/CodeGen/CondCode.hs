@@ -1,15 +1,7 @@
-
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module SPARC.CodeGen.CondCode (
-	getCondCode,
-	condIntCode,
-	condFltCode
+        getCondCode,
+        condIntCode,
+        condFltCode
 )
 
 where
@@ -32,7 +24,7 @@ import Outputable
 
 getCondCode :: CmmExpr -> NatM CondCode
 getCondCode (CmmMachOp mop [x, y])
-  = 
+  =
     case mop of
       MO_F_Eq W32 -> condFltCode EQQ x y
       MO_F_Ne W32 -> condFltCode NE  x y
@@ -86,8 +78,8 @@ condIntCode cond x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     let
-	code__2 = code1 `appOL` code2 `snocOL`
-    	    	  SUB False True src1 (RIReg src2) g0
+        code__2 = code1 `appOL` code2 `snocOL`
+                  SUB False True src1 (RIReg src2) g0
     return (CondCode False cond code__2)
 
 
@@ -98,19 +90,19 @@ condFltCode cond x y = do
     (src2, code2) <- getSomeReg y
     tmp <- getNewRegNat FF64
     let
-   	promote x = FxTOy FF32 FF64 x tmp
+        promote x = FxTOy FF32 FF64 x tmp
 
-    	pk1   = cmmExprType dflags x
-    	pk2   = cmmExprType dflags y
+        pk1   = cmmExprType dflags x
+        pk2   = cmmExprType dflags y
 
-    	code__2 =
-		if pk1 `cmmEqType` pk2 then
-    	            code1 `appOL` code2 `snocOL`
-    	    	    FCMP True (cmmTypeSize pk1) src1 src2
-    	    	else if typeWidth pk1 == W32 then
-    	    	    code1 `snocOL` promote src1 `appOL` code2 `snocOL`
-    	    	    FCMP True FF64 tmp src2
-    	    	else
-    	    	    code1 `appOL` code2 `snocOL` promote src2 `snocOL`
-    	    	    FCMP True FF64 src1 tmp
+        code__2 =
+                if pk1 `cmmEqType` pk2 then
+                    code1 `appOL` code2 `snocOL`
+                    FCMP True (cmmTypeSize pk1) src1 src2
+                else if typeWidth pk1 == W32 then
+                    code1 `snocOL` promote src1 `appOL` code2 `snocOL`
+                    FCMP True FF64 tmp src2
+                else
+                    code1 `appOL` code2 `snocOL` promote src2 `snocOL`
+                    FCMP True FF64 src1 tmp
     return (CondCode True cond code__2)
