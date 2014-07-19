@@ -44,23 +44,23 @@ moduleString = moduleNameString . moduleName
 
 -- return the (name,version) of the package
 modulePackageInfo :: Module -> (String, [Char])
-modulePackageInfo modu = case unpackPackageId pkg of
-                          Nothing -> (packageIdString pkg, "")
+modulePackageInfo modu = case unpackPackageKey pkg of
+                          Nothing -> (packageKeyString pkg, "")
                           Just x -> (display $ pkgName x, showVersion (pkgVersion x))
-  where pkg = modulePackageId modu
+  where pkg = modulePackageKey modu
 
 
 -- This was removed from GHC 6.11
 -- XXX we shouldn't be using it, probably
 
--- | Try and interpret a GHC 'PackageId' as a cabal 'PackageIdentifer'. Returns @Nothing@ if
+-- | Try and interpret a GHC 'PackageKey' as a cabal 'PackageIdentifer'. Returns @Nothing@ if
 -- we could not parse it as such an object.
-unpackPackageId :: PackageId -> Maybe PackageIdentifier
-unpackPackageId p
+unpackPackageKey :: PackageKey -> Maybe PackageIdentifier
+unpackPackageKey p
   = case [ pid | (pid,"") <- readP_to_S parse str ] of
         []      -> Nothing
         (pid:_) -> Just pid
-  where str = packageIdString p
+  where str = packageKeyString p
 
 
 lookupLoadedHomeModuleGRE  :: GhcMonad m => ModuleName -> m (Maybe GlobalRdrEnv)

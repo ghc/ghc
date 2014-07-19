@@ -215,7 +215,7 @@ renderStep dflags flags qual pkgs interfaces = do
   let
     ifaceFiles = map snd pkgs
     installedIfaces = concatMap ifInstalledIfaces ifaceFiles
-    srcMap = Map.fromList [ (ifPackageId if_, x) | ((_, Just x), if_) <- pkgs ]
+    srcMap = Map.fromList [ (ifPackageKey if_, x) | ((_, Just x), if_) <- pkgs ]
   render dflags flags qual interfaces installedIfaces srcMap
 
 
@@ -240,14 +240,14 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     allVisibleIfaces = [ i | i <- allIfaces, OptHide `notElem` instOptions i ]
 
     pkgMod           = ifaceMod (head ifaces)
-    pkgId            = modulePackageId pkgMod
-    pkgStr           = Just (packageIdString pkgId)
+    pkgKey            = modulePackageKey pkgMod
+    pkgStr           = Just (packageKeyString pkgKey)
     (pkgName,pkgVer) = modulePackageInfo pkgMod
 
     (srcBase, srcModule, srcEntity, srcLEntity) = sourceUrls flags
-    srcMap' = maybe srcMap (\path -> Map.insert pkgId path srcMap) srcEntity
+    srcMap' = maybe srcMap (\path -> Map.insert pkgKey path srcMap) srcEntity
     -- TODO: Get these from the interface files as with srcMap
-    srcLMap' = maybe Map.empty (\path -> Map.singleton pkgId path) srcLEntity
+    srcLMap' = maybe Map.empty (\path -> Map.singleton pkgKey path) srcLEntity
     sourceUrls' = (srcBase, srcModule, srcMap', srcLMap')
 
   libDir   <- getHaddockLibDir flags

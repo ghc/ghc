@@ -50,7 +50,7 @@ type SubMap        = Map Name [Name]
 type DeclMap       = Map Name [LHsDecl Name]
 type InstMap       = Map SrcSpan Name
 type FixMap        = Map Name Fixity
-type SrcMap        = Map PackageId FilePath
+type SrcMap        = Map PackageKey FilePath
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 
 

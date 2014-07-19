@@ -224,7 +224,7 @@ topDeclElem ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice names htm
         -- TODO: do something about type instances. They will point to
         -- the module defining the type family, which is wrong.
         origMod = nameModule n
-        origPkg = modulePackageId origMod
+        origPkg = modulePackageKey origMod
 
         -- Name must be documented, otherwise we wouldn't get here
         Documented n mdl = head names

@@ -157,7 +157,7 @@ mkAliasMap dflags mRenamedSource =
         alias <- ideclAs impDecl
         return $
           (lookupModuleDyn dflags
-             (fmap Module.fsToPackageId $
+             (fmap Module.fsToPackageKey $
               ideclPkgQual impDecl)
              (case ideclName impDecl of SrcLoc.L _ name -> name),
            alias))
@@ -165,7 +165,7 @@ mkAliasMap dflags mRenamedSource =
 
 -- similar to GHC.lookupModule
 lookupModuleDyn ::
-  DynFlags -> Maybe PackageId -> ModuleName -> Module
+  DynFlags -> Maybe PackageKey -> ModuleName -> Module
 lookupModuleDyn _ (Just pkgId) mdlName =
   Module.mkModule pkgId mdlName
 lookupModuleDyn dflags Nothing mdlName =
@@ -173,7 +173,7 @@ lookupModuleDyn dflags Nothing mdlName =
   case filter snd $
        Packages.lookupModuleInAllPackages dflags mdlName of
     (pkgId,_):_ -> Packages.packageConfigId pkgId
-    [] -> Module.mainPackageId
+    [] -> Module.mainPackageKey
 
 
 -------------------------------------------------------------------------------
@@ -678,8 +678,8 @@ moduleExports thisMod expMod dflags warnings gre _exports decls ifaceMap instIfa
                     "documentation for exported module: " ++ pretty dflags expMod]
             return []
   where
-    m = mkModule packageId expMod
-    packageId = modulePackageId thisMod
+    m = mkModule packageKey expMod
+    packageKey = modulePackageKey thisMod
 
 
 -- Note [1]:

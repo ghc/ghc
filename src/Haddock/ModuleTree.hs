@@ -15,8 +15,8 @@ module Haddock.ModuleTree ( ModuleTree(..), mkModuleTree ) where
 import Haddock.Types ( Doc )
 
 import GHC           ( Name )
-import Module        ( Module, moduleNameString, moduleName, modulePackageId,
-                       packageIdString )
+import Module        ( Module, moduleNameString, moduleName, modulePackageKey,
+                       packageKeyString )
 
 
 data ModuleTree = Node String Bool (Maybe String) (Maybe (Doc Name)) [ModuleTree]
@@ -26,7 +26,7 @@ mkModuleTree :: Bool -> [(Module, Maybe (Doc Name))] -> [ModuleTree]
 mkModuleTree showPkgs mods =
   foldr fn [] [ (splitModule mdl, modPkg mdl, short) | (mdl, short) <- mods ]
   where
-    modPkg mod_ | showPkgs = Just (packageIdString (modulePackageId mod_))
+    modPkg mod_ | showPkgs = Just (packageKeyString (modulePackageKey mod_))
                 | otherwise = Nothing
     fn (mod_,pkg,short) = addToTrees mod_ pkg short
 
