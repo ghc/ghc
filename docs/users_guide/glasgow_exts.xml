@@ -5022,6 +5022,18 @@ and <option>-XIncoherentInstances</option>
 flags are dynamic flags, and can be set on a per-module basis, using
 an <literal>LANGUAGE</literal> pragma if desired (<xref linkend="language-pragma"/>).</para>
 
+<para>
+In addition, it is possible to specify the overlap behavior for individual
+instances with a pragma, written immediately after the
+<literal>instance</literal> keyword.  The pragma may be one of:
+<literal>OVERLAP</literal>, <literal>NO_OVERLAP</literal>,
+or <literal>INCOHERENT</literal>.  An explicit pragma on an instance
+takes precedence over the default specified with a flag or
+a <literal>LANGUAGE</literal> pragma.  For example, an instance marked with
+<literal>{-# NO_OVERLAP #-}</literal> will be marked as non-overlapping,
+even if the module contains <literal>{-# LANGUAGE OverlappingInstances #-}</literal>.
+</para>
+
 
 <para>
 The <option>-XOverlappingInstances</option> flag instructs GHC to loosen
@@ -5037,7 +5049,8 @@ The <option>-XIncoherentInstances</option> flag implies the
 <para>
 A more precise specification is as follows.
 The willingness to be overlapped or incoherent is a property of
-the <emphasis>instance declaration</emphasis> itself, controlled by the
+the <emphasis>instance declaration</emphasis> itself, controlled by
+iether an explicit pragma, or the
 presence or otherwise of the <option>-XOverlappingInstances</option>
 and <option>-XIncoherentInstances</option> flags when that instance declaration is
 being compiled.  Now suppose that, in some client module, we are searching for an instance of the
@@ -10769,6 +10782,22 @@ data T = T {-# NOUNPACK #-} !(Int,Int)
      <para>The <literal>{-# SOURCE #-}</literal> pragma is used only in <literal>import</literal> declarations,
      to break a module loop.  It is described in detail in <xref linkend="mutual-recursion"/>.
      </para>
+</sect2>
+
+<sect2 id="overlap-pragma">
+<title>OVERLAP, NO_OVERLAP, and INCOHERENT pragmas</title>
+<para>
+The <literal>OVERLAP</literal>, <literal>NO_OVERLAP</literal>, and
+<literal>INCOHERENT</literal> pragmas are used to specify the overlap
+behavior for individual instances, as described in Section
+<xref linkend="instance-overlap"/>.  They take precedence over the behavior
+specified with the corresponding <literal>LANGUAGE</literal> pragmas.
+The pragmas are written immediately after the <literal>instance</literal>
+keyword.  For example:
+</para>
+<programlisting>
+instance {-# OVERLAP #-} C t where ...
+</programlisting>
 </sect2>
 
 </sect1>
