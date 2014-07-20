@@ -1559,6 +1559,8 @@ data XEvTerm
   = XEvTerm { ev_preds  :: [PredType]           -- New predicate types
             , ev_comp   :: [EvTerm] -> EvTerm   -- How to compose evidence
             , ev_decomp :: EvTerm -> [EvTerm]   -- How to decompose evidence
+            -- In both ev_comp and ev_decomp, the [EvTerm] is 1-1 with ev_preds
+            -- and each EvTerm has type of the corresponding EvPred
             }
 
 data MaybeNew = Fresh CtEvidence | Cached EvTerm
@@ -1645,16 +1647,16 @@ Note [xCFlavor]
 ~~~~~~~~~~~~~~~
 A call might look like this:
 
-    xCtFlavor ev subgoal-preds evidence-transformer
+    xCtEvidence ev evidence-transformer
 
-  ev is Given   => use ev_decomp to create new Givens for subgoal-preds,
+  ev is Given   => use ev_decomp to create new Givens for ev_preds,
                    and return them
 
-  ev is Wanted  => create new wanteds for subgoal-preds,
+  ev is Wanted  => create new wanteds for ev_preds,
                    use ev_comp to bind ev,
                    return fresh wanteds (ie ones not cached in inert_cans or solved)
 
-  ev is Derived => create new deriveds for subgoal-preds
+  ev is Derived => create new deriveds for ev_preds
                       (unless cached in inert_cans or solved)
 
 Note: The [CtEvidence] returned is a subset of the subgoal-preds passed in
