@@ -5050,7 +5050,7 @@ The <option>-XIncoherentInstances</option> flag implies the
 A more precise specification is as follows.
 The willingness to be overlapped or incoherent is a property of
 the <emphasis>instance declaration</emphasis> itself, controlled by
-iether an explicit pragma, or the
+either an explicit pragma, or the
 presence or otherwise of the <option>-XOverlappingInstances</option>
 and <option>-XIncoherentInstances</option> flags when that instance declaration is
 being compiled.  Now suppose that, in some client module, we are searching for an instance of the
