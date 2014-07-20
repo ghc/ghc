@@ -26,5 +26,5 @@ Library
 
     build-depends: base >= 4 && < 5,
                    binary >= 0.5 && < 0.8,
-                   Cabal >= 1.20 && < 1.22
+                   Cabal >= 1.20 && < 1.21
 
