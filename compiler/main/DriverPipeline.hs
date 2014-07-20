@@ -2166,7 +2166,9 @@ joinObjectFiles dflags o_files output_fn = do
   if ldIsGnuLd
      then do
           script <- newTempName dflags "ldscript"
-          writeFile script $ "INPUT(" ++ unwords o_files ++ ")"
+          cwd <- getCurrentDirectory
+          let o_files_abs = map (cwd </>) o_files
+          writeFile script $ "INPUT(" ++ unwords o_files_abs ++ ")"
           ld_r [SysTools.FileOption "" script] ccInfo
      else if sLdSupportsFilelist mySettings
      then do
