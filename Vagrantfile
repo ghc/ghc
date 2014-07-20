@@ -4,27 +4,27 @@
 MACHINES =
   { "ubuntu1204-i386" =>
       { :box       => "chef/ubuntu-12.04-i386",
-        :provision => "vagrant/bootstrap-deb.sh"
+        :provision => "utils/vagrant/bootstrap-deb.sh"
       },
     "ubuntu1204-amd64" =>
       { :box       => "chef/ubuntu-12.04",
-        :provision => "vagrant/bootstrap-deb.sh"
+        :provision => "utils/vagrant/bootstrap-deb.sh"
       },
     "centos65-i386" =>
       { :box       => "chef/centos-6.5-i386",
-        :provision => "vagrant/bootstrap-rhel.sh"
+        :provision => "utils/vagrant/bootstrap-rhel.sh"
       },
     "centos65-amd64" =>
       { :box       => "chef/centos-6.5",
-        :provision => "vagrant/bootstrap-rhel.sh"
+        :provision => "utils/vagrant/bootstrap-rhel.sh"
       },
     "debian74-i386" =>
       { :box       => "chef/debian-7.4-i386",
-        :provision => "vagrant/bootstrap-deb.sh"
+        :provision => "utils/vagrant/bootstrap-deb.sh"
       },
     "debian74-amd64" =>
       { :box       => "chef/debian-7.4",
-        :provision => "vagrant/bootstrap-deb.sh"
+        :provision => "utils/vagrant/bootstrap-deb.sh"
       }
   }
 
