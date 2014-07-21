@@ -876,7 +876,7 @@ badIfaceFile file err
 
 hiModuleNameMismatchWarn :: Module -> Module -> MsgDoc
 hiModuleNameMismatchWarn requested_mod read_mod = 
-  withPprStyle defaultUserStyle $
+  withPprStyle (mkUserStyle alwaysQualify AllTheWay) $
     -- we want the Modules below to be qualified with package names,
     -- so reset the PrintUnqualified setting.
     hsep [ ptext (sLit "Something is amiss; requested module ")
