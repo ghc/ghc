@@ -27,8 +27,9 @@ static void *saved_termios[3] = {NULL,NULL,NULL};
 void*
 __hscore_get_saved_termios(int fd)
 {
-  return (0 <= fd && fd < (int)(sizeof(saved_termios) / sizeof(*saved_termios))) ?
-    saved_termios[fd] : NULL;
+  return (0 <= fd &&
+            fd < (int)(sizeof(saved_termios) / sizeof(*saved_termios))) ?
+  saved_termios[fd] : NULL;
 }
 
 void
@@ -47,19 +48,20 @@ resetTerminalSettings (void)
     // if we changed them.  See System.Posix.Internals.tcSetAttr for
     // more details, including the reason we termporarily disable
     // SIGTTOU here.
-    { 
-	int fd;
-	sigset_t sigset, old_sigset;
-	sigemptyset(&sigset);
-	sigaddset(&sigset, SIGTTOU);
-	sigprocmask(SIG_BLOCK, &sigset, &old_sigset);
-	for (fd = 0; fd <= 2; fd++) {
-	    struct termios* ts = (struct termios*)__hscore_get_saved_termios(fd);
-	    if (ts != NULL) {
-		tcsetattr(fd,TCSANOW,ts);
-	    }
-	}
-	sigprocmask(SIG_SETMASK, &old_sigset, NULL);
+    {
+        int fd;
+        sigset_t sigset, old_sigset;
+        sigemptyset(&sigset);
+        sigaddset(&sigset, SIGTTOU);
+        sigprocmask(SIG_BLOCK, &sigset, &old_sigset);
+        for (fd = 0; fd <= 2; fd++) {
+            struct termios* ts =
+                (struct termios*)__hscore_get_saved_termios(fd);
+            if (ts != NULL) {
+                tcsetattr(fd,TCSANOW,ts);
+            }
+        }
+        sigprocmask(SIG_SETMASK, &old_sigset, NULL);
     }
 #endif
 }
