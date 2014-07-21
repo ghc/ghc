@@ -3,7 +3,7 @@
  * (c) The GHC Team, 2001-2005
  *
  * Accessing OS threads functionality in a (mostly) OS-independent
- * manner. 
+ * manner.
  *
  * --------------------------------------------------------------------------*/
 
@@ -18,7 +18,7 @@
 #if defined(freebsd_HOST_OS)
 /* Inclusion of system headers usually requires __BSD_VISIBLE on FreeBSD,
  * because of some specific types, like u_char, u_int, etc. */
-#define __BSD_VISIBLE	1
+#define __BSD_VISIBLE   1
 #endif
 
 #include "Rts.h"
@@ -175,7 +175,7 @@ newThreadLocalKey (ThreadLocalKey *key)
 {
     int r;
     if ((r = pthread_key_create(key, NULL)) != 0) {
-	barf("newThreadLocalKey: %s", strerror(r));
+        barf("newThreadLocalKey: %s", strerror(r));
     }
 }
 
@@ -194,7 +194,7 @@ setThreadLocalVar (ThreadLocalKey *key, void *value)
 {
     int r;
     if ((r = pthread_setspecific(*key,value)) != 0) {
-	barf("setThreadLocalVar: %s", strerror(r));
+        barf("setThreadLocalVar: %s", strerror(r));
     }
 }
 
@@ -203,7 +203,7 @@ freeThreadLocalKey (ThreadLocalKey *key)
 {
     int r;
     if ((r = pthread_key_delete(*key)) != 0) {
-	barf("freeThreadLocalKey: %s", strerror(r));
+        barf("freeThreadLocalKey: %s", strerror(r));
     }
 }
 
@@ -222,7 +222,7 @@ forkOS_createThread ( HsStablePtr entry )
 {
     pthread_t tid;
     int result = pthread_create(&tid, NULL,
-				forkOS_createThreadWrapper, (void*)entry);
+                                forkOS_createThreadWrapper, (void*)entry);
     if(!result)
         pthread_detach(tid);
     return result;
@@ -277,33 +277,34 @@ setThreadAffinity (nat n, nat m GNUC3_ATTRIBUTE(__unused__))
     thread_affinity_policy_data_t policy;
 
     policy.affinity_tag = n;
-    thread_policy_set(mach_thread_self(), 
-		      THREAD_AFFINITY_POLICY,
-		      (thread_policy_t) &policy,
-		      THREAD_AFFINITY_POLICY_COUNT);
+    thread_policy_set(mach_thread_self(),
+                      THREAD_AFFINITY_POLICY,
+                      (thread_policy_t) &policy,
+                      THREAD_AFFINITY_POLICY_COUNT);
 }
 
 #elif defined(HAVE_SYS_CPUSET_H) /* FreeBSD 7.1+ */
 void
 setThreadAffinity(nat n, nat m)
 {
-	nat nproc;
-	cpuset_t cs;
-	nat i;
+        nat nproc;
+        cpuset_t cs;
+        nat i;
 
-	nproc = getNumberOfProcessors();
-	CPU_ZERO(&cs);
+        nproc = getNumberOfProcessors();
+        CPU_ZERO(&cs);
 
-	for (i = n; i < nproc; i += m)
-		CPU_SET(i, &cs);
+        for (i = n; i < nproc; i += m)
+                CPU_SET(i, &cs);
 
-	cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1, sizeof(cpuset_t), &cs);
+        cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID,
+                           -1, sizeof(cpuset_t), &cs);
 }
 
 #else
 void
-setThreadAffinity (nat n GNUC3_ATTRIBUTE(__unused__), 
-		   nat m GNUC3_ATTRIBUTE(__unused__))
+setThreadAffinity (nat n GNUC3_ATTRIBUTE(__unused__),
+                   nat m GNUC3_ATTRIBUTE(__unused__))
 {
 }
 #endif
@@ -340,7 +341,9 @@ KernelThreadId kernelThreadId (void)
     return pthread_getthreadid_np();
 
 // Check for OS X >= 10.6 (see #7356)
-#elif defined(darwin_HOST_OS) && !(defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED < 1060)
+#elif defined(darwin_HOST_OS) && \
+       !(defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && \
+         __MAC_OS_X_VERSION_MIN_REQUIRED < 1060)
     uint64_t ktid;
     pthread_threadid_np(NULL, &ktid);
     return ktid;
