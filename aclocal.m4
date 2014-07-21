@@ -529,6 +529,9 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
     i386-unknown-mingw32)
         $2="$$2 -march=i686"
         ;;
+    i386-portbld-freebsd*)
+        $2="$$2 -march=i686"
+        ;;
     i386-apple-darwin)
         $2="$$2 -m32"
         $3="$$3 -m32"
