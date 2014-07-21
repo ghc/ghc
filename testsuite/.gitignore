@@ -112,7 +112,7 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/cabal/localT1750.package.conf/
 /tests/cabal/localshadow1.package.conf/
 /tests/cabal/localshadow2.package.conf/
-/tests/cabal/package.conf.ghcpkg02/
+/tests/cabal/package.conf.*/
 /tests/cabal/shadow.hs
 /tests/cabal/shadow1.out
 /tests/cabal/shadow2.out

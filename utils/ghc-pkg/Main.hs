@@ -111,6 +111,7 @@ data Flag
   | FlagVersion
   | FlagConfig FilePath
   | FlagGlobalConfig FilePath
+  | FlagUserConfig FilePath
   | FlagForce
   | FlagForceFiles
   | FlagAutoGHCiLibs
@@ -139,6 +140,8 @@ flags = [
         "location of the global package database",
   Option [] ["no-user-package-db"] (NoArg FlagNoUserDb)
         "never read the user package database",
+  Option [] ["user-package-db"] (ReqArg FlagUserConfig "DIR")
+        "location of the user package database (use instead of default)",
   Option [] ["no-user-package-conf"] (NoArg FlagNoUserDb)
         "never read the user package database (DEPRECATED)",
   Option [] ["force"] (NoArg FlagForce)
@@ -521,16 +524,18 @@ getPkgDatabases verbosity modify use_cache expand_vars my_flags = do
   e_appdir <- tryIO $ getAppUserDataDirectory "ghc"
 
   mb_user_conf <-
-     if no_user_db then return Nothing else
-     case e_appdir of
-       Left _    -> return Nothing
-       Right appdir -> do
-         let subdir = targetARCH ++ '-':targetOS ++ '-':Version.version
-             dir = appdir </> subdir
-         r <- lookForPackageDBIn dir
-         case r of
-           Nothing -> return (Just (dir </> "package.conf.d", False))
-           Just f  -> return (Just (f, True))
+    case [ f | FlagUserConfig f <- my_flags ] of
+      _ | no_user_db -> return Nothing
+      [] -> case e_appdir of
+        Left _    -> return Nothing
+        Right appdir -> do
+          let subdir = targetARCH ++ '-':targetOS ++ '-':Version.version
+              dir = appdir </> subdir
+          r <- lookForPackageDBIn dir
+          case r of
+            Nothing -> return (Just (dir </> "package.conf.d", False))
+            Just f  -> return (Just (f, True))
+      fs -> return (Just (last fs, True))
 
   -- If the user database doesn't exist, and this command isn't a
   -- "modify" command, then we won't attempt to create or use it.
@@ -590,6 +595,11 @@ getPkgDatabases verbosity modify use_cache expand_vars my_flags = do
 
   let flag_db_stack = [ db | db_name <- flag_db_names,
                         db <- db_stack, location db == db_name ]
+
+  when (verbosity > Normal) $ do
+    infoLn ("db stack: " ++ show (map location db_stack))
+    infoLn ("modifying: " ++ show to_modify)
+    infoLn ("flag db stack: " ++ show (map location flag_db_stack))
 
   return (db_stack, to_modify, flag_db_stack)
 
@@ -948,10 +958,11 @@ modifyPackage
   -> Force
   -> IO ()
 modifyPackage fn pkgid verbosity my_flags force = do
-  (db_stack, Just _to_modify, _flag_dbs) <- 
+  (db_stack, Just _to_modify, flag_dbs) <-
       getPkgDatabases verbosity True{-modify-} True{-use cache-} False{-expand vars-} my_flags
 
-  (db, ps) <- fmap head $ findPackagesByDB db_stack (Id pkgid)
+  -- Do the search for the package respecting flags...
+  (db, ps) <- fmap head $ findPackagesByDB flag_dbs (Id pkgid)
   let 
       db_name = location db
       pkgs    = packages db
@@ -961,6 +972,7 @@ modifyPackage fn pkgid verbosity my_flags force = do
       cmds = [ fn pkg | pkg <- pkgs, sourcePackageId pkg `elem` pids ]
       new_db = updateInternalDB db cmds
 
+      -- ...but do consistency checks with regards to the full stack
       old_broken = brokenPackages (allPackagesInStack db_stack)
       rest_of_stack = filter ((/= db_name) . location) db_stack
       new_stack = new_db : rest_of_stack

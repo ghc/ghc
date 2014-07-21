@@ -57,6 +57,28 @@ test('T1750',
                   'localT1750.package.conf.old']),
      run_command, ['$MAKE -s --no-print-directory T1750'])
 
+test('T5442a',
+     [extra_clean(['package.conf.T5442a.global', 'package.conf.T5442a.user'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T5442a'])
+
+test('T5442b',
+     [extra_clean(['package.conf.T5442b.global', 'package.conf.T5442b.user'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T5442b'])
+
+test('T5442c',
+     [extra_clean(['package.conf.T5442c.global', 'package.conf.T5442c.user',
+                   'package.conf.T5442c.extra'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T5442c'])
+
+test('T5442d',
+     [extra_clean(['package.conf.T5442d.global', 'package.conf.T5442d.user',
+                   'package.conf.T5442d.extra'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T5442d'])
+
 test('shadow',
      extra_clean(['shadow.out', 'shadow.hs', 'shadow.hi',
                   'local1shadow1.package.conf',

@@ -99,7 +99,21 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO FIXME
+                    <literal>ghc-pkg</literal> now respects <option>--user</option>
+                    and <option>--global</option> when modifying packages (e.g.
+                    changing exposed/trust flag or unregistering).  Previously,
+                    <literal>ghc-pkg</literal> would ignore these flags and modify
+                    whichever package it found first on the database stack.  To
+                    recover the old behavior, simply omit these flags.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    <literal>ghc-pkg</literal> accepts a <option>--user-package-db</option>
+                    flag which allows a user to override the location of the user package
+                    database.  Unlike databases specified using <option>--package-db</option>,
+                    a user package database configured this way respects
+                    the <option>--user</option> flag.
                </para>
            </listitem>
        </itemizedlist>

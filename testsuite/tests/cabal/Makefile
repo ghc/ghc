@@ -165,6 +165,60 @@ shadow:
 	@echo "should SUCCEED:"
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW1) -package-db $(PKGCONFSHADOW2) -package-id shadowdep-1-XXX -c shadow.hs -fno-code
 
+# If we pass --global, we should ignore instances in the user database
+T5442a:
+	@rm -rf package.conf.T5442a.global package.conf.T5442a.user
+	'$(GHC_PKG)' init package.conf.T5442a.global
+	'$(GHC_PKG)' init package.conf.T5442a.user
+	'$(GHC_PKG)' -f package.conf.T5442a.global register --force-files test.pkg 2>/dev/null
+	'$(GHC_PKG)' -f package.conf.T5442a.user register --force-files test.pkg 2>/dev/null
+	'$(GHC_PKG)' --global-package-db=package.conf.T5442a.global --user-package-db=package.conf.T5442a.user --global unregister testpkg
+	@echo "global (should be empty):"
+	'$(GHC_PKG)' -f package.conf.T5442a.global list --simple-output
+	@echo "user:"
+	'$(GHC_PKG)' -f package.conf.T5442a.user list --simple-output
+
+# If we pass --user, we should ignore instances in the global database
+T5442b:
+	@rm -rf package.conf.T5442b.global package.conf.T5442b.user
+	'$(GHC_PKG)' init package.conf.T5442b.global
+	'$(GHC_PKG)' init package.conf.T5442b.user
+	'$(GHC_PKG)' -f package.conf.T5442b.global register --force-files test.pkg 2>/dev/null
+	! '$(GHC_PKG)' --global-package-db=package.conf.T5442b.global --user-package-db=package.conf.T5442b.user --user unregister testpkg
+	@echo "global (should have testpkg):"
+	'$(GHC_PKG)' -f package.conf.T5442b.global list --simple-output
+
+# If we pass -f, we should ignore the user and global databases
+T5442c:
+	@rm -rf package.conf.T5442c.global package.conf.T5442c.user package.conf.T5442c.extra
+	'$(GHC_PKG)' init package.conf.T5442c.global
+	'$(GHC_PKG)' init package.conf.T5442c.user
+	'$(GHC_PKG)' init package.conf.T5442c.extra
+	'$(GHC_PKG)' -f package.conf.T5442c.global register --force-files test.pkg 2>/dev/null
+	'$(GHC_PKG)' -f package.conf.T5442c.user register --force-files test.pkg 2>/dev/null
+	! '$(GHC_PKG)' --global-package-db=package.conf.T5442c.global --user-package-db=package.conf.T5442c.user -f package.conf.T5442c.extra unregister testpkg
+	@echo "global (should have testpkg):"
+	'$(GHC_PKG)' -f package.conf.T5442c.global list --simple-output
+	@echo "use (should have testpkg):"
+	'$(GHC_PKG)' -f package.conf.T5442c.user list --simple-output
+
+# If we pass --global and -f, we remove from the global database, but
+# warn about possible breakage in the full package stack
+T5442d:
+	@rm -rf package.conf.T5442d.global package.conf.T5442d.user package.conf.T5442d.extra
+	'$(GHC_PKG)' init package.conf.T5442d.global
+	'$(GHC_PKG)' init package.conf.T5442d.user
+	'$(GHC_PKG)' init package.conf.T5442d.extra
+	'$(GHC_PKG)' -f package.conf.T5442d.global register --force-files shadow1.pkg 2>/dev/null
+	'$(GHC_PKG)' -f package.conf.T5442d.user register --force-files shadow3.pkg 2>/dev/null
+	'$(GHC_PKG)' --global-package-db=package.conf.T5442d.global -f package.conf.T5442d.extra register --force-files shadow2.pkg 2>/dev/null
+	'$(GHC_PKG)' --global-package-db=package.conf.T5442d.global --user-package-db=package.conf.T5442d.user -f package.conf.T5442d.extra --global unregister shadow --force
+	@echo "global (should be empty):"
+	'$(GHC_PKG)' -f package.conf.T5442d.global list --simple-output
+	@echo "user:"
+	'$(GHC_PKG)' -f package.conf.T5442d.user list --simple-output
+	@echo "extra:"
+	'$(GHC_PKG)' -f package.conf.T5442d.extra list --simple-output
 
 # -----------------------------------------------------------------------------
 # Try piping the output of "ghc-pkg describe" into "ghc-pkg update" for

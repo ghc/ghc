@@ -1,0 +1,8 @@
+Reading package info from "shadow1.pkg" ... done.
+Reading package info from "shadow3.pkg" ... done.
+Reading package info from "shadow2.pkg" ... done.
+global (should be empty):
+user:
+shadow-1
+extra:
+shadowdep-1
