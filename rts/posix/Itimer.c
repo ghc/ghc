@@ -9,10 +9,10 @@
 /*
  * The interval timer is used for profiling and for context switching in the
  * threaded build.  Though POSIX 1003.1b includes a standard interface for
- * such things, no one really seems to be implementing them yet.  Even 
+ * such things, no one really seems to be implementing them yet.  Even
  * Solaris 2.3 only seems to provide support for @CLOCK_REAL@, whereas we're
  * keen on getting access to @CLOCK_VIRTUAL@.
- * 
+ *
  * Hence, we use the old-fashioned @setitimer@ that just about everyone seems
  * to support.  So much for standards.
  */
@@ -202,11 +202,11 @@ startTicker(void)
 #elif defined(USE_TIMER_CREATE)
     {
         struct itimerspec it;
-        
+
         it.it_value.tv_sec  = TimeToSeconds(itimer_interval);
         it.it_value.tv_nsec = TimeToNS(itimer_interval) % 1000000000;
         it.it_interval = it.it_value;
-        
+
         if (timer_settime(timer, 0, &it, NULL) != 0) {
             sysErrorBelch("timer_settime");
             stg_exit(EXIT_FAILURE);
@@ -219,7 +219,7 @@ startTicker(void)
         it.it_value.tv_sec = TimeToSeconds(itimer_interval);
         it.it_value.tv_usec = TimeToUS(itimer_interval) % 1000000;
         it.it_interval = it.it_value;
-        
+
         if (setitimer(ITIMER_REAL, &it, NULL) != 0) {
             sysErrorBelch("setitimer");
             stg_exit(EXIT_FAILURE);
