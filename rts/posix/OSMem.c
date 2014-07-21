@@ -81,13 +81,13 @@ my_mmap (void *addr, W_ size)
     void *ret;
 
 #if defined(solaris2_HOST_OS) || defined(irix_HOST_OS)
-    { 
+    {
         int fd = open("/dev/zero",O_RDONLY);
         ret = mmap(addr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
         close(fd);
     }
 #elif hpux_HOST_OS
-    ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
+    ret = mmap(addr, size, PROT_READ | PROT_WRITE,
                MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #elif darwin_HOST_OS
     // Without MAP_FIXED, Apple's mmap ignores addr.
@@ -97,21 +97,23 @@ my_mmap (void *addr, W_ size)
     // This behaviour seems to be conformant with IEEE Std 1003.1-2001.
     // Let's just use the underlying Mach Microkernel calls directly,
     // they're much nicer.
-    
+
     kern_return_t err = 0;
     ret = addr;
     if(addr)    // try to allocate at address
         err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, FALSE);
     if(!addr || err)    // try to allocate anywhere
         err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, TRUE);
-        
+
     if(err) {
         // don't know what the error codes mean exactly, assume it's
         // not our problem though.
-        errorBelch("memory allocation failed (requested %" FMT_Word " bytes)", size);
+        errorBelch("memory allocation failed (requested %" FMT_Word " bytes)",
+                   size);
         stg_exit(EXIT_FAILURE);
     } else {
-        vm_protect(mach_task_self(),(vm_address_t)ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
+        vm_protect(mach_task_self(), (vm_address_t)ret, size, FALSE,
+                   VM_PROT_READ|VM_PROT_WRITE);
     }
 #elif linux_HOST_OS
     ret = mmap(addr, size, PROT_READ | PROT_WRITE,
@@ -135,12 +137,12 @@ my_mmap (void *addr, W_ size)
         }
     }
 #else
-    ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
+    ret = mmap(addr, size, PROT_READ | PROT_WRITE,
                MAP_ANON | MAP_PRIVATE, -1, 0);
 #endif
 
     if (ret == (void *)-1) {
-        if (errno == ENOMEM || 
+        if (errno == ENOMEM ||
             (errno == EINVAL && sizeof(void*)==4 && size >= 0xc0000000)) {
             // If we request more than 3Gig, then we get EINVAL
             // instead of ENOMEM (at least on Linux).
@@ -167,10 +169,10 @@ gen_map_mblocks (W_ size)
     // it (unmap the rest).
     size += MBLOCK_SIZE;
     ret = my_mmap(0, size);
-    
+
     // unmap the slop bits around the chunk we allocated
     slop = (W_)ret & MBLOCK_MASK;
-    
+
     if (munmap((void*)ret, MBLOCK_SIZE - slop) == -1) {
       barf("gen_map_mblocks: munmap failed");
     }
@@ -188,7 +190,7 @@ gen_map_mblocks (W_ size)
     //       you unmap the extra mblock mmap()ed here (or simply
     //       satisfy yourself that the slop introduced isn't worth
     //       salvaging.)
-    // 
+    //
 
     // next time, try after the block we just got.
     ret += MBLOCK_SIZE - slop;
@@ -210,7 +212,9 @@ osGetMBlocks(nat n)
       if (((W_)ret & MBLOCK_MASK) != 0) {
           // misaligned block!
 #if 0 // defined(DEBUG)
-          errorBelch("warning: getMBlock: misaligned block %p returned when allocating %d megablock(s) at %p", ret, n, next_request);
+          errorBelch("warning: getMBlock: misaligned block %p returned "
+                     "when allocating %d megablock(s) at %p",
+                     ret, n, next_request);
 #endif
 
           // unmap this block...
@@ -289,7 +293,8 @@ StgWord64 getPhysicalMemorySize (void)
         long ret = sysconf(_SC_PHYS_PAGES);
         if (ret == -1) {
 #if defined(DEBUG)
-            errorBelch("warning: getPhysicalMemorySize: cannot get physical memory size");
+            errorBelch("warning: getPhysicalMemorySize: cannot get "
+                       "physical memory size");
 #endif
             return 0;
         }
@@ -308,7 +313,7 @@ void setExecutable (void *p, W_ len, rtsBool exec)
     StgWord startOfFirstPage = ((StgWord)p          ) & mask;
     StgWord startOfLastPage  = ((StgWord)p + len - 1) & mask;
     StgWord size             = startOfLastPage - startOfFirstPage + pageSize;
-    if (mprotect((void*)startOfFirstPage, (size_t)size, 
+    if (mprotect((void*)startOfFirstPage, (size_t)size,
                  (exec ? PROT_EXEC : 0) | PROT_READ | PROT_WRITE) != 0) {
         barf("setExecutable: failed to protect 0x%p\n", p);
     }
