@@ -100,17 +100,18 @@ static rtsBool wakeUpSleepingThreads (LowResTime now)
     rtsBool flag = rtsFalse;
 
     while (sleeping_queue != END_TSO_QUEUE) {
-	tso = sleeping_queue;
+        tso = sleeping_queue;
         if (((long)now - (long)tso->block_info.target) < 0) {
             break;
         }
-	sleeping_queue = tso->_link;
-	tso->why_blocked = NotBlocked;
-	tso->_link = END_TSO_QUEUE;
-	IF_DEBUG(scheduler,debugBelch("Waking up sleeping thread %lu\n", (unsigned long)tso->id));
-	// MainCapability: this code is !THREADED_RTS
-	pushOnRunQueue(&MainCapability,tso);
-	flag = rtsTrue;
+        sleeping_queue = tso->_link;
+        tso->why_blocked = NotBlocked;
+        tso->_link = END_TSO_QUEUE;
+        IF_DEBUG(scheduler, debugBelch("Waking up sleeping thread %lu\n",
+                                       (unsigned long)tso->id));
+        // MainCapability: this code is !THREADED_RTS
+        pushOnRunQueue(&MainCapability,tso);
+        flag = rtsTrue;
     }
     return flag;
 }
@@ -118,7 +119,9 @@ static rtsBool wakeUpSleepingThreads (LowResTime now)
 static void GNUC3_ATTRIBUTE(__noreturn__)
 fdOutOfRange (int fd)
 {
-    errorBelch("file descriptor %d out of range for select (0--%d).\nRecompile with -threaded to work around this.", fd, (int)FD_SETSIZE);
+    errorBelch("file descriptor %d out of range for select (0--%d).\n"
+               "Recompile with -threaded to work around this.",
+               fd, (int)FD_SETSIZE);
     stg_exit(EXIT_FAILURE);
 }
 
@@ -226,12 +229,12 @@ awaitEvent(rtsBool wait)
     LowResTime now;
 
     IF_DEBUG(scheduler,
-	     debugBelch("scheduler: checking for threads blocked on I/O");
-	     if (wait) {
-		 debugBelch(" (waiting)");
-	     }
-	     debugBelch("\n");
-	     );
+             debugBelch("scheduler: checking for threads blocked on I/O");
+             if (wait) {
+                 debugBelch(" (waiting)");
+             }
+             debugBelch("\n");
+             );
 
     /* loop until we've woken up some threads.  This loop is needed
      * because the select timing isn't accurate, we sometimes sleep
@@ -242,7 +245,7 @@ awaitEvent(rtsBool wait)
 
       now = getLowResTimeOfDay();
       if (wakeUpSleepingThreads(now)) {
-	  return;
+          return;
       }
 
       /*
@@ -252,38 +255,38 @@ awaitEvent(rtsBool wait)
       FD_ZERO(&wfd);
 
       for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
-	next = tso->_link;
+        next = tso->_link;
 
       /* On FreeBSD FD_SETSIZE is unsigned. Cast it to signed int
        * in order to switch off the 'comparison between signed and
        * unsigned error message
        */
-	switch (tso->why_blocked) {
-	case BlockedOnRead:
-	  { 
-	    int fd = tso->block_info.fd;
-	    if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
+        switch (tso->why_blocked) {
+        case BlockedOnRead:
+          {
+            int fd = tso->block_info.fd;
+            if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
                 fdOutOfRange(fd);
-	    }
-	    maxfd = (fd > maxfd) ? fd : maxfd;
-	    FD_SET(fd, &rfd);
-	    continue;
-	  }
+            }
+            maxfd = (fd > maxfd) ? fd : maxfd;
+            FD_SET(fd, &rfd);
+            continue;
+          }
 
-	case BlockedOnWrite:
-	  { 
-	    int fd = tso->block_info.fd;
-	    if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
+        case BlockedOnWrite:
+          {
+            int fd = tso->block_info.fd;
+            if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
                 fdOutOfRange(fd);
-	    }
-	    maxfd = (fd > maxfd) ? fd : maxfd;
-	    FD_SET(fd, &wfd);
-	    continue;
-	  }
+            }
+            maxfd = (fd > maxfd) ? fd : maxfd;
+            FD_SET(fd, &wfd);
+            continue;
+          }
 
-	default:
-	  barf("AwaitEvent");
-	}
+        default:
+          barf("AwaitEvent");
+        }
       }
 
       if (!wait) {
@@ -301,46 +304,46 @@ awaitEvent(rtsBool wait)
       }
 
       /* Check for any interesting events */
-      
+
       while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, ptv)) < 0) {
-	  if (errno != EINTR) {
-	    if ( errno == EBADF ) {
+          if (errno != EINTR) {
+            if ( errno == EBADF ) {
                 seen_bad_fd = rtsTrue;
                 break;
-	    } else {
+            } else {
                 sysErrorBelch("select");
                 stg_exit(EXIT_FAILURE);
             }
-	  }
+          }
 
-	  /* We got a signal; could be one of ours.  If so, we need
-	   * to start up the signal handler straight away, otherwise
-	   * we could block for a long time before the signal is
-	   * serviced.
-	   */
+          /* We got a signal; could be one of ours.  If so, we need
+           * to start up the signal handler straight away, otherwise
+           * we could block for a long time before the signal is
+           * serviced.
+           */
 #if defined(RTS_USER_SIGNALS)
-	  if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
-	      startSignalHandlers(&MainCapability);
-	      return; /* still hold the lock */
-	  }
+          if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
+              startSignalHandlers(&MainCapability);
+              return; /* still hold the lock */
+          }
 #endif
 
-	  /* we were interrupted, return to the scheduler immediately.
-	   */
-	  if (sched_state >= SCHED_INTERRUPTING) {
-	      return; /* still hold the lock */
-	  }
-	  
-	  /* check for threads that need waking up 
-	   */
+          /* we were interrupted, return to the scheduler immediately.
+           */
+          if (sched_state >= SCHED_INTERRUPTING) {
+              return; /* still hold the lock */
+          }
+
+          /* check for threads that need waking up
+           */
           wakeUpSleepingThreads(getLowResTimeOfDay());
 
-	  /* If new runnable threads have arrived, stop waiting for
-	   * I/O and run them.
-	   */
-	  if (!emptyRunQueue(&MainCapability)) {
-	      return; /* still hold the lock */
-	  }
+          /* If new runnable threads have arrived, stop waiting for
+           * I/O and run them.
+           */
+          if (!emptyRunQueue(&MainCapability)) {
+              return; /* still hold the lock */
+          }
       }
 
       /* Step through the waiting queue, unblocking every thread that now has
@@ -383,11 +386,16 @@ awaitEvent(rtsBool wait)
                    * Don't let RTS loop on such descriptors,
                    * pass an IOError to blocked threads (Trac #4934)
                    */
-                  IF_DEBUG(scheduler,debugBelch("Killing blocked thread %lu on bad fd=%i\n", (unsigned long)tso->id, fd));
-                  throwToSingleThreaded(&MainCapability, tso, (StgClosure *)blockedOnBadFD_closure);
+                  IF_DEBUG(scheduler,
+                      debugBelch("Killing blocked thread %lu on bad fd=%i\n",
+                                 (unsigned long)tso->id, fd));
+                  throwToSingleThreaded(&MainCapability, tso,
+                                        (StgClosure *)blockedOnBadFD_closure);
                   break;
               case RTS_FD_IS_READY:
-                  IF_DEBUG(scheduler,debugBelch("Waking up blocked thread %lu\n", (unsigned long)tso->id));
+                  IF_DEBUG(scheduler,
+                      debugBelch("Waking up blocked thread %lu\n",
+                                 (unsigned long)tso->id));
                   tso->why_blocked = NotBlocked;
                   tso->_link = END_TSO_QUEUE;
                   pushOnRunQueue(&MainCapability,tso);
@@ -400,19 +408,18 @@ awaitEvent(rtsBool wait)
                   prev = tso;
                   break;
               }
-	  }
+          }
 
-	  if (prev == NULL)
-	      blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
-	  else {
-	      prev->_link = END_TSO_QUEUE;
-	      blocked_queue_tl = prev;
-	  }
+          if (prev == NULL)
+              blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
+          else {
+              prev->_link = END_TSO_QUEUE;
+              blocked_queue_tl = prev;
+          }
       }
-      
+
     } while (wait && sched_state == SCHED_RUNNING
-	     && emptyRunQueue(&MainCapability));
+             && emptyRunQueue(&MainCapability));
 }
 
 #endif /* THREADED_RTS */
-
