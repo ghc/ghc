@@ -69,7 +69,7 @@ libraries/old-time           -           -                               -
 libraries/pretty             -           -                               https://github.com/haskell/pretty.git
 libraries/process            -           -                               -
 libraries/terminfo           -           -                               https://github.com/judah/terminfo.git
-libraries/time               -           -                               http://git.haskell.org/darcs-mirrors/time.git
+libraries/time               -           -                               https://github.com/haskell/time.git
 libraries/transformers       -           -                               http://git.haskell.org/darcs-mirrors/transformers.git
 libraries/unix               -           -                               ssh://git@github.com/haskell/unix.git
 libraries/Win32              -           -                               https://github.com/haskell/win32.git
