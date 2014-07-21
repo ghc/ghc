@@ -50,7 +50,11 @@ void initializeTimer()
 
 Time getProcessCPUTime(void)
 {
-#if !defined(BE_CONSERVATIVE) && defined(HAVE_CLOCK_GETTIME) && defined (_SC_CPUTIME) && defined(CLOCK_PROCESS_CPUTIME_ID) && defined(HAVE_SYSCONF)
+#if !defined(BE_CONSERVATIVE)            &&  \
+       defined(HAVE_CLOCK_GETTIME)       &&  \
+       defined(_SC_CPUTIME)             &&  \
+       defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
+       defined(HAVE_SYSCONF)
     static int checked_sysconf = 0;
     static int sysconf_result = 0;
 
@@ -129,7 +133,7 @@ Time getProcessCPUTime(void)
 #if !defined(THREADED_RTS) && USE_PAPI
     long long usec;
     if ((usec = PAPI_get_virt_usec()) < 0) {
-	barf("PAPI_get_virt_usec: %lld", usec);
+        barf("PAPI_get_virt_usec: %lld", usec);
     }
     return USToTime(usec);
 #else
@@ -152,22 +156,22 @@ void getProcessTimes(Time *user, Time *elapsed)
 
     if (ClockFreq == 0) {
 #if defined(HAVE_SYSCONF)
-	long ticks;
-	ticks = sysconf(_SC_CLK_TCK);
-	if ( ticks == -1 ) {
-	    sysErrorBelch("sysconf");
-	    stg_exit(EXIT_FAILURE);
-	}
-	ClockFreq = ticks;
-#elif defined(CLK_TCK)		/* defined by POSIX */
-	ClockFreq = CLK_TCK;
+        long ticks;
+        ticks = sysconf(_SC_CLK_TCK);
+        if ( ticks == -1 ) {
+            sysErrorBelch("sysconf");
+            stg_exit(EXIT_FAILURE);
+        }
+        ClockFreq = ticks;
+#elif defined(CLK_TCK)          /* defined by POSIX */
+        ClockFreq = CLK_TCK;
 #elif defined(HZ)
-	ClockFreq = HZ;
+        ClockFreq = HZ;
 #elif defined(CLOCKS_PER_SEC)
-	ClockFreq = CLOCKS_PER_SEC;
+        ClockFreq = CLOCKS_PER_SEC;
 #else
-	errorBelch("can't get clock resolution");
-	stg_exit(EXIT_FAILURE);
+        errorBelch("can't get clock resolution");
+        stg_exit(EXIT_FAILURE);
 #endif
     }
 
@@ -184,15 +188,19 @@ Time getThreadCPUTime(void)
 #if USE_PAPI
     long long usec;
     if ((usec = PAPI_get_virt_usec()) < 0) {
-	barf("PAPI_get_virt_usec: %lld", usec);
+        barf("PAPI_get_virt_usec: %lld", usec);
     }
     return USToTime(usec);
 
-#elif !defined(BE_CONSERVATIVE) && defined(HAVE_CLOCK_GETTIME) && defined (_SC_THREAD_CPUTIME) && defined(CLOCK_THREAD_CPUTIME_ID) && defined(HAVE_SYSCONF)
+#elif !defined(BE_CONSERVATIVE)            &&  \
+       defined(HAVE_CLOCK_GETTIME)       &&  \
+       defined(_SC_CPUTIME)             &&  \
+       defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
+       defined(HAVE_SYSCONF)
     {
         static int checked_sysconf = 0;
         static int sysconf_result = 0;
-        
+
         if (!checked_sysconf) {
             sysconf_result = sysconf(_SC_THREAD_CPUTIME);
             checked_sysconf = 1;
@@ -239,4 +247,3 @@ getPageFaults(void)
     return(t.ru_majflt);
 #endif
 }
-
