@@ -1799,13 +1799,13 @@ Note [Computing a coercion kind and role]
 To compute a coercion's kind is straightforward: see coercionKind.
 But to compute a coercion's role, in the case for NthCo we need
 its kind as well.  So if we have two separate functions (one for kinds
-and one for roles) we can get exponentially bad behaviour, sinc each
-NthCo node makes a seaprate call to coercionKind, which traverses the
+and one for roles) we can get exponentially bad behaviour, since each
+NthCo node makes a separate call to coercionKind, which traverses the
 sub-tree again.  This was part of the problem in Trac #9233.
 
 Solution: compute both together; hence coercionKindRole.  We keep a
 separate coercionKind function because it's a bit more efficient if
-the kind is all you wan.
+the kind is all you want.
 
 \begin{code}
 coercionType :: Coercion -> Type
