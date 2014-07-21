@@ -326,6 +326,28 @@ runit verbosity cli nonopts = do
           where splitComma "" = Nothing
                 splitComma fs = Just $ break (==',') (tail fs)
 
+        -- | Parses a glob into a predicate which tests if a string matches
+        -- the glob.  Returns Nothing if the string in question is not a glob.
+        -- At the moment, we only support globs at the beginning and/or end of
+        -- strings.  This function respects case sensitivity.
+        --
+        -- >>> fromJust (substringCheck "*") "anything"
+        -- True
+        --
+        -- >>> fromJust (substringCheck "string") "string"
+        -- True
+        --
+        -- >>> fromJust (substringCheck "*bar") "foobar"
+        -- True
+        --
+        -- >>> fromJust (substringCheck "foo*") "foobar"
+        -- True
+        --
+        -- >>> fromJust (substringCheck "*ooba*") "foobar"
+        -- True
+        --
+        -- >>> fromJust (substringCheck "f*bar") "foobar"
+        -- False
         substringCheck :: String -> Maybe (String -> Bool)
         substringCheck ""    = Nothing
         substringCheck "*"   = Just (const True)
