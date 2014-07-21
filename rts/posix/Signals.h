@@ -31,4 +31,3 @@ extern StgInt *signal_handlers;
 #include "EndPrivate.h"
 
 #endif /* POSIX_SIGNALS_H */
-
