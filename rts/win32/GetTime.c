@@ -25,7 +25,7 @@ fileTimeToRtsTime(FILETIME ft)
     t = NSToTime(t * 100);
     /* FILETIMES are in units of 100ns */
     return t;
-}    
+}
 
 void
 getProcessTimes(Time *user, Time *elapsed)
@@ -40,8 +40,8 @@ getProcessCPUTime(void)
     FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
 
     if (!GetProcessTimes(GetCurrentProcess(), &creationTime,
-			 &exitTime, &kernelTime, &userTime)) {
-	return 0;
+                         &exitTime, &kernelTime, &userTime)) {
+        return 0;
     }
 
     return fileTimeToRtsTime(userTime);
@@ -106,8 +106,8 @@ getThreadCPUTime(void)
     FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
 
     if (!GetThreadTimes(GetCurrentThread(), &creationTime,
-			&exitTime, &kernelTime, &userTime)) {
-	return 0;
+                        &exitTime, &kernelTime, &userTime)) {
+        return 0;
     }
 
     return fileTimeToRtsTime(userTime);
@@ -136,16 +136,16 @@ getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
        ULARGE_INTEGER struct which is a handy union type */
     unixtime.LowPart  = filetime.dwLowDateTime;
     unixtime.HighPart = filetime.dwHighDateTime;
-    
+
     /* We have to do an epoch conversion, since FILETIME uses 1601
        while we want unix epoch of 1970. In case you were wondering,
        there were 11,644,473,600 seconds between 1601 and 1970, then
        multiply by 10^7 for units of 100 nanoseconds. */
     unixtime.QuadPart = unixtime.QuadPart - 116444736000000000ull;
-    
+
     /* For the seconds part we use integer division by 10^7 */
     *sec  = unixtime.QuadPart / 10000000ull;
-    
+
     /* The remainder from integer division by 10^7 gives us
        the sub-second component in units of 100 nanoseconds.
        So for nanoseconds we just multiply by 100.
