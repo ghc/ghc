@@ -291,7 +291,8 @@ interruptOSThread (OSThreadId id)
         sysErrorBelch("interruptOSThread: OpenThread");
         stg_exit(EXIT_FAILURE);
     }
-    pCSIO = (PCSIO) GetProcAddress(GetModuleHandle(TEXT("Kernel32.dll")), "CancelSynchronousIo");
+    pCSIO = (PCSIO) GetProcAddress(GetModuleHandle(TEXT("Kernel32.dll")),
+				   "CancelSynchronousIo");
     if ( NULL != pCSIO ) {
         pCSIO(hdl);
     } else {
