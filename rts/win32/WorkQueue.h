@@ -1,7 +1,7 @@
 /* WorkQueue.h
  *
  * A fixed-size queue; MT-friendly.
- * 
+ *
  * (c) sof, 2002-2003
  *
  */
