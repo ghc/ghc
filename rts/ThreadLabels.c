@@ -59,7 +59,7 @@ removeThreadLabel(StgWord key)
   if ((old = lookupHashTable(threadLabels,key))) {
     removeHashTable(threadLabels,key,old);
     stgFree(old);
-  }  
+  }
 }
 
 #endif /* DEBUG */
@@ -82,4 +82,3 @@ labelThread(Capability *cap   STG_UNUSED,
 #endif
   traceThreadLabel(cap, tso, label);
 }
-
