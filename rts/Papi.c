@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  * (c) The GHC Team 2006
- * 
+ *
  * Initialization and use of the PAPI performance monitoring library
  *
  *
@@ -64,7 +64,7 @@ struct _papi_events {
 #define PAPI_CHECK(CALL) \
   if((papi_error=(CALL)) != PAPI_OK) { \
    debugBelch("PAPI function failed in module %s at line %d with error code %d\n", \
-	      __FILE__,__LINE__,papi_error);				\
+              __FILE__,__LINE__,papi_error);                            \
   }
 
 /* While PAPI reporting is going on this flag is on */
@@ -113,41 +113,41 @@ static nat max_hardware_counters = 2;
 static void papi_add_event(const char *name, int code)
 {
     if (n_papi_events >= max_hardware_counters) {
-        errorBelch("too many PAPI events for this CPU (max: %d)", 
+        errorBelch("too many PAPI events for this CPU (max: %d)",
                    max_hardware_counters);
         stg_exit(EXIT_FAILURE);
     }
     papi_events[n_papi_events].event_code = code;
     papi_events[n_papi_events].event_name = name;
     n_papi_events++;
-}    
+}
 
 static void
-init_countable_events(void) 
+init_countable_events(void)
 {
     max_hardware_counters = PAPI_num_counters();
 
 #define PAPI_ADD_EVENT(EVENT) papi_add_event(#EVENT,EVENT)
 
     if (RtsFlags.PapiFlags.eventType==PAPI_FLAG_BRANCH) {
-	PAPI_ADD_EVENT(FR_BR);
-	PAPI_ADD_EVENT(FR_BR_MIS);
-	/* Docs are wrong? Opteron does not count indirect branch misses exclusively */
-	PAPI_ADD_EVENT(FR_BR_MISCOMPARE);
+        PAPI_ADD_EVENT(FR_BR);
+        PAPI_ADD_EVENT(FR_BR_MIS);
+        /* Docs are wrong? Opteron does not count indirect branch misses exclusively */
+        PAPI_ADD_EVENT(FR_BR_MISCOMPARE);
     } else if (RtsFlags.PapiFlags.eventType==PAPI_FLAG_STALLS) {
-	PAPI_ADD_EVENT(FR_DISPATCH_STALLS);
-	PAPI_ADD_EVENT(FR_DISPATCH_STALLS_BR);
-	PAPI_ADD_EVENT(FR_DISPATCH_STALLS_FULL_LS);
+        PAPI_ADD_EVENT(FR_DISPATCH_STALLS);
+        PAPI_ADD_EVENT(FR_DISPATCH_STALLS_BR);
+        PAPI_ADD_EVENT(FR_DISPATCH_STALLS_FULL_LS);
     } else if (RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L1) {
-	PAPI_ADD_EVENT(PAPI_L1_DCA);
-	PAPI_ADD_EVENT(PAPI_L1_DCM);
+        PAPI_ADD_EVENT(PAPI_L1_DCA);
+        PAPI_ADD_EVENT(PAPI_L1_DCM);
     } else if (RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L2) {
-	PAPI_ADD_EVENT(PAPI_L2_DCA);
-	PAPI_ADD_EVENT(PAPI_L2_DCM);
+        PAPI_ADD_EVENT(PAPI_L2_DCA);
+        PAPI_ADD_EVENT(PAPI_L2_DCM);
     } else if (RtsFlags.PapiFlags.eventType==PAPI_FLAG_CB_EVENTS) {
-	PAPI_ADD_EVENT(DC_L2_REFILL_MOES);
-	PAPI_ADD_EVENT(DC_SYS_REFILL_MOES);
-	PAPI_ADD_EVENT(FR_BR_MIS);
+        PAPI_ADD_EVENT(DC_L2_REFILL_MOES);
+        PAPI_ADD_EVENT(DC_SYS_REFILL_MOES);
+        PAPI_ADD_EVENT(FR_BR_MIS);
     } else if (RtsFlags.PapiFlags.eventType==PAPI_USER_EVENTS) {
         nat i;
         char *name;
@@ -167,25 +167,25 @@ init_countable_events(void)
           papi_add_event(name, code);
         }
     } else {
-	// PAPI_ADD_EVENT(PAPI_L1_DCA); // L1 data cache accesses
-	// PAPI_ADD_EVENT(PAPI_L1_ICR); // L1 instruction cache reads
-	// PAPI_ADD_EVENT(PAPI_L1_ICM); // L1 instruction cache misses
-	// PAPI_ADD_EVENT(PAPI_L1_STM); // L1 store misses
-	// PAPI_ADD_EVENT(PAPI_L1_DCM); // L1 data cache misses
-	// PAPI_ADD_EVENT(PAPI_L1_LDM); // L1 load misses
-	// PAPI_ADD_EVENT(PAPI_L2_TCM); // L2 cache misses
-	// PAPI_ADD_EVENT(PAPI_L2_STM); // L2 store misses
-	// PAPI_ADD_EVENT(PAPI_L2_DCW); // L2 data cache writes
-	// PAPI_ADD_EVENT(PAPI_L2_DCR); // L2 data cache reads
-	// PAPI_ADD_EVENT(PAPI_L2_TCW); // L2 cache writes
-	// PAPI_ADD_EVENT(PAPI_L2_TCR); // L2 cache reads
-	// PAPI_ADD_EVENT(PAPI_CA_CLN); // exclusive access to clean cache line
-	// PAPI_ADD_EVENT(PAPI_TLB_DM); // TLB misses
+        // PAPI_ADD_EVENT(PAPI_L1_DCA); // L1 data cache accesses
+        // PAPI_ADD_EVENT(PAPI_L1_ICR); // L1 instruction cache reads
+        // PAPI_ADD_EVENT(PAPI_L1_ICM); // L1 instruction cache misses
+        // PAPI_ADD_EVENT(PAPI_L1_STM); // L1 store misses
+        // PAPI_ADD_EVENT(PAPI_L1_DCM); // L1 data cache misses
+        // PAPI_ADD_EVENT(PAPI_L1_LDM); // L1 load misses
+        // PAPI_ADD_EVENT(PAPI_L2_TCM); // L2 cache misses
+        // PAPI_ADD_EVENT(PAPI_L2_STM); // L2 store misses
+        // PAPI_ADD_EVENT(PAPI_L2_DCW); // L2 data cache writes
+        // PAPI_ADD_EVENT(PAPI_L2_DCR); // L2 data cache reads
+        // PAPI_ADD_EVENT(PAPI_L2_TCW); // L2 cache writes
+        // PAPI_ADD_EVENT(PAPI_L2_TCR); // L2 cache reads
+        // PAPI_ADD_EVENT(PAPI_CA_CLN); // exclusive access to clean cache line
+        // PAPI_ADD_EVENT(PAPI_TLB_DM); // TLB misses
         PAPI_ADD_EVENT(PAPI_TOT_INS); // Total instructions
         PAPI_ADD_EVENT(PAPI_TOT_CYC); // Total instructions
-	// PAPI_ADD_EVENT(PAPI_CA_SHR); // exclusive access to shared cache line
-	// PAPI_ADD_EVENT(PAPI_RES_STL); // Cycles stalled on any resource
-        
+        // PAPI_ADD_EVENT(PAPI_CA_SHR); // exclusive access to shared cache line
+        // PAPI_ADD_EVENT(PAPI_RES_STL); // Cycles stalled on any resource
+
     }
 
     // We might also consider:
@@ -198,7 +198,7 @@ static void
 papi_report_event(const char *name, StgWord64 value)
 {
     static char temp[BIG_STRING_LEN];
-    showStgWord64(value,temp,rtsTrue/*commas*/); 
+    showStgWord64(value,temp,rtsTrue/*commas*/);
     statsPrintf("  %15s  %15s\n", name, temp);
 }
 
@@ -219,16 +219,16 @@ papi_report(long_long counters[])
     }
 
     if (RtsFlags.PapiFlags.eventType==PAPI_FLAG_BRANCH) {
-	PAPI_REPORT_PCT(counters,FR_BR_MIS,FR_BR);
-	PAPI_REPORT_PCT(counters,FR_BR_MISCOMPARE,FR_BR);
+        PAPI_REPORT_PCT(counters,FR_BR_MIS,FR_BR);
+        PAPI_REPORT_PCT(counters,FR_BR_MISCOMPARE,FR_BR);
     }
 
     else if (RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L1) {
-	PAPI_REPORT_PCT(counters,PAPI_L1_DCM,PAPI_L1_DCA);
+        PAPI_REPORT_PCT(counters,PAPI_L1_DCM,PAPI_L1_DCA);
     }
 
     else if (RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L2) {
-	PAPI_REPORT_PCT(counters,PAPI_L2_DCM,PAPI_L2_DCA);
+        PAPI_REPORT_PCT(counters,PAPI_L2_DCM,PAPI_L2_DCA);
     }
 }
 
@@ -238,7 +238,7 @@ papi_stats_report (void)
     statsPrintf("  Mutator CPU counters\n");
     papi_report_event("CYCLES", mutator_cycles);
     papi_report(MutatorCounters);
-    
+
     statsPrintf("\n  GC(0) CPU counters\n");
     papi_report_event("CYCLES", gc0_cycles);
     papi_report(GC0Counters);
@@ -247,7 +247,7 @@ papi_stats_report (void)
     papi_report_event("CYCLES", gc1_cycles);
     papi_report(GC1Counters);
 }
-    
+
 void
 papi_init_eventset (int *event_set)
 {
@@ -310,10 +310,10 @@ papi_add_events(int EventSet)
   nat i;
   for(i=0;i<n_papi_events;i++) {
     if((papi_error=PAPI_add_event(EventSet,
-				  papi_events[i].event_code))
+                                  papi_events[i].event_code))
        != PAPI_OK)
       debugBelch("Failed adding %s to event set with error code %d\n",
-		 papi_events[i].event_name,papi_error);
+                 papi_events[i].event_name,papi_error);
   }
 }
 
