@@ -20,7 +20,7 @@
 #define _XOPEN_SOURCE   500
 // FreeBSD takes a different approach to _ISOC99_SOURCE: on FreeBSD it
 // means "I want *just* C99 things", whereas on GNU libc and Solaris
-// it means "I also want C99 things".  
+// it means "I also want C99 things".
 //
 // On both GNU libc and FreeBSD, _ISOC99_SOURCE is implied by
 // _XOPEN_SOURCE==600, but on Solaris it is an error to omit it.
