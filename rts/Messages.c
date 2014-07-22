@@ -166,8 +166,8 @@ nat messageBlackHole(Capability *cap, MessageBlackHole *msg)
     StgClosure *bh = UNTAG_CLOSURE(msg->bh);
     StgTSO *owner;
 
-    debugTraceCap(DEBUG_sched, cap, "message: thread %d blocking on blackhole %p",
-                  (W_)msg->tso->id, msg->bh);
+    debugTraceCap(DEBUG_sched, cap, "message: thread %d blocking on "
+                  "blackhole %p", (W_)msg->tso->id, msg->bh);
 
     info = bh->header.info;
 
@@ -210,7 +210,8 @@ loop:
 #ifdef THREADED_RTS
         if (owner->cap != cap) {
             sendMessage(cap, owner->cap, (Message*)msg);
-            debugTraceCap(DEBUG_sched, cap, "forwarding message to cap %d", owner->cap->no);
+            debugTraceCap(DEBUG_sched, cap, "forwarding message to cap %d",
+                          owner->cap->no);
             return 1;
         }
 #endif
@@ -273,7 +274,8 @@ loop:
 #ifdef THREADED_RTS
         if (owner->cap != cap) {
             sendMessage(cap, owner->cap, (Message*)msg);
-            debugTraceCap(DEBUG_sched, cap, "forwarding message to cap %d", owner->cap->no);
+            debugTraceCap(DEBUG_sched, cap, "forwarding message to cap %d",
+                          owner->cap->no);
             return 1;
         }
 #endif
