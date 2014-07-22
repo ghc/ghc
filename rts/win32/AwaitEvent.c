@@ -8,7 +8,7 @@
  * If the Scheduler is otherwise out of work, it'll block
  * herein waiting for external events to occur.
  *
- * This file mirrors the select()-based functionality 
+ * This file mirrors the select()-based functionality
  * for POSIX / Unix platforms in rts/Select.c, but for
  * Win32.
  *
@@ -50,8 +50,8 @@ awaitEvent(rtsBool wait)
     //  - the run-queue is now non- empty
 
   } while (wait
-	   && sched_state == SCHED_RUNNING
-	   && emptyRunQueue(&MainCapability)
+           && sched_state == SCHED_RUNNING
+           && emptyRunQueue(&MainCapability)
       );
 }
 #endif
