@@ -18,7 +18,7 @@
  *   Var1=Value1\0
  *   Var2=Value2\0
  *   ...
- *   VarN=ValueN\0\0 
+ *   VarN=ValueN\0\0
  * But because everyone else (ie POSIX) uses a vector of strings, we convert
  * to that format. Fortunately this is just a matter of making an array of
  * offsets into the environment block.
