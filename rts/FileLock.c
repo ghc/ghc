@@ -5,7 +5,7 @@
  * File locking support as required by Haskell
  *
  * ---------------------------------------------------------------------------*/
- 
+
 #include "PosixSource.h"
 #include "Rts.h"
 
@@ -120,7 +120,7 @@ unlockFile(int fd)
 
     lock = lookupHashTable(fd_hash, fd);
     if (lock == NULL) {
-        // errorBelch("unlockFile: fd %d not found", fd); 
+        // errorBelch("unlockFile: fd %d not found", fd);
         // This is normal: we didn't know when calling unlockFile
         // whether this FD referred to a locked file or not.
         RELEASE_LOCK(&file_lock_mutex);
