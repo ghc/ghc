@@ -44,8 +44,9 @@ static int cmpLocks(StgWord w1, StgWord w2)
 static int hashLock(HashTable *table, StgWord w)
 {
     Lock *l = (Lock *)w;
+    StgWord key = l->inode ^ (l->inode >> 32) ^ l->device ^ (l->device >> 32);
     // Just xor all 32-bit words of inode and device, hope this is good enough.
-    return hashWord(table, l->inode ^ (l->inode >> 32) ^ l->device ^ (l->device >> 32));
+    return hashWord(table, key);
 }
 
 void
