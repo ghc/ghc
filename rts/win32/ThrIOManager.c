@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team, 1998-2006
  *
- * The IO manager thread in THREADED_RTS.  
+ * The IO manager thread in THREADED_RTS.
  * See also libraries/base/GHC/Conc.lhs.
  *
  * ---------------------------------------------------------------------------*/
@@ -66,7 +66,7 @@ getIOManagerEvent (void)
 HsWord32
 readIOManagerEvent (void)
 {
-    // This function must exist even in non-THREADED_RTS, 
+    // This function must exist even in non-THREADED_RTS,
     // see getIOManagerEvent() above.
 #if defined(THREADED_RTS)
     HsWord32 res;
@@ -112,14 +112,14 @@ sendIOManagerEvent (HsWord32 event)
             if (!SetEvent(io_manager_event)) {
                 sysErrorBelch("sendIOManagerEvent");
                 stg_exit(EXIT_FAILURE);
-            }        
+            }
             event_buf[next_event++] = (StgWord32)event;
         }
     }
 
     RELEASE_LOCK(&event_buf_mutex);
 #endif
-}    
+}
 
 void
 ioManagerWakeup (void)
@@ -151,9 +151,9 @@ ioManagerStart (void)
     // Make sure the IO manager thread is running
     Capability *cap;
     if (io_manager_event == INVALID_HANDLE_VALUE) {
-	cap = rts_lock();
-        rts_evalIO(&cap,ensureIOManagerIsRunning_closure,NULL);
-	rts_unlock(cap);
+        cap = rts_lock();
+        rts_evalIO(&cap, ensureIOManagerIsRunning_closure, NULL);
+        rts_unlock(cap);
     }
 }
 #endif
