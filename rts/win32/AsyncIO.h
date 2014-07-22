@@ -10,10 +10,10 @@
 
 extern unsigned int
 addIORequest(int   fd,
-	     int   forWriting,
-	     int   isSock,
-	     int   len,
-	     char* buf);
+             int   forWriting,
+             int   isSock,
+             int   len,
+             char* buf);
 extern unsigned int addDelayRequest(int   usecs);
 extern unsigned int addDoProcRequest(void* proc, void* param);
 extern int  startupAsyncIO(void);
