@@ -40,11 +40,11 @@ initUserSignals(void)
 #if !defined (THREADED_RTS)
     stg_pending_events = 0;
     if (hConsoleEvent == INVALID_HANDLE_VALUE) {
-	hConsoleEvent = 
-	    CreateEvent ( NULL,  /* default security attributes */
-			  TRUE,  /* manual-reset event */
-			  FALSE, /* initially non-signalled */
-			  NULL); /* no name */
+        hConsoleEvent =
+            CreateEvent ( NULL,  /* default security attributes */
+                          TRUE,  /* manual-reset event */
+                          FALSE, /* initially non-signalled */
+                          NULL); /* no name */
     }
 #endif
     return;
@@ -75,31 +75,31 @@ finiUserSignals(void)
  * To repeat Signals.c remark -- user code may choose to override the
  * default handler. Which is fine, assuming they put back the default
  * handler when/if they de-install the custom handler.
- * 
+ *
  */
 static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
 {
     switch (dwCtrlType) {
-    
+
     case CTRL_CLOSE_EVENT:
-	/* see generic_handler() comment re: this event */
-	return FALSE;
+        /* see generic_handler() comment re: this event */
+        return FALSE;
     case CTRL_C_EVENT:
     case CTRL_BREAK_EVENT:
 
-	// If we're already trying to interrupt the RTS, terminate with
-	// extreme prejudice.  So the first ^C tries to exit the program
-	// cleanly, and the second one just kills it.
-	if (sched_state >= SCHED_INTERRUPTING) {
-	    stg_exit(EXIT_INTERRUPTED);
-	} else {
-	    interruptStgRts();
-	}
-	return TRUE;
+        // If we're already trying to interrupt the RTS, terminate with
+        // extreme prejudice.  So the first ^C tries to exit the program
+        // cleanly, and the second one just kills it.
+        if (sched_state >= SCHED_INTERRUPTING) {
+            stg_exit(EXIT_INTERRUPTED);
+        } else {
+            interruptStgRts();
+        }
+        return TRUE;
 
-	/* shutdown + logoff events are not handled here. */
+        /* shutdown + logoff events are not handled here. */
     default:
-	return FALSE;
+        return FALSE;
     }
 }
 
@@ -113,14 +113,14 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
 void initDefaultHandlers(void)
 {
     if ( !SetConsoleCtrlHandler(shutdown_handler, TRUE) ) {
-	errorBelch("warning: failed to install default console handler");
+        errorBelch("warning: failed to install default console handler");
     }
 }
 
 void resetDefaultHandlers(void)
 {
     if ( !SetConsoleCtrlHandler(shutdown_handler, FALSE) ) {
-	errorBelch("warning: failed to uninstall default console handler");
+        errorBelch("warning: failed to uninstall default console handler");
     }
 }
 
@@ -130,7 +130,7 @@ void resetDefaultHandlers(void)
  * Temporarily block the delivery of further console events. Needed to
  * avoid race conditions when GCing the stack of outstanding handlers or
  * when emptying the stack by running the handlers.
- * 
+ *
  */
 void
 blockUserSignals(void)
@@ -174,24 +174,24 @@ void startSignalHandlers(Capability *cap)
     StgStablePtr handler;
 
     if (console_handler < 0) {
-	return;
+        return;
     }
 
     blockUserSignals();
     ACQUIRE_LOCK(&sched_mutex);
-    
+
     handler = deRefStablePtr((StgStablePtr)console_handler);
     while (stg_pending_events > 0) {
-	stg_pending_events--;
-	scheduleThread(cap,
-	    createIOThread(cap,
-			   RtsFlags.GcFlags.initialStkSize, 
-			   rts_apply(cap,
-				     (StgClosure *)handler,
-				     rts_mkInt(cap,
-					       stg_pending_buf[stg_pending_events]))));
+        stg_pending_events--;
+        scheduleThread(cap,
+            createIOThread(cap,
+                RtsFlags.GcFlags.initialStkSize,
+                rts_apply(cap,
+                    (StgClosure *)handler,
+                    rts_mkInt(cap,
+                        stg_pending_buf[stg_pending_events]))));
     }
-    
+
     RELEASE_LOCK(&sched_mutex);
     unblockUserSignals();
 }
@@ -210,39 +210,39 @@ void markSignalHandlers (evac_fn evac STG_UNUSED, void *user STG_UNUSED)
 }
 
 
-/* 
+/*
  * Function: generic_handler()
  *
- * Local function which handles incoming console event (done in a sep OS thread),
- * recording the event in stg_pending_events. 
+ * Local function which handles incoming console event (done in a separate
+ * OS thread), recording the event in stg_pending_events.
  */
 static BOOL WINAPI generic_handler(DWORD dwCtrlType)
 {
     /* Ultra-simple -- up the counter + signal a switch. */
     switch(dwCtrlType) {
     case CTRL_CLOSE_EVENT:
-	/* Don't support the delivery of this event; if we
-	 * indicate that we've handled it here and the Haskell handler
-	 * doesn't take proper action (e.g., terminate the OS process),
-	 * the user of the app will be unable to kill/close it. Not
-	 * good, so disable the delivery for now.
-	 */
-	return FALSE;
+        /* Don't support the delivery of this event; if we
+         * indicate that we've handled it here and the Haskell handler
+         * doesn't take proper action (e.g., terminate the OS process),
+         * the user of the app will be unable to kill/close it. Not
+         * good, so disable the delivery for now.
+         */
+        return FALSE;
     default:
-	if (!deliver_event) return TRUE;
+        if (!deliver_event) return TRUE;
 
 #if defined(THREADED_RTS)
         sendIOManagerEvent((StgWord8) ((dwCtrlType<<1) | 1));
 #else
-	if ( stg_pending_events < N_PENDING_EVENTS ) {
-	    stg_pending_buf[stg_pending_events] = dwCtrlType;
-	    stg_pending_events++;
-	}
+        if ( stg_pending_events < N_PENDING_EVENTS ) {
+            stg_pending_buf[stg_pending_events] = dwCtrlType;
+            stg_pending_events++;
+        }
 
         // we need to wake up awaitEvent()
         abandonRequestWait();
 #endif
-	return TRUE;
+        return TRUE;
     }
 }
 
@@ -259,42 +259,43 @@ rts_InstallConsoleEvent(int action, StgStablePtr *handler)
 
     switch (action) {
     case STG_SIG_IGN:
-	console_handler = STG_SIG_IGN;
-	if ( !SetConsoleCtrlHandler(NULL, TRUE) ) {
-	    errorBelch("warning: unable to ignore console events");
-	}
-	break;
+        console_handler = STG_SIG_IGN;
+        if ( !SetConsoleCtrlHandler(NULL, TRUE) ) {
+            errorBelch("warning: unable to ignore console events");
+        }
+        break;
     case STG_SIG_DFL:
-	console_handler = STG_SIG_IGN;
-	if ( !SetConsoleCtrlHandler(NULL, FALSE) ) {
-	    errorBelch("warning: unable to restore default console event handling");
-	}
-	break;
+        console_handler = STG_SIG_IGN;
+        if ( !SetConsoleCtrlHandler(NULL, FALSE) ) {
+            errorBelch("warning: unable to restore default console event "
+                       "handling");
+        }
+        break;
     case STG_SIG_HAN:
 #ifdef THREADED_RTS
         // handler is stored in an MVar in the threaded RTS
-	console_handler = STG_SIG_HAN;
+        console_handler = STG_SIG_HAN;
 #else
-	console_handler = (StgInt)*handler;
+        console_handler = (StgInt)*handler;
 #endif
-	if (previous_hdlr < 0 || previous_hdlr == STG_SIG_HAN) {
-	  /* Only install generic_handler() once */
-	  if ( !SetConsoleCtrlHandler(generic_handler, TRUE) ) {
-	    errorBelch("warning: unable to install console event handler");
-	  }
-	}
-	break;
+        if (previous_hdlr < 0 || previous_hdlr == STG_SIG_HAN) {
+          /* Only install generic_handler() once */
+          if ( !SetConsoleCtrlHandler(generic_handler, TRUE) ) {
+            errorBelch("warning: unable to install console event handler");
+          }
+        }
+        break;
     }
-    
-    if (previous_hdlr == STG_SIG_DFL || 
-	previous_hdlr == STG_SIG_IGN ||
+
+    if (previous_hdlr == STG_SIG_DFL ||
+        previous_hdlr == STG_SIG_IGN ||
         previous_hdlr == STG_SIG_HAN) {
-	return previous_hdlr;
+        return previous_hdlr;
     } else {
-	if (handler != NULL) {
+        if (handler != NULL) {
             *handler = (StgStablePtr)previous_hdlr;
         }
-	return STG_SIG_HAN;
+        return STG_SIG_HAN;
     }
 }
 
@@ -302,18 +303,18 @@ rts_InstallConsoleEvent(int action, StgStablePtr *handler)
  * Function: rts_HandledConsoleEvent()
  *
  * Signal that a Haskell console event handler has completed its run.
- * The explicit notification that a Haskell handler has completed is 
+ * The explicit notification that a Haskell handler has completed is
  * required to better handle the delivery of Ctrl-C/Break events whilst
- * an async worker thread is handling a read request on stdin. The 
+ * an async worker thread is handling a read request on stdin. The
  * Win32 console implementation will abort such a read request when Ctrl-C
- * is delivered. That leaves the worker thread in a bind: should it 
- * abandon the request (the Haskell thread reading from stdin has been 
- * thrown an exception to signal the delivery of Ctrl-C & hence have 
+ * is delivered. That leaves the worker thread in a bind: should it
+ * abandon the request (the Haskell thread reading from stdin has been
+ * thrown an exception to signal the delivery of Ctrl-C & hence have
  * aborted the I/O request) or simply ignore the aborted read and retry?
  * (the Haskell thread reading from stdin isn't concerned with the
  * delivery and handling of Ctrl-C.) With both scenarios being
  * possible, the worker thread needs to be told -- that is, did the
- * console event handler cause the IO request to be abandoned? 
+ * console event handler cause the IO request to be abandoned?
  *
  */
 void
@@ -321,11 +322,11 @@ rts_ConsoleHandlerDone (int ev USED_IF_NOT_THREADS)
 {
 #if !defined(THREADED_RTS)
     if ( (DWORD)ev == CTRL_BREAK_EVENT ||
-	 (DWORD)ev == CTRL_C_EVENT ) {
-	/* only these two cause stdin system calls to abort.. */
-	SetEvent(hConsoleEvent); /* event is manual-reset */
-	Sleep(0); /* yield */
-	ResetEvent(hConsoleEvent); /* turn it back off again */
+         (DWORD)ev == CTRL_C_EVENT ) {
+        /* only these two cause stdin system calls to abort.. */
+        SetEvent(hConsoleEvent); /* event is manual-reset */
+        Sleep(0); /* yield */
+        ResetEvent(hConsoleEvent); /* turn it back off again */
         // SDM: yeuch, this can't possibly work reliably.
         // I'm not having it in THREADED_RTS.
     }
