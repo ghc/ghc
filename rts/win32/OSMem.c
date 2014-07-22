@@ -17,14 +17,14 @@
 #endif
 
 typedef struct alloc_rec_ {
-    char* base;     /* non-aligned base address, directly from VirtualAlloc */
-    W_ size;       /* Size in bytes */
+    char* base;    // non-aligned base address, directly from VirtualAlloc
+    W_ size;       // Size in bytes
     struct alloc_rec_* next;
 } alloc_rec;
 
 typedef struct block_rec_ {
-    char* base;         /* base address, non-MBLOCK-aligned */
-    W_ size;           /* size in bytes */
+    char* base;        // base address, non-MBLOCK-aligned
+    W_ size;           // size in bytes
     struct block_rec_* next;
 } block_rec;
 
@@ -89,19 +89,20 @@ insertFree(char* alloc_base, W_ alloc_size) {
     for( ; it!=0 && it->base<alloc_base; prev=it, it=it->next) {}
 
     if(it!=0 && alloc_base+alloc_size == it->base) {
-        if(prev->base + prev->size == alloc_base) {        /* Merge it, alloc, prev */
+        if(prev->base + prev->size == alloc_base) { /* Merge it, alloc, prev */
             prev->size += alloc_size + it->size;
             prev->next = it->next;
             stgFree(it);
-        } else {                                            /* Merge it, alloc */
+        } else {                                    /* Merge it, alloc */
             it->base = alloc_base;
             it->size += alloc_size;
         }
-    } else if(prev->base + prev->size == alloc_base) {     /* Merge alloc, prev */
+    } else if(prev->base + prev->size == alloc_base) { /* Merge alloc, prev */
         prev->size += alloc_size;
-    } else {                                                /* Merge none */
+    } else {                                           /* Merge none */
         block_rec* rec;
-        rec = (block_rec*)stgMallocBytes(sizeof(block_rec),"getMBlocks: insertFree");
+        rec = (block_rec*)stgMallocBytes(sizeof(block_rec),
+                                         "getMBlocks: insertFree");
         rec->base=alloc_base;
         rec->size=alloc_size;
         rec->next = it;
@@ -139,7 +140,8 @@ findFreeBlocks(nat n) {
             char* need_base;
             block_rec* next;
             int new_size;
-            need_base = (char*)(((W_)it->base) & ((W_)~MBLOCK_MASK)) + MBLOCK_SIZE;
+            need_base =
+                (char*)(((W_)it->base) & ((W_)~MBLOCK_MASK)) + MBLOCK_SIZE;
             next = (block_rec*)stgMallocBytes(
                     sizeof(block_rec)
                     , "getMBlocks: findFreeBlocks: splitting");
@@ -305,7 +307,9 @@ void osReleaseFreeMemory(void)
                     if (fb->base != a->base) {
                         block_rec *new_fb;
 
-                        new_fb = (block_rec *)stgMallocBytes(sizeof(block_rec),"osReleaseFreeMemory");
+                        new_fb =
+                            (block_rec *)stgMallocBytes(sizeof(block_rec),
+                                                        "osReleaseFreeMemory");
                         new_fb->base = fb->base;
                         new_fb->size = a->base - fb->base;
                         new_fb->next = fb;
@@ -317,7 +321,8 @@ void osReleaseFreeMemory(void)
                 /* Now we can free the alloc */
                 prev_a->next = a->next;
                 if(!VirtualFree((void *)a->base, 0, MEM_RELEASE)) {
-                    sysErrorBelch("freeAllMBlocks: VirtualFree MEM_RELEASE failed");
+                    sysErrorBelch("freeAllMBlocks: VirtualFree MEM_RELEASE "
+                                  "failed");
                     stg_exit(EXIT_FAILURE);
                 }
                 stgFree(a);
@@ -389,7 +394,8 @@ StgWord64 getPhysicalMemorySize (void)
         status.dwLength = sizeof(status);
         if (!GlobalMemoryStatusEx(&status)) {
 #if defined(DEBUG)
-            errorBelch("warning: getPhysicalMemorySize: cannot get physical memory size");
+            errorBelch("warning: getPhysicalMemorySize: cannot get physical "
+                       "memory size");
 #endif
             return 0;
         }
@@ -405,8 +411,8 @@ void setExecutable (void *p, W_ len, rtsBool exec)
                         exec ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE,
                         &dwOldProtect) == 0)
     {
-        sysErrorBelch("setExecutable: failed to protect 0x%p; old protection: %lu\n",
-                      p, (unsigned long)dwOldProtect);
+        sysErrorBelch("setExecutable: failed to protect 0x%p; old protection: "
+                      "%lu\n", p, (unsigned long)dwOldProtect);
         stg_exit(EXIT_FAILURE);
     }
 }
