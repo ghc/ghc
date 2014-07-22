@@ -1,6 +1,6 @@
 /*
  * A fixed-size queue; MT-friendly.
- * 
+ *
  * (c) sof, 2002-2003.
  */
 #include "WorkQueue.h"
@@ -18,9 +18,9 @@ newSemaphore(int initCount, int max)
 {
   Semaphore s;
   s = CreateSemaphore ( NULL,       /* LPSECURITY_ATTRIBUTES (default) */
-			initCount,  /* LONG lInitialCount */
-			max,        /* LONG lMaxCount */
-			NULL);      /* LPCTSTR (anonymous / no object name) */
+                        initCount,  /* LONG lInitialCount */
+                        max,        /* LONG lMaxCount */
+                        NULL);      /* LPCTSTR (anonymous / no object name) */
   if ( NULL == s) {
     queue_error_rc("newSemaphore", GetLastError());
     return NULL;
@@ -33,24 +33,24 @@ newSemaphore(int initCount, int max)
  *
  * The queue constructor - semaphores are initialised to match
  * max number of queue entries.
- * 
+ *
  */
 WorkQueue*
 NewWorkQueue()
 {
   WorkQueue* wq = (WorkQueue*)malloc(sizeof(WorkQueue));
-  
+
   if (!wq) {
     queue_error("NewWorkQueue", "malloc() failed");
     return wq;
   }
-    
+
   memset(wq, 0, sizeof *wq);
-  
+
   InitializeCriticalSection(&wq->queueLock);
   wq->workAvailable = newSemaphore(0, WORKQUEUE_SIZE);
   wq->roomAvailable = newSemaphore(WORKQUEUE_SIZE, WORKQUEUE_SIZE);
-  
+
   /* Fail if we were unable to create any of the sync objects. */
   if ( NULL == wq->workAvailable ||
        NULL == wq->roomAvailable ) {
@@ -75,7 +75,7 @@ FreeWorkQueue ( WorkQueue* pq )
 
   /* Close the semaphores; any threads blocked waiting
    * on either will as a result be woken up.
-   */ 
+   */
   if ( pq->workAvailable ) {
     CloseHandle(pq->workAvailable);
   }
@@ -91,7 +91,7 @@ HANDLE
 GetWorkQueueHandle ( WorkQueue* pq )
 {
   if (!pq) return NULL;
-  
+
   return pq->workAvailable;
 }
 
@@ -114,14 +114,15 @@ GetWork ( WorkQueue* pq, void** ppw )
     queue_error("GetWork", "NULL WorkItem object");
     return FALSE;
   }
-  
+
   /* Block waiting for work item to become available */
-  if ( (rc = WaitForSingleObject( pq->workAvailable, INFINITE)) != WAIT_OBJECT_0 ) {
-    queue_error_rc("GetWork.WaitForSingleObject(workAvailable)", 
-		   ( (WAIT_FAILED == rc) ? GetLastError() : rc));
+  if ( (rc = WaitForSingleObject( pq->workAvailable, INFINITE))
+         != WAIT_OBJECT_0 ) {
+    queue_error_rc("GetWork.WaitForSingleObject(workAvailable)",
+                   ( (WAIT_FAILED == rc) ? GetLastError() : rc));
     return FALSE;
   }
-  
+
   return FetchWork(pq,ppw);
 }
 
@@ -144,7 +145,7 @@ FetchWork ( WorkQueue* pq, void** ppw )
     queue_error("FetchWork", "NULL WorkItem object");
     return FALSE;
   }
-  
+
   EnterCriticalSection(&pq->queueLock);
   *ppw = pq->items[pq->head];
   /* For sanity's sake, zero out the pointer. */
@@ -179,15 +180,16 @@ SubmitWork ( WorkQueue* pq, void* pw )
     queue_error("SubmitWork", "NULL WorkItem object");
     return FALSE;
   }
-  
+
   /* Block waiting for work item to become available */
-  if ( (rc = WaitForSingleObject( pq->roomAvailable, INFINITE)) != WAIT_OBJECT_0 ) {
-    queue_error_rc("SubmitWork.WaitForSingleObject(workAvailable)", 
-		   ( (WAIT_FAILED == rc) ? GetLastError() : rc));
+  if ( (rc = WaitForSingleObject( pq->roomAvailable, INFINITE))
+         != WAIT_OBJECT_0 ) {
+    queue_error_rc("SubmitWork.WaitForSingleObject(workAvailable)",
+                   ( (WAIT_FAILED == rc) ? GetLastError() : rc));
 
     return FALSE;
   }
-  
+
   EnterCriticalSection(&pq->queueLock);
   pq->items[pq->tail] = pw;
   pq->tail = (pq->tail + 1) % WORKQUEUE_SIZE;
@@ -205,20 +207,19 @@ SubmitWork ( WorkQueue* pq, void* pw )
 
 static void
 queue_error_rc( char* loc,
-		DWORD err)
+                DWORD err)
 {
   fprintf(stderr, "%s failed: return code = 0x%lx\n", loc, err);
   fflush(stderr);
   return;
 }
-			    
+
 
 static void
 queue_error( char* loc,
-	     char* reason)
+             char* reason)
 {
   fprintf(stderr, "%s failed: %s\n", loc, reason);
   fflush(stderr);
   return;
 }
-
