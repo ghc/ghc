@@ -83,11 +83,8 @@ last [x]                =  x
 last (_:xs)             =  last xs
 last []                 =  errorEmptyList "last"
 #else
--- eliminate repeated cases
-last []                 =  errorEmptyList "last"
-last (x:xs)             =  last' x xs
-  where last' y []     = y
-        last' _ (y:ys) = last' y ys
+-- use foldl to allow fusion
+last = foldl (\_ x -> x) (errorEmptyList "last")
 #endif
 
 -- | Return all the elements of a list except the last one.

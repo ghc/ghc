@@ -379,3 +379,12 @@ test('T9203',
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
+
+test('T9339',
+     [stats_num_field('bytes allocated',
+                      [ (wordsize(64),    80050760, 5) ]),
+                      # w/o fusing last: 320005080
+                      # 2014-07-22:       80050760
+      only_ways(['normal'])],
+     compile_and_run,
+     ['-O2'])
