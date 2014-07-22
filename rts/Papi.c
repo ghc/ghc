@@ -61,9 +61,10 @@ struct _papi_events {
 #define BIG_STRING_LEN 512
 
 
-#define PAPI_CHECK(CALL) \
-  if((papi_error=(CALL)) != PAPI_OK) { \
-   debugBelch("PAPI function failed in module %s at line %d with error code %d\n", \
+#define PAPI_CHECK(CALL)                                                \
+  if((papi_error=(CALL)) != PAPI_OK) {                                  \
+    debugBelch("PAPI function failed in module %s at line %d "          \
+               "with error code %d\n",                                  \
               __FILE__,__LINE__,papi_error);                            \
   }
 
@@ -132,7 +133,8 @@ init_countable_events(void)
     if (RtsFlags.PapiFlags.eventType==PAPI_FLAG_BRANCH) {
         PAPI_ADD_EVENT(FR_BR);
         PAPI_ADD_EVENT(FR_BR_MIS);
-        /* Docs are wrong? Opteron does not count indirect branch misses exclusively */
+        // Docs are wrong? Opteron does not count indirect branch
+        // misses exclusively
         PAPI_ADD_EVENT(FR_BR_MISCOMPARE);
     } else if (RtsFlags.PapiFlags.eventType==PAPI_FLAG_STALLS) {
         PAPI_ADD_EVENT(FR_DISPATCH_STALLS);
