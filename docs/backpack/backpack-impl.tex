@@ -506,43 +506,57 @@ on various test frameworks that a user won't care about if they are not planning
 on testing the code. (Cabal has a special case for this, allowing the user
 to write effectively multiple packages in a single Cabal file.)
 
+\subsection{Summary}
 
-\subsection{Cabal dependency resolution}
-
-Currently, when we compile a Cabal
-package, Cabal goes ahead and resolves \verb|build-depends| entries with actual
-implementations, which we compile against.  A planned addition to the package key,
-independent of Backpack, is to record the transitive dependency tree selected
-during this dependency resolution process, so that we can install \pname{libfoo-1.0}
-twice compiled against different versions of its dependencies.
-What is the relationship to this transitive dependency tree of \emph{packages},
-with the subterms of our package identities which are \emph{modules}?  Does one
-subsume the other?  In fact, these are separate mechanisms---two levels of indirections,
-so to speak.
-
-To illustrate, suppose I write a Cabal file with \verb|build-depends: foobar|.  A reasonable assumption is that this translates into a
-Backpack package which has \verb|include foobar|.  However, this is not
-actually a Paper Backpack package: Cabal's dependency solver has to
-rewrite all of these package references into versioned references
-\verb|include foobar-0.1|.  For example, this is a pre-package:
+We can summarize all of the various schemes by describing the internal data
+types that would be defined by GHC under each regime.  First, we have
+the shared data structures, which correspond closely to what users are
+used to seeing:
 
 \begin{verbatim}
-package foo where
-    include bar
+<pkg-name>   ::= containers, ...
+<pkg-version ::= 1.0, ...
+<pkg-id>     ::= <pkg-name>-<pkg-version>
+<mod-name>   ::= Data.Set, ...
+<occ>        ::= empty, ...
 \end{verbatim}
 
-and this is a Paper Backpack package:
+Changing the \textbf{granularity of applicativity} modifies how we represent the
+list of dependencies associated with an entity.  With module applicativity,
+we list module identities (not yet defined); with declaration applicativity
+we actually list the original names (i.e., ids).
 
 \begin{verbatim}
-package foo-0.3[bar-0.1[baz-0.2]] where
-    include bar-0.1[baz-0.2]
+<deps>       ::= <id>, ...      # Declaration applicativity
+<deps>       ::= <module>, ...  # Module applicativity
 \end{verbatim}
 
-This tree is very similar to the one tracking dependencies for holes,
-but we must record this tree \emph{even} when our package has no holes.
-%   As a final example, the full module
-%   identity of \m{B1} in Figure~\ref{fig:granularity} may actually be $\pname{p-0.9(q-1.0[p-0.9]:A1)}$:\m{B}.
+Changing the \textbf{granularity of dependency} affects how we compute
+the lists of dependencies, and what entities are well defined:
 
+\begin{verbatim}
+# Package-level granularity
+<pkg-key>    ::= hash(<pkg-id> + <deps for pkg>)
+<module>     ::= <pkg-key> : <mod-name>
+<id>         ::= <module> . <occ>
+
+# Module-level granularity
+<pkg-key>    not defined
+<module>     ::= hash(<pkg-id> : <mod-name> + <deps for mod>)
+<id>         ::= <module-key> . <occ>
+
+# Declaration-level granularity
+<pkg-key>    not defined
+<module>     not defined
+<id>         ::= hash(<pkg-id> : <mod-name> . <occ> + <deps for decl>)
+\end{verbatim}
+
+Notice that as we increase the granularity, the notion of a ``package'' and a ``module''
+become undefined.  This is because, for example, with module-level granularity, a single
+``package'' may result in several modules, each of which have different sets of
+dependencies.  It doesn't make much sense to refer to the package as a monolithic entity,
+because the point of splitting up the dependencies was so that if a user relies only
+on a single module, it has a correspondingly restricted set of dependencies.
 \subsection{The new scheme, formally}
 
 \begin{wrapfigure}{R}{0.5\textwidth}
@@ -662,6 +676,43 @@ semantics of instantiation, and the applicativity example in Figure 3 of the
 Backpack paper still type checks.  However, because we are operating at a coarser
 granularity, modules may have spurious dependencies on holes that they don't
 actually depend on, which means less type equalities may hold.
+
+
+\subsection{Cabal dependency resolution}
+
+Currently, when we compile a Cabal
+package, Cabal goes ahead and resolves \verb|build-depends| entries with actual
+implementations, which we compile against.  A planned addition to the package key,
+independent of Backpack, is to record the transitive dependency tree selected
+during this dependency resolution process, so that we can install \pname{libfoo-1.0}
+twice compiled against different versions of its dependencies.
+What is the relationship to this transitive dependency tree of \emph{packages},
+with the subterms of our package identities which are \emph{modules}?  Does one
+subsume the other?  In fact, these are separate mechanisms---two levels of indirections,
+so to speak.
+
+To illustrate, suppose I write a Cabal file with \verb|build-depends: foobar|.  A reasonable assumption is that this translates into a
+Backpack package which has \verb|include foobar|.  However, this is not
+actually a Paper Backpack package: Cabal's dependency solver has to
+rewrite all of these package references into versioned references
+\verb|include foobar-0.1|.  For example, this is a pre-package:
+
+\begin{verbatim}
+package foo where
+    include bar
+\end{verbatim}
+
+and this is a Paper Backpack package:
+
+\begin{verbatim}
+package foo-0.3[bar-0.1[baz-0.2]] where
+    include bar-0.1[baz-0.2]
+\end{verbatim}
+
+This tree is very similar to the one tracking dependencies for holes,
+but we must record this tree \emph{even} when our package has no holes.
+%   As a final example, the full module
+%   identity of \m{B1} in Figure~\ref{fig:granularity} may actually be $\pname{p-0.9(q-1.0[p-0.9]:A1)}$:\m{B}.
 
 
 \subsection{Implementation}
