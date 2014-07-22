@@ -24,17 +24,17 @@
 #define hash(hk)  (hk % HASH_TABLE_SIZE)
 static RetainerSet *hashTable[HASH_TABLE_SIZE];
 
-static Arena *arena;		// arena in which we store retainer sets
+static Arena *arena;            // arena in which we store retainer sets
 
-static int nextId;              // id of next retainer set       
+static int nextId;              // id of next retainer set
 
 /* -----------------------------------------------------------------------------
  * rs_MANY is a distinguished retainer set, such that
  *
  *        isMember(e, rs_MANY)   = True
  *
- *	  addElement(e, rs)      = rs_MANY,   if rs->num >= maxRetainerSetSize
- *	  addElement(e, rs_MANY) = rs_MANY
+ *        addElement(e, rs)      = rs_MANY,   if rs->num >= maxRetainerSetSize
+ *        addElement(e, rs_MANY) = rs_MANY
  *
  * The point of rs_MANY is to keep the total number of retainer sets
  * from growing too large.
@@ -68,7 +68,7 @@ initializeAllRetainerSet(void)
     arena = newArena();
 
     for (i = 0; i < HASH_TABLE_SIZE; i++)
-	hashTable[i] = NULL;
+        hashTable[i] = NULL;
     nextId = 2;   // Initial value must be positive, 2 is MANY.
 }
 
@@ -86,7 +86,7 @@ refreshAllRetainerSet(void)
     arena = newArena();
 
     for (i = 0; i < HASH_TABLE_SIZE; i++)
-	hashTable[i] = NULL;
+        hashTable[i] = NULL;
     nextId = 2;
 #endif /* FIRST_APPROACH */
 }
@@ -111,7 +111,7 @@ singleton(retainer r)
 
     hk = hashKeySingleton(r);
     for (rs = hashTable[hash(hk)]; rs != NULL; rs = rs->link)
-	if (rs->num == 1 &&  rs->element[0] == r) return rs;    // found it
+        if (rs->num == 1 &&  rs->element[0] == r) return rs;    // found it
 
     // create it
     rs = arenaAlloc( arena, sizeofRetainerSet(1) );
@@ -153,13 +153,13 @@ addElement(retainer r, RetainerSet *rs)
     ASSERT(rs->num <= RtsFlags.ProfFlags.maxRetainerSetSize);
 
     if (rs == &rs_MANY || rs->num == RtsFlags.ProfFlags.maxRetainerSetSize) {
-	return &rs_MANY;
+        return &rs_MANY;
     }
 
     ASSERT(!isMember(r, rs));
 
     for (nl = 0; nl < rs->num; nl++)
-	if (r < rs->element[nl]) break;
+        if (r < rs->element[nl]) break;
     // Now nl is the index for r into the new set.
     // Also it denotes the number of retainers less than r in *rs.
     // Thus, compare the first nl retainers, then r itself, and finally the
@@ -167,29 +167,29 @@ addElement(retainer r, RetainerSet *rs)
 
     hk = hashKeyAddElement(r, rs);
     for (nrs = hashTable[hash(hk)]; nrs != NULL; nrs = nrs->link) {
-	// test *rs and *nrs for equality
+        // test *rs and *nrs for equality
 
-	// check their size
-	if (rs->num + 1 != nrs->num) continue;
+        // check their size
+        if (rs->num + 1 != nrs->num) continue;
 
-	// compare the first nl retainers and find the first non-matching one.
-	for (i = 0; i < nl; i++)
-	    if (rs->element[i] != nrs->element[i]) break;
-	if (i < nl) continue;
+        // compare the first nl retainers and find the first non-matching one.
+        for (i = 0; i < nl; i++)
+            if (rs->element[i] != nrs->element[i]) break;
+        if (i < nl) continue;
 
-	// compare r itself
-	if (r != nrs->element[i]) continue;       // i == nl
+        // compare r itself
+        if (r != nrs->element[i]) continue;       // i == nl
 
-	// compare the remaining retainers
-	for (; i < rs->num; i++)
-	    if (rs->element[i] != nrs->element[i + 1]) break;
-	if (i < rs->num) continue;
+        // compare the remaining retainers
+        for (; i < rs->num; i++)
+            if (rs->element[i] != nrs->element[i + 1]) break;
+        if (i < rs->num) continue;
 
 #ifdef DEBUG_RETAINER
-	// debugBelch("%p\n", nrs);
+        // debugBelch("%p\n", nrs);
 #endif
-	// The set we are seeking already exists!
-	return nrs;
+        // The set we are seeking already exists!
+        return nrs;
     }
 
     // create a new retainer set
@@ -199,11 +199,11 @@ addElement(retainer r, RetainerSet *rs)
     nrs->link = hashTable[hash(hk)];
     nrs->id = nextId++;
     for (i = 0; i < nl; i++) {              // copy the first nl retainers
-	nrs->element[i] = rs->element[i];
+        nrs->element[i] = rs->element[i];
     }
     nrs->element[i] = r;                    // copy r
     for (; i < rs->num; i++) {              // copy the remaining retainers
-	nrs->element[i + 1] = rs->element[i];
+        nrs->element[i + 1] = rs->element[i];
     }
 
     hashTable[hash(hk)] = nrs;
@@ -225,8 +225,8 @@ traverseAllRetainerSet(void (*f)(RetainerSet *))
 
     (*f)(&rs_MANY);
     for (i = 0; i < HASH_TABLE_SIZE; i++)
-	for (rs = hashTable[i]; rs != NULL; rs = rs->link)
-	    (*f)(rs);
+        for (rs = hashTable[i]; rs != NULL; rs = rs->link)
+            (*f)(rs);
 }
 
 
@@ -281,20 +281,20 @@ printRetainerSetShort(FILE *f, RetainerSet *rs, nat max_length)
     ASSERT(size < max_length);
 
     for (j = 0; j < rs->num; j++) {
-	if (j < rs->num - 1) {
-	    strncpy(tmp + size, GET_PROF_DESC(rs->element[j]), max_length - size);
-	    size = strlen(tmp);
-	    if (size == max_length)
-		break;
-	    strncpy(tmp + size, ",", max_length - size);
-	    size = strlen(tmp);
-	    if (size == max_length)
-		break;
-	}
-	else {
-	    strncpy(tmp + size, GET_PROF_DESC(rs->element[j]), max_length - size);
-	    // size = strlen(tmp);
-	}
+        if (j < rs->num - 1) {
+            strncpy(tmp + size, GET_PROF_DESC(rs->element[j]), max_length - size);
+            size = strlen(tmp);
+            if (size == max_length)
+                break;
+            strncpy(tmp + size, ",", max_length - size);
+            size = strlen(tmp);
+            if (size == max_length)
+                break;
+        }
+        else {
+            strncpy(tmp + size, GET_PROF_DESC(rs->element[j]), max_length - size);
+            // size = strlen(tmp);
+        }
     }
     fprintf(f, tmp);
 }
@@ -327,20 +327,20 @@ printRetainerSetShort(FILE *f, RetainerSet *rs, nat max_length)
     ASSERT(size < max_length);
 
     for (j = 0; j < rs->num; j++) {
-	if (j < rs->num - 1) {
-	    strncpy(tmp + size, rs->element[j]->cc->label, max_length - size);
-	    size = strlen(tmp);
-	    if (size == max_length)
-		break;
-	    strncpy(tmp + size, ",", max_length - size);
-	    size = strlen(tmp);
-	    if (size == max_length)
-		break;
-	}
-	else {
-	    strncpy(tmp + size, rs->element[j]->cc->label, max_length - size);
-	    // size = strlen(tmp);
-	}
+        if (j < rs->num - 1) {
+            strncpy(tmp + size, rs->element[j]->cc->label, max_length - size);
+            size = strlen(tmp);
+            if (size == max_length)
+                break;
+            strncpy(tmp + size, ",", max_length - size);
+            size = strlen(tmp);
+            if (size == max_length)
+                break;
+        }
+        else {
+            strncpy(tmp + size, rs->element[j]->cc->label, max_length - size);
+            // size = strlen(tmp);
+        }
     }
     fputs(tmp, f);
 }
@@ -363,22 +363,22 @@ printRetainerSetShort(FILE *f, retainerSet *rs, nat max_length)
     ASSERT(size < max_length);
 
     for (j = 0; j < rs->num; j++) {
-	if (j < rs->num - 1) {
-	    strncpy(tmp + size, rs->element[j]->label,
-		    max_length - size);
-	    size = strlen(tmp);
-	    if (size == max_length)
-		break;
-	    strncpy(tmp + size, ",", max_length - size);
-	    size = strlen(tmp);
-	    if (size == max_length)
-		break;
-	}
-	else {
-	    strncpy(tmp + size, rs->element[j]->label,
-		    max_length - size);
-	    // size = strlen(tmp);
-	}
+        if (j < rs->num - 1) {
+            strncpy(tmp + size, rs->element[j]->label,
+                    max_length - size);
+            size = strlen(tmp);
+            if (size == max_length)
+                break;
+            strncpy(tmp + size, ",", max_length - size);
+            size = strlen(tmp);
+            if (size == max_length)
+                break;
+        }
+        else {
+            strncpy(tmp + size, rs->element[j]->label,
+                    max_length - size);
+            // size = strlen(tmp);
+        }
     }
     fprintf(f, tmp);
 /*
@@ -426,7 +426,7 @@ printRetainerSetShort(FILE *f, retainerSet *rs, nat max_length)
  * Dump the contents of each retainer set into the log file at the end
  * of the run, so the user can find out for a given retainer set ID
  * the full contents of that set.
- * --------------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------- */
 #ifdef SECOND_APPROACH
 void
 outputAllRetainerSet(FILE *prof_file)
@@ -439,51 +439,51 @@ outputAllRetainerSet(FILE *prof_file)
     // least once during retainer profiling
     numSet = 0;
     for (i = 0; i < HASH_TABLE_SIZE; i++)
-	for (rs = hashTable[i]; rs != NULL; rs = rs->link) {
-	    if (rs->id < 0)
-		numSet++;
-	}
+        for (rs = hashTable[i]; rs != NULL; rs = rs->link) {
+            if (rs->id < 0)
+                numSet++;
+        }
 
     if (numSet == 0)      // retainer profiling was not done at all.
-	return;
+        return;
 
     // allocate memory
     rsArray = stgMallocBytes(numSet * sizeof(RetainerSet *),
-			     "outputAllRetainerSet()");
+                             "outputAllRetainerSet()");
 
     // prepare for sorting
     j = 0;
     for (i = 0; i < HASH_TABLE_SIZE; i++)
-	for (rs = hashTable[i]; rs != NULL; rs = rs->link) {
-	    if (rs->id < 0) {
-		rsArray[j] = rs;
-		j++;
-	    }
-	}
+        for (rs = hashTable[i]; rs != NULL; rs = rs->link) {
+            if (rs->id < 0) {
+                rsArray[j] = rs;
+                j++;
+            }
+        }
 
     ASSERT(j == numSet);
 
     // sort rsArray[] according to the id of each retainer set
     for (i = numSet - 1; i > 0; i--) {
-	for (j = 0; j <= i - 1; j++) {
-	    // if (-(rsArray[j]->id) < -(rsArray[j + 1]->id))
-	    if (rsArray[j]->id < rsArray[j + 1]->id) {
-		tmp = rsArray[j];
-		rsArray[j] = rsArray[j + 1];
-		rsArray[j + 1] = tmp;
-	    }
-	}
+        for (j = 0; j <= i - 1; j++) {
+            // if (-(rsArray[j]->id) < -(rsArray[j + 1]->id))
+            if (rsArray[j]->id < rsArray[j + 1]->id) {
+                tmp = rsArray[j];
+                rsArray[j] = rsArray[j + 1];
+                rsArray[j + 1] = tmp;
+            }
+        }
     }
 
     fprintf(prof_file, "\nRetainer sets created during profiling:\n");
     for (i = 0;i < numSet; i++) {
-	fprintf(prof_file, "SET %u = {", -(rsArray[i]->id));
-	for (j = 0; j < rsArray[i]->num - 1; j++) {
-	    printRetainer(prof_file, rsArray[i]->element[j]);
-	    fprintf(prof_file, ", ");
-	}
-	printRetainer(prof_file, rsArray[i]->element[j]);
-	fprintf(prof_file, "}\n");
+        fprintf(prof_file, "SET %u = {", -(rsArray[i]->id));
+        for (j = 0; j < rsArray[i]->num - 1; j++) {
+            printRetainer(prof_file, rsArray[i]->element[j]);
+            fprintf(prof_file, ", ");
+        }
+        printRetainer(prof_file, rsArray[i]->element[j]);
+        fprintf(prof_file, "}\n");
     }
 
     stgFree(rsArray);
