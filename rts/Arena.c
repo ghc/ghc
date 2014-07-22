@@ -8,7 +8,7 @@
 
    Do not assume that sequentially allocated objects will be adjacent
    in memory.
-   
+
    Quirks: this allocator makes use of the RTS block allocator.  If
    the current block doesn't have enough room for the requested
    object, then a new block is allocated.  This means that allocating
@@ -27,11 +27,11 @@
 // Each arena struct is allocated using malloc().
 struct _Arena {
     bdescr *current;
-    StgWord *free;		// ptr to next free byte in current block
-    StgWord *lim;		// limit (== last free byte + 1)
+    StgWord *free;              // ptr to next free byte in current block
+    StgWord *lim;               // limit (== last free byte + 1)
 };
 
-// We like to keep track of how many blocks we've allocated for 
+// We like to keep track of how many blocks we've allocated for
 // Storage.c:memInventory().
 static long arena_blocks = 0;
 
@@ -74,26 +74,26 @@ arenaAlloc( Arena *arena, size_t size )
     size_w = B_TO_W(size);
 
     if ( arena->free + size_w < arena->lim ) {
-	// enough room in the current block...
-	p = arena->free;
-	arena->free += size_w;
-	return p;
+        // enough room in the current block...
+        p = arena->free;
+        arena->free += size_w;
+        return p;
     } else {
-	// allocate a fresh block...
-	req_blocks =  (W_)BLOCK_ROUND_UP(size) / BLOCK_SIZE;
-	bd = allocGroup_lock(req_blocks);
-	arena_blocks += req_blocks;
+        // allocate a fresh block...
+        req_blocks =  (W_)BLOCK_ROUND_UP(size) / BLOCK_SIZE;
+        bd = allocGroup_lock(req_blocks);
+        arena_blocks += req_blocks;
 
-	bd->gen_no  = 0;
-	bd->gen     = NULL;
+        bd->gen_no  = 0;
+        bd->gen     = NULL;
         bd->dest_no = 0;
-	bd->flags   = 0;
-	bd->free    = bd->start;
-	bd->link    = arena->current;
-	arena->current = bd;
-	arena->free = bd->free + size_w;
-	arena->lim = bd->free + bd->blocks * BLOCK_SIZE_W;
-	return bd->start;
+        bd->flags   = 0;
+        bd->free    = bd->start;
+        bd->link    = arena->current;
+        arena->current = bd;
+        arena->free = bd->free + size_w;
+        arena->lim = bd->free + bd->blocks * BLOCK_SIZE_W;
+        return bd->start;
     }
 }
 
@@ -104,10 +104,10 @@ arenaFree( Arena *arena )
     bdescr *bd, *next;
 
     for (bd = arena->current; bd != NULL; bd = next) {
-	next = bd->link;
-	arena_blocks -= bd->blocks;
-	ASSERT(arena_blocks >= 0);
-	freeGroup_lock(bd);
+        next = bd->link;
+        arena_blocks -= bd->blocks;
+        ASSERT(arena_blocks >= 0);
+        freeGroup_lock(bd);
     }
     stgFree(arena);
 }
@@ -117,4 +117,3 @@ arenaBlocks( void )
 {
     return arena_blocks;
 }
-
