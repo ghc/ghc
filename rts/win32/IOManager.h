@@ -13,7 +13,7 @@
 /*
  The IOManager subsystem provides a non-blocking view
  of I/O operations. It lets one (or more) OS thread(s)
- issue multiple I/O requests, which the IOManager then 
+ issue multiple I/O requests, which the IOManager then
  handles independently of/concurrent to the thread(s)
  that issued the request. Upon completion, the issuing
  thread can inspect the result of the I/O operation &
@@ -29,30 +29,30 @@
  *
  */
 typedef void (*CompletionProc)(unsigned int requestID,
-			       int   fd,
-			       int   len,
-			       void* buf,
-			       int   errCode);
+                               int   fd,
+                               int   len,
+                               void* buf,
+                               int   errCode);
 
-/* 
+/*
  * Asynchronous procedure calls executed by a worker thread
- * take a generic state argument pointer and return an int by 
- * default. 
+ * take a generic state argument pointer and return an int by
+ * default.
  */
 typedef int (*DoProcProc)(void *param);
 
 typedef union workData {
     struct {
-	int   fd;
-	int   len;
-	char *buf; 
+        int   fd;
+        int   len;
+        char *buf;
     } ioData;
-    struct { 
-	int   usecs;
+    struct {
+        int   usecs;
     } delayData;
-    struct { 
-	DoProcProc proc;
-	void* param;
+    struct {
+        DoProcProc proc;
+        void* param;
     } procData;
 } WorkData;
 
@@ -78,8 +78,8 @@ extern CompletionProc onComplete;
 #define WORKER_DO_PROC    16
 
 /*
- * Starting up and shutting down. 
- */ 
+ * Starting up and shutting down.
+ */
 extern BOOL StartIOManager     ( void );
 extern void ShutdownIOManager  ( rtsBool wait_threads );
 
@@ -89,18 +89,18 @@ extern void ShutdownIOManager  ( rtsBool wait_threads );
  * will invoke upon completion.
  */
 extern int AddDelayRequest ( unsigned int   usecs,
-			     CompletionProc onCompletion);
+                             CompletionProc onCompletion);
 
 extern int AddIORequest ( int            fd,
-			  BOOL           forWriting,
-			  BOOL           isSocket,
-			  int            len,
-			  char*          buffer,
-			  CompletionProc onCompletion);
+                          BOOL           forWriting,
+                          BOOL           isSocket,
+                          int            len,
+                          char*          buffer,
+                          CompletionProc onCompletion);
 
 extern int AddProcRequest ( void*          proc,
-			    void*          data,
-			    CompletionProc onCompletion);
+                            void*          data,
+                            CompletionProc onCompletion);
 
 extern void abandonWorkRequest ( int reqID );
 
