@@ -394,3 +394,11 @@ papi_thread_stop_gc1_count(int event_set)
 }
 
 #endif /* USE_PAPI */
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

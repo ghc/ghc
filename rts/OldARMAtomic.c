@@ -53,3 +53,11 @@ void arm_atomic_spin_unlock()
 #endif  /* arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6) */
 
 #endif  /* defined(THREADED_RTS) */
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

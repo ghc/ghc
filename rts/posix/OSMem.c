@@ -318,3 +318,11 @@ void setExecutable (void *p, W_ len, rtsBool exec)
         barf("setExecutable: failed to protect 0x%p\n", p);
     }
 }
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

@@ -815,3 +815,11 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 #endif
 
 #endif /* !USE_MINIINTERPRETER */
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

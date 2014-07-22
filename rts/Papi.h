@@ -34,3 +34,11 @@ void papi_thread_stop_gc1_count(int event_set);
 #include "EndPrivate.h"
 
 #endif /* PAPI_H */
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:
