@@ -20,7 +20,7 @@
   Type 'retainer' defines the retainer identity.
 
   Invariant:
-    1. The retainer identity of a given retainer cannot change during 
+    1. The retainer identity of a given retainer cannot change during
     program execution, no matter where it is actually stored.
     For instance, the memory address of a retainer cannot be used as
     its retainer identity because its location may change during garbage
@@ -56,7 +56,7 @@ typedef CostCentre *retainer;
 #endif
 
 /*
-  Type 'retainerSet' defines an abstract datatype for sets of retainers.  
+  Type 'retainerSet' defines an abstract datatype for sets of retainers.
 
   Invariants:
     A retainer set stores its elements in increasing order (in element[] array).
@@ -75,13 +75,13 @@ typedef struct _RetainerSet {
 } RetainerSet;
 
 /*
-  Note: 
+  Note:
     There are two ways of maintaining all retainer sets. The first is simply by
     freeing all the retainer sets and re-initialize the hash table at each
-    retainer profiling. The second is by setting the cost field of each 
-    retainer set. The second is preferred to the first if most retainer sets 
-    are likely to be observed again during the next retainer profiling. Note 
-    that in the first approach, we do not free the memory allocated for 
+    retainer profiling. The second is by setting the cost field of each
+    retainer set. The second is preferred to the first if most retainer sets
+    are likely to be observed again during the next retainer profiling. Note
+    that in the first approach, we do not free the memory allocated for
     retainer sets; we just invalidate all retainer sets.
  */
 #ifdef DEBUG_RETAINER
@@ -108,12 +108,12 @@ RetainerSet *singleton(retainer r);
 extern RetainerSet rs_MANY;
 
 // Checks if a given retainer is a memeber of the retainer set.
-// 
+//
 // Note & (maybe) Todo:
 //   This function needs to be declared as an inline function, so it is declared
 //   as an inline static function here.
 //   This make the interface really bad, but isMember() returns a value, so
-//   it is not easy either to write it as a macro (due to my lack of C 
+//   it is not easy either to write it as a macro (due to my lack of C
 //   programming experience). Sungwoo
 //
 // rtsBool isMember(retainer, retainerSet *);
@@ -124,7 +124,7 @@ extern RetainerSet rs_MANY;
   Note:
     The efficiency of this function is subject to the typical size of
     retainer sets. If it is small, linear scan is better. If it
-    is large in most cases, binary scan is better. 
+    is large in most cases, binary scan is better.
     The current implementation mixes the two search strategies.
  */
 
@@ -169,7 +169,7 @@ void printRetainerSetShort(FILE *, RetainerSet *, nat);
 #endif
 
 // Print the statistics on all the retainer sets.
-// store the sum of all costs and the number of all retainer sets. 
+// store the sum of all costs and the number of all retainer sets.
 void outputRetainerSet(FILE *, nat *, nat *);
 
 #ifdef SECOND_APPROACH
