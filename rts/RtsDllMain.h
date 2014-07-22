@@ -1,4 +1,3 @@
-
 #include "Rts.h"
 
 #ifdef HAVE_WINDOWS_H
@@ -14,4 +13,3 @@ DllMain ( HINSTANCE hInstance
        , LPVOID reserved
        );
 #endif
-
