@@ -21,8 +21,8 @@ BOOL
 WINAPI
 DllMain ( HINSTANCE hInstance STG_UNUSED
         , DWORD reason
-	, LPVOID reserved STG_UNUSED
-	)
+        , LPVOID reserved STG_UNUSED
+        )
 {
   /*
    * Note: the DllMain() doesn't call startupHaskell() for you,
@@ -31,10 +31,10 @@ DllMain ( HINSTANCE hInstance STG_UNUSED
    *       you pass to the RTS.
    */
   switch (reason) {
-  
+
   // shutdownHaskelAndExit() is already being called,
-  //	so I don't think we need this. BL 2009/11/17
- 
+  //    so I don't think we need this. BL 2009/11/17
+
   //case DLL_PROCESS_DETACH: shutdownHaskell();
   }
   return TRUE;
