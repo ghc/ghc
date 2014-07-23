@@ -1795,13 +1795,11 @@ genCCall dflags is32Bit (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] =
         -- In the common case where dst_r is a virtual register the
         -- final move should go away, because it's the last use of arg
         -- and the first use of dst_r.
-        AMO_Add  -> return $ toOL [ LOCK
-                                  , XADD size (OpReg arg) (OpAddr amode)
+        AMO_Add  -> return $ toOL [ LOCK (XADD size (OpReg arg) (OpAddr amode))
                                   , MOV size (OpReg arg) (OpReg dst_r)
                                   ]
         AMO_Sub  -> return $ toOL [ NEGI size (OpReg arg)
-                                  , LOCK
-                                  , XADD size (OpReg arg) (OpAddr amode)
+                                  , LOCK (XADD size (OpReg arg) (OpAddr amode))
                                   , MOV size (OpReg arg) (OpReg dst_r)
                                   ]
         AMO_And  -> cmpxchg_code (\ src dst -> unitOL $ AND size src dst)
@@ -1827,8 +1825,7 @@ genCCall dflags is32Bit (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] =
                 , MOV size (OpReg eax) (OpReg tmp)
                 ]
                 `appOL` instrs (OpReg arg) (OpReg tmp) `appOL` toOL
-                [ LOCK
-                , CMPXCHG size (OpReg tmp) (OpAddr amode)
+                [ LOCK (CMPXCHG size (OpReg tmp) (OpAddr amode))
                 , JXX NE lbl
                 ]
 
@@ -1857,8 +1854,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] =
         dst_r    = getRegisterReg platform use_sse2 (CmmLocal dst)
         code     = toOL
                    [ MOV size (OpReg oldval) (OpReg eax)
-                   , LOCK
-                   , CMPXCHG size (OpReg newval) (OpAddr amode)
+                   , LOCK (CMPXCHG size (OpReg newval) (OpAddr amode))
                    , MOV size (OpReg eax) (OpReg dst_r)
                    ]
     return $ addr_code `appOL` newval_code newval `appOL` oldval_code oldval

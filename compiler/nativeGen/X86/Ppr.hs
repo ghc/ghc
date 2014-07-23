@@ -888,7 +888,7 @@ pprInstr GFREE
 
 -- Atomics
 
-pprInstr LOCK = ptext (sLit "\tlock")
+pprInstr (LOCK i) = ptext (sLit "\tlock") $$ pprInstr i
 
 pprInstr (XADD size src dst) = pprSizeOpOp (sLit "xadd") size src dst
 
