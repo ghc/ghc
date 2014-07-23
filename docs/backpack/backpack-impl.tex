@@ -750,14 +750,6 @@ to do away with full package names and versions, and instead use just a
 base-62 encoded hash, perhaps with the first four characters of the package
 name for user-friendliness.
 
-\paragraph{Wired-in names} One annoying thing to remember is that GHC
-has wired-in names, which refer to packages without any version.  These
-are specially treated during compilation so that they are built using
-a package key that has no version or dependency information.  One approach
-is to continue treating these libraries specially; alternately we can
-maintain a fixed table from these wired names to
-package IDs.
-
 \section{Shapeless Backpack}\label{sec:simplifying-backpack}
 
 Backpack as currently defined always requires a \emph{shaping} pass,
@@ -903,7 +895,7 @@ As far as the implementation is concerned, we never have to worry
 about handling module variables; we only need to do extra typechecks
 against (renamed) interface files.
 
-\subsection{Compiling definite packages}
+\subsection{Compiling definite packages}\label{sec:compiling}
 
 % New definitions
 \algnewcommand\algorithmicswitch{\textbf{switch}}
@@ -993,11 +985,25 @@ package q where
 \end{verbatim}
 
 If there is, we check the implementation to ensure that it is compatible
-with the signature, and then we output a \texttt{hisig} file which, for
-all declarations the signature exposes, forwards their definitions to
-the original implementation file.  The intent is that any code in the
-current package which compiles against this signature will use this
-\texttt{hisig} file, not the original one \texttt{hi} file.
+with the signature. If the implementation was found in $flags_H$, we
+also output a \texttt{hisig} file which, for all declarations the
+signature exposes, forwards their definitions to the original
+implementation file.  The intent is that any code in the current package
+which compiles against this signature will use this \texttt{hisig} file,
+not the original one \texttt{hi} file.
+
+\paragraph{Sometimes \texttt{hisig} is unnecessary}
+In the following package:
+
+\begin{verbatim}
+package p where
+    P = ...
+    P :: ...
+\end{verbatim}
+
+Paper Backpack specifies that we check the signature \m{P} against implementation
+\m{P}, but otherwise no changes are made (i.e., the signature does not narrow
+the implementation.) In this case, no \texttt{hisig} file is not necessary.
 
 \paragraph{Absence of an \texttt{hi} file}
 By default, if we find an appropriate \texttt{hi} file, we'll use it
@@ -1527,6 +1533,57 @@ A\ldots but it will not be defined prior to package p.
 
 In any case, however, it would be good to emit a warning if a package
 cannot be compiled without mutual recursion.
+
+\subsection{Rename on entry}
+
+Consider the following example:
+
+\begin{verbatim}
+package p where
+    A :: [ data T = T ]
+    B = [ import A; x = T ]
+package q where
+    C :: ...
+    A = [ data T = T ]
+    include p
+    D = [
+        import qualified A
+        import qualified B
+        import C
+        x = B.T :: A.T
+    ]
+\end{verbatim}
+
+We are interested in type-checking \pname{q}, which is an indefinite package
+on account of the uninstantiated hole \m{C}.  Furthermore, let's suppose that
+\pname{p} has already been independently typechecked, and its interface files
+installed in some global location with $\alpha_A$ used as the module identity
+of \m{A}. (To simplify this example, we'll assume $\beta_{AT}=\alpha_A$.)
+
+The first three lines of \pname{q} type check in the normal way, but \m{D}
+now poses a problem: if we load the interface file for \m{B} the normal way,
+we will get a reference to type \texttt{T} with the original name $\alpha_A$.\texttt{T},
+whereas from \m{A} we have an original name \pname{q}:\m{A}.\texttt{T}.
+
+Let's suppose that we have already have the result of a shaping pass, which
+maps our identity variables to their true identities.
+Let's consider the possible options here:
+
+\begin{itemize}
+    \item We could re-typecheck \pname{p}, feeding it the correct instantiations
+        for its variables.  However, this seems wasteful: we typechecked the
+        package already, and up-to-renaming, the interface files are exactly
+        what we need to type check our application.
+    \item We could make copies of all the interface files, renamed to have the
+        right original names.  This also seems wasteful: why should we have to
+        create a new copy of every interface file in a library we depend on?
+    \item When \emph{reading in} the interface file to GHC, we could apply the
+        renaming according to the shaping pass and store that in memory.
+\end{itemize}
+
+That last solution is pretty appealing, however, there are still circumstances
+we need to create new interface files; these exactly mirror the cases described
+in Section~\ref{sec:compiling}.
 
 \subsection{Incremental typechecking}
 We want to typecheck modules incrementally, i.e., when something changes in
