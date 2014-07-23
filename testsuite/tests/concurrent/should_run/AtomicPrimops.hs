@@ -76,6 +76,7 @@ fetchXorTest = do
 -- Right now we only test that they return the correct value for a
 -- single op on each thread.
 
+-- | Test an associative operation.
 fetchOpTest :: (MByteArray -> Int -> Int -> IO ())
             -> Int -> String -> IO ()
 fetchOpTest op expected name = do
@@ -87,12 +88,15 @@ fetchOpTest op expected name = do
     work :: MByteArray -> Int -> IO ()
     work mba val = op mba 0 val
 
-    -- Initial value is a large prime and the two patterns are 1010...
-    -- and 0101...
-    (n0, t1pat, t2pat)
-        | sizeOf (undefined :: Int) == 8 =
-            (0x00000000ffffffff, 0x5555555555555555, 0x9999999999999999)
-        | otherwise = (0x0000ffff, 0x55555555, 0x99999999)
+-- | Initial value and operation arguments for race test.
+--
+-- Initial value is a large prime and the two patterns are 1010...
+-- and 0101...
+n0, t1pat, t2pat :: Int
+(n0, t1pat, t2pat)
+    | sizeOf (undefined :: Int) == 8 =
+        (0x00000000ffffffff, 0x5555555555555555, 0x9999999999999999)
+    | otherwise = (0x0000ffff, 0x55555555, 0x99999999)
 
 fetchAndTest :: IO ()
 fetchAndTest = fetchOpTest fetchAndIntArray expected "fetchAndTest"
@@ -100,8 +104,15 @@ fetchAndTest = fetchOpTest fetchAndIntArray expected "fetchAndTest"
             | sizeOf (undefined :: Int) == 8 = 286331153
             | otherwise = 4369
 
+-- | Test NAND without any race, as NAND isn't associative.
 fetchNandTest :: IO ()
-fetchNandTest = fetchOpTest fetchNandIntArray expected "fetchNandTest"
+fetchNandTest = do
+    mba <- newByteArray (sizeOf (undefined :: Int))
+    writeIntArray mba 0 n0
+    fetchNandIntArray mba 0 t1pat
+    fetchNandIntArray mba 0 t2pat
+    res <- readIntArray mba 0
+    assertEq expected res "fetchNandTest"
   where expected
             | sizeOf (undefined :: Int) == 8 = 7378697629770151799
             | otherwise = -2576976009
