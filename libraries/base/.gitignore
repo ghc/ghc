@@ -1,6 +1,7 @@
 *.o
 *.aux
 *.hi
+*.tix
 
 # Backup files
 *~
