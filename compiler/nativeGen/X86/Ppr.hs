@@ -890,6 +890,8 @@ pprInstr GFREE
 
 pprInstr (LOCK i) = ptext (sLit "\tlock") $$ pprInstr i
 
+pprInstr MFENCE = ptext (sLit "\tmfence")
+
 pprInstr (XADD size src dst) = pprSizeOpOp (sLit "xadd") size src dst
 
 pprInstr (CMPXCHG size src dst) = pprSizeOpOp (sLit "cmpxchg") size src dst

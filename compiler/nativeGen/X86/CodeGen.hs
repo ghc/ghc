@@ -1838,7 +1838,8 @@ genCCall dflags _ (PrimTarget (MO_AtomicRead width)) [dst] [addr] = do
   return (load_code (getRegisterReg platform use_sse2 (CmmLocal dst)))
 
 genCCall _ _ (PrimTarget (MO_AtomicWrite width)) [] [addr, val] = do
-    assignMem_IntCode (intSize width) addr val
+    code <- assignMem_IntCode (intSize width) addr val
+    return $ code `snocOL` MFENCE
 
 genCCall dflags is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] = do
     -- On x86 we don't have enough registers to use cmpxchg with a
