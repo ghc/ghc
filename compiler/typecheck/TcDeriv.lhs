@@ -20,7 +20,7 @@ import FamInst
 import TcErrors( reportAllUnsolved )
 import TcValidity( validDerivPred )
 import TcEnv
-import TcTyClsDecls( tcFamTyPats, famTyConShape, tcAddDataFamInstCtxt )
+import TcTyClsDecls( tcFamTyPats, famTyConShape, tcAddDataFamInstCtxt, kcDataDefn )
 import TcClassDcl( tcAddDeclCtxt )      -- Small helper
 import TcGenDeriv                       -- Deriv stuff
 import TcGenGenerics
@@ -598,22 +598,38 @@ deriveInstDecl (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fam
 ------------------------------------------------------------------
 deriveFamInst :: DataFamInstDecl Name -> TcM [EarlyDerivSpec]
 deriveFamInst decl@(DataFamInstDecl { dfid_tycon = L _ tc_name, dfid_pats = pats
-                                    , dfid_defn = HsDataDefn { dd_derivs = Just preds } })
+                                    , dfid_defn = defn@(HsDataDefn { dd_derivs = Just preds }) })
   = tcAddDataFamInstCtxt decl $
     do { fam_tc <- tcLookupTyCon tc_name
-       ; tcFamTyPats (famTyConShape fam_tc) pats (\_ -> return ()) $
+       ; tcFamTyPats (famTyConShape fam_tc) pats (kcDataDefn defn) $
+             -- kcDataDefn defn: see Note [Finding the LHS patterns]
          \ tvs' pats' _ ->
            concatMapM (deriveTyData True tvs' fam_tc pats') preds }
-        -- Tiresomely we must figure out the "lhs", which is awkward for type families
-        -- E.g.   data T a b = .. deriving( Eq )
-        --          Here, the lhs is (T a b)
-        --        data instance TF Int b = ... deriving( Eq )
-        --          Here, the lhs is (TF Int b)
-        -- But if we just look up the tycon_name, we get is the *family*
-        -- tycon, but not pattern types -- they are in the *rep* tycon.
 
 deriveFamInst _ = return []
+\end{code}
 
+Note [Finding the LHS patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When kind polymorphism is in play, we need to be careful.  Here is
+Trac #9359:
+  data Cmp a where
+    Sup :: Cmp a
+    V   :: a -> Cmp a
+
+  data family   CmpInterval (a :: Cmp k) (b :: Cmp k) :: *
+  data instance CmpInterval (V c) Sup = Starting c deriving( Show )
+
+So CmpInterval is kind-polymorphic, but the data instance is not
+   CmpInterval :: forall k. Cmp k -> Cmp k -> *
+   data instance CmpInterval * (V (c::*)) Sup = Starting c deriving( Show )
+
+Hence, when deriving the type patterns in deriveFamInst, we must kind
+check the RHS (the data constructor 'Starting c') as well as the LHS,
+so that we correctly see the instantiation to *.
+
+
+\begin{code}
 ------------------------------------------------------------------
 deriveStandalone :: LDerivDecl Name -> TcM [EarlyDerivSpec]
 -- Standalone deriving declarations
