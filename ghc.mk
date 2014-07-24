@@ -1235,7 +1235,8 @@ clean_files :
 	$(call removeFiles,$(CLEAN_FILES))
 # this is here since CLEAN_FILES can't handle folders
 	$(call removeTrees,includes/dist-derivedconstants)
-	$(call removeTrees,inplace)
+	$(call removeTrees,inplace/bin)
+	$(call removeTrees,inplace/lib)
 
 .PHONY: clean_libraries
 clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
