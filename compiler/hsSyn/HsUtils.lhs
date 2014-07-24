@@ -1,3 +1,5 @@
+> {-# LANGUAGE ScopedTypeVariables #-}
+
 %
 % (c) The University of Glasgow, 1992-2006
 %
@@ -100,7 +102,10 @@ import FastString
 import Util
 import Bag
 import Outputable
+
 import Data.Either
+import Data.Function
+import Data.List
 \end{code}
 
 
@@ -743,24 +748,26 @@ hsDataDefnBinders (HsDataDefn { dd_cons = cons }) = hsConDeclsBinders cons
   -- See Note [Binders in family instances]
 
 -------------------
-hsConDeclsBinders :: (Eq name) => [LConDecl name] -> [Located name]
+hsConDeclsBinders :: forall name. (Eq name) => [LConDecl name] -> [Located name]
   -- See hsLTyClDeclBinders for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful
-hsConDeclsBinders cons
-  = snd (foldl do_one ([], []) cons)
-  where
-    do_one (flds_seen, acc) (L loc (ConDecl { con_name = L _ name
-                                            , con_details = RecCon flds }))
-	= (map unLoc new_flds ++ flds_seen, L loc name : new_flds ++ acc)
-	where
+hsConDeclsBinders cons = go id cons
+  where go :: ([Located name] -> [Located name]) -> [LConDecl name] -> [Located name]
+        go _ [] = []
+        go remSeen (r:rs) =
           -- don't re-mangle the location of field names, because we don't
           -- have a record of the full location of the field declaration anyway
-	  new_flds = filterOut (\f -> unLoc f `elem` flds_seen) 
-			       (map cd_fld_name flds)
+          case r of
+             -- remove only the first occurrence of any seen field in order to
+             -- avoid circumventing detection of duplicate fields (#9156)
+             L loc (ConDecl { con_name = L _ name , con_details = RecCon flds }) ->
+               (L loc name) : r' ++ go remSeen' rs
+                  where r' = remSeen (map cd_fld_name flds)
+                        remSeen' = foldr (.) remSeen [deleteBy ((==) `on` unLoc) v | v <- r']
+             L loc (ConDecl { con_name = L _ name }) ->
+                (L loc name) : go remSeen rs
 
-    do_one (flds_seen, acc) (L loc (ConDecl { con_name = L _ name }))
-	= (flds_seen, L loc name : acc)
 \end{code}
 
 Note [Binders in family instances]
