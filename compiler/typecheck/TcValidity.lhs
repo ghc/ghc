@@ -1114,7 +1114,14 @@ checkValidTyFamInst mb_clsinfo fam_tc
   = setSrcSpan loc $ 
     do { checkValidFamPats fam_tc tvs typats
 
-         -- The right-hand side is a tau type
+         -- The argument patterns, and RHS, are all boxed tau types
+         -- E.g  Reject type family F (a :: k1) :: k2
+         --             type instance F (forall a. a->a) = ...
+         --             type instance F Int#             = ...
+         --             type instance F Int              = forall a. a->a
+         --             type instance F Int              = Int#
+         -- See Trac #9357
+       ; mapM_ checkValidMonoType typats
        ; checkValidMonoType rhs
 
          -- We have a decidable instance unless otherwise permitted
