@@ -1,7 +1,7 @@
 
 <interactive>:12:1:
     Unacceptable result type in foreign declaration:
-    Safe Haskell is on, all FFI imports must be in the IO monad
+      Safe Haskell is on, all FFI imports must be in the IO monad
     When checking declaration:
       foreign import ccall safe "static sin" c_sin :: Double -> Double
 
