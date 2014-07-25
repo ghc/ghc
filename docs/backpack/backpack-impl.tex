@@ -910,30 +910,26 @@ against (renamed) interface files.
 \begin{algorithm}
     \caption{Compilation of definite packages (assume \texttt{-hide-all-packages} on all \texttt{ghc} invocations)}\label{alg:compile}
 \begin{algorithmic}
-    \Procedure{Compile}{\textbf{package} $P$ \textbf{where} $\vec{B}$, $flags_H$}
-    \State$flags\gets \emptyset$
-    \State$\mathcal{K}$ $\gets$ \Call{Hash}{$P + \textsc{HoleInsts}(\vec{B}, flags_H)$}
+    \Procedure{Compile}{\textbf{package} $P$ \textbf{where} $\vec{B}$, $H$, $flags_P$}\Comment{}$H$ maps hole module names to identities
+    \State$flags\gets flags_P$
+    \State$\mathcal{K}$ $\gets$ \Call{Hash}{$P + H$}
     \State$cwd\gets \textrm{fresh working directory for compilation}$
     \For{$B$ \textbf{in} $\vec{B}$}
-        \Case{$p$ $\cc$ $p$\texttt{.hsig}}
-            \State\Call{Exec}{\texttt{ghc -sig} $p$\texttt{.hsig} $flags$ \texttt{-hole-flags} ``$flags_H$''}
-        \EndCase%
         \Case{$p = p\texttt{.hs}$}
             \State\Call{Exec}{\texttt{ghc -c} $p$\texttt{.hs} \texttt{-package-name} $\mathcal{K}$ $flags$}
-                  \Comment{}Nota bene\@: no $flags_H$!
+        \EndCase%
+        \Case{$p$ $\cc$ $p$\texttt{.hsig}}
+            \State\Call{Exec}{\texttt{ghc -c} $p$\texttt{.hsig} \texttt{--sig-of} $H(p)$ $flags$}
         \EndCase%
         \Case{$p = p'$}
-            \State\Call{Exec}{\texttt{ghc -alias} $p$ $p'$}
+            \State$flags\gets flags$ \texttt{-alias} $p$ $p'$
+            \State\Call{Exec}{\texttt{ghc --check} $flags$}
         \EndCase%
-        \Case{\Cinc{$P'$}}
-        \State$\mathcal{K}'\gets$ \Call{Compile}{$P'$, $flags_H$ $flags$ \texttt{-package-loc} $(\mathcal{K}\to cwd)$ \texttt{-package} $\mathcal{K}$}
-            \State$flags\gets flags$ \texttt{-package} $\mathcal{K}'$
-            \State\Call{Exec}{\texttt{ghc -check} $flags$}
-        \EndCase%
-        \Case{\Cinc{$P'$} $\langle \vec{p_H\mapsto p'_H}, \vec{p\mapsto p'} \rangle$}
-        \State$\mathcal{K}'\gets$ \Call{Compile}{$P'$, $flags_H$ $flags$ \texttt{-package-loc} $(\mathcal{K}\to cwd)$ \texttt{-reset-module-env} $\vec{p_H\mapsto p'_H}$}
+        \Case{\Cinc{$P'$} $\langle\vec{p_H\mapsto p_H'}, \vec{p\mapsto p'} \rangle$}
+            \State\textbf{let} $H'(p_H) = $ \Call{Exec}{\texttt{ghc --resolve-module} $p_H'$ $flags$}
+            \State$\mathcal{K}'\gets$ \Call{Compile}{$P'$, $H'$, $flags_P$ \texttt{-package-dir} $\mathcal{K}$ $cwd$ $\langle\rangle$}\Comment{}Nota bene: not $flags$
             \State$flags\gets flags$ \texttt{-package} $\mathcal{K}'$ $\langle\vec{p\mapsto p'}\rangle$
-            \State\Call{Exec}{\texttt{ghc -check} $flags$}
+            \State\Call{Exec}{\texttt{ghc --check} $flags$}
         \EndCase%
     \EndFor%
     \State\Call{Exec}{\texttt{ghc-pkg copy \&\& ghc-pkg register}} \Comment{Records if $P$ exports a thinning}
@@ -948,32 +944,147 @@ processing each line by invoking GHC and/or modifying our package state.
 Here is a more in-depth description of the algorith, line-by-line:
 
 \paragraph{The parameters} To compile a package description for package
-$P$, we need to know a list of $flags_H$, which are flags that are
-passed to \texttt{ghc} to let it know where to find the instantiated
-holes.  Logically, these flags determine a mapping from each hole's
-logical name $p_H$ to a physical module identity $\nu$; we accordingly
-use these flags at the very beginning of compilation to calculate the
-package key $\mathcal{K}$ of the package being compiled, using the
-pre-pass \textsc{HoleInsts}, which finds all of the holes defined in the
-package and looks up what would have been selected for each of them
-based on $flags_H$.  Why don't we pass the actual mapping? It's more
-convenient to use flags, because the flags may be much more compact than
-a full mapping.  (Of course, for the package key, we have to compute the
-true mapping, because the flags may contain spurious dependencies.)  We
-distinguish hole flags ($flags_H$), which are passed in as arguments,
-from flags ($flags$), which are accumulated as we include packages,
-although the reason for this distinction will not be clear until we
-consider the commands themselves.
+$P$, we need to know $H$, the mapping of holes $p_H$ in package $P$ to
+physical module identities $\nu$ which are implementing them; this
+mapping is used to calculate the package key $\mathcal{K}$ for the
+package in question.  Furthermore, because we are running an actual
+compiler, and some of these implementations may not be in the package
+database, we also need an extra set of flags $flags_P$ which tells us
+where to find the interface and object files of any parent packages
+which are currently compiling.
+
+\subsection{Compiling implementations}
+
+We compile modules in the same way we do today, but with some extra
+package visibility $flags$, which let GHC know how to resolve imports
+and look up original names.  We'll describe what the new flags are
+and also discuss some subtleties with module lookup.
+
+\paragraph{New package resolution algorithm}  Currently, GHC has a
+complicated mechanism for processing \texttt{-package} (and related
+flags), motivated by the fact that without any packages, GHC would like
+try to make available \emph{all} packages in the package database.  Here
+is a major simplification we can make: let's assume that \emph{no
+packages are available by default.}  Now process each package flag in
+turn, building up a set of selected packages which is initially empty.
+
+For \texttt{-package} and \texttt{-package-id}, get the set of installed
+packages which match the flag. (If multiple package names apply, process
+each in turn as if it were a separate flag.)  Compute the transitive
+closure of dependencies for all of them, and filter out all choices
+which have dependencies which are inconsistent with the current set of
+selected packages.  In the current GHC world, a dependency is consistent
+with the selected packages if there is no package with the same package
+name but different installed package database in the selected package
+database.  Thus, in \texttt{-package} \pname{foo-0.2} \texttt{-package} \pname{bar},
+selections of \pname{bar} which depended on \pname{foo-0.1} would be excluded.
+In Backpack, we will make the model is a little more sophisticated.
+
+If there is still more than one choice, tiebreak by version, which
+database and time of install. (The latter tiebreak should not be
+necessary unless there are multiple instances of a package with the same
+package ID, as might be the case when their dependencies differ.)
+If there are no choices, error, unless the particular package that was
+asked for is an older version of a package already in the set
+(e.g., \texttt{-package} \pname{containers-0.9} \texttt{-package} \pname{containers-0.8}).
+
+\paragraph{Thinning and renaming on packages}  We augment the syntax of
+\texttt{-package} to also accept a list of thinnings and renamings, e.g.
+\texttt{-package} \pname{containers} $\langle\m{Data.Set}, \m{Data.Map}\mapsto \m{Map}\rangle$ says to make visible for import \m{Data.Set} and
+\m{Map} (which is \m{Data.Map} renamed.)
+With thinning and renaming, we have to slightly augment the package resolution
+algorithm in two ways.  First, as we are processing \texttt{-package} flags,
+we now need to concurrently maintain a mapping of visible module bindings.
+We either put all exposed modules in these mapping, or just the ones mentioned
+by the thinning and the renaming.
+
+Furthermore, it makes sense to refine our notion of conflict to apply at
+the module level.  Rather than maintain a mapping of package names to
+package choices, we instead look at whether or not there are any
+\emph{module binding} conflicts.  Thus, it would make sense to say
+\texttt{-package} \pname{containers-0.9} $\langle\m{Data.Set}\mapsto
+\m{Set09}\rangle$ \texttt{-package} \pname{containers-0.8}
+$\langle\m{Data.Set}\mapsto \m{Set08}\rangle$ and then use both modules
+concurrently, since the modules no longer are mapped onto the same name.
+This is different from existing GHC behavior, where two packages which
+export the same module can be loaded, but now GHC gives an ambiguous import
+error if you try to import the module. (Perhaps this could still be done
+here, by reporting errors lazily.)
+
+Additionally, it's important to note that two packages exporting the
+same module do not \emph{necessarily} cause a conflict; the modules
+may link together.  For example, \texttt{-package} \pname{containers} $\langle\m{Data.Set}\rangle$
+\texttt{-package} \pname{containers} $\langle\m{Data.Set}\rangle$ is fine, because
+precisely the same implementation of \m{Data.Set} is loaded in both cases.
+A similar situation can occur with signatures:
+
+\begin{verbatim}
+package p where
+    A :: [ x :: Int ]
+package q
+    include p
+    A :: [ y :: Int ]
+    B = [ import A; z = x + y ] -- *
+package r where
+    A = [ x = 0; y = 0 ]
+    include q
+\end{verbatim}
+
+Here, both \pname{p} and \pname{q} are visible when compiling the starred
+module, which compiles with the flags \texttt{-package} \pname{p}, but there
+are two interface files available: one available locally, and one from \pname{p}.
+Both of these interface files are \emph{forwarding} to the original implementation
+\pname{r} (more on this in the ``Compiling signatures'' file), so rather than
+reporting an ambiguous import, we instead have to merge the two interface files
+together and use the result as the interface for the module.  (This could be done
+on the fly, or we could generate merged interface files as we go along.)
+
+Note that we need to merge signatures with an implementation, just use the
+implementation interface.  E.g.
+
+\begin{verbatim}
+package p where
+    A :: ...
+package q where
+    A = ...
+    include p
+    B = [ import A ]    -- *
+\end{verbatim}
+
+Here, \m{A} is available both from \pname{p} and \pname{q}, but the use in the
+starred module should be done with respect to the full implementation.
+
+\paragraph{The \texttt{-alias} flag}  We introduce a new flag
+\texttt{-alias} for aliasing modules today.  Aliasing is analogous to
+the merging that can occur when we include packages, but it also applies
+to modules which are locally defined.  When we alias a module $p$ with
+$p'$, we require that $p'$ exists in the current module mapping, and then
+we attempt to add an entry for it at entry $p$.  If there is no mapping for
+$p$, this succeeds; otherwise, we apply the same conflict resolution algorithm.
+
+\paragraph{The \texttt{-package-dir} flag}  We introduce a new flag \texttt{-package-dir}
+which takes a package key $\mathcal{K}$, a directory and a list of thinning/renamings
+as before.  \texttt{-package-dir} works nearly the same as a \texttt{-package} flag,
+except that the package in question does \emph{not} have to already be installed in the
+package database.  Instead, the files associated with the package are checked for in
+the directory in question.  We will use this flag to refer to files in partially compiled
+packages which have not been installed to the package database.
 
 \subsection{Compiling signatures}
 
-Signature compilation uses a new compilation mode \verb|-sig|.  This
-mode is similar to the behavior of how we process \verb|hs-boot| files,
-but with one difference: we first check the environment as specified by
-$flags$ and $flags_H$ to see if there is already an \verb|hi| file
-(i.e., from an implementation) with the same logical name of this
-signature, e.g.,  as would occur compiling the marked signature in this
-example:
+Signature compilation is triggered when we compile a signature file.
+This mode similar to how we process \verb|hs-boot| files, except
+we pass an extra flag \verb|--sig-of| which specifies what the
+actual implementation of the signature is (according to our $H$
+mapping).  This is guaranteed to exist, due to the linking
+restriction.  (Additionally, the implementation will probably by find by looking
+up the package key against a \texttt{-package-dir} flag.)  In this case, we output an \texttt{hisig} file which, for all declarations the
+signature exposes, forwards their definitions to the original
+implementation file.  The intent is that any code in the current package
+which compiles against this signature will use this \texttt{hisig} file,
+not the original one \texttt{hi} file.
+For example, the \texttt{hisig} file produced when compiling the starred interface
+points to the implementation in package \pname{q}.
 
 \begin{verbatim}
 package p where
@@ -983,14 +1094,6 @@ package q where
     A = [ ... ]
     include p
 \end{verbatim}
-
-If there is, we check the implementation to ensure that it is compatible
-with the signature. If the implementation was found in $flags_H$, we
-also output a \texttt{hisig} file which, for all declarations the
-signature exposes, forwards their definitions to the original
-implementation file.  The intent is that any code in the current package
-which compiles against this signature will use this \texttt{hisig} file,
-not the original one \texttt{hi} file.
 
 \paragraph{Sometimes \texttt{hisig} is unnecessary}
 In the following package:
@@ -1003,63 +1106,7 @@ package p where
 
 Paper Backpack specifies that we check the signature \m{P} against implementation
 \m{P}, but otherwise no changes are made (i.e., the signature does not narrow
-the implementation.) In this case, no \texttt{hisig} file is not necessary.
-
-\paragraph{Absence of an \texttt{hi} file}
-By default, if we find an appropriate \texttt{hi} file, we'll use it
-(even if there are other \texttt{hisig} files in the search path), but
-sometimes there won't be any immediate \texttt{hi}, as in this case:
-
-\begin{verbatim}
-package p where
-    P :: [ x :: Int ]
-    A = P
-package q where
-    P :: [ x :: Int ]
-    include p
-    A :: [ x :: Int, y :: Int ] -- *
-package r where
-    P = [ x = 1; y = 1 ]
-    include q
-\end{verbatim}
-
-When compiling the marked signature, we have $flags_H =
-\texttt{-package-loc}\ (\pname{r} \to cwd_r)$ and $flags =
-\texttt{-package}$ \pname{p$(\pname{m} \to \pname{r}$:$\m{P})$}.  The
-only interface files for \m{A} in these two environments is the
-\texttt{hisig} from package \pname{p}.  However, if we use that
-\texttt{hisig}, we will falsely conclude that \m{A} is not sufficiently
-implemented, when in fact it is.  The answer to this conundrum? When
-only \texttt{hisig} files are found, we lookup the \emph{original}
-\texttt{hi} file, and typecheck against that.  An invariant that should
-hold is that all such \texttt{hisig} files should have the same original
-\texttt{hi} file (if this invariant is violated, then we attempt to link
-two physical module implementations together, which is a type error!)
-
-\paragraph{Imports are resolved using only $flags$}
-Another important detail is that $flags_H$ is \emph{only} used to tell
-if there is already a module with the logical name: if the signature
-file contains an import statement, this lookup should be done with
-respect to just $flags$.  As an example:
-
-\begin{verbatim}
-package p where
-    A :: [ x :: Int ]
-    B :: [ import A; y :: Int ]
-    C = [ import B; z = y ]
-package q where
-    A = [ x = 0; y = 0 ]
-    B = [ y = 1 ]
-    include p
-\end{verbatim}
-
-If we processed the import in \m{B} using $flags_H$, we might
-accidentally pick up the implementation of \m{A} from package \pname{q},
-where we actually wanted to use the forwarding signature built when
-processing signature \m{A}.  Notice that this is opposite of what occurs
-when we are looking for an implementation to check consistency against!
-These imports work the same way as resolving imports for compiled implementations;
-in particular, see an important detail in the next section.
+the implementation.) In this case, it is not necessary to generate an \texttt{hisig} file.
 
 \paragraph{Multiple signatures}  As a simplification, we assume that there
 is only one signature per logical name in a package.  (This prevents
@@ -1067,9 +1114,10 @@ us from expressing mutual recursion in signatures, but let's not worry
 about it for now.)
 
 \paragraph{Restricted recursive modules ala hs-boot}\label{sec:hs-boot-restrict}
-It should be possible to support GHC-style mutual recursion using the
-Backpack formalism immediately using hs-boot files.  However, to avoid
-the need for a shaping pass, we must adopt an existing constraint that
+When we compile an \texttt{hsig} file without any \texttt{--sig-of} flag (because
+no implementation is known), we fall back to old-style GHC mutual recursion.
+Na\"\i vely, a shaping pass would be necessary;
+so we adopt an existing constraint that
 already applies to hs-boot files: \emph{at the time we define a signature,
 we must know what the original name for all data types is}.  In practice,
 GHC enforces this by stating that: (1) an hs-boot file must be
@@ -1097,164 +1145,82 @@ of dynamically rewriting these references at the linking stage.  But
 separate compilation achieved in this fashion would not be able to take
 advantage of cross-module optimizations.
 
-\subsection{Compiling implementations}
-
-Compiling a module is the same as usual; however, we \emph{omit}
-$flags_H$ from the environment.  This is to force compilation to use any
-\emph{locally} compiled \texttt{hisig} files from signature compilation,
-so we see an appropriately thinned version of the module.
-
-\paragraph{Multiple signatures}  When there are multiple signatures
-defined for a logical name, we must merge them together.  Although we
-assume that a single package doesn't have multiple signatures, we could
-bring in a signature from an include:
-
-\begin{verbatim}
-package p where
-    A :: [ x :: Int ]
-package q
-    include p
-    A :: [ y :: Int ]
-    B = [ import A; z = x + y ] -- *
-package r where
-    A = [ x = 0; y = 0 ]
-    include q
-\end{verbatim}
-
-In the compilation of \texttt{B}, there is no one \texttt{hisig} found
-in $flags$ (remember that \pname{r}:\m{A} is not findable from $flags$!)
-which provides all the necessary identifiers.  Instead, we have to look
-in both \texttt{hisig} files.  Internally, when we lookup the module, we
-discover there are distinct interface files for the module; however,
-they point to the same original interface file, so the module finder
-loads all of them, merges them together, and uses that as the interface.
-
-An alternate scheme is to perform signature merging in the \verb|-check| step,
-and have some way of telling what the ``latest'' \verb|hi|/\verb|hisig| file is.
-
 \subsection{Compiling aliases}
 
-Aliasing is a new compilation mode designated by \verb|-alias|.  In
-general, in the alias $p = p'$, what is done will vary depending on how
-$p$ and $p'$ are defined in the $flags$ environments.
-(Due to the linking restriction, both are guaranteed to be findable in
-one or the other.)  Here, we say $p\in flags$ to mean that given the
-configuration of the module database with $flags$, $p$ can be found.
-
-\paragraph{$p\in flags$, $p'\not\in flags$ }  This is a type error, $p'$ is
-not findable in the environment, so there's nothing to link against. (Sure,
-it might be in $flags_H$, but these things are not visible in subpackages
-unless we declare a signature.)  Example (marked line fails):
-
-\begin{verbatim}
-package p where
-    A :: ...
-    A = B       -- *
-package q where
-    A = ...
-    B = ...
-    include p
-\end{verbatim}
-
-This is a side effect of the fact that Backpack aliases are oriented;
-one could imagine an alternate scheme where the aliases are symmetric.
-
-\paragraph{$p\not\in flags$, $p'\in flags$ }  Here,
-$p$ is completely undefined, so we are simply defining it from $p'$, no
-linking occurs.  If $p'$ is an \texttt{hisig}, we copy it; if it is an \texttt{hi},
-we create a forwarding \texttt{hisig} to it which reexports \emph{all} of
-its entities.  Both examples are presented below:
-
-\begin{verbatim}
--- A.hisig available in flags
-package p where
-    A :: ...
-    B = A       -- *
-package q where
-    A = ...
-    include p
-
--- A.hi available in flags
-package p where
-    A = ...
-    B = A       -- *
-\end{verbatim}
-
-Especially for the first example, we do \emph{not} consider \texttt{B} as
-part of the holes of package \texttt{p} (only explicit signatures count.)
-This means that even if $p\in flags_H$, causing a problem, we will discover
-it only when we go back to checking the parent package, as seen in this
-example:
-
-\begin{verbatim}
-package p where
-    A :: ...
-    B = A       -- this is fine
-package q where
-    A = ...
-    B = ...
-    include p   -- this is not (A != B)
-\end{verbatim}
-
-\paragraph{$p\in flags$, $p'\in flags$ }
-This is the most interesting situation: we'll have to do some sort of linking,
-and it will depend on what we find in $flags$ for both modules.  For all cases
-we need to check whatever the \texttt{hi}/\texttt{hisig} files are, their backing
-implementations are the same (remember the linking restriction!) as in these
-examples:
-
-\begin{verbatim}
-package p where
-    A = ...
-    B = A
-    B = A -- succeeds
-package q where
-    A1 = ...
-    A2 = ...
-    B = A1
-    B = A2 -- fails
-\end{verbatim}
-
-Furthermore, if only an \texttt{hisig} file is available for $p$ in $flags$, Paper
-Backpack instructs us to extend its signature to include everything from $p'$.
-
-\begin{verbatim}
-package p where
-    A :: [ x :: Bool ]
-    B :: [ y :: Bool ]
-    B = A
-    C = [ import B; z = x + y ] -- typechecks
-    D = [ import A; z = x + y ] -- doesn't typecheck
-\end{verbatim}
-
-But this might be a bit of a bother to implement if we don't have a way of dealing
-with multiple \texttt{hisig} files per module name\ldots
+Aliasing simply adds an extra \texttt{-alias} flag to the compilation flags.  To
+eagerly report errors, we run a special command \texttt{ghc --check} which checks
+to make sure $flags$ is consistent (e.g., no linking conflicts.)
 
 \subsection{Compiling includes}
 
-We consider two cases separately; first the simple case with no
-thinning/renaming, and then the case with renaming (for compactness of
-presentation, we assume thinning is represented as a set of identity
-renamings).
+Includes are the most interesting part of the compilation process, as we have
+calculate how the holes of the subpackage we are filling in are compiled $H'$
+and modify our flags to make the exports of the include visible to subsequently
+compiled modules.  We consider the case with renaming, since includes with
+no renaming are straightforward.
 
-In both cases, we need to compute a set of flags which will be
-sufficient to determine where the implementations of holes in the
-subpackage are.  In the case where there is no renaming, the logical
-names that could be linked against are precisely the ones available in
-the current environment: implementations from holes, implementation
-which were defined from includes, and even the modules from the
-in-progress compilation of the current package.  All of these components
-are incorporated into the $flags_H$ parameter of the recursive call.  In
-particular, the new \texttt{-package-loc} lets us define a temporary
-mapping from a package key to a working directory to do lookups, since
-$\mathcal{K}$ will generally not be registered in the package database,
-but we still need to find the relevant \texttt{hi} files.
+First, we assume that we know \emph{a priori} what the holes of a
+package $p_H$ are (either by some sort of pre-pass, or explicit
+declaration.)  For each of their \emph{renamed targets} $p'_H$, we look
+up the module in the current $flags$ environment, retrieving the
+physical module identity by consulting GHC with the
+\texttt{--resolve-module} flag and storing it in $H'$.  (This can be done in batch.)
+For example:
 
-Once we've compiled the subpackage $\mathcal{K}'$, we need to do two things.
-First, we need to add the package to our $flags$, so that later modules we
-compile are able to see the modules (and signatures) which were defined.
-Second, we need to make sure that the subpackage is \emph{consistent} with
-our current environment.  For example:
+\begin{verbatim}
+package p where
+    A :: ...
+    ...
+package q where
+    A = [ ... ]
+    B = [ ... ]
+    include p (A as B)
+\end{verbatim}
+
+When computing the entry $H(\pname{A})$, we run the command \texttt{ghc --resolve-module} \pname{B}.
+
+Next, we recursively call \textsc{Compile} with the computed $H'$,
+but registering the current working directory as the place to look
+for any original names containing the parent package key $\mathcal{K}$.
+For example, in this situation:
+
+\begin{verbatim}
+package p where
+    B :: ...
+    C = [ import B; ... ]
+package q where
+    A = [ ... ]
+    B = [ import A; ... ]
+    include p
+    D = [ import C; ... ]
+\end{verbatim}
+
+When we recursively process package \pname{p}, $H$ will refer to \pname{q}:\m{B}, and we need
+to know where to find it (\pname{q} is only partially processed and so not installed
+in the package database.)  Furthermore, the interface file for \m{B} may refer to \pname{q}:\m{A},
+and thus we likewise need to know how to find its interface file.
+
+Note that we do \emph{not} import any of the modules (the
+thinning/renaming is empty, masking all modules); we only want to
+register the package key in the in-memory database. Otherwise, this
+example would improperly compile:
+
+\begin{verbatim}
+package p where
+    B = [ import A; ... ]
+package q where
+    A = ...
+    include p
+\end{verbatim}
+
+\pname{p} does not compile on its own, so it should not compile if it is recursively
+invoked from \pname{q}.  However, if we add \texttt{-package-dir} \pname{q} $cwd$ to
+the flags without masking out all modules, \m{A} is now suddenly resolvable.
+
+Finally, once the subpackage is compiled, we can add it to our $flags$ so later
+modules we compile see its (appropriately thinned and renamed) modules, and like
+aliasing, we eagerly check it for consistency.  This consistency check would catch
+the ambiguity in this example:
 
 \begin{verbatim}
 package p where
@@ -1264,73 +1230,42 @@ package q where
     include p
 \end{verbatim}
 
-\pname{p} is a perfectly good package, but we can't include in \pname{q} because
-the identities of the two \m{A}'s don't match up.  Of course, if they were the
-same \m{A}, this would be fine.
+(Note that \pname{p} is a perfectly good package on its own, it is only its inclusion in \pname{q} which is problematic.)
 
 If we adopt the system where we merge signature files as we go along, this checking
 phase would also be a good time to merge any \texttt{hisig} files from the subpackage
 with any in the current $flags$ environment.
 
-\paragraph{With renaming}  Renaming poses an interesting challenge because \emph{holes}
-can be renamed:
+\paragraph{Absence of an \texttt{hi} file}
+It is important that \texttt{--resolve-module} truly looks up the \emph{implementor}
+of a module, and not just a signature which is providing it at some name.
+Sometimes, a little extra work is necessary to compute this, for example:
 
 \begin{verbatim}
 package p where
-    A :: ...
+    A :: [ y :: Int ]
 package q where
-    B = ...
-    include p (A as B)
+    A :: [ x :: Int ]
+    include p -- *
+package r where
+    A = [ x = 0; y = 1 ]
+    include q
 \end{verbatim}
 
-This renaming makes it possible for the include statement to explicitly say how
-holes should be implemented, but it also means that \emph{just} stuffing the current set of flags
-is unlikely to work, because everything has been renamed.  At the same time, we can't
-drop the $flags_H$, because it may contain information about how to find packages which
-are not registered in package database yet (\verb|-package-loc|).
-
-Instead, what we do is pass the same set of flags as before, but use these package
-locations \emph{solely} to resolve the mapping in \verb|-reset-module-env| from holes
-to their implementations: this mapping replaces the old $flags_H$, except for these
-explicitly instantiated modules.
-
-\emph{ToDo: maybe something better can be done here}
+When computing $H'$ for the starred include, our $flags$ only include
+\texttt{-package-dir} \pname{r} $cwd_r$ $\langle\rangle$: with a thinning
+that excludes all modules!  The only interface file we can pick up with these
+$flags$ is the local definition of \m{A}.  However, we \emph{absolutely}
+should set $H'(\m{A})=\pname{q}:\m{A}$; if we do so, then we will incorrectly
+conclude when compiling the signature in \pname{p} that the implementation
+doesn't export enough identifiers to fulfill the signature (\texttt{y} is not
+available from just the signature in \pname{q}).  Instead, we have to look
+up the original implementor of \m{A} in \pname{r}, and use that in $H'$.
 
 \subsection{Commentary}
 
-\paragraph{So how the heck are \texttt{flags} processed}  Previously, the purpose of
-\verb|-package| flags was to modify the exposed flag on entries in the in-memory package
-database, which itself was used to create a map from modules to all packages which
-defined them.
-
-The existence of \verb|-hole-flags| means we need to track a second package state just for
-the lookup needed when we're compiling an \verb|hsig| file and want to know if it is
-implemented in $flags_H$.  Additionally, \verb|-package-loc| and \verb|-reset-module-env|
-mean that not all modules in the database are necessarily in the package database. (It's worth
-remarking why we can't use \verb|-I|: the package key is not right, since \verb|-I| assumes
-that you are adding extra include directories for the compilation of the \emph{current} package
-key, not necessarily one of, say, a parent package.)  Finally, \verb|-package| arguments
-are now augmented with explicit thinning and renaming.
-
-Thus, the new model is to do away with ``exposed packages'', and instead have a package
-database mapping package keys to packages (when we need to find original names), and then
-a mapping of modules to their respective packages which is updated by the various commands.
-
-\begin{itemize}
-    \item \verb|-package| adds the package to the package key map, and
-        dumps all of the exposed modules of the package into the module
-        map.  If it has renamings, the entries placed in the module map
-        are tweaked accordingly.
-    \item \verb|-package-loc| adds the location to the package key map,
-        and scans the directory for all interface files and puts them in
-        the module map (alternately, this could be done lazily, or the
-        modules could be explicitly provided.)
-    \item \verb|-reset-module-env| performs some module resolutions based
-        on the current module map, and then replaces the map with the result
-        of the resolution. (The package key map is left alone.)
-\end{itemize}
-
 \paragraph{Just because it compiled, doesn't mean the individual packages type check}
+The compilation mechanism described is slightly more permissive than vanilla Backpack.
 Here is a simple example:
 
 \begin{verbatim}
