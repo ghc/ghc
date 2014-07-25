@@ -879,8 +879,8 @@ checkValidInstance ctxt hs_type ty
           else checkInstTermination inst_tys theta
 
         ; case (checkInstCoverage undecidable_ok clas theta inst_tys) of
-            Nothing  -> return ()   -- Check succeeded
-            Just msg -> addErrTc (instTypeErr clas inst_tys msg)
+            IsValid  -> return ()   -- Check succeeded
+            NotValid msg -> addErrTc (instTypeErr clas inst_tys msg)
                   
         ; return (tvs, theta, clas, inst_tys) } 
 

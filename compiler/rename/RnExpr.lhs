@@ -40,6 +40,7 @@ import UniqSet
 import Data.List
 import Util
 import ListSetOps       ( removeDups )
+import ErrUtils
 import Outputable
 import SrcLoc
 import FastString
@@ -1225,8 +1226,8 @@ checkStmt :: HsStmtContext Name
 checkStmt ctxt (L _ stmt)
   = do { dflags <- getDynFlags
        ; case okStmt dflags ctxt stmt of
-           Nothing    -> return ()
-           Just extra -> addErr (msg $$ extra) }
+           IsValid        -> return ()
+           NotValid extra -> addErr (msg $$ extra) }
   where
    msg = sep [ ptext (sLit "Unexpected") <+> pprStmtCat stmt <+> ptext (sLit "statement")
              , ptext (sLit "in") <+> pprAStmtContext ctxt ]
@@ -1241,13 +1242,12 @@ pprStmtCat (RecStmt {})       = ptext (sLit "rec")
 pprStmtCat (ParStmt {})       = ptext (sLit "parallel")
 
 ------------
-isOK, notOK :: Maybe SDoc
-isOK  = Nothing
-notOK = Just empty
+emptyInvalid :: Validity  -- Payload is the empty document
+emptyInvalid = NotValid empty
 
 okStmt, okDoStmt, okCompStmt, okParStmt, okPArrStmt
    :: DynFlags -> HsStmtContext Name
-   -> Stmt RdrName (Located (body RdrName)) -> Maybe SDoc
+   -> Stmt RdrName (Located (body RdrName)) -> Validity
 -- Return Nothing if OK, (Just extra) if not ok
 -- The "extra" is an SDoc that is appended to an generic error message
 
@@ -1265,59 +1265,59 @@ okStmt dflags ctxt stmt
       TransStmtCtxt ctxt -> okStmt dflags ctxt stmt
 
 -------------
-okPatGuardStmt :: Stmt RdrName (Located (body RdrName)) -> Maybe SDoc
+okPatGuardStmt :: Stmt RdrName (Located (body RdrName)) -> Validity
 okPatGuardStmt stmt
   = case stmt of
-      BodyStmt {} -> isOK
-      BindStmt {} -> isOK
-      LetStmt {}  -> isOK
-      _           -> notOK
+      BodyStmt {} -> IsValid
+      BindStmt {} -> IsValid
+      LetStmt {}  -> IsValid
+      _           -> emptyInvalid
 
 -------------
 okParStmt dflags ctxt stmt
   = case stmt of
-      LetStmt (HsIPBinds {}) -> notOK
+      LetStmt (HsIPBinds {}) -> emptyInvalid
       _                      -> okStmt dflags ctxt stmt
 
 ----------------
 okDoStmt dflags ctxt stmt
   = case stmt of
        RecStmt {}
-         | Opt_RecursiveDo `xopt` dflags -> isOK
-         | ArrowExpr <- ctxt -> isOK    -- Arrows allows 'rec'
-         | otherwise         -> Just (ptext (sLit "Use RecursiveDo"))
-       BindStmt {} -> isOK
-       LetStmt {}  -> isOK
-       BodyStmt {} -> isOK
-       _           -> notOK
+         | Opt_RecursiveDo `xopt` dflags -> IsValid
+         | ArrowExpr <- ctxt -> IsValid    -- Arrows allows 'rec'
+         | otherwise         -> NotValid (ptext (sLit "Use RecursiveDo"))
+       BindStmt {} -> IsValid
+       LetStmt {}  -> IsValid
+       BodyStmt {} -> IsValid
+       _           -> emptyInvalid
 
 ----------------
 okCompStmt dflags _ stmt
   = case stmt of
-       BindStmt {} -> isOK
-       LetStmt {}  -> isOK
-       BodyStmt {} -> isOK
+       BindStmt {} -> IsValid
+       LetStmt {}  -> IsValid
+       BodyStmt {} -> IsValid
        ParStmt {}
-         | Opt_ParallelListComp `xopt` dflags -> isOK
-         | otherwise -> Just (ptext (sLit "Use ParallelListComp"))
+         | Opt_ParallelListComp `xopt` dflags -> IsValid
+         | otherwise -> NotValid (ptext (sLit "Use ParallelListComp"))
        TransStmt {}
-         | Opt_TransformListComp `xopt` dflags -> isOK
-         | otherwise -> Just (ptext (sLit "Use TransformListComp"))
-       RecStmt {}  -> notOK
-       LastStmt {} -> notOK  -- Should not happen (dealt with by checkLastStmt)
+         | Opt_TransformListComp `xopt` dflags -> IsValid
+         | otherwise -> NotValid (ptext (sLit "Use TransformListComp"))
+       RecStmt {}  -> emptyInvalid
+       LastStmt {} -> emptyInvalid  -- Should not happen (dealt with by checkLastStmt)
 
 ----------------
 okPArrStmt dflags _ stmt
   = case stmt of
-       BindStmt {} -> isOK
-       LetStmt {}  -> isOK
-       BodyStmt {} -> isOK
+       BindStmt {} -> IsValid
+       LetStmt {}  -> IsValid
+       BodyStmt {} -> IsValid
        ParStmt {}
-         | Opt_ParallelListComp `xopt` dflags -> isOK
-         | otherwise -> Just (ptext (sLit "Use ParallelListComp"))
-       TransStmt {} -> notOK
-       RecStmt {}   -> notOK
-       LastStmt {}  -> notOK  -- Should not happen (dealt with by checkLastStmt)
+         | Opt_ParallelListComp `xopt` dflags -> IsValid
+         | otherwise -> NotValid (ptext (sLit "Use ParallelListComp"))
+       TransStmt {} -> emptyInvalid
+       RecStmt {}   -> emptyInvalid
+       LastStmt {}  -> emptyInvalid  -- Should not happen (dealt with by checkLastStmt)
 
 ---------
 checkTupleSection :: [HsTupArg RdrName] -> RnM ()

@@ -1,7 +1,7 @@
 
 ccfail002.hs:10:1:
     Unacceptable result type in foreign declaration:
-        (# Int#, Int#, Int# #)
+      ‘(# Int#, Int#, Int# #)’ cannot be marshalled in a foreign call
     When checking declaration:
-        foreign import ccall unsafe "static foo" foo
-          :: Int# -> Int# -> Int# -> (# Int#, Int#, Int# #)
+      foreign import ccall unsafe "static foo" foo
+        :: Int# -> Int# -> Int# -> (# Int#, Int#, Int# #)

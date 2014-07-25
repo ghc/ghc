@@ -1,13 +1,16 @@
 
 T5664.hs:15:1:
     Unacceptable argument type in foreign declaration:
-      FunPtr (D -> IO ())
+      Expected: Ptr/FunPtr (Int32 -> IO ()),
+        Actual: FunPtr (D -> IO ())
     When checking declaration:
       foreign import ccall safe "dynamic" mkFun3
         :: FunPtr (D -> IO ()) -> CInt -> IO ()
 
 T5664.hs:24:1:
-    Unacceptable result type in foreign declaration: IO (FunPtr (IO D))
+    Unacceptable result type in foreign declaration:
+      Expected: Ptr/FunPtr (IO Int32),
+        Actual: FunPtr (IO D)
     When checking declaration:
       foreign import ccall safe "wrapper" mkCallBack3
         :: IO CInt -> IO (FunPtr (IO D))

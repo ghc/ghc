@@ -1,6 +1,7 @@
 
 T3066.hs:6:1:
-    Unacceptable argument type in foreign declaration: forall u. Ptr ()
+    Unacceptable argument type in foreign declaration:
+      ‘forall u. Ptr ()’ is not a data type
     When checking declaration:
-        foreign import ccall safe "static bla" bla
-          :: (forall u. X u) -> IO ()
+      foreign import ccall safe "static bla" bla
+        :: (forall u. X u) -> IO ()
