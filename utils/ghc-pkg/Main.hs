@@ -127,6 +127,7 @@ data Flag
   | FlagIgnoreCase
   | FlagNoUserDb
   | FlagVerbosity (Maybe String)
+  | FlagIPId
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -171,6 +172,8 @@ flags = [
         "only print package names, not versions; can only be used with list --simple-output",
   Option [] ["ignore-case"] (NoArg FlagIgnoreCase)
         "ignore case for substring matching",
+  Option [] ["ipid"] (NoArg FlagIPId)
+        "interpret package arguments as installed package IDs",
   Option ['v'] ["verbose"] (OptArg FlagVerbosity "Verbosity")
         "verbosity level (0-2, default 1)"
   ]
@@ -279,7 +282,8 @@ usageHeader prog = substProg prog $
   "\n" ++
   " Substring matching is supported for {module} in find-module and\n" ++
   " for {pkg} in list, describe, and field, where a '*' indicates\n" ++
-  " open substring ends (prefix*, *suffix, *infix*).\n" ++
+  " open substring ends (prefix*, *suffix, *infix*).  Use --ipid to\n" ++
+  " match against the installed package ID instead.\n" ++
   "\n" ++
   "  When asked to modify a database (register, unregister, update,\n"++
   "  hide, expose, and also check), ghc-pkg modifies the global database by\n"++
@@ -306,7 +310,17 @@ substProg prog (c:xs) = c : substProg prog xs
 data Force = NoForce | ForceFiles | ForceAll | CannotForce
   deriving (Eq,Ord)
 
-data PackageArg = Id PackageIdentifier | Substring String (String->Bool)
+-- | Represents how a package may be specified by a user on the command line.
+data PackageArg
+    -- | A package identifier foo-0.1; the version might be a glob.
+    = Id PackageIdentifier
+    -- | An installed package ID foo-0.1-HASH.  This is guaranteed to uniquely
+    -- match a single entry in the package database.
+    | IPId InstalledPackageId
+    -- | A glob against the package name.  The first string is the literal
+    -- glob, the second is a function which returns @True@ if the the argument
+    -- matches.
+    | Substring String (String->Bool)
 
 runit :: Verbosity -> [Flag] -> [String] -> IO ()
 runit verbosity cli nonopts = do
@@ -317,6 +331,7 @@ runit verbosity cli nonopts = do
           | FlagForce `elem` cli        = ForceAll
           | FlagForceFiles `elem` cli   = ForceFiles
           | otherwise                   = NoForce
+        as_ipid = FlagIPId `elem` cli
         auto_ghci_libs = FlagAutoGHCiLibs `elem` cli
         multi_instance = FlagMultiInstance `elem` cli
         expand_env_vars= FlagExpandEnvVars `elem` cli
@@ -393,28 +408,29 @@ runit verbosity cli nonopts = do
         registerPackage filename verbosity cli
                         auto_ghci_libs multi_instance
                         expand_env_vars True force
-    ["unregister", pkgid_str] -> do
-        pkgid <- readGlobPkgId pkgid_str
-        unregisterPackage pkgid verbosity cli force
-    ["expose", pkgid_str] -> do
-        pkgid <- readGlobPkgId pkgid_str
-        exposePackage pkgid verbosity cli force
-    ["hide",   pkgid_str] -> do
-        pkgid <- readGlobPkgId pkgid_str
-        hidePackage pkgid verbosity cli force
-    ["trust",    pkgid_str] -> do
-        pkgid <- readGlobPkgId pkgid_str
-        trustPackage pkgid verbosity cli force
-    ["distrust", pkgid_str] -> do
-        pkgid <- readGlobPkgId pkgid_str
-        distrustPackage pkgid verbosity cli force
+    ["unregister", pkgarg_str] -> do
+        pkgarg <- readPackageArg as_ipid pkgarg_str
+        unregisterPackage pkgarg verbosity cli force
+    ["expose", pkgarg_str] -> do
+        pkgarg <- readPackageArg as_ipid pkgarg_str
+        exposePackage pkgarg verbosity cli force
+    ["hide",   pkgarg_str] -> do
+        pkgarg <- readPackageArg as_ipid pkgarg_str
+        hidePackage pkgarg verbosity cli force
+    ["trust",    pkgarg_str] -> do
+        pkgarg <- readPackageArg as_ipid pkgarg_str
+        trustPackage pkgarg verbosity cli force
+    ["distrust", pkgarg_str] -> do
+        pkgarg <- readPackageArg as_ipid pkgarg_str
+        distrustPackage pkgarg verbosity cli force
     ["list"] -> do
         listPackages verbosity cli Nothing Nothing
-    ["list", pkgid_str] ->
-        case substringCheck pkgid_str of
-          Nothing -> do pkgid <- readGlobPkgId pkgid_str
-                        listPackages verbosity cli (Just (Id pkgid)) Nothing
-          Just m -> listPackages verbosity cli (Just (Substring pkgid_str m)) Nothing
+    ["list", pkgarg_str] ->
+        case substringCheck pkgarg_str of
+          Nothing -> do pkgarg <- readPackageArg as_ipid pkgarg_str
+                        listPackages verbosity cli (Just pkgarg) Nothing
+          Just m -> listPackages verbosity cli
+                                 (Just (Substring pkgarg_str m)) Nothing
     ["dot"] -> do
         showPackageDot verbosity cli
     ["find-module", moduleName] -> do
@@ -425,13 +441,13 @@ runit verbosity cli nonopts = do
         latestPackage verbosity cli pkgid
     ["describe", pkgid_str] -> do
         pkgarg <- case substringCheck pkgid_str of
-          Nothing -> liftM Id (readGlobPkgId pkgid_str)
+          Nothing -> readPackageArg as_ipid pkgid_str
           Just m  -> return (Substring pkgid_str m)
         describePackage verbosity cli pkgarg (fromMaybe False mexpand_pkgroot)
         
     ["field", pkgid_str, fields] -> do
         pkgarg <- case substringCheck pkgid_str of
-          Nothing -> liftM Id (readGlobPkgId pkgid_str)
+          Nothing -> readPackageArg as_ipid pkgid_str
           Just m  -> return (Substring pkgid_str m)
         describeField verbosity cli pkgarg
                       (splitFields fields) (fromMaybe True mexpand_pkgroot)
@@ -466,6 +482,11 @@ parseGlobPackageId =
   (do n <- parse
       _ <- string "-*"
       return (PackageIdentifier{ pkgName = n, pkgVersion = globVersion }))
+
+readPackageArg :: Bool -> String -> IO PackageArg
+readPackageArg True str =
+    parseCheck (IPId `fmap` parse) str "installed package id"
+readPackageArg False str = Id `fmap` readGlobPkgId str
 
 -- globVersion means "all versions"
 globVersion :: Version
@@ -1005,34 +1026,34 @@ updateDBCache verbosity db = do
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar
 
-exposePackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
+exposePackage :: PackageArg -> Verbosity -> [Flag] -> Force -> IO ()
 exposePackage = modifyPackage (\p -> ModifyPackage p{exposed=True})
 
-hidePackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
+hidePackage :: PackageArg -> Verbosity -> [Flag] -> Force -> IO ()
 hidePackage = modifyPackage (\p -> ModifyPackage p{exposed=False})
 
-trustPackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
+trustPackage :: PackageArg -> Verbosity -> [Flag] -> Force -> IO ()
 trustPackage = modifyPackage (\p -> ModifyPackage p{trusted=True})
 
-distrustPackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
+distrustPackage :: PackageArg -> Verbosity -> [Flag] -> Force -> IO ()
 distrustPackage = modifyPackage (\p -> ModifyPackage p{trusted=False})
 
-unregisterPackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
+unregisterPackage :: PackageArg -> Verbosity -> [Flag] -> Force -> IO ()
 unregisterPackage = modifyPackage RemovePackage
 
 modifyPackage
   :: (InstalledPackageInfo -> DBOp)
-  -> PackageIdentifier
+  -> PackageArg
   -> Verbosity
   -> [Flag]
   -> Force
   -> IO ()
-modifyPackage fn pkgid verbosity my_flags force = do
+modifyPackage fn pkgarg verbosity my_flags force = do
   (db_stack, Just _to_modify, flag_dbs) <-
       getPkgDatabases verbosity True{-modify-} True{-use cache-} False{-expand vars-} my_flags
 
   -- Do the search for the package respecting flags...
-  (db, ps) <- fmap head $ findPackagesByDB flag_dbs (Id pkgid)
+  (db, ps) <- fmap head $ findPackagesByDB flag_dbs pkgarg
   let 
       db_name = location db
       pkgs    = packages db
@@ -1050,8 +1071,7 @@ modifyPackage fn pkgid verbosity my_flags force = do
       newly_broken = filter (`notElem` map sourcePackageId old_broken) new_broken
   --
   when (not (null newly_broken)) $
-      dieOrForceAll force ("unregistering " ++ display pkgid ++
-           " would break the following packages: "
+      dieOrForceAll force ("unregistering would break the following packages: "
               ++ unwords (map display newly_broken))
 
   changeDB verbosity cmds db
@@ -1251,6 +1271,7 @@ findPackagesByDB db_stack pkgarg
         ps -> return ps
   where
         pkg_msg (Id pkgid)           = display pkgid
+        pkg_msg (IPId ipid)          = display ipid
         pkg_msg (Substring pkgpat _) = "matching " ++ pkgpat
 
 matches :: PackageIdentifier -> PackageIdentifier -> Bool
@@ -1264,6 +1285,7 @@ realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
 
 matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (Id pid)        `matchesPkg` pkg = pid `matches` sourcePackageId pkg
+(IPId ipid)     `matchesPkg` pkg = ipid == installedPackageId pkg
 (Substring _ m) `matchesPkg` pkg = m (display (sourcePackageId pkg))
 
 -- -----------------------------------------------------------------------------

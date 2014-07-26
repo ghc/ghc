@@ -691,7 +691,9 @@ haskell98-1.0.1.0
       package; the specified action will be applied to all the matching
       packages.  A package specifier that matches all version of the package
       can also be written <replaceable>pkg</replaceable><literal>-*</literal>,
-      to make it clearer that multiple packages are being matched.</para>
+      to make it clearer that multiple packages are being matched.  To match
+      against the package ID instead of just package name and version,
+      pass the <option>--ipid</option> flag.</para>
 
     <variablelist>
       <varlistentry>
@@ -1048,6 +1050,24 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
         </listitem>
       </varlistentry>
     </variablelist>
+
+      <varlistentry>
+        <term>
+          <option>--ipid</option>
+          <indexterm><primary>
+              <option>--ipid</option>
+            </primary></indexterm>
+        </term>
+        <listitem>
+          <para>Causes <literal>ghc-pkg</literal> to interpret arguments
+          as package IDs (e.g., an identifier like
+          <literal>unix-2.3.1.0-de7803f1a8cd88d2161b29b083c94240
+          </literal>).  This is useful if providing just the package
+          name and version are ambiguous (in old versions of GHC, this
+          was guaranteed to be unique, but this invariant no longer
+          necessarily holds).</para>
+        </listitem>
+      </varlistentry>
 
   </sect2>
 
