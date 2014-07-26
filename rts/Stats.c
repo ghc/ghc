@@ -173,8 +173,8 @@ initStats1 (void)
     nat i;
   
     if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
-        statsPrintf("    Alloc    Copied     Live    GC    GC     TOT     TOT  Page Flts\n");
-        statsPrintf("    bytes     bytes     bytes  user  elap    user    elap\n");
+        statsPrintf("    Alloc    Copied     Live     GC     GC      TOT      TOT  Page Flts\n");
+        statsPrintf("    bytes     bytes     bytes   user   elap     user     elap\n");
     }
     GC_coll_cpu = 
 	(Time *)stgMallocBytes(
@@ -380,7 +380,7 @@ stat_endGC (Capability *cap, gc_thread *gct,
 	    statsPrintf("%9" FMT_SizeT " %9" FMT_SizeT " %9" FMT_SizeT,
 		    alloc*sizeof(W_), copied*sizeof(W_), 
 			live*sizeof(W_));
-            statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4" FMT_Word " %4" FMT_Word "  (Gen: %2d)\n",
+            statsPrintf(" %6.3f %6.3f %8.3f %8.3f %4" FMT_Word " %4" FMT_Word "  (Gen: %2d)\n",
                     TimeToSecondsDbl(gc_cpu),
 		    TimeToSecondsDbl(gc_elapsed),
 		    TimeToSecondsDbl(cpu),
@@ -604,7 +604,7 @@ stat_exit (void)
 	
 	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
 	    statsPrintf("%9" FMT_SizeT " %9.9s %9.9s", (W_)alloc*sizeof(W_), "", "");
-	    statsPrintf(" %5.2f %5.2f\n\n", 0.0, 0.0);
+	    statsPrintf(" %6.3f %6.3f\n\n", 0.0, 0.0);
 	}
 
         for (i = 0; i < RtsFlags.GcFlags.generations; i++) {
@@ -654,10 +654,10 @@ stat_exit (void)
                         (size_t)(peak_mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
 
 	    /* Print garbage collections in each gen */
-            statsPrintf("                                    Tot time (elapsed)  Avg pause  Max pause\n");
+            statsPrintf("                                     Tot time (elapsed)  Avg pause  Max pause\n");
             for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
                 gen = &generations[g];
-                statsPrintf("  Gen %2d     %5d colls, %5d par   %5.2fs   %5.2fs     %3.4fs    %3.4fs\n",
+                statsPrintf("  Gen %2d     %5d colls, %5d par   %6.3fs  %6.3fs     %3.4fs    %3.4fs\n",
                             gen->no,
                             gen->collections,
                             gen->par_collections,
@@ -704,23 +704,23 @@ stat_exit (void)
             }
 #endif
 
-	    statsPrintf("  INIT    time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  INIT    time  %7.3fs  (%7.3fs elapsed)\n",
                         TimeToSecondsDbl(init_cpu), TimeToSecondsDbl(init_elapsed));
 
-            statsPrintf("  MUT     time  %6.2fs  (%6.2fs elapsed)\n",
+            statsPrintf("  MUT     time  %7.3fs  (%7.3fs elapsed)\n",
                         TimeToSecondsDbl(mut_cpu), TimeToSecondsDbl(mut_elapsed));
-            statsPrintf("  GC      time  %6.2fs  (%6.2fs elapsed)\n",
+            statsPrintf("  GC      time  %7.3fs  (%7.3fs elapsed)\n",
                         TimeToSecondsDbl(gc_cpu), TimeToSecondsDbl(gc_elapsed));
 
 #ifdef PROFILING
-	    statsPrintf("  RP      time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  RP      time  %7.3fs  (%7.3fs elapsed)\n",
 		    TimeToSecondsDbl(RP_tot_time), TimeToSecondsDbl(RPe_tot_time));
-	    statsPrintf("  PROF    time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  PROF    time  %7.3fs  (%7.3fs elapsed)\n",
 		    TimeToSecondsDbl(HC_tot_time), TimeToSecondsDbl(HCe_tot_time));
 #endif 
-	    statsPrintf("  EXIT    time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  EXIT    time  %7.3fs  (%7.3fs elapsed)\n",
 		    TimeToSecondsDbl(exit_cpu), TimeToSecondsDbl(exit_elapsed));
-	    statsPrintf("  Total   time  %6.2fs  (%6.2fs elapsed)\n\n",
+	    statsPrintf("  Total   time  %7.3fs  (%7.3fs elapsed)\n\n",
 		    TimeToSecondsDbl(tot_cpu), TimeToSecondsDbl(tot_elapsed));
 #ifndef THREADED_RTS
 	    statsPrintf("  %%GC     time     %5.1f%%  (%.1f%% elapsed)\n\n",
@@ -779,17 +779,17 @@ stat_exit (void)
                  " ,(\"max_bytes_used\", \"%ld\")\n"
                  " ,(\"num_byte_usage_samples\", \"%ld\")\n"
                  " ,(\"peak_megabytes_allocated\", \"%lu\")\n"
-                 " ,(\"init_cpu_seconds\", \"%.2f\")\n"
-                 " ,(\"init_wall_seconds\", \"%.2f\")\n"
-                 " ,(\"mutator_cpu_seconds\", \"%.2f\")\n"
-                 " ,(\"mutator_wall_seconds\", \"%.2f\")\n"
-                 " ,(\"GC_cpu_seconds\", \"%.2f\")\n"
-                 " ,(\"GC_wall_seconds\", \"%.2f\")\n"
+                 " ,(\"init_cpu_seconds\", \"%.3f\")\n"
+                 " ,(\"init_wall_seconds\", \"%.3f\")\n"
+                 " ,(\"mutator_cpu_seconds\", \"%.3f\")\n"
+                 " ,(\"mutator_wall_seconds\", \"%.3f\")\n"
+                 " ,(\"GC_cpu_seconds\", \"%.3f\")\n"
+                 " ,(\"GC_wall_seconds\", \"%.3f\")\n"
                  " ]\n";
       }
       else {
           fmt1 = "<<ghc: %llu bytes, ";
-          fmt2 = "%d GCs, %ld/%ld avg/max bytes residency (%ld samples), %luM in use, %.2f INIT (%.2f elapsed), %.2f MUT (%.2f elapsed), %.2f GC (%.2f elapsed) :ghc>>\n";
+          fmt2 = "%d GCs, %ld/%ld avg/max bytes residency (%ld samples), %luM in use, %.3f INIT (%.3f elapsed), %.3f MUT (%.3f elapsed), %.3f GC (%.3f elapsed) :ghc>>\n";
       }
 	  /* print the long long separately to avoid bugginess on mingwin (2001-07-02, mingw-0.5) */
 	  statsPrintf(fmt1, GC_tot_alloc*(StgWord64)sizeof(W_));
