@@ -864,8 +864,8 @@ mkModuleMap pkg_db ipid_map = foldr extend_modmap emptyUFM pkgids
     pkgids = map packageConfigId (eltsUFM pkg_db)
 
     extend_modmap pkgid modmap = addListToUFM_C (plusUFM_C merge) modmap es
-      where -- ASSERT(m == m' && pkg == pkg' && e == e'
-            --          && (e || not (v || v')))
+      where -- Invariant: m == m' && pkg == pkg' && e == e'
+            --              && (e || not (v || v'))
             -- Some notes about the assert. Merging only ever occurs when
             -- we find a reexport.  The interesting condition:
             --      e || not (v || v')
