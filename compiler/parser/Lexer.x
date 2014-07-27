@@ -527,8 +527,9 @@ data Token
   | ITvect_scalar_prag
   | ITnovect_prag
   | ITminimal_prag
-  | ITno_overlap_prag           -- instance overlap mode
-  | IToverlap_prag              -- instance overlap mode
+  | IToverlappable_prag         -- instance overlap mode
+  | IToverlapping_prag          -- instance overlap mode
+  | IToverlaps_prag             -- instance overlap mode
   | ITincoherent_prag           -- instance overlap mode
   | ITctype
 
@@ -2431,8 +2432,9 @@ oneWordPrags = Map.fromList([("rules", rulePrag),
                            ("vectorize", token ITvect_prag),
                            ("novectorize", token ITnovect_prag),
                            ("minimal", token ITminimal_prag),
-                           ("no_overlap", token ITno_overlap_prag),
-                           ("overlap", token IToverlap_prag),
+                           ("overlaps", token IToverlaps_prag),
+                           ("overlappable", token IToverlappable_prag),
+                           ("overlapping", token IToverlapping_prag),
                            ("incoherent", token ITincoherent_prag),
                            ("ctype", token ITctype)])
 

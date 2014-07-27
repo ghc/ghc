@@ -638,20 +638,23 @@ insert_overlapping new_item (item:items)
 
     incoherent (inst, _) = overlapMode (is_flag inst) == Incoherent
 
+    -- `instB` can be instantiated to match `instA`
+    instA `moreSpecificThan` instB =
+      isJust (tcMatchTys (mkVarSet (is_tvs instB))
+             (is_tys instB) (is_tys instA))
+
     (instA, _) `beats` (instB, _)
-          = overlap_ok &&
-            isJust (tcMatchTys (mkVarSet (is_tvs instB)) (is_tys instB) (is_tys instA))
-                    -- A beats B if A is more specific than B,
-                    -- (ie. if B can be instantiated to match A)
-                    -- and overlap is permitted
+          = overlap_ok && (instA `moreSpecificThan` instB)
           where
-            -- Overlap permitted if *either* instance permits overlap
-            -- This is a change (Trac #3877, Dec 10). It used to
-            -- require that instB (the less specific one) permitted overlap.
-            overlap_ok = case (overlapMode (is_flag instA),
-                               overlapMode (is_flag instB)) of
-                              (NoOverlap, NoOverlap) -> False
-                              _                      -> True
+            {- Overlap permitted if either the more specific instance
+            is marked as overlapping, or the more general one is
+            marked as overlappable.
+            Latest change described in: Trac #9242.
+            Previous change: Trac #3877, Dec 10.  -}
+            overlap_ok = hasOverlappingFlag  (overlapMode (is_flag instA))
+                      || hasOverlappableFlag (overlapMode (is_flag instB))
+
+
 \end{code}
 
 Note [Incoherent instances]

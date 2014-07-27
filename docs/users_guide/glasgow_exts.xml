@@ -5026,12 +5026,12 @@ an <literal>LANGUAGE</literal> pragma if desired (<xref linkend="language-pragma
 In addition, it is possible to specify the overlap behavior for individual
 instances with a pragma, written immediately after the
 <literal>instance</literal> keyword.  The pragma may be one of:
-<literal>OVERLAP</literal>, <literal>NO_OVERLAP</literal>,
+<literal>OVERLAPPING</literal>,
+<literal>OVERLAPPABLE</literal>,
+<literal>OVERLAPS</literal>,
 or <literal>INCOHERENT</literal>.  An explicit pragma on an instance
 takes precedence over the default specified with a flag or
-a <literal>LANGUAGE</literal> pragma.  For example, an instance marked with
-<literal>{-# NO_OVERLAP #-}</literal> will be marked as non-overlapping,
-even if the module contains <literal>{-# LANGUAGE OverlappingInstances #-}</literal>.
+a <literal>LANGUAGE</literal> pragma.
 </para>
 
 
@@ -5075,15 +5075,25 @@ instantiated.  If all of them were compiled with
 Eliminate any candidate IX for which both of the following hold:
 
 <itemizedlist>
-<listitem><para>There is another candidate IY that is strictly more specific;
-that is, IY is a substitution instance of IX but not vice versa.
-</para></listitem>
-<listitem><para>Either IX or IY was compiled with 
-<option>-XOverlappingInstances</option>.
-</para></listitem>
-</itemizedlist>
-
-</para></listitem>
+  <listitem><para>There is another candidate IY that is strictly more specific;
+    that is, IY is a substitution instance of IX but not vice versa.
+  </para></listitem>
+  <listitem><para>
+  Either IX is <emphasis>overlappable</emphasis> or IY is
+  <emphasis>overlapping</emphasis>.
+  </para></listitem>
+  </itemizedlist>
+</para>
+<para>
+Instance annotated with an <literal>OVERLAPPABLE</literal> or
+<literal>OVERLAPPING</literal> pragma are treated as such.
+</para>
+<para>
+Instances annotated with the <literal>OVERLAPS</literal> pragma, or compiled
+with <option>-XOverlappingInstances</option>, are treated as both
+<emphasis>overlapping</emphasis> and <emphasis>overlappable</emphasis>.
+</para>
+</listitem>
 
 <listitem><para>
 If only one candidate remains, pick it.
@@ -10785,18 +10795,19 @@ data T = T {-# NOUNPACK #-} !(Int,Int)
 </sect2>
 
 <sect2 id="overlap-pragma">
-<title>OVERLAP, NO_OVERLAP, and INCOHERENT pragmas</title>
+<title>OVERLAPPINGP, OVERLAPPABLE, OVERLAPS, and INCOHERENT pragmas</title>
 <para>
-The <literal>OVERLAP</literal>, <literal>NO_OVERLAP</literal>, and
-<literal>INCOHERENT</literal> pragmas are used to specify the overlap
+The pragmas
+  <literal>OVERLAPPING</literal>,
+  <literal>OVERLAPPABLE</literal>,
+  <literal>OVERLAPS</literal>,
+  <literal>INCOHERENT</literal> are used to specify the overlap
 behavior for individual instances, as described in Section
-<xref linkend="instance-overlap"/>.  They take precedence over the behavior
-specified with the corresponding <literal>LANGUAGE</literal> pragmas.
-The pragmas are written immediately after the <literal>instance</literal>
-keyword.  For example:
+<xref linkend="instance-overlap"/>.  The pragmas are written immediately
+after the <literal>instance</literal> keyword, like this:
 </para>
 <programlisting>
-instance {-# OVERLAP #-} C t where ...
+instance {-# OVERLAPPING #-} C t where ...
 </programlisting>
 </sect2>
 

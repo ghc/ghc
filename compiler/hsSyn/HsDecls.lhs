@@ -1055,16 +1055,18 @@ instance (OutputableBndr name) => Outputable (ClsInstDecl name) where
                map (pprDataFamInstDecl NotTopLevel . unLoc) adts ++
                pprLHsBindsForUser binds sigs ]
       where
-        top_matter = ptext (sLit "instance") <+> ppOveralapPragma mbOverlap
+        top_matter = ptext (sLit "instance") <+> ppOverlapPragma mbOverlap
                                              <+> ppr inst_ty
 
-ppOveralapPragma :: Maybe OverlapMode -> SDoc
-ppOveralapPragma mb =
+ppOverlapPragma :: Maybe OverlapMode -> SDoc
+ppOverlapPragma mb =
   case mb of
-    Nothing          -> empty
-    Just NoOverlap   -> ptext (sLit "{-# NO_OVERLAP #-}")
-    Just OverlapOk   -> ptext (sLit "{-# OVERLAP #-}")
-    Just Incoherent  -> ptext (sLit "{-# INCOHERENT #-}")
+    Nothing           -> empty
+    Just NoOverlap    -> ptext (sLit "{-# NO_OVERLAP #-}")
+    Just Overlappable -> ptext (sLit "{-# OVERLAPPABLE #-}")
+    Just Overlapping  -> ptext (sLit "{-# OVERLAPPING #-}")
+    Just Overlaps     -> ptext (sLit "{-# OVERLAPS #-}")
+    Just Incoherent   -> ptext (sLit "{-# INCOHERENT #-}")
 
 
 
@@ -1102,7 +1104,7 @@ data DerivDecl name = DerivDecl { deriv_type :: LHsType name
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
     ppr (DerivDecl ty o)
-        = hsep [ptext (sLit "deriving instance"), ppOveralapPragma o, ppr ty]
+        = hsep [ptext (sLit "deriving instance"), ppOverlapPragma o, ppr ty]
 \end{code}
 
 %************************************************************************

@@ -390,7 +390,7 @@ getOverlapFlag
               use x = OverlapFlag { isSafeOverlap = safeLanguageOn dflags
                                   , overlapMode   = x }
               overlap_flag | incoherent_ok = use Incoherent
-                           | overlap_ok    = use OverlapOk
+                           | overlap_ok    = use Overlaps
                            | otherwise     = use NoOverlap
 
         ; return overlap_flag }

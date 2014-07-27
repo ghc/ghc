@@ -834,15 +834,19 @@ instance Binary RecFlag where
               _ -> do return NonRecursive
 
 instance Binary OverlapMode where
-    put_ bh NoOverlap   = putByte bh 0
-    put_ bh OverlapOk   = putByte bh 1
-    put_ bh Incoherent  = putByte bh 2
+    put_ bh NoOverlap     = putByte bh 0
+    put_ bh Overlaps      = putByte bh 1
+    put_ bh Incoherent    = putByte bh 2
+    put_ bh Overlapping   = putByte bh 3
+    put_ bh Overlappable  = putByte bh 4
     get bh = do
         h <- getByte bh
         case h of
             0 -> return NoOverlap
-            1 -> return OverlapOk
+            1 -> return Overlaps
             2 -> return Incoherent
+            3 -> return Overlapping
+            4 -> return Overlappable
             _ -> panic ("get OverlapMode" ++ show h)
 
 

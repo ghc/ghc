@@ -42,6 +42,7 @@ module BasicTypes(
         TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
+        hasOverlappingFlag, hasOverlappableFlag,
 
         Boxity(..), isBoxed,
 
@@ -456,43 +457,81 @@ setOverlapModeMaybe :: OverlapFlag -> Maybe OverlapMode -> OverlapFlag
 setOverlapModeMaybe f Nothing  = f
 setOverlapModeMaybe f (Just m) = f { overlapMode = m }
 
+hasOverlappableFlag :: OverlapMode -> Bool
+hasOverlappableFlag mode =
+  case mode of
+    Overlappable -> True
+    Overlaps     -> True
+    _            -> False
+
+hasOverlappingFlag :: OverlapMode -> Bool
+hasOverlappingFlag mode =
+  case mode of
+    Overlapping  -> True
+    Overlaps     -> True
+    _            -> False
 
 data OverlapMode
-  -- | This instance must not overlap another
+
+  {- | This instance must not overlap another `NoOverlap` instance.
+  However, it may be overlapped by `Overlapping` instances,
+  and it may overlap `Overlappable` instances. -}
   = NoOverlap
 
-  -- | Silently ignore this instance if you find a
-  -- more specific one that matches the constraint
-  -- you are trying to resolve
-  --
-  -- Example: constraint (Foo [Int])
-  --        instances  (Foo [Int])
-  --                   (Foo [a])        OverlapOk
-  -- Since the second instance has the OverlapOk flag,
-  -- the first instance will be chosen (otherwise
-  -- its ambiguous which to choose)
-  | OverlapOk
+
+  {- | Silently ignore this instance if you find a
+  more specific one that matches the constraint
+  you are trying to resolve
+
+  Example: constraint (Foo [Int])
+    instance                      Foo [Int]
+    instance {-# OVERLAPPABLE #-} Foo [a]
+
+  Since the second instance has the Overlappable flag,
+  the first instance will be chosen (otherwise
+  its ambiguous which to choose) -}
+  | Overlappable
+
+
+  {- | Silently ignore any more general instances that may be
+       used to solve the constraint.
+
+  Example: constraint (Foo [Int])
+    instance {-# OVERLAPPING #-} Foo [Int]
+    instance                     Foo [a]
+
+  Since the first instance has the Overlapping flag,
+  the second---more general---instance will be ignored (otherwise
+  its ambiguous which to choose) -}
+  | Overlapping
+
+
+  -- | Equiavalent to having both `Overlapping` and `Overlappable` flags.
+  | Overlaps
 
   -- | Silently ignore this instance if you find any other that matches the
   -- constraing you are trying to resolve, including when checking if there are
   -- instances that do not match, but unify.
   --
   -- Example: constraint (Foo [b])
-  --        instances  (Foo [Int])      Incoherent
-  --                   (Foo [a])
+  -- instance {-# INCOHERENT -} Foo [Int]
+  -- instance                   Foo [a]
   -- Without the Incoherent flag, we'd complain that
   -- instantiating 'b' would change which instance
   -- was chosen. See also note [Incoherent instances]
   | Incoherent
   deriving (Eq, Data, Typeable)
 
+
 instance Outputable OverlapFlag where
    ppr flag = ppr (overlapMode flag) <+> pprSafeOverlap (isSafeOverlap flag)
 
 instance Outputable OverlapMode where
-   ppr NoOverlap  = empty
-   ppr OverlapOk  = ptext (sLit "[overlap ok]")
-   ppr Incoherent = ptext (sLit "[incoherent]")
+   ppr NoOverlap    = empty
+   ppr Overlappable = ptext (sLit "[overlappable]")
+   ppr Overlapping  = ptext (sLit "[overlapping]")
+   ppr Overlaps     = ptext (sLit "[overlap ok]")
+   ppr Incoherent   = ptext (sLit "[incoherent]")
 
 pprSafeOverlap :: Bool -> SDoc
 pprSafeOverlap True  = ptext $ sLit "[safe]"

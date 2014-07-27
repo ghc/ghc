@@ -286,8 +286,9 @@ incorrect.
  '{-# NOVECTORISE'        { L _ ITnovect_prag }
  '{-# MINIMAL'            { L _ ITminimal_prag }
  '{-# CTYPE'              { L _ ITctype }
- '{-# NO_OVERLAP'         { L _ ITno_overlap_prag }
- '{-# OVERLAP'            { L _ IToverlap_prag }
+ '{-# OVERLAPPING'        { L _ IToverlapping_prag }
+ '{-# OVERLAPPABLE'       { L _ IToverlappable_prag }
+ '{-# OVERLAPS'           { L _ IToverlaps_prag }
  '{-# INCOHERENT'         { L _ ITincoherent_prag }
  '#-}'                                          { L _ ITclose_prag }
 
@@ -707,10 +708,11 @@ inst_decl :: { LInstDecl RdrName }
                                      (unLoc $5) (unLoc $6) (unLoc $7) }
 
 overlap_pragma :: { Maybe OverlapMode }
-  : '{-# OVERLAP'    '#-}'    { Just OverlapOk  }
-  | '{-# INCOHERENT' '#-}'    { Just Incoherent }
-  | '{-# NO_OVERLAP' '#-}'    { Just NoOverlap  }
-  | {- empty -}               { Nothing }
+  : '{-# OVERLAPPABLE'    '#-}' { Just Overlappable }
+  | '{-# OVERLAPPING'     '#-}' { Just Overlapping }
+  | '{-# OVERLAPS'        '#-}' { Just Overlaps }
+  | '{-# INCOHERENT'      '#-}' { Just Incoherent }
+  | {- empty -}                 { Nothing }
 
 
 -- Closed type families
