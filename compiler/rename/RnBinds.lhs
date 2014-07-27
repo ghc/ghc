@@ -559,7 +559,7 @@ rnBind _sig_fn bind@(PatSynBind { patsyn_id = L _ name
                           , bind_fvs = fvs' }
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
-          return (bind', [name], fvs)
+          return (bind', [name], fvs1)
       }
   where
     lookupVar = wrapLocM lookupOccRn
