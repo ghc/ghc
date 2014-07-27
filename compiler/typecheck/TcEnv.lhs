@@ -18,8 +18,8 @@ module TcEnv(
         tcExtendGlobalEnv, tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
         tcExtendGlobalValEnv,
         tcLookupLocatedGlobal, tcLookupGlobal, 
-        tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
-        tcLookupConLike,
+        tcLookupField, tcLookupTyCon, tcLookupClass,
+        tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupInstance, tcLookupAxiom,
         
@@ -73,7 +73,8 @@ import Var
 import VarSet
 import RdrName
 import InstEnv
-import DataCon
+import DataCon ( DataCon )
+import PatSyn  ( PatSyn )
 import ConLike
 import TyCon
 import CoAxiom
@@ -159,6 +160,13 @@ tcLookupDataCon name = do
     case thing of
         AConLike (RealDataCon con) -> return con
         _                          -> wrongThingErr "data constructor" (AGlobal thing) name
+
+tcLookupPatSyn :: Name -> TcM PatSyn
+tcLookupPatSyn name = do
+    thing <- tcLookupGlobal name
+    case thing of
+        AConLike (PatSynCon ps) -> return ps
+        _                       -> wrongThingErr "pattern synonym" (AGlobal thing) name
 
 tcLookupConLike :: Name -> TcM ConLike
 tcLookupConLike name = do
