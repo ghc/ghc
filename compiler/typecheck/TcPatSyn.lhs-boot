@@ -13,4 +13,10 @@ tcPatSynDecl :: Located Name
              -> LPat Name
              -> HsPatSynDir Name
              -> TcM (PatSyn, LHsBinds Id)
+
+tcPatSynWrapper :: Located Id
+                -> LPat Name
+                -> HsPatSynDir Name
+                -> [Name]
+                -> TcM (LHsBinds Id)
 \end{code}

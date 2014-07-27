@@ -16,7 +16,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
 
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
-import {-# SOURCE #-} TcPatSyn ( tcPatSynDecl )
+import {-# SOURCE #-} TcPatSyn ( tcPatSynDecl, tcPatSynWrapper )
 
 import DynFlags
 import HsSyn
@@ -315,14 +315,28 @@ tcValBinds top_lvl binds sigs thing_inside
                 -- Extend the envt right away with all 
                 -- the Ids declared with type signatures
                 -- Use tcExtendIdEnv2 to avoid extending the TcIdBinder stack
-        ; tcExtendIdEnv2 [(idName id, id) | id <- poly_ids] $
-            tcBindGroups top_lvl sig_fn prag_fn
-                         binds thing_inside }
+        ; tcExtendIdEnv2 [(idName id, id) | id <- poly_ids] $ do
+            { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
+                   { thing <- thing_inside
+                   ; patsyn_wrappers <- forM patsyns $ \(name, loc, args, lpat, dir) -> do
+                       { patsyn <- tcLookupPatSyn name
+                       ; case patSynWrapper patsyn of
+                           Nothing -> return emptyBag
+                           Just wrapper_id -> tcPatSynWrapper (L loc wrapper_id) lpat dir args }
+                   ; let extra_binds = [ (NonRecursive, wrapper) | wrapper <- patsyn_wrappers ]
+                   ; return (extra_binds, thing) }
+             ; return (binds' ++ extra_binds', thing) }}
   where
+    patsyns = [ (name, loc, args, lpat, dir)
+              | (_, lbinds) <- binds
+              , L loc (PatSynBind{ patsyn_id = L _ name, patsyn_args = details, patsyn_def = lpat, patsyn_dir = dir }) <- bagToList lbinds
+              , let args = map unLoc $ case details of
+                        PrefixPatSyn args -> args
+                        InfixPatSyn arg1 arg2 -> [arg1, arg2]
+              ]
     patsyn_placeholder_kinds -- See Note [Placeholder PatSyn kinds]
        = [ (name, placeholder_patsyn_tything)
-         | (_, lbinds) <- binds
-         , L _ (PatSynBind{ patsyn_id = L _ name }) <- bagToList lbinds ]
+         | (name, _, _, _, _) <- patsyns ]
     placeholder_patsyn_tything
        = AGlobal $ AConLike $ PatSynCon $ panic "fakePatSynCon"
 
