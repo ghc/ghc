@@ -995,8 +995,8 @@ data ModGuts
         mg_rdr_env   :: !GlobalRdrEnv,   -- ^ Top-level lexical environment
 
         -- These fields all describe the things **declared in this module**
-        mg_fix_env   :: !FixityEnv,      -- ^ Fixities declared in this module
-                                         -- ToDo: I'm unconvinced this is actually used anywhere
+        mg_fix_env   :: !FixityEnv,      -- ^ Fixities declared in this module.
+                                         -- Used for creating interface files.
         mg_tcs       :: ![TyCon],        -- ^ TyCons declared in this module
                                          -- (includes TyCons for classes)
         mg_insts     :: ![ClsInst],      -- ^ Class instances declared in this module
