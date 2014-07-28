@@ -241,7 +241,6 @@ import GHC.IO.Handle
 import GHC.IO.Handle.Text ( hGetBufSome, hPutStrLn )
 import GHC.IO.Exception ( userError )
 import GHC.IO.Encoding
-import GHC.Num
 import Text.Read
 import GHC.Show
 import GHC.MVar
