@@ -359,6 +359,7 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/concurrent/should_run/throwto003
 /tests/concurrent/should_run/tryReadMVar1
 /tests/concurrent/should_run/tryReadMVar2
+/tests/concurrent/should_run/threadstatus-9333
 /tests/cpranal/should_run/CPRRepeat
 /tests/deSugar/should_run/DsLambdaCase
 /tests/deSugar/should_run/DsMultiWayIf

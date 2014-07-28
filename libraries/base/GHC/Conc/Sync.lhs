@@ -448,7 +448,11 @@ runSparks = IO loop
 
 data BlockReason
   = BlockedOnMVar
-        -- ^blocked on on 'MVar'
+        -- ^blocked on 'MVar'
+  {- possibly (see 'threadstatus' below):
+  | BlockedOnMVarRead
+        -- ^blocked on reading an empty 'MVar'
+  -}
   | BlockedOnBlackHole
         -- ^blocked on a computation in progress by another thread
   | BlockedOnException
@@ -480,15 +484,15 @@ threadStatus (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
     (# s', stat, _cap, _locked #) -> (# s', mk_stat (I# stat) #)
    where
-        -- NB. keep these in sync with includes/Constants.h
+        -- NB. keep these in sync with includes/rts/Constants.h
      mk_stat 0  = ThreadRunning
      mk_stat 1  = ThreadBlocked BlockedOnMVar
-     mk_stat 2  = ThreadBlocked BlockedOnMVar -- XXX distinguish?
-     mk_stat 3  = ThreadBlocked BlockedOnBlackHole
-     mk_stat 7  = ThreadBlocked BlockedOnSTM
+     mk_stat 2  = ThreadBlocked BlockedOnBlackHole
+     mk_stat 6  = ThreadBlocked BlockedOnSTM
+     mk_stat 10 = ThreadBlocked BlockedOnForeignCall
      mk_stat 11 = ThreadBlocked BlockedOnForeignCall
-     mk_stat 12 = ThreadBlocked BlockedOnForeignCall
-     mk_stat 13 = ThreadBlocked BlockedOnException
+     mk_stat 12 = ThreadBlocked BlockedOnException
+     mk_stat 14 = ThreadBlocked BlockedOnMVar -- possibly: BlockedOnMVarRead
      -- NB. these are hardcoded in rts/PrimOps.cmm
      mk_stat 16 = ThreadFinished
      mk_stat 17 = ThreadDied
