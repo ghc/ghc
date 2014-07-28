@@ -261,7 +261,7 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
         _other_type -> return ()
 
 #ifdef mingw32_HOST_OS
-    _ <- setmode fd True -- unconditionally set binary mode
+    unless is_socket $ setmode fd True >> return ()
 #endif
 
     return (FD{ fdFD = fd,
@@ -414,7 +414,8 @@ foreign import ccall safe "fdReady"
 isTerminal :: FD -> IO Bool
 isTerminal fd =
 #if defined(mingw32_HOST_OS)
-    is_console (fdFD fd) >>= return.toBool
+    if fdIsSocket fd then return False
+                     else is_console (fdFD fd) >>= return.toBool
 #else
     c_isatty (fdFD fd) >>= return.toBool
 #endif
