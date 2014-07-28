@@ -464,9 +464,7 @@ openBinaryTempFileWithDefaultPermissions tmp_dir template
 
 openTempFile' :: String -> FilePath -> String -> Bool -> CMode
               -> IO (FilePath, Handle)
-openTempFile' loc tmp_dir template binary mode = do
-  pid <- c_getpid
-  findTempName pid
+openTempFile' loc tmp_dir template binary mode = findTempName
   where
     -- We split off the last extension, so we can use .foo.ext files
     -- for temporary files (hidden on Unix OSes). Unfortunately we're
@@ -485,10 +483,13 @@ openTempFile' loc tmp_dir template binary mode = do
          -- beginning with '.' as the second component.
          _                      -> error "bug in System.IO.openTempFile"
 
-    findTempName x = do
+    findTempName = do
+      rs <- rand_string
+      let filename = prefix ++ rs ++ suffix
+          filepath = tmp_dir `combine` filename
       r <- openNewFile filepath binary mode
       case r of
-        FileExists -> findTempName (x + 1)
+        FileExists -> findTempName
         OpenNewError errno -> ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
         NewFileCreated fd -> do
           (fD,fd_type) <- FD.mkFD fd ReadWriteMode Nothing{-no stat-}
@@ -501,15 +502,22 @@ openTempFile' loc tmp_dir template binary mode = do
           return (filepath, h)
 
       where
-        filename        = prefix ++ show x ++ suffix
-        filepath        = tmp_dir `combine` filename
-
         -- XXX bits copied from System.FilePath, since that's not available here
         combine a b
                   | null b = a
                   | null a = b
                   | last a == pathSeparator = a ++ b
                   | otherwise = a ++ [pathSeparator] ++ b
+
+-- int rand(void) from <stdlib.h>, limited by RAND_MAX (small value, 32768)
+foreign import ccall "rand" c_rand :: IO CInt
+
+-- build large digit-alike number
+rand_string :: IO String
+rand_string = do
+  r1 <- c_rand
+  r2 <- c_rand
+  return $ show r1 ++ show r2
 
 data OpenNewFileResult
   = NewFileCreated CInt
