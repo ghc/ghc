@@ -1467,6 +1467,25 @@ haddock-html: /usr/share/doc/ghc/html/libraries/unix
 
         <varlistentry>
           <term>
+            <literal>reexported-modules</literal>
+            <indexterm><primary><literal>reexported-modules</literal></primary><secondary>reexport specification</secondary></indexterm>
+          </term>
+          <listitem>
+            <para>Modules reexported by this package.  This list takes
+            the form of <literal>pkg:OldName as NewName
+            (A@orig-pkg-0.1-HASH)</literal>: the first portion of the
+            string is the user-written reexport specification (possibly
+            omitting the package qualifier and the renaming), while the
+            parenthetical is the original package which exposed the
+            module under are particular name.  Reexported modules have
+            a relaxed overlap constraint: it's permissible for two
+            packages to reexport the same module as the same name if the
+            reexported moduleis identical.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
             <literal>trusted</literal>
             <indexterm><primary><literal>trusted</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
