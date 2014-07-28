@@ -833,7 +833,7 @@ decideBindFloat init_env is_bot binding =
       | all_funs || (fps_floatLNE0 fps && isLNE)
            -- only lift functions or zero-arity LNEs
       ,  not (fps_leaveLNE fps && isLNE) -- see Note [Lifting LNEs]
-      ,  Nothing <- decider emptyVarEnv = Just (tOP_LEVEL, abs_vars)
+      ,  Nothing <- decider = Just (tOP_LEVEL, abs_vars)
       | otherwise = Nothing -- do not lift
       where
         abs_vars = abstractVars tOP_LEVEL env bindings_fvs
@@ -847,6 +847,8 @@ decideBindFloat init_env is_bot binding =
 
         -- for -ddump-late-float with -dppr-debug
         extra_sdoc = text "scope_silt:" <+> ppr scope_silt
+                  $$ text "le_env env:" <+> ppr (le_env env)
+                  $$ text "abs_vars:"   <+> ppr abs_vars
 
     rhs_silt_s :: [(CoreBndr, FISilt)]
     (   isRec , ids
@@ -898,16 +900,15 @@ decideLateLambdaFloat ::
   Bool ->
   Bool ->
   IdSet ->
-  IdSet -> (IdSet -> [(Bool, WordOff, WordOff, WordOff)]) ->
+  IdSet -> [(Bool, WordOff, WordOff, WordOff)] ->
   [Id] -> SDoc ->
   FinalPassSwitches ->
-  VarSet -> -- pinnees to ignore
   Maybe VarSet -- Nothing <=> float to tOP_LEVEL
                --
                -- Just x <=> do not float, not (null x) <=> forgetting
                -- fast calls to the ids in x are the only thing
                -- pinning this binding
-decideLateLambdaFloat env isRec isLNE all_one_shot abs_ids_set badTime spaceInfo' ids extra_sdoc fps pinnees
+decideLateLambdaFloat env isRec isLNE all_one_shot abs_ids_set badTime spaceInfo ids extra_sdoc fps
   = (if fps_trace fps then pprTrace ('\n' : msg) msg_sdoc else (\x -> x)) $
     if floating then Nothing else Just $
     if isBadSpace
@@ -922,8 +923,6 @@ decideLateLambdaFloat env isRec isLNE all_one_shot abs_ids_set badTime spaceInfo
           ++ if floating && isBadSpace then "(SAT)" else ""
 
     isBadTime = not (isEmptyVarSet badTime)
-
-    spaceInfo = spaceInfo' pinnees
 
     -- this should always be empty, by definition of LNE
     spoiledLNEs = le_LNEs env `intersectVarSet` abs_ids_set
@@ -944,8 +943,6 @@ decideLateLambdaFloat env isRec isLNE all_one_shot abs_ids_set badTime spaceInfo
       -- these bindings would be allocated at least as many times as
       -- the closure.
 
-      -- TODO                | Just limit <- fps_ifInClo fps =
-
     cgilViolation = case fps_cloGrowthInLam fps of
       Nothing -> const False
       Just limit -> (> limit * wORDS_PTR)
@@ -960,7 +957,6 @@ decideLateLambdaFloat env isRec isLNE all_one_shot abs_ids_set badTime spaceInfo
        [ ppr v <+> if isLNE then parens (text "LNE") else empty
        , text "size:" <+> ppr closureSize
        , text "abs_ids:" <+> ppr (length abs_ids) <+> ppr abs_ids
-       , text "pinnees:" <+> ppr (varSetElems pinnees)
        , text "createsPAPs:" <+> ppr badPAP
        , text "closureGrowth:" <+> ppr cg
        , text "CG in lam:"   <+> ppr cgil
@@ -996,16 +992,15 @@ wouldIncreaseRuntime env abs_ids binding_group_fiis = case prjFlags `fmap` final
                        , not (fps_absOversatVar fps) -- -fno-late-abstract-oversat-var
                        )
 
--- if a free id was floated, then its abs_ids are now free ids (and so
--- on)
-expandFloatedIds :: LevelEnv -> IdSet -> IdSet
-expandFloatedIds env = w . varSetElems where
-   w = foldl snoc emptyVarSet
-
-   snoc acc id = case lookupVarEnv (le_env env) id of
-     Nothing           -> extendVarSet acc id
-     Just (_,abs_vars) -> extendVarSetList acc $ filter isId abs_vars
-      -- TODO unionVarSet acc $ w $ filter isId abs_vars
+-- if a free id was floated, then its abs_ids are now free ids
+expandFloatedIds :: LevelEnv -> {- In -} IdSet -> {- Out -} IdSet
+expandFloatedIds env = foldl snoc emptyVarSet . varSetElems where
+  snoc acc id = case lookupVarEnv (le_env env) id of
+    Nothing -> extendVarSet acc id -- TODO is this case possible?
+    Just (new_id,filter isId -> abs_ids)
+      | not (null abs_ids) -> -- it's a lambda-lifted function
+                              extendVarSetList acc abs_ids
+      | otherwise          -> extendVarSet     acc new_id
 
 wouldIncreaseAllocation ::
   LevelEnv ->
@@ -1014,7 +1009,6 @@ wouldIncreaseAllocation ::
   [(Id, FISilt)] -> -- the bindings in the binding group with each's
                     -- silt
   FISilt ->       -- the entire scope of the binding group
-  VarSet ->       -- pinnees: ignore these as captors
   [] -- for each binder:
     ( Bool -- would create PAPs
     , WordOff  -- size of this closure group
@@ -1023,24 +1017,13 @@ wouldIncreaseAllocation ::
     , WordOff  -- estimated increase for closures that ARE allocated
                -- under a lambda
     )
-wouldIncreaseAllocation env isLNE abs_ids_set pairs (FISilt _ scope_fiis scope_sk) _pinnees
+wouldIncreaseAllocation env isLNE abs_ids_set pairs (FISilt _ scope_fiis scope_sk)
   | isLNE = map (const (False,0,0,0)) pairs
-  | otherwise = case finalPass env of
-  Nothing -> []
-  Just _fps -> flip map bndrs $ \bndr -> case lookupVarEnv scope_fiis bndr of
+  | otherwise = flip map bndrs $ \bndr -> case lookupVarEnv scope_fiis bndr of
     Nothing -> (False, closuresSize, 0, 0) -- it's a dead variable. Huh.
     Just fii -> (violatesPAPs, closuresSize, closureGrowth, closureGrowthInLambda)
       where
         violatesPAPs = let (unapplied,_,_,_) = fii_useInfo fii in unapplied
-          -- TODO consider incorporating PAP creation into the closure
-          -- growth calculation (ie identifying each PAP, whether its
-          -- in a lambda, etc), instead of having it as a separate all
-          -- or nothing thing. (Maybe just add a "PAP Id" constructor
-          -- to Skeleton?)
-          --
-          -- TODO also, if we specialized on partial applications (eg
-          -- "map (f a) xs" becomes "$smap f a xs"), then maybe we
-          -- could relax this
 
         (closureGrowth, closureGrowthInLambda)
           = costToLift (expandFloatedIds env) sizer bndr abs_ids_set scope_sk
@@ -1055,7 +1038,8 @@ wouldIncreaseAllocation env isLNE abs_ids_set pairs (FISilt _ scope_fiis scope_s
       --
       -- So we instead calculate and then add up the size of each
       -- binding's closure. GHC does not currently share closure
-      -- environments.
+      -- environments, and we either lift the entire recursive binding
+      -- group or none of it.
       closuresSize = sum $ flip map pairs $ \(_,FISilt _ fiis _) ->
         let (words, _, _) =
               StgCmmLayout.mkVirtHeapOffsets dflags isUpdateable $
@@ -1194,7 +1178,8 @@ data LevelEnv
                                         -- (since we want to substitute in LevelledExpr
                                         -- instead) but we do use the Co/TyVar substs
        , le_env      :: IdEnv (OutVar,[OutVar])	-- Domain is pre-cloned Ids
-           -- (v,vs) represents the type application "v [vs0] [vs1] [vs2]" ...
+           -- (v,vs) represents the application "v vs0 vs1 vs2" ...
+           -- Except in the late float, the vs are all types.
 
         -- see Note [The Reason SetLevels Does Substitution]
 
