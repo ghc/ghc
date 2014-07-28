@@ -1215,7 +1215,6 @@ wayOptl platform WayThreaded =
         -- the problems are our fault or theirs, but it seems that using the
         -- alternative 1:1 threading library libthr works around it:
         OSFreeBSD  -> ["-lthr"]
-        OSSolaris2 -> ["-lrt"]
         OSOpenBSD  -> ["-pthread"]
         OSNetBSD   -> ["-pthread"]
         _          -> []
