@@ -22,7 +22,7 @@ install_driver_ghci:
 	$(call removeFiles,                                "$(WRAPPER)")
 	$(CREATE_SCRIPT)                                   "$(WRAPPER)"
 	echo '#!$(SHELL)'                               >> "$(WRAPPER)"
-	echo 'exec "$(bindir)/ghc-$(ProjectVersion)" --interactive $${1+"$$@"}' >> "$(WRAPPER)"
+	echo 'exec "$(bindir)/ghc-$(ProjectVersion)" --interactive "$$@"' >> "$(WRAPPER)"
 	$(EXECUTABLE_FILE)                                 "$(WRAPPER)"
 	$(call removeFiles,"$(DESTDIR)$(bindir)/ghci")
 	$(LN_S) ghci-$(ProjectVersion) "$(DESTDIR)$(bindir)/ghci"
@@ -57,7 +57,7 @@ install_driver_ghcii:
 	$(call INSTALL_DIR,$(DESTDIR)$(bindir))
 	$(call removeFiles,"$(GHCII_SCRIPT)")
 	echo "#!$(SHELL)"                                  >> $(GHCII_SCRIPT)
-	echo 'exec "$$0"/../ghc --interactive $${1+"$$@"}' >> $(GHCII_SCRIPT)
+	echo 'exec "$$(dirname "$$0")"/ghc --interactive "$$@"' >> $(GHCII_SCRIPT)
 	$(EXECUTABLE_FILE) $(GHCII_SCRIPT)
 	cp $(GHCII_SCRIPT) $(GHCII_SCRIPT_VERSIONED)
 	$(EXECUTABLE_FILE) $(GHCII_SCRIPT_VERSIONED)
