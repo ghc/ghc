@@ -252,6 +252,13 @@ instance Monoid (First a) where
         r@(First (Just _)) `mappend` _ = r
         First Nothing `mappend` r = r
 
+instance Functor First where
+        fmap f (First x) = First (fmap f x)
+
+instance Monad First where
+        return x = First (Just x)
+        First x >>= m = First (x >>= getFirst . m)
+
 -- | Maybe monoid returning the rightmost non-Nothing value.
 newtype Last a = Last { getLast :: Maybe a }
         deriving (Eq, Ord, Read, Show, Generic, Generic1)
@@ -260,6 +267,13 @@ instance Monoid (Last a) where
         mempty = Last Nothing
         _ `mappend` r@(Last (Just _)) = r
         r `mappend` Last Nothing = r
+
+instance Functor Last where
+        fmap f (Last x) = Last (fmap f x)
+
+instance Monad Last where
+        return x = Last (Just x)
+        Last x >>= m = Last (x >>= getLast . m)
 
 {-
 {--------------------------------------------------------------------
