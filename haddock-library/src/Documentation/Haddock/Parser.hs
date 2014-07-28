@@ -93,7 +93,7 @@ parseParas :: String -- ^ String to parse
 parseParas = parse (p <* skipSpace) . encodeUtf8 . (++ "\n")
   where
     p :: Parser (DocH mod Identifier)
-    p = mconcat <$> paragraph `sepBy` many (skipHorizontalSpace *> "\n")
+    p = docConcat <$> paragraph `sepBy` many (skipHorizontalSpace *> "\n")
 
 -- | Parse a text paragraph. Actually just a wrapper over 'parseStringBS' which
 -- drops leading whitespace and encodes the string to UTF8 first.
@@ -104,10 +104,10 @@ parseStringBS :: BS.ByteString -> DocH mod Identifier
 parseStringBS = parse p
   where
     p :: Parser (DocH mod Identifier)
-    p = mconcat <$> many (monospace <|> anchor <|> identifier <|> moduleName
-                          <|> picture <|> hyperlink <|> bold
-                          <|> emphasis <|> encodedChar <|> string'
-                          <|> skipSpecialChar)
+    p = docConcat <$> many (monospace <|> anchor <|> identifier <|> moduleName
+                            <|> picture <|> hyperlink <|> bold
+                            <|> emphasis <|> encodedChar <|> string'
+                            <|> skipSpecialChar)
 
 -- | Parses and processes
 -- <https://en.wikipedia.org/wiki/Numeric_character_reference Numeric character references>
@@ -231,8 +231,8 @@ header = do
       pser = foldl1 (<|>) psers
   delim <- decodeUtf8 <$> pser
   line <- skipHorizontalSpace *> nonEmptyLine >>= return . parseString
-  rest <- paragraph <|> return mempty
-  return $ DocHeader (Header (length delim) line) <> rest
+  rest <- paragraph <|> return DocEmpty
+  return $ DocHeader (Header (length delim) line) `docAppend` rest
 
 textParagraph :: Parser (DocH mod Identifier)
 textParagraph = docParagraph . parseString . intercalate "\n" <$> many1 nonEmptyLine
@@ -265,7 +265,7 @@ innerList item = do
   (cs, items) <- more item
   let contents = docParagraph . parseString . dropNLs . unlines $ c : cs
   return $ case items of
-    Left p -> [contents <> p]
+    Left p -> [contents `docAppend` p]
     Right i -> contents : i
 
 -- | Parses definition lists.
@@ -276,7 +276,7 @@ definitionList = do
   (cs, items) <- more definitionList
   let contents = parseString . dropNLs . unlines $ c : cs
   return $ case items of
-    Left p -> [(label, contents <> p)]
+    Left p -> [(label, contents `docAppend` p)]
     Right i -> (label, contents) : i
 
 -- | Drops all trailing newlines.
@@ -291,12 +291,12 @@ more :: Monoid a => Parser a
 more item = innerParagraphs <|> moreListItems item
             <|> moreContent item <|> pure ([], Right mempty)
 
--- | Use by 'innerList' and 'definitionList' to parse any nested paragraphs.
+-- | Used by 'innerList' and 'definitionList' to parse any nested paragraphs.
 innerParagraphs :: Parser ([String], Either (DocH mod Identifier) a)
 innerParagraphs = (,) [] . Left <$> ("\n" *> indentedParagraphs)
 
--- | Attemps to fetch the next list if possibly. Used by 'innerList' and
--- 'definitionList' to recursivly grab lists that aren't separated by a whole
+-- | Attempts to fetch the next list if possibly. Used by 'innerList' and
+-- 'definitionList' to recursively grab lists that aren't separated by a whole
 -- paragraph.
 moreListItems :: Parser a
               -> Parser ([String], Either (DocH mod Identifier) a)
@@ -456,7 +456,7 @@ autoUrl = mkLink <$> url
     url = mappend <$> ("http://" <|> "https://" <|> "ftp://") <*> takeWhile1 (not . isSpace)
     mkLink :: BS.ByteString -> DocH mod a
     mkLink s = case unsnoc s of
-      Just (xs, x) | x `elem` ",.!?" -> DocHyperlink (Hyperlink (decodeUtf8 xs) Nothing) <> DocString [x]
+      Just (xs, x) | x `elem` ",.!?" -> DocHyperlink (Hyperlink (decodeUtf8 xs) Nothing) `docAppend` DocString [x]
       _ -> DocHyperlink (Hyperlink (decodeUtf8 s) Nothing)
 
 -- | Parses strings between identifier delimiters. Consumes all input that it

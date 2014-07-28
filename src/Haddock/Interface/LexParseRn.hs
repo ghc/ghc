@@ -21,7 +21,7 @@ module Haddock.Interface.LexParseRn
 import Control.Applicative
 import Data.IntSet (toList)
 import Data.List
-import Data.Monoid (mconcat)
+import Documentation.Haddock.Doc (docConcat)
 import DynFlags (ExtensionFlag(..), languageExtensions)
 import FastString
 import GHC
@@ -34,7 +34,7 @@ import RdrName
 
 processDocStrings :: DynFlags -> GlobalRdrEnv -> [HsDocString] -> Maybe (Doc Name)
 processDocStrings dflags gre strs =
-  case mconcat $ map (processDocStringParas dflags gre) strs of
+  case docConcat $ map (processDocStringParas dflags gre) strs of
     DocEmpty -> Nothing
     x -> Just x
 

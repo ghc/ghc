@@ -14,7 +14,7 @@
 -----------------------------------------------------------------------------
 module Haddock.Interface.Create (createInterface) where
 
-
+import Documentation.Haddock.Doc (docAppend)
 import Haddock.Types
 import Haddock.Options
 import Haddock.GhcUtils
@@ -251,10 +251,13 @@ mkMaps :: DynFlags
        -> Maps
 mkMaps dflags gre instances decls =
   let (a, b, c, d) = unzip4 $ map mappings decls
-  in (f $ map (nubBy ((==) `on` fst)) a , f b, f c, f d, instanceMap)
+  in (f' $ map (nubBy ((==) `on` fst)) a , f b, f c, f d, instanceMap)
   where
     f :: (Ord a, Monoid b) => [[(a, b)]] -> Map a b
     f = M.fromListWith (<>) . concat
+
+    f' :: [[(Name, Doc Name)]] -> Map Name (Doc Name)
+    f' = M.fromListWith docAppend . concat
 
     mappings :: (LHsDecl Name, [HsDocString])
              -> ( [(Name, Doc Name)]

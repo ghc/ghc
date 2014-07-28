@@ -4,12 +4,15 @@
 
 module Documentation.Haddock.ParserSpec (main, spec) where
 
-import           Data.Monoid
 import           Data.String
 import qualified Documentation.Haddock.Parser as Parse
 import           Documentation.Haddock.Types
+import           Documentation.Haddock.Doc (docAppend)
 import           Test.Hspec
 import           Test.QuickCheck
+
+infixr 6 <>
+(<>) = docAppend
 
 type Doc id = DocH () id
 
@@ -604,6 +607,21 @@ spec = do
                                <> DocDefList [ ("bar", "barv") ])
                      ]
           <> DocOrderedList [ DocParagraph "baz" ]
+
+      it "list order is preserved in presence of nesting + extra text" $ do
+        "1. Foo\n\n    > Some code\n\n2. Bar\n\nSome text"
+          `shouldParseTo`
+          DocOrderedList [ DocParagraph "Foo" <> DocCodeBlock "Some code"
+                         , DocParagraph "Bar"
+                         ]
+          <> DocParagraph (DocString "Some text")
+
+        "1. Foo\n\n2. Bar\n\nSome text"
+          `shouldParseTo`
+          DocOrderedList [ DocParagraph "Foo"
+                         , DocParagraph "Bar"
+                         ]
+          <> DocParagraph (DocString "Some text")
 
     context "when parsing properties" $ do
       it "can parse a single property" $ do

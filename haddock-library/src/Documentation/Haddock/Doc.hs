@@ -1,21 +1,19 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Documentation.Haddock.Doc (docParagraph) where
+module Documentation.Haddock.Doc (docParagraph, docAppend, docConcat) where
 
-import Data.Monoid
 import Documentation.Haddock.Types
 import Data.Char (isSpace)
 
--- We put it here so that we can avoid a circular import
--- anything relevant imports this module anyway
-instance Monoid (DocH mod id) where
-  mempty  = DocEmpty
-  mappend = docAppend
+docConcat :: [DocH mod id] -> DocH mod id
+docConcat = foldr docAppend DocEmpty
 
 docAppend :: DocH mod id -> DocH mod id -> DocH mod id
 docAppend (DocDefList ds1) (DocDefList ds2) = DocDefList (ds1++ds2)
 docAppend (DocDefList ds1) (DocAppend (DocDefList ds2) d) = DocAppend (DocDefList (ds1++ds2)) d
 docAppend (DocOrderedList ds1) (DocOrderedList ds2) = DocOrderedList (ds1 ++ ds2)
+docAppend (DocOrderedList ds1) (DocAppend (DocOrderedList ds2) d) = DocAppend (DocOrderedList (ds1++ds2)) d
 docAppend (DocUnorderedList ds1) (DocUnorderedList ds2) = DocUnorderedList (ds1 ++ ds2)
+docAppend (DocUnorderedList ds1) (DocAppend (DocUnorderedList ds2) d) = DocAppend (DocUnorderedList (ds1++ds2)) d
 docAppend DocEmpty d = d
 docAppend d DocEmpty = d
 docAppend (DocString s1) (DocString s2) = DocString (s1 ++ s2)
