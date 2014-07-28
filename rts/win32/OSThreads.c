@@ -292,7 +292,7 @@ interruptOSThread (OSThreadId id)
         stg_exit(EXIT_FAILURE);
     }
     pCSIO = (PCSIO) GetProcAddress(GetModuleHandle(TEXT("Kernel32.dll")),
-				   "CancelSynchronousIo");
+                                   "CancelSynchronousIo");
     if ( NULL != pCSIO ) {
         pCSIO(hdl);
     } else {
