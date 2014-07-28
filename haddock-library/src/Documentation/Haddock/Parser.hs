@@ -105,7 +105,7 @@ parseStringBS = parse p
   where
     p :: Parser (DocH mod Identifier)
     p = mconcat <$> many (monospace <|> anchor <|> identifier <|> moduleName
-                          <|> picture <|> hyperlink <|> autoUrl <|> bold
+                          <|> picture <|> hyperlink <|> bold
                           <|> emphasis <|> encodedChar <|> string'
                           <|> skipSpecialChar)
 
@@ -125,7 +125,7 @@ encodedChar = "&#" *> c <* ";"
 -- Once we have checked for any of these and tried to parse the
 -- relevant markup, we can assume they are used as regular text.
 specialChar :: [Char]
-specialChar = "_/<@\"&'`#"
+specialChar = "_/<@\"&'`# "
 
 -- | Plain, regular parser for text. Called as one of the last parsers
 -- to ensure that we have already given a chance to more meaningful parsers
