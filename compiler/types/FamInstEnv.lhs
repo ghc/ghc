@@ -644,7 +644,7 @@ lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
                   (ppr tpl_tvs <+> ppr tpl_tys) )
                 -- Unification will break badly if the variables overlap
                 -- They shouldn't because we allocate separate uniques for them
-         if compatibleBranches (coAxiomSingleBranch old_axiom) (new_branch)
+         if compatibleBranches (coAxiomSingleBranch old_axiom) new_branch
            then Nothing
            else Just noSubst
       -- Note [Family instance overlap conflicts]
@@ -672,7 +672,7 @@ Note [Family instance overlap conflicts]
 -- Might be a one-way match or a unifier
 type MatchFun =  FamInst                -- The FamInst template
               -> TyVarSet -> [Type]     --   fi_tvs, fi_tys of that FamInst
-              -> [Type]                         -- Target to match against
+              -> [Type]                 -- Target to match against
               -> Maybe TvSubst
 
 lookup_fam_inst_env'          -- The worker, local to this module
@@ -732,9 +732,9 @@ lookup_fam_inst_env           -- The worker, local to this module
 
 -- Precondition: the tycon is saturated (or over-saturated)
 
-lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys =
-    lookup_fam_inst_env' match_fun home_ie fam tys ++
-    lookup_fam_inst_env' match_fun pkg_ie  fam tys
+lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys
+  =  lookup_fam_inst_env' match_fun home_ie fam tys
+  ++ lookup_fam_inst_env' match_fun pkg_ie  fam tys
 
 \end{code}
 
@@ -750,16 +750,18 @@ which you can't do in Haskell!):
 
 Then looking up (F (Int,Bool) Char) will return a FamInstMatch
      (FPair, [Int,Bool,Char])
-
 The "extra" type argument [Char] just stays on the end.
 
-Because of eta-reduction of data family instances (see
-Note [Eta reduction for data family axioms] in TcInstDecls), we must
-handle data families and type families separately here. All instances
-of a type family must have the same arity, so we can precompute the split
-between the match_tys and the overflow tys. This is done in pre_rough_split_tys.
-For data instances, though, we need to re-split for each instance, because
-the breakdown might be different.
+We handle data families and type families separately here:
+
+ * For type  families, all instances of a type family must have the
+   same arity, so we can precompute the split between the match_tys
+   and the overflow tys. This is done in pre_rough_split_tys.
+
+ * For data families instances, though, we need to re-split for each
+   instance, because the breakdown might be different for each
+   instance.  Why?  Because of eta reduction; see Note [Eta reduction
+   for data family axioms]
 
 \begin{code}
 

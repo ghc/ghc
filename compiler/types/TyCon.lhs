@@ -183,6 +183,9 @@ See also Note [Wrappers for data instance tycons] in MkId.lhs
   It has an AlgTyConParent of
         FamInstTyCon T [Int] ax_ti
 
+* The axiom ax_ti may be eta-reduced; see
+  Note [Eta reduction for data family axioms] in TcInstDcls
+
 * The data contructor T2 has a wrapper (which is what the
   source-level "T2" invokes):
 
@@ -576,11 +579,14 @@ data TyConParent
   --  3) A 'CoTyCon' identifying the representation
   --  type with the type instance family
   | FamInstTyCon          -- See Note [Data type families]
-        (CoAxiom Unbranched)  -- The coercion constructor,
-                              -- always of kind   T ty1 ty2 ~ R:T a b c
-                              -- where T is the family TyCon,
-                              -- and R:T is the representation TyCon (ie this one)
-                              -- and a,b,c are the tyConTyVars of this TyCon
+        (CoAxiom Unbranched)  -- The coercion axiom.
+               -- Generally of kind   T ty1 ty2 ~ R:T a b c
+               -- where T is the family TyCon,
+               -- and R:T is the representation TyCon (ie this one)
+               -- and a,b,c are the tyConTyVars of this TyCon
+               --
+               -- BUT may be eta-reduced; see TcInstDcls
+               --     Note [Eta reduction for data family axioms]
 
           -- Cached fields of the CoAxiom, but adjusted to
           -- use the tyConTyVars of this TyCon
