@@ -582,6 +582,7 @@ rnPatSynBind _sig_fn bind@(PSB { psb_id = L _ name
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind', [name], fvs1)
+          -- See Note [Pattern synonym wrappers don't yield dependencies]
       }
   where
     lookupVar = wrapLocM lookupOccRn
@@ -592,6 +593,32 @@ rnPatSynBind _sig_fn bind@(PSB { psb_id = L _ name
            2 (ptext (sLit "Use -XPatternSynonyms to enable this extension"))
 
 {-
+Note [Pattern synonym wrappers don't yield dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When renaming a pattern synonym that has an explicit wrapper,
+references in the wrapper definition should not be used when
+calculating dependencies. For example, consider the following pattern
+synonym definition:
+
+pattern P x <- C1 x where
+  P x = f (C1 x)
+
+f (P x) = C2 x
+
+In this case, 'P' needs to be typechecked in two passes:
+
+1. Typecheck the pattern definition of 'P', which fully determines the
+type of 'P'. This step doesn't require knowing anything about 'f',
+since the wrapper definition is not looked at.
+
+2. Typecheck the wrapper definition, which needs the typechecked
+definition of 'f' to be in scope.
+
+This behaviour is implemented in 'tcValBinds', but it crucially
+depends on 'P' not being put in a recursive group with 'f' (which
+would make it look like a recursive pattern synonym a la 'pattern P =
+P' which is unsound and rejected).
 
 -}
 

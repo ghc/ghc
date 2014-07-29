@@ -318,6 +318,7 @@ tcValBinds top_lvl binds sigs thing_inside
         ; tcExtendIdEnv2 [(idName id, id) | id <- poly_ids] $ do
             { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
                    { thing <- thing_inside
+                     -- See Note [Pattern synonym wrappers don't yield dependencies]
                    ; patsyn_wrappers <- mapM tcPatSynWrapper patsyns
                    ; let extra_binds = [ (NonRecursive, wrapper) | wrapper <- patsyn_wrappers ]
                    ; return (extra_binds, thing) }
