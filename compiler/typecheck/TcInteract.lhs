@@ -1948,7 +1948,7 @@ getCoercibleInst loc ty1 ty2 = do
        ev_term <- deferTcSForAllEq Representational loc (tvs1,body1) (tvs2,body2)
        return $ GenInst [] ev_term
 
-    -- Coercible NT a                            (see case 4 in [Coercible Instances])
+    -- Coercible NT a                            (see case 3 in [Coercible Instances])
     | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
       Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
       dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
@@ -1960,7 +1960,19 @@ getCoercibleInst loc ty1 ty2 = do
                             coercionToTcCoercion ntCo `mkTcTransCo` mkTcCoVarCo local_var
          return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
 
-    -- Coercible (D ty1 ty2) (D ty1' ty2')       (see case 2 in [Coercible Instances])
+    -- Coercible a NT                            (see case 3 in [Coercible Instances])
+    | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
+      Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
+      dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
+    = do markDataConsAsUsed rdr_env tc
+         ct_ev <- requestCoercible loc ty1 concTy
+         local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred ty1 concTy
+         let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
+             tcCo = TcLetCo binds $
+                            mkTcCoVarCo local_var `mkTcTransCo` mkTcSymCo (coercionToTcCoercion ntCo)
+         return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
+
+    -- Coercible (D ty1 ty2) (D ty1' ty2')       (see case 4 in [Coercible Instances])
     | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
       Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
       tc1 == tc2,
@@ -1990,18 +2002,6 @@ getCoercibleInst loc ty1 ty2 = do
              binds = EvBinds (listToBag (catMaybes arg_binds))
              tcCo = TcLetCo binds (mkTcTyConAppCo Representational tc1 arg_cos)
          return $ GenInst (catMaybes arg_new) (EvCoercion tcCo)
-
-    -- Coercible a NT                            (see case 3 in [Coercible Instances])
-    | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
-      Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
-      dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
-    = do markDataConsAsUsed rdr_env tc
-         ct_ev <- requestCoercible loc ty1 concTy
-         local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred ty1 concTy
-         let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
-             tcCo = TcLetCo binds $
-                            mkTcCoVarCo local_var `mkTcTransCo` mkTcSymCo (coercionToTcCoercion ntCo)
-         return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
 
     -- Cannot solve this one
     | otherwise
