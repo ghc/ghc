@@ -1068,6 +1068,8 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/parser/unicode/1744
 /tests/parser/unicode/T1744
 /tests/parser/unicode/utf8_024
+/tests/patsyn/should_run/bidir-explicit
+/tests/patsyn/should_run/bidir-explicit-scope
 /tests/patsyn/should_run/eval
 /tests/patsyn/should_run/ex-prov
 /tests/patsyn/should_run/ex-prov-run
