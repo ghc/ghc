@@ -987,8 +987,14 @@ Which enables us to rewrite our functions in a much cleaner style:
 In this case, <literal>Head</literal> <replaceable>x</replaceable>
 cannot be used in expressions, only patterns, since it wouldn't
 specify a value for the <replaceable>xs</replaceable> on the
-right-hand side.
+right-hand side. We can give an explicit inversion of a pattern
+synonym using the following syntax:
 </para>
+
+<programlisting>
+  pattern Head x &lt;- x:xs where
+    Head x = [x]
+</programlisting>
 
 <para>
 The syntax and semantics of pattern synonyms are elaborated in the
@@ -1008,6 +1014,10 @@ bidirectional. The syntax for unidirectional pattern synonyms is:
   and the syntax for bidirectional pattern synonyms is:
 <programlisting>
   pattern Name args = pat
+</programlisting> or
+<programlisting>
+  pattern Name args &lt;- pat where
+    Name args = expr
 </programlisting>
   Either prefix or infix syntax can be
   used.
@@ -1020,11 +1030,12 @@ bidirectional. The syntax for unidirectional pattern synonyms is:
 </para>
 <para>
   The variables in the left-hand side of the definition are bound by
-  the pattern on the right-hand side. For bidirectional pattern
-  synonyms, all the variables of the right-hand side must also occur
-  on the left-hand side; also, wildcard patterns and view patterns are
-  not allowed. For unidirectional pattern synonyms, there is no
-  restriction on the right-hand side pattern.
+  the pattern on the right-hand side. For implicitly bidirectional
+  pattern synonyms, all the variables of the right-hand side must also
+  occur on the left-hand side; also, wildcard patterns and view
+  patterns are not allowed. For unidirectional and
+  explicitly-bidirectional pattern synonyms, there is no restriction
+  on the right-hand side pattern.
 </para>
 
 <para>
