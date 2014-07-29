@@ -40,12 +40,10 @@ import TypeRep
 \end{code}
 
 \begin{code}
-tcPatSynDecl :: Located Name
-             -> HsPatSynDetails (Located Name)
-             -> LPat Name
-             -> HsPatSynDir Name
+tcPatSynDecl :: PatSynBind Name Name
              -> TcM (PatSyn, LHsBinds Id)
-tcPatSynDecl lname@(L _ name) details lpat dir
+tcPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
+                  psb_def = lpat, psb_dir = dir }
   = do { traceTc "tcPatSynDecl {" $ ppr name $$ ppr lpat
        ; tcCheckPatSynPat lpat
        ; pat_ty <- newFlexiTyVarTy openTypeKind
@@ -194,31 +192,41 @@ isBidirectional Unidirectional = False
 isBidirectional ImplicitBidirectional = True
 isBidirectional ExplicitBidirectional{} = True
 
-tcPatSynWrapper :: Located Id
-                -> LPat Name
-                -> HsPatSynDir Name
-                -> [Name]
+tcPatSynWrapper :: PatSynBind Name Name
                 -> TcM (LHsBinds Id)
 -- See Note [Matchers and wrappers for pattern synonyms] in PatSyn
-tcPatSynWrapper _ _ Unidirectional _
-  = panic "tcPatSynWrapper"
-tcPatSynWrapper (L _ wrapper_id) lpat ImplicitBidirectional args
-  = do { lexpr <- case tcPatToExpr (mkNameSet args) lpat of
-              Nothing -> cannotInvertPatSynErr lpat
-              Just lexpr -> return lexpr
-       ; let wrapper_args = map (noLoc . VarPat) args
-             wrapper_lname = L (getLoc lpat) (idName wrapper_id)
-             wrapper_match = mkMatch wrapper_args lexpr EmptyLocalBinds
-             wrapper_bind = mkTopFunBind Generated wrapper_lname [wrapper_match]
-       ; mkPatSynWrapper wrapper_id wrapper_bind }
-tcPatSynWrapper (L loc wrapper_id) _ (ExplicitBidirectional mg) _
-  = mkPatSynWrapper wrapper_id $
-    FunBind{ fun_id = L loc (idName wrapper_id)
-           , fun_infix = False
-           , fun_matches = mg
-           , fun_co_fn = idHsWrapper
-           , bind_fvs = placeHolderNames
-           , fun_tick = Nothing }
+tcPatSynWrapper PSB{ psb_id = L loc name, psb_def = lpat, psb_dir = dir, psb_args = details }
+  = case dir of
+    Unidirectional -> return emptyBag
+    ImplicitBidirectional ->
+        do { wrapper_id <- tcLookupPatSynWrapper name
+           ; lexpr <- case tcPatToExpr (mkNameSet args) lpat of
+                  Nothing -> cannotInvertPatSynErr lpat
+                  Just lexpr -> return lexpr
+           ; let wrapper_args = map (noLoc . VarPat) args
+                 wrapper_lname = L (getLoc lpat) (idName wrapper_id)
+                 wrapper_match = mkMatch wrapper_args lexpr EmptyLocalBinds
+                 wrapper_bind = mkTopFunBind Generated wrapper_lname [wrapper_match]
+           ; mkPatSynWrapper wrapper_id wrapper_bind }
+    ExplicitBidirectional mg ->
+        do { wrapper_id <- tcLookupPatSynWrapper name
+           ; mkPatSynWrapper wrapper_id $
+               FunBind{ fun_id = L loc (idName wrapper_id)
+                      , fun_infix = False
+                      , fun_matches = mg
+                      , fun_co_fn = idHsWrapper
+                      , bind_fvs = placeHolderNames
+                      , fun_tick = Nothing }}
+  where
+    args = map unLoc $ case details of
+        PrefixPatSyn args -> args
+        InfixPatSyn arg1 arg2 -> [arg1, arg2]
+
+    tcLookupPatSynWrapper name
+      = do { patsyn <- tcLookupPatSyn name
+           ; case patSynWrapper patsyn of
+               Nothing -> panic "tcLookupPatSynWrapper"
+               Just wrapper_id -> return wrapper_id }
 
 mkPatSynWrapperId :: Located Name
                   -> [Var] -> [TyVar] -> [TyVar] -> ThetaType -> Type

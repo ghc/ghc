@@ -433,12 +433,12 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = name@(L nameLoc _) })
   = do { newname <- applyNameMaker name_maker name
        ; return (bind { fun_id = L nameLoc newname }) } 
 
-rnBindLHS name_maker _ bind@(PatSynBind{ patsyn_id = rdrname@(L nameLoc _) })
+rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname@(L nameLoc _) })
   = do { unless (isTopRecNameMaker name_maker) $
            addErr localPatternSynonymErr
        ; addLocM checkConName rdrname
        ; name <- applyNameMaker name_maker rdrname
-       ; return (bind{ patsyn_id = L nameLoc name }) }
+       ; return (PatSynBind psb{ psb_id = L nameLoc name }) }
   where
     localPatternSynonymErr :: SDoc
     localPatternSynonymErr
@@ -515,10 +515,32 @@ rnBind sig_fn bind@(FunBind { fun_id = name
 		  [plain_name], rhs_fvs)
       }
 
-rnBind _sig_fn bind@(PatSynBind { patsyn_id = L _ name
-                                , patsyn_args = details
-                                , patsyn_def = pat
-                                , patsyn_dir = dir })
+rnBind sig_fn (PatSynBind bind)
+  = do  { (bind', name, fvs) <- rnPatSynBind sig_fn bind
+        ; return (PatSynBind bind', name, fvs) }
+
+rnBind _ b = pprPanic "rnBind" (ppr b)
+
+{-
+Note [Free-variable space leak]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have
+    fvs' = trim fvs
+and we seq fvs' before turning it as part of a record.
+
+The reason is that trim is sometimes something like
+    \xs -> intersectNameSet (mkNameSet bound_names) xs
+and we don't want to retain the list bound_names. This showed up in
+trac ticket #1136.
+-}
+
+rnPatSynBind :: (Name -> [Name])		-- Signature tyvar function
+             -> PatSynBind Name RdrName
+             -> RnM (PatSynBind Name Name, [Name], Uses)
+rnPatSynBind _sig_fn bind@(PSB { psb_id = L _ name
+                               , psb_args = details
+                               , psb_def = pat
+                               , psb_dir = dir })
        -- invariant: no free vars here when it's a FunBind
   = do	{ pattern_synonym_ok <- xoptM Opt_PatternSynonyms
         ; unless pattern_synonym_ok (addErr patternSynonymErr)
@@ -553,10 +575,10 @@ rnBind _sig_fn bind@(PatSynBind { patsyn_id = L _ name
 		-- As well as dependency analysis, we need these for the
 		-- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
 
-        ; let bind' = bind{ patsyn_args = details'
-                          , patsyn_def = pat'
-                          , patsyn_dir = dir'
-                          , bind_fvs = fvs' }
+        ; let bind' = bind{ psb_args = details'
+                          , psb_def = pat'
+                          , psb_dir = dir'
+                          , psb_fvs = fvs' }
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind', [name], fvs1)
@@ -569,20 +591,8 @@ rnBind _sig_fn bind@(PatSynBind { patsyn_id = L _ name
       = hang (ptext (sLit "Illegal pattern synonym declaration"))
            2 (ptext (sLit "Use -XPatternSynonyms to enable this extension"))
 
-
-rnBind _ b = pprPanic "rnBind" (ppr b)
-
 {-
-Note [Free-variable space leak]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We have
-    fvs' = trim fvs
-and we seq fvs' before turning it as part of a record.
 
-The reason is that trim is sometimes something like
-    \xs -> intersectNameSet (mkNameSet bound_names) xs
-and we don't want to retain the list bound_names. This showed up in
-trac ticket #1136.
 -}
 
 ---------------------
