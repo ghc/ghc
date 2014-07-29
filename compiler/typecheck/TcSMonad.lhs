@@ -1281,8 +1281,7 @@ getUntouchables = wrapTcS TcM.getUntouchables
 getGivenInfo :: TcS a -> TcS (Bool, [TcTyVar], a)
 -- See Note [inert_fsks and inert_no_eqs]
 getGivenInfo thing_inside
-  = do {
-       ; updInertTcS reset_vars  -- Set inert_fsks and inert_no_eqs to initial values
+  = do { updInertTcS reset_vars  -- Set inert_fsks and inert_no_eqs to initial values
        ; res <- thing_inside     -- Run thing_inside
        ; is  <- getTcSInerts     -- Get new values of inert_fsks and inert_no_eqs
        ; return (inert_no_eqs (inert_cans is), inert_fsks is, res) }
@@ -1716,7 +1715,7 @@ as an Irreducible (see Note [Equalities with incompatible kinds] in
 TcCanonical), and will do no harm.
 
 \begin{code}
-xCtEvidence :: CtEvidence            -- Original flavor
+xCtEvidence :: CtEvidence            -- Original evidence
             -> XEvTerm               -- Instructions about how to manipulate evidence
             -> TcS [CtEvidence]
 
