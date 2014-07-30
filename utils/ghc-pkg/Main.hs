@@ -901,13 +901,13 @@ registerPackage input verbosity my_flags auto_ghci_libs multi_instance
 
   let 
      -- In the normal mode, we only allow one version of each package, so we
-     -- remove all instances with the same source package key as the one we're
+     -- remove all instances with the same source package id as the one we're
      -- adding. In the multi instance mode we don't do that, thus allowing
-     -- multiple instances with the same source package key.
+     -- multiple instances with the same source package id.
      removes = [ RemovePackage p
                | not multi_instance,
                  p <- packages db_to_operate_on,
-                 packageKey p == packageKey pkg ]
+                 sourcePackageId p == sourcePackageId pkg ]
   --
   changeDB verbosity (removes ++ [AddPackage pkg']) db_to_operate_on
 
@@ -1564,14 +1564,13 @@ checkDuplicates :: PackageDBStack -> InstalledPackageInfo
                 -> Bool -> Bool-> Validate ()
 checkDuplicates db_stack pkg multi_instance update = do
   let
-        pkg_key = packageKey pkg
         pkgid = sourcePackageId pkg
         pkgs  = packages (head db_stack)
   --
   -- Check whether this package id already exists in this DB
   --
   when (not update && not multi_instance
-                   && (pkg_key `elem` map packageKey pkgs)) $
+                   && (pkgid `elem` map sourcePackageId pkgs)) $
        verror CannotForce $
           "package " ++ display pkgid ++ " is already installed"
 
