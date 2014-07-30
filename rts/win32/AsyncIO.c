@@ -286,7 +286,7 @@ start:
             unsigned int rID = completedTable[i].reqID;
 
             prev = NULL;
-            for(tso = blocking_queue_hd; tso != END_TSO_QUEUE;
+            for(tso = blocked_queue_hd; tso != END_TSO_QUEUE;
                   tso = tso->_link) {
 
                 switch(tso->why_blocked) {
