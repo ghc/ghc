@@ -286,7 +286,7 @@ bundle :: Map CLabel CAFSet
        -> (CAFEnv, CmmDecl)
        -> (CAFSet, Maybe CLabel)
        -> (BlockEnv CAFSet, CmmDecl)
-bundle flatmap (env, decl@(CmmProc infos lbl _ g)) (closure_cafs, mb_lbl)
+bundle flatmap (env, decl@(CmmProc infos _lbl _ g)) (closure_cafs, mb_lbl)
   = ( mapMapWithKey get_cafs (info_tbls infos), decl )
  where
   entry = g_entry g
@@ -297,9 +297,13 @@ bundle flatmap (env, decl@(CmmProc infos lbl _ g)) (closure_cafs, mb_lbl)
 
   get_cafs l _
     | l == entry = entry_cafs
-    | otherwise  = if not (mapMember l env)
-                      then pprPanic "bundle" (ppr l <+> ppr lbl <+> ppr (info_tbls infos) $$ ppr env $$ ppr decl)
-                      else flatten flatmap $ expectJust "bundle" $ mapLookup l env
+    | Just info <- mapLookup l env = flatten flatmap info
+    | otherwise  = Set.empty
+    -- the label might not be in the env if the code corresponding to
+    -- this info table was optimised away (perhaps because it was
+    -- unreachable).  In this case it doesn't matter what SRT we
+    -- infer, since the info table will not appear in the generated
+    -- code.  See #9329.
 
 bundle _flatmap (_, decl) _
   = ( mapEmpty, decl )
