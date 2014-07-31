@@ -10,4 +10,6 @@ instance {-# OVERLAPPABLE #-} C a => C [a] where f xs = "Third"
 f [5::Int]  -- Should be fine
 instance {-# OVERLAPPABLE #-} C a => C [a] where f xs = "Fourth"
 f [6::Int]  -- Should be fine too, overrides
+instance C Bool where { f _ = "Bool" }
+f [True]  -- Should be fine too, overrides
 
