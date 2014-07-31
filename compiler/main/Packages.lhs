@@ -78,11 +78,17 @@ import qualified Data.Set as Set
 -- provide.
 --
 -- The package state is computed by 'initPackages', and kept in DynFlags.
+-- It is influenced by various package flags:
 --
---   * @-package <pkg>@ causes @<pkg>@ to become exposed, and all other packages
---      with the same name to become hidden.
+--   * @-package <pkg>@ and @-package-id <pkg>@ cause @<pkg>@ to become exposed.
+--     If @-hide-all-packages@ was not specified, these commands also cause
+--      all other packages with the same name to become hidden.
 --
 --   * @-hide-package <pkg>@ causes @<pkg>@ to become hidden.
+--
+--   * (there are a few more flags, check below for their semantics)
+--
+-- The package state has the following properties.
 --
 --   * Let @exposedPackages@ be the set of packages thus exposed.
 --     Let @depExposedPackages@ be the transitive closure from @exposedPackages@ of
@@ -401,9 +407,12 @@ applyPackageFlag dflags unusable pkgs flag =
 
    where
         -- When a package is requested to be exposed, we hide all other
-        -- packages with the same name.
+        -- packages with the same name if -hide-all-packages was not specified.
+        -- If it was specified, we expect users to not try to expose a package
+        -- multiple times, so don't hide things.
         hideAll name ps = map maybe_hide ps
           where maybe_hide p
+                   | gopt Opt_HideAllPackages dflags     = p
                    | pkgName (sourcePackageId p) == name = p {exposed=False}
                    | otherwise                           = p
 
@@ -475,10 +484,12 @@ packageFlagErr dflags flag reasons
 -- that is already exposed.  This just makes it non-fatal to have two
 -- versions of a package exposed, which can happen if you install a
 -- later version of a package in the user database, for example.
+-- However, don't do this if @-hide-all-packages@ was passed.
 --
 hideOldPackages :: DynFlags -> [PackageConfig] -> IO [PackageConfig]
 hideOldPackages dflags pkgs = mapM maybe_hide pkgs
   where maybe_hide p
+           | gopt Opt_HideAllPackages dflags = return p
            | not (exposed p) = return p
            | (p' : _) <- later_versions = do
                 debugTraceMsg dflags 2 $
