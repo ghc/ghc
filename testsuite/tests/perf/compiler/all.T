@@ -366,10 +366,12 @@ test('T5321Fun',
 test('T5321FD',
      [ only_ways(['normal']),  # no optimisation for this one
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 240302920, 10),
+          [(wordsize(32), 211699816, 10),
             # prev:       213380256
             # 2012-10-08: 240302920 (x86/Linux)
             #  (increase due to new codegen)
+            # 2014-07-31: 211699816 (Windows) (-11%)
+            #  (due to better optCoercion, 5e7406d9, #9233)
            (wordsize(64), 426960992, 10)])
             # prev:       418306336
             # 29/08/2012: 492905640
@@ -432,7 +434,9 @@ test('T6048',
 test('T9020',
      [ only_ways(['optasm']),
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 381360728, 10),
+          [(wordsize(32), 343005716, 10),
+           # Original:    381360728
+           # 2014-07-31:  343005716 (Windows) (general round of updates)
            (wordsize(64), 728263536, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
