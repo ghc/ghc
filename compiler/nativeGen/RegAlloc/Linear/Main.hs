@@ -196,26 +196,30 @@ regAlloc _ (CmmProc _ _ _ _)
 linearRegAlloc
         :: (Outputable instr, Instruction instr)
         => DynFlags
-        -> [BlockId]                    -- ^ entry points
-        -> BlockMap RegSet              -- ^ live regs on entry to each basic block
-        -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
+        -> [BlockId] -- ^ entry points
+        -> BlockMap RegSet
+              -- ^ live regs on entry to each basic block
+        -> [SCC (LiveBasicBlock instr)]
+              -- ^ instructions annotated with "deaths"
         -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
 
 linearRegAlloc dflags entry_ids block_live sccs
- = let platform = targetPlatform dflags
-   in case platformArch platform of
-      ArchX86       -> linearRegAlloc' dflags (frInitFreeRegs platform :: X86.FreeRegs)    entry_ids block_live sccs
-      ArchX86_64    -> linearRegAlloc' dflags (frInitFreeRegs platform :: X86_64.FreeRegs) entry_ids block_live sccs
-      ArchSPARC     -> linearRegAlloc' dflags (frInitFreeRegs platform :: SPARC.FreeRegs)  entry_ids block_live sccs
-      ArchPPC       -> linearRegAlloc' dflags (frInitFreeRegs platform :: PPC.FreeRegs)    entry_ids block_live sccs
-      ArchARM _ _ _ -> panic "linearRegAlloc ArchARM"
-      ArchARM64     -> panic "linearRegAlloc ArchARM64"
-      ArchPPC_64    -> panic "linearRegAlloc ArchPPC_64"
-      ArchAlpha     -> panic "linearRegAlloc ArchAlpha"
-      ArchMipseb    -> panic "linearRegAlloc ArchMipseb"
-      ArchMipsel    -> panic "linearRegAlloc ArchMipsel"
+ = case platformArch platform of
+      ArchX86        -> go $ (frInitFreeRegs platform :: X86.FreeRegs)
+      ArchX86_64     -> go $ (frInitFreeRegs platform :: X86_64.FreeRegs)
+      ArchSPARC      -> go $ (frInitFreeRegs platform :: SPARC.FreeRegs)
+      ArchPPC        -> go $ (frInitFreeRegs platform :: PPC.FreeRegs)
+      ArchARM _ _ _  -> panic "linearRegAlloc ArchARM"
+      ArchARM64      -> panic "linearRegAlloc ArchARM64"
+      ArchPPC_64     -> panic "linearRegAlloc ArchPPC_64"
+      ArchAlpha      -> panic "linearRegAlloc ArchAlpha"
+      ArchMipseb     -> panic "linearRegAlloc ArchMipseb"
+      ArchMipsel     -> panic "linearRegAlloc ArchMipsel"
       ArchJavaScript -> panic "linearRegAlloc ArchJavaScript"
-      ArchUnknown   -> panic "linearRegAlloc ArchUnknown"
+      ArchUnknown    -> panic "linearRegAlloc ArchUnknown"
+ where
+  go f = linearRegAlloc' dflags f entry_ids block_live sccs
+  platform = targetPlatform dflags
 
 linearRegAlloc'
         :: (FR freeRegs, Outputable instr, Instruction instr)
