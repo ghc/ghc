@@ -838,7 +838,11 @@ and starting again.  To support upgrades, Cabal needs to do some work:
 when a new version is put in the default set, all of the
 reverse-dependencies of the old version are now inconsistent.  Cabal
 should offer to hide these packages or reinstall them compiled against
-the latest version.  Cabal should also be able to snapshot the older
+the latest version.  Furthermore, because we in general may not have write
+access to all visible package databases, this visibility information
+must be independent of the package databases themselves.
+
+As a nice bonus, Cabal should also be able to snapshot the older
 environment which captures the state of the universe prior to the
 installation, in case the user wants to revert back.
 
@@ -851,7 +855,8 @@ but exposing packages is a bit dicier.  If a user asks for a different
 version of a package than in the default set, it will probably be
 inconsistent with the rest of the dependencies.  Cabal would have to
 be consulted to figure out a maximal set of consistent packages with
-the constraints given.
+the constraints given.  Alternatively, we could just supply the package
+with no claims of consistency.
 
 However, this use-case is rare.  Usually, it's not because they want a
 specific version: the package is hidden simply because we're not
@@ -928,26 +933,15 @@ There are currently a number of proposed changes to this state of affairs:
         also allow \emph{same-database} shadowing: that is, not even
         package keys are guaranteed to be unique in a database: instead,
         installed package IDs are the sole unique identifier of a
-        package.  The motivation behind this architecture is to treat
-        the package database more like a cache rather than a database:
-        information about shadowing is separately maintained and used.
+        package.  This architecture is Nix inspired, as the intent is
+        to keep all package information in a centralized database.
 \end{itemize}
 
-Edward thinks same-database shadowing is wrong.  What same-database
-shadowing implies is that there are multiple incompatible ``package
-hierarchies'' (possibly with a shared root), one of which shadows the
-other hierarchy.  It is now absolutely essential to somehow identify
-which hierarchy should be visible (the rest being shadowed).  It seems
-better to me to explicitly reify this hierarchy as a hierarchy of
-package databases.  For example, instead of having (installed package
-IDs) \texttt{foo-1.0-hash1} and \texttt{foo-1.0-hash2} in the same
-database, have a separate database for each, and the respective dependencies
-which are built against those packages. (Notice that all of these dependencies
-are incompatible with one another.)  Furthermore, because of the precedence
-of shadowing, we can store one of these installed package IDs in the primary
-database, and then layer the second on top of it (as it takes precedence,
-it automatically invalidates all of the packages depending on \texttt{foo-1.0-hash1},
-while keeping packages which are otherwise compatible.)
+Without mandatory package environments, same-database shadowing is a bad
+idea, because GHC now has no idea how to resolve shadowing.  Conflicting
+installed package IDs can be simulated by placing them in multiple
+package databases (in principle, the databases can be concatenated together
+and treated as a single monolitic database.)
 
 \section{Shapeless Backpack}\label{sec:simplifying-backpack}
 
@@ -1109,29 +1103,31 @@ against (renamed) interface files.
 \begin{algorithm}
     \caption{Compilation of definite packages (assume \texttt{-hide-all-packages} on all \texttt{ghc} invocations)}\label{alg:compile}
 \begin{algorithmic}
-    \Procedure{Compile}{\textbf{package} $P$ \textbf{where} $\vec{B}$, $H$, $flags_P$}\Comment{}$H$ maps hole module names to identities
-    \State$flags\gets flags_P$
+    \Procedure{Compile}{\textbf{package} $P$ \textbf{where} $\vec{B}$, $H$, $db$}\Comment{}$H$ maps hole module names to identities
+    \State$flags\gets \nil$
     \State$\mathcal{K}$ $\gets$ \Call{Hash}{$P + H$}
-    \State$cwd\gets \textrm{fresh working directory for compilation}$
+    \State%
+    In-place register the package $\mathcal{K}$ in $db$
     \For{$B$ \textbf{in} $\vec{B}$}
         \Case{$p = p\texttt{.hs}$}
-            \State\Call{Exec}{\texttt{ghc -c} $p$\texttt{.hs} \texttt{-package-name} $\mathcal{K}$ $flags$}
+        \State\Call{Exec}{\texttt{ghc -c} $p$\texttt{.hs} \texttt{-package-db} $db$ \texttt{-package-name} $\mathcal{K}$ $flags$}
         \EndCase%
         \Case{$p$ $\cc$ $p$\texttt{.hsig}}
-            \State\Call{Exec}{\texttt{ghc -c} $p$\texttt{.hsig} \texttt{--sig-of} $H(p)$ $flags$}
+            \State\Call{Exec}{\texttt{ghc -c} $p$\texttt{.hsig} \texttt{-package-db} $db$ \texttt{--sig-of} $H(p)$ $flags$}
         \EndCase%
         \Case{$p = p'$}
-            \State$flags\gets flags$ \texttt{-alias} $p$ $p'$
-            \State\Call{Exec}{\texttt{ghc --check} $flags$}
+            \State$flags\gets flags$ \texttt{-alias} $p$ $p'$ \texttt{-package-db} $db$
         \EndCase%
         \Case{\Cinc{$P'$} $\langle\vec{p_H\mapsto p_H'}, \vec{p\mapsto p'} \rangle$}
-            \State\textbf{let} $H'(p_H) = $ \Call{Exec}{\texttt{ghc --resolve-module} $p_H'$ $flags$}
-            \State$\mathcal{K}'\gets$ \Call{Compile}{$P'$, $H'$, $flags_P$ \texttt{-package-dir} $\mathcal{K}$ $cwd$ $\langle\rangle$}\Comment{}Nota bene: not $flags$
+            \State\textbf{let} $H'(p_H) = $ \Call{Exec}{\texttt{ghc --resolve-module} $p_H'$ \texttt{-package-db} $db$ $flags$}
+            \State$\mathcal{K}'\gets$ \Call{Compile}{$P'$, $H'$, $db$}\Comment{}Nota bene: not $flags$
             \State$flags\gets flags$ \texttt{-package} $\mathcal{K}'$ $\langle\vec{p\mapsto p'}\rangle$
-            \State\Call{Exec}{\texttt{ghc --check} $flags$}
         \EndCase%
     \EndFor%
-    \State\Call{Exec}{\texttt{ghc-pkg copy \&\& ghc-pkg register}} \Comment{Records if $P$ exports a thinning}
+    \State%
+    Remove $\mathcal{K}$ from $db$
+    \State%
+    Install the complete package $\mathcal{K}$ to the global database
     \State\Return$\mathcal{K}$
     \EndProcedure%
 \end{algorithmic}
@@ -1146,11 +1142,10 @@ Here is a more in-depth description of the algorith, line-by-line:
 $P$, we need to know $H$, the mapping of holes $p_H$ in package $P$ to
 physical module identities $\nu$ which are implementing them; this
 mapping is used to calculate the package key $\mathcal{K}$ for the
-package in question.  Furthermore, because we are running an actual
-compiler, and some of these implementations may not be in the package
-database, we also need an extra set of flags $flags_P$ which tells us
-where to find the interface and object files of any parent packages
-which are currently compiling.
+package in question.  Furthermore, we have an inplace package database
+$db$ in which we will register intermediate build results, including
+partially compiled parent packages which may provide implementations
+of holes for packages they include.
 
 \subsection{Compiling implementations}
 
@@ -1159,60 +1154,44 @@ package visibility $flags$, which let GHC know how to resolve imports
 and look up original names.  We'll describe what the new flags are
 and also discuss some subtleties with module lookup.
 
-\paragraph{New package resolution algorithm}  Currently, GHC has a
-complicated mechanism for processing \texttt{-package} (and related
-flags), motivated by the fact that without any packages, GHC would like
-try to make available \emph{all} packages in the package database.  Here
-is a major simplification we can make: let's assume that \emph{no
-packages are available by default.}  Now process each package flag in
-turn, building up a set of selected packages which is initially empty.
+\paragraph{In-place registration}  Perhaps surprisingly, we start
+compilation by registering the (uncompiled) package in the in-place
+package database.  This registration does not expose packages, and is
+purely intended to inform the compilation of subpackages where to
+find modules that are provided by the parent (in-progress) package,
+as well as provide auxiliary information, e.g., such as the package name
+and version for error reporting.  The pre-registration trick is an old
+one used by the GHC build system; the key invariant to look out for
+is that we shouldn't reference original names in modules that haven't
+been built yet.  This is enforced by our manual tracking of holes in
+$H$: a module can't occur in $H$ unless it's already been compiled!
 
-For \texttt{-package} and \texttt{-package-id}, get the set of installed
-packages which match the flag. (If multiple package names apply, process
-each in turn as if it were a separate flag.)  Compute the transitive
-closure of dependencies for all of them, and filter out all choices
-which have dependencies which are inconsistent with the current set of
-selected packages.  In the current GHC world, a dependency is consistent
-with the selected packages if there is no package with the same package
-name but different installed package database in the selected package
-database.  Thus, in \texttt{-package} \pname{foo-0.2} \texttt{-package} \pname{bar},
-selections of \pname{bar} which depended on \pname{foo-0.1} would be excluded.
-In Backpack, we will make the model is a little more sophisticated.
+\paragraph{New package resolution algorithm}  Currently, invocations
+of \texttt{-package} and similar flags have the result of \emph{hiding}
+other exposed packages with the same name.  However, this is not going
+to work for Backpack: an indefinite package may get loaded multiple times
+with different instantiations, and it might even make sense to load multiple
+versions of the same package simultaneously, as long as their modules
+are renamed to not conflict.
 
-If there is still more than one choice, tiebreak by version, which
-database and time of install. (The latter tiebreak should not be
-necessary unless there are multiple instances of a package with the same
-package ID, as might be the case when their dependencies differ.)
-If there are no choices, error, unless the particular package that was
-asked for is an older version of a package already in the set
-(e.g., \texttt{-package} \pname{containers-0.9} \texttt{-package} \pname{containers-0.8}).
-
-\paragraph{Thinning and renaming on packages}  We augment the syntax of
+Thus, we impose the following behavior change: when
+\texttt{-hide-all-packages} is specified, we do \emph{not} automatically
+hide packages with the same name as a package specified by
+\texttt{-package} (or a similar flag): they are all included, even if
+there are conflicts.  To deal with conflicts, we augment the syntax of
 \texttt{-package} to also accept a list of thinnings and renamings, e.g.
-\texttt{-package} \pname{containers} $\langle\m{Data.Set}, \m{Data.Map}\mapsto \m{Map}\rangle$ says to make visible for import \m{Data.Set} and
-\m{Map} (which is \m{Data.Map} renamed.)
-With thinning and renaming, we have to slightly augment the package resolution
-algorithm in two ways.  First, as we are processing \texttt{-package} flags,
-we now need to concurrently maintain a mapping of visible module bindings.
-We either put all exposed modules in these mapping, or just the ones mentioned
-by the thinning and the renaming.
-
-Furthermore, it makes sense to refine our notion of conflict to apply at
-the module level.  Rather than maintain a mapping of package names to
-package choices, we instead look at whether or not there are any
-\emph{module binding} conflicts.  Thus, it would make sense to say
+\texttt{-package} \pname{containers} $\langle\m{Data.Set},
+\m{Data.Map}\mapsto \m{Map}\rangle$ says to make visible for import
+\m{Data.Set} and \m{Map} (which is \m{Data.Map} renamed.)  This means
+that
 \texttt{-package} \pname{containers-0.9} $\langle\m{Data.Set}\mapsto
 \m{Set09}\rangle$ \texttt{-package} \pname{containers-0.8}
-$\langle\m{Data.Set}\mapsto \m{Set08}\rangle$ and then use both modules
-concurrently, since the modules no longer are mapped onto the same name.
-This is different from existing GHC behavior, where two packages which
-export the same module can be loaded, but now GHC gives an ambiguous import
-error if you try to import the module. (Perhaps this could still be done
-here, by reporting errors lazily.)
+$\langle\m{Data.Set}\mapsto \m{Set08}\rangle$ now uses both packages
+concurrently (previously, GHC would hide one of them.)
 
 Additionally, it's important to note that two packages exporting the
 same module do not \emph{necessarily} cause a conflict; the modules
-may link together.  For example, \texttt{-package} \pname{containers} $\langle\m{Data.Set}\rangle$
+may be linkable.  For example, \texttt{-package} \pname{containers} $\langle\m{Data.Set}\rangle$
 \texttt{-package} \pname{containers} $\langle\m{Data.Set}\rangle$ is fine, because
 precisely the same implementation of \m{Data.Set} is loaded in both cases.
 A similar situation can occur with signatures:
@@ -1261,23 +1240,16 @@ $p'$, we require that $p'$ exists in the current module mapping, and then
 we attempt to add an entry for it at entry $p$.  If there is no mapping for
 $p$, this succeeds; otherwise, we apply the same conflict resolution algorithm.
 
-\paragraph{The \texttt{-package-dir} flag}  We introduce a new flag \texttt{-package-dir}
-which takes a package key $\mathcal{K}$, a directory and a list of thinning/renamings
-as before.  \texttt{-package-dir} works nearly the same as a \texttt{-package} flag,
-except that the package in question does \emph{not} have to already be installed in the
-package database.  Instead, the files associated with the package are checked for in
-the directory in question.  We will use this flag to refer to files in partially compiled
-packages which have not been installed to the package database.
-
 \subsection{Compiling signatures}
 
 Signature compilation is triggered when we compile a signature file.
 This mode similar to how we process \verb|hs-boot| files, except
 we pass an extra flag \verb|--sig-of| which specifies what the
-actual implementation of the signature is (according to our $H$
+identity of the actual implementation of the signature is (according to our $H$
 mapping).  This is guaranteed to exist, due to the linking
-restriction.  (Additionally, the implementation will probably by find by looking
-up the package key against a \texttt{-package-dir} flag.)  In this case, we output an \texttt{hisig} file which, for all declarations the
+restriction, although it may be in a partially registered package
+in $db$.  If the module is \emph{not} exposed under the name of the
+\texttt{hisig}file, we output an \texttt{hisig} file which, for all declarations the
 signature exposes, forwards their definitions to the original
 implementation file.  The intent is that any code in the current package
 which compiles against this signature will use this \texttt{hisig} file,
@@ -1305,7 +1277,8 @@ package p where
 
 Paper Backpack specifies that we check the signature \m{P} against implementation
 \m{P}, but otherwise no changes are made (i.e., the signature does not narrow
-the implementation.) In this case, it is not necessary to generate an \texttt{hisig} file.
+the implementation.) In this case, it is not necessary to generate an \texttt{hisig} file;
+the original interface file suffices.
 
 \paragraph{Multiple signatures}  As a simplification, we assume that there
 is only one signature per logical name in a package.  (This prevents
@@ -1378,9 +1351,10 @@ package q where
 
 When computing the entry $H(\pname{A})$, we run the command \texttt{ghc --resolve-module} \pname{B}.
 
-Next, we recursively call \textsc{Compile} with the computed $H'$,
-but registering the current working directory as the place to look
-for any original names containing the parent package key $\mathcal{K}$.
+Next, we recursively call \textsc{Compile} with the computed $H'$.
+Note that the entries in $H$ may refer to modules which would not be
+picked up by $flags$, but they will be registered in the inplace
+package database $db$.
 For example, in this situation:
 
 \begin{verbatim}
@@ -1394,15 +1368,14 @@ package q where
     D = [ import C; ... ]
 \end{verbatim}
 
-When we recursively process package \pname{p}, $H$ will refer to \pname{q}:\m{B}, and we need
-to know where to find it (\pname{q} is only partially processed and so not installed
-in the package database.)  Furthermore, the interface file for \m{B} may refer to \pname{q}:\m{A},
+When we recursively process package \pname{p}, $H$ will refer to
+\pname{q}:\m{B}, and we need to know where to find it (\pname{q} is only
+partially processed and so is in the inplace package database.)
+Furthermore, the interface file for \m{B} may refer to \pname{q}:\m{A},
 and thus we likewise need to know how to find its interface file.
 
-Note that we do \emph{not} import any of the modules (the
-thinning/renaming is empty, masking all modules); we only want to
-register the package key in the in-memory database. Otherwise, this
-example would improperly compile:
+Note that the inplace package database is not expected to expose and
+packages. Otherwise, this example would improperly compile:
 
 \begin{verbatim}
 package p where
@@ -1412,28 +1385,14 @@ package q where
     include p
 \end{verbatim}
 
-\pname{p} does not compile on its own, so it should not compile if it is recursively
-invoked from \pname{q}.  However, if we add \texttt{-package-dir} \pname{q} $cwd$ to
-the flags without masking out all modules, \m{A} is now suddenly resolvable.
+\pname{p} does not compile on its own, so it should not compile if it is
+recursively invoked from \pname{q}.  However, if we exposed the modules
+of the partially registered package \pname{q}, \m{A} is now suddenly
+resolvable.
 
 Finally, once the subpackage is compiled, we can add it to our $flags$ so later
 modules we compile see its (appropriately thinned and renamed) modules, and like
-aliasing, we eagerly check it for consistency.  This consistency check would catch
-the ambiguity in this example:
-
-\begin{verbatim}
-package p where
-    A = ...
-package q where
-    A = ...
-    include p
-\end{verbatim}
-
-(Note that \pname{p} is a perfectly good package on its own, it is only its inclusion in \pname{q} which is problematic.)
-
-If we adopt the system where we merge signature files as we go along, this checking
-phase would also be a good time to merge any \texttt{hisig} files from the subpackage
-with any in the current $flags$ environment.
+aliasing.
 
 \paragraph{Absence of an \texttt{hi} file}
 It is important that \texttt{--resolve-module} truly looks up the \emph{implementor}
