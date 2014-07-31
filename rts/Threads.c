@@ -221,7 +221,7 @@ removeThreadFromDeQueue (Capability *cap,
             }
 	}
     }
-    barf("removeThreadFromMVarQueue: not found");
+    barf("removeThreadFromDeQueue: not found");
 }
 
 /* ----------------------------------------------------------------------------
