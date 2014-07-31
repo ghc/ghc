@@ -728,7 +728,7 @@ which encodes as (TyConApp instCoercionTyCon [TyConApp CoT [], s])
 Note [Newtype eta]
 ~~~~~~~~~~~~~~~~~~
 Consider
-        newtype Parser a = MkParser (IO a) derriving( Monad )
+        newtype Parser a = MkParser (IO a) deriving Monad
 Are these two types equal (to Core)?
         Monad Parser
         Monad IO
