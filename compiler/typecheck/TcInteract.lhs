@@ -753,12 +753,16 @@ kickOutRewritable :: CtEvidence   -- Flavour of the equality that is
                   -> InertCans
                   -> TcS (Int, InertCans)
 kickOutRewritable new_ev new_tv
-                  (IC { inert_eqs = tv_eqs
-                      , inert_dicts  = dictmap
-                      , inert_funeqs = funeqmap
-                      , inert_irreds = irreds
-                      , inert_insols = insols
-                      , inert_no_eqs = no_eqs })
+                  inert_cans@(IC { inert_eqs = tv_eqs
+                                 , inert_dicts  = dictmap
+                                 , inert_funeqs = funeqmap
+                                 , inert_irreds = irreds
+                                 , inert_insols = insols
+                                 , inert_no_eqs = no_eqs })
+  | new_tv `elemVarEnv` tv_eqs   -- Fast path: there is at least one equality for tv
+                                 -- so kick-out will do nothing
+  = return (0, inert_cans)
+  | otherwise
   = do { traceTcS "kickOutRewritable" $
             vcat [ text "tv = " <+> ppr new_tv
                  , ptext (sLit "Kicked out =") <+> ppr kicked_out]
