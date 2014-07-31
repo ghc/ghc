@@ -681,13 +681,24 @@ stg_block_async_void
    STM-specific waiting
    -------------------------------------------------------------------------- */
 
-stg_block_stmwait_finally
-{
-    ccall stmWaitUnlock(MyCapability() "ptr", R3 "ptr");
-    jump StgReturn [R1];
-}
-
 stg_block_stmwait
 {
-    BLOCK_BUT_FIRST(stg_block_stmwait_finally);
+    // When blocking on an MVar we have to be careful to only release
+    // the lock on the MVar at the very last moment (using
+    // BLOCK_BUT_FIRST()), since when we release the lock another
+    // Capability can wake up the thread, which modifies its stack and
+    // other state.  This is not a problem for STM, because STM
+    // wakeups are non-destructive; the waker simply calls
+    // tryWakeupThread() which sends a message to the owner
+    // Capability.  So the moment we release this lock we might start
+    // getting wakeup messages, but that's perfectly harmless.
+    //
+    // Furthermore, we *must* release these locks, just in case an
+    // exception is raised in this thread by
+    // maybePerformBlockedException() while exiting to the scheduler,
+    // which will abort the transaction, which needs to obtain a lock
+    // on all the TVars to remove the thread from the queues.
+    //
+    ccall stmWaitUnlock(MyCapability() "ptr", R3 "ptr");
+    BLOCK_GENERIC;
 }
