@@ -832,10 +832,10 @@ runLink dflags args = do
                   _ -> id
 {-
   SunOS/Solaris ld emits harmless warning messages about unresolved
-  symbol in case of compiling into shared library when we do not
+  symbols in case of compiling into shared library when we do not
   link against all the required libs. That is the case of GHC which
   does not link against RTS library explicitly in order to be able to
-  chose the library later based on binary application linking
+  choose the library later based on binary application linking
   parameters. The warnings look like:
 
 Undefined                       first referenced
@@ -859,10 +859,10 @@ ld: warning: symbol referencing errors
 
   Following filter code is SunOS/Solaris linker specific and should
   filter out only linker warnings. Please note that the logic is a
-  little bit more complex due to simple reason that we need to preserve
+  little bit more complex due to the simple reason that we need to preserve
   any other linker emitted messages. If there are any. Simply speaking
   if we see "Undefined" and later "ld: warning:..." then we omit all
-  text between (including) the marks. Otherwise we copy whole output.
+  text between (including) the marks. Otherwise we copy the whole output.
 -}
     sunos_ld_filter :: String -> String
     sunos_ld_filter = unlines . sunos_ld_filter' . lines
