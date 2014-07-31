@@ -870,7 +870,7 @@ areaToSp _ _ _ _ other = other
 -- really the job of the stack layout algorithm, hence we do it now.
 
 optStackCheck :: CmmNode O C -> CmmNode O C
-optStackCheck n = -- Note [null stack check]
+optStackCheck n = -- Note [Always false stack check]
  case n of
    CmmCondBranch (CmmLit (CmmInt 0 _)) _true false -> CmmBranch false
    other -> other
