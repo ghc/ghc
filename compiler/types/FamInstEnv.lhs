@@ -751,11 +751,11 @@ The "extra" type argument [Char] just stays on the end.
 
 We handle data families and type families separately here:
 
- * For type  families, all instances of a type family must have the
+ * For type families, all instances of a type family must have the
    same arity, so we can precompute the split between the match_tys
    and the overflow tys. This is done in pre_rough_split_tys.
 
- * For data families instances, though, we need to re-split for each
+ * For data family instances, though, we need to re-split for each
    instance, because the breakdown might be different for each
    instance.  Why?  Because of eta reduction; see Note [Eta reduction
    for data family axioms]
