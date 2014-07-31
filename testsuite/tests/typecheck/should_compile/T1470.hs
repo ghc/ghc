@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, OverlappingInstances, UndecidableInstances, KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, UndecidableInstances, KindSignatures #-}
 
 -- Trac #1470
 
@@ -15,10 +15,9 @@ data FooD a = FooD
 
 instance Foo t => Sat (FooD t)
 
-instance Data FooD a => Foo a
-
-
-instance Foo a       => Foo [a]
+instance {-# OVERLAPPABLE #-} Data FooD a => Foo a
+instance {-# OVERLAPS #-}     Foo a       => Foo [a]
+instance {-# OVERLAPPING #-}                 Foo [Char]
 {-
  Given:                Foo a,
  and its superclasses: Data FooD a
@@ -35,4 +34,3 @@ instance Foo a       => Foo [a]
 BUT THIS INSTANCE OVERLAPS
 -}
 
-instance                Foo [Char]

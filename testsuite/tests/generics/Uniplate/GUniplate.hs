@@ -4,7 +4,8 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE DefaultSignatures          #-}
-{-# LANGUAGE IncoherentInstances        #-} -- necessary, unfortunately
+{- # LANGUAGE IncoherentInstances        #-} -- necessary, unfortunately
+{-# LANGUAGE OverlappingInstances        #-} 
 
 module GUniplate where
 
@@ -20,7 +21,8 @@ class Uniplate' f b where
 instance Uniplate' U1 a where
   children' U1 = []
 
-instance Uniplate' (K1 i a) a where
+instance {-# OVERLAPPING #-} Uniplate' (K1 i a) a where
+  -- overlaps the (Uniplate' (K1 i a) b) instance
   children' (K1 a) = [a]
 
 instance Uniplate' (K1 i a) b where

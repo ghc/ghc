@@ -1,7 +1,6 @@
 --Testing GADTs, type families as well as a ton of crazy type stuff
 :set -XGADTs
 :set -XTypeFamilies
-:set -XOverlappingInstances
 :set -XFunctionalDependencies
 :set -XFlexibleContexts
 :set -XFlexibleInstances
@@ -22,8 +21,9 @@ data HTrue
 data HFalse
 
 class TypeEq x y b | x y -> b
-instance (HTrue ~ b)  => TypeEq x x b
-instance (HFalse ~ b) => TypeEq x y b
+instance {-# OVERLAPS #-} (HTrue ~ b)  => TypeEq x x b
+instance {-# OVERLAPS #-} (HTrue ~ b)  => TypeEq x x b
+instance {-# OVERLAPS #-} (HFalse ~ b) => TypeEq x y b
 
 type family Or a b
 type instance Or HTrue  HTrue  = HTrue

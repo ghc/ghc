@@ -5060,11 +5060,21 @@ The <option>-XIncoherentInstances</option> flag implies the
 <para>
 A more precise specification is as follows.
 The willingness to be overlapped or incoherent is a property of
-the <emphasis>instance declaration</emphasis> itself, controlled by
-either an explicit pragma, or the
-presence or otherwise of the <option>-XOverlappingInstances</option>
-and <option>-XIncoherentInstances</option> flags when that instance declaration is
-being compiled.  Now suppose that, in some client module, we are searching for an instance of the
+the <emphasis>instance declaration</emphasis> itself, controlled as follows:
+<itemizedlist>
+<listitem><para>An instance is <emphasis>incoherent</emphasis> if it has an <literal>INCOHERENT</literal> pragama, or if it appears in a module compiled with <literal>-XIncoherentInstances</literal>.
+</para></listitem>
+<listitem><para>An instance is <emphasis>overlappable</emphasis> if it has an <literal>OVERLAPPABLE</literal> or <literal>OVERLAPS</literal> pragama, or if it appears in a module compiled with <literal>-XOverlappingInstances</literal>, or if the instance is incoherent.
+</para></listitem>
+<listitem><para>An instance is <emphasis>overlapping</emphasis> if it has an <literal>OVERLAPPING</literal> or <literal>OVERLAPS</literal> pragama, or if it appears in a module compiled with <literal>-XOverlappingInstances</literal>, or if the instance is incoherent.
+</para></listitem>
+</itemizedlist>
+The <option>-XOverlappingInstances</option> language extension is now deprecated in favour
+per-instance pragmas.
+</para>
+
+<para>
+Now suppose that, in some client module, we are searching for an instance of the
 <emphasis>target constraint</emphasis> <literal>(C ty1 .. tyn)</literal>.
 The search works like this.
 <itemizedlist>
@@ -5078,8 +5088,7 @@ instance declarations are the <emphasis>candidates</emphasis>.
 Find all <emphasis>non-candidate</emphasis> instances 
 that <emphasis>unify</emphasis> with the target constraint.
 Such non-candidates instances might match when the target constraint is further
-instantiated.  If all of them were compiled with
-<option>-XIncoherentInstances</option>, proceed; if not, the search fails.
+instantiated.  If all of them are incoherent, proceed; if not, the search fails.
 </para></listitem>
 
 <listitem><para>
@@ -5095,21 +5104,12 @@ Eliminate any candidate IX for which both of the following hold:
   </para></listitem>
   </itemizedlist>
 </para>
-<para>
-Instance annotated with an <literal>OVERLAPPABLE</literal> or
-<literal>OVERLAPPING</literal> pragma are treated as such.
-</para>
-<para>
-Instances annotated with the <literal>OVERLAPS</literal> pragma, or compiled
-with <option>-XOverlappingInstances</option>, are treated as both
-<emphasis>overlapping</emphasis> and <emphasis>overlappable</emphasis>.
-</para>
 </listitem>
 
 <listitem><para>
-If only one candidate remains, pick it.
-Otherwise if all remaining candidates were compiled with
-<option>-XInccoherentInstances</option>, pick an arbitrary candidate.
+If exactly one non-incoherent candidate remains, pick it.  If all
+remaining candidates are incoherent, pick an arbitary
+one. Otherwise fail.
 </para></listitem>
 
 </itemizedlist>
@@ -5118,7 +5118,7 @@ overlapping instances without the library client having to know.
 </para>
 <para>
 Errors are reported <emphasis>lazily</emphasis> (when attempting to solve a constraint), rather than <emphasis>eagerly</emphasis> 
-(when the instances themselves are defined).  So for example
+(when the instances themselves are defined).  Consider, for example
 <programlisting>
   instance C Int  b where ..
   instance C a Bool where ..
@@ -5133,20 +5133,19 @@ both instances match and an error is reported.
 <para>
 As a more substantial example of the rules in action, consider
 <programlisting>
-  instance context1 => C Int b     where ...  -- (A)
-  instance context2 => C a   Bool  where ...  -- (B)
-  instance context3 => C a   [b]   where ...  -- (C)
-  instance context4 => C Int [Int] where ...  -- (D)
+  instance {-# OVERLAPPABLE #-} context1 => C Int b     where ...  -- (A)
+  instance {-# OVERLAPPABLE #-} context2 => C a   Bool  where ...  -- (B)
+  instance {-# OVERLAPPABLE #-} context3 => C a   [b]   where ...  -- (C)
+  instance {-# OVERLAPPING  #-} context4 => C Int [Int] where ...  -- (D)
 </programlisting>
-compiled with <option>-XOverlappingInstances</option> enabled. Now suppose that the type inference
-engine needs to solve The constraint
+Now suppose that the type inference
+engine needs to solve the constraint
 <literal>C Int [Int]</literal>.  This constraint matches instances (A), (C) and (D), but the last
 is more specific, and hence is chosen.
 </para>
 <para>If (D) did not exist then (A) and (C) would still be matched, but neither is
-most specific. In that case, the program would be rejected even with
-<option>-XOverlappingInstances</option>. With
-<option>-XIncoherentInstances</option> enabled, it would be accepted and (A) or
+most specific. In that case, the program would be rejected, unless
+<option>-XIncoherentInstances</option> is enabled, in which case it would be accepted and (A) or
 (C) would be chosen arbitrarily.
 </para>
 <para>

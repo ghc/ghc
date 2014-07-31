@@ -1,13 +1,13 @@
 
-{-# LANGUAGE OverlappingInstances, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module ShouldFail where
 
 class Foo a where
   op :: a -> a
 
-instance Foo a => Foo [a] 
-instance Foo [Int]
+instance {-# OVERLAPPABLE #-} Foo a => Foo [a] 
+instance {-# OVERLAPPING #-} Foo [Int]
 
 foo :: Foo a => [a] -> [a]
 foo x = op x

@@ -1,5 +1,5 @@
 {-# LANGUAGE EmptyDataDecls, TypeFamilies, UndecidableInstances,
-             ScopedTypeVariables, OverlappingInstances, TypeOperators,
+             ScopedTypeVariables, TypeOperators,
              FlexibleInstances, NoMonomorphismRestriction,
              MultiParamTypeClasses, FlexibleContexts #-}
 module IndTypesPerfMerge where

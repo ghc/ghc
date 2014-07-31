@@ -1,10 +1,13 @@
 
-<interactive>:12:1:
+P13_A.hs:1:14: Warning:
+    -XOverlappingInstances is deprecated: instead use per-instance pragamas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+<interactive>:11:1:
     Unsafe overlapping instances for Pos [Int]
       arising from a use of ‘res’
     The matching instance is:
-      instance [overlap ok] [safe] Pos [Int]
-        -- Defined at <interactive>:10:10
+      instance [overlapping] [safe] Pos [Int]
+        -- Defined at <interactive>:9:30
     It is compiled in a Safe module and as such can only
     overlap instances from the same module, however it
     overlaps the following instances from different modules:

@@ -462,6 +462,7 @@ hasOverlappableFlag mode =
   case mode of
     Overlappable -> True
     Overlaps     -> True
+    Incoherent   -> True
     _            -> False
 
 hasOverlappingFlag :: OverlapMode -> Bool
@@ -469,57 +470,58 @@ hasOverlappingFlag mode =
   case mode of
     Overlapping  -> True
     Overlaps     -> True
+    Incoherent   -> True
     _            -> False
 
-data OverlapMode
-
-  {- | This instance must not overlap another `NoOverlap` instance.
-  However, it may be overlapped by `Overlapping` instances,
-  and it may overlap `Overlappable` instances. -}
+data OverlapMode  -- See Note [Rules for instance lookup] in InstEnv
   = NoOverlap
+    -- ^ This instance must not overlap another `NoOverlap` instance.
+    -- However, it may be overlapped by `Overlapping` instances,
+    -- and it may overlap `Overlappable` instances.
 
 
-  {- | Silently ignore this instance if you find a
-  more specific one that matches the constraint
-  you are trying to resolve
-
-  Example: constraint (Foo [Int])
-    instance                      Foo [Int]
-    instance {-# OVERLAPPABLE #-} Foo [a]
-
-  Since the second instance has the Overlappable flag,
-  the first instance will be chosen (otherwise
-  its ambiguous which to choose) -}
   | Overlappable
+    -- ^ Silently ignore this instance if you find a
+    -- more specific one that matches the constraint
+    -- you are trying to resolve
+    --
+    -- Example: constraint (Foo [Int])
+    --   instance                      Foo [Int]
+    --   instance {-# OVERLAPPABLE #-} Foo [a]
+    --
+    -- Since the second instance has the Overlappable flag,
+    -- the first instance will be chosen (otherwise
+    -- its ambiguous which to choose)
 
 
-  {- | Silently ignore any more general instances that may be
-       used to solve the constraint.
-
-  Example: constraint (Foo [Int])
-    instance {-# OVERLAPPING #-} Foo [Int]
-    instance                     Foo [a]
-
-  Since the first instance has the Overlapping flag,
-  the second---more general---instance will be ignored (otherwise
-  its ambiguous which to choose) -}
   | Overlapping
+    -- ^ Silently ignore any more general instances that may be
+    --   used to solve the constraint.
+    --
+    -- Example: constraint (Foo [Int])
+    --   instance {-# OVERLAPPING #-} Foo [Int]
+    --   instance                     Foo [a]
+    --
+    -- Since the first instance has the Overlapping flag,
+    -- the second---more general---instance will be ignored (otherwise
+    -- it is ambiguous which to choose)
 
 
-  -- | Equiavalent to having both `Overlapping` and `Overlappable` flags.
   | Overlaps
+    -- ^ Equiavalent to having both `Overlapping` and `Overlappable` flags.
 
-  -- | Silently ignore this instance if you find any other that matches the
-  -- constraing you are trying to resolve, including when checking if there are
-  -- instances that do not match, but unify.
-  --
-  -- Example: constraint (Foo [b])
-  -- instance {-# INCOHERENT -} Foo [Int]
-  -- instance                   Foo [a]
-  -- Without the Incoherent flag, we'd complain that
-  -- instantiating 'b' would change which instance
-  -- was chosen. See also note [Incoherent instances]
   | Incoherent
+    -- ^ Behave like Overlappable and Overlapping, and in addition pick
+    -- an an arbitrary one if there are multiple matching candidates, and
+    -- don't worry about later instantiation
+    --
+    -- Example: constraint (Foo [b])
+    -- instance {-# INCOHERENT -} Foo [Int]
+    -- instance                   Foo [a]
+    -- Without the Incoherent flag, we'd complain that
+    -- instantiating 'b' would change which instance
+    -- was chosen. See also note [Incoherent instances] in InstEnv
+
   deriving (Eq, Data, Typeable)
 
 

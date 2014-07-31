@@ -1,13 +1,13 @@
-{-# LANGUAGE TypeFamilies, FlexibleInstances, OverlappingInstances #-}
+{-# LANGUAGE TypeFamilies, FlexibleInstances #-}
 module T4246 where
 
 class Stupid a where
    type F a
 
-instance Stupid a where
+instance {-# OVERLAPPABLE #-} Stupid a where
    type F a = a
 
-instance Stupid Int where
+instance {-# OVERLAPPING #-} Stupid Int where
    type F Int = Bool
 
 type family G a :: *

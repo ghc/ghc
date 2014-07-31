@@ -12,9 +12,9 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
   axiom T8958.NTCo:Map :: Map k v = [(k, v)]
 INSTANCES
+  instance [incoherent] Nominal a -- Defined at T8958.hs:7:10
   instance [incoherent] Representational a
     -- Defined at T8958.hs:10:10
-  instance [incoherent] Nominal a -- Defined at T8958.hs:7:10
 Dependent modules: []
 Dependent packages: [base, ghc-prim, integer-gmp]
 

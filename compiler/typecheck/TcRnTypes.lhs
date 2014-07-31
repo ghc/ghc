@@ -325,6 +325,9 @@ data TcGblEnv
 #endif /* GHCI */
 
         tcg_ev_binds  :: Bag EvBind,        -- Top-level evidence bindings
+
+        -- Things defined in this module, or (in GHCi) in the interactive package
+        --   For the latter, see Note [The interactive package] in HscTypes
         tcg_binds     :: LHsBinds Id,       -- Value bindings in this module
         tcg_sigs      :: NameSet,           -- ...Top-level names that *lack* a signature
         tcg_imp_specs :: [LTcSpecPrag],     -- ...SPECIALISE prags for imported Ids

@@ -1100,8 +1100,8 @@ appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
 
 Note [The interactive package]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Type and class declarations at the command prompt are treated as if
-they were defined in modules
+Type, class, and value declarations at the command prompt are treated 
+as if they were defined in modules
    interactive:Ghci1
    interactive:Ghci2
    ...etc...
@@ -1151,11 +1151,12 @@ The details are a bit tricky though:
    The 'thisPackage' field stays as 'main' (or whatever -package-name says.
 
  * The main trickiness is that the type environment (tcg_type_env and
-   fixity envt (tcg_fix_env) now contains entities from all the
-   GhciN modules together, rather than just a single module as is usually
-   the case.  So you can't use "nameIsLocalOrFrom" to decide whether
-   to look in the TcGblEnv vs the HPT/PTE.  This is a change, but not
-   a problem provided you know.
+   fixity envt (tcg_fix_env), and instances (tcg_insts, tcg_fam_insts)
+   now contains entities from all the interactive-package modules
+   (Ghci1, Ghci2, ...) together, rather than just a single module as
+   is usually the case.  So you can't use "nameIsLocalOrFrom" to
+   decide whether to look in the TcGblEnv vs the HPT/PTE.  This is a
+   change, but not a problem provided you know.
 
 
 Note [Interactively-bound Ids in GHCi]

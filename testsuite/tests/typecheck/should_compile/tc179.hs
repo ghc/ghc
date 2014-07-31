@@ -1,5 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, FlexibleInstances,
-             OverlappingInstances, UndecidableInstances #-}
+{-# LANGUAGE ExistentialQuantification, FlexibleInstances, UndecidableInstances #-}
 
 -- Tests context reduction for existentials
 
@@ -7,9 +6,9 @@ module TestWrappedNode where
 
 class Foo a where { op :: a -> Int }
 
-instance Foo a => Foo [a] where  	-- NB overlap
+instance {-# OVERLAPPABLE #-} Foo a => Foo [a] where  	-- NB overlap
   op (x:xs) = op x
-instance Foo [Int] where		-- NB overlap
+instance {-# OVERLAPPING #-} Foo [Int] where		-- NB overlap
   op x = 1
 
 data T = forall a. Foo a => MkT a

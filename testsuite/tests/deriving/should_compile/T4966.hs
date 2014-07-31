@@ -2,7 +2,6 @@
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE OverlappingInstances #-}
 
 module HTk.Toolkit.TreeList (getObjectFromTreeList) where
 
@@ -10,7 +9,7 @@ class Eq c => CItem c
 
 -- A bizarre instance decl!
 -- People who use instance decls like this are asking for trouble
-instance GUIObject w => Eq w where
+instance {-# OVERLAPPABLE #-} GUIObject w => Eq w where
   w1 == w2 = toGUIObject w1 == toGUIObject w2
 
 data StateEntry a 
@@ -31,7 +30,7 @@ getObjectFromTreeList state = state == state
 
 data CItem a => TreeListObject a
 
-instance CItem a => Eq (TreeListObject a)
+instance {-# OVERLAPPING #-} CItem a => Eq (TreeListObject a)
 
 class GUIObject w where
   toGUIObject     :: w -> GUIOBJECT

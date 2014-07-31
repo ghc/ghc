@@ -46,7 +46,6 @@ import Coercion
 import CoAxiom
 import VarSet
 import VarEnv
-import Module( isInteractiveModule )
 import Name
 import UniqFM
 import Outputable
@@ -381,23 +380,21 @@ identicalFamInst :: FamInst -> FamInst -> Bool
 -- Same LHS, *and* both instances are on the interactive command line
 -- Used for overriding in GHCi
 identicalFamInst (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
-  =  isInteractiveModule (nameModule (coAxiomName ax1))
-  && isInteractiveModule (nameModule (coAxiomName ax2))
-  && coAxiomTyCon ax1 == coAxiomTyCon ax2
+  =  coAxiomTyCon ax1 == coAxiomTyCon ax2
   && brListLength brs1 == brListLength brs2
-  && and (brListZipWith identical_ax_branch brs1 brs2)
-  where brs1 = coAxiomBranches ax1
-        brs2 = coAxiomBranches ax2
-        identical_ax_branch br1 br2
-          = length tvs1 == length tvs2
-            && length lhs1 == length lhs2
-            && and (zipWith (eqTypeX rn_env) lhs1 lhs2)
-          where
-            tvs1 = coAxBranchTyVars br1
-            tvs2 = coAxBranchTyVars br2
-            lhs1 = coAxBranchLHS br1
-            lhs2 = coAxBranchLHS br2
-            rn_env = rnBndrs2 (mkRnEnv2 emptyInScopeSet) tvs1 tvs2
+  && and (brListZipWith identical_branch brs1 brs2)
+  where
+    brs1 = coAxiomBranches ax1
+    brs2 = coAxiomBranches ax2
+
+    identical_branch br1 br2
+      =  isJust (tcMatchTys tvs1 lhs1 lhs2)
+      && isJust (tcMatchTys tvs2 lhs2 lhs1)
+      where
+        tvs1 = mkVarSet (coAxBranchTyVars br1)
+        tvs2 = mkVarSet (coAxBranchTyVars br2)
+        lhs1 = coAxBranchLHS br1
+        lhs2 = coAxBranchLHS br2
 \end{code}
 
 %************************************************************************

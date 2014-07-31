@@ -1,4 +1,4 @@
-{-# LANGUAGE OverlappingInstances , UndecidableInstances, EmptyDataDecls #-}
+{-# LANGUAGE UndecidableInstances, EmptyDataDecls #-}
 {-# LANGUAGE RankNTypes, KindSignatures, MultiParamTypeClasses, FlexibleInstances #-}
 
 -- Works with new constraint solver

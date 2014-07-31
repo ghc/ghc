@@ -2871,7 +2871,9 @@ xFlags = [
     deprecatedForExtension "MultiParamTypeClasses" ),
   ( "FunctionalDependencies",           Opt_FunctionalDependencies, nop ),
   ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, setGenDeriving ),
-  ( "OverlappingInstances",             Opt_OverlappingInstances, nop ),
+  ( "OverlappingInstances",             Opt_OverlappingInstances, 
+    \ turn_on -> when turn_on
+               $ deprecate "instead use per-instance pragamas OVERLAPPING/OVERLAPPABLE/OVERLAPS" ),
   ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
   ( "IncoherentInstances",              Opt_IncoherentInstances, nop ),
   ( "PackageImports",                   Opt_PackageImports, nop ),
