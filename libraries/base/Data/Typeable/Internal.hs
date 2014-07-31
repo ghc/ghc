@@ -264,13 +264,29 @@ type Typeable7 (a :: * -> * -> * -> * -> * -> * -> * -> *) = Typeable a
 
 -- | Kind-polymorphic Typeable instance for type application
 instance {-# INCOHERENT #-} (Typeable s, Typeable a) => Typeable (s a) where
+         -- See Note [The apparent incoherence of Typable]
   typeRep# = \_ -> rep                  -- Note [Memoising typeOf]
     where !ty1 = typeRep# (proxy# :: Proxy# s)
           !ty2 = typeRep# (proxy# :: Proxy# a)
           !rep = ty1 `mkAppTy` ty2
 
-{- Note [Memoising typeOf]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+{- Note [The apparent incoherence of Typable] See Trac #9242
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The reason we have INCOHERENT here is because we also have instances
+  instance Typeable (x::Nat)
+  instance Typeable (y::Symbol)
+If we have
+  [Wanted] Typeable (a :: Nat)
+
+we should pick the (x::Nat) instance, even though the instance
+matching rules would worry that 'a' might later be instantiated to
+(f b), for some f and b. But we type theorists know that there are no
+type constructors f of kind blah -> Nat, so this can never happen and
+it's safe to pick the second instance.
+
+Note [Memoising typeOf]
+~~~~~~~~~~~~~~~~~~~~~~~
 See #3245, #9203
 
 IMPORTANT: we don't want to recalculate the TypeRep once per call with
@@ -447,6 +463,7 @@ isomorphic to (lifted) `[()]`  and `Symbol` is isomorphic to `[Char]`.
 -}
 
 instance KnownNat n => Typeable (n :: Nat) where
+  -- See Note [The apparent incoherence of Typable]
   -- See #9203 for an explanation of why this is written as `\_ -> rep`.
   typeRep# = \_ -> rep
     where
@@ -464,6 +481,7 @@ instance KnownNat n => Typeable (n :: Nat) where
 
 
 instance KnownSymbol s => Typeable (s :: Symbol) where
+  -- See Note [The apparent incoherence of Typable]
   -- See #9203 for an explanation of why this is written as `\_ -> rep`.
   typeRep# = \_ -> rep
     where
