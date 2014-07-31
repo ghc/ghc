@@ -123,3 +123,4 @@ test('T7321',
 test('T7974', normal, compile, [''])
 test('T7558', normal, compile_fail, [''])
 test('T9096', normal, compile, [''])
+test('T9380', normal, compile_and_run, [''])
