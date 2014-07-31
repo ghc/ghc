@@ -1186,6 +1186,9 @@ canEqTyVar2 dflags ev swapped tv1 xi2 co2
        ; case mb of
            Nothing     -> return ()
            Just new_ev -> emitInsoluble (mkNonCanonical new_ev)
+                          -- If we have a ~ [a], it is not canonical, and in particular
+                          -- we don't want to rewrite existing inerts with it, otherwise
+                          -- we'd risk divergence in the constraint solver
        ; return Stop }
   where
     xi1 = mkTyVarTy tv1
