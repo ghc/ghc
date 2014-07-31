@@ -86,7 +86,7 @@ Overall plan
 \begin{code}
 -- DerivSpec is purely  local to this module
 data DerivSpec theta = DS { ds_loc     :: SrcSpan
-                          , ds_name    :: Name
+                          , ds_name    :: Name           -- DFun name
                           , ds_tvs     :: [TyVar]
                           , ds_theta   :: theta
                           , ds_cls     :: Class
@@ -107,7 +107,7 @@ data DerivSpec theta = DS { ds_loc     :: SrcSpan
         -- the theta is either the given and final theta, in standalone deriving,
         -- or the not-yet-simplified list of constraints together with their origin
 
-        -- ds_newtype = True  <=> Newtype deriving
+        -- ds_newtype = True  <=> Generalised Newtype Deriving (GND)
         --              False <=> Vanilla deriving
 \end{code}
 
@@ -2067,13 +2067,14 @@ the renamer.  What a great hack!
 genInst :: Bool             -- True <=> standalone deriving
         -> OverlapFlag
         -> CommonAuxiliaries
-        -> DerivSpec ThetaType -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
+        -> DerivSpec ThetaType 
+        -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
 genInst standalone_deriv default_oflag comauxs
         spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype, ds_tys = tys
                  , ds_overlap = overlap_mode
-                 , ds_name = name, ds_cls = clas, ds_loc = loc })
-  | is_newtype
+                 , ds_name = dfun_name, ds_cls = clas, ds_loc = loc })
+  | is_newtype   -- See Note [Bindings for Generalised Newtype Deriving]
   = do { inst_spec <- mkInstance oflag theta spec
        ; traceTc "genInst/is_newtype" (vcat [ppr loc, ppr clas, ppr tvs, ppr tys, ppr rhs_ty])
        ; return ( InstInfo
@@ -2089,9 +2090,8 @@ genInst standalone_deriv default_oflag comauxs
               -- See Note [Newtype deriving and unused constructors]
 
   | otherwise
-  = do { fix_env <- getFixityEnv
-       ; (meth_binds, deriv_stuff) <- genDerivStuff (getSrcSpan name)
-                                        fix_env clas name rep_tycon
+  = do { (meth_binds, deriv_stuff) <- genDerivStuff loc clas 
+                                        dfun_name rep_tycon
                                         (lookup rep_tycon comauxs)
        ; inst_spec <- mkInstance oflag theta spec
        ; let inst_info = InstInfo { iSpec   = inst_spec
@@ -2105,49 +2105,45 @@ genInst standalone_deriv default_oflag comauxs
     oflag  = setOverlapModeMaybe default_oflag overlap_mode
     rhs_ty = newTyConInstRhs rep_tycon rep_tc_args
 
-genDerivStuff :: SrcSpan -> FixityEnv -> Class -> Name -> TyCon
+genDerivStuff :: SrcSpan -> Class -> Name -> TyCon
               -> Maybe CommonAuxiliary
               -> TcM (LHsBinds RdrName, BagDerivStuff)
-genDerivStuff loc fix_env clas name tycon comaux_maybe
-  | className clas `elem` oldTypeableClassNames
-  = do dflags <- getDynFlags
-       return (gen_old_Typeable_binds dflags loc tycon, emptyBag)
-
-  | className clas == typeableClassName
-  = do dflags <- getDynFlags
-       return (gen_Typeable_binds dflags loc tycon, emptyBag)
-
-  | ck `elem` [genClassKey, gen1ClassKey]   -- Special case because monadic
-  = let gk =  if ck == genClassKey then Gen0 else Gen1 -- TODO NSF: correctly identify when we're building Both instead of One
+genDerivStuff loc clas dfun_name tycon comaux_maybe
+  | let ck = classKey clas
+  , ck `elem` [genClassKey, gen1ClassKey]   -- Special case because monadic
+  = let gk = if ck == genClassKey then Gen0 else Gen1 
+        -- TODO NSF: correctly identify when we're building Both instead of One
         Just metaTyCons = comaux_maybe -- well-guarded by commonAuxiliaries and genInst
     in do
-      (binds, faminst) <- gen_Generic_binds gk tycon metaTyCons (nameModule name)
+      (binds, faminst) <- gen_Generic_binds gk tycon metaTyCons (nameModule dfun_name)
       return (binds, DerivFamInst faminst `consBag` emptyBag)
 
   | otherwise                      -- Non-monadic generators
   = do dflags <- getDynFlags
-       case assocMaybe (gen_list dflags) (getUnique clas) of
-        Just gen_fn -> return (gen_fn loc tycon)
-        Nothing     -> pprPanic "genDerivStuff: bad derived class" (ppr clas)
-  where
-    ck = classKey clas
-
-    gen_list :: DynFlags
-             -> [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff))]
-    gen_list dflags
-             = [(eqClassKey, gen_Eq_binds)
-               ,(ordClassKey, gen_Ord_binds)
-               ,(enumClassKey, gen_Enum_binds)
-               ,(boundedClassKey, gen_Bounded_binds)
-               ,(ixClassKey, gen_Ix_binds)
-               ,(showClassKey, gen_Show_binds fix_env)
-               ,(readClassKey, gen_Read_binds fix_env)
-               ,(dataClassKey, gen_Data_binds dflags)
-               ,(functorClassKey, gen_Functor_binds)
-               ,(foldableClassKey, gen_Foldable_binds)
-               ,(traversableClassKey, gen_Traversable_binds)
-               ]
+       fix_env <- getFixityEnv
+       return (genDerivedBinds dflags fix_env clas loc tycon)
 \end{code}
+
+Note [Bindings for Generalised Newtype Deriving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider 
+  class Eq a => C a where
+     f :: a -> a
+  newtype N a = MkN [a] deriving( C )
+  instance Eq (N a) where ...
+
+The 'deriving C' clause generates, in effect
+  instance (C [a], Eq a) => C (N a) where
+     f = coerce (f :: [a] -> [a])
+
+This generates a cast for each method, but allows the superclasse to
+be worked out in the usual way.  In this case the superclass (Eq (N
+a)) will be solved by the explicit Eq (N a) instance.  We do *not*
+create the superclasses by casting the superclass dictionaries for the
+representation type.
+
+See the paper "Safe zero-cost coercions for Hsakell".
+
 
 %************************************************************************
 %*                                                                      *

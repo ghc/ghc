@@ -16,20 +16,9 @@ This is where we do all the grimy bindings' generation.
 module TcGenDeriv (
         BagDerivStuff, DerivStuff(..),
 
-        gen_Bounded_binds,
-        gen_Enum_binds,
-        gen_Eq_binds,
-        gen_Ix_binds,
-        gen_Ord_binds,
-        gen_Read_binds,
-        gen_Show_binds,
-        gen_Data_binds,
-        gen_old_Typeable_binds, gen_Typeable_binds,
-        gen_Functor_binds,
+        genDerivedBinds, 
         FFoldType(..), functorLikeTraverse,
         deepSubtypesContaining, foldDataConArgs,
-        gen_Foldable_binds,
-        gen_Traversable_binds,
         mkCoerceClassMethEqn,
         gen_Newtype_binds,
         genAuxBinds,
@@ -75,6 +64,7 @@ import Bag
 import Fingerprint
 import TcEnv (InstInfo)
 
+import ListSetOps( assocMaybe )
 import Data.List ( partition, intersperse )
 \end{code}
 
@@ -101,6 +91,39 @@ data DerivStuff     -- Please add this auxiliary stuff
   | DerivInst (InstInfo RdrName)                -- New, auxiliary instances
 \end{code}
 
+%************************************************************************
+%*                                                                      *
+                Top level function
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+genDerivedBinds :: DynFlags -> FixityEnv -> Class -> SrcSpan -> TyCon
+                -> (LHsBinds RdrName, BagDerivStuff)
+genDerivedBinds dflags fix_env clas loc tycon
+  | className clas `elem` oldTypeableClassNames
+  = gen_old_Typeable_binds dflags loc tycon
+
+  | Just gen_fn <- assocMaybe gen_list (getUnique clas)
+  = gen_fn loc tycon
+
+  | otherwise
+  = pprPanic "genDerivStuff: bad derived class" (ppr clas)
+  where
+    gen_list :: [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff))]
+    gen_list = [ (eqClassKey,          gen_Eq_binds)
+               , (typeableClassKey,    gen_Typeable_binds dflags)
+               , (ordClassKey,         gen_Ord_binds)
+               , (enumClassKey,        gen_Enum_binds)
+               , (boundedClassKey,     gen_Bounded_binds)
+               , (ixClassKey,          gen_Ix_binds)
+               , (showClassKey,        gen_Show_binds fix_env)
+               , (readClassKey,        gen_Read_binds fix_env)
+               , (dataClassKey,        gen_Data_binds dflags)
+               , (functorClassKey,     gen_Functor_binds)
+               , (foldableClassKey,    gen_Foldable_binds)
+               , (traversableClassKey, gen_Traversable_binds) ]
+\end{code}
 
 %************************************************************************
 %*                                                                      *
@@ -1210,13 +1233,15 @@ we generate
 We are passed the Typeable2 class as well as T
 
 \begin{code}
-gen_old_Typeable_binds :: DynFlags -> SrcSpan -> TyCon -> LHsBinds RdrName
+gen_old_Typeable_binds :: DynFlags -> SrcSpan -> TyCon 
+                       -> (LHsBinds RdrName, BagDerivStuff)
 gen_old_Typeable_binds dflags loc tycon
-  = unitBag $
+  = ( unitBag $
         mk_easy_FunBind loc
                 (old_mk_typeOf_RDR tycon)   -- Name of appropriate type0f function
                 [nlWildPat]
                 (nlHsApps oldMkTyConApp_RDR [tycon_rep, nlList []])
+    , emptyBag )
   where
     tycon_name = tyConName tycon
     modl       = nameModule tycon_name
@@ -1270,10 +1295,12 @@ we generate
 We are passed the Typeable2 class as well as T
 
 \begin{code}
-gen_Typeable_binds :: DynFlags -> SrcSpan -> TyCon -> LHsBinds RdrName
+gen_Typeable_binds :: DynFlags -> SrcSpan -> TyCon 
+                   -> (LHsBinds RdrName, BagDerivStuff)
 gen_Typeable_binds dflags loc tycon
-  = unitBag $ mk_easy_FunBind loc typeRep_RDR [nlWildPat]
-              (nlHsApps mkTyConApp_RDR [tycon_rep, nlList []])
+  = ( unitBag $ mk_easy_FunBind loc typeRep_RDR [nlWildPat]
+                (nlHsApps mkTyConApp_RDR [tycon_rep, nlList []])
+    , emptyBag )
   where
     tycon_name = tyConName tycon
     modl       = nameModule tycon_name
