@@ -5062,11 +5062,11 @@ A more precise specification is as follows.
 The willingness to be overlapped or incoherent is a property of
 the <emphasis>instance declaration</emphasis> itself, controlled as follows:
 <itemizedlist>
-<listitem><para>An instance is <emphasis>incoherent</emphasis> if it has an <literal>INCOHERENT</literal> pragama, or if it appears in a module compiled with <literal>-XIncoherentInstances</literal>.
+<listitem><para>An instance is <emphasis>incoherent</emphasis> if it has an <literal>INCOHERENT</literal> pragma, or if it appears in a module compiled with <literal>-XIncoherentInstances</literal>.
 </para></listitem>
-<listitem><para>An instance is <emphasis>overlappable</emphasis> if it has an <literal>OVERLAPPABLE</literal> or <literal>OVERLAPS</literal> pragama, or if it appears in a module compiled with <literal>-XOverlappingInstances</literal>, or if the instance is incoherent.
+<listitem><para>An instance is <emphasis>overlappable</emphasis> if it has an <literal>OVERLAPPABLE</literal> or <literal>OVERLAPS</literal> pragma, or if it appears in a module compiled with <literal>-XOverlappingInstances</literal>, or if the instance is incoherent.
 </para></listitem>
-<listitem><para>An instance is <emphasis>overlapping</emphasis> if it has an <literal>OVERLAPPING</literal> or <literal>OVERLAPS</literal> pragama, or if it appears in a module compiled with <literal>-XOverlappingInstances</literal>, or if the instance is incoherent.
+<listitem><para>An instance is <emphasis>overlapping</emphasis> if it has an <literal>OVERLAPPING</literal> or <literal>OVERLAPS</literal> pragma, or if it appears in a module compiled with <literal>-XOverlappingInstances</literal>, or if the instance is incoherent.
 </para></listitem>
 </itemizedlist>
 The <option>-XOverlappingInstances</option> language extension is now deprecated in favour

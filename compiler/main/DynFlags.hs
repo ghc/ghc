@@ -2873,7 +2873,7 @@ xFlags = [
   ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, setGenDeriving ),
   ( "OverlappingInstances",             Opt_OverlappingInstances, 
     \ turn_on -> when turn_on
-               $ deprecate "instead use per-instance pragamas OVERLAPPING/OVERLAPPABLE/OVERLAPS" ),
+               $ deprecate "instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS" ),
   ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
   ( "IncoherentInstances",              Opt_IncoherentInstances, nop ),
   ( "PackageImports",                   Opt_PackageImports, nop ),

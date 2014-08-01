@@ -508,7 +508,7 @@ data OverlapMode  -- See Note [Rules for instance lookup] in InstEnv
 
 
   | Overlaps
-    -- ^ Equiavalent to having both `Overlapping` and `Overlappable` flags.
+    -- ^ Equivalent to having both `Overlapping` and `Overlappable` flags.
 
   | Incoherent
     -- ^ Behave like Overlappable and Overlapping, and in addition pick
@@ -815,7 +815,7 @@ data InlinePragma            -- Note [InlinePragma]
       , inl_rule   :: RuleMatchInfo  -- Should the function be treated like a constructor?
     } deriving( Eq, Data, Typeable )
 
-data InlineSpec   -- What the user's INLINE pragama looked like
+data InlineSpec   -- What the user's INLINE pragma looked like
   = Inline
   | Inlinable
   | NoInline

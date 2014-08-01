@@ -462,16 +462,16 @@ The willingness to be overlapped or incoherent is a property of the
 instance declaration itself, controlled as follows:
 
  * An instance is "incoherent"
-   if it has an INCOHERENT pragama, or
+   if it has an INCOHERENT pragma, or
    if it appears in a module compiled with -XIncoherentInstances.
 
  * An instance is "overlappable"
-   if it has an OVERLAPPABLE or OVERLAPS pragama, or
+   if it has an OVERLAPPABLE or OVERLAPS pragma, or
    if it appears in a module compiled with -XOverlappingInstances, or
    if the instance is incoherent.
 
  * An instance is "overlapping"
-   if it has an OVERLAPPING or OVERLAPS pragama, or
+   if it has an OVERLAPPING or OVERLAPS pragma, or
    if it appears in a module compiled with -XOverlappingInstances, or
    if the instance is incoherent.
      compiled with -XOverlappingInstances.

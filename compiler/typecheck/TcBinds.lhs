@@ -839,7 +839,7 @@ tcSpec _ prag = pprPanic "tcSpec" (ppr prag)
 
 --------------
 tcImpPrags :: [LSig Name] -> TcM [LTcSpecPrag]
--- SPECIALISE pragamas for imported things
+-- SPECIALISE pragmas for imported things
 tcImpPrags prags
   = do { this_mod <- getModule
        ; dflags <- getDynFlags

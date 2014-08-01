@@ -1,6 +1,6 @@
 
 P13_A.hs:1:14: Warning:
-    -XOverlappingInstances is deprecated: instead use per-instance pragamas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
 
 <interactive>:11:1:
     Unsafe overlapping instances for Pos [Int]
