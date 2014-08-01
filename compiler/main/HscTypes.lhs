@@ -1471,15 +1471,14 @@ mkQualModule :: DynFlags -> QueryQualifyModule
 mkQualModule dflags mod
      | modulePackageKey mod == thisPackage dflags = False
 
-     | [pkgconfig] <- [modConfPkg m | m <- lookup
-                                    , modConfVisible m ],
+     | [(_, pkgconfig)] <- lookup,
        packageConfigId pkgconfig == modulePackageKey mod
         -- this says: we are given a module P:M, is there just one exposed package
         -- that exposes a module M, and is it package P?
      = False
 
      | otherwise = True
-     where lookup = eltsUFM $ lookupModuleInAllPackages dflags (moduleName mod)
+     where lookup = lookupModuleInAllPackages dflags (moduleName mod)
 
 -- | Creates a function for formatting packages based on two heuristics:
 -- (1) don't qualify if the package in question is "main", and (2) only qualify

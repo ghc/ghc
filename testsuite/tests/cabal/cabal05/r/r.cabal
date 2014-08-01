@@ -14,7 +14,7 @@ library
     -- qualified=NO, where=DEP(BOTH), renaming=YES, conflict=NO
     P as RP2,
     -- qualified=NO, where=DEP(BOTH), renaming=YES, conflict=YES
-    P2 as PMerge,
+    P as PMerge,
     -- qualified=YES, where=DEP(ORIG), renaming=YES, conflict=NO
     p:P as RP,
     -- qualified=YES, where=DEP(REEX), renaming=YES, conflict=NO
@@ -28,5 +28,6 @@ library
     -- qualified=YES, where=DEP, renaming=NO, conflict=YES (q)
     q:Q,
     -- qualified=YES, where=DEP(ORIG), renaming=YES, conflict=YES (q)
-    p:P2 as PMerge2
+    p:P2 as PMerge2,
+    P as Conflict
   build-depends:       base, p, q

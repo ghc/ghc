@@ -25,5 +25,6 @@ library
     -- qualified=NO, where=SELF, renaming=YES, conflict=NO
     Q as QQ,
     -- qualified=NO, where=SELF, renaming=YES, conflict=YES (r)
-    Q as QMerge
+    Q as QMerge,
+    P2 as Conflict
   build-depends:       base, p

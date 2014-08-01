@@ -43,7 +43,6 @@ import Maybes           ( expectJust )
 import Exception        ( evaluate )
 
 import Distribution.Text
-import Distribution.Package hiding (PackageKey, mkPackageKey)
 import Data.IORef       ( IORef, writeIORef, readIORef, atomicModifyIORef )
 import System.Directory
 import System.FilePath
@@ -190,46 +189,21 @@ homeSearchCache hsc_env mod_name do_this = do
 findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
                          -> IO FindResult
 findExposedPackageModule hsc_env mod_name mb_pkg
-        -- not found in any package:
-  = case lookupModuleWithSuggestions (hsc_dflags hsc_env) mod_name of
-       Left suggest -> return (NotFound { fr_paths = [], fr_pkg = Nothing
-                                        , fr_pkgs_hidden = []
-                                        , fr_mods_hidden = []
-                                        , fr_suggestions = suggest })
-       Right found'
-         | null found_visible   -- Found, but with no exposed copies
-          -> return (NotFound { fr_paths = [], fr_pkg = Nothing
-                              , fr_pkgs_hidden = pkg_hiddens
-                              , fr_mods_hidden = mod_hiddens
-                              , fr_suggestions = [] })
-
-         | [ModConf mod_name' pkg_conf _ _] <- found_visible -- Found uniquely
-         -> let pkgid = packageConfigId pkg_conf in
-            findPackageModule_ hsc_env (mkModule pkgid mod_name') pkg_conf
-
-         | otherwise           -- Found in more than one place
-         -> return (FoundMultiple (map (packageConfigId.modConfPkg)
-                                       found_visible))
-         where
-           found = eltsUFM found'
-           for_this_pkg  = case mb_pkg of
-                             Nothing -> found
-                             Just p  -> filter ((`matches` p).modConfPkg) found
-           found_visible = filter modConfVisible for_this_pkg
-
-           -- NB: _vis is guaranteed to be False; a non-exposed module
-           -- can never be visible.
-           mod_hiddens = [ packageConfigId pkg_conf
-                         | ModConf _ pkg_conf False _vis <- found ]
-
-           -- NB: We /re-report/ non-exposed modules of hidden packages.
-           pkg_hiddens = [ packageConfigId pkg_conf
-                         | ModConf _ pkg_conf _ False <- found
-                         , not (exposed pkg_conf) ]
-
-           pkg_conf  `matches` pkg
-              = case packageName pkg_conf of
-                  PackageName n -> pkg == mkFastString n
+  = case lookupModuleWithSuggestions (hsc_dflags hsc_env) mod_name mb_pkg of
+     LookupFound m pkg_conf ->
+       findPackageModule_ hsc_env m pkg_conf
+     LookupMultiple rs ->
+       return (FoundMultiple (map (packageConfigId . snd) rs))
+     LookupHidden pkg_hiddens mod_hiddens ->
+       return (NotFound { fr_paths = [], fr_pkg = Nothing
+                        , fr_pkgs_hidden = map (packageConfigId.snd) pkg_hiddens
+                        , fr_mods_hidden = map (packageConfigId.snd) mod_hiddens
+                        , fr_suggestions = [] })
+     LookupNotFound suggest ->
+       return (NotFound { fr_paths = [], fr_pkg = Nothing
+                        , fr_pkgs_hidden = []
+                        , fr_mods_hidden = []
+                        , fr_suggestions = suggest })
 
 modLocationCache :: HscEnv -> Module -> IO FindResult -> IO FindResult
 modLocationCache hsc_env mod do_this = do
@@ -555,7 +529,7 @@ cantFindErr :: LitString -> LitString -> DynFlags -> ModuleName -> FindResult
 cantFindErr _ multiple_found _ mod_name (FoundMultiple pkgs)
   = hang (ptext multiple_found <+> quotes (ppr mod_name) <> colon) 2 (
        sep [ptext (sLit "it was found in multiple packages:"),
-                hsep (map (text.packageKeyString) pkgs)]
+                hsep (map ppr pkgs)]
     )
 cantFindErr cannot_find _ dflags mod_name find_result
   = ptext cannot_find <+> quotes (ppr mod_name)
