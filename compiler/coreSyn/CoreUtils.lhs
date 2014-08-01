@@ -964,7 +964,7 @@ app_ok :: (PrimOp -> Bool) -> Id -> [Expr b] -> Bool
 app_ok primop_ok fun args
   = case idDetails fun of
       DFunId _ new_type ->  not new_type
-         -- DFuns terminate, unless the dict is implemented 
+         -- DFuns terminate, unless the dict is implemented
          -- with a newtype in which case they may not
 
       DataConWorkId {} -> True
@@ -983,14 +983,12 @@ app_ok primop_ok fun args
         -> True
 
         | otherwise
-        -> primop_ok op        -- A bit conservative: we don't really need
-        && all (expr_ok primop_ok) args
-                                  
-                                  -- to care about lazy arguments, but this is easy
+        -> primop_ok op                   -- A bit conservative: we don't really need
+        && all (expr_ok primop_ok) args   -- to care about lazy arguments, but this is easy
 
       _other -> isUnLiftedType (idType fun)          -- c.f. the Var case of exprIsHNF
              || idArity fun > n_val_args             -- Partial apps
-             || (n_val_args == 0 && 
+             || (n_val_args == 0 &&
                  isEvaldUnfolding (idUnfolding fun)) -- Let-bound values
              where
                n_val_args = valArgCount args

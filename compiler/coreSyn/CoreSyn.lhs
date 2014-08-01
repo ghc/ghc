@@ -180,25 +180,8 @@ These data types are the heart of the compiler
 --    /must/ be of lifted type (see "Type#type_classification" for
 --    the meaning of /lifted/ vs. /unlifted/).
 --    
---    #let_app_invariant#
---    The right hand side of of a non-recursive 'Let' 
---    _and_ the argument of an 'App',
---    /may/ be of unlifted type, but only if the expression 
---    is ok-for-speculation.  This means that the let can be floated 
---    around without difficulty. For example, this is OK:
---    
---    > y::Int# = x +# 1#
---    
---    But this is not, as it may affect termination if the 
---    expression is floated out:
---    
---    > y::Int# = fac 4#
---    
---    In this situation you should use @case@ rather than a @let@. The function
---    'CoreUtils.needsCaseBinding' can help you determine which to generate, or
---    alternatively use 'MkCore.mkCoreLet' rather than this constructor directly,
---    which will generate a @case@ if necessary
---    
+--    See Note [CoreSyn let/app invariant]
+--
 --    #type_let#
 --    We allow a /non-recursive/ let to bind a type variable, thus:
 --    
@@ -359,9 +342,28 @@ See #letrec_invariant#
 
 Note [CoreSyn let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See #let_app_invariant#
+The let/app invariant
+     the right hand side of of a non-recursive 'Let', and
+     the argument of an 'App',
+    /may/ be of unlifted type, but only if
+    the expression is ok-for-speculation.
 
-This is intially enforced by DsUtils.mkCoreLet and mkCoreApp
+This means that the let can be floated around
+without difficulty. For example, this is OK:
+
+   y::Int# = x +# 1#
+
+But this is not, as it may affect termination if the
+expression is floated out:
+
+   y::Int# = fac 4#
+
+In this situation you should use @case@ rather than a @let@. The function
+'CoreUtils.needsCaseBinding' can help you determine which to generate, or
+alternatively use 'MkCore.mkCoreLet' rather than this constructor directly,
+which will generate a @case@ if necessary
+
+Th let/app invariant is intially enforced by DsUtils.mkCoreLet and mkCoreApp
 
 Note [CoreSyn case invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
