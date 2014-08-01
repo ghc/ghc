@@ -1476,7 +1476,7 @@ rep2 n xs = do { id <- dsLookupGlobalId n
 
 dataCon' :: Name -> [CoreExpr] -> DsM (Core a)
 dataCon' n args = do { id <- dsLookupDataCon n
-                     ; return $ MkC $ mkConApp id args }
+                     ; return $ MkC $ mkCoreConApps id args }
 
 dataCon :: Name -> DsM (Core a)
 dataCon n = dataCon' n []

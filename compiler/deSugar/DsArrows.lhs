@@ -466,8 +466,8 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf mb_fun cond then_cmd else_cmd)
     left_con   <- dsLookupDataCon leftDataConName
     right_con  <- dsLookupDataCon rightDataConName
 
-    let mk_left_expr ty1 ty2 e = mkConApp left_con [Type ty1, Type ty2, e]
-        mk_right_expr ty1 ty2 e = mkConApp right_con [Type ty1, Type ty2, e]
+    let mk_left_expr ty1 ty2 e = mkCoreConApps left_con   [Type ty1, Type ty2, e]
+        mk_right_expr ty1 ty2 e = mkCoreConApps right_con [Type ty1, Type ty2, e]
 
         in_ty = envStackType env_ids stack_ty
         then_ty = envStackType then_ids stack_ty
