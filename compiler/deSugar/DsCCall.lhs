@@ -236,9 +236,9 @@ boxResult result_ty
 		     _ -> []
 
 	      return_result state anss
-		= mkConApp (tupleCon UnboxedTuple (2 + length extra_result_tys))
-	         	   (map Type (realWorldStatePrimTy : io_res_ty : extra_result_tys)
-			      ++ (state : anss)) 
+		= mkCoreConApps (tupleCon UnboxedTuple (2 + length extra_result_tys))
+	         	        (map Type (realWorldStatePrimTy : io_res_ty : extra_result_tys)
+			         ++ (state : anss)) 
 
 	; (ccall_res_ty, the_alt) <- mk_alt return_result res
 
