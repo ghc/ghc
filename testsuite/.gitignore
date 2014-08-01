@@ -661,6 +661,7 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/ffi/should_run/fptrfail01
 /tests/gadt/CasePrune
 /tests/gadt/Session
+/tests/gadt/T9380
 /tests/gadt/gadt2
 /tests/gadt/gadt23
 /tests/gadt/gadt4
@@ -1142,6 +1143,7 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/perf/should_run/T7954
 /tests/perf/should_run/T876
 /tests/perf/should_run/T9203
+/tests/perf/should_run/T9339
 /tests/perf/should_run/lazy-bs-alloc
 /tests/perf/should_run/lazy-bs-alloc.stats
 /tests/perf/should_run/speed.f32
