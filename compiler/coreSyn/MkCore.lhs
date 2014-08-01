@@ -415,11 +415,16 @@ mkBigCoreTupTy = mkChunkified mkBoxedTupleTy
 %************************************************************************
 
 \begin{code}
-data FloatBind 
+data FloatBind
   = FloatLet  CoreBind
-  | FloatCase CoreExpr Id AltCon [Var]       
+  | FloatCase CoreExpr Id AltCon [Var]
       -- case e of y { C ys -> ... }
       -- See Note [Floating cases] in SetLevels
+
+instance Outputable FloatBind where
+  ppr (FloatLet b) = ptext (sLit "LET") <+> ppr b
+  ppr (FloatCase e b c bs) = hang (ptext (sLit "CASE") <+> ppr e <+> ptext (sLit "of") <+> ppr b)
+                                2 (ppr c <+> ppr bs)
 
 wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
 wrapFloat (FloatLet defns)       body = Let defns body
