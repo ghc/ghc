@@ -1048,7 +1048,6 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
           <para>Output the <literal>ghc-pkg</literal> version number.</para>
         </listitem>
       </varlistentry>
-    </variablelist>
 
       <varlistentry>
         <term>
@@ -1067,7 +1066,7 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
           necessarily holds).</para>
         </listitem>
       </varlistentry>
-
+    </variablelist>
   </sect2>
 
   <sect2 id="building-packages">
