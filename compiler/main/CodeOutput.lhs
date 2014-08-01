@@ -115,7 +115,7 @@ outputC dflags filenm cmm_stream packages
        --   * -#include options from the cmdline and OPTIONS pragmas
        --   * the _stub.h file, if there is one.
        --
-       let rts = getPackageDetails (pkgState dflags) rtsPackageKey
+       let rts = getPackageDetails dflags rtsPackageKey
                        
        let cc_injects = unlines (map mk_include (includes rts))
            mk_include h_file = 
@@ -210,7 +210,7 @@ outputForeignStubs dflags mod location stubs
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes = 
-               let rts_pkg = getPackageDetails (pkgState dflags) rtsPackageKey in
+               let rts_pkg = getPackageDetails dflags rtsPackageKey in
                concatMap mk_include (includes rts_pkg)
             mk_include i = "#include \"" ++ i ++ "\"\n"
 

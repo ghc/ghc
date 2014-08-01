@@ -59,7 +59,6 @@ import Control.Monad
 
 import Data.IORef
 import Data.List
-import qualified Data.Map as Map
 import Control.Concurrent.MVar
 
 import System.FilePath
@@ -1067,9 +1066,6 @@ linkPackages' dflags new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs' }
   where
-     pkg_map = pkgIdMap (pkgState dflags)
-     ipid_map = installedPackageIdMap (pkgState dflags)
-
      link :: [PackageKey] -> [PackageKey] -> IO [PackageKey]
      link pkgs new_pkgs =
          foldM link_one pkgs new_pkgs
@@ -1078,10 +1074,9 @@ linkPackages' dflags new_pks pls = do
         | new_pkg `elem` pkgs   -- Already linked
         = return pkgs
 
-        | Just pkg_cfg <- lookupPackage pkg_map new_pkg
+        | Just pkg_cfg <- lookupPackage dflags new_pkg
         = do {  -- Link dependents first
-               pkgs' <- link pkgs [ Maybes.expectJust "link_one" $
-                                    Map.lookup ipid ipid_map
+               pkgs' <- link pkgs [ resolveInstalledPackageId dflags ipid
                                   | ipid <- depends pkg_cfg ]
                 -- Now link the package itself
              ; linkPackage dflags pkg_cfg

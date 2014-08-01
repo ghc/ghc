@@ -301,9 +301,8 @@ findPackageModule hsc_env mod = do
   let
         dflags = hsc_dflags hsc_env
         pkg_id = modulePackageKey mod
-        pkg_map = pkgIdMap (pkgState dflags)
   --
-  case lookupPackage pkg_map pkg_id of
+  case lookupPackage dflags pkg_id of
      Nothing -> return (NoPackage pkg_id)
      Just pkg_conf -> findPackageModule_ hsc_env mod pkg_conf
 
@@ -562,9 +561,6 @@ cantFindErr cannot_find _ dflags mod_name find_result
   = ptext cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
-    pkg_map :: PackageConfigMap
-    pkg_map = pkgIdMap (pkgState dflags)
-
     more_info
       = case find_result of
             NoPackage pkg
@@ -640,7 +636,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
       where
         (exposed_sugs, hidden_sugs) = partition from_exposed_pkg sugs
 
-    from_exposed_pkg m = case lookupPackage pkg_map (modulePackageKey m) of
+    from_exposed_pkg m = case lookupPackage dflags (modulePackageKey m) of
                             Just pkg_config -> exposed pkg_config
                             Nothing         -> WARN( True, ppr m ) -- Should not happen
                                                False

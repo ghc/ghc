@@ -8,16 +8,20 @@
 module Packages (
         module PackageConfig,
 
-        -- * The PackageConfigMap
-        PackageConfigMap, emptyPackageConfigMap, lookupPackage,
-        extendPackageConfigMap, dumpPackages, simpleDumpPackages,
-
         -- * Reading the package config, and processing cmdline args
-        PackageState(..),
+        PackageState(preloadPackages),
         ModuleConf(..),
         initPackages,
+
+        -- * Querying the package config
+        lookupPackage,
+        resolveInstalledPackageId,
+        searchPackageId,
+        dumpPackages,
+        simpleDumpPackages,
         getPackageDetails,
         lookupModuleInAllPackages, lookupModuleWithSuggestions,
+        listVisibleModuleNames,
 
         -- * Inspecting the set of packages in scope
         getPackageIncludePath,
@@ -144,8 +148,9 @@ data ModuleConf = ModConf {
 -- | Map from 'PackageId' (used for documentation)
 type PackageIdMap = UniqFM
 
--- | Map from 'Module' to 'PackageId' to 'ModuleConf', see 'moduleToPkgConfAll'
-type ModuleToPkgConfAll = UniqFM (PackageIdMap ModuleConf)
+-- | Map from 'ModuleName' to 'PackageId' to 'ModuleConf', see
+-- 'moduleToPkgConfAll'
+type ModuleToPkgConfAll = UniqFM (ModuleName, PackageIdMap ModuleConf)
 
 data PackageState = PackageState {
   pkgIdMap              :: PackageConfigMap, -- PackageKey   -> PackageConfig
@@ -179,10 +184,19 @@ type InstalledPackageIndex = Map InstalledPackageId PackageConfig
 emptyPackageConfigMap :: PackageConfigMap
 emptyPackageConfigMap = emptyUFM
 
--- | Find the package we know about with the given id (e.g. \"foo-1.0\"), if any
-lookupPackage :: PackageConfigMap -> PackageKey -> Maybe PackageConfig
-lookupPackage = lookupUFM
+-- | Find the package we know about with the given key (e.g. @foo_HASH@), if any
+lookupPackage :: DynFlags -> PackageKey -> Maybe PackageConfig
+lookupPackage dflags = lookupPackage' (pkgIdMap (pkgState dflags))
 
+lookupPackage' :: PackageConfigMap -> PackageKey -> Maybe PackageConfig
+lookupPackage' = lookupUFM
+
+-- | Search for packages with a given package ID (e.g. \"foo-0.1\")
+searchPackageId :: DynFlags -> PackageId -> [PackageConfig]
+searchPackageId dflags pid = filter ((pid ==) . sourcePackageId)
+                               (listPackageConfigMap dflags)
+
+-- | Extends the package configuration map with a list of package configs.
 extendPackageConfigMap
    :: PackageConfigMap -> [PackageConfig] -> PackageConfigMap
 extendPackageConfigMap pkg_map new_pkgs
@@ -191,8 +205,19 @@ extendPackageConfigMap pkg_map new_pkgs
 
 -- | Looks up the package with the given id in the package state, panicing if it is
 -- not found
-getPackageDetails :: PackageState -> PackageKey -> PackageConfig
-getPackageDetails ps pid = expectJust "getPackageDetails" (lookupPackage (pkgIdMap ps) pid)
+getPackageDetails :: DynFlags -> PackageKey -> PackageConfig
+getPackageDetails dflags pid =
+    expectJust "getPackageDetails" (lookupPackage dflags pid)
+
+-- | Get a list of entries from the package database.  NB: be careful with
+-- this function, it may not do what you expect it to.
+listPackageConfigMap :: DynFlags -> [PackageConfig]
+listPackageConfigMap dflags = eltsUFM (pkgIdMap (pkgState dflags))
+
+resolveInstalledPackageId :: DynFlags -> InstalledPackageId -> PackageKey
+resolveInstalledPackageId dflags ipid =
+    expectJust "resolveInstalledPackageId"
+        (Map.lookup ipid (installedPackageIdMap (pkgState dflags)))
 
 -- ----------------------------------------------------------------------------
 -- Loading the package db files and building up the package state
@@ -858,7 +883,8 @@ mkPackageState dflags pkgs0 preload0 this_package = do
       -- add base & rts to the preload packages
       basicLinkedPackages
        | gopt Opt_AutoLinkPackages dflags
-          = filter (flip elemUFM pkg_db) [basePackageKey, rtsPackageKey]
+          = filter (flip elemUFM pkg_db)
+                [basePackageKey, rtsPackageKey]
        | otherwise = []
       -- but in any case remove the current package from the set of
       -- preloaded packages so that base/rts does not end up in the
@@ -886,12 +912,16 @@ mkModuleMap
   :: PackageConfigMap
   -> InstalledPackageIdMap
   -> ModuleToPkgConfAll
-mkModuleMap pkg_db ipid_map = foldr extend_modmap emptyUFM pkgids
+mkModuleMap pkg_db ipid_map =
+    foldr extend_modmap emptyUFM (eltsUFM pkg_db)
   where
-    pkgids = map packageConfigId (eltsUFM pkg_db)
-
-    extend_modmap pkgid modmap = addListToUFM_C (plusUFM_C merge) modmap es
-      where -- Invariant: m == m' && pkg == pkg' && e == e'
+    extend_modmap pkg modmap = addListToUFM_C merge0 modmap es
+      where -- Invariant: a == _a'
+            merge0 :: (ModuleName, PackageIdMap ModuleConf)
+                   -> (ModuleName, PackageIdMap ModuleConf)
+                   -> (ModuleName, PackageIdMap ModuleConf)
+            merge0 (a,b) (_a',b') = (a, plusUFM_C merge b b')
+            -- Invariant: m == m' && pkg == pkg' && e == e'
             --              && (e || not (v || v'))
             -- Some notes about the assert. Merging only ever occurs when
             -- we find a reexport.  The interesting condition:
@@ -902,18 +932,18 @@ mkModuleMap pkg_db ipid_map = foldr extend_modmap emptyUFM pkgids
             -- which is why we merge visibility using logical OR.
             merge a b = a { modConfVisible =
                                    modConfVisible a || modConfVisible b }
-            es = [(m, unitUFM pkgid  (ModConf m pkg True (exposed pkg)))
+            es = [(m, (m, unitUFM pkgid  (ModConf m pkg True (exposed pkg))))
                  | m <- exposed_mods] ++
-                 [(m, unitUFM pkgid  (ModConf m pkg False False))
+                 [(m, (m, unitUFM pkgid  (ModConf m pkg False False)))
                  | m <- hidden_mods] ++
-                 [(m, unitUFM pkgid' (ModConf m' pkg' True (exposed pkg)))
+                 [(m, (m, unitUFM pkgid' (ModConf m' pkg' True (exposed pkg))))
                  | ModuleExport{ exportName = m
                                , exportCachedTrueOrig = Just (ipid', m')}
                         <- reexported_mods
                  , Just pkgid' <- [Map.lookup ipid' ipid_map]
                  , let pkg' = pkg_lookup pkgid' ]
-            pkg = pkg_lookup pkgid
-            pkg_lookup = expectJust "mkModuleMap" . lookupPackage pkg_db
+            pkgid = packageConfigId pkg
+            pkg_lookup = expectJust "mkModuleMap" . lookupPackage' pkg_db
             exposed_mods = exposedModules pkg
             reexported_mods = reexportedModules pkg
             hidden_mods  = hiddenModules pkg
@@ -1041,7 +1071,7 @@ lookupModuleWithSuggestions
 lookupModuleWithSuggestions dflags m
   = case lookupUFM (moduleToPkgConfAll pkg_state) m of
         Nothing -> Left suggestions
-        Just ps -> Right ps
+        Just (_, ps) -> Right ps
   where
     pkg_state = pkgState dflags
     suggestions
@@ -1051,10 +1081,14 @@ lookupModuleWithSuggestions dflags m
 
     all_mods :: [(String, Module)]     -- All modules
     all_mods = [ (moduleNameString mod_nm, mkModule pkg_id mod_nm)
-               | pkg_config <- eltsUFM (pkgIdMap pkg_state)
+               | pkg_config <- listPackageConfigMap dflags
                , let pkg_id = packageConfigId pkg_config
                , mod_nm <- exposedModules pkg_config
                         ++ map exportName (reexportedModules pkg_config) ]
+
+listVisibleModuleNames :: DynFlags -> [ModuleName]
+listVisibleModuleNames dflags =
+    map fst (eltsUFM (moduleToPkgConfAll (pkgState dflags)))
 
 -- | Find all the 'PackageConfig' in both the preload packages from 'DynFlags' and corresponding to the list of
 -- 'PackageConfig's
@@ -1068,7 +1102,7 @@ getPreloadPackagesAnd dflags pkgids =
       pairs = zip pkgids (repeat Nothing)
   in do
   all_pkgs <- throwErr dflags (foldM (add_package pkg_map ipid_map) preload pairs)
-  return (map (getPackageDetails state) all_pkgs)
+  return (map (getPackageDetails dflags) all_pkgs)
 
 -- Takes a list of packages, and returns the list with dependencies included,
 -- in reverse dependency order (a package appears before those it depends on).
@@ -1101,7 +1135,7 @@ add_package :: PackageConfigMap
 add_package pkg_db ipid_map ps (p, mb_parent)
   | p `elem` ps = return ps     -- Check if we've already added this package
   | otherwise =
-      case lookupPackage pkg_db p of
+      case lookupPackage' pkg_db p of
         Nothing -> Failed (missingPackageMsg (packageKeyString p) <>
                            missingDependencyMsg mb_parent)
         Just pkg -> do
@@ -1134,7 +1168,7 @@ packageKeyPackageIdString dflags pkg_key
     | pkg_key == mainPackageKey = "main"
     | otherwise = maybe "(unknown)"
                       (display . sourcePackageId)
-                      (lookupPackage (pkgIdMap (pkgState dflags)) pkg_key)
+                      (lookupPackage dflags pkg_key)
 
 -- | Will the 'Name' come from a dynamically linked library?
 isDllName :: DynFlags -> PackageKey -> Module -> Name -> Bool
@@ -1178,11 +1212,10 @@ dumpPackages = dumpPackages' showInstalledPackageInfo
 
 dumpPackages' :: (InstalledPackageInfo -> String) -> DynFlags -> IO ()
 dumpPackages' showIPI dflags
-  = do let pkg_map = pkgIdMap (pkgState dflags)
-       putMsg dflags $
+  = do putMsg dflags $
              vcat (map (text . showIPI
                              . packageConfigToInstalledPackageInfo)
-                       (eltsUFM pkg_map))
+                       (listPackageConfigMap dflags))
 
 -- | Show simplified package info on console, if verbosity == 4.
 -- The idea is to only print package id, and any information that might

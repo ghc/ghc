@@ -1490,15 +1490,14 @@ mkQualPackage dflags pkg_key
         -- Skip the lookup if it's main, since it won't be in the package
         -- database!
      = False
-     | filter ((pkgid ==) . sourcePackageId)
-              (eltsUFM (pkgIdMap (pkgState dflags))) `lengthIs` 1
+     | searchPackageId dflags pkgid `lengthIs` 1
         -- this says: we are given a package pkg-0.1@MMM, are there only one
         -- exposed packages whose package ID is pkg-0.1?
      = False
      | otherwise
      = True
      where pkg = fromMaybe (pprPanic "qual_pkg" (ftext (packageKeyFS pkg_key)))
-                    (lookupPackage (pkgIdMap (pkgState dflags)) pkg_key)
+                    (lookupPackage dflags pkg_key)
            pkgid = sourcePackageId pkg
 
 \end{code}

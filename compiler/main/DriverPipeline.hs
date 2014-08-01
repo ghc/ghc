@@ -411,9 +411,8 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
 
         -- next, check libraries. XXX this only checks Haskell libraries,
         -- not extra_libraries or -l things from the command line.
-        let pkg_map = pkgIdMap (pkgState dflags)
-            pkg_hslibs  = [ (libraryDirs c, lib)
-                          | Just c <- map (lookupPackage pkg_map) pkg_deps,
+        let pkg_hslibs  = [ (libraryDirs c, lib)
+                          | Just c <- map (lookupPackage dflags) pkg_deps,
                             lib <- packageHsLibs dflags c ]
 
         pkg_libfiles <- mapM (uncurry (findHSLib dflags)) pkg_hslibs
@@ -1559,7 +1558,7 @@ mkExtraObj dflags extn xs
  = do cFile <- newTempName dflags extn
       oFile <- newTempName dflags "o"
       writeFile cFile xs
-      let rtsDetails = getPackageDetails (pkgState dflags) rtsPackageKey
+      let rtsDetails = getPackageDetails dflags rtsPackageKey
       SysTools.runCc dflags
                      ([Option        "-c",
                        FileOption "" cFile,

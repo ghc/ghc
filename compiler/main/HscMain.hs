@@ -962,8 +962,7 @@ hscCheckSafe' dflags m l = do
     packageTrusted Sf_Safe         False _ = True
     packageTrusted _ _ m
         | isHomePkg m = True
-        | otherwise   = trusted $ getPackageDetails (pkgState dflags)
-                                                    (modulePackageKey m)
+        | otherwise   = trusted $ getPackageDetails dflags (modulePackageKey m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
@@ -999,7 +998,7 @@ checkPkgTrust dflags pkgs =
     where
         errors = catMaybes $ map go pkgs
         go pkg
-            | trusted $ getPackageDetails (pkgState dflags) pkg
+            | trusted $ getPackageDetails dflags pkg
             = Nothing
             | otherwise
             = Just $ mkErrMsg dflags noSrcSpan (pkgQual dflags)

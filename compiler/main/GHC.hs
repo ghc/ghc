@@ -81,7 +81,7 @@ module GHC (
         SafeHaskellMode(..),
 
         -- * Querying the environment
-        packageDbModules,
+        -- packageDbModules,
 
         -- * Printing
         PrintUnqualified, alwaysQualify,
@@ -1167,6 +1167,7 @@ getGRE = withSession $ \hsc_env-> return $ ic_rn_gbl_env (hsc_IC hsc_env)
 
 -- -----------------------------------------------------------------------------
 
+{- ToDo: Move the primary logic here to compiler/main/Packages.lhs
 -- | Return all /external/ modules available in the package database.
 -- Modules from the current session (i.e., from the 'HomePackageTable') are
 -- not included.  This includes module names which are reexported by packages.
@@ -1183,6 +1184,7 @@ packageDbModules only_exposed = do
      , let pid = packageConfigId p
      , modname <- exposedModules p
                ++ map exportName (reexportedModules p) ]
+               -}
 
 -- -----------------------------------------------------------------------------
 -- Misc exported utils
