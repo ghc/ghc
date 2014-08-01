@@ -404,9 +404,9 @@ Note [primOpOkForSpeculation]
     let-bind a can_fail or has_side_effects primop.  The RHS of a
     let-binding (which can float in and out freely) satisfies
     exprOkForSpeculation.  And exprOkForSpeculation is false of
-    can_fail and no_side_effect.
+    can_fail and has_side_effects.
 
-  * So can_fail and no_side_effect primops will appear only as the
+  * So can_fail and has_side_effects primops will appear only as the
     scrutinees of cases, and that's why the FloatIn pass is capable
     of floating case bindings inwards.
 
@@ -422,10 +422,14 @@ primOpCanFail :: PrimOp -> Bool
 #include "primop-can-fail.hs-incl"
 
 primOpOkForSpeculation :: PrimOp -> Bool
-  -- See Note [primOpOkForSpeculation and primOpOkForFloatOut]
+  -- See Note [primOpOkForSpeculation]
   -- See comments with CoreUtils.exprOkForSpeculation
+  -- primOpOkForSpeculation => primOpOkForSideEffects
 primOpOkForSpeculation op
-  = not (primOpHasSideEffects op || primOpOutOfLine op || primOpCanFail op)
+  =  primOpOkForSideEffects op
+  && not (primOpOutOfLine op || primOpCanFail op)
+    -- I think the "out of line" test is because out of line things can
+    -- be expensive (eg sine, consine), and so we may not want to speculate them
 
 primOpOkForSideEffects :: PrimOp -> Bool
 primOpOkForSideEffects op
