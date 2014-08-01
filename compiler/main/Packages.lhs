@@ -408,24 +408,8 @@ applyPackageFlag
 
 applyPackageFlag dflags unusable pkgs flag =
   case flag of
-    ExposePackage str ->
-       case selectPackages (matchingStr str) pkgs unusable of
-         Left ps         -> packageFlagErr dflags flag ps
-         Right (p:ps,qs) -> return (p':ps')
-          where p' = p {exposed=True}
-                ps' = hideAll (pkgName (sourcePackageId p)) (ps++qs)
-         _ -> panic "applyPackageFlag"
-
-    ExposePackageId str ->
-       case selectPackages (matchingId str) pkgs unusable of
-         Left ps         -> packageFlagErr dflags flag ps
-         Right (p:ps,qs) -> return (p':ps')
-          where p' = p {exposed=True}
-                ps' = hideAll (pkgName (sourcePackageId p)) (ps++qs)
-         _ -> panic "applyPackageFlag"
-
-    ExposePackageKey str ->
-       case selectPackages (matchingKey str) pkgs unusable of
+    ExposePackage arg ->
+       case selectPackages (matching arg) pkgs unusable of
          Left ps         -> packageFlagErr dflags flag ps
          Right (p:ps,qs) -> return (p':ps')
           where p' = p {exposed=True}
@@ -452,7 +436,7 @@ applyPackageFlag dflags unusable pkgs flag =
          Right (ps,qs) -> return (map distrust ps ++ qs)
           where distrust p = p {trusted=False}
 
-    _ -> panic "applyPackageFlag"
+    IgnorePackage _ -> panic "applyPackageFlag: IgnorePackage"
 
    where
         -- When a package is requested to be exposed, we hide all other
@@ -493,6 +477,11 @@ matchingId str p =  InstalledPackageId str == installedPackageId p
 matchingKey :: String -> PackageConfig -> Bool
 matchingKey str p = str == display (packageKey p)
 
+matching :: PackageArg -> PackageConfig -> Bool
+matching (PackageArg str) = matchingStr str
+matching (PackageIdArg str) = matchingId str
+matching (PackageKeyArg str) = matchingKey str
+
 sortByVersion :: [InstalledPackageInfo_ m] -> [InstalledPackageInfo_ m]
 sortByVersion = sortBy (flip (comparing (pkgVersion.sourcePackageId)))
 
@@ -506,7 +495,7 @@ packageFlagErr :: DynFlags
 
 -- for missing DPH package we emit a more helpful error message, because
 -- this may be the result of using -fdph-par or -fdph-seq.
-packageFlagErr dflags (ExposePackage pkg) [] | is_dph_package pkg
+packageFlagErr dflags (ExposePackage (PackageArg pkg)) [] | is_dph_package pkg
   = throwGhcExceptionIO (CmdLineError (showSDoc dflags $ dph_err))
   where dph_err = text "the " <> text pkg <> text " package is not installed."
                   $$ text "To install it: \"cabal install dph\"."
@@ -522,11 +511,13 @@ packageFlagErr dflags flag reasons
         ppr_flag = case flag of
                      IgnorePackage p -> text "-ignore-package " <> text p
                      HidePackage p   -> text "-hide-package " <> text p
-                     ExposePackage p -> text "-package " <> text p
-                     ExposePackageId p -> text "-package-id " <> text p
-                     ExposePackageKey p -> text "-package-key " <> text p
+                     ExposePackage a -> ppr_arg a
                      TrustPackage p    -> text "-trust " <> text p
                      DistrustPackage p -> text "-distrust " <> text p
+        ppr_arg arg = case arg of
+                     PackageArg    p -> text "-package " <> text p
+                     PackageIdArg  p -> text "-package-id " <> text p
+                     PackageKeyArg p -> text "-package-key " <> text p
         ppr_reasons = vcat (map ppr_reason reasons)
         ppr_reason (p, reason) = pprReason (pprIPkg p <+> text "is") reason
 
@@ -831,15 +822,10 @@ mkPackageState dflags pkgs0 preload0 this_package = do
           -- XXX this is just a variant of nub
 
       ipid_map = Map.fromList [ (installedPackageId p, p) | p <- pkgs0 ]
-      -- NB: Prefer the last one (i.e. the one highest in the package stack
-      pk_map = Map.fromList [ (packageConfigId p, p) | p <- pkgs0 ]
 
-      ipid_selected = depClosure ipid_map ([ InstalledPackageId i
-                                           | ExposePackageId i <- flags ]
-                                        ++ [ installedPackageId pkg
-                                           | ExposePackageKey k <- flags
-                                           , Just pkg <- [Map.lookup
-                                                (stringToPackageKey k) pk_map]])
+      ipid_selected = depClosure ipid_map
+                                 [ InstalledPackageId i
+                                 | ExposePackage (PackageIdArg i) <- flags ]
 
       (ignore_flags, other_flags) = partition is_ignore flags
       is_ignore IgnorePackage{} = True
@@ -870,12 +856,10 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   --
   let preload1 = [ installedPackageId p | f <- flags, p <- get_exposed f ]
 
-      get_exposed (ExposePackage   s)
-         = take 1 $ sortByVersion (filter (matchingStr s) pkgs2)
-         --  -package P means "the latest version of P" (#7030)
-      get_exposed (ExposePackageId s) = filter (matchingId  s) pkgs2
-      get_exposed (ExposePackageKey s) = filter (matchingKey s) pkgs2
-      get_exposed _                   = []
+      get_exposed (ExposePackage a) = take 1 . sortByVersion
+                                    . filter (matching a)
+                                    $ pkgs2
+      get_exposed _                 = []
 
   -- hide packages that are subsumed by later versions
   pkgs3 <- hideOldPackages dflags pkgs2

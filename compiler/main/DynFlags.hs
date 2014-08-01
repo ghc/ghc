@@ -43,7 +43,7 @@ module DynFlags (
         targetRetainsAllBindings,
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
-        PackageFlag(..),
+        PackageFlag(..), PackageArg(..),
         PkgConfRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
@@ -1020,10 +1020,13 @@ isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True
 isNoLink _      = False
 
+data PackageArg = PackageArg String
+                | PackageIdArg String
+                | PackageKeyArg String
+  deriving (Eq, Show)
+
 data PackageFlag
-  = ExposePackage   String
-  | ExposePackageId String
-  | ExposePackageKey String
+  = ExposePackage   PackageArg
   | HidePackage     String
   | IgnorePackage   String
   | TrustPackage    String
@@ -3343,13 +3346,20 @@ removeGlobalPkgConf = upd $ \s -> s { extraPkgConfs = filter isNotGlobal . extra
 clearPkgConf :: DynP ()
 clearPkgConf = upd $ \s -> s { extraPkgConfs = const [] }
 
+parsePackageFlag :: (String -> PackageArg) -- type of argument
+                 -> String                 -- string to parse
+                 -> PackageFlag
+parsePackageFlag constr str = ExposePackage (constr str)
+
 exposePackage, exposePackageId, exposePackageKey, hidePackage, ignorePackage,
         trustPackage, distrustPackage :: String -> DynP ()
 exposePackage p = upd (exposePackage' p)
 exposePackageId p =
-  upd (\s -> s{ packageFlags = ExposePackageId p : packageFlags s })
+  upd (\s -> s{ packageFlags =
+    parsePackageFlag PackageIdArg p : packageFlags s })
 exposePackageKey p =
-  upd (\s -> s{ packageFlags = ExposePackageKey p : packageFlags s })
+  upd (\s -> s{ packageFlags =
+    parsePackageFlag PackageKeyArg p : packageFlags s })
 hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p =
@@ -3361,7 +3371,8 @@ distrustPackage p = exposePackage p >>
 
 exposePackage' :: String -> DynFlags -> DynFlags
 exposePackage' p dflags
-    = dflags { packageFlags = ExposePackage p : packageFlags dflags }
+    = dflags { packageFlags =
+            parsePackageFlag PackageArg p : packageFlags dflags }
 
 setPackageKey :: String -> DynFlags -> DynFlags
 setPackageKey p s =  s{ thisPackage = stringToPackageKey p }
