@@ -1,4 +1,10 @@
 
 simpl016.hs:5:1: Warning:
     Forall'd constraint ‘Num b’ is not bound in RULE lhs
-      delta' @ Int @ b $dEq
+      Orig bndrs: [b, $dNum]
+      Orig lhs: let {
+                  $dEq :: Eq Int
+                  [LclId, Str=DmdType]
+                  $dEq = GHC.Classes.$fEqInt } in
+                delta' @ Int @ b $dEq
+      optimised lhs: delta' @ Int @ b $dEq

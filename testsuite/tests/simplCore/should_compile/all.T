@@ -95,7 +95,7 @@ test('EvalTest',
 
 test('T3831', normal, compile, [''])
 test('T4345', normal, compile, [''])
-test('T4398', normal, compile, [''])
+test('T4398', normal, compile, ['-dsuppress-uniques'])
 
 test('T4903',
      extra_clean(['T4903a.hi', 'T4903a.o']),

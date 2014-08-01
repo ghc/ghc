@@ -35,6 +35,7 @@ import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
 import Literal          ( Literal(MachStr) )
 import CoreSubst
+import OccurAnal        ( occurAnalyseExpr )
 import MkCore
 import CoreUtils
 import CoreArity ( etaExpand )
@@ -627,7 +628,9 @@ decomposeRuleLhs orig_bndrs orig_lhs
                               , text "Orig lhs:" <+> ppr orig_lhs])
    dead_msg bndr = hang (sep [ ptext (sLit "Forall'd") <+> pp_bndr bndr
 			     , ptext (sLit "is not bound in RULE lhs")])
-                      2 (ppr lhs2)
+                      2 (vcat [ text "Orig bndrs:" <+> ppr orig_bndrs
+                              , text "Orig lhs:" <+> ppr orig_lhs
+                              , text "optimised lhs:" <+> ppr lhs2 ])
    pp_bndr bndr
     | isTyVar bndr                      = ptext (sLit "type variable") <+> quotes (ppr bndr)
     | Just pred <- evVarPred_maybe bndr = ptext (sLit "constraint") <+> quotes (ppr pred)
@@ -637,8 +640,11 @@ decomposeRuleLhs orig_bndrs orig_lhs
    drop_dicts e 
        = wrap_lets needed bnds body
      where
-       (bnds, body) = split_lets e
        needed = orig_bndr_set `minusVarSet` exprFreeVars body
+       (bnds, body) = split_lets (occurAnalyseExpr e)
+       	   -- The occurAnalyseExpr drops dead bindings which is
+           -- crucial to ensure that every binding is used later;
+           -- which in turn makes wrap_lets work right
 
    split_lets :: CoreExpr -> ([(DictId,CoreExpr)], CoreExpr)
    split_lets e
