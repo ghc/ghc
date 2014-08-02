@@ -33,7 +33,7 @@ import InteractiveUI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 import Config
 import Constants
 import HscTypes
-import Packages         ( dumpPackages, simpleDumpPackages )
+import Packages         ( dumpPackages, simpleDumpPackages, pprModuleMap )
 import DriverPhases
 import BasicTypes       ( failed )
 import StaticFlags
@@ -216,6 +216,11 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   when (verbosity dflags6 >= 3) $ do
         liftIO $ hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
+
+
+  when (dopt Opt_D_dump_mod_map dflags6) . liftIO $
+    printInfoForUser (dflags6 { pprCols = 200 })
+                     (pkgQual dflags6) (pprModuleMap dflags6)
 
         ---------------- Final sanity checking -----------
   liftIO $ checkOptions postLoadMode dflags6 srcs objs

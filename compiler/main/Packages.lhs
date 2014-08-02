@@ -2,7 +2,7 @@
 % (c) The University of Glasgow, 2006
 %
 \begin{code}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 -- | Package manipulation
 module Packages (
@@ -23,6 +23,8 @@ module Packages (
         lookupModuleInAllPackages,
         lookupModuleWithSuggestions,
         LookupResult(..),
+        ModuleSuggestion(..),
+        ModuleOrigin(..),
 
         -- * Inspecting the set of packages in scope
         getPackageIncludePath,
@@ -39,6 +41,8 @@ module Packages (
 
         -- * Utils
         packageKeyPackageIdString,
+        pprFlag,
+        pprModuleMap,
         isDllName
     )
 where
@@ -64,6 +68,7 @@ import Distribution.ModuleExport
 import FastString
 import ErrUtils         ( debugTraceMsg, putMsg, MsgDoc )
 import Exception
+import Unique
 
 import System.Directory
 import System.FilePath as FilePath
@@ -72,6 +77,7 @@ import Control.Monad
 import Data.Char (isSpace)
 import Data.List as List
 import Data.Map (Map)
+import Data.Monoid hiding ((<>))
 import qualified Data.Map as Map
 import qualified FiniteMap as Map
 import qualified Data.Set as Set
@@ -125,46 +131,117 @@ import qualified Data.Set as Set
 -- in a different DLL, by setting the DLL flag.
 
 -- | Given a module name, there may be multiple ways it came into scope,
--- possibly simultaneously (which could lead to ambiguity.)
+-- possibly simultaneously.  This data type tracks all the possible ways
+-- it could have come into scope.  Warning: don't use the record functions,
+-- they're partial!
 data ModuleOrigin =
-    -- | This module name was in the exposed-modules list of a package
-    FromExposedModules PackageConfig
-    -- | This module name was in the hidden-modules list of a package
-  | FromHiddenModules PackageConfig
-    -- | This module name was in the reexported-modules list of a package
-  | FromReexportedModules {
-        theReexporter :: PackageConfig,
-        theOriginal :: PackageConfig
-    }
-  -- FromFlagRenaming
+    -- | Module is hidden, and thus never will be available for import.
+    -- (But maybe the user didn't realize), so we'll still keep track
+    -- of these modules.)
+    ModHidden
+    -- | Module is public, and could have come from some places.
+  | ModOrigin {
+        -- | @Just False@ means that this module is in
+        -- someone's @exported-modules@ list, but that package is hidden;
+        -- @Just True@ means that it is available; @Nothing@ means neither
+        -- applies.
+        fromOrigPackage :: Maybe Bool
+        -- | Is the module available from a reexport of an exposed package?
+        -- There could be multiple.
+      , fromExposedReexport :: [PackageConfig]
+        -- | Is the module available from a reexport of a hidden package?
+      , fromHiddenReexport :: [PackageConfig]
+        -- | Did the module export come from a package flag? (ToDo: track
+        -- more information.
+      , fromPackageFlag :: Bool
+      }
+
+instance Outputable ModuleOrigin where
+    ppr ModHidden = text "hidden module"
+    ppr (ModOrigin e res rhs f) = sep (punctuate comma (
+        (case e of
+            Nothing -> []
+            Just False -> [text "hidden package"]
+            Just True -> [text "exposed package"]) ++
+        (if null res
+            then []
+            else [text "reexport by" <+>
+                    sep (map (ppr . packageConfigId) res)]) ++
+        (if null rhs
+            then []
+            else [text "hidden reexport by" <+>
+                    sep (map (ppr . packageConfigId) res)]) ++
+        (if f then [text "package flag"] else [])
+        ))
+
+-- | Smart constructor for a module which is in @exposed-modules@.  Takes
+-- as an argument whether or not the defining package is exposed.
+fromExposedModules :: Bool -> ModuleOrigin
+fromExposedModules e = ModOrigin (Just e) [] [] False
+
+-- | Smart constructor for a module which is in @reexported-modules@.  Takes
+-- as an argument whether or not the reexporting package is expsed, and
+-- also its 'PackageConfig'.
+fromReexportedModules :: Bool -> PackageConfig -> ModuleOrigin
+fromReexportedModules True pkg = ModOrigin Nothing [pkg] [] False
+fromReexportedModules False pkg = ModOrigin Nothing [] [pkg] False
+
+-- | Smart constructor for a module which was bound by a package flag.
+fromFlag :: ModuleOrigin
+fromFlag = ModOrigin Nothing [] [] True
+
+instance Monoid ModuleOrigin where
+    mempty = ModOrigin Nothing [] [] False
+    mappend (ModOrigin e res rhs f) (ModOrigin e' res' rhs' f') =
+        ModOrigin (g e e') (res ++ res') (rhs ++ rhs') (f || f')
+      where g (Just b) (Just b')
+                | b == b'   = Just b
+                | otherwise = panic "ModOrigin: package both exposed/hidden"
+            g Nothing x = x
+            g x Nothing = x
+    mappend _ _ = panic "ModOrigin: hidden module redefined"
 
 -- | Is the name from the import actually visible? (i.e. does it cause
 -- ambiguity, or is it only relevant when we're making suggestions?)
-originVisible :: ModuleOrigin -> Maybe PackageConfig
-originVisible (FromHiddenModules _) = Nothing
-originVisible (FromExposedModules pkg)
-    | exposed pkg = Just pkg
-    | otherwise = Nothing
-originVisible (FromReexportedModules{ theReexporter = pkg })
-    | exposed pkg = Just pkg
-    | otherwise = Nothing
+originVisible :: ModuleOrigin -> Bool
+originVisible ModHidden = False
+originVisible (ModOrigin b res _ f) = b == Just True || not (null res) || f
+
+-- | Are there actually no providers for this module?  This will never occur
+-- except when we're filtering based on package imports.
+originEmpty :: ModuleOrigin -> Bool
+originEmpty (ModOrigin Nothing [] [] False) = True
+originEmpty _ = False
 
 -- | When we do a plain lookup (e.g. for an import), initially, all we want
 -- to know is if we can find it or not (and if we do and it's a reexport,
 -- what the real name is).  If the find fails, we'll want to investigate more
 -- to give a good error message.
 data SimpleModuleConf =
-    SModConf Module PackageConfig [ModuleOrigin]
+    SModConf Module PackageConfig ModuleOrigin
   | SModConfAmbiguous
 
--- | Map from 'ModuleName'
+-- | 'UniqFM' map from 'ModuleName'
 type ModuleNameMap = UniqFM
 
--- | Map from 'PackageKey'
+-- | 'UniqFM' map from 'PackageKey'
 type PackageKeyMap = UniqFM
 
+-- | 'UniqFM' map from 'PackageKey' to 'PackageConfig'
 type PackageConfigMap = PackageKeyMap PackageConfig
-type ModuleToPkgConfAll = Map ModuleName (Map Module [ModuleOrigin])
+
+-- | 'UniqFM' map from 'PackageKey' to (1) whether or not all modules which
+-- are exposed should be dumped into scope, (2) any custom renamings that
+-- should also be apply, and (3) what package name is associated with the
+-- key, if it might be hidden
+type VisibilityMap =
+    PackageKeyMap (Bool, [(ModuleName, ModuleName)], FastString)
+
+-- | Map from 'ModuleName' to 'Module' to all the origins of the bindings
+-- in scope.  The 'PackageConf' is not cached, mostly for convenience reasons
+-- (since this is the slow path, we'll just look it up again).
+type ModuleToPkgConfAll =
+    Map ModuleName (Map Module ModuleOrigin)
 
 data PackageState = PackageState {
   -- | A mapping of 'PackageKey' to 'PackageConfig'.  This list is adjusted
@@ -196,6 +273,7 @@ data PackageState = PackageState {
 type InstalledPackageIdMap = Map InstalledPackageId PackageKey
 type InstalledPackageIndex = Map InstalledPackageId PackageConfig
 
+-- | Empty package configuration map
 emptyPackageConfigMap :: PackageConfigMap
 emptyPackageConfigMap = emptyUFM
 
@@ -229,6 +307,7 @@ getPackageDetails dflags pid =
 listPackageConfigMap :: DynFlags -> [PackageConfig]
 listPackageConfigMap dflags = eltsUFM (pkgIdMap (pkgState dflags))
 
+-- | Looks up a 'PackageKey' given an 'InstalledPackageId'
 resolveInstalledPackageId :: DynFlags -> InstalledPackageId -> PackageKey
 resolveInstalledPackageId dflags ipid =
     expectJust "resolveInstalledPackageId"
@@ -332,17 +411,12 @@ readPackageConfig dflags conf_file = do
   return pkg_configs2
 
 setBatchPackageFlags :: DynFlags -> [PackageConfig] -> [PackageConfig]
-setBatchPackageFlags dflags pkgs = (maybeDistrustAll . maybeHideAll) pkgs
+setBatchPackageFlags dflags pkgs = maybeDistrustAll pkgs
   where
-    maybeHideAll pkgs'
-      | gopt Opt_HideAllPackages dflags = map hide pkgs'
-      | otherwise                       = pkgs'
-
     maybeDistrustAll pkgs'
       | gopt Opt_DistrustAllPackages dflags = map distrust pkgs'
       | otherwise                           = pkgs'
 
-    hide pkg = pkg{ exposed = False }
     distrust pkg = pkg{ trusted = False }
 
 -- TODO: This code is duplicated in utils/ghc-pkg/Main.hs
@@ -399,70 +473,88 @@ mungePackagePaths top_dir pkgroot pkg =
 -- Modify our copy of the package database based on a package flag
 -- (-package, -hide-package, -ignore-package).
 
+-- | A horrible hack, the problem is the package key we'll turn
+-- up here is going to get edited when we select the wired in
+-- packages, so preemptively pick up the right one.  Also, this elem
+-- test is slow.  The alternative is to change wired in packages first, but
+-- then we are no longer able to match against package keys e.g. from when
+-- a user passes in a package flag.
+calcKey :: PackageConfig -> PackageKey
+calcKey p | pk <- display (pkgName (sourcePackageId p))
+          , pk `elem` wired_in_pkgids
+                      = stringToPackageKey pk
+          | otherwise = packageConfigId p
+
 applyPackageFlag
    :: DynFlags
    -> UnusablePackages
-   -> [PackageConfig]           -- Initial database
+   -> ([PackageConfig], VisibilityMap)           -- Initial database
    -> PackageFlag               -- flag to apply
-   -> IO [PackageConfig]        -- new database
+   -> IO ([PackageConfig], VisibilityMap)        -- new database
 
-applyPackageFlag dflags unusable pkgs flag =
+-- ToDo: Unfortunately, we still have to plumb the package config through,
+-- because Safe Haskell trust is still implemented by modifying the database.
+-- Eventually, track that separately and then axe @[PackageConfig]@ from
+-- this fold entirely
+
+applyPackageFlag dflags unusable (pkgs, vm) flag =
   case flag of
-    ExposePackage arg ->
+    ExposePackage arg m_rns ->
        case selectPackages (matching arg) pkgs unusable of
          Left ps         -> packageFlagErr dflags flag ps
-         Right (p:ps,qs) -> return (p':ps')
-          where p' = p {exposed=True}
-                ps' = hideAll (pkgName (sourcePackageId p)) (ps++qs)
+         Right (p:_,_) -> return (pkgs, vm')
+          where
+           n = fsPackageName p
+           vm' = addToUFM_C edit vm_cleared (calcKey p)
+                              (case m_rns of
+                                   Nothing   -> (True, [], n)
+                                   Just rns' -> (False, map convRn rns', n))
+           edit (b, rns, n) (b', rns', _) = (b || b', rns ++ rns', n)
+           convRn (a,b) = (mkModuleName a, mkModuleName b)
+           -- ToDo: ATM, -hide-all-packages implicitly triggers change in
+           -- behavior, maybe eventually make it toggleable with a separate
+           -- flag
+           vm_cleared | gopt Opt_HideAllPackages dflags = vm
+                      -- NB: -package foo-0.1 (Foo as Foo1) does NOT hide
+                      -- other versions of foo. Presence of renaming means
+                      -- user probably wanted both.
+                      | Just _ <- m_rns = vm
+                      | otherwise = filterUFM_Directly
+                            (\k (_,_,n') -> k == getUnique (calcKey p)
+                                                || n /= n') vm
          _ -> panic "applyPackageFlag"
 
     HidePackage str ->
        case selectPackages (matchingStr str) pkgs unusable of
          Left ps       -> packageFlagErr dflags flag ps
-         Right (ps,qs) -> return (map hide ps ++ qs)
-          where hide p = p {exposed=False}
+         Right (ps,_) -> return (pkgs, vm')
+          where vm' = delListFromUFM vm (map calcKey ps)
 
     -- we trust all matching packages. Maybe should only trust first one?
     -- and leave others the same or set them untrusted
     TrustPackage str ->
        case selectPackages (matchingStr str) pkgs unusable of
          Left ps       -> packageFlagErr dflags flag ps
-         Right (ps,qs) -> return (map trust ps ++ qs)
+         Right (ps,qs) -> return (map trust ps ++ qs, vm)
           where trust p = p {trusted=True}
 
     DistrustPackage str ->
        case selectPackages (matchingStr str) pkgs unusable of
          Left ps       -> packageFlagErr dflags flag ps
-         Right (ps,qs) -> return (map distrust ps ++ qs)
+         Right (ps,qs) -> return (map distrust ps ++ qs, vm)
           where distrust p = p {trusted=False}
 
     IgnorePackage _ -> panic "applyPackageFlag: IgnorePackage"
-
-   where
-        -- When a package is requested to be exposed, we hide all other
-        -- packages with the same name if -hide-all-packages was not specified.
-        -- If it was specified, we expect users to not try to expose a package
-        -- multiple times, so don't hide things.
-        hideAll name ps = map maybe_hide ps
-          where maybe_hide p
-                   | gopt Opt_HideAllPackages dflags     = p
-                   | pkgName (sourcePackageId p) == name = p {exposed=False}
-                   | otherwise                           = p
-
 
 selectPackages :: (PackageConfig -> Bool) -> [PackageConfig]
                -> UnusablePackages
                -> Either [(PackageConfig, UnusablePackageReason)]
                   ([PackageConfig], [PackageConfig])
 selectPackages matches pkgs unusable
-  = let
-        (ps,rest) = partition matches pkgs
-        reasons = [ (p, Map.lookup (installedPackageId p) unusable)
-                  | p <- ps ]
-    in
-    if all (isJust.snd) reasons
-       then Left  [ (p, reason) | (p,Just reason) <- reasons ]
-       else Right (sortByVersion [ p | (p,Nothing) <- reasons ], rest)
+  = let (ps,rest) = partition matches pkgs
+    in if null ps
+        then Left (filter (matches.fst) (Map.elems unusable))
+        else Right (sortByVersion ps, rest)
 
 -- A package named on the command line can either include the
 -- version, or just the name if it is unambiguous.
@@ -495,7 +587,8 @@ packageFlagErr :: DynFlags
 
 -- for missing DPH package we emit a more helpful error message, because
 -- this may be the result of using -fdph-par or -fdph-seq.
-packageFlagErr dflags (ExposePackage (PackageArg pkg)) [] | is_dph_package pkg
+packageFlagErr dflags (ExposePackage (PackageArg pkg) _) []
+  | is_dph_package pkg
   = throwGhcExceptionIO (CmdLineError (showSDoc dflags $ dph_err))
   where dph_err = text "the " <> text pkg <> text " package is not installed."
                   $$ text "To install it: \"cabal install dph\"."
@@ -503,55 +596,36 @@ packageFlagErr dflags (ExposePackage (PackageArg pkg)) [] | is_dph_package pkg
 
 packageFlagErr dflags flag reasons
   = throwGhcExceptionIO (CmdLineError (showSDoc dflags $ err))
-  where err = text "cannot satisfy " <> ppr_flag <>
+  where err = text "cannot satisfy " <> pprFlag flag <>
                 (if null reasons then empty else text ": ") $$
               nest 4 (ppr_reasons $$
                       -- ToDo: this admonition seems a bit dodgy
                       text "(use -v for more information)")
-        ppr_flag = case flag of
-                     IgnorePackage p -> text "-ignore-package " <> text p
-                     HidePackage p   -> text "-hide-package " <> text p
-                     ExposePackage a -> ppr_arg a
-                     TrustPackage p    -> text "-trust " <> text p
-                     DistrustPackage p -> text "-distrust " <> text p
-        ppr_arg arg = case arg of
-                     PackageArg    p -> text "-package " <> text p
-                     PackageIdArg  p -> text "-package-id " <> text p
-                     PackageKeyArg p -> text "-package-key " <> text p
         ppr_reasons = vcat (map ppr_reason reasons)
         ppr_reason (p, reason) = pprReason (pprIPkg p <+> text "is") reason
 
--- -----------------------------------------------------------------------------
--- Hide old versions of packages
-
---
--- hide all packages for which there is also a later version
--- that is already exposed.  This just makes it non-fatal to have two
--- versions of a package exposed, which can happen if you install a
--- later version of a package in the user database, for example.
--- However, don't do this if @-hide-all-packages@ was passed.
---
-hideOldPackages :: DynFlags -> [PackageConfig] -> IO [PackageConfig]
-hideOldPackages dflags pkgs = mapM maybe_hide pkgs
-  where maybe_hide p
-           | gopt Opt_HideAllPackages dflags = return p
-           | not (exposed p) = return p
-           | (p' : _) <- later_versions = do
-                debugTraceMsg dflags 2 $
-                   (ptext (sLit "hiding package") <+> pprSPkg p <+>
-                    ptext (sLit "to avoid conflict with later version") <+>
-                    pprSPkg p')
-                return (p {exposed=False})
-           | otherwise = return p
-          where myname = pkgName (sourcePackageId p)
-                myversion = pkgVersion (sourcePackageId p)
-                later_versions = [ p | p <- pkgs, exposed p,
-                                       let pkg = sourcePackageId p,
-                                       pkgName pkg == myname,
-                                       pkgVersion pkg > myversion ]
+pprFlag :: PackageFlag -> SDoc
+pprFlag flag = case flag of
+    IgnorePackage p -> text "-ignore-package " <> text p
+    HidePackage p   -> text "-hide-package " <> text p
+    ExposePackage a rns -> ppr_arg a <> ppr_rns rns
+    TrustPackage p    -> text "-trust " <> text p
+    DistrustPackage p -> text "-distrust " <> text p
+  where ppr_arg arg = case arg of
+                     PackageArg    p -> text "-package " <> text p
+                     PackageIdArg  p -> text "-package-id " <> text p
+                     PackageKeyArg p -> text "-package-key " <> text p
+        ppr_rns Nothing = empty
+        ppr_rns (Just rns) = char '(' <> hsep (punctuate comma (map ppr_rn rns))
+                                      <> char ')'
+        ppr_rn (orig, new) | orig == new = text orig
+                           | otherwise = text orig <+> text "as" <+> text new
 
 -- -----------------------------------------------------------------------------
 -- Wired-in packages
+
+wired_in_pkgids :: [String]
+wired_in_pkgids = map packageKeyString wiredInPackageKeys
 
 findWiredInPackages
    :: DynFlags
@@ -564,9 +638,6 @@ findWiredInPackages dflags pkgs = do
   -- their canonical names (eg. base-1.0 ==> base).
   --
   let
-        wired_in_pkgids :: [String]
-        wired_in_pkgids = map packageKeyString wiredInPackageKeys
-
         matches :: PackageConfig -> String -> Bool
         pc `matches` pid = display (pkgName (sourcePackageId pc)) == pid
 
@@ -576,9 +647,10 @@ findWiredInPackages dflags pkgs = do
         -- one.
         --
         -- When choosing which package to map to a wired-in package
-        -- name, we prefer exposed packages, and pick the latest
-        -- version.  To override the default choice, -hide-package
-        -- could be used to hide newer versions.
+        -- name, we pick the latest version (modern Cabal makes it difficult
+        -- to install multiple versions of wired-in packages, however!)
+        -- To override the default choice, -ignore-package could be used to
+        -- hide newer versions.
         --
         findWiredInPackage :: [PackageConfig] -> String
                            -> IO (Maybe InstalledPackageId)
@@ -640,7 +712,8 @@ data UnusablePackageReason
   | MissingDependencies [InstalledPackageId]
   | ShadowedBy InstalledPackageId
 
-type UnusablePackages = Map InstalledPackageId UnusablePackageReason
+type UnusablePackages = Map InstalledPackageId
+                            (PackageConfig, UnusablePackageReason)
 
 pprReason :: SDoc -> UnusablePackageReason -> SDoc
 pprReason pref reason = case reason of
@@ -656,7 +729,7 @@ pprReason pref reason = case reason of
 reportUnusable :: DynFlags -> UnusablePackages -> IO ()
 reportUnusable dflags pkgs = mapM_ report (Map.toList pkgs)
   where
-    report (ipid, reason) =
+    report (ipid, (_, reason)) =
        debugTraceMsg dflags 2 $
          pprReason
            (ptext (sLit "package") <+>
@@ -676,7 +749,7 @@ findBroken pkgs = go [] Map.empty pkgs
    go avail ipids not_avail =
      case partitionWith (depsAvailable ipids) not_avail of
         ([], not_avail) ->
-            Map.fromList [ (installedPackageId p, MissingDependencies deps)
+            Map.fromList [ (installedPackageId p, (p, MissingDependencies deps))
                          | (p,deps) <- not_avail ]
         (new_avail, not_avail) ->
             go (new_avail ++ avail) new_ipids (map fst not_avail)
@@ -712,8 +785,8 @@ shadowPackages pkgs preferred
         --
       , ipid_old /= ipid_new
       = if ipid_old `elem` preferred
-           then ( (ipid_new, ShadowedBy ipid_old) : shadowed, pkgmap )
-           else ( (ipid_old, ShadowedBy ipid_new) : shadowed, pkgmap' )
+           then ((ipid_new, (pkg, ShadowedBy ipid_old)) : shadowed, pkgmap)
+           else ((ipid_old, (oldpkg, ShadowedBy ipid_new)) : shadowed, pkgmap')
       | otherwise
       = (shadowed, pkgmap')
       where
@@ -727,7 +800,7 @@ ignorePackages flags pkgs = Map.fromList (concatMap doit flags)
   where
   doit (IgnorePackage str) =
      case partition (matchingStr str) pkgs of
-         (ps, _) -> [ (installedPackageId p, IgnoredWithFlag)
+         (ps, _) -> [ (installedPackageId p, (p, IgnoredWithFlag))
                     | p <- ps ]
         -- missing package is not an error for -ignore-package,
         -- because a common usage is to -ignore-package P as
@@ -825,29 +898,62 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 
       ipid_selected = depClosure ipid_map
                                  [ InstalledPackageId i
-                                 | ExposePackage (PackageIdArg i) <- flags ]
+                                 | ExposePackage (PackageIdArg i) _ <- flags ]
 
       (ignore_flags, other_flags) = partition is_ignore flags
       is_ignore IgnorePackage{} = True
       is_ignore _ = False
 
       shadowed = shadowPackages pkgs0_unique ipid_selected
-
       ignored  = ignorePackages ignore_flags pkgs0_unique
 
-      pkgs0' = filter (not . (`Map.member` (Map.union shadowed ignored)) . installedPackageId) pkgs0_unique
+      isBroken = (`Map.member` (Map.union shadowed ignored)).installedPackageId
+      pkgs0' = filter (not . isBroken) pkgs0_unique
+
       broken   = findBroken pkgs0'
+
       unusable = shadowed `Map.union` ignored `Map.union` broken
+      pkgs1 = filter (not . (`Map.member` unusable) . installedPackageId) pkgs0'
 
   reportUnusable dflags unusable
 
   --
+  -- Calculate the initial set of packages, prior to any package flags.
+  -- This set contains the latest version of all valid (not unusable) packages,
+  -- or is empty if we have -hide-all-packages
+  --
+  let preferLater pkg pkg' =
+        case comparing (pkgVersion.sourcePackageId) pkg pkg' of
+            GT -> pkg
+            _  -> pkg'
+      calcInitial m pkg = addToUFM_C preferLater m (fsPackageName pkg) pkg
+      initial = if gopt Opt_HideAllPackages dflags
+                    then emptyUFM
+                    else foldl' calcInitial emptyUFM pkgs1
+      vis_map0 = foldUFM (\p vm ->
+                            if exposed p
+                               then addToUFM vm (calcKey p)
+                                             (True, [], fsPackageName p)
+                               else vm)
+                         emptyUFM initial
+
+  --
   -- Modify the package database according to the command-line flags
   -- (-package, -hide-package, -ignore-package, -hide-all-packages).
+  -- This needs to know about the unusable packages, since if a user tries
+  -- to enable an unusable package, we should let them know.
   --
-  pkgs1 <- foldM (applyPackageFlag dflags unusable) pkgs0_unique other_flags
-  let pkgs2 = filter (not . (`Map.member` unusable) . installedPackageId) pkgs1
+  (pkgs2, vis_map) <- foldM (applyPackageFlag dflags unusable)
+                            (pkgs1, vis_map0) other_flags
 
+  --
+  -- Sort out which packages are wired in. This has to be done last, since
+  -- it modifies the package keys of wired in packages, but when we process
+  -- package arguments we need to key against the old versions.
+  --
+  pkgs3 <- findWiredInPackages dflags pkgs2
+
+  --
   -- Here we build up a set of the packages mentioned in -package
   -- flags on the command line; these are called the "preload"
   -- packages.  we link these packages in eagerly.  The preload set
@@ -856,21 +962,15 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   --
   let preload1 = [ installedPackageId p | f <- flags, p <- get_exposed f ]
 
-      get_exposed (ExposePackage a) = take 1 . sortByVersion
-                                    . filter (matching a)
-                                    $ pkgs2
+      get_exposed (ExposePackage a _) = take 1 . sortByVersion
+                                      . filter (matching a)
+                                      $ pkgs2
       get_exposed _                 = []
 
-  -- hide packages that are subsumed by later versions
-  pkgs3 <- hideOldPackages dflags pkgs2
-
-  -- sort out which packages are wired in
-  pkgs4 <- findWiredInPackages dflags pkgs3
-
-  let pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs4
+  let pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs3
 
       ipid_map = Map.fromList [ (installedPackageId p, packageConfigId p)
-                              | p <- pkgs4 ]
+                              | p <- pkgs3 ]
 
       lookupIPID ipid@(InstalledPackageId str)
          | Just pid <- Map.lookup ipid ipid_map = return pid
@@ -898,82 +998,115 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   let pstate = PackageState{
     preloadPackages     = dep_preload,
     pkgIdMap            = pkg_db,
-    moduleToPkgConf     = mkModuleToPkgConf pkg_db ipid_map,
-    moduleToPkgConfAll  = mkModuleToPkgConfAll pkg_db ipid_map, -- lazy!
+    moduleToPkgConf     = mkModuleToPkgConf dflags pkg_db ipid_map vis_map,
+    moduleToPkgConfAll  = mkModuleToPkgConfAll dflags pkg_db ipid_map vis_map,
     installedPackageIdMap = ipid_map
     }
-
   return (pstate, new_dep_preload, this_package)
 
 
 -- -----------------------------------------------------------------------------
 -- | Makes the mapping from module to package info
 
--- | Creates the minimal lookup, which is sufficient if we don't need to
--- report errors.
-mkModuleToPkgConf
-  :: PackageConfigMap
+-- | This function is generic; we instantiate it
+mkModuleToPkgConfGeneric
+  :: forall m e.
+     -- Empty map, e.g. the initial state of the output
+     m e
+     -- How to create an entry in the map based on the calculated information
+  -> (PackageKey -> ModuleName -> PackageConfig -> ModuleOrigin -> e)
+     -- How to override the origin of an entry (used for renaming)
+  -> (e -> ModuleOrigin -> e)
+     -- How to incorporate a list of entries into the map
+  -> (m e -> [(ModuleName, e)] -> m e)
+  -- The proper arguments
+  -> DynFlags
+  -> PackageConfigMap
   -> InstalledPackageIdMap
-  -> ModuleNameMap SimpleModuleConf
-mkModuleToPkgConf pkg_db ipid_map =
-    foldl' extend_modmap emptyUFM (eltsUFM pkg_db)
-  where
-    extend_modmap modmap pkg
-        | exposed pkg = addListToUFM_C merge modmap es
-        | otherwise   = modmap
-      where merge (SModConf m pkg o) (SModConf m' _ o')
-                | m == m' = SModConf m pkg (o ++ o')
-                | otherwise = SModConfAmbiguous
-            merge _ _ = SModConfAmbiguous
-            es = [ (m, SModConf (mkModule pk  m ) pkg [FromExposedModules pkg])
-                 | m <- exposed_mods] ++
-                 [ (m, SModConf (mkModule pk' m') pkg' [FromReexportedModules{
-                                                        theReexporter = pkg,
-                                                        theOriginal = pkg'
-                                                       }])
-                 | ModuleExport{ exportName = m
-                               , exportCachedTrueOrig = Just (ipid', m')}
-                        <- reexported_mods
-                 , Just pk' <- [Map.lookup ipid' ipid_map]
-                 , let pkg' = pkg_lookup pk' ]
-            pk = packageConfigId pkg
-            pkg_lookup = expectJust "mkModuleToPkgConf" . lookupPackage' pkg_db
-            exposed_mods = exposedModules pkg
-            reexported_mods = reexportedModules pkg
-
--- | Creates the full lookup, which contains all information we know about
--- modules. Calculate this lazily!  (Note: this will get forced if you use
--- package imports.
-mkModuleToPkgConfAll
-  :: PackageConfigMap
-  -> InstalledPackageIdMap
-  -> ModuleToPkgConfAll
-mkModuleToPkgConfAll pkg_db ipid_map =
-    -- Uses a Map instead of a UniqFM so we don't have to also put
-    -- the keys in the values.
-    foldl' extend_modmap Map.empty (eltsUFM pkg_db)
+  -> VisibilityMap
+  -> m e
+mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
+                         dflags pkg_db ipid_map vis_map =
+    foldl' extend_modmap emptyMap (eltsUFM pkg_db)
  where
-  extend_modmap m pkg = foldl' merge m es
+  extend_modmap modmap pkg = addListTo modmap theBindings
    where
-    merge m' (k, v) = Map.insertWith (Map.unionWith (++)) k v m'
-    sing = Map.singleton
-    es =
-     [(m, sing (mkModule pk m) [FromExposedModules pkg]) | m <- exposed_mods] ++
-     [(m, sing (mkModule pk m) [FromHiddenModules pkg])  | m <- hidden_mods] ++
-     [(m, sing (mkModule pk' m') [FromReexportedModules{ theReexporter = pkg
-                                                       , theOriginal   = pkg'}])
+    theBindings :: [(ModuleName, e)]
+    theBindings | Just (b,rns,_) <- lookupUFM vis_map (packageConfigId pkg)
+                              = newBindings b rns
+                | otherwise   = newBindings False []
+
+    newBindings :: Bool -> [(ModuleName, ModuleName)] -> [(ModuleName, e)]
+    newBindings e rns  = es e ++ hiddens ++ map rnBinding rns
+
+    rnBinding :: (ModuleName, ModuleName) -> (ModuleName, e)
+    rnBinding (orig, new) = (new, setOrigins origEntry fromFlag)
+     where origEntry = case lookupUFM esmap orig of
+            Just r -> r
+            Nothing -> throwGhcException (CmdLineError (showSDoc dflags
+                        (text "package flag: could not find module name" <+>
+                            ppr orig <+> text "in package" <+> ppr pk)))
+
+    es :: Bool -> [(ModuleName, e)]
+    es e =
+     [(m, sing pk  m  pkg  (fromExposedModules e)) | m <- exposed_mods] ++
+     [(m, sing pk' m' pkg' (fromReexportedModules e pkg))
      | ModuleExport{ exportName = m
                    , exportCachedTrueOrig = Just (ipid', m')} <- reexported_mods
-     , let pk' = expectJust "mkModuleToPkgConfAll/i" (Map.lookup ipid' ipid_map)
+     , let pk' = expectJust "mkModuleToPkgConf" (Map.lookup ipid' ipid_map)
            pkg' = pkg_lookup pk' ]
+
+    esmap :: UniqFM e
+    esmap = listToUFM (es False) -- parameter here doesn't matter, orig will
+                                 -- be overwritten
+
+    hiddens = [(m, sing pk m pkg ModHidden) | m <- hidden_mods]
+
     pk = packageConfigId pkg
-    pkg_lookup = expectJust "mkModuleToPkgConfAll" . lookupPackage' pkg_db
+    pkg_lookup = expectJust "mkModuleToPkgConf" . lookupPackage' pkg_db
+
     exposed_mods = exposedModules pkg
     reexported_mods = reexportedModules pkg
-    hidden_mods  = hiddenModules pkg
+    hidden_mods = hiddenModules pkg
 
-pprSPkg :: PackageConfig -> SDoc
-pprSPkg p = text (display (sourcePackageId p))
+-- | This is a quick and efficient module map, which only contains an entry
+-- if it is specified unambiguously.
+mkModuleToPkgConf
+  :: DynFlags
+  -> PackageConfigMap
+  -> InstalledPackageIdMap
+  -> VisibilityMap
+  -> ModuleNameMap SimpleModuleConf
+mkModuleToPkgConf =
+  mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
+    where emptyMap = emptyUFM
+          sing pk m pkg = SModConf (mkModule pk m) pkg
+          -- NB: don't put hidden entries in the map, they're not valid!
+          addListTo m xs = addListToUFM_C merge m (filter isVisible xs)
+          isVisible (_, SModConf _ _ o) = originVisible o
+          isVisible (_, SModConfAmbiguous) = False
+          merge (SModConf m pkg o) (SModConf m' _ o')
+              | m == m' = SModConf m pkg (o `mappend` o')
+              | otherwise = SModConfAmbiguous
+          merge _ _ = SModConfAmbiguous
+          setOrigins (SModConf m pkg _) os = SModConf m pkg os
+          setOrigins SModConfAmbiguous _ = SModConfAmbiguous
+
+-- | This is a slow and complete map, which includes information about
+-- everything, including hidden modules
+mkModuleToPkgConfAll
+  :: DynFlags
+  -> PackageConfigMap
+  -> InstalledPackageIdMap
+  -> VisibilityMap
+  -> ModuleToPkgConfAll
+mkModuleToPkgConfAll =
+  mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
+    where emptyMap = Map.empty
+          sing pk m _ = Map.singleton (mkModule pk m)
+          addListTo = foldl' merge
+          merge m (k, v) = Map.insertWith (Map.unionWith mappend) k v m
+          setOrigins m os = fmap (const os) m
 
 pprIPkg :: PackageConfig -> SDoc
 pprIPkg p = text (display (installedPackageId p))
@@ -1083,7 +1216,9 @@ lookupModuleInAllPackages :: DynFlags
 lookupModuleInAllPackages dflags m
   = case lookupModuleWithSuggestions dflags m Nothing of
       LookupFound a b -> [(a,b)]
-      LookupMultiple rs -> rs
+      LookupMultiple rs -> map f rs
+        where f (m,_) = (m, expectJust "lookupModule" (lookupPackage dflags
+                                                         (modulePackageKey m)))
       _ -> []
 
 -- | The result of performing a lookup
@@ -1091,13 +1226,16 @@ data LookupResult =
     -- | Found the module uniquely, nothing else to do
     LookupFound Module PackageConfig
     -- | Multiple modules with the same name in scope
-  | LookupMultiple [(Module, PackageConfig)]
+  | LookupMultiple [(Module, ModuleOrigin)]
     -- | No modules found, but there were some hidden ones with
     -- an exact name match.  First is due to package hidden, second
     -- is due to module being hidden
-  | LookupHidden [(Module, PackageConfig)] [(Module, PackageConfig)]
+  | LookupHidden [(Module, ModuleOrigin)] [(Module, ModuleOrigin)]
     -- | Nothing found, here are some suggested different names
-  | LookupNotFound [Module] -- suggestions
+  | LookupNotFound [ModuleSuggestion] -- suggestions
+
+data ModuleSuggestion = SuggestVisible ModuleName Module ModuleOrigin
+                      | SuggestHidden ModuleName Module ModuleOrigin
 
 lookupModuleWithSuggestions :: DynFlags
                             -> ModuleName
@@ -1105,55 +1243,71 @@ lookupModuleWithSuggestions :: DynFlags
                             -> LookupResult
 lookupModuleWithSuggestions dflags m mb_pn
   = case lookupUFM (moduleToPkgConf pkg_state) m of
-     Just (SModConf m pkg os) | any (matches mb_pn) os -> LookupFound m pkg
+     Just (SModConf m pkg o) | matches mb_pn pkg o ->
+        ASSERT( originVisible o ) LookupFound m pkg
      _ -> case Map.lookup m (moduleToPkgConfAll pkg_state) of
         Nothing -> LookupNotFound suggestions
-        Just xs0 ->
-          let xs = filter (any (matches mb_pn)) (Map.elems xs0)
-          in case concatMap (selectVisible m) xs of
-                [] -> case [ (mkModule (packageConfigId pkg) m, pkg)
-                           | origin <- concat xs
-                           , mb_pn `matches` origin
-                           , let pkg = extractPackage origin ] of
-                        [] -> LookupNotFound suggestions
-                        rs -> uncurry LookupHidden $ partition (exposed.snd) rs
-                [_] -> panic "lookupModuleWithSuggestions"
-                rs -> LookupMultiple rs
+        Just xs ->
+          case foldl' classify ([],[],[]) (Map.toList xs) of
+            ([], [], []) -> LookupNotFound suggestions
+            -- NB: Yes, we have to check this case too, since package qualified
+            -- imports could cause the main lookup to fail due to ambiguity,
+            -- but the second lookup to succeed.
+            (_, _, [(m, _)])             -> LookupFound m (mod_pkg m)
+            (_, _, exposed@(_:_))        -> LookupMultiple exposed
+            (hidden_pkg, hidden_mod, []) -> LookupHidden hidden_pkg hidden_mod
   where
-    -- ToDo: this will be wrong when we add flag renaming
+    classify (hidden_pkg, hidden_mod, exposed) (m, origin0) =
+      let origin = filterOrigin mb_pn (mod_pkg m) origin0
+          x = (m, origin)
+      in case origin of
+          ModHidden                  -> (hidden_pkg,   x:hidden_mod, exposed)
+          _ | originEmpty origin     -> (hidden_pkg,   hidden_mod,   exposed)
+            | originVisible origin   -> (hidden_pkg,   hidden_mod,   x:exposed)
+            | otherwise              -> (x:hidden_pkg, hidden_mod,   exposed)
 
-    -- NB: ignore the original module; we care about what's user-visible
-    selectVisible mod_nm origins =
-        [ (mkModule (packageConfigId pkg) mod_nm, pkg)
-        | origin <- origins
-        , mb_pn `matches` origin
-        , Just pkg <- [originVisible origin] ]
-
+    pkg_lookup = expectJust "lookupModuleWithSuggestions" . lookupPackage dflags
     pkg_state = pkgState dflags
+    mod_pkg = pkg_lookup . modulePackageKey
+
+    matches Nothing _ _ = True -- shortcut for efficiency
+    matches mb_pn pkg o = originVisible (filterOrigin mb_pn pkg o)
+
+    -- Filters out origins which are not associated with the given package
+    -- qualifier.  No-op if there is no package qualifier.  Test if this
+    -- excluded all origins with 'originEmpty'.
+    filterOrigin :: Maybe FastString
+                 -> PackageConfig
+                 -> ModuleOrigin
+                 -> ModuleOrigin
+    filterOrigin Nothing _ o = o
+    filterOrigin (Just pn) pkg o =
+      case o of
+          ModHidden -> if go pkg then ModHidden else mempty
+          ModOrigin { fromOrigPackage = e, fromExposedReexport = res,
+                      fromHiddenReexport = rhs }
+            -> ModOrigin {
+                  fromOrigPackage = if go pkg then e else Nothing
+                , fromExposedReexport = filter go res
+                , fromHiddenReexport = filter go rhs
+                , fromPackageFlag = False -- always excluded
+                }
+      where go pkg = pn == fsPackageName pkg
 
     suggestions
       | gopt Opt_HelpfulErrors dflags =
            fuzzyLookup (moduleNameString m) all_mods
       | otherwise = []
 
-    all_mods :: [(String, Module)]     -- All modules
-    all_mods =
-        [ (moduleNameString mod_nm, from_mod)
-        | (mod_nm, modmap) <- Map.toList (moduleToPkgConfAll (pkgState dflags))
-        -- NB: ignore the original module; we care about what's user-visible
-        , (_, origins) <- Map.toList modmap
-        -- NB: do *not* filter on mb_pn; user might have passed an incorrect
-        -- package name
-        , from_mod <- map (flip mkModule mod_nm
-                                . packageConfigId . extractPackage) origins ]
-
-    extractPackage (FromExposedModules pkg) = pkg
-    extractPackage (FromHiddenModules pkg) = pkg
-    extractPackage (FromReexportedModules{ theReexporter = pkg }) = pkg
-
-    Nothing `matches` _ = True
-    Just pn `matches` origin = case packageName (extractPackage origin) of
-                                PackageName pn' -> fsLit pn' == pn
+    all_mods :: [(String, ModuleSuggestion)]     -- All modules
+    all_mods = sortBy (comparing fst) $
+        [ (moduleNameString m, suggestion)
+        | (m, e) <- Map.toList (moduleToPkgConfAll (pkgState dflags))
+        , suggestion <- map (getSuggestion m) (Map.toList e)
+        ]
+    getSuggestion name (mod, origin) =
+        (if originVisible origin then SuggestVisible else SuggestHidden)
+            name mod origin
 
 listVisibleModuleNames :: DynFlags -> [ModuleName]
 listVisibleModuleNames dflags =
@@ -1295,5 +1449,19 @@ simpleDumpPackages = dumpPackages' showIPI
                             e = if exposed ipi then "E" else " "
                             t = if trusted ipi then "T" else " "
                         in e ++ t ++ "  " ++ i
+
+-- | Show the mapping of modules to where they come from.
+pprModuleMap :: DynFlags -> SDoc
+pprModuleMap dflags =
+  vcat (map pprLine (Map.toList (moduleToPkgConfAll (pkgState dflags))))
+    where
+      pprLine (m,e) = ppr m $$ nest 50 (vcat (map (pprEntry m) (Map.toList e)))
+      pprEntry m (m',o)
+        | m == moduleName m' = ppr (modulePackageKey m') <+> parens (ppr o)
+        | otherwise = ppr m' <+> parens (ppr o)
+
+fsPackageName :: PackageConfig -> FastString
+fsPackageName pkg = case packageName (sourcePackageId pkg) of
+    PackageName n -> mkFastString n
 
 \end{code}

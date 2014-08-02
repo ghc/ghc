@@ -43,7 +43,7 @@ module DynFlags (
         targetRetainsAllBindings,
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
-        PackageFlag(..), PackageArg(..),
+        PackageFlag(..), PackageArg(..), ModRenaming,
         PkgConfRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
@@ -190,6 +190,8 @@ import Data.Word
 import System.FilePath
 import System.IO
 import System.IO.Error
+import Text.ParserCombinators.ReadP hiding (char)
+import Text.ParserCombinators.ReadP as R
 
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
@@ -269,6 +271,7 @@ data DumpFlag
    | Opt_D_dump_hi
    | Opt_D_dump_hi_diffs
    | Opt_D_dump_mod_cycles
+   | Opt_D_dump_mod_map
    | Opt_D_dump_view_pattern_commoning
    | Opt_D_verbose_core2core
 
@@ -1025,8 +1028,10 @@ data PackageArg = PackageArg String
                 | PackageKeyArg String
   deriving (Eq, Show)
 
+type ModRenaming = Maybe [(String, String)]
+
 data PackageFlag
-  = ExposePackage   PackageArg
+  = ExposePackage   PackageArg ModRenaming
   | HidePackage     String
   | IgnorePackage   String
   | TrustPackage    String
@@ -1633,6 +1638,7 @@ dopt f dflags = (fromEnum f `IntSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_dump_ticked                 = False
           enableIfVerbose Opt_D_dump_view_pattern_commoning = False
           enableIfVerbose Opt_D_dump_mod_cycles             = False
+          enableIfVerbose Opt_D_dump_mod_map                = False
           enableIfVerbose _                                 = True
 
 -- | Set a 'DumpFlag'
@@ -2377,6 +2383,7 @@ dynamic_flags = [
   , Flag "ddump-hpc"               (setDumpFlag Opt_D_dump_ticked) -- back compat
   , Flag "ddump-ticked"            (setDumpFlag Opt_D_dump_ticked)
   , Flag "ddump-mod-cycles"        (setDumpFlag Opt_D_dump_mod_cycles)
+  , Flag "ddump-mod-map"           (setDumpFlag Opt_D_dump_mod_map)
   , Flag "ddump-view-pattern-commoning" (setDumpFlag Opt_D_dump_view_pattern_commoning)
   , Flag "ddump-to-file"           (NoArg (setGeneralFlag Opt_DumpToFile))
   , Flag "ddump-hi-diffs"          (setDumpFlag Opt_D_dump_hi_diffs)
@@ -3349,7 +3356,26 @@ clearPkgConf = upd $ \s -> s { extraPkgConfs = const [] }
 parsePackageFlag :: (String -> PackageArg) -- type of argument
                  -> String                 -- string to parse
                  -> PackageFlag
-parsePackageFlag constr str = ExposePackage (constr str)
+parsePackageFlag constr str = case filter ((=="").snd) (readP_to_S parse str) of
+    [(r, "")] -> r
+    _ -> throwGhcException $ CmdLineError ("Can't parse package flag: " ++ str)
+  where parse = do
+            pkg <- munch1 (\c -> isAlphaNum c || c `elem` ":-_.")
+            (do _ <- tok $ R.char '('
+                rns <- tok $ sepBy parseItem (tok $ R.char ',')
+                _ <- tok $ R.char ')'
+                return (ExposePackage (constr pkg) (Just rns))
+              +++
+             return (ExposePackage (constr pkg) Nothing))
+        parseMod = munch1 (\c -> isAlphaNum c || c `elem` ".")
+        parseItem = do
+            orig <- tok $ parseMod
+            (do _ <- tok $ string "as"
+                new <- tok $ parseMod
+                return (orig, new)
+              +++
+             return (orig, orig))
+        tok m = skipSpaces >> m
 
 exposePackage, exposePackageId, exposePackageKey, hidePackage, ignorePackage,
         trustPackage, distrustPackage :: String -> DynP ()

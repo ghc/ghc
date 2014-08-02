@@ -2461,7 +2461,7 @@ warns if you hide something that the imported module does not export.
 </sect3>
 
 <sect3>
-  <title>Package-qualified imports</title>
+  <title id="package-qualified-imports">Package-qualified imports</title>
 
   <para>With the <option>-XPackageImports</option> flag, GHC allows
   import declarations to be qualified by the package name that the
@@ -2484,7 +2484,9 @@ import "network" Network.Socket
     added mainly so that we can build backwards-compatible versions of
     packages when APIs change.  It can lead to fragile dependencies in
     the common case: modules occasionally move from one package to
-    another, rendering any package-qualified imports broken.</para>
+    another, rendering any package-qualified imports broken.
+    See also <xref linkend="package-thinning-and-renaming" /> for
+    an alternative way of disambiguating between module names.</para>
 </sect3>
 
 <sect3 id="safe-imports-ext">

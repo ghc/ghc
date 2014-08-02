@@ -88,7 +88,11 @@ $ ghc-pkg list
       to expose a hidden package or hide an exposed one.  Only modules
       from exposed packages may be imported by your Haskell code; if
       you try to import a module from a hidden package, GHC will emit
-      an error message.
+      an error message.  If there are a multiple exposed versions of a package,
+      GHC will prefer the latest one.  Additionally, some packages may be
+      broken: that is, they are missing from the package database, or one of
+      their dependencies are broken; in this case; these packages are excluded
+      from the default set of packages.
     </para>
 
     <para>
@@ -137,8 +141,11 @@ exposed-modules: Network.BSD,
             (e.g. <literal>network-1.0</literal>) or the version
             number can be omitted if there is only one version of the
             package installed. If there are multiple versions
-            of <replaceable>P</replaceable> installed, then all other
-            versions will become hidden.</para>
+            of <replaceable>P</replaceable> installed and
+            <option>-hide-all-packages</option> was not specified, then all
+            other versions will become hidden.  <option>-package</option>
+            supports thinning and renaming described in <xref
+            linkend="package-thinning-and-renaming" />.</para>
 
           <para>The <option>-package <replaceable>P</replaceable></option>
             option also causes package <replaceable>P</replaceable> to
@@ -187,6 +194,8 @@ exposed-modules: Network.BSD,
             more robust way to name packages, and can be used to
             select packages that would otherwise be shadowed.  Cabal
             passes <option>-package-id</option> flags to GHC.
+            <option>-package-id</option> supports thinning and renaming
+            described in <xref linkend="package-thinning-and-renaming" />.
           </para>
         </listitem>
       </varlistentry>
@@ -361,6 +370,52 @@ _ZCMain_main_closure
     module name in which it is defined and its name.  In GHC, an
     entity is uniquely defined by a triple: package, module, and
     name.</para>
+  </sect2>
+
+  <sect2 id="package-thinning-and-renaming">
+    <title>Thinning and renaming modules</title>
+
+  <para>When incorporating packages from multiple sources, you may end up
+  in a situation where multiple packages publish modules with the same name.
+  Previously, the only way to distinguish between these modules was to
+  use <xref linkend="package-qualified-imports" />. However, since GHC 7.10,
+  the <option>-package</option> flags (and their variants) have been extended
+  to allow a user to explicitly control what modules a package brings into
+  scope, by analogy to the import lists that users can attach to module imports.
+  </para>
+
+  <para>
+  The basic syntax is that instead of specifying a package name P to the package
+  flag <literal>-package</literal>, instead we specify both a package name and a
+  parenthesized, comma-separated list of module names to import.  For example,
+  <literal>-package "base (Data.List, Data.Bool)"</literal> makes only
+  <literal>Data.List</literal> and <literal>Data.Bool</literal> visible from
+  package <literal>base</literal>.
+  We also support renaming of modules, in case you need to refer to both modules
+  simultaneously; this is supporting by writing <literal>OldModName as
+  NewModName</literal>, e.g. <literal>-package "base (Data.Bool as
+  Bool)</literal>. It's important to specify quotes
+  so that your shell passes the package name and thinning/renaming list as a
+  single argument to GHC.</para>
+
+  <para>Package imports with thinning/renaming do not hide other versions of the
+  package: e.g. if containers-0.9 is already exposed, <literal>-package
+  "containers-0.8 (Data.List as ListV8)"</literal> will only add an additional
+  binding to the environment.  Similarly, <literal>-package "base (Data.Bool as
+  Bool)" -package "base (Data.List as List)"</literal> is equivalent to
+  <literal>-package "base (Data.Bool as Bool, Data.List as List)"</literal>.
+  Literal names must refer to modules defined by the original package, so for
+  example <literal>-package "base (Data.Bool as Bool, Bool as Baz)"</literal> is
+  invalid unless there was a <literal>Bool</literal> module defined in the
+  original package.  Hiding a package also clears all of its renamings.  </para>
+
+  <para>
+  You can use renaming to provide an alternate prelude, e.g.
+  <literal>-hide-all-packages -package "basic-prelude (BasicPrelude as
+  Prelude)"</literal>, in lieu of the <xref
+  linkend="rebindable-syntax">NoImplicitPrelude</xref> extension.
+  </para>
+
   </sect2>
 
   <sect2 id="package-databases">

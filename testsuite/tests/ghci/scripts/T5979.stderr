@@ -1,4 +1,7 @@
 
 <no location info>:
     Could not find module ‘Control.Monad.Trans.State’
-    It is not a module in the current program, or in any known package.
+    Perhaps you meant
+      Control.Monad.Trans.State (from transformers-0.4.1.0@trans_ATJ404cg3uBDx7JJZaSn1I)
+      Control.Monad.Trans.Class (from transformers-0.4.1.0@trans_ATJ404cg3uBDx7JJZaSn1I)
+      Control.Monad.Trans.Cont (from transformers-0.4.1.0@trans_ATJ404cg3uBDx7JJZaSn1I)

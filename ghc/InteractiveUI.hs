@@ -39,7 +39,7 @@ import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName )
 import Module
 import Name
-import Packages ( trusted, getPackageDetails, listVisibleModuleNames )
+import Packages ( trusted, getPackageDetails, listVisibleModuleNames, pprFlag )
 import PprTyThing
 import RdrName ( getGRE_NameQualifier_maybes )
 import SrcLoc
@@ -2333,15 +2333,7 @@ showPackages = do
   let pkg_flags = packageFlags dflags
   liftIO $ putStrLn $ showSDoc dflags $ vcat $
     text ("active package flags:"++if null pkg_flags then " none" else "")
-    : map showFlag pkg_flags
-  where showFlag (ExposePackage a) = text $ showArg a
-        showFlag (HidePackage     p) = text $ "  -hide-package " ++ p
-        showFlag (IgnorePackage   p) = text $ "  -ignore-package " ++ p
-        showFlag (TrustPackage    p) = text $ "  -trust " ++ p
-        showFlag (DistrustPackage p) = text $ "  -distrust " ++ p
-        showArg (PackageArg p) = "  -package " ++ p
-        showArg (PackageIdArg p) = "  -package-id " ++ p
-        showArg (PackageKeyArg p) = "  -package-key " ++ p
+    : map pprFlag pkg_flags
 
 showPaths :: GHCi ()
 showPaths = do

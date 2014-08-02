@@ -891,13 +891,6 @@ hscGetSafe hsc_env m l = runHsc hsc_env $ do
               | otherwise      = pkgs
     return (good, pkgs')
 
--- | A function which only qualifies package names if necessary; but
--- qualifies all other identifiers.
-pkgQual :: DynFlags -> PrintUnqualified
-pkgQual dflags = alwaysQualify {
-        queryQualifyPackage = mkQualPackage dflags
-    }
-
 -- | Is a module trusted? If not, throw or log errors depending on the type.
 -- Return (regardless of trusted or not) if the trust type requires the modules
 -- own package be trusted and a list of other packages required to be trusted

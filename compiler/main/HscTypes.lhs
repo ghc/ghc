@@ -54,7 +54,7 @@ module HscTypes (
         setInteractivePrintName, icInteractiveModule,
         InteractiveImport(..), setInteractivePackage,
         mkPrintUnqualified, pprModulePrefix,
-        mkQualPackage, mkQualModule,
+        mkQualPackage, mkQualModule, pkgQual,
 
         -- * Interfaces
         ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
@@ -637,7 +637,7 @@ data FindResult
         -- ^ The module was found
   | NoPackage PackageKey
         -- ^ The requested package was not found
-  | FoundMultiple [PackageKey]
+  | FoundMultiple [(Module, ModuleOrigin)]
         -- ^ _Error_: both in multiple packages
 
         -- | Not found
@@ -654,7 +654,7 @@ data FindResult
       , fr_pkgs_hidden :: [PackageKey]      -- Module is in these packages,
                                            --   but the *package* is hidden
 
-      , fr_suggestions :: [Module]         -- Possible mis-spelled modules
+      , fr_suggestions :: [ModuleSuggestion] -- Possible mis-spelled modules
       }
 
 -- | Cache that remembers where we found a particular module.  Contains both
@@ -1498,6 +1498,13 @@ mkQualPackage dflags pkg_key
      where pkg = fromMaybe (pprPanic "qual_pkg" (ftext (packageKeyFS pkg_key)))
                     (lookupPackage dflags pkg_key)
            pkgid = sourcePackageId pkg
+
+-- | A function which only qualifies package names if necessary; but
+-- qualifies all other identifiers.
+pkgQual :: DynFlags -> PrintUnqualified
+pkgQual dflags = alwaysQualify {
+        queryQualifyPackage = mkQualPackage dflags
+    }
 
 \end{code}
 
