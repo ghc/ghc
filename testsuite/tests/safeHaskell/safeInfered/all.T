@@ -21,6 +21,11 @@ test('SafeInfered04',
      [ extra_clean(['SafeInfered04_A.hi', 'SafeInfered04_A.o']) ],
      multimod_compile, ['SafeInfered04', ''])
 
+# Test should fail, tests an earlier bug in 7.8
+# test('SafeInfered05',
+#      [ extra_clean(['SafeInfered05_A.hi', 'SafeInfered05_A.o']) ],
+#      multimod_compile_fail, ['SafeInfered05', ''])
+
 # Tests that should fail to compile as they should be infered unsafe
 test('UnsafeInfered01',
      [ extra_clean(['UnsafeInfered01_A.hi', 'UnsafeInfered01_A.o']) ],
