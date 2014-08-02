@@ -295,7 +295,7 @@ import HscMain
 import GhcMake
 import DriverPipeline   ( compileOne' )
 import GhcMonad
-import TcRnMonad        ( finalSafeMode )
+import TcRnMonad        ( finalSafeMode, fixSafeInstances )
 import TcRnTypes
 import Packages
 import NameSet
@@ -887,6 +887,7 @@ typecheckModule pmod = do
                                        hpm_annotations = pm_annotations pmod }
  details <- liftIO $ makeSimpleDetails hsc_env_tmp tc_gbl_env
  safe    <- liftIO $ finalSafeMode (ms_hspp_opts ms) tc_gbl_env
+
  return $
      TypecheckedModule {
        tm_internals_          = (tc_gbl_env, details),
@@ -898,7 +899,7 @@ typecheckModule pmod = do
            minf_type_env  = md_types details,
            minf_exports   = availsToNameSet $ md_exports details,
            minf_rdr_env   = Just (tcg_rdr_env tc_gbl_env),
-           minf_instances = md_insts details,
+           minf_instances = fixSafeInstances safe $ md_insts details,
            minf_iface     = Nothing,
            minf_safe      = safe
 #ifdef GHCI

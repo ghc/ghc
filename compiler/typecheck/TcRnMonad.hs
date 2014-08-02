@@ -1304,6 +1304,13 @@ finalSafeMode dflags tcg_env = do
                 | otherwise                     -> Sf_None
         s -> s
 
+-- | Switch instances to safe instances if we're in Safe mode.
+fixSafeInstances :: SafeHaskellMode -> [ClsInst] -> [ClsInst]
+fixSafeInstances sfMode | sfMode /= Sf_Safe = id
+fixSafeInstances _ = map fixSafe
+  where fixSafe inst = let new_flag = (is_flag inst) { isSafeOverlap = True }
+                       in inst { is_flag = new_flag }
+
 {-
 ************************************************************************
 *                                                                      *

@@ -272,7 +272,7 @@ mkIface_ hsc_env maybe_old_fingerprint
         fixities    = [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
         warns       = src_warns
         iface_rules = map (coreRuleToIfaceRule this_mod) rules
-        iface_insts = map instanceToIfaceInst insts
+        iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode insts
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
         iface_vect_info = flattenVectInfo vect_info
         trust_info  = setSafeMode safe_mode

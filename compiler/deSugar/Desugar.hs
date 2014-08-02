@@ -14,7 +14,7 @@ import DynFlags
 import HscTypes
 import HsSyn
 import TcRnTypes
-import TcRnMonad ( finalSafeMode )
+import TcRnMonad ( finalSafeMode, fixSafeInstances )
 import MkIface
 import Id
 import Name
@@ -179,7 +179,7 @@ deSugar hsc_env
                 mg_warns        = warns,
                 mg_anns         = anns,
                 mg_tcs          = tcs,
-                mg_insts        = insts,
+                mg_insts        = fixSafeInstances safe_mode insts,
                 mg_fam_insts    = fam_insts,
                 mg_inst_env     = inst_env,
                 mg_fam_inst_env = fam_inst_env,
