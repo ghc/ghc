@@ -56,8 +56,11 @@ test('UnsafeInfered11',
      [ extra_clean(['UnsafeInfered11_A.hi', 'UnsafeInfered11_A.o']) ],
      multimod_compile_fail, ['UnsafeInfered11', ''])
 
-# test should fail as unsafe and we made warn unsafe + -Werror
+# Test should fail as unsafe and we made warn unsafe + -Werror
 test('UnsafeInfered12', normal, compile_fail, [''])
+test('UnsafeInfered13', normal, compile_fail, [''])
+test('UnsafeInfered14', normal, compile_fail, [''])
+test('UnsafeInfered15', normal, compile_fail, [''])
 
 # Mixed tests
 test('Mixed01', normal, compile_fail, [''])

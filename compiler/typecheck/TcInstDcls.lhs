@@ -424,6 +424,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        ; when (safeInferOn dflags) $ forM_ local_infos $ \x -> case x of
              _ | typInstCheck x -> recordUnsafeInfer
              _ | genInstCheck x -> recordUnsafeInfer
+             _ | overlapCheck x -> recordUnsafeInfer
              _ -> return ()
 
        ; return ( gbl_env
@@ -450,6 +451,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                          ptext (sLit "Replace the following instance:"))
                      2 (pprInstanceHdr (iSpec i))
 
+    overlapCheck ty = overlapMode (is_flag $ iSpec ty) `elem`
+                        [Overlappable, Overlapping, Overlaps]
     genInstCheck ty = is_cls_nm (iSpec ty) `elem` genericClassNames
     genInstErr i = hang (ptext (sLit $ "Generic instances can only be "
                             ++ "derived in Safe Haskell.") $+$ 
