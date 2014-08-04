@@ -1,0 +1,13 @@
+
+UnsafeInfered16.hs:1:16: Warning:
+    ‘UnsafeInfered15’ has been inferred as unsafe!
+    Reason:
+        UnsafeInfered16.hs:8:30:
+            [overlapping] overlap mode isn't allowed in Safe Haskell
+        UnsafeInfered16.hs:11:27:
+            [overlap ok] overlap mode isn't allowed in Safe Haskell
+        UnsafeInfered16.hs:14:31:
+            [overlappable] overlap mode isn't allowed in Safe Haskell
+
+<no location info>: 
+Failing due to -Werror.

@@ -2,6 +2,8 @@
 UnsafeInfered13.hs:1:16: Warning:
     ‘UnsafeInfered13’ has been inferred as unsafe!
     Reason:
+        UnsafeInfered13.hs:8:27:
+            [overlap ok] overlap mode isn't allowed in Safe Haskell
 
 <no location info>: 
 Failing due to -Werror.
