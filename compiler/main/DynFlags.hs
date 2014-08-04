@@ -774,6 +774,7 @@ data DynFlags = DynFlags {
   thOnLoc               :: SrcSpan,
   newDerivOnLoc         :: SrcSpan,
   overlapInstLoc        :: SrcSpan,
+  incoherentOnLoc       :: SrcSpan,
   pkgTrustOnLoc         :: SrcSpan,
   warnSafeOnLoc         :: SrcSpan,
   warnUnsafeOnLoc       :: SrcSpan,
@@ -1461,6 +1462,7 @@ defaultDynFlags mySettings =
         thOnLoc = noSrcSpan,
         newDerivOnLoc = noSrcSpan,
         overlapInstLoc = noSrcSpan,
+        incoherentOnLoc = noSrcSpan,
         pkgTrustOnLoc = noSrcSpan,
         warnSafeOnLoc = noSrcSpan,
         warnUnsafeOnLoc = noSrcSpan,
@@ -1791,17 +1793,23 @@ combineSafeFlags a b | a == Sf_None         = return b
 --     * function to turn the flag off
 unsafeFlags, unsafeFlagsForInfer
   :: [(String, DynFlags -> SrcSpan, DynFlags -> Bool, DynFlags -> DynFlags)]
-unsafeFlags = [("-XGeneralizedNewtypeDeriving", newDerivOnLoc,
-                   xopt Opt_GeneralizedNewtypeDeriving,
-                   flip xopt_unset Opt_GeneralizedNewtypeDeriving),
-               ("-XTemplateHaskell", thOnLoc,
-                   xopt Opt_TemplateHaskell,
-                   flip xopt_unset Opt_TemplateHaskell)]
+unsafeFlags = [ ("-XGeneralizedNewtypeDeriving", newDerivOnLoc,
+                    xopt Opt_GeneralizedNewtypeDeriving,
+                    flip xopt_unset Opt_GeneralizedNewtypeDeriving)
+              , ("-XTemplateHaskell", thOnLoc,
+                    xopt Opt_TemplateHaskell,
+                    flip xopt_unset Opt_TemplateHaskell)
+              ]
 unsafeFlagsForInfer = unsafeFlags ++
               -- TODO: Can we do better than this for inference?
-              [("-XOverlappingInstances", overlapInstLoc,
+              [ ("-XOverlappingInstances", overlapInstLoc,
                   xopt Opt_OverlappingInstances,
-                  flip xopt_unset Opt_OverlappingInstances)]
+                  flip xopt_unset Opt_OverlappingInstances)
+              , ("-XIncoherentInstances", incoherentOnLoc,
+                  xopt Opt_IncoherentInstances,
+                  flip xopt_unset Opt_IncoherentInstances)
+              ]
+
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
@@ -2881,7 +2889,7 @@ xFlags = [
   ( "ImplicitParams",                   Opt_ImplicitParams, nop ),
   ( "ImplicitPrelude",                  Opt_ImplicitPrelude, nop ),
   ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop),
-  ( "IncoherentInstances",              Opt_IncoherentInstances, nop ),
+  ( "IncoherentInstances",              Opt_IncoherentInstances, setIncoherentInsts  ),
   ( "InstanceSigs",                     Opt_InstanceSigs, nop ),
   ( "InterruptibleFFI",                 Opt_InterruptibleFFI, nop ),
   ( "JavaScriptFFI",                    Opt_JavaScriptFFI, nop ),
@@ -2904,9 +2912,7 @@ xFlags = [
   ( "NullaryTypeClasses",               Opt_NullaryTypeClasses,
                         deprecatedForExtension "MultiParamTypeClasses" ),
   ( "NumDecimals",                      Opt_NumDecimals, nop),
-  ( "OverlappingInstances",             Opt_OverlappingInstances,
-        \ turn_on -> when turn_on
-             $ deprecate "instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS" ),
+  ( "OverlappingInstances",             Opt_OverlappingInstances, setOverlappingInsts),
   ( "OverloadedLists",                  Opt_OverloadedLists, nop),
   ( "OverloadedStrings",                Opt_OverloadedStrings, nop ),
   ( "PackageImports",                   Opt_PackageImports, nop ),
@@ -3225,6 +3231,19 @@ setPackageTrust = do
 setGenDeriving :: TurnOnFlag -> DynP ()
 setGenDeriving True  = getCurLoc >>= \l -> upd (\d -> d { newDerivOnLoc = l })
 setGenDeriving False = return ()
+
+setOverlappingInsts :: TurnOnFlag -> DynP ()
+setOverlappingInsts False = return ()
+setOverlappingInsts True = do
+  l <- getCurLoc
+  upd (\d -> d { overlapInstLoc = l })
+  deprecate "instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS"
+
+setIncoherentInsts :: TurnOnFlag -> DynP ()
+setIncoherentInsts False = return ()
+setIncoherentInsts True = do
+  l <- getCurLoc
+  upd (\d -> d { incoherentOnLoc = l })
 
 checkTemplateHaskellOk :: TurnOnFlag -> DynP ()
 #ifdef GHCI

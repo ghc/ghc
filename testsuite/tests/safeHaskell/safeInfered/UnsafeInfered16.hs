@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fwarn-unsafe -Werror #-}
 {-# LANGUAGE FlexibleInstances #-}
-module UnsafeInfered15 where
+module UnsafeInfered16 where
 
 class C a where
   f :: a -> String
