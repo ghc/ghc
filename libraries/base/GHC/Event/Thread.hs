@@ -39,6 +39,7 @@ import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
 import qualified GHC.Event.Manager as M
 import qualified GHC.Event.TimerManager as TM
 import GHC.Num ((-), (+))
+import GHC.Show (showSignedInt)
 import System.IO.Unsafe (unsafePerformIO)
 import System.Posix.Types (Fd)
 
@@ -244,11 +245,14 @@ startIOManagerThreads =
     forM_ [0..high] (startIOManagerThread eventManagerArray)
     writeIORef numEnabledEventManagers (high+1)
 
+show_int :: Int -> String
+show_int i = showSignedInt 0 i ""
+
 restartPollLoop :: EventManager -> Int -> IO ThreadId
 restartPollLoop mgr i = do
   M.release mgr
   !t <- forkOn i $ loop mgr
-  labelThread t "IOManager"
+  labelThread t ("IOManager on cap " ++ show_int i)
   return t
 
 startIOManagerThread :: IOArray Int (Maybe (ThreadId, EventManager))
@@ -258,7 +262,7 @@ startIOManagerThread eventManagerArray i = do
   let create = do
         !mgr <- new True
         !t <- forkOn i $ loop mgr
-        labelThread t "IOManager"
+        labelThread t ("IOManager on cap " ++ show_int i)
         writeIOArray eventManagerArray i (Just (t,mgr))
   old <- readIOArray eventManagerArray i
   case old of
