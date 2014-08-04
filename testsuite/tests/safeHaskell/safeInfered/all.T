@@ -64,6 +64,7 @@ test('UnsafeInfered13', normal, compile_fail, [''])
 test('UnsafeInfered14', normal, compile_fail, [''])
 test('UnsafeInfered15', normal, compile_fail, [''])
 test('UnsafeInfered16', normal, compile_fail, [''])
+test('UnsafeInfered17', normal, compile_fail, [''])
 
 # Mixed tests
 test('Mixed01', normal, compile_fail, [''])
