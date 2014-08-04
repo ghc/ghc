@@ -152,7 +152,8 @@ test('topHandler03',
      [when(opsys('mingw32'), skip),
       # As above, shells, grrr.
       ignore_output,
-      exit_code(143)  # actually signal 15 SIGTERM
+      when(opsys('solaris2'), exit_code(15)), # Solaris signals 15 correctly
+      when(not opsys('solaris2'), exit_code(143)) # actually signal 15 SIGTERM
      ], compile_and_run, [''])
 
 
