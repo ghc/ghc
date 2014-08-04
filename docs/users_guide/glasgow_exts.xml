@@ -10805,7 +10805,7 @@ data T = T {-# NOUNPACK #-} !(Int,Int)
 </sect2>
 
 <sect2 id="overlap-pragma">
-<title>OVERLAPPINGP, OVERLAPPABLE, OVERLAPS, and INCOHERENT pragmas</title>
+<title>OVERLAPPING, OVERLAPPABLE, OVERLAPS, and INCOHERENT pragmas</title>
 <para>
 The pragmas
   <literal>OVERLAPPING</literal>,
