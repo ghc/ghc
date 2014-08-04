@@ -286,7 +286,7 @@ endif
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 ifeq "$$($1_$2_INSTALL_INPLACE)" "YES"
 $$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG_INPLACE) | $$$$(dir $$$$@)/.
-	"$$(CP)" -p $$< $$@
+	$$(INSTALL) -m 755 $$< $$@
 endif
 endif
 
