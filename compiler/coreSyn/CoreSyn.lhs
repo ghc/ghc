@@ -1217,8 +1217,9 @@ mkDoubleLitDouble :: Double -> Expr b
 mkDoubleLit       d = Lit (mkMachDouble d)
 mkDoubleLitDouble d = Lit (mkMachDouble (toRational d))
 
--- | Bind all supplied binding groups over an expression in a nested let expression. Prefer to
--- use 'MkCore.mkCoreLets' if possible
+-- | Bind all supplied binding groups over an expression in a nested let expression. Assumes
+-- that the rhs satisfies the let/app invariant.  Prefer to use 'MkCore.mkCoreLets' if
+-- possible, which does guarantee the invariant
 mkLets	      :: [Bind b] -> Expr b -> Expr b
 -- | Bind all supplied binders over an expression in a nested lambda expression. Prefer to
 -- use 'MkCore.mkCoreLams' if possible

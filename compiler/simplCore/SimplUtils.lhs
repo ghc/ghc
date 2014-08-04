@@ -854,6 +854,10 @@ the former.
 
 \begin{code}
 preInlineUnconditionally :: DynFlags -> SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
+-- Precondition: rhs satisfies the let/app invariant
+-- See Note [CoreSyn let/app invariant] in CoreSyn
+-- Reason: we don't want to inline single uses, or discard dead bindings,
+--         for unlifted, side-effect-full bindings
 preInlineUnconditionally dflags env top_lvl bndr rhs
   | not active                               = False
   | isStableUnfolding (idUnfolding bndr)     = False -- Note [InlineRule and preInlineUnconditionally]
@@ -963,6 +967,10 @@ postInlineUnconditionally
     -> OutExpr
     -> Unfolding
     -> Bool
+-- Precondition: rhs satisfies the let/app invariant
+-- See Note [CoreSyn let/app invariant] in CoreSyn
+-- Reason: we don't want to inline single uses, or discard dead bindings,
+--         for unlifted, side-effect-full bindings
 postInlineUnconditionally dflags env top_lvl bndr occ_info rhs unfolding
   | not active                  = False
   | isWeakLoopBreaker occ_info  = False -- If it's a loop-breaker of any kind, don't inline

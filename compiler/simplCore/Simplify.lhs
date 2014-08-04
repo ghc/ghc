@@ -326,7 +326,7 @@ simplLazyBind :: SimplEnv
                                         -- The OutId has IdInfo, except arity, unfolding
               -> InExpr -> SimplEnv     -- The RHS and its environment
               -> SimplM SimplEnv
-
+-- Precondition: rhs obeys the let/app invariant
 simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
   = -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
     do  { let   rhs_env     = rhs_se `setInScope` env
@@ -378,11 +378,12 @@ simplNonRecX :: SimplEnv
              -> InId            -- Old binder
              -> OutExpr         -- Simplified RHS
              -> SimplM SimplEnv
-
+-- Precondition: rhs satisfies the let/app invariant
 simplNonRecX env bndr new_rhs
   | isDeadBinder bndr   -- Not uncommon; e.g. case (a,b) of c { (p,q) -> p }
-  = return env          --               Here c is dead, and we avoid creating
-                        --               the binding c = (a,b)
+  = return env    --  Here c is dead, and we avoid creating
+                  --   the binding c = (a,b)
+
   | Coercion co <- new_rhs
   = return (extendCvSubst env bndr co)
 
@@ -397,6 +398,8 @@ completeNonRecX :: TopLevelFlag -> SimplEnv
                 -> OutId                -- New binder
                 -> OutExpr              -- Simplified RHS
                 -> SimplM SimplEnv
+-- Precondition: rhs satisfies the let/app invariant
+--               See Note [CoreSyn let/app invariant] in CoreSyn
 
 completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
   = do  { (env1, rhs1) <- prepareRhs top_lvl (zapFloats env) new_bndr new_rhs
@@ -644,7 +647,8 @@ completeBind :: SimplEnv
 -- completeBind may choose to do its work
 --      * by extending the substitution (e.g. let x = y in ...)
 --      * or by adding to the floats in the envt
-
+--
+-- Precondition: rhs obeys the let/app invariant
 completeBind env top_lvl old_bndr new_bndr new_rhs
  | isCoVar old_bndr
  = case new_rhs of
@@ -1177,6 +1181,8 @@ rebuild env expr cont
       Select _ bndr alts se cont    -> rebuildCase (se `setFloats` env) expr bndr alts cont
       StrictArg info _ cont         -> rebuildCall env (info `addArgTo` expr) cont
       StrictBind b bs body se cont  -> do { env' <- simplNonRecX (se `setFloats` env) b expr
+                                               -- expr satisfies let/app since it started life
+                                               -- in a call to simplNonRecE
                                           ; simplLam env' bs body cont }
       ApplyTo dup_flag arg se cont  -- See Note [Avoid redundant simplification]
         | isSimplified dup_flag     -> rebuild env (App expr arg) cont
@@ -1326,6 +1332,9 @@ simplNonRecE :: SimplEnv
 --
 -- It deals with strict bindings, via the StrictBind continuation,
 -- which may abort the whole process
+--
+-- Precondition: rhs satisfies the let/app invariant
+--               Note [CoreSyn let/app invariant] in CoreSyn
 --
 -- The "body" of the binding comes as a pair of ([InId],InExpr)
 -- representing a lambda; so we recurse back to simplLam
@@ -1863,6 +1872,8 @@ rebuildCase env scrut case_bndr alts cont
   where
     simple_rhs bs rhs = ASSERT( null bs )
                         do { env' <- simplNonRecX env case_bndr scrut
+                               -- scrut is a constructor application,
+                               -- hence satisfies let/app invariant
                            ; simplExprF env' rhs cont }
 
 
@@ -2267,7 +2278,7 @@ knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
              -- it via postInlineUnconditionally.
              -- Nevertheless we must keep it if the case-binder is alive,
              -- because it may be used in the con_app.  See Note [knownCon occ info]
-           ; env'' <- simplNonRecX env' b' arg
+           ; env'' <- simplNonRecX env' b' arg  -- arg satisfies let/app invariant
            ; bind_args env'' bs' args }
 
     bind_args _ _ _ =

@@ -31,8 +31,8 @@ module SimplEnv (
 
         -- Floats
         Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, extendFloats,
-        wrapFloats, floatBinds, setFloats, zapFloats, addRecFloats,
-        doFloatFromRhs, getFloatBinds, getFloats, mapFloats
+        wrapFloats, setFloats, zapFloats, addRecFloats,
+        doFloatFromRhs, getFloatBinds
     ) where
 
 #include "HsVersions.h"
@@ -47,7 +47,7 @@ import VarEnv
 import VarSet
 import OrdList
 import Id
-import MkCore
+import MkCore                   ( mkWildValBinder )
 import TysWiredIn
 import qualified CoreSubst
 import qualified Type
@@ -344,15 +344,21 @@ Note [Simplifier floats]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 The Floats is a bunch of bindings, classified by a FloatFlag.
 
+* All of them satisfy the let/app invariant
+
+Examples
+
   NonRec x (y:ys)       FltLifted
   Rec [(x,rhs)]         FltLifted
 
+  NonRec x* (p:q)       FltOKSpec   -- RHS is WHNF.  Question: why not FltLifted?
   NonRec x# (y +# 3)    FltOkSpec   -- Unboxed, but ok-for-spec'n
 
-  NonRec x# (a /# b)    FltCareful
   NonRec x* (f y)       FltCareful  -- Strict binding; might fail or diverge
-  NonRec x# (f y)       FltCareful  -- Unboxed binding: might fail or diverge
-                                    --  (where f :: Int -> Int#)
+
+Can't happen:
+  NonRec x# (a /# b)    -- Might fail; does not satisfy let/app
+  NonRec x# (f y)       -- Might diverge; does not satisfy let/app
 
 \begin{code}
 data Floats = Floats (OrdList OutBind) FloatFlag
@@ -388,13 +394,6 @@ andFF FltOkSpec  FltCareful = FltCareful
 andFF FltOkSpec  _          = FltOkSpec
 andFF FltLifted  flt        = flt
 
-classifyFF :: CoreBind -> FloatFlag
-classifyFF (Rec _) = FltLifted
-classifyFF (NonRec bndr rhs)
-  | not (isStrictId bndr)    = FltLifted
-  | exprOkForSpeculation rhs = FltOkSpec
-  | otherwise                = FltCareful
-
 doFloatFromRhs :: TopLevelFlag -> RecFlag -> Bool -> OutExpr -> SimplEnv -> Bool
 -- If you change this function look also at FloatIn.noFloatFromRhs
 doFloatFromRhs lvl rec str rhs (SimplEnv {seFloats = Floats fs ff})
@@ -423,8 +422,16 @@ emptyFloats :: Floats
 emptyFloats = Floats nilOL FltLifted
 
 unitFloat :: OutBind -> Floats
--- A single-binding float
-unitFloat bind = Floats (unitOL bind) (classifyFF bind)
+-- This key function constructs a singleton float with the right form
+unitFloat bind = Floats (unitOL bind) (flag bind)
+  where
+    flag (Rec {})                = FltLifted
+    flag (NonRec bndr rhs)
+      | not (isStrictId bndr)    = FltLifted
+      | exprOkForSpeculation rhs = FltOkSpec  -- Unlifted, and lifted but ok-for-spec (eg HNF)
+      | otherwise                = ASSERT2( not (isUnLiftedType (idType bndr)), ppr bndr )
+                                   FltCareful
+      -- Unlifted binders can only be let-bound if exprOkForSpeculation holds
 
 addNonRec :: SimplEnv -> OutId -> OutExpr -> SimplEnv
 -- Add a non-recursive binding and extend the in-scope set
@@ -436,13 +443,6 @@ addNonRec env id rhs
                -- and hence any inner substitutions
     env { seFloats = seFloats env `addFlts` unitFloat (NonRec id rhs),
           seInScope = extendInScopeSet (seInScope env) id }
-
-mapFloats :: SimplEnv -> ((Id,CoreExpr) -> (Id,CoreExpr)) -> SimplEnv
-mapFloats env@SimplEnv { seFloats = Floats fs ff } fun
-   = env { seFloats = Floats (mapOL app fs) ff }
-   where
-     app (NonRec b e) = case fun (b,e) of (b',e') -> NonRec b' e'
-     app (Rec bs)     = Rec (map fun bs)
 
 extendFloats :: SimplEnv -> OutBind -> SimplEnv
 -- Add these bindings to the floats, and extend the in-scope env too
@@ -477,30 +477,29 @@ addRecFloats env1 env2@(SimplEnv {seFloats = Floats bs ff})
     env2 {seFloats = seFloats env1 `addFlts` unitFloat (Rec (flattenBinds (fromOL bs)))}
 
 wrapFloats :: SimplEnv -> OutExpr -> OutExpr
-wrapFloats env expr = wrapFlts (seFloats env) expr
-
-wrapFlts :: Floats -> OutExpr -> OutExpr
--- Wrap the floats around the expression, using case-binding where necessary
-wrapFlts (Floats bs _) body = foldrOL wrap body bs
-  where
-    wrap (Rec prs)    body = Let (Rec prs) body
-    wrap (NonRec b r) body = bindNonRec b r body
+-- Wrap the floats around the expression; they should all
+-- satisfy the let/app invariant, so mkLets should do the job just fine
+wrapFloats (SimplEnv {seFloats = Floats bs _}) body
+  = foldrOL Let body bs
 
 getFloatBinds :: SimplEnv -> [CoreBind]
-getFloatBinds env = floatBinds (seFloats env)
-
-getFloats :: SimplEnv -> Floats
-getFloats env = seFloats env
+getFloatBinds (SimplEnv {seFloats = Floats bs _})
+  = fromOL bs
 
 isEmptyFloats :: SimplEnv -> Bool
-isEmptyFloats env = isEmptyFlts (seFloats env)
-
-isEmptyFlts :: Floats -> Bool
-isEmptyFlts (Floats bs _) = isNilOL bs
-
-floatBinds :: Floats -> [OutBind]
-floatBinds (Floats bs _) = fromOL bs
+isEmptyFloats (SimplEnv {seFloats = Floats bs _})
+  = isNilOL bs
 \end{code}
+
+-- mapFloats commented out: used only in a commented-out bit of Simplify,
+-- concerning ticks
+--
+-- mapFloats :: SimplEnv -> ((Id,CoreExpr) -> (Id,CoreExpr)) -> SimplEnv
+-- mapFloats env@SimplEnv { seFloats = Floats fs ff } fun
+--    = env { seFloats = Floats (mapOL app fs) ff }
+--    where
+--     app (NonRec b e) = case fun (b,e) of (b',e') -> NonRec b' e'
+--     app (Rec bs)     = Rec (map fun bs)
 
 
 %************************************************************************
