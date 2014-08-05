@@ -8,6 +8,12 @@ utils/haddock_dist_INSTALL_INPLACE = YES
 utils/haddock_dist_INSTALL_SHELL_WRAPPER_NAME = haddock-ghc-$(ProjectVersion)
 utils/haddock_dist_PROGNAME = haddock
 
+ifeq "$(GhcProfiled)" "YES"
+utils/haddock_dist_PROGRAM_WAY = p
+utils/haddock_dist_WAY = p
+utils/haddock/dist/build/tmp/$(utils/haddock_dist_PROG) : $(utils/haddock_dist_p_LIB)
+endif
+
 ifeq "$(HADDOCK_DOCS)" "NO"
 utils/haddock_dist_NOT_NEEDED = YES
 endif
