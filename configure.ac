@@ -228,7 +228,7 @@ case $host in
      # here we go with the test
      MINOR=`uname -r|cut -d '.' -f 2-`
      if test "$MINOR" -lt "11"; then
-     	SOLARIS_BROKEN_SHLD=YES
+         SOLARIS_BROKEN_SHLD=YES
      fi
      ;;
 esac
@@ -817,30 +817,6 @@ FP_CHECK_FUNC([WinExec],
 
 FP_CHECK_FUNC([GetModuleFileName],
   [@%:@include <windows.h>], [GetModuleFileName((HMODULE)0,(LPTSTR)0,0)])
-
-dnl ** check return type of signal handlers
-dnl Foo: assumes we can use prototypes.
-dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
-dnl AC_CACHE_CHECK([type of signal handlers], ac_cv_type_signal_handler,
-dnl [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
-dnl #include <signal.h>
-dnl #ifdef signal
-dnl #undef signal
-dnl #endif
-dnl void (*signal (int, void (*)(int)))(int);
-dnl ]],
-dnl [[int i;]])],
-dnl [ac_cv_type_signal_handler=void_int],
-dnl [ac_cv_type_signal_handler=int_void])])
-dnl if test "$ac_cv_type_signal_handler" = void_int; then
-dnl AC_DEFINE(VOID_INT_SIGNALS)
-dnl fi
-
-dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
-AC_TYPE_SIGNAL
-if test "$ac_cv_type_signal" = void; then
-  AC_DEFINE([VOID_INT_SIGNALS], [1], [Define to 1 if signal handlers have type void (*)(int). Otherwise, they're assumed to have type int (*)(void).])
-fi
 
 dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
