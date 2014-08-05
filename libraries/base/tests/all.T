@@ -169,3 +169,4 @@ test('T8766',
       ['-O'])
 
 test('T9111', normal, compile, [''])
+test('T9395', normal, compile_and_run, [''])
