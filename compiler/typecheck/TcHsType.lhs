@@ -1068,10 +1068,15 @@ kcStrategy d@(ForeignType {}) = pprPanic "kcStrategy" (ppr d)
 kcStrategy (FamDecl fam_decl)
   = kcStrategyFamDecl fam_decl
 kcStrategy (SynDecl {})       = ParametricKinds
-kcStrategy (DataDecl { tcdDataDefn = HsDataDefn { dd_kindSig = m_ksig }})
-  | Just _ <- m_ksig            = FullKindSignature
-  | otherwise                   = ParametricKinds
-kcStrategy (ClassDecl {})     = ParametricKinds
+kcStrategy decl@(DataDecl {})  = kcStrategyAlgDecl decl
+kcStrategy decl@(ClassDecl {}) = kcStrategyAlgDecl decl
+
+kcStrategyAlgDecl :: TyClDecl Name -> KindCheckingStrategy
+kcStrategyAlgDecl decl
+  | all (isHsKindedTyVar . unLoc) (hsQTvBndrs $ tcdTyVars decl)
+  = FullKindSignature
+  | otherwise
+  = ParametricKinds
 
 -- if the ClosedTypeFamily has no equations, do the defaulting to *, etc.
 kcStrategyFamDecl :: FamilyDecl Name -> KindCheckingStrategy
@@ -1259,7 +1264,11 @@ kcTyClTyVars :: Name -> LHsTyVarBndrs Name -> TcM a -> TcM a
 kcTyClTyVars name (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
   = kcScopedKindVars kvs $
     do 	{ tc_kind <- kcLookupKind name
-	; let (arg_ks, _res_k) = splitKindFunTysN (length hs_tvs) tc_kind
+	; let (_, mono_kind)   = splitForAllTys tc_kind
+                     -- if we have a FullKindSignature, the tc_kind may already
+                     -- be generalized. The kvs get matched up while kind-checking
+                     -- the types in kc_tv, below
+              (arg_ks, _res_k) = splitKindFunTysN (length hs_tvs) mono_kind
                      -- There should be enough arrows, because
                      -- getInitialKinds used the tcdTyVars
         ; name_ks <- zipWithM kc_tv hs_tvs arg_ks
