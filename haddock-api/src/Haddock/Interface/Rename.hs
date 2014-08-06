@@ -182,11 +182,11 @@ renameMaybeLKind = traverse renameLKind
 
 renameType :: HsType Name -> RnM (HsType DocName)
 renameType t = case t of
-  HsForAllTy expl tyvars lcontext ltype -> do
+  HsForAllTy expl extra tyvars lcontext ltype -> do
     tyvars'   <- renameLTyVarBndrs tyvars
     lcontext' <- renameLContext lcontext
     ltype'    <- renameLType ltype
-    return (HsForAllTy expl tyvars' lcontext' ltype')
+    return (HsForAllTy expl extra tyvars' lcontext' ltype')
 
   HsTyVar n -> return . HsTyVar =<< rename n
   HsBangTy b ltype -> return . HsBangTy b =<< renameLType ltype
@@ -235,6 +235,8 @@ renameType t = case t of
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
   HsQuasiQuoteTy a        -> HsQuasiQuoteTy <$> renameHsQuasiQuote a
   HsSpliceTy _ _          -> error "renameType: HsSpliceTy"
+  HsWildcardTy            -> pure HsWildcardTy
+  HsNamedWildcardTy a     -> HsNamedWildcardTy <$> rename a
 
 renameHsQuasiQuote :: HsQuasiQuote Name -> RnM (HsQuasiQuote DocName)
 renameHsQuasiQuote (HsQuasiQuote a b c) = HsQuasiQuote <$> rename a <*> pure b <*> pure c
@@ -399,10 +401,10 @@ renameConDeclFieldField (L l (ConDeclField names t doc)) = do
 
 renameSig :: Sig Name -> RnM (Sig DocName)
 renameSig sig = case sig of
-  TypeSig lnames ltype -> do
+  TypeSig lnames ltype _ -> do
     lnames' <- mapM renameL lnames
     ltype' <- renameLType ltype
-    return (TypeSig lnames' ltype')
+    return (TypeSig lnames' ltype' PlaceHolder)
   PatSynSig lname (flag, qtvs) lreq lprov lty -> do
     lname' <- renameL lname
     qtvs' <- renameLTyVarBndrs qtvs
@@ -465,7 +467,7 @@ renameLTyFamInstEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = pats_w_bndrs, 
        ; pats' <- mapM renameLType (hswb_cts pats_w_bndrs)
        ; rhs' <- renameLType rhs
        ; return (L loc (TyFamEqn { tfe_tycon = tc'
-                                 , tfe_pats = HsWB pats' PlaceHolder PlaceHolder
+                                 , tfe_pats = HsWB pats' PlaceHolder PlaceHolder PlaceHolder
                                  , tfe_rhs = rhs' })) }
 
 renameLTyFamDefltEqn :: LTyFamDefltEqn Name -> RnM (LTyFamDefltEqn DocName)
@@ -484,7 +486,7 @@ renameDataFamInstD (DataFamInstDecl { dfid_tycon = tc, dfid_pats = pats_w_bndrs,
        ; defn' <- renameDataDefn defn
        ; return (DataFamInstDecl { dfid_tycon = tc'
                                  , dfid_pats
-                                       = HsWB pats' PlaceHolder PlaceHolder
+                                       = HsWB pats' PlaceHolder PlaceHolder PlaceHolder
                                  , dfid_defn = defn', dfid_fvs = placeHolderNames }) }
 
 renameExportItem :: ExportItem Name -> RnM (ExportItem DocName)

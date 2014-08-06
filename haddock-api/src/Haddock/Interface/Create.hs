@@ -343,7 +343,7 @@ typeDocs :: HsDecl Name -> Map Int HsDocString
 typeDocs d =
   let docs = go 0 in
   case d of
-    SigD (TypeSig _ ty) -> docs (unLoc ty)
+    SigD (TypeSig _ ty _) -> docs (unLoc ty)
     SigD (PatSynSig _ _ req prov ty) ->
         let allTys = ty : concat [ unLoc req, unLoc prov ]
         in F.foldMap (docs . unLoc) allTys
@@ -351,7 +351,7 @@ typeDocs d =
     TyClD (SynDecl { tcdRhs = ty }) -> docs (unLoc ty)
     _ -> M.empty
   where
-    go n (HsForAllTy _ _ _ ty) = go n (unLoc ty)
+    go n (HsForAllTy _ _ _ _ ty) = go n (unLoc ty)
     go n (HsFunTy (L _ (HsDocTy _ (L _ x))) (L _ ty)) = M.insert n x $ go (n+1) ty
     go n (HsFunTy _ ty) = go (n+1) (unLoc ty)
     go n (HsDocTy _ (L _ doc)) = M.singleton n doc
@@ -732,8 +732,8 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
     expandSig = foldr f []
       where
         f :: LHsDecl name -> [LHsDecl name] -> [LHsDecl name]
-        f (L l (SigD (TypeSig    names t))) xs = foldr (\n acc -> L l (SigD (TypeSig    [n] t)) : acc) xs names
-        f (L l (SigD (GenericSig names t))) xs = foldr (\n acc -> L l (SigD (GenericSig [n] t)) : acc) xs names
+        f (L l (SigD (TypeSig    names t nwcs)))     xs = foldr (\n acc -> L l (SigD (TypeSig    [n] t nwcs))     : acc) xs names
+        f (L l (SigD (GenericSig names t)))          xs = foldr (\n acc -> L l (SigD (GenericSig [n] t))          : acc) xs names
         f x xs = x : xs
 
     mkExportItem :: LHsDecl Name -> ErrMsgGhc (Maybe (ExportItem Name))
@@ -810,10 +810,10 @@ toTypeNoLoc = noLoc . HsTyVar . unLoc
 
 
 extractClassDecl :: Name -> [Located Name] -> LSig Name -> LSig Name
-extractClassDecl c tvs0 (L pos (TypeSig lname ltype)) = case ltype of
-  L _ (HsForAllTy expl tvs (L _ preds) ty) ->
-    L pos (TypeSig lname (noLoc (HsForAllTy expl tvs (lctxt preds) ty)))
-  _ -> L pos (TypeSig lname (noLoc (HsForAllTy Implicit emptyHsQTvs (lctxt []) ltype)))
+extractClassDecl c tvs0 (L pos (TypeSig lname ltype _)) = case ltype of
+  L _ (HsForAllTy expl _ tvs (L _ preds) ty) ->
+    L pos (TypeSig lname (noLoc (HsForAllTy expl Nothing tvs (lctxt preds) ty)) [])
+  _ -> L pos (TypeSig lname (noLoc (HsForAllTy Implicit Nothing emptyHsQTvs (lctxt []) ltype)) [])
   where
     lctxt = noLoc . ctxt
     ctxt preds = nlHsTyConApp c (map toTypeNoLoc tvs0) : preds
@@ -827,7 +827,7 @@ extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
 extractRecSel nm mdl t tvs (L _ con : rest) =
   case con_details con of
     RecCon fields | ((n,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
-      L (getLoc n) (TypeSig [noLoc nm] (noLoc (HsFunTy data_ty (getBangType ty))))
+      L (getLoc n) (TypeSig [noLoc nm] (noLoc (HsFunTy data_ty (getBangType ty))) [])
     _ -> extractRecSel nm mdl t tvs rest
  where
   matching_fields flds = [ (n,f) | f@(L _ (ConDeclField ns _ _)) <- flds, n <- ns, unLoc n == nm ]

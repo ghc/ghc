@@ -95,7 +95,7 @@ tyThingToLHsDecl t = case t of
 
   -- a data-constructor alone just gets rendered as a function:
   AConLike (RealDataCon dc) -> allOK $ SigD (TypeSig [synifyName dc]
-    (synifyType ImplicitizeForAll (dataConUserType dc)))
+    (synifyType ImplicitizeForAll (dataConUserType dc)) [])
 
   AConLike (PatSynCon ps) ->
       let (univ_tvs, ex_tvs, req_theta, prov_theta, arg_tys, res_ty) = patSynSig ps
@@ -119,7 +119,8 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
     in TyFamEqn { tfe_tycon = name
                 , tfe_pats  = HsWB { hswb_cts = typats
                                     , hswb_kvs = map tyVarName kvs
-                                    , hswb_tvs = map tyVarName tvs }
+                                    , hswb_tvs = map tyVarName tvs
+                                    , hswb_wcs = [] }
                 , tfe_rhs   = hs_rhs }
 
 synifyAxiom :: CoAxiom br -> Either ErrMsg (HsDecl Name)
@@ -299,7 +300,7 @@ synifyName = noLoc . getName
 
 
 synifyIdSig :: SynifyTypeState -> Id -> Sig Name
-synifyIdSig s i = TypeSig [synifyName i] (synifyType s (varType i))
+synifyIdSig s i = TypeSig [synifyName i] (synifyType s (varType i)) []
 
 
 synifyCtx :: [PredType] -> LHsContext Name
@@ -375,7 +376,7 @@ synifyType s forallty@(ForAllTy _tv _ty) =
       sCtx = synifyCtx ctx
       sTau = synifyType WithinType tau
       mkHsForAllTy forallPlicitness =
-        noLoc $ HsForAllTy forallPlicitness sTvs sCtx sTau
+        noLoc $ HsForAllTy forallPlicitness Nothing sTvs sCtx sTau
   in case s of
     DeleteTopLevelQuantification -> synifyType ImplicitizeForAll tau
     WithinType -> mkHsForAllTy Explicit
