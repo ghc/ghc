@@ -108,9 +108,7 @@ BASE_DIR = $(shell $(LOCAL_GHC_PKG) field base library-dirs | sed 's/^.*: *//')
 BASE_LIB = $(shell $(LOCAL_GHC_PKG) field base hs-libraries | sed 's/^.*: *//')
 GHC_PRIM_DIR = $(shell $(LOCAL_GHC_PKG) field ghc-prim library-dirs | sed 's/^.*: *//')
 GHC_PRIM_LIB = $(shell $(LOCAL_GHC_PKG) field ghc-prim hs-libraries | sed 's/^.*: *//')
-# need to cut here in order to get rid of system gmp library directory installation when
-# ghc is configured with --with-gmp-libraries=<dir> parameter
-INTEGER_GMP_DIR = $(shell $(LOCAL_GHC_PKG) field integer-gmp library-dirs | sed 's/^.*: *//' | cut -d ' ' -f -1)
+INTEGER_GMP_DIR = $(shell $(LOCAL_GHC_PKG) field integer-gmp library-dirs | sed 's/^.*: *//')
 INTEGER_GMP_LIB = $(shell $(LOCAL_GHC_PKG) field integer-gmp hs-libraries | sed 's/^.*: *//')
 
 BASE        = $(BASE_DIR)/lib$(BASE_LIB).a

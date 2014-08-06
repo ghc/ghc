@@ -1,4 +1,3 @@
-#include "ghcconfig.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include "Rts.h"
