@@ -43,11 +43,11 @@ ppDecl :: Bool -> LinksInfo -> LHsDecl DocName
        -> DocForDecl DocName -> [DocInstance DocName] -> [(DocName, Fixity)]
        -> [(DocName, DocForDecl DocName)] -> Splice -> Unicode -> Qualification -> Html
 ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances fixities subdocs splice unicode qual = case decl of
-  TyClD (FamDecl d)         -> ppTyFam summ False links instances fixities loc mbDoc d splice unicode qual
-  TyClD d@(DataDecl {})     -> ppDataDecl summ links instances fixities subdocs loc mbDoc d splice unicode qual
-  TyClD d@(SynDecl {})      -> ppTySyn summ links fixities loc (mbDoc, fnArgsDoc) d splice unicode qual
-  TyClD d@(ClassDecl {})    -> ppClassDecl summ links instances fixities loc mbDoc subdocs d splice unicode qual
-  SigD (TypeSig lnames lty) -> ppLFunSig summ links loc (mbDoc, fnArgsDoc) lnames lty fixities splice unicode qual
+  TyClD (FamDecl d)           -> ppTyFam summ False links instances fixities loc mbDoc d splice unicode qual
+  TyClD d@(DataDecl {})       -> ppDataDecl summ links instances fixities subdocs loc mbDoc d splice unicode qual
+  TyClD d@(SynDecl {})        -> ppTySyn summ links fixities loc (mbDoc, fnArgsDoc) d splice unicode qual
+  TyClD d@(ClassDecl {})      -> ppClassDecl summ links instances fixities loc mbDoc subdocs d splice unicode qual
+  SigD (TypeSig lnames lty _) -> ppLFunSig summ links loc (mbDoc, fnArgsDoc) lnames lty fixities splice unicode qual
   SigD (PatSynSig lname qtvs prov req ty) ->
       ppLPatSig summ links loc (mbDoc, fnArgsDoc) lname qtvs prov req ty fixities splice unicode qual
   ForD d                         -> ppFor summ links loc (mbDoc, fnArgsDoc) d fixities splice unicode qual
@@ -132,13 +132,13 @@ ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep)
 
     do_largs n leader (L _ t) = do_args n leader t
     do_args :: Int -> Html -> HsType DocName -> [SubDecl]
-    do_args n leader (HsForAllTy Explicit tvs lctxt ltype)
+    do_args n leader (HsForAllTy Explicit _ tvs lctxt ltype)
       = (leader <+>
           hsep (forallSymbol unicode : ppTyVars tvs ++ [dot]) <+>
           ppLContextNoArrow lctxt unicode qual,
           Nothing, [])
         : do_largs n (darrow unicode) ltype
-    do_args n leader (HsForAllTy Implicit _ lctxt ltype)
+    do_args n leader (HsForAllTy Implicit _ _ lctxt ltype)
       | not (null (unLoc lctxt))
       = (leader <+> ppLContextNoArrow lctxt unicode qual,
           Nothing, [])
@@ -416,7 +416,7 @@ ppShortClassDecl summary links (ClassDecl { tcdCtxt = lctxt, tcdLName = lname, t
                 -- ToDo: add associated type defaults
 
             [ ppFunSig summary links loc doc names typ [] splice unicode qual
-              | L _ (TypeSig lnames (L _ typ)) <- sigs
+              | L _ (TypeSig lnames (L _ typ) _) <- sigs
               , let doc = lookupAnySubdoc (head names) subdocs
                     names = map unLoc lnames ]
               -- FIXME: is taking just the first name ok? Is it possible that
@@ -461,7 +461,7 @@ ppClassDecl summary links instances fixities loc d subdocs
                             subfixs = [ f | f@(n',_) <- fixities, n == n' ] ]
 
     methodBit = subMethods [ ppFunSig summary links loc doc names typ subfixs splice unicode qual
-                           | L _ (TypeSig lnames (L _ typ)) <- lsigs
+                           | L _ (TypeSig lnames (L _ typ) _) <- lsigs
                            , let doc = lookupAnySubdoc (head names) subdocs
                                  subfixs = [ f | n <- names
                                                , f@(n',_) <- fixities
@@ -474,12 +474,12 @@ ppClassDecl summary links instances fixities loc d subdocs
     minimalBit = case [ s | L _ (MinimalSig s) <- lsigs ] of
       -- Miminal complete definition = every shown method
       And xs : _ | sort [getName n | Var (L _ n) <- xs] ==
-                   sort [getName n | L _ (TypeSig ns _) <- lsigs, L _ n <- ns]
+                   sort [getName n | L _ (TypeSig ns _ _) <- lsigs, L _ n <- ns]
         -> noHtml
 
       -- Minimal complete definition = the only shown method
       Var (L _ n) : _ | [getName n] ==
-                        [getName n' | L _ (TypeSig ns _) <- lsigs, L _ n' <- ns]
+                        [getName n' | L _ (TypeSig ns _ _) <- lsigs, L _ n' <- ns]
         -> noHtml
 
       -- Minimal complete definition = nothing
@@ -850,9 +850,12 @@ ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
 
 
 ppr_mono_ty :: Int -> HsType DocName -> Unicode -> Qualification -> Html
-ppr_mono_ty ctxt_prec (HsForAllTy expl tvs ctxt ty) unicode qual
+ppr_mono_ty ctxt_prec (HsForAllTy expl extra tvs ctxt ty) unicode qual
   = maybeParen ctxt_prec pREC_FUN $
-    hsep [ppForAll expl tvs ctxt unicode qual, ppr_mono_lty pREC_TOP ty unicode qual]
+    hsep [ppForAll expl tvs ctxt' unicode qual, ppr_mono_lty pREC_TOP ty unicode qual]
+ where ctxt' = case extra of
+                 Just loc -> (++ [L loc HsWildcardTy]) `fmap` ctxt
+                 Nothing  -> ctxt
 
 -- UnicodeSyntax alternatives
 ppr_mono_ty _ (HsTyVar name) True _
@@ -897,6 +900,10 @@ ppr_mono_ty ctxt_prec (HsParTy ty) unicode qual
 
 ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode qual
   = ppr_mono_lty ctxt_prec ty unicode qual
+
+ppr_mono_ty _ HsWildcardTy _ _ = char '_'
+
+ppr_mono_ty _ (HsNamedWildcardTy name) _ q = ppDocName q Prefix True name
 
 ppr_mono_ty _ (HsTyLit n) _ _ = ppr_tylit n
 

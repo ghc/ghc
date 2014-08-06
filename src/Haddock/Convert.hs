@@ -91,7 +91,7 @@ tyThingToLHsDecl t = noLoc $ case t of
 
   -- a data-constructor alone just gets rendered as a function:
   AConLike (RealDataCon dc) -> SigD (TypeSig [synifyName dc]
-    (synifyType ImplicitizeForAll (dataConUserType dc)))
+    (synifyType ImplicitizeForAll (dataConUserType dc)) [])
 
   AConLike (PatSynCon ps) ->
       let (univ_tvs, ex_tvs, req_theta, prov_theta, arg_tys, res_ty) = patSynSig ps
@@ -112,7 +112,8 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
     in TyFamEqn { tfe_tycon = name
                 , tfe_pats  = HsWB { hswb_cts = typats
                                     , hswb_kvs = map tyVarName kvs
-                                    , hswb_tvs = map tyVarName tvs }
+                                    , hswb_tvs = map tyVarName tvs
+                                    , hswb_wcs = [] }
                 , tfe_rhs   = hs_rhs }
 
 synifyAxiom :: CoAxiom br -> HsDecl Name
@@ -277,7 +278,7 @@ synifyName = noLoc . getName
 
 
 synifyIdSig :: SynifyTypeState -> Id -> Sig Name
-synifyIdSig s i = TypeSig [synifyName i] (synifyType s (varType i))
+synifyIdSig s i = TypeSig [synifyName i] (synifyType s (varType i)) []
 
 
 synifyCtx :: [PredType] -> LHsContext Name
@@ -360,7 +361,7 @@ synifyType s forallty@(ForAllTy _tv _ty) =
       sCtx = synifyCtx ctx
       sTau = synifyType WithinType tau
      in noLoc $
-           HsForAllTy forallPlicitness sTvs sCtx sTau
+           HsForAllTy forallPlicitness Nothing sTvs sCtx sTau
 synifyType _ (LitTy t) = noLoc $ HsTyLit $ synifyTyLit t
 
 synifyTyLit :: TyLit -> HsTyLit

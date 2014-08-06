@@ -105,10 +105,10 @@ filterSigNames p (FixSig (FixitySig ns ty)) =
     []       -> Nothing
     filtered -> Just (FixSig (FixitySig filtered ty))
 filterSigNames _ orig@(MinimalSig _)           = Just orig
-filterSigNames p (TypeSig ns ty)               =
+filterSigNames p (TypeSig ns ty nwcs)    =
   case filter (p . unLoc) ns of
     []       -> Nothing
-    filtered -> Just (TypeSig filtered ty)
+    filtered -> Just (TypeSig filtered ty nwcs)
 filterSigNames _ _                           = Nothing
 
 ifTrueJust :: Bool -> name -> Maybe name
@@ -119,7 +119,7 @@ sigName :: LSig name -> [name]
 sigName (L _ sig) = sigNameNoLoc sig
 
 sigNameNoLoc :: Sig name -> [name]
-sigNameNoLoc (TypeSig   ns _)          = map unLoc ns
+sigNameNoLoc (TypeSig   ns _ _)        = map unLoc ns
 sigNameNoLoc (PatSynSig n _ _ _ _)     = [unLoc n]
 sigNameNoLoc (SpecSig   n _ _)         = [unLoc n]
 sigNameNoLoc (InlineSig n _)           = [unLoc n]
@@ -219,7 +219,7 @@ instance Parent (TyClDecl Name) where
                               $ (dd_cons . tcdDataDefn) $ d
     | isClassDecl d =
         map (unL . fdLName . unL) (tcdATs d) ++
-        [ unL n | L _ (TypeSig ns _) <- tcdSigs d, n <- ns ]
+        [ unL n | L _ (TypeSig ns _ _) <- tcdSigs d, n <- ns ]
     | otherwise = []
 
 

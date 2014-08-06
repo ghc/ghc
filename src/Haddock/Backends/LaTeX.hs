@@ -212,7 +212,7 @@ processExports (e : es) =
 
 
 isSimpleSig :: ExportItem DocName -> Maybe ([DocName], HsType DocName)
-isSimpleSig ExportDecl { expItemDecl = L _ (SigD (TypeSig lnames (L _ t)))
+isSimpleSig ExportDecl { expItemDecl = L _ (SigD (TypeSig lnames (L _ t) _))
                        , expItemMbDoc = (Documentation Nothing Nothing, argDocs) }
   | Map.null argDocs = Just (map unLoc lnames, t)
 isSimpleSig _ = Nothing
@@ -249,7 +249,7 @@ ppDocGroup lev doc = sec lev <> braces doc
 declNames :: LHsDecl DocName -> [DocName]
 declNames (L _ decl) = case decl of
   TyClD d  -> [tcdName d]
-  SigD (TypeSig lnames _) -> map unLoc lnames
+  SigD (TypeSig lnames _ _) -> map unLoc lnames
   SigD (PatSynSig lname _ _ _ _) -> [unLoc lname]
   ForD (ForeignImport (L _ n) _ _ _) -> [n]
   ForD (ForeignExport (L _ n) _ _ _) -> [n]
@@ -293,7 +293,7 @@ ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs _fixities = case decl of
 --    | Just _  <- tcdTyPats d    -> ppTyInst False loc doc d unicode
 -- Family instances happen via FamInst now
   TyClD d@(ClassDecl {})         -> ppClassDecl instances loc doc subdocs d unicode
-  SigD (TypeSig lnames (L _ t))  -> ppFunSig loc (doc, fnArgsDoc) (map unLoc lnames) t unicode
+  SigD (TypeSig lnames (L _ t) _) -> ppFunSig loc (doc, fnArgsDoc) (map unLoc lnames) t unicode
   SigD (PatSynSig lname qtvs prov req ty) ->
       ppLPatSig loc (doc, fnArgsDoc) lname qtvs prov req ty unicode
   ForD d                         -> ppFor loc (doc, fnArgsDoc) d unicode
@@ -393,15 +393,15 @@ ppTypeOrFunSig _ _ typ (doc, argDocs) (pref1, pref2, sep0)
      arg_doc n = rDoc (Map.lookup n argDocs)
 
      do_args :: Int -> LaTeX -> (HsType DocName) -> LaTeX
-     do_args n leader (HsForAllTy Explicit tvs lctxt ltype)
+     do_args n leader (HsForAllTy Explicit _ tvs lctxt ltype)
        = decltt leader <->
              decltt (hsep (forallSymbol unicode : ppTyVars tvs ++ [dot]) <+>
                 ppLContextNoArrow lctxt unicode) <+> nl $$
          do_largs n (darrow unicode) ltype
 
-     do_args n leader (HsForAllTy Qualified a lctxt ltype)
-       = do_args n leader (HsForAllTy Implicit a lctxt ltype)
-     do_args n leader (HsForAllTy Implicit _ lctxt ltype)
+     do_args n leader (HsForAllTy Qualified e a lctxt ltype)
+       = do_args n leader (HsForAllTy Implicit e a lctxt ltype)
+     do_args n leader (HsForAllTy Implicit _ _ lctxt ltype)
        | not (null (unLoc lctxt))
        = decltt leader <-> decltt (ppLContextNoArrow lctxt unicode) <+> nl $$
          do_largs n (darrow unicode) ltype
@@ -521,7 +521,7 @@ ppClassDecl instances loc doc subdocs
     methodTable =
       text "\\haddockpremethods{}\\textbf{Methods}" $$
       vcat  [ ppFunSig loc doc names typ unicode
-            | L _ (TypeSig lnames (L _ typ)) <- lsigs
+            | L _ (TypeSig lnames (L _ typ) _) <- lsigs
             , let doc = lookupAnySubdoc (head names) subdocs
                   names = map unLoc lnames ]
               -- FIXME: is taking just the first name ok? Is it possible that
@@ -895,9 +895,12 @@ ppr_mono_lty ctxt_prec ty unicode = ppr_mono_ty ctxt_prec (unLoc ty) unicode
 
 
 ppr_mono_ty :: Int -> HsType DocName -> Bool -> LaTeX
-ppr_mono_ty ctxt_prec (HsForAllTy expl tvs ctxt ty) unicode
+ppr_mono_ty ctxt_prec (HsForAllTy expl extra tvs ctxt ty) unicode
   = maybeParen ctxt_prec pREC_FUN $
-    hsep [ppForAll expl tvs ctxt unicode, ppr_mono_lty pREC_TOP ty unicode]
+    hsep [ppForAll expl tvs ctxt' unicode, ppr_mono_lty pREC_TOP ty unicode]
+ where ctxt' = case extra of
+                 Just loc -> (++ [L loc HsWildcardTy]) `fmap` ctxt
+                 Nothing  -> ctxt
 
 ppr_mono_ty _         (HsBangTy b ty)     u = ppBang b <> ppLParendType u ty
 ppr_mono_ty _         (HsTyVar name)      _ = ppDocName name
@@ -936,6 +939,10 @@ ppr_mono_ty ctxt_prec (HsParTy ty) unicode
 
 ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode
   = ppr_mono_lty ctxt_prec ty unicode
+
+ppr_mono_ty _ HsWildcardTy _ = char '_'
+
+ppr_mono_ty _ (HsNamedWildcardTy name) _ = ppDocName name
 
 ppr_mono_ty _ (HsTyLit t) u = ppr_tylit t u
 
