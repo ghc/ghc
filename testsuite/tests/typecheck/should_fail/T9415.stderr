@@ -1,0 +1,8 @@
+
+T9415.hs:3:1:
+    Cycle in class declaration (via superclasses): C -> D -> C
+    In the class declaration for ‘C’
+
+T9415.hs:5:1:
+    Cycle in class declaration (via superclasses): D -> C -> D
+    In the class declaration for ‘D’
