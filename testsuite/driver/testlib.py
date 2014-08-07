@@ -232,6 +232,17 @@ def exit_code( val ):
 def _exit_code( name, opts, v ):
     opts.exit_code = v
 
+def signal_exit_code( val ):
+    if opsys('solaris2'):
+        return exit_code( val );
+    else:
+        # When application running on Linux receives fatal error
+        # signal, then its exit code is encoded as 128 + signal
+        # value. See http://www.tldp.org/LDP/abs/html/exitcodes.html
+        # I assume that Mac OS X behaves in the same way at least Mac
+        # OS X builder behavior suggests this.
+        return exit_code( val+128 );
+
 # -----
 
 def timeout_multiplier( val ):
