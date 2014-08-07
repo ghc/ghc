@@ -2331,9 +2331,9 @@ showPackages :: GHCi ()
 showPackages = do
   dflags <- getDynFlags
   let pkg_flags = packageFlags dflags
-  liftIO $ putStrLn $ showSDoc dflags $ vcat $
-    text ("active package flags:"++if null pkg_flags then " none" else "")
-    : map pprFlag pkg_flags
+  liftIO $ putStrLn $ showSDoc dflags $
+    text ("active package flags:"++if null pkg_flags then " none" else "") $$
+      nest 2 (vcat (map pprFlag pkg_flags))
 
 showPaths :: GHCi ()
 showPaths = do
