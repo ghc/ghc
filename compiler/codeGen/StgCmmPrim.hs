@@ -43,6 +43,7 @@ import FastString
 import Outputable
 import Util
 
+import Data.Bits ((.&.), bit)
 import Control.Monad (liftM, when)
 
 ------------------------------------------------------------------------
@@ -121,6 +122,21 @@ cgOpApp (StgPrimCallOp primcall) args _res_ty
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
 
+-- | Interpret the argument as an unsigned value, assuming the value
+-- is given in two-complement form in the given width.
+--
+-- Example: @asUnsigned W64 (-1)@ is 18446744073709551615.
+--
+-- This function is used to work around the fact that many array
+-- primops take Int# arguments, but we interpret them as unsigned
+-- quantities in the code gen. This means that we have to be careful
+-- every time we work on e.g. a CmmInt literal that corresponds to the
+-- array size, as it might contain a negative Integer value if the
+-- user passed a value larger than 2^(wORD_SIZE_IN_BITS-1) as the Int#
+-- literal.
+asUnsigned :: Width -> Integer -> Integer
+asUnsigned w n = n .&. (bit (widthInBits w) - 1)
+
 -- | Decide whether an out-of-line primop should be replaced by an
 -- inline implementation. This might happen e.g. if there's enough
 -- static information, such as statically know arguments, to emit a
@@ -135,12 +151,12 @@ shouldInlinePrimOp :: DynFlags
                    -> [CmmExpr]  -- ^ The primop arguments
                    -> Maybe ([LocalReg] -> FCode ())
 
-shouldInlinePrimOp dflags NewByteArrayOp_Char [(CmmLit (CmmInt n _))]
-  | fromInteger n <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags NewByteArrayOp_Char [(CmmLit (CmmInt n w))]
+  | asUnsigned w n <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> doNewByteArrayOp res (fromInteger n)
 
-shouldInlinePrimOp dflags NewArrayOp [(CmmLit (CmmInt n _)), init]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags NewArrayOp [(CmmLit (CmmInt n w)), init]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] ->
       doNewArrayOp res (arrPtrsRep dflags (fromInteger n)) mkMAP_DIRTY_infoLabel
       [ (mkIntExpr dflags (fromInteger n),
@@ -166,24 +182,24 @@ shouldInlinePrimOp _ CopyMutableArrayArrayOp
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] =
         Just $ \ [] -> doCopyMutableArrayOp src src_off dst dst_off (fromInteger n)
 
-shouldInlinePrimOp dflags CloneArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags CloneArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneArray mkMAP_FROZEN_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags CloneMutableArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags CloneMutableArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags FreezeArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags FreezeArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneArray mkMAP_FROZEN_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags ThawArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags ThawArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags NewSmallArrayOp [(CmmLit (CmmInt n _)), init]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags NewSmallArrayOp [(CmmLit (CmmInt n w)), init]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] ->
       doNewArrayOp res (smallArrPtrsRep (fromInteger n)) mkSMAP_DIRTY_infoLabel
       [ (mkIntExpr dflags (fromInteger n),
@@ -199,20 +215,20 @@ shouldInlinePrimOp _ CopySmallMutableArrayOp
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] =
         Just $ \ [] -> doCopySmallMutableArrayOp src src_off dst dst_off (fromInteger n)
 
-shouldInlinePrimOp dflags CloneSmallArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags CloneSmallArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags CloneSmallMutableArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags CloneSmallMutableArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneSmallArray mkSMAP_DIRTY_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags FreezeSmallArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags FreezeSmallArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags ThawSmallArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags ThawSmallArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneSmallArray mkSMAP_DIRTY_infoLabel res src src_off (fromInteger n)
 
 shouldInlinePrimOp dflags primop args

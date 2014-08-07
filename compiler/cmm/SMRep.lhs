@@ -78,8 +78,11 @@ roundUpToWords :: DynFlags -> ByteOff -> ByteOff
 roundUpToWords dflags n =
   (n + (wORD_SIZE dflags - 1)) .&. (complement (wORD_SIZE dflags - 1))
 
-wordsToBytes :: DynFlags -> WordOff -> ByteOff
-wordsToBytes dflags n = wORD_SIZE dflags * n
+wordsToBytes :: Num a => DynFlags -> a -> a
+wordsToBytes dflags n = fromIntegral (wORD_SIZE dflags) * n
+{-# SPECIALIZE wordsToBytes :: DynFlags -> Int -> Int #-}
+{-# SPECIALIZE wordsToBytes :: DynFlags -> Word -> Word #-}
+{-# SPECIALIZE wordsToBytes :: DynFlags -> Integer -> Integer #-}
 
 bytesToWordsRoundUp :: DynFlags -> ByteOff -> WordOff
 bytesToWordsRoundUp dflags n = (n + word_size - 1) `quot` word_size
