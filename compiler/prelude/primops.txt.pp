@@ -1881,6 +1881,11 @@ primop  RaiseOp "raise#" GenPrimOp
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
       -- NB: result is bottom
    out_of_line = True
+   has_side_effects = True
+     -- raise# certainly throws a Haskell exception and hence has_side_effects
+     -- It doesn't actually make much difference because the fact that it
+     -- returns bottom independently ensures that we are careful not to discard
+     -- it.  But still, it's better to say the Right Thing.
 
 -- raiseIO# needs to be a primop, because exceptions in the IO monad
 -- must be *precise* - we don't want the strictness analyser turning
