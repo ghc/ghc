@@ -318,9 +318,10 @@ newMetaTyVar meta_info kind
   = do	{ uniq <- newUnique
         ; let name = mkTcTyVarName uniq s
               s = case meta_info of
-                        PolyTv -> fsLit "s"
-                        TauTv  -> fsLit "t"
-                        SigTv  -> fsLit "a"
+                        PolyTv     -> fsLit "s"
+                        TauTv      -> fsLit "t"
+                        FlatSkolTv -> fsLit "fsk"
+                        SigTv      -> fsLit "a"
         ; details <- newMetaDetails meta_info
 	; return (mkTcTyVar name kind details) }
 
@@ -742,8 +743,7 @@ zonkImplication implic@(Implic { ic_untch  = untch
        ; if isEmptyWC wanted' 
          then return emptyBag
          else return $ unitBag $
-              implic { ic_fsks   = []  -- Zonking removes all FlatSkol tyvars
-                     , ic_skols  = skols'
+              implic { ic_skols  = skols'
                      , ic_given  = given'
                      , ic_wanted = wanted'
                      , ic_info   = info' } }
@@ -787,7 +787,7 @@ zonkFlats binds_var untch cts
           --     so we can't look for CFunEqCan
       , Just tv <- getTyVar_maybe ty_rhs
       , ASSERT2( not (isFloatedTouchableMetaTyVar untch tv), ppr tv )
-        isTouchableMetaTyVar untch tv
+        isTouchableMetaTyVar untch tv || isFlatSkolTyVar tv
       , not (isSigTyVar tv) || isTyVarTy ty_lhs     -- Never unify a SigTyVar with a non-tyvar
       , typeKind ty_lhs `tcIsSubKind` tyVarKind tv  -- c.f. TcInteract.trySpontaneousEqOneWay
       , not (tv `elemVarSet` tyVarsOfType ty_lhs)   -- Do not construct an infinite type
@@ -842,7 +842,7 @@ Consider them one by one.  For each such constraint C
          and discard C
 
 After processing all the flat constraints, zonk them again to propagate
-the inforamtion from later ones to earlier ones.  Eg
+the information from later ones to earlier ones.  Eg
   Start:  (F alpha ~ beta, G Int ~ alpha)
   Then we get beta := F alpha
               alpha := G Int
@@ -954,7 +954,6 @@ zonkTcTyVar tv
     case tcTyVarDetails tv of
       SkolemTv {}   -> zonk_kind_and_return
       RuntimeUnk {} -> zonk_kind_and_return
-      FlatSkol ty   -> zonkTcType ty
       MetaTv { mtv_ref = ref }
          -> do { cts <- readMutVar ref
                ; case cts of

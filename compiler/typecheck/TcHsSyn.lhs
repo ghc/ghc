@@ -1344,7 +1344,6 @@ zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
   = case tcTyVarDetails tv of
          SkolemTv {}    -> lookup_in_env
          RuntimeUnk {}  -> lookup_in_env
-         FlatSkol ty    -> zonkTcTypeToType env ty
          MetaTv { mtv_ref = ref }
            -> do { cts <- readMutVar ref
                  ; case cts of

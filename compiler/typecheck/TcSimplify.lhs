@@ -376,8 +376,6 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        ; let implic = Implic { ic_untch    = pushUntouchables untch
                              , ic_skols    = qtvs
                              , ic_no_eqs   = False
-                             , ic_fsks     = []  -- wanted_tansformed arose only from solveWanteds
-                                                 -- hence no flatten-skolems (which come from givens)
                              , ic_given    = minimal_bound_ev_vars
                              , ic_wanted   = wanted_transformed
                              , ic_insol    = False
@@ -751,17 +749,16 @@ solveNestedImplications implics
 
        ; return (floated_eqs, unsolved_implics) }
 
-solveImplication :: InertSet
+solveImplication :: (InertSet, Bag Ct)  -- Inerts (all given) and wanted fun-eqs
                  -> Implication    -- Wanted
                  -> TcS (Cts,      -- All wanted or derived floated equalities: var = type
                          Bag Implication) -- Unsolved rest (always empty or singleton)
 -- Precondition: The TcS monad contains an empty worklist and given-only inerts
 -- which after trying to solve this implication we must restore to their original value
-solveImplication inerts
+solveImplication (inerts, outer_funeqs)
      imp@(Implic { ic_untch  = untch
                  , ic_binds  = ev_binds
                  , ic_skols  = skols
-                 , ic_fsks   = old_fsks
                  , ic_given  = givens
                  , ic_wanted = wanteds
                  , ic_info   = info
@@ -769,27 +766,26 @@ solveImplication inerts
   = do { traceTcS "solveImplication {" (ppr imp)
 
          -- Solve the nested constraints
-       ; (no_given_eqs, new_fsks, residual_wanted)
+       ; (no_given_eqs, residual_wanted)
             <- nestImplicTcS ev_binds untch inerts $
-               do { (no_eqs, new_fsks) <- solveInteractGiven (mkGivenLoc info env)
-                                                             old_fsks givens
+               do { no_eqs <- solveInteractGiven (mkGivenLoc info env) givens
+                  ; _      <- solveInteract outer_funeqs
 
                   ; residual_wanted <- solve_wanteds wanteds
                         -- solve_wanteds, *not* solve_wanteds_and_drop, because
                         -- we want to retain derived equalities so we can float
                         -- them out in floatEqualities
 
-                  ; return (no_eqs, new_fsks, residual_wanted) }
+                  ; return (no_eqs, residual_wanted) }
 
        ; (floated_eqs, final_wanted)
-             <- floatEqualities (skols ++ new_fsks) no_given_eqs residual_wanted
+             <- floatEqualities skols no_given_eqs residual_wanted
 
        ; let res_implic | isEmptyWC final_wanted && no_given_eqs
                         = emptyBag  -- Reason for the no_given_eqs: we don't want to
                                     -- lose the "inaccessible code" error message
                         | otherwise
-                        = unitBag (imp { ic_fsks   = new_fsks
-                                       , ic_no_eqs = no_given_eqs
+                        = unitBag (imp { ic_no_eqs = no_given_eqs
                                        , ic_wanted = dropDerivedWC final_wanted
                                        , ic_insol  = insolubleWC final_wanted })
 
@@ -797,7 +793,6 @@ solveImplication inerts
        ; traceTcS "solveImplication end }" $ vcat
              [ text "no_given_eqs =" <+> ppr no_given_eqs
              , text "floated_eqs =" <+> ppr floated_eqs
-             , text "new_fsks =" <+> ppr new_fsks
              , text "res_implic =" <+> ppr res_implic
              , text "implication evbinds = " <+> ppr (evBindMapBinds evbinds) ]
 
@@ -907,7 +902,6 @@ approximateWC wc
       = emptyCts                      -- See Note [ApproximateWC]
       where
         new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
-                                        `extendVarSetList` ic_fsks imp
     do_bag :: (a -> Bag c) -> Bag a -> Bag c
     do_bag f = foldrBag (unionBags.f) emptyBag
 \end{code}

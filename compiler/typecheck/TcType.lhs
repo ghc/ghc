@@ -24,7 +24,7 @@ module TcType (
   TcTyVar, TcTyVarSet, TcKind, TcCoVar,
 
   -- Untouchables
-  Untouchables(..), noUntouchables, pushUntouchables, isTouchable,
+  Untouchables(..), noUntouchables, pushUntouchables, isTouchable, fskUntouchables,
 
   --------------------------------
   -- MetaDetails
@@ -275,14 +275,6 @@ data TcTyVarDetails
   | RuntimeUnk    -- Stands for an as-yet-unknown type in the GHCi
                   -- interactive context
 
-  | FlatSkol TcType
-           -- The "skolem" obtained by flattening during
-           -- constraint simplification
-
-           -- In comments we will use the notation alpha[flat = ty]
-           -- to represent a flattening skolem variable alpha
-           -- identified with type ty.
-
   | MetaTv { mtv_info  :: MetaInfo
            , mtv_ref   :: IORef MetaDetails
            , mtv_untch :: Untouchables }  -- See Note [Untouchable type variables]
@@ -306,6 +298,7 @@ data MetaInfo
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls
 
+   | FlatSkolTv
    | PolyTv        -- Like TauTv, but can unify with a sigma-type
 
    | SigTv         -- A variant of TauTv, except that it should not be
@@ -430,8 +423,12 @@ uf will get unified *once more* to (F Int).
 newtype Untouchables = Untouchables Int
   -- See Note [Untouchable type variables] for what this Int is
 
+fskUntouchables :: Untouchables
+fskUntouchables = Untouchables 0  -- 0 = Outside the outermost level: 
+                                  --     flatten skolems
+
 noUntouchables :: Untouchables
-noUntouchables = Untouchables 0   -- 0 = outermost level
+noUntouchables = Untouchables 1   -- 1 = outermost level
 
 pushUntouchables :: Untouchables -> Untouchables
 pushUntouchables (Untouchables us) = Untouchables (us+1)
@@ -467,14 +464,14 @@ pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 pprTcTyVarDetails (SkolemTv True)  = ptext (sLit "ssk")
 pprTcTyVarDetails (SkolemTv False) = ptext (sLit "sk")
 pprTcTyVarDetails (RuntimeUnk {})  = ptext (sLit "rt")
-pprTcTyVarDetails (FlatSkol {})    = ptext (sLit "fsk")
 pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_untch = untch })
   = pp_info <> brackets (ppr untch)
   where
     pp_info = case info of
-                PolyTv -> ptext (sLit "poly")
-                TauTv  -> ptext (sLit "tau")
-                SigTv  -> ptext (sLit "sig")
+                PolyTv     -> ptext (sLit "poly")
+                TauTv      -> ptext (sLit "tau")
+                SigTv      -> ptext (sLit "sig")
+                FlatSkolTv -> ptext (sLit "fsk")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
@@ -618,14 +615,13 @@ isTyConableTyVar tv
 isFlatSkolTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-        FlatSkol {} -> True
-        _           -> False
+        MetaTv { mtv_info = FlatSkolTv } -> True
+        _                                -> False
 
 isSkolemTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
         SkolemTv {}   -> True
-        FlatSkol {}   -> True
         RuntimeUnk {} -> True
         MetaTv {}     -> False
 

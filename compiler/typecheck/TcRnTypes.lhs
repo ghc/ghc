@@ -52,7 +52,7 @@ module TcRnTypes(
         isGivenCt, isHoleCt,
         ctEvidence, ctLoc, ctPred,
         mkNonCanonical, mkNonCanonicalCt,
-        ctEvPred, ctEvTerm, ctEvId, ctEvCheckDepth,
+        ctEvPred, ctEvTerm, ctEvCoercion, ctEvId, ctEvCheckDepth,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
@@ -75,7 +75,7 @@ module TcRnTypes(
         canRewrite, canRewriteOrSame,
 
         -- Pretty printing
-        pprEvVarTheta, pprWantedsWithLocs,
+        pprEvVarTheta, 
         pprEvVars, pprEvVarWithType,
         pprArising, pprArisingAt,
 
@@ -957,14 +957,14 @@ data Ct
       cc_rhs    :: Xi
     }
 
-  | CFunEqCan {  -- F xis ~ xi
+  | CFunEqCan {  -- F xis ~ fsk
        -- Invariant: * isSynFamilyTyCon cc_fun
        --            * typeKind (F xis) `subKind` typeKind xi
        --       See Note [Kind orientation for CFunEqCan]
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function
       cc_tyargs :: [Xi],        -- Either under-saturated or exactly saturated
-      cc_rhs    :: Xi           --    *never* over-saturated (because if so
+      cc_fsk    :: TcTyVar      --    *never* over-saturated (because if so
                                 --    we should have decomposed)
     }
 
@@ -1253,15 +1253,15 @@ addInsols wc cts
 instance Outputable WantedConstraints where
   ppr (WC {wc_flat = f, wc_impl = i, wc_insol = n})
    = ptext (sLit "WC") <+> braces (vcat
-        [ if isEmptyBag f then empty else
-          ptext (sLit "wc_flat =")  <+> pprBag ppr f
-        , if isEmptyBag i then empty else
-          ptext (sLit "wc_impl =")  <+> pprBag ppr i
-        , if isEmptyBag n then empty else
-          ptext (sLit "wc_insol =") <+> pprBag ppr n ])
+        [ ppr_bag (ptext (sLit "wc_flat")) f
+        , ppr_bag (ptext (sLit "wc_insol")) n
+        , ppr_bag (ptext (sLit "wc_impl")) i ])
 
-pprBag :: (a -> SDoc) -> Bag a -> SDoc
-pprBag pp b = foldrBag (($$) . pp) empty b
+ppr_bag :: Outputable a => SDoc -> Bag a -> SDoc
+ppr_bag doc bag
+ | isEmptyBag bag = empty
+ | otherwise      = hang (doc <+> equals) 
+                       2 (foldrBag (($$) . ppr) empty bag)
 \end{code}
 
 
@@ -1285,10 +1285,6 @@ data Implication
                                  --   (order does not matter)
                                  -- See Invariant (GivenInv) in TcType
 
-      ic_fsks  :: [TcTyVar],     -- Extra flatten-skolems introduced by
-                                 -- by flattening the givens
-                                 -- See Note [Given flatten-skolems]
-
       ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
                                  -- False <=> ic_givens might have equalities
 
@@ -1304,19 +1300,18 @@ data Implication
     }
 
 instance Outputable Implication where
-  ppr (Implic { ic_untch = untch, ic_skols = skols, ic_fsks = fsks
+  ppr (Implic { ic_untch = untch, ic_skols = skols
               , ic_given = given, ic_no_eqs = no_eqs
               , ic_wanted = wanted
               , ic_binds = binds, ic_info = info })
-   = ptext (sLit "Implic") <+> braces
-     (sep [ ptext (sLit "Untouchables =") <+> ppr untch
-          , ptext (sLit "Skolems =") <+> pprTvBndrs skols
-          , ptext (sLit "Flatten-skolems =") <+> pprTvBndrs fsks
-          , ptext (sLit "No-eqs =") <+> ppr no_eqs
-          , ptext (sLit "Given =") <+> pprEvVars given
-          , ptext (sLit "Wanted =") <+> ppr wanted
-          , ptext (sLit "Binds =") <+> ppr binds
-          , pprSkolInfo info ])
+   = hang (ptext (sLit "Implic") <+> lbrace)
+        2 (sep [ ptext (sLit "Untouchables =") <+> ppr untch
+               , ptext (sLit "Skolems =") <+> pprTvBndrs skols
+               , ptext (sLit "No-eqs =") <+> ppr no_eqs
+               , hang (ptext (sLit "Given ="))  2 (pprEvVars given)
+               , hang (ptext (sLit "Wanted =")) 2 (ppr wanted)
+               , ptext (sLit "Binds =") <+> ppr binds
+               , pprSkolInfo info ] <+> rbrace)
 \end{code}
 
 Note [Shadowing in a constraint]
@@ -1387,12 +1382,6 @@ pprEvVarTheta ev_vars = pprTheta (map evVarPred ev_vars)
 
 pprEvVarWithType :: EvVar -> SDoc
 pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
-
-pprWantedsWithLocs :: WantedConstraints -> SDoc
-pprWantedsWithLocs wcs
-  =  vcat [ pprBag ppr (wc_flat wcs)
-          , pprBag ppr (wc_impl wcs)
-          , pprBag ppr (wc_insol wcs) ]
 \end{code}
 
 %************************************************************************
@@ -1434,6 +1423,13 @@ ctEvTerm :: CtEvidence -> EvTerm
 ctEvTerm (CtGiven   { ctev_evtm = tm }) = tm
 ctEvTerm (CtWanted  { ctev_evar = ev }) = EvId ev
 ctEvTerm ctev@(CtDerived {}) = pprPanic "ctEvTerm: derived constraint cannot have id"
+                                      (ppr ctev)
+
+ctEvCoercion :: CtEvidence -> TcCoercion
+-- ctEvCoercion ev = evTermCoercion (ctEvTerm ev)
+ctEvCoercion (CtGiven   { ctev_evtm = tm }) = evTermCoercion tm
+ctEvCoercion (CtWanted  { ctev_evar = v })  = mkTcCoVarCo v
+ctEvCoercion ctev@(CtDerived {}) = pprPanic "ctEvCoercion: derived constraint cannot have id"
                                       (ppr ctev)
 
 -- | Checks whether the evidence can be used to solve a goal with the given minimum depth

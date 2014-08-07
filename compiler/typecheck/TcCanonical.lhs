@@ -3,7 +3,8 @@
 
 module TcCanonical(
     canonicalize, emitWorkNC,
-    StopOrContinue (..)
+    StopOrContinue(..),
+    flatten, FlattenMode(..)
  ) where
 
 #include "HsVersions.h"
@@ -178,9 +179,9 @@ canonicalize (CTyEqCan { cc_ev = ev
 canonicalize (CFunEqCan { cc_ev = ev
                         , cc_fun    = fn
                         , cc_tyargs = xis1
-                        , cc_rhs    = xi2 })
+                        , cc_fsk    = fsk })
   = {-# SCC "canEqLeafFunEq" #-}
-    canEqLeafFun ev NotSwapped fn xis1 xi2 xi2
+    canCFunEqCan ev fn xis1 fsk
 
 canonicalize (CIrredEvCan { cc_ev = ev })
   = canIrred ev
@@ -514,23 +515,7 @@ flatten f ctxt (TyConApp tc tys)
   -- flatten it away as well, and generate a new given equality constraint
   -- between the application and a newly generated flattening skolem variable.
   | otherwise
-  = ASSERT( tyConArity tc <= length tys )       -- Type functions are saturated
-      do { (xis, cos) <- flattenMany f ctxt tys
-         ; let (xi_args,  xi_rest)  = splitAt (tyConArity tc) xis
-               (cos_args, cos_rest) = splitAt (tyConArity tc) cos
-                 -- The type function might be *over* saturated
-                 -- in which case the remaining arguments should
-                 -- be dealt with by AppTys
-
-         ; (rhs_xi, ret_co) <- flattenNestedFamApp f ctxt tc xi_args
-
-                  -- Emit the flat constraints
-         ; return ( mkAppTys rhs_xi xi_rest -- NB mkAppTys: rhs_xi might not be a type variable
-                                            --    cf Trac #5655
-                  , mkTcAppCos (mkTcSymCo ret_co `mkTcTransCo` mkTcTyConAppCo Nominal tc cos_args) $
-                    cos_rest
-                  )
-         }
+  = flattenFamApp f ctxt tc tys
 
 flatten _f ctxt ty@(ForAllTy {})
 -- We allow for-alls when, but only when, no type function
@@ -578,19 +563,43 @@ because now the 'b' has escaped its scope.  We'd have to flatten to
 and we have not begun to think about how to make that work!
 
 \begin{code}
-flattenNestedFamApp :: FlattenMode -> CtEvidence
-                    -> TyCon -> [TcType]   -- Exactly-saturated type function application
-                    -> TcS (Xi, TcCoercion)
-flattenNestedFamApp FMSubstOnly _ tc xi_args
+flattenFamApp, flattenExactFamApp
+-- flattenFamApp      can be over-saturated
+-- flattenExactFamApp is exactly saturated
+  :: FlattenMode -> CtEvidence
+  -> TyCon -> [TcType] -> TcS (Xi, TcCoercion)
+  -- Postcondition: Coercion :: Xi ~ F tys
+flattenFamApp f ctxt tc tys  -- Can be over-saturated
+    = ASSERT( tyConArity tc <= length tys )  -- Type functions are saturated
+      do { (xis, cos) <- flattenMany f ctxt tys
+         ; let (xi_args,  xi_rest)  = splitAt (tyConArity tc) xis
+               (cos_args, cos_rest) = splitAt (tyConArity tc) cos
+                 -- The type function might be *over* saturated
+                 -- in which case the remaining arguments should
+                 -- be dealt with by AppTys
+
+         ; (rhs_xi, ret_co) <- flattenExactFamApp f ctxt tc xi_args
+              -- ret_co :: rhs_xi ~ F xi_args
+
+                  -- Emit the flat constraints
+         ; return ( mkAppTys rhs_xi xi_rest -- NB mkAppTys: rhs_xi might not be a type variable
+                                            --    cf Trac #5655
+                  , mkTcAppCos (ret_co `mkTcTransCo` mkTcTyConAppCo Nominal tc cos_args)
+                               -- (rhs_xi :: F xis) ; (F cos :: F xis ~ F tys)
+                               cos_rest
+                  )
+         }
+
+flattenExactFamApp FMSubstOnly _ tc xi_args
   = do { let fam_ty = mkTyConApp tc xi_args
        ; return (fam_ty, mkTcNomReflCo fam_ty) }
 
-flattenNestedFamApp FMFullFlatten ctxt tc xi_args  -- Eactly saturated
+flattenExactFamApp FMFullFlatten ctxt tc xi_args  -- Eactly saturated
   = do { let fam_ty = mkTyConApp tc xi_args
+             loc    = ctev_loc ctxt
        ; mb_ct <- lookupFlatEqn tc xi_args
        ; case mb_ct of
-           Just (ctev, rhs_ty)
-             | ctev `canRewriteOrSame `ctxt    -- Must allow [W]/[W]
+           Just (co, fsk)  -- co :: F xi_args ~ fsk
              -> -- You may think that we can just return (cc_rhs ct) but not so.
                 --            return (mkTcCoVarCo (ctId ct), cc_rhs ct, [])
                 -- The cached constraint resides in the cache so we have to flatten
@@ -599,25 +608,27 @@ flattenNestedFamApp FMFullFlatten ctxt tc xi_args  -- Eactly saturated
                 -- cache as well when we interact an equality with the inert.
                 -- The design choice is: do we keep the flat cache rewritten or not?
                 -- For now I say we don't keep it fully rewritten.
-               do { (rhs_xi,co) <- flatten FMFullFlatten ctev rhs_ty
-                  ; let final_co = evTermCoercion (ctEvTerm ctev)
-                                   `mkTcTransCo` mkTcSymCo co
-                  ; traceTcS "flatten/flat-cache hit" $ (ppr ctev $$ ppr rhs_xi $$ ppr final_co)
-                  ; return (rhs_xi, final_co) }
+               do { traceTcS "flatten/flat-cache hit" $ (ppr tc <+> ppr xi_args $$ ppr fsk $$ ppr co)
+                  ; (fsk_xi, fsk_co) <- flattenTyVar FMFullFlatten ctxt fsk
+                          -- The fsk may already have been unified, so flatten it
+                          -- fsk_co :: fsk_xi ~ fsk
+                  ; return (fsk_xi, fsk_co `mkTcTransCo`mkTcSymCo co) }
+                                    -- :: fsk_xi ~ F xi_args
 
-           _ -> do { (ctev, rhs_xi) <- newFlattenSkolem ctxt fam_ty
-                   ; extendFlatCache tc xi_args ctev rhs_xi
+           _ -> do { (ev, fsk) <- newFlattenSkolem loc fam_ty
+                   ; let co = ctEvCoercion ev  -- :: F xis ~ fsk
+                   ; extendFlatCache tc xi_args (co, fsk)
 
-                   -- The new constraint (F xi_args ~ rhs_xi) is not necessarily inert
+                   -- The new constraint (F xi_args ~ fsk) is not necessarily inert
                    -- (e.g. the LHS may be a redex) so we must put it in the work list
-                   ; let ct = CFunEqCan { cc_ev     = ctev
+                   ; let ct = CFunEqCan { cc_ev     = ev
                                         , cc_fun    = tc
                                         , cc_tyargs = xi_args
-                                        , cc_rhs    = rhs_xi }
-                   ; updWorkListTcS $ extendWorkListFunEq ct
+                                        , cc_fsk    = fsk }
+                   ; updWorkListTcS (extendWorkListFunEq ct)
 
-                   ; traceTcS "flatten/flat-cache miss" $ (ppr fam_ty $$ ppr rhs_xi $$ ppr ctev)
-                   ; return (rhs_xi, evTermCoercion (ctEvTerm ctev)) }
+                   ; traceTcS "flatten/flat-cache miss" $ (ppr fam_ty $$ ppr fsk $$ ppr ev)
+                   ; return (mkTyVarTy fsk, mkTcSymCo co) }
        }
 \end{code}
 
@@ -682,7 +693,7 @@ flattenTyVarOuter f ctxt tv
                    rhs_ty = cc_rhs ct
              , ctev `canRewrite` ctxt 
              ->  do { traceTcS "Following inert tyvar" (ppr tv <+> equals <+> ppr rhs_ty $$ ppr ctev)
-                    ; return (Right (rhs_ty, mkTcSymCo (evTermCoercion (ctEvTerm ctev)))) }
+                    ; return (Right (rhs_ty, mkTcSymCo (ctEvCoercion ctev))) }
                     -- NB: even if ct is Derived we are not going to
                     -- touch the actual coercion so we are fine.
 
@@ -698,7 +709,6 @@ flattenTyVarFinal f ctxt tv
 
 Note [Non-idempotent inert substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The inert substitution is not idempotent in the broad sense. It is only idempotent in
 that it cannot rewrite the RHS of other inert equalities any further. An example of such
 an inert substitution is:
@@ -769,14 +779,6 @@ can_eq_nc' ev ty1 ps_ty1 ty2 ps_ty2
   | Just ty1' <- tcView ty1 = can_eq_nc ev ty1' ps_ty1 ty2  ps_ty2
   | Just ty2' <- tcView ty2 = can_eq_nc ev ty1  ps_ty1 ty2' ps_ty2
 
--- Type family on LHS or RHS take priority
-can_eq_nc' ev (TyConApp fn tys) _ ty2 ps_ty2
-  | isSynFamilyTyCon fn
-  = canEqLeafFun ev NotSwapped fn tys ty2 ps_ty2
-can_eq_nc' ev ty1 ps_ty1 (TyConApp fn tys) _
-  | isSynFamilyTyCon fn
-  = canEqLeafFun ev IsSwapped fn tys ty1 ps_ty1
-
 -- Type variable on LHS or RHS are next
 can_eq_nc' ev (TyVarTy tv1) _ ty2 ps_ty2
   = canEqTyVar ev NotSwapped tv1 ty2 ps_ty2
@@ -793,6 +795,12 @@ can_eq_nc' ev ty1@(LitTy l1) _ (LitTy l2) _
   = do { when (isWanted ev) $
          setEvBind (ctev_evar ev) (EvCoercion (mkTcNomReflCo ty1))
        ; return Stop }
+
+-- Type family on LHS or RHS take priority
+can_eq_nc' ev ty1@(TyConApp fn _) _ ty2 _
+  | isSynFamilyTyCon fn = can_eq_fam_nc ev NotSwapped ty1 ty2
+can_eq_nc' ev ty1 _ ty2@(TyConApp fn _) _
+  | isSynFamilyTyCon fn = can_eq_fam_nc ev IsSwapped  ty2 ty1
 
 -- Decomposable type constructor applications 
 -- Synonyms and type functions (which are not decomposable)
@@ -840,6 +848,20 @@ can_eq_nc' ev ty1 ps_ty1 (AppTy s2 t2) ps_ty2
 -- Everything else is a definite type error, eg LitTy ~ TyConApp
 can_eq_nc' ev _ ps_ty1 _ ps_ty2
   = canEqFailure ev ps_ty1 ps_ty2
+
+------------
+can_eq_fam_nc :: CtEvidence -> SwapFlag 
+              -> TcType -> TcType -> TcS StopOrContinue
+-- Canonicalise a non-canonical equality of form (F tys ~ ty)
+--   or the swapped version thereof
+-- Flatten both sides and go round again
+can_eq_fam_nc ev swapped lhs rhs
+  = do { (xi_lhs, co_lhs) <- flatten FMFullFlatten ev lhs
+       ; (xi_rhs, co_rhs) <- flatten FMFullFlatten ev rhs
+       ; mb_ct <- rewriteEqEvidence ev swapped xi_lhs xi_rhs co_lhs co_rhs
+       ; case mb_ct of
+           Nothing -> return Stop
+           Just new_ev -> can_eq_nc new_ev xi_lhs xi_lhs xi_rhs xi_rhs }
 
 ------------
 can_eq_app, can_eq_flat_app
@@ -1078,50 +1100,31 @@ inert set is an idempotent subustitution...
     introduce any new ones.
 
 \begin{code}
-canEqLeafFun :: CtEvidence 
-             -> SwapFlag
+canCFunEqCan :: CtEvidence 
              -> TyCon -> [TcType]   -- LHS
-             -> TcType -> TcType    -- RHS
+             -> TcTyVar             -- RHS
              -> TcS StopOrContinue
-canEqLeafFun ev swapped fn tys1 ty2 ps_ty2
-  | length tys1 > tyConArity fn
-  = -- Over-saturated type function on LHS: 
-    -- flatten LHS, leaving an AppTy, and go around again
-    do { (xi1, co1) <- flatten FMFullFlatten ev (mkTyConApp fn tys1)
-       ; mb <- rewriteEqEvidence ev swapped xi1 ps_ty2 
-                                 co1 (mkTcNomReflCo ps_ty2)
-       ; case mb of
-            Nothing     -> return Stop
-            Just new_ev -> can_eq_nc new_ev xi1 xi1 ty2 ps_ty2 }
+-- ^ Canonicalise a CFunEqCan.  We know that 
+--     the arg types are already flat, 
+-- and the RHS is a fsk, which we must not substitute.
+-- So just substitute in the LHS
+canCFunEqCan ev fn tys fsk
+  = ASSERT2( isWanted ev, ppr ev )
+    do { (tys', cos) <- flattenMany FMFullFlatten ev tys
+                        -- cos :: tys' ~ tys
+       ; let lhs_co  = mkTcTyConAppCo Nominal fn cos
+                        -- :: F tys' ~ F tys
+             new_lhs = mkTyConApp fn tys'
+             fsk_ty  = mkTyVarTy fsk
+       ; mb_ev <- rewriteEqEvidence ev NotSwapped new_lhs fsk_ty 
+                                    lhs_co (mkTcNomReflCo fsk_ty)
+       ; case mb_ev of {
+           Nothing  -> return Stop ;
+           Just ev' -> 
 
-  | otherwise
-  = -- ev :: F tys1 ~ ty2,   if not swapped
-    -- ev :: ty2 ~ F tys1,   if swapped                                    
-    ASSERT( length tys1 == tyConArity fn )  
-        -- Type functions are never under-saturated
-        -- Previous equation checks for over-saturation
-    do { traceTcS "canEqLeafFun" $ pprEq (mkTyConApp fn tys1) ps_ty2
-
-            -- Flatten type function arguments
-            -- cos1 :: xis1 ~ tys1
-            -- co2  :: xi2 ~ ty2
-      ; (xis1,cos1) <- flattenMany FMFullFlatten ev tys1
-      ; (xi2, co2)  <- flatten     FMFullFlatten ev ps_ty2
-
-       ; let fam_head = mkTyConApp fn xis1
-             co1      = mkTcTyConAppCo Nominal fn cos1
-       ; mb <- rewriteEqEvidence ev swapped fam_head xi2 co1 co2
-
-       ; let k1 = typeKind fam_head
-             k2 = typeKind xi2
-       ; case mb of
-            Nothing     -> return Stop
-            Just new_ev | k1 `isSubKind` k2
-                        -- Establish CFunEqCan kind invariant
-                        -> continueWith (CFunEqCan { cc_ev = new_ev, cc_fun = fn
-                                                   , cc_tyargs = xis1, cc_rhs = xi2 })
-                        | otherwise
-                        -> checkKind new_ev fam_head k1 xi2 k2 }
+    do { extendFlatCache fn tys' (ctEvCoercion ev', fsk)
+       ; continueWith (CFunEqCan { cc_ev = ev', cc_fun = fn
+                                 , cc_tyargs = tys', cc_fsk = fsk }) } } }
 
 ---------------------
 canEqTyVar :: CtEvidence -> SwapFlag

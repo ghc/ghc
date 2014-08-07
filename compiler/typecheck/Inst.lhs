@@ -506,13 +506,12 @@ addClsInstsErr herald ispecs
 \begin{code}
 ---------------- Getting free tyvars -------------------------
 tyVarsOfCt :: Ct -> TcTyVarSet
--- NB: the 
-tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })    = extendVarSet (tyVarsOfType xi) tv
-tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_rhs = xi }) = tyVarsOfTypes (xi:tys)
-tyVarsOfCt (CDictCan { cc_tyargs = tys }) 	        = tyVarsOfTypes tys
-tyVarsOfCt (CIrredEvCan { cc_ev = ev })                 = tyVarsOfType (ctEvPred ev)
-tyVarsOfCt (CHoleCan { cc_ev = ev })                    = tyVarsOfType (ctEvPred ev)
-tyVarsOfCt (CNonCanonical { cc_ev = ev })               = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })     = extendVarSet (tyVarsOfType xi) tv
+tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk }) = extendVarSet (tyVarsOfTypes tys) fsk
+tyVarsOfCt (CDictCan { cc_tyargs = tys }) 	         = tyVarsOfTypes tys
+tyVarsOfCt (CIrredEvCan { cc_ev = ev })                  = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CHoleCan { cc_ev = ev })                     = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CNonCanonical { cc_ev = ev })                = tyVarsOfType (ctEvPred ev)
 
 tyVarsOfCts :: Cts -> TcTyVarSet
 tyVarsOfCts = foldrBag (unionVarSet . tyVarsOfCt) emptyVarSet
@@ -526,10 +525,10 @@ tyVarsOfWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
 
 tyVarsOfImplic :: Implication -> TyVarSet
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
-tyVarsOfImplic (Implic { ic_skols = skols, ic_fsks = fsks
-                             , ic_given = givens, ic_wanted = wanted })
+tyVarsOfImplic (Implic { ic_skols = skols
+                       , ic_given = givens, ic_wanted = wanted })
   = (tyVarsOfWC wanted `unionVarSet` tyVarsOfTypes (map evVarPred givens))
-    `delVarSetList` skols `delVarSetList` fsks
+    `delVarSetList` skols 
 
 tyVarsOfBag :: (a -> TyVarSet) -> Bag a -> TyVarSet
 tyVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet

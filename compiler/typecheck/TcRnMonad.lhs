@@ -188,8 +188,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
         lie <- readIORef lie_var ;
         if isEmptyWC lie
            then return ()
-           else pprPanic "initTc: unsolved constraints"
-                         (pprWantedsWithLocs lie) ;
+           else pprPanic "initTc: unsolved constraints" (ppr lie) ;
 
         -- Collect any error messages
         msgs <- readIORef errs_var ;
