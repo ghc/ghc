@@ -94,6 +94,7 @@ import MkId
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
 #endif
+import TidyPgm    ( mkBootModDetailsTc )
 
 import FastString
 import Maybes
@@ -136,6 +137,124 @@ tcRnModule hsc_env hsc_src save_rn_syntax
       ; initTc hsc_env hsc_src save_rn_syntax this_mod $
         tcRnModuleTcRnM hsc_env hsc_src parsedModule pair }
 
+-- To be called at the beginning of renaming hsig files.
+-- If we're processing a signature, load up the RdrEnv
+-- specified by sig-of so that
+-- when we process top-level bindings, we pull in the right
+-- original names.  We also need to add in dependencies from
+-- the implementation (orphans, family instances, packages),
+-- similar to how rnImportDecl handles things.
+-- ToDo: Handle SafeHaskell
+tcRnSignature :: DynFlags -> HscSource -> TcRn TcGblEnv
+tcRnSignature dflags hsc_src
+ = do { tcg_env <- getGblEnv ;
+        case tcg_sig_of tcg_env of {
+          Just sof
+           | hsc_src /= HsigFile -> do
+                { addErr (ptext (sLit "Illegal -sig-of specified for non hsig"))
+                ; return tcg_env
+                }
+           | otherwise -> do
+            { sig_iface <- initIfaceTcRn $ loadSysInterface (text "sig-of") sof
+            ; let { gr = mkGlobalRdrEnv
+                              (gresFromAvails LocalDef (mi_exports sig_iface))
+                  ; avails = calculateAvails dflags
+                                    sig_iface False{- safe -} False{- boot -} }
+            ; return (tcg_env
+                { tcg_impl_rdr_env = Just gr
+                , tcg_imports = tcg_imports tcg_env `plusImportAvails` avails
+                })
+            } ;
+            Nothing
+             | HsigFile <- hsc_src
+             , HscNothing <- hscTarget dflags -> do
+                { return tcg_env
+                }
+             | HsigFile <- hsc_src -> do
+                { addErr (ptext (sLit "Missing -sig-of for hsig"))
+                ; failM }
+             | otherwise -> return tcg_env
+        }
+      }
+
+checkHsigIface :: HscEnv -> TcGblEnv -> TcRn ()
+checkHsigIface hsc_env tcg_env
+  = case tcg_impl_rdr_env tcg_env of
+      Just gr -> do { sig_details <- liftIO $ mkBootModDetailsTc hsc_env tcg_env
+                    ; checkHsigIface' gr sig_details
+                    }
+      Nothing -> return ()
+
+checkHsigIface' :: GlobalRdrEnv -> ModDetails -> TcRn ()
+checkHsigIface' gr
+  ModDetails { md_insts = sig_insts, md_fam_insts = sig_fam_insts,
+               md_types = sig_type_env, md_exports = sig_exports}
+  = do { traceTc "checkHsigIface" $ vcat
+           [ ppr sig_type_env, ppr sig_insts, ppr sig_exports ]
+       ; mapM_ check_export sig_exports
+       ; unless (null sig_fam_insts) $
+           panic ("TcRnDriver.checkHsigIface: Cannot handle family " ++
+                  "instances in hsig files yet...")
+       ; mapM_ check_inst sig_insts
+       ; failIfErrsM
+       }
+  where
+    check_export sig_avail
+      -- Skip instances, we'll check them later
+      | name `elem` dfun_names = return ()
+      | otherwise = do
+        { -- Lookup local environment only (don't want to accidentally pick
+          -- up the backing copy.)  We consult tcg_type_env because we want
+          -- to pick up wired in names too (which get dropped by the iface
+          -- creation process); it's OK for a signature file to mention
+          -- a wired in name.
+          env <- getGblEnv
+        ; case lookupNameEnv (tcg_type_env env) name of
+            Nothing
+                -- All this means is no local definition is available: but we
+                -- could have created the export this way:
+                --
+                -- module ASig(f) where
+                --      import B(f)
+                --
+                -- In this case, we have to just lookup the identifier in
+                -- the backing implementation and make sure it matches.
+                | [GRE { gre_name = name' }]
+                    <- lookupGlobalRdrEnv gr (nameOccName name)
+                , name == name' -> return ()
+                -- TODO: Possibly give a different error if the identifier
+                -- is exported, but it's a different original name
+                | otherwise -> addErrAt (nameSrcSpan name)
+                                (missingBootThing False name "exported by")
+            Just sig_thing -> do {
+          -- We use tcLookupImported_maybe because we want to EXCLUDE
+          -- tcg_env.
+        ; r <- tcLookupImported_maybe name
+        ; case r of
+            Failed err -> addErr err
+            Succeeded real_thing ->
+              when (not (checkBootDecl sig_thing real_thing))
+               $ addErrAt (nameSrcSpan (getName sig_thing))
+                          (bootMisMatch False real_thing sig_thing)
+        }}
+      where
+        name          = availName sig_avail
+
+    dfun_names = map getName sig_insts
+
+    -- In general, for hsig files we can't assume that the implementing
+    -- file actually implemented the instances (they may be reexported
+    -- from elsewhere.  Where should we look for the instances?  We do
+    -- the same as we would otherwise: consult the EPS.  This isn't
+    -- perfect (we might conclude the module exports an instance
+    -- when it doesn't, see #9422), but we will never refuse to compile
+    -- something
+    check_inst :: ClsInst -> TcM ()
+    check_inst sig_inst
+        = do eps <- getEps
+             when (not (memberInstEnv (eps_inst_env eps) sig_inst)) $
+               addErrTc (instMisMatch False sig_inst)
+
 tcRnModuleTcRnM :: HscEnv
                 -> HscSource
                 -> HsParsedModule
@@ -153,7 +272,12 @@ tcRnModuleTcRnM hsc_env hsc_src
                 })
                 (this_mod, prel_imp_loc)
  = setSrcSpan loc $
-   do {         -- Deal with imports; first add implicit prelude
+   do { let { dflags = hsc_dflags hsc_env } ;
+
+        tcg_env <- tcRnSignature dflags hsc_src ;
+        setGblEnv tcg_env $ do {
+
+        -- Deal with imports; first add implicit prelude
         implicit_prelude <- xoptM Opt_ImplicitPrelude;
         let { prel_imports = mkPrelImports (moduleName this_mod) prel_imp_loc
                                          implicit_prelude import_decls } ;
@@ -186,8 +310,8 @@ tcRnModuleTcRnM hsc_env hsc_src
 
                 -- Rename and type check the declarations
         traceRn (text "rn1a") ;
-        tcg_env <- if isHsBoot hsc_src then
-                        tcRnHsBootDecls local_decls
+        tcg_env <- if isHsBootOrSig hsc_src then
+                        tcRnHsBootDecls hsc_src local_decls
                    else
                         {-# SCC "tcRnSrcDecls" #-}
                         tcRnSrcDecls boot_iface local_decls ;
@@ -204,6 +328,21 @@ tcRnModuleTcRnM hsc_env hsc_src
         -- Compare the hi-boot iface (if any) with the real thing
         -- Must be done after processing the exports
         tcg_env <- checkHiBootIface tcg_env boot_iface ;
+
+        -- Compare the hsig tcg_env with the real thing
+        checkHsigIface hsc_env tcg_env ;
+
+        -- Nub out type class instances now that we've checked them,
+        -- if we're compiling an hsig with sig-of.
+        -- See Note [Signature files and type class instances]
+        tcg_env <- (case tcg_sig_of tcg_env of
+            Just _ -> return tcg_env {
+                        tcg_inst_env = emptyInstEnv,
+                        tcg_fam_inst_env = emptyFamInstEnv,
+                        tcg_insts = [],
+                        tcg_fam_insts = []
+                        }
+            Nothing -> return tcg_env) ;
 
         -- The new type env is already available to stuff slurped from
         -- interface files, via TcEnv.updateGlobalTypeEnv
@@ -224,8 +363,7 @@ tcRnModuleTcRnM hsc_env hsc_src
                 -- Dump output and return
         tcDump tcg_env ;
         return tcg_env
-    }}}
-
+    }}}}
 
 implicitPreludeWarn :: SDoc
 implicitPreludeWarn
@@ -465,8 +603,8 @@ tc_rn_src_decls boot_details ds
 %************************************************************************
 
 \begin{code}
-tcRnHsBootDecls :: [LHsDecl RdrName] -> TcM TcGblEnv
-tcRnHsBootDecls decls
+tcRnHsBootDecls :: HscSource -> [LHsDecl RdrName] -> TcM TcGblEnv
+tcRnHsBootDecls hsc_src decls
    = do { (first_group, group_tail) <- findSplice decls
 
                 -- Rename the declarations
@@ -487,12 +625,12 @@ tcRnHsBootDecls decls
 
                 -- Check for illegal declarations
         ; case group_tail of
-             Just (SpliceDecl d _, _) -> badBootDecl "splice" d
+             Just (SpliceDecl d _, _) -> badBootDecl hsc_src "splice" d
              Nothing                  -> return ()
-        ; mapM_ (badBootDecl "foreign") for_decls
-        ; mapM_ (badBootDecl "default") def_decls
-        ; mapM_ (badBootDecl "rule")    rule_decls
-        ; mapM_ (badBootDecl "vect")    vect_decls
+        ; mapM_ (badBootDecl hsc_src "foreign") for_decls
+        ; mapM_ (badBootDecl hsc_src "default") def_decls
+        ; mapM_ (badBootDecl hsc_src "rule")    rule_decls
+        ; mapM_ (badBootDecl hsc_src "vect")    vect_decls
 
                 -- Typecheck type/class/isntance decls
         ; traceTc "Tc2 (boot)" empty
@@ -514,7 +652,10 @@ tcRnHsBootDecls decls
                 -- are written into the interface file.
         ; let { type_env0 = tcg_type_env gbl_env
               ; type_env1 = extendTypeEnvWithIds type_env0 val_ids
-              ; type_env2 = extendTypeEnvWithIds type_env1 dfun_ids
+              -- Don't add the dictionaries for hsig, we don't actually want
+              -- to /define/ the instance
+              ; type_env2 | HsigFile <- hsc_src = type_env1
+                          | otherwise = extendTypeEnvWithIds type_env1 dfun_ids
               ; dfun_ids = map iDFunId inst_infos
               }
 
@@ -522,10 +663,15 @@ tcRnHsBootDecls decls
    }}
    ; traceTc "boot" (ppr lie); return gbl_env }
 
-badBootDecl :: String -> Located decl -> TcM ()
-badBootDecl what (L loc _)
+badBootDecl :: HscSource -> String -> Located decl -> TcM ()
+badBootDecl hsc_src what (L loc _)
   = addErrAt loc (char 'A' <+> text what
-      <+> ptext (sLit "declaration is not (currently) allowed in a hs-boot file"))
+      <+> ptext (sLit "declaration is not (currently) allowed in a")
+      <+> (case hsc_src of
+            HsBootFile -> ptext (sLit "hs-boot")
+            HsigFile -> ptext (sLit "hsig")
+            _ -> panic "badBootDecl: should be an hsig or hs-boot file")
+      <+> ptext (sLit "file"))
 \end{code}
 
 Once we've typechecked the body of the module, we want to compare what
@@ -546,7 +692,7 @@ checkHiBootIface
                             tcg_insts = local_insts,
                             tcg_type_env = local_type_env, tcg_exports = local_exports })
         boot_details
-  | isHsBoot hs_src     -- Current module is already a hs-boot file!
+  | HsBootFile <- hs_src     -- Current module is already a hs-boot file!
   = return tcg_env
 
   | otherwise
@@ -605,7 +751,7 @@ checkHiBootIface'
         -- Check that the actual module exports the same thing
       | not (null missing_names)
       = addErrAt (nameSrcSpan (head missing_names))
-                 (missingBootThing (head missing_names) "exported by")
+                 (missingBootThing True (head missing_names) "exported by")
 
         -- If the boot module does not *define* the thing, we are done
         -- (it simply re-exports it, and names match, so nothing further to do)
@@ -617,10 +763,10 @@ checkHiBootIface'
         Just boot_thing <- mb_boot_thing
       = when (not (checkBootDecl boot_thing real_thing))
             $ addErrAt (nameSrcSpan (getName boot_thing))
-                       (bootMisMatch real_thing boot_thing)
+                       (bootMisMatch True real_thing boot_thing)
 
       | otherwise
-      = addErrTc (missingBootThing name "defined in")
+      = addErrTc (missingBootThing True name "defined in")
       where
         name          = availName boot_avail
         mb_boot_thing = lookupTypeEnv boot_type_env name
@@ -643,7 +789,7 @@ checkHiBootIface'
                                                   , text "boot_inst"   <+> ppr boot_inst
                                                   , text "boot_inst_ty" <+> ppr boot_inst_ty
                                                   ])
-                     ; addErrTc (instMisMatch boot_inst); return Nothing }
+                     ; addErrTc (instMisMatch True boot_inst); return Nothing }
             (dfun:_) -> return (Just (local_boot_dfun, dfun))
         where
           boot_dfun = instanceDFunId boot_inst
@@ -785,23 +931,32 @@ emptyRnEnv2 :: RnEnv2
 emptyRnEnv2 = mkRnEnv2 emptyInScopeSet
 
 ----------------
-missingBootThing :: Name -> String -> SDoc
-missingBootThing name what
-  = ppr name <+> ptext (sLit "is exported by the hs-boot file, but not")
+missingBootThing :: Bool -> Name -> String -> SDoc
+missingBootThing is_boot name what
+  = ppr name <+> ptext (sLit "is exported by the") <+>
+              (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "hsig"))
+              <+> ptext (sLit "file, but not")
               <+> text what <+> ptext (sLit "the module")
 
-bootMisMatch :: TyThing -> TyThing -> SDoc
-bootMisMatch real_thing boot_thing
+bootMisMatch :: Bool -> TyThing -> TyThing -> SDoc
+bootMisMatch is_boot real_thing boot_thing
   = vcat [ppr real_thing <+>
           ptext (sLit "has conflicting definitions in the module"),
-          ptext (sLit "and its hs-boot file"),
+          ptext (sLit "and its") <+>
+            (if is_boot then ptext (sLit "hs-boot file")
+                       else ptext (sLit "hsig file")),
           ptext (sLit "Main module:") <+> PprTyThing.pprTyThing real_thing,
-          ptext (sLit "Boot file:  ") <+> PprTyThing.pprTyThing boot_thing]
+          (if is_boot
+            then ptext (sLit "Boot file:  ")
+            else ptext (sLit "Hsig file: "))
+            <+> PprTyThing.pprTyThing boot_thing]
 
-instMisMatch :: ClsInst -> SDoc
-instMisMatch inst
+instMisMatch :: Bool -> ClsInst -> SDoc
+instMisMatch is_boot inst
   = hang (ppr inst)
-       2 (ptext (sLit "is defined in the hs-boot file, but not in the module itself"))
+       2 (ptext (sLit "is defined in the") <+>
+        (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "hsig"))
+       <+> ptext (sLit "file, but not in the module itself"))
 \end{code}
 
 

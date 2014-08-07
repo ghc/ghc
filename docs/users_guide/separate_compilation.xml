@@ -883,6 +883,102 @@ methods entirely; but you must either omit them all or put them all in.
 </para>
     </sect2>
 
+    <sect2 id="module-signatures">
+      <title>Module signatures</title>
+      <para>GHC supports the specification of module signatures, which
+      both implementations and users can typecheck against separately.
+      This functionality should be considered experimental for now; some
+      details, especially for type classes and type families, may change.
+      This system was originally described in <ulink
+      url="http://plv.mpi-sws.org/backpack/">Backpack: Retrofitting Haskell with
+      Interfaces</ulink>.  Signature files are somewhat similar to
+      <literal>hs-boot</literal> files, but have the <literal>hsig</literal>
+      extension and behave slightly differently.
+      </para>
+
+      <para>Suppose that I have modules <filename>String.hs</filename> and
+      <filename>A.hs</filename>, thus:</para>
+
+<programlisting>
+module Text where
+    data Text = Text String
+
+    empty :: Text
+    empty = Text ""
+
+    toString :: Text -> String
+    toString (Text s) = s
+
+module A where
+    import Text
+    z = toString empty
+</programlisting>
+
+      <para>Presently, module <literal>A</literal> depends explicitly on
+      a concrete implementation of <literal>Text</literal>.  What if we wanted
+      to a signature <literal>Text</literal>, so we could vary the
+      implementation with other possibilities (e.g. packed UTF-8 encoded
+      bytestrings)?  To do this, we can write a signature
+      <filename>TextSig.hsig</filename>, and modify <literal>A</literal>
+      to include the signature instead:
+      </para>
+
+<programlisting>
+module TextSig where
+    data Text
+    empty :: Text
+    toString :: Text -> String
+
+module A where
+    import TextSig
+    z = toString empty
+</programlisting>
+
+      <para>To compile these two files, we need to specify what module we
+      would like to use to implement the signature.  This can be done by
+      compiling the implementation, and then using the <literal>-sig-of</literal>
+      flag to specify the implementation backing a signature:</para>
+
+<programlisting>
+ghc -c Text.hs
+ghc -c TextSig.hsig -sig-of main:Text
+ghc -c A.hs
+</programlisting>
+
+      <para>Signature files can also be compiled as part of
+      <literal>--make</literal>, in which case the syntax is extended
+      to support specifying implementations of multiple signatures
+      as <literal>FooSig is main:Foo, BarSig is main:Bar</literal>.
+      At the moment, you must specify the full module name (package key,
+      colon, and then module name), although in the future we may support
+      more user-friendly syntax.</para>
+
+      <para>To just type-check an interface file, no <literal>-sig-of</literal>
+      is necessary; instead, just pass the options
+      <literal>-fno-code -fwrite-interface</literal>.  <literal>hsig</literal>
+      files will generate normal interface files which other files can
+      also use to type-check against.  However, at the moment, we always
+      assume that an entity defined in a signature is a unique identifier
+      (even though we may happen to know it is type equal with another
+      identifier).  In the future, we will support passing shaping information
+      to the compiler in order to let it know about these type
+      equalities.</para>
+
+      <para>Just like <literal>hs-boot</literal> files, when an
+      <literal>hsig</literal> file is compiled it is checked for type
+      consistency against the backing implementation; furthermore, it also
+      produces a pseudo-object file <literal>A.o</literal> which you should
+      not link with.  Signature files are also written in a subset
+      of Haskell similar to essentially identical to that of
+      <literal>hs-boot</literal> files.</para>
+
+      <para>There is one important gotcha with the current implementation:
+      currently, instances from backing implementations will "leak" code that
+      uses signatures, and explicit instance declarations in signatures are
+      forbidden.  This behavior will be subject to change.</para>
+
+    </sect2>
+
 
     <sect2 id="using-make">
       <title>Using <command>make</command></title>

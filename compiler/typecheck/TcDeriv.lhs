@@ -358,7 +358,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
                  ; return (g, emptyBag, emptyValBindsOut)}) $
     do  {       -- Fish the "deriving"-related information out of the TcEnv
                 -- And make the necessary "equations".
-          is_boot <- tcIsHsBoot
+          is_boot <- tcIsHsBootOrSig
         ; traceTc "tcDeriving" (ppr is_boot)
 
         ; early_specs <- makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls

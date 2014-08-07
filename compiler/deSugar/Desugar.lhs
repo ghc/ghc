@@ -108,7 +108,7 @@ deSugar hsc_env
                                  _          -> True)
 
         ; (binds_cvr, ds_hpc_info, modBreaks)
-                         <- if want_ticks && not (isHsBoot hsc_src)
+                         <- if want_ticks && not (isHsBootOrSig hsc_src)
                               then addTicksToBinds dflags mod mod_loc export_set
                                           (typeEnvTyCons type_env) binds
                               else return (binds, hpcInfo, emptyModBreaks)
@@ -165,7 +165,7 @@ deSugar hsc_env
 
         ; let mod_guts = ModGuts {
                 mg_module       = mod,
-                mg_boot         = isHsBoot hsc_src,
+                mg_boot         = hsc_src == HsBootFile,
                 mg_exports      = exports,
                 mg_deps         = deps,
                 mg_used_names   = used_names,

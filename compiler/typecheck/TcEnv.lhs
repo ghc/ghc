@@ -767,7 +767,7 @@ name, like otber top-level names, and hence must be made with newGlobalBinder.
 \begin{code}
 newDFunName :: Class -> [Type] -> SrcSpan -> TcM Name
 newDFunName clas tys loc
-  = do  { is_boot <- tcIsHsBoot
+  = do  { is_boot <- tcIsHsBootOrSig
         ; mod     <- getModule
         ; let info_string = occNameString (getOccName clas) ++ 
                             concatMap (occNameString.getDFunTyKey) tys

@@ -121,6 +121,9 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
   code generator needs it. And to ensure that local names have
   distinct OccNames in case of object-file splitting
 
+* If this an hsig file, drop the instances altogether too (they'll
+  get pulled in by the implicit module import.
+
 \begin{code}
 -- This is Plan A: make a small type env when typechecking only,
 -- or when compiling a hs-boot file, or simply when not using -O

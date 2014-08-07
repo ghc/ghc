@@ -48,6 +48,7 @@ module Name (
         -- ** Manipulating and deconstructing 'Name's
         nameUnique, setNameUnique,
         nameOccName, nameModule, nameModule_maybe,
+        setNameLoc,
         tidyNameOcc,
         localiseName,
         mkLocalisedOccName,
@@ -316,6 +317,11 @@ mkFCallName uniq str = mkInternalName uniq (mkVarOcc str) noSrcSpan
 -- one in the thing it's the name of.  If you know what I mean.
 setNameUnique :: Name -> Unique -> Name
 setNameUnique name uniq = name {n_uniq = getKeyFastInt uniq}
+
+-- This is used for hsigs: we want to use the name of the originally exported
+-- entity, but edit the location to refer to the reexport site
+setNameLoc :: Name -> SrcSpan -> Name
+setNameLoc name loc = name {n_loc = loc}
 
 tidyNameOcc :: Name -> OccName -> Name
 -- We set the OccName of a Name when tidying

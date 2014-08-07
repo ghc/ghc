@@ -104,6 +104,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
         th_state_var         <- newIORef Map.empty ;
 #endif /* GHCI */
         let {
+             dflags = hsc_dflags hsc_env ;
+
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
                 | keep_rn_syntax = Just empty_val
@@ -119,6 +121,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 
                 tcg_mod            = mod,
                 tcg_src            = hsc_src,
+                tcg_sig_of         = getSigOf dflags (moduleName mod),
+                tcg_impl_rdr_env   = Nothing,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
                 tcg_field_env      = RecFields emptyNameEnv emptyNameSet,
@@ -194,8 +198,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
         -- Collect any error messages
         msgs <- readIORef errs_var ;
 
-        let { dflags = hsc_dflags hsc_env
-            ; final_res | errorsFound dflags msgs = Nothing
+        let { final_res | errorsFound dflags msgs = Nothing
                         | otherwise               = maybe_res } ;
 
         return (msgs, final_res)
@@ -533,8 +536,8 @@ getGHCiMonad = do { hsc <- getTopEnv; return (ic_monad $ hsc_IC hsc) }
 getInteractivePrintName :: TcRn Name
 getInteractivePrintName = do { hsc <- getTopEnv; return (ic_int_print $ hsc_IC hsc) }
 
-tcIsHsBoot :: TcRn Bool
-tcIsHsBoot = do { env <- getGblEnv; return (isHsBoot (tcg_src env)) }
+tcIsHsBootOrSig :: TcRn Bool
+tcIsHsBootOrSig = do { env <- getGblEnv; return (isHsBootOrSig (tcg_src env)) }
 
 getGlobalRdrEnv :: TcRn GlobalRdrEnv
 getGlobalRdrEnv = do { env <- getGblEnv; return (tcg_rdr_env env) }

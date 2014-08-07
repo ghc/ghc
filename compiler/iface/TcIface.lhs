@@ -321,7 +321,7 @@ tcHiBootIface :: HscSource -> Module -> TcRn ModDetails
 -- if it indeed exists in the transitive closure of imports
 -- Return the ModDetails, empty if no hi-boot iface
 tcHiBootIface hsc_src mod
-  | isHsBoot hsc_src            -- Already compiling a hs-boot file
+  | HsBootFile <- hsc_src            -- Already compiling a hs-boot file
   = return emptyModDetails
   | otherwise
   = do  { traceIf (text "loadHiBootInterface" <+> ppr mod)

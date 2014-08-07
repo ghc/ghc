@@ -213,6 +213,11 @@ data TcGblEnv
         tcg_mod     :: Module,         -- ^ Module being compiled
         tcg_src     :: HscSource,
           -- ^ What kind of module (regular Haskell, hs-boot, ext-core)
+        tcg_sig_of  :: Maybe Module,
+          -- ^ Are we being compiled as a signature of an implementation?
+        tcg_impl_rdr_env :: Maybe GlobalRdrEnv,
+          -- ^ Environment used only during -sig-of for resolving top level
+          -- bindings.  See Note [Signature parameters in TcGblEnv and DynFlags]
 
         tcg_rdr_env :: GlobalRdrEnv,   -- ^ Top level envt; used during renaming
         tcg_default :: Maybe [Type],
@@ -352,6 +357,53 @@ data TcGblEnv
                                              -- inferred this module
                                              -- as -XSafe (Safe Haskell)
     }
+
+-- Note [Signature parameters in TcGblEnv and DynFlags]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- When compiling signature files, we need to know which implementation
+-- we've actually linked against the signature.  There are three seemingly
+-- redundant places where this information is stored: in DynFlags, there
+-- is sigOf, and in TcGblEnv, there is tcg_sig_of and tcg_impl_rdr_env.
+-- Here's the difference between each of them:
+--
+-- * DynFlags.sigOf is global per invocation of GHC.  If we are compiling
+--   with --make, there may be multiple signature files being compiled; in
+--   which case this parameter is a map from local module name to implementing
+--   Module.
+--
+-- * HscEnv.tcg_sig_of is global per the compilation of a single file, so
+--   it is simply the result of looking up tcg_mod in the DynFlags.sigOf
+--   parameter.  It's setup in TcRnMonad.initTc.  This prevents us
+--   from having to repeatedly do a lookup in DynFlags.sigOf.
+--
+-- * HscEnv.tcg_impl_rdr_env is a RdrEnv that lets us look up names
+--   according to the sig-of module.  It's setup in TcRnDriver.tcRnSignature.
+--   Here is an example showing why we need this map:
+--
+--  module A where
+--      a = True
+--
+--  module ASig where
+--      import B
+--      a :: Bool
+--
+--  module B where
+--      b = False
+--
+-- When we compile ASig --sig-of main:A, the default
+-- global RdrEnv (tcg_rdr_env) has an entry for b, but not for a
+-- (we never imported A).  So we have to look in a different environment
+-- to actually get the original name.
+--
+-- By the way, why do we need to do the lookup; can't we just use A:a
+-- as the name directly?  Well, if A is reexporting the entity from another
+-- module, then the original name needs to be the real original name:
+--
+--  module C where
+--      a = True
+--
+--  module A(a) where
+--      import C
 
 instance ContainsModule TcGblEnv where
     extractModule env = tcg_mod env
