@@ -354,20 +354,20 @@ data dependencies of the state token to enforce write-effect ordering
 
  * NB3: *Read* effects (like reading an IORef) don't count here,
    because it doesn't matter if we don't do them, or do them more than
-   once.  *Sequencing* is maintain by the data dependency of the state
+   once.  *Sequencing* is maintained by the data dependency of the state
    token.
 
 ----------  can_fail ----------------------------
-A primop "can_fail" if if can fail with an *unchecked* exception on
+A primop "can_fail" if it can fail with an *unchecked* exception on
 some elements of its input domain. Main examples:
-   division (fails on zero demoninator
+   division (fails on zero demoninator)
    array indexing (fails if the index is out of bounds)
 
-An "unchecked exception" is one that is an outright error, not
-turned into a Haskell exception), such as seg-fault or
+An "unchecked exception" is one that is an outright error, (not
+turned into a Haskell exception,) such as seg-fault or
 divide-by-zero error.  Such can_fail primops are ALWAYS surrounded
 with a test that checks for the bad cases, but we need to be
-very careful about code motion that might move the out of
+very careful about code motion that might move it out of
 the scope of the test.
 
 Note [Transformations affected by can_fail and has_side_effects]
@@ -404,7 +404,7 @@ Duplicate      YES           NO
 
 
 
-  Synchronous Haskell exceptions, eg from raiseIO#, are treated
+  Synchronous Haskell exceptions, e.g. from raiseIO#, are treated
   as has_side_effects and hence are not discarded.
 
 * Float in.  You can float a can_fail or has_side_effects primop
@@ -449,7 +449,7 @@ Duplicate      YES           NO
   However, it's fine to duplicate a can_fail primop.  That is really
   the only difference between can_fail and has_side_effects.
 
-Note [Implementation: how can_fail/has_side_effects affect transformaations]
+Note [Implementation: how can_fail/has_side_effects affect transformations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 How do we ensure that that floating/duplication/discarding are done right
 in the simplifier?
@@ -487,7 +487,7 @@ primOpOkForSpeculation op
   =  primOpOkForSideEffects op
   && not (primOpOutOfLine op || primOpCanFail op)
     -- I think the "out of line" test is because out of line things can
-    -- be expensive (eg sine, consine), and so we may not want to speculate them
+    -- be expensive (eg sine, cosine), and so we may not want to speculate them
 
 primOpOkForSideEffects :: PrimOp -> Bool
 primOpOkForSideEffects op

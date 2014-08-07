@@ -363,7 +363,7 @@ In this situation you should use @case@ rather than a @let@. The function
 alternatively use 'MkCore.mkCoreLet' rather than this constructor directly,
 which will generate a @case@ if necessary
 
-Th let/app invariant is intially enforced by DsUtils.mkCoreLet and mkCoreApp
+Th let/app invariant is initially enforced by DsUtils.mkCoreLet and mkCoreApp
 
 Note [CoreSyn case invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

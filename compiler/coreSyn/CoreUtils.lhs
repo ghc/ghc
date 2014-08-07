@@ -913,7 +913,7 @@ it's applied only to dictionaries.
 --  c) without causing a write side effect (e.g. writing a mutable variable)
 --  d) without throwing a Haskell exception
 --  e) without risking an unchecked runtime exception (array out of bounds,
---     divide byzero)
+--     divide by zero)
 --
 -- For @exprOkForSideEffects@ the list is the same, but omitting (e).
 --
@@ -922,7 +922,7 @@ it's applied only to dictionaries.
 --    exprOkForSpeculation implies exprOkForSideEffects
 --
 -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
--- and Note [Implementation: how can_fail/has_side_effects affect transformaations]
+-- and Note [Implementation: how can_fail/has_side_effects affect transformations]
 --
 -- As an example of the considerations in this test, consider:
 --
