@@ -329,27 +329,89 @@ Note [PrimOp can_fail and has_side_effects]
 Both can_fail and has_side_effects mean that the primop has
 some effect that is not captured entirely by its result value.
 
-   ----------  has_side_effects ---------------------
-   Has some imperative side effect, perhaps on the world (I/O),
-   or perhaps on some mutable data structure (writeIORef).
-   Generally speaking all such primops have a type like
-      State -> input -> (State, output)
-   so the state token guarantees ordering, and also ensures
-   that the primop is executed even if 'output' is discarded.
+----------  has_side_effects ---------------------
+A primop "has_side_effects" if it has some *write* effect, visible
+elsewhere
+    - writing to the world (I/O)
+    - writing to a mutable data structure (writeIORef)
+    - throwing a synchronous Haskell exception
 
-   ----------  can_fail ----------------------------
-   Can fail with a seg-fault or divide-by-zero error on some elements
-   of its input domain.  Main examples:
-      division (fails on zero demoninator
-      array indexing (fails if the index is out of bounds)
-   However (ASSUMPTION), these can_fail primops are ALWAYS surrounded
-   with a test that checks for the bad cases.  
+Often such primops have a type like
+   State -> input -> (State, output)
+so the state token guarantees ordering.  In general we rely *only* on
+data dependencies of the state token to enforce write-effect ordering
 
-Consequences:
+ * NB1: if you inline unsafePerformIO, you may end up with
+   side-effecting ops whose 'state' output is discarded.
+   And programmers may do that by hand; see Trac #9390.
+   That is why we (conservatively) do not discard write-effecting
+   primops even if both their state and result is discarded.
 
-* You can discard a can_fail primop, or float it _inwards_.
-  But you cannot float it _outwards_, lest you escape the
-  dynamic scope of the test.  Example:
+ * NB2: We consider primops, such as raiseIO#, that can raise a
+   (Haskell) synchronous exception to "have_side_effects" but not
+   "can_fail".  We must be careful about not discarding such things;
+   see the paper "A semantics for imprecise exceptions".
+
+ * NB3: *Read* effects (like reading an IORef) don't count here,
+   because it doesn't matter if we don't do them, or do them more than
+   once.  *Sequencing* is maintain by the data dependency of the state
+   token.
+
+----------  can_fail ----------------------------
+A primop "can_fail" if if can fail with an *unchecked* exception on
+some elements of its input domain. Main examples:
+   division (fails on zero demoninator
+   array indexing (fails if the index is out of bounds)
+
+An "unchecked exception" is one that is an outright error, not
+turned into a Haskell exception), such as seg-fault or
+divide-by-zero error.  Such can_fail primops are ALWAYS surrounded
+with a test that checks for the bad cases, but we need to be
+very careful about code motion that might move the out of
+the scope of the test.
+
+Note [Transformations affected by can_fail and has_side_effects]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The can_fail and has_side_effects properties have the following effect
+on program transformations.  Summary table is followed by details.
+
+            can_fail     has_side_effects
+Discard        NO            NO
+Float in       YES           YES
+Float out      NO            NO
+Duplicate      YES           NO
+
+* Discarding.   case (a `op` b) of _ -> rhs  ===>   rhs
+  You should not discard a has_side_effects primop; e.g.
+     case (writeIntArray# a i v s of (# _, _ #) -> True
+  Arguably you should be able to discard this, since the
+  returned stat token is not used, but that relies on NEVER
+  inlining unsafePerformIO, and programmers sometimes write
+  this kind of stuff by hand (Trac #9390).  So we (conservatively)
+  never discard a has_side_effects primop.
+
+  However, it's fine to discard a can_fail primop.  For example
+     case (indexIntArray# a i) of _ -> True
+  We can discard indexIntArray#; it has can_fail, but not
+  has_side_effects; see Trac #5658 which was all about this.
+  Notice that indexIntArray# is (in a more general handling of
+  effects) read effect, but we don't care about that here, and
+  treat read effects as *not* has_side_effects.
+
+  Similarly (a `/#` b) can be discarded.  It can seg-fault or
+  cause a hardware exception, but not a synchronous Haskell
+  exception.
+
+
+
+  Synchronous Haskell exceptions, eg from raiseIO#, are treated
+  as has_side_effects and hence are not discarded.
+
+* Float in.  You can float a can_fail or has_side_effects primop
+  *inwards*, but not inside a lambda (see Duplication below).
+
+* Float out.  You must not float a can_fail primop *outwards* lest
+  you escape the dynamic scope of the test.  Example:
       case d ># 0# of
         True  -> case x /# d of r -> r +# 1
         False -> 0
@@ -359,25 +421,21 @@ Consequences:
         True  -> r +# 1
         False -> 0
 
-* I believe that exactly the same rules apply to a has_side_effects
-  primop; you can discard it (remember, the state token will keep
-  it alive if necessary), or float it in, but not float it out.
-
-  Example of the latter
-       if blah then let! s1 = writeMutVar s0 v True in s1
+  Nor can you float out a has_side_effects primop.  For example:
+       if blah then case writeMutVar# v True s0 of (# s1 #) -> s1
                else s0
-  Notice that s0 is mentioned in both branches of the 'if', but 
+  Notice that s0 is mentioned in both branches of the 'if', but
   only one of these two will actually be consumed.  But if we
   float out to
-      let! s1 = writeMutVar s0 v True
-      in if blah then s1 else s0
+      case writeMutVar# v True s0 of (# s1 #) ->
+      if blah then s1 else s0
   the writeMutVar will be performed in both branches, which is
   utterly wrong.
 
-* You cannot duplicate a has_side_effect primop.  You might wonder
-  how this can occur given the state token threading, but just look
-  at Control.Monad.ST.Lazy.Imp.strictToLazy!  We get something like
-  this
+* Duplication.  You cannot duplicate a has_side_effect primop.  You
+  might wonder how this can occur given the state token threading, but
+  just look at Control.Monad.ST.Lazy.Imp.strictToLazy!  We get
+  something like this
         p = case readMutVar# s v of
               (# s', r #) -> (S# s', r)
         s' = case p of (s', r) -> s'
@@ -385,26 +443,26 @@ Consequences:
 
   (All these bindings are boxed.)  If we inline p at its two call
   sites, we get a catastrophe: because the read is performed once when
-  s' is demanded, and once when 'r' is demanded, which may be much 
+  s' is demanded, and once when 'r' is demanded, which may be much
   later.  Utterly wrong.  Trac #3207 is real example of this happening.
 
-  However, it's fine to duplicate a can_fail primop.  That is
-  the difference between can_fail and has_side_effects.
+  However, it's fine to duplicate a can_fail primop.  That is really
+  the only difference between can_fail and has_side_effects.
 
-            can_fail     has_side_effects
-Discard        YES           YES
-Float in       YES           YES
-Float out      NO            NO
-Duplicate      YES           NO
+Note [Implementation: how can_fail/has_side_effects affect transformaations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How do we ensure that that floating/duplication/discarding are done right
+in the simplifier?
 
-How do we achieve these effects?
+Two main predicates on primpops test these flags:
+  primOpOkForSideEffects <=> not has_side_effects
+  primOpOkForSpeculation <=> not (has_side_effects || can_fail)
 
-Note [primOpOkForSpeculation]
   * The "no-float-out" thing is achieved by ensuring that we never
     let-bind a can_fail or has_side_effects primop.  The RHS of a
     let-binding (which can float in and out freely) satisfies
-    exprOkForSpeculation.  And exprOkForSpeculation is false of
-    can_fail and has_side_effects.
+    exprOkForSpeculation; this is the let/app invariant.  And
+    exprOkForSpeculation is false of can_fail and has_side_effects.
 
   * So can_fail and has_side_effects primops will appear only as the
     scrutinees of cases, and that's why the FloatIn pass is capable
@@ -422,7 +480,7 @@ primOpCanFail :: PrimOp -> Bool
 #include "primop-can-fail.hs-incl"
 
 primOpOkForSpeculation :: PrimOp -> Bool
-  -- See Note [primOpOkForSpeculation]
+  -- See Note [PrimOp can_fail and has_side_effects]
   -- See comments with CoreUtils.exprOkForSpeculation
   -- primOpOkForSpeculation => primOpOkForSideEffects
 primOpOkForSpeculation op
@@ -447,6 +505,7 @@ behaviour of 'seq' for primops that can fail, so we don't treat them as cheap.
 
 \begin{code}
 primOpIsCheap :: PrimOp -> Bool
+-- See Note [PrimOp can_fail and has_side_effects]
 primOpIsCheap op = primOpOkForSpeculation op
 -- In March 2001, we changed this to
 --      primOpIsCheap op = False

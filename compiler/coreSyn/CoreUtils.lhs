@@ -908,13 +908,22 @@ it's applied only to dictionaries.
 -- Note [exprOkForSpeculation: case expressions] below
 --
 -- Precisely, it returns @True@ iff:
+--  a) The expression guarantees to terminate,
+--  b) soon,
+--  c) without causing a write side effect (e.g. writing a mutable variable)
+--  d) without throwing a Haskell exception
+--  e) without risking an unchecked runtime exception (array out of bounds,
+--     divide byzero)
 --
---  * The expression guarantees to terminate,
---  * soon,
---  * without raising an exception,
---  * without causing a side effect (e.g. writing a mutable variable)
+-- For @exprOkForSideEffects@ the list is the same, but omitting (e).
 --
--- Note that if @exprIsHNF e@, then @exprOkForSpecuation e@.
+-- Note that
+--    exprIsHNF            implies exprOkForSpeculation
+--    exprOkForSpeculation implies exprOkForSideEffects
+--
+-- See Note [PrimOp can_fail and has_side_effects] in PrimOp
+-- and Note [Implementation: how can_fail/has_side_effects affect transformaations]
+--
 -- As an example of the considerations in this test, consider:
 --
 -- > let x = case y# +# 1# of { r# -> I# r# }

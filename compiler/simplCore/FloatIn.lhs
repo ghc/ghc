@@ -389,6 +389,7 @@ floating in cases with a single alternative that may bind values.
 fiExpr dflags to_drop (_, AnnCase scrut case_bndr _ [(con,alt_bndrs,rhs)])
   | isUnLiftedType (idType case_bndr)
   , exprOkForSideEffects (deAnnotate scrut)
+      -- See PrimOp, Note [PrimOp can_fail and has_side_effects]
   = wrapFloats shared_binds $
     fiExpr dflags (case_float : rhs_binds) rhs
   where
