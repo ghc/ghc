@@ -392,9 +392,10 @@ test('T5642',
        compiler_stats_num_field('bytes allocated',
            [(wordsize(32), 650000000, 10),
                      # sample from x86/Linux
-            (wordsize(64), 1358833928, 10)])
+            (wordsize(64), 1402242360, 10)])
             # prev:        1300000000
             # 2014-07-17:  1358833928 (general round of updates)
+            # 2014-08-07:  1402242360 (caused by 1fc60ea)
       ],
       compile,['-O'])
 
