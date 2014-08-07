@@ -1067,21 +1067,40 @@ kcStrategy :: TyClDecl Name -> KindCheckingStrategy
 kcStrategy d@(ForeignType {}) = pprPanic "kcStrategy" (ppr d)
 kcStrategy (FamDecl fam_decl)
   = kcStrategyFamDecl fam_decl
-kcStrategy (SynDecl {})       = ParametricKinds
+kcStrategy (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
+  | all_tyvars_annotated tyvars
+  , rhs_annotated rhs
+  = FullKindSignature
+  | otherwise
+  = ParametricKinds
+  where
+    rhs_annotated (L _ ty) = case ty of
+      HsParTy lty  -> rhs_annotated lty
+      HsKindSig {} -> True
+      _            -> False
 kcStrategy decl@(DataDecl {})  = kcStrategyAlgDecl decl
 kcStrategy decl@(ClassDecl {}) = kcStrategyAlgDecl decl
 
 kcStrategyAlgDecl :: TyClDecl Name -> KindCheckingStrategy
 kcStrategyAlgDecl decl
-  | all (isHsKindedTyVar . unLoc) (hsQTvBndrs $ tcdTyVars decl)
+  | all_tyvars_annotated $ tcdTyVars decl
   = FullKindSignature
   | otherwise
   = ParametricKinds
 
--- if the ClosedTypeFamily has no equations, do the defaulting to *, etc.
 kcStrategyFamDecl :: FamilyDecl Name -> KindCheckingStrategy
-kcStrategyFamDecl (FamilyDecl { fdInfo = ClosedTypeFamily (_:_) }) = NonParametricKinds
+kcStrategyFamDecl (FamilyDecl { fdInfo = ClosedTypeFamily _
+                              , fdTyVars = tyvars
+                              , fdKindSig = Just _ })
+  | all (isHsKindedTyVar . unLoc) (hsQTvBndrs tyvars)
+  = FullKindSignature
+-- if the ClosedTypeFamily has no equations, do the defaulting to *, etc.
+kcStrategyFamDecl (FamilyDecl { fdInfo = ClosedTypeFamily (_:_) }) = ParametricKinds
 kcStrategyFamDecl _                                                = FullKindSignature
+
+-- | Are all the type variables given with a kind annotation?
+all_tyvars_annotated :: LHsTyVarBndrs name -> Bool
+all_tyvars_annotated = all (isHsKindedTyVar . unLoc) . hsQTvBndrs
 
 mkKindSigVar :: Name -> TcM KindVar
 -- Use the specified name; don't clone it
