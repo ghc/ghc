@@ -1351,22 +1351,21 @@ simplNonRecE env bndr (Type ty_arg, rhs_se) (bndrs, body) cont
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
   = do dflags <- getDynFlags
        case () of
-         _
-          | preInlineUnconditionally dflags env NotTopLevel bndr rhs ->
-            do  { tick (PreInlineUnconditionally bndr)
-                ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
+         _ | preInlineUnconditionally dflags env NotTopLevel bndr rhs
+           -> do { tick (PreInlineUnconditionally bndr)
+                 ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
                   simplLam (extendIdSubst env bndr (mkContEx rhs_se rhs)) bndrs body cont }
 
-          | isStrictId bndr ->           -- Includes coercions
-            do  { simplExprF (rhs_se `setFloats` env) rhs
-                             (StrictBind bndr bndrs body env cont) }
+           | isStrictId bndr          -- Includes coercions
+           -> simplExprF (rhs_se `setFloats` env) rhs
+                         (StrictBind bndr bndrs body env cont)
 
-          | otherwise ->
-            ASSERT( not (isTyVar bndr) )
-            do  { (env1, bndr1) <- simplNonRecBndr env bndr
-                ; let (env2, bndr2) = addBndrRules env1 bndr bndr1
-                ; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
-                ; simplLam env3 bndrs body cont }
+           | otherwise
+           -> ASSERT( not (isTyVar bndr) )
+              do { (env1, bndr1) <- simplNonRecBndr env bndr
+                 ; let (env2, bndr2) = addBndrRules env1 bndr bndr1
+                 ; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
+                 ; simplLam env3 bndrs body cont }
 \end{code}
 
 %************************************************************************
@@ -1726,7 +1725,13 @@ transformation:
 or
         (b) 'x' is not used at all and e is ok-for-speculation
              The ok-for-spec bit checks that we don't lose any
-             exceptions or divergence
+             exceptions or divergence.
+
+             NB: it'd be *sound* to switch from case to let if the
+             scrutinee was not yet WHNF but was guaranteed to
+             converge; but sticking with case means we won't build a
+             thunk
+
 or
         (c) 'x' is used strictly in the body, and 'e' is a variable
             Then we can just substitute 'e' for 'x' in the body.
@@ -1881,56 +1886,41 @@ rebuildCase env scrut case_bndr alts cont
 --      2. Eliminate the case if scrutinee is evaluated
 --------------------------------------------------
 
-rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
+rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   -- See if we can get rid of the case altogether
   -- See Note [Case elimination]
   -- mkCase made sure that if all the alternatives are equal,
   -- then there is now only one (DEFAULT) rhs
- | all isDeadBinder bndrs       -- bndrs are [InId]
 
- , if isUnLiftedType (idType case_bndr)
-   then elim_unlifted        -- Satisfy the let-binding invariant
-   else elim_lifted
-  = do  { -- pprTrace "case elim" (vcat [ppr case_bndr, ppr (exprIsHNF scrut),
-          --                            ppr ok_for_spec,
-          --                            ppr scrut]) $
-          tick (CaseElim case_bndr)
-        ; env' <- simplNonRecX env case_bndr scrut
-          -- If case_bndr is dead, simplNonRecX will discard
-        ; simplExprF env' rhs cont }
-  where
-    elim_lifted   -- See Note [Case elimination: lifted case]
-      = exprIsHNF scrut
-     || (is_plain_seq && ok_for_spec)
-            -- Note: not the same as exprIsHNF
-     || (strict_case_bndr && scrut_is_var scrut)
-            -- See Note [Eliminating redundant seqs]
+  -- 2a.  Dropping the case altogether, if
+  --      a) it binds nothing (so it's really just a 'seq')
+  --      b) evaluating the scrutinee has no side effects
+  | is_plain_seq
+  , exprOkForSideEffects scrut
+          -- The entire case is dead, so we can drop it
+          -- if the scrutinee converges without having imperative
+          -- side effects or raising a Haskell exception
+          -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
+   = simplExprF env rhs cont
 
-    elim_unlifted
-      | is_plain_seq = exprOkForSideEffects scrut
-            -- The entire case is dead, so we can drop it,
-            -- _unless_ the scrutinee has side effects
-      | otherwise    = ok_for_spec
-            -- The case-binder is alive, but we may be able
-            -- turn the case into a let, if the expression is ok-for-spec
-            -- See Note [Case elimination: unlifted case]
+  -- 2b.  Turn the case into a let, if
+  --      a) it binds only the case-binder
+  --      b) unlifted case: the scrutinee is ok-for-speculation
+  --           lifted case: the scrutinee is in HNF (or will later be demanded)
+  | all_dead_bndrs
+  , if is_unlifted
+    then exprOkForSpeculation scrut  -- See Note [Case elimination: unlifted case]
+    else exprIsHNF scrut             -- See Note [Case elimination: lifted case]
+      || scrut_is_demanded_var scrut
+  = do { tick (CaseElim case_bndr)
+       ; env' <- simplNonRecX env case_bndr scrut
+       ; simplExprF env' rhs cont }
 
-    ok_for_spec      = exprOkForSpeculation scrut
-    is_plain_seq     = isDeadBinder case_bndr -- Evaluation *only* for effect
-    strict_case_bndr = isStrictDmd (idDemandInfo case_bndr)
-
-    scrut_is_var :: CoreExpr -> Bool
-    scrut_is_var (Cast s _) = scrut_is_var s
-    scrut_is_var (Var _)    = True
-    scrut_is_var _          = False
-
-
---------------------------------------------------
---      3. Try seq rules; see Note [User-defined RULES for seq] in MkId
---------------------------------------------------
-
-rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
-  | all isDeadBinder (case_bndr : bndrs)  -- So this is just 'seq'
+  -- 2c. Try the seq rules if
+  --     a) it binds only the case binder
+  --     b) a rule for seq applies
+  -- See Note [User-defined RULES for seq] in MkId
+  | is_plain_seq
   = do { let rhs' = substExpr (text "rebuild-case") env rhs
              env' = zapSubstEnv env
              out_args = [Type (substTy env (idType case_bndr)),
@@ -1942,6 +1932,17 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
        ; case mb_rule of
            Just (rule_rhs, cont') -> simplExprF env' rule_rhs cont'
            Nothing                -> reallyRebuildCase env scrut case_bndr alts cont }
+  where
+    is_unlifted        = isUnLiftedType (idType case_bndr)
+    all_dead_bndrs     = all isDeadBinder bndrs       -- bndrs are [InId]
+    is_plain_seq       = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
+
+    scrut_is_demanded_var :: CoreExpr -> Bool
+            -- See Note [Eliminating redundant seqs]
+    scrut_is_demanded_var (Cast s _) = scrut_is_demanded_var s
+    scrut_is_demanded_var (Var _)    = isStrictDmd (idDemandInfo case_bndr)
+    scrut_is_demanded_var _          = False
+
 
 rebuildCase env scrut case_bndr alts cont
   = reallyRebuildCase env scrut case_bndr alts cont
