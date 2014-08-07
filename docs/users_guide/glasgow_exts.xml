@@ -6527,11 +6527,11 @@ data T m a = MkT (m a) (T Maybe (m a))
 </programlisting>
 The recursive use of <literal>T</literal> forced the second argument to have kind <literal>*</literal>.
 However, just as in type inference, you can achieve polymorphic recursion by giving a
-<emphasis>complete kind signature</emphasis> for <literal>T</literal>. The way to give
-a complete kind signature for a data type is to use a GADT-style declaration with an
-explicit kind signature thus:
+<emphasis>complete kind signature</emphasis> for <literal>T</literal>. A complete
+kind signature is present when all argument kinds and the result kind are known, without
+any need for inference. For example:
 <programlisting>
-data T :: (k -> *) -> k -> * where
+data T (m :: k -> *) :: k -> * where
   MkT :: m a -> T Maybe (m a) -> T m a
 </programlisting>
 The complete user-supplied kind signature specifies the polymorphic kind for <literal>T</literal>,
@@ -6543,26 +6543,41 @@ In particular, the recursive use of <literal>T</literal> is at kind <literal>*</
 What exactly is considered to be a "complete user-supplied kind signature" for a type constructor?
 These are the forms:
 <itemizedlist>
-<listitem><para>
-A GADT-style data type declaration, with an explicit "<literal>::</literal>" in the header.
-For example:
+<listitem><para>For a datatype, every type variable must be annotated with a kind. In a
+GADT-style declaration, there may also be a kind signature (with a top-level
+<literal>::</literal> in the header), but the presence or absence of this annotation
+does not affect whether or not the declaration has a complete signature.
 <programlisting>
 data T1 :: (k -> *) -> k -> *       where ...   -- Yes  T1 :: forall k. (k->*) -> k -> *
 data T2 (a :: k -> *) :: k -> *     where ...   -- Yes  T2 :: forall k. (k->*) -> k -> *
 data T3 (a :: k -> *) (b :: k) :: * where ...   -- Yes  T3 :: forall k. (k->*) -> k -> *
-data T4 a (b :: k)             :: * where ...   -- YES  T4 :: forall k. * -> k -> *
+data T4 (a :: k -> *) (b :: k)      where ...   -- Yes  T4 :: forall k. (k->*) -> k -> *
 
-data T5 a b                         where ...   -- NO  kind is inferred
-data T4 (a :: k -> *) (b :: k)      where ...   -- NO  kind is inferred
-</programlisting>
-It makes no difference where you put the "<literal>::</literal>" but it must be there.
-You cannot give a complete kind signature using a Haskell-98-style data type declaration;
-you must use GADT syntax.
+data T5 a (b :: k)             :: * where ...   -- NO  kind is inferred
+data T6 a b                         where ...   -- NO  kind is inferred
+</programlisting></para>
+</listitem>
+
+<listitem><para>
+For a class, every type variable must be annotated with a kind.
 </para></listitem>
 
 <listitem><para>
+For a type synonym, every type variable and the result type must all be annotated
+with kinds.
+<programlisting>
+type S1 (a :: k) = (a :: k)    -- Yes   S1 :: forall k. k -> k
+type S2 (a :: k) = a           -- No    kind is inferred
+type S3 (a :: k) = Proxy a     -- No    kind is inferred
+</programlisting>
+Note that in <literal>S2</literal> and <literal>S3</literal>, the kind of the
+right-hand side is rather apparent, but it is still not considered to have a complete
+signature -- no inference can be done before detecting the signature.</para></listitem>
+
+<listitem><para>
 An open type or data family declaration <emphasis>always</emphasis> has a
-complete user-specified kind signature; no "<literal>::</literal>" is required:
+complete user-specified kind signature; un-annotated type variables default to
+kind <literal>*</literal>.
 <programlisting>
 data family D1 a           	-- D1 :: * -> *
 data family D2 (a :: k)    	-- D2 :: forall k. k -> *
@@ -6577,10 +6592,12 @@ variable annotation from the class declaration. It keeps its polymorphic kind
 in the associated type declaration. The variable <literal>b</literal>, however,
 gets defaulted to <literal>*</literal>.
 </para></listitem>
+
+<listitem><para>
+A closed type familey has a complete signature when all of its type variables
+are annotated and a return kind (with a top-level <literal>::</literal>) is supplied.
+</para></listitem>
 </itemizedlist>
-In a complete user-specified kind signature, any un-decorated type variable to the
-left of the "<literal>::</literal>" is considered to have kind "<literal>*</literal>".
-If you want kind polymorphism, specify a kind variable.
 </para>
 
 </sect2>
@@ -6590,31 +6607,33 @@ If you want kind polymorphism, specify a kind variable.
 <para>Although all open type families are considered to have a complete
 user-specified kind signature, we can relax this condition for closed type
 families, where we have equations on which to perform kind inference. GHC will
-infer a kind for any type variable in a closed type family when that kind is
-never used in pattern-matching. If you want a kind variable to be used in
-pattern-matching, you must declare it explicitly.
-</para>
+infer kinds for the arguments and result types of a closed type family.</para>
 
-<para>
-Here are some examples (assuming <literal>-XDataKinds</literal> is enabled):
+<para>GHC supports <emphasis>kind-indexed</emphasis> type families, where the
+family matches both on the kind and type. GHC will <emphasis>not</emphasis> infer
+this behaviour without a complete user-supplied kind signature, as doing so would
+sometimes infer non-principal types.</para>
+
+<para>For example:
 <programlisting>
-type family Not a where      -- Not :: Bool -> Bool
-  Not False = True
-  Not True  = False
+type family F1 a where
+  F1 True  = False
+  F1 False = True
+  F1 x     = x
+-- F1 fails to compile: kind-indexing is not inferred
 
-type family F a where        -- ERROR: requires pattern-matching on a kind variable
-  F Int   = Bool
-  F Maybe = Char
+type family F2 (a :: k) where
+  F2 True  = False
+  F2 False = True
+  F2 x     = x
+-- F2 fails to compile: no complete signature
 
-type family G (a :: k) where -- G :: k -> *
-  G Int   = Bool
-  G Maybe = Char
-
-type family SafeHead where   -- SafeHead :: [k] -> Maybe k
-  SafeHead '[] = Nothing     -- note that k is not required for pattern-matching
-  SafeHead (h ': t) = Just h
-</programlisting>
-</para>
+type family F3 (a :: k) :: k where
+  F3 True  = False
+  F3 False = True
+  F3 x     = x
+-- OK
+</programlisting></para>
 
 </sect2>
 
