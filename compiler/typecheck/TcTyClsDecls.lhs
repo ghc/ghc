@@ -354,7 +354,6 @@ getInitialKinds decls
     do { pairss <- mapM (addLocM getInitialKind) decls
        ; return (concat pairss) }
 
--- See Note [Kind-checking strategies] in TcHsType
 getInitialKind :: TyClDecl Name -> TcM [(Name, TcTyThing)]
 -- Allocate a fresh kind variable for each TyCon and Class
 -- For each tycon, return   (tc, AThing k)
@@ -375,7 +374,7 @@ getInitialKind :: TyClDecl Name -> TcM [(Name, TcTyThing)]
 
 getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
   = do { (cl_kind, inner_prs) <-
-           kcHsTyVarBndrs (kcStrategy decl) ktvs $
+           kcHsTyVarBndrs (hsDeclHasCusk decl) ktvs $
            do { inner_prs <- getFamDeclInitialKinds ats
               ; return (constraintKind, inner_prs) }
        ; let main_pr = (name, AThing cl_kind)
@@ -386,7 +385,7 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
                                 , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
                                                            , dd_cons = cons } })
   = do { (decl_kind, _) <-
-           kcHsTyVarBndrs (kcStrategy decl) ktvs $
+           kcHsTyVarBndrs (hsDeclHasCusk decl) ktvs $
            do { res_k <- case m_sig of
                            Just ksig -> tcLHsKind ksig
                            Nothing   -> return liftedTypeKind
@@ -418,16 +417,14 @@ getFamDeclInitialKind decl@(FamilyDecl { fdLName = L _ name
                                        , fdTyVars = ktvs
                                        , fdKindSig = ksig })
   = do { (fam_kind, _) <-
-           kcHsTyVarBndrs (kcStrategyFamDecl decl) ktvs $
+           kcHsTyVarBndrs (famDeclHasCusk decl) ktvs $
            do { res_k <- case ksig of
                            Just k  -> tcLHsKind k
                            Nothing
-                             | defaultResToStar -> return liftedTypeKind
-                             | otherwise        -> newMetaKindVar
+                             | famDeclHasCusk decl -> return liftedTypeKind
+                             | otherwise           -> newMetaKindVar
               ; return (res_k, ()) }
        ; return [ (name, AThing fam_kind) ] }
-  where
-    defaultResToStar = (kcStrategyFamDecl decl == FullKindSignature)
 
 ----------------
 kcSynDecls :: [SCC (LTyClDecl Name)]
@@ -451,7 +448,7 @@ kcSynDecl decl@(SynDecl { tcdTyVars = hs_tvs, tcdLName = L _ name
   -- Returns a possibly-unzonked kind
   = tcAddDeclCtxt decl $
     do { (syn_kind, _) <-
-           kcHsTyVarBndrs (kcStrategy decl) hs_tvs $
+           kcHsTyVarBndrs (hsDeclHasCusk decl) hs_tvs $
            do { traceTc "kcd1" (ppr name <+> brackets (ppr hs_tvs))
               ; (_, rhs_kind) <- tcLHsType rhs
               ; traceTc "kcd2" (ppr name)
@@ -516,7 +513,10 @@ kcConDecl (ConDecl { con_name = name, con_qvars = ex_tvs
                    , con_cxt = ex_ctxt, con_details = details
                    , con_res = res })
   = addErrCtxt (dataConCtxt name) $
-    do { _ <- kcHsTyVarBndrs ParametricKinds ex_tvs $
+         -- the 'False' says that the existentials don't have a CUSK, as the
+         -- concept doesn't really apply here. We just need to bring the variables
+         -- into scope!
+    do { _ <- kcHsTyVarBndrs False ex_tvs $
               do { _ <- tcHsContext ex_ctxt
                  ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
                  ; _ <- tcConRes res

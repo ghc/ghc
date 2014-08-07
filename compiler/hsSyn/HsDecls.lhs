@@ -23,6 +23,7 @@ module HsDecls (
   tyFamInstDeclName, tyFamInstDeclLName,
   countTyClDecls, pprTyClDeclFlavour,
   tyClDeclLName, tyClDeclTyVars,
+  hsDeclHasCusk, famDeclHasCusk,
   FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
@@ -93,6 +94,7 @@ import Bag
 import Data.Data        hiding (TyCon)
 import Data.Foldable (Foldable)
 import Data.Traversable
+import Data.Maybe
 \end{code}
 
 %************************************************************************
@@ -604,7 +606,53 @@ countTyClDecls decls
    
    isNewTy DataDecl{ tcdDataDefn = HsDataDefn { dd_ND = NewType } } = True
    isNewTy _                                                      = False
+
+-- | Does this declaration have a complete, user-supplied kind signature?
+-- See Note [Complete user-supplied kind signatures]
+hsDeclHasCusk :: TyClDecl name -> Bool
+hsDeclHasCusk (ForeignType {}) = True
+hsDeclHasCusk (FamDecl { tcdFam = fam_decl }) = famDeclHasCusk fam_decl
+hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
+  = hsTvbAllKinded tyvars && rhs_annotated rhs
+  where
+    rhs_annotated (L _ ty) = case ty of
+      HsParTy lty  -> rhs_annotated lty
+      HsKindSig {} -> True
+      _            -> False
+hsDeclHasCusk (DataDecl { tcdTyVars = tyvars })  = hsTvbAllKinded tyvars
+hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
+
+-- | Does this family declaration have a complete, user-supplied kind signature?
+famDeclHasCusk :: FamilyDecl name -> Bool
+famDeclHasCusk (FamilyDecl { fdInfo = ClosedTypeFamily _
+                           , fdTyVars = tyvars
+                           , fdKindSig = m_sig })
+  = hsTvbAllKinded tyvars && isJust m_sig
+famDeclHasCusk _ = True  -- all open families have CUSKs!
 \end{code}
+
+Note [Complete user-supplied kind signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We kind-check declarations differently if they have a complete, user-supplied
+kind signature (CUSK). This is because we can safely generalise a CUSKed
+declaration before checking all of the others, supporting polymorphic recursion.
+See https://ghc.haskell.org/trac/ghc/wiki/GhcKinds/KindInference#Proposednewstrategy
+and #9200 for lots of discussion of how we got here.
+
+A declaration has a CUSK if we can know its complete kind without doing any inference,
+at all. Here are the rules:
+
+ - A class or datatype is said to have a CUSK if and only if all of its type
+variables are annotated. Its result kind is, by construction, Constraint or *
+respectively.
+
+ - A type synonym has a CUSK if and only if all of its type variables and its
+RHS are annotated with kinds.
+
+ - A closed type family is said to have a CUSK if and only if all of its type
+variables and its return type are annotated.
+
+ - An open type family always has a CUSK -- unannotated type variables (and return type) default to *.
 
 \begin{code}
 instance OutputableBndr name
