@@ -1,6 +1,6 @@
 -- |
 -- Module      :  Data.Attoparsec.ByteString
--- Copyright   :  Bryan O'Sullivan 2007-2011
+-- Copyright   :  Bryan O'Sullivan 2007-2014
 -- License     :  BSD3
 --
 -- Maintainer  :  bos@serpentine.com
@@ -38,19 +38,17 @@ module Data.Attoparsec.ByteString
     , maybeResult
     , eitherResult
 
-    -- * Combinators
-    , (I.<?>)
-    , I.try
-    , module Data.Attoparsec.Combinator
-
     -- * Parsing individual bytes
     , I.word8
     , I.anyWord8
     , I.notWord8
-    , I.peekWord8
     , I.satisfy
     , I.satisfyWith
     , I.skip
+
+    -- ** Lookahead
+    , I.peekWord8
+    , I.peekWord8'
 
     -- ** Byte classes
     , I.inClass
@@ -69,6 +67,25 @@ module Data.Attoparsec.ByteString
     , I.takeByteString
     , I.takeLazyByteString
 
+    -- * Combinators
+    , try
+    , (<?>)
+    , choice
+    , count
+    , option
+    , many'
+    , many1
+    , many1'
+    , manyTill
+    , manyTill'
+    , sepBy
+    , sepBy'
+    , sepBy1
+    , sepBy1'
+    , skipMany
+    , skipMany1
+    , eitherP
+    , I.match
     -- * State observation and manipulation functions
     , I.endOfInput
     , I.atEnd
@@ -83,49 +100,51 @@ import qualified Data.Attoparsec.Internal.Types as T
 
 -- $parsec
 --
--- Compared to Parsec 3, Attoparsec makes several tradeoffs.  It is
+-- Compared to Parsec 3, attoparsec makes several tradeoffs.  It is
 -- not intended for, or ideal for, all possible uses.
 --
--- * While Attoparsec can consume input incrementally, Parsec cannot.
+-- * While attoparsec can consume input incrementally, Parsec cannot.
 --   Incremental input is a huge deal for efficient and secure network
 --   and system programming, since it gives much more control to users
 --   of the library over matters such as resource usage and the I/O
 --   model to use.
 --
--- * Much of the performance advantage of Attoparsec is gained via
+-- * Much of the performance advantage of attoparsec is gained via
 --   high-performance parsers such as 'I.takeWhile' and 'I.string'.
 --   If you use complicated combinators that return lists of bytes or
 --   characters, there is less performance difference between the two
 --   libraries.
 --
--- * Unlike Parsec 3, Attoparsec does not support being used as a
+-- * Unlike Parsec 3, attoparsec does not support being used as a
 --   monad transformer.
 --
--- * Attoparsec is specialised to deal only with strict 'B.ByteString'
+-- * attoparsec is specialised to deal only with strict 'B.ByteString'
 --   input.  Efficiency concerns rule out both lists and lazy
 --   bytestrings.  The usual use for lazy bytestrings would be to
 --   allow consumption of very large input without a large footprint.
---   For this need, Attoparsec's incremental input provides an
+--   For this need, attoparsec's incremental input provides an
 --   excellent substitute, with much more control over when input
---   takes place.  If you must use lazy bytestrings, see the 'Lazy'
---   module, which feeds lazy chunks to a regular parser.
+--   takes place.  If you must use lazy bytestrings, see the
+--   "Data.Attoparsec.ByteString.Lazy" module, which feeds lazy chunks
+--   to a regular parser.
 --
 -- * Parsec parsers can produce more helpful error messages than
---   Attoparsec parsers.  This is a matter of focus: Attoparsec avoids
+--   attoparsec parsers.  This is a matter of focus: attoparsec avoids
 --   the extra book-keeping in favour of higher performance.
 
 -- $incremental
 --
--- Attoparsec supports incremental input, meaning that you can feed it
+-- attoparsec supports incremental input, meaning that you can feed it
 -- a bytestring that represents only part of the expected total amount
 -- of data to parse. If your parser reaches the end of a fragment of
 -- input and could consume more input, it will suspend parsing and
 -- return a 'T.Partial' continuation.
 --
--- Supplying the 'T.Partial' continuation with another bytestring will
--- resume parsing at the point where it was suspended. You must be
--- prepared for the result of the resumed parse to be another
--- 'T.Partial' continuation.
+-- Supplying the 'T.Partial' continuation with a bytestring will
+-- resume parsing at the point where it was suspended, with the
+-- bytestring you supplied used as new input at the end of the
+-- existing input. You must be prepared for the result of the resumed
+-- parse to be another 'T.Partial' continuation.
 --
 -- To indicate that you have no more input, supply the 'T.Partial'
 -- continuation with an empty bytestring.
@@ -137,12 +156,19 @@ import qualified Data.Attoparsec.Internal.Types as T
 -- If you do not need support for incremental input, consider using
 -- the 'I.parseOnly' function to run your parser.  It will never
 -- prompt for more input.
+--
+-- /Note/: incremental input does /not/ imply that attoparsec will
+-- release portions of its internal state for garbage collection as it
+-- proceeds.  Its internal representation is equivalent to a single
+-- 'ByteString': if you feed incremental input to a parser, it will
+-- require memory proportional to the amount of input you supply.
+-- (This is necessary to support arbitrary backtracking.)
 
 -- $performance
 --
--- If you write an Attoparsec-based parser carefully, it can be
--- realistic to expect it to perform within a factor of 2 of a
--- hand-rolled C parser (measuring megabytes parsed per second).
+-- If you write an attoparsec-based parser carefully, it can be
+-- realistic to expect it to perform similarly to a hand-rolled C
+-- parser (measuring megabytes parsed per second).
 --
 -- To actually achieve high performance, there are a few guidelines
 -- that it is useful to follow.
@@ -162,14 +188,6 @@ import qualified Data.Attoparsec.Internal.Types as T
 --
 -- Make active use of benchmarking and profiling tools to measure,
 -- find the problems with, and improve the performance of your parser.
-
--- | If a parser has returned a 'T.Partial' result, supply it with more
--- input.
-feed :: Result r -> B.ByteString -> Result r
-feed f@(T.Fail _ _ _) _ = f
-feed (T.Partial k) d    = k d
-feed (T.Done bs r) d    = T.Done (B.append bs d) r
-{-# INLINE feed #-}
 
 -- | Run a parser and print its result to standard output.
 parseTest :: (Show a) => I.Parser a -> B.ByteString -> IO ()

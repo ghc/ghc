@@ -3,7 +3,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Attoparsec.ByteString.FastSet
--- Copyright   :  Bryan O'Sullivan 2008
+-- Copyright   :  Bryan O'Sullivan 2007-2014
 -- License     :  BSD3
 --
 -- Maintainer  :  bos@serpentine.com
@@ -83,7 +83,7 @@ memberWord8 w (Sorted s) = search 0 (B.length s - 1)
     where search lo hi
               | hi < lo = False
               | otherwise =
-                  let mid = (lo + hi) `div` 2
+                  let mid = (lo + hi) `quot` 2
                   in case compare w (U.unsafeIndex s mid) of
                        GT -> search (mid + 1) hi
                        LT -> search lo (mid - 1)

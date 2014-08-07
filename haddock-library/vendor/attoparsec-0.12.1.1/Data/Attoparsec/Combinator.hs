@@ -1,7 +1,7 @@
-{-# LANGUAGE BangPatterns, CPP #-}
+{-# LANGUAGE BangPatterns #-}
 -- |
 -- Module      :  Data.Attoparsec.Combinator
--- Copyright   :  Daan Leijen 1999-2001, Bryan O'Sullivan 2009-2010
+-- Copyright   :  Daan Leijen 1999-2001, Bryan O'Sullivan 2007-2014
 -- License     :  BSD3
 --
 -- Maintainer  :  bos@serpentine.com
@@ -11,7 +11,10 @@
 -- Useful parser combinators, similar to those provided by Parsec.
 module Data.Attoparsec.Combinator
     (
-      choice
+    -- * Combinators
+      try
+    , (<?>)
+    , choice
     , count
     , option
     , many'
@@ -26,28 +29,47 @@ module Data.Attoparsec.Combinator
     , skipMany
     , skipMany1
     , eitherP
+    , feed
+    , satisfyElem
+    , endOfInput
+    , atEnd
     ) where
 
 import Control.Applicative (Alternative(..), Applicative(..), empty, liftA2,
-                            (<|>), (*>), (<$>))
+                            many, (<|>), (*>), (<$>))
 import Control.Monad (MonadPlus(..))
-#if !MIN_VERSION_base(4,2,0)
-import Control.Applicative (many)
-#endif
-
-#if __GLASGOW_HASKELL__ >= 700
-import Data.Attoparsec.Internal.Types (Parser)
+import Data.Attoparsec.Internal.Types (Parser(..), IResult(..))
+import Data.Attoparsec.Internal (endOfInput, atEnd, satisfyElem)
 import Data.ByteString (ByteString)
-#endif
+import Data.Monoid (Monoid(mappend))
+import Prelude hiding (succ)
+
+-- | Attempt a parse, and if it fails, rewind the input so that no
+-- input appears to have been consumed.
+--
+-- This combinator is provided for compatibility with Parsec.
+-- attoparsec parsers always backtrack on failure.
+try :: Parser i a -> Parser i a
+try p = p
+{-# INLINE try #-}
+
+-- | Name the parser, in case failure occurs.
+(<?>) :: Parser i a
+      -> String                 -- ^ the name to use if parsing fails
+      -> Parser i a
+p <?> msg0 = Parser $ \t pos more lose succ ->
+             let lose' t' pos' more' strs msg = lose t' pos' more' (msg0:strs) msg
+             in runParser p t pos more lose' succ
+{-# INLINE (<?>) #-}
+infix 0 <?>
 
 -- | @choice ps@ tries to apply the actions in the list @ps@ in order,
 -- until one of them succeeds. Returns the value of the succeeding
 -- action.
 choice :: Alternative f => [f a] -> f a
 choice = foldr (<|>) empty
-#if __GLASGOW_HASKELL__ >= 700
-{-# SPECIALIZE choice :: [Parser ByteString a] -> Parser ByteString a #-}
-#endif
+{-# SPECIALIZE choice :: [Parser ByteString a]
+                      -> Parser ByteString a #-}
 
 -- | @option x p@ tries to apply action @p@. If @p@ fails without
 -- consuming input, it returns the value @x@, otherwise the value
@@ -56,9 +78,7 @@ choice = foldr (<|>) empty
 -- > priority  = option 0 (digitToInt <$> digit)
 option :: Alternative f => a -> f a -> f a
 option x p = p <|> pure x
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE option :: a -> Parser ByteString a -> Parser ByteString a #-}
-#endif
 
 -- | A version of 'liftM2' that is strict in the result of its first
 -- action.
@@ -103,10 +123,8 @@ many1' p = liftM2' (:) p (many' p)
 -- > commaSep p  = p `sepBy` (symbol ",")
 sepBy :: Alternative f => f a -> f s -> f [a]
 sepBy p s = liftA2 (:) p ((s *> sepBy1 p s) <|> pure []) <|> pure []
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE sepBy :: Parser ByteString a -> Parser ByteString s
                      -> Parser ByteString [a] #-}
-#endif
 
 -- | @sepBy' p sep@ applies /zero/ or more occurrences of @p@, separated
 -- by @sep@. Returns a list of the values returned by @p@. The value
@@ -116,10 +134,8 @@ sepBy p s = liftA2 (:) p ((s *> sepBy1 p s) <|> pure []) <|> pure []
 sepBy' :: (MonadPlus m) => m a -> m s -> m [a]
 sepBy' p s = scan `mplus` return []
   where scan = liftM2' (:) p ((s >> sepBy1' p s) `mplus` return [])
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE sepBy' :: Parser ByteString a -> Parser ByteString s
                       -> Parser ByteString [a] #-}
-#endif
 
 -- | @sepBy1 p sep@ applies /one/ or more occurrences of @p@, separated
 -- by @sep@. Returns a list of the values returned by @p@.
@@ -128,10 +144,8 @@ sepBy' p s = scan `mplus` return []
 sepBy1 :: Alternative f => f a -> f s -> f [a]
 sepBy1 p s = scan
     where scan = liftA2 (:) p ((s *> scan) <|> pure [])
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE sepBy1 :: Parser ByteString a -> Parser ByteString s
                       -> Parser ByteString [a] #-}
-#endif
 
 -- | @sepBy1' p sep@ applies /one/ or more occurrences of @p@, separated
 -- by @sep@. Returns a list of the values returned by @p@. The value
@@ -141,58 +155,51 @@ sepBy1 p s = scan
 sepBy1' :: (MonadPlus m) => m a -> m s -> m [a]
 sepBy1' p s = scan
     where scan = liftM2' (:) p ((s >> scan) `mplus` return [])
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE sepBy1' :: Parser ByteString a -> Parser ByteString s
                        -> Parser ByteString [a] #-}
-#endif
 
 -- | @manyTill p end@ applies action @p@ /zero/ or more times until
 -- action @end@ succeeds, and returns the list of values returned by
 -- @p@.  This can be used to scan comments:
 --
--- >  simpleComment   = string "<!--" *> manyTill anyChar (try (string "-->"))
+-- >  simpleComment   = string "<!--" *> manyTill anyChar (string "-->")
 --
--- Note the overlapping parsers @anyChar@ and @string \"<!--\"@, and
--- therefore the use of the 'try' combinator.
+-- (Note the overlapping parsers @anyChar@ and @string \"-->\"@.
+-- While this will work, it is not very efficient, as it will cause a
+-- lot of backtracking.)
 manyTill :: Alternative f => f a -> f b -> f [a]
 manyTill p end = scan
     where scan = (end *> pure []) <|> liftA2 (:) p scan
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE manyTill :: Parser ByteString a -> Parser ByteString b
                         -> Parser ByteString [a] #-}
-#endif
 
 -- | @manyTill' p end@ applies action @p@ /zero/ or more times until
 -- action @end@ succeeds, and returns the list of values returned by
 -- @p@.  This can be used to scan comments:
 --
--- >  simpleComment   = string "<!--" *> manyTill' anyChar (try (string "-->"))
+-- >  simpleComment   = string "<!--" *> manyTill' anyChar (string "-->")
 --
--- Note the overlapping parsers @anyChar@ and @string \"<!--\"@, and
--- therefore the use of the 'try' combinator. The value returned by @p@
--- is forced to WHNF.
+-- (Note the overlapping parsers @anyChar@ and @string \"-->\"@.
+-- While this will work, it is not very efficient, as it will cause a
+-- lot of backtracking.)
+--
+-- The value returned by @p@ is forced to WHNF.
 manyTill' :: (MonadPlus m) => m a -> m b -> m [a]
 manyTill' p end = scan
     where scan = (end >> return []) `mplus` liftM2' (:) p scan
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE manyTill' :: Parser ByteString a -> Parser ByteString b
                          -> Parser ByteString [a] #-}
-#endif
 
 -- | Skip zero or more instances of an action.
 skipMany :: Alternative f => f a -> f ()
 skipMany p = scan
     where scan = (p *> scan) <|> pure ()
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE skipMany :: Parser ByteString a -> Parser ByteString () #-}
-#endif
 
 -- | Skip one or more instances of an action.
 skipMany1 :: Alternative f => f a -> f ()
 skipMany1 p = p *> skipMany p
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE skipMany1 :: Parser ByteString a -> Parser ByteString () #-}
-#endif
 
 -- | Apply the given action repeatedly, returning every result.
 count :: Monad m => Int -> m a -> m [a]
@@ -203,3 +210,11 @@ count n p = sequence (replicate n p)
 eitherP :: (Alternative f) => f a -> f b -> f (Either a b)
 eitherP a b = (Left <$> a) <|> (Right <$> b)
 {-# INLINE eitherP #-}
+
+-- | If a parser has returned a 'T.Partial' result, supply it with more
+-- input.
+feed :: Monoid i => IResult i r -> i -> IResult i r
+feed f@(Fail _ _ _) _ = f
+feed (Partial k) d    = k d
+feed (Done t r) d     = Done (mappend t d) r
+{-# INLINE feed #-}

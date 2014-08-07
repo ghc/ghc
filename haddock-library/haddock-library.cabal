@@ -36,15 +36,17 @@ library
   other-modules:
     Data.Attoparsec
     Data.Attoparsec.ByteString
+    Data.Attoparsec.ByteString.Buffer
     Data.Attoparsec.ByteString.Char8
-    Data.Attoparsec.Combinator
-    Data.Attoparsec.Number
     Data.Attoparsec.ByteString.FastSet
     Data.Attoparsec.ByteString.Internal
+    Data.Attoparsec.Combinator
     Data.Attoparsec.Internal
+    Data.Attoparsec.Internal.Fhthagn
     Data.Attoparsec.Internal.Types
-    Documentation.Haddock.Utf8
+    Data.Attoparsec.Number
     Documentation.Haddock.Parser.Util
+    Documentation.Haddock.Utf8
 
 test-suite spec
   type:             exitcode-stdio-1.0
@@ -53,8 +55,7 @@ test-suite spec
   hs-source-dirs:
       test
     , src
-    , vendor/attoparsec-0.10.4.0
-
+    , vendor/attoparsec-0.12.1.1
   ghc-options: -Wall
 
   cpp-options:

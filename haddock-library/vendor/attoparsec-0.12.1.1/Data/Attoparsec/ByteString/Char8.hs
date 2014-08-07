@@ -1,10 +1,10 @@
 {-# LANGUAGE BangPatterns, FlexibleInstances, TypeFamilies,
     TypeSynonymInstances, GADTs #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-warnings-deprecations #-}
 
 -- |
 -- Module      :  Data.Attoparsec.ByteString.Char8
--- Copyright   :  Bryan O'Sullivan 2007-2011
+-- Copyright   :  Bryan O'Sullivan 2007-2014
 -- License     :  BSD3
 --
 -- Maintainer  :  bos@serpentine.com
@@ -29,25 +29,23 @@ module Data.Attoparsec.ByteString.Char8
     , A.parse
     , A.feed
     , A.parseOnly
-    , A.parseTest
     , A.parseWith
+    , A.parseTest
 
     -- ** Result conversion
     , A.maybeResult
     , A.eitherResult
-
-    -- * Combinators
-    , (I.<?>)
-    , I.try
-    , module Data.Attoparsec.Combinator
 
     -- * Parsing individual characters
     , char
     , char8
     , anyChar
     , notChar
-    , peekChar
     , satisfy
+
+    -- ** Lookahead
+    , peekChar
+    , peekChar'
 
     -- ** Special character parsers
     , digit
@@ -96,11 +94,27 @@ module Data.Attoparsec.ByteString.Char8
     , decimal
     , hexadecimal
     , signed
-    , double
     , Number(..)
-    , number
-    , rational
 
+    -- * Combinators
+    , try
+    , (<?>)
+    , choice
+    , count
+    , option
+    , many'
+    , many1
+    , many1'
+    , manyTill
+    , manyTill'
+    , sepBy
+    , sepBy'
+    , sepBy1
+    , sepBy1'
+    , skipMany
+    , skipMany1
+    , eitherP
+    , I.match
     -- * State observation and manipulation functions
     , I.endOfInput
     , I.atEnd
@@ -108,13 +122,12 @@ module Data.Attoparsec.ByteString.Char8
 
 import Control.Applicative ((*>), (<*), (<$>), (<|>))
 import Data.Attoparsec.ByteString.FastSet (charClass, memberChar)
-import Data.Attoparsec.ByteString.Internal (Parser, (<?>))
+import Data.Attoparsec.ByteString.Internal (Parser)
 import Data.Attoparsec.Combinator
 import Data.Attoparsec.Number (Number(..))
 import Data.Bits (Bits, (.|.), shiftL)
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Int (Int8, Int16, Int32, Int64)
-import Data.Ratio ((%))
 import Data.String (IsString(..))
 import Data.Word (Word8, Word16, Word32, Word64, Word)
 import Prelude hiding (takeWhile)
@@ -223,8 +236,8 @@ anyChar :: Parser Char
 anyChar = satisfy $ const True
 {-# INLINE anyChar #-}
 
--- | Match any character. Returns 'Nothing' if end of input has been
--- reached. Does not consume any input.
+-- | Match any character, to perform lookahead. Returns 'Nothing' if
+-- end of input has been reached. Does not consume any input.
 --
 -- /Note/: Because this parser does not fail, do not use it with
 -- combinators such as 'many', because such parsers loop until a
@@ -232,6 +245,12 @@ anyChar = satisfy $ const True
 peekChar :: Parser (Maybe Char)
 peekChar = (fmap w2c) `fmap` I.peekWord8
 {-# INLINE peekChar #-}
+
+-- | Match any character, to perform lookahead.  Does not consume any
+-- input, but will fail if end of input has been reached.
+peekChar' :: Parser Char
+peekChar' = w2c `fmap` I.peekWord8'
+{-# INLINE peekChar' #-}
 
 -- | Fast predicate for matching ASCII space characters.
 --
@@ -348,30 +367,39 @@ skipSpace = I.skipWhile isSpace_w8
 
 -- $specalt
 --
--- The '.*>' and '<*.' combinators are intended for use with the
--- @OverloadedStrings@ language extension.  They simplify the common
--- task of matching a statically known string, then immediately
--- parsing something else.
+-- If you enable the @OverloadedStrings@ language extension, you can
+-- use the '*>' and '<*' combinators to simplify the common task of
+-- matching a statically known string, then immediately parsing
+-- something else.
 --
--- An example makes this easier to understand:
+-- Instead of writing something like this:
 --
--- @{-\# LANGUAGE OverloadedStrings #-}
---
--- shoeSize = \"Shoe size: \" '.*>' 'decimal'
+-- @
+--'I.string' \"foo\" '*>' wibble
 -- @
 --
--- If we were to try to use '*>' above instead, the type checker would
--- not be able to tell which 'IsString' instance to use for the text
--- in quotes.  We would have to be explicit, using either a type
--- signature or the 'I.string' parser.
+-- Using @OverloadedStrings@, you can omit the explicit use of
+-- 'I.string', and write a more compact version:
+--
+-- @
+-- \"foo\" '*>' wibble
+-- @
+--
+-- (Note: the '.*>' and '<*.' combinators that were originally
+-- provided for this purpose are obsolete and unnecessary, and will be
+-- removed in the next major version.)
 
--- | Type-specialized version of '*>' for 'B.ByteString'.
+-- | /Obsolete/. A type-specialized version of '*>' for
+-- 'B.ByteString'. Use '*>' instead.
 (.*>) :: B.ByteString -> Parser a -> Parser a
 s .*> f = I.string s *> f
+{-# DEPRECATED (.*>) "This is no longer necessary, and will be removed. Use '*>' instead." #-}
 
--- | Type-specialized version of '<*' for 'B.ByteString'.
+-- | /Obsolete/. A type-specialized version of '<*' for
+-- 'B.ByteString'. Use '<*' instead.
 (<*.) :: Parser a -> B.ByteString -> Parser a
 f <*. s = f <* I.string s
+{-# DEPRECATED (<*.) "This is no longer necessary, and will be removed. Use '<*' instead." #-}
 
 -- | A predicate that matches either a carriage return @\'\\r\'@ or
 -- newline @\'\\n\'@ character.
@@ -439,111 +467,3 @@ signed :: Num a => Parser a -> Parser a
 signed p = (negate <$> (char8 '-' *> p))
        <|> (char8 '+' *> p)
        <|> p
-
--- | Parse a rational number.
---
--- This parser accepts an optional leading sign character, followed by
--- at least one decimal digit.  The syntax similar to that accepted by
--- the 'read' function, with the exception that a trailing @\'.\'@ or
--- @\'e\'@ /not/ followed by a number is not consumed.
---
--- Examples with behaviour identical to 'read', if you feed an empty
--- continuation to the first result:
---
--- >rational "3"     == Done 3.0 ""
--- >rational "3.1"   == Done 3.1 ""
--- >rational "3e4"   == Done 30000.0 ""
--- >rational "3.1e4" == Done 31000.0, ""
---
--- Examples with behaviour identical to 'read':
---
--- >rational ".3"    == Fail "input does not start with a digit"
--- >rational "e3"    == Fail "input does not start with a digit"
---
--- Examples of differences from 'read':
---
--- >rational "3.foo" == Done 3.0 ".foo"
--- >rational "3e"    == Done 3.0 "e"
---
--- This function does not accept string representations of \"NaN\" or
--- \"Infinity\".
-rational :: Fractional a => Parser a
-{-# SPECIALIZE rational :: Parser Double #-}
-{-# SPECIALIZE rational :: Parser Float #-}
-{-# SPECIALIZE rational :: Parser Rational #-}
-rational = floaty $ \real frac fracDenom -> fromRational $
-                     real % 1 + frac % fracDenom
-
--- | Parse a rational number.
---
--- The syntax accepted by this parser is the same as for 'rational'.
---
--- /Note/: This function is almost ten times faster than 'rational',
--- but is slightly less accurate.
---
--- The 'Double' type supports about 16 decimal places of accuracy.
--- For 94.2% of numbers, this function and 'rational' give identical
--- results, but for the remaining 5.8%, this function loses precision
--- around the 15th decimal place.  For 0.001% of numbers, this
--- function will lose precision at the 13th or 14th decimal place.
---
--- This function does not accept string representations of \"NaN\" or
--- \"Infinity\".
-double :: Parser Double
-double = floaty asDouble
-
-asDouble :: Integer -> Integer -> Integer -> Double
-asDouble real frac fracDenom =
-    fromIntegral real + fromIntegral frac / fromIntegral fracDenom
-{-# INLINE asDouble #-}
-
--- | Parse a number, attempting to preserve both speed and precision.
---
--- The syntax accepted by this parser is the same as for 'rational'.
---
--- /Note/: This function is almost ten times faster than 'rational'.
--- On integral inputs, it gives perfectly accurate answers, and on
--- floating point inputs, it is slightly less accurate than
--- 'rational'.
---
--- This function does not accept string representations of \"NaN\" or
--- \"Infinity\".
-number :: Parser Number
-number = floaty $ \real frac fracDenom ->
-         if frac == 0 && fracDenom == 0
-         then I real
-         else D (asDouble real frac fracDenom)
-{-# INLINE number #-}
-
-data T = T !Integer !Int
-
-floaty :: Fractional a => (Integer -> Integer -> Integer -> a) -> Parser a
-{-# INLINE floaty #-}
-floaty f = do
-  let minus = 45
-      plus  = 43
-  !positive <- ((== plus) <$> I.satisfy (\c -> c == minus || c == plus)) <|>
-               return True
-  real <- decimal
-  let tryFraction = do
-        let dot = 46
-        _ <- I.satisfy (==dot)
-        ds <- I.takeWhile isDigit_w8
-        case I.parseOnly decimal ds of
-                Right n -> return $ T n (B.length ds)
-                _       -> fail "no digits after decimal"
-  T fraction fracDigits <- tryFraction <|> return (T 0 0)
-  let littleE = 101
-      bigE    = 69
-      e w = w == littleE || w == bigE
-  power <- (I.satisfy e *> signed decimal) <|> return (0::Int)
-  let n = if fracDigits == 0
-          then if power == 0
-               then fromIntegral real
-               else fromIntegral real * (10 ^^ power)
-          else if power == 0
-               then f real fraction (10 ^ fracDigits)
-               else f real fraction (10 ^ fracDigits) * (10 ^^ power)
-  return $ if positive
-           then n
-           else -n
