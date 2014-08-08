@@ -527,6 +527,10 @@ data Token
   | ITvect_scalar_prag
   | ITnovect_prag
   | ITminimal_prag
+  | IToverlappable_prag         -- instance overlap mode
+  | IToverlapping_prag          -- instance overlap mode
+  | IToverlaps_prag             -- instance overlap mode
+  | ITincoherent_prag           -- instance overlap mode
   | ITctype
 
   | ITdotdot                    -- reserved symbols
@@ -1677,7 +1681,7 @@ getPState = P $ \s -> POk s s
 instance HasDynFlags P where
     getDynFlags = P $ \s -> POk s (dflags s)
 
-withThisPackage :: (PackageId -> a) -> P a
+withThisPackage :: (PackageKey -> a) -> P a
 withThisPackage f
  = do pkg <- liftM thisPackage getDynFlags
       return $ f pkg
@@ -2428,6 +2432,10 @@ oneWordPrags = Map.fromList([("rules", rulePrag),
                            ("vectorize", token ITvect_prag),
                            ("novectorize", token ITnovect_prag),
                            ("minimal", token ITminimal_prag),
+                           ("overlaps", token IToverlaps_prag),
+                           ("overlappable", token IToverlappable_prag),
+                           ("overlapping", token IToverlapping_prag),
+                           ("incoherent", token ITincoherent_prag),
                            ("ctype", token ITctype)])
 
 twoWordPrags = Map.fromList([("inline conlike", token (ITinline_prag Inline ConLike)),

@@ -286,3 +286,11 @@ initMBlocks(void)
     memset(mblock_cache,0xff,sizeof(mblock_cache));
 #endif
 }
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

@@ -35,6 +35,7 @@ import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
 import Literal          ( Literal(MachStr) )
 import CoreSubst
+import OccurAnal        ( occurAnalyseExpr )
 import MkCore
 import CoreUtils
 import CoreArity ( etaExpand )
@@ -454,7 +455,10 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; (bndrs, ds_lhs) <- liftM collectBinders
                                   (dsHsWrapper spec_co (Var poly_id))
        ; let spec_ty = mkPiTypes bndrs (exprType ds_lhs)
-       ; case decomposeRuleLhs bndrs ds_lhs of {
+       ; -- pprTrace "dsRule" (vcat [ ptext (sLit "Id:") <+> ppr poly_id
+         --                         , ptext (sLit "spec_co:") <+> ppr spec_co
+         --                         , ptext (sLit "ds_rhs:") <+> ppr ds_lhs ]) $
+         case decomposeRuleLhs bndrs ds_lhs of {
            Left msg -> do { warnDs msg; return Nothing } ;
            Right (rule_bndrs, _fn, args) -> do
 
@@ -578,7 +582,7 @@ SPEC f :: ty                [n]   INLINE [k]
 decomposeRuleLhs :: [Var] -> CoreExpr -> Either SDoc ([Var], Id, [CoreExpr])
 -- (decomposeRuleLhs bndrs lhs) takes apart the LHS of a RULE,
 -- The 'bndrs' are the quantified binders of the rules, but decomposeRuleLhs
--- may add some extra dictionary binders (see Note [Constant rule dicts])
+-- may add some extra dictionary binders (see Note [Free dictionaries])
 --
 -- Returns Nothing if the LHS isn't of the expected shape
 -- Note [Decomposing the left-hand side of a RULE]
@@ -589,7 +593,13 @@ decomposeRuleLhs orig_bndrs orig_lhs
 
   | Var fn_var <- fun
   , not (fn_var `elemVarSet` orig_bndr_set)
-  = Right (bndrs1, fn_var, args)
+  = -- pprTrace "decmposeRuleLhs" (vcat [ ptext (sLit "orig_bndrs:") <+> ppr orig_bndrs
+    --                                  , ptext (sLit "orig_lhs:") <+> ppr orig_lhs
+    --                                  , ptext (sLit "lhs1:")     <+> ppr lhs1
+    --                                  , ptext (sLit "bndrs1:") <+> ppr bndrs1
+    --                                  , ptext (sLit "fn_var:") <+> ppr fn_var
+    --                                  , ptext (sLit "args:")   <+> ppr args]) $
+    Right (bndrs1, fn_var, args)
 
   | Case scrut bndr ty [(DEFAULT, _, body)] <- fun
   , isDeadBinder bndr	-- Note [Matching seqId]
@@ -608,7 +618,7 @@ decomposeRuleLhs orig_bndrs orig_lhs
 
    orig_bndr_set = mkVarSet orig_bndrs
 
-        -- Add extra dict binders: Note [Constant rule dicts]
+        -- Add extra dict binders: Note [Free dictionaries]
    extra_dict_bndrs = [ mkLocalId (localiseName (idName d)) (idType d)
                       | d <- varSetElems (lhs_fvs `delVarSetList` orig_bndrs)
                       , isDictId d ]
@@ -618,19 +628,41 @@ decomposeRuleLhs orig_bndrs orig_lhs
                               , text "Orig lhs:" <+> ppr orig_lhs])
    dead_msg bndr = hang (sep [ ptext (sLit "Forall'd") <+> pp_bndr bndr
 			     , ptext (sLit "is not bound in RULE lhs")])
-                      2 (ppr lhs2)
+                      2 (vcat [ text "Orig bndrs:" <+> ppr orig_bndrs
+                              , text "Orig lhs:" <+> ppr orig_lhs
+                              , text "optimised lhs:" <+> ppr lhs2 ])
    pp_bndr bndr
     | isTyVar bndr                      = ptext (sLit "type variable") <+> quotes (ppr bndr)
     | Just pred <- evVarPred_maybe bndr = ptext (sLit "constraint") <+> quotes (ppr pred)
     | otherwise                         = ptext (sLit "variable") <+> quotes (ppr bndr)
 
    drop_dicts :: CoreExpr -> CoreExpr
-   drop_dicts (Let (NonRec d rhs) body)
-     | isDictId d
-     , not (exprFreeVars rhs `intersectsVarSet` orig_bndr_set)
-     = drop_dicts body
-   drop_dicts (Let bnd body) = Let bnd (drop_dicts body)
-   drop_dicts body           = body
+   drop_dicts e 
+       = wrap_lets needed bnds body
+     where
+       needed = orig_bndr_set `minusVarSet` exprFreeVars body
+       (bnds, body) = split_lets (occurAnalyseExpr e)
+       	   -- The occurAnalyseExpr drops dead bindings which is
+           -- crucial to ensure that every binding is used later;
+           -- which in turn makes wrap_lets work right
+
+   split_lets :: CoreExpr -> ([(DictId,CoreExpr)], CoreExpr)
+   split_lets e
+     | Let (NonRec d r) body <- e
+     , isDictId d
+     , (bs, body') <- split_lets body
+     = ((d,r):bs, body')
+     | otherwise
+     = ([], e)
+
+   wrap_lets :: VarSet -> [(DictId,CoreExpr)] -> CoreExpr -> CoreExpr
+   wrap_lets _ [] body = body
+   wrap_lets needed ((d, r) : bs) body
+     | rhs_fvs `intersectsVarSet` needed = Let (NonRec d r) (wrap_lets needed' bs body)
+     | otherwise                         = wrap_lets needed bs body
+     where
+       rhs_fvs = exprFreeVars r
+       needed' = (needed `minusVarSet` rhs_fvs) `extendVarSet` d
 \end{code}
 
 Note [Decomposing the left-hand side of a RULE]
@@ -638,7 +670,7 @@ Note [Decomposing the left-hand side of a RULE]
 There are several things going on here.  
 * drop_dicts: see Note [Drop dictionary bindings on rule LHS]
 * simpleOptExpr: see Note [Simplify rule LHS]
-* extra_dict_bndrs: see Note [Free rule dicts]
+* extra_dict_bndrs: see Note [Free dictionaries]
 
 Note [Drop dictionary bindings on rule LHS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -666,8 +698,35 @@ drop_dicts drops dictionary bindings on the LHS where possible.
          will be simple NonRec bindings.  We don't handle recursive
          dictionaries!
 
+    NB3: In the common case of a non-overloaded, but perhpas-polymorphic
+         specialisation, we don't need to bind *any* dictionaries for use
+         in the RHS. For example (Trac #8331)
+             {-# SPECIALIZE INLINE useAbstractMonad :: ReaderST s Int #-}
+             useAbstractMonad :: MonadAbstractIOST m => m Int
+         Here, deriving (MonadAbstractIOST (ReaderST s)) is a lot of code
+         but the RHS uses no dictionaries, so we want to end up with
+             RULE forall s (d :: MonadBstractIOST (ReaderT s)).
+                useAbstractMonad (ReaderT s) d = $suseAbstractMonad s
+
    Trac #8848 is a good example of where there are some intersting
    dictionary bindings to discard.
+
+The drop_dicts algorithm is based on these observations:
+
+  * Given (let d = rhs in e) where d is a DictId,
+    matching 'e' will bind e's free variables.
+
+  * So we want to keep the binding if one of the needed variables (for
+    which we need a binding) is in fv(rhs) but not already in fv(e).
+
+  * The "needed variables" are simply the orig_bndrs.  Consider
+       f :: (Eq a, Show b) => a -> b -> String
+       {-# SPECIALISE f :: (Show b) => Int -> b -> String
+    Then orig_bndrs includes the *quantified* dictionaries of the type
+    namely (dsb::Show b), but not the one for Eq Int
+
+So we work inside out, applying the above criterion at each step.
+
 
 Note [Simplify rule LHS]
 ~~~~~~~~~~~~~~~~~~~~~~~~

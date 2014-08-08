@@ -37,7 +37,7 @@ ghc_memcmp_off( HsPtr a1, HsInt i, HsPtr a2, HsInt len )
 }
 
 void
-enableTimingStats( void )	/* called from the driver */
+enableTimingStats( void )       /* called from the driver */
 {
     RtsFlags.GcFlags.giveStats = ONELINE_GC_STATS;
 }
@@ -47,9 +47,7 @@ setHeapSize( HsInt size )
 {
     RtsFlags.GcFlags.heapSizeSuggestion = size / BLOCK_SIZE;
     if (RtsFlags.GcFlags.maxHeapSize != 0 &&
-	RtsFlags.GcFlags.heapSizeSuggestion > RtsFlags.GcFlags.maxHeapSize) {
-	RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
+        RtsFlags.GcFlags.heapSizeSuggestion > RtsFlags.GcFlags.maxHeapSize) {
+        RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
     }
 }
-
-

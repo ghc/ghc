@@ -1,2 +1,16 @@
-.hpc.dataToExpQUnit
-dataToExpQUnit.comp.stderr
+*.eventlog
+*.genscript
+
+*.stderr.normalised
+*.stdout.normalised
+*.comp.stderr
+*.comp.stdout
+*.interp.stderr
+*.interp.stdout
+*.run.stderr
+*.run.stdout
+
+.hpc.*/
+.hpc/
+
+# specific files

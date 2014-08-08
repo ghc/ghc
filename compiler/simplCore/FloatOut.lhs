@@ -458,11 +458,6 @@ data FloatBinds  = FB !(Bag FloatLet)	   	-- Destined for top level
      		      !MajorEnv 		-- Levels other than top
      -- See Note [Representation of FloatBinds]
 
-instance Outputable FloatBind where
-  ppr (FloatLet b) = ptext (sLit "LET") <+> ppr b
-  ppr (FloatCase e b c bs) = hang (ptext (sLit "CASE") <+> ppr e <+> ptext (sLit "of") <+> ppr b)
-                                2 (ppr c <+> ppr bs)
-
 instance Outputable FloatBinds where
   ppr (FB fbs defs) 
       = ptext (sLit "FB") <+> (braces $ vcat

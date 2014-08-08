@@ -115,7 +115,7 @@ dmdAnalStar :: AnalEnv
             -> Demand 	-- This one takes a *Demand*
             -> CoreExpr -> (BothDmdArg, CoreExpr)
 dmdAnalStar env dmd e 
-  | (cd, defer_and_use) <- toCleanDmd dmd
+  | (cd, defer_and_use) <- toCleanDmd dmd (exprType e)
   , (dmd_ty, e')        <- dmdAnal env cd e
   = (postProcessDmdTypeM defer_and_use dmd_ty, e')
 

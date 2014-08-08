@@ -777,12 +777,12 @@ mkCharConstr dt c = case datarep dt of
 
 ------------------------------------------------------------------------------
 --
---      Non-representations for non-presentable types
+--      Non-representations for non-representable types
 --
 ------------------------------------------------------------------------------
 
 
--- | Constructs a non-representation for a non-presentable type
+-- | Constructs a non-representation for a non-representable type
 mkNoRepType :: String -> DataType
 mkNoRepType str = DataType
                         { tycon   = str

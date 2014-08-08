@@ -52,6 +52,7 @@ import qualified GHC.Foreign
 import GHC.IO.Encoding
 import GHC.Ptr
 import GHC.Stack
+import Data.List
 
 -- $tracing
 --
@@ -70,9 +71,15 @@ import GHC.Stack
 -- /Since: 4.5.0.0/
 traceIO :: String -> IO ()
 traceIO msg = do
-    withCString "%s\n" $ \cfmt ->
-     withCString msg  $ \cmsg ->
+    withCString "%s\n" $ \cfmt -> do
+     -- NB: debugBelch can't deal with null bytes, so filter them
+     -- out so we don't accidentally truncate the message.  See Trac #9395
+     let (nulls, msg') = partition (=='\0') msg
+     withCString msg' $ \cmsg ->
       debugBelch cfmt cmsg
+     when (not (null nulls)) $
+       withCString "WARNING: previous trace message had null bytes" $ \cmsg ->
+         debugBelch cfmt cmsg
 
 -- don't use debugBelch() directly, because we cannot call varargs functions
 -- using the FFI.

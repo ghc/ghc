@@ -1,5 +1,3 @@
-{-# LANGUAGE OverlappingInstances #-}
-
 module C where
 
 import A

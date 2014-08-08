@@ -1,0 +1,891 @@
+%!TEX root = paper/paper.tex
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{xspace}
+\usepackage{color}
+\usepackage{xifthen}
+\usepackage{graphicx}
+\usepackage{amsbsy}
+\usepackage{mathtools}
+\usepackage{stmaryrd}
+\usepackage{url}
+\usepackage{alltt}
+\usepackage{varwidth}
+% \usepackage{hyperref}
+\usepackage{datetime}
+\usepackage{subfig}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{xargs}
+\usepackage{marvosym} % for MVAt
+\usepackage{bm} % for blackboard bold semicolon
+
+
+%% HYPERREF COLORS
+\definecolor{darkred}{rgb}{.7,0,0}
+\definecolor{darkgreen}{rgb}{0,.5,0}
+\definecolor{darkblue}{rgb}{0,0,.5}
+% \hypersetup{
+%   linktoc=page,
+%   colorlinks=true,
+%   linkcolor=darkred,
+%   citecolor=darkgreen,
+%   urlcolor=darkblue,
+% }
+
+% Coloring
+\definecolor{hilite}{rgb}{0.7,0,0}
+\newcommand{\hilite}[1]{\color{hilite}#1\color{black}}
+\definecolor{shade}{rgb}{0.85,0.85,0.85}
+\newcommand{\shade}[1]{\colorbox{shade}{\!\ensuremath{#1}\!}}
+
+% Misc
+\newcommand\evalto{\hookrightarrow}
+\newcommand\elabto{\rightsquigarrow}
+\newcommand\elabtox[1]{\stackrel{#1}\rightsquigarrow}
+\newcommand{\yields}{\uparrow}
+\newcommand\too{\Rightarrow}
+\newcommand{\nil}{\cdot}
+\newcommand{\eps}{\epsilon}
+\newcommand{\Ups}{\Upsilon}
+\newcommand{\avoids}{\mathrel{\#}}
+
+\renewcommand{\vec}[1]{\overline{#1}}
+\newcommand{\rname}[1]{\textsc{#1}}
+\newcommand{\infrule}[3][]{%
+  \vspace{0.5ex}
+  \frac{\begin{array}{@{}c@{}}#2\end{array}}%
+       {\mbox{\ensuremath{#3}}}%
+  \ifthenelse{\isempty{#1}}%
+             {}%
+             % {\hspace{1ex}\rlap{(\rname{#1})}}%
+             {\hspace{1ex}(\rname{#1})}%
+  \vspace{0.5ex}
+}
+\newcommand{\infax}[2][]{\infrule[#1]{}{#2}}
+\newcommand{\andalso}{\hspace{.5cm}}
+\newcommand{\suchthat}{~\mathrm{s.t.}~}
+\newenvironment{notes}%
+  {\vspace{-1.5em}\begin{itemize}\setlength\itemsep{0pt}\small}%
+  {\end{itemize}}
+\newcommand{\macrodef}{\mathbin{\overset{\mathrm{def}}{=}}}
+\newcommand{\macroiff}{\mathbin{\overset{\mathrm{def}}{\Leftrightarrow}}}
+
+
+\newcommand{\ttt}[1]{\text{\tt #1}}
+\newcommand{\ttul}{\texttt{\char 95}}
+\newcommand{\ttcc}{\texttt{:\!:}}
+\newcommand{\ttlb}{{\tt {\char '173}}}
+\newcommand{\ttrb}{{\tt {\char '175}}}
+\newcommand{\tsf}[1]{\textsf{#1}}
+
+% \newcommand{\secref}[1]{\S\ref{sec:#1}}
+% \newcommand{\figref}[1]{Figure~\ref{fig:#1}}
+\newcommand{\marginnote}[1]{\marginpar[$\ast$ {\small #1} $\ast$]%
+                                      {$\ast$ {\small #1} $\ast$}}
+\newcommand{\hschange}{\marginnote{!Haskell}}
+\newcommand{\TODO}{\emph{TODO}\marginnote{TODO}}
+\newcommand{\parheader}[1]{\textbf{#1}\quad}
+
+\newcommand{\file}{\ensuremath{\mathit{file}}}
+\newcommand{\mapnil}{~\mathord{\not\mapsto}}
+
+\newcommand{\Ckey}[1]{\textbf{\textsf{#1}}}
+\newcommand{\Cent}[1]{\texttt{#1}}
+% \newcommand{\Cmod}[1]{\texttt{[#1]}}
+% \newcommand{\Csig}[1]{\texttt{[\ttcc{}#1]}}
+\newcommand{\Cmod}[1]{=\texttt{[#1]}}
+\newcommand{\Csig}[1]{~\ttcc{}~\texttt{[#1]}}
+\newcommand{\Cpath}[1]{\ensuremath{\mathsf{#1}}}
+\newcommand{\Cvar}[1]{\ensuremath{\mathsf{#1}}}
+\newcommand{\Ccb}[1]{\text{\ttlb} {#1} \text{\ttrb}}
+\newcommand{\Cpkg}[1]{\texttt{#1}}
+\newcommand{\Cmv}[1]{\ensuremath{\langle #1 \rangle}}
+\newcommand{\Cto}[2]{#1 \mapsto #2}
+\newcommand{\Ctoo}[2]{\Cpath{#1} \mapsto \Cpath{#2}}
+\newcommand{\Crm}[1]{#1 \mapnil}
+\newcommand{\Crmm}[1]{\Cpath{#1} \mapnil}
+\newcommand{\Cthin}[1]{\ensuremath{\langle \Ckey{only}~#1 \rangle}}
+\newcommand{\Cthinn}[1]{\ensuremath{\langle \Ckey{only}~\Cpath{#1} \rangle}}
+\newcommand{\Cinc}[1]{\Ckey{include}~{#1}}
+\newcommand{\Cincc}[1]{\Ckey{include}~\Cpkg{#1}}
+\newcommand{\Cshar}[2]{~\Ckey{where}~{#1} \equiv {#2}}
+\newcommand{\Csharr}[2]{~\Ckey{where}~\Cpath{#1} \equiv \Cpath{#2}}
+\newcommand{\Ctshar}[2]{~\Ckey{where}~{#1} \equiv {#2}}
+\newcommand{\Ctsharr}[3]{~\Ckey{where}~\Cpath{#1}.\Cent{#3} \equiv \Cpath{#2}.\Cent{#3}}
+\newcommand{\Cbinds}[1]{\left\{\!\begin{array}{l} #1 \end{array}\!\right\}}
+\newcommand{\Cbindsp}[1]{\left(\!\begin{array}{l} #1 \end{array}\!\right)}
+\newcommand{\Cpkgs}[1]{\[\begin{array}{l} #1\end{array}\]}
+\newcommand{\Cpkgsl}[1]{\noindent\ensuremath{\begin{array}{@{}l} #1\end{array}}}
+\newcommand{\Ccomment}[1]{\ttt{\emph{--~#1}}}
+\newcommand{\Cimp}[1]{\Ckey{import}~\Cpkg{#1}}
+\newcommand{\Cimpas}[2]{\Ckey{import}~\Cpkg{#1}~\Ckey{as}~\Cvar{#2}}
+
+\newcommand{\Ctbinds}[1]{\left\{\!\vrule width 0.6pt \begin{array}{l} #1 \end{array} \vrule width 0.6pt \!\right\}}
+\newcommand{\Ctbindsx}{\left\{\!\vrule width 0.6pt \; \vrule width 0.6pt \!\right\}}
+\newcommand{\Ctbindsxx}{\left\{\!\vrule width 0.6pt \begin{array}{l}\!\!\!\!\\\!\!\!\!\end{array} \vrule width 0.6pt \!\right\}}
+\newcommand{\Ctbindsxxx}{\left\{\!\vrule width 0.6pt \begin{array}{l}\!\!\!\!\\\!\!\!\!\\\!\!\!\!\end{array} \vrule width 0.6pt \!\right\}}
+
+
+\newcommand{\Cpkgdef}[2]{%
+  \ensuremath{
+  \begin{array}{l}
+  \Ckey{package}~\Cpkg{#1}~\Ckey{where}\\
+  \hspace{1em}\begin{array}{l}
+              #2
+              \end{array}
+  \end{array}}}
+\newcommand{\Cpkgdefonly}[3]{%
+  \ensuremath{
+  \begin{array}{l}
+  \Ckey{package}~\Cpkg{#1}\Cvar{(#2)}~\Ckey{where}\\
+  \hspace{1em}\begin{array}{l}
+              #3
+              \end{array}
+  \end{array}}}
+\newcommand{\Ccc}{\mathbin{\ttcc{}}}
+\newcommand{\Cbinmod}[2]{\Cvar{#1} = \texttt{[#2]}}
+\newcommand{\Cbinsig}[2]{\Cvar{#1} \Ccc \texttt{[#2]}}
+\newcommand{\Cinconly}[2]{\Ckey{include}~\Cpkg{#1}\Cvar{(#2)}}
+\newcommand{\Cimponly}[2]{\Ckey{import}~\Cpkg{#1}\Cvar{(#2)}}
+\newcommand{\Cimpmv}[3]{\Ckey{import}~\Cpkg{#1}\langle\Cvar{#2}\mapsto\Cvar{#3}\rangle}
+
+
+
+
+
+\newcommand{\oxb}[1]{\llbracket #1 \rrbracket}
+\newcommand{\coxb}[1]{\{\hspace{-.5ex}| #1 |\hspace{-.5ex}\}}
+\newcommand{\coxbv}[1]{\coxb{\vec{#1}}}
+\newcommand{\angb}[1]{\ensuremath{\boldsymbol\langle #1 \boldsymbol\rangle}\xspace}
+\newcommand{\angbv}[1]{\angb{\vec{#1}}}
+\newcommand{\aoxbl}{\ensuremath{\boldsymbol\langle\hspace{-.5ex}|}}
+\newcommand{\aoxbr}{\ensuremath{|\hspace{-.5ex}\boldsymbol\rangle}\xspace}
+\newcommand{\aoxb}[1]{\ensuremath{\aoxbl{#1}\aoxbr}}
+\newcommand{\aoxbv}[1]{\aoxb{\vec{#1}}}
+\newcommand{\poxb}[1]{\ensuremath{%
+  (\hspace{-.5ex}|%
+  #1%
+  |\hspace{-.5ex})}\xspace}
+\newcommand{\stof}[1]{{#1}^{\star}}
+% \newcommand{\stof}[1]{\ensuremath{\underline{#1}}}
+\newcommand{\sh}[1]{\ensuremath{\tilde{#1}}}
+
+
+% \newenvironment{code}[1][t]%
+%   {\ignorespaces\begin{varwidth}[#1]{\textwidth}\begin{alltt}}%
+%   {\end{alltt}\end{varwidth}\ignorespacesafterend}
+% \newenvironment{codel}[1][t]%
+%   {\noindent\begin{varwidth}[#1]{\textwidth}\noindent\begin{alltt}}%
+%   {\end{alltt}\end{varwidth}\ignorespacesafterend}
+
+
+%% hack for subfloats in subfig -------------
+\makeatletter
+\newbox\sf@box
+\newenvironment{SubFloat}[2][]%
+  {\def\sf@one{#1}%
+   \def\sf@two{#2}%
+   \setbox\sf@box\hbox
+   \bgroup}%
+  {\egroup
+   \ifx\@empty\sf@two\@empty\relax
+     \def\sf@two{\@empty}
+   \fi
+   \ifx\@empty\sf@one\@empty\relax
+     \subfloat[\sf@two]{\box\sf@box}%
+   \else
+     \subfloat[\sf@one][\sf@two]{\box\sf@box}%
+   \fi}
+\makeatother
+%% ------------------------------------------
+
+%% hack for top-aligned tabular cells -------------
+\newsavebox\topalignbox
+\newcolumntype{L}{%
+  >{\begin{lrbox}\topalignbox
+    \rule{0pt}{\ht\strutbox}}
+  l
+  <{\end{lrbox}%
+    \raisebox{\dimexpr-\height+\ht\strutbox\relax}%
+      {\usebox\topalignbox}}}
+\newcolumntype{C}{%
+  >{\begin{lrbox}\topalignbox
+    \rule{0pt}{\ht\strutbox}}
+  c
+  <{\end{lrbox}%
+    \raisebox{\dimexpr-\height+\ht\strutbox\relax}%
+      {\usebox\topalignbox}}}
+\newcolumntype{R}{%
+  >{\begin{lrbox}\topalignbox
+    \rule{0pt}{\ht\strutbox}}
+  r
+  <{\end{lrbox}%
+    \raisebox{\dimexpr-\height+\ht\strutbox\relax}%
+      {\usebox\topalignbox}}}
+%% ------------------------------------------------
+
+\newcommand\syn[1]{\textsf{#1}}
+\newcommand\bsyn[1]{\textsf{\bfseries #1}}
+\newcommand\msyn[1]{\textsf{#1}}
+\newcommand{\cc}{\mathop{::}}
+
+% \newcommand{\Eimp}[1]{\bsyn{import}~{#1}}
+% \newcommand{\Eonly}[2]{#1~\bsyn{only}~{#2}}
+% \newcommand{\Ehide}[1]{~\bsyn{hide}~{#1}}
+% \newcommand{\Enew}[1]{\bsyn{new}~{#1}}
+% \newcommand{\Elocal}[2]{\bsyn{local}~{#1}~\bsyn{in}~{#2}}
+% \newcommand{\Smv}[3]{\Emv[]{#1}{#2}{#3}}
+\newcommand{\Srm}[2]{#1 \mathord{\setminus} #2}
+
+\newcommand{\cpath}{\varrho}
+\newcommand{\fpath}{\rho}
+
+\newcommand{\ie}{\emph{i.e.},\xspace}
+\newcommand{\eg}{\emph{e.g.},~}
+\newcommand{\etal}{\emph{et al.}}
+
+\renewcommand{\P}[1]{\Cpkg{#1}}
+\newcommand{\X}[1]{\Cvar{#1}}
+\newcommand{\E}{\mathcal{E}}
+\newcommand{\C}{\mathcal{C}}
+\newcommand{\M}{\mathcal{M}}
+\newcommand{\B}{\mathcal{B}}
+\newcommand{\R}{\mathcal{R}}
+\newcommand{\K}{\mathcal{K}}
+\renewcommand{\L}{\mathcal{L}}
+\newcommand{\D}{\mathcal{D}}
+
+%%%% NEW
+
+\newdateformat{numericdate}{%
+\THEYEAR.\twodigit{\THEMONTH}.\twodigit{\THEDAY}
+}
+
+% EL DEFNS
+\newcommand{\shal}[1]{\syn{shallow}(#1)}
+\newcommand{\exports}[1]{\syn{exports}(#1)}
+\newcommand{\Slocals}[1]{\syn{locals}(#1)}
+\newcommand{\Slocalsi}[2]{\syn{locals}(#1; #2)}
+\newcommand{\specs}[1]{\syn{specs}(#1)}
+\newcommand{\ELmkespc}[2]{\syn{mkespc}(#1;#2)}
+\newcommand{\Smkeenv}[1]{\syn{mkeenv}(#1)}
+\newcommand{\Smklocaleenv}[2]{\syn{mklocaleenv}(#1;#2)}
+\newcommand{\Smklocaleenvespcs}[1]{\syn{mklocaleenv}(#1)}
+\newcommand{\Smkphnms}[1]{\syn{mkphnms}(#1)}
+\newcommand{\Smkphnm}[1]{\syn{mkphnm}(#1)}
+\newcommand{\Sfilterespc}[2]{\syn{filterespc}(#1;#2)}
+\newcommand{\Sfilterespcs}[2]{\syn{filterespcs}(#1;#2)}
+\newcommand{\Simps}[1]{\syn{imps}(#1)}
+
+
+
+% IL DEFNS
+\newcommand{\dexp}{\mathit{dexp}}
+\newcommand{\fexp}{\mathit{fexp}}
+\newcommand{\tfexp}{\mathit{tfexp}}
+\newcommand{\pexp}{\mathit{pexp}}
+\newcommand{\dtyp}{\mathit{dtyp}}
+\newcommand{\ftyp}{\mathit{ftyp}}
+\newcommand{\hsmod}{\mathit{hsmod}}
+\newcommand{\fenv}{\mathit{fenv}}
+\newcommand{\ILmkmod}[6]{\syn{mkmod}(#1; #2; #3; #4; #5; #6)}
+\newcommand{\ILmkstubs}[3]{\syn{mkstubs}(#1; #2; #3)}
+\newcommand{\Smkstubs}[1]{\syn{mkstubs}(#1)}
+\newcommand{\ILentnames}[1]{\syn{entnames}(#1)}
+\newcommand{\ILmkfenv}[1]{\syn{mkfenv}(#1)}
+\newcommand{\ILmkdtyp}[1]{\syn{mkdtyp}(#1)}
+\newcommand{\ILmkknd}[1]{\syn{mkknd}(#1)}
+\newcommand{\ILmkimpdecl}[2]{\syn{mkimpdecl}(#1;#2)}
+\newcommand{\ILmkimpdecls}[2]{\syn{mkimpdecls}(#1;#2)}
+\newcommand{\ILmkimpspec}[3]{\syn{mkimpspec}(#1;#2;#3)}
+\newcommand{\ILmkentimp}[3]{\syn{mkentimp}(#1;#2;#3)}
+\newcommand{\ILmkentimpp}[1]{\syn{mkentimp}(#1)}
+\newcommand{\ILmkexp}[2]{\syn{mkexp}(#1;#2)}
+\newcommand{\ILmkexpdecl}[2]{\syn{mkexpdecl}(#1;#2)}
+\newcommand{\ILmkespc}[2]{\syn{mkespc}(#1;#2)}
+\newcommand{\ILshal}[1]{\syn{shallow}(#1)}
+\newcommand{\ILexports}[1]{\syn{exports}(#1)}
+\newcommand{\ILdefns}[1]{\syn{defns}(#1)}
+\newcommand{\ILdefnsi}[2]{\syn{defns}(#1;#2)}
+
+% CORE DEFNS
+\newcommand{\Hentref}{\mathit{eref}}
+\newcommand{\Hentimp}{\mathit{import}}
+\newcommand{\Hentexp}{\mathit{export}}
+\newcommand{\Himp}{\mathit{impdecl}}
+\newcommand{\Himpspec}{\mathit{impspec}}
+\newcommand{\Himps}{\mathit{impdecls}}
+\newcommand{\Hexps}{\mathit{expdecl}}
+\newcommand{\Hdef}{\mathit{def}}
+\newcommand{\Hdefs}{\mathit{defs}}
+\newcommand{\Hdecl}{\mathit{decl}}
+\newcommand{\Hdecls}{\mathit{decls}}
+\newcommand{\Heenv}{\mathit{eenv}}
+\newcommand{\Haenv}{\mathit{aenv}}
+% \newcommand{\HIL}[1]{{\scriptstyle\downarrow}#1}
+\newcommand{\HIL}[1]{\check{#1}}
+
+\newcommand{\Hcmp}{\sqsubseteq}
+
+\newcommand{\uexp}{\mathit{uexp}}
+\newcommand{\utyp}{\mathit{utyp}}
+\newcommand{\typ}{\mathit{typ}}
+\newcommand{\knd}{\mathit{knd}}
+\newcommand{\kndstar}{\ttt{*}}
+\newcommand{\kndarr}[2]{#1\ensuremath{\mathbin{\ttt{->}}}#2}
+\newcommand{\kenv}{\mathit{kenv}}
+\newcommand{\phnm}{\mathit{phnm}}
+\newcommand{\spc}{\mathit{dspc}}
+\newcommand{\spcs}{\mathit{dspcs}}
+\newcommand{\espc}{\mathit{espc}}
+\newcommand{\espcs}{\mathit{espcs}}
+\newcommand{\ds}{\mathit{ds}}
+
+\newcommand{\shctx}{\sh{\Xi}_{\syn{ctx}}}
+\newcommand{\shctxsigma}{\sh{\Sigma}_{\syn{ctx}}}
+
+\newcommand{\vdashsh}{\Vdash}
+
+% \newcommand{\vdashghc}{\vdash_{\!\!\mathrm{c}}^{\!\!\mathrm{\scriptscriptstyle EL}}}
+% \newcommand{\vdashghcil}{\vdash_{\!\!\mathrm{c}}^{\!\!\mathrm{\scriptscriptstyle IL}}}
+% \newcommand{\vdashshghc}{\vdashsh_{\!\!\mathrm{c}}^{\!\!\mathrm{\scriptscriptstyle EL}}}
+\newcommand{\vdashghc}{\vdash_{\!\!\mathrm{c}}}
+\newcommand{\vdashghcil}{\vdash_{\!\!\mathrm{c}}^{\!\!\mathrm{\scriptscriptstyle IL}}}
+\newcommand{\vdashshghc}{\vdashsh_{\!\!\mathrm{c}}}
+
+% CORE STUFF
+\newcommandx*{\JCModImp}[5][1=\sh\B, 2=\nu_0, usedefault=@]%
+  {#1;#2 \vdashshghc #3;#4 \elabto #5}
+\newcommandx*{\JIlCModImp}[5][1=\fenv, 2=f_0, usedefault=@]%
+  {#1;#2 \vdashghcil #3;#4 \elabto #5}
+\newcommandx*{\JCSigImp}[5][1=\sh\B, 2=\sh\tau, usedefault=@]%
+  {#1;#2 \vdashshghc #3;#4 \elabto #5}
+
+\newcommandx*{\JCImpDecl}[3][1=\sh\B, usedefault=@]%
+  {#1 \vdashshghc #2 \elabto #3}
+\newcommandx*{\JCImp}[4][1=\sh\B, 2=p, usedefault=@]%
+  {#1;#2 \vdashshghc #3 \elabto #4}
+\newcommandx*{\JIlCImpDecl}[3][1=\fenv, usedefault=@]%
+  {#1 \vdashghcil #2 \elabto #3}
+\newcommandx*{\JIlCImp}[4][1=\fenv, 2=f, usedefault=@]%
+  {#1;#2 \vdashghcil #3 \elabto #4}
+
+\newcommandx*{\JCModExp}[4][1=\nu_0, 2=\Heenv, usedefault=@]%
+  {#1;#2 \vdashshghc #3 \elabto #4}
+\newcommandx*{\JIlCModExp}[4][1=f_0, 2=\HIL\Heenv, usedefault=@]%
+  {#1;#2 \vdashghcil #3 \elabto #4}
+
+\newcommandx*{\JCModDef}[5][1=\Psi, 2=\nu_0, 3=\Heenv, usedefault=@]%
+  {#1; #2; #3 \vdashghcil #4 : #5}
+\newcommandx*{\JIlCModDef}[5][1=\fenv, 2=f_0, 3=\HIL\Heenv, usedefault=@]%
+  {#1; #2; #3 \vdashghcil #4 : #5}
+\newcommandx*{\JCSigDecl}[5][1=\Psi, 2=\sh\tau, 3=\Heenv, usedefault=@]%
+  {#1; #2; #3 \vdashghcil #4 : #5}
+
+\newcommandx*{\JCExp}[6][1=\sh\Psi, 2=\nu_0, 3=\Hdefs, 4=\Heenv, usedefault=@]%
+  {#1;#2;#3;#4 \vdashshghc #5 \elabto #6}
+\newcommandx*{\JIlCExp}[4][1=f_0, 2=\HIL\Heenv, usedefault=@]%
+  {#1;#2 \vdashghcil #3 \elabto #4}
+
+\newcommandx*{\JCRefExp}[7][1=\sh\Psi, 2=\nu_0, 3=\Hdefs, 4=\Heenv, usedefault=@]%
+  {#1;#2;#3;#4 \vdashshghc #5 \elabto #6:#7}
+\newcommandx*{\JIlCRefExp}[7][1=\fenv, 2=f_0, 3=\HIL\Hdefs, 4=\HIL\Heenv, usedefault=@]%
+  {#1;#2;#3;#4 \vdashghcil #5 \elabto #6:#7}
+
+\newcommandx*{\JCMod}[4][1=\Gamma, 2=\nu_0, usedefault=@]%
+  {#1; #2 \vdashghc #3 : #4}
+\newcommandx*{\JIlCMod}[3][1=\fenv, usedefault=@]%
+  {#1 \vdashghcil #2 : #3}
+\newcommandx*{\JCSig}[5][1=\Gamma, 2=\sh\tau, usedefault=@]%
+  {#1; #2 \vdashghc #3 \elabto #4;#5}
+\newcommandx*{\JCShSig}[5][1=\Gamma, 2=\sh\tau, usedefault=@]%
+  {#1; #2 \vdashghc #3 \elabto #4;#5}
+\newcommandx*{\JCModElab}[5][1=\Gamma, 2=\nu_0, usedefault=@]%
+  % {#1; #2 \vdashghc #3 : #4 \elabto #5}
+  {#1; #2 \vdashghc #3 : #4 \;\shade{\elabto #5}}
+
+\newcommandx*{\JCWfEenv}[2][1=\Haenv, usedefault=@]%
+  {#1 \vdashshghc #2~\syn{wf}}
+\newcommandx*{\JCWfEenvMap}[2][1=\Haenv, usedefault=@]%
+  {#1 \vdashshghc #2~\syn{wf}}
+\newcommandx*{\JIlCWfEenv}[2][1=\HIL\Haenv, usedefault=@]%
+  {#1 \vdashghcil #2~\syn{wf}}
+\newcommandx*{\JIlCWfEenvMap}[2][1=\HIL\Haenv, usedefault=@]%
+  {#1 \vdashghcil #2~\syn{wf}}
+
+\newcommandx*{\JIlTfexp}[3][1=\fenv, 2=f_0, usedefault=@]%
+  {#1; #2 \vdash #3}
+
+
+
+  % IL STUFF
+
+\newcommandx*{\JIlWf}[2][1=\fenv, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JIlKnd}[4][1=\fenv, 2=\kenv, usedefault=@]%
+  {#1;#2 \vdashghcil #3 \mathrel{\cc} #4}
+% \newcommandx*{\JIlSub}[4][1=\fenv, 2=f, usedefault=@]%
+%   {#1;#2 \vdash #3 \le #4}
+\newcommandx*{\JIlSub}[2][usedefault=@]%
+  {\vdash #1 \le #2}
+\newcommandx*{\JIlMerge}[3][usedefault=@]%
+  {\vdash #1 \oplus #2 \Rightarrow #3}
+
+\newcommandx*{\JIlDexp}[2][1=\fenv, usedefault=@]%
+  {#1 \vdash #2}
+\newcommandx*{\JIlDexpTyp}[3][1=\fenv, usedefault=@]%
+  {#1 \vdash #2 : #3}
+
+\newcommandx*{\JIlWfFenv}[2][1=\nil, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JIlWfFtyp}[2][1=\fenv, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JIlWfSpc}[2][1=\fenv, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JIlWfESpc}[2][1=\fenv, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JIlWfSig}[2][1=\fenv, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JIlWfFtypSpecs}[2][1=\fenv, usedefault=@]%
+  {#1 \vdash #2 ~\syn{specs-wf}}
+\newcommandx*{\JIlWfFtypExps}[2][1=\fenv, usedefault=@]%
+  {#1 \vdash #2 ~\syn{exports-wf}}
+\newcommandx*{\JIlWfFenvDeps}[2][1=\fenv, usedefault=@]%
+  {#1 \vdash #2 ~\syn{deps-wf}}
+
+% WF TYPE STUFF IN EL
+\newcommandx*{\JPkgValid}[1]%
+  {\vdash #1 ~\syn{pkg-valid}}
+\newcommandx*{\JWfPkgCtx}[1][1=\Delta, usedefault=@]%
+  {\vdash #1 ~\syn{wf}}
+\newcommandx*{\JWfPhCtx}[2][1=\nil, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JWfModTyp}[2][1=\Psi, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JWfModTypPol}[3][1=\Psi, usedefault=@]%
+  {#1 \vdash #2^{#3} ~\syn{wf}}
+\newcommandx*{\JWfLogSig}[2][1=\Psi, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JWfSpc}[2][1=\Psi, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JWfESpc}[2][1=\Psi, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JWfSig}[2][1=\nil, usedefault=@]%
+  {#1 \vdash #2 ~\syn{wf}}
+\newcommandx*{\JWfModTypSpecs}[2][1=\Psi, usedefault=@]%
+  {#1 \vdash #2 ~\syn{specs-wf}}
+\newcommandx*{\JWfModTypPolSpecs}[3][1=\Psi, usedefault=@]%
+  {#1 \vdash #2^{#3} ~\syn{specs-wf}}
+\newcommandx*{\JWfModTypExps}[2][1=\Psi, usedefault=@]%
+  {#1 \vdash #2 ~\syn{exports-wf}}
+\newcommandx*{\JWfPhCtxDeps}[2][1=\Psi, usedefault=@]%
+  {#1 \vdash #2 ~\syn{deps-wf}}
+\newcommandx*{\JWfPhCtxDepsOne}[4][1=\Psi, usedefault=@]%
+  {#1 \vdash \styp{#2}{#3}{#4} ~\syn{deps-wf}}
+
+% WF SHAPE STUFF IN EL
+\newcommandx*{\JWfShPhCtx}[2][1=\nil, usedefault=@]%
+  {#1 \vdashsh #2 ~\syn{wf}}
+\newcommandx*{\JWfModSh}[2][1=\sh\Psi, usedefault=@]%
+  {#1 \vdashsh #2 ~\syn{wf}}
+\newcommandx*{\JWfModShPol}[3][1=\sh\Psi, usedefault=@]%
+  {#1 \vdashsh #2^{#3} ~\syn{wf}}
+\newcommandx*{\JWfShLogSig}[2][1=\sh\Psi, usedefault=@]%
+  {#1 \vdashsh #2 ~\syn{wf}}
+\newcommandx*{\JWfShSpc}[2][1=\sh\Psi, usedefault=@]%
+  {#1 \vdashsh #2 ~\syn{wf}}
+\newcommandx*{\JWfShESpc}[2][1=\sh\Psi, usedefault=@]%
+  {#1 \vdashsh #2 ~\syn{wf}}
+\newcommandx*{\JWfShSig}[2][1=\nil, usedefault=@]%
+  {#1 \vdashsh #2 ~\syn{wf}}
+\newcommandx*{\JWfModShSpecs}[2][1=\sh\Psi, usedefault=@]%
+  {#1 \vdashsh #2 ~\syn{specs-wf}}
+\newcommandx*{\JWfModShPolSpecs}[3][1=\sh\Psi, usedefault=@]%
+  {#1 \vdashsh #2^{#3} ~\syn{specs-wf}}
+\newcommandx*{\JWfModShExps}[2][1=\sh\Psi, usedefault=@]%
+  {#1 \vdashsh #2 ~\syn{exports-wf}}
+\newcommandx*{\JWfEenv}[4][1=\sh\Psi, 2=\nu_0, 3=\Hdefs, usedefault=@]%
+  {#1;#2;#3 \vdashshghc #4 ~\syn{wf}}
+
+\newcommandx*{\JCoreKnd}[4][1=\Psi, 2=\kenv, usedefault=@]%
+  {#1;#2 \vdashghc #3 \mathrel{\cc} #4}
+
+\newcommandx*{\JStampEq}[2]%
+  {\vdash #1 \equiv #2}
+\newcommandx*{\JStampNeq}[2]%
+  {\vdash #1 \not\equiv #2}
+\newcommandx*{\JUnif}[3]%
+  {\syn{unify}(#1 \doteq #2) \elabto #3}
+\newcommandx*{\JUnifM}[2]%
+  {\syn{unify}(#1) \elabto #2}
+
+\newcommandx*{\JModTypWf}[1]%
+  {\vdash #1 ~\syn{wf}}
+  
+\newcommandx*{\JModSub}[2]%
+  {\vdash #1 \le #2}
+\newcommandx*{\JModSup}[2]%
+  {\vdash #1 \ge #2}
+\newcommandx*{\JShModSub}[2]%
+  {\vdashsh #1 \le #2}
+
+\newcommandx*{\JModEq}[2]%
+  {\vdash #1 \equiv #2}
+% \newcommandx*{\JCShModEq}[3][3=\C]%
+%   {\vdashsh #1 \equiv #2 \mathbin{|} #3}
+
+\newcommandx*{\JETyp}[4][1=\Gamma, 2=\shctxsigma, usedefault=@]%
+  {#1;#2 \vdash #3 : #4}
+\newcommandx*{\JETypElab}[5][1=\Gamma, 2=\shctxsigma, usedefault=@]%
+  {\JETyp[#1][#2]{#3}{#4} \elabto #5}
+\newcommandx*{\JESh}[3][1=\sh\Gamma, usedefault=@]%
+  {#1 \vdashsh #2 \Rightarrow #3}
+
+\newcommandx*{\JBTyp}[5][1=\Delta, 2=\Gamma, 3=\shctx, usedefault=@]%
+  {#1;#2;#3 \vdash #4 : #5}
+\newcommandx*{\JBTypElab}[6][1=\Delta, 2=\Gamma, 3=\shctx, usedefault=@]%
+  % {\JBTyp[#1][#2][#3]{#4}{#5} \elabto #6}
+  {\JBTyp[#1][#2][#3]{#4}{#5} \;\shade{\elabto #6}}
+\newcommandx*{\JBSh}[4][1=\Delta, 2=\sh\Gamma, usedefault=@]%
+  {#1;#2 \vdashsh #3 \Rightarrow #4}
+  
+\newcommandx*{\JBVTyp}[4][1=\Delta, 2=\shctx, usedefault=@]%
+  {#1;#2 \vdash #3 : #4}
+\newcommandx*{\JBVTypElab}[5][1=\Delta, 2=\shctx, usedefault=@]%
+  % {\JBVTyp[#1][#2]{#3}{#4} \elabto #5}
+  {\JBVTyp[#1][#2]{#3}{#4} \;\shade{\elabto #5}}
+\newcommandx*{\JBVSh}[4][1=\Delta, usedefault=@]%
+  {#1 \vdashsh #2 \Rightarrow #3;\, #4}
+  
+\newcommandx*{\JImp}[3][1=\Gamma, usedefault=@]%
+  {#1 \vdashimp #2 \elabto #3}
+\newcommandx*{\JShImp}[3][1=\sh\Gamma, usedefault=@]%
+  {#1 \vdashshimp #2 \elabto #3}
+  
+\newcommandx*{\JGhcMod}[4]%
+  {#1; #2 \vdashghc #3 : #4}
+\newcommandx*{\JShGhcMod}[4]%
+  {#1; #2 \vdashshghc #3 : #4}
+  
+\newcommandx*{\JGhcSig}[5]%
+  {#1; #2 \vdashghc #3 \elabto #4;#5}
+\newcommandx*{\JShGhcSig}[5]%
+  {#1; #2 \vdashshghc #3 \elabto #4;#5}
+  
+\newcommandx*{\JThin}[3][1=t, usedefault=@]%
+  {\vdash #2 \xrightarrow{~#1~} #3}
+\newcommandx*{\JShThin}[3][1=t, usedefault=@]%
+  {\vdashsh #2 \xrightarrow{~#1~} #3}
+
+\newcommandx*{\JShMatch}[3][1=\nu, usedefault=@]%
+  {#1 \vdash #2 \sqsubseteq #3}
+  
+\newcommandx*{\JShTrans}[4]%
+  {\vdash #1 \le_{#2} #3 \elabto #4}
+  
+\newcommandx*{\JMerge}[3]%
+  {\vdash #1 + #2 \Rightarrow #3}
+\newcommandx*{\JShMerge}[5]%
+  {\vdashsh #1 + #2 \Rightarrow #3;\, #4;\, #5}
+\newcommandx*{\JShMergeNew}[4]%
+  {\vdashsh #1 + #2 \Rightarrow #3;\, #4}
+\newcommandx*{\JShMergeSimple}[3]%
+  {\vdashsh #1 + #2 \Rightarrow #3}
+
+\newcommandx*{\JDTyp}[3][1=\Delta, usedefault=@]%
+  {#1 \vdash #2 : #3}
+\newcommandx*{\JDTypElab}[4][1=\Delta, usedefault=@]%
+  % {#1 \vdash #2 : #3 \elabto #4}
+  {#1 \vdash #2 : #3 \;\shade{\elabto #4}}
+
+\newcommandx*{\JTTyp}[2][1=\Delta, usedefault=@]%
+  {#1 \vdash #2}
+
+\newcommandx*{\JSound}[3][1=\Psi_\syn{ctx}, usedefault=@]%
+  {#1 \vdash #2 \sim #3}
+
+\newcommandx*{\JSoundOne}[4][1=\Psi, 2=\fenv, usedefault=@]%
+  {\vdash #3 \sim #4}
+% \newcommand{\Smodi}[4]{\ensuremath{\oxb{=#2 \cc #3 \imps #4}^{#1}}}
+\newcommand{\Smodi}[3]{\ensuremath{\oxb{=#2 \cc #3}^{#1}}}
+\newcommand{\Smod}[2]{\Smodi{+}{#1}{#2}}
+\newcommand{\Ssig}[2]{\Smodi{-}{#1}{#2}}
+\newcommand{\Sreq}[2]{\Smodi{?}{#1}{#2}}
+\newcommand{\Shole}[2]{\Smodi{\circ}{#1}{#2}}
+
+\newcommand{\SSmodi}[2]{\ensuremath{\oxb{=#2}^{#1}}}
+\newcommand{\SSmod}[1]{\SSmodi{+}{#1}}
+\newcommand{\SSsig}[1]{\SSmodi{-}{#1}}
+\newcommand{\SSreq}[1]{\SSmodi{?}{#1}}
+\newcommand{\SShole}[1]{\SSmodi{\circ}{#1}}
+
+% \newcommand{\styp}[3]{\oxb{{#1}\cc{#2}}^{#3}}
+\newcommand{\styp}[3]{{#1}{:}{#2}^{#3}}
+\newcommand{\stm}[2]{\styp{#1}{#2}{\scriptscriptstyle+}}
+\newcommand{\sts}[2]{\styp{#1}{#2}{\scriptscriptstyle-}}
+
+% \newcommand{\mtypsep}{[\!]}
+\newcommand{\mtypsep}{\mbox{$\bm{;}$}}
+\newcommand{\mtypsepsp}{\hspace{.3em}}
+\newcommand{\msh}[3]{\aoxb{#1 ~\mtypsep~ #2 ~\mtypsep~ #3}}
+\newcommand{\mtyp}[3]{
+  \aoxb{\mtypsepsp #1 \mtypsepsp\mtypsep\mtypsepsp
+        #2 \mtypsepsp\mtypsep\mtypsepsp
+        #3 \mtypsepsp}}
+\newcommand{\bigmtyp}[3]{\ensuremath{
+  \left\langle\!\vrule \begin{array}{l}
+    #1 ~\mtypsep \\[0pt]
+    #2 ~\mtypsep \\
+    #3
+  \end{array} \vrule\!\right\rangle
+}}
+
+
+\newcommand{\mtypm}[2]{\mtyp{#1}{#2}^{\scriptstyle+}}
+\newcommand{\mtyps}[2]{\mtyp{#1}{#2}^{\scriptstyle-}}
+\newcommand{\bigmtypm}[2]{\bigmtyp{#1}{#2}^{\scriptstyle+}}
+\newcommand{\bigmtyps}[2]{\bigmtyp{#1}{#2}^{\scriptstyle-}}
+
+\newcommand{\mref}{\ensuremath{\mathit{mref}}}
+\newcommand{\selfpath}{\msyn{Local}}
+
+% \newcommand{\Ltyp}[3]{\oxb{#1 \mathbin{\scriptstyle\MVAt} #2}^{#3}}
+% \newcommand{\Ltyp}[2]{\poxb{#1 \mathbin{\scriptstyle\MVAt} #2}}
+\newcommand{\Ltyp}[2]{#1 {\scriptstyle\MVAt} #2}
+
+\newcommand{\Sshape}[1]{\ensuremath{\syn{shape}(#1)}}
+\newcommand{\Srename}[2]{\ensuremath{\syn{rename}(#1;#2)}}
+\newcommand{\Scons}[2]{\ensuremath{\syn{cons}(#1;#2)}}
+\newcommand{\Smkreq}[1]{\ensuremath{\syn{hide}(#1)}}
+\newcommand{\Sfv}[1]{\ensuremath{\syn{fv}(#1)}}
+\newcommand{\Sdom}[1]{\ensuremath{\syn{dom}(#1)}}
+\newcommand{\Srng}[1]{\ensuremath{\syn{rng}(#1)}}
+\newcommand{\Sdomp}[2]{\ensuremath{\syn{dom}_{#1}(#2)}}
+\newcommand{\Sclos}[1]{\ensuremath{\syn{clos}(#1)}}
+\newcommand{\Scloss}[2]{\ensuremath{\syn{clos}_{#1}(#2)}}
+\newcommand{\Snorm}[1]{\ensuremath{\syn{norm}(#1)}}
+\newcommand{\Sident}[1]{\ensuremath{\syn{ident}(#1)}}
+\newcommand{\Snec}[2]{\ensuremath{\syn{nec}(#1; #2)}}
+\newcommand{\Sprovs}[1]{\ensuremath{\syn{provs}(#1)}}
+\newcommand{\Smkstamp}[2]{\ensuremath{\syn{mkident}(#1; #2)}}
+\newcommand{\Sname}[1]{\ensuremath{\syn{name}(#1)}}
+\newcommand{\Snames}[1]{\ensuremath{\syn{names}(#1)}}
+\newcommand{\Sallnames}[1]{\ensuremath{\syn{allnames}(#1)}}
+\newcommand{\Shassubs}[1]{\ensuremath{\syn{hasSubs}(#1)}}
+\newcommand{\Snooverlap}[1]{\ensuremath{\syn{nooverlap}(#1)}}
+\newcommand{\Sreduce}[2]{\ensuremath{\syn{apply}(#1; #2)}}
+\newcommand{\Smkfenv}[1]{\ensuremath{\syn{mkfenv}(#1)}}
+\newcommand{\Svalidspc}[2]{\ensuremath{\syn{validspc}(#1; #2)}}
+\newcommand{\Srepath}[2]{\ensuremath{\syn{repath}(#1; #2)}}
+\newcommand{\Smksigenv}[2]{\ensuremath{\syn{mksigenv}(#1; #2)}}
+\newcommand{\Smksigshenv}[2]{\ensuremath{\syn{mksigshenv}(#1; #2)}}
+\newcommand{\Squalify}[2]{\ensuremath{\syn{qualify}(#1; #2)}}
+\newcommandx*{\Sdepends}[2][1=\Psi, usedefault=@]%
+  {\ensuremath{\syn{depends}_{#1}(#2)}}
+\newcommandx*{\Sdependss}[3][1=\Psi, 2=N, usedefault=@]%
+  {\ensuremath{\syn{depends}_{#1;#2}(#3)}}
+\newcommandx*{\Sdependsss}[4][1=\Psi, 2=V, 3=\theta, usedefault=@]%
+  {\ensuremath{\syn{depends}_{#1;#2;#3}(#4)}}
+\newcommand{\Snormsubst}[2]{\ensuremath{\syn{norm}(#1; #2)}}
+
+% \newcommand{\Smergeable}[2]{\ensuremath{\syn{mergeable}(#1; #2)}}
+\newcommand{\mdef}{\mathrel{\bot}}
+\newcommand{\Smergeable}[2]{\ensuremath{#1 \mdef #2}}
+
+\newcommand{\Sstamp}[1]{\ensuremath{\syn{stamp}(#1)}}
+\newcommand{\Stype}[1]{\ensuremath{\syn{type}(#1)}}
+
+\newcommand{\Strue}{\ensuremath{\syn{true}}}
+\newcommand{\Sfalse}{\ensuremath{\syn{false}}}
+
+\newcommandx*{\refsstar}[2][1=\nu_0, usedefault=@]%
+  {\ensuremath{\syn{refs}^{\star}}_{#1}(#2)}
+
+\renewcommand{\merge}{\boxplus}
+\newcommand{\meet}{\sqcap}
+
+\newcommand{\Shaslocaleenv}[3]{\ensuremath{\syn{haslocaleenv}(#1;#2;#3)}}
+\newcommand{\MTvalidnewmod}[3]{\ensuremath{\syn{validnewmod}(#1;#2;#3)}}
+\newcommand{\Sdisjoint}[1]{\ensuremath{\syn{disjoint}(#1)}}
+\newcommand{\Sconsistent}[1]{\ensuremath{\syn{consistent}(#1)}}
+\newcommand{\Slocmatch}[2]{\ensuremath{\syn{locmatch}(#1;#2)}}
+\newcommand{\Sctxmatch}[2]{\ensuremath{\syn{ctxmatch}(#1;#2)}}
+\newcommand{\Snolocmatch}[2]{\ensuremath{\syn{nolocmatch}(#1;#2)}}
+\newcommand{\Snoctxmatch}[2]{\ensuremath{\syn{noctxmatch}(#1;#2)}}
+\newcommand{\Sislocal}[2]{\ensuremath{\syn{islocal}(#1;#2)}}
+\newcommand{\Slocalespcs}[2]{\ensuremath{\syn{localespcs}(#1;#2)}}
+
+\newcommand{\Cprod}[1]{\syn{productive}(#1)}
+\newcommand{\Cnil}{\nil}
+\newcommand{\id}{\syn{id}}
+
+\newcommand{\nui}{\nu_{\syn{i}}}
+\newcommand{\taui}{\tau_{\syn{i}}}
+\newcommand{\Psii}{\Psi_{\syn{i}}}
+
+\newcommand{\vis}{\ensuremath{\mathsf{\scriptstyle V}}}
+\newcommand{\hid}{\ensuremath{\mathsf{\scriptstyle H}}}
+
+\newcommand{\taum}[1]{\ensuremath{\tau_{#1}^{m_{#1}}}}
+
+\newcommand{\sigmamod}{\sigma_{\syn{m}}}
+\newcommand{\sigmaprov}{\sigma_{\syn{p}}}
+
+\newcommand{\Svalidsubst}[2]{\ensuremath{\syn{validsubst}(#1;#2)}}
+\newcommand{\Salias}[1]{\ensuremath{\syn{alias}(#1)}}
+\newcommand{\Saliases}[1]{\ensuremath{\syn{aliases}(#1)}}
+\newcommand{\Simp}[1]{\ensuremath{\syn{imp}(#1)}}
+\newcommand{\Styp}[1]{\ensuremath{\syn{typ}(#1)}}
+\newcommand{\Spol}[1]{\ensuremath{\syn{pol}(#1)}}
+
+\newcommand{\stoff}{\stof{(-)}}
+\newcommand{\stheta}{\stof\theta}
+
+
+%%%%%%% FOR THE PAPER!
+\newcommand{\secref}[1]{Section~\ref{sec:#1}}
+\newcommand{\figref}[1]{Figure~\ref{fig:#1}}
+
+% typesetting for module/path names
+\newcommand{\mname}[1]{\textsf{#1}}
+\newcommand{\m}[1]{\mname{#1}}
+
+% typesetting for package names
+\newcommand{\pname}[1]{\textsf{#1}}
+
+\newcommand{\kpm}[2]{\angb{\pname{#1}.#2}}
+
+% for core entities
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\core}[1]{\texttt{#1}}
+
+\newcommand{\req}{\bsyn{req}}
+\newcommand{\hiding}[1]{\req~\m{#1}}
+
+\newcommand{\Emod}[1]{\ensuremath{[#1]}}
+\newcommand{\Esig}[1]{\ensuremath{[\cc#1]}}
+\newcommand{\Epkg}[2]{\bsyn{package}~\pname{#1}~\bsyn{where}~{#2}}
+% \newcommand{\Epkgt}[3]{\bsyn{package}~{#1}~\bsyn{only}~{#2}~\bsyn{where}~{#3}}
+\newcommand{\Epkgt}[3]{\bsyn{package}~\pname{#1}~{#2}~\bsyn{where}~{#3}}
+\newcommand{\Einc}[1]{\bsyn{include}~\pname{#1}}
+% \newcommand{\Einct}[2]{\bsyn{include}~{#1}~\bsyn{only}~{#2}}
+% \newcommand{\Einctr}[3]{\bsyn{include}~{#1}~\bsyn{only}~{#2}~{#3}}
+\newcommand{\Einct}[2]{\bsyn{include}~\pname{#1}~(#2)}
+\newcommand{\Eincr}[2]{\bsyn{include}~\pname{#1}~\angb{#2}}
+\newcommand{\Einctr}[3]{\bsyn{include}~\pname{#1}~(#2)~\angb{#3}}
+\newcommand{\Emv}[2]{#1 \mapsto #2}
+\newcommand{\Emvp}[2]{\m{#1} \mapsto \m{#2}}
+\newcommand{\Etr}[3][~]{{#2}{#1}\langle #3 \rangle}
+\newcommand{\Erm}[3][~]{{#2}{#1}\langle #3 \mapnil \rangle}
+\newcommand{\Ethin}[1]{(#1)}
+\newcommand{\Ethinn}[2]{(#1; #2)}
+
+
+% \newcommand{\Pdef}[2]{\ensuremath{\begin{array}{l} \Phead{#1} #2\end{array}}}
+% \newcommand{\Phead}[1]{\bsyn{package}~\pname{#1}~\bsyn{where} \\}
+% \newcommand{\Pbndd}[2]{\hspace{1em}{#1} = {#2} \\}
+% \newcommand{\Pbnd}[2]{\hspace{1em}\mname{#1} = {#2} \\}
+% \newcommand{\Pref}[2]{\hspace{1em}\mname{#1} = \mname{#2} \\}
+% \newcommand{\Pmod}[2]{\hspace{1em}\mname{#1} = [\code{#2}] \\}
+% \newcommand{\Psig}[2]{\hspace{1em}\mname{#1} \cc [\code{#2}] \\}
+\newcommand{\Pdef}[2]{\ensuremath{
+  \begin{array}{@{\hspace{1em}}L@{\;\;}c@{\;\;}l}
+    \multicolumn{3}{@{}l}{\Phead{#1}} \\
+    #2
+  \end{array}
+}}
+\newcommand{\Pdeft}[3]{\ensuremath{
+  \begin{array}{@{\hspace{1em}}L@{\;\;}c@{\;\;}l}
+    \multicolumn{3}{@{}l}{\Pheadt{#1}{#2}} \\
+    #3
+  \end{array}
+}}
+\newcommand{\Phead}[1]{\bsyn{package}~\pname{#1}~\bsyn{where}}
+\newcommand{\Pheadt}[2]{\bsyn{package}~\pname{#1}~(#2)~\bsyn{where}}
+\newcommand{\Pbnd}[2]{#1 &=& #2 \\}
+\newcommand{\Pref}[2]{\mname{#1} &=& \mname{#2} \\}
+\newcommand{\Pmod}[2]{\mname{#1} &=& [\code{#2}] \\}
+\newcommand{\Pmodd}[2]{\mname{#1} &=& #2 \\}
+\newcommand{\Psig}[2]{\mname{#1} &\cc& [\code{#2}] \\}
+\newcommand{\Psigg}[2]{\mname{#1} &\cc& #2 \\}
+\newcommand{\Pmulti}[1]{\multicolumn{3}{@{\hspace{1em}}l} {#1} \\}
+\newcommand{\Pinc}[1]{\Pmulti{\Einc{#1}}}
+\newcommand{\Pinct}[2]{\Pmulti{\Einct{#1}{#2}}}
+\newcommand{\Pincr}[2]{\Pmulti{\Eincr{#1}{#2}}}
+\newcommand{\Pinctr}[3]{\Pmulti{\Einctr{#1}{#2}{#3}}}
+\newcommand{\Pmodbig}[2]{\mname{#1} &=& \left[
+  \begin{codeblock}
+  #2
+  \end{codeblock}
+\right] \\}
+\newcommand{\Psigbig}[2]{\mname{#1} &\cc& \left[
+  \begin{codeblock}
+  #2
+  \end{codeblock}
+\right] \\}
+
+\newcommand{\Mimp}[1]{\msyn{import}~\mname{#1}}
+\newcommand{\Mimpq}[1]{\msyn{import}~\msyn{qualified}~\mname{#1}}
+\newcommand{\Mimpas}[2]{\msyn{import}~\mname{#1}~\msyn{as}~\mname{#2}}
+\newcommand{\Mimpqas}[2]{\msyn{import}~\msyn{qualified}~\mname{#1}~\msyn{as}~\mname{#2}}
+\newcommand{\Mexp}[1]{\msyn{export}~(#1)}
+
+\newcommand{\illtyped}{\hfill ($\times$) \; ill-typed}
+
+\newenvironment{example}[1][LL]%
+  {\ignorespaces \begin{flushleft}\begin{tabular}{@{\hspace{1em}}#1} }%
+  {\end{tabular}\end{flushleft} \ignorespacesafterend}
+
+\newenvironment{counterexample}[1][LL]%
+  {\ignorespaces \begin{flushleft}\begin{tabular}{@{\hspace{1em}}#1} }%
+  {& \text{\illtyped} \end{tabular}\end{flushleft}  \ignorespacesafterend}
+
+\newenvironment{codeblock}%
+  {\begin{varwidth}{\textwidth}\begin{alltt}}%
+  {\end{alltt}\end{varwidth}}
+
+\newcommand{\fighead}{\hrule\vspace{1.5ex}}
+\newcommand{\figfoot}{\vspace{1ex}\hrule}
+\newenvironment{myfig}{\fighead\small}{\figfoot}
+
+\newcommand{\Mhead}[2]{\syn{module}~{#1}~\syn{(}{#2}\syn{)}~\syn{where}}
+\newcommand{\Mdef}[3]{\ensuremath{
+  \begin{array}{@{\hspace{1em}}L}
+    \multicolumn{1}{@{}L}{\Mhead{#1}{\core{#2}}} \\
+    #3
+  \end{array}
+}}
+
+\newcommand{\HMstof}[1]{\ensuremath{#1}}
+% \newcommand{\HMstof}[1]{\ensuremath{\lfloor #1 \rfloor}}
+% \newcommand{\HMstof}[1]{\ensuremath{\underline{#1}}}
+% \newcommand{\HMstof}[1]{{#1}^{\star}}
+\newcommand{\HMhead}[2]{\syn{module}~\(\HMstof{#1}\)~\syn{(}{#2}\syn{)}~\syn{where}}
+\newcommand{\HMdef}[3]{\ensuremath{
+  \begin{array}{@{\hspace{1em}}L}
+    \multicolumn{1}{@{}L}{\HMhead{#1}{\core{#2}}} \\
+    #3
+  \end{array}
+}}
+\newcommand{\HMimpas}[3]{%
+  \msyn{import}~\ensuremath{\HMstof{#1}}~%
+  \msyn{as}~\mname{#2}~\msyn{(}\core{#3}\msyn{)}}
+\newcommand{\HMimpqas}[3]{%
+  \msyn{import}~\msyn{qualified}~\ensuremath{\HMstof{#1}}~%
+  \msyn{as}~\mname{#2}~\msyn{(}\core{#3}\msyn{)}}
+
+\newcommand{\stackedenv}[2][c]{\ensuremath{
+  \begin{array}{#1}
+  #2
+  \end{array}
+}}
+
+% \renewcommand{\nil}{\mathsf{nil}}
+\renewcommand{\nil}{\mathrel\emptyset}
+
+% \newcommand{\ee}{\mathit{ee}}
+\newcommand{\ee}{\mathit{dent}}
+
+\renewcommand{\gets}{\mathbin{\coloneqq}}

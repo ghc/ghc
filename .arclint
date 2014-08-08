@@ -14,18 +14,63 @@
     },
     "text": {
       "type": "text",
-      "exclude": [ "(\\.xml$)" ],
+      "exclude": [ "(\\.xml)", "(Makefile)", "(\\.mk)" ],
       "severity": {
         "5": "disabled"
       }
     },
     "text-xml": {
       "type": "text",
-      "include": "(\\.xml$)",
+      "include": "(\\.xml)",
       "severity": {
         "5": "disabled",
         "3": "disabled"
       }
+    },
+    "makefiles": {
+      "type": "text",
+      "include": [ "(Makefile)", "(\\.mk)" ],
+      "severity": {
+        "2": "disabled"
+      }
     }
-  }
+  },
+
+  "exclude":
+    [ "(^libffi-tarballs)",
+      "(^libraries/binary)",
+      "(^libraries/bytestring)",
+      "(^libraries/Cabal)",
+      "(^libraries/containers)",
+      "(^libraries/haskeline)",
+      "(^libraries/pretty)",
+      "(^libraries/terminfo)",
+      "(^libraries/transformers)",
+      "(^libraries/xhtml)",
+      "(^libraries/Win32)",
+      "(^libraries/primitive)",
+      "(^libraries/vector)",
+      "(^libraries/time)",
+      "(^libraries/random)",
+      "(^libraries/array)",
+      "(^libraries/deepseq)",
+      "(^libraries/directory)",
+      "(^libraries/filepath)",
+      "(^libraries/haskell98)",
+      "(^libraries/haskell2010)",
+      "(^libraries/hoopl)",
+      "(^libraries/hpc)",
+      "(^libraries/old-locale)",
+      "(^libraries/old-time)",
+      "(^libraries/process)",
+      "(^libraries/unix)",
+      "(^libraries/parallel)",
+      "(^libraries/stm)",
+      "(^libraries/dph)",
+      "(^utils/haddock)",
+      "(^nofib)",
+      "(^utils/hsc2hs)",
+      "(^libffi-tarballs)",
+      "(^ghc-tarballs)"
+    ]
 }

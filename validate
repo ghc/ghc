@@ -22,9 +22,10 @@ Flags:
   --fast            Omit dyn way, omit binary distribution
   --slow            Build stage2 with -DDEBUG.
                     2008-07-01: 14% slower than the default.
-  --no-dph:         Skip requiring libraries/dph. In --slow mode, these tests
-                    can take a substantial amount of time, and on some platforms
-                    with broken linkers, we don't want to try compiling it.
+  --no-dph:         Skip building libraries/dph and running associated tests.
+                    In --slow mode, these tests can take a substantial amount
+                    of time, and on some platforms with broken linkers, we
+                    don't want to try compiling it.
   --help            shows this usage help.
 
   Set environment variable 'CPUS' to number of cores, to exploit
@@ -134,6 +135,12 @@ thisdir=`utils/ghc-pwd/dist-boot/ghc-pwd`
 echo "Validating=YES"       >  mk/are-validating.mk
 echo "ValidateSpeed=$speed" >> mk/are-validating.mk
 echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
+
+if [ $skip_dph -eq 1 ]; then
+    echo "BUILD_DPH=NO"     >> mk/are-validating.mk
+else
+    echo "BUILD_DPH=YES"    >> mk/are-validating.mk
+fi
 
 $make -j$threads
 # For a "debug make", add "--debug=b --debug=m"

@@ -11,5 +11,5 @@ test('T3103',
                    'GHC/Unicode.o',  'GHC/Unicode.o-boot',
                    'GHC/Word.hi',    'GHC/Word.o'])],
      multimod_compile,
-     ['Foreign.Ptr', '-v0 -hide-all-packages -package ghc-prim -package integer-gmp -package-name base'])
+     ['Foreign.Ptr', '-v0 -hide-all-packages -package ghc-prim -package integer-gmp -this-package-key base'])
 

@@ -1205,9 +1205,10 @@ recordUnsafeInfer = getGblEnv >>= \env -> writeTcRef (tcg_safeInfer env) False
 finalSafeMode :: DynFlags -> TcGblEnv -> IO SafeHaskellMode
 finalSafeMode dflags tcg_env = do
     safeInf <- readIORef (tcg_safeInfer tcg_env)
-    return $ if safeInferOn dflags && not safeInf
-        then Sf_None
-        else safeHaskell dflags
+    return $ case safeHaskell dflags of
+        Sf_None | safeInferOn dflags && safeInf -> Sf_Safe
+                | otherwise                     -> Sf_None
+        s -> s
 \end{code}
 
 

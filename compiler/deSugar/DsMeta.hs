@@ -396,10 +396,10 @@ repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
        ; repTySynInst tc eqn1 }
 
 repTyFamEqn :: LTyFamInstEqn Name -> DsM (Core TH.TySynEqnQ)
-repTyFamEqn (L loc (TyFamInstEqn { tfie_pats = HsWB { hswb_cts = tys
-                                                    , hswb_kvs = kv_names
-                                                    , hswb_tvs = tv_names }
-                                 , tfie_rhs = rhs }))
+repTyFamEqn (L loc (TyFamEqn { tfe_pats = HsWB { hswb_cts = tys
+                                               , hswb_kvs = kv_names
+                                               , hswb_tvs = tv_names }
+                                 , tfe_rhs = rhs }))
   = do { let hs_tvs = HsQTvs { hsq_kvs = kv_names
                              , hsq_tvs = userHsTyVarBndrs loc tv_names }   -- Yuk
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
@@ -1416,7 +1416,7 @@ globalVar name
   where
       mod = ASSERT( isExternalName name) nameModule name
       name_mod = moduleNameString (moduleName mod)
-      name_pkg = packageIdString (modulePackageId mod)
+      name_pkg = packageKeyString (modulePackageKey mod)
       name_occ = nameOccName name
       mk_varg | OccName.isDataOcc name_occ = mkNameG_dName
               | OccName.isVarOcc  name_occ = mkNameG_vName
@@ -1476,7 +1476,7 @@ rep2 n xs = do { id <- dsLookupGlobalId n
 
 dataCon' :: Name -> [CoreExpr] -> DsM (Core a)
 dataCon' n args = do { id <- dsLookupDataCon n
-                     ; return $ MkC $ mkConApp id args }
+                     ; return $ MkC $ mkCoreConApps id args }
 
 dataCon :: Name -> DsM (Core a)
 dataCon n = dataCon' n []
@@ -2117,7 +2117,7 @@ thLib = mkTHModule (fsLit "Language.Haskell.TH.Lib")
 qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
 
 mkTHModule :: FastString -> Module
-mkTHModule m = mkModule thPackageId (mkModuleNameFS m)
+mkTHModule m = mkModule thPackageKey (mkModuleNameFS m)
 
 libFun, libTc, thFun, thTc, thCon, qqFun :: FastString -> Unique -> Name
 libFun = mk_known_key_name OccName.varName  thLib

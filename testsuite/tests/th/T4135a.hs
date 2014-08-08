@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, MultiParamTypeClasses, TypeFamilies,
-             FlexibleInstances, OverlappingInstances #-}
+             FlexibleInstances #-}
 
 module T4135a where
 

@@ -1,11 +1,11 @@
-{-# LANGUAGE FlexibleInstances, OverlappingInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- A very delicate interaction of overlapping instances
 
 module T5051 where
 
 data T = T deriving( Eq, Ord )
-instance Eq [T] 
+instance {-# OVERLAPPING #-} Eq [T] 
 
 foo :: Ord a => [a] -> Bool
 foo x = x >= x

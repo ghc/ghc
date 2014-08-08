@@ -1,4 +1,4 @@
-{-# LANGUAGE NullaryTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Main where
 

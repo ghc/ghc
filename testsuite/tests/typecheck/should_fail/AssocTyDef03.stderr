@@ -1,5 +1,5 @@
 
 AssocTyDef03.hs:6:5:
     Wrong category of family instance; declaration was for a data type
-    In the type instance declaration for ‘Typ’
+    In the default type instance declaration for ‘Typ’
     In the class declaration for ‘Cls’

@@ -39,14 +39,13 @@ import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName )
 import Module
 import Name
-import Packages ( trusted, getPackageDetails, exposed, exposedModules, pkgIdMap )
+import Packages ( trusted, getPackageDetails, listVisibleModuleNames, pprFlag )
 import PprTyThing
 import RdrName ( getGRE_NameQualifier_maybes )
 import SrcLoc
 import qualified Lexer
 
 import StringBuffer
-import UniqFM ( eltsUFM )
 import Outputable hiding ( printForUser, printForUserPartWay, bold )
 
 -- Other random utilities
@@ -586,8 +585,9 @@ nextInputLine show_prompt is_tty
     fileLoop stdin
 
 -- NOTE: We only read .ghci files if they are owned by the current user,
--- and aren't world writable.  Otherwise, we could be accidentally
--- running code planted by a malicious third party.
+-- and aren't world writable (files owned by root are ok, see #9324).
+-- Otherwise, we could be accidentally running code planted by
+-- a malicious third party.
 
 -- Furthermore, We only read ./.ghci if . is owned by the current user
 -- and isn't writable by anyone else.  I think this is sufficient: we
@@ -602,18 +602,14 @@ checkPerms name =
   handleIO (\_ -> return False) $ do
     st <- getFileStatus name
     me <- getRealUserID
-    if fileOwner st /= me then do
-        putStrLn $ "WARNING: " ++ name ++ " is owned by someone else, IGNORING!"
-        return False
-     else do
-        let mode = System.Posix.fileMode st
-        if (groupWriteMode == (mode `intersectFileModes` groupWriteMode))
-            || (otherWriteMode == (mode `intersectFileModes` otherWriteMode))
-            then do
-                putStrLn $ "*** WARNING: " ++ name ++
-                           " is writable by someone else, IGNORING!"
-                return False
-            else return True
+    let mode = System.Posix.fileMode st
+        ok = (fileOwner st == me || fileOwner st == 0) &&
+             groupWriteMode /= mode `intersectFileModes` groupWriteMode &&
+             otherWriteMode /= mode `intersectFileModes` otherWriteMode
+    unless ok $
+      putStrLn $ "*** WARNING: " ++ name ++
+                 " is writable by someone else, IGNORING!"
+    return ok
 #endif
 
 incrementLineNo :: InputT GHCi ()
@@ -1141,9 +1137,10 @@ runMain s = case toArgs s of
             Left err   -> liftIO (hPutStrLn stderr err)
             Right args ->
                 do dflags <- getDynFlags
-                   case mainFunIs dflags of
-                       Nothing -> doWithArgs args "main"
-                       Just f  -> doWithArgs args f
+                   let main = fromMaybe "main" (mainFunIs dflags)
+                   -- Wrap the main function in 'void' to discard its value instead
+                   -- of printing it (#9086). See Haskell 2010 report Chapter 5.
+                   doWithArgs args $ "Control.Monad.void (" ++ main ++ ")"
 
 -----------------------------------------------------------------------------
 -- :run
@@ -1606,26 +1603,25 @@ isSafeModule m = do
     liftIO $ putStrLn $ "Package Trust: " ++ (if packageTrustOn dflags then "On" else "Off")
     when (not $ null good)
          (liftIO $ putStrLn $ "Trusted package dependencies (trusted): " ++
-                        (intercalate ", " $ map packageIdString good))
+                        (intercalate ", " $ map (showPpr dflags) good))
     case msafe && null bad of
         True -> liftIO $ putStrLn $ mname ++ " is trusted!"
         False -> do
             when (not $ null bad)
                  (liftIO $ putStrLn $ "Trusted package dependencies (untrusted): "
-                            ++ (intercalate ", " $ map packageIdString bad))
+                            ++ (intercalate ", " $ map (showPpr dflags) bad))
             liftIO $ putStrLn $ mname ++ " is NOT trusted!"
 
   where
     mname = GHC.moduleNameString $ GHC.moduleName m
 
     packageTrusted dflags md
-        | thisPackage dflags == modulePackageId md = True
-        | otherwise = trusted $ getPackageDetails (pkgState dflags) (modulePackageId md)
+        | thisPackage dflags == modulePackageKey md = True
+        | otherwise = trusted $ getPackageDetails dflags (modulePackageKey md)
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = ([], [])
                           | otherwise = partition part deps
-        where state = pkgState dflags
-              part pkg = trusted $ getPackageDetails state pkg
+        where part pkg = trusted $ getPackageDetails dflags pkg
 
 -----------------------------------------------------------------------------
 -- :browse
@@ -2335,15 +2331,9 @@ showPackages :: GHCi ()
 showPackages = do
   dflags <- getDynFlags
   let pkg_flags = packageFlags dflags
-  liftIO $ putStrLn $ showSDoc dflags $ vcat $
-    text ("active package flags:"++if null pkg_flags then " none" else "")
-    : map showFlag pkg_flags
-  where showFlag (ExposePackage   p) = text $ "  -package " ++ p
-        showFlag (HidePackage     p) = text $ "  -hide-package " ++ p
-        showFlag (IgnorePackage   p) = text $ "  -ignore-package " ++ p
-        showFlag (ExposePackageId p) = text $ "  -package-id " ++ p
-        showFlag (TrustPackage    p) = text $ "  -trust " ++ p
-        showFlag (DistrustPackage p) = text $ "  -distrust " ++ p
+  liftIO $ putStrLn $ showSDoc dflags $
+    text ("active package flags:"++if null pkg_flags then " none" else "") $$
+      nest 2 (vcat (map pprFlag pkg_flags))
 
 showPaths :: GHCi ()
 showPaths = do
@@ -2478,7 +2468,7 @@ completeIdentifier = wrapIdentCompleter $ \w -> do
 
 completeModule = wrapIdentCompleter $ \w -> do
   dflags <- GHC.getSessionDynFlags
-  let pkg_mods = allExposedModules dflags
+  let pkg_mods = allVisibleModules dflags
   loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
   return $ filter (w `isPrefixOf`)
         $ map (showPpr dflags) $ loaded_mods ++ pkg_mods
@@ -2490,7 +2480,7 @@ completeSetModule = wrapIdentCompleterWithModifier "+-" $ \m w -> do
       imports <- GHC.getContext
       return $ map iiModuleName imports
     _ -> do
-      let pkg_mods = allExposedModules dflags
+      let pkg_mods = allVisibleModules dflags
       loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
       return $ loaded_mods ++ pkg_mods
   return $ filter (w `isPrefixOf`) $ map (showPpr dflags) modules
@@ -2535,22 +2525,21 @@ unionComplete f1 f2 line = do
 
 wrapCompleter :: String -> (String -> GHCi [String]) -> CompletionFunc GHCi
 wrapCompleter breakChars fun = completeWord Nothing breakChars
-    $ fmap (map simpleCompletion) . fmap sort . fun
+    $ fmap (map simpleCompletion . nubSort) . fun
 
 wrapIdentCompleter :: (String -> GHCi [String]) -> CompletionFunc GHCi
 wrapIdentCompleter = wrapCompleter word_break_chars
 
 wrapIdentCompleterWithModifier :: String -> (Maybe Char -> String -> GHCi [String]) -> CompletionFunc GHCi
 wrapIdentCompleterWithModifier modifChars fun = completeWordWithPrev Nothing word_break_chars
-    $ \rest -> fmap (map simpleCompletion) . fmap sort . fun (getModifier rest)
+    $ \rest -> fmap (map simpleCompletion . nubSort) . fun (getModifier rest)
  where
   getModifier = find (`elem` modifChars)
 
-allExposedModules :: DynFlags -> [ModuleName]
-allExposedModules dflags
- = concat (map exposedModules (filter exposed (eltsUFM pkg_db)))
- where
-  pkg_db = pkgIdMap (pkgState dflags)
+-- | Return a list of visible module names for autocompletion.
+-- (NB: exposed != visible)
+allVisibleModules :: DynFlags -> [ModuleName]
+allVisibleModules dflags = listVisibleModuleNames dflags
 
 completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
                         completeIdentifier
@@ -3133,7 +3122,7 @@ lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 lookupModuleName mName = GHC.lookupModule mName Nothing
 
 isHomeModule :: Module -> Bool
-isHomeModule m = GHC.modulePackageId m == mainPackageId
+isHomeModule m = GHC.modulePackageKey m == mainPackageKey
 
 -- TODO: won't work if home dir is encoded.
 -- (changeDirectory may not work either in that case.)
@@ -3163,7 +3152,7 @@ wantInterpretedModuleName modname = do
    modl <- lookupModuleName modname
    let str = moduleNameString modname
    dflags <- getDynFlags
-   when (GHC.modulePackageId modl /= thisPackage dflags) $
+   when (GHC.modulePackageKey modl /= thisPackage dflags) $
       throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
    is_interpreted <- GHC.moduleIsInterpreted modl
    when (not is_interpreted) $

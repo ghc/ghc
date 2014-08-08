@@ -81,13 +81,19 @@ test('tryReadMVar1', normal, compile_and_run, [''])
 test('tryReadMVar2', normal, compile_and_run, [''])
 
 test('T7970', normal, compile_and_run, [''])
+test('AtomicPrimops', normal, compile_and_run, [''])
+
+# test uses 2 threads and yield, scheduling can vary with threaded2
+test('threadstatus-9333', [omit_ways(['threaded2'])], compile_and_run, [''])
+
+test('T9379', normal, compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
 def f( name, opts ):
   if config.fast:
-  	opts.skip = 1
+     opts.skip = 1
 
 setTestOpts(f)
 

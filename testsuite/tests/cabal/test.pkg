@@ -1,6 +1,7 @@
 name: testpkg
 version: 1.2.3.4
 id: testpkg-1.2.3.4-XXX
+key: testpkg-1.2.3.4
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org

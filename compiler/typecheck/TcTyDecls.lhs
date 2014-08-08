@@ -121,7 +121,7 @@ synTyConsOfType ty
 mkSynEdges :: [LTyClDecl Name] -> [(LTyClDecl Name, Name, [Name])]
 mkSynEdges syn_decls = [ (ldecl, name, nameSetToList fvs)
                        | ldecl@(L _ (SynDecl { tcdLName = L _ name
-                                            , tcdFVs = fvs })) <- syn_decls ]
+                                             , tcdFVs = fvs })) <- syn_decls ]
 
 calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
 calcSynCycles = stronglyConnCompFromEdgedVertices . mkSynEdges
@@ -264,7 +264,7 @@ this for all newtypes, we'd get infinite types.  So we figure out for
 each newtype whether it is "recursive", and add a coercion if so.  In
 effect, we are trying to "cut the loops" by identifying a loop-breaker.
 
-2.  Avoid infinite unboxing.  This is nothing to do with newtypes.
+2.  Avoid infinite unboxing.  This has nothing to do with newtypes.
 Suppose we have
         data T = MkT Int T
         f (MkT x t) = f t

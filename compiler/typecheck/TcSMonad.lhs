@@ -1147,8 +1147,8 @@ nestImplicTcS ref inner_untch inerts (TcS thing_inside)
                                , tcs_ty_binds    = ty_binds
                                , tcs_count       = count
                                , tcs_inerts      = new_inert_var
-                               , tcs_worklist    = panic "nextImplicTcS: worklist"
-                               , tcs_implics     = panic "nextImplicTcS: implics"
+                               , tcs_worklist    = panic "nestImplicTcS: worklist"
+                               , tcs_implics     = panic "nestImplicTcS: implics"
                                -- NB: Both these are initialised by withWorkList
                                }
        ; res <- TcM.setUntouchables inner_untch $
@@ -1176,8 +1176,8 @@ nestTcS (TcS thing_inside)
     do { inerts <- TcM.readTcRef inerts_var
        ; new_inert_var <- TcM.newTcRef inerts
        ; let nest_env = env { tcs_inerts   = new_inert_var
-                            , tcs_worklist = panic "nextImplicTcS: worklist"
-                            , tcs_implics  = panic "nextImplicTcS: implics" }
+                            , tcs_worklist = panic "nestTcS: worklist"
+                            , tcs_implics  = panic "nestTcS: implics" }
        ; thing_inside nest_env }
 
 tryTcS :: TcS a -> TcS a
@@ -1195,8 +1195,8 @@ tryTcS (TcS thing_inside)
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
                             , tcs_ty_binds = ty_binds_var
                             , tcs_inerts   = is_var
-                            , tcs_worklist = panic "nextImplicTcS: worklist"
-                            , tcs_implics  = panic "nextImplicTcS: implics" }
+                            , tcs_worklist = panic "tryTcS: worklist"
+                            , tcs_implics  = panic "tryTcS: implics" }
        ; thing_inside nest_env }
 
 -- Getters and setters of TcEnv fields
@@ -1281,8 +1281,7 @@ getUntouchables = wrapTcS TcM.getUntouchables
 getGivenInfo :: TcS a -> TcS (Bool, [TcTyVar], a)
 -- See Note [inert_fsks and inert_no_eqs]
 getGivenInfo thing_inside
-  = do {
-       ; updInertTcS reset_vars  -- Set inert_fsks and inert_no_eqs to initial values
+  = do { updInertTcS reset_vars  -- Set inert_fsks and inert_no_eqs to initial values
        ; res <- thing_inside     -- Run thing_inside
        ; is  <- getTcSInerts     -- Get new values of inert_fsks and inert_no_eqs
        ; return (inert_no_eqs (inert_cans is), inert_fsks is, res) }
@@ -1559,6 +1558,8 @@ data XEvTerm
   = XEvTerm { ev_preds  :: [PredType]           -- New predicate types
             , ev_comp   :: [EvTerm] -> EvTerm   -- How to compose evidence
             , ev_decomp :: EvTerm -> [EvTerm]   -- How to decompose evidence
+            -- In both ev_comp and ev_decomp, the [EvTerm] is 1-1 with ev_preds
+            -- and each EvTerm has type of the corresponding EvPred
             }
 
 data MaybeNew = Fresh CtEvidence | Cached EvTerm
@@ -1645,16 +1646,16 @@ Note [xCFlavor]
 ~~~~~~~~~~~~~~~
 A call might look like this:
 
-    xCtFlavor ev subgoal-preds evidence-transformer
+    xCtEvidence ev evidence-transformer
 
-  ev is Given   => use ev_decomp to create new Givens for subgoal-preds,
+  ev is Given   => use ev_decomp to create new Givens for ev_preds,
                    and return them
 
-  ev is Wanted  => create new wanteds for subgoal-preds,
+  ev is Wanted  => create new wanteds for ev_preds,
                    use ev_comp to bind ev,
                    return fresh wanteds (ie ones not cached in inert_cans or solved)
 
-  ev is Derived => create new deriveds for subgoal-preds
+  ev is Derived => create new deriveds for ev_preds
                       (unless cached in inert_cans or solved)
 
 Note: The [CtEvidence] returned is a subset of the subgoal-preds passed in
@@ -1714,7 +1715,7 @@ as an Irreducible (see Note [Equalities with incompatible kinds] in
 TcCanonical), and will do no harm.
 
 \begin{code}
-xCtEvidence :: CtEvidence            -- Original flavor
+xCtEvidence :: CtEvidence            -- Original evidence
             -> XEvTerm               -- Instructions about how to manipulate evidence
             -> TcS [CtEvidence]
 

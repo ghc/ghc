@@ -454,6 +454,8 @@ AC_DEFUN([FP_SETTINGS],
     then
         mingw_bin_prefix=mingw/bin/
         SettingsCCompilerCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
+        SettingsHaskellCPPCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
+        SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="\$topdir/../${mingw_bin_prefix}ld.exe"
         SettingsArCommand="\$topdir/../${mingw_bin_prefix}ar.exe"
         SettingsPerlCommand='$topdir/../perl/perl.exe'
@@ -462,6 +464,8 @@ AC_DEFUN([FP_SETTINGS],
         SettingsTouchCommand='$topdir/touchy.exe'
     else
         SettingsCCompilerCommand="$WhatGccIsCalled"
+        SettingsHaskellCPPCommand="$HaskellCPPCmd"
+        SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$LdCmd"
         SettingsArCommand="$ArCmd"
         SettingsPerlCommand="$PerlCmd"
@@ -486,6 +490,8 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
     AC_SUBST(SettingsCCompilerCommand)
+    AC_SUBST(SettingsHaskellCPPCommand)
+    AC_SUBST(SettingsHaskellCPPFlags)
     AC_SUBST(SettingsCCompilerFlags)
     AC_SUBST(SettingsCCompilerLinkFlags)
     AC_SUBST(SettingsLdCommand)
@@ -520,6 +526,12 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
     esac
 
     case $$1 in
+    i386-unknown-mingw32)
+        $2="$$2 -march=i686"
+        ;;
+    i386-portbld-freebsd*)
+        $2="$$2 -march=i686"
+        ;;
     i386-apple-darwin)
         $2="$$2 -m32"
         $3="$$3 -m32"
@@ -530,6 +542,12 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $2="$$2 -m64"
         $3="$$3 -m64"
         $4="$$4 -arch x86_64"
+        $5="$$5 -m64"
+        ;;
+    x86_64-unknown-solaris2)
+        $2="$$2 -m64"
+        $3="$$3 -m64"
+        $4="$$4 -m64"
         $5="$$5 -m64"
         ;;
     alpha-*)
@@ -705,6 +723,8 @@ AC_ARG_WITH($2,
 ]
 )
 ]) # FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
+
+
 
 # FP_PROG_CONTEXT_DIFF
 # --------------------
@@ -2049,7 +2069,11 @@ AC_DEFUN([FIND_LLVM_PROG],[
         IFS=":;"
         for p in ${PATH}; do
             if test -d "${p}"; then
-                $1=`${FindCmd} "${p}" -type f -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
+                if test "$windows" = YES; then
+                    $1=`${FindCmd} "${p}" -type f -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
+                else
+                    $1=`${FindCmd} "${p}" -type f -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
+                fi
                 if test -n "$$1"; then
                     break
                 fi
@@ -2080,7 +2104,7 @@ AC_DEFUN([FIND_GCC],[
         $1="$CC"
     else
         FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
-        # From Xcode 5 on, OS X command line tools do not include gcc
+        # From Xcode 5 on/, OS X command line tools do not include gcc
         # anymore. Use clang.
         if test -z "$$1"
         then
@@ -2100,5 +2124,7 @@ AC_DEFUN([MAYBE_OVERRIDE_STAGE0],[
       $2=$With_$1
   fi
 ])
+
+
 
 # LocalWords:  fi

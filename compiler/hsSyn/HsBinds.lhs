@@ -166,13 +166,7 @@ data HsBindLR idL idR
         abs_binds    :: LHsBinds idL   -- ^ Typechecked user bindings
     }
 
-  | PatSynBind {
-        patsyn_id   :: Located idL,                   -- ^ Name of the pattern synonym
-        bind_fvs    :: NameSet,                       -- ^ See Note [Bind free vars]
-        patsyn_args :: HsPatSynDetails (Located idR), -- ^ Formal parameter names
-        patsyn_def  :: LPat idR,                      -- ^ Right-hand side
-        patsyn_dir  :: HsPatSynDir idR                -- ^ Directionality
-    }
+  | PatSynBind (PatSynBind idL idR)
 
   deriving (Data, Typeable)
         -- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
@@ -193,6 +187,14 @@ data ABExport id
         , abe_wrap  :: HsWrapper    -- ^ See Note [AbsBinds wrappers]
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
         , abe_prags :: TcSpecPrags  -- ^ SPECIALISE pragmas
+  } deriving (Data, Typeable)
+
+data PatSynBind idL idR
+  = PSB { psb_id   :: Located idL,                   -- ^ Name of the pattern synonym
+          psb_fvs  :: NameSet,                       -- ^ See Note [Bind free vars]
+          psb_args :: HsPatSynDetails (Located idR), -- ^ Formal parameter names
+          psb_def  :: LPat idR,                      -- ^ Right-hand side
+          psb_dir  :: HsPatSynDir idR                -- ^ Directionality
   } deriving (Data, Typeable)
 
 -- | Used for the NameSet in FunBind and PatBind prior to the renamer
@@ -437,20 +439,7 @@ ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
     $$  ifPprDebug (pprBndr LetBind (unLoc fun))
     $$  pprFunBind (unLoc fun) inf matches
     $$  ifPprDebug (ppr wrap)
-ppr_monobind (PatSynBind{ patsyn_id = L _ psyn, patsyn_args = details,
-                          patsyn_def = pat, patsyn_dir = dir })
-  = ppr_lhs <+> ppr_rhs
-      where
-        ppr_lhs = ptext (sLit "pattern") <+> ppr_details details
-        ppr_simple syntax = syntax <+> ppr pat
-
-        ppr_details (InfixPatSyn v1 v2) = hsep [ppr v1, pprInfixOcc psyn, ppr v2]
-        ppr_details (PrefixPatSyn vs)   = hsep (pprPrefixOcc psyn : map ppr vs)
-
-        ppr_rhs = case dir of
-            Unidirectional         -> ppr_simple (ptext (sLit "<-"))
-            ImplicitBidirectional  -> ppr_simple equals
-
+ppr_monobind (PatSynBind psb) = ppr psb
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
                        , abs_ev_binds = ev_binds })
@@ -467,6 +456,23 @@ instance (OutputableBndr id) => Outputable (ABExport id) where
     = vcat [ ppr gbl <+> ptext (sLit "<=") <+> ppr lcl
            , nest 2 (pprTcSpecPrags prags)
            , nest 2 (ppr wrap)]
+
+instance (OutputableBndr idL, OutputableBndr idR) => Outputable (PatSynBind idL idR) where
+  ppr (PSB{ psb_id = L _ psyn, psb_args = details, psb_def = pat, psb_dir = dir })
+      = ppr_lhs <+> ppr_rhs
+    where
+      ppr_lhs = ptext (sLit "pattern") <+> ppr_details
+      ppr_simple syntax = syntax <+> ppr pat
+
+      (is_infix, ppr_details) = case details of
+          InfixPatSyn v1 v2 -> (True, hsep [ppr v1, pprInfixOcc psyn, ppr v2])
+          PrefixPatSyn vs   -> (False, hsep (pprPrefixOcc psyn : map ppr vs))
+
+      ppr_rhs = case dir of
+          Unidirectional           -> ppr_simple (ptext (sLit "<-"))
+          ImplicitBidirectional    -> ppr_simple equals
+          ExplicitBidirectional mg -> ppr_simple (ptext (sLit "<-")) <+> ptext (sLit "where") $$
+                                      (nest 2 $ pprFunBind psyn is_infix mg)
 \end{code}
 
 
@@ -785,10 +791,9 @@ instance Traversable HsPatSynDetails where
     traverse f (InfixPatSyn left right) = InfixPatSyn <$> f left <*> f right
     traverse f (PrefixPatSyn args) = PrefixPatSyn <$> traverse f args
 
-data HsPatSynDirLR idL idR
+data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
+  | ExplicitBidirectional (MatchGroup id (LHsExpr id))
   deriving (Data, Typeable)
-
-type HsPatSynDir id = HsPatSynDirLR id id
 \end{code}

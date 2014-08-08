@@ -1019,7 +1019,7 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
 
 ------------------------
 tidyTopBind  :: DynFlags
-             -> PackageId
+             -> PackageKey
              -> Module
              -> Id
              -> UnfoldEnv
@@ -1189,7 +1189,7 @@ it as a CAF.  In these cases however, we would need to use an additional
 CAF list to keep track of non-collectable CAFs.
 
 \begin{code}
-hasCafRefs :: DynFlags -> PackageId -> Module
+hasCafRefs :: DynFlags -> PackageKey -> Module
            -> (Id, VarEnv Var) -> Arity -> CoreExpr
            -> CafInfo
 hasCafRefs dflags this_pkg this_mod p arity expr

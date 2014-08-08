@@ -3296,12 +3296,38 @@ Prelude> :set -fno-warn-incomplete-patterns -XNoMultiParamTypeClasses
       <title>Setting options for interactive evaluation only</title>
 
       <para>
-        GHCi actually maintains two sets of options: one set that
-        applies when loading modules, and another set that applies for
-        expressions and commands typed at the prompt.  The
-        <literal>:set</literal> command modifies both, but there is
+        GHCi actually maintains <emphasis>two</emphasis> sets of options: 
+<itemizedlist>
+<listitem><para>
+  The <emphasis>loading options</emphasis> apply when loading modules
+</para></listitem>
+<listitem><para>
+  The <emphasis>interactive options</emphasis> apply when evaluating expressions and commands typed at the GHCi prompt.
+</para></listitem>
+</itemizedlist>
+The <literal>:set</literal> command modifies both, but there is
         also a <literal>:seti</literal> command (for "set
-        interactive") that affects only the second set.
+        interactive") that affects only the interactive options set.
+      </para>
+
+      <para>
+        It is often useful to change the interactive options, 
+        without having that option apply to loaded modules
+        too.  For example
+<screen>
+:seti -XMonoLocalBinds
+</screen>
+        It would be undesirable if <option>-XMonoLocalBinds</option> were to
+        apply to loaded modules too: that might cause a compilation error, but
+        more commonly it will cause extra recompilation, because GHC will think
+        that it needs to recompile the module because the flags have changed.
+      </para>
+
+      <para>
+        If you are setting language options in your <literal>.ghci</literal> file, it is good practice
+        to use <literal>:seti</literal> rather than <literal>:set</literal>,
+        unless you really do want them to apply to all modules you
+        load in GHCi.
       </para>
 
       <para>
@@ -3309,8 +3335,6 @@ Prelude> :set -fno-warn-incomplete-patterns -XNoMultiParamTypeClasses
         <literal>:set</literal> and <literal>:seti</literal> commands
         respectively, with no arguments.  For example, in a clean GHCi
         session we might see something like this:
-      </para>
-
 <screen>
 Prelude> :seti
 base language is: Haskell2010
@@ -3324,38 +3348,24 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
 warning settings:
 </screen>
-      <para>
-        Note that the option <option>-XExtendedDefaultRules</option>
-        is on, because we apply special defaulting rules to
+      </para>
+<para>
+The two sets of options are initialised as follows.  First, both sets of options
+are initialised as described in <xref linkend="ghci-dot-files"/>.
+Then the interactive options are modified as follows:
+<itemizedlist>
+<listitem><para>
+        The option <option>-XExtendedDefaultRules</option>
+        is enabled, in order to apply special defaulting rules to
         expressions typed at the prompt (see <xref
         linkend="extended-default-rules" />).
-      </para>
+      </para></listitem>
 
-      <para>
-        Furthermore, the Monomorphism Restriction is disabled by default in
-        GHCi (see <xref linkend="monomorphism" />).
-      </para>
-
-      <para>
-        It is often useful to change the language options for expressions typed
-        at the prompt only, without having that option apply to loaded modules
-        too.  For example
-<screen>
-:seti -XMonoLocalBinds
-</screen>
-        It would be undesirable if <option>-XMonoLocalBinds</option> were to
-        apply to loaded modules too: that might cause a compilation error, but
-        more commonly it will cause extra recompilation, because GHC will think
-        that it needs to recompile the module because the flags have changed.
-      </para>
-
-      <para>
-        It is therefore good practice if you are setting language
-        options in your <literal>.ghci</literal> file, to use
-        <literal>:seti</literal> rather than <literal>:set</literal>
-        unless you really do want them to apply to all modules you
-        load in GHCi.
-      </para>
+<listitem> <para>
+        The Monomorphism Restriction is disabled (see <xref linkend="monomorphism" />).
+      </para></listitem>
+</itemizedlist>
+</para>
     </sect2>
   </sect1>
 

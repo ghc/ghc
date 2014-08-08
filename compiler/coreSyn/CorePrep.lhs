@@ -1115,9 +1115,9 @@ data CorePrepEnv = CPE {
 
 lookupMkIntegerName :: DynFlags -> HscEnv -> IO Id
 lookupMkIntegerName dflags hsc_env
-    = if thisPackage dflags == primPackageId
+    = if thisPackage dflags == primPackageKey
       then return $ panic "Can't use Integer in ghc-prim"
-      else if thisPackage dflags == integerPackageId
+      else if thisPackage dflags == integerPackageKey
       then return $ panic "Can't use Integer in integer"
       else liftM tyThingId
          $ initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)

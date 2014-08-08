@@ -769,6 +769,25 @@ emitPrimOp _ res PrefetchByteArrayOp0        args = doPrefetchByteArrayOp 0 res 
 emitPrimOp _ res PrefetchMutableByteArrayOp0 args = doPrefetchByteArrayOp 0 res args
 emitPrimOp _ res PrefetchAddrOp0             args = doPrefetchAddrOp 0 res args
 
+-- Atomic read-modify-write
+emitPrimOp dflags [res] FetchAddByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_Add mba ix (bWord dflags) n
+emitPrimOp dflags [res] FetchSubByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_Sub mba ix (bWord dflags) n
+emitPrimOp dflags [res] FetchAndByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_And mba ix (bWord dflags) n
+emitPrimOp dflags [res] FetchNandByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_Nand mba ix (bWord dflags) n
+emitPrimOp dflags [res] FetchOrByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_Or mba ix (bWord dflags) n
+emitPrimOp dflags [res] FetchXorByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_Xor mba ix (bWord dflags) n
+emitPrimOp dflags [res] AtomicReadByteArrayOp_Int [mba, ix] =
+    doAtomicReadByteArray res mba ix (bWord dflags)
+emitPrimOp dflags [] AtomicWriteByteArrayOp_Int [mba, ix, val] =
+    doAtomicWriteByteArray mba ix (bWord dflags) val
+emitPrimOp dflags [res] CasByteArrayOp_Int [mba, ix, old, new] =
+    doCasByteArray res mba ix (bWord dflags) old new
 
 -- The rest just translate straightforwardly
 emitPrimOp dflags [res] op [arg]
@@ -1931,6 +1950,81 @@ doWriteSmallPtrArrayOp addr idx val = do
     let ty = cmmExprType dflags val
     mkBasicIndexedWrite (smallArrPtrsHdrSize dflags) Nothing addr ty idx val
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
+
+------------------------------------------------------------------------------
+-- Atomic read-modify-write
+
+-- | Emit an atomic modification to a byte array element. The result
+-- reg contains that previous value of the element. Implies a full
+-- memory barrier.
+doAtomicRMW :: LocalReg      -- ^ Result reg
+            -> AtomicMachOp  -- ^ Atomic op (e.g. add)
+            -> CmmExpr       -- ^ MutableByteArray#
+            -> CmmExpr       -- ^ Index
+            -> CmmType       -- ^ Type of element by which we are indexing
+            -> CmmExpr       -- ^ Op argument (e.g. amount to add)
+            -> FCode ()
+doAtomicRMW res amop mba idx idx_ty n = do
+    dflags <- getDynFlags
+    let width = typeWidth idx_ty
+        addr  = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+                width mba idx
+    emitPrimCall
+        [ res ]
+        (MO_AtomicRMW width amop)
+        [ addr, n ]
+
+-- | Emit an atomic read to a byte array that acts as a memory barrier.
+doAtomicReadByteArray
+    :: LocalReg  -- ^ Result reg
+    -> CmmExpr   -- ^ MutableByteArray#
+    -> CmmExpr   -- ^ Index
+    -> CmmType   -- ^ Type of element by which we are indexing
+    -> FCode ()
+doAtomicReadByteArray res mba idx idx_ty = do
+    dflags <- getDynFlags
+    let width = typeWidth idx_ty
+        addr  = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+                width mba idx
+    emitPrimCall
+        [ res ]
+        (MO_AtomicRead width)
+        [ addr ]
+
+-- | Emit an atomic write to a byte array that acts as a memory barrier.
+doAtomicWriteByteArray
+    :: CmmExpr   -- ^ MutableByteArray#
+    -> CmmExpr   -- ^ Index
+    -> CmmType   -- ^ Type of element by which we are indexing
+    -> CmmExpr   -- ^ Value to write
+    -> FCode ()
+doAtomicWriteByteArray mba idx idx_ty val = do
+    dflags <- getDynFlags
+    let width = typeWidth idx_ty
+        addr  = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+                width mba idx
+    emitPrimCall
+        [ {- no results -} ]
+        (MO_AtomicWrite width)
+        [ addr, val ]
+
+doCasByteArray
+    :: LocalReg  -- ^ Result reg
+    -> CmmExpr   -- ^ MutableByteArray#
+    -> CmmExpr   -- ^ Index
+    -> CmmType   -- ^ Type of element by which we are indexing
+    -> CmmExpr   -- ^ Old value
+    -> CmmExpr   -- ^ New value
+    -> FCode ()
+doCasByteArray res mba idx idx_ty old new = do
+    dflags <- getDynFlags
+    let width = (typeWidth idx_ty)
+        addr = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+               width mba idx
+    emitPrimCall
+        [ res ]
+        (MO_Cmpxchg width)
+        [ addr, old, new ]
 
 ------------------------------------------------------------------------------
 -- Helpers for emitting function calls

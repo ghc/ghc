@@ -6,8 +6,7 @@ License: BSD3
 Author: XXX
 Maintainer: XXX
 Synopsis: XXX
-Description:
-	XXX
+Description: XXX
 Category: Development
 build-type: Simple
 cabal-version: >=1.10
@@ -19,6 +18,6 @@ Executable ghctags
 
     Build-Depends: base       >= 4   && < 5,
                    containers,
-                   Cabal      >= 1.20 && <1.21,
+                   Cabal      >= 1.20 && <1.22,
                    ghc
 

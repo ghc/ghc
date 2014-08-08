@@ -201,13 +201,20 @@ cvtDec (ClassD ctxt cl tvs fds decs)
         ; unless (null adts')
             (failWith $ (ptext (sLit "Default data instance declarations are not allowed:"))
                    $$ (Outputable.ppr adts'))
+        ; at_defs <- mapM cvt_at_def ats'
         ; returnL $ TyClD $
           ClassDecl { tcdCtxt = cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFDs = fds', tcdSigs = sigs', tcdMeths = binds'
-                    , tcdATs = fams', tcdATDefs = ats', tcdDocs = []
+                    , tcdATs = fams', tcdATDefs = at_defs, tcdDocs = []
                     , tcdFVs = placeHolderNames }
                               -- no docs in TH ^^
         }
+  where
+    cvt_at_def :: LTyFamInstDecl RdrName -> CvtM (LTyFamDefltEqn RdrName)
+    -- Very similar to what happens in RdrHsSyn.mkClassDecl
+    cvt_at_def decl = case RdrHsSyn.mkATDefault decl of
+                        Right def     -> return def
+                        Left (_, msg) -> failWith msg
 
 cvtDec (InstanceD ctxt ty decs)
   = do  { let doc = ptext (sLit "an instance declaration")
@@ -216,7 +223,7 @@ cvtDec (InstanceD ctxt ty decs)
         ; ctxt' <- cvtContext ctxt
         ; L loc ty' <- cvtType ty
         ; let inst_ty' = L loc $ mkImplicitHsForAllTy ctxt' $ L loc ty'
-        ; returnL $ InstD (ClsInstD (ClsInstDecl inst_ty' binds' sigs' ats' adts')) }
+        ; returnL $ InstD (ClsInstD (ClsInstDecl inst_ty' binds' sigs' ats' adts' Nothing)) }
 
 cvtDec (ForeignD ford)
   = do { ford' <- cvtForD ford
@@ -280,9 +287,9 @@ cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)
 cvtTySynEqn tc (TySynEqn lhs rhs)
   = do  { lhs' <- mapM cvtType lhs
         ; rhs' <- cvtType rhs
-        ; returnL $ TyFamInstEqn { tfie_tycon = tc
-                                 , tfie_pats = mkHsWithBndrs lhs'
-                                 , tfie_rhs = rhs' } }
+        ; returnL $ TyFamEqn { tfe_tycon = tc
+                             , tfe_pats = mkHsWithBndrs lhs'
+                             , tfe_rhs = rhs' } }
 
 ----------------
 cvt_ci_decs :: MsgDoc -> [TH.Dec]
@@ -1143,8 +1150,8 @@ mk_ghc_ns TH.VarName   = OccName.varName
 mk_mod :: TH.ModName -> ModuleName
 mk_mod mod = mkModuleName (TH.modString mod)
 
-mk_pkg :: TH.PkgName -> PackageId
-mk_pkg pkg = stringToPackageId (TH.pkgString pkg)
+mk_pkg :: TH.PkgName -> PackageKey
+mk_pkg pkg = stringToPackageKey (TH.pkgString pkg)
 
 mk_uniq :: Int# -> Unique
 mk_uniq u = mkUniqueGrimily (I# u)

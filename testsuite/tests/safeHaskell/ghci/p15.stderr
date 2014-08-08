@@ -8,7 +8,9 @@ Top level: Warning:
     Deprecated: "Use Data.Typeable.Internal instead"
 
 <interactive>:14:10:
-    Can't create hand written instances of Typeable in Safe Haskell! Can only derive them
+    Typeable instances can only be derived in Safe Haskell.
+    Replace the following instance:
+      instance [safe] Typeable G
 
 <interactive>:22:22:
     No instance for (Typeable G) arising from a use of ‘cast’

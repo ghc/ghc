@@ -190,7 +190,7 @@ buildDynCon' dflags platform binder _ _cc con [arg]
   , StgLitArg (MachInt val) <- arg
   , val <= fromIntegral (mAX_INTLIKE dflags) -- Comparisons at type Integer!
   , val >= fromIntegral (mIN_INTLIKE dflags) -- ...ditto...
-  = do  { let intlike_lbl   = mkCmmClosureLabel rtsPackageId (fsLit "stg_INTLIKE")
+  = do  { let intlike_lbl   = mkCmmClosureLabel rtsPackageKey (fsLit "stg_INTLIKE")
               val_int = fromIntegral val :: Int
               offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSizeW dflags + 1)
                 -- INTLIKE closures consist of a header and one word payload
@@ -205,7 +205,7 @@ buildDynCon' dflags platform binder _ _cc con [arg]
   , let val_int = ord val :: Int
   , val_int <= mAX_CHARLIKE dflags
   , val_int >= mIN_CHARLIKE dflags
-  = do  { let charlike_lbl   = mkCmmClosureLabel rtsPackageId (fsLit "stg_CHARLIKE")
+  = do  { let charlike_lbl   = mkCmmClosureLabel rtsPackageKey (fsLit "stg_CHARLIKE")
               offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSizeW dflags + 1)
                 -- CHARLIKE closures consist of a header and one word payload
               charlike_amode = cmmLabelOffW dflags charlike_lbl offsetW

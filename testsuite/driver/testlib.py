@@ -232,6 +232,17 @@ def exit_code( val ):
 def _exit_code( name, opts, v ):
     opts.exit_code = v
 
+def signal_exit_code( val ):
+    if opsys('solaris2'):
+        return exit_code( val );
+    else:
+        # When application running on Linux receives fatal error
+        # signal, then its exit code is encoded as 128 + signal
+        # value. See http://www.tldp.org/LDP/abs/html/exitcodes.html
+        # I assume that Mac OS X behaves in the same way at least Mac
+        # OS X builder behavior suggests this.
+        return exit_code( val+128 );
+
 # -----
 
 def timeout_multiplier( val ):
@@ -1021,12 +1032,14 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
 
 def stats( name, way, stats_file ):
     opts = getTestOpts()
-    return checkStats(stats_file, opts.stats_range_fields)
+    return checkStats(name, way, stats_file, opts.stats_range_fields)
 
 # -----------------------------------------------------------------------------
 # Check -t stats info
 
-def checkStats(stats_file, range_fields):
+def checkStats(name, way, stats_file, range_fields):
+    full_name = name + '(' + way + ')'
+
     result = passed()
     if len(range_fields) > 0:
         f = open(in_testdir(stats_file))
@@ -1040,8 +1053,10 @@ def checkStats(stats_file, range_fields):
                 result = failBecause('no such stats field')
             val = int(m.group(1))
 
-            lowerBound = trunc(           expected * ((100 - float(dev))/100));
-            upperBound = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)));
+            lowerBound = trunc(           expected * ((100 - float(dev))/100))
+            upperBound = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)))
+
+            deviation = round(((float(val) * 100)/ expected) - 100, 1)
 
             if val < lowerBound:
                 print field, 'value is too low:'
@@ -1052,7 +1067,7 @@ def checkStats(stats_file, range_fields):
                 print field, 'value is too high:'
                 result = failBecause('stat not good enough')
 
-            if val < lowerBound or val > upperBound:
+            if val < lowerBound or val > upperBound or config.verbose >= 4:
                 valStr = str(val)
                 valLen = len(valStr)
                 expectedStr = str(expected)
@@ -1060,10 +1075,12 @@ def checkStats(stats_file, range_fields):
                 length = max(map (lambda x : len(str(x)), [expected, lowerBound, upperBound, val]))
                 def display(descr, val, extra):
                     print descr, string.rjust(str(val), length), extra
-                display('    Expected    ' + field + ':', expected, '+/-' + str(dev) + '%')
-                display('    Lower bound ' + field + ':', lowerBound, '')
-                display('    Upper bound ' + field + ':', upperBound, '')
-                display('    Actual      ' + field + ':', val, '')
+                display('    Expected    ' + full_name + ' ' + field + ':', expected, '+/-' + str(dev) + '%')
+                display('    Lower bound ' + full_name + ' ' + field + ':', lowerBound, '')
+                display('    Upper bound ' + full_name + ' ' + field + ':', upperBound, '')
+                display('    Actual      ' + full_name + ' ' + field + ':', val, '')
+                if val != expected:
+                    display('    Deviation   ' + full_name + ' ' + field + ':', deviation, '%')
                 
     return result
 
@@ -1154,7 +1171,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    statsResult = checkStats(stats_file, opts.compiler_stats_range_fields)
+    statsResult = checkStats(name, way, stats_file, opts.compiler_stats_range_fields)
 
     if badResult(statsResult):
         return statsResult
@@ -1254,7 +1271,7 @@ def simple_run( name, way, prog, args ):
         if check_prof and not check_prof_ok(name):
             return failBecause('bad profile')
 
-    return checkStats(stats_file, opts.stats_range_fields)
+    return checkStats(name, way, stats_file, opts.stats_range_fields)
 
 def rts_flags(way):
     if (way == ''):

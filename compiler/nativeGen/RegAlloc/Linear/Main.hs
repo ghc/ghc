@@ -158,11 +158,11 @@ regAlloc _ (CmmProc (LiveInfo info _ _ _) lbl live [])
                  , Nothing )
 
 regAlloc dflags (CmmProc static lbl live sccs)
-        | LiveInfo info (Just first_id) (Just block_live) _     <- static
+        | LiveInfo info entry_ids@(first_id:_) (Just block_live) _ <- static
         = do
                 -- do register allocation on each component.
                 (final_blocks, stats, stack_use)
-                        <- linearRegAlloc dflags first_id block_live sccs
+                        <- linearRegAlloc dflags entry_ids block_live sccs
 
                 -- make sure the block that was first in the input list
                 --      stays at the front of the output
@@ -196,46 +196,50 @@ regAlloc _ (CmmProc _ _ _ _)
 linearRegAlloc
         :: (Outputable instr, Instruction instr)
         => DynFlags
-        -> BlockId                      -- ^ the first block
-        -> BlockMap RegSet              -- ^ live regs on entry to each basic block
-        -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
+        -> [BlockId] -- ^ entry points
+        -> BlockMap RegSet
+              -- ^ live regs on entry to each basic block
+        -> [SCC (LiveBasicBlock instr)]
+              -- ^ instructions annotated with "deaths"
         -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc dflags first_id block_live sccs
- = let platform = targetPlatform dflags
-   in case platformArch platform of
-      ArchX86       -> linearRegAlloc' dflags (frInitFreeRegs platform :: X86.FreeRegs)    first_id block_live sccs
-      ArchX86_64    -> linearRegAlloc' dflags (frInitFreeRegs platform :: X86_64.FreeRegs) first_id block_live sccs
-      ArchSPARC     -> linearRegAlloc' dflags (frInitFreeRegs platform :: SPARC.FreeRegs)  first_id block_live sccs
-      ArchPPC       -> linearRegAlloc' dflags (frInitFreeRegs platform :: PPC.FreeRegs)    first_id block_live sccs
-      ArchARM _ _ _ -> panic "linearRegAlloc ArchARM"
-      ArchARM64     -> panic "linearRegAlloc ArchARM64"
-      ArchPPC_64    -> panic "linearRegAlloc ArchPPC_64"
-      ArchAlpha     -> panic "linearRegAlloc ArchAlpha"
-      ArchMipseb    -> panic "linearRegAlloc ArchMipseb"
-      ArchMipsel    -> panic "linearRegAlloc ArchMipsel"
+linearRegAlloc dflags entry_ids block_live sccs
+ = case platformArch platform of
+      ArchX86        -> go $ (frInitFreeRegs platform :: X86.FreeRegs)
+      ArchX86_64     -> go $ (frInitFreeRegs platform :: X86_64.FreeRegs)
+      ArchSPARC      -> go $ (frInitFreeRegs platform :: SPARC.FreeRegs)
+      ArchPPC        -> go $ (frInitFreeRegs platform :: PPC.FreeRegs)
+      ArchARM _ _ _  -> panic "linearRegAlloc ArchARM"
+      ArchARM64      -> panic "linearRegAlloc ArchARM64"
+      ArchPPC_64     -> panic "linearRegAlloc ArchPPC_64"
+      ArchAlpha      -> panic "linearRegAlloc ArchAlpha"
+      ArchMipseb     -> panic "linearRegAlloc ArchMipseb"
+      ArchMipsel     -> panic "linearRegAlloc ArchMipsel"
       ArchJavaScript -> panic "linearRegAlloc ArchJavaScript"
-      ArchUnknown   -> panic "linearRegAlloc ArchUnknown"
+      ArchUnknown    -> panic "linearRegAlloc ArchUnknown"
+ where
+  go f = linearRegAlloc' dflags f entry_ids block_live sccs
+  platform = targetPlatform dflags
 
 linearRegAlloc'
         :: (FR freeRegs, Outputable instr, Instruction instr)
         => DynFlags
         -> freeRegs
-        -> BlockId                      -- ^ the first block
+        -> [BlockId]                    -- ^ entry points
         -> BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
         -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc' dflags initFreeRegs first_id block_live sccs
+linearRegAlloc' dflags initFreeRegs entry_ids block_live sccs
  = do   us      <- getUs
         let (_, stack, stats, blocks) =
                 runR dflags emptyBlockMap initFreeRegs emptyRegMap (emptyStackMap dflags) us
-                    $ linearRA_SCCs first_id block_live [] sccs
+                    $ linearRA_SCCs entry_ids block_live [] sccs
         return  (blocks, stats, getStackUse stack)
 
 
 linearRA_SCCs :: (FR freeRegs, Instruction instr, Outputable instr)
-              => BlockId
+              => [BlockId]
               -> BlockMap RegSet
               -> [NatBasicBlock instr]
               -> [SCC (LiveBasicBlock instr)]
@@ -244,16 +248,16 @@ linearRA_SCCs :: (FR freeRegs, Instruction instr, Outputable instr)
 linearRA_SCCs _ _ blocksAcc []
         = return $ reverse blocksAcc
 
-linearRA_SCCs first_id block_live blocksAcc (AcyclicSCC block : sccs)
+linearRA_SCCs entry_ids block_live blocksAcc (AcyclicSCC block : sccs)
  = do   blocks' <- processBlock block_live block
-        linearRA_SCCs first_id block_live
+        linearRA_SCCs entry_ids block_live
                 ((reverse blocks') ++ blocksAcc)
                 sccs
 
-linearRA_SCCs first_id block_live blocksAcc (CyclicSCC blocks : sccs)
+linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
  = do
-        blockss' <- process first_id block_live blocks [] (return []) False
-        linearRA_SCCs first_id block_live
+        blockss' <- process entry_ids block_live blocks [] (return []) False
+        linearRA_SCCs entry_ids block_live
                 (reverse (concat blockss') ++ blocksAcc)
                 sccs
 
@@ -270,7 +274,7 @@ linearRA_SCCs first_id block_live blocksAcc (CyclicSCC blocks : sccs)
 -}
 
 process :: (FR freeRegs, Instruction instr, Outputable instr)
-        => BlockId
+        => [BlockId]
         -> BlockMap RegSet
         -> [GenBasicBlock (LiveInstr instr)]
         -> [GenBasicBlock (LiveInstr instr)]
@@ -281,7 +285,7 @@ process :: (FR freeRegs, Instruction instr, Outputable instr)
 process _ _ [] []         accum _
         = return $ reverse accum
 
-process first_id block_live [] next_round accum madeProgress
+process entry_ids block_live [] next_round accum madeProgress
         | not madeProgress
 
           {- BUGS: There are so many unreachable blocks in the code the warnings are overwhelming.
@@ -291,22 +295,22 @@ process first_id block_live [] next_round accum madeProgress
         = return $ reverse accum
 
         | otherwise
-        = process first_id block_live
+        = process entry_ids block_live
                   next_round [] accum False
 
-process first_id block_live (b@(BasicBlock id _) : blocks)
+process entry_ids block_live (b@(BasicBlock id _) : blocks)
         next_round accum madeProgress
  = do
         block_assig <- getBlockAssigR
 
         if isJust (mapLookup id block_assig)
-             || id == first_id
+             || id `elem` entry_ids
          then do
                 b'  <- processBlock block_live b
-                process first_id block_live blocks
+                process entry_ids block_live blocks
                         next_round (b' : accum) True
 
-         else   process first_id block_live blocks
+         else   process entry_ids block_live blocks
                         (b : next_round) accum madeProgress
 
 

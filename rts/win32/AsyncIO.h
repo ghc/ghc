@@ -10,10 +10,10 @@
 
 extern unsigned int
 addIORequest(int   fd,
-	     int   forWriting,
-	     int   isSock,
-	     int   len,
-	     char* buf);
+             int   forWriting,
+             int   isSock,
+             int   len,
+             char* buf);
 extern unsigned int addDelayRequest(int   usecs);
 extern unsigned int addDoProcRequest(void* proc, void* param);
 extern int  startupAsyncIO(void);
@@ -25,3 +25,11 @@ extern void abandonRequestWait(void);
 extern void resetAbandonRequestWait(void);
 
 #endif /* WIN32_ASYNCHIO_H */
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

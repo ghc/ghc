@@ -452,9 +452,17 @@ ifneq "$(CrossCompiling)" "YES"
 define addExtraPackage
 ifeq "$2" "-"
 # Do nothing; this package is already handled above
-else ifeq "$2 $$(GhcProfiled)" "dph YES"
-# Ignore the package: These packages need TH, which is incompatible
-# with a profiled GHC
+else ifeq "$2" "dph"
+## DPH-specific clause
+ifeq "$$(GhcProfiled)" "YES"
+# Ignore package: The DPH packages need TH, which is incompatible with
+# a profiled GHC
+else ifneq "$$(BUILD_DPH)" "YES"
+# Ignore package: DPH was disabled
+else
+PACKAGES_STAGE2 += $1
+endif
+## end of DPH-specific clause
 else
 PACKAGES_STAGE2 += $1
 endif
@@ -635,7 +643,9 @@ ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
 BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
+ifeq "$(BUILD_DPH)" "YES"
 BUILD_DIRS += $(wildcard libraries/dph)
+endif
 endif
 
 
@@ -901,10 +911,10 @@ install_packages: rts/dist/package.conf.install
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
 	$(call removeTrees,"$(INSTALLED_PACKAGE_CONF)")
 	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
-	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts-1.0")
-	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts-1.0")
+	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts")
+	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts")
 	$(foreach p, $(INSTALL_DYNLIBS), \
-	    $(call installLibsTo, $(wildcard $p/dist-install/build/*.so $p/dist-install/build/*.dll $p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$($p_PACKAGE)-$($p_dist-install_VERSION)"))
+	    $(call installLibsTo, $(wildcard $p/dist-install/build/*.so $p/dist-install/build/*.dll $p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$($p_dist-install_PACKAGE_KEY)"))
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(ghc-cabal_INPLACE)" copy                        \
@@ -1225,7 +1235,8 @@ clean_files :
 	$(call removeFiles,$(CLEAN_FILES))
 # this is here since CLEAN_FILES can't handle folders
 	$(call removeTrees,includes/dist-derivedconstants)
-	$(call removeTrees,inplace)
+	$(call removeTrees,inplace/bin)
+	$(call removeTrees,inplace/lib)
 
 .PHONY: clean_libraries
 clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2))

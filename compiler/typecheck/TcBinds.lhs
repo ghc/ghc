@@ -16,7 +16,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
 
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
-import {-# SOURCE #-} TcPatSyn ( tcPatSynDecl )
+import {-# SOURCE #-} TcPatSyn ( tcPatSynDecl, tcPatSynWrapper )
 
 import DynFlags
 import HsSyn
@@ -315,16 +315,21 @@ tcValBinds top_lvl binds sigs thing_inside
                 -- Extend the envt right away with all 
                 -- the Ids declared with type signatures
                 -- Use tcExtendIdEnv2 to avoid extending the TcIdBinder stack
-        ; tcExtendIdEnv2 [(idName id, id) | id <- poly_ids] $
-            tcBindGroups top_lvl sig_fn prag_fn
-                         binds thing_inside }
+        ; tcExtendIdEnv2 [(idName id, id) | id <- poly_ids] $ do
+            { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
+                   { thing <- thing_inside
+                     -- See Note [Pattern synonym wrappers don't yield dependencies]
+                   ; patsyn_wrappers <- mapM tcPatSynWrapper patsyns
+                   ; let extra_binds = [ (NonRecursive, wrapper) | wrapper <- patsyn_wrappers ]
+                   ; return (extra_binds, thing) }
+             ; return (binds' ++ extra_binds', thing) }}
   where
+    patsyns
+      = [psb | (_, lbinds) <- binds, L _ (PatSynBind psb) <- bagToList lbinds]
     patsyn_placeholder_kinds -- See Note [Placeholder PatSyn kinds]
-       = [ (name, placeholder_patsyn_tything)
-         | (_, lbinds) <- binds
-         , L _ (PatSynBind{ patsyn_id = L _ name }) <- bagToList lbinds ]
+      = [(name, placeholder_patsyn_tything)| PSB{ psb_id = L _ name } <- patsyns ]
     placeholder_patsyn_tything
-       = AGlobal $ AConLike $ PatSynCon $ panic "fakePatSynCon"
+      = AGlobal $ AConLike $ PatSynCon $ panic "fakePatSynCon"
 
 ------------------------
 tcBindGroups :: TopLevelFlag -> TcSigFun -> PragFun
@@ -413,9 +418,8 @@ tc_single :: forall thing.
             TopLevelFlag -> TcSigFun -> PragFun
           -> LHsBind Name -> TcM thing
           -> TcM (LHsBinds TcId, thing)
-tc_single _top_lvl _sig_fn _prag_fn (L _ ps@PatSynBind{}) thing_inside
-  = do { (pat_syn, aux_binds) <-
-              tcPatSynDecl (patsyn_id ps) (patsyn_args ps) (patsyn_def ps) (patsyn_dir ps)
+tc_single _top_lvl _sig_fn _prag_fn (L _ (PatSynBind psb)) thing_inside
+  = do { (pat_syn, aux_binds) <- tcPatSynDecl psb
 
        ; let tything = AConLike (PatSynCon pat_syn)
              implicit_ids = (patSynMatcher pat_syn) :
@@ -457,7 +461,7 @@ mkEdges sig_fn binds
 bindersOfHsBind :: HsBind Name -> [Name]
 bindersOfHsBind (PatBind { pat_lhs = pat })           = collectPatBinders pat
 bindersOfHsBind (FunBind { fun_id = L _ f })          = [f]
-bindersOfHsBind (PatSynBind { patsyn_id = L _ psyn }) = [psyn]
+bindersOfHsBind (PatSynBind PSB{ psb_id = L _ psyn }) = [psyn]
 bindersOfHsBind (AbsBinds {})                         = panic "bindersOfHsBind AbsBinds"
 bindersOfHsBind (VarBind {})                          = panic "bindersOfHsBind VarBind"
 
@@ -835,7 +839,7 @@ tcSpec _ prag = pprPanic "tcSpec" (ppr prag)
 
 --------------
 tcImpPrags :: [LSig Name] -> TcM [LTcSpecPrag]
--- SPECIALISE pragamas for imported things
+-- SPECIALISE pragmas for imported things
 tcImpPrags prags
   = do { this_mod <- getModule
        ; dflags <- getDynFlags

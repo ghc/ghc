@@ -361,8 +361,8 @@ is /bound/, an unbound thread is created temporarily using 'forkIO'.
 
 Use this function /only/ in the rare case that you have actually observed a
 performance loss due to the use of bound threads. A program that
-doesn't need it's main thread to be bound and makes /heavy/ use of concurrency
-(e.g. a web server), might want to wrap it's @main@ action in
+doesn't need its main thread to be bound and makes /heavy/ use of concurrency
+(e.g. a web server), might want to wrap its @main@ action in
 @runInUnboundThread@.
 
 Note that exceptions which are thrown to the current thread are thrown in turn

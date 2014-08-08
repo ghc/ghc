@@ -843,39 +843,6 @@ Consider floated_eqs (all wanted or derived):
     simpl_loop.  So we iterate if there any of these
 
 \begin{code}
-floatEqualities :: [TcTyVar] -> Bool -> WantedConstraints
-                -> TcS (Cts, WantedConstraints)
--- Post: The returned floated constraints (Cts) are only Wanted or Derived
--- and come from the input wanted ev vars or deriveds
--- Also performs some unifications, adding to monadically-carried ty_binds
--- These will be used when processing floated_eqs later
-floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
-  | not no_given_eqs  -- There are some given equalities, so don't float
-  = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
-  | otherwise
-  = do { let (float_eqs, remaining_flats) = partitionBag is_floatable flats
-       ; untch <- TcS.getUntouchables
-       ; mapM_ (promoteTyVar untch) (varSetElems (tyVarsOfCts float_eqs))
-             -- See Note [Promoting unification variables]
-       ; ty_binds <- getTcSTyBindsMap
-       ; traceTcS "floatEqualities" (vcat [ text "Flats =" <+> ppr flats
-                                          , text "Floated eqs =" <+> ppr float_eqs
-                                          , text "Ty binds =" <+> ppr ty_binds])
-       ; return (float_eqs, wanteds { wc_flat = remaining_flats }) }
-  where
-      -- See Note [Float equalities from under a skolem binding]
-    skol_set = fixVarSet mk_next (mkVarSet skols)
-    mk_next tvs = foldrBag grow_one tvs flats
-    grow_one (CFunEqCan { cc_tyargs = xis, cc_rhs = rhs }) tvs
-       | intersectsVarSet tvs (tyVarsOfTypes xis)
-       = tvs `unionVarSet` tyVarsOfType rhs
-    grow_one _ tvs = tvs
-
-    is_floatable :: Ct -> Bool
-    is_floatable ct = isEqPred pred && skol_set `disjointVarSet` tyVarsOfType pred
-       where
-         pred = ctPred ct
-
 promoteTyVar :: Untouchables -> TcTyVar  -> TcS ()
 -- When we float a constraint out of an implication we must restore
 -- invariant (MetaTvInv) in Note [Untouchable type variables] in TcType
@@ -1036,140 +1003,6 @@ should!  If we don't solve the constraint, we'll stupidly quantify over
 (b:*) instead of (a:OpenKind), which can lead to disaster; see Trac #7332.
 Trac #7641 is a simpler example.
 
-Note [Float Equalities out of Implications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For ordinary pattern matches (including existentials) we float
-equalities out of implications, for instance:
-     data T where
-       MkT :: Eq a => a -> T
-     f x y = case x of MkT _ -> (y::Int)
-We get the implication constraint (x::T) (y::alpha):
-     forall a. [untouchable=alpha] Eq a => alpha ~ Int
-We want to float out the equality into a scope where alpha is no
-longer untouchable, to solve the implication!
-
-But we cannot float equalities out of implications whose givens may
-yield or contain equalities:
-
-      data T a where
-        T1 :: T Int
-        T2 :: T Bool
-        T3 :: T a
-
-      h :: T a -> a -> Int
-
-      f x y = case x of
-                T1 -> y::Int
-                T2 -> y::Bool
-                T3 -> h x y
-
-We generate constraint, for (x::T alpha) and (y :: beta):
-   [untouchables = beta] (alpha ~ Int => beta ~ Int)   -- From 1st branch
-   [untouchables = beta] (alpha ~ Bool => beta ~ Bool) -- From 2nd branch
-   (alpha ~ beta)                                      -- From 3rd branch
-
-If we float the equality (beta ~ Int) outside of the first implication and
-the equality (beta ~ Bool) out of the second we get an insoluble constraint.
-But if we just leave them inside the implications we unify alpha := beta and
-solve everything.
-
-Principle:
-    We do not want to float equalities out which may
-    need the given *evidence* to become soluble.
-
-Consequence: classes with functional dependencies don't matter (since there is
-no evidence for a fundep equality), but equality superclasses do matter (since
-they carry evidence).
-
-Note [When does an implication have given equalities?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider an implication
-   beta => alpha ~ Int
-where beta is a unification variable that has already been unified
-to () in an outer scope.  Then we can float the (alpha ~ Int) out
-just fine. So when deciding whether the givens contain an equality,
-we should canonicalise first, rather than just looking at the original
-givens (Trac #8644).
-
-This is the entire reason for the inert_no_eqs field in InertCans.
-We initialise it to False before processing the Givens of an implication;
-and set it to True when adding an inert equality in addInertCan.
-
-However, when flattening givens, we generate given equalities like
-  <F [a]> : F [a] ~ f,
-with Refl evidence, and we *don't* want those to count as an equality
-in the givens!  After all, the entire flattening business is just an
-internal matter, and the evidence does not mention any of the 'givens'
-of this implication.
-
-So we set the flag to False when adding an equality
-(TcSMonad.addInertCan) whose evidence whose CtOrigin is
-FlatSkolOrigin; see TcSMonad.isFlatSkolEv.  Note that we may transform
-the original flat-skol equality before adding it to the inerts, so
-it's important that the transformation preserves origin (which
-xCtEvidence and rewriteEvidence both do).  Example
-     instance F [a] = Maybe a
-     implication: C (F [a]) => blah
-  We flatten (C (F [a])) to C fsk, with <F [a]> : F [a] ~ fsk
-  Then we reduce the F [a] LHS, giving
-       g22 = ax7 ; <F [a]>
-       g22 : Maybe a ~ fsk
-  And before adding g22 we'll re-orient it to an ordinary tyvar
-  equality.  None of this should count as "adding a given equality".
-  This really happens (Trac #8651).
-
-An alternative we considered was to
-  * Accumulate the new inert equalities (in TcSMonad.addInertCan)
-  * In solveInteractGiven, check whether the evidence for the new
-    equalities mentions any of the ic_givens of this implication.
-This seems like the Right Thing, but it's more code, and more work
-at runtime, so we are using the FlatSkolOrigin idea intead. It's less
-obvious that it works, but I think it does, and it's simple and efficient.
-
-
-Note [Float equalities from under a skolem binding]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-You might worry about skolem escape with all this floating.
-For example, consider
-    [2] forall a. (a ~ F beta[2] delta,
-                   Maybe beta[2] ~ gamma[1])
-
-The (Maybe beta ~ gamma) doesn't mention 'a', so we float it, and
-solve with gamma := beta. But what if later delta:=Int, and
-  F b Int = b.
-Then we'd get a ~ beta[2], and solve to get beta:=a, and now the
-skolem has escaped!
-
-But it's ok: when we float (Maybe beta[2] ~ gamma[1]), we promote beta[2]
-to beta[1], and that means the (a ~ beta[1]) will be stuck, as it should be.
-
-Previously we tried to "grow" the skol_set with the constraints, to get
-all the tyvars that could *conceivably* unify with the skolems, but that
-was far too conservative (Trac #7804). Example: this should be fine:
-    f :: (forall a. a -> Proxy x -> Proxy (F x)) -> Int
-    f = error "Urk" :: (forall a. a -> Proxy x -> Proxy (F x)) -> Int
-
-BUT (sigh) we have to be careful.  Here are some edge cases:
-
-a)    [2]forall a. (F a delta[1] ~ beta[2],   delta[1] ~ Maybe beta[2])
-b)    [2]forall a. (F b ty ~ beta[2],         G beta[2] ~ gamma[2])
-c)    [2]forall a. (F a ty ~ beta[2],         delta[1] ~ Maybe beta[2])
-
-In (a) we *must* float out the second equality,
-       else we can't solve at all (Trac #7804).
-
-In (b) we *must not* float out the second equality.
-       It will ultimately be solved (by flattening) in situ, but if we
-       float it we'll promote beta,gamma, and render the first equality insoluble.
-
-In (c) it would be OK to float the second equality but better not to.
-       If we flatten we see (delta[1] ~ Maybe (F a ty)), which is a
-       skolem-escape problem.  If we float the secodn equality we'll
-       end up with (F a ty ~ beta'[1]), which is a less explicable error.
-
-Hence we start with the skolems, grow them by the CFunEqCans, and
-float ones that don't mention the grown variables.  Seems very ad hoc.
-
 Note [Promoting unification variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we float an equality out of an implication we must "promote" free
@@ -1236,6 +1069,244 @@ When is it ok to do so?
 
 This solving is now happening during zonking, see Note [Unflattening while zonking]
 in TcMType.
+
+
+*********************************************************************************
+*                                                                               *
+*                          Floating equalities                                  *
+*                                                                               *
+*********************************************************************************
+
+Note [Float Equalities out of Implications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For ordinary pattern matches (including existentials) we float
+equalities out of implications, for instance:
+     data T where
+       MkT :: Eq a => a -> T
+     f x y = case x of MkT _ -> (y::Int)
+We get the implication constraint (x::T) (y::alpha):
+     forall a. [untouchable=alpha] Eq a => alpha ~ Int
+We want to float out the equality into a scope where alpha is no
+longer untouchable, to solve the implication!
+
+But we cannot float equalities out of implications whose givens may
+yield or contain equalities:
+
+      data T a where
+        T1 :: T Int
+        T2 :: T Bool
+        T3 :: T a
+
+      h :: T a -> a -> Int
+
+      f x y = case x of
+                T1 -> y::Int
+                T2 -> y::Bool
+                T3 -> h x y
+
+We generate constraint, for (x::T alpha) and (y :: beta):
+   [untouchables = beta] (alpha ~ Int => beta ~ Int)   -- From 1st branch
+   [untouchables = beta] (alpha ~ Bool => beta ~ Bool) -- From 2nd branch
+   (alpha ~ beta)                                      -- From 3rd branch
+
+If we float the equality (beta ~ Int) outside of the first implication and
+the equality (beta ~ Bool) out of the second we get an insoluble constraint.
+But if we just leave them inside the implications we unify alpha := beta and
+solve everything.
+
+Principle:
+    We do not want to float equalities out which may
+    need the given *evidence* to become soluble.
+
+Consequence: classes with functional dependencies don't matter (since there is
+no evidence for a fundep equality), but equality superclasses do matter (since
+they carry evidence).
+
+\begin{code}
+floatEqualities :: [TcTyVar] -> Bool -> WantedConstraints
+                -> TcS (Cts, WantedConstraints)
+-- Main idea: see Note [Float Equalities out of Implications]
+--
+-- Post: The returned floated constraints (Cts) are only Wanted or Derived
+-- and come from the input wanted ev vars or deriveds
+-- Also performs some unifications (via promoteTyVar), adding to
+-- monadically-carried ty_binds. These will be used when processing 
+-- floated_eqs later
+--
+-- Subtleties: Note [Float equalities from under a skolem binding]
+--             Note [Skolem escape]
+floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
+  | not no_given_eqs  -- There are some given equalities, so don't float
+  = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
+  | otherwise
+  = do { let (float_eqs, remaining_flats) = partitionBag is_floatable flats
+       ; untch <- TcS.getUntouchables
+       ; mapM_ (promoteTyVar untch) (varSetElems (tyVarsOfCts float_eqs))
+             -- See Note [Promoting unification variables]
+       ; ty_binds <- getTcSTyBindsMap
+       ; traceTcS "floatEqualities" (vcat [ text "Skols =" <+> ppr skols
+                                          , text "Flats =" <+> ppr flats
+                                          , text "Skol set =" <+> ppr skol_set
+                                          , text "Floated eqs =" <+> ppr float_eqs
+                                          , text "Ty binds =" <+> ppr ty_binds])
+       ; return (float_eqs, wanteds { wc_flat = remaining_flats }) }
+  where
+    is_floatable :: Ct -> Bool
+    is_floatable ct
+       = case classifyPredType (ctPred ct) of
+            EqPred ty1 ty2 -> skol_set `disjointVarSet` tyVarsOfType ty1
+                           && skol_set `disjointVarSet` tyVarsOfType ty2
+            _ -> False
+
+    skol_set = fixVarSet mk_next (mkVarSet skols)
+    mk_next tvs = foldr grow_one tvs flat_eqs
+    flat_eqs :: [(TcTyVarSet, TcTyVarSet)]
+    flat_eqs = [ (tyVarsOfType ty1, tyVarsOfType ty2)
+               | EqPred ty1 ty2 <- map (classifyPredType . ctPred) (bagToList flats)]
+    grow_one (tvs1,tvs2) tvs
+      | intersectsVarSet tvs tvs1 = tvs `unionVarSet` tvs2
+      | intersectsVarSet tvs tvs2 = tvs `unionVarSet` tvs2
+      | otherwise                 = tvs
+\end{code}
+
+Note [When does an implication have given equalities?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     NB: This note is mainly referred to from TcSMonad
+         but it relates to floating equalities, so I've
+         left it here
+
+Consider an implication
+   beta => alpha ~ Int
+where beta is a unification variable that has already been unified
+to () in an outer scope.  Then we can float the (alpha ~ Int) out
+just fine. So when deciding whether the givens contain an equality,
+we should canonicalise first, rather than just looking at the original
+givens (Trac #8644).
+
+This is the entire reason for the inert_no_eqs field in InertCans.
+We initialise it to False before processing the Givens of an implication;
+and set it to True when adding an inert equality in addInertCan.
+
+However, when flattening givens, we generate given equalities like
+  <F [a]> : F [a] ~ f,
+with Refl evidence, and we *don't* want those to count as an equality
+in the givens!  After all, the entire flattening business is just an
+internal matter, and the evidence does not mention any of the 'givens'
+of this implication.
+
+So we set the flag to False when adding an equality
+(TcSMonad.addInertCan) whose evidence whose CtOrigin is
+FlatSkolOrigin; see TcSMonad.isFlatSkolEv.  Note that we may transform
+the original flat-skol equality before adding it to the inerts, so
+it's important that the transformation preserves origin (which
+xCtEvidence and rewriteEvidence both do).  Example
+     instance F [a] = Maybe a
+     implication: C (F [a]) => blah
+  We flatten (C (F [a])) to C fsk, with <F [a]> : F [a] ~ fsk
+  Then we reduce the F [a] LHS, giving
+       g22 = ax7 ; <F [a]>
+       g22 : Maybe a ~ fsk
+  And before adding g22 we'll re-orient it to an ordinary tyvar
+  equality.  None of this should count as "adding a given equality".
+  This really happens (Trac #8651).
+
+An alternative we considered was to
+  * Accumulate the new inert equalities (in TcSMonad.addInertCan)
+  * In solveInteractGiven, check whether the evidence for the new
+    equalities mentions any of the ic_givens of this implication.
+This seems like the Right Thing, but it's more code, and more work
+at runtime, so we are using the FlatSkolOrigin idea intead. It's less
+obvious that it works, but I think it does, and it's simple and efficient.
+
+Note [Float equalities from under a skolem binding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Which of the flat equalities can we float out?  Obviously, only
+ones that don't mention the skolem-bound variables.  But that is
+over-eager. Consider
+   [2] forall a. F a beta[1] ~ gamma[2], G beta[1] gamma[2] ~ Int
+The second constraint doesn't mention 'a'.  But if we float it
+we'll promote gamma to gamma'[1].  Now suppose that we learn that
+beta := Bool, and F a Bool = a, and G Bool _ = Int.  Then we'll
+we left with the constraint
+   [2] forall a. a ~ gamma'[1]
+which is insoluble because gamma became untouchable.
+
+Solution: only promote a constraint if its free variables cannot
+possibly be connected with the skolems.  Procedurally, start with
+the skolems and "grow" that set as follows:
+  * For each flat equality F ts ~ s, or tv ~ s,
+    if the current set intersects with the LHS of the equality,
+       add the free vars of the RHS, and vice versa
+That gives us a grown skolem set.  Now float an equality if its free
+vars don't intersect the grown skolem set.
+
+This seems very ad hoc (sigh).  But here are some tricky edge cases:
+
+a)    [2]forall a. (F a delta[1] ~ beta[2],   delta[1] ~ Maybe beta[2])
+b1)   [2]forall a. (F a ty ~ beta[2],         G beta[2] ~ gamma[2])
+b2)   [2]forall a. (a ~ beta[2],              G beta[2] ~ gamma[2])
+c)    [2]forall a. (F a ty ~ beta[2],         delta[1] ~ Maybe beta[2])
+d)    [2]forall a. (gamma[1] ~ Tree beta[2],  F ty ~ beta[2])
+
+In (a) we *must* float out the second equality,
+       else we can't solve at all (Trac #7804).
+
+In (b1, b2) we *must not* float out the second equality.
+       It will ultimately be solved (by flattening) in situ, but if we float
+       it we'll promote beta,gamma, and render the first equality insoluble.
+
+       Trac #9316 was an example of (b2).  You may wonder why (a ~ beta[2]) isn't
+       solved; in #9316 it wasn't solved because (a:*) and (beta:kappa[1]), so the
+       equality was kind-mismatched, and hence was a CIrredEvCan.  There was
+       another equality alongside, (kappa[1] ~ *).  We must first float *that*
+       one out and *then* we can solve (a ~ beta).
+
+In (c) it would be OK to float the second equality but better not to.
+       If we flatten we see (delta[1] ~ Maybe (F a ty)), which is a
+       skolem-escape problem.  If we float the second equality we'll
+       end up with (F a ty ~ beta'[1]), which is a less explicable error.
+
+In (d) we must float the first equality, so that we can unify gamma.
+       But that promotes beta, so we must float the second equality too,
+       Trac #7196 exhibits this case
+
+Some notes
+
+* When "growing", do not simply take the free vars of the predicate!
+  Example    [2]forall a.  (a:* ~ beta[2]:kappa[1]), (kappa[1] ~ *)
+  We must float the second, and we must not float the first.
+  But the first actually looks like ((~) kappa a beta), so if we just
+  look at its free variables we'll see {a,kappa,beta), and that might
+  make us think kappa should be in the grown skol set.
+
+  (In any case, the kind argument for a kind-mis-matched equality like
+   this one doesn't really make sense anyway.)
+
+  That's why we use classifyPred when growing.
+
+* Previously we tried to "grow" the skol_set with *all* the
+  constraints (not just equalities), to get all the tyvars that could
+  *conceivably* unify with the skolems, but that was far too
+  conservative (Trac #7804). Example: this should be fine:
+    f :: (forall a. a -> Proxy x -> Proxy (F x)) -> Int
+    f = error "Urk" :: (forall a. a -> Proxy x -> Proxy (F x)) -> Int
+
+
+Note [Skolem escape]
+~~~~~~~~~~~~~~~~~~~~
+You might worry about skolem escape with all this floating.
+For example, consider
+    [2] forall a. (a ~ F beta[2] delta,
+                   Maybe beta[2] ~ gamma[1])
+
+The (Maybe beta ~ gamma) doesn't mention 'a', so we float it, and
+solve with gamma := beta. But what if later delta:=Int, and
+  F b Int = b.
+Then we'd get a ~ beta[2], and solve to get beta:=a, and now the
+skolem has escaped!
+
+But it's ok: when we float (Maybe beta[2] ~ gamma[1]), we promote beta[2]
+to beta[1], and that means the (a ~ beta[1]) will be stuck, as it should be.
 
 
 *********************************************************************************

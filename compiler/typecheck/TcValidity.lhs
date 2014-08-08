@@ -46,7 +46,6 @@ import ListSetOps
 import SrcLoc
 import Outputable
 import FastString
-import BasicTypes ( Arity )
 
 import Control.Monad
 import Data.Maybe
@@ -776,7 +775,9 @@ checkValidInstHead ctxt clas cls_args
                        all tcInstHeadTyAppAllTyVars ty_args)
                  (instTypeErr clas cls_args head_type_args_tyvars_msg)
             ; checkTc (xopt Opt_MultiParamTypeClasses dflags ||
-                       length ty_args == 1)  -- Only count type arguments
+                       length ty_args == 1 ||  -- Only count type arguments
+                       (xopt Opt_NullaryTypeClasses dflags &&
+                        null ty_args))
                  (instTypeErr clas cls_args head_one_type_msg) }
 
          -- May not contain type family applications
@@ -878,8 +879,8 @@ checkValidInstance ctxt hs_type ty
           else checkInstTermination inst_tys theta
 
         ; case (checkInstCoverage undecidable_ok clas theta inst_tys) of
-            Nothing  -> return ()   -- Check succeeded
-            Just msg -> addErrTc (instTypeErr clas inst_tys msg)
+            IsValid  -> return ()   -- Check succeeded
+            NotValid msg -> addErrTc (instTypeErr clas inst_tys msg)
                   
         ; return (tvs, theta, clas, inst_tys) } 
 
@@ -1113,7 +1114,14 @@ checkValidTyFamInst mb_clsinfo fam_tc
   = setSrcSpan loc $ 
     do { checkValidFamPats fam_tc tvs typats
 
-         -- The right-hand side is a tau type
+         -- The argument patterns, and RHS, are all boxed tau types
+         -- E.g  Reject type family F (a :: k1) :: k2
+         --             type instance F (forall a. a->a) = ...
+         --             type instance F Int#             = ...
+         --             type instance F Int              = forall a. a->a
+         --             type instance F Int              = Int#
+         -- See Trac #9357
+       ; mapM_ checkValidMonoType typats
        ; checkValidMonoType rhs
 
          -- We have a decidable instance unless otherwise permitted
@@ -1163,26 +1171,18 @@ checkValidFamPats :: TyCon -> [TyVar] -> [Type] -> TcM ()
 --         type instance F (T a) = a
 -- c) Have the right number of patterns
 checkValidFamPats fam_tc tvs ty_pats
-  = do { -- A family instance must have exactly the same number of type
-         -- parameters as the family declaration.  You can't write
-         --     type family F a :: * -> *
-         --     type instance F Int y = y
-         -- because then the type (F Int) would be like (\y.y)
-         checkTc (length ty_pats == fam_arity) $
-           wrongNumberOfParmsErr (fam_arity - length fam_kvs) -- report only types
-       ; mapM_ checkTyFamFreeness ty_pats
+  = ASSERT( length ty_pats == tyConArity fam_tc )
+      -- A family instance must have exactly the same number of type
+      -- parameters as the family declaration.  You can't write
+      --     type family F a :: * -> *
+      --     type instance F Int y = y
+      -- because then the type (F Int) would be like (\y.y)
+      -- But this is checked at the time the axiom is created
+    do { mapM_ checkTyFamFreeness ty_pats
        ; let unbound_tvs = filterOut (`elemVarSet` exactTyVarsOfTypes ty_pats) tvs
        ; checkTc (null unbound_tvs) (famPatErr fam_tc unbound_tvs ty_pats) }
-  where fam_arity    = tyConArity fam_tc
-        (fam_kvs, _) = splitForAllTys (tyConKind fam_tc)
-
-wrongNumberOfParmsErr :: Arity -> SDoc
-wrongNumberOfParmsErr exp_arity
-  = ptext (sLit "Number of parameters must match family declaration; expected")
-    <+> ppr exp_arity
 
 -- Ensure that no type family instances occur in a type.
---
 checkTyFamFreeness :: Type -> TcM ()
 checkTyFamFreeness ty
   = checkTc (isTyFamFree ty) $

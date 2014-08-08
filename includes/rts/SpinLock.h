@@ -34,8 +34,6 @@ typedef struct SpinLock_
 typedef StgWord SpinLock;
 #endif
 
-typedef StgWord SpinLockCount;
-
 #if defined(PROF_SPIN)
 
 // PROF_SPIN enables counting the number of times we spin on a lock

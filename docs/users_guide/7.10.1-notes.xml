@@ -42,7 +42,20 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO FIXME
+                    GHC now checks that all the language extensions required for
+                    the inferred type signatures are explicitly enabled. This
+                    means that if any of the type signatures inferred in your
+                    program requires some language extension you will need to
+                    enable it. The motivation is that adding a missing type
+                    signature inferred by GHC should yield a program that
+                    typechecks. Previously this was not the case.
+                </para>
+                <para>
+                    This is a breaking change. Code that used to compile in the
+                    past might fail with an error message requiring some
+                    particular language extension (most likely
+                    <option>-XTypeFamilies</option>, <option>-XGADTs</option> or
+                    <option>-XFlexibleContexts</option>).
                 </para>
            </listitem>
        </itemizedlist>
@@ -86,7 +99,21 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO FIXME
+                    <literal>ghc-pkg</literal> now respects <option>--user</option>
+                    and <option>--global</option> when modifying packages (e.g.
+                    changing exposed/trust flag or unregistering).  Previously,
+                    <literal>ghc-pkg</literal> would ignore these flags and modify
+                    whichever package it found first on the database stack.  To
+                    recover the old behavior, simply omit these flags.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    <literal>ghc-pkg</literal> accepts a <option>--user-package-db</option>
+                    flag which allows a user to override the location of the user package
+                    database.  Unlike databases specified using <option>--package-db</option>,
+                    a user package database configured this way respects
+                    the <option>--user</option> flag.
                </para>
            </listitem>
        </itemizedlist>
@@ -201,6 +228,27 @@
             <listitem>
                 <para>
                     Version number XXXXX (was 1.3.0.2)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>ghc</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Many internal functions in GHC related to package IDs have been
+                    renamed to refer to package keys, e.g. <literal>PackageId</literal>
+                    is now <literal>PackageKey</literal>, the wired-in names
+                    such as <literal>primPackageId</literal> are now
+                    <literal>primPackageKey</literal>, etc.  This reflects a distinction
+                    that we are now making: a package ID is, as before, the user-visible
+                    ID from Cabal <literal>foo-1.0</literal>; a package key is now
+                    a compiler-internal entity used for generating linking symbols, and
+                    may not correspond at all to the package ID.  In
+                    particular, there may be multiple package keys per
+                    package ID.
                </para>
            </listitem>
        </itemizedlist>

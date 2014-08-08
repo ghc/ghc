@@ -545,12 +545,35 @@ checkHiBootIface
         tcg_env@(TcGblEnv { tcg_src = hs_src, tcg_binds = binds,
                             tcg_insts = local_insts,
                             tcg_type_env = local_type_env, tcg_exports = local_exports })
-        (ModDetails { md_insts = boot_insts, md_fam_insts = boot_fam_insts,
-                      md_types = boot_type_env, md_exports = boot_exports })
+        boot_details
   | isHsBoot hs_src     -- Current module is already a hs-boot file!
   = return tcg_env
 
   | otherwise
+  = do  { mb_dfun_prs <- checkHiBootIface' local_insts local_type_env
+                                           local_exports boot_details
+        ; let dfun_prs   = catMaybes mb_dfun_prs
+              boot_dfuns = map fst dfun_prs
+              dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
+                                     | (boot_dfun, dfun) <- dfun_prs ]
+              type_env'  = extendTypeEnvWithIds local_type_env boot_dfuns
+              tcg_env'   = tcg_env { tcg_binds = binds `unionBags` dfun_binds }
+
+        ; setGlobalTypeEnv tcg_env' type_env' }
+             -- Update the global type env *including* the knot-tied one
+             -- so that if the source module reads in an interface unfolding
+             -- mentioning one of the dfuns from the boot module, then it
+             -- can "see" that boot dfun.   See Trac #4003
+
+checkHiBootIface' :: [ClsInst] -> TypeEnv -> [AvailInfo]
+                  -> ModDetails -> TcM [Maybe (Id, Id)]
+-- Variant which doesn't require a full TcGblEnv; you could get the
+-- local components from another ModDetails.
+
+checkHiBootIface'
+        local_insts local_type_env local_exports
+        (ModDetails { md_insts = boot_insts, md_fam_insts = boot_fam_insts,
+                      md_types = boot_type_env, md_exports = boot_exports })
   = do  { traceTc "checkHiBootIface" $ vcat
              [ ppr boot_type_env, ppr boot_insts, ppr boot_exports]
 
@@ -567,19 +590,11 @@ checkHiBootIface
 
                 -- Check instance declarations
         ; mb_dfun_prs <- mapM check_inst boot_insts
-        ; let dfun_prs   = catMaybes mb_dfun_prs
-              boot_dfuns = map fst dfun_prs
-              dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
-                                     | (boot_dfun, dfun) <- dfun_prs ]
-              type_env'  = extendTypeEnvWithIds local_type_env boot_dfuns
-              tcg_env'   = tcg_env { tcg_binds = binds `unionBags` dfun_binds }
 
         ; failIfErrsM
-        ; setGlobalTypeEnv tcg_env' type_env' }
-             -- Update the global type env *including* the knot-tied one
-             -- so that if the source module reads in an interface unfolding
-             -- mentioning one of the dfuns from the boot module, then it
-             -- can "see" that boot dfun.   See Trac #4003
+
+        ; return mb_dfun_prs }
+
   where
     check_export boot_avail     -- boot_avail is exported by the boot iface
       | name `elem` dfun_names = return ()
@@ -681,17 +696,14 @@ checkBootTyCon tc1 tc2
           (_, rho_ty2) = splitForAllTys (idType id2)
           op_ty2 = funResultTy rho_ty2
 
-       eqAT (tc1, def_ats1) (tc2, def_ats2)
+       eqAT (ATI tc1 def_ats1) (ATI tc2 def_ats2)
          = checkBootTyCon tc1 tc2 &&
-           eqListBy eqATDef def_ats1 def_ats2
+           eqATDef def_ats1 def_ats2
 
        -- Ignore the location of the defaults
-       eqATDef (CoAxBranch { cab_tvs = tvs1, cab_lhs =  ty_pats1, cab_rhs = ty1 })
-               (CoAxBranch { cab_tvs = tvs2, cab_lhs =  ty_pats2, cab_rhs = ty2 })
-         | Just env <- eqTyVarBndrs emptyRnEnv2 tvs1 tvs2
-         = eqListBy (eqTypeX env) ty_pats1 ty_pats2 &&
-           eqTypeX env ty1 ty2
-         | otherwise = False
+       eqATDef Nothing    Nothing    = True
+       eqATDef (Just ty1) (Just ty2) = eqTypeX env ty1 ty2
+       eqATDef _ _ = False           
 
        eqFD (as1,bs1) (as2,bs2) =
          eqListBy (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
@@ -1726,7 +1738,7 @@ loadUnqualIfaces hsc_env ictxt
                   , let name = gre_name gre
                   , not (isInternalName name)
                   , let mod = nameModule name
-                  , not (modulePackageId mod == this_pkg || isInteractiveModule mod)
+                  , not (modulePackageKey mod == this_pkg || isInteractiveModule mod)
                       -- Don't attempt to load an interface for stuff
                       -- from the command line, or from the home package
                   , isTcOcc (nameOccName name)   -- Types and classes only
@@ -1779,7 +1791,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , ptext (sLit "Dependent modules:") <+>
                 ppr (sortBy cmp_mp $ eltsUFM (imp_dep_mods imports))
          , ptext (sLit "Dependent packages:") <+>
-                ppr (sortBy stablePackageIdCmp $ imp_dep_pkgs imports)]
+                ppr (sortBy stablePackageKeyCmp $ imp_dep_pkgs imports)]
   where         -- The two uses of sortBy are just to reduce unnecessary
                 -- wobbling in testsuite output
     cmp_mp (mod_name1, is_boot1) (mod_name2, is_boot2)

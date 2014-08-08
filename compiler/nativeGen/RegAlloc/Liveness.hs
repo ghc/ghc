@@ -169,10 +169,11 @@ data Liveness
 -- | Stash regs live on entry to each basic block in the info part of the cmm code.
 data LiveInfo
         = LiveInfo
-                (BlockEnv CmmStatics)                   -- cmm info table static stuff
-                (Maybe BlockId)                         -- id of the first block
-                (Maybe (BlockMap RegSet))               -- argument locals live on entry to this block
-                (Map BlockId (Set Int))                 -- stack slots live on entry to this block
+                (BlockEnv CmmStatics)     -- cmm info table static stuff
+                [BlockId]                 -- entry points (first one is the
+                                          -- entry point for the proc).
+                (Maybe (BlockMap RegSet)) -- argument locals live on entry to this block
+                (Map BlockId (Set Int))   -- stack slots live on entry to this block
 
 
 -- | A basic block with liveness information.
@@ -223,9 +224,9 @@ instance Outputable instr
                  | otherwise            = name <> (hcat $ punctuate space $ map ppr $ uniqSetToList regs)
 
 instance Outputable LiveInfo where
-    ppr (LiveInfo mb_static firstId liveVRegsOnEntry liveSlotsOnEntry)
+    ppr (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
         =  (ppr mb_static)
-        $$ text "# firstId          = " <> ppr firstId
+        $$ text "# entryIds         = " <> ppr entryIds
         $$ text "# liveVRegsOnEntry = " <> ppr liveVRegsOnEntry
         $$ text "# liveSlotsOnEntry = " <> text (show liveSlotsOnEntry)
 
@@ -480,7 +481,7 @@ stripLive dflags live
  where  stripCmm :: (Outputable statics, Outputable instr, Instruction instr)
                  => LiveCmmDecl statics instr -> NatCmmDecl statics instr
         stripCmm (CmmData sec ds)       = CmmData sec ds
-        stripCmm (CmmProc (LiveInfo info (Just first_id) _ _) label live sccs)
+        stripCmm (CmmProc (LiveInfo info (first_id:_) _ _) label live sccs)
          = let  final_blocks    = flattenSCCs sccs
 
                 -- make sure the block that was first in the input list
@@ -493,7 +494,7 @@ stripLive dflags live
                           (ListGraph $ map (stripLiveBlock dflags) $ first' : rest')
 
         -- procs used for stg_split_markers don't contain any blocks, and have no first_id.
-        stripCmm (CmmProc (LiveInfo info Nothing _ _) label live [])
+        stripCmm (CmmProc (LiveInfo info [] _ _) label live [])
          =      CmmProc info label live (ListGraph [])
 
         -- If the proc has blocks but we don't know what the first one was, then we're dead.
@@ -641,16 +642,19 @@ natCmmTopToLive (CmmData i d)
         = CmmData i d
 
 natCmmTopToLive (CmmProc info lbl live (ListGraph []))
-        = CmmProc (LiveInfo info Nothing Nothing Map.empty) lbl live []
+        = CmmProc (LiveInfo info [] Nothing Map.empty) lbl live []
 
 natCmmTopToLive proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
  = let  first_id        = blockId first
-        sccs            = sccBlocks blocks (entryBlocks proc)
+        all_entry_ids   = entryBlocks proc
+        sccs            = sccBlocks blocks all_entry_ids
+        entry_ids       = filter (/= first_id) all_entry_ids
         sccsLive        = map (fmap (\(BasicBlock l instrs) ->
                                         BasicBlock l (map (\i -> LiveInstr (Instr i) Nothing) instrs)))
                         $ sccs
 
-   in   CmmProc (LiveInfo info (Just first_id) Nothing Map.empty) lbl live sccsLive
+   in   CmmProc (LiveInfo info (first_id : entry_ids) Nothing Map.empty)
+                lbl live sccsLive
 
 
 --

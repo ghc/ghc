@@ -5,7 +5,7 @@
  * File locking support as required by Haskell
  *
  * ---------------------------------------------------------------------------*/
- 
+
 #include "PosixSource.h"
 #include "Rts.h"
 
@@ -44,8 +44,9 @@ static int cmpLocks(StgWord w1, StgWord w2)
 static int hashLock(HashTable *table, StgWord w)
 {
     Lock *l = (Lock *)w;
+    StgWord key = l->inode ^ (l->inode >> 32) ^ l->device ^ (l->device >> 32);
     // Just xor all 32-bit words of inode and device, hope this is good enough.
-    return hashWord(table, l->inode ^ (l->inode >> 32) ^ l->device ^ (l->device >> 32));
+    return hashWord(table, key);
 }
 
 void
@@ -120,7 +121,7 @@ unlockFile(int fd)
 
     lock = lookupHashTable(fd_hash, fd);
     if (lock == NULL) {
-        // errorBelch("unlockFile: fd %d not found", fd); 
+        // errorBelch("unlockFile: fd %d not found", fd);
         // This is normal: we didn't know when calling unlockFile
         // whether this FD referred to a locked file or not.
         RELEASE_LOCK(&file_lock_mutex);
@@ -142,3 +143,11 @@ unlockFile(int fd)
     RELEASE_LOCK(&file_lock_mutex);
     return 0;
 }
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

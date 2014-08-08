@@ -344,26 +344,34 @@ tcHiBootIface hsc_src mod
           else do
 
         -- OK, so we're in one-shot mode.
-        -- In that case, we're read all the direct imports by now,
-        -- so eps_is_boot will record if any of our imports mention us by
-        -- way of hi-boot file
-        { eps <- getEps
-        ; case lookupUFM (eps_is_boot eps) (moduleName mod) of {
-            Nothing -> return emptyModDetails ; -- The typical case
-
-            Just (_, False) -> failWithTc moduleLoop ;
-                -- Someone below us imported us!
-                -- This is a loop with no hi-boot in the way
-
-            Just (_mod, True) ->        -- There's a hi-boot interface below us
-
-    do  { read_result <- findAndReadIface
+        -- Re #9245, we always check if there is an hi-boot interface
+        -- to check consistency against, rather than just when we notice
+        -- that an hi-boot is necessary due to a circular import.
+        { read_result <- findAndReadIface
                                 need mod
                                 True    -- Hi-boot file
 
-        ; case read_result of
-                Failed err               -> failWithTc (elaborate err)
-                Succeeded (iface, _path) -> typecheckIface iface
+        ; case read_result of {
+                Succeeded (iface, _path) -> typecheckIface iface ;
+                Failed err               ->
+
+        -- There was no hi-boot file. But if there is circularity in
+        -- the module graph, there really should have been one.
+        -- Since we've read all the direct imports by now,
+        -- eps_is_boot will record if any of our imports mention the
+        -- current module, which either means a module loop (not
+        -- a SOURCE import) or that our hi-boot file has mysteriously
+        -- disappeared.
+    do  { eps <- getEps
+        ; case lookupUFM (eps_is_boot eps) (moduleName mod) of
+            Nothing -> return emptyModDetails -- The typical case
+
+            Just (_, False) -> failWithTc moduleLoop
+                -- Someone below us imported us!
+                -- This is a loop with no hi-boot in the way
+
+            Just (_mod, True) -> failWithTc (elaborate err)
+                -- The hi-boot file has mysteriously disappeared.
     }}}}
   where
     need = ptext (sLit "Need the hi-boot interface for") <+> ppr mod
@@ -536,13 +544,18 @@ tc_iface_decl _parent ignore_prags
                 -- it mentions unless it's necessary to do so
           ; return (op_name, dm, op_ty) }
 
-   tc_at cls (IfaceAT tc_decl defs_decls)
+   tc_at cls (IfaceAT tc_decl if_def)
      = do ATyCon tc <- tc_iface_decl (AssocFamilyTyCon cls) ignore_prags tc_decl
-          defs <- forkM (mk_at_doc tc) (tc_ax_branches defs_decls)
+          mb_def <- case if_def of
+                      Nothing  -> return Nothing
+                      Just def -> forkM (mk_at_doc tc)                 $
+                                  extendIfaceTyVarEnv (tyConTyVars tc) $
+                                  do { tc_def <- tcIfaceType def
+                                     ; return (Just tc_def) }
                   -- Must be done lazily in case the RHS of the defaults mention
                   -- the type constructor being defined here
                   -- e.g.   type AT a; type AT b = AT [b]   Trac #8002
-          return (tc, defs)
+          return (ATI tc mb_def)
 
    mk_sc_doc pred = ptext (sLit "Superclass") <+> ppr pred
    mk_at_doc tc = ptext (sLit "Associated type") <+> ppr tc

@@ -77,7 +77,7 @@
    ------------------------------------------------------------------------- */
 
 typedef struct gen_workspace_ {
-    generation * gen;		// the gen for this workspace 
+    generation * gen;           // the gen for this workspace
     struct gc_thread_ * my_gct; // the gc_thread that contains this workspace
 
     // where objects to be scavenged go
@@ -184,7 +184,6 @@ typedef struct gc_thread_ {
 
     Time gc_start_cpu;   // process CPU time
     Time gc_start_elapsed;  // process elapsed time
-    Time gc_start_thread_cpu; // thread CPU time
     W_ gc_start_faults;
 
     // -------------------
@@ -211,3 +210,11 @@ extern ThreadLocalKey gctKey;
 
 #endif // SM_GCTHREAD_H
 
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

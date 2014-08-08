@@ -59,7 +59,6 @@ import Control.Monad
 
 import Data.IORef
 import Data.List
-import qualified Data.Map as Map
 import Control.Concurrent.MVar
 
 import System.FilePath
@@ -70,7 +69,7 @@ import System.Directory hiding (findFile)
 import System.Directory
 #endif
 
-import Distribution.Package hiding (depends, PackageId)
+import Distribution.Package hiding (depends, mkPackageKey, PackageKey)
 
 import Exception
 \end{code}
@@ -124,12 +123,8 @@ data PersistentLinkerState
         -- The currently-loaded packages; always object code
         -- Held, as usual, in dependency order; though I am not sure if
         -- that is really important
-        pkgs_loaded :: ![PackageId],
-
-        -- we need to remember the name of the last temporary DLL/.so
-        -- so we can link it
-        last_temp_so :: !(Maybe FilePath)
-         }
+        pkgs_loaded :: ![PackageKey]
+     }
 
 emptyPLS :: DynFlags -> PersistentLinkerState
 emptyPLS _ = PersistentLinkerState {
@@ -137,18 +132,17 @@ emptyPLS _ = PersistentLinkerState {
                         itbl_env    = emptyNameEnv,
                         pkgs_loaded = init_pkgs,
                         bcos_loaded = [],
-                        objs_loaded = [],
-                        last_temp_so = Nothing }
+                        objs_loaded = [] }
 
   -- Packages that don't need loading, because the compiler
   -- shares them with the interpreted program.
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = [rtsPackageId]
+  where init_pkgs = [rtsPackageKey]
 
 
-extendLoadedPkgs :: [PackageId] -> IO ()
+extendLoadedPkgs :: [PackageKey] -> IO ()
 extendLoadedPkgs pkgs =
   modifyPLS_ $ \s ->
       return s{ pkgs_loaded = pkgs ++ pkgs_loaded s }
@@ -320,14 +314,14 @@ reallyInitDynLinker dflags =
         ; if null cmdline_lib_specs then return pls
                                     else do
 
-        { pls1 <- foldM (preloadLib dflags lib_paths framework_paths) pls cmdline_lib_specs
+        { mapM_ (preloadLib dflags lib_paths framework_paths) cmdline_lib_specs
         ; maybePutStr dflags "final link ... "
         ; ok <- resolveObjs
 
         ; if succeeded ok then maybePutStrLn dflags "done"
           else throwGhcExceptionIO (ProgramError "linking extra libraries/objects failed")
 
-        ; return pls1
+        ; return pls
         }}
 
 
@@ -366,21 +360,19 @@ classifyLdInput dflags f
         return Nothing
     where platform = targetPlatform dflags
 
-preloadLib :: DynFlags -> [String] -> [String] -> PersistentLinkerState -> LibrarySpec -> IO (PersistentLinkerState)
-preloadLib dflags lib_paths framework_paths pls lib_spec
+preloadLib :: DynFlags -> [String] -> [String] -> LibrarySpec -> IO ()
+preloadLib dflags lib_paths framework_paths lib_spec
   = do maybePutStr dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
        case lib_spec of
           Object static_ish
-             -> do (b, pls1) <- preload_static lib_paths static_ish
+             -> do b <- preload_static lib_paths static_ish
                    maybePutStrLn dflags (if b  then "done"
                                                 else "not found")
-                   return pls1
 
           Archive static_ish
              -> do b <- preload_static_archive lib_paths static_ish
                    maybePutStrLn dflags (if b  then "done"
                                                 else "not found")
-                   return pls
 
           DLL dll_unadorned
              -> do maybe_errstr <- loadDLL (mkSOName platform dll_unadorned)
@@ -396,14 +388,12 @@ preloadLib dflags lib_paths framework_paths pls lib_spec
                         case err2 of
                           Nothing -> maybePutStrLn dflags "done"
                           Just _  -> preloadFailed mm lib_paths lib_spec
-                   return pls
 
           DLLPath dll_path
              -> do maybe_errstr <- loadDLL dll_path
                    case maybe_errstr of
                       Nothing -> maybePutStrLn dflags "done"
                       Just mm -> preloadFailed mm lib_paths lib_spec
-                   return pls
 
           Framework framework ->
               if platformUsesFrameworks (targetPlatform dflags)
@@ -411,7 +401,6 @@ preloadLib dflags lib_paths framework_paths pls lib_spec
                       case maybe_errstr of
                          Nothing -> maybePutStrLn dflags "done"
                          Just mm -> preloadFailed mm framework_paths lib_spec
-                      return pls
               else panic "preloadLib Framework"
 
   where
@@ -431,13 +420,11 @@ preloadLib dflags lib_paths framework_paths pls lib_spec
     -- Not interested in the paths in the static case.
     preload_static _paths name
        = do b <- doesFileExist name
-            if not b then return (False, pls)
-                     else if dynamicGhc
-                             then  do pls1 <- dynLoadObjs dflags pls [name]
-                                      return (True, pls1)
-                             else  do loadObj name
-                                      return (True, pls)
-
+            if not b then return False
+                     else do if dynamicGhc
+                                 then dynLoadObjs dflags [name]
+                                 else loadObj name
+                             return True
     preload_static_archive _paths name
        = do b <- doesFileExist name
             if not b then return False
@@ -539,7 +526,7 @@ getLinkDeps :: HscEnv -> HomePackageTable
             -> Maybe FilePath                   -- replace object suffices?
             -> SrcSpan                          -- for error messages
             -> [Module]                         -- If you need these
-            -> IO ([Linkable], [PackageId])     -- ... then link these first
+            -> IO ([Linkable], [PackageKey])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
 getLinkDeps hsc_env hpt pls replace_osuf span mods
@@ -577,8 +564,8 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         -- tree recursively.  See bug #936, testcase ghci/prog007.
     follow_deps :: [Module]             -- modules to follow
                 -> UniqSet ModuleName         -- accum. module dependencies
-                -> UniqSet PackageId          -- accum. package dependencies
-                -> IO ([ModuleName], [PackageId]) -- result
+                -> UniqSet PackageKey          -- accum. package dependencies
+                -> IO ([ModuleName], [PackageKey]) -- result
     follow_deps []     acc_mods acc_pkgs
         = return (uniqSetToList acc_mods, uniqSetToList acc_pkgs)
     follow_deps (mod:mods) acc_mods acc_pkgs
@@ -592,7 +579,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           when (mi_boot iface) $ link_boot_mod_error mod
 
           let
-            pkg = modulePackageId mod
+            pkg = modulePackageKey mod
             deps  = mi_deps iface
 
             pkg_deps = dep_pkgs deps
@@ -804,8 +791,8 @@ dynLinkObjs dflags pls objs = do
             wanted_objs              = map nameOfObject unlinkeds
 
         if dynamicGhc
-            then do pls2 <- dynLoadObjs dflags pls1 wanted_objs
-                    return (pls2, Succeeded)
+            then do dynLoadObjs dflags wanted_objs
+                    return (pls1, Succeeded)
             else do mapM_ loadObj wanted_objs
 
                     -- Link them all together
@@ -819,11 +806,9 @@ dynLinkObjs dflags pls objs = do
                             pls2 <- unload_wkr dflags [] pls1
                             return (pls2, Failed)
 
-
-dynLoadObjs :: DynFlags -> PersistentLinkerState -> [FilePath]
-            -> IO PersistentLinkerState
-dynLoadObjs _      pls []   = return pls
-dynLoadObjs dflags pls objs = do
+dynLoadObjs :: DynFlags -> [FilePath] -> IO ()
+dynLoadObjs _      []   = return ()
+dynLoadObjs dflags objs = do
     let platform = targetPlatform dflags
     soFile <- newTempName dflags (soExt platform)
     let -- When running TH for a non-dynamic way, we still need to make
@@ -831,22 +816,10 @@ dynLoadObjs dflags pls objs = do
         -- Opt_Static off
         dflags1 = gopt_unset dflags Opt_Static
         dflags2 = dflags1 {
-                      -- We don't want the original ldInputs in
-                      -- (they're already linked in), but we do want
-                      -- to link against the previous dynLoadObjs
-                      -- library if there was one, so that the linker
-                      -- can resolve dependencies when it loads this
-                      -- library.
-                      ldInputs =
-                        case last_temp_so pls of
-                          Nothing -> []
-                          Just so  ->
-                                 let (lp, l) = splitFileName so in
-                                 [ Option ("-L" ++ lp)
-                                 , Option ("-Wl,-rpath")
-                                 , Option ("-Wl," ++ lp)
-                                 , Option ("-l:" ++ l)
-                                 ],
+                      -- We don't want to link the ldInputs in; we'll
+                      -- be calling dynLoadObjs with any objects that
+                      -- need to be linked.
+                      ldInputs = [],
                       -- Even if we're e.g. profiling, we still want
                       -- the vanilla dynamic libraries, so we set the
                       -- ways / build tag to be just WayDyn.
@@ -858,7 +831,7 @@ dynLoadObjs dflags pls objs = do
     consIORef (filesToNotIntermediateClean dflags) soFile
     m <- loadDLL soFile
     case m of
-        Nothing -> return pls { last_temp_so = Just soFile }
+        Nothing -> return ()
         Just err -> panic ("Loading temp shared object failed: " ++ err)
 
 rmDupLinkables :: [Linkable]    -- Already loaded
@@ -1071,7 +1044,7 @@ showLS (Framework nm) = "(framework) " ++ nm
 -- automatically, and it doesn't matter what order you specify the input
 -- packages.
 --
-linkPackages :: DynFlags -> [PackageId] -> IO ()
+linkPackages :: DynFlags -> [PackageKey] -> IO ()
 -- NOTE: in fact, since each module tracks all the packages it depends on,
 --       we don't really need to use the package-config dependencies.
 --
@@ -1087,16 +1060,13 @@ linkPackages dflags new_pkgs = do
   modifyPLS_ $ \pls -> do
     linkPackages' dflags new_pkgs pls
 
-linkPackages' :: DynFlags -> [PackageId] -> PersistentLinkerState
+linkPackages' :: DynFlags -> [PackageKey] -> PersistentLinkerState
              -> IO PersistentLinkerState
 linkPackages' dflags new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs' }
   where
-     pkg_map = pkgIdMap (pkgState dflags)
-     ipid_map = installedPackageIdMap (pkgState dflags)
-
-     link :: [PackageId] -> [PackageId] -> IO [PackageId]
+     link :: [PackageKey] -> [PackageKey] -> IO [PackageKey]
      link pkgs new_pkgs =
          foldM link_one pkgs new_pkgs
 
@@ -1104,17 +1074,16 @@ linkPackages' dflags new_pks pls = do
         | new_pkg `elem` pkgs   -- Already linked
         = return pkgs
 
-        | Just pkg_cfg <- lookupPackage pkg_map new_pkg
+        | Just pkg_cfg <- lookupPackage dflags new_pkg
         = do {  -- Link dependents first
-               pkgs' <- link pkgs [ Maybes.expectJust "link_one" $
-                                    Map.lookup ipid ipid_map
+               pkgs' <- link pkgs [ resolveInstalledPackageId dflags ipid
                                   | ipid <- depends pkg_cfg ]
                 -- Now link the package itself
              ; linkPackage dflags pkg_cfg
              ; return (new_pkg : pkgs') }
 
         | otherwise
-        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ packageIdString new_pkg))
+        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ packageKeyString new_pkg))
 
 
 linkPackage :: DynFlags -> PackageConfig -> IO ()
@@ -1235,7 +1204,9 @@ locateLib dflags is_hs dirs lib
      mk_hs_dyn_lib_path dir = dir </> mkHsSOName platform hs_dyn_lib_name
 
      so_name = mkSOName platform lib
-     mk_dyn_lib_path dir = dir </> so_name
+     mk_dyn_lib_path dir = case (arch, os) of
+                             (ArchX86_64, OSSolaris2) -> dir </> ("64/" ++ so_name)
+                             _ -> dir </> so_name
 
      findObject     = liftM (fmap Object)  $ findFile mk_obj_path        dirs
      findDynObject  = liftM (fmap Object)  $ findFile mk_dyn_obj_path    dirs
@@ -1252,6 +1223,8 @@ locateLib dflags is_hs dirs lib
                            Nothing -> g
 
      platform = targetPlatform dflags
+     arch = platformArch platform
+     os = platformOS platform
 
 searchForLibUsingGcc :: DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
 searchForLibUsingGcc dflags so dirs = do

@@ -151,18 +151,6 @@ stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 }
 
 
-stg_fetchAddIntArrayzh( gcptr arr, W_ ind, W_ incr )
-/* MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #) */
-{
-    W_ p, h;
-
-    p = arr + SIZEOF_StgArrWords + WDS(ind);
-    (h) = ccall atomic_inc(p, incr);
-
-    return(h);
-}
-
-
 stg_newArrayzh ( W_ n /* words */, gcptr init )
 {
     W_ words, size, p;

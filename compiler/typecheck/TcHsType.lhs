@@ -76,7 +76,7 @@ import Util
 
 import Data.Maybe( isNothing )
 import Control.Monad ( unless, when, zipWithM )
-import PrelNames( ipClassName, funTyConKey )
+import PrelNames( ipClassName, funTyConKey, allNameStrings )
 \end{code}
 
 
@@ -1307,6 +1307,11 @@ tcTyClTyVars tycon (HsQTvs { hsq_kvs = hs_kvs, hsq_tvs = hs_tvs }) thing_inside
        ; tvs <- zipWithM tc_hs_tv hs_tvs kinds
        ; tcExtendTyVarEnv tvs (thing_inside (kvs ++ tvs) res) }
   where
+    -- In the case of associated types, the renamer has
+    -- ensured that the names are in commmon
+    -- e.g.   class C a_29 where
+    --           type T b_30 a_29 :: *
+    -- Here the a_29 is shared
     tc_hs_tv (L _ (UserTyVar n))        kind = return (mkTyVar n kind)
     tc_hs_tv (L _ (KindedTyVar n hs_k)) kind = do { tc_kind <- tcLHsKind hs_k
                                                   ; checkKind kind tc_kind
@@ -1325,7 +1330,7 @@ tcDataKindSig kind
 	; us   <- newUniqueSupply 
         ; rdr_env <- getLocalRdrEnv
 	; let uniqs = uniqsFromSupply us
-              occs  = [ occ | str <- strs
+              occs  = [ occ | str <- allNameStrings
                             , let occ = mkOccName tvName str
                             , isNothing (lookupLocalRdrOcc rdr_env occ) ]
                  -- Note [Avoid name clashes for associated data types]
@@ -1337,9 +1342,6 @@ tcDataKindSig kind
     mk_tv loc uniq occ kind 
       = mkTyVar (mkInternalName uniq occ loc) kind
 	  
-    strs :: [String]
-    strs = [ c:cs | cs <- "" : strs, c <- ['a'..'z'] ] 
-
 badKindSig :: Kind -> SDoc
 badKindSig kind 
  = hang (ptext (sLit "Kind signature on data type declaration has non-* return kind"))

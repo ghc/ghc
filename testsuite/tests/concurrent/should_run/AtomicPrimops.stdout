@@ -1,0 +1,7 @@
+fetchAddSubTest: OK
+fetchAndTest: OK
+fetchNandTest: OK
+fetchOrTest: OK
+fetchXorTest: OK
+casTest: OK
+readWriteTest: OK

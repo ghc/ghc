@@ -264,6 +264,7 @@ type Typeable7 (a :: * -> * -> * -> * -> * -> * -> * -> *) = Typeable a
 
 -- | Kind-polymorphic Typeable instance for type application
 instance (Typeable s, Typeable a) => Typeable (s a) where
+         -- See Note [The apparent incoherence of Typable]
   typeRep# = \_ -> rep                  -- Note [Memoising typeOf]
     where !ty1 = typeRep# (proxy# :: Proxy# s)
           !ty2 = typeRep# (proxy# :: Proxy# a)
@@ -446,9 +447,20 @@ lifted types with infinitely many inhabitants.  Indeed, `Nat` is
 isomorphic to (lifted) `[()]`  and `Symbol` is isomorphic to `[Char]`.
 -}
 
--- See `Note [Kinds Containing Only Literals]` in `types/Unify.hs` for
--- an explanation of how we avoid overlap with `Typeable (f a)`.
-instance KnownNat n => Typeable (n :: Nat) where
+{- Note [The apparent incoherence of Typable] See Trac #9242
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The reason we have INCOHERENT on Typeable (n:Nat) and Typeable (s:Symbol)
+because we also have an instance Typable (f a).  Now suppose we have
+  [Wanted] Typeable (a :: Nat)
+we should pick the (x::Nat) instance, even though the instance
+matching rules would worry that 'a' might later be instantiated to
+(f b), for some f and b. But we type theorists know that there are no
+type constructors f of kind blah -> Nat, so this can never happen and
+it's safe to pick the second instance. -}
+
+
+instance {-# INCOHERENT #-} KnownNat n => Typeable (n :: Nat) where
+  -- See Note [The apparent incoherence of Typable]
   -- See #9203 for an explanation of why this is written as `\_ -> rep`.
   typeRep# = \_ -> rep
     where
@@ -465,9 +477,8 @@ instance KnownNat n => Typeable (n :: Nat) where
     mk a b c = a ++ " " ++ b ++ " " ++ c
 
 
--- See `Note [Kinds Containing Only Literals]` in `types/Unify.hs` for
--- an explanation of how we avoid overlap with `Typeable (f a)`.
-instance KnownSymbol s => Typeable (s :: Symbol) where
+instance {-# INCOHERENT #-} KnownSymbol s => Typeable (s :: Symbol) where
+  -- See Note [The apparent incoherence of Typable]
   -- See #9203 for an explanation of why this is written as `\_ -> rep`.
   typeRep# = \_ -> rep
     where

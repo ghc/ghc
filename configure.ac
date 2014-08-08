@@ -34,7 +34,7 @@ fi
 AC_SUBST([CONFIGURE_ARGS], [$ac_configure_args])
 
 dnl ----------------------------------------------------------
-dnl ** Find unixy sort and find commands, 
+dnl ** Find unixy sort and find commands,
 dnl ** which are needed by FP_SETUP_PROJECT_VERSION
 
 dnl ** Find find command (for Win32's benefit)
@@ -91,7 +91,7 @@ AC_ARG_WITH([ghc],
   WithGhc="$GHC"])
 
 dnl ** Tell the make system which OS we are using
-dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something 
+dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something
 AC_SUBST(OSTYPE)
 
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
@@ -228,7 +228,7 @@ case $host in
      # here we go with the test
      MINOR=`uname -r|cut -d '.' -f 2-`
      if test "$MINOR" -lt "11"; then
-     	SOLARIS_BROKEN_SHLD=YES
+         SOLARIS_BROKEN_SHLD=YES
      fi
      ;;
 esac
@@ -478,6 +478,61 @@ export CC
 # applies to the stage0 compiler.
 MAYBE_OVERRIDE_STAGE0([gcc],[CC_STAGE0])
 MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
+
+dnl ** what cpp to use?
+dnl --------------------------------------------------------------
+AC_ARG_WITH(hs-cpp,
+[AC_HELP_STRING([--with-hs-cpp=ARG],
+        [Use ARG as the path to cpp [default=autodetect]])],
+[
+    if test "$HostOS" = "mingw32"
+    then
+        AC_MSG_WARN([Request to use $withval will be ignored])
+    else
+        HaskellCPPCmd=$withval
+    fi
+],
+[
+        HaskellCPPCmd=$WhatGccIsCalled
+]
+)
+
+
+
+dnl ** what cpp flags to use?
+dnl -----------------------------------------------------------
+AC_ARG_WITH(hs-cpp-flags,
+  [AC_HELP_STRING([--with-hs-cpp-flags=ARG],
+          [Use ARG as the path to hs cpp [default=autodetect]])],
+  [
+      if test "$HostOS" = "mingw32"
+      then
+          AC_MSG_WARN([Request to use $withval will be ignored])
+      else
+          HaskellCPPArgs=$withval
+      fi
+  ],
+[
+  $HaskellCPPCmd -x c /dev/null -dM -E > conftest.txt 2>&1
+  if grep "__clang__" conftest.txt >/dev/null 2>&1; then
+    HaskellCPPArgs="-E -undef -traditional -Wno-invalid-pp-token -Wno-unicode -Wno-trigraphs "
+  else
+      $HaskellCPPCmd  -v > conftest.txt 2>&1
+      if  grep "gcc" conftest.txt >/dev/null 2>&1; then
+          HaskellCPPArgs="-E -undef -traditional "
+        else
+          $HaskellCPPCmd  --version > conftest.txt 2>&1
+          if grep "cpphs" conftest.txt >/dev/null 2>&1; then
+            HaskellCPPArgs="--cpp -traditional"
+          else
+            AC_MSG_WARN([configure can't recognize your CPP program, you may need to set --with-hs-cpp-flags=FLAGS explicitly])
+            HaskellCPPArgs=""
+          fi
+      fi
+  fi
+  ]
+)
+
 
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
@@ -763,30 +818,6 @@ FP_CHECK_FUNC([WinExec],
 FP_CHECK_FUNC([GetModuleFileName],
   [@%:@include <windows.h>], [GetModuleFileName((HMODULE)0,(LPTSTR)0,0)])
 
-dnl ** check return type of signal handlers
-dnl Foo: assumes we can use prototypes.
-dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
-dnl AC_CACHE_CHECK([type of signal handlers], ac_cv_type_signal_handler,
-dnl [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
-dnl #include <signal.h>
-dnl #ifdef signal
-dnl #undef signal
-dnl #endif
-dnl void (*signal (int, void (*)(int)))(int);
-dnl ]],
-dnl [[int i;]])],
-dnl [ac_cv_type_signal_handler=void_int],
-dnl [ac_cv_type_signal_handler=int_void])])
-dnl if test "$ac_cv_type_signal_handler" = void_int; then
-dnl AC_DEFINE(VOID_INT_SIGNALS)
-dnl fi
-
-dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
-AC_TYPE_SIGNAL
-if test "$ac_cv_type_signal" = void; then
-  AC_DEFINE([VOID_INT_SIGNALS], [1], [Define to 1 if signal handlers have type void (*)(int). Otherwise, they're assumed to have type int (*)(void).])
-fi
-
 dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
 AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r sched_setaffinity setlocale])
@@ -991,13 +1022,14 @@ echo ["\
    Using $CompilerName       : $WhatGccIsCalled
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
-
-   ld       : $LdCmd
-   Happy    : $HappyCmd ($HappyVersion)
-   Alex     : $AlexCmd ($AlexVersion)
-   Perl     : $PerlCmd
-   dblatex  : $DblatexCmd
-   xsltproc : $XsltprocCmd
+   cpp       : $HaskellCPPCmd
+   cpp-flags : $HaskellCPPArgs
+   ld        : $LdCmd
+   Happy     : $HappyCmd ($HappyVersion)
+   Alex      : $AlexCmd ($AlexVersion)
+   Perl      : $PerlCmd
+   dblatex   : $DblatexCmd
+   xsltproc  : $XsltprocCmd
 
    Using LLVM tools
       llc   : $LlcCmd

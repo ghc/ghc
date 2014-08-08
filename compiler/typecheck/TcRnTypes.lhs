@@ -325,6 +325,9 @@ data TcGblEnv
 #endif /* GHCI */
 
         tcg_ev_binds  :: Bag EvBind,        -- Top-level evidence bindings
+
+        -- Things defined in this module, or (in GHCi) in the interactive package
+        --   For the latter, see Note [The interactive package] in HscTypes
         tcg_binds     :: LHsBinds Id,       -- Value bindings in this module
         tcg_sigs      :: NameSet,           -- ...Top-level names that *lack* a signature
         tcg_imp_specs :: [LTcSpecPrag],     -- ...SPECIALISE prags for imported Ids
@@ -806,17 +809,17 @@ data ImportAvails
           -- compiling M might not need to consult X.hi, but X
           -- is still listed in M's dependencies.
 
-        imp_dep_pkgs :: [PackageId],
+        imp_dep_pkgs :: [PackageKey],
           -- ^ Packages needed by the module being compiled, whether directly,
           -- or via other modules in this package, or via modules imported
           -- from other packages.
 
-        imp_trust_pkgs :: [PackageId],
+        imp_trust_pkgs :: [PackageKey],
           -- ^ This is strictly a subset of imp_dep_pkgs and records the
           -- packages the current module needs to trust for Safe Haskell
           -- compilation to succeed. A package is required to be trusted if
           -- we are dependent on a trustworthy module in that package.
-          -- While perhaps making imp_dep_pkgs a tuple of (PackageId, Bool)
+          -- While perhaps making imp_dep_pkgs a tuple of (PackageKey, Bool)
           -- where True for the bool indicates the package is required to be
           -- trusted is the more logical  design, doing so complicates a lot
           -- of code not concerned with Safe Haskell.
@@ -1852,8 +1855,7 @@ pprO TupleOrigin           = ptext (sLit "a tuple")
 pprO NegateOrigin          = ptext (sLit "a use of syntactic negation")
 pprO ScOrigin              = ptext (sLit "the superclasses of an instance declaration")
 pprO DerivOrigin           = ptext (sLit "the 'deriving' clause of a data type declaration")
-pprO (DerivOriginDC dc n)  = pprTrace "dco" (ppr dc <+> ppr n) $ 
-                             hsep [ ptext (sLit "the"), speakNth n,
+pprO (DerivOriginDC dc n)  = hsep [ ptext (sLit "the"), speakNth n,
                                     ptext (sLit "field of"), quotes (ppr dc),
                                     parens (ptext (sLit "type") <+> quotes (ppr ty)) ]
     where ty = dataConOrigArgTys dc !! (n-1)

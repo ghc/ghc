@@ -183,7 +183,7 @@ enterCostCentreFun ccs closure =
   ifProfiling $ do
     if isCurrentCCS ccs
        then do dflags <- getDynFlags
-               emitRtsCall rtsPackageId (fsLit "enterFunCCS")
+               emitRtsCall rtsPackageKey (fsLit "enterFunCCS")
                    [(CmmReg (CmmGlobal BaseReg), AddrHint),
                     (costCentreFrom dflags closure, AddrHint)] False
        else return () -- top-level function, nothing to do
@@ -285,7 +285,7 @@ emitSetCCC cc tick push
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> FCode ()
 pushCostCentre result ccs cc
   = emitRtsCallWithResult result AddrHint
-        rtsPackageId
+        rtsPackageKey
         (fsLit "pushCostCentre") [(ccs,AddrHint),
                                 (CmmLit (mkCCostCentre cc), AddrHint)]
         False
@@ -356,7 +356,7 @@ ldvEnter cl_ptr = do
 
 loadEra :: DynFlags -> CmmExpr
 loadEra dflags = CmmMachOp (MO_UU_Conv (cIntWidth dflags) (wordWidth dflags))
-    [CmmLoad (mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "era")))
+    [CmmLoad (mkLblExpr (mkCmmDataLabel rtsPackageKey (fsLit "era")))
              (cInt dflags)]
 
 ldvWord :: DynFlags -> CmmExpr -> CmmExpr

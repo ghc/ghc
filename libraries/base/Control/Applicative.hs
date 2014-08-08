@@ -54,7 +54,7 @@ import Control.Monad (liftM, ap, MonadPlus(..))
 import Control.Monad.ST.Safe (ST)
 import qualified Control.Monad.ST.Lazy.Safe as Lazy (ST)
 import Data.Functor ((<$>), (<$))
-import Data.Monoid (Monoid(..))
+import Data.Monoid (Monoid(..), First(..), Last(..))
 import Data.Proxy
 
 import Text.ParserCombinators.ReadP (ReadP)
@@ -280,6 +280,15 @@ instance Arrow a => Applicative (WrappedArrow a b) where
 instance (ArrowZero a, ArrowPlus a) => Alternative (WrappedArrow a b) where
     empty = WrapArrow zeroArrow
     WrapArrow u <|> WrapArrow v = WrapArrow (u <+> v)
+
+-- Added in base-4.8.0.0
+instance Applicative First where
+        pure x = First (Just x)
+        First x <*> First y = First (x <*> y)
+
+instance Applicative Last where
+        pure x = Last (Just x)
+        Last x <*> Last y = Last (x <*> y)
 
 -- | Lists, but with an 'Applicative' functor based on zipping, so that
 --

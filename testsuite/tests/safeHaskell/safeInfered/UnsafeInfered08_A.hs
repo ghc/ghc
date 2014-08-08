@@ -1,4 +1,5 @@
 {-# LANGUAGE OverlappingInstances #-}
+{-# OPTIONS_GHC -w #-}  -- Turn off deprecation for OverlappingInstances
 -- | Unsafe as uses overlapping instances
 -- Although it isn't defining any so can we mark safe
 -- still?

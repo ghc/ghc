@@ -433,12 +433,12 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = name@(L nameLoc _) })
   = do { newname <- applyNameMaker name_maker name
        ; return (bind { fun_id = L nameLoc newname }) } 
 
-rnBindLHS name_maker _ bind@(PatSynBind{ patsyn_id = rdrname@(L nameLoc _) })
+rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname@(L nameLoc _) })
   = do { unless (isTopRecNameMaker name_maker) $
            addErr localPatternSynonymErr
        ; addLocM checkConName rdrname
        ; name <- applyNameMaker name_maker rdrname
-       ; return (bind{ patsyn_id = L nameLoc name }) }
+       ; return (PatSynBind psb{ psb_id = L nameLoc name }) }
   where
     localPatternSynonymErr :: SDoc
     localPatternSynonymErr
@@ -515,15 +515,37 @@ rnBind sig_fn bind@(FunBind { fun_id = name
 		  [plain_name], rhs_fvs)
       }
 
-rnBind _sig_fn bind@(PatSynBind { patsyn_id = L _ name
-                                , patsyn_args = details
-                                , patsyn_def = pat
-                                , patsyn_dir = dir })
+rnBind sig_fn (PatSynBind bind)
+  = do  { (bind', name, fvs) <- rnPatSynBind sig_fn bind
+        ; return (PatSynBind bind', name, fvs) }
+
+rnBind _ b = pprPanic "rnBind" (ppr b)
+
+{-
+Note [Free-variable space leak]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have
+    fvs' = trim fvs
+and we seq fvs' before turning it as part of a record.
+
+The reason is that trim is sometimes something like
+    \xs -> intersectNameSet (mkNameSet bound_names) xs
+and we don't want to retain the list bound_names. This showed up in
+trac ticket #1136.
+-}
+
+rnPatSynBind :: (Name -> [Name])		-- Signature tyvar function
+             -> PatSynBind Name RdrName
+             -> RnM (PatSynBind Name Name, [Name], Uses)
+rnPatSynBind _sig_fn bind@(PSB { psb_id = L _ name
+                               , psb_args = details
+                               , psb_def = pat
+                               , psb_dir = dir })
        -- invariant: no free vars here when it's a FunBind
   = do	{ pattern_synonym_ok <- xoptM Opt_PatternSynonyms
         ; unless pattern_synonym_ok (addErr patternSynonymErr)
 
-        ; ((pat', details'), fvs) <- rnPat PatSyn pat $ \pat' -> do
+        ; ((pat', details'), fvs1) <- rnPat PatSyn pat $ \pat' -> do
          -- We check the 'RdrName's instead of the 'Name's
          -- so that the binding locations are reported
          -- from the left-hand side
@@ -539,23 +561,28 @@ rnBind _sig_fn bind@(PatSynBind { patsyn_id = L _ name
                       -- ; checkPrecMatch -- TODO
                       ; return (InfixPatSyn name1 name2, mkFVs (map unLoc [name1, name2])) }
         ; return ((pat', details'), fvs) }
-        ; dir' <- case dir of
-            Unidirectional -> return Unidirectional
-            ImplicitBidirectional -> return ImplicitBidirectional
+        ; (dir', fvs2) <- case dir of
+            Unidirectional -> return (Unidirectional, emptyFVs)
+            ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
+            ExplicitBidirectional mg ->
+                do { (mg', fvs) <- rnMatchGroup PatSyn rnLExpr mg
+                   ; return (ExplicitBidirectional mg', fvs) }
 
         ; mod <- getModule
-        ; let fvs' = filterNameSet (nameIsLocalOrFrom mod) fvs
+        ; let fvs = fvs1 `plusFV` fvs2
+              fvs' = filterNameSet (nameIsLocalOrFrom mod) fvs
 	        -- Keep locally-defined Names
 		-- As well as dependency analysis, we need these for the
 		-- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
 
-        ; let bind' = bind{ patsyn_args = details'
-                          , patsyn_def = pat'
-                          , patsyn_dir = dir'
-                          , bind_fvs = fvs' }
+        ; let bind' = bind{ psb_args = details'
+                          , psb_def = pat'
+                          , psb_dir = dir'
+                          , psb_fvs = fvs' }
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
-          return (bind', [name], fvs)
+          return (bind', [name], fvs1)
+          -- See Note [Pattern synonym wrappers don't yield dependencies]
       }
   where
     lookupVar = wrapLocM lookupOccRn
@@ -565,20 +592,34 @@ rnBind _sig_fn bind@(PatSynBind { patsyn_id = L _ name
       = hang (ptext (sLit "Illegal pattern synonym declaration"))
            2 (ptext (sLit "Use -XPatternSynonyms to enable this extension"))
 
-
-rnBind _ b = pprPanic "rnBind" (ppr b)
-
 {-
-Note [Free-variable space leak]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We have
-    fvs' = trim fvs
-and we seq fvs' before turning it as part of a record.
+Note [Pattern synonym wrappers don't yield dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The reason is that trim is sometimes something like
-    \xs -> intersectNameSet (mkNameSet bound_names) xs
-and we don't want to retain the list bound_names. This showed up in
-trac ticket #1136.
+When renaming a pattern synonym that has an explicit wrapper,
+references in the wrapper definition should not be used when
+calculating dependencies. For example, consider the following pattern
+synonym definition:
+
+pattern P x <- C1 x where
+  P x = f (C1 x)
+
+f (P x) = C2 x
+
+In this case, 'P' needs to be typechecked in two passes:
+
+1. Typecheck the pattern definition of 'P', which fully determines the
+type of 'P'. This step doesn't require knowing anything about 'f',
+since the wrapper definition is not looked at.
+
+2. Typecheck the wrapper definition, which needs the typechecked
+definition of 'f' to be in scope.
+
+This behaviour is implemented in 'tcValBinds', but it crucially
+depends on 'P' not being put in a recursive group with 'f' (which
+would make it look like a recursive pattern synonym a la 'pattern P =
+P' which is unsound and rejected).
+
 -}
 
 ---------------------

@@ -81,7 +81,7 @@ module GHC (
         SafeHaskellMode(..),
 
         -- * Querying the environment
-        packageDbModules,
+        -- packageDbModules,
 
         -- * Printing
         PrintUnqualified, alwaysQualify,
@@ -133,10 +133,10 @@ module GHC (
         -- * Abstract syntax elements
 
         -- ** Packages
-        PackageId,
+        PackageKey,
 
         -- ** Modules
-        Module, mkModule, pprModule, moduleName, modulePackageId,
+        Module, mkModule, pprModule, moduleName, modulePackageKey,
         ModuleName, mkModuleName, moduleNameString,
 
         -- ** Names
@@ -534,7 +534,7 @@ checkBrokenTablesNextToCode' dflags
 -- flags.  If you are not doing linking or doing static linking, you
 -- can ignore the list of packages returned.
 --
-setSessionDynFlags :: GhcMonad m => DynFlags -> m [PackageId]
+setSessionDynFlags :: GhcMonad m => DynFlags -> m [PackageKey]
 setSessionDynFlags dflags = do
   (dflags', preload) <- liftIO $ initPackages dflags
   modifySession $ \h -> h{ hsc_dflags = dflags'
@@ -543,7 +543,7 @@ setSessionDynFlags dflags = do
   return preload
 
 -- | Sets the program 'DynFlags'.
-setProgramDynFlags :: GhcMonad m => DynFlags -> m [PackageId]
+setProgramDynFlags :: GhcMonad m => DynFlags -> m [PackageKey]
 setProgramDynFlags dflags = do
   (dflags', preload) <- liftIO $ initPackages dflags
   modifySession $ \h -> h{ hsc_dflags = dflags' }
@@ -1167,9 +1167,10 @@ getGRE = withSession $ \hsc_env-> return $ ic_rn_gbl_env (hsc_IC hsc_env)
 
 -- -----------------------------------------------------------------------------
 
+{- ToDo: Move the primary logic here to compiler/main/Packages.lhs
 -- | Return all /external/ modules available in the package database.
 -- Modules from the current session (i.e., from the 'HomePackageTable') are
--- not included.
+-- not included.  This includes module names which are reexported by packages.
 packageDbModules :: GhcMonad m =>
                     Bool  -- ^ Only consider exposed packages.
                  -> m [Module]
@@ -1177,10 +1178,13 @@ packageDbModules only_exposed = do
    dflags <- getSessionDynFlags
    let pkgs = eltsUFM (pkgIdMap (pkgState dflags))
    return $
-     [ mkModule pid modname | p <- pkgs
-                            , not only_exposed || exposed p
-                            , let pid = packageConfigId p
-                            , modname <- exposedModules p ]
+     [ mkModule pid modname
+     | p <- pkgs
+     , not only_exposed || exposed p
+     , let pid = packageConfigId p
+     , modname <- exposedModules p
+               ++ map exportName (reexportedModules p) ]
+               -}
 
 -- -----------------------------------------------------------------------------
 -- Misc exported utils
@@ -1301,7 +1305,7 @@ showRichTokenStream ts = go startLoc ts ""
 -- -----------------------------------------------------------------------------
 -- Interactive evaluation
 
--- | Takes a 'ModuleName' and possibly a 'PackageId', and consults the
+-- | Takes a 'ModuleName' and possibly a 'PackageKey', and consults the
 -- filesystem and package database to find the corresponding 'Module', 
 -- using the algorithm that is used for an @import@ declaration.
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
@@ -1311,7 +1315,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
     this_pkg = thisPackage dflags
   --
   case maybe_pkg of
-    Just pkg | fsToPackageId pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
+    Just pkg | fsToPackageKey pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule hsc_env mod_name maybe_pkg
       case res of
         Found _ m -> return m
@@ -1323,7 +1327,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
         Nothing -> liftIO $ do
            res <- findImportedModule hsc_env mod_name maybe_pkg
            case res of
-             Found loc m | modulePackageId m /= this_pkg -> return m
+             Found loc m | modulePackageKey m /= this_pkg -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError dflags noSrcSpan mod_name err
 
@@ -1368,7 +1372,7 @@ isModuleTrusted m = withSession $ \hsc_env ->
     liftIO $ hscCheckSafe hsc_env m noSrcSpan
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
-moduleTrustReqs :: GhcMonad m => Module -> m (Bool, [PackageId])
+moduleTrustReqs :: GhcMonad m => Module -> m (Bool, [PackageKey])
 moduleTrustReqs m = withSession $ \hsc_env ->
     liftIO $ hscGetSafe hsc_env m noSrcSpan
 

@@ -1,2 +1,2 @@
-ghc-pkg: unregistering testpkg-2.0 would break the following packages: testpkg-3.0 (use --force to override)
+ghc-pkg: unregistering would break the following packages: testpkg-3.0 (use --force to override)
 testpkg-3.0: dependency "testpkg-2.0-XXX" doesn't exist (use --force to override)

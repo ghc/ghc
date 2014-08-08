@@ -239,7 +239,7 @@ data FastStringTable =
 string_table :: FastStringTable
 {-# NOINLINE string_table #-}
 string_table = unsafePerformIO $ do
-  uid <- newIORef 0
+  uid <- newIORef 603979776 -- ord '$' * 0x01000000
   tab <- IO $ \s1# -> case newArray# hASH_TBL_SIZE_UNBOXED (panic "string_table") s1# of
                           (# s2#, arr# #) ->
                               (# s2#, FastStringTable uid arr# #)

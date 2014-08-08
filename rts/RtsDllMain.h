@@ -1,4 +1,3 @@
-
 #include "Rts.h"
 
 #ifdef HAVE_WINDOWS_H
@@ -15,3 +14,10 @@ DllMain ( HINSTANCE hInstance
        );
 #endif
 
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

@@ -54,6 +54,7 @@ module HscTypes (
         setInteractivePrintName, icInteractiveModule,
         InteractiveImport(..), setInteractivePackage,
         mkPrintUnqualified, pprModulePrefix,
+        mkQualPackage, mkQualModule, pkgQual,
 
         -- * Interfaces
         ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
@@ -443,7 +444,7 @@ instance Outputable TargetId where
 -- | Helps us find information about modules in the home package
 type HomePackageTable  = ModuleNameEnv HomeModInfo
         -- Domain = modules in the home package that have been fully compiled
-        -- "home" package name cached here for convenience
+        -- "home" package key cached here for convenience
 
 -- | Helps us find information about modules in the imported packages
 type PackageIfaceTable = ModuleEnv ModIface
@@ -634,26 +635,26 @@ type FinderCache = ModuleNameEnv FindResult
 data FindResult
   = Found ModLocation Module
         -- ^ The module was found
-  | NoPackage PackageId
+  | NoPackage PackageKey
         -- ^ The requested package was not found
-  | FoundMultiple [PackageId]
+  | FoundMultiple [(Module, ModuleOrigin)]
         -- ^ _Error_: both in multiple packages
 
         -- | Not found
   | NotFound
       { fr_paths       :: [FilePath]       -- Places where I looked
 
-      , fr_pkg         :: Maybe PackageId  -- Just p => module is in this package's
+      , fr_pkg         :: Maybe PackageKey  -- Just p => module is in this package's
                                            --           manifest, but couldn't find
                                            --           the .hi file
 
-      , fr_mods_hidden :: [PackageId]      -- Module is in these packages,
+      , fr_mods_hidden :: [PackageKey]      -- Module is in these packages,
                                            --   but the *module* is hidden
 
-      , fr_pkgs_hidden :: [PackageId]      -- Module is in these packages,
+      , fr_pkgs_hidden :: [PackageKey]      -- Module is in these packages,
                                            --   but the *package* is hidden
 
-      , fr_suggestions :: [Module]         -- Possible mis-spelled modules
+      , fr_suggestions :: [ModuleSuggestion] -- Possible mis-spelled modules
       }
 
 -- | Cache that remembers where we found a particular module.  Contains both
@@ -995,8 +996,8 @@ data ModGuts
         mg_rdr_env   :: !GlobalRdrEnv,   -- ^ Top-level lexical environment
 
         -- These fields all describe the things **declared in this module**
-        mg_fix_env   :: !FixityEnv,      -- ^ Fixities declared in this module
-                                         -- ToDo: I'm unconvinced this is actually used anywhere
+        mg_fix_env   :: !FixityEnv,      -- ^ Fixities declared in this module.
+                                         -- Used for creating interface files.
         mg_tcs       :: ![TyCon],        -- ^ TyCons declared in this module
                                          -- (includes TyCons for classes)
         mg_insts     :: ![ClsInst],      -- ^ Class instances declared in this module
@@ -1067,7 +1068,7 @@ data CgGuts
                 -- as part of the code-gen of tycons
 
         cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs
-        cg_dep_pkgs  :: ![PackageId],    -- ^ Dependent packages, used to
+        cg_dep_pkgs  :: ![PackageKey],    -- ^ Dependent packages, used to
                                          -- generate #includes for C code gen
         cg_hpc_info  :: !HpcInfo,        -- ^ Program coverage tick box information
         cg_modBreaks :: !ModBreaks       -- ^ Module breakpoints
@@ -1100,13 +1101,13 @@ appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
 
 Note [The interactive package]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Type and class declarations at the command prompt are treated as if
-they were defined in modules
+Type, class, and value declarations at the command prompt are treated 
+as if they were defined in modules
    interactive:Ghci1
    interactive:Ghci2
    ...etc...
 with each bunch of declarations using a new module, all sharing a
-common package 'interactive' (see Module.interactivePackageId, and
+common package 'interactive' (see Module.interactivePackageKey, and
 PrelNames.mkInteractiveModule).
 
 This scheme deals well with shadowing.  For example:
@@ -1138,7 +1139,7 @@ The details are a bit tricky though:
    extend the HPT.
 
  * The 'thisPackage' field of DynFlags is *not* set to 'interactive'.
-   It stays as 'main' (or whatever -package-name says), and is the
+   It stays as 'main' (or whatever -this-package-key says), and is the
    package to which :load'ed modules are added to.
 
  * So how do we arrange that declarations at the command prompt get
@@ -1148,14 +1149,15 @@ The details are a bit tricky though:
    turn get the module from it 'icInteractiveModule' field of the 
    interactive context.
 
-   The 'thisPackage' field stays as 'main' (or whatever -package-name says.
+   The 'thisPackage' field stays as 'main' (or whatever -this-package-key says.
 
  * The main trickiness is that the type environment (tcg_type_env and
-   fixity envt (tcg_fix_env) now contains entities from all the
-   GhciN modules together, rather than just a single module as is usually
-   the case.  So you can't use "nameIsLocalOrFrom" to decide whether
-   to look in the TcGblEnv vs the HPT/PTE.  This is a change, but not
-   a problem provided you know.
+   fixity envt (tcg_fix_env), and instances (tcg_insts, tcg_fam_insts)
+   now contains entities from all the interactive-package modules
+   (Ghci1, Ghci2, ...) together, rather than just a single module as
+   is usually the case.  So you can't use "nameIsLocalOrFrom" to
+   decide whether to look in the TcGblEnv vs the HPT/PTE.  This is a
+   change, but not a problem provided you know.
 
 
 Note [Interactively-bound Ids in GHCi]
@@ -1341,7 +1343,7 @@ extendInteractiveContext ictxt new_tythings
 setInteractivePackage :: HscEnv -> HscEnv
 -- Set the 'thisPackage' DynFlag to 'interactive'
 setInteractivePackage hsc_env
-   = hsc_env { hsc_dflags = (hsc_dflags hsc_env) { thisPackage = interactivePackageId } }
+   = hsc_env { hsc_dflags = (hsc_dflags hsc_env) { thisPackage = interactivePackageKey } }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}
@@ -1408,11 +1410,28 @@ exposed (say P2), so we use M.T for that, and P1:M.T for the other one.
 This is handled by the qual_mod component of PrintUnqualified, inside
 the (ppr mod) of case (3), in Name.pprModulePrefix
 
+Note [Printing package keys]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the old days, original names were tied to PackageIds, which directly
+corresponded to the entities that users wrote in Cabal files, and were perfectly
+suitable for printing when we need to disambiguate packages.  However, with
+PackageKey, the situation is different.  First, the key is not a human readable
+at all, so we need to consult the package database to find the appropriate
+PackageId to display.  Second, there may be multiple copies of a library visible
+with the same PackageId, in which case we need to disambiguate.  For now,
+we just emit the actual package key (which the user can go look up); however,
+another scheme is to (recursively) say which dependencies are different.
+
+NB: When we extend package keys to also have holes, we will have to disambiguate
+those as well.
+
 \begin{code}
 -- | Creates some functions that work out the best ways to format
--- names for the user according to a set of heuristics
+-- names for the user according to a set of heuristics.
 mkPrintUnqualified :: DynFlags -> GlobalRdrEnv -> PrintUnqualified
-mkPrintUnqualified dflags env = (qual_name, qual_mod)
+mkPrintUnqualified dflags env = QueryQualify qual_name
+                                             (mkQualModule dflags)
+                                             (mkQualPackage dflags)
   where
   qual_name mod occ
         | [gre] <- unqual_gres
@@ -1445,18 +1464,48 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
     -- "import M" would resolve unambiguously to P:M.  (if P is the
     -- current package we can just assume it is unqualified).
 
-  qual_mod mod
-     | modulePackageId mod == thisPackage dflags = False
+-- | Creates a function for formatting modules based on two heuristics:
+-- (1) if the module is the current module, don't qualify, and (2) if there
+-- is only one exposed package which exports this module, don't qualify.
+mkQualModule :: DynFlags -> QueryQualifyModule
+mkQualModule dflags mod
+     | modulePackageKey mod == thisPackage dflags = False
 
-     | [pkgconfig] <- [pkg | (pkg,exposed_module) <- lookup,
-                             exposed pkg && exposed_module],
-       packageConfigId pkgconfig == modulePackageId mod
+     | [(_, pkgconfig)] <- lookup,
+       packageConfigId pkgconfig == modulePackageKey mod
         -- this says: we are given a module P:M, is there just one exposed package
         -- that exposes a module M, and is it package P?
      = False
 
      | otherwise = True
      where lookup = lookupModuleInAllPackages dflags (moduleName mod)
+
+-- | Creates a function for formatting packages based on two heuristics:
+-- (1) don't qualify if the package in question is "main", and (2) only qualify
+-- with a package key if the package ID would be ambiguous.
+mkQualPackage :: DynFlags -> QueryQualifyPackage
+mkQualPackage dflags pkg_key
+     | pkg_key == mainPackageKey
+        -- Skip the lookup if it's main, since it won't be in the package
+        -- database!
+     = False
+     | searchPackageId dflags pkgid `lengthIs` 1
+        -- this says: we are given a package pkg-0.1@MMM, are there only one
+        -- exposed packages whose package ID is pkg-0.1?
+     = False
+     | otherwise
+     = True
+     where pkg = fromMaybe (pprPanic "qual_pkg" (ftext (packageKeyFS pkg_key)))
+                    (lookupPackage dflags pkg_key)
+           pkgid = sourcePackageId pkg
+
+-- | A function which only qualifies package names if necessary; but
+-- qualifies all other identifiers.
+pkgQual :: DynFlags -> PrintUnqualified
+pkgQual dflags = alwaysQualify {
+        queryQualifyPackage = mkQualPackage dflags
+    }
+
 \end{code}
 
 
@@ -1904,7 +1953,7 @@ data Dependencies
                         -- I.e. modules that this one imports, or that are in the
                         --      dep_mods of those directly-imported modules
 
-         , dep_pkgs   :: [(PackageId, Bool)]
+         , dep_pkgs   :: [(PackageKey, Bool)]
                         -- ^ All packages transitively below this module
                         -- I.e. packages to which this module's direct imports belong,
                         --      or that are in the dep_pkgs of those modules
@@ -2493,14 +2542,15 @@ trustInfoToNum it
             Sf_Unsafe       -> 1
             Sf_Trustworthy  -> 2
             Sf_Safe         -> 3
-            Sf_SafeInferred -> 4
 
 numToTrustInfo :: Word8 -> IfaceTrustInfo
 numToTrustInfo 0 = setSafeMode Sf_None
 numToTrustInfo 1 = setSafeMode Sf_Unsafe
 numToTrustInfo 2 = setSafeMode Sf_Trustworthy
 numToTrustInfo 3 = setSafeMode Sf_Safe
-numToTrustInfo 4 = setSafeMode Sf_SafeInferred
+numToTrustInfo 4 = setSafeMode Sf_Safe -- retained for backwards compat, used
+                                       -- to be Sf_SafeInfered but we no longer
+                                       -- differentiate.
 numToTrustInfo n = error $ "numToTrustInfo: bad input number! (" ++ show n ++ ")"
 
 instance Outputable IfaceTrustInfo where
@@ -2508,7 +2558,6 @@ instance Outputable IfaceTrustInfo where
     ppr (TrustInfo Sf_Unsafe)        = ptext $ sLit "unsafe"
     ppr (TrustInfo Sf_Trustworthy)   = ptext $ sLit "trustworthy"
     ppr (TrustInfo Sf_Safe)          = ptext $ sLit "safe"
-    ppr (TrustInfo Sf_SafeInferred)  = ptext $ sLit "safe-inferred"
 
 instance Binary IfaceTrustInfo where
     put_ bh iftrust = putByte bh $ trustInfoToNum iftrust

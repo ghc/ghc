@@ -207,7 +207,8 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
        ; binder_ty <- applySubstTy binder_ty
        ; checkTys binder_ty ty (mkRhsMsg binder (ptext (sLit "RHS")) ty)
 
-        -- Check (not isUnLiftedType) (also checks for bogus unboxed tuples)
+        -- Check the let/app invariant
+        -- See Note [CoreSyn let/app invariant] in CoreSyn
        ; checkL (not (isUnLiftedType binder_ty)
             || (isNonRec rec_flag && exprOkForSpeculation rhs))
            (mkRhsPrimMsg binder rhs)
@@ -220,6 +221,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
         -- Check that if the binder is local, it is not marked as exported
        ; checkL (not (isExportedId binder) || isTopLevel top_lvl_flag)
            (mkNonTopExportedMsg binder)
+
         -- Check that if the binder is local, it does not have an external name
        ; checkL (not (isExternalName (Var.varName binder)) || isTopLevel top_lvl_flag)
            (mkNonTopExternalNameMsg binder)
@@ -451,6 +453,8 @@ lintCoreArg fun_ty (Type arg_ty)
 
 lintCoreArg fun_ty arg
   = do { arg_ty <- lintCoreExpr arg
+       ; checkL (not (isUnLiftedType arg_ty) || exprOkForSpeculation arg)
+                (mkLetAppMsg arg)
        ; lintValApp arg fun_ty arg_ty }
 
 -----------------
@@ -1390,6 +1394,11 @@ mkRhsMsg binder what ty
             ppr binder],
      hsep [ptext (sLit "Binder's type:"), ppr (idType binder)],
      hsep [ptext (sLit "Rhs type:"), ppr ty]]
+
+mkLetAppMsg :: CoreExpr -> MsgDoc
+mkLetAppMsg e
+  = hang (ptext (sLit "This argument does not satisfy the let/app invariant:"))
+       2 (ppr e)
 
 mkRhsPrimMsg :: Id -> CoreExpr -> MsgDoc
 mkRhsPrimMsg binder _rhs

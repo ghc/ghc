@@ -168,9 +168,10 @@ data IfaceClassOp = IfaceClassOp IfaceTopBndr DefMethSpec IfaceType
         -- Just False => ordinary polymorphic default method
         -- Just True  => generic default method
 
-data IfaceAT = IfaceAT
-                  IfaceDecl        -- The associated type declaration
-                  [IfaceAxBranch]  -- Default associated type instances, if any
+data IfaceAT = IfaceAT  -- See Class.ClassATItem
+                  IfaceDecl          -- The associated type declaration
+                  (Maybe IfaceType)  -- Default associated type instance, if any
+
 
 -- This is just like CoAxBranch
 data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars  :: [IfaceTvBndr]
@@ -839,12 +840,12 @@ instance Outputable IfaceAT where
    ppr = pprIfaceAT showAll
 
 pprIfaceAT :: ShowSub -> IfaceAT -> SDoc
-pprIfaceAT ss (IfaceAT d defs)
+pprIfaceAT ss (IfaceAT d mb_def)
   = vcat [ pprIfaceDecl ss d
-         , ppUnless (null defs) $ nest 2 $
-           ptext (sLit "Defaults:") <+> vcat (map (pprAxBranch pp_tc) defs) ]
-  where
-    pp_tc = ppr (ifName d)
+         , case mb_def of
+              Nothing  -> empty
+              Just rhs -> nest 2 $
+                          ptext (sLit "Default:") <+> ppr rhs ]
 
 instance Outputable IfaceTyConParent where
   ppr p = pprIfaceTyConParent p
@@ -1174,9 +1175,11 @@ freeNamesIfContext :: IfaceContext -> NameSet
 freeNamesIfContext = fnList freeNamesIfType
 
 freeNamesIfAT :: IfaceAT -> NameSet
-freeNamesIfAT (IfaceAT decl defs)
+freeNamesIfAT (IfaceAT decl mb_def)
   = freeNamesIfDecl decl &&&
-    fnList freeNamesIfAxBranch defs
+    case mb_def of
+      Nothing  -> emptyNameSet
+      Just rhs -> freeNamesIfType rhs
 
 freeNamesIfClsSig :: IfaceClassOp -> NameSet
 freeNamesIfClsSig (IfaceClassOp _n _dm ty) = freeNamesIfType ty

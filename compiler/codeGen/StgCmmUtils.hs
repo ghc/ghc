@@ -175,10 +175,10 @@ tagToClosure dflags tycon tag
 --
 -------------------------------------------------------------------------
 
-emitRtsCall :: PackageId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
+emitRtsCall :: PackageKey -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCall pkg fun args safe = emitRtsCallGen [] (mkCmmCodeLabel pkg fun) args safe
 
-emitRtsCallWithResult :: LocalReg -> ForeignHint -> PackageId -> FastString
+emitRtsCallWithResult :: LocalReg -> ForeignHint -> PackageKey -> FastString
         -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCallWithResult res hint pkg fun args safe
    = emitRtsCallGen [(res,hint)] (mkCmmCodeLabel pkg fun) args safe
