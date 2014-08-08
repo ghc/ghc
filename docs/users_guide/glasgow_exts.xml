@@ -5025,38 +5025,30 @@ In general, as discussed in <xref linkend="instance-resolution"/>,
 <emphasis>GHC requires that it be unambiguous which instance
 declaration
 should be used to resolve a type-class constraint</emphasis>.
-This behaviour
-can be modified by two flags: <option>-XOverlappingInstances</option>
+GHC also provides a way to to loosen
+the instance resolution, by
+allowing more than one instance to match, <emphasis>provided there is a most
+specific one</emphasis>.  Moreover, it can be loosened further, by allowing more than one instance to match
+irespective of whether there is a most specific one.
+This section gives the details.
+</para>
+<para>
+To control the choice of instance, it is possible to specify the overlap behavior for individual
+instances with a pragma, written immediately after the
+<literal>instance</literal> keyword.  The pragma may be one of:
+<literal>{-# OVERLAPPING #-}</literal>,
+<literal>{-# OVERLAPPABLE #-}</literal>,
+<literal>{-# OVERLAPS #-}</literal>,
+or <literal>{-# INCOHERENT #-}</literal>.
+</para>
+<para>
+The matching behaviour is also influenced by two module-level language extension flags: <option>-XOverlappingInstances</option>
 <indexterm><primary>-XOverlappingInstances
 </primary></indexterm>
 and <option>-XIncoherentInstances</option>
 <indexterm><primary>-XIncoherentInstances
-</primary></indexterm>, as this section discusses.  Both these
-flags are dynamic flags, and can be set on a per-module basis, using
-an <literal>LANGUAGE</literal> pragma if desired (<xref linkend="language-pragma"/>).</para>
-
-<para>
-In addition, it is possible to specify the overlap behavior for individual
-instances with a pragma, written immediately after the
-<literal>instance</literal> keyword.  The pragma may be one of:
-<literal>OVERLAPPING</literal>,
-<literal>OVERLAPPABLE</literal>,
-<literal>OVERLAPS</literal>,
-or <literal>INCOHERENT</literal>.  An explicit pragma on an instance
-takes precedence over the default specified with a flag or
-a <literal>LANGUAGE</literal> pragma.
-</para>
-
-
-<para>
-The <option>-XOverlappingInstances</option> flag instructs GHC to loosen
-the instance resolution described in <xref linkend="instance-resolution"/>, by
-allowing more than one instance to match, <emphasis>provided there is a most
-specific one</emphasis>. The <option>-XIncoherentInstances</option> flag
-further loosens the resolution, by allowing more than one instance to match,
-irespective of whether there is a most specific one.
-The <option>-XIncoherentInstances</option> flag implies the
-<option>-XOverlappingInstances</option> flag, but not vice versa.
+</primary></indexterm>.   These flags are now deprecated (since GHC 7.10) in favour of
+the fine-grained per-instance pragmas.
 </para>
 
 <para>
@@ -5064,15 +5056,13 @@ A more precise specification is as follows.
 The willingness to be overlapped or incoherent is a property of
 the <emphasis>instance declaration</emphasis> itself, controlled as follows:
 <itemizedlist>
-<listitem><para>An instance is <emphasis>incoherent</emphasis> if it has an <literal>INCOHERENT</literal> pragma, or if it appears in a module compiled with <literal>-XIncoherentInstances</literal>.
+<listitem><para>An instance is <emphasis>incoherent</emphasis> if: it has an <literal>INCOHERENT</literal> pragma; or if the instance has no pragma and it appears in a module compiled with <literal>-XIncoherentInstances</literal>.
 </para></listitem>
-<listitem><para>An instance is <emphasis>overlappable</emphasis> if it has an <literal>OVERLAPPABLE</literal> or <literal>OVERLAPS</literal> pragma, or if it appears in a module compiled with <literal>-XOverlappingInstances</literal>, or if the instance is incoherent.
+<listitem><para>An instance is <emphasis>overlappable</emphasis> if: it has an <literal>OVERLAPPABLE</literal> or <literal>OVERLAPS</literal> pragma; or if the instance has no pragma and it appears in a module compiled with <literal>-XOverlappingInstances</literal>; or if the instance is incoherent.
 </para></listitem>
-<listitem><para>An instance is <emphasis>overlapping</emphasis> if it has an <literal>OVERLAPPING</literal> or <literal>OVERLAPS</literal> pragma, or if it appears in a module compiled with <literal>-XOverlappingInstances</literal>, or if the instance is incoherent.
+<listitem><para>An instance is <emphasis>overlapping</emphasis> if: it has an <literal>OVERLAPPING</literal> or <literal>OVERLAPS</literal> pragma; or if the instance has no pragma and it appears in a module compiled with <literal>-XOverlappingInstances</literal>; or if the instance is incoherent.
 </para></listitem>
 </itemizedlist>
-The <option>-XOverlappingInstances</option> language extension is now deprecated in favour
-per-instance pragmas.
 </para>
 
 <para>
@@ -5087,13 +5077,6 @@ instance declarations are the <emphasis>candidates</emphasis>.
 </para></listitem>
 
 <listitem><para>
-Find all <emphasis>non-candidate</emphasis> instances 
-that <emphasis>unify</emphasis> with the target constraint.
-Such non-candidates instances might match when the target constraint is further
-instantiated.  If all of them are incoherent, proceed; if not, the search fails.
-</para></listitem>
-
-<listitem><para>
 Eliminate any candidate IX for which both of the following hold:
 
 <itemizedlist>
@@ -5101,22 +5084,37 @@ Eliminate any candidate IX for which both of the following hold:
     that is, IY is a substitution instance of IX but not vice versa.
   </para></listitem>
   <listitem><para>
-  Either IX is <emphasis>overlappable</emphasis> or IY is
-  <emphasis>overlapping</emphasis>.
+  Either IX is <emphasis>overlappable</emphasis>, or IY is
+  <emphasis>overlapping</emphasis>.  (This "either/or" design, rather than a "both/and" design,
+  allow a client to deliberately override an instance from a library, without requiring a change to the library.)
   </para></listitem>
   </itemizedlist>
 </para>
 </listitem>
 
 <listitem><para>
-If exactly one non-incoherent candidate remains, pick it.  If all
-remaining candidates are incoherent, pick an arbitary
-one. Otherwise fail.
+If exactly one non-incoherent candidate remains, select it.  If all
+remaining candidates are incoherent, select an arbitary
+one. Otherwise the search fails (i.e. when more than one surviving candidate is not incoherent).
+</para></listitem>
+
+<listitem><para>
+If the selected candidate (from the previous step) is incoherent, the search succeeds, returning that candidate.
+</para></listitem>
+
+<listitem><para>
+If not, find all instances that <emphasis>unify</emphasis> with the target
+constraint, but do not <emphasis>match</emphasis> it.
+Such non-candidate instances might match when the target constraint is further
+instantiated.  If all of them are incoherent, the search succeeds, returning the selected candidate;
+if not, the search fails.
 </para></listitem>
 
 </itemizedlist>
+Notice that these rules are not influenced by flag settings in the client module, where
+the instances are <emphasis>used</emphasis>.
 These rules make it possible for a library author to design a library that relies on
-overlapping instances without the library client having to know.
+overlapping instances without the client having to know.
 </para>
 <para>
 Errors are reported <emphasis>lazily</emphasis> (when attempting to solve a constraint), rather than <emphasis>eagerly</emphasis> 

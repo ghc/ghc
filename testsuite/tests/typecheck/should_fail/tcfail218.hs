@@ -1,12 +1,22 @@
-{-# LANGUAGE IncoherentInstances, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 
-import Tcfail218_Help
+module Tcfail218 where
 
-instance C [a] b where foo = undefined
-instance C a Int where foo = undefined
+class C a b where foo :: (a,b)
 
--- Should fail, as a more specific, unifying but not matching, non-incoherent instance exists.
-x :: ([a],b)
+instance                    C [Int] Bool where foo = undefined
+instance                    C [a]   b   where foo = undefined
+instance {-# INCOHERENT #-} C a     Int where foo = undefined
+
+
+x :: ([a],Bool)
+-- Needs C [a] b.
+-- Should fail, as a more specific, unifying but not matching
+-- non-incoherent instance exists, namely C [Int] Bool
 x = foo
 
-main = return ()
+-- Needs C [a] Int.
+-- Should succeed, because two instances match, but one is incoherent
+y :: ([a],Int)
+y = foo
+
