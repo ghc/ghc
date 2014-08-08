@@ -25,7 +25,7 @@ library
     bytestring,
     deepseq
 
-  hs-source-dirs:       src, vendor/attoparsec-0.10.4.0
+  hs-source-dirs:       src, vendor/attoparsec-0.12.1.1
   ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
 
   exposed-modules:
