@@ -33,7 +33,7 @@ test('haddock.base',
             # 2014-01-22: 62189068 (x86/Linux)
             # 2014-06-29: 58243640 (x86/Linux)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 7992757384,  5)
+          [(wordsize(64), 7946284944,  5)
             # 2012-08-14: 5920822352 (amd64/Linux)
             # 2012-09-20: 5829972376 (amd64/Linux)
             # 2012-10-08: 5902601224 (amd64/Linux)
@@ -45,6 +45,7 @@ test('haddock.base',
             # 2014-01-12: 7128342344 (x86_64/Linux)
             # 2014-06-12: 7498123680 (x86_64/Linux)
             # 2014-08-05: 7992757384 (x86_64/Linux - bugfix for #314, Haddock now parses more URLs)
+            # 2014-08-08: 7946284944 (x86_64/Linux - Haddock updates to attoparsec-0.12.1.0)
           ,(platform('i386-unknown-mingw32'), 3548581572, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
             # 2013-11-13:                     3097751052 (x86/Windows, 64bit machine)
