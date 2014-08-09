@@ -17,7 +17,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Classes where
 
 -- GHC.Magic is used in some derived instances
