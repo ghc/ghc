@@ -180,6 +180,7 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/codeGen/should_run/T8103
 /tests/codeGen/should_run/T8256
 /tests/codeGen/should_run/T9001
+/tests/codeGen/should_run/T9013
 /tests/codeGen/should_run/Word2Float64
 /tests/codeGen/should_run/cgrun001
 /tests/codeGen/should_run/cgrun002
