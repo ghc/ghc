@@ -163,7 +163,7 @@ data (~) a b = Eq# ((~#) a b)
 data Coercible a b = MkCoercible ((~#) a b)
 -- Also see Note [Kind-changing of (~) and Coercible]
 
--- | Alias for tagToEnum#. Returns True of its parameter is 1# and False
+-- | Alias for 'tagToEnum#'. Returns True if its parameter is 1# and False
 --   if it is 0#.
 
 {-# INLINE isTrue# #-}
@@ -225,7 +225,7 @@ isTrue# x = tagToEnum# x
 -- you're reading this in 2023 then things went wrong). See #8326.
 --
 
--- | SPEC is used by GHC in the @SpecConstr@ pass in order to inform
+-- | 'SPEC' is used by GHC in the @SpecConstr@ pass in order to inform
 -- the compiler when to be particularly aggressive. In particular, it
 -- tells GHC to specialize regardless of size or the number of
 -- specializations. However, not all loops fall into this category.
