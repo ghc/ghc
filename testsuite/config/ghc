@@ -160,6 +160,10 @@ opt_ways = map (lambda x: x[0], \
                  filter(lambda x: '-O' in x[1], \
                         config.way_flags('dummy_name').items()))
 
+llvm_ways = map (lambda x: x[0], \
+                 filter(lambda x: '-fllvm' in x[1], \
+                        config.way_flags('dummy_name').items()))
+
 def get_compiler_info():
 # This should really not go through the shell
     h = os.popen('"' + config.compiler + '" --info', 'r')
