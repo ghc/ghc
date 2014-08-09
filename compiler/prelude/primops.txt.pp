@@ -247,13 +247,19 @@ primop   NotIOp   "notI#"   Monadic   Int# -> Int#
 
 primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-	 {Add with carry.  First member of result is (wrapped) sum;
-          second member is 0 iff no overflow occured.}
+         {Add signed integers reporting overflow.
+          First member of result is the sum truncated to an {\tt Int#};
+          second member is zero if the true sum fits in an {\tt Int#},
+          nonzero if overflow occurred (the sum is either too large
+          or too small to fit in an {\tt Int#}).}
    with code_size = 2
 
 primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-	 {Subtract with carry.  First member of result is (wrapped) difference;
-          second member is 0 iff no overflow occured.}
+         {Subtract signed integers reporting overflow.
+          First member of result is the difference truncated to an {\tt Int#};
+          second member is zero if the true difference fits in an {\tt Int#},
+          nonzero if overflow occurred (the difference is either too large
+          or too small to fit in an {\tt Int#}).}
    with code_size = 2
 
 primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Int#
