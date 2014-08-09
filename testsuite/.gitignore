@@ -1009,6 +1009,7 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/numeric/should_run/3676
 /tests/numeric/should_run/4381
 /tests/numeric/should_run/4383
+/tests/numeric/should_run/CarryOverflow
 /tests/numeric/should_run/NumDecimals
 /tests/numeric/should_run/T3676
 /tests/numeric/should_run/T4381
