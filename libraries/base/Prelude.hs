@@ -163,6 +163,13 @@ f $! x  = let !vx = x in f vx  -- see #2273
 -- | The value of @'seq' a b@ is bottom if @a@ is bottom, and otherwise
 -- equal to @b@.  'seq' is usually introduced to improve performance by
 -- avoiding unneeded laziness.
+--
+-- A note on evaluation order: the expression @seq a b@ does /not/ guarantee
+-- that @a@ will be evaluated before @b@. The only guarantee given by @seq@ is
+-- that the both @a@ and @b@ will be evaluated before @seq@ returns a value. In
+-- particular, this means that @b@ may be evaluated before @a@. If you need to
+-- guarantee a specific order of evaluation, you must use the function @pseq@
+-- from the parallel package.
 seq :: a -> b -> b
 seq _ y = y
 #endif
