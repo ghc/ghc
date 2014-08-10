@@ -1863,15 +1863,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] =
   where
     size = intSize width
 
-genCCall _ is32Bit target dest_regs args
- | is32Bit   = genCCall32 target dest_regs args
- | otherwise = genCCall64 target dest_regs args
-
-genCCall32 :: ForeignTarget            -- function to call
-           -> [CmmFormal]        -- where to put the result
-           -> [CmmActual]        -- arguments (of mixed type)
-           -> NatM InstrBlock
-genCCall32 target dest_regs args = do
+genCCall _ is32Bit target dest_regs args = do
   dflags <- getDynFlags
   let platform = targetPlatform dflags
   case (target, dest_regs) of
@@ -1879,7 +1871,9 @@ genCCall32 target dest_regs args = do
     (PrimTarget op, []) ->
         outOfLineCmmOp op Nothing args
     -- we only cope with a single result for foreign calls
-    (PrimTarget op, [r]) -> do
+    (PrimTarget op, [r])
+      | not is32Bit -> outOfLineCmmOp op (Just r) args
+      | otherwise -> do
         l1 <- getNewLabelNat
         l2 <- getNewLabelNat
         sse2 <- sse2Enabled
@@ -1908,7 +1902,7 @@ genCCall32 target dest_regs args = do
                    return (any (getRegisterReg platform False (CmmLocal r)))
 
         actuallyInlineFloatOp _ _ args
-              = panic $ "genCCall32.actuallyInlineFloatOp: bad number of arguments! ("
+              = panic $ "genCCall.actuallyInlineFloatOp: bad number of arguments! ("
                       ++ show (length args) ++ ")"
 
     (PrimTarget (MO_S_QuotRem  width), _) -> divOp1 platform True  width dest_regs args
@@ -1926,7 +1920,7 @@ genCCall32 target dest_regs args = do
                           lCode reg_l `snocOL`
                           ADC size (OpImm (ImmInteger 0)) (OpReg reg_h)
                return code
-        _ -> panic "genCCall32: Wrong number of arguments/results for add2"
+        _ -> panic "genCCall: Wrong number of arguments/results for add2"
     (PrimTarget (MO_U_Mul2 width), [res_h, res_l]) ->
         case args of
         [arg_x, arg_y] ->
@@ -1941,18 +1935,20 @@ genCCall32 target dest_regs args = do
                                 MOV size (OpReg rdx) (OpReg reg_h),
                                 MOV size (OpReg rax) (OpReg reg_l)]
                return code
-        _ -> panic "genCCall32: Wrong number of arguments/results for add2"
+        _ -> panic "genCCall: Wrong number of arguments/results for add2"
 
-    _ -> genCCall32' dflags target dest_regs args
+    _ -> if is32Bit
+         then genCCall32' dflags target dest_regs args
+         else genCCall64' dflags target dest_regs args
 
   where divOp1 platform signed width results [arg_x, arg_y]
             = divOp platform signed width results Nothing arg_x arg_y
         divOp1 _ _ _ _ _
-            = panic "genCCall32: Wrong number of arguments for divOp1"
+            = panic "genCCall: Wrong number of arguments for divOp1"
         divOp2 platform signed width results [arg_x_high, arg_x_low, arg_y]
             = divOp platform signed width results (Just arg_x_high) arg_x_low arg_y
         divOp2 _ _ _ _ _
-            = panic "genCCall64: Wrong number of arguments for divOp2"
+            = panic "genCCall: Wrong number of arguments for divOp2"
         divOp platform signed width [res_q, res_r]
               m_arg_x_high arg_x_low arg_y
             = do let size = intSize width
@@ -1976,7 +1972,7 @@ genCCall32 target dest_regs args = do
                                 MOV size (OpReg rax) (OpReg reg_q),
                                 MOV size (OpReg rdx) (OpReg reg_r)]
         divOp _ _ _ _ _ _ _
-            = panic "genCCall32: Wrong number of results for divOp"
+            = panic "genCCall: Wrong number of results for divOp"
 
 genCCall32' :: DynFlags
             -> ForeignTarget            -- function to call
@@ -2130,90 +2126,6 @@ genCCall32' dflags target dest_regs args = do
           where
              arg_ty = cmmExprType dflags arg
              size = arg_size arg_ty -- Byte size
-
-genCCall64 :: ForeignTarget            -- function to call
-           -> [CmmFormal]        -- where to put the result
-           -> [CmmActual]        -- arguments (of mixed type)
-           -> NatM InstrBlock
-genCCall64 target dest_regs args = do
-  dflags <- getDynFlags
-  let platform = targetPlatform dflags
-  case (target, dest_regs) of
-
-    (PrimTarget op, []) ->
-        -- void return type prim op
-        outOfLineCmmOp op Nothing args
-
-    (PrimTarget op, [res]) ->
-        -- we only cope with a single result for foreign calls
-        outOfLineCmmOp op (Just res) args
-
-    (PrimTarget (MO_S_QuotRem  width), _) -> divOp1 platform True  width dest_regs args
-    (PrimTarget (MO_U_QuotRem  width), _) -> divOp1 platform False width dest_regs args
-    (PrimTarget (MO_U_QuotRem2 width), _) -> divOp2 platform False width dest_regs args
-    (PrimTarget (MO_Add2 width), [res_h, res_l]) ->
-        case args of
-        [arg_x, arg_y] ->
-            do hCode <- getAnyReg (CmmLit (CmmInt 0 width))
-               lCode <- getAnyReg (CmmMachOp (MO_Add width) [arg_x, arg_y])
-               let size = intSize width
-                   reg_l = getRegisterReg platform True (CmmLocal res_l)
-                   reg_h = getRegisterReg platform True (CmmLocal res_h)
-                   code = hCode reg_h `appOL`
-                          lCode reg_l `snocOL`
-                          ADC size (OpImm (ImmInteger 0)) (OpReg reg_h)
-               return code
-        _ -> panic "genCCall64: Wrong number of arguments/results for add2"
-    (PrimTarget (MO_U_Mul2 width), [res_h, res_l]) ->
-        case args of
-        [arg_x, arg_y] ->
-            do (y_reg, y_code) <- getRegOrMem arg_y
-               x_code <- getAnyReg arg_x
-               let size = intSize width
-                   reg_h = getRegisterReg platform True (CmmLocal res_h)
-                   reg_l = getRegisterReg platform True (CmmLocal res_l)
-                   code = y_code `appOL`
-                          x_code rax `appOL`
-                          toOL [MUL2 size y_reg,
-                                MOV size (OpReg rdx) (OpReg reg_h),
-                                MOV size (OpReg rax) (OpReg reg_l)]
-               return code
-        _ -> panic "genCCall64: Wrong number of arguments/results for add2"
-
-    _ ->
-        do dflags <- getDynFlags
-           genCCall64' dflags target dest_regs args
-
-  where divOp1 platform signed width results [arg_x, arg_y]
-            = divOp platform signed width results Nothing arg_x arg_y
-        divOp1 _ _ _ _ _
-            = panic "genCCall64: Wrong number of arguments for divOp1"
-        divOp2 platform signed width results [arg_x_high, arg_x_low, arg_y]
-            = divOp platform signed width results (Just arg_x_high) arg_x_low arg_y
-        divOp2 _ _ _ _ _
-            = panic "genCCall64: Wrong number of arguments for divOp2"
-        divOp platform signed width [res_q, res_r]
-              m_arg_x_high arg_x_low arg_y
-            = do let size = intSize width
-                     reg_q = getRegisterReg platform True (CmmLocal res_q)
-                     reg_r = getRegisterReg platform True (CmmLocal res_r)
-                     widen | signed    = CLTD size
-                           | otherwise = XOR size (OpReg rdx) (OpReg rdx)
-                     instr | signed    = IDIV
-                           | otherwise = DIV
-                 (y_reg, y_code) <- getRegOrMem arg_y
-                 x_low_code <- getAnyReg arg_x_low
-                 x_high_code <- case m_arg_x_high of
-                                Just arg_x_high -> getAnyReg arg_x_high
-                                Nothing -> return $ const $ unitOL widen
-                 return $ y_code `appOL`
-                          x_low_code rax `appOL`
-                          x_high_code rdx `appOL`
-                          toOL [instr size y_reg,
-                                MOV size (OpReg rax) (OpReg reg_q),
-                                MOV size (OpReg rdx) (OpReg reg_r)]
-        divOp _ _ _ _ _ _ _
-            = panic "genCCall64: Wrong number of results for divOp"
 
 genCCall64' :: DynFlags
             -> ForeignTarget            -- function to call
