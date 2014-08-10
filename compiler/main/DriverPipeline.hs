@@ -1872,7 +1872,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
             let os = platformOS (targetPlatform dflags)
             in if os == OSOsf3 then ["-lpthread", "-lexc"]
                else if os `elem` [OSMinGW32, OSFreeBSD, OSOpenBSD,
-                                  OSNetBSD, OSHaiku, OSQNXNTO, OSiOS]
+                                  OSNetBSD, OSHaiku, OSQNXNTO, OSiOS, OSDarwin]
                then []
                else ["-lpthread"]
          | otherwise               = []
