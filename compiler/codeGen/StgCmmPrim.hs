@@ -250,63 +250,6 @@ emitPrimOp :: DynFlags
 -- First we handle various awkward cases specially.  The remaining
 -- easy cases are then handled by translateOp, defined below.
 
-emitPrimOp dflags [res_r,res_c] IntAddCOp [aa,bb]
-{-
-   With some bit-twiddling, we can define int{Add,Sub}Czh portably in
-   C, and without needing any comparisons.  This may not be the
-   fastest way to do it - if you have better code, please send it! --SDM
-
-   Return : r = a + b,  c = 0 if no overflow, 1 on overflow.
-
-   We currently don't make use of the r value if c is != 0 (i.e.
-   overflow), we just convert to big integers and try again.  This
-   could be improved by making r and c the correct values for
-   plugging into a new J#.
-
-   { r = ((I_)(a)) + ((I_)(b));                                 \
-     c = ((StgWord)(~(((I_)(a))^((I_)(b))) & (((I_)(a))^r)))    \
-         >> (BITS_IN (I_) - 1);                                 \
-   }
-   Wading through the mass of bracketry, it seems to reduce to:
-   c = ( (~(a^b)) & (a^r) ) >>unsigned (BITS_IN(I_)-1)
-
--}
-   = emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd dflags) [aa,bb]),
-        mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr dflags) [
-                CmmMachOp (mo_wordAnd dflags) [
-                    CmmMachOp (mo_wordNot dflags) [CmmMachOp (mo_wordXor dflags) [aa,bb]],
-                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
-                ],
-                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
-          ]
-     ]
-
-
-emitPrimOp dflags [res_r,res_c] IntSubCOp [aa,bb]
-{- Similarly:
-   #define subIntCzh(r,c,a,b)                                   \
-   { r = ((I_)(a)) - ((I_)(b));                                 \
-     c = ((StgWord)((((I_)(a))^((I_)(b))) & (((I_)(a))^r)))     \
-         >> (BITS_IN (I_) - 1);                                 \
-   }
-
-   c =  ((a^b) & (a^r)) >>unsigned (BITS_IN(I_)-1)
--}
-   = emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub dflags) [aa,bb]),
-        mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr dflags) [
-                CmmMachOp (mo_wordAnd dflags) [
-                    CmmMachOp (mo_wordXor dflags) [aa,bb],
-                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
-                ],
-                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
-          ]
-     ]
-
-
 emitPrimOp _ [res] ParOp [arg]
   =
         -- for now, just implement this in a C function
@@ -828,6 +771,10 @@ callishPrimOpSupported dflags op
       WordAdd2Op     | ncg && x86ish  -> Left (MO_Add2       (wordWidth dflags))
                      | otherwise      -> Right genericWordAdd2Op
 
+      IntAddCOp                       -> Right genericIntAddCOp
+
+      IntSubCOp                       -> Right genericIntSubCOp
+
       WordMul2Op     | ncg && x86ish  -> Left (MO_U_Mul2     (wordWidth dflags))
                      | otherwise      -> Right genericWordMul2Op
 
@@ -932,6 +879,67 @@ genericWordAdd2Op [res_h, res_l] [arg_x, arg_y]
                (or (toTopHalf (CmmReg (CmmLocal r2)))
                    (bottomHalf (CmmReg (CmmLocal r1))))]
 genericWordAdd2Op _ _ = panic "genericWordAdd2Op"
+
+genericIntAddCOp :: GenericOp
+genericIntAddCOp [res_r, res_c] [aa, bb]
+{-
+   With some bit-twiddling, we can define int{Add,Sub}Czh portably in
+   C, and without needing any comparisons.  This may not be the
+   fastest way to do it - if you have better code, please send it! --SDM
+
+   Return : r = a + b,  c = 0 if no overflow, 1 on overflow.
+
+   We currently don't make use of the r value if c is != 0 (i.e.
+   overflow), we just convert to big integers and try again.  This
+   could be improved by making r and c the correct values for
+   plugging into a new J#.
+
+   { r = ((I_)(a)) + ((I_)(b));                                 \
+     c = ((StgWord)(~(((I_)(a))^((I_)(b))) & (((I_)(a))^r)))    \
+         >> (BITS_IN (I_) - 1);                                 \
+   }
+   Wading through the mass of bracketry, it seems to reduce to:
+   c = ( (~(a^b)) & (a^r) ) >>unsigned (BITS_IN(I_)-1)
+
+-}
+ = do dflags <- getDynFlags
+      emit $ catAGraphs [
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd dflags) [aa,bb]),
+        mkAssign (CmmLocal res_c) $
+          CmmMachOp (mo_wordUShr dflags) [
+                CmmMachOp (mo_wordAnd dflags) [
+                    CmmMachOp (mo_wordNot dflags) [CmmMachOp (mo_wordXor dflags) [aa,bb]],
+                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
+                ],
+                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
+          ]
+        ]
+genericIntAddCOp _ _ = panic "genericIntAddCOp"
+
+genericIntSubCOp :: GenericOp
+genericIntSubCOp [res_r, res_c] [aa, bb]
+{- Similarly:
+   #define subIntCzh(r,c,a,b)                                   \
+   { r = ((I_)(a)) - ((I_)(b));                                 \
+     c = ((StgWord)((((I_)(a))^((I_)(b))) & (((I_)(a))^r)))     \
+         >> (BITS_IN (I_) - 1);                                 \
+   }
+
+   c =  ((a^b) & (a^r)) >>unsigned (BITS_IN(I_)-1)
+-}
+ = do dflags <- getDynFlags
+      emit $ catAGraphs [
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub dflags) [aa,bb]),
+        mkAssign (CmmLocal res_c) $
+          CmmMachOp (mo_wordUShr dflags) [
+                CmmMachOp (mo_wordAnd dflags) [
+                    CmmMachOp (mo_wordXor dflags) [aa,bb],
+                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
+                ],
+                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
+          ]
+        ]
+genericIntSubCOp _ _ = panic "genericIntSubCOp"
 
 genericWordMul2Op :: GenericOp
 genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
