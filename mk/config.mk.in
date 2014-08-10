@@ -791,7 +791,7 @@ HSCOLOUR_SRCS = YES
 endif
 
 # Build DPH?
-BUILD_DPH = YES
+BUILD_DPH = NO
 
 ################################################################################
 #
