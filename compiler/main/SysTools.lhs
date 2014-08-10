@@ -809,10 +809,10 @@ getCompilerInfo' dflags = do
             )
             (\err -> do
                 debugTraceMsg dflags 2
-                    (text "Error (figuring out compiler information):" <+>
+                    (text "Error (figuring out C compiler information):" <+>
                      text (show err))
                 errorMsg dflags $ hang (text "Warning:") 9 $
-                  text "Couldn't figure out linker information!" $$
+                  text "Couldn't figure out C compiler information!" $$
                   text "Make sure you're using GNU gcc, or clang"
                 return UnknownCC)
   return info
