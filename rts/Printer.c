@@ -33,10 +33,7 @@ static void    insert        ( StgWord value, const char *name );
 #endif
 #if 0 /* unused but might be useful sometime */
 static rtsBool lookup_name   ( char *name, StgWord *result );
-static void    enZcode       ( char *in, char *out );
 #endif
-static char    unZcode       ( char ch );
-static void    printZcoded   ( const char *raw );
 
 /* --------------------------------------------------------------------------
  * Printer
@@ -47,7 +44,8 @@ void printPtr( StgPtr p )
     const char *raw;
     raw = lookupGHCName(p);
     if (raw != NULL) {
-        printZcoded(raw);
+        debugBelch("<%s>", raw);
+        debugBelch("[%p]", p);
     } else {
         debugBelch("%p", p);
     }
@@ -646,134 +644,6 @@ static rtsBool lookup_name( char *name, StgWord *result )
 }
 #endif
 
-/* Code from somewhere inside GHC (circa 1994)
- * * Z-escapes:
- *     "std"++xs -> "Zstd"++xs
- *     char_to_c 'Z'  = "ZZ"
- *     char_to_c '&'  = "Za"
- *     char_to_c '|'  = "Zb"
- *     char_to_c ':'  = "Zc"
- *     char_to_c '/'  = "Zd"
- *     char_to_c '='  = "Ze"
- *     char_to_c '>'  = "Zg"
- *     char_to_c '#'  = "Zh"
- *     char_to_c '<'  = "Zl"
- *     char_to_c '-'  = "Zm"
- *     char_to_c '!'  = "Zn"
- *     char_to_c '.'  = "Zo"
- *     char_to_c '+'  = "Zp"
- *     char_to_c '\'' = "Zq"
- *     char_to_c '*'  = "Zt"
- *     char_to_c '_'  = "Zu"
- *     char_to_c c    = "Z" ++ show (ord c)
- */
-static char unZcode( char ch )
-{
-    switch (ch) {
-    case 'a'  : return ('&');
-    case 'b'  : return ('|');
-    case 'c'  : return (':');
-    case 'd'  : return ('/');
-    case 'e'  : return ('=');
-    case 'g'  : return ('>');
-    case 'h'  : return ('#');
-    case 'l'  : return ('<');
-    case 'm'  : return ('-');
-    case 'n'  : return ('!');
-    case 'o'  : return ('.');
-    case 'p'  : return ('+');
-    case 'q'  : return ('\'');
-    case 't'  : return ('*');
-    case 'u'  : return ('_');
-    case 'Z'  :
-    case '\0' : return ('Z');
-    default   : return (ch);
-    }
-}
-
-#if 0
-/* Precondition: out big enough to handle output (about twice length of in) */
-static void enZcode( char *in, char *out )
-{
-    int i, j;
-
-    j = 0;
-    out[ j++ ] = '_';
-    for( i = 0; in[i] != '\0'; ++i ) {
-        switch (in[i]) {
-        case 'Z'  : 
-                out[j++] = 'Z';
-                out[j++] = 'Z';
-                break;
-        case '&'  : 
-                out[j++] = 'Z';
-                out[j++] = 'a';
-                break;
-        case '|'  : 
-                out[j++] = 'Z';
-                out[j++] = 'b';
-                break;
-        case ':'  : 
-                out[j++] = 'Z';
-                out[j++] = 'c';
-                break;
-        case '/'  : 
-                out[j++] = 'Z';
-                out[j++] = 'd';
-                break;
-        case '='  : 
-                out[j++] = 'Z';
-                out[j++] = 'e';
-                break;
-        case '>'  : 
-                out[j++] = 'Z';
-                out[j++] = 'g';
-                break;
-        case '#'  : 
-                out[j++] = 'Z';
-                out[j++] = 'h';
-                break;
-        case '<'  : 
-                out[j++] = 'Z';
-                out[j++] = 'l';
-                break;
-        case '-'  : 
-                out[j++] = 'Z';
-                out[j++] = 'm';
-                break;
-        case '!'  : 
-                out[j++] = 'Z';
-                out[j++] = 'n';
-                break;
-        case '.'  : 
-                out[j++] = 'Z';
-                out[j++] = 'o';
-                break;
-        case '+'  : 
-                out[j++] = 'Z';
-                out[j++] = 'p';
-                break;
-        case '\'' : 
-                out[j++] = 'Z';
-                out[j++] = 'q';
-                break;
-        case '*'  : 
-                out[j++] = 'Z';
-                out[j++] = 't';
-                break;
-        case '_'  : 
-                out[j++] = 'Z';
-                out[j++] = 'u';
-                break;
-        default :
-                out[j++] = in[i];
-                break;
-        }
-    }
-    out[j] = '\0';
-}
-#endif
-
 const char *lookupGHCName( void *addr )
 {
     nat i;
@@ -783,21 +653,6 @@ const char *lookupGHCName( void *addr )
         return table[i].name;
     } else {
         return NULL;
-    }
-}
-
-static void printZcoded( const char *raw )
-{
-    nat j = 0;
-    
-    while ( raw[j] != '\0' ) {
-        if (raw[j] == 'Z') {
-            debugBelch("%c", unZcode(raw[j+1]));
-            j = j + 2;
-        } else {
-            debugBelch("%c", unZcode(raw[j+1]));
-            j = j + 1;
-        }
     }
 }
 
