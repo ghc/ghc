@@ -146,14 +146,13 @@ test('topHandler02',
       # ignore the stdout here, we only care about the exit code (which itself
       # is messed up because of the shell, using 128+sig encoding)
       ignore_output,
-      exit_code(130)  # actually signal 2 SIGINT
+      signal_exit_code(2)
      ], compile_and_run, [''])
 test('topHandler03',
      [when(opsys('mingw32'), skip),
       # As above, shells, grrr.
       ignore_output,
-      when(opsys('solaris2'), exit_code(15)), # Solaris signals 15 correctly
-      when(not opsys('solaris2'), exit_code(143)) # actually signal 15 SIGTERM
+      signal_exit_code(15)
      ], compile_and_run, [''])
 
 
