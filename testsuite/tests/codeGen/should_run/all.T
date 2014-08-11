@@ -120,8 +120,5 @@ test('CopySmallArray', normal, compile_and_run, [''])
 test('CopySmallArrayStressTest', reqlib('random'), compile_and_run, [''])
 test('SizeOfSmallArray', normal, compile_and_run, [''])
 test('T9001', normal, compile_and_run, [''])
-test('T9013',
-     [ omit_ways(['ghci']),  # ghci doesn't support unboxed tuples
-       when(arch('x86') or arch('x86_64'),
-            expect_broken_for(9013, list(set(opt_ways) - set(llvm_ways)))) ],
+test('T9013', omit_ways(['ghci']),  # ghci doesn't support unboxed tuples
      compile_and_run, [''])

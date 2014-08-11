@@ -204,6 +204,12 @@ data Instr
         | DIV         Size Operand              -- eax := eax:edx/op, edx := eax:edx%op
         | IDIV        Size Operand              -- ditto, but signed
 
+        -- Int Arithmetic, where the effects on the condition register
+        -- are important. Used in specialized sequences such as MO_Add2.
+        -- Do not rewrite these instructions to "equivalent" ones that
+        -- have different effect on the condition register! (See #9013.)
+        | ADD_CC      Size Operand Operand
+
         -- Simple bit-twiddling.
         | AND         Size Operand Operand
         | OR          Size Operand Operand
@@ -360,6 +366,7 @@ x86_regUsageOfInstr platform instr
     MUL2   _ src        -> mkRU (eax:use_R src []) [eax,edx]
     DIV    _ op -> mkRU (eax:edx:use_R op []) [eax,edx]
     IDIV   _ op -> mkRU (eax:edx:use_R op []) [eax,edx]
+    ADD_CC _ src dst    -> usageRM src dst
     AND    _ src dst    -> usageRM src dst
     OR     _ src dst    -> usageRM src dst
 
@@ -533,6 +540,7 @@ x86_patchRegsOfInstr instr env
     MUL2 sz src         -> patch1 (MUL2 sz) src
     IDIV sz op          -> patch1 (IDIV sz) op
     DIV sz op           -> patch1 (DIV sz) op
+    ADD_CC sz src dst   -> patch2 (ADD_CC sz) src dst
     AND  sz src dst     -> patch2 (AND  sz) src dst
     OR   sz src dst     -> patch2 (OR   sz) src dst
     XOR  sz src dst     -> patch2 (XOR  sz) src dst

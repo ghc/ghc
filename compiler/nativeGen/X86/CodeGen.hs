@@ -1912,9 +1912,10 @@ genCCall _ is32Bit target dest_regs args = do
         case args of
         [arg_x, arg_y] ->
             do hCode <- getAnyReg (CmmLit (CmmInt 0 width))
-               lCode <- getAnyReg (CmmMachOp (MO_Add width) [arg_x, arg_y])
                let size = intSize width
-                   reg_l = getRegisterReg platform True (CmmLocal res_l)
+               lCode <- anyReg =<< trivialCode width (ADD_CC size)
+                                     (Just (ADD_CC size)) arg_x arg_y
+               let reg_l = getRegisterReg platform True (CmmLocal res_l)
                    reg_h = getRegisterReg platform True (CmmLocal res_h)
                    code = hCode reg_h `appOL`
                           lCode reg_l `snocOL`

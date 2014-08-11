@@ -563,6 +563,9 @@ pprInstr (ADC size src dst)
 pprInstr (SUB size src dst) = pprSizeOpOp (sLit "sub") size src dst
 pprInstr (IMUL size op1 op2) = pprSizeOpOp (sLit "imul") size op1 op2
 
+pprInstr (ADD_CC size src dst)
+  = pprSizeOpOp (sLit "add") size src dst
+
 {- A hack.  The Intel documentation says that "The two and three
    operand forms [of IMUL] may also be used with unsigned operands
    because the lower half of the product is the same regardless if
