@@ -477,26 +477,19 @@ applyPackageFlag
 
 applyPackageFlag dflags unusable (pkgs, vm) flag =
   case flag of
-    ExposePackage arg m_rns ->
+    ExposePackage arg (ModRenaming b rns) ->
        case selectPackages (matching arg) pkgs unusable of
          Left ps         -> packageFlagErr dflags flag ps
          Right (p:_,_) -> return (pkgs, vm')
           where
            n = fsPackageName p
-           vm' = addToUFM_C edit vm_cleared (calcKey p)
-                              (case m_rns of
-                                   Nothing   -> (True, [], n)
-                                   Just rns' -> (False, map convRn rns', n))
+           vm' = addToUFM_C edit vm_cleared (calcKey p) (b, map convRn rns, n)
            edit (b, rns, n) (b', rns', _) = (b || b', rns ++ rns', n)
            convRn (a,b) = (mkModuleName a, mkModuleName b)
            -- ToDo: ATM, -hide-all-packages implicitly triggers change in
            -- behavior, maybe eventually make it toggleable with a separate
            -- flag
            vm_cleared | gopt Opt_HideAllPackages dflags = vm
-                      -- NB: -package foo-0.1 (Foo as Foo1) does NOT hide
-                      -- other versions of foo. Presence of renaming means
-                      -- user probably wanted both.
-                      | Just _ <- m_rns = vm
                       | otherwise = filterUFM_Directly
                             (\k (_,_,n') -> k == getUnique (calcKey p)
                                                 || n /= n') vm
@@ -594,9 +587,10 @@ pprFlag flag = case flag of
                      PackageArg    p -> text "-package " <> text p
                      PackageIdArg  p -> text "-package-id " <> text p
                      PackageKeyArg p -> text "-package-key " <> text p
-        ppr_rns Nothing = Outputable.empty
-        ppr_rns (Just rns) = char '(' <> hsep (punctuate comma (map ppr_rn rns))
-                                      <> char ')'
+        ppr_rns (ModRenaming True []) = Outputable.empty
+        ppr_rns (ModRenaming b rns) =
+            if b then text "with" else Outputable.empty <+>
+            char '(' <> hsep (punctuate comma (map ppr_rn rns)) <> char ')'
         ppr_rn (orig, new) | orig == new = text orig
                            | otherwise = text orig <+> text "as" <+> text new
 

@@ -43,7 +43,7 @@ module DynFlags (
         targetRetainsAllBindings,
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
-        PackageFlag(..), PackageArg(..), ModRenaming,
+        PackageFlag(..), PackageArg(..), ModRenaming(..),
         PkgConfRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
@@ -1059,7 +1059,8 @@ data PackageArg = PackageArg String
                 | PackageKeyArg String
   deriving (Eq, Show)
 
-type ModRenaming = Maybe [(String, String)]
+data ModRenaming = ModRenaming Bool [(String, String)]
+  deriving (Eq, Show)
 
 data PackageFlag
   = ExposePackage   PackageArg ModRenaming
@@ -3440,13 +3441,15 @@ parsePackageFlag constr str = case filter ((=="").snd) (readP_to_S parse str) of
     [(r, "")] -> r
     _ -> throwGhcException $ CmdLineError ("Can't parse package flag: " ++ str)
   where parse = do
-            pkg <- munch1 (\c -> isAlphaNum c || c `elem` ":-_.")
-            (do _ <- tok $ R.char '('
-                rns <- tok $ sepBy parseItem (tok $ R.char ',')
-                _ <- tok $ R.char ')'
-                return (ExposePackage (constr pkg) (Just rns))
-              +++
-             return (ExposePackage (constr pkg) Nothing))
+            pkg <- tok $ munch1 (\c -> isAlphaNum c || c `elem` ":-_.")
+            ( do _ <- tok $ string "with"
+                 fmap (ExposePackage (constr pkg) . ModRenaming True) parseRns
+             <++ fmap (ExposePackage (constr pkg) . ModRenaming False) parseRns
+             <++ return (ExposePackage (constr pkg) (ModRenaming True [])))
+        parseRns = do _ <- tok $ R.char '('
+                      rns <- tok $ sepBy parseItem (tok $ R.char ',')
+                      _ <- tok $ R.char ')'
+                      return rns
         parseItem = do
             orig <- tok $ parseModuleName
             (do _ <- tok $ string "as"
@@ -3454,7 +3457,7 @@ parsePackageFlag constr str = case filter ((=="").snd) (readP_to_S parse str) of
                 return (orig, new)
               +++
              return (orig, orig))
-        tok m = skipSpaces >> m
+        tok m = m >>= \x -> skipSpaces >> return x
 
 exposePackage, exposePackageId, exposePackageKey, hidePackage, ignorePackage,
         trustPackage, distrustPackage :: String -> DynP ()
@@ -3723,6 +3726,7 @@ compilerInfo dflags
        ("Support dynamic-too",         if isWindows then "NO" else "YES"),
        ("Support parallel --make",     "YES"),
        ("Support reexported-modules",  "YES"),
+       ("Support thinning and renaming package flags", "YES"),
        ("Uses package keys",           "YES"),
        ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
                                        then "YES" else "NO"),

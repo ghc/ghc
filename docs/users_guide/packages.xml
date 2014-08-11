@@ -390,13 +390,14 @@ _ZCMain_main_closure
   parenthesized, comma-separated list of module names to import.  For example,
   <literal>-package "base (Data.List, Data.Bool)"</literal> makes only
   <literal>Data.List</literal> and <literal>Data.Bool</literal> visible from
-  package <literal>base</literal>.
-  We also support renaming of modules, in case you need to refer to both modules
-  simultaneously; this is supporting by writing <literal>OldModName as
-  NewModName</literal>, e.g. <literal>-package "base (Data.Bool as
-  Bool)</literal>. It's important to specify quotes
-  so that your shell passes the package name and thinning/renaming list as a
-  single argument to GHC.</para>
+  package <literal>base</literal>.  We also support renaming of modules, in case
+  you need to refer to both modules simultaneously; this is supporting by
+  writing <literal>OldModName as NewModName</literal>, e.g. <literal>-package
+  "base (Data.Bool as Bool)</literal>.  You can also write <literal>-package
+  "base with (Data.Bool as Bool)</literal> to include all of the original
+  bindings (e.g. the renaming is strictly additive).  It's important to specify
+  quotes so that your shell passes the package name and thinning/renaming list
+  as a single argument to GHC.</para>
 
   <para>Package imports with thinning/renaming do not hide other versions of the
   package: e.g. if containers-0.9 is already exposed, <literal>-package

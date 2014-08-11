@@ -17,7 +17,10 @@ main =
                 liftIO $ print (mkModuleName "Outputable" `elem` listVisibleModuleNames dflags)
      _ <- runGhc (Just libdir) $ do
                 dflags <- getSessionDynFlags
-                setSessionDynFlags (dflags { packageFlags = [ExposePackage (PackageArg "ghc") Nothing]})
+                setSessionDynFlags (dflags {
+                    packageFlags = [ExposePackage (PackageArg "ghc")
+                                                  (ModRenaming True [])]
+                    })
                 dflags <- getSessionDynFlags
                 liftIO $ print (mkModuleName "Outputable" `elem` listVisibleModuleNames dflags)
      return ()
