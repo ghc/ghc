@@ -26,11 +26,7 @@ StgWord hs_popcnt8(StgWord x);
 StgWord hs_popcnt16(StgWord x);
 StgWord hs_popcnt32(StgWord x);
 StgWord hs_popcnt64(StgWord64 x);
-#ifdef i386_HOST_ARCH
 StgWord hs_popcnt(StgWord x);
-#else
-StgWord hs_popcnt(StgWord x);
-#endif
 
 /* libraries/ghc-prim/cbits/word2float.c */
 StgFloat hs_word2float32(StgWord x);
