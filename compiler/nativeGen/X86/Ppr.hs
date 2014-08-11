@@ -521,6 +521,9 @@ pprInstr (RELOAD slot reg)
 pprInstr (MOV size src dst)
   = pprSizeOpOp (sLit "mov") size src dst
 
+pprInstr (CMOV cc size src dst)
+  = pprCondOpReg (sLit "cmov") size cc src dst
+
 pprInstr (MOVZxL II32 src dst) = pprSizeOpOp (sLit "mov") II32 src dst
         -- 32-to-64 bit zero extension on x86_64 is accomplished by a simple
         -- movl.  But we represent it as a MOVZxL instruction, because
@@ -1119,6 +1122,18 @@ pprSizeOpReg name size op1 reg2
         pprOperand size op1,
         comma,
         pprReg (archWordSize (target32Bit platform)) reg2
+    ]
+
+pprCondOpReg :: LitString -> Size -> Cond -> Operand -> Reg -> SDoc
+pprCondOpReg name size cond op1 reg2
+  = hcat [
+        char '\t',
+        ptext name,
+        pprCond cond,
+        space,
+        pprOperand size op1,
+        comma,
+        pprReg size reg2
     ]
 
 pprCondRegReg :: LitString -> Size -> Cond -> Reg -> Reg -> SDoc

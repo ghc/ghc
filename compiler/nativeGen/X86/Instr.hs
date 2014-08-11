@@ -182,6 +182,7 @@ data Instr
 
         -- Moves.
         | MOV         Size Operand Operand
+        | CMOV   Cond Size Operand Reg
         | MOVZxL      Size Operand Operand -- size is the size of operand 1
         | MOVSxL      Size Operand Operand -- size is the size of operand 1
         -- x86_64 note: plain mov into a 32-bit register always zero-extends
@@ -356,6 +357,7 @@ x86_regUsageOfInstr :: Platform -> Instr -> RegUsage
 x86_regUsageOfInstr platform instr
  = case instr of
     MOV    _ src dst    -> usageRW src dst
+    CMOV _ _ src dst    -> mkRU (use_R src [dst]) [dst]
     MOVZxL _ src dst    -> usageRW src dst
     MOVSxL _ src dst    -> usageRW src dst
     LEA    _ src dst    -> usageRW src dst
@@ -532,6 +534,7 @@ x86_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 x86_patchRegsOfInstr instr env
  = case instr of
     MOV  sz src dst     -> patch2 (MOV  sz) src dst
+    CMOV cc sz src dst  -> CMOV cc sz (patchOp src) (env dst)
     MOVZxL sz src dst   -> patch2 (MOVZxL sz) src dst
     MOVSxL sz src dst   -> patch2 (MOVSxL sz) src dst
     LEA  sz src dst     -> patch2 (LEA  sz) src dst
