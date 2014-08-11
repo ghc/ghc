@@ -1508,6 +1508,8 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/typecheck/should_run/tcrun051
 /tests/typecheck/should_run/testeq2
 /tests/typecheck/testeq1/typecheck.testeq1
+/tests/concurrent/should_run/T9379
+/tests/simplCore/should_run/T9390
 /timeout/calibrate.out
 /timeout/dist/
 /timeout/install-inplace/
