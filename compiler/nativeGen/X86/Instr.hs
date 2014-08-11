@@ -326,8 +326,10 @@ data Instr
                                  --       call 1f
                                  -- 1:    popl %reg
 
-    -- SSE4.2
-        | POPCNT      Size Operand Reg -- src, dst
+    -- bit counting instructions
+        | POPCNT      Size Operand Reg -- [SSE4.2] count number of bits set to 1
+        | BSF         Size Operand Reg -- bit scan forward
+        | BSR         Size Operand Reg -- bit scan reverse
 
     -- prefetch
         | PREFETCH  PrefetchVariant Size Operand -- prefetch Variant, addr size, address to prefetch
@@ -439,6 +441,8 @@ x86_regUsageOfInstr platform instr
     DELTA   _           -> noUsage
 
     POPCNT _ src dst -> mkRU (use_R src []) [dst]
+    BSF    _ src dst -> mkRU (use_R src []) [dst]
+    BSR    _ src dst -> mkRU (use_R src []) [dst]
 
     -- note: might be a better way to do this
     PREFETCH _  _ src -> mkRU (use_R src []) []
@@ -610,6 +614,8 @@ x86_patchRegsOfInstr instr env
     CLTD _              -> instr
 
     POPCNT sz src dst -> POPCNT sz (patchOp src) (env dst)
+    BSF    sz src dst -> BSF    sz (patchOp src) (env dst)
+    BSR    sz src dst -> BSR    sz (patchOp src) (env dst)
 
     PREFETCH lvl size src -> PREFETCH lvl size (patchOp src)
 

@@ -581,6 +581,8 @@ pprInstr (XOR FF64 src dst) = pprOpOp (sLit "xorpd") FF64 src dst
 pprInstr (XOR size src dst) = pprSizeOpOp (sLit "xor")  size src dst
 
 pprInstr (POPCNT size src dst) = pprOpOp (sLit "popcnt") size src (OpReg dst)
+pprInstr (BSF size src dst)    = pprOpOp (sLit "bsf")    size src (OpReg dst)
+pprInstr (BSR size src dst)    = pprOpOp (sLit "bsr")    size src (OpReg dst)
 
 pprInstr (PREFETCH NTA size src ) =  pprSizeOp_ (sLit "prefetchnta") size src
 pprInstr (PREFETCH Lvl0 size src) = pprSizeOp_ (sLit "prefetcht0") size src
