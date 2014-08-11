@@ -563,6 +563,20 @@ emitPrimOp _      [res] PopCnt32Op [w] = emitPopCntCall res w W32
 emitPrimOp _      [res] PopCnt64Op [w] = emitPopCntCall res w W64
 emitPrimOp dflags [res] PopCntOp   [w] = emitPopCntCall res w (wordWidth dflags)
 
+-- count leading zeros
+emitPrimOp _      [res] Clz8Op  [w] = emitClzCall res w W8
+emitPrimOp _      [res] Clz16Op [w] = emitClzCall res w W16
+emitPrimOp _      [res] Clz32Op [w] = emitClzCall res w W32
+emitPrimOp _      [res] Clz64Op [w] = emitClzCall res w W64
+emitPrimOp dflags [res] ClzOp   [w] = emitClzCall res w (wordWidth dflags)
+
+-- count trailing zeros
+emitPrimOp _      [res] Ctz8Op [w]  = emitCtzCall res w W8
+emitPrimOp _      [res] Ctz16Op [w] = emitCtzCall res w W16
+emitPrimOp _      [res] Ctz32Op [w] = emitCtzCall res w W32
+emitPrimOp _      [res] Ctz64Op [w] = emitCtzCall res w W64
+emitPrimOp dflags [res] CtzOp   [w] = emitCtzCall res w (wordWidth dflags)
+
 -- Unsigned int to floating point conversions
 emitPrimOp _      [res] Word2FloatOp  [w] = emitPrimCall [res]
                                             (MO_UF_Conv W32) [w]
@@ -2095,4 +2109,18 @@ emitPopCntCall res x width = do
     emitPrimCall
         [ res ]
         (MO_PopCnt width)
+        [ x ]
+
+emitClzCall :: LocalReg -> CmmExpr -> Width -> FCode ()
+emitClzCall res x width = do
+    emitPrimCall
+        [ res ]
+        (MO_Clz width)
+        [ x ]
+
+emitCtzCall :: LocalReg -> CmmExpr -> Width -> FCode ()
+emitCtzCall res x width = do
+    emitPrimCall
+        [ res ]
+        (MO_Ctz width)
         [ x ]

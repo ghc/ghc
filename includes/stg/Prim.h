@@ -32,4 +32,16 @@ StgWord hs_popcnt(StgWord x);
 StgFloat hs_word2float32(StgWord x);
 StgDouble hs_word2float64(StgWord x);
 
+/* libraries/ghc-prim/cbits/clz.c */
+StgWord hs_clz8(StgWord x);
+StgWord hs_clz16(StgWord x);
+StgWord hs_clz32(StgWord x);
+StgWord hs_clz64(StgWord64 x);
+
+/* libraries/ghc-prim/cbits/ctz.c */
+StgWord hs_ctz8(StgWord x);
+StgWord hs_ctz16(StgWord x);
+StgWord hs_ctz32(StgWord x);
+StgWord hs_ctz64(StgWord64 x);
+
 #endif /* PRIM_H */

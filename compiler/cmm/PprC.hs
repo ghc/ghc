@@ -753,6 +753,8 @@ pprCallishMachOp_for_C mop
         MO_Memmove      -> ptext (sLit "memmove")
         (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
+        (MO_Clz w)      -> ptext (sLit $ clzLabel w)
+        (MO_Ctz w)      -> ptext (sLit $ ctzLabel w)
         (MO_AtomicRMW w amop) -> ptext (sLit $ atomicRMWLabel w amop)
         (MO_Cmpxchg w)  -> ptext (sLit $ cmpxchgLabel w)
         (MO_AtomicRead w)  -> ptext (sLit $ atomicReadLabel w)

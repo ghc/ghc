@@ -6,6 +6,8 @@ module CPrim
     , cmpxchgLabel
     , popCntLabel
     , bSwapLabel
+    , clzLabel
+    , ctzLabel
     , word2FloatLabel
     ) where
 
@@ -29,6 +31,24 @@ bSwapLabel w = "hs_bswap" ++ pprWidth w
     pprWidth W32 = "32"
     pprWidth W64 = "64"
     pprWidth w   = pprPanic "bSwapLabel: Unsupported word width " (ppr w)
+
+clzLabel :: Width -> String
+clzLabel w = "hs_clz" ++ pprWidth w
+  where
+    pprWidth W8  = "8"
+    pprWidth W16 = "16"
+    pprWidth W32 = "32"
+    pprWidth W64 = "64"
+    pprWidth w   = pprPanic "clzLabel: Unsupported word width " (ppr w)
+
+ctzLabel :: Width -> String
+ctzLabel w = "hs_ctz" ++ pprWidth w
+  where
+    pprWidth W8  = "8"
+    pprWidth W16 = "16"
+    pprWidth W32 = "32"
+    pprWidth W64 = "64"
+    pprWidth w   = pprPanic "ctzLabel: Unsupported word width " (ppr w)
 
 word2FloatLabel :: Width -> String
 word2FloatLabel w = "hs_word2float" ++ pprWidth w

@@ -224,8 +224,13 @@ genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
     return (stmts, top1 ++ top2)
   | otherwise = panic $ "prefetch locality level integer must be between 0 and 3, given: " ++ (show localityInt)
 
--- Handle PopCnt and BSwap that need to only convert arg and return types
+-- Handle PopCnt, Clz, Ctz, and BSwap that need to only convert arg
+-- and return types
 genCall t@(PrimTarget (MO_PopCnt w)) dsts args =
+    genCallSimpleCast w t dsts args
+genCall t@(PrimTarget (MO_Clz w)) dsts args =
+    genCallSimpleCast w t dsts args
+genCall t@(PrimTarget (MO_Ctz w)) dsts args =
     genCallSimpleCast w t dsts args
 genCall t@(PrimTarget (MO_BSwap w)) dsts args =
     genCallSimpleCast w t dsts args
@@ -558,6 +563,8 @@ cmmPrimOpFunctions mop = do
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     (MO_BSwap w)  -> fsLit $ "llvm.bswap."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_Clz w)    -> fsLit $ "llvm.ctlz."   ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_Ctz w)    -> fsLit $ "llvm.cttz."   ++ showSDoc dflags (ppr $ widthToLlvmInt w)
 
     (MO_Prefetch_Data _ )-> fsLit "llvm.prefetch"
 

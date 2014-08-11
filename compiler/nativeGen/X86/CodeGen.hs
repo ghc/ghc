@@ -1767,6 +1767,69 @@ genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
     size = intSize width
     lbl = mkCmmCodeLabel primPackageKey (fsLit (popCntLabel width))
 
+genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src]
+  | is32Bit && width == W64 = do
+    -- Fallback to `hs_clz64` on i386
+    targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
+    let target = ForeignTarget targetExpr (ForeignConvention CCallConv
+                                           [NoHint] [NoHint]
+                                           CmmMayReturn)
+    genCCall dflags is32Bit target dest_regs args
+
+  | otherwise = do
+    code_src <- getAnyReg src
+    src_r <- getNewRegNat size
+    tmp_r <- getNewRegNat size
+    let dst_r = getRegisterReg platform False (CmmLocal dst)
+
+    -- The following insn sequence makes sure 'clz 0' has a defined value.
+    -- starting with Haswell, one could use the LZCNT insn instead.
+    return $ code_src src_r `appOL` toOL
+             ([ MOVZxL  II8  (OpReg src_r) (OpReg src_r) | width == W8 ] ++
+              [ BSR     size (OpReg src_r) tmp_r
+              , MOV     II32 (OpImm (ImmInt (2*bw-1))) (OpReg dst_r)
+              , CMOV NE size (OpReg tmp_r) dst_r
+              , XOR     size (OpImm (ImmInt (bw-1))) (OpReg dst_r)
+              ]) -- NB: We don't need to zero-extend the result for the
+                 -- W8/W16 cases because the 'MOV' insn already
+                 -- took care of implicitly clearing the upper bits
+  where
+    bw = widthInBits width
+    platform = targetPlatform dflags
+    size = if width == W8 then II16 else intSize width
+    lbl = mkCmmCodeLabel primPackageKey (fsLit (clzLabel width))
+
+genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) dest_regs@[dst] args@[src]
+  | is32Bit, width == W64 = do
+    -- Fallback to `hs_ctz64` on i386
+    targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
+    let target = ForeignTarget targetExpr (ForeignConvention CCallConv
+                                           [NoHint] [NoHint]
+                                           CmmMayReturn)
+    genCCall dflags is32Bit target dest_regs args
+
+  | otherwise = do
+    code_src <- getAnyReg src
+    src_r <- getNewRegNat size
+    tmp_r <- getNewRegNat size
+    let dst_r = getRegisterReg platform False (CmmLocal dst)
+
+    -- The following insn sequence makes sure 'ctz 0' has a defined value.
+    -- starting with Haswell, one could use the TZCNT insn instead.
+    return $ code_src src_r `appOL` toOL
+             ([ MOVZxL  II8  (OpReg src_r) (OpReg src_r) | width == W8 ] ++
+              [ BSF     size (OpReg src_r) tmp_r
+              , MOV     II32 (OpImm (ImmInt bw)) (OpReg dst_r)
+              , CMOV NE size (OpReg tmp_r) dst_r
+              ]) -- NB: We don't need to zero-extend the result for the
+                 -- W8/W16 cases because the 'MOV' insn already
+                 -- took care of implicitly clearing the upper bits
+  where
+    bw = widthInBits width
+    platform = targetPlatform dflags
+    size = if width == W8 then II16 else intSize width
+    lbl = mkCmmCodeLabel primPackageKey (fsLit (ctzLabel width))
+
 genCCall dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args = do
     targetExpr <- cmmMakeDynamicReference dflags
                   CallReference lbl
@@ -2403,6 +2466,8 @@ outOfLineCmmOp mop res args
 
               MO_PopCnt _  -> fsLit "popcnt"
               MO_BSwap _   -> fsLit "bswap"
+              MO_Clz w     -> fsLit $ clzLabel w
+              MO_Ctz w     -> fsLit $ ctzLabel w
 
               MO_AtomicRMW _ _ -> fsLit "atomicrmw"
               MO_AtomicRead _  -> fsLit "atomicread"

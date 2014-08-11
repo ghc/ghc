@@ -549,6 +549,9 @@ data CallishMachOp
   | MO_Memmove
 
   | MO_PopCnt Width
+  | MO_Clz Width
+  | MO_Ctz Width
+
   | MO_BSwap Width
 
   -- Atomic read-modify-write.

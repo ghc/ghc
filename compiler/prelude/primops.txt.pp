@@ -386,6 +386,28 @@ primop   PopCnt64Op   "popCnt64#"   GenPrimOp   WORD64 -> Word#
 primop   PopCntOp   "popCnt#"   Monadic   Word# -> Word#
     {Count the number of set bits in a word.}
 
+primop   Clz8Op   "clz8#" Monadic   Word# -> Word#
+    {Count leading zeros in the lower 8 bits of a word.}
+primop   Clz16Op   "clz16#" Monadic   Word# -> Word#
+    {Count leading zeros in the lower 16 bits of a word.}
+primop   Clz32Op   "clz32#" Monadic   Word# -> Word#
+    {Count leading zeros in the lower 32 bits of a word.}
+primop   Clz64Op   "clz64#" GenPrimOp WORD64 -> Word#
+    {Count leading zeros in a 64-bit word.}
+primop   ClzOp     "clz#"   Monadic   Word# -> Word#
+    {Count leading zeros in a word.}
+
+primop   Ctz8Op   "ctz8#"  Monadic   Word# -> Word#
+    {Count trailing zeros in the lower 8 bits of a word.}
+primop   Ctz16Op   "ctz16#" Monadic   Word# -> Word#
+    {Count trailing zeros in the lower 16 bits of a word.}
+primop   Ctz32Op   "ctz32#" Monadic   Word# -> Word#
+    {Count trailing zeros in the lower 32 bits of a word.}
+primop   Ctz64Op   "ctz64#" GenPrimOp WORD64 -> Word#
+    {Count trailing zeros in a 64-bit word.}
+primop   CtzOp     "ctz#"   Monadic   Word# -> Word#
+    {Count trailing zeros in a word.}
+
 primop   BSwap16Op   "byteSwap16#"   Monadic   Word# -> Word#
     {Swap bytes in the lower 16 bits of a word. The higher bytes are undefined. }
 primop   BSwap32Op   "byteSwap32#"   Monadic   Word# -> Word#
