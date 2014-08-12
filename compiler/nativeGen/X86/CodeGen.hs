@@ -1743,15 +1743,19 @@ genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
     if sse4_2
         then do code_src <- getAnyReg src
                 src_r <- getNewRegNat size
+                let dst_r = getRegisterReg platform False (CmmLocal dst)
                 return $ code_src src_r `appOL`
                     (if width == W8 then
                          -- The POPCNT instruction doesn't take a r/m8
                          unitOL (MOVZxL II8 (OpReg src_r) (OpReg src_r)) `appOL`
-                         unitOL (POPCNT II16 (OpReg src_r)
-                                 (getRegisterReg platform False (CmmLocal dst)))
+                         unitOL (POPCNT II16 (OpReg src_r) dst_r)
                      else
-                         unitOL (POPCNT size (OpReg src_r)
-                                 (getRegisterReg platform False (CmmLocal dst))))
+                         unitOL (POPCNT size (OpReg src_r) dst_r)) `appOL`
+                    (if width == W8 || width == W16 then
+                         -- We used a 16-bit destination register above,
+                         -- so zero-extend
+                         unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
+                     else nilOL)
         else do
             targetExpr <- cmmMakeDynamicReference dflags
                           CallReference lbl
