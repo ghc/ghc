@@ -137,6 +137,11 @@ cgOpApp (StgPrimCallOp primcall) args _res_ty
 asUnsigned :: Width -> Integer -> Integer
 asUnsigned w n = n .&. (bit (widthInBits w) - 1)
 
+-- TODO: Several primop implementations (e.g. 'doNewByteArrayOp') use
+--     ByteOff (or some other fixed width signed type) to represent
+--     array sizes or indices. This means that these will overflow for
+--     large enough sizes.
+
 -- | Decide whether an out-of-line primop should be replaced by an
 -- inline implementation. This might happen e.g. if there's enough
 -- static information, such as statically know arguments, to emit a
