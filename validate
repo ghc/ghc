@@ -60,6 +60,9 @@ do
     --normal)
         speed=NORMAL
         ;;
+    --no-dph) # for backward compat
+        use_dph=0
+        ;;
     --dph)
         use_dph=1
         ;;
