@@ -87,8 +87,6 @@ $4_USE_PACKAGE_KEY=NO
 endif
 endif
 
-# ToDo: It would be more accurate to version test this against what version of
-# GHC we're using to see if it understands package-key
 ifeq "$($4_USE_PACKAGE_KEY)" "NO"
 $1_$2_$4_DEP_OPTS = \
  $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg))
