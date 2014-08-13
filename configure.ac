@@ -162,6 +162,11 @@ FP_COMPARE_VERSIONS([$GhcVersion],[-gt],[7.7],
                     CMM_SINK_BOOTSTRAP_IS_NEEDED=NO)
 AC_SUBST(CMM_SINK_BOOTSTRAP_IS_NEEDED)
 
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.9],
+                    SUPPORTS_PACKAGE_KEY=NO,
+                    SUPPORTS_PACKAGE_KEY=YES)
+AC_SUBST(SUPPORTS_PACKAGE_KEY)
+
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
 then

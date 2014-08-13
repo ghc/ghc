@@ -81,9 +81,15 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 # $1_$2_$3_MOST_HC_OPTS is also passed to C compilations when we use
 # GHC as the C compiler.
 
+ifeq "$(SUPPORTS_PACKAGE_KEY)" "NO"
+ifeq "$4" "0"
+$4_USE_PACKAGE_KEY=NO
+endif
+endif
+
 # ToDo: It would be more accurate to version test this against what version of
 # GHC we're using to see if it understands package-key
-ifeq "$4" "0"
+ifeq "$($4_USE_PACKAGE_KEY)" "NO"
 $1_$2_$4_DEP_OPTS = \
  $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg))
 $4_THIS_PACKAGE_KEY = -package-name
