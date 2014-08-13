@@ -916,13 +916,21 @@ parsePackageInfo
         -> IO (InstalledPackageInfo, [ValidateWarning])
 parsePackageInfo str =
   case parseInstalledPackageInfo str of
-    ParseOk warnings ok -> return (ok, ws)
+    ParseOk warnings ok -> return (mungePackageInfo ok, ws)
       where
         ws = [ msg | PWarning msg <- warnings
                    , not ("Unrecognized field pkgroot" `isPrefixOf` msg) ]
     ParseFailed err -> case locatedErrorMsg err of
                            (Nothing, s) -> die s
                            (Just l, s) -> die (show l ++ ": " ++ s)
+
+mungePackageInfo :: InstalledPackageInfo -> InstalledPackageInfo
+mungePackageInfo ipi = ipi { packageKey = packageKey' }
+  where
+    packageKey'
+      | OldPackageKey (PackageIdentifier (PackageName "") _) <- packageKey ipi
+          = OldPackageKey (sourcePackageId ipi)
+      | otherwise = packageKey ipi
 
 -- | Takes the "reexported-modules" field of an InstalledPackageInfo
 -- and resolves the references so they point to the original exporter
