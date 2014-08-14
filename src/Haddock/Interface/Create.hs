@@ -45,7 +45,6 @@ import Bag
 import RdrName
 import TcRnTypes
 import FastString (concatFS)
-import UniqFM
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
@@ -171,9 +170,9 @@ lookupModuleDyn _ (Just pkgId) mdlName =
   Module.mkModule pkgId mdlName
 lookupModuleDyn dflags Nothing mdlName =
   flip Module.mkModule mdlName $
-  case filter Packages.modConfExposed . eltsUFM $
+  case filter snd $
        Packages.lookupModuleInAllPackages dflags mdlName of
-    m:_ -> Packages.packageConfigId (Packages.modConfPkg m)
+    (pkgId,_):_ -> Packages.packageConfigId pkgId
     [] -> Module.mainPackageKey
 
 
