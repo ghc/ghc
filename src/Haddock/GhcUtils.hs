@@ -44,23 +44,23 @@ moduleString = moduleNameString . moduleName
 
 -- return the (name,version) of the package
 modulePackageInfo :: Module -> (String, [Char])
-modulePackageInfo modu = case unpackPackageKey pkg of
-                          Nothing -> (packageKeyString pkg, "")
+modulePackageInfo modu = case unpackPackageId pkg of
+                          Nothing -> (packageIdString pkg, "")
                           Just x -> (display $ pkgName x, showVersion (pkgVersion x))
-  where pkg = modulePackageKey modu
+  where pkg = modulePackageId modu
 
 
 -- This was removed from GHC 6.11
 -- XXX we shouldn't be using it, probably
 
--- | Try and interpret a GHC 'PackageKey' as a cabal 'PackageIdentifer'. Returns @Nothing@ if
+-- | Try and interpret a GHC 'PackageId' as a cabal 'PackageIdentifer'. Returns @Nothing@ if
 -- we could not parse it as such an object.
-unpackPackageKey :: PackageKey -> Maybe PackageIdentifier
-unpackPackageKey p
+unpackPackageId :: PackageId -> Maybe PackageIdentifier
+unpackPackageId p
   = case [ pid | (pid,"") <- readP_to_S parse str ] of
         []      -> Nothing
         (pid:_) -> Just pid
-  where str = packageKeyString p
+  where str = packageIdString p
 
 
 lookupLoadedHomeModuleGRE  :: GhcMonad m => ModuleName -> m (Maybe GlobalRdrEnv)
@@ -102,7 +102,7 @@ getInstLoc (TyFamInstD (TyFamInstDecl
   -- Since CoAxioms' Names refer to the whole line for type family instances
   -- in particular, we need to dig a bit deeper to pull out the entire
   -- equation. This does not happen for data family instances, for some reason.
-  { tfid_eqn = L _ (TyFamEqn { tfe_rhs = L l _ })})) = l
+  { tfid_eqn = L _ (TyFamInstEqn { tfie_rhs = L l _ })})) = l
 
 -- Useful when there is a signature with multiple names, e.g.
 --   foo, bar :: Types..
