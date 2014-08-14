@@ -39,7 +39,11 @@ module Data.Bits (
     rotateL, rotateR,
     popCount
   ),
-  FiniteBits(finiteBitSize),
+  FiniteBits(
+    finiteBitSize,
+    countLeadingZeros,
+    countTrailingZeros
+  ),
 
   bitDefault,
   testBitDefault,
@@ -288,6 +292,65 @@ class Bits b => FiniteBits b where
     -- /Since: 4.7.0.0/
     finiteBitSize :: b -> Int
 
+    -- | Count number of zero bits preceding the most significant set bit.
+    --
+    -- @
+    -- 'countLeadingZeros' ('zeroBits' :: a) = finiteBitSize ('zeroBits' :: a)
+    -- 'countLeadingZeros' . 'negate' = 'const' 0
+    -- @
+    --
+    -- 'countLeadingZeros' can be used to compute log base 2 via
+    --
+    -- @
+    -- logBase2 x = 'finiteBitSize' x - 1 - 'countLeadingZeros' x
+    -- @
+    --
+    -- Note: The default implementation for this method is intentionally
+    -- naive. However, the instances provided for the primitive
+    -- integral types are implemented using CPU specific machine
+    -- instructions.
+    --
+    -- /Since: 4.8.0.0/
+    countLeadingZeros :: b -> Int
+    countLeadingZeros x = (w-1) - go (w-1)
+      where
+        go i | i < 0       = i -- no bit set
+             | testBit x i = i
+             | otherwise   = go (i-1)
+
+        w = finiteBitSize x
+
+    -- | Count number of zero bits following the least significant set bit.
+    --
+    -- @
+    -- 'countTrailingZeros' ('zeroBits' :: a) = finiteBitSize ('zeroBits' :: a)
+    -- 'countTrailingZeros' . 'negate' = 'countTrailingZeros'
+    -- @
+    --
+    -- The related
+    -- <http://en.wikipedia.org/wiki/Find_first_set find-first-set operation>
+    -- can be expressed in terms of 'countTrailingZeros' as follows
+    --
+    -- @
+    -- findFirstSet x = 1 + 'countTrailingZeros' x
+    -- @
+    --
+    -- Note: The default implementation for this method is intentionally
+    -- naive. However, the instances provided for the primitive
+    -- integral types are implemented using CPU specific machine
+    -- instructions.
+    --
+    -- /Since: 4.8.0.0/
+    countTrailingZeros :: b -> Int
+    countTrailingZeros x = go 0
+      where
+        go i | i >= w      = i
+             | testBit x i = i
+             | otherwise   = go (i+1)
+
+        w = finiteBitSize x
+
+
 -- The defaults below are written with lambdas so that e.g.
 --     bit = bitDefault
 -- is fully applied, so inlining will happen
@@ -356,7 +419,8 @@ instance Bits Bool where
 
 instance FiniteBits Bool where
     finiteBitSize _ = 1
-
+    countTrailingZeros x = if x then 0 else 1
+    countLeadingZeros  x = if x then 0 else 1
 
 instance Bits Int where
     {-# INLINE shift #-}
@@ -396,6 +460,8 @@ instance Bits Int where
 
 instance FiniteBits Int where
     finiteBitSize _ = WORD_SIZE_IN_BITS
+    countLeadingZeros  (I# x#) = I# (word2Int# (clz# (int2Word# x#)))
+    countTrailingZeros (I# x#) = I# (word2Int# (ctz# (int2Word# x#)))
 
 instance Bits Word where
     {-# INLINE shift #-}
@@ -429,6 +495,8 @@ instance Bits Word where
 
 instance FiniteBits Word where
     finiteBitSize _ = WORD_SIZE_IN_BITS
+    countLeadingZeros  (W# x#) = I# (word2Int# (clz# x#))
+    countTrailingZeros (W# x#) = I# (word2Int# (ctz# x#))
 
 instance Bits Integer where
    (.&.) = andInteger

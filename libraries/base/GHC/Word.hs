@@ -154,6 +154,8 @@ instance Bits Word8 where
 
 instance FiniteBits Word8 where
     finiteBitSize _ = 8
+    countLeadingZeros  (W8# x#) = I# (word2Int# (clz8# x#))
+    countTrailingZeros (W8# x#) = I# (word2Int# (ctz8# x#))
 
 {-# RULES
 "fromIntegral/Word8->Word8"   fromIntegral = id :: Word8 -> Word8
@@ -301,6 +303,8 @@ instance Bits Word16 where
 
 instance FiniteBits Word16 where
     finiteBitSize _ = 16
+    countLeadingZeros  (W16# x#) = I# (word2Int# (clz16# x#))
+    countTrailingZeros (W16# x#) = I# (word2Int# (ctz16# x#))
 
 -- | Swap bytes in 'Word16'.
 --
@@ -495,6 +499,8 @@ instance Bits Word32 where
 
 instance FiniteBits Word32 where
     finiteBitSize _ = 32
+    countLeadingZeros  (W32# x#) = I# (word2Int# (clz32# x#))
+    countTrailingZeros (W32# x#) = I# (word2Int# (ctz32# x#))
 
 {-# RULES
 "fromIntegral/Word8->Word32"   fromIntegral = \(W8# x#) -> W32# x#
@@ -767,6 +773,8 @@ uncheckedShiftRL64# = uncheckedShiftRL#
 
 instance FiniteBits Word64 where
     finiteBitSize _ = 64
+    countLeadingZeros  (W64# x#) = I# (word2Int# (clz64# x#))
+    countTrailingZeros (W64# x#) = I# (word2Int# (ctz64# x#))
 
 instance Show Word64 where
     showsPrec p x = showsPrec p (toInteger x)
