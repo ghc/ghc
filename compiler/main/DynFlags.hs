@@ -333,8 +333,8 @@ data GeneralFlag
    | Opt_LLF_CreatePAPs        -- ^ allowed to float function bindings that occur unapplied
    | Opt_LLF_Simpl        -- ^ follow the late lambda lift with a simplification pass?
    | Opt_LLF_Stabilize
-   | Opt_LLF_UseStr        -- ^ use strictness in the late-float
-   | Opt_LLF_IgnoreLNEClo        -- ^ predict LNEs in the late-float
+   | Opt_LLF_UseStr        -- ^ use strictness in the late lambda float
+   | Opt_LLF_IgnoreLNEClo        -- ^ predict LNEs in the late lambda float
    | Opt_LLF_FloatLNE0        -- ^ float zero-arity LNEs
    | Opt_LLF_OneShot
    | Opt_LLF_LeaveLNE
@@ -2397,7 +2397,7 @@ dynamic_flags = [
   , Flag "ddump-hpc"               (setDumpFlag Opt_D_dump_ticked) -- back compat
   , Flag "ddump-ticked"            (setDumpFlag Opt_D_dump_ticked)
   , Flag "ddump-mod-cycles"        (setDumpFlag Opt_D_dump_mod_cycles)
-  , Flag "ddump-late-float"        (setDumpFlag Opt_D_dump_late_float)
+  , Flag "ddump-llf"        (setDumpFlag Opt_D_dump_late_float)
   , Flag "ddump-view-pattern-commoning" (setDumpFlag Opt_D_dump_view_pattern_commoning)
   , Flag "ddump-to-file"           (NoArg (setGeneralFlag Opt_DumpToFile))
   , Flag "ddump-hi-diffs"          (setDumpFlag Opt_D_dump_hi_diffs)
@@ -2465,21 +2465,21 @@ dynamic_flags = [
   , Flag "ffloat-lam-args"             (intSuffix (\n d -> d{ floatLamArgs = Just n }))
   , Flag "ffloat-all-lams"             (noArg (\d -> d{ floatLamArgs = Nothing }))
 
-  , Flag "flate-float-nonrec-lam-limit"         (intSuffix (\n d -> d{ lateFloatNonRecLam = Just n }))
-  , Flag "flate-float-nonrec-lam-any"           (noArg       (\d -> d{ lateFloatNonRecLam = Nothing }))
-  , Flag "fno-late-float-nonrec-lam"            (noArg       (\d -> d{ lateFloatNonRecLam = Just 0 }))
-  , Flag "flate-float-rec-lam-limit"            (intSuffix (\n d -> d{ lateFloatRecLam = Just n }))
-  , Flag "flate-float-rec-lam-any"              (noArg       (\d -> d{ lateFloatRecLam = Nothing }))
-  , Flag "fno-late-float-rec-lam"               (noArg       (\d -> d{ lateFloatRecLam = Just 0 }))
-  , Flag "flate-float-clo-growth-limit"         (intSuffix (\n d -> d{ lateFloatCloGrowth = Just n }))
-  , Flag "flate-float-clo-growth-any"           (noArg       (\d -> d{ lateFloatCloGrowth = Nothing }))
-  , Flag "fno-late-float-clo-growth"            (noArg       (\d -> d{ lateFloatCloGrowth = Just 0 }))
-  , Flag "flate-float-in-clo-limit"             (intSuffix (\n d -> d{ lateFloatIfInClo = Just n }))
-  , Flag "flate-float-in-clo-any"               (noArg       (\d -> d{ lateFloatIfInClo = Nothing }))
-  , Flag "fno-late-float-in-clo"                (noArg       (\d -> d{ lateFloatIfInClo = Just 0 }))
-  , Flag "flate-float-clo-growth-in-lam-limit"  (intSuffix (\n d -> d{ lateFloatCloGrowthInLam = Just n }))
-  , Flag "flate-float-clo-growth-in-lam-any"    (noArg       (\d -> d{ lateFloatCloGrowthInLam = Nothing }))
-  , Flag "fno-late-float-clo-growth-in-lam"     (noArg       (\d -> d{ lateFloatCloGrowthInLam = Just 0 }))
+  , Flag "fllf-nonrec-lam-limit"         (intSuffix (\n d -> d{ lateFloatNonRecLam = Just n }))
+  , Flag "fllf-nonrec-lam-any"           (noArg       (\d -> d{ lateFloatNonRecLam = Nothing }))
+  , Flag "fno-llf-nonrec-lam"            (noArg       (\d -> d{ lateFloatNonRecLam = Just 0 }))
+  , Flag "fllf-rec-lam-limit"            (intSuffix (\n d -> d{ lateFloatRecLam = Just n }))
+  , Flag "fllf-rec-lam-any"              (noArg       (\d -> d{ lateFloatRecLam = Nothing }))
+  , Flag "fno-llf-rec-lam"               (noArg       (\d -> d{ lateFloatRecLam = Just 0 }))
+  , Flag "fllf-clo-growth-limit"         (intSuffix (\n d -> d{ lateFloatCloGrowth = Just n }))
+  , Flag "fllf-clo-growth-any"           (noArg       (\d -> d{ lateFloatCloGrowth = Nothing }))
+  , Flag "fno-llf-clo-growth"            (noArg       (\d -> d{ lateFloatCloGrowth = Just 0 }))
+  , Flag "fllf-in-clo-limit"             (intSuffix (\n d -> d{ lateFloatIfInClo = Just n }))
+  , Flag "fllf-in-clo-any"               (noArg       (\d -> d{ lateFloatIfInClo = Nothing }))
+  , Flag "fno-llf-in-clo"                (noArg       (\d -> d{ lateFloatIfInClo = Just 0 }))
+  , Flag "fllf-clo-growth-in-lam-limit"  (intSuffix (\n d -> d{ lateFloatCloGrowthInLam = Just n }))
+  , Flag "fllf-clo-growth-in-lam-any"    (noArg       (\d -> d{ lateFloatCloGrowthInLam = Nothing }))
+  , Flag "fno-llf-clo-growth-in-lam"     (noArg       (\d -> d{ lateFloatCloGrowthInLam = Just 0 }))
 
   , Flag "fhistory-size"               (intSuffix (\n d -> d{ historySize = n }))
 
@@ -2761,18 +2761,18 @@ fFlags = [
 
   ( "no-LNE",                           Opt_NoLNE, nop),
 
-  ( "late-float",                       Opt_LLF, nop),
-  ( "late-float-abstract-undersat",     Opt_LLF_AbsUnsat, nop),
-  ( "late-float-abstract-sat",          Opt_LLF_AbsSat, nop),
-  ( "late-float-abstract-oversat",      Opt_LLF_AbsOversat, nop),
-  ( "late-float-create-PAPs",           Opt_LLF_CreatePAPs, nop),
-  ( "late-float-simpl",                 Opt_LLF_Simpl, nop),
-  ( "late-float-stabilize",             Opt_LLF_Stabilize, nop),
-  ( "late-float-use-strictness",        Opt_LLF_UseStr, nop),
-  ( "late-float-ignore-LNE-clo",        Opt_LLF_IgnoreLNEClo, nop),
-  ( "late-float-LNE0",                  Opt_LLF_FloatLNE0, nop),
-  ( "late-float-oneshot",               Opt_LLF_OneShot, nop),
-  ( "late-float-leave-LNE",             Opt_LLF_LeaveLNE, nop)
+  ( "llf",                       Opt_LLF, nop),
+  ( "llf-abstract-undersat",     Opt_LLF_AbsUnsat, nop),
+  ( "llf-abstract-sat",          Opt_LLF_AbsSat, nop),
+  ( "llf-abstract-oversat",      Opt_LLF_AbsOversat, nop),
+  ( "llf-create-PAPs",           Opt_LLF_CreatePAPs, nop),
+  ( "llf-simpl",                 Opt_LLF_Simpl, nop),
+  ( "llf-stabilize",             Opt_LLF_Stabilize, nop),
+  ( "llf-use-strictness",        Opt_LLF_UseStr, nop),
+  ( "llf-ignore-LNE-clo",        Opt_LLF_IgnoreLNEClo, nop),
+  ( "llf-LNE0",                  Opt_LLF_FloatLNE0, nop),
+  ( "llf-oneshot",               Opt_LLF_OneShot, nop),
+  ( "llf-leave-LNE",             Opt_LLF_LeaveLNE, nop)
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
