@@ -9003,8 +9003,8 @@ A quasi-quote has the form
 <literal>[<replaceable>quoter</replaceable>| <replaceable>string</replaceable> |]</literal>.
 <itemizedlist>
 <listitem><para>
-The <replaceable>quoter</replaceable> must be the (unqualified) name of an imported
-quoter; it cannot be an arbitrary expression.
+The <replaceable>quoter</replaceable> must be the name of an imported quoter,
+either qualified or unqualified; it cannot be an arbitrary expression.
 </para></listitem>
 <listitem><para>
 The <replaceable>quoter</replaceable> cannot be "<literal>e</literal>",
