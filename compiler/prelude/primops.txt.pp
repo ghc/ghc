@@ -1074,6 +1074,30 @@ primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
 primop  SameMutableByteArrayOp "sameMutableByteArray#" GenPrimOp
    MutableByteArray# s -> MutableByteArray# s -> Int#
 
+primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> State# s
+   {Shrink mutable byte array to new specified size (in bytes), in
+    the specified state thread. The new size argument must be less than or
+    equal to the current size as reported by {\tt sizeofMutableArray\#}.}
+   with out_of_line = True
+        has_side_effects = True
+
+primop  ResizeMutableByteArrayOp_Char "resizeMutableByteArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+   {Resize (unpinned) mutable byte array to new specified size (in bytes).
+    The returned {\tt MutableByteArray\#} is either the original
+    {\tt MutableByteArray\#} resized in-place or, if not possible, a newly
+    allocated (unpinned) {\tt MutableByteArray\#} (with the original content
+    copied over).
+
+    To avoid undefined behaviour, the original {\tt MutableByteArray\#} shall
+    not be accessed anymore after a {\tt resizeMutableByteArray\#} has been
+    performed.  Moreover, no reference to the old one should be kept in order
+    to allow garbage collection of the original {\tt MutableByteArray\#} in
+    case a new {\tt MutableByteArray\#} had to be allocated.}
+   with out_of_line = True
+        has_side_effects = True
+
 primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
    MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)
    {Make a mutable byte array immutable, without copying.}

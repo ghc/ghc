@@ -137,6 +137,60 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     return (p);
 }
 
+// shrink size of MutableByteArray in-place
+stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
+// MutableByteArray# s -> Int# -> State# s -> State# s
+{
+   ASSERT(new_size >= 0);
+   ASSERT(new_size <= StgArrWords_bytes(mba));
+
+   OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgArrWords) +
+                                 ROUNDUP_BYTES_TO_WDS(new_size)));
+   StgArrWords_bytes(mba) = new_size;
+   LDV_RECORD_CREATE(mba);
+
+   return ();
+}
+
+// resize MutableByteArray
+//
+// The returned MutableByteArray is either the original
+// MutableByteArray resized in-place or, if not possible, a newly
+// allocated (unpinned) MutableByteArray (with the original content
+// copied over)
+stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
+// MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+{
+   W_ new_size_wds;
+
+   ASSERT(new_size >= 0);
+
+   new_size_wds = ROUNDUP_BYTES_TO_WDS(new_size);
+
+   if (new_size_wds <= BYTE_ARR_WDS(mba)) {
+      OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgArrWords) +
+                                    new_size_wds));
+      StgArrWords_bytes(mba) = new_size;
+      LDV_RECORD_CREATE(mba);
+
+      return (mba);
+   } else {
+      (P_ new_mba) = call stg_newByteArrayzh(new_size);
+
+      // maybe at some point in the future we may be able to grow the
+      // MBA in-place w/o copying if we know the space after the
+      // current MBA is still available, as often we want to grow the
+      // MBA shortly after we allocated the original MBA. So maybe no
+      // further allocations have occurred by then.
+
+      // copy over old content
+      prim %memcpy(BYTE_ARR_CTS(new_mba), BYTE_ARR_CTS(mba),
+                   StgArrWords_bytes(mba), WDS(1));
+
+      return (new_mba);
+   }
+}
+
 // RRN: This one does not use the "ticketing" approach because it
 // deals in unboxed scalars, not heap pointers.
 stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )

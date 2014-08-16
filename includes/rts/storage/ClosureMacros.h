@@ -504,8 +504,11 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 
 #if ZERO_SLOP_FOR_LDV_PROF || ZERO_SLOP_FOR_SANITY_CHECK
 #define OVERWRITING_CLOSURE(c) overwritingClosure(c)
+#define OVERWRITING_CLOSURE_OFS(c,n) \
+    overwritingClosureOfs(c,n)
 #else
 #define OVERWRITING_CLOSURE(c) /* nothing */
+#define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
 #endif
 
 #ifdef PROFILING
@@ -532,6 +535,36 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
     for (i = 0; i < size - sizeofW(StgThunkHeader); i++) {
         ((StgThunk *)(p))->payload[i] = 0;
     }
+}
+
+// Version of 'overwritingClosure' which overwrites only a suffix of a
+// closure.  The offset is expressed in words relative to 'p' and shall
+// be less than or equal to closure_sizeW(p), and usually at least as
+// large as the respective thunk header.
+//
+// Note: As this calls LDV_recordDead() you have to call LDV_RECORD()
+//       on the final state of the closure at the call-site
+EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, nat offset);
+EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, nat offset)
+{
+    nat size, i;
+
+#if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
+    // see Note [zeroing slop], also #8402
+    if (era <= 0) return;
+#endif
+
+    size = closure_sizeW(p);
+
+    ASSERT(offset <= size);
+
+    // For LDV profiling, we need to record the closure as dead
+#if defined(PROFILING)
+    LDV_recordDead(p, size);
+#endif
+
+    for (i = offset; i < size; i++)
+        ((StgWord *)p)[i] = 0;
 }
 
 #endif /* RTS_STORAGE_CLOSUREMACROS_H */

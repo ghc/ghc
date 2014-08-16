@@ -600,8 +600,11 @@
 
 #if defined(PROFILING) || (!defined(THREADED_RTS) && defined(DEBUG))
 #define OVERWRITING_CLOSURE(c) foreign "C" overwritingClosure(c "ptr")
+#define OVERWRITING_CLOSURE_OFS(c,n) \
+    foreign "C" overwritingClosureOfs(c "ptr", n)
 #else
 #define OVERWRITING_CLOSURE(c) /* nothing */
+#define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
 #endif
 
 #ifdef THREADED_RTS
