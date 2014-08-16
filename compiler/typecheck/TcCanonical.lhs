@@ -600,19 +600,11 @@ flattenExactFamApp FMFullFlatten ctxt tc xi_args  -- Eactly saturated
        ; mb_ct <- lookupFlatEqn tc xi_args
        ; case mb_ct of
            Just (co, fsk)  -- co :: F xi_args ~ fsk
-             -> -- You may think that we can just return (cc_rhs ct) but not so.
-                --            return (mkTcCoVarCo (ctId ct), cc_rhs ct, [])
-                -- The cached constraint resides in the cache so we have to flatten
-                -- the rhs to make sure we have applied any inert substitution to it.
-                -- Alternatively we could be applying the inert substitution to the
-                -- cache as well when we interact an equality with the inert.
-                -- The design choice is: do we keep the flat cache rewritten or not?
-                -- For now I say we don't keep it fully rewritten.
-               do { traceTcS "flatten/flat-cache hit" $ (ppr tc <+> ppr xi_args $$ ppr fsk $$ ppr co)
-                  ; (fsk_xi, fsk_co) <- flattenTyVar FMFullFlatten ctxt fsk
+             -> do { traceTcS "flatten/flat-cache hit" $ (ppr tc <+> ppr xi_args $$ ppr fsk $$ ppr co)
+                   ; (fsk_xi, fsk_co) <- flattenTyVar FMFullFlatten ctxt fsk
                           -- The fsk may already have been unified, so flatten it
                           -- fsk_co :: fsk_xi ~ fsk
-                  ; return (fsk_xi, fsk_co `mkTcTransCo`mkTcSymCo co) }
+                   ; return (fsk_xi, fsk_co `mkTcTransCo`mkTcSymCo co) }
                                     -- :: fsk_xi ~ F xi_args
 
            _ -> do { (ev, fsk) <- newFlattenSkolem loc fam_ty

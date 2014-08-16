@@ -484,19 +484,20 @@ interactFunEq :: InertCans -> Ct -> TcS (Maybe InertCans, StopNowFlag)
 interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
                                          , cc_tyargs = args, cc_fsk = fsk })
   | Just (CFunEqCan { cc_ev = ev_i, cc_fsk = fsk_i }) <- matching_inerts
-  = do { traceTcS "interact with inerts: FunEq/FunEq" $
-         vcat [ text "workItem =" <+> ppr workItem
-              , text "inertItem=" <+> ppr ev_i ]
-       ; new_ev <- newWantedEvVarNC loc (mkEqPred (mkTyVarTy fsk) (mkTyVarTy fsk_i)) -- :: fsk ~ fsk_i
-             -- No caching!  See Note [Cache-caused loops]
-             -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
-       ; let inert_co = ctEvCoercion ev_i   -- :: F tys ~ fsk_i
-             new_co   = ctEvCoercion new_ev -- :: fsk ~ fsk_i
-
-       ; setEvBind (ctEvId ev)  -- :: F tys ~ fsk
-                   (EvCoercion (inert_co `mkTcTransCo` mkTcSymCo new_co))
-       ; emitWorkNC [new_ev]
-       ; return (Nothing, True) }
+  = if ev_i `canRewriteOrSame` ev
+    then  -- Rewrite work-item using inert
+      do { traceTcS "reactFunEq (discharge work item):" $
+           vcat [ text "workItem =" <+> ppr workItem
+                , text "inertItem=" <+> ppr ev_i ]
+         ; reactFunEq ev_i fsk_i ev fsk
+         ; return (Nothing, True) }
+    else  -- Rewrite intert using work-item
+      do { traceTcS "reactFunEq (rewrite inert item):" $
+           vcat [ text "workItem =" <+> ppr workItem
+                , text "inertItem=" <+> ppr ev_i ]
+         ; solveFunEq ev fsk ev_i fsk_i
+         ; let new_inerts = inerts { inert_funeqs = insertFunEq funeqs tc args workItem }
+         ; return (Just new_inerts, True) }
 
   | Just ops <- isBuiltInSynFamTyCon_maybe tc
   = do { let is = findFunEqsByTyCon funeqs tc
@@ -524,6 +525,31 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
     loc = ctev_loc ev
 
 interactFunEq _ wi = pprPanic "interactFunEq" (ppr wi)
+
+reactFunEq :: CtEvidence -> TcTyVar    -- From this  :: F tys ~ fsk1
+           -> CtEvidence -> TcTyVar    -- Solve this :: F tys ~ fsk2
+           -> TcS ()
+reactFunEq from_this fsk1 solve_this fsk2
+  = do { ctevs <- xCtEvidence solve_this xev
+             -- No caching!  See Note [Cache-caused loops]
+
+       ; emitWorkNC ctevs }
+  where
+    from_this_co = evTermCoercion $ ctEvTerm from_this
+
+    xev = XEvTerm [mkTcEqPred (mkTyVarTy fsk2) (mkTyVarTy fsk1)] 
+                  -- Why not (mkTcEqPred xi1 xi2)? 
+                  -- See Note [Efficient orientation]
+                  xcomp xdecomp
+
+    -- xcomp : [(fsk2 ~ fsk1)] -> (F tys ~ fsk2)
+    xcomp [x] = EvCoercion (from_this_co `mkTcTransCo` mk_sym_co x)
+    xcomp _   = panic "No more goals!"
+
+    -- xdecomp : (F tys ~ fsk2) -> [(fsk2 ~ fsk1)]
+    xdecomp x = [EvCoercion (mk_sym_co x `mkTcTransCo` from_this_co)]
+
+    mk_sym_co x = mkTcSymCo (evTermCoercion x)
 \end{code}
 
 Note [Cache-caused loops]
@@ -1459,29 +1485,38 @@ doTopReactFunEq _ct ev fam_tc args fsk
     do { match_res <- matchFam fam_tc args   -- See Note [MATCHING-SYNONYMS]
        ; case match_res of {
            Nothing -> do { try_improvement; return NoTopInt } ;
-           Just (co, rhs_ty) ->
+           Just (ax_co, rhs_ty) ->
 
     -- Found a top-level instance
-    do { let deeper_loc = bumpCtLocDepth CountTyFunApps loc
-       ; (rhs_xi, flat_co) <- flatten FMFullFlatten (givenFlavour deeper_loc) rhs_ty
+    | isGiven ev
+    -> do { let final_co = mkTcSymCo (ctEvCoercion ev) `mkTransCo` ax_co
+                -- final_co :: fsk ~ rhs_ty
+          ; ev <- newGivenEvVar deeper_loc (mkTcEqPred (mkTyVarTy fsk) rhs_ty, EvCoercion final_co)
+          ; emitNC [ev] 
+          ; return $ SomeTopInt { tir_rule = "Fun/Top (given)"
+                                , tir_new_item = Stop } }
+
+    | otherwise
+    do { (rhs_xi, flat_co) <- flatten FMFullFlatten (givenFlavour deeper_loc) rhs_ty
                               -- givenFlavour doesn't matter; rhs_ty will be inert
                               -- to tyvar substitution since 'args' are inert
         ; dflags <- getDynFlags
         ; case occurCheckExpand dflags fsk rhs_xi of
            OC_OK rhs_xi'
+             | otherwise  -- Wanted; fsk is really a unification variable
              -> do { setWantedTyBind fsk rhs_xi'
                    ; inerts <- getTcSInerts
                    ; (n_kicked, cans') <- kickOutRewritable (givenFlavour loc) fsk (inert_cans inerts)
                    ; setTcSInerts (inerts { inert_cans = cans' })
                    ; traceTcS "Fun/Top" (ppr_kicked n_kicked)
 
-       		   ; let final_co = co `mkTcTransCo` mkTcSymCo flat_co
-       		         --       co :: fam_tc args ~ rhs_ty
+       		   ; let final_co = ax_co `mkTcTransCo` mkTcSymCo flat_co
+       		         --    ax_co :: fam_tc args ~ rhs_ty
        		         --  flat_co :: rhs_xi' ~ rhs_ty
        		         -- final_co :: fam_tc args ~ rhs_xi'
        		   ; setEvBind (ctEvId ev) (EvCoercion final_co)
 
-       		   ; return $ SomeTopInt { tir_rule = "Fun/Top"
+       		   ; return $ SomeTopInt { tir_rule = "Fun/Top (wanted)x"
                                          , tir_new_item = Stop } }
 
            _ -> do { traceTcS "doTopReactFunEq: occurs check" 
@@ -1489,11 +1524,12 @@ doTopReactFunEq _ct ev fam_tc args fsk
                                   , ppr fsk, ppr rhs_xi ])
                    ; ev <- newWantedEvVarNC loc (mkEqPred (mkTyVarTy fsk) rhs_xi)
                    ; emitInsoluble (mkNonCanonical ev) 
-                   ; return $ SomeTopInt { tir_rule = "Fun/Top"
+                   ; return $ SomeTopInt { tir_rule = "Fun/Top (insol)"
                                          , tir_new_item = Stop } }
          } } }
   where
     loc = ctev_loc ev
+    deeper_loc = bumpCtLocDepth CountTyFunApps loc
 
     try_improvement
       | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc

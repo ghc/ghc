@@ -954,6 +954,7 @@ zonkTcTyVar tv
     case tcTyVarDetails tv of
       SkolemTv {}   -> zonk_kind_and_return
       RuntimeUnk {} -> zonk_kind_and_return
+      FlatSkol ty   -> zonkTcType ty
       MetaTv { mtv_ref = ref }
          -> do { cts <- readMutVar ref
                ; case cts of

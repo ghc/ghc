@@ -1285,6 +1285,8 @@ data Implication
                                  --   (order does not matter)
                                  -- See Invariant (GivenInv) in TcType
 
+      ic_fsks  :: [TcTyVar],     -- Extra flatten-skolems introduced by
+                                 -- by flattening the givens
       ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
                                  -- False <=> ic_givens might have equalities
 
@@ -1626,6 +1628,7 @@ data CtLoc = CtLoc { ctl_origin :: CtOrigin
   --    source location:  tcl_loc   :: SrcSpan
   --    context:          tcl_ctxt  :: [ErrCtxt]
   --    binder stack:     tcl_bndrs :: [TcIdBinders]
+  --    level:            tcl_untch :: Untouchables
 
 mkGivenLoc :: SkolemInfo -> TcLclEnv -> CtLoc
 mkGivenLoc skol_info env = CtLoc { ctl_origin = GivenOrigin skol_info
@@ -1774,9 +1777,6 @@ pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "Unk
 \begin{code}
 data CtOrigin
   = GivenOrigin SkolemInfo
-  | FlatSkolOrigin              -- Flatten-skolems created for Givens
-                                -- Note [When does an implication have given equalities?]
-                                -- in TcSimplify
 
   -- All the others are for *wanted* constraints
   | OccurrenceOf Name           -- Occurrence of an overloaded identifier
@@ -1827,7 +1827,6 @@ data CtOrigin
 
 pprO :: CtOrigin -> SDoc
 pprO (GivenOrigin sk)      = ppr sk
-pprO FlatSkolOrigin        = ptext (sLit "a given flatten-skolem")
 pprO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprO AppOrigin             = ptext (sLit "an application")
 pprO (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]

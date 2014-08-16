@@ -663,7 +663,7 @@ solve_wanteds_and_drop wanted = do { wc <- solve_wanteds wanted
 solve_wanteds :: WantedConstraints -> TcS WantedConstraints
 -- so that the inert set doesn't mindlessly propagate.
 -- NB: wc_flats may be wanted /or/ derived now
-solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols })
+solve_wanteds wanted@(WC { wc_flat = flats, wc_insol = insols, wc_impl = implics })
   = do { traceTcS "solveWanteds {" (ppr wanted)
 
          -- Try the flat bit, including insolubles. Solving insolubles a
@@ -672,8 +672,7 @@ solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols
          -- of adding Derived insolubles twice; see
          -- TcSMonad Note [Do not add duplicate derived insolubles]
        ; traceTcS "solveFlats {" empty
-       ; let all_flats = flats `unionBags` insols
-       ; impls_from_flats <- solveInteract all_flats
+       ; impls_from_flats <- solveInteract (flats `unionBags` insols)
        ; traceTcS "solveFlats end }" (ppr impls_from_flats)
 
        -- solve_wanteds iterates when it is able to float equalities
@@ -760,23 +759,26 @@ solveImplication (inerts, outer_funeqs)
                  , ic_binds  = ev_binds
                  , ic_skols  = skols
                  , ic_given  = givens
+                 , ic_fsks   = old_fsks
                  , ic_wanted = wanteds
                  , ic_info   = info
                  , ic_env    = env })
   = do { traceTcS "solveImplication {" (ppr imp)
 
          -- Solve the nested constraints
-       ; (no_given_eqs, residual_wanted)
+       ; (no_given_eqs, new_fsks, residual_wanted)
             <- nestImplicTcS ev_binds untch inerts $
-               do { no_eqs <- solveInteractGiven (mkGivenLoc info env) givens
-                  ; _      <- solveInteract outer_funeqs
+               do { solveInteractGiven (mkGivenLoc info env) givens
+                  ; _ <- solveInteract outer_funeqs
 
                   ; residual_wanted <- solve_wanteds wanteds
                         -- solve_wanteds, *not* solve_wanteds_and_drop, because
                         -- we want to retain derived equalities so we can float
                         -- them out in floatEqualities
 
-                  ; return (no_eqs, residual_wanted) }
+                  ; (no_eqs, fsks) <- getInertGivens untch
+
+                  ; return (no_eqs, fsks, residual_wanted) }
 
        ; (floated_eqs, final_wanted)
              <- floatEqualities skols no_given_eqs residual_wanted
@@ -785,7 +787,8 @@ solveImplication (inerts, outer_funeqs)
                         = emptyBag  -- Reason for the no_given_eqs: we don't want to
                                     -- lose the "inaccessible code" error message
                         | otherwise
-                        = unitBag (imp { ic_no_eqs = no_given_eqs
+                        = unitBag (imp { ic_fsks   = new_fsks
+                                       , ic_no_eqs = no_given_eqs
                                        , ic_wanted = dropDerivedWC final_wanted
                                        , ic_insol  = insolubleWC final_wanted })
 

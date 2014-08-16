@@ -68,6 +68,7 @@ module TcSMonad (
     getInertEqs,
     emptyInert, getTcSInerts, setTcSInerts,
     getInertUnsolved, checkAllSolved,
+    getInertGivens,
     prepareInertsForImplications,
     addInertCan, insertInertItemTcS,
     EqualCtList,
@@ -379,7 +380,7 @@ The reason for all this is simply to avoid re-solving goals we have solved alrea
 
 Note [Type family equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Type-family equations, of form (ev : F tys ~ ty), live in four places
+Type-family equations, of form (ev : F tys ~ ty), live in three places
 
   * The work-list, of course
 
@@ -393,9 +394,6 @@ Type-family equations, of form (ev : F tys ~ ty), live in four places
     Because it contains work-list things, DO NOT use the flat cache to solve
     a top-level goal.  Eg in the above example we don't want to solve w3
     using w3 itself!
-
-  * The inert_solved_funeqs.  These are all "solved" goals (see Note [Solved constraints]),
-    the result of using a top-level type-family instance.
 
   * THe inert_funeqs are un-solved but fully processed and in the InertCans.
 
@@ -422,13 +420,6 @@ data InertCans
 
        , inert_insols :: Cts
               -- Frozen errors (as non-canonicals)
-
-       , inert_no_eqs :: !Bool    
-              -- Set to False when adding a new equality
-              -- (eq/funeq) or potential equality (irred)
-              -- whose evidence is not a constant
-              -- See Note [When does an implication have given equalities?]
-              -- in TcSimplify
        }
 
 type EqualCtList = [Ct]
@@ -497,7 +488,6 @@ instance Outputable InertCans where
                    <+> vcat (map ppr (varEnvElts (inert_eqs ics)))
                  , ptext (sLit "Type-function equalities:")
                    <+> vcat (map ppr (funEqsToList (inert_funeqs ics)))
-                 , ptext (sLit "No-eqs:") <+> ppr (inert_no_eqs ics)
                  , ptext (sLit "Dictionaries:")
                    <+> vcat (map ppr (Bag.bagToList $ dictsToBag (inert_dicts ics)))
                  , ptext (sLit "Irreds:")
@@ -517,7 +507,6 @@ emptyInert
                          , inert_funeqs  = emptyFunEqs
                          , inert_irreds  = emptyCts
                          , inert_insols  = emptyCts
-                         , inert_no_eqs  = True  -- See Note [inert_fsks and inert_no_eqs]
                          }
        , inert_flat_cache    = emptyFunEqs
        , inert_solved_dicts  = emptyDictMap }
@@ -528,18 +517,13 @@ addInertCan :: InertCans -> Ct -> InertCans
 addInertCan ics item@(CTyEqCan { cc_ev = ev })
   = ics { inert_eqs = extendVarEnv_C (\eqs _ -> item : eqs)
                               (inert_eqs ics)
-                              (cc_tyvar item) [item]
-        , inert_no_eqs = isFlatSkolEv ev && inert_no_eqs ics }
-    -- See Note [When does an implication have given equalities?] in TcSimplify
+                              (cc_tyvar item) [item] }
 
 addInertCan ics item@(CFunEqCan { cc_fun = tc, cc_tyargs = tys, cc_ev = ev })
-  = ics { inert_funeqs = insertFunEq (inert_funeqs ics) tc tys item
-        , inert_no_eqs = isFlatSkolEv ev && inert_no_eqs ics }
-    -- See Note [When does an implication have given equalities?] in TcSimplify
+  = ics { inert_funeqs = insertFunEq (inert_funeqs ics) tc tys item }
 
 addInertCan ics item@(CIrredEvCan {})
-  = ics { inert_irreds = inert_irreds ics `Bag.snocBag` item
-        , inert_no_eqs = False }
+  = ics { inert_irreds = inert_irreds ics `Bag.snocBag` item }
        -- The 'False' is because the irreducible constraint might later instantiate
        -- to an equality.
        -- But since we try to simplify first, if there's a constraint function FC with
@@ -553,14 +537,6 @@ addInertCan _ item
   = pprPanic "upd_inert set: can't happen! Inserting " $
     ppr item   -- Can't be CNonCanonical, CHoleCan,
                -- because they only land in inert_insols
-
-isFlatSkolEv :: CtEvidence -> Bool
--- True if (a) it's a Given and (b) it is evidence for
--- (or derived from) a flatten-skolem equality.
--- See Note [When does an implication have given equalities?] in TcSimplify
-isFlatSkolEv ev = case ctLocOrigin (ctev_loc ev) of
-                    FlatSkolOrigin -> True
-                    _              -> False
 
 --------------
 insertInertItemTcS :: Ct -> TcS ()
@@ -606,7 +582,6 @@ prepareInertsForImplications is@(IS { inert_cans = cans })
            , inert_irreds  = Bag.filterBag isGivenCt irreds
            , inert_dicts   = filterDicts isGivenCt dicts
            , inert_insols  = emptyCts
-           , inert_no_eqs  = True  -- See Note [inert_fsks and inert_no_eqs]
            }
 
     is_given_ecl :: EqualCtList -> Bool
@@ -684,17 +659,19 @@ getInertUnsolved :: TcS (Cts, Cts)
 -- Both consist of a mixture of Wanted and Derived
 getInertUnsolved
  = do { is <- getTcSInerts
-
-      ; let icans = inert_cans is
-            unsolved_irreds = Bag.filterBag is_unsolved  (inert_irreds icans)
-            unsolved_dicts  = foldDicts  add_if_unsolved (inert_dicts icans)  emptyCts
-            unsolved_funeqs = foldFunEqs add_if_unsolved (inert_funeqs icans) emptyCts
-            unsolved_eqs    = foldVarEnv add_if_unsolveds emptyCts (inert_eqs icans)
+      ; let icans@(InertCans { inert_eqs = ieqs, inert_funeqs = ifuneqs
+                             , inert_irreds = iirreds, inert_dicts = idicts
+                             , inert_insols = iinsols })
+                            = inert_cans is
+            unsolved_irreds = Bag.filterBag is_unsolved  iirreds
+            unsolved_dicts  = foldDicts  add_if_unsolved idicts  emptyCts
+            unsolved_funeqs = foldFunEqs add_if_unsolved ifuneqs emptyCts
+            unsolved_eqs    = foldVarEnv add_if_unsolveds emptyCts ieqs
 
             unsolved_flats = unsolved_eqs `unionBags` unsolved_irreds `unionBags`
                              unsolved_dicts `unionBags` unsolved_funeqs
 
-      ; return (unsolved_flats, inert_insols icans) }
+      ; return ( unsolved_flats, iinsols ) }
   where
     add_if_unsolved :: Ct -> Cts -> Cts
     add_if_unsolved ct cts | is_unsolved ct = cts `extendCts` ct
@@ -704,6 +681,42 @@ getInertUnsolved
     add_if_unsolveds eqs cts = foldr add_if_unsolved cts eqs
 
     is_unsolved ct = not (isGivenCt ct)   -- Wanted or Derived
+
+
+getInertGivens :: Untouchables
+               -> TcS ( Bool       -- True <=> definitely no residual given equalities
+                      , [TcTyVar]  -- Flatten-skolems
+
+getInertGivens untch
+  = do { is <- getTcSInerts
+       ; let icans@(InertCans { inert_eqs = ieqs, inert_funeqs = ifuneqs
+                              , inert_irreds = iirreds })
+                  = inert_cans is
+        
+              has_given_eqs = foldrBag ((||) . ev_given_here . ctEvidence) False iirreds
+                           || foldVarEnv ((||) . cts_given_here)           False ieqs
+
+              fsks = foldFunEqs (add_fsk untch) ifuneqs []
+
+       ; return (not has_given_eqs, fsks) }
+  where
+    cts_given_here :: Untouchables -> EqualCtList -> Bool
+    cts_given_here untch [ct]   -- Givens are always a sigleton
+      = ev_given_here untch (ctEvidence ct)
+
+    ev_given_here :: Untouchables -> CtEvidence -> Bool
+    -- True for a Given bound by the curent implication,
+    -- i.e. the current level
+    ev_given_here untch ev
+      =  isGiven ev
+      && untch == tcl_untch (ctl_env (ctEvLoc ev))
+
+    add_fsk :: Untouchables -> Ct -> [TcTyVar] -> [TcTyVar]
+    add_fsk untch (CFunEqCan { cc_ev = ev, cc_fsk = fsk }) fsks
+      | ev_given_here untch ev
+      = fsk : fsks
+    add_fsk _ _ fsks = fsks  
+
 
 checkAllSolved :: TcS Bool
 -- True if there are no unsolved wanteds
@@ -1245,34 +1258,7 @@ getTcEvBinds = TcS (return . tcs_ev_binds)
 
 getUntouchables :: TcS Untouchables
 getUntouchables = wrapTcS TcM.getUntouchables
-
-getGivenInfo :: TcS a -> TcS (Bool, a)
--- See Note [inert_fsks and inert_no_eqs]
-getGivenInfo thing_inside
-  = do { updInertTcS reset_vars  -- Set inert_fsks and inert_no_eqs to initial values
-       ; res <- thing_inside     -- Run thing_inside
-       ; is  <- getTcSInerts     -- Get new values of inert_fsks and inert_no_eqs
-       ; return (inert_no_eqs (inert_cans is), res) }
-  where
-    reset_vars :: InertSet -> InertSet
-    reset_vars is = is { inert_cans = (inert_cans is) { inert_no_eqs = True } }
 \end{code}
-
-Note [inert_fsks and inert_no_eqs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The function getGivenInfo runs thing_inside to see what new flatten-skolems
-and equalities are generated by thing_inside.  To that end,
- * it initialises inert_fsks, inert_no_eqs
- * runs thing_inside
- * reads out inert_fsks, inert_no_eqs
-This is the only place where it matters what inert_fsks and inert_no_eqs
-are initialised to.  In other places (eg emptyIntert), we need to set them
-to something (because they are strict) but they will never be looked at.
-
-See Note [When does an implication have given equalities?] in TcSimplify
-for more details about inert_no_eqs.
-
-See Note [Given flatten-skolems] for more details about inert_fsks.
 
 \begin{code}
 getTcSTyBinds :: TcS (IORef (Bool, TyVarEnv (TcTyVar, TcType)))
@@ -1438,16 +1424,31 @@ which will result in two Deriveds to end up in the insoluble set:
 newFlattenSkolem :: CtLoc -> TcType              -- F xis
                  -> TcS (CtEvidence, TcTyVar)    -- [W] x:: F xis ~ fsk
 newFlattenSkolem loc fam_ty
-  = do { fsk <- wrapTcS $
-    		do { uniq <- TcM.newUnique
-    		   ; ref  <- TcM.newMutVar Flexi
-    		   ; let details = MetaTv { mtv_info = FlatSkolTv
-    		                          , mtv_ref = ref
-    		                          , mtv_untch = fskUntouchables }
-    		         name = TcM.mkTcTyVarName uniq (fsLit "fsk")
-    		   ; return (mkTcTyVar name (typeKind fam_ty) details) }
-       ; ev <- newWantedEvVarNC loc (mkTcEqPred fam_ty (mkTyVarTy fsk))
-       ; return (ev, fsk) }
+  = do { untch <- getUntouchables
+       ; if foldVarSet ((||) . isTouchableMetaTyVar untch) False
+                       (tyVarsOfType fam_ty)
+
+         then -- Make a wanted
+           do { ufsk <- wrapTcS $
+    		    do { uniq <- TcM.newUnique
+    		       ; ref  <- TcM.newMutVar Flexi
+    		       ; let details = MetaTv { mtv_info  = FlatSkolTv
+    		                              , mtv_ref   = ref
+    		                              , mtv_untch = fskUntouchables }
+    		             name = TcM.mkTcTyVarName uniq (fsLit "ufsk")
+    		       ; return (mkTcTyVar name (typeKind fam_ty) details) }
+       	      ; ev <- newWantedEvVarNC loc (mkTcEqPred fam_ty (mkTyVarTy ufsk))
+       	      ; return (ev, ufsk) }
+
+         else -- Make a given
+           do { fsk <- wrapTcS $
+                    do { uniq <- TcM.newUnique
+                       ; let name = TcM.mkTcTyVarName uniq (fsLit "fsk")
+                       ; return (mkTcTyVar name (typeKind fam_ty) (FlatSkol fam_ty)) }
+              ; let ev = CtGiven { ctev_pred = mkTcEqPred fam_ty (mkTyVarTy tv)
+                                 , ctev_evtm = EvCoercion (mkTcNomReflCo fam_ty)
+                                 , ctev_loc  = loc }
+              ; return (ev, fsk) } }
 
 extendFlatCache :: TyCon -> [Type] -> (TcCoercion, TcTyVar) -> TcS ()
 extendFlatCache tc xi_args (co, fsk)
@@ -1887,6 +1888,7 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                                                   , ic_skols  = skol_tvs
                                                   , ic_no_eqs = True
                                                   , ic_given  = []
+                                                  , ic_fsks   = []
                                                   , ic_wanted = wc
                                                   , ic_insol  = False
                                                   , ic_binds  = ev_binds_var

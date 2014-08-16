@@ -272,6 +272,9 @@ data TcTyVarDetails
                   --          when looking up instances
                   -- See Note [Binding when looking up instances] in InstEnv
 
+  | FlatSkol 
+       TcType
+
   | RuntimeUnk    -- Stands for an as-yet-unknown type in the GHCi
                   -- interactive context
 
@@ -420,7 +423,7 @@ the whole implication disappears but when we pop out again we are left with
 uf will get unified *once more* to (F Int).
 
 \begin{code}
-newtype Untouchables = Untouchables Int
+newtype Untouchables = Untouchables Int deriving( Eq )
   -- See Note [Untouchable type variables] for what this Int is
 
 fskUntouchables :: Untouchables
@@ -464,6 +467,7 @@ pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 pprTcTyVarDetails (SkolemTv True)  = ptext (sLit "ssk")
 pprTcTyVarDetails (SkolemTv False) = ptext (sLit "sk")
 pprTcTyVarDetails (RuntimeUnk {})  = ptext (sLit "rt")
+pprTcTyVarDetails (FlatSkol {})    = ptext (sLit "fsk")
 pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_untch = untch })
   = pp_info <> brackets (ppr untch)
   where
@@ -471,7 +475,7 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_untch = untch })
                 PolyTv     -> ptext (sLit "poly")
                 TauTv      -> ptext (sLit "tau")
                 SigTv      -> ptext (sLit "sig")
-                FlatSkolTv -> ptext (sLit "fsk")
+                FlatSkolTv -> ptext (sLit "usk")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
@@ -621,9 +625,8 @@ isFlatSkolTyVar tv
 isSkolemTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-        SkolemTv {}   -> True
-        RuntimeUnk {} -> True
-        MetaTv {}     -> False
+        MetaTv {} -> False
+        _other    -> True
 
 isOverlappableTyVar tv
   = ASSERT( isTcTyVar tv )

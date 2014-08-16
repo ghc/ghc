@@ -831,6 +831,7 @@ extraTyVarInfo ctxt tv1 ty2
                 , let pp_tv = quotes (ppr tv)
                 = case tcTyVarDetails tv of
                     SkolemTv {}   -> pp_tv <+> pprSkol (getSkolemInfo implics tv) (getSrcLoc tv)
+                    FlatSkol {}   -> pp_tv <+> ptext (sLit "is a flattening type variable")
                     RuntimeUnk {} -> pp_tv <+> ptext (sLit "is an interactive-debugger skolem")
                     MetaTv {}     -> empty
 
