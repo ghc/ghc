@@ -1195,7 +1195,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_newPinnedByteArrayzh)                           \
       SymI_HasProto(stg_newAlignedPinnedByteArrayzh)                    \
       SymI_HasProto(stg_shrinkMutableByteArrayzh)                       \
-      SymI_HasProto(stg_resizzeMutableByteArrayzh)                      \
+      SymI_HasProto(stg_resizeMutableByteArrayzh)                       \
       SymI_HasProto(newSpark)                                           \
       SymI_HasProto(performGC)                                          \
       SymI_HasProto(performMajorGC)                                     \

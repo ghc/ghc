@@ -158,7 +158,7 @@ stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
 // MutableByteArray resized in-place or, if not possible, a newly
 // allocated (unpinned) MutableByteArray (with the original content
 // copied over)
-stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
+stg_resizeMutableByteArrayzh ( gcptr mba, W_ new_size )
 // MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
 {
    W_ new_size_wds;
