@@ -1328,7 +1328,7 @@ addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey, byteA
     floatPrimTyConKey, floatTyConKey, funTyConKey, intPrimTyConKey,
     intTyConKey, int8TyConKey, int16TyConKey, int32PrimTyConKey,
     int32TyConKey, int64PrimTyConKey, int64TyConKey,
-    integerTyConKey, digitsTyConKey,
+    integerTyConKey,
     listTyConKey, foreignObjPrimTyConKey, weakPrimTyConKey,
     mutableArrayPrimTyConKey, mutableArrayArrayPrimTyConKey, mutableByteArrayPrimTyConKey,
     orderingTyConKey, mVarPrimTyConKey, ratioTyConKey, rationalTyConKey,
@@ -1355,7 +1355,7 @@ int32TyConKey                           = mkPreludeTyConUnique 19
 int64PrimTyConKey                       = mkPreludeTyConUnique 20
 int64TyConKey                           = mkPreludeTyConUnique 21
 integerTyConKey                         = mkPreludeTyConUnique 22
-digitsTyConKey                          = mkPreludeTyConUnique 23
+
 listTyConKey                            = mkPreludeTyConUnique 24
 foreignObjPrimTyConKey                  = mkPreludeTyConUnique 25
 weakPrimTyConKey                        = mkPreludeTyConUnique 27
