@@ -484,60 +484,8 @@ export CC
 MAYBE_OVERRIDE_STAGE0([gcc],[CC_STAGE0])
 MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
 
-dnl ** what cpp to use?
-dnl --------------------------------------------------------------
-AC_ARG_WITH(hs-cpp,
-[AC_HELP_STRING([--with-hs-cpp=ARG],
-        [Use ARG as the path to cpp [default=autodetect]])],
-[
-    if test "$HostOS" = "mingw32"
-    then
-        AC_MSG_WARN([Request to use $withval will be ignored])
-    else
-        HaskellCPPCmd=$withval
-    fi
-],
-[
-        HaskellCPPCmd=$WhatGccIsCalled
-]
-)
-
-
-
-dnl ** what cpp flags to use?
-dnl -----------------------------------------------------------
-AC_ARG_WITH(hs-cpp-flags,
-  [AC_HELP_STRING([--with-hs-cpp-flags=ARG],
-          [Use ARG as the path to hs cpp [default=autodetect]])],
-  [
-      if test "$HostOS" = "mingw32"
-      then
-          AC_MSG_WARN([Request to use $withval will be ignored])
-      else
-          HaskellCPPArgs=$withval
-      fi
-  ],
-[
-  $HaskellCPPCmd -x c /dev/null -dM -E > conftest.txt 2>&1
-  if grep "__clang__" conftest.txt >/dev/null 2>&1; then
-    HaskellCPPArgs="-E -undef -traditional -Wno-invalid-pp-token -Wno-unicode -Wno-trigraphs "
-  else
-      $HaskellCPPCmd  -v > conftest.txt 2>&1
-      if  grep "gcc" conftest.txt >/dev/null 2>&1; then
-          HaskellCPPArgs="-E -undef -traditional "
-        else
-          $HaskellCPPCmd  --version > conftest.txt 2>&1
-          if grep "cpphs" conftest.txt >/dev/null 2>&1; then
-            HaskellCPPArgs="--cpp -traditional"
-          else
-            AC_MSG_WARN([configure can't recognize your CPP program, you may need to set --with-hs-cpp-flags=FLAGS explicitly])
-            HaskellCPPArgs=""
-          fi
-      fi
-  fi
-  ]
-)
-
+# --with-hs-cpp/--with-hs-cpp-flags
+FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
 
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
