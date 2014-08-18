@@ -8,19 +8,19 @@
 -- Module      :  Data.Data
 -- Copyright   :  (c) The University of Glasgow, CWI 2001--2004
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  non-portable (local universal quantification)
 --
--- \"Scrap your boilerplate\" --- Generic programming in Haskell.
--- See <http://www.cs.vu.nl/boilerplate/>. This module provides
--- the 'Data' class with its primitives for generic programming, along
--- with instances for many datatypes. It corresponds to a merge between
--- the previous "Data.Generics.Basics" and almost all of 
--- "Data.Generics.Instances". The instances that are not present
--- in this module were moved to the @Data.Generics.Instances@ module
--- in the @syb@ package.
+-- \"Scrap your boilerplate\" --- Generic programming in Haskell.  See
+-- <http://www.haskell.org/haskellwiki/Research_papers/Generics#Scrap_your_boilerplate.21>.
+-- This module provides the 'Data' class with its primitives for
+-- generic programming, along with instances for many datatypes. It
+-- corresponds to a merge between the previous "Data.Generics.Basics"
+-- and almost all of "Data.Generics.Instances". The instances that are
+-- not present in this module were moved to the
+-- @Data.Generics.Instances@ module in the @syb@ package.
 --
 -- For more information, please visit the new
 -- SYB wiki: <http://www.cs.uu.nl/wiki/bin/view/GenericProgramming/SYB>.
