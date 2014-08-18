@@ -3708,7 +3708,8 @@ may use different notation to that implemented in GHC.
 </para>
 <para>
 The rest of this section outlines the extensions to GHC that support GADTs.   The extension is enabled with
-<option>-XGADTs</option>.  The <option>-XGADTs</option> flag also sets <option>-XRelaxedPolyRec</option>.
+<option>-XGADTs</option>.  The <option>-XGADTs</option> flag also sets <option>-XGADTSyntax</option>
+and <option>-XMonoLocalBinds</option>.
 <itemizedlist>
 <listitem><para>
 A GADT can only be declared using GADT-style syntax (<xref linkend="gadt-style"/>);
