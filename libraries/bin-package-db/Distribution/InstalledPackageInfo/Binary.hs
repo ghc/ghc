@@ -22,8 +22,10 @@ module Distribution.InstalledPackageInfo.Binary (
 import Distribution.Version
 import Distribution.Package hiding (depends)
 import Distribution.License
+import Distribution.ModuleName as ModuleName
 import Distribution.ModuleExport
 import Distribution.InstalledPackageInfo as IPI
+import Distribution.Text (display)
 import Data.Binary as Bin
 import Control.Exception as Exception
 
@@ -163,6 +165,10 @@ instance Binary Version where
 
 deriving instance Binary PackageName
 deriving instance Binary InstalledPackageId
+
+instance Binary ModuleName where
+  put = put . display
+  get = fmap ModuleName.fromString get
 
 instance Binary m => Binary (ModuleExport m) where
   put (ModuleExport a b c d) = do put a; put b; put c; put d

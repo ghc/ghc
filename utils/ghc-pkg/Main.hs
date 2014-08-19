@@ -706,8 +706,7 @@ readParseDatabase verbosity mb_user_conf use_cache path
                           when (verbosity > Normal) $
                              infoLn ("using cache: " ++ cache)
                           pkgs <- myReadBinPackageDB cache
-                          let pkgs' = map convertPackageInfoIn pkgs
-                          mkPackageDB pkgs'
+                          mkPackageDB pkgs
                       else do
                           when (verbosity >= Normal) $ do
                               warn ("WARNING: cache is out of date: "
@@ -735,7 +734,7 @@ readParseDatabase verbosity mb_user_conf use_cache path
 -- bytestring 0.9.0.x (fixed in 0.9.1.x) where the file wasn't closed
 -- after it has been completely read, leading to a sharing violation
 -- later.
-myReadBinPackageDB :: FilePath -> IO [InstalledPackageInfoString]
+myReadBinPackageDB :: FilePath -> IO [InstalledPackageInfo]
 myReadBinPackageDB filepath = do
   h <- openBinaryFile filepath ReadMode
   sz <- hFileSize h
@@ -1021,7 +1020,7 @@ updateDBCache verbosity db = do
   let filename = location db </> cachefilename
   when (verbosity > Normal) $
       infoLn ("writing cache " ++ filename)
-  writeBinaryFileAtomic filename (map convertPackageInfoOut (packages db))
+  writeBinaryFileAtomic filename (packages db)
     `catchIO` \e ->
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
