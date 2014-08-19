@@ -2175,8 +2175,15 @@ dynamic_flags = [
         ----- Linker --------------------------------------------------------
   , Flag "static"         (NoArg removeWayDyn)
   , Flag "dynamic"        (NoArg (addWay WayDyn))
+  , Flag "rdynamic" $ noArg $
+#ifdef linux_HOST_OS
+                              addOptl "-rdynamic"
+#elif defined (mingw32_HOST_OS)
+                              addOptl "-export-all-symbols"
+#else
     -- ignored for compat w/ gcc:
-  , Flag "rdynamic"       (NoArg (return ()))
+                              id
+#endif
   , Flag "relative-dynlib-paths"  (NoArg (setGeneralFlag Opt_RelativeDynlibPaths))
 
         ------- Specific phases  --------------------------------------------

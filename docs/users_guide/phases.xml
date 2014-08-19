@@ -1230,6 +1230,21 @@ $ cat foo.hspp</screen>
               platforms.</para>
         </listitem>
       </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-rdynamic</option>
+          <indexterm><primary><option>-rdynamic</option></primary>
+          </indexterm>
+        </term>
+        <listitem>
+          <para>
+              This instructs the linker to add all symbols, not only used ones, to the
+              dynamic symbol table. Currently Linux and Windows/MinGW32 only.
+              This is equivalent to using <literal>-optl -rdynamic</literal> in linux,
+              and <literal>-optl -export-all-symbols</literal> in Windows.</para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </sect2>
 
