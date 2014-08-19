@@ -63,11 +63,7 @@ import Control.Concurrent.MVar
 
 import System.FilePath
 import System.IO
-#if __GLASGOW_HASKELL__ > 704
 import System.Directory hiding (findFile)
-#else
-import System.Directory
-#endif
 
 import Distribution.Package hiding (depends, mkPackageKey, PackageKey)
 

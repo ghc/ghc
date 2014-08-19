@@ -136,8 +136,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.4],
-    [AC_MSG_ERROR([GHC version 7.4 or later is required to compile GHC.])])dnl
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.6],
+    [AC_MSG_ERROR([GHC version 7.6 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
@@ -151,9 +151,7 @@ then
     fi
 fi
 
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],
-                    GHC_PACKAGE_DB_FLAG=package-conf,
-                    GHC_PACKAGE_DB_FLAG=package-db)
+GHC_PACKAGE_DB_FLAG=package-db
 AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
 # GHC 7.7+ needs -fcmm-sink when compiling Parser.hs. See #8182

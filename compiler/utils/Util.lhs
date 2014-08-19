@@ -129,10 +129,6 @@ import qualified Data.IntMap as IM
 import qualified Data.Set as Set
 
 import Data.Time
-#if __GLASGOW_HASKELL__ < 705
-import Data.Time.Clock.POSIX
-import System.Time
-#endif
 
 infixr 9 `thenCmp`
 \end{code}
@@ -954,13 +950,7 @@ doesDirNameExist fpath = case takeDirectory fpath of
 -- Backwards compatibility definition of getModificationTime
 
 getModificationUTCTime :: FilePath -> IO UTCTime
-#if __GLASGOW_HASKELL__ < 705
-getModificationUTCTime f = do
-    TOD secs _ <- getModificationTime f
-    return $ posixSecondsToUTCTime (realToFrac secs)
-#else
 getModificationUTCTime = getModificationTime
-#endif
 
 -- --------------------------------------------------------------
 -- check existence & modification time at the same time

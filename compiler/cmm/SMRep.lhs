@@ -105,11 +105,7 @@ StgWord is a type representing an StgWord on the target platform.
 \begin{code}
 -- A Word64 is large enough to hold a Word for either a 32bit or 64bit platform
 newtype StgWord = StgWord Word64
-    deriving (Eq,
-#if __GLASGOW_HASKELL__ < 706
-              Num,
-#endif
-              Bits)
+    deriving (Eq, Bits)
 
 fromStgWord :: StgWord -> Integer
 fromStgWord (StgWord i) = toInteger i
