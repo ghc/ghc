@@ -10,10 +10,11 @@
 module Main (main) where
 
 import Version ( version, targetOS, targetARCH )
+import qualified GHC.PackageDb as GhcPkg
 import Distribution.InstalledPackageInfo.Binary()
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import Distribution.ModuleName hiding (main)
-import Distribution.InstalledPackageInfo
+import Distribution.InstalledPackageInfo as Cabal
 import Distribution.Compat.ReadP
 import Distribution.ParseUtils
 import Distribution.ModuleExport
@@ -50,7 +51,6 @@ import GHC.IO.Exception (IOErrorType(InappropriateType))
 import Data.List
 import Control.Concurrent
 
-import qualified Data.ByteString.Lazy as B
 import qualified Data.Binary as Bin
 import qualified Data.Binary.Get as Bin
 
@@ -715,7 +715,7 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
                       then do
                           when (verbosity > Normal) $
                              infoLn ("using cache: " ++ cache)
-                          pkgs <- myReadBinPackageDB cache
+                          pkgs <- GhcPkg.readPackageDbForGhcPkg cache
                           mkPackageDB pkgs
                       else do
                           when (verbosity >= Normal && not modify || verbosity > Normal) $ do
@@ -740,18 +740,6 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
         packages = pkgs
       }
 
--- read the package.cache file strictly, to work around a problem with
--- bytestring 0.9.0.x (fixed in 0.9.1.x) where the file wasn't closed
--- after it has been completely read, leading to a sharing violation
--- later.
-myReadBinPackageDB :: FilePath -> IO [InstalledPackageInfo]
-myReadBinPackageDB filepath = do
-  h <- openBinaryFile filepath ReadMode
-  sz <- hFileSize h
-  b <- B.hGet h (fromIntegral sz)
-  hClose h
-  return $ Bin.runGet Bin.get b
-  
 parseSingletonPackageConf :: Verbosity -> FilePath -> IO InstalledPackageInfo
 parseSingletonPackageConf verbosity file = do
   when (verbosity > Normal) $ infoLn ("reading package config: " ++ file)
@@ -1016,9 +1004,16 @@ changeDBDir verbosity cmds db = do
 updateDBCache :: Verbosity -> PackageDB -> IO ()
 updateDBCache verbosity db = do
   let filename = location db </> cachefilename
+
+      pkgsCabalFormat :: [InstalledPackageInfo]
+      pkgsCabalFormat = packages db
+
+      pkgsGhcCacheFormat :: [GhcPkg.GhcPackageInfo]
+      pkgsGhcCacheFormat = [] -- TODO: for the moment
+
   when (verbosity > Normal) $
       infoLn ("writing cache " ++ filename)
-  writeBinaryFileAtomic filename (packages db)
+  GhcPkg.writePackageDb filename pkgsGhcCacheFormat pkgsCabalFormat
     `catchIO` \e ->
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
@@ -1861,12 +1856,6 @@ catchError io handler = io `Exception.catch` handler'
 
 tryIO :: IO a -> IO (Either Exception.IOException a)
 tryIO = Exception.try
-
-writeBinaryFileAtomic :: Bin.Binary a => FilePath -> a -> IO ()
-writeBinaryFileAtomic targetFile obj =
-  withFileAtomic targetFile $ \h -> do
-     hSetBinaryMode h True
-     B.hPutStr h (Bin.encode obj)
 
 writeFileUtf8Atomic :: FilePath -> String -> IO ()
 writeFileUtf8Atomic targetFile content =

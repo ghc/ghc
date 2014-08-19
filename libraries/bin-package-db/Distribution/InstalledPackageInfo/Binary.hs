@@ -14,10 +14,7 @@
 -- Portability :  portable
 --
 
-module Distribution.InstalledPackageInfo.Binary (
-       readBinPackageDB,
-       writeBinPackageDB
-  ) where
+module Distribution.InstalledPackageInfo.Binary () where
 
 import Distribution.Version
 import Distribution.Package hiding (depends)
@@ -28,20 +25,6 @@ import Distribution.InstalledPackageInfo as IPI
 import Distribution.Text (display)
 import Data.Binary as Bin
 import Control.Exception as Exception
-
-readBinPackageDB :: Binary m => FilePath -> IO [InstalledPackageInfo_ m]
-readBinPackageDB file
-    = do xs <- Bin.decodeFile file
-         _ <- Exception.evaluate $ length xs
-         return xs
-      `catchUserError`
-      (\err -> error ("While parsing " ++ show file ++ ": " ++ err))
-
-catchUserError :: IO a -> (String -> IO a) -> IO a
-catchUserError io f = io `Exception.catch` \(ErrorCall err) -> f err
-
-writeBinPackageDB :: Binary m => FilePath -> [InstalledPackageInfo_ m] -> IO ()
-writeBinPackageDB file ipis = Bin.encodeFile file ipis
 
 instance Binary m => Binary (InstalledPackageInfo_ m) where
   put = putInstalledPackageInfo
