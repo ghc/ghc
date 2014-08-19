@@ -46,6 +46,7 @@ import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO
 import System.IO.Error
+import GHC.IO.Exception (IOErrorType(InappropriateType))
 import Data.List
 import Control.Concurrent
 
@@ -672,9 +673,12 @@ readParseDatabase verbosity mb_user_conf use_cache path
   | otherwise
   = do e <- tryIO $ getDirectoryContents path
        case e of
-         Left _   -> do
-              pkgs <- parseMultiPackageConf verbosity path
-              mkPackageDB pkgs
+         Left err
+           | ioeGetErrorType err == InappropriateType ->
+              die ("ghc no longer supports single-file style package databases ("
+                ++ path ++ ") use 'ghc-pkg init' to create the database with "
+                ++ "the correct format.")
+           | otherwise -> ioError err
          Right fs
            | not use_cache -> ignore_cache (const $ return ())
            | otherwise -> do
@@ -741,15 +745,6 @@ myReadBinPackageDB filepath = do
   b <- B.hGet h (fromIntegral sz)
   hClose h
   return $ Bin.runGet Bin.get b
-
-parseMultiPackageConf :: Verbosity -> FilePath -> IO [InstalledPackageInfo]
-parseMultiPackageConf verbosity file = do
-  when (verbosity > Normal) $ infoLn ("reading package database: " ++ file)
-  str <- readUTF8File file
-  let pkgs = map convertPackageInfoIn $ read str
-  Exception.evaluate pkgs
-    `catchError` \e->
-       die ("error while parsing " ++ file ++ ": " ++ show e)
   
 parseSingletonPackageConf :: Verbosity -> FilePath -> IO InstalledPackageInfo
 parseSingletonPackageConf verbosity file = do
@@ -982,12 +977,8 @@ data DBOp = RemovePackage InstalledPackageInfo
 changeDB :: Verbosity -> [DBOp] -> PackageDB -> IO ()
 changeDB verbosity cmds db = do
   let db' = updateInternalDB db cmds
-  isfile <- doesFileExist (location db)
-  if isfile
-     then writeNewConfig verbosity (location db') (packages db')
-     else do
-       createDirectoryIfMissing True (location db)
-       changeDBDir verbosity cmds db'
+  createDirectoryIfMissing True (location db)
+  changeDBDir verbosity cmds db'
 
 updateInternalDB :: PackageDB -> [DBOp] -> PackageDB
 updateInternalDB db cmds = db{ packages = foldl do_cmd (packages db) cmds }
@@ -1396,46 +1387,6 @@ closure pkgs db_stack = go pkgs db_stack
 
 brokenPackages :: [InstalledPackageInfo] -> [InstalledPackageInfo]
 brokenPackages pkgs = snd (closure [] pkgs)
-
--- -----------------------------------------------------------------------------
--- Manipulating package.conf files
-
-type InstalledPackageInfoString = InstalledPackageInfo_ String
-
-convertPackageInfoOut :: InstalledPackageInfo -> InstalledPackageInfoString
-convertPackageInfoOut
-    (pkgconf@(InstalledPackageInfo { exposedModules = e,
-                                     reexportedModules = r,
-                                     hiddenModules = h })) =
-        pkgconf{ exposedModules = map display e,
-                 reexportedModules = map (fmap display) r,
-                 hiddenModules  = map display h }
-
-convertPackageInfoIn :: InstalledPackageInfoString -> InstalledPackageInfo
-convertPackageInfoIn
-    (pkgconf@(InstalledPackageInfo { exposedModules = e,
-                                     reexportedModules = r,
-                                     hiddenModules = h })) =
-        pkgconf{ exposedModules = map convert e,
-                 reexportedModules = map (fmap convert) r,
-                 hiddenModules  = map convert h }
-    where convert = fromJust . simpleParse
-
-writeNewConfig :: Verbosity -> FilePath -> [InstalledPackageInfo] -> IO ()
-writeNewConfig verbosity filename ipis = do
-  when (verbosity >= Normal) $
-      info "Writing new package config file... "
-  createDirectoryIfMissing True $ takeDirectory filename
-  let shown = concat $ intersperse ",\n "
-                     $ map (show . convertPackageInfoOut) ipis
-      fileContents = "[" ++ shown ++ "\n]"
-  writeFileUtf8Atomic filename fileContents
-    `catchIO` \e ->
-      if isPermissionError e
-      then die (filename ++ ": you don't have permission to modify this file")
-      else ioError e
-  when (verbosity >= Normal) $
-      infoLn "done."
 
 -----------------------------------------------------------------------------
 -- Sanity-check a new package config, and automatically build GHCi libs

@@ -74,7 +74,6 @@ import System.Directory
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
 import Control.Monad
-import Data.Char (isSpace)
 import Data.List as List
 import Data.Map (Map)
 import Data.Monoid hiding ((<>))
@@ -391,16 +390,13 @@ readPackageConfig dflags conf_file = do
 
        else do
             isfile <- doesFileExist conf_file
-            when (not isfile) $
-              throwGhcExceptionIO $ InstallationError $
-                "can't find a package database at " ++ conf_file
-            debugTraceMsg dflags 2 (text "Using package config file:" <+> text conf_file)
-            str <- readFile conf_file
-            case reads str of
-                [(configs, rest)]
-                    | all isSpace rest -> return (map installedPackageInfoToPackageConfig configs)
-                _ -> throwGhcExceptionIO $ InstallationError $
-                        "invalid package database file " ++ conf_file
+            if isfile
+               then throwGhcExceptionIO $ InstallationError $
+                      "ghc no longer supports single-file style package databases (" ++
+                      conf_file ++
+                      ") use 'ghc-pkg init' to create the database with the correct format."
+               else throwGhcExceptionIO $ InstallationError $
+                      "can't find a package database at " ++ conf_file
 
   let
       top_dir = topDir dflags
