@@ -1454,8 +1454,8 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
     any_strict_pat     = any (isStrictHsBind   . unLoc) orig_binds
     any_pat_looks_lazy = any (looksLazyPatBind . unLoc) orig_binds
 
-    is_unlifted id = case tcSplitForAllTys (idType id) of
-                       (_, rho) -> isUnLiftedType rho
+    is_unlifted id = case tcSplitSigmaTy (idType id) of
+                       (_, _, rho) -> isUnLiftedType rho
 
     is_monomorphic (L _ (AbsBinds { abs_tvs = tvs, abs_ev_vars = evs }))
                      = null tvs && null evs
