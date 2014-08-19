@@ -255,6 +255,7 @@ initCapability( Capability *cap, nat i )
     cap->spark_stats.converted  = 0;
     cap->spark_stats.gcd        = 0;
     cap->spark_stats.fizzled    = 0;
+    cap->io_manager_control_wr_fd = -1;
 #endif
     cap->total_allocated        = 0;
 
@@ -1075,6 +1076,16 @@ rtsBool checkSparkCountInvariant (void)
 
 }
 #endif
+
+void setIOManagerControlFd(nat cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
+#if defined(THREADED_RTS)
+    if (cap_no < n_capabilities) {
+        capabilities[cap_no]->io_manager_control_wr_fd = fd;
+    } else {
+        errorBelch("warning: setIOManagerControlFd called with illegal capability number.");
+    }
+#endif
+}
 
 // Local Variables:
 // mode: C

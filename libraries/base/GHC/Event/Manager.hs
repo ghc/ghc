@@ -27,6 +27,7 @@ module GHC.Event.Manager
 
       -- * State
     , callbackTableVar
+    , emControl
 
       -- * Registering interest in I/O events
     , Event
