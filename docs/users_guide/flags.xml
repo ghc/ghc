@@ -2433,8 +2433,8 @@
             <entry><option>-rdynamic</option></entry>
             <entry>This instructs the linker to add all symbols, not only used ones, to the
               dynamic symbol table. Currently Linux and Windows/MinGW32 only.
-              This is equivalent to using <literal>-optl -rdynamic</literal> in linux,
-              and <literal>-optl -export-all-symbols</literal> in Windows.</entry>
+              This is equivalent to using <literal>-optl -rdynamic</literal> on Linux,
+              and <literal>-optl -export-all-symbols</literal> on Windows.</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
