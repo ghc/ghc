@@ -61,8 +61,9 @@ import Outputable
 import Maybes
 
 import System.Environment ( getEnv )
+import GHC.PackageDb (readPackageDbForGhcPkg)
 import Distribution.InstalledPackageInfo
-import Distribution.InstalledPackageInfo.Binary
+import Distribution.InstalledPackageInfo.Binary ()
 import Distribution.Package hiding (depends, PackageKey, mkPackageKey)
 import Distribution.ModuleExport
 import FastString
@@ -385,7 +386,8 @@ readPackageConfig dflags conf_file = do
     if isdir
        then do let filename = conf_file </> "package.cache"
                debugTraceMsg dflags 2 (text "Using binary package database:" <+> text filename)
-               conf <- readBinPackageDB filename
+               conf <- readPackageDbForGhcPkg filename
+               -- TODO readPackageDbForGhc ^^ instead
                return (map installedPackageInfoToPackageConfig conf)
 
        else do
