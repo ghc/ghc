@@ -205,8 +205,9 @@ instance  Num Float  where
     (-)         x y     =  minusFloat x y
     negate      x       =  negateFloat x
     (*)         x y     =  timesFloat x y
-    abs x | x >= 0.0    =  x
-          | otherwise   =  negateFloat x
+    abs x    | x == 0    = 0 -- handles (-0.0)
+             | x >  0    = x
+             | otherwise = negateFloat x
     signum x | x == 0.0  = 0
              | x > 0.0   = 1
              | otherwise = negate 1
@@ -370,8 +371,9 @@ instance  Num Double  where
     (-)         x y     =  minusDouble x y
     negate      x       =  negateDouble x
     (*)         x y     =  timesDouble x y
-    abs x | x >= 0.0    =  x
-          | otherwise   =  negateDouble x
+    abs x    | x == 0    = 0 -- handles (-0.0)
+             | x >  0    = x
+             | otherwise = negateDouble x
     signum x | x == 0.0  = 0
              | x > 0.0   = 1
              | otherwise = negate 1
