@@ -208,9 +208,9 @@ instance  Num Float  where
     abs x    | x == 0    = 0 -- handles (-0.0)
              | x >  0    = x
              | otherwise = negateFloat x
-    signum x | x == 0.0  = 0
-             | x > 0.0   = 1
-             | otherwise = negate 1
+    signum x | x > 0     = 1
+             | x < 0     = negateFloat 1
+             | otherwise = x -- handles 0.0, (-0.0), and NaN
 
     {-# INLINE fromInteger #-}
     fromInteger i = F# (floatFromInteger i)
@@ -374,9 +374,10 @@ instance  Num Double  where
     abs x    | x == 0    = 0 -- handles (-0.0)
              | x >  0    = x
              | otherwise = negateDouble x
-    signum x | x == 0.0  = 0
-             | x > 0.0   = 1
-             | otherwise = negate 1
+    signum x | x > 0     = 1
+             | x < 0     = negateDouble 1
+             | otherwise = x -- handles 0.0, (-0.0), and NaN
+
 
     {-# INLINE fromInteger #-}
     fromInteger i = D# (doubleFromInteger i)

@@ -18,7 +18,7 @@
     enabled, so that the `Monoid` instance for `Proxy` are polykinded
     like `Proxy` itself is.
 
-  * Make `abs` handle (-0.0) correctly per IEEE-754.
+  * Make `abs` and `signum` handle (-0.0) correctly per IEEE-754.
 
 ## 4.7.0.1  *Jul 2014*
 
