@@ -26,6 +26,7 @@
 #include "sm/GC.h" // for gcWorkerThread()
 #include "STM.h"
 #include "RtsUtils.h"
+#include "rts/IOManager.h"
 
 #include <string.h>
 
