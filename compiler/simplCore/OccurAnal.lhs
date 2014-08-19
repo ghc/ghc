@@ -1199,7 +1199,7 @@ occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
     let usage1 = markManyIf (isRhsEnv env) usage
         usage2 = addIdOccs usage1 (coVarsOfCo co)
-          -- See Note [Gather occurrences of coercion veriables]
+          -- See Note [Gather occurrences of coercion variables]
     in (usage2, Cast expr' co)
         -- If we see let x = y `cast` co
         -- then mark y as 'Many' so that we don't
