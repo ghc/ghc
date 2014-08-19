@@ -124,8 +124,7 @@ outputC dflags filenm cmm_stream packages
                '<':_      -> "#include "++h_file
                _          -> "#include \""++h_file++"\""
 
-       pkg_configs <- getPreloadPackagesAnd dflags packages
-       let pkg_names = map (display.sourcePackageId) pkg_configs
+       let pkg_names = map packageKeyString packages
 
        doOutput filenm $ \ h -> do
           hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
