@@ -198,9 +198,10 @@ test('T5996',
      ['$MAKE -s --no-print-directory T5996'])
 test('T8537', normal, compile, [''])
 test('T8832',
-     [when(wordsize(32), expect_fail), extra_clean(['T8832.hi', 'T8832a.o'])],
+     normal,
      run_command,
-     ['$MAKE -s --no-print-directory T8832'])
+     ['$MAKE -s --no-print-directory T8832 T8832_WORDSIZE_OPTS=' +
+      ('-DT8832_WORDSIZE_64' if wordsize(64) else '')])
 test('T8848', only_ways(['optasm']), compile, ['-ddump-rule-firings'])
 test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T8331', only_ways(['optasm']), compile, ['-ddump-rules'])

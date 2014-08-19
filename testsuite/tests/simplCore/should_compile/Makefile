@@ -4,7 +4,7 @@ include $(TOP)/mk/test.mk
 
 T8832:
 	$(RM) -f T8832.o T8832.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T8832.hs | grep '#'
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl T8832.hs | grep '#'
 
 T7865:
 	$(RM) -f T7865.o T7865.hi
