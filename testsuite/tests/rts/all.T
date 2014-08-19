@@ -231,9 +231,7 @@ test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], c
 # with the non-threaded one.
 test('T9078', [ omit_ways(threaded_ways) ], compile_and_run, ['-with-rtsopts="-DS" -debug'])
 
-# -rdynamic is implemented in windows, but the RTS linker does
-# not pickup yet the symbols exported in executables.
-test('rdynamic', unless(opsys('linux'), skip),
+test('rdynamic', unless(opsys('linux') or opsys('mingw32'), skip),
      compile_and_run, ['-rdynamic -package ghc'])
 
 # 251 = RTS exit code for "out of memory"

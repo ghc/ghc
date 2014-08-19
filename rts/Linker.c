@@ -1592,6 +1592,8 @@ static regex_t re_realso;
 #ifdef THREADED_RTS
 static Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
 #endif
+#elif defined(OBJFORMAT_PEi386)
+void addDLLHandle(pathchar* dll_name, HINSTANCE instance);
 #endif
 
 void initLinker (void)
@@ -1689,6 +1691,7 @@ initLinker_ (int retain_cafs)
      */
     addDLL(WSTR("msvcrt"));
     addDLL(WSTR("kernel32"));
+    addDLLHandle(WSTR("*.exe"), GetModuleHandle(NULL));
 #endif
 
     IF_DEBUG(linker, debugBelch("initLinker: done\n"));
@@ -1752,6 +1755,16 @@ typedef
 
 /* A list thereof. */
 static IndirectAddr* indirects = NULL;
+
+/* Adds a DLL instance to the list of DLLs in which to search for symbols. */
+void addDLLHandle(pathchar* dll_name, HINSTANCE instance) {
+   OpenedDLL* o_dll;
+   o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLLHandle" );
+   o_dll->name     = dll_name ? pathdup(dll_name) : NULL;
+   o_dll->instance = instance;
+   o_dll->next     = opened_dlls;
+   opened_dlls     = o_dll;
+}
 
 #endif
 
@@ -1960,12 +1973,7 @@ addDLL( pathchar *dll_name )
    }
    stgFree(buf);
 
-   /* Add this DLL to the list of DLLs in which to search for symbols. */
-   o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLL" );
-   o_dll->name     = pathdup(dll_name);
-   o_dll->instance = instance;
-   o_dll->next     = opened_dlls;
-   opened_dlls     = o_dll;
+   addDLLHandle(dll_name, instance);
 
    return NULL;
 
