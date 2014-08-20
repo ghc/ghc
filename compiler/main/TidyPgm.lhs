@@ -5,7 +5,8 @@
 
 \begin{code}
 module TidyPgm (
-       mkBootModDetailsTc, tidyProgram, globaliseAndTidyId
+       mkBootModDetailsTc, tidyProgram, globaliseAndTidyId,
+       addExternal
    ) where
 
 #include "HsVersions.h"

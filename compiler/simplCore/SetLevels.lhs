@@ -84,6 +84,8 @@ import StgCmmArgRep     ( ArgRep(P), argRepSizeW, toArgRep )
 import StgCmmLayout     ( mkVirtHeapOffsets )
 import StgCmmClosure    ( idPrimRep, addIdReps )
 
+import qualified TidyPgm
+
 import Demand           ( isStrictDmd, splitStrictSig )
 import Id
 import IdInfo
@@ -260,13 +262,16 @@ lvlTopBind :: DynFlags -> LevelEnv -> Bind Id -> LvlM (LevelledBind, LevelEnv)
 lvlTopBind dflags env (NonRec bndr rhs)
   = do { rhs' <- lvlExpr env (analyzeFVs (initFVEnv $ finalPass env) rhs)
        ; let  -- lambda lifting impedes specialization, so: if the old
-              -- RHS has an unstable unfolding, "stablize it" so that it
-              -- ends up in the .hi file
+              -- RHS has an unstable unfolding that will survive
+              -- TidyPgm, "stablize it" so that it ends up in the .hi
+              -- file as-is, prior to LLF squeezing all of the juice out
+              expose_all = gopt Opt_ExposeAllUnfoldings  dflags
               stab_bndr
-                | gopt Opt_LLF_Stabilize dflags
-                , isFinalPass env
+                | isFinalPass env
+                , gopt Opt_LLF_Stabilize dflags
+                , snd $ TidyPgm.addExternal expose_all bndr
                 , isUnstableUnfolding (realIdUnfolding bndr)
-                = bndr `setIdUnfolding` mkInlinableUnfolding dflags rhs
+                  = bndr `setIdUnfolding` mkInlinableUnfolding dflags rhs
                 | otherwise = bndr
        ; let (env', [bndr']) = substAndLvlBndrs NonRecursive env tOP_LEVEL [stab_bndr]
        ; return (NonRec bndr' rhs', env') }
