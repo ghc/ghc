@@ -41,7 +41,7 @@
 #define H 1
 #endif
 
-#define __abs(a)		(( (a) >= 0 ) ? (a) : (-(a)))
+#define __abs(a)                (( (a) >= 0 ) ? (a) : (-(a)))
 
 /* Special version for words */
 StgDouble
@@ -117,44 +117,44 @@ void
 __decodeDouble_2Int (I_ *man_sign, W_ *man_high, W_ *man_low, I_ *exp, StgDouble dbl)
 {
     /* Do some bit fiddling on IEEE */
-    unsigned int low, high; 	     	/* assuming 32 bit ints */
+    unsigned int low, high;             /* assuming 32 bit ints */
     int sign, iexp;
-    union { double d; unsigned int i[2]; } u;	/* assuming 32 bit ints, 64 bit double */
+    union { double d; unsigned int i[2]; } u;   /* assuming 32 bit ints, 64 bit double */
 
     ASSERT(sizeof(unsigned int ) == 4            );
     ASSERT(sizeof(dbl          ) == 8            );
     ASSERT(sizeof(dbl          ) == SIZEOF_DOUBLE);
 
-    u.d = dbl;	    /* grab chunks of the double */
+    u.d = dbl;      /* grab chunks of the double */
     low = u.i[L];
     high = u.i[H];
 
     if (low == 0 && (high & ~DMSBIT) == 0) {
-	*man_low = 0;
-	*man_high = 0;
-	*exp = 0L;
+        *man_low = 0;
+        *man_high = 0;
+        *exp = 0L;
     } else {
-	iexp = ((high >> 20) & 0x7ff) + MY_DMINEXP;
-	sign = high;
+        iexp = ((high >> 20) & 0x7ff) + MY_DMINEXP;
+        sign = high;
 
-	high &= DHIGHBIT-1;
-	if (iexp != MY_DMINEXP)	/* don't add hidden bit to denorms */
-	    high |= DHIGHBIT;
-	else {
-	    iexp++;
-	    /* A denorm, normalize the mantissa */
-	    while (! (high & DHIGHBIT)) {
-		high <<= 1;
-		if (low & DMSBIT)
-		    high++;
-		low <<= 1;
-		iexp--;
-	    }
-	}
+        high &= DHIGHBIT-1;
+        if (iexp != MY_DMINEXP) /* don't add hidden bit to denorms */
+            high |= DHIGHBIT;
+        else {
+            iexp++;
+            /* A denorm, normalize the mantissa */
+            while (! (high & DHIGHBIT)) {
+                high <<= 1;
+                if (low & DMSBIT)
+                    high++;
+                low <<= 1;
+                iexp--;
+            }
+        }
         *exp = (I_) iexp;
-	*man_low = low;
-	*man_high = high;
-	*man_sign = (sign < 0) ? -1 : 1;
+        *man_low = low;
+        *man_high = high;
+        *man_sign = (sign < 0) ? -1 : 1;
     }
 }
 
@@ -166,37 +166,37 @@ void
 __decodeFloat_Int (I_ *man, I_ *exp, StgFloat flt)
 {
     /* Do some bit fiddling on IEEE */
-    int high, sign; 	    	    /* assuming 32 bit ints */
+    int high, sign;                 /* assuming 32 bit ints */
     union { float f; int i; } u;    /* assuming 32 bit float and int */
 
     ASSERT(sizeof(int          ) == 4            );
     ASSERT(sizeof(flt          ) == 4            );
     ASSERT(sizeof(flt          ) == SIZEOF_FLOAT );
 
-    u.f = flt;	    /* grab the float */
+    u.f = flt;      /* grab the float */
     high = u.i;
 
     if ((high & ~FMSBIT) == 0) {
-	*man = 0;
-	*exp = 0;
+        *man = 0;
+        *exp = 0;
     } else {
-	*exp = ((high >> 23) & 0xff) + MY_FMINEXP;
-	sign = high;
+        *exp = ((high >> 23) & 0xff) + MY_FMINEXP;
+        sign = high;
 
-	high &= FHIGHBIT-1;
-	if (*exp != MY_FMINEXP)	/* don't add hidden bit to denorms */
-	    high |= FHIGHBIT;
-	else {
-	    (*exp)++;
-	    /* A denorm, normalize the mantissa */
-	    while (! (high & FHIGHBIT)) {
-		high <<= 1;
-		(*exp)--;
-	    }
-	}
-	*man = high;
-	if (sign < 0)
-	    *man = - *man;
+        high &= FHIGHBIT-1;
+        if (*exp != MY_FMINEXP) /* don't add hidden bit to denorms */
+            high |= FHIGHBIT;
+        else {
+            (*exp)++;
+            /* A denorm, normalize the mantissa */
+            while (! (high & FHIGHBIT)) {
+                high <<= 1;
+                (*exp)--;
+            }
+        }
+        *man = high;
+        if (sign < 0)
+            *man = - *man;
     }
 }
 
