@@ -7,20 +7,13 @@ Desugaring foreign calls
 
 \begin{code}
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
-module DsCCall 
-	( dsCCall
-	, mkFCall
-	, unboxArg
-	, boxResult
-	, resultWrapper
-	) where
+module DsCCall
+        ( dsCCall
+        , mkFCall
+        , unboxArg
+        , boxResult
+        , resultWrapper
+        ) where
 
 #include "HsVersions.h"
 
@@ -86,15 +79,15 @@ follows:
    |
    V
    \ s# -> case (ccall# foo [ r, t1#, ... tm# ] s# e1# ... em#) of
-	  (StateAnd<r># result# state#) -> (R# result#, realWorld#)
+          (StateAnd<r># result# state#) -> (R# result#, realWorld#)
 \end{verbatim}
 
 \begin{code}
-dsCCall :: CLabelString	-- C routine to invoke
-	-> [CoreExpr]	-- Arguments (desugared)
-	-> Safety	-- Safety of the call
-	-> Type		-- Type of the result: IO t
-	-> DsM CoreExpr	-- Result, of type ???
+dsCCall :: CLabelString -- C routine to invoke
+        -> [CoreExpr]   -- Arguments (desugared)
+        -> Safety       -- Safety of the call
+        -> Type         -- Type of the result: IO t
+        -> DsM CoreExpr -- Result, of type ???
 
 dsCCall lbl args may_gc result_ty
   = do (unboxed_args, arg_wrappers) <- mapAndUnzipM unboxArg args
@@ -107,36 +100,36 @@ dsCCall lbl args may_gc result_ty
            the_prim_app = mkFCall dflags uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
 
-mkFCall :: DynFlags -> Unique -> ForeignCall 
-	-> [CoreExpr] 	-- Args
-	-> Type 	-- Result type
-	-> CoreExpr
+mkFCall :: DynFlags -> Unique -> ForeignCall
+        -> [CoreExpr]   -- Args
+        -> Type         -- Result type
+        -> CoreExpr
 -- Construct the ccall.  The only tricky bit is that the ccall Id should have
 -- no free vars, so if any of the arg tys do we must give it a polymorphic type.
--- 	[I forget *why* it should have no free vars!]
+--      [I forget *why* it should have no free vars!]
 -- For example:
---	mkCCall ... [s::StablePtr (a->b), x::Addr, c::Char]
+--      mkCCall ... [s::StablePtr (a->b), x::Addr, c::Char]
 --
 -- Here we build a ccall thus
---	(ccallid::(forall a b.  StablePtr (a -> b) -> Addr -> Char -> IO Addr))
---			a b s x c
+--      (ccallid::(forall a b.  StablePtr (a -> b) -> Addr -> Char -> IO Addr))
+--                      a b s x c
 mkFCall dflags uniq the_fcall val_args res_ty
   = mkApps (mkVarApps (Var the_fcall_id) tyvars) val_args
   where
     arg_tys = map exprType val_args
     body_ty = (mkFunTys arg_tys res_ty)
     tyvars  = varSetElems (tyVarsOfType body_ty)
-    ty 	    = mkForAllTys tyvars body_ty
+    ty      = mkForAllTys tyvars body_ty
     the_fcall_id = mkFCallId dflags uniq the_fcall ty
 \end{code}
 
 \begin{code}
-unboxArg :: CoreExpr			-- The supplied argument
-	 -> DsM (CoreExpr,		-- To pass as the actual argument
-		 CoreExpr -> CoreExpr	-- Wrapper to unbox the arg
-		)
+unboxArg :: CoreExpr                    -- The supplied argument
+         -> DsM (CoreExpr,              -- To pass as the actual argument
+                 CoreExpr -> CoreExpr   -- Wrapper to unbox the arg
+                )
 -- Example: if the arg is e::Int, unboxArg will return
---	(x#::Int#, \W. case x of I# x# -> W)
+--      (x#::Int#, \W. case x of I# x# -> W)
 -- where W is a CoreExpr that probably mentions x#
 
 unboxArg arg
@@ -147,9 +140,9 @@ unboxArg arg
   -- Recursive newtypes
   | Just(co, _rep_ty) <- topNormaliseNewType_maybe arg_ty
   = unboxArg (mkCast arg co)
-      
+
   -- Booleans
-  | Just tc <- tyConAppTyCon_maybe arg_ty, 
+  | Just tc <- tyConAppTyCon_maybe arg_ty,
     tc `hasKey` boolTyConKey
   = do dflags <- getDynFlags
        prim_arg <- newSysLocalDs intPrimTy
@@ -159,12 +152,12 @@ unboxArg arg
                                         (DataAlt trueDataCon, [],mkIntLit dflags 1)])
                                         -- In increasing tag order!
                              prim_arg
-                             (exprType body) 
+                             (exprType body)
                              [(DEFAULT,[],body)])
 
   -- Data types with a single constructor, which has a single, primitive-typed arg
   -- This deals with Int, Float etc; also Ptr, ForeignPtr
-  | is_product_type && data_con_arity == 1 
+  | is_product_type && data_con_arity == 1
   = ASSERT2(isUnLiftedType data_con_arg_ty1, pprType arg_ty)
                         -- Typechecker ensures this
     do case_bndr <- newSysLocalDs arg_ty
@@ -175,8 +168,8 @@ unboxArg arg
 
   -- Byte-arrays, both mutable and otherwise; hack warning
   -- We're looking for values of type ByteArray, MutableByteArray
-  --	data ByteArray          ix = ByteArray        ix ix ByteArray#
-  --	data MutableByteArray s ix = MutableByteArray ix ix (MutableByteArray# s)
+  --    data ByteArray          ix = ByteArray        ix ix ByteArray#
+  --    data MutableByteArray s ix = MutableByteArray ix ix (MutableByteArray# s)
   | is_product_type &&
     data_con_arity == 3 &&
     isJust maybe_arg3_tycon &&
@@ -192,73 +185,73 @@ unboxArg arg
   = do l <- getSrcSpanDs
        pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
   where
-    arg_ty					= exprType arg
-    maybe_product_type 			   	= splitDataProductType_maybe arg_ty
-    is_product_type			   	= isJust maybe_product_type
-    Just (_, _, data_con, data_con_arg_tys)	= maybe_product_type
-    data_con_arity				= dataConSourceArity data_con
-    (data_con_arg_ty1 : _)			= data_con_arg_tys
+    arg_ty                                      = exprType arg
+    maybe_product_type                          = splitDataProductType_maybe arg_ty
+    is_product_type                             = isJust maybe_product_type
+    Just (_, _, data_con, data_con_arg_tys)     = maybe_product_type
+    data_con_arity                              = dataConSourceArity data_con
+    (data_con_arg_ty1 : _)                      = data_con_arg_tys
 
     (_ : _ : data_con_arg_ty3 : _) = data_con_arg_tys
-    maybe_arg3_tycon    	   = tyConAppTyCon_maybe data_con_arg_ty3
-    Just arg3_tycon		   = maybe_arg3_tycon
+    maybe_arg3_tycon               = tyConAppTyCon_maybe data_con_arg_ty3
+    Just arg3_tycon                = maybe_arg3_tycon
 \end{code}
 
 
 \begin{code}
 boxResult :: Type
-	  -> DsM (Type, CoreExpr -> CoreExpr)
+          -> DsM (Type, CoreExpr -> CoreExpr)
 
--- Takes the result of the user-level ccall: 
---	either (IO t), 
---	or maybe just t for an side-effect-free call
+-- Takes the result of the user-level ccall:
+--      either (IO t),
+--      or maybe just t for an side-effect-free call
 -- Returns a wrapper for the primitive ccall itself, along with the
 -- type of the result of the primitive ccall.  This result type
--- will be of the form  
---	State# RealWorld -> (# State# RealWorld, t' #)
+-- will be of the form
+--      State# RealWorld -> (# State# RealWorld, t' #)
 -- where t' is the unwrapped form of t.  If t is simply (), then
--- the result type will be 
---	State# RealWorld -> (# State# RealWorld #)
+-- the result type will be
+--      State# RealWorld -> (# State# RealWorld #)
 
 boxResult result_ty
   | Just (io_tycon, io_res_ty) <- tcSplitIOType_maybe result_ty
-	-- isIOType_maybe handles the case where the type is a 
-	-- simple wrapping of IO.  E.g.
-	-- 	newtype Wrap a = W (IO a)
-	-- No coercion necessary because its a non-recursive newtype
-	-- (If we wanted to handle a *recursive* newtype too, we'd need
-	-- another case, and a coercion.)
-   	-- The result is IO t, so wrap the result in an IO constructor
-  = do	{ res <- resultWrapper io_res_ty
-	; let extra_result_tys 
-		= case res of
-		     (Just ty,_) 
-		       | isUnboxedTupleType ty 
-		       -> let Just ls = tyConAppArgs_maybe ty in tail ls
-		     _ -> []
+        -- isIOType_maybe handles the case where the type is a
+        -- simple wrapping of IO.  E.g.
+        --      newtype Wrap a = W (IO a)
+        -- No coercion necessary because its a non-recursive newtype
+        -- (If we wanted to handle a *recursive* newtype too, we'd need
+        -- another case, and a coercion.)
+        -- The result is IO t, so wrap the result in an IO constructor
+  = do  { res <- resultWrapper io_res_ty
+        ; let extra_result_tys
+                = case res of
+                     (Just ty,_)
+                       | isUnboxedTupleType ty
+                       -> let Just ls = tyConAppArgs_maybe ty in tail ls
+                     _ -> []
 
-	      return_result state anss
-		= mkCoreConApps (tupleCon UnboxedTuple (2 + length extra_result_tys))
-	         	        (map Type (realWorldStatePrimTy : io_res_ty : extra_result_tys)
-			         ++ (state : anss)) 
+              return_result state anss
+                = mkCoreConApps (tupleCon UnboxedTuple (2 + length extra_result_tys))
+                                (map Type (realWorldStatePrimTy : io_res_ty : extra_result_tys)
+                                 ++ (state : anss))
 
-	; (ccall_res_ty, the_alt) <- mk_alt return_result res
+        ; (ccall_res_ty, the_alt) <- mk_alt return_result res
 
-	; state_id <- newSysLocalDs realWorldStatePrimTy
-	; let io_data_con = head (tyConDataCons io_tycon)
-	      toIOCon     = dataConWrapId io_data_con
+        ; state_id <- newSysLocalDs realWorldStatePrimTy
+        ; let io_data_con = head (tyConDataCons io_tycon)
+              toIOCon     = dataConWrapId io_data_con
 
-	      wrap the_call =
-			      mkApps (Var toIOCon)
-			    	     [ Type io_res_ty, 
-			    	       Lam state_id $
-			    	       mkWildCase (App the_call (Var state_id))
-			    	     	     ccall_res_ty
-			                     (coreAltType the_alt) 
-			    	     	     [the_alt]
-			    	     ]
+              wrap the_call =
+                              mkApps (Var toIOCon)
+                                     [ Type io_res_ty,
+                                       Lam state_id $
+                                       mkWildCase (App the_call (Var state_id))
+                                             ccall_res_ty
+                                             (coreAltType the_alt)
+                                             [the_alt]
+                                     ]
 
-	; return (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap) }
+        ; return (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap) }
 
 boxResult result_ty
   = do -- It isn't IO, so do unsafePerformIO
@@ -266,10 +259,10 @@ boxResult result_ty
        res <- resultWrapper result_ty
        (ccall_res_ty, the_alt) <- mk_alt return_result res
        let
-           wrap = \ the_call -> mkWildCase (App the_call (Var realWorldPrimId)) 
-                                     	   ccall_res_ty
-                                     	   (coreAltType the_alt)
-                                     	   [the_alt]
+           wrap = \ the_call -> mkWildCase (App the_call (Var realWorldPrimId))
+                                           ccall_res_ty
+                                           (coreAltType the_alt)
+                                           [the_alt]
        return (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
   where
     return_result _ [ans] = ans
@@ -283,16 +276,16 @@ mk_alt return_result (Nothing, wrap_result)
   = do -- The ccall returns ()
        state_id <- newSysLocalDs realWorldStatePrimTy
        let
-             the_rhs = return_result (Var state_id) 
+             the_rhs = return_result (Var state_id)
                                      [wrap_result (panic "boxResult")]
 
              ccall_res_ty = mkTyConApp unboxedSingletonTyCon [realWorldStatePrimTy]
              the_alt      = (DataAlt unboxedSingletonDataCon, [state_id], the_rhs)
-       
+
        return (ccall_res_ty, the_alt)
 
 mk_alt return_result (Just prim_res_ty, wrap_result)
-    		-- The ccall returns a non-() value
+                -- The ccall returns a non-() value
   | isUnboxedTupleType prim_res_ty= do
     let
         Just ls = tyConAppArgs_maybe prim_res_ty
@@ -300,7 +293,7 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
     args_ids@(result_id:as) <- mapM newSysLocalDs ls
     state_id <- newSysLocalDs realWorldStatePrimTy
     let
-        the_rhs = return_result (Var state_id) 
+        the_rhs = return_result (Var state_id)
                                 (wrap_result (Var result_id) : map Var as)
         ccall_res_ty = mkTyConApp (tupleTyCon UnboxedTuple arity)
                                   (realWorldStatePrimTy : ls)
@@ -314,7 +307,7 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
     result_id <- newSysLocalDs prim_res_ty
     state_id <- newSysLocalDs realWorldStatePrimTy
     let
-        the_rhs = return_result (Var state_id) 
+        the_rhs = return_result (Var state_id)
                                 [wrap_result (Var result_id)]
         ccall_res_ty = mkTyConApp unboxedPairTyCon [realWorldStatePrimTy, prim_res_ty]
         the_alt      = (DataAlt unboxedPairDataCon, [state_id, result_id], the_rhs)
@@ -323,7 +316,7 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
 
 resultWrapper :: Type
               -> DsM (Maybe Type,               -- Type of the expected result, if any
-                      CoreExpr -> CoreExpr)     -- Wrapper for the result 
+                      CoreExpr -> CoreExpr)     -- Wrapper for the result
 -- resultWrapper deals with the result *value*
 -- E.g. foreign import foo :: Int -> IO T
 -- Then resultWrapper deals with marshalling the 'T' part
@@ -367,7 +360,7 @@ resultWrapper result_ty
            narrow_wrapper         = maybeNarrow dflags tycon
        (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
        return
-         (maybe_ty, \e -> mkApps (Var (dataConWrapId data_con)) 
+         (maybe_ty, \e -> mkApps (Var (dataConWrapId data_con))
                                  (map Type tycon_arg_tys ++ [wrapper (narrow_wrapper e)]))
 
   | otherwise
@@ -385,11 +378,11 @@ maybeNarrow dflags tycon
   | tycon `hasKey` int8TyConKey   = \e -> App (Var (mkPrimOpId Narrow8IntOp)) e
   | tycon `hasKey` int16TyConKey  = \e -> App (Var (mkPrimOpId Narrow16IntOp)) e
   | tycon `hasKey` int32TyConKey
-	 && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32IntOp)) e
+         && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32IntOp)) e
 
   | tycon `hasKey` word8TyConKey  = \e -> App (Var (mkPrimOpId Narrow8WordOp)) e
   | tycon `hasKey` word16TyConKey = \e -> App (Var (mkPrimOpId Narrow16WordOp)) e
   | tycon `hasKey` word32TyConKey
-	 && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32WordOp)) e
-  | otherwise			  = id
+         && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32WordOp)) e
+  | otherwise                     = id
 \end{code}
