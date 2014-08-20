@@ -40,23 +40,23 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
                PROF_HDR_FIELDS(W_,p1,p2))
 /* no return list: explicit stack layout */
 {
-    /* 
+    /*
        The final exit.
-      
+
        The top-top-level closures (e.g., "main") are of type "IO a".
        When entered, they perform an IO action and return an 'a' in R1.
-      
+
        We save R1 on top of the stack where the scheduler can find it,
        tidy up the registers and return to the scheduler.
-      
+
        We Leave the stack looking like this:
-      
-            	+----------------+
+
+                +----------------+
                 |      -------------------> return value
-            	+----------------+
-            	| stg_enter_info |
-            	+----------------+
-      
+                +----------------+
+                | stg_enter_info |
+                +----------------+
+
        The stg_enter_info is just a dummy info table so that the
        garbage collector can understand the stack (there must always
        be an info table on top of the stack).
@@ -137,11 +137,11 @@ stg_threadFinished /* no args: explicit stack layout */
   StgRegTable_rRet(BaseReg) = ThreadFinished;
   R1 = BaseReg;
   jump StgReturn [R1];
-}  
+}
 
 /* -----------------------------------------------------------------------------
     Strict IO application - performing an IO action and entering its result.
-    
+
     rts_evalIO() lets you perform Haskell IO actions from outside of
     Haskell-land, returning back to you their result. Want this result
     to be evaluated to WHNF by that time, so that we can easily get at
