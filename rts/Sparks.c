@@ -30,7 +30,7 @@ freeSparkPool (SparkPool *pool)
 }
 
 /* -----------------------------------------------------------------------------
- * 
+ *
  * Turn a spark into a real thread
  *
  * -------------------------------------------------------------------------- */
@@ -40,7 +40,7 @@ createSparkThread (Capability *cap)
 {
     StgTSO *tso;
 
-    tso = createIOThread (cap, RtsFlags.GcFlags.initialStkSize, 
+    tso = createIOThread (cap, RtsFlags.GcFlags.initialStkSize,
                           (StgClosure *)runSparks_closure);
 
     traceEventCreateSparkThread(cap, tso->id);
@@ -67,7 +67,7 @@ newSpark (StgRegTable *reg, StgClosure *p)
             /* overflowing the spark pool */
             cap->spark_stats.overflowed++;
             traceEventSparkOverflow(cap);
-	}
+        }
     } else {
         cap->spark_stats.dud++;
         traceEventSparkDud(cap);
@@ -85,18 +85,18 @@ newSpark (StgRegTable *reg, StgClosure *p)
 
 void
 pruneSparkQueue (Capability *cap)
-{ 
+{
     SparkPool *pool;
     StgClosurePtr spark, tmp, *elements;
     nat n, pruned_sparks; // stats only
     StgWord botInd,oldBotInd,currInd; // indices in array (always < size)
     const StgInfoTable *info;
-    
+
     n = 0;
     pruned_sparks = 0;
-    
+
     pool = cap->sparks;
-    
+
     // it is possible that top > bottom, indicating an empty pool.  We
     // fix that here; this is only necessary because the loop below
     // assumes it.
@@ -158,11 +158,11 @@ pruneSparkQueue (Capability *cap)
 
     while (currInd != oldBotInd ) {
       /* must use != here, wrap-around at size
-	 subtle: loop not entered if queue empty
+         subtle: loop not entered if queue empty
        */
 
       /* check element at currInd. if valuable, evacuate and move to
-	 botInd, otherwise move on */
+         botInd, otherwise move on */
       spark = elements[currInd];
 
       // We have to be careful here: in the parallel GC, another
@@ -241,11 +241,11 @@ pruneSparkQueue (Capability *cap)
     pool->top = oldBotInd; // where we started writing
     pool->topBound = pool->top;
 
-    pool->bottom = (oldBotInd <= botInd) ? botInd : (botInd + pool->size); 
+    pool->bottom = (oldBotInd <= botInd) ? botInd : (botInd + pool->size);
     // first free place we did not use (corrected by wraparound)
 
     debugTrace(DEBUG_sparks, "pruned %d sparks", pruned_sparks);
-    
+
     debugTrace(DEBUG_sparks,
                "new spark queue len=%ld; (hd=%ld; tl=%ld)",
                sparkPoolSize(pool), pool->bottom, pool->top);
@@ -261,7 +261,7 @@ traverseSparkQueue (evac_fn evac, void *user, Capability *cap)
     StgClosure **sparkp;
     SparkPool *pool;
     StgWord top,bottom, modMask;
-    
+
     pool = cap->sparks;
 
     ASSERT_WSDEQUE_INVARIANTS(pool);
@@ -276,7 +276,7 @@ traverseSparkQueue (evac_fn evac, void *user, Capability *cap)
      * In GHC-6.10, evac takes an additional 1st argument to hold a
      * GC-specific register, see rts/sm/GC.c::mark_root()
      */
-      evac( user , sparkp + (top & modMask) ); 
+      evac( user , sparkp + (top & modMask) );
       top++;
     }
 
@@ -290,12 +290,12 @@ traverseSparkQueue (evac_fn evac, void *user, Capability *cap)
  * capabilities) and its size. Accesses all spark pools and equally
  * distributes the sparks among them.
  *
- * Could be called after GC, before Cap. release, from scheduler. 
+ * Could be called after GC, before Cap. release, from scheduler.
  * -------------------------------------------------------------------------- */
 void balanceSparkPoolsCaps(nat n_caps, Capability caps[])
    GNUC3_ATTRIBUTE(__noreturn__);
 
-void balanceSparkPoolsCaps(nat n_caps STG_UNUSED, 
+void balanceSparkPoolsCaps(nat n_caps STG_UNUSED,
                            Capability caps[] STG_UNUSED) {
   barf("not implemented");
 }
