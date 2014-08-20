@@ -8,7 +8,7 @@
 
 /*
  * The interval timer is used for profiling and for context switching in the
- * threaded build. 
+ * threaded build.
  *
  * This file defines the platform-independent view of interval timing, relying
  * on platform-specific services to install and run the timers.
@@ -45,7 +45,7 @@ handle_tick(int unused STG_UNUSED)
   if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0) {
       ticks_to_ctxt_switch--;
       if (ticks_to_ctxt_switch <= 0) {
-	  ticks_to_ctxt_switch = RtsFlags.ConcFlags.ctxtSwitchTicks;
+          ticks_to_ctxt_switch = RtsFlags.ConcFlags.ctxtSwitchTicks;
           contextSwitchAllCapabilities(); /* schedule a context switch */
       }
   }
@@ -88,7 +88,7 @@ handle_tick(int unused STG_UNUSED)
 }
 
 // This global counter is used to allow multiple threads to stop the
-// timer temporarily with a stopTimer()/startTimer() pair.  If 
+// timer temporarily with a stopTimer()/startTimer() pair.  If
 //      timer_enabled  == 0          timer is enabled
 //      timer_disabled == N, N > 0   timer is disabled by N threads
 // When timer_enabled makes a transition to 0, we enable the timer,
