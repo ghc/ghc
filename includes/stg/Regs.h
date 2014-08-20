@@ -17,12 +17,12 @@
 /*
  * The STG machine has a collection of "registers", each one of which
  * may or may not correspond to an actual machine register when
- * running code.  
+ * running code.
  *
  * The register set is backed by a table in memory (struct
  * StgRegTable).  If a particular STG register is not mapped to a
  * machine register, then the appropriate slot in this table is used
- * instead.  
+ * instead.
  *
  * This table is itself pointed to by another register, BaseReg.  If
  * BaseReg is not in a machine register, then the register table is
@@ -50,7 +50,7 @@ typedef union {
     StgPtr         p;
 } StgUnion;
 
-/* 
+/*
  * This is the table that holds shadow-locations for all the STG
  * registers.  The shadow locations are used when:
  *
@@ -59,57 +59,57 @@ typedef union {
  *     2) caller-saves registers are saved across a CCall
  */
 typedef struct {
-  StgUnion 	  rR1;
-  StgUnion   	  rR2;
-  StgUnion   	  rR3;
-  StgUnion   	  rR4;
-  StgUnion   	  rR5;
-  StgUnion   	  rR6;
-  StgUnion   	  rR7;
-  StgUnion   	  rR8;
-  StgUnion   	  rR9;		/* used occasionally by heap/stack checks */
-  StgUnion   	  rR10;		/* used occasionally by heap/stack checks */
-  StgFloat 	  rF1;
-  StgFloat 	  rF2;
-  StgFloat 	  rF3;
-  StgFloat 	  rF4;
-  StgFloat 	  rF5;
-  StgFloat 	  rF6;
-  StgDouble 	  rD1;
-  StgDouble 	  rD2;
-  StgDouble 	  rD3;
-  StgDouble 	  rD4;
-  StgDouble 	  rD5;
-  StgDouble 	  rD6;
-  StgWord128 	  rXMM1;
-  StgWord128 	  rXMM2;
-  StgWord128 	  rXMM3;
-  StgWord128 	  rXMM4;
-  StgWord128 	  rXMM5;
-  StgWord128 	  rXMM6;
-  StgWord256 	  rYMM1;
-  StgWord256 	  rYMM2;
-  StgWord256 	  rYMM3;
-  StgWord256 	  rYMM4;
-  StgWord256 	  rYMM5;
-  StgWord256 	  rYMM6;
-  StgWord512 	  rZMM1;
-  StgWord512 	  rZMM2;
-  StgWord512 	  rZMM3;
-  StgWord512 	  rZMM4;
-  StgWord512 	  rZMM5;
-  StgWord512 	  rZMM6;
+  StgUnion        rR1;
+  StgUnion        rR2;
+  StgUnion        rR3;
+  StgUnion        rR4;
+  StgUnion        rR5;
+  StgUnion        rR6;
+  StgUnion        rR7;
+  StgUnion        rR8;
+  StgUnion        rR9;          /* used occasionally by heap/stack checks */
+  StgUnion        rR10;         /* used occasionally by heap/stack checks */
+  StgFloat        rF1;
+  StgFloat        rF2;
+  StgFloat        rF3;
+  StgFloat        rF4;
+  StgFloat        rF5;
+  StgFloat        rF6;
+  StgDouble       rD1;
+  StgDouble       rD2;
+  StgDouble       rD3;
+  StgDouble       rD4;
+  StgDouble       rD5;
+  StgDouble       rD6;
+  StgWord128      rXMM1;
+  StgWord128      rXMM2;
+  StgWord128      rXMM3;
+  StgWord128      rXMM4;
+  StgWord128      rXMM5;
+  StgWord128      rXMM6;
+  StgWord256      rYMM1;
+  StgWord256      rYMM2;
+  StgWord256      rYMM3;
+  StgWord256      rYMM4;
+  StgWord256      rYMM5;
+  StgWord256      rYMM6;
+  StgWord512      rZMM1;
+  StgWord512      rZMM2;
+  StgWord512      rZMM3;
+  StgWord512      rZMM4;
+  StgWord512      rZMM5;
+  StgWord512      rZMM6;
   StgWord64       rL1;
-  StgPtr 	  rSp;
-  StgPtr 	  rSpLim;
-  StgPtr 	  rHp;
-  StgPtr 	  rHpLim;
+  StgPtr          rSp;
+  StgPtr          rSpLim;
+  StgPtr          rHp;
+  StgPtr          rHpLim;
   struct CostCentreStack_ * rCCCS;  /* current cost-centre-stack */
   struct StgTSO_ *     rCurrentTSO;
   struct nursery_ *    rNursery;
   struct bdescr_ *     rCurrentNursery; /* Hp/HpLim point into this block */
   struct bdescr_ *     rCurrentAlloc;   /* for allocation using allocate() */
-  StgWord         rHpAlloc;	/* number of *bytes* being allocated in heap */
+  StgWord         rHpAlloc;     /* number of *bytes* being allocated in heap */
   StgWord         rRet;  /* holds the return code of the thread */
 } StgRegTable;
 
@@ -151,7 +151,7 @@ typedef struct {
  */
 
 /* define NO_REGS to omit register declarations - used in RTS C code
- * that needs all the STG definitions but not the global register 
+ * that needs all the STG definitions but not the global register
  * settings.
  */
 #define GLOBAL_REG_DECL(type,name,reg) register type name REG(reg);
@@ -496,12 +496,12 @@ GLOBAL_REG_DECL(bdescr *,HpAlloc,REG_HpAlloc)
 
 /* -----------------------------------------------------------------------------
    Get absolute function pointers from the register table, to save
-   code space.  On x86, 
+   code space.  On x86,
 
        jmp  *-12(%ebx)
 
    is shorter than
-   
+
        jmp absolute_address
 
    as long as the offset is within the range of a signed byte
@@ -510,7 +510,7 @@ GLOBAL_REG_DECL(bdescr *,HpAlloc,REG_HpAlloc)
    be reduced.
 
    Other possible candidates in order of importance:
-      
+
      stg_upd_frame_info
      stg_CAF_BLACKHOLE_info
      stg_IND_STATIC_info
