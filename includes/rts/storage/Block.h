@@ -146,7 +146,7 @@ typedef struct bdescr_ {
 /* Block is free, and on the free list  (TODO: is this used?) */
 #define BF_FREE      16
 /* Block is executable */
-#define BF_EXEC	     32
+#define BF_EXEC      32
 /* Block contains only a small amount of live data */
 #define BF_FRAGMENTED 64
 /* we know about this block (for finding leaks) */
@@ -168,7 +168,7 @@ EXTERN_INLINE bdescr *Bdescr(StgPtr p);
 EXTERN_INLINE bdescr *Bdescr(StgPtr p)
 {
   return (bdescr *)
-    ((((W_)p &  MBLOCK_MASK & ~BLOCK_MASK) >> (BLOCK_SHIFT-BDESCR_SHIFT)) 
+    ((((W_)p &  MBLOCK_MASK & ~BLOCK_MASK) >> (BLOCK_SHIFT-BDESCR_SHIFT))
      | ((W_)p & ~MBLOCK_MASK)
      );
 }
@@ -185,7 +185,7 @@ EXTERN_INLINE bdescr *Bdescr(StgPtr p)
 /* First data block in a given megablock */
 
 #define FIRST_BLOCK(m) ((void *)(FIRST_BLOCK_OFF + (W_)(m)))
-   
+
 /* Last data block in a given megablock */
 
 #define LAST_BLOCK(m)  ((void *)(MBLOCK_SIZE-BLOCK_SIZE + (W_)(m)))
@@ -217,7 +217,7 @@ EXTERN_INLINE bdescr *Bdescr(StgPtr p)
    (1 + (W_)MBLOCK_ROUND_UP((n-BLOCKS_PER_MBLOCK) * BLOCK_SIZE) / MBLOCK_SIZE)
 
 
-#ifndef CMINUSMINUS 
+#ifndef CMINUSMINUS
 /* to the end... */
 
 /* Double-linked block lists: --------------------------------------------- */
