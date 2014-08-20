@@ -1,7 +1,7 @@
 /* 
  * (c) The University of Glasgow 2002
  *
- * static versions of the inline functions in HsCore.h
+ * static versions of the inline functions in HsBase.h
  */
 
 #define INLINE
