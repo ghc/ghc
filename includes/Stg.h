@@ -53,7 +53,7 @@
 // C compilers that use an LLVM back end (clang or llvm-gcc) do not
 // correctly support global register variables so we make sure that
 // we do not declare them for these compilers.
-# define NO_GLOBAL_REG_DECLS	/* don't define fixed registers */
+# define NO_GLOBAL_REG_DECLS    /* don't define fixed registers */
 #endif
 
 /* Configuration */
