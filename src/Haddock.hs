@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wwarn #-}
-{-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, Rank2Types #-}
 {-# LANGUAGE LambdaCase #-}
 -----------------------------------------------------------------------------
 -- |
@@ -17,7 +17,13 @@
 --
 -- Program entry point and top-level code.
 -----------------------------------------------------------------------------
-module Haddock (haddock, readPackagesAndProcessModules, withGhc') where
+module Haddock (
+  haddock,
+  haddockWithGhc,
+  getGhcDirs,
+  readPackagesAndProcessModules,
+  withGhc
+) where
 
 import Haddock.Backends.Xhtml
 import Haddock.Backends.Xhtml.Themes (getThemes)
@@ -128,7 +134,10 @@ handleGhcExceptions =
 --
 -- > main = getArgs >>= haddock
 haddock :: [String] -> IO ()
-haddock args = handleTopExceptions $ do
+haddock args = haddockWithGhc withGhc args
+
+haddockWithGhc :: (forall a. [Flag] -> Ghc a -> IO a) -> [String] -> IO ()
+haddockWithGhc ghc args = handleTopExceptions $ do
 
   -- Parse command-line flags and handle some of them initially.
   -- TODO: unify all of this (and some of what's in the 'render' function),
@@ -139,7 +148,7 @@ haddock args = handleTopExceptions $ do
   qual <- case qualification flags of {Left msg -> throwE msg; Right q -> return q}
 
   -- inject dynamic-too into flags before we proceed
-  flags' <- withGhc' flags $ do
+  flags' <- ghc flags $ do
         df <- getDynFlags
         case lookup "GHC Dynamic" (compilerInfo df) of
           Just "YES" -> return $ Flag_OptGhc "-dynamic-too" : flags
@@ -149,7 +158,7 @@ haddock args = handleTopExceptions $ do
     forM_ (warnings args) $ \warning -> do
       hPutStrLn stderr warning
 
-  withGhc' flags' $ do
+  ghc flags' $ do
 
     dflags <- getDynFlags
 
@@ -183,8 +192,8 @@ warnings = map format . filter (isPrefixOf "-optghc")
     format arg = concat ["Warning: `", arg, "' means `-o ", drop 2 arg, "', did you mean `-", arg, "'?"]
 
 
-withGhc' :: [Flag] -> Ghc a -> IO a
-withGhc' flags action = do
+withGhc :: [Flag] -> Ghc a -> IO a
+withGhc flags action = do
   libDir <- fmap snd (getGhcDirs flags)
 
   -- Catches all GHC source errors, then prints and re-throws them.
@@ -192,7 +201,7 @@ withGhc' flags action = do
         printException err
         liftIO exitFailure
 
-  withGhc libDir (ghcFlags flags) (\_ -> handleSrcErrors action)
+  withGhc' libDir (ghcFlags flags) (\_ -> handleSrcErrors action)
 
 
 readPackagesAndProcessModules :: [Flag] -> [String]
@@ -313,8 +322,8 @@ readInterfaceFiles name_cache_accessor pairs = do
 
 -- | Start a GHC session with the -haddock flag set. Also turn off
 -- compilation and linking. Then run the given 'Ghc' action.
-withGhc :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
-withGhc libDir flags ghcActs = runGhc (Just libDir) $ do
+withGhc' :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
+withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
   dynflags  <- getSessionDynFlags
   dynflags' <- parseGhcFlags (gopt_set dynflags Opt_Haddock) {
     hscTarget = HscNothing,

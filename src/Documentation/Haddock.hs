@@ -57,8 +57,14 @@ module Documentation.Haddock (
   Flag(..),
   DocOption(..),
 
+  -- * Error handling
+  HaddockException(..),
+
   -- * Program entry point
   haddock,
+  haddockWithGhc,
+  getGhcDirs,
+  withGhc
 ) where
 
 
@@ -79,5 +85,5 @@ createInterfaces
   -> [String]       -- ^ File or module names
   -> IO [Interface] -- ^ Resulting list of interfaces
 createInterfaces flags modules = do
-  (_, ifaces, _) <- withGhc' flags (readPackagesAndProcessModules flags modules)
+  (_, ifaces, _) <- withGhc flags (readPackagesAndProcessModules flags modules)
   return ifaces
