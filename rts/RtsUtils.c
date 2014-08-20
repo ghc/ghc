@@ -109,7 +109,7 @@ stgFree(void* p)
 
 /* -----------------------------------------------------------------------------
    Stack overflow
-   
+
    Not sure if this belongs here.
    -------------------------------------------------------------------------- */
 
@@ -147,14 +147,14 @@ time_str(void)
     static char nowstr[26];
 
     if (now == 0) {
-	time(&now);
+        time(&now);
 #if HAVE_CTIME_R
-	ctime_r(&now, nowstr);
+        ctime_r(&now, nowstr);
 #else
-	strcpy(nowstr, ctime(&now));
+        strcpy(nowstr, ctime(&now));
 #endif
-	memmove(nowstr+16,nowstr+19,7);
-	nowstr[21] = '\0';  // removes the \n
+        memmove(nowstr+16,nowstr+19,7);
+        nowstr[21] = '\0';  // removes the \n
     }
     return nowstr;
 }
@@ -244,7 +244,7 @@ heapCheckFail( void )
 }
 #endif
 
-/* 
+/*
  * It seems that pthreads and signals interact oddly in OpenBSD & FreeBSD
  * pthreads (and possibly others). When linking with -lpthreads, we
  * have to use pthread_kill to send blockable signals. So use that
