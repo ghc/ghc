@@ -61,9 +61,9 @@ extern SpinLock gc_alloc_block_sync;
 extern StgWord8 mblock_map[];
 
 /* On a 32-bit machine a 4KB table is always sufficient */
-# define MBLOCK_MAP_SIZE	4096
-# define MBLOCK_MAP_ENTRY(p)	((StgWord)(p) >> MBLOCK_SHIFT)
-# define HEAP_ALLOCED(p)	mblock_map[MBLOCK_MAP_ENTRY(p)]
+# define MBLOCK_MAP_SIZE        4096
+# define MBLOCK_MAP_ENTRY(p)    ((StgWord)(p) >> MBLOCK_SHIFT)
+# define HEAP_ALLOCED(p)        mblock_map[MBLOCK_MAP_ENTRY(p)]
 # define HEAP_ALLOCED_GC(p)     HEAP_ALLOCED(p)
 
 /* -----------------------------------------------------------------------------
