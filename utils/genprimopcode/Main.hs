@@ -242,7 +242,7 @@ gen_hs_source (Info defaults entries) =
         ++ "-----------------------------------------------------------------------------\n"
         ++ "{-# LANGUAGE MagicHash, MultiParamTypeClasses, NoImplicitPrelude, UnboxedTuples #-}\n"
         ++ "module GHC.Prim (\n"
-        ++ unlines (map (("\t" ++) . hdr) entries')
+        ++ unlines (map (("        " ++) . hdr) entries')
         ++ ") where\n"
     ++ "\n"
     ++ "{-\n"
@@ -735,7 +735,7 @@ gen_primop_vector_tys_exports (Info _ entries)
 
     mkVecTypes :: Entry -> String
     mkVecTypes i =
-        "\t" ++ ty_id ++ ", " ++ tycon_id ++ ","
+        "        " ++ ty_id ++ ", " ++ tycon_id ++ ","
       where
         ty_id    = prefix i ++ "PrimTy"
         tycon_id = prefix i ++ "PrimTyCon"
