@@ -1,6 +1,6 @@
 /*
  * (c)2006 Galois Connections, Inc.
- */ 
+ */
 
 #include "PosixSource.h"
 #include "Rts.h"
@@ -32,11 +32,11 @@
  *
  */
 
-static int hpc_inited = 0;		// Have you started this component?
-static pid_t hpc_pid = 0;		// pid of this process at hpc-boot time.
-					// Only this pid will read or write .tix file(s).
-static FILE *tixFile;			// file being read/written
-static int tix_ch;			// current char
+static int hpc_inited = 0;              // Have you started this component?
+static pid_t hpc_pid = 0;               // pid of this process at hpc-boot time.
+                                        // Only this pid will read or write .tix file(s).
+static FILE *tixFile;                   // file being read/written
+static int tix_ch;                      // current char
 
 static HashTable * moduleHash = NULL;   // module name -> HpcModuleInfo
 
@@ -115,7 +115,7 @@ readTix(void) {
   ws();
   expect('[');
   ws();
-  
+
   while(tix_ch != ']') {
     tmpModule = (HpcModuleInfo *)stgMallocBytes(sizeof(HpcModuleInfo),
                                                 "Hpc.readTix");
@@ -143,13 +143,13 @@ readTix(void) {
       tmpModule->tixArr[i] = expectWord64();
       ws();
       if (tix_ch == ',') {
-	expect(',');
-	ws();
+        expect(',');
+        ws();
       }
     }
     expect(']');
     ws();
-    
+
     lookup = lookupHashTable(moduleHash, (StgWord)tmpModule->modName);
     if (lookup == NULL) {
         debugTrace(DEBUG_hpc,"readTix: new HpcModuleInfo for %s",
@@ -252,8 +252,8 @@ startupHpc(void)
 
 void
 hs_hpc_module(char *modName,
-	      StgWord32 modCount,
-	      StgWord32 modHashNo,
+              StgWord32 modCount,
+              StgWord32 modHashNo,
               StgWord64 *tixArr)
 {
   HpcModuleInfo *tmpModule;
@@ -313,7 +313,7 @@ hs_hpc_module(char *modName,
 
 static void
 writeTix(FILE *f) {
-  HpcModuleInfo *tmpModule;  
+  HpcModuleInfo *tmpModule;
   unsigned int i, inner_comma, outer_comma;
 
   outer_comma = 0;
@@ -331,32 +331,32 @@ writeTix(FILE *f) {
       outer_comma = 1;
     }
     fprintf(f," TixModule \"%s\" %u %u [",
-	   tmpModule->modName,
-	    (nat)tmpModule->hashNo,
-	    (nat)tmpModule->tickCount);
+           tmpModule->modName,
+            (nat)tmpModule->hashNo,
+            (nat)tmpModule->tickCount);
     debugTrace(DEBUG_hpc,"%s: %u (hash=%u)\n",
-	       tmpModule->modName,
-	       (nat)tmpModule->tickCount,
+               tmpModule->modName,
+               (nat)tmpModule->tickCount,
                (nat)tmpModule->hashNo);
 
     inner_comma = 0;
     for(i = 0;i < tmpModule->tickCount;i++) {
       if (inner_comma) {
-	fprintf(f,",");
+        fprintf(f,",");
       } else {
-	inner_comma = 1;
+        inner_comma = 1;
       }
 
       if (tmpModule->tixArr) {
-	fprintf(f,"%" FMT_Word64,tmpModule->tixArr[i]);
+        fprintf(f,"%" FMT_Word64,tmpModule->tixArr[i]);
       } else {
-	fprintf(f,"0");
+        fprintf(f,"0");
       }
     }
     fprintf(f,"]");
   }
   fprintf(f,"]\n");
-  
+
   fclose(f);
 }
 
