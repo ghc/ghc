@@ -1456,6 +1456,10 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
 
     is_unlifted id = case tcSplitSigmaTy (idType id) of
                        (_, _, rho) -> isUnLiftedType rho
+          -- For the is_unlifted check, we need to look inside polymorphism
+          -- and overloading.  E.g.  x = (# 1, True #)
+          -- would get type forall a. Num a => (# a, Bool #)
+          -- and we want to reject that.  See Trac #9140
 
     is_monomorphic (L _ (AbsBinds { abs_tvs = tvs, abs_ev_vars = evs }))
                      = null tvs && null evs
