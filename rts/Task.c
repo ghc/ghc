@@ -5,7 +5,7 @@
  * The task manager subsystem.  Tasks execute STG code, with this
  * module providing the API which the Scheduler uses to control their
  * creation and destruction.
- * 
+ *
  * -------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
@@ -73,7 +73,7 @@ initTaskManager (void)
         tasksInitialized = 1;
 #if defined(THREADED_RTS)
 #if !defined(MYTASK_USE_TLV)
-	newThreadLocalKey(&currentTaskKey);
+        newThreadLocalKey(&currentTaskKey);
 #endif
         initMutex(&all_tasks_mutex);
 #endif
@@ -105,7 +105,7 @@ freeTaskManager (void)
     RELEASE_LOCK(&all_tasks_mutex);
 
 #if defined(THREADED_RTS)
-    closeMutex(&all_tasks_mutex); 
+    closeMutex(&all_tasks_mutex);
 #if !defined(MYTASK_USE_TLV)
     freeThreadLocalKey(&currentTaskKey);
 #endif
@@ -205,7 +205,7 @@ newTask (rtsBool worker)
 
 #define ROUND_TO_CACHE_LINE(x) ((((x)+63) / 64) * 64)
     task = stgMallocBytes(ROUND_TO_CACHE_LINE(sizeof(Task)), "newTask");
-    
+
     task->cap           = NULL;
     task->worker        = worker;
     task->stopped       = rtsFalse;
@@ -213,7 +213,7 @@ newTask (rtsBool worker)
     task->n_spare_incalls = 0;
     task->spare_incalls = NULL;
     task->incall        = NULL;
-    
+
 #if defined(THREADED_RTS)
     initCondition(&task->cond);
     initMutex(&task->lock);
@@ -251,7 +251,7 @@ static void
 newInCall (Task *task)
 {
     InCall *incall;
-    
+
     if (task->spare_incalls != NULL) {
         incall = task->spare_incalls;
         task->spare_incalls = incall->next;
@@ -497,22 +497,22 @@ printAllTasks(void)
 {
     Task *task;
     for (task = all_tasks; task != NULL; task = task->all_next) {
-	debugBelch("task %#" FMT_HexWord64 " is %s, ", serialisableTaskId(task),
+        debugBelch("task %#" FMT_HexWord64 " is %s, ", serialisableTaskId(task),
                    task->stopped ? "stopped" : "alive");
-	if (!task->stopped) {
-	    if (task->cap) {
-		debugBelch("on capability %d, ", task->cap->no);
-	    }
-	    if (task->incall->tso) {
-	      debugBelch("bound to thread %lu",
+        if (!task->stopped) {
+            if (task->cap) {
+                debugBelch("on capability %d, ", task->cap->no);
+            }
+            if (task->incall->tso) {
+              debugBelch("bound to thread %lu",
                          (unsigned long)task->incall->tso->id);
-	    } else {
-		debugBelch("worker");
-	    }
-	}
-	debugBelch("\n");
+            } else {
+                debugBelch("worker");
+            }
+        }
+        debugBelch("\n");
     }
-}		       
+}
 
 #endif
 
