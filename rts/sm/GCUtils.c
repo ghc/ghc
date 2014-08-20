@@ -6,7 +6,7 @@
  *
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
- * 
+ *
  *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
  *
  * ---------------------------------------------------------------------------*/
@@ -53,7 +53,7 @@ allocGroup_sync(nat n)
 
 #if 0
 static void
-allocBlocks_sync(nat n, bdescr **hd, bdescr **tl, 
+allocBlocks_sync(nat n, bdescr **hd, bdescr **tl,
                  nat gen_no, step *stp,
                  StgWord32 flags)
 {
@@ -98,14 +98,14 @@ grab_local_todo_block (gen_workspace *ws)
         ws->todo_overflow = bd->link;
         bd->link = NULL;
         ws->n_todo_overflow--;
-	return bd;
+        return bd;
     }
 
     bd = popWSDeque(ws->todo_q);
     if (bd != NULL)
     {
-	ASSERT(bd->link == NULL);
-	return bd;
+        ASSERT(bd->link == NULL);
+        return bd;
     }
 
     return NULL;
@@ -144,7 +144,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
         bd->link = ws->part_list;
         ws->part_list = bd;
         ws->n_part_blocks += bd->blocks;
-        IF_DEBUG(sanity, 
+        IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->part_list) == ws->n_part_blocks));
     }
     else
@@ -153,7 +153,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
         bd->link = ws->scavd_list;
         ws->scavd_list = bd;
         ws->n_scavd_blocks += bd->blocks;
-        IF_DEBUG(sanity, 
+        IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks));
     }
 }
@@ -219,7 +219,7 @@ todo_block_full (nat size, gen_workspace *ws)
 
         return p;
     }
-    
+
     gct->copied += ws->todo_free - bd->free;
     bd->free = ws->todo_free;
 
@@ -230,7 +230,7 @@ todo_block_full (nat size, gen_workspace *ws)
     if (bd != gct->scan_bd)
     {
         // If this block does not have enough space to allocate the
-        // current object, but it also doesn't have any work to push, then 
+        // current object, but it also doesn't have any work to push, then
         // push it on to the scanned list.
         if (bd->u.scan == bd->free)
         {
@@ -246,11 +246,11 @@ todo_block_full (nat size, gen_workspace *ws)
             }
         }
         // Otherwise, push this block out to the global list.
-        else 
+        else
         {
             DEBUG_ONLY( generation *gen );
             DEBUG_ONLY( gen = ws->gen );
-            debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld", 
+            debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld",
                   bd->start, (unsigned long)(bd->free - bd->u.scan),
                   gen->no, dequeElements(ws->todo_q));
 
@@ -290,7 +290,7 @@ alloc_todo_block (gen_workspace *ws, nat size)
     {
         // blocks in to-space get the BF_EVACUATED flag.
 
-//        allocBlocks_sync(16, &hd, &tl, 
+//        allocBlocks_sync(16, &hd, &tl,
 //                         ws->step->gen_no, ws->step, BF_EVACUATED);
 //
 //        tl->link = ws->part_list;
@@ -317,7 +317,7 @@ alloc_todo_block (gen_workspace *ws, nat size)
     ws->todo_lim  = stg_min(bd->start + bd->blocks * BLOCK_SIZE_W,
                             bd->free + stg_max(WORK_UNIT_WORDS,size));
 
-    debugTrace(DEBUG_gc, "alloc new todo block %p for gen  %d", 
+    debugTrace(DEBUG_gc, "alloc new todo block %p for gen  %d",
                bd->free, ws->gen->no);
 
     return ws->todo_free;
@@ -336,9 +336,9 @@ printMutableList(bdescr *bd)
     debugBelch("mutable list %p: ", bd);
 
     for (; bd != NULL; bd = bd->link) {
-	for (p = bd->start; p < bd->free; p++) {
-	    debugBelch("%p (%s), ", (void *)*p, info_type((StgClosure *)*p));
-	}
+        for (p = bd->start; p < bd->free; p++) {
+            debugBelch("%p (%s), ", (void *)*p, info_type((StgClosure *)*p));
+        }
     }
     debugBelch("\n");
 }
