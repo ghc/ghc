@@ -5643,7 +5643,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
            errorBelch("%s: unknown symbol `%s'", oc->fileName, symbol);
            return 0;
          }
-         IF_DEBUG(linker,debugBelch( "`%s' resolves to %p", symbol, (void*)S ));
+         IF_DEBUG(linker,debugBelch( "`%s' resolves to %p\n", symbol, (void*)S ));
       }
 
       IF_DEBUG(linker,debugBelch("Reloc: P = %p   S = %p   A = %p\n",
