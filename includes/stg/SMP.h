@@ -24,14 +24,14 @@ void arm_atomic_spin_unlock(void);
 /* ----------------------------------------------------------------------------
    Atomic operations
    ------------------------------------------------------------------------- */
-   
+
 #if !IN_STG_CODE || IN_STGCRUN
 // We only want the barriers, e.g. write_barrier(), declared in .hc
 // files.  Defining the other inline functions here causes type
 // mismatch errors from gcc, because the generated C code is assuming
 // that there are no prototypes in scope.
 
-/* 
+/*
  * The atomic exchange operation: xchg(p,w) exchanges the value
  * pointed to by p with the value w, returning the old value.
  *
@@ -40,12 +40,12 @@ void arm_atomic_spin_unlock(void);
  */
 EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
 
-/* 
+/*
  * Compare-and-swap.  Atomically does this:
  *
- * cas(p,o,n) { 
- *    r = *p; 
- *    if (r == o) { *p = n }; 
+ * cas(p,o,n) {
+ *    r = *p;
+ *    if (r == o) { *p = n };
  *    return r;
  * }
  */
@@ -88,11 +88,11 @@ EXTERN_INLINE void busy_wait_nop(void);
  * Reference for these: "The JSR-133 Cookbook for Compiler Writers"
  * http://gee.cs.oswego.edu/dl/jmm/cookbook.html
  *
- * To check whether you got these right, try the test in 
+ * To check whether you got these right, try the test in
  *   testsuite/tests/rts/testwsdeque.c
  * This tests the work-stealing deque implementation, which relies on
  * properly working store_load and load_load memory barriers.
- */ 
+ */
 EXTERN_INLINE void write_barrier(void);
 EXTERN_INLINE void store_load_barrier(void);
 EXTERN_INLINE void load_load_barrier(void);
@@ -115,10 +115,10 @@ xchg(StgPtr p, StgWord w)
     __asm__ __volatile__ (
         // NB: the xchg instruction is implicitly locked, so we do not
         // need a lock prefix here.
- 	  "xchg %1,%0"
+          "xchg %1,%0"
           :"+r" (result), "+m" (*p)
           : /* no input-only operands */
-	);
+        );
 #elif powerpc_HOST_ARCH
     __asm__ __volatile__ (
         "1:     lwarx     %0, 0, %2\n"
@@ -131,8 +131,8 @@ xchg(StgPtr p, StgWord w)
     result = w;
     __asm__ __volatile__ (
         "swap %1,%0"
-	: "+r" (result), "+m" (*p)
-	: /* no input-only operands */
+        : "+r" (result), "+m" (*p)
+        : /* no input-only operands */
       );
 #elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
     __asm__ __volatile__ ("swp %0, %1, [%2]"
@@ -163,8 +163,8 @@ xchg(StgPtr p, StgWord w)
     return result;
 }
 
-/* 
- * CMPXCHG - the single-word atomic compare-and-exchange instruction.  Used 
+/*
+ * CMPXCHG - the single-word atomic compare-and-exchange instruction.  Used
  * in the STM implementation.
  */
 EXTERN_INLINE StgWord
@@ -179,7 +179,7 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
     return result;
 #elif i386_HOST_ARCH || x86_64_HOST_ARCH
     __asm__ __volatile__ (
- 	  "lock\ncmpxchg %3,%1"
+          "lock\ncmpxchg %3,%1"
           :"=a"(o), "+m" (*(volatile unsigned int *)p)
           :"0" (o), "r" (n));
     return o;
@@ -199,17 +199,17 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
     return result;
 #elif sparc_HOST_ARCH
     __asm__ __volatile__ (
-	"cas [%1], %2, %0"
-	: "+r" (n)
-	: "r" (p), "r" (o)
-	: "memory"
+        "cas [%1], %2, %0"
+        : "+r" (n)
+        : "r" (p), "r" (o)
+        : "memory"
     );
     return n;
 #elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
     StgWord r;
     arm_atomic_spin_lock();
-    r  = *p; 
-    if (r == o) { *p = n; } 
+    r  = *p;
+    if (r == o) { *p = n; }
     arm_atomic_spin_unlock();
     return r;
 #elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)
