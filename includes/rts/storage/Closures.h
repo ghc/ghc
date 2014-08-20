@@ -28,11 +28,11 @@ typedef struct {
 
 /* -----------------------------------------------------------------------------
    The SMP header
-   
+
    A thunk has a padding word to take the updated value.  This is so
    that the update doesn't overwrite the payload, so we can avoid
    needing to lock the thunk during entry and update.
-   
+
    Note: this doesn't apply to THUNK_STATICs, which have no payload.
 
    Note: we leave this padding word in all ways, rather than just SMP,
@@ -94,17 +94,17 @@ typedef struct {
 
 typedef struct {
     StgHeader   header;
-    StgHalfWord arity;		/* zero if it is an AP */
+    StgHalfWord arity;          /* zero if it is an AP */
     StgHalfWord n_args;
-    StgClosure *fun;		/* really points to a fun */
+    StgClosure *fun;            /* really points to a fun */
     StgClosure *payload[FLEXIBLE_ARRAY];
 } StgPAP;
 
 typedef struct {
     StgThunkHeader   header;
-    StgHalfWord arity;		/* zero if it is an AP */
+    StgHalfWord arity;          /* zero if it is an AP */
     StgHalfWord n_args;
-    StgClosure *fun;		/* really points to a fun */
+    StgClosure *fun;            /* really points to a fun */
     StgClosure *payload[FLEXIBLE_ARRAY];
 } StgAP;
 
@@ -185,7 +185,7 @@ typedef struct {
 
 typedef struct {
     StgHeader  header;
-} StgStopFrame;  
+} StgStopFrame;
 
 typedef struct {
   StgHeader header;
@@ -202,11 +202,11 @@ typedef struct _StgStableName {
   StgWord        sn;
 } StgStableName;
 
-typedef struct _StgWeak {	/* Weak v */
+typedef struct _StgWeak {       /* Weak v */
   StgHeader header;
   StgClosure *cfinalizers;
   StgClosure *key;
-  StgClosure *value;		/* v */
+  StgClosure *value;            /* v */
   StgClosure *finalizer;
   struct _StgWeak *link;
 } StgWeak;
@@ -243,9 +243,9 @@ typedef struct _StgCFinalizerList {
 
 typedef struct {
     StgHeader      header;
-    StgArrWords   *instrs;	/* a pointer to an ArrWords */
-    StgArrWords   *literals;	/* a pointer to an ArrWords */
-    StgMutArrPtrs *ptrs;	/* a pointer to a  MutArrPtrs */
+    StgArrWords   *instrs;      /* a pointer to an ArrWords */
+    StgArrWords   *literals;    /* a pointer to an ArrWords */
+    StgMutArrPtrs *ptrs;        /* a pointer to a  MutArrPtrs */
     StgHalfWord   arity;        /* arity of this BCO */
     StgHalfWord   size;         /* size of this BCO (in words) */
     StgWord       bitmap[FLEXIBLE_ARRAY];  /* an StgLargeBitmap */
@@ -255,7 +255,7 @@ typedef struct {
 #define BCO_BITMAP_SIZE(bco) (BCO_BITMAP(bco)->size)
 #define BCO_BITMAP_BITS(bco) (BCO_BITMAP(bco)->bitmap)
 #define BCO_BITMAP_SIZEW(bco) ((BCO_BITMAP_SIZE(bco) + BITS_IN(StgWord) - 1) \
-			        / BITS_IN(StgWord))
+                                / BITS_IN(StgWord))
 
 /* A function return stack frame: used when saving the state for a
  * garbage collection at a function entry point.  The function
@@ -291,14 +291,14 @@ typedef struct {
  *
  *  StgTVar defines the only type that can be updated through the STM
  *  interface.
- * 
+ *
  *  Note that various optimisations may be possible in order to use less
  *  space for these data structures at the cost of more complexity in the
  *  implementation:
  *
  *   - In StgTVar, current_value and first_watch_queue_entry could be held in
  *     the same field: if any thread is waiting then its expected_value for
- *     the tvar is the current value.  
+ *     the tvar is the current value.
  *
  *   - In StgTRecHeader, it might be worthwhile having separate chunks
  *     of read-only and read-write locations.  This would save a
@@ -338,7 +338,7 @@ typedef struct {
 typedef struct {
   StgTVar                   *tvar;
   StgClosure                *expected_value;
-  StgClosure                *new_value; 
+  StgClosure                *new_value;
 #if defined(THREADED_RTS)
   StgInt                     num_updates;
 #endif
@@ -353,7 +353,7 @@ typedef struct StgTRecChunk_ {
   TRecEntry                  entries[TREC_CHUNK_NUM_ENTRIES];
 } StgTRecChunk;
 
-typedef enum { 
+typedef enum {
   TREC_ACTIVE,        /* Transaction in progress, outcome undecided */
   TREC_CONDEMNED,     /* Transaction in progress, inconsistent / out of date reads */
   TREC_COMMITTED,     /* Transaction has committed, now updating tvars */
