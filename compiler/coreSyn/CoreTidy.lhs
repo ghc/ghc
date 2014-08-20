@@ -8,15 +8,8 @@ The code for *top-level* bindings is in TidyPgm.
 
 \begin{code}
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module CoreTidy (
-	tidyExpr, tidyVarOcc, tidyRule, tidyRules, tidyUnfolding
+        tidyExpr, tidyVarOcc, tidyRule, tidyRules, tidyUnfolding
     ) where
 
 #include "HsVersions.h"
@@ -38,55 +31,55 @@ import Data.List
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Tidying expressions, rules}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 tidyBind :: TidyEnv
-	 -> CoreBind
-	 ->  (TidyEnv, CoreBind)
+         -> CoreBind
+         ->  (TidyEnv, CoreBind)
 
 tidyBind env (NonRec bndr rhs)
   = tidyLetBndr env env (bndr,rhs) =: \ (env', bndr') ->
     (env', NonRec bndr' (tidyExpr env' rhs))
 
 tidyBind env (Rec prs)
-  = let 
+  = let
        (env', bndrs') = mapAccumL (tidyLetBndr env') env prs
     in
-    map (tidyExpr env') (map snd prs)	=: \ rhss' ->
+    map (tidyExpr env') (map snd prs)   =: \ rhss' ->
     (env', Rec (zip bndrs' rhss'))
 
 
 ------------  Expressions  --------------
 tidyExpr :: TidyEnv -> CoreExpr -> CoreExpr
-tidyExpr env (Var v)   	 =  Var (tidyVarOcc env v)
+tidyExpr env (Var v)     =  Var (tidyVarOcc env v)
 tidyExpr env (Type ty)  =  Type (tidyType env ty)
 tidyExpr env (Coercion co) = Coercion (tidyCo env co)
 tidyExpr _   (Lit lit)   =  Lit lit
-tidyExpr env (App f a) 	 =  App (tidyExpr env f) (tidyExpr env a)
+tidyExpr env (App f a)   =  App (tidyExpr env f) (tidyExpr env a)
 tidyExpr env (Tick t e) =  Tick (tidyTickish env t) (tidyExpr env e)
 tidyExpr env (Cast e co) =  Cast (tidyExpr env e) (tidyCo env co)
 
-tidyExpr env (Let b e) 
-  = tidyBind env b 	=: \ (env', b') ->
+tidyExpr env (Let b e)
+  = tidyBind env b      =: \ (env', b') ->
     Let b' (tidyExpr env' e)
 
 tidyExpr env (Case e b ty alts)
-  = tidyBndr env b 	=: \ (env', b) ->
-    Case (tidyExpr env e) b (tidyType env ty) 
-	 (map (tidyAlt b env') alts)
+  = tidyBndr env b      =: \ (env', b) ->
+    Case (tidyExpr env e) b (tidyType env ty)
+         (map (tidyAlt b env') alts)
 
 tidyExpr env (Lam b e)
-  = tidyBndr env b 	=: \ (env', b) ->
+  = tidyBndr env b      =: \ (env', b) ->
     Lam b (tidyExpr env' e)
 
 ------------  Case alternatives  --------------
 tidyAlt :: CoreBndr -> TidyEnv -> CoreAlt -> CoreAlt
 tidyAlt _case_bndr env (con, vs, rhs)
-  = tidyBndrs env vs 	=: \ (env', vs) ->
+  = tidyBndrs env vs    =: \ (env', vs) ->
     (con, vs, tidyExpr env' rhs)
 
 ------------  Tickish  --------------
@@ -98,27 +91,27 @@ tidyTickish _   other_tickish       = other_tickish
 tidyRules :: TidyEnv -> [CoreRule] -> [CoreRule]
 tidyRules _   [] = []
 tidyRules env (rule : rules)
-  = tidyRule env rule  		=: \ rule ->
-    tidyRules env rules 	=: \ rules ->
+  = tidyRule env rule           =: \ rule ->
+    tidyRules env rules         =: \ rules ->
     (rule : rules)
 
 tidyRule :: TidyEnv -> CoreRule -> CoreRule
 tidyRule _   rule@(BuiltinRule {}) = rule
 tidyRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs,
-			  ru_fn = fn, ru_rough = mb_ns })
-  = tidyBndrs env bndrs		=: \ (env', bndrs) ->
-    map (tidyExpr env') args  	=: \ args ->
-    rule { ru_bndrs = bndrs, ru_args = args, 
-	   ru_rhs   = tidyExpr env' rhs,
-	   ru_fn    = tidyNameOcc env fn, 
-	   ru_rough = map (fmap (tidyNameOcc env')) mb_ns }
+                          ru_fn = fn, ru_rough = mb_ns })
+  = tidyBndrs env bndrs         =: \ (env', bndrs) ->
+    map (tidyExpr env') args    =: \ args ->
+    rule { ru_bndrs = bndrs, ru_args = args,
+           ru_rhs   = tidyExpr env' rhs,
+           ru_fn    = tidyNameOcc env fn,
+           ru_rough = map (fmap (tidyNameOcc env')) mb_ns }
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Tidying non-top-level binders}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -126,8 +119,8 @@ tidyNameOcc :: TidyEnv -> Name -> Name
 -- In rules and instances, we have Names, and we must tidy them too
 -- Fortunately, we can lookup in the VarEnv with a name
 tidyNameOcc (_, var_env) n = case lookupUFM var_env n of
-				Nothing -> n
-				Just v  -> idName v
+                                Nothing -> n
+                                Just v  -> idName v
 
 tidyVarOcc :: TidyEnv -> Var -> Var
 tidyVarOcc (_, var_env) v = lookupVarEnv var_env v `orElse` v
@@ -148,19 +141,19 @@ tidyIdBndr env@(tidy_env, var_env) id
     -- stuff in the OccName.
     case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') ->
     let
-	-- Give the Id a fresh print-name, *and* rename its type
-	-- The SrcLoc isn't important now,
-	-- though we could extract it from the Id
-	--
+        -- Give the Id a fresh print-name, *and* rename its type
+        -- The SrcLoc isn't important now,
+        -- though we could extract it from the Id
+        --
         ty'      = tidyType env (idType id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
-	id'      = mkLocalIdWithInfo name' ty' new_info
-	var_env' = extendVarEnv var_env id id'
+        id'      = mkLocalIdWithInfo name' ty' new_info
+        var_env' = extendVarEnv var_env id id'
 
-	-- Note [Tidy IdInfo]
+        -- Note [Tidy IdInfo]
         new_info = vanillaIdInfo `setOccInfo` occInfo old_info
                                  `setUnfoldingInfo` new_unf
-	old_info = idInfo id
+        old_info = idInfo id
         old_unf  = unfoldingInfo old_info
         new_unf | isEvaldUnfolding old_unf = evaldUnfolding
                 | otherwise                = noUnfolding
@@ -169,8 +162,8 @@ tidyIdBndr env@(tidy_env, var_env) id
     ((tidy_env', var_env'), id')
    }
 
-tidyLetBndr :: TidyEnv	       -- Knot-tied version for unfoldings
-            -> TidyEnv 	       -- The one to extend
+tidyLetBndr :: TidyEnv         -- Knot-tied version for unfoldings
+            -> TidyEnv         -- The one to extend
             -> (Id, CoreExpr) -> (TidyEnv, Var)
 -- Used for local (non-top-level) let(rec)s
 -- Just like tidyIdBndr above, but with more IdInfo
@@ -179,36 +172,36 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
     let
         ty'      = tidyType env (idType id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
-	id'      = mkLocalIdWithInfo name' ty' new_info
-	var_env' = extendVarEnv var_env id id'
+        id'      = mkLocalIdWithInfo name' ty' new_info
+        var_env' = extendVarEnv var_env id id'
 
-	-- Note [Tidy IdInfo]
-	-- We need to keep around any interesting strictness and
-	-- demand info because later on we may need to use it when
-	-- converting to A-normal form.
-	-- eg.
-	--	f (g x),  where f is strict in its argument, will be converted
-	--	into  case (g x) of z -> f z  by CorePrep, but only if f still
-	-- 	has its strictness info.
-	--
-	-- Similarly for the demand info - on a let binder, this tells
-	-- CorePrep to turn the let into a case.
-	--
-	-- Similarly arity info for eta expansion in CorePrep
-	--
-	-- Set inline-prag info so that we preseve it across
-	-- separate compilation boundaries
-	old_info = idInfo id
+        -- Note [Tidy IdInfo]
+        -- We need to keep around any interesting strictness and
+        -- demand info because later on we may need to use it when
+        -- converting to A-normal form.
+        -- eg.
+        --      f (g x),  where f is strict in its argument, will be converted
+        --      into  case (g x) of z -> f z  by CorePrep, but only if f still
+        --      has its strictness info.
+        --
+        -- Similarly for the demand info - on a let binder, this tells
+        -- CorePrep to turn the let into a case.
+        --
+        -- Similarly arity info for eta expansion in CorePrep
+        --
+        -- Set inline-prag info so that we preseve it across
+        -- separate compilation boundaries
+        old_info = idInfo id
         new_info = vanillaIdInfo
                     `setOccInfo`        occInfo old_info
-                    `setArityInfo`	exprArity rhs
-                    `setStrictnessInfo`	strictnessInfo old_info
-                    `setDemandInfo`	demandInfo old_info
-                    `setInlinePragInfo`	inlinePragInfo old_info
-                    `setUnfoldingInfo`	new_unf
+                    `setArityInfo`      exprArity rhs
+                    `setStrictnessInfo` strictnessInfo old_info
+                    `setDemandInfo`     demandInfo old_info
+                    `setInlinePragInfo` inlinePragInfo old_info
+                    `setUnfoldingInfo`  new_unf
 
         new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf
-                | otherwise	            = noUnfolding
+                | otherwise                 = noUnfolding
         old_unf = unfoldingInfo old_info
     in
     ((tidy_env', var_env'), id') }
@@ -220,14 +213,14 @@ tidyUnfolding tidy_env df@(DFunUnfolding { df_bndrs = bndrs, df_args = args }) _
   where
     (tidy_env', bndrs') = tidyBndrs tidy_env bndrs
 
-tidyUnfolding tidy_env 
+tidyUnfolding tidy_env
               unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
               unf_from_rhs
   | isStableSource src
-  = unf { uf_tmpl = tidyExpr tidy_env unf_rhs }	   -- Preserves OccInfo
+  = unf { uf_tmpl = tidyExpr tidy_env unf_rhs }    -- Preserves OccInfo
   | otherwise
   = unf_from_rhs
-tidyUnfolding _ unf _ = unf	-- NoUnfolding or OtherCon
+tidyUnfolding _ unf _ = unf     -- NoUnfolding or OtherCon
 \end{code}
 
 Note [Tidy IdInfo]
