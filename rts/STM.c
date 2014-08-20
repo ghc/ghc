@@ -6,32 +6,33 @@
  * Overview
  * --------
  *
- * See the PPoPP 2005 paper "Composable memory transactions".  In summary,
- * each transaction has a TRec (transaction record) holding entries for each of the
- * TVars (transactional variables) that it has accessed.  Each entry records
- * (a) the TVar, (b) the expected value seen in the TVar, (c) the new value that
- * the transaction wants to write to the TVar, (d) during commit, the identity of
+ * See the PPoPP 2005 paper "Composable memory transactions".  In summary, each
+ * transaction has a TRec (transaction record) holding entries for each of the
+ * TVars (transactional variables) that it has accessed.  Each entry records (a)
+ * the TVar, (b) the expected value seen in the TVar, (c) the new value that the
+ * transaction wants to write to the TVar, (d) during commit, the identity of
  * the TRec that wrote the expected value.
  *
- * Separate TRecs are used for each level in a nest of transactions.  This allows
- * a nested transaction to be aborted without condemning its enclosing transactions.
- * This is needed in the implementation of catchRetry.  Note that the "expected value"
- * in a nested transaction's TRec is the value expected to be *held in memory* if
- * the transaction commits -- not the "new value" stored in one of the enclosing
- * transactions.  This means that validation can be done without searching through
- * a nest of TRecs.
+ * Separate TRecs are used for each level in a nest of transactions.  This
+ * allows a nested transaction to be aborted without condemning its enclosing
+ * transactions.  This is needed in the implementation of catchRetry.  Note that
+ * the "expected value" in a nested transaction's TRec is the value expected to
+ * be *held in memory* if the transaction commits -- not the "new value" stored
+ * in one of the enclosing transactions.  This means that validation can be done
+ * without searching through a nest of TRecs.
  *
  * Concurrency control
  * -------------------
  *
- * Three different concurrency control schemes can be built according to the settings
- * in STM.h:
+ * Three different concurrency control schemes can be built according to the
+ * settings in STM.h:
  *
- * STM_UNIPROC assumes that the caller serialises invocations on the STM interface.
- * In the Haskell RTS this means it is suitable only for non-THREADED_RTS builds.
+ * STM_UNIPROC assumes that the caller serialises invocations on the STM
+ * interface.  In the Haskell RTS this means it is suitable only for
+ * non-THREADED_RTS builds.
  *
- * STM_CG_LOCK uses coarse-grained locking -- a single 'stm lock' is acquired during
- * an invocation on the STM interface.  Note that this does not mean that
+ * STM_CG_LOCK uses coarse-grained locking -- a single 'stm lock' is acquired
+ * during an invocation on the STM interface.  Note that this does not mean that
  * transactions are simply serialized -- the lock is only held *within* the
  * implementation of stmCommitTransaction, stmWait etc.
  *
@@ -52,11 +53,11 @@
  * lock_stm & unlock_stm are straightforward : they acquire a simple spin-lock
  * using STM_CG_LOCK, and otherwise they are no-ops.
  *
- * lock_tvar / cond_lock_tvar and unlock_tvar are more complex because they
- * have other effects (present in STM_UNIPROC and STM_CG_LOCK builds) as well
- * as the actual business of manipulating a lock (present only in STM_FG_LOCKS
- * builds).  This is because locking a TVar is implemented by writing the lock
- * holder's TRec into the TVar's current_value field:
+ * lock_tvar / cond_lock_tvar and unlock_tvar are more complex because they have
+ * other effects (present in STM_UNIPROC and STM_CG_LOCK builds) as well as the
+ * actual business of manipulating a lock (present only in STM_FG_LOCKS builds).
+ * This is because locking a TVar is implemented by writing the lock holder's
+ * TRec into the TVar's current_value field:
  *
  *   lock_tvar - lock a specified TVar (STM_FG_LOCKS only), returning the value
  *               it contained.
@@ -68,18 +69,17 @@
  *   unlock_tvar - release the lock on a specified TVar (STM_FG_LOCKS only),
  *               storing a specified value in place of the lock entry.
  *
- * Using these operations, the typical pattern of a commit/validate/wait operation
- * is to (a) lock the STM, (b) lock all the TVars being updated, (c) check that
- * the TVars that were only read from still contain their expected values,
- * (d) release the locks on the TVars, writing updates to them in the case of a
- * commit, (e) unlock the STM.
+ * Using these operations, the typical pattern of a commit/validate/wait
+ * operation is to (a) lock the STM, (b) lock all the TVars being updated, (c)
+ * check that the TVars that were only read from still contain their expected
+ * values, (d) release the locks on the TVars, writing updates to them in the
+ * case of a commit, (e) unlock the STM.
  *
- * Queues of waiting threads hang off the first_watch_queue_entry
- * field of each TVar.  This may only be manipulated when holding that
- * TVar's lock.  In particular, when a thread is putting itself to
- * sleep, it mustn't release the TVar's lock until it has added itself
- * to the wait queue and marked its TSO as BlockedOnSTM -- this makes
- * sure that other threads will know to wake it.
+ * Queues of waiting threads hang off the first_watch_queue_entry field of each
+ * TVar.  This may only be manipulated when holding that TVar's lock.  In
+ * particular, when a thread is putting itself to sleep, it mustn't release the
+ * TVar's lock until it has added itself to the wait queue and marked its TSO as
+ * BlockedOnSTM -- this makes sure that other threads will know to wake it.
  *
  * ---------------------------------------------------------------------------*/
 
