@@ -38,9 +38,9 @@
  *         GC is finished, when the original step's contents may be freed
  *         and replaced by the to-space.
  *
- *       - the mutable-list is per-generation (not per-step).  G0 doesn't 
+ *       - the mutable-list is per-generation (not per-step).  G0 doesn't
  *         have one (since every garbage collection collects at least G0).
- * 
+ *
  *       - block descriptors contain pointers to both the step and the
  *         generation that the block belongs to, for convenience.
  *
@@ -67,13 +67,13 @@ typedef struct nursery_ {
 } nursery;
 
 typedef struct generation_ {
-    nat            no;			// generation number
+    nat            no;                  // generation number
 
-    bdescr *       blocks;	        // blocks in this gen
+    bdescr *       blocks;              // blocks in this gen
     memcount       n_blocks;            // number of blocks
     memcount       n_words;             // number of used words
 
-    bdescr *       large_objects;	// large objects (doubly linked)
+    bdescr *       large_objects;       // large objects (doubly linked)
     memcount       n_large_blocks;      // no. of blocks used by large objs
     memcount       n_large_words;       // no. of words used by large objs
     memcount       n_new_large_words;   // words of new large objects
@@ -85,7 +85,7 @@ typedef struct generation_ {
                                         // linked via global_link
     StgWeak *      weak_ptr_list;       // weak pointers in this gen
 
-    struct generation_ *to;		// destination gen for live objects
+    struct generation_ *to;             // destination gen for live objects
 
     // stats information
     nat collections;
@@ -102,20 +102,20 @@ typedef struct generation_ {
                                         //    and scavenged_large_objects
 #endif
 
-    int          mark;			// mark (not copy)? (old gen only)
-    int          compact;		// compact (not sweep)? (old gen only)
+    int          mark;                  // mark (not copy)? (old gen only)
+    int          compact;               // compact (not sweep)? (old gen only)
 
     // During GC, if we are collecting this gen, blocks and n_blocks
     // are copied into the following two fields.  After GC, these blocks
     // are freed.
-    bdescr *     old_blocks;	        // bdescr of first from-space block
+    bdescr *     old_blocks;            // bdescr of first from-space block
     memcount     n_old_blocks;         // number of blocks in from-space
     memcount     live_estimate;         // for sweeping: estimate of live data
-    
+
     bdescr *     scavenged_large_objects;  // live large objs after GC (d-link)
     memcount     n_scavenged_large_blocks; // size (not count) of above
 
-    bdescr *     bitmap;  		// bitmap for compacting collection
+    bdescr *     bitmap;                // bitmap for compacting collection
 
     StgTSO *     old_threads;
     StgWeak *    old_weak_ptr_list;
@@ -130,26 +130,26 @@ extern generation * oldest_gen;
 
    StgPtr allocate(Capability *cap, W_ n)
                                 Allocates memory from the nursery in
-				the current Capability.  This can be
-				done without taking a global lock,
+                                the current Capability.  This can be
+                                done without taking a global lock,
                                 unlike allocate().
 
    StgPtr allocatePinned(Capability *cap, W_ n)
                                 Allocates a chunk of contiguous store
-   				n words long, which is at a fixed
-				address (won't be moved by GC).  
-				Returns a pointer to the first word.
-				Always succeeds.
-				
-				NOTE: the GC can't in general handle
-				pinned objects, so allocatePinned()
-				can only be used for ByteArrays at the
-				moment.
+                                n words long, which is at a fixed
+                                address (won't be moved by GC).
+                                Returns a pointer to the first word.
+                                Always succeeds.
 
-				Don't forget to TICK_ALLOC_XXX(...)
-				after calling allocate or
-				allocatePinned, for the
-				benefit of the ticky-ticky profiler.
+                                NOTE: the GC can't in general handle
+                                pinned objects, so allocatePinned()
+                                can only be used for ByteArrays at the
+                                moment.
+
+                                Don't forget to TICK_ALLOC_XXX(...)
+                                after calling allocate or
+                                allocatePinned, for the
+                                benefit of the ticky-ticky profiler.
 
    -------------------------------------------------------------------------- */
 
