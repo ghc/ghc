@@ -22,9 +22,9 @@ StgStablePtr getStablePtr  (StgPtr p);
    -------------------------------------------------------------------------- */
 
 typedef struct {
-    StgPtr  addr;			/* Haskell object, free list, or NULL */
-    StgPtr  old;			/* old Haskell object, used during GC */
-    StgClosure *sn_obj;		/* the StableName object (or NULL) */
+    StgPtr  addr;                       /* Haskell object, free list, or NULL */
+    StgPtr  old;                        /* old Haskell object, used during GC */
+    StgClosure *sn_obj;         /* the StableName object (or NULL) */
 } snEntry;
 
 typedef struct {
