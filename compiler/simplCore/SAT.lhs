@@ -50,14 +50,6 @@ essential to make this work well!
 
 \begin{code}
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
-
 module SAT ( doStaticArgs ) where
 
 import Var
@@ -105,14 +97,14 @@ satBind (Rec [(binder, rhs)]) interesting_ids = do
     (rhs_body', sat_info_rhs_body) <- satTopLevelExpr rhs_body interesting_ids'
     let sat_info_rhs_from_args = unitVarEnv binder (bindersToSATInfo rhs_binders)
         sat_info_rhs' = mergeIdSATInfo sat_info_rhs_from_args sat_info_rhs_body
-        
+
         shadowing = binder `elementOfUniqSet` interesting_ids
         sat_info_rhs'' = if shadowing
                         then sat_info_rhs' `delFromUFM` binder -- For safety
                         else sat_info_rhs'
-    
-    bind' <- saTransformMaybe binder (lookupUFM sat_info_rhs' binder) 
-			      rhs_binders rhs_body'
+
+    bind' <- saTransformMaybe binder (lookupUFM sat_info_rhs' binder)
+                              rhs_binders rhs_body'
     return (bind', sat_info_rhs'')
 satBind (Rec pairs) interesting_ids = do
     let (binders, rhss) = unzip pairs
@@ -140,8 +132,8 @@ pprSATInfo :: SATInfo -> SDoc
 pprSATInfo staticness = hcat $ map pprStaticness staticness
 
 pprStaticness :: Staticness App -> SDoc
-pprStaticness (Static (VarApp _))  = ptext (sLit "SV") 
-pprStaticness (Static (TypeApp _)) = ptext (sLit "ST") 
+pprStaticness (Static (VarApp _))  = ptext (sLit "SV")
+pprStaticness (Static (TypeApp _)) = ptext (sLit "ST")
 pprStaticness (Static (CoApp _))   = ptext (sLit "SC")
 pprStaticness NotStatic            = ptext (sLit "NS")
 
@@ -171,7 +163,7 @@ bindersToSATInfo vs = map (Static . binderToApp) vs
 
 finalizeApp :: Maybe IdAppInfo -> IdSATInfo -> IdSATInfo
 finalizeApp Nothing id_sat_info = id_sat_info
-finalizeApp (Just (v, sat_info')) id_sat_info = 
+finalizeApp (Just (v, sat_info')) id_sat_info =
     let sat_info'' = case lookupUFM id_sat_info v of
                         Nothing -> sat_info'
                         Just sat_info -> mergeSATInfo sat_info sat_info'
@@ -212,7 +204,7 @@ satExpr (App fn arg) interesting_ids = do
                 _          -> satRemainderWithStaticness $ NotStatic
   where
     boring :: CoreExpr -> IdSATInfo -> Maybe IdAppInfo -> SatM (CoreExpr, IdSATInfo, Maybe IdAppInfo)
-    boring fn' sat_info_fn app_info = 
+    boring fn' sat_info_fn app_info =
         do (arg', sat_info_arg, arg_app) <- satExpr arg interesting_ids
            let sat_info_arg' = finalizeApp arg_app sat_info_arg
                sat_info = mergeIdSATInfo sat_info_fn sat_info_arg'
@@ -221,7 +213,7 @@ satExpr (App fn arg) interesting_ids = do
 satExpr (Case expr bndr ty alts) interesting_ids = do
     (expr', sat_info_expr, expr_app) <- satExpr expr interesting_ids
     let sat_info_expr' = finalizeApp expr_app sat_info_expr
-    
+
     zipped_alts' <- mapM satAlt alts
     let (alts', sat_infos_alts) = unzip zipped_alts'
     return (Case expr' bndr ty alts', mergeIdSATInfo sat_info_expr' (mergeIdSATInfos sat_infos_alts), Nothing)
@@ -241,7 +233,7 @@ satExpr (Tick tickish expr) interesting_ids = do
 
 satExpr ty@(Type _) _ = do
     return (ty, emptyIdSATInfo, Nothing)
-    
+
 satExpr co@(Coercion _) _ = do
     return (co, emptyIdSATInfo, Nothing)
 
@@ -298,13 +290,13 @@ to
     map :: forall a b. (a->b) -> [a] -> [b]
     map = /\ab. \(f:a->b) (as:[a]) ->
          letrec map' :: [a] -> [b]
-		    -- The "worker function
-                map' = \(as:[a]) -> 
-			 let map :: forall a' b'. (a -> b) -> [a] -> [b]
-				-- The "shadow function
-			     map = /\a'b'. \(f':(a->b) (as:[a]).
-				   map' as
-	                 in body[map]
+                    -- The "worker function
+                map' = \(as:[a]) ->
+                         let map :: forall a' b'. (a -> b) -> [a] -> [b]
+                                -- The "shadow function
+                             map = /\a'b'. \(f':(a->b) (as:[a]).
+                                   map' as
+                         in body[map]
          in map' as
 
 Note [Shadow binding]
@@ -325,13 +317,13 @@ Notice that in the inner map (the "shadow function"), the static arguments
 are discarded -- it's as if they were underscores.  Instead, mentions
 of these arguments (notably in the types of dynamic arguments) are bound
 by the *outer* lambdas of the main function.  So we must make up fresh
-names for the static arguments so that they do not capture variables 
-mentioned in the types of dynamic args.  
+names for the static arguments so that they do not capture variables
+mentioned in the types of dynamic args.
 
 In the map example, the shadow function must clone the static type
 argument a,b, giving a',b', to ensure that in the \(as:[a]), the 'a'
 is bound by the outer forall.  We clone f' too for consistency, but
-that doesn't matter either way because static Id arguments aren't 
+that doesn't matter either way because static Id arguments aren't
 mentioned in the shadow binding at all.
 
 If we don't we get something like this:
@@ -363,8 +355,8 @@ GHC.Base.until =
             GHC.Types.True -> x_a6X
           }; } in
     sat_worker_s1aU x_a6X
-    
-Where sat_shadow has captured the type variables of x_a6X etc as it has a a_aiK 
+
+Where sat_shadow has captured the type variables of x_a6X etc as it has a a_aiK
 type argument. This is bad because it means the application sat_worker_s1aU x_a6X
 is not well typed.
 
@@ -376,61 +368,61 @@ saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
   = saTransform binder arg_staticness rhs_binders rhs_body
   | otherwise
   = return (Rec [(binder, mkLams rhs_binders rhs_body)])
-  where 
+  where
     should_transform staticness = n_static_args > 1 -- THIS IS THE DECISION POINT
       where
-	n_static_args = length (filter isStaticValue staticness)
+        n_static_args = length (filter isStaticValue staticness)
 
 saTransform :: Id -> SATInfo -> [Id] -> CoreExpr -> SatM CoreBind
 saTransform binder arg_staticness rhs_binders rhs_body
-  = do	{ shadow_lam_bndrs <- mapM clone binders_w_staticness
-	; uniq	 	   <- newUnique
-	; return (NonRec binder (mk_new_rhs uniq shadow_lam_bndrs)) }
+  = do  { shadow_lam_bndrs <- mapM clone binders_w_staticness
+        ; uniq             <- newUnique
+        ; return (NonRec binder (mk_new_rhs uniq shadow_lam_bndrs)) }
   where
     -- Running example: foldr
     -- foldr \alpha \beta c n xs = e, for some e
     -- arg_staticness = [Static TypeApp, Static TypeApp, Static VarApp, Static VarApp, NonStatic]
     -- rhs_binders = [\alpha, \beta, c, n, xs]
     -- rhs_body = e
-    
+
     binders_w_staticness = rhs_binders `zip` (arg_staticness ++ repeat NotStatic)
-					-- Any extra args are assumed NotStatic
+                                        -- Any extra args are assumed NotStatic
 
     non_static_args :: [Var]
-	    -- non_static_args = [xs]
-	    -- rhs_binders_without_type_capture = [\alpha', \beta', c, n, xs]
+            -- non_static_args = [xs]
+            -- rhs_binders_without_type_capture = [\alpha', \beta', c, n, xs]
     non_static_args = [v | (v, NotStatic) <- binders_w_staticness]
 
     clone (bndr, NotStatic) = return bndr
     clone (bndr, _        ) = do { uniq <- newUnique
-				 ; return (setVarUnique bndr uniq) }
+                                 ; return (setVarUnique bndr uniq) }
 
-    -- new_rhs = \alpha beta c n xs -> 
-    --           let sat_worker = \xs -> let sat_shadow = \alpha' beta' c n xs -> 
-    -- 					     sat_worker xs 
+    -- new_rhs = \alpha beta c n xs ->
+    --           let sat_worker = \xs -> let sat_shadow = \alpha' beta' c n xs ->
+    --                                       sat_worker xs
     --                                   in e
     --           in sat_worker xs
-    mk_new_rhs uniq shadow_lam_bndrs 
-	= mkLams rhs_binders $ 
-	  Let (Rec [(rec_body_bndr, rec_body)]) 
-	  local_body
-	where
-	  local_body = mkVarApps (Var rec_body_bndr) non_static_args
+    mk_new_rhs uniq shadow_lam_bndrs
+        = mkLams rhs_binders $
+          Let (Rec [(rec_body_bndr, rec_body)])
+          local_body
+        where
+          local_body = mkVarApps (Var rec_body_bndr) non_static_args
 
-	  rec_body = mkLams non_static_args $
+          rec_body = mkLams non_static_args $
                      Let (NonRec shadow_bndr shadow_rhs) rhs_body
 
-	    -- See Note [Binder type capture]
-	  shadow_rhs = mkLams shadow_lam_bndrs local_body
-	    -- nonrec_rhs = \alpha' beta' c n xs -> sat_worker xs
+            -- See Note [Binder type capture]
+          shadow_rhs = mkLams shadow_lam_bndrs local_body
+            -- nonrec_rhs = \alpha' beta' c n xs -> sat_worker xs
 
-	  rec_body_bndr = mkSysLocal (fsLit "sat_worker") uniq (exprType rec_body)
-	    -- rec_body_bndr = sat_worker
-    
-	    -- See Note [Shadow binding]; make a SysLocal
-	  shadow_bndr = mkSysLocal (occNameFS (getOccName binder)) 
-				   (idUnique binder)
-				   (exprType shadow_rhs)
+          rec_body_bndr = mkSysLocal (fsLit "sat_worker") uniq (exprType rec_body)
+            -- rec_body_bndr = sat_worker
+
+            -- See Note [Shadow binding]; make a SysLocal
+          shadow_bndr = mkSysLocal (occNameFS (getOccName binder))
+                                   (idUnique binder)
+                                   (exprType shadow_rhs)
 
 isStaticValue :: Staticness App -> Bool
 isStaticValue (Static (VarApp _)) = True
