@@ -1,4 +1,3 @@
-
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section{SetLevels}
@@ -42,6 +41,7 @@
   the scrutinee of the case, and we can inline it.  
 
 \begin{code}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
