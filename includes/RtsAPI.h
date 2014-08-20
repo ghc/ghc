@@ -23,8 +23,8 @@ extern "C" {
  */
 typedef enum {
     NoStatus,    /* not finished yet */
-    Success,	 /* completed successfully */
-    Killed,	 /* uncaught exception */
+    Success,     /* completed successfully */
+    Killed,      /* uncaught exception */
     Interrupted, /* stopped in response to a call to interruptStgRts */
     HeapExhausted /* out of memory */
 } SchedulerStatus;
@@ -76,7 +76,7 @@ extern const RtsConfig defaultRtsConfig;
 
 /* DEPRECATED, use hs_init() or hs_init_ghc() instead  */
 extern void startupHaskell         ( int argc, char *argv[],
-				     void (*init_root)(void) );
+                                     void (*init_root)(void) );
 
 /* DEPRECATED, use hs_exit() instead  */
 extern void shutdownHaskell        ( void );
@@ -113,10 +113,10 @@ extern void (*exitFn)(int);
 
 /* ----------------------------------------------------------------------------
    Locking.
-   
+
    You have to surround all access to the RtsAPI with these calls.
    ------------------------------------------------------------------------- */
-   
+
 // acquires a token which may be used to create new objects and
 // evaluate them.
 Capability *rts_lock (void);
@@ -242,11 +242,11 @@ void rts_done (void);
    These are used by foreign export and foreign import "wrapper" stubs.
    ----------------------------------------------------------------------- */
 
-// When producing Windows DLLs the we need to know which symbols are in the 
-//	local package/DLL vs external ones. 
+// When producing Windows DLLs the we need to know which symbols are in the
+//      local package/DLL vs external ones.
 //
-//	Note that RtsAPI.h is also included by foreign export stubs in
-//	the base package itself.
+//      Note that RtsAPI.h is also included by foreign export stubs in
+//      the base package itself.
 //
 #if defined(COMPILING_WINDOWS_DLL) && !defined(COMPILING_BASE_PACKAGE)
 __declspec(dllimport) extern StgWord base_GHCziTopHandler_runIO_closure[];
