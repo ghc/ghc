@@ -6,7 +6,7 @@
 Storage manager representation of closures
 
 \begin{code}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP,GeneralizedNewtypeDeriving #-}
 
 module SMRep (
         -- * Words and bytes
@@ -71,16 +71,30 @@ import Data.Bits
 %************************************************************************
 
 \begin{code}
-type WordOff = Int -- Word offset, or word count
-type ByteOff = Int -- Byte offset, or byte count
+-- | Word offset, or word count
+type WordOff = Int
 
+-- | Byte offset, or byte count
+type ByteOff = Int
+
+-- | Round up the given byte count to the next byte count that's a
+-- multiple of the machine's word size.
 roundUpToWords :: DynFlags -> ByteOff -> ByteOff
 roundUpToWords dflags n =
   (n + (wORD_SIZE dflags - 1)) .&. (complement (wORD_SIZE dflags - 1))
 
-wordsToBytes :: DynFlags -> WordOff -> ByteOff
-wordsToBytes dflags n = wORD_SIZE dflags * n
+-- | Convert the given number of words to a number of bytes.
+--
+-- This function morally has type @WordOff -> ByteOff@, but uses @Num
+-- a@ to allow for overloading.
+wordsToBytes :: Num a => DynFlags -> a -> a
+wordsToBytes dflags n = fromIntegral (wORD_SIZE dflags) * n
+{-# SPECIALIZE wordsToBytes :: DynFlags -> Int -> Int #-}
+{-# SPECIALIZE wordsToBytes :: DynFlags -> Word -> Word #-}
+{-# SPECIALIZE wordsToBytes :: DynFlags -> Integer -> Integer #-}
 
+-- | First round the given byte count up to a multiple of the
+-- machine's word size and then convert the result to words.
 bytesToWordsRoundUp :: DynFlags -> ByteOff -> WordOff
 bytesToWordsRoundUp dflags n = (n + word_size - 1) `quot` word_size
  where word_size = wORD_SIZE dflags
@@ -91,11 +105,7 @@ StgWord is a type representing an StgWord on the target platform.
 \begin{code}
 -- A Word64 is large enough to hold a Word for either a 32bit or 64bit platform
 newtype StgWord = StgWord Word64
-    deriving (Eq,
-#if __GLASGOW_HASKELL__ < 706
-              Num,
-#endif
-              Bits)
+    deriving (Eq, Bits)
 
 fromStgWord :: StgWord -> Integer
 fromStgWord (StgWord i) = toInteger i

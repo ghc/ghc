@@ -1,4 +1,12 @@
 
-T4912.hs:10:10: Warning: Orphan instance: instance Foo TheirData
+T4912.hs:10:10: Warning:
+    Orphan instance: instance Foo TheirData
+    To avoid this
+        move the instance declaration to the module of the class or of the type, or
+        wrap the type with a newtype and declare the instance on the new type.
 
-T4912.hs:13:10: Warning: Orphan instance: instance Bar OurData
+T4912.hs:13:10: Warning:
+    Orphan instance: instance Bar OurData
+    To avoid this
+        move the instance declaration to the module of the class or of the type, or
+        wrap the type with a newtype and declare the instance on the new type.

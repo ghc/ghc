@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, RecordWildCards #-}
+
 -----------------------------------------------------------------------------
 --
 -- Stg to C-- code generation:
@@ -8,8 +10,6 @@
 -- Nothing monadic in here!
 --
 -----------------------------------------------------------------------------
-
-{-# LANGUAGE RecordWildCards #-}
 
 module StgCmmClosure (
         DynTag,  tagForCon, isSmallFamily,

@@ -351,6 +351,6 @@ tryConvert var vect_var rhs
   = fromVect (idType var) (Var vect_var) 
     `orElseErrV` 
     do 
-    { emitVt "  Could NOT call vectorised from original version" $ ppr var
+    { emitVt "  Could NOT call vectorised from original version" $ ppr var <+> dcolon <+> ppr (idType var)
     ; return rhs
     }

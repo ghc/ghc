@@ -323,3 +323,9 @@ test('T7021',
      extra_clean(['T7021a.hi', 'T7021a.o']), multimod_compile, ['T7021','-v0'])
 test('T8807', normal, compile, ['-v0'])
 test('T8884', normal, compile, ['-v0'])
+test('T8954', normal, compile, ['-v0'])
+test('T8932', normal, compile_fail, ['-v0'])
+test('T8987', normal, compile_fail, ['-v0'])
+test('T7241', normal, compile_fail, ['-v0'])
+test('T9199', normal, compile, ['-v0'])
+

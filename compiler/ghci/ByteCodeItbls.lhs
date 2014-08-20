@@ -4,7 +4,8 @@
 ByteCodeItbls: Generate infotables for interpreter-made bytecodes
 
 \begin{code}
-{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
+{-# LANGUAGE CPP, MagicHash #-}
+{-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 
 module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls, peekItbl
                      , StgInfoTable(..)

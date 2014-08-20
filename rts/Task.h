@@ -171,6 +171,11 @@ isBoundTask (Task *task)
 //
 extern Task *all_tasks;
 
+// The all_tasks list is protected by the all_tasks_mutex
+#if defined(THREADED_RTS)
+extern Mutex all_tasks_mutex;
+#endif
+
 // Start and stop the task manager.
 // Requires: sched_mutex.
 //
@@ -324,3 +329,11 @@ serialisableTaskId (Task *task
 #include "EndPrivate.h"
 
 #endif /* TASK_H */
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

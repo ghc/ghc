@@ -5,6 +5,8 @@ c%
 \section[TcExpr]{Typecheck an expression}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
                 tcInferRho, tcInferRhoNC,
                 tcSyntaxOp, tcCheckId,
@@ -74,7 +76,7 @@ import qualified Data.Set as Set
 \begin{code}
 tcPolyExpr, tcPolyExprNC
          :: LHsExpr Name        -- Expression to type check
-         -> TcSigmaType         -- Expected type (could be a polytpye)
+         -> TcSigmaType         -- Expected type (could be a polytype)
          -> TcM (LHsExpr TcId)  -- Generalised expr with expected type
 
 -- tcPolyExpr is a convenient place (frequent but not too frequent)
@@ -200,7 +202,7 @@ tcExpr (HsIPVar x) res_ty
        ; ip_var <- emitWanted origin (mkClassPred ipClass [ip_name, ip_ty])
        ; tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var)) ip_ty res_ty }
   where
-  -- Coerces a dictionry for `IP "x" t` into `t`.
+  -- Coerces a dictionary for `IP "x" t` into `t`.
   fromDict ipClass x ty =
     case unwrapNewTyCon_maybe (classTyCon ipClass) of
       Just (_,_,ax) -> HsWrap $ mkWpCast $ mkTcUnbranchedAxInstCo Representational ax [x,ty]
@@ -498,7 +500,8 @@ for conditionals:
 to support expressions like this:
 
  ifThenElse :: Maybe a -> (a -> b) -> b -> b
- ifThenElse (Just a) f _ = f a  ifThenElse Nothing  _ e = e
+ ifThenElse (Just a) f _ = f a
+ ifThenElse Nothing  _ e = e
 
  example :: String
  example = if Just 2
@@ -562,7 +565,7 @@ Note that because MkT3 doesn't contain all the fields being updated,
 its RHS is simply an error, so it doesn't impose any type constraints.
 Hence the use of 'relevant_cont'.
 
-Note [Implict type sharing]
+Note [Implicit type sharing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We also take into account any "implicit" non-update fields.  For example
         data T a b where { MkT { f::a } :: T a a; ... }
@@ -748,7 +751,7 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
                                     -- Universally-quantified tyvars that
                                     -- appear in any of the *implicit*
                                     -- arguments to the constructor are fixed
-                                    -- See Note [Implict type sharing]
+                                    -- See Note [Implicit type sharing]
 
                             fixed_tys = [ty | (fld,ty) <- zip flds arg_tys
                                             , not (fld `elem` upd_fld_names)]
@@ -804,7 +807,7 @@ tcExpr (PArrSeq _ _) _
 
 \begin{code}
 tcExpr (HsSpliceE is_ty splice)  res_ty
-  = ASSERT( is_ty )   -- Untyped splices are expanced by the renamer
+  = ASSERT( is_ty )   -- Untyped splices are expanded by the renamer
    tcSpliceExpr splice res_ty
 
 tcExpr (HsBracket brack)         res_ty = tcTypedBracket   brack res_ty
@@ -963,7 +966,7 @@ tcInferFun fun
 
          -- Zonk the function type carefully, to expose any polymorphism
          -- E.g. (( \(x::forall a. a->a). blah ) e)
-         -- We can see the rank-2 type of the lambda in time to genrealise e
+         -- We can see the rank-2 type of the lambda in time to generalise e
        ; fun_ty' <- zonkTcType fun_ty
 
        ; (wrap, rho) <- deeplyInstantiate AppOrigin fun_ty'

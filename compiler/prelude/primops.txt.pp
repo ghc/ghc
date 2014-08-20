@@ -247,13 +247,19 @@ primop   NotIOp   "notI#"   Monadic   Int# -> Int#
 
 primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-	 {Add with carry.  First member of result is (wrapped) sum;
-          second member is 0 iff no overflow occured.}
+         {Add signed integers reporting overflow.
+          First member of result is the sum truncated to an {\tt Int#};
+          second member is zero if the true sum fits in an {\tt Int#},
+          nonzero if overflow occurred (the sum is either too large
+          or too small to fit in an {\tt Int#}).}
    with code_size = 2
 
 primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-	 {Subtract with carry.  First member of result is (wrapped) difference;
-          second member is 0 iff no overflow occured.}
+         {Subtract signed integers reporting overflow.
+          First member of result is the difference truncated to an {\tt Int#};
+          second member is zero if the true difference fits in an {\tt Int#},
+          nonzero if overflow occurred (the difference is either too large
+          or too small to fit in an {\tt Int#}).}
    with code_size = 2
 
 primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Int#
@@ -379,6 +385,28 @@ primop   PopCnt64Op   "popCnt64#"   GenPrimOp   WORD64 -> Word#
     {Count the number of set bits in a 64-bit word.}
 primop   PopCntOp   "popCnt#"   Monadic   Word# -> Word#
     {Count the number of set bits in a word.}
+
+primop   Clz8Op   "clz8#" Monadic   Word# -> Word#
+    {Count leading zeros in the lower 8 bits of a word.}
+primop   Clz16Op   "clz16#" Monadic   Word# -> Word#
+    {Count leading zeros in the lower 16 bits of a word.}
+primop   Clz32Op   "clz32#" Monadic   Word# -> Word#
+    {Count leading zeros in the lower 32 bits of a word.}
+primop   Clz64Op   "clz64#" GenPrimOp WORD64 -> Word#
+    {Count leading zeros in a 64-bit word.}
+primop   ClzOp     "clz#"   Monadic   Word# -> Word#
+    {Count leading zeros in a word.}
+
+primop   Ctz8Op   "ctz8#"  Monadic   Word# -> Word#
+    {Count trailing zeros in the lower 8 bits of a word.}
+primop   Ctz16Op   "ctz16#" Monadic   Word# -> Word#
+    {Count trailing zeros in the lower 16 bits of a word.}
+primop   Ctz32Op   "ctz32#" Monadic   Word# -> Word#
+    {Count trailing zeros in the lower 32 bits of a word.}
+primop   Ctz64Op   "ctz64#" GenPrimOp WORD64 -> Word#
+    {Count trailing zeros in a 64-bit word.}
+primop   CtzOp     "ctz#"   Monadic   Word# -> Word#
+    {Count trailing zeros in a word.}
 
 primop   BSwap16Op   "byteSwap16#"   Monadic   Word# -> Word#
     {Swap bytes in the lower 16 bits of a word. The higher bytes are undefined. }
@@ -843,8 +871,22 @@ primop CasArrayOp  "casArray#" GenPrimOp
 section "Small Arrays"
 
 	{Operations on {\tt SmallArray\#}. A {\tt SmallArray\#} works
-         just like an {\tt Array\#}, except that its implementation is
-         optimized for small arrays (i.e. no more than 128 elements.)}
+         just like an {\tt Array\#}, but with different space use and
+         performance characteristics (that are often useful with small
+         arrays). The {\tt SmallArray\#} and {\tt SmallMutableArray#}
+         lack a `card table'. The purpose of a card table is to avoid
+         having to scan every element of the array on each GC by
+         keeping track of which elements have changed since the last GC
+         and only scanning those that have changed. So the consequence
+         of there being no card table is that the representation is
+         somewhat smaller and the writes are somewhat faster (because
+         the card table does not need to be updated). The disadvantage
+         of course is that for a {\tt SmallMutableArray#} the whole
+         array has to be scanned on each GC. Thus it is best suited for
+         use cases where the mutable array is not long lived, e.g.
+         where a mutable array is initialised quickly and then frozen
+         to become an immutable {\tt SmallArray\#}.
+        }
 
 ------------------------------------------------------------------------
 
@@ -1032,6 +1074,30 @@ primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
 primop  SameMutableByteArrayOp "sameMutableByteArray#" GenPrimOp
    MutableByteArray# s -> MutableByteArray# s -> Int#
 
+primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> State# s
+   {Shrink mutable byte array to new specified size (in bytes), in
+    the specified state thread. The new size argument must be less than or
+    equal to the current size as reported by {\tt sizeofMutableArray\#}.}
+   with out_of_line = True
+        has_side_effects = True
+
+primop  ResizeMutableByteArrayOp_Char "resizeMutableByteArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+   {Resize (unpinned) mutable byte array to new specified size (in bytes).
+    The returned {\tt MutableByteArray\#} is either the original
+    {\tt MutableByteArray\#} resized in-place or, if not possible, a newly
+    allocated (unpinned) {\tt MutableByteArray\#} (with the original content
+    copied over).
+
+    To avoid undefined behaviour, the original {\tt MutableByteArray\#} shall
+    not be accessed anymore after a {\tt resizeMutableByteArray\#} has been
+    performed.  Moreover, no reference to the old one should be kept in order
+    to allow garbage collection of the original {\tt MutableByteArray\#} in
+    case a new {\tt MutableByteArray\#} had to be allocated.}
+   with out_of_line = True
+        has_side_effects = True
+
 primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
    MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)
    {Make a mutable byte array immutable, without copying.}
@@ -1082,34 +1148,42 @@ primop IndexByteArrayOp_StablePtr "indexStablePtrArray#" GenPrimOp
 
 primop IndexByteArrayOp_Int8 "indexInt8Array#" GenPrimOp
    ByteArray# -> Int# -> Int#
+   {Read 8-bit integer; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
    ByteArray# -> Int# -> Int#
+   {Read 16-bit integer; offset in 16-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
    ByteArray# -> Int# -> INT32
+   {Read 32-bit integer; offset in 32-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
    ByteArray# -> Int# -> INT64
+   {Read 64-bit integer; offset in 64-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8 "indexWord8Array#" GenPrimOp
    ByteArray# -> Int# -> Word#
+   {Read 8-bit word; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
    ByteArray# -> Int# -> Word#
+   {Read 16-bit word; offset in 16-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
    ByteArray# -> Int# -> WORD32
+   {Read 32-bit word; offset in 32-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
    ByteArray# -> Int# -> WORD64
+   {Read 64-bit word; offset in 64-bit words.}
    with can_fail = True
 
 primop  ReadByteArrayOp_Char "readCharArray#" GenPrimOp
@@ -1126,11 +1200,13 @@ primop  ReadByteArrayOp_WideChar "readWideCharArray#" GenPrimOp
 
 primop  ReadByteArrayOp_Int "readIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   {Read intger; offset in words.}
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word "readWordArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   {Read word; offset in words.}
    with has_side_effects = True
         can_fail = True
 
@@ -1339,19 +1415,79 @@ primop  SetByteArrayOp "setByteArray#" GenPrimOp
   code_size = { primOpCodeSizeForeignCall + 4 }
   can_fail = True
 
+-- Atomic operations
+
+primop  AtomicReadByteArrayOp_Int "atomicReadIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array and an offset in Int units, read an element. The
+    index is assumed to be in bounds. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop  AtomicWriteByteArrayOp_Int "atomicWriteIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   {Given an array and an offset in Int units, write an element. The
+    index is assumed to be in bounds. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
 primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #)
-   {Machine-level atomic compare and swap on a word within a ByteArray.}
-   with
-   out_of_line = True
-   has_side_effects = True
+   {Given an array, an offset in Int units, the expected old value, and
+    the new value, perform an atomic compare and swap i.e. write the new
+    value if the current value matches the provided old value. Returns
+    the value of the element before the operation. Implies a full memory
+    barrier.}
+   with has_side_effects = True
+        can_fail = True
 
 primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
-   {Machine-level word-sized fetch-and-add within a ByteArray.}
-   with
-   out_of_line = True
-   has_side_effects = True
+   {Given an array, and offset in Int units, and a value to add,
+    atomically add the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchSubByteArrayOp_Int "fetchSubIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to subtract,
+    atomically substract the value to the element. Returns the value of
+    the element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchAndByteArrayOp_Int "fetchAndIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to AND,
+    atomically AND the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchNandByteArrayOp_Int "fetchNandIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to NAND,
+    atomically NAND the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchOrByteArrayOp_Int "fetchOrIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to OR,
+    atomically OR the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop FetchXorByteArrayOp_Int "fetchXorIntArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   {Given an array, and offset in Int units, and a value to XOR,
+    atomically XOR the value to the element. Returns the value of the
+    element before the operation. Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail = True
 
 
 ------------------------------------------------------------------------
@@ -1797,6 +1933,11 @@ primop  RaiseOp "raise#" GenPrimOp
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
       -- NB: result is bottom
    out_of_line = True
+   has_side_effects = True
+     -- raise# certainly throws a Haskell exception and hence has_side_effects
+     -- It doesn't actually make much difference because the fact that it
+     -- returns bottom independently ensures that we are careful not to discard
+     -- it.  But still, it's better to say the Right Thing.
 
 -- raiseIO# needs to be a primop, because exceptions in the IO monad
 -- must be *precise* - we don't want the strictness analyser turning
@@ -2413,7 +2554,7 @@ pseudoop   "seq"
    { Evaluates its first argument to head normal form, and then returns its second
 	argument as the result. }
 
-primtype Any k
+primtype Any
 	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
 	lifted type, and back.
 
@@ -2438,8 +2579,11 @@ primtype Any k
 
 	{\tt length (Any *) ([] (Any *))}
 
-        Note that {\tt Any} is kind polymorphic, and takes a kind {\tt k} as its
-        first argument. The kind of {\tt Any} is thus {\tt forall k. k -> k}.}
+        Above, we print kinds explicitly, as if with
+        {\tt -fprint-explicit-kinds}.
+
+        Note that {\tt Any} is kind polymorphic; its kind is thus
+        {\tt forall k. k}.}
 
 primtype AnyK
         { The kind {\tt AnyK} is the kind level counterpart to {\tt Any}. In a

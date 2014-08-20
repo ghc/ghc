@@ -20,3 +20,6 @@ test('T8467', normal, compile, [''])
 test('T8037', normal, compile, [''])
 test('T8743', [ extra_clean(['T8743.o-boot', 'T8743.hi-boot']) ], multimod_compile, ['T8743', '-v0'])
 
+test('T9208', when(compiler_debugged(), expect_broken(9208)), compile, [''])
+# T9208 fails (and should do so) if you have assertion checking on in the compiler
+# Hence the above expect_broken.  See comments in the Trac ticket

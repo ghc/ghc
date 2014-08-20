@@ -25,6 +25,8 @@
 #include "Storage.h"
 #include "Threads.h"
 
+#include "sm/Sanity.h"
+
 /* -----------------------------------------------------------------------------
    Weak Pointers
 
@@ -39,10 +41,8 @@
    new live weak pointers, then all the currently unreachable ones are
    dead.
 
-   For generational GC: we just don't try to finalize weak pointers in
-   older generations than the one we're collecting.  This could
-   probably be optimised by keeping per-generation lists of weak
-   pointers, but for a few weak pointers this scheme will work.
+   For generational GC: we don't try to finalize weak pointers in
+   older generations than the one we're collecting.
 
    There are three distinct stages to processing weak pointers:
 
@@ -343,6 +343,39 @@ static void tidyThreadList (generation *gen)
     }
 }
 
+#ifdef DEBUG
+static void checkWeakPtrSanity(StgWeak *hd, StgWeak *tl)
+{
+    StgWeak *w, *prev;
+    for (w = hd; w != NULL; prev = w, w = w->link) {
+        ASSERT(INFO_PTR_TO_STRUCT(UNTAG_CLOSURE((StgClosure*)w)->header.info)->type == WEAK);
+        checkClosure((StgClosure*)w);
+    }
+    if (tl != NULL) {
+        ASSERT(prev == tl);
+    }
+}
+#endif
+
+void collectFreshWeakPtrs()
+{
+    nat i;
+    generation *gen = &generations[0];
+    // move recently allocated weak_ptr_list to the old list as well
+    for (i = 0; i < n_capabilities; i++) {
+        Capability *cap = capabilities[i];
+        if (cap->weak_ptr_list_tl != NULL) {
+            IF_DEBUG(sanity, checkWeakPtrSanity(cap->weak_ptr_list_hd, cap->weak_ptr_list_tl));
+            cap->weak_ptr_list_tl->link = gen->weak_ptr_list;
+            gen->weak_ptr_list = cap->weak_ptr_list_hd;
+            cap->weak_ptr_list_tl = NULL;
+            cap->weak_ptr_list_hd = NULL;
+        } else {
+            ASSERT(cap->weak_ptr_list_hd == NULL);
+        }
+    }
+}
+
 /* -----------------------------------------------------------------------------
    Evacuate every weak pointer object on the weak_ptr_list, and update
    the link fields.
@@ -383,3 +416,11 @@ markWeakPtrList ( void )
     }
 }
 
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

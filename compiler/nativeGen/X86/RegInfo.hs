@@ -1,14 +1,7 @@
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
+{-# LANGUAGE CPP #-}
 module X86.RegInfo (
-	mkVirtualReg,
-	regDotColor
+        mkVirtualReg,
+        regDotColor
 )
 
 where
@@ -30,9 +23,9 @@ import X86.Regs
 mkVirtualReg :: Unique -> Size -> VirtualReg
 mkVirtualReg u size
    = case size of
-        FF32	-> VirtualRegSSE u
-        FF64	-> VirtualRegSSE u
-        FF80	-> VirtualRegD   u
+        FF32    -> VirtualRegSSE u
+        FF64    -> VirtualRegSSE u
+        FF80    -> VirtualRegD   u
         _other  -> VirtualRegI   u
 
 regDotColor :: Platform -> RealReg -> SDoc
@@ -65,11 +58,10 @@ normalRegColors platform
 fpRegColors :: [(Reg,String)]
 fpRegColors =
         [ (fake0, "#ff00ff")
-	, (fake1, "#ff00aa")
-	, (fake2, "#aa00ff")
-	, (fake3, "#aa00aa")
-	, (fake4, "#ff0055")
-	, (fake5, "#5500ff") ]
+        , (fake1, "#ff00aa")
+        , (fake2, "#aa00ff")
+        , (fake3, "#aa00aa")
+        , (fake4, "#ff0055")
+        , (fake5, "#5500ff") ]
 
-	++ zip (map regSingle [24..39]) (repeat "red")
-
+        ++ zip (map regSingle [24..39]) (repeat "red")

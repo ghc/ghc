@@ -6,6 +6,8 @@
 Desugaring exporessions.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 
 #include "HsVersions.h"
@@ -99,7 +101,7 @@ ds_val_bind :: (RecFlag, LHsBinds Id) -> CoreExpr -> DsM CoreExpr
 -- a tuple and doing selections.
 -- Silently ignore INLINE and SPECIALISE pragmas...
 ds_val_bind (NonRecursive, hsbinds) body
-  | [(_, L loc bind)] <- bagToList hsbinds,
+  | [L loc bind] <- bagToList hsbinds,
         -- Non-recursive, non-overloaded bindings only come in ones
         -- ToDo: in some bizarre case it's conceivable that there
         --       could be dict binds in the 'binds'.  (See the notes
@@ -130,11 +132,11 @@ dsStrictBind :: HsBind Id -> CoreExpr -> DsM CoreExpr
 dsStrictBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
                , abs_exports = exports
                , abs_ev_binds = ev_binds
-               , abs_binds = binds }) body
+               , abs_binds = lbinds }) body
   = do { let body1 = foldr bind_export body exports
              bind_export export b = bindNonRec (abe_poly export) (Var (abe_mono export)) b
-       ; body2 <- foldlBagM (\body (_, bind) -> dsStrictBind (unLoc bind) body)
-                            body1 binds 
+       ; body2 <- foldlBagM (\body lbind -> dsStrictBind (unLoc lbind) body)
+                            body1 lbinds 
        ; ds_binds <- dsTcEvBinds ev_binds
        ; return (mkCoreLets ds_binds body2) }
 
@@ -163,8 +165,8 @@ dsStrictBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 
 ----------------------
 strictMatchOnly :: HsBind Id -> Bool
-strictMatchOnly (AbsBinds { abs_binds = binds })
-  = anyBag (strictMatchOnly . unLoc . snd) binds
+strictMatchOnly (AbsBinds { abs_binds = lbinds })
+  = anyBag (strictMatchOnly . unLoc) lbinds
 strictMatchOnly (PatBind { pat_lhs = lpat, pat_rhs_ty = rhs_ty })
   =  isUnLiftedType rhs_ty
   || isStrictLPat lpat
@@ -290,9 +292,9 @@ dsExpr (ExplicitTuple tup_args boxity)
        ; (lam_vars, args) <- foldM go ([], []) (reverse tup_args)
                 -- The reverse is because foldM goes left-to-right
 
-       ; return $ mkCoreLams lam_vars $ 
-                  mkConApp (tupleCon (boxityNormalTupleSort boxity) (length tup_args))
-                           (map (Type . exprType) args ++ args) }
+       ; return $ mkCoreLams lam_vars $
+                  mkCoreConApps (tupleCon (boxityNormalTupleSort boxity) (length tup_args))
+                                (map (Type . exprType) args ++ args) }
 
 dsExpr (HsSCC cc expr@(L loc _)) = do
     mod_name <- getModule
@@ -433,7 +435,7 @@ dsExpr (RecordCon (L _ data_con_id) con_expr rbinds) = do
                 then mapM unlabelled_bottom arg_tys
                 else mapM mk_arg (zipEqual "dsExpr:RecordCon" arg_tys labels)
     
-    return (mkApps con_expr' con_args)
+    return (mkCoreApps con_expr' con_args)
 \end{code}
 
 Record update is a little harder. Suppose we have the decl:
@@ -488,7 +490,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
         -- constructor aguments.
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code) 
-                <- matchWrapper RecUpd (MG { mg_alts = alts, mg_arg_tys = [in_ty], mg_res_ty = out_ty })
+                <- matchWrapper RecUpd (MG { mg_alts = alts, mg_arg_tys = [in_ty], mg_res_ty = out_ty, mg_origin = Generated })
 
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }
@@ -548,7 +550,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
                                          , pat_dicts = eqs_vars ++ theta_vars
                                          , pat_binds = emptyTcEvBinds
                                          , pat_args = PrefixCon $ map nlVarPat arg_ids
-                                         , pat_ty = in_ty
+                                         , pat_arg_tys = in_inst_tys
                                          , pat_wrap = idHsWrapper }
            ; let wrapped_rhs | null eq_spec = rhs
                              | otherwise    = mkLHsWrap (mkWpCast (mkTcSubCo wrap_co)) rhs
@@ -789,7 +791,8 @@ dsDo stmts
         rets         = map noLoc rec_rets
         mfix_app     = nlHsApp (noLoc mfix_op) mfix_arg
         mfix_arg     = noLoc $ HsLam (MG { mg_alts = [mkSimpleMatch [mfix_pat] body]
-                                         , mg_arg_tys = [tup_ty], mg_res_ty = body_ty })
+                                         , mg_arg_tys = [tup_ty], mg_res_ty = body_ty
+                                         , mg_origin = Generated })
         mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTup rec_tup_pats
         body         = noLoc $ HsDo DoExpr (rec_stmts ++ [ret_stmt]) body_ty
         ret_app      = nlHsApp (noLoc return_op) (mkBigLHsTup rets)

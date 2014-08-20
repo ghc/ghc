@@ -11,25 +11,14 @@ This module is nominally ``subordinate'' to @TcDeriv@, which is the
 This is where we do all the grimy bindings' generation.
 
 \begin{code}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 module TcGenDeriv (
         BagDerivStuff, DerivStuff(..),
 
-        gen_Bounded_binds,
-        gen_Enum_binds,
-        gen_Eq_binds,
-        gen_Ix_binds,
-        gen_Ord_binds,
-        gen_Read_binds,
-        gen_Show_binds,
-        gen_Data_binds,
-        gen_old_Typeable_binds, gen_Typeable_binds,
-        gen_Functor_binds,
+        genDerivedBinds, 
         FFoldType(..), functorLikeTraverse,
         deepSubtypesContaining, foldDataConArgs,
-        gen_Foldable_binds,
-        gen_Traversable_binds,
         mkCoerceClassMethEqn,
         gen_Newtype_binds,
         genAuxBinds,
@@ -75,6 +64,7 @@ import Bag
 import Fingerprint
 import TcEnv (InstInfo)
 
+import ListSetOps( assocMaybe )
 import Data.List ( partition, intersperse )
 \end{code}
 
@@ -97,10 +87,43 @@ data DerivStuff     -- Please add this auxiliary stuff
   | DerivFamInst (FamInst)             -- New type family instances
 
   -- New top-level auxiliary bindings
-  | DerivHsBind ((Origin, LHsBind RdrName), LSig RdrName) -- Also used for SYB
+  | DerivHsBind (LHsBind RdrName, LSig RdrName) -- Also used for SYB
   | DerivInst (InstInfo RdrName)                -- New, auxiliary instances
 \end{code}
 
+%************************************************************************
+%*                                                                      *
+                Top level function
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+genDerivedBinds :: DynFlags -> FixityEnv -> Class -> SrcSpan -> TyCon
+                -> (LHsBinds RdrName, BagDerivStuff)
+genDerivedBinds dflags fix_env clas loc tycon
+  | className clas `elem` oldTypeableClassNames
+  = gen_old_Typeable_binds dflags loc tycon
+
+  | Just gen_fn <- assocMaybe gen_list (getUnique clas)
+  = gen_fn loc tycon
+
+  | otherwise
+  = pprPanic "genDerivStuff: bad derived class" (ppr clas)
+  where
+    gen_list :: [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff))]
+    gen_list = [ (eqClassKey,          gen_Eq_binds)
+               , (typeableClassKey,    gen_Typeable_binds dflags)
+               , (ordClassKey,         gen_Ord_binds)
+               , (enumClassKey,        gen_Enum_binds)
+               , (boundedClassKey,     gen_Bounded_binds)
+               , (ixClassKey,          gen_Ix_binds)
+               , (showClassKey,        gen_Show_binds fix_env)
+               , (readClassKey,        gen_Read_binds fix_env)
+               , (dataClassKey,        gen_Data_binds dflags)
+               , (functorClassKey,     gen_Functor_binds)
+               , (foldableClassKey,    gen_Foldable_binds)
+               , (traversableClassKey, gen_Traversable_binds) ]
+\end{code}
 
 %************************************************************************
 %*                                                                      *
@@ -360,7 +383,7 @@ gen_Ord_binds loc tycon
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon tycon_data_cons
 
 
-    mkOrdOp :: OrdOp -> (Origin, LHsBind RdrName)
+    mkOrdOp :: OrdOp -> LHsBind RdrName
     -- Returns a binding   op a b = ... compares a and b according to op ....
     mkOrdOp op = mk_easy_FunBind loc (ordMethRdr op) [a_Pat, b_Pat] (mkOrdOpRhs op)
 
@@ -1210,20 +1233,22 @@ we generate
 We are passed the Typeable2 class as well as T
 
 \begin{code}
-gen_old_Typeable_binds :: DynFlags -> SrcSpan -> TyCon -> LHsBinds RdrName
+gen_old_Typeable_binds :: DynFlags -> SrcSpan -> TyCon 
+                       -> (LHsBinds RdrName, BagDerivStuff)
 gen_old_Typeable_binds dflags loc tycon
-  = unitBag $
+  = ( unitBag $
         mk_easy_FunBind loc
                 (old_mk_typeOf_RDR tycon)   -- Name of appropriate type0f function
                 [nlWildPat]
                 (nlHsApps oldMkTyConApp_RDR [tycon_rep, nlList []])
+    , emptyBag )
   where
     tycon_name = tyConName tycon
     modl       = nameModule tycon_name
-    pkg        = modulePackageId modl
+    pkg        = modulePackageKey modl
 
     modl_fs    = moduleNameFS (moduleName modl)
-    pkg_fs     = packageIdFS pkg
+    pkg_fs     = packageKeyFS pkg
     name_fs    = occNameFS (nameOccName tycon_name)
 
     tycon_rep = nlHsApps oldMkTyCon_RDR
@@ -1270,17 +1295,19 @@ we generate
 We are passed the Typeable2 class as well as T
 
 \begin{code}
-gen_Typeable_binds :: DynFlags -> SrcSpan -> TyCon -> LHsBinds RdrName
+gen_Typeable_binds :: DynFlags -> SrcSpan -> TyCon 
+                   -> (LHsBinds RdrName, BagDerivStuff)
 gen_Typeable_binds dflags loc tycon
-  = unitBag $ mk_easy_FunBind loc typeRep_RDR [nlWildPat]
-              (nlHsApps mkTyConApp_RDR [tycon_rep, nlList []])
+  = ( unitBag $ mk_easy_FunBind loc typeRep_RDR [nlWildPat]
+                (nlHsApps mkTyConApp_RDR [tycon_rep, nlList []])
+    , emptyBag )
   where
     tycon_name = tyConName tycon
     modl       = nameModule tycon_name
-    pkg        = modulePackageId modl
+    pkg        = modulePackageKey modl
 
     modl_fs    = moduleNameFS (moduleName modl)
-    pkg_fs     = packageIdFS pkg
+    pkg_fs     = packageKeyFS pkg
     name_fs    = occNameFS (nameOccName tycon_name)
 
     tycon_rep = nlHsApps mkTyCon_RDR
@@ -1352,7 +1379,7 @@ gen_Data_binds dflags loc tycon
     n_cons     = length data_cons
     one_constr = n_cons == 1
 
-    genDataTyCon :: ((Origin, LHsBind RdrName), LSig RdrName)
+    genDataTyCon :: (LHsBind RdrName, LSig RdrName)
     genDataTyCon        --  $dT
       = (mkHsVarBind loc rdr_name rhs,
          L loc (TypeSig [L loc rdr_name] sig_ty))
@@ -1364,7 +1391,7 @@ gen_Data_binds dflags loc tycon
               `nlHsApp` nlHsLit (mkHsString (showSDocOneLine dflags (ppr tycon)))
               `nlHsApp` nlList constrs
 
-    genDataDataCon :: DataCon -> ((Origin, LHsBind RdrName), LSig RdrName)
+    genDataDataCon :: DataCon -> (LHsBind RdrName, LSig RdrName)
     genDataDataCon dc       --  $cT1 etc
       = (mkHsVarBind loc rdr_name rhs,
          L loc (TypeSig [L loc rdr_name] sig_ty))
@@ -1943,7 +1970,7 @@ gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
         (map (mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty) (classMethods cls))
   where
     coerce_RDR = getRdrName coerceId
-    mk_bind :: Id -> Pair Type -> (Origin, LHsBind RdrName)
+    mk_bind :: Id -> Pair Type -> LHsBind RdrName
     mk_bind id (Pair tau_ty user_ty)
       = mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch [] rhs_expr]
       where
@@ -1978,7 +2005,7 @@ The `tags' here start at zero, hence the @fIRST_TAG@ (currently one)
 fiddling around.
 
 \begin{code}
-genAuxBindSpec :: SrcSpan -> AuxBindSpec -> ((Origin, LHsBind RdrName), LSig RdrName)
+genAuxBindSpec :: SrcSpan -> AuxBindSpec -> (LHsBind RdrName, LSig RdrName)
 genAuxBindSpec loc (DerivCon2Tag tycon)
   = (mk_FunBind loc rdr_name eqns,
      L loc (TypeSig [L loc rdr_name] (L loc sig_ty)))
@@ -2024,7 +2051,7 @@ genAuxBindSpec loc (DerivMaxTag tycon)
                  data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 
 type SeparateBagsDerivStuff = -- AuxBinds and SYB bindings
-                              ( Bag ((Origin, LHsBind RdrName), LSig RdrName)
+                              ( Bag (LHsBind RdrName, LSig RdrName)
                                 -- Extra bindings (used by Generic only)
                               , Bag TyCon   -- Extra top-level datatypes
                               , Bag (FamInst)           -- Extra family instances
@@ -2079,14 +2106,14 @@ mkParentType tc
 \begin{code}
 mk_FunBind :: SrcSpan -> RdrName
            -> [([LPat RdrName], LHsExpr RdrName)]
-           -> (Origin, LHsBind RdrName)
+           -> LHsBind RdrName
 mk_FunBind loc fun pats_and_exprs
   = mkRdrFunBind (L loc fun) matches
   where
     matches = [mkMatch p e emptyLocalBinds | (p,e) <-pats_and_exprs]
 
-mkRdrFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> (Origin, LHsBind RdrName)
-mkRdrFunBind fun@(L loc fun_rdr) matches = (Generated, L loc (mkFunBind fun matches'))
+mkRdrFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> LHsBind RdrName
+mkRdrFunBind fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
  where
    -- Catch-all eqn looks like
    --     fmap = error "Void fmap"

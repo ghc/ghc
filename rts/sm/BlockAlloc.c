@@ -45,7 +45,7 @@ static void  initMBlock(void *mblock);
    bd->free is either:
       - zero for a non-group-head; bd->link points to the head
       - (-1) for the head of a free block group
-      - or it points within the block
+      - or it points within the block (group)
 
    bd->blocks is either:
       - zero for a non-group-head; bd->link points to the head
@@ -894,3 +894,11 @@ reportUnmarkedBlocks (void)
 }
 
 #endif
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

@@ -1,3 +1,5 @@
+{-# LANGUAGE UnboxedTuples #-}
+
 -- | State monad for the linear register allocator.
 
 --      Here we keep all the state that the register allocator keeps track

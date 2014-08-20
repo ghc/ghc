@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Vectorise.Monad.InstEnv 
   ( existsInst
   , lookupInst

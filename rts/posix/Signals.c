@@ -6,7 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#include "PosixSource.h" 
+#include "PosixSource.h"
 #include "Rts.h"
 
 #include "Schedule.h"
@@ -49,7 +49,7 @@
 
 /* This curious flag is provided for the benefit of the Haskell binding
  * to POSIX.1 to control whether or not to include SA_NOCLDSTOP when
- * installing a SIGCHLD handler. 
+ * installing a SIGCHLD handler.
  */
 HsInt nocldstop = 0;
 
@@ -108,27 +108,34 @@ more_handlers(int sig)
     StgInt i;
 
     if (sig < nHandlers)
-	return;
+        return;
 
     if (signal_handlers == NULL)
-	signal_handlers = (StgInt *)stgMallocBytes((sig + 1) * sizeof(StgInt), "more_handlers");
+        signal_handlers = (StgInt *)stgMallocBytes((sig + 1) * sizeof(StgInt),
+                                                   "more_handlers");
     else
-	signal_handlers = (StgInt *)stgReallocBytes(signal_handlers, (sig + 1) * sizeof(StgInt), "more_handlers");
+        signal_handlers = (StgInt *)stgReallocBytes(signal_handlers,
+                                                    (sig + 1) * sizeof(StgInt),
+                                                    "more_handlers");
 
     for(i = nHandlers; i <= sig; i++)
-	// Fill in the new slots with default actions
-	signal_handlers[i] = STG_SIG_DFL;
+        // Fill in the new slots with default actions
+        signal_handlers[i] = STG_SIG_DFL;
 
     nHandlers = sig + 1;
 }
 
 // Here's the pipe into which we will send our signals
 static int io_manager_wakeup_fd = -1;
-static int io_manager_control_fd = -1;
+static int timer_manager_control_wr_fd = -1;
 
 #define IO_MANAGER_WAKEUP 0xff
 #define IO_MANAGER_DIE    0xfe
 #define IO_MANAGER_SYNC   0xfd
+
+void setTimerManagerControlFd(int fd) {
+    timer_manager_control_wr_fd = fd;
+}
 
 void
 setIOManagerWakeupFd (int fd)
@@ -138,14 +145,9 @@ setIOManagerWakeupFd (int fd)
     io_manager_wakeup_fd = fd;
 }
 
-void
-setIOManagerControlFd (int fd)
-{
-    // only called when THREADED_RTS, but unconditionally
-    // compiled here because GHC.Event.Control depends on it.
-    io_manager_control_fd = fd;
-}
-
+/* -----------------------------------------------------------------------------
+ * Wake up at least one IO or timer manager HS thread.
+ * -------------------------------------------------------------------------- */
 void
 ioManagerWakeup (void)
 {
@@ -153,11 +155,11 @@ ioManagerWakeup (void)
     // Wake up the IO Manager thread by sending a byte down its pipe
     if (io_manager_wakeup_fd >= 0) {
 #if defined(HAVE_EVENTFD)
-	StgWord64 n = (StgWord64)IO_MANAGER_WAKEUP;
-	r = write(io_manager_wakeup_fd, (char *) &n, 8);
+        StgWord64 n = (StgWord64)IO_MANAGER_WAKEUP;
+        r = write(io_manager_wakeup_fd, (char *) &n, 8);
 #else
-	StgWord8 byte = (StgWord8)IO_MANAGER_WAKEUP;
-	r = write(io_manager_wakeup_fd, &byte, 1);
+        StgWord8 byte = (StgWord8)IO_MANAGER_WAKEUP;
+        r = write(io_manager_wakeup_fd, &byte, 1);
 #endif
         if (r == -1) { sysErrorBelch("ioManagerWakeup: write"); }
     }
@@ -167,14 +169,24 @@ ioManagerWakeup (void)
 void
 ioManagerDie (void)
 {
+    StgWord8 byte = (StgWord8)IO_MANAGER_DIE;
+    nat i;
+    int fd;
     int r;
-    // Ask the IO Manager thread to exit
-    if (io_manager_control_fd >= 0) {
-	StgWord8 byte = (StgWord8)IO_MANAGER_DIE;
-	r = write(io_manager_control_fd, &byte, 1);
+
+    if (0 <= timer_manager_control_wr_fd) {
+        r = write(timer_manager_control_wr_fd, &byte, 1);
         if (r == -1) { sysErrorBelch("ioManagerDie: write"); }
-        io_manager_control_fd = -1;
-        io_manager_wakeup_fd = -1;
+        timer_manager_control_wr_fd = -1;
+    }
+
+    for (i=0; i < n_capabilities; i++) {
+        fd = capabilities[i]->io_manager_control_wr_fd;
+        if (0 <= fd) {
+            r = write(fd, &byte, 1);
+            if (r == -1) { sysErrorBelch("ioManagerDie: write"); }
+            capabilities[i]->io_manager_control_wr_fd = -1;
+        }
     }
 }
 
@@ -189,10 +201,10 @@ ioManagerStart (void)
 {
     // Make sure the IO manager thread is running
     Capability *cap;
-    if (io_manager_control_fd < 0 || io_manager_wakeup_fd < 0) {
-	cap = rts_lock();
+    if (timer_manager_control_wr_fd < 0 || io_manager_wakeup_fd < 0) {
+        cap = rts_lock();
         ioManagerStartCap(&cap);
-	rts_unlock(cap);
+        rts_unlock(cap);
     }
 }
 #endif
@@ -220,26 +232,37 @@ generic_handler(int sig USED_IF_THREADS,
 {
 #if defined(THREADED_RTS)
 
-    if (io_manager_control_fd != -1)
+    StgWord8 buf[sizeof(siginfo_t) + 1];
+    int r;
+
+    buf[0] = sig;
+    if (info == NULL) {
+        // info may be NULL on Solaris (see #3790)
+        memset(buf+1, 0, sizeof(siginfo_t));
+    } else {
+        memcpy(buf+1, info, sizeof(siginfo_t));
+    }
+
+    if (0 <= timer_manager_control_wr_fd)
     {
-        StgWord8 buf[sizeof(siginfo_t) + 1];
-        int r;
-
-        buf[0] = sig;
-
-	if (info == NULL) {
-	    // info may be NULL on Solaris (see #3790)
-	    memset(buf+1, 0, sizeof(siginfo_t));
-	} else {
-	    memcpy(buf+1, info, sizeof(siginfo_t));
-	}
-
-	r = write(io_manager_control_fd, buf, sizeof(siginfo_t)+1);
-        if (r == -1 && errno == EAGAIN)
-        {
+        r = write(timer_manager_control_wr_fd, buf, sizeof(siginfo_t)+1);
+        if (r == -1 && errno == EAGAIN) {
             errorBelch("lost signal due to full pipe: %d\n", sig);
         }
     }
+
+    nat i;
+    int fd;
+    for (i=0; i < n_capabilities; i++) {
+        fd = capabilities[i]->io_manager_control_wr_fd;
+        if (0 <= fd) {
+            r = write(fd, buf, sizeof(siginfo_t)+1);
+            if (r == -1 && errno == EAGAIN) {
+                errorBelch("lost signal due to full pipe: %d\n", sig);
+            }
+        }
+    }
+
     // If the IO manager hasn't told us what the FD of the write end
     // of its pipe is, there's not much we can do here, so just ignore
     // the signal..
@@ -255,7 +278,7 @@ generic_handler(int sig USED_IF_THREADS,
 
        We need some kind of locking, but with low overhead (i.e. no
        blocking signals every time around the scheduler).
-       
+
        Signal Handlers are atomic (i.e. they can't be interrupted), and
        we can make use of this.  We just need to make sure the
        critical section of the scheduler can't be interrupted - the
@@ -264,14 +287,14 @@ generic_handler(int sig USED_IF_THREADS,
        handlers to run, i.e. the set of pending handlers is
        non-empty.
     */
-       
+
     /* We use a stack to store the pending signals.  We can't
        dynamically grow this since we can't allocate any memory from
        within a signal handler.
 
        Hence unfortunately we have to bomb out if the buffer
        overflows.  It might be acceptable to carry on in certain
-       circumstances, depending on the signal.  
+       circumstances, depending on the signal.
     */
 
     memcpy(next_pending_handler, info, sizeof(siginfo_t));
@@ -280,10 +303,10 @@ generic_handler(int sig USED_IF_THREADS,
 
     // stack full?
     if (next_pending_handler == &pending_handler_buf[N_PENDING_HANDLERS]) {
-	errorBelch("too many pending signals");
-	stg_exit(EXIT_FAILURE);
+        errorBelch("too many pending signals");
+        stg_exit(EXIT_FAILURE);
     }
-    
+
     interruptCapability(&MainCapability);
 
 #endif /* THREADED_RTS */
@@ -316,7 +339,7 @@ void
 awaitUserSignals(void)
 {
     while (!signals_pending() && sched_state == SCHED_RUNNING) {
-	pause();
+        pause();
     }
 }
 #endif
@@ -340,34 +363,36 @@ stg_sig_install(int sig, int spi, void *mask)
 
     // Block the signal until we figure out what to do
     // Count on this to fail if the signal number is invalid
-    if (sig < 0 || sigemptyset(&signals) ||
-	sigaddset(&signals, sig) || sigprocmask(SIG_BLOCK, &signals, &osignals)) {
+    if (sig < 0 ||
+          sigemptyset(&signals) ||
+          sigaddset(&signals, sig) ||
+          sigprocmask(SIG_BLOCK, &signals, &osignals)) {
         RELEASE_LOCK(&sig_mutex);
         return STG_SIG_ERR;
     }
-    
+
     more_handlers(sig);
 
     previous_spi = signal_handlers[sig];
 
     action.sa_flags = 0;
-    
+
     switch(spi) {
     case STG_SIG_IGN:
         action.sa_handler = SIG_IGN;
-    	break;
+        break;
 
     case STG_SIG_DFL:
         action.sa_handler = SIG_DFL;
-    	break;
+        break;
 
     case STG_SIG_RST:
         action.sa_flags |= SA_RESETHAND;
         /* fall through */
     case STG_SIG_HAN:
-    	action.sa_sigaction = generic_handler;
+        action.sa_sigaction = generic_handler;
         action.sa_flags |= SA_SIGINFO;
-    	break;
+        break;
 
     default:
         barf("stg_sig_install: bad spi");
@@ -376,7 +401,7 @@ stg_sig_install(int sig, int spi, void *mask)
     if (mask != NULL)
         action.sa_mask = *(sigset_t *)mask;
     else
-	sigemptyset(&action.sa_mask);
+        sigemptyset(&action.sa_mask);
 
     action.sa_flags |= sig == SIGCHLD && nocldstop ? SA_NOCLDSTOP : 0;
 
@@ -392,14 +417,14 @@ stg_sig_install(int sig, int spi, void *mask)
     switch(spi) {
     case STG_SIG_RST:
     case STG_SIG_HAN:
-	sigaddset(&userSignals, sig);
+        sigaddset(&userSignals, sig);
         if (previous_spi != STG_SIG_HAN && previous_spi != STG_SIG_RST) {
             n_haskell_handlers++;
         }
-    	break;
+        break;
 
     default:
-	sigdelset(&userSignals, sig);
+        sigdelset(&userSignals, sig);
         if (previous_spi == STG_SIG_HAN || previous_spi == STG_SIG_RST) {
             n_haskell_handlers--;
         }
@@ -429,7 +454,7 @@ startSignalHandlers(Capability *cap)
   int sig;
 
   blockUserSignals();
-  
+
   while (next_pending_handler != pending_handler_buf) {
 
     next_pending_handler--;
@@ -439,18 +464,18 @@ startSignalHandlers(Capability *cap)
         continue; // handler has been changed.
     }
 
-    info = stgMallocBytes(sizeof(siginfo_t), "startSignalHandlers"); 
+    info = stgMallocBytes(sizeof(siginfo_t), "startSignalHandlers");
            // freed by runHandler
     memcpy(info, next_pending_handler, sizeof(siginfo_t));
 
-    scheduleThread (cap,
-	createIOThread(cap,
-		       RtsFlags.GcFlags.initialStkSize, 
-                       rts_apply(cap,
-                                 rts_apply(cap,
-                                           &base_GHCziConcziSignal_runHandlers_closure,
-                                           rts_mkPtr(cap, info)),
-                                 rts_mkInt(cap, info->si_signo))));
+    scheduleThread(cap,
+        createIOThread(cap,
+          RtsFlags.GcFlags.initialStkSize,
+              rts_apply(cap,
+                  rts_apply(cap,
+                      &base_GHCziConcziSignal_runHandlers_closure,
+                      rts_mkPtr(cap, info)),
+                  rts_mkInt(cap, info->si_signo))));
   }
 
   unblockUserSignals();
@@ -468,10 +493,10 @@ markSignalHandlers (evac_fn evac STG_UNUSED, void *user STG_UNUSED)
 }
 
 #else /* !RTS_USER_SIGNALS */
-StgInt 
+StgInt
 stg_sig_install(StgInt sig STG_UNUSED,
-		StgInt spi STG_UNUSED,
-		void* mask STG_UNUSED)
+                StgInt spi STG_UNUSED,
+                void* mask STG_UNUSED)
 {
   //barf("User signals not supported");
   return STG_SIG_DFL;
@@ -493,9 +518,9 @@ shutdown_handler(int sig STG_UNUSED)
     // extreme prejudice.  So the first ^C tries to exit the program
     // cleanly, and the second one just kills it.
     if (sched_state >= SCHED_INTERRUPTING) {
-	stg_exit(EXIT_INTERRUPTED);
+        stg_exit(EXIT_INTERRUPTED);
     } else {
-	interruptStgRts();
+        interruptStgRts();
     }
 }
 
@@ -574,7 +599,9 @@ set_sigtstp_action (rtsBool handle)
     }
     sa.sa_flags = 0;
     sigemptyset(&sa.sa_mask);
-    sigaction(SIGTSTP, &sa, NULL);
+    if (sigaction(SIGTSTP, &sa, NULL) != 0) {
+        sysErrorBelch("warning: failed to install SIGTSTP handler");
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -602,11 +629,11 @@ initDefaultHandlers(void)
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGINT, &action, &oact) != 0) {
-	sysErrorBelch("warning: failed to install SIGINT handler");
+        sysErrorBelch("warning: failed to install SIGINT handler");
     }
 
 #if defined(HAVE_SIGINTERRUPT)
-    siginterrupt(SIGINT, 1);	// isn't this the default? --SDM
+    siginterrupt(SIGINT, 1);    // isn't this the default? --SDM
 #endif
 
     // install the SIGFPE handler
@@ -624,7 +651,7 @@ initDefaultHandlers(void)
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGFPE, &action, &oact) != 0) {
-	sysErrorBelch("warning: failed to install SIGFPE handler");
+        sysErrorBelch("warning: failed to install SIGFPE handler");
     }
 #endif
 
@@ -639,7 +666,7 @@ initDefaultHandlers(void)
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGPIPE, &action, &oact) != 0) {
-	sysErrorBelch("warning: failed to install SIGPIPE handler");
+        sysErrorBelch("warning: failed to install SIGPIPE handler");
     }
 
     set_sigtstp_action(rtsTrue);
@@ -656,14 +683,22 @@ resetDefaultHandlers(void)
 
     // restore SIGINT
     if (sigaction(SIGINT, &action, NULL) != 0) {
-	sysErrorBelch("warning: failed to uninstall SIGINT handler");
+        sysErrorBelch("warning: failed to uninstall SIGINT handler");
     }
     // restore SIGPIPE
     if (sigaction(SIGPIPE, &action, NULL) != 0) {
-	sysErrorBelch("warning: failed to uninstall SIGPIPE handler");
+        sysErrorBelch("warning: failed to uninstall SIGPIPE handler");
     }
 
     set_sigtstp_action(rtsFalse);
 }
 
 #endif /* RTS_USER_SIGNALS */
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

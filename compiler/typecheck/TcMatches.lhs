@@ -6,7 +6,8 @@
 TcMatches: Typecheck some @Matches@
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP, RankNTypes #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -109,7 +110,7 @@ tcMatchesCase :: (Outputable (body Name)) =>
 
 tcMatchesCase ctxt scrut_ty matches res_ty
   | isEmptyMatchGroup matches   -- Allow empty case expressions
-  = return (MG { mg_alts = [], mg_arg_tys = [scrut_ty], mg_res_ty = res_ty }) 
+  = return (MG { mg_alts = [], mg_arg_tys = [scrut_ty], mg_res_ty = res_ty, mg_origin = mg_origin matches })
 
   | otherwise
   = tcMatches ctxt [scrut_ty] res_ty matches
@@ -180,10 +181,10 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
                  -> TcRhoType
                  -> TcM (Located (body TcId)) }
 
-tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = matches })
+tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = matches, mg_origin = origin })
   = ASSERT( not (null matches) )	-- Ensure that rhs_ty is filled in
     do	{ matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
-	; return (MG { mg_alts = matches', mg_arg_tys = pat_tys, mg_res_ty = rhs_ty }) }
+	; return (MG { mg_alts = matches', mg_arg_tys = pat_tys, mg_res_ty = rhs_ty, mg_origin = origin }) }
 
 -------------
 tcMatch :: (Outputable (body Name)) => TcMatchCtxt body

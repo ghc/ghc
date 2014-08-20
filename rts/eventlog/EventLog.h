@@ -170,3 +170,11 @@ INLINE_HEADER void postThreadLabel(Capability    *cap   STG_UNUSED,
 #include "EndPrivate.h"
 
 #endif /* TRACING_H */
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

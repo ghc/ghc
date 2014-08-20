@@ -1,5 +1,6 @@
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -303,9 +304,9 @@ mkStringExprFS str
 mkEqBox :: Coercion -> CoreExpr
 mkEqBox co = ASSERT2( typeKind ty2 `eqKind` k, ppr co $$ ppr ty1 $$ ppr ty2 $$ ppr (typeKind ty1) $$ ppr (typeKind ty2) )
              Var (dataConWorkId datacon) `mkTyApps` [k, ty1, ty2] `App` Coercion co
-  where Pair ty1 ty2 = coercionKind co
+  where (Pair ty1 ty2, role) = coercionKindRole co
         k = typeKind ty1
-        datacon = case coercionRole co of 
+        datacon = case role of
             Nominal ->          eqBoxDataCon
             Representational -> coercibleDataCon
             Phantom ->          pprPanic "mkEqBox does not support boxing phantom coercions"
@@ -414,11 +415,16 @@ mkBigCoreTupTy = mkChunkified mkBoxedTupleTy
 %************************************************************************
 
 \begin{code}
-data FloatBind 
+data FloatBind
   = FloatLet  CoreBind
-  | FloatCase CoreExpr Id AltCon [Var]       
+  | FloatCase CoreExpr Id AltCon [Var]
       -- case e of y { C ys -> ... }
       -- See Note [Floating cases] in SetLevels
+
+instance Outputable FloatBind where
+  ppr (FloatLet b) = ptext (sLit "LET") <+> ppr b
+  ppr (FloatCase e b c bs) = hang (ptext (sLit "CASE") <+> ppr e <+> ptext (sLit "of") <+> ppr b)
+                                2 (ppr c <+> ppr bs)
 
 wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
 wrapFloat (FloatLet defns)       body = Let defns body

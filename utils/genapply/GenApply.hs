@@ -21,6 +21,7 @@ import Data.List        ( intersperse, nub, sort )
 import System.Exit
 import System.Environment
 import System.IO
+import Control.Arrow ((***))
 
 -- -----------------------------------------------------------------------------
 -- Argument kinds (rougly equivalent to PrimRep)
@@ -199,6 +200,45 @@ mb_tag_node arity | Just tag <- tagForArity arity = mkTagStmt tag <> semi
 
 mkTagStmt tag = text ("R1 = R1 + "++ show tag)
 
+type StackUsage = (Int, Int)  -- PROFILING, normal
+
+maxStack :: [StackUsage] -> StackUsage
+maxStack = (maximum *** maximum) . unzip
+
+stackCheck
+   :: RegStatus  -- Registerised status
+   -> [ArgRep]
+   -> Bool       -- args in regs?
+   -> Doc        -- fun_info_label
+   -> StackUsage
+   -> Doc
+stackCheck regstatus args args_in_regs fun_info_label (prof_sp, norm_sp) =
+  let
+     (reg_locs, leftovers, sp_offset) = assignRegs regstatus 1 args
+
+     cmp_sp n
+       | n > 0 =
+          text "if (Sp - WDS(" <> int n <> text ") < SpLim) {" $$
+          nest 4 (vcat [
+            if args_in_regs
+               then
+                 text "Sp_adj" <> parens (int (-sp_offset)) <> semi $$
+                 saveRegOffs reg_locs
+               else
+                 empty,
+            text "Sp(0) = " <> fun_info_label <> char ';',
+            mkJump regstatus (text "__stg_gc_enter_1") ["R1"] [] <> semi
+            ]) $$
+          char '}'
+       | otherwise = empty
+  in
+  vcat [ text "#ifdef PROFILING",
+         cmp_sp prof_sp,
+         text "#else",
+         cmp_sp norm_sp,
+         text "#endif"
+       ]
+
 genMkPAP :: RegStatus -- Register status
          -> String    -- Macro
          -> String    -- Jump target
@@ -212,17 +252,19 @@ genMkPAP :: RegStatus -- Register status
          -> Int       -- Size of all arguments
          -> Doc       -- info label
          -> Bool      -- Is a function
-         -> Doc
+         -> (Doc, StackUsage)
 genMkPAP regstatus macro jump live ticker disamb
         no_load_regs    -- don't load argument regs before jumping
         args_in_regs    -- arguments are already in regs
         is_pap args all_args_size fun_info_label
         is_fun_case
-  =  smaller_arity_cases
-  $$ exact_arity_case
-  $$ larger_arity_case
-        
+  = (doc, stack_usage)
+
   where
+    doc = vcat smaller_arity_doc $$ exact_arity_case $$ larger_arity_doc
+
+    stack_usage = maxStack (larger_arity_stack : smaller_arity_stack)
+
     n_args = length args
 
         -- offset of arguments on the stack at slow apply calls.
@@ -237,10 +279,17 @@ genMkPAP regstatus macro jump live ticker disamb
 --          Sp[0] = Sp[1];
 --          Sp[1] = (W_)&stg_ap_1_info;
 --          JMP_(GET_ENTRY(R1.cl));
-    smaller_arity_cases = vcat [ smaller_arity i | i <- [1..n_args-1] ]
+    (smaller_arity_doc, smaller_arity_stack)
+       = unzip [ smaller_arity i | i <- [1..n_args-1] ]
 
-    smaller_arity arity
-        =  text "if (arity == " <> int arity <> text ") {" $$
+    smaller_arity arity = (doc, stack_usage)
+      where
+        (save_regs, stack_usage)
+          | overflow_regs = save_extra_regs
+          | otherwise     = shuffle_extra_args
+
+        doc =
+           text "if (arity == " <> int arity <> text ") {" $$
            nest 4 (vcat [
            --  text "TICK_SLOW_CALL_" <> text ticker <> text "_TOO_MANY();",
 
@@ -253,9 +302,7 @@ genMkPAP regstatus macro jump live ticker disamb
                 -- If the extra arguments are on the stack, then we must
                 -- instead shuffle them down to make room for the info
                 -- table for the follow-on call.
-             if overflow_regs
-                then save_extra_regs
-                else shuffle_extra_args,
+             save_regs,
 
                 -- for a PAP, we have to arrange that the stack contains a
                 -- return address in the event that stg_PAP_entry fails its
@@ -271,81 +318,88 @@ genMkPAP regstatus macro jump live ticker disamb
             ]) $$
            text "}"
 
-        where
-                -- offsets in case we need to save regs:
-             (reg_locs, _, _)
-                = assignRegs regstatus stk_args_offset args
+           -- offsets in case we need to save regs:
+        (reg_locs, _, _)
+           = assignRegs regstatus stk_args_offset args
 
-                -- register assignment for *this function call*
-             (reg_locs', reg_call_leftovers, reg_call_sp_stk_args) 
-                = assignRegs regstatus stk_args_offset (take arity args)
+           -- register assignment for *this function call*
+        (reg_locs', reg_call_leftovers, reg_call_sp_stk_args) 
+           = assignRegs regstatus stk_args_offset (take arity args)
 
-             load_regs
-                | no_load_regs || args_in_regs = empty
-                | otherwise                    = loadRegOffs reg_locs'
+        load_regs
+           | no_load_regs || args_in_regs = empty
+           | otherwise                    = loadRegOffs reg_locs'
 
-             (this_call_args, rest_args) = splitAt arity args
+        (this_call_args, rest_args) = splitAt arity args
 
-                -- the offset of the stack args from initial Sp
-             sp_stk_args
-                | args_in_regs = stk_args_offset
-                | no_load_regs = stk_args_offset
-                | otherwise    = reg_call_sp_stk_args
+           -- the offset of the stack args from initial Sp
+        sp_stk_args
+           | args_in_regs = stk_args_offset
+           | no_load_regs = stk_args_offset
+           | otherwise    = reg_call_sp_stk_args
 
-                -- the stack args themselves
-             this_call_stack_args
-                | args_in_regs = reg_call_leftovers -- sp offsets are wrong
-                | no_load_regs = this_call_args
-                | otherwise    = reg_call_leftovers
+           -- the stack args themselves
+        this_call_stack_args
+           | args_in_regs = reg_call_leftovers -- sp offsets are wrong
+           | no_load_regs = this_call_args
+           | otherwise    = reg_call_leftovers
 
-             stack_args_size = sum (map argSize this_call_stack_args)
-                
-             overflow_regs = args_in_regs && length reg_locs > length reg_locs'
+        stack_args_size = sum (map argSize this_call_stack_args)
+           
+        overflow_regs = args_in_regs && length reg_locs > length reg_locs'
 
-             save_extra_regs
-                = -- we have extra arguments in registers to save
-                  let
-                   extra_reg_locs = drop (length reg_locs') (reverse reg_locs)
-                   adj_reg_locs = [ (reg, off - adj + 1) | 
-                                    (reg,off) <- extra_reg_locs ]
-                   adj = case extra_reg_locs of
-                           (reg, fst_off):_ -> fst_off
-                   size = snd (last adj_reg_locs)
-                   in
-                   text "Sp_adj(" <> int (-size - 1) <> text ");" $$
-                   saveRegOffs adj_reg_locs $$
-                   loadSpWordOff "W_" 0 <> text " = " <>
-                                mkApplyInfoName rest_args <> semi
+        save_extra_regs = (doc, (size,size))
+          where
+             -- we have extra arguments in registers to save
+              extra_reg_locs = drop (length reg_locs') (reverse reg_locs)
+              adj_reg_locs = [ (reg, off - adj + 1) | 
+                               (reg,off) <- extra_reg_locs ]
+              adj = case extra_reg_locs of
+                      (reg, fst_off):_ -> fst_off
+              size = snd (last adj_reg_locs) + 1
 
-             shuffle_extra_args
-                = vcat [text "#ifdef PROFILING",
-                        shuffle True,
+              doc =
+                text "Sp_adj(" <> int (-size) <> text ");" $$
+                saveRegOffs adj_reg_locs $$
+                loadSpWordOff "W_" 0 <> text " = " <>
+                             mkApplyInfoName rest_args <> semi
+
+        shuffle_extra_args = (doc, (shuffle_prof_stack, shuffle_norm_stack))
+          where
+           doc = vcat [ text "#ifdef PROFILING",
+                        shuffle_prof_doc,
                         text "#else",
-                        shuffle False,
+                        shuffle_norm_doc,
                         text "#endif"]
-               where
-                -- Sadly here we have to insert an stg_restore_cccs frame
-                -- just underneath the stg_ap_*_info frame if we're
-                -- profiling; see Note [jump_SAVE_CCCS]
-                shuffle prof =
-                  let offset = if prof then 2 else 0 in
-                  vcat (map (shuffle_down (offset+1))
-                         [sp_stk_args .. sp_stk_args+stack_args_size-1]) $$
-                  (if prof
-                    then
-                      loadSpWordOff "W_" (sp_stk_args+stack_args_size-3)
-                        <> text " = stg_restore_cccs_info;" $$
-                      loadSpWordOff "W_" (sp_stk_args+stack_args_size-2)
-                        <> text " = CCCS;"
-                    else empty) $$
-                  loadSpWordOff "W_" (sp_stk_args+stack_args_size-1)
-                        <> text " = "
-                        <> mkApplyInfoName rest_args <> semi $$
-                  text "Sp_adj(" <> int (sp_stk_args -  1 - offset) <> text ");"
 
-             shuffle_down j i =
-                  loadSpWordOff "W_" (i-j) <> text " = " <>
-                  loadSpWordOff "W_" i <> semi
+           (shuffle_prof_doc, shuffle_prof_stack) = shuffle True
+           (shuffle_norm_doc, shuffle_norm_stack) = shuffle False
+
+           -- Sadly here we have to insert an stg_restore_cccs frame
+           -- just underneath the stg_ap_*_info frame if we're
+           -- profiling; see Note [jump_SAVE_CCCS]
+           shuffle prof = (doc, -sp_adj)
+             where
+             sp_adj = sp_stk_args - 1 - offset
+             offset = if prof then 2 else 0
+             doc =
+               vcat (map (shuffle_down (offset+1))
+                      [sp_stk_args .. sp_stk_args+stack_args_size-1]) $$
+               (if prof
+                 then
+                   loadSpWordOff "W_" (sp_stk_args+stack_args_size-3)
+                     <> text " = stg_restore_cccs_info;" $$
+                   loadSpWordOff "W_" (sp_stk_args+stack_args_size-2)
+                     <> text " = CCCS;"
+                 else empty) $$
+               loadSpWordOff "W_" (sp_stk_args+stack_args_size-1)
+                     <> text " = "
+                     <> mkApplyInfoName rest_args <> semi $$
+               text "Sp_adj(" <> int sp_adj <> text ");"
+
+        shuffle_down j i =
+             loadSpWordOff "W_" (i-j) <> text " = " <>
+             loadSpWordOff "W_" i <> semi
 
 
 -- The EXACT ARITY case
@@ -378,7 +432,17 @@ genMkPAP regstatus macro jump live ticker disamb
 --          BUILD_PAP(1,0,(W_)&stg_ap_v_info);
 --      }
 
-    larger_arity_case = 
+    (larger_arity_doc, larger_arity_stack) = (doc, stack)
+     where
+       -- offsets in case we need to save regs:
+       (reg_locs, leftovers, sp_offset)
+           = assignRegs regstatus stk_args_slow_offset args
+           -- BUILD_PAP assumes args start at offset 1
+
+       stack | args_in_regs = (sp_offset, sp_offset)
+             | otherwise    = (0,0)
+
+       doc =
            text "} else {" $$
            let
              save_regs
@@ -407,11 +471,7 @@ genMkPAP regstatus macro jump live ticker disamb
                                         text ");"
            ]) $$
            char '}'
-        where
-          -- offsets in case we need to save regs:
-          (reg_locs, leftovers, sp_offset) 
-                = assignRegs regstatus stk_args_slow_offset args
-                -- BUILD_PAP assumes args start at offset 1
+
 
 -- Note [jump_SAVE_CCCS]
 
@@ -453,13 +513,14 @@ enterFastPathHelper :: Int
                     -> [ArgRep]
                     -> Doc
 enterFastPathHelper tag regstatus no_load_regs args_in_regs args =
-  vcat [text "if (GETTAG(R1)==" <> int tag <> text ") {",
-        reg_doc,
-        text "  Sp_adj(" <> int sp' <> text ");",
-        -- enter, but adjust offset with tag
-        text "  " <> mkJump regstatus (text "%GET_ENTRY(R1-" <> int tag <> text ")") ["R1"] args <> semi,
-        text "}"
-       ]
+  text "if (GETTAG(R1)==" <> int tag <> text ") {" $$
+  nest 4 (vcat [
+    reg_doc,
+    text "Sp_adj(" <> int sp' <> text ");",
+    -- enter, but adjust offset with tag
+    mkJump regstatus (text "%GET_ENTRY(R1-" <> int tag <> text ")") ["R1"] args <> semi
+  ]) $$
+  text "}"
   -- I don't totally understand this code, I copied it from
   -- exact_arity_case
   -- TODO: refactor
@@ -519,6 +580,23 @@ genApply regstatus args =
     fun_ret_label  = mkApplyRetName args
     fun_info_label = mkApplyInfoName args
     all_args_size  = sum (map argSize args)
+
+    (bco_doc, bco_stack) =
+       genMkPAP regstatus "BUILD_PAP" "ENTRY_LBL(stg_BCO)" ["R1"] "FUN" "BCO"
+             True{-stack apply-} False{-args on stack-} False{-not a PAP-}
+             args all_args_size fun_info_label {- tag stmt -}False
+
+    (fun_doc, fun_stack) =
+       genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" ["R1"] "FUN" "FUN"
+             False{-reg apply-} False{-args on stack-} False{-not a PAP-}
+             args all_args_size fun_info_label {- tag stmt -}True
+
+    (pap_doc, pap_stack) =
+       genMkPAP regstatus "NEW_PAP" "stg_PAP_apply" ["R1", "R2"] "PAP" "PAP"
+             True{-stack apply-} False{-args on stack-} True{-is a PAP-}
+             args all_args_size fun_info_label {- tag stmt -}False
+
+    stack_usage = maxStack [bco_stack, fun_stack, pap_stack]
    in
     vcat [
       text "INFO_TABLE_RET(" <> mkApplyName args <> text ", " <>
@@ -579,6 +657,9 @@ genApply regstatus args =
        -- if pointer is tagged enter it fast!
        enterFastPath regstatus False False args,
 
+       stackCheck regstatus args False{-args on stack-}
+                  fun_info_label stack_usage,
+
        -- Functions can be tagged, so we untag them!
        text  "R1 = UNTAG(R1);",
        text  "info = %INFO_PTR(R1);",
@@ -596,9 +677,7 @@ genApply regstatus args =
         nest 4 (vcat [
           text "arity = TO_W_(StgBCO_arity(R1));",
           text "ASSERT(arity > 0);",
-          genMkPAP regstatus "BUILD_PAP" "ENTRY_LBL(stg_BCO)" ["R1"] "FUN" "BCO"
-                True{-stack apply-} False{-args on stack-} False{-not a PAP-}
-                args all_args_size fun_info_label {- tag stmt -}False
+          bco_doc
          ]),
         text "}",
 
@@ -615,9 +694,7 @@ genApply regstatus args =
         nest 4 (vcat [
           text "arity = TO_W_(StgFunInfoExtra_arity(%FUN_INFO(info)));",
           text "ASSERT(arity > 0);",
-          genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" ["R1"] "FUN" "FUN"
-                False{-reg apply-} False{-args on stack-} False{-not a PAP-}
-                args all_args_size fun_info_label {- tag stmt -}True
+          fun_doc
          ]),
         text "}",
 
@@ -629,9 +706,7 @@ genApply regstatus args =
         nest 4 (vcat [
           text "arity = TO_W_(StgPAP_arity(R1));",
           text "ASSERT(arity > 0);",
-          genMkPAP regstatus "NEW_PAP" "stg_PAP_apply" ["R1", "R2"] "PAP" "PAP"
-                True{-stack apply-} False{-args on stack-} True{-is a PAP-}
-                args all_args_size fun_info_label {- tag stmt -}False
+          pap_doc
          ]),
         text "}",
 
@@ -690,6 +765,7 @@ genApply regstatus args =
         ]),
        text "}"
       ]),
+
       text "}"
     ]
 
@@ -702,6 +778,15 @@ genApplyFast regstatus args =
     fun_ret_label  = text "RET_LBL" <> parens (mkApplyName args)
     fun_info_label = mkApplyInfoName args
     all_args_size  = sum (map argSize args)
+
+    (fun_doc, fun_stack) =
+       genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" ["R1"] "FUN" "FUN"
+            False{-reg apply-} True{-args in regs-} False{-not a PAP-}
+            args all_args_size fun_info_label {- tag stmt -}True
+
+    (reg_locs, leftovers, sp_offset) = assignRegs regstatus 1 args
+
+    stack_usage = maxStack [fun_stack, (sp_offset,sp_offset)]
    in
     vcat [
      fun_fast_label,
@@ -714,6 +799,9 @@ genApplyFast regstatus args =
 
         -- if pointer is tagged enter it fast!
         enterFastPath regstatus False True args,
+
+        stackCheck regstatus args True{-args in regs-}
+                   fun_info_label stack_usage,
 
         -- Functions can be tagged, so we untag them!
         text  "R1 = UNTAG(R1);",
@@ -730,18 +818,11 @@ genApplyFast regstatus args =
           nest 4 (vcat [
             text "arity = TO_W_(StgFunInfoExtra_arity(%GET_FUN_INFO(R1)));",
             text "ASSERT(arity > 0);",
-            genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" ["R1"] "FUN" "FUN"
-                False{-reg apply-} True{-args in regs-} False{-not a PAP-}
-                args all_args_size fun_info_label {- tag stmt -}True
+            fun_doc
            ]),
           char '}',
           
           text "default: {",
-          let
-             (reg_locs, leftovers, sp_offset) = assignRegs regstatus 1 args
-                -- leave a one-word space on the top of the stack when
-                -- calling the slow version
-          in
           nest 4 (vcat [
              text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
              saveRegOffs reg_locs,
@@ -749,8 +830,9 @@ genApplyFast regstatus args =
           ]),
           char '}'
         ]),
-        char '}'
-      ]),
+
+       char '}'
+     ]),
      char '}'
    ]
 

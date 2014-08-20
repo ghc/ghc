@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, GADTs #-}
+
 -----------------------------------------------------------------------------
 --
 -- Code generator utilities; mostly monadic
@@ -6,7 +8,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE GADTs #-}
 module CgUtils ( fixStgRegisters ) where
 
 #include "HsVersions.h"

@@ -5,6 +5,8 @@
 Taken quite directly from the Peyton Jones/Lester paper.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 -- | A module concerned with finding the free variables of an expression.
 module CoreFVs (
         -- * Free variables of expressions and binding groups

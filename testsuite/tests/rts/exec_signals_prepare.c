@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 
 // Invokes a process, making sure that the state of the signal
 // handlers has all been set back to the unix default.

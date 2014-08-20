@@ -5,7 +5,9 @@
 Functions for working with the typechecker environment (setters, getters...).
 
 \begin{code}
+{-# LANGUAGE CPP, ExplicitForAll, FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module TcRnMonad(
         module TcRnMonad,
         module TcRnTypes,
@@ -24,7 +26,6 @@ import Module
 import RdrName
 import Name
 import Type
-import Kind ( isSuperKind )
 
 import TcType
 import InstEnv
@@ -49,7 +50,7 @@ import FastString
 import Panic
 import Util
 import Annotations
-import BasicTypes( TopLevelFlag, Origin )
+import BasicTypes( TopLevelFlag )
 
 import Control.Exception
 import Data.IORef
@@ -587,11 +588,6 @@ addLocM fn (L loc a) = setSrcSpan loc $ fn a
 
 wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
 wrapLocM fn (L loc a) = setSrcSpan loc $ do b <- fn a; return (L loc b)
-
-wrapOriginLocM :: (a -> TcM r) -> (Origin, Located a) -> TcM (Origin, Located r)
-wrapOriginLocM fn (origin, lbind)
-  = do  { lbind' <- wrapLocM fn lbind
-        ; return (origin, lbind') }
 
 wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
 wrapLocFstM fn (L loc a) =
@@ -1136,10 +1132,6 @@ setUntouchables untch thing_inside
 
 isTouchableTcM :: TcTyVar -> TcM Bool
 isTouchableTcM tv
-    -- Kind variables are always touchable
-  | isSuperKind (tyVarKind tv) 
-  = return False
-  | otherwise 
   = do { env <- getLclEnv
        ; return (isTouchableMetaTyVar (tcl_untch env) tv) }
 
@@ -1213,9 +1205,10 @@ recordUnsafeInfer = getGblEnv >>= \env -> writeTcRef (tcg_safeInfer env) False
 finalSafeMode :: DynFlags -> TcGblEnv -> IO SafeHaskellMode
 finalSafeMode dflags tcg_env = do
     safeInf <- readIORef (tcg_safeInfer tcg_env)
-    return $ if safeInferOn dflags && not safeInf
-        then Sf_None
-        else safeHaskell dflags
+    return $ case safeHaskell dflags of
+        Sf_None | safeInferOn dflags && safeInf -> Sf_Safe
+                | otherwise                     -> Sf_None
+        s -> s
 \end{code}
 
 
@@ -1254,17 +1247,6 @@ initIfaceTcRn thing_inside
         ; let { if_env = IfGblEnv { if_rec_types = Just (tcg_mod tcg_env, get_type_env) }
               ; get_type_env = readTcRef (tcg_type_env_var tcg_env) }
         ; setEnvs (if_env, ()) thing_inside }
-
-initIfaceExtCore :: IfL a -> TcRn a
-initIfaceExtCore thing_inside
-  = do  { tcg_env <- getGblEnv
-        ; let { mod = tcg_mod tcg_env
-              ; doc = ptext (sLit "External Core file for") <+> quotes (ppr mod)
-              ; if_env = IfGblEnv {
-                        if_rec_types = Just (mod, return (tcg_type_env tcg_env)) }
-              ; if_lenv = mkIfLclEnv mod doc
-          }
-        ; setEnvs (if_env, if_lenv) thing_inside }
 
 initIfaceCheck :: HscEnv -> IfG a -> IO a
 -- Used when checking the up-to-date-ness of the old Iface

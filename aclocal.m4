@@ -197,6 +197,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             GET_ARM_ISA()
             test -z "[$]2" || eval "[$]2=\"ArchARM {armISA = \$ARM_ISA, armISAExt = \$ARM_ISA_EXT, armABI = \$ARM_ABI}\""
             ;;
+        aarch64)
+            test -z "[$]2" || eval "[$]2=ArchARM64"
+            ;;
         alpha)
             test -z "[$]2" || eval "[$]2=ArchAlpha"
             ;;
@@ -206,7 +209,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         mipsel)
             test -z "[$]2" || eval "[$]2=ArchMipsel"
             ;;
-        hppa|hppa1_1|ia64|m68k|rs6000|s390|s390x|sparc64|vax)
+        hppa|hppa1_1|ia64|m68k|powerpc64le|rs6000|s390|s390x|sparc64|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
         *)
@@ -451,6 +454,8 @@ AC_DEFUN([FP_SETTINGS],
     then
         mingw_bin_prefix=mingw/bin/
         SettingsCCompilerCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
+        SettingsHaskellCPPCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
+        SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="\$topdir/../${mingw_bin_prefix}ld.exe"
         SettingsArCommand="\$topdir/../${mingw_bin_prefix}ar.exe"
         SettingsPerlCommand='$topdir/../perl/perl.exe'
@@ -459,6 +464,8 @@ AC_DEFUN([FP_SETTINGS],
         SettingsTouchCommand='$topdir/touchy.exe'
     else
         SettingsCCompilerCommand="$WhatGccIsCalled"
+        SettingsHaskellCPPCommand="$HaskellCPPCmd"
+        SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$LdCmd"
         SettingsArCommand="$ArCmd"
         SettingsPerlCommand="$PerlCmd"
@@ -483,6 +490,8 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
     AC_SUBST(SettingsCCompilerCommand)
+    AC_SUBST(SettingsHaskellCPPCommand)
+    AC_SUBST(SettingsHaskellCPPFlags)
     AC_SUBST(SettingsCCompilerFlags)
     AC_SUBST(SettingsCCompilerLinkFlags)
     AC_SUBST(SettingsLdCommand)
@@ -517,6 +526,12 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
     esac
 
     case $$1 in
+    i386-unknown-mingw32)
+        $2="$$2 -march=i686"
+        ;;
+    i386-portbld-freebsd*)
+        $2="$$2 -march=i686"
+        ;;
     i386-apple-darwin)
         $2="$$2 -m32"
         $3="$$3 -m32"
@@ -527,6 +542,12 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $2="$$2 -m64"
         $3="$$3 -m64"
         $4="$$4 -arch x86_64"
+        $5="$$5 -m64"
+        ;;
+    x86_64-unknown-solaris2)
+        $2="$$2 -m64"
+        $3="$$3 -m64"
+        $4="$$4 -m64"
         $5="$$5 -m64"
         ;;
     alpha-*)
@@ -703,6 +724,8 @@ AC_ARG_WITH($2,
 )
 ]) # FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
 
+
+
 # FP_PROG_CONTEXT_DIFF
 # --------------------
 # Figure out how to do context diffs. Sets the output variable ContextDiffCmd.
@@ -872,7 +895,7 @@ else
 fi;
 changequote([, ])dnl
 ])
-if test ! -f compiler/parser/Parser.hs || test ! -f compiler/cmm/CmmParse.hs || test ! -f compiler/parser/ParserCore.hs
+if test ! -f compiler/parser/Parser.hs || test ! -f compiler/cmm/CmmParse.hs
 then
     FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.19],
       [AC_MSG_ERROR([Happy version 1.19 or later is required to compile GHC.])])[]
@@ -1809,7 +1832,7 @@ AC_MSG_NOTICE(Building in-tree ghc-pwd)
     dnl If special linker flags are needed to build things, then allow
     dnl the user to pass them in via LDFLAGS.
     changequote(, )dnl
-    GHC_LDFLAGS=`echo $LDFLAGS | sed 's/\(^\| \)\([^ ]\)/\1-optl\2/g'`
+    GHC_LDFLAGS=`echo $LDFLAGS | sed -r 's/(^| )([^ ])/\1-optl\2/g'`
     changequote([, ])dnl
     if ! "$WithGhc" $GHC_LDFLAGS -v0 -no-user-$GHC_PACKAGE_DB_FLAG -hidir utils/ghc-pwd/dist-boot -odir utils/ghc-pwd/dist-boot -stubdir utils/ghc-pwd/dist-boot --make utils/ghc-pwd/Main.hs -o utils/ghc-pwd/dist-boot/ghc-pwd
     then
@@ -1854,6 +1877,9 @@ AC_MSG_CHECKING(for path to top of build tree)
 # converts cpu from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_CPU],[
 case "$1" in
+  aarch64*)
+    $2="aarch64"
+    ;;
   alpha*)
     $2="alpha"
     ;;
@@ -1883,6 +1909,9 @@ case "$1" in
     ;;
   mips*)
     $2="mips"
+    ;;
+  powerpc64le*)
+    $2="powerpc64le"
     ;;
   powerpc64*)
     $2="powerpc64"
@@ -2040,7 +2069,11 @@ AC_DEFUN([FIND_LLVM_PROG],[
         IFS=":;"
         for p in ${PATH}; do
             if test -d "${p}"; then
-                $1=`${FindCmd} "${p}" -type f -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
+                if test "$windows" = YES; then
+                    $1=`${FindCmd} "${p}" -type f -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
+                else
+                    $1=`${FindCmd} "${p}" -type f -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
+                fi
                 if test -n "$$1"; then
                     break
                 fi
@@ -2071,7 +2104,7 @@ AC_DEFUN([FIND_GCC],[
         $1="$CC"
     else
         FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
-        # From Xcode 5 on, OS X command line tools do not include gcc
+        # From Xcode 5 on/, OS X command line tools do not include gcc
         # anymore. Use clang.
         if test -z "$$1"
         then
@@ -2090,6 +2123,106 @@ AC_DEFUN([MAYBE_OVERRIDE_STAGE0],[
       AC_MSG_NOTICE([Not cross-compiling, so --with-$1 also sets $2])
       $2=$With_$1
   fi
+])
+
+
+# FP_CPP_CMD_WITH_ARGS()
+# ----------------------
+# sets CPP command and its arguments
+#
+# $1 = the variable to set to CPP command
+# $2 = the varibale to set to CPP command arguments
+
+AC_DEFUN([FP_CPP_CMD_WITH_ARGS],[
+dnl ** what cpp to use?
+dnl --------------------------------------------------------------
+AC_ARG_WITH(hs-cpp,
+[AC_HELP_STRING([--with-hs-cpp=ARG],
+        [Use ARG as the path to cpp [default=autodetect]])],
+[
+    if test "$HostOS" = "mingw32"
+    then
+        AC_MSG_WARN([Request to use $withval will be ignored])
+    else
+        HS_CPP_CMD=$withval
+    fi
+],
+[
+
+    HS_CPP_CMD=$WhatGccIsCalled
+
+    SOLARIS_GCC_CPP_BROKEN=NO
+    SOLARIS_FOUND_GOOD_CPP=NO
+    case $host in
+        i386-*-solaris2)
+        GCC_MAJOR_MINOR=`$WhatGccIsCalled --version|grep "gcc (GCC)"|cut -d ' ' -f 3-3|cut -d '.' -f 1-2`
+        if test "$GCC_MAJOR_MINOR" != "3.4"; then
+          # this is not 3.4.x release so with broken CPP
+          SOLARIS_GCC_CPP_BROKEN=YES
+        fi
+        ;;
+    esac
+
+    if test "$SOLARIS_GCC_CPP_BROKEN" = "YES"; then
+      # let's try to find if GNU C 3.4.x is installed
+      if test -x /usr/sfw/bin/gcc; then
+        # something executable is in expected path so let's
+        # see if it's really GNU C
+        NEW_GCC_MAJOR_MINOR=`/usr/sfw/bin/gcc --version|grep "gcc (GCC)"|cut -d ' ' -f 3-3|cut -d '.' -f 1-2`
+        if test "$NEW_GCC_MAJOR_MINOR" = "3.4"; then
+          # this is GNU C 3.4.x which provides non-broken CPP on Solaris
+          # let's use it as CPP then.
+          HS_CPP_CMD=/usr/sfw/bin/gcc
+          SOLARIS_FOUND_GOOD_CPP=YES
+        fi
+      fi
+      if test "$SOLARIS_FOUND_GOOD_CPP" = "NO"; then
+        AC_MSG_WARN([Your GNU C provides broken CPP and you do not have GNU C 3.4.x installed.])
+        AC_MSG_WARN([Please install GNU C 3.4.x to solve this issue. It will be used as CPP only.])
+      fi
+    fi
+]
+)
+
+
+
+dnl ** what cpp flags to use?
+dnl -----------------------------------------------------------
+AC_ARG_WITH(hs-cpp-flags,
+  [AC_HELP_STRING([--with-hs-cpp-flags=ARG],
+          [Use ARG as the path to hs cpp [default=autodetect]])],
+  [
+      if test "$HostOS" = "mingw32"
+      then
+          AC_MSG_WARN([Request to use $withval will be ignored])
+      else
+          HS_CPP_ARGS=$withval
+      fi
+  ],
+[
+  $HS_CPP_CMD -x c /dev/null -dM -E > conftest.txt 2>&1
+  if grep "__clang__" conftest.txt >/dev/null 2>&1; then
+    HS_CPP_ARGS="-E -undef -traditional -Wno-invalid-pp-token -Wno-unicode -Wno-trigraphs "
+  else
+      $HS_CPP_CMD  -v > conftest.txt 2>&1
+      if  grep "gcc" conftest.txt >/dev/null 2>&1; then
+          HS_CPP_ARGS="-E -undef -traditional "
+        else
+          $HS_CPP_CMD  --version > conftest.txt 2>&1
+          if grep "cpphs" conftest.txt >/dev/null 2>&1; then
+            HS_CPP_ARGS="--cpp -traditional"
+          else
+            AC_MSG_WARN([configure can't recognize your CPP program, you may need to set --with-hs-cpp-flags=FLAGS explicitly])
+            HS_CPP_ARGS=""
+          fi
+      fi
+  fi
+  ]
+)
+
+$1=$HS_CPP_CMD
+$2=$HS_CPP_ARGS
+
 ])
 
 # LocalWords:  fi

@@ -8,5 +8,5 @@ tcfail032.hs:14:8:
     Relevant bindings include
       x :: t (bound at tcfail032.hs:14:3)
       f :: t -> a -> Int (bound at tcfail032.hs:14:1)
-    In the expression: (x :: Eq a => a -> Int)
-    In an equation for ‘f’: f x = (x :: Eq a => a -> Int)
+    In the expression: (x :: (Eq a) => a -> Int)
+    In an equation for ‘f’: f x = (x :: (Eq a) => a -> Int)

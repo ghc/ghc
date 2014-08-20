@@ -1,32 +1,24 @@
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 {-# LANGUAGE BangPatterns, DeriveDataTypeable #-}
-
 module CostCentre (
         CostCentre(..), CcName, IsCafCC(..),
-		-- All abstract except to friend: ParseIface.y
+                -- All abstract except to friend: ParseIface.y
 
-	CostCentreStack,
-	CollectedCCs,
+        CostCentreStack,
+        CollectedCCs,
         noCCS, currentCCS, dontCareCCS,
         noCCSAttached, isCurrentCCS,
         maybeSingletonCCS,
 
-	mkUserCC, mkAutoCC, mkAllCafsCC, 
+        mkUserCC, mkAutoCC, mkAllCafsCC,
         mkSingletonCCS,
         isCafCCS, isCafCC, isSccCountCC, sccAbleCC, ccFromThisModule,
 
-	pprCostCentreCore,
+        pprCostCentreCore,
         costCentreUserName, costCentreUserNameFS,
         costCentreSrcSpan,
 
-	cmpCostCentre	-- used for removing dups in a list
+        cmpCostCentre   -- used for removing dups in a list
     ) where
 
 import Binary
@@ -34,7 +26,7 @@ import Var
 import Name
 import Module
 import Unique
-import Outputable	
+import Outputable
 import FastTypes
 import SrcLoc
 import FastString
@@ -46,7 +38,7 @@ import Data.Data
 -- Cost Centres
 
 -- | A Cost Centre is a single @{-# SCC #-}@ annotation.
- 
+
 data CostCentre
   = NormalCC {
                 cc_key  :: {-# UNPACK #-} !Int,
@@ -66,7 +58,7 @@ data CostCentre
                 cc_is_caf  :: IsCafCC   -- see below
     }
 
-  | AllCafsCC {	
+  | AllCafsCC {
                 cc_mod  :: Module,      -- Name of module defining this CC.
                 cc_loc  :: SrcSpan
     }
@@ -79,10 +71,10 @@ data IsCafCC = NotCafCC | CafCC
 
 
 instance Eq CostCentre where
-	c1 == c2 = case c1 `cmpCostCentre` c2 of { EQ -> True; _ -> False }
+        c1 == c2 = case c1 `cmpCostCentre` c2 of { EQ -> True; _ -> False }
 
 instance Ord CostCentre where
-	compare = cmpCostCentre
+        compare = cmpCostCentre
 
 cmpCostCentre :: CostCentre -> CostCentre -> Ordering
 
@@ -96,8 +88,8 @@ cmpCostCentre NormalCC {cc_key = n1, cc_mod =  m1}
 
 cmpCostCentre other_1 other_2
   = let
-	!tag1 = tag_CC other_1
-	!tag2 = tag_CC other_2
+        !tag1 = tag_CC other_1
+        !tag2 = tag_CC other_2
     in
     if tag1 <# tag2 then LT else GT
   where
@@ -143,7 +135,7 @@ mkAutoCC id mod is_caf
                cc_loc = nameSrcSpan (getName id),
                cc_is_caf = is_caf
     }
-  where 
+  where
         name = getName id
         -- beware: only external names are guaranteed to have unique
         -- Occnames.  If the name is not external, we must append its
@@ -161,28 +153,28 @@ mkAllCafsCC m loc = AllCafsCC { cc_mod = m, cc_loc = loc }
 
 -- | A Cost Centre Stack is something that can be attached to a closure.
 -- This is either:
--- 	
+--
 --      * the current cost centre stack (CCCS)
 --      * a pre-defined cost centre stack (there are several
--- 	  pre-defined CCSs, see below).
+--        pre-defined CCSs, see below).
 
 data CostCentreStack
   = NoCCS
 
-  | CurrentCCS		-- Pinned on a let(rec)-bound 
-			-- thunk/function/constructor, this says that the 
-			-- cost centre to be attached to the object, when it 
-			-- is allocated, is whatever is in the 
-			-- current-cost-centre-stack register.
+  | CurrentCCS          -- Pinned on a let(rec)-bound
+                        -- thunk/function/constructor, this says that the
+                        -- cost centre to be attached to the object, when it
+                        -- is allocated, is whatever is in the
+                        -- current-cost-centre-stack register.
 
   | DontCareCCS         -- We need a CCS to stick in static closures
-			-- (for data), but we *don't* expect them to
-			-- accumulate any costs.  But we still need
-			-- the placeholder.  This CCS is it.
+                        -- (for data), but we *don't* expect them to
+                        -- accumulate any costs.  But we still need
+                        -- the placeholder.  This CCS is it.
 
   | SingletonCCS CostCentre
 
-  deriving (Eq, Ord)	-- needed for Ord on CLabel
+  deriving (Eq, Ord)    -- needed for Ord on CLabel
 
 
 -- synonym for triple which describes the cost centre info in the generated
@@ -196,7 +188,7 @@ type CollectedCCs
 
 noCCS, currentCCS, dontCareCCS :: CostCentreStack
 
-noCCS 			= NoCCS
+noCCS                   = NoCCS
 currentCCS              = CurrentCCS
 dontCareCCS             = DontCareCCS
 
@@ -204,20 +196,20 @@ dontCareCCS             = DontCareCCS
 -- Predicates on Cost-Centre Stacks
 
 noCCSAttached :: CostCentreStack -> Bool
-noCCSAttached NoCCS			= True
-noCCSAttached _				= False
+noCCSAttached NoCCS                     = True
+noCCSAttached _                         = False
 
 isCurrentCCS :: CostCentreStack -> Bool
-isCurrentCCS CurrentCCS			= True
-isCurrentCCS _	      			= False
+isCurrentCCS CurrentCCS                 = True
+isCurrentCCS _                          = False
 
 isCafCCS :: CostCentreStack -> Bool
 isCafCCS (SingletonCCS cc)              = isCafCC cc
-isCafCCS _				= False
+isCafCCS _                              = False
 
 maybeSingletonCCS :: CostCentreStack -> Maybe CostCentre
 maybeSingletonCCS (SingletonCCS cc)     = Just cc
-maybeSingletonCCS _			= Nothing
+maybeSingletonCCS _                     = Nothing
 
 mkSingletonCCS :: CostCentre -> CostCentreStack
 mkSingletonCCS cc = SingletonCCS cc
@@ -230,31 +222,31 @@ mkSingletonCCS cc = SingletonCCS cc
 -- expression.
 
 instance Outputable CostCentreStack where
-  ppr NoCCS		= ptext (sLit "NO_CCS")
-  ppr CurrentCCS	= ptext (sLit "CCCS")
+  ppr NoCCS             = ptext (sLit "NO_CCS")
+  ppr CurrentCCS        = ptext (sLit "CCCS")
   ppr DontCareCCS       = ptext (sLit "CCS_DONT_CARE")
   ppr (SingletonCCS cc) = ppr cc <> ptext (sLit "_ccs")
 
 
 -----------------------------------------------------------------------------
 -- Printing Cost Centres
--- 
+--
 -- There are several different ways in which we might want to print a
 -- cost centre:
--- 
--- 	- the name of the cost centre, for profiling output (a C string)
--- 	- the label, i.e. C label for cost centre in .hc file.
--- 	- the debugging name, for output in -ddump things
--- 	- the interface name, for printing in _scc_ exprs in iface files.
--- 
+--
+--      - the name of the cost centre, for profiling output (a C string)
+--      - the label, i.e. C label for cost centre in .hc file.
+--      - the debugging name, for output in -ddump things
+--      - the interface name, for printing in _scc_ exprs in iface files.
+--
 -- The last 3 are derived from costCentreStr below.  The first is given
 -- by costCentreName.
 
 instance Outputable CostCentre where
   ppr cc = getPprStyle $ \ sty ->
-	   if codeStyle sty
-  	   then ppCostCentreLbl cc
-	   else text (costCentreUserName cc)
+           if codeStyle sty
+           then ppCostCentreLbl cc
+           else text (costCentreUserName cc)
 
 -- Printing in Core
 pprCostCentreCore :: CostCentre -> SDoc
@@ -281,7 +273,7 @@ ppCostCentreLbl (NormalCC {cc_key = k, cc_name = n, cc_mod = m,
   = ppr m <> char '_' <> ztext (zEncodeFS n) <> char '_' <>
         case is_caf of { CafCC -> ptext (sLit "CAF"); _ -> ppr (mkUniqueGrimily k)} <> text "_cc"
 
--- This is the name to go in the user-displayed string, 
+-- This is the name to go in the user-displayed string,
 -- recorded in the cost centre declaration
 costCentreUserName :: CostCentre -> String
 costCentreUserName = unpackFS . costCentreUserNameFS

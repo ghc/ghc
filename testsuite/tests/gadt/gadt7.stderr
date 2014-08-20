@@ -11,6 +11,7 @@ gadt7.hs:16:38:
            the inferred type of i1b :: T t2 -> t1 -> t at gadt7.hs:16:1
       ‘t’ is a rigid type variable bound by
           the inferred type of i1b :: T t2 -> t1 -> t at gadt7.hs:16:1
+    Possible fix: add a type signature for ‘i1b’
     Relevant bindings include
       y1 :: t1 (bound at gadt7.hs:16:16)
       y :: t1 (bound at gadt7.hs:16:7)

@@ -1,28 +1,20 @@
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
+{-# LANGUAGE CPP #-}
 -- | Hard wired things related to registers.
---	This is module is preventing the native code generator being able to 
---	emit code for non-host architectures.
+--      This is module is preventing the native code generator being able to
+--      emit code for non-host architectures.
 --
---	TODO: Do a better job of the overloading, and eliminate this module.
---	We'd probably do better with a Register type class, and hook this to 
---	Instruction somehow.
+--      TODO: Do a better job of the overloading, and eliminate this module.
+--      We'd probably do better with a Register type class, and hook this to
+--      Instruction somehow.
 --
---	TODO: We should also make arch specific versions of RegAlloc.Graph.TrivColorable
-
+--      TODO: We should also make arch specific versions of RegAlloc.Graph.TrivColorable
 module TargetReg (
-	targetVirtualRegSqueeze,
-	targetRealRegSqueeze,
-	targetClassOfRealReg,
-	targetMkVirtualReg,
-	targetRegDotColor,
-	targetClassOfReg
+        targetVirtualRegSqueeze,
+        targetRealRegSqueeze,
+        targetClassOfRealReg,
+        targetMkVirtualReg,
+        targetRegDotColor,
+        targetClassOfReg
 )
 
 where
@@ -54,6 +46,7 @@ targetVirtualRegSqueeze platform
       ArchSPARC     -> SPARC.virtualRegSqueeze
       ArchPPC_64    -> panic "targetVirtualRegSqueeze ArchPPC_64"
       ArchARM _ _ _ -> panic "targetVirtualRegSqueeze ArchARM"
+      ArchARM64     -> panic "targetVirtualRegSqueeze ArchARM64"
       ArchAlpha     -> panic "targetVirtualRegSqueeze ArchAlpha"
       ArchMipseb    -> panic "targetVirtualRegSqueeze ArchMipseb"
       ArchMipsel    -> panic "targetVirtualRegSqueeze ArchMipsel"
@@ -70,6 +63,7 @@ targetRealRegSqueeze platform
       ArchSPARC     -> SPARC.realRegSqueeze
       ArchPPC_64    -> panic "targetRealRegSqueeze ArchPPC_64"
       ArchARM _ _ _ -> panic "targetRealRegSqueeze ArchARM"
+      ArchARM64     -> panic "targetRealRegSqueeze ArchARM64"
       ArchAlpha     -> panic "targetRealRegSqueeze ArchAlpha"
       ArchMipseb    -> panic "targetRealRegSqueeze ArchMipseb"
       ArchMipsel    -> panic "targetRealRegSqueeze ArchMipsel"
@@ -85,6 +79,7 @@ targetClassOfRealReg platform
       ArchSPARC     -> SPARC.classOfRealReg
       ArchPPC_64    -> panic "targetClassOfRealReg ArchPPC_64"
       ArchARM _ _ _ -> panic "targetClassOfRealReg ArchARM"
+      ArchARM64     -> panic "targetClassOfRealReg ArchARM64"
       ArchAlpha     -> panic "targetClassOfRealReg ArchAlpha"
       ArchMipseb    -> panic "targetClassOfRealReg ArchMipseb"
       ArchMipsel    -> panic "targetClassOfRealReg ArchMipsel"
@@ -100,6 +95,7 @@ targetMkVirtualReg platform
       ArchSPARC     -> SPARC.mkVirtualReg
       ArchPPC_64    -> panic "targetMkVirtualReg ArchPPC_64"
       ArchARM _ _ _ -> panic "targetMkVirtualReg ArchARM"
+      ArchARM64     -> panic "targetMkVirtualReg ArchARM64"
       ArchAlpha     -> panic "targetMkVirtualReg ArchAlpha"
       ArchMipseb    -> panic "targetMkVirtualReg ArchMipseb"
       ArchMipsel    -> panic "targetMkVirtualReg ArchMipsel"
@@ -115,6 +111,7 @@ targetRegDotColor platform
       ArchSPARC     -> SPARC.regDotColor
       ArchPPC_64    -> panic "targetRegDotColor ArchPPC_64"
       ArchARM _ _ _ -> panic "targetRegDotColor ArchARM"
+      ArchARM64     -> panic "targetRegDotColor ArchARM64"
       ArchAlpha     -> panic "targetRegDotColor ArchAlpha"
       ArchMipseb    -> panic "targetRegDotColor ArchMipseb"
       ArchMipsel    -> panic "targetRegDotColor ArchMipsel"
@@ -127,5 +124,3 @@ targetClassOfReg platform reg
  = case reg of
    RegVirtual vr -> classOfVirtualReg vr
    RegReal rr -> targetClassOfRealReg platform rr
-
-

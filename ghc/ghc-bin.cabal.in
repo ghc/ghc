@@ -16,7 +16,7 @@ Category: XXX
 Data-Dir: ..
 Data-Files: settings
 Build-Type: Simple
-Cabal-Version: >= 1.2
+Cabal-Version: >=1.10
 
 Flag ghci
     Description: Build GHCi support.
@@ -24,6 +24,8 @@ Flag ghci
     Manual: True
 
 Executable ghc
+    Default-Language: Haskell2010
+
     Main-Is: Main.hs
     Build-Depends: base       >= 3   && < 5,
                    array      >= 0.1 && < 0.6,
@@ -43,12 +45,17 @@ Executable ghc
     if flag(ghci)
         CPP-Options: -DGHCI
         GHC-Options: -fno-warn-name-shadowing
-        Other-Modules: InteractiveUI, GhciMonad, GhciTags
+        Other-Modules:
+            InteractiveUI
+            GhciMonad
+            GhciTags
         Build-Depends: transformers, haskeline
-        Extensions: ForeignFunctionInterface,
-                    UnboxedTuples,
-                    FlexibleInstances,
-                    TupleSections,
-                    MagicHash
+        Other-Extensions:
+            FlexibleInstances
+            MagicHash
+            TupleSections
+            UnboxedTuples
 
-    Extensions: CPP, PatternGuards, NondecreasingIndentation
+    Other-Extensions:
+        CPP
+        NondecreasingIndentation

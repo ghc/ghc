@@ -3,6 +3,8 @@
 % (c) University of Glasgow, 2007
 %
 \begin{code}
+{-# LANGUAGE NondecreasingIndentation #-}
+
 module Coverage (addTicksToBinds, hpcInitCode) where
 
 import Type
@@ -117,7 +119,7 @@ guessSourceFile :: LHsBinds Id -> FilePath -> FilePath
 guessSourceFile binds orig_file =
      -- Try look for a file generated from a .hsc file to a
      -- .hs file, by peeking ahead.
-     let top_pos = catMaybes $ foldrBag (\ (_, (L pos _)) rest ->
+     let top_pos = catMaybes $ foldrBag (\ (L pos _) rest ->
                                  srcSpanFileName_maybe pos : rest) [] binds
      in
      case top_pos of
@@ -152,8 +154,8 @@ writeMixEntries dflags mod count entries filename
             mod_name = moduleNameString (moduleName mod)
 
             hpc_mod_dir
-              | modulePackageId mod == mainPackageId  = hpc_dir
-              | otherwise = hpc_dir ++ "/" ++ packageIdString (modulePackageId mod)
+              | modulePackageKey mod == mainPackageKey  = hpc_dir
+              | otherwise = hpc_dir ++ "/" ++ packageKeyString (modulePackageKey mod)
 
             tabStop = 8 -- <tab> counts as a normal char in GHC's location ranges.
 
@@ -229,11 +231,7 @@ shouldTickPatBind density top_lev
 -- Adding ticks to bindings
 
 addTickLHsBinds :: LHsBinds Id -> TM (LHsBinds Id)
-addTickLHsBinds binds = mapBagM addTick binds
-  where
-    addTick (origin, bind) = do
-        bind' <- addTickLHsBind bind
-        return (origin, bind')
+addTickLHsBinds = mapBagM addTickLHsBind
 
 addTickLHsBind :: LHsBind Id -> TM (LHsBind Id)
 addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
@@ -1235,9 +1233,9 @@ hpcInitCode this_mod (HpcInfo tickCount hashNo)
     module_name  = hcat (map (text.charToC) $
                          bytesFS (moduleNameFS (Module.moduleName this_mod)))
     package_name = hcat (map (text.charToC) $
-                         bytesFS (packageIdFS  (modulePackageId this_mod)))
+                         bytesFS (packageKeyFS  (modulePackageKey this_mod)))
     full_name_str
-       | modulePackageId this_mod == mainPackageId
+       | modulePackageKey this_mod == mainPackageKey
        = module_name
        | otherwise
        = package_name <> char '/' <> module_name

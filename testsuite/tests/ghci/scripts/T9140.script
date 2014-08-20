@@ -1,0 +1,5 @@
+:set -XUnboxedTuples -XBangPatterns
+let a = (# 1 #)
+let a = (# 1, 3 #)
+:set -XBangPatterns
+let !a = (# 1, 3 #)

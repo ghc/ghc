@@ -13,6 +13,7 @@ instance Num T where
     (*)    = error "urk"
     abs    = error "urk"
     signum = error "urk"
+    negate = error "urk"
 
 -- Typing 3 at the ghci prompt should print T
 

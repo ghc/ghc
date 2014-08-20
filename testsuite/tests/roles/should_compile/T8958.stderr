@@ -1,0 +1,40 @@
+
+T8958.hs:1:31: Warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+TYPE SIGNATURES
+TYPE CONSTRUCTORS
+  type role Map nominal representational
+  newtype (Nominal k, Representational v) => Map k v = MkMap [(k, v)]
+    Promotable
+  class Nominal a
+  type role Representational representational
+  class Representational a
+COERCION AXIOMS
+  axiom T8958.NTCo:Map :: Map k v = [(k, v)]
+INSTANCES
+  instance [incoherent] Nominal a -- Defined at T8958.hs:7:10
+  instance [incoherent] Representational a
+    -- Defined at T8958.hs:10:10
+Dependent modules: []
+Dependent packages: [base, ghc-prim, integer-gmp]
+
+==================== Typechecker ====================
+AbsBinds [a] []
+  {Exports: [T8958.$fRepresentationala <= $dRepresentational
+               <>]
+   Exported types: T8958.$fRepresentationala [InlPrag=[ALWAYS] CONLIKE]
+                     :: forall a. Representational a
+                   [LclIdX[DFunId],
+                    Str=DmdType,
+                    Unf=DFun: \ (@ a) -> T8958.D:Representational TYPE a]
+   Binds: $dRepresentational = T8958.D:Representational}
+AbsBinds [a] []
+  {Exports: [T8958.$fNominala <= $dNominal
+               <>]
+   Exported types: T8958.$fNominala [InlPrag=[ALWAYS] CONLIKE]
+                     :: forall a. Nominal a
+                   [LclIdX[DFunId],
+                    Str=DmdType,
+                    Unf=DFun: \ (@ a) -> T8958.D:Nominal TYPE a]
+   Binds: $dNominal = T8958.D:Nominal}
+

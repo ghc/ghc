@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -----------------------------------------------------------------------------
 --
 -- Pretty-printing assembly language
@@ -519,6 +521,9 @@ pprInstr (RELOAD slot reg)
 pprInstr (MOV size src dst)
   = pprSizeOpOp (sLit "mov") size src dst
 
+pprInstr (CMOV cc size src dst)
+  = pprCondOpReg (sLit "cmov") size cc src dst
+
 pprInstr (MOVZxL II32 src dst) = pprSizeOpOp (sLit "mov") II32 src dst
         -- 32-to-64 bit zero extension on x86_64 is accomplished by a simple
         -- movl.  But we represent it as a MOVZxL instruction, because
@@ -561,6 +566,9 @@ pprInstr (ADC size src dst)
 pprInstr (SUB size src dst) = pprSizeOpOp (sLit "sub") size src dst
 pprInstr (IMUL size op1 op2) = pprSizeOpOp (sLit "imul") size op1 op2
 
+pprInstr (ADD_CC size src dst)
+  = pprSizeOpOp (sLit "add") size src dst
+
 {- A hack.  The Intel documentation says that "The two and three
    operand forms [of IMUL] may also be used with unsigned operands
    because the lower half of the product is the same regardless if
@@ -576,6 +584,8 @@ pprInstr (XOR FF64 src dst) = pprOpOp (sLit "xorpd") FF64 src dst
 pprInstr (XOR size src dst) = pprSizeOpOp (sLit "xor")  size src dst
 
 pprInstr (POPCNT size src dst) = pprOpOp (sLit "popcnt") size src (OpReg dst)
+pprInstr (BSF size src dst)    = pprOpOp (sLit "bsf")    size src (OpReg dst)
+pprInstr (BSR size src dst)    = pprOpOp (sLit "bsr")    size src (OpReg dst)
 
 pprInstr (PREFETCH NTA size src ) =  pprSizeOp_ (sLit "prefetchnta") size src
 pprInstr (PREFETCH Lvl0 size src) = pprSizeOp_ (sLit "prefetcht0") size src
@@ -884,6 +894,16 @@ pprInstr GFREE
             ptext (sLit "\tffree %st(4) ;ffree %st(5)")
           ]
 
+-- Atomics
+
+pprInstr (LOCK i) = ptext (sLit "\tlock") $$ pprInstr i
+
+pprInstr MFENCE = ptext (sLit "\tmfence")
+
+pprInstr (XADD size src dst) = pprSizeOpOp (sLit "xadd") size src dst
+
+pprInstr (CMPXCHG size src dst) = pprSizeOpOp (sLit "cmpxchg") size src dst
+
 pprInstr _
         = panic "X86.Ppr.pprInstr: no match"
 
@@ -1102,6 +1122,18 @@ pprSizeOpReg name size op1 reg2
         pprOperand size op1,
         comma,
         pprReg (archWordSize (target32Bit platform)) reg2
+    ]
+
+pprCondOpReg :: LitString -> Size -> Cond -> Operand -> Reg -> SDoc
+pprCondOpReg name size cond op1 reg2
+  = hcat [
+        char '\t',
+        ptext name,
+        pprCond cond,
+        space,
+        pprOperand size op1,
+        comma,
+        pprReg size reg2
     ]
 
 pprCondRegReg :: LitString -> Size -> Cond -> Reg -> Reg -> SDoc

@@ -11,7 +11,7 @@ class C a b where
   c4 :: a1 -> b
 c1 :: (C a b, N b) => a -> b
 c2 :: (C a b, N b, S b) => a -> b
-c3 :: C a b => forall a1. a1 -> b
+c3 :: C a b => forall a. a -> b
 c4 :: C a b => forall a1. a1 -> b
 -- imported via Control.Monad
 class Monad m => MonadPlus (m :: * -> *) where
@@ -69,7 +69,7 @@ class C a b where
   c4 :: a1 -> b
 c1 :: (C a b, N b) => a -> b
 c2 :: (C a b, N b, S b) => a -> b
-c3 :: C a b => forall a1. a1 -> b
+c3 :: C a b => forall a. a -> b
 c4 :: C a b => forall a1. a1 -> b
 :browse! T -- with -fprint-explicit-foralls
 -- defined locally
@@ -83,7 +83,7 @@ class C a b where
   c4 :: forall a1. a1 -> b
 c1 :: forall a b. (C a b, N b) => a -> b
 c2 :: forall a b. (C a b, N b, S b) => a -> b
-c3 :: forall a b. C a b => forall a1. a1 -> b
+c3 :: forall a b. C a b => forall a. a -> b
 c4 :: forall a b. C a b => forall a1. a1 -> b
 -- test :browse! <target> relative to different contexts
 :browse! Ghci025C -- from *Ghci025C>

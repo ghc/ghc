@@ -146,7 +146,7 @@
           <emphasis>must</emphasis> be re-compiled.</para>
 
 	  <para>A useful option to alert you when interfaces change is
-          <option>-hi-diffs</option><indexterm><primary>-hi-diffs
+          <option>-ddump-hi-diffs</option><indexterm><primary>-ddump-hi-diffs
           option</primary></indexterm>.  It will run
           <command>diff</command> on the changed interface file,
           before and after, when applicable.</para>
@@ -167,7 +167,7 @@
 
 <screen>
 % rm *.o        # scrub your object files
-% make my_prog  # re-make your program; use -hi-diffs to highlight changes;
+% make my_prog  # re-make your program; use -ddump-hi-diffs to highlight changes;
                 # as mentioned above, use -dcore-lint to be more paranoid
 % ./my_prog ... # retry...
 </screen>

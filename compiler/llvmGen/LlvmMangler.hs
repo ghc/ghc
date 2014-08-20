@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- -----------------------------------------------------------------------------
 -- | GHC LLVM Mangler
 --
@@ -56,13 +58,23 @@ llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-} do
     hClose w
     return ()
 
+-- | This rewrites @.type@ annotations of function symbols to @%object@.
+-- This is done as the linker can relocate @%functions@ through the
+-- Procedure Linking Table (PLT). This is bad since we expect that the
+-- info table will appear directly before the symbol's location. In the
+-- case that the PLT is used, this will be not an info table but instead
+-- some random PLT garbage.
 rewriteSymType :: B.ByteString -> B.ByteString
 rewriteSymType s =
-    foldl (\s' (typeFunc,typeObj)->replace typeFunc typeObj s') s types
+    B.unlines $ map (rewrite '@' . rewrite '%') $ B.lines s
   where
-    types = [ (B.pack "@function", B.pack "@object")
-            , (B.pack "%function", B.pack "%object")
-            ]
+    rewrite :: Char -> B.ByteString -> B.ByteString
+    rewrite prefix x
+        | isType x = replace funcType objType x
+        | otherwise = x
+      where
+        funcType = prefix `B.cons` B.pack "function"
+        objType  = prefix `B.cons` B.pack "object"
 
 -- | Splits the file contents into its sections
 readSections :: Handle -> Handle -> IO [Section]

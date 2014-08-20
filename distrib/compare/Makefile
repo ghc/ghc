@@ -2,7 +2,7 @@
 GHC = ghc
 
 compare: *.hs
-	"$(GHC)" -O --make -Wall -Werror $@
+	"$(GHC)" -O -XHaskell2010 --make -Wall -Werror $@
 
 .PHONY: clean
 clean:

@@ -30,10 +30,10 @@ default : all
 
 # For help, type 'make help'
 .PHONY: help
-help :
+help:
 	@cat MAKEHELP
 
-ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$(filter maintainer-clean distclean clean help,$(MAKECMDGOALS))" ""
 -include mk/config.mk
 else
 include mk/config.mk
@@ -43,6 +43,13 @@ endif
 endif
 
 include mk/custom-settings.mk
+
+# Verify that stage 0 LLVM backend isn't affected by Bug #9439 if needed
+ifeq "$(GHC_LLVM_AFFECTED_BY_9439)" "1"
+ifneq "$(findstring -fllvm,$(GhcHcOpts) $(GhcStage1HcOpts))" ""
+$(error Stage 0 compiler is affected by Bug #9439. Refusing to bootstrap with -fllvm)
+endif
+endif
 
 # No need to update makefiles for these targets:
 REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show echo help test fulltest,$(MAKECMDGOALS))

@@ -1,5 +1,7 @@
-{- BlockId module should probably go away completely, being superseded by Label -}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
+{- BlockId module should probably go away completely, being superseded by Label -}
 module BlockId
   ( BlockId, mkBlockId -- ToDo: BlockId should be abstract, but it isn't yet
   , BlockSet, BlockEnv

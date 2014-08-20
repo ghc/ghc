@@ -1,4 +1,6 @@
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcInteract (
      solveInteractGiven,  -- Solves [EvVar],GivenLoc
      solveInteract,       -- Solves Cts
@@ -101,6 +103,7 @@ solveInteractGiven loc old_fsks givens
                                                      , ctev_loc = loc }
                           | ev_id <- givens ]
 
+    -- See Note [Given flatten-skolems] in TcSMonad
     fsk_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_evtm = EvCoercion (mkTcNomReflCo tv_ty)
                                                    , ctev_pred = pred
                                                    , ctev_loc = loc }
@@ -750,12 +753,16 @@ kickOutRewritable :: CtEvidence   -- Flavour of the equality that is
                   -> InertCans
                   -> TcS (Int, InertCans)
 kickOutRewritable new_ev new_tv
-                  (IC { inert_eqs = tv_eqs
-                      , inert_dicts  = dictmap
-                      , inert_funeqs = funeqmap
-                      , inert_irreds = irreds
-                      , inert_insols = insols
-                      , inert_no_eqs = no_eqs })
+                  inert_cans@(IC { inert_eqs = tv_eqs
+                                 , inert_dicts  = dictmap
+                                 , inert_funeqs = funeqmap
+                                 , inert_irreds = irreds
+                                 , inert_insols = insols
+                                 , inert_no_eqs = no_eqs })
+  | new_tv `elemVarEnv` tv_eqs   -- Fast path: there is at least one equality for tv
+                                 -- so kick-out will do nothing
+  = return (0, inert_cans)
+  | otherwise
   = do { traceTcS "kickOutRewritable" $
             vcat [ text "tv = " <+> ppr new_tv
                  , ptext (sLit "Kicked out =") <+> ppr kicked_out]
@@ -1478,7 +1485,9 @@ doTopReactDict inerts fl cls xis
        = do { instEnvs <- getInstEnvs
             ; let fd_eqns = improveFromInstEnv instEnvs pred
             ; fd_work <- rewriteWithFunDeps fd_eqns loc
-            ; unless (null fd_work) (updWorkListTcS (extendWorkListEqs fd_work))
+            ; unless (null fd_work) $
+              do { traceTcS "Addig FD work" (ppr pred $$ vcat (map pprEquation fd_eqns) $$ ppr fd_work)
+                 ; updWorkListTcS (extendWorkListEqs fd_work) }
             ; return NoTopInt }
 
 --------------------
@@ -1830,7 +1839,7 @@ matchClassInst _ clas [ ty ] _
 
 matchClassInst _ clas [ _k, ty1, ty2 ] loc
   | clas == coercibleClass =  do
-      traceTcS "matchClassInst for" $ ppr clas <+> ppr ty1 <+> ppr ty2 <+> text "at depth" <+> ppr (ctLocDepth loc)
+      traceTcS "matchClassInst for" $ quotes (pprClassPred clas [ty1,ty2]) <+> text "at depth" <+> ppr (ctLocDepth loc)
       ev <- getCoercibleInst loc ty1 ty2
       traceTcS "matchClassInst returned" $ ppr ev
       return ev
@@ -1926,6 +1935,8 @@ getCoercibleInst loc ty1 ty2 = do
   where
   go :: FamInstEnvs -> GlobalRdrEnv -> TcS LookupInstResult
   go famenv rdr_env
+    -- Also see [Order of Coercible Instances]
+
     -- Coercible a a                             (see case 1 in [Coercible Instances])
     | ty1 `tcEqType` ty2
     = do return $ GenInst []
@@ -1941,7 +1952,31 @@ getCoercibleInst loc ty1 ty2 = do
        ev_term <- deferTcSForAllEq Representational loc (tvs1,body1) (tvs2,body2)
        return $ GenInst [] ev_term
 
-    -- Coercible (D ty1 ty2) (D ty1' ty2')       (see case 3 in [Coercible Instances])
+    -- Coercible NT a                            (see case 3 in [Coercible Instances])
+    | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
+      Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
+      dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
+    = do markDataConsAsUsed rdr_env tc
+         ct_ev <- requestCoercible loc concTy ty2
+         local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred concTy ty2
+         let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
+             tcCo = TcLetCo binds $
+                            coercionToTcCoercion ntCo `mkTcTransCo` mkTcCoVarCo local_var
+         return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
+
+    -- Coercible a NT                            (see case 3 in [Coercible Instances])
+    | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
+      Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
+      dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
+    = do markDataConsAsUsed rdr_env tc
+         ct_ev <- requestCoercible loc ty1 concTy
+         local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred ty1 concTy
+         let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
+             tcCo = TcLetCo binds $
+                            mkTcCoVarCo local_var `mkTcTransCo` mkTcSymCo (coercionToTcCoercion ntCo)
+         return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
+
+    -- Coercible (D ty1 ty2) (D ty1' ty2')       (see case 4 in [Coercible Instances])
     | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
       Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
       tc1 == tc2,
@@ -1971,30 +2006,6 @@ getCoercibleInst loc ty1 ty2 = do
              binds = EvBinds (listToBag (catMaybes arg_binds))
              tcCo = TcLetCo binds (mkTcTyConAppCo Representational tc1 arg_cos)
          return $ GenInst (catMaybes arg_new) (EvCoercion tcCo)
-
-    -- Coercible NT a                            (see case 4 in [Coercible Instances])
-    | Just (tc,tyArgs) <- splitTyConApp_maybe ty1,
-      Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
-      dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
-    = do markDataConsAsUsed rdr_env tc
-         ct_ev <- requestCoercible loc concTy ty2
-         local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred concTy ty2
-         let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
-             tcCo = TcLetCo binds $
-                            coercionToTcCoercion ntCo `mkTcTransCo` mkTcCoVarCo local_var
-         return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
-
-    -- Coercible a NT                            (see case 4 in [Coercible Instances])
-    | Just (tc,tyArgs) <- splitTyConApp_maybe ty2,
-      Just (concTy, ntCo) <- instNewTyConTF_maybe famenv tc tyArgs,
-      dataConsInScope rdr_env tc -- Do not look at all tyConsOfTyCon
-    = do markDataConsAsUsed rdr_env tc
-         ct_ev <- requestCoercible loc ty1 concTy
-         local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred ty1 concTy
-         let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
-             tcCo = TcLetCo binds $
-                            mkTcCoVarCo local_var `mkTcTransCo` mkTcSymCo (coercionToTcCoercion ntCo)
-         return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo)
 
     -- Cannot solve this one
     | otherwise
@@ -2035,7 +2046,7 @@ Note [Coercible Instances]
 The class Coercible is special: There are no regular instances, and the user
 cannot even define them (it is listed as an `abstractClass` in TcValidity).
 Instead, the type checker will create instances and their evidence out of thin
-air, in getCoercibleInst. The following “instances” are present:
+air, in getCoercibleInst. The following "instances" are present:
 
  1. instance Coercible a a
     for any type a at any kind k.
@@ -2044,8 +2055,22 @@ air, in getCoercibleInst. The following “instances” are present:
     (which would be illegal to write like that in the source code, but we have
     it nevertheless).
 
+ 3. instance Coercible r b => Coercible (NT t1 t2 ...) b
+    instance Coercible a r => Coercible a (NT t1 t2 ...)
+    for a newtype constructor NT (or data family instance that resolves to a
+    newtype) where
+     * r is the concrete type of NT, instantiated with the arguments t1 t2 ...
+     * the constructor of NT is in scope.
 
- 3. instance (Coercible t1_r t1'_r, Coercible t2_r t2_r',...) =>
+    The newtype TyCon can appear undersaturated, but only if it has
+    enough arguments to apply the newtype coercion (which is eta-reduced). Examples:
+      newtype NT a = NT (Either a Int)
+      Coercible (NT Int) (Either Int Int) -- ok
+      newtype NT2 a b = NT2 (b -> a)
+      newtype NT3 a b = NT3 (b -> a)
+      Coercible (NT2 Int) (NT3 Int) -- cannot be derived
+
+ 4. instance (Coercible t1_r t1'_r, Coercible t2_r t2_r',...) =>
        Coercible (C t1_r  t2_r  ... t1_p  t2_p  ... t1_n t2_n ...)
                  (C t1_r' t2_r' ... t1_p' t2_p' ... t1_n t2_n ...)
     for a type constructor C where
@@ -2056,27 +2081,13 @@ air, in getCoercibleInst. The following “instances” are present:
     The type constructor can be used undersaturated; then the Coercible
     instance is at a higher kind. This does not cause problems.
 
- 4. instance Coercible r b => Coercible (NT t1 t2 ...) b
-    instance Coercible a r => Coercible a (NT t1 t2 ...)
-    for a newtype constructor NT (or data family instance that resolves to a
-    newtype) where
-     * r is the concrete type of NT, instantiated with the arguments t1 t2 ...
-     * the constructor of NT are in scope.
-
-    Again, the newtype TyCon can appear undersaturated, but only if it has
-    enough arguments to apply the newtype coercion (which is eta-reduced). Examples:
-      newtype NT a = NT (Either a Int)
-      Coercible (NT Int) (Either Int Int) -- ok
-      newtype NT2 a b = NT2 (b -> a)
-      newtype NT3 a b = NT3 (b -> a)
-      Coercible (NT2 Int) (NT3 Int) -- cannot be derived
 
 The type checker generates evidence in the form of EvCoercion, but the
 TcCoercion therein has role Representational,  which are turned into Core
 coercions by dsEvTerm in DsBinds.
 
-The evidence for the first three instance is generated here by
-getCoercibleInst, for the second instance deferTcSForAllEq is used.
+The evidence for the second case is created by deferTcSForAllEq, for the other
+cases by getCoercibleInst.
 
 When the constraint cannot be solved, it is treated as any other unsolved
 constraint, i.e. it can turn up in an inferred type signature, or reported to
@@ -2085,6 +2096,33 @@ coercible_msg in TcErrors gives additional explanations of why GHC could not
 find a Coercible instance, so it duplicates some of the logic from
 getCoercibleInst (in negated form).
 
+Note [Order of Coercible Instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At first glance, the order of the various coercible instances doesn't matter, as
+incoherence is no issue here: We do not care how the evidence is constructed,
+as long as it is.
+
+But because of role annotations, the order *can* matter:
+
+  newtype T a = MkT [a]
+  type role T nominal
+
+  type family F a
+  type instance F Int = Bool
+
+Here T's declared role is more restrictive than its inferred role
+(representational) would be.  If MkT is not in scope, so that the
+newtype-unwrapping instance is not available, then this coercible
+instance would fail:
+  Coercible (T Bool) (T (F Int)
+But MkT was in scope, *and* if we used it before decomposing on T,
+we'd unwrap the newtype (on both sides) to get
+  Coercible Bool (F Int)
+whic succeeds.
+
+So our current decision is to apply case 3 (newtype-unwrapping) first,
+followed by decomposition (case 4).  This is strictly more powerful 
+if the newtype constructor is in scope.  See Trac #9117 for a discussion.
 
 Note [Instance and Given overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

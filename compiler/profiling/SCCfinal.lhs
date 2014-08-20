@@ -2,6 +2,8 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 -----------------------------------------------------------------------------
 -- Modify and collect code generation for final STG program
 

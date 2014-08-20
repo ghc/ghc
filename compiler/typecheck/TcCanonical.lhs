@@ -1,4 +1,6 @@
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcCanonical(
     canonicalize, emitWorkNC,
     StopOrContinue (..)
@@ -492,13 +494,21 @@ flatten f ctxt (FunTy ty1 ty2)
        ; return (mkFunTy xi1 xi2, mkTcFunCo Nominal co1 co2) }
 
 flatten f ctxt (TyConApp tc tys)
+
+  -- Expand type synonyms that mention type families 
+  -- on the RHS; see Note [Flattening synonyms]
+  | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys
+  , any isSynFamilyTyCon (tyConsOfType rhs)
+  = flatten f ctxt (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
+
   -- For * a normal data type application
-  --     * type synonym application  See Note [Flattening synonyms]
   --     * data family application
+  --     * type synonym application whose RHS does not mention type families
+  --             See Note [Flattening synonyms]
   -- we just recursively flatten the arguments.
   | not (isSynFamilyTyCon tc)
-    = do { (xis,cos) <- flattenMany f ctxt tys
-         ; return (mkTyConApp tc xis, mkTcTyConAppCo Nominal tc cos) }
+  = do { (xis,cos) <- flattenMany f ctxt tys
+       ; return (mkTyConApp tc xis, mkTcTyConAppCo Nominal tc cos) }
 
   -- Otherwise, it's a type function application, and we have to
   -- flatten it away as well, and generate a new given equality constraint
@@ -534,6 +544,9 @@ flatten _f ctxt ty@(ForAllTy {})
 
 Note [Flattening synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+Not expanding synonyms aggressively improves error messages, and
+keeps types smaller. But we need to take care.
+
 Suppose
    type T a = a -> a
 and we want to flatten the type (T (F a)).  Then we can safely flatten
@@ -541,12 +554,16 @@ the (F a) to a skolem, and return (T fsk).  We don't need to expand the
 synonym.  This works because TcTyConAppCo can deal with synonyms
 (unlike TyConAppCo), see Note [TcCoercions] in TcEvidence.
 
-Not expanding synonyms aggressively improves error messages.
+But (Trac #8979) for
+   type T a = (F a, a)    where F is a type function
+we must expand the synonym in (say) T Int, to expose the type function
+to the flattener.
+
 
 Note [Flattening under a forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Under a forall, we
-  (a) MUST apply the inert subsitution
+  (a) MUST apply the inert substitution
   (b) MUST NOT flatten type family applications
 Hence FMSubstOnly.
 
@@ -1169,6 +1186,9 @@ canEqTyVar2 dflags ev swapped tv1 xi2 co2
        ; case mb of
            Nothing     -> return ()
            Just new_ev -> emitInsoluble (mkNonCanonical new_ev)
+                          -- If we have a ~ [a], it is not canonical, and in particular
+                          -- we don't want to rewrite existing inerts with it, otherwise
+                          -- we'd risk divergence in the constraint solver
        ; return Stop }
   where
     xi1 = mkTyVarTy tv1
@@ -1245,7 +1265,7 @@ checkKind new_ev s1 k1 s2 k2   -- See Note [Equalities with incompatible kinds]
     do { traceTcS "canEqLeaf: incompatible kinds" (vcat [ppr k1, ppr k2])
 
          -- Create a derived kind-equality, and solve it
-       ; mw <- newDerived kind_co_loc (mkEqPred k1 k2)
+       ; mw <- newDerived kind_co_loc (mkTcEqPred k1 k2)
        ; case mw of
            Nothing  -> return ()
            Just kev -> emitWorkNC [kev]

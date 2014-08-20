@@ -1,0 +1,6 @@
+lookup :: Eq a => a -> [(a, b)] -> Maybe b
+undefined :: (forall a. a -> a) -> a :: (forall a1. a1 -> a1) -> a
+lookup ∷ Eq a ⇒ a → [(a, b)] → Maybe b
+undefined :: (forall a. a -> a) -> a ∷ (∀ a1. a1 → a1) → a
+lookup :: Eq a => a -> [(a, b)] -> Maybe b
+undefined :: (forall a. a -> a) -> a :: (forall a1. a1 -> a1) -> a

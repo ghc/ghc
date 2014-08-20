@@ -1,3 +1,5 @@
+{-# LANGUAGE MagicHash #-}
+
 -----------------------------------------------------------------------------
 --
 -- GHCi Interactive debugging commands 

@@ -28,11 +28,12 @@ rn.prog006:
 	rm -f pkg.conf
 	rm -f pwd pwd.exe pwd.exe.manifest pwd.hi pwd.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make pwd -v0
-	'$(TEST_HC)' $(TEST_HC_OPTS) --make -package-name test-1.0 B.C -fforce-recomp -v0 $(RM_PROG006_EXTRA_FLAGS)
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -this-package-key test-1.0 B.C -fforce-recomp -v0 $(RM_PROG006_EXTRA_FLAGS)
 	rm -f pkg.conf
 	echo "name: test" >>pkg.conf
 	echo "version: 1.0" >>pkg.conf
 	echo "id: test-XXX" >>pkg.conf
+	echo "key: test-1.0" >>pkg.conf
 	echo "import-dirs: `./pwd`" >>pkg.conf
 	echo "exposed-modules: B.C" >>pkg.conf
 	echo "[]" >$(LOCAL_PKGCONF)

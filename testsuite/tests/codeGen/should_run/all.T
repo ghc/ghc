@@ -48,9 +48,7 @@ test('cgrun047', normal, compile_and_run, [''])
 test('cgrun048', normal, compile_and_run, [''])
 test('cgrun049', normal, compile_and_run, ['-funbox-strict-fields'])
 test('cgrun050', normal, compile_and_run, [''])
-# Doesn't work with External Core due to datatype declaration with no constructors
-test('cgrun051', [expect_fail_for(['extcore','optextcore']), exit_code(1)],
-     compile_and_run, [''])
+test('cgrun051', [exit_code(1)], compile_and_run, [''])
 test('cgrun052', only_ways(['optasm']), compile_and_run, ['-funbox-strict-fields'])
 test('cgrun053', normal, compile_and_run, [''])
 test('cgrun054', normal, compile_and_run, [''])
@@ -121,3 +119,7 @@ test('StaticByteArraySize', normal, compile_and_run, ['-O2'])
 test('CopySmallArray', normal, compile_and_run, [''])
 test('CopySmallArrayStressTest', reqlib('random'), compile_and_run, [''])
 test('SizeOfSmallArray', normal, compile_and_run, [''])
+test('T9001', normal, compile_and_run, [''])
+test('T9013', omit_ways(['ghci']),  # ghci doesn't support unboxed tuples
+     compile_and_run, [''])
+test('T9340', normal, compile_and_run, [''])

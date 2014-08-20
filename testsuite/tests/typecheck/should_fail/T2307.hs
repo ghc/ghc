@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-              OverlappingInstances, UndecidableInstances,
+              UndecidableInstances,
 	      IncoherentInstances,
               FlexibleInstances #-}
 

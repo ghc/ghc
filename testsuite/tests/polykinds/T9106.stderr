@@ -1,0 +1,8 @@
+
+T9106.hs:13:10:
+    Illegal instance declaration for ‘FunctorN n f a (f fa)’
+      The liberal coverage condition fails in class ‘FunctorN’
+        for functional dependency: ‘n f a -> fa’
+      Reason: lhs types ‘n’, ‘f’, ‘a’
+        do not jointly determine rhs type ‘f fa’
+    In the instance declaration for ‘FunctorN n f a (f fa)’

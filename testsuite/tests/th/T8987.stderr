@@ -1,0 +1,5 @@
+
+T8987.hs:1:1:
+    Exception when trying to run compile-time code:
+      Prelude.undefined
+    Code: (>>) reportWarning ['1', undefined] return []

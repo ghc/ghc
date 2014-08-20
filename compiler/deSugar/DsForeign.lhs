@@ -6,6 +6,8 @@
 Desugaring foreign declarations (see also DsCCall).
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module DsForeign ( dsForeigns
                  , dsForeigns'
                  , dsFImport, dsCImport, dsFCall, dsPrimCall
@@ -222,9 +224,9 @@ dsFCall fn_id co fcall mDeclHeader = do
     dflags <- getDynFlags
     (fcall', cDoc) <-
               case fcall of
-              CCall (CCallSpec (StaticTarget cName mPackageId isFun) CApiConv safety) ->
+              CCall (CCallSpec (StaticTarget cName mPackageKey isFun) CApiConv safety) ->
                do wrapperName <- mkWrapperName "ghc_wrapper" (unpackFS cName)
-                  let fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId True) CApiConv safety)
+                  let fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageKey True) CApiConv safety)
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
                       includes = vcat [ text "#include <" <> ftext h <> text ">"

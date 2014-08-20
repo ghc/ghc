@@ -111,3 +111,8 @@ test('T7906', normal, compile_fail, [''])
 test('T7937', normal, compile_fail, [''])
 test('T7943', normal, compile_fail, [''])
 test('T8448', normal, compile_fail, [''])
+test('T9006',
+     extra_clean(['T9006a.hi', 'T9006a.o']),
+     multimod_compile_fail, ['T9006', '-v0'])
+test('T9156', normal, compile_fail, [''])
+test('T9177', normal, compile_fail, [''])

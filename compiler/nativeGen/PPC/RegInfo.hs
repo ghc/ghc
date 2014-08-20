@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -----------------------------------------------------------------------------
 --
 -- Machine-specific parts of the register allocator
@@ -5,20 +7,12 @@
 -- (c) The University of Glasgow 1996-2004
 --
 -----------------------------------------------------------------------------
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module PPC.RegInfo (
         JumpDest( DestBlockId ), getJumpDestBlockId,
-	canShortcut, 
-	shortcutJump, 
+        canShortcut,
+        shortcutJump,
 
-	shortcutStatics
+        shortcutStatics
 )
 
 where
@@ -68,14 +62,13 @@ shortcutStatic fn (CmmStaticLit (CmmLabelDiffOff lbl1 lbl2 off))
 shortcutStatic _ other_static
         = other_static
 
-shortBlockId 
-	:: (BlockId -> Maybe JumpDest)
-	-> BlockId
-	-> CLabel
+shortBlockId
+        :: (BlockId -> Maybe JumpDest)
+        -> BlockId
+        -> CLabel
 
 shortBlockId fn blockid =
    case fn blockid of
       Nothing -> mkAsmTempLabel uq
       Just (DestBlockId blockid')  -> shortBlockId fn blockid'
    where uq = getUnique blockid
-

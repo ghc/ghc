@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Vectorise.Utils.Base 
   ( voidType
   , newLocalVVar

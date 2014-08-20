@@ -4,6 +4,8 @@
 \section[CoreRules]{Transformation rules}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 -- | Functions for collecting together and applying rewrite rules to a module.
 -- The 'CoreRule' datatype itself is declared elsewhere.
 module Rules (

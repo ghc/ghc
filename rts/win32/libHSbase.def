@@ -40,5 +40,4 @@ EXPORTS
 
 	base_ControlziExceptionziBase_nonTermination_closure
 	base_ControlziExceptionziBase_nestedAtomically_closure
-
-
+	base_GHCziEventziThread_blockedOnBadFD_closure

@@ -255,6 +255,7 @@ initCapability( Capability *cap, nat i )
     cap->spark_stats.converted  = 0;
     cap->spark_stats.gcd        = 0;
     cap->spark_stats.fizzled    = 0;
+    cap->io_manager_control_wr_fd = -1;
 #endif
     cap->total_allocated        = 0;
 
@@ -273,6 +274,8 @@ initCapability( Capability *cap, nat i )
 	cap->mut_lists[g] = NULL;
     }
 
+    cap->weak_ptr_list_hd = NULL;
+    cap->weak_ptr_list_tl = NULL;
     cap->free_tvar_watch_queues = END_STM_WATCH_QUEUE;
     cap->free_invariant_check_queues = END_INVARIANT_CHECK_QUEUE;
     cap->free_trec_chunks = END_STM_CHUNK_LIST;
@@ -1073,3 +1076,21 @@ rtsBool checkSparkCountInvariant (void)
 
 }
 #endif
+
+void setIOManagerControlFd(nat cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
+#if defined(THREADED_RTS)
+    if (cap_no < n_capabilities) {
+        capabilities[cap_no]->io_manager_control_wr_fd = fd;
+    } else {
+        errorBelch("warning: setIOManagerControlFd called with illegal capability number.");
+    }
+#endif
+}
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

@@ -7,7 +7,8 @@
 			-----------------
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 
 module DmdAnal ( dmdAnalProgram ) where
 
@@ -114,7 +115,7 @@ dmdAnalStar :: AnalEnv
             -> Demand 	-- This one takes a *Demand*
             -> CoreExpr -> (BothDmdArg, CoreExpr)
 dmdAnalStar env dmd e 
-  | (cd, defer_and_use) <- toCleanDmd dmd
+  | (cd, defer_and_use) <- toCleanDmd dmd (exprType e)
   , (dmd_ty, e')        <- dmdAnal env cd e
   = (postProcessDmdTypeM defer_and_use dmd_ty, e')
 
@@ -593,9 +594,18 @@ dmdAnalRhs :: TopLevelFlag
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 dmdAnalRhs top_lvl rec_flag env id rhs
-  | Just fn <- unpackTrivial rhs   -- See Note [Trivial right-hand sides]
+  | Just fn <- unpackTrivial rhs   -- See Note [Demand analysis for trivial right-hand sides]
   , let fn_str = getStrictness env fn
-  = (fn_str, emptyDmdEnv, set_idStrictness env id fn_str, rhs)
+        fn_fv | isLocalId fn = unitVarEnv fn topDmd
+              | otherwise    = emptyDmdEnv
+        -- Note [Remember to demand the function itself]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        -- fn_fv: don't forget to produce a demand for fn itself
+        -- Lacking this caused Trac #9128
+        -- The demand is very conservative (topDmd), but that doesn't
+        -- matter; trivial bindings are usually inlined, so it only 
+        -- kicks in for top-level bindings and NOINLINE bindings
+  = (fn_str, fn_fv, set_idStrictness env id fn_str, rhs)
 
   | otherwise
   = (sig_ty, lazy_fv, id', mkLams bndrs' body')
@@ -638,7 +648,7 @@ dmdAnalRhs top_lvl rec_flag env id rhs
 unpackTrivial :: CoreExpr -> Maybe Id
 -- Returns (Just v) if the arg is really equal to v, modulo
 -- casts, type applications etc 
--- See Note [Trivial right-hand sides]
+-- See Note [Demand analysis for trivial right-hand sides]
 unpackTrivial (Var v)                 = Just v
 unpackTrivial (Cast e _)              = unpackTrivial e
 unpackTrivial (Lam v e) | isTyVar v   = unpackTrivial e
@@ -646,15 +656,23 @@ unpackTrivial (App e a) | isTypeArg a = unpackTrivial e
 unpackTrivial _                       = Nothing
 \end{code}
 
-Note [Trivial right-hand sides]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Demand analysis for trivial right-hand sides]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 	foo = plusInt |> co
 where plusInt is an arity-2 function with known strictness.  Clearly
 we want plusInt's strictness to propagate to foo!  But because it has
-no manifest lambdas, it won't do so automatically.  So we have a 
+no manifest lambdas, it won't do so automatically, and indeed 'co' might
+have type (Int->Int->Int) ~ T, so we *can't* eta-expand.  So we have a
 special case for right-hand sides that are "trivial", namely variables,
-casts, type applications, and the like. 
+casts, type applications, and the like.
+
+Note that this can mean that 'foo' has an arity that is smaller than that
+indicated by its demand info.  e.g. if co :: (Int->Int->Int) ~ T, then
+foo's arity will be zero (see Note [exprArity invariant] in CoreArity),
+but its demand signature will be that of plusInt. A small example is the
+test case of Trac #8963.
+
 
 Note [Product demands for function body]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

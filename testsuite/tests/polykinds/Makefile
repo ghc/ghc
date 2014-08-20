@@ -38,3 +38,9 @@ T8449:
 	$(RM) -f T8449.hi T8449.o T8449a.hi T8449a.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8449a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8449.hs
+
+T9263:
+	$(RM) -f T9263.hi T9263.o T9263a.hi T9263a.o T9263b.hi T9263b.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T9263b.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T9263a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T9263.hs

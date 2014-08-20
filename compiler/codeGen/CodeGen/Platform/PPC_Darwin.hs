@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 
 module CodeGen.Platform.PPC_Darwin where
 

@@ -3,7 +3,9 @@
 %
 
 \begin{code}
+{-# LANGUAGE CPP, FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module TcEnv(
         TyThing(..), TcTyThing(..), TcId,
 
@@ -16,8 +18,8 @@ module TcEnv(
         tcExtendGlobalEnv, tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
         tcExtendGlobalValEnv,
         tcLookupLocatedGlobal, tcLookupGlobal, 
-        tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
-        tcLookupConLike,
+        tcLookupField, tcLookupTyCon, tcLookupClass,
+        tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupInstance, tcLookupAxiom,
         
@@ -66,11 +68,13 @@ import TcIface
 import PrelNames
 import TysWiredIn
 import Id
+import IdInfo( IdDetails(VanillaId) )
 import Var
 import VarSet
 import RdrName
 import InstEnv
-import DataCon
+import DataCon ( DataCon )
+import PatSyn  ( PatSyn )
 import ConLike
 import TyCon
 import CoAxiom
@@ -156,6 +160,13 @@ tcLookupDataCon name = do
     case thing of
         AConLike (RealDataCon con) -> return con
         _                          -> wrongThingErr "data constructor" (AGlobal thing) name
+
+tcLookupPatSyn :: Name -> TcM PatSyn
+tcLookupPatSyn name = do
+    thing <- tcLookupGlobal name
+    case thing of
+        AConLike (PatSynCon ps) -> return ps
+        _                       -> wrongThingErr "pattern synonym" (AGlobal thing) name
 
 tcLookupConLike :: Name -> TcM ConLike
 tcLookupConLike name = do
@@ -801,7 +812,7 @@ mkStableIdFromString str sig_ty loc occ_wrapper = do
     name <- mkWrapperName "stable" str
     let occ = mkVarOccFS name :: OccName
         gnm = mkExternalName uniq mod (occ_wrapper occ) loc :: Name
-        id  = mkExportedLocalId gnm sig_ty :: Id
+        id  = mkExportedLocalId VanillaId gnm sig_ty :: Id
     return id
 
 mkStableIdFromName :: Name -> Type -> SrcSpan -> (OccName -> OccName) -> TcM TcId
@@ -816,7 +827,7 @@ mkWrapperName what nameBase
          thisMod <- getModule
          let -- Note [Generating fresh names for ccall wrapper]
              wrapperRef = nextWrapperNum dflags
-             pkg = packageIdString  (modulePackageId thisMod)
+             pkg = packageKeyString  (modulePackageKey thisMod)
              mod = moduleNameString (moduleName      thisMod)
          wrapperNum <- liftIO $ atomicModifyIORef wrapperRef $ \mod_env ->
              let num = lookupWithDefaultModuleEnv mod_env 0 thisMod
@@ -864,13 +875,16 @@ notFound name
                      ptext (sLit "is not in scope during type checking, but it passed the renamer"),
                      ptext (sLit "tcl_env of environment:") <+> ppr (tcl_env lcl_env)]
                        -- Take case: printing the whole gbl env can
-                       -- cause an infnite loop, in the case where we
+                       -- cause an infinite loop, in the case where we
                        -- are in the middle of a recursive TyCon/Class group;
                        -- so let's just not print it!  Getting a loop here is
                        -- very unhelpful, because it hides one compiler bug with another
        }
 
 wrongThingErr :: String -> TcTyThing -> Name -> TcM a
+-- It's important that this only calls pprTcTyThingCategory, which in 
+-- turn does not look at the details of the TcTyThing.
+-- See Note [Placeholder PatSyn kinds] in TcBinds
 wrongThingErr expected thing name
   = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+> 
                 ptext (sLit "used as a") <+> text expected)

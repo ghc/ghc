@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, EmptyDataDecls, FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances, OverlappingInstances, UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances, UndecidableInstances #-}
 
 module NonLinearLHS where
 

@@ -118,7 +118,7 @@ main = getArgs >>= \args ->
        do s <- getContents
           case parse s of
              Left err -> error ("parse error at " ++ (show err))
-             Right p_o_specs@(Info _ entries)
+             Right p_o_specs@(Info _ _)
                 -> seq (sanityTop p_o_specs) (
                    case head args of
 
@@ -187,9 +187,6 @@ main = getArgs >>= \args ->
                       "--make-haskell-source" 
                          -> putStr (gen_hs_source p_o_specs)
 
-                      "--make-ext-core-source"
-                         -> putStr (gen_ext_core_source entries)
-
                       "--make-latex-doc"
                          -> putStr (gen_latex_doc p_o_specs)
 
@@ -215,7 +212,6 @@ known_args
        "--primop-vector-tycons",
        "--make-haskell-wrappers",
        "--make-haskell-source",
-       "--make-ext-core-source",
        "--make-latex-doc"
      ]
 

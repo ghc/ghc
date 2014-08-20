@@ -151,7 +151,7 @@ readTix(void) {
     ws();
     
     lookup = lookupHashTable(moduleHash, (StgWord)tmpModule->modName);
-    if (tmpModule == NULL) {
+    if (lookup == NULL) {
         debugTrace(DEBUG_hpc,"readTix: new HpcModuleInfo for %s",
                    tmpModule->modName);
         insertHashTable(moduleHash, (StgWord)tmpModule->modName, tmpModule);
@@ -404,3 +404,11 @@ exitHpc(void) {
 HpcModuleInfo *hs_hpc_rootModule(void) {
   return modules;
 }
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

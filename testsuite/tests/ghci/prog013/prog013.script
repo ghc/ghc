@@ -1,0 +1,8 @@
+:set editor /bin/echo
+:l Good.hs
+:e
+:l Bad.hs
+:e
+:e ./Bad.hs
+:l Good.hs
+:e

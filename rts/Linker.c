@@ -47,6 +47,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <libgen.h>
 
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
@@ -157,6 +158,7 @@ ObjectCode *unloaded_objects = NULL; /* initially empty */
 /* Type of the initializer */
 typedef void (*init_t) (int argc, char **argv, char **env);
 
+static HsInt isAlreadyLoaded( pathchar *path );
 static HsInt loadOc( ObjectCode* oc );
 static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
                          char *archiveMemberName
@@ -858,6 +860,7 @@ typedef struct _RtsSymbolVal {
 #if !defined(mingw32_HOST_OS)
 #define RTS_USER_SIGNALS_SYMBOLS        \
    SymI_HasProto(setIOManagerControlFd) \
+   SymI_HasProto(setTimerManagerControlFd) \
    SymI_HasProto(setIOManagerWakeupFd)  \
    SymI_HasProto(ioManagerWakeup)       \
    SymI_HasProto(blockUserSignals)      \
@@ -1184,7 +1187,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_newBCOzh)                                       \
       SymI_HasProto(stg_newByteArrayzh)                                 \
       SymI_HasProto(stg_casIntArrayzh)                                  \
-      SymI_HasProto(stg_fetchAddIntArrayzh)                             \
       SymI_HasProto(stg_newMVarzh)                                      \
       SymI_HasProto(stg_newMutVarzh)                                    \
       SymI_HasProto(stg_newTVarzh)                                      \
@@ -1193,6 +1195,8 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_casMutVarzh)                                    \
       SymI_HasProto(stg_newPinnedByteArrayzh)                           \
       SymI_HasProto(stg_newAlignedPinnedByteArrayzh)                    \
+      SymI_HasProto(stg_shrinkMutableByteArrayzh)                       \
+      SymI_HasProto(stg_resizzeMutableByteArrayzh)                      \
       SymI_HasProto(newSpark)                                           \
       SymI_HasProto(performGC)                                          \
       SymI_HasProto(performMajorGC)                                     \
@@ -1589,6 +1593,8 @@ static regex_t re_realso;
 #ifdef THREADED_RTS
 static Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
 #endif
+#elif defined(OBJFORMAT_PEi386)
+void addDLLHandle(pathchar* dll_name, HINSTANCE instance);
 #endif
 
 void initLinker (void)
@@ -1686,6 +1692,7 @@ initLinker_ (int retain_cafs)
      */
     addDLL(WSTR("msvcrt"));
     addDLL(WSTR("kernel32"));
+    addDLLHandle(WSTR("*.exe"), GetModuleHandle(NULL));
 #endif
 
     IF_DEBUG(linker, debugBelch("initLinker: done\n"));
@@ -1749,6 +1756,16 @@ typedef
 
 /* A list thereof. */
 static IndirectAddr* indirects = NULL;
+
+/* Adds a DLL instance to the list of DLLs in which to search for symbols. */
+void addDLLHandle(pathchar* dll_name, HINSTANCE instance) {
+   OpenedDLL* o_dll;
+   o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLLHandle" );
+   o_dll->name     = dll_name ? pathdup(dll_name) : NULL;
+   o_dll->instance = instance;
+   o_dll->next     = opened_dlls;
+   opened_dlls     = o_dll;
+}
 
 #endif
 
@@ -1898,6 +1915,7 @@ addDLL( pathchar *dll_name )
             // success -- try to dlopen the first named file
             IF_DEBUG(linker, debugBelch("match%s\n",""));
             line[match[2].rm_eo] = '\0';
+            stgFree((void*)errmsg); // Free old message before creating new one
             errmsg = internal_dlopen(line+match[2].rm_so);
             break;
          }
@@ -1956,12 +1974,7 @@ addDLL( pathchar *dll_name )
    }
    stgFree(buf);
 
-   /* Add this DLL to the list of DLLs in which to search for symbols. */
-   o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLL" );
-   o_dll->name     = pathdup(dll_name);
-   o_dll->instance = instance;
-   o_dll->next     = opened_dlls;
-   opened_dlls     = o_dll;
+   addDLLHandle(dll_name, instance);
 
    return NULL;
 
@@ -2302,6 +2315,23 @@ mkOc( pathchar *path, char *image, int imageSize,
    return oc;
 }
 
+/* -----------------------------------------------------------------------------
+ * Check if an object or archive is already loaded.
+ *
+ * Returns: 1 if the path is already loaded, 0 otherwise.
+ */
+static HsInt
+isAlreadyLoaded( pathchar *path )
+{
+    ObjectCode *o;
+    for (o = objects; o; o = o->next) {
+       if (0 == pathcmp(o->fileName, path)) {
+           return 1; /* already loaded */
+       }
+    }
+    return 0; /* not loaded yet */
+}
+
 HsInt
 loadArchive( pathchar *path )
 {
@@ -2313,7 +2343,7 @@ loadArchive( pathchar *path )
     size_t thisFileNameSize;
     char *fileName;
     size_t fileNameSize;
-    int isObject, isGnuIndex;
+    int isObject, isGnuIndex, isThin;
     char tmp[20];
     char *gnuFileIndex;
     int gnuFileIndexSize;
@@ -2340,14 +2370,26 @@ loadArchive( pathchar *path )
 #endif
 #endif
 
+    initLinker();
+
     IF_DEBUG(linker, debugBelch("loadArchive: start\n"));
     IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%" PATH_FMT" '\n", path));
+
+    /* Check that we haven't already loaded this archive.
+       Ignore requests to load multiple times */
+    if (isAlreadyLoaded(path)) {
+        IF_DEBUG(linker,
+                 debugBelch("ignoring repeated load of %" PATH_FMT "\n", path));
+        return 1; /* success */
+    }
 
     gnuFileIndex = NULL;
     gnuFileIndexSize = 0;
 
     fileNameSize = 32;
     fileName = stgMallocBytes(fileNameSize, "loadArchive(fileName)");
+
+    isThin = 0;
 
     f = pathopen(path, WSTR("rb"));
     if (!f)
@@ -2375,53 +2417,58 @@ loadArchive( pathchar *path )
     n = fread ( tmp, 1, 8, f );
     if (n != 8)
         barf("loadArchive: Failed reading header from `%s'", path);
-    if (strncmp(tmp, "!<arch>\n", 8) != 0) {
-
+    if (strncmp(tmp, "!<arch>\n", 8) == 0) {}
+#if !defined(mingw32_HOST_OS)
+    /* See Note [thin archives on Windows] */
+    else if (strncmp(tmp, "!<thin>\n", 8) == 0) {
+        isThin = 1;
+    }
+#endif
 #if defined(darwin_HOST_OS)
-        /* Not a standard archive, look for a fat archive magic number: */
-        if (ntohl(*(uint32_t *)tmp) == FAT_MAGIC) {
-            nfat_arch = ntohl(*(uint32_t *)(tmp + 4));
-            IF_DEBUG(linker, debugBelch("loadArchive: found a fat archive containing %d architectures\n", nfat_arch));
-            nfat_offset = 0;
+    /* Not a standard archive, look for a fat archive magic number: */
+    else if (ntohl(*(uint32_t *)tmp) == FAT_MAGIC) {
+        nfat_arch = ntohl(*(uint32_t *)(tmp + 4));
+        IF_DEBUG(linker, debugBelch("loadArchive: found a fat archive containing %d architectures\n", nfat_arch));
+        nfat_offset = 0;
 
-            for (i = 0; i < (int)nfat_arch; i++) {
-                /* search for the right arch */
-                n = fread( tmp, 1, 20, f );
-                if (n != 8)
-                    barf("loadArchive: Failed reading arch from `%s'", path);
-                cputype = ntohl(*(uint32_t *)tmp);
-                cpusubtype = ntohl(*(uint32_t *)(tmp + 4));
+        for (i = 0; i < (int)nfat_arch; i++) {
+            /* search for the right arch */
+            n = fread( tmp, 1, 20, f );
+            if (n != 8)
+                barf("loadArchive: Failed reading arch from `%s'", path);
+            cputype = ntohl(*(uint32_t *)tmp);
+            cpusubtype = ntohl(*(uint32_t *)(tmp + 4));
 
-                if (cputype == mycputype && cpusubtype == mycpusubtype) {
-                    IF_DEBUG(linker, debugBelch("loadArchive: found my archive in a fat archive\n"));
-                    nfat_offset = ntohl(*(uint32_t *)(tmp + 8));
-                    break;
-                }
+            if (cputype == mycputype && cpusubtype == mycpusubtype) {
+                IF_DEBUG(linker, debugBelch("loadArchive: found my archive in a fat archive\n"));
+                nfat_offset = ntohl(*(uint32_t *)(tmp + 8));
+                break;
             }
+        }
 
-            if (nfat_offset == 0) {
-               barf ("loadArchive: searched %d architectures, but no host arch found", (int)nfat_arch);
-            }
-            else {
-                n = fseek( f, nfat_offset, SEEK_SET );
-                if (n != 0)
-                    barf("loadArchive: Failed to seek to arch in `%s'", path);
-                n = fread ( tmp, 1, 8, f );
-                if (n != 8)
-                    barf("loadArchive: Failed reading header from `%s'", path);
-                if (strncmp(tmp, "!<arch>\n", 8) != 0) {
-                    barf("loadArchive: couldn't find archive in `%s' at offset %d", path, nfat_offset);
-                }
-            }
+        if (nfat_offset == 0) {
+           barf ("loadArchive: searched %d architectures, but no host arch found", (int)nfat_arch);
         }
         else {
-            barf("loadArchive: Neither an archive, nor a fat archive: `%s'", path);
+            n = fseek( f, nfat_offset, SEEK_SET );
+            if (n != 0)
+                barf("loadArchive: Failed to seek to arch in `%s'", path);
+            n = fread ( tmp, 1, 8, f );
+            if (n != 8)
+                barf("loadArchive: Failed reading header from `%s'", path);
+            if (strncmp(tmp, "!<arch>\n", 8) != 0) {
+                barf("loadArchive: couldn't find archive in `%s' at offset %d", path, nfat_offset);
+            }
         }
-
-#else
-        barf("loadArchive: Not an archive: `%s'", path);
-#endif
     }
+    else {
+        barf("loadArchive: Neither an archive, nor a fat archive: `%s'", path);
+    }
+#else
+    else {
+        barf("loadArchive: Not an archive: `%s'", path);
+    }
+#endif
 
     IF_DEBUG(linker, debugBelch("loadArchive: loading archive contents\n"));
 
@@ -2527,8 +2574,8 @@ loadArchive( pathchar *path )
                 if (n != 0 && gnuFileIndex[n - 1] != '\n') {
                     barf("loadArchive: GNU-variant filename offset %d invalid (range [0..%d]) while reading filename from `%s'", n, gnuFileIndexSize, path);
                 }
-                for (i = n; gnuFileIndex[i] != '/'; i++);
-                thisFileNameSize = i - n;
+                for (i = n; gnuFileIndex[i] != '\n'; i++);
+                thisFileNameSize = i - n - 1;
                 if (thisFileNameSize >= fileNameSize) {
                     /* Double it to avoid potentially continually
                        increasing it by 1 */
@@ -2616,9 +2663,53 @@ loadArchive( pathchar *path )
 #else
             image = stgMallocBytes(memberSize, "loadArchive(image)");
 #endif
-            n = fread ( image, 1, memberSize, f );
-            if (n != memberSize) {
-                barf("loadArchive: error whilst reading `%s'", path);
+
+#if !defined(mingw32_HOST_OS)
+            /*
+             * Note [thin archives on Windows]
+             * This doesn't compile on Windows because it assumes
+             * char* pathnames, and we use wchar_t* on Windows.  It's
+             * not trivial to fix, so I'm leaving it disabled on
+             * Windows for now --SDM
+             */
+            if (isThin) {
+                FILE *member;
+                char *pathCopy, *dirName, *memberPath;
+
+                /* Allocate and setup the dirname of the archive.  We'll need
+                   this to locate the thin member */
+                pathCopy = stgMallocBytes(strlen(path) + 1, "loadArchive(file)");
+                strcpy(pathCopy, path);
+                dirName = dirname(pathCopy);
+
+                /* Append the relative member name to the dirname.  This should be
+                   be the full path to the actual thin member. */
+                memberPath = stgMallocBytes(
+                    strlen(path) + 1 + strlen(fileName) + 1, "loadArchive(file)");
+                strcpy(memberPath, dirName);
+                memberPath[strlen(dirName)] = '/';
+                strcpy(memberPath + strlen(dirName) + 1, fileName);
+
+                member = pathopen(memberPath, WSTR("rb"));
+                if (!member)
+                    barf("loadObj: can't read `%s'", path);
+
+                n = fread ( image, 1, memberSize, member );
+                if (n != memberSize) {
+                    barf("loadArchive: error whilst reading `%s'", fileName);
+                }
+
+                fclose(member);
+                stgFree(memberPath);
+                stgFree(pathCopy);
+            }
+            else
+#endif
+            {
+                n = fread ( image, 1, memberSize, f );
+                if (n != memberSize) {
+                    barf("loadArchive: error whilst reading `%s'", path);
+                }
             }
 
             archiveMemberName = stgMallocBytes(pathlen(path) + thisFileNameSize + 3,
@@ -2638,6 +2729,7 @@ loadArchive( pathchar *path )
 
             if (0 == loadOc(oc)) {
                 stgFree(fileName);
+                fclose(f);
                 return 0;
             }
         }
@@ -2660,14 +2752,16 @@ loadArchive( pathchar *path )
         }
         else {
             IF_DEBUG(linker, debugBelch("loadArchive: '%s' does not appear to be an object file\n", fileName));
-            n = fseek(f, memberSize, SEEK_CUR);
-            if (n != 0)
-                barf("loadArchive: error whilst seeking by %d in `%s'",
-                     memberSize, path);
+            if (!isThin || thisFileNameSize == 0) {
+                n = fseek(f, memberSize, SEEK_CUR);
+                if (n != 0)
+                    barf("loadArchive: error whilst seeking by %d in `%s'",
+                         memberSize, path);
+            }
         }
 
         /* .ar files are 2-byte aligned */
-        if (memberSize % 2) {
+        if (!(isThin && thisFileNameSize > 0) && memberSize % 2) {
             IF_DEBUG(linker, debugBelch("loadArchive: trying to read one pad byte\n"));
             n = fread ( tmp, 1, 1, f );
             if (n != 1) {
@@ -2728,24 +2822,11 @@ loadObj( pathchar *path )
 
    /* Check that we haven't already loaded this object.
       Ignore requests to load multiple times */
-   {
-       ObjectCode *o;
-       int is_dup = 0;
-       for (o = objects; o; o = o->next) {
-          if (0 == pathcmp(o->fileName, path)) {
-             is_dup = 1;
-             break; /* don't need to search further */
-          }
-       }
-       if (is_dup) {
-          IF_DEBUG(linker, debugBelch(
-            "GHCi runtime linker: warning: looks like you're trying to load the\n"
-            "same object file twice:\n"
-            "   %" PATH_FMT "\n"
-            "GHCi will ignore this, but be warned.\n"
-            , path));
-          return 1; /* success */
-       }
+
+   if (isAlreadyLoaded(path)) {
+       IF_DEBUG(linker,
+                debugBelch("ignoring repeated load of %" PATH_FMT "\n", path));
+       return 1; /* success */
    }
 
    r = pathstat(path, &st);
@@ -2760,8 +2841,10 @@ loadObj( pathchar *path )
    /* On many architectures malloc'd memory isn't executable, so we need to use mmap. */
 
 #if defined(openbsd_HOST_OS)
+   /* coverity[toctou] */
    fd = open(path, O_RDONLY, S_IRUSR);
 #else
+   /* coverity[toctou] */
    fd = open(path, O_RDONLY);
 #endif
    if (fd == -1)
@@ -2773,6 +2856,7 @@ loadObj( pathchar *path )
 
 #else /* !USE_MMAP */
    /* load the image into memory */
+   /* coverity[toctou] */
    f = pathopen(path, WSTR("rb"));
    if (!f)
        barf("loadObj: can't read `%" PATH_FMT "'", path);
@@ -2948,8 +3032,8 @@ unloadObj( pathchar *path )
     IF_DEBUG(linker, debugBelch("unloadObj: %" PATH_FMT "\n", path));
 
     prev = NULL;
-    for (oc = objects; oc; prev = oc, oc = next) {
-        next = oc->next;
+    for (oc = objects; oc; oc = next) {
+        next = oc->next; // oc might be freed
 
         if (!pathcmp(oc->fileName,path)) {
 
@@ -3007,6 +3091,8 @@ unloadObj( pathchar *path )
             /* This could be a member of an archive so continue
              * unloading other members. */
             unloadedAnyObj = HS_BOOL_TRUE;
+        } else {
+            prev = oc;
         }
     }
 
@@ -4069,6 +4155,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       if (0==strcmp(".text",(char*)secname) ||
           0==strcmp(".text.startup",(char*)secname) ||
+          0==strcmp(".text.unlikely", (char*)secname) ||
           0==strcmp(".rdata",(char*)secname)||
           0==strcmp(".eh_frame", (char*)secname)||
           0==strcmp(".rodata",(char*)secname))
@@ -7087,3 +7174,11 @@ machoGetMisalignment( FILE * f )
 #endif
 
 #endif
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

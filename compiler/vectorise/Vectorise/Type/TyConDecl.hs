@@ -59,7 +59,6 @@ vectTyConDecl tycon name'
            -- NB: 'buildClass' attaches new quantifiers and dictionaries to the method types
        ; cls' <- liftDs $
                    buildClass
-                     False                      -- include unfoldings on dictionary selectors
                      name'                      -- new name: "V:Class"
                      (tyConTyVars tycon)        -- keep original type vars
                      (map (const Nominal) (tyConRoles tycon)) -- all role are N for safety

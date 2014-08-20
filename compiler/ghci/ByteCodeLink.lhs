@@ -5,7 +5,12 @@ ByteCodeLink: Bytecode assembler and linker
 
 \begin{code}
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 
 module ByteCodeLink (
         ClosureEnv, emptyClosureEnv, extendClosureEnv,
@@ -255,13 +260,13 @@ linkFail who what
 -- HACKS!!!  ToDo: cleaner
 nameToCLabel :: Name -> String{-suffix-} -> String
 nameToCLabel n suffix
-   = if pkgid /= mainPackageId
+   = if pkgid /= mainPackageKey
         then package_part ++ '_': qual_name
         else qual_name
   where
-        pkgid = modulePackageId mod
+        pkgid = modulePackageKey mod
         mod = ASSERT( isExternalName n ) nameModule n
-        package_part = zString (zEncodeFS (packageIdFS (modulePackageId mod)))
+        package_part = zString (zEncodeFS (packageKeyFS (modulePackageKey mod)))
         module_part  = zString (zEncodeFS (moduleNameFS (moduleName mod)))
         occ_part     = zString (zEncodeFS (occNameFS (nameOccName n)))
         qual_name = module_part ++ '_':occ_part ++ '_':suffix

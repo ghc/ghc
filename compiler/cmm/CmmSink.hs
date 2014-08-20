@@ -3,14 +3,13 @@ module CmmSink (
      cmmSink
   ) where
 
-import CodeGen.Platform (callerSaves)
-
 import Cmm
 import CmmOpt
 import BlockId
 import CmmLive
 import CmmUtils
 import Hoopl
+import CodeGen.Platform
 
 import DynFlags
 import UniqFM
@@ -18,6 +17,7 @@ import PprCmm ()
 
 import Data.List (partition)
 import qualified Data.Set as Set
+import Data.Maybe
 
 -- -----------------------------------------------------------------------------
 -- Sinking and inlining
@@ -199,7 +199,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       drop_if a@(r,rhs,_) live_sets = (should_drop, live_sets')
           where
             should_drop =  conflicts dflags a final_last
-                        || not (isTrivial rhs) && live_in_multi live_sets r
+                        || not (isTrivial dflags rhs) && live_in_multi live_sets r
                         || r `Set.member` live_in_joins
 
             live_sets' | should_drop = live_sets
@@ -221,28 +221,24 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
 -- small: an expression we don't mind duplicating
 isSmall :: CmmExpr -> Bool
-isSmall (CmmReg (CmmLocal _)) = True  -- not globals, we want to coalesce them instead* See below
+isSmall (CmmReg (CmmLocal _)) = True  --
 isSmall (CmmLit _) = True
 isSmall (CmmMachOp (MO_Add _) [x,y]) = isTrivial x && isTrivial y
 isSmall (CmmRegOff (CmmLocal _) _) = True
 isSmall _ = False
-
-Coalesce global registers? What does that mean? We observed no decrease
-in performance comming from inlining of global registers, hence we do it now
-(see isTrivial function). Ideally we'd like to measure performance using
-some tool like perf or VTune and make decisions what to inline based on that.
 -}
 
 --
 -- We allow duplication of trivial expressions: registers (both local and
 -- global) and literals.
 --
-isTrivial :: CmmExpr -> Bool
-isTrivial (CmmReg (CmmLocal _)) = True
--- isTrivial (CmmLit _) = True  -- Disabled because it used to make thing worse.
-                                -- Needs further investigation
-isTrivial _ = False
-
+isTrivial :: DynFlags -> CmmExpr -> Bool
+isTrivial _ (CmmReg (CmmLocal _)) = True
+isTrivial dflags (CmmReg (CmmGlobal r)) = -- see Note [Inline GlobalRegs?]
+   isJust (globalRegMaybe (targetPlatform dflags) r)
+   -- GlobalRegs that are loads from BaseReg are not trivial
+isTrivial _ (CmmLit _) = True
+isTrivial _ _          = False
 
 --
 -- annotate each node with the set of registers live *after* the node
@@ -405,7 +401,7 @@ tryToInline dflags live node assigs = go usages node [] assigs
    | cannot_inline           = dont_inline
    | occurs_none             = discard  -- Note [discard during inlining]
    | occurs_once             = inline_and_discard
-   | isTrivial rhs           = inline_and_keep
+   | isTrivial dflags rhs    = inline_and_keep
    | otherwise               = dont_inline
    where
         inline_and_discard = go usages' inl_node skipped rest
@@ -505,7 +501,8 @@ regsUsedIn ls e = wrapRecExpf f e False
 -- nor the NCG can do it.  See Note [Register parameter passing]
 -- See also StgCmmForeign:load_args_into_temps.
 okToInline :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
-okToInline dflags expr CmmUnsafeForeignCall{} = not (anyCallerSavesRegs dflags expr)
+okToInline dflags expr node@(CmmUnsafeForeignCall{}) =
+    not (globalRegistersConflict dflags expr node)
 okToInline _ _ _ = True
 
 -- -----------------------------------------------------------------------------
@@ -518,22 +515,22 @@ okToInline _ _ _ = True
 conflicts :: DynFlags -> Assignment -> CmmNode O x -> Bool
 conflicts dflags (r, rhs, addr) node
 
-  -- (1) an assignment to a register conflicts with a use of the register
-  | CmmAssign reg  _ <- node, reg `regUsedIn` rhs                 = True
+  -- (1) node defines registers used by rhs of assignment. This catches
+  -- assignments and all three kinds of calls. See Note [Sinking and calls]
+  | globalRegistersConflict dflags rhs node                       = True
+  | localRegistersConflict  dflags rhs node                       = True
+
+  -- (2) node uses register defined by assignment
   | foldRegsUsed dflags (\b r' -> r == r' || b) False node        = True
 
-  -- (2) a store to an address conflicts with a read of the same memory
+  -- (3) a store to an address conflicts with a read of the same memory
   | CmmStore addr' e <- node
   , memConflicts addr (loadAddr dflags addr' (cmmExprWidth dflags e)) = True
 
-  -- (3) an assignment to Hp/Sp conflicts with a heap/stack read respectively
+  -- (4) an assignment to Hp/Sp conflicts with a heap/stack read respectively
   | HeapMem    <- addr, CmmAssign (CmmGlobal Hp) _ <- node        = True
   | StackMem   <- addr, CmmAssign (CmmGlobal Sp) _ <- node        = True
   | SpMem{}    <- addr, CmmAssign (CmmGlobal Sp) _ <- node        = True
-
-  -- (4) assignments that read caller-saves GlobalRegs conflict with a
-  -- foreign call.  See Note [Unsafe foreign calls clobber caller-save registers]
-  | CmmUnsafeForeignCall{} <- node, anyCallerSavesRegs dflags rhs = True
 
   -- (5) foreign calls clobber heap: see Note [Foreign calls clobber heap]
   | CmmUnsafeForeignCall{} <- node, memConflicts addr AnyMem      = True
@@ -544,11 +541,57 @@ conflicts dflags (r, rhs, addr) node
   -- (7) otherwise, no conflict
   | otherwise = False
 
-anyCallerSavesRegs :: DynFlags -> CmmExpr -> Bool
-anyCallerSavesRegs dflags e = wrapRecExpf f e False
-  where f (CmmReg (CmmGlobal r)) _
-         | callerSaves (targetPlatform dflags) r = True
-        f _ z = z
+-- Returns True if node defines any global registers that are used in the
+-- Cmm expression
+globalRegistersConflict :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
+globalRegistersConflict dflags expr node =
+    foldRegsDefd dflags (\b r -> b || (CmmGlobal r) `regUsedIn` expr) False node
+
+-- Returns True if node defines any local registers that are used in the
+-- Cmm expression
+localRegistersConflict :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
+localRegistersConflict dflags expr node =
+    foldRegsDefd dflags (\b r -> b || (CmmLocal  r) `regUsedIn` expr) False node
+
+-- Note [Sinking and calls]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- We have three kinds of calls: normal (CmmCall), safe foreign (CmmForeignCall)
+-- and unsafe foreign (CmmUnsafeForeignCall). We perform sinking pass after
+-- stack layout (see Note [Sinking after stack layout]) which leads to two
+-- invariants related to calls:
+--
+--   a) during stack layout phase all safe foreign calls are turned into
+--      unsafe foreign calls (see Note [Lower safe foreign calls]). This
+--      means that we will never encounter CmmForeignCall node when running
+--      sinking after stack layout
+--
+--   b) stack layout saves all variables live across a call on the stack
+--      just before making a call (remember we are not sinking assignments to
+--      stack):
+--
+--       L1:
+--          x = R1
+--          P64[Sp - 16] = L2
+--          P64[Sp - 8]  = x
+--          Sp = Sp - 16
+--          call f() returns L2
+--       L2:
+--
+--      We will attempt to sink { x = R1 } but we will detect conflict with
+--      { P64[Sp - 8]  = x } and hence we will drop { x = R1 } without even
+--      checking whether it conflicts with { call f() }. In this way we will
+--      never need to check any assignment conflicts with CmmCall. Remember
+--      that we still need to check for potential memory conflicts.
+--
+-- So the result is that we only need to worry about CmmUnsafeForeignCall nodes
+-- when checking conflicts (see Note [Unsafe foreign calls clobber caller-save registers]).
+-- This assumption holds only when we do sinking after stack layout. If we run
+-- it before stack layout we need to check for possible conflicts with all three
+-- kinds of calls. Our `conflicts` function does that by using a generic
+-- foldRegsDefd and foldRegsUsed functions defined in DefinerOfRegs and
+-- UserOfRegs typeclasses.
+--
 
 -- An abstraction of memory read or written.
 data AbsMem
@@ -607,6 +650,10 @@ data AbsMem
 -- perhaps we ought to have a special annotation for calls that can
 -- modify heap/stack memory.  For now we just use the conservative
 -- definition here.
+--
+-- Some CallishMachOp imply a memory barrier e.g. AtomicRMW and
+-- therefore we should never float any memory operations across one of
+-- these calls.
 
 
 bothMems :: AbsMem -> AbsMem -> AbsMem
@@ -652,3 +699,91 @@ regAddr _      (CmmGlobal Hp) _ _ = HeapMem
 regAddr _      (CmmGlobal CurrentTSO) _ _ = HeapMem -- important for PrimOps
 regAddr dflags r _ _ | isGcPtrType (cmmRegType dflags r) = HeapMem -- yay! GCPtr pays for itself
 regAddr _      _ _ _ = AnyMem
+
+{-
+Note [Inline GlobalRegs?]
+
+Should we freely inline GlobalRegs?
+
+Actually it doesn't make a huge amount of difference either way, so we
+*do* currently treat GlobalRegs as "trivial" and inline them
+everywhere, but for what it's worth, here is what I discovered when I
+(SimonM) looked into this:
+
+Common sense says we should not inline GlobalRegs, because when we
+have
+
+  x = R1
+
+the register allocator will coalesce this assignment, generating no
+code, and simply record the fact that x is bound to $rbx (or
+whatever).  Furthermore, if we were to sink this assignment, then the
+range of code over which R1 is live increases, and the range of code
+over which x is live decreases.  All things being equal, it is better
+for x to be live than R1, because R1 is a fixed register whereas x can
+live in any register.  So we should neither sink nor inline 'x = R1'.
+
+However, not inlining GlobalRegs can have surprising
+consequences. e.g. (cgrun020)
+
+  c3EN:
+      _s3DB::P64 = R1;
+      _c3ES::P64 = _s3DB::P64 & 7;
+      if (_c3ES::P64 >= 2) goto c3EU; else goto c3EV;
+  c3EU:
+      _s3DD::P64 = P64[_s3DB::P64 + 6];
+      _s3DE::P64 = P64[_s3DB::P64 + 14];
+      I64[Sp - 8] = c3F0;
+      R1 = _s3DE::P64;
+      P64[Sp] = _s3DD::P64;
+
+inlining the GlobalReg gives:
+
+  c3EN:
+      if (R1 & 7 >= 2) goto c3EU; else goto c3EV;
+  c3EU:
+      I64[Sp - 8] = c3F0;
+      _s3DD::P64 = P64[R1 + 6];
+      R1 = P64[R1 + 14];
+      P64[Sp] = _s3DD::P64;
+
+but if we don't inline the GlobalReg, instead we get:
+
+      _s3DB::P64 = R1;
+      if (_s3DB::P64 & 7 >= 2) goto c3EU; else goto c3EV;
+  c3EU:
+      I64[Sp - 8] = c3F0;
+      R1 = P64[_s3DB::P64 + 14];
+      P64[Sp] = P64[_s3DB::P64 + 6];
+
+This looks better - we managed to inline _s3DD - but in fact it
+generates an extra reg-reg move:
+
+.Lc3EU:
+        movq $c3F0_info,-8(%rbp)
+        movq %rbx,%rax
+        movq 14(%rbx),%rbx
+        movq 6(%rax),%rax
+        movq %rax,(%rbp)
+
+because _s3DB is now live across the R1 assignment, we lost the
+benefit of coalescing.
+
+Who is at fault here?  Perhaps if we knew that _s3DB was an alias for
+R1, then we would not sink a reference to _s3DB past the R1
+assignment.  Or perhaps we *should* do that - we might gain by sinking
+it, despite losing the coalescing opportunity.
+
+Sometimes not inlining global registers wins by virtue of the rule
+about not inlining into arguments of a foreign call, e.g. (T7163) this
+is what happens when we inlined F1:
+
+      _s3L2::F32 = F1;
+      _c3O3::F32 = %MO_F_Mul_W32(F1, 10.0 :: W32);
+      (_s3L7::F32) = call "ccall" arg hints:  []  result hints:  [] rintFloat(_c3O3::F32);
+
+but if we don't inline F1:
+
+      (_s3L7::F32) = call "ccall" arg hints:  []  result hints:  [] rintFloat(%MO_F_Mul_W32(_s3L2::F32,
+                                                                                            10.0 :: W32));
+-}

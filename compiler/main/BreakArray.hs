@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
+
 -------------------------------------------------------------------------------
 --
 -- | Break Arrays in the IO monad

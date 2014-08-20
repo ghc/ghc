@@ -286,6 +286,9 @@ GarbageCollect (nat collect_gen,
   memInventory(DEBUG_gc);
 #endif
 
+  // do this *before* we start scavenging
+  collectFreshWeakPtrs();
+
   // check sanity *before* GC
   IF_DEBUG(sanity, checkSanity(rtsFalse /* before GC */, major_gc));
 
@@ -1038,8 +1041,6 @@ gcWorkerThread (Capability *cap)
     SET_GCT(gc_threads[cap->no]);
     gct->id = osThreadId();
 
-    stat_gcWorkerThreadStart(gct);
-
     // Wait until we're told to wake up
     RELEASE_SPIN_LOCK(&gct->mut_spin);
     // yieldThread();
@@ -1096,9 +1097,6 @@ gcWorkerThread (Capability *cap)
                gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->mut_spin);
     debugTrace(DEBUG_gc, "GC thread %d on my way...", gct->thread_index);
-
-    // record the time spent doing GC in the Task structure
-    stat_gcWorkerThreadDone(gct);
 
     SET_GCT(saved_gct);
 }
@@ -1613,7 +1611,8 @@ resize_generations (void)
 static void
 resize_nursery (void)
 {
-    const StgWord min_nursery = RtsFlags.GcFlags.minAllocAreaSize * n_capabilities;
+    const StgWord min_nursery =
+      RtsFlags.GcFlags.minAllocAreaSize * (StgWord)n_capabilities;
 
     if (RtsFlags.GcFlags.generations == 1)
     {   // Two-space collector:
@@ -1771,3 +1770,11 @@ static void gcCAFs(void)
     debugTrace(DEBUG_gccafs, "%d CAFs live", i);
 }
 #endif
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

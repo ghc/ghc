@@ -1,7 +1,7 @@
 
 mc24.hs:10:31:
-    Couldn't match type ‘[a0]’ with ‘a -> a1’
-    Expected type: (a -> a1) -> [a] -> t [a]
+    Couldn't match type ‘[a0]’ with ‘a -> Integer’
+    Expected type: (a -> Integer) -> [a] -> t [a]
       Actual type: [a0] -> [a0]
     Possible cause: ‘take’ is applied to too many arguments
     In the expression: take 2

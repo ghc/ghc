@@ -6,7 +6,8 @@ T8566.hs:31:9:
       bound by the instance declaration at T8566.hs:29:10-67
     or from ('AA t (a : as) ~ 'AA t1 as1)
       bound by a pattern with constructor
-                 A :: forall (r :: [*]) (t :: k) (as :: [U *]). I ('AA t as) r,
+                 A :: forall (r :: [*]) (k :: BOX) (t :: k) (as :: [U *]).
+                      I ('AA t as) r,
                in an equation for ‘c’
       at T8566.hs:31:5
     The type variable ‘fs0’ is ambiguous

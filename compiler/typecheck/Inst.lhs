@@ -6,7 +6,8 @@
 The @Inst@ type: dictionaries or method instances
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -48,7 +49,6 @@ import TcMType
 import Type
 import Coercion ( Role(..) )
 import TcType
-import Unify
 import HscTypes
 import Id
 import Name
@@ -59,9 +59,9 @@ import PrelNames
 import SrcLoc
 import DynFlags
 import Bag
-import Maybes
 import Util
 import Outputable
+import Control.Monad( unless )
 import Data.List( mapAccumL )
 \end{code}
 
@@ -382,14 +382,15 @@ syntaxNameCtxt name orig ty tidy_env
 
 \begin{code}
 getOverlapFlag :: TcM OverlapFlag
-getOverlapFlag 
+getOverlapFlag
   = do  { dflags <- getDynFlags
         ; let overlap_ok    = xopt Opt_OverlappingInstances dflags
               incoherent_ok = xopt Opt_IncoherentInstances  dflags
-              safeOverlap   = safeLanguageOn dflags
-              overlap_flag | incoherent_ok = Incoherent safeOverlap
-                           | overlap_ok    = OverlapOk safeOverlap
-                           | otherwise     = NoOverlap safeOverlap
+              use x = OverlapFlag { isSafeOverlap = safeLanguageOn dflags
+                                  , overlapMode   = x }
+              overlap_flag | incoherent_ok = use Incoherent
+                           | overlap_ok    = use Overlaps
+                           | otherwise     = use NoOverlap
 
         ; return overlap_flag }
 
@@ -408,22 +409,24 @@ tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
 tcExtendLocalInstEnv dfuns thing_inside
  = do { traceDFuns dfuns
       ; env <- getGblEnv
-      ; inst_env' <- foldlM addLocalInst (tcg_inst_env env) dfuns
-      ; let env' = env { tcg_insts = dfuns ++ tcg_insts env,
-			 tcg_inst_env = inst_env' }
+      ; (inst_env', cls_insts') <- foldlM addLocalInst
+                                          (tcg_inst_env env, tcg_insts env)
+                                          dfuns
+      ; let env' = env { tcg_insts    = cls_insts'
+		       , tcg_inst_env = inst_env' }
       ; setGblEnv env' thing_inside }
 
-addLocalInst :: InstEnv -> ClsInst -> TcM InstEnv
--- Check that the proposed new instance is OK, 
+addLocalInst :: (InstEnv, [ClsInst]) -> ClsInst -> TcM (InstEnv, [ClsInst])
+-- Check that the proposed new instance is OK,
 -- and then add it to the home inst env
 -- If overwrite_inst, then we can overwrite a direct match
-addLocalInst home_ie ispec
+addLocalInst (home_ie, my_insts) ispec
    = do {
          -- Instantiate the dfun type so that we extend the instance
          -- envt with completely fresh template variables
          -- This is important because the template variables must
          -- not overlap with anything in the things being looked up
-         -- (since we do unification).  
+         -- (since we do unification).
              --
              -- We use tcInstSkolType because we don't want to allocate fresh
              --  *meta* type variables.
@@ -436,9 +439,23 @@ addLocalInst home_ie ispec
 
              -- Load imported instances, so that we report
              -- duplicates correctly
-           eps <- getEps
-         ; let inst_envs = (eps_inst_env eps, home_ie)
-               (tvs, cls, tys) = instanceHead ispec
+
+             -- 'matches'  are existing instance declarations that are less
+             --            specific than the new one
+             -- 'dups'     are those 'matches' that are equal to the new one
+         ; isGHCi <- getIsGHCi
+         ; eps    <- getEps
+         ; let (home_ie', my_insts')
+                 | isGHCi    = ( deleteFromInstEnv home_ie ispec
+                               , filterOut (identicalInstHead ispec) my_insts)
+                 | otherwise = (home_ie, my_insts)
+               -- If there is a home-package duplicate instance,
+               -- silently delete it
+
+               (_tvs, cls, tys) = instanceHead ispec
+               inst_envs       = (eps_inst_env eps, home_ie')
+               (matches, _, _) = lookupInstEnv inst_envs cls tys
+               dups            = filter (identicalInstHead ispec) (map fst matches)
 
              -- Check functional dependencies
          ; case checkFunDeps inst_envs ispec of
@@ -446,37 +463,17 @@ addLocalInst home_ie ispec
              Nothing    -> return ()
 
              -- Check for duplicate instance decls
-         ; let (matches, unifs, _) = lookupInstEnv inst_envs cls tys
-               dup_ispecs = [ dup_ispec 
-                            | (dup_ispec, _) <- matches
-                            , let dup_tys = is_tys dup_ispec
-                            , isJust (tcMatchTys (mkVarSet tvs) tys dup_tys)]
-                             
-             -- Find memebers of the match list which ispec itself matches.
-             -- If the match is 2-way, it's a duplicate
-             -- If it's a duplicate, but we can overwrite home package dups, then overwrite
-         ; isGHCi <- getIsGHCi
-         ; overlapFlag <- getOverlapFlag
-         ; case isGHCi of
-             False -> case dup_ispecs of
-                 dup : _ -> dupInstErr ispec dup >> return (extendInstEnv home_ie ispec)
-                 []      -> return (extendInstEnv home_ie ispec)
-             True  -> case (dup_ispecs, home_ie_matches, unifs, overlapFlag) of
-                 (_, _:_, _, _)      -> return (overwriteInstEnv home_ie ispec)
-                 (dup:_, [], _, _)   -> dupInstErr ispec dup >> return (extendInstEnv home_ie ispec)
-                 ([], _, u:_, NoOverlap _)    -> overlappingInstErr ispec u >> return (extendInstEnv home_ie ispec)
-                 _                   -> return (extendInstEnv home_ie ispec)
-               where (homematches, _) = lookupInstEnv' home_ie cls tys
-                     home_ie_matches = [ dup_ispec 
-                         | (dup_ispec, _) <- homematches
-                         , let dup_tys = is_tys dup_ispec
-                         , isJust (tcMatchTys (mkVarSet tvs) tys dup_tys)] }
+         ; unless (null dups) $
+           dupInstErr ispec (head dups)
+
+         ; return (extendInstEnv home_ie' ispec, ispec:my_insts') }
 
 traceDFuns :: [ClsInst] -> TcRn ()
 traceDFuns ispecs
   = traceTc "Adding instances:" (vcat (map pp ispecs))
   where
-    pp ispec = ppr (instanceDFunId ispec) <+> colon <+> ppr ispec
+    pp ispec = hang (ppr (instanceDFunId ispec) <+> colon)
+                  2 (ppr ispec)
 	-- Print the dfun name itself too
 
 funDepErr :: ClsInst -> [ClsInst] -> TcRn ()
@@ -488,11 +485,6 @@ dupInstErr :: ClsInst -> ClsInst -> TcRn ()
 dupInstErr ispec dup_ispec
   = addClsInstsErr (ptext (sLit "Duplicate instance declarations:"))
 	            [ispec, dup_ispec]
-
-overlappingInstErr :: ClsInst -> ClsInst -> TcRn ()
-overlappingInstErr ispec dup_ispec
-  = addClsInstsErr (ptext (sLit "Overlapping instance declarations:")) 
-                    [ispec, dup_ispec]
 
 addClsInstsErr :: SDoc -> [ClsInst] -> TcRn ()
 addClsInstsErr herald ispecs

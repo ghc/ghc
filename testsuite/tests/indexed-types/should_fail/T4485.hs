@@ -11,7 +11,6 @@
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses
   , FlexibleContexts, FlexibleInstances, UndecidableInstances
   , TypeSynonymInstances, GeneralizedNewtypeDeriving
-  , OverlappingInstances 
   #-}
 module XMLGenerator where
 
@@ -26,9 +25,9 @@ class Monad m => XMLGen m where
 class XMLGen m => EmbedAsChild m c where
     asChild :: c -> XMLGenT m [Child m]
 
-instance (EmbedAsChild m c, m1 ~ m) => EmbedAsChild m (XMLGenT m1 c)
+instance {-# OVERLAPPING #-} (EmbedAsChild m c, m1 ~ m) => EmbedAsChild m (XMLGenT m1 c)
 
-instance (XMLGen m,  XML m ~ x) => EmbedAsChild m x
+instance {-# OVERLAPPABLE #-} (XMLGen m,  XML m ~ x) => EmbedAsChild m x
 
 data Xml = Xml
 data IdentityT m a = IdentityT (m a)
@@ -39,11 +38,11 @@ instance XMLGen (IdentityT m) where
 data Identity a = Identity a
 instance Monad Identity
 
-instance EmbedAsChild (IdentityT IO) (XMLGenT Identity ())
+instance {-# OVERLAPPING #-} EmbedAsChild (IdentityT IO) (XMLGenT Identity ())
 
 data FooBar = FooBar
 
-instance EmbedAsChild (IdentityT IO) FooBar where
+instance {-# OVERLAPPING #-} EmbedAsChild (IdentityT IO) FooBar where
   asChild b = asChild $ (genElement "foo")
   -- asChild :: FooBar -> XMLGenT (XMLGenT (IdentityT IO) [Child (IdentitiyT IO)])
 

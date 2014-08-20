@@ -7,7 +7,8 @@
 -- -----------------------------------------------------------------------------
 
 \begin{code}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, UnboxedTuples #-}
+
 module AsmCodeGen ( nativeCodeGen ) where
 
 #include "HsVersions.h"
@@ -166,6 +167,7 @@ nativeCodeGen dflags this_mod h us cmms
       ArchPPC     -> nCG' (ppcNcgImpl    dflags)
       ArchSPARC   -> nCG' (sparcNcgImpl  dflags)
       ArchARM {}  -> panic "nativeCodeGen: No NCG for ARM"
+      ArchARM64   -> panic "nativeCodeGen: No NCG for ARM64"
       ArchPPC_64  -> panic "nativeCodeGen: No NCG for PPC 64"
       ArchAlpha   -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb  -> panic "nativeCodeGen: No NCG for mipseb"
@@ -604,7 +606,7 @@ makeImportsDoc dflags imports
              then text ".section .note.GNU-stack,\"\",@progbits"
              else empty)
             $$
-                -- And just because every other compiler does, lets stick in
+                -- And just because every other compiler does, let's stick in
                 -- an identifier directive: .ident "GHC x.y.z"
             (if platformHasIdentDirective platform
              then let compilerIdent = text "GHC" <+> text cProjectVersion
@@ -1023,15 +1025,15 @@ cmmExprNative referenceKind expr = do
         CmmReg (CmmGlobal EagerBlackholeInfo)
           | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
-             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_EAGER_BLACKHOLE_info")))
+             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageKey (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
           | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
-             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_enter_1")))
+             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageKey (fsLit "__stg_gc_enter_1")))
         CmmReg (CmmGlobal GCFun)
           | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
-             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_fun")))
+             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageKey (fsLit "__stg_gc_fun")))
 
         other
            -> return other

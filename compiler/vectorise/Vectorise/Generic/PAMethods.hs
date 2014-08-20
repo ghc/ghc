@@ -16,7 +16,7 @@ import Vectorise.Generic.Description
 import CoreSyn
 import CoreUtils
 import FamInstEnv
-import MkCore            ( mkWildCase )
+import MkCore            ( mkWildCase, mkCoreLet )
 import TyCon
 import CoAxiom
 import Type
@@ -24,6 +24,7 @@ import OccName
 import Coercion
 import MkId
 import FamInst
+import TysPrim( intPrimTy )
 
 import DynFlags
 import FastString
@@ -404,9 +405,13 @@ buildToArrPReprs vect_tc repr_co _ pdatas_tc r
                 -- and PDatas Void arrays in the product. See Note [Empty PDatas].
                 let xSums        =  App (repr_selsLength_v ss) (Var sels)
 
-                (vars, exprs)    <- mapAndUnzipM (to_con xSums) (repr_cons ss)
+                xSums_var <- newLocalVar (fsLit "xsum") intPrimTy
+
+                (vars, exprs)    <- mapAndUnzipM (to_con xSums_var) (repr_cons ss)
                 return ( sels : concat vars
                        , wrapFamInstBody psums_tc (repr_con_tys ss)
+                         $ mkCoreLet (NonRec xSums_var xSums)
+                                 -- mkCoreLet ensures that the let/app invariant holds
                          $ mkConApp psums_con 
                          $ map Type (repr_con_tys ss) ++ (Var sels : exprs))        
 
@@ -414,7 +419,7 @@ buildToArrPReprs vect_tc repr_co _ pdatas_tc r
      = case ss of
         EmptyProd    
          -> do  pvoids  <- builtin pvoidsVar
-                return ([], App (Var pvoids) xSums )
+                return ([], App (Var pvoids) (Var xSums) )
 
         UnaryProd r
          -> do  pty  <- mkPDatasType (compOrigType r)

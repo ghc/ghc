@@ -59,7 +59,7 @@ removeThreadLabel(StgWord key)
   if ((old = lookupHashTable(threadLabels,key))) {
     removeHashTable(threadLabels,key,old);
     stgFree(old);
-  }  
+  }
 }
 
 #endif /* DEBUG */
@@ -83,3 +83,10 @@ labelThread(Capability *cap   STG_UNUSED,
   traceThreadLabel(cap, tso, label);
 }
 
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

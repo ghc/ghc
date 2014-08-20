@@ -9,12 +9,15 @@ This module is an extension of @HsSyn@ syntax, for use in the type
 checker.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcHsSyn (
         mkHsConApp, mkHsDictLet, mkHsApp,
         hsLitType, hsLPatType, hsPatType,
         mkHsAppTy, mkSimpleHsAlt,
         nlHsIntLit,
         shortCutLit, hsOverLitName,
+        conLikeResTy,
 
         -- re-exported from TcMonad
         TcId, TcIdSet,
@@ -38,7 +41,9 @@ import TcEvidence
 import TysPrim
 import TysWiredIn
 import Type
+import ConLike
 import DataCon
+import PatSyn( patSynInstResTy )
 import Name
 import NameSet
 import Var
@@ -80,13 +85,18 @@ hsPatType (ViewPat _ _ ty)            = ty
 hsPatType (ListPat _ ty Nothing)      = mkListTy ty
 hsPatType (ListPat _ _ (Just (ty,_))) = ty
 hsPatType (PArrPat _ ty)              = mkPArrTy ty
-hsPatType (TuplePat _ _ ty)           = ty
-hsPatType (ConPatOut { pat_ty = ty }) = ty
+hsPatType (TuplePat _ bx tys)         = mkTupleTy (boxityNormalTupleSort bx) tys
+hsPatType (ConPatOut { pat_con = L _ con, pat_arg_tys = tys }) 
+                                      = conLikeResTy con tys
 hsPatType (SigPatOut _ ty)            = ty
 hsPatType (NPat lit _ _)              = overLitType lit
 hsPatType (NPlusKPat id _ _ _)        = idType (unLoc id)
 hsPatType (CoPat _ _ ty)              = ty
 hsPatType p                           = pprPanic "hsPatType" (ppr p)
+
+conLikeResTy :: ConLike -> [Type] -> Type
+conLikeResTy (RealDataCon con) tys = mkTyConApp (dataConTyCon con) tys
+conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 
 hsLitType :: HsLit -> TcType
 hsLitType (HsChar _)       = charTy
@@ -405,10 +415,8 @@ warnMissingSig msg id
 zonkMonoBinds :: ZonkEnv -> SigWarn -> LHsBinds TcId -> TcM (LHsBinds Id)
 zonkMonoBinds env sig_warn binds = mapBagM (zonk_lbind env sig_warn) binds
 
-zonk_lbind :: ZonkEnv -> SigWarn -> (Origin, LHsBind TcId) -> TcM (Origin, LHsBind Id)
-zonk_lbind env sig_warn (origin, lbind)
-  = do  { lbind' <- wrapLocM (zonk_bind env sig_warn) lbind
-        ; return (origin, lbind') }
+zonk_lbind :: ZonkEnv -> SigWarn -> LHsBind TcId -> TcM (LHsBind Id)
+zonk_lbind env sig_warn = wrapLocM (zonk_bind env sig_warn)
 
 zonk_bind :: ZonkEnv -> SigWarn -> HsBind TcId -> TcM (HsBind Id)
 zonk_bind env sig_warn bind@(PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty})
@@ -460,18 +468,19 @@ zonk_bind env sig_warn (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                         , abe_mono = zonkIdOcc env mono_id
                         , abe_prags = new_prags })
 
-zonk_bind env _sig_warn bind@(PatSynBind { patsyn_id = L loc id
-                                         , patsyn_args = details
-                                         , patsyn_def = lpat
-                                         , patsyn_dir = dir })
+zonk_bind env _sig_warn (PatSynBind bind@(PSB { psb_id = L loc id
+                                              , psb_args = details
+                                              , psb_def = lpat
+                                              , psb_dir = dir }))
   = do { id' <- zonkIdBndr env id
        ; details' <- zonkPatSynDetails env details
        ;(env1, lpat') <- zonkPat env lpat
        ; (_env2, dir') <- zonkPatSynDir env1 dir
-       ; return (bind { patsyn_id = L loc id'
-                      , patsyn_args = details'
-                      , patsyn_def = lpat'
-                      , patsyn_dir = dir' }) }
+       ; return $ PatSynBind $
+                  bind { psb_id = L loc id'
+                       , psb_args = details'
+                       , psb_def = lpat'
+                       , psb_dir = dir' } }
 
 zonkPatSynDetails :: ZonkEnv
                   -> HsPatSynDetails (Located TcId)
@@ -481,6 +490,9 @@ zonkPatSynDetails env = traverse (wrapLocM $ zonkIdBndr env)
 zonkPatSynDir :: ZonkEnv -> HsPatSynDir TcId -> TcM (ZonkEnv, HsPatSynDir Id)
 zonkPatSynDir env Unidirectional = return (env, Unidirectional)
 zonkPatSynDir env ImplicitBidirectional = return (env, ImplicitBidirectional)
+zonkPatSynDir env (ExplicitBidirectional mg) = do
+    mg' <- zonkMatchGroup env zonkLExpr mg
+    return (env, ExplicitBidirectional mg')
 
 zonkSpecPrags :: ZonkEnv -> TcSpecPrags -> TcM TcSpecPrags
 zonkSpecPrags _   IsDefaultMethod = return IsDefaultMethod
@@ -506,11 +518,11 @@ zonkLTcSpecPrags env ps
 zonkMatchGroup :: ZonkEnv
                -> (ZonkEnv -> Located (body TcId) -> TcM (Located (body Id)))
                -> MatchGroup TcId (Located (body TcId)) -> TcM (MatchGroup Id (Located (body Id)))
-zonkMatchGroup env zBody (MG { mg_alts = ms, mg_arg_tys = arg_tys, mg_res_ty = res_ty })
+zonkMatchGroup env zBody (MG { mg_alts = ms, mg_arg_tys = arg_tys, mg_res_ty = res_ty, mg_origin = origin })
   = do  { ms' <- mapM (zonkMatch env zBody) ms
         ; arg_tys' <- zonkTcTypeToTypes env arg_tys
         ; res_ty'  <- zonkTcTypeToType env res_ty
-        ; return (MG { mg_alts = ms', mg_arg_tys = arg_tys', mg_res_ty = res_ty' }) }
+        ; return (MG { mg_alts = ms', mg_arg_tys = arg_tys', mg_res_ty = res_ty', mg_origin = origin }) }
 
 zonkMatch :: ZonkEnv
           -> (ZonkEnv -> Located (body TcId) -> TcM (Located (body Id)))
@@ -1027,16 +1039,16 @@ zonk_pat env (PArrPat pats ty)
         ; (env', pats') <- zonkPats env pats
         ; return (env', PArrPat pats' ty') }
 
-zonk_pat env (TuplePat pats boxed ty)
-  = do  { ty' <- zonkTcTypeToType env ty
+zonk_pat env (TuplePat pats boxed tys)
+  = do  { tys' <- mapM (zonkTcTypeToType env) tys
         ; (env', pats') <- zonkPats env pats
-        ; return (env', TuplePat pats' boxed ty') }
+        ; return (env', TuplePat pats' boxed tys') }
 
-zonk_pat env p@(ConPatOut { pat_ty = ty, pat_tvs = tyvars
+zonk_pat env p@(ConPatOut { pat_arg_tys = tys, pat_tvs = tyvars
                           , pat_dicts = evs, pat_binds = binds
                           , pat_args = args, pat_wrap = wrapper })
   = ASSERT( all isImmutableTyVar tyvars )
-    do  { new_ty <- zonkTcTypeToType env ty
+    do  { new_tys <- mapM (zonkTcTypeToType env) tys
         ; (env0, new_tyvars) <- zonkTyBndrsX env tyvars
           -- Must zonk the existential variables, because their
           -- /kind/ need potential zonking.
@@ -1045,7 +1057,7 @@ zonk_pat env p@(ConPatOut { pat_ty = ty, pat_tvs = tyvars
         ; (env2, new_binds) <- zonkTcEvBinds env1 binds
         ; (env3, new_wrapper) <- zonkCoFn env2 wrapper
         ; (env', new_args) <- zonkConStuff env3 args
-        ; return (env', p { pat_ty = new_ty,
+        ; return (env', p { pat_arg_tys = new_tys,
                             pat_tvs = new_tyvars,
                             pat_dicts = new_evs,
                             pat_binds = new_binds,

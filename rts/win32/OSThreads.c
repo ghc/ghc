@@ -291,7 +291,8 @@ interruptOSThread (OSThreadId id)
         sysErrorBelch("interruptOSThread: OpenThread");
         stg_exit(EXIT_FAILURE);
     }
-    pCSIO = (PCSIO) GetProcAddress(GetModuleHandle(TEXT("Kernel32.dll")), "CancelSynchronousIo");
+    pCSIO = (PCSIO) GetProcAddress(GetModuleHandle(TEXT("Kernel32.dll")),
+                                   "CancelSynchronousIo");
     if ( NULL != pCSIO ) {
         pCSIO(hdl);
     } else {
@@ -320,3 +321,11 @@ KernelThreadId kernelThreadId (void)
     DWORD tid = GetCurrentThreadId();
     return tid;
 }
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

@@ -1,7 +1,8 @@
+{-# LANGUAGE CPP, TypeFamilies #-}
+
 -- -----------------------------------------------------------------------------
 -- | This is the top-level module in the LLVM code generator.
 --
-
 module LlvmCodeGen ( llvmCodeGen, llvmFixupAsm ) where
 
 #include "HsVersions.h"

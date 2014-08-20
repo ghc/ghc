@@ -4,6 +4,8 @@
 \section{Common subexpression}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module CSE (cseProgram) where
 
 #include "HsVersions.h"

@@ -1,4 +1,3 @@
-
 -- | Free regs map for PowerPC
 module RegAlloc.Linear.PPC.FreeRegs
 where

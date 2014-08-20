@@ -6,7 +6,8 @@
 Desugaring foreign calls
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -237,9 +238,9 @@ boxResult result_ty
 		     _ -> []
 
 	      return_result state anss
-		= mkConApp (tupleCon UnboxedTuple (2 + length extra_result_tys))
-	         	   (map Type (realWorldStatePrimTy : io_res_ty : extra_result_tys)
-			      ++ (state : anss)) 
+		= mkCoreConApps (tupleCon UnboxedTuple (2 + length extra_result_tys))
+	         	        (map Type (realWorldStatePrimTy : io_res_ty : extra_result_tys)
+			         ++ (state : anss)) 
 
 	; (ccall_res_ty, the_alt) <- mk_alt return_result res
 

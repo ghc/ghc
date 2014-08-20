@@ -34,7 +34,7 @@ fi
 AC_SUBST([CONFIGURE_ARGS], [$ac_configure_args])
 
 dnl ----------------------------------------------------------
-dnl ** Find unixy sort and find commands, 
+dnl ** Find unixy sort and find commands,
 dnl ** which are needed by FP_SETUP_PROJECT_VERSION
 
 dnl ** Find find command (for Win32's benefit)
@@ -91,7 +91,7 @@ AC_ARG_WITH([ghc],
   WithGhc="$GHC"])
 
 dnl ** Tell the make system which OS we are using
-dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something 
+dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something
 AC_SUBST(OSTYPE)
 
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
@@ -136,8 +136,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.4],
-    [AC_MSG_ERROR([GHC version 7.4 or later is required to compile GHC.])])dnl
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.6],
+    [AC_MSG_ERROR([GHC version 7.6 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
@@ -151,9 +151,7 @@ then
     fi
 fi
 
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],
-                    GHC_PACKAGE_DB_FLAG=package-conf,
-                    GHC_PACKAGE_DB_FLAG=package-db)
+GHC_PACKAGE_DB_FLAG=package-db
 AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
 # GHC 7.7+ needs -fcmm-sink when compiling Parser.hs. See #8182
@@ -161,6 +159,11 @@ FP_COMPARE_VERSIONS([$GhcVersion],[-gt],[7.7],
                     CMM_SINK_BOOTSTRAP_IS_NEEDED=YES,
                     CMM_SINK_BOOTSTRAP_IS_NEEDED=NO)
 AC_SUBST(CMM_SINK_BOOTSTRAP_IS_NEEDED)
+
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.9],
+                    SUPPORTS_PACKAGE_KEY=NO,
+                    SUPPORTS_PACKAGE_KEY=YES)
+AC_SUBST(SUPPORTS_PACKAGE_KEY)
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -183,6 +186,56 @@ AC_SUBST([WithGhc])
 
 dnl ** Without optimization some INLINE trickery fails for GHCi
 SRC_CC_OPTS="-O"
+
+dnl ** Bug 9439: Some GHC 7.8 releases had broken LLVM code generator.
+dnl Unfortunately we don't know whether the user is going to request a
+dnl build with the LLVM backend as this is only given in build.mk.
+dnl
+dnl Instead, we try to do as much work as possible here, checking
+dnl whether -fllvm is the stage 0 compiler's default. If so we
+dnl fail. If not, we check whether -fllvm is affected explicitly and
+dnl if so set a flag. The build system will later check this flag
+dnl after the desired build flags are known.
+AC_MSG_CHECKING(whether bootstrap compiler is affected by bug 9439)
+echo "main = putStrLn \"%function\"" > conftestghc.hs
+
+# Check whether LLVM backend is default for this platform
+${WithGhc} conftestghc.hs 2>&1 >/dev/null
+res=`./conftestghc`
+if test "x$res" == "x%object"
+then
+    AC_MSG_RESULT(yes)
+    echo "Buggy bootstrap compiler"
+    echo ""
+    echo "The stage 0 compiler $WithGhc is affected by GHC Bug \#9439"
+    echo "and therefore will miscompile the LLVM backend if -fllvm is"
+    echo "used."
+    echo
+    echo "Please use another bootstrap compiler"
+    exit 1
+fi
+
+# -fllvm is not the default, but set a flag so the Makefile can check
+# -for it in the build flags later on
+${WithGhc} -fforce-recomp -fllvm conftestghc.hs 2>&1 >/dev/null
+if test $? == 0
+then
+    res=`./conftestghc`
+    if test "x$res" == "x%object"
+    then
+        AC_MSG_RESULT(yes)
+        GHC_LLVM_AFFECTED_BY_9439=1
+    elif test "x$res" == "x%function"
+    then
+        AC_MSG_RESULT(no)
+        GHC_LLVM_AFFECTED_BY_9439=0
+    else
+        AC_MSG_WARN(unexpected output $res)
+    fi
+else
+    AC_MSG_RESULT(failed to compile, assuming no)
+fi
+AC_SUBST([GHC_LLVM_AFFECTED_BY_9439])
 
 dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
@@ -228,7 +281,7 @@ case $host in
      # here we go with the test
      MINOR=`uname -r|cut -d '.' -f 2-`
      if test "$MINOR" -lt "11"; then
-     	SOLARIS_BROKEN_SHLD=YES
+         SOLARIS_BROKEN_SHLD=YES
      fi
      ;;
 esac
@@ -479,6 +532,9 @@ export CC
 MAYBE_OVERRIDE_STAGE0([gcc],[CC_STAGE0])
 MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
 
+# --with-hs-cpp/--with-hs-cpp-flags
+FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
+
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
 FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
@@ -623,9 +679,6 @@ chmod +x install-sh
 dnl ** figure out how to do a BSD-ish install
 AC_PROG_INSTALL
 
-dnl If you can run configure, you certainly have /bin/sh
-AC_DEFINE([HAVE_BIN_SH], [1], [Define to 1 if you have /bin/sh.])
-
 dnl ** how to invoke `ar' and `ranlib'
 FP_PROG_AR_SUPPORTS_ATFILE
 FP_PROG_AR_NEEDS_RANLIB
@@ -762,30 +815,6 @@ FP_CHECK_FUNC([WinExec],
 
 FP_CHECK_FUNC([GetModuleFileName],
   [@%:@include <windows.h>], [GetModuleFileName((HMODULE)0,(LPTSTR)0,0)])
-
-dnl ** check return type of signal handlers
-dnl Foo: assumes we can use prototypes.
-dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
-dnl AC_CACHE_CHECK([type of signal handlers], ac_cv_type_signal_handler,
-dnl [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
-dnl #include <signal.h>
-dnl #ifdef signal
-dnl #undef signal
-dnl #endif
-dnl void (*signal (int, void (*)(int)))(int);
-dnl ]],
-dnl [[int i;]])],
-dnl [ac_cv_type_signal_handler=void_int],
-dnl [ac_cv_type_signal_handler=int_void])])
-dnl if test "$ac_cv_type_signal_handler" = void_int; then
-dnl AC_DEFINE(VOID_INT_SIGNALS)
-dnl fi
-
-dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
-AC_TYPE_SIGNAL
-if test "$ac_cv_type_signal" = void; then
-  AC_DEFINE([VOID_INT_SIGNALS], [1], [Define to 1 if signal handlers have type void (*)(int). Otherwise, they're assumed to have type int (*)(void).])
-fi
 
 dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
@@ -991,13 +1020,14 @@ echo ["\
    Using $CompilerName       : $WhatGccIsCalled
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
-
-   ld       : $LdCmd
-   Happy    : $HappyCmd ($HappyVersion)
-   Alex     : $AlexCmd ($AlexVersion)
-   Perl     : $PerlCmd
-   dblatex  : $DblatexCmd
-   xsltproc : $XsltprocCmd
+   cpp       : $HaskellCPPCmd
+   cpp-flags : $HaskellCPPArgs
+   ld        : $LdCmd
+   Happy     : $HappyCmd ($HappyVersion)
+   Alex      : $AlexCmd ($AlexVersion)
+   Perl      : $PerlCmd
+   dblatex   : $DblatexCmd
+   xsltproc  : $XsltprocCmd
 
    Using LLVM tools
       llc   : $LlcCmd

@@ -8,6 +8,8 @@ FunDeps - functional dependencies
 It's better to read it as: "if we know these, then we're going to know these"
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module FunDeps (
         FDEq (..),
         Equation(..), pprEquation,
@@ -26,8 +28,8 @@ import Unify
 import InstEnv
 import VarSet
 import VarEnv
-import Maybes( firstJusts )
 import Outputable
+import ErrUtils( Validity(..), allValid )
 import Util
 import FastString
 
@@ -415,7 +417,7 @@ makes instance inference go into a loop, because it requires the constraint
 \begin{code}
 checkInstCoverage :: Bool   -- Be liberal
                   -> Class -> [PredType] -> [Type]
-                  -> Maybe SDoc
+                  -> Validity
 -- "be_liberal" flag says whether to use "liberal" coverage of
 --              See Note [Coverage Condition] below
 --
@@ -424,14 +426,14 @@ checkInstCoverage :: Bool   -- Be liberal
 --    Just msg => coverage problem described by msg
 
 checkInstCoverage be_liberal clas theta inst_taus
-  = firstJusts (map fundep_ok fds)
+  = allValid (map fundep_ok fds)
   where
     (tyvars, fds) = classTvsFds clas
     fundep_ok fd
        | if be_liberal then liberal_ok else conservative_ok
-       = Nothing
+       = IsValid
        | otherwise
-       = Just msg
+       = NotValid msg
        where
          (ls,rs) = instFD fd tyvars inst_taus
          ls_tvs = closeOverKinds (tyVarsOfTypes ls)  -- See Note [Closing over kinds in coverage]
@@ -559,7 +561,7 @@ if s1 matches
 \begin{code}
 checkFunDeps :: (InstEnv, InstEnv) -> ClsInst
              -> Maybe [ClsInst] -- Nothing  <=> ok
-                                        -- Just dfs <=> conflict with dfs
+                                -- Just dfs <=> conflict with dfs
 -- Check wheher adding DFunId would break functional-dependency constraints
 -- Used only for instance decls defined in the module being compiled
 checkFunDeps inst_envs ispec

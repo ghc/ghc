@@ -6,6 +6,7 @@
 name:           rts
 version:        1.0
 id:             builtin_rts
+key:            rts
 license:        BSD3
 maintainer:     glasgow-haskell-users@haskell.org
 exposed:        True
@@ -16,7 +17,7 @@ hidden-modules:
 import-dirs:
 
 #ifdef INSTALLING
-library-dirs:           LIB_DIR"/rts-1.0" PAPI_LIB_DIR FFI_LIB_DIR
+library-dirs:           LIB_DIR"/rts" PAPI_LIB_DIR FFI_LIB_DIR
 #else /* !INSTALLING */
 library-dirs:           TOP"/rts/dist/build" PAPI_LIB_DIR FFI_LIB_DIR
 #endif
@@ -99,6 +100,7 @@ ld-options:
          , "-Wl,-u,_base_GHCziIOziException_blockedIndefinitelyOnMVar_closure"
          , "-Wl,-u,_base_GHCziIOziException_blockedIndefinitelyOnSTM_closure"
          , "-Wl,-u,_base_ControlziExceptionziBase_nestedAtomically_closure"
+         , "-Wl,-u,_base_GHCziEventziThread_blockedOnBadFD_closure"
          , "-Wl,-u,_base_GHCziWeak_runFinalizzerBatch_closure"
          , "-Wl,-u,_base_GHCziTopHandler_flushStdHandles_closure"
          , "-Wl,-u,_base_GHCziTopHandler_runIO_closure"
@@ -139,6 +141,7 @@ ld-options:
          , "-Wl,-u,base_GHCziIOziException_blockedIndefinitelyOnMVar_closure"
          , "-Wl,-u,base_GHCziIOziException_blockedIndefinitelyOnSTM_closure"
          , "-Wl,-u,base_ControlziExceptionziBase_nestedAtomically_closure"
+         , "-Wl,-u,base_GHCziEventziThread_blockedOnBadFD_closure"
          , "-Wl,-u,base_GHCziWeak_runFinalizzerBatch_closure"
          , "-Wl,-u,base_GHCziTopHandler_flushStdHandles_closure"
          , "-Wl,-u,base_GHCziTopHandler_runIO_closure"

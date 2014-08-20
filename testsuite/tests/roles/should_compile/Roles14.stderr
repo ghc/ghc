@@ -1,9 +1,7 @@
 TYPE SIGNATURES
 TYPE CONSTRUCTORS
-  C2 :: * -> Constraint
-  class C2 a
-    Roles: [representational]
-    RecFlag NonRecursive
+  type role C2 representational
+  class C2 a where
     meth2 :: a -> a
 COERCION AXIOMS
   axiom Roles12.NTCo:C2 :: C2 a = a -> a

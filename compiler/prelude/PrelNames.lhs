@@ -37,56 +37,73 @@ Nota Bene: all Names defined in here should come from the base package
 
 Note [Known-key names]
 ~~~~~~~~~~~~~~~~~~~~~~
+It is *very* important that the compiler gives wired-in things and
+things with "known-key" names the correct Uniques wherever they
+occur. We have to be careful about this in exactly two places:
 
-It is *very* important that the compiler gives wired-in things and things with "known-key" names
-the correct Uniques wherever they occur. We have to be careful about this in exactly two places:
+  1. When we parse some source code, renaming the AST better yield an
+     AST whose Names have the correct uniques
 
-  1. When we parse some source code, renaming the AST better yield an AST whose Names have the
-     correct uniques
-
-  2. When we read an interface file, the read-in gubbins better have the right uniques
+  2. When we read an interface file, the read-in gubbins better have
+     the right uniques
 
 This is accomplished through a combination of mechanisms:
 
-  1. When parsing source code, the RdrName-decorated AST has some RdrNames which are Exact. These are
-     wired-in RdrNames where the we could directly tell from the parsed syntax what Name to use. For
-     example, when we parse a [] in a type we can just insert an Exact RdrName Name with the listTyConKey.
+  1. When parsing source code, the RdrName-decorated AST has some
+     RdrNames which are Exact. These are wired-in RdrNames where the
+     we could directly tell from the parsed syntax what Name to
+     use. For example, when we parse a [] in a type we can just insert
+     an Exact RdrName Name with the listTyConKey.
 
-     Currently, I believe this is just an optimisation: it would be equally valid to just output Orig
-     RdrNames that correctly record the module etc we expect the final Name to come from. However,
-     were we to eliminate isTupleOcc_maybe it would become essential (see point 3).
+     Currently, I believe this is just an optimisation: it would be
+     equally valid to just output Orig RdrNames that correctly record
+     the module etc we expect the final Name to come from. However,
+     were we to eliminate isBuiltInOcc_maybe it would become essential
+     (see point 3).
 
-  2. The knownKeyNames (which consist of the basicKnownKeyNames from the module, and those names reachable
-     via the wired-in stuff from TysWiredIn) are used to initialise the "original name cache" in IfaceEnv.
-     This initialization ensures that when the type checker or renamer (both of which use IfaceEnv) look up
-     an original name (i.e. a pair of a Module and an OccName) for a known-key name they get the correct Unique.
+  2. The knownKeyNames (which consist of the basicKnownKeyNames from
+     the module, and those names reachable via the wired-in stuff from
+     TysWiredIn) are used to initialise the "OrigNameCache" in
+     IfaceEnv.  This initialization ensures that when the type checker
+     or renamer (both of which use IfaceEnv) look up an original name
+     (i.e. a pair of a Module and an OccName) for a known-key name
+     they get the correct Unique.
 
-     This is the most important mechanism for ensuring that known-key stuff gets the right Unique, and is why
-     it is so important to place your known-key names in the appropriate lists.
+     This is the most important mechanism for ensuring that known-key
+     stuff gets the right Unique, and is why it is so important to
+     place your known-key names in the appropriate lists.
 
-  3. For "infinite families" of known-key names (i.e. tuples, Any tycons and implicit parameter TyCons), we
-     have to be extra careful. Because there are an infinite number of these things, we cannot add them to
-     the list of known-key names used to initialise the original name cache. Instead, we have to rely on
-     never having to look them up in that cache.
+  3. For "infinite families" of known-key names (i.e. tuples), we have
+     to be extra careful. Because there are an infinite number of
+     these things, we cannot add them to the list of known-key names
+     used to initialise the OrigNameCache. Instead, we have to
+     rely on never having to look them up in that cache.
 
      This is accomplished through a variety of mechanisms:
 
-       a) The known infinite families of names are specially serialised by BinIface.putName, with that special treatment
-          detected when we read back to ensure that we get back to the correct uniques.
+       a) The parser recognises them specially and generates an 
+          Exact Name (hence not looked up in the orig-name cache)
 
-       b) Most of the infinite families cannot occur in source code, so mechanism a) sufficies to ensure that they
-          always have the right Unique. In particular, implicit param TyCon names, constraint tuples and Any TyCons
-          cannot be mentioned by the user.
+       b) The known infinite families of names are specially
+          serialised by BinIface.putName, with that special treatment
+          detected when we read back to ensure that we get back to the
+          correct uniques.
 
-       c) Tuple TyCon/DataCon names have a special hack (isTupleOcc_maybe) that is used by the original name cache
-          lookup routine to detect tuple names and give them the right Unique. You might think that this is unnecessary
-          because tuple TyCon/DataCons are parsed as Exact RdrNames and *don't* appear as original names in interface files
-          (because serialization gives them special treatment), so we will never look them up in the original name cache.
+       Most of the infinite families cannot occur in source code,
+       so mechanisms (a,b) sufficies to ensure that they always have
+       the right Unique. In particular, implicit param TyCon names,
+       constraint tuples and Any TyCons cannot be mentioned by the
+       user.
 
-          However, there is a subtle reason why this is not the case: if you use setRdrNameSpace on an Exact RdrName
-          it may be turned into an Orig RdrName. So if the original name was an Exact tuple Name we might end up with
-          an Orig instead, which *will* lead to an original name cache query.
+       c) IfaceEnv.lookupOrigNameCache uses isBuiltInOcc_maybe to map
+          built-in syntax directly onto the corresponding name, rather
+          than trying to find it in the original-name cache.
+
+          See also Note [Built-in syntax and the OrigNameCache]
+
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module PrelNames (
         Unique, Uniquable(..), hasKey,  -- Re-exported for convenience
 
@@ -108,6 +125,19 @@ import BasicTypes
 import Name
 import SrcLoc
 import FastString
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+     allNameStrings
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+allNameStrings :: [String]
+-- Infinite list of a,b,c...z, aa, ab, ac, ... etc
+allNameStrings = [ c:cs | cs <- "" : allNameStrings, c <- ['a'..'z'] ] 
 \end{code}
 
 
@@ -431,7 +461,7 @@ rOOT_MAIN       = mkMainModule (fsLit ":Main") -- Root module for initialisation
 
 mkInteractiveModule :: Int -> Module
 -- (mkInteractiveMoudule 9) makes module 'interactive:M9'
-mkInteractiveModule n = mkModule interactivePackageId (mkModuleName ("Ghci" ++ show n))
+mkInteractiveModule n = mkModule interactivePackageKey (mkModuleName ("Ghci" ++ show n))
 
 pRELUDE_NAME, mAIN_NAME :: ModuleName
 pRELUDE_NAME   = mkModuleNameFS (fsLit "Prelude")
@@ -442,28 +472,28 @@ dATA_ARRAY_PARALLEL_NAME      = mkModuleNameFS (fsLit "Data.Array.Parallel")
 dATA_ARRAY_PARALLEL_PRIM_NAME = mkModuleNameFS (fsLit "Data.Array.Parallel.Prim")
 
 mkPrimModule :: FastString -> Module
-mkPrimModule m = mkModule primPackageId (mkModuleNameFS m)
+mkPrimModule m = mkModule primPackageKey (mkModuleNameFS m)
 
 mkIntegerModule :: FastString -> Module
-mkIntegerModule m = mkModule integerPackageId (mkModuleNameFS m)
+mkIntegerModule m = mkModule integerPackageKey (mkModuleNameFS m)
 
 mkBaseModule :: FastString -> Module
-mkBaseModule m = mkModule basePackageId (mkModuleNameFS m)
+mkBaseModule m = mkModule basePackageKey (mkModuleNameFS m)
 
 mkBaseModule_ :: ModuleName -> Module
-mkBaseModule_ m = mkModule basePackageId m
+mkBaseModule_ m = mkModule basePackageKey m
 
 mkThisGhcModule :: FastString -> Module
-mkThisGhcModule m = mkModule thisGhcPackageId (mkModuleNameFS m)
+mkThisGhcModule m = mkModule thisGhcPackageKey (mkModuleNameFS m)
 
 mkThisGhcModule_ :: ModuleName -> Module
-mkThisGhcModule_ m = mkModule thisGhcPackageId m
+mkThisGhcModule_ m = mkModule thisGhcPackageKey m
 
 mkMainModule :: FastString -> Module
-mkMainModule m = mkModule mainPackageId (mkModuleNameFS m)
+mkMainModule m = mkModule mainPackageKey (mkModuleNameFS m)
 
 mkMainModule_ :: ModuleName -> Module
-mkMainModule_ m = mkModule mainPackageId m
+mkMainModule_ m = mkModule mainPackageKey m
 \end{code}
 
 %************************************************************************
@@ -473,10 +503,10 @@ mkMainModule_ m = mkModule mainPackageId m
 %************************************************************************
 
 \begin{code}
-mkTupleModule :: TupleSort -> Arity -> Module
-mkTupleModule BoxedTuple   _ = gHC_TUPLE
-mkTupleModule ConstraintTuple    _ = gHC_TUPLE
-mkTupleModule UnboxedTuple _ = gHC_PRIM
+mkTupleModule :: TupleSort -> Module
+mkTupleModule BoxedTuple      = gHC_TUPLE
+mkTupleModule ConstraintTuple = gHC_TUPLE
+mkTupleModule UnboxedTuple    = gHC_PRIM
 \end{code}
 
 
@@ -802,20 +832,20 @@ inlineIdName            = varQual gHC_MAGIC (fsLit "inline") inlineIdKey
 
 -- Base classes (Eq, Ord, Functor)
 fmapName, eqClassName, eqName, ordClassName, geName, functorClassName :: Name
-eqClassName       = clsQual  gHC_CLASSES (fsLit "Eq")      eqClassKey
-eqName            = methName gHC_CLASSES (fsLit "==")      eqClassOpKey
-ordClassName      = clsQual  gHC_CLASSES (fsLit "Ord")     ordClassKey
-geName            = methName gHC_CLASSES (fsLit ">=")      geClassOpKey
-functorClassName  = clsQual  gHC_BASE (fsLit "Functor") functorClassKey
-fmapName          = methName gHC_BASE (fsLit "fmap")    fmapClassOpKey
+eqClassName       = clsQual gHC_CLASSES (fsLit "Eq")      eqClassKey
+eqName            = varQual gHC_CLASSES (fsLit "==")      eqClassOpKey
+ordClassName      = clsQual gHC_CLASSES (fsLit "Ord")     ordClassKey
+geName            = varQual gHC_CLASSES (fsLit ">=")      geClassOpKey
+functorClassName  = clsQual gHC_BASE    (fsLit "Functor") functorClassKey
+fmapName          = varQual gHC_BASE    (fsLit "fmap")    fmapClassOpKey
 
 -- Class Monad
 monadClassName, thenMName, bindMName, returnMName, failMName :: Name
-monadClassName     = clsQual  gHC_BASE (fsLit "Monad")  monadClassKey
-thenMName          = methName gHC_BASE (fsLit ">>")     thenMClassOpKey
-bindMName          = methName gHC_BASE (fsLit ">>=")    bindMClassOpKey
-returnMName        = methName gHC_BASE (fsLit "return") returnMClassOpKey
-failMName          = methName gHC_BASE (fsLit "fail")   failMClassOpKey
+monadClassName     = clsQual gHC_BASE (fsLit "Monad")  monadClassKey
+thenMName          = varQual gHC_BASE (fsLit ">>")     thenMClassOpKey
+bindMName          = varQual gHC_BASE (fsLit ">>=")    bindMClassOpKey
+returnMName        = varQual gHC_BASE (fsLit "return") returnMClassOpKey
+failMName          = varQual gHC_BASE (fsLit "fail")   failMClassOpKey
 
 -- Classes (Applicative, Foldable, Traversable)
 applicativeClassName, foldableClassName, traversableClassName :: Name
@@ -828,10 +858,10 @@ traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") trave
 -- AMP additions
 
 joinMName,  apAName, pureAName, alternativeClassName :: Name
-joinMName            = methName mONAD               (fsLit "join")        joinMIdKey
-apAName              = methName cONTROL_APPLICATIVE (fsLit "<*>")         apAClassOpKey
-pureAName            = methName cONTROL_APPLICATIVE (fsLit "pure")        pureAClassOpKey
-alternativeClassName = clsQual  cONTROL_APPLICATIVE (fsLit "Alternative") alternativeClassKey
+joinMName            = varQual mONAD               (fsLit "join")        joinMIdKey
+apAName              = varQual cONTROL_APPLICATIVE (fsLit "<*>")         apAClassOpKey
+pureAName            = varQual cONTROL_APPLICATIVE (fsLit "pure")        pureAClassOpKey
+alternativeClassName = clsQual cONTROL_APPLICATIVE (fsLit "Alternative") alternativeClassKey
 
 joinMIdKey, apAClassOpKey, pureAClassOpKey, alternativeClassKey :: Unique
 joinMIdKey          = mkPreludeMiscIdUnique 750
@@ -849,7 +879,7 @@ fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
     mapName, appendName, assertName,
     breakpointName, breakpointCondName, breakpointAutoName,
     opaqueTyConName :: Name
-fromStringName = methName dATA_STRING (fsLit "fromString") fromStringClassOpKey
+fromStringName = varQual dATA_STRING (fsLit "fromString") fromStringClassOpKey
 otherwiseIdName   = varQual gHC_BASE (fsLit "otherwise")  otherwiseIdKey
 foldrName         = varQual gHC_BASE (fsLit "foldr")      foldrIdKey
 buildName         = varQual gHC_BASE (fsLit "build")      buildIdKey
@@ -860,7 +890,7 @@ assertName        = varQual gHC_BASE (fsLit "assert")     assertIdKey
 breakpointName    = varQual gHC_BASE (fsLit "breakpoint") breakpointIdKey
 breakpointCondName= varQual gHC_BASE (fsLit "breakpointCond") breakpointCondIdKey
 breakpointAutoName= varQual gHC_BASE (fsLit "breakpointAuto") breakpointAutoIdKey
-opaqueTyConName   = tcQual  gHC_BASE (fsLit "Opaque")   opaqueTyConKey
+opaqueTyConName   = tcQual  gHC_BASE (fsLit "Opaque")     opaqueTyConKey
 
 breakpointJumpName :: Name
 breakpointJumpName
@@ -888,10 +918,10 @@ sndName           = varQual dATA_TUPLE (fsLit "snd") sndIdKey
 
 -- Module GHC.Num
 numClassName, fromIntegerName, minusName, negateName :: Name
-numClassName      = clsQual  gHC_NUM (fsLit "Num") numClassKey
-fromIntegerName   = methName gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
-minusName         = methName gHC_NUM (fsLit "-") minusClassOpKey
-negateName        = methName gHC_NUM (fsLit "negate") negateClassOpKey
+numClassName      = clsQual gHC_NUM (fsLit "Num")         numClassKey
+fromIntegerName   = varQual gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
+minusName         = varQual gHC_NUM (fsLit "-")           minusClassOpKey
+negateName        = varQual gHC_NUM (fsLit "negate")      negateClassOpKey
 
 integerTyConName, mkIntegerName,
     integerToWord64Name, integerToInt64Name,
@@ -958,23 +988,23 @@ rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
     integralClassName, realFracClassName, fractionalClassName,
     fromRationalName, toIntegerName, toRationalName, fromIntegralName,
     realToFracName :: Name
-rationalTyConName   = tcQual  gHC_REAL (fsLit "Rational") rationalTyConKey
-ratioTyConName      = tcQual  gHC_REAL (fsLit "Ratio") ratioTyConKey
-ratioDataConName    = conName gHC_REAL (fsLit ":%") ratioDataConKey
-realClassName       = clsQual gHC_REAL (fsLit "Real") realClassKey
-integralClassName   = clsQual gHC_REAL (fsLit "Integral") integralClassKey
-realFracClassName   = clsQual gHC_REAL (fsLit "RealFrac") realFracClassKey
-fractionalClassName = clsQual gHC_REAL (fsLit "Fractional") fractionalClassKey
-fromRationalName    = methName gHC_REAL (fsLit "fromRational") fromRationalClassOpKey
-toIntegerName       = methName gHC_REAL (fsLit "toInteger") toIntegerClassOpKey
-toRationalName      = methName gHC_REAL (fsLit "toRational") toRationalClassOpKey
-fromIntegralName    = varQual  gHC_REAL (fsLit "fromIntegral") fromIntegralIdKey
-realToFracName      = varQual  gHC_REAL (fsLit "realToFrac") realToFracIdKey
+rationalTyConName   = tcQual  gHC_REAL (fsLit "Rational")     rationalTyConKey
+ratioTyConName      = tcQual  gHC_REAL (fsLit "Ratio")        ratioTyConKey
+ratioDataConName    = conName gHC_REAL (fsLit ":%")           ratioDataConKey
+realClassName       = clsQual gHC_REAL (fsLit "Real")         realClassKey
+integralClassName   = clsQual gHC_REAL (fsLit "Integral")     integralClassKey
+realFracClassName   = clsQual gHC_REAL (fsLit "RealFrac")     realFracClassKey
+fractionalClassName = clsQual gHC_REAL (fsLit "Fractional")   fractionalClassKey
+fromRationalName    = varQual gHC_REAL (fsLit "fromRational") fromRationalClassOpKey
+toIntegerName       = varQual gHC_REAL (fsLit "toInteger")    toIntegerClassOpKey
+toRationalName      = varQual gHC_REAL (fsLit "toRational")   toRationalClassOpKey
+fromIntegralName    = varQual  gHC_REAL (fsLit "fromIntegral")fromIntegralIdKey
+realToFracName      = varQual  gHC_REAL (fsLit "realToFrac")  realToFracIdKey
 
 -- PrelFloat classes
 floatingClassName, realFloatClassName :: Name
-floatingClassName  = clsQual  gHC_FLOAT (fsLit "Floating") floatingClassKey
-realFloatClassName = clsQual  gHC_FLOAT (fsLit "RealFloat") realFloatClassKey
+floatingClassName  = clsQual gHC_FLOAT (fsLit "Floating")  floatingClassKey
+realFloatClassName = clsQual gHC_FLOAT (fsLit "RealFloat") realFloatClassKey
 
 -- other GHC.Float functions
 rationalToFloatName, rationalToDoubleName :: Name
@@ -990,7 +1020,7 @@ typeableClassName,
     oldTypeableClassName, oldTypeable1ClassName, oldTypeable2ClassName,
     oldTypeable3ClassName, oldTypeable4ClassName, oldTypeable5ClassName,
     oldTypeable6ClassName, oldTypeable7ClassName :: Name
-typeableClassName  = clsQual tYPEABLE_INTERNAL (fsLit "Typeable")  typeableClassKey
+typeableClassName     = clsQual tYPEABLE_INTERNAL    (fsLit "Typeable")  typeableClassKey
 oldTypeableClassName  = clsQual oLDTYPEABLE_INTERNAL (fsLit "Typeable")  oldTypeableClassKey
 oldTypeable1ClassName = clsQual oLDTYPEABLE_INTERNAL (fsLit "Typeable1") oldTypeable1ClassKey
 oldTypeable2ClassName = clsQual oLDTYPEABLE_INTERNAL (fsLit "Typeable2") oldTypeable2ClassKey
@@ -1016,33 +1046,33 @@ assertErrorName   = varQual gHC_IO_Exception (fsLit "assertError") assertErrorId
 -- Enum module (Enum, Bounded)
 enumClassName, enumFromName, enumFromToName, enumFromThenName,
     enumFromThenToName, boundedClassName :: Name
-enumClassName      = clsQual gHC_ENUM (fsLit "Enum") enumClassKey
-enumFromName       = methName gHC_ENUM (fsLit "enumFrom") enumFromClassOpKey
-enumFromToName     = methName gHC_ENUM (fsLit "enumFromTo") enumFromToClassOpKey
-enumFromThenName   = methName gHC_ENUM (fsLit "enumFromThen") enumFromThenClassOpKey
-enumFromThenToName = methName gHC_ENUM (fsLit "enumFromThenTo") enumFromThenToClassOpKey
-boundedClassName   = clsQual gHC_ENUM (fsLit "Bounded") boundedClassKey
+enumClassName      = clsQual gHC_ENUM (fsLit "Enum")           enumClassKey
+enumFromName       = varQual gHC_ENUM (fsLit "enumFrom")       enumFromClassOpKey
+enumFromToName     = varQual gHC_ENUM (fsLit "enumFromTo")     enumFromToClassOpKey
+enumFromThenName   = varQual gHC_ENUM (fsLit "enumFromThen")   enumFromThenClassOpKey
+enumFromThenToName = varQual gHC_ENUM (fsLit "enumFromThenTo") enumFromThenToClassOpKey
+boundedClassName   = clsQual gHC_ENUM (fsLit "Bounded")        boundedClassKey
 
 -- List functions
 concatName, filterName, zipName :: Name
 concatName        = varQual gHC_LIST (fsLit "concat") concatIdKey
 filterName        = varQual gHC_LIST (fsLit "filter") filterIdKey
-zipName           = varQual gHC_LIST (fsLit "zip") zipIdKey
+zipName           = varQual gHC_LIST (fsLit "zip")    zipIdKey
 
 -- Overloaded lists
 isListClassName, fromListName, fromListNName, toListName :: Name
-isListClassName = clsQual gHC_EXTS (fsLit "IsList") isListClassKey
-fromListName = methName gHC_EXTS (fsLit "fromList") fromListClassOpKey
-fromListNName = methName gHC_EXTS (fsLit "fromListN") fromListNClassOpKey
-toListName = methName gHC_EXTS (fsLit "toList") toListClassOpKey
+isListClassName = clsQual gHC_EXTS (fsLit "IsList")    isListClassKey
+fromListName    = varQual gHC_EXTS (fsLit "fromList")  fromListClassOpKey
+fromListNName   = varQual gHC_EXTS (fsLit "fromListN") fromListNClassOpKey
+toListName      = varQual gHC_EXTS (fsLit "toList")    toListClassOpKey
 
 -- Class Show
 showClassName :: Name
-showClassName     = clsQual gHC_SHOW (fsLit "Show")       showClassKey
+showClassName   = clsQual gHC_SHOW (fsLit "Show")      showClassKey
 
 -- Class Read
 readClassName :: Name
-readClassName      = clsQual gHC_READ (fsLit "Read") readClassKey
+readClassName   = clsQual gHC_READ (fsLit "Read")      readClassKey
 
 -- Classes Generic and Generic1, Datatype, Constructor and Selector
 genClassName, gen1ClassName, datatypeClassName, constructorClassName,
@@ -1050,24 +1080,27 @@ genClassName, gen1ClassName, datatypeClassName, constructorClassName,
 genClassName  = clsQual gHC_GENERICS (fsLit "Generic")  genClassKey
 gen1ClassName = clsQual gHC_GENERICS (fsLit "Generic1") gen1ClassKey
 
-datatypeClassName = clsQual gHC_GENERICS (fsLit "Datatype") datatypeClassKey
+datatypeClassName    = clsQual gHC_GENERICS (fsLit "Datatype")    datatypeClassKey
 constructorClassName = clsQual gHC_GENERICS (fsLit "Constructor") constructorClassKey
-selectorClassName = clsQual gHC_GENERICS (fsLit "Selector") selectorClassKey
+selectorClassName    = clsQual gHC_GENERICS (fsLit "Selector")    selectorClassKey
+
+genericClassNames :: [Name]
+genericClassNames = [genClassName, gen1ClassName]
 
 -- GHCi things
 ghciIoClassName, ghciStepIoMName :: Name
 ghciIoClassName = clsQual gHC_GHCI (fsLit "GHCiSandboxIO") ghciIoClassKey
-ghciStepIoMName = methName gHC_GHCI (fsLit "ghciStepIO") ghciStepIoMClassOpKey
+ghciStepIoMName = varQual gHC_GHCI (fsLit "ghciStepIO") ghciStepIoMClassOpKey
 
 -- IO things
 ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName,
     failIOName :: Name
-ioTyConName       = tcQual  gHC_TYPES (fsLit "IO") ioTyConKey
-ioDataConName     = conName gHC_TYPES (fsLit "IO") ioDataConKey
-thenIOName        = varQual gHC_BASE (fsLit "thenIO") thenIOIdKey
-bindIOName        = varQual gHC_BASE (fsLit "bindIO") bindIOIdKey
-returnIOName      = varQual gHC_BASE (fsLit "returnIO") returnIOIdKey
-failIOName        = varQual gHC_IO (fsLit "failIO") failIOIdKey
+ioTyConName       = tcQual  gHC_TYPES (fsLit "IO")       ioTyConKey
+ioDataConName     = conName gHC_TYPES (fsLit "IO")       ioDataConKey
+thenIOName        = varQual gHC_BASE  (fsLit "thenIO")   thenIOIdKey
+bindIOName        = varQual gHC_BASE  (fsLit "bindIO")   bindIOIdKey
+returnIOName      = varQual gHC_BASE  (fsLit "returnIO") returnIOIdKey
+failIOName        = varQual gHC_IO    (fsLit "failIO")   failIOIdKey
 
 -- IO things
 printName :: Name
@@ -1075,7 +1108,7 @@ printName         = varQual sYSTEM_IO (fsLit "print") printIdKey
 
 -- Int, Word, and Addr things
 int8TyConName, int16TyConName, int32TyConName, int64TyConName :: Name
-int8TyConName     = tcQual gHC_INT  (fsLit "Int8") int8TyConKey
+int8TyConName     = tcQual gHC_INT  (fsLit "Int8")  int8TyConKey
 int16TyConName    = tcQual gHC_INT  (fsLit "Int16") int16TyConKey
 int32TyConName    = tcQual gHC_INT  (fsLit "Int32") int32TyConKey
 int64TyConName    = tcQual gHC_INT  (fsLit "Int64") int64TyConKey
@@ -1089,12 +1122,12 @@ word64TyConName   = tcQual  gHC_WORD (fsLit "Word64") word64TyConKey
 
 -- PrelPtr module
 ptrTyConName, funPtrTyConName :: Name
-ptrTyConName      = tcQual   gHC_PTR (fsLit "Ptr") ptrTyConKey
+ptrTyConName      = tcQual   gHC_PTR (fsLit "Ptr")    ptrTyConKey
 funPtrTyConName   = tcQual   gHC_PTR (fsLit "FunPtr") funPtrTyConKey
 
 -- Foreign objects and weak pointers
 stablePtrTyConName, newStablePtrName :: Name
-stablePtrTyConName    = tcQual   gHC_STABLE (fsLit "StablePtr") stablePtrTyConKey
+stablePtrTyConName    = tcQual   gHC_STABLE (fsLit "StablePtr")    stablePtrTyConKey
 newStablePtrName      = varQual  gHC_STABLE (fsLit "newStablePtr") newStablePtrIdKey
 
 -- PrelST module
@@ -1104,21 +1137,21 @@ runSTRepName       = varQual gHC_ST  (fsLit "runSTRep") runSTRepIdKey
 -- Recursive-do notation
 monadFixClassName, mfixName :: Name
 monadFixClassName  = clsQual mONAD_FIX (fsLit "MonadFix") monadFixClassKey
-mfixName           = methName mONAD_FIX (fsLit "mfix") mfixIdKey
+mfixName           = varQual mONAD_FIX (fsLit "mfix")     mfixIdKey
 
 -- Arrow notation
 arrAName, composeAName, firstAName, appAName, choiceAName, loopAName :: Name
-arrAName           = varQual aRROW (fsLit "arr")          arrAIdKey
+arrAName           = varQual aRROW (fsLit "arr")       arrAIdKey
 composeAName       = varQual gHC_DESUGAR (fsLit ">>>") composeAIdKey
-firstAName         = varQual aRROW (fsLit "first") firstAIdKey
-appAName           = varQual aRROW (fsLit "app")          appAIdKey
-choiceAName        = varQual aRROW (fsLit "|||")          choiceAIdKey
-loopAName          = varQual aRROW (fsLit "loop")  loopAIdKey
+firstAName         = varQual aRROW (fsLit "first")     firstAIdKey
+appAName           = varQual aRROW (fsLit "app")       appAIdKey
+choiceAName        = varQual aRROW (fsLit "|||")       choiceAIdKey
+loopAName          = varQual aRROW (fsLit "loop")      loopAIdKey
 
 -- Monad comprehensions
 guardMName, liftMName, mzipName :: Name
-guardMName         = varQual mONAD (fsLit "guard") guardMIdKey
-liftMName          = varQual mONAD (fsLit "liftM") liftMIdKey
+guardMName         = varQual mONAD (fsLit "guard")    guardMIdKey
+liftMName          = varQual mONAD (fsLit "liftM")    liftMIdKey
 mzipName           = varQual mONAD_ZIP (fsLit "mzip") mzipIdKey
 
 
@@ -1129,9 +1162,9 @@ toAnnotationWrapperName = varQual gHC_DESUGAR (fsLit "toAnnotationWrapper") toAn
 -- Other classes, needed for type defaulting
 monadPlusClassName, randomClassName, randomGenClassName,
     isStringClassName :: Name
-monadPlusClassName  = clsQual mONAD (fsLit "MonadPlus")  monadPlusClassKey
-randomClassName     = clsQual rANDOM (fsLit "Random")    randomClassKey
-randomGenClassName  = clsQual rANDOM (fsLit "RandomGen") randomGenClassKey
+monadPlusClassName  = clsQual mONAD (fsLit "MonadPlus")      monadPlusClassKey
+randomClassName     = clsQual rANDOM (fsLit "Random")        randomClassKey
+randomGenClassName  = clsQual rANDOM (fsLit "RandomGen")     randomGenClassKey
 isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
 
 -- Type-level naturals
@@ -1187,10 +1220,6 @@ mk_known_key_name space modu str unique
 conName :: Module -> FastString -> Unique -> Name
 conName modu occ unique
   = mkExternalName unique modu (mkOccNameFS dataName occ) noSrcSpan
-
-methName :: Module -> FastString -> Unique -> Name
-methName modu occ unique
-  = mkExternalName unique modu (mkVarOccFS occ) noSrcSpan
 \end{code}
 
 %************************************************************************
@@ -1299,7 +1328,7 @@ addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey, byteA
     floatPrimTyConKey, floatTyConKey, funTyConKey, intPrimTyConKey,
     intTyConKey, int8TyConKey, int16TyConKey, int32PrimTyConKey,
     int32TyConKey, int64PrimTyConKey, int64TyConKey,
-    integerTyConKey, digitsTyConKey,
+    integerTyConKey,
     listTyConKey, foreignObjPrimTyConKey, weakPrimTyConKey,
     mutableArrayPrimTyConKey, mutableArrayArrayPrimTyConKey, mutableByteArrayPrimTyConKey,
     orderingTyConKey, mVarPrimTyConKey, ratioTyConKey, rationalTyConKey,
@@ -1326,7 +1355,7 @@ int32TyConKey                           = mkPreludeTyConUnique 19
 int64PrimTyConKey                       = mkPreludeTyConUnique 20
 int64TyConKey                           = mkPreludeTyConUnique 21
 integerTyConKey                         = mkPreludeTyConUnique 22
-digitsTyConKey                          = mkPreludeTyConUnique 23
+
 listTyConKey                            = mkPreludeTyConUnique 24
 foreignObjPrimTyConKey                  = mkPreludeTyConUnique 25
 weakPrimTyConKey                        = mkPreludeTyConUnique 27

@@ -1,0 +1,12 @@
+two writes (should fail)
+Left openFile005.out1: openFile: resource busy (file is locked)
+write and an append (should fail)
+Left openFile005.out1: openFile: resource busy (file is locked)
+read/write and a write (should fail)
+Left openFile005.out1: openFile: resource busy (file is locked)
+read and a read/write (should fail)
+Left openFile005.out1: openFile: resource busy (file is locked)
+write and a read (should fail)
+Left openFile005.out1: openFile: resource busy (file is locked)
+two writes, different files (silly, but should succeed)
+two reads, should succeed

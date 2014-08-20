@@ -23,6 +23,8 @@ pre {
 pre.screen         { color: #006400 }
 pre.programlisting { color: maroon }
 
+code.option { white-space: nowrap }
+
 div.example {
   margin: 1ex 0em;
   border: solid #412e25 1px;

@@ -1,0 +1,5 @@
+foo ()
+{
+  STK_CHK_GEN_N (8); /* panics */
+  return (0);
+}

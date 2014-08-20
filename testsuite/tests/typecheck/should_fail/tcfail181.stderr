@@ -10,7 +10,6 @@ tcfail181.hs:17:9:
       instance Monad ((->) r) -- Defined in ‘GHC.Base’
       instance Monad IO -- Defined in ‘GHC.Base’
       instance Monad [] -- Defined in ‘GHC.Base’
-      ...plus one other
     In the expression: foo
     In the expression: foo {bar = return True}
     In an equation for ‘wog’: wog x = foo {bar = return True}

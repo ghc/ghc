@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fcontext-stack=1000 #-} 
 {-# LANGUAGE 
      FlexibleContexts, FlexibleInstances, FunctionalDependencies, 
-     MultiParamTypeClasses, OverlappingInstances, TypeSynonymInstances, 
+     MultiParamTypeClasses, TypeSynonymInstances, 
      TypeOperators, UndecidableInstances, TypeFamilies #-} 
 module T5321Fun where
 

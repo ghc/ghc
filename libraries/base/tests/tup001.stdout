@@ -1,0 +1,7 @@
+((),(A,B),(A,B,C),(A,B,C,D),(A,B,C,D,E),(A,B,C,D,E,F),(A,B,C,D,E,F,G),(A,B,C,D,E,F,G,H),(A,B,C,D,E,F,G,H,I),(A,B,C,D,E,F,G,H,I,J),(A,B,C,D,E,F,G,H,I,J,K),(A,B,C,D,E,F,G,H,I,J,K,L),(A,B,C,D,E,F,G,H,I,J,K,L,M),(A,B,C,D,E,F,G,H,I,J,K,L,M,N),(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O))
+((),(A,B),(A,B,C),(A,B,C,D),(A,B,C,D,E),(A,B,C,D,E,F),(A,B,C,D,E,F,G),(A,B,C,D,E,F,G,H),(A,B,C,D,E,F,G,H,I),(A,B,C,D,E,F,G,H,I,J),(A,B,C,D,E,F,G,H,I,J,K),(A,B,C,D,E,F,G,H,I,J,K,L),(A,B,C,D,E,F,G,H,I,J,K,L,M),(A,B,C,D,E,F,G,H,I,J,K,L,M,N),(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O))
+True
+False
+False
+((),(A,A),(A,A,A),(A,A,A,A),(A,A,A,A,A),(A,A,A,A,A,A),(A,A,A,A,A,A,A),(A,A,A,A,A,A,A,A),(A,A,A,A,A,A,A,A,A),(A,A,A,A,A,A,A,A,A,A),(A,A,A,A,A,A,A,A,A,A,A),(A,A,A,A,A,A,A,A,A,A,A,A),(A,A,A,A,A,A,A,A,A,A,A,A,A),(A,A,A,A,A,A,A,A,A,A,A,A,A,A),(A,A,A,A,A,A,A,A,A,A,A,A,A,A,A))
+((),(O,O),(O,O,O),(O,O,O,O),(O,O,O,O,O),(O,O,O,O,O,O),(O,O,O,O,O,O,O),(O,O,O,O,O,O,O,O),(O,O,O,O,O,O,O,O,O),(O,O,O,O,O,O,O,O,O,O),(O,O,O,O,O,O,O,O,O,O,O),(O,O,O,O,O,O,O,O,O,O,O,O),(O,O,O,O,O,O,O,O,O,O,O,O,O),(O,O,O,O,O,O,O,O,O,O,O,O,O,O),(O,O,O,O,O,O,O,O,O,O,O,O,O,O,O))

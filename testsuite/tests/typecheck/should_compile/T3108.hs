@@ -1,4 +1,4 @@
-{-# LANGUAGE OverlappingInstances, UndecidableInstances, MultiParamTypeClasses, 
+{-# LANGUAGE UndecidableInstances, MultiParamTypeClasses, 
              FunctionalDependencies, FlexibleInstances #-}
 
 module T3108 where
@@ -10,9 +10,9 @@ class C0 x
  m0 :: x -> ()
  m0 = const undefined
 
-instance (C0 x, C0 y) => C0 (x,y)
-instance C0 Bool
-instance C0 (x,Bool) => C0 x
+instance {-# OVERLAPPING #-} (C0 x, C0 y) => C0 (x,y)
+instance {-# OVERLAPPING #-} C0 Bool
+instance {-# OVERLAPPABLE #-} C0 (x,Bool) => C0 x
 
 foo :: ()
 foo = m0 (1::Int)
@@ -25,9 +25,9 @@ class C1 x
  m1 :: x -> ()
  m1 = const undefined
 
-instance (C1 x, C1 y) => C1 (x,y)
-instance C1 Bool
-instance (C2 x y, C1 (y,Bool)) => C1 x
+instance {-# OVERLAPPING #-} (C1 x, C1 y) => C1 (x,y)
+instance {-# OVERLAPPING #-} C1 Bool
+instance {-# OVERLAPPABLE #-} (C2 x y, C1 (y,Bool)) => C1 x
 
 class C2 x y | x -> y
 instance C2 Int Int

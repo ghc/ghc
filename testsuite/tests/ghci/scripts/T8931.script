@@ -1,0 +1,3 @@
+:m +Data.Typeable
+let {f :: Typeable a => (a->Bool) -> Bool; f _ = True}
+f (\x -> (x == 3))

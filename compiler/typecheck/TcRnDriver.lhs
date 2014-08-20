@@ -5,6 +5,8 @@
 \section[TcMovectle]{Typechecking a whole module}
 
 \begin{code}
+{-# LANGUAGE CPP, NondecreasingIndentation #-}
+
 module TcRnDriver (
 #ifdef GHCI
         tcRnStmt, tcRnExpr, tcRnType,
@@ -18,8 +20,7 @@ module TcRnDriver (
         tcRnLookupName,
         tcRnGetInfo,
         tcRnModule, tcRnModuleTcRnM,
-        tcTopSrcDecls,
-        tcRnExtCore
+        tcTopSrcDecls
     ) where
 
 #ifdef GHCI
@@ -58,10 +59,9 @@ import LoadIface
 import RnNames
 import RnEnv
 import RnSource
-import PprCore
-import CoreSyn
 import ErrUtils
 import Id
+import IdInfo( IdDetails( VanillaId ) )
 import VarEnv
 import Module
 import UniqFM
@@ -79,14 +79,11 @@ import DataCon
 import Type
 import Class
 import CoAxiom
-import Inst     ( tcGetInstEnvs, tcGetInsts )
+import Inst     ( tcGetInstEnvs )
 import Annotations
 import Data.List ( sortBy )
-import Data.IORef ( readIORef )
 import Data.Ord
-#ifndef GHCI
-import BasicTypes ( Origin(..) )
-#else
+#ifdef GHCI
 import BasicTypes hiding( SuccessFlag(..) )
 import TcType   ( isUnitTy, isTauTy )
 import TcHsType
@@ -303,107 +300,6 @@ tcRnImports hsc_env import_decls
         ; checkFamInstConsistency (imp_finsts imports) dir_imp_mods ;
 
         ; getGblEnv } }
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
-        Type-checking external-core modules
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-tcRnExtCore :: HscEnv
-            -> HsExtCore RdrName
-            -> IO (Messages, Maybe ModGuts)
-        -- Nothing => some error occurred
-
-tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
-        -- The decls are IfaceDecls; all names are original names
- = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
-
-   initTc hsc_env ExtCoreFile False this_mod $ do {
-
-   let { ldecls  = map noLoc decls } ;
-
-       -- Bring the type and class decls into scope
-       -- ToDo: check that this doesn't need to extract the val binds.
-       --       It seems that only the type and class decls need to be in scope below because
-       --          (a) tcTyAndClassDecls doesn't need the val binds, and
-       --          (b) tcExtCoreBindings doesn't need anything
-       --              (in fact, it might not even need to be in the scope of
-       --               this tcg_env at all)
-   (tc_envs, _bndrs) <- getLocalNonValBinders emptyFsEnv {- no fixity decls -}
-                                              (mkFakeGroup ldecls) ;
-   setEnvs tc_envs $ do {
-
-   (rn_decls, _fvs) <- checkNoErrs $ rnTyClDecls [] [mkTyClGroup ldecls] ;
-   -- The empty list is for extra dependencies coming from .hs-boot files
-   -- See Note [Extra dependencies from .hs-boot files] in RnSource
-
-        -- Dump trace of renaming part
-   rnDump (ppr rn_decls) ;
-
-        -- Typecheck them all together so that
-        -- any mutually recursive types are done right
-        -- Just discard the auxiliary bindings; they are generated
-        -- only for Haskell source code, and should already be in Core
-   tcg_env   <- tcTyAndClassDecls emptyModDetails rn_decls ;
-   safe_mode <- liftIO $ finalSafeMode (hsc_dflags hsc_env) tcg_env ;
-   dep_files <- liftIO $ readIORef (tcg_dependent_files tcg_env) ;
-
-   setGblEnv tcg_env $ do {
-        -- Make the new type env available to stuff slurped from interface files
-
-        -- Now the core bindings
-   core_binds <- initIfaceExtCore (tcExtCoreBindings src_binds) ;
-
-
-        -- Wrap up
-   let {
-        bndrs      = bindersOfBinds core_binds ;
-        my_exports = map (Avail . idName) bndrs ;
-                -- ToDo: export the data types also?
-
-        mod_guts = ModGuts {    mg_module    = this_mod,
-                                mg_boot      = False,
-                                mg_used_names = emptyNameSet, -- ToDo: compute usage
-                                mg_used_th   = False,
-                                mg_dir_imps  = emptyModuleEnv, -- ??
-                                mg_deps      = noDependencies,  -- ??
-                                mg_exports   = my_exports,
-                                mg_tcs       = tcg_tcs tcg_env,
-                                mg_insts     = tcg_insts tcg_env,
-                                mg_fam_insts = tcg_fam_insts tcg_env,
-                                mg_inst_env  = tcg_inst_env tcg_env,
-                                mg_fam_inst_env = tcg_fam_inst_env tcg_env,
-                                mg_patsyns      = [], -- TODO
-                                mg_rules        = [],
-                                mg_vect_decls   = [],
-                                mg_anns         = [],
-                                mg_binds        = core_binds,
-
-                                -- Stubs
-                                mg_rdr_env      = emptyGlobalRdrEnv,
-                                mg_fix_env      = emptyFixityEnv,
-                                mg_warns        = NoWarnings,
-                                mg_foreign      = NoStubs,
-                                mg_hpc_info     = emptyHpcInfo False,
-                                mg_modBreaks    = emptyModBreaks,
-                                mg_vect_info    = noVectInfo,
-                                mg_safe_haskell = safe_mode,
-                                mg_trust_pkg    = False,
-                                mg_dependent_files = dep_files
-                            } } ;
-
-   tcCoreDump mod_guts ;
-
-   return mod_guts
-   }}}}
-
-mkFakeGroup :: [LTyClDecl a] -> HsGroup a
-mkFakeGroup decls -- Rather clumsy; lots of unused fields
-  = emptyRdrGroup { hs_tyclds = [mkTyClGroup decls] }
 \end{code}
 
 
@@ -649,12 +545,35 @@ checkHiBootIface
         tcg_env@(TcGblEnv { tcg_src = hs_src, tcg_binds = binds,
                             tcg_insts = local_insts,
                             tcg_type_env = local_type_env, tcg_exports = local_exports })
-        (ModDetails { md_insts = boot_insts, md_fam_insts = boot_fam_insts,
-                      md_types = boot_type_env, md_exports = boot_exports })
+        boot_details
   | isHsBoot hs_src     -- Current module is already a hs-boot file!
   = return tcg_env
 
   | otherwise
+  = do  { mb_dfun_prs <- checkHiBootIface' local_insts local_type_env
+                                           local_exports boot_details
+        ; let dfun_prs   = catMaybes mb_dfun_prs
+              boot_dfuns = map fst dfun_prs
+              dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
+                                     | (boot_dfun, dfun) <- dfun_prs ]
+              type_env'  = extendTypeEnvWithIds local_type_env boot_dfuns
+              tcg_env'   = tcg_env { tcg_binds = binds `unionBags` dfun_binds }
+
+        ; setGlobalTypeEnv tcg_env' type_env' }
+             -- Update the global type env *including* the knot-tied one
+             -- so that if the source module reads in an interface unfolding
+             -- mentioning one of the dfuns from the boot module, then it
+             -- can "see" that boot dfun.   See Trac #4003
+
+checkHiBootIface' :: [ClsInst] -> TypeEnv -> [AvailInfo]
+                  -> ModDetails -> TcM [Maybe (Id, Id)]
+-- Variant which doesn't require a full TcGblEnv; you could get the
+-- local components from another ModDetails.
+
+checkHiBootIface'
+        local_insts local_type_env local_exports
+        (ModDetails { md_insts = boot_insts, md_fam_insts = boot_fam_insts,
+                      md_types = boot_type_env, md_exports = boot_exports })
   = do  { traceTc "checkHiBootIface" $ vcat
              [ ppr boot_type_env, ppr boot_insts, ppr boot_exports]
 
@@ -671,19 +590,11 @@ checkHiBootIface
 
                 -- Check instance declarations
         ; mb_dfun_prs <- mapM check_inst boot_insts
-        ; let dfun_prs   = catMaybes mb_dfun_prs
-              boot_dfuns = map fst dfun_prs
-              dfun_binds = listToBag [ (Generated, mkVarBind boot_dfun (nlHsVar dfun))
-                                     | (boot_dfun, dfun) <- dfun_prs ]
-              type_env'  = extendTypeEnvWithIds local_type_env boot_dfuns
-              tcg_env'   = tcg_env { tcg_binds = binds `unionBags` dfun_binds }
 
         ; failIfErrsM
-        ; setGlobalTypeEnv tcg_env' type_env' }
-             -- Update the global type env *including* the knot-tied one
-             -- so that if the source module reads in an interface unfolding
-             -- mentioning one of the dfuns from the boot module, then it
-             -- can "see" that boot dfun.   See Trac #4003
+
+        ; return mb_dfun_prs }
+
   where
     check_export boot_avail     -- boot_avail is exported by the boot iface
       | name `elem` dfun_names = return ()
@@ -737,7 +648,7 @@ checkHiBootIface
         where
           boot_dfun = instanceDFunId boot_inst
           boot_inst_ty = idType boot_dfun
-          local_boot_dfun = Id.mkExportedLocalId (idName boot_dfun) boot_inst_ty
+          local_boot_dfun = Id.mkExportedLocalId VanillaId (idName boot_dfun) boot_inst_ty
 
 
 -- This has to compare the TyThing from the .hi-boot file to the TyThing
@@ -785,17 +696,14 @@ checkBootTyCon tc1 tc2
           (_, rho_ty2) = splitForAllTys (idType id2)
           op_ty2 = funResultTy rho_ty2
 
-       eqAT (tc1, def_ats1) (tc2, def_ats2)
+       eqAT (ATI tc1 def_ats1) (ATI tc2 def_ats2)
          = checkBootTyCon tc1 tc2 &&
-           eqListBy eqATDef def_ats1 def_ats2
+           eqATDef def_ats1 def_ats2
 
        -- Ignore the location of the defaults
-       eqATDef (CoAxBranch { cab_tvs = tvs1, cab_lhs =  ty_pats1, cab_rhs = ty1 })
-               (CoAxBranch { cab_tvs = tvs2, cab_lhs =  ty_pats2, cab_rhs = ty2 })
-         | Just env <- eqTyVarBndrs emptyRnEnv2 tvs1 tvs2
-         = eqListBy (eqTypeX env) ty_pats1 ty_pats2 &&
-           eqTypeX env ty1 ty2
-         | otherwise = False
+       eqATDef Nothing    Nothing    = True
+       eqATDef (Just ty1) (Just ty2) = eqTypeX env ty1 ty2
+       eqATDef _ _ = False           
 
        eqFD (as1,bs1) (as2,bs2) =
          eqListBy (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
@@ -941,218 +849,6 @@ rnTopSrcDecls extra_deps group
 
 %************************************************************************
 %*                                                                      *
-                AMP warnings
-     The functions defined here issue warnings according to
-     the 2013 Applicative-Monad proposal. (Trac #8004)
-%*                                                                      *
-%************************************************************************
-
-Note [No AMP warning with NoImplicitPrelude]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If you have -XNoImplicitPrelude, then we suppress the AMP warnings.
-The AMP warnings need access to Monad, Applicative, etc, and they
-are defined in 'base'. If, when compiling package 'ghc-prim' (say),
-you try to load Monad (from 'base'), chaos results because 'base'
-depends on 'ghc-prim'.  See Note [Home module load error] in LoadIface,
-and Trac #8320.
-
-Using -XNoImplicitPrelude is a proxy for ensuring that all the
-'base' modules are below the home module in the dependency tree.
-
-\begin{code}
--- | Main entry point for generating AMP warnings
-tcAmpWarn :: TcM ()
-tcAmpWarn =
-    do { implicit_prel <- xoptM Opt_ImplicitPrelude
-       ; warnFlag <- woptM Opt_WarnAMP
-       ; when (warnFlag && implicit_prel) $ do {
-              -- See Note [No AMP warning with NoImplicitPrelude]
-
-         -- Monad without Applicative
-       ; tcAmpMissingParentClassWarn monadClassName
-                                     applicativeClassName
-
-         -- MonadPlus without Alternative
-       ; tcAmpMissingParentClassWarn monadPlusClassName
-                                     alternativeClassName
-
-         -- Custom local definitions of join/pure/<*>
-       ; mapM_ tcAmpFunctionWarn [joinMName, apAName, pureAName]
-    }}
-
-
-
--- | Warn on local definitions of names that would clash with Prelude versions,
---   i.e. join/pure/<*>
---
---   A name clashes if the following criteria are met:
---       1. It would is imported (unqualified) from Prelude
---       2. It is locally defined in the current module
---       3. It has the same literal name as the reference function
---       4. It is not identical to the reference function
-tcAmpFunctionWarn :: Name -- ^ Name to check, e.g. joinMName for join
-                  -> TcM ()
-tcAmpFunctionWarn name = do
-    { traceTc "tcAmpFunctionWarn/wouldBeImported" empty
-    -- Is the name imported (unqualified) from Prelude? (Point 4 above)
-    ; rnImports <- fmap (map unLoc . tcg_rn_imports) getGblEnv
-    -- (Note that this automatically handles -XNoImplicitPrelude, as Prelude
-    -- will not appear in rnImports automatically if it is set.)
-
-    -- Continue only the name is imported from Prelude
-    ; when (tcAmpImportViaPrelude name rnImports) $ do
-      -- Handle 2.-4.
-    { rdrElts <- fmap (concat . occEnvElts . tcg_rdr_env) getGblEnv
-
-    ; let clashes :: GlobalRdrElt -> Bool
-          clashes x = and [ gre_prov x == LocalDef
-                          , nameOccName (gre_name x) == nameOccName name
-                          , gre_name x /= name
-                          ]
-
-          -- List of all offending definitions
-          clashingElts :: [GlobalRdrElt]
-          clashingElts = filter clashes rdrElts
-
-    ; traceTc "tcAmpFunctionWarn/amp_prelude_functions"
-                (hang (ppr name) 4 (sep [ppr clashingElts]))
-
-    ; let warn_msg x = addWarnAt (nameSrcSpan $ gre_name x) . hsep $
-              [ ptext (sLit "Local definition of")
-              , quotes . ppr . nameOccName $ gre_name x
-              , ptext (sLit "clashes with a future Prelude name")
-              , ptext (sLit "- this will become an error in GHC 7.10,")
-              , ptext (sLit "under the Applicative-Monad Proposal.")
-              ]
-    ; mapM_ warn_msg clashingElts
-    }}
-
--- | Is the given name imported via Prelude?
---
---   This function makes sure that e.g. "import Prelude (map)" should silence
---   AMP warnings about "join" even when they are locally defined.
---
---   Possible scenarios:
---     a) Prelude is imported implicitly, issue warnings.
---     b) Prelude is imported explicitly, but without mentioning the name in
---        question. Issue no warnings.
---     c) Prelude is imported hiding the name in question. Issue no warnings.
---     d) Qualified import of Prelude, no warnings.
-tcAmpImportViaPrelude :: Name
-                      -> [ImportDecl Name]
-                      -> Bool
-tcAmpImportViaPrelude name = any importViaPrelude
-  where
-    isPrelude :: ImportDecl Name -> Bool
-    isPrelude imp = unLoc (ideclName imp) == pRELUDE_NAME
-
-    -- Implicit (Prelude) import?
-    isImplicit :: ImportDecl Name -> Bool
-    isImplicit = ideclImplicit
-
-    -- Unqualified import?
-    isUnqualified :: ImportDecl Name -> Bool
-    isUnqualified = not . ideclQualified
-
-    second :: (a -> b) -> (x, a) -> (x, b)
-    second f (x, y) = (x, f y)
-
-    -- List of explicitly imported (or hidden) Names from a single import.
-    --   Nothing -> No explicit imports
-    --   Just (False, <names>) -> Explicit import list of <names>
-    --   Just (True , <names>) -> Explicit hiding of <names>
-    importList :: ImportDecl Name -> Maybe (Bool, [Name])
-    importList = fmap (second (map (ieName . unLoc))) . ideclHiding
-
-    -- Check whether the given name would be imported (unqualified) from
-    -- an import declaration.
-    importViaPrelude :: ImportDecl Name -> Bool
-    importViaPrelude x = isPrelude x && isUnqualified x && or [
-        -- Whole Prelude imported -> potential clash
-          isImplicit x
-        -- Explicit import/hiding list, if applicable
-        , case importList x of
-            Just (False, explicit) -> nameOccName name `elem`    map nameOccName explicit
-            Just (True , hidden  ) -> nameOccName name `notElem` map nameOccName hidden
-            Nothing                -> False
-        ]
-
--- | Issue a warning for instance definitions lacking a should-be parent class.
---   Used for Monad without Applicative and MonadPlus without Alternative.
-tcAmpMissingParentClassWarn :: Name -- ^ Class instance is defined for
-                            -> Name -- ^ Class it should also be instance of
-                            -> TcM ()
-
--- Notation: is* is for classes the type is an instance of, should* for those
---           that it should also be an instance of based on the corresponding
---           is*.
---           Example: in case of Applicative/Monad: is = Monad,
---                                                  should = Applicative
-tcAmpMissingParentClassWarn isName shouldName
-  = do { isClass'     <- tcLookupClass_maybe isName
-       ; shouldClass' <- tcLookupClass_maybe shouldName
-       ; case (isClass', shouldClass') of
-              (Just isClass, Just shouldClass) -> do
-                  { localInstances <- tcGetInsts
-                  ; let isInstance m = is_cls m == isClass
-                        isInsts = filter isInstance localInstances
-                  ; traceTc "tcAmpMissingParentClassWarn/isInsts" (ppr isInsts)
-                  ; forM_ isInsts $ checkShouldInst isClass shouldClass
-                  }
-              _ -> return ()
-       }
-  where
-    -- Checks whether the desired superclass exists in a given environment.
-    checkShouldInst :: Class   -- ^ Class of existing instance
-                    -> Class   -- ^ Class there should be an instance of
-                    -> ClsInst -- ^ Existing instance
-                    -> TcM ()
-    checkShouldInst isClass shouldClass isInst
-      = do { instEnv <- tcGetInstEnvs
-           ; let (instanceMatches, shouldInsts, _)
-                    = lookupInstEnv instEnv shouldClass (is_tys isInst)
-
-           ; traceTc "tcAmpMissingParentClassWarn/checkShouldInst"
-                     (hang (ppr isInst) 4
-                         (sep [ppr instanceMatches, ppr shouldInsts]))
-
-           -- "<location>: Warning: <type> is an instance of <is> but not <should>"
-           -- e.g. "Foo is an instance of Monad but not Applicative"
-           ; let instLoc = srcLocSpan . nameSrcLoc $ getName isInst
-                 warnMsg (Just name:_) =
-                      addWarnAt instLoc . hsep $
-                           [ quotes (ppr $ nameOccName name)
-                           , ptext (sLit "is an instance of")
-                           , ppr . nameOccName $ className isClass
-                           , ptext (sLit "but not")
-                           , ppr . nameOccName $ className shouldClass
-                           , ptext (sLit "- this will become an error in GHC 7.10,")
-                           , ptext (sLit "under the Applicative-Monad Proposal.")
-                           ]
-                 warnMsg _ = return ()
-           ; when (null shouldInsts && null instanceMatches) $
-                  warnMsg (is_tcs isInst)
-           }
-
-
--- | Looks up a class, returning Nothing on failure. Similar to
---   TcEnv.tcLookupClass, but does not issue any error messages.
---
--- In particular, it may be called by the AMP check on, say, 
--- Control.Applicative.Applicative, well before Control.Applicative 
--- has been compiled.  In this case we just return Nothing, and the
--- AMP test is silently dropped.
-tcLookupClass_maybe :: Name -> TcM (Maybe Class)
-tcLookupClass_maybe name
-  = do { mb_thing <- tcLookupImported_maybe name
-       ; case mb_thing of
-            Succeeded (ATyCon tc) | Just cls <- tyConClass_maybe tc -> return (Just cls)
-            _ -> return Nothing }
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
                 tcTopSrcDecls
 %*                                                                      *
 %************************************************************************
@@ -1184,7 +880,6 @@ tcTopSrcDecls boot_details
 
                 -- Generate Applicative/Monad proposal (AMP) warnings
         traceTc "Tc3b" empty ;
-        tcAmpWarn ;
 
                 -- Foreign import declarations next.
         traceTc "Tc4" empty ;
@@ -1363,7 +1058,7 @@ check_main dflags tcg_env
         ; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN
                                    (mkVarOccFS (fsLit "main"))
                                    (getSrcSpan main_name)
-              ; root_main_id = Id.mkExportedLocalId root_main_name
+              ; root_main_id = Id.mkExportedLocalId VanillaId root_main_name
                                                     (mkTyConApp ioTyCon [res_ty])
               ; co  = mkWpTyApps [res_ty]
               ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) main_expr
@@ -1371,7 +1066,7 @@ check_main dflags tcg_env
 
         ; return (tcg_env { tcg_main  = Just main_name,
                             tcg_binds = tcg_binds tcg_env
-                                        `snocBag` (Generated, main_bind),
+                                        `snocBag` main_bind,
                             tcg_dus   = tcg_dus tcg_env
                                         `plusDU` usesOnly (unitFV main_name)
                         -- Record the use of 'main', so that we don't
@@ -1606,14 +1301,14 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
         ; let fresh_it  = itName uniq loc
               matches   = [mkMatch [] rn_expr emptyLocalBinds]
               -- [it = expr]
-              the_bind  = L loc $ (mkTopFunBind (L loc fresh_it) matches) { bind_fvs = fvs }
+              the_bind  = L loc $ (mkTopFunBind FromSource (L loc fresh_it) matches) { bind_fvs = fvs }
                           -- Care here!  In GHCi the expression might have
                           -- free variables, and they in turn may have free type variables
                           -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
               let_stmt  = L loc $ LetStmt $ HsValBinds $
-                          ValBindsOut [(NonRecursive,unitBag (FromSource, the_bind))] []
+                          ValBindsOut [(NonRecursive,unitBag the_bind)] []
 
               -- [it <- e]
               bind_stmt = L loc $ BindStmt (L loc (VarPat fresh_it))
@@ -2043,7 +1738,7 @@ loadUnqualIfaces hsc_env ictxt
                   , let name = gre_name gre
                   , not (isInternalName name)
                   , let mod = nameModule name
-                  , not (modulePackageId mod == this_pkg || isInteractiveModule mod)
+                  , not (modulePackageKey mod == this_pkg || isInteractiveModule mod)
                       -- Don't attempt to load an interface for stuff
                       -- from the command line, or from the home package
                   , isTcOcc (nameOccName name)   -- Types and classes only
@@ -2079,17 +1774,6 @@ tcDump env
         -- NB: foreign x-d's have undefined's in their types;
         --     hence can't show the tc_fords
 
-tcCoreDump :: ModGuts -> TcM ()
-tcCoreDump mod_guts
- = do { dflags <- getDynFlags ;
-        when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
-             (dumpTcRn (pprModGuts mod_guts)) ;
-
-        -- Dump bindings if -ddump-tc
-        dumpOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump) }
-  where
-    full_dump = pprCoreBindings (mg_binds mod_guts)
-
 -- It's unpleasant having both pprModGuts and pprModDetails here
 pprTcGblEnv :: TcGblEnv -> SDoc
 pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
@@ -2107,19 +1791,13 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , ptext (sLit "Dependent modules:") <+>
                 ppr (sortBy cmp_mp $ eltsUFM (imp_dep_mods imports))
          , ptext (sLit "Dependent packages:") <+>
-                ppr (sortBy stablePackageIdCmp $ imp_dep_pkgs imports)]
+                ppr (sortBy stablePackageKeyCmp $ imp_dep_pkgs imports)]
   where         -- The two uses of sortBy are just to reduce unnecessary
                 -- wobbling in testsuite output
     cmp_mp (mod_name1, is_boot1) (mod_name2, is_boot2)
         = (mod_name1 `stableModuleNameCmp` mod_name2)
                   `thenCmp`
           (is_boot1 `compare` is_boot2)
-
-pprModGuts :: ModGuts -> SDoc
-pprModGuts (ModGuts { mg_tcs = tcs
-                    , mg_rules = rules })
-  = vcat [ ppr_types [] (mkTypeEnv (map ATyCon tcs)),
-           ppr_rules rules ]
 
 ppr_types :: [ClsInst] -> TypeEnv -> SDoc
 ppr_types insts type_env
@@ -2171,13 +1849,5 @@ ppr_tydecls tycons
         -- Print type constructor info; sort by OccName
   = vcat (map ppr_tycon (sortBy (comparing getOccName) tycons))
   where
-    ppr_tycon tycon = vcat [ ppr (tyConName tycon) <+> dcolon <+> ppr (tyConKind tycon)
-                              -- Temporarily print the kind signature too
-                           , ppr (tyThingToIfaceDecl (ATyCon tycon)) ]
-
-ppr_rules :: [CoreRule] -> SDoc
-ppr_rules [] = empty
-ppr_rules rs = vcat [ptext (sLit "{-# RULES"),
-                      nest 2 (pprRules rs),
-                      ptext (sLit "#-}")]
+    ppr_tycon tycon = vcat [ ppr (tyThingToIfaceDecl (ATyCon tycon)) ]
 \end{code}

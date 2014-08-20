@@ -13,7 +13,7 @@ T2431.$WRefl [InlPrag=INLINE] :: forall a. a T2431.:~: a
 T2431.$WRefl = \ (@ a) -> T2431.Refl @ a @ a @~ <a>_N
 
 T2431.absurd
-  :: forall a. (GHC.Types.Int T2431.:~: GHC.Types.Bool) -> a
+  :: forall a. GHC.Types.Int T2431.:~: GHC.Types.Bool -> a
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <L,U>b]
 T2431.absurd =
   \ (@ a) (x :: GHC.Types.Int T2431.:~: GHC.Types.Bool) ->

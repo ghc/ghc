@@ -1,9 +1,10 @@
+{-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
+
 --
 -- (c) The University of Glasgow 2002-2006
 --
 -- Serialized values
 
-{-# LANGUAGE ScopedTypeVariables #-}
 module Serialized (
     -- * Main Serialized data type
     Serialized,

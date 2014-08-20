@@ -1,5 +1,3 @@
-{-# LANGUAGE PatternGuards #-}
-
 module Main (main) where
 
 import Control.Monad.State

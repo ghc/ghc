@@ -7,13 +7,16 @@
 The bits common to TcInstDcls and TcDeriv.
 
 \begin{code}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
+
 module InstEnv (
-        DFunId, OverlapFlag(..), InstMatch, ClsInstLookupResult,
-        ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances, 
+        DFunId, InstMatch, ClsInstLookupResult,
+        OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
+        ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
         instanceHead, instanceSig, mkLocalInstance, mkImportedInstance,
         instanceDFunId, tidyClsInstDFun, instanceRoughTcs,
 
-        InstEnv, emptyInstEnv, extendInstEnv, overwriteInstEnv, 
+        InstEnv, emptyInstEnv, extendInstEnv, deleteFromInstEnv, identicalInstHead, 
         extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv', lookupInstEnv, instEnvElts,
         classInstances, orphNamesOfClsInst, instanceBindFun,
         instanceCantMatch, roughMatchTcs
@@ -157,22 +160,21 @@ pprInstance :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
 pprInstance ispec
   = hang (pprInstanceHdr ispec)
-        2 (ptext (sLit "--") <+> pprDefinedAt (getName ispec))
+        2 (vcat [ ptext (sLit "--") <+> pprDefinedAt (getName ispec)
+                , ifPprDebug (ppr (is_dfun ispec)) ])
 
 -- * pprInstanceHdr is used in VStudio to populate the ClassView tree
 pprInstanceHdr :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
 pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
   = getPprStyle $ \ sty ->
-    let theta_to_print
-          | debugStyle sty = theta
-          | otherwise = drop (dfunNSilent dfun) theta
+    let dfun_ty = idType dfun
+        (tvs, theta, res_ty) = tcSplitSigmaTy dfun_ty
+        theta_to_print = drop (dfunNSilent dfun) theta
           -- See Note [Silent superclass arguments] in TcInstDcls
-    in ptext (sLit "instance") <+> ppr flag
-       <+> sep [pprThetaArrowTy theta_to_print, ppr res_ty]
-  where
-    (_, theta, res_ty) = tcSplitSigmaTy (idType dfun)
-       -- Print without the for-all, which the programmer doesn't write
+        ty_to_print | debugStyle sty = dfun_ty
+                    | otherwise      = mkSigmaTy tvs theta_to_print res_ty
+    in ptext (sLit "instance") <+> ppr flag <+> pprSigmaType ty_to_print
 
 pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)
@@ -419,26 +421,22 @@ extendInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
   where
     add (ClsIE cur_insts) _ = ClsIE (ins_item : cur_insts)
 
-overwriteInstEnv :: InstEnv -> ClsInst -> InstEnv
-overwriteInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm, is_tys = tys })
-  = addToUFM_C add inst_env cls_nm (ClsIE [ins_item])
+deleteFromInstEnv :: InstEnv -> ClsInst -> InstEnv
+deleteFromInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
+  = adjustUFM adjust inst_env cls_nm
   where
-    add (ClsIE cur_insts) _ = ClsIE (replaceInst cur_insts)
-    
-    rough_tcs  = roughMatchTcs tys
-    replaceInst [] = [ins_item]
-    replaceInst (item@(ClsInst { is_tcs = mb_tcs,  is_tvs = tpl_tvs 
-                               , is_tys = tpl_tys }) : rest)
-    -- Fast check for no match, uses the "rough match" fields
-      | instanceCantMatch rough_tcs mb_tcs
-      = item : replaceInst rest
+    adjust (ClsIE items) = ClsIE (filterOut (identicalInstHead ins_item) items)
 
-      | let tpl_tv_set = mkVarSet tpl_tvs
-      , Just _ <- tcMatchTys tpl_tv_set tpl_tys tys
-      = ins_item : rest
-
-      | otherwise
-      = item : replaceInst rest
+identicalInstHead :: ClsInst -> ClsInst -> Bool
+-- ^ True when when the instance heads are the same
+-- e.g.  both are   Eq [(a,b)]
+-- Obviously should be insenstive to alpha-renaming
+identicalInstHead (ClsInst { is_cls_nm = cls_nm1, is_tcs = rough1, is_tvs = tvs1, is_tys = tys1 })
+                  (ClsInst { is_cls_nm = cls_nm2, is_tcs = rough2, is_tvs = tvs2, is_tys = tys2 })
+  =  cls_nm1 == cls_nm2
+  && not (instanceCantMatch rough1 rough2)  -- Fast check for no match, uses the "rough match" fields
+  && isJust (tcMatchTys (mkVarSet tvs1) tys1 tys2)
+  && isJust (tcMatchTys (mkVarSet tvs2) tys2 tys1)
 \end{code}
 
 
@@ -451,6 +449,54 @@ overwriteInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm, is_tys = tys }
 @lookupInstEnv@ looks up in a @InstEnv@, using a one-way match.  Since
 the env is kept ordered, the first match must be the only one.  The
 thing we are looking up can have an arbitrary "flexi" part.
+
+Note [Rules for instance lookup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+These functions implement the carefully-written rules in the user
+manual section on "overlapping instances". At risk of duplication,
+here are the rules.  If the rules change, change this text and the
+user manual simultaneously.  The link may be this:
+http://www.haskell.org/ghc/docs/latest/html/users_guide/type-class-extensions.html#instance-overlap
+
+The willingness to be overlapped or incoherent is a property of the
+instance declaration itself, controlled as follows:
+
+ * An instance is "incoherent"
+   if it has an INCOHERENT pragma, or
+   if it appears in a module compiled with -XIncoherentInstances.
+
+ * An instance is "overlappable"
+   if it has an OVERLAPPABLE or OVERLAPS pragma, or
+   if it appears in a module compiled with -XOverlappingInstances, or
+   if the instance is incoherent.
+
+ * An instance is "overlapping"
+   if it has an OVERLAPPING or OVERLAPS pragma, or
+   if it appears in a module compiled with -XOverlappingInstances, or
+   if the instance is incoherent.
+     compiled with -XOverlappingInstances.
+
+Now suppose that, in some client module, we are searching for an instance
+of the target constraint (C ty1 .. tyn). The search works like this.
+
+ * Find all instances I that match the target constraint; that is, the
+   target constraint is a substitution instance of I. These instance
+   declarations are the candidates.
+
+ * Find all non-candidate instances that unify with the target
+   constraint. Such non-candidates instances might match when the
+   target constraint is further instantiated. If all of them are
+   incoherent, proceed; if not, the search fails.
+
+ * Eliminate any candidate IX for which both of the following hold:
+   * There is another candidate IY that is strictly more specific;
+     that is, IY is a substitution instance of IX but not vice versa.
+
+   * Either IX is overlappable or IY is overlapping.
+
+ * If only one candidate remains, pick it. Otherwise if all remaining
+   candidates are incoherent, pick an arbitrary candidate. Otherwise fail.
+
 
 \begin{code}
 type DFunInstType = Maybe Type
@@ -535,8 +581,8 @@ lookupInstEnv' ie cls tys
       = find ((item, map (lookup_tv subst) tpl_tvs) : ms) us rest
 
         -- Does not match, so next check whether the things unify
-        -- See Note [Overlapping instances] and Note [Incoherent Instances]
-      | Incoherent _ <- oflag
+        -- See Note [Overlapping instances] and Note [Incoherent instances]
+      | Incoherent <- overlapMode oflag
       = find ms us rest
 
       | otherwise
@@ -565,22 +611,29 @@ lookupInstEnv' ie cls tys
 lookupInstEnv :: (InstEnv, InstEnv)     -- External and home package inst-env
               -> Class -> [Type]   -- What we are looking for
               -> ClsInstLookupResult
- 
+-- ^ See Note [Rules for instance lookup]
 lookupInstEnv (pkg_ie, home_ie) cls tys
-  = (safe_matches, all_unifs, safe_fail)
+  = (final_matches, final_unifs, safe_fail)
   where
     (home_matches, home_unifs) = lookupInstEnv' home_ie cls tys
     (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  cls tys
     all_matches = home_matches ++ pkg_matches
     all_unifs   = home_unifs   ++ pkg_unifs
     pruned_matches = foldr insert_overlapping [] all_matches
-    (safe_matches, safe_fail) = if length pruned_matches == 1 
-                        then check_safe (head pruned_matches) all_matches
-                        else (pruned_matches, False)
         -- Even if the unifs is non-empty (an error situation)
         -- we still prune the matches, so that the error message isn't
         -- misleading (complaining of multiple matches when some should be
         -- overlapped away)
+
+    (final_matches, safe_fail)
+       = case pruned_matches of
+           [match] -> check_safe match all_matches
+           _       -> (pruned_matches, False)
+
+    -- If the selected match is incoherent, discard all unifiers
+    final_unifs = case final_matches of
+                    (m:_) | is_incoherent m -> []
+                    _ -> all_unifs
 
     -- NOTE [Safe Haskell isSafeOverlap]
     -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -605,7 +658,7 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
                 if inSameMod x
                     then go bad unchecked
                     else go (i:bad) unchecked
-            
+
             inSameMod b =
                 let na = getName $ getName inst
                     la = isInternalName na
@@ -614,64 +667,72 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
                 in (la && lb) || (nameModule na == nameModule nb)
 
 ---------------
+is_incoherent :: InstMatch -> Bool
+is_incoherent (inst, _) = overlapMode (is_flag inst) == Incoherent
+
 ---------------
 insert_overlapping :: InstMatch -> [InstMatch] -> [InstMatch]
--- Add a new solution, knocking out strictly less specific ones
+-- ^ Add a new solution, knocking out strictly less specific ones
+-- See Note [Rules for instance lookup]
 insert_overlapping new_item [] = [new_item]
-insert_overlapping new_item (item:items)
-  | new_beats_old && old_beats_new = item : insert_overlapping new_item items
-        -- Duplicate => keep both for error report
-  | new_beats_old = insert_overlapping new_item items
-        -- Keep new one
-  | old_beats_new = item : items
-        -- Keep old one
-  | incoherent new_item = item : items -- note [Incoherent instances]
-        -- Keep old one
-  | incoherent item = new_item : items
-        -- Keep new one
-  | otherwise     = item : insert_overlapping new_item items
-        -- Keep both
+insert_overlapping new_item (old_item : old_items)
+  | new_beats_old        -- New strictly overrides old
+  , not old_beats_new
+  , new_item `can_override` old_item
+  = insert_overlapping new_item old_items
+
+  | old_beats_new        -- Old strictly overrides new
+  , not new_beats_old
+  , old_item `can_override` new_item
+  = old_item : old_items
+
+  -- Discard incoherent instances; see Note [Incoherent instances]
+  | is_incoherent old_item       -- Old is incoherent; discard it
+  = insert_overlapping new_item old_items
+  | is_incoherent new_item       -- New is incoherent; discard it
+  = old_item : old_items
+
+  -- Equal or incomparable, and neither is incoherent; keep both
+  | otherwise
+  = old_item : insert_overlapping new_item old_items
   where
-    new_beats_old = new_item `beats` item
-    old_beats_new = item `beats` new_item
 
-    incoherent (inst, _) = case is_flag inst of Incoherent _ -> True
-                                                _            -> False
+    new_beats_old = new_item `more_specific_than` old_item
+    old_beats_new = old_item `more_specific_than` new_item
 
-    (instA, _) `beats` (instB, _)
-          = overlap_ok && 
-            isJust (tcMatchTys (mkVarSet (is_tvs instB)) (is_tys instB) (is_tys instA))
-                    -- A beats B if A is more specific than B,
-                    -- (ie. if B can be instantiated to match A)
-                    -- and overlap is permitted
-          where
-            -- Overlap permitted if *either* instance permits overlap
-            -- This is a change (Trac #3877, Dec 10). It used to
-            -- require that instB (the less specific one) permitted overlap.
-            overlap_ok = case (is_flag instA, is_flag instB) of
-                              (NoOverlap _, NoOverlap _) -> False
-                              _                          -> True
+    -- `instB` can be instantiated to match `instA`
+    -- or the two are equal
+    (instA,_) `more_specific_than` (instB,_)
+      = isJust (tcMatchTys (mkVarSet (is_tvs instB))
+               (is_tys instB) (is_tys instA))
+
+    (instA, _) `can_override` (instB, _)
+       =  hasOverlappingFlag  (overlapMode (is_flag instA))
+       || hasOverlappableFlag (overlapMode (is_flag instB))
+       -- Overlap permitted if either the more specific instance
+       -- is marked as overlapping, or the more general one is
+       -- marked as overlappable.
+       -- Latest change described in: Trac #9242.
+       -- Previous change: Trac #3877, Dec 10.
 \end{code}
 
 Note [Incoherent instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For some classes, the choise of a particular instance does not matter, any one
+For some classes, the choice of a particular instance does not matter, any one
 is good. E.g. consider
 
         class D a b where { opD :: a -> b -> String }
         instance D Int b where ...
         instance D a Int where ...
 
-        g (x::Int) = opD x x
+        g (x::Int) = opD x x  -- Wanted: D Int Int
 
 For such classes this should work (without having to add an "instance D Int
 Int", and using -XOverlappingInstances, which would then work). This is what
 -XIncoherentInstances is for: Telling GHC "I don't care which instance you use;
 if you can use one, use it."
 
-
-Should this logic only work when all candidates have the incoherent flag, or
+Should this logic only work when *all* candidates have the incoherent flag, or
 even when all but one have it? The right choice is the latter, which can be
 justified by comparing the behaviour with how -XIncoherentInstances worked when
 it was only about the unify-check (note [Overlapping instances]):
@@ -682,7 +743,7 @@ Example:
         instance [incoherent] [Int] b c
         instance [incoherent] C a Int c
 Thanks to the incoherent flags,
-        foo :: ([a],b,Int)
+        [Wanted]  C [a] b Int
 works: Only instance one matches, the others just unify, but are marked
 incoherent.
 

@@ -81,6 +81,22 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 # $1_$2_$3_MOST_HC_OPTS is also passed to C compilations when we use
 # GHC as the C compiler.
 
+ifeq "$(SUPPORTS_PACKAGE_KEY)" "NO"
+ifeq "$4" "0"
+$4_USE_PACKAGE_KEY=NO
+endif
+endif
+
+ifeq "$($4_USE_PACKAGE_KEY)" "NO"
+$1_$2_$4_DEP_OPTS = \
+ $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg))
+$4_THIS_PACKAGE_KEY = -package-name
+else
+$1_$2_$4_DEP_OPTS = \
+ $$(foreach pkg,$$($1_$2_DEP_KEYS),-package-key $$(pkg))
+$4_THIS_PACKAGE_KEY = -this-package-key
+endif
+
 $1_$2_$3_MOST_HC_OPTS = \
  $$(WAY_$3_HC_OPTS) \
  $$(CONF_HC_OPTS) \
@@ -88,7 +104,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$($1_HC_OPTS) \
  $$($1_$2_HC_PKGCONF) \
  $$(if $$($1_$2_PROG),, \
-        $$(if $$($1_PACKAGE),-package-name $$($1_PACKAGE)-$$($1_$2_VERSION))) \
+        $$(if $$($1_PACKAGE),$$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))) \
  $$(if $$($1_PACKAGE),-hide-all-packages) \
  -i $$(if $$($1_$2_HS_SRC_DIRS),$$(foreach dir,$$($1_$2_HS_SRC_DIRS),-i$1/$$(dir)),-i$1) \
  -i$1/$2/build -i$1/$2/build/autogen \
@@ -98,7 +114,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$(foreach inc,$$($1_$2_INCLUDE),-\#include "$$(inc)") \
  $$(foreach opt,$$($1_$2_CPP_OPTS),-optP$$(opt)) \
  $$(if $$($1_PACKAGE),-optP-include -optP$1/$2/build/autogen/cabal_macros.h) \
- $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg)) \
+ $$($1_$2_$4_DEP_OPTS) \
  $$($1_$2_HC_OPTS) \
  $$(CONF_HC_OPTS_STAGE$4) \
  $$($1_$2_MORE_HC_OPTS) \
@@ -170,11 +186,11 @@ ifneq "$4" "0"
 ifeq "$$(TargetElf)" "YES"
 $1_$2_$3_GHC_LD_OPTS += \
     -fno-use-rpaths \
-    $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d') -optl-Wl,-zorigin
+    $$(foreach d,$$($1_$2_TRANSITIVE_DEP_KEYS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d') -optl-Wl,-zorigin
 else ifeq "$$(TargetOS_CPP)" "darwin"
 $1_$2_$3_GHC_LD_OPTS += \
     -fno-use-rpaths \
-    $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'@loader_path/../$$d')
+    $$(foreach d,$$($1_$2_TRANSITIVE_DEP_KEYS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'@loader_path/../$$d')
 endif
 endif
 endif

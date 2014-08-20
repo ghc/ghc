@@ -6,6 +6,8 @@
 Bag: an unordered collection with duplicates
 
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
+
 module Bag (
         Bag, -- abstract type
 

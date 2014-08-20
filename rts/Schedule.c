@@ -1802,6 +1802,10 @@ forkProcess(HsStablePtr *entry
         ACQUIRE_LOCK(&capabilities[i]->lock);
     }
 
+#ifdef THREADED_RTS
+    ACQUIRE_LOCK(&all_tasks_mutex);
+#endif
+
     stopTimer(); // See #4074
 
 #if defined(TRACING)
@@ -1823,13 +1827,18 @@ forkProcess(HsStablePtr *entry
             releaseCapability_(capabilities[i],rtsFalse);
             RELEASE_LOCK(&capabilities[i]->lock);
         }
+
+#ifdef THREADED_RTS
+        RELEASE_LOCK(&all_tasks_mutex);
+#endif
+
         boundTaskExiting(task);
 
 	// just return the pid
         return pid;
 	
     } else { // child
-	
+
 #if defined(THREADED_RTS)
         initMutex(&sched_mutex);
         initMutex(&sm_mutex);
@@ -1839,6 +1848,8 @@ forkProcess(HsStablePtr *entry
         for (i=0; i < n_capabilities; i++) {
             initMutex(&capabilities[i]->lock);
         }
+
+        initMutex(&all_tasks_mutex);
 #endif
 
 #ifdef TRACING
@@ -1926,8 +1937,7 @@ forkProcess(HsStablePtr *entry
 	rts_checkSchedStatus("forkProcess",cap);
 	
 	rts_unlock(cap);
-	hs_exit();                      // clean up and exit
-	stg_exit(EXIT_SUCCESS);
+        shutdownHaskellAndExit(EXIT_SUCCESS, 0 /* !fastExit */);
     }
 #else /* !FORKPROCESS_PRIMOP_SUPPORTED */
     barf("forkProcess#: primop not supported on this platform, sorry!\n");
@@ -2858,3 +2868,11 @@ resurrectThreads (StgTSO *threads)
 	}
     }
 }
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

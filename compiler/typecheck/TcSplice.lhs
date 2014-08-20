@@ -7,8 +7,9 @@ TcSplice: Template Haskell splices
 
 
 \begin{code}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP, FlexibleInstances, MagicHash, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module TcSplice(
      -- These functions are defined in stage1 and stage2
      -- The raise civilised errors in stage1
@@ -70,7 +71,7 @@ import Class
 import Inst
 import TyCon
 import CoAxiom
-import PatSyn ( patSynId )
+import PatSyn ( patSynName )
 import ConLike
 import DataCon
 import TcEvidence( TcEvBinds(..) )
@@ -845,6 +846,12 @@ like that.  Here's how it's processed:
     (qReport True s) by using addErr to add an error message to the bag of errors.
     The 'fail' in TcM raises an IOEnvFailure exception
 
+ * 'qReport' forces the message to ensure any exception hidden in unevaluated
+   thunk doesn't get into the bag of errors. Otherwise the following splice
+   will triger panic (Trac #8987):
+        $(fail undefined)
+   See also Note [Concealed TH exceptions]
+
   * So, when running a splice, we catch all exceptions; then for
         - an IOEnvFailure exception, we assume the error is already
                 in the error-bag (above)
@@ -875,8 +882,10 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
                   ; let i = getKey u
                   ; return (TH.mkNameU s i) }
 
-  qReport True msg  = addErr  (text msg)
-  qReport False msg = addWarn (text msg)
+  -- 'msg' is forced to ensure exceptions don't escape,
+  -- see Note [Exceptions in TH]
+  qReport True msg  = seqList msg $ addErr  (text msg)
+  qReport False msg = seqList msg $ addWarn (text msg)
 
   qLocation = do { m <- getModule
                  ; l <- getSrcSpanM
@@ -886,7 +895,7 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
                         RealSrcSpan s -> return s
                  ; return (TH.Loc { TH.loc_filename = unpackFS (srcSpanFile r)
                                   , TH.loc_module   = moduleNameString (moduleName m)
-                                  , TH.loc_package  = packageIdString (modulePackageId m)
+                                  , TH.loc_package  = packageKeyString (modulePackageKey m)
                                   , TH.loc_start = (srcSpanStartLine r, srcSpanStartCol r)
                                   , TH.loc_end = (srcSpanEndLine   r, srcSpanEndCol   r) }) }
 
@@ -1175,7 +1184,7 @@ reifyThing (AGlobal (AConLike (RealDataCon dc)))
                               (reifyName (dataConOrigTyCon dc)) fix)
         }
 reifyThing (AGlobal (AConLike (PatSynCon ps)))
-  = noTH (sLit "pattern synonyms") (ppr $ patSynId ps)
+  = noTH (sLit "pattern synonyms") (ppr $ patSynName ps)
 
 reifyThing (ATcId {tct_id = id})
   = do  { ty1 <- zonkTcType (idType id) -- Make use of all the info we have, even
@@ -1463,7 +1472,7 @@ reifyName thing
   where
     name    = getName thing
     mod     = ASSERT( isExternalName name ) nameModule name
-    pkg_str = packageIdString (modulePackageId mod)
+    pkg_str = packageKeyString (modulePackageKey mod)
     mod_str = moduleNameString (moduleName mod)
     occ_str = occNameString occ
     occ     = nameOccName name
@@ -1496,26 +1505,27 @@ lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget
 lookupThAnnLookup (TH.AnnLookupName th_nm) = fmap NamedTarget (lookupThName th_nm)
 lookupThAnnLookup (TH.AnnLookupModule (TH.Module pn mn))
   = return $ ModuleTarget $
-    mkModule (stringToPackageId $ TH.pkgString pn) (mkModuleName $ TH.modString mn)
+    mkModule (stringToPackageKey $ TH.pkgString pn) (mkModuleName $ TH.modString mn)
 
 reifyAnnotations :: Data a => TH.AnnLookup -> TcM [a]
-reifyAnnotations th_nm
-  = do { name <- lookupThAnnLookup th_nm
-       ; eps <- getEps
+reifyAnnotations th_name
+  = do { name <- lookupThAnnLookup th_name
+       ; topEnv <- getTopEnv
+       ; epsHptAnns <- liftIO $ prepareAnnotations topEnv Nothing
        ; tcg <- getGblEnv
-       ; let epsAnns = findAnns deserializeWithData (eps_ann_env eps) name
-       ; let envAnns = findAnns deserializeWithData (tcg_ann_env tcg) name
-       ; return (envAnns ++ epsAnns) }
+       ; let selectedEpsHptAnns = findAnns deserializeWithData epsHptAnns name
+       ; let selectedTcgAnns = findAnns deserializeWithData (tcg_ann_env tcg) name
+       ; return (selectedEpsHptAnns ++ selectedTcgAnns) }
 
 ------------------------------
 modToTHMod :: Module -> TH.Module
-modToTHMod m = TH.Module (TH.PkgName $ packageIdString  $ modulePackageId m)
+modToTHMod m = TH.Module (TH.PkgName $ packageKeyString  $ modulePackageKey m)
                          (TH.ModName $ moduleNameString $ moduleName m)
 
 reifyModule :: TH.Module -> TcM TH.ModuleInfo
 reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
   this_mod <- getModule
-  let reifMod = mkModule (stringToPackageId pkgString) (mkModuleName mString)
+  let reifMod = mkModule (stringToPackageKey pkgString) (mkModuleName mString)
   if (reifMod == this_mod) then reifyThisModule else reifyFromIface reifMod
     where
       reifyThisModule = do
@@ -1525,10 +1535,10 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
       reifyFromIface reifMod = do
         iface <- loadInterfaceForModule (ptext (sLit "reifying module from TH for") <+> ppr reifMod) reifMod
         let usages = [modToTHMod m | usage <- mi_usages iface,
-                                     Just m <- [usageToModule (modulePackageId reifMod) usage] ]
+                                     Just m <- [usageToModule (modulePackageKey reifMod) usage] ]
         return $ TH.ModuleInfo usages
 
-      usageToModule :: PackageId -> Usage -> Maybe Module
+      usageToModule :: PackageKey -> Usage -> Maybe Module
       usageToModule _ (UsageFile {}) = Nothing
       usageToModule this_pkg (UsageHomeModule { usg_mod_name = mn }) = Just $ mkModule this_pkg mn
       usageToModule _ (UsagePackageModule { usg_mod = m }) = Just m

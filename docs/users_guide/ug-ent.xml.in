@@ -3,7 +3,7 @@
 <!ENTITY flags          SYSTEM "flags.xml">
 <!ENTITY license        SYSTEM "license.xml">
 <!ENTITY intro          SYSTEM "intro.xml" >
-<!ENTITY relnotes1      SYSTEM "7.8.1-notes.xml" >
+<!ENTITY relnotes1      SYSTEM "7.10.1-notes.xml" >
 <!ENTITY using          SYSTEM "using.xml" >
 <!ENTITY code-gens      SYSTEM "codegens.xml" >
 <!ENTITY runtime        SYSTEM "runtime_control.xml" >
@@ -12,7 +12,6 @@
 <!ENTITY sooner         SYSTEM "sooner.xml" >
 <!ENTITY lang-features  SYSTEM "lang.xml" >
 <!ENTITY glasgowexts    SYSTEM "glasgow_exts.xml" >
-<!ENTITY external-core  SYSTEM "external_core.xml" >
 <!ENTITY packages       SYSTEM "packages.xml" >
 <!ENTITY parallel       SYSTEM "parallel.xml" >
 <!ENTITY safehaskell    SYSTEM "safe_haskell.xml" >

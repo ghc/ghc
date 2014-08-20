@@ -6,6 +6,8 @@
 Utility functions on @Core@ syntax
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 -- | Commonly useful utilites for manipulating the Core language
 module CoreUtils (
         -- * Constructing expressions
@@ -215,7 +217,7 @@ mkCast expr co
 --    if to_ty `eqType` from_ty
 --    then expr
 --    else
-        WARN(not (from_ty `eqType` exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ pprEqPred (coercionKind co))
+        WARN(not (from_ty `eqType` exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ ppr (coercionType co))
          (Cast expr co)
 \end{code}
 
@@ -906,13 +908,22 @@ it's applied only to dictionaries.
 -- Note [exprOkForSpeculation: case expressions] below
 --
 -- Precisely, it returns @True@ iff:
+--  a) The expression guarantees to terminate,
+--  b) soon,
+--  c) without causing a write side effect (e.g. writing a mutable variable)
+--  d) without throwing a Haskell exception
+--  e) without risking an unchecked runtime exception (array out of bounds,
+--     divide by zero)
 --
---  * The expression guarantees to terminate,
---  * soon,
---  * without raising an exception,
---  * without causing a side effect (e.g. writing a mutable variable)
+-- For @exprOkForSideEffects@ the list is the same, but omitting (e).
 --
--- Note that if @exprIsHNF e@, then @exprOkForSpecuation e@.
+-- Note that
+--    exprIsHNF            implies exprOkForSpeculation
+--    exprOkForSpeculation implies exprOkForSideEffects
+--
+-- See Note [PrimOp can_fail and has_side_effects] in PrimOp
+-- and Note [Implementation: how can_fail/has_side_effects affect transformations]
+--
 -- As an example of the considerations in this test, consider:
 --
 -- > let x = case y# +# 1# of { r# -> I# r# }
@@ -962,7 +973,7 @@ app_ok :: (PrimOp -> Bool) -> Id -> [Expr b] -> Bool
 app_ok primop_ok fun args
   = case idDetails fun of
       DFunId _ new_type ->  not new_type
-         -- DFuns terminate, unless the dict is implemented 
+         -- DFuns terminate, unless the dict is implemented
          -- with a newtype in which case they may not
 
       DataConWorkId {} -> True
@@ -981,14 +992,12 @@ app_ok primop_ok fun args
         -> True
 
         | otherwise
-        -> primop_ok op        -- A bit conservative: we don't really need
-        && all (expr_ok primop_ok) args
-                                  
-                                  -- to care about lazy arguments, but this is easy
+        -> primop_ok op                   -- A bit conservative: we don't really need
+        && all (expr_ok primop_ok) args   -- to care about lazy arguments, but this is easy
 
       _other -> isUnLiftedType (idType fun)          -- c.f. the Var case of exprIsHNF
              || idArity fun > n_val_args             -- Partial apps
-             || (n_val_args == 0 && 
+             || (n_val_args == 0 &&
                  isEvaldUnfolding (idUnfolding fun)) -- Let-bound values
              where
                n_val_args = valArgCount args
@@ -1222,7 +1231,7 @@ dataConInstPat :: [FastString]          -- A long enough list of FSs to use for 
                -> [Unique]              -- An equally long list of uniques, at least one for each binder
                -> DataCon
                -> [Type]                -- Types to instantiate the universally quantified tyvars
-               -> ([TyVar], [Id])          -- Return instantiated variables
+               -> ([TyVar], [Id])       -- Return instantiated variables
 -- dataConInstPat arg_fun fss us con inst_tys returns a triple
 -- (ex_tvs, arg_ids),
 --
@@ -1250,14 +1259,14 @@ dataConInstPat :: [FastString]          -- A long enough list of FSs to use for 
 --
 --  where the double-primed variables are created with the FastStrings and
 --  Uniques given as fss and us
-dataConInstPat fss uniqs con inst_tys 
+dataConInstPat fss uniqs con inst_tys
   = ASSERT( univ_tvs `equalLength` inst_tys )
     (ex_bndrs, arg_ids)
-  where 
+  where
     univ_tvs = dataConUnivTyVars con
     ex_tvs   = dataConExTyVars con
     arg_tys  = dataConRepArgTys con
-
+    arg_strs = dataConRepStrictness con  -- 1-1 with arg_tys
     n_ex = length ex_tvs
 
       -- split the Uniques and FastStrings
@@ -1268,7 +1277,7 @@ dataConInstPat fss uniqs con inst_tys
     univ_subst = zipOpenTvSubst univ_tvs inst_tys
 
       -- Make existential type variables, applyingn and extending the substitution
-    (full_subst, ex_bndrs) = mapAccumL mk_ex_var univ_subst 
+    (full_subst, ex_bndrs) = mapAccumL mk_ex_var univ_subst
                                        (zip3 ex_tvs ex_fss ex_uniqs)
 
     mk_ex_var :: TvSubst -> (TyVar, FastString, Unique) -> (TvSubst, TyVar)
@@ -1280,10 +1289,29 @@ dataConInstPat fss uniqs con inst_tys
         kind     = Type.substTy subst (tyVarKind tv)
 
       -- Make value vars, instantiating types
-    arg_ids = zipWith3 mk_id_var id_uniqs id_fss arg_tys
-    mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq 
-                                       (Type.substTy full_subst ty) noSrcSpan
+    arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
+    mk_id_var uniq fs ty str
+      = mkLocalIdWithInfo name (Type.substTy full_subst ty) info
+      where
+        name = mkInternalName uniq (mkVarOccFS fs) noSrcSpan
+        info | isMarkedStrict str = vanillaIdInfo `setUnfoldingInfo` evaldUnfolding
+             | otherwise          = vanillaIdInfo
+             -- See Note [Mark evaluated arguments]
 \end{code}
+
+Note [Mark evaluated arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When pattern matching on a constructor with strict fields, the binder
+can have an 'evaldUnfolding'.  Moreover, it *should* have one, so that
+when loading an interface file unfolding like:
+  data T = MkT !Int
+  f x = case x of { MkT y -> let v::Int# = case y of I# n -> n+1
+                             in ... }
+we don't want Lint to complain.  The 'y' is evaluated, so the
+case in the RHS of the binding for 'v' is fine.  But only if we
+*know* that 'y' is evaluated.
+
+c.f. add_evals in Simplify.simplAlt
 
 %************************************************************************
 %*                                                                      *

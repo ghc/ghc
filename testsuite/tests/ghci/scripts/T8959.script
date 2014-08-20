@@ -1,0 +1,20 @@
+:set -XPatternGuards -XArrows -XRankNTypes
+
+:t lookup
+:t undefined :: (forall a. a -> a) -> a
+:t () >- () -< () >>- () -<< ()
+let fun foo | True <- () = ()
+
+:set -XUnicodeSyntax
+
+:t lookup
+:t undefined :: (forall a. a -> a) -> a
+:t () >- () -< () >>- () -<< ()
+let fun foo | True <- () = ()
+
+:set -XNoUnicodeSyntax
+
+:t lookup
+:t undefined :: (forall a. a -> a) -> a
+:t () >- () -< () >>- () -<< ()
+let fun foo | True <- () = ()

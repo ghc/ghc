@@ -1,4 +1,4 @@
--- This program compares the sizes of corresponding files in two tress
+-- This program compares the sizes of corresponding files in two trees
 
 --   $ ./compareSizes --hi ~/ghc/darcs/ghc ~/ghc/6.12-branch/ghc
 --        Size | Change | Filename

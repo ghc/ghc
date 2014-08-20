@@ -23,7 +23,7 @@ Packages
     automates the process of configuring, building, installing and distributing
     a package.  All you need to do is write a simple configuration file, put a
     few files in the right places, and you have a package.  See the
-    <ulink url="../Cabal/index.html">Cabal documentation</ulink>
+    <ulink url="http://www.haskell.org/cabal/users-guide/">Cabal documentation</ulink>
     for details, and also the Cabal libraries (<ulink url="&libraryCabalLocation;/Distribution-Simple.html">Distribution.Simple</ulink>,
     for example).</para>
 
@@ -88,7 +88,11 @@ $ ghc-pkg list
       to expose a hidden package or hide an exposed one.  Only modules
       from exposed packages may be imported by your Haskell code; if
       you try to import a module from a hidden package, GHC will emit
-      an error message.
+      an error message.  If there are a multiple exposed versions of a package,
+      GHC will prefer the latest one.  Additionally, some packages may be
+      broken: that is, they are missing from the package database, or one of
+      their dependencies are broken; in this case; these packages are excluded
+      from the default set of packages.
     </para>
 
     <para>
@@ -137,8 +141,11 @@ exposed-modules: Network.BSD,
             (e.g. <literal>network-1.0</literal>) or the version
             number can be omitted if there is only one version of the
             package installed. If there are multiple versions
-            of <replaceable>P</replaceable> installed, then all other
-            versions will become hidden.</para>
+            of <replaceable>P</replaceable> installed and
+            <option>-hide-all-packages</option> was not specified, then all
+            other versions will become hidden.  <option>-package</option>
+            supports thinning and renaming described in <xref
+            linkend="package-thinning-and-renaming" />.</para>
 
           <para>The <option>-package <replaceable>P</replaceable></option>
             option also causes package <replaceable>P</replaceable> to
@@ -183,10 +190,12 @@ exposed-modules: Network.BSD,
         <listitem>
           <para>
             Exposes a package like <option>-package</option>, but the
-            package is named by its ID rather than by name.  This is a
+            package is named by its installed package ID rather than by name.  This is a
             more robust way to name packages, and can be used to
             select packages that would otherwise be shadowed.  Cabal
             passes <option>-package-id</option> flags to GHC.
+            <option>-package-id</option> supports thinning and renaming
+            described in <xref linkend="package-thinning-and-renaming" />.
           </para>
         </listitem>
       </varlistentry>
@@ -258,19 +267,15 @@ exposed-modules: Network.BSD,
       </varlistentry>
 
       <varlistentry>
-        <term><option>-package-name</option> <replaceable>foo</replaceable>
-        <indexterm><primary><option>-package-name</option></primary>
+        <term><option>-this-package-key</option> <replaceable>foo</replaceable>
+        <indexterm><primary><option>-this-package-key</option></primary>
           </indexterm></term>
         <listitem>
           <para>Tells GHC the the module being compiled forms part of
-            package <replaceable>foo</replaceable>.
+            package key <replaceable>foo</replaceable>; internally, these
+            keys are used to determine type equality and linker symbols.
             If this flag is omitted (a very common case) then the
             default package <literal>main</literal> is assumed.</para>
-            <para>Note: the argument to <option>-package-name</option>
-              should be the full
-              package <literal>name-version</literal> for the package.
-              For example:
-            <literal>-package mypkg-1.2</literal>.</para>
         </listitem>
       </varlistentry>
 
@@ -328,7 +333,7 @@ exposed-modules: Network.BSD,
 
   <para>Every complete Haskell program must define <literal>main</literal> in
    module <literal>Main</literal>
-   in package <literal>main</literal>.   (Omitting the <option>-package-name</option> flag compiles
+   in package <literal>main</literal>.   (Omitting the <option>-this-package-key</option> flag compiles
    code for package <literal>main</literal>.) Failure to do so leads to a somewhat obscure
    link-time error of the form:
 <programlisting>
@@ -365,6 +370,52 @@ _ZCMain_main_closure
     module name in which it is defined and its name.  In GHC, an
     entity is uniquely defined by a triple: package, module, and
     name.</para>
+  </sect2>
+
+  <sect2 id="package-thinning-and-renaming">
+    <title>Thinning and renaming modules</title>
+
+  <para>When incorporating packages from multiple sources, you may end up
+  in a situation where multiple packages publish modules with the same name.
+  Previously, the only way to distinguish between these modules was to
+  use <xref linkend="package-qualified-imports" />. However, since GHC 7.10,
+  the <option>-package</option> flags (and their variants) have been extended
+  to allow a user to explicitly control what modules a package brings into
+  scope, by analogy to the import lists that users can attach to module imports.
+  </para>
+
+  <para>
+  The basic syntax is that instead of specifying a package name P to the package
+  flag <literal>-package</literal>, instead we specify both a package name and a
+  parenthesized, comma-separated list of module names to import.  For example,
+  <literal>-package "base (Data.List, Data.Bool)"</literal> makes only
+  <literal>Data.List</literal> and <literal>Data.Bool</literal> visible from
+  package <literal>base</literal>.
+  We also support renaming of modules, in case you need to refer to both modules
+  simultaneously; this is supporting by writing <literal>OldModName as
+  NewModName</literal>, e.g. <literal>-package "base (Data.Bool as
+  Bool)</literal>. It's important to specify quotes
+  so that your shell passes the package name and thinning/renaming list as a
+  single argument to GHC.</para>
+
+  <para>Package imports with thinning/renaming do not hide other versions of the
+  package: e.g. if containers-0.9 is already exposed, <literal>-package
+  "containers-0.8 (Data.List as ListV8)"</literal> will only add an additional
+  binding to the environment.  Similarly, <literal>-package "base (Data.Bool as
+  Bool)" -package "base (Data.List as List)"</literal> is equivalent to
+  <literal>-package "base (Data.Bool as Bool, Data.List as List)"</literal>.
+  Literal names must refer to modules defined by the original package, so for
+  example <literal>-package "base (Data.Bool as Bool, Bool as Baz)"</literal> is
+  invalid unless there was a <literal>Bool</literal> module defined in the
+  original package.  Hiding a package also clears all of its renamings.  </para>
+
+  <para>
+  You can use renaming to provide an alternate prelude, e.g.
+  <literal>-hide-all-packages -package "basic-prelude (BasicPrelude as
+  Prelude)"</literal>, in lieu of the <xref
+  linkend="rebindable-syntax">NoImplicitPrelude</xref> extension.
+  </para>
+
   </sect2>
 
   <sect2 id="package-databases">
@@ -528,12 +579,11 @@ _ZCMain_main_closure
   </sect2>
 
   <sect2 id="package-ids">
-    <title>Package IDs, dependencies, and broken packages</title>
+    <title>Installed package IDs, dependencies, and broken packages</title>
 
     <para>Each installed package has a unique identifier (the
-      &ldquo;installed package ID&rdquo;, or just &ldquo;package
-      ID&rdquo; for short) , which distinguishes it from all other
-      installed packages on the system.  To see the package IDs
+      &ldquo;installed package ID&rdquo;), which distinguishes it from all other
+      installed packages on the system.  To see the installed package IDs
       associated with each installed package, use <literal>ghc-pkg
       list -v</literal>:</para>
 
@@ -549,10 +599,10 @@ using cache: /usr/lib/ghc-6.12.1/package.conf.d/package.cache
 </screen>
 
     <para>
-      The string in parentheses after the package name is the package
+      The string in parentheses after the package name is the installed package
       ID: it normally begins with the package name and version, and
       ends in a hash string derived from the compiled package.
-      Dependencies between packages are expressed in terms of package
+      Dependencies between packages are expressed in terms of installed package
       IDs, rather than just packages and versions.  For example, take
       a look at the dependencies of the <literal>haskell98</literal>
       package:
@@ -570,14 +620,14 @@ depends: array-0.2.0.1-9cbf76a576b6ee9c1f880cf171a0928d
 </screen>
 
     <para>
-      The purpose of the package ID is to detect problems caused by
+      The purpose of the installed package ID is to detect problems caused by
       re-installing a package without also recompiling the packages
       that depend on it.  Recompiling dependencies is necessary,
       because the newly compiled package may have a different ABI
       (Application Binary Interface) than the previous version, even
       if both packages were built from the same source code using the
-      same compiler.  With package IDs, a recompiled
-      package will have a different package ID from the previous
+      same compiler.  With installed package IDs, a recompiled
+      package will have a different installed package ID from the previous
       version, so packages that depended on the previous version are
       now orphaned - one of their dependencies is not satisfied.
       Packages that are broken in this way are shown in
@@ -691,7 +741,9 @@ haskell98-1.0.1.0
       package; the specified action will be applied to all the matching
       packages.  A package specifier that matches all version of the package
       can also be written <replaceable>pkg</replaceable><literal>-*</literal>,
-      to make it clearer that multiple packages are being matched.</para>
+      to make it clearer that multiple packages are being matched.  To match
+      against the installed package ID instead of just package name and version,
+      pass the <option>--ipid</option> flag.</para>
 
     <variablelist>
       <varlistentry>
@@ -1047,8 +1099,25 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
           <para>Output the <literal>ghc-pkg</literal> version number.</para>
         </listitem>
       </varlistentry>
-    </variablelist>
 
+      <varlistentry>
+        <term>
+          <option>--ipid</option>
+          <indexterm><primary>
+              <option>--ipid</option>
+            </primary></indexterm>
+        </term>
+        <listitem>
+          <para>Causes <literal>ghc-pkg</literal> to interpret arguments
+          as installed package IDs (e.g., an identifier like
+          <literal>unix-2.3.1.0-de7803f1a8cd88d2161b29b083c94240
+          </literal>).  This is useful if providing just the package
+          name and version are ambiguous (in old versions of GHC, this
+          was guaranteed to be unique, but this invariant no longer
+          necessarily holds).</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
   </sect2>
 
   <sect2 id="building-packages">
@@ -1057,7 +1126,7 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
       <secondary>building</secondary></indexterm>
 
     <para>We don't recommend building packages the hard way.  Instead, use the
-      <ulink url="../Cabal/index.html">Cabal</ulink> infrastructure
+      <ulink url="http://www.haskell.org/cabal/users-guide/">Cabal</ulink> infrastructure
       if possible.  If your package is particularly complicated or requires a
       lot of configuration, then you might have to fall back to the low-level
       mechanisms, so a few hints for those brave souls follow.</para>
@@ -1152,8 +1221,8 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
     </itemizedlist>
 
      <para>To compile a module which is to be part of a new package,
-      use the <literal>-package-name</literal> option (<xref linkend="using-packages"/>).
-      Failure to use the <literal>-package-name</literal> option
+      use the <literal>-this-package-key</literal> option (<xref linkend="using-packages"/>).
+      Failure to use the <literal>-this-package-key</literal> option
       when compiling a package will probably result in disaster, but
       you will only discover later when you attempt to import modules
       from the package.  At this point GHC will complain that the
@@ -1288,7 +1357,7 @@ haddock-html: /usr/share/doc/ghc/html/libraries/unix
           <indexterm><primary><literal>id</literal></primary><secondary>package specification</secondary></indexterm>
         </term>
         <listitem>
-          <para>The package ID.  It is up to you to choose a suitable
+          <para>The installed package ID.  It is up to you to choose a suitable
           one.</para>
         </listitem>
       </varlistentry>
@@ -1443,6 +1512,25 @@ haddock-html: /usr/share/doc/ghc/html/libraries/unix
             no other package in the same program may provide a module of the
             same name.</para>
         </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <literal>reexported-modules</literal>
+            <indexterm><primary><literal>reexported-modules</literal></primary><secondary>reexport specification</secondary></indexterm>
+          </term>
+          <listitem>
+            <para>Modules reexported by this package.  This list takes
+            the form of <literal>pkg:OldName as NewName
+            (A@orig-pkg-0.1-HASH)</literal>: the first portion of the
+            string is the user-written reexport specification (possibly
+            omitting the package qualifier and the renaming), while the
+            parenthetical is the original package which exposed the
+            module under are particular name.  Reexported modules have
+            a relaxed overlap constraint: it's permissible for two
+            packages to reexport the same module as the same name if the
+            reexported moduleis identical.</para>
+          </listitem>
         </varlistentry>
 
         <varlistentry>

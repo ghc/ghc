@@ -38,7 +38,7 @@
        
     <para>You must install and have LLVM available on your PATH for the LLVM
       code generator to work. Specifically GHC needs to be able to call the
-      <command>opt</command>and <command>llc</command> tools.  Secondly, if you
+      <command>opt</command> and <command>llc</command> tools.  Secondly, if you
       are running Mac OS X with LLVM 3.0 or greater then
       you also need the <ulink url="http://clang.llvm.org">Clang c
         compiler</ulink> compiler available on your PATH.

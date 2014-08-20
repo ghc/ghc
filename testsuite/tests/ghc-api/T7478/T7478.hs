@@ -9,7 +9,7 @@ import GHC
 import qualified Config as GHC
 import qualified Outputable as GHC
 import GhcMonad (liftIO)
-import Outputable (PprStyle, qualName, qualModule)
+import Outputable (PprStyle, queryQual)
 
 compileInGhc :: [FilePath]          -- ^ Targets
              -> (String -> IO ())   -- ^ handler for each SevOutput message
@@ -42,7 +42,7 @@ compileInGhc targets handlerOutput = do
         _ -> error "fileFromTarget: not a known target"
 
     collectSrcError handlerOutput flags SevOutput _srcspan style msg
-      = handlerOutput $ GHC.showSDocForUser flags (qualName style,qualModule style) msg
+      = handlerOutput $ GHC.showSDocForUser flags (queryQual style) msg
     collectSrcError _ _ _ _ _ _
       = return ()
 

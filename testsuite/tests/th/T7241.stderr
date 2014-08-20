@@ -1,0 +1,6 @@
+
+T7241.hs:7:3:
+    Duplicate exact Name ‘Foo’
+      Probable cause: you used a unique Template Haskell name (NameU), 
+      perhaps via newName, but bound it multiple times
+      If that's it, then -ddump-splices might be useful

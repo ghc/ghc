@@ -5,6 +5,8 @@
 \section[Name]{@Name@: to transmit name info from renamer to typechecker}
 
 \begin{code}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 -- |
 -- #name_types#
 -- GHC uses several kinds of name internally:
@@ -501,7 +503,7 @@ pprModulePrefix sty mod occ = sdocWithDynFlags $ \dflags ->
     case qualName sty mod occ of              -- See Outputable.QualifyName:
       NameQual modname -> ppr modname <> dot       -- Name is in scope
       NameNotInScope1  -> ppr mod <> dot           -- Not in scope
-      NameNotInScope2  -> ppr (modulePackageId mod) <> colon     -- Module not in
+      NameNotInScope2  -> ppr (modulePackageKey mod) <> colon     -- Module not in
                           <> ppr (moduleName mod) <> dot         -- scope either
       _otherwise       -> empty
 

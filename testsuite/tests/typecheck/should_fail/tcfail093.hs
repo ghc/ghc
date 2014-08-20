@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances, UndecidableInstances #-}
+             FlexibleInstances, UndecidableInstances, FlexibleContexts #-}
 -- UndecidableInstances now needed because the Coverage Condition fails
 
 module ShouldFail where

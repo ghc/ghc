@@ -1,5 +1,5 @@
 -- Cmm representations using Hoopl's Graph CmmNode e x.
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE CPP, GADTs #-}
 
 module Cmm (
      -- * Cmm top-level datatypes
@@ -80,10 +80,7 @@ data GenCmmDecl d h g
                        -- registers will be correct in generated C-- code, but
                        -- not in hand-written C-- code. However,
                        -- splitAtProcPoints calculates correct liveness
-                       -- information for CmmProc's. Right now only the LLVM
-                       -- back-end relies on correct liveness information and
-                       -- for that back-end we always call splitAtProcPoints, so
-                       -- all is good.
+                       -- information for CmmProcs.
      g                 -- Control-flow graph for the procedure's code
 
   | CmmData     -- Static data

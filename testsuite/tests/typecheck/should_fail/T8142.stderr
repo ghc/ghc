@@ -5,8 +5,8 @@ T8142.hs:6:18:
     The type variable ‘t0’ is ambiguous
     Expected type: Nu ((,) t) -> Nu f
       Actual type: Nu ((,) t0) -> Nu f0
-    When checking that ‘h’
-      has the inferred type ‘forall t (f :: * -> *). Nu ((,) t) -> Nu f’
+    When checking that ‘h’ has the inferred type
+      h :: forall t (f :: * -> *). Nu ((,) t) -> Nu f
     Probable cause: the inferred type is ambiguous
     In an equation for ‘tracer’:
         tracer

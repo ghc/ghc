@@ -10,4 +10,4 @@ data Foo = Bool :+: Bool
 type X = True ':+: False
 
 deriving instance Typeable '(:+:)
-deriving instance Typeable '(,,)
+

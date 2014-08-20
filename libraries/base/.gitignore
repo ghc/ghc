@@ -1,0 +1,21 @@
+*.o
+*.aux
+*.hi
+*.tix
+
+# Backup files
+*~
+
+# Specific generated files
+/GNUmakefile
+/autom4te.cache/
+/base.buildinfo
+/config.log
+/config.status
+/configure
+/dist-install/
+/ghc.mk
+/include/EventConfig.h
+/include/HsBaseConfig.h
+/include/HsBaseConfig.h.in
+

@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- | Graph coloring register allocator.
 module RegAlloc.Graph.Main (
         regAlloc

@@ -1,0 +1,8 @@
+
+T9196.hs:4:7:
+    Illegal constraint: forall a. Eq a
+    In the type signature for ‘f’: f :: (forall a. Eq a) => a -> a
+
+T9196.hs:7:7:
+    Illegal constraint: Eq a => Ord a
+    In the type signature for ‘g’: g :: (Eq a => Ord a) => a -> a

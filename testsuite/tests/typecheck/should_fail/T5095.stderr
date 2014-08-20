@@ -2,7 +2,7 @@
 T5095.hs:9:11:
     Overlapping instances for Eq a arising from a use of ‘==’
     Matching instances:
-      instance [overlap ok] Show a => Eq a -- Defined at T5095.hs:5:10
+      instance [overlappable] Show a => Eq a -- Defined at T5095.hs:5:31
       instance Eq a => Eq (GHC.Real.Ratio a) -- Defined in ‘GHC.Real’
       instance Eq () -- Defined in ‘GHC.Classes’
       instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‘GHC.Classes’
@@ -56,8 +56,6 @@ T5095.hs:9:11:
       instance Eq Ordering -- Defined in ‘GHC.Classes’
       instance Eq GHC.Types.Word -- Defined in ‘GHC.Classes’
       instance Eq a => Eq [a] -- Defined in ‘GHC.Classes’
-      instance Eq a => Eq (Control.Applicative.ZipList a)
-        -- Defined in ‘Control.Applicative’
       instance Eq Integer -- Defined in ‘integer-gmp:GHC.Integer.Type’
     (The choice depends on the instantiation of ‘a’
      To pick the first instance above, use IncoherentInstances

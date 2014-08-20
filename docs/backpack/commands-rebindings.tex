@@ -1,0 +1,57 @@
+
+
+%% hide the full syntax of shapes/types for the paper
+\newcommand{\fullmsh}[3]{\aoxb{#1 ~\mtypsep~ #2 ~\mtypsep~ #3}}
+\newcommand{\fullmtyp}[3]{
+  \aoxb{\mtypsepsp #1 \mtypsepsp\mtypsep\mtypsepsp
+        #2 \mtypsepsp\mtypsep\mtypsepsp
+        #3 \mtypsepsp}}
+\newcommand{\fullbigmtyp}[3]{\ensuremath{
+  \left\langle\!\vrule \begin{array}{l}
+    #1 ~\mtypsep \\[0pt]
+    #2 ~\mtypsep \\
+    #3
+  \end{array} \vrule\!\right\rangle
+}}
+\renewcommand{\msh}[2]{\aoxb{#1 \mtypsepsp\mtypsep\mtypsepsp #2}}
+\renewcommand{\mtyp}[2]{
+  \aoxb{#1 ~\mtypsep~ #2}}
+\newcommand{\mtypstretch}[2]{
+  \left\langle\!\vrule
+    \mtypsepsp #1 \mtypsepsp\mtypsep\mtypsepsp #2 \mtypsepsp
+  \vrule\!\right\rangle
+}
+\renewcommand{\bigmtyp}[2]{\ensuremath{
+  \left\langle\!\vrule \begin{array}{l}
+    #1 ~\mtypsep \\[0pt] #2
+  \end{array} \vrule\!\right\rangle
+}}
+
+
+
+%% change syntax of signatures
+\renewcommand{\Esig}[1]{\ensuremath{\,[#1]}}
+
+\renewcommandx*{\JBVSh}[3][1=\Delta, usedefault=@]%
+  {#1 \vdashsh #2 \Rightarrow #3}
+
+
+% JUDGMENTS
+\renewcommandx*{\JBTypElab}[6][1=\Delta, 2=\Gamma, 3=\shctx, usedefault=@]%
+  % {\JBTyp[#1][#2][#3]{#4}{#5} \elabto #6}
+  {\JBTyp[#1][#2][#3]{#4}{#5} \;\shade{\elabto #6}}
+\renewcommandx*{\JBVTypElab}[5][1=\Delta, 2=\shctx, usedefault=@]%
+  % {\JBVTyp[#1][#2]{#3}{#4} \elabto #5}
+  {\JBVTyp[#1][#2]{#3}{#4} \;\shade{\elabto #5}}
+\renewcommandx*{\JDTypElab}[4][1=\Delta, usedefault=@]%
+  % {#1 \vdash #2 : #3 \elabto #4}
+  {#1 \vdash #2 : #3 \;\shade{\elabto #4}}
+\renewcommandx*{\JCModElab}[5][1=\Gamma, 2=\nu_0, usedefault=@]%
+  % {#1; #2 \vdashghc #3 : #4 \elabto #5}
+  {#1; #2 \vdashghc #3 : #4 \;\shade{\elabto #5}}
+
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "paper"
+%%% End: 

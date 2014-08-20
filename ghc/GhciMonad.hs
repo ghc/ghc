@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, FlexibleInstances, UnboxedTuples, MagicHash #-}
 {-# OPTIONS_GHC -fno-cse -fno-warn-orphans #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -32,6 +33,7 @@ import Outputable       hiding (printForUser, printForUserPartWay)
 import qualified Outputable
 import Util
 import DynFlags
+import FastString
 import HscTypes
 import SrcLoc
 import Module
@@ -104,7 +106,8 @@ data GHCiState = GHCiState
 
         -- help text to display to a user
         short_help :: String,
-        long_help  :: String
+        long_help  :: String,
+        lastErrorLocations :: IORef [(FastString, Int)]
      }
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]
@@ -316,7 +319,12 @@ printTimes dflags allocs psecs
             secs_str = showFFloat (Just 2) secs
         putStrLn (showSDoc dflags (
                  parens (text (secs_str "") <+> text "secs" <> comma <+>
-                         text (show allocs) <+> text "bytes")))
+                         text (separateThousands allocs) <+> text "bytes")))
+  where
+    separateThousands n = reverse . sep . reverse . show $ n
+      where sep n'
+              | length n' <= 3 = n'
+              | otherwise = take 3 n' ++ "," ++ sep (drop 3 n')
 
 -----------------------------------------------------------------------------
 -- reverting CAFs

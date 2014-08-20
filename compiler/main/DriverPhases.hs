@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -----------------------------------------------------------------------------
 --  $Id: DriverPhases.hs,v 1.38 2005/05/17 11:01:59 simonmar Exp $
 --
@@ -18,7 +20,6 @@ module DriverPhases (
    isHaskellSrcSuffix,
    isObjectSuffix,
    isCishSuffix,
-   isExtCoreSuffix,
    isDynLibSuffix,
    isHaskellUserSrcSuffix,
    isSourceSuffix,
@@ -27,7 +28,6 @@ module DriverPhases (
    isHaskellSrcFilename,
    isObjectFilename,
    isCishFilename,
-   isExtCoreFilename,
    isDynLibFilename,
    isHaskellUserSrcFilename,
    isSourceFilename
@@ -56,7 +56,7 @@ import System.FilePath
 -}
 
 data HscSource
-   = HsSrcFile | HsBootFile | ExtCoreFile
+   = HsSrcFile | HsBootFile
      deriving( Eq, Ord, Show )
         -- Ord needed for the finite maps we build in CompManager
 
@@ -64,7 +64,6 @@ data HscSource
 hscSourceString :: HscSource -> String
 hscSourceString HsSrcFile   = ""
 hscSourceString HsBootFile  = "[boot]"
-hscSourceString ExtCoreFile = "[ext core]"
 
 isHsBoot :: HscSource -> Bool
 isHsBoot HsBootFile = True
@@ -82,7 +81,7 @@ data Phase
         | HCc           -- Haskellised C (as opposed to vanilla C) compilation
         | Splitter      -- Assembly file splitter (part of '-split-objs')
         | SplitAs       -- Assembler for split assembly files (part of '-split-objs')
-        | As            -- Assembler for regular assembly files
+        | As Bool       -- Assembler for regular assembly files (Bool: with-cpp)
         | LlvmOpt       -- Run LLVM opt tool over llvm assembly
         | LlvmLlc       -- LLVM bitcode to native assembly
         | LlvmMangle    -- Fix up TNTC by processing assembly produced by LLVM
@@ -119,7 +118,7 @@ eqPhase Cobjcpp     Cobjcpp    = True
 eqPhase HCc         HCc        = True
 eqPhase Splitter    Splitter   = True
 eqPhase SplitAs     SplitAs    = True
-eqPhase As          As         = True
+eqPhase (As x)      (As y)     = x == y
 eqPhase LlvmOpt     LlvmOpt    = True
 eqPhase LlvmLlc     LlvmLlc    = True
 eqPhase LlvmMangle  LlvmMangle = True
@@ -150,21 +149,21 @@ nextPhase dflags p
       Splitter   -> SplitAs
       LlvmOpt    -> LlvmLlc
       LlvmLlc    -> LlvmMangle
-      LlvmMangle -> As
+      LlvmMangle -> As False
       SplitAs    -> MergeStub
-      As         -> MergeStub
-      Ccpp       -> As
-      Cc         -> As
-      Cobjc      -> As
-      Cobjcpp    -> As
+      As _       -> MergeStub
+      Ccpp       -> As False
+      Cc         -> As False
+      Cobjc      -> As False
+      Cobjcpp    -> As False
       CmmCpp     -> Cmm
       Cmm        -> maybeHCc
-      HCc        -> As
+      HCc        -> As False
       MergeStub  -> StopLn
       StopLn     -> panic "nextPhase: nothing after StopLn"
     where maybeHCc = if platformUnregisterised (targetPlatform dflags)
                      then HCc
-                     else As
+                     else As False
 
 -- the first compilation phase for a given file is determined
 -- by its suffix.
@@ -175,7 +174,6 @@ startPhase "hs"       = Cpp   HsSrcFile
 startPhase "hs-boot"  = Cpp   HsBootFile
 startPhase "hscpp"    = HsPp  HsSrcFile
 startPhase "hspp"     = Hsc   HsSrcFile
-startPhase "hcr"      = Hsc   ExtCoreFile
 startPhase "hc"       = HCc
 startPhase "c"        = Cc
 startPhase "cpp"      = Ccpp
@@ -186,8 +184,8 @@ startPhase "mm"       = Cobjcpp
 startPhase "cc"       = Ccpp
 startPhase "cxx"      = Ccpp
 startPhase "split_s"  = Splitter
-startPhase "s"        = As
-startPhase "S"        = As
+startPhase "s"        = As False
+startPhase "S"        = As True
 startPhase "ll"       = LlvmOpt
 startPhase "bc"       = LlvmLlc
 startPhase "lm_s"     = LlvmMangle
@@ -202,7 +200,6 @@ startPhase _          = StopLn     -- all unknown file types
 phaseInputExt :: Phase -> String
 phaseInputExt (Unlit HsSrcFile)   = "lhs"
 phaseInputExt (Unlit HsBootFile)  = "lhs-boot"
-phaseInputExt (Unlit ExtCoreFile) = "lhcr"
 phaseInputExt (Cpp   _)           = "lpp"       -- intermediate only
 phaseInputExt (HsPp  _)           = "hscpp"     -- intermediate only
 phaseInputExt (Hsc   _)           = "hspp"      -- intermediate only
@@ -215,7 +212,8 @@ phaseInputExt Cobjc               = "m"
 phaseInputExt Cobjcpp             = "mm"
 phaseInputExt Cc                  = "c"
 phaseInputExt Splitter            = "split_s"
-phaseInputExt As                  = "s"
+phaseInputExt (As True)           = "S"
+phaseInputExt (As False)          = "s"
 phaseInputExt LlvmOpt             = "ll"
 phaseInputExt LlvmLlc             = "bc"
 phaseInputExt LlvmMangle          = "lm_s"
@@ -226,13 +224,12 @@ phaseInputExt MergeStub           = "o"
 phaseInputExt StopLn              = "o"
 
 haskellish_src_suffixes, haskellish_suffixes, cish_suffixes,
-    extcoreish_suffixes, haskellish_user_src_suffixes
+    haskellish_user_src_suffixes
  :: [String]
 haskellish_src_suffixes      = haskellish_user_src_suffixes ++
                                [ "hspp", "hscpp", "hcr", "cmm", "cmmcpp" ]
 haskellish_suffixes          = haskellish_src_suffixes ++ ["hc", "raw_s"]
 cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S", "ll", "bc", "lm_s", "m", "M", "mm" ]
-extcoreish_suffixes          = [ "hcr" ]
 -- Will not be deleted as temp files:
 haskellish_user_src_suffixes = [ "hs", "lhs", "hs-boot", "lhs-boot" ]
 
@@ -249,13 +246,12 @@ dynlib_suffixes platform = case platformOS platform of
   OSDarwin  -> ["dylib", "so"]
   _         -> ["so"]
 
-isHaskellishSuffix, isHaskellSrcSuffix, isCishSuffix, isExtCoreSuffix,
+isHaskellishSuffix, isHaskellSrcSuffix, isCishSuffix,
     isHaskellUserSrcSuffix
  :: String -> Bool
 isHaskellishSuffix     s = s `elem` haskellish_suffixes
 isHaskellSrcSuffix     s = s `elem` haskellish_src_suffixes
 isCishSuffix           s = s `elem` cish_suffixes
-isExtCoreSuffix        s = s `elem` extcoreish_suffixes
 isHaskellUserSrcSuffix s = s `elem` haskellish_user_src_suffixes
 
 isObjectSuffix, isDynLibSuffix :: Platform -> String -> Bool
@@ -266,13 +262,12 @@ isSourceSuffix :: String -> Bool
 isSourceSuffix suff  = isHaskellishSuffix suff || isCishSuffix suff
 
 isHaskellishFilename, isHaskellSrcFilename, isCishFilename,
-    isExtCoreFilename, isHaskellUserSrcFilename, isSourceFilename
+    isHaskellUserSrcFilename, isSourceFilename
  :: FilePath -> Bool
 -- takeExtension return .foo, so we drop 1 to get rid of the .
 isHaskellishFilename     f = isHaskellishSuffix     (drop 1 $ takeExtension f)
 isHaskellSrcFilename     f = isHaskellSrcSuffix     (drop 1 $ takeExtension f)
 isCishFilename           f = isCishSuffix           (drop 1 $ takeExtension f)
-isExtCoreFilename        f = isExtCoreSuffix        (drop 1 $ takeExtension f)
 isHaskellUserSrcFilename f = isHaskellUserSrcSuffix (drop 1 $ takeExtension f)
 isSourceFilename         f = isSourceSuffix         (drop 1 $ takeExtension f)
 

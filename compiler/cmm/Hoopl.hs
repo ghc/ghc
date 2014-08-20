@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
+
 module Hoopl (
     module Compiler.Hoopl,
     module Hoopl.Dataflow,

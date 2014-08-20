@@ -40,7 +40,7 @@ test('gadt23',
 test('gadt24', normal, compile, [''])
 
 test('red-black', normal, compile, [''])
-test('type-rep', [ when(fast(), skip), when(compiler_debugged(),expect_broken_for(8569, ['hpc','optasm','threaded2','dyn','optllvm'])) ] , compile_and_run, [''])
+test('type-rep', when(fast(), skip), compile_and_run, [''])
 test('equal', normal, compile, [''])
 test('nbe', normal, compile, [''])
 test('while', normal, compile_and_run, [''])
@@ -122,3 +122,5 @@ test('T7321',
      ['$MAKE -s --no-print-directory T7321'])
 test('T7974', normal, compile, [''])
 test('T7558', normal, compile_fail, [''])
+test('T9096', normal, compile, [''])
+test('T9380', normal, compile_and_run, [''])

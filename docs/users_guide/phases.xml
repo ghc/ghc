@@ -218,15 +218,6 @@
       </varlistentry>
       <varlistentry>
         <term>
-          <option>-optm</option>  <replaceable>option</replaceable>
-          <indexterm><primary><option>-optm</option></primary></indexterm>
-        </term>
-        <listitem>
-          <para>Pass <replaceable>option</replaceable> to the mangler.</para>
-        </listitem>
-      </varlistentry>
-      <varlistentry>
-        <term>
           <option>-opta</option>  <replaceable>option</replaceable>
           <indexterm><primary><option>-opta</option></primary></indexterm>
         </term>
@@ -585,8 +576,22 @@ $ cat foo.hspp</screen>
         </term>
         <listitem>
           <para>Omit code generation (and all later phases)
-          altogether.  Might be of some use if you just want to see
-          dumps of the intermediate compilation phases.</para>
+          altogether.  This is useful if you're only interested in
+          type checking code.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-fwrite-interface</option>
+          <indexterm><primary><option>-fwrite-interface</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Always write interface files.  GHC will normally write
+          interface files automatically, but this flag is useful with
+          <option>-fno-code</option>, which normally suppresses generation
+          of interface files.  This is useful if you want to type check
+          over multiple runs of GHC without compiling dependencies.</para>
         </listitem>
       </varlistentry>
 
@@ -1223,6 +1228,21 @@ $ cat foo.hspp</screen>
               allows you to override it with the specified file path. (It passes
               <literal>-install_name</literal> to Apple's linker.) Ignored on other
               platforms.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-rdynamic</option>
+          <indexterm><primary><option>-rdynamic</option></primary>
+          </indexterm>
+        </term>
+        <listitem>
+          <para>
+              This instructs the linker to add all symbols, not only used ones, to the
+              dynamic symbol table. Currently Linux and Windows/MinGW32 only.
+              This is equivalent to using <literal>-optl -rdynamic</literal> on Linux,
+              and <literal>-optl -export-all-symbols</literal> on Windows.</para>
         </listitem>
       </varlistentry>
     </variablelist>

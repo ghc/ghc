@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-10-1">
+  <title>Release notes for version 7.10.1</title>
+
+  <para>
+      The significant changes to the various parts of the compiler are listed
+      in the following sections. There have also been numerous bug fixes and
+      performance improvements over the 7.8 branch.
+  </para>
+
+  <sect2>
+    <title>Highlights</title>
+
+    <para>
+        The highlights, since the 7.8 branch, are:
+    </para>
+
+    <itemizedlist>
+        <listitem>
+            <para>
+                TODO FIXME
+           </para>
+       </listitem>
+   </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Full details</title>
+    <sect3>
+        <title>Language</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Added support for <link linkend="binary-literals">binary integer literals</link>
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Compiler</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    GHC now checks that all the language extensions required for
+                    the inferred type signatures are explicitly enabled. This
+                    means that if any of the type signatures inferred in your
+                    program requires some language extension you will need to
+                    enable it. The motivation is that adding a missing type
+                    signature inferred by GHC should yield a program that
+                    typechecks. Previously this was not the case.
+                </para>
+                <para>
+                    This is a breaking change. Code that used to compile in the
+                    past might fail with an error message requiring some
+                    particular language extension (most likely
+                    <option>-XTypeFamilies</option>, <option>-XGADTs</option> or
+                    <option>-XFlexibleContexts</option>).
+                </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>GHCi</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    TODO FIXME
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Template Haskell</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    TODO FIXME
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Runtime system</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    TODO FIXME
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Build system</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    <literal>ghc-pkg</literal> now respects <option>--user</option>
+                    and <option>--global</option> when modifying packages (e.g.
+                    changing exposed/trust flag or unregistering).  Previously,
+                    <literal>ghc-pkg</literal> would ignore these flags and modify
+                    whichever package it found first on the database stack.  To
+                    recover the old behavior, simply omit these flags.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    <literal>ghc-pkg</literal> accepts a <option>--user-package-db</option>
+                    flag which allows a user to override the location of the user package
+                    database.  Unlike databases specified using <option>--package-db</option>,
+                    a user package database configured this way respects
+                    the <option>--user</option> flag.
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+  </sect2>
+
+  <sect2>
+    <title>Libraries</title>
+
+    <sect3>
+        <title>array</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 0.5.0.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>base</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 4.7.0.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>bin-package-db</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is an internal package, and should not be used.
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>binary</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 0.7.1.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>bytestring</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 0.10.4.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Cabal</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 1.18.1.3)
+              </para>
+          </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>containers</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 0.5.4.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>deepseq</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 1.3.0.2)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>directory</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 1.2.0.2)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>filepath</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 1.3.0.2)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>ghc</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Many internal functions in GHC related to package IDs have been
+                    renamed to refer to package keys, e.g. <literal>PackageId</literal>
+                    is now <literal>PackageKey</literal>, the wired-in names
+                    such as <literal>primPackageId</literal> are now
+                    <literal>primPackageKey</literal>, etc.  This reflects a distinction
+                    that we are now making: a package ID is, as before, the user-visible
+                    ID from Cabal <literal>foo-1.0</literal>; a package key is now
+                    a compiler-internal entity used for generating linking symbols, and
+                    may not correspond at all to the package ID.  In
+                    particular, there may be multiple package keys per
+                    package ID.
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>ghc-prim</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 0.3.1.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>haskell98</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 2.0.0.3)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>haskell2010</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 1.1.1.1)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>hoopl</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 3.10.0.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>hpc</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 0.6.0.1)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>integer-gmp</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 0.5.1.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>old-locale</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 1.0.0.6)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>old-time</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 1.1.0.2)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>process</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 1.2.0.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>template-haskell</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 2.9.0.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>time</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 1.4.1)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>unix</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 2.7.0.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Win32</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number XXXXX (was 2.3.0.1)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+  </sect2>
+
+  <sect2>
+    <title>Known bugs</title>
+    <itemizedlist>
+        <listitem>
+            <para>
+                TODO FIXME
+           </para>
+       </listitem>
+   </itemizedlist>
+  </sect2>
+</sect1>

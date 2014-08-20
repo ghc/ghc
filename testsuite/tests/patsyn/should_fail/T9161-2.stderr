@@ -1,0 +1,5 @@
+
+T9161-2.hs:8:20:
+    Pattern synonym ‘PATTERN’ used as a type
+    In the type signature for ‘wrongLift’:
+      wrongLift :: Proxy PATTERN ()

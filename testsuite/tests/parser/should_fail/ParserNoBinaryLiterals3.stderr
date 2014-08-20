@@ -1,0 +1,5 @@
+
+ParserNoBinaryLiterals3.hs:8:4:
+    Constructor ‘I#’ should have 1 argument, but has been given 2
+    In the pattern: I# 0 b0#
+    In an equation for ‘f’: f (I# 0 b0#) = ()

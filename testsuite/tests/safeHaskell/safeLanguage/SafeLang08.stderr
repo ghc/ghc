@@ -1,7 +1,7 @@
 
 SafeLang08.hs:9:1:
-    Unacceptable result type in foreign declaration: Double
-    Safe Haskell is on, all FFI imports must be in the IO monad
+    Unacceptable result type in foreign declaration:
+      Safe Haskell is on, all FFI imports must be in the IO monad
     When checking declaration:
       foreign import ccall safe "static SafeLang08_A" c_sin
         :: CDouble -> CDouble

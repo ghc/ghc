@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module X86.Regs (
         -- squeese functions for the graph allocator
         virtualRegSqueeze,

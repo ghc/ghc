@@ -1,8 +1,8 @@
 
 drvfail009.hs:10:31:
-    Can't make a derived instance of ‘C T1’
-      (even with cunning newtype deriving):
-      ‘C’ does not have arity 1
+    Expecting one more argument to ‘C’
+    Expected kind ‘* -> Constraint’,
+      but ‘C’ has kind ‘* -> * -> Constraint’
     In the newtype declaration for ‘T1’
 
 drvfail009.hs:13:31:

@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, OverlappingInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 {-  With "hugs -98 +o test.hs" gives me:
     ERROR "test.hs":8 - Cannot justify constraints in instance member binding
@@ -29,8 +29,8 @@ class FromStr a where
 typeError :: FromStr a => a -> a
 typeError t = error "type error"
 
-instance FromStr [a] where
+instance {-# OVERLAPPABLE #-} FromStr [a] where
      fromStr _ = typeError undefined  -- line 8
 
-instance FromStr [(String,a)] where  -- line 10
+instance {-# OVERLAPPING #-} FromStr [(String,a)] where  -- line 10
      fromStr _ = typeError undefined  -- line 11

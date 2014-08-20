@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2006
@@ -394,10 +396,10 @@ repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
        ; repTySynInst tc eqn1 }
 
 repTyFamEqn :: LTyFamInstEqn Name -> DsM (Core TH.TySynEqnQ)
-repTyFamEqn (L loc (TyFamInstEqn { tfie_pats = HsWB { hswb_cts = tys
-                                                    , hswb_kvs = kv_names
-                                                    , hswb_tvs = tv_names }
-                                 , tfie_rhs = rhs }))
+repTyFamEqn (L loc (TyFamEqn { tfe_pats = HsWB { hswb_cts = tys
+                                               , hswb_kvs = kv_names
+                                               , hswb_tvs = tv_names }
+                                 , tfe_rhs = rhs }))
   = do { let hs_tvs = HsQTvs { hsq_kvs = kv_names
                              , hsq_tvs = userHsTyVarBndrs loc tv_names }   -- Yuk
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
@@ -705,12 +707,14 @@ addTyVarBinds :: LHsTyVarBndrs Name                            -- the binders to
 -- the computations passed as the second argument is executed in that extended
 -- meta environment and gets the *new* names on Core-level as an argument
 
-addTyVarBinds tvs m
-  = do { freshNames <- mkGenSyms (hsLKiTyVarNames tvs)
-       ; term <- addBinds freshNames $
-                 do { kbs <- repList tyVarBndrTyConName mk_tv_bndr (hsQTvBndrs tvs `zip` freshNames)
+addTyVarBinds (HsQTvs { hsq_kvs = kvs, hsq_tvs = tvs }) m
+  = do { fresh_kv_names <- mkGenSyms kvs
+       ; fresh_tv_names <- mkGenSyms (map hsLTyVarName tvs)
+       ; let fresh_names = fresh_kv_names ++ fresh_tv_names
+       ; term <- addBinds fresh_names $
+                 do { kbs <- repList tyVarBndrTyConName mk_tv_bndr (tvs `zip` fresh_tv_names)
                     ; m kbs }
-       ; wrapGenSyms freshNames term }
+       ; wrapGenSyms fresh_names term }
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
@@ -1180,7 +1184,7 @@ rep_binds binds = do { binds_w_locs <- rep_binds' binds
                      ; return (de_loc (sort_by_loc binds_w_locs)) }
 
 rep_binds' :: LHsBinds Name -> DsM [(SrcSpan, Core TH.DecQ)]
-rep_binds' binds = mapM (rep_bind . snd) (bagToList binds)
+rep_binds' = mapM rep_bind . bagToList
 
 rep_bind :: LHsBind Name -> DsM (SrcSpan, Core TH.DecQ)
 -- Assumes: all the binders of the binding are alrady in the meta-env
@@ -1412,7 +1416,7 @@ globalVar name
   where
       mod = ASSERT( isExternalName name) nameModule name
       name_mod = moduleNameString (moduleName mod)
-      name_pkg = packageIdString (modulePackageId mod)
+      name_pkg = packageKeyString (modulePackageKey mod)
       name_occ = nameOccName name
       mk_varg | OccName.isDataOcc name_occ = mkNameG_dName
               | OccName.isVarOcc  name_occ = mkNameG_vName
@@ -1472,7 +1476,7 @@ rep2 n xs = do { id <- dsLookupGlobalId n
 
 dataCon' :: Name -> [CoreExpr] -> DsM (Core a)
 dataCon' n args = do { id <- dsLookupDataCon n
-                     ; return $ MkC $ mkConApp id args }
+                     ; return $ MkC $ mkCoreConApps id args }
 
 dataCon :: Name -> DsM (Core a)
 dataCon n = dataCon' n []
@@ -2113,7 +2117,7 @@ thLib = mkTHModule (fsLit "Language.Haskell.TH.Lib")
 qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
 
 mkTHModule :: FastString -> Module
-mkTHModule m = mkModule thPackageId (mkModuleNameFS m)
+mkTHModule m = mkModule thPackageKey (mkModuleNameFS m)
 
 libFun, libTc, thFun, thTc, thCon, qqFun :: FastString -> Unique -> Name
 libFun = mk_known_key_name OccName.varName  thLib

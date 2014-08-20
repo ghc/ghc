@@ -6,6 +6,7 @@
 Loading interface files
 
 \begin{code}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module LoadIface (
         -- RnM/TcM functions
@@ -352,13 +353,13 @@ wantHiBootFile dflags eps mod from
                      -- The boot-ness of the requested interface, 
                      -- based on the dependencies in directly-imported modules
   where
-    this_package = thisPackage dflags == modulePackageId mod
+    this_package = thisPackage dflags == modulePackageKey mod
 
 badSourceImport :: Module -> SDoc
 badSourceImport mod
   = hang (ptext (sLit "You cannot {-# SOURCE #-} import a module from another package"))
        2 (ptext (sLit "but") <+> quotes (ppr mod) <+> ptext (sLit "is from package")
-          <+> quotes (ppr (modulePackageId mod)))
+          <+> quotes (ppr (modulePackageKey mod)))
 \end{code}
 
 Note [Care with plugin imports]
@@ -391,7 +392,7 @@ compiler expects.
 -- the declaration itself, will find the fully-glorious Name
 --
 -- We handle ATs specially.  They are not main declarations, but also not
--- implict things (in particular, adding them to `implicitTyThings' would mess
+-- implicit things (in particular, adding them to `implicitTyThings' would mess
 -- things up in the renaming/type checking of source programs).
 -----------------------------------------------------
 
@@ -416,7 +417,6 @@ loadDecl ignore_prags mod (_version, decl)
   = do  {       -- Populate the name cache with final versions of all 
                 -- the names associated with the decl
           main_name      <- lookupOrig mod (ifName decl)
---        ; traceIf (text "Loading decl for " <> ppr main_name)
 
         -- Typecheck the thing, lazily
         -- NB. Firstly, the laziness is there in case we never need the
@@ -445,11 +445,11 @@ loadDecl ignore_prags mod (_version, decl)
         --      [ "MkT" -> <datacon MkT>, "x" -> <selector x>, ... ]
         -- (where the "MkT" is the *Name* associated with MkT, etc.)
         --
-        -- We do this by mapping the implict_names to the associated
+        -- We do this by mapping the implicit_names to the associated
         -- TyThings.  By the invariant on ifaceDeclImplicitBndrs and
         -- implicitTyThings, we can use getOccName on the implicit
         -- TyThings to make this association: each Name's OccName should
-        -- be the OccName of exactly one implictTyThing.  So the key is
+        -- be the OccName of exactly one implicitTyThing.  So the key is
         -- to define a "mini-env"
         --
         -- [ 'MkT' -> <datacon MkT>, 'x' -> <selector x>, ... ]
@@ -457,7 +457,7 @@ loadDecl ignore_prags mod (_version, decl)
         --
         -- However, there is a subtlety: due to how type checking needs
         -- to be staged, we can't poke on the forkM'd thunks inside the
-        -- implictTyThings while building this mini-env.  
+        -- implicitTyThings while building this mini-env.  
         -- If we poke these thunks too early, two problems could happen:
         --    (1) When processing mutually recursive modules across
         --        hs-boot boundaries, poking too early will do the
@@ -490,9 +490,11 @@ loadDecl ignore_prags mod (_version, decl)
                              pprPanic "loadDecl" (ppr main_name <+> ppr n $$ ppr (decl))
 
         ; implicit_names <- mapM (lookupOrig mod) (ifaceDeclImplicitBndrs decl)
+
+--         ; traceIf (text "Loading decl for " <> ppr main_name $$ ppr implicit_names)
         ; return $ (main_name, thing) :
                       -- uses the invariant that implicit_names and
-                      -- implictTyThings are bijective
+                      -- implicitTyThings are bijective
                       [(n, lookup n) | n <- implicit_names]
         }
   where
@@ -571,7 +573,7 @@ findAndReadIface doc_str mod hi_boot_file
                                                            (ml_hi_file loc)
 
                        -- See Note [Home module load error]
-                       if thisPackage dflags == modulePackageId mod &&
+                       if thisPackage dflags == modulePackageKey mod &&
                           not (isOneShot (ghcMode dflags))
                            then return (Failed (homeModError mod loc))
                            else do r <- read_file file_path
@@ -751,7 +753,7 @@ pprModIface iface
         , vcat (map pprUsage (mi_usages iface))
         , vcat (map pprIfaceAnnotation (mi_anns iface))
         , pprFixities (mi_fixities iface)
-        , vcat (map pprIfaceDecl (mi_decls iface))
+        , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls iface]
         , vcat (map ppr (mi_insts iface))
         , vcat (map ppr (mi_fam_insts iface))
         , vcat (map ppr (mi_rules iface))
@@ -817,10 +819,6 @@ pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
     ppr_boot True  = text "[boot]"
     ppr_boot False = empty
 
-pprIfaceDecl :: (Fingerprint, IfaceDecl) -> SDoc
-pprIfaceDecl (ver, decl)
-  = ppr ver $$ nest 2 (ppr decl)
-
 pprFixities :: [(OccName, Fixity)] -> SDoc
 pprFixities []    = empty
 pprFixities fixes = ptext (sLit "fixities") <+> pprWithCommas pprFix fixes
@@ -878,7 +876,9 @@ badIfaceFile file err
 
 hiModuleNameMismatchWarn :: Module -> Module -> MsgDoc
 hiModuleNameMismatchWarn requested_mod read_mod = 
-  withPprStyle defaultUserStyle $
+  -- ToDo: This will fail to have enough qualification when the package IDs
+  -- are the same
+  withPprStyle (mkUserStyle alwaysQualify AllTheWay) $
     -- we want the Modules below to be qualified with package names,
     -- so reset the PrintUnqualified setting.
     hsep [ ptext (sLit "Something is amiss; requested module ")

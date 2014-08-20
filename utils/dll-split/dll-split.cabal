@@ -10,9 +10,10 @@ Description:
 	XXX
 Category: Development
 build-type: Simple
-cabal-version: >=1.2
+cabal-version: >=1.10
 
 Executable dll-split
+    Default-Language: Haskell2010
     Main-Is: Main.hs
 
     Build-Depends: base       >= 4   && < 5,

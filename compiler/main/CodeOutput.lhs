@@ -4,6 +4,8 @@
 \section{Code output phase}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module CodeOutput( codeOutput, outputForeignStubs ) where
 
 #include "HsVersions.h"
@@ -48,7 +50,7 @@ codeOutput :: DynFlags
            -> FilePath
            -> ModLocation
            -> ForeignStubs
-           -> [PackageId]
+           -> [PackageKey]
            -> Stream IO RawCmmGroup ()                       -- Compiled C--
            -> IO (FilePath,
                   (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}))
@@ -72,7 +74,6 @@ codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
                 ; return cmm
                 }
 
-        ; showPass dflags "CodeOutput"
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
         ; case hscTarget dflags of {
              HscAsm         -> outputAsm dflags this_mod filenm linted_cmm_stream;
@@ -99,7 +100,7 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 outputC :: DynFlags
         -> FilePath
         -> Stream IO RawCmmGroup ()
-        -> [PackageId]
+        -> [PackageKey]
         -> IO ()
 
 outputC dflags filenm cmm_stream packages
@@ -114,7 +115,7 @@ outputC dflags filenm cmm_stream packages
        --   * -#include options from the cmdline and OPTIONS pragmas
        --   * the _stub.h file, if there is one.
        --
-       let rts = getPackageDetails (pkgState dflags) rtsPackageId
+       let rts = getPackageDetails dflags rtsPackageKey
                        
        let cc_injects = unlines (map mk_include (includes rts))
            mk_include h_file = 
@@ -123,8 +124,7 @@ outputC dflags filenm cmm_stream packages
                '<':_      -> "#include "++h_file
                _          -> "#include \""++h_file++"\""
 
-       pkg_configs <- getPreloadPackagesAnd dflags packages
-       let pkg_names = map (display.sourcePackageId) pkg_configs
+       let pkg_names = map packageKeyString packages
 
        doOutput filenm $ \ h -> do
           hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
@@ -190,11 +190,8 @@ outputForeignStubs dflags mod location stubs
    stub_c <- newTempName dflags "c"
 
    case stubs of
-     NoStubs -> do
-        -- When compiling External Core files, may need to use stub
-        -- files from a previous compilation
-        stub_h_exists <- doesFileExist stub_h
-        return (stub_h_exists, Nothing)
+     NoStubs ->
+        return (False, Nothing)
 
      ForeignStubs h_code c_code -> do
         let
@@ -212,7 +209,7 @@ outputForeignStubs dflags mod location stubs
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes = 
-               let rts_pkg = getPackageDetails (pkgState dflags) rtsPackageId in
+               let rts_pkg = getPackageDetails dflags rtsPackageKey in
                concatMap mk_include (includes rts_pkg)
             mk_include i = "#include \"" ++ i ++ "\"\n"
 

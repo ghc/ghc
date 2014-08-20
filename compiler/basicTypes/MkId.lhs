@@ -12,7 +12,8 @@ have a standard form, namely:
 - primitive operations
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -20,7 +21,7 @@ have a standard form, namely:
 -- for details
 
 module MkId (
-        mkDictFunId, mkDictFunTy, mkDictSelId,
+        mkDictFunId, mkDictFunTy, mkDictSelId, mkDictSelRhs,
 
         mkPrimOpId, mkFCallId,
 
@@ -66,7 +67,6 @@ import PrimOp
 import ForeignCall
 import DataCon
 import Id
-import Var              ( mkExportedLocalVar )
 import IdInfo
 import Demand
 import CoreSyn
@@ -272,39 +272,36 @@ at the outside.  When dealing with classes it's very convenient to
 recover the original type signature from the class op selector.
 
 \begin{code}
-mkDictSelId :: DynFlags
-            -> Bool	     -- True <=> don't include the unfolding
-			     -- Little point on imports without -O, because the
-			     -- dictionary itself won't be visible
- 	    -> Name	     -- Name of one of the *value* selectors 
+mkDictSelId :: Name	     -- Name of one of the *value* selectors 
 	       		     -- (dictionary superclass or method)
             -> Class -> Id
-mkDictSelId dflags no_unf name clas
+mkDictSelId name clas
   = mkGlobalId (ClassOpId clas) name sel_ty info
   where
-    sel_ty = mkForAllTys tyvars (mkFunTy (idType dict_id) (idType the_arg_id))
-        -- We can't just say (exprType rhs), because that would give a type
-        --      C a -> C a
-        -- for a single-op class (after all, the selector is the identity)
-        -- But it's type must expose the representation of the dictionary
-        -- to get (say)         C a -> (a -> a)
+    tycon      	   = classTyCon clas
+    sel_names      = map idName (classAllSelIds clas)
+    new_tycon  	   = isNewTyCon tycon
+    [data_con] 	   = tyConDataCons tycon
+    tyvars     	   = dataConUnivTyVars data_con
+    arg_tys    	   = dataConRepArgTys data_con	-- Includes the dictionary superclasses
+    val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
+
+    sel_ty = mkForAllTys tyvars (mkFunTy (mkClassPred clas (mkTyVarTys tyvars))
+                                         (getNth arg_tys val_index))
 
     base_info = noCafIdInfo
                 `setArityInfo`         1
                 `setStrictnessInfo`    strict_sig
-                `setUnfoldingInfo`     (if no_unf then noUnfolding
-	                                else mkImplicitUnfolding dflags rhs)
-		   -- In module where class op is defined, we must add
-		   -- the unfolding, even though it'll never be inlined
-		   -- because we use that to generate a top-level binding
-		   -- for the ClassOp
 
-    info | new_tycon = base_info `setInlinePragInfo` alwaysInlinePragma
+    info | new_tycon
+         = base_info `setInlinePragInfo` alwaysInlinePragma
+                     `setUnfoldingInfo`  mkInlineUnfolding (Just 1) (mkDictSelRhs clas val_index)
     	   	   -- See Note [Single-method classes] in TcInstDcls
 		   -- for why alwaysInlinePragma
-         | otherwise = base_info  `setSpecInfo`       mkSpecInfo [rule]
-		       		  `setInlinePragInfo` neverInlinePragma
-		   -- Add a magic BuiltinRule, and never inline it
+
+         | otherwise
+         = base_info `setSpecInfo` mkSpecInfo [rule]
+		   -- Add a magic BuiltinRule, but no unfolding
 		   -- so that the rule is always available to fire.
 		   -- See Note [ClassOp/DFun selection] in TcInstDcls
 
@@ -326,25 +323,26 @@ mkDictSelId dflags no_unf name clas
     strict_sig = mkClosedStrictSig [arg_dmd] topRes
     arg_dmd | new_tycon = evalDmd
             | otherwise = mkManyUsedDmd $
-                          mkProdDmd [ if the_arg_id == id then evalDmd else absDmd
-                                    | id <- arg_ids ]
+                          mkProdDmd [ if name == sel_name then evalDmd else absDmd
+                                    | sel_name <- sel_names ]
 
+mkDictSelRhs :: Class
+             -> Int         -- 0-indexed selector among (superclasses ++ methods)
+             -> CoreExpr
+mkDictSelRhs clas val_index
+  = mkLams tyvars (Lam dict_id rhs_body)
+  where
     tycon      	   = classTyCon clas
     new_tycon  	   = isNewTyCon tycon
     [data_con] 	   = tyConDataCons tycon
     tyvars     	   = dataConUnivTyVars data_con
     arg_tys    	   = dataConRepArgTys data_con	-- Includes the dictionary superclasses
 
-    -- 'index' is a 0-index into the *value* arguments of the dictionary
-    val_index      = assoc "MkId.mkDictSelId" sel_index_prs name
-    sel_index_prs  = map idName (classAllSelIds clas) `zip` [0..]
-
     the_arg_id     = getNth arg_ids val_index
     pred       	   = mkClassPred clas (mkTyVarTys tyvars)
     dict_id    	   = mkTemplateLocal 1 pred
     arg_ids    	   = mkTemplateLocalsNum 2 arg_tys
 
-    rhs = mkLams tyvars  (Lam dict_id   rhs_body)
     rhs_body | new_tycon = unwrapNewTypeBody tycon (map mkTyVarTy tyvars) (Var dict_id)
              | otherwise = Case (Var dict_id) dict_id (idType the_arg_id)
                                 [(DataAlt data_con, arg_ids, varToCoreExpr the_arg_id)]
@@ -956,29 +954,13 @@ mkFCallId dflags uniq fcall ty
 %*                                                                      *
 %************************************************************************
 
-Important notes about dict funs and default methods
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Dict funs and default methods]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Dict funs and default methods are *not* ImplicitIds.  Their definition
 involves user-written code, so we can't figure out their strictness etc
 based on fixed info, as we can for constructors and record selectors (say).
 
-We build them as LocalIds, but with External Names.  This ensures that
-they are taken to account by free-variable finding and dependency
-analysis (e.g. CoreFVs.exprFreeVars).
-
-Why shouldn't they be bound as GlobalIds?  Because, in particular, if
-they are globals, the specialiser floats dict uses above their defns,
-which prevents good simplifications happening.  Also the strictness
-analyser treats a occurrence of a GlobalId as imported and assumes it
-contains strictness in its IdInfo, which isn't true if the thing is
-bound in the same module as the occurrence.
-
-It's OK for dfuns to be LocalIds, because we form the instance-env to
-pass on to the next module (md_insts) in CoreTidy, afer tidying
-and globalising the top-level Ids.
-
-BUT make sure they are *exported* LocalIds (mkExportedLocalId) so 
-that they aren't discarded by the occurrence analyser.
+NB: See also Note [Exported LocalIds] in Id
 
 \begin{code}
 mkDictFunId :: Name      -- Name to use for the dict fun;
@@ -988,12 +970,12 @@ mkDictFunId :: Name      -- Name to use for the dict fun;
             -> [Type]
             -> Id
 -- Implements the DFun Superclass Invariant (see TcInstDcls)
+-- See Note [Dict funs and default methods]
 
 mkDictFunId dfun_name tvs theta clas tys
-  = mkExportedLocalVar (DFunId n_silent is_nt)
-                       dfun_name
-                       dfun_ty
-                       vanillaIdInfo
+  = mkExportedLocalId (DFunId n_silent is_nt)
+                      dfun_name
+                      dfun_ty
   where
     is_nt = isNewTyCon (classTyCon clas)
     (n_silent, dfun_ty) = mkDictFunTy tvs theta clas tys

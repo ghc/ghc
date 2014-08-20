@@ -10,12 +10,13 @@ Description:
 	XXX
 Category: Development
 build-type: Simple
-cabal-version: >=1.2
+cabal-version: >=1.10
 
 Flag base3
     Description: Choose the new smaller, split-up base package.
 
 Executable runghc
+    Default-Language: Haskell2010
     Main-Is: runghc.hs
 
     if flag(base3)

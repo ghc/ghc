@@ -1,0 +1,16 @@
+/autom4te.cache/
+/cbits/GmpDerivedConstants.h
+/cbits/mkGmpDerivedConstants
+/config.log
+/config.status
+/configure
+/dist-install/
+/ghc.mk
+/gmp/config.mk
+/GNUmakefile
+/include/HsIntegerGmp.h
+/integer-gmp.buildinfo
+/mkGmpDerivedConstants/dist/
+
+/gmp/gmp.h
+/gmp/gmpbuild

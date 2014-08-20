@@ -6,6 +6,8 @@
 @DsMonad@: monadery used in desugaring
 
 \begin{code}
+{-# LANGUAGE FlexibleInstances #-}
+
 module DsMonad (
         DsM, mapM, mapAndUnzipM,
         initDs, initDsTc, fixDs,

@@ -2,14 +2,15 @@
 % (c) The University of Glasgow 2005-2012
 %
 \begin{code}
+{-# LANGUAGE CPP, NondecreasingIndentation #-}
+{-# OPTIONS_GHC -fno-cse #-}
+-- -fno-cse is needed for GLOBAL_VAR's to behave properly
+
 -- | The dynamic linker for GHCi.
 --
 -- This module deals with the top-level issues of dynamic linking,
 -- calling the object-code linker and the byte-code linker where
 -- necessary.
-
-{-# OPTIONS -fno-cse #-}
--- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 module Linker ( getHValue, showLinkerState,
                 linkExpr, linkDecls, unload, withExtendedLinkEnv,
@@ -58,18 +59,13 @@ import Control.Monad
 
 import Data.IORef
 import Data.List
-import qualified Data.Map as Map
 import Control.Concurrent.MVar
 
 import System.FilePath
 import System.IO
-#if __GLASGOW_HASKELL__ > 704
 import System.Directory hiding (findFile)
-#else
-import System.Directory
-#endif
 
-import Distribution.Package hiding (depends, PackageId)
+import Distribution.Package hiding (depends, mkPackageKey, PackageKey)
 
 import Exception
 \end{code}
@@ -123,7 +119,7 @@ data PersistentLinkerState
         -- The currently-loaded packages; always object code
         -- Held, as usual, in dependency order; though I am not sure if
         -- that is really important
-        pkgs_loaded :: ![PackageId]
+        pkgs_loaded :: ![PackageKey]
      }
 
 emptyPLS :: DynFlags -> PersistentLinkerState
@@ -139,10 +135,10 @@ emptyPLS _ = PersistentLinkerState {
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = [rtsPackageId]
+  where init_pkgs = [rtsPackageKey]
 
 
-extendLoadedPkgs :: [PackageId] -> IO ()
+extendLoadedPkgs :: [PackageKey] -> IO ()
 extendLoadedPkgs pkgs =
   modifyPLS_ $ \s ->
       return s{ pkgs_loaded = pkgs ++ pkgs_loaded s }
@@ -526,7 +522,7 @@ getLinkDeps :: HscEnv -> HomePackageTable
             -> Maybe FilePath                   -- replace object suffices?
             -> SrcSpan                          -- for error messages
             -> [Module]                         -- If you need these
-            -> IO ([Linkable], [PackageId])     -- ... then link these first
+            -> IO ([Linkable], [PackageKey])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
 getLinkDeps hsc_env hpt pls replace_osuf span mods
@@ -564,8 +560,8 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         -- tree recursively.  See bug #936, testcase ghci/prog007.
     follow_deps :: [Module]             -- modules to follow
                 -> UniqSet ModuleName         -- accum. module dependencies
-                -> UniqSet PackageId          -- accum. package dependencies
-                -> IO ([ModuleName], [PackageId]) -- result
+                -> UniqSet PackageKey          -- accum. package dependencies
+                -> IO ([ModuleName], [PackageKey]) -- result
     follow_deps []     acc_mods acc_pkgs
         = return (uniqSetToList acc_mods, uniqSetToList acc_pkgs)
     follow_deps (mod:mods) acc_mods acc_pkgs
@@ -579,7 +575,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           when (mi_boot iface) $ link_boot_mod_error mod
 
           let
-            pkg = modulePackageId mod
+            pkg = modulePackageKey mod
             deps  = mi_deps iface
 
             pkg_deps = dep_pkgs deps
@@ -1044,7 +1040,7 @@ showLS (Framework nm) = "(framework) " ++ nm
 -- automatically, and it doesn't matter what order you specify the input
 -- packages.
 --
-linkPackages :: DynFlags -> [PackageId] -> IO ()
+linkPackages :: DynFlags -> [PackageKey] -> IO ()
 -- NOTE: in fact, since each module tracks all the packages it depends on,
 --       we don't really need to use the package-config dependencies.
 --
@@ -1060,16 +1056,13 @@ linkPackages dflags new_pkgs = do
   modifyPLS_ $ \pls -> do
     linkPackages' dflags new_pkgs pls
 
-linkPackages' :: DynFlags -> [PackageId] -> PersistentLinkerState
+linkPackages' :: DynFlags -> [PackageKey] -> PersistentLinkerState
              -> IO PersistentLinkerState
 linkPackages' dflags new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs' }
   where
-     pkg_map = pkgIdMap (pkgState dflags)
-     ipid_map = installedPackageIdMap (pkgState dflags)
-
-     link :: [PackageId] -> [PackageId] -> IO [PackageId]
+     link :: [PackageKey] -> [PackageKey] -> IO [PackageKey]
      link pkgs new_pkgs =
          foldM link_one pkgs new_pkgs
 
@@ -1077,17 +1070,16 @@ linkPackages' dflags new_pks pls = do
         | new_pkg `elem` pkgs   -- Already linked
         = return pkgs
 
-        | Just pkg_cfg <- lookupPackage pkg_map new_pkg
+        | Just pkg_cfg <- lookupPackage dflags new_pkg
         = do {  -- Link dependents first
-               pkgs' <- link pkgs [ Maybes.expectJust "link_one" $
-                                    Map.lookup ipid ipid_map
+               pkgs' <- link pkgs [ resolveInstalledPackageId dflags ipid
                                   | ipid <- depends pkg_cfg ]
                 -- Now link the package itself
              ; linkPackage dflags pkg_cfg
              ; return (new_pkg : pkgs') }
 
         | otherwise
-        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ packageIdString new_pkg))
+        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ packageKeyString new_pkg))
 
 
 linkPackage :: DynFlags -> PackageConfig -> IO ()
@@ -1208,7 +1200,9 @@ locateLib dflags is_hs dirs lib
      mk_hs_dyn_lib_path dir = dir </> mkHsSOName platform hs_dyn_lib_name
 
      so_name = mkSOName platform lib
-     mk_dyn_lib_path dir = dir </> so_name
+     mk_dyn_lib_path dir = case (arch, os) of
+                             (ArchX86_64, OSSolaris2) -> dir </> ("64/" ++ so_name)
+                             _ -> dir </> so_name
 
      findObject     = liftM (fmap Object)  $ findFile mk_obj_path        dirs
      findDynObject  = liftM (fmap Object)  $ findFile mk_dyn_obj_path    dirs
@@ -1225,6 +1219,8 @@ locateLib dflags is_hs dirs lib
                            Nothing -> g
 
      platform = targetPlatform dflags
+     arch = platformArch platform
+     os = platformOS platform
 
 searchForLibUsingGcc :: DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
 searchForLibUsingGcc dflags so dirs = do

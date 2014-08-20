@@ -2,7 +2,7 @@
 -- This was accepted due to a bug in GHC
 
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             OverlappingInstances, UndecidableInstances, IncoherentInstances,
+             UndecidableInstances, IncoherentInstances,
              FlexibleInstances #-}
 
 module Foo where

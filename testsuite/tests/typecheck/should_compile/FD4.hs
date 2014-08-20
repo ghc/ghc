@@ -2,7 +2,6 @@
     MultiParamTypeClasses,
     FunctionalDependencies,
     UndecidableInstances,
-    OverlappingInstances,
     FlexibleInstances,
     EmptyDataDecls #-}
 

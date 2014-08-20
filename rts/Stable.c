@@ -246,6 +246,7 @@ STATIC_INLINE void
 freeSnEntry(snEntry *sn)
 {
   ASSERT(sn->sn_obj == NULL);
+  removeHashTable(addrToStableHash, (W_)sn->old, NULL);
   sn->addr = (P_)stable_name_free;
   stable_name_free = sn;
 }
@@ -548,3 +549,11 @@ updateStableTables(rtsBool full)
             });
     }
 }
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

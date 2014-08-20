@@ -1,3 +1,6 @@
+{-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts, FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 ----------------------------------------------------------------------------
 --
 -- Pretty-printing of Cmm as (a superset of) C--
@@ -30,8 +33,6 @@
 --
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts #-}
 module PprCmm
   ( module PprCmmDecl
   , module PprCmmExpr
@@ -137,6 +138,9 @@ pprCmmGraph g
   $$ nest 2 (vcat $ map ppr blocks)
   $$ text "}"
   where blocks = postorderDfs g
+    -- postorderDfs has the side-effect of discarding unreachable code,
+    -- so pretty-printed Cmm will omit any unreachable blocks.  This can
+    -- sometimes be confusing.
 
 ---------------------------------------------
 -- Outputting CmmNode and types which it contains

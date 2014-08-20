@@ -12,7 +12,8 @@ case, so that we don't allocate things, save them on the stack, and
 then discover that they aren't needed in the chosen branch.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -25,16 +26,17 @@ module FloatIn ( floatInwards ) where
 
 import CoreSyn
 import MkCore
-import CoreUtils	( exprIsDupable, exprIsExpandable, exprOkForSideEffects )
+import CoreUtils	( exprIsDupable, exprIsExpandable, exprType, exprOkForSideEffects )
 import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf, idRuleAndUnfoldingVars )
 import Id		( isOneShotBndr, idType )
 import Var
-import Type		( isUnLiftedType )
+import Type		( Type, isUnLiftedType, splitFunTy, applyTy )
 import VarSet
 import Util
 import UniqFM
 import DynFlags
 import Outputable
+import Data.List( mapAccumL )
 \end{code}
 
 Top-level interface function, @floatInwards@.  Note that we do not
@@ -154,17 +156,41 @@ need to get at all the arguments.  The next simplifier run will
 pull out any silly ones.
 
 \begin{code}
-fiExpr dflags to_drop (_,AnnApp fun arg@(arg_fvs, ann_arg))
-  | noFloatIntoRhs ann_arg  = wrapFloats drop_here $ wrapFloats arg_drop $
-                              App (fiExpr dflags fun_drop fun) (fiExpr dflags [] arg)
-       -- It's inconvenient to test for an unlifted arg here,
-       -- and it really doesn't matter if we float into one
-  | otherwise               = wrapFloats drop_here $
-                              App (fiExpr dflags fun_drop fun) (fiExpr dflags arg_drop arg)
+fiExpr dflags to_drop ann_expr@(_,AnnApp {})
+  = wrapFloats drop_here $ wrapFloats extra_drop $
+    mkApps (fiExpr dflags fun_drop ann_fun)
+           (zipWith (fiExpr dflags) arg_drops ann_args)
   where
-    [drop_here, fun_drop, arg_drop] 
-      = sepBindsByDropPoint dflags False [freeVarsOf fun, arg_fvs] to_drop
+    (ann_fun@(fun_fvs, _), ann_args) = collectAnnArgs ann_expr
+    fun_ty = exprType (deAnnotate ann_fun)
+    ((_,extra_fvs), arg_fvs) = mapAccumL mk_arg_fvs (fun_ty, emptyVarSet) ann_args
+
+    -- All this faffing about is so that we can get hold of
+    -- the types of the arguments, to pass to noFloatIntoRhs
+    mk_arg_fvs :: (Type, FreeVarSet) -> CoreExprWithFVs -> ((Type, FreeVarSet), FreeVarSet)
+    mk_arg_fvs (fun_ty, extra_fvs) (_, AnnType ty)
+      = ((applyTy fun_ty ty, extra_fvs), emptyVarSet)
+
+    mk_arg_fvs (fun_ty, extra_fvs) (arg_fvs, ann_arg)
+      | noFloatIntoRhs ann_arg arg_ty
+      = ((res_ty, extra_fvs `unionVarSet` arg_fvs), emptyVarSet)
+      | otherwise
+      = ((res_ty, extra_fvs), arg_fvs)
+      where
+       (arg_ty, res_ty) = splitFunTy fun_ty
+
+    drop_here : extra_drop : fun_drop : arg_drops
+      = sepBindsByDropPoint dflags False (extra_fvs : fun_fvs : arg_fvs) to_drop
 \end{code}
+
+Note [Do not destroy the let/app invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Watch out for
+   f (x +# y)
+We don't want to float bindings into here
+   f (case ... of { x -> x +# y })
+because that might destroy the let/app invariant, which requires
+unlifted function arguments to be ok-for-speculation.
 
 Note [Floating in past a lambda group]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -274,8 +300,8 @@ arrange to dump bindings that bind extra_fvs before the entire let.
 
 Note [extra_fvs (2): free variables of rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider 
-  let x{rule mentioning y} = rhs in body 
+Consider
+  let x{rule mentioning y} = rhs in body
 Here y is not free in rhs or body; but we still want to dump bindings
 that bind y outside the let.  So we augment extra_fvs with the
 idRuleAndUnfoldingVars of x.  No need for type variables, hence not using
@@ -287,11 +313,11 @@ fiExpr dflags to_drop (_,AnnLet (AnnNonRec id rhs@(rhs_fvs, ann_rhs)) body)
   = fiExpr dflags new_to_drop body
   where
     body_fvs = freeVarsOf body `delVarSet` id
+    rhs_ty = idType id
 
     rule_fvs = idRuleAndUnfoldingVars id	-- See Note [extra_fvs (2): free variables of rules]
-    extra_fvs | noFloatIntoRhs ann_rhs
-	      || isUnLiftedType (idType id) = rule_fvs `unionVarSet` rhs_fvs
-	      | otherwise		    = rule_fvs
+    extra_fvs | noFloatIntoRhs ann_rhs rhs_ty = rule_fvs `unionVarSet` rhs_fvs
+	      | otherwise		      = rule_fvs
 	-- See Note [extra_fvs (1): avoid floating into RHS]
 	-- No point in floating in only to float straight out again
 	-- Ditto ok-for-speculation unlifted RHSs
@@ -321,7 +347,7 @@ fiExpr dflags to_drop (_,AnnLet (AnnRec bindings) body)
     rule_fvs = foldr (unionVarSet . idRuleAndUnfoldingVars) emptyVarSet ids
     extra_fvs = rule_fvs `unionVarSet` 
 		unionVarSets [ fvs | (fvs, rhs) <- rhss
-			     , noFloatIntoRhs rhs ]
+			     , noFloatIntoExpr rhs ]
 
     (shared_binds:extra_binds:body_binds:rhss_binds) 
 	= sepBindsByDropPoint dflags False (extra_fvs:body_fvs:rhss_fvs) to_drop
@@ -363,6 +389,7 @@ floating in cases with a single alternative that may bind values.
 fiExpr dflags to_drop (_, AnnCase scrut case_bndr _ [(con,alt_bndrs,rhs)])
   | isUnLiftedType (idType case_bndr)
   , exprOkForSideEffects (deAnnotate scrut)
+      -- See PrimOp, Note [PrimOp can_fail and has_side_effects]
   = wrapFloats shared_binds $
     fiExpr dflags (case_float : rhs_binds) rhs
   where
@@ -402,8 +429,15 @@ okToFloatInside bndrs = all ok bndrs
     ok b = not (isId b) || isOneShotBndr b
     -- Push the floats inside there are no non-one-shot value binders
 
-noFloatIntoRhs :: AnnExpr' Var (UniqFM Var) -> Bool
-noFloatIntoRhs (AnnLam bndr e) 
+noFloatIntoRhs :: AnnExpr' Var (UniqFM Var) -> Type -> Bool
+-- ^ True if it's a bad idea to float bindings into this RHS
+-- Preconditio:  rhs :: rhs_ty
+noFloatIntoRhs rhs rhs_ty
+  =  isUnLiftedType rhs_ty   -- See Note [Do not destroy the let/app invariant]
+  || noFloatIntoExpr rhs
+
+noFloatIntoExpr :: AnnExpr' Var (UniqFM Var) -> Bool
+noFloatIntoExpr (AnnLam bndr e)
    = not (okToFloatInside (bndr:bndrs))
      -- NB: Must line up with fiExpr (AnnLam...); see Trac #7088
    where
@@ -417,7 +451,7 @@ noFloatIntoRhs (AnnLam bndr e)
 	-- boxing constructor into it, else we box it every time which is very bad
 	-- news indeed.
 
-noFloatIntoRhs rhs = exprIsExpandable (deAnnotate' rhs)	
+noFloatIntoExpr rhs = exprIsExpandable (deAnnotate' rhs)
        -- We'd just float right back out again...
        -- Should match the test in SimplEnv.doFloatFromRhs
 \end{code}

@@ -1,0 +1,16 @@
+
+T8959b.hs:5:7:
+    Couldn't match expected type ‘Int → Int’ with actual type ‘()’
+    In the expression: ()
+    In an equation for ‘foo’: foo = ()
+
+T8959b.hs:8:7:
+    Couldn't match expected type ‘()’ with actual type ‘t0 → m0 t0’
+    In the expression: proc x -> do { return ↢ x }
+    In an equation for ‘bar’: bar = proc x -> do { return ↢ x }
+
+T8959b.hs:10:7:
+    Couldn't match expected type ‘(∀ a2. a2 → a2) → a1’
+                with actual type ‘()’
+    In the expression: () ∷ (∀ a. a -> a) -> a
+    In an equation for ‘baz’: baz = () ∷ (∀ a. a -> a) -> a

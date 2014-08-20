@@ -15,4 +15,4 @@ The following packages are broken, either because they have a problem
 listed above, or because they depend on a broken package.
 testpkg-2.0
 testpkg-3.0
-ghc-pkg: unregistering testpkg-2.0 would break the following packages: testpkg-3.0 (use --force to override)
+ghc-pkg: unregistering would break the following packages: testpkg-3.0 (use --force to override)

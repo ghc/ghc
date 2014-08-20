@@ -1,6 +1,6 @@
 \begin{code}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -48,7 +48,7 @@ import DynFlags
 import ListSetOps       ( equivClasses )
 
 import Data.Maybe
-import Data.List        ( partition, mapAccumL, zip4 )
+import Data.List        ( partition, mapAccumL, zip4, nub )
 \end{code}
 
 %************************************************************************
@@ -668,10 +668,11 @@ mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> SDoc -> Ct
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   | isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
-                            -- be oriented the other way round; see TcCanonical.reOrient
+                            -- be oriented the other way round;
+                            -- see TcCanonical.canEqTyVarTyVar
   || isSigTyVar tv1 && not (isTyVarTy ty2)
   = mkErrorMsg ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
-                             , extraTyVarInfo ctxt ty1 ty2
+                             , extraTyVarInfo ctxt tv1 ty2
                              , extra ])
 
   -- So tv is a meta tyvar (or started that way before we 
@@ -701,7 +702,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   , Implic { ic_skols = skols } <- implic
   , tv1 `elem` skols
   = mkErrorMsg ctxt ct (vcat [ misMatchMsg oriented ty1 ty2
-                             , extraTyVarInfo ctxt ty1 ty2
+                             , extraTyVarInfo ctxt tv1 ty2
                              , extra ])
 
   -- Check for skolem escape
@@ -728,14 +729,15 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_env = env, ic_given = given, ic_info = skol_info } <- implic
   = do { let msg = misMatchMsg oriented ty1 ty2
-             untch_extra 
+             untch_extra
                 = nest 2 $
                   sep [ quotes (ppr tv1) <+> ptext (sLit "is untouchable")
                       , nest 2 $ ptext (sLit "inside the constraints") <+> pprEvVarTheta given
                       , nest 2 $ ptext (sLit "bound by") <+> ppr skol_info
                       , nest 2 $ ptext (sLit "at") <+> ppr (tcl_loc env) ]
-             tv_extra = extraTyVarInfo ctxt ty1 ty2
-       ; mkErrorMsg ctxt ct (vcat [msg, untch_extra, tv_extra, extra]) }
+             tv_extra = extraTyVarInfo ctxt tv1 ty2
+             add_sig  = suggestAddSig ctxt ty1 ty2
+       ; mkErrorMsg ctxt ct (vcat [msg, untch_extra, tv_extra, add_sig, extra]) }
 
   | otherwise
   = reportEqErr ctxt extra ct oriented (mkTyVarTy tv1) ty2
@@ -792,7 +794,7 @@ misMatchOrCND ctxt ct oriented ty1 ty2
        -- or there is no context, don't report the context
   = misMatchMsg oriented ty1 ty2
   | otherwise      
-  = couldNotDeduce givens ([mkEqPred ty1 ty2], orig)
+  = couldNotDeduce givens ([mkTcEqPred ty1 ty2], orig)
   where
     givens = getUserGivens ctxt
     orig   = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2 }
@@ -814,30 +816,46 @@ pp_givens givens
                 2 (sep [ ptext (sLit "bound by") <+> ppr skol_info
                        , ptext (sLit "at") <+> ppr loc])
 
-extraTyVarInfo :: ReportErrCtxt -> TcType -> TcType -> SDoc
--- Add on extra info about the types themselves
+extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
+-- Add on extra info about skolem constants
 -- NB: The types themselves are already tidied
-extraTyVarInfo ctxt ty1 ty2
-  = nest 2 (extra1 $$ extra2)
+extraTyVarInfo ctxt tv1 ty2
+  = nest 2 (tv_extra tv1 $$ ty_extra ty2)
   where
-    extra1 = tyVarExtraInfoMsg (cec_encl ctxt) ty1
-    extra2 = tyVarExtraInfoMsg (cec_encl ctxt) ty2
+    implics = cec_encl ctxt
+    ty_extra ty = case tcGetTyVar_maybe ty of
+                    Just tv -> tv_extra tv
+                    Nothing -> empty
 
-tyVarExtraInfoMsg :: [Implication] -> Type -> SDoc
--- Shows a bit of extra info about skolem constants
-tyVarExtraInfoMsg implics ty
-  | Just tv <- tcGetTyVar_maybe ty
-  , isTcTyVar tv, isSkolemTyVar tv
-  , let pp_tv = quotes (ppr tv)
- = case tcTyVarDetails tv of
-    SkolemTv {}   -> pp_tv <+> pprSkol (getSkolemInfo implics tv) (getSrcLoc tv)
-    FlatSkol {}   -> pp_tv <+> ptext (sLit "is a flattening type variable")
-    RuntimeUnk {} -> pp_tv <+> ptext (sLit "is an interactive-debugger skolem")
-    MetaTv {}     -> empty
+    tv_extra tv | isTcTyVar tv, isSkolemTyVar tv
+                , let pp_tv = quotes (ppr tv)
+                = case tcTyVarDetails tv of
+                    SkolemTv {}   -> pp_tv <+> pprSkol (getSkolemInfo implics tv) (getSrcLoc tv)
+                    FlatSkol {}   -> pp_tv <+> ptext (sLit "is a flattening type variable")
+                    RuntimeUnk {} -> pp_tv <+> ptext (sLit "is an interactive-debugger skolem")
+                    MetaTv {}     -> empty
 
- | otherwise             -- Normal case
- = empty
- 
+                | otherwise             -- Normal case
+                = empty
+
+suggestAddSig :: ReportErrCtxt -> TcType -> TcType -> SDoc
+-- See Note [Suggest adding a type signature]
+suggestAddSig ctxt ty1 ty2
+  | null inferred_bndrs
+  = empty
+  | [bndr] <- inferred_bndrs
+  = ptext (sLit "Possible fix: add a type signature for") <+> quotes (ppr bndr)
+  | otherwise
+  = ptext (sLit "Possible fix: add type signatures for some or all of") <+> (ppr inferred_bndrs)
+  where
+    inferred_bndrs = nub (get_inf ty1 ++ get_inf ty2)
+    get_inf ty | Just tv <- tcGetTyVar_maybe ty
+               , isTcTyVar tv, isSkolemTyVar tv
+               , InferSkol prs <- getSkolemInfo (cec_encl ctxt) tv
+               = map fst prs
+               | otherwise
+               = []
+
 kindErrorMsg :: TcType -> TcType -> SDoc   -- Types are already tidy
 kindErrorMsg ty1 ty2
   = vcat [ ptext (sLit "Kind incompatibility when matching types:")
@@ -885,7 +903,7 @@ sameOccExtra ty1 ty2
   , let n1 = tyConName tc1
         n2 = tyConName tc2
         same_occ = nameOccName n1                  == nameOccName n2
-        same_pkg = modulePackageId (nameModule n1) == modulePackageId (nameModule n2)
+        same_pkg = modulePackageKey (nameModule n1) == modulePackageKey (nameModule n2)
   , n1 /= n2   -- Different Names
   , same_occ   -- but same OccName
   = ptext (sLit "NB:") <+> (ppr_from same_pkg n1 $$ ppr_from same_pkg n2)
@@ -899,13 +917,30 @@ sameOccExtra ty1 ty2
       | otherwise  -- Imported things have an UnhelpfulSrcSpan
       = hang (quotes (ppr nm))
            2 (sep [ ptext (sLit "is defined in") <+> quotes (ppr (moduleName mod))
-                  , ppUnless (same_pkg || pkg == mainPackageId) $
+                  , ppUnless (same_pkg || pkg == mainPackageKey) $
                     nest 4 $ ptext (sLit "in package") <+> quotes (ppr pkg) ])
        where
-         pkg = modulePackageId mod
+         pkg = modulePackageKey mod
          mod = nameModule nm
          loc = nameSrcSpan nm
 \end{code}
+
+Note [Suggest adding a type signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The OutsideIn algorithm rejects GADT programs that don't have a principal
+type, and indeed some that do.  Example:
+   data T a where
+     MkT :: Int -> T Int
+
+   f (MkT n) = n
+
+Does this have type f :: T a -> a, or f :: T a -> Int?
+The error that shows up tends to be an attempt to unify an
+untouchable type variable.  So suggestAddSig sees if the offending
+type variable is bound by an *inferred* signature, and suggests
+adding a declared signature instead.
+
+This initially came up in Trac #8968, concerning pattern synonyms.
 
 Note [Disambiguating (X ~ X) errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1052,8 +1087,9 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     no_inst_msg
       | clas == coercibleClass
       = let (ty1, ty2) = getEqPredTys pred
-        in ptext (sLit "Could not coerce from") <+> quotes (ppr ty1) <+>
-           ptext (sLit "to") <+> quotes (ppr ty2)
+        in sep [ ptext (sLit "Could not coerce from") <+> quotes (ppr ty1)
+               , nest 19 (ptext (sLit "to") <+> quotes (ppr ty2)) ]
+                 -- The nesting makes the types line up
       | null givens && null matches
       = ptext (sLit "No instance for")  <+> pprParendType pred
       | otherwise
@@ -1161,9 +1197,9 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
         Just msg <- coercible_msg_for_tycon rdr_env tc
       = msg
       | otherwise
-      = nest 2 $ hsep [ ptext $ sLit "because", quotes (ppr ty1),
-                        ptext $ sLit "and", quotes (ppr ty2),
-                        ptext $ sLit "are different types." ]
+      = nest 2 $ sep [ ptext (sLit "because") <+> quotes (ppr ty1)
+                     , nest 4 (vcat [ ptext (sLit "and") <+> quotes (ppr ty2)
+                                    , ptext (sLit "are different types.") ]) ]
       where
         (ty1, ty2) = getEqPredTys pred
 
@@ -1253,29 +1289,51 @@ flattening any further.  After all, there can be no instance declarations
 that match such things.  And flattening under a for-all is problematic
 anyway; consider C (forall a. F a)
 
+Note [Suggest -fprint-explicit-kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It can be terribly confusing to get an error message like (Trac #9171)
+    Couldn't match expected type ‘GetParam Base (GetParam Base Int)’
+                with actual type ‘GetParam Base (GetParam Base Int)’
+The reason may be that the kinds don't match up.  Typically you'll get
+more useful information, but not when it's as a result of ambiguity.
+This test suggests -fprint-explicit-kinds when all the ambiguous type
+variables are kind variables.
+
 \begin{code}
 mkAmbigMsg :: Ct -> (Bool, SDoc)
 mkAmbigMsg ct
-  | isEmptyVarSet ambig_tv_set = (False, empty)
-  | otherwise                  = (True,  msg)
+  | null ambig_tkvs = (False, empty)
+  | otherwise       = (True,  msg)
   where
-    ambig_tv_set = filterVarSet isAmbiguousTyVar (tyVarsOfCt ct)
-    ambig_tvs = varSetElems ambig_tv_set
-    
-    is_or_are | isSingleton ambig_tvs = text "is"
-              | otherwise             = text "are"
-                 
-    msg | any isRuntimeUnkSkol ambig_tvs  -- See Note [Runtime skolems]
+    ambig_tkv_set = filterVarSet isAmbiguousTyVar (tyVarsOfCt ct)
+    ambig_tkvs    = varSetElems ambig_tkv_set
+    (ambig_kvs, ambig_tvs) = partition isKindVar ambig_tkvs
+
+    msg | any isRuntimeUnkSkol ambig_tkvs  -- See Note [Runtime skolems]
         =  vcat [ ptext (sLit "Cannot resolve unknown runtime type") <> plural ambig_tvs
                      <+> pprQuotedList ambig_tvs
                 , ptext (sLit "Use :print or :force to determine these types")]
-        | otherwise
-        = vcat [ text "The type variable" <> plural ambig_tvs
-                    <+> pprQuotedList ambig_tvs
-                    <+> is_or_are <+> text "ambiguous" ]
+
+        | not (null ambig_tvs)
+        = pp_ambig (ptext (sLit "type")) ambig_tvs
+
+        | otherwise  -- All ambiguous kind variabes; suggest -fprint-explicit-kinds
+        = vcat [ pp_ambig (ptext (sLit "kind")) ambig_kvs
+               , sdocWithDynFlags suggest_explicit_kinds ]
+
+    pp_ambig what tkvs
+      = ptext (sLit "The") <+> what <+> ptext (sLit "variable") <> plural tkvs
+        <+> pprQuotedList tkvs <+> is_or_are tkvs <+> ptext (sLit "ambiguous")
+
+    is_or_are [_] = text "is"
+    is_or_are _   = text "are"
+
+    suggest_explicit_kinds dflags  -- See Note [Suggest -fprint-explicit-kinds]
+      | gopt Opt_PrintExplicitKinds dflags = empty
+      | otherwise = ptext (sLit "Use -fprint-explicit-kinds to see the kind arguments")
 
 pprSkol :: SkolemInfo -> SrcLoc -> SDoc
-pprSkol UnkSkol   _ 
+pprSkol UnkSkol   _
   = ptext (sLit "is an unknown type variable")
 pprSkol skol_info tv_loc 
   = sep [ ptext (sLit "is a rigid type variable bound by"),

@@ -117,7 +117,7 @@ data CCallTarget
   = StaticTarget
         CLabelString                    -- C-land name of label.
 
-        (Maybe PackageId)               -- What package the function is in.
+        (Maybe PackageKey)              -- What package the function is in.
                                         -- If Nothing, then it's taken to be in the current package.
                                         -- Note: This information is only used for PrimCalls on Windows.
                                         --       See CLabel.labelDynamic and CoreToStg.coreToStgApp

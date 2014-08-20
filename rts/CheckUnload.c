@@ -298,7 +298,7 @@ void checkUnload (StgClosure *static_objects)
   // marked as unreferenced can be physically unloaded, because we
   // have no references to it.
   prev = NULL;
-  for (oc = unloaded_objects; oc; prev = oc, oc = next) {
+  for (oc = unloaded_objects; oc; oc = next) {
       next = oc->next;
       if (oc->referenced == 0) {
           if (prev == NULL) {
@@ -312,8 +312,17 @@ void checkUnload (StgClosure *static_objects)
       } else {
           IF_DEBUG(linker, debugBelch("Object file still in use: %"
                                       PATH_FMT "\n", oc->fileName));
+          prev = oc;
       }
   }
 
   freeHashTable(addrs, NULL);
 }
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

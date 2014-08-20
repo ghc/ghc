@@ -63,6 +63,9 @@ FIND_GCC([WhatGccIsCalled], [gcc], [gcc])
 CC="$WhatGccIsCalled"
 export CC
 
+# --with-hs-cpp/--with-hs-cpp-flags
+FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
+
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
 FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])

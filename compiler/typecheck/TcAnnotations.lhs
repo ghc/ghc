@@ -5,6 +5,8 @@
 \section[TcAnnotations]{Typechecking annotations}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcAnnotations ( tcAnnotations, annCtxt ) where
 
 #ifdef GHCI

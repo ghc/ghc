@@ -3,28 +3,21 @@
 %
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 module Digraph(
         Graph, graphFromVerticesAndAdjacency, graphFromEdgedVertices,
 
         SCC(..), Node, flattenSCC, flattenSCCs,
-        stronglyConnCompG, stronglyConnCompFromG,
+        stronglyConnCompG,
         topologicalSortG, dfsTopSortG,
         verticesG, edgesG, hasVertexG,
-        reachableG, transposeG,
+        reachableG, reachablesG, transposeG,
         outdegreeG, indegreeG,
         vertexGroupsG, emptyG,
         componentsG,
 
         findCycle,
-  
+
         -- For backwards compatability with the simpler version of Digraph
         stronglyConnCompFromEdgedVertices, stronglyConnCompFromEdgedVerticesR,
 
@@ -77,14 +70,14 @@ Note [Nodes, keys, vertices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * A 'node' is a big blob of client-stuff
 
- * Each 'node' has a unique (client) 'key', but the latter 
-	is in Ord and has fast comparison
+ * Each 'node' has a unique (client) 'key', but the latter
+        is in Ord and has fast comparison
 
  * Digraph then maps each 'key' to a Vertex (Int) which is
-  	arranged densely in 0.n
+        arranged densely in 0.n
 
 \begin{code}
-data Graph node = Graph { 
+data Graph node = Graph {
     gr_int_graph      :: IntGraph,
     gr_vertex_to_node :: Vertex -> node,
     gr_node_to_vertex :: node -> Maybe Vertex
@@ -92,12 +85,12 @@ data Graph node = Graph {
 
 data Edge node = Edge node node
 
-type Node key payload = (payload, key, [key])	
+type Node key payload = (payload, key, [key])
      -- The payload is user data, just carried around in this module
      -- The keys are ordered
-     -- The [key] are the dependencies of the node; 
+     -- The [key] are the dependencies of the node;
      --    it's ok to have extra keys in the dependencies that
-     --	   are not the key of any Node in the graph
+     --    are not the key of any Node in the graph
 
 emptyGraph :: Graph a
 emptyGraph = Graph (array (1, 0) []) (error "emptyGraph") (const Nothing)
@@ -105,7 +98,7 @@ emptyGraph = Graph (array (1, 0) []) (error "emptyGraph") (const Nothing)
 graphFromVerticesAndAdjacency
         :: Ord key
         => [(node, key)]
-        -> [(key, key)]  -- First component is source vertex key, 
+        -> [(key, key)]  -- First component is source vertex key,
                          -- second is target vertex key (thing depended on)
                          -- Unlike the other interface I insist they correspond to
                          -- actual vertices because the alternative hides bugs. I can't
@@ -115,7 +108,7 @@ graphFromVerticesAndAdjacency []       _     = emptyGraph
 graphFromVerticesAndAdjacency vertices edges = Graph graph vertex_node (key_vertex . key_extractor)
   where key_extractor = snd
         (bounds, vertex_node, key_vertex, _) = reduceNodesIntoVertices vertices key_extractor
-        key_vertex_pair (a, b) = (expectJust "graphFromVerticesAndAdjacency" $ key_vertex a, 
+        key_vertex_pair (a, b) = (expectJust "graphFromVerticesAndAdjacency" $ key_vertex a,
                                   expectJust "graphFromVerticesAndAdjacency" $ key_vertex b)
         reduced_edges = map key_vertex_pair edges
         graph = buildG bounds reduced_edges
@@ -132,10 +125,10 @@ graphFromEdgedVertices edged_vertices = Graph graph vertex_fn (key_vertex . key_
         (bounds, vertex_fn, key_vertex, numbered_nodes) = reduceNodesIntoVertices edged_vertices key_extractor
         graph = array bounds [(v, mapMaybe key_vertex ks) | (v, (_, _, ks)) <- numbered_nodes]
 
-reduceNodesIntoVertices 
-        :: Ord key 
-        => [node] 
-        -> (node -> key) 
+reduceNodesIntoVertices
+        :: Ord key
+        => [node]
+        -> (node -> key)
         -> (Bounds, Vertex -> node, key -> Maybe Vertex, [(Int, node)])
 reduceNodesIntoVertices nodes key_extractor = (bounds, (!) vertex_map, key_vertex, numbered_nodes)
   where
@@ -168,18 +161,18 @@ reduceNodesIntoVertices nodes key_extractor = (bounds, (!) vertex_map, key_verte
 
 \begin{code}
 type WorkItem key payload
-  = (Node key payload,	-- Tip of the path
-     [payload])	  	-- Rest of the path; 
-     			--  [a,b,c] means c depends on b, b depends on a
+  = (Node key payload,  -- Tip of the path
+     [payload])         -- Rest of the path;
+                        --  [a,b,c] means c depends on b, b depends on a
 
 -- | Find a reasonably short cycle a->b->c->a, in a strongly
 -- connected component.  The input nodes are presumed to be
 -- a SCC, so you can start anywhere.
-findCycle :: forall payload key. Ord key 
+findCycle :: forall payload key. Ord key
           => [Node key payload]     -- The nodes.  The dependencies can
-	     	     	  	    -- contain extra keys, which are ignored
-	  -> Maybe [payload]        -- A cycle, starting with node
-	     			    -- so each depends on the next
+                                    -- contain extra keys, which are ignored
+          -> Maybe [payload]        -- A cycle, starting with node
+                                    -- so each depends on the next
 findCycle graph
   = go Set.empty (new_work root_deps []) []
   where
@@ -189,29 +182,29 @@ findCycle graph
     -- Find the node with fewest dependencies among the SCC modules
     -- This is just a heuristic to find some plausible root module
     root :: Node key payload
-    root = fst (minWith snd [ (node, count (`Map.member` env) deps) 
+    root = fst (minWith snd [ (node, count (`Map.member` env) deps)
                             | node@(_,_,deps) <- graph ])
     (root_payload,root_key,root_deps) = root
 
 
     -- 'go' implements Dijkstra's algorithm, more or less
-    go :: Set.Set key	-- Visited
-       -> [WorkItem key payload]	-- Work list, items length n
-       -> [WorkItem key payload]	-- Work list, items length n+1
-       -> Maybe [payload]		-- Returned cycle
+    go :: Set.Set key   -- Visited
+       -> [WorkItem key payload]        -- Work list, items length n
+       -> [WorkItem key payload]        -- Work list, items length n+1
+       -> Maybe [payload]               -- Returned cycle
        -- Invariant: in a call (go visited ps qs),
        --            visited = union (map tail (ps ++ qs))
 
-    go _       [] [] = Nothing	-- No cycles
+    go _       [] [] = Nothing  -- No cycles
     go visited [] qs = go visited qs []
-    go visited (((payload,key,deps), path) : ps) qs 
+    go visited (((payload,key,deps), path) : ps) qs
        | key == root_key           = Just (root_payload : reverse path)
        | key `Set.member` visited  = go visited ps qs
        | key `Map.notMember` env   = go visited ps qs
        | otherwise                 = go (Set.insert key visited)
                                         ps (new_qs ++ qs)
        where
-	 new_qs = new_work deps (payload : path)
+         new_qs = new_work deps (payload : path)
 
     new_work :: [key] -> [payload] -> [WorkItem key payload]
     new_work deps path = [ (n, path) | Just n <- map (`Map.lookup` env) deps ]
@@ -250,21 +243,13 @@ instance Outputable a => Outputable (SCC a) where
 %************************************************************************
 
 Note: the components are returned topologically sorted: later components
-depend on earlier ones, but not vice versa i.e. later components only have 
+depend on earlier ones, but not vice versa i.e. later components only have
 edges going from them to earlier ones.
 
 \begin{code}
 stronglyConnCompG :: Graph node -> [SCC node]
 stronglyConnCompG graph = decodeSccs graph forest
   where forest = {-# SCC "Digraph.scc" #-} scc (gr_int_graph graph)
-
--- Find the set of strongly connected components starting from the
--- given roots.  This is a good way to discard unreachable nodes at
--- the same time as computing SCCs.
-stronglyConnCompFromG :: Graph node -> [node] -> [SCC node]
-stronglyConnCompFromG graph roots = decodeSccs graph forest
-  where forest = {-# SCC "Digraph.scc" #-} sccFrom (gr_int_graph graph) vs
-        vs = [ v | Just v <- map (gr_node_to_vertex graph) roots ]
 
 decodeSccs :: Graph node -> Forest Vertex -> [SCC node]
 decodeSccs Graph { gr_int_graph = graph, gr_vertex_to_node = vertex_fn } forest
@@ -315,7 +300,13 @@ dfsTopSortG graph =
 reachableG :: Graph node -> node -> [node]
 reachableG graph from = map (gr_vertex_to_node graph) result
   where from_vertex = expectJust "reachableG" (gr_node_to_vertex graph from)
-        result = {-# SCC "Digraph.reachable" #-} reachable (gr_int_graph graph) from_vertex
+        result = {-# SCC "Digraph.reachable" #-} reachable (gr_int_graph graph) [from_vertex]
+
+reachablesG :: Graph node -> [node] -> [node]
+reachablesG graph froms = map (gr_vertex_to_node graph) result
+  where result = {-# SCC "Digraph.reachable" #-}
+                 reachable (gr_int_graph graph) vs
+        vs = [ v | Just v <- map (gr_node_to_vertex graph) froms ]
 
 hasVertexG :: Graph node -> node -> Bool
 hasVertexG graph node = isJust $ gr_node_to_vertex graph node
@@ -548,9 +539,6 @@ postorderF ts = foldr (.) id $ map postorder ts
 postOrd :: IntGraph -> [Vertex]
 postOrd g = postorderF (dff g) []
 
-postOrdFrom :: IntGraph -> [Vertex] -> [Vertex]
-postOrdFrom g vs = postorderF (dfs g vs) []
-
 topSort :: IntGraph -> [Vertex]
 topSort = reverse . postOrd
 \end{code}
@@ -574,9 +562,6 @@ undirected g  = buildG (bounds g) (edges g ++ reverseE g)
 \begin{code}
 scc  :: IntGraph -> Forest Vertex
 scc g = dfs g (reverse (postOrd (transpose g)))
-
-sccFrom  :: IntGraph -> [Vertex] -> Forest Vertex
-sccFrom g vs = reverse (dfs (transpose g) (reverse (postOrdFrom g vs)))
 \end{code}
 
 ------------------------------------------------------------
@@ -602,11 +587,11 @@ forward g tree pre = mapT select g
 ------------------------------------------------------------
 
 \begin{code}
-reachable    :: IntGraph -> Vertex -> [Vertex]
-reachable g v = preorderF (dfs g [v])
+reachable    :: IntGraph -> [Vertex] -> [Vertex]
+reachable g vs = preorderF (dfs g vs)
 
 path         :: IntGraph -> Vertex -> Vertex -> Bool
-path g v w    = w `elem` (reachable g v)
+path g v w    = w `elem` (reachable g [v])
 \end{code}
 
 ------------------------------------------------------------
@@ -664,18 +649,18 @@ noOutEdges g = [ v | v <- vertices g, null (g!v)]
 
 vertexGroupsS :: Set s -> IntGraph -> [Vertex] -> ST s [[Vertex]]
 vertexGroupsS provided g to_provide
-  = if null to_provide 
-    then do { 
+  = if null to_provide
+    then do {
           all_provided <- allM (provided `contains`) (vertices g)
         ; if all_provided
           then return []
-          else error "vertexGroup: cyclic graph" 
+          else error "vertexGroup: cyclic graph"
         }
-    else do { 
+    else do {
           mapM_ (include provided) to_provide
         ; to_provide' <- filterM (vertexReady provided g) (vertices g)
         ; rest <- vertexGroupsS provided g to_provide'
-        ; return $ to_provide : rest 
+        ; return $ to_provide : rest
         }
 
 vertexReady :: Set s -> IntGraph -> Vertex -> ST s Bool

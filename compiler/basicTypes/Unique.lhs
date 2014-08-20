@@ -16,7 +16,7 @@ Some of the other hair in this code is to be able to use a
 Haskell).
 
 \begin{code}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP, BangPatterns, MagicHash #-}
 
 module Unique (
         -- * Main data types

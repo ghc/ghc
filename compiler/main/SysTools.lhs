@@ -7,6 +7,8 @@
 -----------------------------------------------------------------------------
 
 \begin{code}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
+
 module SysTools (
         -- Initialisation
         initSysTools,
@@ -233,6 +235,8 @@ initSysTools mbMinusB
        -- to make that possible, so for now you can't.
        gcc_prog <- getSetting "C compiler command"
        gcc_args_str <- getSetting "C compiler flags"
+       cpp_prog <- getSetting "Haskell CPP command"
+       cpp_args_str <- getSetting "Haskell CPP flags"
        let unreg_gcc_args = if targetUnregisterised
                             then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
                             else []
@@ -241,6 +245,7 @@ initSysTools mbMinusB
             | mkTablesNextToCode targetUnregisterised
                = ["-DTABLES_NEXT_TO_CODE"]
             | otherwise = []
+           cpp_args= map Option (words cpp_args_str)
            gcc_args = map Option (words gcc_args_str
                                ++ unreg_gcc_args
                                ++ tntc_gcc_args)
@@ -283,10 +288,7 @@ initSysTools mbMinusB
        -- cpp is derived from gcc on all platforms
        -- HACK, see setPgmP below. We keep 'words' here to remember to fix
        -- Config.hs one day.
-       let cpp_prog  = gcc_prog
-           cpp_args  = Option "-E"
-                     : map Option (words cRAWCPP_FLAGS)
-                    ++ gcc_args
+
 
        -- Other things being equal, as and ld are simply gcc
        gcc_link_args_str <- getSetting "C compiler link flags"
@@ -602,6 +604,42 @@ figureLlvmVersion dflags = do
                 return Nothing)
   return ver
 
+{- Note [Windows stack usage]
+
+See: Trac #8870 (and #8834 for related info)
+
+On Windows, occasionally we need to grow the stack. In order to do
+this, we would normally just bump the stack pointer - but there's a
+catch on Windows.
+
+If the stack pointer is bumped by more than a single page, then the
+pages between the initial pointer and the resulting location must be
+properly committed by the Windows virtual memory subsystem. This is
+only needed in the event we bump by more than one page (i.e 4097 bytes
+or more).
+
+Windows compilers solve this by emitting a call to a special function
+called _chkstk, which does this committing of the pages for you.
+
+The reason this was causing a segfault was because due to the fact the
+new code generator tends to generate larger functions, we needed more
+stack space in GHC itself. In the x86 codegen, we needed approximately
+~12kb of stack space in one go, which caused the process to segfault,
+as the intervening pages were not committed.
+
+In the future, we should do the same thing, to make the problem
+completely go away. In the mean time, we're using a workaround: we
+instruct the linker to specify the generated PE as having an initial
+reserved stack size of 8mb, as well as a initial *committed* stack
+size of 8mb. The default committed size was previously only 4k.
+
+Theoretically it's possible to still hit this problem if you request a
+stack bump of more than 8mb in one go. But the amount of code
+necessary is quite large, and 8mb "should be more than enough for
+anyone" right now (he said, before millions of lines of code cried out
+in terror).
+
+-}
 
 {- Note [Run-time linker info]
 
@@ -691,15 +729,20 @@ getLinkerInfo' dflags = do
                  -- that doesn't support --version. We can just assume that's
                  -- what we're using.
                  return $ DarwinLD []
-               OSiOS -> 
+               OSiOS ->
                  -- Ditto for iOS
                  return $ DarwinLD []
                OSMinGW32 ->
                  -- GHC doesn't support anything but GNU ld on Windows anyway.
                  -- Process creation is also fairly expensive on win32, so
                  -- we short-circuit here.
-                 return $ GnuLD $ map Option ["-Wl,--hash-size=31",
-                                              "-Wl,--reduce-memory-overheads"]
+                 return $ GnuLD $ map Option
+                   [ -- Reduce ld memory usage
+                     "-Wl,--hash-size=31"
+                   , "-Wl,--reduce-memory-overheads"
+                     -- Increase default stack, see
+                     -- Note [Windows stack usage]
+                   , "-Xlinker", "--stack=0x800000,0x800000" ]
                _ -> do
                  -- In practice, we use the compiler as the linker here. Pass
                  -- -Wl,--version to get linker version info.
@@ -745,12 +788,15 @@ getCompilerInfo' dflags = do
         -- Regular clang
         | any ("clang version" `isPrefixOf`) stde =
           return Clang
+        -- XCode 5.1 clang
+        | any ("Apple LLVM version 5.1" `isPrefixOf`) stde =
+          return AppleClang51
         -- XCode 5 clang
         | any ("Apple LLVM version" `isPrefixOf`) stde =
-          return Clang
+          return AppleClang
         -- XCode 4.1 clang
         | any ("Apple clang version" `isPrefixOf`) stde =
-          return Clang
+          return AppleClang
          -- Unknown linker.
         | otherwise = fail "invalid -v output, or compiler is unsupported"
 
@@ -763,10 +809,10 @@ getCompilerInfo' dflags = do
             )
             (\err -> do
                 debugTraceMsg dflags 2
-                    (text "Error (figuring out compiler information):" <+>
+                    (text "Error (figuring out C compiler information):" <+>
                      text (show err))
                 errorMsg dflags $ hang (text "Warning:") 9 $
-                  text "Couldn't figure out linker information!" $$
+                  text "Couldn't figure out C compiler information!" $$
                   text "Make sure you're using GNU gcc, or clang"
                 return UnknownCC)
   return info
@@ -779,7 +825,57 @@ runLink dflags args = do
       args1     = map Option (getOpts dflags opt_l)
       args2     = args0 ++ args1 ++ args ++ linkargs
   mb_env <- getGccEnv args2
-  runSomethingFiltered dflags id "Linker" p args2 mb_env
+  runSomethingFiltered dflags ld_filter "Linker" p args2 mb_env
+  where
+    ld_filter = case (platformOS (targetPlatform dflags)) of
+                  OSSolaris2 -> sunos_ld_filter
+                  _ -> id
+{-
+  SunOS/Solaris ld emits harmless warning messages about unresolved
+  symbols in case of compiling into shared library when we do not
+  link against all the required libs. That is the case of GHC which
+  does not link against RTS library explicitly in order to be able to
+  choose the library later based on binary application linking
+  parameters. The warnings look like:
+
+Undefined                       first referenced
+ symbol                             in file
+stg_ap_n_fast                       ./T2386_Lib.o
+stg_upd_frame_info                  ./T2386_Lib.o
+templatezmhaskell_LanguageziHaskellziTHziLib_litE_closure ./T2386_Lib.o
+templatezmhaskell_LanguageziHaskellziTHziLib_appE_closure ./T2386_Lib.o
+templatezmhaskell_LanguageziHaskellziTHziLib_conE_closure ./T2386_Lib.o
+templatezmhaskell_LanguageziHaskellziTHziSyntax_mkNameGzud_closure ./T2386_Lib.o
+newCAF                              ./T2386_Lib.o
+stg_bh_upd_frame_info               ./T2386_Lib.o
+stg_ap_ppp_fast                     ./T2386_Lib.o
+templatezmhaskell_LanguageziHaskellziTHziLib_stringL_closure ./T2386_Lib.o
+stg_ap_p_fast                       ./T2386_Lib.o
+stg_ap_pp_fast                      ./T2386_Lib.o
+ld: warning: symbol referencing errors
+
+  this is actually coming from T2386 testcase. The emitting of those
+  warnings is also a reason why so many TH testcases fail on Solaris.
+
+  Following filter code is SunOS/Solaris linker specific and should
+  filter out only linker warnings. Please note that the logic is a
+  little bit more complex due to the simple reason that we need to preserve
+  any other linker emitted messages. If there are any. Simply speaking
+  if we see "Undefined" and later "ld: warning:..." then we omit all
+  text between (including) the marks. Otherwise we copy the whole output.
+-}
+    sunos_ld_filter :: String -> String
+    sunos_ld_filter = unlines . sunos_ld_filter' . lines
+    sunos_ld_filter' x = if (undefined_found x && ld_warning_found x)
+                         then (ld_prefix x) ++ (ld_postfix x)
+                         else x
+    breakStartsWith x y = break (isPrefixOf x) y
+    ld_prefix = fst . breakStartsWith "Undefined"
+    undefined_found = not . null . snd . breakStartsWith "Undefined"
+    ld_warn_break = breakStartsWith "ld: warning: symbol referencing errors"
+    ld_postfix = tail . snd . ld_warn_break
+    ld_warning_found = not . null . snd . ld_warn_break
+
 
 runLibtool :: DynFlags -> [Option] -> IO ()
 runLibtool dflags args = do
@@ -1270,7 +1366,7 @@ linesPlatform xs =
 
 #endif
 
-linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
+linkDynLib :: DynFlags -> [String] -> [PackageKey] -> IO ()
 linkDynLib dflags0 o_files dep_packages
  = do
     let -- This is a rather ugly hack to fix dynamically linked
@@ -1316,7 +1412,7 @@ linkDynLib dflags0 o_files dep_packages
                       OSMinGW32 ->
                           pkgs
                       _ ->
-                          filter ((/= rtsPackageId) . packageConfigId) pkgs
+                          filter ((/= rtsPackageKey) . packageConfigId) pkgs
     let pkg_link_opts = let (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs_no_rts
                         in  package_hs_libs ++ extra_libs ++ other_flags
 
@@ -1418,7 +1514,7 @@ linkDynLib dflags0 o_files dep_packages
             -------------------------------------------------------------------
 
             let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
-            let buildingRts = thisPackage dflags == rtsPackageId
+            let buildingRts = thisPackage dflags == rtsPackageKey
             let bsymbolicFlag = if buildingRts
                                 then -- -Bsymbolic breaks the way we implement
                                      -- hooks in the RTS

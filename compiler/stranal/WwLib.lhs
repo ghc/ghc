@@ -4,6 +4,8 @@
 \section[WwLib]{A library for the ``worker\/wrapper'' back-end to the strictness analyser}
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
              , deepSplitProductType_maybe, findTypeShape
  ) where
@@ -732,7 +734,7 @@ mk_absent_let dflags arg
   where
     arg_ty  = idType arg
     abs_rhs = mkRuntimeErrorApp aBSENT_ERROR_ID arg_ty msg
-    msg     = showSDocDebug dflags (ppr arg <+> ppr (idType arg))
+    msg     = showSDoc dflags (ppr arg <+> ppr (idType arg))
 
 mk_seq_case :: Id -> CoreExpr -> CoreExpr
 mk_seq_case arg body = Case (Var arg) (sanitiseCaseBndr arg) (exprType body) [(DEFAULT, [], body)]

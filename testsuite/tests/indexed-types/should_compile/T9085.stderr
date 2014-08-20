@@ -1,0 +1,4 @@
+
+T9085.hs:7:3: Warning:
+    Overlapped type family instance equation:
+      F Bool = Bool

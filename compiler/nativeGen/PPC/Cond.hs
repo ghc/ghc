@@ -1,17 +1,9 @@
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module PPC.Cond (
-	Cond(..),
-	condNegate,
-	condUnsigned,
-	condToSigned,
-	condToUnsigned,
+        Cond(..),
+        condNegate,
+        condUnsigned,
+        condToSigned,
+        condToUnsigned,
 )
 
 where
@@ -19,18 +11,18 @@ where
 import Panic
 
 data Cond
-	= ALWAYS
-	| EQQ
-	| GE
-	| GEU
-	| GTT
-	| GU
-	| LE
-	| LEU
-	| LTT
-	| LU
-	| NE
-	deriving Eq
+        = ALWAYS
+        | EQQ
+        | GE
+        | GEU
+        | GTT
+        | GU
+        | LE
+        | LEU
+        | LTT
+        | LU
+        | NE
+        deriving Eq
 
 
 condNegate :: Cond -> Cond

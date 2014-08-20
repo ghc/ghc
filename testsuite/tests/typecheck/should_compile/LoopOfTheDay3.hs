@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances,
-             OverlappingInstances, UndecidableInstances #-}
+             UndecidableInstances #-}
 
 -- Instances compile fine but instance selection loops in GHC 6.2.
 -- try: :t foo (T1a 1)

@@ -1,5 +1,5 @@
 
-{-# LANGUAGE UnicodeSyntax #-}
+{-# LANGUAGE UnicodeSyntax, FlexibleContexts #-}
 
 module Main (main) where
 

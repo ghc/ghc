@@ -13,8 +13,7 @@ Roles13.convert =
   `cast` (<Roles13.Wrap Roles13.Age>_R
           -> Roles13.NTCo:Wrap[0] Roles13.NTCo:Age[0]
           :: (Roles13.Wrap Roles13.Age -> Roles13.Wrap Roles13.Age)
-               ~#
-             (Roles13.Wrap Roles13.Age -> GHC.Types.Int))
+             ~R# (Roles13.Wrap Roles13.Age -> GHC.Types.Int))
 
 
 

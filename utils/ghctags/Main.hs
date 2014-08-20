@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternGuards, ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
 import Prelude hiding ( mod, id, mapM )
@@ -20,7 +20,6 @@ import SrcLoc
 
 import Distribution.Simple.GHC ( componentGhcOptions )
 import Distribution.Simple.Configure ( getPersistBuildConfig )
-import Distribution.Simple.Compiler ( compilerVersion )
 import Distribution.Simple.Program.GHC ( renderGhcOptions )
 import Distribution.PackageDescription ( library, libBuildInfo )
 import Distribution.Simple.LocalBuildInfo
@@ -191,8 +190,7 @@ flagsFromCabal distPref = do
       let bi = libBuildInfo lib
           odir = buildDir lbi
           opts = componentGhcOptions V.normal lbi bi clbi odir
-          version = compilerVersion (compiler lbi)
-      in return $ renderGhcOptions version opts
+      in return $ renderGhcOptions (compiler lbi) opts
     _ -> error "no library"
 
 ----------------------------------------------------------------
@@ -257,7 +255,7 @@ boundValues mod group =
   let vals = case hs_valds group of
                ValBindsOut nest _sigs ->
                    [ x | (_rec, binds) <- nest
-                       , (_, bind) <- bagToList binds
+                       , bind <- bagToList binds
                        , x <- boundThings mod bind ]
                _other -> error "boundValues"
       tys = [ n | ns <- map hsLTyClDeclBinders (tyClGroupConcat (hs_tyclds group))
@@ -284,7 +282,7 @@ boundThings modname lbinding =
     PatBind { pat_lhs = lhs } -> patThings lhs []
     VarBind { var_id = id } -> [FoundThing modname (getOccString id) (startOfLocated lbinding)]
     AbsBinds { } -> [] -- nothing interesting in a type abstraction
-    PatSynBind { patsyn_id = id } -> [thing id]
+    PatSynBind PSB{ psb_id = id } -> [thing id]
   where thing = foundOfLName modname
         patThings lpat tl =
           let loc = startOfLocated lpat

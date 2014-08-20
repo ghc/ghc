@@ -16,6 +16,8 @@ For state that is global and should be returned at the end (e.g not part
 of the stack mechanism), you should use an TcRef (= IORef) to store them.
 
 \begin{code}
+{-# LANGUAGE CPP #-}
+
 module TcRnTypes(
         TcRnIf, TcRn, TcM, RnM, IfM, IfL, IfG, -- The monad is opaque outside this module
         TcRef,
@@ -92,7 +94,7 @@ import Class    ( Class )
 import TyCon    ( TyCon )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
-import PatSyn   ( PatSyn, patSynId )
+import PatSyn   ( PatSyn, patSynType )
 import TcType
 import Annotations
 import InstEnv
@@ -294,7 +296,7 @@ data TcGblEnv
           -- ^ Allows us to choose unique DFun names.
 
         -- The next fields accumulate the payload of the module
-        -- The binds, rules and foreign-decl fiels are collected
+        -- The binds, rules and foreign-decl fields are collected
         -- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
         tcg_rn_exports :: Maybe [Located (IE Name)],
@@ -323,6 +325,9 @@ data TcGblEnv
 #endif /* GHCI */
 
         tcg_ev_binds  :: Bag EvBind,        -- Top-level evidence bindings
+
+        -- Things defined in this module, or (in GHCi) in the interactive package
+        --   For the latter, see Note [The interactive package] in HscTypes
         tcg_binds     :: LHsBinds Id,       -- Value bindings in this module
         tcg_sigs      :: NameSet,           -- ...Top-level names that *lack* a signature
         tcg_imp_specs :: [LTcSpecPrag],     -- ...SPECIALISE prags for imported Ids
@@ -804,17 +809,17 @@ data ImportAvails
           -- compiling M might not need to consult X.hi, but X
           -- is still listed in M's dependencies.
 
-        imp_dep_pkgs :: [PackageId],
+        imp_dep_pkgs :: [PackageKey],
           -- ^ Packages needed by the module being compiled, whether directly,
           -- or via other modules in this package, or via modules imported
           -- from other packages.
 
-        imp_trust_pkgs :: [PackageId],
+        imp_trust_pkgs :: [PackageKey],
           -- ^ This is strictly a subset of imp_dep_pkgs and records the
           -- packages the current module needs to trust for Safe Haskell
           -- compilation to succeed. A package is required to be trusted if
           -- we are dependent on a trustworthy module in that package.
-          -- While perhaps making imp_dep_pkgs a tuple of (PackageId, Bool)
+          -- While perhaps making imp_dep_pkgs a tuple of (PackageKey, Bool)
           -- where True for the bool indicates the package is required to be
           -- trusted is the more logical  design, doing so complicates a lot
           -- of code not concerned with Safe Haskell.
@@ -1282,6 +1287,8 @@ data Implication
 
       ic_fsks  :: [TcTyVar],     -- Extra flatten-skolems introduced by
                                  -- by flattening the givens
+                                 -- See Note [Given flatten-skolems]
+
       ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
                                  -- False <=> ic_givens might have equalities
 
@@ -1741,11 +1748,14 @@ pprSkolInfo ArrowSkol       = ptext (sLit "the arrow form")
 pprSkolInfo (PatSkol cl mc) = case cl of
     RealDataCon dc -> sep [ ptext (sLit "a pattern with constructor")
                           , nest 2 $ ppr dc <+> dcolon
-                            <+> ppr (dataConUserType dc) <> comma
+                            <+> pprType (dataConUserType dc) <> comma
+                            -- pprType prints forall's regardless of -fprint-explict-foralls
+                            -- which is what we want here, since we might be saying
+                            -- type variable 't' is bound by ...
                           , ptext (sLit "in") <+> pprMatchContext mc ]
     PatSynCon ps -> sep [ ptext (sLit "a pattern with pattern synonym")
                         , nest 2 $ ppr ps <+> dcolon
-                          <+> ppr (varType (patSynId ps)) <> comma
+                          <+> pprType (patSynType ps) <> comma
                         , ptext (sLit "in") <+> pprMatchContext mc ]
 pprSkolInfo (InferSkol ids) = sep [ ptext (sLit "the inferred type of")
                                   , vcat [ ppr name <+> dcolon <+> ppr ty
@@ -1850,9 +1860,9 @@ pprO (DerivOriginDC dc n)  = hsep [ ptext (sLit "the"), speakNth n,
                                     parens (ptext (sLit "type") <+> quotes (ppr ty)) ]
     where ty = dataConOrigArgTys dc !! (n-1)
 pprO (DerivOriginCoerce meth ty1 ty2)
-                           = fsep [ ptext (sLit "the coercion"), ptext (sLit "of the method")
-                                  , quotes (ppr meth), ptext (sLit "from type"), quotes (ppr ty1)
-                                  , ptext (sLit "to type"), quotes (ppr ty2) ]
+                           = sep [ ptext (sLit "the coercion of the method") <+> quotes (ppr meth)
+                                 , ptext (sLit "from type") <+> quotes (ppr ty1)
+                                 , nest 2 (ptext (sLit "to type") <+> quotes (ppr ty2)) ]
 pprO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
 pprO DefaultOrigin         = ptext (sLit "a 'default' declaration")
 pprO DoOrigin              = ptext (sLit "a do statement")

@@ -22,11 +22,12 @@ module Outputable (
         char,
         text, ftext, ptext, ztext,
         int, intWithCommas, integer, float, double, rational,
-        parens, cparen, brackets, braces, quotes, quote, 
+        parens, cparen, brackets, braces, quotes, quote,
         doubleQuotes, angleBrackets, paBrackets,
-        semi, comma, colon, dcolon, space, equals, dot, arrow, darrow,
+        semi, comma, colon, dcolon, space, equals, dot,
+        arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
-        blankLine,
+        blankLine, forAllLit,
         (<>), (<+>), hcat, hsep,
         ($$), ($+$), vcat,
         sep, cat,
@@ -52,15 +53,17 @@ module Outputable (
         -- * Controlling the style in which output is printed
         BindingSite(..),
 
-        PprStyle, CodeStyle(..), PrintUnqualified,
+        PprStyle, CodeStyle(..), PrintUnqualified(..),
+        QueryQualifyName, QueryQualifyModule, QueryQualifyPackage,
+        reallyAlwaysQualify, reallyAlwaysQualifyNames,
         alwaysQualify, alwaysQualifyNames, alwaysQualifyModules,
         neverQualify, neverQualifyNames, neverQualifyModules,
-        QualifyName(..),
+        QualifyName(..), queryQual,
         sdocWithDynFlags, sdocWithPlatform,
         getPprStyle, withPprStyle, withPprStyleDoc,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
-        ifPprDebug, qualName, qualModule,
+        ifPprDebug, qualName, qualModule, qualPackage,
         mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
         mkUserStyle, cmdlineParserStyle, Depth(..),
 
@@ -73,9 +76,9 @@ module Outputable (
 
 import {-# SOURCE #-}   DynFlags( DynFlags,
                                   targetPlatform, pprUserLength, pprCols,
-                                  useUnicodeQuotes,
+                                  useUnicode, useUnicodeSyntax,
                                   unsafeGlobalDynFlags )
-import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
+import {-# SOURCE #-}   Module( PackageKey, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
 import {-# SOURCE #-}   StaticFlags( opt_PprStyle_Debug, opt_NoDebugOutput )
 
@@ -141,12 +144,15 @@ data Depth = AllTheWay
 -- -----------------------------------------------------------------------------
 -- Printing original names
 
--- When printing code that contains original names, we need to map the
+-- | When printing code that contains original names, we need to map the
 -- original names back to something the user understands.  This is the
--- purpose of the pair of functions that gets passed around
+-- purpose of the triple of functions that gets passed around
 -- when rendering 'SDoc'.
-
-type PrintUnqualified = (QueryQualifyName, QueryQualifyModule)
+data PrintUnqualified = QueryQualify {
+    queryQualifyName    :: QueryQualifyName,
+    queryQualifyModule  :: QueryQualifyModule,
+    queryQualifyPackage :: QueryQualifyPackage
+}
 
 -- | given an /original/ name, this function tells you which module
 -- name it should be qualified with when printing for the user, if
@@ -160,6 +166,9 @@ type QueryQualifyName = Module -> OccName -> QualifyName
 -- a package name to disambiguate it.
 type QueryQualifyModule = Module -> Bool
 
+-- | For a given package, we need to know whether to print it with
+-- the package key to disambiguate it.
+type QueryQualifyPackage = PackageKey -> Bool
 
 -- See Note [Printing original names] in HscTypes
 data QualifyName                        -- given P:M.T
@@ -172,6 +181,10 @@ data QualifyName                        -- given P:M.T
                 -- it is not in scope at all, and M.T is already bound in the
                 -- current scope, so we must refer to it as "P:M.T"
 
+reallyAlwaysQualifyNames :: QueryQualifyName
+reallyAlwaysQualifyNames _ _ = NameNotInScope2
+
+-- | NB: This won't ever show package IDs
 alwaysQualifyNames :: QueryQualifyName
 alwaysQualifyNames m _ = NameQual (moduleName m)
 
@@ -184,37 +197,50 @@ alwaysQualifyModules _ = True
 neverQualifyModules :: QueryQualifyModule
 neverQualifyModules _ = False
 
-alwaysQualify, neverQualify :: PrintUnqualified
-alwaysQualify = (alwaysQualifyNames, alwaysQualifyModules)
-neverQualify  = (neverQualifyNames,  neverQualifyModules)
+alwaysQualifyPackages :: QueryQualifyPackage
+alwaysQualifyPackages _ = True
+
+neverQualifyPackages :: QueryQualifyPackage
+neverQualifyPackages _ = False
+
+reallyAlwaysQualify, alwaysQualify, neverQualify :: PrintUnqualified
+reallyAlwaysQualify
+              = QueryQualify reallyAlwaysQualifyNames
+                             alwaysQualifyModules
+                             alwaysQualifyPackages
+alwaysQualify = QueryQualify alwaysQualifyNames
+                             alwaysQualifyModules
+                             alwaysQualifyPackages
+neverQualify  = QueryQualify neverQualifyNames
+                             neverQualifyModules
+                             neverQualifyPackages
 
 defaultUserStyle, defaultDumpStyle :: PprStyle
 
-defaultUserStyle = mkUserStyle alwaysQualify AllTheWay
+defaultUserStyle = mkUserStyle neverQualify AllTheWay
+ -- Print without qualifiers to reduce verbosity, unless -dppr-debug
 
 defaultDumpStyle |  opt_PprStyle_Debug = PprDebug
                  |  otherwise          = PprDump
+
+defaultErrStyle :: DynFlags -> PprStyle
+-- Default style for error messages, when we don't know PrintUnqualified
+-- It's a bit of a hack because it doesn't take into account what's in scope
+-- Only used for desugarer warnings, and typechecker errors in interface sigs
+-- NB that -dppr-debug will still get into PprDebug style
+defaultErrStyle dflags = mkErrStyle dflags neverQualify
 
 -- | Style for printing error messages
 mkErrStyle :: DynFlags -> PrintUnqualified -> PprStyle
 mkErrStyle dflags qual = mkUserStyle qual (PartWay (pprUserLength dflags))
 
-defaultErrStyle :: DynFlags -> PprStyle
--- Default style for error messages
--- It's a bit of a hack because it doesn't take into account what's in scope
--- Only used for desugarer warnings, and typechecker errors in interface sigs
-defaultErrStyle dflags = mkUserStyle alwaysQualify depth
-    where depth = if opt_PprStyle_Debug
-                  then AllTheWay
-                  else PartWay (pprUserLength dflags)
+cmdlineParserStyle :: PprStyle
+cmdlineParserStyle = mkUserStyle alwaysQualify AllTheWay
 
 mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
 mkUserStyle unqual depth
    | opt_PprStyle_Debug = PprDebug
    | otherwise          = PprUser unqual depth
-
-cmdlineParserStyle :: PprStyle
-cmdlineParserStyle = PprUser alwaysQualify AllTheWay
 \end{code}
 
 Orthogonal to the above printing styles are (possibly) some
@@ -297,12 +323,21 @@ sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 
 \begin{code}
 qualName :: PprStyle -> QueryQualifyName
-qualName (PprUser (qual_name,_) _)  mod occ = qual_name mod occ
+qualName (PprUser q _)  mod occ = queryQualifyName q mod occ
 qualName _other                     mod _   = NameQual (moduleName mod)
 
 qualModule :: PprStyle -> QueryQualifyModule
-qualModule (PprUser (_,qual_mod) _)  m = qual_mod m
+qualModule (PprUser q _)  m = queryQualifyModule q m
 qualModule _other                   _m = True
+
+qualPackage :: PprStyle -> QueryQualifyPackage
+qualPackage (PprUser q _)  m = queryQualifyPackage q m
+qualPackage _other                   _m = True
+
+queryQual :: PprStyle -> PrintUnqualified
+queryQual s = QueryQualify (qualName s)
+                           (qualModule s)
+                           (qualPackage s)
 
 codeStyle :: PprStyle -> Bool
 codeStyle (PprCode _)     = True
@@ -459,7 +494,7 @@ cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
 -- so that we don't get `foo''.  Instead we just have foo'.
 quotes d =
       sdocWithDynFlags $ \dflags ->
-      if useUnicodeQuotes dflags
+      if useUnicode dflags
       then char '‘' <> d <> char '’'
       else SDoc $ \sty ->
            let pp_d = runSDoc d sty
@@ -469,13 +504,19 @@ quotes d =
              ('\'' : _, _)       -> pp_d
              _other              -> Pretty.quotes pp_d
 
-semi, comma, colon, equals, space, dcolon, arrow, underscore, dot :: SDoc
-darrow, lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
+semi, comma, colon, equals, space, dcolon, underscore, dot :: SDoc
+arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
+lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
 blankLine  = docToSDoc $ Pretty.ptext (sLit "")
-dcolon     = docToSDoc $ Pretty.ptext (sLit "::")
-arrow      = docToSDoc $ Pretty.ptext (sLit "->")
-darrow     = docToSDoc $ Pretty.ptext (sLit "=>")
+dcolon     = unicodeSyntax (char '∷') (docToSDoc $ Pretty.ptext (sLit "::"))
+arrow      = unicodeSyntax (char '→') (docToSDoc $ Pretty.ptext (sLit "->"))
+larrow     = unicodeSyntax (char '←') (docToSDoc $ Pretty.ptext (sLit "<-"))
+darrow     = unicodeSyntax (char '⇒') (docToSDoc $ Pretty.ptext (sLit "=>"))
+arrowt     = unicodeSyntax (char '↣') (docToSDoc $ Pretty.ptext (sLit ">-"))
+larrowt    = unicodeSyntax (char '↢') (docToSDoc $ Pretty.ptext (sLit "-<"))
+arrowtt    = unicodeSyntax (char '⤜') (docToSDoc $ Pretty.ptext (sLit ">>-"))
+larrowtt   = unicodeSyntax (char '⤛') (docToSDoc $ Pretty.ptext (sLit "-<<"))
 semi       = docToSDoc $ Pretty.semi
 comma      = docToSDoc $ Pretty.comma
 colon      = docToSDoc $ Pretty.colon
@@ -489,6 +530,15 @@ lbrack     = docToSDoc $ Pretty.lbrack
 rbrack     = docToSDoc $ Pretty.rbrack
 lbrace     = docToSDoc $ Pretty.lbrace
 rbrace     = docToSDoc $ Pretty.rbrace
+
+forAllLit :: SDoc
+forAllLit = unicodeSyntax (char '∀') (ptext (sLit "forall"))
+
+unicodeSyntax :: SDoc -> SDoc -> SDoc
+unicodeSyntax unicode plain = sdocWithDynFlags $ \dflags ->
+    if useUnicode dflags && useUnicodeSyntax dflags
+    then unicode
+    else plain
 
 nest :: Int -> SDoc -> SDoc
 -- ^ Indent 'SDoc' some specified amount
@@ -979,7 +1029,7 @@ assertPprPanic file line msg
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> String -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg
- = cont (showSDocDebug dflags doc)
+ = cont (showSDoc dflags doc)
  where
      doc = sep [text heading, nest 4 pretty_msg]
 \end{code}

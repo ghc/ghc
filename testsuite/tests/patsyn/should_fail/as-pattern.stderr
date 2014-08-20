@@ -1,0 +1,4 @@
+
+as-pattern.hs:4:18:
+    Pattern synonym definition cannot contain as-patterns (@):
+      x@(Just y)

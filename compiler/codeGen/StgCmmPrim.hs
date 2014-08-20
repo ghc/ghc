@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 ----------------------------------------------------------------------------
 --
 -- Stg to C--: primitive operations
@@ -41,6 +43,7 @@ import FastString
 import Outputable
 import Util
 
+import Data.Bits ((.&.), bit)
 import Control.Monad (liftM, when)
 
 ------------------------------------------------------------------------
@@ -119,6 +122,26 @@ cgOpApp (StgPrimCallOp primcall) args _res_ty
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
 
+-- | Interpret the argument as an unsigned value, assuming the value
+-- is given in two-complement form in the given width.
+--
+-- Example: @asUnsigned W64 (-1)@ is 18446744073709551615.
+--
+-- This function is used to work around the fact that many array
+-- primops take Int# arguments, but we interpret them as unsigned
+-- quantities in the code gen. This means that we have to be careful
+-- every time we work on e.g. a CmmInt literal that corresponds to the
+-- array size, as it might contain a negative Integer value if the
+-- user passed a value larger than 2^(wORD_SIZE_IN_BITS-1) as the Int#
+-- literal.
+asUnsigned :: Width -> Integer -> Integer
+asUnsigned w n = n .&. (bit (widthInBits w) - 1)
+
+-- TODO: Several primop implementations (e.g. 'doNewByteArrayOp') use
+--     ByteOff (or some other fixed width signed type) to represent
+--     array sizes or indices. This means that these will overflow for
+--     large enough sizes.
+
 -- | Decide whether an out-of-line primop should be replaced by an
 -- inline implementation. This might happen e.g. if there's enough
 -- static information, such as statically know arguments, to emit a
@@ -133,12 +156,12 @@ shouldInlinePrimOp :: DynFlags
                    -> [CmmExpr]  -- ^ The primop arguments
                    -> Maybe ([LocalReg] -> FCode ())
 
-shouldInlinePrimOp dflags NewByteArrayOp_Char [(CmmLit (CmmInt n _))]
-  | fromInteger n <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags NewByteArrayOp_Char [(CmmLit (CmmInt n w))]
+  | asUnsigned w n <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> doNewByteArrayOp res (fromInteger n)
 
-shouldInlinePrimOp dflags NewArrayOp [(CmmLit (CmmInt n _)), init]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags NewArrayOp [(CmmLit (CmmInt n w)), init]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] ->
       doNewArrayOp res (arrPtrsRep dflags (fromInteger n)) mkMAP_DIRTY_infoLabel
       [ (mkIntExpr dflags (fromInteger n),
@@ -164,24 +187,24 @@ shouldInlinePrimOp _ CopyMutableArrayArrayOp
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] =
         Just $ \ [] -> doCopyMutableArrayOp src src_off dst dst_off (fromInteger n)
 
-shouldInlinePrimOp dflags CloneArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags CloneArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneArray mkMAP_FROZEN_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags CloneMutableArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags CloneMutableArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags FreezeArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags FreezeArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneArray mkMAP_FROZEN_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags ThawArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags ThawArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags NewSmallArrayOp [(CmmLit (CmmInt n _)), init]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags NewSmallArrayOp [(CmmLit (CmmInt n w)), init]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] ->
       doNewArrayOp res (smallArrPtrsRep (fromInteger n)) mkSMAP_DIRTY_infoLabel
       [ (mkIntExpr dflags (fromInteger n),
@@ -197,20 +220,20 @@ shouldInlinePrimOp _ CopySmallMutableArrayOp
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] =
         Just $ \ [] -> doCopySmallMutableArrayOp src src_off dst dst_off (fromInteger n)
 
-shouldInlinePrimOp dflags CloneSmallArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags CloneSmallArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags CloneSmallMutableArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags CloneSmallMutableArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneSmallArray mkSMAP_DIRTY_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags FreezeSmallArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags FreezeSmallArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_infoLabel res src src_off (fromInteger n)
 
-shouldInlinePrimOp dflags ThawSmallArrayOp [src, src_off, (CmmLit (CmmInt n _))]
-  | wordsToBytes dflags (fromInteger n) <= maxInlineAllocSize dflags =
+shouldInlinePrimOp dflags ThawSmallArrayOp [src, src_off, (CmmLit (CmmInt n w))]
+  | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
       Just $ \ [res] -> emitCloneSmallArray mkSMAP_DIRTY_infoLabel res src src_off (fromInteger n)
 
 shouldInlinePrimOp dflags primop args
@@ -247,63 +270,6 @@ emitPrimOp :: DynFlags
 
 -- First we handle various awkward cases specially.  The remaining
 -- easy cases are then handled by translateOp, defined below.
-
-emitPrimOp dflags [res_r,res_c] IntAddCOp [aa,bb]
-{-
-   With some bit-twiddling, we can define int{Add,Sub}Czh portably in
-   C, and without needing any comparisons.  This may not be the
-   fastest way to do it - if you have better code, please send it! --SDM
-
-   Return : r = a + b,  c = 0 if no overflow, 1 on overflow.
-
-   We currently don't make use of the r value if c is != 0 (i.e.
-   overflow), we just convert to big integers and try again.  This
-   could be improved by making r and c the correct values for
-   plugging into a new J#.
-
-   { r = ((I_)(a)) + ((I_)(b));                                 \
-     c = ((StgWord)(~(((I_)(a))^((I_)(b))) & (((I_)(a))^r)))    \
-         >> (BITS_IN (I_) - 1);                                 \
-   }
-   Wading through the mass of bracketry, it seems to reduce to:
-   c = ( (~(a^b)) & (a^r) ) >>unsigned (BITS_IN(I_)-1)
-
--}
-   = emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd dflags) [aa,bb]),
-        mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr dflags) [
-                CmmMachOp (mo_wordAnd dflags) [
-                    CmmMachOp (mo_wordNot dflags) [CmmMachOp (mo_wordXor dflags) [aa,bb]],
-                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
-                ],
-                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
-          ]
-     ]
-
-
-emitPrimOp dflags [res_r,res_c] IntSubCOp [aa,bb]
-{- Similarly:
-   #define subIntCzh(r,c,a,b)                                   \
-   { r = ((I_)(a)) - ((I_)(b));                                 \
-     c = ((StgWord)((((I_)(a))^((I_)(b))) & (((I_)(a))^r)))     \
-         >> (BITS_IN (I_) - 1);                                 \
-   }
-
-   c =  ((a^b) & (a^r)) >>unsigned (BITS_IN(I_)-1)
--}
-   = emit $ catAGraphs [
-        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub dflags) [aa,bb]),
-        mkAssign (CmmLocal res_c) $
-          CmmMachOp (mo_wordUShr dflags) [
-                CmmMachOp (mo_wordAnd dflags) [
-                    CmmMachOp (mo_wordXor dflags) [aa,bb],
-                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
-                ],
-                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
-          ]
-     ]
-
 
 emitPrimOp _ [res] ParOp [arg]
   =
@@ -597,6 +563,20 @@ emitPrimOp _      [res] PopCnt32Op [w] = emitPopCntCall res w W32
 emitPrimOp _      [res] PopCnt64Op [w] = emitPopCntCall res w W64
 emitPrimOp dflags [res] PopCntOp   [w] = emitPopCntCall res w (wordWidth dflags)
 
+-- count leading zeros
+emitPrimOp _      [res] Clz8Op  [w] = emitClzCall res w W8
+emitPrimOp _      [res] Clz16Op [w] = emitClzCall res w W16
+emitPrimOp _      [res] Clz32Op [w] = emitClzCall res w W32
+emitPrimOp _      [res] Clz64Op [w] = emitClzCall res w W64
+emitPrimOp dflags [res] ClzOp   [w] = emitClzCall res w (wordWidth dflags)
+
+-- count trailing zeros
+emitPrimOp _      [res] Ctz8Op [w]  = emitCtzCall res w W8
+emitPrimOp _      [res] Ctz16Op [w] = emitCtzCall res w W16
+emitPrimOp _      [res] Ctz32Op [w] = emitCtzCall res w W32
+emitPrimOp _      [res] Ctz64Op [w] = emitCtzCall res w W64
+emitPrimOp dflags [res] CtzOp   [w] = emitCtzCall res w (wordWidth dflags)
+
 -- Unsigned int to floating point conversions
 emitPrimOp _      [res] Word2FloatOp  [w] = emitPrimCall [res]
                                             (MO_UF_Conv W32) [w]
@@ -767,6 +747,25 @@ emitPrimOp _ res PrefetchByteArrayOp0        args = doPrefetchByteArrayOp 0 res 
 emitPrimOp _ res PrefetchMutableByteArrayOp0 args = doPrefetchByteArrayOp 0 res args
 emitPrimOp _ res PrefetchAddrOp0             args = doPrefetchAddrOp 0 res args
 
+-- Atomic read-modify-write
+emitPrimOp dflags [res] FetchAddByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_Add mba ix (bWord dflags) n
+emitPrimOp dflags [res] FetchSubByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_Sub mba ix (bWord dflags) n
+emitPrimOp dflags [res] FetchAndByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_And mba ix (bWord dflags) n
+emitPrimOp dflags [res] FetchNandByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_Nand mba ix (bWord dflags) n
+emitPrimOp dflags [res] FetchOrByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_Or mba ix (bWord dflags) n
+emitPrimOp dflags [res] FetchXorByteArrayOp_Int [mba, ix, n] =
+    doAtomicRMW res AMO_Xor mba ix (bWord dflags) n
+emitPrimOp dflags [res] AtomicReadByteArrayOp_Int [mba, ix] =
+    doAtomicReadByteArray res mba ix (bWord dflags)
+emitPrimOp dflags [] AtomicWriteByteArrayOp_Int [mba, ix, val] =
+    doAtomicWriteByteArray mba ix (bWord dflags) val
+emitPrimOp dflags [res] CasByteArrayOp_Int [mba, ix, old, new] =
+    doCasByteArray res mba ix (bWord dflags) old new
 
 -- The rest just translate straightforwardly
 emitPrimOp dflags [res] op [arg]
@@ -806,6 +805,10 @@ callishPrimOpSupported dflags op
 
       WordAdd2Op     | ncg && x86ish  -> Left (MO_Add2       (wordWidth dflags))
                      | otherwise      -> Right genericWordAdd2Op
+
+      IntAddCOp                       -> Right genericIntAddCOp
+
+      IntSubCOp                       -> Right genericIntSubCOp
 
       WordMul2Op     | ncg && x86ish  -> Left (MO_U_Mul2     (wordWidth dflags))
                      | otherwise      -> Right genericWordMul2Op
@@ -911,6 +914,67 @@ genericWordAdd2Op [res_h, res_l] [arg_x, arg_y]
                (or (toTopHalf (CmmReg (CmmLocal r2)))
                    (bottomHalf (CmmReg (CmmLocal r1))))]
 genericWordAdd2Op _ _ = panic "genericWordAdd2Op"
+
+genericIntAddCOp :: GenericOp
+genericIntAddCOp [res_r, res_c] [aa, bb]
+{-
+   With some bit-twiddling, we can define int{Add,Sub}Czh portably in
+   C, and without needing any comparisons.  This may not be the
+   fastest way to do it - if you have better code, please send it! --SDM
+
+   Return : r = a + b,  c = 0 if no overflow, 1 on overflow.
+
+   We currently don't make use of the r value if c is != 0 (i.e.
+   overflow), we just convert to big integers and try again.  This
+   could be improved by making r and c the correct values for
+   plugging into a new J#.
+
+   { r = ((I_)(a)) + ((I_)(b));                                 \
+     c = ((StgWord)(~(((I_)(a))^((I_)(b))) & (((I_)(a))^r)))    \
+         >> (BITS_IN (I_) - 1);                                 \
+   }
+   Wading through the mass of bracketry, it seems to reduce to:
+   c = ( (~(a^b)) & (a^r) ) >>unsigned (BITS_IN(I_)-1)
+
+-}
+ = do dflags <- getDynFlags
+      emit $ catAGraphs [
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd dflags) [aa,bb]),
+        mkAssign (CmmLocal res_c) $
+          CmmMachOp (mo_wordUShr dflags) [
+                CmmMachOp (mo_wordAnd dflags) [
+                    CmmMachOp (mo_wordNot dflags) [CmmMachOp (mo_wordXor dflags) [aa,bb]],
+                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
+                ],
+                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
+          ]
+        ]
+genericIntAddCOp _ _ = panic "genericIntAddCOp"
+
+genericIntSubCOp :: GenericOp
+genericIntSubCOp [res_r, res_c] [aa, bb]
+{- Similarly:
+   #define subIntCzh(r,c,a,b)                                   \
+   { r = ((I_)(a)) - ((I_)(b));                                 \
+     c = ((StgWord)((((I_)(a))^((I_)(b))) & (((I_)(a))^r)))     \
+         >> (BITS_IN (I_) - 1);                                 \
+   }
+
+   c =  ((a^b) & (a^r)) >>unsigned (BITS_IN(I_)-1)
+-}
+ = do dflags <- getDynFlags
+      emit $ catAGraphs [
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub dflags) [aa,bb]),
+        mkAssign (CmmLocal res_c) $
+          CmmMachOp (mo_wordUShr dflags) [
+                CmmMachOp (mo_wordAnd dflags) [
+                    CmmMachOp (mo_wordXor dflags) [aa,bb],
+                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
+                ],
+                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
+          ]
+        ]
+genericIntSubCOp _ _ = panic "genericIntSubCOp"
 
 genericWordMul2Op :: GenericOp
 genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
@@ -1931,6 +1995,81 @@ doWriteSmallPtrArrayOp addr idx val = do
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
 ------------------------------------------------------------------------------
+-- Atomic read-modify-write
+
+-- | Emit an atomic modification to a byte array element. The result
+-- reg contains that previous value of the element. Implies a full
+-- memory barrier.
+doAtomicRMW :: LocalReg      -- ^ Result reg
+            -> AtomicMachOp  -- ^ Atomic op (e.g. add)
+            -> CmmExpr       -- ^ MutableByteArray#
+            -> CmmExpr       -- ^ Index
+            -> CmmType       -- ^ Type of element by which we are indexing
+            -> CmmExpr       -- ^ Op argument (e.g. amount to add)
+            -> FCode ()
+doAtomicRMW res amop mba idx idx_ty n = do
+    dflags <- getDynFlags
+    let width = typeWidth idx_ty
+        addr  = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+                width mba idx
+    emitPrimCall
+        [ res ]
+        (MO_AtomicRMW width amop)
+        [ addr, n ]
+
+-- | Emit an atomic read to a byte array that acts as a memory barrier.
+doAtomicReadByteArray
+    :: LocalReg  -- ^ Result reg
+    -> CmmExpr   -- ^ MutableByteArray#
+    -> CmmExpr   -- ^ Index
+    -> CmmType   -- ^ Type of element by which we are indexing
+    -> FCode ()
+doAtomicReadByteArray res mba idx idx_ty = do
+    dflags <- getDynFlags
+    let width = typeWidth idx_ty
+        addr  = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+                width mba idx
+    emitPrimCall
+        [ res ]
+        (MO_AtomicRead width)
+        [ addr ]
+
+-- | Emit an atomic write to a byte array that acts as a memory barrier.
+doAtomicWriteByteArray
+    :: CmmExpr   -- ^ MutableByteArray#
+    -> CmmExpr   -- ^ Index
+    -> CmmType   -- ^ Type of element by which we are indexing
+    -> CmmExpr   -- ^ Value to write
+    -> FCode ()
+doAtomicWriteByteArray mba idx idx_ty val = do
+    dflags <- getDynFlags
+    let width = typeWidth idx_ty
+        addr  = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+                width mba idx
+    emitPrimCall
+        [ {- no results -} ]
+        (MO_AtomicWrite width)
+        [ addr, val ]
+
+doCasByteArray
+    :: LocalReg  -- ^ Result reg
+    -> CmmExpr   -- ^ MutableByteArray#
+    -> CmmExpr   -- ^ Index
+    -> CmmType   -- ^ Type of element by which we are indexing
+    -> CmmExpr   -- ^ Old value
+    -> CmmExpr   -- ^ New value
+    -> FCode ()
+doCasByteArray res mba idx idx_ty old new = do
+    dflags <- getDynFlags
+    let width = (typeWidth idx_ty)
+        addr = cmmIndexOffExpr dflags (arrWordsHdrSize dflags)
+               width mba idx
+    emitPrimCall
+        [ res ]
+        (MO_Cmpxchg width)
+        [ addr, old, new ]
+
+------------------------------------------------------------------------------
 -- Helpers for emitting function calls
 
 -- | Emit a call to @memcpy@.
@@ -1970,4 +2109,18 @@ emitPopCntCall res x width = do
     emitPrimCall
         [ res ]
         (MO_PopCnt width)
+        [ x ]
+
+emitClzCall :: LocalReg -> CmmExpr -> Width -> FCode ()
+emitClzCall res x width = do
+    emitPrimCall
+        [ res ]
+        (MO_Clz width)
+        [ x ]
+
+emitCtzCall :: LocalReg -> CmmExpr -> Width -> FCode ()
+emitCtzCall res x width = do
+    emitPrimCall
+        [ res ]
+        (MO_Ctz width)
         [ x ]

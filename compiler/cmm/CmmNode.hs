@@ -1,8 +1,13 @@
--- CmmNode type for representation using Hoopl graphs.
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
+
+-- CmmNode type for representation using Hoopl graphs.
 
 module CmmNode (
      CmmNode(..), CmmFormal, CmmActual,

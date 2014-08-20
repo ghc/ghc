@@ -3,7 +3,6 @@ module Type where
 import {-# SOURCE #-} TypeRep( Type, Kind )
 import Var
 
-noParenPred :: Type -> Bool
 isPredTy :: Type -> Bool
 
 typeKind :: Type -> Kind

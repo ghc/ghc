@@ -1,8 +1,8 @@
-{-# LANGUAGE FlexibleInstances, OverlappingInstances, UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances, UndecidableInstances #-}
 
 module Test where
 
-instance Show a => Eq a where
+instance {-# OVERLAPPABLE #-} Show a => Eq a where
    x == y =  length (show x) == length (show y)
 
 f :: Show a => a -> a -> Bool

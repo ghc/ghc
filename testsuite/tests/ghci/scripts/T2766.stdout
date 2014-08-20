@@ -1,3 +1,3 @@
 first :: Arrow to => b `to` c -> (b, d) `to` (c, d)
   :: Arrow to => to b c -> to (b, d) (c, d)
-first :: b~>c -> (b, d)~>(c, d) :: (b ~> c) -> (b, d) ~> (c, d)
+first :: b~>c -> (b, d)~>(c, d) :: b ~> c -> (b, d) ~> (c, d)

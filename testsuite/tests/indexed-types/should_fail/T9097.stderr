@@ -1,0 +1,5 @@
+
+T9097.hs:10:3:
+    Illegal type synonym family application in instance: Any
+    In the equations for closed type family ‘Foo’
+    In the type family declaration for ‘Foo’

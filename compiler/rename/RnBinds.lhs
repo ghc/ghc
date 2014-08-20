@@ -9,7 +9,7 @@ type-synonym declarations; those cannot be done at this stage because
 they may be affected by renaming (which isn't fully worked out yet).
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -47,7 +47,7 @@ import NameSet
 import RdrName          ( RdrName, rdrNameOcc )
 import SrcLoc
 import ListSetOps	( findDupsEq )
-import BasicTypes	( RecFlag(..), Origin )
+import BasicTypes	( RecFlag(..) )
 import Digraph		( SCC(..) )
 import Bag
 import Outputable
@@ -275,7 +275,7 @@ rnValBindsLHS :: NameMaker
               -> HsValBinds RdrName
               -> RnM (HsValBindsLR Name RdrName)
 rnValBindsLHS topP (ValBindsIn mbinds sigs)
-  = do { mbinds' <- mapBagM (wrapOriginLocM (rnBindLHS topP doc)) mbinds
+  = do { mbinds' <- mapBagM (wrapLocM (rnBindLHS topP doc)) mbinds
        ; return $ ValBindsIn mbinds' sigs }
   where
     bndrs = collectHsBindsBinders mbinds
@@ -433,12 +433,12 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = name@(L nameLoc _) })
   = do { newname <- applyNameMaker name_maker name
        ; return (bind { fun_id = L nameLoc newname }) } 
 
-rnBindLHS name_maker _ bind@(PatSynBind{ patsyn_id = rdrname@(L nameLoc _) })
+rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname@(L nameLoc _) })
   = do { unless (isTopRecNameMaker name_maker) $
            addErr localPatternSynonymErr
        ; addLocM checkConName rdrname
        ; name <- applyNameMaker name_maker rdrname
-       ; return (bind{ patsyn_id = L nameLoc name }) }
+       ; return (PatSynBind psb{ psb_id = L nameLoc name }) }
   where
     localPatternSynonymErr :: SDoc
     localPatternSynonymErr
@@ -448,12 +448,12 @@ rnBindLHS name_maker _ bind@(PatSynBind{ patsyn_id = rdrname@(L nameLoc _) })
 rnBindLHS _ _ b = pprPanic "rnBindHS" (ppr b)
 
 rnLBind :: (Name -> [Name])		-- Signature tyvar function
-        -> (Origin, LHsBindLR Name RdrName)
-        -> RnM ((Origin, LHsBind Name), [Name], Uses)
-rnLBind sig_fn (origin, (L loc bind))
+        -> LHsBindLR Name RdrName
+        -> RnM (LHsBind Name, [Name], Uses)
+rnLBind sig_fn (L loc bind)
   = setSrcSpan loc $
     do { (bind', bndrs, dus) <- rnBind sig_fn bind
-       ; return ((origin, L loc bind'), bndrs, dus) }
+       ; return (L loc bind', bndrs, dus) }
 
 -- assumes the left-hands-side vars are in scope
 rnBind :: (Name -> [Name])		-- Signature tyvar function
@@ -476,8 +476,9 @@ rnBind _ bind@(PatBind { pat_lhs = pat
               bndrs = collectPatBinders pat
               bind' = bind { pat_rhs  = grhss', bind_fvs = fvs' }
               is_wild_pat = case pat of
-                              L _ (WildPat {}) -> True
-                              _                -> False
+                              L _ (WildPat {})                 -> True
+                              L _ (BangPat (L _ (WildPat {}))) -> True -- #9127
+                              _                                -> False
 
         -- Warn if the pattern binds no variables, except for the
         -- entirely-explicit idiom    _ = rhs
@@ -514,56 +515,9 @@ rnBind sig_fn bind@(FunBind { fun_id = name
 		  [plain_name], rhs_fvs)
       }
 
-rnBind _sig_fn bind@(PatSynBind { patsyn_id = L _ name
-                                , patsyn_args = details
-                                , patsyn_def = pat
-                                , patsyn_dir = dir })
-       -- invariant: no free vars here when it's a FunBind
-  = do	{ pattern_synonym_ok <- xoptM Opt_PatternSynonyms
-        ; unless pattern_synonym_ok (addErr patternSynonymErr)
-
-        ; ((pat', details'), fvs) <- rnPat PatSyn pat $ \pat' -> do
-         -- We check the 'RdrName's instead of the 'Name's
-         -- so that the binding locations are reported
-         -- from the left-hand side
-        { (details', fvs) <- case details of
-               PrefixPatSyn vars ->
-                   do { checkDupRdrNames vars
-                      ; names <- mapM lookupVar vars
-                      ; return (PrefixPatSyn names, mkFVs (map unLoc names)) }
-               InfixPatSyn var1 var2 ->
-                   do { checkDupRdrNames [var1, var2]
-                      ; name1 <- lookupVar var1
-                      ; name2 <- lookupVar var2
-                      -- ; checkPrecMatch -- TODO
-                      ; return (InfixPatSyn name1 name2, mkFVs (map unLoc [name1, name2])) }
-        ; return ((pat', details'), fvs) }
-        ; dir' <- case dir of
-            Unidirectional -> return Unidirectional
-            ImplicitBidirectional -> return ImplicitBidirectional
-
-        ; mod <- getModule
-        ; let fvs' = filterNameSet (nameIsLocalOrFrom mod) fvs
-	        -- Keep locally-defined Names
-		-- As well as dependency analysis, we need these for the
-		-- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
-
-        ; let bind' = bind{ patsyn_args = details'
-                          , patsyn_def = pat'
-                          , patsyn_dir = dir'
-                          , bind_fvs = fvs' }
-
-        ; fvs' `seq` -- See Note [Free-variable space leak]
-          return (bind', [name], fvs)
-      }
-  where
-    lookupVar = wrapLocM lookupOccRn
-
-    patternSynonymErr :: SDoc
-    patternSynonymErr
-      = hang (ptext (sLit "Illegal pattern synonym declaration"))
-           2 (ptext (sLit "Use -XPatternSynonyms to enable this extension"))
-
+rnBind sig_fn (PatSynBind bind)
+  = do  { (bind', name, fvs) <- rnPatSynBind sig_fn bind
+        ; return (PatSynBind bind', name, fvs) }
 
 rnBind _ b = pprPanic "rnBind" (ppr b)
 
@@ -580,8 +534,96 @@ and we don't want to retain the list bound_names. This showed up in
 trac ticket #1136.
 -}
 
+rnPatSynBind :: (Name -> [Name])		-- Signature tyvar function
+             -> PatSynBind Name RdrName
+             -> RnM (PatSynBind Name Name, [Name], Uses)
+rnPatSynBind _sig_fn bind@(PSB { psb_id = L _ name
+                               , psb_args = details
+                               , psb_def = pat
+                               , psb_dir = dir })
+       -- invariant: no free vars here when it's a FunBind
+  = do	{ pattern_synonym_ok <- xoptM Opt_PatternSynonyms
+        ; unless pattern_synonym_ok (addErr patternSynonymErr)
+
+        ; ((pat', details'), fvs1) <- rnPat PatSyn pat $ \pat' -> do
+         -- We check the 'RdrName's instead of the 'Name's
+         -- so that the binding locations are reported
+         -- from the left-hand side
+        { (details', fvs) <- case details of
+               PrefixPatSyn vars ->
+                   do { checkDupRdrNames vars
+                      ; names <- mapM lookupVar vars
+                      ; return (PrefixPatSyn names, mkFVs (map unLoc names)) }
+               InfixPatSyn var1 var2 ->
+                   do { checkDupRdrNames [var1, var2]
+                      ; name1 <- lookupVar var1
+                      ; name2 <- lookupVar var2
+                      -- ; checkPrecMatch -- TODO
+                      ; return (InfixPatSyn name1 name2, mkFVs (map unLoc [name1, name2])) }
+        ; return ((pat', details'), fvs) }
+        ; (dir', fvs2) <- case dir of
+            Unidirectional -> return (Unidirectional, emptyFVs)
+            ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
+            ExplicitBidirectional mg ->
+                do { (mg', fvs) <- rnMatchGroup PatSyn rnLExpr mg
+                   ; return (ExplicitBidirectional mg', fvs) }
+
+        ; mod <- getModule
+        ; let fvs = fvs1 `plusFV` fvs2
+              fvs' = filterNameSet (nameIsLocalOrFrom mod) fvs
+	        -- Keep locally-defined Names
+		-- As well as dependency analysis, we need these for the
+		-- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
+
+        ; let bind' = bind{ psb_args = details'
+                          , psb_def = pat'
+                          , psb_dir = dir'
+                          , psb_fvs = fvs' }
+
+        ; fvs' `seq` -- See Note [Free-variable space leak]
+          return (bind', [name], fvs1)
+          -- See Note [Pattern synonym wrappers don't yield dependencies]
+      }
+  where
+    lookupVar = wrapLocM lookupOccRn
+
+    patternSynonymErr :: SDoc
+    patternSynonymErr
+      = hang (ptext (sLit "Illegal pattern synonym declaration"))
+           2 (ptext (sLit "Use -XPatternSynonyms to enable this extension"))
+
+{-
+Note [Pattern synonym wrappers don't yield dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When renaming a pattern synonym that has an explicit wrapper,
+references in the wrapper definition should not be used when
+calculating dependencies. For example, consider the following pattern
+synonym definition:
+
+pattern P x <- C1 x where
+  P x = f (C1 x)
+
+f (P x) = C2 x
+
+In this case, 'P' needs to be typechecked in two passes:
+
+1. Typecheck the pattern definition of 'P', which fully determines the
+type of 'P'. This step doesn't require knowing anything about 'f',
+since the wrapper definition is not looked at.
+
+2. Typecheck the wrapper definition, which needs the typechecked
+definition of 'f' to be in scope.
+
+This behaviour is implemented in 'tcValBinds', but it crucially
+depends on 'P' not being put in a recursive group with 'f' (which
+would make it look like a recursive pattern synonym a la 'pattern P =
+P' which is unsound and rejected).
+
+-}
+
 ---------------------
-depAnalBinds :: Bag ((Origin, LHsBind Name), [Name], Uses)
+depAnalBinds :: Bag (LHsBind Name, [Name], Uses)
 	     -> ([(RecFlag, LHsBinds Name)], DefUses)
 -- Dependency analysis; this is important so that 
 -- unused-binding reporting is accurate
@@ -666,10 +708,9 @@ rnMethodBinds cls sig_fn binds
        ; foldlM do_one (emptyBag, emptyFVs) (bagToList binds) }
   where 
     meth_names  = collectMethodBinders binds
-    do_one (binds,fvs) (origin,bind)
+    do_one (binds,fvs) bind
        = do { (bind', fvs_bind) <- rnMethodBind cls sig_fn bind
-            ; let bind'' = mapBag (\bind -> (origin,bind)) bind'
-	    ; return (binds `unionBags` bind'', fvs_bind `plusFV` fvs) }
+	    ; return (binds `unionBags` bind', fvs_bind `plusFV` fvs) }
 
 rnMethodBind :: Name
 	      -> (Name -> [Name])
@@ -677,7 +718,7 @@ rnMethodBind :: Name
 	      -> RnM (Bag (LHsBindLR Name Name), FreeVars)
 rnMethodBind cls sig_fn 
              (L loc bind@(FunBind { fun_id = name, fun_infix = is_infix 
-				  , fun_matches = MG { mg_alts = matches } }))
+				  , fun_matches = MG { mg_alts = matches, mg_origin = origin } }))
   = setSrcSpan loc $ do
     sel_name <- wrapLocM (lookupInstDeclBndr cls (ptext (sLit "method"))) name
     let plain_name = unLoc sel_name
@@ -685,7 +726,7 @@ rnMethodBind cls sig_fn
 
     (new_matches, fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
                           mapFvRn (rnMatch (FunRhs plain_name is_infix) rnLExpr) matches
-    let new_group = mkMatchGroup new_matches
+    let new_group = mkMatchGroup origin new_matches
 
     when is_infix $ checkPrecMatch plain_name new_group
     return (unitBag (L loc (bind { fun_id      = sel_name 
@@ -889,11 +930,11 @@ rnMatchGroup :: Outputable (body RdrName) => HsMatchContext Name
              -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
              -> MatchGroup RdrName (Located (body RdrName))
              -> RnM (MatchGroup Name (Located (body Name)), FreeVars)
-rnMatchGroup ctxt rnBody (MG { mg_alts = ms }) 
+rnMatchGroup ctxt rnBody (MG { mg_alts = ms, mg_origin = origin }) 
   = do { empty_case_ok <- xoptM Opt_EmptyCase
        ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
-       ; return (mkMatchGroup new_ms, ms_fvs) }
+       ; return (mkMatchGroup origin new_ms, ms_fvs) }
 
 rnMatch :: Outputable (body RdrName) => HsMatchContext Name
         -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))

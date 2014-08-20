@@ -1,0 +1,12 @@
+
+T9036.hs:17:17:
+    Couldn't match type ‘GetMonad t0’ with ‘GetMonad t’
+    NB: ‘GetMonad’ is a type function, and may not be injective
+    The type variable ‘t0’ is ambiguous
+    Expected type: Maybe (GetMonad t after) -> Curried t [t]
+      Actual type: Maybe (GetMonad t0 after) -> Curried t0 [t0]
+    In the ambiguity check for:
+      forall t after. Maybe (GetMonad t after) -> Curried t [t]
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+    In the type signature for ‘simpleLogger’:
+      simpleLogger :: Maybe (GetMonad t after) -> t `Curried` [t]

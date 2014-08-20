@@ -1,4 +1,4 @@
-{-# LANGUAGE OverlappingInstances, UndecidableInstances,
+{-# LANGUAGE UndecidableInstances,
              ExistentialQuantification, FlexibleInstances #-}
 
 -- module Formula where
@@ -186,7 +186,7 @@ class AddT a where
     addT :: a -> Formula -> Maybe Formula
     addT _ _ = Nothing
 
-instance (FORMULA a) => AddT a where {}
+instance {-# OVERLAPPABLE #-} (FORMULA a) => AddT a where {}
 
 instance AddT Formula where
     addT (Formula f) = addT f

@@ -10,13 +10,8 @@ general, all of these functions return a renamed thing, and a set of
 free variables.
 
 \begin{code}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
+{-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
 
-{-# LANGUAGE ScopedTypeVariables #-}
 module RnPat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
 
@@ -439,7 +434,7 @@ rnPatAndThen mk (PArrPat pats _)
 rnPatAndThen mk (TuplePat pats boxed _)
   = do { liftCps $ checkTupSize (length pats)
        ; pats' <- rnLPatsAndThen mk pats
-       ; return (TuplePat pats' boxed placeHolderType) }
+       ; return (TuplePat pats' boxed []) }
 
 rnPatAndThen _ (SplicePat splice)
   = do { -- XXX How to deal with free variables?

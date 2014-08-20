@@ -3,7 +3,7 @@
  * (c) The GHC Team, 2009
  *
  * Work-stealing Deque data structure
- * 
+ *
  * ---------------------------------------------------------------------------*/
 
 #ifndef WSDEQUE_H
@@ -11,8 +11,8 @@
 
 typedef struct WSDeque_ {
     // Size of elements array. Used for modulo calculation: we round up
-    // to powers of 2 and use the dyadic log (modulo == bitwise &) 
-    StgWord size; 
+    // to powers of 2 and use the dyadic log (modulo == bitwise &)
+    StgWord size;
     StgWord moduloSize; /* bitmask for modulo */
 
     // top, index where multiple readers steal() (protected by a cas)
@@ -24,7 +24,7 @@ typedef struct WSDeque_ {
 
     // both top and bottom are continuously incremented, and used as
     // an index modulo the current array size.
-  
+
     // lower bound on the current top value. This is an internal
     // optimisation to avoid unnecessarily accessing the top field
     // inside pushBottom
@@ -41,7 +41,7 @@ typedef struct WSDeque_ {
 
 /* INVARIANTS, in this order: reasonable size,
    topBound consistent, space pointer, space accessible to us.
-   
+
    NB. This is safe to use only (a) on a spark pool owned by the
    current thread, or (b) when there's only one thread running, or no
    stealing going on (e.g. during GC).
@@ -54,7 +54,7 @@ typedef struct WSDeque_ {
   ASSERT(*((p)->elements - 1  + ((p)->size)) || 1);
 
 // No: it is possible that top > bottom when using pop()
-//  ASSERT((p)->bottom >= (p)->top);           
+//  ASSERT((p)->bottom >= (p)->top);
 //  ASSERT((p)->size > (p)->bottom - (p)->top);
 
 /* -----------------------------------------------------------------------------
@@ -124,3 +124,11 @@ discardElements (WSDeque *q)
 }
 
 #endif // WSDEQUE_H
+
+// Local Variables:
+// mode: C
+// fill-column: 80
+// indent-tabs-mode: nil
+// c-basic-offset: 4
+// buffer-file-coding-system: utf-8-unix
+// End:

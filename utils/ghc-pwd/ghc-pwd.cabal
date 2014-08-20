@@ -9,9 +9,10 @@ Synopsis: XXX
 Description:
 	XXX
 build-type: Simple
-cabal-version: >=1.2
+cabal-version: >=1.10
 
 Executable ghc-pwd
+    Default-Language: Haskell2010
     Main-Is: ghc-pwd.hs
     Build-Depends: base       >= 3   && < 5,
                    directory  >= 1   && < 1.3

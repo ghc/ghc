@@ -1,6 +1,8 @@
 The Glasgow Haskell Compiler
 ============================
 
+[![Build Status](https://api.travis-ci.org/ghc/ghc.svg?branch=master)](http://travis-ci.org/ghc/ghc)
+
 This is the source tree for [GHC][1], a compiler and interactive
 environment for the Haskell functional programming language.
 
@@ -24,16 +26,18 @@ There are two ways to get a source tree:
 
  2. *Check out the source code from git*
 
-  First clone the GHC github read-only repository:
+  The official mirror for GHC on GitHub is located at https://github.com/ghc/ghc.
 
         $ git clone git://github.com/ghc/ghc.git
-
-  Then run the `sync-all` script in that repository to get the other repositories:
-
         $ cd ghc
         $ ./sync-all get
 
-  This checks out the "boot" packages.
+  If you want to clone your own fork instead, add an argument to `sync-all` to
+  tell it where it can find the other repositories it needs.
+
+        $ git clone <your preferred github.com GHC fork URL> ghc
+        $ cd ghc
+        $ ./sync-all -r git://github.com/ghc get
 
   **DO NOT submit pull request directly to the github repo.**
   *See the GHC developer team's working conventions re [contributing patches](http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/Git#Contributingpatches "ghc.haskell.org/trac/ghc/wiki/WorkingConventions/Git#Contributingpatches").*
@@ -130,5 +134,5 @@ you to join!
           "http://ghc.haskell.org/trac/ghc/"
   [11]: http://www.haskell.org/pipermail/glasgow-haskell-users/
           "http://www.haskell.org/pipermail/glasgow-haskell-users/"
-  [12]: http://ghc.haskell.org/trac/ghc/wiki/Contributors
-          "http://ghc.haskell.org/trac/ghc/wiki/Contributors"
+  [12]: http://ghc.haskell.org/trac/ghc/wiki/TeamGHC
+          "http://ghc.haskell.org/trac/ghc/wiki/TeamGHC"

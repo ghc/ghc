@@ -742,6 +742,8 @@ globalRegMaybe CurrentTSO               = Just (RealRegSingle REG_CurrentTSO)
 globalRegMaybe CurrentNursery           = Just (RealRegSingle REG_CurrentNursery)
 # endif
 globalRegMaybe _                        = Nothing
+#elif MACHREGS_NO_REGS
+globalRegMaybe _ = Nothing
 #else
 globalRegMaybe = panic "globalRegMaybe not defined for this platform"
 #endif

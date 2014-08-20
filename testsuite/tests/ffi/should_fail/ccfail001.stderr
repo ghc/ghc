@@ -1,6 +1,7 @@
 
 ccfail001.hs:10:1:
-    Unacceptable result type in foreign declaration: State# RealWorld
+    Unacceptable result type in foreign declaration:
+      ‘State# RealWorld’ cannot be marshalled in a foreign call
     When checking declaration:
-        foreign import ccall safe "static foo" foo
-          :: Int -> State# RealWorld
+      foreign import ccall safe "static foo" foo
+        :: Int -> State# RealWorld

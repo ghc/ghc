@@ -6,7 +6,8 @@
 Desugaring arrow commands
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -465,8 +466,8 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf mb_fun cond then_cmd else_cmd)
     left_con   <- dsLookupDataCon leftDataConName
     right_con  <- dsLookupDataCon rightDataConName
 
-    let mk_left_expr ty1 ty2 e = mkConApp left_con [Type ty1, Type ty2, e]
-        mk_right_expr ty1 ty2 e = mkConApp right_con [Type ty1, Type ty2, e]
+    let mk_left_expr ty1 ty2 e = mkCoreConApps left_con   [Type ty1, Type ty2, e]
+        mk_right_expr ty1 ty2 e = mkCoreConApps right_con [Type ty1, Type ty2, e]
 
         in_ty = envStackType env_ids stack_ty
         then_ty = envStackType then_ids stack_ty
@@ -517,7 +518,7 @@ case bodies, containing the following fields:
 
 \begin{code}
 dsCmd ids local_vars stack_ty res_ty 
-      (HsCmdCase exp (MG { mg_alts = matches, mg_arg_tys = arg_tys }))
+      (HsCmdCase exp (MG { mg_alts = matches, mg_arg_tys = arg_tys, mg_origin = origin }))
       env_ids = do
     stack_id <- newSysLocalDs stack_ty
 
@@ -561,7 +562,7 @@ dsCmd ids local_vars stack_ty res_ty
         in_ty = envStackType env_ids stack_ty
 
     core_body <- dsExpr (HsCase exp (MG { mg_alts = matches', mg_arg_tys = arg_tys
-                                        , mg_res_ty = sum_ty }))
+                                        , mg_res_ty = sum_ty, mg_origin = origin }))
         -- Note that we replace the HsCase result type by sum_ty,
         -- which is the type of matches'
 

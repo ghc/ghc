@@ -1,0 +1,8 @@
+
+T8883.hs:20:1:
+    Non type-variable argument in the constraint: Functor (PF a)
+    (Use FlexibleContexts to permit this)
+    When checking that ‘fold’ has the inferred type
+      fold :: forall a b.
+              (Regular a, Functor (PF a)) =>
+              (PF a b -> b) -> a -> b

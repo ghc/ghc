@@ -1,0 +1,8 @@
+
+T9071_2.hs:7:40:
+    No instance for (Functor Mu)
+      arising from the first field of ‘F1’ (type ‘Mu (K1 a)’)
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Functor F1)

@@ -1,32 +1,26 @@
 Character classification
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
+{-# LANGUAGE CPP #-}
 module Ctype
-	( is_ident	-- Char# -> Bool
-	, is_symbol	-- Char# -> Bool
-	, is_any	-- Char# -> Bool
-	, is_space	-- Char# -> Bool
-	, is_lower	-- Char# -> Bool
-	, is_upper	-- Char# -> Bool
-	, is_digit	-- Char# -> Bool
-	, is_alphanum   -- Char# -> Bool
+        ( is_ident      -- Char# -> Bool
+        , is_symbol     -- Char# -> Bool
+        , is_any        -- Char# -> Bool
+        , is_space      -- Char# -> Bool
+        , is_lower      -- Char# -> Bool
+        , is_upper      -- Char# -> Bool
+        , is_digit      -- Char# -> Bool
+        , is_alphanum   -- Char# -> Bool
 
-	, is_decdigit, is_hexdigit, is_octdigit
-	, hexDigit, octDecDigit
-	) where
+        , is_decdigit, is_hexdigit, is_octdigit, is_bindigit
+        , hexDigit, octDecDigit
+        ) where
 
 #include "HsVersions.h"
 
-import Data.Int		( Int32 )
-import Data.Bits	( Bits((.&.)) )
-import Data.Char	( ord, chr )
+import Data.Int         ( Int32 )
+import Data.Bits        ( Bits((.&.)) )
+import Data.Char        ( ord, chr )
 import Panic
 \end{code}
 
@@ -75,16 +69,19 @@ octDecDigit c = ord c - ord '0'
 
 is_decdigit :: Char -> Bool
 is_decdigit c
-	=  c >= '0' && c <= '9'
+        =  c >= '0' && c <= '9'
 
 is_hexdigit :: Char -> Bool
 is_hexdigit c
-	=  is_decdigit c 
-	|| (c >= 'a' && c <= 'f')
-	|| (c >= 'A' && c <= 'F')
+        =  is_decdigit c
+        || (c >= 'a' && c <= 'f')
+        || (c >= 'A' && c <= 'F')
 
 is_octdigit :: Char -> Bool
 is_octdigit c = c >= '0' && c <= '7'
+
+is_bindigit :: Char -> Bool
+is_bindigit c = c == '0' || c == '1'
 
 to_lower :: Char -> Char
 to_lower c
@@ -108,7 +105,7 @@ charType c = case c of
    '\7'   -> 0                         -- \007
    '\8'   -> 0                         -- \010
    '\9'   -> cSpace                    -- \t  (not allowed in strings, so !cAny)
-   '\10'  -> cSpace	               -- \n  (ditto)
+   '\10'  -> cSpace                    -- \n  (ditto)
    '\11'  -> cSpace                    -- \v  (ditto)
    '\12'  -> cSpace                    -- \f  (ditto)
    '\13'  -> cSpace                    --  ^M (ditto)

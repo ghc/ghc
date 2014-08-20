@@ -1,5 +1,5 @@
+{-# LANGUAGE CPP, NondecreasingIndentation #-}
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 
 -----------------------------------------------------------------------------
 --
@@ -33,7 +33,7 @@ import InteractiveUI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 import Config
 import Constants
 import HscTypes
-import Packages         ( dumpPackages )
+import Packages         ( dumpPackages, simpleDumpPackages, pprModuleMap )
 import DriverPhases
 import BasicTypes       ( failed )
 import StaticFlags
@@ -209,11 +209,18 @@ main' postLoadMode dflags0 args flagWarnings = do
   hsc_env <- GHC.getSession
 
         ---------------- Display configuration -----------
-  when (verbosity dflags6 >= 4) $
-        liftIO $ dumpPackages dflags6
+  case verbosity dflags6 of
+    v | v == 4 -> liftIO $ simpleDumpPackages dflags6
+      | v >= 5 -> liftIO $ dumpPackages dflags6
+      | otherwise -> return ()
 
   when (verbosity dflags6 >= 3) $ do
         liftIO $ hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
+
+
+  when (dopt Opt_D_dump_mod_map dflags6) . liftIO $
+    printInfoForUser (dflags6 { pprCols = 200 })
+                     (pkgQual dflags6) (pprModuleMap dflags6)
 
         ---------------- Final sanity checking -----------
   liftIO $ checkOptions postLoadMode dflags6 srcs objs
@@ -562,7 +569,7 @@ mode_flags =
   , Flag "M"            (PassFlag (setMode doMkDependHSMode))
   , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
   , Flag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
-  , Flag "S"            (PassFlag (setMode (stopBeforeMode As)))
+  , Flag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
   , Flag "-make"        (PassFlag (setMode doMakeMode))
   , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
   , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
@@ -629,7 +636,8 @@ doMake srcs  = do
         haskellish (f,Nothing) =
           looksLikeModuleName f || isHaskellUserSrcFilename f || '.' `notElem` f
         haskellish (_,Just phase) =
-          phase `notElem` [As, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm, StopLn]
+          phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm
+                          , StopLn]
 
     hsc_env <- GHC.getSession
 

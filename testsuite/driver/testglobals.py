@@ -252,6 +252,11 @@ class TestOptions:
        # Extra output normalisation
        self.extra_normaliser = lambda x: x
 
+       # Custom output checker, otherwise do a comparison with expected
+       # stdout file.  Accepts two arguments: filename of actual stdout
+       # output, and a normaliser function given other test options
+       self.check_stdout = None
+
        # Extra normalisation for compiler error messages
        self.extra_errmsg_normaliser = lambda x: x
 

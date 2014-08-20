@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 
 module CodeGen.Platform.SPARC where
 

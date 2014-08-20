@@ -38,6 +38,7 @@
 #define MACHREGS_powerpc  (powerpc_TARGET_ARCH || powerpc64_TARGET_ARCH || rs6000_TARGET_ARCH)
 #define MACHREGS_sparc    sparc_TARGET_ARCH
 #define MACHREGS_arm      arm_TARGET_ARCH
+#define MACHREGS_aarch64  aarch64_TARGET_ARCH
 #define MACHREGS_darwin   darwin_TARGET_OS
 
 #endif

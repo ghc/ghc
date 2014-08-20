@@ -130,13 +130,28 @@ test('T5423',
      run_command,
      ['$MAKE -s --no-print-directory T5423'])
 
+# Workaround bug #8458: old dlopen opens sections in the wrong order,
+# so we just accept both orders.
+def checkDynAsm(actual_file, normaliser):
+    actual_raw = read_no_crs(actual_file)
+    actual_str = normaliser(actual_raw)
+    actual = actual_str.split()
+    if actual == ['initArray1', 'initArray2', 'ctors1', 'ctors2', 'success']:
+        return 1
+    elif actual == ['ctors1', 'ctors2', 'initArray1', 'initArray2', 'success']:
+        if_verbose(1, 'T5435_dyn_asm detected old-style dlopen, see #8458')
+        return 1
+    else:
+        if_verbose(1, 'T5435_dyn_asm failed with %s, see all.T for details' % actual)
+        return 0
+
 # These should have extra_clean() arguments, but I need
 # to somehow extract out the name of DLLs to do that
 
 test('T5435_v_asm', normal, run_command, ['$MAKE -s --no-print-directory T5435_v_asm'])
 test('T5435_v_gcc', normal, run_command, ['$MAKE -s --no-print-directory T5435_v_gcc'])
-test('T5435_dyn_asm', normal, run_command, ['$MAKE -s --no-print-directory T5435_dyn_asm'])
-test('T5435_dyn_gcc', normal, run_command, ['$MAKE -s --no-print-directory T5435_dyn_gcc'])
+test('T5435_dyn_asm', check_stdout(checkDynAsm), run_command, ['$MAKE -s --no-print-directory T5435_dyn_asm'])
+test('T5435_dyn_gcc', normal , run_command, ['$MAKE -s --no-print-directory T5435_dyn_gcc'])
 
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
@@ -207,3 +222,19 @@ test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
                  # T8124_stub.h before compiling T8124_c.c, which
                  # needs it.
                compile_and_run, ['T8124_c.c -no-hs-main'])
+
+# +RTS -A8k makes it fail faster
+# The ghci way gets confused by the RTS options
+test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], compile_and_run, [''])
+
+# I couldn't reproduce 9078 with the -threaded runtime, but could easily
+# with the non-threaded one.
+test('T9078', [ omit_ways(threaded_ways) ], compile_and_run, ['-with-rtsopts="-DS" -debug'])
+
+test('rdynamic', unless(opsys('linux') or opsys('mingw32'), skip),
+     compile_and_run, ['-rdynamic -package ghc'])
+
+# 251 = RTS exit code for "out of memory"
+test('overflow1', [ exit_code(251) ], compile_and_run, [''])
+test('overflow2', [ exit_code(251) ], compile_and_run, [''])
+test('overflow3', [ exit_code(251) ], compile_and_run, [''])

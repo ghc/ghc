@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 module CmmPipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into
   -- optimized, CPS converted and native-call-less C--.  The latter
@@ -35,8 +37,6 @@ cmmPipeline  :: HscEnv -- Compilation env including
 
 cmmPipeline hsc_env topSRT prog =
   do let dflags = hsc_dflags hsc_env
-
-     showPass dflags "CPSZ"
 
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
 
@@ -326,10 +326,9 @@ _GLOBAL_OFFSET_TABLE_, regardless of which entry point we arrived via.
 {- Note [unreachable blocks]
 
 The control-flow optimiser sometimes leaves unreachable blocks behind
-containing junk code.  If these blocks make it into the native code
-generator then they trigger a register allocator panic because they
-refer to undefined LocalRegs, so we must eliminate any unreachable
-blocks before passing the code onwards.
+containing junk code.  These aren't necessarily a problem, but
+removing them is good because it might save time in the native code
+generator later.
 
 -}
 

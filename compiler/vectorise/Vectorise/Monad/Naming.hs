@@ -24,6 +24,7 @@ import Name
 import SrcLoc
 import MkId
 import Id
+import IdInfo( IdDetails(VanillaId) )
 import FastString
 
 import Control.Monad
@@ -67,7 +68,7 @@ mkVectId :: Id -> Type -> VM Id
 mkVectId id ty
   = do { name <- mkLocalisedName mkVectOcc (getName id)
        ; let id' | isDFunId id     = MkId.mkDictFunId name tvs theta cls tys
-                 | isExportedId id = Id.mkExportedLocalId name ty
+                 | isExportedId id = Id.mkExportedLocalId VanillaId name ty
                  | otherwise       = Id.mkLocalId         name ty
        ; return id'
        }
@@ -91,8 +92,8 @@ newExportedVar occ_name ty
       u   <- liftDs newUnique
 
       let name = mkExternalName u mod occ_name noSrcSpan
-      
-      return $ Id.mkExportedLocalId name ty
+
+      return $ Id.mkExportedLocalId VanillaId name ty
 
 -- |Make a fresh local variable with the given type.
 -- The variable's name is formed using the given string as the prefix.

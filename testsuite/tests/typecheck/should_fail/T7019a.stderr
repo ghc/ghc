@@ -1,7 +1,4 @@
 
-T7019a.hs:11:1:
-    Illegal polymorphic or qualified type:
-      forall b. Context (Associated a b)
-    In the context: (forall b. Context (Associated a b))
-    While checking the super-classes of class ‘Class’
+T7019a.hs:11:8:
+    Illegal constraint: forall b. Context (Associated a b)
     In the class declaration for ‘Class’

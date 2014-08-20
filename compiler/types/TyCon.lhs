@@ -6,6 +6,7 @@
 The @TyCon@ datatype
 
 \begin{code}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module TyCon(
         -- * Main TyCon data types
@@ -34,14 +35,13 @@ module TyCon(
         isFunTyCon,
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
-        isSynTyCon, 
+        isSynTyCon, isTypeSynonymTyCon,
         isDecomposableTyCon,
         isForeignTyCon, 
         isPromotedDataCon, isPromotedTyCon,
         isPromotedDataCon_maybe, isPromotedTyCon_maybe,
         promotableTyCon_maybe, promoteTyCon,
 
-        isInjectiveTyCon,
         isDataTyCon, isProductTyCon, isDataProductTyCon_maybe,
         isEnumerationTyCon,
         isNewTyCon, isAbstractTyCon,
@@ -182,6 +182,9 @@ See also Note [Wrappers for data instance tycons] in MkId.lhs
   The R:TInt is the "representation TyCons".
   It has an AlgTyConParent of
         FamInstTyCon T [Int] ax_ti
+
+* The axiom ax_ti may be eta-reduced; see
+  Note [Eta reduction for data family axioms] in TcInstDcls
 
 * The data contructor T2 has a wrapper (which is what the
   source-level "T2" invokes):
@@ -576,11 +579,14 @@ data TyConParent
   --  3) A 'CoTyCon' identifying the representation
   --  type with the type instance family
   | FamInstTyCon          -- See Note [Data type families]
-        (CoAxiom Unbranched)  -- The coercion constructor,
-                              -- always of kind   T ty1 ty2 ~ R:T a b c
-                              -- where T is the family TyCon,
-                              -- and R:T is the representation TyCon (ie this one)
-                              -- and a,b,c are the tyConTyVars of this TyCon
+        (CoAxiom Unbranched)  -- The coercion axiom.
+               -- Generally of kind   T ty1 ty2 ~ R:T a b c
+               -- where T is the family TyCon,
+               -- and R:T is the representation TyCon (ie this one)
+               -- and a,b,c are the tyConTyVars of this TyCon
+               --
+               -- BUT may be eta-reduced; see TcInstDcls
+               --     Note [Eta reduction for data family axioms]
 
           -- Cached fields of the CoAxiom, but adjusted to
           -- use the tyConTyVars of this TyCon
@@ -722,7 +728,7 @@ which encodes as (TyConApp instCoercionTyCon [TyConApp CoT [], s])
 Note [Newtype eta]
 ~~~~~~~~~~~~~~~~~~
 Consider
-        newtype Parser a = MkParser (IO a) derriving( Monad )
+        newtype Parser a = MkParser (IO a) deriving Monad
 Are these two types equal (to Core)?
         Monad Parser
         Monad IO
@@ -1187,10 +1193,16 @@ isDataProductTyCon_maybe (TupleTyCon { dataCon = con })
   = Just con
 isDataProductTyCon_maybe _ = Nothing
 
--- | Is this a 'TyCon' representing a type synonym (@type@)?
+-- | Is this a 'TyCon' representing a regular H98 type synonym (@type@)?
+isTypeSynonymTyCon :: TyCon -> Bool
+isTypeSynonymTyCon (SynTyCon { synTcRhs = SynonymTyCon {} }) = True
+isTypeSynonymTyCon _ = False
+
+-- | Is this 'TyCon' a type synonym or type family?
 isSynTyCon :: TyCon -> Bool
 isSynTyCon (SynTyCon {}) = True
 isSynTyCon _             = False
+
 
 -- As for newtypes, it is in some contexts important to distinguish between
 -- closed synonyms and synonym families, as synonym families have no unique
@@ -1199,7 +1211,14 @@ isSynTyCon _             = False
 
 isDecomposableTyCon :: TyCon -> Bool
 -- True iff we can decompose (T a b c) into ((T a b) c)
+--   I.e. is it injective?
 -- Specifically NOT true of synonyms (open and otherwise)
+-- Ultimately we may have injective associated types
+-- in which case this test will become more interesting
+--
+-- It'd be unusual to call isDecomposableTyCon on a regular H98
+-- type synonym, because you should probably have expanded it first
+-- But regardless, it's not decomposable
 isDecomposableTyCon (SynTyCon {}) = False
 isDecomposableTyCon _other        = True
 
@@ -1258,17 +1277,6 @@ isBuiltInSynFamTyCon_maybe _ = Nothing
 isDataFamilyTyCon :: TyCon -> Bool
 isDataFamilyTyCon (AlgTyCon {algTcRhs = DataFamilyTyCon {}}) = True
 isDataFamilyTyCon _ = False
-
--- | Injective 'TyCon's can be decomposed, so that
---     T ty1 ~ T ty2  =>  ty1 ~ ty2
-isInjectiveTyCon :: TyCon -> Bool
-isInjectiveTyCon tc = not (isSynTyCon tc)
-        -- Ultimately we may have injective associated types
-        -- in which case this test will become more interesting
-        --
-        -- It'd be unusual to call isInjectiveTyCon on a regular H98
-        -- type synonym, because you should probably have expanded it first
-        -- But regardless, it's not injective!
 
 -- | Are we able to extract informationa 'TyVar' to class argument list
 -- mappping from a given 'TyCon'?
@@ -1370,13 +1378,15 @@ isPromotedDataCon_maybe _ = Nothing
 -- * Family instances are /not/ implicit as they represent the instance body
 --   (similar to a @dfun@ does that for a class instance).
 isImplicitTyCon :: TyCon -> Bool
-isImplicitTyCon tycon
-  | isTyConAssoc tycon = True
-  | isSynTyCon tycon   = False
-  | isAlgTyCon tycon   = isTupleTyCon tycon
-  | otherwise          = True
-        -- 'otherwise' catches: FunTyCon, PrimTyCon,
-        -- PromotedDataCon, PomotedTypeTyCon
+isImplicitTyCon (FunTyCon {})        = True
+isImplicitTyCon (TupleTyCon {})      = True
+isImplicitTyCon (PrimTyCon {})       = True
+isImplicitTyCon (PromotedDataCon {}) = True
+isImplicitTyCon (PromotedTyCon {})   = True
+isImplicitTyCon (AlgTyCon { algTcParent = AssocFamilyTyCon {} }) = True
+isImplicitTyCon (AlgTyCon {})                                    = False
+isImplicitTyCon (SynTyCon { synTcParent = AssocFamilyTyCon {} }) = True
+isImplicitTyCon (SynTyCon {})                                    = False
 
 tyConCType_maybe :: TyCon -> Maybe CType
 tyConCType_maybe tc@(AlgTyCon {}) = tyConCType tc

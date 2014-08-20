@@ -1,0 +1,5 @@
+
+ParserNoBinaryLiterals2.hs:8:4:
+    Constructor ‘W#’ should have 1 argument, but has been given 2
+    In the pattern: W# 0 b0##
+    In an equation for ‘f’: f (W# 0 b0##) = ()
