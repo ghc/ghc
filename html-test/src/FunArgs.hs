@@ -1,4 +1,4 @@
-{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE RankNTypes, DataKinds, TypeFamilies #-}
 module FunArgs where
 
 f :: forall a. Ord a
@@ -15,3 +15,24 @@ g :: a -- ^ First argument
   -> c -- ^ Third argument
   -> d -- ^ Result
 g = undefined
+
+
+h :: forall a b c
+  .  a -- ^ First argument
+  -> b -- ^ Second argument
+  -> c -- ^ Third argument
+  -> forall d. d -- ^ Result
+h = undefined
+
+
+i :: forall a (b :: ()) d. (d ~ '())
+  => forall c
+  .  a b c d -- ^ abcd
+  -> ()      -- ^ Result
+i = undefined
+
+
+j :: forall proxy (a :: ()) b
+  .  proxy a -- ^ First argument
+  -> b       -- ^ Result
+j = undefined

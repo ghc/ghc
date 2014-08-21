@@ -138,26 +138,25 @@ ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep)
 
     do_largs n leader (L _ t) = do_args n leader t
     do_args :: Int -> Html -> HsType DocName -> [SubDecl]
-    do_args n leader (HsForAllTy Explicit tvs lctxt ltype)
-      = (leader <+>
-          hsep (forallSymbol unicode : ppTyVars tvs ++ [dot]) <+>
-          ppLContextNoArrow lctxt unicode qual,
-          Nothing, [])
-        : do_largs n (darrow unicode) ltype
-    do_args n leader (HsForAllTy Implicit _ lctxt ltype)
-      | not (null (unLoc lctxt))
-      = (leader <+> ppLContextNoArrow lctxt unicode qual,
-          Nothing, [])
-        : do_largs n (darrow unicode) ltype
-      -- if we're not showing any 'forall' or class constraints or
-      -- anything, skip having an empty line for the context.
-      | otherwise
-      = do_largs n leader ltype
+    do_args n leader (HsForAllTy _ tvs lctxt ltype)
+      = case unLoc lctxt of
+        [] -> do_largs n leader' ltype
+        _  -> (leader' <+> ppLContextNoArrow lctxt unicode qual, Nothing, [])
+              : do_largs n (darrow unicode) ltype
+      where leader' = leader <+> ppForAll tvs unicode qual
     do_args n leader (HsFunTy lt r)
       = (leader <+> ppLFunLhType unicode qual lt, argDoc n, [])
         : do_largs (n+1) (arrow unicode) r
     do_args n leader t
       = [(leader <+> ppType unicode qual t, argDoc n, [])]
+
+ppForAll :: LHsTyVarBndrs DocName -> Unicode -> Qualification -> Html
+ppForAll tvs unicode qual =
+  case [ppKTv n k | L _ (KindedTyVar n k) <- hsQTvBndrs tvs] of
+    [] -> noHtml
+    ts -> forallSymbol unicode <+> hsep ts +++ dot
+  where ppKTv n k = parens $
+          ppTyName (getName n) <+> dcolon unicode <+> ppLKind unicode qual k
 
 ppFixities :: [(DocName, Fixity)] -> Qualification -> Html
 ppFixities [] _ = noHtml
@@ -618,7 +617,7 @@ ppShortConstrParts summary dataInst con unicode qual = case con_res con of
     -- (except each field gets its own line in docs, to match
     -- non-GADT records)
     RecCon fields -> (ppBinder summary occ <+> dcolon unicode <+>
-                            ppForAll forall_ ltvs lcontext unicode qual <+> char '{',
+                            ppForAllCon forall_ ltvs lcontext unicode qual <+> char '{',
                             doRecordFields fields,
                             char '}' <+> arrow unicode <+> ppLType unicode qual resTy)
     InfixCon arg1 arg2 -> (doGADTCon [arg1, arg2] resTy, noHtml, noHtml)
@@ -626,7 +625,7 @@ ppShortConstrParts summary dataInst con unicode qual = case con_res con of
   where
     doRecordFields fields = shortSubDecls dataInst (map (ppShortField summary unicode qual) fields)
     doGADTCon args resTy = ppBinder summary occ <+> dcolon unicode <+> hsep [
-                             ppForAll forall_ ltvs lcontext unicode qual,
+                             ppForAllCon forall_ ltvs lcontext unicode qual,
                              ppLType unicode qual (foldr mkFunTy resTy args) ]
 
     header_  = ppConstrHdr forall_ tyVars context
@@ -687,7 +686,7 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con) = (decl, mbDoc, field
       (map (ppSideBySideField subdocs unicode qual) fields)
     doGADTCon :: [LHsType DocName] -> Located (HsType DocName) -> Html
     doGADTCon args resTy = ppBinder False occ <+> dcolon unicode
-        <+> hsep [ppForAll forall_ ltvs (con_cxt con) unicode qual,
+        <+> hsep [ppForAllCon forall_ ltvs (con_cxt con) unicode qual,
                   ppLType unicode qual (foldr mkFunTy resTy args) ]
         <+> fixity
 
@@ -805,9 +804,9 @@ ppKind unicode qual ki = ppr_mono_ty pREC_TOP ki unicode qual
 -- Drop top-level for-all type variables in user style
 -- since they are implicit in Haskell
 
-ppForAll :: HsExplicitFlag -> LHsTyVarBndrs DocName
+ppForAllCon :: HsExplicitFlag -> LHsTyVarBndrs DocName
          -> Located (HsContext DocName) -> Unicode -> Qualification -> Html
-ppForAll expl tvs cxt unicode qual
+ppForAllCon expl tvs cxt unicode qual
   | show_forall = forall_part <+> ppLContext cxt unicode qual
   | otherwise   = ppLContext cxt unicode qual
   where
@@ -822,7 +821,7 @@ ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
 
 ppr_mono_ty :: Int -> HsType DocName -> Unicode -> Qualification -> Html
 ppr_mono_ty ctxt_prec (HsForAllTy expl tvs ctxt ty) unicode qual
-  = maybeParen ctxt_prec pREC_FUN $ ppForAll expl tvs ctxt unicode qual
+  = maybeParen ctxt_prec pREC_FUN $ ppForAllCon expl tvs ctxt unicode qual
                                     <+> ppr_mono_lty pREC_TOP ty unicode qual
 
 -- UnicodeSyntax alternatives
