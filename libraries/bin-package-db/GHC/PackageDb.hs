@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 -- This module deliberately defines orphan instances for now (Binary Version).
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-name-shadowing #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.PackageDb
@@ -246,10 +246,10 @@ writeFileAtomic targetPath content = do
   let (targetDir, targetName) = splitFileName targetPath
   Exception.bracketOnError
     (openBinaryTempFileWithDefaultPermissions targetDir $ targetName <.> "tmp")
-    (\(tmpPath, handle) -> hClose handle >> removeFile tmpPath)
-    (\(tmpPath, handle) -> do
-        BS.Lazy.hPut handle content
-        hClose handle
+    (\(tmpPath, hnd) -> hClose hnd >> removeFile tmpPath)
+    (\(tmpPath, hnd) -> do
+        BS.Lazy.hPut hnd content
+        hClose hnd
 #if mingw32_HOST_OS || mingw32_TARGET_OS
         renameFile tmpPath targetPath
           -- If the targetPath exists then renameFile will fail

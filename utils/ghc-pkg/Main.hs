@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, RecordWildCards,
              GeneralizedNewtypeDeriving, StandaloneDeriving #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004-2009.
@@ -13,7 +14,6 @@ module Main (main) where
 import Version ( version, targetOS, targetARCH )
 import qualified GHC.PackageDb as GhcPkg
 import qualified Distribution.Simple.PackageIndex as PackageIndex
-import qualified Distribution.Package as Cabal
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.ModuleName (ModuleName)
 import Distribution.InstalledPackageInfo as Cabal
@@ -1898,10 +1898,6 @@ throwIOIO = Exception.throwIO
 
 catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
 catchIO = Exception.catch
-
-catchError :: IO a -> (String -> IO a) -> IO a
-catchError io handler = io `Exception.catch` handler'
-    where handler' (Exception.ErrorCall err) = handler err
 
 tryIO :: IO a -> IO (Either Exception.IOException a)
 tryIO = Exception.try
