@@ -1,4 +1,4 @@
 test('apirecomp001',
-     when(fast(), skip),
+     normal,
      run_command,
      ['$MAKE -s --no-print-directory apirecomp001'])
