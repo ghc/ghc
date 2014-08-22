@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances, RecordWildCards,
+             GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004-2009.
@@ -11,13 +12,13 @@ module Main (main) where
 
 import Version ( version, targetOS, targetARCH )
 import qualified GHC.PackageDb as GhcPkg
-import Distribution.InstalledPackageInfo.Binary()
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import qualified Distribution.Package as Cabal
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.ModuleName (ModuleName)
 import Distribution.InstalledPackageInfo as Cabal
-import Distribution.Compat.ReadP
+import Distribution.License
+import Distribution.Compat.ReadP hiding (get)
 import Distribution.ParseUtils
 import Distribution.ModuleExport
 import Distribution.Package hiding (depends)
@@ -54,8 +55,8 @@ import Data.List
 import Control.Concurrent
 
 import qualified Data.ByteString.Char8 as BS
-import qualified Data.Binary as Bin
-import qualified Data.Binary.Get as Bin
+import Data.Binary as Bin
+--import qualified Data.Binary.Get as Bin
 
 #if defined(mingw32_HOST_OS)
 -- mingw32 needs these for getExecDir
@@ -1985,3 +1986,144 @@ removeFileSafe fn =
 
 absolutePath :: FilePath -> IO FilePath
 absolutePath path = return . normalise . (</> path) =<< getCurrentDirectory
+
+-----------------------------------------------------------------------------
+-- Binary instances for the Cabal InstalledPackageInfo types
+--
+
+instance Binary m => Binary (InstalledPackageInfo_ m) where
+  put = putInstalledPackageInfo
+  get = getInstalledPackageInfo
+
+putInstalledPackageInfo :: Binary m => InstalledPackageInfo_ m -> Put
+putInstalledPackageInfo ipi = do
+  put (sourcePackageId ipi)
+  put (installedPackageId ipi)
+  put (packageKey ipi)
+  put (license ipi)
+  put (copyright ipi)
+  put (maintainer ipi)
+  put (author ipi)
+  put (stability ipi)
+  put (homepage ipi)
+  put (pkgUrl ipi)
+  put (synopsis ipi)
+  put (description ipi)
+  put (category ipi)
+  put (exposed ipi)
+  put (exposedModules ipi)
+  put (reexportedModules ipi)
+  put (hiddenModules ipi)
+  put (trusted ipi)
+  put (importDirs ipi)
+  put (libraryDirs ipi)
+  put (hsLibraries ipi)
+  put (extraLibraries ipi)
+  put (extraGHCiLibraries ipi)
+  put (includeDirs ipi)
+  put (includes ipi)
+  put (depends ipi)
+  put (hugsOptions ipi)
+  put (ccOptions ipi)
+  put (ldOptions ipi)
+  put (frameworkDirs ipi)
+  put (frameworks ipi)
+  put (haddockInterfaces ipi)
+  put (haddockHTMLs ipi)
+
+getInstalledPackageInfo :: Binary m => Get (InstalledPackageInfo_ m)
+getInstalledPackageInfo = do
+  sourcePackageId <- get
+  installedPackageId <- get
+  packageKey <- get
+  license <- get
+  copyright <- get
+  maintainer <- get
+  author <- get
+  stability <- get
+  homepage <- get
+  pkgUrl <- get
+  synopsis <- get
+  description <- get
+  category <- get
+  exposed <- get
+  exposedModules <- get
+  reexportedModules <- get
+  hiddenModules <- get
+  trusted <- get
+  importDirs <- get
+  libraryDirs <- get
+  hsLibraries <- get
+  extraLibraries <- get
+  extraGHCiLibraries <- get
+  includeDirs <- get
+  includes <- get
+  depends <- get
+  hugsOptions <- get
+  ccOptions <- get
+  ldOptions <- get
+  frameworkDirs <- get
+  frameworks <- get
+  haddockInterfaces <- get
+  haddockHTMLs <- get
+  return InstalledPackageInfo{..}
+
+instance Binary PackageIdentifier where
+  put pid = do put (pkgName pid); put (pkgVersion pid)
+  get = do 
+    pkgName <- get
+    pkgVersion <- get
+    return PackageIdentifier{..}
+
+instance Binary License where
+  put (GPL v)              = do putWord8 0; put v
+  put (LGPL v)             = do putWord8 1; put v
+  put BSD3                 = do putWord8 2
+  put BSD4                 = do putWord8 3
+  put MIT                  = do putWord8 4
+  put PublicDomain         = do putWord8 5
+  put AllRightsReserved    = do putWord8 6
+  put OtherLicense         = do putWord8 7
+  put (Apache v)           = do putWord8 8; put v
+  put (AGPL v)             = do putWord8 9; put v
+  put BSD2                 = do putWord8 10
+  put (MPL v)              = do putWord8 11; put v
+  put (UnknownLicense str) = do putWord8 12; put str
+
+  get = do
+    n <- getWord8
+    case n of
+      0 -> do v <- get; return (GPL v)
+      1 -> do v <- get; return (LGPL v)
+      2 -> return BSD3
+      3 -> return BSD4
+      4 -> return MIT
+      5 -> return PublicDomain
+      6 -> return AllRightsReserved
+      7 -> return OtherLicense
+      8 -> do v <- get; return (Apache v)
+      9 -> do v <- get; return (AGPL v)
+      10 -> return BSD2
+      11 -> do v <- get; return (MPL v)
+      _ -> do str <- get; return (UnknownLicense str)
+
+deriving instance Binary PackageName
+deriving instance Binary InstalledPackageId
+
+instance Binary ModuleName where
+  put = put . display
+  get = fmap ModuleName.fromString get
+
+instance Binary m => Binary (ModuleExport m) where
+  put (ModuleExport a b c d) = do put a; put b; put c; put d
+  get = do a <- get; b <- get; c <- get; d <- get;
+           return (ModuleExport a b c d)
+
+instance Binary PackageKey where
+  put (PackageKey a b c) = do putWord8 0; put a; put b; put c
+  put (OldPackageKey a) = do putWord8 1; put a
+  get = do n <- getWord8
+           case n of
+            0 -> do a <- get; b <- get; c <- get; return (PackageKey a b c)
+            1 -> do a <- get; return (OldPackageKey a)
+            _ -> error ("Binary PackageKey: bad branch " ++ show n)
