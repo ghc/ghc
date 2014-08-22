@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances #-}
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004-2009.
@@ -13,7 +13,9 @@ import Version ( version, targetOS, targetARCH )
 import qualified GHC.PackageDb as GhcPkg
 import Distribution.InstalledPackageInfo.Binary()
 import qualified Distribution.Simple.PackageIndex as PackageIndex
-import Distribution.ModuleName hiding (main)
+import qualified Distribution.Package as Cabal
+import qualified Distribution.ModuleName as ModuleName
+import Distribution.ModuleName (ModuleName)
 import Distribution.InstalledPackageInfo as Cabal
 import Distribution.Compat.ReadP
 import Distribution.ParseUtils
@@ -51,6 +53,7 @@ import GHC.IO.Exception (IOErrorType(InappropriateType))
 import Data.List
 import Control.Concurrent
 
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.Binary as Bin
 import qualified Data.Binary.Get as Bin
 
@@ -1008,8 +1011,8 @@ updateDBCache verbosity db = do
       pkgsCabalFormat :: [InstalledPackageInfo]
       pkgsCabalFormat = packages db
 
-      pkgsGhcCacheFormat :: [GhcPkg.GhcPackageInfo]
-      pkgsGhcCacheFormat = [] -- TODO: for the moment
+      pkgsGhcCacheFormat :: [PackageCacheFormat]
+      pkgsGhcCacheFormat = map convertPackageInfoToCacheFormat pkgsCabalFormat
 
   when (verbosity > Normal) $
       infoLn ("writing cache " ++ filename)
@@ -1022,6 +1025,51 @@ updateDBCache verbosity db = do
   status <- getFileStatus filename
   setFileTimes (location db) (accessTime status) (modificationTime status)
 #endif
+
+type PackageCacheFormat = GhcPkg.InstalledPackageInfo String String String String ModuleName
+
+convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
+convertPackageInfoToCacheFormat pkg =
+    GhcPkg.InstalledPackageInfo {
+       GhcPkg.installedPackageId = display (installedPackageId pkg),
+       GhcPkg.sourcePackageId    = display (sourcePackageId pkg),
+       GhcPkg.packageName        = display (packageName pkg),
+       GhcPkg.packageVersion     = packageVersion pkg,
+       GhcPkg.packageKey         = display (packageKey pkg),
+       GhcPkg.depends            = map display (depends pkg),
+       GhcPkg.importDirs         = importDirs pkg,
+       GhcPkg.hsLibraries        = hsLibraries pkg,
+       GhcPkg.extraLibraries     = extraLibraries pkg,
+       GhcPkg.extraGHCiLibraries = extraGHCiLibraries pkg,
+       GhcPkg.libraryDirs        = libraryDirs pkg,
+       GhcPkg.frameworks         = frameworks pkg,
+       GhcPkg.frameworkDirs      = frameworkDirs pkg,
+       GhcPkg.ldOptions          = ldOptions pkg,
+       GhcPkg.ccOptions          = ccOptions pkg,
+       GhcPkg.includes           = includes pkg,
+       GhcPkg.includeDirs        = includeDirs pkg,
+       GhcPkg.haddockInterfaces  = haddockInterfaces pkg,
+       GhcPkg.haddockHTMLs       = haddockHTMLs pkg,
+       GhcPkg.exposedModules     = exposedModules pkg,
+       GhcPkg.hiddenModules      = hiddenModules pkg,
+       GhcPkg.reexportedModules  = [ GhcPkg.ModuleExport m ipid' m'
+                                   | ModuleExport {
+                                       exportName = m,
+                                       exportCachedTrueOrig = Just (InstalledPackageId ipid', m')
+                                     } <- reexportedModules pkg
+                                   ],
+       GhcPkg.exposed            = exposed pkg,
+       GhcPkg.trusted            = trusted pkg
+    }
+
+instance GhcPkg.BinaryStringRep ModuleName where
+  fromStringRep = ModuleName.fromString . BS.unpack
+  toStringRep   = BS.pack . display
+
+instance GhcPkg.BinaryStringRep String where
+  fromStringRep = BS.unpack
+  toStringRep   = BS.pack
+
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar
@@ -1631,8 +1679,8 @@ checkModules pkg = do
   where
     findModule modl =
       -- there's no interface file for GHC.Prim
-      unless (modl == fromString "GHC.Prim") $ do
-      let files = [ toFilePath modl <.> extension
+      unless (modl == ModuleName.fromString "GHC.Prim") $ do
+      let files = [ ModuleName.toFilePath modl <.> extension
                   | extension <- ["hi", "p_hi", "dyn_hi" ] ]
       m <- liftIO $ doesFileExistOnPath files (importDirs pkg)
       when (isNothing m) $

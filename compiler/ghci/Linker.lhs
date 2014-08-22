@@ -65,8 +65,6 @@ import System.FilePath
 import System.IO
 import System.Directory hiding (findFile)
 
-import Distribution.Package hiding (depends, mkPackageKey, PackageKey)
-
 import Exception
 \end{code}
 
@@ -1119,7 +1117,7 @@ linkPackage dflags pkg
             objs       = [ obj  | Object obj     <- classifieds ]
             archs      = [ arch | Archive arch   <- classifieds ]
 
-        maybePutStr dflags ("Loading package " ++ display (sourcePackageId pkg) ++ " ... ")
+        maybePutStr dflags ("Loading package " ++ sourcePackageIdString pkg ++ " ... ")
 
         -- See comments with partOfGHCi
         when (packageName pkg `notElem` partOfGHCi) $ do
@@ -1135,7 +1133,7 @@ linkPackage dflags pkg
         maybePutStr dflags "linking ... "
         ok <- resolveObjs
         if succeeded ok then maybePutStrLn dflags "done."
-              else throwGhcExceptionIO (InstallationError ("unable to load package `" ++ display (sourcePackageId pkg) ++ "'"))
+              else throwGhcExceptionIO (InstallationError ("unable to load package `" ++ sourcePackageIdString pkg ++ "'"))
 
 -- we have already searched the filesystem; the strings passed to load_dyn
 -- can be passed directly to loadDLL.  They are either fully-qualified
@@ -1149,7 +1147,7 @@ load_dyn dll = do r <- loadDLL dll
                     Just err -> throwGhcExceptionIO (CmdLineError ("can't load .so/.DLL for: "
                                                               ++ dll ++ " (" ++ err ++ ")" ))
 
-loadFrameworks :: Platform -> InstalledPackageInfo_ ModuleName -> IO ()
+loadFrameworks :: Platform -> PackageConfig -> IO ()
 loadFrameworks platform pkg
     = if platformUsesFrameworks platform
       then mapM_ load frameworks
