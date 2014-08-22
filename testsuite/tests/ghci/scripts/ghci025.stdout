@@ -54,8 +54,9 @@ class Eq a where
 Prelude.length :: [a] -> GHC.Types.Int
 -- imported via T
 data T.Integer
-  = integer-gmp:GHC.Integer.Type.S# GHC.Prim.Int#
-  | integer-gmp:GHC.Integer.Type.J# GHC.Prim.Int# GHC.Prim.ByteArray#
+  = integer-gmp-0.5.1.0:GHC.Integer.Type.S# GHC.Prim.Int#
+  | integer-gmp-0.5.1.0:GHC.Integer.Type.J# GHC.Prim.Int#
+                                            GHC.Prim.ByteArray#
 T.length :: Data.ByteString.Internal.ByteString -> GHC.Types.Int
 :browse! T
 -- defined locally

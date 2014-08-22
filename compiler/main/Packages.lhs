@@ -698,8 +698,7 @@ findWiredInPackages dflags pkgs = do
           where upd_pkg p
                   | installedPackageId p `elem` wired_in_ids
                   = let pid = (sourcePackageId p) { pkgVersion = Version [] [] }
-                    in p { sourcePackageId = pid
-                         , packageKey = OldPackageKey pid }
+                    in p { packageKey = OldPackageKey pid }
                   | otherwise
                   = p
 

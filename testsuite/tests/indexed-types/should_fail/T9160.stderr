@@ -1,8 +1,8 @@
-Loading package ghc-prim ... linking ... done.
-Loading package integer-gmp ... linking ... done.
-Loading package base ... linking ... done.
+Loading package ghc-prim-0.3.1.0 ... linking ... done.
+Loading package integer-gmp-0.5.1.0 ... linking ... done.
+Loading package base-4.7.1.0 ... linking ... done.
 Loading package pretty-1.1.1.1 ... linking ... done.
-Loading package template-haskell ... linking ... done.
+Loading package template-haskell-2.10.0.0 ... linking ... done.
 
 T9160.hs:18:8:
     Type indexes must match class instance head

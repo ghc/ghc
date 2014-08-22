@@ -56,7 +56,8 @@ T5095.hs:9:11:
       instance Eq Ordering -- Defined in ‘GHC.Classes’
       instance Eq GHC.Types.Word -- Defined in ‘GHC.Classes’
       instance Eq a => Eq [a] -- Defined in ‘GHC.Classes’
-      instance Eq Integer -- Defined in ‘integer-gmp:GHC.Integer.Type’
+      instance Eq Integer
+        -- Defined in ‘integer-gmp-0.5.1.0:GHC.Integer.Type’
     (The choice depends on the instantiation of ‘a’
      To pick the first instance above, use IncoherentInstances
      when compiling the other instance declarations)
