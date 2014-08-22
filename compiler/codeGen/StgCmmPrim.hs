@@ -806,9 +806,11 @@ callishPrimOpSupported dflags op
       WordAdd2Op     | ncg && x86ish  -> Left (MO_Add2       (wordWidth dflags))
                      | otherwise      -> Right genericWordAdd2Op
 
-      IntAddCOp                       -> Right genericIntAddCOp
+      IntAddCOp      | ncg && x86ish  -> Left (MO_AddIntC    (wordWidth dflags))
+                     | otherwise      -> Right genericIntAddCOp
 
-      IntSubCOp                       -> Right genericIntSubCOp
+      IntSubCOp      | ncg && x86ish  -> Left (MO_SubIntC    (wordWidth dflags))
+                     | otherwise      -> Right genericIntSubCOp
 
       WordMul2Op     | ncg && x86ish  -> Left (MO_U_Mul2     (wordWidth dflags))
                      | otherwise      -> Right genericWordMul2Op

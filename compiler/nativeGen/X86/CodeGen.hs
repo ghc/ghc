@@ -1989,6 +1989,10 @@ genCCall _ is32Bit target dest_regs args = do
                           ADC size (OpImm (ImmInteger 0)) (OpReg reg_h)
                return code
         _ -> panic "genCCall: Wrong number of arguments/results for add2"
+    (PrimTarget (MO_AddIntC width), [res_r, res_c]) ->
+        addSubIntC platform ADD_CC (Just . ADD_CC) width res_r res_c args
+    (PrimTarget (MO_SubIntC width), [res_r, res_c]) ->
+        addSubIntC platform SUB_CC (const Nothing) width res_r res_c args
     (PrimTarget (MO_U_Mul2 width), [res_h, res_l]) ->
         case args of
         [arg_x, arg_y] ->
@@ -2041,6 +2045,20 @@ genCCall _ is32Bit target dest_regs args = do
                                 MOV size (OpReg rdx) (OpReg reg_r)]
         divOp _ _ _ _ _ _ _
             = panic "genCCall: Wrong number of results for divOp"
+
+        addSubIntC platform instr mrevinstr width res_r res_c [arg_x, arg_y]
+            = do let size = intSize width
+                 rCode <- anyReg =<< trivialCode width (instr size)
+                                       (mrevinstr size) arg_x arg_y
+                 reg_tmp <- getNewRegNat II8
+                 let reg_c = getRegisterReg platform True (CmmLocal res_c)
+                     reg_r = getRegisterReg platform True (CmmLocal res_r)
+                     code = rCode reg_r `snocOL`
+                            SETCC OFLO (OpReg reg_tmp) `snocOL`
+                            MOVZxL II8 (OpReg reg_tmp) (OpReg reg_c)
+                 return code
+        addSubIntC _ _ _ _ _ _ _
+            = panic "genCCall: Wrong number of arguments/results for addSubIntC"
 
 genCCall32' :: DynFlags
             -> ForeignTarget            -- function to call
@@ -2480,6 +2498,8 @@ outOfLineCmmOp mop res args
               MO_U_QuotRem {}  -> unsupported
               MO_U_QuotRem2 {} -> unsupported
               MO_Add2 {}       -> unsupported
+              MO_AddIntC {}    -> unsupported
+              MO_SubIntC {}    -> unsupported
               MO_U_Mul2 {}     -> unsupported
               MO_WriteBarrier  -> unsupported
               MO_Touch         -> unsupported

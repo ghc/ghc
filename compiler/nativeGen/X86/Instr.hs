@@ -210,6 +210,7 @@ data Instr
         -- Do not rewrite these instructions to "equivalent" ones that
         -- have different effect on the condition register! (See #9013.)
         | ADD_CC      Size Operand Operand
+        | SUB_CC      Size Operand Operand
 
         -- Simple bit-twiddling.
         | AND         Size Operand Operand
@@ -371,6 +372,7 @@ x86_regUsageOfInstr platform instr
     DIV    _ op -> mkRU (eax:edx:use_R op []) [eax,edx]
     IDIV   _ op -> mkRU (eax:edx:use_R op []) [eax,edx]
     ADD_CC _ src dst    -> usageRM src dst
+    SUB_CC _ src dst    -> usageRM src dst
     AND    _ src dst    -> usageRM src dst
     OR     _ src dst    -> usageRM src dst
 
@@ -548,6 +550,7 @@ x86_patchRegsOfInstr instr env
     IDIV sz op          -> patch1 (IDIV sz) op
     DIV sz op           -> patch1 (DIV sz) op
     ADD_CC sz src dst   -> patch2 (ADD_CC sz) src dst
+    SUB_CC sz src dst   -> patch2 (SUB_CC sz) src dst
     AND  sz src dst     -> patch2 (AND  sz) src dst
     OR   sz src dst     -> patch2 (OR   sz) src dst
     XOR  sz src dst     -> patch2 (XOR  sz) src dst
