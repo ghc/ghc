@@ -1305,6 +1305,7 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/rts/bug1010
 /tests/rts/derefnull
 /tests/rts/divbyzero
+/tests/rts/rdynamic
 /tests/rts/exec_signals
 /tests/rts/exec_signals_child
 /tests/rts/exec_signals_prepare
