@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections, BangPatterns, LambdaCase #-}
+{-# LANGUAGE CPP, TupleSections, BangPatterns, LambdaCase #-}
 {-# OPTIONS_GHC -Wwarn #-}
 -----------------------------------------------------------------------------
 -- |
@@ -366,7 +366,11 @@ classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
     docs  = mkDecls tcdDocs DocD class_
+#if MIN_VERSION_ghc(7,8,3)
     defs  = mkDecls (bagToList . tcdMeths) ValD class_
+#else
+    defs  = mkDecls (map snd . bagToList . tcdMeths) ValD class_
+#endif
     sigs  = mkDecls tcdSigs SigD class_
     ats   = mkDecls tcdATs (TyClD . FamDecl) class_
 
@@ -392,7 +396,11 @@ ungroup group_ =
   mkDecls hs_docs                DocD   group_ ++
   mkDecls hs_instds              InstD  group_ ++
   mkDecls (typesigs . hs_valds)  SigD   group_ ++
+#if MIN_VERSION_ghc(7,8,3)
   mkDecls (valbinds . hs_valds)  ValD   group_
+#else
+  mkDecls (map snd . valbinds . hs_valds)  ValD   group_
+#endif
   where
     typesigs (ValBindsOut _ sigs) = filter isVanillaLSig sigs
     typesigs _ = error "expected ValBindsOut"

@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE CPP, PatternGuards #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Convert
@@ -94,10 +94,19 @@ tyThingToLHsDecl t = noLoc $ case t of
     (synifyType ImplicitizeForAll (dataConUserType dc)))
 
   AConLike (PatSynCon ps) ->
+#if MIN_VERSION_ghc(7,8,3)
       let (_, _, req_theta, prov_theta, _, res_ty) = patSynSig ps
+#else
+      let (_, _, (req_theta, prov_theta)) = patSynSig ps
+#endif
       in SigD $ PatSynSig (synifyName ps)
+#if MIN_VERSION_ghc(7,8,3)
                           (fmap (synifyType WithinType) (patSynTyDetails ps))
                           (synifyType WithinType res_ty)
+#else
+                          (fmap (synifyType WithinType) (patSynTyDetails ps))
+                          (synifyType WithinType (patSynType ps))
+#endif
                           (synifyCtx req_theta)
                           (synifyCtx prov_theta)
 
