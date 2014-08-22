@@ -1,10 +1,10 @@
 
 package06e.hs:2:1:
     Failed to load interface for ‘HsTypes’
-    It is a member of the hidden package ‘ghc-7.9.20140821’.
+    It is a member of the hidden package ‘ghc-<VERSION>’.
     Use -v to see a list of the files searched for.
 
 package06e.hs:3:1:
     Failed to load interface for ‘UniqFM’
-    It is a member of the hidden package ‘ghc-7.9.20140821’.
+    It is a member of the hidden package ‘ghc-<VERSION>’.
     Use -v to see a list of the files searched for.
