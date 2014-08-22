@@ -15,7 +15,6 @@ module GHC.Event.TimerManager
     , new
     , newWith
     , newDefaultBackend
-    , emControl
 
       -- * Running
     , finished

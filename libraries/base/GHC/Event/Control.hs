@@ -17,7 +17,6 @@ module GHC.Event.Control
     , readControlMessage
     -- *** File descriptors
     , controlReadFd
-    , controlWriteFd
     , wakeupReadFd
     -- ** Control message sending
     , sendWakeup
@@ -92,6 +91,7 @@ newControl shouldRegister = allocaArray 2 $ \fds -> do
         setCloseOnExec wr
         return (rd, wr)
   (ctrl_rd, ctrl_wr) <- createPipe
+  when shouldRegister $ c_setIOManagerControlFd ctrl_wr
 #if defined(HAVE_EVENTFD)
   ev <- throwErrnoIfMinus1 "eventfd" $ c_eventfd 0 0
   setNonBlockingFD ev True
@@ -200,5 +200,9 @@ foreign import ccall unsafe "sys/eventfd.h eventfd_write"
    c_eventfd_write :: CInt -> CULLong -> IO CInt
 #endif
 
-foreign import ccall unsafe "setIOManagerWakeupFd"
+-- Used to tell the RTS how it can send messages to the I/O manager.
+foreign import ccall "setIOManagerControlFd"
+   c_setIOManagerControlFd :: CInt -> IO ()
+
+foreign import ccall "setIOManagerWakeupFd"
    c_setIOManagerWakeupFd :: CInt -> IO ()
