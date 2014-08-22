@@ -49,6 +49,7 @@ where
 
 #include "HsVersions.h"
 
+import GHC.PackageDb
 import PackageConfig
 import DynFlags
 import Config           ( cProjectVersion )
@@ -61,11 +62,6 @@ import Outputable
 import Maybes
 
 import System.Environment ( getEnv )
-import GHC.PackageDb (readPackageDbForGhcPkg)
-import Distribution.InstalledPackageInfo
-import Distribution.InstalledPackageInfo.Binary ()
-import Distribution.Package hiding (depends, PackageKey, mkPackageKey)
-import Distribution.ModuleExport
 import FastString
 import ErrUtils         ( debugTraceMsg, putMsg, MsgDoc )
 import Exception
@@ -285,7 +281,7 @@ lookupPackage' :: PackageConfigMap -> PackageKey -> Maybe PackageConfig
 lookupPackage' = lookupUFM
 
 -- | Search for packages with a given package ID (e.g. \"foo-0.1\")
-searchPackageId :: DynFlags -> PackageId -> [PackageConfig]
+searchPackageId :: DynFlags -> SourcePackageId -> [PackageConfig]
 searchPackageId dflags pid = filter ((pid ==) . sourcePackageId)
                                (listPackageConfigMap dflags)
 
@@ -386,10 +382,11 @@ readPackageConfig dflags conf_file = do
     if isdir
        then do let filename = conf_file </> "package.cache"
                debugTraceMsg dflags 2 (text "Using binary package database:" <+> text filename)
-               conf <- readPackageDbForGhcPkg filename
+               readPackageDbForGhc filename
+{-
                -- TODO readPackageDbForGhc ^^ instead
                return (map installedPackageInfoToPackageConfig conf)
-
+-}
        else do
             isfile <- doesFileExist conf_file
             if isfile
@@ -478,7 +475,7 @@ mungePackagePaths top_dir pkgroot pkg =
 -- then we are no longer able to match against package keys e.g. from when
 -- a user passes in a package flag.
 calcKey :: PackageConfig -> PackageKey
-calcKey p | pk <- display (pkgName (sourcePackageId p))
+calcKey p | pk <- packageNameString p
           , pk `elem` wired_in_pkgids
                       = stringToPackageKey pk
           | otherwise = packageConfigId p
@@ -558,22 +555,22 @@ selectPackages matches pkgs unusable
 -- version, or just the name if it is unambiguous.
 matchingStr :: String -> PackageConfig -> Bool
 matchingStr str p
-        =  str == display (sourcePackageId p)
-        || str == display (pkgName (sourcePackageId p))
+        =  str == sourcePackageIdString p
+        || str == packageNameString p
 
 matchingId :: String -> PackageConfig -> Bool
-matchingId str p =  InstalledPackageId str == installedPackageId p
+matchingId str p =  str == installedPackageIdString p
 
 matchingKey :: String -> PackageConfig -> Bool
-matchingKey str p = str == display (packageKey p)
+matchingKey str p = str == packageKeyString (packageConfigId p)
 
 matching :: PackageArg -> PackageConfig -> Bool
 matching (PackageArg str) = matchingStr str
 matching (PackageIdArg str) = matchingId str
 matching (PackageKeyArg str) = matchingKey str
 
-sortByVersion :: [InstalledPackageInfo_ m] -> [InstalledPackageInfo_ m]
-sortByVersion = sortBy (flip (comparing (pkgVersion.sourcePackageId)))
+sortByVersion :: [PackageConfig] -> [PackageConfig]
+sortByVersion = sortBy (flip (comparing packageVersion))
 
 comparing :: Ord a => (t -> a) -> t -> t -> Ordering
 comparing f a b = f a `compare` f b
@@ -600,7 +597,7 @@ packageFlagErr dflags flag reasons
                       -- ToDo: this admonition seems a bit dodgy
                       text "(use -v for more information)")
         ppr_reasons = vcat (map ppr_reason reasons)
-        ppr_reason (p, reason) = pprReason (pprIPkg p <+> text "is") reason
+        ppr_reason (p, reason) = pprReason (ppr (installedPackageId p) <+> text "is") reason
 
 pprFlag :: PackageFlag -> SDoc
 pprFlag flag = case flag of
@@ -637,7 +634,7 @@ findWiredInPackages dflags pkgs = do
   --
   let
         matches :: PackageConfig -> String -> Bool
-        pc `matches` pid = display (pkgName (sourcePackageId pc)) == pid
+        pc `matches` pid = packageNameString pc == pid
 
         -- find which package corresponds to each wired-in package
         -- delete any other packages with the same name
@@ -664,14 +661,14 @@ findWiredInPackages dflags pkgs = do
                                  <> text wired_pkg
                                  <> ptext (sLit " not found.")
                           return Nothing
-                pick :: InstalledPackageInfo_ ModuleName
+                pick :: PackageConfig
                      -> IO (Maybe InstalledPackageId)
                 pick pkg = do
                         debugTraceMsg dflags 2 $
                             ptext (sLit "wired-in package ")
                                  <> text wired_pkg
                                  <> ptext (sLit " mapped to ")
-                                 <> pprIPkg pkg
+                                 <> ppr (installedPackageId pkg)
                         return (Just (installedPackageId pkg))
 
 
@@ -693,12 +690,11 @@ findWiredInPackages dflags pkgs = do
         -}
 
         updateWiredInDependencies pkgs = map upd_pkg pkgs
-          where upd_pkg p
-                  | installedPackageId p `elem` wired_in_ids
-                  = let pid = (sourcePackageId p) { pkgVersion = Version [] [] }
-                    in p { packageKey = OldPackageKey pid }
+          where upd_pkg pkg
+                  | installedPackageId pkg `elem` wired_in_ids
+                  = pkg { packageKey = stringToPackageKey (packageNameString pkg) }
                   | otherwise
-                  = p
+                  = pkg
 
   return $ updateWiredInDependencies pkgs
 
@@ -719,9 +715,9 @@ pprReason pref reason = case reason of
   MissingDependencies deps ->
       pref <+>
       ptext (sLit "unusable due to missing or recursive dependencies:") $$
-        nest 2 (hsep (map (text.display) deps))
+        nest 2 (hsep (map ppr deps))
   ShadowedBy ipid ->
-      pref <+> ptext (sLit "shadowed by package ") <> text (display ipid)
+      pref <+> ptext (sLit "shadowed by package ") <> ppr ipid
 
 reportUnusable :: DynFlags -> UnusablePackages -> IO ()
 reportUnusable dflags pkgs = mapM_ report (Map.toList pkgs)
@@ -730,7 +726,7 @@ reportUnusable dflags pkgs = mapM_ report (Map.toList pkgs)
        debugTraceMsg dflags 2 $
          pprReason
            (ptext (sLit "package") <+>
-            text (display ipid) <+> text "is") reason
+            ppr ipid <+> text "is") reason
 
 -- ----------------------------------------------------------------------------
 --
@@ -787,7 +783,7 @@ shadowPackages pkgs preferred
       | otherwise
       = (shadowed, pkgmap')
       where
-        pkgid = mkFastString (display (sourcePackageId pkg))
+        pkgid = mkFastString (sourcePackageIdString pkg)
         pkgmap' = addToUFM pkgmap pkgid pkg
 
 -- -----------------------------------------------------------------------------
@@ -920,7 +916,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   -- or is empty if we have -hide-all-packages
   --
   let preferLater pkg pkg' =
-        case comparing (pkgVersion.sourcePackageId) pkg pkg' of
+        case comparing packageVersion pkg pkg' of
             GT -> pkg
             _  -> pkg'
       calcInitial m pkg = addToUFM_C preferLater m (fsPackageName pkg) pkg
@@ -1048,8 +1044,11 @@ mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
     es e =
      [(m, sing pk  m  pkg  (fromExposedModules e)) | m <- exposed_mods] ++
      [(m, sing pk' m' pkg' (fromReexportedModules e pkg))
-     | ModuleExport{ exportName = m
-                   , exportCachedTrueOrig = Just (ipid', m')} <- reexported_mods
+     | ModuleExport {
+         exportModuleName         = m,
+         exportOriginalPackageId  = ipid',
+         exportOriginalModuleName = m'
+       } <- reexported_mods
      , let pk' = expectJust "mkModuleToPkgConf" (Map.lookup ipid' ipid_map)
            pkg' = pkg_lookup pk' ]
 
@@ -1104,9 +1103,6 @@ mkModuleToPkgConfAll =
           addListTo = foldl' merge
           merge m (k, v) = Map.insertWith (Map.unionWith mappend) k v m
           setOrigins m os = fmap (const os) m
-
-pprIPkg :: PackageConfig -> SDoc
-pprIPkg p = text (display (installedPackageId p))
 
 -- -----------------------------------------------------------------------------
 -- Extracting information from the packages in scope
@@ -1387,7 +1383,7 @@ packageKeyPackageIdString :: DynFlags -> PackageKey -> String
 packageKeyPackageIdString dflags pkg_key
     | pkg_key == mainPackageKey = "main"
     | otherwise = maybe "(unknown)"
-                      (display . sourcePackageId)
+                      sourcePackageIdString
                       (lookupPackage dflags pkg_key)
 
 -- | Will the 'Name' come from a dynamically linked library?
@@ -1430,11 +1426,10 @@ isDllName dflags _this_pkg this_mod name
 dumpPackages :: DynFlags -> IO ()
 dumpPackages = dumpPackages' showInstalledPackageInfo
 
-dumpPackages' :: (InstalledPackageInfo -> String) -> DynFlags -> IO ()
+dumpPackages' :: (PackageConfig -> String) -> DynFlags -> IO ()
 dumpPackages' showIPI dflags
   = do putMsg dflags $
-             vcat (map (text . showIPI
-                             . packageConfigToInstalledPackageInfo)
+             vcat (map (text . showIPI)
                        (listPackageConfigMap dflags))
 
 -- | Show simplified package info on console, if verbosity == 4.
@@ -1458,7 +1453,6 @@ pprModuleMap dflags =
         | otherwise = ppr m' <+> parens (ppr o)
 
 fsPackageName :: PackageConfig -> FastString
-fsPackageName pkg = case packageName (sourcePackageId pkg) of
-    PackageName n -> mkFastString n
+fsPackageName = mkFastString . packageNameString
 
 \end{code}

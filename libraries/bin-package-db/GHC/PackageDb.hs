@@ -1,8 +1,6 @@
-{-# LANGUAGE CPP, RecordWildCards, NamedFieldPuns #-}
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-#if __GLASGOW_HASKELL__ >= 701
-{-# LANGUAGE Trustworthy #-}
-#endif
+{-# LANGUAGE CPP #-}
+-- This module deliberately defines orphan instances for now (Binary Version).
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.PackageDb
@@ -38,12 +36,16 @@
 -- this library avoids depending on Cabal.
 -- 
 module GHC.PackageDb (
-       GhcPackageInfo(..),
+       InstalledPackageInfo(..),
+       ModuleExport(..),
+       BinaryStringRep(..),
+       emptyInstalledPackageInfo,
        readPackageDbForGhc,
        readPackageDbForGhcPkg,
        writePackageDb
   ) where
 
+import Data.Version (Version(..))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 import qualified Data.ByteString.Lazy as BS.Lazy
@@ -63,22 +65,89 @@ import System.Directory
 -- | This is a subset of Cabal's 'InstalledPackageInfo', with just the bits
 -- that GHC is interested in.
 --
-data GhcPackageInfo = GhcPackageInfo {
-       --TODO
+data InstalledPackageInfo instpkgid srcpkgid srcpkgname pkgkey modulename
+   = InstalledPackageInfo {
+       installedPackageId :: instpkgid,
+       sourcePackageId    :: srcpkgid,
+       packageName        :: srcpkgname,
+       packageVersion     :: Version,
+       packageKey         :: pkgkey,
+       depends            :: [instpkgid],
+       importDirs         :: [FilePath],
+       hsLibraries        :: [String],
+       extraLibraries     :: [String],
+       extraGHCiLibraries :: [String],
+       libraryDirs        :: [FilePath],
+       frameworks         :: [String],
+       frameworkDirs      :: [FilePath],
+       ldOptions          :: [String],
+       ccOptions          :: [String],
+       includes           :: [String],
+       includeDirs        :: [FilePath],
+       haddockInterfaces  :: [FilePath],
+       haddockHTMLs       :: [FilePath],
+       exposedModules     :: [modulename],
+       hiddenModules      :: [modulename],
+       reexportedModules  :: [ModuleExport instpkgid modulename],
+       exposed            :: Bool,
+       trusted            :: Bool
      }
   deriving (Eq, Show)
 
+class BinaryStringRep a where
+  fromStringRep :: BS.ByteString -> a
+  toStringRep   :: a -> BS.ByteString
+
+data ModuleExport instpkgid modulename
+   = ModuleExport {
+       exportModuleName         :: modulename,
+       exportOriginalPackageId  :: instpkgid,
+       exportOriginalModuleName :: modulename
+     }
+  deriving (Eq, Show)
+
+emptyInstalledPackageInfo :: (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c, BinaryStringRep d)
+                          => InstalledPackageInfo a b c d e
+emptyInstalledPackageInfo =
+  InstalledPackageInfo {
+       installedPackageId = fromStringRep BS.empty,
+       sourcePackageId    = fromStringRep BS.empty,
+       packageName        = fromStringRep BS.empty,
+       packageVersion     = Version [] [],
+       packageKey         = fromStringRep BS.empty,
+       depends            = [],
+       importDirs         = [],
+       hsLibraries        = [],
+       extraLibraries     = [],
+       extraGHCiLibraries = [],
+       libraryDirs        = [],
+       frameworks         = [],
+       frameworkDirs      = [],
+       ldOptions          = [],
+       ccOptions          = [],
+       includes           = [],
+       includeDirs        = [],
+       haddockInterfaces  = [],
+       haddockHTMLs       = [],
+       exposedModules     = [],
+       hiddenModules      = [],
+       reexportedModules  = [],
+       exposed            = False,
+       trusted            = False
+  }
 
 -- | Read the part of the package DB that GHC is interested in.
 --
-readPackageDbForGhc :: FilePath -> IO [GhcPackageInfo]
+readPackageDbForGhc :: (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
+                        BinaryStringRep d, BinaryStringRep e) =>
+                       FilePath -> IO [InstalledPackageInfo a b c d e]
 readPackageDbForGhc file =
     decodeFromFile file getDbForGhc
   where
     getDbForGhc = do
       _version    <- getHeader
       _ghcPartLen <- get :: Get Word32
-      ghcPart     <- get :: Get [GhcPackageInfo]
+      ghcPart     <- get
       -- the next part is for ghc-pkg, but we stop here.
       return ghcPart
 
@@ -99,7 +168,9 @@ readPackageDbForGhcPkg file =
 
 -- | Write the whole of the package DB, both parts.
 --
-writePackageDb :: Binary pkgs => FilePath -> [GhcPackageInfo] -> pkgs -> IO ()
+writePackageDb :: (Binary pkgs, BinaryStringRep a, BinaryStringRep b,
+                   BinaryStringRep c, BinaryStringRep d, BinaryStringRep e) =>
+                  FilePath -> [InstalledPackageInfo a b c d e] -> pkgs -> IO ()
 writePackageDb file ghcPkgs ghcPkgPart =
     writeFileAtomic file (runPut putDbForGhcPkg)
   where
@@ -197,10 +268,104 @@ writeFileAtomic targetPath content = do
         )
 
 
-instance Binary GhcPackageInfo where
-  put (GhcPackageInfo {-TODO-}) = do
-    return ()
+instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
+          BinaryStringRep d, BinaryStringRep e) =>
+         Binary (InstalledPackageInfo a b c d e) where
+  put (InstalledPackageInfo
+         installedPackageId sourcePackageId packageName packageVersion packageKey
+         depends importDirs
+         hsLibraries extraLibraries extraGHCiLibraries libraryDirs
+         frameworks frameworkDirs
+         ldOptions ccOptions
+         includes includeDirs
+         haddockInterfaces haddockHTMLs
+         exposedModules hiddenModules reexportedModules
+         exposed trusted) = do
+    put (toStringRep installedPackageId)
+    put (toStringRep sourcePackageId)
+    put (toStringRep packageName)
+    put packageVersion
+    put (toStringRep packageKey)
+    put (map toStringRep depends)
+    put importDirs
+    put hsLibraries
+    put extraLibraries
+    put extraGHCiLibraries
+    put libraryDirs
+    put frameworks
+    put frameworkDirs
+    put ldOptions
+    put ccOptions
+    put includes
+    put includeDirs
+    put haddockInterfaces
+    put haddockHTMLs
+    put (map toStringRep exposedModules)
+    put (map toStringRep hiddenModules)
+    put reexportedModules
+    put exposed
+    put trusted
 
   get = do
-    return (GhcPackageInfo {-TODO-})
+    installedPackageId <- get
+    sourcePackageId    <- get
+    packageName        <- get
+    packageVersion     <- get
+    packageKey         <- get
+    depends            <- get
+    importDirs         <- get
+    hsLibraries        <- get
+    extraLibraries     <- get
+    extraGHCiLibraries <- get
+    libraryDirs        <- get
+    frameworks         <- get
+    frameworkDirs      <- get
+    ldOptions          <- get
+    ccOptions          <- get
+    includes           <- get
+    includeDirs        <- get
+    haddockInterfaces  <- get
+    haddockHTMLs       <- get
+    exposedModules     <- get
+    hiddenModules      <- get
+    reexportedModules  <- get
+    exposed            <- get
+    trusted            <- get
+    return (InstalledPackageInfo
+              (fromStringRep installedPackageId)
+              (fromStringRep sourcePackageId)
+              (fromStringRep packageName) packageVersion
+              (fromStringRep packageKey)
+              (map fromStringRep depends)
+              importDirs
+              hsLibraries extraLibraries extraGHCiLibraries libraryDirs
+              frameworks frameworkDirs
+              ldOptions ccOptions
+              includes includeDirs
+              haddockInterfaces haddockHTMLs
+              (map fromStringRep exposedModules)
+              (map fromStringRep hiddenModules)
+              reexportedModules
+              exposed trusted)
 
+instance Binary Version where
+  put (Version a b) = do
+    put a
+    put b
+  get = do
+    a <- get
+    b <- get
+    return (Version a b)
+
+instance (BinaryStringRep a, BinaryStringRep b) => Binary (ModuleExport a b) where
+  put (ModuleExport a b c) = do
+    put (toStringRep a)
+    put (toStringRep b)
+    put (toStringRep c)
+  get = do
+    a <- get
+    b <- get
+    c <- get
+    return (ModuleExport (fromStringRep a)
+                         (fromStringRep b)
+                         (fromStringRep c))

@@ -42,7 +42,6 @@ import UniqFM
 import Maybes           ( expectJust )
 import Exception        ( evaluate )
 
-import Distribution.Text
 import Data.IORef       ( IORef, writeIORef, readIORef, atomicModifyIORef )
 import System.Directory
 import System.FilePath
@@ -616,17 +615,17 @@ cantFindErr cannot_find _ dflags mod_name find_result
         | otherwise =
                hang (ptext (sLit "Locations searched:")) 2 $ vcat (map text files)
 
-    pkg_hidden pkg =
-        ptext (sLit "It is a member of the hidden package") <+> quotes (ppr pkg)
-        <> dot $$ cabal_pkg_hidden_hint pkg
-    cabal_pkg_hidden_hint pkg
+    pkg_hidden pkgid =
+        ptext (sLit "It is a member of the hidden package") <+> quotes (ppr pkgid)
+        --FIXME: we don't really want to show the package key here we should
+        -- show the source package id or installed package id if it's ambiguous
+        <> dot $$ cabal_pkg_hidden_hint pkgid
+    cabal_pkg_hidden_hint pkgid
      | gopt Opt_BuildingCabalPackage dflags
-        = case simpleParse (packageKeyString pkg) of
-          Just pid ->
-              ptext (sLit "Perhaps you need to add") <+>
-              quotes (text (display (pkgName pid))) <+>
+        = let pkg = expectJust "cabal_pkg_hidden_hint" (lookupPackage dflags pkgid)
+           in ptext (sLit "Perhaps you need to add") <+>
+              quotes (ppr (packageName pkg)) <+>
               ptext (sLit "to the build-depends in your .cabal file.")
-          Nothing -> empty
      | otherwise = empty
 
     mod_hidden pkg =

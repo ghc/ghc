@@ -10,38 +10,102 @@ module PackageConfig (
         -- $package_naming
 
         -- * PackageKey
-        mkPackageKey, packageConfigId,
+        packageConfigId,
 
         -- * The PackageConfig type: information about a package
         PackageConfig,
-        InstalledPackageInfo_(..), display,
+        InstalledPackageInfo(..),
+        InstalledPackageId(..),
+        SourcePackageId(..),
+        PackageName(..),
         Version(..),
-        PackageIdentifier(..),
         defaultPackageConfig,
-        packageConfigToInstalledPackageInfo,
-        installedPackageInfoToPackageConfig
+        installedPackageIdString,
+        sourcePackageIdString,
+        packageNameString,
+        showInstalledPackageInfo,
     ) where
 
 #include "HsVersions.h"
 
-import Distribution.InstalledPackageInfo
-import Distribution.ModuleName
-import Distribution.Package hiding (PackageKey, mkPackageKey)
-import qualified Distribution.Package as Cabal
-import Distribution.Text
-import Distribution.Version
+import GHC.PackageDb
+import qualified Data.ByteString.Char8 as BS
+import Data.Version
 
-import Maybes
+import Outputable
 import Module
 
 -- -----------------------------------------------------------------------------
--- Our PackageConfig type is just InstalledPackageInfo from Cabal. Later we
--- might need to extend it with some GHC-specific stuff, but for now it's fine.
+-- Our PackageConfig type is the InstalledPackageInfo from bin-package-db,
+-- which is similar to a subset of the InstalledPackageInfo type from Cabal.
 
-type PackageConfig = InstalledPackageInfo_ Module.ModuleName
+type PackageConfig = InstalledPackageInfo
+                       InstalledPackageId
+                       SourcePackageId
+                       PackageName
+                       Module.PackageKey
+                       Module.ModuleName
+
+newtype InstalledPackageId = InstalledPackageId String deriving (Eq, Ord, Show)
+newtype SourcePackageId    = SourcePackageId String    deriving (Eq, Ord, Show)
+newtype PackageName        = PackageName String        deriving (Eq, Ord, Show)
+
+instance BinaryStringRep InstalledPackageId where
+  fromStringRep = InstalledPackageId . BS.unpack
+  toStringRep   (InstalledPackageId s) = BS.pack s
+
+instance BinaryStringRep SourcePackageId where
+  fromStringRep = SourcePackageId . BS.unpack
+  toStringRep   (SourcePackageId s) = BS.pack s
+
+instance BinaryStringRep PackageName where
+  fromStringRep = PackageName . BS.unpack
+  toStringRep   (PackageName s) = BS.pack s
+
+instance BinaryStringRep PackageKey where
+  fromStringRep = Module.stringToPackageKey . BS.unpack
+  toStringRep   = BS.pack . Module.packageKeyString
+
+instance BinaryStringRep Module.ModuleName where
+  fromStringRep = Module.mkModuleName . BS.unpack
+  toStringRep   = BS.pack . Module.moduleNameString  
+
+instance Outputable InstalledPackageId where
+  ppr (InstalledPackageId str) = text str
+
+instance Outputable SourcePackageId where
+  ppr (SourcePackageId str) = text str
+
+instance Outputable PackageName where
+  ppr (PackageName str) = text str
 
 defaultPackageConfig :: PackageConfig
 defaultPackageConfig = emptyInstalledPackageInfo
+
+installedPackageIdString :: PackageConfig -> String
+installedPackageIdString pkg = str
+  where
+    InstalledPackageId str = installedPackageId pkg
+
+sourcePackageIdString :: PackageConfig -> String
+sourcePackageIdString pkg = str
+  where
+    SourcePackageId str = sourcePackageId pkg
+
+packageNameString :: PackageConfig -> String
+packageNameString pkg = str
+  where
+    PackageName str = packageName pkg
+
+showInstalledPackageInfo :: PackageConfig -> String
+showInstalledPackageInfo = show
+
+instance Show ModuleName where
+  show = moduleNameString
+
+instance Show PackageKey where
+  show = packageKeyString
+
 
 -- -----------------------------------------------------------------------------
 -- PackageKey (package names, versions and dep hash)
@@ -54,35 +118,7 @@ defaultPackageConfig = emptyInstalledPackageInfo
 -- wired-in packages like @base@ & @rts@, we don't necessarily know what the
 -- version is, so these are handled specially; see #wired_in_packages#.
 
--- | Turn a Cabal 'PackageIdentifier' into a GHC 'PackageKey'
-mkPackageKey :: Cabal.PackageKey -> PackageKey
-mkPackageKey = stringToPackageKey . display
-
 -- | Get the GHC 'PackageKey' right out of a Cabalish 'PackageConfig'
 packageConfigId :: PackageConfig -> PackageKey
-packageConfigId = mkPackageKey . packageKey
-
--- | Turn a 'PackageConfig', which contains GHC 'Module.ModuleName's into a Cabal specific
--- 'InstalledPackageInfo' which contains Cabal 'Distribution.ModuleName.ModuleName's
-packageConfigToInstalledPackageInfo :: PackageConfig -> InstalledPackageInfo
-packageConfigToInstalledPackageInfo
-    (pkgconf@(InstalledPackageInfo { exposedModules = e,
-                                     reexportedModules = r,
-                                     hiddenModules = h })) =
-        pkgconf{ exposedModules = map convert e,
-                 reexportedModules = map (fmap convert) r,
-                 hiddenModules  = map convert h }
-    where convert :: Module.ModuleName -> Distribution.ModuleName.ModuleName
-          convert = (expectJust "packageConfigToInstalledPackageInfo") . simpleParse . moduleNameString
-
--- | Turn an 'InstalledPackageInfo', which contains Cabal 'Distribution.ModuleName.ModuleName's
--- into a GHC specific 'PackageConfig' which contains GHC 'Module.ModuleName's
-installedPackageInfoToPackageConfig :: InstalledPackageInfo_ String -> PackageConfig
-installedPackageInfoToPackageConfig
-    (pkgconf@(InstalledPackageInfo { exposedModules = e,
-                                     reexportedModules = r,
-                                     hiddenModules = h })) =
-        pkgconf{ exposedModules = map mkModuleName e,
-                 reexportedModules = map (fmap mkModuleName) r,
-                 hiddenModules  = map mkModuleName h }
+packageConfigId = packageKey
 
