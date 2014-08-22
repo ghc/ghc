@@ -15,6 +15,7 @@ before_install:
  - doctest -isrc -i$(echo vendor/attoparsec-*) -optP-include -optPdist/build/autogen/cabal_macros.h src/Documentation/Haddock/Parser.hs
  - cabal install
  - cd ..
+ - (cd haddock-api/ && cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test && cabal install)
 
 script:
  - cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test

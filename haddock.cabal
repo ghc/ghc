@@ -35,29 +35,8 @@ extra-source-files:
   latex-test/ref/Simple/*.tex
   latex-test/ref/Simple/*.sty
 
-data-dir:   resources
-data-files: html/frames.html
-            html/haddock-util.js
-            html/Classic.theme/haskell_icon.gif
-            html/Classic.theme/minus.gif
-            html/Classic.theme/plus.gif
-            html/Classic.theme/xhaddock.css
-            html/Ocean.std-theme/hslogo-16.png
-            html/Ocean.std-theme/minus.gif
-            html/Ocean.std-theme/ocean.css
-            html/Ocean.std-theme/plus.gif
-            html/Ocean.std-theme/synopsis.png
-            latex/haddock.sty
-
 flag in-ghc-tree
   description: Are we in a GHC tree?
-  default: False
-  manual: True
-
--- Using this disables -O2, and hence allows to use --disable-optimization,
--- which is about twice as fast.  This should probably be the default, but we
--- need some benchmarks first..
-flag dev
   default: False
   manual: True
 
@@ -65,15 +44,12 @@ executable haddock
   default-language:     Haskell2010
   main-is:              Main.hs
   hs-source-dirs:       driver
-  if flag(dev)
-    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs
-  else
-    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
+  ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
 
   build-depends:
     base >= 4.3 && < 4.8
   if flag(in-ghc-tree)
-    hs-source-dirs: src, haddock-library/vendor/attoparsec-0.12.1.1, haddock-library/src
+    hs-source-dirs: haddock-api/src, haddock-library/vendor/attoparsec-0.12.1.1, haddock-library/src
     cpp-options: -DIN_GHC_TREE
     build-depends:
       filepath,
@@ -134,93 +110,7 @@ executable haddock
       Haddock.GhcUtils
       Haddock.Convert
   else
-    build-depends:  haddock, haddock-library
-
-library
-  default-language:     Haskell2010
-
-  build-depends:
-    base >= 4.3 && < 4.8,
-    bytestring,
-    filepath,
-    directory,
-    containers,
-    deepseq,
-    array,
-    xhtml >= 3000.2 && < 3000.3,
-    Cabal >= 1.10,
-    ghc == 7.8.3
-
-  if flag(in-ghc-tree)
-    cpp-options: -DIN_GHC_TREE
-    hs-source-dirs:       src, haddock-library/vendor/attoparsec-0.12.1.1, haddock-library/src
-
-    exposed-modules:
-      Documentation.Haddock.Parser
-      Documentation.Haddock.Types
-      Documentation.Haddock.Doc
-
-    other-modules:
-      Data.Attoparsec
-      Data.Attoparsec.ByteString
-      Data.Attoparsec.ByteString.Buffer
-      Data.Attoparsec.ByteString.Char8
-      Data.Attoparsec.ByteString.FastSet
-      Data.Attoparsec.ByteString.Internal
-      Data.Attoparsec.Combinator
-      Data.Attoparsec.Internal
-      Data.Attoparsec.Internal.Fhthagn
-      Data.Attoparsec.Internal.Types
-      Data.Attoparsec.Number
-      Documentation.Haddock.Utf8
-      Documentation.Haddock.Parser.Util
-
-  else
-    build-depends: ghc-paths, haddock-library
-    hs-source-dirs:       src
-
-
-  if flag(dev)
-    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs
-  else
-    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
-
-  exposed-modules:
-    Documentation.Haddock
-
-  other-modules:
-    Haddock
-    Haddock.Interface
-    Haddock.Interface.Rename
-    Haddock.Interface.Create
-    Haddock.Interface.AttachInstances
-    Haddock.Interface.LexParseRn
-    Haddock.Interface.ParseModuleHeader
-    Haddock.Parser
-    Haddock.Utils
-    Haddock.Backends.Xhtml
-    Haddock.Backends.Xhtml.Decl
-    Haddock.Backends.Xhtml.DocMarkup
-    Haddock.Backends.Xhtml.Layout
-    Haddock.Backends.Xhtml.Names
-    Haddock.Backends.Xhtml.Themes
-    Haddock.Backends.Xhtml.Types
-    Haddock.Backends.Xhtml.Utils
-    Haddock.Backends.LaTeX
-    Haddock.Backends.HaddockDB
-    Haddock.Backends.Hoogle
-    Haddock.ModuleTree
-    Haddock.Types
-    Haddock.Doc
-    Haddock.Version
-    Haddock.InterfaceFile
-    Haddock.Options
-    Haddock.GhcUtils
-    Haddock.Convert
-    Paths_haddock
-
-  if flag(in-ghc-tree)
-    buildable: False
+    build-depends:  haddock-api, haddock-library
 
 test-suite html-test
   type:             exitcode-stdio-1.0

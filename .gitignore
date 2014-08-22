@@ -1,5 +1,6 @@
 /dist/
-/haddock-library/dist
+/haddock-api/dist/
+/haddock-library/dist/
 /html-test/out/
 /latex-test/out/
 

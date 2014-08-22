@@ -19,7 +19,6 @@
 -----------------------------------------------------------------------------
 module Haddock (haddock, readPackagesAndProcessModules, withGhc') where
 
-
 import Haddock.Backends.Xhtml
 import Haddock.Backends.Xhtml.Themes (getThemes)
 import Haddock.Backends.LaTeX
@@ -54,7 +53,7 @@ import Data.Int
 import System.FilePath
 #else
 import qualified GHC.Paths as GhcPaths
-import Paths_haddock
+import Paths_haddock_api (getDataDir)
 #endif
 
 import GHC hiding (verbosity)

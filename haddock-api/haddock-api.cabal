@@ -1,0 +1,94 @@
+name:                 haddock-api
+version:              2.14.4
+synopsis:             A documentation-generation tool for Haskell libraries
+description:          Haddock is a documentation-generation tool for Haskell
+                      libraries
+license:              BSD3
+license-file:         LICENSE
+author:               Simon Marlow, David Waern
+maintainer:           Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
+homepage:             http://www.haskell.org/haddock/
+bug-reports:          https://github.com/haskell/haddock/issues
+copyright:            (c) Simon Marlow, David Waern
+category:             Documentation
+build-type:           Simple
+cabal-version:        >= 1.10
+stability:            experimental
+
+data-dir:
+  resources
+data-files:
+  html/frames.html
+  html/haddock-util.js
+  html/Classic.theme/haskell_icon.gif
+  html/Classic.theme/minus.gif
+  html/Classic.theme/plus.gif
+  html/Classic.theme/xhaddock.css
+  html/Ocean.std-theme/hslogo-16.png
+  html/Ocean.std-theme/minus.gif
+  html/Ocean.std-theme/ocean.css
+  html/Ocean.std-theme/plus.gif
+  html/Ocean.std-theme/synopsis.png
+  latex/haddock.sty
+
+library
+  default-language:
+      Haskell2010
+
+  build-depends:
+      base >= 4.3 && < 4.8
+    , bytestring
+    , filepath
+    , directory
+    , containers
+    , deepseq
+    , array
+    , xhtml >= 3000.2 && < 3000.3
+    , Cabal >= 1.10
+    , ghc == 7.8.3
+
+    , ghc-paths
+    , haddock-library
+
+  hs-source-dirs:
+      src
+
+  ghc-options: -funbox-strict-fields -Wall -fwarn-tabs -O2
+
+  exposed-modules:
+    Documentation.Haddock
+
+  other-modules:
+    Haddock
+    Haddock.Interface
+    Haddock.Interface.Rename
+    Haddock.Interface.Create
+    Haddock.Interface.AttachInstances
+    Haddock.Interface.LexParseRn
+    Haddock.Interface.ParseModuleHeader
+    Haddock.Parser
+    Haddock.Utils
+    Haddock.Backends.Xhtml
+    Haddock.Backends.Xhtml.Decl
+    Haddock.Backends.Xhtml.DocMarkup
+    Haddock.Backends.Xhtml.Layout
+    Haddock.Backends.Xhtml.Names
+    Haddock.Backends.Xhtml.Themes
+    Haddock.Backends.Xhtml.Types
+    Haddock.Backends.Xhtml.Utils
+    Haddock.Backends.LaTeX
+    Haddock.Backends.HaddockDB
+    Haddock.Backends.Hoogle
+    Haddock.ModuleTree
+    Haddock.Types
+    Haddock.Doc
+    Haddock.Version
+    Haddock.InterfaceFile
+    Haddock.Options
+    Haddock.GhcUtils
+    Haddock.Convert
+    Paths_haddock_api
+
+source-repository head
+  type:     git
+  location: https://github.com/haskell/haddock.git
