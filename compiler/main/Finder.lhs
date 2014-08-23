@@ -616,13 +616,14 @@ cantFindErr cannot_find _ dflags mod_name find_result
                hang (ptext (sLit "Locations searched:")) 2 $ vcat (map text files)
 
     pkg_hidden pkgid =
-        ptext (sLit "It is a member of the hidden package") <+> quotes (ppr pkgid)
+        ptext (sLit "It is a member of the hidden package")
+        <+> quotes (ppr pkgid)
         --FIXME: we don't really want to show the package key here we should
         -- show the source package id or installed package id if it's ambiguous
         <> dot $$ cabal_pkg_hidden_hint pkgid
     cabal_pkg_hidden_hint pkgid
      | gopt Opt_BuildingCabalPackage dflags
-        = let pkg = expectJust "cabal_pkg_hidden_hint" (lookupPackage dflags pkgid)
+        = let pkg = expectJust "pkg_hidden" (lookupPackage dflags pkgid)
            in ptext (sLit "Perhaps you need to add") <+>
               quotes (ppr (packageName pkg)) <+>
               ptext (sLit "to the build-depends in your .cabal file.")

@@ -34,7 +34,7 @@
 -- the second version -- the bit GHC uses -- and the part managed by ghc-pkg
 -- is kept in the file but here we treat it as an opaque blob of data. That way
 -- this library avoids depending on Cabal.
--- 
+--
 module GHC.PackageDb (
        InstalledPackageInfo(..),
        ModuleExport(..),
@@ -106,7 +106,8 @@ data ModuleExport instpkgid modulename
      }
   deriving (Eq, Show)
 
-emptyInstalledPackageInfo :: (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c, BinaryStringRep d)
+emptyInstalledPackageInfo :: (BinaryStringRep a, BinaryStringRep b,
+                              BinaryStringRep c, BinaryStringRep d)
                           => InstalledPackageInfo a b c d e
 emptyInstalledPackageInfo =
   InstalledPackageInfo {
@@ -230,17 +231,17 @@ decodeFromFile file decoder =
     withBinaryFile file ReadMode $ \hnd ->
       feed hnd (runGetIncremental decoder)
   where
-    feed hnd (Partial k)       = do chunk <- BS.hGet hnd BS.Lazy.defaultChunkSize
-                                    if BS.null chunk
-                                      then feed hnd (k Nothing)
-                                      else feed hnd (k (Just chunk))
-    feed _   (Done _ _ result) = return result
-    feed _   (Fail _ _ msg)    = ioError err
+    feed hnd (Partial k)  = do chunk <- BS.hGet hnd BS.Lazy.defaultChunkSize
+                               if BS.null chunk
+                                 then feed hnd (k Nothing)
+                                 else feed hnd (k (Just chunk))
+    feed _ (Done _ _ res) = return res
+    feed _ (Fail _ _ msg) = ioError err
       where
         err = mkIOError InappropriateType loc Nothing (Just file)
               `ioeSetErrorString` msg
         loc = "GHC.PackageDb.readPackageDb"
-        
+
 writeFileAtomic :: FilePath -> BS.Lazy.ByteString -> IO ()
 writeFileAtomic targetPath content = do
   let (targetDir, targetName) = splitFileName targetPath
@@ -272,7 +273,8 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
           BinaryStringRep d, BinaryStringRep e) =>
          Binary (InstalledPackageInfo a b c d e) where
   put (InstalledPackageInfo
-         installedPackageId sourcePackageId packageName packageVersion packageKey
+         installedPackageId sourcePackageId
+         packageName packageVersion packageKey
          depends importDirs
          hsLibraries extraLibraries extraGHCiLibraries libraryDirs
          frameworks frameworkDirs
@@ -357,7 +359,8 @@ instance Binary Version where
     b <- get
     return (Version a b)
 
-instance (BinaryStringRep a, BinaryStringRep b) => Binary (ModuleExport a b) where
+instance (BinaryStringRep a, BinaryStringRep b) =>
+         Binary (ModuleExport a b) where
   put (ModuleExport a b c) = do
     put (toStringRep a)
     put (toStringRep b)

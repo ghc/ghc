@@ -681,9 +681,9 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
        case e of
          Left err
            | ioeGetErrorType err == InappropriateType ->
-              die ("ghc no longer supports single-file style package databases ("
-                ++ path ++ ") use 'ghc-pkg init' to create the database with "
-                ++ "the correct format.")
+              die ("ghc no longer supports single-file style package databases "
+                ++ "(" ++ path ++ ") use 'ghc-pkg init' to create the database "
+                ++ "with the correct format.")
            | otherwise -> ioError err
          Right fs
            | not use_cache -> ignore_cache (const $ return ())
@@ -693,13 +693,17 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
               e_tcache <- tryIO $ getModificationTime cache
               case e_tcache of
                 Left ex -> do
-                     when (verbosity >= Normal && not modify || verbosity > Normal) $ do
-                        if isDoesNotExistError ex
-                           then do warn ("WARNING: cache does not exist: " ++ cache)
-                                   warn "ghc will fail to read this package db. Use 'ghc-pkg recache' to fix."
-                           else do warn ("WARNING: cache cannot be read: " ++ show ex)
-                                   warn "ghc will fail to read this package db."
-                     ignore_cache (const $ return ())
+                  when (   verbosity >  Normal
+                        || verbosity >= Normal && not modify) $
+                    if isDoesNotExistError ex
+                      then do
+                        warn ("WARNING: cache does not exist: " ++ cache)
+                        warn ("ghc will fail to read this package db. " ++
+                              "Use 'ghc-pkg recache' to fix.")
+                      else do
+                        warn ("WARNING: cache cannot be read: " ++ show ex)
+                        warn "ghc will fail to read this package db."
+                  ignore_cache (const $ return ())
                 Right tcache -> do
                   let compareTimestampToCache file =
                           when (verbosity >= Verbose) $ do
@@ -722,10 +726,11 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
                           pkgs <- GhcPkg.readPackageDbForGhcPkg cache
                           mkPackageDB pkgs
                       else do
-                          when (verbosity >= Normal && not modify || verbosity > Normal) $ do
-                              warn ("WARNING: cache is out of date: "
-                                 ++ cache)
-                              warn "ghc will see an old view of this package db. Use 'ghc-pkg recache' to fix."
+                          when (   verbosity >  Normal
+                                || verbosity >= Normal && not modify) $ do
+                              warn ("WARNING: cache is out of date: " ++ cache)
+                              warn ("ghc will see an old view of this " ++
+                                    "package db. Use 'ghc-pkg recache' to fix.")
                           ignore_cache compareTimestampToCache
             where
                  ignore_cache :: (FilePath -> IO ()) -> IO PackageDB
@@ -844,8 +849,8 @@ registerPackage :: FilePath
 registerPackage input verbosity my_flags auto_ghci_libs multi_instance
                 expand_env_vars update force = do
   (db_stack, Just to_modify, _flag_dbs) <- 
-      getPkgDatabases verbosity True{-modify-} True{-use user-} True{-use cache-}
-                                False{-expand vars-} my_flags
+      getPkgDatabases verbosity True{-modify-} True{-use user-}
+                                True{-use cache-} False{-expand vars-} my_flags
 
   let
         db_to_operate_on = my_head "register" $
@@ -1027,7 +1032,12 @@ updateDBCache verbosity db = do
   setFileTimes (location db) (accessTime status) (modificationTime status)
 #endif
 
-type PackageCacheFormat = GhcPkg.InstalledPackageInfo String String String String ModuleName
+type PackageCacheFormat = GhcPkg.InstalledPackageInfo
+                            String     -- installed package id
+                            String     -- src package id
+                            String     -- package name
+                            String     -- package key
+                            ModuleName -- module name
 
 convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
 convertPackageInfoToCacheFormat pkg =
@@ -1056,7 +1066,8 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.reexportedModules  = [ GhcPkg.ModuleExport m ipid' m'
                                    | ModuleExport {
                                        exportName = m,
-                                       exportCachedTrueOrig = Just (InstalledPackageId ipid', m')
+                                       exportCachedTrueOrig =
+                                         Just (InstalledPackageId ipid', m')
                                      } <- reexportedModules pkg
                                    ],
        GhcPkg.exposed            = exposed pkg,
@@ -1099,8 +1110,8 @@ modifyPackage
   -> IO ()
 modifyPackage fn pkgarg verbosity my_flags force = do
   (db_stack, Just _to_modify, flag_dbs) <-
-      getPkgDatabases verbosity True{-modify-} True{-use user-} True{-use cache-}
-                                False{-expand vars-} my_flags
+      getPkgDatabases verbosity True{-modify-} True{-use user-}
+                                True{-use cache-} False{-expand vars-} my_flags
 
   -- Do the search for the package respecting flags...
   (db, ps) <- fmap head $ findPackagesByDB flag_dbs pkgarg
@@ -1153,8 +1164,8 @@ listPackages ::  Verbosity -> [Flag] -> Maybe PackageArg
 listPackages verbosity my_flags mPackageName mModuleName = do
   let simple_output = FlagSimpleOutput `elem` my_flags
   (db_stack, _, flag_db_stack) <- 
-     getPkgDatabases verbosity False{-modify-} False{-use user-} True{-use cache-}
-                               False{-expand vars-} my_flags
+     getPkgDatabases verbosity False{-modify-} False{-use user-}
+                               True{-use cache-} False{-expand vars-} my_flags
 
   let db_stack_filtered -- if a package is given, filter out all other packages
         | Just this <- mPackageName =
@@ -1255,8 +1266,8 @@ simplePackageList my_flags pkgs = do
 showPackageDot :: Verbosity -> [Flag] -> IO ()
 showPackageDot verbosity myflags = do
   (_, _, flag_db_stack) <- 
-      getPkgDatabases verbosity False{-modify-} False{-use user-} True{-use cache-}
-                                False{-expand vars-} myflags
+      getPkgDatabases verbosity False{-modify-} False{-use user-}
+                                True{-use cache-} False{-expand vars-} myflags
 
   let all_pkgs = allPackagesInStack flag_db_stack
       ipix  = PackageIndex.fromList all_pkgs
@@ -1280,8 +1291,8 @@ showPackageDot verbosity myflags = do
 latestPackage ::  Verbosity -> [Flag] -> PackageIdentifier -> IO ()
 latestPackage verbosity my_flags pkgid = do
   (_, _, flag_db_stack) <- 
-     getPkgDatabases verbosity False{-modify-} False{-use user-} True{-use cache-}
-                               False{-expand vars-} my_flags
+     getPkgDatabases verbosity False{-modify-} False{-use user-}
+                               True{-use cache-} False{-expand vars-} my_flags
 
   ps <- findPackages flag_db_stack (Id pkgid)
   case ps of
@@ -1296,8 +1307,8 @@ latestPackage verbosity my_flags pkgid = do
 describePackage :: Verbosity -> [Flag] -> PackageArg -> Bool -> IO ()
 describePackage verbosity my_flags pkgarg expand_pkgroot = do
   (_, _, flag_db_stack) <- 
-      getPkgDatabases verbosity False{-modify-} False{-use user-} True{-use cache-}
-                                expand_pkgroot my_flags
+      getPkgDatabases verbosity False{-modify-} False{-use user-}
+                                True{-use cache-} expand_pkgroot my_flags
   dbs <- findPackagesByDB flag_db_stack pkgarg
   doDump expand_pkgroot [ (pkg, locationAbsolute db)
                         | (db, pkgs) <- dbs, pkg <- pkgs ]
@@ -1305,8 +1316,8 @@ describePackage verbosity my_flags pkgarg expand_pkgroot = do
 dumpPackages :: Verbosity -> [Flag] -> Bool -> IO ()
 dumpPackages verbosity my_flags expand_pkgroot = do
   (_, _, flag_db_stack) <- 
-     getPkgDatabases verbosity False{-modify-} False{-use user-} True{-use cache-}
-                               expand_pkgroot my_flags
+     getPkgDatabases verbosity False{-modify-} False{-use user-}
+                               True{-use cache-} expand_pkgroot my_flags
   doDump expand_pkgroot [ (pkg, locationAbsolute db)
                         | db <- flag_db_stack, pkg <- packages db ]
 
@@ -1362,8 +1373,8 @@ matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 describeField :: Verbosity -> [Flag] -> PackageArg -> [String] -> Bool -> IO ()
 describeField verbosity my_flags pkgarg fields expand_pkgroot = do
   (_, _, flag_db_stack) <- 
-      getPkgDatabases verbosity False{-modify-} False{-use user-} True{-use cache-}
-                                expand_pkgroot my_flags
+      getPkgDatabases verbosity False{-modify-} False{-use user-}
+                                True{-use cache-} expand_pkgroot my_flags
   fns <- mapM toField fields
   ps <- findPackages flag_db_stack pkgarg
   mapM_ (selectFields fns) ps
@@ -1382,9 +1393,11 @@ describeField verbosity my_flags pkgarg fields expand_pkgroot = do
 checkConsistency :: Verbosity -> [Flag] -> IO ()
 checkConsistency verbosity my_flags = do
   (db_stack, _, _) <- 
-         getPkgDatabases verbosity False{-modify-} True{-use user-} True{-use cache-} True{-expand vars-} my_flags
+         getPkgDatabases verbosity False{-modify-} True{-use user-}
+                                   True{-use cache-} True{-expand vars-}
+                                   my_flags
          -- although check is not a modify command, we do need to use the user
-         -- db, because ordering is important.
+         -- db, because we may need it to verify package deps.
 
   let simple_output = FlagSimpleOutput `elem` my_flags
 
@@ -2066,7 +2079,7 @@ getInstalledPackageInfo = do
 
 instance Binary PackageIdentifier where
   put pid = do put (pkgName pid); put (pkgVersion pid)
-  get = do 
+  get = do
     pkgName <- get
     pkgVersion <- get
     return PackageIdentifier{..}
