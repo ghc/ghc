@@ -1117,7 +1117,8 @@ linkPackage dflags pkg
             objs       = [ obj  | Object obj     <- classifieds ]
             archs      = [ arch | Archive arch   <- classifieds ]
 
-        maybePutStr dflags ("Loading package " ++ sourcePackageIdString pkg ++ " ... ")
+        maybePutStr dflags
+            ("Loading package " ++ sourcePackageIdString pkg ++ " ... ")
 
         -- See comments with partOfGHCi
         when (packageName pkg `notElem` partOfGHCi) $ do
@@ -1132,8 +1133,11 @@ linkPackage dflags pkg
 
         maybePutStr dflags "linking ... "
         ok <- resolveObjs
-        if succeeded ok then maybePutStrLn dflags "done."
-              else throwGhcExceptionIO (InstallationError ("unable to load package `" ++ sourcePackageIdString pkg ++ "'"))
+        if succeeded ok
+           then maybePutStrLn dflags "done."
+           else let errmsg = "unable to load package `"
+                             ++ sourcePackageIdString pkg ++ "'"
+                 in throwGhcExceptionIO (InstallationError errmsg)
 
 -- we have already searched the filesystem; the strings passed to load_dyn
 -- can be passed directly to loadDLL.  They are either fully-qualified

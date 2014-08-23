@@ -391,9 +391,10 @@ readPackageConfig dflags conf_file = do
             isfile <- doesFileExist conf_file
             if isfile
                then throwGhcExceptionIO $ InstallationError $
-                      "ghc no longer supports single-file style package databases (" ++
-                      conf_file ++
-                      ") use 'ghc-pkg init' to create the database with the correct format."
+                      "ghc no longer supports single-file style package " ++
+                      "databases (" ++ conf_file ++
+                      ") use 'ghc-pkg init' to create the database with " ++
+                      "the correct format."
                else throwGhcExceptionIO $ InstallationError $
                       "can't find a package database at " ++ conf_file
 
@@ -597,7 +598,8 @@ packageFlagErr dflags flag reasons
                       -- ToDo: this admonition seems a bit dodgy
                       text "(use -v for more information)")
         ppr_reasons = vcat (map ppr_reason reasons)
-        ppr_reason (p, reason) = pprReason (ppr (installedPackageId p) <+> text "is") reason
+        ppr_reason (p, reason) =
+            pprReason (ppr (installedPackageId p) <+> text "is") reason
 
 pprFlag :: PackageFlag -> SDoc
 pprFlag flag = case flag of
@@ -692,7 +694,9 @@ findWiredInPackages dflags pkgs = do
         updateWiredInDependencies pkgs = map upd_pkg pkgs
           where upd_pkg pkg
                   | installedPackageId pkg `elem` wired_in_ids
-                  = pkg { packageKey = stringToPackageKey (packageNameString pkg) }
+                  = pkg {
+                      packageKey = stringToPackageKey (packageNameString pkg)
+                    }
                   | otherwise
                   = pkg
 

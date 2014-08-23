@@ -68,7 +68,7 @@ instance BinaryStringRep PackageKey where
 
 instance BinaryStringRep Module.ModuleName where
   fromStringRep = Module.mkModuleName . BS.unpack
-  toStringRep   = BS.pack . Module.moduleNameString  
+  toStringRep   = BS.pack . Module.moduleNameString
 
 instance Outputable InstalledPackageId where
   ppr (InstalledPackageId str) = text str
