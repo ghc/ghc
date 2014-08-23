@@ -28,7 +28,7 @@ extra-source-files:
   doc/haddock.xml
   haddock.spec
   haskell.vim
-  src/haddock.sh
+  haddock-api/src/haddock.sh
   html-test/src/*.hs
   html-test/ref/*.html
   latex-test/src/Simple/*.hs
