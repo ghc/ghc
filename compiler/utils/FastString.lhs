@@ -380,10 +380,12 @@ mkFastStringForeignPtr ptr !fp len
 -- | Create a 'FastString' from an existing 'ForeignPtr'; the difference
 -- between this and 'mkFastStringBytes' is that we don't have to copy
 -- the bytes if the string is new to the table.
-mkFastStringByteString :: ByteString -> IO FastString
-mkFastStringByteString bs = BS.unsafeUseAsCStringLen bs $ \(ptr, len) -> do
-  let ptr' = castPtr ptr
-  mkFastStringWith (mkNewFastStringByteString bs ptr' len) ptr' len
+mkFastStringByteString :: ByteString -> FastString
+mkFastStringByteString bs =
+    inlinePerformIO $
+      BS.unsafeUseAsCStringLen bs $ \(ptr, len) -> do
+        let ptr' = castPtr ptr
+        mkFastStringWith (mkNewFastStringByteString bs ptr' len) ptr' len
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
@@ -510,8 +512,7 @@ zEncodeFS fs@(FastString _ _ _ ref) =
               Just zfs -> (m', zfs)
 
 appendFS :: FastString -> FastString -> FastString
-appendFS fs1 fs2 = inlinePerformIO
-                 $ mkFastStringByteString
+appendFS fs1 fs2 = mkFastStringByteString
                  $ BS.append (fastStringToByteString fs1)
                              (fastStringToByteString fs2)
 
@@ -530,7 +531,7 @@ tailFS (FastString _ _ bs _) =
     inlinePerformIO $ BS.unsafeUseAsCString bs $ \ptr ->
     do let (_, ptr') = utf8DecodeChar (castPtr ptr)
            n = ptr' `minusPtr` ptr
-       mkFastStringByteString $ BS.drop n bs
+       return $! mkFastStringByteString (BS.drop n bs)
 
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
