@@ -49,14 +49,14 @@ a[href]:hover { text-decoration:underline; }
    For reasons, see:
       http://yui.yahooapis.com/3.1.1/build/cssfonts/fonts.css
  */
- 
+
 body {
 	font:13px/1.4 sans-serif;
 	*font-size:small; /* for IE */
 	*font:x-small; /* for IE in quirks mode */
 }
 
-h1 { font-size: 146.5%; /* 19pt */ } 
+h1 { font-size: 146.5%; /* 19pt */ }
 h2 { font-size: 131%;   /* 17pt */ }
 h3 { font-size: 116%;   /* 15pt */ }
 h4 { font-size: 100%;   /* 13pt */ }
@@ -98,7 +98,7 @@ pre, code, kbd, samp, tt, .src {
 
 /* @group Common */
 
-.caption, h1, h2, h3, h4, h5, h6 { 
+.caption, h1, h2, h3, h4, h5, h6 {
   font-weight: bold;
   color: rgb(78,98,114);
   margin: 0.8em 0 0.4em;
@@ -122,7 +122,7 @@ ul.links {
 
 ul.links li {
   display: inline;
-  border-left: 1px solid #d5d5d5; 
+  border-left: 1px solid #d5d5d5;
   white-space: nowrap;
   padding: 0;
 }
@@ -378,6 +378,19 @@ div#style-menu-holder {
   margin: 0 -0.5em 0 0.5em;
 }
 
+#interface span.fixity {
+  color: #919191;
+  border-left: 1px solid #919191;
+  padding: 0.2em 0.5em 0.2em 0.5em;
+  margin: 0 -1em 0 1em;
+}
+
+#interface span.rightedge {
+  border-left: 1px solid #919191;
+  padding: 0.2em 0 0.2em 0;
+  margin: 0 0 0 1em;
+}
+
 #interface table { border-spacing: 2px; }
 #interface td {
   vertical-align: top;
@@ -420,18 +433,17 @@ div#style-menu-holder {
   margin: 0;
 }
 
-.subs ul {
+/* Render short-style data instances */
+.inst ul {
   height: 100%;
   padding: 0.5em;
   margin: 0;
 }
 
-.subs ul,
-.subs ul li.src {
+.inst, .inst li {
   list-style: none;
   margin-left: 1em;
 }
-
 
 .top p.src {
   border-top: 1px solid #ccc;
@@ -482,7 +494,7 @@ div#style-menu-holder {
 }
 
 #mini > * {
-  font-size: 93%; /* 12pt */  
+  font-size: 93%; /* 12pt */
 }
 
 #mini #module-list .caption,
