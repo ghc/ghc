@@ -29,9 +29,9 @@ module PackageConfig (
 #include "HsVersions.h"
 
 import GHC.PackageDb
-import qualified Data.ByteString.Char8 as BS
 import Data.Version
 
+import FastString
 import Outputable
 import Module
 
@@ -46,54 +46,50 @@ type PackageConfig = InstalledPackageInfo
                        Module.PackageKey
                        Module.ModuleName
 
-newtype InstalledPackageId = InstalledPackageId String deriving (Eq, Ord, Show)
-newtype SourcePackageId    = SourcePackageId String    deriving (Eq, Ord, Show)
-newtype PackageName        = PackageName String        deriving (Eq, Ord, Show)
+-- TODO: there's no need for these to be FastString, as we don't need the uniq
+--       feature, but ghc doesn't currently have convenient support for any
+--       other compact string types, e.g. plain ByteString or Text.
+
+newtype InstalledPackageId = InstalledPackageId FastString deriving (Eq, Ord)
+newtype SourcePackageId    = SourcePackageId    FastString deriving (Eq, Ord)
+newtype PackageName        = PackageName        FastString deriving (Eq, Ord)
 
 instance BinaryStringRep InstalledPackageId where
-  fromStringRep = InstalledPackageId . BS.unpack
-  toStringRep   (InstalledPackageId s) = BS.pack s
+  fromStringRep = InstalledPackageId . mkFastStringByteString
+  toStringRep (InstalledPackageId s) = fastStringToByteString s
 
 instance BinaryStringRep SourcePackageId where
-  fromStringRep = SourcePackageId . BS.unpack
-  toStringRep   (SourcePackageId s) = BS.pack s
+  fromStringRep = SourcePackageId . mkFastStringByteString
+  toStringRep (SourcePackageId s) = fastStringToByteString s
 
 instance BinaryStringRep PackageName where
-  fromStringRep = PackageName . BS.unpack
-  toStringRep   (PackageName s) = BS.pack s
-
-instance BinaryStringRep PackageKey where
-  fromStringRep = Module.stringToPackageKey . BS.unpack
-  toStringRep   = BS.pack . Module.packageKeyString
-
-instance BinaryStringRep Module.ModuleName where
-  fromStringRep = Module.mkModuleName . BS.unpack
-  toStringRep   = BS.pack . Module.moduleNameString
+  fromStringRep = PackageName . mkFastStringByteString
+  toStringRep (PackageName s) = fastStringToByteString s
 
 instance Outputable InstalledPackageId where
-  ppr (InstalledPackageId str) = text str
+  ppr (InstalledPackageId str) = ftext str
 
 instance Outputable SourcePackageId where
-  ppr (SourcePackageId str) = text str
+  ppr (SourcePackageId str) = ftext str
 
 instance Outputable PackageName where
-  ppr (PackageName str) = text str
+  ppr (PackageName str) = ftext str
 
 defaultPackageConfig :: PackageConfig
 defaultPackageConfig = emptyInstalledPackageInfo
 
 installedPackageIdString :: PackageConfig -> String
-installedPackageIdString pkg = str
+installedPackageIdString pkg = unpackFS str
   where
     InstalledPackageId str = installedPackageId pkg
 
 sourcePackageIdString :: PackageConfig -> String
-sourcePackageIdString pkg = str
+sourcePackageIdString pkg = unpackFS str
   where
     SourcePackageId str = sourcePackageId pkg
 
 packageNameString :: PackageConfig -> String
-packageNameString pkg = str
+packageNameString pkg = unpackFS str
   where
     PackageName str = packageName pkg
 

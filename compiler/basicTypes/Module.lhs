@@ -84,6 +84,7 @@ import FastString
 import Binary
 import Util
 import {-# SOURCE #-} Packages
+import GHC.PackageDb (BinaryStringRep(..))
 
 import Data.Data
 import Data.Map (Map)
@@ -180,6 +181,10 @@ instance Outputable ModuleName where
 instance Binary ModuleName where
   put_ bh (ModuleName fs) = put_ bh fs
   get bh = do fs <- get bh; return (ModuleName fs)
+
+instance BinaryStringRep ModuleName where
+  fromStringRep = mkModuleNameFS . mkFastStringByteString
+  toStringRep   = fastStringToByteString . moduleNameFS
 
 instance Data ModuleName where
   -- don't traverse?
@@ -331,6 +336,10 @@ instance Outputable PackageKey where
 instance Binary PackageKey where
   put_ bh pid = put_ bh (packageKeyFS pid)
   get bh = do { fs <- get bh; return (fsToPackageKey fs) }
+
+instance BinaryStringRep PackageKey where
+  fromStringRep = fsToPackageKey . mkFastStringByteString
+  toStringRep   = fastStringToByteString . packageKeyFS
 
 fsToPackageKey :: FastString -> PackageKey
 fsToPackageKey = PId

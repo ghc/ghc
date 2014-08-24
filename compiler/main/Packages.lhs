@@ -890,7 +890,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
       ipid_map = Map.fromList [ (installedPackageId p, p) | p <- pkgs0 ]
 
       ipid_selected = depClosure ipid_map
-                                 [ InstalledPackageId i
+                                 [ InstalledPackageId (mkFastString i)
                                  | ExposePackage (PackageIdArg i) _ <- flags ]
 
       (ignore_flags, other_flags) = partition is_ignore flags
@@ -965,9 +965,9 @@ mkPackageState dflags pkgs0 preload0 this_package = do
       ipid_map = Map.fromList [ (installedPackageId p, packageConfigId p)
                               | p <- pkgs3 ]
 
-      lookupIPID ipid@(InstalledPackageId str)
+      lookupIPID ipid
          | Just pid <- Map.lookup ipid ipid_map = return pid
-         | otherwise                            = missingPackageErr dflags str
+         | otherwise                            = missingPackageErr dflags ipid
 
   preload2 <- mapM lookupIPID preload1
 
@@ -1352,25 +1352,25 @@ add_package pkg_db ipid_map ps (p, mb_parent)
   | p `elem` ps = return ps     -- Check if we've already added this package
   | otherwise =
       case lookupPackage' pkg_db p of
-        Nothing -> Failed (missingPackageMsg (packageKeyString p) <>
+        Nothing -> Failed (missingPackageMsg p <>
                            missingDependencyMsg mb_parent)
         Just pkg -> do
            -- Add the package's dependents also
            ps' <- foldM add_package_ipid ps (depends pkg)
            return (p : ps')
           where
-            add_package_ipid ps ipid@(InstalledPackageId str)
+            add_package_ipid ps ipid
               | Just pid <- Map.lookup ipid ipid_map
               = add_package pkg_db ipid_map ps (pid, Just p)
               | otherwise
-              = Failed (missingPackageMsg str <> missingDependencyMsg mb_parent)
+              = Failed (missingPackageMsg ipid <> missingDependencyMsg mb_parent)
 
-missingPackageErr :: DynFlags -> String -> IO a
+missingPackageErr :: Outputable pkgid => DynFlags -> pkgid -> IO a
 missingPackageErr dflags p
     = throwGhcExceptionIO (CmdLineError (showSDoc dflags (missingPackageMsg p)))
 
-missingPackageMsg :: String -> SDoc
-missingPackageMsg p = ptext (sLit "unknown package:") <+> text p
+missingPackageMsg :: Outputable pkgid => pkgid -> SDoc
+missingPackageMsg p = ptext (sLit "unknown package:") <+> ppr p
 
 missingDependencyMsg :: Maybe PackageKey -> SDoc
 missingDependencyMsg Nothing = empty
@@ -1435,11 +1435,11 @@ pprPackagesWith pprIPI dflags =
 -- The idea is to only print package id, and any information that might
 -- be different from the package databases (exposure, trust)
 pprPackagesSimple :: DynFlags -> SDoc
-pprPackagesSimple = pprPackagesWith (text . showIPI)
-    where showIPI ipi = let InstalledPackageId i = installedPackageId ipi
-                            e = if exposed ipi then "E" else " "
-                            t = if trusted ipi then "T" else " "
-                        in e ++ t ++ "  " ++ i
+pprPackagesSimple = pprPackagesWith pprIPI
+    where pprIPI ipi = let InstalledPackageId i = installedPackageId ipi
+                           e = if exposed ipi then text "E" else text " "
+                           t = if trusted ipi then text "T" else text " "
+                       in e <> t <> text "  " <> ftext i
 
 -- | Show the mapping of modules to where they come from.
 pprModuleMap :: DynFlags -> SDoc
