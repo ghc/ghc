@@ -154,6 +154,10 @@ readPackageDbForGhc file =
 
 -- | Read the part of the package DB that ghc-pkg is interested in
 --
+-- Note that the Binary instance for ghc-pkg's representation of packages
+-- is not defined in this package. This is because ghc-pkg uses Cabal types
+-- (and Binary instances for these) which this package does not depend on.
+--
 readPackageDbForGhcPkg :: Binary pkgs => FilePath -> IO pkgs
 readPackageDbForGhcPkg file =
     decodeFromFile file getDbForGhcPkg
@@ -223,6 +227,9 @@ putHeader = do
 headerMagic :: BS.ByteString
 headerMagic = BS.Char8.pack "\0ghcpkg\0"
 
+
+-- TODO: we may be able to replace the following with utils from the binary
+-- package in future.
 
 -- | Feed a 'Get' decoder with data chunks from a file.
 --

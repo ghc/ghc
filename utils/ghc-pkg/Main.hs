@@ -590,8 +590,9 @@ getPkgDatabases verbosity modify use_user use_cache expand_vars my_flags = do
             Just f  -> return (Just (f, True))
       fs -> return (Just (last fs, True))
 
-  -- If the user database exists, and for "check" and all "modify" commands
-  -- we will attempt to use the user db.
+  -- If the user database exists, and for "use_user" commands (which includes
+  -- "ghc-pkg check" and all commands that modify the db) we will attempt to
+  -- use the user db.
   let sys_databases
         | Just (user_conf,user_exists) <- mb_user_conf,
           use_user || user_exists = [user_conf, global_conf]
@@ -694,8 +695,7 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
               e_tcache <- tryIO $ getModificationTime cache
               case e_tcache of
                 Left ex -> do
-                  when (   verbosity >  Normal
-                        || verbosity >= Normal && not modify) $
+                  whenReportCacheErrors $
                     if isDoesNotExistError ex
                       then do
                         warn ("WARNING: cache does not exist: " ++ cache)
@@ -727,8 +727,7 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
                           pkgs <- GhcPkg.readPackageDbForGhcPkg cache
                           mkPackageDB pkgs
                       else do
-                          when (   verbosity >  Normal
-                                || verbosity >= Normal && not modify) $ do
+                          whenReportCacheErrors $ do
                               warn ("WARNING: cache is out of date: " ++ cache)
                               warn ("ghc will see an old view of this " ++
                                     "package db. Use 'ghc-pkg recache' to fix.")
@@ -741,6 +740,12 @@ readParseDatabase verbosity mb_user_conf modify use_cache path
                                        parseSingletonPackageConf verbosity f
                      pkgs <- mapM doFile $ map (path </>) confs
                      mkPackageDB pkgs
+
+                 -- We normally report cache errors for read-only commands,
+                 -- since modify commands because will usually fix the cache.
+                 whenReportCacheErrors =
+                     when (   verbosity >  Normal
+                           || verbosity >= Normal && not modify)
   where
     mkPackageDB pkgs = do
       path_abs <- absolutePath path

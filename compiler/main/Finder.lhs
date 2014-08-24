@@ -615,6 +615,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
         | otherwise =
                hang (ptext (sLit "Locations searched:")) 2 $ vcat (map text files)
 
+    pkg_hidden :: PackageKey -> SDoc
     pkg_hidden pkgid =
         ptext (sLit "It is a member of the hidden package")
         <+> quotes (ppr pkgid)
