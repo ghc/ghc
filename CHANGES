@@ -1,4 +1,4 @@
-Changes in version 2.14.4
+Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)
 
@@ -7,6 +7,23 @@ Changes in version 2.14.4
  * parser: don't mangle append order for nested lists (pandoc #1346)
 
  * parser: preserve list ordering in certain scenarios (#313)
+
+ * parser: update the attoparsec version used internally giving slight
+   parsing performance boost.
+
+ * Move development to be against latest GHC release and not GHC HEAD.
+
+ * Further split up the package to separate the executable from the
+   library, necessary by things like GHCJS. We now have
+   ‘haddock-library’ which are the parts that don't use GHC API,
+   ‘haddock-api’ which are (some of) the parts that do use GHC API and
+   ‘haddock’ which merely provides the executable.
+
+ * Export few extra functions in the API.
+
+ * Add compatibility with GHC 7.8.2.
+
+ * Omit unnecessary ‘forall’s (#315 and #86)
 
 Changes in version 2.14.3
 
