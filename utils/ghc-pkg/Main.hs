@@ -24,6 +24,7 @@ import Distribution.ModuleExport
 import Distribution.Package hiding (depends)
 import Distribution.Text
 import Distribution.Version
+import Distribution.Simple.Utils (fromUTF8, toUTF8)
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
 import System.Process
@@ -1075,12 +1076,12 @@ convertPackageInfoToCacheFormat pkg =
     }
 
 instance GhcPkg.BinaryStringRep ModuleName where
-  fromStringRep = ModuleName.fromString . BS.unpack
-  toStringRep   = BS.pack . display
+  fromStringRep = ModuleName.fromString . fromUTF8 . BS.unpack
+  toStringRep   = BS.pack . toUTF8 . display
 
 instance GhcPkg.BinaryStringRep String where
-  fromStringRep = BS.unpack
-  toStringRep   = BS.pack
+  fromStringRep = fromUTF8 . BS.unpack
+  toStringRep   = BS.pack . toUTF8
 
 
 -- -----------------------------------------------------------------------------
