@@ -383,10 +383,6 @@ readPackageConfig dflags conf_file = do
        then do let filename = conf_file </> "package.cache"
                debugTraceMsg dflags 2 (text "Using binary package database:" <+> text filename)
                readPackageDbForGhc filename
-{-
-               -- TODO readPackageDbForGhc ^^ instead
-               return (map installedPackageInfoToPackageConfig conf)
--}
        else do
             isfile <- doesFileExist conf_file
             if isfile
