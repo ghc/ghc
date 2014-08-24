@@ -33,7 +33,7 @@ import InteractiveUI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 import Config
 import Constants
 import HscTypes
-import Packages         ( dumpPackages, simpleDumpPackages, pprModuleMap )
+import Packages         ( pprPackages, pprPackagesSimple, pprModuleMap )
 import DriverPhases
 import BasicTypes       ( failed )
 import StaticFlags
@@ -210,7 +210,7 @@ main' postLoadMode dflags0 args flagWarnings = do
 
         ---------------- Display configuration -----------
   case verbosity dflags6 of
-    v | v == 4 -> liftIO $ simpleDumpPackages dflags6
+    v | v == 4 -> liftIO $ dumpPackagesSimple dflags6
       | v >= 5 -> liftIO $ dumpPackages dflags6
       | otherwise -> return ()
 
@@ -237,6 +237,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoInteractive          -> ghciUI srcs Nothing
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash srcs
+       ShowPackages           -> liftIO $ showPackages dflags6
 
   liftIO $ dumpFinalStats dflags6
 
@@ -435,12 +436,15 @@ data PostLoadMode
   | DoInteractive           -- ghc --interactive
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
+  | ShowPackages            -- ghc --show-packages
 
-doMkDependHSMode, doMakeMode, doInteractiveMode, doAbiHashMode :: Mode
+doMkDependHSMode, doMakeMode, doInteractiveMode,
+  doAbiHashMode, showPackagesMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doAbiHashMode = mkPostLoadMode DoAbiHash
+showPackagesMode = mkPostLoadMode ShowPackages
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -533,6 +537,7 @@ mode_flags =
   , Flag "-show-options"         (PassFlag (setMode showOptionsMode))
   , Flag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
   , Flag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
+  , Flag "-show-packages"        (PassFlag (setMode showPackagesMode))
   ] ++
   [ Flag k'                      (PassFlag (setMode (printSetting k)))
   | k <- ["Project version",
@@ -771,6 +776,11 @@ countFS entries longest has_z (b:bs) =
         has_zs = length (filter hasZEncoding b)
   in
         countFS entries' longest' (has_z + has_zs) bs
+
+showPackages, dumpPackages, dumpPackagesSimple :: DynFlags -> IO ()
+showPackages       dflags = putStrLn (showSDoc dflags (pprPackages dflags))
+dumpPackages       dflags = putMsg dflags (pprPackages dflags)
+dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
 
 -- -----------------------------------------------------------------------------
 -- ABI hash support

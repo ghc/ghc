@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, RecordWildCards #-}
 
 -- |
 -- Package configuration information: essentially the interface to Cabal, with
@@ -23,7 +23,7 @@ module PackageConfig (
         installedPackageIdString,
         sourcePackageIdString,
         packageNameString,
-        showInstalledPackageInfo,
+        pprPackageConfig,
     ) where
 
 #include "HsVersions.h"
@@ -97,14 +97,35 @@ packageNameString pkg = str
   where
     PackageName str = packageName pkg
 
-showInstalledPackageInfo :: PackageConfig -> String
-showInstalledPackageInfo = show
-
-instance Show ModuleName where
-  show = moduleNameString
-
-instance Show PackageKey where
-  show = packageKeyString
+pprPackageConfig :: PackageConfig -> SDoc
+pprPackageConfig InstalledPackageInfo {..} =
+    vcat [
+      field "name"                 (ppr packageName),
+      field "version"              (text (showVersion packageVersion)),
+      field "id"                   (ppr installedPackageId),
+      field "key"                  (ppr packageKey),
+      field "exposed"              (ppr exposed),
+      field "exposed-modules"      (fsep (map ppr exposedModules)),
+      field "hidden-modules"       (fsep (map ppr hiddenModules)),
+      field "reexported-modules"   (fsep (map ppr haddockHTMLs)),
+      field "trusted"              (ppr trusted),
+      field "import-dirs"          (fsep (map text importDirs)),
+      field "library-dirs"         (fsep (map text libraryDirs)),
+      field "hs-libraries"         (fsep (map text hsLibraries)), 
+      field "extra-libraries"      (fsep (map text extraLibraries)),
+      field "extra-ghci-libraries" (fsep (map text extraGHCiLibraries)),
+      field "include-dirs"         (fsep (map text includeDirs)),
+      field "includes"             (fsep (map text includes)),
+      field "depends"              (fsep (map ppr  depends)),
+      field "cc-options"           (fsep (map text ccOptions)),
+      field "ld-options"           (fsep (map text ldOptions)),
+      field "framework-dirs"       (fsep (map text frameworkDirs)),
+      field "frameworks"           (fsep (map text frameworks)),
+      field "haddock-interfaces"   (fsep (map text haddockInterfaces)),
+      field "haddock-html"         (fsep (map text haddockHTMLs))
+    ]
+  where
+    field name body = text name <> colon <+> nest 4 body
 
 
 -- -----------------------------------------------------------------------------

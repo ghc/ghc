@@ -16,8 +16,6 @@ module Packages (
         lookupPackage,
         resolveInstalledPackageId,
         searchPackageId,
-        dumpPackages,
-        simpleDumpPackages,
         getPackageDetails,
         listVisibleModuleNames,
         lookupModuleInAllPackages,
@@ -42,6 +40,8 @@ module Packages (
         -- * Utils
         packageKeyPackageIdString,
         pprFlag,
+        pprPackages,
+        pprPackagesSimple,
         pprModuleMap,
         isDllName
     )
@@ -63,7 +63,7 @@ import Maybes
 
 import System.Environment ( getEnv )
 import FastString
-import ErrUtils         ( debugTraceMsg, putMsg, MsgDoc )
+import ErrUtils         ( debugTraceMsg, MsgDoc )
 import Exception
 import Unique
 
@@ -1422,21 +1422,20 @@ isDllName dflags _this_pkg this_mod name
 -- -----------------------------------------------------------------------------
 -- Displaying packages
 
--- | Show (very verbose) package info on console, if verbosity is >= 5
-dumpPackages :: DynFlags -> IO ()
-dumpPackages = dumpPackages' showInstalledPackageInfo
+-- | Show (very verbose) package info
+pprPackages :: DynFlags -> SDoc
+pprPackages = pprPackagesWith pprPackageConfig
 
-dumpPackages' :: (PackageConfig -> String) -> DynFlags -> IO ()
-dumpPackages' showIPI dflags
-  = do putMsg dflags $
-             vcat (map (text . showIPI)
-                       (listPackageConfigMap dflags))
+pprPackagesWith :: (PackageConfig -> SDoc) -> DynFlags -> SDoc
+pprPackagesWith pprIPI dflags =
+    vcat (intersperse (text "---") (map pprIPI (listPackageConfigMap dflags)))
 
--- | Show simplified package info on console, if verbosity == 4.
+-- | Show simplified package info.
+--
 -- The idea is to only print package id, and any information that might
 -- be different from the package databases (exposure, trust)
-simpleDumpPackages :: DynFlags -> IO ()
-simpleDumpPackages = dumpPackages' showIPI
+pprPackagesSimple :: DynFlags -> SDoc
+pprPackagesSimple = pprPackagesWith (text . showIPI)
     where showIPI ipi = let InstalledPackageId i = installedPackageId ipi
                             e = if exposed ipi then "E" else " "
                             t = if trusted ipi then "T" else " "
