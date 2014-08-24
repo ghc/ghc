@@ -13,7 +13,7 @@ cd ..
 tar cvzf haddock-*.tar.gz haddock-*/
 
 # Steps for doing a release:
-#  * Update version number in .cabal, doc/haddock.xml, haddock.spec
+#  * Update version number in .cabal, doc/haddock.xml
 #  * Update CHANGES
 #  * Source:
 #    - do the above

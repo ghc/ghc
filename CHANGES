@@ -25,6 +25,9 @@ Changes in version 2.15.0
 
  * Omit unnecessary ‘forall’s (#315 and #86)
 
+ * Remove some files which were really old or did not belong in the
+   repository in the first place.
+
 Changes in version 2.14.3
 
  * Fix parsing of identifiers with ^ or ⋆ in them (#298)
