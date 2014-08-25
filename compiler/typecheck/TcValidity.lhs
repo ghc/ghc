@@ -290,7 +290,7 @@ check_type ctxt rank (AppTy ty1 ty2)
         ; check_arg_type ctxt rank ty2 }
 
 check_type ctxt rank ty@(TyConApp tc tys)
-  | isTypeSynonymTyCon tc  = check_syn_tc_app ctxt rank ty tc tys
+  | isSynTyCon tc          = check_syn_tc_app ctxt rank ty tc tys
   | isUnboxedTupleTyCon tc = check_ubx_tuple  ctxt      ty    tys
   | otherwise              = mapM_ (check_arg_type ctxt rank) tys
 
@@ -301,6 +301,9 @@ check_type _ _ ty = pprPanic "check_type" (ppr ty)
 ----------------------------------------
 check_syn_tc_app :: UserTypeCtxt -> Rank -> KindOrType 
                  -> TyCon -> [KindOrType] -> TcM ()
+-- Used for type synonyms and type synonym families,
+-- which must be saturated, 
+-- but not data families, which need not be saturated
 check_syn_tc_app ctxt rank ty tc tys
   | tc_arity <= n_args   -- Saturated
        -- Check that the synonym has enough args
