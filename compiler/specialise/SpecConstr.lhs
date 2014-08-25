@@ -1194,21 +1194,18 @@ scExpr' env (Let (NonRec bndr rhs) body)
 
   | otherwise
   = do  { let (body_env, bndr') = extendBndr env bndr
-        ; (rhs_usg, rhs_info)  <- scRecRhs env (bndr',rhs)
+        ; rhs_info  <- scRecRhs env (bndr',rhs)
 
-        ; let body_env2         = extendHowBound body_env [bndr'] RecFun
-                                   -- Note [Local let bindings]
-              RI _ rhs' _ _ _   = rhs_info
-              body_env3         = extendValEnv body_env2 bndr' (isValue (sc_vals env) rhs')
+        ; let body_env2 = extendHowBound body_env [bndr'] RecFun
+                           -- Note [Local let bindings]
+              rhs'      = ri_new_rhs rhs_info
+              body_env3 = extendValEnv body_env2 bndr' (isValue (sc_vals env) rhs')
 
         ; (body_usg, body') <- scExpr body_env3 body
 
           -- NB: For non-recursive bindings we inherit sc_force flag from
           -- the parent function (see Note [Forcing specialisation])
-        ; (spec_usg, specs) <- specialise env
-                                          (scu_calls body_usg)
-                                          rhs_info
-                                          (SI [] 0 (Just rhs_usg))
+        ; (spec_usg, specs) <- specNonRec env body_usg rhs_info
 
         ; return (body_usg { scu_calls = scu_calls body_usg `delVarEnv` bndr' }
                     `combineUsage` spec_usg,  -- Note [spec_usg includes rhs_usg]
@@ -1224,13 +1221,12 @@ scExpr' env (Let (Rec prs) body)
               force_spec        = any (forceSpecBndr env) bndrs'
                 -- Note [Forcing specialisation]
 
-        ; (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs rhs_env2) (bndrs' `zip` rhss)
+        ; rhs_infos <- mapM (scRecRhs rhs_env2) (bndrs' `zip` rhss)
         ; (body_usg, body')     <- scExpr rhs_env2 body
 
         -- NB: start specLoop from body_usg
-        ; (spec_usg, specs) <- specLoop (scForce rhs_env2 force_spec)
-                                        (scu_calls body_usg) rhs_infos nullUsage
-                                        [SI [] 0 (Just usg) | usg <- rhs_usgs]
+        ; (spec_usg, specs) <- specRec NotTopLevel (scForce rhs_env2 force_spec)
+                                       body_usg rhs_infos
                 -- Do not unconditionally generate specialisations from rhs_usgs
                 -- Instead use them only if we find an unspecialised call
                 -- See Note [Local recursive groups]
@@ -1341,17 +1337,10 @@ scTopBind env body_usage (Rec prs)
         ; return (body_usage `combineUsage` combineUsages rhs_usgs, Rec (bndrs `zip` rhss')) }
 
   | otherwise   -- Do specialisation
-  = do  { (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs env) prs
-        -- ; pprTrace "scTopBind" (ppr bndrs $$ ppr (map (lookupVarEnv (scu_calls body_usage)) bndrs)) (return ())
+  = do  { rhs_infos <- mapM (scRecRhs env) prs
 
-        -- Note [Top-level recursive groups]
-        ; let (usg,rest) | any isExportedId bndrs  -- Seed from RHSs
-                         = ( combineUsages rhs_usgs, [SI [] 0 Nothing   | _  <- rhs_usgs] )
-                         | otherwise               -- Seed from body only
-                         = ( body_usage,             [SI [] 0 (Just us) | us <- rhs_usgs] )
-
-        ; (spec_usage, specs) <- specLoop (scForce env force_spec)
-                                          (scu_calls usg) rhs_infos nullUsage rest
+        ; (spec_usage, specs) <- specRec TopLevel (scForce env force_spec)
+                                         body_usage rhs_infos
 
         ; return (body_usage `combineUsage` spec_usage,
                   Rec (concat (zipWith specInfoBinds rhs_infos specs))) }
@@ -1365,22 +1354,24 @@ scTopBind env usage (NonRec bndr rhs)   -- Oddly, we don't seem to specialise to
         ; return (usage `combineUsage` rhs_usg', NonRec bndr rhs') }
 
 ----------------------
-scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM (ScUsage, RhsInfo)
+scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM RhsInfo
 scRecRhs env (bndr,rhs)
   = do  { let (arg_bndrs,body)       = collectBinders rhs
               (body_env, arg_bndrs') = extendBndrsWith RecArg env arg_bndrs
         ; (body_usg, body')         <- scExpr body_env body
         ; let (rhs_usg, arg_occs)    = lookupOccs body_usg arg_bndrs'
-        ; return (rhs_usg, RI bndr (mkLams arg_bndrs' body')
-                                   arg_bndrs body arg_occs) }
+        ; return (RI { ri_rhs_usg = rhs_usg
+                     , ri_fn = bndr, ri_new_rhs = mkLams arg_bndrs' body'
+                     , ri_lam_bndrs = arg_bndrs, ri_lam_body = body
+                     , ri_arg_occs = arg_occs }) }
                 -- The arg_occs says how the visible,
                 -- lambda-bound binders of the RHS are used
                 -- (including the TyVar binders)
                 -- Two pats are the same if they match both ways
 
 ----------------------
-specInfoBinds :: RhsInfo -> SpecInfo -> [(Id,CoreExpr)]
-specInfoBinds (RI fn new_rhs _ _ _) (SI specs _ _)
+specInfoBinds :: RhsInfo -> [OneSpec] -> [(Id,CoreExpr)]
+specInfoBinds (RI { ri_fn = fn, ri_new_rhs = new_rhs }) specs
   = [(id,rhs) | OS _ _ id rhs <- specs] ++
               -- First the specialised bindings
 
@@ -1399,11 +1390,15 @@ specInfoBinds (RI fn new_rhs _ _ _) (SI specs _ _)
 %************************************************************************
 
 \begin{code}
-data RhsInfo = RI OutId                 -- The binder
-                  OutExpr               -- The new RHS
-                  [InVar] InExpr        -- The *original* RHS (\xs.body)
-                                        --   Note [Specialise original body]
-                  [ArgOcc]              -- Info on how the xs occur in body
+data RhsInfo
+  = RI { ri_fn :: OutId                 -- The binder
+       , ri_new_rhs :: OutExpr          -- The specialised RHS (in current envt)
+       , ri_rhs_usg :: ScUsage          -- Usage info from specialising RHS
+
+       , ri_lam_bndrs :: [InVar]       -- The *original* RHS (\xs.body)
+       , ri_lam_body  :: InExpr        --   Note [Specialise original body]
+       , ri_arg_occs  :: [ArgOcc]      -- Info on how the xs occur in body
+    }
 
 data SpecInfo = SI [OneSpec]            -- The specialisations we have generated
 
@@ -1425,23 +1420,51 @@ data OneSpec  = OS CallPat              -- Call pattern that generated this spec
                    OutId OutExpr        -- Spec id + its rhs
 
 
-specLoop :: ScEnv
-         -> CallEnv
-         -> [RhsInfo]
-         -> ScUsage -> [SpecInfo]               -- One per binder; acccumulating parameter
-         -> UniqSM (ScUsage, [SpecInfo])        -- ...ditto...
+----------------------
+specNonRec :: ScEnv
+           -> ScUsage         -- Body usage
+           -> RhsInfo         -- Structure info usage info for un-specialised RHS
+           -> UniqSM (ScUsage, [OneSpec])       -- Usage from RHSs (specialised and not)
+                                                --     plus details of specialisations
 
-specLoop env all_calls rhs_infos usg_so_far specs_so_far
-  = do  { specs_w_usg <- zipWithM (specialise env all_calls) rhs_infos specs_so_far
-        ; let (new_usg_s, all_specs) = unzip specs_w_usg
-              new_usg   = combineUsages new_usg_s
-              new_calls = scu_calls new_usg
-              all_usg   = usg_so_far `combineUsage` new_usg
-        ; if isEmptyVarEnv new_calls then
-                return (all_usg, all_specs)
-          else
-                specLoop env new_calls rhs_infos all_usg all_specs }
+specNonRec env body_usg rhs_info
+  = do { (spec_usg, SI specs _ _) <- specialise env (scu_calls body_usg)
+                                                rhs_info
+                                                (SI [] 0 (Just (ri_rhs_usg rhs_info)))
+       ; return (spec_usg, specs) }
 
+----------------------
+specRec :: TopLevelFlag -> ScEnv
+        -> ScUsage                             -- Body usage
+        -> [RhsInfo]                           -- Structure info and usage info for un-specialised RHSs
+        -> UniqSM (ScUsage, [[OneSpec]])       -- Usage from all RHSs (specialised and not)
+                                               --     plus details of specialisations
+
+specRec top_lvl env body_usg rhs_infos
+  = do { (spec_usg, spec_infos) <- go seed_calls nullUsage init_spec_infos
+       ; return (spec_usg, [ s | SI s _ _ <- spec_infos ]) }
+  where
+    (seed_calls, init_spec_infos)    -- Note [Top-level recursive groups]
+       | isTopLevel top_lvl
+       , any (isExportedId . ri_fn) rhs_infos -- Seed from RHSs
+       = (calls_in_rhss,      [SI [] 0 Nothing   | _ <- rhs_infos])
+       | otherwise                                            -- Seed from body only
+       = (scu_calls body_usg, [SI [] 0 (Just (ri_rhs_usg ri)) | ri <- rhs_infos])
+
+    calls_in_rhss = foldr (combineCalls . scu_calls . ri_rhs_usg) emptyVarEnv rhs_infos
+
+    -- Loop, specialising, until you get no new specialisations
+    go seed_calls usg_so_far spec_infos
+      | isEmptyVarEnv seed_calls
+      = return (usg_so_far, spec_infos)
+      | otherwise
+      = do  { specs_w_usg <- zipWithM (specialise env seed_calls) rhs_infos spec_infos
+            ; let (extra_usg_s, new_spec_infos) = unzip specs_w_usg
+                  extra_usg = combineUsages extra_usg_s
+                  all_usg   = usg_so_far `combineUsage` extra_usg
+            ; go (scu_calls extra_usg) all_usg new_spec_infos }
+
+----------------------
 specialise
    :: ScEnv
    -> CallEnv                     -- Info on newly-discovered calls to this function
@@ -1458,7 +1481,8 @@ specialise
 -- So when we make a specialised copy of the RHS, we're starting
 -- from an RHS whose nested functions have been optimised already.
 
-specialise env bind_calls (RI fn _ arg_bndrs body arg_occs)
+specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
+                              , ri_lam_body = body, ri_arg_occs = arg_occs })
                spec_info@(SI specs spec_count mb_unspec)
   | isBottomingId fn      -- Note [Do not specialise diverging functions]
                           -- and do not generate specialisation seeds from its RHS
