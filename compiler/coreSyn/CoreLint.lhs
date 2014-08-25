@@ -726,13 +726,20 @@ lintType ty@(FunTy t1 t2)    -- (->) has two different rules, for types and kind
        ; lintArrow (ptext (sLit "type or kind") <+> quotes (ppr ty)) k1 k2 }
 
 lintType ty@(TyConApp tc tys)
-  | not (isUnLiftedTyCon tc) || tys `lengthIs` tyConArity tc
-       -- Check that primitive types are saturated
+  | Just ty' <- coreView ty
+  = lintType ty'   -- Expand type synonyms, so that we do not bogusly complain
+                   --  about un-saturated type synonyms
+                   -- 
+
+  | isUnLiftedTyCon tc || isSynTyCon tc
        -- See Note [The kind invariant] in TypeRep
+       -- Also type synonyms and type families
+  , length tys < tyConArity tc
+  = failWithL (hang (ptext (sLit "Un-saturated type application")) 2 (ppr ty))
+
+  | otherwise
   = do { ks <- mapM lintType tys
        ; lint_ty_app ty (tyConKind tc) (tys `zip` ks) }
-  | otherwise
-  = failWithL (hang (ptext (sLit "Malformed type:")) 2 (ppr ty))
 
 lintType (ForAllTy tv ty)
   = do { lintTyBndrKind tv
