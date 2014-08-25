@@ -2325,7 +2325,7 @@ f (C {a = 1, ..}) = b + c + d
 More details:
 <itemizedlist>
 <listitem><para>
-Wildcards can be mixed with other patterns, including puns
+Record wildcards in patterns can be mixed with other patterns, including puns
 (<xref linkend="record-puns"/>); for example, in a pattern <literal>C {a
 = 1, b, ..})</literal>.  Additionally, record wildcards can be used
 wherever record patterns occur, including in <literal>let</literal>
@@ -2338,7 +2338,7 @@ defines <literal>b</literal>, <literal>c</literal>, and
 </para></listitem>
 
 <listitem><para>
-Record wildcards can also be used in expressions, writing, for example,
+Record wildcards can also be used in an expression, when constructing a record.  For example,
 <programlisting>
 let {a = 1; b = 2; c = 3; d = 4} in C {..}
 </programlisting>
@@ -2352,7 +2352,15 @@ the same as the omitted field names.
 </para></listitem>
 
 <listitem><para>
-The "<literal>..</literal>" expands to the missing
+Record wildcards may <emphasis>not</emphasis> be used in record <emphasis>updates</emphasis>.  For example this
+is illegal:
+<programlisting>
+f r = r { x = 3, .. }
+</programlisting>
+</para></listitem>
+
+<listitem><para>
+For both pattern and expression wildcards, the "<literal>..</literal>" expands to the missing
 <emphasis>in-scope</emphasis> record fields.
 Specifically the expansion of "<literal>C {..}</literal>" includes
 <literal>f</literal> if and only if:
@@ -2369,6 +2377,8 @@ the variable <literal>f</literal> is in scope unqualified,
 apart from the binding of the record selector itself.
 </para></listitem>
 </itemizedlist>
+These rules restrict record wildcards to the situations in which the user
+could have written the expanded version.
 For example
 <programlisting>
 module M where
