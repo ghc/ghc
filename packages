@@ -57,7 +57,7 @@ libraries/bytestring         -           -                               https:/
 libraries/Cabal              -           -                               https://github.com/haskell/cabal.git
 libraries/containers         -           -                               https://github.com/haskell/containers.git
 libraries/deepseq            -           -                               -
-libraries/directory          -           -                               -
+libraries/directory          -           -                               ssh://git@github.com/haskell/directory.git
 libraries/filepath           -           -                               -
 libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
 libraries/haskell98          -           -                               -
@@ -67,7 +67,7 @@ libraries/hpc                -           -                               -
 libraries/old-locale         -           -                               -
 libraries/old-time           -           -                               -
 libraries/pretty             -           -                               https://github.com/haskell/pretty.git
-libraries/process            -           -                               -
+libraries/process            -           -                               ssh://git@github.com/haskell/process.git
 libraries/terminfo           -           -                               https://github.com/judah/terminfo.git
 libraries/time               -           -                               https://github.com/haskell/time.git
 libraries/transformers       -           -                               http://git.haskell.org/darcs-mirrors/transformers.git
