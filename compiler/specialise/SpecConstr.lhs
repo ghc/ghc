@@ -35,6 +35,7 @@ import Rules
 import Type             hiding ( substTy )
 import TyCon            ( isRecursiveTyCon, tyConName )
 import Id
+import PprCore          ( pprParendExpr )
 import MkCore           ( mkImpossibleExpr )
 import Var
 import VarEnv
@@ -1019,15 +1020,27 @@ data ScUsage
      }                                  -- The domain is OutIds
 
 type CallEnv = IdEnv [Call]
-type Call = (ValueEnv, [CoreArg])
+data Call = Call Id [CoreArg] ValueEnv
         -- The arguments of the call, together with the
         -- env giving the constructor bindings at the call site
+        -- We keep the function mainly for debug output
+
+instance Outputable Call where
+  ppr (Call fn args _) = ppr fn <+> fsep (map pprParendExpr args)
 
 nullUsage :: ScUsage
 nullUsage = SCU { scu_calls = emptyVarEnv, scu_occs = emptyVarEnv }
 
 combineCalls :: CallEnv -> CallEnv -> CallEnv
 combineCalls = plusVarEnv_C (++)
+  where
+--    plus cs ds | length res > 1
+--               = pprTrace "combineCalls" (vcat [ ptext (sLit "cs:") <+> ppr cs
+--                                               , ptext (sLit "ds:") <+> ppr ds])
+--                 res
+--               | otherwise = res
+--       where
+--          res = cs ++ ds
 
 combineUsage :: ScUsage -> ScUsage -> ScUsage
 combineUsage u1 u2 = SCU { scu_calls = combineCalls (scu_calls u1) (scu_calls u2),
@@ -1285,7 +1298,7 @@ scApp env (other_fn, args)
 mkVarUsage :: ScEnv -> Id -> [CoreExpr] -> ScUsage
 mkVarUsage env fn args
   = case lookupHowBound env fn of
-        Just RecFun -> SCU { scu_calls = unitVarEnv fn [(sc_vals env, args)]
+        Just RecFun -> SCU { scu_calls = unitVarEnv fn [Call fn args (sc_vals env)]
                            , scu_occs  = emptyVarEnv }
         Just RecArg -> SCU { scu_calls = emptyVarEnv
                            , scu_occs  = unitVarEnv fn arg_occ }
@@ -1711,7 +1724,7 @@ callToPats :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe (CallPat, ValueEnv))
         --      Type variables come first, since they may scope
         --      over the following term variables
         -- The [CoreExpr] are the argument patterns for the rule
-callToPats env bndr_occs (con_env, args)
+callToPats env bndr_occs (Call _ args con_env)
   | length args < length bndr_occs      -- Check saturated
   = return Nothing
   | otherwise
