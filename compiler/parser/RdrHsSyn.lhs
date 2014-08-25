@@ -1064,11 +1064,11 @@ mkRecConstrOrUpdate
         -> ([HsRecField RdrName (LHsExpr RdrName)], Bool)
         -> P (HsExpr RdrName)
 
-mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd) | isRdrDataCon c
+mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd) 
+  | isRdrDataCon c
   = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd))
-mkRecConstrOrUpdate exp loc (fs,dd)
-  | null fs   = parseErrorSDoc loc (text "Empty record update of:" <+> ppr exp)
-  | otherwise = return (RecordUpd exp (mk_rec_fields fs dd) [] [] [])
+mkRecConstrOrUpdate exp _ (fs,dd)
+  = return (RecordUpd exp (mk_rec_fields fs dd) [] [] [])
 
 mk_rec_fields :: [HsRecField id arg] -> Bool -> HsRecFields id arg
 mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }

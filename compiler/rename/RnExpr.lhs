@@ -370,7 +370,7 @@ rnSection other = pprPanic "rnSection" (ppr other)
 rnHsRecBinds :: HsRecFieldContext -> HsRecordBinds RdrName
              -> RnM (HsRecordBinds Name, FreeVars)
 rnHsRecBinds ctxt rec_binds@(HsRecFields { rec_dotdot = dd })
-  = do { (flds, fvs) <- rnHsRecFields1 ctxt HsVar rec_binds
+  = do { (flds, fvs) <- rnHsRecFields ctxt HsVar rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd },
                  fvs `plusFV` plusFVs fvss) }
