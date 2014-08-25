@@ -1209,7 +1209,7 @@ scExpr' env (Let (NonRec bndr rhs) body)
                                           (SI [] 0 (Just rhs_usg))
 
         ; return (body_usg { scu_calls = scu_calls body_usg `delVarEnv` bndr' }
-                    `combineUsage` rhs_usg `combineUsage` spec_usg,
+                    `combineUsage` spec_usg,  -- Note [spec_usg includes rhs_usg]
                   mkLets [NonRec b r | (b,r) <- specInfoBinds rhs_info specs] body')
         }
 
@@ -1233,8 +1233,7 @@ scExpr' env (Let (Rec prs) body)
                 -- Instead use them only if we find an unspecialised call
                 -- See Note [Local recursive groups]
 
-        ; let rhs_usg = combineUsages rhs_usgs
-              all_usg = spec_usg `combineUsage` rhs_usg `combineUsage` body_usg
+        ; let all_usg = spec_usg `combineUsage` body_usg  -- Note [spec_usg includes rhs_usg]
               bind'   = Rec (concat (zipWith specInfoBinds rhs_infos specs))
 
         ; return (all_usg { scu_calls = scu_calls all_usg `delVarEnvList` bndrs' },
@@ -1330,35 +1329,36 @@ scTopBind _ usage _
   | pprTrace "scTopBind_usage" (ppr (scu_calls usage)) False
   = error "false"
 -}
- 
-scTopBind env usage (Rec prs)
+
+scTopBind env body_usage (Rec prs)
   | Just threshold <- sc_size env
   , not force_spec
   , not (all (couldBeSmallEnoughToInline (sc_dflags env) threshold) rhss)
                 -- No specialisation
   = do  { (rhs_usgs, rhss')   <- mapAndUnzipM (scExpr env) rhss
-        ; return (usage `combineUsage` (combineUsages rhs_usgs), Rec (bndrs `zip` rhss')) }
+        ; return (body_usage `combineUsage` combineUsages rhs_usgs, Rec (bndrs `zip` rhss')) }
+
   | otherwise   -- Do specialisation
   = do  { (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs env) prs
-        -- ; pprTrace "scTopBind" (ppr bndrs $$ ppr (map (lookupVarEnv (scu_calls usage)) bndrs)) (return ())
+        -- ; pprTrace "scTopBind" (ppr bndrs $$ ppr (map (lookupVarEnv (scu_calls body_usage)) bndrs)) (return ())
 
         -- Note [Top-level recursive groups]
         ; let (usg,rest) | any isExportedId bndrs  -- Seed from RHSs
                          = ( combineUsages rhs_usgs, [SI [] 0 Nothing   | _  <- rhs_usgs] )
                          | otherwise               -- Seed from body only
-                         = ( usage,                  [SI [] 0 (Just us) | us <- rhs_usgs] )
+                         = ( body_usage,             [SI [] 0 (Just us) | us <- rhs_usgs] )
 
-        ; (usage', specs) <- specLoop (scForce env force_spec)
-                                 (scu_calls usg) rhs_infos nullUsage rest
+        ; (spec_usage, specs) <- specLoop (scForce env force_spec)
+                                          (scu_calls usg) rhs_infos nullUsage rest
 
-        ; return (usage `combineUsage` usage',
+        ; return (body_usage `combineUsage` spec_usage,
                   Rec (concat (zipWith specInfoBinds rhs_infos specs))) }
   where
     (bndrs,rhss) = unzip prs
     force_spec   = any (forceSpecBndr env) bndrs
       -- Note [Forcing specialisation]
 
-scTopBind env usage (NonRec bndr rhs)
+scTopBind env usage (NonRec bndr rhs)   -- Oddly, we don't seem to specialise top-level non-rec functions
   = do  { (rhs_usg', rhs') <- scExpr env rhs
         ; return (usage `combineUsage` rhs_usg', NonRec bndr rhs') }
 
@@ -1415,6 +1415,7 @@ data SpecInfo = SI [OneSpec]            -- The specialisations we have generated
                                         --             unleashed)
                                         -- Nothing => we have
                                         -- See Note [Local recursive groups]
+                                        -- See Note [spec_usg includes rhs_usg]
 
         -- One specialisation: Rule plus definition
 data OneSpec  = OS CallPat              -- Call pattern that generated this specialisation
@@ -1441,10 +1442,12 @@ specLoop env all_calls rhs_infos usg_so_far specs_so_far
 
 specialise
    :: ScEnv
-   -> CallEnv                           -- Info on calls
+   -> CallEnv                     -- Info on newly-discovered calls to this function
    -> RhsInfo
-   -> SpecInfo                          -- Original RHS plus patterns dealt with
-   -> UniqSM (ScUsage, SpecInfo)        -- New specialised versions and their usage
+   -> SpecInfo                    -- Original RHS plus patterns dealt with
+   -> UniqSM (ScUsage, SpecInfo)  -- New specialised versions and their usage
+
+-- See Note [spec_usg includes rhs_usg]
 
 -- Note: this only generates *specialised* bindings
 -- The original binding is added by specInfoBinds
@@ -1455,11 +1458,20 @@ specialise
 
 specialise env bind_calls (RI fn _ arg_bndrs body arg_occs)
                spec_info@(SI specs spec_count mb_unspec)
-  | not (isBottomingId fn)      -- Note [Do not specialise diverging functions]
-  , not (isNeverActive (idInlineActivation fn)) -- See Note [Transfer activation]
-  , notNull arg_bndrs           -- Only specialise functions
-  , Just all_calls <- lookupVarEnv bind_calls fn
-  = do  { (boring_call, pats) <- callsToPats env specs arg_occs all_calls
+  | isBottomingId fn      -- Note [Do not specialise diverging functions]
+                          -- and do not generate specialisation seeds from its RHS
+  = return (nullUsage, spec_info)
+
+  | isNeverActive (idInlineActivation fn) -- See Note [Transfer activation]
+    || null arg_bndrs                     -- Only specialise functions
+  = case mb_unspec of    -- Behave as if there was a single, boring call
+      Just rhs_usg -> return (rhs_usg, SI specs spec_count Nothing)
+                         -- See Note [spec_usg includes rhs_usg]
+      Nothing      -> return (nullUsage, spec_info)
+
+  | Just all_calls <- lookupVarEnv bind_calls fn
+  = -- pprTrace "specialise entry {" (ppr fn <+> ppr (length all_calls)) $
+    do  { (boring_call, pats) <- callsToPats env specs arg_occs all_calls
 
                 -- Bale out if too many specialisations
         ; let n_pats      = length pats
@@ -1506,9 +1518,13 @@ specialise env bind_calls (RI fn _ arg_bndrs body arg_occs)
                       Just rhs_usg | boring_call -> (spec_usg `combineUsage` rhs_usg, Nothing)
                       _                          -> (spec_usg,                      mb_unspec)
 
-        ; return (new_usg, SI (new_specs ++ specs) spec_count' mb_unspec') } }
-  | otherwise
-  = return (nullUsage, spec_info)               -- The boring case
+--        ; pprTrace "specialise return }" (ppr fn
+--                                        <+> ppr (scu_calls new_usg))
+          ; return (new_usg, SI (new_specs ++ specs) spec_count' mb_unspec') } }
+
+
+  | otherwise  -- No new seeds, so return nullUsage
+  = return (nullUsage, spec_info)
 
 
 ---------------------
@@ -1609,6 +1625,16 @@ calcSpecStrictness fn qvars pats
            , (Var _, args) <- collectArgs e = go env ds args
     go_one env _         _ = env
 \end{code}
+
+Note [spec_usg includes rhs_usg]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In calls to 'specialise', the returned ScUsage must include the rhs_usg in
+the passed-in SpecInfo, unless there are no calls at all to the function.
+
+The caller can, indeed must, assume this.  He should not combine in rhs_usg
+himself, or he'll get rhs_usg twice -- and that can lead to an exponential
+blowup of duplicates in the CallEnv.  This is what gave rise to the massive
+performace loss in Trac #8852.
 
 Note [Specialise original body]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
