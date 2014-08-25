@@ -324,7 +324,7 @@ sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 \begin{code}
 qualName :: PprStyle -> QueryQualifyName
 qualName (PprUser q _)  mod occ = queryQualifyName q mod occ
-qualName _other                     mod _   = NameQual (moduleName mod)
+qualName _other         mod _   = NameQual (moduleName mod)
 
 qualModule :: PprStyle -> QueryQualifyModule
 qualModule (PprUser q _)  m = queryQualifyModule q m
@@ -1029,7 +1029,7 @@ assertPprPanic file line msg
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> String -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg
- = cont (showSDoc dflags doc)
+ = cont (showSDocDump dflags doc)
  where
      doc = sep [text heading, nest 4 pretty_msg]
 \end{code}
