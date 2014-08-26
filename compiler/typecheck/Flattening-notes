@@ -1,0 +1,285 @@
+ToDo:
+
+* TcInteract, Note [Efficient orientation]?
+
+* inert_funeqs, inert_eqs: keep only the CtEvidence. 
+   They are all CFunEqCans, CTyEqCans
+
+* Update Note [Preparing inert set for implications]
+
+* indexed_types/should_compile/T3826
+
+
+The new flattening story
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+* A "flatten-skolem", fsk, is a *unification* variable
+  (ie with an IORef inside it)
+
+* A CFunEqCan is either of form
+     [G] <F xis> : F xis ~ fsk   -- fsk is a FlatSkol
+     [W]       x : F xis ~ usk   -- usk is a unification variable,
+                                 -- but untouchable
+  where
+     x is the witness variable
+     fsk is a flatten skolem
+     xis are function-free
+  CFunEqCans are always [Wanted], or [Given]
+
+  usk untouchable just means that in a CTyVarEq, say,
+       usk ~ Int
+  we do NOT unify usk.
+
+* KEY INSIGHTS:
+
+   - A given flatten-skolem, fsk, is known a-priori to be equal to
+     F xis (the LHS), with <F xis> evidence
+
+   - A unification flatten-skolem, usk, stands for the as-yet-unknown 
+     type to which (F xis) will eventually reduce
+
+
+* Inert set invariant: if F xis1 ~ fsk1, F xis2 ~ fsk2
+                       then xis1 /= xis2 
+  i.e. at most one CFunEqCan with a particular LHS
+
+* Each canonical CFunEqCan x : F xis ~ fsk/usk has its own
+  distinct evidence variable x and flatten-skolem fsk/usk.
+  Why? We make a fresh fsk/usk when the constraint is born;
+  and we never rewrite the RHS of a CFunEqCan.
+
+* CFunEqCans are the *only* way that function applications appear in
+  canonical constraints.  Function applications in any other
+  constraint must be gotten rid of by flattening, thereby generating
+  fresh CFunEqCans.
+
+* Flattening a type (F xis):
+    - If any member of fvs(xis) is a touchable unification variable
+                                or a unification flatten-skolem usk
+      then create new [W] x : F xis ~ usk
+      else create new [G] x : F xis ~ fsk
+      with fresh evidence variable x and flatten-skolem fsk/usk
+
+      NB: givens never contain touchable unification variables
+
+    - Add it to the work list
+
+    - Replace (F xis) with fsk/usk in the type you are flattening
+
+    - You can also add the CFunEqCan to the "flat cache", which
+      simply keeps track of all the function applications you
+      have flattened. 
+
+    - If (F xis) is in the cache already, just
+      use its fsk/usk and evidence x, and emit nothing.
+
+    - No need to substitute in the flat-cache. It's not the end
+      of the world if we start with, say (F alpha ~ usk1) and
+      (F Int ~ usk2) and then find alpha := Int.  Athat will
+      simply give rise to usk1 := usk2 via [Interacting rule] below
+
+* Canonicalising a CFunEqan [G/W] x : F xis ~ fks/usk
+    - Flatten xis (to substitute any tyvars; there are already no functions)
+                  cos :: xis ~ flat_xis
+    - New wanted  x2 :: F flat_xis ~ fsk/usk
+    - Add new wanted to flat cache
+    - Discharge x = F cos ; x2
+
+* Unification flatten-skolems, usk, ONLY get unified when either
+    a) The CFunEqCan takes a step, using an axiom
+    b) During un-flattening at the very, very end
+  They are never unified in any other form of equality.
+  For example [W] fsk ~ Int  is stuck; it does not unify with fsk.
+
+* We *never* substitute in the RHS (i.e. the fsk) of a CFunEqCan.
+  That would destroy the invariant about the shape of a CFunEqCan,
+  and it would risk wanted/wanted interactions. The only way we
+  learn information about fsk is when the CFunEqCan takes a step.
+
+  However we *do* substitute in the LHS of a CFunEqCan (else it
+  would never get to fire!)
+
+* [Interacting rule]
+    (inert)     [W] x1 : F tys ~ usk1
+    (work item) [W] x2 : F tys ~ usk2
+  Just solve one from the other:
+    x2 := x1
+    usk2 := usk1
+  This just unites the two fsks into one.
+  Always solve given from wanted if poss.
+
+* [Firing rule: wanteds]
+    (work item) [W] x : F tys ~ ufsk
+    instantiate axiom: co : F tys ~ rhs
+
+   First flatten rhs, giving
+      flat_co : rhs ~ xi
+
+   Now unify
+      ufsk := xi
+      x := co ; flat_co
+   discharging the work item. This is the way that usk's get
+   unified; even though they are "untouchable".
+
+   UNLESS fsk appears in xi, which can happen, in which case
+   don't unify but stick [W] ufsk ~ xi in the insoluble set.
+
+   Short cut if rhs = G rhs_tys, where G is a type function
+   Then
+      - Flatten rhs_tys (cos : rhs_tys ~ rhs_xis)
+      - Add G rhs_xis ~ ufsk to flat cache
+      - New wanted [W] x2 : G rhs_xis ~ ufsk
+      - Discharge x := co ; G cos ; x2
+
+* [Firing rule: givens]
+    (work item) [G] g : F tys ~ fsk
+    instantiate axiom: co : F tys ~ rhs
+
+   Now add non-canonical (since rhs is not flat)
+      [G] (sym g ; co) : fsk ~ rhs
+
+
+Floating
+~~~~~~~~
+Principle 1: do floating as if you un-flattened first
+
+For example:
+   [2] forall s.  () => (F alpha[1] s ~ ufsk, alpha[1] ~ Maybe ufsk)
+   and axiom F (Maybe _) x = x
+
+Here we obviously cannot float (F alpha s ~ ufsk) since it mentions s,
+*and hence* cannot float alpha ~ Maybe ufsk
+
+BUT consider this:
+   [2] forall s.  () => (F alpha[1] t ~ ufsk, alpha[1] ~ Maybe ufsk)
+   and axiom F (Maybe _) x = x
+
+Here we really *should* float both constraints, since they are
+equivalent to this (un-flattened) constraint
+   [2] forall s.  alpha[1] ~ Maybe (F alpha[1] t)
+which is clearly floatable.
+
+Principle 2: start the quest for floating with (a[n] ~ xi), where
+a is an untouchable unification variable.  Reason: the whole point
+of floating is to make thse
+
+Algorithm.  Start with ([W] a[n] ~ xi)
+            Look at free vars of xi
+               - unification variable: promote if necessary
+               - ufsk: float if its CFunEqCan is floatable
+               - skolem bound at this level: do not float
+               - fsk: look at the free vars of its value
+                      (in that case maybe promote a ~ F Int,
+                      rather than a ~ fsk, perhaps)
+            (see Principle 1)
+
+---------------
+----------------
+Preparing the inert set for implications
+
+   type instance F True a b = a
+   type instance F False a b = b
+
+   [W] x : F c a b ~ fsk
+   [G] gamma ~ fsk
+   (c ~ True)  => a ~ gamma
+   (c ~ False) => b ~ gamma
+--> (c ~ True branch)  Push in as given non-canonical
+   [G] g : (c ~ True)
+   [G] x : F c a b ~ fsk  (nc)
+   [W] a ~ fsk,
+--> flatten
+   [G] g : (c ~ True)
+   [G] sym x1 ; x : fsk1 ~ fsk
+   [W] x1 : F c a b ~ fsk1 (canon)
+  [W] a ~ fsk,
+---> subst c
+   [G] g : (c ~ True)
+   [G] sym x1 ; x : fsk1 ~ fsk
+   [W] x2 : F True a b ~ fsk1 (canon)
+   x1 = F g a b ; x2
+   [W] a ~ fsk,
+---> step  ax : F True a b ~ a
+   [G] g : (c ~ True)
+   [G] sym x1 ; x : fsk1 ~ fsk
+   [W] x2 : F True a b ~ fsk1 (canon)
+   [G] <a> : fsk1 := a
+   x2 = ax
+
+   [W] a ~ fsk,
+
+--------------------------
+Simple20
+~~~~~~~~
+axiom F [a] = [F a]
+
+[G] F [a] ~ a
+-->
+ [G] fsk ~ a
+[W] F [a] ~ fsk
+-->
+fsk := [fsk2]
+ [G] [fsk2] ~ a
+[W] F a ~ fsk2
+-->
+[W] F [fsk2] ~ fsk2   -- Back to square 1
+
+
+-------------------------------------------
+Simple13  with unification-fsks only
+~~~~~~~~  (This is why unif-fsks-only doesn't work)
+
+  [G] g : a ~ [F a]
+
+---> Flatten given
+  g' = g;[x]
+  [G] g'  : a ~ [usk]
+  [W] x : F a ~ usk
+
+--> subst a in x
+       x = F g' ; x2
+   [W] x2 : F [usk] ~ usk
+
+And now we have an evidence cycle between g' and x.
+
+If we used a given instead (ie current story)
+
+  [G] g : a ~ [F a]
+
+---> Flatten given
+  g' = g;[x]
+  [G] g'  : a ~ [fsk]
+  [G] <F a> : F a ~ fsk
+
+---> Substitute for a
+  [G] g'  : a ~ [fsk]
+  [G] F (sym g'); <F a> : F [fsk] ~ fsk
+
+
+
+-------------------------------------------
+Why given-fsks, alone, doesn't work
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  [W] w : alpha ~ [F alpha Int]
+
+---> flatten
+  w = ...w'...
+  [W] w' : alpha ~ [fsk]
+  [G] <F alpha Int> : F alpha Int ~ fsk
+
+--> unify (no occurs check)
+  alpha := [fsk]
+
+But since fsk = F alpha Int, this is really an occurs check error.  If
+that is all we know about alpha, we will succeed in constraint
+solving, producing a program with an infinite type.
+
+Even if we did finally get (g : fsk ~ Boo)l by solving (F alpha Int ~ fsk)
+using axiom, zonking would not see it, so (x::alpha) sitting in the
+tree will get zonked to an infinite type.  (Zonking always only does
+refl stuff.)
+
+
+
+
