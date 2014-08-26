@@ -1222,7 +1222,7 @@ ones that don't mention the skolem-bound variables.  But that is
 over-eager. Consider
    [2] forall a. F a beta[1] ~ gamma[2], G beta[1] gamma[2] ~ Int
 The second constraint doesn't mention 'a'.  But if we float it
-we'll promote gamma to gamma'[1].  Now suppose that we learn that
+we'll promote gamma[2] to gamma'[1].  Now suppose that we learn that
 beta := Bool, and F a Bool = a, and G Bool _ = Int.  Then we'll
 we left with the constraint
    [2] forall a. a ~ gamma'[1]
