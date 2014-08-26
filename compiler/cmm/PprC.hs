@@ -1214,8 +1214,9 @@ commafy xs = hsep $ punctuate comma xs
 pprHexVal :: Integer -> Width -> SDoc
 pprHexVal 0 _ = ptext (sLit "0x0")
 pprHexVal w rep
-  | w < 0     = parens (char '-' <> ptext (sLit "0x") <> go (-w) <> repsuffix rep)
-  | otherwise = ptext (sLit "0x") <> go w <> repsuffix rep
+  | w < 0     = parens (char '-' <>
+                    ptext (sLit "0x") <> intToDoc (-w) <> repsuffix rep)
+  | otherwise =     ptext (sLit "0x") <> intToDoc   w  <> repsuffix rep
   where
         -- type suffix for literals:
         -- Integer literals are unsigned in Cmm/C.  We explicitly cast to
@@ -1230,10 +1231,33 @@ pprHexVal w rep
           else panic "pprHexVal: Can't find a 64-bit type"
       repsuffix _ = char 'U'
 
+      intToDoc :: Integer -> SDoc
+      intToDoc i = go (truncInt i)
+
+      -- We need to truncate value as Cmm backend does not drop
+      -- redundant bits to ease handling of negative values.
+      -- Thus the following Cmm code on 64-bit arch, like amd64:
+      --     CInt v;
+      --     v = {something};
+      --     if (v == %lobits32(-1)) { ...
+      -- leads to the following C code:
+      --     StgWord64 v = (StgWord32)({something});
+      --     if (v == 0xFFFFffffFFFFffffU) { ...
+      -- Such code is incorrect as it promotes both operands to StgWord64
+      -- and the whole condition is always false.
+      truncInt :: Integer -> Integer
+      truncInt i =
+          case rep of
+              W8  -> i `rem` (2^(8 :: Int))
+              W16 -> i `rem` (2^(16 :: Int))
+              W32 -> i `rem` (2^(32 :: Int))
+              W64 -> i `rem` (2^(64 :: Int))
+              _   -> panic ("pprHexVal/truncInt: C backend can't encode "
+                            ++ show rep ++ " literals")
+
       go 0 = empty
       go w' = go q <> dig
            where
              (q,r) = w' `quotRem` 16
              dig | r < 10    = char (chr (fromInteger r + ord '0'))
                  | otherwise = char (chr (fromInteger r - 10 + ord 'a'))
-
