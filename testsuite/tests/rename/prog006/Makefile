@@ -36,7 +36,8 @@ rn.prog006:
 	echo "key: test-1.0" >>pkg.conf
 	echo "import-dirs: `./pwd`" >>pkg.conf
 	echo "exposed-modules: B.C" >>pkg.conf
-	echo "[]" >$(LOCAL_PKGCONF)
+	rm -rf $(LOCAL_PKGCONF)
+	$(GHC_PKG) init $(LOCAL_PKGCONF)
 	$(LOCAL_GHC_PKG) register pkg.conf -v0
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -package-db $(LOCAL_PKGCONF) -package test -fforce-recomp A.hs -i
 # The -i clears the search path, so A.hs will find B.C from package test

@@ -11,7 +11,7 @@ clean:
 	rm -f v2/setup v2/Setup.o v2/Setup.hi
 	rm -rf v1/dist v2/dist
 	rm -f *.o *.hi
-	rm -f $(LOCAL_PKGCONF)
+	rm -rf $(LOCAL_PKGCONF)
 
 bug1465:
 	$(MAKE) clean
@@ -20,7 +20,7 @@ bug1465:
 	$(MAKE) clean
 
 prep:
-	echo "[]" >$(LOCAL_PKGCONF)
+	'$(GHC_PKG)' init $(LOCAL_PKGCONF)
 	$(MAKE) prep.v1
 	$(MAKE) prep.v2
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(LOCAL_PKGCONF) -c -package $(PKG)-1.0 B1.hs
