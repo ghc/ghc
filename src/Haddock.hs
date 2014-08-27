@@ -42,7 +42,6 @@ import Data.IORef
 import qualified Data.Map as Map
 import System.IO
 import System.Exit
-import System.Directory
 
 #if defined(mingw32_HOST_OS)
 import Foreign
@@ -63,6 +62,8 @@ import DynFlags hiding (verbosity)
 import StaticFlags (discardStaticFlags)
 import Panic (handleGhcException)
 import Module
+import PackageConfig
+import FastString
 
 --------------------------------------------------------------------------------
 -- * Exception handling
@@ -242,7 +243,7 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     pkgMod           = ifaceMod (head ifaces)
     pkgKey            = modulePackageKey pkgMod
     pkgStr           = Just (packageKeyString pkgKey)
-    (pkgName,pkgVer) = modulePackageInfo pkgMod
+    (pkgName,pkgVer) = modulePackageInfo dflags pkgMod
 
     (srcBase, srcModule, srcEntity, srcLEntity) = sourceUrls flags
     srcMap' = maybe srcMap (\path -> Map.insert pkgKey path srcMap) srcEntity
@@ -276,13 +277,15 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     copyHtmlBits odir libDir themes
 
   when (Flag_Hoogle `elem` flags) $ do
-    let pkgName2 = if pkgName == "main" && title /= [] then title else pkgName
-    ppHoogle dflags pkgName2 pkgVer title prologue visibleIfaces odir
+    let pkgNameStr | unpackFS pkgNameFS == "main" && title /= []
+                               = title
+                   | otherwise = unpackFS pkgNameFS
+          where PackageName pkgNameFS = pkgName
+    ppHoogle dflags pkgNameStr pkgVer title prologue visibleIfaces odir
 
   when (Flag_LaTeX `elem` flags) $ do
     ppLaTeX title pkgStr visibleIfaces odir prologue opt_latex_style
                   libDir
-
 
 -------------------------------------------------------------------------------
 -- * Reading and dumping interface files
