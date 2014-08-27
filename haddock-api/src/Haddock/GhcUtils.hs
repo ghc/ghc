@@ -22,8 +22,6 @@ import Control.Arrow
 import Data.Foldable hiding (concatMap)
 import Data.Function
 import Data.Traversable
-import Distribution.Compat.ReadP
-import Distribution.Text
 
 import Exception
 import Outputable
@@ -43,24 +41,11 @@ moduleString = moduleNameString . moduleName
 
 
 -- return the (name,version) of the package
-modulePackageInfo :: Module -> (String, [Char])
-modulePackageInfo modu = case unpackPackageKey pkg of
-                          Nothing -> (packageKeyString pkg, "")
-                          Just x -> (display $ pkgName x, showVersion (pkgVersion x))
-  where pkg = modulePackageKey modu
-
-
--- This was removed from GHC 6.11
--- XXX we shouldn't be using it, probably
-
--- | Try and interpret a GHC 'PackageKey' as a cabal 'PackageIdentifer'. Returns @Nothing@ if
--- we could not parse it as such an object.
-unpackPackageKey :: PackageKey -> Maybe PackageIdentifier
-unpackPackageKey p
-  = case [ pid | (pid,"") <- readP_to_S parse str ] of
-        []      -> Nothing
-        (pid:_) -> Just pid
-  where str = packageKeyString p
+modulePackageInfo :: DynFlags -> Module -> (PackageName, Version)
+modulePackageInfo dflags modu =
+    (packageName pkg, packageVersion pkg)
+  where
+    pkg = getPackageDetails dflags (modulePackageKey modu)
 
 
 lookupLoadedHomeModuleGRE  :: GhcMonad m => ModuleName -> m (Maybe GlobalRdrEnv)
