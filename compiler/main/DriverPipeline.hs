@@ -1199,6 +1199,7 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
 
         as_prog <- whichAsProg
         let cmdline_include_paths = includePaths dflags
+        let pic_c_flags = picCCOpts dflags
 
         next_phase <- maybeMergeStub
         output_fn <- phaseOutputFilename next_phase
@@ -1211,6 +1212,9 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         let runAssembler inputFilename outputFilename
                 = liftIO $ as_prog dflags
                        ([ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
+
+                       -- See Note [-fPIC for assembler]
+                       ++ map SysTools.Option pic_c_flags
 
         -- We only support SparcV9 and better because V8 lacks an atomic CAS
         -- instruction so we have to make sure that the assembler accepts the
@@ -1253,6 +1257,8 @@ runPhase (RealPhase SplitAs) _input_fn dflags
             osuf = objectSuf dflags
             split_odir  = base_o ++ "_" ++ osuf ++ "_split"
 
+        let pic_c_flags = picCCOpts dflags
+
         -- this also creates the hierarchy
         liftIO $ createDirectoryIfMissing True split_odir
 
@@ -1285,6 +1291,9 @@ runPhase (RealPhase SplitAs) _input_fn dflags
                           (if platformArch (targetPlatform dflags) == ArchSPARC
                            then [SysTools.Option "-mcpu=v9"]
                            else []) ++
+
+                          -- See Note [-fPIC for assembler]
+                          map SysTools.Option pic_c_flags ++
 
                           [ SysTools.Option "-c"
                           , SysTools.Option "-o"
@@ -2203,3 +2212,38 @@ haveRtsOptsFlags dflags =
          isJust (rtsOpts dflags) || case rtsOptsEnabled dflags of
                                         RtsOptsSafeOnly -> False
                                         _ -> True
+
+-- Note [-fPIC for assembler]
+-- When compiling .c source file GHC's driver pipeline basically
+-- does the following two things:
+--   1. ${CC}              -S 'PIC_CFLAGS' source.c
+--   2. ${CC} -x assembler -c 'PIC_CFLAGS' source.S
+--
+-- Why do we need to pass 'PIC_CFLAGS' both to C compiler and assembler?
+-- Because on some architectures (at least sparc32) assembler also choses
+-- relocation type!
+-- Consider the following C module:
+--
+--     /* pic-sample.c */
+--     int v;
+--     void set_v (int n) { v = n; }
+--     int  get_v (void)  { return v; }
+--
+--     $ gcc -S -fPIC pic-sample.c
+--     $ gcc -c       pic-sample.s -o pic-sample.no-pic.o # incorrect binary
+--     $ gcc -c -fPIC pic-sample.s -o pic-sample.pic.o    # correct binary
+--
+--     $ objdump -r -d pic-sample.pic.o    > pic-sample.pic.o.od
+--     $ objdump -r -d pic-sample.no-pic.o > pic-sample.no-pic.o.od
+--     $ diff -u pic-sample.pic.o.od pic-sample.no-pic.o.od
+--
+-- Most of architectures won't show any difference in this test, but on sparc32
+-- the following assembly snippet:
+--
+--    sethi   %hi(_GLOBAL_OFFSET_TABLE_-8), %l7
+--
+-- generates two kinds or relocations, only 'R_SPARC_PC22' is correct:
+--
+--       3c:  2f 00 00 00     sethi  %hi(0), %l7
+--    -                       3c: R_SPARC_PC22        _GLOBAL_OFFSET_TABLE_-0x8
+--    +                       3c: R_SPARC_HI22        _GLOBAL_OFFSET_TABLE_-0x8
