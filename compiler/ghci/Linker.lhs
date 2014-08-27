@@ -1023,7 +1023,7 @@ data LibrarySpec
 partOfGHCi :: [PackageName]
 partOfGHCi
  | isWindowsHost || isDarwinHost = []
- | otherwise = map PackageName
+ | otherwise = map (PackageName . mkFastString)
                    ["base", "template-haskell", "editline"]
 
 showLS :: LibrarySpec -> String
