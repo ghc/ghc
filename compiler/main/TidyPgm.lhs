@@ -417,12 +417,6 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                                 md_anns      = anns      -- are already tidy
                               })
         }
-  where
-    lookup_dfun :: TypeEnv -> Var -> Id
-    lookup_dfun type_env dfun_id
-      = case lookupTypeEnv type_env (idName dfun_id) of
-            Just (AnId dfun_id') -> dfun_id'
-            _other -> pprPanic "lookup_dfun" (ppr dfun_id)
 
 lookup_aux_id :: TypeEnv -> Var -> Id
 lookup_aux_id type_env id
