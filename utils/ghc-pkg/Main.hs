@@ -57,7 +57,6 @@ import Control.Concurrent
 
 import qualified Data.ByteString.Char8 as BS
 import Data.Binary as Bin
---import qualified Data.Binary.Get as Bin
 
 #if defined(mingw32_HOST_OS)
 -- mingw32 needs these for getExecDir
@@ -2141,4 +2140,4 @@ instance Binary PackageKey where
            case n of
             0 -> do a <- get; b <- get; c <- get; return (PackageKey a b c)
             1 -> do a <- get; return (OldPackageKey a)
-            _ -> error ("Binary PackageKey: bad branch " ++ show n)
+            _ -> fail ("Binary PackageKey: bad branch " ++ show n)

@@ -1363,7 +1363,8 @@ add_package pkg_db ipid_map ps (p, mb_parent)
               | Just pid <- Map.lookup ipid ipid_map
               = add_package pkg_db ipid_map ps (pid, Just p)
               | otherwise
-              = Failed (missingPackageMsg ipid <> missingDependencyMsg mb_parent)
+              = Failed (missingPackageMsg ipid
+                          <> missingDependencyMsg mb_parent)
 
 missingPackageErr :: Outputable pkgid => DynFlags -> pkgid -> IO a
 missingPackageErr dflags p
