@@ -178,29 +178,37 @@ like 'bracket' cannot be used safely within 'unsafeDupablePerformIO'.
 /Since: 4.4.0.0/
 -}
 {-# NOINLINE unsafeDupablePerformIO #-}
+    -- See Note [unsafeDupablePerformIO is NOINLINE]
 unsafeDupablePerformIO  :: IO a -> a
 unsafeDupablePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
+     -- See Note [unsafeDupablePerformIO has a lazy RHS]
 
+-- Note [unsafeDupablePerformIO is NOINLINE]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Why do we NOINLINE unsafeDupablePerformIO?  See the comment with
 -- GHC.ST.runST.  Essentially the issue is that the IO computation
 -- inside unsafePerformIO must be atomic: it must either all run, or
 -- not at all.  If we let the compiler see the application of the IO
 -- to realWorld#, it might float out part of the IO.
 
+-- Note [unsafeDupablePerformIO has a lazy RHS]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Why is there a call to 'lazy' in unsafeDupablePerformIO?
 -- If we don't have it, the demand analyser discovers the following strictness
 -- for unsafeDupablePerformIO:  C(U(AV))
 -- But then consider
---      unsafeDupablePerformIO (\s -> let r = f x in 
+--      unsafeDupablePerformIO (\s -> let r = f x in
 --                             case writeIORef v r s of (# s1, _ #) ->
---                             (# s1, r #)
+--                             (# s1, r #) )
 -- The strictness analyser will find that the binding for r is strict,
--- (because of uPIO's strictness sig), and so it'll evaluate it before 
--- doing the writeIORef.  This actually makes tests/lib/should_run/memo002
--- get a deadlock!  
+-- (because of uPIO's strictness sig), and so it'll evaluate it before
+-- doing the writeIORef.  This actually makes libraries/base/tests/memo002
+-- get a deadlock, where we specifically wanted to write a lazy thunk
+-- into the ref cell.
 --
 -- Solution: don't expose the strictness of unsafeDupablePerformIO,
 --           by hiding it with 'lazy'
+-- But see discussion in Trac #9390 (comment:33)
 
 {-|
 'unsafeInterleaveIO' allows 'IO' computation to be deferred lazily.
