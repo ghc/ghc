@@ -99,9 +99,7 @@ pprTop (CmmProc infos clbl _ graph) =
            (if (externallyVisibleCLabel clbl)
                     then mkFN_ else mkIF_) (ppr clbl) <+> lbrace,
            nest 8 temp_decls,
-           nest 8 mkFB_,
            vcat (map pprBBlock blocks),
-           nest 8 mkFE_,
            rbrace ]
     )
   where
@@ -784,11 +782,6 @@ mkJMP_, mkFN_, mkIF_ :: SDoc -> SDoc
 mkJMP_ i = ptext (sLit "JMP_") <> parens i
 mkFN_  i = ptext (sLit "FN_")  <> parens i -- externally visible function
 mkIF_  i = ptext (sLit "IF_")  <> parens i -- locally visible
-
-
-mkFB_, mkFE_ :: SDoc
-mkFB_ = ptext (sLit "FB_") -- function code begin
-mkFE_ = ptext (sLit "FE_") -- function code end
 
 -- from includes/Stg.h
 --
