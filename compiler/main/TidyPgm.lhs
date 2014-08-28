@@ -448,7 +448,7 @@ So trimAutoRules does this:
   * Remove all bindings that are kept alive *only* by isAutoRule rules
   * Remove all auto rules that mention bindings that have been removed
 So if a binding is kept alive for some other reason (e.g. f_spec is
-called in the final code), we keep th e rule too.
+called in the final code), we keep the rule too.
 
 I found that binary sizes jumped by 6-10% when I started to specialise
 INLINE functions (again, Note [Inline specialisations] in Specialise).
@@ -459,7 +459,7 @@ Adding trimAutoRules removed all this bloat.
 trimAutoRules :: [CoreBind] -> [CoreRule] -> ([CoreBind], [CoreRule])
 -- See Note [Trimming auto rules]
 trimAutoRules binds rules
-  | null auto_rules
+  | True {- null auto_rules -}  -- Temporrary fix
   = (binds, rules)
   | otherwise
   = (binds', filter keep_rule auto_rules ++ user_rules)
