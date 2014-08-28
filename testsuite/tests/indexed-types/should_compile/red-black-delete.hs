@@ -1,4 +1,4 @@
-{-# LANGUAGE InstanceSigs,GADTs, DataKinds, KindSignatures, MultiParamTypeClasses, FlexibleInstances, TypeFamilies #-}
+{-# LANGUAGE InstanceSigs, GADTs, StandaloneDeriving, DataKinds, KindSignatures, MultiParamTypeClasses, FlexibleInstances, TypeFamilies #-}
 
 -- Implementation of deletion for red black trees by Matt Might
 -- Editing to preserve the red/black tree invariants by Stephanie Weirich,
@@ -12,7 +12,6 @@
 module MightRedBlackGADT where
 
 import Prelude hiding (max)
--- import Test.QuickCheck hiding (elements)
 import Data.List(nub,sort)
 import Control.Monad(liftM)
 import Data.Type.Equality
@@ -61,19 +60,8 @@ type instance Incr NegativeBlack (S n) = n
 data RBSet a where
   Root :: (CT n Black a) -> RBSet a
 
--- We can't automatically derive show and equality
--- methods for GADTs.
-instance Show (SColor c) where
-  show R = "R"
-  show B = "B"
-  show BB = "BB"
-  show NB = "NB"
-
-instance Show a => Show (CT n c a) where
-  show E = "E"
-  show (T c l x r) =
-    "(T " ++ show c ++ " " ++ show l ++ " "
-          ++ show x ++ " " ++ show r ++ ")"
+deriving instance Show (SColor c)
+deriving instance Show a => Show (CT n c a)
 instance Show a => Show (RBSet a) where
   show (Root x) = show x
 
