@@ -77,6 +77,7 @@ _darcs/
 /bindisttest/
 /ch01.html
 /ch02.html
+/compiler/dist/
 /compiler/ghc.cabal
 /compiler/ghc.cabal.old
 /distrib/configure.ac
