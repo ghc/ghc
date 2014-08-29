@@ -555,6 +555,9 @@ module GHC.Generics  (
   , Datatype(..), Constructor(..), Selector(..), NoSelector
   , Fixity(..), Associativity(..), Arity(..), prec
 
+  -- * Propositional equality for meta-information
+  , sameDatatype
+
   -- * Generic type classes
   , Generic(..), Generic1(..)
 
@@ -562,11 +565,14 @@ module GHC.Generics  (
 
 -- We use some base types
 import GHC.Types
+import Unsafe.Coerce
 import Data.Maybe ( Maybe(..) )
 import Data.Either ( Either(..) )
+import Data.Type.Equality
+import GHC.Base ( (&&), undefined )
 
 -- Needed for instances
-import GHC.Classes ( Eq, Ord )
+import GHC.Classes ( Eq((==)), Ord )
 import GHC.Read ( Read )
 import GHC.Show ( Show )
 import Data.Proxy
@@ -651,6 +657,17 @@ class Datatype d where
   -- | Marks if the datatype is actually a newtype
   isNewtype    :: t d (f :: * -> *) a -> Bool
   isNewtype _ = False
+
+-- | Propositional equality predicate for datatypes
+sameDatatype :: (Datatype l, Datatype r) => Proxy l -> Proxy r -> Maybe (l :~: r)
+sameDatatype l r | moduleName dl == moduleName dr
+                 && datatypeName dl == datatypeName dr
+                 = Just (unsafeCoerce Refl)
+    where dummy :: Proxy m -> D1 m a p
+          dummy Proxy = undefined
+          dl = dummy l
+          dr = dummy r
+sameDatatype _ _ = Nothing
 
 
 -- | Class for datatypes that represent records
