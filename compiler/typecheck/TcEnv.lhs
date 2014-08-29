@@ -426,7 +426,7 @@ Note especially that
  * It does not extend the local RdrEnv (tcl_rdr), because the things are
    already in the GlobalRdrEnv.  Extending the local RdrEnv isn't terrible,
    but it means there is an entry for the same Name in both global and local
-   RdrEnvs, and that lead to duplicate "perhpas you meant..." suggestions
+   RdrEnvs, and that lead to duplicate "perhaps you meant..." suggestions
    (e.g. T5564).
 
    We don't bother with the tcl_th_bndrs environment either.

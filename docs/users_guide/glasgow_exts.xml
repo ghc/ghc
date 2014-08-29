@@ -5358,7 +5358,7 @@ is extended thus: defaulting applies when all the unresolved constraints involve
 </para></listitem>
 </itemizedlist>
 So, for example, the expression <literal>length "foo"</literal> will give rise
-to an ambiguous use of <literal>IsString a0</literal> which, becuase of the above
+to an ambiguous use of <literal>IsString a0</literal> which, because of the above
 rules, will default to <literal>String</literal>.
 </para>
 <para>

@@ -527,7 +527,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
 
        -- Check for an empty record update  e {}
-       -- NB: don't complain about e { .. }, becuase rn_dotdot has done that already
+       -- NB: don't complain about e { .. }, because rn_dotdot has done that already
        ; case ctxt of
            HsRecFieldUpd | Nothing <- dotdot
                          , null flds

@@ -694,7 +694,7 @@ drop_dicts drops dictionary bindings on the LHS where possible.
          will be simple NonRec bindings.  We don't handle recursive
          dictionaries!
 
-    NB3: In the common case of a non-overloaded, but perhpas-polymorphic
+    NB3: In the common case of a non-overloaded, but perhaps-polymorphic
          specialisation, we don't need to bind *any* dictionaries for use
          in the RHS. For example (Trac #8331)
              {-# SPECIALIZE INLINE useAbstractMonad :: ReaderST s Int #-}
