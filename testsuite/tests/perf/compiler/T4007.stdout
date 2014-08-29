@@ -1,5 +1,10 @@
 Rule fired: unpack
-Rule fired: SPEC Control.Monad.sequence_ @ GHC.Types.IO _
+Rule fired: Class op return
+Rule fired: Class op >>
+Rule fired: Class op >>
+Rule fired: Class op return
+Rule fired: Class op >>
+Rule fired: Class op return
 Rule fired: <=#
 Rule fired: tagToEnum#
 Rule fired: fold/build
