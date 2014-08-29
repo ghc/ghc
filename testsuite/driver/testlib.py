@@ -1596,10 +1596,8 @@ def normalise_errmsg( str ):
     # The inplace ghc's are called ghc-stage[123] to avoid filename
     # collisions, so we need to normalise that to just "ghc"
     str = re.sub('ghc-stage[123]', 'ghc', str)
-    # We sometimes see the name of the integer-gmp package on stderr,
-    # but this can change (either the implementation name or the
-    # version number), so we canonicalise it here
-    str = re.sub('integer-[a-z]+', 'integer-impl', str)
+    # Error messages simetimes contain integer implementation package
+    str = re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', str)
     return str
 
 # normalise a .prof file, so that we can reasonably compare it against

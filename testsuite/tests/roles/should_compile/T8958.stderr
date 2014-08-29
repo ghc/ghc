@@ -17,7 +17,7 @@ INSTANCES
     -- Defined at T8958.hs:10:10
 Dependent modules: []
 Dependent packages: [base-4.7.1.0, ghc-prim-0.3.1.0,
-                     integer-gmp-0.5.1.0]
+                     integer-<IMPL>-<VERSION>]
 
 ==================== Typechecker ====================
 AbsBinds [a] []
