@@ -58,7 +58,7 @@ module CoreSyn (
 	maybeUnfoldingTemplate, otherCons, 
 	isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
-        isStableUnfolding, isStableCoreUnfolding_maybe,
+        isStableUnfolding, hasStableCoreUnfolding_maybe,
         isClosedUnfolding, hasSomeUnfolding, 
 	canUnfold, neverUnfoldGuidance, isStableSource,
 
@@ -929,10 +929,17 @@ expandUnfolding_maybe :: Unfolding -> Maybe CoreExpr
 expandUnfolding_maybe (CoreUnfolding { uf_expandable = True, uf_tmpl = rhs }) = Just rhs
 expandUnfolding_maybe _                                                       = Nothing
 
-isStableCoreUnfolding_maybe :: Unfolding -> Maybe UnfoldingSource
-isStableCoreUnfolding_maybe (CoreUnfolding { uf_src = src })
-   | isStableSource src   = Just src
-isStableCoreUnfolding_maybe _ = Nothing
+hasStableCoreUnfolding_maybe :: Unfolding -> Maybe Bool
+-- Just True  <=> has stable inlining, very keen to inline (eg. INLINE pragma)
+-- Just False <=> has stable inlining, open to inlining it (eg. INLINEABLE pragma)
+-- Nothing    <=> not table, or cannot inline it anyway
+hasStableCoreUnfolding_maybe (CoreUnfolding { uf_src = src, uf_guidance = guide })
+   | isStableSource src
+   = case guide of
+       UnfWhen {}       -> Just True
+       UnfIfGoodArgs {} -> Just False
+       UnfNever         -> Nothing
+hasStableCoreUnfolding_maybe _ = Nothing
 
 isCompulsoryUnfolding :: Unfolding -> Bool
 isCompulsoryUnfolding (CoreUnfolding { uf_src = InlineCompulsory }) = True
