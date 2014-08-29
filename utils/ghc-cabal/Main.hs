@@ -346,13 +346,11 @@ generate directory distdir dll0Modules config_args
       withLibLBI pd lbi $ \lib clbi ->
           do cwd <- getCurrentDirectory
              let ipid = InstalledPackageId (display (packageId pd) ++ "-inplace")
-             let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
-                                        pd lib lbi clbi
-                 final_ipi = installedPkgInfo {
-                                 Installed.installedPackageId = ipid,
-                                 Installed.haddockHTMLs = []
-                             }
-                 content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
+             let installedPkgInfo = (inplaceInstalledPackageInfo cwd distdir
+                                        pd ipid lib lbi clbi)
+                                        { Installed.haddockHTMLs = [] }
+                 content = Installed.showInstalledPackageInfo installedPkgInfo
+                        ++ "\n"
              writeFileAtomic (distdir </> "inplace-pkg-config") (BS.pack $ toUTF8 content)
 
       let

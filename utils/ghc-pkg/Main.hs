@@ -20,8 +20,7 @@ import Distribution.InstalledPackageInfo as Cabal
 import Distribution.License
 import Distribution.Compat.ReadP hiding (get)
 import Distribution.ParseUtils
-import Distribution.ModuleExport
-import Distribution.Package hiding (depends)
+import Distribution.Package hiding (depends, installedPackageId)
 import Distribution.Text
 import Distribution.Version
 import Distribution.Simple.Utils (fromUTF8, toUTF8)
@@ -37,8 +36,6 @@ import Prelude
 import System.Console.GetOpt
 import qualified Control.Exception as Exception
 import Data.Maybe
-
-import qualified Data.Set as Set
 
 import Data.Char ( isSpace, toLower )
 import Data.Ord (comparing)
@@ -899,9 +896,6 @@ registerPackage input verbosity my_flags auto_ghci_libs multi_instance
   validatePackageConfig pkg_expanded verbosity truncated_stack
                         auto_ghci_libs multi_instance update force
 
-  -- postprocess the package
-  pkg' <- resolveReexports truncated_stack pkg
-
   let 
      -- In the normal mode, we only allow one version of each package, so we
      -- remove all instances with the same source package id as the one we're
@@ -912,7 +906,7 @@ registerPackage input verbosity my_flags auto_ghci_libs multi_instance
                  p <- packages db_to_operate_on,
                  sourcePackageId p == sourcePackageId pkg ]
   --
-  changeDB verbosity (removes ++ [AddPackage pkg']) db_to_operate_on
+  changeDB verbosity (removes ++ [AddPackage pkg]) db_to_operate_on
 
 parsePackageInfo
         :: String
@@ -934,47 +928,6 @@ mungePackageInfo ipi = ipi { packageKey = packageKey' }
       | OldPackageKey (PackageIdentifier (PackageName "") _) <- packageKey ipi
           = OldPackageKey (sourcePackageId ipi)
       | otherwise = packageKey ipi
-
--- | Takes the "reexported-modules" field of an InstalledPackageInfo
--- and resolves the references so they point to the original exporter
--- of a module (i.e. the module is in exposed-modules, not
--- reexported-modules).  This is done by maintaining an invariant on
--- the installed package database that a reexported-module field always
--- points to the original exporter.
-resolveReexports :: PackageDBStack
-                 -> InstalledPackageInfo
-                 -> IO InstalledPackageInfo
-resolveReexports db_stack pkg = do
-  let dep_mask = Set.fromList (depends pkg)
-      deps = filter (flip Set.member dep_mask . installedPackageId)
-                    (allPackagesInStack db_stack)
-      matchExposed pkg_dep m = map ((,) (installedPackageId pkg_dep))
-                                   (filter (==m) (exposedModules pkg_dep))
-      worker ModuleExport{ exportOrigPackageName = Just pnm } pkg_dep
-        | pnm /= packageName (sourcePackageId pkg_dep) = []
-      -- Now, either the package matches, *or* we were asked to search the
-      -- true location ourselves.
-      worker ModuleExport{ exportOrigName = m } pkg_dep =
-            matchExposed pkg_dep m ++
-            map (fromMaybe (error $ "Impossible! Missing true location in " ++
-                                    display (installedPackageId pkg_dep))
-                    . exportCachedTrueOrig)
-                (filter ((==m) . exportName) (reexportedModules pkg_dep))
-      self_reexports ModuleExport{ exportOrigPackageName = Just pnm }
-        | pnm /= packageName (sourcePackageId pkg) = []
-      self_reexports ModuleExport{ exportName = m', exportOrigName = m }
-        -- Self-reexport without renaming doesn't make sense
-        | m == m' = []
-        -- *Only* match against exposed modules!
-        | otherwise = matchExposed pkg m
-
-  r <- forM (reexportedModules pkg) $ \me -> do
-    case nub (concatMap (worker me) deps ++ self_reexports me) of
-      [c] -> return me { exportCachedTrueOrig = Just c }
-      [] -> die $ "Couldn't resolve reexport " ++ display me
-      cs -> die $ "Found multiple possible ways to resolve reexport " ++
-                  display me ++ ": " ++ show cs
-  return (pkg { reexportedModules = r })
 
 -- -----------------------------------------------------------------------------
 -- Making changes to a package database
@@ -1068,16 +1021,25 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.haddockHTMLs       = haddockHTMLs pkg,
        GhcPkg.exposedModules     = exposedModules pkg,
        GhcPkg.hiddenModules      = hiddenModules pkg,
-       GhcPkg.reexportedModules  = [ GhcPkg.ModuleExport m ipid' m'
-                                   | ModuleExport {
-                                       exportName = m,
-                                       exportCachedTrueOrig =
-                                         Just (InstalledPackageId ipid', m')
-                                     } <- reexportedModules pkg
-                                   ],
+       GhcPkg.reexportedModules  = map convertModuleReexport
+                                       (reexportedModules pkg),
        GhcPkg.exposed            = exposed pkg,
        GhcPkg.trusted            = trusted pkg
     }
+  where
+    convertModuleReexport :: ModuleReexport
+                          -> GhcPkg.ModuleExport String ModuleName
+    convertModuleReexport
+        ModuleReexport {
+          moduleReexportName            = m,
+          moduleReexportDefiningPackage = ipid',
+          moduleReexportDefiningName    = m'
+        }
+      = GhcPkg.ModuleExport {
+          exportModuleName         = m,
+          exportOriginalPackageId  = display ipid',
+          exportOriginalModuleName = m'
+        }
 
 instance GhcPkg.BinaryStringRep ModuleName where
   fromStringRep = ModuleName.fromString . fromUTF8 . BS.unpack
@@ -2128,10 +2090,10 @@ instance Binary ModuleName where
   put = put . display
   get = fmap ModuleName.fromString get
 
-instance Binary m => Binary (ModuleExport m) where
-  put (ModuleExport a b c d) = do put a; put b; put c; put d
-  get = do a <- get; b <- get; c <- get; d <- get;
-           return (ModuleExport a b c d)
+instance Binary ModuleReexport where
+  put (ModuleReexport a b c) = do put a; put b; put c
+  get = do a <- get; b <- get; c <- get
+           return (ModuleReexport a b c)
 
 instance Binary PackageKey where
   put (PackageKey a b c) = do putWord8 0; put a; put b; put c
