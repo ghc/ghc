@@ -643,8 +643,8 @@ specImport dflags this_mod done rb fn calls_for_fn
   | null calls_for_fn   -- We filtered out all the calls in deleteCallsMentioning
   = return ([], [])
 
-  | wantSpecImport dflags fn
-  , Just rhs <- maybeUnfoldingTemplate (realIdUnfolding fn)
+  | wantSpecImport dflags unfolding
+  , Just rhs <- maybeUnfoldingTemplate unfolding
   = do {     -- Get rules from the external package state
              -- We keep doing this in case we "page-fault in"
              -- more rules as we go along
@@ -669,21 +669,25 @@ specImport dflags this_mod done rb fn calls_for_fn
        ; return (rules2 ++ rules1, spec_binds2 ++ spec_binds1) }
 
   | otherwise
-  = WARN( True, hang (ptext (sLit "specImport discarding:"))
-                   2 (vcat (map (pprCallInfo fn) calls_for_fn)) )
+  = WARN( True, hang (ptext (sLit "specImport discarding:") <+> ppr fn <+> dcolon <+> ppr (idType fn))
+                   2 (  (text "want:" <+> ppr (wantSpecImport dflags unfolding))
+                     $$ (text "stable:" <+> ppr (isStableUnfolding unfolding))
+                     $$ (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn)) ) )
     return ([], [])
+  where
+    unfolding = realIdUnfolding fn   -- We want to see the unfolding even for loop breakers
 
-wantSpecImport :: DynFlags -> Id -> Bool
+wantSpecImport :: DynFlags -> Unfolding -> Bool
 -- See Note [Specialise imported INLINABLE things]
-wantSpecImport dflags fn
- = case idUnfolding fn of
+wantSpecImport dflags unf
+ = case unf of
      NoUnfolding      -> False
      OtherCon {}      -> False
      DFunUnfolding {} -> True
      CoreUnfolding { uf_src = src, uf_guidance = _guidance }
        | gopt Opt_SpecialiseAggressively dflags -> True
        | isStableSource src -> True
-               -- Specialise even INILNE things; it hasn't inlined yet,
+               -- Specialise even INLINE things; it hasn't inlined yet,
                -- so perhaps it never will.  Moreover it may have calls
                -- inside it that we want to specialise
        | otherwise -> False    -- Stable, not INLINE, hence INLINEABLE
@@ -1614,8 +1618,8 @@ instance Outputable CallInfoSet where
 
 pprCallInfo :: Id -> CallInfo -> SDoc
 pprCallInfo fn (CallKey mb_tys, (dxs, _))
-  = hang (ppr fn <+> dcolon <+> ppr (idType fn)) 
-       2 (ptext (sLit "args:") <+> fsep (map ppr_call_key_ty mb_tys ++ map pprParendExpr dxs))
+  = hang (ppr fn)
+       2 (fsep (map ppr_call_key_ty mb_tys ++ map pprParendExpr dxs))
 
 ppr_call_key_ty :: Maybe Type -> SDoc
 ppr_call_key_ty Nothing   = char '_'
