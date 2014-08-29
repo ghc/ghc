@@ -14,6 +14,7 @@ module Main (main) where
 import Version ( version, targetOS, targetARCH )
 import qualified GHC.PackageDb as GhcPkg
 import qualified Distribution.Simple.PackageIndex as PackageIndex
+import qualified Data.Graph as Graph
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.ModuleName (ModuleName)
 import Distribution.InstalledPackageInfo as Cabal
@@ -1519,7 +1520,9 @@ checkPackageConfig pkg verbosity db_stack auto_ghci_libs
   mapM_ (checkDir True  "framework-dirs") (frameworkDirs pkg)
   mapM_ (checkFile   True "haddock-interfaces") (haddockInterfaces pkg)
   mapM_ (checkDirURL True "haddock-html")       (haddockHTMLs pkg)
-  checkModules pkg
+  checkDuplicateModules pkg
+  checkModuleFiles pkg
+  checkModuleReexports db_stack pkg
   mapM_ (checkHSLib verbosity (libraryDirs pkg) auto_ghci_libs) (hsLibraries pkg)
   -- ToDo: check these somehow?
   --    extra_libraries :: [String],
@@ -1653,9 +1656,8 @@ doesFileExistOnPath filenames paths = go fullFilenames
         go ((p, fp) : xs) = do b <- doesFileExist fp
                                if b then return (Just p) else go xs
 
--- XXX maybe should check reexportedModules too
-checkModules :: InstalledPackageInfo -> Validate ()
-checkModules pkg = do
+checkModuleFiles :: InstalledPackageInfo -> Validate ()
+checkModuleFiles pkg = do
   mapM_ findModule (exposedModules pkg ++ hiddenModules pkg)
   where
     findModule modl =
@@ -1666,6 +1668,62 @@ checkModules pkg = do
       m <- liftIO $ doesFileExistOnPath files (importDirs pkg)
       when (isNothing m) $
          verror ForceFiles ("cannot find any of " ++ show files)
+
+checkDuplicateModules :: InstalledPackageInfo -> Validate ()
+checkDuplicateModules pkg
+  | null dups = return ()
+  | otherwise = verror ForceAll ("package has duplicate modules: " ++
+                                     unwords (map display dups))
+  where
+    dups = [ m | (m:_:_) <- group (sort mods) ]
+    mods = exposedModules pkg ++ hiddenModules pkg
+        ++ map moduleReexportName (reexportedModules pkg)
+
+checkModuleReexports :: PackageDBStack -> InstalledPackageInfo -> Validate ()
+checkModuleReexports db_stack pkg =
+    mapM_ checkReexport (reexportedModules pkg)
+  where
+    all_pkgs = allPackagesInStack db_stack
+    ipix     = PackageIndex.fromList all_pkgs
+
+    checkReexport ModuleReexport {
+      moduleReexportDefiningPackage = definingPkgId,
+      moduleReexportDefiningName    = definingModule
+    } = case PackageIndex.lookupInstalledPackageId ipix definingPkgId of
+          Nothing
+           -> verror ForceAll ("module re-export refers to a non-existant " ++
+                               "(or not visible) defining package: " ++
+                                       display definingPkgId)
+
+          Just definingPkg
+            | not (isIndirectDependency definingPkgId)
+           -> verror ForceAll ("module re-export refers to a defining  " ++
+                               "package that is not a direct (or indirect) " ++
+                               "dependency of this package: " ++
+                                       display definingPkgId)
+
+            | definingPkgId == installedPackageId pkg
+              && definingModule `notElem` (exposedModules definingPkg
+                                        ++ hiddenModules definingPkg)
+           -> verror ForceAll ("module (self) re-export refers to a module " ++
+                               "that is not defined in this package " ++
+                                       display definingModule)
+
+            | definingPkgId /= installedPackageId pkg
+              && definingModule `notElem` exposedModules definingPkg
+           -> verror ForceAll ("module re-export refers to a module that is " ++
+                               "not exposed by the defining package " ++
+                                       display definingModule)
+
+            | otherwise
+           -> return ()
+
+    isIndirectDependency pkgid = fromMaybe False $ do
+      thispkg  <- graphVertex (installedPackageId pkg)
+      otherpkg <- graphVertex pkgid
+      return (Graph.path depgraph thispkg otherpkg)
+    (depgraph, _, graphVertex) = PackageIndex.dependencyGraph ipix
+
 
 checkGHCiLib :: Verbosity -> String -> String -> String -> Bool -> IO ()
 checkGHCiLib verbosity batch_lib_dir batch_lib_file lib auto_build
