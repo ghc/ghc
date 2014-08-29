@@ -141,12 +141,12 @@ mkBootModDetailsTc hsc_env
         ; showPass dflags CoreTidy
 
         ; let { insts'      = map (tidyClsInstDFun globaliseAndTidyId) insts
-              ; pat_syns'   = map (tidyPatSynIds   globaliseAndTidyId) pat_syns
-              ; dfun_ids    = map instanceDFunId insts'
-              ; pat_syn_ids = concatMap patSynIds pat_syns'
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
                                            (typeEnvIds type_env) tcs fam_insts
-              ; type_env'  = extendTypeEnvWithIds type_env1 (pat_syn_ids ++ dfun_ids)
+              ; pat_syns'   = map (tidyPatSynIds   globaliseAndTidyId) pat_syns
+              ; type_env2  = extendTypeEnvWithPatSyns pat_syns' type_env1
+              ; dfun_ids    = map instanceDFunId insts'
+              ; type_env'  = extendTypeEnvWithIds type_env2 dfun_ids
               }
         ; return (ModDetails { md_types     = type_env'
                              , md_insts     = insts'
@@ -357,8 +357,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                 -- This is really the only reason we keep mg_patsyns at all; otherwise
                 -- they could just stay in type_env
               ; tidy_patsyns = map (tidyPatSynIds (lookup_aux_id tidy_type_env)) patsyns
-              ; type_env2    = extendTypeEnvList type_env1
-                                    [AConLike (PatSynCon ps) | ps <- tidy_patsyns ]
+              ; type_env2    = extendTypeEnvWithPatSyns tidy_patsyns type_env1
 
               ; tidy_type_env = tidyTypeEnv omit_prags type_env2
 
@@ -456,6 +455,10 @@ trimThing (AnId id)
 
 trimThing other_thing
   = other_thing
+
+extendTypeEnvWithPatSyns :: [PatSyn] -> TypeEnv -> TypeEnv
+extendTypeEnvWithPatSyns tidy_patsyns type_env
+  = extendTypeEnvList type_env [AConLike (PatSynCon ps) | ps <- tidy_patsyns ]
 \end{code}
 
 \begin{code}
