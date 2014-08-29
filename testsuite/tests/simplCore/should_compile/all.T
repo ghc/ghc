@@ -205,3 +205,4 @@ test('T8832',
 test('T8848', only_ways(['optasm']), compile, ['-ddump-rule-firings -dsuppress-uniques'])
 test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T8331', only_ways(['optasm']), compile, ['-ddump-rules'])
+test('T6056', only_ways(['optasm']), multimod_compile, ['T6056', '-v0 -ddump-rule-firings'])
