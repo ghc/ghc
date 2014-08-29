@@ -684,10 +684,10 @@ makeNode env imp_rules_edges bndr_set (bndr, rhs)
                   , let fvs = exprFreeVars (ru_rhs rule)
                               `delVarSetList` ru_bndrs rule
                   , not (isEmptyVarSet fvs) ]
-    all_rule_fvs = foldr (unionVarSet . snd) rule_lhs_fvs rules_w_fvs
-    rule_lhs_fvs = foldr (unionVarSet . (\ru -> exprsFreeVars (ru_args ru)
-                                                `delVarSetList` ru_bndrs ru))
-                         emptyVarSet rules
+    all_rule_fvs = rule_lhs_fvs `unionVarSet` rule_rhs_fvs
+    rule_rhs_fvs = mapUnionVarSet snd rules_w_fvs
+    rule_lhs_fvs = mapUnionVarSet (\ru -> exprsFreeVars (ru_args ru)
+                                          `delVarSetList` ru_bndrs ru) rules
     active_rule_fvs = unionVarSets [fvs | (a,fvs) <- rules_w_fvs, is_active a]
 
     -- Finding the free variables of the INLINE pragma (if any)
@@ -757,7 +757,7 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
           -- a fresh SCC computation that will yield a single CyclicSCC result.
 
     weak_fvs :: VarSet
-    weak_fvs = foldr (unionVarSet . nd_weak . fstOf3) emptyVarSet nodes
+    weak_fvs = mapUnionVarSet (nd_weak . fstOf3) nodes
 
         -- See Note [Choosing loop breakers] for loop_breaker_edges
     loop_breaker_edges = map mk_node tagged_nodes

@@ -327,7 +327,7 @@ tyVarsOfType (ForAllTy tyvar ty) = delVarSet (tyVarsOfType ty) tyvar
                                    `unionVarSet` tyVarsOfType (tyVarKind tyvar)
 
 tyVarsOfTypes :: [Type] -> TyVarSet
-tyVarsOfTypes tys = foldr (unionVarSet . tyVarsOfType) emptyVarSet tys
+tyVarsOfTypes = mapUnionVarSet tyVarsOfType
 
 closeOverKinds :: TyVarSet -> TyVarSet
 -- Add the kind variables free in the kinds

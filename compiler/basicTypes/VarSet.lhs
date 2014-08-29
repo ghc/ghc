@@ -15,12 +15,12 @@
 module VarSet (
         -- * Var, Id and TyVar set types
 	VarSet, IdSet, TyVarSet, CoVarSet,
-	
+
 	-- ** Manipulating these sets
 	emptyVarSet, unitVarSet, mkVarSet,
 	extendVarSet, extendVarSetList, extendVarSet_C,
 	elemVarSet, varSetElems, subVarSet,
-	unionVarSet, unionVarSets,
+	unionVarSet, unionVarSets, mapUnionVarSet,
 	intersectVarSet, intersectsVarSet, disjointVarSet,
 	isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
 	minusVarSet, foldVarSet, filterVarSet, fixVarSet,
@@ -51,6 +51,10 @@ emptyVarSet	:: VarSet
 intersectVarSet	:: VarSet -> VarSet -> VarSet
 unionVarSet	:: VarSet -> VarSet -> VarSet
 unionVarSets	:: [VarSet] -> VarSet
+
+mapUnionVarSet  :: (a -> VarSet) -> [a] -> VarSet
+-- ^ map the function oer the list, and union the results
+
 varSetElems	:: VarSet -> [Var]
 unitVarSet	:: Var -> VarSet
 extendVarSet	:: VarSet -> Var -> VarSet
@@ -108,6 +112,8 @@ partitionVarSet = partitionUniqSet
 \end{code}
 
 \begin{code}
+mapUnionVarSet get_set xs = foldr (unionVarSet . get_set) emptyVarSet xs
+
 -- See comments with type signatures
 intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)
 disjointVarSet   s1 s2 = isEmptyVarSet (s1 `intersectVarSet` s2)

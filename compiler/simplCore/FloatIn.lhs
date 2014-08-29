@@ -344,7 +344,7 @@ fiExpr dflags to_drop (_,AnnLet (AnnRec bindings) body)
     body_fvs = freeVarsOf body 
 
 	-- See Note [extra_fvs (1,2)]
-    rule_fvs = foldr (unionVarSet . idRuleAndUnfoldingVars) emptyVarSet ids
+    rule_fvs = mapUnionVarSet idRuleAndUnfoldingVars ids
     extra_fvs = rule_fvs `unionVarSet` 
 		unionVarSets [ fvs | (fvs, rhs) <- rhss
 			     , noFloatIntoExpr rhs ]
@@ -552,7 +552,7 @@ sepBindsByDropPoint dflags is_case drop_pts floaters
 
 
 floatedBindsFVs :: FloatInBinds -> FreeVarSet
-floatedBindsFVs binds = foldr (unionVarSet . fbFVs) emptyVarSet binds
+floatedBindsFVs binds = mapUnionVarSet fbFVs binds
 
 fbFVs :: FloatInBind -> VarSet
 fbFVs (FB _ fvs _) = fvs

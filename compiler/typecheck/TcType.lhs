@@ -571,7 +571,7 @@ exactTyVarsOfType ty
     go (ForAllTy tyvar ty)  = delVarSet (go ty) tyvar
 
 exactTyVarsOfTypes :: [Type] -> TyVarSet
-exactTyVarsOfTypes tys = foldr (unionVarSet . exactTyVarsOfType) emptyVarSet tys
+exactTyVarsOfTypes = mapUnionVarSet exactTyVarsOfType
 \end{code}
 
 %************************************************************************
@@ -1319,7 +1319,7 @@ tcTyVarsOfType (ForAllTy tyvar ty)  = tcTyVarsOfType ty `delVarSet` tyvar
         -- We do sometimes quantify over skolem TcTyVars
 
 tcTyVarsOfTypes :: [Type] -> TyVarSet
-tcTyVarsOfTypes tys = foldr (unionVarSet.tcTyVarsOfType) emptyVarSet tys
+tcTyVarsOfTypes = mapUnionVarSet tcTyVarsOfType
 \end{code}
 
 Find the free tycons and classes of a type.  This is used in the front

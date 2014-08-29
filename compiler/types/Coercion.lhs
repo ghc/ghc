@@ -535,7 +535,7 @@ tyCoVarsOfCo (SubCo co)            = tyCoVarsOfCo co
 tyCoVarsOfCo (AxiomRuleCo _ ts cs) = tyVarsOfTypes ts `unionVarSet` tyCoVarsOfCos cs
 
 tyCoVarsOfCos :: [Coercion] -> VarSet
-tyCoVarsOfCos cos = foldr (unionVarSet . tyCoVarsOfCo) emptyVarSet cos
+tyCoVarsOfCos = mapUnionVarSet tyCoVarsOfCo
 
 coVarsOfCo :: Coercion -> VarSet
 -- Extract *coerction* variables only.  Tiresome to repeat the code, but easy.
@@ -555,7 +555,7 @@ coVarsOfCo (SubCo co)            = coVarsOfCo co
 coVarsOfCo (AxiomRuleCo _ _ cos) = coVarsOfCos cos
 
 coVarsOfCos :: [Coercion] -> VarSet
-coVarsOfCos cos = foldr (unionVarSet . coVarsOfCo) emptyVarSet cos
+coVarsOfCos = mapUnionVarSet coVarsOfCo
 
 coercionSize :: Coercion -> Int
 coercionSize (Refl _ ty)           = typeSize ty

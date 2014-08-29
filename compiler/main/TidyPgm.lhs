@@ -635,7 +635,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
   -- (c) it is the vectorised version of an imported Id
   -- See Note [Which rules to expose]
   is_external id = isExportedId id || id `elemVarSet` rule_rhs_vars || id `elemVarSet` vect_var_vs
-  rule_rhs_vars  = listFVs ruleRhsFreeVars imp_id_rules emptyVarSet
+  rule_rhs_vars  = mapUnionVarSet ruleRhsFreeVars imp_id_rules
   vect_var_vs    = mkVarSet [var_v | (var, var_v) <- nameEnvElts vect_vars, isGlobalId var]
 
   binders          = bindersOfBinds binds
@@ -923,7 +923,7 @@ findExternalRules omit_prags binds imp_id_rules unfold_env
   = (trimmed_binds, filter keep_rule all_rules)
   where
     imp_rules         = filter expose_rule imp_id_rules
-    imp_user_rule_fvs = listFVs user_rule_rhs_fvs imp_rules emptyVarSet
+    imp_user_rule_fvs = mapUnionVarSet user_rule_rhs_fvs imp_rules
 
     user_rule_rhs_fvs rule | isAutoRule rule = emptyVarSet
                            | otherwise       = ruleRhsFreeVars rule
@@ -980,11 +980,11 @@ findExternalRules omit_prags binds imp_id_rules unfold_env
          rhss          = rhssOfBind bind
          bndr_set'     = bndr_set `extendVarSetList` bndrs
 
-         needed_fvs'   = listFVs idUnfoldingVars   bndrs       $
+         needed_fvs'   = needed_fvs                                   `unionVarSet`
+                         mapUnionVarSet idUnfoldingVars   bndrs       `unionVarSet`
                               -- Ignore type variables in the type of bndrs
-                         listFVs exprFreeVars      rhss        $
-                         listFVs user_rule_rhs_fvs local_rules $
-                         needed_fvs
+                         mapUnionVarSet exprFreeVars      rhss        `unionVarSet`
+                         mapUnionVarSet user_rule_rhs_fvs local_rules
             -- In needed_fvs', we don't bother to delete binders from the fv set
 
          local_rules  = [ rule
@@ -992,9 +992,6 @@ findExternalRules omit_prags binds imp_id_rules unfold_env
                         , is_external_id id   -- Only collect rules for external Ids
                         , rule <- idCoreRules id
                         , expose_rule rule ]  -- and ones that can fire in a client
-
-listFVs :: (a -> VarSet) -> [a] -> VarSet -> VarSet
-listFVs fv_fn xs fvs = foldr (unionVarSet . fv_fn) fvs xs
 \end{code}
 
 %************************************************************************

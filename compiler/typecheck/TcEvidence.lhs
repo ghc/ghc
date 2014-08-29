@@ -316,12 +316,12 @@ coVarsOfTcCo tc_co
   = go tc_co
   where
     go (TcRefl _ _)              = emptyVarSet
-    go (TcTyConAppCo _ _ cos)    = foldr (unionVarSet . go) emptyVarSet cos
+    go (TcTyConAppCo _ _ cos)    = mapUnionVarSet go cos
     go (TcAppCo co1 co2)         = go co1 `unionVarSet` go co2
     go (TcCastCo co1 co2)        = go co1 `unionVarSet` go co2
     go (TcForAllCo _ co)         = go co
     go (TcCoVarCo v)             = unitVarSet v
-    go (TcAxiomInstCo _ _ cos)   = foldr (unionVarSet . go) emptyVarSet cos
+    go (TcAxiomInstCo _ _ cos)   = mapUnionVarSet go cos
     go (TcPhantomCo _ _)         = emptyVarSet
     go (TcSymCo co)              = go co
     go (TcTransCo co1 co2)       = go co1 `unionVarSet` go co2
@@ -332,7 +332,7 @@ coVarsOfTcCo tc_co
                                    `minusVarSet` get_bndrs bs
     go (TcLetCo {}) = emptyVarSet    -- Harumph. This does legitimately happen in the call
                                      -- to evVarsOfTerm in the DEBUG check of setEvBind
-    go (TcAxiomRuleCo _ _ cos)   = foldr (unionVarSet . go) emptyVarSet cos
+    go (TcAxiomRuleCo _ _ cos)   = mapUnionVarSet go cos
 
 
     -- We expect only coercion bindings, so use evTermCoercion 
@@ -738,7 +738,7 @@ evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
 
 evVarsOfTerms :: [EvTerm] -> VarSet
-evVarsOfTerms = foldr (unionVarSet . evVarsOfTerm) emptyVarSet 
+evVarsOfTerms = mapUnionVarSet evVarsOfTerm
 \end{code}
 
 
