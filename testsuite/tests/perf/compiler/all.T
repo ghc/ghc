@@ -235,7 +235,7 @@ test('T3064',
             # 2012-10-30: 111189536 (x86/Windows)
             # 2013-11-13: 146626504 (x86/Windows, 64bit machine)
             # 2014-01-22: 162457940 (x86/Linux)
-           (wordsize(64), 332702112, 5)]),
+           (wordsize(64), 313638592, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
@@ -245,6 +245,7 @@ test('T3064',
             # (amd64/Linux) (11/02/2014): 308422280, optimize Coercions in simpleOptExpr
             # (amd64/Linux) (23/05/2014): 324022680, unknown cause
             # (amd64/Linux) (2014-07-17): 332702112, general round of updates
+            # (amd64/Linux) (2014-08-29): 313638592, w/w for INLINABLE things
 
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 11202304, 20),
@@ -413,13 +414,14 @@ test('T5837',
           [(wordsize(32), 45520936 , 10),
              # 40000000 (x86/Linux)
              # 2013-11-13: 45520936 (x86/Windows, 64bit machine)
-           (wordsize(64), 86795752, 10)])
+           (wordsize(64), 73639840, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
              # 2013-09-18 90587232 amd64/Linux
              # 2013-11-21 86795752 amd64/Linux, GND via Coercible and counters
              #                                  for constraints solving
+             # 2041-08-29 73639840 amd64/Linux, w/w for INLINABLE things
       ],
       compile_fail,['-ftype-function-depth=50'])
 
@@ -430,13 +432,14 @@ test('T6048',
             # prev:       38000000 (x86/Linux)
             # 2012-10-08: 48887164 (x86/Linux)
             # 2014-04-04: 62618072 (x86 Windows, 64 bit machine)
-           (wordsize(64), 125431448, 12)])
+           (wordsize(64), 108354472, 12)])
              # 18/09/2012  97247032 amd64/Linux
              # 16/01/2014 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
              # 18/01/2014  95960720 amd64/Linux Call Arity improvements
              # 28/02/2014 105556793 amd64/Linux (unknown, tweak in base/4d9e7c9e3 resulted in change)
              # 05/03/2014 110646312 amd64/Linux Call Arity became more elaborate
              # 14/07/2014 125431448 amd64/Linux unknown reason. Even worse in GHC-7.8.3. *shurg*
+             # 29/08/2014 108354472 amd64/Linux w/w for INLINABLE things
       ],
       compile,[''])
 

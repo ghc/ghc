@@ -17,7 +17,7 @@ test('haddock.base',
             # 2014-01-22: 168 (x86/Linux - new haddock)
             # 2014-06-29: 156 (x86/Linux)
      ,stats_num_field('max_bytes_used',
-          [(wordsize(64), 127954488, 10)
+          [(wordsize(64), 112286208, 10)
             # 2012-08-14:  87374568 (amd64/Linux)
             # 2012-08-21:  86428216 (amd64/Linux)
             # 2012-09-20:  84794136 (amd64/Linux)
@@ -25,6 +25,7 @@ test('haddock.base',
             # 2013-01-29:  96022312 (amd64/Linux)
             # 2013-10-18: 115113864 (amd64/Linux)
 	    # 2014-07-31: 127954488 (amd64/Linux), correlates with 1ae5fa45
+            # 2014-08-29: 112286208 (amd64/Linux), w/w for INLINABLE things
           ,(platform('i386-unknown-mingw32'), 58557136, 10)
             # 2013-02-10:                     47988488 (x86/Windows)
             # 2013-11-13:                     58557136 (x86/Windows, 64bit machine)
@@ -103,7 +104,7 @@ test('haddock.Cabal',
             # 2014-01-22: 52718512 (x86/Linux)
             # 2014-06-29: 66411508 (x86/Linux)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 4493770224, 5)
+          [(wordsize(64), 4267311856, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -116,12 +117,15 @@ test('haddock.Cabal',
             # 2014-01-12: 3979151552 (amd64/Linux) new parser
             # 2014-06-29: 4200993768 (amd64/Linux)
             # 2014-08-05: 4493770224 (x86_64/Linux - bugfix for #314, Haddock now parses more URLs)
+            # 2014-08-29: 4267311856 (x86_64/Linux - w/w for INLINABLE things)
+
           ,(platform('i386-unknown-mingw32'), 2052220292, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)
             # 2013-02-10:                     1906532680 (x86/Windows)
             # 2014-01-28:                     1966911336 (x86/Windows)
             # 2014-04-24:                     2052220292 (x86/Windows)
             # 2014-08-05: XXX TODO UPDATE ME XXX
+
           ,(wordsize(32), 2127198484, 1)])
             # 2012-08-14: 1648610180 (x86/OSX)
             # 2014-01-22: 1986290624 (x86/Linux)
