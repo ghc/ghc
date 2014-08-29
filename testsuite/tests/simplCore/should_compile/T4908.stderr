@@ -21,7 +21,7 @@ T4908.f_$s$wf =
     }
 end Rec }
 
-T4908.$wf
+T4908.$wf [InlPrag=[0]]
   :: GHC.Prim.Int#
      -> (GHC.Types.Int, GHC.Types.Int) -> GHC.Types.Bool
 [GblId,
@@ -66,7 +66,7 @@ T4908.f =
 
 
 ------ Local rules for imported ids --------
-"SC:$wf0" [ALWAYS]
+"SC:$wf0" [0]
     forall (sc :: GHC.Prim.Int#)
            (sc1 :: GHC.Types.Int)
            (sc2 :: GHC.Prim.Int#).

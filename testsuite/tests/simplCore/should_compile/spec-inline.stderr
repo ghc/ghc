@@ -42,7 +42,7 @@ Roman.foo_$s$wgo =
     }
 end Rec }
 
-Roman.$wgo
+Roman.$wgo [InlPrag=[0]]
   :: Data.Maybe.Maybe GHC.Types.Int
      -> Data.Maybe.Maybe GHC.Types.Int -> GHC.Prim.Int#
 [GblId,
@@ -145,7 +145,7 @@ Roman.foo =
 
 
 ------ Local rules for imported ids --------
-"SC:$wgo0" [ALWAYS]
+"SC:$wgo0" [0]
     forall (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#).
       Roman.$wgo (Data.Maybe.Just @ GHC.Types.Int (GHC.Types.I# sc))
                  (Data.Maybe.Just @ GHC.Types.Int (GHC.Types.I# sc1))
