@@ -330,7 +330,7 @@ test('T783',
             # 2013-02-10: 329202116 (x86/Windows)
             # 2013-02-10: 338465200 (x86/OSX)
             # 2014-04-04: 319179104 (x86 Windows, 64 bit machine)
-           (wordsize(64), 640031840, 10)]),
+           (wordsize(64), 441932632, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -343,6 +343,8 @@ test('T783',
             #   (fix previous fix for #8456)
             # 2014-07-17: 640031840 (amd64/Linux)
             #   (general round of updates)
+            # 2014-08-29: 441932632  (amd64/Linux)
+            #   (better specialisation, raft of core-to-core optimisations)
       extra_hc_opts('-static')
       ],
       compile,[''])
