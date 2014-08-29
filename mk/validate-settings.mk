@@ -117,6 +117,7 @@ libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
 # binary upstream has some warnings, so don't use -Werror for it
+libraries/binary_dist-boot_EXTRA_HC_OPTS += -Wwarn
 libraries/binary_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # temporarily turn off -Werror for mtl
