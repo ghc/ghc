@@ -932,7 +932,7 @@ expandUnfolding_maybe _                                                       = 
 hasStableCoreUnfolding_maybe :: Unfolding -> Maybe Bool
 -- Just True  <=> has stable inlining, very keen to inline (eg. INLINE pragma)
 -- Just False <=> has stable inlining, open to inlining it (eg. INLINEABLE pragma)
--- Nothing    <=> not table, or cannot inline it anyway
+-- Nothing    <=> not stable, or cannot inline it anyway
 hasStableCoreUnfolding_maybe (CoreUnfolding { uf_src = src, uf_guidance = guide })
    | isStableSource src
    = case guide of

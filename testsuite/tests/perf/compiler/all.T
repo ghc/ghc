@@ -88,7 +88,7 @@ test('T1969',
              # 12/11/2012 658786936 (amd64/Linux) UNKNOWN REASON
              # 17/1/13:   667160192 (x86_64/Linux) new demand analyser
              # 18/10/2013 698612512 (x86_64/Linux) fix for #8456
-             # 10/02/2014 660922376 (x86_64/Linux) call artiy analysis
+             # 10/02/2014 660922376 (x86_64/Linux) call arity analysis
              # 17/07/2014 651626680 (x86_64/Linux) roundabout update
 
       only_ways(['normal']),
