@@ -261,15 +261,15 @@ writeFileAtomic targetPath content = do
 #if mingw32_HOST_OS || mingw32_TARGET_OS
         renameFile tmpPath targetPath
           -- If the targetPath exists then renameFile will fail
-          `catchIO` \err -> do
+          `catch` \err -> do
             exists <- doesFileExist targetPath
             if exists
               then do removeFile targetPath
                       -- Big fat hairy race condition
-                      renameFile newFile targetPath
+                      renameFile tmpPath targetPath
                       -- If the removeFile succeeds and the renameFile fails
                       -- then we've lost the atomic property.
-              else throwIOIO err
+              else throwIO (err :: IOException)
 #else
         renameFile tmpPath targetPath
 #endif
