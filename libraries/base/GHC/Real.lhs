@@ -517,6 +517,10 @@ showSigned showPos p x
 even, odd       :: (Integral a) => a -> Bool
 even n          =  n `rem` 2 == 0
 odd             =  not . even
+{-# SPECIALISE even :: Int -> Bool #-}
+{-# SPECIALISE odd  :: Int -> Bool #-}
+{-# SPECIALISE even :: Integer -> Bool #-}
+{-# SPECIALISE odd  :: Integer -> Bool #-}
 
 -------------------------------------------------------
 -- | raise a number to a non-negative integral power
