@@ -625,13 +625,13 @@ data Details
   = ND { nd_bndr :: Id          -- Binder
        , nd_rhs  :: CoreExpr    -- RHS, already occ-analysed
 
-       , nd_uds  :: UsageDetails  -- Usage from RHS, and RULES, and InlineRule unfolding
+       , nd_uds  :: UsageDetails  -- Usage from RHS, and RULES, and stable unfoldings
                                   -- ignoring phase (ie assuming all are active)
                                   -- See Note [Forming Rec groups]
 
        , nd_inl  :: IdSet       -- Free variables of
-                                --   the InlineRule (if present and active)
-                                --   or the RHS (ir no InlineRule)
+                                --   the stable unfolding (if present and active)
+                                --   or the RHS (if not)
                                 -- but excluding any RULES
                                 -- This is the IdSet that may be used if the Id is inlined
 
@@ -1798,8 +1798,8 @@ tagLamBinders :: UsageDetails          -- Of scope
               -> (UsageDetails,        -- Details with binders removed
                  [IdWithOccInfo])    -- Tagged binders
 -- Used for lambda and case binders
--- It copes with the fact that lambda bindings can have InlineRule
--- unfoldings, used for join points
+-- It copes with the fact that lambda bindings can have a
+-- stable unfolding, used for join points
 tagLamBinders usage binders = usage' `seq` (usage', bndrs')
   where
     (usage', bndrs') = mapAccumR tag_lam usage binders

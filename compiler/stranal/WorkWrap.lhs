@@ -148,8 +148,8 @@ The only reason this is monadised is for the unique supply.
 Note [Don't w/w INLINE things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's very important to refrain from w/w-ing an INLINE function (ie one
-with an InlineRule) because the wrapper will then overwrite the
-InlineRule unfolding.
+with a stable unfolding) because the wrapper will then overwrite the
+old stable unfolding with the wrapper code.
 
 Furthermore, if the programmer has marked something as INLINE,
 we may lose by w/w'ing it.

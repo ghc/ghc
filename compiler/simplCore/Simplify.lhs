@@ -780,8 +780,8 @@ simplUnfolding env top_lvl id new_rhs unf
     bottoming = isBottomingId id
     is_top_lvl = isTopLevel top_lvl
     act      = idInlineActivation id
-    rule_env = updMode (updModeForInlineRules act) env
-               -- See Note [Simplifying inside InlineRules] in SimplUtils
+    rule_env = updMode (updModeForStableUnfoldings act) env
+               -- See Note [Simplifying inside stable unfoldings] in SimplUtils
 \end{code}
 
 Note [Force bottoming field]
@@ -824,9 +824,9 @@ Note [Setting the new unfolding]
   important: if exprIsConApp says 'yes' for a recursive thing, then we
   can get into an infinite loop
 
-If there's an InlineRule on a loop breaker, we hang on to the inlining.
-It's pretty dodgy, but the user did say 'INLINE'.  May need to revisit
-this choice.
+If there's an stable unfolding on a loop breaker (which happens for
+INLINEABLE), we hang on to the inlining.  It's pretty dodgy, but the
+user did say 'INLINE'.  May need to revisit this choice.
 
 Note [Setting the demand info]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2568,7 +2568,7 @@ An alternative plan is this:
 but that is bad if 'c' is *not* later scrutinised.
 
 So instead we do both: we pass 'c' and 'c#' , and record in c's inlining
-(an InlineRule) that it's really I# c#, thus
+(a stable unfolding) that it's really I# c#, thus
 
    $j = \c# -> \c[=I# c#] -> ...c....
 
