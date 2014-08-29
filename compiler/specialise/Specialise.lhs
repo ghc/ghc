@@ -1614,7 +1614,8 @@ instance Outputable CallInfoSet where
 
 pprCallInfo :: Id -> CallInfo -> SDoc
 pprCallInfo fn (CallKey mb_tys, (dxs, _))
-  = hang (ppr fn) 2 (sep (map ppr_call_key_ty mb_tys ++ map pprParendExpr dxs))
+  = hang (ppr fn <+> dcolon <+> ppr (idType fn)) 
+       2 (ptext (sLit "args:") <+> fsep (map ppr_call_key_ty mb_tys ++ map pprParendExpr dxs))
 
 ppr_call_key_ty :: Maybe Type -> SDoc
 ppr_call_key_ty Nothing   = char '_'
