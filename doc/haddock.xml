@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 <!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
-   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd" [
+    <!ENTITY nbsp   '&#160;'>
+    <!ENTITY frac12 '&#189;'>
+    <!ENTITY mdash  '&#8212;'>
+    <!ENTITY lsquo  '&#8217;'>
+    <!ENTITY rsquo  '&#8218;'>
+    <!ENTITY ldquo  '&#8220;'>
+    <!ENTITY rdquo  '&#8221;'>
+] >
 
 <book id="haddock">
   <bookinfo>
