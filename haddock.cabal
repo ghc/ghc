@@ -26,8 +26,6 @@ extra-source-files:
   doc/docbook-xml.mk
   doc/fptools.css
   doc/haddock.xml
-  haddock.spec
-  haskell.vim
   haddock-api/src/haddock.sh
   html-test/src/*.hs
   html-test/ref/*.html
