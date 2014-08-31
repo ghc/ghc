@@ -129,7 +129,7 @@ import Data.Bits (Bits, (.|.), shiftL)
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.String (IsString(..))
-import Data.Word (Word8, Word16, Word32, Word64, Word)
+import Data.Word
 import Prelude hiding (takeWhile)
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.Attoparsec.ByteString.Internal as I
