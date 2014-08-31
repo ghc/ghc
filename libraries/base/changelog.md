@@ -20,6 +20,8 @@
 
   * Make `abs` and `signum` handle (-0.0) correctly per IEEE-754.
 
+  * Re-export `Data.Word.Word` from `Prelude`
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3

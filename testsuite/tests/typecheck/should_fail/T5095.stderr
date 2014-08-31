@@ -53,7 +53,7 @@ T5095.hs:9:11:
       instance Eq Float -- Defined in ‘GHC.Classes’
       instance Eq Int -- Defined in ‘GHC.Classes’
       instance Eq Ordering -- Defined in ‘GHC.Classes’
-      instance Eq GHC.Types.Word -- Defined in ‘GHC.Classes’
+      instance Eq Word -- Defined in ‘GHC.Classes’
       instance Eq a => Eq [a] -- Defined in ‘GHC.Classes’
       instance Eq Integer
         -- Defined in ‘integer-gmp-0.5.1.0:GHC.Integer.Type’

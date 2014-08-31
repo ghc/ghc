@@ -92,7 +92,9 @@ import DynFlags
 import Data.Char        ( ord )
 import Data.List
 import Data.Ord
-import Data.Word
+#if __GLASGOW_HASKELL__ < 709
+import Data.Word        ( Word )
+#endif
 
 infixl 4 `mkCoreApp`, `mkCoreApps`
 \end{code}

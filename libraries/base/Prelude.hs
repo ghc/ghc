@@ -48,7 +48,7 @@ module Prelude (
 
     -- *** Numeric types
     Int, Integer, Float, Double,
-    Rational,
+    Rational, Word,
 
     -- *** Numeric type classes
     Num((+), (-), (*), negate, abs, signum, fromInteger),
