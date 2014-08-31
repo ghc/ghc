@@ -35,7 +35,7 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
              handleSourceError )
 import HsImpExp
-import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC, 
+import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName )
 import Module
 import Name
@@ -384,7 +384,6 @@ interactiveUI config srcs maybe_exprs = do
    _ <- GHC.setProgramDynFlags $
       progDynFlags { log_action = ghciLogAction lastErrLocationsRef }
 
- 
    liftIO $ when (isNothing maybe_exprs) $ do
         -- Only for GHCi (not runghc and ghc -e):
 
@@ -427,7 +426,7 @@ interactiveUI config srcs maybe_exprs = do
                    long_help          = fullHelpText config,
                    lastErrorLocations = lastErrLocationsRef
                  }
-    
+
    return ()
 
 resetLastErrorLocations :: GHCi ()
@@ -696,7 +695,7 @@ installInteractivePrint Nothing _  = return ()
 installInteractivePrint (Just ipFun) exprmode = do
   ok <- trySuccess $ do
                 (name:_) <- GHC.parseName ipFun
-                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name 
+                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
                                       in he{hsc_IC = new_ic})
                 return Succeeded
 
@@ -1838,7 +1837,7 @@ restoreContextOnFailure do_this = do
 
 checkAdd :: InteractiveImport -> GHCi ()
 checkAdd ii = do
-  dflags <- getDynFlags 
+  dflags <- getDynFlags
   let safe = safeLanguageOn dflags
   case ii of
     IIModule modname
@@ -3136,7 +3135,7 @@ expandPathIO p =
         tilde <- getHomeDirectory -- will fail if HOME not defined
         return (tilde ++ '/':d)
    other ->
-        return other    
+        return other
 
 sameFile :: FilePath -> FilePath -> IO Bool
 sameFile path1 path2 = do

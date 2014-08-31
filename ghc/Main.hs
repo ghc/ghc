@@ -837,7 +837,7 @@ unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
         "unrecognised flag: " ++ f ++ "\n" ++
         (case fuzzyMatch f (nub allFlags) of
             [] -> ""
-            suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs)) 
+            suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs))
 
 {- Note [-Bsymbolic and hooks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

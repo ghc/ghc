@@ -445,7 +445,7 @@ instance Bits Int where
     (I# x#) `shiftR` (I# i#)       = I# (x# `iShiftRA#` i#)
     (I# x#) `unsafeShiftR` (I# i#) = I# (x# `uncheckedIShiftRA#` i#)
 
-    {-# INLINE rotate #-} 	-- See Note [Constant folding for rotate]
+    {-# INLINE rotate #-}       -- See Note [Constant folding for rotate]
     (I# x#) `rotate` (I# i#) =
         I# ((x# `uncheckedIShiftL#` i'#) `orI#` (x# `uncheckedIShiftRL#` (wsib -# i'#)))
       where
@@ -520,8 +520,8 @@ instance Bits Integer where
    bitSize _  = error "Data.Bits.bitSize(Integer)"
    isSigned _ = True
 
-{- 	Note [Constant folding for rotate]
-	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-      Note [Constant folding for rotate]
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The INLINE on the Int instance of rotate enables it to be constant
 folded.  For example:
      sumU . mapU (`rotate` 3) . replicateU 10000000 $ (7 :: Int)
@@ -544,4 +544,3 @@ own to enable constant folding; for example 'shift':
            10000000 -> ww_sOb
          }
 -}
-

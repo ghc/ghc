@@ -81,7 +81,7 @@ This is accomplished through a combination of mechanisms:
 
      This is accomplished through a variety of mechanisms:
 
-       a) The parser recognises them specially and generates an 
+       a) The parser recognises them specially and generates an
           Exact Name (hence not looked up in the orig-name cache)
 
        b) The known infinite families of names are specially
@@ -137,7 +137,7 @@ import FastString
 \begin{code}
 allNameStrings :: [String]
 -- Infinite list of a,b,c...z, aa, ab, ac, ... etc
-allNameStrings = [ c:cs | cs <- "" : allNameStrings, c <- ['a'..'z'] ] 
+allNameStrings = [ c:cs | cs <- "" : allNameStrings, c <- ['a'..'z'] ]
 \end{code}
 
 
@@ -1898,4 +1898,3 @@ derivableClassKeys
   = [ eqClassKey, ordClassKey, enumClassKey, ixClassKey,
       boundedClassKey, showClassKey, readClassKey ]
 \end{code}
-

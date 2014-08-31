@@ -955,10 +955,10 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
 
       alloc   = mkStackAllocInstr   platform delta
       dealloc = mkStackDeallocInstr platform delta
-  
+
       new_blockmap :: BlockEnv BlockId
       new_blockmap = mapFromList (zip entries (map mkBlockId uniqs))
-  
+
       insert_stack_insns (BasicBlock id insns)
          | Just new_blockid <- mapLookup id new_blockmap
          = [ BasicBlock id [alloc, JXX ALWAYS new_blockid]

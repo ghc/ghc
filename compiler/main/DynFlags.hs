@@ -2905,7 +2905,7 @@ xFlags = [
     deprecatedForExtension "MultiParamTypeClasses" ),
   ( "FunctionalDependencies",           Opt_FunctionalDependencies, nop ),
   ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, setGenDeriving ),
-  ( "OverlappingInstances",             Opt_OverlappingInstances, 
+  ( "OverlappingInstances",             Opt_OverlappingInstances,
     \ turn_on -> when turn_on
                $ deprecate "instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS" ),
   ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
@@ -2996,7 +2996,7 @@ impliedFlags
     , (Opt_ImplicitParams, turnOn, Opt_FlexibleInstances)
 
     , (Opt_JavaScriptFFI, turnOn, Opt_InterruptibleFFI)
-    
+
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFunctor)
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
   ]

@@ -606,7 +606,7 @@ pprMachOp_for_C mop = case mop of
 
         MO_SF_Conv _from to -> parens (machRep_F_CType to)
         MO_FS_Conv _from to -> parens (machRep_S_CType to)
-        
+
         MO_S_MulMayOflo _ -> pprTrace "offending mop:"
                                 (ptext $ sLit "MO_S_MulMayOflo")
                                 (panic $ "PprC.pprMachOp_for_C: MO_S_MulMayOflo"
