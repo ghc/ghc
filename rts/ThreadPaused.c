@@ -26,6 +26,7 @@
  *
  * -------------------------------------------------------------------------- */
 
+
 struct stack_gap { StgWord gap_size; struct stack_gap *next_gap; };
 
 static struct stack_gap *
@@ -131,7 +132,7 @@ stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
                                    adjacent_update_frames, gap);
     }
 
-    // Now we have a stack with gaps in it, and we have to walk down
+    // Now we have a stack with gap-structs in it, and we have to walk down
     // shoving the stack up to fill in the gaps.  A diagram might
     // help:
     //
@@ -200,6 +201,7 @@ threadPaused(Capability *cap, StgTSO *tso)
     nat weight           = 0;
     nat weight_pending   = 0;
     rtsBool prev_was_update_frame = rtsFalse;
+    StgWord heuristic_says_squeeze;
 
     // Check to see whether we have threads waiting to raise
     // exceptions, and we're not blocking exceptions, or are blocked
@@ -358,17 +360,20 @@ threadPaused(Capability *cap, StgTSO *tso)
     }
 
 end:
-    debugTrace(DEBUG_squeeze,
-               "words_to_squeeze: %d, weight: %d, squeeze: %s",
-               words_to_squeeze, weight,
-               ((weight <= 8 && words_to_squeeze > 0) || weight < words_to_squeeze) ? "YES" : "NO");
-
     // Should we squeeze or not?  Arbitrary heuristic: we squeeze if
     // the number of words we have to shift down is less than the
     // number of stack words we squeeze away by doing so.
+    // The threshold was bumped from 5 to 8 as a result of #2797
+    heuristic_says_squeeze = ((weight <= 8 && words_to_squeeze > 0)
+                            || weight < words_to_squeeze);
+
+    debugTrace(DEBUG_squeeze,
+        "words_to_squeeze: %d, weight: %d, squeeze: %s",
+        words_to_squeeze, weight,
+        heuristic_says_squeeze ? "YES" : "NO");
+
     if (RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue &&
-        ((weight <= 8 && words_to_squeeze > 0) || weight < words_to_squeeze)) {
-        // threshold above bumped from 5 to 8 as a result of #2797
+        heuristic_says_squeeze) {
         stackSqueeze(cap, tso, (StgPtr)frame);
         tso->flags |= TSO_SQUEEZED;
         // This flag tells threadStackOverflow() that the stack was
