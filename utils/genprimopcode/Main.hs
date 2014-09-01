@@ -227,7 +227,7 @@ gen_hs_source (Info defaults entries) =
     ++ "consumed by haddock.\n"
     ++ "-}\n"
     ++ "\n"
-        ++ "-----------------------------------------------------------------------------\n"
+        ++ (replicate 77 '-' ++ "\n") -- For 80-col cleanliness
         ++ "-- |\n"
         ++ "-- Module      :  GHC.Prim\n"
         ++ "-- \n"
@@ -238,9 +238,13 @@ gen_hs_source (Info defaults entries) =
         ++ "-- GHC\'s primitive types and operations.\n"
         ++ "-- Use GHC.Exts from the base package instead of importing this\n"
         ++ "-- module directly.\n"
-        ++ "--\n" 
-        ++ "-----------------------------------------------------------------------------\n"
-        ++ "{-# LANGUAGE MagicHash, MultiParamTypeClasses, NoImplicitPrelude, UnboxedTuples #-}\n"
+        ++ "--\n"
+        ++ (replicate 77 '-' ++ "\n") -- For 80-col cleanliness
+        ++ "{-# LANGUAGE Unsafe #-}\n"
+        ++ "{-# LANGUAGE MagicHash #-}\n"
+        ++ "{-# LANGUAGE MultiParamTypeClasses #-}\n"
+        ++ "{-# LANGUAGE NoImplicitPrelude #-}\n"
+        ++ "{-# LANGUAGE UnboxedTuples #-}\n"
         ++ "module GHC.Prim (\n"
         ++ unlines (map (("        " ++) . hdr) entries')
         ++ ") where\n"
