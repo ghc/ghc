@@ -143,8 +143,11 @@ if windows:
 # msys gives "MINGW32"
 # msys2 gives "MINGW_NT-6.2"
         config.msys = True
+# msys2 gives 'MSYS_NT-6.3' unless you set MSYSTEM, which is also needed elsewhere
+    elif v.startswith("MSYS"):
+        raise Exception("Remember to set your MSYSTEM environment variable to MINGW32 or MINGW64")
     else:
-        raise Exception("Can't detect Windows terminal type")
+        raise Exception("Can't detect Windows terminal type: " + v)
 
 # Try to use UTF8
 if windows:

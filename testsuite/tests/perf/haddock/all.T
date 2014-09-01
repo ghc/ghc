@@ -24,7 +24,7 @@ test('haddock.base',
             # 2012-11-12:  87265136 (amd64/Linux)
             # 2013-01-29:  96022312 (amd64/Linux)
             # 2013-10-18: 115113864 (amd64/Linux)
-	    # 2014-07-31: 127954488 (amd64/Linux), correlates with 1ae5fa45
+            # 2014-07-31: 127954488 (amd64/Linux), correlates with 1ae5fa45
             # 2014-08-29: 112286208 (amd64/Linux), w/w for INLINABLE things
           ,(platform('i386-unknown-mingw32'), 58557136, 10)
             # 2013-02-10:                     47988488 (x86/Windows)
@@ -34,7 +34,7 @@ test('haddock.base',
             # 2014-01-22: 62189068 (x86/Linux)
             # 2014-06-29: 58243640 (x86/Linux)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 7946284944,  5)
+          [(wordsize(64), 7499083776,  5)
             # 2012-08-14: 5920822352 (amd64/Linux)
             # 2012-09-20: 5829972376 (amd64/Linux)
             # 2012-10-08: 5902601224 (amd64/Linux)
@@ -47,6 +47,7 @@ test('haddock.base',
             # 2014-06-12: 7498123680 (x86_64/Linux)
             # 2014-08-05: 7992757384 (x86_64/Linux - bugfix for #314, Haddock now parses more URLs)
             # 2014-08-08: 7946284944 (x86_64/Linux - Haddock updates to attoparsec-0.12.1.0)
+            # 2014-09-01: 7499083776 (x86_64/Windows)
           ,(platform('i386-unknown-mingw32'), 3548581572, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
             # 2013-11-13:                     3097751052 (x86/Windows, 64bit machine)
@@ -74,7 +75,7 @@ test('haddock.Cabal',
             # 2013-06-07: 246 (amd64/Linux) (reason unknown)
             # 2013-11-21: 269
             # 2013-11-22: 278 (amd64/Linux) (TH refactoring; weird)
-	    # 2014-07-14: 309 (amd64/Linux)
+            # 2014-07-14: 309 (amd64/Linux)
           ,(platform('i386-unknown-mingw32'), 144, 10)
             # 2012-10-30:                      83 (x86/Windows)
             # 2013-02-10:                     116 (x86/Windows)
@@ -182,7 +183,7 @@ test('haddock.compiler',
             # 2012-09-18: 26882813032 (amd64/Linux)
             # 2012-11-12: 25990254632 (amd64/Linux)
             # 2014-07-17: 29809571376 (amd64/Linux) general round of updates
-	    # 2012-11-27: 28708374824 (amd64/Linux)
+            # 2012-11-27: 28708374824 (amd64/Linux)
           ,(platform('i386-unknown-mingw32'), 14328363592, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)
             # 2013-02-10:                     14925262356 (x86/Windows)
