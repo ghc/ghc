@@ -47,9 +47,12 @@ import Encoding
 import FastString
 import FastTypes
 import FastFunctions
+import Outputable
+import Util
 
-import System.IO                ( hGetBuf, hFileSize,IOMode(ReadMode), hClose
-                                , Handle, hTell, openBinaryFile )
+import Data.Maybe
+import Control.Exception
+import System.IO
 import System.IO.Unsafe         ( unsafePerformIO )
 
 import GHC.Exts
@@ -89,7 +92,8 @@ hGetStringBuffer :: FilePath -> IO StringBuffer
 hGetStringBuffer fname = do
    h <- openBinaryFile fname ReadMode
    size_i <- hFileSize h
-   let size = fromIntegral size_i
+   offset_i <- skipBOM h size_i 0  -- offset is 0 initially
+   let size = fromIntegral $ size_i - offset_i
    buf <- mallocForeignPtrArray (size+3)
    withForeignPtr buf $ \ptr -> do
      r <- if size == 0 then return 0 else hGetBuf h ptr size
@@ -101,7 +105,7 @@ hGetStringBuffer fname = do
 hGetStringBufferBlock :: Handle -> Int -> IO StringBuffer
 hGetStringBufferBlock handle wanted
     = do size_i <- hFileSize handle
-         offset_i <- hTell handle
+         offset_i <- hTell handle >>= skipBOM handle size_i
          let size = min wanted (fromIntegral $ size_i-offset_i)
          buf <- mallocForeignPtrArray (size+3)
          withForeignPtr buf $ \ptr ->
@@ -110,19 +114,34 @@ hGetStringBufferBlock handle wanted
                    then ioError (userError $ "short read of file: "++show(r,size,size_i,handle))
                    else newUTF8StringBuffer buf ptr size
 
+-- | Skip the byte-order mark if there is one (see #1744 and #6016),
+-- and return the new position of the handle in bytes.
+--
+-- This is better than treating #FEFF as whitespace,
+-- because that would mess up layout.  We don't have a concept
+-- of zero-width whitespace in Haskell: all whitespace codepoints
+-- have a width of one column.
+skipBOM :: Handle -> Integer -> Integer -> IO Integer
+skipBOM h size offset =
+  -- Only skip BOM at the beginning of a file.
+  if size > 0 && offset == 0
+    then do
+      -- Validate assumption that handle is in binary mode.
+      ASSERTM( hGetEncoding h >>= return . isNothing )
+      -- Temporarily select text mode to make `hLookAhead` and
+      -- `hGetChar` return full Unicode characters.
+      bracket_ (hSetBinaryMode h False) (hSetBinaryMode h True) $ do
+        c <- hLookAhead h
+        if c == '\xfeff'
+          then hGetChar h >> hTell h
+          else return offset
+    else return offset
+
 newUTF8StringBuffer :: ForeignPtr Word8 -> Ptr Word8 -> Int -> IO StringBuffer
 newUTF8StringBuffer buf ptr size = do
   pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
   -- sentinels for UTF-8 decoding
-  let
-      sb0 = StringBuffer buf size 0
-      (first_char, sb1) = nextChar sb0
-        -- skip the byte-order mark if there is one (see #1744)
-        -- This is better than treating #FEFF as whitespace,
-        -- because that would mess up layout.  We don't have a concept
-        -- of zero-width whitespace in Haskell: all whitespace codepoints
-        -- have a width of one column.
-  return (if first_char == '\xfeff' then sb1 else sb0)
+  return $ StringBuffer buf size 0
 
 appendStringBuffers :: StringBuffer -> StringBuffer -> IO StringBuffer
 appendStringBuffers sb1 sb2
