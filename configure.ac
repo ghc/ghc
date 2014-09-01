@@ -856,13 +856,7 @@ dnl Check for libraries
 dnl ################################################################
 
 dnl ** check whether we need -ldl to get dlopen()
-
-AC_CHECK_LIB(dl, dlopen,
-    [HaveLibDL=YES
-     AC_DEFINE([HAVE_LIBDL], [1], [Define to 1 if you need -ldl to get dlopen().])
-     LIBS="$LIBS -ldl"],
-    [HaveLibDL=NO])
-AC_SUBST(HaveLibDL)
+AC_CHECK_LIB(dl, dlopen)
 
 dnl --------------------------------------------------
 dnl * Miscellaneous feature tests
