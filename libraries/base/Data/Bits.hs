@@ -296,7 +296,6 @@ class Bits b => FiniteBits b where
     --
     -- @
     -- 'countLeadingZeros' ('zeroBits' :: a) = finiteBitSize ('zeroBits' :: a)
-    -- 'countLeadingZeros' . 'negate' = 'const' 0
     -- @
     --
     -- 'countLeadingZeros' can be used to compute log base 2 via
