@@ -16,11 +16,10 @@ test('T3586',
 
 test('T4830',
      [stats_num_field('bytes allocated',
-          [(wordsize(64), 94496, 1),
+          [(wordsize(64), 98248, 1),
            #             127000 (amd64/Linux)
            # 2013-02-07:  99264 (amd64/Linux)
            # 2014-01-13:  98248 (amd64/Linux) due to #8647
-           # 2014-09-01:  94496 (amd64/Windows)
            (wordsize(32), 70646, 3)]),
            # 2013-02-10:  69744 (x86/Windows)
            # 2013-02-10:  71548 (x86/OSX)
@@ -40,11 +39,10 @@ test('lazy-bs-alloc',
      [stats_num_field('peak_megabytes_allocated', (2, 1)),
                                  # expected value: 2 (amd64/Linux)
       stats_num_field('bytes allocated',
-          [(wordsize(64), 438320, 1),
+          [(wordsize(64), 425400, 1),
             #             489776 (amd64/Linux)
             # 2013-02-07: 429744 (amd64/Linux)
             # 2013-12-12: 425400 (amd64/Linux)
-            # 2014-09-01: 438320 (amd64/Windows)
            (wordsize(32), 411500, 2)]),
             # 2013-02-10: 421296 (x86/Windows)
             # 2013-02-10: 414180 (x86/OSX)
@@ -60,10 +58,9 @@ test('lazy-bs-alloc',
 
 test('T876',
      [stats_num_field('bytes allocated',
-          [(wordsize(64), 72168 , 5),
+          [(wordsize(64), 63216 , 5),
               # 2013-02-14: 1263712 (x86_64/Linux)
               # 2014-02-10:   63216 (x86_64/Linux), call arity analysis
-              # 2014-09-01:   72168 (x86_64/Windows)
            (wordsize(32), 53024, 5) ]),
               # some date:  663712  (Windows, 64-bit machine)
               # 2014-04-04:  56820  (Windows, 64-bit machine)
@@ -95,11 +92,9 @@ test('T3738',
       stats_num_field('bytes allocated',
                       [(wordsize(32), 45648, 5),
                     # expected value: 50520 (x86/Linux)
-                       (wordsize(64), 46840, 5)]),
-                    # 2014-09-01:     46840 (amd64/Windows)
+                       (wordsize(64), 49400, 5)]),
                     # prev:           49400 (amd64/Linux)
                     # 2014-07-17:     50520 (amd64/Linux) general round of updates
-
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -161,10 +156,9 @@ test('T5205',
      [stats_num_field('bytes allocated',
                       [(wordsize(32), 47088, 5),
                     # expected value: 47088 (x86/Darwin)
-                       (wordsize(64), 48920, 5)]),
+                       (wordsize(64), 52600, 5)]),
                     # expected value: 51320 (amd64/Linux)
                     # 2014-07-17:     52600 (amd64/Linux) general round of updates
-                    # 2014-09-01:     48920 (amd64/Windows)
       only_ways(['normal', 'optasm'])
       ],
      compile_and_run,
@@ -275,10 +269,9 @@ test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
 
 test('T7436',
      [stats_num_field('max_bytes_used',
-          [(wordsize(64), 58520, 1),
+          [(wordsize(64), 60360, 1),
            #             127000 (amd64/Linux)
            # 2013-02-07:  60360 (amd64/Linux)
-           # 2014-09-01:  58520 (amd64/Windows)
            (wordsize(32), 58434, 1)]),
             # 2013-02-10: 58032 (x86/Windows)
             # 2013-02-10: 58836 (x86/OSX)

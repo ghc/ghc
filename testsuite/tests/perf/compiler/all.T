@@ -449,9 +449,8 @@ test('T9020',
           [(wordsize(32), 343005716, 10),
            # Original:    381360728
            # 2014-07-31:  343005716 (Windows) (general round of updates)
-           (wordsize(64), 627647808, 10)])
+           (wordsize(64), 728263536, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
-           # 2014-09-01:  627647808 (SPJ compiler improvements)
       ],
       compile,[''])
