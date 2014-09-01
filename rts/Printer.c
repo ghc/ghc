@@ -759,14 +759,14 @@ extern void DEBUG_LoadSymbols( char *name )
     prepare_table();
 }
 
-#else /* HAVE_BFD_H */
+#else /* USING_LIBBFD */
 
 extern void DEBUG_LoadSymbols( char *name STG_UNUSED )
 {
   /* nothing, yet */
 }
 
-#endif /* HAVE_BFD_H */
+#endif /* USING_LIBBFD */
 
 void findPtr(P_ p, int);                /* keep gcc -Wall happy */
 
