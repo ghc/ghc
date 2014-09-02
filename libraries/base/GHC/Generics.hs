@@ -557,7 +557,7 @@ module GHC.Generics  (
   , Fixity(..), Associativity(..), Arity(..), prec
 
   -- * Propositional equality for meta-information
-  , sameDatatype
+  , sameDatatype, sameConstructor
 
   -- * Generic type classes
   , Generic(..), Generic1(..)
@@ -693,6 +693,19 @@ class Constructor c where
   -- | Marks if this constructor is a record
   conIsRecord :: t c (f :: * -> *) a -> Bool
   conIsRecord _ = False
+
+-- | Propositional equality predicate for constructors
+sameConstructor :: (Datatype l, Datatype r, Constructor (cl l), Constructor (cr r))
+                => Proxy (cl l) -> Proxy (cr r) -> Maybe (cl l :~: cr r)
+sameConstructor l r | Just Refl <- pd l ` sameDatatype` pd r
+                    , True <- conName cl == conName cr
+                    = Just (unsafeCoerce Refl)
+    where pd :: Proxy (cm m) -> Proxy m
+          pd Proxy = Proxy
+          dummyC :: Proxy (cm m) -> C1 (cm m) a p
+          dummyC Proxy = undefined
+          cl = dummyC l
+          cr = dummyC r
 
 
 -- | Datatype to represent the arity of a tuple.
