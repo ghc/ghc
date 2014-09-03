@@ -332,8 +332,10 @@ check_syn_tc_app ctxt rank ty tc tys
   = mapM_ check_arg tys
 
   | otherwise
-  = failWithTc (arityErr "Type synonym" (tyConName tc) tc_arity n_args)
+  = failWithTc (arityErr flavour (tyConName tc) tc_arity n_args)
   where
+    flavour | isSynFamilyTyCon tc = "Type family" 
+            | otherwise           = "Type synonym"
     n_args = length tys
     tc_arity  = tyConArity tc
     check_arg | isSynFamilyTyCon tc = check_arg_type  ctxt rank
