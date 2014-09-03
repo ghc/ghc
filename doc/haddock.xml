@@ -1041,6 +1041,18 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
           </para>
         </listitem>
       </varlistentry>
+
+      <varlistentry>
+        <term>
+          <indexterm><primary><option>--print-missing-docs</option></primary></indexterm>
+          <option>--print-missing-docs</option>
+        </term>
+        <listitem>
+          <para>
+          Print extra information about any undocumented entities.
+          </para>
+        </listitem>
+      </varlistentry>
     </variablelist>
 
     <section id="cpp">
