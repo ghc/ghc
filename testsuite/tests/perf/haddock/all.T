@@ -18,11 +18,12 @@ test('haddock.base',
             # 2014-06-12: 7498123680 (x86_64/Linux)
             # 2014-08-05: 7992757384 (x86_64/Linux - bugfix for #314, Haddock now parses more URLs)
             # 2014-08-08: 7946284944 (x86_64/Linux - Haddock updates to attoparsec-0.12.1.0)
-          ,(platform('i386-unknown-mingw32'), 3548581572, 5)
+          ,(platform('i386-unknown-mingw32'), 3746792812, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
             # 2013-11-13:                     3097751052 (x86/Windows, 64bit machine)
             # 2014-04-04:                     3548581572 (x86/Windows, 64bit machine)
             # 2014-08-05: XXX TODO UPDATE ME XXX
+            # 2014-09-03: Windows laptop, no konwn reason
           ,(wordsize(32), 3799130400, 1)])
             # 2012-08-14: 3046487920 (x86/OSX)
             # 2012-10-30: 2955470952 (x86/Windows)

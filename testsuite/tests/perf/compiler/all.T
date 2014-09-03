@@ -179,9 +179,10 @@ test('T4801',
           [(platform('x86_64-apple-darwin'), 464872776, 5),
                            # expected value: 510938976 (amd64/OS X):
 
-           (wordsize(32), 211198056, 10),
+           (wordsize(32), 185242032, 10),
            # prev:        185669232 (x86/OSX)
            # 2014-01-22:  211198056 (x86/Linux)
+           # 2014-09-03:  185242032 (Windows laptop)
            (wordsize(64), 392409984, 10)]),
             # prev:       360243576 (amd64/Linux)
             # 19/10/2012: 447190832 (amd64/Linux) (-fPIC turned on)
@@ -326,11 +327,13 @@ test('T783',
      [ only_ways(['normal']),  # no optimisation for this one
       # expected value: 175,569,928 (x86/Linux)
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 319179104, 5),
+          [(wordsize(32), 223377364, 5),
             # 2012-10-08: 226907420 (x86/Linux)
             # 2013-02-10: 329202116 (x86/Windows)
             # 2013-02-10: 338465200 (x86/OSX)
             # 2014-04-04: 319179104 (x86 Windows, 64 bit machine)
+            # 2014-09-03: 223377364 (Windows, better specialisation, raft of core-to-core optimisations)
+
            (wordsize(64), 441932632, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
@@ -353,10 +356,11 @@ test('T783',
 test('T5321Fun',
      [ only_ways(['normal']),  # no optimisation for this one
        compiler_stats_num_field('bytes allocated',
-           [(wordsize(32), 344416344, 10),
+           [(wordsize(32), 299656164, 10),
              # prev:       300000000
              # 2012-10-08: 344416344 x86/Linux
              #  (increase due to new codegen)
+             # 2014-09-03: 299656164     (specialisation and inlining)
             (wordsize(64), 614409344, 10)])
              # prev:       585521080
              # 29/08/2012: 713385808     #  (increase due to new codegen)
@@ -394,8 +398,10 @@ test('T5321FD',
 test('T5642',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-           [(wordsize(32), 650000000, 10),
+           [(wordsize(32), 753045568, 10),
                      # sample from x86/Linux
+            # pref:        650000000
+            # 2014-09-03:  753045568 
             (wordsize(64), 1402242360, 10)])
             # prev:        1300000000
             # 2014-07-17:  1358833928 (general round of updates)
@@ -411,9 +417,10 @@ test('T5642',
 test('T5837',
      [ only_ways(['normal']),
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 45520936 , 10),
+          [(wordsize(32), 37096484, 10),
              # 40000000 (x86/Linux)
              # 2013-11-13: 45520936 (x86/Windows, 64bit machine)
+             # 2041-09-03: 37096484 (Windows laptop, w/w for INLINABLE things
            (wordsize(64), 73639840, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
@@ -428,10 +435,11 @@ test('T5837',
 test('T6048',
      [ only_ways(['optasm']),
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 62618072, 10),
+          [(wordsize(32), 56315812, 10),
             # prev:       38000000 (x86/Linux)
             # 2012-10-08: 48887164 (x86/Linux)
             # 2014-04-04: 62618072 (x86 Windows, 64 bit machine)
+            # 2014-09-03: 56315812 (x86 Windows, w/w for INLINEAVBLE)
            (wordsize(64), 108354472, 12)])
              # 18/09/2012  97247032 amd64/Linux
              # 16/01/2014 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
