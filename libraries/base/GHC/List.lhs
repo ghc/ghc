@@ -74,6 +74,8 @@ badHead = errorEmptyList "head"
 -- | Decompose a list into its head and tail. If the list is empty,
 -- returns 'Nothing'. If the list is non-empty, returns @'Just' (x, xs)@,
 -- where @x@ is the head of the list and @xs@ its tail.
+--
+-- /Since: 4.8.0.0/
 uncons                  :: [a] -> Maybe (a, [a])
 uncons []               = Nothing
 uncons (x:xs)           = Just (x, xs)

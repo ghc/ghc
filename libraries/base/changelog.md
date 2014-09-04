@@ -25,6 +25,8 @@
   * Add `countLeadingZeros` and `countTrailingZeros` methods to
     `Data.Bits.FiniteBits` class
 
+  * Add `Data.List.uncons` list destructor (#9550)
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3
