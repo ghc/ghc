@@ -801,6 +801,7 @@ labelType (CmmLabel _ _ CmmClosure)             = GcPtrLabel
 labelType (CmmLabel _ _ CmmCode)                = CodeLabel
 labelType (CmmLabel _ _ CmmInfo)                = DataLabel
 labelType (CmmLabel _ _ CmmEntry)               = CodeLabel
+labelType (CmmLabel _ _ CmmPrimCall)            = CodeLabel
 labelType (CmmLabel _ _ CmmRetInfo)             = DataLabel
 labelType (CmmLabel _ _ CmmRet)                 = CodeLabel
 labelType (RtsLabel (RtsSelectorInfoTable _ _)) = DataLabel
