@@ -24,6 +24,7 @@ module Data.List
    , last
    , tail
    , init
+   , uncons
    , null
    , length
 

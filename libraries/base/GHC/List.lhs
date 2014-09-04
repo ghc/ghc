@@ -21,7 +21,7 @@ module GHC.List (
    -- [] (..),          -- built-in syntax; can't be used in export list
 
    map, (++), filter, concat,
-   head, last, tail, init, null, length, (!!),
+   head, last, tail, init, uncons, null, length, (!!),
    foldl, scanl, scanl1, foldr, foldr1, scanr, scanr1,
    iterate, repeat, replicate, cycle,
    take, drop, splitAt, takeWhile, dropWhile, span, break,
@@ -70,6 +70,13 @@ badHead = errorEmptyList "head"
 "head/augment"  forall xs (g::forall b. (a->b->b) -> b -> b) .
                 head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
+
+-- | Decompose a list into its head and tail. If the list is empty,
+-- returns 'Nothing'. If the list is non-empty, returns @'Just' (x, xs)@,
+-- where @x@ is the head of the list and @xs@ its tail.
+uncons                  :: [a] -> Maybe (a, [a])
+uncons []               = Nothing
+uncons (x:xs)           = Just (x, xs)
 
 -- | Extract the elements after the head of a list, which must be non-empty.
 tail                    :: [a] -> [a]
