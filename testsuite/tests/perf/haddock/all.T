@@ -23,7 +23,7 @@ test('haddock.base',
             # 2013-11-13:                     3097751052 (x86/Windows, 64bit machine)
             # 2014-04-04:                     3548581572 (x86/Windows, 64bit machine)
             # 2014-08-05: XXX TODO UPDATE ME XXX
-            # 2014-09-03: Windows laptop, no konwn reason
+            # 2014-09-03: Windows laptop, no known reason
           ,(wordsize(32), 3799130400, 1)])
             # 2012-08-14: 3046487920 (x86/OSX)
             # 2012-10-30: 2955470952 (x86/Windows)

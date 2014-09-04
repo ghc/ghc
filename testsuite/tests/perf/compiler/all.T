@@ -401,7 +401,7 @@ test('T5642',
        compiler_stats_num_field('bytes allocated',
            [(wordsize(32), 753045568, 10),
                      # sample from x86/Linux
-            # pref:        650000000
+            # prev:        650000000
             # 2014-09-03:  753045568 
             (wordsize(64), 1402242360, 10)])
             # prev:        1300000000
