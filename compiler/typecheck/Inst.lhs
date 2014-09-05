@@ -34,8 +34,8 @@ module Inst (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcExpr( tcPolyExpr, tcSyntaxOp )
-import {-# SOURCE #-}	TcUnify( unifyType )
+import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcSyntaxOp )
+import {-# SOURCE #-}   TcUnify( unifyType )
 
 import FastString
 import HsSyn
@@ -271,7 +271,8 @@ newOverloadedLit' dflags orig
 	-- Reason: If we do, tcSimplify will call lookupInst, which
 	--	   will call tcSyntaxName, which does unification, 
 	--	   which tcSimplify doesn't like
-  = return (lit { ol_witness = expr, ol_type = res_ty })
+  = return (lit { ol_witness = expr, ol_type = res_ty
+                , ol_rebindable = rebindable })
 
   | otherwise
   = do	{ hs_lit <- mkOverLit val
@@ -282,7 +283,8 @@ newOverloadedLit' dflags orig
 	 	-- whereas res_ty might be openTypeKind. This was a bug in 6.2.2
 		-- However this'll be picked up by tcSyntaxOp if necessary
 	; let witness = HsApp (noLoc fi') (noLoc (HsLit hs_lit))
-	; return (lit { ol_witness = witness, ol_type = res_ty }) }
+	; return (lit { ol_witness = witness, ol_type = res_ty
+                      , ol_rebindable = rebindable }) }
 
 ------------
 mkOverLit :: OverLitVal -> TcM HsLit

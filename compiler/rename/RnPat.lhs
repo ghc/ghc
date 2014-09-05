@@ -205,7 +205,8 @@ matchNameMaker ctxt = LamMk report_unused
                       StmtCtxt GhciStmtCtxt -> False
                       _                     -> True
 
-rnHsSigCps :: HsWithBndrs (LHsType RdrName) -> CpsRn (HsWithBndrs (LHsType Name))
+rnHsSigCps :: HsWithBndrs RdrName (LHsType RdrName)
+           -> CpsRn (HsWithBndrs Name (LHsType Name))
 rnHsSigCps sig 
   = CpsRn (rnHsBndrSig PatCtx sig)
 
@@ -401,14 +402,16 @@ rnPatAndThen mk (AsPat rdr pat)
        ; pat' <- rnLPatAndThen mk pat
        ; return (AsPat (L (nameSrcSpan new_name) new_name) pat') }
 
-rnPatAndThen mk p@(ViewPat expr pat ty)
+rnPatAndThen mk p@(ViewPat expr pat _ty)
   = do { liftCps $ do { vp_flag <- xoptM Opt_ViewPatterns
                       ; checkErr vp_flag (badViewPat p) }
          -- Because of the way we're arranging the recursive calls,
          -- this will be in the right context 
        ; expr' <- liftCpsFV $ rnLExpr expr 
        ; pat' <- rnLPatAndThen mk pat
-       ; return (ViewPat expr' pat' ty) }
+       -- Note: at this point the PreTcType in ty can only be a placeHolder
+       -- ; return (ViewPat expr' pat' ty) }
+       ; return (ViewPat expr' pat' placeHolderType) }
 
 rnPatAndThen mk (ConPatIn con stuff)
    -- rnConPatAndThen takes care of reconstructing the pattern
@@ -423,8 +426,9 @@ rnPatAndThen mk (ListPat pats _ _)
   = do { opt_OverloadedLists <- liftCps $ xoptM Opt_OverloadedLists
        ; pats' <- rnLPatsAndThen mk pats
        ; case opt_OverloadedLists of
-          True -> do   { (to_list_name,_) <- liftCps $ lookupSyntaxName toListName
-                       ; return (ListPat pats' placeHolderType (Just (placeHolderType, to_list_name)))}
+          True -> do { (to_list_name,_) <- liftCps $ lookupSyntaxName toListName
+                     ; return (ListPat pats' placeHolderType
+                                       (Just (placeHolderType, to_list_name)))}
           False -> return (ListPat pats' placeHolderType Nothing) }
 
 rnPatAndThen mk (PArrPat pats _)
@@ -709,7 +713,8 @@ rnOverLit origLit
                                 HsVar v -> v /= std_name
                                 _       -> panic "rnOverLit"
         ; return (lit { ol_witness = from_thing_name
-                      , ol_rebindable = rebindable }, fvs) }
+                      , ol_rebindable = rebindable
+                      , ol_type = placeHolderType }, fvs) }
 \end{code}
 
 %************************************************************************

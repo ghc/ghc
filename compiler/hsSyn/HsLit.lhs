@@ -6,40 +6,32 @@
 
 \begin{code}
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
+                                      -- in module PlaceHolder
+{-# LANGUAGE ConstraintKinds #-}
+
 module HsLit where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} HsExpr( SyntaxExpr, pprExpr )
 import BasicTypes ( FractionalLit(..) )
-import Type     ( Type, Kind )
+import Type       ( Type )
 import Outputable
 import FastString
+import PlaceHolder ( PostTc,PostRn,DataId )
 
 import Data.ByteString (ByteString)
-import Data.Data
+import Data.Data hiding ( Fixity )
 \end{code}
 
 
-%************************************************************************
-%*                                                                      *
-\subsection{Annotating the syntax}
-%*                                                                      *
-%************************************************************************
 
-\begin{code}
-type PostTcKind = Kind
-type PostTcType = Type          -- Used for slots in the abstract syntax
-                                -- where we want to keep slot for a type
-                                -- to be added by the type checker...but
-                                -- before typechecking it's just bogus
 
-placeHolderType :: PostTcType   -- Used before typechecking
-placeHolderType  = panic "Evaluated the place holder for a PostTcType"
-
-placeHolderKind :: PostTcKind   -- Used before typechecking
-placeHolderKind  = panic "Evaluated the place holder for a PostTcKind"
-\end{code}
 
 %************************************************************************
 %*                                                                      *
@@ -50,22 +42,24 @@ placeHolderKind  = panic "Evaluated the place holder for a PostTcKind"
 
 \begin{code}
 data HsLit
-  = HsChar          Char                -- Character
-  | HsCharPrim      Char                -- Unboxed character
-  | HsString        FastString          -- String
-  | HsStringPrim    ByteString          -- Packed bytes
-  | HsInt           Integer             -- Genuinely an Int; arises from TcGenDeriv,
-                                        --      and from TRANSLATION
-  | HsIntPrim       Integer             -- literal Int#
-  | HsWordPrim      Integer             -- literal Word#
-  | HsInt64Prim     Integer             -- literal Int64#
-  | HsWord64Prim    Integer             -- literal Word64#
-  | HsInteger       Integer  Type       -- Genuinely an integer; arises only from TRANSLATION
-                                        --      (overloaded literals are done with HsOverLit)
-  | HsRat           FractionalLit Type  -- Genuinely a rational; arises only from TRANSLATION
-                                        --      (overloaded literals are done with HsOverLit)
-  | HsFloatPrim     FractionalLit       -- Unboxed Float
-  | HsDoublePrim    FractionalLit       -- Unboxed Double
+  = HsChar          Char               -- Character
+  | HsCharPrim      Char               -- Unboxed character
+  | HsString        FastString         -- String
+  | HsStringPrim    ByteString         -- Packed bytes
+  | HsInt           Integer            -- Genuinely an Int; arises from
+                                       --     TcGenDeriv, and from TRANSLATION
+  | HsIntPrim       Integer            -- literal Int#
+  | HsWordPrim      Integer            -- literal Word#
+  | HsInt64Prim     Integer            -- literal Int64#
+  | HsWord64Prim    Integer            -- literal Word64#
+  | HsInteger       Integer  Type      -- Genuinely an integer; arises only from
+                                       --   TRANSLATION (overloaded literals are
+                                       --   done with HsOverLit)
+  | HsRat           FractionalLit Type -- Genuinely a rational; arises only from
+                                       --   TRANSLATION (overloaded literals are
+                                       --   done with HsOverLit)
+  | HsFloatPrim     FractionalLit      -- Unboxed Float
+  | HsDoublePrim    FractionalLit      -- Unboxed Double
   deriving (Data, Typeable)
 
 instance Eq HsLit where
@@ -87,10 +81,11 @@ instance Eq HsLit where
 data HsOverLit id       -- An overloaded literal
   = OverLit {
         ol_val :: OverLitVal,
-        ol_rebindable :: Bool,          -- Note [ol_rebindable]
-        ol_witness :: SyntaxExpr id,    -- Note [Overloaded literal witnesses]
-        ol_type :: PostTcType }
-  deriving (Data, Typeable)
+        ol_rebindable :: PostRn id Bool, -- Note [ol_rebindable]
+        ol_witness :: SyntaxExpr id,     -- Note [Overloaded literal witnesses]
+        ol_type :: PostTc id Type }
+  deriving (Typeable)
+deriving instance (DataId id) => Data (HsOverLit id)
 
 data OverLitVal
   = HsIntegral   !Integer       -- Integer-looking literals;
@@ -98,7 +93,7 @@ data OverLitVal
   | HsIsString   !FastString    -- String-looking literals
   deriving (Data, Typeable)
 
-overLitType :: HsOverLit a -> Type
+overLitType :: HsOverLit a -> PostTc a Type
 overLitType = ol_type
 \end{code}
 

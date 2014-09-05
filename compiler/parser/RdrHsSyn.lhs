@@ -5,6 +5,7 @@ Functions over HsSyn specialised to RdrName.
 
 \begin{code}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module RdrHsSyn (
         mkHsOpApp,
@@ -720,7 +721,8 @@ checkAPat msg loc e0 = do
    ELazyPat e         -> checkLPat msg e >>= (return . LazyPat)
    EAsPat n e         -> checkLPat msg e >>= (return . AsPat n)
    -- view pattern is well-formed if the pattern is
-   EViewPat expr patE -> checkLPat msg patE >>= (return . (\p -> ViewPat expr p placeHolderType))
+   EViewPat expr patE -> checkLPat msg patE >>=
+                            (return . (\p -> ViewPat expr p placeHolderType))
    ExprWithTySig e t  -> do e <- checkLPat msg e
                             -- Pattern signatures are parsed as sigtypes,
                             -- but they aren't explicit forall points.  Hence
@@ -817,7 +819,8 @@ checkFunBind msg lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
         -- The span of the match covers the entire equation.
         -- That isn't quite right, but it'll do for now.
 
-makeFunBind :: Located id -> Bool -> [LMatch id (LHsExpr id)] -> HsBind id
+makeFunBind :: Located RdrName -> Bool -> [LMatch RdrName (LHsExpr RdrName)]
+            -> HsBind RdrName
 -- Like HsUtils.mkFunBind, but we need to be able to set the fixity too
 makeFunBind fn is_infix ms
   = FunBind { fun_id = fn, fun_infix = is_infix, fun_matches = mkMatchGroup FromSource ms,
@@ -995,13 +998,13 @@ checkCmd _ (HsLet lb e) =
 checkCmd _ (HsDo DoExpr stmts ty) = 
     mapM checkCmdLStmt stmts >>= (\ss -> return $ HsCmdDo ss ty)
 
-checkCmd _ (OpApp eLeft op fixity eRight) = do
+checkCmd _ (OpApp eLeft op _fixity eRight) = do
     -- OpApp becomes a HsCmdArrForm with a (Just fixity) in it
     c1 <- checkCommand eLeft
     c2 <- checkCommand eRight
     let arg1 = L (getLoc c1) $ HsCmdTop c1 placeHolderType placeHolderType []
         arg2 = L (getLoc c2) $ HsCmdTop c2 placeHolderType placeHolderType []
-    return $ HsCmdArrForm op (Just fixity) [arg1, arg2]
+    return $ HsCmdArrForm op Nothing [arg1, arg2]
 
 checkCmd l e = cmdFail l e
 

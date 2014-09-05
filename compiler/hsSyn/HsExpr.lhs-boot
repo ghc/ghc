@@ -1,13 +1,28 @@
 \begin{code}
 {-# LANGUAGE CPP, KindSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
+                                      -- in module PlaceHolder
+{-# LANGUAGE ConstraintKinds #-}
+#if __GLASGOW_HASKELL__ > 706
+{-# LANGUAGE RoleAnnotations #-}
+#endif
+
 module HsExpr where
 
 import SrcLoc     ( Located )
 import Outputable ( SDoc, OutputableBndr, Outputable )
 import {-# SOURCE #-} HsPat  ( LPat )
+import PlaceHolder ( DataId )
+import Data.Data hiding ( Fixity )
 
-import Data.Data
-
+#if __GLASGOW_HASKELL__ > 706
+type role HsExpr nominal
+type role HsCmd nominal
+type role MatchGroup nominal representational
+type role GRHSs nominal representational
+type role HsSplice nominal
+#endif
 data HsExpr (i :: *)
 data HsCmd  (i :: *)
 data HsSplice (i :: *)
@@ -27,11 +42,11 @@ instance Typeable2 MatchGroup
 instance Typeable2 GRHSs
 #endif
 
-instance Data i => Data (HsSplice i)
-instance Data i => Data (HsExpr i)
-instance Data i => Data (HsCmd i)
-instance (Data i, Data body) => Data (MatchGroup i body)
-instance (Data i, Data body) => Data (GRHSs i body)
+instance (DataId id) => Data (HsSplice id)
+instance (DataId id) => Data (HsExpr id)
+instance (DataId id) => Data (HsCmd id)
+instance (Data body,DataId id) => Data (MatchGroup id body)
+instance (Data body,DataId id) => Data (GRHSs id body)
 
 instance OutputableBndr id => Outputable (HsExpr id)
 instance OutputableBndr id => Outputable (HsCmd id)

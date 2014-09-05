@@ -14,7 +14,7 @@
 -- for details
 
 module TcHsType (
-	tcHsSigType, tcHsSigTypeNC, tcHsDeriv, tcHsVectInst, 
+	tcHsSigType, tcHsSigTypeNC, tcHsDeriv, tcHsVectInst,
 	tcHsInstHead, 
 	UserTypeCtxt(..), 
 
@@ -1233,8 +1233,8 @@ Historical note:
 
 \begin{code}
 tcHsPatSigType :: UserTypeCtxt
-	       -> HsWithBndrs (LHsType Name)  -- The type signature
-	      -> TcM ( Type                   -- The signature
+	       -> HsWithBndrs Name (LHsType Name) -- The type signature
+	      -> TcM ( Type                       -- The signature
                       , [(Name, TcTyVar)] )   -- The new bit of type environment, binding
 				              -- the scoped type variables
 -- Used for type-checking type signatures in
@@ -1263,7 +1263,7 @@ tcHsPatSigType ctxt (HsWB { hswb_cts = hs_ty, hswb_kvs = sig_kvs, hswb_tvs = sig
           _              -> newSigTyVar name kind  -- See Note [Unifying SigTvs]
 
 tcPatSig :: UserTypeCtxt
-	 -> HsWithBndrs (LHsType Name)
+	 -> HsWithBndrs Name (LHsType Name)
 	 -> TcSigmaType
 	 -> TcM (TcType,	    -- The type to use for "inside" the signature
 		 [(Name, TcTyVar)], -- The new bit of type environment, binding

@@ -1169,7 +1169,8 @@ tcRhs (TcFunBind (_,_,mono_id) loc inf matches)
         ; return (FunBind { fun_id = L loc mono_id, fun_infix = inf
                           , fun_matches = matches'
                           , fun_co_fn = co_fn 
-                          , bind_fvs = placeHolderNames, fun_tick = Nothing }) }
+                          , bind_fvs = placeHolderNamesTc
+                          , fun_tick = Nothing }) }
 
 tcRhs (TcPatBind infos pat' grhss pat_ty)
   = tcExtendIdBndrs [ TcIdBndr mono_id NotTopLevel | (_,_,mono_id) <- infos ] $
@@ -1178,7 +1179,7 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
         ; grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
                     tcGRHSsPat grhss pat_ty
         ; return (PatBind { pat_lhs = pat', pat_rhs = grhss', pat_rhs_ty = pat_ty 
-                          , bind_fvs = placeHolderNames
+                          , bind_fvs = placeHolderNamesTc
                           , pat_ticks = (Nothing,[]) }) }
 
 

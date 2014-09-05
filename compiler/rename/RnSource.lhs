@@ -515,7 +515,8 @@ rnFamInstDecl :: HsDocContext
               -> [LHsType RdrName]
               -> rhs
               -> (HsDocContext -> rhs -> RnM (rhs', FreeVars))
-              -> RnM (Located Name, HsWithBndrs [LHsType Name], rhs', FreeVars)
+              -> RnM (Located Name, HsWithBndrs Name [LHsType Name], rhs',
+                      FreeVars)
 rnFamInstDecl doc mb_cls tycon pats payload rnPayload
   = do { tycon'   <- lookupFamInstName (fmap fst mb_cls) tycon
        ; let loc = case pats of

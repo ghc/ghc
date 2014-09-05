@@ -215,7 +215,7 @@ tcPatSynWrapper PSB{ psb_id = L loc name, psb_def = lpat, psb_dir = dir, psb_arg
                       , fun_infix = False
                       , fun_matches = mg
                       , fun_co_fn = idHsWrapper
-                      , bind_fvs = placeHolderNames
+                      , bind_fvs = placeHolderNamesTc
                       , fun_tick = Nothing }}
   where
     args = map unLoc $ case details of

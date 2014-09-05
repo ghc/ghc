@@ -7,7 +7,7 @@ The deriving code for the Generic class
 
 \begin{code}
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
-
+{-# LANGUAGE FlexibleContexts #-}
 
 module TcGenGenerics (canDoGenerics, canDoGenerics1,
                       GenericKind(..),

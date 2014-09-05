@@ -7,6 +7,13 @@ HsTypes: Abstract syntax: user-defined types
 
 \begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
+                                      -- in module PlaceHolder
+{-# LANGUAGE ConstraintKinds #-}
 
 module HsTypes (
         HsType(..), LHsType, HsKind, LHsKind,
@@ -40,7 +47,7 @@ module HsTypes (
 
 import {-# SOURCE #-} HsExpr ( HsSplice, pprUntypedSplice )
 
-import HsLit
+import PlaceHolder ( PostTc,PostRn,DataId,PlaceHolder(..) )
 
 import Name( Name )
 import RdrName( RdrName )
@@ -54,7 +61,7 @@ import StaticFlags
 import Outputable
 import FastString
 
-import Data.Data
+import Data.Data hiding ( Fixity )
 \end{code}
 
 
@@ -131,17 +138,18 @@ type LHsKind name = Located (HsKind name)
 
 type LHsTyVarBndr name = Located (HsTyVarBndr name)
 
-data LHsTyVarBndrs name 
+data LHsTyVarBndrs name
   = HsQTvs { hsq_kvs :: [Name]                  -- Kind variables
            , hsq_tvs :: [LHsTyVarBndr name]     -- Type variables
              -- See Note [HsForAllTy tyvar binders]
     }
-  deriving( Data, Typeable )
+  deriving( Typeable )
+deriving instance (DataId name) => Data (LHsTyVarBndrs name)
 
 mkHsQTvs :: [LHsTyVarBndr RdrName] -> LHsTyVarBndrs RdrName
 -- Just at RdrName because in the Name variant we should know just
 -- what the kind-variable binders are; and we don't
--- We put an empty list (rather than a panic) for the kind vars so 
+-- We put an empty list (rather than a panic) for the kind vars so
 -- that the pretty printer works ok on them.
 mkHsQTvs tvs = HsQTvs { hsq_kvs = [], hsq_tvs = tvs }
 
@@ -151,16 +159,18 @@ emptyHsQTvs =  HsQTvs { hsq_kvs = [], hsq_tvs = [] }
 hsQTvBndrs :: LHsTyVarBndrs name -> [LHsTyVarBndr name]
 hsQTvBndrs = hsq_tvs
 
-data HsWithBndrs thing
-  = HsWB { hswb_cts :: thing         -- Main payload (type or list of types)
-         , hswb_kvs :: [Name]        -- Kind vars
-         , hswb_tvs :: [Name]        -- Type vars
-    }                  
-  deriving (Data, Typeable)
+data HsWithBndrs name thing
+  = HsWB { hswb_cts :: thing             -- Main payload (type or list of types)
+         , hswb_kvs :: PostRn name [Name] -- Kind vars
+         , hswb_tvs :: PostRn name [Name] -- Type vars
+    }
+  deriving (Typeable)
+deriving instance (Data name, Data thing, Data (PostRn name [Name]))
+  => Data (HsWithBndrs name thing)
 
-mkHsWithBndrs :: thing -> HsWithBndrs thing
-mkHsWithBndrs x = HsWB { hswb_cts = x, hswb_kvs = panic "mkHsTyWithBndrs:kvs"
-                                     , hswb_tvs = panic "mkHsTyWithBndrs:tvs" }
+mkHsWithBndrs :: thing -> HsWithBndrs RdrName thing
+mkHsWithBndrs x = HsWB { hswb_cts = x, hswb_kvs = PlaceHolder
+                                     , hswb_tvs = PlaceHolder }
 
 
 -- | These names are used early on to store the names of implicit
@@ -186,7 +196,8 @@ data HsTyVarBndr name
   | KindedTyVar
          name
          (LHsKind name)  -- The user-supplied kind signature
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId name) => Data (HsTyVarBndr name)
 
 -- | Does this 'HsTyVarBndr' come with an explicit kind annotation?
 isHsKindedTyVar :: HsTyVarBndr name -> Bool
@@ -239,7 +250,7 @@ data HsType name
   | HsQuasiQuoteTy      (HsQuasiQuote name)
 
   | HsSpliceTy          (HsSplice name) 
-                        PostTcKind
+                        (PostTc name Kind)
 
   | HsDocTy             (LHsType name) LHsDocString -- A documented type
 
@@ -249,18 +260,19 @@ data HsType name
   | HsCoreTy Type       -- An escape hatch for tunnelling a *closed* 
                         -- Core Type through HsSyn.  
 
-  | HsExplicitListTy     -- A promoted explicit list
-        PostTcKind       -- See Note [Promoted lists and tuples]
+  | HsExplicitListTy       -- A promoted explicit list
+        (PostTc name Kind) -- See Note [Promoted lists and tuples]
         [LHsType name]   
                          
-  | HsExplicitTupleTy    -- A promoted explicit tuple
-        [PostTcKind]     -- See Note [Promoted lists and tuples]
+  | HsExplicitTupleTy      -- A promoted explicit tuple
+        [PostTc name Kind] -- See Note [Promoted lists and tuples]
         [LHsType name]   
 
   | HsTyLit HsTyLit      -- A promoted numeric literal.
 
   | HsWrapTy HsTyWrapper (HsType name)  -- only in typechecker output
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId name) => Data (HsType name)
 
 
 data HsTyLit
@@ -380,7 +392,8 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
   = ConDeclField { cd_fld_name :: Located name,
                    cd_fld_type :: LBangType name, 
                    cd_fld_doc  :: Maybe LHsDocString }
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId name) => Data (ConDeclField name)
 
 -----------------------
 -- Combine adjacent for-alls. 
@@ -565,7 +578,7 @@ instance (OutputableBndr name) => Outputable (HsTyVarBndr name) where
     ppr (UserTyVar n)     = ppr n
     ppr (KindedTyVar n k) = parens $ hsep [ppr n, dcolon, ppr k]
 
-instance (Outputable thing) => Outputable (HsWithBndrs thing) where
+instance (Outputable thing) => Outputable (HsWithBndrs name thing) where
     ppr (HsWB { hswb_cts = ty }) = ppr ty
 
 pprHsForAll :: OutputableBndr name => HsExplicitFlag -> LHsTyVarBndrs name ->  LHsContext name -> SDoc

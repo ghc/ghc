@@ -280,6 +280,7 @@ Library
         HsExpr
         HsImpExp
         HsLit
+        PlaceHolder
         HsPat
         HsSyn
         HsTypes

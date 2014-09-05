@@ -996,9 +996,9 @@ famTyConShape fam_tc
     , tyConKind fam_tc )
 
 tc_fam_ty_pats :: FamTyConShape
-               -> HsWithBndrs [LHsType Name] -- Patterns
-               -> (TcKind -> TcM ())         -- Kind checker for RHS
-                                             -- result is ignored
+               -> HsWithBndrs Name [LHsType Name] -- Patterns
+               -> (TcKind -> TcM ())              -- Kind checker for RHS
+                                                  -- result is ignored
                -> TcM ([Kind], [Type], Kind)
 -- Check the type patterns of a type or data family instance
 --     type instance F <pat1> <pat2> = <type>
@@ -1045,8 +1045,8 @@ tc_fam_ty_pats (name, arity, kind)
 
 -- See Note [tc_fam_ty_pats vs tcFamTyPats]
 tcFamTyPats :: FamTyConShape
-            -> HsWithBndrs [LHsType Name] -- patterns
-            -> (TcKind -> TcM ())         -- kind-checker for RHS
+            -> HsWithBndrs Name [LHsType Name] -- patterns
+            -> (TcKind -> TcM ())              -- kind-checker for RHS
             -> ([TKVar]              -- Kind and type variables
                 -> [TcType]          -- Kind and type arguments
                 -> Kind -> TcM a)

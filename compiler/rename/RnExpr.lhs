@@ -207,9 +207,10 @@ rnExpr (HsLam matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches
        ; return (HsLam matches', fvMatch) }
 
-rnExpr (HsLamCase arg matches)
+rnExpr (HsLamCase _arg matches)
   = do { (matches', fvs_ms) <- rnMatchGroup CaseAlt rnLExpr matches
-       ; return (HsLamCase arg matches', fvs_ms) }
+       -- ; return (HsLamCase arg matches', fvs_ms) }
+       ; return (HsLamCase placeHolderType matches', fvs_ms) }
 
 rnExpr (HsCase expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
@@ -231,7 +232,8 @@ rnExpr (ExplicitList _ _  exps)
         ; if opt_OverloadedLists
            then do {
             ; (from_list_n_name, fvs') <- lookupSyntaxName fromListNName
-            ; return (ExplicitList placeHolderType (Just from_list_n_name) exps', fvs `plusFV` fvs') }
+            ; return (ExplicitList placeHolderType (Just from_list_n_name) exps'
+                     , fvs `plusFV` fvs') }
            else
             return  (ExplicitList placeHolderType Nothing exps', fvs) }
 
@@ -273,9 +275,10 @@ rnExpr (HsIf _ p b1 b2)
        ; (mb_ite, fvITE) <- lookupIfThenElse
        ; return (HsIf mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
 
-rnExpr (HsMultiIf ty alts)
+rnExpr (HsMultiIf _ty alts)
   = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt rnLExpr) alts
-       ; return (HsMultiIf ty alts', fvs) }
+       -- ; return (HsMultiIf ty alts', fvs) }
+       ; return (HsMultiIf placeHolderType alts', fvs) }
 
 rnExpr (HsType a)
   = do { (t, fvT) <- rnLHsType HsTypeCtx a
@@ -404,7 +407,8 @@ rnCmdTop = wrapLocFstM rnCmdTop'
         -- Generate the rebindable syntax for the monad
         ; (cmd_names', cmd_fvs) <- lookupSyntaxNames cmd_names
 
-        ; return (HsCmdTop cmd' placeHolderType placeHolderType (cmd_names `zip` cmd_names'),
+        ; return (HsCmdTop cmd' placeHolderType placeHolderType
+                  (cmd_names `zip` cmd_names'),
                   fvCmd `plusFV` cmd_fvs) }
 
 rnLCmd :: LHsCmd RdrName -> RnM (LHsCmd Name, FreeVars)
@@ -677,9 +681,9 @@ rnStmt ctxt rnBody (L _ (RecStmt { recS_stmts = rec_stmts })) thing_inside
   = do  { (return_op, fvs1)  <- lookupStmtName ctxt returnMName
         ; (mfix_op,   fvs2)  <- lookupStmtName ctxt mfixName
         ; (bind_op,   fvs3)  <- lookupStmtName ctxt bindMName
-        ; let empty_rec_stmt = emptyRecStmt { recS_ret_fn  = return_op
-                                            , recS_mfix_fn = mfix_op
-                                            , recS_bind_fn = bind_op }
+        ; let empty_rec_stmt = emptyRecStmtName { recS_ret_fn  = return_op
+                                                , recS_mfix_fn = mfix_op
+                                                , recS_bind_fn = bind_op }
 
         -- Step1: Bring all the binders of the mdo into scope
         -- (Remember that this also removes the binders from the

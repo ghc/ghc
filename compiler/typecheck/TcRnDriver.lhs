@@ -1385,7 +1385,8 @@ tcUserStmt rdr_stmt@(L loc _)
            ; return stuff }
       where
         print_v  = L loc $ BodyStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
-                                    (HsVar thenIOName) noSyntaxExpr placeHolderType
+                                    (HsVar thenIOName) noSyntaxExpr
+                                    placeHolderType
 
 -- | Typecheck the statements given and then return the results of the
 -- statement in the form 'IO [()]'.
