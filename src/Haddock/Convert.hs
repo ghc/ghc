@@ -81,7 +81,7 @@ tyThingToLHsDecl t = noLoc $ case t of
          , tcdATs = atFamDecls
          , tcdATDefs = [] --ignore associated type defaults
          , tcdDocs = [] --we don't have any docs at this point
-         , tcdFVs = placeHolderNames }
+         , tcdFVs = placeHolderNamesTc }
     | otherwise
     -> TyClD (synifyTyCon Nothing tc)
 
@@ -118,7 +118,7 @@ synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
   | isOpenSynFamilyTyCon tc
   , Just branch <- coAxiomSingleBranch_maybe ax
   = InstD (TyFamInstD (TyFamInstDecl { tfid_eqn = noLoc $ synifyAxBranch tc branch
-                                     , tfid_fvs = placeHolderNames }))
+                                     , tfid_fvs = placeHolderNamesTc }))
 
   | Just ax' <- isClosedSynFamilyTyCon_maybe tc
   , getUnique ax' == getUnique ax   -- without the getUniques, type error
@@ -148,7 +148,7 @@ synifyTyCon coax tc
                                                -- we have their kind accurately:
                                       , dd_cons = []  -- No constructors
                                       , dd_derivs = Nothing }
-           , tcdFVs = placeHolderNames }
+           , tcdFVs = placeHolderNamesTc }
 
   | isSynFamilyTyCon tc 
   = case synTyConRhs_maybe tc of
@@ -177,7 +177,7 @@ synifyTyCon coax tc
           SynDecl { tcdLName = synifyName tc
                   , tcdTyVars = synifyTyVars (tyConTyVars tc)
                   , tcdRhs = synifyType WithinType ty
-                  , tcdFVs = placeHolderNames }
+                  , tcdFVs = placeHolderNamesTc }
         _ -> error "synifyTyCon: impossible synTyCon"
   | otherwise =
   -- (closed) newtype and data
@@ -217,7 +217,7 @@ synifyTyCon coax tc
                     , dd_cons    = cons 
                     , dd_derivs  = alg_deriv }
  in DataDecl { tcdLName = name, tcdTyVars = tyvars, tcdDataDefn = defn
-             , tcdFVs = placeHolderNames }
+             , tcdFVs = placeHolderNamesTc }
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
 -- for any constructor that would be misrepresented by omitting its
