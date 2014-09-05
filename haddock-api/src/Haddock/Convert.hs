@@ -85,7 +85,7 @@ tyThingToLHsDecl t = case t of
          , tcdATs = rights atFamDecls
          , tcdATDefs = [] --ignore associated type defaults
          , tcdDocs = [] --we don't have any docs at this point
-         , tcdFVs = placeHolderNames }
+         , tcdFVs = placeHolderNamesTc }
     | otherwise
     -> synifyTyCon Nothing tc >>= allOK . TyClD
 
@@ -135,7 +135,7 @@ synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
   , Just branch <- coAxiomSingleBranch_maybe ax
   = return $ InstD (TyFamInstD
                     (TyFamInstDecl { tfid_eqn = noLoc $ synifyAxBranch tc branch
-                                   , tfid_fvs = placeHolderNames }))
+                                   , tfid_fvs = placeHolderNamesTc }))
 
   | Just ax' <- isClosedSynFamilyTyCon_maybe tc
   , getUnique ax' == getUnique ax   -- without the getUniques, type error
@@ -167,7 +167,7 @@ synifyTyCon coax tc
                                                -- we have their kind accurately:
                                       , dd_cons = []  -- No constructors
                                       , dd_derivs = Nothing }
-           , tcdFVs = placeHolderNames }
+           , tcdFVs = placeHolderNamesTc }
 
   | isSynFamilyTyCon tc
   = case synTyConRhs_maybe tc of
@@ -203,7 +203,7 @@ synifyTyCon coax tc
           SynDecl { tcdLName = synifyName tc
                   , tcdTyVars = synifyTyVars (tyConTyVars tc)
                   , tcdRhs = synifyType WithinType ty
-                  , tcdFVs = placeHolderNames }
+                  , tcdFVs = placeHolderNamesTc }
         _ -> Left "synifyTyCon: impossible synTyCon"
   | otherwise =
   -- (closed) newtype and data
@@ -246,7 +246,7 @@ synifyTyCon coax tc
  in case lefts consRaw of
   [] -> return $
         DataDecl { tcdLName = name, tcdTyVars = tyvars, tcdDataDefn = defn
-                 , tcdFVs = placeHolderNames }
+                 , tcdFVs = placeHolderNamesTc }
   dataConErrs -> Left $ unlines dataConErrs
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)

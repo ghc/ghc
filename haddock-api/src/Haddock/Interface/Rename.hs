@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 ----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.Rename
@@ -20,6 +21,8 @@ import Haddock.Types
 import Bag (emptyBag)
 import GHC hiding (NoLink)
 import Name
+import NameSet
+import Coercion
 
 import Control.Applicative
 import Control.Monad hiding (mapM)
@@ -176,6 +179,7 @@ renameLKind = renameLType
 renameMaybeLKind :: Maybe (LHsKind Name) -> RnM (Maybe (LHsKind DocName))
 renameMaybeLKind = traverse renameLKind
 
+
 renameType :: HsType Name -> RnM (HsType DocName)
 renameType t = case t of
   HsForAllTy expl tyvars lcontext ltype -> do
@@ -302,17 +306,17 @@ renameTyClD d = case d of
     decl' <- renameFamilyDecl decl
     return (FamDecl { tcdFam = decl' })
 
-  SynDecl { tcdLName = lname, tcdTyVars = tyvars, tcdRhs = rhs, tcdFVs = fvs } -> do
+  SynDecl { tcdLName = lname, tcdTyVars = tyvars, tcdRhs = rhs, tcdFVs = _fvs } -> do
     lname'    <- renameL lname
     tyvars'   <- renameLTyVarBndrs tyvars
     rhs'     <- renameLType rhs
-    return (SynDecl { tcdLName = lname', tcdTyVars = tyvars', tcdRhs = rhs', tcdFVs = fvs })
+    return (SynDecl { tcdLName = lname', tcdTyVars = tyvars', tcdRhs = rhs', tcdFVs = placeHolderNames })
 
-  DataDecl { tcdLName = lname, tcdTyVars = tyvars, tcdDataDefn = defn, tcdFVs = fvs } -> do
+  DataDecl { tcdLName = lname, tcdTyVars = tyvars, tcdDataDefn = defn, tcdFVs = _fvs } -> do
     lname'    <- renameL lname
     tyvars'   <- renameLTyVarBndrs tyvars
     defn'     <- renameDataDefn defn
-    return (DataDecl { tcdLName = lname', tcdTyVars = tyvars', tcdDataDefn = defn', tcdFVs = fvs })
+    return (DataDecl { tcdLName = lname', tcdTyVars = tyvars', tcdDataDefn = defn', tcdFVs = placeHolderNames })
 
   ClassDecl { tcdCtxt = lcontext, tcdLName = lname, tcdTyVars = ltyvars
             , tcdFDs = lfundeps, tcdSigs = lsigs, tcdATs = ats, tcdATDefs = at_defs } -> do
@@ -465,7 +469,7 @@ renameLTyFamInstEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = pats_w_bndrs, 
        ; pats' <- mapM renameLType (hswb_cts pats_w_bndrs)
        ; rhs' <- renameLType rhs
        ; return (L loc (TyFamEqn { tfe_tycon = tc'
-                                 , tfe_pats = pats_w_bndrs { hswb_cts = pats' }
+                                 , tfe_pats = HsWB pats' PlaceHolder PlaceHolder
                                  , tfe_rhs = rhs' })) }
 
 renameLTyFamDefltEqn :: LTyFamDefltEqn Name -> RnM (LTyFamDefltEqn DocName)
@@ -482,7 +486,9 @@ renameDataFamInstD (DataFamInstDecl { dfid_tycon = tc, dfid_pats = pats_w_bndrs,
   = do { tc' <- renameL tc
        ; pats' <- mapM renameLType (hswb_cts pats_w_bndrs)
        ; defn' <- renameDataDefn defn
-       ; return (DataFamInstDecl { dfid_tycon = tc', dfid_pats = pats_w_bndrs { hswb_cts = pats' }
+       ; return (DataFamInstDecl { dfid_tycon = tc'
+                                 , dfid_pats
+                                       = HsWB pats' PlaceHolder PlaceHolder
                                  , dfid_defn = defn', dfid_fvs = placeHolderNames }) }
 
 renameExportItem :: ExportItem Name -> RnM (ExportItem DocName)
@@ -517,3 +523,12 @@ renameSub (n,doc) = do
   n' <- rename n
   doc' <- renameDocForDecl doc
   return (n', doc')
+
+type instance PostRn DocName NameSet  = PlaceHolder
+type instance PostRn DocName Fixity   = PlaceHolder
+type instance PostRn DocName Bool     = PlaceHolder
+type instance PostRn DocName [Name]   = PlaceHolder
+
+type instance PostTc DocName Kind     = PlaceHolder
+type instance PostTc DocName Type     = PlaceHolder
+type instance PostTc DocName Coercion = PlaceHolder
