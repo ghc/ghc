@@ -183,10 +183,11 @@ test('T4801',
            # prev:        185669232 (x86/OSX)
            # 2014-01-22:  211198056 (x86/Linux)
            # 2014-09-03:  185242032 (Windows laptop)
-           (wordsize(64), 392409984, 10)]),
+           (wordsize(64), 362939272, 10)]),
             # prev:       360243576 (amd64/Linux)
             # 19/10/2012: 447190832 (amd64/Linux) (-fPIC turned on)
             # 19/10/2012: 392409984 (amd64/Linux) (-fPIC turned off)
+            # 2014-04-08: 362939272 (amd64/Linux) cumulation of various smaller improvements over recent commits
 
       compiler_stats_num_field('max_bytes_used',
           [(platform('x86_64-apple-darwin'), 25145320, 5),
