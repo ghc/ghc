@@ -995,11 +995,38 @@ sortOn f =
 -- > unfoldr (\b -> if b == 0 then Nothing else Just (b, b-1)) 10
 -- >  [10,9,8,7,6,5,4,3,2,1]
 --
-unfoldr      :: (b -> Maybe (a, b)) -> b -> [a]
-unfoldr f b  =
-  case f b of
-   Just (a,new_b) -> a : unfoldr f new_b
-   Nothing        -> []
+
+-- Note [INLINE unfoldr]
+-- We treat unfoldr a little differently from some other forms for list fusion
+-- for two reasons:
+--
+-- 1. We don't want to use a rule to rewrite a basic form to a fusible
+-- form because this would inline before constant floating. As Simon Peyton-
+-- Jones and others have pointed out, this could reduce sharing in some cases
+-- where sharing is beneficial. Thus we simply INLINE it, which is, for
+-- example, how enumFromTo::Int becomes eftInt. Unfortunately, we don't seem
+-- to get enough of an inlining discount to get a version of eftInt based on
+-- unfoldr to inline as readily as the usual one. We know that all the Maybe
+-- nonsense will go away, but the compiler does not.
+--
+-- 2. The benefit of inlining unfoldr is likely to be huge in many common cases,
+-- even apart from list fusion. In particular, inlining unfoldr often
+-- allows GHC to erase all the Maybes. This appears to be critical if unfoldr
+-- is to be used in high-performance code. A small increase in code size
+-- in the relatively rare cases when this does not happen looks like a very
+-- small price to pay.
+--
+-- Doing a back-and-forth dance doesn't seem to accomplish anything if the
+-- final form has to be inlined in any case.
+
+unfoldr :: (b -> Maybe (a, b)) -> b -> [a]
+
+{-# INLINE unfoldr #-} -- See Note [INLINE unfoldr]
+unfoldr f b0 = build (\c n ->
+  let go b = case f b of
+               Just (a, new_b) -> a `c` go new_b
+               Nothing         -> n
+  in go b0)
 
 -- -----------------------------------------------------------------------------
 
