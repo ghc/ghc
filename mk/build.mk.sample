@@ -108,7 +108,7 @@ endif
 ifeq "$(BuildFlavour)" "perf-cross"
 
 SRC_HC_OPTS     = -O -H64m -fllvm
-GhcStage1HcOpts = -O2 -fllvm
+GhcStage1HcOpts = -O2
 GhcStage2HcOpts = -O2 -fllvm
 GhcHcOpts       = -Rghc-timing
 GhcLibHcOpts    = -O2
@@ -179,7 +179,7 @@ endif
 ifeq "$(BuildFlavour)" "quick-cross"
 
 SRC_HC_OPTS        = -H64m -O0
-GhcStage1HcOpts    = -O -fllvm
+GhcStage1HcOpts    = -O
 GhcStage2HcOpts    = -O0 -fllvm
 GhcLibHcOpts       = -O -fllvm
 SplitObjs          = NO
