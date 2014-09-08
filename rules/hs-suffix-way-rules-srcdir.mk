@@ -52,10 +52,10 @@ $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hc includes/ghcautoconf.h includes/ghc
 
 # Now the rules for hs-boot files.
 
-$1/$2/build/%.$$($3_o-boot) : $1/$4/%.hs-boot $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
+$1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
 
-$1/$2/build/%.$$($3_o-boot) : $1/$4/%.lhs-boot $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
+$1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.lhs-boot $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
 
 # stubs are automatically generated and compiled by GHC
