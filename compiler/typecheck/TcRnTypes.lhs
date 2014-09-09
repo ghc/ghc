@@ -1285,8 +1285,9 @@ data Implication
                                  --   (order does not matter)
                                  -- See Invariant (GivenInv) in TcType
 
-      ic_fsks  :: [TcTyVar],     -- Extra flatten-skolems introduced by
-                                 -- by flattening the givens
+      ic_fsks  :: Cts            -- Extra Given constraints, all CFunEqCans,
+                                 -- arising from flattening the givens
+
       ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
                                  -- False <=> ic_givens might have equalities
 

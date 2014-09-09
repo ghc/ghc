@@ -1122,7 +1122,10 @@ they carry evidence).
 
 
 \begin{code}
-floatEqualities :: [TcTyVar] -> Bool -> [TcTyVar]
+data SkolStatus = Pinned | CanFloat | Pending
+
+floatEqualities :: [TcTyVar] -> Bool
+                -> Cts          -- Given fsks
                 -> WantedConstraints -> TcS (Cts, WantedConstraints)
 -- Main idea: see Note [Float Equalities out of Implications]
 --
@@ -1140,14 +1143,43 @@ floatEqualities skols no_given_eqs fsks wanteds@(WC { wc_flat = flats })
   | otherwise
   = 
   where
-    (ufsk_funeqs, others) = partitionBag isCFunEqCan flats
+    skol_set = mkVarSet skols
+    (ufsks, others) = partitionBag isCFunEqCan flats
+    all_fsks = ufsks `andCts` fsks
 
-    pinned_tvs = fixVarSet mk_next (mkVarSet skols)
-    mk_next tvs = foldr grow_one tvs flat_eqs
-    grow_one (tvs1,tvs2) tvs
-      | intersectsVarSet tvs tvs1 = tvs `unionVarSet` tvs2
-      | intersectsVarSet tvs tvs2 = tvs `unionVarSet` tvs2
-      | otherwise                 = tvs
+    fsk_tvs :: VarEnv [TcTyVar]
+    fsk_tvs = foldBag (\env (CFunEqCan { cc_fsk = tv, cc_tyargs = xis })
+                       -> extendVarEnv env tv (varSetElems (tyVarsOfTypes xis)))
+                      emptyVarEnv all_fsks
+
+    fsk_map :: VarEnv SkolStatus  -- True <=> pinned by skolem
+    fsk_map = foldrBag mk_fsk_map emptyVarEnv (ufsks `andCts` fsks)
+
+    mk_fsk_map :: Ct -> VarEnv SkolStatus -> VarEnv SkolStatus
+    mk_fsk_map (CFunEqCan { cc_fsk = tv }) map_so_far
+      = snd (mk_fsk_map_tv map_so_far tv)
+
+    mk_fsk_map_tv :: VarEnv SkolStatus -> TcTyVar -> (Bool, VarEnv SkolStatus)
+    mk_fsk_map_tv map_so_far tv
+      | Just status <- lookupVarEnv map_so_far tv
+      = (status, map_so_far)
+      | tv `elem skol_set
+      = (Pinned, extendVarEnv map_so_far tv Pinned)
+      | Just new_tvs <- lookupVarEnv fsk_tvs tv
+      , (status, map_so_far') <- mk_fsk_map_tvs (extendVarEnv map_so_far tv Pending) new_tvs
+      = (status, extendVarEnv map_so_far' tv status)
+      | otherwise
+      = (CanFloat, extendVarEnv map_so_far tv CanFloat)
+
+    mk_fsk_map_tvs :: VarEnv Bool -> [TcTyVar] -> (Bool, VarEnv Bool)
+    mk_fsk_map_tvs map_so_far []
+       = (CanFloat, map_so_far)
+    mk_fsk_map_tvs map_so_far (tv:tvs)
+       | (status, map_so_far') <- mk_fsk_map_tv map_so_far tv
+       = case status of
+           Pinned -> (Pinned, map_so_far')
+           _      -> mk_fsk_map_tvs map_so_far' tvs
+
 
     (float_candidates, flats1) = partitionBag is_candidate flats
     is_candidate (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })

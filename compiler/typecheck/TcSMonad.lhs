@@ -1970,7 +1970,7 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                                                   , ic_skols  = skol_tvs
                                                   , ic_no_eqs = True
                                                   , ic_given  = []
-                                                  , ic_fsks   = []
+                                                  , ic_fsks   = emptyCts
                                                   , ic_wanted = wc
                                                   , ic_insol  = False
                                                   , ic_binds  = ev_binds_var
