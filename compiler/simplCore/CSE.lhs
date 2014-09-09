@@ -153,14 +153,7 @@ let-binding, and we can use cseRhs for dealing with the scrutinee.
 
 \begin{code}
 cseProgram :: CoreProgram -> CoreProgram
-cseProgram binds = cseBinds emptyCSEnv binds
-
-cseBinds :: CSEnv -> [CoreBind] -> [CoreBind]
-cseBinds _   []     = []
-cseBinds env (b:bs) = (b':bs')
-                    where
-                      (env1, b') = cseBind  env  b
-                      bs'        = cseBinds env1 bs
+cseProgram binds = snd (mapAccumL cseBind emptyCSEnv binds)
 
 cseBind :: CSEnv -> CoreBind -> (CSEnv, CoreBind)
 cseBind env (NonRec b e)
