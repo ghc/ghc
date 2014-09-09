@@ -163,7 +163,7 @@ module GHC.Generics  (
 -- type 'D1' = 'M1' 'D'
 -- @
 --
--- The types 'S', 'C' and 'R' are once again type-level proxies, just used to create
+-- The types 'S', 'C' and 'D' are once again type-level proxies, just used to create
 -- several variants of 'M1'.
 
 -- *** Additional generic representation type constructors
