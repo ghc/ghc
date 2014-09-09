@@ -154,8 +154,8 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
       case con_details d of
         PrefixCon _ -> Just d
         RecCon fields
-          | all field_avail fields -> Just d
-          | otherwise -> Just (d { con_details = PrefixCon (field_types (map unL fields)) })
+          | all field_avail (unL fields) -> Just d
+          | otherwise -> Just (d { con_details = PrefixCon (field_types (map unL (unL fields))) })
           -- if we have *all* the field names available, then
           -- keep the record declaration.  Otherwise degrade to
           -- a constructor declaration.  This isn't quite right, but

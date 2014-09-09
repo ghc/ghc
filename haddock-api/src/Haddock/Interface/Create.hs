@@ -194,8 +194,8 @@ moduleWarning dflags gre (WarnAll w) = Just $ parseWarning dflags gre w
 
 parseWarning :: DynFlags -> GlobalRdrEnv -> WarningTxt -> Doc Name
 parseWarning dflags gre w = force $ case w of
-  DeprecatedTxt msg -> format "Deprecated: " (concatFS $ map unLoc msg)
-  WarningTxt    msg -> format "Warning: "    (concatFS $ map unLoc msg)
+  DeprecatedTxt _ msg -> format "Deprecated: " (concatFS $ map unLoc msg)
+  WarningTxt    _ msg -> format "Warning: "    (concatFS $ map unLoc msg)
   where
     format x xs = DocWarning . DocParagraph . DocAppend (DocString x)
                   . processDocString dflags gre $ HsDocString xs
@@ -335,7 +335,7 @@ subordinates instMap decl = case decl of
                   | c <- cons, cname <- con_names c ]
         fields  = [ (unL n, maybeToList $ fmap unL doc, M.empty)
                   | RecCon flds <- map con_details cons
-                  , L _ (ConDeclField ns _ doc) <- flds
+                  , L _ (ConDeclField ns _ doc) <- (unLoc flds)
                   , n <- ns ]
 
 -- | Extract function argument docs from inside types.
@@ -496,7 +496,7 @@ mkExportItems
     Just exports -> liftM concat $ mapM lookupExport exports
   where
     lookupExport (IEVar (L _ x))         = declWith x
-    lookupExport (IEThingAbs t)          = declWith t
+    lookupExport (IEThingAbs (L _ t))    = declWith t
     lookupExport (IEThingAll (L _ t))    = declWith t
     lookupExport (IEThingWith (L _ t) _) = declWith t
     lookupExport (IEModuleContents (L _ m)) =
@@ -553,7 +553,7 @@ mkExportItems
 
                   L loc (TyClD cl@ClassDecl{}) -> do
                     mdef <- liftGhcToErrMsgGhc $ minimalDef t
-                    let sig = maybeToList $ fmap (noLoc . MinimalSig . fmap noLoc) mdef
+                    let sig = maybeToList $ fmap (noLoc . MinimalSig mempty . fmap noLoc) mdef
                     return [ mkExportDecl t
                       (L loc $ TyClD cl { tcdSigs = sig ++ tcdSigs cl }) docs_ ]
 
@@ -745,7 +745,7 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
         return $ Just (ExportDecl decl doc subs [] (fixities name subs) (l `elem` splices))
     mkExportItem (L l (TyClD cl@ClassDecl{ tcdLName = L _ name, tcdSigs = sigs })) = do
       mdef <- liftGhcToErrMsgGhc $ minimalDef name
-      let sig = maybeToList $ fmap (noLoc . MinimalSig . fmap noLoc) mdef
+      let sig = maybeToList $ fmap (noLoc . MinimalSig mempty . fmap noLoc) mdef
       expDecl (L l (TyClD cl { tcdSigs = sig ++ sigs })) l name
     mkExportItem decl@(L l d)
       | name:_ <- getMainDeclBinder d = expDecl decl l name
@@ -785,7 +785,7 @@ extractDecl name mdl decl
       InstD (ClsInstD ClsInstDecl { cid_datafam_insts = insts }) ->
         let matches = [ d | L _ d <- insts
                           , L _ ConDecl { con_details = RecCon rec } <- dd_cons (dfid_defn d)
-                          , ConDeclField { cd_fld_names = ns } <- map unLoc rec
+                          , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
                           , L _ n <- ns
                           , n == name
                       ]
@@ -818,13 +818,13 @@ extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
 
 extractRecSel nm mdl t tvs (L _ con : rest) =
   case con_details con of
-    RecCon fields | ((n,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
+    RecCon (L _ fields) | ((n,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
       L (getLoc n) (TypeSig [noLoc nm] (noLoc (HsFunTy data_ty (getBangType ty))) [])
     _ -> extractRecSel nm mdl t tvs rest
  where
   matching_fields flds = [ (n,f) | f@(L _ (ConDeclField ns _ _)) <- flds, n <- ns, unLoc n == nm ]
   data_ty
-    | ResTyGADT ty <- con_res con = ty
+    | ResTyGADT _ ty <- con_res con = ty
     | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar t)) tvs
 
 

@@ -104,8 +104,8 @@ filterSigNames p (FixSig (FixitySig ns ty)) =
   case filter (p . unLoc) ns of
     []       -> Nothing
     filtered -> Just (FixSig (FixitySig filtered ty))
-filterSigNames _ orig@(MinimalSig _)           = Just orig
-filterSigNames p (TypeSig ns ty nwcs)    =
+filterSigNames _ orig@(MinimalSig _ _)      = Just orig
+filterSigNames p (TypeSig ns ty nwcs) =
   case filter (p . unLoc) ns of
     []       -> Nothing
     filtered -> Just (TypeSig filtered ty nwcs)
@@ -182,14 +182,6 @@ before :: Located a -> Located a -> Bool
 before = (<) `on` getLoc
 
 
-instance Foldable (GenLocated l) where
-  foldMap f (L _ x) = f x
-
-
-instance Traversable (GenLocated l) where
-  mapM f (L l x) = (return . L l) =<< f x
-  traverse f (L l x) = L l <$> f x
-
 -------------------------------------------------------------------------------
 -- * NamedThing instances
 -------------------------------------------------------------------------------
@@ -210,7 +202,7 @@ class Parent a where
 instance Parent (ConDecl Name) where
   children con =
     case con_details con of
-      RecCon fields -> map unL $ concatMap (cd_fld_names . unL) fields
+      RecCon fields -> map unL $ concatMap (cd_fld_names . unL) (unL fields)
       _             -> []
 
 instance Parent (TyClDecl Name) where

@@ -145,7 +145,7 @@ ppClass dflags x = out dflags x{tcdSigs=[]} :
             concatMap (ppSig dflags . addContext . unL) (tcdSigs x)
     where
         addContext (TypeSig name (L l sig) nwcs) = TypeSig name (L l $ f sig) nwcs
-        addContext (MinimalSig sig) = MinimalSig sig
+        addContext (MinimalSig src sig) = MinimalSig src sig
         addContext _ = error "expected TypeSig"
 
         f (HsForAllTy a b c con d) = HsForAllTy a b c (reL (context : unLoc con)) d
@@ -189,7 +189,7 @@ ppCtor dflags dat subdocs con
     where
         f (PrefixCon args) = [typeSig name $ args ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [a1,a2]
-        f (RecCon recs) = f (PrefixCon $ map cd_fld_type (map unLoc recs)) ++ concat
+        f (RecCon (L _ recs)) = f (PrefixCon $ map cd_fld_type (map unLoc recs)) ++ concat
                           [(concatMap (lookupCon dflags subdocs) (cd_fld_names r)) ++
                            [out dflags (map unL $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
                           | r <- map unLoc recs]
@@ -203,7 +203,7 @@ ppCtor dflags dat subdocs con
         resType = case con_res con of
             ResTyH98 -> apps $ map (reL . HsTyVar) $
                         (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _) <- hsQTvBndrs $ tyClDeclTyVars dat]
-            ResTyGADT x -> x
+            ResTyGADT _ x -> x
 
 
 ---------------------------------------------------------------------

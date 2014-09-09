@@ -477,7 +477,7 @@ rDoc = maybeDoc . fmap latexStripTrailingWhitespace
 
 
 ppClassHdr :: Bool -> Located [LHsType DocName] -> DocName
-           -> LHsTyVarBndrs DocName -> [Located ([DocName], [DocName])]
+           -> LHsTyVarBndrs DocName -> [Located ([Located DocName], [Located DocName])]
            -> Bool -> LaTeX
 ppClassHdr summ lctxt n tvs fds unicode =
   keyword "class"
@@ -486,13 +486,13 @@ ppClassHdr summ lctxt n tvs fds unicode =
   <+> ppFds fds unicode
 
 
-ppFds :: [Located ([DocName], [DocName])] -> Bool -> LaTeX
+ppFds :: [Located ([Located DocName], [Located DocName])] -> Bool -> LaTeX
 ppFds fds unicode =
   if null fds then empty else
     char '|' <+> hsep (punctuate comma (map (fundep . unLoc) fds))
   where
-    fundep (vars1,vars2) = hsep (map ppDocName vars1) <+> arrow unicode <+>
-                           hsep (map ppDocName vars2)
+    fundep (vars1,vars2) = hsep (map (ppDocName . unLoc) vars1) <+> arrow unicode <+>
+                           hsep (map (ppDocName . unLoc) vars2)
 
 
 ppClassDecl :: [DocInstance DocName] -> SrcSpan
@@ -598,8 +598,8 @@ ppDataDecl instances subdocs _loc doc dataDecl unicode
     (whereBit, leaders)
       | null cons = (empty,[])
       | otherwise = case resTy of
-        ResTyGADT _ -> (decltt (keyword "where"), repeat empty)
-        _           -> (empty, (decltt (text "=") : repeat (decltt (text "|"))))
+        ResTyGADT _ _ -> (decltt (keyword "where"), repeat empty)
+        _             -> (empty, (decltt (text "=") : repeat (decltt (text "|"))))
 
     constrBit
       | null cons = Nothing
@@ -636,7 +636,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
                  map (ppLParendType unicode) args))
       <-> rDoc mbDoc <+> nl
 
-    RecCon fields ->
+    RecCon (L _ fields) ->
       (decltt (header_ unicode <+> ppOcc)
         <-> rDoc mbDoc <+> nl)
       $$
@@ -648,11 +648,11 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
                  ppLParendType unicode arg2 ])
       <-> rDoc mbDoc <+> nl
 
-  ResTyGADT resTy -> case con_details con of
+  ResTyGADT _ resTy -> case con_details con of
     -- prefix & infix could also use hsConDeclArgTys if it seemed to
     -- simplify the code.
     PrefixCon args -> doGADTCon args resTy
-    cd@(RecCon fields) -> doGADTCon (hsConDeclArgTys cd) resTy <+> nl $$
+    cd@(RecCon (L _ fields)) -> doGADTCon (hsConDeclArgTys cd) resTy <+> nl $$
                                      doRecordFields fields
     InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy
 
@@ -948,8 +948,8 @@ ppr_mono_ty _ (HsTyLit t) u = ppr_tylit t u
 
 
 ppr_tylit :: HsTyLit -> Bool -> LaTeX
-ppr_tylit (HsNumTy n) _ = integer n
-ppr_tylit (HsStrTy s) _ = text (show s)
+ppr_tylit (HsNumTy _ n) _ = integer n
+ppr_tylit (HsStrTy _ s) _ = text (show s)
   -- XXX: Ok in verbatim, but not otherwise
   -- XXX: Do something with Unicode parameter?
 
