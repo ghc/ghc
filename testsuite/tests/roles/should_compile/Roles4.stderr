@@ -9,7 +9,7 @@ COERCION AXIOMS
   axiom Roles4.NTCo:C1 :: C1 a = a -> a
   axiom Roles4.NTCo:C3 :: C3 a = a -> Syn1 a
 Dependent modules: []
-Dependent packages: [base-4.7.1.0, ghc-prim-0.3.1.0,
+Dependent packages: [base-4.8.0.0, ghc-prim-0.3.1.0,
                      integer-gmp-0.5.1.0]
 
 ==================== Typechecker ====================
