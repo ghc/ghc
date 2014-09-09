@@ -1630,10 +1630,11 @@ data CtLoc = CtLoc { ctl_origin :: CtOrigin
   --    binder stack:     tcl_bndrs :: [TcIdBinders]
   --    level:            tcl_untch :: Untouchables
 
-mkGivenLoc :: SkolemInfo -> TcLclEnv -> CtLoc
-mkGivenLoc skol_info env = CtLoc { ctl_origin = GivenOrigin skol_info
-                                 , ctl_env = env
-                                 , ctl_depth = initialSubGoalDepth }
+mkGivenLoc :: Untouchables -> SkolemInfo -> TcLclEnv -> CtLoc
+mkGivenLoc untch skol_info env 
+  = CtLoc { ctl_origin = GivenOrigin skol_info
+          , ctl_env    = env { tcl_untch = untch }
+          , ctl_depth  = initialSubGoalDepth }
 
 ctLocEnv :: CtLoc -> TcLclEnv
 ctLocEnv = ctl_env

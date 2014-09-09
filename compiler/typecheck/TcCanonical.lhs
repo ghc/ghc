@@ -2,7 +2,7 @@
 {-# LANGUAGE CPP #-}
 
 module TcCanonical(
-    canonicalize, emitWorkNC,
+    canonicalize,
     StopOrContinue(..),
     flatten, FlattenMode(..)
  ) where
@@ -597,19 +597,20 @@ flattenExactFamApp FMSubstOnly _ tc xi_args
 flattenExactFamApp FMFullFlatten ctxt tc xi_args  -- Eactly saturated
   = do { let fam_ty = mkTyConApp tc xi_args
              loc    = ctev_loc ctxt
-       ; mb_ct <- lookupFlatEqn tc xi_args
+       ; mb_ct <- lookupFlatCache ctxt tc xi_args
        ; case mb_ct of
            Just (co, fsk)  -- co :: F xi_args ~ fsk
-             -> do { traceTcS "flatten/flat-cache hit" $ (ppr tc <+> ppr xi_args $$ ppr fsk $$ ppr co)
+             ->  -- Hit in the flat-cache
+                 -- No need to check for given/wanted here, because that's a
+                 -- property of the free vars of (F tys) not of the context
+                do { traceTcS "flatten/flat-cache hit" $ (ppr tc <+> ppr xi_args $$ ppr fsk $$ ppr co)
                    ; (fsk_xi, fsk_co) <- flattenTyVar FMFullFlatten ctxt fsk
                           -- The fsk may already have been unified, so flatten it
                           -- fsk_co :: fsk_xi ~ fsk
                    ; return (fsk_xi, fsk_co `mkTcTransCo`mkTcSymCo co) }
                                     -- :: fsk_xi ~ F xi_args
 
-           _ -> do { (ev, fsk) <- newFlattenSkolem loc fam_ty
-                   ; let co = ctEvCoercion ev  -- :: F xis ~ fsk
-                   ; extendFlatCache tc xi_args (co, fsk)
+           _ -> do { (ev, fsk) <- newFlattenSkolem ctxt fam_ty
 
                    -- The new constraint (F xi_args ~ fsk) is not necessarily inert
                    -- (e.g. the LHS may be a redex) so we must put it in the work list
@@ -620,7 +621,7 @@ flattenExactFamApp FMFullFlatten ctxt tc xi_args  -- Eactly saturated
                    ; updWorkListTcS (extendWorkListFunEq ct)
 
                    ; traceTcS "flatten/flat-cache miss" $ (ppr fam_ty $$ ppr fsk $$ ppr ev)
-                   ; return (mkTyVarTy fsk, mkTcSymCo co) }
+                   ; return (mkTyVarTy fsk, mkTcSymCo (ctEvCoerction ev) }
        }
 \end{code}
 
@@ -741,14 +742,6 @@ canEvVarsCreated [] = return Stop
 canEvVarsCreated (ev : evs)
   = do { emitWorkNC evs; canEvNC ev }
           -- Note the "NC": these are fresh goals, not necessarily canonical
-
-emitWorkNC :: [CtEvidence] -> TcS ()
-emitWorkNC evs
-  | null evs  = return ()
-  | otherwise = do { traceTcS "Emitting fresh work" (vcat (map ppr evs))
-                   ; updWorkListTcS (extendWorkListCts (map mk_nc evs)) }
-  where
-    mk_nc ev = mkNonCanonical ev
 
 -------------------------
 canEqNC :: CtEvidence -> Type -> Type -> TcS StopOrContinue
@@ -1098,11 +1091,10 @@ canCFunEqCan :: CtEvidence
              -> TcS StopOrContinue
 -- ^ Canonicalise a CFunEqCan.  We know that 
 --     the arg types are already flat, 
--- and the RHS is a fsk, which we must not substitute.
+-- and the RHS is a fsk, which we must *not* substitute.
 -- So just substitute in the LHS
 canCFunEqCan ev fn tys fsk
-  = ASSERT2( isWanted ev, ppr ev )
-    do { (tys', cos) <- flattenMany FMFullFlatten ev tys
+  = do { (tys', cos) <- flattenMany FMFullFlatten ev tys
                         -- cos :: tys' ~ tys
        ; let lhs_co  = mkTcTyConAppCo Nominal fn cos
                         -- :: F tys' ~ F tys

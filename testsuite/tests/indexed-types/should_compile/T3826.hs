@@ -34,15 +34,17 @@ f t@(MkT x) = c x t
    [W] E (T beta) ~ beta
 
 -->
-   [W] fsk ~ beta
-   [W] E (T beta) ~ fsk
+   [W] ufsk ~ beta      
+   [W] E (T beta) ~ ufsk
 
---> 
-   [W] x : E (T fsk) ~ fsk
+--> (swap and subst)
+   beta := ufsk
+   [W] x : E (T ufsk) ~ ufsk   (do not rewrite RHS)
 
-take a step   ax: E (T fsk) ~ fsk
-DO NOT unify fsk.  Instead x = ax
+take a step   ax: E (T beta) ~ beta
 
+-->
+   [W] ufsk 
 --------------------------
  But what about this?
 --------------------------

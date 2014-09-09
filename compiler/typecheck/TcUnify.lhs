@@ -455,10 +455,11 @@ newImplication skol_info skol_tvs given thing_inside
          else do
        { ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
-       ; emitImplication $ Implic { ic_untch = untch
-             		     	  , ic_skols = skol_tvs
+       ; emitImplication $ Implic { ic_untch  = untch
+             		     	  , ic_skols  = skol_tvs
+                                  , ic_fsks   = []
                                   , ic_no_eqs = False
-                             	  , ic_given = given
+                             	  , ic_given  = given
                                   , ic_wanted = wanted
                                   , ic_insol  = insolubleWC wanted
                                   , ic_binds = ev_binds_var

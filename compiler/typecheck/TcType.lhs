@@ -37,7 +37,8 @@ module TcType (
   isFlexi, isIndirect, isRuntimeUnkSkol,
   isTypeVar, isKindVar,
   metaTyVarUntouchables, setMetaTyVarUntouchables,
-  isTouchableMetaTyVar, isFloatedTouchableMetaTyVar,
+  isTouchableMetaTyVar, isTouchableOrUfsk,
+  isFloatedTouchableMetaTyVar,
 
   --------------------------------
   -- Builders
@@ -273,6 +274,7 @@ data TcTyVarDetails
                   -- See Note [Binding when looking up instances] in InstEnv
 
   | FlatSkol 
+       Untouchables
        TcType
 
   | RuntimeUnk    -- Stands for an as-yet-unknown type in the GHCi
@@ -301,7 +303,8 @@ data MetaInfo
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls
 
-   | FlatSkolTv
+   | FlatSkolTv    -- A unification flatten-skolem
+
    | PolyTv        -- Like TauTv, but can unify with a sigma-type
 
    | SigTv         -- A variant of TauTv, except that it should not be
@@ -419,7 +422,7 @@ the implication where a new constraint
        uf  ~  beta
 emerges. If we (wrongly) spontaneously solved it to get uf := beta,
 the whole implication disappears but when we pop out again we are left with
-(F Int ~ uf) which will be unified by our final solveCTyFunEqs stage and
+(F Int ~ uf) which will be unified by our final zonking stage and
 uf will get unified *once more* to (F Int).
 
 \begin{code}
@@ -582,6 +585,18 @@ exactTyVarsOfTypes tys = foldr (unionVarSet . exactTyVarsOfType) emptyVarSet tys
 %************************************************************************
 
 \begin{code}
+isTouchableOrUfsk :: Untouchables -> TcTyVar -> Bool
+isTouchableOrUfsk ctxt_untch tv
+  = ASSERT2( isTcTyVar tv, ppr tv )
+    case tcTyVarDetails tv of
+      MetaTv { mtv_untch = tv_untch, mtv_info = info }
+        -> ASSERT2( checkTouchableInvariant ctxt_untch tv_untch,
+                    ppr tv $$ ppr tv_untch $$ ppr ctxt_untch )
+           case info of
+             FlatSkolTv -> True
+             _          -> isTouchable ctxt_untch tv_untch
+      _          -> False
+
 isTouchableMetaTyVar :: Untouchables -> TcTyVar -> Bool
 isTouchableMetaTyVar ctxt_untch tv
   = ASSERT2( isTcTyVar tv, ppr tv )

@@ -375,6 +375,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        ; minimal_bound_ev_vars <- mapM TcM.newEvVar minimal_flat_preds
        ; let implic = Implic { ic_untch    = pushUntouchables untch
                              , ic_skols    = qtvs
+                             , ic_fsks     = []
                              , ic_no_eqs   = False
                              , ic_given    = minimal_bound_ev_vars
                              , ic_wanted   = wanted_transformed
@@ -768,7 +769,7 @@ solveImplication (inerts, outer_funeqs)
          -- Solve the nested constraints
        ; (no_given_eqs, new_fsks, residual_wanted)
             <- nestImplicTcS ev_binds untch inerts $
-               do { solveInteractGiven (mkGivenLoc info env) givens
+               do { solveInteractGiven (mkGivenLoc untch info env) old_fsks givens
                   ; _ <- solveInteract outer_funeqs
 
                   ; residual_wanted <- solve_wanteds wanteds
@@ -776,7 +777,7 @@ solveImplication (inerts, outer_funeqs)
                         -- we want to retain derived equalities so we can float
                         -- them out in floatEqualities
 
-                  ; (no_eqs, fsks) <- getInertGivens untch
+                  ; (no_eqs, fsks) <- getInertGivens untch skols
 
                   ; return (no_eqs, fsks, residual_wanted) }
 
@@ -1119,9 +1120,10 @@ Consequence: classes with functional dependencies don't matter (since there is
 no evidence for a fundep equality), but equality superclasses do matter (since
 they carry evidence).
 
+
 \begin{code}
-floatEqualities :: [TcTyVar] -> Bool -> WantedConstraints
-                -> TcS (Cts, WantedConstraints)
+floatEqualities :: [TcTyVar] -> Bool -> [TcTyVar]
+                -> WantedConstraints -> TcS (Cts, WantedConstraints)
 -- Main idea: see Note [Float Equalities out of Implications]
 --
 -- Post: The returned floated constraints (Cts) are only Wanted or Derived
@@ -1132,10 +1134,55 @@ floatEqualities :: [TcTyVar] -> Bool -> WantedConstraints
 --
 -- Subtleties: Note [Float equalities from under a skolem binding]
 --             Note [Skolem escape]
-floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
+floatEqualities skols no_given_eqs fsks wanteds@(WC { wc_flat = flats })
   | not no_given_eqs  -- There are some given equalities, so don't float
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
   | otherwise
+  = 
+  where
+    (ufsk_funeqs, others) = partitionBag isCFunEqCan flats
+
+    pinned_tvs = fixVarSet mk_next (mkVarSet skols)
+    mk_next tvs = foldr grow_one tvs flat_eqs
+    grow_one (tvs1,tvs2) tvs
+      | intersectsVarSet tvs tvs1 = tvs `unionVarSet` tvs2
+      | intersectsVarSet tvs tvs2 = tvs `unionVarSet` tvs2
+      | otherwise                 = tvs
+
+    (float_candidates, flats1) = partitionBag is_candidate flats
+    is_candidate (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })
+       = isMetaTyVar tv && not (isTouchableMetaTyVar tv) && 
+
+[ ct | ct <- flats
+canFloatEq :: Untouchables
+           -> VarSet         -- Skolems extended by inert_funeqs
+           -> VarEnv Ct      -- Inverted inert_funeqs
+           -> TcTyVar -> Xi  -- Can I float this a~xi?
+           -> Maybe (Cts, VarEnv Ct)   -- Just (floated funeqs, non-floated funeqs0
+                                       -- Nothing   =>   don't float me
+canFloatEq untch skols funeqs tv xi
+  | not (isMetaTyVar tv)          = Nothing
+  | isTouchableMetaTyVar untch tv = Nothing
+  | otherwise                     = Just (floatTyVars (tyVarsOfType xi) (emptyBag, funeqs))
+
+floatTyVar :: TcTyVar -> (Cts, VarEnv Ct) -> (Cts, VarEnv Ct)
+floatTyVar tv (so_far, funeqs)
+  | Just ct <- lookupVarEnv funeqs tv
+  , CFunEqCan { cc_tyargs = xis } <- ct
+  = floatTyVars (tyVarsOfTypes xi) (so_var `snocBag` ct, delVarEnv funEqs tv)
+  | otherwise
+  = (so_far, funeqs)
+
+floatTyVars :: TcTyVarSet -> (Cts, VarEnv Ct) -> (Cts, VarEnv Ct)
+floatTyVars tvs acc = foldVarSet floatTyVar acc tvs
+
+
+
+
+
+
+
+
   = do { let (float_eqs, remaining_flats) = partitionBag is_floatable flats
        ; untch <- TcS.getUntouchables
        ; mapM_ (promoteTyVar untch) (varSetElems (tyVarsOfCts float_eqs))
