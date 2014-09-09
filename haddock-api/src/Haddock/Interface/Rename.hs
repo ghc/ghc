@@ -250,10 +250,10 @@ renameLTyVarBndr :: LHsTyVarBndr Name -> RnM (LHsTyVarBndr DocName)
 renameLTyVarBndr (L loc (UserTyVar n))
   = do { n' <- rename n
        ; return (L loc (UserTyVar n')) }
-renameLTyVarBndr (L loc (KindedTyVar n kind))
+renameLTyVarBndr (L loc (KindedTyVar (L lv n) kind))
   = do { n' <- rename n
        ; kind' <- renameLKind kind
-       ; return (L loc (KindedTyVar n' kind')) }
+       ; return (L loc (KindedTyVar (L lv n') kind')) }
 
 renameLContext :: Located [LHsType Name] -> RnM (Located [LHsType DocName])
 renameLContext (L loc context) = do
@@ -330,9 +330,9 @@ renameTyClD d = case d of
 
   where
     renameLFunDep (L loc (xs, ys)) = do
-      xs' <- mapM rename xs
-      ys' <- mapM rename ys
-      return (L loc (xs', ys'))
+      xs' <- mapM rename (map unLoc xs)
+      ys' <- mapM rename (map unLoc ys)
+      return (L loc (map noLoc xs', map noLoc ys'))
 
     renameLSig (L loc sig) = return . L loc =<< renameSig sig
 
@@ -377,9 +377,9 @@ renameCon decl@(ConDecl { con_names = lnames, con_qvars = ltyvars
                    , con_details = details', con_res = restype', con_doc = mbldoc' })
 
   where
-    renameDetails (RecCon fields) = do
+    renameDetails (RecCon (L l fields)) = do
       fields' <- mapM renameConDeclFieldField fields
-      return (RecCon fields')
+      return (RecCon (L l fields'))
     renameDetails (PrefixCon ps) = return . PrefixCon =<< mapM renameLType ps
     renameDetails (InfixCon a b) = do
       a' <- renameLType a
@@ -387,7 +387,7 @@ renameCon decl@(ConDecl { con_names = lnames, con_qvars = ltyvars
       return (InfixCon a' b')
 
     renameResType (ResTyH98) = return ResTyH98
-    renameResType (ResTyGADT t) = return . ResTyGADT =<< renameLType t
+    renameResType (ResTyGADT l t) = return . ResTyGADT l =<< renameLType t
 
 
 renameConDeclFieldField :: LConDeclField Name -> RnM (LConDeclField DocName)
@@ -414,7 +414,7 @@ renameSig sig = case sig of
   FixSig (FixitySig lnames fixity) -> do
     lnames' <- mapM renameL lnames
     return $ FixSig (FixitySig lnames' fixity)
-  MinimalSig s -> MinimalSig <$> traverse renameL s
+  MinimalSig src s -> MinimalSig src <$> traverse renameL s
   -- we have filtered out all other kinds of signatures in Interface.Create
   _ -> error "expected TypeSig"
 

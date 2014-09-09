@@ -145,7 +145,7 @@ ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep)
 
 ppForAll :: LHsTyVarBndrs DocName -> Unicode -> Qualification -> Html
 ppForAll tvs unicode qual =
-  case [ppKTv n k | L _ (KindedTyVar n k) <- hsQTvBndrs tvs] of
+  case [ppKTv n k | L _ (KindedTyVar (L _ n) k) <- hsQTvBndrs tvs] of
     [] -> noHtml
     ts -> forallSymbol unicode <+> hsep ts +++ dot
   where ppKTv n k = parens $
@@ -380,7 +380,7 @@ ppHsContext cxt unicode qual = parenList (map (ppType unicode qual) cxt)
 
 
 ppClassHdr :: Bool -> Located [LHsType DocName] -> DocName
-           -> LHsTyVarBndrs DocName -> [Located ([DocName], [DocName])]
+           -> LHsTyVarBndrs DocName -> [Located ([Located DocName], [Located DocName])]
            -> Unicode -> Qualification -> Html
 ppClassHdr summ lctxt n tvs fds unicode qual =
   keyword "class"
@@ -389,13 +389,13 @@ ppClassHdr summ lctxt n tvs fds unicode qual =
   <+> ppFds fds unicode qual
 
 
-ppFds :: [Located ([DocName], [DocName])] -> Unicode -> Qualification -> Html
+ppFds :: [Located ([Located DocName], [Located DocName])] -> Unicode -> Qualification -> Html
 ppFds fds unicode qual =
   if null fds then noHtml else
         char '|' <+> hsep (punctuate comma (map (fundep . unLoc) fds))
   where
         fundep (vars1,vars2) = ppVars vars1 <+> arrow unicode <+> ppVars vars2
-        ppVars = hsep . map (ppDocName qual Prefix True)
+        ppVars = hsep . map ((ppDocName qual Prefix True) . unLoc)
 
 ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan
                  -> [(DocName, DocForDecl DocName)]
@@ -469,7 +469,7 @@ ppClassDecl summary links instances fixities loc d subdocs
                            -- there are different subdocs for different names in a single
                            -- type signature?
 
-    minimalBit = case [ s | L _ (MinimalSig s) <- lsigs ] of
+    minimalBit = case [ s | L _ (MinimalSig _ s) <- lsigs ] of
       -- Miminal complete definition = every shown method
       And xs : _ | sort [getName n | Var (L _ n) <- xs] ==
                    sort [getName n | L _ (TypeSig ns _ _) <- lsigs, L _ n <- ns]
@@ -572,7 +572,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
     whereBit
       | null cons = noHtml
       | otherwise = case resTy of
-        ResTyGADT _ -> keyword "where"
+        ResTyGADT _ _ -> keyword "where"
         _ -> noHtml
 
     constrBit = subConstructors qual
@@ -600,7 +600,7 @@ ppShortConstrParts summary dataInst con unicode qual = case con_res con of
     PrefixCon args ->
       (header_ unicode qual +++ hsep (ppOcc
             : map (ppLParendType unicode qual) args), noHtml, noHtml)
-    RecCon fields ->
+    RecCon (L _ fields) ->
       (header_ unicode qual +++ ppOcc <+> char '{',
        doRecordFields fields,
        char '}')
@@ -609,7 +609,7 @@ ppShortConstrParts summary dataInst con unicode qual = case con_res con of
             ppOccInfix, ppLParendType unicode qual arg2],
        noHtml, noHtml)
 
-  ResTyGADT resTy -> case con_details con of
+  ResTyGADT _ resTy -> case con_details con of
     -- prefix & infix could use hsConDeclArgTys if it seemed to
     -- simplify the code.
     PrefixCon args -> (doGADTCon args resTy, noHtml, noHtml)
@@ -617,7 +617,7 @@ ppShortConstrParts summary dataInst con unicode qual = case con_res con of
     -- Constr :: (Context) => { field :: a, field2 :: b } -> Ty (a, b)
     -- (except each field gets its own line in docs, to match
     -- non-GADT records)
-    RecCon fields -> (ppOcc <+> dcolon unicode <+>
+    RecCon (L _ fields) -> (ppOcc <+> dcolon unicode <+>
                             ppForAllCon forall_ ltvs lcontext unicode qual <+> char '{',
                             doRecordFields fields,
                             char '}' <+> arrow unicode <+> ppLType unicode qual resTy)
@@ -682,7 +682,7 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con) = (decl, mbDoc, field
             ppLParendType unicode qual arg2]
           <+> fixity
 
-      ResTyGADT resTy -> case con_details con of
+      ResTyGADT _ resTy -> case con_details con of
         -- prefix & infix could also use hsConDeclArgTys if it seemed to
         -- simplify the code.
         PrefixCon args -> doGADTCon args resTy
@@ -690,7 +690,7 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con) = (decl, mbDoc, field
         InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy
 
     fieldPart = case con_details con of
-        RecCon fields -> [doRecordFields fields]
+        RecCon (L _ fields) -> [doRecordFields fields]
         _ -> []
 
     doRecordFields fields = subFields qual
@@ -907,8 +907,8 @@ ppr_mono_ty _ (HsNamedWildcardTy name) _ q = ppDocName q Prefix True name
 ppr_mono_ty _ (HsTyLit n) _ _ = ppr_tylit n
 
 ppr_tylit :: HsTyLit -> Html
-ppr_tylit (HsNumTy n) = toHtml (show n)
-ppr_tylit (HsStrTy s) = toHtml (show s)
+ppr_tylit (HsNumTy _ n) = toHtml (show n)
+ppr_tylit (HsStrTy _ s) = toHtml (show s)
 
 
 ppr_fun_ty :: Int -> LHsType DocName -> LHsType DocName -> Unicode -> Qualification -> Html
