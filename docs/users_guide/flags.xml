@@ -706,7 +706,7 @@
         <tbody>
           <row>
             <entry><option>-fcontext-stack=N</option><replaceable>n</replaceable></entry>
-            <entry>set the <link linkend="undecidable-instances">limit for context reduction</link>. Default is 20.</entry>
+            <entry>set the <link linkend="undecidable-instances">limit for type-class context reduction</link>. Default is 100.</entry>
             <entry>dynamic</entry>
             <entry></entry>
           </row>
