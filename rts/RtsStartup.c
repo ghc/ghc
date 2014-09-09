@@ -36,7 +36,7 @@
 #include "Timer.h"
 #include "Globals.h"
 #include "FileLock.h"
-void exitLinker( void );        // there is no Linker.h file to include
+#include "LinkerInternals.h"
 
 #if defined(PROFILING)
 # include "ProfHeap.h"
