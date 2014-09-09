@@ -1021,7 +1021,7 @@
             </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoMonoLocalBinds</option></entry>
-          </row>          
+          </row>
           <row>
             <entry><option>-XNoMonomorphismRestriction</option></entry>
             <entry>Disable the <link linkend="monomorphism">monomorphism restriction</link>.</entry>
