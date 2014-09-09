@@ -90,8 +90,9 @@ to the substitution
 
 Note [CSE for INLINE and NOINLINE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We are careful to with CSE inside functions that the user has marked as
-INLINE or NOINLINE. (Examples from Roman Leshchinskiy.)  Consider
+There are some subtle interactions of CSE with functions that the user
+has marked as INLINE or NOINLINE. (Examples from Roman Leshchinskiy.)
+Consider
 
         yes :: Int  {-# NOINLINE yes #-}
         yes = undefined
