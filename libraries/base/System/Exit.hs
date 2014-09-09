@@ -78,6 +78,6 @@ exitSuccess = exitWith ExitSuccess
 
 -- | Write given error message to `stderr` and terminate with `exitFailure`.
 --
--- /Since: 4.7.1.0/
+-- /Since: 4.8.0.0/
 die :: String -> IO a
 die err = hPutStrLn stderr err >> exitFailure

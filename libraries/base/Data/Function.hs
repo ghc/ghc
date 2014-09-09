@@ -94,6 +94,6 @@ on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
 -- convenience.  Its precedence is one higher than that of the forward
 -- application operator '$', which allows '&' to be nested in '$'.
 --
--- /Since: 4.7.1.0/
+-- /Since: 4.8.0.0/
 (&) :: a -> (a -> b) -> b
 x & f = f x

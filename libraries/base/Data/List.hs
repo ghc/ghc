@@ -967,7 +967,7 @@ rqpart cmp x (y:ys) rle rgt r =
 -- input list.  This is called the decorate-sort-undecorate paradigm, or
 -- Schwartzian transform.
 --
--- /Since: 4.7.1.0/
+-- /Since: 4.8.0.0/
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
 sortOn f =
   map snd . sortBy (comparing fst) . map (\x -> let y = f x in y `seq` (y, x))
