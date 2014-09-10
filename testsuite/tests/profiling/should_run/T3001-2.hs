@@ -26,6 +26,8 @@ import System.IO
 
 import Data.Char    (chr,ord)
 
+import Control.Applicative
+
 main :: IO ()
 main = do
   encodeFile "test.bin" $ replicate 10000 'x'
@@ -95,6 +97,10 @@ instance Monad PutM where
         let PairS _ w  = unPut m
             PairS b w' = unPut k
         in PairS b (w `mappend` w')
+
+instance Applicative PutM where
+    pure  = return
+    (<*>) = ap
 
 tell :: Builder -> Put
 tell b = Put $ PairS () b
@@ -188,6 +194,10 @@ instance Monad Get where
 
     fail      = error "failDesc"
 
+instance Applicative Get where
+    pure  = return
+    (<*>) = ap
+
 getZ :: Get S
 getZ   = Get (\s -> (s, s))
 
@@ -238,7 +248,7 @@ toLazyByteString m = L.fromChunks $ unsafePerformIO $ do
 
 ensureFree :: Int -> Builder
 ensureFree n = n `seq` withSize $ \ l ->
-    if n <= l then empty else
+    if n <= l then emptyBuilder else
         flush `append` unsafeLiftIO (const (newBuffer (max n defaultSize)))
 
 withSize :: (Int -> Builder) -> Builder
@@ -271,10 +281,10 @@ flush = Builder $ \ k buf@(Buffer p o u l) ->
       then k buf
       else S.PS p o u : k (Buffer p (o+u) 0 l)
 
-empty :: Builder
-empty = Builder id
+emptyBuilder :: Builder
+emptyBuilder = Builder id
 
 instance Monoid Builder where
-    mempty  = empty
+    mempty  = emptyBuilder
     mappend = append
 
