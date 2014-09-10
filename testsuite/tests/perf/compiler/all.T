@@ -372,13 +372,13 @@ test('T5321Fun',
              # 2012-10-08: 344416344 x86/Linux
              #  (increase due to new codegen)
              # 2014-09-03: 299656164     (specialisation and inlining)
-            (wordsize(64), 408664512, 10)])
+            (wordsize(64), 601629032, 10)])
              # prev:       585521080
              # 29/08/2012: 713385808     #  (increase due to new codegen)
              # 15/05/2013: 628341952     #  (reason for decrease unknown)
              # 24/06/2013: 694019152     #  (reason for re-increase unknown)
              # 12/05/2014: 614409344     #  (specialisation and inlining changes)
-             # 10/09/2014: 408664512     #  post-AMP-cleanp
+             # 10/09/2014: 601629032     #  post-AMP-cleanp
 
       ],
       compile,[''])
