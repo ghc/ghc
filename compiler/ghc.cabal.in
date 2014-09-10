@@ -57,9 +57,6 @@ Library
                    bin-package-db,
                    hoopl
 
-    if flag(stage1) && impl(ghc < 7.5)
-        Build-Depends: old-time   >= 1   && < 1.2
-
     if os(windows)
         Build-Depends: Win32
     else
