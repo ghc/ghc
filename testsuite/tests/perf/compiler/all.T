@@ -169,7 +169,7 @@ test('T4801',
                            # expected value: 58 (amd64/OS X)
                            # 13/01/2014 - 70
            (wordsize(32), 30, 20),
-           (wordsize(64), 52, 20)]),
+           (wordsize(64), 55, 20)]),
             # prev:       50 (amd64/Linux)
             # 19/10/2012: 64 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
@@ -177,7 +177,7 @@ test('T4801',
             #                (^ REASON UNKNOWN!)
             # 28/8/13:    60 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
-            # 2014-09-10: 52 post-AMP-cleanup
+            # 2014-09-10: 55 post-AMP-cleanup
 
       compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 464872776, 5),
