@@ -5,7 +5,7 @@
 test('haddock.base',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 8354439016,  5)
+          [(wordsize(64), 7901230808,  5)
             # 2012-08-14: 5920822352 (amd64/Linux)
             # 2012-09-20: 5829972376 (amd64/Linux)
             # 2012-10-08: 5902601224 (amd64/Linux)
@@ -18,7 +18,8 @@ test('haddock.base',
             # 2014-06-12: 7498123680 (x86_64/Linux)
             # 2014-08-05: 7992757384 (x86_64/Linux - bugfix for #314, Haddock now parses more URLs)
             # 2014-08-08: 7946284944 (x86_64/Linux - Haddock updates to attoparsec-0.12.1.0)
-            # 2014-09-09: 8354439016 (x86_64/Linux - Applicative/Monad changes)
+            # 2014-09-09: 8354439016 (x86_64/Linux - Applicative/Monad changes, according to Austin)
+            # 2014-09-10: 7901230808 (x86_64/Linux - Applicative/Monad changes, according to Joachim)
           ,(platform('i386-unknown-mingw32'), 3746792812, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
             # 2013-11-13:                     3097751052 (x86/Windows, 64bit machine)
@@ -39,7 +40,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 4660249216, 5)
+          [(wordsize(64), 4500376192, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -53,7 +54,8 @@ test('haddock.Cabal',
             # 2014-06-29: 4200993768 (amd64/Linux)
             # 2014-08-05: 4493770224 (x86_64/Linux - bugfix for #314, Haddock now parses more URLs)
             # 2014-08-29: 4267311856 (x86_64/Linux - w/w for INLINABLE things)
-            # 2014-09-09: 4660249216 (x86_64/Linux - Applicative/Monad changes)
+            # 2014-09-09: 4660249216 (x86_64/Linux - Applicative/Monad changes according to Austin)
+            # 2014-09-10: 4500376192 (x86_64/Linux - Applicative/Monad changes according to Joachim)
 
           ,(platform('i386-unknown-mingw32'), 2052220292, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)
@@ -74,13 +76,14 @@ test('haddock.Cabal',
 test('haddock.compiler',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 29809571376, 10)
+          [(wordsize(64), 30353349160, 10)
             # 2012-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
             # 2012-11-12: 25990254632 (amd64/Linux)
             # 2014-07-17: 29809571376 (amd64/Linux) general round of updates
             # 2012-11-27: 28708374824 (amd64/Linux)
+            # 2014-09-10: 30353349160 (amd64/Linux) post-AMP cleanup
           ,(platform('i386-unknown-mingw32'), 14328363592, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)
             # 2013-02-10:                     14925262356 (x86/Windows)
