@@ -1,5 +1,7 @@
 import Control.Concurrent
 import Control.Exception
+import Control.Monad (ap, liftM)
+import Control.Applicative
 
 type S = String
 
@@ -9,6 +11,13 @@ instance Monad (M s) where
   (M m) >>= k = M $ \s -> case m s of
                             (s',a) -> unM (k a) s'
   return a = M $ \s -> (s,a)
+
+instance Functor (M s) where
+    fmap = liftM
+
+instance Applicative (M s) where
+    pure  = return
+    (<*>) = ap
 
 errorM :: String -> M s a
 errorM s = M $ \_ -> error s
