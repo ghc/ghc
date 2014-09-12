@@ -491,10 +491,11 @@ tc_mkRepFamInsts gk tycon metaDts mod =
                      -- `appT` = D Int a b (data families case)
                      Just (famtycon, apps) ->
                        -- `fam` = D
-                       -- `apps` = [Int, a]
-                       let allApps = apps ++
-                                     drop (length apps + length tyvars
-                                           - tyConArity famtycon) tyvar_args
+                       -- `apps` = [Int, a, b]
+                       let allApps = case gk of
+                                       Gen0 -> apps
+                                       Gen1 -> ASSERT(not $ null apps)
+                                               init apps
                        in [mkTyConApp famtycon allApps]
                      -- `appT` = D a b (normal case)
                      Nothing -> [mkTyConApp tycon tyvar_args]
