@@ -624,9 +624,6 @@ xs     !! n | n < 0 =  error "Prelude.!!: negative index"
 (_:xs) !! n         =  xs !! (n-1)
 #else
 -- HBC version (stolen), then unboxified
--- The semantics is not quite the same for error conditions
--- in the more efficient version.
---
 xs !! (I# n0) | isTrue# (n0 <# 0#) =  error "Prelude.(!!): negative index\n"
               | otherwise          =  sub xs n0
                          where
