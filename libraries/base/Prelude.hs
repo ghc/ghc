@@ -151,14 +151,6 @@ import GHC.Real
 import GHC.Float
 import GHC.Show
 
-infixr 0 $!
-
--- -----------------------------------------------------------------------------
--- Miscellaneous functions
-
--- | Strict (call-by-value) application, defined in terms of 'seq'.
-($!)    :: (a -> b) -> a -> b
-f $! x  = let !vx = x in f vx  -- see #2273
 
 #ifdef __HADDOCK__
 -- | The value of @'seq' a b@ is bottom if @a@ is bottom, and otherwise

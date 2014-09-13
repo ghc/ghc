@@ -121,7 +121,7 @@ infixr 9  .
 infixr 5  ++
 infixl 4  <$
 infixl 1  >>, >>=
-infixr 0  $
+infixr 0  $, $!
 
 infixl 4 <*>, <*, *>, <**>
 
@@ -840,6 +840,10 @@ flip f x y              =  f y x
 {-# INLINE ($) #-}
 ($)                     :: (a -> b) -> a -> b
 f $ x                   =  f x
+
+-- | Strict (call-by-value) application, defined in terms of 'seq'.
+($!)                    :: (a -> b) -> a -> b
+f $! x                  = let !vx = x in f vx  -- see #2273
 
 -- | @'until' p f@ yields the result of applying @f@ until @p@ holds.
 until                   :: (a -> Bool) -> (a -> a) -> a -> a
