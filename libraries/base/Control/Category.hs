@@ -1,9 +1,6 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 706
-{-# LANGUAGE PolyKinds, GADTs #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
