@@ -2551,8 +2551,17 @@ pseudoop "proxy#"
 
 pseudoop   "seq"
    a -> b -> b
-   { Evaluates its first argument to head normal form, and then returns its second
-	argument as the result. }
+   { The value of {\tt seq a b} is bottom if {\tt a} is bottom, and
+     otherwise equal to {\tt b}. {\tt seq} is usually introduced to
+     improve performance by avoiding unneeded laziness.
+
+     A note on evaluation order: the expression {\tt seq a b} does
+     {\it not} guarantee that {\tt a} will be evaluated before {\tt b}.
+     The only guarantee given by {\tt seq} is that the both {\tt a}
+     and {\tt b} will be evaluated before {\tt seq} returns a value.
+     In particular, this means that {\tt b} may be evaluated before
+     {\tt a}. If you need to guarantee a specific order of evaluation,
+     you must use the function {\tt pseq} from the "parallel" package. }
 
 primtype Any
 	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
