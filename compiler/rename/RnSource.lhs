@@ -1471,10 +1471,10 @@ add gp loc (SpliceD splice@(SpliceDecl _ flag)) ds
   = do { -- We've found a top-level splice.  If it is an *implicit* one
          -- (i.e. a naked top level expression)
          case flag of
-           Explicit -> return ()
-           Implicit -> do { th_on <- xoptM Opt_TemplateHaskell
-                          ; unless th_on $ setSrcSpan loc $
-                            failWith badImplicitSplice }
+           ExplicitSplice -> return ()
+           ImplicitSplice -> do { th_on <- xoptM Opt_TemplateHaskell
+                                ; unless th_on $ setSrcSpan loc $
+                                  failWith badImplicitSplice }
 
        ; return (gp, Just (splice, ds)) }
   where
