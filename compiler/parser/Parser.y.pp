@@ -1115,8 +1115,7 @@ strict_mark :: { Located HsBang }
 ctype   :: { LHsType RdrName }
         : 'forall' tv_bndrs '.' ctype   {% hintExplicitForall (getLoc $1) >>
                                             return (LL $ mkExplicitHsForAllTy $2 (noLoc []) $4) }
-        | context '=>' ctype            { LL $ mkImplicitHsForAllTy   $1 $3 }
-        -- A type of form (context => type) is an *implicit* HsForAllTy
+        | context '=>' ctype            { LL $ mkQualifiedHsForAllTy   $1 $3 }
         | ipvar '::' type               { LL (HsIParamTy (unLoc $1) $3) }
         | type                          { $1 }
 
@@ -1134,8 +1133,7 @@ ctype   :: { LHsType RdrName }
 ctypedoc :: { LHsType RdrName }
         : 'forall' tv_bndrs '.' ctypedoc {% hintExplicitForall (getLoc $1) >>
                                             return (LL $ mkExplicitHsForAllTy $2 (noLoc []) $4) }
-        | context '=>' ctypedoc         { LL $ mkImplicitHsForAllTy   $1 $3 }
-        -- A type of form (context => type) is an *implicit* HsForAllTy
+        | context '=>' ctypedoc         { LL $ mkQualifiedHsForAllTy   $1 $3 }
         | ipvar '::' type               { LL (HsIParamTy (unLoc $1) $3) }
         | typedoc                       { $1 }
 

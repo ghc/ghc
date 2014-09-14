@@ -1,0 +1,30 @@
+
+T4426.hs:6:12: Warning:
+    Variable ‘m’ is implicitly quantified due to a context
+    Use explicit forall syntax instead
+    In the type ‘a -> m a’
+    In the declaration for type synonym ‘F’
+
+T4426.hs:8:15: Warning:
+    Variable ‘b’ is implicitly quantified due to a context
+    Use explicit forall syntax instead
+    In the type ‘a -> b’
+    In the definition of data constructor ‘X’
+
+T4426.hs:10:21: Warning:
+    Variable ‘b’ is implicitly quantified due to a context
+    Use explicit forall syntax instead
+    In the type ‘a -> b -> c’
+    In the definition of data constructor ‘Y’
+
+T4426.hs:10:21: Warning:
+    Variable ‘c’ is implicitly quantified due to a context
+    Use explicit forall syntax instead
+    In the type ‘a -> b -> c’
+    In the definition of data constructor ‘Y’
+
+T4426.hs:12:17: Warning:
+    Variable ‘m’ is implicitly quantified due to a context
+    Use explicit forall syntax instead
+    In the type ‘m b’
+    In the type signature for ‘f’

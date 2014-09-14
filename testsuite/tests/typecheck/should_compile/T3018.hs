@@ -20,7 +20,7 @@ class Sat a where dict :: a
 class Subst_A a t t' where
     subst_A :: (Monad m) => a -> t -> t' -> m t'
 
-data SubstD_A a t t' = SubstD_A {substD_A:: (Monad m) => a -> t -> t' -> m t'}
+data SubstD_A a t t' = SubstD_A {substD_A:: forall m. (Monad m) => a -> t -> t' -> m t'}
 
 -- Allow override dictionary verion with implementation of type class Subst
 instance Subst_A a t t' => Sat (SubstD_A a t t') where

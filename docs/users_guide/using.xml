@@ -1033,8 +1033,9 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-wrong-do-bind</option>,
     <option>-fwarn-unsupported-calling-conventions</option>,
     <option>-fwarn-dodgy-foreign-imports</option>,
-    <option>-fwarn-inline-rule-shadowing</option>, and
-    <option>-fwarn-unsupported-llvm-version</option>.
+    <option>-fwarn-inline-rule-shadowing</option>,
+    <option>-fwarn-unsupported-llvm-version</option>, and
+    <option>-fwarn-context-quantification</option>.
     The following flags are simple ways to select standard
     &ldquo;packages&rdquo; of warnings:
     </para>
@@ -1837,6 +1838,27 @@ _  = rhs3        -- No warning: lone wild-card pattern
             <programlisting>
                do { mapM_ popInt xs ; return 10 }
             </programlisting>
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-context-quantification</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-context-quantification</option></primary></indexterm>
+          <indexterm><primary>implicit context quantification, warning</primary></indexterm>
+          <indexterm><primary>context, implicit quantification</primary></indexterm>
+
+          <para>Report if a variable is quantified only due to its presence
+          in a context (see <xref linkend="universal-quantification"/>). For example,
+            <programlisting>
+              type T a = Monad m => a -> f a
+            </programlisting>
+          It is recommended to write this polymorphic type as
+            <programlisting>
+              type T a = forall m. Monad m => a -> f a
+            </programlisting>
+          instead.
           </para>
         </listitem>
       </varlistentry>

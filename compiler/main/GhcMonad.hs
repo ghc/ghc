@@ -199,7 +199,7 @@ printException err = do
   liftIO $ printBagOfErrors dflags (srcErrorMessages err)
 
 -- | A function called to log warnings and errors.
-type WarnErrLogger = GhcMonad m => Maybe SourceError -> m ()
+type WarnErrLogger = forall m. GhcMonad m => Maybe SourceError -> m ()
 
 defaultWarnErrLogger :: WarnErrLogger
 defaultWarnErrLogger Nothing  = return ()
