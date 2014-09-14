@@ -33,15 +33,16 @@ test('T1969',
              # 2013-02-10 13 (x86/Windows)
              # 2013-02-10 14 (x86/OSX)
              # 2013-11-13 17 (x86/Windows, 64bit machine)
-           (wordsize(64), 30, 15)]),
+           (wordsize(64), 30, 20)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
              # 2012-10-03 25 (amd64/Linux if .hi exists)
              # 2013-02-13 23, but unstable so increased to 10% range
              # 2013-02-13 27, very unstable!
-             # 2013-09-11 30 (amd64/Linux)
              # 2014-09-10 29 (amd64/Linux) post-AMP-cleanup
+             # 2013-09-11 30, 10 (amd64/Linux)
+             # 2013-09-11 30, 15 (adapt to Phab CI)
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5719436, 20),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -54,13 +55,14 @@ test('T1969',
              # 2009-12-31 6149572 (x86/Linux)
              # 2014-01-22 6429864 (x86/Linux)
              # 2014-06-29 5949188 (x86/Linux)
-           (wordsize(64), 10463640, 10)]),
+           (wordsize(64), 9684256, 10)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
                # varies quite a lot with CLEANUP and BINDIST,
                # hence 10% range.
                # See Note [residency] to get an accurate view.
+             # 2014-09-14 9684256, 10 # try to lower it a bit more to match Phab's CI
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
                                  #            215582916 (x86/Windows)
@@ -202,7 +204,7 @@ test('T4801',
              # 2013-02-10:  11207828 (x86/OSX)
              # (some date): 11139444
              # 2013-11-13:  11829000 (x86/Windows, 64bit machine)
-           (wordsize(64), 19296544, 10)]),
+           (wordsize(64), 19296544, 15)]),
                 # prev:       20486256 (amd64/OS X)
                 # 30/08/2012: 17305600--20391920 (varies a lot)
                 # 19/10/2012: 26882576 (-fPIC turned on)
@@ -212,7 +214,8 @@ test('T4801',
                 # 13/01/2014: 22646000 (mostly due to #8647)
                 # 18/02/2014: 25002136 (call arity analysis changes)
                 # 12/05/2014: 25002136 (specialisation and inlining changes)
-                # 10/09/2014: 19296544 (post-AMP-cleanup)
+                # 10/09/2014: 19296544, 10 (post-AMP-cleanup)
+                # 14/09/2014: 19585456, 15 (adapt to Phab CI env)
        only_ways(['normal']),
        extra_hc_opts('-static')
       ],
