@@ -418,7 +418,7 @@ class Applicative m => Monad m where
     -- by the first, like sequencing operators (such as the semicolon)
     -- in imperative languages.
     (>>)        :: forall a b. m a -> m b -> m b
-    m >> k = m >>= \_ -> k
+    m >> k = m >>= \_ -> k -- See Note [Recursive bindings for Applicative/Monad]
     {-# INLINE (>>) #-}
 
     -- | Inject a value into the monadic type.
@@ -429,6 +429,28 @@ class Applicative m => Monad m where
     -- failure in a @do@ expression.
     fail        :: String -> m a
     fail s      = error s
+
+{- Note [Recursive bindings for Applicative/Monad]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The original Applicative/Monad proposal stated that after
+implementation, the designated implementation of (>>) would become
+
+  (>>) :: forall a b. m a -> m b -> m b
+  (>>) = (*>)
+
+by default. You might be inclined to change this to reflect the stated
+proposal, but you really shouldn't! Why? Because people tend to define
+such instances the /other/ way around: in particular, it is perfectly
+legitimate to define an instance of Applicative (*>) in terms of (>>),
+which would lead to an infinite loop for the default implementation of
+Monad! And people do this in the wild.
+
+This turned into a nasty bug that was tricky to track down, and rather
+than eliminate it everywhere upstream, it's easier to just retain the
+original default.
+
+-}
 
 -- | Promote a function to a monad.
 liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
