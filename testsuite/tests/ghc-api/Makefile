@@ -20,6 +20,6 @@ T8628:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc T8628
 	./T8628 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
-.PHONY: clean T6145
+.PHONY: clean T6145 T8639_api T8628
 
 
