@@ -58,7 +58,7 @@ libraries/Cabal              -           -                               https:/
 libraries/containers         -           -                               https://github.com/haskell/containers.git
 libraries/deepseq            -           -                               -
 libraries/directory          -           -                               ssh://git@github.com/haskell/directory.git
-libraries/filepath           -           -                               -
+libraries/filepath           -           -                               ssh://git@github.com/haskell/filepath.git
 libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
 libraries/haskell98          -           -                               -
 libraries/haskell2010        -           -                               -
