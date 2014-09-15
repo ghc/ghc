@@ -1304,7 +1304,8 @@ lookupModuleWithSuggestions dflags m mb_pn
 
 listVisibleModuleNames :: DynFlags -> [ModuleName]
 listVisibleModuleNames dflags =
-    Map.keys (moduleToPkgConfAll (pkgState dflags))
+    map fst (filter visible (Map.toList (moduleToPkgConfAll (pkgState dflags))))
+  where visible (_, ms) = any originVisible (Map.elems ms)
 
 -- | Find all the 'PackageConfig' in both the preload packages from 'DynFlags' and corresponding to the list of
 -- 'PackageConfig's
