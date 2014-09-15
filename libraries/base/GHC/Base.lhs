@@ -413,7 +413,6 @@ class Applicative m => Monad m where
     -- | Sequentially compose two actions, passing any value produced
     -- by the first as an argument to the second.
     (>>=)       :: forall a b. m a -> (a -> m b) -> m b
-    m >>= f = join (fmap f m)
 
     -- | Sequentially compose two actions, discarding any value produced
     -- by the first, like sequencing operators (such as the semicolon)
