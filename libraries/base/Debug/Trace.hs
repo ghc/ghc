@@ -1,5 +1,7 @@
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -42,7 +44,6 @@ module Debug.Trace (
         traceMarkerIO,
   ) where
 
-import Prelude
 import System.IO.Unsafe
 import Control.Monad
 
@@ -51,6 +52,7 @@ import GHC.Base
 import qualified GHC.Foreign
 import GHC.IO.Encoding
 import GHC.Ptr
+import GHC.Show
 import GHC.Stack
 import Data.List
 

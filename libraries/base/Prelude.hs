@@ -72,6 +72,9 @@ module Prelude (
     Monad((>>=), (>>), return, fail),
     mapM, mapM_, sequence, sequence_, (=<<),
 
+    -- ** Traversals and Foldables
+    Foldable, Traversable,
+
     -- ** Miscellaneous functions
     id, const, (.), flip, ($), until,
     asTypeOf, error, undefined,
@@ -140,7 +143,9 @@ import System.IO
 import System.IO.Error
 import Data.List
 import Data.Either
+import Data.Foldable    ( Foldable )
 import Data.Maybe
+import Data.Traversable ( Traversable )
 import Data.Tuple
 
 import GHC.Base

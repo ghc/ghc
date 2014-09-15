@@ -1,6 +1,7 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE AutoDeriveTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -46,16 +47,22 @@ module Control.Applicative (
     optional,
     ) where
 
-import Prelude hiding (id,(.))
-
-import GHC.Base (liftA, liftA2, liftA3, (<**>))
 import Control.Category
 import Control.Arrow
-import Control.Monad (liftM, ap, MonadPlus(..), Alternative(..))
+import Control.Monad (liftM, ap, Monad(..), MonadPlus(..), Alternative(..))
 import Data.Functor ((<$>), (<$))
+import Data.Maybe
 import Data.Monoid (Monoid(..))
+import Data.Tuple
+import Data.Eq
+import Data.Ord
+import Data.Functor (Functor(..))
 
+import GHC.Base (const, Applicative(..),liftA, liftA2, liftA3, (<**>))
 import GHC.Generics
+import GHC.List (map, repeat, zipWith)
+import GHC.Read (Read)
+import GHC.Show (Show)
 
 newtype Const a b = Const { getConst :: a }
                   deriving (Generic, Generic1)

@@ -20,6 +20,8 @@ instance (Read a, Read b) => Read (a, b) -- Defined in ‘GHC.Read’
 instance (Show a, Show b) => Show (a, b) -- Defined in ‘GHC.Show’
 instance GHC.Base.Monoid a => Applicative ((,) a)
   -- Defined in ‘GHC.Base’
+instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
+instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
 data (#,#) (a :: OpenKind) (b :: OpenKind) = (#,#) a b
   	-- Defined in ‘GHC.Prim’
 (,) :: a -> b -> (a, b)

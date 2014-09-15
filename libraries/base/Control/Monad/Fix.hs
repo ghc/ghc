@@ -1,4 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -22,10 +23,14 @@ module Control.Monad.Fix (
         fix
   ) where
 
-import Prelude
-import System.IO
-import Data.Function (fix)
+import Control.Monad ( Monad )
+import Data.Either
+import Data.Function ( fix )
+import Data.Maybe
+import GHC.Base ( error, (.) )
+import GHC.List ( head, tail )
 import GHC.ST
+import System.IO
 
 -- | Monads having fixed points with a \'knot-tying\' semantics.
 -- Instances of 'MonadFix' should satisfy the following laws:

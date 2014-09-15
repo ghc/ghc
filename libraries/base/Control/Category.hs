@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Trustworthy #-}
 
@@ -16,7 +17,7 @@
 
 module Control.Category where
 
-import qualified Prelude
+import qualified GHC.Base (id,(.))
 import Data.Type.Coercion
 import Data.Type.Equality
 import GHC.Prim (coerce)
@@ -43,8 +44,8 @@ class Category cat where
  #-}
 
 instance Category (->) where
-    id = Prelude.id
-    (.) = (Prelude..)
+    id = GHC.Base.id
+    (.) = (GHC.Base..)
 
 instance Category (:~:) where
   id          = Refl

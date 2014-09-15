@@ -1,5 +1,6 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE MagicHash, UnboxedTuples, AutoDeriveTypeable, TypeFamilies, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -71,14 +72,13 @@ module GHC.Exts
         IsList(..)
        ) where
 
-import Prelude
-
-import GHC.Prim hiding (coerce)
+import GHC.Prim hiding (coerce, Constraint)
 import GHC.Base hiding (coerce) -- implicitly comes from GHC.Prim
 import GHC.Word
 import GHC.Int
 import GHC.Ptr
 import GHC.Stack
+
 import qualified Data.Coerce
 import Data.String
 import Data.List

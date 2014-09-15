@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
@@ -50,14 +51,19 @@ module Data.Traversable (
     foldMapDefault,
     ) where
 
-import Prelude hiding (mapM, sequence, foldr)
-import qualified Prelude (mapM, foldr)
 import Control.Applicative
-import Data.Foldable (Foldable())
-import Data.Monoid (Monoid)
+import Control.Monad ( Monad(..) )
+import qualified Control.Monad
+import Data.Either
+import Data.Foldable ( Foldable )
+import Data.Functor
+import Data.Maybe
+import Data.Monoid ( Monoid )
 import Data.Proxy
 
 import GHC.Arr
+import GHC.Base ( ($), (.), id, flip )
+import qualified GHC.List as List
 
 -- | Functors representing data structures that can be traversed from
 -- left to right.
@@ -174,10 +180,10 @@ instance Traversable Maybe where
 
 instance Traversable [] where
     {-# INLINE traverse #-} -- so that traverse can fuse
-    traverse f = Prelude.foldr cons_f (pure [])
+    traverse f = List.foldr cons_f (pure [])
       where cons_f x ys = (:) <$> f x <*> ys
 
-    mapM = Prelude.mapM
+    mapM = Control.Monad.mapM
 
 instance Traversable (Either a) where
     traverse _ (Left x) = pure (Left x)

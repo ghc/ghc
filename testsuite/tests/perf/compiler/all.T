@@ -246,7 +246,7 @@ test('T3064',
             # 2012-10-30: 111189536 (x86/Windows)
             # 2013-11-13: 146626504 (x86/Windows, 64bit machine)
             # 2014-01-22: 162457940 (x86/Linux)
-           (wordsize(64), 407416464, 5)]),
+           (wordsize(64), 385145080, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
@@ -258,6 +258,7 @@ test('T3064',
             # (amd64/Linux) (2014-07-17): 332702112, general round of updates
             # (amd64/Linux) (2014-08-29): 313638592, w/w for INLINABLE things
             # (amd64/Linux) (09/09/2014): 407416464, AMP changes (larger interfaces, more loading)
+            # (amd64/Linux) (14/09/2014): 385145080, BPP changes (more NoImplicitPrelude in base)
 
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 11202304, 20),
@@ -265,7 +266,7 @@ test('T3064',
             #(some date):  5511604
             # 2013-11-13:  7218200 (x86/Windows, 64bit machine)
             # 2014-04-04: 11202304 (x86/Windows, 64bit machine)
-           (wordsize(64), 24357392, 20)]),
+           (wordsize(64), 16053888, 20)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
             # (amd64/Linux)         (14/02/2013):  8687360
@@ -277,6 +278,7 @@ test('T3064',
             # (amd64/Linux)         (22/11/2013): 16266992, GND via Coercible and counters for constraints solving
             # (amd64/Linux)         (12/12/2013): 19821544, better One shot analysis
             # (amd64/Linux)         (09/09/2014): 24357392, AMP changes (larger interfaces, more loading)
+            # (amd64/Linux)         (14/09/2014): 16053888, BPP changes (more NoImplicitPrelude in base)
        only_ways(['normal'])
       ],
      compile,
@@ -456,7 +458,7 @@ test('T6048',
             # 2012-10-08: 48887164 (x86/Linux)
             # 2014-04-04: 62618072 (x86 Windows, 64 bit machine)
             # 2014-09-03: 56315812 (x86 Windows, w/w for INLINEAVBLE)
-           (wordsize(64), 108354472, 12)])
+           (wordsize(64), 88186056, 12)])
              # 18/09/2012  97247032 amd64/Linux
              # 16/01/2014 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
              # 18/01/2014  95960720 amd64/Linux Call Arity improvements
@@ -464,6 +466,7 @@ test('T6048',
              # 05/03/2014 110646312 amd64/Linux Call Arity became more elaborate
              # 14/07/2014 125431448 amd64/Linux unknown reason. Even worse in GHC-7.8.3. *shurg*
              # 29/08/2014 108354472 amd64/Linux w/w for INLINABLE things
+             # 14/09/2014  88186056 amd64/Linux BPP part1 change (more NoImplicitPreludes in base)
       ],
       compile,[''])
 

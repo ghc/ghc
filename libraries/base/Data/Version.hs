@@ -1,5 +1,6 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE AutoDeriveTypeable #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -33,14 +34,17 @@ module Data.Version (
         showVersion, parseVersion,
   ) where
 
-import Prelude -- necessary to get dependencies right
-
-import Text.ParserCombinators.ReadP
-
-import Data.Typeable    ( Typeable )
-import Data.List        ( intersperse, sort )
-import Control.Monad    ( liftM )
+import Control.Monad    ( Monad(..), liftM )
 import Data.Char        ( isDigit, isAlphaNum )
+import Data.Eq
+import Data.List
+import Data.Ord
+import Data.Typeable    ( Typeable )
+import GHC.Base         ( ($), (&&), String, Int )
+import GHC.Read
+import GHC.Show
+import Text.ParserCombinators.ReadP
+import Text.Read        ( read )
 
 {- |
 A 'Version' represents the version of a software entity.  

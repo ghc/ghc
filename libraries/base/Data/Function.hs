@@ -1,4 +1,5 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -24,7 +25,7 @@ module Data.Function
   , on
   ) where
 
-import Prelude
+import GHC.Base ( ($), (.), id, const, flip )
 
 infixl 0 `on`
 infixl 1 &

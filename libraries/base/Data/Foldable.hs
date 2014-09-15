@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
@@ -57,19 +58,21 @@ module Data.Foldable (
     find
     ) where
 
-import Prelude hiding (foldl, foldr, foldl1, foldr1, mapM_, sequence_,
-                elem, notElem, concat, concatMap, and, or, any, all,
-                sum, product, maximum, minimum)
-import qualified Prelude (foldl, foldr, foldl1, foldr1)
-import qualified Data.List as List (foldl')
 import Control.Applicative
-import Control.Monad (MonadPlus(..))
-import Data.Maybe (fromMaybe, listToMaybe)
+import Control.Monad ( Monad(..), MonadPlus(..) )
+import Data.Bool
+import Data.Either
+import Data.Eq
+import qualified Data.List as List
+import Data.Maybe
 import Data.Monoid
+import Data.Ord
 import Data.Proxy
 
-import GHC.Exts (build)
-import GHC.Arr
+import GHC.Arr  ( Array(..), Ix(..), elems )
+import GHC.Base ( (.), ($!), error, flip, id )
+import GHC.Exts ( build )
+import GHC.Num  ( Num(..) )
 
 -- | Data structures that can be folded.
 --
@@ -163,11 +166,11 @@ instance Foldable Maybe where
     foldl f z (Just x) = f z x
 
 instance Foldable [] where
-    foldr = Prelude.foldr
-    foldl = Prelude.foldl
+    foldr = List.foldr
+    foldl = List.foldl
     foldl' = List.foldl'
-    foldr1 = Prelude.foldr1
-    foldl1 = Prelude.foldl1
+    foldr1 = List.foldr1
+    foldl1 = List.foldl1
 
 instance Foldable (Either a) where
     foldMap _ (Left _) = mempty
@@ -182,10 +185,10 @@ instance Foldable ((,) a) where
     foldr f z (_, y) = f y z
 
 instance Ix i => Foldable (Array i) where
-    foldr f z = Prelude.foldr f z . elems
-    foldl f z = Prelude.foldl f z . elems
-    foldr1 f = Prelude.foldr1 f . elems
-    foldl1 f = Prelude.foldl1 f . elems
+    foldr f z = List.foldr f z . elems
+    foldl f z = List.foldl f z . elems
+    foldr1 f = List.foldr1 f . elems
+    foldl1 f = List.foldl1 f . elems
 
 instance Foldable Proxy where
     foldMap _ _ = mempty

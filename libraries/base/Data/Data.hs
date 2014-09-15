@@ -2,6 +2,7 @@
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, PolyKinds #-}
 {-# LANGUAGE StandaloneDeriving, AutoDeriveTypeable, TypeOperators,
              GADTs #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -106,19 +107,25 @@ module Data.Data (
 
 ------------------------------------------------------------------------------
 
-import Prelude -- necessary to get dependencies right
-
-import Data.Typeable
-import Data.Maybe
-import Data.Version( Version(..) )
 import Control.Monad
+import Data.Either
+import Data.Eq
+import Data.Maybe
+import Data.Ord
+import Data.Typeable
+import Data.Version( Version(..) )
+import GHC.Base
+import GHC.List
+import GHC.Num
+import GHC.Read
+import GHC.Show
+import Text.Read( reads )
 
 -- Imports for the instances
 import Data.Int              -- So we can give Data instance for Int8, ...
 import Data.Type.Coercion
-import Data.Coerce
 import Data.Word             -- So we can give Data instance for Word8, ...
-import GHC.Real( Ratio(..) ) -- So we can give Data instance for Ratio
+import GHC.Real              -- So we can give Data instance for Ratio
 --import GHC.IOBase            -- So we can give Data instance for IO, Handle
 import GHC.Ptr               -- So we can give Data instance for Ptr
 import GHC.ForeignPtr        -- So we can give Data instance for ForeignPtr

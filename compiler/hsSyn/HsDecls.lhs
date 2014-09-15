@@ -4,6 +4,7 @@
 %
 
 \begin{code}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
              DeriveTraversable #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -98,8 +99,10 @@ import FastString
 
 import Bag
 import Data.Data        hiding (TyCon,Fixity)
-import Data.Foldable (Foldable)
-import Data.Traversable
+#if __GLASGOW_HASKELL__ < 709
+import Data.Foldable ( Foldable )
+import Data.Traversable ( Traversable )
+#endif
 import Data.Maybe
 \end{code}
 

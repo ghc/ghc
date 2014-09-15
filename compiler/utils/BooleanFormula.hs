@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 --------------------------------------------------------------------------------
 -- | Boolean formulas without quantifiers and without negation.
 -- Such a formula consists of variables, conjunctions (and), and disjunctions (or).
@@ -18,8 +20,10 @@ module BooleanFormula (
 
 import Data.List ( nub, intersperse )
 import Data.Data
+#if __GLASGOW_HASKELL__ < 709
 import Data.Foldable ( Foldable )
 import Data.Traversable ( Traversable )
+#endif
 
 import MonadUtils
 import Outputable

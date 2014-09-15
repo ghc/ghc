@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
@@ -23,7 +24,7 @@ module Data.Functor
     ) where
 
 import Control.Monad
-import GHC.Base (Functor(..))
+import GHC.Base ( Functor(..), flip )
 
 infixl 4 <$>
 
