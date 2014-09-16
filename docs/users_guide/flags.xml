@@ -1026,7 +1026,7 @@
             <entry><option>-XNoMonomorphismRestriction</option></entry>
             <entry>Disable the <link linkend="monomorphism">monomorphism restriction</link>.</entry>
             <entry>dynamic</entry>
-            <entry><option>-XMonomorphismRrestriction</option></entry>
+            <entry><option>-XMonomorphismRestriction</option></entry>
           </row>
           <row>
             <entry><option>-XMultiParamTypeClasses</option></entry>
