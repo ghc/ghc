@@ -1,0 +1,4 @@
+:set -ldl
+import Foreign
+import Foreign.C.String
+foreign import ccall "dlerror" dle :: IO CString

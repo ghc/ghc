@@ -17,6 +17,7 @@ module Linker ( getHValue, showLinkerState,
                 extendLinkEnv, deleteFromLinkEnv,
                 extendLoadedPkgs,
                 linkPackages,initDynLinker,linkModule,
+                linkCmdLineLibs,
 
                 -- Saving/restoring globals
                 PersistentLinkerState, saveLinkerGlobals, restoreLinkerGlobals
@@ -283,10 +284,21 @@ reallyInitDynLinker dflags =
           -- (b) Load packages from the command-line (Note [preload packages])
         ; pls <- linkPackages' dflags (preloadPackages (pkgState dflags)) pls0
 
-          -- (c) Link libraries from the command-line
-        ; let cmdline_ld_inputs = ldInputs dflags
+          -- steps (c), (d) and (e)
+        ; linkCmdLineLibs' dflags pls
+        }
+
+linkCmdLineLibs :: DynFlags -> IO ()
+linkCmdLineLibs dflags = do
+  initDynLinker dflags
+  modifyPLS_ $ \pls -> do
+    linkCmdLineLibs' dflags pls
+
+linkCmdLineLibs' :: DynFlags -> PersistentLinkerState -> IO PersistentLinkerState
+linkCmdLineLibs' dflags@(DynFlags { ldInputs     = cmdline_ld_inputs
+                                  , libraryPaths = lib_paths}) pls =
+  do  {   -- (c) Link libraries from the command-line
         ; let minus_ls = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
-        ; let lib_paths = libraryPaths dflags
         ; libspecs <- mapM (locateLib dflags False lib_paths) minus_ls
 
           -- (d) Link .o files from the command-line
@@ -295,12 +307,11 @@ reallyInitDynLinker dflags =
 
           -- (e) Link any MacOS frameworks
         ; let platform = targetPlatform dflags
-        ; let framework_paths = if platformUsesFrameworks platform
-                                then frameworkPaths dflags
-                                else []
-        ; let frameworks = if platformUsesFrameworks platform
-                           then cmdlineFrameworks dflags
-                           else []
+        ; let (framework_paths, frameworks) =
+                if platformUsesFrameworks platform
+                 then (frameworkPaths dflags, cmdlineFrameworks dflags)
+                  else ([],[])
+
           -- Finally do (c),(d),(e)
         ; let cmdline_lib_specs = [ l | Just l <- classified_ld_inputs ]
                                ++ libspecs

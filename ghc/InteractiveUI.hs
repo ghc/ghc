@@ -2146,6 +2146,17 @@ newDynFlags interactive_only minus_opts = do
                      , pkgDatabase = pkgDatabase dflags2
                      , packageFlags = packageFlags dflags2 }
 
+        let ld0length   = length $ ldInputs dflags0
+            fmrk0length = length $ cmdlineFrameworks dflags0
+
+            newLdInputs     = drop ld0length (ldInputs dflags2)
+            newCLFrameworks = drop fmrk0length (cmdlineFrameworks dflags2)
+
+        when (not (null newLdInputs && null newCLFrameworks)) $
+          liftIO $ linkCmdLineLibs $
+            dflags2 { ldInputs = newLdInputs
+                    , cmdlineFrameworks = newCLFrameworks }
+
       return ()
 
 
