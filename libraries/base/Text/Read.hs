@@ -47,7 +47,6 @@ module Text.Read (
 import GHC.Base
 import GHC.Read
 import Data.Either
-import Data.Maybe
 import Text.ParserCombinators.ReadP as P
 import Text.ParserCombinators.ReadPrec
 import qualified Text.Read.Lex as L

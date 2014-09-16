@@ -28,7 +28,6 @@ available = False
 import Control.Concurrent.MVar (MVar, newMVar, swapMVar)
 import Control.Monad ((=<<), unless)
 import Data.Bits (Bits, FiniteBits, (.|.), (.&.))
-import Data.Maybe (Maybe(..))
 import Data.Word
 import Foreign.C.Types (CInt(..), CShort(..))
 import Foreign.Ptr (Ptr)

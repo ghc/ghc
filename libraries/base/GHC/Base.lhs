@@ -183,6 +183,29 @@ otherwise = True
 build = error "urk"
 foldr = error "urk"
 -}
+
+\end{code}
+
+%*********************************************************
+%*                                                      *
+\subsection{The Maybe type}
+%*                                                      *
+%*********************************************************
+\begin{code}
+
+-- | The 'Maybe' type encapsulates an optional value.  A value of type
+-- @'Maybe' a@ either contains a value of type @a@ (represented as @'Just' a@),
+-- or it is empty (represented as 'Nothing').  Using 'Maybe' is a good way to
+-- deal with errors or exceptional cases without resorting to drastic
+-- measures such as 'error'.
+--
+-- The 'Maybe' type is also a monad.  It is a simple kind of error
+-- monad, where all errors are represented by 'Nothing'.  A richer
+-- error monad can be built using the 'Data.Either.Either' type.
+--
+data  Maybe a  =  Nothing | Just a
+  deriving (Eq, Ord)
+
 \end{code}
 
 %*********************************************************
@@ -271,6 +294,18 @@ instance Monoid Ordering where
         LT `mappend` _ = LT
         EQ `mappend` y = y
         GT `mappend` _ = GT
+
+-- | Lift a semigroup into 'Maybe' forming a 'Monoid' according to
+-- <http://en.wikipedia.org/wiki/Monoid>: \"Any semigroup @S@ may be
+-- turned into a monoid simply by adjoining an element @e@ not in @S@
+-- and defining @e*e = e@ and @e*s = s = s*e@ for all @s ∈ S@.\" Since
+-- there is no \"Semigroup\" typeclass providing just 'mappend', we
+-- use 'Monoid' instead.
+instance Monoid a => Monoid (Maybe a) where
+  mempty = Nothing
+  Nothing `mappend` m = m
+  m `mappend` Nothing = m
+  Just m1 `mappend` Just m2 = Just (m1 `mappend` m2)
 
 instance Monoid a => Applicative ((,) a) where
     pure x = (mempty, x)
@@ -520,6 +555,25 @@ instance Monad ((->) r) where
 
 instance Functor ((,) a) where
     fmap f (x,y) = (x, f y)
+
+
+instance  Functor Maybe  where
+    fmap _ Nothing       = Nothing
+    fmap f (Just a)      = Just (f a)
+
+instance Applicative Maybe where
+    pure = return
+    (<*>) = ap
+
+instance  Monad Maybe  where
+    (Just x) >>= k      = k x
+    Nothing  >>= _      = Nothing
+
+    (Just _) >>  k      = k
+    Nothing  >>  _      = Nothing
+
+    return              = Just
+    fail _              = Nothing
 
 \end{code}
 

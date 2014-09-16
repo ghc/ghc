@@ -32,7 +32,6 @@ module GHC.Weak (
     ) where
 
 import GHC.Base
-import Data.Maybe
 import Data.Typeable
 
 {-|

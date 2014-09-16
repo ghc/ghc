@@ -33,7 +33,6 @@ module GHC.MVar (
     ) where
 
 import GHC.Base
-import Data.Maybe
 import Data.Typeable
 
 data MVar a = MVar (MVar# RealWorld a) deriving( Typeable )

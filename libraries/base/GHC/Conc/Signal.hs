@@ -10,7 +10,6 @@ module GHC.Conc.Signal
 
 import Control.Concurrent.MVar (MVar, newMVar, withMVar)
 import Data.Dynamic (Dynamic)
-import Data.Maybe (Maybe(..))
 import Foreign.C.Types (CInt)
 import Foreign.ForeignPtr (ForeignPtr)
 import Foreign.StablePtr (castPtrToStablePtr, castStablePtrToPtr,

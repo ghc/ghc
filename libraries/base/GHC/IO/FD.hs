@@ -35,7 +35,6 @@ import GHC.Num
 import GHC.Real
 import GHC.Show
 import GHC.Enum
-import Data.Maybe
 import Control.Monad
 import Data.Typeable
 

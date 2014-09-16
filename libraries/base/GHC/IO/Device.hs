@@ -29,7 +29,6 @@ import GHC.Enum
 import GHC.Read
 import GHC.Show
 import GHC.Ptr
-import Data.Maybe
 import GHC.Num
 import GHC.IO
 import {-# SOURCE #-} GHC.IO.Exception ( unsupportedOperation )

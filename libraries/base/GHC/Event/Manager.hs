@@ -56,7 +56,7 @@ import Control.Monad ((=<<), forM_, when, replicateM, void)
 import Data.Bits ((.&.))
 import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (maybe)
 import GHC.Arr (Array, (!), listArray)
 import GHC.Base
 import GHC.Conc.Signal (runHandlers)

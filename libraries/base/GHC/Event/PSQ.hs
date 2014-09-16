@@ -88,7 +88,6 @@ module GHC.Event.PSQ
     , atMost
     ) where
 
-import Data.Maybe (Maybe(..))
 import GHC.Base
 import GHC.Num (Num(..))
 import GHC.Show (Show(showsPrec))

@@ -3,6 +3,7 @@ T5095.hs:9:11:
     Overlapping instances for Eq a arising from a use of ‘==’
     Matching instances:
       instance [overlappable] Show a => Eq a -- Defined at T5095.hs:5:31
+      instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Base’
       instance Eq () -- Defined in ‘GHC.Classes’
       instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‘GHC.Classes’
       instance (Eq a, Eq b, Eq c) => Eq (a, b, c)

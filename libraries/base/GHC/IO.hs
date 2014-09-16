@@ -44,7 +44,6 @@ import GHC.Base
 import GHC.ST
 import GHC.Exception
 import GHC.Show
-import Data.Maybe
 
 import {-# SOURCE #-} GHC.IO.Exception ( userError )
 

@@ -105,7 +105,6 @@ import GHC.Conc.Sync
 
 import Data.Dynamic
 import Data.Either
-import Data.Maybe
 
 -----------------------------------------------------------------------------
 -- Catching exceptions

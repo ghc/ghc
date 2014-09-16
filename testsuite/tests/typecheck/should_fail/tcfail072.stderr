@@ -7,10 +7,9 @@ tcfail072.hs:23:13:
       at tcfail072.hs:22:6-38
     The type variable ‘q0’ is ambiguous
     Note: there are several potential instances:
+      instance Ord a => Ord (Maybe a) -- Defined in ‘GHC.Base’
       instance Ord () -- Defined in ‘GHC.Classes’
       instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
-      instance (Ord a, Ord b, Ord c) => Ord (a, b, c)
-        -- Defined in ‘GHC.Classes’
-      ...plus 21 others
+      ...plus 22 others
     In the expression: g A
     In an equation for ‘g’: g (B _ _) = g A

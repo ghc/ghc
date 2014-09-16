@@ -52,7 +52,6 @@ module GHC.Show
 
 import GHC.Base
 import GHC.Num
-import Data.Maybe
 import GHC.List ((!!), foldr1, break)
 \end{code}
 

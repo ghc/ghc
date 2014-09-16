@@ -46,7 +46,6 @@ import GHC.Num
 import GHC.Read
 import GHC.Show
 import GHC.Generics
-import Data.Maybe
 
 {-
 -- just for testing

@@ -47,7 +47,6 @@ import GHC.IO.Encoding.Failure
 import GHC.IO.Encoding.Types
 import GHC.Word
 import Data.Bits
-import Data.Maybe
 import GHC.IORef
 
 -- -----------------------------------------------------------------------------

@@ -3,7 +3,7 @@ tcfail182.hs:9:3:
     Couldn't match expected type ‘Prelude.Maybe a’
                 with actual type ‘Maybe t0’
     NB: ‘Prelude.Maybe’
-          is defined in ‘Data.Maybe’ in package ‘base-4.8.0.0’
+          is defined in ‘GHC.Base’ in package ‘base-4.8.0.0’
         ‘Maybe’ is defined at tcfail182.hs:6:1-18
     Relevant bindings include
       f :: Prelude.Maybe a -> Int (bound at tcfail182.hs:9:1)

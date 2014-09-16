@@ -1,2 +1,1 @@
-data Data.Maybe.Maybe a_0
-    = Data.Maybe.Nothing | Data.Maybe.Just a_0
+data GHC.Base.Maybe a_0 = GHC.Base.Nothing | GHC.Base.Just a_0

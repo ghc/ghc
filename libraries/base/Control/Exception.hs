@@ -133,7 +133,6 @@ import Control.Exception.Base
 
 import GHC.Base
 import GHC.IO (unsafeUnmask)
-import Data.Maybe
 
 -- | You need this when using 'catches'.
 data Handler a = forall e . Exception e => Handler (e -> IO a)

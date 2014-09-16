@@ -54,7 +54,6 @@ import GHC.Base
 import GHC.Word
 import GHC.Show
 import GHC.Read ( Read )
-import Data.Maybe
 import Data.Proxy
 import GHC.Num
 import GHC.Real

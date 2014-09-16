@@ -42,7 +42,6 @@ import GHC.IO.Buffer
 import GHC.IO.BufferedIO
 import GHC.IO.Encoding.Types
 import GHC.IORef
-import Data.Maybe
 import GHC.Show
 import GHC.Read
 import GHC.Word

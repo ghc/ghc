@@ -48,7 +48,6 @@ import GHC.IO
 import GHC.Show
 import GHC.Read
 import GHC.Exception
-import Data.Maybe
 import GHC.IO.Handle.Types
 import Foreign.C.Types
 

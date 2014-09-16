@@ -49,7 +49,6 @@ import GHC.Word
 import Data.IORef
 import Data.Char (toUpper)
 import Data.List
-import Data.Maybe
 import System.IO.Unsafe (unsafePerformIO)
 
 -- -----------------------------------------------------------------------------
