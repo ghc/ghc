@@ -22,6 +22,7 @@ import Data.List (zipWith3)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (snd)
 import Foreign.C.Error (eBADF, errnoToIOError)
+import Foreign.C.Types (CInt(..), CUInt(..))
 import Foreign.Ptr (Ptr)
 import GHC.Base
 import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
@@ -33,12 +34,14 @@ import GHC.IO.Exception (ioError)
 import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
                     boundsIOArray)
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
+import GHC.Event.Control (controlWriteFd)
 import GHC.Event.Internal (eventIs, evtClose)
 import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
                              new, registerFd, unregisterFd_)
 import qualified GHC.Event.Manager as M
 import qualified GHC.Event.TimerManager as TM
 import GHC.Num ((-), (+))
+import GHC.Real (fromIntegral)
 import GHC.Show (showSignedInt)
 import System.IO.Unsafe (unsafePerformIO)
 import System.Posix.Types (Fd)
@@ -261,7 +264,11 @@ startIOManagerThread :: IOArray Int (Maybe (ThreadId, EventManager))
 startIOManagerThread eventManagerArray i = do
   let create = do
         !mgr <- new True
-        !t <- forkOn i $ loop mgr
+        !t <- forkOn i $ do
+                c_setIOManagerControlFd
+                  (fromIntegral i)
+                  (fromIntegral $ controlWriteFd $ M.emControl mgr)
+                loop mgr
         labelThread t ("IOManager on cap " ++ show_int i)
         writeIOArray eventManagerArray i (Just (t,mgr))
   old <- readIOArray eventManagerArray i
@@ -277,6 +284,7 @@ startIOManagerThread eventManagerArray i = do
           -- the fork, for example. In this case we should clean up
           -- open pipes and everything else related to the event manager.
           -- See #4449
+          c_setIOManagerControlFd (fromIntegral i) (-1)
           M.cleanup em
           create
         _other         -> return ()
@@ -285,8 +293,10 @@ startTimerManagerThread :: IO ()
 startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
   let create = do
         !mgr <- TM.new
+        c_setTimerManagerControlFd
+          (fromIntegral $ controlWriteFd $ TM.emControl mgr)
         writeIORef timerManager $ Just mgr
-        !t <- forkIO $ TM.loop mgr `finally` shutdownManagers
+        !t <- forkIO $ TM.loop mgr
         labelThread t "TimerManager"
         return $ Just t
   case old of
@@ -304,20 +314,10 @@ startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
           mem <- readIORef timerManager
           _ <- case mem of
                  Nothing -> return ()
-                 Just em -> TM.cleanup em
+                 Just em -> do c_setTimerManagerControlFd (-1)
+                               TM.cleanup em
           create
         _other         -> return st
-
-shutdownManagers :: IO ()
-shutdownManagers =
-  withMVar ioManagerLock $ \_ -> do
-    eventManagerArray <- readIORef eventManager
-    let (_, high) = boundsIOArray eventManagerArray
-    forM_ [0..high] $ \i -> do
-      mmgr <- readIOArray eventManagerArray i
-      case mmgr of
-        Nothing -> return ()
-        Just (_,mgr) -> M.shutdown mgr
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 
@@ -352,3 +352,10 @@ ioManagerCapabilitiesChanged = do
               Just (_,mgr) <- readIOArray eventManagerArray i
               tid <- restartPollLoop mgr i
               writeIOArray eventManagerArray i (Just (tid,mgr))
+
+-- Used to tell the RTS how it can send messages to the I/O manager.
+foreign import ccall unsafe "setIOManagerControlFd"
+   c_setIOManagerControlFd :: CUInt -> CInt -> IO ()
+
+foreign import ccall unsafe "setTimerManagerControlFd"
+   c_setTimerManagerControlFd :: CInt -> IO ()
