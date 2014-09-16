@@ -512,7 +512,7 @@ funArgTy ty                = pprPanic "funArgTy" (ppr ty)
                                 ~~~~~~~~
 
 \begin{code}
--- | A key function: builds a 'TyConApp' or 'FunTy' as apppropriate to
+-- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
 -- its arguments.  Applies its arguments to the constructor from left to right.
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
