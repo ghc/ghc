@@ -640,19 +640,20 @@ AC_DEFUN([FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN],
 ])
 
 
-# FP_ARG_WITH_PATH_GNU_PROG
+# FP_ARG_WITH_PATH_GNU_PROG_GENERAL
 # --------------------
 # Find the specified command on the path or allow a user to set it manually
-# with a --with-<command> option. An error will be thrown if the command isn't
-# found.
+# with a --with-<command> option.
 #
 # This is ignored on the mingw32 platform.
 #
 # $1 = the variable to set
 # $2 = the with option name
 # $3 = the command to look for
+# $4 = prepend target to program name? if 'no', use the name unchanged
+# $5 = optional? if 'no', then raise an error if the command isn't found
 #
-AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG],
+AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_GENERAL],
 [
 AC_ARG_WITH($2,
 [AC_HELP_STRING([--with-$2=ARG],
@@ -672,58 +673,40 @@ AC_ARG_WITH($2,
 [
     if test "$HostOS" != "mingw32"
     then
-        if test "$target_alias" = "" ; then
+        if test "$4" = "no" -o "$target_alias" = "" ; then
             AC_PATH_PROG([$1], [$3])
         else
             AC_PATH_PROG([$1], [$target_alias-$3])
         fi
-        if test -z "$$1"
+        if test "$5" = "no" -a -z "$$1"
         then
             AC_MSG_ERROR([cannot find $3 in your PATH])
         fi
     fi
 ]
 )
-]) # FP_ARG_WITH_PATH_GNU_PROG
+]) # FP_ARG_WITH_PATH_GNU_PROG_GENERAL
 
+
+# FP_ARG_WITH_PATH_GNU_PROG
+# --------------------
+# The usual case: prepend the target, and the program is not optional.
+AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG],
+[FP_ARG_WITH_PATH_GNU_PROG_GENERAL([$1], [$2], [$3], [yes], [no])])
 
 # FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
 # --------------------
 # Same as FP_ARG_WITH_PATH_GNU_PROG but no error will be thrown if the command
 # isn't found.
-#
-# This is ignored on the mingw32 platform.
-#
-# $1 = the variable to set
-# $2 = the with option name
-# $3 = the command to look for
-#
 AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL],
-[
-AC_ARG_WITH($2,
-[AC_HELP_STRING([--with-$2=ARG],
-        [Use ARG as the path to $2 [default=autodetect]])],
-[
-    if test "$HostOS" = "mingw32"
-    then
-        AC_MSG_WARN([Request to use $withval will be ignored])
-    else
-        $1=$withval
-    fi
+[FP_ARG_WITH_PATH_GNU_PROG_GENERAL([$1], [$2], [$3], [yes], [yes])])
 
-    # Remember that we set this manually.  Used to override CC_STAGE0
-    # and friends later, if we are not cross-compiling.
-    With_$2=$withval
-],
-[
-    if test "$HostOS" != "mingw32"
-    then
-        AC_PATH_PROG([$1], [$3])
-    fi
-]
-)
-]) # FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
-
+# FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET
+# --------------------
+# Same as FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL but don't prepend the target name
+# (used for LLVM).
+AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET],
+[FP_ARG_WITH_PATH_GNU_PROG_GENERAL([$1], [$2], [$3], [no], [yes])])
 
 
 # FP_PROG_CONTEXT_DIFF
@@ -2063,7 +2046,7 @@ AC_DEFUN([XCODE_VERSION],[
 # $3 = the command to look for
 #
 AC_DEFUN([FIND_LLVM_PROG],[
-    FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
+    FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
     if test "$$1" == ""; then
         save_IFS=$IFS
         IFS=":;"
