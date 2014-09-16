@@ -529,8 +529,7 @@ tailFS :: FastString -> FastString
 tailFS (FastString _ 0 _ _) = panic "tailFS: Empty FastString"
 tailFS (FastString _ _ bs _) =
     inlinePerformIO $ BS.unsafeUseAsCString bs $ \ptr ->
-    do let (_, ptr') = utf8DecodeChar (castPtr ptr)
-           n = ptr' `minusPtr` ptr
+    do let (_, n) = utf8DecodeChar (castPtr ptr)
        return $! mkFastStringByteString (BS.drop n bs)
 
 consFS :: Char -> FastString -> FastString
