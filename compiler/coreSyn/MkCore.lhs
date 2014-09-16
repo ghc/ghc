@@ -283,10 +283,6 @@ mkStringExprFS str
   | nullFS str
   = return (mkNilExpr charTy)
 
-  | lengthFS str == 1
-  = do let the_char = mkCharExpr (headFS str)
-       return (mkConsExpr charTy the_char (mkNilExpr charTy))
-
   | all safeChar chars
   = do unpack_id <- lookupId unpackCStringName
        return (App (Var unpack_id) (Lit (MachStr (fastStringToByteString str))))

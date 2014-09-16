@@ -42,7 +42,8 @@ module CoreSubst (
 import CoreSyn
 import CoreFVs
 import CoreUtils
-import Literal  ( Literal )
+import Literal  ( Literal(MachStr) )
+import qualified Data.ByteString as BS
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 
 import qualified Type
@@ -55,7 +56,8 @@ import Coercion hiding ( substTy, substCo, extendTvSubst, substTyVarBndr, substC
 
 import TyCon       ( tyConArity )
 import DataCon
-import PrelNames   ( eqBoxDataConKey, coercibleDataConKey )
+import PrelNames   ( eqBoxDataConKey, coercibleDataConKey, unpackCStringIdKey
+                   , unpackCStringUtf8IdKey )
 import OptCoercion ( optCoercion )
 import PprCore     ( pprCoreBindings, pprRules )
 import Module      ( Module )
@@ -78,6 +80,8 @@ import PprCore          ()              -- Instances
 import FastString
 
 import Data.List
+
+import TysWiredIn
 \end{code}
 
 
@@ -1135,6 +1139,25 @@ a data constructor.
 
 However e might not *look* as if
 
+
+Note [exprIsConApp_maybe on literal strings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See #9400.
+
+Conceptually, a string literal "abc" is just ('a':'b':'c':[]), but in Core
+they are represented as unpackCString# "abc"# by MkCore.mkStringExprFS, or
+unpackCStringUtf8# when the literal contains multi-byte UTF8 characters.
+
+For optimizations we want to be able to treat it as a list, so they can be
+decomposed when used in a case-statement. exprIsConApp_maybe detects those
+calls to unpackCString# and returns:
+
+Just (':', [Char], ['a', unpackCString# "bc"]).
+
+We need to be careful about UTF8 strings here. ""# contains a ByteString, so
+we must parse it back into a FastString to split off the first character.
+That way we can treat unpackCString# and unpackCStringUtf8# in the same way.
+
 \begin{code}
 data ConCont = CC [CoreExpr] Coercion
                   -- Substitution already applied
@@ -1164,6 +1187,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
             cont
 
     go (Left in_scope) (Var fun) cont@(CC args co)
+
         | Just con <- isDataConWorkId_maybe fun
         , count isValArg args == idArity fun
         = dealWithCoercion co con args
@@ -1183,6 +1207,11 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         , Just rhs <- expandUnfolding_maybe unfolding
         , let in_scope' = extendInScopeSetSet in_scope (exprFreeVars rhs)
         = go (Left in_scope') rhs cont
+
+        | (fun `hasKey` unpackCStringIdKey)
+         || (fun `hasKey` unpackCStringUtf8IdKey)
+        , [Lit (MachStr str)] <- args
+        = dealWithStringLiteral fun str co
         where
           unfolding = id_unf fun
 
@@ -1199,6 +1228,31 @@ exprIsConApp_maybe (in_scope, id_unf) expr
 
     extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
     extend (Right s)       v e = Right (extendSubst s v e)
+
+-- See Note [exprIsConApp_maybe on literal strings]
+dealWithStringLiteral :: Var -> BS.ByteString -> Coercion
+                      -> Maybe (DataCon, [Type], [CoreExpr])
+
+-- This is not possible with user-supplied empty literals, MkCore.mkStringExprFS
+-- turns those into [] automatically, but just in case something else in GHC
+-- generates a string literal directly.
+dealWithStringLiteral _   str co
+  | BS.null str
+  = dealWithCoercion co nilDataCon [Type charTy]
+
+dealWithStringLiteral fun str co
+  = let strFS = mkFastStringByteString str
+
+        char = mkConApp charDataCon [mkCharLit (headFS strFS)]
+        charTail = fastStringToByteString (tailFS strFS)
+
+        -- In singleton strings, just add [] instead of unpackCstring# ""#.
+        rest = if BS.null charTail
+                 then mkConApp nilDataCon [Type charTy]
+                 else App (Var fun)
+                          (Lit (MachStr charTail))
+
+    in dealWithCoercion co consDataCon [Type charTy, char, rest]
 
 dealWithCoercion :: Coercion -> DataCon -> [CoreExpr]
                  -> Maybe (DataCon, [Type], [CoreExpr])
