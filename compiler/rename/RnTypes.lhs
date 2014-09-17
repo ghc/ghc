@@ -156,7 +156,7 @@ rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty)
 
     rnForAll doc Implicit forall_kvs (mkHsQTvs tyvar_bndrs) lctxt ty
 
-rnHsTyKi isType doc (HsForAllTy Qualified _ lctxt@(L _ ctxt) ty)
+rnHsTyKi isType doc fulltype@(HsForAllTy Qualified _ lctxt@(L _ ctxt) ty)
   = ASSERT( isType ) do
     rdr_env <- getLocalRdrEnv
     loc <- getSrcSpanM
@@ -164,7 +164,7 @@ rnHsTyKi isType doc (HsForAllTy Qualified _ lctxt@(L _ ctxt) ty)
         (forall_kvs, forall_tvs) = filterInScope rdr_env $
                                    extractHsTysRdrTyVars (ty:ctxt)
         tyvar_bndrs = userHsTyVarBndrs loc forall_tvs
-        in_type_doc = ptext (sLit "In the type") <+> quotes (ppr ty)
+        in_type_doc = ptext (sLit "In the type") <+> quotes (ppr fulltype)
 
     -- See Note [Context quantification]
     warnContextQuantification (in_type_doc $$ docOfHsDocContext doc) tyvar_bndrs
