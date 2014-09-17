@@ -100,7 +100,7 @@ genGenericMetaTyCons tc mod =
                     newGlobalBinder mod (s_occ m n) loc
 
       let metaDTyCon  = mkTyCon [] d_name
-          metaCTyCons = map (\c_name -> mkTyConApp (mkTyCon [mkTyVar undefined openTypeKind] c_name) [mkTyConTy metaDTyCon]) c_names
+          metaCTyCons = map (\c_name -> mkTyConApp (mkTyCon [mkTyVar c_name openTypeKind] c_name) [mkTyConTy metaDTyCon]) c_names
           metaSTyCons = map (map $ mkTyCon []) s_names
 
           metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
