@@ -139,9 +139,9 @@ if windows:
     h.close()
     if v.startswith("CYGWIN"):
         config.cygwin = True
-    elif v.startswith("MINGW"):
+    elif v.startswith("MINGW") or v.startswith("MSYS"):
 # msys gives "MINGW32"
-# msys2 gives "MINGW_NT-6.2"
+# msys2 gives "MINGW_NT-6.2" or "MSYS_NT-6.3"
         config.msys = True
     else:
         raise Exception("Can't detect Windows terminal type")
