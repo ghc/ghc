@@ -42,6 +42,7 @@ import BuildTyCl
 import SrcLoc
 import Bag
 import VarSet (elemVarSet)
+import Var (mkTyVar)
 import Outputable
 import FastString
 import Util
@@ -99,7 +100,7 @@ genGenericMetaTyCons tc mod =
                     newGlobalBinder mod (s_occ m n) loc
 
       let metaDTyCon  = mkTyCon [] d_name
-          metaCTyCons = map (\c_name -> mkTyConApp (mkTyCon [] c_name) [mkTyConTy metaDTyCon]) c_names
+          metaCTyCons = map (\c_name -> mkTyConApp (mkTyCon [mkTyVar undefined openTypeKind] c_name) [mkTyConTy metaDTyCon]) c_names
           metaSTyCons = map (map $ mkTyCon []) s_names
 
           metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
@@ -665,7 +666,7 @@ instance Outputable MetaTyCons where
 
 metaTyCons2TyCons :: MetaTyCons -> Bag TyCon
 metaTyCons2TyCons (MetaTyCons d cty s) = listToBag (d : c ++ concat s)
-  where c = map (\(TyConApp c []) -> c) cty
+  where c = map (\(TyConApp c [_]) -> c) cty
 
 
 -- Bindings for Datatype, Constructor, and Selector instances
