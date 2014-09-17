@@ -34,6 +34,30 @@
                     Added support for <link linkend="binary-literals">binary integer literals</link>
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    Simplified rules for implicit quantification. In previous versions of GHC,
+                    it was possible to use the <literal>=></literal> arrow
+                    to quantify over type variables in <literal>data</literal> and
+                    <literal>type</literal> declarations without a
+                    <literal>forall</literal> quantifier. For example,
+                    <literal>data Fun = Fun (Ord a => a -> b)</literal> was identical to
+                    <literal>data Fun = Fun (forall a b. Ord a => a -> b)</literal>, while
+                    <literal>data Fun = Fun (a -> b)</literal> caused a not-in-scope error.
+                    This implicit quantification is now deprecated, and variables
+                    in higher-rank constructors should be quantified with <literal>forall</literal>
+                    regardless of whether a class context is present or not.
+                    GHC 7.10 raises a warning (controlled by
+                    <option>-fwarn-context-quantification</option>, enabled by default)
+                    and GHC 7.12 will raise an error. See <link linkend="univ">examples</link>
+                    in GHC documentation.
+                </para>
+                <para>
+                    The change also applies to Template Haskell splices such as
+                    <literal>[t|Ord a => a|]</literal>, which should be written as
+                    <literal>[t|forall a. Ord a => a|]</literal>.
+                </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 

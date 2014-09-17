@@ -868,7 +868,8 @@ warnContextQuantification in_doc tvs
       = addWarnAt loc $
         vcat [ ptext (sLit "Variable") <+> quotes (ppr tv) <+>
                ptext (sLit "is implicitly quantified due to a context") $$
-               ptext (sLit "Use explicit forall syntax instead")
+               ptext (sLit "Use explicit forall syntax instead.") $$
+               ptext (sLit "This will become an error in GHC 7.12.")
              , in_doc ]
 
 opTyErr :: RdrName -> HsType RdrName -> SDoc

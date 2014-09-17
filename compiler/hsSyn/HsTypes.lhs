@@ -303,8 +303,11 @@ After renaming
     Explicit => the variables the user wrote (renamed)
 
 Qualified currently behaves exactly as Implicit,
-but gives an additional warning if there are
-implicitly quantified variables.
+but it is deprecated to use it for implicit quantification.
+In this case, GHC 7.10 gives a warning; see
+Note [Context quantification] and Trac #4426.
+In GHC 7.12, Qualified will no longer bind variables
+and this will become an error.
 
 The kind variables bound in the hsq_kvs field come both
   a) from the kind signatures on the kind vars (eg k1)

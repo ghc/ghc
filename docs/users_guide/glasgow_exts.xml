@@ -7732,7 +7732,8 @@ newtype Swizzle' = MkSwizzle' (Ord a => [a] -> [a])
 </programlisting>
 
 As of GHC 7.10, this is deprecated. The <literal>-fwarn-context-quantification</literal>
-flag detects this situation and issues a warning.
+flag detects this situation and issues a warning. In GHC 7.12, declarations
+such as <literal>MkSwizzle'</literal> will cause an out-of-scope error.
 </para>
 
 <para>
