@@ -606,6 +606,11 @@ primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp
     respectively, and the last is the exponent.}
    with out_of_line = True
 
+primop   DoubleDecode_Int64Op   "decodeDouble_Int64#" GenPrimOp
+   Double# -> (# INT64, Int# #)
+   {Decode {\tt Double\#} into mantissa and base-2 exponent.}
+   with out_of_line = True
+
 ------------------------------------------------------------------------
 section "Float#"
         {Operations on single-precision (32-bit) floating-point numbers.}

@@ -341,6 +341,7 @@ RTS_FUN_DECL(StgReturn);
 
 RTS_FUN_DECL(stg_decodeFloatzuIntzh);
 RTS_FUN_DECL(stg_decodeDoublezu2Intzh);
+RTS_FUN_DECL(stg_decodeDoublezuInt64zh);
 
 RTS_FUN_DECL(stg_unsafeThawArrayzh);
 RTS_FUN_DECL(stg_casArrayzh);

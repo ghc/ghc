@@ -17,6 +17,10 @@
 
 #define IEEE_FLOATING_POINT 1
 
+#if FLT_RADIX != 2
+# error FLT_RADIX != 2 not supported
+#endif
+
 /*
  * Encoding and decoding Doubles.  Code based on the HBC code
  * (lib/fltcode.c).
@@ -155,6 +159,20 @@ __decodeDouble_2Int (I_ *man_sign, W_ *man_high, W_ *man_low, I_ *exp, StgDouble
         *man_low = low;
         *man_high = high;
         *man_sign = (sign < 0) ? -1 : 1;
+    }
+}
+
+/* This is expected to replace uses of __decodeDouble_2Int() in the long run */
+StgInt
+__decodeDouble_Int64 (StgInt64 *const mantissa, const StgDouble dbl)
+{
+    if (dbl) {
+        int exp = 0;
+        *mantissa = (StgInt64)scalbn(frexp(dbl, &exp), DBL_MANT_DIG);
+        return exp-DBL_MANT_DIG;
+    } else {
+        *mantissa = 0;
+        return 0;
     }
 }
 

@@ -22,6 +22,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Cmm.h"
+#include "MachDeps.h"
 
 #ifdef __PIC__
 import pthread_mutex_lock;
@@ -805,6 +806,22 @@ stg_decodeDoublezu2Intzh ( D_ arg )
     /* returns:
        (Int# (mant sign), Word# (mant high), Word# (mant low), Int# (expn)) */
     return (r1, r2, r3, r4);
+}
+
+/* Double# -> (# Int64#, Int# #) */
+stg_decodeDoublezuInt64zh ( D_ arg )
+{
+    CInt exp;
+    I64  mant;
+    W_   mant_ptr;
+
+    STK_CHK_GEN_N (SIZEOF_INT64);
+    reserve BYTES_TO_WDS(SIZEOF_INT64) = mant_ptr {
+        (exp) = ccall __decodeDouble_Int64(mant_ptr "ptr", arg);
+        mant = I64[mant_ptr];
+    }
+
+    return (mant, TO_W_(exp));
 }
 
 /* -----------------------------------------------------------------------------

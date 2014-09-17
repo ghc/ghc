@@ -1108,6 +1108,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(cmp_thread)                                         \
       SymI_HasProto(createAdjustor)                                     \
       SymI_HasProto(stg_decodeDoublezu2Intzh)                           \
+      SymI_HasProto(stg_decodeDoublezuInt64zh)                          \
       SymI_HasProto(stg_decodeFloatzuIntzh)                             \
       SymI_HasProto(defaultsHook)                                       \
       SymI_HasProto(stg_delayzh)                                        \
