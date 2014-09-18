@@ -76,6 +76,7 @@ module Control.Monad
     , (<$!>)
     ) where
 
+import Data.Functor ( void )
 import Data.Maybe
 
 import GHC.List
@@ -158,10 +159,6 @@ forever     :: (Monad m) => m a -> m b
 forever a   = let a' = a >> a' in a'
 -- Use explicit sharing here, as it is prevents a space leak regardless of
 -- optimizations.
-
--- | @'void' value@ discards or ignores the result of evaluation, such as the return value of an 'IO' action.
-void :: Functor f => f a -> f ()
-void = fmap (const ())
 
 -- -----------------------------------------------------------------------------
 -- Other monad functions
