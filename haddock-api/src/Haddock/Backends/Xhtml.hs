@@ -60,7 +60,8 @@ import Module
 --------------------------------------------------------------------------------
 
 
-ppHtml :: String
+ppHtml :: DynFlags
+       -> String                       -- ^ Title
        -> Maybe String                 -- ^ Package
        -> [Interface]
        -> FilePath                     -- ^ Destination directory
@@ -75,7 +76,7 @@ ppHtml :: String
        -> Bool                         -- ^ Output pretty html (newlines and indenting)
        -> IO ()
 
-ppHtml doctitle maybe_package ifaces odir prologue
+ppHtml dflags doctitle maybe_package ifaces odir prologue
         themes maybe_source_url maybe_wiki_url
         maybe_contents_url maybe_index_url unicode
         qual debug =  do
@@ -84,7 +85,7 @@ ppHtml doctitle maybe_package ifaces odir prologue
     visible i = OptHide `notElem` ifaceOptions i
 
   when (isNothing maybe_contents_url) $
-    ppHtmlContents odir doctitle maybe_package
+    ppHtmlContents dflags odir doctitle maybe_package
         themes maybe_index_url maybe_source_url maybe_wiki_url
         (map toInstalledIface visible_ifaces)
         False -- we don't want to display the packages in a single-package contents
@@ -239,7 +240,8 @@ moduleInfo iface =
 
 
 ppHtmlContents
-   :: FilePath
+   :: DynFlags
+   -> FilePath
    -> String
    -> Maybe String
    -> Themes
@@ -250,10 +252,10 @@ ppHtmlContents
    -> Bool
    -> Qualification  -- ^ How to qualify names
    -> IO ()
-ppHtmlContents odir doctitle _maybe_package
+ppHtmlContents dflags odir doctitle _maybe_package
   themes maybe_index_url
   maybe_source_url maybe_wiki_url ifaces showPkgs prologue debug qual = do
-  let tree = mkModuleTree showPkgs
+  let tree = mkModuleTree dflags showPkgs
          [(instMod iface, toInstalledDescription iface) | iface <- ifaces]
       html =
         headHtml doctitle Nothing themes +++

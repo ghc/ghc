@@ -270,14 +270,14 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     copyHtmlBits odir libDir themes
 
   when (Flag_GenContents `elem` flags) $ do
-    ppHtmlContents odir title pkgStr
+    ppHtmlContents dflags odir title pkgStr
                    themes opt_index_url sourceUrls' opt_wiki_urls
                    allVisibleIfaces True prologue pretty
                    (makeContentsQual qual)
     copyHtmlBits odir libDir themes
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml title pkgStr visibleIfaces odir
+    ppHtml dflags title pkgStr visibleIfaces odir
                 prologue
                 themes sourceUrls' opt_wiki_urls
                 opt_contents_url opt_index_url unicode qual
