@@ -455,6 +455,7 @@ opt_trans_rule is co1 co2
 -- Push transitivity inside axioms
 opt_trans_rule is co1 co2
 
+  -- See Note [Why call checkAxInstCo during optimisation]
   -- TrPushSymAxR
   | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
   , Just cos2 <- matchAxiom sym con ind co2
@@ -537,13 +538,47 @@ Equal :: forall k::BOX. k -> k -> Bool
 axEqual :: { forall k::BOX. forall a::k. Equal k a a ~ True
            ; forall k::BOX. forall a::k. forall b::k. Equal k a b ~ False }
 
-We wish to disallow (axEqual[1] <*> <Int> <Int). (Recall that the index is 0-based,
-so this is the second branch of the axiom.) The problem is that, on the surface, it
-seems that (axEqual[1] <*> <Int> <Int>) :: (Equal * Int Int ~ False) and that all is
-OK. But, all is not OK: we want to use the first branch of the axiom in this case,
-not the second. The problem is that the parameters of the first branch can unify with
-the supplied coercions, thus meaning that the first branch should be taken. See also
-Note [Branched instance checking] in types/FamInstEnv.lhs.
+We wish to disallow (axEqual[1] <*> <Int> <Int). (Recall that the index is
+0-based, so this is the second branch of the axiom.) The problem is that, on
+the surface, it seems that (axEqual[1] <*> <Int> <Int>) :: (Equal * Int Int ~
+False) and that all is OK. But, all is not OK: we want to use the first branch
+of the axiom in this case, not the second. The problem is that the parameters
+of the first branch can unify with the supplied coercions, thus meaning that
+the first branch should be taken. See also Note [Branched instance checking]
+in types/FamInstEnv.lhs.
+
+Note [Why call checkAxInstCo during optimisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It is possible that otherwise-good-looking optimisations meet with disaster
+in the presence of axioms with multiple equations. Consider
+
+type family Equal (a :: *) (b :: *) :: Bool where
+  Equal a a = True
+  Equal a b = False
+type family Id (a :: *) :: * where
+  Id a = a
+
+axEq :: { [a::*].       Equal a a ~ True
+        ; [a::*, b::*]. Equal a b ~ False }
+axId :: [a::*]. Id a ~ a
+
+co1 = Equal (axId[0] Int) (axId[0] Bool)
+  :: Equal (Id Int) (Id Bool) ~  Equal Int Bool
+co2 = axEq[1] <Int> <Bool>
+  :: Equal Int Bool ~ False
+
+We wish to optimise (co1 ; co2). We end up in rule TrPushAxL, noting that
+co2 is an axiom and that matchAxiom succeeds when looking at co1. But, what
+happens when we push the coercions inside? We get
+
+co3 = axEq[1] (axId[0] Int) (axId[0] Bool)
+  :: Equal (Id Int) (Id Bool) ~ False
+
+which is bogus! This is because the type system isn't smart enough to know
+that (Id Int) and (Id Bool) are Surely Apart, as they're headed by type
+families. At the time of writing, I (Richard Eisenberg) couldn't think of
+a way of detecting this any more efficient than just building the optimised
+coercion and checking.
 
 \begin{code}
 -- | Check to make sure that an AxInstCo is internally consistent.
@@ -554,12 +589,12 @@ checkAxInstCo :: Coercion -> Maybe CoAxBranch
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in CoreLint
 checkAxInstCo (AxiomInstCo ax ind cos)
-  = let branch = coAxiomNthBranch ax ind
-        tvs = coAxBranchTyVars branch
-        incomps = coAxBranchIncomps branch
-        tys = map (pFst . coercionKind) cos 
-        subst = zipOpenTvSubst tvs tys
-        target = Type.substTys subst (coAxBranchLHS branch)
+  = let branch   = coAxiomNthBranch ax ind
+        tvs      = coAxBranchTyVars branch
+        incomps  = coAxBranchIncomps branch
+        tys      = map (pFst . coercionKind) cos 
+        subst    = zipOpenTvSubst tvs tys
+        target   = Type.substTys subst (coAxBranchLHS branch)
         in_scope = mkInScopeSet $
                    unionVarSets (map (tyVarsOfTypes . coAxBranchLHS) incomps)
         flattened_target = flattenTys in_scope target in
