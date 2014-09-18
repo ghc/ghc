@@ -61,7 +61,6 @@ import qualified Text.ParserCombinators.ReadP as ReadP
   , pfail
   )
 
-import Control.Monad( MonadPlus(..), Alternative(..) )
 import GHC.Num( Num(..) )
 import GHC.Base
 

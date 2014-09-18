@@ -310,10 +310,6 @@ annotateIOError :: IOError
 annotateIOError ioe loc hdl path = 
   ioe{ ioe_handle = hdl `mplus` ioe_handle ioe,
        ioe_location = loc, ioe_filename = path `mplus` ioe_filename ioe }
-  where
-    mplus :: Maybe a -> Maybe a -> Maybe a
-    Nothing `mplus` ys = ys
-    xs      `mplus` _  = xs
 
 -- | The 'catchIOError' function establishes a handler that receives any
 -- 'IOError' raised in the action protected by 'catchIOError'.

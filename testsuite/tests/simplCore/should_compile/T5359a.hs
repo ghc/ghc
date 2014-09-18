@@ -2,7 +2,7 @@
 
 module T5359a (linesT) where
 
-import GHC.Base
+import GHC.Base hiding (empty)
 import GHC.Word
 import GHC.ST (ST(..), runST)
 

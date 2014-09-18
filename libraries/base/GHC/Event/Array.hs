@@ -31,7 +31,7 @@ import Foreign.C.Types (CSize(..))
 import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 import Foreign.Ptr (Ptr, nullPtr, plusPtr)
 import Foreign.Storable (Storable(..))
-import GHC.Base
+import GHC.Base hiding (empty)
 import GHC.ForeignPtr (mallocPlainForeignPtrBytes, newForeignPtr_)
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral)

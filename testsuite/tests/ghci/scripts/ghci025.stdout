@@ -14,7 +14,7 @@ c2 :: (C a b, N b, S b) => a -> b
 c3 :: C a b => forall a. a -> b
 c4 :: C a b => forall a1. a1 -> b
 -- imported via Control.Monad
-class (Control.Monad.Alternative m, Monad m) =>
+class (GHC.Base.Alternative m, Monad m) =>
       MonadPlus (m :: * -> *) where
   mzero :: m a
   mplus :: m a -> m a -> m a

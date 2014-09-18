@@ -100,7 +100,6 @@ import Data.Typeable
 #ifndef mingw32_HOST_OS
 import Data.Dynamic
 #endif
-import Control.Monad
 import Data.Maybe
 
 import GHC.Base

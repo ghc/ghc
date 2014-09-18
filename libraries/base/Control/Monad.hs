@@ -81,8 +81,6 @@ import Data.Maybe
 import GHC.List
 import GHC.Base
 
-infixl 3 <|>
-
 -- -----------------------------------------------------------------------------
 -- Prelude monad functions
 
@@ -109,76 +107,6 @@ mapM f as       =  sequence (map f as)
 mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
 {-# INLINE mapM_ #-}
 mapM_ f as      =  sequence_ (map f as)
-
--- -----------------------------------------------------------------------------
--- The Alternative class definition
-
--- | A monoid on applicative functors.
---
--- Minimal complete definition: 'empty' and '<|>'.
---
--- If defined, 'some' and 'many' should be the least solutions
--- of the equations:
---
--- * @some v = (:) '<$>' v '<*>' many v@
---
--- * @many v = some v '<|>' 'pure' []@
-class Applicative f => Alternative f where
-    -- | The identity of '<|>'
-    empty :: f a
-    -- | An associative binary operation
-    (<|>) :: f a -> f a -> f a
-
-    -- | One or more.
-    some :: f a -> f [a]
-    some v = some_v
-      where
-        many_v = some_v <|> pure []
-        some_v = (fmap (:) v) <*> many_v
-
-    -- | Zero or more.
-    many :: f a -> f [a]
-    many v = many_v
-      where
-        many_v = some_v <|> pure []
-        some_v = (fmap (:) v) <*> many_v
-
-instance Alternative Maybe where
-    empty = Nothing
-    Nothing <|> r = r
-    l       <|> _ = l
-
-instance Alternative [] where
-    empty = []
-    (<|>) = (++)
-
-
--- -----------------------------------------------------------------------------
--- The MonadPlus class definition
-
--- | Monads that also support choice and failure.
-class (Alternative m, Monad m) => MonadPlus m where
-   -- | the identity of 'mplus'.  It should also satisfy the equations
-   --
-   -- > mzero >>= f  =  mzero
-   -- > v >> mzero   =  mzero
-   --
-   mzero :: m a
-   mzero = empty
-
-   -- | an associative operation
-   mplus :: m a -> m a -> m a
-   mplus = (<|>)
-
-instance MonadPlus [] where
-   mzero = []
-   mplus = (++)
-
-instance MonadPlus Maybe where
-   mzero = Nothing
-
-   Nothing `mplus` ys  = ys
-   xs      `mplus` _ys = xs
 
 -- -----------------------------------------------------------------------------
 -- Functions mandated by the Prelude

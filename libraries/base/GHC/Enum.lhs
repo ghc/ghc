@@ -28,7 +28,7 @@ module GHC.Enum(
 
    ) where
 
-import GHC.Base
+import GHC.Base hiding ( many )
 import GHC.Char
 import GHC.Integer
 import GHC.Num

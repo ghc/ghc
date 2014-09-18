@@ -72,10 +72,10 @@ module Text.ParserCombinators.ReadP
   )
  where
 
-import Control.Monad ( Alternative(empty, (<|>)), MonadPlus(..), sequence )
+import Control.Monad ( sequence )
 import {-# SOURCE #-} GHC.Unicode ( isSpace )
 import GHC.List ( replicate, null )
-import GHC.Base
+import GHC.Base hiding ( many )
 
 infixr 5 +++, <++
 

@@ -74,8 +74,6 @@ import Text.ParserCombinators.ReadPrec ( ReadPrec )
 import GHC.Float ( FFFormat, RealFloat, Floating )
 import Data.Bits ( Bits, FiniteBits )
 import GHC.Enum ( Bounded, Enum )
-import Control.Monad ( MonadPlus )
--- import Data.Int
 
 import GHC.Fingerprint.Type
 import {-# SOURCE #-} GHC.Fingerprint
@@ -422,9 +420,12 @@ deriving instance Typeable Ix
 deriving instance Typeable Show
 deriving instance Typeable Read
 
+deriving instance Typeable Alternative
+deriving instance Typeable Applicative
 deriving instance Typeable Functor
 deriving instance Typeable Monad
 deriving instance Typeable MonadPlus
+deriving instance Typeable Monoid
 
 deriving instance Typeable Typeable
 

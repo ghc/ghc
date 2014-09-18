@@ -88,7 +88,7 @@ module GHC.Event.PSQ
     , atMost
     ) where
 
-import GHC.Base
+import GHC.Base hiding (empty)
 import GHC.Num (Num(..))
 import GHC.Show (Show(showsPrec))
 import GHC.Event.Unique (Unique)

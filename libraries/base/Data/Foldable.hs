@@ -58,8 +58,7 @@ module Data.Foldable (
     find
     ) where
 
-import Control.Applicative
-import Control.Monad ( Monad(..), MonadPlus(..) )
+import Control.Applicative ( Const )
 import Data.Bool
 import Data.Either
 import Data.Eq
@@ -70,8 +69,7 @@ import Data.Ord
 import Data.Proxy
 
 import GHC.Arr  ( Array(..), Ix(..), elems )
-import GHC.Base ( (.), ($!), error, flip, id )
-import GHC.Exts ( build )
+import GHC.Base hiding ( foldr )
 import GHC.Num  ( Num(..) )
 
 -- | Data structures that can be folded.
