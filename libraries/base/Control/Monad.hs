@@ -81,16 +81,10 @@ import Data.Maybe
 import GHC.List
 import GHC.Base
 
-infixr 1 =<<
 infixl 3 <|>
 
 -- -----------------------------------------------------------------------------
 -- Prelude monad functions
-
--- | Same as '>>=', but with the arguments interchanged.
-{-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}
-(=<<)           :: Monad m => (a -> m b) -> m a -> m b
-f =<< x         = x >>= f
 
 -- | Evaluate each action in the sequence from left to right,
 -- and collect the results.

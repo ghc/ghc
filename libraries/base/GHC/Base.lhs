@@ -121,6 +121,7 @@ infixr 9  .
 infixr 5  ++
 infixl 4  <$
 infixl 1  >>, >>=
+infixr 1  =<<
 infixr 0  $, $!
 
 infixl 4 <*>, <*, *>, <**>
@@ -486,6 +487,11 @@ than eliminate it everywhere upstream, it's easier to just retain the
 original default.
 
 -}
+
+-- | Same as '>>=', but with the arguments interchanged.
+{-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}
+(=<<)           :: Monad m => (a -> m b) -> m a -> m b
+f =<< x         = x >>= f
 
 -- | Promote a function to a monad.
 liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r

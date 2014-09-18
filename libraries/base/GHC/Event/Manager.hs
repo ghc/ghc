@@ -52,7 +52,7 @@ module GHC.Event.Manager
 import Control.Concurrent.MVar (MVar, newMVar, readMVar, putMVar,
                                 tryPutMVar, takeMVar, withMVar)
 import Control.Exception (onException)
-import Control.Monad ((=<<), forM_, when, replicateM, void)
+import Control.Monad (forM_, when, replicateM, void)
 import Data.Bits ((.&.))
 import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)

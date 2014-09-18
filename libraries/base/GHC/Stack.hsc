@@ -34,8 +34,6 @@ module GHC.Stack (
     renderStack
   ) where
 
-import Control.Monad ( (=<<) )
-
 import Foreign
 import Foreign.C
 

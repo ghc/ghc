@@ -39,7 +39,7 @@ module GHC.Event.TimerManager
 -- Imports
 
 import Control.Exception (finally)
-import Control.Monad ((=<<), sequence_, when)
+import Control.Monad (sequence_, when)
 import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import GHC.Base

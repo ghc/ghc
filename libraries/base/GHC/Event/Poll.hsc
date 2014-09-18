@@ -26,7 +26,7 @@ available = False
 #include <poll.h>
 
 import Control.Concurrent.MVar (MVar, newMVar, swapMVar)
-import Control.Monad ((=<<), unless)
+import Control.Monad (unless)
 import Data.Bits (Bits, FiniteBits, (.|.), (.&.))
 import Data.Word
 import Foreign.C.Types (CInt(..), CShort(..))
