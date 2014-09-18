@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstraintKinds, TemplateHaskell, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE ConstraintKinds, TemplateHaskell, PolyKinds, TypeFamilies, RankNTypes #-}
 
 module T7021a where
 
@@ -27,5 +27,5 @@ test = do
     reify fooName
     reify bazName
     reify barName
-    [t| (Show a, (Read a, Num a)) => a -> a |]
+    [t| forall a. (Show a, (Read a, Num a)) => a -> a |]
     [| \_ -> 0 |]

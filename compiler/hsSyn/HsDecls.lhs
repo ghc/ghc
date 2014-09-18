@@ -50,6 +50,7 @@ module HsDecls (
   -- ** @default@ declarations
   DefaultDecl(..), LDefaultDecl,
   -- ** Template haskell declaration splice
+  SpliceExplicitFlag(..),
   SpliceDecl(..), LSpliceDecl,
   -- ** Foreign function interface declarations
   ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
@@ -294,12 +295,15 @@ instance OutputableBndr name => Outputable (HsGroup name) where
           vcat_mb gap (Nothing : ds) = vcat_mb gap ds
           vcat_mb gap (Just d  : ds) = gap $$ d $$ vcat_mb blankLine ds
 
+data SpliceExplicitFlag = ExplicitSplice | -- <=> $(f x y)
+                          ImplicitSplice   -- <=> f x y,  i.e. a naked top level expression
+    deriving (Data, Typeable)
+
 type LSpliceDecl name = Located (SpliceDecl name)
 data SpliceDecl id
   = SpliceDecl                  -- Top level splice
         (Located (HsSplice id))
-        HsExplicitFlag          -- Explicit <=> $(f x y)
-                                -- Implicit <=> f x y,  i.e. a naked top level expression
+        SpliceExplicitFlag
     deriving (Typeable)
 deriving instance (DataId id) => Data (SpliceDecl id)
 

@@ -256,8 +256,8 @@ mkSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 mkSpliceDecl lexpr@(L loc expr)
   | HsQuasiQuoteE qq <- expr          = QuasiQuoteD qq
   | HsSpliceE is_typed splice <- expr = ASSERT( not is_typed )
-                                        SpliceD (SpliceDecl (L loc splice) Explicit)
-  | otherwise                         = SpliceD (SpliceDecl (L loc splice) Implicit)
+                                        SpliceD (SpliceDecl (L loc splice) ExplicitSplice)
+  | otherwise                         = SpliceD (SpliceDecl (L loc splice) ImplicitSplice)
   where
     splice = mkHsSplice lexpr
 

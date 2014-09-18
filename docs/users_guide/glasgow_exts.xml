@@ -7702,7 +7702,7 @@ data MonadT m = MkMonad { return :: forall a. a -> m a,
                           bind   :: forall a b. m a -> (a -> m b) -> m b
                         }
 
-newtype Swizzle = MkSwizzle (Ord a => [a] -> [a])
+newtype Swizzle = MkSwizzle (forall a. Ord a => [a] -> [a])
 </programlisting>
 
 </para>
@@ -7718,22 +7718,22 @@ T1 :: forall a. (forall b. b -> b -> b) -> a -> T a
 MkMonad :: forall m. (forall a. a -> m a)
                   -> (forall a b. m a -> (a -> m b) -> m b)
                   -> MonadT m
-MkSwizzle :: (Ord a => [a] -> [a]) -> Swizzle
+MkSwizzle :: (forall a. Ord a => [a] -> [a]) -> Swizzle
 </programlisting>
 
 </para>
 
 <para>
-Notice that you don't need to use a <literal>forall</literal> if there's an
-explicit context.  For example in the first argument of the
-constructor <function>MkSwizzle</function>, an implicit "<literal>forall a.</literal>" is
-prefixed to the argument type.  The implicit <literal>forall</literal>
-quantifies all type variables that are not already in scope, and are
-mentioned in the type quantified over. (Arguably, it would be better
-to <emphasis>require</emphasis> explicit quantification on constructor arguments
-where that is what is wanted.
-See <ulink url="http://ghc.haskell.org/trac/ghc/ticket/4426">Trac #4426</ulink>.)
+In earlier versions of GHC, it was possible to omit the <literal>forall</literal>
+in the type of the constructor if there was an explicit context. For example:
 
+<programlisting>
+newtype Swizzle' = MkSwizzle' (Ord a => [a] -> [a])
+</programlisting>
+
+As of GHC 7.10, this is deprecated. The <literal>-fwarn-context-quantification</literal>
+flag detects this situation and issues a warning. In GHC 7.12, declarations
+such as <literal>MkSwizzle'</literal> will cause an out-of-scope error.
 </para>
 
 <para>

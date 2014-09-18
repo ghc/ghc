@@ -2,7 +2,7 @@
 
 module ShouldSucceed where
 
-data Empty q			=  Empty (Ord a => q a)
+data Empty q			=  Empty (forall a. Ord a => q a)
 q				:: (Ord a) => [a]
 q				=  []
 e0, e1, e2			:: Empty []

@@ -33,7 +33,8 @@ module HsTypes (
         ConDeclField(..), pprConDeclFields,
         
         mkHsQTvs, hsQTvBndrs, isHsKindedTyVar, hsTvbAllKinded,
-        mkExplicitHsForAllTy, mkImplicitHsForAllTy, hsExplicitTvs,
+        mkExplicitHsForAllTy, mkImplicitHsForAllTy, mkQualifiedHsForAllTy,
+        hsExplicitTvs,
         hsTyVarName, mkHsWithBndrs, hsLKiTyVarNames,
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
         splitLHsInstDeclTy_maybe,
@@ -301,6 +302,13 @@ After renaming
   * Implicit => the *type* variables free in the type
     Explicit => the variables the user wrote (renamed)
 
+Qualified currently behaves exactly as Implicit,
+but it is deprecated to use it for implicit quantification.
+In this case, GHC 7.10 gives a warning; see
+Note [Context quantification] and Trac #4426.
+In GHC 7.12, Qualified will no longer bind variables
+and this will become an error.
+
 The kind variables bound in the hsq_kvs field come both
   a) from the kind signatures on the kind vars (eg k1)
   b) from the scope of the forall (eg k2)
@@ -386,7 +394,7 @@ data HsTupleSort = HsUnboxedTuple
                  | HsBoxedOrConstraintTuple
                  deriving (Data, Typeable)
 
-data HsExplicitFlag = Explicit | Implicit deriving (Data, Typeable)
+data HsExplicitFlag = Qualified | Implicit | Explicit deriving (Data, Typeable)
 
 data ConDeclField name  -- Record fields have Haddoc docs on them
   = ConDeclField { cd_fld_name :: Located name,
@@ -405,10 +413,12 @@ deriving instance (DataId name) => Data (ConDeclField name)
 --
 -- A valid type must have one for-all at the top of the type, or of the fn arg types
 
-mkImplicitHsForAllTy ::                           LHsContext RdrName -> LHsType RdrName -> HsType RdrName
-mkExplicitHsForAllTy :: [LHsTyVarBndr RdrName] -> LHsContext RdrName -> LHsType RdrName -> HsType RdrName
-mkImplicitHsForAllTy     ctxt ty = mkHsForAllTy Implicit []  ctxt ty
-mkExplicitHsForAllTy tvs ctxt ty = mkHsForAllTy Explicit tvs ctxt ty
+mkImplicitHsForAllTy  ::                           LHsContext RdrName -> LHsType RdrName -> HsType RdrName
+mkExplicitHsForAllTy  :: [LHsTyVarBndr RdrName] -> LHsContext RdrName -> LHsType RdrName -> HsType RdrName
+mkQualifiedHsForAllTy ::                           LHsContext RdrName -> LHsType RdrName -> HsType RdrName
+mkImplicitHsForAllTy      ctxt ty = mkHsForAllTy Implicit  []  ctxt ty
+mkExplicitHsForAllTy  tvs ctxt ty = mkHsForAllTy Explicit  tvs ctxt ty
+mkQualifiedHsForAllTy     ctxt ty = mkHsForAllTy Qualified []  ctxt ty
 
 mkHsForAllTy :: HsExplicitFlag -> [LHsTyVarBndr RdrName] -> LHsContext RdrName -> LHsType RdrName -> HsType RdrName
 -- Smart constructor for HsForAllTy
@@ -427,8 +437,10 @@ mk_forall_ty exp  tvs  ty                                    = HsForAllTy exp (m
         --      so that (forall. ty) isn't implicitly quantified
 
 plus :: HsExplicitFlag -> HsExplicitFlag -> HsExplicitFlag
-Implicit `plus` Implicit = Implicit
-_        `plus` _        = Explicit
+Qualified `plus` Qualified = Qualified
+Explicit  `plus` _         = Explicit
+_         `plus` Explicit  = Explicit
+_         `plus` _         = Implicit
 
 hsExplicitTvs :: LHsType Name -> [Name]
 -- The explicitly-given forall'd type variables of a HsType
@@ -588,7 +600,7 @@ pprHsForAll exp qtvs cxt
   where
     show_forall =  opt_PprStyle_Debug
                 || (not (null (hsQTvBndrs qtvs)) && is_explicit)
-    is_explicit = case exp of {Explicit -> True; Implicit -> False}
+    is_explicit = case exp of {Explicit -> True; Implicit -> False; Qualified -> False}
     forall_part = forAllLit <+> ppr qtvs <> dot
 
 pprHsContext :: (OutputableBndr name) => HsContext name -> SDoc

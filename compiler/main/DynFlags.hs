@@ -452,6 +452,7 @@ data WarningFlag =
    | Opt_WarnUnusedBinds
    | Opt_WarnUnusedImports
    | Opt_WarnUnusedMatches
+   | Opt_WarnContextQuantification
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnAMP
@@ -2624,6 +2625,7 @@ fWarningFlags = [
   ( "warn-unused-binds",                Opt_WarnUnusedBinds, nop ),
   ( "warn-unused-imports",              Opt_WarnUnusedImports, nop ),
   ( "warn-unused-matches",              Opt_WarnUnusedMatches, nop ),
+  ( "warn-context-quantification",      Opt_WarnContextQuantification, nop ),
   ( "warn-warnings-deprecations",       Opt_WarnWarningsDeprecations, nop ),
   ( "warn-deprecations",                Opt_WarnWarningsDeprecations, nop ),
   ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, nop ),
@@ -3070,7 +3072,8 @@ standardWarnings
         Opt_WarnDodgyForeignImports,
         Opt_WarnInlineRuleShadowing,
         Opt_WarnAlternativeLayoutRuleTransitional,
-        Opt_WarnUnsupportedLlvmVersion
+        Opt_WarnUnsupportedLlvmVersion,
+        Opt_WarnContextQuantification
       ]
 
 minusWOpts :: [WarningFlag]
