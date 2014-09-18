@@ -247,7 +247,7 @@ G |-co g t0 : s[m |-> t0] ~R k t[n |-> t0]
 
 C = T_R0 </ axBranchkk // kk />
 0 <= ind < length </ axBranchkk // kk />
-forall </ ni_Ri // i />. (</ s1j // j /> ~> t1) = (</ axBranchkk // kk />)[ind]
+forall </ ni_^^Ri // i />. (</ s1j // j /> ~> t1) = (</ axBranchkk // kk />)[ind]
 </ G |-co gi : s'i ~Ri k'i t'i // i />
 </ substi @ // i /> = inits(</ [ ni |-> s'i ] // i />)
 </ ni = zi_ki // i />
