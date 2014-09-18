@@ -49,7 +49,6 @@ import qualified Control.Exception as Exception
 import Data.Typeable
 import System.IO.Error
 import Data.Maybe
-import Control.Monad
 
 import GHC.IORef
 import GHC.Base

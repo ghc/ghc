@@ -52,7 +52,6 @@ module Data.Traversable (
     ) where
 
 import Control.Applicative
-import Control.Monad ( Monad(..) )
 import qualified Control.Monad
 import Data.Either
 import Data.Foldable ( Foldable )
@@ -62,7 +61,7 @@ import Data.Monoid ( Monoid )
 import Data.Proxy
 
 import GHC.Arr
-import GHC.Base ( ($), (.), id, flip )
+import GHC.Base ( ($), (.), Monad(..), id, flip )
 import qualified GHC.List as List
 
 -- | Functors representing data structures that can be traversed from

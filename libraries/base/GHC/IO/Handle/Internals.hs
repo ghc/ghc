@@ -73,7 +73,6 @@ import GHC.Show
 import GHC.IORef
 import GHC.MVar
 import Data.Typeable
-import Control.Monad
 import Data.Maybe
 import Foreign.Safe
 import System.Posix.Internals hiding (FD)

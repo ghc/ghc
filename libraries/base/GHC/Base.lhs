@@ -493,6 +493,18 @@ original default.
 (=<<)           :: Monad m => (a -> m b) -> m a -> m b
 f =<< x         = x >>= f
 
+-- | Conditional execution of monadic expressions. For example,
+--
+-- > when debug (putStrLn "Debugging")
+--
+-- will output the string @Debugging@ if the Boolean value @debug@
+-- is 'True', and otherwise do nothing.
+when    :: (Monad m) => Bool -> m () -> m ()
+{-# INLINEABLE when #-}
+{-# SPECIALISE when :: Bool -> IO () -> IO () #-}
+{-# SPECIALISE when :: Bool -> Maybe () -> Maybe () #-}
+when p s                = if p then s else return ()
+
 -- | Promote a function to a monad.
 liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
 liftM f m1              = do { x1 <- m1; return (f x1) }

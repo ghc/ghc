@@ -34,13 +34,12 @@ module Data.Version (
         showVersion, parseVersion,
   ) where
 
-import Control.Monad    ( Monad(..), liftM )
 import Data.Char        ( isDigit, isAlphaNum )
 import Data.Eq
 import Data.List
 import Data.Ord
 import Data.Typeable    ( Typeable )
-import GHC.Base         ( ($), (&&), String, Int )
+import GHC.Base         ( ($), (&&), Monad(..), String, Int, liftM )
 import GHC.Read
 import GHC.Show
 import Text.ParserCombinators.ReadP

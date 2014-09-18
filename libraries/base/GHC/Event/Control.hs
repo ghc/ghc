@@ -28,7 +28,6 @@ module GHC.Event.Control
 
 #include "EventConfig.h"
 
-import Control.Monad (when)
 import Foreign.ForeignPtr (ForeignPtr)
 import GHC.Base
 import GHC.Conc.Signal (Signal)

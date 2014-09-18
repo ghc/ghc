@@ -102,8 +102,6 @@ import Foreign.Storable
 
 import Data.Word
 
-import Control.Monad
-
 import GHC.Char
 import GHC.List
 import GHC.Real

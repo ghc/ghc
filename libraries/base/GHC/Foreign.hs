@@ -44,7 +44,6 @@ import Foreign.Storable
 import Data.Word
 
 -- Imports for the locale-encoding version of marshallers
-import Control.Monad
 
 import Data.Tuple (fst)
 import Data.Maybe

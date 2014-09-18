@@ -303,22 +303,7 @@ replicateM_       :: (Monad m) => Int -> m a -> m ()
 {-# SPECIALISE replicateM_ :: Int -> Maybe a -> Maybe () #-}
 replicateM_ n x   = sequence_ (replicate n x)
 
-{- | Conditional execution of monadic expressions. For example, 
-
->       when debug (putStr "Debugging\n")
-
-will output the string @Debugging\\n@ if the Boolean value @debug@ is 'True',
-and otherwise do nothing.
--}
-
-when              :: (Monad m) => Bool -> m () -> m ()
-{-# INLINEABLE when #-}
-{-# SPECIALISE when :: Bool -> IO () -> IO () #-}
-{-# SPECIALISE when :: Bool -> Maybe () -> Maybe () #-}
-when p s          =  if p then s else return ()
-
 -- | The reverse of 'when'.
-
 unless            :: (Monad m) => Bool -> m () -> m ()
 {-# INLINEABLE unless #-}
 {-# SPECIALISE unless :: Bool -> IO () -> IO () #-}

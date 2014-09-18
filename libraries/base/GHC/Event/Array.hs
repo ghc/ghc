@@ -24,7 +24,6 @@ module GHC.Event.Array
     , useAsPtr
     ) where
 
-import Control.Monad hiding (forM_, empty)
 import Data.Bits ((.|.), shiftR)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef, writeIORef)
 import Data.Maybe

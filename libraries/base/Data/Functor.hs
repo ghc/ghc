@@ -23,7 +23,7 @@ module Data.Functor
       void,
     ) where
 
-import Control.Monad
+import Control.Monad ( void )
 import GHC.Base ( Functor(..), flip )
 
 infixl 4 <$>

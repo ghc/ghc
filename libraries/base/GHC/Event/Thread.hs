@@ -16,7 +16,7 @@ module GHC.Event.Thread
     ) where
 
 import Control.Exception (finally, SomeException, toException)
-import Control.Monad (forM, forM_, sequence_, zipWithM, when)
+import Control.Monad (forM, forM_, sequence_, zipWithM)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.List (zipWith3)
 import Data.Tuple (snd)

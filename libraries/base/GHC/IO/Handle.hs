@@ -68,7 +68,7 @@ import GHC.Num
 import GHC.Real
 import Data.Maybe
 import Data.Typeable
-import Control.Monad
+import Control.Monad ( mapM )
 
 -- ---------------------------------------------------------------------------
 -- Closing a handle

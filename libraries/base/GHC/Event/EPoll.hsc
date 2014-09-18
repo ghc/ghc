@@ -38,7 +38,6 @@ available = False
 
 #include <sys/epoll.h>
 
-import Control.Monad (when)
 import Data.Bits (Bits, FiniteBits, (.|.), (.&.))
 import Data.Word (Word32)
 import Foreign.C.Error (eNOENT, getErrno, throwErrno,

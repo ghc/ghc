@@ -12,13 +12,12 @@ module GHC.Event.IntTable
     , updateWith
     ) where
 
-import Control.Monad ((=<<), liftM, unless, when)
 import Data.Bits ((.&.), shiftL, shiftR)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), isJust, isNothing)
 import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtr, withForeignPtr)
 import Foreign.Storable (peek, poke)
-import GHC.Base (Monad(..), ($), const, otherwise)
+import GHC.Base (Monad(..), (=<<), ($), const, liftM, otherwise, when)
 import GHC.Classes (Eq(..), Ord(..))
 import GHC.Event.Arr (Arr)
 import GHC.Num (Num(..))
@@ -134,7 +133,7 @@ updateWith f k (IntTable ref) = do
   (fbv, oldVal, newBucket) <- go False `liftM` Arr.read tabArr idx
   when (isJust oldVal) $ do
     Arr.write tabArr idx newBucket
-    unless (isJust fbv) $
+    when (isNothing fbv) $
       withForeignPtr tabSize $ \ptr -> do
         size <- peek ptr
         poke ptr (size - 1)

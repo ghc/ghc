@@ -24,9 +24,6 @@ module System.Posix.Internals where
 
 #include "HsBaseConfig.h"
 
-#if ! (defined(mingw32_HOST_OS) || defined(__MINGW32__))
-import Control.Monad
-#endif
 import System.Posix.Types
 
 import Foreign
@@ -323,7 +320,7 @@ setNonBlockingFD fd set = do
                  (c_fcntl_read fd const_f_getfl)
   let flags' | set       = flags .|. o_NONBLOCK
              | otherwise = flags .&. complement o_NONBLOCK
-  unless (flags == flags') $ do
+  when (flags /= flags') $ do
     -- An error when setting O_NONBLOCK isn't fatal: on some systems
     -- there are certain file handles on which this will fail (eg. /dev/null
     -- on FreeBSD) so we throw away the return code from fcntl_write.

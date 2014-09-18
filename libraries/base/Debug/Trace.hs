@@ -45,7 +45,6 @@ module Debug.Trace (
   ) where
 
 import System.IO.Unsafe
-import Control.Monad
 
 import Foreign.C.String
 import GHC.Base
