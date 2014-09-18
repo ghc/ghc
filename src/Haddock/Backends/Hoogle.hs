@@ -134,7 +134,6 @@ ppSig dflags (TypeSig names sig)
         prettyNames = intercalate ", " $ map (out dflags) names
         typ = case unL sig of
                    HsForAllTy Explicit a b c -> HsForAllTy Implicit a b c
-                   HsForAllTy Qualified a b c -> HsForAllTy Implicit a b c
                    x -> x
 ppSig _ _ = []
 

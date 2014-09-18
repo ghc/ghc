@@ -402,8 +402,6 @@ ppTypeOrFunSig _ _ typ (doc, argDocs) (pref1, pref2, sep0)
                 ppLContextNoArrow lctxt unicode) <+> nl $$
          do_largs n (darrow unicode) ltype
 
-     do_args n leader (HsForAllTy Qualified a lctxt ltype)
-       = do_args n leader (HsForAllTy Implicit a lctxt ltype)
      do_args n leader (HsForAllTy Implicit _ lctxt ltype)
        | not (null (unLoc lctxt))
        = decltt leader <-> decltt (ppLContextNoArrow lctxt unicode) <+> nl $$
@@ -623,7 +621,6 @@ ppConstrHdr forall tvs ctxt unicode
   where
     ppForall = case forall of
       Explicit -> forallSymbol unicode <+> hsep (map ppName tvs) <+> text ". "
-      Qualified -> empty
       Implicit -> empty
 
 
@@ -874,7 +871,7 @@ ppForAll expl tvs cxt unicode
   | otherwise   = ppLContext cxt unicode
   where
     show_forall = not (null (hsQTvBndrs tvs)) && is_explicit
-    is_explicit = case expl of {Explicit -> True; Implicit -> False; Qualified -> False}
+    is_explicit = case expl of {Explicit -> True; Implicit -> False}
     forall_part = hsep (forallSymbol unicode : ppTyVars tvs) <> dot
 
 

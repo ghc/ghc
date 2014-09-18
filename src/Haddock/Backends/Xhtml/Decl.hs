@@ -650,7 +650,6 @@ ppConstrHdr forall_ tvs ctxt unicode qual
   where
     ppForall = case forall_ of
       Explicit -> forallSymbol unicode <+> hsep (map (ppName Prefix) tvs) <+> toHtml ". "
-      Qualified -> noHtml
       Implicit -> noHtml
 
 
@@ -813,7 +812,7 @@ ppForAll expl tvs cxt unicode qual
   | otherwise   = ppLContext cxt unicode qual
   where
     show_forall = not (null (hsQTvBndrs tvs)) && is_explicit
-    is_explicit = case expl of {Explicit -> True; Implicit -> False; Qualified -> False}
+    is_explicit = case expl of {Explicit -> True; Implicit -> False}
     forall_part = hsep (forallSymbol unicode : ppTyVars tvs) +++ dot
 
 
