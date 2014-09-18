@@ -199,7 +199,7 @@ moduleName = DocModule <$> (char '"' *> modid <* char '"')
       -- accept {small | large | digit | ' } here.  But as we can't
       -- match on unicode characters, this is currently not possible.
       -- Note that we allow ‘#’ to suport anchors.
-      <*> (decodeUtf8 <$> takeWhile (`notElem` " .&[{}(=*)+]!|@/;,^?\"\n"))
+      <*> (decodeUtf8 <$> takeWhile (`notElem` (" .&[{}(=*)+]!|@/;,^?\"\n"::String)))
 
 -- | Picture parser, surrounded by \<\< and \>\>. It's possible to specify
 -- a title for the picture.
@@ -271,7 +271,7 @@ innerList item = do
 -- | Parses definition lists.
 definitionList :: Parser [(DocH mod Identifier, DocH mod Identifier)]
 definitionList = do
-  label <- "[" *> (parseStringBS <$> takeWhile1 (`notElem` "]\n")) <* "]"
+  label <- "[" *> (parseStringBS <$> takeWhile1 (`notElem` ("]\n"::String))) <* "]"
   c <- takeLine
   (cs, items) <- more definitionList
   let contents = parseString . dropNLs . unlines $ c : cs
@@ -456,7 +456,7 @@ autoUrl = mkLink <$> url
     url = mappend <$> ("http://" <|> "https://" <|> "ftp://") <*> takeWhile1 (not . isSpace)
     mkLink :: BS.ByteString -> DocH mod a
     mkLink s = case unsnoc s of
-      Just (xs, x) | x `elem` ",.!?" -> DocHyperlink (Hyperlink (decodeUtf8 xs) Nothing) <> DocString [x]
+      Just (xs, x) | x `elem` (",.!?"::String) -> DocHyperlink (Hyperlink (decodeUtf8 xs) Nothing) <> DocString [x]
       _ -> DocHyperlink (Hyperlink (decodeUtf8 s) Nothing)
 
 -- | Parses strings between identifier delimiters. Consumes all input that it
@@ -473,7 +473,7 @@ parseValid = do
                  <|> return vs
     _ -> fail "outofvalid"
   where
-    idChar = satisfy (`elem` "_.!#$%&*+/<=>?@\\|-~:^")
+    idChar = satisfy (`elem` ("_.!#$%&*+/<=>?@\\|-~:^"::String))
              <|> digit <|> letter_ascii
 
 -- | Parses UTF8 strings from ByteString streams.
