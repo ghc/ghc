@@ -76,6 +76,7 @@ module Control.Monad
     , (<$!>)
     ) where
 
+import Data.Foldable ()
 import Data.Functor ( void )
 import Data.Maybe
 

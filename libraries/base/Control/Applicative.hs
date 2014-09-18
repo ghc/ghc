@@ -53,6 +53,7 @@ import Data.Maybe
 import Data.Tuple
 import Data.Eq
 import Data.Ord
+import Data.Foldable (Foldable(..))
 import Data.Functor ((<$>))
 
 import GHC.Base hiding ((.), id)
@@ -63,6 +64,9 @@ import GHC.Show (Show)
 
 newtype Const a b = Const { getConst :: a }
                   deriving (Generic, Generic1)
+
+instance Foldable (Const m) where
+    foldMap _ _ = mempty
 
 instance Functor (Const m) where
     fmap _ (Const v) = Const v

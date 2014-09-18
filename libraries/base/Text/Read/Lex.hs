@@ -45,7 +45,13 @@ import GHC.Real( Rational, (%), fromIntegral,
 import GHC.List
 import GHC.Enum( minBound, maxBound )
 import Data.Maybe
-import Control.Monad
+
+-- local copy to break import-cycle
+-- | @'guard' b@ is @'return' ()@ if @b@ is 'True',
+-- and 'mzero' if @b@ is 'False'.
+guard           :: (MonadPlus m) => Bool -> m ()
+guard True      =  return ()
+guard False     =  mzero
 
 -- -----------------------------------------------------------------------------
 -- Lexing types
