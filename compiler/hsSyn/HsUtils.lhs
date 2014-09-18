@@ -29,7 +29,7 @@ module HsUtils(
   mkHsPar, mkHsApp, mkHsConApp, mkSimpleHsAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
   mkMatchGroup, mkMatchGroupName, mkMatch, mkHsLam, mkHsIf,
-  mkHsWrap, mkLHsWrap, mkHsWrapCo, mkLHsWrapCo,
+  mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
   coToHsWrapper, mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
   mkLHsPar, mkHsCmdCast,
@@ -487,8 +487,13 @@ mkHsWrap :: HsWrapper -> HsExpr id -> HsExpr id
 mkHsWrap co_fn e | isIdHsWrapper co_fn = e
                  | otherwise           = HsWrap co_fn e
 
-mkHsWrapCo :: TcCoercion -> HsExpr id -> HsExpr id
+mkHsWrapCo :: TcCoercion   -- A Nominal coercion  a ~N b
+           -> HsExpr id -> HsExpr id
 mkHsWrapCo co e = mkHsWrap (coToHsWrapper co) e
+
+mkHsWrapCoR :: TcCoercion   -- A Representational coercion  a ~R b
+            -> HsExpr id -> HsExpr id
+mkHsWrapCoR co e = mkHsWrap (coToHsWrapperR co) e
 
 mkLHsWrapCo :: TcCoercion -> LHsExpr id -> LHsExpr id
 mkLHsWrapCo co (L loc e) = L loc (mkHsWrapCo co e)
@@ -497,9 +502,13 @@ mkHsCmdCast :: TcCoercion -> HsCmd id -> HsCmd id
 mkHsCmdCast co cmd | isTcReflCo co = cmd
                    | otherwise     = HsCmdCast co cmd
 
-coToHsWrapper :: TcCoercion -> HsWrapper
+coToHsWrapper :: TcCoercion -> HsWrapper   -- A Nominal coercion
 coToHsWrapper co | isTcReflCo co = idHsWrapper
                  | otherwise     = mkWpCast (mkTcSubCo co)
+
+coToHsWrapperR :: TcCoercion -> HsWrapper   -- A Representational coercion
+coToHsWrapperR co | isTcReflCo co = idHsWrapper
+                  | otherwise     = mkWpCast co
 
 mkHsWrapPat :: HsWrapper -> Pat id -> Type -> Pat id
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p

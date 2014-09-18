@@ -888,9 +888,14 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
            IsValid      -> mkOldTypeableEqn tvs cls tycon tc_args mtheta }
 
   | otherwise
-  = do { (rep_tc, rep_tc_args) <- lookup_data_fam tycon tc_args
-              -- Be careful to test rep_tc here: in the case of families,
-              -- we want to check the instance tycon, not the family tycon
+  = do {      -- Find the instance of a data family
+              -- Note [Looking up family instances for deriving]
+         fam_envs <- tcGetFamInstEnvs
+       ; let (rep_tc, rep_tc_args, _co) = tcLookupDataFamInst fam_envs tycon tc_args
+
+              -- If it's still a data family, the lookup failed; i.e no instance exists
+       ; when (isDataFamilyTyCon rep_tc)
+              (bale_out (ptext (sLit "No family instance for") <+> quotes (pprTypeApp tycon tc_args)))
 
        -- For standalone deriving (mtheta /= Nothing),
        -- check that all the data constructors are in scope.
@@ -923,23 +928,6 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
                          tycon tc_args rep_tc rep_tc_args mtheta }
   where
      bale_out msg = failWithTc (derivingThingErr False cls cls_tys (mkTyConApp tycon tc_args) msg)
-
-     lookup_data_fam :: TyCon -> [Type] -> TcM (TyCon, [Type])
-     -- Find the instance of a data family
-     -- Note [Looking up family instances for deriving]
-     lookup_data_fam tycon tys
-       | not (isFamilyTyCon tycon)
-       = return (tycon, tys)
-       | otherwise
-       = ASSERT( isAlgTyCon tycon )
-         do { maybeFamInst <- tcLookupFamInst tycon tys
-            ; case maybeFamInst of
-                Nothing -> bale_out (ptext (sLit "No family instance for")
-                                     <+> quotes (pprTypeApp tycon tys))
-                Just (FamInstMatch { fim_instance = famInst
-                                   , fim_tys      = tys })
-                  -> let tycon' = dataFamInstRepTyCon famInst
-                     in return (tycon', tys) }
 \end{code}
 
 Note [Looking up family instances for deriving]

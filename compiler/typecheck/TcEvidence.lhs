@@ -28,14 +28,12 @@ module TcEvidence (
   mkTcAxiomRuleCo,
   tcCoercionKind, coVarsOfTcCo, isEqVar, mkTcCoVarCo, 
   isTcReflCo, getTcCoVar_maybe,
-  tcCoercionRole, eqVarRole,
-  coercionToTcCoercion
+  tcCoercionRole, eqVarRole
   ) where
 #include "HsVersions.h"
 
 import Var
 import Coercion( LeftOrRight(..), pickLR, nthRole )
-import qualified Coercion as C
 import PprCore ()   -- Instance OutputableBndr TyVar
 import TypeRep  -- Knows type representation
 import TcType
@@ -95,8 +93,6 @@ differences
   * TcAxiomInstCo has a [TcCoercion] parameter, and not a [Type] parameter.
     This differs from the formalism, but corresponds to AxiomInstCo (see
     [Coercion axioms applied to coercions]).
-    Why can't we use [TcType] here, in code not relevant for the simplifier?
-    Because of coercionToTcCoercion.
 
 \begin{code}
 data TcCoercion 
@@ -425,21 +421,6 @@ ppr_forall_co p ty
     split1 tvs ty                 = (reverse tvs, ty)
 \end{code}
 
-Conversion from Coercion to TcCoercion
-(at the moment, this is only needed to convert the result of
-instNewTyConTF_maybe, so all unused cases are panics for now).
-
-\begin{code}
-coercionToTcCoercion :: C.Coercion -> TcCoercion
-coercionToTcCoercion = go
-  where
-    go (C.Refl r t)                = TcRefl r t
-    go (C.TransCo c1 c2)           = TcTransCo (go c1) (go c2)
-    go (C.AxiomInstCo coa ind cos) = TcAxiomInstCo coa ind (map go cos)
-    go (C.SubCo c)                 = TcSubCo (go c)
-    go (C.AppCo c1 c2)             = TcAppCo (go c1) (go c2)
-    go co                          = pprPanic "coercionToTcCoercion" (ppr co)
-\end{code}
 
 
 %************************************************************************

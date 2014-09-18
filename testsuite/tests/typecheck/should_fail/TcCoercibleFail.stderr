@@ -33,7 +33,8 @@ TcCoercibleFail.hs:16:8:
 
 TcCoercibleFail.hs:18:8:
     Could not coerce from ‘Int’ to ‘Down Int’
-    because the constructor of ‘Down’ is not imported
+    because the data constructor ‘Data.Ord.Down’
+      of newtype ‘Down’ is not in scope
       arising from a use of ‘coerce’
     In the expression: coerce
     In the expression: coerce $ one :: Down Int

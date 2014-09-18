@@ -25,6 +25,7 @@ import Type
 import Kind ( isKind )
 import Unify            ( tcMatchTys )
 import Module
+import FamInst          ( FamInstEnvs, tcGetFamInstEnvs, tcLookupDataFamInst )
 import Inst
 import InstEnv
 import TyCon
@@ -983,18 +984,19 @@ Warn of loopy local equalities that were dropped.
 
 \begin{code}
 mkDictErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
-mkDictErr ctxt cts 
+mkDictErr ctxt cts
   = ASSERT( not (null cts) )
     do { inst_envs <- tcGetInstEnvs
+       ; fam_envs  <- tcGetFamInstEnvs
        ; lookups   <- mapM (lookup_cls_inst inst_envs) cts
        ; let (no_inst_cts, overlap_cts) = partition is_no_inst lookups
 
-       -- Report definite no-instance errors, 
+       -- Report definite no-instance errors,
        -- or (iff there are none) overlap errors
        -- But we report only one of them (hence 'head') because they all
        -- have the same source-location origin, to try avoid a cascade
        -- of error from one location
-       ; (ctxt, err) <- mk_dict_err ctxt (head (no_inst_cts ++ overlap_cts))
+       ; (ctxt, err) <- mk_dict_err fam_envs ctxt (head (no_inst_cts ++ overlap_cts))
        ; mkErrorMsg ctxt ct1 err }
   where
     ct1:_ = elim_superclasses cts
@@ -1022,11 +1024,11 @@ mkDictErr ctxt cts
       where
         min_preds = mkMinimalBySCs (map ctPred cts)
 
-mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
+mk_dict_err :: FamInstEnvs -> ReportErrCtxt -> (Ct, ClsInstLookupResult)
             -> TcM (ReportErrCtxt, SDoc)
 -- Report an overlap error if this class constraint results
 -- from an overlap (returning Left clas), otherwise return (Right pred)
-mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell)) 
+mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell)) 
   | null matches  -- No matches but perhaps several unifiers
   = do { let (is_ambig, ambig_msg) = mkAmbigMsg ct
        ; (ctxt, binds_msg) <- relevantBindings True ctxt ct
@@ -1190,11 +1192,13 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
           | (n,Nominal,t1,t2) <- zip4 [1..] (tyConRoles tc1) tyArgs1 tyArgs2
           , not (t1 `eqType` t2)
           ]
-      | Just (tc,_) <- splitTyConApp_maybe ty1,
-        Just msg <- coercible_msg_for_tycon rdr_env tc
+      | Just (tc, tys) <- tcSplitTyConApp_maybe ty1
+      , (rep_tc, _, _) <- tcLookupDataFamInst fam_envs tc tys
+      , Just msg <- coercible_msg_for_tycon rdr_env rep_tc
       = msg
-      | Just (tc,_) <- splitTyConApp_maybe ty2,
-        Just msg <- coercible_msg_for_tycon rdr_env tc
+      | Just (tc, tys) <- splitTyConApp_maybe ty2
+      , (rep_tc, _, _) <- tcLookupDataFamInst fam_envs tc tys
+      , Just msg <- coercible_msg_for_tycon rdr_env rep_tc
       = msg
       | otherwise
       = nest 2 $ sep [ ptext (sLit "because") <+> quotes (ppr ty1)
@@ -1203,26 +1207,17 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
       where
         (ty1, ty2) = getEqPredTys pred
 
-    dataConMissing rdr_env tc =
-        all (null . lookupGRE_Name rdr_env) (map dataConName (tyConDataCons tc))
-
     coercible_msg_for_tycon rdr_env tc
+        | isAbstractTyCon tc
+        = Just $ hsep [ ptext $ sLit "because the type constructor", quotes (pprSourceTyCon tc)
+                      , ptext $ sLit "is abstract" ]
         | isNewTyCon tc
-        = tyConAbstractMsg rdr_env tc empty
-        | otherwise
-        = Nothing
-
-    tyConAbstractMsg rdr_env tc occExpl
-        | isAbstractTyCon tc || dataConMissing rdr_env tc = Just $ vcat $
-            [ fsep [ ptext $ sLit "because the type constructor", quotes (ppr tc) <+> occExpl
-                   , ptext $ sLit "is abstract" ]
-            | isAbstractTyCon tc
-            ] ++
-            [ fsep [ ptext (sLit "because the constructor") <> plural (tyConDataCons tc)
-                   , ptext (sLit "of") <+> quotes (ppr tc) <+> occExpl
-                   , isOrAre (tyConDataCons tc) <+> ptext (sLit "not imported") ]
-            | dataConMissing rdr_env tc
-            ]
+        , [data_con] <- tyConDataCons tc
+        , let dc_name = dataConName data_con
+        , null (lookupGRE_Name rdr_env dc_name)
+        = Just $ hang (ptext (sLit "because the data constructor") <+> quotes (ppr dc_name))
+                    2 (sep [ ptext (sLit "of newtype") <+> quotes (pprSourceTyCon tc)
+                           , ptext (sLit "is not in scope") ])
         | otherwise = Nothing
 
 show_fixes :: [SDoc] -> SDoc

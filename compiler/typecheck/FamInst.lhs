@@ -9,10 +9,11 @@ The @FamInst@ type: family instance heads
 --     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-module FamInst ( 
+module FamInst (
+        FamInstEnvs, tcGetFamInstEnvs,
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
-	tcLookupFamInst, 
-        tcGetFamInstEnvs,
+	tcLookupFamInst,
+        tcLookupDataFamInst, tcInstNewTyConTF_maybe, tcInstNewTyCon_maybe,
         newFamInst
     ) where
 
@@ -20,7 +21,9 @@ import HscTypes
 import FamInstEnv
 import InstEnv( roughMatchTcs )
 import Coercion( pprCoAxBranchHdr )
+import TcEvidence
 import LoadIface
+import Type( applyTysX )
 import TypeRep
 import TcRnMonad
 import TyCon
@@ -35,7 +38,6 @@ import Maybes
 import TcMType
 import TcType
 import Name
-import VarSet
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -210,24 +212,60 @@ then we have a coercion (ie, type instance of family instance coercion)
 which implies that :R42T was declared as 'data instance T [a]'.
 
 \begin{code}
-tcLookupFamInst :: TyCon -> [Type] -> TcM (Maybe FamInstMatch)
-tcLookupFamInst tycon tys
+tcLookupFamInst :: FamInstEnvs -> TyCon -> [Type] -> Maybe FamInstMatch
+tcLookupFamInst fam_envs tycon tys
   | not (isOpenFamilyTyCon tycon)
-  = return Nothing
+  = Nothing
   | otherwise
-  = do { instEnv <- tcGetFamInstEnvs
-       ; let mb_match = lookupFamInstEnv instEnv tycon tys 
-       ; traceTc "lookupFamInst" $
-         vcat [ ppr tycon <+> ppr tys
-              , pprTvBndrs (varSetElems (tyVarsOfTypes tys))
-              , ppr mb_match
-              -- , ppr instEnv
-         ]
-       ; case mb_match of
-	   [] -> return Nothing
-	   (match:_) 
-              -> return $ Just match
-       }
+  = case lookupFamInstEnv fam_envs tycon tys of
+      match : _ -> Just match
+      []        -> Nothing
+
+-- | If @co :: T ts ~ rep_ty@ then:
+--
+-- > instNewTyCon_maybe T ts = Just (rep_ty, co)
+--
+-- Checks for a newtype, and for being saturated
+-- Just like Coercion.instNewTyCon_maybe, but returns a TcCoercion
+tcInstNewTyCon_maybe :: TyCon -> [TcType] -> Maybe (TcType, TcCoercion)
+tcInstNewTyCon_maybe tc tys
+  | Just (tvs, ty, co_tc) <- unwrapNewTyConEtad_maybe tc  -- Check for newtype
+  , tvs `leLength` tys                                    -- Check saturated enough
+  = Just (applyTysX tvs ty tys, mkTcUnbranchedAxInstCo Representational co_tc tys)
+  | otherwise
+  = Nothing
+
+tcLookupDataFamInst :: FamInstEnvs -> TyCon -> [TcType]
+                    -> (TyCon, [TcType], TcCoercion)
+-- ^ Converts a data family type (eg F [a]) to its representation type (eg FList a)
+-- and returns a coercion between the two: co :: F [a] ~R FList a
+-- If there is no instance, or it's not a data family, just return
+-- Refl coercion and the original inputs
+tcLookupDataFamInst fam_inst_envs tc tc_args
+  | isDataFamilyTyCon tc
+  , match : _ <- lookupFamInstEnv fam_inst_envs tc tc_args
+  , FamInstMatch { fim_instance = rep_fam
+                 , fim_tys      = rep_args } <- match
+  , let co_tc  = famInstAxiom rep_fam
+        rep_tc = dataFamInstRepTyCon rep_fam
+        co     = mkTcUnbranchedAxInstCo Representational co_tc rep_args
+  = (rep_tc, rep_args, co)
+
+  | otherwise
+  = (tc, tc_args, mkTcNomReflCo (mkTyConApp tc tc_args))
+
+tcInstNewTyConTF_maybe :: FamInstEnvs -> TcType -> Maybe (TyCon, TcType, TcCoercion)
+-- ^ If (instNewTyConTF_maybe envs ty) returns Just (ty', co)
+--   then co :: ty ~R ty'
+--        ty is (D tys) is a newtype (possibly after looking through the type family D)
+--        ty' is the RHS type of the of (D tys) newtype
+tcInstNewTyConTF_maybe fam_envs ty
+  | Just (tc, tc_args) <- tcSplitTyConApp_maybe ty
+  , let (rep_tc, rep_tc_args, fam_co) = tcLookupDataFamInst fam_envs tc tc_args
+  , Just (inner_ty, nt_co) <- tcInstNewTyCon_maybe rep_tc rep_tc_args
+  = Just (rep_tc, inner_ty, fam_co `mkTcTransCo` nt_co)
+  | otherwise
+  = Nothing
 \end{code}
 
 

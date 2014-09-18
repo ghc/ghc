@@ -26,8 +26,7 @@ import TcUnify
 import BasicTypes
 import Inst
 import TcBinds
-import FamInst          ( tcLookupFamInst )
-import FamInstEnv       ( famInstAxiom, dataFamInstRepTyCon, FamInstMatch(..) )
+import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
 import TcEnv
 import TcArrows
 import TcMatches
@@ -1225,49 +1224,32 @@ tcTagToEnum loc fun_name arg res_ty
         ; let mb_tc_app = tcSplitTyConApp_maybe ty'
               Just (tc, tc_args) = mb_tc_app
         ; checkTc (isJust mb_tc_app)
-                  (tagToEnumError ty' doc1)
+                  (mk_error ty' doc1)
 
         -- Look through any type family
-        ; (coi, rep_tc, rep_args) <- get_rep_ty ty' tc tc_args
+        ; fam_envs <- tcGetFamInstEnvs
+        ; let (rep_tc, rep_args, coi) = tcLookupDataFamInst fam_envs tc tc_args
+             -- coi :: tc tc_args ~ rep_tc rep_args
 
         ; checkTc (isEnumerationTyCon rep_tc)
-                  (tagToEnumError ty' doc2)
+                  (mk_error ty' doc2)
 
         ; arg' <- tcMonoExpr arg intPrimTy
         ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar fun))
               rep_ty = mkTyConApp rep_tc rep_args
 
-        ; return (mkHsWrapCo coi $ HsApp fun' arg') }
+        ; return (mkHsWrapCoR (mkTcSymCo coi) $ HsApp fun' arg') }
+                  -- coi is a Representational coercion
   where
     doc1 = vcat [ ptext (sLit "Specify the type by giving a type signature")
                 , ptext (sLit "e.g. (tagToEnum# x) :: Bool") ]
     doc2 = ptext (sLit "Result type must be an enumeration type")
-    doc3 = ptext (sLit "No family instance for this type")
 
-    get_rep_ty :: TcType -> TyCon -> [TcType]
-               -> TcM (TcCoercion, TyCon, [TcType])
-        -- Converts a family type (eg F [a]) to its rep type (eg FList a)
-        -- and returns a coercion between the two
-    get_rep_ty ty tc tc_args
-      | not (isFamilyTyCon tc)
-      = return (mkTcNomReflCo ty, tc, tc_args)
-      | otherwise
-      = do { mb_fam <- tcLookupFamInst tc tc_args
-           ; case mb_fam of
-               Nothing -> failWithTc (tagToEnumError ty doc3)
-               Just (FamInstMatch { fim_instance = rep_fam
-                                  , fim_tys      = rep_args })
-                   -> return ( mkTcSymCo (mkTcUnbranchedAxInstCo Nominal co_tc rep_args)
-                             , rep_tc, rep_args )
-                 where
-                   co_tc  = famInstAxiom rep_fam
-                   rep_tc = dataFamInstRepTyCon rep_fam }
-
-tagToEnumError :: TcType -> SDoc -> SDoc
-tagToEnumError ty what
-  = hang (ptext (sLit "Bad call to tagToEnum#")
-           <+> ptext (sLit "at type") <+> ppr ty)
-         2 what
+    mk_error :: TcType -> SDoc -> SDoc
+    mk_error ty what
+      = hang (ptext (sLit "Bad call to tagToEnum#")
+               <+> ptext (sLit "at type") <+> ppr ty)
+           2 what
 \end{code}
 
 
