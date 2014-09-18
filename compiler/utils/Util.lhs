@@ -26,7 +26,8 @@ module Util (
         foldl1', foldl2, count, all2,
 
         lengthExceeds, lengthIs, lengthAtLeast,
-        listLengthCmp, atLength, equalLength, compareLength,
+        listLengthCmp, atLength,
+        equalLength, compareLength, leLength,
 
         isSingleton, only, singleton,
         notNull, snocView,
@@ -422,6 +423,13 @@ compareLength []     []     = EQ
 compareLength (_:xs) (_:ys) = compareLength xs ys
 compareLength []     _      = LT
 compareLength _      []     = GT
+
+leLength :: [a] -> [b] -> Bool
+-- ^ True if length xs <= length ys
+leLength xs ys = case compareLength xs ys of
+                   LT -> True
+                   EQ -> True
+                   GT -> False
 
 ----------------------------
 singleton :: a -> [a]
