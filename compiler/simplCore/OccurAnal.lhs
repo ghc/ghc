@@ -54,21 +54,29 @@ Here's the externally-callable interface:
 
 \begin{code}
 occurAnalysePgm :: Module       -- Used only in debug output
-                -> (Activation -> Bool) 
+                -> (Activation -> Bool)
                 -> [CoreRule] -> [CoreVect] -> VarSet
                 -> CoreProgram -> CoreProgram
 occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
   | isEmptyVarEnv final_usage
-  = binds'
+  = occ_anald_binds
+
   | otherwise   -- See Note [Glomming]
   = WARN( True, hang (text "Glomming in" <+> ppr this_mod <> colon)
                    2 (ppr final_usage ) )
-    [Rec (flattenBinds binds')]
+    occ_anald_glommed_binds
   where
-    (final_usage, binds') = go (initOccEnv active_rule) binds
+    init_env = initOccEnv active_rule
+    (final_usage, occ_anald_binds) = go init_env binds
+    (_, occ_anald_glommed_binds)   = occAnalRecBind init_env imp_rules_edges
+                                                    (flattenBinds occ_anald_binds)
+                                                    initial_uds
+          -- It's crucial to re-analyse the glommed-together bindings
+          -- so that we establish the right loop breakers. Otherwise
+          -- we can easily create an infinite loop (Trac #9583 is an example)
 
-    initial_uds = addIdOccs emptyDetails 
-                            (rulesFreeVars imp_rules `unionVarSet` 
+    initial_uds = addIdOccs emptyDetails
+                            (rulesFreeVars imp_rules `unionVarSet`
                              vectsFreeVars vects `unionVarSet`
                              vectVars)
     -- The RULES and VECTORISE declarations keep things alive! (For VECTORISE declarations,
@@ -90,7 +98,7 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
         = (final_usage, bind' ++ binds')
         where
            (bs_usage, binds')   = go env binds
-           (final_usage, bind') = occAnalBind env env imp_rules_edges bind bs_usage
+           (final_usage, bind') = occAnalBind env imp_rules_edges bind bs_usage
 
 occurAnalyseExpr :: CoreExpr -> CoreExpr
         -- Do occurrence analysis, and discard occurrence info returned
@@ -120,14 +128,21 @@ Bindings
 
 \begin{code}
 occAnalBind :: OccEnv           -- The incoming OccEnv
-            -> OccEnv           -- Same, but trimmed by (binderOf bind)
             -> IdEnv IdSet      -- Mapping from FVs of imported RULE LHSs to RHS FVs
             -> CoreBind
             -> UsageDetails             -- Usage details of scope
             -> (UsageDetails,           -- Of the whole let(rec)
                 [CoreBind])
 
-occAnalBind env _ imp_rules_edges (NonRec binder rhs) body_usage
+occAnalBind env imp_rules_edges (NonRec binder rhs) body_usage
+  = occAnalNonRecBind env imp_rules_edges binder rhs body_usage
+occAnalBind env imp_rules_edges (Rec pairs) body_usage
+  = occAnalRecBind env imp_rules_edges pairs body_usage
+
+-----------------
+occAnalNonRecBind :: OccEnv -> IdEnv IdSet -> Var -> CoreExpr
+                  -> UsageDetails -> (UsageDetails, [CoreBind])
+occAnalNonRecBind env imp_rules_edges binder rhs body_usage
   | isTyVar binder      -- A type let; we don't gather usage info
   = (body_usage, [NonRec binder rhs])
 
@@ -145,7 +160,10 @@ occAnalBind env _ imp_rules_edges (NonRec binder rhs) body_usage
     rhs_usage4 = maybe rhs_usage3 (addIdOccs rhs_usage3) $ lookupVarEnv imp_rules_edges binder
        -- See Note [Preventing loops due to imported functions rules]
 
-occAnalBind _ env imp_rules_edges (Rec pairs) body_usage
+-----------------
+occAnalRecBind :: OccEnv -> IdEnv IdSet -> [(Var,CoreExpr)]
+               -> UsageDetails -> (UsageDetails, [CoreBind])
+occAnalRecBind env imp_rules_edges pairs body_usage
   = foldr occAnalRec (body_usage, []) sccs
         -- For a recursive group, we
         --      * occ-analyse all the RHSs
@@ -1264,7 +1282,7 @@ occAnal env (Case scrut bndr ty alts)
 
 occAnal env (Let bind body)
   = case occAnal env body                                of { (body_usage, body') ->
-    case occAnalBind env env emptyVarEnv bind body_usage of { (final_usage, new_binds) ->
+    case occAnalBind env emptyVarEnv bind body_usage of { (final_usage, new_binds) ->
        (final_usage, mkLets new_binds body') }}
 
 occAnalArgs :: OccEnv -> [CoreExpr] -> [OneShots] -> (UsageDetails, [CoreExpr])
