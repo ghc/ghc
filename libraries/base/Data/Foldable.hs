@@ -71,6 +71,8 @@ import GHC.Arr  ( Array(..), Ix(..), elems )
 import GHC.Base hiding ( foldr )
 import GHC.Num  ( Num(..) )
 
+infix  4 `elem`, `notElem`
+
 -- | Data structures that can be folded.
 --
 -- Minimal complete definition: 'foldMap' or 'foldr'.
