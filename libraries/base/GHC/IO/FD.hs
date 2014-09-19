@@ -259,7 +259,7 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
         _other_type -> return ()
 
 #ifdef mingw32_HOST_OS
-    unless is_socket $ setmode fd True >> return ()
+    when (not is_socket) $ setmode fd True >> return ()
 #endif
 
     return (FD{ fdFD = fd,
