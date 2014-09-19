@@ -7,7 +7,6 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE FlexibleInstances      #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -556,9 +555,6 @@ module GHC.Generics  (
   , Datatype(..), Constructor(..), Selector(..), NoSelector
   , Fixity(..), Associativity(..), Arity(..), prec
 
-  -- * Propositional equality for meta-information
-  , sameDatatype, sameConstructor
-
   -- * Generic type classes
   , Generic(..), Generic1(..)
 
@@ -566,14 +562,11 @@ module GHC.Generics  (
 
 -- We use some base types
 import GHC.Types
-import Unsafe.Coerce
 import Data.Maybe ( Maybe(..) )
 import Data.Either ( Either(..) )
-import Data.Type.Equality
-import GHC.Base ( (&&), undefined )
 
 -- Needed for instances
-import GHC.Classes ( Eq((==)), Ord )
+import GHC.Classes ( Eq, Ord )
 import GHC.Read ( Read )
 import GHC.Show ( Show )
 import Data.Proxy
@@ -659,17 +652,6 @@ class Datatype d where
   isNewtype    :: t d (f :: * -> *) a -> Bool
   isNewtype _ = False
 
--- | Propositional equality predicate for datatypes
-sameDatatype :: (Datatype l, Datatype r) => Proxy l -> Proxy r -> Maybe (l :~: r)
-sameDatatype l r | moduleName dl == moduleName dr
-                 && datatypeName dl == datatypeName dr
-                 = Just (unsafeCoerce Refl)
-    where dummy :: Proxy m -> D1 m a p
-          dummy Proxy = undefined
-          dl = dummy l
-          dr = dummy r
-sameDatatype _ _ = Nothing
-
 
 -- | Class for datatypes that represent records
 class Selector s where
@@ -694,19 +676,6 @@ class Constructor c where
   conIsRecord :: t c (f :: * -> *) a -> Bool
   conIsRecord _ = False
 
--- | Propositional equality predicate for constructors
-sameConstructor :: (Datatype l, Datatype r, Constructor (cl l), Constructor (cr r))
-                => Proxy (cl l) -> Proxy (cr r) -> Maybe (cl l :~: cr r)
-sameConstructor l r | Just Refl <- pd l ` sameDatatype` pd r
-                    , True <- conName cl == conName cr
-                    = Just (unsafeCoerce Refl)
-    where pd :: Proxy (cm m) -> Proxy m
-          pd Proxy = Proxy
-          dummyC :: Proxy (cm m) -> C1 (cm m) a p
-          dummyC Proxy = undefined
-          cl = dummyC l
-          cr = dummyC r
-sameConstructor _ _ = Nothing
 
 -- | Datatype to represent the arity of a tuple.
 data Arity = NoArity | Arity Int
@@ -782,68 +751,68 @@ deriving instance Generic1 ((,,,,,,) a b c d e f)
 
 -- Int
 data D_Int
-data C_Int d
+data C_Int
 
 instance Datatype D_Int where
   datatypeName _ = "Int"
   moduleName   _ = "GHC.Int"
 
-instance Constructor (C_Int D_Int) where
+instance Constructor C_Int where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Int where
-  type Rep Int = D1 D_Int (C1 (C_Int D_Int) (S1 NoSelector (Rec0 Int)))
+  type Rep Int = D1 D_Int (C1 C_Int (S1 NoSelector (Rec0 Int)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 
 
 -- Float
 data D_Float
-data C_Float d
+data C_Float
 
 instance Datatype D_Float where
   datatypeName _ = "Float"
   moduleName   _ = "GHC.Float"
 
-instance Constructor (C_Float D_Float) where
+instance Constructor C_Float where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Float where
-  type Rep Float = D1 D_Float (C1 (C_Float D_Float) (S1 NoSelector (Rec0 Float)))
+  type Rep Float = D1 D_Float (C1 C_Float (S1 NoSelector (Rec0 Float)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 
 
 -- Double
 data D_Double
-data C_Double d
+data C_Double
 
 instance Datatype D_Double where
   datatypeName _ = "Double"
   moduleName   _ = "GHC.Float"
 
-instance Constructor (C_Double D_Double) where
+instance Constructor C_Double where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Double where
-  type Rep Double = D1 D_Double (C1 (C_Double D_Double) (S1 NoSelector (Rec0 Double)))
+  type Rep Double = D1 D_Double (C1 C_Double (S1 NoSelector (Rec0 Double)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 
 
 -- Char
 data D_Char
-data C_Char d
+data C_Char
 
 instance Datatype D_Char where
   datatypeName _ = "Char"
   moduleName   _ = "GHC.Base"
 
-instance Constructor (C_Char D_Char) where
+instance Constructor C_Char where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
 instance Generic Char where
-  type Rep Char = D1 D_Char (C1 (C_Char D_Char) (S1 NoSelector (Rec0 Char)))
+  type Rep Char = D1 D_Char (C1 C_Char (S1 NoSelector (Rec0 Char)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
 

@@ -17,7 +17,6 @@ module TcGenGenerics (canDoGenerics, canDoGenerics1,
 import DynFlags
 import HsSyn
 import Type
-import TypeRep          ( Type( TyConApp ) )
 import Kind             ( isKind )
 import TcType
 import TcGenDeriv
@@ -42,7 +41,6 @@ import BuildTyCl
 import SrcLoc
 import Bag
 import VarSet (elemVarSet)
-import Var (mkTyVar)
 import Outputable
 import FastString
 import Util
@@ -85,13 +83,12 @@ genGenericMetaTyCons tc mod =
         c_occ m   = mkGenC tc_occ m
         s_occ m n = mkGenS tc_occ m n
 
-        mkTyCon tyvars name = ASSERT( isExternalName name )
-                              buildAlgTyCon name tyvars roles Nothing [] distinctAbstractTyConRhs
+        mkTyCon name = ASSERT( isExternalName name )
+                       buildAlgTyCon name [] [] Nothing [] distinctAbstractTyConRhs
                                           NonRecursive
                                           False          -- Not promotable
                                           False          -- Not GADT syntax
                                           NoParentTyCon
-                                  where roles = map (const Nominal) tyvars
 
       d_name  <- newGlobalBinder mod d_occ loc
       c_names <- forM (zip [0..] tc_cons) $ \(m,_) ->
@@ -99,12 +96,13 @@ genGenericMetaTyCons tc mod =
       s_names <- forM (zip [0..] tc_arits) $ \(m,a) -> forM [0..a-1] $ \n ->
                     newGlobalBinder mod (s_occ m n) loc
 
-      let metaDTyCon  = mkTyCon [] d_name
-          metaCTyCons = map (\c_name -> mkTyConApp (mkTyCon [mkTyVar d_name openTypeKind] c_name) [mkTyConTy metaDTyCon]) c_names
-          metaSTyCons = map (map $ mkTyCon []) s_names
+      let metaDTyCon  = mkTyCon d_name
+          metaCTyCons = map mkTyCon c_names
+          metaSTyCons = map (map mkTyCon) s_names
 
           metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
 
+      -- pprTrace "rep0" (ppr rep0_tycon) $
       (,) metaDts `fmap` metaTyConsToDerivStuff tc metaDts
 
 -- both the tycon declarations and related instances
@@ -113,7 +111,7 @@ metaTyConsToDerivStuff tc metaDts =
   do  loc <- getSrcSpanM
       dflags <- getDynFlags
       dClas <- tcLookupClass datatypeClassName
-      let new_dfun_name clas tycon = newDFunName clas [mkTyConTy tycon] loc
+      let new_dfun_name clas tycon = newDFunName clas [mkTyConApp tycon []] loc
       d_dfun_name <- new_dfun_name dClas tc
       cClas <- tcLookupClass constructorClassName
       c_dfun_names <- sequence [ new_dfun_name cClas tc | _ <- metaC metaDts ]
@@ -125,12 +123,13 @@ metaTyConsToDerivStuff tc metaDts =
 
       let
         (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
-        mk_inst' clas ty dfun_name
-          = mkLocalInstance (mkDictFunId dfun_name [] [] clas [ty])
+        mk_inst clas tc dfun_name
+          = mkLocalInstance (mkDictFunId dfun_name [] [] clas tys)
                             OverlapFlag { overlapMode   = NoOverlap
                                         , isSafeOverlap = safeLanguageOn dflags }
-                            [] clas [ty]
-        mk_inst clas tc dfun_name = mk_inst' clas (mkTyConTy tc) dfun_name
+                            [] clas tys
+          where
+            tys = [mkTyConTy tc]
 
         -- Datatype
         d_metaTycon = metaD metaDts
@@ -143,7 +142,7 @@ metaTyConsToDerivStuff tc metaDts =
 
         -- Constructor
         c_metaTycons = metaC metaDts
-        c_insts = [ mk_inst' cClas c ds
+        c_insts = [ mk_inst cClas c ds
                   | (c, ds) <- myZip1 c_metaTycons c_dfun_names ]
         c_binds = [ InstBindings { ib_binds = c
                                  , ib_pragmas = []
@@ -645,7 +644,7 @@ tc_mkRepTy gk_ tycon metaDts =
 
 
         metaDTyCon  = mkTyConTy (metaD metaDts)
-        metaCTyCons = metaC metaDts
+        metaCTyCons = map mkTyConTy (metaC metaDts)
         metaSTyCons = map (map mkTyConTy) (metaS metaDts)
 
     return (mkD tycon)
@@ -657,7 +656,7 @@ tc_mkRepTy gk_ tycon metaDts =
 data MetaTyCons = MetaTyCons { -- One meta datatype per datatype
                                metaD :: TyCon
                                -- One meta datatype per constructor
-                             , metaC :: [Type]
+                             , metaC :: [TyCon]
                                -- One meta datatype per selector per constructor
                              , metaS :: [[TyCon]] }
 
@@ -665,8 +664,7 @@ instance Outputable MetaTyCons where
   ppr (MetaTyCons d c s) = ppr d $$ vcat (map ppr c) $$ vcat (map ppr (concat s))
 
 metaTyCons2TyCons :: MetaTyCons -> Bag TyCon
-metaTyCons2TyCons (MetaTyCons d cty s) = listToBag (d : c ++ concat s)
-  where c = map (\(TyConApp c [_]) -> c) cty
+metaTyCons2TyCons (MetaTyCons d c s) = listToBag (d : c ++ concat s)
 
 
 -- Bindings for Datatype, Constructor, and Selector instances
