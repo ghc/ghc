@@ -92,10 +92,12 @@ Derived instances:
     GHC.Generics.datatypeName _ = "List"
     GHC.Generics.moduleName _ = "GenDerivOutput"
   
-  instance GHC.Generics.Constructor GenDerivOutput.C1_0List where
+  instance GHC.Generics.Constructor
+             (GenDerivOutput.C1_0List GenDerivOutput.D1List) where
     GHC.Generics.conName _ = "Nil"
   
-  instance GHC.Generics.Constructor GenDerivOutput.C1_1List where
+  instance GHC.Generics.Constructor
+             (GenDerivOutput.C1_1List GenDerivOutput.D1List) where
     GHC.Generics.conName _ = "Cons"
     GHC.Generics.conIsRecord _ = GHC.Types.True
   
@@ -109,10 +111,12 @@ Derived instances:
     GHC.Generics.datatypeName _ = "Rose"
     GHC.Generics.moduleName _ = "GenDerivOutput"
   
-  instance GHC.Generics.Constructor GenDerivOutput.C1_0Rose where
+  instance GHC.Generics.Constructor
+             (GenDerivOutput.C1_0Rose GenDerivOutput.D1Rose) where
     GHC.Generics.conName _ = "Empty"
   
-  instance GHC.Generics.Constructor GenDerivOutput.C1_1Rose where
+  instance GHC.Generics.Constructor
+             (GenDerivOutput.C1_1Rose GenDerivOutput.D1Rose) where
     GHC.Generics.conName _ = "Rose"
   
 
@@ -134,9 +138,12 @@ Generic representation:
     type GHC.Generics.Rep (GenDerivOutput.List a) = GHC.Generics.D1
                                                       GenDerivOutput.D1List
                                                       (GHC.Generics.C1
-                                                         GenDerivOutput.C1_0List GHC.Generics.U1
+                                                         (GenDerivOutput.C1_0List
+                                                            GenDerivOutput.D1List)
+                                                         GHC.Generics.U1
                                                        GHC.Generics.:+: GHC.Generics.C1
-                                                                          GenDerivOutput.C1_1List
+                                                                          (GenDerivOutput.C1_1List
+                                                                             GenDerivOutput.D1List)
                                                                           (GHC.Generics.S1
                                                                              GenDerivOutput.S1_1_0List
                                                                              (GHC.Generics.Rec0 a)
@@ -148,9 +155,12 @@ Generic representation:
     type GHC.Generics.Rep1 GenDerivOutput.List = GHC.Generics.D1
                                                    GenDerivOutput.D1List
                                                    (GHC.Generics.C1
-                                                      GenDerivOutput.C1_0List GHC.Generics.U1
+                                                      (GenDerivOutput.C1_0List
+                                                         GenDerivOutput.D1List)
+                                                      GHC.Generics.U1
                                                     GHC.Generics.:+: GHC.Generics.C1
-                                                                       GenDerivOutput.C1_1List
+                                                                       (GenDerivOutput.C1_1List
+                                                                          GenDerivOutput.D1List)
                                                                        (GHC.Generics.S1
                                                                           GenDerivOutput.S1_1_0List
                                                                           GHC.Generics.Par1
@@ -161,9 +171,12 @@ Generic representation:
     type GHC.Generics.Rep (GenDerivOutput.Rose a) = GHC.Generics.D1
                                                       GenDerivOutput.D1Rose
                                                       (GHC.Generics.C1
-                                                         GenDerivOutput.C1_0Rose GHC.Generics.U1
+                                                         (GenDerivOutput.C1_0Rose
+                                                            GenDerivOutput.D1Rose)
+                                                         GHC.Generics.U1
                                                        GHC.Generics.:+: GHC.Generics.C1
-                                                                          GenDerivOutput.C1_1Rose
+                                                                          (GenDerivOutput.C1_1Rose
+                                                                             GenDerivOutput.D1Rose)
                                                                           (GHC.Generics.S1
                                                                              GHC.Generics.NoSelector
                                                                              (GHC.Generics.Rec0 a)
@@ -176,9 +189,12 @@ Generic representation:
     type GHC.Generics.Rep1 GenDerivOutput.Rose = GHC.Generics.D1
                                                    GenDerivOutput.D1Rose
                                                    (GHC.Generics.C1
-                                                      GenDerivOutput.C1_0Rose GHC.Generics.U1
+                                                      (GenDerivOutput.C1_0Rose
+                                                         GenDerivOutput.D1Rose)
+                                                      GHC.Generics.U1
                                                     GHC.Generics.:+: GHC.Generics.C1
-                                                                       GenDerivOutput.C1_1Rose
+                                                                       (GenDerivOutput.C1_1Rose
+                                                                          GenDerivOutput.D1Rose)
                                                                        (GHC.Generics.S1
                                                                           GHC.Generics.NoSelector
                                                                           GHC.Generics.Par1

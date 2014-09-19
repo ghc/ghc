@@ -157,10 +157,12 @@ Derived instances:
     GHC.Generics.datatypeName _ = "Da"
     GHC.Generics.moduleName _ = "CanDoRep1_1"
   
-  instance GHC.Generics.Constructor CanDoRep1_1.C1_0Da where
+  instance GHC.Generics.Constructor
+             (CanDoRep1_1.C1_0Da CanDoRep1_1.D1Da) where
     GHC.Generics.conName _ = "D0"
   
-  instance GHC.Generics.Constructor CanDoRep1_1.C1_1Da where
+  instance GHC.Generics.Constructor
+             (CanDoRep1_1.C1_1Da CanDoRep1_1.D1Da) where
     GHC.Generics.conName _ = "D1"
     GHC.Generics.conIsRecord _ = GHC.Types.True
   
@@ -174,10 +176,12 @@ Derived instances:
     GHC.Generics.datatypeName _ = "Db"
     GHC.Generics.moduleName _ = "CanDoRep1_1"
   
-  instance GHC.Generics.Constructor CanDoRep1_1.C1_0Db where
+  instance GHC.Generics.Constructor
+             (CanDoRep1_1.C1_0Db CanDoRep1_1.D1Db) where
     GHC.Generics.conName _ = "D0b"
   
-  instance GHC.Generics.Constructor CanDoRep1_1.C1_1Db where
+  instance GHC.Generics.Constructor
+             (CanDoRep1_1.C1_1Db CanDoRep1_1.D1Db) where
     GHC.Generics.conName _ = "D1b"
     GHC.Generics.conIsRecord _ = GHC.Types.True
   
@@ -191,10 +195,12 @@ Derived instances:
     GHC.Generics.datatypeName _ = "Dc"
     GHC.Generics.moduleName _ = "CanDoRep1_1"
   
-  instance GHC.Generics.Constructor CanDoRep1_1.C1_0Dc where
+  instance GHC.Generics.Constructor
+             (CanDoRep1_1.C1_0Dc CanDoRep1_1.D1Dc) where
     GHC.Generics.conName _ = "D0c"
   
-  instance GHC.Generics.Constructor CanDoRep1_1.C1_1Dc where
+  instance GHC.Generics.Constructor
+             (CanDoRep1_1.C1_1Dc CanDoRep1_1.D1Dc) where
     GHC.Generics.conName _ = "D1c"
     GHC.Generics.conIsRecord _ = GHC.Types.True
   
@@ -208,10 +214,12 @@ Derived instances:
     GHC.Generics.datatypeName _ = "Dd"
     GHC.Generics.moduleName _ = "CanDoRep1_1"
   
-  instance GHC.Generics.Constructor CanDoRep1_1.C1_0Dd where
+  instance GHC.Generics.Constructor
+             (CanDoRep1_1.C1_0Dd CanDoRep1_1.D1Dd) where
     GHC.Generics.conName _ = "D0d"
   
-  instance GHC.Generics.Constructor CanDoRep1_1.C1_1Dd where
+  instance GHC.Generics.Constructor
+             (CanDoRep1_1.C1_1Dd CanDoRep1_1.D1Dd) where
     GHC.Generics.conName _ = "D1d"
     GHC.Generics.conIsRecord _ = GHC.Types.True
   
@@ -249,9 +257,12 @@ Generic representation:
   Representation types:
     type GHC.Generics.Rep1 CanDoRep1_1.Dd = GHC.Generics.D1
                                               CanDoRep1_1.D1Dd
-                                              (GHC.Generics.C1 CanDoRep1_1.C1_0Dd GHC.Generics.U1
+                                              (GHC.Generics.C1
+                                                 (CanDoRep1_1.C1_0Dd CanDoRep1_1.D1Dd)
+                                                 GHC.Generics.U1
                                                GHC.Generics.:+: GHC.Generics.C1
-                                                                  CanDoRep1_1.C1_1Dd
+                                                                  (CanDoRep1_1.C1_1Dd
+                                                                     CanDoRep1_1.D1Dd)
                                                                   (GHC.Generics.S1
                                                                      CanDoRep1_1.S1_1_0Dd
                                                                      GHC.Generics.Par1
@@ -261,9 +272,12 @@ Generic representation:
                                                                                          CanDoRep1_1.Dd)))
     type GHC.Generics.Rep (CanDoRep1_1.Dd a) = GHC.Generics.D1
                                                  CanDoRep1_1.D1Dd
-                                                 (GHC.Generics.C1 CanDoRep1_1.C1_0Dd GHC.Generics.U1
+                                                 (GHC.Generics.C1
+                                                    (CanDoRep1_1.C1_0Dd CanDoRep1_1.D1Dd)
+                                                    GHC.Generics.U1
                                                   GHC.Generics.:+: GHC.Generics.C1
-                                                                     CanDoRep1_1.C1_1Dd
+                                                                     (CanDoRep1_1.C1_1Dd
+                                                                        CanDoRep1_1.D1Dd)
                                                                      (GHC.Generics.S1
                                                                         CanDoRep1_1.S1_1_0Dd
                                                                         (GHC.Generics.Rec0 a)
@@ -274,9 +288,12 @@ Generic representation:
                                                                                                a))))
     type GHC.Generics.Rep (CanDoRep1_1.Dc a) = GHC.Generics.D1
                                                  CanDoRep1_1.D1Dc
-                                                 (GHC.Generics.C1 CanDoRep1_1.C1_0Dc GHC.Generics.U1
+                                                 (GHC.Generics.C1
+                                                    (CanDoRep1_1.C1_0Dc CanDoRep1_1.D1Dc)
+                                                    GHC.Generics.U1
                                                   GHC.Generics.:+: GHC.Generics.C1
-                                                                     CanDoRep1_1.C1_1Dc
+                                                                     (CanDoRep1_1.C1_1Dc
+                                                                        CanDoRep1_1.D1Dc)
                                                                      (GHC.Generics.S1
                                                                         CanDoRep1_1.S1_1_0Dc
                                                                         (GHC.Generics.Rec0 a)
@@ -287,9 +304,12 @@ Generic representation:
                                                                                                a))))
     type GHC.Generics.Rep1 CanDoRep1_1.Db = GHC.Generics.D1
                                               CanDoRep1_1.D1Db
-                                              (GHC.Generics.C1 CanDoRep1_1.C1_0Db GHC.Generics.U1
+                                              (GHC.Generics.C1
+                                                 (CanDoRep1_1.C1_0Db CanDoRep1_1.D1Db)
+                                                 GHC.Generics.U1
                                                GHC.Generics.:+: GHC.Generics.C1
-                                                                  CanDoRep1_1.C1_1Db
+                                                                  (CanDoRep1_1.C1_1Db
+                                                                     CanDoRep1_1.D1Db)
                                                                   (GHC.Generics.S1
                                                                      CanDoRep1_1.S1_1_0Db
                                                                      GHC.Generics.Par1
@@ -299,9 +319,12 @@ Generic representation:
                                                                                          CanDoRep1_1.Db)))
     type GHC.Generics.Rep (CanDoRep1_1.Da a) = GHC.Generics.D1
                                                  CanDoRep1_1.D1Da
-                                                 (GHC.Generics.C1 CanDoRep1_1.C1_0Da GHC.Generics.U1
+                                                 (GHC.Generics.C1
+                                                    (CanDoRep1_1.C1_0Da CanDoRep1_1.D1Da)
+                                                    GHC.Generics.U1
                                                   GHC.Generics.:+: GHC.Generics.C1
-                                                                     CanDoRep1_1.C1_1Da
+                                                                     (CanDoRep1_1.C1_1Da
+                                                                        CanDoRep1_1.D1Da)
                                                                      (GHC.Generics.S1
                                                                         CanDoRep1_1.S1_1_0Da
                                                                         (GHC.Generics.Rec0 a)
@@ -312,9 +335,12 @@ Generic representation:
                                                                                                a))))
     type GHC.Generics.Rep1 CanDoRep1_1.Da = GHC.Generics.D1
                                               CanDoRep1_1.D1Da
-                                              (GHC.Generics.C1 CanDoRep1_1.C1_0Da GHC.Generics.U1
+                                              (GHC.Generics.C1
+                                                 (CanDoRep1_1.C1_0Da CanDoRep1_1.D1Da)
+                                                 GHC.Generics.U1
                                                GHC.Generics.:+: GHC.Generics.C1
-                                                                  CanDoRep1_1.C1_1Da
+                                                                  (CanDoRep1_1.C1_1Da
+                                                                     CanDoRep1_1.D1Da)
                                                                   (GHC.Generics.S1
                                                                      CanDoRep1_1.S1_1_0Da
                                                                      GHC.Generics.Par1
@@ -324,9 +350,12 @@ Generic representation:
                                                                                          CanDoRep1_1.Da)))
     type GHC.Generics.Rep (CanDoRep1_1.Db a) = GHC.Generics.D1
                                                  CanDoRep1_1.D1Db
-                                                 (GHC.Generics.C1 CanDoRep1_1.C1_0Db GHC.Generics.U1
+                                                 (GHC.Generics.C1
+                                                    (CanDoRep1_1.C1_0Db CanDoRep1_1.D1Db)
+                                                    GHC.Generics.U1
                                                   GHC.Generics.:+: GHC.Generics.C1
-                                                                     CanDoRep1_1.C1_1Db
+                                                                     (CanDoRep1_1.C1_1Db
+                                                                        CanDoRep1_1.D1Db)
                                                                      (GHC.Generics.S1
                                                                         CanDoRep1_1.S1_1_0Db
                                                                         (GHC.Generics.Rec0 a)
@@ -337,9 +366,12 @@ Generic representation:
                                                                                                a))))
     type GHC.Generics.Rep1 CanDoRep1_1.Dc = GHC.Generics.D1
                                               CanDoRep1_1.D1Dc
-                                              (GHC.Generics.C1 CanDoRep1_1.C1_0Dc GHC.Generics.U1
+                                              (GHC.Generics.C1
+                                                 (CanDoRep1_1.C1_0Dc CanDoRep1_1.D1Dc)
+                                                 GHC.Generics.U1
                                                GHC.Generics.:+: GHC.Generics.C1
-                                                                  CanDoRep1_1.C1_1Dc
+                                                                  (CanDoRep1_1.C1_1Dc
+                                                                     CanDoRep1_1.D1Dc)
                                                                   (GHC.Generics.S1
                                                                      CanDoRep1_1.S1_1_0Dc
                                                                      GHC.Generics.Par1

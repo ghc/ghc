@@ -25,10 +25,12 @@ Derived instances:
     GHC.Generics.datatypeName _ = "List"
     GHC.Generics.moduleName _ = "GenDerivOutput1_0"
   
-  instance GHC.Generics.Constructor GenDerivOutput1_0.C1_0List where
+  instance GHC.Generics.Constructor
+             (GenDerivOutput1_0.C1_0List GenDerivOutput1_0.D1List) where
     GHC.Generics.conName _ = "Nil"
   
-  instance GHC.Generics.Constructor GenDerivOutput1_0.C1_1List where
+  instance GHC.Generics.Constructor
+             (GenDerivOutput1_0.C1_1List GenDerivOutput1_0.D1List) where
     GHC.Generics.conName _ = "Cons"
     GHC.Generics.conIsRecord _ = GHC.Types.True
   
@@ -52,9 +54,12 @@ Generic representation:
     type GHC.Generics.Rep1 GenDerivOutput1_0.List = GHC.Generics.D1
                                                       GenDerivOutput1_0.D1List
                                                       (GHC.Generics.C1
-                                                         GenDerivOutput1_0.C1_0List GHC.Generics.U1
+                                                         (GenDerivOutput1_0.C1_0List
+                                                            GenDerivOutput1_0.D1List)
+                                                         GHC.Generics.U1
                                                        GHC.Generics.:+: GHC.Generics.C1
-                                                                          GenDerivOutput1_0.C1_1List
+                                                                          (GenDerivOutput1_0.C1_1List
+                                                                             GenDerivOutput1_0.D1List)
                                                                           (GHC.Generics.S1
                                                                              GenDerivOutput1_0.S1_1_0List
                                                                              GHC.Generics.Par1
