@@ -706,7 +706,7 @@ sameConstructor l r | Just Refl <- pd l ` sameDatatype` pd r
           dummyC Proxy = undefined
           cl = dummyC l
           cr = dummyC r
-
+sameConstructor _ _ = Nothing
 
 -- | Datatype to represent the arity of a tuple.
 data Arity = NoArity | Arity Int
