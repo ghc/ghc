@@ -679,7 +679,7 @@ There are a few cases where the W/W transformation is told that something
 returns a constructor, but the type at hand doesn't really match this. One
 real-world example involves unsafeCoerce:
   foo = IO a
-  foo = unsafeCoere c_exit
+  foo = unsafeCoerce c_exit
   foreign import ccall "c_exit" c_exit :: IO ()
 Here CPR will tell you that `foo` returns a () constructor for sure, but trying
 to create a worker/wrapper for type `a` obviously fails.

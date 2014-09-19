@@ -827,8 +827,8 @@ C's kind args.  Consider (Trac #8865):
 where
   Category :: forall k. (k -> k -> *) -> Constraint
 We need to generate the instance
-  insatnce Category * (Either a) where ...
-Notice the '*' argument to Cagegory.
+  instance Category * (Either a) where ...
+Notice the '*' argument to Category.
 
 So we need to
  * drop arguments from (T a b) to match the number of
