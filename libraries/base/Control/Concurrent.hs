@@ -123,7 +123,7 @@ import Foreign.C.Types
 #ifdef mingw32_HOST_OS
 import Foreign.C
 import System.IO
-import Data.Maybe (Maybe(..))
+import Data.Functor ( void )
 #endif
 
 import Control.Concurrent.MVar
