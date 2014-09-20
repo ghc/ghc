@@ -1292,7 +1292,7 @@ findFile mk_file_path (dir : dirs)
 \begin{code}
 maybePutStr :: DynFlags -> String -> IO ()
 maybePutStr dflags s
-    = when (verbosity dflags > 0) $
+    = when (verbosity dflags > 1) $
           do let act = log_action dflags
              act dflags SevInteractive noSrcSpan defaultUserStyle (text s)
 
