@@ -23,13 +23,12 @@ module GHC.Event.Internal
     ) where
 
 import Data.Bits ((.|.), (.&.))
-import Data.List (foldl', intercalate)
+import Data.OldList (foldl', filter, intercalate, null)
 import Foreign.C.Error (eINTR, getErrno, throwErrno)
 import System.Posix.Types (Fd)
 import GHC.Base
 import GHC.Num (Num(..))
 import GHC.Show (Show(..))
-import GHC.List (filter, null)
 
 -- | An I\/O event.
 newtype Event = Event Int

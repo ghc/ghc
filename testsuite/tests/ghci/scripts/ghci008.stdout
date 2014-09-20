@@ -32,5 +32,5 @@ class (RealFrac a, Floating a) => RealFloat a where
   	-- Defined in ‘GHC.Float’
 instance RealFloat Float -- Defined in ‘GHC.Float’
 instance RealFloat Double -- Defined in ‘GHC.Float’
-Data.List.isPrefixOf :: Eq a => [a] -> [a] -> Bool
-  	-- Defined in ‘Data.List’
+Data.OldList.isPrefixOf :: Eq a => [a] -> [a] -> Bool
+  	-- Defined in ‘Data.OldList’

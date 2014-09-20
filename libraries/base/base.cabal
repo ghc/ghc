@@ -136,6 +136,7 @@ Library
         Data.List
         Data.Maybe
         Data.Monoid
+        Data.OldList
         Data.OldTypeable
         Data.OldTypeable.Internal
         Data.Ord

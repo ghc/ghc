@@ -61,7 +61,7 @@ module Data.Foldable (
 import Data.Bool
 import Data.Either
 import Data.Eq
-import qualified Data.List as List
+import qualified Data.OldList as List
 import Data.Maybe
 import Data.Monoid
 import Data.Ord

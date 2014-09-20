@@ -81,7 +81,7 @@ import GHC.Stack
 
 import qualified Data.Coerce
 import Data.String
-import Data.List
+import Data.OldList
 import Data.Data
 import Data.Ord
 import qualified Debug.Trace
