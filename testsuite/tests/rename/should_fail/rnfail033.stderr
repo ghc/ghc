@@ -3,5 +3,5 @@ rnfail033.hs:2:21:
     Not in scope: ‘Data.List.map’
     Perhaps you meant one of these:
       ‘Data.List.zip’ (imported from Data.List),
-      ‘Data.List.sum’ (imported from Data.List),
-      ‘Data.List.all’ (imported from Data.List)
+      ‘Data.List.all’ (imported from Data.List),
+      ‘Data.List.and’ (imported from Data.List)

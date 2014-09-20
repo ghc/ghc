@@ -35,6 +35,16 @@
   * Turn `toList`, `elem`, `sum`, `product`, `maximum`, and `minimum`
     into `Foldable` methods (#9621)
 
+  * Replace the `Data.List`-exported functions
+
+    ```
+    all, and, any, concat, concatMap, elem, find, product, sum
+    ```
+
+    by re-exports of their generalised `Data.Foldable` counterparts.
+    In other words, unqualified imports of `Data.List` and
+    `Data.Foldable` no longer lead to conflicting definitions. (#9586)
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3
