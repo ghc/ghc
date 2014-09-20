@@ -38,9 +38,8 @@ module GHC.Conc.Windows
        , toWin32ConsoleEvent
        ) where
 
-import Control.Monad
+import Control.Monad (unless)
 import Data.Bits (shiftR)
-import Data.Maybe (Maybe(..))
 import Data.Typeable
 import GHC.Base
 import GHC.Conc.Sync
