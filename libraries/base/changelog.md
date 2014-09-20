@@ -32,6 +32,9 @@
   * Set fixity for `Data.Foldable.{elem,notElem}` to match the
     conventional one set for `Data.List.{elem,notElem}` (#9610)
 
+  * Turn `toList`, `elem`, `sum`, `product`, `maximum`, and `minimum`
+    into `Foldable` methods (#9621)
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3
