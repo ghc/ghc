@@ -18,12 +18,12 @@ module GHC.Event.Thread
 import Control.Exception (finally, SomeException, toException)
 import Control.Monad (forM, forM_, sequence_, zipWithM)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Data.List (zipWith3)
 import Data.Tuple (snd)
 import Foreign.C.Error (eBADF, errnoToIOError)
 import Foreign.C.Types (CInt(..), CUInt(..))
 import Foreign.Ptr (Ptr)
 import GHC.Base
+import GHC.List (zipWith3)
 import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
                       labelThread, modifyMVar_, withMVar, newTVar, sharedCAF,
                       getNumCapabilities, threadCapability, myThreadId, forkOn,

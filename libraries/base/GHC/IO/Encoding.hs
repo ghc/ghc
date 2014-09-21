@@ -44,11 +44,11 @@ import qualified GHC.IO.Encoding.Latin1 as Latin1
 import qualified GHC.IO.Encoding.UTF8   as UTF8
 import qualified GHC.IO.Encoding.UTF16  as UTF16
 import qualified GHC.IO.Encoding.UTF32  as UTF32
+import GHC.List
 import GHC.Word
 
 import Data.IORef
 import Data.Char (toUpper)
-import Data.List
 import System.IO.Unsafe (unsafePerformIO)
 
 -- -----------------------------------------------------------------------------

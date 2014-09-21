@@ -222,7 +222,6 @@ module System.IO (
 import Control.Exception.Base
 
 import Data.Bits
-import Data.List
 import Data.Maybe
 import Foreign.C.Error
 #ifdef mingw32_HOST_OS
@@ -233,6 +232,7 @@ import System.Posix.Internals
 import System.Posix.Types
 
 import GHC.Base
+import GHC.List
 import GHC.IO hiding ( bracket, onException )
 import GHC.IO.IOMode
 import GHC.IO.Handle.FD
