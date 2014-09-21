@@ -46,7 +46,9 @@ import FastString
 import Control.Monad
 
 import Data.Int
+#if __GLASGOW_HASKELL__ < 709
 import Data.Traversable (traverse)
+#endif
 import Data.Word
 \end{code}
 

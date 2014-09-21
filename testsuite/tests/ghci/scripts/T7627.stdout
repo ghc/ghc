@@ -5,6 +5,7 @@ instance Eq () -- Defined in ‘GHC.Classes’
 instance Ord () -- Defined in ‘GHC.Classes’
 instance Read () -- Defined in ‘GHC.Read’
 instance Show () -- Defined in ‘GHC.Show’
+instance Monoid () -- Defined in ‘GHC.Base’
 data (##) = (##) 	-- Defined in ‘GHC.Prim’
 () :: ()
 (##) :: (# #)
@@ -18,10 +19,11 @@ instance Functor ((,) a) -- Defined in ‘GHC.Base’
 instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
 instance (Read a, Read b) => Read (a, b) -- Defined in ‘GHC.Read’
 instance (Show a, Show b) => Show (a, b) -- Defined in ‘GHC.Show’
-instance GHC.Base.Monoid a => Applicative ((,) a)
-  -- Defined in ‘GHC.Base’
+instance Monoid a => Applicative ((,) a) -- Defined in ‘GHC.Base’
 instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
 instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
+instance (Monoid a, Monoid b) => Monoid (a, b)
+  -- Defined in ‘GHC.Base’
 data (#,#) (a :: OpenKind) (b :: OpenKind) = (#,#) a b
   	-- Defined in ‘GHC.Prim’
 (,) :: a -> b -> (a, b)

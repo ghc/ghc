@@ -1,5 +1,6 @@
 import Control.Monad.Fix
 import Data.IORef
+import Prelude hiding (traverse)
 
 data N a = N (IORef Bool, N a, a, N a)
 

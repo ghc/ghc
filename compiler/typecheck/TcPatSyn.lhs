@@ -30,7 +30,9 @@ import BasicTypes
 import TcSimplify
 import TcType
 import VarSet
+#if __GLASGOW_HASKELL__ < 709
 import Data.Monoid
+#endif
 import Bag
 import TcEvidence
 import BuildTyCl

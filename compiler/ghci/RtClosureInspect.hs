@@ -65,7 +65,9 @@ import Data.Array.Base
 import Data.Ix
 import Data.List
 import qualified Data.Sequence as Seq
+#if __GLASGOW_HASKELL__ < 709
 import Data.Monoid (mappend)
+#endif
 import Data.Sequence (viewl, ViewL(..))
 import Foreign.Safe
 import System.IO.Unsafe

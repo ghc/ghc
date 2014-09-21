@@ -5,6 +5,7 @@ module Main(main) where
 import Control.Monad.Fix
 import Control.Monad.ST
 import Data.STRef
+import Prelude hiding (traverse)
 
 newtype Node s a = N (STRef s Bool, Node s a, a, Node s a)
 

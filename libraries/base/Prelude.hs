@@ -66,14 +66,32 @@ module Prelude (
     subtract, even, odd, gcd, lcm, (^), (^^),
     fromIntegral, realToFrac,
 
+    -- ** Monoids
+    Monoid(mempty, mappend, mconcat),
+
     -- ** Monads and functors
     Functor(fmap),
     Applicative(pure, (<*>), (*>), (<*)),
     Monad((>>=), (>>), return, fail),
-    mapM, mapM_, sequence, sequence_, (=<<),
+    mapM_, sequence_, (=<<),
 
-    -- ** Traversals and Foldables
-    Foldable, Traversable,
+    -- ** Folds and traversals
+    Foldable(elem,      -- :: (Foldable t, Eq a) => a -> t a -> Bool
+             -- fold,   -- :: Monoid m => t m -> m
+             foldMap,   -- :: Monoid m => (a -> m) -> t a -> m
+             foldr,     -- :: (a -> b -> b) -> b -> t a -> b
+             -- foldr', -- :: (a -> b -> b) -> b -> t a -> b
+             foldl,     -- :: (b -> a -> b) -> b -> t a -> b
+             -- foldl', -- :: (b -> a -> b) -> b -> t a -> b
+             foldr1,    -- :: (a -> a -> a) -> t a -> a
+             foldl1,    -- :: (a -> a -> a) -> t a -> a
+             maximum,   -- :: (Foldable t, Ord a) => t a -> a
+             minimum,   -- :: (Foldable t, Ord a) => t a -> a
+             product,   -- :: (Foldable t, Num a) => t a -> a
+             sum),      -- :: Num a => t a -> a
+             -- toList) -- :: Foldable t => t a -> [a]
+
+    Traversable(traverse, sequenceA, mapM, sequence),
 
     -- ** Miscellaneous functions
     id, const, (.), flip, ($), until,
@@ -84,13 +102,9 @@ module Prelude (
     map, (++), filter,
     head, last, tail, init, null, length, (!!),
     reverse,
-    -- ** Reducing lists (folds)
-    foldl, foldl1, foldr, foldr1,
     -- *** Special folds
     and, or, any, all,
-    sum, product,
     concat, concatMap,
-    maximum, minimum,
     -- ** Building lists
     -- *** Scans
     scanl, scanl1, scanr, scanr1,
@@ -99,7 +113,7 @@ module Prelude (
     -- ** Sublists
     take, drop, splitAt, takeWhile, dropWhile, span, break,
     -- ** Searching lists
-    elem, notElem, lookup,
+    notElem, lookup,
     -- ** Zipping and unzipping lists
     zip, zip3, zipWith, zipWith3, unzip, unzip3,
     -- ** Functions on strings
@@ -143,9 +157,9 @@ import System.IO
 import System.IO.Error
 import Data.List
 import Data.Either
-import Data.Foldable    ( Foldable )
+import Data.Foldable    ( Foldable(..) )
 import Data.Maybe
-import Data.Traversable ( Traversable )
+import Data.Traversable ( Traversable(..) )
 import Data.Tuple
 
 import GHC.Base hiding ( foldr, mapM, sequence )

@@ -41,10 +41,10 @@ import BooleanFormula (BooleanFormula)
 import Data.Data hiding ( Fixity )
 import Data.List
 import Data.Ord
+#if __GLASGOW_HASKELL__ < 709
 import Data.Foldable ( Foldable(..) )
 import Data.Traversable ( Traversable(..) )
 import Data.Monoid ( mappend )
-#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative hiding (empty)
 #else
 import Control.Applicative ((<$>))

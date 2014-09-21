@@ -132,8 +132,14 @@ libraries/binary_dist-install_EXTRA_HC_OPTS += -Wwarn
 # temporarily turn off -Werror for mtl
 libraries/mtl_dist-install_EXTRA_HC_OPTS += -Wwarn
 
+# temporarily turn off unused-imports warnings for pretty
+libraries/pretty_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+
 # primitive has a warning about deprecated use of GHC.IOBase
 libraries/primitive_dist-install_EXTRA_HC_OPTS += -Wwarn
+
+# temporarily turn off unused-imports warnings for terminfo
+libraries/terminfo_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
 # temporarily turn off -Werror for transformers
 libraries/transformers_dist-boot_EXTRA_HC_OPTS += -Wwarn
@@ -141,6 +147,9 @@ libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # vector has some unused match warnings
 libraries/vector_dist-install_EXTRA_HC_OPTS += -Wwarn
+
+# temporarily turn off unused-imports warnings for xhtml
+libraries/xhtml_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
 libraries/dph/dph-base_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-prim-interface_dist-install_EXTRA_HC_OPTS += -Wwarn

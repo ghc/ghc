@@ -48,7 +48,9 @@ import Util             ( mapSnd )
 
 import Control.Monad
 import Data.List( partition, sortBy )
+#if __GLASGOW_HASKELL__ < 709
 import Data.Traversable (traverse)
+#endif
 import Maybes( orElse, mapMaybe )
 \end{code}
 

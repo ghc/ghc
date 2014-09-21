@@ -25,6 +25,7 @@ instance Eq () -- Defined in ‘GHC.Classes’
 instance Ord () -- Defined in ‘GHC.Classes’
 instance Read () -- Defined in ‘GHC.Read’
 instance Show () -- Defined in ‘GHC.Show’
+instance Monoid () -- Defined in ‘GHC.Base’
 type instance D () () = Bool 	-- Defined at T4175.hs:22:5
 type instance D Int () = String 	-- Defined at T4175.hs:19:5
 data instance B () = MkB 	-- Defined at T4175.hs:13:15
@@ -38,6 +39,7 @@ instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
 instance Applicative Maybe -- Defined in ‘GHC.Base’
 instance Foldable Maybe -- Defined in ‘Data.Foldable’
 instance Traversable Maybe -- Defined in ‘Data.Traversable’
+instance Monoid a => Monoid (Maybe a) -- Defined in ‘GHC.Base’
 type instance A (Maybe a) a = a 	-- Defined at T4175.hs:9:1
 data Int = I# Int# 	-- Defined in ‘GHC.Types’
 instance C Int -- Defined at T4175.hs:18:10

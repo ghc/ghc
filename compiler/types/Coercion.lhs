@@ -102,7 +102,9 @@ import Pair
 import SrcLoc
 import PrelNames        ( funTyConKey, eqPrimTyConKey, eqReprPrimTyConKey )
 import Control.Applicative
+#if __GLASGOW_HASKELL__ < 709
 import Data.Traversable (traverse, sequenceA)
+#endif
 import FastString
 import ListSetOps
 

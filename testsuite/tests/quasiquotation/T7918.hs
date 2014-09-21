@@ -15,6 +15,7 @@ import Control.Monad
 import Control.Monad.Trans.State
 import Data.List
 import Data.Ord
+import Prelude hiding (traverse)
 
 type Traverse a = State (SrcSpan, [(Name, SrcSpan)]) a
 

@@ -19,7 +19,6 @@
 module Main (main) where
 
 import Control.Exception
-import Data.Monoid
 import System.Directory
 import System.Environment
 import System.Exit

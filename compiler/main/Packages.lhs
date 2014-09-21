@@ -73,7 +73,9 @@ import qualified System.FilePath.Posix as FilePath.Posix
 import Control.Monad
 import Data.List as List
 import Data.Map (Map)
+#if __GLASGOW_HASKELL__ < 709
 import Data.Monoid hiding ((<>))
+#endif
 import qualified Data.Map as Map
 import qualified FiniteMap as Map
 import qualified Data.Set as Set

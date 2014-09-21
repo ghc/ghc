@@ -8,6 +8,7 @@ instance Show a => Show [a] -- Defined in ‘GHC.Show’
 instance Applicative [] -- Defined in ‘GHC.Base’
 instance Foldable [] -- Defined in ‘Data.Foldable’
 instance Traversable [] -- Defined in ‘Data.Traversable’
+instance Monoid [a] -- Defined in ‘GHC.Base’
 data () = () 	-- Defined in ‘GHC.Tuple’
 instance Bounded () -- Defined in ‘GHC.Enum’
 instance Enum () -- Defined in ‘GHC.Enum’
@@ -15,6 +16,7 @@ instance Eq () -- Defined in ‘GHC.Classes’
 instance Ord () -- Defined in ‘GHC.Classes’
 instance Read () -- Defined in ‘GHC.Read’
 instance Show () -- Defined in ‘GHC.Show’
+instance Monoid () -- Defined in ‘GHC.Base’
 data (,) a b = (,) a b 	-- Defined in ‘GHC.Tuple’
 instance (Bounded a, Bounded b) => Bounded (a, b)
   -- Defined in ‘GHC.Enum’
@@ -23,7 +25,8 @@ instance Functor ((,) a) -- Defined in ‘GHC.Base’
 instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
 instance (Read a, Read b) => Read (a, b) -- Defined in ‘GHC.Read’
 instance (Show a, Show b) => Show (a, b) -- Defined in ‘GHC.Show’
-instance GHC.Base.Monoid a => Applicative ((,) a)
-  -- Defined in ‘GHC.Base’
+instance Monoid a => Applicative ((,) a) -- Defined in ‘GHC.Base’
 instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
 instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
+instance (Monoid a, Monoid b) => Monoid (a, b)
+  -- Defined in ‘GHC.Base’

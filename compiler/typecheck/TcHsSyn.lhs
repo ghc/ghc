@@ -58,7 +58,9 @@ import Bag
 import FastString
 import Outputable
 import Util
+#if __GLASGOW_HASKELL__ < 709
 import Data.Traversable ( traverse )
+#endif
 \end{code}
 
 %************************************************************************
