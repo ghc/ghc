@@ -44,10 +44,9 @@ module Control.Arrow (
 
 import Data.Tuple ( fst, snd, uncurry )
 import Data.Either
-import Control.Monad
 import Control.Monad.Fix
 import Control.Category
-import GHC.Base ( Applicative(..), const, ($) )
+import GHC.Base hiding ( (.), id )
 
 infixr 5 <+>
 infixr 3 ***

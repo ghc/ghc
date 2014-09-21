@@ -51,18 +51,17 @@ module Data.Traversable (
     foldMapDefault,
     ) where
 
-import Control.Applicative
-import qualified Control.Monad
-import Data.Either
+import Control.Applicative ( Const(..), WrappedMonad(..) )
+import Data.Either ( Either(..) )
 import Data.Foldable ( Foldable )
 import Data.Functor
-import Data.Maybe
-import Data.Monoid ( Monoid )
-import Data.Proxy
+import Data.Proxy ( Proxy(..) )
 
 import GHC.Arr
-import GHC.Base ( ($), (.), Monad(..), id, flip )
-import qualified GHC.List as List
+import GHC.Base ( Applicative(..), Monad(..), Monoid, Maybe(..),
+                  ($), (.), id, flip )
+import qualified GHC.Base as Monad ( mapM )
+import qualified GHC.List as List ( foldr )
 
 -- | Functors representing data structures that can be traversed from
 -- left to right.
@@ -182,7 +181,7 @@ instance Traversable [] where
     traverse f = List.foldr cons_f (pure [])
       where cons_f x ys = (:) <$> f x <*> ys
 
-    mapM = Control.Monad.mapM
+    mapM = Monad.mapM
 
 instance Traversable (Either a) where
     traverse _ (Left x) = pure (Left x)

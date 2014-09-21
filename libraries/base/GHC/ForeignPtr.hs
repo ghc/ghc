@@ -44,8 +44,8 @@ module GHC.ForeignPtr
         finalizeForeignPtr
   ) where
 
-import Control.Monad    ( sequence_ )
 import Foreign.Storable
+import Data.Foldable    ( sequence_ )
 import Data.Typeable
 
 import GHC.Show

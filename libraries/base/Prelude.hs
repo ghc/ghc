@@ -148,7 +148,7 @@ import Data.Maybe
 import Data.Traversable ( Traversable )
 import Data.Tuple
 
-import GHC.Base hiding ( foldr )
+import GHC.Base hiding ( foldr, mapM, sequence )
 import Text.Read
 import GHC.Enum
 import GHC.Num

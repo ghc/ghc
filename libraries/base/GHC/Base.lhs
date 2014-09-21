@@ -505,6 +505,19 @@ when    :: (Monad m) => Bool -> m () -> m ()
 {-# SPECIALISE when :: Bool -> Maybe () -> Maybe () #-}
 when p s                = if p then s else return ()
 
+-- | Evaluate each action in the sequence from left to right,
+-- and collect the results.
+sequence :: Monad m => [m a] -> m [a]
+{-# INLINE sequence #-}
+sequence ms = foldr k (return []) ms
+            where
+              k m m' = do { x <- m; xs <- m'; return (x:xs) }
+
+-- | @'mapM' f@ is equivalent to @'sequence' . 'map' f@.
+mapM :: Monad m => (a -> m b) -> [a] -> m [b]
+{-# INLINE mapM #-}
+mapM f as       =  sequence (map f as)
+
 -- | Promote a function to a monad.
 liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
 liftM f m1              = do { x1 <- m1; return (f x1) }

@@ -52,8 +52,9 @@ module GHC.Event.Manager
 import Control.Concurrent.MVar (MVar, newMVar, readMVar, putMVar,
                                 tryPutMVar, takeMVar, withMVar)
 import Control.Exception (onException)
-import Control.Monad (forM_, replicateM, void)
 import Data.Bits ((.&.))
+import Data.Foldable (forM_)
+import Data.Functor (void)
 import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (maybe)
@@ -61,7 +62,7 @@ import GHC.Arr (Array, (!), listArray)
 import GHC.Base
 import GHC.Conc.Signal (runHandlers)
 import GHC.Conc.Sync (yield)
-import GHC.List (filter)
+import GHC.List (filter, replicate)
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral)
 import GHC.Show (Show(..))
@@ -192,6 +193,8 @@ newWith oneShot be = do
   registerControlFd mgr (controlReadFd ctrl) evtRead
   registerControlFd mgr (wakeupReadFd ctrl) evtRead
   return mgr
+  where
+    replicateM n x = sequence (replicate n x)
 
 failOnInvalidFile :: String -> Fd -> IO Bool -> IO ()
 failOnInvalidFile loc fd m = do

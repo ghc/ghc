@@ -23,11 +23,10 @@ module Control.Monad.Fix (
         fix
   ) where
 
-import Control.Monad ( Monad )
 import Data.Either
 import Data.Function ( fix )
 import Data.Maybe
-import GHC.Base ( error, (.) )
+import GHC.Base ( Monad, error, (.) )
 import GHC.List ( head, tail )
 import GHC.ST
 import System.IO

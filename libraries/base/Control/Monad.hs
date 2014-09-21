@@ -78,25 +78,10 @@ module Control.Monad
 
 import Data.Foldable ( sequence_, msum, mapM_, forM_ )
 import Data.Functor ( void )
+import Data.Traversable ()
 
 import GHC.Base
 import GHC.List ( zipWith, unzip, replicate )
-
--- -----------------------------------------------------------------------------
--- Prelude monad functions
-
--- | Evaluate each action in the sequence from left to right,
--- and collect the results.
-sequence       :: Monad m => [m a] -> m [a] 
-{-# INLINE sequence #-}
-sequence ms = foldr k (return []) ms
-            where
-              k m m' = do { x <- m; xs <- m'; return (x:xs) }
-
--- | @'mapM' f@ is equivalent to @'sequence' . 'map' f@.
-mapM            :: Monad m => (a -> m b) -> [a] -> m [b]
-{-# INLINE mapM #-}
-mapM f as       =  sequence (map f as)
 
 -- -----------------------------------------------------------------------------
 -- Functions mandated by the Prelude

@@ -310,10 +310,6 @@ count :: Int -> ReadP a -> ReadP [a]
 -- ^ @count n p@ parses @n@ occurrences of @p@ in sequence. A list of
 --   results is returned.
 count n p = sequence (replicate n p)
-  where -- local 'sequence' to avoid import-cycle
-    sequence ms = foldr k (return []) ms
-      where
-        k m m' = do { x <- m; xs <- m'; return (x:xs) }
 
 between :: ReadP open -> ReadP close -> ReadP a -> ReadP a
 -- ^ @between open close p@ parses @open@, followed by @p@ and finally
