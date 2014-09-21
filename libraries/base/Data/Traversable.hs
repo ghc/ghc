@@ -31,11 +31,6 @@
 --    in /Mathematically-Structured Functional Programming/, 2012, online at
 --    <http://arxiv.org/pdf/1202.2919>.
 --
--- Note that the functions 'mapM' and 'sequence' generalize "Prelude"
--- functions of the same names from lists to any 'Traversable' functor.
--- To avoid ambiguity, either import the "Prelude" hiding these names
--- or qualify uses of these function names with an alias for this module.
---
 -----------------------------------------------------------------------------
 
 module Data.Traversable (

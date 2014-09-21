@@ -78,9 +78,9 @@ module Control.Monad
 
 import Data.Foldable ( sequence_, msum, mapM_, forM_ )
 import Data.Functor ( void )
-import Data.Traversable ()
+import Data.Traversable ( forM, mapM, sequence )
 
-import GHC.Base
+import GHC.Base hiding ( mapM, sequence )
 import GHC.List ( zipWith, unzip, replicate )
 
 -- -----------------------------------------------------------------------------
@@ -100,11 +100,6 @@ filterM p (x:xs) =  do
    flg <- p x
    ys  <- filterM p xs
    return (if flg then x:ys else ys)
-
--- | 'forM' is 'mapM' with its arguments flipped
-forM            :: Monad m => [a] -> (a -> m b) -> m [b]
-{-# INLINE forM #-}
-forM            = flip mapM
 
 infixr 1 <=<, >=>
 

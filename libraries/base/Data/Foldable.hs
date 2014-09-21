@@ -13,12 +13,6 @@
 --
 -- Class of data structures that can be folded to a summary value.
 --
--- Many of these functions generalize "Prelude", "Control.Monad" and
--- "Data.List" functions of the same names from lists to any 'Foldable'
--- functor.  To avoid ambiguity, either import those modules hiding
--- these names or qualify uses of these function names with an alias
--- for this module.
---
 -----------------------------------------------------------------------------
 
 module Data.Foldable (

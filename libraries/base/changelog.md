@@ -38,22 +38,26 @@
   * Replace the `Data.List`-exported functions
 
     ```
-    all, and, any, concat, concatMap, elem, find, product, sum
+    all, and, any, concat, concatMap, elem, find, product, sum,
+    mapAccumL, mapAccumR
     ```
 
-    by re-exports of their generalised `Data.Foldable` counterparts.
-    In other words, unqualified imports of `Data.List` and
-    `Data.Foldable` no longer lead to conflicting definitions. (#9586)
+    by re-exports of their generalised `Data.Foldable`/`Data.Traversable`
+    counterparts.  In other words, unqualified imports of `Data.List`
+    and `Data.Foldable`/`Data.Traversable` no longer lead to conflicting
+    definitions. (#9586)
 
   * Replace the `Control.Monad`-exported functions
 
     ```
-    sequence_, msum, mapM_, forM_
+    sequence_, msum, mapM_, forM_,
+    forM, mapM, sequence
     ```
 
-    by re-exports of their generalised `Data.Foldable` counterparts.
-    In other words, unqualified imports of `Control.Monad` and
-    `Data.Foldable` no longer lead to conflicting definitions. (#9586)
+    by re-exports of their generalised `Data.Foldable`/`Data.Traversable`
+    counterparts.  In other words, unqualified imports of `Control.Monad`
+    and `Data.Foldable`/`Data.Traversable` no longer lead to conflicting
+    definitions. (#9586)
 
   * New module `Data.OldList` containing only list-specialised versions of
     the functions from `Data.List` (in other words, `Data.OldList` corresponds
