@@ -58,7 +58,7 @@ module GHC.Windows (
     ) where
 
 import Data.Char
-import Data.List
+import Data.OldList
 import Data.Maybe
 import Data.Word
 import Foreign.C.Error

@@ -8,7 +8,6 @@ import Foreign.C
 import Foreign.Ptr
 import Foreign.Marshal
 import Foreign.Storable
-import Control.Monad
 import Data.Bits
 import Data.Either
 import Data.Word
@@ -136,7 +135,7 @@ newCP rec fn cp = do
   -- Fail early if the code page doesn't exist, to match the behaviour of the IConv TextEncoding
   max_char_size <- alloca $ \cpinfo_ptr -> do
     success <- c_GetCPInfo cp cpinfo_ptr 
-    unless success $ throwGetLastError ("GetCPInfo " ++ show cp)
+    when (not success) $ throwGetLastError ("GetCPInfo " ++ show cp)
     fmap (fromIntegral . maxCharSize) $ peek cpinfo_ptr
 
   debugIO $ "GetCPInfo " ++ show cp ++ " = " ++ show max_char_size
