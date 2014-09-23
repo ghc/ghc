@@ -262,7 +262,7 @@ splitEithers (e : es) = case e of
 chkAppend :: [a] -> [a] -> [a]
 -- Checks for the second arguemnt being empty
 -- Used in situations where that situation is common
-chkAppend xs ys 
+chkAppend xs ys
   | null ys   = xs
   | otherwise = xs ++ ys
 \end{code}
@@ -589,7 +589,7 @@ dropTail :: Int -> [a] -> [a]
 dropTail n xs
   = go (drop n xs) xs
   where
-    go (_:ys) (x:xs) = x : go ys xs 
+    go (_:ys) (x:xs) = x : go ys xs
     go _      _      = []  -- Stop when ys runs out
                            -- It'll always run out before xs does
 
@@ -950,9 +950,7 @@ maybeReadFuzzy str = case reads str of
 -- Verify that the 'dirname' portion of a FilePath exists.
 --
 doesDirNameExist :: FilePath -> IO Bool
-doesDirNameExist fpath = case takeDirectory fpath of
-                         "" -> return True -- XXX Hack
-                         _  -> doesDirectoryExist (takeDirectory fpath)
+doesDirNameExist fpath = doesDirectoryExist (takeDirectory fpath)
 
 -----------------------------------------------------------------------------
 -- Backwards compatibility definition of getModificationTime

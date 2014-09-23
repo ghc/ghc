@@ -345,16 +345,16 @@ checkOptions mode dflags srcs objs = do
 
 -- Compiler output options
 
--- called to verify that the output files & directories
--- point somewhere valid.
+-- Called to verify that the output files point somewhere valid.
 --
 -- The assumption is that the directory portion of these output
 -- options will have to exist by the time 'verifyOutputFiles'
 -- is invoked.
 --
+-- We create the directories for -odir, -hidir, -outputdir etc. ourselves if
+-- they don't exist, so don't check for those here (#2278).
 verifyOutputFiles :: DynFlags -> IO ()
 verifyOutputFiles dflags = do
-  -- not -odir: we create the directory for -odir if it doesn't exist (#2278).
   let ofile = outputFile dflags
   when (isJust ofile) $ do
      let fn = fromJust ofile
