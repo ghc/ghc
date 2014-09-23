@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
 # This script can be used to generate some unregisterised .hc files
 # for bootstrapping GHC on a new/unsupported platform.  It involves a
