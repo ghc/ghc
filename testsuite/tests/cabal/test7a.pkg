@@ -13,6 +13,7 @@ category: none
 author: simonmar@microsoft.com
 exposed: True
 exposed-modules: E
-reexported-modules: testpkg:A, testpkg:A as A1, E as E2
+reexported-modules: testpkg-1.2.3.4-XXX:A as A, testpkg-1.2.3.4-XXX:A as A1,
+    testpkg7a-1.0-XXX:E as E2
 hs-libraries: testpkg7a-1.0
 depends: testpkg-1.2.3.4-XXX

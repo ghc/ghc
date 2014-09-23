@@ -14,14 +14,13 @@ module Main (main) where
 import Version ( version, targetOS, targetARCH )
 import qualified GHC.PackageDb as GhcPkg
 import qualified Distribution.Simple.PackageIndex as PackageIndex
+import qualified Data.Graph as Graph
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.ModuleName (ModuleName)
 import Distribution.InstalledPackageInfo as Cabal
-import Distribution.License
 import Distribution.Compat.ReadP hiding (get)
 import Distribution.ParseUtils
-import Distribution.ModuleExport
-import Distribution.Package hiding (depends)
+import Distribution.Package hiding (depends, installedPackageId)
 import Distribution.Text
 import Distribution.Version
 import Distribution.Simple.Utils (fromUTF8, toUTF8)
@@ -37,8 +36,6 @@ import Prelude
 import System.Console.GetOpt
 import qualified Control.Exception as Exception
 import Data.Maybe
-
-import qualified Data.Set as Set
 
 import Data.Char ( isSpace, toLower )
 import Data.Ord (comparing)
@@ -58,7 +55,6 @@ import Data.List
 import Control.Concurrent
 
 import qualified Data.ByteString.Char8 as BS
-import Data.Binary as Bin
 
 #if defined(mingw32_HOST_OS)
 -- mingw32 needs these for getExecDir
@@ -901,9 +897,6 @@ registerPackage input verbosity my_flags auto_ghci_libs multi_instance
   validatePackageConfig pkg_expanded verbosity truncated_stack
                         auto_ghci_libs multi_instance update force
 
-  -- postprocess the package
-  pkg' <- resolveReexports truncated_stack pkg
-
   let 
      -- In the normal mode, we only allow one version of each package, so we
      -- remove all instances with the same source package id as the one we're
@@ -914,7 +907,7 @@ registerPackage input verbosity my_flags auto_ghci_libs multi_instance
                  p <- packages db_to_operate_on,
                  sourcePackageId p == sourcePackageId pkg ]
   --
-  changeDB verbosity (removes ++ [AddPackage pkg']) db_to_operate_on
+  changeDB verbosity (removes ++ [AddPackage pkg]) db_to_operate_on
 
 parsePackageInfo
         :: String
@@ -936,47 +929,6 @@ mungePackageInfo ipi = ipi { packageKey = packageKey' }
       | OldPackageKey (PackageIdentifier (PackageName "") _) <- packageKey ipi
           = OldPackageKey (sourcePackageId ipi)
       | otherwise = packageKey ipi
-
--- | Takes the "reexported-modules" field of an InstalledPackageInfo
--- and resolves the references so they point to the original exporter
--- of a module (i.e. the module is in exposed-modules, not
--- reexported-modules).  This is done by maintaining an invariant on
--- the installed package database that a reexported-module field always
--- points to the original exporter.
-resolveReexports :: PackageDBStack
-                 -> InstalledPackageInfo
-                 -> IO InstalledPackageInfo
-resolveReexports db_stack pkg = do
-  let dep_mask = Set.fromList (depends pkg)
-      deps = filter (flip Set.member dep_mask . installedPackageId)
-                    (allPackagesInStack db_stack)
-      matchExposed pkg_dep m = map ((,) (installedPackageId pkg_dep))
-                                   (filter (==m) (exposedModules pkg_dep))
-      worker ModuleExport{ exportOrigPackageName = Just pnm } pkg_dep
-        | pnm /= packageName (sourcePackageId pkg_dep) = []
-      -- Now, either the package matches, *or* we were asked to search the
-      -- true location ourselves.
-      worker ModuleExport{ exportOrigName = m } pkg_dep =
-            matchExposed pkg_dep m ++
-            map (fromMaybe (error $ "Impossible! Missing true location in " ++
-                                    display (installedPackageId pkg_dep))
-                    . exportCachedTrueOrig)
-                (filter ((==m) . exportName) (reexportedModules pkg_dep))
-      self_reexports ModuleExport{ exportOrigPackageName = Just pnm }
-        | pnm /= packageName (sourcePackageId pkg) = []
-      self_reexports ModuleExport{ exportName = m', exportOrigName = m }
-        -- Self-reexport without renaming doesn't make sense
-        | m == m' = []
-        -- *Only* match against exposed modules!
-        | otherwise = matchExposed pkg m
-
-  r <- forM (reexportedModules pkg) $ \me -> do
-    case nub (concatMap (worker me) deps ++ self_reexports me) of
-      [c] -> return me { exportCachedTrueOrig = Just c }
-      [] -> die $ "Couldn't resolve reexport " ++ display me
-      cs -> die $ "Found multiple possible ways to resolve reexport " ++
-                  display me ++ ": " ++ show cs
-  return (pkg { reexportedModules = r })
 
 -- -----------------------------------------------------------------------------
 -- Making changes to a package database
@@ -1070,16 +1022,25 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.haddockHTMLs       = haddockHTMLs pkg,
        GhcPkg.exposedModules     = exposedModules pkg,
        GhcPkg.hiddenModules      = hiddenModules pkg,
-       GhcPkg.reexportedModules  = [ GhcPkg.ModuleExport m ipid' m'
-                                   | ModuleExport {
-                                       exportName = m,
-                                       exportCachedTrueOrig =
-                                         Just (InstalledPackageId ipid', m')
-                                     } <- reexportedModules pkg
-                                   ],
+       GhcPkg.reexportedModules  = map convertModuleReexport
+                                       (reexportedModules pkg),
        GhcPkg.exposed            = exposed pkg,
        GhcPkg.trusted            = trusted pkg
     }
+  where
+    convertModuleReexport :: ModuleReexport
+                          -> GhcPkg.ModuleExport String ModuleName
+    convertModuleReexport
+        ModuleReexport {
+          moduleReexportName            = m,
+          moduleReexportDefiningPackage = ipid',
+          moduleReexportDefiningName    = m'
+        }
+      = GhcPkg.ModuleExport {
+          exportModuleName         = m,
+          exportOriginalPackageId  = display ipid',
+          exportOriginalModuleName = m'
+        }
 
 instance GhcPkg.BinaryStringRep ModuleName where
   fromStringRep = ModuleName.fromString . fromUTF8 . BS.unpack
@@ -1559,7 +1520,9 @@ checkPackageConfig pkg verbosity db_stack auto_ghci_libs
   mapM_ (checkDir True  "framework-dirs") (frameworkDirs pkg)
   mapM_ (checkFile   True "haddock-interfaces") (haddockInterfaces pkg)
   mapM_ (checkDirURL True "haddock-html")       (haddockHTMLs pkg)
-  checkModules pkg
+  checkDuplicateModules pkg
+  checkModuleFiles pkg
+  checkModuleReexports db_stack pkg
   mapM_ (checkHSLib verbosity (libraryDirs pkg) auto_ghci_libs) (hsLibraries pkg)
   -- ToDo: check these somehow?
   --    extra_libraries :: [String],
@@ -1693,9 +1656,8 @@ doesFileExistOnPath filenames paths = go fullFilenames
         go ((p, fp) : xs) = do b <- doesFileExist fp
                                if b then return (Just p) else go xs
 
--- XXX maybe should check reexportedModules too
-checkModules :: InstalledPackageInfo -> Validate ()
-checkModules pkg = do
+checkModuleFiles :: InstalledPackageInfo -> Validate ()
+checkModuleFiles pkg = do
   mapM_ findModule (exposedModules pkg ++ hiddenModules pkg)
   where
     findModule modl =
@@ -1706,6 +1668,58 @@ checkModules pkg = do
       m <- liftIO $ doesFileExistOnPath files (importDirs pkg)
       when (isNothing m) $
          verror ForceFiles ("cannot find any of " ++ show files)
+
+checkDuplicateModules :: InstalledPackageInfo -> Validate ()
+checkDuplicateModules pkg
+  | null dups = return ()
+  | otherwise = verror ForceAll ("package has duplicate modules: " ++
+                                     unwords (map display dups))
+  where
+    dups = [ m | (m:_:_) <- group (sort mods) ]
+    mods = exposedModules pkg ++ hiddenModules pkg
+        ++ map moduleReexportName (reexportedModules pkg)
+
+checkModuleReexports :: PackageDBStack -> InstalledPackageInfo -> Validate ()
+checkModuleReexports db_stack pkg =
+    mapM_ checkReexport (reexportedModules pkg)
+  where
+    all_pkgs = allPackagesInStack db_stack
+    ipix     = PackageIndex.fromList all_pkgs
+
+    checkReexport ModuleReexport {
+      moduleReexportDefiningPackage = definingPkgId,
+      moduleReexportDefiningName    = definingModule
+    } = case if definingPkgId == installedPackageId pkg
+                then Just pkg
+                else PackageIndex.lookupInstalledPackageId ipix definingPkgId of
+          Nothing
+           -> verror ForceAll ("module re-export refers to a non-existent " ++
+                               "defining package: " ++
+                                       display definingPkgId)
+
+          Just definingPkg
+            | not (isIndirectDependency definingPkgId)
+           -> verror ForceAll ("module re-export refers to a defining  " ++
+                               "package that is not a direct (or indirect) " ++
+                               "dependency of this package: " ++
+                                       display definingPkgId)
+
+            | definingModule `notElem` exposedModules definingPkg
+           -> verror ForceAll ("module (self) re-export refers to a module " ++
+                               display definingModule ++ " " ++
+                               "that is not defined and exposed in the " ++
+                               "defining package " ++ display definingPkgId)
+
+            | otherwise
+           -> return ()
+
+    isIndirectDependency pkgid = fromMaybe False $ do
+      thispkg  <- graphVertex (installedPackageId pkg)
+      otherpkg <- graphVertex pkgid
+      return (Graph.path depgraph thispkg otherpkg)
+    (depgraph, _, graphVertex) =
+      PackageIndex.dependencyGraph (PackageIndex.insert pkg ipix)
+
 
 checkGHCiLib :: Verbosity -> String -> String -> String -> Bool -> IO ()
 checkGHCiLib verbosity batch_lib_dir batch_lib_file lib auto_build
@@ -2002,144 +2016,3 @@ removeFileSafe fn =
 
 absolutePath :: FilePath -> IO FilePath
 absolutePath path = return . normalise . (</> path) =<< getCurrentDirectory
-
------------------------------------------------------------------------------
--- Binary instances for the Cabal InstalledPackageInfo types
---
-
-instance Binary m => Binary (InstalledPackageInfo_ m) where
-  put = putInstalledPackageInfo
-  get = getInstalledPackageInfo
-
-putInstalledPackageInfo :: Binary m => InstalledPackageInfo_ m -> Put
-putInstalledPackageInfo ipi = do
-  put (sourcePackageId ipi)
-  put (installedPackageId ipi)
-  put (packageKey ipi)
-  put (license ipi)
-  put (copyright ipi)
-  put (maintainer ipi)
-  put (author ipi)
-  put (stability ipi)
-  put (homepage ipi)
-  put (pkgUrl ipi)
-  put (synopsis ipi)
-  put (description ipi)
-  put (category ipi)
-  put (exposed ipi)
-  put (exposedModules ipi)
-  put (reexportedModules ipi)
-  put (hiddenModules ipi)
-  put (trusted ipi)
-  put (importDirs ipi)
-  put (libraryDirs ipi)
-  put (hsLibraries ipi)
-  put (extraLibraries ipi)
-  put (extraGHCiLibraries ipi)
-  put (includeDirs ipi)
-  put (includes ipi)
-  put (depends ipi)
-  put (hugsOptions ipi)
-  put (ccOptions ipi)
-  put (ldOptions ipi)
-  put (frameworkDirs ipi)
-  put (frameworks ipi)
-  put (haddockInterfaces ipi)
-  put (haddockHTMLs ipi)
-
-getInstalledPackageInfo :: Binary m => Get (InstalledPackageInfo_ m)
-getInstalledPackageInfo = do
-  sourcePackageId <- get
-  installedPackageId <- get
-  packageKey <- get
-  license <- get
-  copyright <- get
-  maintainer <- get
-  author <- get
-  stability <- get
-  homepage <- get
-  pkgUrl <- get
-  synopsis <- get
-  description <- get
-  category <- get
-  exposed <- get
-  exposedModules <- get
-  reexportedModules <- get
-  hiddenModules <- get
-  trusted <- get
-  importDirs <- get
-  libraryDirs <- get
-  hsLibraries <- get
-  extraLibraries <- get
-  extraGHCiLibraries <- get
-  includeDirs <- get
-  includes <- get
-  depends <- get
-  hugsOptions <- get
-  ccOptions <- get
-  ldOptions <- get
-  frameworkDirs <- get
-  frameworks <- get
-  haddockInterfaces <- get
-  haddockHTMLs <- get
-  return InstalledPackageInfo{..}
-
-instance Binary PackageIdentifier where
-  put pid = do put (pkgName pid); put (pkgVersion pid)
-  get = do
-    pkgName <- get
-    pkgVersion <- get
-    return PackageIdentifier{..}
-
-instance Binary License where
-  put (GPL v)              = do putWord8 0; put v
-  put (LGPL v)             = do putWord8 1; put v
-  put BSD3                 = do putWord8 2
-  put BSD4                 = do putWord8 3
-  put MIT                  = do putWord8 4
-  put PublicDomain         = do putWord8 5
-  put AllRightsReserved    = do putWord8 6
-  put OtherLicense         = do putWord8 7
-  put (Apache v)           = do putWord8 8; put v
-  put (AGPL v)             = do putWord8 9; put v
-  put BSD2                 = do putWord8 10
-  put (MPL v)              = do putWord8 11; put v
-  put (UnknownLicense str) = do putWord8 12; put str
-
-  get = do
-    n <- getWord8
-    case n of
-      0 -> do v <- get; return (GPL v)
-      1 -> do v <- get; return (LGPL v)
-      2 -> return BSD3
-      3 -> return BSD4
-      4 -> return MIT
-      5 -> return PublicDomain
-      6 -> return AllRightsReserved
-      7 -> return OtherLicense
-      8 -> do v <- get; return (Apache v)
-      9 -> do v <- get; return (AGPL v)
-      10 -> return BSD2
-      11 -> do v <- get; return (MPL v)
-      _ -> do str <- get; return (UnknownLicense str)
-
-deriving instance Binary PackageName
-deriving instance Binary InstalledPackageId
-
-instance Binary ModuleName where
-  put = put . display
-  get = fmap ModuleName.fromString get
-
-instance Binary m => Binary (ModuleExport m) where
-  put (ModuleExport a b c d) = do put a; put b; put c; put d
-  get = do a <- get; b <- get; c <- get; d <- get;
-           return (ModuleExport a b c d)
-
-instance Binary PackageKey where
-  put (PackageKey a b c) = do putWord8 0; put a; put b; put c
-  put (OldPackageKey a) = do putWord8 1; put a
-  get = do n <- getWord8
-           case n of
-            0 -> do a <- get; b <- get; c <- get; return (PackageKey a b c)
-            1 -> do a <- get; return (OldPackageKey a)
-            _ -> fail ("Binary PackageKey: bad branch " ++ show n)

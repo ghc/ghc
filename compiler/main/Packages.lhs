@@ -767,11 +767,15 @@ findBroken pkgs = go [] Map.empty pkgs
 -- package name/version.  Additionally, a package may be preferred if
 -- it is in the transitive closure of packages selected using -package-id
 -- flags.
+type UnusablePackage = (PackageConfig, UnusablePackageReason)
 shadowPackages :: [PackageConfig] -> [InstalledPackageId] -> UnusablePackages
 shadowPackages pkgs preferred
  = let (shadowed,_) = foldl check ([],emptyUFM) pkgs
    in  Map.fromList shadowed
  where
+ check :: ([(InstalledPackageId, UnusablePackage)], UniqFM PackageConfig)
+       -> PackageConfig
+       -> ([(InstalledPackageId, UnusablePackage)], UniqFM PackageConfig)
  check (shadowed,pkgmap) pkg
       | Just oldpkg <- lookupUFM pkgmap pkgid
       , let
@@ -785,7 +789,7 @@ shadowPackages pkgs preferred
       | otherwise
       = (shadowed, pkgmap')
       where
-        pkgid = mkFastString (sourcePackageIdString pkg)
+        pkgid = packageKeyFS (packageKey pkg)
         pkgmap' = addToUFM pkgmap pkgid pkg
 
 -- -----------------------------------------------------------------------------

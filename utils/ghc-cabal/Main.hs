@@ -347,7 +347,7 @@ generate directory distdir dll0Modules config_args
           do cwd <- getCurrentDirectory
              let ipid = InstalledPackageId (display (packageId pd) ++ "-inplace")
              let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
-                                        pd lib lbi clbi
+                                        pd ipid lib lbi clbi
                  final_ipi = installedPkgInfo {
                                  Installed.installedPackageId = ipid,
                                  Installed.haddockHTMLs = []

@@ -40,7 +40,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 4500376192, 5)
+          [(wordsize(64), 5840893376, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -56,6 +56,7 @@ test('haddock.Cabal',
             # 2014-08-29: 4267311856 (x86_64/Linux - w/w for INLINABLE things)
             # 2014-09-09: 4660249216 (x86_64/Linux - Applicative/Monad changes according to Austin)
             # 2014-09-10: 4500376192 (x86_64/Linux - Applicative/Monad changes according to Joachim)
+            # 2014-09-24: 5840893376 (x86_64/Linux - Cabal update)
 
           ,(platform('i386-unknown-mingw32'), 2052220292, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)
