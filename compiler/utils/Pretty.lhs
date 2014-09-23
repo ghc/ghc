@@ -184,12 +184,10 @@ import Panic
 import Numeric (fromRat)
 import System.IO
 
-#if defined(__GLASGOW_HASKELL__)
 --for a RULES
 import GHC.Base ( unpackCString# )
 import GHC.Exts ( Int# )
 import GHC.Ptr  ( Ptr(..) )
-#endif
 
 -- Don't import Util( assertPanic ) because it makes a loop in the module structure
 
@@ -556,13 +554,11 @@ ztext :: FastZString -> Doc
 ztext s = case iUnbox (lengthFZS s) of {sl -> textBeside_ (ZStr s) sl Empty}
 zeroWidthText s = textBeside_ (Str s) (_ILIT(0)) Empty
 
-#if defined(__GLASGOW_HASKELL__)
 -- RULE that turns (text "abc") into (ptext (A# "abc"#)) to avoid the
 -- intermediate packing/unpacking of the string.
 {-# RULES
   "text/str" forall a. text (unpackCString# a) = ptext (Ptr a)
  #-}
-#endif
 
 nest k  p = mkNest (iUnbox k) (reduceDoc p)        -- Externally callable version
 

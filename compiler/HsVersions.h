@@ -22,9 +22,6 @@ you will screw up the layout where they are used in case expressions!
  * settings for the target plat instead). */
 #include "../includes/ghcautoconf.h"
 
-/* Global variables may not work in other Haskell implementations,
- * but we need them currently! so the conditional on GLASGOW won't do. */
-#if defined(__GLASGOW_HASKELL__) || !defined(__GLASGOW_HASKELL__)
 #define GLOBAL_VAR(name,value,ty)  \
 {-# NOINLINE name #-};             \
 name :: IORef (ty);                \
@@ -34,14 +31,13 @@ name = Util.global (value);
 {-# NOINLINE name #-};              \
 name :: IORef (ty);                 \
 name = Util.globalM (value);
-#endif
 
 #define ASSERT(e)      if debugIsOn && not (e) then (assertPanic __FILE__ __LINE__) else
 #define ASSERT2(e,msg) if debugIsOn && not (e) then (assertPprPanic __FILE__ __LINE__ (msg)) else
 #define WARN( e, msg ) (warnPprTrace (e) __FILE__ __LINE__ (msg)) $
 
 -- Examples:   Assuming   flagSet :: String -> m Bool
--- 
+--
 --    do { c   <- getChar; MASSERT( isUpper c ); ... }
 --    do { c   <- getChar; MASSERT2( isUpper c, text "Bad" ); ... }
 --    do { str <- getStr;  ASSERTM( flagSet str ); .. }

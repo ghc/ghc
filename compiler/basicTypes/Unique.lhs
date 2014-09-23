@@ -66,12 +66,9 @@ import Outputable
 -- import StaticFlags
 import Util
 
-#if defined(__GLASGOW_HASKELL__)
 --just for implementing a fast [0,61) -> Char function
 import GHC.Exts (indexCharOffAddr#, Char(..))
-#else
-import Data.Array
-#endif
+
 import Data.Char        ( chr, ord )
 \end{code}
 
@@ -260,15 +257,8 @@ iToBase62 n_
 
     chooseChar62 :: FastInt -> Char
     {-# INLINE chooseChar62 #-}
-#if defined(__GLASGOW_HASKELL__)
-    --then FastInt == Int#
     chooseChar62 n = C# (indexCharOffAddr# chars62 n)
     !chars62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"#
-#else
-    --Haskell98 arrays are portable
-    chooseChar62 n = (!) chars62 n
-    chars62 = listArray (0,61) "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-#endif
 \end{code}
 
 %************************************************************************

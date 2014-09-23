@@ -16,7 +16,6 @@ module FastMutInt(
         readFastMutPtr, writeFastMutPtr
   ) where
 
-#ifdef __GLASGOW_HASKELL__
 
 #include "../includes/MachDeps.h"
 #ifndef SIZEOF_HSINT
@@ -25,12 +24,6 @@ module FastMutInt(
 
 import GHC.Base
 import GHC.Ptr
-
-#else /* ! __GLASGOW_HASKELL__ */
-
-import Data.IORef
-
-#endif
 
 newFastMutInt :: IO FastMutInt
 readFastMutInt :: FastMutInt -> IO Int
@@ -42,7 +35,6 @@ writeFastMutPtr :: FastMutPtr -> Ptr a -> IO ()
 \end{code}
 
 \begin{code}
-#ifdef __GLASGOW_HASKELL__
 data FastMutInt = FastMutInt (MutableByteArray# RealWorld)
 
 newFastMutInt = IO $ \s ->
@@ -72,43 +64,5 @@ readFastMutPtr (FastMutPtr arr) = IO $ \s ->
 writeFastMutPtr (FastMutPtr arr) (Ptr i) = IO $ \s ->
   case writeAddrArray# arr 0# i s of { s ->
   (# s, () #) }
-#else /* ! __GLASGOW_HASKELL__ */
---maybe someday we could use
---http://haskell.org/haskellwiki/Library/ArrayRef
---which has an implementation of IOURefs
---that is unboxed in GHC and just strict in all other compilers...
-newtype FastMutInt = FastMutInt (IORef Int)
-
--- If any default value was chosen, it surely would be 0,
--- so we will use that since IORef requires a default value.
--- Or maybe it would be more interesting to package an error,
--- assuming nothing relies on being able to read a bogus Int?
--- That could interfere with its strictness for smart optimizers
--- (are they allowed to optimize a 'newtype' that way?) ...
--- Well, maybe that can be added (in DEBUG?) later.
-newFastMutInt = fmap FastMutInt (newIORef 0)
-
-readFastMutInt (FastMutInt ioRefInt) = readIORef ioRefInt
-
--- FastMutInt is strict in the value it contains.
-writeFastMutInt (FastMutInt ioRefInt) i = i `seq` writeIORef ioRefInt i
-
-
-newtype FastMutPtr = FastMutPtr (IORef (Ptr ()))
-
--- If any default value was chosen, it surely would be 0,
--- so we will use that since IORef requires a default value.
--- Or maybe it would be more interesting to package an error,
--- assuming nothing relies on being able to read a bogus Ptr?
--- That could interfere with its strictness for smart optimizers
--- (are they allowed to optimize a 'newtype' that way?) ...
--- Well, maybe that can be added (in DEBUG?) later.
-newFastMutPtr = fmap FastMutPtr (newIORef (castPtr nullPtr))
-
-readFastMutPtr (FastMutPtr ioRefPtr) = readIORef ioRefPtr
-
--- FastMutPtr is strict in the value it contains.
-writeFastMutPtr (FastMutPtr ioRefPtr) i = i `seq` writeIORef ioRefPtr i
-#endif
 \end{code}
 

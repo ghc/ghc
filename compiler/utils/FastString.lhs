@@ -50,9 +50,7 @@ module FastString
         mkFastStringBytes,
         mkFastStringByteList,
         mkFastStringForeignPtr,
-#if defined(__GLASGOW_HASKELL__)
         mkFastString#,
-#endif
 
         -- ** Deconstruction
         unpackFS,           -- :: FastString -> String
@@ -84,9 +82,7 @@ module FastString
 
         -- ** Construction
         sLit,
-#if defined(__GLASGOW_HASKELL__)
         mkLitString#,
-#endif
         mkLitString,
 
         -- ** Deconstruction
@@ -128,9 +124,7 @@ import Foreign.Safe
 import GHC.Conc.Sync    (sharedCAF)
 #endif
 
-#if defined(__GLASGOW_HASKELL__)
 import GHC.Base         ( unpackCString# )
-#endif
 
 #define hASH_TBL_SIZE          4091
 #define hASH_TBL_SIZE_UNBOXED  4091#
@@ -573,10 +567,8 @@ type LitString = Ptr Word8
 --If it's commonly needed, we should perhaps have
 --data LitString = LitString {-#UNPACK#-}!(FastPtr Word8) {-#UNPACK#-}!FastInt
 
-#if defined(__GLASGOW_HASKELL__)
 mkLitString# :: Addr# -> LitString
 mkLitString# a# = Ptr a#
-#endif
 --can/should we use FastTypes here?
 --Is this likely to be memory-preserving if only used on constant strings?
 --should we inline it? If lucky, that would make a CAF that wouldn't

@@ -46,12 +46,9 @@ module Binary
    lazyGet,
    lazyPut,
 
-#ifdef __GLASGOW_HASKELL__
-   -- GHC only:
    ByteArray(..),
    getByteArray,
    putByteArray,
-#endif
 
    UserData(..), getUserData, setUserData,
    newReadState, newWriteState,
@@ -461,7 +458,6 @@ instance Binary DiffTime where
     get bh = do r <- get bh
                 return $ fromRational r
 
-#if defined(__GLASGOW_HASKELL__) || 1
 --to quote binary-0.3 on this code idea,
 --
 -- TODO  This instance is not architecture portable.  GMP stores numbers as
@@ -553,7 +549,6 @@ indexByteArray a# n# = W8# (indexWord8Array# a# n#)
 instance (Integral a, Binary a) => Binary (Ratio a) where
     put_ bh (a :% b) = do put_ bh a; put_ bh b
     get bh = do a <- get bh; b <- get bh; return (a :% b)
-#endif
 
 instance Binary (Bin a) where
   put_ bh (BinPtr i) = put_ bh (fromIntegral i :: Int32)

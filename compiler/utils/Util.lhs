@@ -737,7 +737,6 @@ matchVectors = snd . foldl' go (0 :: Int, IM.empty)
                            im' = IM.insertWith (.|.) (ord char) (2 ^ ix) im
                        in seq ix' $ seq im' $ (ix', im')
 
-#ifdef __GLASGOW_HASKELL__
 {-# SPECIALIZE INLINE restrictedDamerauLevenshteinDistance'
                       :: Word32 -> Int -> Int -> String -> String -> Int #-}
 {-# SPECIALIZE INLINE restrictedDamerauLevenshteinDistance'
@@ -757,7 +756,6 @@ matchVectors = snd . foldl' go (0 :: Int, IM.empty)
 
 {-# SPECIALIZE matchVectors :: String -> IM.IntMap Word32 #-}
 {-# SPECIALIZE matchVectors :: String -> IM.IntMap Integer #-}
-#endif
 
 fuzzyMatch :: String -> [String] -> [String]
 fuzzyMatch key vals = fuzzyLookup key [(v,v) | v <- vals]

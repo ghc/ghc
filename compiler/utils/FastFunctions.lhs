@@ -19,8 +19,6 @@ import FastTypes
 import Data.IORef
 import System.IO.Unsafe
 
-#if defined(__GLASGOW_HASKELL__)
-
 import GHC.Exts
 import GHC.Word
 import GHC.Base (unsafeChr)
@@ -36,29 +34,6 @@ indexWord8OffFastPtr p i = W8# (indexWord8OffAddr# p i)
 indexWord8OffFastPtrAsFastChar p i = indexCharOffAddr# p i
 indexWord8OffFastPtrAsFastInt p i = word2Int# (indexWord8OffAddr# p i)
 -- or ord# (indexCharOffAddr# p i)
-
-#else /* ! __GLASGOW_HASKELL__ */
-
-import Foreign.Ptr
-import Data.Word
-
--- hey, no harm inlining it, :-P
-{-# INLINE inlinePerformIO #-}
-inlinePerformIO :: IO a -> a
-inlinePerformIO = unsafePerformIO
-
-unsafeDupableInterleaveIO :: IO a -> IO a
-unsafeDupableInterleaveIO = unsafeInterleaveIO
-
--- truly, these functions are unsafe: they assume
--- a certain immutability of the pointer's target area.
-indexWord8OffFastPtr p i = inlinePerformIO (peekByteOff p n) :: Word8
-indexWord8OffFastPtrAsFastInt p i =
-  iUnbox (fromIntegral (inlinePerformIO (peekByteOff p n) :: Word8))
-indexWord8OffFastPtrAsFastChar p i =
-  fastChr (iUnbox (fromIntegral (inlinePerformIO (peekByteOff p n) :: Word8)))
-
-#endif /* ! __GLASGOW_HASKELL__ */
 
 --just so we can refer to the type clearly in a macro
 type Global a = IORef a
