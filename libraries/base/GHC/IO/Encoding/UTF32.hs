@@ -11,7 +11,7 @@
 -- Module      :  GHC.IO.Encoding.UTF32
 -- Copyright   :  (c) The University of Glasgow, 2009
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
@@ -202,10 +202,10 @@ utf32le_EF cfm =
 
 
 utf32be_decode :: DecodeBuffer
-utf32be_decode 
+utf32be_decode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
- = let 
+ = let
        loop !ir !ow
          | ow >= os    = done OutputUnderflow ir ow
          | iw - ir < 4 = done InputUnderflow  ir ow
@@ -230,10 +230,10 @@ utf32be_decode
     loop ir0 ow0
 
 utf32le_decode :: DecodeBuffer
-utf32le_decode 
+utf32le_decode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
- = let 
+ = let
        loop !ir !ow
          | ow >= os    = done OutputUnderflow ir ow
          | iw - ir < 4 = done InputUnderflow  ir ow
@@ -261,7 +261,7 @@ utf32be_encode :: EncodeBuffer
 utf32be_encode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
- = let 
+ = let
       done why !ir !ow = return (why,
                                  if ir == iw then input{ bufL=0, bufR=0 }
                                              else input{ bufL=ir },
@@ -320,8 +320,8 @@ chr4 (W8# x1#) (W8# x2#) (W8# x3#) (W8# x4#) =
 {-# INLINE chr4 #-}
 
 ord4 :: Char -> (Word8,Word8,Word8,Word8)
-ord4 c = (fromIntegral (x `shiftR` 24), 
-          fromIntegral (x `shiftR` 16), 
+ord4 c = (fromIntegral (x `shiftR` 24),
+          fromIntegral (x `shiftR` 16),
           fromIntegral (x `shiftR` 8),
           fromIntegral x)
   where

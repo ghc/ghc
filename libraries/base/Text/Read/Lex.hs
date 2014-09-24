@@ -164,7 +164,7 @@ lex = skipSpaces >> lexToken
 
 -- | /Since: 4.7.0.0/
 expect :: Lexeme -> ReadP ()
-expect lexeme = do { skipSpaces 
+expect lexeme = do { skipSpaces
                    ; thing <- lexToken
                    ; if thing == lexeme then return () else pfail }
 

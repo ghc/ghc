@@ -144,7 +144,7 @@ Likewise we implicitly need Integer when deriving things like Eq
 instances.
 
 The danger is that if the build system doesn't know about the dependency
-on Integer, it'll compile some base module before GHC.Integer.Type, 
+on Integer, it'll compile some base module before GHC.Integer.Type,
 resulting in:
   Failed to load interface for ‘GHC.Integer.Type’
     There are files missing in the ‘integer-gmp’ package,
@@ -563,11 +563,11 @@ liftM5 f m1 m2 m3 m4 m5 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; x5 <- m5;
 {-# SPECIALISE liftM5 :: (a1->a2->a3->a4->a5->r) -> Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe a4 -> Maybe a5 -> Maybe r #-}
 
 {- | In many situations, the 'liftM' operations can be replaced by uses of
-'ap', which promotes function application. 
+'ap', which promotes function application.
 
 >       return f `ap` x1 `ap` ... `ap` xn
 
-is equivalent to 
+is equivalent to
 
 >       liftMn f x1 x2 ... xn
 

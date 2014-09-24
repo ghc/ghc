@@ -6,7 +6,7 @@
 -- Module      :  System.IO
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  stable
 -- Portability :  portable
@@ -181,21 +181,21 @@ module System.IO (
     -- 'readFile'), where a decoding error merely results in
     -- termination of the character stream, as with other I/O errors.
 
-    hSetEncoding, 
+    hSetEncoding,
     hGetEncoding,
 
     -- ** Unicode encodings
-    TextEncoding, 
+    TextEncoding,
     latin1,
     utf8, utf8_bom,
     utf16, utf16le, utf16be,
-    utf32, utf32le, utf32be, 
+    utf32, utf32le, utf32be,
     localeEncoding,
     char8,
     mkTextEncoding,
 
     -- * Newline conversion
-    
+
     -- | In Haskell, a newline is always represented by the character
     -- '\n'.  However, in files and external character streams, a
     -- newline may be represented by another character sequence, such
@@ -213,9 +213,9 @@ module System.IO (
     --
     -- Binary-mode 'Handle's do no newline translation at all.
     --
-    hSetNewlineMode, 
-    Newline(..), nativeNewline, 
-    NewlineMode(..), 
+    hSetNewlineMode,
+    Newline(..), nativeNewline,
+    NewlineMode(..),
     noNewlineTranslation, universalNewlineMode, nativeNewlineMode,
   ) where
 
@@ -358,7 +358,7 @@ localeEncoding = initLocaleEncoding
 
 -- | Computation 'hReady' @hdl@ indicates whether at least one item is
 -- available for input from handle @hdl@.
--- 
+--
 -- This operation may fail with:
 --
 --  * 'System.IO.Error.isEOFError' if the end of file has been reached.

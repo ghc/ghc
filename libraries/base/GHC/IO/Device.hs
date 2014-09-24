@@ -6,7 +6,7 @@
 -- Module      :  GHC.IO.Device
 -- Copyright   :  (c) The University of Glasgow, 1994-2008
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
@@ -20,7 +20,7 @@ module GHC.IO.Device (
         IODevice(..),
         IODeviceType(..),
         SeekMode(..)
-    ) where  
+    ) where
 
 import GHC.Base
 import GHC.Word
@@ -62,7 +62,7 @@ class IODevice a where
   -- to read (if @write@ is 'False') or space to write new data (if
   -- @write@ is 'True').  @msecs@ specifies how long to wait, in
   -- milliseconds.
-  -- 
+  --
   ready :: a -> Bool -> Int -> IO Bool
 
   -- | closes the device.  Further operations on the device should
@@ -90,7 +90,7 @@ class IODevice a where
   getSize _ = ioe_unsupportedOperation
 
   -- | change the size of the data.
-  setSize :: a -> Integer -> IO () 
+  setSize :: a -> Integer -> IO ()
   setSize _ _ = ioe_unsupportedOperation
 
   -- | for terminal devices, changes whether characters are echoed on

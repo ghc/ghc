@@ -6,7 +6,7 @@
 -- Module      :  Text.ParserCombinators.ReadPrec
 -- Copyright   :  (c) The University of Glasgow 2002
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  non-portable (uses Text.ParserCombinators.ReadP)
@@ -113,7 +113,7 @@ reset :: ReadPrec a -> ReadPrec a
 reset (P f) = P (\_ -> f minPrec)
 
 prec :: Prec -> ReadPrec a -> ReadPrec a
--- ^ @(prec n p)@ checks whether the precedence context is 
+-- ^ @(prec n p)@ checks whether the precedence context is
 --   less than or equal to @n@, and
 --
 --   * if not, fails

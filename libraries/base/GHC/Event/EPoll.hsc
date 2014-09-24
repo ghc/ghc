@@ -167,7 +167,7 @@ newtype EventType = EventType {
  , epollOut = EPOLLOUT
  , epollErr = EPOLLERR
  , epollHup = EPOLLHUP
- , epollOneShot = EPOLLONESHOT              
+ , epollOneShot = EPOLLONESHOT
  }
 
 -- | Create a new epoll context, returning a file descriptor associated with the context.

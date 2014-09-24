@@ -6,7 +6,7 @@
 -- Module      :  Data.Maybe
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  stable
 -- Portability :  portable
@@ -80,7 +80,7 @@ listToMaybe []        =  Nothing
 listToMaybe (a:_)     =  Just a
 
 -- | The 'catMaybes' function takes a list of 'Maybe's and returns
--- a list of all the 'Just' values. 
+-- a list of all the 'Just' values.
 catMaybes              :: [Maybe a] -> [a]
 catMaybes ls = [x | Just x <- ls]
 

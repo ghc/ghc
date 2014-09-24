@@ -14,7 +14,7 @@
 -- Module      :  GHC.Weak
 -- Copyright   :  (c) The University of Glasgow, 1998-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -46,7 +46,7 @@ A weak pointer may also have a finalizer of type @IO ()@; if it does,
 then the finalizer will be run at most once, at a time after the key
 has become unreachable by the program (\"dead\").  The storage manager
 attempts to run the finalizer(s) for an object soon after the object
-dies, but promptness is not guaranteed.  
+dies, but promptness is not guaranteed.
 
 It is not guaranteed that a finalizer will eventually run, and no
 attempt is made to run outstanding finalizers when the program exits.
@@ -137,7 +137,7 @@ Instance Eq (Weak v) where
 -}
 
 
--- run a batch of finalizers from the garbage collector.  We're given 
+-- run a batch of finalizers from the garbage collector.  We're given
 -- an array of finalizers and the length of the array, and we just
 -- call each one in turn.
 --
@@ -145,13 +145,13 @@ Instance Eq (Weak v) where
 -- code (sigh) --SDM.
 
 runFinalizerBatch :: Int -> Array# (IO ()) -> IO ()
-runFinalizerBatch (I# n) arr = 
+runFinalizerBatch (I# n) arr =
    let  go m  = IO $ \s ->
-                  case m of 
+                  case m of
                   0# -> (# s, () #)
                   _  -> let !m' = m -# 1# in
-                        case indexArray# arr m' of { (# io #) -> 
-                        case unIO io s of          { (# s', _ #) -> 
+                        case indexArray# arr m' of { (# io #) ->
+                        case unIO io s of          { (# s', _ #) ->
                         unIO (go m') s'
                         }}
    in

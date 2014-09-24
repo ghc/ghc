@@ -102,7 +102,7 @@ class Foldable t where
     foldr :: (a -> b -> b) -> b -> t a -> b
     foldr f z t = appEndo (foldMap (Endo . f) t) z
 
-    -- | Right-associative fold of a structure, 
+    -- | Right-associative fold of a structure,
     -- but with strict application of the operator.
     foldr' :: (a -> b -> b) -> b -> t a -> b
     foldr' f z0 xs = foldl f' id xs z0

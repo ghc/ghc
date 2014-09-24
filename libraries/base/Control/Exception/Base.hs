@@ -7,7 +7,7 @@
 -- Module      :  Control.Exception.Base
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  non-portable (extended exceptions)
@@ -387,7 +387,7 @@ recSelError, recConError, irrefutPatError, runtimeError,
         :: Addr# -> a   -- All take a UTF8-encoded C string
 
 recSelError              s = throw (RecSelError ("No match in record selector "
-			                         ++ unpackCStringUtf8# s))  -- No location info unfortunately
+                                                 ++ unpackCStringUtf8# s))  -- No location info unfortunately
 runtimeError             s = error (unpackCStringUtf8# s)                   -- No location info unfortunately
 absentError              s = error ("Oops!  Entered absent arg " ++ unpackCStringUtf8# s)
 

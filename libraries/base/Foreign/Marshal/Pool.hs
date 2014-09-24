@@ -6,7 +6,7 @@
 -- Module      :  Foreign.Marshal.Pool
 -- Copyright   :  (c) Sven Panne 2002-2004
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  sven.panne@aedion.de
 -- Stability   :  provisional
 -- Portability :  portable

@@ -7,19 +7,19 @@
 -- Module      :  Data.Version
 -- Copyright   :  (c) The University of Glasgow 2004
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  non-portable (local universal quantification in ReadP)
 --
 -- A general library for representation and manipulation of versions.
--- 
+--
 -- Versioning schemes are many and varied, so the version
 -- representation provided by this library is intended to be a
 -- compromise between complete generality, where almost no common
 -- functionality could reasonably be provided, and fixing a particular
 -- versioning scheme, which would probably be too restrictive.
--- 
+--
 -- So the approach taken here is to provide a representation which
 -- subsumes many of the versioning schemes commonly in use, and we
 -- provide implementations of 'Eq', 'Ord' and conversion to\/from 'String'
@@ -46,7 +46,7 @@ import Text.ParserCombinators.ReadP
 import Text.Read        ( read )
 
 {- |
-A 'Version' represents the version of a software entity.  
+A 'Version' represents the version of a software entity.
 
 An instance of 'Eq' is provided, which implements exact equality
 modulo reordering of the tags in the 'versionTags' field.
@@ -68,7 +68,7 @@ possible concrete representation is provided (see 'showVersion' and
 'parseVersion'), but depending on the application a different concrete
 representation may be more appropriate.
 -}
-data Version = 
+data Version =
   Version { versionBranch :: [Int],
                 -- ^ The numeric branch for this version.  This reflects the
                 -- fact that most software versions are tree-structured; there
@@ -77,7 +77,7 @@ data Version =
                 -- version 3 is 3.1, the second branch off the trunk after
                 -- version 3 is 3.2, and so on.  The tree can be branched
                 -- arbitrarily, just by adding more digits.
-                -- 
+                --
                 -- We represent the branch as a list of 'Int', so
                 -- version 3.2.1 becomes [3,2,1].  Lexicographic ordering
                 -- (i.e. the default instance of 'Ord' for @[Int]@) gives
@@ -91,7 +91,7 @@ data Version =
   deriving (Read,Show,Typeable)
 
 instance Eq Version where
-  v1 == v2  =  versionBranch v1 == versionBranch v2 
+  v1 == v2  =  versionBranch v1 == versionBranch v2
                 && sort (versionTags v1) == sort (versionTags v2)
                 -- tags may be in any order
 
@@ -102,12 +102,12 @@ instance Ord Version where
 -- A concrete representation of 'Version'
 
 -- | Provides one possible concrete representation for 'Version'.  For
--- a version with 'versionBranch' @= [1,2,3]@ and 'versionTags' 
+-- a version with 'versionBranch' @= [1,2,3]@ and 'versionTags'
 -- @= [\"tag1\",\"tag2\"]@, the output will be @1.2.3-tag1-tag2@.
 --
 showVersion :: Version -> String
 showVersion (Version branch tags)
-  = concat (intersperse "." (map show branch)) ++ 
+  = concat (intersperse "." (map show branch)) ++
      concatMap ('-':) tags
 
 -- | A parser for versions in the format produced by 'showVersion'.

@@ -13,7 +13,7 @@
 -- Module      :  GHC.IO
 -- Copyright   :  (c) The University of Glasgow 1994-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -34,7 +34,7 @@ module GHC.IO (
         FilePath,
 
         catchException, catchAny, throwIO,
-        mask, mask_, uninterruptibleMask, uninterruptibleMask_, 
+        mask, mask_, uninterruptibleMask, uninterruptibleMask_,
         MaskingState(..), getMaskingState,
         unsafeUnmask,
         onException, bracket, finally, evaluate
@@ -61,7 +61,7 @@ system.  The following list may or may not be exhaustive:
 Compiler  - types of various primitives in PrimOp.lhs
 
 RTS       - forceIO (StgMiscClosures.hc)
-          - catchzh_fast, (un)?blockAsyncExceptionszh_fast, raisezh_fast 
+          - catchzh_fast, (un)?blockAsyncExceptionszh_fast, raisezh_fast
             (Exceptions.hc)
           - raiseAsync (Schedule.c)
 
@@ -129,8 +129,8 @@ different precautions:
         two side effects that were meant to be separate.  A good example
         is using multiple global variables (like @test@ in the example below).
 
-  * Make sure that the either you switch off let-floating (@-fno-full-laziness@), or that the 
-        call to 'unsafePerformIO' cannot float outside a lambda.  For example, 
+  * Make sure that the either you switch off let-floating (@-fno-full-laziness@), or that the
+        call to 'unsafePerformIO' cannot float outside a lambda.  For example,
         if you say:
         @
            f x = unsafePerformIO (newIORef [])
@@ -147,7 +147,7 @@ It is less well known that
 
 >     test :: IORef [a]
 >     test = unsafePerformIO $ newIORef []
->     
+>
 >     main = do
 >             writeIORef test [42]
 >             bang <- readIORef test
@@ -163,7 +163,7 @@ help of 'unsafePerformIO'.  So be careful!
 unsafePerformIO :: IO a -> a
 unsafePerformIO m = unsafeDupablePerformIO (noDuplicate >> m)
 
-{-| 
+{-|
 This version of 'unsafePerformIO' is more efficient
 because it omits the check that the IO is only being performed by a
 single thread.  Hence, when you use 'unsafeDupablePerformIO',
@@ -245,7 +245,7 @@ unsafeDupableInterleaveIO (IO m)
                 in
                 (# s, r #))
 
-{-| 
+{-|
 Ensures that the suspensions under evaluation by the current thread
 are unique; that is, the current thread is not evaluating anything
 that is also under evaluation by another thread that has also executed
@@ -348,7 +348,7 @@ blockUninterruptible (IO io) = IO $ maskUninterruptible# io
 -- exception is received.
 data MaskingState
   = Unmasked -- ^ asynchronous exceptions are unmasked (the normal state)
-  | MaskedInterruptible 
+  | MaskedInterruptible
       -- ^ the state during 'mask': asynchronous exceptions are masked, but blocking operations may still be interrupted
   | MaskedUninterruptible
       -- ^ the state during 'uninterruptibleMask': asynchronous exceptions are masked, and blocking operations may not be interrupted
@@ -356,7 +356,7 @@ data MaskingState
 
 -- | Returns the 'MaskingState' for the current thread.
 getMaskingState :: IO MaskingState
-getMaskingState  = IO $ \s -> 
+getMaskingState  = IO $ \s ->
   case getMaskingState# s of
      (# s', i #) -> (# s', case i of
                              0# -> Unmasked
@@ -408,7 +408,7 @@ onException io what = io `catchException` \e -> do _ <- what
 -- to establish an exception handler in the forked thread before any
 -- asynchronous exceptions are received.  To create a a new thread in
 -- an unmasked state use 'Control.Concurrent.forkIOUnmasked'.
--- 
+--
 mask  :: ((forall a. IO a -> IO a) -> IO b) -> IO b
 
 -- | Like 'mask', but does not pass a @restore@ action to the argument.

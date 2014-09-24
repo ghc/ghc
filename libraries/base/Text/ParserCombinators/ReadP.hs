@@ -9,13 +9,13 @@
 -- Module      :  Text.ParserCombinators.ReadP
 -- Copyright   :  (c) The University of Glasgow 2002
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  non-portable (local universal quantification)
 --
 -- This is a library of parser combinators, originally written by Koen Claessen.
--- It parses all alternatives in parallel, so it never keeps hold of 
+-- It parses all alternatives in parallel, so it never keeps hold of
 -- the beginning of the input string, a common source of space leaks with
 -- other parsers.  The '(+++)' choice combinator is genuinely commutative;
 -- it makes no difference which branch is \"shorter\".
@@ -23,17 +23,17 @@
 -----------------------------------------------------------------------------
 
 module Text.ParserCombinators.ReadP
-  ( 
+  (
   -- * The 'ReadP' type
   ReadP,
-  
+
   -- * Primitive operations
   get,
   look,
   (+++),
   (<++),
   gather,
-  
+
   -- * Other operations
   pfail,
   eof,
@@ -234,9 +234,9 @@ gather :: ReadP a -> ReadP (String, a)
 -- ^ Transforms a parser into one that does the same, but
 --   in addition returns the exact characters read.
 --   IMPORTANT NOTE: 'gather' gives a runtime error if its first argument
---   is built using any occurrences of readS_to_P. 
+--   is built using any occurrences of readS_to_P.
 gather (R m)
-  = R (\k -> gath id (m (\a -> return (\s -> k (s,a)))))  
+  = R (\k -> gath id (m (\a -> return (\s -> k (s,a)))))
  where
   gath :: (String -> String) -> P (String -> P b) -> P b
   gath l (Get f)      = Get (\c -> gath (l.(c:)) (f c))
@@ -259,8 +259,8 @@ char c = satisfy (c ==)
 
 eof :: ReadP ()
 -- ^ Succeeds iff we are at the end of input
-eof = do { s <- look 
-         ; if null s then return () 
+eof = do { s <- look
+         ; if null s then return ()
                      else pfail }
 
 string :: String -> ReadP String
@@ -477,12 +477,12 @@ Here follow the properties:
 >    xs +<+ _  = xs
 >
 >  prop_Gather s =
->    forAll readPWithoutReadS $ \p -> 
+>    forAll readPWithoutReadS $ \p ->
 >      readP_to_S (gather p) s =~
->	 [ ((pre,x::Int),s')
->	 | (x,s') <- readP_to_S p s
->	 , let pre = take (length s - length s') s
->	 ]
+>        [ ((pre,x::Int),s')
+>        | (x,s') <- readP_to_S p s
+>        , let pre = take (length s - length s') s
+>        ]
 >
 >  prop_String_Yes this s =
 >    readP_to_S (string this) (this ++ s) =~

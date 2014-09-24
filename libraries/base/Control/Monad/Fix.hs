@@ -69,7 +69,7 @@ instance MonadFix [] where
                (x:_) -> x : mfix (tail . f)
 
 instance MonadFix IO where
-    mfix = fixIO 
+    mfix = fixIO
 
 instance MonadFix ((->) r) where
     mfix f = \ r -> let a = f a r in a

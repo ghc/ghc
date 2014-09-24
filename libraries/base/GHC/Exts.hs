@@ -126,9 +126,9 @@ traceEvent = Debug.Trace.traceEventIO
 
 
 {- **********************************************************************
-*									*
+*                                                                       *
 *              SpecConstr annotation                                    *
-*									*
+*                                                                       *
 ********************************************************************** -}
 
 -- Annotating a type with NoSpecConstr will make SpecConstr
@@ -143,9 +143,9 @@ data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
 
 
 {- **********************************************************************
-*									*
+*                                                                       *
 *              The IsList class                                         *
-*									*
+*                                                                       *
 ********************************************************************** -}
 
 -- | The 'IsList' class and its methods are intended to be used in
