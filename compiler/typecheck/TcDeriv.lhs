@@ -481,7 +481,7 @@ renameDeriv is_boot inst_infos bagBinds
                             { ib_binds = binds
                             , ib_pragmas = sigs
                             , ib_extensions = exts -- only for type-checking
-                            , ib_standalone_deriving = sa } })
+                            , ib_derived = sa } })
         =       -- Bring the right type variables into
                 -- scope (yuk), and rename the method binds
            ASSERT( null sigs )
@@ -490,7 +490,7 @@ renameDeriv is_boot inst_infos bagBinds
               ; let binds' = InstBindings { ib_binds = rn_binds
                                            , ib_pragmas = []
                                            , ib_extensions = exts
-                                           , ib_standalone_deriving = sa }
+                                           , ib_derived = sa }
               ; return (inst_info { iBinds = binds' }, fvs) }
         where
           (tyvars, _) = tcSplitForAllTys (idType (instanceDFunId inst))
@@ -1897,9 +1897,11 @@ simplifyDeriv pred tvs theta
                          | otherwise = Right ct
                          where p = ctPred ct
 
-       -- We never want to defer these errors because they are errors in the
-       -- compiler! Hence the `False` below
-       ; reportAllUnsolved (residual_wanted { wc_flat = bad })
+       -- If we are deferring type errors, simply ignore any insoluble
+       -- constraints.  Tney'll come up again when we typecheck the
+       -- generated instance declaration
+       ; defer <- goptM Opt_DeferTypeErrors
+       ; unless defer (reportAllUnsolved (residual_wanted { wc_flat = bad }))
 
        ; let min_theta = mkMinimalBySCs (bagToList good)
        ; return (substTheta subst_skol min_theta) }
@@ -2057,7 +2059,7 @@ genInst :: Bool             -- True <=> standalone deriving
         -> CommonAuxiliaries
         -> DerivSpec ThetaType 
         -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
-genInst standalone_deriv default_oflag comauxs
+genInst _standalone_deriv default_oflag comauxs
         spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype, ds_tys = tys
                  , ds_overlap = overlap_mode
@@ -2072,7 +2074,7 @@ genInst standalone_deriv default_oflag comauxs
                         , ib_pragmas = []
                         , ib_extensions = [ Opt_ImpredicativeTypes
                                           , Opt_RankNTypes ]
-                        , ib_standalone_deriving = standalone_deriv } }
+                        , ib_derived = True } }
                 , emptyBag
                 , Just $ getName $ head $ tyConDataCons rep_tycon ) }
               -- See Note [Newtype deriving and unused constructors]
@@ -2087,7 +2089,7 @@ genInst standalone_deriv default_oflag comauxs
                                                 { ib_binds = meth_binds
                                                 , ib_pragmas = []
                                                 , ib_extensions = []
-                                                , ib_standalone_deriving = standalone_deriv } }
+                                                , ib_derived = True } }
        ; return ( inst_info, deriv_stuff, Nothing ) }
   where
     oflag  = setOverlapModeMaybe default_oflag overlap_mode

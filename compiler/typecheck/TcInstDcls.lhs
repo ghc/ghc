@@ -561,7 +561,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                                      { ib_binds = binds
                                      , ib_pragmas = uprags
                                      , ib_extensions = []
-                                     , ib_standalone_deriving = False } }
+                                     , ib_derived = False } }
 
         ; return ( [inst_info], tyfam_insts0 ++ concat tyfam_insts1 ++ datafam_insts) }
 
@@ -1205,8 +1205,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                   op_items (InstBindings { ib_binds = binds
                                          , ib_pragmas = sigs
                                          , ib_extensions = exts
-                                         , ib_standalone_deriving
-                                              = standalone_deriv })
+                                         , ib_derived    = is_derived })
   = do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
        ; let hs_sig_fn = mkHsSigFun sigs
        ; checkMinimalDefinition
@@ -1220,15 +1219,15 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     tc_item sig_fn (sel_id, dm_info)
       = case findMethodBind (idName sel_id) binds of
             Just (user_bind, bndr_loc)
-                     -> tc_body sig_fn sel_id standalone_deriv user_bind bndr_loc
+                     -> tc_body sig_fn sel_id user_bind bndr_loc
             Nothing  -> do { traceTc "tc_def" (ppr sel_id)
                            ; tc_default sig_fn sel_id dm_info }
 
     ----------------------
-    tc_body :: HsSigFun -> Id -> Bool -> LHsBind Name
+    tc_body :: HsSigFun -> Id -> LHsBind Name
             -> SrcSpan -> TcM (TcId, LHsBind Id)
-    tc_body sig_fn sel_id generated_code rn_bind bndr_loc
-      = add_meth_ctxt sel_id generated_code rn_bind $
+    tc_body sig_fn sel_id rn_bind bndr_loc
+      = add_meth_ctxt sel_id rn_bind $
         do { traceTc "tc_item" (ppr sel_id <+> ppr (idType sel_id))
            ; (meth_id, local_meth_sig) <- setSrcSpan bndr_loc $
                                           mkMethIds sig_fn clas tyvars dfun_ev_vars
@@ -1248,8 +1247,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
     tc_default sig_fn sel_id (GenDefMeth dm_name)
       = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id dm_name
-           ; tc_body sig_fn sel_id False {- Not generated code? -}
-                     meth_bind inst_loc }
+           ; tc_body sig_fn sel_id meth_bind inst_loc }
 
     tc_default sig_fn sel_id NoDefMeth     -- No default method at all
       = do { traceTc "tc_def: warn" (ppr sel_id)
@@ -1331,12 +1329,12 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
     inst_loc = getSrcSpan dfun_id
 
-        -- For instance decls that come from standalone deriving clauses
+        -- For instance decls that come from deriving clauses
         -- we want to print out the full source code if there's an error
         -- because otherwise the user won't see the code at all
-    add_meth_ctxt sel_id generated_code rn_bind thing
-      | generated_code = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys rn_bind) thing
-      | otherwise      = thing
+    add_meth_ctxt sel_id rn_bind thing
+      | is_derived = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys rn_bind) thing
+      | otherwise  = thing
 
     ----------------------
 
@@ -1369,7 +1367,7 @@ wrapId wrapper id = mkHsWrap wrapper (HsVar id)
 derivBindCtxt :: Id -> Class -> [Type ] -> LHsBind Name -> SDoc
 derivBindCtxt sel_id clas tys _bind
    = vcat [ ptext (sLit "When typechecking the code for ") <+> quotes (ppr sel_id)
-          , nest 2 (ptext (sLit "in a standalone derived instance for")
+          , nest 2 (ptext (sLit "in a derived instance for")
                     <+> quotes (pprClassPred clas tys) <> colon)
           , nest 2 $ ptext (sLit "To see the code I am typechecking, use -ddump-deriv") ]
 
