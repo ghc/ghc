@@ -11,7 +11,7 @@ Pattern-matching literal patterns
 module MatchLit ( dsLit, dsOverLit, hsLitKey, hsOverLitKey
                 , tidyLitPat, tidyNPat
                 , matchLiterals, matchNPlusKPats, matchNPats
-                , warnAboutIdentities, warnAboutEmptyEnumerations 
+                , warnAboutIdentities, warnAboutEmptyEnumerations
                 ) where
 
 #include "HsVersions.h"

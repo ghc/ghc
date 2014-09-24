@@ -432,11 +432,11 @@ patchCCallTarget packageKey callTarget =
 
 \begin{code}
 rnSrcInstDecl :: InstDecl RdrName -> RnM (InstDecl Name, FreeVars)
-rnSrcInstDecl (TyFamInstD { tfid_inst = tfi }) 
+rnSrcInstDecl (TyFamInstD { tfid_inst = tfi })
   = do { (tfi', fvs) <- rnTyFamInstDecl Nothing tfi
        ; return (TyFamInstD { tfid_inst = tfi' }, fvs) }
 
-rnSrcInstDecl (DataFamInstD { dfid_inst = dfi }) 
+rnSrcInstDecl (DataFamInstD { dfid_inst = dfi })
   = do { (dfi', fvs) <- rnDataFamInstDecl Nothing dfi
        ; return (DataFamInstD { dfid_inst = dfi' }, fvs) }
 
@@ -465,7 +465,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
        -- Rename the associated types, and type signatures
        -- Both need to have the instance type variables in scope
        ; traceRn (text "rnSrcInstDecl"  <+> ppr inst_ty' $$ ppr inst_tyvars $$ ppr ktv_names)
-       ; ((ats', adts', other_sigs'), more_fvs) 
+       ; ((ats', adts', other_sigs'), more_fvs)
              <- extendTyVarEnvFVRn ktv_names $
                 do { (ats',  at_fvs)  <- rnATInstDecls rnTyFamInstDecl cls inst_tyvars ats
                    ; (adts', adt_fvs) <- rnATInstDecls rnDataFamInstDecl cls inst_tyvars adts
@@ -533,9 +533,9 @@ rnFamInstDecl doc mb_cls tycon pats payload rnPayload
        ; tv_names <- mapM (newTyVarNameRn mb_cls rdr_env loc) tv_rdr_names
              -- All the free vars of the family patterns
              -- with a sensible binding location
-       ; ((pats', payload'), fvs) 
-              <- bindLocalNamesFV kv_names $ 
-                 bindLocalNamesFV tv_names $ 
+       ; ((pats', payload'), fvs)
+              <- bindLocalNamesFV kv_names $
+                 bindLocalNamesFV tv_names $
                  do { (pats', pat_fvs) <- rnLHsTypes doc pats
                     ; (payload', rhs_fvs) <- rnPayload doc payload
 
@@ -547,7 +547,7 @@ rnFamInstDecl doc mb_cls tycon pats payload rnPayload
 
                     ; unless (null bad_tvs) (badAssocRhs bad_tvs)
                     ; return ((pats', payload'), rhs_fvs `plusFV` pat_fvs) }
-                              
+
 
        ; let all_fvs = fvs `addOneFV` unLoc tycon'
        ; return (tycon',
@@ -610,7 +610,7 @@ Renaming of the associated types in instances.
 \begin{code}
 -- Rename associated type family decl in class
 rnATDecls :: Name      -- Class
-          -> [LFamilyDecl RdrName] 
+          -> [LFamilyDecl RdrName]
           -> RnM ([LFamilyDecl Name], FreeVars)
 rnATDecls cls at_decls
   = rnList (rnFamDecl (Just cls)) at_decls
@@ -620,7 +620,7 @@ rnATInstDecls :: (Maybe (Name, [Name]) ->    -- The function that renames
                   RnM (decl Name, FreeVars)) -- or rnDataFamInstDecl
               -> Name      -- Class
               -> LHsTyVarBndrs Name
-              -> [Located (decl RdrName)] 
+              -> [Located (decl RdrName)]
               -> RnM ([Located (decl Name)], FreeVars)
 -- Used for data and type family defaults in a class decl
 -- and the family instance declarations in an instance
@@ -804,7 +804,7 @@ rnHsVectDecl (HsVect var rhs@(L _ (HsVar _)))
        ; return (HsVect var' rhs', fv_rhs `addOneFV` unLoc var')
        }
 rnHsVectDecl (HsVect _var _rhs)
-  = failWith $ vcat 
+  = failWith $ vcat
                [ ptext (sLit "IMPLEMENTATION RESTRICTION: right-hand side of a VECTORISE pragma")
                , ptext (sLit "must be an identifier")
                ]
@@ -930,12 +930,12 @@ rnTyClDecls extra_deps tycl_ds
                        )
                        ([], role_annot_env)
                        raw_groups
-                 
+
        ; mapM_ orphanRoleAnnotErr (nameEnvElts orphan_roles)
        ; traceRn (text "rnTycl"  <+> (ppr ds_w_fvs $$ ppr sccs))
        ; return (groups, all_fvs) }
 
-rnTyClDecl :: TyClDecl RdrName 
+rnTyClDecl :: TyClDecl RdrName
            -> RnM (TyClDecl Name, FreeVars)
 rnTyClDecl (ForeignType {tcdLName = name, tcdExtName = ext_name})
   = do { name' <- lookupLocatedTopBndrRn name
@@ -974,8 +974,8 @@ rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdDataDefn = defn 
        ; return (DataDecl { tcdLName = tycon', tcdTyVars = tyvars'
                           , tcdDataDefn = defn', tcdFVs = fvs }, fvs) }
 
-rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls, 
-                              tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs, 
+rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls,
+                              tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs,
                               tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
                               tcdDocs = docs})
   = do  { lcls' <- lookupLocatedTopBndrRn lcls
@@ -1078,7 +1078,7 @@ dupRoleAnnotErr list
     where
       sorted_list = sortBy cmp_annot list
       (L loc first_decl : _) = sorted_list
-    
+
       pp_role_annot (L loc decl) = hang (ppr decl)
                                       4 (text "-- written at" <+> ppr loc)
 
@@ -1095,9 +1095,9 @@ orphanRoleAnnotErr (L loc decl)
 
 rnDataDefn :: HsDocContext -> HsDataDefn RdrName -> RnM (HsDataDefn Name, FreeVars)
 rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
-                           , dd_ctxt = context, dd_cons = condecls 
+                           , dd_ctxt = context, dd_cons = condecls
                            , dd_kindSig = sig, dd_derivs = derivs })
-  = do  { checkTc (h98_style || null (unLoc context)) 
+  = do  { checkTc (h98_style || null (unLoc context))
                   (badGadtStupidTheta doc)
 
         ; (sig', sig_fvs)  <- rnLHsMaybeKind doc sig
@@ -1137,7 +1137,7 @@ badGadtStupidTheta _
           ptext (sLit "(You can put a context on each contructor, though.)")]
 
 rnFamDecl :: Maybe Name
-                    -- Just cls => this FamilyDecl is nested 
+                    -- Just cls => this FamilyDecl is nested
                     --             inside an *class decl* for cls
                     --             used for associated types
           -> FamilyDecl RdrName
@@ -1153,7 +1153,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
        ; return (FamilyDecl { fdLName = tycon', fdTyVars = tyvars'
                             , fdInfo = info', fdKindSig = kind' }
                 , fv1 `plusFV` fv2) }
-  where 
+  where
      fmly_doc = TyFamilyCtx tycon
      kvs = extractRdrKindSigVars kind
 
@@ -1163,7 +1163,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
             ; return (ClosedTypeFamily eqns', fvs) }
      rn_info OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
      rn_info DataFamily     = return (DataFamily, emptyFVs)
-     
+
 \end{code}
 
 Note [Stupid theta]
@@ -1196,11 +1196,11 @@ depAnalTyClDecls ds_w_fvs
       (L _ d, _) <- ds_w_fvs
       case d of
         ClassDecl { tcdLName = L _ cls_name
-                  , tcdATs = ats } 
+                  , tcdATs = ats }
           -> do L _ (FamilyDecl { fdLName = L _ fam_name }) <- ats
                 return (fam_name, cls_name)
         DataDecl { tcdLName = L _ data_name
-                 , tcdDataDefn = HsDataDefn { dd_cons = cons } } 
+                 , tcdDataDefn = HsDataDefn { dd_cons = cons } }
           -> do L _ dc <- cons
                 return (unLoc (con_name dc), data_name)
         _ -> []

@@ -57,14 +57,14 @@ module HsDecls (
   noForeignImportCoercionYet, noForeignExportCoercionYet,
   CImportSpec(..),
   -- ** Data-constructor declarations
-  ConDecl(..), LConDecl, ResType(..), 
-  HsConDeclDetails, hsConDeclArgTys, 
+  ConDecl(..), LConDecl, ResType(..),
+  HsConDeclDetails, hsConDeclArgTys,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
   -- ** Deprecations
   WarnDecl(..),  LWarnDecl,
   -- ** Annotations
-  AnnDecl(..), LAnnDecl, 
+  AnnDecl(..), LAnnDecl,
   AnnProvenance(..), annProvenanceName_maybe,
   -- ** Role annotations
   RoleAnnotDecl(..), LRoleAnnotDecl, roleAnnotDeclName,
@@ -93,7 +93,7 @@ import NameSet
 -- others:
 import InstEnv
 import Class
-import Outputable       
+import Outputable
 import Util
 import SrcLoc
 import FastString
@@ -187,7 +187,7 @@ emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
 emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
 emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
-emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [], 
+emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [],
                        hs_derivds = [],
                        hs_fixds = [], hs_defds = [], hs_annds = [],
                        hs_fords = [], hs_warnds = [], hs_ruleds = [], hs_vects = [],
@@ -196,46 +196,46 @@ emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [],
                        hs_docs = [] }
 
 appendGroups :: HsGroup a -> HsGroup a -> HsGroup a
-appendGroups 
-    HsGroup { 
+appendGroups
+    HsGroup {
         hs_valds  = val_groups1,
         hs_splcds = spliceds1,
-        hs_tyclds = tyclds1, 
+        hs_tyclds = tyclds1,
         hs_instds = instds1,
         hs_derivds = derivds1,
-        hs_fixds  = fixds1, 
+        hs_fixds  = fixds1,
         hs_defds  = defds1,
         hs_annds  = annds1,
-        hs_fords  = fords1, 
+        hs_fords  = fords1,
         hs_warnds = warnds1,
         hs_ruleds = rulds1,
         hs_vects = vects1,
   hs_docs   = docs1 }
-    HsGroup { 
+    HsGroup {
         hs_valds  = val_groups2,
         hs_splcds = spliceds2,
-        hs_tyclds = tyclds2, 
+        hs_tyclds = tyclds2,
         hs_instds = instds2,
         hs_derivds = derivds2,
-        hs_fixds  = fixds2, 
+        hs_fixds  = fixds2,
         hs_defds  = defds2,
         hs_annds  = annds2,
-        hs_fords  = fords2, 
+        hs_fords  = fords2,
         hs_warnds = warnds2,
         hs_ruleds = rulds2,
         hs_vects  = vects2,
         hs_docs   = docs2 }
-  = 
-    HsGroup { 
+  =
+    HsGroup {
         hs_valds  = val_groups1 `plusHsValBinds` val_groups2,
-        hs_splcds = spliceds1 ++ spliceds2, 
-        hs_tyclds = tyclds1 ++ tyclds2, 
+        hs_splcds = spliceds1 ++ spliceds2,
+        hs_tyclds = tyclds1 ++ tyclds2,
         hs_instds = instds1 ++ instds2,
         hs_derivds = derivds1 ++ derivds2,
         hs_fixds  = fixds1 ++ fixds2,
         hs_annds  = annds1 ++ annds2,
         hs_defds  = defds1 ++ defds2,
-        hs_fords  = fords1 ++ fords2, 
+        hs_fords  = fords1 ++ fords2,
         hs_warnds = warnds1 ++ warnds2,
         hs_ruleds = rulds1 ++ rulds2,
         hs_vects  = vects1 ++ vects2,
@@ -272,15 +272,15 @@ instance OutputableBndr name => Outputable (HsGroup name) where
                    hs_defds  = default_decls,
                    hs_ruleds = rule_decls,
                    hs_vects  = vect_decls })
-        = vcat_mb empty 
-            [ppr_ds fix_decls, ppr_ds default_decls, 
+        = vcat_mb empty
+            [ppr_ds fix_decls, ppr_ds default_decls,
              ppr_ds deprec_decls, ppr_ds ann_decls,
              ppr_ds rule_decls,
              ppr_ds vect_decls,
-             if isEmptyValBinds val_decls 
-                then Nothing 
+             if isEmptyValBinds val_decls
+                then Nothing
                 else Just (ppr val_decls),
-             ppr_ds (tyClGroupConcat tycl_decls), 
+             ppr_ds (tyClGroupConcat tycl_decls),
              ppr_ds inst_decls,
              ppr_ds deriv_decls,
              ppr_ds foreign_decls]
@@ -327,7 +327,7 @@ and instance decls.  It's a bit tricky, so pay attention!
 
 "Implicit" (or "system") binders
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  Each data type decl defines 
+  Each data type decl defines
         a worker name for each constructor
         to-T and from-T convertors
   Each class decl defines
@@ -345,7 +345,7 @@ interface files, of course.  Any such occurrence must haul in the
 relevant type or class decl.
 
 Plan of attack:
- - Ensure they "point to" the parent data/class decl 
+ - Ensure they "point to" the parent data/class decl
    when loading that decl from an interface file
    (See RnHiFiles.getSysBinders)
 
@@ -377,7 +377,7 @@ In *source-code* class declarations:
 
  - The renamer renames it to a Name
 
- - During typechecking, we generate a binding for each $dm for 
+ - During typechecking, we generate a binding for each $dm for
    which there's a programmer-supplied default method:
         class Foo a where
           op1 :: <type>
@@ -398,7 +398,7 @@ In *interface-file* class declarations:
   - The interface file has a separate definition for $dmop1, with unfolding etc.
   - The renamer renames it to a Name.
   - The renamer treats $dmop1 as a free variable of the declaration, so that
-    the binding for $dmop1 will be sucked in.  (See RnHsSyn.tyClDeclFVs)  
+    the binding for $dmop1 will be sucked in.  (See RnHsSyn.tyClDeclFVs)
     This doesn't happen for source code class decls, because they *bind* the default method.
 
 Dictionary functions
@@ -426,7 +426,7 @@ Source code:
     instance decl, whether it comes from a source-code instance decl, or whether
     the instance decl is derived from some other construct (e.g. 'deriving').
 
-  - The occurrence name it chooses is derived from the instance decl (just for 
+  - The occurrence name it chooses is derived from the instance decl (just for
     documentation really) --- e.g. dNumInt.  Two dict funs may share a common
     occurrence name, but will have different uniques.  E.g.
         instance Foo [Int]  where ...
@@ -436,7 +436,7 @@ Source code:
   - The CoreTidy phase externalises the name, and ensures the occurrence name is
     unique (this isn't special to dict funs).  So we'd get dFooList and dFooList1.
 
-  - We can take this relaxed approach (changing the occurrence name later) 
+  - We can take this relaxed approach (changing the occurrence name later)
     because dict fun Ids are not captured in a TyCon or Class (unlike default
     methods, say).  Instead, they are kept separately in the InstEnv.  This
     makes it easy to adjust them after compiling a module.  (Once we've finished
@@ -456,7 +456,7 @@ type LTyClDecl name = Located (TyClDecl name)
 
 -- | A type or class declaration.
 data TyClDecl name
-  = ForeignType { 
+  = ForeignType {
                 tcdLName    :: Located name,
                 tcdExtName  :: Maybe FastString
     }
@@ -478,7 +478,7 @@ data TyClDecl name
                                                   -- Eg  class T a where
                                                   --       type F a :: *
                                                   --       type F a = a -> a
-                                                  -- Here the type decl for 'f' includes 'a' 
+                                                  -- Here the type decl for 'f' includes 'a'
                                                   -- in its tcdTyVars
              , tcdDataDefn :: HsDataDefn name
              , tcdFVs      :: PostRn name NameSet }
@@ -614,7 +614,7 @@ tyClDeclTyVars d = tcdTyVars d
 \begin{code}
 countTyClDecls :: [TyClDecl name] -> (Int, Int, Int, Int, Int)
         -- class, synonym decls, data, newtype, family decls
-countTyClDecls decls 
+countTyClDecls decls
  = (count isClassDecl    decls,
     count isSynDecl      decls,  -- excluding...
     count isDataTy       decls,  -- ...family...
@@ -623,7 +623,7 @@ countTyClDecls decls
  where
    isDataTy DataDecl{ tcdDataDefn = HsDataDefn { dd_ND = DataType } } = True
    isDataTy _                                                       = False
-   
+
    isNewTy DataDecl{ tcdDataDefn = HsDataDefn { dd_ND = NewType } } = True
    isNewTy _                                                      = False
 
@@ -685,12 +685,12 @@ instance OutputableBndr name
     ppr (SynDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdRhs = rhs })
       = hang (ptext (sLit "type") <+>
               pp_vanilla_decl_head ltycon tyvars [] <+> equals)
-          4 (ppr rhs) 
+          4 (ppr rhs)
 
     ppr (DataDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdDataDefn = defn })
       = pp_data_defn (pp_vanilla_decl_head ltycon tyvars) defn
 
-    ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars, 
+    ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFDs  = fds,
                     tcdSigs = sigs, tcdMeths = methods,
                     tcdATs = ats, tcdATDefs = at_defs})
@@ -703,7 +703,7 @@ instance OutputableBndr name
                                      map ppr_fam_deflt_eqn at_defs ++
                                      pprLHsBindsForUser methods sigs) ]
       where
-        top_matter = ptext (sLit "class") 
+        top_matter = ptext (sLit "class")
                      <+> pp_vanilla_decl_head lclas tyvars (unLoc context)
                      <+> pprFundeps (map unLoc fds)
 
@@ -713,7 +713,7 @@ instance OutputableBndr name => Outputable (TyClGroup name) where
       ppr roles
 
 instance (OutputableBndr name) => Outputable (FamilyDecl name) where
-  ppr (FamilyDecl { fdInfo = info, fdLName = ltycon, 
+  ppr (FamilyDecl { fdInfo = info, fdLName = ltycon,
                     fdTyVars = tyvars, fdKindSig = mb_kind})
       = vcat [ pprFlavour info <+> pp_vanilla_decl_head ltycon tyvars [] <+> pp_kind <+> pp_where
              , nest 2 $ pp_eqns ]
@@ -785,7 +785,7 @@ data HsDataDefn name   -- The payload of a data type defn
                  dd_kindSig:: Maybe (LHsKind name),
                      -- ^ Optional kind signature.
                      --
-                     -- @(Just k)@ for a GADT-style @data@, 
+                     -- @(Just k)@ for a GADT-style @data@,
                      -- or @data instance@ decl, with explicit kind sig
                      --
                      -- Always @Nothing@ for H98-syntax decls
@@ -848,7 +848,7 @@ data ConDecl name
         --  - ResTyGADT: *all* the constructor's quantified type variables
         --
         -- If con_explicit is Implicit, then con_qvars is irrelevant
-        -- until after renaming.  
+        -- until after renaming.
 
     , con_cxt       :: LHsContext name
         -- ^ The context.  This /does not/ include the \"stupid theta\" which
@@ -895,9 +895,9 @@ instance Outputable ty => Outputable (ResType ty) where
 pp_data_defn :: OutputableBndr name
                   => (HsContext name -> SDoc)   -- Printing the header
                   -> HsDataDefn name
-                  -> SDoc 
+                  -> SDoc
 pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = L _ context
-                                , dd_kindSig = mb_sig 
+                                , dd_kindSig = mb_sig
                                 , dd_cons = condecls, dd_derivs = derivings })
   | null condecls
   = ppr new_or_data <+> pp_hdr context <+> pp_sig
@@ -942,14 +942,14 @@ pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
 pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = PrefixCon arg_tys
                     , con_res = ResTyGADT res_ty })
-  = ppr con <+> dcolon <+> 
+  = ppr con <+> dcolon <+>
     sep [pprHsForAll expl tvs cxt, ppr (foldr mk_fun_ty res_ty arg_tys)]
   where
     mk_fun_ty a b = noLoc (HsFunTy a b)
 
 pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = RecCon fields, con_res = ResTyGADT res_ty })
-  = sep [ppr con <+> dcolon <+> pprHsForAll expl tvs cxt, 
+  = sep [ppr con <+> dcolon <+> pprHsForAll expl tvs cxt,
          pprConDeclFields fields <+> arrow <+> ppr res_ty]
 
 pprConDecl decl@(ConDecl { con_details = InfixCon ty1 ty2, con_res = ResTyGADT {} })
@@ -1048,7 +1048,7 @@ deriving instance (DataId id) => Data (ClsInstDecl id)
 
 type LInstDecl name = Located (InstDecl name)
 data InstDecl name  -- Both class and family instances
-  = ClsInstD    
+  = ClsInstD
       { cid_inst  :: ClsInstDecl name }
   | DataFamInstD              -- data family instance
       { dfid_inst :: DataFamInstDecl name }
@@ -1069,7 +1069,7 @@ tvs are fv(pat_tys), *including* ones that are already in scope
         instance C w (a,b) where
           type F (a,b) x = x->a
    The tcdTyVars of the F decl are {a,b,x}, even though the F decl
-   is nested inside the 'instance' decl. 
+   is nested inside the 'instance' decl.
 
    However after the renamer, the uniques will match up:
         instance C w7 (a8,b9) where
@@ -1106,7 +1106,7 @@ instance (OutputableBndr name) => Outputable (DataFamInstDecl name) where
 
 pprDataFamInstDecl :: OutputableBndr name => TopLevelFlag -> DataFamInstDecl name -> SDoc
 pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_tycon = tycon
-                                            , dfid_pats  = pats  
+                                            , dfid_pats  = pats
                                             , dfid_defn  = defn })
   = pp_data_defn pp_hdr defn
   where
@@ -1155,7 +1155,7 @@ instance (OutputableBndr name) => Outputable (InstDecl name) where
 -- Extract the declarations of associated data types from an instance
 
 instDeclDataFamInsts :: [LInstDecl name] -> [DataFamInstDecl name]
-instDeclDataFamInsts inst_decls 
+instDeclDataFamInsts inst_decls
   = concatMap do_one inst_decls
   where
     do_one (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fam_insts } }))
@@ -1252,7 +1252,7 @@ noForeignExportCoercionYet :: PlaceHolder
 noForeignExportCoercionYet = PlaceHolder
 
 -- Specification Of an imported external entity in dependence on the calling
--- convention 
+-- convention
 --
 data ForeignImport = -- import of a C entity
                      --
@@ -1264,7 +1264,7 @@ data ForeignImport = -- import of a C entity
                      --
                      --  * the calling convention is irrelevant for code
                      --   generation in the case of `CLabel', but is needed
-                     --   for pretty printing 
+                     --   for pretty printing
                      --
                      --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
                      --
@@ -1301,16 +1301,16 @@ instance OutputableBndr name => Outputable (ForeignDecl name) where
 
 instance Outputable ForeignImport where
   ppr (CImport  cconv safety mHeader spec) =
-    ppr cconv <+> ppr safety <+> 
+    ppr cconv <+> ppr safety <+>
     char '"' <> pprCEntity spec <> char '"'
     where
       pp_hdr = case mHeader of
                Nothing -> empty
                Just (Header header) -> ftext header
 
-      pprCEntity (CLabel lbl) = 
+      pprCEntity (CLabel lbl) =
         ptext (sLit "static") <+> pp_hdr <+> char '&' <> ppr lbl
-      pprCEntity (CFunction (StaticTarget lbl _ isFun)) = 
+      pprCEntity (CFunction (StaticTarget lbl _ isFun)) =
             ptext (sLit "static")
         <+> pp_hdr
         <+> (if isFun then empty else ptext (sLit "value"))
@@ -1320,7 +1320,7 @@ instance Outputable ForeignImport where
       pprCEntity (CWrapper) = ptext (sLit "wrapper")
 
 instance Outputable ForeignExport where
-  ppr (CExport  (CExportStatic lbl cconv)) = 
+  ppr (CExport  (CExportStatic lbl cconv)) =
     ppr cconv <+> char '"' <> ppr lbl <> char '"'
 \end{code}
 
@@ -1358,7 +1358,7 @@ collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 instance OutputableBndr name => Outputable (RuleDecl name) where
   ppr (HsRule name act ns lhs _fv_lhs rhs _fv_rhs)
         = sep [text "{-# RULES" <+> doubleQuotes (ftext name) <+> ppr act,
-               nest 4 (pp_forall <+> pprExpr (unLoc lhs)), 
+               nest 4 (pp_forall <+> pprExpr (unLoc lhs)),
                nest 4 (equals <+> pprExpr (unLoc rhs) <+> text "#-}") ]
         where
           pp_forall | null ns   = empty
@@ -1384,7 +1384,7 @@ A vectorisation pragma, one of
 
   {-# VECTORISE type T = ty #-}
   {-# VECTORISE SCALAR type T #-}
-  
+
 \begin{code}
 type LVectDecl name = Located (VectDecl name)
 
@@ -1431,7 +1431,7 @@ lvectInstDecl _                       = False
 instance OutputableBndr name => Outputable (VectDecl name) where
   ppr (HsVect v rhs)
     = sep [text "{-# VECTORISE" <+> ppr v,
-           nest 4 $ 
+           nest 4 $
              pprExpr (unLoc rhs) <+> text "#-}" ]
   ppr (HsNoVect v)
     = sep [text "{-# NOVECTORISE" <+> ppr v <+> text "#-}" ]
@@ -1477,7 +1477,7 @@ data DocDecl
   | DocCommentNamed String HsDocString
   | DocGroup Int HsDocString
   deriving (Data, Typeable)
- 
+
 -- Okay, I need to reconstruct the document comments, but for now:
 instance Outputable DocDecl where
   ppr _ = text "<document comment>"

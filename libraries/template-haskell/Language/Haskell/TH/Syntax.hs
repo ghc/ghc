@@ -23,30 +23,30 @@ import qualified Data.Data as Data
 import Control.Applicative( Applicative(..) )
 #endif
 import Data.IORef
-import System.IO.Unsafe	( unsafePerformIO )
+import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad (liftM)
-import System.IO	( hPutStrLn, stderr )
+import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper )
 import Data.Word        ( Word8 )
 
 -----------------------------------------------------
 --
---		The Quasi class
+--              The Quasi class
 --
 -----------------------------------------------------
 
 class (Monad m, Applicative m) => Quasi m where
   qNewName :: String -> m Name
-	-- ^ Fresh names
+        -- ^ Fresh names
 
-	-- Error reporting and recovery
-  qReport  :: Bool -> String -> m ()	-- ^ Report an error (True) or warning (False)
-					-- ...but carry on; use 'fail' to stop
+        -- Error reporting and recovery
+  qReport  :: Bool -> String -> m ()    -- ^ Report an error (True) or warning (False)
+                                        -- ...but carry on; use 'fail' to stop
   qRecover :: m a -- ^ the error handler
            -> m a -- ^ action which may fail
-           -> m a		-- ^ Recover from the monadic 'fail'
+           -> m a               -- ^ Recover from the monadic 'fail'
 
-	-- Inspect the type-checker's environment
+        -- Inspect the type-checker's environment
   qLookupName :: Bool -> String -> m (Maybe Name)
        -- True <=> type namespace, False <=> value namespace
   qReify          :: Name -> m Info
@@ -75,7 +75,7 @@ class (Monad m, Applicative m) => Quasi m where
   qPutQ :: Typeable a => a -> m ()
 
 -----------------------------------------------------
---	The IO instance of Quasi
+--      The IO instance of Quasi
 --
 --  This instance is used only when running a Q
 --  computation in the IO monad, usually just to
@@ -99,8 +99,8 @@ instance Quasi IO where
   qReifyRoles _       = badIO "reifyRoles"
   qReifyAnnotations _ = badIO "reifyAnnotations"
   qReifyModule _      = badIO "reifyModule"
-  qLocation    	      = badIO "currentLocation"
-  qRecover _ _ 	      = badIO "recover" -- Maybe we could fix this?
+  qLocation           = badIO "currentLocation"
+  qRecover _ _        = badIO "recover" -- Maybe we could fix this?
   qAddDependentFile _ = badIO "addDependentFile"
   qAddTopDecls _      = badIO "addTopDecls"
   qAddModFinalizer _  = badIO "addModFinalizer"
@@ -110,8 +110,8 @@ instance Quasi IO where
   qRunIO m = m
 
 badIO :: String -> IO a
-badIO op = do	{ qReport True ("Can't do `" ++ op ++ "' in the IO monad")
-		; fail "Template Haskell failure" }
+badIO op = do   { qReport True ("Can't do `" ++ op ++ "' in the IO monad")
+                ; fail "Template Haskell failure" }
 
 -- Global variable to generate unique symbols
 counter :: IORef Int
@@ -121,7 +121,7 @@ counter = unsafePerformIO (newIORef 0)
 
 -----------------------------------------------------
 --
---		The Q monad
+--              The Q monad
 --
 -----------------------------------------------------
 
@@ -156,7 +156,7 @@ instance Applicative Q where
 
 -----------------------------------------------------
 --
---		The TExp type
+--              The TExp type
 --
 -----------------------------------------------------
 
@@ -402,17 +402,17 @@ putQ :: Typeable a => a -> Q ()
 putQ x = Q (qPutQ x)
 
 instance Quasi Q where
-  qNewName  	    = newName
-  qReport   	    = report
-  qRecover  	    = recover
-  qReify    	    = reify
+  qNewName          = newName
+  qReport           = report
+  qRecover          = recover
+  qReify            = reify
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
   qReifyAnnotations = reifyAnnotations
   qReifyModule      = reifyModule
   qLookupName       = lookupName
-  qLocation 	    = location
-  qRunIO    	    = runIO
+  qLocation         = location
+  qRunIO            = runIO
   qAddDependentFile = addDependentFile
   qAddTopDecls      = addTopDecls
   qAddModFinalizer  = addModFinalizer
@@ -436,7 +436,7 @@ sequenceQ = sequence
 
 -----------------------------------------------------
 --
---		The Lift class
+--              The Lift class
 --
 -----------------------------------------------------
 
@@ -521,13 +521,13 @@ rightName = mkNameG DataName "base" "Data.Either" "Right"
 
 
 -----------------------------------------------------
---		Names and uniques
+--              Names and uniques
 -----------------------------------------------------
 
-newtype ModName = ModName String	-- Module name
+newtype ModName = ModName String        -- Module name
  deriving (Show,Eq,Ord,Typeable,Data)
 
-newtype PkgName = PkgName String	-- package name
+newtype PkgName = PkgName String        -- package name
  deriving (Show,Eq,Ord,Typeable,Data)
 
 -- | Obtained from 'reifyModule' and 'thisModule'.
@@ -552,7 +552,7 @@ pkgString (PkgName m) = m
 
 
 -----------------------------------------------------
---		OccName
+--              OccName
 -----------------------------------------------------
 
 mkOccName :: String -> OccName
@@ -563,7 +563,7 @@ occString (OccName occ) = occ
 
 
 -----------------------------------------------------
---		 Names
+--               Names
 -----------------------------------------------------
 --
 -- For "global" names ('NameG') we need a totally unique name,
@@ -655,8 +655,8 @@ data NameFlavour
   | NameL Int#      -- ^ Local name bound outside of the TH AST
   | NameG NameSpace PkgName ModName -- ^ Global name bound outside of the TH AST:
                 -- An original name (occurrences only, not binders)
-		-- Need the namespace too to be sure which
-		-- thing we are naming
+                -- Need the namespace too to be sure which
+                -- thing we are naming
   deriving ( Typeable )
 
 -- |
@@ -702,11 +702,11 @@ ty_NameFlavour = mkDataType "Language.Haskell.TH.Syntax.NameFlavour"
                             [con_NameS, con_NameQ, con_NameU,
                              con_NameL, con_NameG]
 
-data NameSpace = VarName	-- ^ Variables
-	       | DataName	-- ^ Data constructors
-	       | TcClsName	-- ^ Type constructors and classes; Haskell has them
-				-- in the same name space for now.
-	       deriving( Eq, Ord, Data, Typeable )
+data NameSpace = VarName        -- ^ Variables
+               | DataName       -- ^ Data constructors
+               | TcClsName      -- ^ Type constructors and classes; Haskell has them
+                                -- in the same name space for now.
+               deriving( Eq, Ord, Data, Typeable )
 
 type Uniq = Int
 
@@ -760,16 +760,16 @@ mkName str
   = split [] (reverse str)
   where
     split occ []        = Name (mkOccName occ) NameS
-    split occ ('.':rev)	| not (null occ)
-			, is_rev_mod_name rev
-			= Name (mkOccName occ) (NameQ (mkModName (reverse rev)))
-	-- The 'not (null occ)' guard ensures that
-	-- 	mkName "&." = Name "&." NameS
-	-- The 'is_rev_mod' guards ensure that
-	--	mkName ".&" = Name ".&" NameS
-	--	mkName "^.." = Name "^.." NameS      -- Trac #8633
-	--	mkName "Data.Bits..&" = Name ".&" (NameQ "Data.Bits")
-	-- This rather bizarre case actually happened; (.&.) is in Data.Bits
+    split occ ('.':rev) | not (null occ)
+                        , is_rev_mod_name rev
+                        = Name (mkOccName occ) (NameQ (mkModName (reverse rev)))
+        -- The 'not (null occ)' guard ensures that
+        --      mkName "&." = Name "&." NameS
+        -- The 'is_rev_mod' guards ensure that
+        --      mkName ".&" = Name ".&" NameS
+        --      mkName "^.." = Name "^.." NameS      -- Trac #8633
+        --      mkName "Data.Bits..&" = Name ".&" (NameQ "Data.Bits")
+        -- This rather bizarre case actually happened; (.&.) is in Data.Bits
     split occ (c:rev)   = split (c:occ) rev
 
     -- Recognises a reversed module name xA.yB.C,
@@ -810,13 +810,13 @@ instance Eq Name where
 
 instance Ord Name where
   (Name o1 f1) `compare` (Name o2 f2) = (f1 `compare` f2)   `thenCmp`
-				        (o1 `compare` o2)
+                                        (o1 `compare` o2)
 
 instance Eq NameFlavour where
   f1 == f2 = cmpEq (f1 `compare` f2)
 
 instance Ord NameFlavour where
-	-- NameS < NameQ < NameU < NameL < NameG
+        -- NameS < NameQ < NameU < NameL < NameG
   NameS `compare` NameS = EQ
   NameS `compare` _     = LT
 
@@ -827,21 +827,21 @@ instance Ord NameFlavour where
   (NameU _)  `compare` NameS      = GT
   (NameU _)  `compare` (NameQ _)  = GT
   (NameU u1) `compare` (NameU u2) | isTrue# (u1  <# u2) = LT
-				  | isTrue# (u1 ==# u2) = EQ
-				  | otherwise           = GT
+                                  | isTrue# (u1 ==# u2) = EQ
+                                  | otherwise           = GT
   (NameU _)  `compare` _     = LT
 
   (NameL _)  `compare` NameS      = GT
   (NameL _)  `compare` (NameQ _)  = GT
   (NameL _)  `compare` (NameU _)  = GT
   (NameL u1) `compare` (NameL u2) | isTrue# (u1  <# u2) = LT
-				  | isTrue# (u1 ==# u2) = EQ
-				  | otherwise           = GT
+                                  | isTrue# (u1 ==# u2) = EQ
+                                  | otherwise           = GT
   (NameL _)  `compare` _          = LT
 
   (NameG ns1 p1 m1) `compare` (NameG ns2 p2 m2) = (ns1 `compare` ns2) `thenCmp`
                                             (p1 `compare` p2) `thenCmp`
-					    (m1 `compare` m2)
+                                            (m1 `compare` m2)
   (NameG _ _ _)    `compare` _ = GT
 
 data NameIs = Alone | Applied | Infix
@@ -860,12 +860,12 @@ showName' ni nm
         | pnam      -> "`" ++ nms ++ "`"
         | otherwise -> nms
     where
-	-- For now, we make the NameQ and NameG print the same, even though
-	-- NameQ is a qualified name (so what it means depends on what the
-	-- current scope is), and NameG is an original name (so its meaning
-	-- should be independent of what's in scope.
-	-- We may well want to distinguish them in the end.
-	-- Ditto NameU and NameL
+        -- For now, we make the NameQ and NameG print the same, even though
+        -- NameQ is a qualified name (so what it means depends on what the
+        -- current scope is), and NameG is an original name (so its meaning
+        -- should be independent of what's in scope.
+        -- We may well want to distinguish them in the end.
+        -- Ditto NameU and NameL
         nms = case nm of
                     Name occ NameS         -> occString occ
                     Name occ (NameQ m)     -> modString m ++ "." ++ occString occ
@@ -932,22 +932,22 @@ mk_unboxed_tup_name n_commas space
 
 
 -----------------------------------------------------
---		Locations
+--              Locations
 -----------------------------------------------------
 
 data Loc
   = Loc { loc_filename :: String
-	, loc_package  :: String
-	, loc_module   :: String
-	, loc_start    :: CharPos
-	, loc_end      :: CharPos }
+        , loc_package  :: String
+        , loc_module   :: String
+        , loc_start    :: CharPos
+        , loc_end      :: CharPos }
 
-type CharPos = (Int, Int)	-- ^ Line and character position
+type CharPos = (Int, Int)       -- ^ Line and character position
 
 
 -----------------------------------------------------
 --
---	The Info returned by reification
+--      The Info returned by reification
 --
 -----------------------------------------------------
 
@@ -1012,9 +1012,9 @@ data Info
   At present, this is always @'VarT' theName@, but future changes
   may permit refinement of this.
   -}
-  | TyVarI 	-- Scoped type variable
-	Name
-	Type	-- What it is bound to
+  | TyVarI      -- Scoped type variable
+        Name
+        Type    -- What it is bound to
   deriving( Show, Data, Typeable )
 
 -- | Obtained from 'reifyModule' in the 'Q' Monad.
@@ -1123,7 +1123,7 @@ reassociate the tree as necessary.
 
 -----------------------------------------------------
 --
---	The main syntax data types
+--      The main syntax data types
 --
 -----------------------------------------------------
 
@@ -1138,7 +1138,7 @@ data Lit = CharL Char
          | WordPrimL Integer
          | FloatPrimL Rational
          | DoublePrimL Rational
-         | StringPrimL [Word8]	-- ^ A primitive C-style string, type Addr#
+         | StringPrimL [Word8]  -- ^ A primitive C-style string, type Addr#
     deriving( Show, Eq, Data, Typeable )
 
     -- We could add Int, Float, Double etc, as we do in HsLit,
@@ -1426,7 +1426,7 @@ type constructor at the head.  So,
   -----------------------------------------------
   t1 -> t2          ArrowT `AppT` t2 `AppT` t2
   [t]               ListT `AppT` t
-  (t1,t2)	    TupleT 2 `AppT` t1 `AppT` t2
+  (t1,t2)           TupleT 2 `AppT` t1 `AppT` t2
   '(t1,t2)          PromotedTupleT 2 `AppT` t1 `AppT` t2
 
 But if the original HsSyn used prefix application, we won't use
@@ -1447,7 +1447,7 @@ constructors):
 -}
 
 -----------------------------------------------------
---		Internal helper functions
+--              Internal helper functions
 -----------------------------------------------------
 
 cmpEq :: Ordering -> Bool

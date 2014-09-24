@@ -1424,7 +1424,7 @@ isDllName dflags _this_pkg this_mod name
                                   Just i -> i
                                   Nothing -> panic ("Can't find " ++ modStr ++ "in DLL split")
                in findMod mod /= findMod this_mod
-       
+
   | otherwise = False  -- no, it is not even an external name
 
 -- -----------------------------------------------------------------------------

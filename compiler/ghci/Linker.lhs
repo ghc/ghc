@@ -557,7 +557,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
       ; let { osuf = objectSuf dflags }
       ; lnks_needed <- mapM (get_linkable osuf) mods_needed
 
-      ; return (lnks_needed, pkgs_needed) } 
+      ; return (lnks_needed, pkgs_needed) }
   where
     dflags = hsc_dflags hsc_env
     this_pkg = thisPackage dflags

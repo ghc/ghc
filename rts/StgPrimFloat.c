@@ -52,13 +52,13 @@ StgDouble
 __word_encodeDouble (W_ j, I_ e)
 {
   StgDouble r;
-  
+
   r = (StgDouble)j;
-  
+
   /* Now raise to the exponent */
   if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
     r = ldexp(r, e);
-  
+
   return r;
 }
 
@@ -67,17 +67,17 @@ StgDouble
 __int_encodeDouble (I_ j, I_ e)
 {
   StgDouble r;
-  
+
   r = (StgDouble)__abs(j);
-  
+
   /* Now raise to the exponent */
   if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
     r = ldexp(r, e);
-  
+
   /* sign is encoded in the size */
   if (j < 0)
     r = -r;
-  
+
   return r;
 }
 
@@ -86,17 +86,17 @@ StgFloat
 __int_encodeFloat (I_ j, I_ e)
 {
   StgFloat r;
-  
+
   r = (StgFloat)__abs(j);
-  
+
   /* Now raise to the exponent */
   if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
     r = ldexp(r, e);
-  
+
   /* sign is encoded in the size */
   if (j < 0)
     r = -r;
-  
+
   return r;
 }
 
@@ -105,13 +105,13 @@ StgFloat
 __word_encodeFloat (W_ j, I_ e)
 {
   StgFloat r;
-  
+
   r = (StgFloat)j;
-  
+
   /* Now raise to the exponent */
   if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
     r = ldexp(r, e);
-  
+
   return r;
 }
 

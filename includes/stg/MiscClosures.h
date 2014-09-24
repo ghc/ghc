@@ -222,7 +222,7 @@ RTS_THUNK(stg_ap_5_upd);
 RTS_THUNK(stg_ap_6_upd);
 RTS_THUNK(stg_ap_7_upd);
 
-/* standard application routines (see also utils/genapply, 
+/* standard application routines (see also utils/genapply,
  * and compiler/codeGen/CgStackery.lhs).
  */
 RTS_RET(stg_ap_v);

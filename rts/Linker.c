@@ -3606,7 +3606,7 @@ allocateImageAndTrampolines (
        barf("getNumberOfSymbols: error whilst reading `%s' header in `%S'",
              member_name, arch_name);
    fseek( f, -sizeof_COFF_header, SEEK_CUR );
-   
+
    /* We get back 8-byte aligned memory (is that guaranteed?), but
       the offsets to the sections within the file are all 4 mod 8
       (is that guaranteed?). We therefore need to offset the image

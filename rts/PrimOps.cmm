@@ -318,7 +318,7 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
 
     p = arr + SIZEOF_StgMutArrPtrs + WDS(ind);
     (h) = ccall cas(p, old, new);
-    
+
     if (h != old) {
         // Failure, return what was there instead of 'old':
         return (1,h);
@@ -791,7 +791,7 @@ stg_decodeDoublezu2Intzh ( D_ arg )
         mp_tmp2    = tmp + WDS(2);
         mp_result1 = tmp + WDS(1);
         mp_result2 = tmp;
-  
+
         /* Perform the operation */
         ccall __decodeDouble_2Int(mp_tmp1 "ptr", mp_tmp2 "ptr",
                                   mp_result1 "ptr", mp_result2 "ptr",
