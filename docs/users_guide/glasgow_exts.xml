@@ -5025,6 +5025,11 @@ sort of backtrace, and the opportunity to increase the stack depth
 with <option>-fcontext-stack=</option><emphasis>N</emphasis>.
 </para>
 
+<para>
+The <option>-XUndecidableInstances</option> flag is also used to lift some of the
+restricitions imposed on type family instances. See <xref linkend="type-family-decidability"/>.
+</para>
+
 </sect3>
 
 
