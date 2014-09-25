@@ -72,7 +72,7 @@ module TcRnTypes(
         CtEvidence(..),
         mkGivenLoc,
         isWanted, isGiven, isDerived,
-        canRewrite, canRewriteOrSame,
+        eqCanRewrite, canRewriteOrSame,
 
         -- Pretty printing
         pprEvVarTheta, 
@@ -981,11 +981,13 @@ data Ct
 
 Note [Kind orientation for CTyEqCan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Given an equality  (t:* ~ s:Open), we absolutely want to re-orient it.
-We can't solve it by updating t:=s, ragardless of how touchable 't' is,
-because the kinds don't work.  Indeed we don't want to leave it with
-the orientation (t ~ s), because if that gets into the inert set we'll
-start replacing t's by s's, and that too is the wrong way round.
+Given an equality (t:* ~ s:Open), we can't solve it by updating t:=s,
+ragardless of how touchable 't' is, because the kinds don't work.
+
+Instead we absolutely must re-orient it. Reason: if that gets into the
+inert set we'll start replacing t's by s's, and that might make a
+kind-correct type into a kind error.  After re-orienting,
+we may be able to solve by updating s:=t.
 
 Hence in a CTyEqCan, (t:k1 ~ xi:k2) we require that k2 is a subkind of k1.
 
@@ -1000,7 +1002,7 @@ We can't require *equal* kinds, because
 Note [Kind orientation for CFunEqCan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For (F xis ~ rhs) we require that kind(lhs) is a subkind of kind(rhs).
-This reallly only maters when rhs is an Open type variable (since only type
+This really only maters when rhs is an Open type variable (since only type
 variables have Open kinds):
    F ty ~ (a:Open)
 which can happen, say, from
@@ -1285,7 +1287,7 @@ data Implication
                                  --   (order does not matter)
                                  -- See Invariant (GivenInv) in TcType
 
-      ic_fsks  :: Cts            -- Extra Given constraints, all CFunEqCans,
+      ic_fsks  :: Cts,           -- Extra Given constraints, all CFunEqCans,
                                  -- arising from flattening the givens
 
       ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
@@ -1305,12 +1307,13 @@ data Implication
 instance Outputable Implication where
   ppr (Implic { ic_untch = untch, ic_skols = skols
               , ic_given = given, ic_no_eqs = no_eqs
-              , ic_wanted = wanted
+              , ic_wanted = wanted, ic_insol = insol
               , ic_binds = binds, ic_info = info })
    = hang (ptext (sLit "Implic") <+> lbrace)
         2 (sep [ ptext (sLit "Untouchables =") <+> ppr untch
                , ptext (sLit "Skolems =") <+> pprTvBndrs skols
                , ptext (sLit "No-eqs =") <+> ppr no_eqs
+               , ptext (sLit "Insol =") <+> ppr insol
                , hang (ptext (sLit "Given ="))  2 (pprEvVars given)
                , hang (ptext (sLit "Wanted =")) 2 (ppr wanted)
                , ptext (sLit "Binds =") <+> ppr binds
@@ -1465,13 +1468,14 @@ isDerived (CtDerived {}) = True
 isDerived _              = False
 
 -----------------------------------------
-canRewrite :: CtEvidence -> CtEvidence -> Bool
+eqCanRewrite :: TcTyVar -> CtEvidence -> CtEvidence -> Bool
 -- Very important function!
 -- See Note [canRewrite and canRewriteOrSame]
-canRewrite (CtGiven {})   _              = True
-canRewrite (CtWanted {})  (CtDerived {}) = True
-canRewrite (CtDerived {}) (CtDerived {}) = True  -- Derived can't solve wanted/given
-canRewrite _ _ = False             -- No evidence for a derived, anyway
+eqCanRewrite _  (CtGiven {})   _              = True
+eqCanRewrite _  (CtWanted {})  (CtDerived {}) = True
+eqCanRewrite tv (CtWanted {})  (CtWanted {})  = isMetaTyVar tv
+eqCanRewrite _  (CtDerived {}) (CtDerived {}) = True  -- Derived can't solve wanted/given
+eqCanRewrite _ _ _ = False             -- No evidence for a derived, anyway
 
 canRewriteOrSame :: CtEvidence -> CtEvidence -> Bool
 canRewriteOrSame (CtGiven {})   _              = True

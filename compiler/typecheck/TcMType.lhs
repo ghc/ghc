@@ -70,7 +70,6 @@ import TcType
 import TcEvidence
 import Type
 import Class
-import TyCon
 import Var
 
 -- others:
@@ -320,7 +319,7 @@ newMetaTyVar meta_info kind
               s = case meta_info of
                         PolyTv     -> fsLit "s"
                         TauTv      -> fsLit "t"
-                        FlatSkolTv -> fsLit "fsk"
+                        FlatMetaTv -> fsLit "fu"
                         SigTv      -> fsLit "a"
         ; details <- newMetaDetails meta_info
 	; return (mkTcTyVar name kind details) }
@@ -772,14 +771,17 @@ zonkWCRec binds_var untch (WC { wc_flat = flat, wc_impl = implic, wc_insol = ins
 zonkFlats :: EvBindsVar -> Untouchables -> Cts -> TcM Cts
 -- This zonks and unflattens a bunch of flat constraints
 -- See Note [Unflattening while zonking]
-zonkFlats binds_var untch cts
+zonkFlats _binds_var _untch cts
   = do { -- See Note [How to unflatten]
-         cts <- foldrBagM unflatten_one emptyCts cts
+--         cts <- foldrBagM unflatten_one emptyCts cts
        ; zonkCts cts }
+{-
   where
     unflatten_one orig_ct cts
-      = do { zct <- zonkCt orig_ct                -- First we need to fully zonk 
+      = do { traceTc "unflatten {" (ppr orig_ct)
+           ; zct <- zonkCt orig_ct                -- First we need to fully zonk 
            ; mct <- try_zonk_fun_eq orig_ct zct   -- Then try to solve if family equation
+           ; traceTc "unflatten }" (ppr mct)
            ; return $ maybe cts (`consBag` cts) mct }
 
     try_zonk_fun_eq orig_ct zct   -- See Note [How to unflatten]
@@ -804,6 +806,7 @@ zonkFlats binds_var untch cts
            ; return Nothing }
       | otherwise
       = return (Just zct)
+-}
 \end{code}
 
 Note [Unflattening while zonking]
@@ -852,7 +855,13 @@ the information from later ones to earlier ones.  Eg
 
 \begin{code}
 zonkCts :: Cts -> TcM Cts
-zonkCts = mapBagM zonkCt
+zonkCts = mapBagM zonkCt'
+
+zonkCt' :: Ct -> TcM Ct
+zonkCt' ct = do { traceTc "zonkCt {" (ppr ct)
+                ; ct' <- zonkCt ct
+                ; traceTc "} zonkCt" (ppr ct)
+                ; return ct' }
 
 zonkCt :: Ct -> TcM Ct
 zonkCt ct@(CHoleCan { cc_ev = ev })
@@ -867,7 +876,9 @@ zonkCtEvidence ctev@(CtGiven { ctev_pred = pred })
   = do { pred' <- zonkTcType pred
        ; return (ctev { ctev_pred = pred'}) }
 zonkCtEvidence ctev@(CtWanted { ctev_pred = pred })
-  = do { pred' <- zonkTcType pred
+  = do { traceTc "zonkCtEv: wanted {" (ppr pred) 
+       ; pred' <- zonkTcType pred
+       ; traceTc "zonkCtEv: wanted }" (ppr pred') 
        ; return (ctev { ctev_pred = pred' }) }
 zonkCtEvidence ctev@(CtDerived { ctev_pred = pred })
   = do { pred' <- zonkTcType pred
@@ -955,7 +966,7 @@ zonkTcTyVar tv
     case tcTyVarDetails tv of
       SkolemTv {}   -> zonk_kind_and_return
       RuntimeUnk {} -> zonk_kind_and_return
-      FlatSkol _ ty -> zonkTcType ty
+      FlatSkol ty   -> zonkTcType ty
       MetaTv { mtv_ref = ref }
          -> do { cts <- readMutVar ref
                ; case cts of

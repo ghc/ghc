@@ -32,7 +32,8 @@ module TcType (
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
   MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
-  isSigTyVar, isOverlappableTyVar,  isTyConableTyVar, isFlatSkolTyVar,
+  isSigTyVar, isOverlappableTyVar,  isTyConableTyVar, 
+  isFskTyVar, isFmvTyVar, isFlattenTyVar, 
   isAmbiguousTyVar, metaTvRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   isTypeVar, isKindVar,
@@ -273,8 +274,7 @@ data TcTyVarDetails
                   --          when looking up instances
                   -- See Note [Binding when looking up instances] in InstEnv
 
-  | FlatSkol 
-       Untouchables
+  | FlatSkol      -- A flatten-skolem
        TcType
 
   | RuntimeUnk    -- Stands for an as-yet-unknown type in the GHCi
@@ -303,7 +303,7 @@ data MetaInfo
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls
 
-   | FlatSkolTv    -- A unification flatten-skolem
+   | FlatMetaTv    -- A flatten meta-tyvar
 
    | PolyTv        -- Like TauTv, but can unify with a sigma-type
 
@@ -478,7 +478,7 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_untch = untch })
                 PolyTv     -> ptext (sLit "poly")
                 TauTv      -> ptext (sLit "tau")
                 SigTv      -> ptext (sLit "sig")
-                FlatSkolTv -> ptext (sLit "usk")
+                FlatMetaTv -> ptext (sLit "fmv")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
@@ -593,7 +593,7 @@ isTouchableOrUfsk ctxt_untch tv
         -> ASSERT2( checkTouchableInvariant ctxt_untch tv_untch,
                     ppr tv $$ ppr tv_untch $$ ppr ctxt_untch )
            case info of
-             FlatSkolTv -> True
+             FlatMetaTv -> True
              _          -> isTouchable ctxt_untch tv_untch
       _          -> False
 
@@ -620,7 +620,8 @@ isImmutableTyVar tv
   | otherwise    = True
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
-  isMetaTyVar, isAmbiguousTyVar, isFlatSkolTyVar :: TcTyVar -> Bool
+  isMetaTyVar, isAmbiguousTyVar, 
+  isFmvTyVar, isFskTyVar, isFlattenTyVar :: TcTyVar -> Bool
 
 isTyConableTyVar tv
         -- True of a meta-type variable that can be filled in
@@ -631,11 +632,26 @@ isTyConableTyVar tv
         MetaTv { mtv_info = SigTv } -> False
         _                           -> True
 
-isFlatSkolTyVar tv
+isFmvTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-        MetaTv { mtv_info = FlatSkolTv } -> True
+        MetaTv { mtv_info = FlatMetaTv } -> True
         _                                -> False
+
+-- | True of both given and wanted flatten-skolems (fak and usk)
+isFlattenTyVar tv
+  = ASSERT2( isTcTyVar tv, ppr tv )
+    case tcTyVarDetails tv of
+        FlatSkol {}                      -> True
+        MetaTv { mtv_info = FlatMetaTv } -> True
+        _                                -> False
+
+-- | True of FlatSkol skolems only
+isFskTyVar tv
+  = ASSERT2( isTcTyVar tv, ppr tv )
+    case tcTyVarDetails tv of
+        FlatSkol {} -> True
+        _           -> False
 
 isSkolemTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv )

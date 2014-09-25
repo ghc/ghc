@@ -1,13 +1,12 @@
 
 T7729.hs:28:14:
-    Could not deduce (BasePrimMonad (Rand m)
-                      ~ t0 (BasePrimMonad (Rand m)))
+    Could not deduce (BasePrimMonad m ~ t0 (BasePrimMonad m))
     from the context (PrimMonad (BasePrimMonad (Rand m)),
                       Monad (Rand m),
                       MonadPrim m)
       bound by the instance declaration at T7729.hs:26:10-42
     The type variable ‘t0’ is ambiguous
-    Expected type: t0 (BasePrimMonad (Rand m)) a -> Rand m a
+    Expected type: t0 (BasePrimMonad m) a -> Rand m a
       Actual type: BasePrimMonad (Rand m) a -> Rand m a
     Relevant bindings include
       liftPrim :: BasePrimMonad (Rand m) a -> Rand m a

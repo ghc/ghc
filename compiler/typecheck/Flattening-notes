@@ -1,5 +1,10 @@
 ToDo:
 
+* TcCanonical re-orients, so TcInteract should
+  not do so.  (TwoWay, OneWay)
+
+* No need to zonk now we are unflattening
+
 * TcInteract, Note [Efficient orientation]?
 
 * inert_funeqs, inert_eqs: keep only the CtEvidence. 
@@ -9,10 +14,115 @@ ToDo:
 
 * indexed_types/should_compile/T3826
 
+* remove level from FlatSkol -- not needed now they always
+  come from current level
+
+* remove the (b) CFunEqCan in simpl_loop
+
+* remove fe_rewrite_same
+
+* remove/rewrite TcMType Note [Unflattening while zonking]
+
+* Consider individual data tpyes for CFunEqCan etc
+
+* Check orientation (isFlattenTyVar) in canEqTyVarTyVar
+
+----------------------------------------
+typecheck/TcTypeNatSimple
+
+Original constraint
+  [W] x + y ~ x + alpha  (non-canonical)
+==>
+  [W] x + y     ~ fmv1   (CFunEqCan)
+  [W] x + alpha ~ fmv2   (CFuneqCan)
+  [W] fmv1 ~ fmv2        (CTyEqCan)
+
+(sigh)
+
+----------------------------------------
+indexed-types/should_fail/GADTwrong1
+
+  [G] Const a ~ ()
+==> flatten
+  [G] fsk ~ ()
+  work item: Const a ~ fsk
+==> fire top rule
+  [G] fsk ~ ()
+  work item fsk ~ ()
+
+Surely the work item should rewrite to () ~ ()?  Well, maybe not;
+it'a very special case.  More generally, our givens look like 
+F a ~ Int, where (F a) is not reducible.
+
+----------------------------------------
+indexed_types/should_fail/T7786
+
+  BuriedUnder sub k Empty ~ fsk _ajP
+  Intersect fsk_ajP inv ~ s_aJM
+  xxx[1] ~ s_aJM
+  forall . (xxx ~ Empty 
+         => Intersect (BuriedUnder sub k Empty) inv ~ Empty
+
+Conclusion: unflatten before solving nested implications
+
+----------------------------------------
+indexed_types/should_fail/T8227:
+
+   Inert: [W] fsk_aBh ~ s_aBk -> s_aBk
+          [W] s_aBk   ~ fsk_aBh
+
+          [G] Scalar fsk_aBg ~ fsk_aBh
+          [G] V a ~ f_aBg
+
+   Worklist includes  [W] Scalar s_aBi ~ s_aBk
+   s_aBi, s_aBk are flatten unificaiton variables
+
+   Work item: V fsk_aBh ~ s_aBi
+
+Note that the inert wanteds are cyclic, because we do not rewrite
+wanteds with wanteds.
+
+Then we go into a loop when normalise the work-item, because we
+use rewriteOrSame on the argument of V.
+
+Conclusion: Don't make canRewrite context specific; instead use 
+[W] a ~ ty to rewrite a wanted iff 'a' is a unification variable.
+
+
+----------------------------------------
+IndTypesPerfMerge is interesting
+
+      [G] F a ~ a
+      [W] F alpha ~ alpha, alpha ~ a
+
+    From Givens we get
+      [G] F a ~ fsk, fsk ~ a
+
+    Now if we flatten we get
+      [W] alpha ~ ufsk, F alpha ~ ufsk, alpha ~ a
+    Now, processing the first one first, choosing alpha := ufsk
+      [W] F ufsk ~ ufsk, ufsk ~ a
+    And now we are stuck.  We must either *unify* ufsk := a, or
+    use the ufsk ~ a to rewrite F ufsk ~ ufsk, so we can make it
+    meet up with the given F a ~ blah.
+
+Here is a somewhat similar case:
+
+   type family G a :: *
+
+   blah :: (G a ~ Bool, Eq (G a)) => a -> a
+   blah = error "urk"
+
+   foo x = blah x
+
+For foo we get
+   [W] Eq (G a), G a ~ Bool
+Flattening
+   [W] G a ~ ufsk, Eq ufsk, ufsk ~ Bool
+We can't simplify away the Eq Bool unless we substitute for 
 
 The new flattening story
 ~~~~~~~~~~~~~~~~~~~~~~~~
-
 * A "flatten-skolem", fsk, is a *unification* variable
   (ie with an IORef inside it)
 
@@ -110,22 +220,20 @@ The new flattening story
 
 * [Firing rule: wanteds]
     (work item) [W] x : F tys ~ ufsk
-    instantiate axiom: co : F tys ~ rhs
+    instantiate axiom: ax_co : F tys ~ rhs
 
-   First flatten rhs, giving
-      flat_co : rhs ~ xi
-
-   Now unify
-      ufsk := xi
-      x := co ; flat_co
+   Dischard ufsk:
+      ufsk := alpha
+      x := ax_co ; sym x2
+      [W] x2 : alpha ~ rhs  (Non-canonical)
    discharging the work item. This is the way that usk's get
    unified; even though they are "untouchable".
 
-   UNLESS fsk appears in xi, which can happen, in which case
-   don't unify but stick [W] ufsk ~ xi in the insoluble set.
+   NB: this deals with the case where ufsk appears in xi, which can
+   happen; it just happens through the non-canonical stuff
 
-   Short cut if rhs = G rhs_tys, where G is a type function
-   Then
+   Possible short cut if rhs = G rhs_tys, 
+   where G is a type function.  Then
       - Flatten rhs_tys (cos : rhs_tys ~ rhs_xis)
       - Add G rhs_xis ~ ufsk to flat cache
       - New wanted [W] x2 : G rhs_xis ~ ufsk
@@ -138,6 +246,10 @@ The new flattening story
    Now add non-canonical (since rhs is not flat)
       [G] (sym g ; co) : fsk ~ rhs
 
+   Short cut for when rhs = G rhs_tys and G is a type function
+      [G] (co ; g) : G tys ~ fsk
+   But need to flatten tys:  flat_cos : tys ~ flat_tys
+      [G] (sym (G flat_cos) ; co ; g) : G flat_tys ~ fsk
 
 Floating
 ~~~~~~~~
@@ -213,16 +325,18 @@ Simple20
 ~~~~~~~~
 axiom F [a] = [F a]
 
-[G] F [a] ~ a
+ [G] F [a] ~ a
 -->
  [G] fsk ~ a
-[W] F [a] ~ fsk
+ [G] [F a] ~ fsk  (nc)
 -->
-fsk := [fsk2]
- [G] [fsk2] ~ a
-[W] F a ~ fsk2
+ [G] F a ~ fsk2
+ [G] fsk ~ [fsk2] 
+ [G] fsk ~ a
 -->
-[W] F [fsk2] ~ fsk2   -- Back to square 1
+ [G] F a ~ fsk2
+ [G] a ~ [fsk2]
+ [G] fsk ~ a
 
 
 -------------------------------------------

@@ -45,6 +45,7 @@ import FastString
 import Outputable
 import SrcLoc
 import DynFlags
+import StaticFlags      ( opt_PprStyle_Debug )
 import ListSetOps       ( equivClasses )
 
 import Data.Maybe
@@ -1408,7 +1409,8 @@ relevantBindings want_filtering ctxt ct
 			    	 <+> ppr (getSrcLoc id)))]
                   new_seen = tvs_seen `unionVarSet` id_tvs
 
-            ; if (want_filtering && id_tvs `disjointVarSet` ct_tvs)
+            ; if (want_filtering && not opt_PprStyle_Debug 
+                                 && id_tvs `disjointVarSet` ct_tvs)
                        -- We want to filter out this binding anyway
                        -- so discard it silently
               then go tidy_env n_left tvs_seen docs discards tc_bndrs

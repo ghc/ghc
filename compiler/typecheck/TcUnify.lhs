@@ -457,7 +457,7 @@ newImplication skol_info skol_tvs given thing_inside
        ; env <- getLclEnv
        ; emitImplication $ Implic { ic_untch  = untch
              		     	  , ic_skols  = skol_tvs
-                                  , ic_fsks   = []
+                                  , ic_fsks   = emptyCts
                                   , ic_no_eqs = False
                              	  , ic_given  = given
                                   , ic_wanted = wanted

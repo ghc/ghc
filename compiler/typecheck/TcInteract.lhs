@@ -82,12 +82,13 @@ If in Step 1 no such element exists, we have exceeded our context-stack
 depth and will simply fail.
 
 \begin{code}
-solveInteractGiven :: CtLoc -> [TcTyVar] -> [EvVar] -> TcS ()
-solveInteractGiven loc old_fsks givens
+solveInteractGiven :: CtLoc -> [EvVar] -> TcS ()
+solveInteractGiven loc givens
   | null givens  -- Shortcut for common case
   = return ()
   | otherwise
-  = do { implics2 <- solveInteract (fsk_bag `unionBags` given_bag)
+  = do { implics2 <- solveInteract given_bag
+           -- old_fsks: see Note [Given flatten-skolems] in TcSMonad
        ; MASSERT( isEmptyBag implics2 )
            -- empty implics because we discard Given equalities between
            -- foralls (see Note [Do not decompose given polytype equalities]
@@ -100,20 +101,6 @@ solveInteractGiven loc old_fsks givens
                                                      , ctev_pred = evVarPred ev_id
                                                      , ctev_loc = loc }
                           | ev_id <- givens ]
-
-    -- See Note [Given flatten-skolems] in TcSMonad
-    fsk_bag = listToBag 
-               [ CFunEqCan { cc_ev = CtGiven { ctev_evtm = EvCoercion (mkTcNomReflCo fam_ty)
-                                             , ctev_pred = pred
-                                             , ctev_loc = loc }
-                           , cc_fun = fam_tc
-                           , cc_tyargs = arg_tys
-                           , cc_fsk = fsk }
-                        | fsk <- old_fsks
-                        , let FlatSkol _ fam_ty = tcTyVarDetails fsk
-                              Just (fam_tc, arg_tys) = tcSplitTyConApp_maybe fam_ty
-                              pred  = mkTcEqPred fam_ty (mkTyVarTy fsk)
-                        ]
 
 -- The main solver loop implements Note [Basic Simplifier Plan]
 ---------------------------------------------------------------
@@ -519,9 +506,7 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
        ; let interact = sfInteractInert ops args (mkTyVarTy fsk)
        ; impMbs <- sequence
                  [ do mb <- newDerived (ctev_loc iev) (mkTcEqPred lhs_ty rhs_ty)
-                      case mb of
-                        Just x -> return $ Just $ mkNonCanonical x
-                        Nothing -> return Nothing
+                      return (fmap mkNonCanonical mb)
                  | CFunEqCan { cc_tyargs = iargs
                              , cc_fsk = ifsk
                              , cc_ev = iev } <- is
@@ -775,19 +760,19 @@ kick_out new_ev new_tv (IC { inert_eqs = tv_eqs
                                                    `andCts` insols_out) }
 
     (tv_eqs_out,  tv_eqs_in) = foldVarEnv kick_out_eqs ([], emptyVarEnv) tv_eqs
-    (feqs_out,   feqs_in)    = partitionFunEqs  kick_out_ct    funeqmap
-    (dicts_out,  dicts_in)   = partitionDicts   kick_out_ct    dictmap
+    (feqs_out,   feqs_in)    = partitionFunEqs  kick_out_ct funeqmap
+    (dicts_out,  dicts_in)   = partitionDicts   kick_out_ct dictmap
     (irs_out,    irs_in)     = partitionBag     kick_out_irred irreds
     (insols_out, insols_in)  = partitionBag     kick_out_ct    insols
       -- Kick out even insolubles; see Note [Kick out insolubles]
 
     kick_out_ct :: Ct -> Bool
-    kick_out_ct ct =  new_ev `canRewrite` ctEvidence ct
+    kick_out_ct ct =  eqCanRewrite new_tv new_ev (ctEvidence ct)
                    && new_tv `elemVarSet` tyVarsOfCt ct
          -- See Note [Kicking out inert constraints]
 
     kick_out_irred :: Ct -> Bool
-    kick_out_irred ct =  new_ev `canRewrite` ctEvidence ct
+    kick_out_irred ct =  eqCanRewrite new_tv new_ev (ctEvidence ct)
                       && new_tv `elemVarSet` closeOverKinds (tyVarsOfCt ct)
           -- See Note [Kicking out Irreds]
 
@@ -803,10 +788,10 @@ kick_out new_ev new_tv (IC { inert_eqs = tv_eqs
 
     kick_out_eq :: Ct -> Bool
     kick_out_eq (CTyEqCan { cc_tyvar = tv, cc_rhs = rhs, cc_ev = ev })
-      =  (new_ev `canRewrite` ev)  -- See Note [Delicate equality kick-out]
+      =  (eqCanRewrite new_tv new_ev ev)  -- See Note [Delicate equality kick-out]
       && (new_tv == tv ||                    
-          new_tv `elemVarSet` kind_vars ||    -- (1)
-          (not (ev `canRewrite` new_ev) &&    -- (2)
+          new_tv `elemVarSet` kind_vars ||       -- (1)
+          (not (eqCanRewrite tv ev new_ev) &&    -- (2)
            new_tv `elemVarSet` (extendVarSet (tyVarsOfType rhs) tv)))
       where
         kind_vars = tyVarsOfType (tyVarKind tv) `unionVarSet`
@@ -925,12 +910,24 @@ trySpontaneousSolve gw tv1 xi
 trySpontaneousEqOneWay :: CtEvidence -> TcTyVar -> Xi -> TcS SPSolveResult
 -- tv is a MetaTyVar, not untouchable
 trySpontaneousEqOneWay gw tv xi
-  | not (isSigTyVar tv) || isTyVarTy xi
+  | not (isSigTyVar tv) || is_tyvar xi
   , typeKind xi `tcIsSubKind` tyVarKind tv
   = solveWithIdentity gw tv xi
   | otherwise -- Still can't solve, sig tyvar and non-variable rhs
   = return SPCantSolve
-
+  where
+    is_tyvar xi 
+      = case tcGetTyVar_maybe xi of
+          Nothing -> False
+          Just tv -> case tcTyVarDetails tv of
+                       MetaTv { mtv_info = info }
+                                   -> case info of
+                                        SigTv -> True
+                                        _     -> False
+                       SkolemTv {} -> True
+                       FlatSkol {} -> False
+                       RuntimeUnk  -> True
+                       
 ----------------
 trySpontaneousEqTwoWay :: CtEvidence -> TcTyVar -> TcTyVar -> TcS SPSolveResult
 -- Both tyvars are *touchable* MetaTyvars so there is only a chance for kind error here

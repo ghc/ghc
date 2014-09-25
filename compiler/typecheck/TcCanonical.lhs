@@ -237,7 +237,8 @@ canClassNC ev cls tys
     `andWhenContinue` emitSuperclasses
 
 canClass ev cls tys
-  = do { (xis, cos) <- flattenMany FMFullFlatten ev tys
+  = do { let fmode = FE { fe_ev = ev, fe_subst_only = False, fe_rewrite_same = True }
+       ; (xis, cos) <- flattenMany fmode tys
        ; let co = mkTcTyConAppCo Nominal (classTyCon cls) cos
              xi = mkClassPred cls xis
        ; mb <- rewriteEvidence ev xi co
@@ -377,8 +378,9 @@ canIrred :: CtEvidence -> TcS StopOrContinue
 -- Precondition: ty not a tuple and no other evidence form
 canIrred old_ev
   = do { let old_ty = ctEvPred old_ev
+             fmode  = FE { fe_ev = old_ev, fe_rewrite_same = False, fe_subst_only = False }
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr old_ty)
-       ; (xi,co) <- flatten FMFullFlatten old_ev old_ty -- co :: xi ~ old_ty
+       ; (xi,co) <- flatten fmode old_ty -- co :: xi ~ old_ty
        ; mb <- rewriteEvidence old_ev xi co
        ; case mb of {
              Nothing     -> return Stop ;
@@ -394,8 +396,9 @@ canIrred old_ev
 
 canHole :: CtEvidence -> OccName -> TcS StopOrContinue
 canHole ev occ
-  = do { let ty = ctEvPred ev
-       ; (xi,co) <- flatten FMFullFlatten ev ty -- co :: xi ~ ty
+  = do { let ty    = ctEvPred ev
+             fmode = FE { fe_ev = ev, fe_rewrite_same = False, fe_subst_only = False }
+       ; (xi,co) <- flatten fmode ty -- co :: xi ~ ty
        ; mb <- rewriteEvidence ev xi co
        ; case mb of
              Just new_ev -> emitInsoluble (CHoleCan { cc_ev = new_ev, cc_occ = occ })
@@ -450,57 +453,56 @@ it expands the synonym and proceeds; if not, it simply returns the
 unexpanded synonym.
 
 \begin{code}
-data FlattenMode = FMSubstOnly | FMFullFlatten
-                   -- See Note [Flattening under a forall]
+data FlattenMode
+  = FE { fe_subst_only   :: Bool     -- See Note [Flattening under a forall]
+       , fe_rewrite_same :: Bool
+       , fe_ev           :: CtEvidence }
 
 -- Flatten a bunch of types all at once.
-flattenMany ::  FlattenMode
-            -> CtEvidence
-            -> [Type] -> TcS ([Xi], [TcCoercion])
+flattenMany :: FlattenMode -> [Type] -> TcS ([Xi], [TcCoercion])
 -- Coercions :: Xi ~ Type
 -- Returns True iff (no flattening happened)
--- NB: The EvVar inside the 'ctxt :: CtEvidence' is unused,
+-- NB: The EvVar inside the 'fe_ev :: CtEvidence' is unused,
 --     we merely want (a) Given/Solved/Derived/Wanted info
 --                    (b) the GivenLoc/WantedLoc for when we create new evidence
-flattenMany f ctxt tys
+flattenMany fmode tys
   = -- pprTrace "flattenMany" empty $
     go tys
   where go []       = return ([],[])
-        go (ty:tys) = do { (xi,co)    <- flatten f ctxt ty
+        go (ty:tys) = do { (xi,co)    <- flatten fmode ty
                          ; (xis,cos)  <- go tys
                          ; return (xi:xis,co:cos) }
 
-flatten :: FlattenMode
-        -> CtEvidence -> TcType -> TcS (Xi, TcCoercion)
+flatten :: FlattenMode -> TcType -> TcS (Xi, TcCoercion)
 -- Flatten a type to get rid of type function applications, returning
 -- the new type-function-free type, and a collection of new equality
 -- constraints.  See Note [Flattening] for more detail.
 --
 -- Postcondition: Coercion :: Xi ~ TcType
 
-flatten _ _ xi@(LitTy {}) = return (xi, mkTcNomReflCo xi)
+flatten _ xi@(LitTy {}) = return (xi, mkTcNomReflCo xi)
 
-flatten f ctxt (TyVarTy tv)
-  = flattenTyVar f ctxt tv
+flatten fmode (TyVarTy tv)
+  = flattenTyVar fmode tv
 
-flatten f ctxt (AppTy ty1 ty2)
-  = do { (xi1,co1) <- flatten f ctxt ty1
-       ; (xi2,co2) <- flatten f ctxt ty2
+flatten fmode (AppTy ty1 ty2)
+  = do { (xi1,co1) <- flatten fmode ty1
+       ; (xi2,co2) <- flatten fmode ty2
        ; traceTcS "flatten/appty" (ppr ty1 $$ ppr ty2 $$ ppr xi1 $$ ppr co1 $$ ppr xi2 $$ ppr co2)
        ; return (mkAppTy xi1 xi2, mkTcAppCo co1 co2) }
 
-flatten f ctxt (FunTy ty1 ty2)
-  = do { (xi1,co1) <- flatten f ctxt ty1
-       ; (xi2,co2) <- flatten f ctxt ty2
+flatten fmode (FunTy ty1 ty2)
+  = do { (xi1,co1) <- flatten fmode ty1
+       ; (xi2,co2) <- flatten fmode ty2
        ; return (mkFunTy xi1 xi2, mkTcFunCo Nominal co1 co2) }
 
-flatten f ctxt (TyConApp tc tys)
+flatten fmode (TyConApp tc tys)
 
   -- Expand type synonyms that mention type families 
   -- on the RHS; see Note [Flattening synonyms]
   | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys
   , any isSynFamilyTyCon (tyConsOfType rhs)
-  = flatten f ctxt (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
+  = flatten fmode (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
 
   -- For * a normal data type application
   --     * data family application
@@ -508,20 +510,20 @@ flatten f ctxt (TyConApp tc tys)
   --             See Note [Flattening synonyms]
   -- we just recursively flatten the arguments.
   | not (isSynFamilyTyCon tc)
-  = do { (xis,cos) <- flattenMany f ctxt tys
+  = do { (xis,cos) <- flattenMany fmode tys
        ; return (mkTyConApp tc xis, mkTcTyConAppCo Nominal tc cos) }
 
   -- Otherwise, it's a type function application, and we have to
   -- flatten it away as well, and generate a new given equality constraint
   -- between the application and a newly generated flattening skolem variable.
   | otherwise
-  = flattenFamApp f ctxt tc tys
+  = flattenFamApp fmode tc tys
 
-flatten _f ctxt ty@(ForAllTy {})
+flatten fmode ty@(ForAllTy {})
 -- We allow for-alls when, but only when, no type function
 -- applications inside the forall involve the bound type variables.
   = do { let (tvs, rho) = splitForAllTys ty
-       ; (rho', co) <- flatten FMSubstOnly ctxt rho
+       ; (rho', co) <- flatten (fmode { fe_subst_only = True }) rho
                          -- Substitute only under a forall
                          -- See Note [Flattening under a forall]
        ; return (mkForAllTys tvs rho', foldr mkTcForAllCo co tvs) }
@@ -564,77 +566,77 @@ and we have not begun to think about how to make that work!
 
 \begin{code}
 flattenFamApp, flattenExactFamApp
--- flattenFamApp      can be over-saturated
--- flattenExactFamApp is exactly saturated
-  :: FlattenMode -> CtEvidence
-  -> TyCon -> [TcType] -> TcS (Xi, TcCoercion)
+  :: FlattenMode -> TyCon -> [TcType] -> TcS (Xi, TcCoercion)
+  -- flattenFamApp      can be over-saturated
+  -- flattenExactFamApp is exactly saturated
   -- Postcondition: Coercion :: Xi ~ F tys
-flattenFamApp f ctxt tc tys  -- Can be over-saturated
+flattenFamApp fmode tc tys  -- Can be over-saturated
     = ASSERT( tyConArity tc <= length tys )  -- Type functions are saturated
-      do { (xis, cos) <- flattenMany f ctxt tys
-         ; let (xi_args,  xi_rest)  = splitAt (tyConArity tc) xis
-               (cos_args, cos_rest) = splitAt (tyConArity tc) cos
                  -- The type function might be *over* saturated
                  -- in which case the remaining arguments should
                  -- be dealt with by AppTys
-
-         ; (rhs_xi, ret_co) <- flattenExactFamApp f ctxt tc xi_args
-              -- ret_co :: rhs_xi ~ F xi_args
-
-                  -- Emit the flat constraints
-         ; return ( mkAppTys rhs_xi xi_rest -- NB mkAppTys: rhs_xi might not be a type variable
+      do { let (tys1, tys_rest) = splitAt (tyConArity tc) tys
+         ; (xi1, co1) <- flattenExactFamApp fmode tc tys1
+               -- co1 :: xi1 ~ F tys1
+         ; (xis_rest, cos_rest) <- flattenMany fmode tys_rest
+               -- cos_res :: xis_rest ~ tys_rest
+         ; return ( mkAppTys xi1 xis_rest   -- NB mkAppTys: rhs_xi might not be a type variable
                                             --    cf Trac #5655
-                  , mkTcAppCos (ret_co `mkTcTransCo` mkTcTyConAppCo Nominal tc cos_args)
-                               -- (rhs_xi :: F xis) ; (F cos :: F xis ~ F tys)
-                               cos_rest
+                  , mkTcAppCos co1 cos_rest -- (rhs_xi :: F xis) ; (F cos :: F xis ~ F tys)
                   )
          }
 
-flattenExactFamApp FMSubstOnly _ tc xi_args
-  = do { let fam_ty = mkTyConApp tc xi_args
-       ; return (fam_ty, mkTcNomReflCo fam_ty) }
+flattenExactFamApp fmode tc tys
+  | fe_subst_only fmode
+  = do { (xis, cos) <- flattenMany fmode tys 
+       ; return ( mkTyConApp tc xis
+                , mkTcTyConAppCo Nominal tc cos ) }
 
-flattenExactFamApp FMFullFlatten ctxt tc xi_args  -- Eactly saturated
-  = do { let fam_ty = mkTyConApp tc xi_args
-             loc    = ctev_loc ctxt
-       ; mb_ct <- lookupFlatCache ctxt tc xi_args
+flattenExactFamApp fmode tc tys  -- Eactly saturated
+  = do { (xis, cos) <- flattenMany (fmode { fe_rewrite_same = True }) tys
+       ; let ret_co = mkTcTyConAppCo Nominal tc cos
+              -- ret_co :: F xis ~ F tys
+             ctxt_ev = fe_ev fmode
+
+       ; mb_ct <- lookupFlatCache tc xis
        ; case mb_ct of
-           Just (co, fsk)  -- co :: F xi_args ~ fsk
-             ->  -- Hit in the flat-cache
-                 -- No need to check for given/wanted here, because that's a
-                 -- property of the free vars of (F tys) not of the context
-                do { traceTcS "flatten/flat-cache hit" $ (ppr tc <+> ppr xi_args $$ ppr fsk $$ ppr co)
-                   ; (fsk_xi, fsk_co) <- flattenTyVar FMFullFlatten ctxt fsk
+           Just (co, fsk)  -- co :: F xis ~ fsk
+             | isFskTyVar fsk || not (isGiven ctxt_ev)
+             ->  -- Usable hit in the flat-cache
+                 -- isFskTyVar checks for a "given" in the cache
+                do { traceTcS "flatten/flat-cache hit" $ (ppr tc <+> ppr xis $$ ppr fsk $$ ppr co)
+                   ; (fsk_xi, fsk_co) <- flattenTyVar fmode fsk
                           -- The fsk may already have been unified, so flatten it
                           -- fsk_co :: fsk_xi ~ fsk
-                   ; return (fsk_xi, fsk_co `mkTcTransCo`mkTcSymCo co) }
-                                    -- :: fsk_xi ~ F xi_args
+                   ; return (fsk_xi, fsk_co `mkTcTransCo` mkTcSymCo co `mkTcTransCo` ret_co) }
+                                    -- :: fsk_xi ~ F xis
 
-           _ -> do { (ev, fsk) <- newFlattenSkolem ctxt fam_ty
+           _ -> do { let fam_ty = mkTyConApp tc xis
+                   ; (ev, fsk) <- newFlattenSkolem ctxt_ev fam_ty
+                   ; extendFlatCache tc xis (ctEvCoercion ev, fsk)
 
-                   -- The new constraint (F xi_args ~ fsk) is not necessarily inert
+                   -- The new constraint (F xis ~ fsk) is not necessarily inert
                    -- (e.g. the LHS may be a redex) so we must put it in the work list
                    ; let ct = CFunEqCan { cc_ev     = ev
                                         , cc_fun    = tc
-                                        , cc_tyargs = xi_args
+                                        , cc_tyargs = xis
                                         , cc_fsk    = fsk }
                    ; updWorkListTcS (extendWorkListFunEq ct)
 
                    ; traceTcS "flatten/flat-cache miss" $ (ppr fam_ty $$ ppr fsk $$ ppr ev)
-                   ; return (mkTyVarTy fsk, mkTcSymCo (ctEvCoerction ev) }
-       }
+                   ; return (mkTyVarTy fsk, mkTcSymCo (ctEvCoercion ev) `mkTcTransCo` ret_co) } }
 \end{code}
 
 \begin{code}
-flattenTyVar :: FlattenMode -> CtEvidence -> TcTyVar -> TcS (Xi, TcCoercion)
+flattenTyVar :: FlattenMode -> TcTyVar -> TcS (Xi, TcCoercion)
 -- "Flattening" a type variable means to apply the substitution to it
 -- The substitution is actually the union of the substitution in the TyBinds
 -- for the unification variables that have been unified already with the inert
 -- equalities, see Note [Spontaneously solved in TyBinds] in TcInteract.
 --
 -- Postcondition: co : xi ~ tv
-flattenTyVar f ctxt tv
-  = do { mb_yes <- flattenTyVarOuter f ctxt tv
+flattenTyVar fmode tv
+  = do { mb_yes <- flattenTyVarOuter fmode tv
        ; case mb_yes of
            Left tv'         -> -- Done 
                                do { traceTcS "flattenTyVar1" (ppr tv $$ ppr (tyVarKind tv'))
@@ -643,15 +645,13 @@ flattenTyVar f ctxt tv
                                ty' = mkTyVarTy tv'
 
            Right (ty1, co1) -> -- Recurse
-                               do { (ty2, co2) <- flatten f ctxt ty1
+                               do { (ty2, co2) <- flatten fmode ty1
                                   ; traceTcS "flattenTyVar2" (ppr tv $$ ppr ty2)
                                   ; return (ty2, co2 `mkTcTransCo` co1) }
        }
 
 flattenTyVarOuter, flattenTyVarFinal 
-   :: FlattenMode -> CtEvidence
-   -> TcTyVar 
-   -> TcS (Either TyVar (TcType, TcCoercion))
+   :: FlattenMode  -> TcTyVar -> TcS (Either TyVar (TcType, TcCoercion))
 -- Look up the tyvar in 
 --   a) the internal MetaTyVar box
 --   b) the tyvar binds 
@@ -660,9 +660,9 @@ flattenTyVarOuter, flattenTyVarFinal
 --        (Right (ty, co)) if found, with co :: ty ~ tv
 --                         NB: in the latter case ty is not necessarily flattened
 
-flattenTyVarOuter f ctxt tv
+flattenTyVarOuter fmode tv
   | not (isTcTyVar tv)            -- Happens when flatten under a (forall a. ty)
-  = flattenTyVarFinal f ctxt tv   -- So ty contains refernces to the non-TcTyVar a
+  = flattenTyVarFinal fmode tv   -- So ty contains refernces to the non-TcTyVar a
   | otherwise
   = do { mb_ty <- isFilledMetaTyVar_maybe tv
        ; case mb_ty of {
@@ -681,22 +681,23 @@ flattenTyVarOuter f ctxt tv
     -- Try in the inert equalities
     do { ieqs <- getInertEqs
        ; case lookupVarEnv ieqs tv of
-           Just (ct:_)                      -- If the first doesn't work,
-             | let ctev   = ctEvidence ct   -- the subsequent ones won't either
-                   rhs_ty = cc_rhs ct
-             , ctev `canRewrite` ctxt 
+           Just (ct:_)   -- If the first doesn't work,
+                         -- the subsequent ones won't either
+             | CTyEqCan { cc_ev = ctev, cc_tyvar = tv, cc_rhs = rhs_ty } <- ct
+             , eqCanRewrite tv ctev (fe_ev fmode)
              ->  do { traceTcS "Following inert tyvar" (ppr tv <+> equals <+> ppr rhs_ty $$ ppr ctev)
                     ; return (Right (rhs_ty, mkTcSymCo (ctEvCoercion ctev))) }
-                    -- NB: even if ct is Derived we are not going to
-                    -- touch the actual coercion so we are fine.
+                    -- NB: ct is Derived then (fe_ev fmode) must be also, hence
+                    -- we are not going to touch the returned coercion
+                    -- so ctEvCoercion is fine.
 
-           _other -> flattenTyVarFinal f ctxt tv
+           _other -> flattenTyVarFinal fmode tv
     } } } } }
 
-flattenTyVarFinal f ctxt tv
+flattenTyVarFinal fmode tv
   = -- Done, but make sure the kind is zonked
     do { let knd = tyVarKind tv
-       ; (new_knd, _kind_co) <- flatten f ctxt knd
+       ; (new_knd, _kind_co) <- flatten fmode knd
        ; return (Left (setVarType tv new_knd)) }
 \end{code}
 
@@ -841,8 +842,9 @@ can_eq_fam_nc :: CtEvidence -> SwapFlag
 --   or the swapped version thereof
 -- Flatten both sides and go round again
 can_eq_fam_nc ev swapped lhs rhs
-  = do { (xi_lhs, co_lhs) <- flatten FMFullFlatten ev lhs
-       ; (xi_rhs, co_rhs) <- flatten FMFullFlatten ev rhs
+  = do { let fmode = FE { fe_ev = ev, fe_subst_only = False, fe_rewrite_same = False }
+       ; (xi_lhs, co_lhs) <- flatten fmode lhs
+       ; (xi_rhs, co_rhs) <- flatten fmode rhs
        ; mb_ct <- rewriteEqEvidence ev swapped xi_lhs xi_rhs co_lhs co_rhs
        ; case mb_ct of
            Nothing -> return Stop
@@ -858,12 +860,13 @@ can_eq_app, can_eq_flat_app
 can_eq_app ev swapped s1 t1 ps_ty1 ty2 ps_ty2
   =  do { traceTcS "can_eq_app 1" $
           vcat [ ppr ev, ppr swapped, ppr s1, ppr t1, ppr ty2 ]
-        ; (xi_s1, co_s1) <- flatten FMSubstOnly ev s1
+        ; let fmode = FE { fe_ev = ev, fe_subst_only = True, fe_rewrite_same = False }
+        ; (xi_s1, co_s1) <- flatten fmode s1
         ; traceTcS "can_eq_app 2" $ vcat [ ppr ev, ppr xi_s1 ]
         ; if s1 `tcEqType` xi_s1
           then can_eq_flat_app ev swapped s1 t1 ps_ty1 ty2 ps_ty2
           else
-     do { (xi_t1, co_t1) <- flatten FMSubstOnly ev t1
+     do { (xi_t1, co_t1) <- flatten fmode t1
              -- We flatten t1 as well so that (xi_s1 xi_t1) is well-kinded
              -- If we form (xi_s1 t1) that might (appear) ill-kinded, 
              -- and then crash in a call to typeKind
@@ -925,8 +928,9 @@ canDecomposableTyConAppOK ev tc1 tys1 tys2
 canEqFailure :: CtEvidence -> TcType -> TcType -> TcS StopOrContinue
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqFailure ev ty1 ty2
-  = do { (s1, co1) <- flatten FMSubstOnly ev ty1
-       ; (s2, co2) <- flatten FMSubstOnly ev ty2
+  = do { let fmode = FE { fe_ev = ev, fe_subst_only = True, fe_rewrite_same = False }
+       ; (s1, co1) <- flatten fmode ty1
+       ; (s2, co2) <- flatten fmode ty2
        ; mb_ct <- rewriteEqEvidence ev NotSwapped s1 s2 co1 co2
        ; case mb_ct of
            Just new_ev -> emitInsoluble (mkNonCanonical new_ev)
@@ -1094,7 +1098,8 @@ canCFunEqCan :: CtEvidence
 -- and the RHS is a fsk, which we must *not* substitute.
 -- So just substitute in the LHS
 canCFunEqCan ev fn tys fsk
-  = do { (tys', cos) <- flattenMany FMFullFlatten ev tys
+  = do { let fmode = FE { fe_ev = ev, fe_rewrite_same = True, fe_subst_only = False }
+       ; (tys', cos) <- flattenMany fmode tys
                         -- cos :: tys' ~ tys
        ; let lhs_co  = mkTcTyConAppCo Nominal fn cos
                         -- :: F tys' ~ F tys
@@ -1118,7 +1123,8 @@ canEqTyVar :: CtEvidence -> SwapFlag
 -- A TyVar on LHS, but so far un-zonked
 canEqTyVar ev swapped tv1 ty2 ps_ty2              -- ev :: tv ~ s2
   = do { traceTcS "canEqTyVar" (ppr tv1 $$ ppr ty2 $$ ppr swapped)
-       ; mb_yes <- flattenTyVarOuter FMFullFlatten ev tv1 
+       ; let fmode = FE { fe_ev = ev, fe_rewrite_same = False, fe_subst_only = False }
+       ; mb_yes <- flattenTyVarOuter fmode tv1 
        ; case mb_yes of
            Right (ty1, co1) -> -- co1 :: ty1 ~ tv1
                                do { mb <- rewriteEqEvidence ev swapped  ty1 ps_ty2
@@ -1129,7 +1135,7 @@ canEqTyVar ev swapped tv1 ty2 ps_ty2              -- ev :: tv ~ s2
                                       Nothing     -> return Stop
                                       Just new_ev -> can_eq_nc new_ev ty1 ty1 ty2 ps_ty2 }
 
-           Left tv1' -> do { (xi2, co2) <- flatten FMFullFlatten ev ps_ty2 -- co2 :: xi2 ~ ps_ty2
+           Left tv1' -> do { (xi2, co2) <- flatten fmode ps_ty2 -- co2 :: xi2 ~ ps_ty2
                                            -- Use ps_ty2 to preserve type synonyms if poss
                            ; dflags <- getDynFlags
                            ; canEqTyVar2 dflags ev swapped tv1' xi2 co2 } }
@@ -1230,9 +1236,9 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
     k2  = tyVarKind tv2
 
     tv2 `better_than` tv1
-      | isMetaTyVar tv1     = False   -- Never swap a meta-tyvar
-      | isFlatSkolTyVar tv1 = isMetaTyVar tv2
-      | otherwise           = isMetaTyVar tv2 || isFlatSkolTyVar tv2
+      | isMetaTyVar tv1    = False   -- Never swap a meta-tyvar
+      | isFlattenTyVar tv1 = isMetaTyVar tv2
+      | otherwise          = isMetaTyVar tv2 || isFlattenTyVar tv2
                             -- Note [Eliminate flat-skols]
 
 checkKind :: CtEvidence         -- t1~t2
