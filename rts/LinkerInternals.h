@@ -144,6 +144,10 @@ typedef struct _ObjectCode {
 extern ObjectCode *objects;
 extern ObjectCode *unloaded_objects;
 
+#ifdef THREADED_RTS
+extern Mutex linker_mutex;
+#endif
+
 void exitLinker( void );
 
 void freeObjectCode (ObjectCode *oc);

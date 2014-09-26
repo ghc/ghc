@@ -26,6 +26,7 @@ loadFunction :: Maybe String
              -> String
            -> IO (Maybe a)
 loadFunction mpkg m valsym = do
+    c_initLinker
     let symbol = prefixUnderscore
                    ++ maybe "" (\p -> zEncodeString p ++ "_") mpkg
                    ++ zEncodeString m ++ "_" ++ zEncodeString valsym
@@ -39,3 +40,4 @@ loadFunction mpkg m valsym = do
     prefixUnderscore = if elem os ["darwin","mingw32","cygwin"] then "_" else ""
 
 foreign import ccall safe "lookupSymbol" c_lookupSymbol :: CString -> IO (Ptr a)
+foreign import ccall safe "initLinker" c_initLinker :: IO ()
