@@ -30,6 +30,7 @@ import VarSet
 import VarEnv
 import Outputable
 import ErrUtils( Validity(..), allValid )
+import SrcLoc
 import Util
 import FastString
 
@@ -135,11 +136,11 @@ unification variables when producing the FD constraints.
 Finally, the position parameters will help us rewrite the wanted constraint ``on the spot''
 
 \begin{code}
-data Equation
+data Equation loc
    = FDEqn { fd_qtvs :: [TyVar]                 -- Instantiate these type and kind vars to fresh unification vars
            , fd_eqs  :: [FDEq]                  --   and then make these equal
-           , fd_pred1, fd_pred2 :: PredType }   -- The Equation arose from
-                                                -- combining these two constraints
+           , fd_pred1, fd_pred2 :: PredType     -- The Equation arose from combining these two constraints
+           , fd_loc :: loc  }
 
 data FDEq = FDEq { fd_pos      :: Int -- We use '0' for the first position
                  , fd_ty_left  :: Type
@@ -215,14 +216,14 @@ zipAndComputeFDEqs _ _ _ = []
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 improveFromAnother :: PredType -- Template item (usually given, or inert)
                    -> PredType -- Workitem [that can be improved]
-                   -> [Equation]
+                   -> [Equation ()]
 -- Post: FDEqs always oriented from the other to the workitem
 --       Equations have empty quantified variables
 improveFromAnother pred1 pred2
   | Just (cls1, tys1) <- getClassPredTys_maybe pred1
   , Just (cls2, tys2) <- getClassPredTys_maybe pred2
   , tys1 `lengthAtLeast` 2 && cls1 == cls2
-  = [ FDEqn { fd_qtvs = [], fd_eqs = eqs, fd_pred1 = pred1, fd_pred2 = pred2 }
+  = [ FDEqn { fd_qtvs = [], fd_eqs = eqs, fd_pred1 = pred1, fd_pred2 = pred2, fd_loc = () }
     | let (cls_tvs, cls_fds) = classTvsFds cls1
     , fd <- cls_fds
     , let (ltys1, rs1)  = instFD         fd cls_tvs tys1
@@ -237,15 +238,15 @@ improveFromAnother _ _ = []
 -- Improve a class constraint from instance declarations
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-pprEquation :: Equation -> SDoc
+pprEquation :: Equation a -> SDoc
 pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
   = vcat [ptext (sLit "forall") <+> braces (pprWithCommas ppr qtvs),
           nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2 | (FDEq _ t1 t2) <- pairs])]
 
 improveFromInstEnv :: (InstEnv,InstEnv)
                    -> PredType
-                   -> [Equation] -- Needs to be an Equation because
-                                 -- of quantified variables
+                   -> [Equation SrcSpan] -- Needs to be an Equation because
+                                         -- of quantified variables
 -- Post: Equations oriented from the template (matching instance) to the workitem!
 improveFromInstEnv _inst_env pred
   | not (isClassPred pred)
@@ -256,7 +257,9 @@ improveFromInstEnv inst_env pred
   , let (cls_tvs, cls_fds) = classTvsFds cls
         instances          = classInstances inst_env cls
         rough_tcs          = roughMatchTcs tys
-  = [ FDEqn { fd_qtvs = meta_tvs, fd_eqs = eqs, fd_pred1 = p_inst, fd_pred2=pred }
+  = [ FDEqn { fd_qtvs = meta_tvs, fd_eqs = eqs
+            , fd_pred1 = p_inst, fd_pred2=pred
+            , fd_loc = getSrcSpan (is_dfun ispec) }
     | fd <- cls_fds             -- Iterate through the fundeps first,
                                 -- because there often are none!
     , let trimmed_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs

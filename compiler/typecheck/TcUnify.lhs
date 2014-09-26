@@ -545,7 +545,7 @@ uType_defer origin ty1 ty2
             { ctxt <- getErrCtxt
             ; doc <- mkErrInfo emptyTidyEnv ctxt
             ; traceTc "utype_defer" (vcat [ppr eqv, ppr ty1,
-                                           ppr ty2, ppr origin, doc])
+                                           ppr ty2, pprCtOrigin origin, doc])
             }
        ; return (mkTcCoVarCo eqv) }
 
@@ -556,7 +556,7 @@ uType origin orig_ty1 orig_ty2
        ; traceTc "u_tys " $ vcat
               [ text "untch" <+> ppr untch
               , sep [ ppr orig_ty1, text "~", ppr orig_ty2]
-              , ppr origin]
+              , pprCtOrigin origin]
        ; co <- go orig_ty1 orig_ty2
        ; if isTcReflCo co
             then traceTc "u_tys yields no coercion" Outputable.empty

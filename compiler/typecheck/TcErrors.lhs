@@ -208,7 +208,7 @@ reportWanteds ctxt wanted@(WC { wc_flat = flats, wc_insol = insols, wc_impl = im
   = do { reportFlats ctxt  (mapBag (tidyCt env) insol_given)
        ; reportFlats ctxt1 (mapBag (tidyCt env) insol_wanted)
        ; reportFlats ctxt2 (mapBag (tidyCt env) flats)
-            -- All the Derived ones have been filtered out of flats 
+            -- All the Derived ones have been filtered out of flats
             -- by the constraint solver. This is ok; we don't want
             -- to report unsolved Derived goals as errors
             -- See Note [Do not report derived but soluble errors]
@@ -609,10 +609,11 @@ mkEqErr1 ctxt ct
 
   | otherwise   -- Wanted or derived
   = do { (ctxt, binds_msg) <- relevantBindings True ctxt ct
-       ; (ctxt, tidy_orig) <- zonkTidyOrigin ctxt (ctLocOrigin loc)
+       ; (env1, tidy_orig) <- zonkTidyOrigin (cec_tidy ctxt) (ctLocOrigin loc)
        ; let (is_oriented, wanted_msg) = mk_wanted_extra tidy_orig
        ; dflags <- getDynFlags
-       ; mkEqErr_help dflags ctxt (wanted_msg $$ binds_msg) 
+       ; mkEqErr_help dflags (ctxt {cec_tidy = env1})
+                      (wanted_msg $$ binds_msg)
                       ct is_oriented ty1 ty2 }
   where
     ev         = ctEvidence ct
@@ -642,10 +643,12 @@ mkEqErr1 ctxt ct
                  TypeEqOrigin {} -> snd (mkExpectedActualMsg cty1 cty2 sub_o)
                  _ -> empty
 
-    mk_wanted_extra _ = (Nothing, empty)
+    mk_wanted_extra orig@(FunDepOrigin1 {}) = (Nothing, pprArising orig)
+    mk_wanted_extra orig@(FunDepOrigin2 {}) = (Nothing, pprArising orig)
+    mk_wanted_extra _                       = (Nothing, empty)
 
 mkEqErr_help :: DynFlags -> ReportErrCtxt -> SDoc
-             -> Ct          
+             -> Ct
              -> Maybe SwapFlag   -- Nothing <=> not sure
              -> TcType -> TcType -> TcM ErrMsg
 mkEqErr_help dflags ctxt extra ct oriented ty1 ty2
@@ -656,7 +659,7 @@ mkEqErr_help dflags ctxt extra ct oriented ty1 ty2
     swapped = fmap flipSwap oriented
 
 reportEqErr :: ReportErrCtxt -> SDoc
-            -> Ct    
+            -> Ct
             -> Maybe SwapFlag   -- Nothing <=> not sure
             -> TcType -> TcType -> TcM ErrMsg
 reportEqErr ctxt extra1 ct oriented ty1 ty2
@@ -664,7 +667,7 @@ reportEqErr ctxt extra1 ct oriented ty1 ty2
        ; mkErrorMsg ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
                                    , extra2, extra1]) }
 
-mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> SDoc -> Ct 
+mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> SDoc -> Ct
              -> Maybe SwapFlag -> TcTyVar -> TcType -> TcM ErrMsg
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
@@ -1366,7 +1369,7 @@ relevantBindings want_filtering ctxt ct
          -- tcl_bndrs has the innermost bindings first, 
          -- which are probably the most relevant ones
 
-       ; traceTc "relevantBindings" (ppr [id | TcIdBndr id _ <- tcl_bndrs lcl_env])
+       ; traceTc "relevantBindings" (ppr ct $$ ppr [id | TcIdBndr id _ <- tcl_bndrs lcl_env])
        ; let doc = hang (ptext (sLit "Relevant bindings include")) 
                       2 (vcat docs $$ max_msg)
              max_msg | discards 
@@ -1378,8 +1381,15 @@ relevantBindings want_filtering ctxt ct
          else do { traceTc "rb" doc
                  ; return (ctxt { cec_tidy = tidy_env' }, doc) } } 
   where
-    lcl_env = ctLocEnv (ctLoc ct)
-    ct_tvs = tyVarsOfCt ct
+    loc       = ctLoc ct
+    lcl_env   = ctLocEnv loc
+    ct_tvs    = tyVarsOfCt ct `unionVarSet` extra_tvs
+
+    -- For *kind* errors, report the relevant bindings of the
+    -- enclosing *type* equality, becuase that's more useful for the programmer
+    extra_tvs = case ctLocOrigin loc of
+                  KindEqOrigin t1 t2 _ -> tyVarsOfTypes [t1,t2]
+                  _                    -> emptyVarSet
 
     run_out :: Maybe Int -> Bool
     run_out Nothing = False
@@ -1397,6 +1407,7 @@ relevantBindings want_filtering ctxt ct
        = return (tidy_env, reverse docs, discards)
     go tidy_env n_left tvs_seen docs discards (TcIdBndr id top_lvl : tc_bndrs)
        = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env (idType id)
+            ; traceTc "relevantBindings 1" (ppr id <+> dcolon <+> ppr tidy_ty)
             ; let id_tvs = tyVarsOfType tidy_ty
                   doc = sep [ pprPrefixOcc id <+> dcolon <+> ppr tidy_ty
 		            , nest 2 (parens (ptext (sLit "bound at")
@@ -1481,20 +1492,28 @@ zonkTidyTcType :: TidyEnv -> TcType -> TcM (TidyEnv, TcType)
 zonkTidyTcType env ty = do { ty' <- zonkTcType ty
                            ; return (tidyOpenType env ty') }
 
-zonkTidyOrigin :: ReportErrCtxt -> CtOrigin -> TcM (ReportErrCtxt, CtOrigin)
-zonkTidyOrigin ctxt (GivenOrigin skol_info)
+zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
+zonkTidyOrigin env (GivenOrigin skol_info)
   = do { skol_info1 <- zonkSkolemInfo skol_info
-       ; let (env1, skol_info2) = tidySkolemInfo (cec_tidy ctxt) skol_info1
-       ; return (ctxt { cec_tidy = env1 }, GivenOrigin skol_info2) }
-zonkTidyOrigin ctxt (TypeEqOrigin { uo_actual = act, uo_expected = exp })
-  = do { (env1, act') <- zonkTidyTcType (cec_tidy ctxt) act
-       ; (env2, exp') <- zonkTidyTcType env1            exp
-       ; return ( ctxt { cec_tidy = env2 }
-                , TypeEqOrigin { uo_actual = act', uo_expected = exp' }) }
-zonkTidyOrigin ctxt (KindEqOrigin ty1 ty2 orig)
-  = do { (env1, ty1') <- zonkTidyTcType (cec_tidy ctxt) ty1
-       ; (env2, ty2') <- zonkTidyTcType env1            ty2
-       ; (ctxt2, orig') <- zonkTidyOrigin (ctxt { cec_tidy = env2 }) orig
-       ; return (ctxt2, KindEqOrigin ty1' ty2' orig') }
-zonkTidyOrigin ctxt orig = return (ctxt, orig)
+       ; let (env1, skol_info2) = tidySkolemInfo env skol_info1
+       ; return (env1, GivenOrigin skol_info2) }
+zonkTidyOrigin env (TypeEqOrigin { uo_actual = act, uo_expected = exp })
+  = do { (env1, act') <- zonkTidyTcType env  act
+       ; (env2, exp') <- zonkTidyTcType env1 exp
+       ; return ( env2, TypeEqOrigin { uo_actual = act', uo_expected = exp' }) }
+zonkTidyOrigin env (KindEqOrigin ty1 ty2 orig)
+  = do { (env1, ty1') <- zonkTidyTcType env  ty1
+       ; (env2, ty2') <- zonkTidyTcType env1 ty2
+       ; (env3, orig') <- zonkTidyOrigin env2 orig
+       ; return (env3, KindEqOrigin ty1' ty2' orig') }
+zonkTidyOrigin env (FunDepOrigin1 p1 l1 p2 l2)
+  = do { (env1, p1') <- zonkTidyTcType env  p1
+       ; (env2, p2') <- zonkTidyTcType env1 p2
+       ; return (env2, FunDepOrigin1 p1' l1 p2' l2) }
+zonkTidyOrigin env (FunDepOrigin2 p1 o1 p2 l2)
+  = do { (env1, p1') <- zonkTidyTcType env  p1
+       ; (env2, p2') <- zonkTidyTcType env1 p2
+       ; (env3, o1') <- zonkTidyOrigin env2 o1
+       ; return (env3, FunDepOrigin2 p1' o1' p2' l2) }
+zonkTidyOrigin env orig = return (env, orig)
 \end{code}

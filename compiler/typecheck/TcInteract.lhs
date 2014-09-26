@@ -414,8 +414,10 @@ interactGivenIP _ wi = pprPanic "interactGivenIP" (ppr wi)
 
 addFunDepWork :: Ct -> Ct -> TcS ()
 addFunDepWork work_ct inert_ct
-  = do {  let fd_eqns = improveFromAnother (ctPred inert_ct) (ctPred work_ct)
-       ; fd_work <- rewriteWithFunDeps fd_eqns (ctLoc work_ct)
+  = do {  let fd_eqns :: [Equation CtLoc]
+              fd_eqns = [ eqn { fd_loc = derived_loc }
+                        | eqn <- improveFromAnother inert_pred work_pred ]
+       ; fd_work <- rewriteWithFunDeps fd_eqns
                 -- We don't really rewrite tys2, see below _rewritten_tys2, so that's ok
                 -- NB: We do create FDs for given to report insoluble equations that arise
                 -- from pairs of Givens, and also because of floating when we approximate
@@ -430,6 +432,14 @@ addFunDepWork work_ct inert_ct
        ; case fd_work of
            [] -> return ()
            _  -> updWorkListTcS (extendWorkListEqs fd_work)    }
+  where
+    work_pred  = ctPred work_ct
+    inert_pred = ctPred inert_ct
+    work_loc   = ctLoc work_ct
+    inert_loc  = ctLoc inert_ct
+    derived_loc = work_loc { ctl_origin = FunDepOrigin1 work_pred  work_loc
+                                                        inert_pred inert_loc }
+
 \end{code}
 
 Note [Shadowing of Implicit Parameters]
@@ -1353,16 +1363,16 @@ To achieve this required some refactoring of FunDeps.lhs (nicer
 now!).
 
 \begin{code}
-rewriteWithFunDeps :: [Equation] -> CtLoc -> TcS [Ct]
+rewriteWithFunDeps :: [Equation CtLoc] -> TcS [Ct]
 -- NB: The returned constraints are all Derived
 -- Post: returns no trivial equalities (identities) and all EvVars returned are fresh
-rewriteWithFunDeps eqn_pred_locs loc
- = do { fd_cts <- mapM (instFunDepEqn loc) eqn_pred_locs
+rewriteWithFunDeps eqn_pred_locs
+ = do { fd_cts <- mapM instFunDepEqn eqn_pred_locs
       ; return (concat fd_cts) }
 
-instFunDepEqn :: CtLoc -> Equation -> TcS [Ct]
+instFunDepEqn :: Equation CtLoc -> TcS [Ct]
 -- Post: Returns the position index as well as the corresponding FunDep equality
-instFunDepEqn loc (FDEqn { fd_qtvs = tvs, fd_eqs = eqs })
+instFunDepEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = loc })
   = do { (subst, _) <- instFlexiTcS tvs  -- Takes account of kind substitution
        ; foldM (do_one subst) [] eqs }
   where
@@ -1483,8 +1493,12 @@ doTopReactDict inerts fl cls xis
      -- so we make sure we get on and solve it first. See Note [Weird fundeps]
      try_fundeps_and_return
        = do { instEnvs <- getInstEnvs
-            ; let fd_eqns = improveFromInstEnv instEnvs pred
-            ; fd_work <- rewriteWithFunDeps fd_eqns loc
+            ; let fd_eqns :: [Equation CtLoc]
+                  fd_eqns = [ fd { fd_loc = loc { ctl_origin = FunDepOrigin2 pred (ctl_origin loc)
+                                                                             inst_pred inst_loc } }
+                            | fd@(FDEqn { fd_loc = inst_loc, fd_pred1 = inst_pred })
+                                 <- improveFromInstEnv instEnvs pred ]
+            ; fd_work <- rewriteWithFunDeps fd_eqns
             ; unless (null fd_work) $
               do { traceTcS "Addig FD work" (ppr pred $$ vcat (map pprEquation fd_eqns) $$ ppr fd_work)
                  ; updWorkListTcS (extendWorkListEqs fd_work) }
