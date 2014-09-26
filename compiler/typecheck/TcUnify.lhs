@@ -1071,9 +1071,9 @@ We must use the careful function lookupTcTyVar to see if a kind
 variable is filled or unifiable.  It checks for touchablity, and kind
 variables can certainly be untouchable --- for example the variable
 might be bound outside an enclosing existental pattern match that
-binds an inner kind variable, which we don't want ot escape outside.
+binds an inner kind variable, which we don't want to escape outside.
 
-This, or something closely related, was teh cause of Trac #8985.
+This, or something closely related, was the cause of Trac #8985.
 
 Note [Unifying kind variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

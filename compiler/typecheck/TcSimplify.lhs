@@ -364,6 +364,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
          else do
 
       {     -- Step 7) Emit an implication
+            -- See Trac #9633 for an instructive example 
          let minimal_flat_preds = mkMinimalBySCs bound
                   -- See Note [Minimize by Superclasses]
              skol_info = InferSkol [ (name, mkSigmaTy [] minimal_flat_preds ty)
