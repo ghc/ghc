@@ -672,7 +672,7 @@ For Derived constraints we don't have evidence, so we do not turn
 them into Givens.  There can *be* deriving CFunEqCans; see Trac #8129.
 
 \begin{code}
-getInertEqs :: TcS (TyVarEnv [Ct])
+getInertEqs :: TcS (TyVarEnv EqualCtList)
 getInertEqs = do { inert <- getTcSInerts
                  ; return (inert_eqs (inert_cans inert)) }
 

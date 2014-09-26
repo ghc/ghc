@@ -512,27 +512,37 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
 
   | Just ops <- isBuiltInSynFamTyCon_maybe tc
   = do { let is = findFunEqsByTyCon funeqs tc
-       ; traceTcS "builtInCandidates: " $ ppr is
-       ; let interact = sfInteractInert ops args (mkTyVarTy fsk)
+       ; let interact = sfInteractInert ops args (lookupFlattenTyVar eqs fsk)
        ; impMbs <- sequence
                  [ do mb <- newDerived (ctev_loc iev) (mkTcEqPred lhs_ty rhs_ty)
                       return (fmap mkNonCanonical mb)
                  | CFunEqCan { cc_tyargs = iargs
                              , cc_fsk = ifsk
                              , cc_ev = iev } <- is
-                 , Pair lhs_ty rhs_ty <- interact iargs (mkTyVarTy ifsk)
+                 , Pair lhs_ty rhs_ty <- interact iargs (lookupFlattenTyVar eqs ifsk)
                  ]
        ; let imps = catMaybes impMbs
+       ; traceTcS "builtInCandidates: " $ vcat [ ptext (sLit "Candidates:") <+> ppr is
+                                               , ptext (sLit "improvements:") <+> ppr imps
+                                               , ptext (sLit "TvEqs:") <+> ppr eqs ]
        ; unless (null imps) $ updWorkListTcS (extendWorkListEqs imps)
        ; return False }
 
   | otherwise
   = return False
   where
+    eqs    = inert_eqs inerts
     funeqs = inert_funeqs inerts
     matching_inerts = findFunEqs funeqs tc args
 
 interactFunEq _ wi = pprPanic "interactFunEq" (ppr wi)
+
+lookupFlattenTyVar :: TyVarEnv EqualCtList -> TcTyVar -> TcType
+-- ^ Look up a flatten-tyvar in the inert TyVarEqs
+lookupFlattenTyVar inert_eqs ftv 
+  = case lookupVarEnv inert_eqs ftv of
+      Just (CTyEqCan { cc_rhs = rhs } : _) -> rhs
+      _                                    -> mkTyVarTy ftv
 
 reactFunEq :: CtEvidence -> TcTyVar    -- From this  :: F tys ~ fsk1
            -> CtEvidence -> TcTyVar    -- Solve this :: F tys ~ fsk2
@@ -1540,7 +1550,8 @@ doTopReactFunEq _ct old_ev fam_tc args fsk
 
     try_improvement
       | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
-      = do { let eqns = sfInteractTop ops args (mkTyVarTy fsk)
+      = do { inert_eqs <- getInertEqs
+           ; let eqns = sfInteractTop ops args (lookupFlattenTyVar inert_eqs fsk)
            ; impsMb <- mapM (\(Pair x y) -> newDerived loc (mkTcEqPred x y)) eqns
            ; let work = map mkNonCanonical (catMaybes impsMb)
            ; unless (null work) (updWorkListTcS (extendWorkListEqs work)) }

@@ -24,4 +24,15 @@ coerce x = case T x :: T (Const b) of
 ==> 
   Const b ~ Const a
 
+------------
+
+case e of 
+  T y -> y
+
+  e :: T alpha
+
+  Patterns
+   forall c. (alpha ~ Const c) => c ~ b
+   alpha ~ Const b
+
 -}  
