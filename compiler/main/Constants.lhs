@@ -18,7 +18,8 @@ mAX_TUPLE_SIZE = 62 -- Should really match the number
                     -- of decls in Data.Tuple
 
 mAX_CONTEXT_REDUCTION_DEPTH :: Int
-mAX_CONTEXT_REDUCTION_DEPTH = 20
+mAX_CONTEXT_REDUCTION_DEPTH = 100
+  -- Trac #5395 reports at least one library that needs depth 37 here
 
 mAX_TYPE_FUNCTION_REDUCTION_DEPTH :: Int
 mAX_TYPE_FUNCTION_REDUCTION_DEPTH = 200

@@ -25,6 +25,13 @@ COMPILER     = ghc
 CONFIGDIR    = $(TOP)/config
 CONFIG       = $(CONFIGDIR)/$(COMPILER)
 
+ifeq "$(GhcUnregisterised)" "YES"
+    # Otherwise C backend generates many warnings about
+    # imcompatible proto casts for GCC's buitins:
+    #    memcpy, printf, strlen.
+    EXTRA_HC_OPTS += -optc-fno-builtin
+endif
+
 # TEST_HC_OPTS is passed to every invocation of TEST_HC 
 # in nested Makefiles
 TEST_HC_OPTS = -fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-$(GhcPackageDbFlag) -rtsopts $(EXTRA_HC_OPTS)

@@ -13,6 +13,7 @@ import Reg
 import Cmm hiding (RegSet)
 import BlockId
 
+import MonadUtils
 import State
 import Unique
 import UniqFM

@@ -22,6 +22,6 @@ type family K a where
   K '[] = Nothing
   K (h ': t) = Just h
 
-type family L (a :: k) b :: k where
+type family L (a :: k) (b :: *) :: k where
   L Int Int = Bool
   L Maybe Bool = IO

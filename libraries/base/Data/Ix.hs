@@ -12,7 +12,7 @@
 --
 -- The 'Ix' class is used to map a contiguous subrange of values in
 -- type onto integers.  It is used primarily for array indexing
--- (see the array package).
+-- (see the array package).  'Ix' uses row-major order.
 -- 
 -----------------------------------------------------------------------------
 

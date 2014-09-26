@@ -12,24 +12,34 @@
     "nolint": {
       "type": "nolint"
     },
-    "text": {
+    "haskell": {
       "type": "text",
-      "exclude": [ "(\\.xml)", "(Makefile)", "(\\.mk)" ],
+      "include": ["(\\.(l?hs(-boot)?|x|y\\.pp)(\\.in)?$)"],
       "severity": {
         "5": "disabled"
       }
     },
+    "c": {
+      "type": "text",
+      "include": ["(\\.(c|h)(\\.in)?$)"]
+    },
     "text-xml": {
       "type": "text",
-      "include": "(\\.xml)",
+      "include": "(\\.xml$)",
       "severity": {
         "5": "disabled",
         "3": "disabled"
       }
     },
+    "shell": {
+      "type": "text",
+      "include": [ "(\\.sh$)" ],
+      "text.max-line-length": 200
+    },
     "makefiles": {
       "type": "text",
-      "include": [ "(Makefile)", "(\\.mk)" ],
+      "include": [ "(Makefile$)", "(\\.mk$)" ],
+      "text.max-line-length": 200,
       "severity": {
         "2": "disabled"
       }

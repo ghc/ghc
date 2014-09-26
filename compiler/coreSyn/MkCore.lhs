@@ -1,11 +1,5 @@
 \begin{code}
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 -- | Handy functions for creating much Core syntax
 module MkCore (
@@ -15,7 +9,7 @@ module MkCore (
         mkCoreLams, mkWildCase, mkIfThenElse,
         mkWildValBinder, mkWildEvBinder,
         sortQuantVars, castBottomExpr,
-        
+
         -- * Constructing boxed literals
         mkWordExpr, mkWordExprWord,
         mkIntExpr, mkIntExprInt,
@@ -32,29 +26,29 @@ module MkCore (
         -- * Constructing general big tuples
         -- $big_tuples
         mkChunkified,
-        
+
         -- * Constructing small tuples
-        mkCoreVarTup, mkCoreVarTupTy, mkCoreTup, 
-        
+        mkCoreVarTup, mkCoreVarTupTy, mkCoreTup,
+
         -- * Constructing big tuples
         mkBigCoreVarTup, mkBigCoreVarTupTy,
         mkBigCoreTup, mkBigCoreTupTy,
-        
+
         -- * Deconstructing small tuples
         mkSmallTupleSelector, mkSmallTupleCase,
-        
+
         -- * Deconstructing big tuples
         mkTupleSelector, mkTupleCase,
-        
+
         -- * Constructing list expressions
-        mkNilExpr, mkConsExpr, mkListExpr, 
+        mkNilExpr, mkConsExpr, mkListExpr,
         mkFoldrExpr, mkBuildExpr,
 
-    	-- * Error Ids 
-    	mkRuntimeErrorApp, mkImpossibleExpr, errorIds,
-    	rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
-    	nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
-    	pAT_ERROR_ID, eRROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID,
+        -- * Error Ids
+        mkRuntimeErrorApp, mkImpossibleExpr, errorIds,
+        rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
+        nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
+        pAT_ERROR_ID, eRROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID,
         uNDEFINED_ID, undefinedName
     ) where
 
@@ -71,14 +65,14 @@ import HscTypes
 import TysWiredIn
 import PrelNames
 
-import TcType		( mkSigmaTy )
+import TcType           ( mkSigmaTy )
 import Type
 import Coercion
 import TysPrim
 import DataCon          ( DataCon, dataConWorkId )
-import IdInfo		( vanillaIdInfo, setStrictnessInfo, 
+import IdInfo           ( vanillaIdInfo, setStrictnessInfo,
                           setArityInfo )
-import Demand 
+import Demand
 import Name      hiding ( varName )
 import Outputable
 import FastString
@@ -92,7 +86,9 @@ import DynFlags
 import Data.Char        ( ord )
 import Data.List
 import Data.Ord
-import Data.Word
+#if __GLASGOW_HASKELL__ < 709
+import Data.Word        ( Word )
+#endif
 
 infixl 4 `mkCoreApp`, `mkCoreApps`
 \end{code}
@@ -105,7 +101,7 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 
 \begin{code}
 sortQuantVars :: [Var] -> [Var]
--- Sort the variables (KindVars, TypeVars, and Ids) 
+-- Sort the variables (KindVars, TypeVars, and Ids)
 -- into order: Kind, then Type, then Id
 sortQuantVars = sortBy (comparing withCategory)
   where
@@ -173,20 +169,20 @@ mk_val_app fun arg arg_ty _        -- See Note [CoreSyn let/app invariant]
 mk_val_app fun arg arg_ty res_ty
   = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
   where
-    arg_id = mkWildValBinder arg_ty    
-	-- Lots of shadowing, but it doesn't matter,
+    arg_id = mkWildValBinder arg_ty
+        -- Lots of shadowing, but it doesn't matter,
         -- because 'fun ' should not have a free wild-id
-	--
-	-- This is Dangerous.  But this is the only place we play this 
-	-- game, mk_val_app returns an expression that does not have
-	-- have a free wild-id.  So the only thing that can go wrong
-	-- is if you take apart this case expression, and pass a 
-	-- fragmet of it as the fun part of a 'mk_val_app'.
+        --
+        -- This is Dangerous.  But this is the only place we play this
+        -- game, mk_val_app returns an expression that does not have
+        -- have a free wild-id.  So the only thing that can go wrong
+        -- is if you take apart this case expression, and pass a
+        -- fragmet of it as the fun part of a 'mk_val_app'.
 
 mkWildEvBinder :: PredType -> EvVar
 mkWildEvBinder pred = mkWildValBinder pred
 
--- | Make a /wildcard binder/. This is typically used when you need a binder 
+-- | Make a /wildcard binder/. This is typically used when you need a binder
 -- that you expect to use only at a *binding* site.  Do not use it at
 -- occurrence sites because it has a single, fixed unique, and it's very
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
@@ -197,18 +193,18 @@ mkWildValBinder ty = mkLocalId wildCardName ty
 mkWildCase :: CoreExpr -> Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused
 -- The alts should not have any occurrences of WildId
-mkWildCase scrut scrut_ty res_ty alts 
+mkWildCase scrut scrut_ty res_ty alts
   = Case scrut (mkWildValBinder scrut_ty) res_ty alts
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr
 -- Not going to be refining, so okay to take the type of the "then" clause
-  = mkWildCase guard boolTy (exprType then_expr) 
-	 [ (DataAlt falseDataCon, [], else_expr),	-- Increasing order of tag!
-    	   (DataAlt trueDataCon,  [], then_expr) ]
+  = mkWildCase guard boolTy (exprType then_expr)
+         [ (DataAlt falseDataCon, [], else_expr),       -- Increasing order of tag!
+           (DataAlt trueDataCon,  [], then_expr) ]
 
 castBottomExpr :: CoreExpr -> Type -> CoreExpr
--- (castBottomExpr e ty), assuming that 'e' diverges, 
+-- (castBottomExpr e ty), assuming that 'e' diverges,
 -- return an expression of type 'ty'
 -- See Note [Empty case alternatives] in CoreSyn
 castBottomExpr e res_ty
@@ -281,10 +277,6 @@ mkStringExprFS str
   | nullFS str
   = return (mkNilExpr charTy)
 
-  | lengthFS str == 1
-  = do let the_char = mkCharExpr (headFS str)
-       return (mkConsExpr charTy the_char (mkNilExpr charTy))
-
   | all safeChar chars
   = do unpack_id <- lookupId unpackCStringName
        return (App (Var unpack_id) (Lit (MachStr (fastStringToByteString str))))
@@ -346,7 +338,7 @@ mkChunkified :: ([a] -> a)      -- ^ \"Small\" constructor function, of maximum 
              -> a               -- ^ Constructed thing made possible by recursive decomposition
 mkChunkified small_tuple as = mk_big_tuple (chunkify as)
   where
-	-- Each sub-list is short enough to fit in a tuple
+        -- Each sub-list is short enough to fit in a tuple
     mk_big_tuple [as] = small_tuple as
     mk_big_tuple as_s = mk_big_tuple (chunkify (map small_tuple as_s))
 
@@ -355,23 +347,23 @@ chunkify :: [a] -> [[a]]
 -- tuple arity. The sub-lists of the result all have length <= 'mAX_TUPLE_SIZE'
 -- But there may be more than 'mAX_TUPLE_SIZE' sub-lists
 chunkify xs
-  | n_xs <= mAX_TUPLE_SIZE = [xs] 
-  | otherwise		   = split xs
+  | n_xs <= mAX_TUPLE_SIZE = [xs]
+  | otherwise              = split xs
   where
     n_xs     = length xs
     split [] = []
     split xs = take mAX_TUPLE_SIZE xs : split (drop mAX_TUPLE_SIZE xs)
-    
+
 \end{code}
 
-Creating tuples and their types for Core expressions 
+Creating tuples and their types for Core expressions
 
-@mkBigCoreVarTup@ builds a tuple; the inverse to @mkTupleSelector@.  
+@mkBigCoreVarTup@ builds a tuple; the inverse to @mkTupleSelector@.
 
 * If it has only one element, it is the identity function.
 
-* If there are more elements than a big tuple can have, it nests 
-  the tuples.  
+* If there are more elements than a big tuple can have, it nests
+  the tuples.
 
 \begin{code}
 
@@ -415,11 +407,16 @@ mkBigCoreTupTy = mkChunkified mkBoxedTupleTy
 %************************************************************************
 
 \begin{code}
-data FloatBind 
+data FloatBind
   = FloatLet  CoreBind
-  | FloatCase CoreExpr Id AltCon [Var]       
+  | FloatCase CoreExpr Id AltCon [Var]
       -- case e of y { C ys -> ... }
       -- See Note [Floating cases] in SetLevels
+
+instance Outputable FloatBind where
+  ppr (FloatLet b) = ptext (sLit "LET") <+> ppr b
+  ppr (FloatCase e b c bs) = hang (ptext (sLit "CASE") <+> ppr e <+> ptext (sLit "of") <+> ppr b)
+                                2 (ppr c <+> ppr bs)
 
 wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
 wrapFloat (FloatLet defns)       body = Let defns body
@@ -450,14 +447,14 @@ mkTupleSelector :: [Id]         -- ^ The 'Id's to pattern match the tuple agains
                 -> CoreExpr     -- ^ Selector expression
 
 -- mkTupleSelector [a,b,c,d] b v e
---          = case e of v { 
+--          = case e of v {
 --                (p,q) -> case p of p {
 --                           (a,b) -> b }}
 -- We use 'tpl' vars for the p,q, since shadowing does not matter.
 --
 -- In fact, it's more convenient to generate it innermost first, getting
 --
---        case (case e of v 
+--        case (case e of v
 --                (p,q) -> p) of p
 --          (a,b) -> b
 mkTupleSelector vars the_var scrut_var scrut
@@ -519,12 +516,12 @@ mkTupleCase uniqs vars body scrut_var scrut
     -- This is the case where don't need any nesting
     mk_tuple_case _ [vars] body
       = mkSmallTupleCase vars body scrut_var scrut
-      
+
     -- This is the case where we must make nest tuples at least once
     mk_tuple_case us vars_s body
       = let (us', vars', body') = foldr one_tuple_case (us, [], body) vars_s
             in mk_tuple_case us' (chunkify vars') body'
-    
+
     one_tuple_case chunk_vars (us, vs, body)
       = let (uniq, us') = takeUniqFromSupply us
             scrut_var = mkSysLocal (fsLit "ds") uniq
@@ -582,7 +579,7 @@ mkFoldrExpr :: MonadThings m
             -> m CoreExpr
 mkFoldrExpr elt_ty result_ty c n list = do
     foldr_id <- lookupId foldrName
-    return (Var foldr_id `App` Type elt_ty 
+    return (Var foldr_id `App` Type elt_ty
            `App` Type result_ty
            `App` c
            `App` n
@@ -600,9 +597,9 @@ mkBuildExpr elt_ty mk_build_inside = do
     let n_ty = mkTyVarTy n_tyvar
         c_ty = mkFunTys [elt_ty, n_ty] n_ty
     [c, n] <- sequence [mkSysLocalM (fsLit "c") c_ty, mkSysLocalM (fsLit "n") n_ty]
-    
+
     build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
-    
+
     build_id <- lookupId buildName
     return $ Var build_id `App` Type elt_ty `App` mkLams [n_tyvar, c, n] build_inside
   where
@@ -619,14 +616,14 @@ mkBuildExpr elt_ty mk_build_inside = do
 %************************************************************************
 
 \begin{code}
-mkRuntimeErrorApp 
+mkRuntimeErrorApp
         :: Id           -- Should be of type (forall a. Addr# -> a)
                         --      where Addr# points to a UTF8 encoded string
         -> Type         -- The type to instantiate 'a'
         -> String       -- The string to print
         -> CoreExpr
 
-mkRuntimeErrorApp err_id res_ty err_msg 
+mkRuntimeErrorApp err_id res_ty err_msg
   = mkApps (Var err_id) [Type res_ty, err_string]
   where
     err_string = Lit (mkMachString err_msg)
@@ -659,7 +656,7 @@ templates, but we don't ever expect to generate code for it.
 
 \begin{code}
 errorIds :: [Id]
-errorIds 
+errorIds
   = [ eRROR_ID,   -- This one isn't used anywhere else in the compiler
                   -- But we still need it in wiredInIds so that when GHC
                   -- compiles a program that mentions 'error' we don't
@@ -691,7 +688,7 @@ patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
 
 noMethodBindingErrorName     = err_nm "noMethodBindingError"
                                   noMethodBindingErrorIdKey nO_METHOD_BINDING_ERROR_ID
-nonExhaustiveGuardsErrorName = err_nm "nonExhaustiveGuardsError" 
+nonExhaustiveGuardsErrorName = err_nm "nonExhaustiveGuardsError"
                                   nonExhaustiveGuardsErrorIdKey nON_EXHAUSTIVE_GUARDS_ERROR_ID
 
 err_nm :: String -> Unique -> Id -> Name
@@ -739,11 +736,11 @@ undefinedTy  = mkSigmaTy [openAlphaTyVar] [] openAlphaTy
 
 Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-'error' and 'undefined' have types 
+'error' and 'undefined' have types
         error     :: forall (a::OpenKind). String -> a
         undefined :: forall (a::OpenKind). a
 Notice the 'OpenKind' (manifested as openAlphaTyVar in the code). This ensures that
-"error" can be instantiated at 
+"error" can be instantiated at
   * unboxed as well as boxed types
   * polymorphic types
 This is OK because it never returns, so the return type is irrelevant.
@@ -763,8 +760,8 @@ pc_bottoming_Id1 name ty
  = mkVanillaGlobalWithInfo name ty bottoming_info
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo`    strict_sig
-				   `setArityInfo`         1
-			-- Make arity and strictness agree
+                                   `setArityInfo`         1
+                        -- Make arity and strictness agree
 
         -- Do *not* mark them as NoCafRefs, because they can indeed have
         -- CAF refs.  For example, pAT_ERROR_ID calls GHC.Err.untangle,
@@ -786,4 +783,3 @@ pc_bottoming_Id0 name ty
     bottoming_info = vanillaIdInfo `setStrictnessInfo` strict_sig
     strict_sig = mkClosedStrictSig [] botRes
 \end{code}
-

@@ -363,7 +363,7 @@ stableNameCmp :: Name -> Name -> Ordering
 stableNameCmp (Name { n_sort = s1, n_occ = occ1 })
               (Name { n_sort = s2, n_occ = occ2 })
   = (s1 `sort_cmp` s2) `thenCmp` (occ1 `compare` occ2)
-    -- The ordinary compare on OccNames is lexicogrpahic
+    -- The ordinary compare on OccNames is lexicographic
   where
     -- Later constructors are bigger
     sort_cmp (External m1) (External m2)       = m1 `stableModuleCmp` m2

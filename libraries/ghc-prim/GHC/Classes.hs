@@ -17,7 +17,6 @@
 --
 -----------------------------------------------------------------------------
 
--- #hide
 module GHC.Classes where
 
 -- GHC.Magic is used in some derived instances
@@ -84,7 +83,9 @@ deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
                => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
 
 instance (Eq a) => Eq [a] where
+    {-# SPECIALISE instance Eq [[Char]] #-}
     {-# SPECIALISE instance Eq [Char] #-}
+    {-# SPECIALISE instance Eq [Int] #-}
     []     == []     = True
     (x:xs) == (y:ys) = x == y && xs == ys
     _xs    == _ys    = False
@@ -182,7 +183,9 @@ deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
                => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
 
 instance (Ord a) => Ord [a] where
+    {-# SPECIALISE instance Ord [[Char]] #-}
     {-# SPECIALISE instance Ord [Char] #-}
+    {-# SPECIALISE instance Ord [Int] #-}
     compare []     []     = EQ
     compare []     (_:_)  = LT
     compare (_:_)  []     = GT

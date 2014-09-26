@@ -2,19 +2,20 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Text.ParserCombinators.ReadP
 -- Copyright   :  (c) The University of Glasgow 2002
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  non-portable (local universal quantification)
 --
 -- This is a library of parser combinators, originally written by Koen Claessen.
--- It parses all alternatives in parallel, so it never keeps hold of 
+-- It parses all alternatives in parallel, so it never keeps hold of
 -- the beginning of the input string, a common source of space leaks with
 -- other parsers.  The '(+++)' choice combinator is genuinely commutative;
 -- it makes no difference which branch is \"shorter\".
@@ -22,17 +23,17 @@
 -----------------------------------------------------------------------------
 
 module Text.ParserCombinators.ReadP
-  ( 
+  (
   -- * The 'ReadP' type
   ReadP,
-  
+
   -- * Primitive operations
   get,
   look,
   (+++),
   (<++),
   gather,
-  
+
   -- * Other operations
   pfail,
   eof,
@@ -60,22 +61,20 @@ module Text.ParserCombinators.ReadP
   chainl1,
   chainr1,
   manyTill,
-  
+
   -- * Running a parser
   ReadS,
   readP_to_S,
   readS_to_P,
-  
+
   -- * Properties
   -- $properties
   )
  where
 
-import Control.Monad( MonadPlus(..), sequence, liftM2 )
-
-import {-# SOURCE #-} GHC.Unicode ( isSpace  )
+import {-# SOURCE #-} GHC.Unicode ( isSpace )
 import GHC.List ( replicate, null )
-import GHC.Base
+import GHC.Base hiding ( many )
 
 infixr 5 +++, <++
 
@@ -99,8 +98,17 @@ data P a
   | Fail
   | Result a (P a)
   | Final [(a,String)] -- invariant: list is non-empty!
+  deriving Functor
 
 -- Monad, MonadPlus
+
+instance Applicative P where
+  pure  = return
+  (<*>) = ap
+
+instance MonadPlus P where
+  mzero = empty
+  mplus = (<|>)
 
 instance Monad P where
   return x = Result x Fail
@@ -108,39 +116,39 @@ instance Monad P where
   (Get f)      >>= k = Get (\c -> f c >>= k)
   (Look f)     >>= k = Look (\s -> f s >>= k)
   Fail         >>= _ = Fail
-  (Result x p) >>= k = k x `mplus` (p >>= k)
+  (Result x p) >>= k = k x <|> (p >>= k)
   (Final r)    >>= k = final [ys' | (x,s) <- r, ys' <- run (k x) s]
 
   fail _ = Fail
 
-instance MonadPlus P where
-  mzero = Fail
+instance Alternative P where
+  empty = Fail
 
   -- most common case: two gets are combined
-  Get f1     `mplus` Get f2     = Get (\c -> f1 c `mplus` f2 c)
-  
+  Get f1     <|> Get f2     = Get (\c -> f1 c <|> f2 c)
+
   -- results are delivered as soon as possible
-  Result x p `mplus` q          = Result x (p `mplus` q)
-  p          `mplus` Result x q = Result x (p `mplus` q)
+  Result x p <|> q          = Result x (p <|> q)
+  p          <|> Result x q = Result x (p <|> q)
 
   -- fail disappears
-  Fail       `mplus` p          = p
-  p          `mplus` Fail       = p
+  Fail       <|> p          = p
+  p          <|> Fail       = p
 
   -- two finals are combined
   -- final + look becomes one look and one final (=optimization)
   -- final + sthg else becomes one look and one final
-  Final r    `mplus` Final t    = Final (r ++ t)
-  Final r    `mplus` Look f     = Look (\s -> Final (r ++ run (f s) s))
-  Final r    `mplus` p          = Look (\s -> Final (r ++ run p s))
-  Look f     `mplus` Final r    = Look (\s -> Final (run (f s) s ++ r))
-  p          `mplus` Final r    = Look (\s -> Final (run p s ++ r))
+  Final r    <|> Final t    = Final (r ++ t)
+  Final r    <|> Look f     = Look (\s -> Final (r ++ run (f s) s))
+  Final r    <|> p          = Look (\s -> Final (r ++ run p s))
+  Look f     <|> Final r    = Look (\s -> Final (run (f s) s ++ r))
+  p          <|> Final r    = Look (\s -> Final (run p s ++ r))
 
   -- two looks are combined (=optimization)
   -- look + sthg else floats upwards
-  Look f     `mplus` Look g     = Look (\s -> f s `mplus` g s)
-  Look f     `mplus` p          = Look (\s -> f s `mplus` p)
-  p          `mplus` Look f     = Look (\s -> p `mplus` f s)
+  Look f     <|> Look g     = Look (\s -> f s <|> g s)
+  Look f     <|> p          = Look (\s -> f s <|> p)
+  p          <|> Look f     = Look (\s -> p <|> f s)
 
 -- ---------------------------------------------------------------------------
 -- The ReadP type
@@ -152,10 +160,18 @@ newtype ReadP a = R (forall b . (a -> P b) -> P b)
 instance Functor ReadP where
   fmap h (R f) = R (\k -> f (k . h))
 
+instance Applicative ReadP where
+    pure = return
+    (<*>) = ap
+
 instance Monad ReadP where
   return x  = R (\k -> k x)
   fail _    = R (\_ -> Fail)
   R m >>= f = R (\k -> m (\a -> let R m' = f a in m' k))
+
+instance Alternative ReadP where
+    empty = mzero
+    (<|>) = mplus
 
 instance MonadPlus ReadP where
   mzero = pfail
@@ -195,7 +211,7 @@ pfail = R (\_ -> Fail)
 
 (+++) :: ReadP a -> ReadP a -> ReadP a
 -- ^ Symmetric choice.
-R f1 +++ R f2 = R (\k -> f1 k `mplus` f2 k)
+R f1 +++ R f2 = R (\k -> f1 k <|> f2 k)
 
 (<++) :: ReadP a -> ReadP a -> ReadP a
 -- ^ Local, exclusive, left-biased choice: If left parser
@@ -218,15 +234,15 @@ gather :: ReadP a -> ReadP (String, a)
 -- ^ Transforms a parser into one that does the same, but
 --   in addition returns the exact characters read.
 --   IMPORTANT NOTE: 'gather' gives a runtime error if its first argument
---   is built using any occurrences of readS_to_P. 
+--   is built using any occurrences of readS_to_P.
 gather (R m)
-  = R (\k -> gath id (m (\a -> return (\s -> k (s,a)))))  
+  = R (\k -> gath id (m (\a -> return (\s -> k (s,a)))))
  where
   gath :: (String -> String) -> P (String -> P b) -> P b
   gath l (Get f)      = Get (\c -> gath (l.(c:)) (f c))
   gath _ Fail         = Fail
   gath l (Look f)     = Look (\s -> gath l (f s))
-  gath l (Result k p) = k (l []) `mplus` gath l p
+  gath l (Result k p) = k (l []) <|> gath l p
   gath _ (Final _)    = error "do not use readS_to_P in gather!"
 
 -- ---------------------------------------------------------------------------
@@ -243,8 +259,8 @@ char c = satisfy (c ==)
 
 eof :: ReadP ()
 -- ^ Succeeds iff we are at the end of input
-eof = do { s <- look 
-         ; if null s then return () 
+eof = do { s <- look
+         ; if null s then return ()
                      else pfail }
 
 string :: String -> ReadP String
@@ -461,12 +477,12 @@ Here follow the properties:
 >    xs +<+ _  = xs
 >
 >  prop_Gather s =
->    forAll readPWithoutReadS $ \p -> 
+>    forAll readPWithoutReadS $ \p ->
 >      readP_to_S (gather p) s =~
->	 [ ((pre,x::Int),s')
->	 | (x,s') <- readP_to_S p s
->	 , let pre = take (length s - length s') s
->	 ]
+>        [ ((pre,x::Int),s')
+>        | (x,s') <- readP_to_S p s
+>        , let pre = take (length s - length s') s
+>        ]
 >
 >  prop_String_Yes this s =
 >    readP_to_S (string this) (this ++ s) =~

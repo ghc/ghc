@@ -11,7 +11,7 @@
  *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
  *
  * NOTE: assumes #include "ghcconfig.h"
- * 
+ *
  * Works with or without _POSIX_SOURCE.
  *
  * WARNING: Keep this file, MachDeps.h, and HsFFI.h in synch!
@@ -26,19 +26,19 @@
  *
  * Specifically:
 
-	StgInt8,  16, 32, 64
-	StgWord8, 16, 32, 64
-	StgChar, StgFloat, StgDouble
+        StgInt8,  16, 32, 64
+        StgWord8, 16, 32, 64
+        StgChar, StgFloat, StgDouble
 
-	***** All the same size (i.e. sizeof(void *)): *****
-	StgPtr			Basic pointer type
-	StgWord			Unit of heap allocation
-	StgInt			Signed version of StgWord
-	StgAddr			Generic address type
-	
-	StgBool, StgVoid, StgPtr, StgOffset, 
-	StgCode, StgStablePtr, StgFunPtr,
-	StgUnion.
+        ***** All the same size (i.e. sizeof(void *)): *****
+        StgPtr                  Basic pointer type
+        StgWord                 Unit of heap allocation
+        StgInt                  Signed version of StgWord
+        StgAddr                 Generic address type
+
+        StgBool, StgVoid, StgPtr, StgOffset,
+        StgCode, StgStablePtr, StgFunPtr,
+        StgUnion.
  */
 
 /*
@@ -104,7 +104,7 @@ typedef StgWord32          StgHalfWord;
 #define FMT_Int      FMT_Int64
 #else
 #if SIZEOF_VOID_P == 4
-typedef StgInt32           StgInt; 
+typedef StgInt32           StgInt;
 typedef StgWord32          StgWord;
 typedef StgInt16           StgHalfInt;
 typedef StgWord16          StgHalfWord;
@@ -125,13 +125,13 @@ typedef StgWord16          StgHalfWord;
 typedef void*              StgAddr;
 typedef StgWord32          StgChar;
 typedef int                StgBool;
-typedef float		   StgFloat;
-typedef double		   StgDouble;
+typedef float              StgFloat;
+typedef double             StgDouble;
 typedef StgWord*           StgPtr;           /* heap or stack pointer */
 typedef StgWord volatile*  StgVolatilePtr;   /* pointer to volatile word   */
 typedef StgWord            StgOffset;        /* byte offset within closure */
-typedef StgWord8 	   StgCode;  	     /* close enough */
-typedef void*		   StgStablePtr;
+typedef StgWord8           StgCode;          /* close enough */
+typedef void*              StgStablePtr;
 typedef StgWord8*          StgByteArray;
 
 /*
@@ -141,7 +141,7 @@ typedef StgWord8*          StgByteArray;
   function to be called use: Ptr to Fun that returns a Ptr to Fun
   which returns Ptr to void
 
-  Note: Neither StgFunPtr not StgFun is quite right (that is, 
+  Note: Neither StgFunPtr not StgFun is quite right (that is,
   StgFunPtr != StgFun*).  So, the functions we define all have type
   StgFun but we always have to cast them to StgFunPtr when we assign
   them to something.

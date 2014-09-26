@@ -17,7 +17,6 @@
 
 #include "MachDeps.h"
 
--- #hide
 module GHC.IntWord64 (
 #if WORD_SIZE_IN_BITS < 64
         Int64#, Word64#, module GHC.IntWord64

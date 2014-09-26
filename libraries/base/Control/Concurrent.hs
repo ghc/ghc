@@ -119,12 +119,11 @@ import GHC.Base
 import System.Posix.Types ( Fd )
 import Foreign.StablePtr
 import Foreign.C.Types
-import Control.Monad
 
 #ifdef mingw32_HOST_OS
 import Foreign.C
 import System.IO
-import Data.Maybe (Maybe(..))
+import Data.Functor ( void )
 #endif
 
 import Control.Concurrent.MVar

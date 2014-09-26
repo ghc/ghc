@@ -613,20 +613,27 @@ lookupInstEnv :: (InstEnv, InstEnv)     -- External and home package inst-env
               -> ClsInstLookupResult
 -- ^ See Note [Rules for instance lookup]
 lookupInstEnv (pkg_ie, home_ie) cls tys
-  = (safe_matches, all_unifs, safe_fail)
+  = (final_matches, final_unifs, safe_fail)
   where
     (home_matches, home_unifs) = lookupInstEnv' home_ie cls tys
     (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  cls tys
     all_matches = home_matches ++ pkg_matches
     all_unifs   = home_unifs   ++ pkg_unifs
     pruned_matches = foldr insert_overlapping [] all_matches
-    (safe_matches, safe_fail) = if length pruned_matches == 1 
-                        then check_safe (head pruned_matches) all_matches
-                        else (pruned_matches, False)
         -- Even if the unifs is non-empty (an error situation)
         -- we still prune the matches, so that the error message isn't
         -- misleading (complaining of multiple matches when some should be
         -- overlapped away)
+
+    (final_matches, safe_fail)
+       = case pruned_matches of
+           [match] -> check_safe match all_matches
+           _       -> (pruned_matches, False)
+
+    -- If the selected match is incoherent, discard all unifiers
+    final_unifs = case final_matches of
+                    (m:_) | is_incoherent m -> []
+                    _ -> all_unifs
 
     -- NOTE [Safe Haskell isSafeOverlap]
     -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -660,45 +667,53 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
                 in (la && lb) || (nameModule na == nameModule nb)
 
 ---------------
+is_incoherent :: InstMatch -> Bool
+is_incoherent (inst, _) = overlapMode (is_flag inst) == Incoherent
+
 ---------------
 insert_overlapping :: InstMatch -> [InstMatch] -> [InstMatch]
 -- ^ Add a new solution, knocking out strictly less specific ones
 -- See Note [Rules for instance lookup]
 insert_overlapping new_item [] = [new_item]
-insert_overlapping new_item (item:items)
-  | new_beats_old && old_beats_new = item : insert_overlapping new_item items
-        -- Duplicate => keep both for error report
-  | new_beats_old = insert_overlapping new_item items
-        -- Keep new one
-  | old_beats_new = item : items
-        -- Keep old one
-  | incoherent new_item = item : items -- note [Incoherent instances]
-        -- Keep old one
-  | incoherent item = new_item : items
-        -- Keep new one
-  | otherwise     = item : insert_overlapping new_item items
-        -- Keep both
-  where
-    new_beats_old = new_item `beats` item
-    old_beats_new = item `beats` new_item
+insert_overlapping new_item (old_item : old_items)
+  | new_beats_old        -- New strictly overrides old
+  , not old_beats_new
+  , new_item `can_override` old_item
+  = insert_overlapping new_item old_items
 
-    incoherent (inst, _) = overlapMode (is_flag inst) == Incoherent
+  | old_beats_new        -- Old strictly overrides new
+  , not new_beats_old
+  , old_item `can_override` new_item
+  = old_item : old_items
+
+  -- Discard incoherent instances; see Note [Incoherent instances]
+  | is_incoherent old_item       -- Old is incoherent; discard it
+  = insert_overlapping new_item old_items
+  | is_incoherent new_item       -- New is incoherent; discard it
+  = old_item : old_items
+
+  -- Equal or incomparable, and neither is incoherent; keep both
+  | otherwise
+  = old_item : insert_overlapping new_item old_items
+  where
+
+    new_beats_old = new_item `more_specific_than` old_item
+    old_beats_new = old_item `more_specific_than` new_item
 
     -- `instB` can be instantiated to match `instA`
-    instA `moreSpecificThan` instB =
-      isJust (tcMatchTys (mkVarSet (is_tvs instB))
-             (is_tys instB) (is_tys instA))
+    -- or the two are equal
+    (instA,_) `more_specific_than` (instB,_)
+      = isJust (tcMatchTys (mkVarSet (is_tvs instB))
+               (is_tys instB) (is_tys instA))
 
-    (instA, _) `beats` (instB, _)
-          = overlap_ok && (instA `moreSpecificThan` instB)
-          where
-            {- Overlap permitted if either the more specific instance
-            is marked as overlapping, or the more general one is
-            marked as overlappable.
-            Latest change described in: Trac #9242.
-            Previous change: Trac #3877, Dec 10.  -}
-            overlap_ok = hasOverlappingFlag  (overlapMode (is_flag instA))
-                      || hasOverlappableFlag (overlapMode (is_flag instB))
+    (instA, _) `can_override` (instB, _)
+       =  hasOverlappingFlag  (overlapMode (is_flag instA))
+       || hasOverlappableFlag (overlapMode (is_flag instB))
+       -- Overlap permitted if either the more specific instance
+       -- is marked as overlapping, or the more general one is
+       -- marked as overlappable.
+       -- Latest change described in: Trac #9242.
+       -- Previous change: Trac #3877, Dec 10.
 \end{code}
 
 Note [Incoherent instances]

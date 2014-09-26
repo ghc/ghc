@@ -9,5 +9,5 @@ type family Bar a where
   Bar Int = Bool
   Bar Double = Char
 
-type family Baz (a :: k) where
+type family Baz (a :: k) :: * where
   Baz Int = Bool

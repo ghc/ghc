@@ -1,11 +1,11 @@
 /* -----------------------------------------------------------------------------
  *
  * (c) The GHC Team 1998-2008
- * 
+ *
  * The block allocator and free list manager.
  *
  * This is the architecture independent part of the block allocator.
- * It requires only the following support from the operating system: 
+ * It requires only the following support from the operating system:
  *
  *    void *getMBlock(nat n);
  *
@@ -153,8 +153,8 @@ static bdescr *free_list[MAX_FREE_LIST];
 static bdescr *free_mblock_list;
 
 // free_list[i] contains blocks that are at least size 2^i, and at
-// most size 2^(i+1) - 1.  
-// 
+// most size 2^(i+1) - 1.
+//
 // To find the free list in which to place a block, use log_2(size).
 // To find a free block of the right size, use log_2_ceil(size).
 
@@ -237,7 +237,7 @@ free_list_insert (bdescr *bd)
 
     ASSERT(bd->blocks < BLOCKS_PER_MBLOCK);
     ln = log_2(bd->blocks);
-    
+
     dbl_link_onto(bd, &free_list[ln]);
 }
 
@@ -250,7 +250,7 @@ tail_of (bdescr *bd)
 
 // After splitting a group, the last block of each group must have a
 // tail that points to the head block, to keep our invariants for
-// coalescing. 
+// coalescing.
 STATIC_INLINE void
 setup_tail (bdescr *bd)
 {
@@ -298,7 +298,7 @@ alloc_mega_group (StgWord mblocks)
     prev = NULL;
     for (bd = free_mblock_list; bd != NULL; prev = bd, bd = bd->link)
     {
-        if (bd->blocks == n) 
+        if (bd->blocks == n)
         {
             if (prev) {
                 prev->link = bd->link;
@@ -320,7 +320,7 @@ alloc_mega_group (StgWord mblocks)
     {
         // we take our chunk off the end here.
         StgWord best_mblocks  = BLOCKS_TO_MBLOCKS(best->blocks);
-        bd = FIRST_BDESCR((StgWord8*)MBLOCK_ROUND_DOWN(best) + 
+        bd = FIRST_BDESCR((StgWord8*)MBLOCK_ROUND_DOWN(best) +
                           (best_mblocks-mblocks)*MBLOCK_SIZE);
 
         best->blocks = MBLOCK_GROUP_BLOCKS(best_mblocks - mblocks);
@@ -329,7 +329,7 @@ alloc_mega_group (StgWord mblocks)
     else
     {
         void *mblock = getMBlocks(mblocks);
-        initMBlock(mblock);		// only need to init the 1st one
+        initMBlock(mblock);             // only need to init the 1st one
         bd = FIRST_BDESCR(mblock);
     }
     bd->blocks = MBLOCK_GROUP_BLOCKS(mblocks);
@@ -343,7 +343,7 @@ allocGroup (W_ n)
     StgWord ln;
 
     if (n == 0) barf("allocGroup: requested zero blocks");
-    
+
     if (n >= BLOCKS_PER_MBLOCK)
     {
         StgWord mblocks;
@@ -360,7 +360,7 @@ allocGroup (W_ n)
         initGroup(bd);
         goto finish;
     }
-    
+
     n_alloc_blocks += n;
     if (n_alloc_blocks > hw_alloc_blocks) hw_alloc_blocks = n_alloc_blocks;
 
@@ -382,24 +382,24 @@ allocGroup (W_ n)
 
         bd = alloc_mega_group(1);
         bd->blocks = n;
-        initGroup(bd);		         // we know the group will fit
+        initGroup(bd);                   // we know the group will fit
         rem = bd + n;
         rem->blocks = BLOCKS_PER_MBLOCK-n;
         initGroup(rem); // init the slop
         n_alloc_blocks += rem->blocks;
-        freeGroup(rem);      	         // add the slop on to the free list
+        freeGroup(rem);                  // add the slop on to the free list
         goto finish;
     }
 
     bd = free_list[ln];
 
-    if (bd->blocks == n)	        // exactly the right size!
+    if (bd->blocks == n)                // exactly the right size!
     {
         dbl_link_remove(bd, &free_list[ln]);
         initGroup(bd);
     }
     else if (bd->blocks >  n)            // block too big...
-    {                              
+    {
         bd = split_free_block(bd, n, ln);
         ASSERT(bd->blocks == n);
         initGroup(bd);
@@ -458,7 +458,7 @@ allocLargeChunk (W_ min, W_ max)
         initGroup(bd);
     }
     else   // block too big...
-    {                              
+    {
         bd = split_free_block(bd, max, ln);
         ASSERT(bd->blocks == max);
         initGroup(bd);
@@ -508,9 +508,9 @@ coalesce_mblocks (bdescr *p)
     bdescr *q;
 
     q = p->link;
-    if (q != NULL && 
-        MBLOCK_ROUND_DOWN(q) == 
-        (StgWord8*)MBLOCK_ROUND_DOWN(p) + 
+    if (q != NULL &&
+        MBLOCK_ROUND_DOWN(q) ==
+        (StgWord8*)MBLOCK_ROUND_DOWN(p) +
         BLOCKS_TO_MBLOCKS(p->blocks) * MBLOCK_SIZE) {
         // can coalesce
         p->blocks  = MBLOCK_GROUP_BLOCKS(BLOCKS_TO_MBLOCKS(p->blocks) +
@@ -551,7 +551,7 @@ free_mega_group (bdescr *mg)
     coalesce_mblocks(mg);
 
     IF_DEBUG(sanity, checkFreeListSanity());
-}    
+}
 
 
 void
@@ -627,7 +627,7 @@ freeGroup(bdescr *p)
           p = prev;
       }
   }
-      
+
   setup_tail(p);
   free_list_insert(p);
 
@@ -672,10 +672,10 @@ initMBlock(void *mblock)
      */
     block = FIRST_BLOCK(mblock);
     bd    = FIRST_BDESCR(mblock);
-    
+
     /* Initialise the start field of each block descriptor
      */
-    for (; block <= (StgWord8*)LAST_BLOCK(mblock); bd += 1, 
+    for (; block <= (StgWord8*)LAST_BLOCK(mblock); bd += 1,
              block += BLOCK_SIZE) {
         bd->start = (void*)block;
     }
@@ -690,7 +690,7 @@ countBlocks(bdescr *bd)
 {
     W_ n;
     for (n=0; bd != NULL; bd=bd->link) {
-	n += bd->blocks;
+        n += bd->blocks;
     }
     return n;
 }
@@ -705,12 +705,12 @@ countAllocdBlocks(bdescr *bd)
 {
     W_ n;
     for (n=0; bd != NULL; bd=bd->link) {
-	n += bd->blocks;
-	// hack for megablock groups: see (*1) above
-	if (bd->blocks > BLOCKS_PER_MBLOCK) {
-	    n -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
-		* (bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE));
-	}
+        n += bd->blocks;
+        // hack for megablock groups: see (*1) above
+        if (bd->blocks > BLOCKS_PER_MBLOCK) {
+            n -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
+                * (bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE));
+        }
     }
     return n;
 }
@@ -784,7 +784,7 @@ checkFreeListSanity(void)
         for (bd = free_list[ln]; bd != NULL; prev = bd, bd = bd->link)
         {
             IF_DEBUG(block_alloc,
-                     debugBelch("group at %p, length %ld blocks\n", 
+                     debugBelch("group at %p, length %ld blocks\n",
                                 bd->start, (long)bd->blocks));
             ASSERT(bd->free == (P_)-1);
             ASSERT(bd->blocks > 0 && bd->blocks < BLOCKS_PER_MBLOCK);
@@ -795,7 +795,7 @@ checkFreeListSanity(void)
 
             if (prev)
                 ASSERT(bd->u.back == prev);
-            else 
+            else
                 ASSERT(bd->u.back == NULL);
 
             {
@@ -814,7 +814,7 @@ checkFreeListSanity(void)
     for (bd = free_mblock_list; bd != NULL; prev = bd, bd = bd->link)
     {
         IF_DEBUG(block_alloc,
-                 debugBelch("mega group at %p, length %ld blocks\n", 
+                 debugBelch("mega group at %p, length %ld blocks\n",
                             bd->start, (long)bd->blocks));
 
         ASSERT(bd->link != bd); // catch easy loops
@@ -832,8 +832,8 @@ checkFreeListSanity(void)
         // make sure we're fully coalesced
         if (bd->link != NULL)
         {
-            ASSERT (MBLOCK_ROUND_DOWN(bd->link) != 
-                    (StgWord8*)MBLOCK_ROUND_DOWN(bd) + 
+            ASSERT (MBLOCK_ROUND_DOWN(bd->link) !=
+                    (StgWord8*)MBLOCK_ROUND_DOWN(bd) +
                     BLOCKS_TO_MBLOCKS(bd->blocks) * MBLOCK_SIZE);
         }
     }

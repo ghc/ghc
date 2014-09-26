@@ -33,8 +33,9 @@ import Data.Function
 import Data.List
 
 import Control.Monad (liftM, ap)
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
-
+#endif
 
 --------------------------------------------------------
 --         The Flag and OptKind types

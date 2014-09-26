@@ -26,10 +26,7 @@ available = False
 #include <poll.h>
 
 import Control.Concurrent.MVar (MVar, newMVar, swapMVar)
-import Control.Monad ((=<<), liftM, liftM2, unless)
 import Data.Bits (Bits, FiniteBits, (.|.), (.&.))
-import Data.Maybe (Maybe(..))
-import Data.Monoid (Monoid(..))
 import Data.Word
 import Foreign.C.Types (CInt(..), CShort(..))
 import Foreign.Ptr (Ptr)
@@ -95,7 +92,7 @@ poll p mtout f = do
         c_pollLoop ptr (fromIntegral len) (fromTimeout tout)
       Nothing   ->
         c_poll_unsafe ptr (fromIntegral len) 0
-  unless (n == 0) $ do
+  when (n /= 0) $ do
     A.loop a 0 $ \i e -> do
       let r = pfdRevents e
       if r /= 0

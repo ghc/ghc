@@ -1,0 +1,6 @@
+
+T9200b.hs:8:5:
+    The first argument of ‘F’ should have kind ‘k’,
+      but ‘True’ has kind ‘Bool’
+    In the type ‘True’
+    In the type family declaration for ‘F’

@@ -326,6 +326,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                                    intermediate_iface decls
 
     -- Warn about orphans
+    -- See Note [Orphans and auto-generated rules]
     let warn_orphs      = wopt Opt_WarnOrphans dflags
         warn_auto_orphs = wopt Opt_WarnAutoOrphans dflags
         orph_warnings   --- Laziness means no work done unless -fwarn-orphans
@@ -623,7 +624,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 mi_exp_hash    = export_hash,
                 mi_orphan_hash = orphan_hash,
                 mi_flag_hash   = flag_hash,
-                mi_orphan      = not (   null orph_rules
+                mi_orphan      = not (   all ifRuleAuto orph_rules
+                                           -- See Note [Orphans and auto-generated rules]
                                       && null orph_insts
                                       && null orph_fis
                                       && isNoIfaceVectInfo (mi_vect_info iface0)),
@@ -682,6 +684,25 @@ mkIfaceAnnCache anns
     -- flipping (++), so the first argument is always short
     env = mkOccEnv_C (flip (++)) (map pair anns)
 \end{code}
+
+Note [Orphans and auto-generated rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we specialise an INLINEABLE function, or when we have
+-fspecialise-aggressively, we auto-generate RULES that are orphans.
+We don't want to warn about these, at least not by default, or we'd
+generate a lot of warnings.  Hence -fwarn-auto-orphans.
+
+Indeed, we don't even treat the module as an oprhan module if it has
+auto-generated *rule* orphans.  Orphan modules are read every time we
+compile, so they are pretty obtrusive and slow down every compilation,
+even non-optimised ones.  (Reason: for type class instances it's a
+type correctness issue.)  But specialisation rules are strictly for
+*optimisation* only so it's fine not to read the interface.
+
+What this means is that a SPEC rules from auto-specialisation in
+module M will be used in other modules only if M.hi has been read for
+some other reason, which is actually pretty likely.
+
 
 %************************************************************************
 %*                                                                      *
@@ -775,7 +796,7 @@ freeNamesIdExtras :: IfaceIdExtras -> NameSet
 freeNamesIdExtras (IdExtras _ rules _) = unionManyNameSets (map freeNamesIfRule rules)
 
 instance Outputable IfaceDeclExtras where
-  ppr IfaceOtherDeclExtras       = empty
+  ppr IfaceOtherDeclExtras       = Outputable.empty
   ppr (IfaceIdExtras  extras)    = ppr_id_extras extras
   ppr (IfaceSynExtras fix finsts anns) = vcat [ppr fix, ppr finsts, ppr anns]
   ppr (IfaceDataExtras fix insts anns stuff) = vcat [ppr fix, ppr_insts insts, ppr anns,
@@ -1026,7 +1047,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
         (is_direct_import, imp_safe)
             = case lookupModuleEnv direct_imports mod of
                 Just ((_,_,_,safe):_xs) -> (True, safe)
-                Just _                  -> pprPanic "mkUsage: empty direct import" empty
+                Just _                  -> pprPanic "mkUsage: empty direct import" Outputable.empty
                 Nothing                 -> (False, safeImplicitImpsReq dflags)
                 -- Nothing case is for implicit imports like 'System.IO' when 'putStrLn'
                 -- is used in the source code. We require them to be safe in Safe Haskell
@@ -1881,14 +1902,16 @@ toIfaceIdInfo id_info
 
 --------------------------
 toIfUnfolding :: Bool -> Unfolding -> Maybe IfaceInfoItem
-toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity
-                                , uf_src = src, uf_guidance = guidance })
+toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs
+                                , uf_src = src
+                                , uf_guidance = guidance })
   = Just $ HsUnfold lb $
     case src of
         InlineStable
           -> case guidance of
-               UnfWhen unsat_ok boring_ok -> IfInlineRule arity unsat_ok boring_ok if_rhs
-               _other                     -> IfCoreUnfold True if_rhs
+               UnfWhen {ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok =  boring_ok }
+                      -> IfInlineRule arity unsat_ok boring_ok if_rhs
+               _other -> IfCoreUnfold True if_rhs
         InlineCompulsory -> IfCompulsory if_rhs
         InlineRhs        -> IfCoreUnfold False if_rhs
         -- Yes, even if guidance is UnfNever, expose the unfolding

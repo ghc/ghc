@@ -3,8 +3,8 @@
  * (c) The GHC Team, 2001-2009
  *
  * Accessing OS threads functionality in a (mostly) OS-independent
- * manner. 
- * 
+ * manner.
+ *
  * Do not #include this file directly: #include "Rts.h" instead.
  *
  * To understand the structure of the RTS headers, see the wiki:
@@ -93,7 +93,7 @@ EXTERN_INLINE int TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex)
 
 typedef HANDLE Condition;
 typedef DWORD OSThreadId;
-// don't be tempted to use HANDLE as the OSThreadId: there can be 
+// don't be tempted to use HANDLE as the OSThreadId: there can be
 // many HANDLES to a given thread, so comparison would not work.
 typedef DWORD ThreadLocalKey;
 
@@ -141,14 +141,14 @@ typedef HANDLE Mutex;
 
 // casting to (Mutex *) here required due to use in .cmm files where
 // the argument has (void *) type.
-#define ACQUIRE_LOCK(mutex)					\
+#define ACQUIRE_LOCK(mutex)                                     \
     if (WaitForSingleObject(*((Mutex *)mutex),INFINITE) == WAIT_FAILED) { \
-	barf("WaitForSingleObject: %d", GetLastError());	\
+        barf("WaitForSingleObject: %d", GetLastError());        \
     }
 
-#define RELEASE_LOCK(mutex)				\
-    if (ReleaseMutex(*((Mutex *)mutex)) == 0) {		\
-	barf("ReleaseMutex: %d", GetLastError());	\
+#define RELEASE_LOCK(mutex)                             \
+    if (ReleaseMutex(*((Mutex *)mutex)) == 0) {         \
+        barf("ReleaseMutex: %d", GetLastError());       \
     }
 
 #define ASSERT_LOCK_HELD(mutex) /* nothing */
@@ -171,8 +171,8 @@ extern void yieldThread           ( void );
 
 typedef void OSThreadProcAttr OSThreadProc(void *);
 
-extern int  createOSThread        ( OSThreadId* tid, 
-				    OSThreadProc *startProc, void *param);
+extern int  createOSThread        ( OSThreadId* tid,
+                                    OSThreadProc *startProc, void *param);
 extern rtsBool osThreadIsAlive    ( OSThreadId id );
 extern void interruptOSThread (OSThreadId id);
 

@@ -10,10 +10,12 @@ module Pair ( Pair(..), unPair, toPair, swap ) where
 #include "HsVersions.h"
 
 import Outputable
-import Data.Monoid
 import Control.Applicative
+#if __GLASGOW_HASKELL__ < 709
 import Data.Foldable
+import Data.Monoid
 import Data.Traversable
+#endif
 
 data Pair a = Pair { pFst :: a, pSnd :: a }
 -- Note that Pair is a *unary* type constructor

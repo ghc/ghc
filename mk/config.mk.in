@@ -97,9 +97,7 @@ endif
 # Some platforms don't support shared libraries
 NoSharedLibsPlatformList = powerpc-unknown-linux \
 	x86_64-unknown-mingw32 \
-	i386-unknown-mingw32 \
-	sparc-sun-solaris2 \
-	sparc-unknown-linux
+	i386-unknown-mingw32
 
 ifeq "$(SOLARIS_BROKEN_SHLD)" "YES"
 NoSharedLibsPlatformList += i386-unknown-solaris2
@@ -484,6 +482,8 @@ GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 
 CMM_SINK_BOOTSTRAP_IS_NEEDED = @CMM_SINK_BOOTSTRAP_IS_NEEDED@
 
+SUPPORTS_PACKAGE_KEY = @SUPPORTS_PACKAGE_KEY@
+
 #-----------------------------------------------------------------------------
 # C compiler
 #
@@ -791,7 +791,7 @@ HSCOLOUR_SRCS = YES
 endif
 
 # Build DPH?
-BUILD_DPH = YES
+BUILD_DPH = NO
 
 ################################################################################
 #

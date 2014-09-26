@@ -243,10 +243,7 @@ test('tcfail214', normal, compile_fail, [''])
 test('tcfail215', normal, compile_fail, [''])
 test('tcfail216', normal, compile_fail, [''])
 test('tcfail217', normal, compile_fail, [''])
-test('tcfail218',
-    extra_clean(['Tcfail218_Help.o','Tcfail218_Help.hi']),
-    multimod_compile_fail, ['tcfail218','-v0'])
-
+test('tcfail218', normal, compile_fail, [''])
 test('SilentParametersOverlapping', normal, compile_fail, [''])
 test('FailDueToGivenOverlapping', normal, compile_fail, [''])
 test('LongWayOverlapping', normal, compile_fail, [''])
@@ -336,3 +333,6 @@ test('T8883', normal, compile_fail, [''])
 test('T9196', normal, compile_fail, [''])
 test('T9305', normal, compile_fail, [''])
 test('T9323', normal, compile_fail, [''])
+test('T9415', normal, compile_fail, [''])
+test('T9612', normal, compile_fail, [''])
+test('T9634', normal, compile_fail, [''])

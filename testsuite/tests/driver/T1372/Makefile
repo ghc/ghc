@@ -15,7 +15,7 @@ clean:
 	rm -f *.o *.hi
 	rm -f clean.out prep.out
 	rm -f p1/A.hs
-	rm -f $(LOCAL_PKGCONF)
+	rm -rf $(LOCAL_PKGCONF)
 
 T1372:
 	$(MAKE) clean
@@ -26,7 +26,7 @@ T1372:
 	$(MAKE) clean
 
 prep:
-	echo "[]" >$(LOCAL_PKGCONF)
+	"$(GHC_PKG)" init $(LOCAL_PKGCONF)
 	cp p1/A1.hs p1/A.hs
 	$(MAKE) prep.p1
 	$(MAKE) prep.p2

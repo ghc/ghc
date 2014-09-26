@@ -26,7 +26,7 @@
 #include "Weak.h"
 #include "Ticky.h"
 #include "StgRun.h"
-#include "Prelude.h"		/* fixupRTStoPreludeRefs */
+#include "Prelude.h"            /* fixupRTStoPreludeRefs */
 #include "ThreadLabels.h"
 #include "sm/BlockAlloc.h"
 #include "Trace.h"
@@ -36,7 +36,7 @@
 #include "Timer.h"
 #include "Globals.h"
 #include "FileLock.h"
-void exitLinker( void );	// there is no Linker.h file to include
+void exitLinker( void );        // there is no Linker.h file to include
 
 #if defined(PROFILING)
 # include "ProfHeap.h"
@@ -124,8 +124,8 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 {
     hs_init_count++;
     if (hs_init_count > 1) {
-	// second and subsequent inits are ignored
-	return;
+        // second and subsequent inits are ignored
+        return;
     }
 
     setlocale(LC_CTYPE,"");
@@ -308,13 +308,13 @@ hs_exit_(rtsBool wait_foreign)
     nat g, i;
 
     if (hs_init_count <= 0) {
-	errorBelch("warning: too many hs_exit()s");
-	return;
+        errorBelch("warning: too many hs_exit()s");
+        return;
     }
     hs_init_count--;
     if (hs_init_count > 0) {
-	// ignore until it's the last one
-	return;
+        // ignore until it's the last one
+        return;
     }
 
     /* start timing the shutdown */

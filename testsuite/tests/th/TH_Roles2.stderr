@@ -4,8 +4,8 @@ TYPE CONSTRUCTORS
   data T (a :: k)
 COERCION AXIOMS
 Dependent modules: []
-Dependent packages: [base, ghc-prim, integer-gmp, pretty-1.1.1.1,
-                     template-haskell]
+Dependent packages: [base-4.8.0.0, ghc-prim-0.3.1.0,
+                     integer-gmp-0.5.1.0, pretty-1.1.1.1, template-haskell-2.10.0.0]
 
 ==================== Typechecker ====================
 

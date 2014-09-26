@@ -1,0 +1,14 @@
+
+<interactive>:3:5:
+    You can't mix polymorphic and unlifted bindings
+      a = (# 1 #)
+      Probable fix: use a bang pattern
+
+<interactive>:4:5:
+    You can't mix polymorphic and unlifted bindings
+      a = (# 1, 3 #)
+      Probable fix: use a bang pattern
+
+Top level:
+    GHCi can't bind a variable of unlifted type:
+      a :: (# Integer, Integer #)

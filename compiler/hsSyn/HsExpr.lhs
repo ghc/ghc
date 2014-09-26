@@ -4,6 +4,11 @@
 %
 \begin{code}
 {-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
+                                      -- in module PlaceHolder
+{-# LANGUAGE ConstraintKinds #-}
 
 -- | Abstract Haskell syntax for expressions.
 module HsExpr where
@@ -14,6 +19,7 @@ module HsExpr where
 import HsDecls
 import HsPat
 import HsLit
+import PlaceHolder ( PostTc,PostRn,DataId )
 import HsTypes
 import HsBinds
 
@@ -30,11 +36,11 @@ import Util
 import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastString
+import Type
 
 -- libraries:
 import Data.Data hiding (Fixity)
 \end{code}
-
 
 %************************************************************************
 %*                                                                      *
@@ -127,7 +133,7 @@ data HsExpr id
 
   | HsLam     (MatchGroup id (LHsExpr id)) -- ^ Lambda abstraction. Currently always a single match
 
-  | HsLamCase PostTcType (MatchGroup id (LHsExpr id)) -- ^ Lambda-case
+  | HsLamCase (PostTc id Type) (MatchGroup id (LHsExpr id)) -- ^ Lambda-case
 
   | HsApp     (LHsExpr id) (LHsExpr id) -- ^ Application
 
@@ -139,7 +145,7 @@ data HsExpr id
 
   | OpApp       (LHsExpr id)    -- left operand
                 (LHsExpr id)    -- operator
-                Fixity          -- Renamer adds fixity; bottom until then
+                (PostRn id Fixity) -- Renamer adds fixity; bottom until then
                 (LHsExpr id)    -- right operand
 
   -- | Negation operator. Contains the negated expression and the name
@@ -170,7 +176,7 @@ data HsExpr id
                 (LHsExpr id)    --  else part
 
   -- | Multi-way if
-  | HsMultiIf   PostTcType [LGRHS id (LHsExpr id)] 
+  | HsMultiIf   (PostTc id Type) [LGRHS id (LHsExpr id)]
 
   -- | let(rec)
   | HsLet       (HsLocalBinds id) 
@@ -180,17 +186,17 @@ data HsExpr id
                                      -- because in this context we never use
                                      -- the PatGuard or ParStmt variant
                 [ExprLStmt id]       -- "do":one or more stmts
-                PostTcType           -- Type of the whole expression
+                (PostTc id Type)     -- Type of the whole expression
 
   -- | Syntactic list: [a,b,c,...]
-  | ExplicitList                        
-                PostTcType              -- Gives type of components of list
+  | ExplicitList
+                (PostTc id Type)        -- Gives type of components of list
                 (Maybe (SyntaxExpr id)) -- For OverloadedLists, the fromListN witness
                 [LHsExpr id]
 
   -- | Syntactic parallel array: [:e1, ..., en:]
-  | ExplicitPArr                
-                PostTcType      -- type of elements of the parallel array
+  | ExplicitPArr
+                (PostTc id Type)   -- type of elements of the parallel array
                 [LHsExpr id]
 
   -- | Record construction
@@ -207,8 +213,8 @@ data HsExpr id
                 [DataCon]          -- Filled in by the type checker to the
                                    -- _non-empty_ list of DataCons that have
                                    -- all the upd'd fields
-                [PostTcType]       -- Argument types of *input* record type
-                [PostTcType]       --              and  *output* record type
+                [PostTc id Type]   -- Argument types of *input* record type
+                [PostTc id Type]   --              and  *output* record type
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 
@@ -274,22 +280,22 @@ data HsExpr id
   -- The following are commands, not expressions proper
   -- They are only used in the parsing stage and are removed
   --    immediately in parser.RdrHsSyn.checkCommand
-  | HsArrApp            -- Arrow tail, or arrow application (f -< arg)
-        (LHsExpr id)    -- arrow expression, f
-        (LHsExpr id)    -- input expression, arg
-        PostTcType      -- type of the arrow expressions f,
-                        -- of the form a t t', where arg :: t
-        HsArrAppType    -- higher-order (-<<) or first-order (-<)
-        Bool            -- True => right-to-left (f -< arg)
-                        -- False => left-to-right (arg >- f)
+  | HsArrApp             -- Arrow tail, or arrow application (f -< arg)
+        (LHsExpr id)     -- arrow expression, f
+        (LHsExpr id)     -- input expression, arg
+        (PostTc id Type) -- type of the arrow expressions f,
+                         -- of the form a t t', where arg :: t
+        HsArrAppType     -- higher-order (-<<) or first-order (-<)
+        Bool             -- True => right-to-left (f -< arg)
+                         -- False => left-to-right (arg >- f)
 
-  | HsArrForm           -- Command formation,  (| e cmd1 .. cmdn |)
-        (LHsExpr id)    -- the operator
-                        -- after type-checking, a type abstraction to be
-                        -- applied to the type of the local environment tuple
-        (Maybe Fixity)  -- fixity (filled in by the renamer), for forms that
-                        -- were converted from OpApp's by the renamer
-        [LHsCmdTop id]  -- argument commands
+  | HsArrForm            -- Command formation,  (| e cmd1 .. cmdn |)
+        (LHsExpr id)     -- the operator
+                         -- after type-checking, a type abstraction to be
+                         -- applied to the type of the local environment tuple
+        (Maybe Fixity)   -- fixity (filled in by the renamer), for forms that
+                         -- were converted from OpApp's by the renamer
+        [LHsCmdTop id]   -- argument commands
 
   ---------------------------------------
   -- Haskell program coverage (Hpc) Support
@@ -329,15 +335,17 @@ data HsExpr id
   |  HsWrap     HsWrapper    -- TRANSLATION
                 (HsExpr id)
   |  HsUnboundVar RdrName
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId id) => Data (HsExpr id)
 
 -- | HsTupArg is used for tuple sections
 --  (,a,) is represented by  ExplicitTuple [Mising ty1, Present a, Missing ty3]
 --  Which in turn stands for (\x:ty1 \y:ty2. (x,a,y))
 data HsTupArg id
-  = Present (LHsExpr id)        -- ^ The argument
-  | Missing PostTcType          -- ^ The argument is missing, but this is its type
-  deriving (Data, Typeable)
+  = Present (LHsExpr id)     -- ^ The argument
+  | Missing (PostTc id Type) -- ^ The argument is missing, but this is its type
+  deriving (Typeable)
+deriving instance (DataId id) => Data (HsTupArg id)
 
 tupArgPresent :: HsTupArg id -> Bool
 tupArgPresent (Present {}) = True
@@ -716,22 +724,22 @@ We re-use HsExpr to represent these.
 type LHsCmd id = Located (HsCmd id)
 
 data HsCmd id
-  = HsCmdArrApp         -- Arrow tail, or arrow application (f -< arg)
-        (LHsExpr id)    -- arrow expression, f
-        (LHsExpr id)    -- input expression, arg
-        PostTcType      -- type of the arrow expressions f,
-                        -- of the form a t t', where arg :: t
-        HsArrAppType    -- higher-order (-<<) or first-order (-<)
-        Bool            -- True => right-to-left (f -< arg)
-                        -- False => left-to-right (arg >- f)
+  = HsCmdArrApp          -- Arrow tail, or arrow application (f -< arg)
+        (LHsExpr id)     -- arrow expression, f
+        (LHsExpr id)     -- input expression, arg
+        (PostTc id Type) -- type of the arrow expressions f,
+                         -- of the form a t t', where arg :: t
+        HsArrAppType     -- higher-order (-<<) or first-order (-<)
+        Bool             -- True => right-to-left (f -< arg)
+                         -- False => left-to-right (arg >- f)
 
-  | HsCmdArrForm        -- Command formation,  (| e cmd1 .. cmdn |)
-        (LHsExpr id)    -- the operator
-                        -- after type-checking, a type abstraction to be
-                        -- applied to the type of the local environment tuple
-        (Maybe Fixity)  -- fixity (filled in by the renamer), for forms that
-                        -- were converted from OpApp's by the renamer
-        [LHsCmdTop id]  -- argument commands
+  | HsCmdArrForm         -- Command formation,  (| e cmd1 .. cmdn |)
+        (LHsExpr id)     -- the operator
+                         -- after type-checking, a type abstraction to be
+                         -- applied to the type of the local environment tuple
+        (Maybe Fixity)   -- fixity (filled in by the renamer), for forms that
+                         -- were converted from OpApp's by the renamer
+        [LHsCmdTop id]   -- argument commands
 
   | HsCmdApp    (LHsCmd id)
                 (LHsExpr id)
@@ -752,14 +760,14 @@ data HsCmd id
                 (LHsCmd  id)
 
   | HsCmdDo     [CmdLStmt id]
-                PostTcType                      -- Type of the whole expression
+                (PostTc id Type)                -- Type of the whole expression
 
   | HsCmdCast   TcCoercion     -- A simpler version of HsWrap in HsExpr
                 (HsCmd id)     -- If   cmd :: arg1 --> res
                                --       co :: arg1 ~ arg2
                                -- Then (HsCmdCast co cmd) :: arg2 --> res
-                
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId id) => Data (HsCmd id)
 
 data HsArrAppType = HsHigherOrderApp | HsFirstOrderApp
   deriving (Data, Typeable)
@@ -775,10 +783,11 @@ type LHsCmdTop id = Located (HsCmdTop id)
 
 data HsCmdTop id
   = HsCmdTop (LHsCmd id)
-             PostTcType          -- Nested tuple of inputs on the command's stack
-             PostTcType          -- return type of the command
+             (PostTc id Type)   -- Nested tuple of inputs on the command's stack
+             (PostTc id Type)   -- return type of the command
              (CmdSyntaxTable id) -- See Note [CmdSyntaxTable]
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId id) => Data (HsCmdTop id)
 \end{code}
 
 
@@ -906,13 +915,14 @@ patterns in each equation.
 \begin{code}
 data MatchGroup id body
   = MG { mg_alts    :: [LMatch id body]  -- The alternatives
-       , mg_arg_tys :: [PostTcType]      -- Types of the arguments, t1..tn
-       , mg_res_ty  :: PostTcType        -- Type of the result, tr 
+       , mg_arg_tys :: [PostTc id Type]  -- Types of the arguments, t1..tn
+       , mg_res_ty  :: PostTc id Type    -- Type of the result, tr
        , mg_origin  :: Origin }
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
      -- where there are n patterns
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (Data body,DataId id) => Data (MatchGroup id body)
 
 type LMatch id body = Located (Match id body)
 
@@ -922,7 +932,8 @@ data Match id body
         (Maybe (LHsType id))    -- A type signature for the result of the match
                                 -- Nothing after typechecking
         (GRHSs id body)
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (Data body,DataId id) => Data (Match id body)
 
 isEmptyMatchGroup :: MatchGroup id body -> Bool
 isEmptyMatchGroup (MG { mg_alts = ms }) = null ms
@@ -942,14 +953,16 @@ data GRHSs id body
   = GRHSs {
       grhssGRHSs :: [LGRHS id body],       -- ^ Guarded RHSs
       grhssLocalBinds :: (HsLocalBinds id) -- ^ The where clause
-    } deriving (Data, Typeable)
+    } deriving (Typeable)
+deriving instance (Data body,DataId id) => Data (GRHSs id body)
 
 type LGRHS id body = Located (GRHS id body)
 
 -- | Guarded Right Hand Side.
 data GRHS id body = GRHS [GuardLStmt id] -- Guards
                          body            -- Right hand side
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (Data body,DataId id) => Data (GRHS id body)
 \end{code}
 
 We know the list must have at least one @Match@ in it.
@@ -1066,11 +1079,11 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
              -- The fail operator is noSyntaxExpr
              -- if the pattern match can't fail
 
-  | BodyStmt body             -- See Note [BodyStmt]
-             (SyntaxExpr idR) -- The (>>) operator
-             (SyntaxExpr idR) -- The `guard` operator; used only in MonadComp
-                              -- See notes [Monad Comprehensions]
-             PostTcType       -- Element type of the RHS (used for arrows)
+  | BodyStmt body              -- See Note [BodyStmt]
+             (SyntaxExpr idR)  -- The (>>) operator
+             (SyntaxExpr idR)  -- The `guard` operator; used only in MonadComp
+                               -- See notes [Monad Comprehensions]
+             (PostTc idR Type) -- Element type of the RHS (used for arrows)
 
   | LetStmt  (HsLocalBindsLR idL idR)
 
@@ -1131,11 +1144,14 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
                                      -- the returned thing has to be *monomorphic*,
                                      -- so they may be type applications
 
-      , recS_ret_ty :: PostTcType    -- The type of of do { stmts; return (a,b,c) }
-                                     -- With rebindable syntax the type might not
-                                     -- be quite as simple as (m (tya, tyb, tyc)).
+      , recS_ret_ty :: PostTc idR Type -- The type of
+                                       -- do { stmts; return (a,b,c) }
+                                   -- With rebindable syntax the type might not
+                                   -- be quite as simple as (m (tya, tyb, tyc)).
       }
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (Data body, DataId idL, DataId idR)
+  => Data (StmtLR idL idR body)
 
 data TransForm   -- The 'f' below is the 'using' function, 'e' is the by function
   = ThenForm     -- then f               or    then f by e             (depending on trS_by)
@@ -1147,7 +1163,8 @@ data ParStmtBlock idL idR
         [ExprLStmt idL]
         [idR]              -- The variables to be returned
         (SyntaxExpr idR)   -- The return operator
-  deriving( Data, Typeable )
+  deriving( Typeable )
+deriving instance (DataId idL, DataId idR) => Data (ParStmtBlock idL idR)
 \end{code}
 
 Note [The type of bind in Stmts]
@@ -1373,7 +1390,8 @@ pprQuals quals = interpp'SP quals
 data HsSplice id  = HsSplice            --  $z  or $(f 4)
                         id              -- The id is just a unique name to
                         (LHsExpr id)    -- identify this splice point
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId id) => Data (HsSplice id)
 
 instance OutputableBndr id => Outputable (HsSplice id) where
   ppr (HsSplice n e) = angleBrackets (ppr n <> comma <+> ppr e)
@@ -1406,7 +1424,8 @@ data HsBracket id = ExpBr (LHsExpr id)   -- [|  expr  |]
                   | VarBr Bool id        -- True: 'x, False: ''T
                                          -- (The Bool flag is used only in pprHsBracket)
                   | TExpBr (LHsExpr id)  -- [||  expr  ||]
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId id) => Data (HsBracket id)
 
 isTypedBracket :: HsBracket id -> Bool
 isTypedBracket (TExpBr {}) = True
@@ -1457,7 +1476,8 @@ data ArithSeqInfo id
   | FromThenTo      (LHsExpr id)
                     (LHsExpr id)
                     (LHsExpr id)
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId id) => Data (ArithSeqInfo id)
 \end{code}
 
 \begin{code}

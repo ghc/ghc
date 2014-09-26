@@ -1033,8 +1033,9 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-wrong-do-bind</option>,
     <option>-fwarn-unsupported-calling-conventions</option>,
     <option>-fwarn-dodgy-foreign-imports</option>,
-    <option>-fwarn-inline-rule-shadowing</option>, and
-    <option>-fwarn-unsupported-llvm-version</option>.
+    <option>-fwarn-inline-rule-shadowing</option>,
+    <option>-fwarn-unsupported-llvm-version</option>, and
+    <option>-fwarn-context-quantification</option>.
     The following flags are simple ways to select standard
     &ldquo;packages&rdquo; of warnings:
     </para>
@@ -1842,6 +1843,27 @@ _  = rhs3        -- No warning: lone wild-card pattern
       </varlistentry>
 
       <varlistentry>
+        <term><option>-fwarn-context-quantification</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-context-quantification</option></primary></indexterm>
+          <indexterm><primary>implicit context quantification, warning</primary></indexterm>
+          <indexterm><primary>context, implicit quantification</primary></indexterm>
+
+          <para>Report if a variable is quantified only due to its presence
+          in a context (see <xref linkend="universal-quantification"/>). For example,
+            <programlisting>
+              type T a = Monad m => a -> f a
+            </programlisting>
+          It is recommended to write this polymorphic type as
+            <programlisting>
+              type T a = forall m. Monad m => a -> f a
+            </programlisting>
+          instead.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
         <term><option>-fwarn-wrong-do-bind</option>:</term>
         <listitem>
           <indexterm><primary><option>-fwarn-wrong-do-bind</option></primary></indexterm>
@@ -2453,7 +2475,7 @@ _  = rhs3        -- No warning: lone wild-card pattern
             <indexterm><primary>unfolding, controlling</primary></indexterm>
           </term>
           <listitem>
-            <para>(Default: 45) Governs the maximum size that GHC will allow a
+            <para>(Default: 750) Governs the maximum size that GHC will allow a
             function unfolding to be. (An unfolding has a &ldquo;size&rdquo;
             that reflects the cost in terms of &ldquo;code bloat&rdquo; of
             expanding (aka inlining) that unfolding at a call site. A bigger
@@ -2480,12 +2502,12 @@ _  = rhs3        -- No warning: lone wild-card pattern
             <indexterm><primary>unfolding, controlling</primary></indexterm>
           </term>
           <listitem>
-            <para>(Default: 8) This is the magic cut-off figure for unfolding
+            <para>(Default: 60) This is the magic cut-off figure for unfolding
             (aka inlining): below this size, a function definition will be
             unfolded at the call-site, any bigger and it won't. The size
             computed for a function depends on two things: the actual size of
-            the expression minus any discounts that
-            apply (see <option>-funfolding-con-discount</option>).
+            the expression minus any discounts that apply depending on the
+            context into which the expression is to be inlined.
             </para>
 
             <para>The difference between this and

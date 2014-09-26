@@ -1,0 +1,20 @@
+Rule fired: foldr/nil
+Rule fired: foldr/nil
+Rule fired:
+    SPEC/main@main:T6056 T6056a.$wsmallerAndRest @ GHC.Integer.Type.Integer
+Rule fired:
+    SPEC/main@main:T6056 T6056a.$wsmallerAndRest @ GHC.Types.Int
+Rule fired: Class op <
+Rule fired: Class op <
+Rule fired:
+    SPEC/main@main:T6056 T6056a.$wsmallerAndRest @ GHC.Integer.Type.Integer
+Rule fired:
+    SPEC/main@main:T6056 T6056a.$wsmallerAndRest @ GHC.Integer.Type.Integer
+Rule fired:
+    SPEC/main@main:T6056 T6056a.$wsmallerAndRest @ GHC.Types.Int
+Rule fired:
+    SPEC/main@main:T6056 T6056a.$wsmallerAndRest @ GHC.Types.Int
+Rule fired:
+    SPEC/main@main:T6056 T6056a.$wsmallerAndRest @ GHC.Integer.Type.Integer
+Rule fired:
+    SPEC/main@main:T6056 T6056a.$wsmallerAndRest @ GHC.Types.Int

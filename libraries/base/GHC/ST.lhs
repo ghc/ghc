@@ -65,6 +65,10 @@ instance Functor (ST s) where
       case (m s) of { (# new_s, r #) ->
       (# new_s, f r #) }
 
+instance Applicative (ST s) where
+    pure = return
+    (<*>) = ap
+
 instance Monad (ST s) where
     {-# INLINE return #-}
     {-# INLINE (>>)   #-}

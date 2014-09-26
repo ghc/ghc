@@ -1,5 +1,6 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE MagicHash, UnboxedTuples, AutoDeriveTypeable, TypeFamilies, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -71,17 +72,16 @@ module GHC.Exts
         IsList(..)
        ) where
 
-import Prelude
-
-import GHC.Prim hiding (coerce)
+import GHC.Prim hiding (coerce, Constraint)
 import GHC.Base hiding (coerce) -- implicitly comes from GHC.Prim
 import GHC.Word
 import GHC.Int
 import GHC.Ptr
 import GHC.Stack
+
 import qualified Data.Coerce
 import Data.String
-import Data.List
+import Data.OldList
 import Data.Data
 import Data.Ord
 import qualified Debug.Trace
@@ -126,9 +126,9 @@ traceEvent = Debug.Trace.traceEventIO
 
 
 {- **********************************************************************
-*									*
+*                                                                       *
 *              SpecConstr annotation                                    *
-*									*
+*                                                                       *
 ********************************************************************** -}
 
 -- Annotating a type with NoSpecConstr will make SpecConstr
@@ -143,9 +143,9 @@ data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
 
 
 {- **********************************************************************
-*									*
+*                                                                       *
 *              The IsList class                                         *
-*									*
+*                                                                       *
 ********************************************************************** -}
 
 -- | The 'IsList' class and its methods are intended to be used in

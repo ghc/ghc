@@ -35,19 +35,17 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
              handleSourceError )
 import HsImpExp
-import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC, 
+import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName )
 import Module
 import Name
-import Packages ( ModuleExport(..), trusted, getPackageDetails, exposed,
-                  exposedModules, reexportedModules, pkgIdMap )
+import Packages ( trusted, getPackageDetails, listVisibleModuleNames, pprFlag )
 import PprTyThing
 import RdrName ( getGRE_NameQualifier_maybes )
 import SrcLoc
 import qualified Lexer
 
 import StringBuffer
-import UniqFM ( eltsUFM )
 import Outputable hiding ( printForUser, printForUserPartWay, bold )
 
 -- Other random utilities
@@ -65,8 +63,9 @@ import Util
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
 
+import Control.Monad as Monad hiding (empty)
+
 import Control.Applicative hiding (empty)
-import Control.Monad as Monad
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 
@@ -386,7 +385,6 @@ interactiveUI config srcs maybe_exprs = do
    _ <- GHC.setProgramDynFlags $
       progDynFlags { log_action = ghciLogAction lastErrLocationsRef }
 
- 
    liftIO $ when (isNothing maybe_exprs) $ do
         -- Only for GHCi (not runghc and ghc -e):
 
@@ -429,7 +427,7 @@ interactiveUI config srcs maybe_exprs = do
                    long_help          = fullHelpText config,
                    lastErrorLocations = lastErrLocationsRef
                  }
-    
+
    return ()
 
 resetLastErrorLocations :: GHCi ()
@@ -698,7 +696,7 @@ installInteractivePrint Nothing _  = return ()
 installInteractivePrint (Just ipFun) exprmode = do
   ok <- trySuccess $ do
                 (name:_) <- GHC.parseName ipFun
-                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name 
+                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
                                       in he{hsc_IC = new_ic})
                 return Succeeded
 
@@ -1605,13 +1603,13 @@ isSafeModule m = do
     liftIO $ putStrLn $ "Package Trust: " ++ (if packageTrustOn dflags then "On" else "Off")
     when (not $ null good)
          (liftIO $ putStrLn $ "Trusted package dependencies (trusted): " ++
-                        (intercalate ", " $ map packageKeyString good))
+                        (intercalate ", " $ map (showPpr dflags) good))
     case msafe && null bad of
         True -> liftIO $ putStrLn $ mname ++ " is trusted!"
         False -> do
             when (not $ null bad)
                  (liftIO $ putStrLn $ "Trusted package dependencies (untrusted): "
-                            ++ (intercalate ", " $ map packageKeyString bad))
+                            ++ (intercalate ", " $ map (showPpr dflags) bad))
             liftIO $ putStrLn $ mname ++ " is NOT trusted!"
 
   where
@@ -1619,12 +1617,11 @@ isSafeModule m = do
 
     packageTrusted dflags md
         | thisPackage dflags == modulePackageKey md = True
-        | otherwise = trusted $ getPackageDetails (pkgState dflags) (modulePackageKey md)
+        | otherwise = trusted $ getPackageDetails dflags (modulePackageKey md)
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = ([], [])
                           | otherwise = partition part deps
-        where state = pkgState dflags
-              part pkg = trusted $ getPackageDetails state pkg
+        where part pkg = trusted $ getPackageDetails dflags pkg
 
 -----------------------------------------------------------------------------
 -- :browse
@@ -1841,7 +1838,7 @@ restoreContextOnFailure do_this = do
 
 checkAdd :: InteractiveImport -> GHCi ()
 checkAdd ii = do
-  dflags <- getDynFlags 
+  dflags <- getDynFlags
   let safe = safeLanguageOn dflags
   case ii of
     IIModule modname
@@ -2149,6 +2146,17 @@ newDynFlags interactive_only minus_opts = do
                      , pkgDatabase = pkgDatabase dflags2
                      , packageFlags = packageFlags dflags2 }
 
+        let ld0length   = length $ ldInputs dflags0
+            fmrk0length = length $ cmdlineFrameworks dflags0
+
+            newLdInputs     = drop ld0length (ldInputs dflags2)
+            newCLFrameworks = drop fmrk0length (cmdlineFrameworks dflags2)
+
+        when (not (null newLdInputs && null newCLFrameworks)) $
+          liftIO $ linkCmdLineLibs $
+            dflags2 { ldInputs = newLdInputs
+                    , cmdlineFrameworks = newCLFrameworks }
+
       return ()
 
 
@@ -2334,15 +2342,9 @@ showPackages :: GHCi ()
 showPackages = do
   dflags <- getDynFlags
   let pkg_flags = packageFlags dflags
-  liftIO $ putStrLn $ showSDoc dflags $ vcat $
-    text ("active package flags:"++if null pkg_flags then " none" else "")
-    : map showFlag pkg_flags
-  where showFlag (ExposePackage   p) = text $ "  -package " ++ p
-        showFlag (HidePackage     p) = text $ "  -hide-package " ++ p
-        showFlag (IgnorePackage   p) = text $ "  -ignore-package " ++ p
-        showFlag (ExposePackageId p) = text $ "  -package-id " ++ p
-        showFlag (TrustPackage    p) = text $ "  -trust " ++ p
-        showFlag (DistrustPackage p) = text $ "  -distrust " ++ p
+  liftIO $ putStrLn $ showSDoc dflags $
+    text ("active package flags:"++if null pkg_flags then " none" else "") $$
+      nest 2 (vcat (map pprFlag pkg_flags))
 
 showPaths :: GHCi ()
 showPaths = do
@@ -2477,7 +2479,7 @@ completeIdentifier = wrapIdentCompleter $ \w -> do
 
 completeModule = wrapIdentCompleter $ \w -> do
   dflags <- GHC.getSessionDynFlags
-  let pkg_mods = allExposedModules dflags
+  let pkg_mods = allVisibleModules dflags
   loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
   return $ filter (w `isPrefixOf`)
         $ map (showPpr dflags) $ loaded_mods ++ pkg_mods
@@ -2489,7 +2491,7 @@ completeSetModule = wrapIdentCompleterWithModifier "+-" $ \m w -> do
       imports <- GHC.getContext
       return $ map iiModuleName imports
     _ -> do
-      let pkg_mods = allExposedModules dflags
+      let pkg_mods = allVisibleModules dflags
       loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
       return $ loaded_mods ++ pkg_mods
   return $ filter (w `isPrefixOf`) $ map (showPpr dflags) modules
@@ -2546,13 +2548,9 @@ wrapIdentCompleterWithModifier modifChars fun = completeWordWithPrev Nothing wor
   getModifier = find (`elem` modifChars)
 
 -- | Return a list of visible module names for autocompletion.
-allExposedModules :: DynFlags -> [ModuleName]
-allExposedModules dflags
- = concatMap extract (filter exposed (eltsUFM pkg_db))
- where
-  pkg_db = pkgIdMap (pkgState dflags)
-  extract pkg = exposedModules pkg ++ map exportName (reexportedModules pkg)
-  -- Extract the *new* name, because that's what is user visible
+-- (NB: exposed != visible)
+allVisibleModules :: DynFlags -> [ModuleName]
+allVisibleModules dflags = listVisibleModuleNames dflags
 
 completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
                         completeIdentifier
@@ -3149,7 +3147,7 @@ expandPathIO p =
         tilde <- getHomeDirectory -- will fail if HOME not defined
         return (tilde ++ '/':d)
    other ->
-        return other    
+        return other
 
 sameFile :: FilePath -> FilePath -> IO Bool
 sameFile path1 path2 = do

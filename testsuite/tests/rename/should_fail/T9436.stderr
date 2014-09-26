@@ -1,0 +1,4 @@
+
+T9436.hs:8:4:
+    Not in scope: data constructor ‘T'’
+    Perhaps you meant ‘T’ (line 5)

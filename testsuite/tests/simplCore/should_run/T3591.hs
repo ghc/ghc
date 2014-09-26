@@ -43,7 +43,7 @@
 
 module Main where
 
-import Control.Monad (liftM, liftM2, when)
+import Control.Monad (liftM, liftM2, when, ap)
 -- import Control.Monad.Identity
 
 import Debug.Trace (trace)
@@ -66,17 +66,29 @@ instance ( Functor a
       => AncestorFunctor a d where
    liftFunctor = LeftF . (trace "liftFunctor other" . liftFunctor :: a x -> d' x)
 
-
-
-
 -------------
 newtype Identity a = Identity { runIdentity :: a }
+
+instance Functor Identity where
+    fmap = liftM
+
+instance Applicative Identity where
+    pure  = return
+    (<*>) = ap
+
 instance Monad Identity where
     return a = Identity a
     m >>= k  = k (runIdentity m)
 
 newtype Trampoline m s r = Trampoline {bounce :: m (TrampolineState m s r)}
 data TrampolineState m s r = Done r | Suspend! (s (Trampoline m s r))
+
+instance (Monad m, Functor s) => Functor (Trampoline m s) where
+  fmap = liftM
+
+instance (Monad m, Functor s) => Applicative (Trampoline m s) where
+  pure  = return
+  (<*>) = ap
 
 instance (Monad m, Functor s) => Monad (Trampoline m s) where
    return x = Trampoline (return (Done x))

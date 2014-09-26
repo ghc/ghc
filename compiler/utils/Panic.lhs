@@ -35,9 +35,6 @@ import Exception
 
 import Control.Concurrent
 import Data.Dynamic
-#if __GLASGOW_HASKELL__ < 705
-import Data.Maybe
-#endif
 import Debug.Trace        ( trace )
 import System.IO.Unsafe
 import System.Exit
@@ -52,10 +49,7 @@ import GHC.ConsoleHandler
 #endif
 
 import GHC.Stack
-
-#if __GLASGOW_HASKELL__ >= 705
 import System.Mem.Weak  ( Weak, deRefWeak )
-#endif
 
 -- | GHC's own exception type
 --   error messages all take the form:
@@ -286,7 +280,6 @@ installSignalHandlers = do
   return ()
 #endif
 
-#if __GLASGOW_HASKELL__ >= 705
 {-# NOINLINE interruptTargetThread #-}
 interruptTargetThread :: MVar [Weak ThreadId]
 interruptTargetThread = unsafePerformIO (newMVar [])
@@ -306,19 +299,6 @@ peekInterruptTargetThread =
      case r of
        Nothing -> loop ts
        Just t  -> return (Just t)
-#else
-{-# NOINLINE interruptTargetThread #-}
-interruptTargetThread :: MVar [ThreadId]
-interruptTargetThread = unsafePerformIO (newMVar [])
-
-pushInterruptTargetThread :: ThreadId -> IO ()
-pushInterruptTargetThread tid = do
- modifyMVar_ interruptTargetThread $ return . (tid :)
-
-peekInterruptTargetThread :: IO (Maybe ThreadId)
-peekInterruptTargetThread =
-  withMVar interruptTargetThread $ return . listToMaybe
-#endif
 
 popInterruptTargetThread :: IO ()
 popInterruptTargetThread =

@@ -43,7 +43,7 @@ module DynFlags (
         targetRetainsAllBindings,
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
-        PackageFlag(..),
+        PackageFlag(..), PackageArg(..), ModRenaming,
         PkgConfRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
@@ -61,7 +61,7 @@ module DynFlags (
         safeHaskellOn, safeImportsOn, safeLanguageOn, safeInferOn,
         packageTrustOn,
         safeDirectImpsReq, safeImplicitImpsReq,
-        unsafeFlags,
+        unsafeFlags, unsafeFlagsForInfer,
 
         -- ** System tool settings and locations
         Settings(..),
@@ -90,7 +90,7 @@ module DynFlags (
         getVerbFlags,
         updOptLevel,
         setTmpDir,
-        setPackageName,
+        setPackageKey,
 
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
@@ -190,6 +190,8 @@ import Data.Word
 import System.FilePath
 import System.IO
 import System.IO.Error
+import Text.ParserCombinators.ReadP hiding (char)
+import Text.ParserCombinators.ReadP as R
 
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
@@ -269,6 +271,7 @@ data DumpFlag
    | Opt_D_dump_hi
    | Opt_D_dump_hi_diffs
    | Opt_D_dump_mod_cycles
+   | Opt_D_dump_mod_map
    | Opt_D_dump_view_pattern_commoning
    | Opt_D_verbose_core2core
 
@@ -300,6 +303,7 @@ data GeneralFlag
    | Opt_FullLaziness
    | Opt_FloatIn
    | Opt_Specialise
+   | Opt_SpecialiseAggressively
    | Opt_StaticArgumentTransformation
    | Opt_CSE
    | Opt_LiberateCase
@@ -448,6 +452,7 @@ data WarningFlag =
    | Opt_WarnUnusedBinds
    | Opt_WarnUnusedImports
    | Opt_WarnUnusedMatches
+   | Opt_WarnContextQuantification
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnAMP
@@ -480,7 +485,6 @@ data SafeHaskellMode
    | Sf_Unsafe
    | Sf_Trustworthy
    | Sf_Safe
-   | Sf_SafeInferred
    deriving (Eq)
 
 instance Show SafeHaskellMode where
@@ -488,7 +492,6 @@ instance Show SafeHaskellMode where
     show Sf_Unsafe       = "Unsafe"
     show Sf_Trustworthy  = "Trustworthy"
     show Sf_Safe         = "Safe"
-    show Sf_SafeInferred = "Safe-Inferred"
 
 instance Outputable SafeHaskellMode where
     ppr = text . show
@@ -737,11 +740,14 @@ data DynFlags = DynFlags {
   language              :: Maybe Language,
   -- | Safe Haskell mode
   safeHaskell           :: SafeHaskellMode,
+  safeInfer             :: Bool,
+  safeInferred          :: Bool,
   -- We store the location of where some extension and flags were turned on so
   -- we can produce accurate error messages when Safe Haskell fails due to
   -- them.
   thOnLoc               :: SrcSpan,
   newDerivOnLoc         :: SrcSpan,
+  overlapInstLoc        :: SrcSpan,
   pkgTrustOnLoc         :: SrcSpan,
   warnSafeOnLoc         :: SrcSpan,
   warnUnsafeOnLoc       :: SrcSpan,
@@ -1019,9 +1025,15 @@ isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True
 isNoLink _      = False
 
+data PackageArg = PackageArg String
+                | PackageIdArg String
+                | PackageKeyArg String
+  deriving (Eq, Show)
+
+type ModRenaming = Maybe [(String, String)]
+
 data PackageFlag
-  = ExposePackage   String
-  | ExposePackageId String
+  = ExposePackage   PackageArg ModRenaming
   | HidePackage     String
   | IgnorePackage   String
   | TrustPackage    String
@@ -1416,9 +1428,12 @@ defaultDynFlags mySettings =
         warningFlags = IntSet.fromList (map fromEnum standardWarnings),
         ghciScripts = [],
         language = Nothing,
-        safeHaskell = Sf_SafeInferred,
+        safeHaskell = Sf_None,
+        safeInfer   = True,
+        safeInferred = True,
         thOnLoc = noSrcSpan,
         newDerivOnLoc = noSrcSpan,
+        overlapInstLoc = noSrcSpan,
         pkgTrustOnLoc = noSrcSpan,
         warnSafeOnLoc = noSrcSpan,
         warnUnsafeOnLoc = noSrcSpan,
@@ -1625,6 +1640,7 @@ dopt f dflags = (fromEnum f `IntSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_dump_ticked                 = False
           enableIfVerbose Opt_D_dump_view_pattern_commoning = False
           enableIfVerbose Opt_D_dump_mod_cycles             = False
+          enableIfVerbose Opt_D_dump_mod_map                = False
           enableIfVerbose _                                 = True
 
 -- | Set a 'DumpFlag'
@@ -1701,7 +1717,7 @@ packageTrustOn = gopt Opt_PackageTrust
 
 -- | Is Safe Haskell on in some way (including inference mode)
 safeHaskellOn :: DynFlags -> Bool
-safeHaskellOn dflags = safeHaskell dflags /= Sf_None
+safeHaskellOn dflags = safeHaskell dflags /= Sf_None || safeInferOn dflags
 
 -- | Is the Safe Haskell safe language in use
 safeLanguageOn :: DynFlags -> Bool
@@ -1709,7 +1725,7 @@ safeLanguageOn dflags = safeHaskell dflags == Sf_Safe
 
 -- | Is the Safe Haskell safe inference mode active
 safeInferOn :: DynFlags -> Bool
-safeInferOn dflags = safeHaskell dflags == Sf_SafeInferred
+safeInferOn = safeInfer
 
 -- | Test if Safe Imports are on in some form
 safeImportsOn :: DynFlags -> Bool
@@ -1723,7 +1739,11 @@ setSafeHaskell s = updM f
     where f dfs = do
               let sf = safeHaskell dfs
               safeM <- combineSafeFlags sf s
-              return $ dfs { safeHaskell = safeM }
+              return $ case (s == Sf_Safe || s == Sf_Unsafe) of
+                True  -> dfs { safeHaskell = safeM, safeInfer = False }
+                -- leave safe inferrence on in Trustworthy mode so we can warn
+                -- if it could have been inferred safe.
+                False -> dfs { safeHaskell = safeM }
 
 -- | Are all direct imports required to be safe for this Safe Haskell mode?
 -- Direct imports are when the code explicitly imports a module
@@ -1740,9 +1760,7 @@ safeImplicitImpsReq d = safeLanguageOn d
 -- want to export this functionality from the module but do want to export the
 -- type constructors.
 combineSafeFlags :: SafeHaskellMode -> SafeHaskellMode -> DynP SafeHaskellMode
-combineSafeFlags a b | a == Sf_SafeInferred = return b
-                     | b == Sf_SafeInferred = return a
-                     | a == Sf_None         = return b
+combineSafeFlags a b | a == Sf_None         = return b
                      | b == Sf_None         = return a
                      | a == b               = return a
                      | otherwise            = addErr errm >> return (panic errm)
@@ -1754,13 +1772,19 @@ combineSafeFlags a b | a == Sf_SafeInferred = return b
 --     * function to get srcspan that enabled the flag
 --     * function to test if the flag is on
 --     * function to turn the flag off
-unsafeFlags :: [(String, DynFlags -> SrcSpan, DynFlags -> Bool, DynFlags -> DynFlags)]
+unsafeFlags, unsafeFlagsForInfer
+  :: [(String, DynFlags -> SrcSpan, DynFlags -> Bool, DynFlags -> DynFlags)]
 unsafeFlags = [("-XGeneralizedNewtypeDeriving", newDerivOnLoc,
                    xopt Opt_GeneralizedNewtypeDeriving,
                    flip xopt_unset Opt_GeneralizedNewtypeDeriving),
                ("-XTemplateHaskell", thOnLoc,
                    xopt Opt_TemplateHaskell,
                    flip xopt_unset Opt_TemplateHaskell)]
+unsafeFlagsForInfer = unsafeFlags ++
+              -- TODO: Can we do better than this for inference?
+              [("-XOverlappingInstances", overlapInstLoc,
+                  xopt Opt_OverlappingInstances,
+                  flip xopt_unset Opt_OverlappingInstances)]
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
@@ -2042,43 +2066,41 @@ updateWays dflags
 -- The bool is to indicate if we are parsing command line flags (false means
 -- file pragma). This allows us to generate better warnings.
 safeFlagCheck :: Bool -> DynFlags -> (DynFlags, [Located String])
-safeFlagCheck _  dflags | not (safeLanguageOn dflags || safeInferOn dflags)
-                        = (dflags, [])
+safeFlagCheck _ dflags | safeLanguageOn dflags = (dflagsUnset, warns)
+  where
+    -- Handle illegal flags under safe language.
+    (dflagsUnset, warns) = foldl check_method (dflags, []) unsafeFlags
 
--- safe or safe-infer ON
+    check_method (df, warns) (str,loc,test,fix)
+        | test df   = (fix df, warns ++ safeFailure (loc df) str)
+        | otherwise = (df, warns)
+
+    safeFailure loc str
+       = [L loc $ str ++ " is not allowed in Safe Haskell; ignoring "
+           ++ str]
+
 safeFlagCheck cmdl dflags =
-    case safeLanguageOn dflags of
-        True -> (dflags', warns)
+  case (safeInferOn dflags) of
+    True | safeFlags -> (dflags', warn)
+    True             -> (dflags' { safeInferred = False }, warn)
+    False            -> (dflags', warn)
 
-        -- throw error if -fpackage-trust by itself with no safe haskell flag
-        False | not cmdl && packageTrustOn dflags
-              -> (gopt_unset dflags' Opt_PackageTrust,
-                  [L (pkgTrustOnLoc dflags') $
-                      "-fpackage-trust ignored;" ++
-                      " must be specified with a Safe Haskell flag"]
-                  )
+  where
+    -- dynflags and warn for when -fpackage-trust by itself with no safe
+    -- haskell flag
+    (dflags', warn)
+      | safeHaskell dflags == Sf_None && not cmdl && packageTrustOn dflags
+      = (gopt_unset dflags Opt_PackageTrust, pkgWarnMsg)
+      | otherwise = (dflags, [])
 
-        False | null warns && safeInfOk
-              -> (dflags', [])
+    pkgWarnMsg = [L (pkgTrustOnLoc dflags') $
+                    "-fpackage-trust ignored;" ++
+                    " must be specified with a Safe Haskell flag"]
 
-              | otherwise
-              -> (dflags' { safeHaskell = Sf_None }, [])
-                -- Have we inferred Unsafe?
-                -- See Note [HscMain . Safe Haskell Inference]
-    where
-        -- TODO: Can we do better than this for inference?
-        safeInfOk = not $ xopt Opt_OverlappingInstances dflags
+    safeFlags = all (\(_,_,t,_) -> not $ t dflags) unsafeFlagsForInfer
+    -- Have we inferred Unsafe?
+    -- See Note [HscMain . Safe Haskell Inference]
 
-        (dflags', warns) = foldl check_method (dflags, []) unsafeFlags
-
-        check_method (df, warns) (str,loc,test,fix)
-            | test df   = (apFix fix df, warns ++ safeFailure (loc dflags) str)
-            | otherwise = (df, warns)
-
-        apFix f = if safeInferOn dflags then id else f
-
-        safeFailure loc str
-           = [L loc $ str ++ " is not allowed in Safe Haskell; ignoring " ++ str]
 
 {- **********************************************************************
 %*                                                                      *
@@ -2155,8 +2177,15 @@ dynamic_flags = [
         ----- Linker --------------------------------------------------------
   , Flag "static"         (NoArg removeWayDyn)
   , Flag "dynamic"        (NoArg (addWay WayDyn))
+  , Flag "rdynamic" $ noArg $
+#ifdef linux_HOST_OS
+                              addOptl "-rdynamic"
+#elif defined (mingw32_HOST_OS)
+                              addOptl "-export-all-symbols"
+#else
     -- ignored for compat w/ gcc:
-  , Flag "rdynamic"       (NoArg (return ()))
+                              id
+#endif
   , Flag "relative-dynlib-paths"  (NoArg (setGeneralFlag Opt_RelativeDynlibPaths))
 
         ------- Specific phases  --------------------------------------------
@@ -2363,6 +2392,7 @@ dynamic_flags = [
   , Flag "ddump-hpc"               (setDumpFlag Opt_D_dump_ticked) -- back compat
   , Flag "ddump-ticked"            (setDumpFlag Opt_D_dump_ticked)
   , Flag "ddump-mod-cycles"        (setDumpFlag Opt_D_dump_mod_cycles)
+  , Flag "ddump-mod-map"           (setDumpFlag Opt_D_dump_mod_map)
   , Flag "ddump-view-pattern-commoning" (setDumpFlag Opt_D_dump_view_pattern_commoning)
   , Flag "ddump-to-file"           (NoArg (setGeneralFlag Opt_DumpToFile))
   , Flag "ddump-hi-diffs"          (setDumpFlag Opt_D_dump_hi_diffs)
@@ -2477,7 +2507,7 @@ dynamic_flags = [
 
         ------ Safe Haskell flags -------------------------------------------
   , Flag "fpackage-trust"   (NoArg setPackageTrust)
-  , Flag "fno-safe-infer"   (NoArg (setSafeHaskell Sf_None))
+  , Flag "fno-safe-infer"   (noArg (\d -> d { safeInfer = False  } ))
   , Flag "fPIC"             (NoArg (setGeneralFlag Opt_PIC))
   , Flag "fno-PIC"          (NoArg (unSetGeneralFlag Opt_PIC))
  ]
@@ -2516,9 +2546,13 @@ package_flags = [
                                     removeUserPkgConf
                                     deprecate "Use -no-user-package-db instead")
 
-  , Flag "package-name"          (hasArg setPackageName)
+  , Flag "package-name"          (HasArg $ \name -> do
+                                    upd (setPackageKey name)
+                                    deprecate "Use -this-package-key instead")
+  , Flag "this-package-key"      (hasArg setPackageKey)
   , Flag "package-id"            (HasArg exposePackageId)
   , Flag "package"               (HasArg exposePackage)
+  , Flag "package-key"           (HasArg exposePackageKey)
   , Flag "hide-package"          (HasArg hidePackage)
   , Flag "hide-all-packages"     (NoArg (setGeneralFlag Opt_HideAllPackages))
   , Flag "ignore-package"        (HasArg ignorePackage)
@@ -2591,6 +2625,7 @@ fWarningFlags = [
   ( "warn-unused-binds",                Opt_WarnUnusedBinds, nop ),
   ( "warn-unused-imports",              Opt_WarnUnusedImports, nop ),
   ( "warn-unused-matches",              Opt_WarnUnusedMatches, nop ),
+  ( "warn-context-quantification",      Opt_WarnContextQuantification, nop ),
   ( "warn-warnings-deprecations",       Opt_WarnWarningsDeprecations, nop ),
   ( "warn-deprecations",                Opt_WarnWarningsDeprecations, nop ),
   ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, nop ),
@@ -2639,6 +2674,7 @@ fFlags = [
   ( "strictness",                       Opt_Strictness, nop ),
   ( "late-dmd-anal",                    Opt_LateDmdAnal, nop ),
   ( "specialise",                       Opt_Specialise, nop ),
+  ( "specialise-aggressively",          Opt_SpecialiseAggressively, nop ),
   ( "float-in",                         Opt_FloatIn, nop ),
   ( "static-argument-transformation",   Opt_StaticArgumentTransformation, nop ),
   ( "full-laziness",                    Opt_FullLaziness, nop ),
@@ -2871,7 +2907,7 @@ xFlags = [
     deprecatedForExtension "MultiParamTypeClasses" ),
   ( "FunctionalDependencies",           Opt_FunctionalDependencies, nop ),
   ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, setGenDeriving ),
-  ( "OverlappingInstances",             Opt_OverlappingInstances, 
+  ( "OverlappingInstances",             Opt_OverlappingInstances,
     \ turn_on -> when turn_on
                $ deprecate "instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS" ),
   ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
@@ -2962,7 +2998,7 @@ impliedFlags
     , (Opt_ImplicitParams, turnOn, Opt_FlexibleInstances)
 
     , (Opt_JavaScriptFFI, turnOn, Opt_InterruptibleFFI)
-    
+
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFunctor)
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
   ]
@@ -3036,7 +3072,8 @@ standardWarnings
         Opt_WarnDodgyForeignImports,
         Opt_WarnInlineRuleShadowing,
         Opt_WarnAlternativeLayoutRuleTransitional,
-        Opt_WarnUnsupportedLlvmVersion
+        Opt_WarnUnsupportedLlvmVersion,
+        Opt_WarnContextQuantification
       ]
 
 minusWOpts :: [WarningFlag]
@@ -3328,11 +3365,39 @@ removeGlobalPkgConf = upd $ \s -> s { extraPkgConfs = filter isNotGlobal . extra
 clearPkgConf :: DynP ()
 clearPkgConf = upd $ \s -> s { extraPkgConfs = const [] }
 
-exposePackage, exposePackageId, hidePackage, ignorePackage,
+parsePackageFlag :: (String -> PackageArg) -- type of argument
+                 -> String                 -- string to parse
+                 -> PackageFlag
+parsePackageFlag constr str = case filter ((=="").snd) (readP_to_S parse str) of
+    [(r, "")] -> r
+    _ -> throwGhcException $ CmdLineError ("Can't parse package flag: " ++ str)
+  where parse = do
+            pkg <- munch1 (\c -> isAlphaNum c || c `elem` ":-_.")
+            (do _ <- tok $ R.char '('
+                rns <- tok $ sepBy parseItem (tok $ R.char ',')
+                _ <- tok $ R.char ')'
+                return (ExposePackage (constr pkg) (Just rns))
+              +++
+             return (ExposePackage (constr pkg) Nothing))
+        parseMod = munch1 (\c -> isAlphaNum c || c `elem` ".")
+        parseItem = do
+            orig <- tok $ parseMod
+            (do _ <- tok $ string "as"
+                new <- tok $ parseMod
+                return (orig, new)
+              +++
+             return (orig, orig))
+        tok m = skipSpaces >> m
+
+exposePackage, exposePackageId, exposePackageKey, hidePackage, ignorePackage,
         trustPackage, distrustPackage :: String -> DynP ()
 exposePackage p = upd (exposePackage' p)
 exposePackageId p =
-  upd (\s -> s{ packageFlags = ExposePackageId p : packageFlags s })
+  upd (\s -> s{ packageFlags =
+    parsePackageFlag PackageIdArg p : packageFlags s })
+exposePackageKey p =
+  upd (\s -> s{ packageFlags =
+    parsePackageFlag PackageKeyArg p : packageFlags s })
 hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p =
@@ -3344,10 +3409,11 @@ distrustPackage p = exposePackage p >>
 
 exposePackage' :: String -> DynFlags -> DynFlags
 exposePackage' p dflags
-    = dflags { packageFlags = ExposePackage p : packageFlags dflags }
+    = dflags { packageFlags =
+            parsePackageFlag PackageArg p : packageFlags dflags }
 
-setPackageName :: String -> DynFlags -> DynFlags
-setPackageName p s =  s{ thisPackage = stringToPackageKey p }
+setPackageKey :: String -> DynFlags -> DynFlags
+setPackageKey p s =  s{ thisPackage = stringToPackageKey p }
 
 -- If we're linking a binary, then only targets that produce object
 -- code are allowed (requests for other target types are ignored).
@@ -3590,6 +3656,7 @@ compilerInfo dflags
        ("Support dynamic-too",         if isWindows then "NO" else "YES"),
        ("Support parallel --make",     "YES"),
        ("Support reexported-modules",  "YES"),
+       ("Uses package keys",           "YES"),
        ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
                                        then "YES" else "NO"),
        ("GHC Dynamic",                 if dynamicGhc

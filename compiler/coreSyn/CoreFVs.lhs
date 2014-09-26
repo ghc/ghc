@@ -23,7 +23,7 @@ module CoreFVs (
         varTypeTyVars, 
         idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
-        ruleRhsFreeVars, rulesFreeVars,
+        ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
         ruleLhsOrphNames, ruleLhsFreeIds,
         vectsFreeVars,
 
@@ -78,11 +78,11 @@ exprFreeIds = exprSomeFreeVars isLocalId
 
 -- | Find all locally-defined free Ids or type variables in several expressions
 exprsFreeVars :: [CoreExpr] -> VarSet
-exprsFreeVars = foldr (unionVarSet . exprFreeVars) emptyVarSet
+exprsFreeVars = mapUnionVarSet exprFreeVars
 
 -- | Find all locally defined free Ids in a binding group
 bindFreeVars :: CoreBind -> VarSet
-bindFreeVars (NonRec _ r) = exprFreeVars r
+bindFreeVars (NonRec b r) = rhs_fvs (b,r) isLocalVar emptyVarSet
 bindFreeVars (Rec prs)    = addBndrs (map fst prs)
                                      (foldr (union . rhs_fvs) noVars prs)
                                      isLocalVar emptyVarSet
@@ -97,7 +97,7 @@ exprSomeFreeVars fv_cand e = expr_fvs e fv_cand emptyVarSet
 exprsSomeFreeVars :: InterestingVarFun  -- Says which 'Var's are interesting
                   -> [CoreExpr]
                   -> VarSet
-exprsSomeFreeVars fv_cand = foldr (unionVarSet . exprSomeFreeVars fv_cand) emptyVarSet
+exprsSomeFreeVars fv_cand = mapUnionVarSet (exprSomeFreeVars fv_cand)
 
 -- | Predicate on possible free variables: returns @True@ iff the variable is interesting
 type InterestingVarFun = Var -> Bool
@@ -294,7 +294,7 @@ ruleFreeVars (Rule { ru_fn = _, ru_bndrs = bndrs, ru_rhs = rhs, ru_args = args }
 idRuleRhsVars :: (Activation -> Bool) -> Id -> VarSet
 -- Just the variables free on the *rhs* of a rule
 idRuleRhsVars is_active id
-  = foldr (unionVarSet . get_fvs) emptyVarSet (idCoreRules id)
+  = mapUnionVarSet get_fvs (idCoreRules id)
   where
     get_fvs (Rule { ru_fn = fn, ru_bndrs = bndrs
                   , ru_rhs = rhs, ru_act = act })
@@ -307,7 +307,7 @@ idRuleRhsVars is_active id
 
 -- | Those variables free in the right hand side of several rules
 rulesFreeVars :: [CoreRule] -> VarSet
-rulesFreeVars rules = foldr (unionVarSet . ruleFreeVars) emptyVarSet rules
+rulesFreeVars rules = mapUnionVarSet ruleFreeVars rules
 
 ruleLhsFreeIds :: CoreRule -> VarSet
 -- ^ This finds all locally-defined free Ids on the left hand side of a rule
@@ -330,7 +330,7 @@ breaker, which is perfectly inlinable.
 \begin{code}
 -- |Free variables of a vectorisation declaration
 vectsFreeVars :: [CoreVect] -> VarSet
-vectsFreeVars = foldr (unionVarSet . vectFreeVars) emptyVarSet
+vectsFreeVars = mapUnionVarSet vectFreeVars
   where
     vectFreeVars (Vect   _ rhs)   = expr_fvs rhs isLocalId emptyVarSet
     vectFreeVars (NoVect _)       = noFVs

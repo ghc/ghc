@@ -6,7 +6,7 @@
 -- Module      :  System.IO.Error
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -30,9 +30,9 @@ module System.IO.Error (
     isAlreadyExistsError,
     isDoesNotExistError,
     isAlreadyInUseError,
-    isFullError, 
+    isFullError,
     isEOFError,
-    isIllegalOperation, 
+    isIllegalOperation,
     isPermissionError,
     isUserError,
 
@@ -57,7 +57,7 @@ module System.IO.Error (
     alreadyInUseErrorType,
     fullErrorType,
     eofErrorType,
-    illegalOperationErrorType, 
+    illegalOperationErrorType,
     permissionErrorType,
     userErrorType,
 
@@ -65,11 +65,11 @@ module System.IO.Error (
     isAlreadyExistsErrorType,
     isDoesNotExistErrorType,
     isAlreadyInUseErrorType,
-    isFullErrorType, 
+    isFullErrorType,
     isEOFErrorType,
-    isIllegalOperationErrorType, 
+    isIllegalOperationErrorType,
     isPermissionErrorType,
-    isUserErrorType, 
+    isUserErrorType,
 
     -- * Throwing and catching I\/O errors
 
@@ -113,11 +113,11 @@ tryIOError f   =  catch (do r <- f
 -- error if applicable.
 mkIOError :: IOErrorType -> String -> Maybe Handle -> Maybe FilePath -> IOError
 mkIOError t location maybe_hdl maybe_filename =
-               IOError{ ioe_type = t, 
+               IOError{ ioe_type = t,
                         ioe_location = location,
                         ioe_description = "",
                         ioe_errno = Nothing,
-                        ioe_handle = maybe_hdl, 
+                        ioe_handle = maybe_hdl,
                         ioe_filename = maybe_filename
                         }
 
@@ -302,18 +302,14 @@ modifyIOError f io = catch io (\e -> ioError (f e))
 -- | Adds a location description and maybe a file path and file handle
 -- to an 'IOError'.  If any of the file handle or file path is not given
 -- the corresponding value in the 'IOError' remains unaltered.
-annotateIOError :: IOError 
-              -> String 
-              -> Maybe Handle 
-              -> Maybe FilePath 
-              -> IOError 
-annotateIOError ioe loc hdl path = 
+annotateIOError :: IOError
+              -> String
+              -> Maybe Handle
+              -> Maybe FilePath
+              -> IOError
+annotateIOError ioe loc hdl path =
   ioe{ ioe_handle = hdl `mplus` ioe_handle ioe,
        ioe_location = loc, ioe_filename = path `mplus` ioe_filename ioe }
-  where
-    mplus :: Maybe a -> Maybe a -> Maybe a
-    Nothing `mplus` ys = ys
-    xs      `mplus` _  = xs
 
 -- | The 'catchIOError' function establishes a handler that receives any
 -- 'IOError' raised in the action protected by 'catchIOError'.

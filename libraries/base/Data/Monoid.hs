@@ -46,50 +46,12 @@ import GHC.Num
 import GHC.Read
 import GHC.Show
 import GHC.Generics
-import Data.Maybe
-import Data.Proxy
 
 {-
 -- just for testing
 import Data.Maybe
 import Test.QuickCheck
 -- -}
-
--- ---------------------------------------------------------------------------
--- | The class of monoids (types with an associative binary operation that
--- has an identity).  Instances should satisfy the following laws:
---
---  * @mappend mempty x = x@
---
---  * @mappend x mempty = x@
---
---  * @mappend x (mappend y z) = mappend (mappend x y) z@
---
---  * @mconcat = 'foldr' mappend mempty@
---
--- The method names refer to the monoid of lists under concatenation,
--- but there are many other instances.
---
--- Minimal complete definition: 'mempty' and 'mappend'.
---
--- Some types can be viewed as a monoid in more than one way,
--- e.g. both addition and multiplication on numbers.
--- In such cases we often define @newtype@s and make those instances
--- of 'Monoid', e.g. 'Sum' and 'Product'.
-
-class Monoid a where
-        mempty  :: a
-        -- ^ Identity of 'mappend'
-        mappend :: a -> a -> a
-        -- ^ An associative operation
-        mconcat :: [a] -> a
-
-        -- ^ Fold a list using the monoid.
-        -- For most types, the default definition for 'mconcat' will be
-        -- used, but the function is included in the class definition so
-        -- that an optimized version can be provided for specific types.
-
-        mconcat = foldr mappend mempty
 
 infixr 6 <>
 
@@ -101,55 +63,6 @@ infixr 6 <>
 {-# INLINE (<>) #-}
 
 -- Monoid instances.
-
-instance Monoid [a] where
-        mempty  = []
-        mappend = (++)
-
-instance Monoid b => Monoid (a -> b) where
-        mempty _ = mempty
-        mappend f g x = f x `mappend` g x
-
-instance Monoid () where
-        -- Should it be strict?
-        mempty        = ()
-        _ `mappend` _ = ()
-        mconcat _     = ()
-
-instance (Monoid a, Monoid b) => Monoid (a,b) where
-        mempty = (mempty, mempty)
-        (a1,b1) `mappend` (a2,b2) =
-                (a1 `mappend` a2, b1 `mappend` b2)
-
-instance (Monoid a, Monoid b, Monoid c) => Monoid (a,b,c) where
-        mempty = (mempty, mempty, mempty)
-        (a1,b1,c1) `mappend` (a2,b2,c2) =
-                (a1 `mappend` a2, b1 `mappend` b2, c1 `mappend` c2)
-
-instance (Monoid a, Monoid b, Monoid c, Monoid d) => Monoid (a,b,c,d) where
-        mempty = (mempty, mempty, mempty, mempty)
-        (a1,b1,c1,d1) `mappend` (a2,b2,c2,d2) =
-                (a1 `mappend` a2, b1 `mappend` b2,
-                 c1 `mappend` c2, d1 `mappend` d2)
-
-instance (Monoid a, Monoid b, Monoid c, Monoid d, Monoid e) =>
-                Monoid (a,b,c,d,e) where
-        mempty = (mempty, mempty, mempty, mempty, mempty)
-        (a1,b1,c1,d1,e1) `mappend` (a2,b2,c2,d2,e2) =
-                (a1 `mappend` a2, b1 `mappend` b2, c1 `mappend` c2,
-                 d1 `mappend` d2, e1 `mappend` e2)
-
--- lexicographical ordering
-instance Monoid Ordering where
-        mempty         = EQ
-        LT `mappend` _ = LT
-        EQ `mappend` y = y
-        GT `mappend` _ = GT
-
-instance Monoid (Proxy s) where
-    mempty = Proxy
-    mappend _ _ = Proxy
-    mconcat _ = Proxy
 
 -- | The dual of a monoid, obtained by swapping the arguments of 'mappend'.
 newtype Dual a = Dual { getDual :: a }
@@ -230,18 +143,6 @@ instance Num a => Monoid (Product a) where
 --      Just (combine key value oldValue))
 -- @
 
--- | Lift a semigroup into 'Maybe' forming a 'Monoid' according to
--- <http://en.wikipedia.org/wiki/Monoid>: \"Any semigroup @S@ may be
--- turned into a monoid simply by adjoining an element @e@ not in @S@
--- and defining @e*e = e@ and @e*s = s = s*e@ for all @s ∈ S@.\" Since
--- there is no \"Semigroup\" typeclass providing just 'mappend', we
--- use 'Monoid' instead.
-instance Monoid a => Monoid (Maybe a) where
-  mempty = Nothing
-  Nothing `mappend` m = m
-  m `mappend` Nothing = m
-  Just m1 `mappend` Just m2 = Just (m1 `mappend` m2)
-
 
 -- | Maybe monoid returning the leftmost non-Nothing value.
 newtype First a = First { getFirst :: Maybe a }
@@ -254,6 +155,10 @@ instance Monoid (First a) where
 
 instance Functor First where
         fmap f (First x) = First (fmap f x)
+
+instance Applicative First where
+        pure x = First (Just x)
+        First x <*> First y = First (x <*> y)
 
 instance Monad First where
         return x = First (Just x)
@@ -270,6 +175,10 @@ instance Monoid (Last a) where
 
 instance Functor Last where
         fmap f (Last x) = Last (fmap f x)
+
+instance Applicative Last where
+        pure x = Last (Just x)
+        Last x <*> Last y = Last (x <*> y)
 
 instance Monad Last where
         return x = Last (Just x)

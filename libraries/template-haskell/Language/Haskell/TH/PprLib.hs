@@ -38,7 +38,6 @@ module Language.Haskell.TH.PprLib (
 import Language.Haskell.TH.Syntax
     (Name(..), showName', NameFlavour(..), NameIs(..))
 import qualified Text.PrettyPrint as HPJ
-import Control.Applicative (Applicative(..))
 import Control.Monad (liftM, liftM2, ap)
 import Language.Haskell.TH.Lib.Map ( Map )
 import qualified Language.Haskell.TH.Lib.Map as Map ( lookup, insert, empty )

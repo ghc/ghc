@@ -58,6 +58,9 @@ cabal05: clean
 	cd s && $(SETUP) clean
 	cd s && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
 	cd s && $(SETUP) build
+	cd t && $(SETUP) clean
+	cd t && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
+	! (cd t && $(SETUP) build)
 ifneq "$(CLEANUP)" ""
 	$(MAKE) clean
 endif
@@ -66,4 +69,4 @@ clean :
 	'$(GHC_PKG)' unregister --force p >/dev/null 2>&1 || true
 	'$(GHC_PKG)' unregister --force q >/dev/null 2>&1 || true
 	'$(GHC_PKG)' unregister --force r >/dev/null 2>&1 || true
-	$(RM) -r p-* q-* r-* tmp.d *.o *.hi */*.o */*.hi */Setup$(exeext) */dist Setup$(exeext)
+	$(RM) -r p-* q-* r-* s-* t-* tmp.d *.o *.hi */*.o */*.hi */Setup$(exeext) */dist Setup$(exeext)

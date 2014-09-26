@@ -5,6 +5,7 @@ module Main(main) where
 import Control.Monad.Fix
 import Control.Monad.ST
 import Data.STRef
+import Prelude hiding (traverse)
 
 newtype Node s a = N (STRef s Bool, Node s a, a, Node s a)
 
@@ -22,7 +23,7 @@ ll = mdo n0 <- newNode n3 0 n1
 data Direction = Forward | Backward deriving Eq
 
 traverse                      :: Direction -> Node s a -> ST s [a]
-traverse dir (N (v, b, i, f)) = 
+traverse dir (N (v, b, i, f)) =
        do visited <- readSTRef v
           if visited
              then return []
@@ -43,14 +44,14 @@ l2dll' p (x:xs) = mdo c <- newNode p x f
                       return (c, l)
 
 insertAfter :: Node s a -> a -> ST s (Node s a)
-insertAfter cur@(N (v, prev, val, next)) i 
+insertAfter cur@(N (v, prev, val, next)) i
      = do vis <- newSTRef False
           let newCell = N (vis, cur, i, next)
-	  return (N (v, prev, val, newCell))
+          return (N (v, prev, val, newCell))
 
-test = runST (do l   <- l2dll [1 .. 10] 
-                 l'  <- insertAfter l  12 
-		 l'' <- insertAfter l' 13 
-		 traverse Forward l'')
+test = runST (do l   <- l2dll [1 .. 10]
+                 l'  <- insertAfter l  12
+                 l'' <- insertAfter l' 13
+                 traverse Forward l'')
 
 main = print test

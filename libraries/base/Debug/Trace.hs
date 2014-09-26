@@ -1,12 +1,14 @@
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Debug.Trace
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -35,23 +37,23 @@ module Debug.Trace (
         -- $eventlog_tracing
         traceEvent,
         traceEventIO,
-        
+
         -- * Execution phase markers
         -- $markers
         traceMarker,
         traceMarkerIO,
   ) where
 
-import Prelude
 import System.IO.Unsafe
-import Control.Monad
 
 import Foreign.C.String
 import GHC.Base
 import qualified GHC.Foreign
 import GHC.IO.Encoding
 import GHC.Ptr
+import GHC.Show
 import GHC.Stack
+import Data.List
 
 -- $tracing
 --
@@ -70,9 +72,15 @@ import GHC.Stack
 -- /Since: 4.5.0.0/
 traceIO :: String -> IO ()
 traceIO msg = do
-    withCString "%s\n" $ \cfmt ->
-     withCString msg  $ \cmsg ->
+    withCString "%s\n" $ \cfmt -> do
+     -- NB: debugBelch can't deal with null bytes, so filter them
+     -- out so we don't accidentally truncate the message.  See Trac #9395
+     let (nulls, msg') = partition (=='\0') msg
+     withCString msg' $ \cmsg ->
       debugBelch cfmt cmsg
+     when (not (null nulls)) $
+       withCString "WARNING: previous trace message had null bytes" $ \cmsg ->
+         debugBelch cfmt cmsg
 
 -- don't use debugBelch() directly, because we cannot call varargs functions
 -- using the FFI.
@@ -238,7 +246,7 @@ traceEventIO msg =
 --
 -- Markers let us do this: we can annotate the program to emit a marker at
 -- an appropriate point during execution and then see that in a profile.
--- 
+--
 -- Currently this feature is only supported in GHC by the eventlog tracing
 -- system, but in future it may also be supported by the heap profiling or
 -- other profiling tools. These function exists for other Haskell

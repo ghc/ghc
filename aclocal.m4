@@ -473,18 +473,18 @@ AC_DEFUN([FP_SETTINGS],
         SettingsWindresCommand="/bin/false"
         SettingsLibtoolCommand="libtool"
         SettingsTouchCommand='touch'
-        if test -z "$LlcCmd"
-        then
-          SettingsLlcCommand="llc"
-        else
-          SettingsLlcCommand="$LlcCmd"
-        fi
-        if test -z "$OptCmd"
-        then
-          SettingsOptCommand="opt"
-        else
-          SettingsOptCommand="$OptCmd"
-        fi
+    fi
+    if test -z "$LlcCmd"
+    then
+      SettingsLlcCommand="llc"
+    else
+      SettingsLlcCommand="$LlcCmd"
+    fi
+    if test -z "$OptCmd"
+    then
+      SettingsOptCommand="opt"
+    else
+      SettingsOptCommand="$OptCmd"
     fi
     SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
@@ -640,19 +640,20 @@ AC_DEFUN([FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN],
 ])
 
 
-# FP_ARG_WITH_PATH_GNU_PROG
+# FP_ARG_WITH_PATH_GNU_PROG_GENERAL
 # --------------------
 # Find the specified command on the path or allow a user to set it manually
-# with a --with-<command> option. An error will be thrown if the command isn't
-# found.
+# with a --with-<command> option.
 #
 # This is ignored on the mingw32 platform.
 #
 # $1 = the variable to set
 # $2 = the with option name
 # $3 = the command to look for
+# $4 = prepend target to program name? if 'no', use the name unchanged
+# $5 = optional? if 'no', then raise an error if the command isn't found
 #
-AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG],
+AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_GENERAL],
 [
 AC_ARG_WITH($2,
 [AC_HELP_STRING([--with-$2=ARG],
@@ -672,58 +673,40 @@ AC_ARG_WITH($2,
 [
     if test "$HostOS" != "mingw32"
     then
-        if test "$target_alias" = "" ; then
+        if test "$4" = "no" -o "$target_alias" = "" ; then
             AC_PATH_PROG([$1], [$3])
         else
             AC_PATH_PROG([$1], [$target_alias-$3])
         fi
-        if test -z "$$1"
+        if test "$5" = "no" -a -z "$$1"
         then
             AC_MSG_ERROR([cannot find $3 in your PATH])
         fi
     fi
 ]
 )
-]) # FP_ARG_WITH_PATH_GNU_PROG
+]) # FP_ARG_WITH_PATH_GNU_PROG_GENERAL
 
+
+# FP_ARG_WITH_PATH_GNU_PROG
+# --------------------
+# The usual case: prepend the target, and the program is not optional.
+AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG],
+[FP_ARG_WITH_PATH_GNU_PROG_GENERAL([$1], [$2], [$3], [yes], [no])])
 
 # FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
 # --------------------
 # Same as FP_ARG_WITH_PATH_GNU_PROG but no error will be thrown if the command
 # isn't found.
-#
-# This is ignored on the mingw32 platform.
-#
-# $1 = the variable to set
-# $2 = the with option name
-# $3 = the command to look for
-#
 AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL],
-[
-AC_ARG_WITH($2,
-[AC_HELP_STRING([--with-$2=ARG],
-        [Use ARG as the path to $2 [default=autodetect]])],
-[
-    if test "$HostOS" = "mingw32"
-    then
-        AC_MSG_WARN([Request to use $withval will be ignored])
-    else
-        $1=$withval
-    fi
+[FP_ARG_WITH_PATH_GNU_PROG_GENERAL([$1], [$2], [$3], [yes], [yes])])
 
-    # Remember that we set this manually.  Used to override CC_STAGE0
-    # and friends later, if we are not cross-compiling.
-    With_$2=$withval
-],
-[
-    if test "$HostOS" != "mingw32"
-    then
-        AC_PATH_PROG([$1], [$3])
-    fi
-]
-)
-]) # FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
-
+# FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET
+# --------------------
+# Same as FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL but don't prepend the target name
+# (used for LLVM).
+AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET],
+[FP_ARG_WITH_PATH_GNU_PROG_GENERAL([$1], [$2], [$3], [no], [yes])])
 
 
 # FP_PROG_CONTEXT_DIFF
@@ -897,8 +880,8 @@ changequote([, ])dnl
 ])
 if test ! -f compiler/parser/Parser.hs || test ! -f compiler/cmm/CmmParse.hs
 then
-    FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.19],
-      [AC_MSG_ERROR([Happy version 1.19 or later is required to compile GHC.])])[]
+    FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.19.4],
+      [AC_MSG_ERROR([Happy version 1.19.4 or later is required to compile GHC.])])[]
 fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
@@ -1832,7 +1815,7 @@ AC_MSG_NOTICE(Building in-tree ghc-pwd)
     dnl If special linker flags are needed to build things, then allow
     dnl the user to pass them in via LDFLAGS.
     changequote(, )dnl
-    GHC_LDFLAGS=`echo $LDFLAGS | sed 's/\(^\| \)\([^ ]\)/\1-optl\2/g'`
+    GHC_LDFLAGS=`perl -e 'foreach (@ARGV) { print "-optl$_ " }' -- $LDFLAGS`
     changequote([, ])dnl
     if ! "$WithGhc" $GHC_LDFLAGS -v0 -no-user-$GHC_PACKAGE_DB_FLAG -hidir utils/ghc-pwd/dist-boot -odir utils/ghc-pwd/dist-boot -stubdir utils/ghc-pwd/dist-boot --make utils/ghc-pwd/Main.hs -o utils/ghc-pwd/dist-boot/ghc-pwd
     then
@@ -2063,7 +2046,7 @@ AC_DEFUN([XCODE_VERSION],[
 # $3 = the command to look for
 #
 AC_DEFUN([FIND_LLVM_PROG],[
-    FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
+    FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
     if test "$$1" == ""; then
         save_IFS=$IFS
         IFS=":;"
@@ -2126,5 +2109,103 @@ AC_DEFUN([MAYBE_OVERRIDE_STAGE0],[
 ])
 
 
+# FP_CPP_CMD_WITH_ARGS()
+# ----------------------
+# sets CPP command and its arguments
+#
+# $1 = the variable to set to CPP command
+# $2 = the varibale to set to CPP command arguments
+
+AC_DEFUN([FP_CPP_CMD_WITH_ARGS],[
+dnl ** what cpp to use?
+dnl --------------------------------------------------------------
+AC_ARG_WITH(hs-cpp,
+[AC_HELP_STRING([--with-hs-cpp=ARG],
+        [Use ARG as the path to cpp [default=autodetect]])],
+[
+    if test "$HostOS" = "mingw32"
+    then
+        AC_MSG_WARN([Request to use $withval will be ignored])
+    else
+        HS_CPP_CMD=$withval
+    fi
+],
+[
+
+    HS_CPP_CMD=$WhatGccIsCalled
+
+    SOLARIS_GCC_CPP_BROKEN=NO
+    SOLARIS_FOUND_GOOD_CPP=NO
+    case $host in
+        i386-*-solaris2)
+        GCC_MAJOR_MINOR=`$WhatGccIsCalled --version|grep "gcc (GCC)"|cut -d ' ' -f 3-3|cut -d '.' -f 1-2`
+        if test "$GCC_MAJOR_MINOR" != "3.4"; then
+          # this is not 3.4.x release so with broken CPP
+          SOLARIS_GCC_CPP_BROKEN=YES
+        fi
+        ;;
+    esac
+
+    if test "$SOLARIS_GCC_CPP_BROKEN" = "YES"; then
+      # let's try to find if GNU C 3.4.x is installed
+      if test -x /usr/sfw/bin/gcc; then
+        # something executable is in expected path so let's
+        # see if it's really GNU C
+        NEW_GCC_MAJOR_MINOR=`/usr/sfw/bin/gcc --version|grep "gcc (GCC)"|cut -d ' ' -f 3-3|cut -d '.' -f 1-2`
+        if test "$NEW_GCC_MAJOR_MINOR" = "3.4"; then
+          # this is GNU C 3.4.x which provides non-broken CPP on Solaris
+          # let's use it as CPP then.
+          HS_CPP_CMD=/usr/sfw/bin/gcc
+          SOLARIS_FOUND_GOOD_CPP=YES
+        fi
+      fi
+      if test "$SOLARIS_FOUND_GOOD_CPP" = "NO"; then
+        AC_MSG_WARN([Your GNU C provides broken CPP and you do not have GNU C 3.4.x installed.])
+        AC_MSG_WARN([Please install GNU C 3.4.x to solve this issue. It will be used as CPP only.])
+      fi
+    fi
+]
+)
+
+
+
+dnl ** what cpp flags to use?
+dnl -----------------------------------------------------------
+AC_ARG_WITH(hs-cpp-flags,
+  [AC_HELP_STRING([--with-hs-cpp-flags=ARG],
+          [Use ARG as the path to hs cpp [default=autodetect]])],
+  [
+      if test "$HostOS" = "mingw32"
+      then
+          AC_MSG_WARN([Request to use $withval will be ignored])
+      else
+          HS_CPP_ARGS=$withval
+      fi
+  ],
+[
+  $HS_CPP_CMD -x c /dev/null -dM -E > conftest.txt 2>&1
+  if grep "__clang__" conftest.txt >/dev/null 2>&1; then
+    HS_CPP_ARGS="-E -undef -traditional -Wno-invalid-pp-token -Wno-unicode -Wno-trigraphs "
+  else
+      $HS_CPP_CMD  -v > conftest.txt 2>&1
+      if  grep "gcc" conftest.txt >/dev/null 2>&1; then
+          HS_CPP_ARGS="-E -undef -traditional "
+        else
+          $HS_CPP_CMD  --version > conftest.txt 2>&1
+          if grep "cpphs" conftest.txt >/dev/null 2>&1; then
+            HS_CPP_ARGS="--cpp -traditional"
+          else
+            AC_MSG_WARN([configure can't recognize your CPP program, you may need to set --with-hs-cpp-flags=FLAGS explicitly])
+            HS_CPP_ARGS=""
+          fi
+      fi
+  fi
+  ]
+)
+
+$1=$HS_CPP_CMD
+$2=$HS_CPP_ARGS
+
+])
 
 # LocalWords:  fi

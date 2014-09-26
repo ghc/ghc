@@ -49,6 +49,7 @@ test('T2783', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
 # Test the work-stealing deque implementation.  We run this test in
 # both threaded1 (-threaded -debug) and threaded2 (-threaded) ways.
 test('testwsdeque', [unless(in_tree_compiler(), skip),
+                    req_smp, # needs atomic 'cas'
                     c_src, only_ways(['threaded1', 'threaded2'])],
                     compile_and_run, ['-I../../../rts'])
 
@@ -191,6 +192,7 @@ test('stablename001', expect_fail_for(['hpc']), compile_and_run, [''])
 
 test('T7815', [ multi_cpu_race,
                 extra_run_opts('50000 +RTS -N2 -RTS'),
+                req_smp,
                 only_ways(['threaded1', 'threaded2']) ], compile_and_run, [''] )
 
 # ignore_output because it contains a unique:
@@ -230,6 +232,13 @@ test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], c
 # I couldn't reproduce 9078 with the -threaded runtime, but could easily
 # with the non-threaded one.
 test('T9078', [ omit_ways(threaded_ways) ], compile_and_run, ['-with-rtsopts="-DS" -debug'])
+
+test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
+                 # this needs runtime infrastructure to do in ghci:
+                 #  '-rdynamic' ghc, load modules only via dlopen(RTLD_BLOBAL) and more.
+                 , omit_ways(['ghci'])
+                 ],
+     compile_and_run, ['-rdynamic -package ghc'])
 
 # 251 = RTS exit code for "out of memory"
 test('overflow1', [ exit_code(251) ], compile_and_run, [''])

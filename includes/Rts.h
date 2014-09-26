@@ -99,16 +99,16 @@ extern "C" {
 void _assertFail(const char *filename, unsigned int linenum)
    GNUC3_ATTRIBUTE(__noreturn__);
 
-#define CHECK(predicate)			\
-	if (predicate)				\
-	    /*null*/;				\
-	else					\
-	    _assertFail(__FILE__, __LINE__)
+#define CHECK(predicate)                        \
+        if (predicate)                          \
+            /*null*/;                           \
+        else                                    \
+            _assertFail(__FILE__, __LINE__)
 
 #define CHECKM(predicate, msg, ...)             \
-	if (predicate)				\
-	    /*null*/;				\
-	else					\
+        if (predicate)                          \
+            /*null*/;                           \
+        else                                    \
             barf(msg, ##__VA_ARGS__)
 
 #ifndef DEBUG
@@ -119,7 +119,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #define ASSERTM(predicate,msg,...) CHECKM(predicate,msg,##__VA_ARGS__)
 #endif /* DEBUG */
 
-/* 
+/*
  * Use this on the RHS of macros which expand to nothing
  * to make sure that the macro can be used in a context which
  * demands a non-empty statement.
@@ -240,7 +240,7 @@ INLINE_HEADER Time fsecondsToTime (double t)
 #include "rts/Main.h"
 
 /* Misc stuff without a home */
-DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell */
+DLL_IMPORT_RTS extern char **prog_argv; /* so we can get at these from Haskell */
 DLL_IMPORT_RTS extern int    prog_argc;
 DLL_IMPORT_RTS extern char  *prog_name;
 

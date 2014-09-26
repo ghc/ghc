@@ -35,7 +35,9 @@ import Outputable
 import Platform
 import Util
 
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
+#endif
 import Control.Monad
 import Control.Monad.ST ( runST )
 import Control.Monad.Trans.Class

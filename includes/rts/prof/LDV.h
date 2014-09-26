@@ -20,7 +20,7 @@
 #define LDVW(c)                 (((StgClosure *)(c))->header.prof.hp.ldvw)
 
 /*
- * Stores the creation time for closure c. 
+ * Stores the creation time for closure c.
  * This macro is called at the very moment of closure creation.
  *
  * NOTE: this initializes LDVW(c) to zero, which ensures that there

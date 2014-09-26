@@ -5,7 +5,7 @@
 -- type signature in t1 and t2
 
 module Foo7 where
-import Control.Monad
+import Control.Monad hiding (empty)
 import Control.Monad.ST
 import Data.Array.MArray
 import Data.Array.ST

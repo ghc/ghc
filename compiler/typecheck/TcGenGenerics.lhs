@@ -7,7 +7,7 @@ The deriving code for the Generic class
 
 \begin{code}
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
-
+{-# LANGUAGE FlexibleContexts #-}
 
 module TcGenGenerics (canDoGenerics, canDoGenerics1,
                       GenericKind(..),
@@ -137,7 +137,7 @@ metaTyConsToDerivStuff tc metaDts =
         d_binds  = InstBindings { ib_binds = dBinds
                                 , ib_pragmas = []
                                 , ib_extensions = []
-                                , ib_standalone_deriving = False }
+                                , ib_derived = True }
         d_mkInst = DerivInst (InstInfo { iSpec = d_inst, iBinds = d_binds })
 
         -- Constructor
@@ -147,7 +147,7 @@ metaTyConsToDerivStuff tc metaDts =
         c_binds = [ InstBindings { ib_binds = c
                                  , ib_pragmas = []
                                  , ib_extensions = []
-                                 , ib_standalone_deriving = False }
+                                 , ib_derived = True }
                   | c <- cBinds ]
         c_mkInst = [ DerivInst (InstInfo { iSpec = is, iBinds = bs })
                    | (is,bs) <- myZip1 c_insts c_binds ]
@@ -159,7 +159,7 @@ metaTyConsToDerivStuff tc metaDts =
         s_binds = [ [ InstBindings { ib_binds = s
                                    , ib_pragmas = []
                                    , ib_extensions = []
-                                   , ib_standalone_deriving = False }
+                                   , ib_derived = True }
                     | s <- ss ] | ss <- sBinds ]
         s_mkInst = map (map (\(is,bs) -> DerivInst (InstInfo { iSpec  = is
                                                              , iBinds = bs})))
@@ -486,10 +486,11 @@ tc_mkRepFamInsts gk tycon metaDts mod =
                      -- `appT` = D Int a b (data families case)
                      Just (famtycon, apps) ->
                        -- `fam` = D
-                       -- `apps` = [Int, a]
-                       let allApps = apps ++
-                                     drop (length apps + length tyvars
-                                           - tyConArity famtycon) tyvar_args
+                       -- `apps` = [Int, a, b]
+                       let allApps = case gk of
+                                       Gen0 -> apps
+                                       Gen1 -> ASSERT(not $ null apps)
+                                               init apps
                        in [mkTyConApp famtycon allApps]
                      -- `appT` = D a b (normal case)
                      Nothing -> [mkTyConApp tycon tyvar_args]

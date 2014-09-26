@@ -56,7 +56,6 @@ import ErrUtils (Severity(..))
 import Outputable
 import FastBool hiding ( fastOr )
 import SrcLoc
-import Util
 import FastString
 import qualified ErrUtils as Err
 
@@ -142,12 +141,12 @@ mkBootModDetailsTc hsc_env
         ; showPass dflags CoreTidy
 
         ; let { insts'      = map (tidyClsInstDFun globaliseAndTidyId) insts
-              ; pat_syns'   = map (tidyPatSynIds   globaliseAndTidyId) pat_syns
-              ; dfun_ids    = map instanceDFunId insts'
-              ; pat_syn_ids = concatMap patSynIds pat_syns'
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
                                            (typeEnvIds type_env) tcs fam_insts
-              ; type_env'  = extendTypeEnvWithIds type_env1 (pat_syn_ids ++ dfun_ids)
+              ; pat_syns'   = map (tidyPatSynIds   globaliseAndTidyId) pat_syns
+              ; type_env2  = extendTypeEnvWithPatSyns pat_syns' type_env1
+              ; dfun_ids    = map instanceDFunId insts'
+              ; type_env'  = extendTypeEnvWithIds type_env2 dfun_ids
               }
         ; return (ModDetails { md_types     = type_env'
                              , md_insts     = insts'
@@ -330,13 +329,11 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; (unfold_env, tidy_occ_env)
               <- chooseExternalIds hsc_env mod omit_prags expose_all
                                    binds implicit_binds imp_rules (vectInfoVar vect_info)
-        ; let { ext_rules = findExternalRules omit_prags binds imp_rules unfold_env }
-                -- Glom together imp_rules and rules currently attached to binders
-                -- Then pick just the ones we need to expose
-                -- See Note [Which rules to expose]
+        ; let { (trimmed_binds, trimmed_rules) 
+                    = findExternalRules omit_prags binds imp_rules unfold_env }
 
         ; (tidy_env, tidy_binds)
-                 <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env binds
+                 <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env trimmed_binds
 
         ; let { final_ids  = [ id | id <- bindersOfBinds tidy_binds,
                                     isExternalName (idName id)]
@@ -348,7 +345,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                 -- it was born, but we want Global, IdInfo-rich (or not) DFunId in the
                 -- tidy_insts.  Similarly the Ids inside a PatSyn.
 
-              ; tidy_rules = tidyRules tidy_env ext_rules
+              ; tidy_rules = tidyRules tidy_env trimmed_rules
                 -- You might worry that the tidy_env contains IdInfo-rich stuff
                 -- and indeed it does, but if omit_prags is on, ext_rules is
                 -- empty
@@ -360,8 +357,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                 -- This is really the only reason we keep mg_patsyns at all; otherwise
                 -- they could just stay in type_env
               ; tidy_patsyns = map (tidyPatSynIds (lookup_aux_id tidy_type_env)) patsyns
-              ; type_env2    = extendTypeEnvList type_env1
-                                    [AConLike (PatSynCon ps) | ps <- tidy_patsyns ]
+              ; type_env2    = extendTypeEnvWithPatSyns tidy_patsyns type_env1
 
               ; tidy_type_env = tidyTypeEnv omit_prags type_env2
 
@@ -421,8 +417,10 @@ lookup_aux_id type_env id
   = case lookupTypeEnv type_env (idName id) of
         Just (AnId id') -> id'
         _other          -> pprPanic "lookup_axu_id" (ppr id)
+\end{code}
 
---------------------------
+
+\begin{code}
 tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
             -> TypeEnv -> TypeEnv
 
@@ -457,6 +455,10 @@ trimThing (AnId id)
 
 trimThing other_thing
   = other_thing
+
+extendTypeEnvWithPatSyns :: [PatSyn] -> TypeEnv -> TypeEnv
+extendTypeEnvWithPatSyns tidy_patsyns type_env
+  = extendTypeEnvList type_env [AConLike (PatSynCon ps) | ps <- tidy_patsyns ]
 \end{code}
 
 \begin{code}
@@ -557,7 +559,7 @@ Oh: two other reasons for injecting them late:
 
   - If implicit Ids are already in the bindings when we start TidyPgm,
     we'd have to be careful not to treat them as external Ids (in
-    the sense of findExternalIds); else the Ids mentioned in *their*
+    the sense of chooseExternalIds); else the Ids mentioned in *their*
     RHSs will be treated as external and you get an interface file
     saying      a18 = <blah>
     but nothing refererring to a18 (because the implicit Id is the
@@ -636,7 +638,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
   -- (c) it is the vectorised version of an imported Id
   -- See Note [Which rules to expose]
   is_external id = isExportedId id || id `elemVarSet` rule_rhs_vars || id `elemVarSet` vect_var_vs
-  rule_rhs_vars  = foldr (unionVarSet . ruleRhsFreeVars) emptyVarSet imp_id_rules
+  rule_rhs_vars  = mapUnionVarSet ruleRhsFreeVars imp_id_rules
   vect_var_vs    = mkVarSet [var_v | (var, var_v) <- nameEnvElts vect_vars, isGlobalId var]
 
   binders          = bindersOfBinds binds
@@ -854,6 +856,149 @@ dffvLetBndr vanilla_unfold id
 
 %************************************************************************
 %*                                                                      *
+               findExternalRules
+%*                                                                      *
+%************************************************************************
+
+Note [Finding external rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The complete rules are gotten by combining
+   a) local rules for imported Ids
+   b) rules embedded in the top-level Ids
+
+There are two complications:
+  * Note [Which rules to expose]
+  * Note [Trimming auto-rules]
+
+Note [Which rules to expose]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The function 'expose_rule' filters out rules that mention, on the LHS,
+Ids that aren't externally visible; these rules can't fire in a client
+module.
+
+The externally-visible binders are computed (by chooseExternalIds)
+assuming that all orphan rules are externalised (see init_ext_ids in
+function 'search'). So in fact it's a bit conservative and we may
+export more than we need.  (It's a sort of mutual recursion.)
+
+Note [Trimming auto-rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Second, with auto-specialisation we may specialise local or imported
+dfuns or INLINE functions, and then later inline them.  That may leave
+behind something like
+   RULE "foo" forall d. f @ Int d = f_spec
+where f is either local or imported, and there is no remaining
+reference to f_spec except from the RULE.
+
+Now that RULE *might* be useful to an importing module, but that is
+purely speculative, and meanwhile the code is taking up space and
+codegen time.  So is seeems better to drop the binding for f_spec if
+the auto-generated rule is the *only* reason that it is being kept
+alive.
+
+(The RULE still might have been useful in the past; that is, it was
+the right thing to have generated it in the first place.  See Note
+[Inline specialisations] in Specialise.  But now it has served its
+purpose, and can be discarded.)
+
+So findExternalRules does this:
+  * Remove all bindings that are kept alive *only* by isAutoRule rules
+      (this is done in trim_binds)
+  * Remove all auto rules that mention bindings that have been removed
+      (this is done by filtering by keep_rule)
+
+So if a binding is kept alive for some *other* reason (e.g. f_spec is
+called in the final code), we keep the rule too.
+
+I found that binary sizes jumped by 6-10% when I started to specialise
+INLINE functions (again, Note [Inline specialisations] in Specialise).
+Adding trimAutoRules removed all this bloat.
+
+
+\begin{code}
+findExternalRules :: Bool       -- Omit pragmas
+                  -> [CoreBind]
+                  -> [CoreRule] -- Local rules for imported fns
+                  -> UnfoldEnv  -- Ids that are exported, so we need their rules
+                  -> ([CoreBind], [CoreRule])
+-- See Note [Finding external rules]
+findExternalRules omit_prags binds imp_id_rules unfold_env
+  = (trimmed_binds, filter keep_rule all_rules)
+  where
+    imp_rules         = filter expose_rule imp_id_rules
+    imp_user_rule_fvs = mapUnionVarSet user_rule_rhs_fvs imp_rules
+
+    user_rule_rhs_fvs rule | isAutoRule rule = emptyVarSet
+                           | otherwise       = ruleRhsFreeVars rule
+
+    (trimmed_binds, local_bndrs, _, all_rules) = trim_binds binds
+
+    keep_rule rule = ruleFreeVars rule `subVarSet` local_bndrs
+        -- Remove rules that make no sense, because they mention a
+        -- local binder (on LHS or RHS) that we have now discarded.
+        -- (NB: ruleFreeVars only includes LocalIds)
+        --
+        -- LHS: we have alrady filtered out rules that mention internal Ids
+        --     on LHS but that isn't enough because we might have by now
+        --     discarded a binding with an external Id. (How?
+        --     chooseExternalIds is a bit conservative.)
+        --
+        -- RHS: the auto rules that might mention a binder that has
+        --      been discarded; see Note [Trimming auto-rules]
+
+    expose_rule rule
+        | omit_prags = False
+        | otherwise  = all is_external_id (varSetElems (ruleLhsFreeIds rule))
+                -- Don't expose a rule whose LHS mentions a locally-defined
+                -- Id that is completely internal (i.e. not visible to an
+                -- importing module).  NB: ruleLhsFreeIds only returns LocalIds.
+                -- See Note [Which rules to expose]
+
+    is_external_id id = case lookupVarEnv unfold_env id of
+                          Just (name, _) -> isExternalName name
+                          Nothing        -> False
+
+    trim_binds :: [CoreBind]
+               -> ( [CoreBind]   -- Trimmed bindings
+                  , VarSet       -- Binders of those bindings
+                  , VarSet       -- Free vars of those bindings + rhs of user rules
+                                 -- (we don't bother to delete the binders)
+                  , [CoreRule])  -- All rules, imported + from the bindings
+    -- This function removes unnecessary bindings, and gathers up rules from
+    -- the bindings we keep.  See Note [Trimming auto-rules]
+    trim_binds []  -- Base case, start with imp_user_rule_fvs
+       = ([], emptyVarSet, imp_user_rule_fvs, imp_rules)
+
+    trim_binds (bind:binds)
+       | any needed bndrs    -- Keep binding
+       = ( bind : binds', bndr_set', needed_fvs', local_rules ++ rules )
+       | otherwise           -- Discard binding altogether
+       = stuff
+       where
+         stuff@(binds', bndr_set, needed_fvs, rules)
+                       = trim_binds binds
+         needed bndr   = isExportedId bndr || bndr `elemVarSet` needed_fvs
+
+         bndrs         = bindersOf  bind
+         rhss          = rhssOfBind bind
+         bndr_set'     = bndr_set `extendVarSetList` bndrs
+
+         needed_fvs'   = needed_fvs                                   `unionVarSet`
+                         mapUnionVarSet idUnfoldingVars   bndrs       `unionVarSet`
+                              -- Ignore type variables in the type of bndrs
+                         mapUnionVarSet exprFreeVars      rhss        `unionVarSet`
+                         mapUnionVarSet user_rule_rhs_fvs local_rules
+            -- In needed_fvs', we don't bother to delete binders from the fv set
+
+         local_rules  = [ rule
+                        | id <- bndrs
+                        , is_external_id id   -- Only collect rules for external Ids
+                        , rule <- idCoreRules id
+                        , expose_rule rule ]  -- and ones that can fire in a client
+\end{code}
+
+%************************************************************************
+%*                                                                      *
                tidyTopName
 %*                                                                      *
 %************************************************************************
@@ -933,44 +1078,6 @@ tidyTopName mod nc_var maybe_ref occ_env id
         -- use the same name for externally-visible things as we did before.
 \end{code}
 
-\begin{code}
-findExternalRules :: Bool       -- Omit pragmas
-                  -> [CoreBind]
-                  -> [CoreRule] -- Local rules for imported fns
-                  -> UnfoldEnv  -- Ids that are exported, so we need their rules
-                  -> [CoreRule]
-  -- The complete rules are gotten by combining
-  --    a) local rules for imported Ids
-  --    b) rules embedded in the top-level Ids
-findExternalRules omit_prags binds imp_id_rules unfold_env
-  | omit_prags = []
-  | otherwise  = filterOut internal_rule (imp_id_rules ++ local_rules)
-  where
-    local_rules  = [ rule
-                   | id <- bindersOfBinds binds,
-                     external_id id,
-                     rule <- idCoreRules id
-                   ]
-
-    internal_rule rule
-        =  any (not . external_id) (varSetElems (ruleLhsFreeIds rule))
-                -- Don't export a rule whose LHS mentions a locally-defined
-                --  Id that is completely internal (i.e. not visible to an
-                -- importing module)
-
-    external_id id
-      | Just (name,_) <- lookupVarEnv unfold_env id = isExternalName name
-      | otherwise = False
-\end{code}
-
-Note [Which rules to expose]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-findExternalRules filters imp_rules to avoid binders that
-aren't externally visible; but the externally-visible binders
-are computed (by findExternalIds) assuming that all orphan
-rules are externalised (see init_ext_ids in function
-'search'). So in fact we may export more than we need.
-(It's a sort of mutual recursion.)
 
 %************************************************************************
 %*                                                                      *

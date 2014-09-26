@@ -171,11 +171,11 @@ applyTypeToArgs e op_ty args
     go _ _ = pprPanic "applyTypeToArgs" panic_msg
 
     -- go_ty_args: accumulate type arguments so we can instantiate all at once
-    go_ty_args op_ty rev_tys (Type ty : args) 
+    go_ty_args op_ty rev_tys (Type ty : args)
        = go_ty_args op_ty (ty:rev_tys) args
     go_ty_args op_ty rev_tys args
        = go (applyTysD panic_msg_w_hdr op_ty (reverse rev_tys)) args
-    
+
     panic_msg_w_hdr = hang (ptext (sLit "applyTypeToArgs")) 2 panic_msg
     panic_msg = vcat [ ptext (sLit "Expression:") <+> pprCoreExpr e
                      , ptext (sLit "Type:") <+> ppr op_ty
@@ -908,13 +908,22 @@ it's applied only to dictionaries.
 -- Note [exprOkForSpeculation: case expressions] below
 --
 -- Precisely, it returns @True@ iff:
+--  a) The expression guarantees to terminate,
+--  b) soon,
+--  c) without causing a write side effect (e.g. writing a mutable variable)
+--  d) without throwing a Haskell exception
+--  e) without risking an unchecked runtime exception (array out of bounds,
+--     divide by zero)
 --
---  * The expression guarantees to terminate,
---  * soon,
---  * without raising an exception,
---  * without causing a side effect (e.g. writing a mutable variable)
+-- For @exprOkForSideEffects@ the list is the same, but omitting (e).
 --
--- Note that if @exprIsHNF e@, then @exprOkForSpecuation e@.
+-- Note that
+--    exprIsHNF            implies exprOkForSpeculation
+--    exprOkForSpeculation implies exprOkForSideEffects
+--
+-- See Note [PrimOp can_fail and has_side_effects] in PrimOp
+-- and Note [Implementation: how can_fail/has_side_effects affect transformations]
+--
 -- As an example of the considerations in this test, consider:
 --
 -- > let x = case y# +# 1# of { r# -> I# r# }
@@ -964,7 +973,7 @@ app_ok :: (PrimOp -> Bool) -> Id -> [Expr b] -> Bool
 app_ok primop_ok fun args
   = case idDetails fun of
       DFunId _ new_type ->  not new_type
-         -- DFuns terminate, unless the dict is implemented 
+         -- DFuns terminate, unless the dict is implemented
          -- with a newtype in which case they may not
 
       DataConWorkId {} -> True
@@ -983,14 +992,12 @@ app_ok primop_ok fun args
         -> True
 
         | otherwise
-        -> primop_ok op        -- A bit conservative: we don't really need
-        && all (expr_ok primop_ok) args
-                                  
-                                  -- to care about lazy arguments, but this is easy
+        -> primop_ok op                   -- A bit conservative: we don't really need
+        && all (expr_ok primop_ok) args   -- to care about lazy arguments, but this is easy
 
       _other -> isUnLiftedType (idType fun)          -- c.f. the Var case of exprIsHNF
              || idArity fun > n_val_args             -- Partial apps
-             || (n_val_args == 0 && 
+             || (n_val_args == 0 &&
                  isEvaldUnfolding (idUnfolding fun)) -- Let-bound values
              where
                n_val_args = valArgCount args

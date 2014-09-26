@@ -1,6 +1,6 @@
 name:           template-haskell
 version:        2.10.0.0
--- GHC 7.8.1 released with 2.9.0.0
+-- NOTE: Don't forget to update ./changelog.md
 license:        BSD3
 license-file:   LICENSE
 category:       Template Haskell
@@ -15,6 +15,8 @@ description:
     .
     See <http://www.haskell.org/haskellwiki/Template_Haskell> for more
     information.
+
+extra-source-files: changelog.md
 
 source-repository head
     type:     git
@@ -46,9 +48,9 @@ Library
         Language.Haskell.TH.Lib.Map
 
     build-depends:
-        base       == 4.7.*,
+        base       == 4.8.*,
         pretty     == 1.1.*
 
-    -- We need to set the package name to template-haskell (without a
+    -- We need to set the package key to template-haskell (without a
     -- version number) as it's magic.
-    ghc-options: -Wall -package-name template-haskell
+    ghc-options: -Wall -this-package-key template-haskell

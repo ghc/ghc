@@ -1,8 +1,10 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.7.1.0 *TBA*
+## 4.8.0.0  *TBA*
 
   * Bundled with GHC 7.10.1
+
+  * Make `Applicative` a superclass of `Monad`
 
   * Add reverse application operator `Data.Function.(&)`
 
@@ -17,6 +19,56 @@
   * The `Data.Monoid` module now has the `PolyKinds` extension
     enabled, so that the `Monoid` instance for `Proxy` are polykinded
     like `Proxy` itself is.
+
+  * Make `abs` and `signum` handle (-0.0) correctly per IEEE-754.
+
+  * Re-export `Data.Word.Word` from `Prelude`
+
+  * Add `countLeadingZeros` and `countTrailingZeros` methods to
+    `Data.Bits.FiniteBits` class
+
+  * Add `Data.List.uncons` list destructor (#9550)
+
+  * Export `Monoid(..)` from `Prelude`
+
+  * Export `Foldable(..)` from `Prelude`
+    (hiding `fold`, `foldl'`, `foldr'`, and `toList`)
+
+  * Export `Traversable(..)` from `Prelude`
+
+  * Set fixity for `Data.Foldable.{elem,notElem}` to match the
+    conventional one set for `Data.List.{elem,notElem}` (#9610)
+
+  * Turn `toList`, `elem`, `sum`, `product`, `maximum`, and `minimum`
+    into `Foldable` methods (#9621)
+
+  * Replace the `Data.List`-exported functions
+
+    ```
+    all, and, any, concat, concatMap, elem, find, product, sum,
+    mapAccumL, mapAccumR
+    ```
+
+    by re-exports of their generalised `Data.Foldable`/`Data.Traversable`
+    counterparts.  In other words, unqualified imports of `Data.List`
+    and `Data.Foldable`/`Data.Traversable` no longer lead to conflicting
+    definitions. (#9586)
+
+  * Replace the `Control.Monad`-exported functions
+
+    ```
+    sequence_, msum, mapM_, forM_,
+    forM, mapM, sequence
+    ```
+
+    by re-exports of their generalised `Data.Foldable`/`Data.Traversable`
+    counterparts.  In other words, unqualified imports of `Control.Monad`
+    and `Data.Foldable`/`Data.Traversable` no longer lead to conflicting
+    definitions. (#9586)
+
+  * New module `Data.OldList` containing only list-specialised versions of
+    the functions from `Data.List` (in other words, `Data.OldList` corresponds
+    to `base-4.7.0.1`'s `Data.List`)
 
 ## 4.7.0.1  *Jul 2014*
 

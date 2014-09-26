@@ -224,8 +224,13 @@ genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
     return (stmts, top1 ++ top2)
   | otherwise = panic $ "prefetch locality level integer must be between 0 and 3, given: " ++ (show localityInt)
 
--- Handle PopCnt and BSwap that need to only convert arg and return types
+-- Handle PopCnt, Clz, Ctz, and BSwap that need to only convert arg
+-- and return types
 genCall t@(PrimTarget (MO_PopCnt w)) dsts args =
+    genCallSimpleCast w t dsts args
+genCall t@(PrimTarget (MO_Clz w)) dsts args =
+    genCallSimpleCast w t dsts args
+genCall t@(PrimTarget (MO_Ctz w)) dsts args =
     genCallSimpleCast w t dsts args
 genCall t@(PrimTarget (MO_BSwap w)) dsts args =
     genCallSimpleCast w t dsts args
@@ -277,7 +282,7 @@ genCall t@(PrimTarget op) [] args'
     -- than a direct constant (i.e. 'i32 8') as the alignment argument for the
     -- memcpy & co llvm intrinsic functions. So we handle this directly now.
     extractLit (CmmLit (CmmInt i _)) = mkIntLit i32 i
-    extractLit _other = trace ("WARNING: Non constant alignment value given" ++ 
+    extractLit _other = trace ("WARNING: Non constant alignment value given" ++
                                " for memcpy! Please report to GHC developers")
                         mkIntLit i32 0
 
@@ -558,6 +563,8 @@ cmmPrimOpFunctions mop = do
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     (MO_BSwap w)  -> fsLit $ "llvm.bswap."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_Clz w)    -> fsLit $ "llvm.ctlz."   ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_Ctz w)    -> fsLit $ "llvm.cttz."   ++ showSDoc dflags (ppr $ widthToLlvmInt w)
 
     (MO_Prefetch_Data _ )-> fsLit "llvm.prefetch"
 
@@ -565,6 +572,8 @@ cmmPrimOpFunctions mop = do
     MO_U_QuotRem {}  -> unsupported
     MO_U_QuotRem2 {} -> unsupported
     MO_Add2 {}       -> unsupported
+    MO_AddIntC {}    -> unsupported
+    MO_SubIntC {}    -> unsupported
     MO_U_Mul2 {}     -> unsupported
     MO_WriteBarrier  -> unsupported
     MO_Touch         -> unsupported
@@ -977,10 +986,10 @@ genMachOp _ op [x] = case op of
     MO_Shl          _ -> panicOp
     MO_U_Shr        _ -> panicOp
     MO_S_Shr        _ -> panicOp
- 
+
     MO_V_Insert   _ _ -> panicOp
     MO_V_Extract  _ _ -> panicOp
-  
+
     MO_V_Add      _ _ -> panicOp
     MO_V_Sub      _ _ -> panicOp
     MO_V_Mul      _ _ -> panicOp
@@ -990,7 +999,7 @@ genMachOp _ op [x] = case op of
 
     MO_VU_Quot    _ _ -> panicOp
     MO_VU_Rem     _ _ -> panicOp
- 
+
     MO_VF_Insert  _ _ -> panicOp
     MO_VF_Extract _ _ -> panicOp
 
@@ -1029,7 +1038,7 @@ genMachOp _ op [x] = case op of
                  w | w < toWidth -> sameConv' expand
                  w | w > toWidth -> sameConv' reduce
                  _w              -> return x'
-        
+
         panicOp = panic $ "LLVM.CodeGen.genMachOp: non unary op encountered"
                        ++ "with one argument! (" ++ show op ++ ")"
 
@@ -1107,7 +1116,7 @@ genMachOp_slow _ (MO_VF_Insert l w) [val, elt, idx] = do
             top1 ++ top2 ++ top3)
   where
     ty = LMVector l (widthToLlvmFloat w)
-    
+
 -- Binary MachOp
 genMachOp_slow opt op [x, y] = case op of
 
@@ -1166,7 +1175,7 @@ genMachOp_slow opt op [x, y] = case op of
 
     MO_VU_Quot l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_UDiv
     MO_VU_Rem  l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_URem
- 
+
     MO_VF_Add  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FAdd
     MO_VF_Sub  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FSub
     MO_VF_Mul  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FMul

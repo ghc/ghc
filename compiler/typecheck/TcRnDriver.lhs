@@ -100,7 +100,11 @@ import Maybes
 import Util
 import Bag
 
+#if __GLASGOW_HASKELL__ >= 709
+import Control.Monad hiding (empty)
+#else
 import Control.Monad
+#endif
 
 #include "HsVersions.h"
 \end{code}
@@ -1385,7 +1389,8 @@ tcUserStmt rdr_stmt@(L loc _)
            ; return stuff }
       where
         print_v  = L loc $ BodyStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
-                                    (HsVar thenIOName) noSyntaxExpr placeHolderType
+                                    (HsVar thenIOName) noSyntaxExpr
+                                    placeHolderType
 
 -- | Typecheck the statements given and then return the results of the
 -- statement in the form 'IO [()]'.

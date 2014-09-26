@@ -516,6 +516,25 @@ bug.  The fix here is simply to decline to do w/w if that happens.
 %*                                                                      *
 %************************************************************************
 
+Note [Do not unpack class dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have
+   f :: Ord a => [a] -> Int -> a
+   {-# INLINABLE f #-}
+and we worker/wrapper f, we'll get a worker with an INLINALBE pragma
+(see Note [Worker-wrapper for INLINABLE functions] in WorkWrap), which
+can still be specialised by the type-class specialiser, something like
+   fw :: Ord a => [a] -> Int# -> a
+
+BUT if f is strict in the Ord dictionary, we might unpack it, to get
+   fw :: (a->a->Bool) -> [a] -> Int# -> a
+and the type-class specialiser can't specialise that.
+
+Moreover, dictinoaries can have a lot of fields, so unpacking them can
+increase closure sizes.
+
+Conclusion: don't unpack dictionaries.
+
 \begin{code}
 deepSplitProductType_maybe :: FamInstEnvs -> Type -> Maybe (DataCon, [Type], [Type], Coercion)
 -- If    deepSplitProductType_maybe ty = Just (dc, tys, arg_tys, co)
@@ -526,6 +545,7 @@ deepSplitProductType_maybe fam_envs ty
                     `orElse` (mkReflCo Representational ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , Just con <- isDataProductTyCon_maybe tc
+  , not (isClassTyCon tc)  -- See Note [Do not unpack class dictionaries]
   = Just (con, tc_args, dataConInstArgTys con tc_args, co)
 deepSplitProductType_maybe _ _ = Nothing
 
@@ -659,7 +679,7 @@ There are a few cases where the W/W transformation is told that something
 returns a constructor, but the type at hand doesn't really match this. One
 real-world example involves unsafeCoerce:
   foo = IO a
-  foo = unsafeCoere c_exit
+  foo = unsafeCoerce c_exit
   foreign import ccall "c_exit" c_exit :: IO ()
 Here CPR will tell you that `foo` returns a () constructor for sure, but trying
 to create a worker/wrapper for type `a` obviously fails.

@@ -6,7 +6,7 @@
 -- Module      :  Foreign.C.String
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  ffi@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -101,8 +101,6 @@ import Foreign.Ptr
 import Foreign.Storable
 
 import Data.Word
-
-import Control.Monad
 
 import GHC.Char
 import GHC.List
@@ -240,7 +238,7 @@ peekCAString cp = do
 -- | Marshal a C string with explicit length into a Haskell string.
 --
 peekCAStringLen           :: CStringLen -> IO String
-peekCAStringLen (cp, len) 
+peekCAStringLen (cp, len)
   | len <= 0  = return "" -- being (too?) nice.
   | otherwise = loop [] (len-1)
   where

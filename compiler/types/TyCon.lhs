@@ -73,7 +73,8 @@ module TyCon(
         synTyConDefn_maybe, synTyConRhs_maybe, 
         tyConExtName,           -- External name for foreign types
         algTyConRhs,
-        newTyConRhs, newTyConEtadArity, newTyConEtadRhs, unwrapNewTyCon_maybe,
+        newTyConRhs, newTyConEtadArity, newTyConEtadRhs, 
+        unwrapNewTyCon_maybe, unwrapNewTyConEtad_maybe,
         tupleTyConBoxity, tupleTyConSort, tupleTyConArity,
 
         -- ** Manipulating TyCons
@@ -1169,6 +1170,12 @@ unwrapNewTyCon_maybe (AlgTyCon { tyConTyVars = tvs,
                                                        nt_rhs = rhs }})
                            = Just (tvs, rhs, co)
 unwrapNewTyCon_maybe _     = Nothing
+
+unwrapNewTyConEtad_maybe :: TyCon -> Maybe ([TyVar], Type, CoAxiom Unbranched)
+unwrapNewTyConEtad_maybe (AlgTyCon { algTcRhs = NewTyCon { nt_co = co,
+                                                           nt_etad_rhs = (tvs,rhs) }})
+                           = Just (tvs, rhs, co)
+unwrapNewTyConEtad_maybe _ = Nothing
 
 isProductTyCon :: TyCon -> Bool
 -- True of datatypes or newtypes that have

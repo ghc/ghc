@@ -126,6 +126,10 @@ struct Capability_ {
 
     // Stats on spark creation/conversion
     SparkCounters spark_stats;
+#if !defined(mingw32_HOST_OS)
+    // IO manager for this cap
+    int io_manager_control_wr_fd;
+#endif
 #endif
     // Total words allocated by this cap since rts start
     W_ total_allocated;

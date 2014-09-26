@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, UndecidableInstances #-}
+{-# LANGUAGE CPP #-}
 
 --
 -- (c) The University of Glasgow 2002-2006
@@ -43,7 +44,9 @@ import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
 import Control.Monad
 import MonadUtils
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Alternative(..))
+#endif
 
 ----------------------------------------------------------------------
 -- Defining the monad type

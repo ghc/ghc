@@ -1,8 +1,5 @@
-{-# LANGUAGE Safe #-}
-{-# LANGUAGE CPP #-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >=  700
 {-# LANGUAGE GADTs #-}
-#endif
+{-# LANGUAGE Safe #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -292,8 +289,6 @@ instance (IsChar c) => PrintfType [c] where
 -- type system won't readily let us say that without
 -- bringing the GADTs. So we go conditional for these defs.
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >=  700
-
 instance (a ~ ()) => PrintfType (IO a) where
     spr fmts args =
         putStr $ map fromChar $ uprintf fmts $ reverse args
@@ -301,21 +296,6 @@ instance (a ~ ()) => PrintfType (IO a) where
 instance (a ~ ()) => HPrintfType (IO a) where
     hspr hdl fmts args = do
         hPutStr hdl (uprintf fmts (reverse args))
-
-#else
-
-instance PrintfType (IO a) where
-    spr fmts args = do
-        putStr $ map fromChar $ uprintf fmts $ reverse args
-        return (error "PrintfType (IO a): result should not be used.")
-
-instance HPrintfType (IO a) where
-    hspr hdl fmts args = do
-        hPutStr hdl (uprintf fmts (reverse args))
-        return (error "HPrintfType (IO a): result should not be used.")
-
-#endif
-
 
 instance (PrintfArg a, PrintfType r) => PrintfType (a -> r) where
     spr fmts args = \ a -> spr fmts

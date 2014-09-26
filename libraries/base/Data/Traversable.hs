@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
@@ -30,11 +31,6 @@
 --    in /Mathematically-Structured Functional Programming/, 2012, online at
 --    <http://arxiv.org/pdf/1202.2919>.
 --
--- Note that the functions 'mapM' and 'sequence' generalize "Prelude"
--- functions of the same names from lists to any 'Traversable' functor.
--- To avoid ambiguity, either import the "Prelude" hiding these names
--- or qualify uses of these function names with an alias for this module.
---
 -----------------------------------------------------------------------------
 
 module Data.Traversable (
@@ -50,14 +46,17 @@ module Data.Traversable (
     foldMapDefault,
     ) where
 
-import Prelude hiding (mapM, sequence, foldr)
-import qualified Prelude (mapM, foldr)
-import Control.Applicative
-import Data.Foldable (Foldable())
-import Data.Monoid (Monoid)
-import Data.Proxy
+import Control.Applicative ( Const(..), WrappedMonad(..) )
+import Data.Either ( Either(..) )
+import Data.Foldable ( Foldable )
+import Data.Functor
+import Data.Proxy ( Proxy(..) )
 
 import GHC.Arr
+import GHC.Base ( Applicative(..), Monad(..), Monoid, Maybe(..),
+                  ($), (.), id, flip )
+import qualified GHC.Base as Monad ( mapM )
+import qualified GHC.List as List ( foldr )
 
 -- | Functors representing data structures that can be traversed from
 -- left to right.
@@ -174,10 +173,10 @@ instance Traversable Maybe where
 
 instance Traversable [] where
     {-# INLINE traverse #-} -- so that traverse can fuse
-    traverse f = Prelude.foldr cons_f (pure [])
+    traverse f = List.foldr cons_f (pure [])
       where cons_f x ys = (:) <$> f x <*> ys
 
-    mapM = Prelude.mapM
+    mapM = Monad.mapM
 
 instance Traversable (Either a) where
     traverse _ (Left x) = pure (Left x)

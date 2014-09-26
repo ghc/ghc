@@ -3,7 +3,8 @@
 Result size of Tidy Core = {terms: 22, types: 10, coercions: 0}
 
 Rec {
-T3717.$wfoo [Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int#
+T3717.$wfoo [InlPrag=[0], Occ=LoopBreaker]
+  :: GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
 T3717.$wfoo =
   \ (ww :: GHC.Prim.Int#) ->
@@ -18,9 +19,9 @@ T3717.foo [InlPrag=INLINE[0]] :: GHC.Types.Int -> GHC.Types.Int
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType <S(S),1*U(1*U)>m,
- Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
-         ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: GHC.Types.Int) ->
                  case w of _ [Occ=Dead] { GHC.Types.I# ww1 [Occ=Once] ->
                  case T3717.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }

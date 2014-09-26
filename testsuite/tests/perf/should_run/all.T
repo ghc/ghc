@@ -92,9 +92,10 @@ test('T3738',
       stats_num_field('bytes allocated',
                       [(wordsize(32), 45648, 5),
                     # expected value: 50520 (x86/Linux)
-                       (wordsize(64), 49400, 5)]),
+                       (wordsize(64), 50592, 5)]),
                     # prev:           49400 (amd64/Linux)
                     # 2014-07-17:     50520 (amd64/Linux) general round of updates
+                    # 2014-09-10:     50592 (amd64/Linux) post-AMP-update
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -375,14 +376,17 @@ test('InlineCloneArrayAlloc',
 test('T9203',
      [stats_num_field('bytes allocated',
                       [ (wordsize(32), 50000000, 5)
-                      , (wordsize(64), 95747304, 5) ]),
+                      , (wordsize(64), 94547280, 5) ]),
+                      # was            95747304
+                      # 2019-09-10     94547280 post-AMP cleanup
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
 
 test('T9339',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64),    80050760, 5) ]),
+                      [ (wordsize(32),    40046844, 5)
+                      , (wordsize(64),    80050760, 5) ]),
                       # w/o fusing last: 320005080
                       # 2014-07-22:       80050760
       only_ways(['normal'])],

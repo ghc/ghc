@@ -205,11 +205,12 @@ instance  Num Float  where
     (-)         x y     =  minusFloat x y
     negate      x       =  negateFloat x
     (*)         x y     =  timesFloat x y
-    abs x | x >= 0.0    =  x
-          | otherwise   =  negateFloat x
-    signum x | x == 0.0  = 0
-             | x > 0.0   = 1
-             | otherwise = negate 1
+    abs x    | x == 0    = 0 -- handles (-0.0)
+             | x >  0    = x
+             | otherwise = negateFloat x
+    signum x | x > 0     = 1
+             | x < 0     = negateFloat 1
+             | otherwise = x -- handles 0.0, (-0.0), and NaN
 
     {-# INLINE fromInteger #-}
     fromInteger i = F# (floatFromInteger i)
@@ -370,11 +371,13 @@ instance  Num Double  where
     (-)         x y     =  minusDouble x y
     negate      x       =  negateDouble x
     (*)         x y     =  timesDouble x y
-    abs x | x >= 0.0    =  x
-          | otherwise   =  negateDouble x
-    signum x | x == 0.0  = 0
-             | x > 0.0   = 1
-             | otherwise = negate 1
+    abs x    | x == 0    = 0 -- handles (-0.0)
+             | x >  0    = x
+             | otherwise = negateDouble x
+    signum x | x > 0     = 1
+             | x < 0     = negateDouble 1
+             | otherwise = x -- handles 0.0, (-0.0), and NaN
+
 
     {-# INLINE fromInteger #-}
     fromInteger i = D# (doubleFromInteger i)

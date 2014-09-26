@@ -38,9 +38,7 @@ module GHC.Conc.Windows
        , toWin32ConsoleEvent
        ) where
 
-import Control.Monad
 import Data.Bits (shiftR)
-import Data.Maybe (Maybe(..))
 import Data.Typeable
 import GHC.Base
 import GHC.Conc.Sync
@@ -226,7 +224,7 @@ prodServiceThread = do
   -- conditions in which prodding is left at True but the server is
   -- blocked in select().
   was_set <- atomicModifyIORef prodding $ \b -> (True,b)
-  unless was_set wakeupIOManager
+  when (not was_set) wakeupIOManager
 
 -- ----------------------------------------------------------------------------
 -- Windows IO manager thread
@@ -259,7 +257,7 @@ service_loop wakeup old_delays = do
                 _ | r2 == io_MANAGER_DIE    -> return True
                 0 -> return False -- spurious wakeup
                 _ -> do start_console_handler (r2 `shiftR` 1); return False
-        unless exit $ service_cont wakeup delays'
+        when (not exit) $ service_cont wakeup delays'
 
     _other -> service_cont wakeup delays' -- probably timeout
 

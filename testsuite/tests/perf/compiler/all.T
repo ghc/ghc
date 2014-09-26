@@ -33,14 +33,16 @@ test('T1969',
              # 2013-02-10 13 (x86/Windows)
              # 2013-02-10 14 (x86/OSX)
              # 2013-11-13 17 (x86/Windows, 64bit machine)
-           (wordsize(64), 30, 15)]),
+           (wordsize(64), 30, 20)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
              # 2012-10-03 25 (amd64/Linux if .hi exists)
              # 2013-02-13 23, but unstable so increased to 10% range
              # 2013-02-13 27, very unstable!
-             # 2013-09-11 30 (amd64/Linux)
+             # 2014-09-10 29 (amd64/Linux) post-AMP-cleanup
+             # 2013-09-11 30, 10 (amd64/Linux)
+             # 2013-09-11 30, 15 (adapt to Phab CI)
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5719436, 20),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -53,12 +55,14 @@ test('T1969',
              # 2009-12-31 6149572 (x86/Linux)
              # 2014-01-22 6429864 (x86/Linux)
              # 2014-06-29 5949188 (x86/Linux)
-           (wordsize(64), 11000000, 20)]),
+           (wordsize(64), 9684256, 10)]),
+             # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
                # varies quite a lot with CLEANUP and BINDIST,
                # hence 10% range.
                # See Note [residency] to get an accurate view.
+             # 2014-09-14 9684256, 10 # try to lower it a bit more to match Phab's CI
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
                                  #            215582916 (x86/Windows)
@@ -73,7 +77,7 @@ test('T1969',
              # 2013-02-10 322937684 (x86/OSX)
              # 2014-01-22 316103268 (x86/Linux)
              # 2014-06-29 303300692 (x86/Linux)
-           (wordsize(64), 651626680, 5)]),
+           (wordsize(64), 630299456, 5)]),
              # 17/11/2009 434845560 (amd64/Linux)
              # 08/12/2009 459776680 (amd64/Linux)
              # 17/05/2010 519377728 (amd64/Linux)
@@ -88,8 +92,9 @@ test('T1969',
              # 12/11/2012 658786936 (amd64/Linux) UNKNOWN REASON
              # 17/1/13:   667160192 (x86_64/Linux) new demand analyser
              # 18/10/2013 698612512 (x86_64/Linux) fix for #8456
-             # 10/02/2014 660922376 (x86_64/Linux) call artiy analysis
+             # 10/02/2014 660922376 (x86_64/Linux) call arity analysis
              # 17/07/2014 651626680 (x86_64/Linux) roundabout update
+             # 10/09/2014 630299456 (x86_64/Linux) post-AMP-cleanup
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static')
@@ -142,7 +147,7 @@ test('T3294',
            # 2013-11-13: 1478325844  (x86/Windows, 64bit machine)
            # 2014-01-12: 1565185140  (x86/Linux)
            # 2013-04-04: 1377050640  (x86/Windows, 64bit machine)
-           (wordsize(64), 2671595512, 5)]),
+           (wordsize(64), 2709595808, 5)]),
             # old:        1357587088 (amd64/Linux)
             # 29/08/2012: 2961778696 (amd64/Linux)
             # (^ increase due to new codegen, see #7198)
@@ -152,6 +157,7 @@ test('T3294',
             # 18/02/2014: 2897630040 (amd64/Linux) (call arity improvements)
             # 12/03/2014: 2705289664 (amd64/Linux) (more call arity improvements)
             # 2014-17-07: 2671595512 (amd64/Linux) (round-about update)
+            # 2014-09-10: 2709595808 (amd64/Linux) post-AMP cleanup
       conf_3294
       ],
      compile,
@@ -165,7 +171,7 @@ test('T4801',
                            # expected value: 58 (amd64/OS X)
                            # 13/01/2014 - 70
            (wordsize(32), 30, 20),
-           (wordsize(64), 60, 20)]),
+           (wordsize(64), 55, 20)]),
             # prev:       50 (amd64/Linux)
             # 19/10/2012: 64 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
@@ -173,37 +179,46 @@ test('T4801',
             #                (^ REASON UNKNOWN!)
             # 28/8/13:    60 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
+            # 2014-09-10: 55 post-AMP-cleanup
 
       compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 464872776, 5),
                            # expected value: 510938976 (amd64/OS X):
 
-           (wordsize(32), 211198056, 10),
+           (wordsize(32), 185242032, 10),
            # prev:        185669232 (x86/OSX)
            # 2014-01-22:  211198056 (x86/Linux)
-           (wordsize(64), 392409984, 10)]),
+           # 2014-09-03:  185242032 (Windows laptop)
+           (wordsize(64), 362939272, 10)]),
             # prev:       360243576 (amd64/Linux)
             # 19/10/2012: 447190832 (amd64/Linux) (-fPIC turned on)
             # 19/10/2012: 392409984 (amd64/Linux) (-fPIC turned off)
+            # 2014-04-08: 362939272 (amd64/Linux) cumulation of various smaller improvements over recent commits
 
-      compiler_stats_num_field('max_bytes_used',
-          [(platform('x86_64-apple-darwin'), 25145320, 5),
-           (wordsize(32), 11829000, 15),
-             #              9651948 (x86/OSX)
-             #              10290952 (windows)
-             # 2013-02-10   11071060 (x86/Windows)
-             # 2013-02-10:  11207828 (x86/OSX)
-             # (some date): 11139444
-             # 2013-11-13:  11829000 (x86/Windows, 64bit machine)
-           (wordsize(64), 25002136, 10)]),
-                # prev:       20486256 (amd64/OS X)
-                # 30/08/2012: 17305600--20391920 (varies a lot)
-                # 19/10/2012: 26882576 (-fPIC turned on)
-                # 19/10/2012: 18619912 (-fPIC turned off)
-                # 24/12/2012: 21657520 (perhaps gc sampling time wibbles?)
-                # 10/01/2014: 25166280 
-                # 13/01/2014: 22646000 (mostly due to #8647)
-                # 18/02/2014: 25002136 (call arity analysis changes)
+###################################
+# deactivated for now, as this metric became to volatile recently
+#
+#     compiler_stats_num_field('max_bytes_used',
+#         [(platform('x86_64-apple-darwin'), 25145320, 5),
+#          (wordsize(32), 11829000, 15),
+#            #              9651948 (x86/OSX)
+#            #              10290952 (windows)
+#            # 2013-02-10   11071060 (x86/Windows)
+#            # 2013-02-10:  11207828 (x86/OSX)
+#            # (some date): 11139444
+#            # 2013-11-13:  11829000 (x86/Windows, 64bit machine)
+#          (wordsize(64), 19296544, 15)]),
+#               # prev:       20486256 (amd64/OS X)
+#               # 30/08/2012: 17305600--20391920 (varies a lot)
+#               # 19/10/2012: 26882576 (-fPIC turned on)
+#               # 19/10/2012: 18619912 (-fPIC turned off)
+#               # 24/12/2012: 21657520 (perhaps gc sampling time wibbles?)
+#               # 10/01/2014: 25166280
+#               # 13/01/2014: 22646000 (mostly due to #8647)
+#               # 18/02/2014: 25002136 (call arity analysis changes)
+#               # 12/05/2014: 25002136 (specialisation and inlining changes)
+#               # 10/09/2014: 19296544, 10 (post-AMP-cleanup)
+#               # 14/09/2014: 19585456, 15 (adapt to Phab CI env)
        only_ways(['normal']),
        extra_hc_opts('-static')
       ],
@@ -226,6 +241,7 @@ test('T3064',
             # Increased range to 20%.  peak-usage varies from 22 to 26,
             #  depending on whether the old .hi file exists
             # (amd64/Linux) 2013-09-11: 37; better arity analysis (weird)
+            # (amd64/Linux) (09/09/2014): 42, AMP changes (larger interfaces, more loading)
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 162457940, 10),
@@ -233,7 +249,7 @@ test('T3064',
             # 2012-10-30: 111189536 (x86/Windows)
             # 2013-11-13: 146626504 (x86/Windows, 64bit machine)
             # 2014-01-22: 162457940 (x86/Linux)
-           (wordsize(64), 332702112, 5)]),
+           (wordsize(64), 385145080, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
@@ -243,6 +259,9 @@ test('T3064',
             # (amd64/Linux) (11/02/2014): 308422280, optimize Coercions in simpleOptExpr
             # (amd64/Linux) (23/05/2014): 324022680, unknown cause
             # (amd64/Linux) (2014-07-17): 332702112, general round of updates
+            # (amd64/Linux) (2014-08-29): 313638592, w/w for INLINABLE things
+            # (amd64/Linux) (09/09/2014): 407416464, AMP changes (larger interfaces, more loading)
+            # (amd64/Linux) (14/09/2014): 385145080, BPP changes (more NoImplicitPrelude in base)
 
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 11202304, 20),
@@ -250,7 +269,7 @@ test('T3064',
             #(some date):  5511604
             # 2013-11-13:  7218200 (x86/Windows, 64bit machine)
             # 2014-04-04: 11202304 (x86/Windows, 64bit machine)
-           (wordsize(64), 19821544, 20)]),
+           (wordsize(64), 18744992, 20)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
             # (amd64/Linux)         (14/02/2013):  8687360
@@ -261,6 +280,10 @@ test('T3064',
             #                                     933cdf15a2d85229d3df04b437da31fdfbf4961f
             # (amd64/Linux)         (22/11/2013): 16266992, GND via Coercible and counters for constraints solving
             # (amd64/Linux)         (12/12/2013): 19821544, better One shot analysis
+            # (amd64/Linux)         (09/09/2014): 24357392, AMP changes (larger interfaces, more loading)
+            # (amd64/Linux)         (14/09/2014): 16053888, BPP changes (more NoImplicitPrelude in base)
+            # (amd64/Linux)         (19/09/2014): 18744992, unknown
+
        only_ways(['normal'])
       ],
      compile,
@@ -277,7 +300,7 @@ test('T5030',
            # previous:    196457520
            # 2012-10-08:  259547660 (x86/Linux, new codegen)
            # 2013-11-21:  198573456 (x86 Windows, 64 bit machine)
-           (wordsize(64), 409314320, 10)]),
+           (wordsize(64), 385152728, 10)]),
              # Previously 530000000 (+/- 10%)
              # 17/1/13:   602993184  (x86_64/Linux)
              #            (new demand analyser)
@@ -289,6 +312,7 @@ test('T5030',
              # big decrease following better CSE and arity
              # 2014-07-17 409314320  (amd64/Linux)
              # general round of updates
+             # 2014-09-10 385152728  post-AMP-cleanup
 
        only_ways(['normal'])
       ],
@@ -300,10 +324,11 @@ test('T5631',
           [(wordsize(32), 346389856, 10),
         # expected value: 392904228 (x86/Linux)
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
-           (wordsize(64), 690742040, 5)]),
+           (wordsize(64), 739704712, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
+        # 2014-09-09:     739704712 (amd64/Linux) AMP changes
        only_ways(['normal'])
       ],
      compile,
@@ -323,12 +348,14 @@ test('T783',
      [ only_ways(['normal']),  # no optimisation for this one
       # expected value: 175,569,928 (x86/Linux)
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 319179104, 5),
+          [(wordsize(32), 223377364, 5),
             # 2012-10-08: 226907420 (x86/Linux)
             # 2013-02-10: 329202116 (x86/Windows)
             # 2013-02-10: 338465200 (x86/OSX)
             # 2014-04-04: 319179104 (x86 Windows, 64 bit machine)
-           (wordsize(64), 640031840, 10)]),
+            # 2014-09-03: 223377364 (Windows, better specialisation, raft of core-to-core optimisations)
+
+           (wordsize(64), 441932632, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -341,6 +368,8 @@ test('T783',
             #   (fix previous fix for #8456)
             # 2014-07-17: 640031840 (amd64/Linux)
             #   (general round of updates)
+            # 2014-08-29: 441932632  (amd64/Linux)
+            #   (better specialisation, raft of core-to-core optimisations)
       extra_hc_opts('-static')
       ],
       compile,[''])
@@ -348,18 +377,19 @@ test('T783',
 test('T5321Fun',
      [ only_ways(['normal']),  # no optimisation for this one
        compiler_stats_num_field('bytes allocated',
-           [(wordsize(32), 344416344, 10),
+           [(wordsize(32), 299656164, 10),
              # prev:       300000000
              # 2012-10-08: 344416344 x86/Linux
              #  (increase due to new codegen)
-            (wordsize(64), 694019152, 10)])
+             # 2014-09-03: 299656164     (specialisation and inlining)
+            (wordsize(64), 601629032, 10)])
              # prev:       585521080
-             # 29/08/2012: 713385808
-             #  (increase due to new codegen)
-             # 15/05/2013: 628341952
-             #  (reason for decrease unknown)
-             # 24/06/2013: 694019152
-             #  (reason for re-increase unknown)
+             # 29/08/2012: 713385808     #  (increase due to new codegen)
+             # 15/05/2013: 628341952     #  (reason for decrease unknown)
+             # 24/06/2013: 694019152     #  (reason for re-increase unknown)
+             # 12/05/2014: 614409344     #  (specialisation and inlining changes)
+             # 10/09/2014: 601629032     #  post-AMP-cleanp
+
       ],
       compile,[''])
 
@@ -390,44 +420,58 @@ test('T5321FD',
 test('T5642',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-           [(wordsize(32), 650000000, 10),
+           [(wordsize(32), 753045568, 10),
                      # sample from x86/Linux
-            (wordsize(64), 1358833928, 10)])
+            # prev:        650000000
+            # 2014-09-03:  753045568 
+            (wordsize(64), 1536924976, 10)])
             # prev:        1300000000
             # 2014-07-17:  1358833928 (general round of updates)
+            # 2014-08-07:  1402242360 (caused by 1fc60ea)
+# Watch out for:
+            # 23/05/2014:  1452688392 (More aggressive specialisation means we get
+            #                          specialised copies of imported functions that
+            #                          are ultimately discarded by trimAutoRules
+            #                          It's a bizarre program with LOTS of data types)
+            # 2014-09-10:  1536924976 post-AMP-cleanup
       ],
       compile,['-O'])
 
 test('T5837',
      [ only_ways(['normal']),
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 45520936 , 10),
+          [(wordsize(32), 37096484, 10),
              # 40000000 (x86/Linux)
              # 2013-11-13: 45520936 (x86/Windows, 64bit machine)
-           (wordsize(64), 86795752, 10)])
+             # 2041-09-03: 37096484 (Windows laptop, w/w for INLINABLE things
+           (wordsize(64), 73639840, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
              # 2013-09-18 90587232 amd64/Linux
              # 2013-11-21 86795752 amd64/Linux, GND via Coercible and counters
              #                                  for constraints solving
+             # 2041-08-29 73639840 amd64/Linux, w/w for INLINABLE things
       ],
       compile_fail,['-ftype-function-depth=50'])
 
 test('T6048',
      [ only_ways(['optasm']),
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 62618072, 10),
+          [(wordsize(32), 56315812, 10),
             # prev:       38000000 (x86/Linux)
             # 2012-10-08: 48887164 (x86/Linux)
             # 2014-04-04: 62618072 (x86 Windows, 64 bit machine)
-           (wordsize(64), 125431448, 12)])
+            # 2014-09-03: 56315812 (x86 Windows, w/w for INLINEAVBLE)
+           (wordsize(64), 88186056, 12)])
              # 18/09/2012  97247032 amd64/Linux
              # 16/01/2014 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
              # 18/01/2014  95960720 amd64/Linux Call Arity improvements
              # 28/02/2014 105556793 amd64/Linux (unknown, tweak in base/4d9e7c9e3 resulted in change)
              # 05/03/2014 110646312 amd64/Linux Call Arity became more elaborate
              # 14/07/2014 125431448 amd64/Linux unknown reason. Even worse in GHC-7.8.3. *shurg*
+             # 29/08/2014 108354472 amd64/Linux w/w for INLINABLE things
+             # 14/09/2014  88186056 amd64/Linux BPP part1 change (more NoImplicitPreludes in base)
       ],
       compile,[''])
 
@@ -437,8 +481,9 @@ test('T9020',
           [(wordsize(32), 343005716, 10),
            # Original:    381360728
            # 2014-07-31:  343005716 (Windows) (general round of updates)
-           (wordsize(64), 728263536, 10)])
+           (wordsize(64), 785871680, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
+           # 2014-09-10:  785871680 post-AMP-cleanup
       ],
       compile,[''])

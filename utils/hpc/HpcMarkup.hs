@@ -17,7 +17,6 @@ import System.IO (localeEncoding)
 import Data.List
 import Data.Maybe(fromJust)
 import Data.Array
-import Data.Monoid
 import Control.Monad
 import qualified Data.Set as Set
 

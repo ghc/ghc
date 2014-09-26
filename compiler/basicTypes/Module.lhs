@@ -43,6 +43,7 @@ module Module
         mainPackageKey,
         thisGhcPackageKey,
         interactivePackageKey, isInteractiveModule,
+        wiredInPackageKeys,
 
         -- * The Module type
         Module,
@@ -82,6 +83,8 @@ import UniqFM
 import FastString
 import Binary
 import Util
+import {-# SOURCE #-} Packages
+import GHC.PackageDb (BinaryStringRep(..))
 
 import Data.Data
 import Data.Map (Map)
@@ -179,6 +182,10 @@ instance Binary ModuleName where
   put_ bh (ModuleName fs) = put_ bh fs
   get bh = do fs <- get bh; return (ModuleName fs)
 
+instance BinaryStringRep ModuleName where
+  fromStringRep = mkModuleNameFS . mkFastStringByteString
+  toStringRep   = fastStringToByteString . moduleNameFS
+
 instance Data ModuleName where
   -- don't traverse?
   toConstr _   = abstractConstr "ModuleName"
@@ -274,7 +281,7 @@ pprPackagePrefix p mod = getPprStyle doc
           if p == mainPackageKey
                 then empty -- never qualify the main package in code
                 else ztext (zEncodeFS (packageKeyFS p)) <> char '_'
-       | qualModule sty mod = ftext (packageKeyFS (modulePackageKey mod)) <> char ':'
+       | qualModule sty mod = ppr (modulePackageKey mod) <> char ':'
                 -- the PrintUnqualified tells us which modules have to
                 -- be qualified with package names
        | otherwise = empty
@@ -293,7 +300,10 @@ class HasModule m where
 %************************************************************************
 
 \begin{code}
--- | Essentially just a string identifying a package, including the version: e.g. parsec-1.0
+-- | A string which uniquely identifies a package.  For wired-in packages,
+-- it is just the package name, but for user compiled packages, it is a hash.
+-- ToDo: when the key is a hash, we can do more clever things than store
+-- the hex representation and hash-cons those strings.
 newtype PackageKey = PId FastString deriving( Eq, Typeable )
     -- here to avoid module loops with PackageConfig
 
@@ -316,11 +326,20 @@ stablePackageKeyCmp :: PackageKey -> PackageKey -> Ordering
 stablePackageKeyCmp p1 p2 = packageKeyFS p1 `compare` packageKeyFS p2
 
 instance Outputable PackageKey where
-   ppr pid = text (packageKeyString pid)
+   ppr pk = getPprStyle $ \sty -> sdocWithDynFlags $ \dflags ->
+    text (packageKeyPackageIdString dflags pk)
+    -- Don't bother qualifying if it's wired in!
+       <> (if qualPackage sty pk && not (pk `elem` wiredInPackageKeys)
+            then char '@' <> ftext (packageKeyFS pk)
+            else empty)
 
 instance Binary PackageKey where
   put_ bh pid = put_ bh (packageKeyFS pid)
   get bh = do { fs <- get bh; return (fsToPackageKey fs) }
+
+instance BinaryStringRep PackageKey where
+  fromStringRep = fsToPackageKey . mkFastStringByteString
+  toStringRep   = fastStringToByteString . packageKeyFS
 
 fsToPackageKey :: FastString -> PackageKey
 fsToPackageKey = PId
@@ -377,6 +396,16 @@ mainPackageKey      = fsToPackageKey (fsLit "main")
 
 isInteractiveModule :: Module -> Bool
 isInteractiveModule mod = modulePackageKey mod == interactivePackageKey
+
+wiredInPackageKeys :: [PackageKey]
+wiredInPackageKeys = [ primPackageKey,
+                       integerPackageKey,
+                       basePackageKey,
+                       rtsPackageKey,
+                       thPackageKey,
+                       thisGhcPackageKey,
+                       dphSeqPackageKey,
+                       dphParPackageKey ]
 \end{code}
 
 %************************************************************************

@@ -52,8 +52,8 @@ findMBlockMap(void *p)
     {
         if(mblock_maps[i]->addrHigh32 == hi)
         {
-	    return mblock_maps[i];
-	}
+            return mblock_maps[i];
+        }
     }
     return NULL;
 }
@@ -63,7 +63,7 @@ StgBool HEAP_ALLOCED_miss(StgWord mblock, void *p)
     MBlockMap *map;
     MBlockMapLine value;
     nat entry_no;
-    
+
     entry_no = mblock & (MBC_ENTRIES-1);
 
     map = findMBlockMap(p);
@@ -87,14 +87,14 @@ setHeapAlloced(void *p, StgWord8 i)
     MBlockMap *map = findMBlockMap(p);
     if(map == NULL)
     {
-    	mblock_map_count++;
-    	mblock_maps = stgReallocBytes(mblock_maps,
+        mblock_map_count++;
+        mblock_maps = stgReallocBytes(mblock_maps,
                                       sizeof(MBlockMap*) * mblock_map_count,
                                       "markHeapAlloced(1)");
-	map = mblock_maps[mblock_map_count-1] = 
+        map = mblock_maps[mblock_map_count-1] =
             stgMallocBytes(sizeof(MBlockMap),"markHeapAlloced(2)");
         memset(map,0,sizeof(MBlockMap));
-	map->addrHigh32 = (StgWord32) (((StgWord)p) >> 32);
+        map->addrHigh32 = (StgWord32) (((StgWord)p) >> 32);
     }
 
     map->lines[MBLOCK_MAP_LINE(p)] = i;
@@ -102,7 +102,7 @@ setHeapAlloced(void *p, StgWord8 i)
     {
         StgWord mblock;
         nat entry_no;
-        
+
         mblock   = (StgWord)p >> MBLOCK_SHIFT;
         entry_no = mblock & (MBC_ENTRIES-1);
         mblock_cache[entry_no] = (mblock << 1) + i;
@@ -178,7 +178,7 @@ void * getNextMBlock(void *p)
             line = map->lines[line_no];
             for (; off < MBC_LINE_SIZE; off++) {
                 if (line & (1<<off)) {
-                    return (void*)(((StgWord)map->addrHigh32 << 32) + 
+                    return (void*)(((StgWord)map->addrHigh32 << 32) +
                                    line_no * MBC_LINE_SIZE * MBLOCK_SIZE +
                                    off * MBLOCK_SIZE);
                 }
@@ -200,7 +200,7 @@ void * getFirstMBlock(void)
         if (line) {
             for (off = 0; off < MBC_LINE_SIZE; off++) {
                 if (line & (1<<off)) {
-                    return (void*)(((StgWord)map->addrHigh32 << 32) + 
+                    return (void*)(((StgWord)map->addrHigh32 << 32) +
                                    line_no * MBC_LINE_SIZE * MBLOCK_SIZE +
                                    off * MBLOCK_SIZE);
                 }
@@ -234,12 +234,12 @@ getMBlocks(nat n)
     ret = osGetMBlocks(n);
 
     debugTrace(DEBUG_gc, "allocated %d megablock(s) at %p",n,ret);
-    
+
     // fill in the table
     for (i = 0; i < n; i++) {
         markHeapAlloced( (StgWord8*)ret + i * MBLOCK_SIZE );
     }
-    
+
     mblocks_allocated += n;
     peak_mblocks_allocated = stg_max(peak_mblocks_allocated, mblocks_allocated);
 

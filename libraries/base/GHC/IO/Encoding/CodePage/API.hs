@@ -8,7 +8,6 @@ import Foreign.C
 import Foreign.Ptr
 import Foreign.Marshal
 import Foreign.Storable
-import Control.Monad
 import Data.Bits
 import Data.Either
 import Data.Word
@@ -71,13 +70,13 @@ instance Storable CPINFO where
       ptr <- return $ castPtr $ advancePtr ptr 1
       b <- peekArray mAX_DEFAULTCHAR ptr
       c <- peekArray mAX_LEADBYTES   (advancePtr ptr mAX_DEFAULTCHAR)
-      return $ CPINFO a b c  
+      return $ CPINFO a b c
     poke ptr val = do
       ptr <- return $ castPtr ptr
       poke ptr (maxCharSize val)
       ptr <- return $ castPtr $ advancePtr ptr 1
       pokeArray' "CPINFO.defaultChar" mAX_DEFAULTCHAR ptr                              (defaultChar val)
-      pokeArray' "CPINFO.leadByte"    mAX_LEADBYTES   (advancePtr ptr mAX_DEFAULTCHAR) (leadByte val) 
+      pokeArray' "CPINFO.leadByte"    mAX_LEADBYTES   (advancePtr ptr mAX_DEFAULTCHAR) (leadByte val)
 
 pokeArray' :: Storable a => String -> Int -> Ptr a -> [a] -> IO ()
 pokeArray' msg sz ptr xs | length xs == sz = pokeArray ptr xs
@@ -119,10 +118,10 @@ foreign import WINDOWS_CCONV unsafe "windows.h IsDBCSLeadByteEx"
 --
 -- This is useful for supporting DBCS text encoding on the console without having to statically link
 -- in huge code tables into all of our executables, or just as a fallback mechanism if a new code page
--- is introduced that we don't know how to deal with ourselves yet.  
+-- is introduced that we don't know how to deal with ourselves yet.
 mkCodePageEncoding :: CodingFailureMode -> Word32 -> TextEncoding
 mkCodePageEncoding cfm cp
-  = TextEncoding { 
+  = TextEncoding {
         textEncodingName = "CP" ++ show cp,
         mkTextDecoder = newCP (recoverDecode cfm) cpDecode cp,
         mkTextEncoder = newCP (recoverEncode cfm) cpEncode cp
@@ -135,8 +134,8 @@ newCP :: (Buffer from -> Buffer to -> IO (Buffer from, Buffer to))
 newCP rec fn cp = do
   -- Fail early if the code page doesn't exist, to match the behaviour of the IConv TextEncoding
   max_char_size <- alloca $ \cpinfo_ptr -> do
-    success <- c_GetCPInfo cp cpinfo_ptr 
-    unless success $ throwGetLastError ("GetCPInfo " ++ show cp)
+    success <- c_GetCPInfo cp cpinfo_ptr
+    when (not success) $ throwGetLastError ("GetCPInfo " ++ show cp)
     fmap (fromIntegral . maxCharSize) $ peek cpinfo_ptr
 
   debugIO $ "GetCPInfo " ++ show cp ++ " = " ++ show max_char_size
@@ -269,7 +268,7 @@ cpEncode cp _max_char_size = \ibuf obuf -> do
     let sz =       (bufferElems ibuf * 2)     -- UTF-32 always uses 4 bytes. UTF-16 uses at most 4 bytes.
              `min` (bufferAvailable obuf * 2) -- In the best case, each pair of UTF-16 points fits into only 1 byte
     mbuf <- newBuffer (2 * sz) sz WriteBuffer
-    
+
     -- Convert as much UTF-32 as possible to UTF-16. NB: this can't fail due to output underflow
     -- since we sized the output buffer correctly. However, it could fail due to an illegal character
     -- in the input if it encounters a lone surrogate. In this case, our recovery will be applied as normal.
@@ -296,7 +295,7 @@ cpEncode cp _max_char_size = \ibuf obuf -> do
         -- UTF-32 characters required to get the consumed count of UTF-16 characters:
         --
         -- When dealing with data from the BMP (the common case), consuming N UTF-16 characters will be the same as consuming N
-        -- UTF-32 characters. We start our search there so that most binary searches will terminate in a single iteration. 
+        -- UTF-32 characters. We start our search there so that most binary searches will terminate in a single iteration.
         -- Furthermore, the absolute minimum number of UTF-32 characters this can correspond to is 1/2 the UTF-16 byte count
         -- (this will be realised when the input data is entirely not in the BMP).
         utf32_count <- bSearch "cpEncode" utf16_native_encode ibuf mbuf target_utf16_count (target_utf16_count `div` 2) target_utf16_count target_utf16_count
@@ -347,7 +346,7 @@ bSearch msg code ibuf mbuf target_to_elems = go
       -- have just been unlucky enough to set md so that ibuf straddles a byte boundary.
       -- In this case we have to be really careful, because we don't want to report that
       -- "md" elements is the right number when in actual fact we could have had md-1 input
-      -- elements and still produced the same number of bufferElems in mbuf. 
+      -- elements and still produced the same number of bufferElems in mbuf.
       --
       -- In fact, we have to worry about this possibility even if we get InputUnderflow
       -- since that will report InputUnderflow rather than InvalidSequence if the buffer
@@ -359,7 +358,7 @@ bSearch msg code ibuf mbuf target_to_elems = go
       -- Luckily if we have InvalidSequence/OutputUnderflow and we do not appear to have reached
       -- the target, what we should do is the same as normal because the fraction of ibuf that our
       -- first "code" coded succesfully must be invalid-sequence-free, and ibuf will always
-      -- have been decoded as far as the first invalid sequence in it. 
+      -- have been decoded as far as the first invalid sequence in it.
       case bufferElems mbuf `compare` target_to_elems of
         -- Coding n "from" chars from the input yields exactly as many "to" chars
         -- as were consumed by the recode. All is peachy:

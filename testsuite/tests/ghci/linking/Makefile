@@ -60,9 +60,10 @@ ghcilink004 :
 	echo 'name: test' >>$(PKG004)
 	echo 'version: 1.0' >>$(PKG004)
 	echo 'id: test-XXX' >>$(PKG004)
+	echo 'key: test-1.0' >>$(PKG004)
 	echo 'library-dirs: $${pkgroot}' >>$(PKG004)
 	echo 'extra-libraries: foo' >>$(PKG004)
-	echo '[]' >$(LOCAL_PKGCONF004)
+	'$(GHC_PKG)' init $(LOCAL_PKGCONF004)
 	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF004) register $(PKG004) -v0
 	#
 	"$(TEST_HC)" -c f.c -o dir004/foo.o
@@ -87,9 +88,10 @@ ghcilink005 :
 	echo 'name: test' >>$(PKG005)
 	echo 'version: 1.0' >>$(PKG005)
 	echo 'id: test-XXX' >>$(PKG005)
+	echo 'key: test-1.0' >>$(PKG005)
 	echo 'library-dirs: $${pkgroot}' >>$(PKG005)
 	echo 'extra-libraries: foo' >>$(PKG005)
-	echo '[]' >$(LOCAL_PKGCONF005)
+	'$(GHC_PKG)' init $(LOCAL_PKGCONF005)
 	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF005) register $(PKG005) -v0
 	#
 	"$(TEST_HC)" -c -dynamic f.c -o dir005/foo.o
@@ -111,8 +113,9 @@ ghcilink006 :
 	echo "name: test" >>$(PKG006)
 	echo "version: 1.0" >>$(PKG006)
 	echo "id: test-XXX" >>$(PKG006)
+	echo "key: test-1.0" >>$(PKG006)
 	echo "extra-libraries: stdc++" >>$(PKG006)
-	echo "[]" >$(LOCAL_PKGCONF006)
+	'$(GHC_PKG)' init $(LOCAL_PKGCONF006)
 	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF006) register $(PKG006) -v0
 	#
 	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-db $(LOCAL_PKGCONF006) -package test

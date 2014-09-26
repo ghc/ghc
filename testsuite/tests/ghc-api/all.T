@@ -1,10 +1,11 @@
 test('ghcApi', normal, compile_and_run, ['-package ghc'])
-test('T6145', when(fast(), skip),
+test('T6145', normal,
               run_command,
               ['$MAKE -s --no-print-directory T6145'])
-test('T8639_api', when(fast(), skip),
+test('T8639_api', normal,
               run_command,
               ['$MAKE -s --no-print-directory T8639_api'])
-test('T8628', when(fast(), skip),
+test('T8628', normal,
               run_command,
               ['$MAKE -s --no-print-directory T8628'])
+test('T9595', extra_run_opts('"' + config.libdir + '"'), compile_and_run, ['-package ghc'])

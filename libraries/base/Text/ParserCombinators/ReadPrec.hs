@@ -6,7 +6,7 @@
 -- Module      :  Text.ParserCombinators.ReadPrec
 -- Copyright   :  (c) The University of Glasgow 2002
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  non-portable (uses Text.ParserCombinators.ReadP)
@@ -16,9 +16,9 @@
 -----------------------------------------------------------------------------
 
 module Text.ParserCombinators.ReadPrec
-  ( 
+  (
   ReadPrec,
-  
+
   -- * Precedences
   Prec,
   minPrec,
@@ -61,7 +61,6 @@ import qualified Text.ParserCombinators.ReadP as ReadP
   , pfail
   )
 
-import Control.Monad( MonadPlus(..) )
 import GHC.Num( Num(..) )
 import GHC.Base
 
@@ -75,17 +74,24 @@ newtype ReadPrec a = P (Prec -> ReadP a)
 instance Functor ReadPrec where
   fmap h (P f) = P (\n -> fmap h (f n))
 
+instance Applicative ReadPrec where
+    pure = return
+    (<*>) = ap
+
 instance Monad ReadPrec where
   return x  = P (\_ -> return x)
   fail s    = P (\_ -> fail s)
   P f >>= k = P (\n -> do a <- f n; let P f' = k a in f' n)
-  
+
 instance MonadPlus ReadPrec where
   mzero = pfail
   mplus = (+++)
 
+instance Alternative ReadPrec where
+    empty = mzero
+    (<|>) = mplus
+
 -- precedences
-  
 type Prec = Int
 
 minPrec :: Prec
@@ -107,7 +113,7 @@ reset :: ReadPrec a -> ReadPrec a
 reset (P f) = P (\_ -> f minPrec)
 
 prec :: Prec -> ReadPrec a -> ReadPrec a
--- ^ @(prec n p)@ checks whether the precedence context is 
+-- ^ @(prec n p)@ checks whether the precedence context is
 --   less than or equal to @n@, and
 --
 --   * if not, fails

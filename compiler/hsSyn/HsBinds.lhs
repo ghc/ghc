@@ -8,6 +8,12 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 
 \begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
+                                      -- in module PlaceHolder
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE CPP #-}
 
 module HsBinds where
 
@@ -16,7 +22,7 @@ import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
                                GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
 
-import HsLit
+import PlaceHolder ( PostTc,PostRn,DataId )
 import HsTypes
 import PprCore ()
 import CoreSyn
@@ -35,10 +41,14 @@ import BooleanFormula (BooleanFormula)
 import Data.Data hiding ( Fixity )
 import Data.List
 import Data.Ord
+#if __GLASGOW_HASKELL__ < 709
 import Data.Foldable ( Foldable(..) )
 import Data.Traversable ( Traversable(..) )
 import Data.Monoid ( mappend )
-import Control.Applicative ( (<$>), (<*>) )
+import Control.Applicative hiding (empty)
+#else
+import Control.Applicative ((<$>))
+#endif
 \end{code}
 
 %************************************************************************
@@ -60,30 +70,34 @@ type HsLocalBinds id = HsLocalBindsLR id id
 
 -- | Bindings in a 'let' expression
 -- or a 'where' clause
-data HsLocalBindsLR idL idR    
+data HsLocalBindsLR idL idR
   = HsValBinds (HsValBindsLR idL idR)
   | HsIPBinds  (HsIPBinds idR)
   | EmptyLocalBinds
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId idL, DataId idR)
+  => Data (HsLocalBindsLR idL idR)
 
 type HsValBinds id = HsValBindsLR id id
 
 -- | Value bindings (not implicit parameters)
-data HsValBindsLR idL idR   
+data HsValBindsLR idL idR
   = -- | Before renaming RHS; idR is always RdrName
     -- Not dependency analysed
     -- Recursive by default
     ValBindsIn
-        (LHsBindsLR idL idR) [LSig idR] 
+        (LHsBindsLR idL idR) [LSig idR]
 
     -- | After renaming RHS; idR can be Name or Id
     --  Dependency analysed,
     -- later bindings in the list may depend on earlier
     -- ones.
-  | ValBindsOut            
-        [(RecFlag, LHsBinds idL)]       
+  | ValBindsOut
+        [(RecFlag, LHsBinds idL)]
         [LSig Name]
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId idL, DataId idR)
+  => Data (HsValBindsLR idL idR)
 
 type LHsBind  id = LHsBindLR  id id
 type LHsBinds id = LHsBindsLR id id
@@ -124,7 +138,8 @@ data HsBindLR idL idR
                                 -- type         Int -> forall a'. a' -> a'
                                 -- Notice that the coercion captures the free a'.
 
-        bind_fvs :: NameSet,    -- ^ After the renamer, this contains the locally-bound
+        bind_fvs :: PostRn idL NameSet, -- ^ After the renamer, this contains
+                                --  the locally-bound
                                 -- free variables of this defn.
                                 -- See Note [Bind free vars]
 
@@ -134,11 +149,11 @@ data HsBindLR idL idR
 
   -- | The pattern is never a simple variable;
   -- That case is done by FunBind
-  | PatBind {   
+  | PatBind {
         pat_lhs    :: LPat idL,
         pat_rhs    :: GRHSs idR (LHsExpr idR),
-        pat_rhs_ty :: PostTcType,       -- ^ Type of the GRHSs
-        bind_fvs   :: NameSet,          -- ^ See Note [Bind free vars]
+        pat_rhs_ty :: PostTc idR Type,      -- ^ Type of the GRHSs
+        bind_fvs   :: PostRn idL NameSet, -- ^ See Note [Bind free vars]
         pat_ticks  :: (Maybe (Tickish Id), [Maybe (Tickish Id)])
                -- ^ Tick to put on the rhs, if any, and ticks to put on
                -- the bound variables.
@@ -146,8 +161,8 @@ data HsBindLR idL idR
 
   -- | Dictionary binding and suchlike.
   -- All VarBinds are introduced by the type checker
-  | VarBind {   
-        var_id     :: idL,           
+  | VarBind {
+        var_id     :: idL,
         var_rhs    :: LHsExpr idR,   -- ^ Located only for consistency
         var_inline :: Bool           -- ^ True <=> inline this binding regardless
                                      -- (used for implication constraints only)
@@ -168,7 +183,10 @@ data HsBindLR idL idR
 
   | PatSynBind (PatSynBind idL idR)
 
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId idL, DataId idR)
+  => Data (HsBindLR idL idR)
+
         -- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
         --
         -- Creates bindings for (polymorphic, overloaded) poly_f
@@ -190,16 +208,15 @@ data ABExport id
   } deriving (Data, Typeable)
 
 data PatSynBind idL idR
-  = PSB { psb_id   :: Located idL,                   -- ^ Name of the pattern synonym
-          psb_fvs  :: NameSet,                       -- ^ See Note [Bind free vars]
+  = PSB { psb_id   :: Located idL,             -- ^ Name of the pattern synonym
+          psb_fvs  :: PostRn idR NameSet,      -- ^ See Note [Bind free vars]
           psb_args :: HsPatSynDetails (Located idR), -- ^ Formal parameter names
           psb_def  :: LPat idR,                      -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR                -- ^ Directionality
-  } deriving (Data, Typeable)
+  } deriving (Typeable)
+deriving instance (DataId idL, DataId idR )
+  => Data (PatSynBind idL idR)
 
--- | Used for the NameSet in FunBind and PatBind prior to the renamer
-placeHolderNames :: NameSet
-placeHolderNames = panic "placeHolderNames"
 \end{code}
 
 Note [AbsBinds]
@@ -213,9 +230,9 @@ top-level binding
 In Hindley-Milner, a recursive binding is typechecked with the *recursive* uses
 being *monomorphic*.  So after typechecking *and* desugaring we will get something
 like this
- 
+
     M.reverse :: forall a. [a] -> [a]
-      = /\a. letrec 
+      = /\a. letrec
                 reverse :: [a] -> [a] = \xs -> case xs of
                                                 []     -> []
                                                 (x:xs) -> reverse xs ++ [x]
@@ -225,22 +242,22 @@ Notice that 'M.reverse' is polymorphic as expected, but there is a local
 definition for plain 'reverse' which is *monomorphic*.  The type variable
 'a' scopes over the entire letrec.
 
-That's after desugaring.  What about after type checking but before desugaring?  
+That's after desugaring.  What about after type checking but before desugaring?
 That's where AbsBinds comes in.  It looks like this:
 
    AbsBinds { abs_tvs     = [a]
             , abs_exports = [ABE { abe_poly = M.reverse :: forall a. [a] -> [a],
                                  , abe_mono = reverse :: a -> a}]
-            , abs_binds = { reverse :: [a] -> [a] 
+            , abs_binds = { reverse :: [a] -> [a]
                                = \xs -> case xs of
                                             []     -> []
                                             (x:xs) -> reverse xs ++ [x] } }
 
 Here,
-  * abs_tvs says what type variables are abstracted over the binding group, 
+  * abs_tvs says what type variables are abstracted over the binding group,
     just 'a' in this case.
   * abs_binds is the *monomorphic* bindings of the group
-  * abs_exports describes how to get the polymorphic Id 'M.reverse' from the 
+  * abs_exports describes how to get the polymorphic Id 'M.reverse' from the
     monomorphic one 'reverse'
 
 Notice that the *original* function (the polymorphic one you thought
@@ -500,7 +517,8 @@ data HsIPBinds id
         [LIPBind id]
         TcEvBinds       -- Only in typechecker output; binds
                         -- uses of the implicit parameters
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId id) => Data (HsIPBinds id)
 
 isEmptyIPBinds :: HsIPBinds id -> Bool
 isEmptyIPBinds (IPBinds is ds) = null is && isEmptyTcEvBinds ds
@@ -514,7 +532,8 @@ that way until after type-checking when they are replaced with
 evidene for the implicit parameter. -}
 data IPBind id
   = IPBind (Either HsIPName id) (LHsExpr id)
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId name) => Data (IPBind name)
 
 instance (OutputableBndr id) => Outputable (HsIPBinds id) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs)
@@ -543,7 +562,7 @@ serves for both.
 type LSig name = Located (Sig name)
 
 -- | Signatures and pragmas
-data Sig name   
+data Sig name
   =   -- | An ordinary type signature
       -- @f :: Num a => a -> a@
     TypeSig [Located name] (LHsType name)
@@ -605,7 +624,8 @@ data Sig name
         -- > {-# MINIMAL a | (b, c | (d | e)) #-}
   | MinimalSig (BooleanFormula (Located name))
 
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId name) => Data (Sig name)
 
 
 type LFixitySig name = Located (FixitySig name)
@@ -623,9 +643,9 @@ type LTcSpecPrag = Located TcSpecPrag
 
 data TcSpecPrag
   = SpecPrag
-        Id              
-        HsWrapper       
-        InlinePragma    
+        Id
+        HsWrapper
+        InlinePragma
   -- ^ The Id to be specialised, an wrapper that specialises the
   -- polymorphic function, and inlining spec for the specialised function
   deriving (Data, Typeable)
@@ -795,5 +815,6 @@ data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
   | ExplicitBidirectional (MatchGroup id (LHsExpr id))
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId id) => Data (HsPatSynDir id)
 \end{code}

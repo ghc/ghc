@@ -54,7 +54,9 @@ import Data.Word
 import System.IO
 import qualified Data.Map as Map
 import Control.Monad (liftM, ap)
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
+#endif
 
 import qualified Data.Array.Unsafe as U ( castSTUArray )
 import Data.Array.ST
@@ -99,9 +101,7 @@ pprTop (CmmProc infos clbl _ graph) =
            (if (externallyVisibleCLabel clbl)
                     then mkFN_ else mkIF_) (ppr clbl) <+> lbrace,
            nest 8 temp_decls,
-           nest 8 mkFB_,
            vcat (map pprBBlock blocks),
-           nest 8 mkFE_,
            rbrace ]
     )
   where
@@ -608,7 +608,7 @@ pprMachOp_for_C mop = case mop of
 
         MO_SF_Conv _from to -> parens (machRep_F_CType to)
         MO_FS_Conv _from to -> parens (machRep_S_CType to)
-        
+
         MO_S_MulMayOflo _ -> pprTrace "offending mop:"
                                 (ptext $ sLit "MO_S_MulMayOflo")
                                 (panic $ "PprC.pprMachOp_for_C: MO_S_MulMayOflo"
@@ -753,6 +753,8 @@ pprCallishMachOp_for_C mop
         MO_Memmove      -> ptext (sLit "memmove")
         (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
+        (MO_Clz w)      -> ptext (sLit $ clzLabel w)
+        (MO_Ctz w)      -> ptext (sLit $ ctzLabel w)
         (MO_AtomicRMW w amop) -> ptext (sLit $ atomicRMWLabel w amop)
         (MO_Cmpxchg w)  -> ptext (sLit $ cmpxchgLabel w)
         (MO_AtomicRead w)  -> ptext (sLit $ atomicReadLabel w)
@@ -763,6 +765,8 @@ pprCallishMachOp_for_C mop
         MO_U_QuotRem  {} -> unsupported
         MO_U_QuotRem2 {} -> unsupported
         MO_Add2       {} -> unsupported
+        MO_AddIntC    {} -> unsupported
+        MO_SubIntC    {} -> unsupported
         MO_U_Mul2     {} -> unsupported
         MO_Touch         -> unsupported
         (MO_Prefetch_Data _ ) -> unsupported
@@ -780,11 +784,6 @@ mkJMP_, mkFN_, mkIF_ :: SDoc -> SDoc
 mkJMP_ i = ptext (sLit "JMP_") <> parens i
 mkFN_  i = ptext (sLit "FN_")  <> parens i -- externally visible function
 mkIF_  i = ptext (sLit "IF_")  <> parens i -- locally visible
-
-
-mkFB_, mkFE_ :: SDoc
-mkFB_ = ptext (sLit "FB_") -- function code begin
-mkFE_ = ptext (sLit "FE_") -- function code end
 
 -- from includes/Stg.h
 --
@@ -1219,8 +1218,9 @@ commafy xs = hsep $ punctuate comma xs
 pprHexVal :: Integer -> Width -> SDoc
 pprHexVal 0 _ = ptext (sLit "0x0")
 pprHexVal w rep
-  | w < 0     = parens (char '-' <> ptext (sLit "0x") <> go (-w) <> repsuffix rep)
-  | otherwise = ptext (sLit "0x") <> go w <> repsuffix rep
+  | w < 0     = parens (char '-' <>
+                    ptext (sLit "0x") <> intToDoc (-w) <> repsuffix rep)
+  | otherwise =     ptext (sLit "0x") <> intToDoc   w  <> repsuffix rep
   where
         -- type suffix for literals:
         -- Integer literals are unsigned in Cmm/C.  We explicitly cast to
@@ -1235,10 +1235,33 @@ pprHexVal w rep
           else panic "pprHexVal: Can't find a 64-bit type"
       repsuffix _ = char 'U'
 
+      intToDoc :: Integer -> SDoc
+      intToDoc i = go (truncInt i)
+
+      -- We need to truncate value as Cmm backend does not drop
+      -- redundant bits to ease handling of negative values.
+      -- Thus the following Cmm code on 64-bit arch, like amd64:
+      --     CInt v;
+      --     v = {something};
+      --     if (v == %lobits32(-1)) { ...
+      -- leads to the following C code:
+      --     StgWord64 v = (StgWord32)({something});
+      --     if (v == 0xFFFFffffFFFFffffU) { ...
+      -- Such code is incorrect as it promotes both operands to StgWord64
+      -- and the whole condition is always false.
+      truncInt :: Integer -> Integer
+      truncInt i =
+          case rep of
+              W8  -> i `rem` (2^(8 :: Int))
+              W16 -> i `rem` (2^(16 :: Int))
+              W32 -> i `rem` (2^(32 :: Int))
+              W64 -> i `rem` (2^(64 :: Int))
+              _   -> panic ("pprHexVal/truncInt: C backend can't encode "
+                            ++ show rep ++ " literals")
+
       go 0 = empty
       go w' = go q <> dig
            where
              (q,r) = w' `quotRem` 16
              dig | r < 10    = char (chr (fromInteger r + ord '0'))
                  | otherwise = char (chr (fromInteger r - 10 + ord 'a'))
-

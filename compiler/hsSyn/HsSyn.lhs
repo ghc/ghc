@@ -10,6 +10,11 @@ therefore, is almost nothing but re-exporting.
 
 \begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
+                                      -- in module PlaceHolder
+{-# LANGUAGE ConstraintKinds #-}
 
 module HsSyn (
         module HsBinds,
@@ -21,6 +26,7 @@ module HsSyn (
         module HsTypes,
         module HsUtils,
         module HsDoc,
+        module PlaceHolder,
         Fixity,
 
         HsModule(..)
@@ -32,6 +38,7 @@ import HsBinds
 import HsExpr
 import HsImpExp
 import HsLit
+import PlaceHolder
 import HsPat
 import HsTypes
 import BasicTypes       ( Fixity, WarningTxt )
@@ -75,7 +82,8 @@ data HsModule name
         -- ^ reason\/explanation for warning/deprecation of this module
       hsmodHaddockModHeader :: Maybe LHsDocString
         -- ^ Haddock module info and description, unparsed
-   } deriving (Data, Typeable)
+   } deriving (Typeable)
+deriving instance (DataId name) => Data (HsModule name)
 \end{code}
 
 

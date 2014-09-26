@@ -7,7 +7,7 @@
 -- Module      :  GHC.IO.Encoding
 -- Copyright   :  (c) The University of Glasgow, 2008-2009
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
@@ -21,7 +21,7 @@ module GHC.IO.Encoding (
         latin1, latin1_encode, latin1_decode,
         utf8, utf8_bom,
         utf16, utf16le, utf16be,
-        utf32, utf32le, utf32be, 
+        utf32, utf32le, utf32be,
         initLocaleEncoding,
         getLocaleEncoding, getFileSystemEncoding, getForeignEncoding,
         setLocaleEncoding, setFileSystemEncoding, setForeignEncoding,
@@ -44,12 +44,11 @@ import qualified GHC.IO.Encoding.Latin1 as Latin1
 import qualified GHC.IO.Encoding.UTF8   as UTF8
 import qualified GHC.IO.Encoding.UTF16  as UTF16
 import qualified GHC.IO.Encoding.UTF32  as UTF32
+import GHC.List
 import GHC.Word
 
 import Data.IORef
 import Data.Char (toUpper)
-import Data.List
-import Data.Maybe
 import System.IO.Unsafe (unsafePerformIO)
 
 -- -----------------------------------------------------------------------------
@@ -174,7 +173,7 @@ initForeignEncoding    = CodePage.mkLocaleEncoding IgnoreCodingFailure
 char8 :: TextEncoding
 char8 = Latin1.latin1
 
--- | Look up the named Unicode encoding.  May fail with 
+-- | Look up the named Unicode encoding.  May fail with
 --
 --  * 'isDoesNotExistError' if the encoding is unknown
 --
@@ -189,7 +188,7 @@ char8 = Latin1.latin1
 -- There is additional notation (borrowed from GNU iconv) for specifying
 -- how illegal characters are handled:
 --
---  * a suffix of @\/\/IGNORE@, e.g. @UTF-8\/\/IGNORE@, will cause 
+--  * a suffix of @\/\/IGNORE@, e.g. @UTF-8\/\/IGNORE@, will cause
 --    all illegal sequences on input to be ignored, and on output
 --    will drop all code points that have no representation in the
 --    target encoding.
@@ -259,6 +258,6 @@ latin1_decode :: Buffer Word8 -> CharBuffer -> IO (Buffer Word8, CharBuffer)
 latin1_decode input output = fmap (\(_why,input',output') -> (input',output')) $ Latin1.latin1_decode input output
 --latin1_decode = unsafePerformIO $ do mkTextDecoder Iconv.latin1 >>= return.encode
 
-unknownEncodingErr :: String -> IO a    
+unknownEncodingErr :: String -> IO a
 unknownEncodingErr e = ioException (IOError Nothing NoSuchThing "mkTextEncoding"
                                             ("unknown encoding:" ++ e)  Nothing Nothing)

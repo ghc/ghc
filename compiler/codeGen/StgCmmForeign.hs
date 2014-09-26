@@ -41,7 +41,12 @@ import Outputable
 import BasicTypes
 
 import Control.Monad
+
+#if __GLASGOW_HASKELL__ >= 709
+import Prelude hiding( succ, (<*>) )
+#else
 import Prelude hiding( succ )
+#endif
 
 -----------------------------------------------------------------------------
 -- Code generation for Foreign Calls

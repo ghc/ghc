@@ -1,14 +1,19 @@
 -----------------------------------------------------------------------------
 -- (c) The University of Glasgow, 2006
 --
--- GHC's lexer.
+-- GHC's lexer for Haskell 2010 [1].
 --
--- This is a combination of an Alex-generated lexer from a regex
--- definition, with some hand-coded bits.
+-- This is a combination of an Alex-generated lexer [2] from a regex
+-- definition, with some hand-coded bits. [3]
 --
 -- Completely accurate information about token-spans within the source
 -- file is maintained.  Every token has a start and end RealSrcLoc
 -- attached to it.
+--
+-- References:
+-- [1] https://www.haskell.org/onlinereport/haskell2010/haskellch2.html
+-- [2] http://www.haskell.org/alex/
+-- [3] https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/Parser
 --
 -----------------------------------------------------------------------------
 
@@ -30,6 +35,10 @@
 --     - Should we therefore also rule out reserved operators in the qualified
 --       form?  This is quite difficult to achieve.  We don't do it for
 --       qualified varids.
+
+
+-- -----------------------------------------------------------------------------
+-- Alex "Haskell code fragment top"
 
 {
 -- XXX The above flags turn off warnings in the generated code:
@@ -56,7 +65,6 @@ module Lexer (
    getLexState, popLexState, pushLexState,
    extension, bangPatEnabled, datatypeContextsEnabled,
    traditionalRecordSyntaxEnabled,
-   typeLiteralsEnabled,
    explicitForallEnabled,
    inRulePrag,
    explicitNamespacesEnabled,
@@ -79,6 +87,7 @@ import Ctype
 import BasicTypes       ( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..) )
 import Util             ( readRational )
 
+import Control.Applicative
 import Control.Monad
 import Data.Bits
 import Data.ByteString (ByteString)
@@ -91,48 +100,55 @@ import Data.Ratio
 import Data.Word
 }
 
-$unispace    = \x05 -- Trick Alex into handling Unicode. See alexGetChar.
-$whitechar   = [\ \n\r\f\v $unispace]
-$white_no_nl = $whitechar # \n
+
+-- -----------------------------------------------------------------------------
+-- Alex "Character set macros"
+
+$unispace    = \x05 -- Trick Alex into handling Unicode. See alexGetByte.
+$nl          = [\n\r\f]
+$whitechar   = [$nl\v\ $unispace]
+$white_no_nl = $whitechar # \n -- TODO #8424
 $tab         = \t
 
 $ascdigit  = 0-9
-$unidigit  = \x03 -- Trick Alex into handling Unicode. See alexGetChar.
+$unidigit  = \x03 -- Trick Alex into handling Unicode. See alexGetByte.
 $decdigit  = $ascdigit -- for now, should really be $digit (ToDo)
 $digit     = [$ascdigit $unidigit]
 
 $special   = [\(\)\,\;\[\]\`\{\}]
-$ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~]
-$unisymbol = \x04 -- Trick Alex into handling Unicode. See alexGetChar.
-$symbol    = [$ascsymbol $unisymbol] # [$special \_\:\"\']
+$ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~\:]
+$unisymbol = \x04 -- Trick Alex into handling Unicode. See alexGetByte.
+$symbol    = [$ascsymbol $unisymbol] # [$special \_\"\']
 
-$unilarge  = \x01 -- Trick Alex into handling Unicode. See alexGetChar.
+$unilarge  = \x01 -- Trick Alex into handling Unicode. See alexGetByte.
 $asclarge  = [A-Z]
 $large     = [$asclarge $unilarge]
 
-$unismall  = \x02 -- Trick Alex into handling Unicode. See alexGetChar.
+$unismall  = \x02 -- Trick Alex into handling Unicode. See alexGetByte.
 $ascsmall  = [a-z]
 $small     = [$ascsmall $unismall \_]
 
-$unigraphic = \x06 -- Trick Alex into handling Unicode. See alexGetChar.
-$graphic   = [$small $large $symbol $digit $special $unigraphic \:\"\']
+$unigraphic = \x06 -- Trick Alex into handling Unicode. See alexGetByte.
+$graphic   = [$small $large $symbol $digit $special $unigraphic \"\']
 
 $binit     = 0-1
 $octit     = 0-7
 $hexit     = [$decdigit A-F a-f]
-$symchar   = [$symbol \:]
-$nl        = [\n\r]
 $idchar    = [$small $large $digit \']
 
 $pragmachar = [$small $large $digit]
 
 $docsym    = [\| \^ \* \$]
 
-@varid     = $small $idchar*
-@conid     = $large $idchar*
 
-@varsym    = $symbol $symchar*
-@consym    = \: $symchar*
+-- -----------------------------------------------------------------------------
+-- Alex "Regular expression macros"
+
+@varid     = $small $idchar*          -- variable identifiers
+@conid     = $large $idchar*          -- constructor identifiers
+
+@varsym    = ($symbol # \:) $symbol*  -- variable (operator) symbol
+@consym    = \: $symbol*              -- constructor (operator) symbol
 
 @decimal     = $decdigit+
 @binary      = $binit+
@@ -140,8 +156,11 @@ $docsym    = [\| \^ \* \$]
 @hexadecimal = $hexit+
 @exponent    = [eE] [\-\+]? @decimal
 
--- we support the hierarchical module name extension:
 @qual = (@conid \.)+
+@qvarid = @qual @varid
+@qconid = @qual @conid
+@qvarsym = @qual @varsym
+@qconsym = @qual @consym
 
 @floating_point = @decimal \. @decimal @exponent? | @decimal @exponent
 
@@ -150,9 +169,17 @@ $docsym    = [\| \^ \* \$]
 @negative = \-
 @signed = @negative ?
 
+
+-- -----------------------------------------------------------------------------
+-- Alex "Identifier"
+
 haskell :-
 
--- everywhere: skip whitespace and comments
+
+-- -----------------------------------------------------------------------------
+-- Alex "Rules"
+
+-- everywhere: skip whitespace
 $white_no_nl+ ;
 $tab+         { warn Opt_WarnTabs (text "Tab character") }
 
@@ -179,7 +206,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- have a Haddock comment). The rules then munch the rest of the line.
 
 "-- " ~[$docsym \#] .* { lineCommentToken }
-"--" [^$symbol : \ ] .* { lineCommentToken }
+"--" [^$symbol \ ] .* { lineCommentToken }
 
 -- Next, match Haddock comments if no -haddock flag
 
@@ -191,7 +218,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- make sure that the first non-dash character isn't a symbol, and munch the
 -- rest of the line.
 
-"---"\-* [^$symbol :] .* { lineCommentToken }
+"---"\-* ~$symbol .* { lineCommentToken }
 
 -- Since the previous rules all match dashes followed by at least one
 -- character, we also need to match a whole line filled with just dashes.
@@ -252,13 +279,13 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 
 -- single-line line pragmas, of the form
 --    # <line> "<file>" <extra-stuff> \n
-<line_prag1> $decdigit+                 { setLine line_prag1a }
+<line_prag1> @decimal                   { setLine line_prag1a }
 <line_prag1a> \" [$graphic \ ]* \"      { setFile line_prag1b }
 <line_prag1b> .*                        { pop }
 
 -- Haskell-style line pragmas, of the form
 --    {-# LINE <line> "<file>" #-}
-<line_prag2> $decdigit+                 { setLine line_prag2a }
+<line_prag2> @decimal                   { setLine line_prag2a }
 <line_prag2a> \" [$graphic \ ]* \"      { setFile line_prag2b }
 <line_prag2b> "#-}"|"-}"                { pop }
    -- NOTE: accept -} at the end of a LINE pragma, for compatibility
@@ -341,8 +368,8 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
                      { lex_quasiquote_tok }
 
   -- qualified quasi-quote (#5555)
-  "[" @qual @varid "|"  / { ifExtension qqEnabled }
-                          { lex_qquasiquote_tok }
+  "[" @qvarid "|"  / { ifExtension qqEnabled }
+                     { lex_qquasiquote_tok }
 }
 
 <0> {
@@ -376,15 +403,15 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 }
 
 <0,option_prags> {
-  @qual @varid                  { idtoken qvarid }
-  @qual @conid                  { idtoken qconid }
+  @qvarid                       { idtoken qvarid }
+  @qconid                       { idtoken qconid }
   @varid                        { varid }
   @conid                        { idtoken conid }
 }
 
 <0> {
-  @qual @varid "#"+ / { ifExtension magicHashEnabled } { idtoken qvarid }
-  @qual @conid "#"+ / { ifExtension magicHashEnabled } { idtoken qconid }
+  @qvarid "#"+      / { ifExtension magicHashEnabled } { idtoken qvarid }
+  @qconid "#"+      / { ifExtension magicHashEnabled } { idtoken qconid }
   @varid "#"+       / { ifExtension magicHashEnabled } { varid }
   @conid "#"+       / { ifExtension magicHashEnabled } { idtoken conid }
 }
@@ -392,8 +419,8 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- ToDo: - move `var` and (sym) into lexical syntax?
 --       - remove backquote from $special?
 <0> {
-  @qual @varsym                                    { idtoken qvarsym }
-  @qual @consym                                    { idtoken qconsym }
+  @qvarsym                                         { idtoken qvarsym }
+  @qconsym                                         { idtoken qconsym }
   @varsym                                          { varsym }
   @consym                                          { consym }
 }
@@ -453,6 +480,10 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   \"                            { lex_string_tok }
 }
 
+
+-- -----------------------------------------------------------------------------
+-- Alex "Haskell code fragment bottom"
+
 {
 -- -----------------------------------------------------------------------------
 -- The token type
@@ -467,6 +498,7 @@ data Token
   | ITdo
   | ITelse
   | IThiding
+  | ITforeign
   | ITif
   | ITimport
   | ITin
@@ -484,7 +516,6 @@ data Token
   | ITwhere
 
   | ITforall                    -- GHC extension keywords
-  | ITforeign
   | ITexport
   | ITlabel
   | ITdynamic
@@ -1649,6 +1680,13 @@ data ALRLayout = ALRLayoutLet
 
 newtype P a = P { unP :: PState -> ParseResult a }
 
+instance Functor P where
+  fmap = liftM
+
+instance Applicative P where
+  pure  = return
+  (<*>) = ap
+
 instance Monad P where
   return = returnP
   (>>=) = thenP
@@ -1738,13 +1776,13 @@ alexGetByte (AI loc s)
         loc'   = advanceSrcLoc loc c
         byte   = fromIntegral $ ord adj_c
 
-        non_graphic     = '\x0'
-        upper           = '\x1'
-        lower           = '\x2'
-        digit           = '\x3'
-        symbol          = '\x4'
-        space           = '\x5'
-        other_graphic   = '\x6'
+        non_graphic     = '\x00'
+        upper           = '\x01'
+        lower           = '\x02'
+        digit           = '\x03'
+        symbol          = '\x04'
+        space           = '\x05'
+        other_graphic   = '\x06'
 
         adj_c
           | c <= '\x06' = non_graphic
@@ -1911,7 +1949,6 @@ data ExtBits
   | NondecreasingIndentationBit
   | SafeHaskellBit
   | TraditionalRecordSyntaxBit
-  | TypeLiteralsBit
   | ExplicitNamespacesBit
   | LambdaCaseBit
   | BinaryLiteralsBit
@@ -1963,8 +2000,6 @@ sccProfilingOn :: ExtsBitmap -> Bool
 sccProfilingOn = xtest SccProfilingOnBit
 traditionalRecordSyntaxEnabled :: ExtsBitmap -> Bool
 traditionalRecordSyntaxEnabled = xtest TraditionalRecordSyntaxBit
-typeLiteralsEnabled :: ExtsBitmap -> Bool
-typeLiteralsEnabled = xtest TypeLiteralsBit
 
 explicitNamespacesEnabled :: ExtsBitmap -> Bool
 explicitNamespacesEnabled = xtest ExplicitNamespacesBit
@@ -2035,7 +2070,6 @@ mkPState flags buf loc =
                .|. NondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
                .|. SafeHaskellBit              `setBitIf` safeImportsOn                     flags
                .|. TraditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags
-               .|. TypeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
                .|. ExplicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
                .|. LambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
                .|. BinaryLiteralsBit           `setBitIf` xopt Opt_BinaryLiterals           flags

@@ -17,6 +17,7 @@ module Linker ( getHValue, showLinkerState,
                 extendLinkEnv, deleteFromLinkEnv,
                 extendLoadedPkgs,
                 linkPackages,initDynLinker,linkModule,
+                linkCmdLineLibs,
 
                 -- Saving/restoring globals
                 PersistentLinkerState, saveLinkerGlobals, restoreLinkerGlobals
@@ -59,18 +60,11 @@ import Control.Monad
 
 import Data.IORef
 import Data.List
-import qualified Data.Map as Map
 import Control.Concurrent.MVar
 
 import System.FilePath
 import System.IO
-#if __GLASGOW_HASKELL__ > 704
 import System.Directory hiding (findFile)
-#else
-import System.Directory
-#endif
-
-import Distribution.Package hiding (depends)
 
 import Exception
 \end{code}
@@ -290,10 +284,21 @@ reallyInitDynLinker dflags =
           -- (b) Load packages from the command-line (Note [preload packages])
         ; pls <- linkPackages' dflags (preloadPackages (pkgState dflags)) pls0
 
-          -- (c) Link libraries from the command-line
-        ; let cmdline_ld_inputs = ldInputs dflags
+          -- steps (c), (d) and (e)
+        ; linkCmdLineLibs' dflags pls
+        }
+
+linkCmdLineLibs :: DynFlags -> IO ()
+linkCmdLineLibs dflags = do
+  initDynLinker dflags
+  modifyPLS_ $ \pls -> do
+    linkCmdLineLibs' dflags pls
+
+linkCmdLineLibs' :: DynFlags -> PersistentLinkerState -> IO PersistentLinkerState
+linkCmdLineLibs' dflags@(DynFlags { ldInputs     = cmdline_ld_inputs
+                                  , libraryPaths = lib_paths}) pls =
+  do  {   -- (c) Link libraries from the command-line
         ; let minus_ls = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
-        ; let lib_paths = libraryPaths dflags
         ; libspecs <- mapM (locateLib dflags False lib_paths) minus_ls
 
           -- (d) Link .o files from the command-line
@@ -302,12 +307,11 @@ reallyInitDynLinker dflags =
 
           -- (e) Link any MacOS frameworks
         ; let platform = targetPlatform dflags
-        ; let framework_paths = if platformUsesFrameworks platform
-                                then frameworkPaths dflags
-                                else []
-        ; let frameworks = if platformUsesFrameworks platform
-                           then cmdlineFrameworks dflags
-                           else []
+        ; let (framework_paths, frameworks) =
+                if platformUsesFrameworks platform
+                 then (frameworkPaths dflags, cmdlineFrameworks dflags)
+                  else ([],[])
+
           -- Finally do (c),(d),(e)
         ; let cmdline_lib_specs = [ l | Just l <- classified_ld_inputs ]
                                ++ libspecs
@@ -553,7 +557,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
       ; let { osuf = objectSuf dflags }
       ; lnks_needed <- mapM (get_linkable osuf) mods_needed
 
-      ; return (lnks_needed, pkgs_needed) } 
+      ; return (lnks_needed, pkgs_needed) }
   where
     dflags = hsc_dflags hsc_env
     this_pkg = thisPackage dflags
@@ -1030,7 +1034,7 @@ data LibrarySpec
 partOfGHCi :: [PackageName]
 partOfGHCi
  | isWindowsHost || isDarwinHost = []
- | otherwise = map PackageName
+ | otherwise = map (PackageName . mkFastString)
                    ["base", "template-haskell", "editline"]
 
 showLS :: LibrarySpec -> String
@@ -1067,9 +1071,6 @@ linkPackages' dflags new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs' }
   where
-     pkg_map = pkgIdMap (pkgState dflags)
-     ipid_map = installedPackageIdMap (pkgState dflags)
-
      link :: [PackageKey] -> [PackageKey] -> IO [PackageKey]
      link pkgs new_pkgs =
          foldM link_one pkgs new_pkgs
@@ -1078,10 +1079,9 @@ linkPackages' dflags new_pks pls = do
         | new_pkg `elem` pkgs   -- Already linked
         = return pkgs
 
-        | Just pkg_cfg <- lookupPackage pkg_map new_pkg
+        | Just pkg_cfg <- lookupPackage dflags new_pkg
         = do {  -- Link dependents first
-               pkgs' <- link pkgs [ Maybes.expectJust "link_one" $
-                                    Map.lookup ipid ipid_map
+               pkgs' <- link pkgs [ resolveInstalledPackageId dflags ipid
                                   | ipid <- depends pkg_cfg ]
                 -- Now link the package itself
              ; linkPackage dflags pkg_cfg
@@ -1128,7 +1128,8 @@ linkPackage dflags pkg
             objs       = [ obj  | Object obj     <- classifieds ]
             archs      = [ arch | Archive arch   <- classifieds ]
 
-        maybePutStr dflags ("Loading package " ++ display (sourcePackageId pkg) ++ " ... ")
+        maybePutStr dflags
+            ("Loading package " ++ sourcePackageIdString pkg ++ " ... ")
 
         -- See comments with partOfGHCi
         when (packageName pkg `notElem` partOfGHCi) $ do
@@ -1143,8 +1144,11 @@ linkPackage dflags pkg
 
         maybePutStr dflags "linking ... "
         ok <- resolveObjs
-        if succeeded ok then maybePutStrLn dflags "done."
-              else throwGhcExceptionIO (InstallationError ("unable to load package `" ++ display (sourcePackageId pkg) ++ "'"))
+        if succeeded ok
+           then maybePutStrLn dflags "done."
+           else let errmsg = "unable to load package `"
+                             ++ sourcePackageIdString pkg ++ "'"
+                 in throwGhcExceptionIO (InstallationError errmsg)
 
 -- we have already searched the filesystem; the strings passed to load_dyn
 -- can be passed directly to loadDLL.  They are either fully-qualified
@@ -1158,7 +1162,7 @@ load_dyn dll = do r <- loadDLL dll
                     Just err -> throwGhcExceptionIO (CmdLineError ("can't load .so/.DLL for: "
                                                               ++ dll ++ " (" ++ err ++ ")" ))
 
-loadFrameworks :: Platform -> InstalledPackageInfo_ ModuleName -> IO ()
+loadFrameworks :: Platform -> PackageConfig -> IO ()
 loadFrameworks platform pkg
     = if platformUsesFrameworks platform
       then mapM_ load frameworks
@@ -1288,7 +1292,7 @@ findFile mk_file_path (dir : dirs)
 \begin{code}
 maybePutStr :: DynFlags -> String -> IO ()
 maybePutStr dflags s
-    = when (verbosity dflags > 0) $
+    = when (verbosity dflags > 1) $
           do let act = log_action dflags
              act dflags SevInteractive noSrcSpan defaultUserStyle (text s)
 

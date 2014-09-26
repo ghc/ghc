@@ -55,7 +55,11 @@ import qualified Data.Set as Set
 import Data.IORef
 import Data.Ord
 import Data.Time
+#if __GLASGOW_HASKELL__ >= 709
+import Control.Monad hiding (empty)
+#else
 import Control.Monad
+#endif
 import Control.Monad.IO.Class
 import System.IO
 

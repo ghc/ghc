@@ -1,13 +1,7 @@
 \begin{code}
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
-module TcErrors( 
+module TcErrors(
        reportUnsolved, reportAllUnsolved,
        warnDefaulting,
 
@@ -25,6 +19,7 @@ import Type
 import Kind ( isKind )
 import Unify            ( tcMatchTys )
 import Module
+import FamInst          ( FamInstEnvs, tcGetFamInstEnvs, tcLookupDataFamInst )
 import Inst
 import InstEnv
 import TyCon
@@ -33,13 +28,13 @@ import TcEvidence
 import TysWiredIn       ( coercibleClass )
 import Name
 import RdrName          ( lookupGRE_Name )
-import Id 
+import Id
 import Var
 import VarSet
 import VarEnv
 import Bag
 import ErrUtils         ( ErrMsg, makeIntoWarning, pprLocErrMsg )
-import BasicTypes 
+import BasicTypes
 import Util
 import FastString
 import Outputable
@@ -53,9 +48,9 @@ import Data.List        ( partition, mapAccumL, zip4, nub )
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \section{Errors and contexts}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 ToDo: for these error messages, should we note the location as coming
@@ -125,7 +120,7 @@ report_unsolved mb_binds_var defer wanted
   = do { traceTc "reportUnsolved (before unflattening)" (ppr wanted)
 
        ; env0 <- tcInitTidyEnv
-                 
+
             -- If we are deferring we are going to need /all/ evidence around,
             -- including the evidence produced by unflattening (zonkWC)
        ; let tidy_env = tidyFreeTyVars env0 free_tvs
@@ -136,7 +131,7 @@ report_unsolved mb_binds_var defer wanted
                             , cec_suppress = False -- See Note [Suppressing error messages]
                             , cec_binds    = mb_binds_var }
 
-       ; traceTc "reportUnsolved (after unflattening):" $ 
+       ; traceTc "reportUnsolved (after unflattening):" $
          vcat [ pprTvBndrs (varSetElems free_tvs)
               , ppr wanted ]
 
@@ -146,12 +141,12 @@ report_unsolved mb_binds_var defer wanted
 --      Internal functions
 --------------------------------------------
 
-data ReportErrCtxt 
+data ReportErrCtxt
     = CEC { cec_encl :: [Implication]  -- Enclosing implications
-                	       	       --   (innermost first)
+                                       --   (innermost first)
                                        -- ic_skols and givens are tidied, rest are not
           , cec_tidy  :: TidyEnv
-          , cec_binds :: Maybe EvBindsVar 
+          , cec_binds :: Maybe EvBindsVar
                          -- Nothinng <=> Report all errors, including holes; no bindings
                          -- Just ev  <=> make some errors (depending on cec_defer)
                          --              into warnings, and emit evidence bindings
@@ -173,7 +168,7 @@ evidence bindings (as usual).  It's used when more important errors have occurre
 Specifically (see reportWanteds)
   * If there are insoluble Givens, then we are in unreachable code and all bets
     are off.  So don't report any further errors.
-  * If there are any insolubles (eg Int~Bool), here or in a nested implication, 
+  * If there are any insolubles (eg Int~Bool), here or in a nested implication,
     then suppress errors from the flat constraints here.  Sometimes the
     flat-constraint errors are a knock-on effect of the insolubles.
 
@@ -208,7 +203,7 @@ reportWanteds ctxt wanted@(WC { wc_flat = flats, wc_insol = insols, wc_impl = im
   = do { reportFlats ctxt  (mapBag (tidyCt env) insol_given)
        ; reportFlats ctxt1 (mapBag (tidyCt env) insol_wanted)
        ; reportFlats ctxt2 (mapBag (tidyCt env) flats)
-            -- All the Derived ones have been filtered out of flats 
+            -- All the Derived ones have been filtered out of flats
             -- by the constraint solver. This is ok; we don't want
             -- to report unsolved Derived goals as errors
             -- See Note [Do not report derived but soluble errors]
@@ -411,21 +406,21 @@ pprWithArising :: [Ct] -> (CtLoc, SDoc)
 --    (Show a) arising from a use of p at q
 -- Also return a location for the error message
 -- Works for Wanted/Derived only
-pprWithArising [] 
+pprWithArising []
   = panic "pprWithArising"
 pprWithArising (ct:cts)
   | null cts
-  = (loc, addArising (ctLocOrigin loc) 
+  = (loc, addArising (ctLocOrigin loc)
                      (pprTheta [ctPred ct]))
   | otherwise
   = (loc, vcat (map ppr_one (ct:cts)))
   where
     loc = ctLoc ct
-    ppr_one ct' = hang (parens (pprType (ctPred ct'))) 
+    ppr_one ct' = hang (parens (pprType (ctPred ct')))
                      2 (pprArisingAt (ctLoc ct'))
 
 mkErrorMsg :: ReportErrCtxt -> Ct -> SDoc -> TcM ErrMsg
-mkErrorMsg ctxt ct msg 
+mkErrorMsg ctxt ct msg
   = do { let tcl_env = ctLocEnv (ctLoc ct)
        ; err_info <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
        ; mkLongErrAt (tcl_loc tcl_env) msg err_info }
@@ -436,7 +431,7 @@ getUserGivens :: ReportErrCtxt -> [UserGiven]
 -- One item for each enclosing implication
 getUserGivens (CEC {cec_encl = ctxt})
   = reverse $
-    [ (givens, info, tcl_loc env) 
+    [ (givens, info, tcl_loc env)
     | Implic {ic_given = givens, ic_env = env, ic_info = info } <- ctxt
     , not (null givens) ]
 \end{code}
@@ -447,13 +442,13 @@ When -fdefer-type-errors is on we warn about *all* type errors, even
 if cec_suppress is on.  This can lead to a lot more warnings than you
 would get errors without -fdefer-type-errors, but if we suppress any of
 them you might get a runtime error that wasn't warned about at compile
-time. 
+time.
 
 This is an easy design choice to change; just flip the order of the
 first two equations for maybeReportError
 
 To be consistent, we should also report multiple warnings from a single
-location in mkGroupReporter, when -fdefer-type-errors is on.  But that 
+location in mkGroupReporter, when -fdefer-type-errors is on.  But that
 is perhaps a bit *over*-consistent! Again, an easy choice to change.
 
 
@@ -478,7 +473,7 @@ these as errors:
 
   For wanteds, something similar
       data T a where
-        MkT :: C Int b => a -> b -> T a 
+        MkT :: C Int b => a -> b -> T a
       g :: C Int c => c -> ()
       f :: T a -> ()
       f (MkT x y) = g x
@@ -488,23 +483,23 @@ these as errors:
 (We leave the Deriveds in wc_flat until reportErrors, so that we don't lose
 derived superclasses between iterations of the solver.)
 
-For functional dependencies, here is a real example, 
+For functional dependencies, here is a real example,
 stripped off from libraries/utf8-string/Codec/Binary/UTF8/Generic.hs
 
   class C a b | a -> b
-  g :: C a b => a -> b -> () 
-  f :: C a b => a -> b -> () 
-  f xa xb = 
-      let loop = g xa 
+  g :: C a b => a -> b -> ()
+  f :: C a b => a -> b -> ()
+  f xa xb =
+      let loop = g xa
       in loop xb
 
 We will first try to infer a type for loop, and we will succeed:
     C a b' => b' -> ()
-Subsequently, we will type check (loop xb) and all is good. But, 
-recall that we have to solve a final implication constraint: 
-    C a b => (C a b' => .... cts from body of loop .... )) 
-And now we have a problem as we will generate an equality b ~ b' and fail to 
-solve it. 
+Subsequently, we will type check (loop xb) and all is good. But,
+recall that we have to solve a final implication constraint:
+    C a b => (C a b' => .... cts from body of loop .... ))
+And now we have a problem as we will generate an equality b ~ b' and fail to
+solve it.
 
 
 %************************************************************************
@@ -515,7 +510,7 @@ solve it.
 
 \begin{code}
 mkIrredErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
-mkIrredErr ctxt cts 
+mkIrredErr ctxt cts
   = do { (ctxt, binds_msg) <- relevantBindings True ctxt ct1
        ; mkErrorMsg ctxt ct1 (msg $$ binds_msg) }
   where
@@ -536,12 +531,12 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ })
                -- The 'False' means "don't filter the bindings; see Trac #8191
        ; mkErrorMsg ctxt ct (msg $$ binds_doc) }
   where
-    loc_msg tv 
+    loc_msg tv
        = case tcTyVarDetails tv of
           SkolemTv {} -> quotes (ppr tv) <+> skol_msg
           MetaTv {}   -> quotes (ppr tv) <+> ptext (sLit "is an ambiguous type variable")
           det -> pprTcTyVarDetails det
-       where 
+       where
           skol_msg = pprSkol (getSkolemInfo (cec_encl ctxt) tv) (getSrcLoc tv)
 
 mkHoleError _ ct = pprPanic "mkHoleError" (ppr ct)
@@ -559,16 +554,16 @@ mkIPErr ctxt cts
     msg | null givens
         = addArising orig $
           sep [ ptext (sLit "Unbound implicit parameter") <> plural cts
-              , nest 2 (pprTheta preds) ] 
+              , nest 2 (pprTheta preds) ]
         | otherwise
         = couldNotDeduce givens (preds, orig)
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
                 Equality errors
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Note [Inaccessible code]
@@ -603,16 +598,17 @@ mkEqErr1 ctxt ct
   = do { (ctxt, binds_msg) <- relevantBindings True ctxt ct
        ; let (given_loc, given_msg) = mk_given (cec_encl ctxt)
        ; dflags <- getDynFlags
-       ; mkEqErr_help dflags ctxt (given_msg $$ binds_msg) 
+       ; mkEqErr_help dflags ctxt (given_msg $$ binds_msg)
                       (ct { cc_ev = ev {ctev_loc = given_loc}}) -- Note [Inaccessible code]
                       Nothing ty1 ty2 }
 
   | otherwise   -- Wanted or derived
   = do { (ctxt, binds_msg) <- relevantBindings True ctxt ct
-       ; (ctxt, tidy_orig) <- zonkTidyOrigin ctxt (ctLocOrigin loc)
+       ; (env1, tidy_orig) <- zonkTidyOrigin (cec_tidy ctxt) (ctLocOrigin loc)
        ; let (is_oriented, wanted_msg) = mk_wanted_extra tidy_orig
        ; dflags <- getDynFlags
-       ; mkEqErr_help dflags ctxt (wanted_msg $$ binds_msg) 
+       ; mkEqErr_help dflags (ctxt {cec_tidy = env1})
+                      (wanted_msg $$ binds_msg)
                       ct is_oriented ty1 ty2 }
   where
     ev         = ctEvidence ct
@@ -642,10 +638,12 @@ mkEqErr1 ctxt ct
                  TypeEqOrigin {} -> snd (mkExpectedActualMsg cty1 cty2 sub_o)
                  _ -> empty
 
-    mk_wanted_extra _ = (Nothing, empty)
+    mk_wanted_extra orig@(FunDepOrigin1 {}) = (Nothing, pprArising orig)
+    mk_wanted_extra orig@(FunDepOrigin2 {}) = (Nothing, pprArising orig)
+    mk_wanted_extra _                       = (Nothing, empty)
 
 mkEqErr_help :: DynFlags -> ReportErrCtxt -> SDoc
-             -> Ct          
+             -> Ct
              -> Maybe SwapFlag   -- Nothing <=> not sure
              -> TcType -> TcType -> TcM ErrMsg
 mkEqErr_help dflags ctxt extra ct oriented ty1 ty2
@@ -656,7 +654,7 @@ mkEqErr_help dflags ctxt extra ct oriented ty1 ty2
     swapped = fmap flipSwap oriented
 
 reportEqErr :: ReportErrCtxt -> SDoc
-            -> Ct    
+            -> Ct
             -> Maybe SwapFlag   -- Nothing <=> not sure
             -> TcType -> TcType -> TcM ErrMsg
 reportEqErr ctxt extra1 ct oriented ty1 ty2
@@ -664,7 +662,7 @@ reportEqErr ctxt extra1 ct oriented ty1 ty2
        ; mkErrorMsg ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
                                    , extra2, extra1]) }
 
-mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> SDoc -> Ct 
+mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> SDoc -> Ct
              -> Maybe SwapFlag -> TcTyVar -> TcType -> TcM ErrMsg
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
@@ -676,10 +674,10 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
                              , extraTyVarInfo ctxt tv1 ty2
                              , extra ])
 
-  -- So tv is a meta tyvar (or started that way before we 
-  -- generalised it).  So presumably it is an *untouchable* 
+  -- So tv is a meta tyvar (or started that way before we
+  -- generalised it).  So presumably it is an *untouchable*
   -- meta tyvar or a SigTv, else it'd have been unified
-  | not (k2 `tcIsSubKind` k1)   	 -- Kind error
+  | not (k2 `tcIsSubKind` k1)            -- Kind error
   = mkErrorMsg ctxt ct $ (kindErrorMsg (mkTyVarTy tv1) ty2 $$ extra)
 
   | OC_Occurs <- occ_check_expand
@@ -718,7 +716,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
                              if isSingleton esc_skols then ptext (sLit "its scope")
                                                       else ptext (sLit "their scope") ]
              tv_extra = vcat [ nest 2 $ esc_doc
-                             , sep [ (if isSingleton esc_skols 
+                             , sep [ (if isSingleton esc_skols
                                       then ptext (sLit "This (rigid, skolem) type variable is")
                                       else ptext (sLit "These (rigid, skolem) type variables are"))
                                <+> ptext (sLit "bound by")
@@ -745,15 +743,15 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
         -- This *can* happen (Trac #6123, and test T2627b)
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
-  where         
+  where
     occ_check_expand = occurCheckExpand dflags tv1 ty2
-    k1 	= tyVarKind tv1
-    k2 	= typeKind ty2
+    k1  = tyVarKind tv1
+    k2  = typeKind ty2
     ty1 = mkTyVarTy tv1
 
 mkEqInfoMsg :: Ct -> TcType -> TcType -> SDoc
 -- Report (a) ambiguity if either side is a type function application
---            e.g. F a0 ~ Int    
+--            e.g. F a0 ~ Int
 --        (b) warning about injectivity if both sides are the same
 --            type function application   F a ~ F b
 --            See Note [Non-injective type functions]
@@ -763,14 +761,14 @@ mkEqInfoMsg ct ty1 ty2
     mb_fun1 = isTyFun_maybe ty1
     mb_fun2 = isTyFun_maybe ty2
 
-    ambig_msg | isJust mb_fun1 || isJust mb_fun2 
+    ambig_msg | isJust mb_fun1 || isJust mb_fun2
               = snd (mkAmbigMsg ct)
               | otherwise = empty
 
     tyfun_msg | Just tc1 <- mb_fun1
               , Just tc2 <- mb_fun2
-              , tc1 == tc2 
-              = ptext (sLit "NB:") <+> quotes (ppr tc1) 
+              , tc1 == tc2
+              = ptext (sLit "NB:") <+> quotes (ppr tc1)
                 <+> ptext (sLit "is a type function, and may not be injective")
               | otherwise = empty
 
@@ -788,13 +786,13 @@ isUserSkolem ctxt tv
 misMatchOrCND :: ReportErrCtxt -> Ct -> Maybe SwapFlag -> TcType -> TcType -> SDoc
 -- If oriented then ty1 is actual, ty2 is expected
 misMatchOrCND ctxt ct oriented ty1 ty2
-  | null givens || 
-    (isRigid ty1 && isRigid ty2) || 
+  | null givens ||
+    (isRigid ty1 && isRigid ty2) ||
     isGivenCt ct
        -- If the equality is unconditionally insoluble
        -- or there is no context, don't report the context
   = misMatchMsg oriented ty1 ty2
-  | otherwise      
+  | otherwise
   = couldNotDeduce givens ([mkTcEqPred ty1 ty2], orig)
   where
     givens = getUserGivens ctxt
@@ -806,12 +804,12 @@ couldNotDeduce givens (wanteds, orig)
          , vcat (pp_givens givens)]
 
 pp_givens :: [UserGiven] -> [SDoc]
-pp_givens givens 
+pp_givens givens
    = case givens of
          []     -> []
          (g:gs) ->      ppr_given (ptext (sLit "from the context")) g
                  : map (ppr_given (ptext (sLit "or from"))) gs
-    where 
+    where
        ppr_given herald (gs, skol_info, loc)
            = hang (herald <+> pprEvVarTheta gs)
                 2 (sep [ ptext (sLit "bound by") <+> ppr skol_info
@@ -867,7 +865,7 @@ kindErrorMsg ty1 ty2
     k2 = typeKind ty2
 
 --------------------
-misMatchMsg :: Maybe SwapFlag -> TcType -> TcType -> SDoc	   -- Types are already tidy
+misMatchMsg :: Maybe SwapFlag -> TcType -> TcType -> SDoc          -- Types are already tidy
 -- If oriented then ty1 is actual, ty2 is expected
 misMatchMsg oriented ty1 ty2
   | Just IsSwapped <- oriented
@@ -977,25 +975,26 @@ Warn of loopy local equalities that were dropped.
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
                  Type-class errors
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 mkDictErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
-mkDictErr ctxt cts 
+mkDictErr ctxt cts
   = ASSERT( not (null cts) )
     do { inst_envs <- tcGetInstEnvs
+       ; fam_envs  <- tcGetFamInstEnvs
        ; lookups   <- mapM (lookup_cls_inst inst_envs) cts
        ; let (no_inst_cts, overlap_cts) = partition is_no_inst lookups
 
-       -- Report definite no-instance errors, 
+       -- Report definite no-instance errors,
        -- or (iff there are none) overlap errors
        -- But we report only one of them (hence 'head') because they all
        -- have the same source-location origin, to try avoid a cascade
        -- of error from one location
-       ; (ctxt, err) <- mk_dict_err ctxt (head (no_inst_cts ++ overlap_cts))
+       ; (ctxt, err) <- mk_dict_err fam_envs ctxt (head (no_inst_cts ++ overlap_cts))
        ; mkErrorMsg ctxt ct1 err }
   where
     ct1:_ = elim_superclasses cts
@@ -1023,11 +1022,11 @@ mkDictErr ctxt cts
       where
         min_preds = mkMinimalBySCs (map ctPred cts)
 
-mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
+mk_dict_err :: FamInstEnvs -> ReportErrCtxt -> (Ct, ClsInstLookupResult)
             -> TcM (ReportErrCtxt, SDoc)
 -- Report an overlap error if this class constraint results
 -- from an overlap (returning Left clas), otherwise return (Right pred)
-mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell)) 
+mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
   | null matches  -- No matches but perhaps several unifiers
   = do { let (is_ambig, ambig_msg) = mkAmbigMsg ct
        ; (ctxt, binds_msg) <- relevantBindings True ctxt ct
@@ -1057,10 +1056,10 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
 
     potential_msg
       = ppWhen (not (null unifiers) && want_potential orig) $
-        hang (if isSingleton unifiers 
+        hang (if isSingleton unifiers
               then ptext (sLit "Note: there is a potential instance available:")
               else ptext (sLit "Note: there are several potential instances:"))
-    	   2 (ppr_insts unifiers)
+           2 (ppr_insts unifiers)
 
     -- Report "potential instances" only when the constraint arises
     -- directly from the user's use of an overloaded function
@@ -1072,16 +1071,16 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
       , (orig:origs) <- mapMaybe get_good_orig (cec_encl ctxt)
       = [sep [ ptext (sLit "add") <+> pprParendType pred
                <+> ptext (sLit "to the context of")
-	     , nest 2 $ ppr_skol orig $$ 
-                        vcat [ ptext (sLit "or") <+> ppr_skol orig 
+             , nest 2 $ ppr_skol orig $$
+                        vcat [ ptext (sLit "or") <+> ppr_skol orig
                              | orig <- origs ] ] ]
       | otherwise = []
 
     ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
     ppr_skol skol_info      = ppr skol_info
 
-	-- Do not suggest adding constraints to an *inferred* type signature!
-    get_good_orig ic = case ic_info ic of 
+        -- Do not suggest adding constraints to an *inferred* type signature!
+    get_good_orig ic = case ic_info ic of
                          SigSkol (InfSigCtxt {}) _ -> Nothing
                          origin                    -> Just origin
 
@@ -1108,15 +1107,15 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     -- Normal overlap error
     overlap_msg
       = ASSERT( not (null matches) )
-        vcat [	addArising orig (ptext (sLit "Overlapping instances for") 
-				<+> pprType (mkClassPred clas tys))
+        vcat [  addArising orig (ptext (sLit "Overlapping instances for")
+                                <+> pprType (mkClassPred clas tys))
 
              ,  ppUnless (null matching_givens) $
-                  sep [ptext (sLit "Matching givens (or their superclasses):") 
+                  sep [ptext (sLit "Matching givens (or their superclasses):")
                       , nest 2 (vcat matching_givens)]
 
-    	     ,	sep [ptext (sLit "Matching instances:"),
-    		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
+             ,  sep [ptext (sLit "Matching instances:"),
+                     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
 
              ,  ppWhen (null matching_givens && isSingleton matches && null unifiers) $
                 -- Intuitively, some given matched the wanted in their
@@ -1125,15 +1124,15 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
                 -- constraints are non-flat and non-rewritten so we
                 -- simply report back the whole given
                 -- context. Accelerate Smart.hs showed this problem.
-                  sep [ ptext (sLit "There exists a (perhaps superclass) match:") 
+                  sep [ ptext (sLit "There exists a (perhaps superclass) match:")
                       , nest 2 (vcat (pp_givens givens))]
 
-	     ,	ppWhen (isSingleton matches) $
-		parens (vcat [ ptext (sLit "The choice depends on the instantiation of") <+>
-	    		          quotes (pprWithCommas ppr (varSetElems (tyVarsOfTypes tys)))
-			     , ppWhen (null (matching_givens)) $
+             ,  ppWhen (isSingleton matches) $
+                parens (vcat [ ptext (sLit "The choice depends on the instantiation of") <+>
+                                  quotes (pprWithCommas ppr (varSetElems (tyVarsOfTypes tys)))
+                             , ppWhen (null (matching_givens)) $
                                vcat [ ptext (sLit "To pick the first instance above, use IncoherentInstances")
-			            , ptext (sLit "when compiling the other instance declarations")]
+                                    , ptext (sLit "when compiling the other instance declarations")]
                         ])]
         where
             ispecs = [ispec | (ispec, _) <- matches]
@@ -1141,7 +1140,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
             givens = getUserGivens ctxt
             matching_givens = mapMaybe matchable givens
 
-            matchable (evvars,skol_info,loc) 
+            matchable (evvars,skol_info,loc)
               = case ev_vars_matching of
                      [] -> Nothing
                      _  -> Just $ hang (pprTheta ev_vars_matching)
@@ -1152,16 +1151,16 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
                          Just (clas', tys')
                            | clas' == clas
                            , Just _ <- tcMatchTys (tyVarsOfTypes tys) tys tys'
-                           -> True 
+                           -> True
                            | otherwise
                            -> any ev_var_matches (immSuperClasses clas' tys')
                          Nothing -> False
 
-    -- Overlap error because of Safe Haskell (first 
+    -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)
     safe_haskell_msg
       = ASSERT( length matches > 1 )
-        vcat [ addArising orig (ptext (sLit "Unsafe overlapping instances for") 
+        vcat [ addArising orig (ptext (sLit "Unsafe overlapping instances for")
                         <+> pprType (mkClassPred clas tys))
              , sep [ptext (sLit "The matching instance is:"),
                     nest 2 (pprInstance $ head ispecs)]
@@ -1191,11 +1190,13 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
           | (n,Nominal,t1,t2) <- zip4 [1..] (tyConRoles tc1) tyArgs1 tyArgs2
           , not (t1 `eqType` t2)
           ]
-      | Just (tc,_) <- splitTyConApp_maybe ty1,
-        Just msg <- coercible_msg_for_tycon rdr_env tc
+      | Just (tc, tys) <- tcSplitTyConApp_maybe ty1
+      , (rep_tc, _, _) <- tcLookupDataFamInst fam_envs tc tys
+      , Just msg <- coercible_msg_for_tycon rdr_env rep_tc
       = msg
-      | Just (tc,_) <- splitTyConApp_maybe ty2,
-        Just msg <- coercible_msg_for_tycon rdr_env tc
+      | Just (tc, tys) <- splitTyConApp_maybe ty2
+      , (rep_tc, _, _) <- tcLookupDataFamInst fam_envs tc tys
+      , Just msg <- coercible_msg_for_tycon rdr_env rep_tc
       = msg
       | otherwise
       = nest 2 $ sep [ ptext (sLit "because") <+> quotes (ppr ty1)
@@ -1204,26 +1205,17 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
       where
         (ty1, ty2) = getEqPredTys pred
 
-    dataConMissing rdr_env tc =
-        all (null . lookupGRE_Name rdr_env) (map dataConName (tyConDataCons tc))
-
     coercible_msg_for_tycon rdr_env tc
+        | isAbstractTyCon tc
+        = Just $ hsep [ ptext $ sLit "because the type constructor", quotes (pprSourceTyCon tc)
+                      , ptext $ sLit "is abstract" ]
         | isNewTyCon tc
-        = tyConAbstractMsg rdr_env tc empty
-        | otherwise
-        = Nothing
-
-    tyConAbstractMsg rdr_env tc occExpl
-        | isAbstractTyCon tc || dataConMissing rdr_env tc = Just $ vcat $
-            [ fsep [ ptext $ sLit "because the type constructor", quotes (ppr tc) <+> occExpl
-                   , ptext $ sLit "is abstract" ]
-            | isAbstractTyCon tc
-            ] ++
-            [ fsep [ ptext (sLit "because the constructor") <> plural (tyConDataCons tc)
-                   , ptext (sLit "of") <+> quotes (ppr tc) <+> occExpl
-                   , isOrAre (tyConDataCons tc) <+> ptext (sLit "not imported") ]
-            | dataConMissing rdr_env tc
-            ]
+        , [data_con] <- tyConDataCons tc
+        , let dc_name = dataConName data_con
+        , null (lookupGRE_Name rdr_env dc_name)
+        = Just $ hang (ptext (sLit "because the data constructor") <+> quotes (ppr dc_name))
+                    2 (sep [ ptext (sLit "of newtype") <+> quotes (pprSourceTyCon tc)
+                           , ptext (sLit "is not in scope") ])
         | otherwise = Nothing
 
 show_fixes :: [SDoc] -> SDoc
@@ -1236,9 +1228,9 @@ ppr_insts insts
   = pprInstances (take 3 insts) $$ dot_dot_message
   where
     n_extra = length insts - 3
-    dot_dot_message 
+    dot_dot_message
        | n_extra <= 0 = empty
-       | otherwise    = ptext (sLit "...plus") 
+       | otherwise    = ptext (sLit "...plus")
                         <+> speakNOf n_extra (ptext (sLit "other"))
 
 ----------------------
@@ -1257,7 +1249,7 @@ quickFlattenTy (FunTy ty1 ty2) = do { fy1 <- quickFlattenTy ty1
                                     ; return (FunTy fy1 fy2) }
 quickFlattenTy (TyConApp tc tys)
     | not (isSynFamilyTyCon tc)
-    = do { fys <- mapM quickFlattenTy tys 
+    = do { fys <- mapM quickFlattenTy tys
          ; return (TyConApp tc fys) }
     | otherwise
     = do { let (funtys,resttys) = splitAt (tyConArity tc) tys
@@ -1336,12 +1328,12 @@ mkAmbigMsg ct
 pprSkol :: SkolemInfo -> SrcLoc -> SDoc
 pprSkol UnkSkol   _
   = ptext (sLit "is an unknown type variable")
-pprSkol skol_info tv_loc 
+pprSkol skol_info tv_loc
   = sep [ ptext (sLit "is a rigid type variable bound by"),
           sep [ppr skol_info, ptext (sLit "at") <+> ppr tv_loc]]
 
 getSkolemInfo :: [Implication] -> TcTyVar -> SkolemInfo
--- Get the skolem info for a type variable 
+-- Get the skolem info for a type variable
 -- from the implication constraint that binds it
 getSkolemInfo [] tv
   = pprPanic "No skolem info:" (ppr tv)
@@ -1356,7 +1348,7 @@ getSkolemInfo (implic:implics) tv
 -- careful to zonk the Id's type first, so it has to be in the monad.
 -- We must be careful to pass it a zonked type variable, too.
 --
--- We always remove closed top-level bindings, though, 
+-- We always remove closed top-level bindings, though,
 -- since they are never relevant (cf Trac #8233)
 
 relevantBindings :: Bool  -- True <=> filter by tyvar; False <=> no filtering
@@ -1365,27 +1357,34 @@ relevantBindings :: Bool  -- True <=> filter by tyvar; False <=> no filtering
                  -> TcM (ReportErrCtxt, SDoc)
 relevantBindings want_filtering ctxt ct
   = do { dflags <- getDynFlags
-       ; (tidy_env', docs, discards) 
-              <- go (cec_tidy ctxt) (maxRelevantBinds dflags) 
+       ; (tidy_env', docs, discards)
+              <- go (cec_tidy ctxt) (maxRelevantBinds dflags)
                     emptyVarSet [] False
                     (tcl_bndrs lcl_env)
-         -- tcl_bndrs has the innermost bindings first, 
+         -- tcl_bndrs has the innermost bindings first,
          -- which are probably the most relevant ones
 
-       ; traceTc "relevantBindings" (ppr [id | TcIdBndr id _ <- tcl_bndrs lcl_env])
-       ; let doc = hang (ptext (sLit "Relevant bindings include")) 
+       ; traceTc "relevantBindings" (ppr ct $$ ppr [id | TcIdBndr id _ <- tcl_bndrs lcl_env])
+       ; let doc = hang (ptext (sLit "Relevant bindings include"))
                       2 (vcat docs $$ max_msg)
-             max_msg | discards 
+             max_msg | discards
                      = ptext (sLit "(Some bindings suppressed; use -fmax-relevant-binds=N or -fno-max-relevant-binds)")
                      | otherwise = empty
 
-       ; if null docs 
+       ; if null docs
          then return (ctxt, empty)
          else do { traceTc "rb" doc
-                 ; return (ctxt { cec_tidy = tidy_env' }, doc) } } 
+                 ; return (ctxt { cec_tidy = tidy_env' }, doc) } }
   where
-    lcl_env = ctLocEnv (ctLoc ct)
-    ct_tvs = tyVarsOfCt ct
+    loc       = ctLoc ct
+    lcl_env   = ctLocEnv loc
+    ct_tvs    = tyVarsOfCt ct `unionVarSet` extra_tvs
+
+    -- For *kind* errors, report the relevant bindings of the
+    -- enclosing *type* equality, becuase that's more useful for the programmer
+    extra_tvs = case ctLocOrigin loc of
+                  KindEqOrigin t1 t2 _ -> tyVarsOfTypes [t1,t2]
+                  _                    -> emptyVarSet
 
     run_out :: Maybe Int -> Bool
     run_out Nothing = False
@@ -1394,19 +1393,20 @@ relevantBindings want_filtering ctxt ct
     dec_max :: Maybe Int -> Maybe Int
     dec_max = fmap (\n -> n - 1)
 
-    go :: TidyEnv -> Maybe Int -> TcTyVarSet -> [SDoc] 
+    go :: TidyEnv -> Maybe Int -> TcTyVarSet -> [SDoc]
        -> Bool                          -- True <=> some filtered out due to lack of fuel
-       -> [TcIdBinder] 
+       -> [TcIdBinder]
        -> TcM (TidyEnv, [SDoc], Bool)   -- The bool says if we filtered any out
                                         -- because of lack of fuel
     go tidy_env _ _ docs discards []
        = return (tidy_env, reverse docs, discards)
     go tidy_env n_left tvs_seen docs discards (TcIdBndr id top_lvl : tc_bndrs)
        = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env (idType id)
+            ; traceTc "relevantBindings 1" (ppr id <+> dcolon <+> ppr tidy_ty)
             ; let id_tvs = tyVarsOfType tidy_ty
                   doc = sep [ pprPrefixOcc id <+> dcolon <+> ppr tidy_ty
-		            , nest 2 (parens (ptext (sLit "bound at")
-			    	 <+> ppr (getSrcLoc id)))]
+                            , nest 2 (parens (ptext (sLit "bound at")
+                                 <+> ppr (getSrcLoc id)))]
                   new_seen = tvs_seen `unionVarSet` id_tvs
 
             ; if (want_filtering && not opt_PprStyle_Debug 
@@ -1447,13 +1447,13 @@ Note [Runtime skolems]
 ~~~~~~~~~~~~~~~~~~~~~~
 We want to give a reasonably helpful error message for ambiguity
 arising from *runtime* skolems in the debugger.  These
-are created by in RtClosureInspect.zonkRTTIType.  
+are created by in RtClosureInspect.zonkRTTIType.
 
 %************************************************************************
-%*									*
+%*                                                                      *
                  Error from the canonicaliser
-	 These ones are called *during* constraint simplification
-%*									*
+         These ones are called *during* constraint simplification
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -1478,9 +1478,9 @@ solverDepthErrorTcS cnt ev
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
                  Tidying
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -1488,20 +1488,28 @@ zonkTidyTcType :: TidyEnv -> TcType -> TcM (TidyEnv, TcType)
 zonkTidyTcType env ty = do { ty' <- zonkTcType ty
                            ; return (tidyOpenType env ty') }
 
-zonkTidyOrigin :: ReportErrCtxt -> CtOrigin -> TcM (ReportErrCtxt, CtOrigin)
-zonkTidyOrigin ctxt (GivenOrigin skol_info)
+zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
+zonkTidyOrigin env (GivenOrigin skol_info)
   = do { skol_info1 <- zonkSkolemInfo skol_info
-       ; let (env1, skol_info2) = tidySkolemInfo (cec_tidy ctxt) skol_info1
-       ; return (ctxt { cec_tidy = env1 }, GivenOrigin skol_info2) }
-zonkTidyOrigin ctxt (TypeEqOrigin { uo_actual = act, uo_expected = exp })
-  = do { (env1, act') <- zonkTidyTcType (cec_tidy ctxt) act
-       ; (env2, exp') <- zonkTidyTcType env1            exp
-       ; return ( ctxt { cec_tidy = env2 }
-                , TypeEqOrigin { uo_actual = act', uo_expected = exp' }) }
-zonkTidyOrigin ctxt (KindEqOrigin ty1 ty2 orig)
-  = do { (env1, ty1') <- zonkTidyTcType (cec_tidy ctxt) ty1
-       ; (env2, ty2') <- zonkTidyTcType env1            ty2
-       ; (ctxt2, orig') <- zonkTidyOrigin (ctxt { cec_tidy = env2 }) orig
-       ; return (ctxt2, KindEqOrigin ty1' ty2' orig') }
-zonkTidyOrigin ctxt orig = return (ctxt, orig)
+       ; let (env1, skol_info2) = tidySkolemInfo env skol_info1
+       ; return (env1, GivenOrigin skol_info2) }
+zonkTidyOrigin env (TypeEqOrigin { uo_actual = act, uo_expected = exp })
+  = do { (env1, act') <- zonkTidyTcType env  act
+       ; (env2, exp') <- zonkTidyTcType env1 exp
+       ; return ( env2, TypeEqOrigin { uo_actual = act', uo_expected = exp' }) }
+zonkTidyOrigin env (KindEqOrigin ty1 ty2 orig)
+  = do { (env1, ty1') <- zonkTidyTcType env  ty1
+       ; (env2, ty2') <- zonkTidyTcType env1 ty2
+       ; (env3, orig') <- zonkTidyOrigin env2 orig
+       ; return (env3, KindEqOrigin ty1' ty2' orig') }
+zonkTidyOrigin env (FunDepOrigin1 p1 l1 p2 l2)
+  = do { (env1, p1') <- zonkTidyTcType env  p1
+       ; (env2, p2') <- zonkTidyTcType env1 p2
+       ; return (env2, FunDepOrigin1 p1' l1 p2' l2) }
+zonkTidyOrigin env (FunDepOrigin2 p1 o1 p2 l2)
+  = do { (env1, p1') <- zonkTidyTcType env  p1
+       ; (env2, p2') <- zonkTidyTcType env1 p2
+       ; (env3, o1') <- zonkTidyOrigin env2 o1
+       ; return (env3, FunDepOrigin2 p1' o1' p2' l2) }
+zonkTidyOrigin env orig = return (env, orig)
 \end{code}

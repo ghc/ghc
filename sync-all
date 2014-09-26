@@ -8,9 +8,8 @@ use English;
 $| = 1; # autoflush stdout after each print, to avoid output after die
 
 my $initial_working_directory;
-my $exit_via_die;
 
-my $defaultrepo;
+my $default_root;
 my @packages;
 my $verbose = 2;
 my $try_to_resume = 0;
@@ -161,12 +160,11 @@ sub configure_repository {
 sub getrepo {
     my $repo;
 
-    if (defined($defaultrepo)) {
-        $repo = $defaultrepo;
-        chomp $repo;
+    if ($default_root) {
+        $repo = $default_root;
     } else {
         # Figure out where to get the other repositories from,
-        # based on where this GHC repo came from.
+        # based on where this GHC repository came from.
         my $git_dir = $bare_flag ? "ghc.git" : ".";
         my $branch = &readgitline($git_dir, "rev-parse", "--abbrev-ref", "HEAD");
         die "Bad branch: $branch"
@@ -181,7 +179,7 @@ sub getrepo {
         $repo = &readgitline($git_dir, "config", "--get", "remote.$remote.url");
     }
 
-    my $repo_base;
+    my $remote_root;
     my $checked_out_tree;
     my $repo_local = 0;
 
@@ -189,33 +187,33 @@ sub getrepo {
         # HTTP or SSH
         # Above regex says "at least two chars before the :", to avoid
         # catching Win32 drives ("C:\").
-        $repo_base = $repo;
+        $remote_root = $repo;
 
-        # --checked-out is needed if you want to use a checked-out repo
-        # over SSH or HTTP
+        # --checked-out is needed if you want to use a checked-out
+        # repository over SSH or HTTP
         $checked_out_tree = $checked_out_flag;
 
         # Don't drop the last part of the path if specified with -r, as
         # it expects repos of the form:
         #
-        #   http://git.haskell.org
+        #   git://git.haskell.org
         #
         # rather than
         #
-        #   http://git.haskell.org/ghc
+        #   git://git.haskell.org/ghc.git
         #
-        if (!$defaultrepo) {
-            $repo_base =~ s#/[^/]+/?$##;
+        if (!$default_root) {
+            $remote_root =~ s#/[^/]+/?$##;
         }
     }
     elsif ($repo =~ /^\/|\.\.\/|.:(\/|\\)/) {
         # Local filesystem, either absolute (C:/ or /) or relative (../) path
         $repo_local = 1;
-        $repo_base = $repo;
+        $remote_root = $repo;
         if (-f "$repo/HEAD") {
             # assume a local mirror:
             $checked_out_tree = 0;
-            $repo_base =~ s#/[^/]+/?$##;
+            $remote_root =~ s#/[^/]+/?$##;
         } elsif (-d "$repo/ghc.git") {
             # assume a local mirror:
             $checked_out_tree = 0;
@@ -225,10 +223,10 @@ sub getrepo {
         }
     }
     else {
-        die "Couldn't work out repo";
+        die "Couldn't work out root of remote repository tree";
     }
 
-    return $repo_base, $checked_out_tree, $repo_local;
+    return $remote_root, $checked_out_tree, $repo_local;
 }
 
 sub gitall {
@@ -239,7 +237,7 @@ sub gitall {
     my $remotepath;
     my $line;
     my $repo_is_submodule;
-    my $branch_name;
+    my $remote_name;
     my $subcommand;
 
     my $path;
@@ -250,9 +248,9 @@ sub gitall {
     my $doing;
     my $start_repo;
 
-    my ($repo_base, $checked_out_tree, $repo_local) = getrepo();
+    my ($remote_root, $checked_out_tree, $repo_local) = getrepo();
 
-    my $is_github_repo = $repo_base =~ $GITHUB;
+    my $is_github_repo = $remote_root =~ $GITHUB;
 
     @args = ();
 
@@ -271,18 +269,20 @@ sub gitall {
         while (@_ > 0 && $_[0] =~ /^-/) {
             push(@args,shift);
         }
-        if (($subcommand eq 'add' || $subcommand eq 'rm') && @_ < 1) {
+        if (($subcommand eq 'set-branches') && @_ < 2) {
+            help(1);
+        } elsif (($subcommand eq 'add' || $subcommand eq 'rm') && @_ < 1) {
             help(1);
         } elsif (@_ < 1) { # set-url
-            $branch_name = 'origin';
+            $remote_name = 'origin';
         } else {
-            $branch_name = shift;
+            $remote_name = shift;
         }
     } elsif ($command eq 'new') {
         if (@_ < 1) {
-            $branch_name = 'origin';
+            $remote_name = 'origin';
         } else {
-            $branch_name = shift;
+            $remote_name = shift;
         }
     }
 
@@ -350,8 +350,8 @@ sub gitall {
             $remotepath =~ s/\//-/;
         }
 
-        # Construct the path for this package in the repo we pulled from
-        $path = "$repo_base/$remotepath";
+        # Construct the path or url of the remote repository.
+        $path = "$remote_root/$remotepath";
 
         if ($command eq "get") {
             next if $repo_is_submodule; # "git submodule init/update" will get this later
@@ -451,14 +451,13 @@ sub gitall {
             gitNewWorkdir ($localpath, @args);
         }
         elsif ($command eq "send") {
-            $command = "send-email";
             &git($localpath, $command, @args);
         }
         elsif ($command eq "fetch") {
             &git($localpath, "fetch", @args);
         }
         elsif ($command eq "new") {
-            my @scm_args = ("log", "$branch_name..");
+            my @scm_args = ("log", "$remote_name..");
             &git($localpath, @scm_args, @args);
         }
         elsif ($command eq "log") {
@@ -468,13 +467,13 @@ sub gitall {
             my @scm_args;
             $ignore_failure = 1;
             if ($subcommand eq 'add') {
-                @scm_args = ("remote", "add", $branch_name, $path);
+                @scm_args = ("remote", "add", $remote_name, $path);
             } elsif ($subcommand eq 'rm') {
-                @scm_args = ("remote", "rm", $branch_name);
+                @scm_args = ("remote", "rm", $remote_name);
             } elsif ($subcommand eq 'set-branches') {
-                @scm_args = ("remote", "set-branches", $branch_name);
+                @scm_args = ("remote", "set-branches", $remote_name);
             } elsif ($subcommand eq 'set-url') {
-                @scm_args = ("remote", "set-url", $branch_name, $path);
+                @scm_args = ("remote", "set-url", $remote_name, $path);
             }
             &git($localpath, @scm_args, @args);
         }
@@ -516,7 +515,7 @@ sub gitall {
             &git($localpath, "tag", @args);
         }
         elsif ($command eq "compare") {
-            # Don't compare the subrepos; it doesn't work properly as
+            # Don't compare the submodules; it doesn't work properly as
             # they aren't on a branch.
             next if $repo_is_submodule;
 
@@ -533,8 +532,7 @@ sub gitall {
             else {
                 die "Bad args for compare";
             }
-            print "$localpath";
-            print (' ' x (40 - length($localpath)));
+            printf "%*s", -40, $localpath;
             my $branch = &readgitline($localpath, "rev-parse", "--abbrev-ref", "HEAD");
             die "Bad branch: $branch"
                 unless $branch =~ m!^[a-zA-Z][a-zA-Z0-9./-]*$!;
@@ -544,25 +542,20 @@ sub gitall {
             $them =~ s/[[:space:]].*//;
             die "Bad commit of mine: $us"     unless (length($us)   eq 40);
             die "Bad commit of theirs: $them" unless (length($them) eq 40);
-            if ($us eq $them) {
-                print "same\n";
-            }
-            else {
-                print "DIFFERENT\n";
-            }
+            print $us eq $them ? "same" : "DIFFERENT", "\n";
         }
         else {
             die "Unknown command: $command";
         }
     }
 
-    unlink "resume";
+    unlink "resume", "resume.tmp";
 }
 
 sub gitInitSubmodules {
     &git(".", "submodule", "init", @_);
 
-    my ($repo_base, $checked_out_tree, $repo_local) = getrepo();
+    my ($remote_root, $checked_out_tree, $repo_local) = getrepo();
 
     my $submodulespaths = &readgit(".", "config", "--get-regexp", "^submodule[.].*[.]url");
     # if we came from github, change the urls appropriately
@@ -574,8 +567,8 @@ sub gitInitSubmodules {
     # checkouts over there, if they exist.
     if ($repo_local) {
         while ($submodulespaths =~ m!^(submodule.((?:libraries/|utils/)?[a-zA-Z0-9-]+).url) .*$!gm) {
-            if (-e "$repo_base/$2/.git") {
-                &git(".", "config", $1, "$repo_base/$2");
+            if (-e "$remote_root/$2/.git") {
+                &git(".", "config", $1, "$remote_root/$2");
             }
         }
     }
@@ -600,77 +593,88 @@ sub help
         print <<END;
 Usage:
 
-./sync-all [-q] [-s] [--ignore-failure] [-r repo] [--checked-out] [--bare]
-           [--<tag>] [--no-<tag>] [--resume]
-           cmd [git flags]
+./sync-all [-q] [-s] [--ignore-failure] [-r remote-root] [--checked-out]
+           [--bare] [--<tag>] [--no-<tag>] [--resume] cmd [git flags]
 
     where <tag> is one of: $tags
 
-Applies the command "cmd" to each repository in the tree.
+Applies the command "cmd" to each repository and submodule in the local
+tree.
 
-A full repository tree is obtained by first cloning the ghc
-repository, then getting the subrepositories with "sync-all get":
+A full repository tree is obtained by first cloning the ghc repository,
+then getting the subrepositories and submodules with "sync-all get":
 
-  \$ git clone http://git.haskell.org/ghc.git
+  \$ git clone git://git.haskell.org/ghc.git
   \$ cd ghc
   \$ ./sync-all get
 
 After this, "./sync-all pull" will pull from the original repository
 tree.
 
-A remote pointing to another local repository tree can be added like
-this:
+If you want to clone your own GitHub fork instead, add an argument to
+sync-all to tell it where it can find the other repositories it needs.
 
-  \$ ./sync-all -r /path/to/ghc remote add otherlocal
+  \$ git clone <your preferred github.com GHC fork URL> ghc
+  \$ cd ghc
+  \$ ./sync-all -r git://github.com/ghc get
 
-and then we can pull from this other tree with
+Another commonly used feature is to add remotes pointing to another
+repository tree like this:
 
-  \$ ./sync-all pull otherlocal
+  \$ ./sync-all -r /path/to/other/ghc remote add otherghc
+
+and then to pull from that other tree with
+
+  \$ ./sync-all pull otherghc
 
 -------------- Commands -----------------
 get
 
-    Clones all sub-repositories from the same place that the ghc
-    repository was cloned from. See "which repos to use" below
-    for details of how the subrepositories are laid out.
+    Gets all subrepositories and submodules from the same place that the
+    ghc repository was cloned from. See "layout of remote tree" below
+    for details of how the subrepositories and submodules are laid
+    out.
 
-    There are various --<package-tag> options that can be given
-    before "get" that enable extra repositories. The full list is
-    given at the end of this help. For example:
+    There are various --<package-tag> options that can be given before
+    "get" that enable extra subrepositories. The full list is given at
+    the end of this help. For example:
 
     ./sync-all --nofib get
 
-    would get the nofib repository in addition to the usual set of
-    subrepositories.
+    would get the nofib subrepository in addition to the usual set of
+    subrepositories and submodules.
 
-remote add <remote-name>
+remote [-r remote-root] add <remote-name>
 remote rm <remote-name>
-remote set-url [--push] <remote-name>
+remote [-r remote-root] set-url [--push] <remote-name>
+remote set-branches <remote-name> <branch>...
 
-    Runs a "git remote" command on each subrepository, adjusting the
-    repository location in each case appropriately. For example, to
-    add a new remote pointing to the upstream repositories:
+    Runs a "git remote" command on each repository and submodule in the
+    local tree. For the "add" and "set-url" subcommands, the url the
+    remotes will point to are adjusted according to the inferred layout
+    of the remote tree (see "layout of remote tree" below). For example,
+    to add new remotes pointing to the repositories on GitHub:
 
-    ./sync-all -r http://git.haskell.org remote add upstream
+    ./sync-all -r git://github.com/ghc remote add github
 
-    The -r flag points to the root of the repository tree (see "which
-    repos to use" below). For a repository on the local filesystem it
-    would point to the ghc repository, and for a remote repository it
-    points to the directory containing "ghc.git".
+    The <remote-root> should be the root of a repository tree (see
+    "layout of remote tree" below). For a checked-out tree it would
+    point to the ghc directory, otherwise it points to a directory
+    containing "ghc.git".
 
 compare
-compare reporoot
-compare -b reporoot
+compare <remote-root>
+compare -b <remote-root>
 
-    Compare the git HEADs of the repos to the origin repos, or the
-    repos under reporoot (which is assumde to be a checked-out tree
-    unless the -b flag is used).
+    Compare the git HEADs of the repositories to the origin
+    repositories, or the repositories under <remote-root> (which is
+    assumed to be a checked-out tree unless the -b flag is used).
 
-    1 line is printed for each repo, indicating whether the repo is
-    at the "same" or a "DIFFERENT" commit.
+    1 line is printed for each repository, indicating whether the
+    repository is at the "same" or a "DIFFERENT" commit.
 
-These commands just run the equivalent git command on each repository, passing
-any extra arguments to git:
+These commands just run the equivalent git command on each repository
+and submodule, passing any extra arguments to git:
 
   branch
   checkout
@@ -694,24 +698,29 @@ any extra arguments to git:
   tag
 
 -------------- Flags -------------------
-These flags are given *before* the command and modify the way sync-all behaves.
-Flags given *after* the command are passed to git.
+
+These flags are given *before* the command and modify the way sync-all
+behaves. Flags given *after* the command are passed to git.
 
   -q says to be quiet, and -s to be silent.
 
-  --resume will restart a command that failed, from the repo at which it
-  failed. This means you don't need to wait while, e.g., "pull" goes through
-  all the repos it's just pulled, and tries to pull them again.
+  --resume will restart a command that failed, from the repository or
+  submodule at which it failed. This means you don't need to wait while,
+  e.g., "pull" goes through all the repositories it's just pulled, and
+  tries to pull them again.
 
-  --ignore-failure says to ignore errors and move on to the next repository
+  --ignore-failure says to ignore errors and move on to the next
+  repository or submodule
 
-  -r repo says to use repo as the location of package repositories
+  -r <remote-root> says that the remote repository tree can be found at
+  <remote-root>, instead of where this GHC repository came from. Only
+  useful in combination with 'sync-all get' and 'sync-all remote'.
 
-  --checked-out says that the remote repo is in checked-out layout, as opposed
-  to the layout used for the main repo. By default a repo on the local
-  filesystem is assumed to be checked-out, and repos accessed via HTTP or SSH
-  are assumed to be in the main repo layout; use --checked-out to override the
-  latter.
+  --checked-out says that the remote repositories are a checked-out
+  tree, as opposed to a collection of bare repositories. By default a
+  repository on the local filesystem is assumed to be
+  checked-out, and repositories accessed via HTTP or SSH are assumed to
+  be bare; use --checked-out to override the latter.
 
   --bare says that the local repo is in bare layout, same as the main repo. It
   also means that these repos are bare. You only have to use this flag if you
@@ -725,45 +734,59 @@ Flags given *after* the command are passed to git.
 
   --nofib also clones the nofib benchmark suite
 
-  --extra also clone some extra library packages
+  --extra clones some extra library packages (see the packages file for
+  the current list)
 
-  --no-dph avoids cloning the dph packages
+  --windows also clones the ghc-tarballs repository (enabled by default
+  on Windows)
+
+  --no-dph avoids cloning the dph repositories
 
 
 ------------ Checking out a branch -------------
+
 To check out a branch you can run the following command:
 
   \$ ./sync-all checkout ghc-7.4
 
 
------------- Which repos to use -------------
-sync-all uses the following algorithm to decide which remote repos to use
+------------ Layout of remote tree -------------
 
-It always computes the remote repos from a single base, <repo_base> How is
-<repo_base> set? If you say "-r repo", then that's <repo_base> otherwise
-<repo_base> is set by asking git where the ghc repo came from, and removing the
-last component (e.g. /ghc.git/ or /ghc/).
+sync-all uses the following algorithm to guess the layout of the remote
+tree
 
-Then sync-all iterates over the package found in the file ./packages; see that
-file for a description of the contents.
+It always computes the urls or paths of the remote repositories from a
+single root, <remote-root>. If you say "-r <remote-root>", then that sets
+<remote-root>. Otherwise, <remote-root> is inferred by asking git where
+the local ghc repository came from, and removing the last component
+(e.g. /ghc.git). The last component is not removed when the
+remote repository is checked-out (appears to be on the local filesystem
+or the flag --checked-out is given).
 
-If <repo_base> looks like a local filesystem path, or if you give the
---checked-out flag, sync-all works on repos of form:
+Then sync-all iterates over the repositories found in the file packages;
+see that file for a description of the contents.
 
-  <repo_base>/<local-path>
+If <remote-root> looks like a local filesystem path, or if you give the
+--checked-out flag, sync-all works on remote repositories of form:
 
-otherwise sync-all works on repos of form:
+  <remote-root>/<local-path>
 
-  <repo_base>/<remote-path>
+Otherwise, if a particular repository is a submodule, sync-all uses:
+
+  <remote-root>/<submodule-url>
+
+Else, sync-all works on remote repositories of form:
+
+  <remote-root>/<remote-path>
+
+In these, <local-path> and <remote-path> are taken from the packages
+file, and <submodule-url> is taken from the file .gitmodules.
+
+Besides all this, there is special handling for GitHub links.
 
 This logic lets you say
   both    sync-all -r http://example.org/ghc-6.12 remote add ghc-6.12
   and     sync-all -r ../working remote add working
-The latter is called a "checked-out tree".
-
-sync-all *ignores* the defaultrepo of all repos other than the root one. So the
-remote repos must be laid out in one of the two formats given by <local-path>
-and <remote-path> in the file 'packages'.
 
 Available package-tags are: $tags
 
@@ -792,7 +815,7 @@ sub main {
             $verbose = 0;
         }
         elsif ($arg eq "-r") {
-            $defaultrepo = shift;
+            $default_root = shift;
         }
         elsif ($arg eq "--resume") {
             $try_to_resume = 1;
@@ -800,8 +823,9 @@ sub main {
         elsif ($arg eq "--ignore-failure") {
             $ignore_failure = 1;
         }
-        # Use --checked-out if the _remote_ repos are a checked-out tree,
-        # rather than the master trees.
+        # Use --checked-out if the _remote_ repositories are a
+        # checked-out tree, rather than a collection of bare
+        # repositories.
         elsif ($arg eq "--checked-out") {
             $checked_out_flag = 1;
         }
@@ -837,7 +861,7 @@ sub main {
     my $checked_out_found = 1 if (-d ".git" && -d "compiler");
     my $bare_found = 1 if (-d "ghc.git");
 
-    if ($bare_flag && ! $bare_found && ! $defaultrepo) {
+    if ($bare_flag && ! $bare_found && ! $default_root) {
         die "error: bare repository ghc.git not found.\n"
           . "       Either clone a bare ghc repo first or specify the repo location. E.g.:\n"
           . "       ./sync-all --bare [--nofib --extra] -r http://git.haskell.org get\n"
@@ -867,8 +891,8 @@ sub main {
         elsif ($command =~ /^(?:pul|pull)$/) {
             $command = "pull";
         }
-        elsif ($command =~ /^(?:s|se|sen|send)$/) {
-            $command = "send";
+        elsif ($command =~ /^(?:s|se|sen|send|send-email)$/) {
+            $command = "send-email";
         }
         elsif ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew|status)$/) {
             $command = "status";
@@ -899,11 +923,6 @@ BEGIN {
     }
     $initial_working_directory = getcwd();
 
-    $SIG{__DIE__} = sub {
-      die @_ if $^S;
-      $exit_via_die = 1;
-    };
-
     my @obsolete_dirs = qw!
         testsuite
         libraries/base
@@ -913,7 +932,7 @@ BEGIN {
         libraries/integer-simple
         !;
     for my $dir (@obsolete_dirs) {
-        if (-d "$dir/.git") {
+        if (-e "$dir/.git") {
             print <<EOF;
 ============================
 ATTENTION!
@@ -931,7 +950,6 @@ EOF
 }
 
 END {
-    return if $exit_via_die;
     my $ec = $?;
 
     chdir($initial_working_directory);
@@ -946,10 +964,10 @@ END {
         my ($dir, $hash) = @$_;
         my ($name) = $dir =~ m!/([^/]+)$!;
         message "== Checking for old $name repo";
-        if (-d "$dir/.git") {
-            chdir($dir);
-            if ((system "git log -1 $hash > /dev/null 2> /dev/null") == 0) {
-                print <<EOF;
+        if (-e "$dir/.git") {
+            &inDir($dir, sub {
+                if ((system "git log -1 --quiet $hash > /dev/null 2> /dev/null") == 0) {
+                    print <<EOF;
 ============================
 ATTENTION!
 
@@ -959,17 +977,17 @@ Please remove it (e.g. "rm -r $dir"), and then run
 "./sync-all get" to get the new repository.
 ============================
 EOF
-            }
-            chdir($initial_working_directory);
+                }
+            });
         }
     }
     message "== Checking for old time from tarball";
-    if (-d "libraries/time" and ! -e "libraries/time/.git") {
+    if (-f "libraries/time/LICENSE" and ! -e "libraries/time/.git") {
             print <<EOF;
 ============================
 ATTENTION!
 
-You have an old time package in your GHC tree!
+You have an old time repository in your GHC tree!
 
 Please remove it (e.g. "rm -r libraries/time"), and then run
 "./sync-all get" to get the new repository.
@@ -977,7 +995,7 @@ Please remove it (e.g. "rm -r libraries/time"), and then run
 EOF
     }
 
-    message "== Checking for obsolete Git repo URL";
+    message "== Checking for obsolete Git repository URL";
     my $repo_url = &readgitline(".", 'config', '--get', 'remote.origin.url');
     if ($repo_url =~ /^http:\/\/darcs.haskell.org/) {
             print <<EOF;

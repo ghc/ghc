@@ -75,6 +75,6 @@ Library
 
     build-depends: ghc-prim >= 0.3.1 && < 0.4
 
-    -- We need to set the package name to integer-gmp
+    -- We need to set the package key to integer-gmp
     -- (without a version number) as it's magic.
-    ghc-options: -Wall -package-name integer-gmp
+    ghc-options: -Wall -this-package-key integer-gmp

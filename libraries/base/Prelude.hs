@@ -6,7 +6,7 @@
 -- Module      :  Prelude
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  stable
 -- Portability :  portable
@@ -48,7 +48,7 @@ module Prelude (
 
     -- *** Numeric types
     Int, Integer, Float, Double,
-    Rational,
+    Rational, Word,
 
     -- *** Numeric type classes
     Num((+), (-), (*), negate, abs, signum, fromInteger),
@@ -66,10 +66,32 @@ module Prelude (
     subtract, even, odd, gcd, lcm, (^), (^^),
     fromIntegral, realToFrac,
 
+    -- ** Monoids
+    Monoid(mempty, mappend, mconcat),
+
     -- ** Monads and functors
-    Monad((>>=), (>>), return, fail),
     Functor(fmap),
-    mapM, mapM_, sequence, sequence_, (=<<),
+    Applicative(pure, (<*>), (*>), (<*)),
+    Monad((>>=), (>>), return, fail),
+    mapM_, sequence_, (=<<),
+
+    -- ** Folds and traversals
+    Foldable(elem,      -- :: (Foldable t, Eq a) => a -> t a -> Bool
+             -- fold,   -- :: Monoid m => t m -> m
+             foldMap,   -- :: Monoid m => (a -> m) -> t a -> m
+             foldr,     -- :: (a -> b -> b) -> b -> t a -> b
+             -- foldr', -- :: (a -> b -> b) -> b -> t a -> b
+             foldl,     -- :: (b -> a -> b) -> b -> t a -> b
+             -- foldl', -- :: (b -> a -> b) -> b -> t a -> b
+             foldr1,    -- :: (a -> a -> a) -> t a -> a
+             foldl1,    -- :: (a -> a -> a) -> t a -> a
+             maximum,   -- :: (Foldable t, Ord a) => t a -> a
+             minimum,   -- :: (Foldable t, Ord a) => t a -> a
+             product,   -- :: (Foldable t, Num a) => t a -> a
+             sum),      -- :: Num a => t a -> a
+             -- toList) -- :: Foldable t => t a -> [a]
+
+    Traversable(traverse, sequenceA, mapM, sequence),
 
     -- ** Miscellaneous functions
     id, const, (.), flip, ($), until,
@@ -80,13 +102,9 @@ module Prelude (
     map, (++), filter,
     head, last, tail, init, null, length, (!!),
     reverse,
-    -- ** Reducing lists (folds)
-    foldl, foldl1, foldr, foldr1,
     -- *** Special folds
     and, or, any, all,
-    sum, product,
     concat, concatMap,
-    maximum, minimum,
     -- ** Building lists
     -- *** Scans
     scanl, scanl1, scanr, scanr1,
@@ -95,7 +113,7 @@ module Prelude (
     -- ** Sublists
     take, drop, splitAt, takeWhile, dropWhile, span, break,
     -- ** Searching lists
-    elem, notElem, lookup,
+    notElem, lookup,
     -- ** Zipping and unzipping lists
     zip, zip3, zipWith, zipWith3, unzip, unzip3,
     -- ** Functions on strings
@@ -139,30 +157,15 @@ import System.IO
 import System.IO.Error
 import Data.List
 import Data.Either
+import Data.Foldable    ( Foldable(..) )
 import Data.Maybe
+import Data.Traversable ( Traversable(..) )
 import Data.Tuple
 
-import GHC.Base
+import GHC.Base hiding ( foldr, mapM, sequence )
 import Text.Read
 import GHC.Enum
 import GHC.Num
 import GHC.Real
 import GHC.Float
 import GHC.Show
-
-infixr 0 $!
-
--- -----------------------------------------------------------------------------
--- Miscellaneous functions
-
--- | Strict (call-by-value) application, defined in terms of 'seq'.
-($!)    :: (a -> b) -> a -> b
-f $! x  = let !vx = x in f vx  -- see #2273
-
-#ifdef __HADDOCK__
--- | The value of @'seq' a b@ is bottom if @a@ is bottom, and otherwise
--- equal to @b@.  'seq' is usually introduced to improve performance by
--- avoiding unneeded laziness.
-seq :: a -> b -> b
-seq _ y = y
-#endif

@@ -21,7 +21,7 @@ module GHC.List (
    -- [] (..),          -- built-in syntax; can't be used in export list
 
    map, (++), filter, concat,
-   head, last, tail, init, null, length, (!!),
+   head, last, tail, init, uncons, null, length, (!!),
    foldl, scanl, scanl1, foldr, foldr1, scanr, scanr1,
    iterate, repeat, replicate, cycle,
    take, drop, splitAt, takeWhile, dropWhile, span, break,
@@ -70,6 +70,15 @@ badHead = errorEmptyList "head"
 "head/augment"  forall xs (g::forall b. (a->b->b) -> b -> b) .
                 head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
+
+-- | Decompose a list into its head and tail. If the list is empty,
+-- returns 'Nothing'. If the list is non-empty, returns @'Just' (x, xs)@,
+-- where @x@ is the head of the list and @xs@ its tail.
+--
+-- /Since: 4.8.0.0/
+uncons                  :: [a] -> Maybe (a, [a])
+uncons []               = Nothing
+uncons (x:xs)           = Just (x, xs)
 
 -- | Extract the elements after the head of a list, which must be non-empty.
 tail                    :: [a] -> [a]
@@ -385,10 +394,17 @@ takeFoldr (I# n#) xs
 takeConst :: a -> Int# -> a
 takeConst x _ = x
 
-{-# NOINLINE [0] takeFB #-}
+{-# INLINE [0] takeFB #-}
 takeFB :: (a -> b -> b) -> b -> a -> (Int# -> b) -> Int# -> b
-takeFB c n x xs m | isTrue# (m <=# 1#) = x `c` n
-                  | otherwise          = x `c` xs (m -# 1#)
+-- The \m accounts for the fact that takeFB is used in a higher-order
+-- way by takeFoldr, so it's better to inline.  A good example is
+--     take n (repeat x)
+-- for which we get excellent code... but only if we inline takeFB
+-- when given four arguments
+takeFB c n x xs
+  = \ m -> if isTrue# (m <=# 1#)
+           then x `c` n
+           else x `c` xs (m -# 1#)
 
 {-# INLINE [0] take #-}
 take (I# n#) xs = takeUInt n# xs
@@ -608,9 +624,6 @@ xs     !! n | n < 0 =  error "Prelude.!!: negative index"
 (_:xs) !! n         =  xs !! (n-1)
 #else
 -- HBC version (stolen), then unboxified
--- The semantics is not quite the same for error conditions
--- in the more efficient version.
---
 xs !! (I# n0) | isTrue# (n0 <# 0#) =  error "Prelude.(!!): negative index\n"
               | otherwise          =  sub xs n0
                          where
@@ -633,9 +646,9 @@ xs !! (I# n0) | isTrue# (n0 <# 0#) =  error "Prelude.(!!): negative index\n"
 foldr2 :: (a -> b -> c -> c) -> c -> [a] -> [b] -> c
 foldr2 k z = go
   where
-	go []    _ys     = z
-	go _xs   []      = z
-	go (x:xs) (y:ys) = k x y (go xs ys)
+        go []    _ys     = z
+        go _xs   []      = z
+        go (x:xs) (y:ys) = k x y (go xs ys)
 {-# INLINE [0] foldr2 #-}
 
 foldr2_left :: (a -> b -> c -> d) -> d -> a -> ([b] -> c) -> [b] -> d

@@ -37,10 +37,10 @@ processHeapClosureForDead( StgClosure *c )
 
     info = c->header.info;
     if (IS_FORWARDING_PTR(info)) {
-	// The size of the evacuated closure is currently stored in
-	// the LDV field.  See SET_EVACUAEE_FOR_LDV() in
-	// includes/StgLdvProf.h.
-	return LDVW(c);
+        // The size of the evacuated closure is currently stored in
+        // the LDV field.  See SET_EVACUAEE_FOR_LDV() in
+        // includes/StgLdvProf.h.
+        return LDVW(c);
     }
     info = INFO_PTR_TO_STRUCT(info);
 
@@ -56,9 +56,9 @@ processHeapClosureForDead( StgClosure *c )
     size = closure_sizeW(c);
 
     switch (info->type) {
-	/*
-	  'inherently used' cases: do nothing.
-	*/
+        /*
+          'inherently used' cases: do nothing.
+        */
     case TSO:
     case STACK:
     case MVAR_CLEAN:
@@ -80,11 +80,11 @@ processHeapClosureForDead( StgClosure *c )
     case PRIM:
     case MUT_PRIM:
     case TREC_CHUNK:
-	return size;
+        return size;
 
-	/*
-	  ordinary cases: call LDV_recordDead().
-	*/
+        /*
+          ordinary cases: call LDV_recordDead().
+        */
     case THUNK:
     case THUNK_1_0:
     case THUNK_0_1:
@@ -110,30 +110,30 @@ processHeapClosureForDead( StgClosure *c )
     case BLACKHOLE:
     case BLOCKING_QUEUE:
     case IND_PERM:
-	/*
-	  'Ingore' cases
-	*/
-	// Why can we ignore IND closures? We assume that
-	// any census is preceded by a major garbage collection, which
-	// IND closures cannot survive. Therefore, it is no
-	// use considering IND closures in the meanwhile
-	// because they will perish before the next census at any
-	// rate.
+        /*
+          'Ingore' cases
+        */
+        // Why can we ignore IND closures? We assume that
+        // any census is preceded by a major garbage collection, which
+        // IND closures cannot survive. Therefore, it is no
+        // use considering IND closures in the meanwhile
+        // because they will perish before the next census at any
+        // rate.
     case IND:
-	// Found a dead closure: record its size
-	LDV_recordDead(c, size);
-	return size;
+        // Found a dead closure: record its size
+        LDV_recordDead(c, size);
+        return size;
 
-	/*
-	  Error case
-	*/
-	// static objects
+        /*
+          Error case
+        */
+        // static objects
     case IND_STATIC:
     case CONSTR_STATIC:
     case FUN_STATIC:
     case THUNK_STATIC:
     case CONSTR_NOCAF_STATIC:
-	// stack objects
+        // stack objects
     case UPDATE_FRAME:
     case CATCH_FRAME:
     case UNDERFLOW_FRAME:
@@ -141,11 +141,11 @@ processHeapClosureForDead( StgClosure *c )
     case RET_BCO:
     case RET_SMALL:
     case RET_BIG:
-	// others
+        // others
     case INVALID_OBJECT:
     default:
-	barf("Invalid object in processHeapClosureForDead(): %d", info->type);
-	return 0;
+        barf("Invalid object in processHeapClosureForDead(): %d", info->type);
+        return 0;
     }
 }
 
@@ -159,14 +159,14 @@ processHeapForDead( bdescr *bd )
     StgPtr p;
 
     while (bd != NULL) {
-	p = bd->start;
-	while (p < bd->free) {
-	    p += processHeapClosureForDead((StgClosure *)p);
-	    while (p < bd->free && !*p)   // skip slop
-		p++;
-	}
-	ASSERT(p == bd->free);
-	bd = bd->link;
+        p = bd->start;
+        while (p < bd->free) {
+            p += processHeapClosureForDead((StgClosure *)p);
+            while (p < bd->free && !*p)   // skip slop
+                p++;
+        }
+        ASSERT(p == bd->free);
+        bd = bd->link;
     }
 }
 
@@ -201,7 +201,7 @@ processChainForDead( bdescr *bd )
         if (!(bd->flags & BF_PINNED)) {
             processHeapClosureForDead((StgClosure *)bd->start);
         }
-	bd = bd->link;
+        bd = bd->link;
     }
 }
 
@@ -220,16 +220,16 @@ LdvCensusForDead( nat N )
 
     // ldvTime == 0 means that LDV profiling is currently turned off.
     if (era == 0)
-	return;
+        return;
 
     if (RtsFlags.GcFlags.generations == 1) {
-	//
-	// Todo: support LDV for two-space garbage collection.
-	//
-	barf("Lag/Drag/Void profiling not supported with -G1");
+        //
+        // Todo: support LDV for two-space garbage collection.
+        //
+        barf("Lag/Drag/Void profiling not supported with -G1");
     } else {
         processNurseryForDead();
-	for (g = 0; g <= N; g++) {
+        for (g = 0; g <= N; g++) {
             processHeapForDead(generations[g].old_blocks);
             processChainForDead(generations[g].large_objects);
         }

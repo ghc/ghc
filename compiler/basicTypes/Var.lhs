@@ -6,13 +6,6 @@
 
 \begin{code}
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 -- |
 -- #name_types#
 -- GHC uses several kinds of name internally:
@@ -25,17 +18,17 @@
 --
 -- * 'Id.Id': see "Id#name_types"
 --
--- * 'Var.Var' is a synonym for the 'Id.Id' type but it may additionally 
---   potentially contain type variables, which have a 'TypeRep.Kind' 
---   rather than a 'TypeRep.Type' and only contain some extra 
+-- * 'Var.Var' is a synonym for the 'Id.Id' type but it may additionally
+--   potentially contain type variables, which have a 'TypeRep.Kind'
+--   rather than a 'TypeRep.Type' and only contain some extra
 --   details during typechecking.
--- 
+--
 --   These 'Var.Var' names may either be global or local, see "Var#globalvslocal"
 --
 -- #globalvslocal#
--- Global 'Id's and 'Var's are those that are imported or correspond 
+-- Global 'Id's and 'Var's are those that are imported or correspond
 --    to a data constructor, primitive operation, or record selectors.
--- Local 'Id's and 'Var's are those bound within an expression 
+-- Local 'Id's and 'Var's are those bound within an expression
 --    (e.g. by a lambda) or at the top level of the module being compiled.
 
 module Var (
@@ -43,41 +36,41 @@ module Var (
         Var, CoVar, Id, DictId, DFunId, EvVar, EqVar, EvId, IpId,
         TyVar, TypeVar, KindVar, TKVar,
 
-	-- ** Taking 'Var's apart
-	varName, varUnique, varType, 
+        -- ** Taking 'Var's apart
+        varName, varUnique, varType,
 
-	-- ** Modifying 'Var's
-	setVarName, setVarUnique, setVarType,
+        -- ** Modifying 'Var's
+        setVarName, setVarUnique, setVarType,
 
-	-- ** Constructing, taking apart, modifying 'Id's
-	mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
-	idInfo, idDetails,
-	lazySetIdInfo, setIdDetails, globaliseId,
-	setIdExported, setIdNotExported,
+        -- ** Constructing, taking apart, modifying 'Id's
+        mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
+        idInfo, idDetails,
+        lazySetIdInfo, setIdDetails, globaliseId,
+        setIdExported, setIdNotExported,
 
         -- ** Predicates
         isId, isTKVar, isTyVar, isTcTyVar,
         isLocalVar, isLocalId,
-	isGlobalId, isExportedId,
-	mustHaveLocalBinding,
+        isGlobalId, isExportedId,
+        mustHaveLocalBinding,
 
-	-- ** Constructing 'TyVar's
-	mkTyVar, mkTcTyVar, mkKindVar,
+        -- ** Constructing 'TyVar's
+        mkTyVar, mkTcTyVar, mkKindVar,
 
-	-- ** Taking 'TyVar's apart
+        -- ** Taking 'TyVar's apart
         tyVarName, tyVarKind, tcTyVarDetails, setTcTyVarDetails,
 
-	-- ** Modifying 'TyVar's
-	setTyVarName, setTyVarUnique, setTyVarKind, updateTyVarKind,
+        -- ** Modifying 'TyVar's
+        setTyVarName, setTyVarUnique, setTyVarKind, updateTyVarKind,
         updateTyVarKindM
 
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TypeRep( Type, Kind, SuperKind )
-import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
-import {-# SOURCE #-}	IdInfo( IdDetails, IdInfo, coVarDetails, vanillaIdInfo, pprIdDetails )
+import {-# SOURCE #-}   TypeRep( Type, Kind, SuperKind )
+import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails )
+import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, vanillaIdInfo, pprIdDetails )
 
 import Name hiding (varName)
 import Unique
@@ -91,9 +84,9 @@ import Data.Data
 
 
 %************************************************************************
-%*									*
-                     Synonyms									
-%*									*
+%*                                                                      *
+                     Synonyms
+%*                                                                      *
 %************************************************************************
 -- These synonyms are here and not in Id because otherwise we need a very
 -- large number of SOURCE imports of Id.hs :-(
@@ -106,22 +99,22 @@ type TyVar   = Var     -- Type *or* kind variable (historical)
 type TKVar   = Var     -- Type *or* kind variable (historical)
 type TypeVar = Var     -- Definitely a type variable
 type KindVar = Var     -- Definitely a kind variable
-     	       	       -- See Note [Kind and type variables]
+                       -- See Note [Kind and type variables]
 
 -- See Note [Evidence: EvIds and CoVars]
 type EvId   = Id        -- Term-level evidence: DictId, IpId, or EqVar
-type EvVar  = EvId	-- ...historical name for EvId
-type DFunId = Id	-- A dictionary function
-type DictId = EvId	-- A dictionary variable
+type EvVar  = EvId      -- ...historical name for EvId
+type DFunId = Id        -- A dictionary function
+type DictId = EvId      -- A dictionary variable
 type IpId   = EvId      -- A term-level implicit parameter
 type EqVar  = EvId      -- Boxed equality evidence
 
-type CoVar = Id		-- See Note [Evidence: EvIds and CoVars]
+type CoVar = Id         -- See Note [Evidence: EvIds and CoVars]
 \end{code}
 
 Note [Evidence: EvIds and CoVars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* An EvId (evidence Id) is a *boxed*, term-level evidence variable 
+* An EvId (evidence Id) is a *boxed*, term-level evidence variable
   (dictionary, implicit parameter, or equality).
 
 * A CoVar (coercion variable) is an *unboxed* term-level evidence variable
@@ -144,9 +137,9 @@ go over the whole compiler code to use:
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{The main data type declarations}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 
@@ -161,37 +154,37 @@ in its @VarDetails@.
 data Var
   = TyVar {  -- Type and kind variables
              -- see Note [Kind and type variables]
-	varName    :: !Name,
-	realUnique :: FastInt,	     -- Key for fast comparison
-				     -- Identical to the Unique in the name,
-				     -- cached here for speed
-	varType    :: Kind           -- ^ The type or kind of the 'Var' in question
+        varName    :: !Name,
+        realUnique :: FastInt,       -- Key for fast comparison
+                                     -- Identical to the Unique in the name,
+                                     -- cached here for speed
+        varType    :: Kind           -- ^ The type or kind of the 'Var' in question
  }
 
-  | TcTyVar { 				-- Used only during type inference
-					-- Used for kind variables during 
-					-- inference, as well
-	varName        :: !Name,
-	realUnique     :: FastInt,
-	varType        :: Kind,
-	tc_tv_details  :: TcTyVarDetails }
+  | TcTyVar {                           -- Used only during type inference
+                                        -- Used for kind variables during
+                                        -- inference, as well
+        varName        :: !Name,
+        realUnique     :: FastInt,
+        varType        :: Kind,
+        tc_tv_details  :: TcTyVarDetails }
 
   | Id {
-	varName    :: !Name,
-	realUnique :: FastInt,
-   	varType    :: Type,
-	idScope    :: IdScope,
-	id_details :: IdDetails,	-- Stable, doesn't change
-	id_info    :: IdInfo }		-- Unstable, updated by simplifier
+        varName    :: !Name,
+        realUnique :: FastInt,
+        varType    :: Type,
+        idScope    :: IdScope,
+        id_details :: IdDetails,        -- Stable, doesn't change
+        id_info    :: IdInfo }          -- Unstable, updated by simplifier
     deriving Typeable
 
-data IdScope	-- See Note [GlobalId/LocalId]
-  = GlobalId 
+data IdScope    -- See Note [GlobalId/LocalId]
+  = GlobalId
   | LocalId ExportFlag
 
-data ExportFlag 
-  = NotExported	-- ^ Not exported: may be discarded as dead code.
-  | Exported	-- ^ Exported: kept alive
+data ExportFlag
+  = NotExported -- ^ Not exported: may be discarded as dead code.
+  | Exported    -- ^ Exported: kept alive
 \end{code}
 
 Note [GlobalId/LocalId]
@@ -202,9 +195,9 @@ A GlobalId is
   * has a Unique that is globally unique across the whole
     GHC invocation (a single invocation may compile multiple modules)
   * never treated as a candidate by the free-variable finder;
-	it's a constant!
+        it's a constant!
 
-A LocalId is 
+A LocalId is
   * bound within an expression (lambda, case, local let(rec))
   * or defined at top level in the module being compiled
   * always treated as a candidate by the free-variable finder
@@ -240,9 +233,9 @@ instance Eq Var where
 
 instance Ord Var where
     a <= b = realUnique a <=# realUnique b
-    a <	 b = realUnique a <#  realUnique b
+    a <  b = realUnique a <#  realUnique b
     a >= b = realUnique a >=# realUnique b
-    a >	 b = realUnique a >#  realUnique b
+    a >  b = realUnique a >#  realUnique b
     a `compare` b = varUnique a `compare` varUnique b
 
 instance Data Var where
@@ -258,14 +251,14 @@ varUnique :: Var -> Unique
 varUnique var = mkUniqueGrimily (iBox (realUnique var))
 
 setVarUnique :: Var -> Unique -> Var
-setVarUnique var uniq 
-  = var { realUnique = getKeyFastInt uniq, 
-	  varName = setNameUnique (varName var) uniq }
+setVarUnique var uniq
+  = var { realUnique = getKeyFastInt uniq,
+          varName = setNameUnique (varName var) uniq }
 
 setVarName :: Var -> Name -> Var
 setVarName var new_name
-  = var { realUnique = getKeyFastInt (getUnique new_name), 
-   	  varName = new_name }
+  = var { realUnique = getKeyFastInt (getUnique new_name),
+          varName = new_name }
 
 setVarType :: Id -> Type -> Id
 setVarType id ty = id { varType = ty }
@@ -273,9 +266,9 @@ setVarType id ty = id { varType = ty }
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Type and kind variables}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -306,18 +299,18 @@ updateTyVarKindM update tv
 \begin{code}
 mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar { varName    = name
-			  , realUnique = getKeyFastInt (nameUnique name)
-			  , varType  = kind
-			}
+                          , realUnique = getKeyFastInt (nameUnique name)
+                          , varType  = kind
+                        }
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
 mkTcTyVar name kind details
   = -- NB: 'kind' may be a coercion kind; cf, 'TcMType.newMetaCoVar'
-    TcTyVar {	varName    = name,
-		realUnique = getKeyFastInt (nameUnique name),
-		varType  = kind,
-		tc_tv_details = details
-	}
+    TcTyVar {   varName    = name,
+                realUnique = getKeyFastInt (nameUnique name),
+                varType  = kind,
+                tc_tv_details = details
+        }
 
 tcTyVarDetails :: TyVar -> TcTyVarDetails
 tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
@@ -337,19 +330,19 @@ mkKindVar name kind = TyVar
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Ids}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 idInfo :: Id -> IdInfo
 idInfo (Id { id_info = info }) = info
-idInfo other 	       	       = pprPanic "idInfo" (ppr other)
+idInfo other                   = pprPanic "idInfo" (ppr other)
 
 idDetails :: Id -> IdDetails
 idDetails (Id { id_details = details }) = details
-idDetails other 	       	        = pprPanic "idDetails" (ppr other)
+idDetails other                         = pprPanic "idDetails" (ppr other)
 
 -- The next three have a 'Var' suffix even though they always build
 -- Ids, because Id.lhs uses 'mkGlobalId' etc with different types
@@ -367,17 +360,17 @@ mkCoVar name ty = mk_id name ty (LocalId NotExported) coVarDetails vanillaIdInfo
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
-mkExportedLocalVar details name ty info 
+mkExportedLocalVar details name ty info
   = mk_id name ty (LocalId Exported) details info
 
 mk_id :: Name -> Type -> IdScope -> IdDetails -> IdInfo -> Id
 mk_id name ty scope details info
-  = Id { varName    = name, 
-	 realUnique = getKeyFastInt (nameUnique name),
-	 varType    = ty,	
-	 idScope    = scope,
-	 id_details = details,
-	 id_info    = info }
+  = Id { varName    = name,
+         realUnique = getKeyFastInt (nameUnique name),
+         varType    = ty,
+         idScope    = scope,
+         id_details = details,
+         id_info    = info }
 
 -------------------
 lazySetIdInfo :: Id -> IdInfo -> Var
@@ -395,18 +388,18 @@ setIdExported :: Id -> Id
 -- and class operations, which are born as global 'Id's and automatically exported
 setIdExported id@(Id { idScope = LocalId {} }) = id { idScope = LocalId Exported }
 setIdExported id@(Id { idScope = GlobalId })   = id
-setIdExported tv	  	    	       = pprPanic "setIdExported" (ppr tv)
+setIdExported tv                               = pprPanic "setIdExported" (ppr tv)
 
 setIdNotExported :: Id -> Id
 -- ^ We can only do this to LocalIds
-setIdNotExported id = ASSERT( isLocalId id ) 
+setIdNotExported id = ASSERT( isLocalId id )
                       id { idScope = LocalId NotExported }
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Predicates over variables}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -445,7 +438,7 @@ isGlobalId _                           = False
 -- is not quite right: there are some global 'Id's that must have
 -- bindings, such as record selectors.  But that doesn't matter,
 -- because it's only used for assertions
-mustHaveLocalBinding	    :: Var -> Bool
+mustHaveLocalBinding        :: Var -> Bool
 mustHaveLocalBinding var = isLocalVar var
 
 -- | 'isExportedIdVar' means \"don't throw this away\"

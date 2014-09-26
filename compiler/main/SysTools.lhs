@@ -492,6 +492,51 @@ readCreateProcess proc = do
 
     return (ex, output)
 
+readProcessEnvWithExitCode
+    :: String -- ^ program path
+    -> [String] -- ^ program args
+    -> [(String, String)] -- ^ environment to override
+    -> IO (ExitCode, String, String) -- ^ (exit_code, stdout, stderr)
+readProcessEnvWithExitCode prog args env_update = do
+    current_env <- getEnvironment
+    let new_env = env_update ++ [ (k, v)
+                                | let overriden_keys = map fst env_update
+                                , (k, v) <- current_env
+                                , k `notElem` overriden_keys
+                                ]
+        p       = proc prog args
+
+    (_stdin, Just stdoh, Just stdeh, pid) <-
+        createProcess p{ std_out = CreatePipe
+                       , std_err = CreatePipe
+                       , env     = Just new_env
+                       }
+
+    outMVar <- newEmptyMVar
+    errMVar <- newEmptyMVar
+
+    _ <- forkIO $ do
+        stdo <- hGetContents stdoh
+        _ <- evaluate (length stdo)
+        putMVar outMVar stdo
+
+    _ <- forkIO $ do
+        stde <- hGetContents stdeh
+        _ <- evaluate (length stde)
+        putMVar errMVar stde
+
+    out <- takeMVar outMVar
+    hClose stdoh
+    err <- takeMVar errMVar
+    hClose stdeh
+
+    ex <- waitForProcess pid
+
+    return (ex, out, err)
+
+-- Don't let gcc localize version info string, #8825
+en_locale_env :: [(String, String)]
+en_locale_env = [("LANGUAGE", "en")]
 
 -- If the -B<dir> option is set, add <dir> to PATH.  This works around
 -- a bug in gcc on Windows Vista where it can't find its auxiliary
@@ -746,8 +791,9 @@ getLinkerInfo' dflags = do
                _ -> do
                  -- In practice, we use the compiler as the linker here. Pass
                  -- -Wl,--version to get linker version info.
-                 (exitc, stdo, stde) <- readProcessWithExitCode pgm
-                                        ["-Wl,--version"] ""
+                 (exitc, stdo, stde) <- readProcessEnvWithExitCode pgm
+                                        ["-Wl,--version"]
+                                        en_locale_env
                  -- Split the output by lines to make certain kinds
                  -- of processing easier. In particular, 'clang' and 'gcc'
                  -- have slightly different outputs for '-Wl,--version', but
@@ -802,17 +848,18 @@ getCompilerInfo' dflags = do
 
   -- Process the executable call
   info <- catchIO (do
-                (exitc, stdo, stde) <- readProcessWithExitCode pgm ["-v"] ""
+                (exitc, stdo, stde) <-
+                    readProcessEnvWithExitCode pgm ["-v"] en_locale_env
                 -- Split the output by lines to make certain kinds
                 -- of processing easier.
                 parseCompilerInfo (lines stdo) (lines stde) exitc
             )
             (\err -> do
                 debugTraceMsg dflags 2
-                    (text "Error (figuring out compiler information):" <+>
+                    (text "Error (figuring out C compiler information):" <+>
                      text (show err))
                 errorMsg dflags $ hang (text "Warning:") 9 $
-                  text "Couldn't figure out linker information!" $$
+                  text "Couldn't figure out C compiler information!" $$
                   text "Make sure you're using GNU gcc, or clang"
                 return UnknownCC)
   return info
@@ -952,7 +999,8 @@ readElfSection _dflags section exe = do
      prog = "readelf"
      args = [Option "-p", Option section, FileOption "" exe]
   --
-  r <- readProcessWithExitCode prog (filter notNull (map showOpt args)) ""
+  r <- readProcessEnvWithExitCode prog (filter notNull (map showOpt args))
+                                  en_locale_env
   case r of
     (ExitSuccess, out, _err) -> return (doFilter (lines out))
     _ -> return Nothing

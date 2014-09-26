@@ -1,6 +1,7 @@
 
 tcfail159.hs:9:11:
-    Kind incompatibility when matching types:
+    Couldn't match kind ‘*’ with ‘#’
+    When matching types
       t0 :: *
       (# Int, Int #) :: #
     In the pattern: ~(# p, q #)

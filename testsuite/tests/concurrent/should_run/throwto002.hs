@@ -1,4 +1,4 @@
-{-# LANGUAGE DoRec, ScopedTypeVariables #-}
+{-# LANGUAGE RecursiveDo, ScopedTypeVariables #-}
 import Control.Concurrent
 import Control.Exception
 import Data.Array

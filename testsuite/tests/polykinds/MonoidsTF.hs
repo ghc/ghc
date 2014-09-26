@@ -12,7 +12,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Main where
-import Control.Monad (Monad(..), join)
+import Control.Monad (Monad(..), join, ap, liftM)
 import Data.Monoid (Monoid(..))
 
 -- First we define the type class Monoidy:
@@ -95,6 +95,10 @@ instance (MId (→) m ~ (), MComp (→) m ~ (,), Monoidy (→) m)
        ⇒ Monoid m where
   mempty = munit ()
   mappend = curry mjoin
+
+instance Applicative Wrapper where
+  pure  = return
+  (<*>) = ap
 
 instance Monad Wrapper where
   return x = runNT munit $ Id x

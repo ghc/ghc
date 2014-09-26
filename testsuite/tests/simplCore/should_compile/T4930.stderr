@@ -14,9 +14,9 @@ T4930.foo :: GHC.Types.Int -> GHC.Types.Int
 [GblId,
  Arity=1,
  Str=DmdType <S,1*U(U)>m,
- Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
-         ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once!] :: GHC.Types.Int) ->
                  case n of _ [Occ=Dead] { GHC.Types.I# x ->
                  case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# x 5)

@@ -53,7 +53,7 @@
 // C compilers that use an LLVM back end (clang or llvm-gcc) do not
 // correctly support global register variables so we make sure that
 // we do not declare them for these compilers.
-# define NO_GLOBAL_REG_DECLS	/* don't define fixed registers */
+# define NO_GLOBAL_REG_DECLS    /* don't define fixed registers */
 #endif
 
 /* Configuration */
@@ -248,8 +248,6 @@ ABI).
    -------------------------------------------------------------------------- */
 
 #define JMP_(cont) return((StgFunPtr)(cont))
-#define FB_
-#define FE_
 
 /* -----------------------------------------------------------------------------
    Other Stg stuff...
@@ -477,24 +475,6 @@ INLINE_HEADER StgInt64 PK_Int64(W_ p_src[])
 #else
 #define __STG_SPLIT_MARKER /* nothing */
 #endif
-
-/* -----------------------------------------------------------------------------
-   Write-combining store
-   -------------------------------------------------------------------------- */
-
-INLINE_HEADER void
-wcStore (StgPtr p, StgWord w)
-{
-#ifdef x86_64_HOST_ARCH
-    __asm__(
-   "movnti\t%1, %0"
-   : "=m" (*p)
-   : "r" (w)
-   );
-#else
-      *p = w;
-#endif
-}
 
 /* -----------------------------------------------------------------------------
    Integer multiply with overflow

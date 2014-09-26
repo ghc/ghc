@@ -8,7 +8,7 @@
 -- Module      :  Data.Fixed
 -- Copyright   :  (c) Ashley Yakeley 2005, 2006, 2009
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  Ashley Yakeley <ashley@semantic.org>
 -- Stability   :  experimental
 -- Portability :  portable
@@ -215,4 +215,3 @@ instance HasResolution E12 where
     resolution _ = 1000000000000
 -- | resolution of 10^-12 = .000000000001
 type Pico = Fixed E12
-

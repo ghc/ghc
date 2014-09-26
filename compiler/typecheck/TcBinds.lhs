@@ -488,7 +488,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
     recoverM (recoveryCode binder_names sig_fn) $ do 
         -- Set up main recover; take advantage of any type sigs
 
-    { traceTc "------------------------------------------------" empty
+    { traceTc "------------------------------------------------" Outputable.empty
     ; traceTc "Bindings for {" (ppr binder_names)
     ; dflags   <- getDynFlags
     ; type_env <- getLclTypeEnv
@@ -1169,7 +1169,8 @@ tcRhs (TcFunBind (_,_,mono_id) loc inf matches)
         ; return (FunBind { fun_id = L loc mono_id, fun_infix = inf
                           , fun_matches = matches'
                           , fun_co_fn = co_fn 
-                          , bind_fvs = placeHolderNames, fun_tick = Nothing }) }
+                          , bind_fvs = placeHolderNamesTc
+                          , fun_tick = Nothing }) }
 
 tcRhs (TcPatBind infos pat' grhss pat_ty)
   = tcExtendIdBndrs [ TcIdBndr mono_id NotTopLevel | (_,_,mono_id) <- infos ] $
@@ -1178,7 +1179,7 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
         ; grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
                     tcGRHSsPat grhss pat_ty
         ; return (PatBind { pat_lhs = pat', pat_rhs = grhss', pat_rhs_ty = pat_ty 
-                          , bind_fvs = placeHolderNames
+                          , bind_fvs = placeHolderNamesTc
                           , pat_ticks = (Nothing,[]) }) }
 
 
@@ -1454,8 +1455,12 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
     any_strict_pat     = any (isStrictHsBind   . unLoc) orig_binds
     any_pat_looks_lazy = any (looksLazyPatBind . unLoc) orig_binds
 
-    is_unlifted id = case tcSplitForAllTys (idType id) of
-                       (_, rho) -> isUnLiftedType rho
+    is_unlifted id = case tcSplitSigmaTy (idType id) of
+                       (_, _, rho) -> isUnLiftedType rho
+          -- For the is_unlifted check, we need to look inside polymorphism
+          -- and overloading.  E.g.  x = (# 1, True #)
+          -- would get type forall a. Num a => (# a, Bool #)
+          -- and we want to reject that.  See Trac #9140
 
     is_monomorphic (L _ (AbsBinds { abs_tvs = tvs, abs_ev_vars = evs }))
                      = null tvs && null evs

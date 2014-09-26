@@ -6,7 +6,7 @@
 -- Module      :  GHC.IO.Encoding.Failure
 -- Copyright   :  (c) The University of Glasgow, 2008-2011
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
@@ -33,9 +33,6 @@ import GHC.Num
 import GHC.Real ( fromIntegral )
 
 --import System.Posix.Internals
-
-import Data.Maybe
-
 
 -- | The 'CodingFailureMode' is used to construct 'TextEncoding's, and
 -- specifies how they handle illegal sequences.
@@ -183,7 +180,7 @@ recoverEncode cfm input@Buffer{  bufRaw=iraw, bufL=ir, bufR=_  }
           -- reperesenting all ASCII characters.
           _ir' <- writeCharBuf iraw ir '?'
           return (input, output)
-        
+
         -- This implementation does not work because e.g. UTF-16
         -- requires 2 bytes to encode a simple ASCII value
         --writeWord8Buf oraw ow unrepresentableByte

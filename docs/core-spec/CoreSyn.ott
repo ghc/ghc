@@ -235,6 +235,8 @@ type_list :: 'TypeList_' ::= {{ com List of types }}
 RA {{ tex {\!\!\!{}_{\rho} } }} :: 'RoleAnnot_' ::= {{ com Role annotation }}
   | _ R                    :: M :: annotation
   {{ tex {\!\!\!{}_{[[R]]} } }}
+  | _ ^^ R                 :: M :: spaced_annotation
+  {{ tex {}_{[[R]]} }}
 
 role_list {{ tex {\overline{\rho_j} }^j }} :: 'RoleList_' ::= {{ com List of roles }}
   | </ Ri // , // i />       ::   :: List

@@ -590,7 +590,7 @@
         </thead>
         <tbody>
           <row>
-            <entry><option>-package-name</option> <replaceable>P</replaceable></entry>
+            <entry><option>-this-package-key</option> <replaceable>P</replaceable></entry>
             <entry>Compile to be part of package <replaceable>P</replaceable></entry>
             <entry>static</entry>
             <entry>-</entry>
@@ -706,7 +706,7 @@
         <tbody>
           <row>
             <entry><option>-fcontext-stack=N</option><replaceable>n</replaceable></entry>
-            <entry>set the <link linkend="undecidable-instances">limit for context reduction</link>. Default is 20.</entry>
+            <entry>set the <link linkend="undecidable-instances">limit for type-class context reduction</link>. Default is 100.</entry>
             <entry>dynamic</entry>
             <entry></entry>
           </row>
@@ -1021,12 +1021,12 @@
             </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoMonoLocalBinds</option></entry>
-          </row>          
+          </row>
           <row>
             <entry><option>-XNoMonomorphismRestriction</option></entry>
             <entry>Disable the <link linkend="monomorphism">monomorphism restriction</link>.</entry>
             <entry>dynamic</entry>
-            <entry><option>-XMonomorphismRrestriction</option></entry>
+            <entry><option>-XMonomorphismRestriction</option></entry>
           </row>
           <row>
             <entry><option>-XMultiParamTypeClasses</option></entry>
@@ -1937,28 +1937,35 @@
             <entry><option>-funfolding-creation-threshold</option></entry>
             <entry>Tweak unfolding settings</entry>
             <entry>dynamic</entry>
-            <entry><option>-fno-unfolding-creation-threshold</option></entry>
+            <entry>-</entry>
           </row>
 
           <row>
             <entry><option>-funfolding-fun-discount</option></entry>
             <entry>Tweak unfolding settings</entry>
             <entry>dynamic</entry>
-            <entry><option>-fno-unfolding-fun-discount</option></entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-funfolding-dict-discount</option></entry>
+            <entry>Tweak unfolding settings</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
           </row>
 
           <row>
             <entry><option>-funfolding-keeness-factor</option></entry>
             <entry>Tweak unfolding settings</entry>
             <entry>dynamic</entry>
-            <entry><option>-fno-unfolding-keeness-factor</option></entry>
+            <entry>-</entry>
           </row>
 
           <row>
             <entry><option>-funfolding-use-threshold</option></entry>
             <entry>Tweak unfolding settings</entry>
             <entry>dynamic</entry>
-            <entry><option>-fno-unfolding-use-threshold</option></entry>
+            <entry>-</entry>
           </row>
 
           <row>
@@ -2426,6 +2433,15 @@
               linker), specifying the full install path of the library file. Any libraries
               or executables that link with it later will pick up that path as their
               runtime search location for it. (Darwin/OS X only)</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-rdynamic</option></entry>
+            <entry>This instructs the linker to add all symbols, not only used ones, to the
+              dynamic symbol table. Currently Linux and Windows/MinGW32 only.
+              This is equivalent to using <literal>-optl -rdynamic</literal> on Linux,
+              and <literal>-optl -export-all-symbols</literal> on Windows.</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>

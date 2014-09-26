@@ -34,6 +34,30 @@
                     Added support for <link linkend="binary-literals">binary integer literals</link>
                </para>
            </listitem>
+            <listitem>
+                <para>
+                    Simplified rules for implicit quantification. In previous versions of GHC,
+                    it was possible to use the <literal>=></literal> arrow
+                    to quantify over type variables in <literal>data</literal> and
+                    <literal>type</literal> declarations without a
+                    <literal>forall</literal> quantifier. For example,
+                    <literal>data Fun = Fun (Ord a => a -> b)</literal> was identical to
+                    <literal>data Fun = Fun (forall a b. Ord a => a -> b)</literal>, while
+                    <literal>data Fun = Fun (a -> b)</literal> caused a not-in-scope error.
+                    This implicit quantification is now deprecated, and variables
+                    in higher-rank constructors should be quantified with <literal>forall</literal>
+                    regardless of whether a class context is present or not.
+                    GHC 7.10 raises a warning (controlled by
+                    <option>-fwarn-context-quantification</option>, enabled by default)
+                    and GHC 7.12 will raise an error. See <link linkend="univ">examples</link>
+                    in GHC documentation.
+                </para>
+                <para>
+                    The change also applies to Template Haskell splices such as
+                    <literal>[t|Ord a => a|]</literal>, which should be written as
+                    <literal>[t|forall a. Ord a => a|]</literal>.
+                </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -114,6 +138,39 @@
                     database.  Unlike databases specified using <option>--package-db</option>,
                     a user package database configured this way respects
                     the <option>--user</option> flag.
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Package system</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    TODO: cover module renaming, thinning, re-export etc
+               </para>
+            </listitem>
+            <listitem>
+                <para>
+                    ghc-pkg (and ghc) have dropped support for single-file style
+                    package databases. Since version 6.12, ghc-pkg has defaulted
+                    to a new database format (using a directory of files, one per
+                    package plus a binary cache).
+               </para>
+               <para>
+                    This change will not affect programs and scripts that use
+                    <literal>ghc-pkg init</literal> to create package databases.
+               </para>
+               <para>
+                    This will affect scripts that create package databases
+                    using tricks like
+<programlisting>
+echo "[]" > package.conf
+</programlisting>
+                    Such scripts will need to be modified to use
+                    <literal>ghc-pkg init</literal>, and to delete databases
+                    by directory removal, rather than simple file delete.
                </para>
            </listitem>
        </itemizedlist>
@@ -249,6 +306,16 @@
                     may not correspond at all to the package ID.  In
                     particular, there may be multiple package keys per
                     package ID.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    The ghc library no longer depends on the Cabal library. This means
+                    that users of the ghc library are no longer forced to use the same
+                    version of Cabal as ghc did. It also means that Cabal is freed up
+                    to be able to depend on packages that ghc does not want to depend
+                    on (which for example may enable improvements to Cabal's parsing
+                    infrastructure).
                </para>
            </listitem>
        </itemizedlist>

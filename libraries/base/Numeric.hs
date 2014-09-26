@@ -65,7 +65,6 @@ import GHC.Real
 import GHC.Float
 import GHC.Num
 import GHC.Show
-import Data.Maybe
 import Text.ParserCombinators.ReadP( ReadP, readP_to_S, pfail )
 import qualified Text.Read.Lex as L
 

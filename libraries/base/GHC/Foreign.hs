@@ -6,7 +6,7 @@
 -- Module      :  GHC.Foreign
 -- Copyright   :  (c) The University of Glasgow, 2008-2011
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
@@ -17,22 +17,22 @@
 
 module GHC.Foreign (
     -- * C strings with a configurable encoding
-    
+
     -- conversion of C strings into Haskell strings
     --
     peekCString,
     peekCStringLen,
-    
+
     -- conversion of Haskell strings into C strings
     --
     newCString,
     newCStringLen,
-    
+
     -- conversion of Haskell strings into C strings using temporary storage
     --
     withCString,
     withCStringLen,
-    
+
     charIsRepresentable,
   ) where
 
@@ -44,7 +44,6 @@ import Foreign.Storable
 import Data.Word
 
 -- Imports for the locale-encoding version of marshallers
-import Control.Monad
 
 import Data.Tuple (fst)
 import Data.Maybe

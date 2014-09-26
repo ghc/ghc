@@ -30,7 +30,6 @@ import GHC.Show
 import Foreign
 import Foreign.C
 import System.IO
-import Control.Monad (when)
 
 import GHC.Fingerprint.Type
 

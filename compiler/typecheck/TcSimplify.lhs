@@ -364,6 +364,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
          else do
 
       {     -- Step 7) Emit an implication
+            -- See Trac #9633 for an instructive example 
          let minimal_flat_preds = mkMinimalBySCs bound
                   -- See Note [Minimize by Superclasses]
              skol_info = InferSkol [ (name, mkSigmaTy [] minimal_flat_preds ty)
@@ -694,7 +695,10 @@ solveFlats :: WantedConstraints -> TcS WantedConstraints
 -- Do not affect the inerts
 solveFlats (WC { wc_flat = flats, wc_insol = insols, wc_impl = implics })
   = do { (wc, given_funeqs) <- nestTcS $
-            do { implics_from_flats <- solveInteract (flats `unionBags` insols)
+            do { let all_flats = flats `unionBags` filterBag (not . isDerivedCt) insols
+                     -- See Note [Dropping derived constraints] in TcRnTypes for
+                     -- why the insolubles may have derived constraints
+               ; implics_from_flats <- solveInteract all_flats
                ; (unsolved_flats, insoluble_flats, given_funeqs) <- getInertUnsolved
                ; return ( WC { wc_flat = unsolved_flats, wc_insol = insoluble_flats
                              , wc_impl = implics `unionBags` implics_from_flats }
@@ -1145,10 +1149,11 @@ floatEqualities :: [TcTyVar] -> Bool
 -- Subtleties: Note [Float equalities from under a skolem binding]
 --             Note [Skolem escape]
 floatEqualities skols no_given_eqs
-                wanteds@(WC { wc_flat = flats })
+                wanteds@(WC { wc_flat = flats, wc_insol = insols })
   | not no_given_eqs  -- There are some given equalities, so don't float
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
-
+  | not (isEmptyBag insols)
+  = return (emptyBag, wanteds)   -- Note [Do not float equalities if there are insolubles]
   | otherwise
   = do { outer_untch <- TcS.getUntouchables
        ; mapM_ (promoteTyVar outer_untch) (varSetElems (tyVarsOfCts float_eqs))
@@ -1167,6 +1172,15 @@ floatEqualities skols no_given_eqs
          pred = ctPred ct
     skol_set = mkVarSet skols
 \end{code}
+
+Note [Do not float equalities if there are insolubles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have (t::* ~ s::*->*), we'll get a Derived insoluble equality.
+If we float the equality outwards, we'll get *another* Derived
+insoluble equality one level out, so the same error will be reported
+twice.  However, the equality is insoluble anyway, and when there are
+any insolubles we report only them, so there is no point in floating.
+
 
 Note [When does an implication have given equalities?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1370,7 +1384,7 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
     find_unary cc = Right cc  -- Non unary or non dictionary
 
     bad_tvs :: TcTyVarSet  -- TyVars mentioned by non-unaries
-    bad_tvs = foldr (unionVarSet . tyVarsOfCt) emptyVarSet non_unaries
+    bad_tvs = mapUnionVarSet tyVarsOfCt non_unaries
 
     cmp_tv (_,_,tv1) (_,_,tv2) = tv1 `compare` tv2
 

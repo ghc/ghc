@@ -7,9 +7,9 @@ T7116.dl :: GHC.Types.Double -> GHC.Types.Double
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType <S,1*U(U)>m,
- Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
-         ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: GHC.Types.Double) ->
                  case x of _ [Occ=Dead] { GHC.Types.D# y ->
                  GHC.Types.D# (GHC.Prim.+## y y)
@@ -25,9 +25,9 @@ T7116.dr :: GHC.Types.Double -> GHC.Types.Double
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType <S,1*U(U)>m,
- Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
-         ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: GHC.Types.Double) ->
                  case x of _ [Occ=Dead] { GHC.Types.D# x1 ->
                  GHC.Types.D# (GHC.Prim.+## x1 x1)
@@ -39,9 +39,9 @@ T7116.fl :: GHC.Types.Float -> GHC.Types.Float
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType <S,1*U(U)>m,
- Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
-         ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: GHC.Types.Float) ->
                  case x of _ [Occ=Dead] { GHC.Types.F# y ->
                  GHC.Types.F# (GHC.Prim.plusFloat# y y)
@@ -57,9 +57,9 @@ T7116.fr :: GHC.Types.Float -> GHC.Types.Float
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType <S,1*U(U)>m,
- Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
-         ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: GHC.Types.Float) ->
                  case x of _ [Occ=Dead] { GHC.Types.F# x1 ->
                  GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)

@@ -165,6 +165,8 @@ instance Bits Int8 where
 
 instance FiniteBits Int8 where
     finiteBitSize _ = 8
+    countLeadingZeros  (I8# x#) = I# (word2Int# (clz8# (int2Word# x#)))
+    countTrailingZeros (I8# x#) = I# (word2Int# (ctz8# (int2Word# x#)))
 
 {-# RULES
 "fromIntegral/Int8->Int8" fromIntegral = id :: Int8 -> Int8
@@ -324,6 +326,8 @@ instance Bits Int16 where
 
 instance FiniteBits Int16 where
     finiteBitSize _ = 16
+    countLeadingZeros  (I16# x#) = I# (word2Int# (clz16# (int2Word# x#)))
+    countTrailingZeros (I16# x#) = I# (word2Int# (ctz16# (int2Word# x#)))
 
 {-# RULES
 "fromIntegral/Word8->Int16"  fromIntegral = \(W8# x#) -> I16# (word2Int# x#)
@@ -489,6 +493,8 @@ instance Bits Int32 where
 
 instance FiniteBits Int32 where
     finiteBitSize _ = 32
+    countLeadingZeros  (I32# x#) = I# (word2Int# (clz32# (int2Word# x#)))
+    countTrailingZeros (I32# x#) = I# (word2Int# (ctz32# (int2Word# x#)))
 
 {-# RULES
 "fromIntegral/Word8->Int32"  fromIntegral = \(W8# x#) -> I32# (word2Int# x#)
@@ -698,12 +704,12 @@ instance Bits Int64 where
 iShiftL64#, iShiftRA64# :: Int64# -> Int# -> Int64#
 
 a `iShiftL64#` b  | isTrue# (b >=# 64#) = intToInt64# 0#
-		  | otherwise           = a `uncheckedIShiftL64#` b
+                  | otherwise           = a `uncheckedIShiftL64#` b
 
 a `iShiftRA64#` b | isTrue# (b >=# 64#) = if isTrue# (a `ltInt64#` (intToInt64# 0#))
-				          then intToInt64# (-1#)
-					  else intToInt64# 0#
-		  | otherwise = a `uncheckedIShiftRA64#` b
+                                          then intToInt64# (-1#)
+                                          else intToInt64# 0#
+                  | otherwise = a `uncheckedIShiftRA64#` b
 
 {-# RULES
 "fromIntegral/Int->Int64"    fromIntegral = \(I#   x#) -> I64# (intToInt64# x#)
@@ -871,6 +877,13 @@ uncheckedIShiftRA64# = uncheckedIShiftRA#
 
 instance FiniteBits Int64 where
     finiteBitSize _ = 64
+#if WORD_SIZE_IN_BITS < 64
+    countLeadingZeros  (I64# x#) = I# (word2Int# (clz64# (int64ToWord64# x#)))
+    countTrailingZeros (I64# x#) = I# (word2Int# (ctz64# (int64ToWord64# x#)))
+#else
+    countLeadingZeros  (I64# x#) = I# (word2Int# (clz64# (int2Word# x#)))
+    countTrailingZeros (I64# x#) = I# (word2Int# (ctz64# (int2Word# x#)))
+#endif
 
 instance Real Int64 where
     toRational x = toInteger x % 1

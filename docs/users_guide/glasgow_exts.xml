@@ -2325,7 +2325,7 @@ f (C {a = 1, ..}) = b + c + d
 More details:
 <itemizedlist>
 <listitem><para>
-Wildcards can be mixed with other patterns, including puns
+Record wildcards in patterns can be mixed with other patterns, including puns
 (<xref linkend="record-puns"/>); for example, in a pattern <literal>C {a
 = 1, b, ..})</literal>.  Additionally, record wildcards can be used
 wherever record patterns occur, including in <literal>let</literal>
@@ -2338,7 +2338,7 @@ defines <literal>b</literal>, <literal>c</literal>, and
 </para></listitem>
 
 <listitem><para>
-Record wildcards can also be used in expressions, writing, for example,
+Record wildcards can also be used in an expression, when constructing a record.  For example,
 <programlisting>
 let {a = 1; b = 2; c = 3; d = 4} in C {..}
 </programlisting>
@@ -2352,7 +2352,15 @@ the same as the omitted field names.
 </para></listitem>
 
 <listitem><para>
-The "<literal>..</literal>" expands to the missing
+Record wildcards may <emphasis>not</emphasis> be used in record <emphasis>updates</emphasis>.  For example this
+is illegal:
+<programlisting>
+f r = r { x = 3, .. }
+</programlisting>
+</para></listitem>
+
+<listitem><para>
+For both pattern and expression wildcards, the "<literal>..</literal>" expands to the missing
 <emphasis>in-scope</emphasis> record fields.
 Specifically the expansion of "<literal>C {..}</literal>" includes
 <literal>f</literal> if and only if:
@@ -2369,6 +2377,8 @@ the variable <literal>f</literal> is in scope unqualified,
 apart from the binding of the record selector itself.
 </para></listitem>
 </itemizedlist>
+These rules restrict record wildcards to the situations in which the user
+could have written the expanded version.
 For example
 <programlisting>
 module M where
@@ -2461,7 +2471,7 @@ warns if you hide something that the imported module does not export.
 </sect3>
 
 <sect3>
-  <title>Package-qualified imports</title>
+  <title id="package-qualified-imports">Package-qualified imports</title>
 
   <para>With the <option>-XPackageImports</option> flag, GHC allows
   import declarations to be qualified by the package name that the
@@ -2484,7 +2494,9 @@ import "network" Network.Socket
     added mainly so that we can build backwards-compatible versions of
     packages when APIs change.  It can lead to fragile dependencies in
     the common case: modules occasionally move from one package to
-    another, rendering any package-qualified imports broken.</para>
+    another, rendering any package-qualified imports broken.
+    See also <xref linkend="package-thinning-and-renaming" /> for
+    an alternative way of disambiguating between module names.</para>
 </sect3>
 
 <sect3 id="safe-imports-ext">
@@ -3706,7 +3718,8 @@ may use different notation to that implemented in GHC.
 </para>
 <para>
 The rest of this section outlines the extensions to GHC that support GADTs.   The extension is enabled with
-<option>-XGADTs</option>.  The <option>-XGADTs</option> flag also sets <option>-XRelaxedPolyRec</option>.
+<option>-XGADTs</option>.  The <option>-XGADTs</option> flag also sets <option>-XGADTSyntax</option>
+and <option>-XMonoLocalBinds</option>.
 <itemizedlist>
 <listitem><para>
 A GADT can only be declared using GADT-style syntax (<xref linkend="gadt-style"/>);
@@ -5012,6 +5025,11 @@ sort of backtrace, and the opportunity to increase the stack depth
 with <option>-fcontext-stack=</option><emphasis>N</emphasis>.
 </para>
 
+<para>
+The <option>-XUndecidableInstances</option> flag is also used to lift some of the
+restricitions imposed on type family instances. See <xref linkend="type-family-decidability"/>.
+</para>
+
 </sect3>
 
 
@@ -5023,38 +5041,30 @@ In general, as discussed in <xref linkend="instance-resolution"/>,
 <emphasis>GHC requires that it be unambiguous which instance
 declaration
 should be used to resolve a type-class constraint</emphasis>.
-This behaviour
-can be modified by two flags: <option>-XOverlappingInstances</option>
+GHC also provides a way to to loosen
+the instance resolution, by
+allowing more than one instance to match, <emphasis>provided there is a most
+specific one</emphasis>.  Moreover, it can be loosened further, by allowing more than one instance to match
+irespective of whether there is a most specific one.
+This section gives the details.
+</para>
+<para>
+To control the choice of instance, it is possible to specify the overlap behavior for individual
+instances with a pragma, written immediately after the
+<literal>instance</literal> keyword.  The pragma may be one of:
+<literal>{-# OVERLAPPING #-}</literal>,
+<literal>{-# OVERLAPPABLE #-}</literal>,
+<literal>{-# OVERLAPS #-}</literal>,
+or <literal>{-# INCOHERENT #-}</literal>.
+</para>
+<para>
+The matching behaviour is also influenced by two module-level language extension flags: <option>-XOverlappingInstances</option>
 <indexterm><primary>-XOverlappingInstances
 </primary></indexterm>
 and <option>-XIncoherentInstances</option>
 <indexterm><primary>-XIncoherentInstances
-</primary></indexterm>, as this section discusses.  Both these
-flags are dynamic flags, and can be set on a per-module basis, using
-an <literal>LANGUAGE</literal> pragma if desired (<xref linkend="language-pragma"/>).</para>
-
-<para>
-In addition, it is possible to specify the overlap behavior for individual
-instances with a pragma, written immediately after the
-<literal>instance</literal> keyword.  The pragma may be one of:
-<literal>OVERLAPPING</literal>,
-<literal>OVERLAPPABLE</literal>,
-<literal>OVERLAPS</literal>,
-or <literal>INCOHERENT</literal>.  An explicit pragma on an instance
-takes precedence over the default specified with a flag or
-a <literal>LANGUAGE</literal> pragma.
-</para>
-
-
-<para>
-The <option>-XOverlappingInstances</option> flag instructs GHC to loosen
-the instance resolution described in <xref linkend="instance-resolution"/>, by
-allowing more than one instance to match, <emphasis>provided there is a most
-specific one</emphasis>. The <option>-XIncoherentInstances</option> flag
-further loosens the resolution, by allowing more than one instance to match,
-irespective of whether there is a most specific one.
-The <option>-XIncoherentInstances</option> flag implies the
-<option>-XOverlappingInstances</option> flag, but not vice versa.
+</primary></indexterm>.   These flags are now deprecated (since GHC 7.10) in favour of
+the fine-grained per-instance pragmas.
 </para>
 
 <para>
@@ -5062,15 +5072,13 @@ A more precise specification is as follows.
 The willingness to be overlapped or incoherent is a property of
 the <emphasis>instance declaration</emphasis> itself, controlled as follows:
 <itemizedlist>
-<listitem><para>An instance is <emphasis>incoherent</emphasis> if it has an <literal>INCOHERENT</literal> pragma, or if it appears in a module compiled with <literal>-XIncoherentInstances</literal>.
+<listitem><para>An instance is <emphasis>incoherent</emphasis> if: it has an <literal>INCOHERENT</literal> pragma; or if the instance has no pragma and it appears in a module compiled with <literal>-XIncoherentInstances</literal>.
 </para></listitem>
-<listitem><para>An instance is <emphasis>overlappable</emphasis> if it has an <literal>OVERLAPPABLE</literal> or <literal>OVERLAPS</literal> pragma, or if it appears in a module compiled with <literal>-XOverlappingInstances</literal>, or if the instance is incoherent.
+<listitem><para>An instance is <emphasis>overlappable</emphasis> if: it has an <literal>OVERLAPPABLE</literal> or <literal>OVERLAPS</literal> pragma; or if the instance has no pragma and it appears in a module compiled with <literal>-XOverlappingInstances</literal>; or if the instance is incoherent.
 </para></listitem>
-<listitem><para>An instance is <emphasis>overlapping</emphasis> if it has an <literal>OVERLAPPING</literal> or <literal>OVERLAPS</literal> pragma, or if it appears in a module compiled with <literal>-XOverlappingInstances</literal>, or if the instance is incoherent.
+<listitem><para>An instance is <emphasis>overlapping</emphasis> if: it has an <literal>OVERLAPPING</literal> or <literal>OVERLAPS</literal> pragma; or if the instance has no pragma and it appears in a module compiled with <literal>-XOverlappingInstances</literal>; or if the instance is incoherent.
 </para></listitem>
 </itemizedlist>
-The <option>-XOverlappingInstances</option> language extension is now deprecated in favour
-per-instance pragmas.
 </para>
 
 <para>
@@ -5085,13 +5093,6 @@ instance declarations are the <emphasis>candidates</emphasis>.
 </para></listitem>
 
 <listitem><para>
-Find all <emphasis>non-candidate</emphasis> instances 
-that <emphasis>unify</emphasis> with the target constraint.
-Such non-candidates instances might match when the target constraint is further
-instantiated.  If all of them are incoherent, proceed; if not, the search fails.
-</para></listitem>
-
-<listitem><para>
 Eliminate any candidate IX for which both of the following hold:
 
 <itemizedlist>
@@ -5099,22 +5100,37 @@ Eliminate any candidate IX for which both of the following hold:
     that is, IY is a substitution instance of IX but not vice versa.
   </para></listitem>
   <listitem><para>
-  Either IX is <emphasis>overlappable</emphasis> or IY is
-  <emphasis>overlapping</emphasis>.
+  Either IX is <emphasis>overlappable</emphasis>, or IY is
+  <emphasis>overlapping</emphasis>.  (This "either/or" design, rather than a "both/and" design,
+  allow a client to deliberately override an instance from a library, without requiring a change to the library.)
   </para></listitem>
   </itemizedlist>
 </para>
 </listitem>
 
 <listitem><para>
-If exactly one non-incoherent candidate remains, pick it.  If all
-remaining candidates are incoherent, pick an arbitary
-one. Otherwise fail.
+If exactly one non-incoherent candidate remains, select it.  If all
+remaining candidates are incoherent, select an arbitary
+one. Otherwise the search fails (i.e. when more than one surviving candidate is not incoherent).
+</para></listitem>
+
+<listitem><para>
+If the selected candidate (from the previous step) is incoherent, the search succeeds, returning that candidate.
+</para></listitem>
+
+<listitem><para>
+If not, find all instances that <emphasis>unify</emphasis> with the target
+constraint, but do not <emphasis>match</emphasis> it.
+Such non-candidate instances might match when the target constraint is further
+instantiated.  If all of them are incoherent, the search succeeds, returning the selected candidate;
+if not, the search fails.
 </para></listitem>
 
 </itemizedlist>
+Notice that these rules are not influenced by flag settings in the client module, where
+the instances are <emphasis>used</emphasis>.
 These rules make it possible for a library author to design a library that relies on
-overlapping instances without the library client having to know.
+overlapping instances without the client having to know.
 </para>
 <para>
 Errors are reported <emphasis>lazily</emphasis> (when attempting to solve a constraint), rather than <emphasis>eagerly</emphasis> 
@@ -5347,7 +5363,7 @@ is extended thus: defaulting applies when all the unresolved constraints involve
 </para></listitem>
 </itemizedlist>
 So, for example, the expression <literal>length "foo"</literal> will give rise
-to an ambiguous use of <literal>IsString a0</literal> which, becuase of the above
+to an ambiguous use of <literal>IsString a0</literal> which, because of the above
 rules, will default to <literal>String</literal>.
 </para>
 <para>
@@ -6527,11 +6543,11 @@ data T m a = MkT (m a) (T Maybe (m a))
 </programlisting>
 The recursive use of <literal>T</literal> forced the second argument to have kind <literal>*</literal>.
 However, just as in type inference, you can achieve polymorphic recursion by giving a
-<emphasis>complete kind signature</emphasis> for <literal>T</literal>. The way to give
-a complete kind signature for a data type is to use a GADT-style declaration with an
-explicit kind signature thus:
+<emphasis>complete kind signature</emphasis> for <literal>T</literal>. A complete
+kind signature is present when all argument kinds and the result kind are known, without
+any need for inference. For example:
 <programlisting>
-data T :: (k -> *) -> k -> * where
+data T (m :: k -> *) :: k -> * where
   MkT :: m a -> T Maybe (m a) -> T m a
 </programlisting>
 The complete user-supplied kind signature specifies the polymorphic kind for <literal>T</literal>,
@@ -6543,26 +6559,41 @@ In particular, the recursive use of <literal>T</literal> is at kind <literal>*</
 What exactly is considered to be a "complete user-supplied kind signature" for a type constructor?
 These are the forms:
 <itemizedlist>
-<listitem><para>
-A GADT-style data type declaration, with an explicit "<literal>::</literal>" in the header.
-For example:
+<listitem><para>For a datatype, every type variable must be annotated with a kind. In a
+GADT-style declaration, there may also be a kind signature (with a top-level
+<literal>::</literal> in the header), but the presence or absence of this annotation
+does not affect whether or not the declaration has a complete signature.
 <programlisting>
 data T1 :: (k -> *) -> k -> *       where ...   -- Yes  T1 :: forall k. (k->*) -> k -> *
 data T2 (a :: k -> *) :: k -> *     where ...   -- Yes  T2 :: forall k. (k->*) -> k -> *
 data T3 (a :: k -> *) (b :: k) :: * where ...   -- Yes  T3 :: forall k. (k->*) -> k -> *
-data T4 a (b :: k)             :: * where ...   -- YES  T4 :: forall k. * -> k -> *
+data T4 (a :: k -> *) (b :: k)      where ...   -- Yes  T4 :: forall k. (k->*) -> k -> *
 
-data T5 a b                         where ...   -- NO  kind is inferred
-data T4 (a :: k -> *) (b :: k)      where ...   -- NO  kind is inferred
-</programlisting>
-It makes no difference where you put the "<literal>::</literal>" but it must be there.
-You cannot give a complete kind signature using a Haskell-98-style data type declaration;
-you must use GADT syntax.
+data T5 a (b :: k)             :: * where ...   -- NO  kind is inferred
+data T6 a b                         where ...   -- NO  kind is inferred
+</programlisting></para>
+</listitem>
+
+<listitem><para>
+For a class, every type variable must be annotated with a kind.
 </para></listitem>
 
 <listitem><para>
+For a type synonym, every type variable and the result type must all be annotated
+with kinds.
+<programlisting>
+type S1 (a :: k) = (a :: k)    -- Yes   S1 :: forall k. k -> k
+type S2 (a :: k) = a           -- No    kind is inferred
+type S3 (a :: k) = Proxy a     -- No    kind is inferred
+</programlisting>
+Note that in <literal>S2</literal> and <literal>S3</literal>, the kind of the
+right-hand side is rather apparent, but it is still not considered to have a complete
+signature -- no inference can be done before detecting the signature.</para></listitem>
+
+<listitem><para>
 An open type or data family declaration <emphasis>always</emphasis> has a
-complete user-specified kind signature; no "<literal>::</literal>" is required:
+complete user-specified kind signature; un-annotated type variables default to
+kind <literal>*</literal>.
 <programlisting>
 data family D1 a           	-- D1 :: * -> *
 data family D2 (a :: k)    	-- D2 :: forall k. k -> *
@@ -6577,10 +6608,12 @@ variable annotation from the class declaration. It keeps its polymorphic kind
 in the associated type declaration. The variable <literal>b</literal>, however,
 gets defaulted to <literal>*</literal>.
 </para></listitem>
+
+<listitem><para>
+A closed type familey has a complete signature when all of its type variables
+are annotated and a return kind (with a top-level <literal>::</literal>) is supplied.
+</para></listitem>
 </itemizedlist>
-In a complete user-specified kind signature, any un-decorated type variable to the
-left of the "<literal>::</literal>" is considered to have kind "<literal>*</literal>".
-If you want kind polymorphism, specify a kind variable.
 </para>
 
 </sect2>
@@ -6590,31 +6623,33 @@ If you want kind polymorphism, specify a kind variable.
 <para>Although all open type families are considered to have a complete
 user-specified kind signature, we can relax this condition for closed type
 families, where we have equations on which to perform kind inference. GHC will
-infer a kind for any type variable in a closed type family when that kind is
-never used in pattern-matching. If you want a kind variable to be used in
-pattern-matching, you must declare it explicitly.
-</para>
+infer kinds for the arguments and result types of a closed type family.</para>
 
-<para>
-Here are some examples (assuming <literal>-XDataKinds</literal> is enabled):
+<para>GHC supports <emphasis>kind-indexed</emphasis> type families, where the
+family matches both on the kind and type. GHC will <emphasis>not</emphasis> infer
+this behaviour without a complete user-supplied kind signature, as doing so would
+sometimes infer non-principal types.</para>
+
+<para>For example:
 <programlisting>
-type family Not a where      -- Not :: Bool -> Bool
-  Not False = True
-  Not True  = False
+type family F1 a where
+  F1 True  = False
+  F1 False = True
+  F1 x     = x
+-- F1 fails to compile: kind-indexing is not inferred
 
-type family F a where        -- ERROR: requires pattern-matching on a kind variable
-  F Int   = Bool
-  F Maybe = Char
+type family F2 (a :: k) where
+  F2 True  = False
+  F2 False = True
+  F2 x     = x
+-- F2 fails to compile: no complete signature
 
-type family G (a :: k) where -- G :: k -> *
-  G Int   = Bool
-  G Maybe = Char
-
-type family SafeHead where   -- SafeHead :: [k] -> Maybe k
-  SafeHead '[] = Nothing     -- note that k is not required for pattern-matching
-  SafeHead (h ': t) = Just h
-</programlisting>
-</para>
+type family F3 (a :: k) :: k where
+  F3 True  = False
+  F3 False = True
+  F3 x     = x
+-- OK
+</programlisting></para>
 
 </sect2>
 
@@ -7672,7 +7707,7 @@ data MonadT m = MkMonad { return :: forall a. a -> m a,
                           bind   :: forall a b. m a -> (a -> m b) -> m b
                         }
 
-newtype Swizzle = MkSwizzle (Ord a => [a] -> [a])
+newtype Swizzle = MkSwizzle (forall a. Ord a => [a] -> [a])
 </programlisting>
 
 </para>
@@ -7688,22 +7723,22 @@ T1 :: forall a. (forall b. b -> b -> b) -> a -> T a
 MkMonad :: forall m. (forall a. a -> m a)
                   -> (forall a b. m a -> (a -> m b) -> m b)
                   -> MonadT m
-MkSwizzle :: (Ord a => [a] -> [a]) -> Swizzle
+MkSwizzle :: (forall a. Ord a => [a] -> [a]) -> Swizzle
 </programlisting>
 
 </para>
 
 <para>
-Notice that you don't need to use a <literal>forall</literal> if there's an
-explicit context.  For example in the first argument of the
-constructor <function>MkSwizzle</function>, an implicit "<literal>forall a.</literal>" is
-prefixed to the argument type.  The implicit <literal>forall</literal>
-quantifies all type variables that are not already in scope, and are
-mentioned in the type quantified over. (Arguably, it would be better
-to <emphasis>require</emphasis> explicit quantification on constructor arguments
-where that is what is wanted.
-See <ulink url="http://ghc.haskell.org/trac/ghc/ticket/4426">Trac #4426</ulink>.)
+In earlier versions of GHC, it was possible to omit the <literal>forall</literal>
+in the type of the constructor if there was an explicit context. For example:
 
+<programlisting>
+newtype Swizzle' = MkSwizzle' (Ord a => [a] -> [a])
+</programlisting>
+
+As of GHC 7.10, this is deprecated. The <literal>-fwarn-context-quantification</literal>
+flag detects this situation and issues a warning. In GHC 7.12, declarations
+such as <literal>MkSwizzle'</literal> will cause an out-of-scope error.
 </para>
 
 <para>
@@ -8984,8 +9019,8 @@ A quasi-quote has the form
 <literal>[<replaceable>quoter</replaceable>| <replaceable>string</replaceable> |]</literal>.
 <itemizedlist>
 <listitem><para>
-The <replaceable>quoter</replaceable> must be the (unqualified) name of an imported
-quoter; it cannot be an arbitrary expression.
+The <replaceable>quoter</replaceable> must be the name of an imported quoter,
+either qualified or unqualified; it cannot be an arbitrary expression.
 </para></listitem>
 <listitem><para>
 The <replaceable>quoter</replaceable> cannot be "<literal>e</literal>",
@@ -10805,7 +10840,7 @@ data T = T {-# NOUNPACK #-} !(Int,Int)
 </sect2>
 
 <sect2 id="overlap-pragma">
-<title>OVERLAPPINGP, OVERLAPPABLE, OVERLAPS, and INCOHERENT pragmas</title>
+<title>OVERLAPPING, OVERLAPPABLE, OVERLAPS, and INCOHERENT pragmas</title>
 <para>
 The pragmas
   <literal>OVERLAPPING</literal>,

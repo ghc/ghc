@@ -90,26 +90,17 @@ to the substitution
 
 Note [CSE for INLINE and NOINLINE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We are careful to do no CSE inside functions that the user has marked as
-INLINE or NOINLINE.  In terms of Core, that means
+There are some subtle interactions of CSE with functions that the user
+has marked as INLINE or NOINLINE. (Examples from Roman Leshchinskiy.)
+Consider
 
-        a) we do not do CSE inside an InlineRule
-
-        b) we do not do CSE on the RHS of a binding b=e
-           unless b's InlinePragma is AlwaysActive
-
-Here's why (examples from Roman Leshchinskiy).  Consider
-
-        yes :: Int
-        {-# NOINLINE yes #-}
+        yes :: Int  {-# NOINLINE yes #-}
         yes = undefined
 
-        no :: Int
-        {-# NOINLINE no #-}
+        no :: Int   {-# NOINLINE no #-}
         no = undefined
 
-        foo :: Int -> Int -> Int
-        {-# NOINLINE foo #-}
+        foo :: Int -> Int -> Int  {-# NOINLINE foo #-}
         foo m n = n
 
         {-# RULES "foo/no" foo no = id #-}
@@ -117,35 +108,36 @@ Here's why (examples from Roman Leshchinskiy).  Consider
         bar :: Int -> Int
         bar = foo yes
 
-We do not expect the rule to fire.  But if we do CSE, then we get
-yes=no, and the rule does fire.  Worse, whether we get yes=no or
-no=yes depends on the order of the definitions.
+We do not expect the rule to fire.  But if we do CSE, then we risk
+getting yes=no, and the rule does fire.  Actually, it won't because
+NOINLINE means that 'yes' will never be inlined, not even if we have
+yes=no.  So that's fine (now; perhaps in the olden days, yes=no would
+have substituted even if 'yes' was NOINLINE.
 
-In general, CSE should probably never touch things with INLINE pragmas
-as this could lead to surprising results.  Consider
-
-        {-# INLINE foo #-}
-        foo = <rhs>
+But we do need to take care.  Consider
 
         {-# NOINLINE bar #-}
         bar = <rhs>     -- Same rhs as foo
 
+        foo = <rhs>
+
 If CSE produces
         foo = bar
-then foo will never be inlined (when it should be); but if it produces
-        bar = foo
-bar will be inlined (when it should not be). Even if we remove INLINE foo,
-we'd still like foo to be inlined if rhs is small. This won't happen
-with foo = bar.
+then foo will never be inlined to <rhs> (when it should be, if <rhs>
+is small).  The conclusion here is this:
 
-Not CSE-ing inside INLINE also solves an annoying bug in CSE. Consider
-a worker/wrapper, in which the worker has turned into a single variable:
-        $wf = h
-        f = \x -> ...$wf...
-Now CSE may transform to
-        f = \x -> ...h...
-But the WorkerInfo for f still says $wf, which is now dead!  This won't
-happen now that we don't look inside INLINEs (which wrappers are).
+   We should not add
+       <rhs> :-> bar
+  to the CSEnv if 'bar' has any constraints on when it can inline;
+  that is, if its 'activation' not always active.  Otherwise we
+  might replace <rhs> by 'bar', and then later be unable to see that it
+  really was <rhs>.
+
+Note that we do not (currently) do CSE on the unfolding stored inside
+an Id, even if is a 'stable' unfolding.  That means that when an
+unfolding happens, it is always faithful to what the stable unfolding
+originally was.
+
 
 Note [CSE for case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -162,14 +154,7 @@ let-binding, and we can use cseRhs for dealing with the scrutinee.
 
 \begin{code}
 cseProgram :: CoreProgram -> CoreProgram
-cseProgram binds = cseBinds emptyCSEnv binds
-
-cseBinds :: CSEnv -> [CoreBind] -> [CoreBind]
-cseBinds _   []     = []
-cseBinds env (b:bs) = (b':bs')
-                    where
-                      (env1, b') = cseBind  env  b
-                      bs'        = cseBinds env1 bs
+cseProgram binds = snd (mapAccumL cseBind emptyCSEnv binds)
 
 cseBind :: CSEnv -> CoreBind -> (CSEnv, CoreBind)
 cseBind env (NonRec b e)
@@ -188,8 +173,12 @@ cseBind env (Rec pairs)
 cseRhs :: CSEnv -> (OutBndr, InExpr) -> (CSEnv, OutExpr)
 cseRhs env (id',rhs)
   = case lookupCSEnv env rhs' of
-        Nothing -> (extendCSEnv env rhs' id', rhs')
-        Just id -> (extendCSSubst env id' id, Var id)
+        Nothing
+          | always_active -> (extendCSEnv env rhs' id', rhs')
+          | otherwise     -> (env,                      rhs')
+        Just id
+          | always_active -> (extendCSSubst env id' id, Var id)
+          | otherwise     -> (env,                      Var id)
           -- In the Just case, we have
           --        x = rhs
           --        ...
@@ -199,9 +188,10 @@ cseRhs env (id',rhs)
           -- that subsequent uses of x' are replaced with x,
           -- See Trac #5996
   where
-    rhs' | isAlwaysActive (idInlineActivation id') = cseExpr env rhs
-         | otherwise                               = rhs
-                -- See Note [CSE for INLINE and NOINLINE]
+    rhs' = cseExpr env rhs
+
+    always_active = isAlwaysActive (idInlineActivation id')
+         -- See Note [CSE for INLINE and NOINLINE]
 
 tryForCSE :: CSEnv -> InExpr -> OutExpr
 tryForCSE env expr
@@ -259,8 +249,8 @@ cseAlts env scrut' bndr bndr' alts
         = (DataAlt con, args', tryForCSE new_env rhs)
         where
           (env', args') = addBinders alt_env args
-          new_env       = extendCSEnv env' (mkAltExpr (DataAlt con) args' arg_tys)
-                                           con_target
+          new_env       = extendCSEnv env' con_expr con_target
+          con_expr      = mkAltExpr (DataAlt con) args' arg_tys
 
     cse_alt (con, args, rhs)
         = (con, args', tryForCSE env' rhs)

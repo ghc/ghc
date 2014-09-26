@@ -227,7 +227,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
        ; traceVt " VECT SCALAR    : " $ ppr (scalarTyConsNoRHS ++ map fst scalarTyConsWithRHS)
        ; traceVt " VECT [class]   : " $ ppr impVectTyCons
        ; traceVt " VECT with rhs  : " $ ppr (map fst (vectTyConsWithRHS ++ scalarTyConsWithRHS))
-       ; traceVt " -- after classification (local and VECT [class] tycons) --" empty
+       ; traceVt " -- after classification (local and VECT [class] tycons) --" Outputable.empty
        ; traceVt " reuse          : " $ ppr keep_tcs
        ; traceVt " convert        : " $ ppr conv_tcs
        

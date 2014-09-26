@@ -23,14 +23,14 @@
 -- This file is divided into named sections, each containing or more
 -- primop entries. Section headers have the format:
 --
---	section "section-name" {description}
+--      section "section-name" {description}
 --
 -- This information is used solely when producing documentation; it is
 -- otherwise ignored.  The description is optional.
 --
 -- The format of each primop entry is as follows:
 --
---	primop internal-name "name-in-program-text" type category {description} attributes
+--      primop internal-name "name-in-program-text" type category {description} attributes
 
 -- The default attribute values which apply if you don't specify
 -- other ones.  Attribute values can be True, False, or arbitrary
@@ -76,56 +76,56 @@ defaults
 #include "ghc_boot_platform.h"
 
 section "The word size story."
-	{Haskell98 specifies that signed integers (type {\tt Int})
-	 must contain at least 30 bits. GHC always implements {\tt
-	 Int} using the primitive type {\tt Int\#}, whose size equals
-	 the {\tt MachDeps.h} constant {\tt WORD\_SIZE\_IN\_BITS}.
-	 This is normally set based on the {\tt config.h} parameter
-	 {\tt SIZEOF\_HSWORD}, i.e., 32 bits on 32-bit machines, 64
-	 bits on 64-bit machines.  However, it can also be explicitly
-	 set to a smaller number, e.g., 31 bits, to allow the
-	 possibility of using tag bits. Currently GHC itself has only
-	 32-bit and 64-bit variants, but 30 or 31-bit code can be
-	 exported as an external core file for use in other back ends.
+        {Haskell98 specifies that signed integers (type {\tt Int})
+         must contain at least 30 bits. GHC always implements {\tt
+         Int} using the primitive type {\tt Int\#}, whose size equals
+         the {\tt MachDeps.h} constant {\tt WORD\_SIZE\_IN\_BITS}.
+         This is normally set based on the {\tt config.h} parameter
+         {\tt SIZEOF\_HSWORD}, i.e., 32 bits on 32-bit machines, 64
+         bits on 64-bit machines.  However, it can also be explicitly
+         set to a smaller number, e.g., 31 bits, to allow the
+         possibility of using tag bits. Currently GHC itself has only
+         32-bit and 64-bit variants, but 30 or 31-bit code can be
+         exported as an external core file for use in other back ends.
 
-	 GHC also implements a primitive unsigned integer type {\tt
-	 Word\#} which always has the same number of bits as {\tt
-	 Int\#}.
+         GHC also implements a primitive unsigned integer type {\tt
+         Word\#} which always has the same number of bits as {\tt
+         Int\#}.
 
-	 In addition, GHC supports families of explicit-sized integers
-	 and words at 8, 16, 32, and 64 bits, with the usual
-	 arithmetic operations, comparisons, and a range of
-	 conversions.  The 8-bit and 16-bit sizes are always
-	 represented as {\tt Int\#} and {\tt Word\#}, and the
-	 operations implemented in terms of the the primops on these
-	 types, with suitable range restrictions on the results (using
-	 the {\tt narrow$n$Int\#} and {\tt narrow$n$Word\#} families
-	 of primops.  The 32-bit sizes are represented using {\tt
-	 Int\#} and {\tt Word\#} when {\tt WORD\_SIZE\_IN\_BITS}
-	 $\geq$ 32; otherwise, these are represented using distinct
-	 primitive types {\tt Int32\#} and {\tt Word32\#}. These (when
-	 needed) have a complete set of corresponding operations;
-	 however, nearly all of these are implemented as external C
-	 functions rather than as primops.  Exactly the same story
-	 applies to the 64-bit sizes.  All of these details are hidden
-	 under the {\tt PrelInt} and {\tt PrelWord} modules, which use
-	 {\tt \#if}-defs to invoke the appropriate types and
-	 operators.
+         In addition, GHC supports families of explicit-sized integers
+         and words at 8, 16, 32, and 64 bits, with the usual
+         arithmetic operations, comparisons, and a range of
+         conversions.  The 8-bit and 16-bit sizes are always
+         represented as {\tt Int\#} and {\tt Word\#}, and the
+         operations implemented in terms of the the primops on these
+         types, with suitable range restrictions on the results (using
+         the {\tt narrow$n$Int\#} and {\tt narrow$n$Word\#} families
+         of primops.  The 32-bit sizes are represented using {\tt
+         Int\#} and {\tt Word\#} when {\tt WORD\_SIZE\_IN\_BITS}
+         $\geq$ 32; otherwise, these are represented using distinct
+         primitive types {\tt Int32\#} and {\tt Word32\#}. These (when
+         needed) have a complete set of corresponding operations;
+         however, nearly all of these are implemented as external C
+         functions rather than as primops.  Exactly the same story
+         applies to the 64-bit sizes.  All of these details are hidden
+         under the {\tt PrelInt} and {\tt PrelWord} modules, which use
+         {\tt \#if}-defs to invoke the appropriate types and
+         operators.
 
-	 Word size also matters for the families of primops for
-	 indexing/reading/writing fixed-size quantities at offsets
-	 from an array base, address, or foreign pointer.  Here, a
-	 slightly different approach is taken.  The names of these
-	 primops are fixed, but their {\it types} vary according to
-	 the value of {\tt WORD\_SIZE\_IN\_BITS}. For example, if word
-	 size is at least 32 bits then an operator like
-	 \texttt{indexInt32Array\#} has type {\tt ByteArray\# -> Int\#
-	 -> Int\#}; otherwise it has type {\tt ByteArray\# -> Int\# ->
-	 Int32\#}.  This approach confines the necessary {\tt
-	 \#if}-defs to this file; no conditional compilation is needed
-	 in the files that expose these primops.
+         Word size also matters for the families of primops for
+         indexing/reading/writing fixed-size quantities at offsets
+         from an array base, address, or foreign pointer.  Here, a
+         slightly different approach is taken.  The names of these
+         primops are fixed, but their {\it types} vary according to
+         the value of {\tt WORD\_SIZE\_IN\_BITS}. For example, if word
+         size is at least 32 bits then an operator like
+         \texttt{indexInt32Array\#} has type {\tt ByteArray\# -> Int\#
+         -> Int\#}; otherwise it has type {\tt ByteArray\# -> Int\# ->
+         Int32\#}.  This approach confines the necessary {\tt
+         \#if}-defs to this file; no conditional compilation is needed
+         in the files that expose these primops.
 
-	 Finally, there are strongly deprecated primops for coercing
+         Finally, there are strongly deprecated primops for coercing
          between {\tt Addr\#}, the primitive type of machine
          addresses, and {\tt Int\#}.  These are pretty bogus anyway,
          but will work on existing 32-bit and 64-bit GHC targets; they
@@ -152,7 +152,7 @@ section "The word size story."
 
 ------------------------------------------------------------------------
 section "Char#"
-	{Operations on 31-bit characters.}
+        {Operations on 31-bit characters.}
 ------------------------------------------------------------------------
 
 primtype Char#
@@ -176,7 +176,7 @@ primop   OrdOp   "ord#"  GenPrimOp   Char# -> Int#
 
 ------------------------------------------------------------------------
 section "Int#"
-	{Operations on native-size integers (30+ bits).}
+        {Operations on native-size integers (30+ bits).}
 ------------------------------------------------------------------------
 
 primtype Int#
@@ -247,13 +247,19 @@ primop   NotIOp   "notI#"   Monadic   Int# -> Int#
 
 primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-	 {Add with carry.  First member of result is (wrapped) sum;
-          second member is 0 iff no overflow occured.}
+         {Add signed integers reporting overflow.
+          First member of result is the sum truncated to an {\tt Int#};
+          second member is zero if the true sum fits in an {\tt Int#},
+          nonzero if overflow occurred (the sum is either too large
+          or too small to fit in an {\tt Int#}).}
    with code_size = 2
 
 primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-	 {Subtract with carry.  First member of result is (wrapped) difference;
-          second member is 0 iff no overflow occured.}
+         {Subtract signed integers reporting overflow.
+          First member of result is the difference truncated to an {\tt Int#};
+          second member is zero if the true difference fits in an {\tt Int#},
+          nonzero if overflow occurred (the difference is either too large
+          or too small to fit in an {\tt Int#}).}
    with code_size = 2
 
 primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Int#
@@ -291,18 +297,18 @@ primop   Word2FloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
 primop   Word2DoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
 
 primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
-	 {Shift left.  Result undefined if shift amount is not
+         {Shift left.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
 primop   ISraOp   "uncheckedIShiftRA#" GenPrimOp Int# -> Int# -> Int#
-	 {Shift right arithmetic.  Result undefined if shift amount is not
+         {Shift right arithmetic.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
 primop   ISrlOp   "uncheckedIShiftRL#" GenPrimOp Int# -> Int# -> Int#
-	 {Shift right logical.  Result undefined if shift amount is not
+         {Shift right logical.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
 
 ------------------------------------------------------------------------
 section "Word#"
-	{Operations on native-sized unsigned words (30+ bits).}
+        {Operations on native-sized unsigned words (30+ bits).}
 ------------------------------------------------------------------------
 
 primtype Word#
@@ -353,10 +359,10 @@ primop   XorOp   "xor#"   Dyadic   Word# -> Word# -> Word#
 primop   NotOp   "not#"   Monadic   Word# -> Word#
 
 primop   SllOp   "uncheckedShiftL#"   GenPrimOp   Word# -> Int# -> Word#
-	 {Shift left logical.   Result undefined if shift amount is not
+         {Shift left logical.   Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
 primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
-	 {Shift right logical.   Result undefined if shift  amount is not
+         {Shift right logical.   Result undefined if shift  amount is not
           in the range 0 to word size - 1 inclusive.}
 
 primop   Word2IntOp   "word2Int#"   GenPrimOp   Word# -> Int#
@@ -380,6 +386,28 @@ primop   PopCnt64Op   "popCnt64#"   GenPrimOp   WORD64 -> Word#
 primop   PopCntOp   "popCnt#"   Monadic   Word# -> Word#
     {Count the number of set bits in a word.}
 
+primop   Clz8Op   "clz8#" Monadic   Word# -> Word#
+    {Count leading zeros in the lower 8 bits of a word.}
+primop   Clz16Op   "clz16#" Monadic   Word# -> Word#
+    {Count leading zeros in the lower 16 bits of a word.}
+primop   Clz32Op   "clz32#" Monadic   Word# -> Word#
+    {Count leading zeros in the lower 32 bits of a word.}
+primop   Clz64Op   "clz64#" GenPrimOp WORD64 -> Word#
+    {Count leading zeros in a 64-bit word.}
+primop   ClzOp     "clz#"   Monadic   Word# -> Word#
+    {Count leading zeros in a word.}
+
+primop   Ctz8Op   "ctz8#"  Monadic   Word# -> Word#
+    {Count trailing zeros in the lower 8 bits of a word.}
+primop   Ctz16Op   "ctz16#" Monadic   Word# -> Word#
+    {Count trailing zeros in the lower 16 bits of a word.}
+primop   Ctz32Op   "ctz32#" Monadic   Word# -> Word#
+    {Count trailing zeros in the lower 32 bits of a word.}
+primop   Ctz64Op   "ctz64#" GenPrimOp WORD64 -> Word#
+    {Count trailing zeros in a 64-bit word.}
+primop   CtzOp     "ctz#"   Monadic   Word# -> Word#
+    {Count trailing zeros in a word.}
+
 primop   BSwap16Op   "byteSwap16#"   Monadic   Word# -> Word#
     {Swap bytes in the lower 16 bits of a word. The higher bytes are undefined. }
 primop   BSwap32Op   "byteSwap32#"   Monadic   Word# -> Word#
@@ -391,7 +419,7 @@ primop   BSwapOp     "byteSwap#"     Monadic   Word# -> Word#
 
 ------------------------------------------------------------------------
 section "Narrowings"
-	{Explicit narrowing of native-sized ints or words.}
+        {Explicit narrowing of native-sized ints or words.}
 ------------------------------------------------------------------------
 
 primop   Narrow8IntOp      "narrow8Int#"      Monadic   Int# -> Int#
@@ -405,18 +433,18 @@ primop   Narrow32WordOp    "narrow32Word#"    Monadic   Word# -> Word#
 #if WORD_SIZE_IN_BITS < 32
 ------------------------------------------------------------------------
 section "Int32#"
-	{Operations on 32-bit integers ({\tt Int32\#}).  This type is only used
+        {Operations on 32-bit integers ({\tt Int32\#}).  This type is only used
          if plain {\tt Int\#} has less than 32 bits.  In any case, the operations
-	 are not primops; they are implemented (if needed) as ccalls instead.}
+         are not primops; they are implemented (if needed) as ccalls instead.}
 ------------------------------------------------------------------------
 
 primtype Int32#
 
 ------------------------------------------------------------------------
 section "Word32#"
-	{Operations on 32-bit unsigned words. This type is only used
-	 if plain {\tt Word\#} has less than 32 bits. In any case, the operations
-	 are not primops; they are implemented (if needed) as ccalls instead.}
+        {Operations on 32-bit unsigned words. This type is only used
+         if plain {\tt Word\#} has less than 32 bits. In any case, the operations
+         are not primops; they are implemented (if needed) as ccalls instead.}
 ------------------------------------------------------------------------
 
 primtype Word32#
@@ -427,18 +455,18 @@ primtype Word32#
 #if WORD_SIZE_IN_BITS < 64
 ------------------------------------------------------------------------
 section "Int64#"
-	{Operations on 64-bit unsigned words. This type is only used
-	 if plain {\tt Int\#} has less than 64 bits. In any case, the operations
-	 are not primops; they are implemented (if needed) as ccalls instead.}
+        {Operations on 64-bit unsigned words. This type is only used
+         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
+         are not primops; they are implemented (if needed) as ccalls instead.}
 ------------------------------------------------------------------------
 
 primtype Int64#
 
 ------------------------------------------------------------------------
 section "Word64#"
-	{Operations on 64-bit unsigned words. This type is only used
-	 if plain {\tt Word\#} has less than 64 bits. In any case, the operations
-	 are not primops; they are implemented (if needed) as ccalls instead.}
+        {Operations on 64-bit unsigned words. This type is only used
+         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
+         are not primops; they are implemented (if needed) as ccalls instead.}
 ------------------------------------------------------------------------
 
 primtype Word64#
@@ -447,7 +475,7 @@ primtype Word64#
 
 ------------------------------------------------------------------------
 section "Double#"
-	{Operations on double-precision (64 bit) floating-point numbers.}
+        {Operations on double-precision (64 bit) floating-point numbers.}
 ------------------------------------------------------------------------
 
 primtype Double#
@@ -578,9 +606,14 @@ primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp
     respectively, and the last is the exponent.}
    with out_of_line = True
 
+primop   DoubleDecode_Int64Op   "decodeDouble_Int64#" GenPrimOp
+   Double# -> (# INT64, Int# #)
+   {Decode {\tt Double\#} into mantissa and base-2 exponent.}
+   with out_of_line = True
+
 ------------------------------------------------------------------------
 section "Float#"
-	{Operations on single-precision (32-bit) floating-point numbers.}
+        {Operations on single-precision (32-bit) floating-point numbers.}
 ------------------------------------------------------------------------
 
 primtype Float#
@@ -698,7 +731,7 @@ primop   FloatDecode_IntOp   "decodeFloat_Int#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Arrays"
-	{Operations on {\tt Array\#}.}
+        {Operations on {\tt Array\#}.}
 ------------------------------------------------------------------------
 
 primtype Array# a
@@ -842,7 +875,7 @@ primop CasArrayOp  "casArray#" GenPrimOp
 ------------------------------------------------------------------------
 section "Small Arrays"
 
-	{Operations on {\tt SmallArray\#}. A {\tt SmallArray\#} works
+        {Operations on {\tt SmallArray\#}. A {\tt SmallArray\#} works
          just like an {\tt Array\#}, but with different space use and
          performance characteristics (that are often useful with small
          arrays). The {\tt SmallArray\#} and {\tt SmallMutableArray#}
@@ -1003,7 +1036,7 @@ primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Byte Arrays"
-	{Operations on {\tt ByteArray\#}. A {\tt ByteArray\#} is a just a region of
+        {Operations on {\tt ByteArray\#}. A {\tt ByteArray\#} is a just a region of
          raw memory in the garbage-collected heap, which is not
          scanned for pointers. It carries its own size (in bytes).
          There are
@@ -1045,6 +1078,30 @@ primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
 
 primop  SameMutableByteArrayOp "sameMutableByteArray#" GenPrimOp
    MutableByteArray# s -> MutableByteArray# s -> Int#
+
+primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> State# s
+   {Shrink mutable byte array to new specified size (in bytes), in
+    the specified state thread. The new size argument must be less than or
+    equal to the current size as reported by {\tt sizeofMutableArray\#}.}
+   with out_of_line = True
+        has_side_effects = True
+
+primop  ResizeMutableByteArrayOp_Char "resizeMutableByteArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+   {Resize (unpinned) mutable byte array to new specified size (in bytes).
+    The returned {\tt MutableByteArray\#} is either the original
+    {\tt MutableByteArray\#} resized in-place or, if not possible, a newly
+    allocated (unpinned) {\tt MutableByteArray\#} (with the original content
+    copied over).
+
+    To avoid undefined behaviour, the original {\tt MutableByteArray\#} shall
+    not be accessed anymore after a {\tt resizeMutableByteArray\#} has been
+    performed.  Moreover, no reference to the old one should be kept in order
+    to allow garbage collection of the original {\tt MutableByteArray\#} in
+    case a new {\tt MutableByteArray\#} had to be allocated.}
+   with out_of_line = True
+        has_side_effects = True
 
 primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
    MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)
@@ -1440,11 +1497,11 @@ primop FetchXorByteArrayOp_Int "fetchXorIntArray#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Arrays of arrays"
-	{Operations on {\tt ArrayArray\#}. An {\tt ArrayArray\#} contains references to {\em unpointed}
-	 arrays, such as {\tt ByteArray\#s}. Hence, it is not parameterised by the element types,
-	 just like a {\tt ByteArray\#}, but it needs to be scanned during GC, just like an {\tt Array#}.
-	 We represent an {\tt ArrayArray\#} exactly as a {\tt Array\#}, but provide element-type-specific
-	 indexing, reading, and writing.}
+        {Operations on {\tt ArrayArray\#}. An {\tt ArrayArray\#} contains references to {\em unpointed}
+         arrays, such as {\tt ByteArray\#s}. Hence, it is not parameterised by the element types,
+         just like a {\tt ByteArray\#}, but it needs to be scanned during GC, just like an {\tt Array#}.
+         We represent an {\tt ArrayArray\#} exactly as a {\tt Array\#}, but provide element-type-specific
+         indexing, reading, and writing.}
 ------------------------------------------------------------------------
 
 primtype ArrayArray#
@@ -1550,25 +1607,25 @@ section "Addr#"
 ------------------------------------------------------------------------
 
 primtype Addr#
-	{ An arbitrary machine address assumed to point outside
-	 the garbage-collected heap. }
+        { An arbitrary machine address assumed to point outside
+         the garbage-collected heap. }
 
 pseudoop "nullAddr#" Addr#
-	{ The null address. }
+        { The null address. }
 
-primop	 AddrAddOp "plusAddr#" GenPrimOp Addr# -> Int# -> Addr#
-primop	 AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
-	 {Result is meaningless if two {\tt Addr\#}s are so far apart that their
-	 difference doesn't fit in an {\tt Int\#}.}
-primop	 AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
-	 {Return the remainder when the {\tt Addr\#} arg, treated like an {\tt Int\#},
-	  is divided by the {\tt Int\#} arg.}
+primop   AddrAddOp "plusAddr#" GenPrimOp Addr# -> Int# -> Addr#
+primop   AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
+         {Result is meaningless if two {\tt Addr\#}s are so far apart that their
+         difference doesn't fit in an {\tt Int\#}.}
+primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
+         {Return the remainder when the {\tt Addr\#} arg, treated like an {\tt Int\#},
+          is divided by the {\tt Int\#} arg.}
 #if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
 primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
-	{Coerce directly from address to int. Strongly deprecated.}
+        {Coerce directly from address to int. Strongly deprecated.}
    with code_size = 0
 primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
-	{Coerce directly from int to address. Strongly deprecated.}
+        {Coerce directly from int to address. Strongly deprecated.}
    with code_size = 0
 #endif
 
@@ -1809,11 +1866,11 @@ primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Mutable variables"
-	{Operations on MutVar\#s.}
+        {Operations on MutVar\#s.}
 ------------------------------------------------------------------------
 
 primtype MutVar# s a
-	{A {\tt MutVar\#} behaves like a single-element mutable array.}
+        {A {\tt MutVar\#} behaves like a single-element mutable array.}
 
 primop  NewMutVarOp "newMutVar#" GenPrimOp
    a -> State# s -> (# State# s, MutVar# s a #)
@@ -1868,9 +1925,9 @@ primop  CatchOp "catch#" GenPrimOp
        -> State# RealWorld
        -> (# State# RealWorld, a #)
    with
-	-- Catch is actually strict in its first argument
-	-- but we don't want to tell the strictness
-	-- analyser about that, so that exceptions stay inside it.
+        -- Catch is actually strict in its first argument
+        -- but we don't want to tell the strictness
+        -- analyser about that, so that exceptions stay inside it.
    strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,apply2Dmd,topDmd] topRes }
    out_of_line = True
    has_side_effects = True
@@ -1881,6 +1938,11 @@ primop  RaiseOp "raise#" GenPrimOp
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
       -- NB: result is bottom
    out_of_line = True
+   has_side_effects = True
+     -- raise# certainly throws a Haskell exception and hence has_side_effects
+     -- It doesn't actually make much difference because the fact that it
+     -- returns bottom independently ensures that we are careful not to discard
+     -- it.  But still, it's better to say the Right Thing.
 
 -- raiseIO# needs to be a primop, because exceptions in the IO monad
 -- must be *precise* - we don't want the strictness analyser turning
@@ -1888,8 +1950,8 @@ primop  RaiseOp "raise#" GenPrimOp
 --
 -- But we *do* want to know that it returns bottom after
 -- being applied to two arguments, so that this function is strict in y
---     f x y | x>0  	 = raiseIO blah
---           | y>0  	 = return 1
+--     f x y | x>0       = raiseIO blah
+--           | y>0       = return 1
 --           | otherwise = return 2
 
 primop  RaiseIOOp "raiseIO#" GenPrimOp
@@ -1935,7 +1997,7 @@ section "STM-accessible Mutable Variables"
 
 primtype TVar# s a
 
-primop	AtomicallyOp "atomically#" GenPrimOp
+primop  AtomicallyOp "atomically#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> State# RealWorld -> (# State# RealWorld, a #)
    with
@@ -1985,7 +2047,7 @@ primop  Check "check#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
-primop	NewTVarOp "newTVar#" GenPrimOp
+primop  NewTVarOp "newTVar#" GenPrimOp
        a
     -> State# s -> (# State# s, TVar# s a #)
    {Create a new {\tt TVar\#} holding a specified initial value.}
@@ -1993,12 +2055,12 @@ primop	NewTVarOp "newTVar#" GenPrimOp
    out_of_line  = True
    has_side_effects = True
 
-primop	ReadTVarOp "readTVar#" GenPrimOp
+primop  ReadTVarOp "readTVar#" GenPrimOp
        TVar# s a
     -> State# s -> (# State# s, a #)
    {Read contents of {\tt TVar\#}.  Result is not yet evaluated.}
    with
-   out_of_line	= True
+   out_of_line  = True
    has_side_effects = True
 
 primop ReadTVarIOOp "readTVarIO#" GenPrimOp
@@ -2006,16 +2068,16 @@ primop ReadTVarIOOp "readTVarIO#" GenPrimOp
     -> State# s -> (# State# s, a #)
    {Read contents of {\tt TVar\#} outside an STM transaction}
    with
-   out_of_line	= True
+   out_of_line      = True
    has_side_effects = True
 
-primop	WriteTVarOp "writeTVar#" GenPrimOp
+primop  WriteTVarOp "writeTVar#" GenPrimOp
        TVar# s a
     -> a
     -> State# s -> State# s
    {Write contents of {\tt TVar\#}.}
    with
-   out_of_line	    = True
+   out_of_line      = True
    has_side_effects = True
 
 primop  SameTVarOp "sameTVar#" GenPrimOp
@@ -2024,13 +2086,13 @@ primop  SameTVarOp "sameTVar#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Synchronized Mutable Variables"
-	{Operations on {\tt MVar\#}s. }
+        {Operations on {\tt MVar\#}s. }
 ------------------------------------------------------------------------
 
 primtype MVar# s a
-	{ A shared mutable variable ({\it not} the same as a {\tt MutVar\#}!).
-	(Note: in a non-concurrent implementation, {\tt (MVar\# a)} can be
-	represented by {\tt (MutVar\# (Maybe a))}.) }
+        { A shared mutable variable ({\it not} the same as a {\tt MutVar\#}!).
+        (Note: in a non-concurrent implementation, {\tt (MVar\# a)} can be
+        represented by {\tt (MutVar\# (Maybe a))}.) }
 
 primop  NewMVarOp "newMVar#"  GenPrimOp
    State# s -> (# State# s, MVar# s a #)
@@ -2152,21 +2214,21 @@ section "Concurrency primitives"
 ------------------------------------------------------------------------
 
 primtype State# s
-	{ {\tt State\#} is the primitive, unlifted type of states.  It has
-	one type parameter, thus {\tt State\# RealWorld}, or {\tt State\# s},
-	where s is a type variable. The only purpose of the type parameter
-	is to keep different state threads separate.  It is represented by
-	nothing at all. }
+        { {\tt State\#} is the primitive, unlifted type of states.  It has
+        one type parameter, thus {\tt State\# RealWorld}, or {\tt State\# s},
+        where s is a type variable. The only purpose of the type parameter
+        is to keep different state threads separate.  It is represented by
+        nothing at all. }
 
 primtype RealWorld
-	{ {\tt RealWorld} is deeply magical.  It is {\it primitive}, but it is not
-	{\it unlifted} (hence {\tt ptrArg}).  We never manipulate values of type
-	{\tt RealWorld}; it's only used in the type system, to parameterise {\tt State\#}. }
+        { {\tt RealWorld} is deeply magical.  It is {\it primitive}, but it is not
+        {\it unlifted} (hence {\tt ptrArg}).  We never manipulate values of type
+        {\tt RealWorld}; it's only used in the type system, to parameterise {\tt State\#}. }
 
 primtype ThreadId#
-	{(In a non-concurrent implementation, this can be a singleton
-	type, whose (unique) value is returned by {\tt myThreadId\#}.  The
-	other operations can be omitted.)}
+        {(In a non-concurrent implementation, this can be a singleton
+        type, whose (unique) value is returned by {\tt myThreadId\#}.  The
+        other operations can be omitted.)}
 
 primop  ForkOp "fork#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
@@ -2410,8 +2472,8 @@ primop  ParAtForNowOp  "parAtForNow#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Tag to enum stuff"
-	{Convert back and forth between values of enumerated types
-	and small integers.}
+        {Convert back and forth between values of enumerated types
+        and small integers.}
 ------------------------------------------------------------------------
 
 primop  DataToTagOp "dataToTag#" GenPrimOp
@@ -2419,14 +2481,14 @@ primop  DataToTagOp "dataToTag#" GenPrimOp
    with
    strictness  = { \ _arity -> mkClosedStrictSig [evalDmd] topRes }
 
-	-- dataToTag# must have an evaluated argument
+        -- dataToTag# must have an evaluated argument
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp
    Int# -> a
 
 ------------------------------------------------------------------------
 section "Bytecode operations"
-	{Support for the bytecode interpreter and linker.}
+        {Support for the bytecode interpreter and linker.}
 ------------------------------------------------------------------------
 
 primtype BCO#
@@ -2477,7 +2539,7 @@ primop  GetCurrentCCSOp "getCurrentCCS#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Etc"
-	{Miscellaneous built-ins}
+        {Miscellaneous built-ins}
 ------------------------------------------------------------------------
 
 primtype Proxy# a
@@ -2494,33 +2556,42 @@ pseudoop "proxy#"
 
 pseudoop   "seq"
    a -> b -> b
-   { Evaluates its first argument to head normal form, and then returns its second
-	argument as the result. }
+   { The value of {\tt seq a b} is bottom if {\tt a} is bottom, and
+     otherwise equal to {\tt b}. {\tt seq} is usually introduced to
+     improve performance by avoiding unneeded laziness.
+
+     A note on evaluation order: the expression {\tt seq a b} does
+     {\it not} guarantee that {\tt a} will be evaluated before {\tt b}.
+     The only guarantee given by {\tt seq} is that the both {\tt a}
+     and {\tt b} will be evaluated before {\tt seq} returns a value.
+     In particular, this means that {\tt b} may be evaluated before
+     {\tt a}. If you need to guarantee a specific order of evaluation,
+     you must use the function {\tt pseq} from the "parallel" package. }
 
 primtype Any
-	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
-	lifted type, and back.
+        { The type constructor {\tt Any} is type to which you can unsafely coerce any
+        lifted type, and back.
 
-	  * It is lifted, and hence represented by a pointer
+          * It is lifted, and hence represented by a pointer
 
-	  * It does not claim to be a {\it data} type, and that's important for
-	    the code generator, because the code gen may {\it enter} a data value
-	    but never enters a function value.
+          * It does not claim to be a {\it data} type, and that's important for
+            the code generator, because the code gen may {\it enter} a data value
+            but never enters a function value.
 
-	It's also used to instantiate un-constrained type variables after type
-	checking.  For example, {\tt length} has type
+        It's also used to instantiate un-constrained type variables after type
+        checking.  For example, {\tt length} has type
 
-	{\tt length :: forall a. [a] -> Int}
+        {\tt length :: forall a. [a] -> Int}
 
-	and the list datacon for the empty list has type
+        and the list datacon for the empty list has type
 
-	{\tt [] :: forall a. [a]}
+        {\tt [] :: forall a. [a]}
 
-	In order to compose these two terms as {\tt length []} a type
-	application is required, but there is no constraint on the
-	choice.  In this situation GHC uses {\tt Any}:
+        In order to compose these two terms as {\tt length []} a type
+        application is required, but there is no constraint on the
+        choice.  In this situation GHC uses {\tt Any}:
 
-	{\tt length (Any *) ([] (Any *))}
+        {\tt length (Any *) ([] (Any *))}
 
         Above, we print kinds explicitly, as if with
         {\tt -fprint-explicit-kinds}.
@@ -2546,10 +2617,10 @@ primtype AnyK
 pseudoop   "unsafeCoerce#"
    a -> b
    { The function {\tt unsafeCoerce\#} allows you to side-step the typechecker entirely. That
-	is, it allows you to coerce any type into any other type. If you use this function,
-	you had better get it right, otherwise segmentation faults await. It is generally
-	used when you want to write a program that you know is well-typed, but where Haskell's
-	type system is not expressive enough to prove that it is well typed.
+        is, it allows you to coerce any type into any other type. If you use this function,
+        you had better get it right, otherwise segmentation faults await. It is generally
+        used when you want to write a program that you know is well-typed, but where Haskell's
+        type system is not expressive enough to prove that it is well typed.
 
         The following uses of {\tt unsafeCoerce\#} are supposed to work (i.e. not lead to
         spurious compile-time or run-time crashes):
@@ -2568,12 +2639,12 @@ pseudoop   "unsafeCoerce#"
            at runtime as {\tt T}.
 
         Other uses of {\tt unsafeCoerce\#} are undefined.  In particular, you should not use
-	{\tt unsafeCoerce\#} to cast a T to an algebraic data type D, unless T is also
-	an algebraic data type.  For example, do not cast {\tt Int->Int} to {\tt Bool}, even if
+        {\tt unsafeCoerce\#} to cast a T to an algebraic data type D, unless T is also
+        an algebraic data type.  For example, do not cast {\tt Int->Int} to {\tt Bool}, even if
         you later cast that {\tt Bool} back to {\tt Int->Int} before applying it.  The reasons
         have to do with GHC's internal representation details (for the congnoscenti, data values
-	can be entered but function closures cannot).  If you want a safe type to cast things
-	to, use {\tt Any}, which is not an algebraic data type.
+        can be entered but function closures cannot).  If you want a safe type to cast things
+        to, use {\tt Any}, which is not an algebraic data type.
 
         }
 
@@ -2621,7 +2692,7 @@ pseudoop   "coerce"
 
 ------------------------------------------------------------------------
 section "SIMD Vectors"
-	{Operations on SIMD vectors.}
+        {Operations on SIMD vectors.}
 ------------------------------------------------------------------------
 
 #define ALL_VECTOR_TYPES \
@@ -2658,86 +2729,86 @@ section "SIMD Vectors"
 
 primtype VECTOR
    with llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecBroadcastOp "broadcast#" GenPrimOp
    SCALAR -> VECTOR
    { Broadcast a scalar to all elements of a vector. }
    with llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecPackOp "pack#" GenPrimOp
    VECTUPLE -> VECTOR
    { Pack the elements of an unboxed tuple into a vector. }
    with llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecUnpackOp "unpack#" GenPrimOp
    VECTOR -> VECTUPLE
    { Unpack the elements of a vector into an unboxed tuple. #}
    with llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecInsertOp "insert#" GenPrimOp
    VECTOR -> SCALAR -> Int# -> VECTOR
    { Insert a scalar at the given position in a vector. }
    with can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecAddOp "plus#" Dyadic
    VECTOR -> VECTOR -> VECTOR
    { Add two vectors element-wise. }
    with commutable = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecSubOp "minus#" Dyadic
    VECTOR -> VECTOR -> VECTOR
    { Subtract two vectors element-wise. }
    with llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecMulOp "times#" Dyadic
    VECTOR -> VECTOR -> VECTOR
    { Multiply two vectors element-wise. }
    with commutable = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecDivOp "divide#" Dyadic
    VECTOR -> VECTOR -> VECTOR
    { Divide two vectors element-wise. }
    with can_fail = True
         llvm_only = True
-   	vector = FLOAT_VECTOR_TYPES
+        vector = FLOAT_VECTOR_TYPES
 
 primop VecQuotOp "quot#" Dyadic
    VECTOR -> VECTOR -> VECTOR
    { Rounds towards zero element-wise. }
    with can_fail = True
         llvm_only = True
-   	vector = INT_VECTOR_TYPES
+        vector = INT_VECTOR_TYPES
 
 primop VecRemOp "rem#" Dyadic
    VECTOR -> VECTOR -> VECTOR
    { Satisfies \texttt{(quot\# x y) times\# y plus\# (rem\# x y) == x}. }
    with can_fail = True
         llvm_only = True
-   	vector = INT_VECTOR_TYPES
+        vector = INT_VECTOR_TYPES
 
 primop VecNegOp "negate#" Monadic
    VECTOR -> VECTOR
    { Negate element-wise. }
    with llvm_only = True
-   	vector = SIGNED_VECTOR_TYPES
+        vector = SIGNED_VECTOR_TYPES
 
 primop VecIndexByteArrayOp "indexArray#" GenPrimOp
    ByteArray# -> Int# -> VECTOR
    { Read a vector from specified index of immutable array. }
    with can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecReadByteArrayOp "readArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, VECTOR #)
@@ -2745,7 +2816,7 @@ primop VecReadByteArrayOp "readArray#" GenPrimOp
    with has_side_effects = True
         can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecWriteByteArrayOp "writeArray#" GenPrimOp
    MutableByteArray# s -> Int# -> VECTOR -> State# s -> State# s
@@ -2753,14 +2824,14 @@ primop VecWriteByteArrayOp "writeArray#" GenPrimOp
    with has_side_effects = True
         can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecIndexOffAddrOp "indexOffAddr#" GenPrimOp
    Addr# -> Int# -> VECTOR
    { Reads vector; offset in bytes. }
    with can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecReadOffAddrOp "readOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, VECTOR #)
@@ -2768,7 +2839,7 @@ primop VecReadOffAddrOp "readOffAddr#" GenPrimOp
    with has_side_effects = True
         can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecWriteOffAddrOp "writeOffAddr#" GenPrimOp
    Addr# -> Int# -> VECTOR -> State# s -> State# s
@@ -2776,7 +2847,7 @@ primop VecWriteOffAddrOp "writeOffAddr#" GenPrimOp
    with has_side_effects = True
         can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 
 primop VecIndexScalarByteArrayOp "indexArrayAs#" GenPrimOp
@@ -2784,7 +2855,7 @@ primop VecIndexScalarByteArrayOp "indexArrayAs#" GenPrimOp
    { Read a vector from specified index of immutable array of scalars; offset is in scalar elements. }
    with can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecReadScalarByteArrayOp "readArrayAs#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, VECTOR #)
@@ -2792,7 +2863,7 @@ primop VecReadScalarByteArrayOp "readArrayAs#" GenPrimOp
    with has_side_effects = True
         can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecWriteScalarByteArrayOp "writeArrayAs#" GenPrimOp
    MutableByteArray# s -> Int# -> VECTOR -> State# s -> State# s
@@ -2800,14 +2871,14 @@ primop VecWriteScalarByteArrayOp "writeArrayAs#" GenPrimOp
    with has_side_effects = True
         can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecIndexScalarOffAddrOp "indexOffAddrAs#" GenPrimOp
    Addr# -> Int# -> VECTOR
    { Reads vector; offset in scalar elements. }
    with can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecReadScalarOffAddrOp "readOffAddrAs#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, VECTOR #)
@@ -2815,7 +2886,7 @@ primop VecReadScalarOffAddrOp "readOffAddrAs#" GenPrimOp
    with has_side_effects = True
         can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 primop VecWriteScalarOffAddrOp "writeOffAddrAs#" GenPrimOp
    Addr# -> Int# -> VECTOR -> State# s -> State# s
@@ -2823,12 +2894,12 @@ primop VecWriteScalarOffAddrOp "writeOffAddrAs#" GenPrimOp
    with has_side_effects = True
         can_fail = True
         llvm_only = True
-   	vector = ALL_VECTOR_TYPES
+        vector = ALL_VECTOR_TYPES
 
 ------------------------------------------------------------------------
 
 section "Prefetch"
-	{Prefetch operations: Note how every prefetch operation has a name
+        {Prefetch operations: Note how every prefetch operation has a name
   with the pattern prefetch*N#, where N is either 0,1,2, or 3.
 
   This suffix number, N, is the "locality level" of the prefetch, following the

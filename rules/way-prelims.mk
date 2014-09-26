@@ -18,9 +18,11 @@ else
 $1__way  = _$1
 $1_way_  = $1_
 endif
-$1_osuf   = $$($1_way_)o
-$1_hisuf  = $$($1_way_)hi
-$1_hcsuf  = $$($1_way_)hc
+$1_osuf      = $$($1_way_)o
+$1_o-bootsuf = $$($1_way_)o-boot
+$1_hisuf     = $$($1_way_)hi
+$1_hcsuf     = $$($1_way_)hc
+$1_ssuf      = $$($1_way_)s
 
 ifneq "$(findstring dyn,$1)" ""
 #  If the way includes "dyn" then it's a dynamic lib way. We mangle the

@@ -1,6 +1,7 @@
 
 T7368.hs:3:10:
-    Kind incompatibility when matching types:
+    Couldn't match kind ‘* -> *’ with ‘*’
+    When matching types
       c0 :: (* -> *) -> *
       (->) a0 :: * -> *
     Expected type: a0 -> b0

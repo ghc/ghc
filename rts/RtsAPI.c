@@ -367,9 +367,9 @@ rts_getBool (HaskellObj p)
 
     info = get_itbl((StgClosure *)UNTAG_CLOSURE(p));
     if (info->srt_bitmap == 0) { // srt_bitmap is the constructor tag
-	return 0;
+        return 0;
     } else {
-	return 1;
+        return 1;
     }
 }
 
@@ -429,7 +429,7 @@ void rts_eval (/* inout */ Capability **cap,
                /* out */   HaskellObj *ret)
 {
     StgTSO *tso;
-    
+
     tso = createGenThread(*cap, RtsFlags.GcFlags.initialStkSize, p);
     scheduleWaitThread(tso,ret,cap);
 }
@@ -453,8 +453,8 @@ void rts_evalIO (/* inout */ Capability **cap,
                  /* in    */ HaskellObj p,
                  /* out */   HaskellObj *ret)
 {
-    StgTSO* tso; 
-    
+    StgTSO* tso;
+
     tso = createStrictIOThread(*cap, RtsFlags.GcFlags.initialStkSize, p);
     scheduleWaitThread(tso,ret,cap);
 }
@@ -482,8 +482,8 @@ void rts_evalStableIO (/* inout */ Capability **cap,
     stat = rts_getSchedStatus(*cap);
 
     if (stat == Success && ret != NULL) {
-	ASSERT(r != NULL);
-	*ret = getStablePtr((StgPtr)r);
+        ASSERT(r != NULL);
+        *ret = getStablePtr((StgPtr)r);
     }
 }
 
@@ -519,12 +519,12 @@ rts_checkSchedStatus (char* site, Capability *cap)
     SchedulerStatus rc = cap->running_task->incall->stat;
     switch (rc) {
     case Success:
-	return;
+        return;
     case Killed:
-	errorBelch("%s: uncaught exception",site);
-	stg_exit(EXIT_FAILURE);
+        errorBelch("%s: uncaught exception",site);
+        stg_exit(EXIT_FAILURE);
     case Interrupted:
-	errorBelch("%s: interrupted", site);
+        errorBelch("%s: interrupted", site);
 #ifdef THREADED_RTS
         // The RTS is shutting down, and the process will probably
         // soon exit.  We don't want to preempt the shutdown
@@ -536,8 +536,8 @@ rts_checkSchedStatus (char* site, Capability *cap)
         stg_exit(EXIT_FAILURE);
 #endif
     default:
-	errorBelch("%s: Return code (%d) not ok",(site),(rc));	
-	stg_exit(EXIT_FAILURE);
+        errorBelch("%s: Return code (%d) not ok",(site),(rc));
+        stg_exit(EXIT_FAILURE);
     }
 }
 

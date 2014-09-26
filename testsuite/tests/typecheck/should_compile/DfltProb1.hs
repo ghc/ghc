@@ -2,6 +2,7 @@
 module DfltProb1 where
 
 import Control.Monad.ST
+import Prelude hiding (traverse)
 
 traverse :: a -> ST s [a]
 traverse = undefined

@@ -11,7 +11,7 @@ Pattern-matching literal patterns
 module MatchLit ( dsLit, dsOverLit, hsLitKey, hsOverLitKey
                 , tidyLitPat, tidyNPat
                 , matchLiterals, matchNPlusKPats, matchNPats
-                , warnAboutIdentities, warnAboutEmptyEnumerations 
+                , warnAboutIdentities, warnAboutEmptyEnumerations
                 ) where
 
 #include "HsVersions.h"
@@ -38,7 +38,6 @@ import TysWiredIn
 import Literal
 import SrcLoc
 import Data.Ratio
-import MonadUtils
 import Outputable
 import BasicTypes
 import DynFlags
@@ -47,7 +46,9 @@ import FastString
 import Control.Monad
 
 import Data.Int
+#if __GLASGOW_HASKELL__ < 709
 import Data.Traversable (traverse)
+#endif
 import Data.Word
 \end{code}
 
@@ -92,7 +93,7 @@ dsLit (HsInt i)        = do dflags <- getDynFlags
 dsLit (HsRat r ty) = do
    num   <- mkIntegerExpr (numerator (fl_value r))
    denom <- mkIntegerExpr (denominator (fl_value r))
-   return (mkConApp ratio_data_con [Type integer_ty, num, denom])
+   return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
   where
     (ratio_data_con, integer_ty)
         = case tcSplitTyConApp ty of
@@ -187,7 +188,7 @@ warnAboutOverflowedLiterals dflags lit
             , i > 0
             , not (xopt Opt_NegativeLiterals dflags)
             = ptext (sLit "If you are trying to write a large negative literal, use NegativeLiterals")
-            | otherwise = empty
+            | otherwise = Outputable.empty
 \end{code}
 
 Note [Suggest NegativeLiterals]
@@ -365,7 +366,7 @@ matchLiterals (var:vars) ty sub_groups
     wrap_str_guard eq_str (MachStr s, mr)
         = do { -- We now have to convert back to FastString. Perhaps there
                -- should be separate MachBytes and MachStr constructors?
-               s'     <- liftIO $ mkFastStringByteString s
+               let s'  = mkFastStringByteString s
              ; lit    <- mkStringExprFS s'
              ; let pred = mkApps (Var eq_str) [Var var, lit]
              ; return (mkGuardedMatchResult pred mr) }

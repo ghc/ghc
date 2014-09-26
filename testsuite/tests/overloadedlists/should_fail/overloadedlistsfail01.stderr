@@ -5,9 +5,8 @@ overloadedlistsfail01.hs:5:8:
     Note: there are several potential instances:
       instance Show Double -- Defined in ‘GHC.Float’
       instance Show Float -- Defined in ‘GHC.Float’
-      instance (Integral a, Show a) => Show (GHC.Real.Ratio a)
-        -- Defined in ‘GHC.Real’
-      ...plus 23 others
+      instance Show () -- Defined in ‘GHC.Show’
+      ...plus 22 others
     In the expression: print [1]
     In an equation for ‘main’: main = print [1]
 
@@ -28,9 +27,8 @@ overloadedlistsfail01.hs:5:15:
     Note: there are several potential instances:
       instance Num Double -- Defined in ‘GHC.Float’
       instance Num Float -- Defined in ‘GHC.Float’
-      instance Integral a => Num (GHC.Real.Ratio a)
-        -- Defined in ‘GHC.Real’
-      ...plus three others
+      instance Num Int -- Defined in ‘GHC.Num’
+      ...plus two others
     In the expression: 1
     In the first argument of ‘print’, namely ‘[1]’
     In the expression: print [1]

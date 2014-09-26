@@ -33,7 +33,7 @@ import InteractiveUI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 import Config
 import Constants
 import HscTypes
-import Packages         ( dumpPackages, simpleDumpPackages )
+import Packages         ( pprPackages, pprPackagesSimple, pprModuleMap )
 import DriverPhases
 import BasicTypes       ( failed )
 import StaticFlags
@@ -210,12 +210,17 @@ main' postLoadMode dflags0 args flagWarnings = do
 
         ---------------- Display configuration -----------
   case verbosity dflags6 of
-    v | v == 4 -> liftIO $ simpleDumpPackages dflags6
+    v | v == 4 -> liftIO $ dumpPackagesSimple dflags6
       | v >= 5 -> liftIO $ dumpPackages dflags6
       | otherwise -> return ()
 
   when (verbosity dflags6 >= 3) $ do
         liftIO $ hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
+
+
+  when (dopt Opt_D_dump_mod_map dflags6) . liftIO $
+    printInfoForUser (dflags6 { pprCols = 200 })
+                     (pkgQual dflags6) (pprModuleMap dflags6)
 
         ---------------- Final sanity checking -----------
   liftIO $ checkOptions postLoadMode dflags6 srcs objs
@@ -232,6 +237,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoInteractive          -> ghciUI srcs Nothing
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash srcs
+       ShowPackages           -> liftIO $ showPackages dflags6
 
   liftIO $ dumpFinalStats dflags6
 
@@ -339,16 +345,16 @@ checkOptions mode dflags srcs objs = do
 
 -- Compiler output options
 
--- called to verify that the output files & directories
--- point somewhere valid.
+-- Called to verify that the output files point somewhere valid.
 --
 -- The assumption is that the directory portion of these output
 -- options will have to exist by the time 'verifyOutputFiles'
 -- is invoked.
 --
+-- We create the directories for -odir, -hidir, -outputdir etc. ourselves if
+-- they don't exist, so don't check for those here (#2278).
 verifyOutputFiles :: DynFlags -> IO ()
 verifyOutputFiles dflags = do
-  -- not -odir: we create the directory for -odir if it doesn't exist (#2278).
   let ofile = outputFile dflags
   when (isJust ofile) $ do
      let fn = fromJust ofile
@@ -430,12 +436,15 @@ data PostLoadMode
   | DoInteractive           -- ghc --interactive
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
+  | ShowPackages            -- ghc --show-packages
 
-doMkDependHSMode, doMakeMode, doInteractiveMode, doAbiHashMode :: Mode
+doMkDependHSMode, doMakeMode, doInteractiveMode,
+  doAbiHashMode, showPackagesMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doAbiHashMode = mkPostLoadMode DoAbiHash
+showPackagesMode = mkPostLoadMode ShowPackages
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -528,6 +537,7 @@ mode_flags =
   , Flag "-show-options"         (PassFlag (setMode showOptionsMode))
   , Flag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
   , Flag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
+  , Flag "-show-packages"        (PassFlag (setMode showPackagesMode))
   ] ++
   [ Flag k'                      (PassFlag (setMode (printSetting k)))
   | k <- ["Project version",
@@ -767,6 +777,11 @@ countFS entries longest has_z (b:bs) =
   in
         countFS entries' longest' (has_z + has_zs) bs
 
+showPackages, dumpPackages, dumpPackagesSimple :: DynFlags -> IO ()
+showPackages       dflags = putStrLn (showSDoc dflags (pprPackages dflags))
+dumpPackages       dflags = putMsg dflags (pprPackages dflags)
+dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
+
 -- -----------------------------------------------------------------------------
 -- ABI hash support
 
@@ -822,7 +837,7 @@ unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
         "unrecognised flag: " ++ f ++ "\n" ++
         (case fuzzyMatch f (nub allFlags) of
             [] -> ""
-            suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs)) 
+            suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs))
 
 {- Note [-Bsymbolic and hooks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

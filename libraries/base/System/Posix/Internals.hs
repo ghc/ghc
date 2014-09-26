@@ -7,7 +7,7 @@
 -- Module      :  System.Posix.Internals
 -- Copyright   :  (c) The University of Glasgow, 1992-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (requires POSIX)
@@ -24,9 +24,6 @@ module System.Posix.Internals where
 
 #include "HsBaseConfig.h"
 
-#if ! (defined(mingw32_HOST_OS) || defined(__MINGW32__))
-import Control.Monad
-#endif
 import System.Posix.Types
 
 import Foreign
@@ -84,11 +81,11 @@ type FD = CInt
 -- stat()-related stuff
 
 fdFileSize :: FD -> IO Integer
-fdFileSize fd = 
+fdFileSize fd =
   allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry_ "fileSize" $
         c_fstat fd p_stat
-    c_mode <- st_mode p_stat :: IO CMode 
+    c_mode <- st_mode p_stat :: IO CMode
     if not (s_isreg c_mode)
         then return (-1)
         else do
@@ -106,7 +103,7 @@ fileType file =
 -- NOTE: On Win32 platforms, this will only work with file descriptors
 -- referring to file handles. i.e., it'll fail for socket FDs.
 fdStat :: FD -> IO (IODeviceType, CDev, CIno)
-fdStat fd = 
+fdStat fd =
   allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry_ "fdType" $
         c_fstat fd p_stat
@@ -114,7 +111,7 @@ fdStat fd =
     dev <- st_dev p_stat
     ino <- st_ino p_stat
     return (ty,dev,ino)
-    
+
 fdType :: FD -> IO IODeviceType
 fdType fd = do (ty,_,_) <- fdStat fd; return ty
 
@@ -129,7 +126,7 @@ statGetType p_stat = do
          -- Q: map char devices to RawDevice too?
         | s_isblk c_mode        -> return RawDevice
         | otherwise             -> ioError ioe_unknownfiletype
-    
+
 ioe_unknownfiletype :: IOException
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
                         "unknown file type"
@@ -144,7 +141,7 @@ fdGetMode _ = do
     let flags = o_RDWR
 #else
 fdGetMode fd = do
-    flags <- throwErrnoIfMinus1Retry "fdGetMode" 
+    flags <- throwErrnoIfMinus1Retry "fdGetMode"
                 (c_fcntl_read fd const_f_getfl)
 #endif
     let
@@ -157,7 +154,7 @@ fdGetMode fd = do
          | wH        = WriteMode
          | rwH       = ReadWriteMode
          | otherwise = ReadMode
-          
+
     return mode
 
 #ifdef mingw32_HOST_OS
@@ -204,7 +201,7 @@ getEcho fd = do
     return ((lflag .&. fromIntegral const_echo) /= 0)
 
 setCooked :: FD -> Bool -> IO ()
-setCooked fd cooked = 
+setCooked fd cooked =
   tcSetAttr fd $ \ p_tios -> do
 
     -- turn on/off ICANON
@@ -280,7 +277,7 @@ setCooked fd cooked = do
    else return ()
 
 ioe_unk_error :: String -> String -> IOException
-ioe_unk_error loc msg 
+ioe_unk_error loc msg
  = ioeSetErrorString (mkIOError OtherError loc Nothing Nothing) msg
 
 -- Note: echoing goes hand in hand with enabling 'line input' / raw-ness
@@ -323,7 +320,7 @@ setNonBlockingFD fd set = do
                  (c_fcntl_read fd const_f_getfl)
   let flags' | set       = flags .|. o_NONBLOCK
              | otherwise = flags .&. complement o_NONBLOCK
-  unless (flags == flags') $ do
+  when (flags /= flags') $ do
     -- An error when setting O_NONBLOCK isn't fatal: on some systems
     -- there are certain file handles on which this will fail (eg. /dev/null
     -- on FreeBSD) so we throw away the return code from fcntl_write.
@@ -441,7 +438,7 @@ foreign import capi unsafe "HsBase.h fcntl"
    c_fcntl_lock  :: CInt -> CInt -> Ptr CFLock -> IO CInt
 
 foreign import ccall unsafe "HsBase.h fork"
-   c_fork :: IO CPid 
+   c_fork :: IO CPid
 
 foreign import ccall unsafe "HsBase.h link"
    c_link :: CString -> CString -> IO CInt

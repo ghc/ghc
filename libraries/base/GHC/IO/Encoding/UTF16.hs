@@ -11,7 +11,7 @@
 -- Module      :  GHC.IO.Encoding.UTF16
 -- Copyright   :  (c) The University of Glasgow, 2009
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
@@ -47,7 +47,6 @@ import GHC.IO.Encoding.Failure
 import GHC.IO.Encoding.Types
 import GHC.Word
 import Data.Bits
-import Data.Maybe
 import GHC.IORef
 
 -- -----------------------------------------------------------------------------
@@ -199,10 +198,10 @@ utf16le_EF cfm =
 
 
 utf16be_decode :: DecodeBuffer
-utf16be_decode 
+utf16be_decode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
- = let 
+ = let
        loop !ir !ow
          | ow >= os     = done OutputUnderflow ir ow
          | ir >= iw     = done InputUnderflow ir ow
@@ -233,10 +232,10 @@ utf16be_decode
     loop ir0 ow0
 
 utf16le_decode :: DecodeBuffer
-utf16le_decode 
+utf16le_decode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
- = let 
+ = let
        loop !ir !ow
          | ow >= os     = done OutputUnderflow ir ow
          | ir >= iw     = done InputUnderflow ir ow
@@ -270,7 +269,7 @@ utf16be_encode :: EncodeBuffer
 utf16be_encode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
- = let 
+ = let
       done why !ir !ow = return (why,
                                  if ir == iw then input{ bufL=0, bufR=0 }
                                              else input{ bufL=ir },
@@ -287,7 +286,7 @@ utf16be_encode
                     loop ir' (ow+2)
                | otherwise -> do
                     if os - ow < 4 then done OutputUnderflow ir ow else do
-                    let 
+                    let
                          n1 = x - 0x10000
                          c1 = fromIntegral (n1 `shiftR` 18 + 0xD8)
                          c2 = fromIntegral (n1 `shiftR` 10)
@@ -324,7 +323,7 @@ utf16le_encode
                     loop ir' (ow+2)
                | otherwise ->
                     if os - ow < 4 then done OutputUnderflow ir ow else do
-                    let 
+                    let
                          n1 = x - 0x10000
                          c1 = fromIntegral (n1 `shiftR` 18 + 0xD8)
                          c2 = fromIntegral (n1 `shiftR` 10)

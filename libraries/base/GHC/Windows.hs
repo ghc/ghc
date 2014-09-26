@@ -6,7 +6,7 @@
 -- Module      :  GHC.Windows
 -- Copyright   :  (c) The University of Glasgow, 2009
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
@@ -58,7 +58,7 @@ module GHC.Windows (
     ) where
 
 import Data.Char
-import Data.List
+import Data.OldList
 import Data.Maybe
 import Data.Word
 import Foreign.C.Error

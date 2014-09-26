@@ -3,21 +3,15 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 
-	Arity and eta expansion
+        Arity and eta expansion
 
 \begin{code}
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
--- | Arit and eta expansion
+-- | Arity and eta expansion
 module CoreArity (
-	manifestArity, exprArity, typeArity, exprBotStrictness_maybe,
-	exprEtaExpandArity, findRhsArity, CheapFun, etaExpand
+        manifestArity, exprArity, typeArity, exprBotStrictness_maybe,
+        exprEtaExpandArity, findRhsArity, CheapFun, etaExpand
     ) where
 
 #include "HsVersions.h"
@@ -31,7 +25,7 @@ import Var
 import VarEnv
 import Id
 import Type
-import TyCon	( initRecTc, checkRecTc )
+import TyCon    ( initRecTc, checkRecTc )
 import Coercion
 import BasicTypes
 import Unique
@@ -43,9 +37,9 @@ import Util     ( debugIsOn )
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
               manifestArity and exprArity
-%*									*
+%*                                                                      *
 %************************************************************************
 
 exprArity is a cheap-and-cheerful version of exprEtaExpandArity.
@@ -53,52 +47,52 @@ It tells how many things the expression can be applied to before doing
 any work.  It doesn't look inside cases, lets, etc.  The idea is that
 exprEtaExpandArity will do the hard work, leaving something that's easy
 for exprArity to grapple with.  In particular, Simplify uses exprArity to
-compute the ArityInfo for the Id. 
+compute the ArityInfo for the Id.
 
 Originally I thought that it was enough just to look for top-level lambdas, but
 it isn't.  I've seen this
 
-	foo = PrelBase.timesInt
+        foo = PrelBase.timesInt
 
 We want foo to get arity 2 even though the eta-expander will leave it
 unchanged, in the expectation that it'll be inlined.  But occasionally it
-isn't, because foo is blacklisted (used in a rule).  
+isn't, because foo is blacklisted (used in a rule).
 
-Similarly, see the ok_note check in exprEtaExpandArity.  So 
-	f = __inline_me (\x -> e)
+Similarly, see the ok_note check in exprEtaExpandArity.  So
+        f = __inline_me (\x -> e)
 won't be eta-expanded.
 
 And in any case it seems more robust to have exprArity be a bit more intelligent.
-But note that 	(\x y z -> f x y z)
+But note that   (\x y z -> f x y z)
 should have arity 3, regardless of f's arity.
 
 \begin{code}
 manifestArity :: CoreExpr -> Arity
 -- ^ manifestArity sees how many leading value lambdas there are,
 --   after looking through casts
-manifestArity (Lam v e) | isId v    	= 1 + manifestArity e
-			| otherwise 	= manifestArity e
+manifestArity (Lam v e) | isId v        = 1 + manifestArity e
+                        | otherwise     = manifestArity e
 manifestArity (Tick t e) | not (tickishIsCode t) =  manifestArity e
-manifestArity (Cast e _)            	= manifestArity e
-manifestArity _                     	= 0
+manifestArity (Cast e _)                = manifestArity e
+manifestArity _                         = 0
 
 ---------------
 exprArity :: CoreExpr -> Arity
 -- ^ An approximate, fast, version of 'exprEtaExpandArity'
 exprArity e = go e
   where
-    go (Var v) 	       	           = idArity v
-    go (Lam x e) | isId x    	   = go e + 1
-    		 | otherwise 	   = go e
+    go (Var v)                     = idArity v
+    go (Lam x e) | isId x          = go e + 1
+                 | otherwise       = go e
     go (Tick t e) | not (tickishIsCode t) = go e
     go (Cast e co)                 = trim_arity (go e) (pSnd (coercionKind co))
                                         -- Note [exprArity invariant]
     go (App e (Type _))            = go e
     go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
         -- See Note [exprArity for applications]
-	-- NB: coercions count as a value argument
+        -- NB: coercions count as a value argument
 
-    go _		       	   = 0
+    go _                           = 0
 
     trim_arity :: Arity -> Type -> Arity
     trim_arity arity ty = arity `min` length (typeArity ty)
@@ -108,26 +102,26 @@ typeArity :: Type -> [OneShotInfo]
 -- How many value arrows are visible in the type?
 -- We look through foralls, and newtypes
 -- See Note [exprArity invariant]
-typeArity ty 
+typeArity ty
   = go initRecTc ty
   where
-    go rec_nts ty 
-      | Just (_, ty')  <- splitForAllTy_maybe ty 
+    go rec_nts ty
+      | Just (_, ty')  <- splitForAllTy_maybe ty
       = go rec_nts ty'
 
-      | Just (arg,res) <- splitFunTy_maybe ty    
+      | Just (arg,res) <- splitFunTy_maybe ty
       = typeOneShot arg : go rec_nts res
-      | Just (tc,tys) <- splitTyConApp_maybe ty 
+      | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
       , Just rec_nts' <- checkRecTc rec_nts tc  -- See Note [Expanding newtypes]
                                                 -- in TyCon
---   , not (isClassTyCon tc)	-- Do not eta-expand through newtype classes
---    		      		-- See Note [Newtype classes and eta expansion]
+--   , not (isClassTyCon tc)    -- Do not eta-expand through newtype classes
+--                              -- See Note [Newtype classes and eta expansion]
 --                              (no longer required)
       = go rec_nts' ty'
-  	-- Important to look through non-recursive newtypes, so that, eg 
-  	--	(f x)   where f has arity 2, f :: Int -> IO ()
-  	-- Here we want to get arity 1 for the result!
+        -- Important to look through non-recursive newtypes, so that, eg
+        --      (f x)   where f has arity 2, f :: Int -> IO ()
+        -- Here we want to get arity 1 for the result!
         --
         -- AND through a layer of recursive newtypes
         -- e.g. newtype Stream m a b = Stream (m (Either b (a, Stream m a b)))
@@ -142,8 +136,8 @@ exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
 -- float-out
 exprBotStrictness_maybe e
   = case getBotArity (arityType env e) of
-	Nothing -> Nothing
-	Just ar -> Just (ar, sig ar)
+        Nothing -> Nothing
+        Just ar -> Just (ar, sig ar)
   where
     env    = AE { ae_ped_bot = True, ae_cheap_fn = \ _ _ -> False }
     sig ar = mkClosedStrictSig (replicate ar topDmd) botRes
@@ -156,19 +150,19 @@ exprArity has the following invariant:
 
   (1) If typeArity (exprType e) = n,
       then manifestArity (etaExpand e n) = n
- 
+
       That is, etaExpand can always expand as much as typeArity says
       So the case analysis in etaExpand and in typeArity must match
- 
-  (2) exprArity e <= typeArity (exprType e)      
+
+  (2) exprArity e <= typeArity (exprType e)
 
   (3) Hence if (exprArity e) = n, then manifestArity (etaExpand e n) = n
 
-      That is, if exprArity says "the arity is n" then etaExpand really 
+      That is, if exprArity says "the arity is n" then etaExpand really
       can get "n" manifest lambdas to the top.
 
-Why is this important?  Because 
-  - In TidyPgm we use exprArity to fix the *final arity* of 
+Why is this important?  Because
+  - In TidyPgm we use exprArity to fix the *final arity* of
     each top-level Id, and in
   - In CorePrep we use etaExpand on each rhs, so that the visible lambdas
     actually match that arity, which in turn means
@@ -186,9 +180,9 @@ Note [Newtype classes and eta expansion]
 
 -------- Old out of date comments, just for interest -----------
 We have to be careful when eta-expanding through newtypes.  In general
-it's a good idea, but annoyingly it interacts badly with the class-op 
+it's a good idea, but annoyingly it interacts badly with the class-op
 rule mechanism.  Consider
- 
+
    class C a where { op :: a -> a }
    instance C b => C [b] where
      op x = ...
@@ -206,7 +200,7 @@ These translate to
 
 Now suppose we have:
 
-   dCInt :: C Int    
+   dCInt :: C Int
 
    blah :: [Int] -> [Int]
    blah = op ($dfList dCInt)
@@ -230,7 +224,7 @@ The test simplCore/should_compile/T3722 is an excellent example.
 Note [exprArity for applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we come to an application we check that the arg is trivial.
-   eg  f (fac x) does not have arity 2, 
+   eg  f (fac x) does not have arity 2,
                  even if f has arity 3!
 
 * We require that is trivial rather merely cheap.  Suppose f has arity 2.
@@ -245,9 +239,9 @@ When we come to an application we check that the arg is trivial.
 
 
 %************************************************************************
-%*									*
-	   Computing the "arity" of an expression
-%*									*
+%*                                                                      *
+           Computing the "arity" of an expression
+%*                                                                      *
 %************************************************************************
 
 Note [Definition of arity]
@@ -275,7 +269,7 @@ It's all a bit more subtle than it looks:
 Note [One-shot lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Consider one-shot lambdas
-		let x = expensive in \y z -> E
+                let x = expensive in \y z -> E
 We want this to have arity 1 if the \y-abstraction is a 1-shot lambda.
 
 Note [Dealing with bottom]
@@ -291,21 +285,21 @@ In this case we do eta-expand, in order to get that \s to the
 top, and give f arity 2.
 
 This isn't really right in the presence of seq.  Consider
-	(f bot) `seq` 1
+        (f bot) `seq` 1
 
 This should diverge!  But if we eta-expand, it won't.  We ignore this
 "problem" (unless -fpedantic-bottoms is on), because being scrupulous
-would lose an important transformation for many programs. (See 
+would lose an important transformation for many programs. (See
 Trac #5587 for an example.)
 
 Consider also
-	f = \x -> error "foo"
+        f = \x -> error "foo"
 Here, arity 1 is fine.  But if it is
-	f = \x -> case x of 
-			True  -> error "foo"
-			False -> \y -> x+y
+        f = \x -> case x of
+                        True  -> error "foo"
+                        False -> \y -> x+y
 then we want to get arity 2.  Technically, this isn't quite right, because
-	(f True) `seq` 1
+        (f True) `seq` 1
 should diverge, but it'll converge if we eta-expand f.  Nevertheless, we
 do so; it improves some programs significantly, and increasing convergence
 isn't a bad thing.  Hence the ABot/ATop in ArityType.
@@ -318,11 +312,11 @@ this transformation.  So we try to limit it as much as possible:
        case undefined of { (a,b) -> \y -> e }
      This showed up in Trac #5557
 
- (2) Do NOT move a lambda outside a case if all the branches of 
+ (2) Do NOT move a lambda outside a case if all the branches of
      the case are known to return bottom.
         case x of { (a,b) -> \y -> error "urk" }
-     This case is less important, but the idea is that if the fn is 
-     going to diverge eventually anyway then getting the best arity 
+     This case is less important, but the idea is that if the fn is
+     going to diverge eventually anyway then getting the best arity
      isn't an issue, so we might as well play safe
 
  (3) Do NOT move a lambda outside a case unless
@@ -337,34 +331,34 @@ Of course both (1) and (2) are readily defeated by disguising the bottoms.
 Non-recursive newtypes are transparent, and should not get in the way.
 We do (currently) eta-expand recursive newtypes too.  So if we have, say
 
-	newtype T = MkT ([T] -> Int)
+        newtype T = MkT ([T] -> Int)
 
 Suppose we have
-	e = coerce T f
-where f has arity 1.  Then: etaExpandArity e = 1; 
+        e = coerce T f
+where f has arity 1.  Then: etaExpandArity e = 1;
 that is, etaExpandArity looks through the coerce.
 
 When we eta-expand e to arity 1: eta_expand 1 e T
-we want to get: 		 coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
+we want to get:                  coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
 
   HOWEVER, note that if you use coerce bogusly you can ge
-  	coerce Int negate
+        coerce Int negate
   And since negate has arity 2, you might try to eta expand.  But you can't
   decopose Int to a function type.   Hence the final case in eta_expand.
-  
+
 Note [The state-transformer hack]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have 
-	f = e
+Suppose we have
+        f = e
 where e has arity n.  Then, if we know from the context that f has
 a usage type like
-	t1 -> ... -> tn -1-> t(n+1) -1-> ... -1-> tm -> ...
+        t1 -> ... -> tn -1-> t(n+1) -1-> ... -1-> tm -> ...
 then we can expand the arity to m.  This usage type says that
 any application (x e1 .. en) will be applied to uniquely to (m-n) more args
-Consider f = \x. let y = <expensive> 
-		 in case x of
-		      True  -> foo
-		      False -> \(s:RealWorld) -> e
+Consider f = \x. let y = <expensive>
+                 in case x of
+                      True  -> foo
+                      False -> \(s:RealWorld) -> e
 where foo has arity 1.  Then we want the state hack to
 apply to foo too, so we can eta expand the case.
 
@@ -409,16 +403,16 @@ This arose in another guise in Trac #3959.  Here we had
      catch# (throw exn >> return ())
 
 Note that (throw :: forall a e. Exn e => e -> a) is called with [a = IO ()].
-After inlining (>>) we get 
+After inlining (>>) we get
 
      catch# (\_. throw {IO ()} exn)
 
-We must *not* eta-expand to 
+We must *not* eta-expand to
 
      catch# (\_ _. throw {...} exn)
 
 because 'catch#' expects to get a (# _,_ #) after applying its argument to
-a State#, not another function!  
+a State#, not another function!
 
 In short, we use the state hack to allow us to push let inside a lambda,
 but not to introduce a new lambda.
@@ -430,24 +424,24 @@ ArityType is the result of a compositional analysis on expressions,
 from which we can decide the real arity of the expression (extracted
 with function exprEtaExpandArity).
 
-Here is what the fields mean. If an arbitrary expression 'f' has 
+Here is what the fields mean. If an arbitrary expression 'f' has
 ArityType 'at', then
 
  * If at = ABot n, then (f x1..xn) definitely diverges. Partial
    applications to fewer than n args may *or may not* diverge.
 
    We allow ourselves to eta-expand bottoming functions, even
-   if doing so may lose some `seq` sharing, 
+   if doing so may lose some `seq` sharing,
        let x = <expensive> in \y. error (g x y)
        ==> \y. let x = <expensive> in error (g x y)
 
- * If at = ATop as, and n=length as, 
-   then expanding 'f' to (\x1..xn. f x1 .. xn) loses no sharing, 
+ * If at = ATop as, and n=length as,
+   then expanding 'f' to (\x1..xn. f x1 .. xn) loses no sharing,
    assuming the calls of f respect the one-shot-ness of of
-   its definition.  
+   its definition.
 
    NB 'f' is an arbitary expression, eg (f = g e1 e2).  This 'f'
-   can have ArityType as ATop, with length as > 0, only if e1 e2 are 
+   can have ArityType as ATop, with length as > 0, only if e1 e2 are
    themselves.
 
  * In both cases, f, (f x1), ... (f x1 ... f(n-1)) are definitely
@@ -457,8 +451,8 @@ ArityType 'at', then
    So eta expansion is dynamically ok; see Note [State hack and
    bottoming functions], the part about catch#
 
-Example: 
-      f = \x\y. let v = <expensive> in 
+Example:
+      f = \x\y. let v = <expensive> in
           \s(one-shot) \t(one-shot). blah
       'f' has ArityType [ManyShot,ManyShot,OneShot,OneShot]
       The one-shot-ness means we can, in effect, push that
@@ -467,8 +461,8 @@ Example:
 
 Suppose f = \xy. x+y
 Then  f             :: AT [False,False] ATop
-      f v           :: AT [False] 	ATop
-      f <expensive> :: AT [] 	        ATop
+      f v           :: AT [False]       ATop
+      f <expensive> :: AT []            ATop
 
 -------------------- Main arity code ----------------------------
 \begin{code}
@@ -478,13 +472,13 @@ data ArityType = ATop [OneShotInfo] | ABot Arity
      -- to justify the [OneShot], or the Arity
 
 vanillaArityType :: ArityType
-vanillaArityType = ATop []	-- Totally uninformative
+vanillaArityType = ATop []      -- Totally uninformative
 
 -- ^ The Arity returned is the number of value args the
 -- expression can be applied to without doing much work
 exprEtaExpandArity :: DynFlags -> CoreExpr -> Arity
 -- exprEtaExpandArity is used when eta expanding
--- 	e  ==>  \xy -> e x y
+--      e  ==>  \xy -> e x y
 exprEtaExpandArity dflags e
   = case (arityType env e) of
       ATop oss -> length oss
@@ -548,11 +542,11 @@ findRhsArity dflags bndr rhs old_arity
 -- expression can be applied to without doing much work
 rhsEtaExpandArity :: DynFlags -> CheapAppFun -> CoreExpr -> Arity
 -- exprEtaExpandArity is used when eta expanding
--- 	e  ==>  \xy -> e x y
+--      e  ==>  \xy -> e x y
 rhsEtaExpandArity dflags cheap_app e
   = case (arityType env e) of
       ATop (os:oss)
-        | isOneShotInfo os || has_lam e -> 1 + length oss  
+        | isOneShotInfo os || has_lam e -> 1 + length oss
                                    -- Don't expand PAPs/thunks
                                    -- Note [Eta expanding thunks]
         | otherwise       -> 0
@@ -602,13 +596,13 @@ dictionary bindings.  This improves arities. Thereby, it also
 means that full laziness is less prone to floating out the
 application of a function to its dictionary arguments, which
 can thereby lose opportunities for fusion.  Example:
-	foo :: Ord a => a -> ...
+        foo :: Ord a => a -> ...
      foo = /\a \(d:Ord a). let d' = ...d... in \(x:a). ....
-     	-- So foo has arity 1
+        -- So foo has arity 1
 
      f = \x. foo dInt $ bar x
 
-The (foo DInt) is floated out, and makes ineffective a RULE 
+The (foo DInt) is floated out, and makes ineffective a RULE
      foo (bar x) = ...
 
 One could go further and make exprIsCheap reply True to any
@@ -626,12 +620,12 @@ We don't eta-expand
 
 When we see
      f = case y of p -> \x -> blah
-should we eta-expand it? Well, if 'x' is a one-shot state token 
+should we eta-expand it? Well, if 'x' is a one-shot state token
 then 'yes' because 'f' will only be applied once.  But otherwise
 we (conservatively) say no.  My main reason is to avoid expanding
 PAPSs
-	f = g d  ==>  f = \x. g d x
-because that might in turn make g inline (if it has an inline pragma), 
+        f = g d  ==>  f = \x. g d x
+because that might in turn make g inline (if it has an inline pragma),
 which we might not want.  After all, INLINE pragmas say "inline only
 when saturated" so we don't want to be too gung-ho about saturating!
 
@@ -662,7 +656,7 @@ andArityType (ABot n1) (ABot n2)
 andArityType (ATop as)  (ABot _)  = ATop as
 andArityType (ABot _)   (ATop bs) = ATop bs
 andArityType (ATop as)  (ATop bs) = ATop (as `combine` bs)
-  where	     -- See Note [Combining case branches]
+  where      -- See Note [Combining case branches]
     combine (a:as) (b:bs) = (a `bestOneShot` b) : combine as bs
     combine []     bs     = takeWhile isOneShotInfo bs
     combine as     []     = takeWhile isOneShotInfo as
@@ -689,11 +683,11 @@ basis that if we know one branch is one-shot, then they all must be.
 \begin{code}
 ---------------------------
 type CheapFun = CoreExpr -> Maybe Type -> Bool
-     	-- How to decide if an expression is cheap
-	-- If the Maybe is Just, the type is the type
-	-- of the expression; Nothing means "don't know"
+        -- How to decide if an expression is cheap
+        -- If the Maybe is Just, the type is the type
+        -- of the expression; Nothing means "don't know"
 
-data ArityEnv 
+data ArityEnv
   = AE { ae_cheap_fn :: CheapFun
        , ae_ped_bot  :: Bool       -- True <=> be pedantic about bottoms
   }
@@ -723,37 +717,37 @@ arityType _ (Var v)
   | otherwise
   = ATop (take (idArity v) one_shots)
   where
-    one_shots :: [OneShotInfo]	-- One-shot-ness derived from the type
+    one_shots :: [OneShotInfo]  -- One-shot-ness derived from the type
     one_shots = typeArity (idType v)
 
-	-- Lambdas; increase arity
+        -- Lambdas; increase arity
 arityType env (Lam x e)
   | isId x    = arityLam x (arityType env e)
   | otherwise = arityType env e
 
-	-- Applications; decrease arity, except for types
+        -- Applications; decrease arity, except for types
 arityType env (App fun (Type _))
    = arityType env fun
 arityType env (App fun arg )
    = arityApp (arityType env fun) (ae_cheap_fn env arg Nothing)
 
-	-- Case/Let; keep arity if either the expression is cheap
-	-- or it's a 1-shot lambda
-	-- The former is not really right for Haskell
-	--	f x = case x of { (a,b) -> \y. e }
-	--  ===>
-	--	f x y = case x of { (a,b) -> e }
-	-- The difference is observable using 'seq'
-	--
+        -- Case/Let; keep arity if either the expression is cheap
+        -- or it's a 1-shot lambda
+        -- The former is not really right for Haskell
+        --      f x = case x of { (a,b) -> \y. e }
+        --  ===>
+        --      f x y = case x of { (a,b) -> e }
+        -- The difference is observable using 'seq'
+        --
 arityType env (Case scrut _ _ alts)
   | exprIsBottom scrut || null alts
   = ABot 0     -- Do not eta expand
                -- See Note [Dealing with bottom (1)]
   | otherwise
   = case alts_type of
-     ABot n  | n>0       -> ATop []    -- Don't eta expand 
-     	     | otherwise -> ABot 0     -- if RHS is bottomming
-    			               -- See Note [Dealing with bottom (2)]
+     ABot n  | n>0       -> ATop []    -- Don't eta expand
+             | otherwise -> ABot 0     -- if RHS is bottomming
+                                       -- See Note [Dealing with bottom (2)]
 
      ATop as | not (ae_ped_bot env)    -- See Note [Dealing with bottom (3)]
              , ae_cheap_fn env scrut Nothing -> ATop as
@@ -762,7 +756,7 @@ arityType env (Case scrut _ _ alts)
   where
     alts_type = foldr1 andArityType [arityType env rhs | (_,_,rhs) <- alts]
 
-arityType env (Let b e) 
+arityType env (Let b e)
   = floatIn (cheap_bind b) (arityType env e)
   where
     cheap_bind (NonRec b e) = is_cheap (b,e)
@@ -774,32 +768,32 @@ arityType env (Tick t e)
 
 arityType _ _ = vanillaArityType
 \end{code}
-  
-  
+
+
 %************************************************************************
-%*									*
-              The main eta-expander								
-%*									*
+%*                                                                      *
+              The main eta-expander
+%*                                                                      *
 %************************************************************************
 
 We go for:
    f = \x1..xn -> N  ==>   f = \x1..xn y1..ym -> N y1..ym
-				 (n >= 0)
+                                 (n >= 0)
 
-where (in both cases) 
+where (in both cases)
 
-	* The xi can include type variables
+        * The xi can include type variables
 
-	* The yi are all value variables
+        * The yi are all value variables
 
-	* N is a NORMAL FORM (i.e. no redexes anywhere)
-	  wanting a suitable number of extra args.
+        * N is a NORMAL FORM (i.e. no redexes anywhere)
+          wanting a suitable number of extra args.
 
 The biggest reason for doing this is for cases like
 
-	f = \x -> case x of
-		    True  -> \y -> e1
-		    False -> \y -> e2
+        f = \x -> case x of
+                    True  -> \y -> e1
+                    False -> \y -> e2
 
 Here we want to get the lambdas together.  A good example is the nofib
 program fibheaps, which gets 25% more allocation if you don't do this
@@ -818,15 +812,15 @@ returns a CoreExpr satisfying the same invariant. See Note [Eta
 expansion and the CorePrep invariants] in CorePrep.
 
 This means the eta-expander has to do a bit of on-the-fly
-simplification but it's not too hard.  The alernative, of relying on 
+simplification but it's not too hard.  The alernative, of relying on
 a subsequent clean-up phase of the Simplifier to de-crapify the result,
 means you can't really use it in CorePrep, which is painful.
 
 Note [Eta expansion and SCCs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Note that SCCs are not treated specially by etaExpand.  If we have
-	etaExpand 2 (\x -> scc "foo" e)
-	= (\xy -> (scc "foo" e) y)
+        etaExpand 2 (\x -> scc "foo" e)
+        = (\xy -> (scc "foo" e) y)
 So the costs of evaluating 'e' (not 'e y') are attributed to "foo"
 
 \begin{code}
@@ -840,14 +834,14 @@ So the costs of evaluating 'e' (not 'e y') are attributed to "foo"
 -- We should have that:
 --
 -- > ty = exprType e = exprType e'
-etaExpand :: Arity	  	-- ^ Result should have this number of value args
-	  -> CoreExpr	        -- ^ Expression to expand
-	  -> CoreExpr
+etaExpand :: Arity              -- ^ Result should have this number of value args
+          -> CoreExpr           -- ^ Expression to expand
+          -> CoreExpr
 -- etaExpand deals with for-alls. For example:
---		etaExpand 1 E
+--              etaExpand 1 E
 -- where  E :: forall a. a -> a
 -- would return
---	(/\b. \y::a -> E b y)
+--      (/\b. \y::a -> E b y)
 --
 -- It deals with coerces too, though they are now rare
 -- so perhaps the extra code isn't worth it
@@ -859,20 +853,20 @@ etaExpand n orig_expr
       -- Note [Eta expansion and SCCs]
     go 0 expr = expr
     go n (Lam v body) | isTyVar v = Lam v (go n     body)
-       	              | otherwise = Lam v (go (n-1) body)
+                      | otherwise = Lam v (go (n-1) body)
     go n (Cast expr co) = Cast (go n expr) co
     go n expr           = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, ppr etas]) $
-       	 		  etaInfoAbs etas (etaInfoApp subst' expr etas)
-    	  		where
-			    in_scope = mkInScopeSet (exprFreeVars expr)
-			    (in_scope', etas) = mkEtaWW n orig_expr in_scope (exprType expr)
-			    subst' = mkEmptySubst in_scope'
+                          etaInfoAbs etas (etaInfoApp subst' expr etas)
+                        where
+                            in_scope = mkInScopeSet (exprFreeVars expr)
+                            (in_scope', etas) = mkEtaWW n orig_expr in_scope (exprType expr)
+                            subst' = mkEmptySubst in_scope'
 
-      	      	       	        -- Wrapper    Unwrapper
+                                -- Wrapper    Unwrapper
 --------------
-data EtaInfo = EtaVar Var	-- /\a. [],   [] a
-     	                 	-- \x.  [],   [] x
-	     | EtaCo Coercion   -- [] |> co,  [] |> (sym co)
+data EtaInfo = EtaVar Var       -- /\a. [],   [] a
+                                -- \x.  [],   [] x
+             | EtaCo Coercion   -- [] |> co,  [] |> (sym co)
 
 instance Outputable EtaInfo where
    ppr (EtaVar v) = ptext (sLit "EtaVar") <+> ppr v
@@ -881,7 +875,7 @@ instance Outputable EtaInfo where
 pushCoercion :: Coercion -> [EtaInfo] -> [EtaInfo]
 pushCoercion co1 (EtaCo co2 : eis)
   | isReflCo co = eis
-  | otherwise	= EtaCo co : eis
+  | otherwise   = EtaCo co : eis
   where
     co = co1 `mkTransCo` co2
 
@@ -895,10 +889,10 @@ etaInfoAbs (EtaCo co : eis) expr = Cast (etaInfoAbs eis expr) (mkSymCo co)
 
 --------------
 etaInfoApp :: Subst -> CoreExpr -> [EtaInfo] -> CoreExpr
--- (etaInfoApp s e eis) returns something equivalent to 
--- 	       ((substExpr s e) `appliedto` eis)
+-- (etaInfoApp s e eis) returns something equivalent to
+--             ((substExpr s e) `appliedto` eis)
 
-etaInfoApp subst (Lam v1 e) (EtaVar v2 : eis) 
+etaInfoApp subst (Lam v1 e) (EtaVar v2 : eis)
   = etaInfoApp (CoreSubst.extendSubstWithVar subst v1 v2) e eis
 
 etaInfoApp subst (Cast e co1) eis
@@ -906,20 +900,20 @@ etaInfoApp subst (Cast e co1) eis
   where
     co' = CoreSubst.substCo subst co1
 
-etaInfoApp subst (Case e b ty alts) eis 
+etaInfoApp subst (Case e b ty alts) eis
   = Case (subst_expr subst e) b1 (mk_alts_ty (CoreSubst.substTy subst ty) eis) alts'
   where
     (subst1, b1) = substBndr subst b
     alts' = map subst_alt alts
-    subst_alt (con, bs, rhs) = (con, bs', etaInfoApp subst2 rhs eis) 
-    	      where
-	      	 (subst2,bs') = substBndrs subst1 bs
+    subst_alt (con, bs, rhs) = (con, bs', etaInfoApp subst2 rhs eis)
+              where
+                 (subst2,bs') = substBndrs subst1 bs
 
     mk_alts_ty ty []               = ty
     mk_alts_ty ty (EtaVar v : eis) = mk_alts_ty (applyTypeToArg ty (varToCoreExpr v)) eis
     mk_alts_ty _  (EtaCo co : eis) = mk_alts_ty (pSnd (coercionKind co)) eis
-    
-etaInfoApp subst (Let b e) eis 
+
+etaInfoApp subst (Let b e) eis
   = Let b' (etaInfoApp subst' e eis)
   where
     (subst', b') = subst_bind subst b
@@ -936,18 +930,18 @@ etaInfoApp subst e eis
 
 --------------
 mkEtaWW :: Arity -> CoreExpr -> InScopeSet -> Type
-	-> (InScopeSet, [EtaInfo])
-	-- EtaInfo contains fresh variables,
-	--   not free in the incoming CoreExpr
-	-- Outgoing InScopeSet includes the EtaInfo vars
-	--   and the original free vars
+        -> (InScopeSet, [EtaInfo])
+        -- EtaInfo contains fresh variables,
+        --   not free in the incoming CoreExpr
+        -- Outgoing InScopeSet includes the EtaInfo vars
+        --   and the original free vars
 
 mkEtaWW orig_n orig_expr in_scope orig_ty
   = go orig_n empty_subst orig_ty []
   where
     empty_subst = TvSubst in_scope emptyTvSubstEnv
 
-    go n subst ty eis	    -- See Note [exprArity invariant]
+    go n subst ty eis       -- See Note [exprArity invariant]
        | n == 0
        = (getTvInScope subst, reverse eis)
 
@@ -957,29 +951,29 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
        = go n subst' ty' (EtaVar tv' : eis)
 
        | Just (arg_ty, res_ty) <- splitFunTy_maybe ty
-       , let (subst', eta_id') = freshEtaId n subst arg_ty 
+       , let (subst', eta_id') = freshEtaId n subst arg_ty
            -- Avoid free vars of the original expression
        = go (n-1) subst' res_ty (EtaVar eta_id' : eis)
-       				   
+
        | Just (co, ty') <- topNormaliseNewType_maybe ty
-       = 	-- Given this:
-       		-- 	newtype T = MkT ([T] -> Int)
-       		-- Consider eta-expanding this
-       		--  	eta_expand 1 e T
-       		-- We want to get
-       		--	coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
+       =        -- Given this:
+                --      newtype T = MkT ([T] -> Int)
+                -- Consider eta-expanding this
+                --      eta_expand 1 e T
+                -- We want to get
+                --      coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
          go n subst ty' (EtaCo co : eis)
 
-       | otherwise	 -- We have an expression of arity > 0, 
-       	 		 -- but its type isn't a function. 		   
+       | otherwise       -- We have an expression of arity > 0,
+                         -- but its type isn't a function.
        = WARN( True, (ppr orig_n <+> ppr orig_ty) $$ ppr orig_expr )
          (getTvInScope subst, reverse eis)
-    	-- This *can* legitmately happen:
-    	-- e.g.  coerce Int (\x. x) Essentially the programmer is
-	-- playing fast and loose with types (Happy does this a lot).
-	-- So we simply decline to eta-expand.  Otherwise we'd end up
-	-- with an explicit lambda having a non-function type
-   
+        -- This *can* legitmately happen:
+        -- e.g.  coerce Int (\x. x) Essentially the programmer is
+        -- playing fast and loose with types (Happy does this a lot).
+        -- So we simply decline to eta-expand.  Otherwise we'd end up
+        -- with an explicit lambda having a non-function type
+
 
 --------------
 -- Avoiding unnecessary substitution; use short-cutting versions
@@ -997,14 +991,14 @@ freshEtaId :: Int -> TvSubst -> Type -> (TvSubst, Id)
 -- It should be "fresh" in the sense that it's not in the in-scope set
 -- of the TvSubstEnv; and it should itself then be added to the in-scope
 -- set of the TvSubstEnv
--- 
+--
 -- The Int is just a reasonable starting point for generating a unique;
 -- it does not necessarily have to be unique itself.
 freshEtaId n subst ty
       = (subst', eta_id')
       where
         ty'     = Type.substTy subst ty
-	eta_id' = uniqAway (getTvInScope subst) $
-		  mkSysLocal (fsLit "eta") (mkBuiltinUnique n) ty'
-	subst'  = extendTvInScope subst eta_id'		  
+        eta_id' = uniqAway (getTvInScope subst) $
+                  mkSysLocal (fsLit "eta") (mkBuiltinUnique n) ty'
+        subst'  = extendTvInScope subst eta_id'
 \end{code}

@@ -47,3 +47,5 @@ test('T3333',
      unless(opsys('linux') or ghci_dynamic(), expect_broken(3333))],
      run_command,
      ['$MAKE -s --no-print-directory T3333'])
+
+test('T1407', normal, ghci_script, ['T1407.script'])

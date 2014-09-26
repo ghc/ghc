@@ -66,8 +66,8 @@ V = 1
 # working on stage 2 and want to freeze stage 1 and the libraries for
 # a while.
 
-# Uncomment the following line to disable building DPH
-#BUILD_DPH=NO
+# Uncomment the following line to enable building DPH
+#BUILD_DPH=YES
 
 GhcLibWays = $(if $(filter $(DYNAMIC_GHC_PROGRAMS),YES),v dyn,v)
 
@@ -108,7 +108,7 @@ endif
 ifeq "$(BuildFlavour)" "perf-cross"
 
 SRC_HC_OPTS     = -O -H64m -fllvm
-GhcStage1HcOpts = -O2 -fllvm
+GhcStage1HcOpts = -O2
 GhcStage2HcOpts = -O2 -fllvm
 GhcHcOpts       = -Rghc-timing
 GhcLibHcOpts    = -O2
@@ -179,7 +179,7 @@ endif
 ifeq "$(BuildFlavour)" "quick-cross"
 
 SRC_HC_OPTS        = -H64m -O0
-GhcStage1HcOpts    = -O -fllvm
+GhcStage1HcOpts    = -O
 GhcStage2HcOpts    = -O0 -fllvm
 GhcLibHcOpts       = -O -fllvm
 SplitObjs          = NO

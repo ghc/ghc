@@ -64,7 +64,7 @@ module TcRnTypes(
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocOrigin,
         ctLocDepth, bumpCtLocDepth,
         setCtLocOrigin, setCtLocEnv,
-        CtOrigin(..),
+        CtOrigin(..), pprCtOrigin,
         pushErrCtxt, pushErrCtxtSameOrigin,
 
         SkolemInfo(..),
@@ -1072,36 +1072,34 @@ ctPred ct = ctEvPred (cc_ev ct)
 
 dropDerivedWC :: WantedConstraints -> WantedConstraints
 -- See Note [Dropping derived constraints]
-dropDerivedWC wc@(WC { wc_flat = flats, wc_insol = insols })
-  = wc { wc_flat  = filterBag isWantedCt          flats
-       , wc_insol = filterBag (not . isDerivedCt) insols  }
-    -- Keep Givens from insols because they indicate unreachable code
-    -- The implications are (recursively) already filtered
+dropDerivedWC wc@(WC { wc_flat = flats })
+  = wc { wc_flat  = filterBag isWantedCt flats }
+    -- The wc_impl implications are already (recursively) filtered
 \end{code}
 
 Note [Dropping derived constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general we discard derived constraints at the end of constraint solving;
-see dropDerivedWC.  A consequence is that
-   we never report an error for a derived constraint,
-   and hence we do not need to take much care with their CtLoc
-
-For example,
-
+see dropDerivedWC.  For example
  * If we have an unsolved (Ord a), we don't want to complain about
    an unsolved (Eq a) as well.
- * If we have kind-incompatible (a::* ~ Int#::#) equality, we
-   don't want to complain about the kind error twice.
 
-Arguably, for *some* derived constraints we might want to report errors.
-Notably, functional dependencies.  If we have
-    class C a b | a -> b
-and we have
-    [W] C a b, [W] C a c
-where a,b,c are all signature variables.  Then we could imagine
-reporting an error unifying (b ~ c). But it's better to report that we can't
-solve (C a b) and (C a c) since those arose directly from something the
-programmer wrote.
+But we keep Derived *insoluble* constraints because they indicate a solid,
+comprehensible error.  Particularly:
+
+ * Insolubles Givens indicate unreachable code
+
+ * Insoluble kind equalities (e.g. [D] * ~ (* -> *)) may arise from
+   a type equality a ~ Int#, say
+
+ * Insoluble derived wanted equalities (e.g. [D] Int ~ Bool) may
+   arise from functional dependency interactions.  We are careful
+   to keep a good CtOrigin on such constriants (FunDepOrigin1, FunDepOrigin2)
+   so that we can produce a good error message (Trac #9612)
+
+Since we leave these Derived constraints in the residual WantedConstraints,
+we must filter them out when we re-process the WantedConstraint,
+in TcSimplify.solve_wanteds.
 
 
 %************************************************************************
@@ -1675,12 +1673,11 @@ pprArising :: CtOrigin -> SDoc
 -- Used for the main, top-level error message
 -- We've done special processing for TypeEq and FunDep origins
 pprArising (TypeEqOrigin {}) = empty
-pprArising FunDepOrigin      = empty
-pprArising orig              = text "arising from" <+> ppr orig
+pprArising orig              = pprCtOrigin orig
 
 pprArisingAt :: CtLoc -> SDoc
 pprArisingAt (CtLoc { ctl_origin = o, ctl_env = lcl})
-  = sep [ text "arising from" <+> ppr o
+  = sep [ pprCtOrigin o
         , text "at" <+> ppr (tcl_loc lcl)]
 \end{code}
 
@@ -1741,7 +1738,7 @@ pprSkolInfo (SigSkol (FunSigCtxt f) ty)
                                  2 (pprPrefixOcc f <+> dcolon <+> ppr ty)
 pprSkolInfo (SigSkol cx ty) = hang (pprUserTypeCtxt cx <> colon)
                                  2 (ppr ty)
-pprSkolInfo (IPSkol ips)    = ptext (sLit "the implicit-parameter bindings for")
+pprSkolInfo (IPSkol ips)    = ptext (sLit "the implicit-parameter binding") <> plural ips <+> ptext (sLit "for")
                               <+> pprWithCommas ppr ips
 pprSkolInfo (ClsSkol cls)   = ptext (sLit "the class declaration for") <+> quotes (ppr cls)
 pprSkolInfo InstSkol        = ptext (sLit "the instance declaration")
@@ -1826,57 +1823,98 @@ data CtOrigin
   | IfOrigin            -- Arising from an if statement
   | ProcOrigin          -- Arising from a proc expression
   | AnnOrigin           -- An annotation
-  | FunDepOrigin
+
+  | FunDepOrigin1       -- A functional dependency from combining
+        PredType CtLoc      -- This constraint arising from ...
+        PredType CtLoc      -- and this constraint arising from ...
+
+  | FunDepOrigin2       -- A functional dependency from combining
+        PredType CtOrigin   -- This constraint arising from ...
+        PredType SrcSpan    -- and this instance
+        -- We only need a CtOrigin on the first, because the location
+        -- is pinned on the entire error message
+
   | HoleOrigin
   | UnboundOccurrenceOf RdrName
   | ListOrigin          -- An overloaded list
 
-pprO :: CtOrigin -> SDoc
-pprO (GivenOrigin sk)      = ppr sk
-pprO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
-pprO AppOrigin             = ptext (sLit "an application")
-pprO (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]
-pprO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
-pprO RecordUpdOrigin       = ptext (sLit "a record update")
-pprO (AmbigOrigin ctxt)    = ptext (sLit "the ambiguity check for")
-                             <+> case ctxt of
-                                    FunSigCtxt name -> quotes (ppr name)
-                                    InfSigCtxt name -> quotes (ppr name)
-                                    _               -> pprUserTypeCtxt ctxt
-pprO ExprSigOrigin         = ptext (sLit "an expression type signature")
-pprO PatSigOrigin          = ptext (sLit "a pattern type signature")
-pprO PatOrigin             = ptext (sLit "a pattern")
-pprO ViewPatOrigin         = ptext (sLit "a view pattern")
-pprO IfOrigin              = ptext (sLit "an if statement")
-pprO (LiteralOrigin lit)   = hsep [ptext (sLit "the literal"), quotes (ppr lit)]
-pprO (ArithSeqOrigin seq)  = hsep [ptext (sLit "the arithmetic sequence"), quotes (ppr seq)]
-pprO (PArrSeqOrigin seq)   = hsep [ptext (sLit "the parallel array sequence"), quotes (ppr seq)]
-pprO SectionOrigin         = ptext (sLit "an operator section")
-pprO TupleOrigin           = ptext (sLit "a tuple")
-pprO NegateOrigin          = ptext (sLit "a use of syntactic negation")
-pprO ScOrigin              = ptext (sLit "the superclasses of an instance declaration")
-pprO DerivOrigin           = ptext (sLit "the 'deriving' clause of a data type declaration")
-pprO (DerivOriginDC dc n)  = hsep [ ptext (sLit "the"), speakNth n,
-                                    ptext (sLit "field of"), quotes (ppr dc),
-                                    parens (ptext (sLit "type") <+> quotes (ppr ty)) ]
-    where ty = dataConOrigArgTys dc !! (n-1)
-pprO (DerivOriginCoerce meth ty1 ty2)
-                           = sep [ ptext (sLit "the coercion of the method") <+> quotes (ppr meth)
-                                 , ptext (sLit "from type") <+> quotes (ppr ty1)
-                                 , nest 2 (ptext (sLit "to type") <+> quotes (ppr ty2)) ]
-pprO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
-pprO DefaultOrigin         = ptext (sLit "a 'default' declaration")
-pprO DoOrigin              = ptext (sLit "a do statement")
-pprO MCompOrigin           = ptext (sLit "a statement in a monad comprehension")
-pprO ProcOrigin            = ptext (sLit "a proc expression")
-pprO (TypeEqOrigin t1 t2)  = ptext (sLit "a type equality") <+> sep [ppr t1, char '~', ppr t2]
-pprO (KindEqOrigin t1 t2 _) = ptext (sLit "a kind equality arising from") <+> sep [ppr t1, char '~', ppr t2]
-pprO AnnOrigin             = ptext (sLit "an annotation")
-pprO FunDepOrigin          = ptext (sLit "a functional dependency")
-pprO HoleOrigin            = ptext (sLit "a use of") <+> quotes (ptext $ sLit "_")
-pprO (UnboundOccurrenceOf name) = hsep [ptext (sLit "an undeclared identifier"), quotes (ppr name)]
-pprO ListOrigin            = ptext (sLit "an overloaded list")
+ctoHerald :: SDoc
+ctoHerald = ptext (sLit "arising from")
 
-instance Outputable CtOrigin where
-  ppr = pprO
+pprCtOrigin :: CtOrigin -> SDoc
+
+pprCtOrigin (GivenOrigin sk) = ctoHerald <+> ppr sk
+
+pprCtOrigin (FunDepOrigin1 pred1 loc1 pred2 loc2)
+  = hang (ctoHerald <+> ptext (sLit "a functional dependency between constraints:"))
+       2 (vcat [ hang (quotes (ppr pred1)) 2 (pprArisingAt loc1)
+               , hang (quotes (ppr pred2)) 2 (pprArisingAt loc2) ])
+
+pprCtOrigin (FunDepOrigin2 pred1 orig1 pred2 loc2)
+  = hang (ctoHerald <+> ptext (sLit "a functional dependency between:"))
+       2 (vcat [ hang (ptext (sLit "constraint") <+> quotes (ppr pred1))
+                    2 (pprArising orig1 )
+               , hang (ptext (sLit "instance") <+> quotes (ppr pred2))
+                    2 (ptext (sLit "at") <+> ppr loc2) ])
+
+pprCtOrigin (KindEqOrigin t1 t2 _)
+  = hang (ctoHerald <+> ptext (sLit "a kind equality arising from"))
+       2 (sep [ppr t1, char '~', ppr t2])
+
+pprCtOrigin (UnboundOccurrenceOf name)
+  = ctoHerald <+> ptext (sLit "an undeclared identifier") <+> quotes (ppr name)
+
+pprCtOrigin (DerivOriginDC dc n)
+  = hang (ctoHerald <+> ptext (sLit "the") <+> speakNth n
+          <+> ptext (sLit "field of") <+> quotes (ppr dc))
+       2 (parens (ptext (sLit "type") <+> quotes (ppr ty)))
+  where
+    ty = dataConOrigArgTys dc !! (n-1)
+
+pprCtOrigin (AmbigOrigin ctxt)
+  = ctoHerald <+> ptext (sLit "the ambiguity check for")
+    <+> case ctxt of
+           FunSigCtxt name -> quotes (ppr name)
+           InfSigCtxt name -> quotes (ppr name)
+           _               -> pprUserTypeCtxt ctxt
+
+pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
+  = hang (ctoHerald <+> ptext (sLit "the coercion of the method") <+> quotes (ppr meth))
+       2 (sep [ ptext (sLit "from type") <+> quotes (ppr ty1)
+              , ptext (sLit "  to type") <+> quotes (ppr ty2) ])
+
+pprCtOrigin simple_origin
+  = ctoHerald <+> pprCtO simple_origin
+
+----------------
+pprCtO :: CtOrigin -> SDoc  -- Ones that are short one-liners
+pprCtO FlatSkolOrigin        = ptext (sLit "a given flatten-skolem")
+pprCtO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
+pprCtO AppOrigin             = ptext (sLit "an application")
+pprCtO (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]
+pprCtO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
+pprCtO RecordUpdOrigin       = ptext (sLit "a record update")
+pprCtO ExprSigOrigin         = ptext (sLit "an expression type signature")
+pprCtO PatSigOrigin          = ptext (sLit "a pattern type signature")
+pprCtO PatOrigin             = ptext (sLit "a pattern")
+pprCtO ViewPatOrigin         = ptext (sLit "a view pattern")
+pprCtO IfOrigin              = ptext (sLit "an if statement")
+pprCtO (LiteralOrigin lit)   = hsep [ptext (sLit "the literal"), quotes (ppr lit)]
+pprCtO (ArithSeqOrigin seq)  = hsep [ptext (sLit "the arithmetic sequence"), quotes (ppr seq)]
+pprCtO (PArrSeqOrigin seq)   = hsep [ptext (sLit "the parallel array sequence"), quotes (ppr seq)]
+pprCtO SectionOrigin         = ptext (sLit "an operator section")
+pprCtO TupleOrigin           = ptext (sLit "a tuple")
+pprCtO NegateOrigin          = ptext (sLit "a use of syntactic negation")
+pprCtO ScOrigin              = ptext (sLit "the superclasses of an instance declaration")
+pprCtO DerivOrigin           = ptext (sLit "the 'deriving' clause of a data type declaration")
+pprCtO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
+pprCtO DefaultOrigin         = ptext (sLit "a 'default' declaration")
+pprCtO DoOrigin              = ptext (sLit "a do statement")
+pprCtO MCompOrigin           = ptext (sLit "a statement in a monad comprehension")
+pprCtO ProcOrigin            = ptext (sLit "a proc expression")
+pprCtO (TypeEqOrigin t1 t2)  = ptext (sLit "a type equality") <+> sep [ppr t1, char '~', ppr t2]
+pprCtO AnnOrigin             = ptext (sLit "an annotation")
+pprCtO HoleOrigin            = ptext (sLit "a use of") <+> quotes (ptext $ sLit "_")
+pprCtO ListOrigin            = ptext (sLit "an overloaded list")
+pprCtO _                     = panic "pprCtOrigin"
 \end{code}

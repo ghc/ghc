@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * 
+ *
  * (c) The GHC Team, 1998-2002
  *
  * Info Tables
@@ -30,7 +30,7 @@
 
 #if x86_64_TARGET_ARCH
 #define OFFSET_FIELD(n) StgHalfInt n; StgHalfWord __pad_##n
-#else   
+#else
 #define OFFSET_FIELD(n) StgInt n
 #endif
 
@@ -61,7 +61,7 @@ typedef struct {
 #ifdef DEBUG_CLOSURE
 
 typedef struct {
-	... whatever ...
+        ... whatever ...
 } StgDebugInfo;
 
 #else /* !DEBUG_CLOSURE */
@@ -112,14 +112,14 @@ extern StgWord16 closure_flags[];
 #define ipFlags(ip)             (closure_flags[ip->type])
 
 #define ip_HNF(ip)               (  ipFlags(ip) & _HNF)
-#define ip_BITMAP(ip)       	 (  ipFlags(ip) & _BTM)
-#define ip_SHOULD_SPARK(ip) 	 (!(ipFlags(ip) & _NS))
-#define ip_STATIC(ip)       	 (  ipFlags(ip) & _STA)
-#define ip_THUNK(ip)        	 (  ipFlags(ip) & _THU)
-#define ip_MUTABLE(ip)      	 (  ipFlags(ip) & _MUT)
-#define ip_UNPOINTED(ip)    	 (  ipFlags(ip) & _UPT)
-#define ip_SRT(ip)          	 (  ipFlags(ip) & _SRT)
-#define ip_IND(ip)          	 (  ipFlags(ip) & _IND)
+#define ip_BITMAP(ip)            (  ipFlags(ip) & _BTM)
+#define ip_SHOULD_SPARK(ip)      (!(ipFlags(ip) & _NS))
+#define ip_STATIC(ip)            (  ipFlags(ip) & _STA)
+#define ip_THUNK(ip)             (  ipFlags(ip) & _THU)
+#define ip_MUTABLE(ip)           (  ipFlags(ip) & _MUT)
+#define ip_UNPOINTED(ip)         (  ipFlags(ip) & _UPT)
+#define ip_SRT(ip)               (  ipFlags(ip) & _SRT)
+#define ip_IND(ip)               (  ipFlags(ip) & _IND)
 
 /* -----------------------------------------------------------------------------
    Bitmaps
@@ -133,7 +133,7 @@ extern StgWord16 closure_flags[];
    -------------------------------------------------------------------------- */
 
 /*
- * Small bitmaps:  for a small bitmap, we store the size and bitmap in 
+ * Small bitmaps:  for a small bitmap, we store the size and bitmap in
  * the same word, using the following macros.  If the bitmap doesn't
  * fit in a single word, we use a pointer to an StgLargeBitmap below.
  */
@@ -185,21 +185,21 @@ typedef struct StgLargeSRT_ {
  * word long.
  */
 typedef union {
-    struct {			/* Heap closure payload layout: */
-	StgHalfWord ptrs;	/* number of pointers */
-	StgHalfWord nptrs;	/* number of non-pointers */
+    struct {                    /* Heap closure payload layout: */
+        StgHalfWord ptrs;       /* number of pointers */
+        StgHalfWord nptrs;      /* number of non-pointers */
     } payload;
-    
-    StgWord bitmap;		  /* word-sized bit pattern describing */
-				  /*  a stack frame: see below */
+
+    StgWord bitmap;               /* word-sized bit pattern describing */
+                                  /*  a stack frame: see below */
 
 #ifndef TABLES_NEXT_TO_CODE
     StgLargeBitmap* large_bitmap; /* pointer to large bitmap structure */
 #else
     OFFSET_FIELD(large_bitmap_offset);  /* offset from info table to large bitmap structure */
 #endif
-    
-    StgWord selector_offset;	  /* used in THUNK_SELECTORs */
+
+    StgWord selector_offset;      /* used in THUNK_SELECTORs */
 
 } StgClosureInfo;
 
@@ -210,7 +210,7 @@ typedef union {
 typedef struct StgInfoTable_ {
 
 #if !defined(TABLES_NEXT_TO_CODE)
-    StgFunPtr       entry;	/* pointer to the entry code */
+    StgFunPtr       entry;      /* pointer to the entry code */
 #endif
 
 #ifdef PROFILING
@@ -223,9 +223,9 @@ typedef struct StgInfoTable_ {
   /* Debug-specific stuff would go here. */
 #endif
 
-    StgClosureInfo  layout;	/* closure layout info (one word) */
+    StgClosureInfo  layout;     /* closure layout info (one word) */
 
-    StgHalfWord     type;	/* closure type */
+    StgHalfWord     type;       /* closure type */
     StgHalfWord     srt_bitmap;
        /* In a CONSTR:
             - the constructor tag
@@ -248,7 +248,7 @@ typedef struct StgInfoTable_ {
    -  If fun_type is not ARG_GEN or ARG_GEN_BIG, then the slow_apply
       and bitmap fields may be left out (they are at the end, so omitting
       them doesn't affect the layout).
-      
+
    -  If srt_bitmap (in the std info table part) is zero, then the srt
       field may be omitted.  This only applies if the slow_apply and
       bitmap fields have also been omitted.
@@ -256,9 +256,9 @@ typedef struct StgInfoTable_ {
 
 typedef struct StgFunInfoExtraRev_ {
     OFFSET_FIELD(slow_apply_offset); /* apply to args on the stack */
-    union { 
-	StgWord bitmap;
-	OFFSET_FIELD(bitmap_offset);	/* arg ptr/nonptr bitmap */
+    union {
+        StgWord bitmap;
+        OFFSET_FIELD(bitmap_offset);    /* arg ptr/nonptr bitmap */
     } b;
     OFFSET_FIELD(srt_offset);   /* pointer to the SRT table */
     StgHalfWord    fun_type;    /* function type */
@@ -268,9 +268,9 @@ typedef struct StgFunInfoExtraRev_ {
 typedef struct StgFunInfoExtraFwd_ {
     StgHalfWord    fun_type;    /* function type */
     StgHalfWord    arity;       /* function arity */
-    StgSRT         *srt;	/* pointer to the SRT table */
+    StgSRT         *srt;        /* pointer to the SRT table */
     union { /* union for compat. with TABLES_NEXT_TO_CODE version */
-	StgWord        bitmap;	/* arg ptr/nonptr bitmap */
+        StgWord        bitmap;  /* arg ptr/nonptr bitmap */
     } b;
     StgFun         *slow_apply; /* apply to args on the stack */
 } StgFunInfoExtraFwd;
@@ -299,11 +299,11 @@ extern StgWord stg_arg_bitmaps[];
 
 typedef struct {
 #if defined(TABLES_NEXT_TO_CODE)
-    OFFSET_FIELD(srt_offset);	/* offset to the SRT table */
+    OFFSET_FIELD(srt_offset);   /* offset to the SRT table */
     StgInfoTable i;
 #else
     StgInfoTable i;
-    StgSRT      *srt;	/* pointer to the SRT table */
+    StgSRT      *srt;   /* pointer to the SRT table */
 #endif
 } StgRetInfoTable;
 
@@ -321,9 +321,9 @@ typedef struct StgThunkInfoTable_ {
     StgInfoTable i;
 #endif
 #if defined(TABLES_NEXT_TO_CODE)
-    OFFSET_FIELD(srt_offset);	/* offset to the SRT table */
+    OFFSET_FIELD(srt_offset);   /* offset to the SRT table */
 #else
-    StgSRT         *srt;	/* pointer to the SRT table */
+    StgSRT         *srt;        /* pointer to the SRT table */
 #endif
 #if defined(TABLES_NEXT_TO_CODE)
     StgInfoTable i;
@@ -340,7 +340,7 @@ typedef struct StgConInfoTable_ {
 #endif
 
 #if defined(TABLES_NEXT_TO_CODE)
-    OFFSET_FIELD(con_desc); // the name of the data constructor 
+    OFFSET_FIELD(con_desc); // the name of the data constructor
                             // as: Package:Module.Name
 #else
     char *con_desc;

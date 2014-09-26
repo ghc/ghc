@@ -13,15 +13,15 @@
 -- Module      :  GHC.Generics
 -- Copyright   :  (c) Universiteit Utrecht 2010-2011, University of Oxford 2012-2013
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
 --
 -- /Since: 4.6.0.0/
--- 
+--
 -- If you're using @GHC.Generics@, you should consider using the
--- <http://hackage.haskell.org/package/generic-deriving> package, which 
+-- <http://hackage.haskell.org/package/generic-deriving> package, which
 -- contains many useful generic functions.
 
 module GHC.Generics  (
@@ -163,7 +163,7 @@ module GHC.Generics  (
 -- type 'D1' = 'M1' 'D'
 -- @
 --
--- The types 'S', 'C' and 'R' are once again type-level proxies, just used to create
+-- The types 'S', 'C' and 'D' are once again type-level proxies, just used to create
 -- several variants of 'M1'.
 
 -- *** Additional generic representation type constructors
@@ -263,7 +263,7 @@ module GHC.Generics  (
 -- data    'V1'        p                       -- lifted version of Empty
 -- data    'U1'        p = 'U1'                  -- lifted version of ()
 -- data    (':+:') f g p = 'L1' (f p) | 'R1' (g p) -- lifted version of 'Either'
--- data    (':*:') f g p = (f p) ':*:' (g p)     -- lifted version of (,) 
+-- data    (':*:') f g p = (f p) ':*:' (g p)     -- lifted version of (,)
 -- newtype 'K1'    i c p = 'K1' { 'unK1' :: c }    -- a container for a c
 -- newtype 'M1'  i t f p = 'M1' { 'unM1' :: f p }  -- a wrapper
 -- @

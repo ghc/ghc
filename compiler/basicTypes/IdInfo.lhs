@@ -8,68 +8,61 @@
 Haskell. [WDP 94/11])
 
 \begin{code}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module IdInfo (
         -- * The IdDetails type
-	IdDetails(..), pprIdDetails, coVarDetails,
+        IdDetails(..), pprIdDetails, coVarDetails,
 
         -- * The IdInfo type
-	IdInfo,		-- Abstract
-	vanillaIdInfo, noCafIdInfo,
-	seqIdInfo, megaSeqIdInfo,
+        IdInfo,         -- Abstract
+        vanillaIdInfo, noCafIdInfo,
+        seqIdInfo, megaSeqIdInfo,
 
         -- ** The OneShotInfo type
         OneShotInfo(..),
         oneShotInfo, noOneShotInfo, hasNoOneShotInfo,
-        setOneShotInfo, 
+        setOneShotInfo,
 
-	-- ** Zapping various forms of Info
-	zapLamInfo, zapFragileInfo,
+        -- ** Zapping various forms of Info
+        zapLamInfo, zapFragileInfo,
         zapDemandInfo,
 
-	-- ** The ArityInfo type
-	ArityInfo,
-	unknownArity, 
-	arityInfo, setArityInfo, ppArityInfo, 
+        -- ** The ArityInfo type
+        ArityInfo,
+        unknownArity,
+        arityInfo, setArityInfo, ppArityInfo,
 
         callArityInfo, setCallArityInfo,
 
-	-- ** Demand and strictness Info
- 	strictnessInfo, setStrictnessInfo, 
-  	demandInfo, setDemandInfo, pprStrictness,
+        -- ** Demand and strictness Info
+        strictnessInfo, setStrictnessInfo,
+        demandInfo, setDemandInfo, pprStrictness,
 
-	-- ** Unfolding Info
-	unfoldingInfo, setUnfoldingInfo, setUnfoldingInfoLazily,
+        -- ** Unfolding Info
+        unfoldingInfo, setUnfoldingInfo, setUnfoldingInfoLazily,
 
-	-- ** The InlinePragInfo type
-	InlinePragInfo,
-	inlinePragInfo, setInlinePragInfo,
+        -- ** The InlinePragInfo type
+        InlinePragInfo,
+        inlinePragInfo, setInlinePragInfo,
 
-	-- ** The OccInfo type
-	OccInfo(..),
-	isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker,
-	occInfo, setOccInfo,
+        -- ** The OccInfo type
+        OccInfo(..),
+        isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker,
+        occInfo, setOccInfo,
 
-	InsideLam, OneBranch,
-	insideLam, notInsideLam, oneBranch, notOneBranch,
+        InsideLam, OneBranch,
+        insideLam, notInsideLam, oneBranch, notOneBranch,
 
-	-- ** The SpecInfo type
-	SpecInfo(..),
-	emptySpecInfo,
-	isEmptySpecInfo, specInfoFreeVars,
-	specInfoRules, seqSpecInfo, setSpecInfoHead,
+        -- ** The SpecInfo type
+        SpecInfo(..),
+        emptySpecInfo,
+        isEmptySpecInfo, specInfoFreeVars,
+        specInfoRules, seqSpecInfo, setSpecInfoHead,
         specInfo, setSpecInfo,
 
-	-- ** The CAFInfo type
-	CafInfo(..),
-	ppCafInfo, mayHaveCafRefs,
-	cafInfo, setCafInfo,
+        -- ** The CAFInfo type
+        CafInfo(..),
+        ppCafInfo, mayHaveCafRefs,
+        cafInfo, setCafInfo,
 
         -- ** Tick-box Info
         TickBoxOp(..), TickBoxId,
@@ -85,57 +78,57 @@ import BasicTypes
 import DataCon
 import TyCon
 import ForeignCall
-import Outputable	
+import Outputable
 import Module
 import FastString
 import Demand
 
 -- infixl so you can say (id `set` a `set` b)
-infixl 	1 `setSpecInfo`,
-	  `setArityInfo`,
-	  `setInlinePragInfo`,
-	  `setUnfoldingInfo`,
-	  `setOneShotInfo`,
-	  `setOccInfo`,
-	  `setCafInfo`,
-	  `setStrictnessInfo`,
-	  `setDemandInfo`
+infixl  1 `setSpecInfo`,
+          `setArityInfo`,
+          `setInlinePragInfo`,
+          `setUnfoldingInfo`,
+          `setOneShotInfo`,
+          `setOccInfo`,
+          `setCafInfo`,
+          `setStrictnessInfo`,
+          `setDemandInfo`
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
                      IdDetails
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
--- | The 'IdDetails' of an 'Id' give stable, and necessary, 
--- information about the Id. 
+-- | The 'IdDetails' of an 'Id' give stable, and necessary,
+-- information about the Id.
 data IdDetails
-  = VanillaId	
+  = VanillaId
 
   -- | The 'Id' for a record selector
-  | RecSelId                 
-    { sel_tycon   :: TyCon	-- ^ For a data type family, this is the /instance/ 'TyCon'
-				--   not the family 'TyCon'
+  | RecSelId
+    { sel_tycon   :: TyCon      -- ^ For a data type family, this is the /instance/ 'TyCon'
+                                --   not the family 'TyCon'
     , sel_naughty :: Bool       -- True <=> a "naughty" selector which can't actually exist, for example @x@ in:
                                 --    data T = forall a. MkT { x :: a }
-    }				-- See Note [Naughty record selectors] in TcTyClsDecls
+    }                           -- See Note [Naughty record selectors] in TcTyClsDecls
 
-  | DataConWorkId DataCon	-- ^ The 'Id' is for a data constructor /worker/
-  | DataConWrapId DataCon	-- ^ The 'Id' is for a data constructor /wrapper/
-				
-				-- [the only reasons we need to know is so that
-				--  a) to support isImplicitId
-				--  b) when desugaring a RecordCon we can get 
-				--     from the Id back to the data con]
+  | DataConWorkId DataCon       -- ^ The 'Id' is for a data constructor /worker/
+  | DataConWrapId DataCon       -- ^ The 'Id' is for a data constructor /wrapper/
 
-  | ClassOpId Class 		-- ^ The 'Id' is a superclass selector or class operation of a class
+                                -- [the only reasons we need to know is so that
+                                --  a) to support isImplicitId
+                                --  b) when desugaring a RecordCon we can get
+                                --     from the Id back to the data con]
 
-  | PrimOpId PrimOp		-- ^ The 'Id' is for a primitive operator
-  | FCallId ForeignCall		-- ^ The 'Id' is for a foreign call
+  | ClassOpId Class             -- ^ The 'Id' is a superclass selector or class operation of a class
 
-  | TickBoxOpId TickBoxOp	-- ^ The 'Id' is for a HPC tick box (both traditional and binary)
+  | PrimOpId PrimOp             -- ^ The 'Id' is for a primitive operator
+  | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call
+
+  | TickBoxOpId TickBoxOp       -- ^ The 'Id' is for a HPC tick box (both traditional and binary)
 
   | DFunId Int Bool             -- ^ A dictionary function.
        -- Int = the number of "silent" arguments to the dfun
@@ -170,39 +163,39 @@ pprIdDetails other     = brackets (pp other)
                              <> ppWhen (ns /= 0) (brackets (int ns))
                              <> ppWhen nt (ptext (sLit "(nt)"))
    pp (RecSelId { sel_naughty = is_naughty })
-      			 = brackets $ ptext (sLit "RecSel") 
-      			    <> ppWhen is_naughty (ptext (sLit "(naughty)"))
+                         = brackets $ ptext (sLit "RecSel")
+                            <> ppWhen is_naughty (ptext (sLit "(naughty)"))
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{The main IdInfo type}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 -- | An 'IdInfo' gives /optional/ information about an 'Id'.  If
 -- present it never lies, but it may not be present, in which case there
 -- is always a conservative assumption which can be made.
--- 
+--
 -- Two 'Id's may have different info even though they have the same
 -- 'Unique' (and are hence the same 'Id'); for example, one might lack
 -- the properties attached to the other.
--- 
+--
 -- The 'IdInfo' gives information about the value, or definition, of the
 -- 'Id'.  It does not contain information about the 'Id''s usage,
 -- except for 'demandInfo' and 'oneShotInfo'.
 data IdInfo
   = IdInfo {
-	arityInfo 	:: !ArityInfo,		-- ^ 'Id' arity
-	specInfo 	:: SpecInfo,		-- ^ Specialisations of the 'Id's function which exist
-			   			-- See Note [Specialisations and RULES in IdInfo]
-	unfoldingInfo	:: Unfolding,		-- ^ The 'Id's unfolding
-	cafInfo		:: CafInfo,		-- ^ 'Id' CAF info
-        oneShotInfo	:: OneShotInfo,		-- ^ Info about a lambda-bound variable, if the 'Id' is one
-	inlinePragInfo	:: InlinePragma,	-- ^ Any inline pragma atached to the 'Id'
-	occInfo		:: OccInfo,		-- ^ How the 'Id' occurs in the program
+        arityInfo       :: !ArityInfo,          -- ^ 'Id' arity
+        specInfo        :: SpecInfo,            -- ^ Specialisations of the 'Id's function which exist
+                                                -- See Note [Specialisations and RULES in IdInfo]
+        unfoldingInfo   :: Unfolding,           -- ^ The 'Id's unfolding
+        cafInfo         :: CafInfo,             -- ^ 'Id' CAF info
+        oneShotInfo     :: OneShotInfo,         -- ^ Info about a lambda-bound variable, if the 'Id' is one
+        inlinePragInfo  :: InlinePragma,        -- ^ Any inline pragma atached to the 'Id'
+        occInfo         :: OccInfo,             -- ^ How the 'Id' occurs in the program
 
         strictnessInfo  :: StrictSig,      --  ^ A strictness signature
 
@@ -219,16 +212,16 @@ seqIdInfo (IdInfo {}) = ()
 -- compiler
 megaSeqIdInfo :: IdInfo -> ()
 megaSeqIdInfo info
-  = seqSpecInfo (specInfo info)			`seq`
+  = seqSpecInfo (specInfo info)                 `seq`
 
 -- Omitting this improves runtimes a little, presumably because
 -- some unfoldings are not calculated at all
---    seqUnfolding (unfoldingInfo info)		`seq`
+--    seqUnfolding (unfoldingInfo info)         `seq`
 
     seqDemandInfo (demandInfo info)             `seq`
     seqStrictnessInfo (strictnessInfo info)     `seq`
-    seqCaf (cafInfo info)			`seq`
-    seqOneShot (oneShotInfo info)		`seq`
+    seqCaf (cafInfo info)                       `seq`
+    seqOneShot (oneShotInfo info)               `seq`
     seqOccInfo (occInfo info)
 
 seqOneShot :: OneShotInfo -> ()
@@ -245,20 +238,20 @@ Setters
 
 \begin{code}
 setSpecInfo :: IdInfo -> SpecInfo -> IdInfo
-setSpecInfo 	  info sp = sp `seq` info { specInfo = sp }
+setSpecInfo       info sp = sp `seq` info { specInfo = sp }
 setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo :: IdInfo -> OccInfo -> IdInfo
-setOccInfo	  info oc = oc `seq` info { occInfo = oc }
-	-- Try to avoid spack leaks by seq'ing
+setOccInfo        info oc = oc `seq` info { occInfo = oc }
+        -- Try to avoid spack leaks by seq'ing
 
 setUnfoldingInfoLazily :: IdInfo -> Unfolding -> IdInfo
-setUnfoldingInfoLazily info uf 	-- Lazy variant to avoid looking at the
-  =				-- unfolding of an imported Id unless necessary
-    info { unfoldingInfo = uf }	-- (In this case the demand-zapping is redundant.)
+setUnfoldingInfoLazily info uf  -- Lazy variant to avoid looking at the
+  =                             -- unfolding of an imported Id unless necessary
+    info { unfoldingInfo = uf } -- (In this case the demand-zapping is redundant.)
 
 setUnfoldingInfo :: IdInfo -> Unfolding -> IdInfo
-setUnfoldingInfo info uf 
+setUnfoldingInfo info uf
   = -- We don't seq the unfolding, as we generate intermediate
     -- unfoldings which are just thrown away, so evaluating them is a
     -- waste of time.
@@ -266,7 +259,7 @@ setUnfoldingInfo info uf
     info { unfoldingInfo = uf }
 
 setArityInfo :: IdInfo -> ArityInfo -> IdInfo
-setArityInfo	  info ar  = info { arityInfo = ar  }
+setArityInfo      info ar  = info { arityInfo = ar  }
 setCallArityInfo :: IdInfo -> ArityInfo -> IdInfo
 setCallArityInfo info ar  = info { callArityInfo = ar  }
 setCafInfo :: IdInfo -> CafInfo -> IdInfo
@@ -286,42 +279,42 @@ setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
 \begin{code}
 -- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
-vanillaIdInfo 
+vanillaIdInfo
   = IdInfo {
-	    cafInfo		= vanillaCafInfo,
-	    arityInfo		= unknownArity,
-	    specInfo		= emptySpecInfo,
-	    unfoldingInfo	= noUnfolding,
-	    oneShotInfo		= NoOneShotInfo,
-	    inlinePragInfo 	= defaultInlinePragma,
-	    occInfo		= NoOccInfo,
-            demandInfo	        = topDmd,
-	    strictnessInfo      = nopSig,
-	    callArityInfo     = unknownArity
-	   }
+            cafInfo             = vanillaCafInfo,
+            arityInfo           = unknownArity,
+            specInfo            = emptySpecInfo,
+            unfoldingInfo       = noUnfolding,
+            oneShotInfo         = NoOneShotInfo,
+            inlinePragInfo      = defaultInlinePragma,
+            occInfo             = NoOccInfo,
+            demandInfo          = topDmd,
+            strictnessInfo      = nopSig,
+            callArityInfo     = unknownArity
+           }
 
 -- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references
 noCafIdInfo :: IdInfo
 noCafIdInfo  = vanillaIdInfo `setCafInfo`    NoCafRefs
-	-- Used for built-in type Ids in MkId.
+        -- Used for built-in type Ids in MkId.
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[arity-IdInfo]{Arity info about an @Id@}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 For locally-defined Ids, the code generator maintains its own notion
-of their arities; so it should not be asking...	 (but other things
+of their arities; so it should not be asking...  (but other things
 besides the code-generator need arity info!)
 
 \begin{code}
--- | An 'ArityInfo' of @n@ tells us that partial application of this 
+-- | An 'ArityInfo' of @n@ tells us that partial application of this
 -- 'Id' to up to @n-1@ value arguments does essentially no work.
 --
--- That is not necessarily the same as saying that it has @n@ leading 
+-- That is not necessarily the same as saying that it has @n@ leading
 -- lambdas, because coerces may get in the way.
 --
 -- The arity might increase later in the compilation process, if
@@ -338,9 +331,9 @@ ppArityInfo n = hsep [ptext (sLit "Arity"), int n]
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Inline-pragma information}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -358,9 +351,9 @@ type InlinePragInfo = InlinePragma
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
                Strictness
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -370,9 +363,9 @@ pprStrictness sig = ppr sig
 
 
 %************************************************************************
-%*									*
-	SpecInfo
-%*									*
+%*                                                                      *
+        SpecInfo
+%*                                                                      *
 %************************************************************************
 
 Note [Specialisations and RULES in IdInfo]
@@ -386,7 +379,7 @@ them all uniformly.
 The EXCEPTION is PrimOpIds, which do have rules in their IdInfo. That is
 jsut for convenience really.
 
-However, LocalIds may have non-empty SpecInfo.  We treat them 
+However, LocalIds may have non-empty SpecInfo.  We treat them
 differently because:
   a) they might be nested, in which case a global table won't work
   b) the RULE might mention free variables, which we use to keep things alive
@@ -397,13 +390,13 @@ and put in the global list.
 \begin{code}
 -- | Records the specializations of this 'Id' that we know about
 -- in the form of rewrite 'CoreRule's that target them
-data SpecInfo 
-  = SpecInfo 
-	[CoreRule] 
-	VarSet		-- Locally-defined free vars of *both* LHS and RHS 
-			-- of rules.  I don't think it needs to include the
-			-- ru_fn though.
-			-- Note [Rule dependency info] in OccurAnal
+data SpecInfo
+  = SpecInfo
+        [CoreRule]
+        VarSet          -- Locally-defined free vars of *both* LHS and RHS
+                        -- of rules.  I don't think it needs to include the
+                        -- ru_fn though.
+                        -- Note [Rule dependency info] in OccurAnal
 
 -- | Assume that no specilizations exist: always safe
 emptySpecInfo :: SpecInfo
@@ -430,25 +423,25 @@ seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[CG-IdInfo]{Code generator-related information}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 -- CafInfo is used to build Static Reference Tables (see simplStg/SRT.lhs).
 
 -- | Records whether an 'Id' makes Constant Applicative Form references
-data CafInfo 
-	= MayHaveCafRefs		-- ^ Indicates that the 'Id' is for either:
-					--
-					-- 1. A function or static constructor
-					--    that refers to one or more CAFs, or
-					--
-					-- 2. A real live CAF
+data CafInfo
+        = MayHaveCafRefs                -- ^ Indicates that the 'Id' is for either:
+                                        --
+                                        -- 1. A function or static constructor
+                                        --    that refers to one or more CAFs, or
+                                        --
+                                        -- 2. A real live CAF
 
-	| NoCafRefs			-- ^ A function or static constructor
-				        -- that refers to no CAFs.
+        | NoCafRefs                     -- ^ A function or static constructor
+                                        -- that refers to no CAFs.
         deriving (Eq, Ord)
 
 -- | Assumes that the 'Id' has CAF references: definitely safe
@@ -457,7 +450,7 @@ vanillaCafInfo = MayHaveCafRefs
 
 mayHaveCafRefs :: CafInfo -> Bool
 mayHaveCafRefs  MayHaveCafRefs = True
-mayHaveCafRefs _	       = False
+mayHaveCafRefs _               = False
 
 seqCaf :: CafInfo -> ()
 seqCaf c = c `seq` ()
@@ -471,9 +464,9 @@ ppCafInfo MayHaveCafRefs = empty
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Bulk operations on IdInfo}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -489,14 +482,14 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
   | otherwise
   = Just (info {occInfo = safe_occ, demandInfo = topDmd})
   where
-	-- The "unsafe" occ info is the ones that say I'm not in a lambda
-	-- because that might not be true for an unsaturated lambda
+        -- The "unsafe" occ info is the ones that say I'm not in a lambda
+        -- because that might not be true for an unsaturated lambda
     is_safe_occ (OneOcc in_lam _ _) = in_lam
-    is_safe_occ _other		    = True
+    is_safe_occ _other              = True
 
     safe_occ = case occ of
-		 OneOcc _ once int_cxt -> OneOcc insideLam once int_cxt
-		 _other	       	       -> occ
+                 OneOcc _ once int_cxt -> OneOcc insideLam once int_cxt
+                 _other                -> occ
 
     is_safe_dmd dmd = not (isStrictDmd dmd)
 \end{code}
@@ -510,25 +503,25 @@ zapDemandInfo info = Just (info {demandInfo = topDmd})
 \begin{code}
 zapFragileInfo :: IdInfo -> Maybe IdInfo
 -- ^ Zap info that depends on free variables
-zapFragileInfo info 
+zapFragileInfo info
   = Just (info `setSpecInfo` emptySpecInfo
                `setUnfoldingInfo` noUnfolding
-	       `setOccInfo` zapFragileOcc occ)
+               `setOccInfo` zapFragileOcc occ)
   where
     occ = occInfo info
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{TickBoxOp}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 type TickBoxId = Int
 
 -- | Tick box for Hpc-style coverage
-data TickBoxOp 
+data TickBoxOp
    = TickBox Module {-# UNPACK #-} !TickBoxId
 
 instance Outputable TickBoxOp where

@@ -7,7 +7,7 @@
 -- Module      :  GHC.IO.BufferedIO
 -- Copyright   :  (c) The University of Glasgow 2008
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -25,7 +25,6 @@ import GHC.Base
 import GHC.Ptr
 import Data.Word
 import GHC.Num
-import Data.Maybe
 import GHC.IO.Device as IODevice
 import GHC.IO.Device as RawIO
 import GHC.IO.Buffer
@@ -61,7 +60,7 @@ class BufferedIO dev where
   -- There is no corresponding operation for read buffers, because before
   -- reading the client will always call 'fillReadBuffer'.
   emptyWriteBuffer  :: dev -> Buffer Word8 -> IO (Buffer Word8)
-  emptyWriteBuffer _dev buf 
+  emptyWriteBuffer _dev buf
     = return buf{ bufL=0, bufR=0, bufState = WriteBuffer }
 
   -- | Flush all the data from the supplied write buffer out to the device.

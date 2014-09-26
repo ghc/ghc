@@ -25,25 +25,25 @@
 
        "info pointer"    The first word of the closure.  Might point
                          to either the end or the beginning of the
-			 info table, depending on whether we're using
-			 the mini interpreter or not.  GET_INFO(c)
-			 retrieves the info pointer of a closure.
+                         info table, depending on whether we're using
+                         the mini interpreter or not.  GET_INFO(c)
+                         retrieves the info pointer of a closure.
 
        "info table"      The info table structure associated with a
                          closure.  This is always a pointer to the
-			 beginning of the structure, so we can
-			 use standard C structure indexing to pull out
-			 the fields.  get_itbl(c) returns a pointer to
-			 the info table for closure c.
+                         beginning of the structure, so we can
+                         use standard C structure indexing to pull out
+                         the fields.  get_itbl(c) returns a pointer to
+                         the info table for closure c.
 
    An address of the form xxxx_info points to the end of the info
    table or the beginning of the info table depending on whether we're
-   mangling or not respectively.  So, 
+   mangling or not respectively.  So,
 
-         c->header.info = xxx_info 
+         c->header.info = xxx_info
 
    makes absolute sense, whether mangling or not.
- 
+
    -------------------------------------------------------------------------- */
 
 INLINE_HEADER void SET_INFO(StgClosure *c, const StgInfoTable *info) {
@@ -103,8 +103,8 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con) {
 
 #ifdef PROFILING
 #ifdef DEBUG_RETAINER
-/* 
-  For the sake of debugging, we take the safest way for the moment. Actually, this 
+/*
+  For the sake of debugging, we take the safest way for the moment. Actually, this
   is useful to check the sanity of heap before beginning retainer profiling.
   flip is defined in RetainerProfile.c, and declared as extern in RetainerProfile.h.
   Note: change those functions building Haskell objects from C datatypes, i.e.,
@@ -116,7 +116,7 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con) {
 /*
   For retainer profiling only: we do not have to set (c)->header.prof.hp.rs to
   NULL | flip (flip is defined in RetainerProfile.c) because even when flip
-  is 1, rs is invalid and will be initialized to NULL | flip later when 
+  is 1, rs is invalid and will be initialized to NULL | flip later when
   the closure *c is visited.
  */
 /*
@@ -136,14 +136,14 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con) {
 #define SET_PROF_HDR(c,ccs)
 #endif
 
-#define SET_HDR(c,_info,ccs)				\
-   {							\
-	(c)->header.info = _info;			\
-	SET_PROF_HDR((StgClosure *)(c),ccs);		\
+#define SET_HDR(c,_info,ccs)                            \
+   {                                                    \
+        (c)->header.info = _info;                       \
+        SET_PROF_HDR((StgClosure *)(c),ccs);            \
    }
 
-#define SET_ARR_HDR(c,info,costCentreStack,n_bytes)	\
-   SET_HDR(c,info,costCentreStack);			\
+#define SET_ARR_HDR(c,info,costCentreStack,n_bytes)     \
+   SET_HDR(c,info,costCentreStack);                     \
    (c)->bytes = n_bytes;
 
 // Use when changing a closure from one kind to another
@@ -163,17 +163,17 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con) {
 
 INLINE_HEADER StgClosure **
 STATIC_LINK(const StgInfoTable *info, StgClosure *p)
-{ 
+{
     switch (info->type) {
     case THUNK_STATIC:
-	return THUNK_STATIC_LINK(p);
+        return THUNK_STATIC_LINK(p);
     case FUN_STATIC:
-	return FUN_STATIC_LINK(p);
+        return FUN_STATIC_LINK(p);
     case IND_STATIC:
-	return IND_STATIC_LINK(p);
+        return IND_STATIC_LINK(p);
     default:
-	return &(p)->payload[info->layout.payload.ptrs +
-			     info->layout.payload.nptrs];
+        return &(p)->payload[info->layout.payload.ptrs +
+                             info->layout.payload.nptrs];
     }
 }
 
@@ -350,58 +350,58 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
     switch (info->type) {
     case THUNK_0_1:
     case THUNK_1_0:
-	return sizeofW(StgThunk) + 1;
+        return sizeofW(StgThunk) + 1;
     case FUN_0_1:
     case CONSTR_0_1:
     case FUN_1_0:
     case CONSTR_1_0:
-	return sizeofW(StgHeader) + 1;
+        return sizeofW(StgHeader) + 1;
     case THUNK_0_2:
     case THUNK_1_1:
     case THUNK_2_0:
-	return sizeofW(StgThunk) + 2;
+        return sizeofW(StgThunk) + 2;
     case FUN_0_2:
     case CONSTR_0_2:
     case FUN_1_1:
     case CONSTR_1_1:
     case FUN_2_0:
     case CONSTR_2_0:
-	return sizeofW(StgHeader) + 2;
+        return sizeofW(StgHeader) + 2;
     case THUNK:
-	return thunk_sizeW_fromITBL(info);
+        return thunk_sizeW_fromITBL(info);
     case THUNK_SELECTOR:
-	return THUNK_SELECTOR_sizeW();
+        return THUNK_SELECTOR_sizeW();
     case AP_STACK:
-	return ap_stack_sizeW((StgAP_STACK *)p);
+        return ap_stack_sizeW((StgAP_STACK *)p);
     case AP:
-	return ap_sizeW((StgAP *)p);
+        return ap_sizeW((StgAP *)p);
     case PAP:
-	return pap_sizeW((StgPAP *)p);
+        return pap_sizeW((StgPAP *)p);
     case IND:
     case IND_PERM:
-	return sizeofW(StgInd);
+        return sizeofW(StgInd);
     case ARR_WORDS:
-	return arr_words_sizeW((StgArrWords *)p);
+        return arr_words_sizeW((StgArrWords *)p);
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
-	return mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+        return mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
     case SMALL_MUT_ARR_PTRS_CLEAN:
     case SMALL_MUT_ARR_PTRS_DIRTY:
     case SMALL_MUT_ARR_PTRS_FROZEN:
     case SMALL_MUT_ARR_PTRS_FROZEN0:
-	return small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs*)p);
+        return small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs*)p);
     case TSO:
         return sizeofW(StgTSO);
     case STACK:
         return stack_sizeW((StgStack*)p);
     case BCO:
-	return bco_sizeW((StgBCO *)p);
+        return bco_sizeW((StgBCO *)p);
     case TREC_CHUNK:
         return sizeofW(StgTRecChunk);
     default:
-	return sizeW_fromITBL(info);
+        return sizeW_fromITBL(info);
     }
 }
 
@@ -425,16 +425,16 @@ EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame )
     switch (info->i.type) {
 
     case RET_FUN:
-	return sizeofW(StgRetFun) + ((StgRetFun *)frame)->size;
+        return sizeofW(StgRetFun) + ((StgRetFun *)frame)->size;
 
     case RET_BIG:
-	return 1 + GET_LARGE_BITMAP(&info->i)->size;
+        return 1 + GET_LARGE_BITMAP(&info->i)->size;
 
     case RET_BCO:
-	return 2 + BCO_BITMAP_SIZE((StgBCO *)((P_)frame)[1]);
+        return 2 + BCO_BITMAP_SIZE((StgBCO *)((P_)frame)[1]);
 
     default:
-	return 1 + BITMAP_SIZE(info->i.layout.bitmap);
+        return 1 + BITMAP_SIZE(info->i.layout.bitmap);
     }
 }
 
@@ -504,8 +504,11 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 
 #if ZERO_SLOP_FOR_LDV_PROF || ZERO_SLOP_FOR_SANITY_CHECK
 #define OVERWRITING_CLOSURE(c) overwritingClosure(c)
+#define OVERWRITING_CLOSURE_OFS(c,n) \
+    overwritingClosureOfs(c,n)
 #else
 #define OVERWRITING_CLOSURE(c) /* nothing */
+#define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
 #endif
 
 #ifdef PROFILING
@@ -532,6 +535,36 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
     for (i = 0; i < size - sizeofW(StgThunkHeader); i++) {
         ((StgThunk *)(p))->payload[i] = 0;
     }
+}
+
+// Version of 'overwritingClosure' which overwrites only a suffix of a
+// closure.  The offset is expressed in words relative to 'p' and shall
+// be less than or equal to closure_sizeW(p), and usually at least as
+// large as the respective thunk header.
+//
+// Note: As this calls LDV_recordDead() you have to call LDV_RECORD()
+//       on the final state of the closure at the call-site
+EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, nat offset);
+EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, nat offset)
+{
+    nat size, i;
+
+#if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
+    // see Note [zeroing slop], also #8402
+    if (era <= 0) return;
+#endif
+
+    size = closure_sizeW(p);
+
+    ASSERT(offset <= size);
+
+    // For LDV profiling, we need to record the closure as dead
+#if defined(PROFILING)
+    LDV_recordDead(p, size);
+#endif
+
+    for (i = offset; i < size; i++)
+        ((StgWord *)p)[i] = 0;
 }
 
 #endif /* RTS_STORAGE_CLOSUREMACROS_H */

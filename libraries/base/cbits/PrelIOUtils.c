@@ -1,18 +1,13 @@
-/* 
+/*
  * (c) The University of Glasgow 2002
  *
- * static versions of the inline functions in HsCore.h
+ * static versions of the inline functions in HsBase.h
  */
 
 #define INLINE
 
-#ifdef __GLASGOW_HASKELL__
-# include "Rts.h"
-#endif
-
+#include "Rts.h"
 #include "HsBase.h"
-
-#ifdef __GLASGOW_HASKELL__
 
 void errorBelch2(const char*s, char *t)
 {
@@ -48,5 +43,3 @@ const char* localeEncoding(void)
 #endif
 }
 #endif
-
-#endif /* __GLASGOW_HASKELL__ */

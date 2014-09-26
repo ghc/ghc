@@ -48,18 +48,14 @@ Library
                    directory  >= 1   && < 1.3,
                    process    >= 1   && < 1.3,
                    bytestring >= 0.9 && < 0.11,
-                   time                 < 1.5,
+                   time                 < 1.6,
                    containers >= 0.1 && < 0.6,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.4,
-                   Cabal,
                    hpc,
                    transformers,
                    bin-package-db,
                    hoopl
-
-    if flag(stage1) && impl(ghc < 7.5)
-        Build-Depends: old-time   >= 1   && < 1.2
 
     if os(windows)
         Build-Depends: Win32
@@ -105,11 +101,11 @@ Library
     Include-Dirs: . parser utils
 
     if impl( ghc >= 7.9 )
-        -- We need to set the package name to ghc (without a version number)
+        -- We need to set the package key to ghc (without a version number)
         -- as it's magic.  But we can't set it for old versions of GHC (e.g.
         -- when bootstrapping) because those versions of GHC don't understand
         -- that GHC is wired-in.
-        GHC-Options: -package-name ghc
+        GHC-Options: -this-package-key ghc
 
     if flag(stage1)
         Include-Dirs: stage1
@@ -281,6 +277,7 @@ Library
         HsExpr
         HsImpExp
         HsLit
+        PlaceHolder
         HsPat
         HsSyn
         HsTypes

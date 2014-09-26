@@ -20,7 +20,7 @@ module RnPat (-- main entry points
                                              --   sometimes we want to make top (qualified) names.
               isTopRecNameMaker,
 
-              rnHsRecFields1, HsRecFieldContext(..),
+              rnHsRecFields, HsRecFieldContext(..),
 
               -- CpsRn monad
               CpsRn, liftCps,
@@ -205,7 +205,8 @@ matchNameMaker ctxt = LamMk report_unused
                       StmtCtxt GhciStmtCtxt -> False
                       _                     -> True
 
-rnHsSigCps :: HsWithBndrs (LHsType RdrName) -> CpsRn (HsWithBndrs (LHsType Name))
+rnHsSigCps :: HsWithBndrs RdrName (LHsType RdrName)
+           -> CpsRn (HsWithBndrs Name (LHsType Name))
 rnHsSigCps sig 
   = CpsRn (rnHsBndrSig PatCtx sig)
 
@@ -401,14 +402,16 @@ rnPatAndThen mk (AsPat rdr pat)
        ; pat' <- rnLPatAndThen mk pat
        ; return (AsPat (L (nameSrcSpan new_name) new_name) pat') }
 
-rnPatAndThen mk p@(ViewPat expr pat ty)
+rnPatAndThen mk p@(ViewPat expr pat _ty)
   = do { liftCps $ do { vp_flag <- xoptM Opt_ViewPatterns
                       ; checkErr vp_flag (badViewPat p) }
          -- Because of the way we're arranging the recursive calls,
          -- this will be in the right context 
        ; expr' <- liftCpsFV $ rnLExpr expr 
        ; pat' <- rnLPatAndThen mk pat
-       ; return (ViewPat expr' pat' ty) }
+       -- Note: at this point the PreTcType in ty can only be a placeHolder
+       -- ; return (ViewPat expr' pat' ty) }
+       ; return (ViewPat expr' pat' placeHolderType) }
 
 rnPatAndThen mk (ConPatIn con stuff)
    -- rnConPatAndThen takes care of reconstructing the pattern
@@ -423,8 +426,9 @@ rnPatAndThen mk (ListPat pats _ _)
   = do { opt_OverloadedLists <- liftCps $ xoptM Opt_OverloadedLists
        ; pats' <- rnLPatsAndThen mk pats
        ; case opt_OverloadedLists of
-          True -> do   { (to_list_name,_) <- liftCps $ lookupSyntaxName toListName
-                       ; return (ListPat pats' placeHolderType (Just (placeHolderType, to_list_name)))}
+          True -> do { (to_list_name,_) <- liftCps $ lookupSyntaxName toListName
+                     ; return (ListPat pats' placeHolderType
+                                       (Just (placeHolderType, to_list_name)))}
           False -> return (ListPat pats' placeHolderType Nothing) }
 
 rnPatAndThen mk (PArrPat pats _)
@@ -478,7 +482,7 @@ rnHsRecPatsAndThen :: NameMaker
                    -> HsRecFields RdrName (LPat RdrName)
                    -> CpsRn (HsRecFields Name (LPat Name))
 rnHsRecPatsAndThen mk (L _ con) hs_rec_fields@(HsRecFields { rec_dotdot = dd })
-  = do { flds <- liftCpsFV $ rnHsRecFields1 (HsRecFieldPat con) VarPat hs_rec_fields
+  = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) VarPat hs_rec_fields
        ; flds' <- mapM rn_field (flds `zip` [1..])
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where 
@@ -505,7 +509,7 @@ data HsRecFieldContext
   | HsRecFieldPat Name
   | HsRecFieldUpd
 
-rnHsRecFields1 
+rnHsRecFields
     :: forall arg. 
        HsRecFieldContext
     -> (RdrName -> arg) -- When punning, use this to build a new field
@@ -518,13 +522,22 @@ rnHsRecFields1
 -- When we we've finished, we've renamed the LHS, but not the RHS,
 -- of each x=e binding
 
-rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
+rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
   = do { pun_ok      <- xoptM Opt_RecordPuns
        ; disambig_ok <- xoptM Opt_DisambiguateRecordFields
        ; parent <- check_disambiguation disambig_ok mb_con
-       ; flds1 <- mapM (rn_fld pun_ok parent) flds
+       ; flds1  <- mapM (rn_fld pun_ok parent) flds
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
+
+       -- Check for an empty record update  e {}
+       -- NB: don't complain about e { .. }, because rn_dotdot has done that already
+       ; case ctxt of
+           HsRecFieldUpd | Nothing <- dotdot
+                         , null flds
+                         -> addErr emptyUpdateErr
+           _ -> return ()
+
        ; let all_flds | null dotdot_flds = flds1
                       | otherwise        = flds1 ++ dotdot_flds
        ; return (all_flds, mkFVs (getFieldIds all_flds)) }
@@ -532,7 +545,7 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
     mb_con = case ctxt of
                 HsRecFieldCon con | not (isUnboundName con) -> Just con
                 HsRecFieldPat con | not (isUnboundName con) -> Just con
-                _other -> Nothing
+                _ {- update or isUnboundName con -}         -> Nothing
            -- The unbound name test is because if the constructor 
            -- isn't in scope the constructor lookup will add an error
            -- add an error, but still return an unbound name. 
@@ -562,7 +575,10 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
     rn_dotdot Nothing _mb_con _flds     -- No ".." at all
       = return []
     rn_dotdot (Just {}) Nothing _flds   -- ".." on record update
-      = do { addErr (badDotDot ctxt); return [] }
+      = do { case ctxt of
+                HsRecFieldUpd -> addErr badDotDot
+                _             -> return ()
+           ; return [] }
     rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
       = ASSERT( n == length flds )
         do { loc <- getSrcSpanM -- Rather approximate
@@ -639,8 +655,11 @@ needFlagDotDot :: HsRecFieldContext -> SDoc
 needFlagDotDot ctxt = vcat [ptext (sLit "Illegal `..' in record") <+> pprRFC ctxt,
                             ptext (sLit "Use RecordWildCards to permit this")]
 
-badDotDot :: HsRecFieldContext -> SDoc
-badDotDot ctxt = ptext (sLit "You cannot use `..' in a record") <+> pprRFC ctxt
+badDotDot :: SDoc
+badDotDot = ptext (sLit "You cannot use `..' in a record update")
+
+emptyUpdateErr :: SDoc
+emptyUpdateErr = ptext (sLit "Empty record update")
 
 badPun :: Located RdrName -> SDoc
 badPun fld = vcat [ptext (sLit "Illegal use of punning for field") <+> quotes (ppr fld),
@@ -694,7 +713,8 @@ rnOverLit origLit
                                 HsVar v -> v /= std_name
                                 _       -> panic "rnOverLit"
         ; return (lit { ol_witness = from_thing_name
-                      , ol_rebindable = rebindable }, fvs) }
+                      , ol_rebindable = rebindable
+                      , ol_type = placeHolderType }, fvs) }
 \end{code}
 
 %************************************************************************

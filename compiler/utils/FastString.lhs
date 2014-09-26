@@ -50,9 +50,7 @@ module FastString
         mkFastStringBytes,
         mkFastStringByteList,
         mkFastStringForeignPtr,
-#if defined(__GLASGOW_HASKELL__)
         mkFastString#,
-#endif
 
         -- ** Deconstruction
         unpackFS,           -- :: FastString -> String
@@ -84,9 +82,7 @@ module FastString
 
         -- ** Construction
         sLit,
-#if defined(__GLASGOW_HASKELL__)
         mkLitString#,
-#endif
         mkLitString,
 
         -- ** Deconstruction
@@ -128,9 +124,7 @@ import Foreign.Safe
 import GHC.Conc.Sync    (sharedCAF)
 #endif
 
-#if defined(__GLASGOW_HASKELL__)
 import GHC.Base         ( unpackCString# )
-#endif
 
 #define hASH_TBL_SIZE          4091
 #define hASH_TBL_SIZE_UNBOXED  4091#
@@ -239,7 +233,7 @@ data FastStringTable =
 string_table :: FastStringTable
 {-# NOINLINE string_table #-}
 string_table = unsafePerformIO $ do
-  uid <- newIORef 0
+  uid <- newIORef 603979776 -- ord '$' * 0x01000000
   tab <- IO $ \s1# -> case newArray# hASH_TBL_SIZE_UNBOXED (panic "string_table") s1# of
                           (# s2#, arr# #) ->
                               (# s2#, FastStringTable uid arr# #)
@@ -380,10 +374,12 @@ mkFastStringForeignPtr ptr !fp len
 -- | Create a 'FastString' from an existing 'ForeignPtr'; the difference
 -- between this and 'mkFastStringBytes' is that we don't have to copy
 -- the bytes if the string is new to the table.
-mkFastStringByteString :: ByteString -> IO FastString
-mkFastStringByteString bs = BS.unsafeUseAsCStringLen bs $ \(ptr, len) -> do
-  let ptr' = castPtr ptr
-  mkFastStringWith (mkNewFastStringByteString bs ptr' len) ptr' len
+mkFastStringByteString :: ByteString -> FastString
+mkFastStringByteString bs =
+    inlinePerformIO $
+      BS.unsafeUseAsCStringLen bs $ \(ptr, len) -> do
+        let ptr' = castPtr ptr
+        mkFastStringWith (mkNewFastStringByteString bs ptr' len) ptr' len
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
@@ -510,8 +506,7 @@ zEncodeFS fs@(FastString _ _ _ ref) =
               Just zfs -> (m', zfs)
 
 appendFS :: FastString -> FastString -> FastString
-appendFS fs1 fs2 = inlinePerformIO
-                 $ mkFastStringByteString
+appendFS fs1 fs2 = mkFastStringByteString
                  $ BS.append (fastStringToByteString fs1)
                              (fastStringToByteString fs2)
 
@@ -528,9 +523,8 @@ tailFS :: FastString -> FastString
 tailFS (FastString _ 0 _ _) = panic "tailFS: Empty FastString"
 tailFS (FastString _ _ bs _) =
     inlinePerformIO $ BS.unsafeUseAsCString bs $ \ptr ->
-    do let (_, ptr') = utf8DecodeChar (castPtr ptr)
-           n = ptr' `minusPtr` ptr
-       mkFastStringByteString $ BS.drop n bs
+    do let (_, n) = utf8DecodeChar (castPtr ptr)
+       return $! mkFastStringByteString (BS.drop n bs)
 
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
@@ -573,10 +567,8 @@ type LitString = Ptr Word8
 --If it's commonly needed, we should perhaps have
 --data LitString = LitString {-#UNPACK#-}!(FastPtr Word8) {-#UNPACK#-}!FastInt
 
-#if defined(__GLASGOW_HASKELL__)
 mkLitString# :: Addr# -> LitString
 mkLitString# a# = Ptr a#
-#endif
 --can/should we use FastTypes here?
 --Is this likely to be memory-preserving if only used on constant strings?
 --should we inline it? If lucky, that would make a CAF that wouldn't

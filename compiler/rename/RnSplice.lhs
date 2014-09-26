@@ -14,6 +14,7 @@ import NameSet
 import HsSyn
 import RdrName
 import TcRnMonad
+import Kind
 
 #ifdef GHCI
 import Control.Monad    ( unless, when )
@@ -46,7 +47,8 @@ rnBracket e _ = failTH e "Template Haskell bracket"
 rnTopSpliceDecls :: HsSplice RdrName -> RnM ([LHsDecl RdrName], FreeVars)
 rnTopSpliceDecls e = failTH e "Template Haskell top splice"
 
-rnSpliceType :: HsSplice RdrName -> PostTcKind -> RnM (HsType Name, FreeVars)
+rnSpliceType :: HsSplice RdrName -> PostTc Name Kind
+             -> RnM (HsType Name, FreeVars)
 rnSpliceType e _ = failTH e "Template Haskell type splice"
 
 rnSpliceExpr :: Bool -> HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
@@ -169,7 +171,8 @@ rnSpliceExpr is_typed splice
            ; return (unLoc lexpr3, fvs)  }
 
 ----------------------
-rnSpliceType :: HsSplice RdrName -> PostTcKind -> RnM (HsType Name, FreeVars)
+rnSpliceType :: HsSplice RdrName -> PostTc Name Kind
+             -> RnM (HsType Name, FreeVars)
 rnSpliceType splice k
   = rnSpliceGen False run_type_splice pend_type_splice splice
   where

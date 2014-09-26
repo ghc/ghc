@@ -6,9 +6,8 @@ tcfail008.hs:3:5:
     Note: there are several potential instances:
       instance Num Double -- Defined in ‘GHC.Float’
       instance Num Float -- Defined in ‘GHC.Float’
-      instance Integral a => Num (GHC.Real.Ratio a)
-        -- Defined in ‘GHC.Real’
-      ...plus three others
+      instance Num Int -- Defined in ‘GHC.Num’
+      ...plus two others
     In the first argument of ‘(:)’, namely ‘1’
     In the expression: 1 : 2
     In an equation for ‘o’: o = 1 : 2

@@ -6,11 +6,11 @@ clean:
 	rm -f A/Setup A/Setup.o A/Setup.hi
 	rm -f B/Setup B/Setup.o B/Setup.hi
 	rm -rf A/dist B/dist
-	rm -f package.conf
+	rm -rf package.conf
 
 T3007:
 	$(MAKE) clean
-	echo '[]' > package.conf
+	'$(GHC_PKG)' init package.conf
 	cd A && '$(TEST_HC)' -v0 --make Setup
 	cd A && ./Setup configure -v0 --with-compiler='$(TEST_HC)' --ghc-pkg-option=--global-package-db=../package.conf --ghc-option=-package-db../package.conf
 	cd A && ./Setup build -v0

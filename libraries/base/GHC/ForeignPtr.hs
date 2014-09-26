@@ -12,13 +12,13 @@
 -- Module      :  GHC.ForeignPtr
 -- Copyright   :  (c) The University of Glasgow, 1992-2003
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
 -- GHC's implementation of the 'ForeignPtr' data type.
--- 
+--
 -----------------------------------------------------------------------------
 
 module GHC.ForeignPtr
@@ -44,8 +44,8 @@ module GHC.ForeignPtr
         finalizeForeignPtr
   ) where
 
-import Control.Monad    ( sequence_ )
 import Foreign.Storable
+import Data.Foldable    ( sequence_ )
 import Data.Typeable
 
 import GHC.Show
@@ -105,7 +105,7 @@ instance Show (ForeignPtr a) where
 -- |A finalizer is represented as a pointer to a foreign function that, at
 -- finalisation time, gets as an argument a plain pointer variant of the
 -- foreign pointer that the finalizer is associated with.
--- 
+--
 -- Note that the foreign function /must/ use the @ccall@ calling convention.
 --
 type FinalizerPtr a        = FunPtr (Ptr a -> IO ())
@@ -140,7 +140,7 @@ mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 -- 'mallocForeignPtr' is equivalent to
 --
 -- >    do { p <- malloc; newForeignPtr finalizerFree p }
--- 
+--
 -- although it may be implemented differently internally: you may not
 -- assume that the memory returned by 'mallocForeignPtr' has been
 -- allocated with 'Foreign.Marshal.Alloc.malloc'.
@@ -151,7 +151,7 @@ mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 -- free the memory.  Use of 'mallocForeignPtr' and associated
 -- functions is strongly recommended in preference to 'newForeignPtr'
 -- with a finalizer.
--- 
+--
 mallocForeignPtr = doMalloc undefined
   where doMalloc :: Storable b => b -> IO (ForeignPtr b)
         doMalloc a
@@ -171,7 +171,7 @@ mallocForeignPtr = doMalloc undefined
 mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
 mallocForeignPtrBytes size | size < 0 =
   error "mallocForeignPtrBytes: size must be >= 0"
-mallocForeignPtrBytes (I# size) = do 
+mallocForeignPtrBytes (I# size) = do
   r <- newIORef NoFinalizers
   IO $ \s ->
      case newPinnedByteArray# size s      of { (# s', mbarr# #) ->
@@ -205,7 +205,7 @@ mallocForeignPtrAlignedBytes (I# size) (I# align) = do
 -- only inside Haskell (such as those created for packed strings).
 -- Attempts to add a finalizer to a ForeignPtr created this way, or to
 -- finalize such a pointer, will throw an exception.
--- 
+--
 mallocPlainForeignPtr :: Storable a => IO (ForeignPtr a)
 mallocPlainForeignPtr = doMalloc undefined
   where doMalloc :: Storable b => b -> IO (ForeignPtr b)
@@ -284,7 +284,7 @@ addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- are finalized objects, so a finalizer should not refer to a 'Handle'
 -- (including @stdout@, @stdin@ or @stderr@).
 --
-addForeignPtrConcFinalizer (ForeignPtr _ c) finalizer = 
+addForeignPtrConcFinalizer (ForeignPtr _ c) finalizer =
   addForeignPtrConcFinalizer_ c finalizer
 
 addForeignPtrConcFinalizer_ :: ForeignPtrContents -> IO () -> IO ()
@@ -299,7 +299,7 @@ addForeignPtrConcFinalizer_ (PlainForeignPtr r) finalizer = do
 addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do
   noFinalizers <- insertHaskellFinalizer r finalizer
   if noFinalizers
-     then  IO $ \s -> 
+     then  IO $ \s ->
                case mkWeak# fo () (do foreignPtrFinalizer r; touch f) s of
                   (# s1, _ #) -> (# s1, () #)
      else return ()
@@ -378,7 +378,7 @@ touchForeignPtr :: ForeignPtr a -> IO ()
 -- actions. In particular 'Foreign.ForeignPtr.withForeignPtr'
 -- does a 'touchForeignPtr' after it
 -- executes the user action.
--- 
+--
 -- Note that this function should not be used to express dependencies
 -- between finalizers on 'ForeignPtr's.  For example, if the finalizer
 -- for a 'ForeignPtr' @F1@ calls 'touchForeignPtr' on a second

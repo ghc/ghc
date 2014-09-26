@@ -15,8 +15,8 @@
 #define RTS_PROF_CCS_H
 
 /* -----------------------------------------------------------------------------
- * Data Structures 
- * ---------------------------------------------------------------------------*/  
+ * Data Structures
+ * ---------------------------------------------------------------------------*/
 /*
  * Note [struct alignment]
  * NB. be careful to avoid unwanted padding between fields, by
@@ -88,7 +88,7 @@ void startProfTimer     ( void );
  * ---------------------------------------------------------------------------*/
 
 #if defined(PROFILING)
-  
+
 /* -----------------------------------------------------------------------------
  * Constants
  * ---------------------------------------------------------------------------*/
@@ -116,17 +116,17 @@ typedef struct IndexTable_ {
     nat back_edge;
 } IndexTable;
 
-     
+
 /* -----------------------------------------------------------------------------
    Pre-defined cost centres and cost centre stacks
    -------------------------------------------------------------------------- */
 
 #if IN_STG_CODE
 
-extern StgWord CC_MAIN[];	
+extern StgWord CC_MAIN[];
 extern StgWord CCS_MAIN[];      // Top CCS
 
-extern StgWord CC_SYSTEM[];	
+extern StgWord CC_SYSTEM[];
 extern StgWord CCS_SYSTEM[];    // RTS costs
 
 extern StgWord CC_GC[];
@@ -140,10 +140,10 @@ extern StgWord CCS_DONT_CARE[];  // CCS attached to static constructors
 
 #else
 
-extern CostCentre      CC_MAIN[];	
+extern CostCentre      CC_MAIN[];
 extern CostCentreStack CCS_MAIN[];      // Top CCS
 
-extern CostCentre      CC_SYSTEM[];	
+extern CostCentre      CC_SYSTEM[];
 extern CostCentreStack CCS_SYSTEM[];    // RTS costs
 
 extern CostCentre      CC_GC[];
@@ -169,7 +169,7 @@ extern unsigned int RTS_VAR(CCS_ID);
 extern unsigned int RTS_VAR(era);
 
 /* -----------------------------------------------------------------------------
- * Functions 
+ * Functions
  * ---------------------------------------------------------------------------*/
 
 CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
@@ -177,7 +177,7 @@ void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
 
 /* -----------------------------------------------------------------------------
    Registering CCs and CCSs
- 
+
    Registering a CC or CCS consists of
      - assigning it a unique ID
      - linking it onto the list of registered CCs/CCSs
@@ -190,21 +190,21 @@ void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
 extern CostCentre * RTS_VAR(CC_LIST);               // registered CC list
 extern CostCentreStack * RTS_VAR(CCS_LIST);         // registered CCS list
 
-#define REGISTER_CC(cc)					\
-	do {						\
-	if ((cc)->link == (CostCentre *)0) {		\
-	    (cc)->link = CC_LIST;			\
-	    CC_LIST = (cc);				\
-	    (cc)->ccID = CC_ID++; 			\
-	}} while(0)
+#define REGISTER_CC(cc)                                 \
+        do {                                            \
+        if ((cc)->link == (CostCentre *)0) {            \
+            (cc)->link = CC_LIST;                       \
+            CC_LIST = (cc);                             \
+            (cc)->ccID = CC_ID++;                       \
+        }} while(0)
 
-#define REGISTER_CCS(ccs)				\
-	do {						\
-        if ((ccs)->prevStack == (CostCentreStack *)0) {	\
-	  (ccs)->prevStack = CCS_LIST;			\
-	  CCS_LIST = (ccs);				\
-	  (ccs)->ccsID = CCS_ID++;			\
-	}} while(0)
+#define REGISTER_CCS(ccs)                               \
+        do {                                            \
+        if ((ccs)->prevStack == (CostCentreStack *)0) { \
+          (ccs)->prevStack = CCS_LIST;                  \
+          CCS_LIST = (ccs);                             \
+          (ccs)->ccsID = CCS_ID++;                      \
+        }} while(0)
 
 /* -----------------------------------------------------------------------------
  * Declaring Cost Centres & Cost Centre Stacks.
@@ -224,17 +224,17 @@ extern CostCentreStack * RTS_VAR(CCS_LIST);         // registered CCS list
 
 # define CCS_DECLARE(ccs_ident,cc_ident,is_local)       \
      is_local CostCentreStack ccs_ident[1]              \
-       = {{ ccsID 		: 0,                    \
-	    cc 			: cc_ident,             \
-	    prevStack 		: NULL,                 \
-	    indexTable 		: NULL,                 \
+       = {{ ccsID               : 0,                    \
+            cc                  : cc_ident,             \
+            prevStack           : NULL,                 \
+            indexTable          : NULL,                 \
             root                : NULL,                 \
             depth               : 0,                    \
             selected            : 0,                    \
-	    scc_count 		: 0,                    \
-	    time_ticks 		: 0,                    \
-	    mem_alloc 		: 0,                    \
-	    inherited_ticks 	: 0,                    \
+            scc_count           : 0,                    \
+            time_ticks          : 0,                    \
+            mem_alloc           : 0,                    \
+            inherited_ticks     : 0,                    \
             inherited_alloc     : 0                     \
        }};
 
@@ -248,8 +248,7 @@ extern CostCentreStack * RTS_VAR(CCS_LIST);         // registered CCS list
 #else /* !PROFILING */
 
 #define CCS_ALLOC(ccs, amount) doNothing()
- 
+
 #endif /* PROFILING */
 
 #endif /* RTS_PROF_CCS_H */
-

@@ -261,18 +261,16 @@ pcNonRecDataTyCon = pcTyCon False NonRecursive False
 -- Representational role!
 pcTyCon :: Bool -> RecFlag -> Bool -> Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
 pcTyCon is_enum is_rec is_prom name cType tyvars cons
-  = tycon
-  where
-    tycon = buildAlgTyCon name
-                tyvars
-                (map (const Representational) tyvars)
-                cType
-                []              -- No stupid theta
-                (DataTyCon cons is_enum)
-                is_rec
-                is_prom
-                False           -- Not in GADT syntax
-                NoParentTyCon
+  = buildAlgTyCon name
+        tyvars
+        (map (const Representational) tyvars)
+        cType
+        []              -- No stupid theta
+        (DataTyCon cons is_enum)
+        is_rec
+        is_prom
+        False           -- Not in GADT syntax
+        NoParentTyCon
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
 pcDataCon = pcDataConWithFixity False

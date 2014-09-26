@@ -53,15 +53,17 @@ module Outputable (
         -- * Controlling the style in which output is printed
         BindingSite(..),
 
-        PprStyle, CodeStyle(..), PrintUnqualified,
+        PprStyle, CodeStyle(..), PrintUnqualified(..),
+        QueryQualifyName, QueryQualifyModule, QueryQualifyPackage,
+        reallyAlwaysQualify, reallyAlwaysQualifyNames,
         alwaysQualify, alwaysQualifyNames, alwaysQualifyModules,
         neverQualify, neverQualifyNames, neverQualifyModules,
-        QualifyName(..),
+        QualifyName(..), queryQual,
         sdocWithDynFlags, sdocWithPlatform,
         getPprStyle, withPprStyle, withPprStyleDoc,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
-        ifPprDebug, qualName, qualModule,
+        ifPprDebug, qualName, qualModule, qualPackage,
         mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
         mkUserStyle, cmdlineParserStyle, Depth(..),
 
@@ -76,7 +78,7 @@ import {-# SOURCE #-}   DynFlags( DynFlags,
                                   targetPlatform, pprUserLength, pprCols,
                                   useUnicode, useUnicodeSyntax,
                                   unsafeGlobalDynFlags )
-import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
+import {-# SOURCE #-}   Module( PackageKey, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
 import {-# SOURCE #-}   StaticFlags( opt_PprStyle_Debug, opt_NoDebugOutput )
 
@@ -142,12 +144,15 @@ data Depth = AllTheWay
 -- -----------------------------------------------------------------------------
 -- Printing original names
 
--- When printing code that contains original names, we need to map the
+-- | When printing code that contains original names, we need to map the
 -- original names back to something the user understands.  This is the
--- purpose of the pair of functions that gets passed around
+-- purpose of the triple of functions that gets passed around
 -- when rendering 'SDoc'.
-
-type PrintUnqualified = (QueryQualifyName, QueryQualifyModule)
+data PrintUnqualified = QueryQualify {
+    queryQualifyName    :: QueryQualifyName,
+    queryQualifyModule  :: QueryQualifyModule,
+    queryQualifyPackage :: QueryQualifyPackage
+}
 
 -- | given an /original/ name, this function tells you which module
 -- name it should be qualified with when printing for the user, if
@@ -161,6 +166,9 @@ type QueryQualifyName = Module -> OccName -> QualifyName
 -- a package name to disambiguate it.
 type QueryQualifyModule = Module -> Bool
 
+-- | For a given package, we need to know whether to print it with
+-- the package key to disambiguate it.
+type QueryQualifyPackage = PackageKey -> Bool
 
 -- See Note [Printing original names] in HscTypes
 data QualifyName                        -- given P:M.T
@@ -173,6 +181,10 @@ data QualifyName                        -- given P:M.T
                 -- it is not in scope at all, and M.T is already bound in the
                 -- current scope, so we must refer to it as "P:M.T"
 
+reallyAlwaysQualifyNames :: QueryQualifyName
+reallyAlwaysQualifyNames _ _ = NameNotInScope2
+
+-- | NB: This won't ever show package IDs
 alwaysQualifyNames :: QueryQualifyName
 alwaysQualifyNames m _ = NameQual (moduleName m)
 
@@ -185,9 +197,23 @@ alwaysQualifyModules _ = True
 neverQualifyModules :: QueryQualifyModule
 neverQualifyModules _ = False
 
-alwaysQualify, neverQualify :: PrintUnqualified
-alwaysQualify = (alwaysQualifyNames, alwaysQualifyModules)
-neverQualify  = (neverQualifyNames,  neverQualifyModules)
+alwaysQualifyPackages :: QueryQualifyPackage
+alwaysQualifyPackages _ = True
+
+neverQualifyPackages :: QueryQualifyPackage
+neverQualifyPackages _ = False
+
+reallyAlwaysQualify, alwaysQualify, neverQualify :: PrintUnqualified
+reallyAlwaysQualify
+              = QueryQualify reallyAlwaysQualifyNames
+                             alwaysQualifyModules
+                             alwaysQualifyPackages
+alwaysQualify = QueryQualify alwaysQualifyNames
+                             alwaysQualifyModules
+                             alwaysQualifyPackages
+neverQualify  = QueryQualify neverQualifyNames
+                             neverQualifyModules
+                             neverQualifyPackages
 
 defaultUserStyle, defaultDumpStyle :: PprStyle
 
@@ -297,12 +323,21 @@ sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 
 \begin{code}
 qualName :: PprStyle -> QueryQualifyName
-qualName (PprUser (qual_name,_) _)  mod occ = qual_name mod occ
-qualName _other                     mod _   = NameQual (moduleName mod)
+qualName (PprUser q _)  mod occ = queryQualifyName q mod occ
+qualName _other         mod _   = NameQual (moduleName mod)
 
 qualModule :: PprStyle -> QueryQualifyModule
-qualModule (PprUser (_,qual_mod) _)  m = qual_mod m
+qualModule (PprUser q _)  m = queryQualifyModule q m
 qualModule _other                   _m = True
+
+qualPackage :: PprStyle -> QueryQualifyPackage
+qualPackage (PprUser q _)  m = queryQualifyPackage q m
+qualPackage _other                   _m = True
+
+queryQual :: PprStyle -> PrintUnqualified
+queryQual s = QueryQualify (qualName s)
+                           (qualModule s)
+                           (qualPackage s)
 
 codeStyle :: PprStyle -> Bool
 codeStyle (PprCode _)     = True
@@ -994,7 +1029,7 @@ assertPprPanic file line msg
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> String -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg
- = cont (showSDoc dflags doc)
+ = cont (showSDocDump dflags doc)
  where
      doc = sep [text heading, nest 4 pretty_msg]
 \end{code}

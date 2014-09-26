@@ -1,7 +1,11 @@
+{-# LANGUAGE CPP #-}
+
 module Main where
 
 import Data.Bits
-import Data.Word
+#if __GLASGOW_HASKELL__ < 705
+import Data.Word (Word)
+#endif
 
 test_and1 :: Word -> Word
 test_and1 x = x .&. 0

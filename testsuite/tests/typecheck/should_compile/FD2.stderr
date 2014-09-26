@@ -1,8 +1,8 @@
 
 FD2.hs:26:34:
     Could not deduce (e ~ e1)
-    from the context (Foldable a)
-      bound by the class declaration for ‘Foldable’
+    from the context (ShouldCompile.Foldable a)
+      bound by the class declaration for ‘ShouldCompile.Foldable’
       at FD2.hs:(17,1)-(26,39)
     or from (Elem a e)
       bound by the type signature for

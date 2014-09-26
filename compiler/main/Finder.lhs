@@ -42,14 +42,12 @@ import UniqFM
 import Maybes           ( expectJust )
 import Exception        ( evaluate )
 
-import Distribution.Text
-import Distribution.Package
 import Data.IORef       ( IORef, writeIORef, readIORef, atomicModifyIORef )
 import System.Directory
 import System.FilePath
 import Control.Monad
-import Data.List        ( partition )
 import Data.Time
+import Data.List        ( foldl' )
 
 
 type FileExt = String   -- Filename extension
@@ -190,46 +188,21 @@ homeSearchCache hsc_env mod_name do_this = do
 findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
                          -> IO FindResult
 findExposedPackageModule hsc_env mod_name mb_pkg
-        -- not found in any package:
-  = case lookupModuleWithSuggestions (hsc_dflags hsc_env) mod_name of
-       Left suggest -> return (NotFound { fr_paths = [], fr_pkg = Nothing
-                                        , fr_pkgs_hidden = []
-                                        , fr_mods_hidden = []
-                                        , fr_suggestions = suggest })
-       Right found'
-         | null found_visible   -- Found, but with no exposed copies
-          -> return (NotFound { fr_paths = [], fr_pkg = Nothing
-                              , fr_pkgs_hidden = pkg_hiddens
-                              , fr_mods_hidden = mod_hiddens
-                              , fr_suggestions = [] })
-
-         | [ModConf mod_name' pkg_conf _ _] <- found_visible -- Found uniquely
-         -> let pkgid = packageConfigId pkg_conf in
-            findPackageModule_ hsc_env (mkModule pkgid mod_name') pkg_conf
-
-         | otherwise           -- Found in more than one place
-         -> return (FoundMultiple (map (packageConfigId.modConfPkg)
-                                       found_visible))
-         where
-           found = eltsUFM found'
-           for_this_pkg  = case mb_pkg of
-                             Nothing -> found
-                             Just p  -> filter ((`matches` p).modConfPkg) found
-           found_visible = filter modConfVisible for_this_pkg
-
-           -- NB: _vis is guaranteed to be False; a non-exposed module
-           -- can never be visible.
-           mod_hiddens = [ packageConfigId pkg_conf
-                         | ModConf _ pkg_conf False _vis <- found ]
-
-           -- NB: We /re-report/ non-exposed modules of hidden packages.
-           pkg_hiddens = [ packageConfigId pkg_conf
-                         | ModConf _ pkg_conf _ False <- found
-                         , not (exposed pkg_conf) ]
-
-           pkg_conf  `matches` pkg
-              = case packageName pkg_conf of
-                  PackageName n -> pkg == mkFastString n
+  = case lookupModuleWithSuggestions (hsc_dflags hsc_env) mod_name mb_pkg of
+     LookupFound m pkg_conf ->
+       findPackageModule_ hsc_env m pkg_conf
+     LookupMultiple rs ->
+       return (FoundMultiple rs)
+     LookupHidden pkg_hiddens mod_hiddens ->
+       return (NotFound{ fr_paths = [], fr_pkg = Nothing
+                       , fr_pkgs_hidden = map (modulePackageKey.fst) pkg_hiddens
+                       , fr_mods_hidden = map (modulePackageKey.fst) mod_hiddens
+                       , fr_suggestions = [] })
+     LookupNotFound suggest ->
+       return (NotFound{ fr_paths = [], fr_pkg = Nothing
+                       , fr_pkgs_hidden = []
+                       , fr_mods_hidden = []
+                       , fr_suggestions = suggest })
 
 modLocationCache :: HscEnv -> Module -> IO FindResult -> IO FindResult
 modLocationCache hsc_env mod do_this = do
@@ -301,14 +274,21 @@ findPackageModule hsc_env mod = do
   let
         dflags = hsc_dflags hsc_env
         pkg_id = modulePackageKey mod
-        pkg_map = pkgIdMap (pkgState dflags)
   --
-  case lookupPackage pkg_map pkg_id of
+  case lookupPackage dflags pkg_id of
      Nothing -> return (NoPackage pkg_id)
      Just pkg_conf -> findPackageModule_ hsc_env mod pkg_conf
 
+-- | Look up the interface file associated with module @mod@.  This function
+-- requires a few invariants to be upheld: (1) the 'Module' in question must
+-- be the module identifier of the *original* implementation of a module,
+-- not a reexport (this invariant is upheld by @Packages.lhs@) and (2)
+-- the 'PackageConfig' must be consistent with the package key in the 'Module'.
+-- The redundancy is to avoid an extra lookup in the package state
+-- for the appropriate config.
 findPackageModule_ :: HscEnv -> Module -> PackageConfig -> IO FindResult
 findPackageModule_ hsc_env mod pkg_conf =
+  ASSERT( modulePackageKey mod == packageConfigId pkg_conf )
   modLocationCache hsc_env mod $
 
   -- special case for GHC.Prim; we won't find it in the filesystem.
@@ -553,18 +533,38 @@ cannotFindInterface = cantFindErr (sLit "Failed to load interface for")
 
 cantFindErr :: LitString -> LitString -> DynFlags -> ModuleName -> FindResult
             -> SDoc
-cantFindErr _ multiple_found _ mod_name (FoundMultiple pkgs)
+cantFindErr _ multiple_found _ mod_name (FoundMultiple mods)
+  | Just pkgs <- unambiguousPackages
   = hang (ptext multiple_found <+> quotes (ppr mod_name) <> colon) 2 (
        sep [ptext (sLit "it was found in multiple packages:"),
-                hsep (map (text.packageKeyString) pkgs)]
+                hsep (map ppr pkgs) ]
     )
+  | otherwise
+  = hang (ptext multiple_found <+> quotes (ppr mod_name) <> colon) 2 (
+       vcat (map pprMod mods)
+    )
+  where
+    unambiguousPackages = foldl' unambiguousPackage (Just []) mods
+    unambiguousPackage (Just xs) (m, ModOrigin (Just _) _ _ _)
+        = Just (modulePackageKey m : xs)
+    unambiguousPackage _ _ = Nothing
+
+    pprMod (m, o) = ptext (sLit "it is bound as") <+> ppr m <+>
+                                ptext (sLit "by") <+> pprOrigin m o
+    pprOrigin _ ModHidden = panic "cantFindErr: bound by mod hidden"
+    pprOrigin m (ModOrigin e res _ f) = sep $ punctuate comma (
+      if e == Just True
+          then [ptext (sLit "package") <+> ppr (modulePackageKey m)]
+          else [] ++
+      map ((ptext (sLit "a reexport in package") <+>)
+                .ppr.packageConfigId) res ++
+      if f then [ptext (sLit "a package flag")] else []
+      )
+
 cantFindErr cannot_find _ dflags mod_name find_result
   = ptext cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
-    pkg_map :: PackageConfigMap
-    pkg_map = pkgIdMap (pkgState dflags)
-
     more_info
       = case find_result of
             NoPackage pkg
@@ -609,44 +609,64 @@ cantFindErr cannot_find _ dflags mod_name find_result
          tried_these files
 
     tried_these files
-        | null files = empty
+        | null files = Outputable.empty
         | verbosity dflags < 3 =
               ptext (sLit "Use -v to see a list of the files searched for.")
         | otherwise =
                hang (ptext (sLit "Locations searched:")) 2 $ vcat (map text files)
 
-    pkg_hidden pkg =
-        ptext (sLit "It is a member of the hidden package") <+> quotes (ppr pkg)
-        <> dot $$ cabal_pkg_hidden_hint pkg
-    cabal_pkg_hidden_hint pkg
+    pkg_hidden :: PackageKey -> SDoc
+    pkg_hidden pkgid =
+        ptext (sLit "It is a member of the hidden package")
+        <+> quotes (ppr pkgid)
+        --FIXME: we don't really want to show the package key here we should
+        -- show the source package id or installed package id if it's ambiguous
+        <> dot $$ cabal_pkg_hidden_hint pkgid
+    cabal_pkg_hidden_hint pkgid
      | gopt Opt_BuildingCabalPackage dflags
-        = case simpleParse (packageKeyString pkg) of
-          Just pid ->
-              ptext (sLit "Perhaps you need to add") <+>
-              quotes (text (display (pkgName pid))) <+>
+        = let pkg = expectJust "pkg_hidden" (lookupPackage dflags pkgid)
+           in ptext (sLit "Perhaps you need to add") <+>
+              quotes (ppr (packageName pkg)) <+>
               ptext (sLit "to the build-depends in your .cabal file.")
-          Nothing -> empty
-     | otherwise = empty
+     | otherwise = Outputable.empty
 
     mod_hidden pkg =
         ptext (sLit "it is a hidden module in the package") <+> quotes (ppr pkg)
 
-    pp_suggestions :: [Module] -> SDoc
+    pp_suggestions :: [ModuleSuggestion] -> SDoc
     pp_suggestions sugs
-      | null sugs = empty
+      | null sugs = Outputable.empty
       | otherwise = hang (ptext (sLit "Perhaps you meant"))
-                       2 (vcat [ vcat (map pp_exp exposed_sugs)
-                               , vcat (map pp_hid hidden_sugs) ])
-      where
-        (exposed_sugs, hidden_sugs) = partition from_exposed_pkg sugs
+                       2 (vcat (map pp_sugg sugs))
 
-    from_exposed_pkg m = case lookupPackage pkg_map (modulePackageKey m) of
-                            Just pkg_config -> exposed pkg_config
-                            Nothing         -> WARN( True, ppr m ) -- Should not happen
-                                               False
-
-    pp_exp mod = ppr (moduleName mod)
-                 <+> parens (ptext (sLit "from") <+> ppr (modulePackageKey mod))
-    pp_hid mod = ppr (moduleName mod)
-                 <+> parens (ptext (sLit "needs flag -package") <+> ppr (modulePackageKey mod))
+    -- NB: Prefer the *original* location, and then reexports, and then
+    -- package flags when making suggestions.  ToDo: if the original package
+    -- also has a reexport, prefer that one
+    pp_sugg (SuggestVisible m mod o) = ppr m <+> provenance o
+      where provenance ModHidden = Outputable.empty
+            provenance (ModOrigin{ fromOrigPackage = e,
+                                   fromExposedReexport = res,
+                                   fromPackageFlag = f })
+              | Just True <- e
+                 = parens (ptext (sLit "from") <+> ppr (modulePackageKey mod))
+              | f && moduleName mod == m
+                 = parens (ptext (sLit "from") <+> ppr (modulePackageKey mod))
+              | (pkg:_) <- res
+                 = parens (ptext (sLit "from") <+> ppr (packageConfigId pkg)
+                    <> comma <+> ptext (sLit "reexporting") <+> ppr mod)
+              | f
+                 = parens (ptext (sLit "defined via package flags to be")
+                    <+> ppr mod)
+              | otherwise = Outputable.empty
+    pp_sugg (SuggestHidden m mod o) = ppr m <+> provenance o
+      where provenance ModHidden =  Outputable.empty
+            provenance (ModOrigin{ fromOrigPackage = e,
+                                   fromHiddenReexport = rhs })
+              | Just False <- e
+                 = parens (ptext (sLit "needs flag -package-key")
+                    <+> ppr (modulePackageKey mod))
+              | (pkg:_) <- rhs
+                 = parens (ptext (sLit "needs flag -package-key")
+                    <+> ppr (packageConfigId pkg))
+              | otherwise = Outputable.empty
 \end{code}

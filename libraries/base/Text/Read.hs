@@ -6,7 +6,7 @@
 -- Module      :  Text.Read
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  non-portable (uses Text.ParserCombinators.ReadP)
@@ -15,7 +15,7 @@
 --
 -- The "Text.Read" library is the canonical library to import for
 -- 'Read'-class facilities.  For GHC only, it offers an extended and much
--- improved 'Read' class, which constitutes a proposed alternative to the 
+-- improved 'Read' class, which constitutes a proposed alternative to the
 -- Haskell 2010 'Read'.  In particular, writing parsers is easier, and
 -- the parsers are much more efficient.
 --
@@ -47,7 +47,6 @@ module Text.Read (
 import GHC.Base
 import GHC.Read
 import Data.Either
-import Data.Maybe
 import Text.ParserCombinators.ReadP as P
 import Text.ParserCombinators.ReadPrec
 import qualified Text.Read.Lex as L

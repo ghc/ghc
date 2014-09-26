@@ -12,7 +12,7 @@
 -- Module      :  GHC.IO.Handle.Types
 -- Copyright   :  (c) The University of Glasgow, 1994-2009
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
@@ -42,7 +42,6 @@ import GHC.IO.Buffer
 import GHC.IO.BufferedIO
 import GHC.IO.Encoding.Types
 import GHC.IORef
-import Data.Maybe
 import GHC.Show
 import GHC.Read
 import GHC.Word
@@ -55,13 +54,13 @@ import Control.Monad
 -- ---------------------------------------------------------------------------
 -- Handle type
 
---  A Handle is represented by (a reference to) a record 
+--  A Handle is represented by (a reference to) a record
 --  containing the state of the I/O port/device. We record
 --  the following pieces of info:
 
 --    * type (read,write,closed etc.)
 --    * the underlying file descriptor
---    * buffering mode 
+--    * buffering mode
 --    * buffer, and spare buffers
 --    * user-friendly name (usually the
 --      FilePath used when IO.openFile was called)
@@ -73,7 +72,7 @@ import Control.Monad
 -- represented by values of type @Handle@.  Each value of this type is a
 -- /handle/: a record used by the Haskell run-time system to /manage/ I\/O
 -- with file system objects.  A handle has at least the following properties:
--- 
+--
 --  * whether it manages input or output or both;
 --
 --  * whether it is /open/, /closed/ or /semi-closed/;
@@ -97,7 +96,7 @@ import Control.Monad
 -- equal according to '==' only to itself; no attempt
 -- is made to compare the internal state of different handles for equality.
 
-data Handle 
+data Handle
   = FileHandle                          -- A normal handle to a file
         FilePath                        -- the file (used for error messages
                                         -- only)
@@ -119,7 +118,7 @@ data Handle
 instance Eq Handle where
  (FileHandle _ h1)     == (FileHandle _ h2)     = h1 == h2
  (DuplexHandle _ h1 _) == (DuplexHandle _ h2 _) = h1 == h2
- _ == _ = False 
+ _ == _ = False
 
 data Handle__
   = forall dev enc_state dec_state . (IODevice dev, BufferedIO dev, Typeable dev) =>
@@ -136,7 +135,7 @@ data Handle__
       haCodec       :: Maybe TextEncoding,
       haInputNL     :: Newline,
       haOutputNL    :: Newline,
-      haOtherSide   :: Maybe (MVar Handle__) -- ptr to the write side of a 
+      haOtherSide   :: Maybe (MVar Handle__) -- ptr to the write side of a
                                              -- duplex handle.
     }
     deriving Typeable
@@ -145,7 +144,7 @@ data Handle__
 -- a new one for each hPutStr.  These buffers are *guaranteed* to be the
 -- same size as the main buffer.
 data BufferList e
-  = BufferListNil 
+  = BufferListNil
   | BufferListCons (RawBuffer e) (BufferList e)
 
 --  Internally, we classify handles as being one
@@ -203,13 +202,13 @@ checkHandleInvariants _ = return ()
 -- ---------------------------------------------------------------------------
 -- Buffering modes
 
--- | Three kinds of buffering are supported: line-buffering, 
+-- | Three kinds of buffering are supported: line-buffering,
 -- block-buffering or no-buffering.  These modes have the following
 -- effects. For output, items are written out, or /flushed/,
 -- from the internal buffer according to the buffer mode:
 --
 --  * /line-buffering/: the entire output buffer is flushed
---    whenever a newline is output, the buffer overflows, 
+--    whenever a newline is output, the buffer overflows,
 --    a 'System.IO.hFlush' is issued, or the handle is closed.
 --
 --  * /block-buffering/: the entire buffer is written out whenever it
@@ -240,10 +239,10 @@ checkHandleInvariants _ = return ()
 -- The default buffering mode when a handle is opened is
 -- implementation-dependent and may depend on the file system object
 -- which is attached to that handle.
--- For most implementations, physical files will normally be block-buffered 
+-- For most implementations, physical files will normally be block-buffered
 -- and terminals will normally be line-buffered.
 
-data BufferMode  
+data BufferMode
  = NoBuffering  -- ^ buffering is disabled if possible.
  | LineBuffering
                 -- ^ line-buffering should be enabled if possible.
@@ -257,7 +256,7 @@ data BufferMode
 [note Buffering Implementation]
 
 Each Handle has two buffers: a byte buffer (haByteBuffer) and a Char
-buffer (haCharBuffer).  
+buffer (haCharBuffer).
 
 [note Buffered Reading]
 
@@ -360,7 +359,7 @@ data Newline = LF    -- ^ '\n'
 -- are assumed to represent newlines with the '\n' character; the
 -- newline mode specifies how to translate '\n' on output, and what to
 -- translate into '\n' on input.
-data NewlineMode 
+data NewlineMode
   = NewlineMode { inputNL :: Newline,
                     -- ^ the representation of newlines on input
                   outputNL :: Newline
@@ -381,25 +380,25 @@ nativeNewline = LF
 -- represetnation on output.  This mode can be used on any platform, and
 -- works with text files using any newline convention.  The downside is
 -- that @readFile >>= writeFile@ might yield a different file.
--- 
--- > universalNewlineMode  = NewlineMode { inputNL  = CRLF, 
+--
+-- > universalNewlineMode  = NewlineMode { inputNL  = CRLF,
 -- >                                       outputNL = nativeNewline }
 --
 universalNewlineMode :: NewlineMode
-universalNewlineMode  = NewlineMode { inputNL  = CRLF, 
+universalNewlineMode  = NewlineMode { inputNL  = CRLF,
                                       outputNL = nativeNewline }
 
 -- | Use the native newline representation on both input and output
--- 
+--
 -- > nativeNewlineMode  = NewlineMode { inputNL  = nativeNewline
 -- >                                    outputNL = nativeNewline }
 --
 nativeNewlineMode    :: NewlineMode
-nativeNewlineMode     = NewlineMode { inputNL  = nativeNewline, 
+nativeNewlineMode     = NewlineMode { inputNL  = nativeNewline,
                                       outputNL = nativeNewline }
 
 -- | Do no newline translation at all.
--- 
+--
 -- > noNewlineTranslation  = NewlineMode { inputNL  = LF, outputNL = LF }
 --
 noNewlineTranslation :: NewlineMode
@@ -422,7 +421,7 @@ instance Show HandleType where
       AppendHandle      -> showString "writable (append)"
       ReadWriteHandle   -> showString "read-writable"
 
-instance Show Handle where 
+instance Show Handle where
   showsPrec _ (FileHandle   file _)   = showHandle file
   showsPrec _ (DuplexHandle file _ _) = showHandle file
 

@@ -1,8 +1,10 @@
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnboxedTuples, CPP #-}
 
-module State (module State, mapAccumLM {- XXX hack -}) where
+module State where
 
-import MonadUtils
+#if __GLASGOW_HASKELL__ < 709
+import Control.Applicative
+#endif
 
 newtype State s a = State { runState' :: s -> (# a, s #) }
 

@@ -63,6 +63,7 @@ import qualified Data.Set as Set
 import qualified FiniteMap as Map ( insertListWith )
 
 import Control.Concurrent ( forkIOWithUnmask, killThread )
+import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
 import Control.Concurrent.QSem
 import Control.Exception
@@ -79,6 +80,11 @@ import System.IO        ( fixIO )
 import System.IO.Error  ( isDoesNotExistError )
 
 import GHC.Conc ( getNumProcessors, getNumCapabilities, setNumCapabilities )
+
+label_self :: String -> IO ()
+label_self thread_name = do
+    self_tid <- CC.myThreadId
+    CC.labelThread self_tid thread_name
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -744,10 +750,18 @@ parUpsweep n_jobs old_hpt stable_mods cleanup sccs = do
                          | ((ms,mvar,_),idx) <- comp_graph_w_idx ]
 
 
+    liftIO $ label_self "main --make thread"
     -- For each module in the module graph, spawn a worker thread that will
     -- compile this module.
     let { spawnWorkers = forM comp_graph_w_idx $ \((mod,!mvar,!log_queue),!mod_idx) ->
             forkIOWithUnmask $ \unmask -> do
+                liftIO $ label_self $ unwords
+                    [ "worker --make thread"
+                    , "for module"
+                    , show (moduleNameString (ms_mod_name mod))
+                    , "number"
+                    , show mod_idx
+                    ]
                 -- Replace the default log_action with one that writes each
                 -- message to the module's log_queue. The main thread will
                 -- deal with synchronously printing these messages.

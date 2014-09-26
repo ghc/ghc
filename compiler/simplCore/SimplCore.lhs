@@ -227,7 +227,7 @@ getCoreToDo dflags
            CoreDoFloatOutwards FloatOutSwitches {
                                  floatOutLambdas   = Just 0,
                                  floatOutConstants = True,
-                                 floatOutPartialApplications = False },
+                                 floatOutOverSatApps = False },
                 -- Was: gentleFloatOutSwitches
                 --
                 -- I have no idea why, but not floating constants to
@@ -239,14 +239,12 @@ getCoreToDo dflags
                 --          made 0.0% difference to any other nofib
                 --          benchmark
                 --
-                -- Not doing floatOutPartialApplications yet, we'll do
+                -- Not doing floatOutOverSatApps yet, we'll do
                 -- that later on when we've had a chance to get more
                 -- accurate arity information.  In fact it makes no
                 -- difference at all to performance if we do it here,
                 -- but maybe we save some unnecessary to-and-fro in
                 -- the simplifier.
-
-        runWhen do_float_in CoreDoFloatInwards,
 
         simpl_phases,
 
@@ -262,6 +260,13 @@ getCoreToDo dflags
                 -- Don't stop now!
         simpl_phase 0 ["main"] (max max_iter 3),
 
+        runWhen do_float_in CoreDoFloatInwards,
+            -- Run float-inwards immediately before the strictness analyser
+            -- Doing so pushes bindings nearer their use site and hence makes
+            -- them more likely to be strict. These bindings might only show
+            -- up after the inlining from simplification.  Example in fulsom,
+            -- Csg.calc, where an arg of timesDouble thereby becomes strict.
+
         runWhen call_arity $ CoreDoPasses
             [ CoreDoCallArity
             , simpl_phase 0 ["post-call-arity"] max_iter
@@ -271,9 +276,9 @@ getCoreToDo dflags
 
         runWhen full_laziness $
            CoreDoFloatOutwards FloatOutSwitches {
-                                 floatOutLambdas   = floatLamArgs dflags,
-                                 floatOutConstants = True,
-                                 floatOutPartialApplications = True },
+                                 floatOutLambdas     = floatLamArgs dflags,
+                                 floatOutConstants   = True,
+                                 floatOutOverSatApps = True },
                 -- nofib/spectral/hartel/wang doubles in speed if you
                 -- do full laziness late in the day.  It only happens
                 -- after fusion and other stuff, so the early pass doesn't

@@ -1116,7 +1116,7 @@ against (renamed) interface files.
             \State\Call{Exec}{\texttt{ghc -c} $p$\texttt{.hsig} \texttt{-package-db} $db$ \texttt{--sig-of} $H(p)$ $flags$}
         \EndCase%
         \Case{$p = p'$}
-            \State$flags\gets flags$ \texttt{-alias} $p$ $p'$ \texttt{-package-db} $db$
+            \State$flags\gets flags$ \texttt{-alias} $p$ $p'$
         \EndCase%
         \Case{\Cinc{$P'$} $\langle\vec{p_H\mapsto p_H'}, \vec{p\mapsto p'} \rangle$}
             \State\textbf{let} $H'(p_H) = $ \Call{Exec}{\texttt{ghc --resolve-module} $p_H'$ \texttt{-package-db} $db$ $flags$}
@@ -1133,10 +1133,11 @@ against (renamed) interface files.
 \end{algorithmic}
 \end{algorithm}
 
-The full recursive procedure for compiling a Backpack package is given
-in Figure~\ref{alg:compile}.  We recursively walk through Backpack descriptions,
-processing each line by invoking GHC and/or modifying our package state.
-Here is a more in-depth description of the algorith, line-by-line:
+The full recursive procedure for compiling a Backpack package using
+one-shot compilation is given in Figure~\ref{alg:compile}.  We
+recursively walk through Backpack descriptions, processing each line by
+invoking GHC and/or modifying our package state.  Here is a more
+in-depth description of the algorithm, line-by-line:
 
 \paragraph{The parameters} To compile a package description for package
 $P$, we need to know $H$, the mapping of holes $p_H$ in package $P$ to
@@ -1217,8 +1218,8 @@ reporting an ambiguous import, we instead have to merge the two interface files
 together and use the result as the interface for the module.  (This could be done
 on the fly, or we could generate merged interface files as we go along.)
 
-Note that we need to merge signatures with an implementation, just use the
-implementation interface.  E.g.
+Note that we do not need to merge signatures with an implementation, in such
+cases, we should just use the implementation interface.  E.g.
 
 \begin{verbatim}
 package p where
@@ -1233,7 +1234,7 @@ Here, \m{A} is available both from \pname{p} and \pname{q}, but the use in the
 starred module should be done with respect to the full implementation.
 
 \paragraph{The \texttt{-alias} flag}  We introduce a new flag
-\texttt{-alias} for aliasing modules today.  Aliasing is analogous to
+\texttt{-alias} for aliasing modules.  Aliasing is analogous to
 the merging that can occur when we include packages, but it also applies
 to modules which are locally defined.  When we alias a module $p$ with
 $p'$, we require that $p'$ exists in the current module mapping, and then
@@ -1316,12 +1317,6 @@ to have are.  This is a very minor change to the assembly, so one could conceive
 of dynamically rewriting these references at the linking stage.  But
 separate compilation achieved in this fashion would not be able to take
 advantage of cross-module optimizations.
-
-\subsection{Compiling aliases}
-
-Aliasing simply adds an extra \texttt{-alias} flag to the compilation flags.  To
-eagerly report errors, we run a special command \texttt{ghc --check} which checks
-to make sure $flags$ is consistent (e.g., no linking conflicts.)
 
 \subsection{Compiling includes}
 
@@ -1449,7 +1444,7 @@ generate for them all point to the same original implementation.  However,
 The problem here is that type checking asks ``does it compile with respect
 to all possible instantiations of the holes'', whereas compilation asks
 ``does it compile with respect to this particular instantiation of holes.''
-It's a bit unavoidable, really.
+In the absence of a shaping pass, this problem is unavoidable.
 
 \section{Shaped Backpack}
 

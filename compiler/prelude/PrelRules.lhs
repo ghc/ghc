@@ -48,7 +48,10 @@ import Platform
 import Util
 import Coercion     (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ( Applicative(..), Alternative(..) )
+#endif
+
 import Control.Monad
 import Data.Bits as Bits
 import qualified Data.ByteString as BS

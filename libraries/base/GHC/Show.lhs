@@ -52,7 +52,6 @@ module GHC.Show
 
 import GHC.Base
 import GHC.Num
-import Data.Maybe
 import GHC.List ((!!), foldr1, break)
 \end{code}
 
@@ -180,20 +179,16 @@ appPrec1 = I# 11#       -- appPrec + 1
 
 \begin{code}
 
-instance  Show ()  where
-    showsPrec _ () = showString "()"
+deriving instance Show ()
 
 instance Show a => Show [a]  where
-    showsPrec _         = showList
+  {-# SPECIALISE instance Show [String] #-}
+  {-# SPECIALISE instance Show [Char] #-}
+  {-# SPECIALISE instance Show [Int] #-}
+  showsPrec _         = showList
 
-instance Show Bool where
-  showsPrec _ True  = showString "True"
-  showsPrec _ False = showString "False"
-
-instance Show Ordering where
-  showsPrec _ LT = showString "LT"
-  showsPrec _ EQ = showString "EQ"
-  showsPrec _ GT = showString "GT"
+deriving instance Show Bool
+deriving instance Show Ordering
 
 instance  Show Char  where
     showsPrec _ '\'' = showString "'\\''"
@@ -214,12 +209,7 @@ showWord w# cs
                c# ->
                    showWord (w# `quotWord#` 10##) (C# c# : cs)
 
-instance Show a => Show (Maybe a) where
-    showsPrec _p Nothing s = showString "Nothing" s
-    showsPrec p (Just x) s
-                          = (showParen (p > appPrec) $
-                             showString "Just " .
-                             showsPrec appPrec1 x) s
+deriving instance Show a => Show (Maybe a)
 \end{code}
 
 

@@ -5,7 +5,7 @@
 -- CmmLint: checking the correctness of Cmm statements and expressions
 --
 -----------------------------------------------------------------------------
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, CPP #-}
 module CmmLint (
     cmmLint, cmmLintGraph
   ) where
@@ -22,7 +22,9 @@ import DynFlags
 
 import Data.Maybe
 import Control.Monad (liftM, ap)
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
+#endif
 
 -- Things to check:
 --     - invariant on CmmBlock in CmmExpr (see comment there)

@@ -160,4 +160,4 @@ main = do
 
 
     roll :: [Word8] -> Integer
-    roll = foldr (\b a -> a `shiftL` 8 .|. fromIntegral b) 0
+    roll = GHC.Base.foldr (\b a -> a `shiftL` 8 .|. fromIntegral b) 0

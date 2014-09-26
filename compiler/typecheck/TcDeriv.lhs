@@ -481,7 +481,7 @@ renameDeriv is_boot inst_infos bagBinds
                             { ib_binds = binds
                             , ib_pragmas = sigs
                             , ib_extensions = exts -- only for type-checking
-                            , ib_standalone_deriving = sa } })
+                            , ib_derived = sa } })
         =       -- Bring the right type variables into
                 -- scope (yuk), and rename the method binds
            ASSERT( null sigs )
@@ -490,7 +490,7 @@ renameDeriv is_boot inst_infos bagBinds
               ; let binds' = InstBindings { ib_binds = rn_binds
                                            , ib_pragmas = []
                                            , ib_extensions = exts
-                                           , ib_standalone_deriving = sa }
+                                           , ib_derived = sa }
               ; return (inst_info { iBinds = binds' }, fvs) }
         where
           (tyvars, _) = tcSplitForAllTys (idType (instanceDFunId inst))
@@ -827,8 +827,8 @@ C's kind args.  Consider (Trac #8865):
 where
   Category :: forall k. (k -> k -> *) -> Constraint
 We need to generate the instance
-  insatnce Category * (Either a) where ...
-Notice the '*' argument to Cagegory.
+  instance Category * (Either a) where ...
+Notice the '*' argument to Category.
 
 So we need to
  * drop arguments from (T a b) to match the number of
@@ -888,9 +888,14 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
            IsValid      -> mkOldTypeableEqn tvs cls tycon tc_args mtheta }
 
   | otherwise
-  = do { (rep_tc, rep_tc_args) <- lookup_data_fam tycon tc_args
-              -- Be careful to test rep_tc here: in the case of families,
-              -- we want to check the instance tycon, not the family tycon
+  = do {      -- Find the instance of a data family
+              -- Note [Looking up family instances for deriving]
+         fam_envs <- tcGetFamInstEnvs
+       ; let (rep_tc, rep_tc_args, _co) = tcLookupDataFamInst fam_envs tycon tc_args
+
+              -- If it's still a data family, the lookup failed; i.e no instance exists
+       ; when (isDataFamilyTyCon rep_tc)
+              (bale_out (ptext (sLit "No family instance for") <+> quotes (pprTypeApp tycon tc_args)))
 
        -- For standalone deriving (mtheta /= Nothing),
        -- check that all the data constructors are in scope.
@@ -923,23 +928,6 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
                          tycon tc_args rep_tc rep_tc_args mtheta }
   where
      bale_out msg = failWithTc (derivingThingErr False cls cls_tys (mkTyConApp tycon tc_args) msg)
-
-     lookup_data_fam :: TyCon -> [Type] -> TcM (TyCon, [Type])
-     -- Find the instance of a data family
-     -- Note [Looking up family instances for deriving]
-     lookup_data_fam tycon tys
-       | not (isFamilyTyCon tycon)
-       = return (tycon, tys)
-       | otherwise
-       = ASSERT( isAlgTyCon tycon )
-         do { maybeFamInst <- tcLookupFamInst tycon tys
-            ; case maybeFamInst of
-                Nothing -> bale_out (ptext (sLit "No family instance for")
-                                     <+> quotes (pprTypeApp tycon tys))
-                Just (FamInstMatch { fim_instance = famInst
-                                   , fim_tys      = tys })
-                  -> let tycon' = dataFamInstRepTyCon famInst
-                     in return (tycon', tys) }
 \end{code}
 
 Note [Looking up family instances for deriving]
@@ -1909,9 +1897,11 @@ simplifyDeriv pred tvs theta
                          | otherwise = Right ct
                          where p = ctPred ct
 
-       -- We never want to defer these errors because they are errors in the
-       -- compiler! Hence the `False` below
-       ; reportAllUnsolved (residual_wanted { wc_flat = bad })
+       -- If we are deferring type errors, simply ignore any insoluble
+       -- constraints.  Tney'll come up again when we typecheck the
+       -- generated instance declaration
+       ; defer <- goptM Opt_DeferTypeErrors
+       ; unless defer (reportAllUnsolved (residual_wanted { wc_flat = bad }))
 
        ; let min_theta = mkMinimalBySCs (bagToList good)
        ; return (substTheta subst_skol min_theta) }
@@ -2069,7 +2059,7 @@ genInst :: Bool             -- True <=> standalone deriving
         -> CommonAuxiliaries
         -> DerivSpec ThetaType 
         -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
-genInst standalone_deriv default_oflag comauxs
+genInst _standalone_deriv default_oflag comauxs
         spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype, ds_tys = tys
                  , ds_overlap = overlap_mode
@@ -2084,7 +2074,7 @@ genInst standalone_deriv default_oflag comauxs
                         , ib_pragmas = []
                         , ib_extensions = [ Opt_ImpredicativeTypes
                                           , Opt_RankNTypes ]
-                        , ib_standalone_deriving = standalone_deriv } }
+                        , ib_derived = True } }
                 , emptyBag
                 , Just $ getName $ head $ tyConDataCons rep_tycon ) }
               -- See Note [Newtype deriving and unused constructors]
@@ -2099,7 +2089,7 @@ genInst standalone_deriv default_oflag comauxs
                                                 { ib_binds = meth_binds
                                                 , ib_pragmas = []
                                                 , ib_extensions = []
-                                                , ib_standalone_deriving = standalone_deriv } }
+                                                , ib_derived = True } }
        ; return ( inst_info, deriv_stuff, Nothing ) }
   where
     oflag  = setOverlapModeMaybe default_oflag overlap_mode
@@ -2176,7 +2166,7 @@ derivingThingErr newtype_deriving clas tys ty why
          nest 2 why]
   where
     extra | newtype_deriving = ptext (sLit "(even with cunning newtype deriving)")
-          | otherwise        = empty
+          | otherwise        = Outputable.empty
     pred = mkClassPred clas (tys ++ [ty])
 
 derivingHiddenErr :: TyCon -> SDoc

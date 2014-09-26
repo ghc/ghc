@@ -6,7 +6,7 @@
 -- Module      :  Foreign.Marshal.Pool
 -- Copyright   :  (c) Sven Panne 2002-2004
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  sven.panne@aedion.de
 -- Stability   :  provisional
 -- Portability :  portable
@@ -46,7 +46,7 @@ module Foreign.Marshal.Pool (
    pooledNewArray0
 ) where
 
-import GHC.Base              ( Int, Monad(..), (.), not )
+import GHC.Base              ( Int, Monad(..), (.), liftM, not )
 import GHC.Err               ( undefined )
 import GHC.Exception         ( throw )
 import GHC.IO                ( IO, mask, catchAny )
@@ -54,8 +54,7 @@ import GHC.IORef             ( IORef, newIORef, readIORef, writeIORef )
 import GHC.List              ( elem, length )
 import GHC.Num               ( Num(..) )
 
-import Control.Monad         ( liftM )
-import Data.List             ( delete )
+import Data.OldList          ( delete )
 import Foreign.Marshal.Alloc ( mallocBytes, reallocBytes, free )
 import Foreign.Marshal.Array ( pokeArray, pokeArray0 )
 import Foreign.Marshal.Error ( throwIf )

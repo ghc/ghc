@@ -6,7 +6,7 @@
 -- Module      :  Data.Typeable.Internal
 -- Copyright   :  (c) The University of Glasgow, CWI 2001--2011
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- The representations of the types TyCon and TypeRep, and the
 -- function mkTyCon which is used by derived instances of Typeable to
 -- construct a TyCon.
@@ -54,7 +54,6 @@ import GHC.Base
 import GHC.Word
 import GHC.Show
 import GHC.Read ( Read )
-import Data.Maybe
 import Data.Proxy
 import GHC.Num
 import GHC.Real
@@ -75,8 +74,6 @@ import Text.ParserCombinators.ReadPrec ( ReadPrec )
 import GHC.Float ( FFFormat, RealFloat, Floating )
 import Data.Bits ( Bits, FiniteBits )
 import GHC.Enum ( Bounded, Enum )
-import Control.Monad ( MonadPlus )
--- import Data.Int
 
 import GHC.Fingerprint.Type
 import {-# SOURCE #-} GHC.Fingerprint
@@ -140,7 +137,7 @@ mkTyConApp tc@(TyCon tc_k _ _ _) args
   where
     arg_ks = [k | TypeRep k _ _ <- args]
 
--- | A special case of 'mkTyConApp', which applies the function 
+-- | A special case of 'mkTyConApp', which applies the function
 -- type constructor to a pair of types.
 mkFunTy  :: TypeRep -> TypeRep -> TypeRep
 mkFunTy f a = mkTyConApp funTc [f,a]
@@ -164,7 +161,7 @@ mkAppTy :: TypeRep -> TypeRep -> TypeRep
 mkAppTy (TypeRep _ tc trs) arg_tr = mkTyConApp tc (trs ++ [arg_tr])
    -- Notice that we call mkTyConApp to construct the fingerprint from tc and
    -- the arg fingerprints.  Simply combining the current fingerprint with
-   -- the new one won't give the same answer, but of course we want to 
+   -- the new one won't give the same answer, but of course we want to
    -- ensure that a TypeRep of the same shape has the same fingerprint!
    -- See Trac #5962
 
@@ -263,30 +260,15 @@ type Typeable7 (a :: * -> * -> * -> * -> * -> * -> * -> *) = Typeable a
 {-# DEPRECATED Typeable7 "renamed to 'Typeable'" #-} -- deprecated in 7.8
 
 -- | Kind-polymorphic Typeable instance for type application
-instance {-# INCOHERENT #-} (Typeable s, Typeable a) => Typeable (s a) where
+instance (Typeable s, Typeable a) => Typeable (s a) where
          -- See Note [The apparent incoherence of Typable]
   typeRep# = \_ -> rep                  -- Note [Memoising typeOf]
     where !ty1 = typeRep# (proxy# :: Proxy# s)
           !ty2 = typeRep# (proxy# :: Proxy# a)
           !rep = ty1 `mkAppTy` ty2
 
-
-{- Note [The apparent incoherence of Typable] See Trac #9242
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The reason we have INCOHERENT here is because we also have instances
-  instance Typeable (x::Nat)
-  instance Typeable (y::Symbol)
-If we have
-  [Wanted] Typeable (a :: Nat)
-
-we should pick the (x::Nat) instance, even though the instance
-matching rules would worry that 'a' might later be instantiated to
-(f b), for some f and b. But we type theorists know that there are no
-type constructors f of kind blah -> Nat, so this can never happen and
-it's safe to pick the second instance.
-
-Note [Memoising typeOf]
-~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Memoising typeOf]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 See #3245, #9203
 
 IMPORTANT: we don't want to recalculate the TypeRep once per call with
@@ -308,8 +290,8 @@ instance Show TypeRep where
       xs | isTupleTyCon tycon -> showTuple xs
          | otherwise         ->
             showParen (p > 9) $
-            showsPrec p tycon . 
-            showChar ' '      . 
+            showsPrec p tycon .
+            showChar ' '      .
             showArgs (showChar ' ') tys
 
 showsTypeRep :: TypeRep -> ShowS
@@ -327,7 +309,7 @@ isTupleTyCon _                         = False
 showArgs :: Show a => ShowS -> [a] -> ShowS
 showArgs _   []     = id
 showArgs _   [a]    = showsPrec 10 a
-showArgs sep (a:as) = showsPrec 10 a . sep . showArgs sep as 
+showArgs sep (a:as) = showsPrec 10 a . sep . showArgs sep as
 
 showTuple :: [TypeRep] -> ShowS
 showTuple args = showChar '('
@@ -438,9 +420,12 @@ deriving instance Typeable Ix
 deriving instance Typeable Show
 deriving instance Typeable Read
 
+deriving instance Typeable Alternative
+deriving instance Typeable Applicative
 deriving instance Typeable Functor
 deriving instance Typeable Monad
 deriving instance Typeable MonadPlus
+deriving instance Typeable Monoid
 
 deriving instance Typeable Typeable
 
@@ -462,7 +447,19 @@ lifted types with infinitely many inhabitants.  Indeed, `Nat` is
 isomorphic to (lifted) `[()]`  and `Symbol` is isomorphic to `[Char]`.
 -}
 
-instance KnownNat n => Typeable (n :: Nat) where
+{- Note [The apparent incoherence of Typable] See Trac #9242
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The reason we have INCOHERENT on Typeable (n:Nat) and Typeable (s:Symbol)
+because we also have an instance Typable (f a).  Now suppose we have
+  [Wanted] Typeable (a :: Nat)
+we should pick the (x::Nat) instance, even though the instance
+matching rules would worry that 'a' might later be instantiated to
+(f b), for some f and b. But we type theorists know that there are no
+type constructors f of kind blah -> Nat, so this can never happen and
+it's safe to pick the second instance. -}
+
+
+instance {-# INCOHERENT #-} KnownNat n => Typeable (n :: Nat) where
   -- See Note [The apparent incoherence of Typable]
   -- See #9203 for an explanation of why this is written as `\_ -> rep`.
   typeRep# = \_ -> rep
@@ -480,7 +477,7 @@ instance KnownNat n => Typeable (n :: Nat) where
     mk a b c = a ++ " " ++ b ++ " " ++ c
 
 
-instance KnownSymbol s => Typeable (s :: Symbol) where
+instance {-# INCOHERENT #-} KnownSymbol s => Typeable (s :: Symbol) where
   -- See Note [The apparent incoherence of Typable]
   -- See #9203 for an explanation of why this is written as `\_ -> rep`.
   typeRep# = \_ -> rep

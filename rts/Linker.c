@@ -860,6 +860,7 @@ typedef struct _RtsSymbolVal {
 #if !defined(mingw32_HOST_OS)
 #define RTS_USER_SIGNALS_SYMBOLS        \
    SymI_HasProto(setIOManagerControlFd) \
+   SymI_HasProto(setTimerManagerControlFd) \
    SymI_HasProto(setIOManagerWakeupFd)  \
    SymI_HasProto(ioManagerWakeup)       \
    SymI_HasProto(blockUserSignals)      \
@@ -1092,6 +1093,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(__word_encodeFloat)                                 \
       SymI_HasProto(stg_atomicallyzh)                                   \
       SymI_HasProto(barf)                                               \
+      SymI_HasProto(deRefStablePtr)                                     \
       SymI_HasProto(debugBelch)                                         \
       SymI_HasProto(errorBelch)                                         \
       SymI_HasProto(sysErrorBelch)                                      \
@@ -1106,6 +1108,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(cmp_thread)                                         \
       SymI_HasProto(createAdjustor)                                     \
       SymI_HasProto(stg_decodeDoublezu2Intzh)                           \
+      SymI_HasProto(stg_decodeDoublezuInt64zh)                          \
       SymI_HasProto(stg_decodeFloatzuIntzh)                             \
       SymI_HasProto(defaultsHook)                                       \
       SymI_HasProto(stg_delayzh)                                        \
@@ -1194,6 +1197,8 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_casMutVarzh)                                    \
       SymI_HasProto(stg_newPinnedByteArrayzh)                           \
       SymI_HasProto(stg_newAlignedPinnedByteArrayzh)                    \
+      SymI_HasProto(stg_shrinkMutableByteArrayzh)                       \
+      SymI_HasProto(stg_resizzeMutableByteArrayzh)                      \
       SymI_HasProto(newSpark)                                           \
       SymI_HasProto(performGC)                                          \
       SymI_HasProto(performMajorGC)                                     \
@@ -1590,6 +1595,8 @@ static regex_t re_realso;
 #ifdef THREADED_RTS
 static Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
 #endif
+#elif defined(OBJFORMAT_PEi386)
+void addDLLHandle(pathchar* dll_name, HINSTANCE instance);
 #endif
 
 void initLinker (void)
@@ -1687,6 +1694,7 @@ initLinker_ (int retain_cafs)
      */
     addDLL(WSTR("msvcrt"));
     addDLL(WSTR("kernel32"));
+    addDLLHandle(WSTR("*.exe"), GetModuleHandle(NULL));
 #endif
 
     IF_DEBUG(linker, debugBelch("initLinker: done\n"));
@@ -1750,6 +1758,16 @@ typedef
 
 /* A list thereof. */
 static IndirectAddr* indirects = NULL;
+
+/* Adds a DLL instance to the list of DLLs in which to search for symbols. */
+void addDLLHandle(pathchar* dll_name, HINSTANCE instance) {
+   OpenedDLL* o_dll;
+   o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLLHandle" );
+   o_dll->name     = dll_name ? pathdup(dll_name) : NULL;
+   o_dll->instance = instance;
+   o_dll->next     = opened_dlls;
+   opened_dlls     = o_dll;
+}
 
 #endif
 
@@ -1958,12 +1976,7 @@ addDLL( pathchar *dll_name )
    }
    stgFree(buf);
 
-   /* Add this DLL to the list of DLLs in which to search for symbols. */
-   o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLL" );
-   o_dll->name     = pathdup(dll_name);
-   o_dll->instance = instance;
-   o_dll->next     = opened_dlls;
-   opened_dlls     = o_dll;
+   addDLLHandle(dll_name, instance);
 
    return NULL;
 
@@ -3593,7 +3606,7 @@ allocateImageAndTrampolines (
        barf("getNumberOfSymbols: error whilst reading `%s' header in `%S'",
              member_name, arch_name);
    fseek( f, -sizeof_COFF_header, SEEK_CUR );
-   
+
    /* We get back 8-byte aligned memory (is that guaranteed?), but
       the offsets to the sections within the file are all 4 mod 8
       (is that guaranteed?). We therefore need to offset the image
@@ -5632,7 +5645,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
            errorBelch("%s: unknown symbol `%s'", oc->fileName, symbol);
            return 0;
          }
-         IF_DEBUG(linker,debugBelch( "`%s' resolves to %p", symbol, (void*)S ));
+         IF_DEBUG(linker,debugBelch( "`%s' resolves to %p\n", symbol, (void*)S ));
       }
 
       IF_DEBUG(linker,debugBelch("Reloc: P = %p   S = %p   A = %p\n",

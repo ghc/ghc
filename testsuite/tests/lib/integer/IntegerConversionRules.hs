@@ -1,7 +1,10 @@
+{-# LANGUAGE CPP #-}
 
 module IntegerConversionRules where
 
-import Data.Word
+#if __GLASGOW_HASKELL__ < 709
+import Data.Word (Word)
+#endif
 
 f1 :: Int -> Double
 f1 = fi

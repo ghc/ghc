@@ -81,7 +81,7 @@ This is accomplished through a combination of mechanisms:
 
      This is accomplished through a variety of mechanisms:
 
-       a) The parser recognises them specially and generates an 
+       a) The parser recognises them specially and generates an
           Exact Name (hence not looked up in the orig-name cache)
 
        b) The known infinite families of names are specially
@@ -137,7 +137,7 @@ import FastString
 \begin{code}
 allNameStrings :: [String]
 -- Infinite list of a,b,c...z, aa, ab, ac, ... etc
-allNameStrings = [ c:cs | cs <- "" : allNameStrings, c <- ['a'..'z'] ] 
+allNameStrings = [ c:cs | cs <- "" : allNameStrings, c <- ['a'..'z'] ]
 \end{code}
 
 
@@ -735,8 +735,8 @@ ap_RDR                  = nameRdrName apAName
 foldable_foldr_RDR      = varQual_RDR dATA_FOLDABLE       (fsLit "foldr")
 foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
 traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
-mempty_RDR              = varQual_RDR dATA_MONOID         (fsLit "mempty")
-mappend_RDR             = varQual_RDR dATA_MONOID         (fsLit "mappend")
+mempty_RDR              = varQual_RDR gHC_BASE            (fsLit "mempty")
+mappend_RDR             = varQual_RDR gHC_BASE            (fsLit "mappend")
 
 ----------------------
 varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR
@@ -849,7 +849,7 @@ failMName          = varQual gHC_BASE (fsLit "fail")   failMClassOpKey
 
 -- Classes (Applicative, Foldable, Traversable)
 applicativeClassName, foldableClassName, traversableClassName :: Name
-applicativeClassName  = clsQual  cONTROL_APPLICATIVE (fsLit "Applicative") applicativeClassKey
+applicativeClassName  = clsQual  gHC_BASE            (fsLit "Applicative") applicativeClassKey
 foldableClassName     = clsQual  dATA_FOLDABLE       (fsLit "Foldable")    foldableClassKey
 traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") traversableClassKey
 
@@ -858,10 +858,10 @@ traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") trave
 -- AMP additions
 
 joinMName,  apAName, pureAName, alternativeClassName :: Name
-joinMName            = varQual mONAD               (fsLit "join")        joinMIdKey
-apAName              = varQual cONTROL_APPLICATIVE (fsLit "<*>")         apAClassOpKey
-pureAName            = varQual cONTROL_APPLICATIVE (fsLit "pure")        pureAClassOpKey
-alternativeClassName = clsQual cONTROL_APPLICATIVE (fsLit "Alternative") alternativeClassKey
+joinMName            = varQual gHC_BASE (fsLit "join")        joinMIdKey
+apAName              = varQual gHC_BASE (fsLit "<*>")         apAClassOpKey
+pureAName            = varQual gHC_BASE (fsLit "pure")        pureAClassOpKey
+alternativeClassName = clsQual mONAD (fsLit "Alternative") alternativeClassKey
 
 joinMIdKey, apAClassOpKey, pureAClassOpKey, alternativeClassKey :: Unique
 joinMIdKey          = mkPreludeMiscIdUnique 750
@@ -1083,6 +1083,9 @@ gen1ClassName = clsQual gHC_GENERICS (fsLit "Generic1") gen1ClassKey
 datatypeClassName    = clsQual gHC_GENERICS (fsLit "Datatype")    datatypeClassKey
 constructorClassName = clsQual gHC_GENERICS (fsLit "Constructor") constructorClassKey
 selectorClassName    = clsQual gHC_GENERICS (fsLit "Selector")    selectorClassKey
+
+genericClassNames :: [Name]
+genericClassNames = [genClassName, gen1ClassName]
 
 -- GHCi things
 ghciIoClassName, ghciStepIoMName :: Name
@@ -1325,7 +1328,7 @@ addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey, byteA
     floatPrimTyConKey, floatTyConKey, funTyConKey, intPrimTyConKey,
     intTyConKey, int8TyConKey, int16TyConKey, int32PrimTyConKey,
     int32TyConKey, int64PrimTyConKey, int64TyConKey,
-    integerTyConKey, digitsTyConKey,
+    integerTyConKey,
     listTyConKey, foreignObjPrimTyConKey, weakPrimTyConKey,
     mutableArrayPrimTyConKey, mutableArrayArrayPrimTyConKey, mutableByteArrayPrimTyConKey,
     orderingTyConKey, mVarPrimTyConKey, ratioTyConKey, rationalTyConKey,
@@ -1352,7 +1355,7 @@ int32TyConKey                           = mkPreludeTyConUnique 19
 int64PrimTyConKey                       = mkPreludeTyConUnique 20
 int64TyConKey                           = mkPreludeTyConUnique 21
 integerTyConKey                         = mkPreludeTyConUnique 22
-digitsTyConKey                          = mkPreludeTyConUnique 23
+
 listTyConKey                            = mkPreludeTyConUnique 24
 foreignObjPrimTyConKey                  = mkPreludeTyConUnique 25
 weakPrimTyConKey                        = mkPreludeTyConUnique 27
@@ -1895,4 +1898,3 @@ derivableClassKeys
   = [ eqClassKey, ordClassKey, enumClassKey, ixClassKey,
       boundedClassKey, showClassKey, readClassKey ]
 \end{code}
-

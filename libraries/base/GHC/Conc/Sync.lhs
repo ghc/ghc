@@ -100,7 +100,6 @@ import Data.Typeable
 #ifndef mingw32_HOST_OS
 import Data.Dynamic
 #endif
-import Control.Monad
 import Data.Maybe
 
 import GHC.Base
@@ -552,6 +551,10 @@ unSTM (STM a) = a
 instance  Functor STM where
    fmap f x = x >>= (return . f)
 
+instance Applicative STM where
+  pure = return
+  (<*>) = ap
+
 instance  Monad STM  where
     {-# INLINE return #-}
     {-# INLINE (>>)   #-}
@@ -575,9 +578,13 @@ thenSTM (STM m) k = STM ( \s ->
 returnSTM :: a -> STM a
 returnSTM x = STM (\s -> (# s, x #))
 
+instance Alternative STM where
+  empty = retry
+  (<|>) = orElse
+
 instance MonadPlus STM where
-  mzero = retry
-  mplus = orElse
+  mzero = empty
+  mplus = (<|>)
 
 -- | Unsafely performs IO in the STM monad.  Beware: this is a highly
 -- dangerous thing to do.

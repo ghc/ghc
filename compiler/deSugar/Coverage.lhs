@@ -1209,7 +1209,7 @@ static void hpc_init_Main(void)
 
 \begin{code}
 hpcInitCode :: Module -> HpcInfo -> SDoc
-hpcInitCode _ (NoHpcInfo {}) = empty
+hpcInitCode _ (NoHpcInfo {}) = Outputable.empty
 hpcInitCode this_mod (HpcInfo tickCount hashNo)
  = vcat
     [ text "static void hpc_init_" <> ppr this_mod

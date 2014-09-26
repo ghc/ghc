@@ -43,9 +43,9 @@ bdescr * splitLargeBlock (bdescr *bd, W_ blocks);
    Generational garbage collection support
 
    updateWithIndirection(p1,p2)  Updates the object at p1 with an
-				 indirection pointing to p2.  This is
-				 normally called for objects in an old
-				 generation (>0) when they are updated.
+                                 indirection pointing to p2.  This is
+                                 normally called for objects in an old
+                                 generation (>0) when they are updated.
 
    updateWithPermIndirection(p1,p2)  As above but uses a permanent indir.
 
@@ -117,7 +117,7 @@ void move_STACK  (StgStack *src, StgStack *dest);
 
 /* -----------------------------------------------------------------------------
    CAF lists
-   
+
    dyn_caf_list  (CAFs chained through static_link)
       This is a chain of all CAFs in the program, used for
       dynamically-linked GHCi.

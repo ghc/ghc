@@ -5,7 +5,7 @@
 -- Module      :  Data.Typeable.Internal
 -- Copyright   :  (c) The University of Glasgow, CWI 2001--2011
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- The representations of the types TyCon and TypeRep, and the
 -- function mkTyCon which is used by derived instances of Typeable to
 -- construct a TyCon.
@@ -57,8 +57,7 @@ module Data.OldTypeable.Internal {-# DEPRECATED "Use Data.Typeable.Internal inst
 import GHC.Base
 import GHC.Word
 import GHC.Show
-import Data.Maybe
-import Data.List
+import Data.OldList
 import GHC.Num
 import GHC.Real
 import GHC.IORef
@@ -129,7 +128,7 @@ mkTyConApp tc@(TyCon tc_k _ _ _) args
   where
     arg_ks = [k | TypeRep k _ _ <- args]
 
--- | A special case of 'mkTyConApp', which applies the function 
+-- | A special case of 'mkTyConApp', which applies the function
 -- type constructor to a pair of types.
 mkFunTy  :: TypeRep -> TypeRep -> TypeRep
 mkFunTy f a = mkTyConApp funTc [f,a]
@@ -153,7 +152,7 @@ mkAppTy :: TypeRep -> TypeRep -> TypeRep
 mkAppTy (TypeRep _ tc trs) arg_tr = mkTyConApp tc (trs ++ [arg_tr])
    -- Notice that we call mkTyConApp to construct the fingerprint from tc and
    -- the arg fingerprints.  Simply combining the current fingerprint with
-   -- the new one won't give the same answer, but of course we want to 
+   -- the new one won't give the same answer, but of course we want to
    -- ensure that a TypeRep of the same shape has the same fingerprint!
    -- See Trac #5962
 
@@ -196,13 +195,13 @@ tyConString = tyConName
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 IMPORTANT: we don't want to recalculate the type-rep once per
 call to the dummy argument.  This is what went wrong in Trac #3245
-So we help GHC by manually keeping the 'rep' *outside* the value 
+So we help GHC by manually keeping the 'rep' *outside* the value
 lambda, thus
-    
+
     typeOfDefault :: forall t a. (Typeable1 t, Typeable a) => t a -> TypeRep
     typeOfDefault = \_ -> rep
       where
-        rep = typeOf1 (undefined :: t a) `mkAppTy` 
+        rep = typeOf1 (undefined :: t a) `mkAppTy`
               typeOf  (undefined :: a)
 
 Notice the crucial use of scoped type variables here!
@@ -225,7 +224,7 @@ class Typeable1 t where
 typeOfDefault :: forall t a. (Typeable1 t, Typeable a) => t a -> TypeRep
 typeOfDefault = \_ -> rep
  where
-   rep = typeOf1 (undefined :: t a) `mkAppTy` 
+   rep = typeOf1 (undefined :: t a) `mkAppTy`
          typeOf  (undefined :: a)
    -- Note [Memoising typeOf]
 
@@ -235,9 +234,9 @@ class Typeable2 t where
 
 -- | For defining a 'Typeable1' instance from any 'Typeable2' instance.
 typeOf1Default :: forall t a b. (Typeable2 t, Typeable a) => t a b -> TypeRep
-typeOf1Default = \_ -> rep 
+typeOf1Default = \_ -> rep
  where
-   rep = typeOf2 (undefined :: t a b) `mkAppTy` 
+   rep = typeOf2 (undefined :: t a b) `mkAppTy`
          typeOf  (undefined :: a)
    -- Note [Memoising typeOf]
 
@@ -247,9 +246,9 @@ class Typeable3 t where
 
 -- | For defining a 'Typeable2' instance from any 'Typeable3' instance.
 typeOf2Default :: forall t a b c. (Typeable3 t, Typeable a) => t a b c -> TypeRep
-typeOf2Default = \_ -> rep 
+typeOf2Default = \_ -> rep
  where
-   rep = typeOf3 (undefined :: t a b c) `mkAppTy` 
+   rep = typeOf3 (undefined :: t a b c) `mkAppTy`
          typeOf  (undefined :: a)
    -- Note [Memoising typeOf]
 
@@ -261,19 +260,19 @@ class Typeable4 t where
 typeOf3Default :: forall t a b c d. (Typeable4 t, Typeable a) => t a b c d -> TypeRep
 typeOf3Default = \_ -> rep
  where
-   rep = typeOf4 (undefined :: t a b c d) `mkAppTy` 
+   rep = typeOf4 (undefined :: t a b c d) `mkAppTy`
          typeOf  (undefined :: a)
    -- Note [Memoising typeOf]
-   
+
 -- | Variant for 5-ary type constructors
 class Typeable5 t where
   typeOf5 :: t a b c d e -> TypeRep
 
 -- | For defining a 'Typeable4' instance from any 'Typeable5' instance.
 typeOf4Default :: forall t a b c d e. (Typeable5 t, Typeable a) => t a b c d e -> TypeRep
-typeOf4Default = \_ -> rep 
+typeOf4Default = \_ -> rep
  where
-   rep = typeOf5 (undefined :: t a b c d e) `mkAppTy` 
+   rep = typeOf5 (undefined :: t a b c d e) `mkAppTy`
          typeOf  (undefined :: a)
    -- Note [Memoising typeOf]
 
@@ -285,7 +284,7 @@ class Typeable6 t where
 typeOf5Default :: forall t a b c d e f. (Typeable6 t, Typeable a) => t a b c d e f -> TypeRep
 typeOf5Default = \_ -> rep
  where
-   rep = typeOf6 (undefined :: t a b c d e f) `mkAppTy` 
+   rep = typeOf6 (undefined :: t a b c d e f) `mkAppTy`
          typeOf  (undefined :: a)
    -- Note [Memoising typeOf]
 
@@ -297,7 +296,7 @@ class Typeable7 t where
 typeOf6Default :: forall t a b c d e f g. (Typeable7 t, Typeable a) => t a b c d e f g -> TypeRep
 typeOf6Default = \_ -> rep
  where
-   rep = typeOf7 (undefined :: t a b c d e f g) `mkAppTy` 
+   rep = typeOf7 (undefined :: t a b c d e f g) `mkAppTy`
          typeOf  (undefined :: a)
    -- Note [Memoising typeOf]
 
@@ -356,8 +355,8 @@ instance Show TypeRep where
       xs | isTupleTyCon tycon -> showTuple xs
          | otherwise         ->
             showParen (p > 9) $
-            showsPrec p tycon . 
-            showChar ' '      . 
+            showsPrec p tycon .
+            showChar ' '      .
             showArgs tys
 
 showsTypeRep :: TypeRep -> ShowS
@@ -375,11 +374,11 @@ isTupleTyCon _                         = False
 showArgs :: Show a => [a] -> ShowS
 showArgs [] = id
 showArgs [a] = showsPrec 10 a
-showArgs (a:as) = showsPrec 10 a . showString " " . showArgs as 
+showArgs (a:as) = showsPrec 10 a . showString " " . showArgs as
 
 showTuple :: [TypeRep] -> ShowS
 showTuple args = showChar '('
-               . (foldr (.) id $ intersperse (showChar ',') 
+               . (foldr (.) id $ intersperse (showChar ',')
                                $ map (showsPrec 10) args)
                . showChar ')'
 

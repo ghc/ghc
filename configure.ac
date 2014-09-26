@@ -136,8 +136,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.4],
-    [AC_MSG_ERROR([GHC version 7.4 or later is required to compile GHC.])])dnl
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.6],
+    [AC_MSG_ERROR([GHC version 7.6 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
@@ -151,9 +151,7 @@ then
     fi
 fi
 
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],
-                    GHC_PACKAGE_DB_FLAG=package-conf,
-                    GHC_PACKAGE_DB_FLAG=package-db)
+GHC_PACKAGE_DB_FLAG=package-db
 AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
 # GHC 7.7+ needs -fcmm-sink when compiling Parser.hs. See #8182
@@ -161,6 +159,11 @@ FP_COMPARE_VERSIONS([$GhcVersion],[-gt],[7.7],
                     CMM_SINK_BOOTSTRAP_IS_NEEDED=YES,
                     CMM_SINK_BOOTSTRAP_IS_NEEDED=NO)
 AC_SUBST(CMM_SINK_BOOTSTRAP_IS_NEEDED)
+
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.9],
+                    SUPPORTS_PACKAGE_KEY=NO,
+                    SUPPORTS_PACKAGE_KEY=YES)
+AC_SUBST(SUPPORTS_PACKAGE_KEY)
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -183,6 +186,56 @@ AC_SUBST([WithGhc])
 
 dnl ** Without optimization some INLINE trickery fails for GHCi
 SRC_CC_OPTS="-O"
+
+dnl ** Bug 9439: Some GHC 7.8 releases had broken LLVM code generator.
+dnl Unfortunately we don't know whether the user is going to request a
+dnl build with the LLVM backend as this is only given in build.mk.
+dnl
+dnl Instead, we try to do as much work as possible here, checking
+dnl whether -fllvm is the stage 0 compiler's default. If so we
+dnl fail. If not, we check whether -fllvm is affected explicitly and
+dnl if so set a flag. The build system will later check this flag
+dnl after the desired build flags are known.
+AC_MSG_CHECKING(whether bootstrap compiler is affected by bug 9439)
+echo "main = putStrLn \"%function\"" > conftestghc.hs
+
+# Check whether LLVM backend is default for this platform
+${WithGhc} conftestghc.hs 2>&1 >/dev/null
+res=`./conftestghc`
+if test "x$res" == "x%object"
+then
+    AC_MSG_RESULT(yes)
+    echo "Buggy bootstrap compiler"
+    echo ""
+    echo "The stage 0 compiler $WithGhc is affected by GHC Bug \#9439"
+    echo "and therefore will miscompile the LLVM backend if -fllvm is"
+    echo "used."
+    echo
+    echo "Please use another bootstrap compiler"
+    exit 1
+fi
+
+# -fllvm is not the default, but set a flag so the Makefile can check
+# -for it in the build flags later on
+${WithGhc} -fforce-recomp -fllvm conftestghc.hs 2>&1 >/dev/null
+if test $? == 0
+then
+    res=`./conftestghc`
+    if test "x$res" == "x%object"
+    then
+        AC_MSG_RESULT(yes)
+        GHC_LLVM_AFFECTED_BY_9439=1
+    elif test "x$res" == "x%function"
+    then
+        AC_MSG_RESULT(no)
+        GHC_LLVM_AFFECTED_BY_9439=0
+    else
+        AC_MSG_WARN(unexpected output $res)
+    fi
+else
+    AC_MSG_RESULT(failed to compile, assuming no)
+fi
+AC_SUBST([GHC_LLVM_AFFECTED_BY_9439])
 
 dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
@@ -228,7 +281,7 @@ case $host in
      # here we go with the test
      MINOR=`uname -r|cut -d '.' -f 2-`
      if test "$MINOR" -lt "11"; then
-     	SOLARIS_BROKEN_SHLD=YES
+         SOLARIS_BROKEN_SHLD=YES
      fi
      ;;
 esac
@@ -479,60 +532,8 @@ export CC
 MAYBE_OVERRIDE_STAGE0([gcc],[CC_STAGE0])
 MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
 
-dnl ** what cpp to use?
-dnl --------------------------------------------------------------
-AC_ARG_WITH(hs-cpp,
-[AC_HELP_STRING([--with-hs-cpp=ARG],
-        [Use ARG as the path to cpp [default=autodetect]])],
-[
-    if test "$HostOS" = "mingw32"
-    then
-        AC_MSG_WARN([Request to use $withval will be ignored])
-    else
-        HaskellCPPCmd=$withval
-    fi
-],
-[
-        HaskellCPPCmd=$WhatGccIsCalled
-]
-)
-
-
-
-dnl ** what cpp flags to use?
-dnl -----------------------------------------------------------
-AC_ARG_WITH(hs-cpp-flags,
-  [AC_HELP_STRING([--with-hs-cpp-flags=ARG],
-          [Use ARG as the path to hs cpp [default=autodetect]])],
-  [
-      if test "$HostOS" = "mingw32"
-      then
-          AC_MSG_WARN([Request to use $withval will be ignored])
-      else
-          HaskellCPPArgs=$withval
-      fi
-  ],
-[
-  $HaskellCPPCmd -x c /dev/null -dM -E > conftest.txt 2>&1
-  if grep "__clang__" conftest.txt >/dev/null 2>&1; then
-    HaskellCPPArgs="-E -undef -traditional -Wno-invalid-pp-token -Wno-unicode -Wno-trigraphs "
-  else
-      $HaskellCPPCmd  -v > conftest.txt 2>&1
-      if  grep "gcc" conftest.txt >/dev/null 2>&1; then
-          HaskellCPPArgs="-E -undef -traditional "
-        else
-          $HaskellCPPCmd  --version > conftest.txt 2>&1
-          if grep "cpphs" conftest.txt >/dev/null 2>&1; then
-            HaskellCPPArgs="--cpp -traditional"
-          else
-            AC_MSG_WARN([configure can't recognize your CPP program, you may need to set --with-hs-cpp-flags=FLAGS explicitly])
-            HaskellCPPArgs=""
-          fi
-      fi
-  fi
-  ]
-)
-
+# --with-hs-cpp/--with-hs-cpp-flags
+FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
 
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
@@ -678,9 +679,6 @@ chmod +x install-sh
 dnl ** figure out how to do a BSD-ish install
 AC_PROG_INSTALL
 
-dnl If you can run configure, you certainly have /bin/sh
-AC_DEFINE([HAVE_BIN_SH], [1], [Define to 1 if you have /bin/sh.])
-
 dnl ** how to invoke `ar' and `ranlib'
 FP_PROG_AR_SUPPORTS_ATFILE
 FP_PROG_AR_NEEDS_RANLIB
@@ -818,30 +816,6 @@ FP_CHECK_FUNC([WinExec],
 FP_CHECK_FUNC([GetModuleFileName],
   [@%:@include <windows.h>], [GetModuleFileName((HMODULE)0,(LPTSTR)0,0)])
 
-dnl ** check return type of signal handlers
-dnl Foo: assumes we can use prototypes.
-dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
-dnl AC_CACHE_CHECK([type of signal handlers], ac_cv_type_signal_handler,
-dnl [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
-dnl #include <signal.h>
-dnl #ifdef signal
-dnl #undef signal
-dnl #endif
-dnl void (*signal (int, void (*)(int)))(int);
-dnl ]],
-dnl [[int i;]])],
-dnl [ac_cv_type_signal_handler=void_int],
-dnl [ac_cv_type_signal_handler=int_void])])
-dnl if test "$ac_cv_type_signal_handler" = void_int; then
-dnl AC_DEFINE(VOID_INT_SIGNALS)
-dnl fi
-
-dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
-AC_TYPE_SIGNAL
-if test "$ac_cv_type_signal" = void; then
-  AC_DEFINE([VOID_INT_SIGNALS], [1], [Define to 1 if signal handlers have type void (*)(int). Otherwise, they're assumed to have type int (*)(void).])
-fi
-
 dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
 AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r sched_setaffinity setlocale])
@@ -882,13 +856,7 @@ dnl Check for libraries
 dnl ################################################################
 
 dnl ** check whether we need -ldl to get dlopen()
-
-AC_CHECK_LIB(dl, dlopen,
-    [HaveLibDL=YES
-     AC_DEFINE([HAVE_LIBDL], [1], [Define to 1 if you need -ldl to get dlopen().])
-     LIBS="$LIBS -ldl"],
-    [HaveLibDL=NO])
-AC_SUBST(HaveLibDL)
+AC_CHECK_LIB(dl, dlopen)
 
 dnl --------------------------------------------------
 dnl * Miscellaneous feature tests

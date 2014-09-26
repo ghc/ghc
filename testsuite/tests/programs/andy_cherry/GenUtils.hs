@@ -9,7 +9,7 @@
 
 module GenUtils (
 
-	trace,
+        trace,
 
       assocMaybe, assocMaybeErr,
       arrElem,
@@ -46,14 +46,8 @@ import Debug.Trace ( trace )
 
 -- -------------------------------------------------------------------------
 
--- Here are two defs that everyone seems to define ... 
+-- Here are two defs that everyone seems to define ...
 -- HBC has it in one of its builtin modules
-
-#if defined(__GLASGOW_HASKELL__) || defined(__GOFER__)
-
---in 1.3: data Maybe a = Nothing | Just a deriving (Eq,Ord,Text)
-
-#endif
 
 infix 1 =: -- 1.3
 type Assoc a b = (a,b) -- 1.3
@@ -68,10 +62,10 @@ mapMaybe f (a:r) = case f a of
 -- This version returns nothing, if *any* one fails.
 
 mapMaybeFail f (x:xs) = case f x of
-			Just x' -> case mapMaybeFail f xs of
-				    Just xs' -> Just (x':xs')
-				    Nothing -> Nothing
-			Nothing -> Nothing
+                        Just x' -> case mapMaybeFail f xs of
+                                    Just xs' -> Just (x':xs')
+                                    Nothing -> Nothing
+                        Nothing -> Nothing
 mapMaybeFail f [] = Just []
 
 maybeToBool :: Maybe a -> Bool
@@ -87,7 +81,7 @@ maybeMap f (Just a) = Just (f a)
 maybeMap f Nothing  = Nothing
 
 
-joinMaybe :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a 
+joinMaybe :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a
 joinMaybe _ Nothing  Nothing  = Nothing
 joinMaybe _ (Just g) Nothing  = Just g
 joinMaybe _ Nothing  (Just g) = Just g
@@ -95,8 +89,8 @@ joinMaybe f (Just g) (Just h) = Just (f g h)
 
 data MaybeErr a err = Succeeded a | Failed err deriving (Eq,Show{-was:Text-})
 
--- @mkClosure@ makes a closure, when given a comparison and iteration loop. 
--- Be careful, because if the functional always makes the object different, 
+-- @mkClosure@ makes a closure, when given a comparison and iteration loop.
+-- Be careful, because if the functional always makes the object different,
 -- This will never terminate.
 
 mkClosure :: (a -> a -> Bool) -> (a -> a) -> a -> a
@@ -112,14 +106,14 @@ foldb :: (a -> a -> a) -> [a] -> a
 foldb f [] = error "can't reduce an empty list using foldb"
 foldb f [x] = x
 foldb f l  = foldb f (foldb' l)
-   where 
+   where
       foldb' (x:y:x':y':xs) = f (f x y) (f x' y') : foldb' xs
       foldb' (x:y:xs) = f x y : foldb' xs
       foldb' xs = xs
 
--- Merge two ordered lists into one ordered list. 
+-- Merge two ordered lists into one ordered list.
 
-mergeWith               :: (a -> a -> Bool) -> [a] -> [a] -> [a] 
+mergeWith               :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 mergeWith _ []     ys      = ys
 mergeWith _ xs     []      = xs
 mergeWith le (x:xs) (y:ys)
@@ -139,9 +133,9 @@ sortWith :: (a -> a -> Bool) -> [a] -> [a]
 sortWith le [] = []
 sortWith le lst = foldb (mergeWith le) (splitList lst)
   where
-      splitList (a1:a2:a3:a4:a5:xs) = 
-               insertWith le a1 
-              (insertWith le a2 
+      splitList (a1:a2:a3:a4:a5:xs) =
+               insertWith le a1
+              (insertWith le a2
               (insertWith le a3
               (insertWith le a4 [a5]))) : splitList xs
       splitList [] = []
@@ -166,12 +160,12 @@ copy  :: Int -> a -> [a]      -- make list of n copies of x
 copy n x = take n xs where xs = x:xs
 
 combinePairs :: (Ord a) => [(a,b)] -> [(a,[b])]
-combinePairs xs = 
-	combine [ (a,[b]) | (a,b) <- sortWith (\ (a,_) (b,_) -> a <= b) xs]
+combinePairs xs =
+        combine [ (a,[b]) | (a,b) <- sortWith (\ (a,_) (b,_) -> a <= b) xs]
  where
-	combine [] = []
-	combine ((a,b):(c,d):r) | a == c = combine ((a,b++d) : r)
-	combine (a:r) = a : combine r
+        combine [] = []
+        combine ((a,b):(c,d):r) | a == c = combine ((a,b++d) : r)
+        combine (a:r) = a : combine r
 
 assocMaybe :: (Eq a) => [(a,b)] -> a -> Maybe b
 assocMaybe env k = case [ val | (key,val) <- env, k == key] of
@@ -189,9 +183,9 @@ deSucc (Succeeded e) = e
 mapAccumL :: (a -> b -> (c,a)) -> a -> [b] -> ([c],a)
 mapAccumL f s [] = ([],s)
 mapAccumL f s (b:bs) = (c:cs,s'')
-	where
-		(c,s') = f s b
-		(cs,s'') = mapAccumL f s' bs
+        where
+                (c,s') = f s b
+                (cs,s'') = mapAccumL f s' bs
 
 
 
@@ -200,7 +194,7 @@ mapAccumL f s (b:bs) = (c:cs,s'')
 -- to optimise lookup.
 
 arrElem :: (Ix a) => [a] -> a -> Bool
-arrElem obj = \x -> inRange size x && arr ! x 
+arrElem obj = \x -> inRange size x && arr ! x
   where
       size = (maximum obj,minimum obj)
       arr = listArray size [ i `elem` obj | i <- range size ]
@@ -209,7 +203,7 @@ arrElem obj = \x -> inRange size x && arr ! x
 -- again using arrays, of course. Remember @b@ can be a function !
 -- Note again the use of partiual application.
 
-arrCond :: (Ix a) 
+arrCond :: (Ix a)
         => (a,a)                      -- the bounds
         -> [(Assoc [a] b)]            -- the simple lookups
         -> [(Assoc (a -> Bool) b)]    -- the functional lookups
@@ -233,12 +227,12 @@ memoise bds f = (!) arr
 formatText :: Int -> [String] -> [String]
 formatText n = map unwords . cutAt n []
   where
-	cutAt :: Int -> [String] -> [String] -> [[String]]
-	cutAt m wds [] = [reverse wds]
-	cutAt m wds (wd:rest) = if len <= m || null wds
-			        then cutAt (m-(len+1)) (wd:wds) rest 
-				else reverse wds : cutAt n [] (wd:rest)
-	  where	len = length wd
+        cutAt :: Int -> [String] -> [String] -> [[String]]
+        cutAt m wds [] = [reverse wds]
+        cutAt m wds (wd:rest) = if len <= m || null wds
+                                then cutAt (m-(len+1)) (wd:wds) rest
+                                else reverse wds : cutAt n [] (wd:rest)
+          where len = length wd
 
 
 

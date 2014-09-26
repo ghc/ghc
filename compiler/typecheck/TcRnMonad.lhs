@@ -967,10 +967,10 @@ addWarnTcM (env0, msg)
         add_warn msg err_info }
 
 addWarn :: MsgDoc -> TcRn ()
-addWarn msg = add_warn msg empty
+addWarn msg = add_warn msg Outputable.empty
 
 addWarnAt :: SrcSpan -> MsgDoc -> TcRn ()
-addWarnAt loc msg = add_warn_at loc msg empty
+addWarnAt loc msg = add_warn_at loc msg Outputable.empty
 
 add_warn :: MsgDoc -> MsgDoc -> TcRn ()
 add_warn msg extra_info 
@@ -1011,7 +1011,7 @@ mkErrInfo env ctxts
  = go 0 env ctxts
  where
    go :: Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
-   go _ _   [] = return empty
+   go _ _   [] = return Outputable.empty
    go n env ((is_landmark, ctxt) : ctxts)
      | is_landmark || n < mAX_CONTEXTS -- Too verbose || opt_PprStyle_Debug
      = do { (env', msg) <- ctxt env
@@ -1204,9 +1204,10 @@ recordUnsafeInfer = getGblEnv >>= \env -> writeTcRef (tcg_safeInfer env) False
 finalSafeMode :: DynFlags -> TcGblEnv -> IO SafeHaskellMode
 finalSafeMode dflags tcg_env = do
     safeInf <- readIORef (tcg_safeInfer tcg_env)
-    return $ if safeInferOn dflags && not safeInf
-        then Sf_None
-        else safeHaskell dflags
+    return $ case safeHaskell dflags of
+        Sf_None | safeInferOn dflags && safeInf -> Sf_Safe
+                | otherwise                     -> Sf_None
+        s -> s
 \end{code}
 
 

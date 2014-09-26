@@ -11,8 +11,6 @@ module FastBool (
     FastBool, fastBool, isFastTrue, fastOr, fastAnd
   ) where
 
-#if defined(__GLASGOW_HASKELL__)
-
 -- Import the beggars
 import GHC.Exts
 #ifdef DEBUG
@@ -65,21 +63,6 @@ fastAnd 0# _ = 0#
 fastAnd _  x = x
 
 #endif /* ! DEBUG */
-
-
-#else /* ! __GLASGOW_HASKELL__ */
-
-type FastBool = Bool
-fastBool x = x
-isFastTrue x = x
--- make sure these are as strict as the unboxed version,
--- so that the performance characteristics match
-fastOr False False = False
-fastOr _ _ = True
-fastAnd True True = True
-fastAnd _ _ = False
-
-#endif /* ! __GLASGOW_HASKELL__ */
 
 fastBool :: Bool -> FastBool
 isFastTrue :: FastBool -> Bool

@@ -57,7 +57,9 @@ import ErrUtils
 import qualified Stream
 
 import Control.Monad (ap)
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
+#endif
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
@@ -406,7 +408,7 @@ strDisplayName_llvm lbl = do
     dflags <- getDynFlags
     let sdoc = pprCLabel platform lbl
         depth = Outp.PartWay 1
-        style = Outp.mkUserStyle (\ _ _ -> Outp.NameNotInScope2, Outp.alwaysQualifyModules) depth
+        style = Outp.mkUserStyle Outp.reallyAlwaysQualify depth
         str = Outp.renderWithStyle dflags sdoc style
     return (fsLit (dropInfoSuffix str))
 

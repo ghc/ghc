@@ -54,21 +54,29 @@ Here's the externally-callable interface:
 
 \begin{code}
 occurAnalysePgm :: Module       -- Used only in debug output
-                -> (Activation -> Bool) 
+                -> (Activation -> Bool)
                 -> [CoreRule] -> [CoreVect] -> VarSet
                 -> CoreProgram -> CoreProgram
 occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
   | isEmptyVarEnv final_usage
-  = binds'
+  = occ_anald_binds
+
   | otherwise   -- See Note [Glomming]
   = WARN( True, hang (text "Glomming in" <+> ppr this_mod <> colon)
                    2 (ppr final_usage ) )
-    [Rec (flattenBinds binds')]
+    occ_anald_glommed_binds
   where
-    (final_usage, binds') = go (initOccEnv active_rule) binds
+    init_env = initOccEnv active_rule
+    (final_usage, occ_anald_binds) = go init_env binds
+    (_, occ_anald_glommed_binds)   = occAnalRecBind init_env imp_rules_edges
+                                                    (flattenBinds occ_anald_binds)
+                                                    initial_uds
+          -- It's crucial to re-analyse the glommed-together bindings
+          -- so that we establish the right loop breakers. Otherwise
+          -- we can easily create an infinite loop (Trac #9583 is an example)
 
-    initial_uds = addIdOccs emptyDetails 
-                            (rulesFreeVars imp_rules `unionVarSet` 
+    initial_uds = addIdOccs emptyDetails
+                            (rulesFreeVars imp_rules `unionVarSet`
                              vectsFreeVars vects `unionVarSet`
                              vectVars)
     -- The RULES and VECTORISE declarations keep things alive! (For VECTORISE declarations,
@@ -90,7 +98,7 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
         = (final_usage, bind' ++ binds')
         where
            (bs_usage, binds')   = go env binds
-           (final_usage, bind') = occAnalBind env env imp_rules_edges bind bs_usage
+           (final_usage, bind') = occAnalBind env imp_rules_edges bind bs_usage
 
 occurAnalyseExpr :: CoreExpr -> CoreExpr
         -- Do occurrence analysis, and discard occurrence info returned
@@ -120,14 +128,21 @@ Bindings
 
 \begin{code}
 occAnalBind :: OccEnv           -- The incoming OccEnv
-            -> OccEnv           -- Same, but trimmed by (binderOf bind)
             -> IdEnv IdSet      -- Mapping from FVs of imported RULE LHSs to RHS FVs
             -> CoreBind
             -> UsageDetails             -- Usage details of scope
             -> (UsageDetails,           -- Of the whole let(rec)
                 [CoreBind])
 
-occAnalBind env _ imp_rules_edges (NonRec binder rhs) body_usage
+occAnalBind env imp_rules_edges (NonRec binder rhs) body_usage
+  = occAnalNonRecBind env imp_rules_edges binder rhs body_usage
+occAnalBind env imp_rules_edges (Rec pairs) body_usage
+  = occAnalRecBind env imp_rules_edges pairs body_usage
+
+-----------------
+occAnalNonRecBind :: OccEnv -> IdEnv IdSet -> Var -> CoreExpr
+                  -> UsageDetails -> (UsageDetails, [CoreBind])
+occAnalNonRecBind env imp_rules_edges binder rhs body_usage
   | isTyVar binder      -- A type let; we don't gather usage info
   = (body_usage, [NonRec binder rhs])
 
@@ -145,7 +160,10 @@ occAnalBind env _ imp_rules_edges (NonRec binder rhs) body_usage
     rhs_usage4 = maybe rhs_usage3 (addIdOccs rhs_usage3) $ lookupVarEnv imp_rules_edges binder
        -- See Note [Preventing loops due to imported functions rules]
 
-occAnalBind _ env imp_rules_edges (Rec pairs) body_usage
+-----------------
+occAnalRecBind :: OccEnv -> IdEnv IdSet -> [(Var,CoreExpr)]
+               -> UsageDetails -> (UsageDetails, [CoreBind])
+occAnalRecBind env imp_rules_edges pairs body_usage
   = foldr occAnalRec (body_usage, []) sccs
         -- For a recursive group, we
         --      * occ-analyse all the RHSs
@@ -625,13 +643,13 @@ data Details
   = ND { nd_bndr :: Id          -- Binder
        , nd_rhs  :: CoreExpr    -- RHS, already occ-analysed
 
-       , nd_uds  :: UsageDetails  -- Usage from RHS, and RULES, and InlineRule unfolding
+       , nd_uds  :: UsageDetails  -- Usage from RHS, and RULES, and stable unfoldings
                                   -- ignoring phase (ie assuming all are active)
                                   -- See Note [Forming Rec groups]
 
        , nd_inl  :: IdSet       -- Free variables of
-                                --   the InlineRule (if present and active)
-                                --   or the RHS (ir no InlineRule)
+                                --   the stable unfolding (if present and active)
+                                --   or the RHS (if not)
                                 -- but excluding any RULES
                                 -- This is the IdSet that may be used if the Id is inlined
 
@@ -684,10 +702,10 @@ makeNode env imp_rules_edges bndr_set (bndr, rhs)
                   , let fvs = exprFreeVars (ru_rhs rule)
                               `delVarSetList` ru_bndrs rule
                   , not (isEmptyVarSet fvs) ]
-    all_rule_fvs = foldr (unionVarSet . snd) rule_lhs_fvs rules_w_fvs
-    rule_lhs_fvs = foldr (unionVarSet . (\ru -> exprsFreeVars (ru_args ru)
-                                                `delVarSetList` ru_bndrs ru))
-                         emptyVarSet rules
+    all_rule_fvs = rule_lhs_fvs `unionVarSet` rule_rhs_fvs
+    rule_rhs_fvs = mapUnionVarSet snd rules_w_fvs
+    rule_lhs_fvs = mapUnionVarSet (\ru -> exprsFreeVars (ru_args ru)
+                                          `delVarSetList` ru_bndrs ru) rules
     active_rule_fvs = unionVarSets [fvs | (a,fvs) <- rules_w_fvs, is_active a]
 
     -- Finding the free variables of the INLINE pragma (if any)
@@ -757,7 +775,7 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
           -- a fresh SCC computation that will yield a single CyclicSCC result.
 
     weak_fvs :: VarSet
-    weak_fvs = foldr (unionVarSet . nd_weak . fstOf3) emptyVarSet nodes
+    weak_fvs = mapUnionVarSet (nd_weak . fstOf3) nodes
 
         -- See Note [Choosing loop breakers] for loop_breaker_edges
     loop_breaker_edges = map mk_node tagged_nodes
@@ -879,13 +897,14 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
         | isDFunId bndr = 9   -- Never choose a DFun as a loop breaker
                               -- Note [DFuns should not be loop breakers]
 
-        | Just _ <- isStableCoreUnfolding_maybe (idUnfolding bndr)
-        = 3    -- Note [INLINE pragmas]
+        | Just be_very_keen <- hasStableCoreUnfolding_maybe (idUnfolding bndr)
+        = if be_very_keen then 6    -- Note [Loop breakers and INLINE/INLINEABLE pragmas]
+                          else 3
                -- Data structures are more important than INLINE pragmas
                -- so that dictionary/method recursion unravels
-               -- Note that this case hits all InlineRule things, so we
-               -- never look at 'rhs' for InlineRule stuff. That's right, because
-               -- 'rhs' is irrelevant for inlining things with an InlineRule
+               -- Note that this case hits all stable unfoldings, so we
+               -- never look at 'rhs' for stable unfoldings. That's right, because
+               -- 'rhs' is irrelevant for inlining things with a stable unfolding
 
         | is_con_app rhs = 5  -- Data types help with cases: Note [Constructor applications]
 
@@ -962,43 +981,25 @@ The RULES stuff means that we can't choose $dm as a loop breaker
 opInt *and* opBool, and so on.  The number of loop breakders is
 linear in the number of instance declarations.
 
-Note [INLINE pragmas]
-~~~~~~~~~~~~~~~~~~~~~
+Note [Loop breakers and INLINE/INLINEABLE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Avoid choosing a function with an INLINE pramga as the loop breaker!
 If such a function is mutually-recursive with a non-INLINE thing,
 then the latter should be the loop-breaker.
 
-   ----> Historical note, dating from when strictness wrappers
-   were generated from the strictness signatures:
+It's vital to distinguish between INLINE and INLINEABLE (the
+Bool returned by hasStableCoreUnfolding_maybe).  If we start with
+   Rec { {-# INLINEABLE f #-}
+         f x = ...f... }
+and then worker/wrapper it through strictness analysis, we'll get
+   Rec { {-# INLINEABLE $wf #-}
+         $wf p q = let x = (p,q) in ...f...
 
-      Usually this is just a question of optimisation. But a particularly
-      bad case is wrappers generated by the demand analyser: if you make
-      then into a loop breaker you may get an infinite inlining loop.  For
-      example:
-        rec {
-              $wfoo x = ....foo x....
+         {-# INLINE f #-}
+         f x = case x of (p,q) -> $wf p q }
 
-              {-loop brk-} foo x = ...$wfoo x...
-        }
-      The interface file sees the unfolding for $wfoo, and sees that foo is
-      strict (and hence it gets an auto-generated wrapper).  Result: an
-      infinite inlining in the importing scope.  So be a bit careful if you
-      change this.  A good example is Tree.repTree in
-      nofib/spectral/minimax. If the repTree wrapper is chosen as the loop
-      breaker then compiling Game.hs goes into an infinite loop.  This
-      happened when we gave is_con_app a lower score than inline candidates:
-
-        Tree.repTree
-          = __inline_me (/\a. \w w1 w2 ->
-                         case Tree.$wrepTree @ a w w1 w2 of
-                          { (# ww1, ww2 #) -> Branch @ a ww1 ww2 })
-        Tree.$wrepTree
-          = /\a w w1 w2 ->
-            (# w2_smP, map a (Tree a) (Tree.repTree a w1 w) (w w2) #)
-
-      Here we do *not* want to choose 'repTree' as the loop breaker.
-
-   -----> End of historical note
+Now it is vital that we choose $wf as the loop breaker, so we can
+inline 'f' in '$wf'.
 
 Note [DFuns should not be loop breakers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1172,10 +1173,10 @@ occAnal env expr@(Var v)  = (mkOneOcc env v False, expr)
 
 occAnal _ (Coercion co)
   = (addIdOccs emptyDetails (coVarsOfCo co), Coercion co)
-        -- See Note [Gather occurrences of coercion veriables]
+        -- See Note [Gather occurrences of coercion variables]
 \end{code}
 
-Note [Gather occurrences of coercion veriables]
+Note [Gather occurrences of coercion variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We need to gather info about what coercion variables appear, so that
 we can sort them into the right place when doing dependency analysis.
@@ -1199,7 +1200,7 @@ occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
     let usage1 = markManyIf (isRhsEnv env) usage
         usage2 = addIdOccs usage1 (coVarsOfCo co)
-          -- See Note [Gather occurrences of coercion veriables]
+          -- See Note [Gather occurrences of coercion variables]
     in (usage2, Cast expr' co)
         -- If we see let x = y `cast` co
         -- then mark y as 'Many' so that we don't
@@ -1269,7 +1270,7 @@ occAnal env (Case scrut bndr ty alts)
           Just _  -> (usage `delVarEnv` bndr, setIdOccInfo bndr NoOccInfo)
 
     alt_env = mkAltEnv env scrut bndr
-    occ_anal_alt = occAnalAlt alt_env bndr
+    occ_anal_alt = occAnalAlt alt_env
 
     occ_anal_scrut (Var v) (alt1 : other_alts)
         | not (null other_alts) || not (isDefaultAlt alt1)
@@ -1281,7 +1282,7 @@ occAnal env (Case scrut bndr ty alts)
 
 occAnal env (Let bind body)
   = case occAnal env body                                of { (body_usage, body') ->
-    case occAnalBind env env emptyVarEnv bind body_usage of { (final_usage, new_binds) ->
+    case occAnalBind env emptyVarEnv bind body_usage of { (final_usage, new_binds) ->
        (final_usage, mkLets new_binds body') }}
 
 occAnalArgs :: OccEnv -> [CoreExpr] -> [OneShots] -> (UsageDetails, [CoreExpr])
@@ -1404,30 +1405,41 @@ scrutinised y).
 
 \begin{code}
 occAnalAlt :: (OccEnv, Maybe (Id, CoreExpr))
-           -> CoreBndr
            -> CoreAlt
            -> (UsageDetails, Alt IdWithOccInfo)
-occAnalAlt (env, scrut_bind) case_bndr (con, bndrs, rhs)
+occAnalAlt (env, scrut_bind) (con, bndrs, rhs)
   = case occAnal env rhs of { (rhs_usage1, rhs1) ->
     let
-        (rhs_usage2, rhs2) =
-          wrapProxy (occ_binder_swap env) scrut_bind case_bndr rhs_usage1 rhs1 
-        (alt_usg, tagged_bndrs) = tagLamBinders rhs_usage2 bndrs
-        bndrs' = tagged_bndrs      -- See Note [Binders in case alternatives]
+        (alt_usg, tagged_bndrs) = tagLamBinders rhs_usage1 bndrs
+                                  -- See Note [Binders in case alternatives]
+        (alt_usg', rhs2) =
+          wrapAltRHS env scrut_bind alt_usg tagged_bndrs rhs1
     in
-    (alt_usg, (con, bndrs', rhs2)) }
+    (alt_usg', (con, tagged_bndrs, rhs2)) }
 
-wrapProxy :: Bool -> Maybe (Id, CoreExpr) -> Id -> UsageDetails -> CoreExpr -> (UsageDetails, CoreExpr)
-wrapProxy enable_binder_swap (Just (scrut_var, rhs)) case_bndr body_usg body
-  | enable_binder_swap,
-    scrut_var `usedIn` body_usg
-  = ( body_usg' +++ unitVarEnv case_bndr NoOccInfo
-    , Let (NonRec tagged_scrut_var rhs) body )
+wrapAltRHS :: OccEnv
+           -> Maybe (Id, CoreExpr)      -- proxy mapping generated by mkAltEnv
+           -> UsageDetails              -- usage for entire alt (p -> rhs)
+           -> [Var]                     -- alt binders
+           -> CoreExpr                  -- alt RHS
+           -> (UsageDetails, CoreExpr)
+wrapAltRHS env (Just (scrut_var, let_rhs)) alt_usg bndrs alt_rhs
+  | occ_binder_swap env
+  , scrut_var `usedIn` alt_usg -- bndrs are not be present in alt_usg so this
+                               -- handles condition (a) in Note [Binder swap]
+  , not captured               -- See condition (b) in Note [Binder swap]
+  = ( alt_usg' +++ let_rhs_usg
+    , Let (NonRec tagged_scrut_var let_rhs') alt_rhs )
   where
-    (body_usg', tagged_scrut_var) = tagBinder body_usg scrut_var
-    
-wrapProxy _ _ _ body_usg body 
-  = (body_usg, body)
+    captured = any (`usedIn` let_rhs_usg) bndrs
+    -- The rhs of the let may include coercion variables
+    -- if the scrutinee was a cast, so we must gather their
+    -- usage. See Note [Gather occurrences of coercion variables]
+    (let_rhs_usg, let_rhs') = occAnal env let_rhs
+    (alt_usg', tagged_scrut_var) = tagBinder alt_usg scrut_var
+
+wrapAltRHS _ _ alt_usg _ alt_rhs
+  = (alt_usg, alt_rhs)
 \end{code}
 
 
@@ -1787,8 +1799,8 @@ tagLamBinders :: UsageDetails          -- Of scope
               -> (UsageDetails,        -- Details with binders removed
                  [IdWithOccInfo])    -- Tagged binders
 -- Used for lambda and case binders
--- It copes with the fact that lambda bindings can have InlineRule
--- unfoldings, used for join points
+-- It copes with the fact that lambda bindings can have a
+-- stable unfolding, used for join points
 tagLamBinders usage binders = usage' `seq` (usage', bndrs')
   where
     (usage', bndrs') = mapAccumR tag_lam usage binders

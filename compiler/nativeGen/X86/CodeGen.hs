@@ -1743,15 +1743,19 @@ genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
     if sse4_2
         then do code_src <- getAnyReg src
                 src_r <- getNewRegNat size
+                let dst_r = getRegisterReg platform False (CmmLocal dst)
                 return $ code_src src_r `appOL`
                     (if width == W8 then
                          -- The POPCNT instruction doesn't take a r/m8
                          unitOL (MOVZxL II8 (OpReg src_r) (OpReg src_r)) `appOL`
-                         unitOL (POPCNT II16 (OpReg src_r)
-                                 (getRegisterReg platform False (CmmLocal dst)))
+                         unitOL (POPCNT II16 (OpReg src_r) dst_r)
                      else
-                         unitOL (POPCNT size (OpReg src_r)
-                                 (getRegisterReg platform False (CmmLocal dst))))
+                         unitOL (POPCNT size (OpReg src_r) dst_r)) `appOL`
+                    (if width == W8 || width == W16 then
+                         -- We used a 16-bit destination register above,
+                         -- so zero-extend
+                         unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
+                     else nilOL)
         else do
             targetExpr <- cmmMakeDynamicReference dflags
                           CallReference lbl
@@ -1762,6 +1766,69 @@ genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
   where
     size = intSize width
     lbl = mkCmmCodeLabel primPackageKey (fsLit (popCntLabel width))
+
+genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src]
+  | is32Bit && width == W64 = do
+    -- Fallback to `hs_clz64` on i386
+    targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
+    let target = ForeignTarget targetExpr (ForeignConvention CCallConv
+                                           [NoHint] [NoHint]
+                                           CmmMayReturn)
+    genCCall dflags is32Bit target dest_regs args
+
+  | otherwise = do
+    code_src <- getAnyReg src
+    src_r <- getNewRegNat size
+    tmp_r <- getNewRegNat size
+    let dst_r = getRegisterReg platform False (CmmLocal dst)
+
+    -- The following insn sequence makes sure 'clz 0' has a defined value.
+    -- starting with Haswell, one could use the LZCNT insn instead.
+    return $ code_src src_r `appOL` toOL
+             ([ MOVZxL  II8  (OpReg src_r) (OpReg src_r) | width == W8 ] ++
+              [ BSR     size (OpReg src_r) tmp_r
+              , MOV     II32 (OpImm (ImmInt (2*bw-1))) (OpReg dst_r)
+              , CMOV NE size (OpReg tmp_r) dst_r
+              , XOR     size (OpImm (ImmInt (bw-1))) (OpReg dst_r)
+              ]) -- NB: We don't need to zero-extend the result for the
+                 -- W8/W16 cases because the 'MOV' insn already
+                 -- took care of implicitly clearing the upper bits
+  where
+    bw = widthInBits width
+    platform = targetPlatform dflags
+    size = if width == W8 then II16 else intSize width
+    lbl = mkCmmCodeLabel primPackageKey (fsLit (clzLabel width))
+
+genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) dest_regs@[dst] args@[src]
+  | is32Bit, width == W64 = do
+    -- Fallback to `hs_ctz64` on i386
+    targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
+    let target = ForeignTarget targetExpr (ForeignConvention CCallConv
+                                           [NoHint] [NoHint]
+                                           CmmMayReturn)
+    genCCall dflags is32Bit target dest_regs args
+
+  | otherwise = do
+    code_src <- getAnyReg src
+    src_r <- getNewRegNat size
+    tmp_r <- getNewRegNat size
+    let dst_r = getRegisterReg platform False (CmmLocal dst)
+
+    -- The following insn sequence makes sure 'ctz 0' has a defined value.
+    -- starting with Haswell, one could use the TZCNT insn instead.
+    return $ code_src src_r `appOL` toOL
+             ([ MOVZxL  II8  (OpReg src_r) (OpReg src_r) | width == W8 ] ++
+              [ BSF     size (OpReg src_r) tmp_r
+              , MOV     II32 (OpImm (ImmInt bw)) (OpReg dst_r)
+              , CMOV NE size (OpReg tmp_r) dst_r
+              ]) -- NB: We don't need to zero-extend the result for the
+                 -- W8/W16 cases because the 'MOV' insn already
+                 -- took care of implicitly clearing the upper bits
+  where
+    bw = widthInBits width
+    platform = targetPlatform dflags
+    size = if width == W8 then II16 else intSize width
+    lbl = mkCmmCodeLabel primPackageKey (fsLit (ctzLabel width))
 
 genCCall dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args = do
     targetExpr <- cmmMakeDynamicReference dflags
@@ -1863,15 +1930,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] =
   where
     size = intSize width
 
-genCCall _ is32Bit target dest_regs args
- | is32Bit   = genCCall32 target dest_regs args
- | otherwise = genCCall64 target dest_regs args
-
-genCCall32 :: ForeignTarget            -- function to call
-           -> [CmmFormal]        -- where to put the result
-           -> [CmmActual]        -- arguments (of mixed type)
-           -> NatM InstrBlock
-genCCall32 target dest_regs args = do
+genCCall _ is32Bit target dest_regs args = do
   dflags <- getDynFlags
   let platform = targetPlatform dflags
   case (target, dest_regs) of
@@ -1879,7 +1938,9 @@ genCCall32 target dest_regs args = do
     (PrimTarget op, []) ->
         outOfLineCmmOp op Nothing args
     -- we only cope with a single result for foreign calls
-    (PrimTarget op, [r]) -> do
+    (PrimTarget op, [r])
+      | not is32Bit -> outOfLineCmmOp op (Just r) args
+      | otherwise -> do
         l1 <- getNewLabelNat
         l2 <- getNewLabelNat
         sse2 <- sse2Enabled
@@ -1908,7 +1969,7 @@ genCCall32 target dest_regs args = do
                    return (any (getRegisterReg platform False (CmmLocal r)))
 
         actuallyInlineFloatOp _ _ args
-              = panic $ "genCCall32.actuallyInlineFloatOp: bad number of arguments! ("
+              = panic $ "genCCall.actuallyInlineFloatOp: bad number of arguments! ("
                       ++ show (length args) ++ ")"
 
     (PrimTarget (MO_S_QuotRem  width), _) -> divOp1 platform True  width dest_regs args
@@ -1918,15 +1979,20 @@ genCCall32 target dest_regs args = do
         case args of
         [arg_x, arg_y] ->
             do hCode <- getAnyReg (CmmLit (CmmInt 0 width))
-               lCode <- getAnyReg (CmmMachOp (MO_Add width) [arg_x, arg_y])
                let size = intSize width
-                   reg_l = getRegisterReg platform True (CmmLocal res_l)
+               lCode <- anyReg =<< trivialCode width (ADD_CC size)
+                                     (Just (ADD_CC size)) arg_x arg_y
+               let reg_l = getRegisterReg platform True (CmmLocal res_l)
                    reg_h = getRegisterReg platform True (CmmLocal res_h)
                    code = hCode reg_h `appOL`
                           lCode reg_l `snocOL`
                           ADC size (OpImm (ImmInteger 0)) (OpReg reg_h)
                return code
-        _ -> panic "genCCall32: Wrong number of arguments/results for add2"
+        _ -> panic "genCCall: Wrong number of arguments/results for add2"
+    (PrimTarget (MO_AddIntC width), [res_r, res_c]) ->
+        addSubIntC platform ADD_CC (Just . ADD_CC) width res_r res_c args
+    (PrimTarget (MO_SubIntC width), [res_r, res_c]) ->
+        addSubIntC platform SUB_CC (const Nothing) width res_r res_c args
     (PrimTarget (MO_U_Mul2 width), [res_h, res_l]) ->
         case args of
         [arg_x, arg_y] ->
@@ -1941,18 +2007,20 @@ genCCall32 target dest_regs args = do
                                 MOV size (OpReg rdx) (OpReg reg_h),
                                 MOV size (OpReg rax) (OpReg reg_l)]
                return code
-        _ -> panic "genCCall32: Wrong number of arguments/results for add2"
+        _ -> panic "genCCall: Wrong number of arguments/results for add2"
 
-    _ -> genCCall32' dflags target dest_regs args
+    _ -> if is32Bit
+         then genCCall32' dflags target dest_regs args
+         else genCCall64' dflags target dest_regs args
 
   where divOp1 platform signed width results [arg_x, arg_y]
             = divOp platform signed width results Nothing arg_x arg_y
         divOp1 _ _ _ _ _
-            = panic "genCCall32: Wrong number of arguments for divOp1"
+            = panic "genCCall: Wrong number of arguments for divOp1"
         divOp2 platform signed width results [arg_x_high, arg_x_low, arg_y]
             = divOp platform signed width results (Just arg_x_high) arg_x_low arg_y
         divOp2 _ _ _ _ _
-            = panic "genCCall64: Wrong number of arguments for divOp2"
+            = panic "genCCall: Wrong number of arguments for divOp2"
         divOp platform signed width [res_q, res_r]
               m_arg_x_high arg_x_low arg_y
             = do let size = intSize width
@@ -1976,7 +2044,21 @@ genCCall32 target dest_regs args = do
                                 MOV size (OpReg rax) (OpReg reg_q),
                                 MOV size (OpReg rdx) (OpReg reg_r)]
         divOp _ _ _ _ _ _ _
-            = panic "genCCall32: Wrong number of results for divOp"
+            = panic "genCCall: Wrong number of results for divOp"
+
+        addSubIntC platform instr mrevinstr width res_r res_c [arg_x, arg_y]
+            = do let size = intSize width
+                 rCode <- anyReg =<< trivialCode width (instr size)
+                                       (mrevinstr size) arg_x arg_y
+                 reg_tmp <- getNewRegNat II8
+                 let reg_c = getRegisterReg platform True (CmmLocal res_c)
+                     reg_r = getRegisterReg platform True (CmmLocal res_r)
+                     code = rCode reg_r `snocOL`
+                            SETCC OFLO (OpReg reg_tmp) `snocOL`
+                            MOVZxL II8 (OpReg reg_tmp) (OpReg reg_c)
+                 return code
+        addSubIntC _ _ _ _ _ _ _
+            = panic "genCCall: Wrong number of arguments/results for addSubIntC"
 
 genCCall32' :: DynFlags
             -> ForeignTarget            -- function to call
@@ -2130,90 +2212,6 @@ genCCall32' dflags target dest_regs args = do
           where
              arg_ty = cmmExprType dflags arg
              size = arg_size arg_ty -- Byte size
-
-genCCall64 :: ForeignTarget            -- function to call
-           -> [CmmFormal]        -- where to put the result
-           -> [CmmActual]        -- arguments (of mixed type)
-           -> NatM InstrBlock
-genCCall64 target dest_regs args = do
-  dflags <- getDynFlags
-  let platform = targetPlatform dflags
-  case (target, dest_regs) of
-
-    (PrimTarget op, []) ->
-        -- void return type prim op
-        outOfLineCmmOp op Nothing args
-
-    (PrimTarget op, [res]) ->
-        -- we only cope with a single result for foreign calls
-        outOfLineCmmOp op (Just res) args
-
-    (PrimTarget (MO_S_QuotRem  width), _) -> divOp1 platform True  width dest_regs args
-    (PrimTarget (MO_U_QuotRem  width), _) -> divOp1 platform False width dest_regs args
-    (PrimTarget (MO_U_QuotRem2 width), _) -> divOp2 platform False width dest_regs args
-    (PrimTarget (MO_Add2 width), [res_h, res_l]) ->
-        case args of
-        [arg_x, arg_y] ->
-            do hCode <- getAnyReg (CmmLit (CmmInt 0 width))
-               lCode <- getAnyReg (CmmMachOp (MO_Add width) [arg_x, arg_y])
-               let size = intSize width
-                   reg_l = getRegisterReg platform True (CmmLocal res_l)
-                   reg_h = getRegisterReg platform True (CmmLocal res_h)
-                   code = hCode reg_h `appOL`
-                          lCode reg_l `snocOL`
-                          ADC size (OpImm (ImmInteger 0)) (OpReg reg_h)
-               return code
-        _ -> panic "genCCall64: Wrong number of arguments/results for add2"
-    (PrimTarget (MO_U_Mul2 width), [res_h, res_l]) ->
-        case args of
-        [arg_x, arg_y] ->
-            do (y_reg, y_code) <- getRegOrMem arg_y
-               x_code <- getAnyReg arg_x
-               let size = intSize width
-                   reg_h = getRegisterReg platform True (CmmLocal res_h)
-                   reg_l = getRegisterReg platform True (CmmLocal res_l)
-                   code = y_code `appOL`
-                          x_code rax `appOL`
-                          toOL [MUL2 size y_reg,
-                                MOV size (OpReg rdx) (OpReg reg_h),
-                                MOV size (OpReg rax) (OpReg reg_l)]
-               return code
-        _ -> panic "genCCall64: Wrong number of arguments/results for add2"
-
-    _ ->
-        do dflags <- getDynFlags
-           genCCall64' dflags target dest_regs args
-
-  where divOp1 platform signed width results [arg_x, arg_y]
-            = divOp platform signed width results Nothing arg_x arg_y
-        divOp1 _ _ _ _ _
-            = panic "genCCall64: Wrong number of arguments for divOp1"
-        divOp2 platform signed width results [arg_x_high, arg_x_low, arg_y]
-            = divOp platform signed width results (Just arg_x_high) arg_x_low arg_y
-        divOp2 _ _ _ _ _
-            = panic "genCCall64: Wrong number of arguments for divOp2"
-        divOp platform signed width [res_q, res_r]
-              m_arg_x_high arg_x_low arg_y
-            = do let size = intSize width
-                     reg_q = getRegisterReg platform True (CmmLocal res_q)
-                     reg_r = getRegisterReg platform True (CmmLocal res_r)
-                     widen | signed    = CLTD size
-                           | otherwise = XOR size (OpReg rdx) (OpReg rdx)
-                     instr | signed    = IDIV
-                           | otherwise = DIV
-                 (y_reg, y_code) <- getRegOrMem arg_y
-                 x_low_code <- getAnyReg arg_x_low
-                 x_high_code <- case m_arg_x_high of
-                                Just arg_x_high -> getAnyReg arg_x_high
-                                Nothing -> return $ const $ unitOL widen
-                 return $ y_code `appOL`
-                          x_low_code rax `appOL`
-                          x_high_code rdx `appOL`
-                          toOL [instr size y_reg,
-                                MOV size (OpReg rax) (OpReg reg_q),
-                                MOV size (OpReg rdx) (OpReg reg_r)]
-        divOp _ _ _ _ _ _ _
-            = panic "genCCall64: Wrong number of results for divOp"
 
 genCCall64' :: DynFlags
             -> ForeignTarget            -- function to call
@@ -2486,6 +2484,8 @@ outOfLineCmmOp mop res args
 
               MO_PopCnt _  -> fsLit "popcnt"
               MO_BSwap _   -> fsLit "bswap"
+              MO_Clz w     -> fsLit $ clzLabel w
+              MO_Ctz w     -> fsLit $ ctzLabel w
 
               MO_AtomicRMW _ _ -> fsLit "atomicrmw"
               MO_AtomicRead _  -> fsLit "atomicread"
@@ -2498,6 +2498,8 @@ outOfLineCmmOp mop res args
               MO_U_QuotRem {}  -> unsupported
               MO_U_QuotRem2 {} -> unsupported
               MO_Add2 {}       -> unsupported
+              MO_AddIntC {}    -> unsupported
+              MO_SubIntC {}    -> unsupported
               MO_U_Mul2 {}     -> unsupported
               MO_WriteBarrier  -> unsupported
               MO_Touch         -> unsupported

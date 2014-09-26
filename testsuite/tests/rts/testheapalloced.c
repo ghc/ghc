@@ -85,7 +85,7 @@ int main (int argc, char *argv[])
         printf("%d\n", j);
     }
 
-    printf("misses: %ld, %ld%\n", mpc_misses, mpc_misses / (LOOPS*20));
+    printf("misses: %ld, %ld%%\n", mpc_misses, mpc_misses / (LOOPS*20));
 
     for (i=0; i < ARRSIZE; i++)
     {

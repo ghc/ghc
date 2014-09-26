@@ -26,10 +26,7 @@ available = False
 {-# INLINE available #-}
 #else
 
-import Control.Monad (when)
 import Data.Bits (Bits(..), FiniteBits(..))
-import Data.Maybe (Maybe(..))
-import Data.Monoid (Monoid(..))
 import Data.Word (Word16, Word32)
 import Foreign.C.Error (throwErrnoIfMinus1, eINTR, eINVAL,
                         eNOTSUP, getErrno, throwErrno)

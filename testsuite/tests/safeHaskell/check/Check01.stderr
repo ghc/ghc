@@ -1,4 +1,4 @@
 [3 of 3] Compiling Check01          ( Check01.hs, Check01.o )
 
 <no location info>:
-    The package (base) is required to be trusted but it isn't!
+    The package (base-4.8.0.0) is required to be trusted but it isn't!

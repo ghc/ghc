@@ -96,6 +96,15 @@ libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-incomplete-patterns
 # Temporarily turn off pointless-pragma warnings for containers
 libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-pointless-pragmas
 
+# Turn off import warnings for bad unused imports
+libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+libraries/hoopl_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+utils/haddock_dist_EXTRA_HC_OPTS += -fno-warn-unused-imports
+libraries/stm_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+libraries/parallel_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+libraries/vector_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+
 # bytestring has identities at the moment
 libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-identities
 
@@ -117,13 +126,20 @@ libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
 # binary upstream has some warnings, so don't use -Werror for it
+libraries/binary_dist-boot_EXTRA_HC_OPTS += -Wwarn
 libraries/binary_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # temporarily turn off -Werror for mtl
 libraries/mtl_dist-install_EXTRA_HC_OPTS += -Wwarn
 
+# temporarily turn off unused-imports warnings for pretty
+libraries/pretty_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
+
 # primitive has a warning about deprecated use of GHC.IOBase
 libraries/primitive_dist-install_EXTRA_HC_OPTS += -Wwarn
+
+# temporarily turn off unused-imports warnings for terminfo
+libraries/terminfo_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
 # temporarily turn off -Werror for transformers
 libraries/transformers_dist-boot_EXTRA_HC_OPTS += -Wwarn
@@ -131,6 +147,9 @@ libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # vector has some unused match warnings
 libraries/vector_dist-install_EXTRA_HC_OPTS += -Wwarn
+
+# temporarily turn off unused-imports warnings for xhtml
+libraries/xhtml_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 
 libraries/dph/dph-base_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-prim-interface_dist-install_EXTRA_HC_OPTS += -Wwarn

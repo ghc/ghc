@@ -16,10 +16,10 @@
 
 #include "BeginPrivate.h"
 
-/* 
+/*
    Definition of a Task
    --------------------
- 
+
    A task is an OSThread that runs Haskell code.  Every OSThread that
    runs inside the RTS, whether as a worker created by the RTS or via
    an in-call from C to Haskell, has an associated Task.  The first
@@ -29,7 +29,7 @@
    There is a one-to-one relationship between OSThreads and Tasks.
    The Task for an OSThread is kept in thread-local storage, and can
    be retrieved at any time using myTask().
-   
+
    In the THREADED_RTS build, multiple Tasks may all be running
    Haskell code simultaneously. A task relinquishes its Capability
    when it is asked to evaluate an external (C) call.
@@ -64,7 +64,7 @@
 
       (a) waiting on the condition task->cond.  The Task is either
          (1) a bound Task, the TSO will be on a queue somewhere
-	 (2) a worker task, on the spare_workers queue of task->cap.
+         (2) a worker task, on the spare_workers queue of task->cap.
 
      (b) making a foreign call.  The InCall will be on the
          suspended_ccalls list.
@@ -74,8 +74,8 @@
       (a) the task is currently blocked in yieldCapability().
           This call will return when we have ownership of the Task and
           a Capability.  The Capability we get might not be the same
-	  as the one we had when we called yieldCapability().
-          
+          as the one we had when we called yieldCapability().
+
       (b) we must call resumeThread(task), which will safely establish
           ownership of the Task and a Capability.
 */
@@ -86,7 +86,7 @@ typedef struct InCall_ {
     StgTSO *   tso;             // the bound TSO (or NULL for a worker)
 
     StgTSO *   suspended_tso;   // the TSO is stashed here when we
-				// make a foreign call (NULL otherwise);
+                                // make a foreign call (NULL otherwise);
 
     Capability *suspended_cap;  // The capability that the
                                 // suspended_tso is on, because
@@ -113,10 +113,10 @@ typedef struct InCall_ {
 
 typedef struct Task_ {
 #if defined(THREADED_RTS)
-    OSThreadId id;		// The OS Thread ID of this task
+    OSThreadId id;              // The OS Thread ID of this task
 
     Condition cond;             // used for sleeping & waking up this task
-    Mutex lock;			// lock for the condition variable
+    Mutex lock;                 // lock for the condition variable
 
     // this flag tells the task whether it should wait on task->cond
     // or just continue immediately.  It's a workaround for the fact
@@ -162,7 +162,7 @@ typedef struct Task_ {
 } Task;
 
 INLINE_HEADER rtsBool
-isBoundTask (Task *task) 
+isBoundTask (Task *task)
 {
     return (task->incall->tso != NULL);
 }

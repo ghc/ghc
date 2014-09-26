@@ -182,6 +182,7 @@ data Instr
 
         -- Moves.
         | MOV         Size Operand Operand
+        | CMOV   Cond Size Operand Reg
         | MOVZxL      Size Operand Operand -- size is the size of operand 1
         | MOVSxL      Size Operand Operand -- size is the size of operand 1
         -- x86_64 note: plain mov into a 32-bit register always zero-extends
@@ -203,6 +204,13 @@ data Instr
 
         | DIV         Size Operand              -- eax := eax:edx/op, edx := eax:edx%op
         | IDIV        Size Operand              -- ditto, but signed
+
+        -- Int Arithmetic, where the effects on the condition register
+        -- are important. Used in specialized sequences such as MO_Add2.
+        -- Do not rewrite these instructions to "equivalent" ones that
+        -- have different effect on the condition register! (See #9013.)
+        | ADD_CC      Size Operand Operand
+        | SUB_CC      Size Operand Operand
 
         -- Simple bit-twiddling.
         | AND         Size Operand Operand
@@ -320,8 +328,10 @@ data Instr
                                  --       call 1f
                                  -- 1:    popl %reg
 
-    -- SSE4.2
-        | POPCNT      Size Operand Reg -- src, dst
+    -- bit counting instructions
+        | POPCNT      Size Operand Reg -- [SSE4.2] count number of bits set to 1
+        | BSF         Size Operand Reg -- bit scan forward
+        | BSR         Size Operand Reg -- bit scan reverse
 
     -- prefetch
         | PREFETCH  PrefetchVariant Size Operand -- prefetch Variant, addr size, address to prefetch
@@ -348,6 +358,7 @@ x86_regUsageOfInstr :: Platform -> Instr -> RegUsage
 x86_regUsageOfInstr platform instr
  = case instr of
     MOV    _ src dst    -> usageRW src dst
+    CMOV _ _ src dst    -> mkRU (use_R src [dst]) [dst]
     MOVZxL _ src dst    -> usageRW src dst
     MOVSxL _ src dst    -> usageRW src dst
     LEA    _ src dst    -> usageRW src dst
@@ -360,6 +371,8 @@ x86_regUsageOfInstr platform instr
     MUL2   _ src        -> mkRU (eax:use_R src []) [eax,edx]
     DIV    _ op -> mkRU (eax:edx:use_R op []) [eax,edx]
     IDIV   _ op -> mkRU (eax:edx:use_R op []) [eax,edx]
+    ADD_CC _ src dst    -> usageRM src dst
+    SUB_CC _ src dst    -> usageRM src dst
     AND    _ src dst    -> usageRM src dst
     OR     _ src dst    -> usageRM src dst
 
@@ -432,6 +445,8 @@ x86_regUsageOfInstr platform instr
     DELTA   _           -> noUsage
 
     POPCNT _ src dst -> mkRU (use_R src []) [dst]
+    BSF    _ src dst -> mkRU (use_R src []) [dst]
+    BSR    _ src dst -> mkRU (use_R src []) [dst]
 
     -- note: might be a better way to do this
     PREFETCH _  _ src -> mkRU (use_R src []) []
@@ -521,6 +536,7 @@ x86_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 x86_patchRegsOfInstr instr env
  = case instr of
     MOV  sz src dst     -> patch2 (MOV  sz) src dst
+    CMOV cc sz src dst  -> CMOV cc sz (patchOp src) (env dst)
     MOVZxL sz src dst   -> patch2 (MOVZxL sz) src dst
     MOVSxL sz src dst   -> patch2 (MOVSxL sz) src dst
     LEA  sz src dst     -> patch2 (LEA  sz) src dst
@@ -533,6 +549,8 @@ x86_patchRegsOfInstr instr env
     MUL2 sz src         -> patch1 (MUL2 sz) src
     IDIV sz op          -> patch1 (IDIV sz) op
     DIV sz op           -> patch1 (DIV sz) op
+    ADD_CC sz src dst   -> patch2 (ADD_CC sz) src dst
+    SUB_CC sz src dst   -> patch2 (SUB_CC sz) src dst
     AND  sz src dst     -> patch2 (AND  sz) src dst
     OR   sz src dst     -> patch2 (OR   sz) src dst
     XOR  sz src dst     -> patch2 (XOR  sz) src dst
@@ -602,6 +620,8 @@ x86_patchRegsOfInstr instr env
     CLTD _              -> instr
 
     POPCNT sz src dst -> POPCNT sz (patchOp src) (env dst)
+    BSF    sz src dst -> BSF    sz (patchOp src) (env dst)
+    BSR    sz src dst -> BSR    sz (patchOp src) (env dst)
 
     PREFETCH lvl size src -> PREFETCH lvl size (patchOp src)
 
@@ -935,10 +955,10 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
 
       alloc   = mkStackAllocInstr   platform delta
       dealloc = mkStackDeallocInstr platform delta
-  
+
       new_blockmap :: BlockEnv BlockId
       new_blockmap = mapFromList (zip entries (map mkBlockId uniqs))
-  
+
       insert_stack_insns (BasicBlock id insns)
          | Just new_blockid <- mapLookup id new_blockmap
          = [ BasicBlock id [alloc, JXX ALWAYS new_blockid]

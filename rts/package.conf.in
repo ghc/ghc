@@ -6,6 +6,7 @@
 name:           rts
 version:        1.0
 id:             builtin_rts
+key:            rts
 license:        BSD3
 maintainer:     glasgow-haskell-users@haskell.org
 exposed:        True
@@ -16,7 +17,7 @@ hidden-modules:
 import-dirs:
 
 #ifdef INSTALLING
-library-dirs:           LIB_DIR"/rts-1.0" PAPI_LIB_DIR FFI_LIB_DIR
+library-dirs:           LIB_DIR"/rts" PAPI_LIB_DIR FFI_LIB_DIR
 #else /* !INSTALLING */
 library-dirs:           TOP"/rts/dist/build" PAPI_LIB_DIR FFI_LIB_DIR
 #endif

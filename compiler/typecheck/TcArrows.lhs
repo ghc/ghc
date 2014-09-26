@@ -381,10 +381,12 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
         ; let ret_table = zip tup_ids tup_rets
         ; let later_rets = [r | i <- later_ids, (j, r) <- ret_table, i == j]
 
-        ; return (emptyRecStmt { recS_stmts = stmts', recS_later_ids = later_ids
-                               , recS_later_rets = later_rets
-                               , recS_rec_ids = rec_ids, recS_rec_rets = rec_rets
-                               , recS_ret_ty = res_ty }, thing)
+        ; return (emptyRecStmtId { recS_stmts = stmts'
+                                 , recS_later_ids = later_ids
+                                 , recS_later_rets = later_rets
+                                 , recS_rec_ids = rec_ids
+                                 , recS_rec_rets = rec_rets
+                                 , recS_ret_ty = res_ty }, thing)
         }}
 
 tcArrDoStmt _ _ stmt _ _

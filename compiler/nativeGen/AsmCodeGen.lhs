@@ -81,7 +81,9 @@ import qualified Stream
 import Data.List
 import Data.Maybe
 import Control.Exception
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
+#endif
 import Control.Monad
 import System.IO
 
@@ -594,7 +596,7 @@ makeImportsDoc dflags imports
             -- There's a hack to make this work in PprMach.pprNatCmmDecl.
             (if platformHasSubsectionsViaSymbols platform
              then text ".subsections_via_symbols"
-             else empty)
+             else Outputable.empty)
             $$
                 -- On recent GNU ELF systems one can mark an object file
                 -- as not requiring an executable stack. If all objects
@@ -604,14 +606,14 @@ makeImportsDoc dflags imports
                 -- stack so add the note in:
             (if platformHasGnuNonexecStack platform
              then text ".section .note.GNU-stack,\"\",@progbits"
-             else empty)
+             else Outputable.empty)
             $$
                 -- And just because every other compiler does, let's stick in
                 -- an identifier directive: .ident "GHC x.y.z"
             (if platformHasIdentDirective platform
              then let compilerIdent = text "GHC" <+> text cProjectVersion
                    in text ".ident" <+> doubleQuotes compilerIdent
-             else empty)
+             else Outputable.empty)
 
  where
         platform = targetPlatform dflags
@@ -635,7 +637,7 @@ makeImportsDoc dflags imports
                         map doPpr $
                         imps
                 | otherwise
-                = empty
+                = Outputable.empty
 
         doPpr lbl = (lbl, renderWithStyle dflags (pprCLabel platform lbl) astyle)
         astyle = mkCodeStyle AsmStyle

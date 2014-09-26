@@ -1937,8 +1937,7 @@ forkProcess(HsStablePtr *entry
 	rts_checkSchedStatus("forkProcess",cap);
 	
 	rts_unlock(cap);
-	hs_exit();                      // clean up and exit
-	stg_exit(EXIT_SUCCESS);
+        shutdownHaskellAndExit(EXIT_SUCCESS, 0 /* !fastExit */);
     }
 #else /* !FORKPROCESS_PRIMOP_SUPPORTED */
     barf("forkProcess#: primop not supported on this platform, sorry!\n");
