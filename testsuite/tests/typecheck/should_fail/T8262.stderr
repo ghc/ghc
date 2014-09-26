@@ -1,6 +1,7 @@
 
 T8262.hs:5:15:
-    Kind incompatibility when matching types:
+    Couldn't match kind ‘*’ with ‘#’
+    When matching types
       a :: *
       GHC.Prim.Int# :: #
     Relevant bindings include

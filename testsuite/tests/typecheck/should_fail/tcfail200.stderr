@@ -1,6 +1,7 @@
 
 tcfail200.hs:5:15:
-    Kind incompatibility when matching types:
+    Couldn't match kind ‘*’ with ‘#’
+    When matching types
       t1 :: *
       GHC.Prim.Int# :: #
     Relevant bindings include

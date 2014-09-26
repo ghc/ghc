@@ -1070,36 +1070,34 @@ ctPred ct = ctEvPred (cc_ev ct)
 
 dropDerivedWC :: WantedConstraints -> WantedConstraints
 -- See Note [Dropping derived constraints]
-dropDerivedWC wc@(WC { wc_flat = flats, wc_insol = insols })
-  = wc { wc_flat  = filterBag isWantedCt          flats
-       , wc_insol = filterBag (not . isDerivedCt) insols  }
-    -- Keep Givens from insols because they indicate unreachable code
-    -- The implications are (recursively) already filtered
+dropDerivedWC wc@(WC { wc_flat = flats })
+  = wc { wc_flat  = filterBag isWantedCt flats }
+    -- The wc_impl implications are already (recursively) filtered
 \end{code}
 
 Note [Dropping derived constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general we discard derived constraints at the end of constraint solving;
-see dropDerivedWC.  A consequence is that
-   we never report an error for a derived constraint,
-   and hence we do not need to take much care with their CtLoc
-
-For example,
-
+see dropDerivedWC.  For example
  * If we have an unsolved (Ord a), we don't want to complain about
    an unsolved (Eq a) as well.
- * If we have kind-incompatible (a::* ~ Int#::#) equality, we
-   don't want to complain about the kind error twice.
 
-Arguably, for *some* derived constraints we might want to report errors.
-Notably, functional dependencies.  If we have
-    class C a b | a -> b
-and we have
-    [W] C a b, [W] C a c
-where a,b,c are all signature variables.  Then we could imagine
-reporting an error unifying (b ~ c). But it's better to report that we can't
-solve (C a b) and (C a c) since those arose directly from something the
-programmer wrote.
+But we keep Derived *insoluble* constraints because they indicate a solid,
+comprehensible error.  Particularly:
+
+ * Insolubles Givens indicate unreachable code
+
+ * Insoluble kind equalities (e.g. [D] * ~ (* -> *)) may arise from
+   a type equality a ~ Int#, say
+
+ * Insoluble derived wanted equalities (e.g. [D] Int ~ Bool) may
+   arise from functional dependency interactions.  We are careful
+   to keep a good CtOrigin on such constriants (FunDepOrigin1, FunDepOrigin2)
+   so that we can produce a good error message (Trac #9612)
+
+Since we leave these Derived constraints in the residual WantedConstraints,
+we must filter them out when we re-process the WantedConstraint,
+in TcSimplify.solve_wanteds.
 
 
 %************************************************************************

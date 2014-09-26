@@ -674,7 +674,10 @@ solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols
          -- of adding Derived insolubles twice; see
          -- TcSMonad Note [Do not add duplicate derived insolubles]
        ; traceTcS "solveFlats {" empty
-       ; let all_flats = flats `unionBags` insols
+       ; let all_flats = flats `unionBags` filterBag (not . isDerivedCt) insols
+             -- See Note [Dropping derived constraints] in TcRnTypes for
+             -- why the insolubles may have derived constraints
+
        ; impls_from_flats <- solveInteract all_flats
        ; traceTcS "solveFlats end }" (ppr impls_from_flats)
 
@@ -1135,9 +1138,11 @@ floatEqualities :: [TcTyVar] -> Bool -> WantedConstraints
 --
 -- Subtleties: Note [Float equalities from under a skolem binding]
 --             Note [Skolem escape]
-floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
+floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats, wc_insol = insols })
   | not no_given_eqs  -- There are some given equalities, so don't float
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
+  | not (isEmptyBag insols)
+  = return (emptyBag, wanteds)   -- Note [Do not float equalities if there are insolubles]
   | otherwise
   = do { let (float_eqs, remaining_flats) = partitionBag is_floatable flats
        ; untch <- TcS.getUntouchables
@@ -1168,6 +1173,15 @@ floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
       | intersectsVarSet tvs tvs2 = tvs `unionVarSet` tvs2
       | otherwise                 = tvs
 \end{code}
+
+Note [Do not float equalities if there are insolubles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have (t::* ~ s::*->*), we'll get a Derived insoluble equality.
+If we float the equality outwards, we'll get *another* Derived
+insoluble equality one level out, so the same error will be reported
+twice.  However, the equality is insoluble anyway, and when there are
+any insolubles we report only them, so there is no point in floating.
+
 
 Note [When does an implication have given equalities?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

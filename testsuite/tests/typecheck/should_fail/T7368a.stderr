@@ -1,8 +1,9 @@
 
 T7368a.hs:8:6:
-    Couldn't match type ‘f’ with ‘Bad’
-      ‘f’ is a rigid type variable bound by
-          the type signature for fun :: f (Bad f) -> Bool at T7368a.hs:7:15
+    Couldn't match kind ‘*’ with ‘* -> *’
+    When matching types
+      f :: * -> *
+      Bad :: (* -> *) -> *
     Expected type: f (Bad f)
       Actual type: Bad t0
     Relevant bindings include
