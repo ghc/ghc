@@ -402,8 +402,9 @@ onException io what = io `catchException` \e -> do _ <- what
 -- state if the masked thread /blocks/ in certain ways; see
 -- "Control.Exception#interruptible".
 --
--- Threads created by 'Control.Concurrent.forkIO' inherit the masked
--- state from the parent; that is, to start a thread in blocked mode,
+-- Threads created by 'Control.Concurrent.forkIO' inherit the
+-- 'MaskingState' from the parent; that is, to start a thread in the
+-- 'MaskedInterruptible' state,
 -- use @mask_ $ forkIO ...@.  This is particularly useful if you need
 -- to establish an exception handler in the forked thread before any
 -- asynchronous exceptions are received.  To create a a new thread in

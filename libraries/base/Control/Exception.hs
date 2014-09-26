@@ -190,11 +190,11 @@ use:
    case use 'catch' or 'catchJust'.
 
 The difference between using 'try' and 'catch' for recovery is that in
-'catch' the handler is inside an implicit 'block' (see \"Asynchronous
+'catch' the handler is inside an implicit 'mask' (see \"Asynchronous
 Exceptions\") which is important when catching asynchronous
 exceptions, but when catching other kinds of exception it is
 unnecessary.  Furthermore it is possible to accidentally stay inside
-the implicit 'block' by tail-calling rather than returning from the
+the implicit 'mask' by tail-calling rather than returning from the
 handler, which is why we recommend using 'try' rather than 'catch' for
 ordinary exception recovery.
 
@@ -210,7 +210,7 @@ A typical use of 'tryJust' for recovery looks like this:
 -- -----------------------------------------------------------------------------
 -- Asynchronous exceptions
 
--- | When invoked inside 'mask', this function allows a blocked
+-- | When invoked inside 'mask', this function allows a masked
 -- asynchronous exception to be raised, if one exists.  It is
 -- equivalent to performing an interruptible operation (see
 -- #interruptible#), but does not involve any actual blocking.
@@ -258,7 +258,7 @@ to write something like
 >           catch (restore (...))
 >                 (\e -> handler)
 
-If you need to unblock asynchronous exceptions again in the exception
+If you need to unmask asynchronous exceptions again in the exception
 handler, 'restore' can be used there too.
 
 Note that 'try' and friends /do not/ have a similar default, because
