@@ -7,18 +7,12 @@ Pattern-matching constructors
 
 \begin{code}
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 module MatchCon ( matchConFamily, matchPatSyn ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Match	( match )
+import {-# SOURCE #-} Match     ( match )
 
 import HsSyn
 import DsBinds
@@ -92,8 +86,8 @@ have-we-used-all-the-constructors? question; the local function
 \begin{code}
 matchConFamily :: [Id]
                -> Type
-	       -> [[EquationInfo]]
-	       -> DsM MatchResult
+               -> [[EquationInfo]]
+               -> DsM MatchResult
 -- Each group of eqns is for a single constructor
 matchConFamily (var:vars) ty groups
   = do dflags <- getDynFlags
@@ -124,17 +118,17 @@ matchOneConLike :: [Id]
                 -> Type
                 -> [EquationInfo]
                 -> DsM (CaseAlt ConLike)
-matchOneConLike vars ty (eqn1 : eqns)	-- All eqns for a single constructor
-  = do	{ arg_vars <- selectConMatchVars val_arg_tys args1
-	 	-- Use the first equation as a source of 
-		-- suggestions for the new variables
+matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
+  = do  { arg_vars <- selectConMatchVars val_arg_tys args1
+                -- Use the first equation as a source of
+                -- suggestions for the new variables
 
-	-- Divide into sub-groups; see Note [Record patterns]
+        -- Divide into sub-groups; see Note [Record patterns]
         ; let groups :: [[(ConArgPats, EquationInfo)]]
-	      groups = runs compatible_pats [ (pat_args (firstPat eqn), eqn) 
-	      	       	    	            | eqn <- eqn1:eqns ]
+              groups = runs compatible_pats [ (pat_args (firstPat eqn), eqn)
+                                            | eqn <- eqn1:eqns ]
 
-	; match_results <- mapM (match_group arg_vars) groups
+        ; match_results <- mapM (match_group arg_vars) groups
 
         ; return $ MkCaseAlt{ alt_pat = con1,
                               alt_bndrs = tvs1 ++ dicts1 ++ arg_vars,
@@ -142,19 +136,19 @@ matchOneConLike vars ty (eqn1 : eqns)	-- All eqns for a single constructor
                               alt_result = foldr1 combineMatchResults match_results } }
   where
     ConPatOut { pat_con = L _ con1, pat_arg_tys = arg_tys, pat_wrap = wrapper1,
-	        pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
-	      = firstPat eqn1
+                pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
+              = firstPat eqn1
     fields1 = case con1 of
-        	RealDataCon dcon1 -> dataConFieldLabels dcon1
-        	PatSynCon{}       -> []
+                RealDataCon dcon1 -> dataConFieldLabels dcon1
+                PatSynCon{}       -> []
 
     val_arg_tys = case con1 of
                     RealDataCon dcon1 -> dataConInstOrigArgTys dcon1 inst_tys
                     PatSynCon psyn1   -> patSynInstArgTys      psyn1 inst_tys
     inst_tys = ASSERT( tvs1 `equalLength` ex_tvs )
                arg_tys ++ mkTyVarTys tvs1
-	-- dataConInstOrigArgTys takes the univ and existential tyvars
-	-- and returns the types of the *value* args, which is what we want
+        -- dataConInstOrigArgTys takes the univ and existential tyvars
+        -- and returns the types of the *value* args, which is what we want
 
     ex_tvs = case con1 of
                RealDataCon dcon1 -> dataConExTyVars dcon1
@@ -165,13 +159,13 @@ matchOneConLike vars ty (eqn1 : eqns)	-- All eqns for a single constructor
     match_group arg_vars arg_eqn_prs
       = ASSERT( notNull arg_eqn_prs )
         do { (wraps, eqns') <- liftM unzip (mapM shift arg_eqn_prs)
-    	   ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
-    	   ; match_result <- match (group_arg_vars ++ vars) ty eqns'
-    	   ; return (adjustMatchResult (foldr1 (.) wraps) match_result) }
+           ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
+           ; match_result <- match (group_arg_vars ++ vars) ty eqns'
+           ; return (adjustMatchResult (foldr1 (.) wraps) match_result) }
 
-    shift (_, eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds, 
-					           pat_binds = bind, pat_args = args
-					} : pats }))
+    shift (_, eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds,
+                                                   pat_binds = bind, pat_args = args
+                                        } : pats }))
       = do ds_bind <- dsTcEvBinds bind
            return ( wrapBinds (tvs `zip` tvs1)
                   . wrapBinds (ds  `zip` dicts1)
@@ -184,17 +178,17 @@ matchOneConLike vars ty (eqn1 : eqns)	-- All eqns for a single constructor
     -- Note [Record patterns]
     select_arg_vars arg_vars ((arg_pats, _) : _)
       | RecCon flds <- arg_pats
-      , let rpats = rec_flds flds  
+      , let rpats = rec_flds flds
       , not (null rpats)     -- Treated specially; cf conArgPats
-      = ASSERT2( length fields1 == length arg_vars, 
+      = ASSERT2( length fields1 == length arg_vars,
                  ppr con1 $$ ppr fields1 $$ ppr arg_vars )
         map lookup_fld rpats
       | otherwise
       = arg_vars
       where
         fld_var_env = mkNameEnv $ zipEqual "get_arg_vars" fields1 arg_vars
-	lookup_fld rpat = lookupNameEnv_NF fld_var_env 
-		   	  		   (idName (unLoc (hsRecFieldId rpat)))
+        lookup_fld rpat = lookupNameEnv_NF fld_var_env
+                                           (idName (unLoc (hsRecFieldId rpat)))
     select_arg_vars _ [] = panic "matchOneCon/select_arg_vars []"
 matchOneConLike _ _ [] = panic "matchOneCon []"
 
@@ -208,9 +202,9 @@ compatible_pats _                 (RecCon flds2, _) = null (rec_flds flds2)
 compatible_pats _                 _                 = True -- Prefix or infix con
 
 same_fields :: HsRecFields Id (LPat Id) -> HsRecFields Id (LPat Id) -> Bool
-same_fields flds1 flds2 
+same_fields flds1 flds2
   = all2 (\f1 f2 -> unLoc (hsRecFieldId f1) == unLoc (hsRecFieldId f2))
-	 (rec_flds flds1) (rec_flds flds2)
+         (rec_flds flds1) (rec_flds flds2)
 
 
 -----------------
@@ -219,38 +213,38 @@ selectConMatchVars arg_tys (RecCon {})      = newSysLocalsDs arg_tys
 selectConMatchVars _       (PrefixCon ps)   = selectMatchVars (map unLoc ps)
 selectConMatchVars _       (InfixCon p1 p2) = selectMatchVars [unLoc p1, unLoc p2]
 
-conArgPats :: [Type]	-- Instantiated argument types 
-			-- Used only to fill in the types of WildPats, which
-			-- are probably never looked at anyway
-	   -> ConArgPats
-	   -> [Pat Id]
+conArgPats :: [Type]    -- Instantiated argument types
+                        -- Used only to fill in the types of WildPats, which
+                        -- are probably never looked at anyway
+           -> ConArgPats
+           -> [Pat Id]
 conArgPats _arg_tys (PrefixCon ps)   = map unLoc ps
 conArgPats _arg_tys (InfixCon p1 p2) = [unLoc p1, unLoc p2]
 conArgPats  arg_tys (RecCon (HsRecFields { rec_flds = rpats }))
   | null rpats = map WildPat arg_tys
-	-- Important special case for C {}, which can be used for a 
- 	-- datacon that isn't declared to have fields at all
+        -- Important special case for C {}, which can be used for a
+        -- datacon that isn't declared to have fields at all
   | otherwise  = map (unLoc . hsRecFieldArg) rpats
 \end{code}
 
 Note [Record patterns]
 ~~~~~~~~~~~~~~~~~~~~~~
-Consider 
-	 data T = T { x,y,z :: Bool }
+Consider
+         data T = T { x,y,z :: Bool }
 
-	 f (T { y=True, x=False }) = ...
+         f (T { y=True, x=False }) = ...
 
 We must match the patterns IN THE ORDER GIVEN, thus for the first
-one we match y=True before x=False.  See Trac #246; or imagine 
+one we match y=True before x=False.  See Trac #246; or imagine
 matching against (T { y=False, x=undefined }): should fail without
-touching the undefined. 
+touching the undefined.
 
 Now consider:
 
-	 f (T { y=True, x=False }) = ...
-	 f (T { x=True, y= False}) = ...
+         f (T { y=True, x=False }) = ...
+         f (T { x=True, y= False}) = ...
 
-In the first we must test y first; in the second we must test x 
+In the first we must test y first; in the second we must test x
 first.  So we must divide even the equations for a single constructor
 T into sub-goups, based on whether they match the same field in the
 same order.  That's what the (runs compatible_pats) grouping.
@@ -264,31 +258,31 @@ Hence the (null rpats) checks here and there.
 Note [Existentials in shift_con_pat]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
-	data T = forall a. Ord a => T a (a->Int)
+        data T = forall a. Ord a => T a (a->Int)
 
-	f (T x f) True  = ...expr1...
-	f (T y g) False = ...expr2..
+        f (T x f) True  = ...expr1...
+        f (T y g) False = ...expr2..
 
 When we put in the tyvars etc we get
 
-	f (T a (d::Ord a) (x::a) (f::a->Int)) True =  ...expr1...
-	f (T b (e::Ord b) (y::a) (g::a->Int)) True =  ...expr2...
+        f (T a (d::Ord a) (x::a) (f::a->Int)) True =  ...expr1...
+        f (T b (e::Ord b) (y::a) (g::a->Int)) True =  ...expr2...
 
 After desugaring etc we'll get a single case:
 
-	f = \t::T b::Bool -> 
-	    case t of
-	       T a (d::Ord a) (x::a) (f::a->Int)) ->
-	    case b of
-		True  -> ...expr1...
-		False -> ...expr2...
+        f = \t::T b::Bool ->
+            case t of
+               T a (d::Ord a) (x::a) (f::a->Int)) ->
+            case b of
+                True  -> ...expr1...
+                False -> ...expr2...
 
 *** We have to substitute [a/b, d/e] in expr2! **
 Hence
-		False -> ....((/\b\(e:Ord b).expr2) a d)....
+                False -> ....((/\b\(e:Ord b).expr2) a d)....
 
-Originally I tried to use 
-	(\b -> let e = d in expr2) a 
+Originally I tried to use
+        (\b -> let e = d in expr2) a
 to do this substitution.  While this is "correct" in a way, it fails
-Lint, because e::Ord b but d::Ord a.  
+Lint, because e::Ord b but d::Ord a.
 

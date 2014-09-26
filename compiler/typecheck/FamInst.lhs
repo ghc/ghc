@@ -2,17 +2,11 @@ The @FamInst@ type: family instance heads
 
 \begin{code}
 {-# LANGUAGE CPP, GADTs #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 module FamInst (
         FamInstEnvs, tcGetFamInstEnvs,
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
-	tcLookupFamInst,
+        tcLookupFamInst,
         tcLookupDataFamInst, tcInstNewTyConTF_maybe, tcInstNewTyCon_maybe,
         newFamInst
     ) where
@@ -46,9 +40,9 @@ import qualified Data.Map as Map
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
                  Making a FamInst
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -81,9 +75,9 @@ newFamInst flavor axiom@(CoAxiom { co_ax_branches = FirstBranch branch
 
 
 %************************************************************************
-%*									*
-	Optimised overlap checking for family instances
-%*									*
+%*                                                                      *
+        Optimised overlap checking for family instances
+%*                                                                      *
 %************************************************************************
 
 For any two family instance modules that we import directly or indirectly, we
@@ -91,12 +85,12 @@ check whether the instances in the two modules are consistent, *unless* we can
 be certain that the instances of the two modules have already been checked for
 consistency during the compilation of modules that we import.
 
-Why do we need to check?  Consider 
-   module X1 where	  	  module X2 where
-    data T1			    data T2
-    type instance F T1 b = Int	    type instance F a T2 = Char
-    f1 :: F T1 a -> Int		    f2 :: Char -> F a T2
-    f1 x = x			    f2 x = x
+Why do we need to check?  Consider
+   module X1 where                module X2 where
+    data T1                         data T2
+    type instance F T1 b = Int      type instance F a T2 = Char
+    f1 :: F T1 a -> Int             f2 :: Char -> F a T2
+    f1 x = x                        f2 x = x
 
 Now if we import both X1 and X2 we could make (f2 . f1) :: Int -> Char.
 Notice that neither instance is an orphan.
@@ -117,7 +111,7 @@ data ModulePair = ModulePair Module Module
 --
 canon :: ModulePair -> (Module, Module)
 canon (ModulePair m1 m2) | m1 < m2   = (m1, m2)
-			 | otherwise = (m2, m1)
+                         | otherwise = (m2, m1)
 
 instance Eq ModulePair where
   mp1 == mp2 = canon mp1 == canon mp2
@@ -141,26 +135,26 @@ checkFamInstConsistency famInstMods directlyImpMods
        ; (eps, hpt) <- getEpsAndHpt
 
        ; let { -- Fetch the iface of a given module.  Must succeed as
- 	       -- all directly imported modules must already have been loaded.
-	       modIface mod = 
-	         case lookupIfaceByModule dflags hpt (eps_PIT eps) mod of
+               -- all directly imported modules must already have been loaded.
+               modIface mod =
+                 case lookupIfaceByModule dflags hpt (eps_PIT eps) mod of
                    Nothing    -> panic "FamInst.checkFamInstConsistency"
                    Just iface -> iface
 
              ; hmiModule     = mi_module . hm_iface
-	     ; hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv 
+             ; hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv
                                . md_fam_insts . hm_details
-             ; hpt_fam_insts = mkModuleEnv [ (hmiModule hmi, hmiFamInstEnv hmi) 
-			                   | hmi <- eltsUFM hpt]
-	     ; groups        = map (dep_finsts . mi_deps . modIface) 
-				   directlyImpMods
-	     ; okPairs       = listToSet $ concatMap allPairs groups
-	         -- instances of okPairs are consistent
-	     ; criticalPairs = listToSet $ allPairs famInstMods
-	         -- all pairs that we need to consider
+             ; hpt_fam_insts = mkModuleEnv [ (hmiModule hmi, hmiFamInstEnv hmi)
+                                           | hmi <- eltsUFM hpt]
+             ; groups        = map (dep_finsts . mi_deps . modIface)
+                                   directlyImpMods
+             ; okPairs       = listToSet $ concatMap allPairs groups
+                 -- instances of okPairs are consistent
+             ; criticalPairs = listToSet $ allPairs famInstMods
+                 -- all pairs that we need to consider
              ; toCheckPairs  = Map.keys $ criticalPairs `Map.difference` okPairs
-	         -- the difference gives us the pairs we need to check now
-	     }
+                 -- the difference gives us the pairs we need to check now
+             }
 
        ; mapM_ (check hpt_fam_insts) toCheckPairs
        }
@@ -171,7 +165,7 @@ checkFamInstConsistency famInstMods directlyImpMods
     check hpt_fam_insts (ModulePair m1 m2)
       = do { env1 <- getFamInsts hpt_fam_insts m1
            ; env2 <- getFamInsts hpt_fam_insts m2
-           ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))   
+           ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))
                    (famInstEnvElts env1) }
 
 getFamInsts :: ModuleEnv FamInstEnv -> Module -> TcM FamInstEnv
@@ -186,9 +180,9 @@ getFamInsts hpt_fam_insts mod
 \end{code}
 
 %************************************************************************
-%*									*
-	Lookup
-%*									*
+%*                                                                      *
+        Lookup
+%*                                                                      *
 %************************************************************************
 
 Look up the instance tycon of a family instance.
@@ -270,9 +264,9 @@ tcInstNewTyConTF_maybe fam_envs ty
 
 
 %************************************************************************
-%*									*
-	Extending the family instance environment
-%*									*
+%*                                                                      *
+        Extending the family instance environment
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -280,11 +274,11 @@ tcInstNewTyConTF_maybe fam_envs ty
 tcExtendLocalFamInstEnv :: [FamInst] -> TcM a -> TcM a
 tcExtendLocalFamInstEnv fam_insts thing_inside
  = do { env <- getGblEnv
-      ; (inst_env', fam_insts') <- foldlM addLocalFamInst  
+      ; (inst_env', fam_insts') <- foldlM addLocalFamInst
                                           (tcg_fam_inst_env env, tcg_fam_insts env)
                                           fam_insts
       ; let env' = env { tcg_fam_insts    = fam_insts'
-		       , tcg_fam_inst_env = inst_env' }
+                       , tcg_fam_inst_env = inst_env' }
       ; setGblEnv env' thing_inside
       }
 
@@ -325,9 +319,9 @@ addLocalFamInst (home_fie, my_fis) fam_inst
 \end{code}
 
 %************************************************************************
-%*									*
-	Checking an instance against conflicts with an instance env
-%*									*
+%*                                                                      *
+        Checking an instance against conflicts with an instance env
+%*                                                                      *
 %************************************************************************
 
 Check whether a single family instance conflicts with those in two instance
@@ -351,7 +345,7 @@ conflictInstErr fam_inst conflictingMatch
   | (FamInstMatch { fim_instance = confInst }) : _ <- conflictingMatch
   = addFamInstsErr (ptext (sLit "Conflicting family instance declarations:"))
                    [fam_inst, confInst]
-  | otherwise 
+  | otherwise
   = panic "conflictInstErr"
 
 addFamInstsErr :: SDoc -> [FamInst] -> TcRn ()
@@ -373,7 +367,7 @@ addFamInstsErr herald insts
 tcGetFamInstEnvs :: TcM FamInstEnvs
 -- Gets both the external-package inst-env
 -- and the home-pkg inst env (includes module being compiled)
-tcGetFamInstEnvs 
+tcGetFamInstEnvs
   = do { eps <- getEps; env <- getGblEnv
        ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) }
 \end{code}

@@ -5,13 +5,6 @@
 \section[TcDefaults]{Typechecking \tr{default} declarations}
 
 \begin{code}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module TcDefaults ( tcDefaults ) where
 
 import HsSyn
@@ -32,37 +25,37 @@ import FastString
 
 \begin{code}
 tcDefaults :: [LDefaultDecl Name]
-	   -> TcM (Maybe [Type])    -- Defaulting types to heave
-				    -- into Tc monad for later use
-				    -- in Disambig.
+           -> TcM (Maybe [Type])    -- Defaulting types to heave
+                                    -- into Tc monad for later use
+                                    -- in Disambig.
 
-tcDefaults [] 
-  = getDeclaredDefaultTys	-- No default declaration, so get the
-				-- default types from the envt; 
-				-- i.e. use the current ones
-				-- (the caller will put them back there)
-	-- It's important not to return defaultDefaultTys here (which
-	-- we used to do) because in a TH program, tcDefaults [] is called
-	-- repeatedly, once for each group of declarations between top-level
-	-- splices.  We don't want to carefully set the default types in
-	-- one group, only for the next group to ignore them and install
-	-- defaultDefaultTys
+tcDefaults []
+  = getDeclaredDefaultTys       -- No default declaration, so get the
+                                -- default types from the envt;
+                                -- i.e. use the current ones
+                                -- (the caller will put them back there)
+        -- It's important not to return defaultDefaultTys here (which
+        -- we used to do) because in a TH program, tcDefaults [] is called
+        -- repeatedly, once for each group of declarations between top-level
+        -- splices.  We don't want to carefully set the default types in
+        -- one group, only for the next group to ignore them and install
+        -- defaultDefaultTys
 
 tcDefaults [L _ (DefaultDecl [])]
-  = return (Just [])		-- Default declaration specifying no types
+  = return (Just [])            -- Default declaration specifying no types
 
 tcDefaults [L locn (DefaultDecl mono_tys)]
-  = setSrcSpan locn 			$
-    addErrCtxt defaultDeclCtxt		$
-    do	{ ovl_str <- xoptM Opt_OverloadedStrings
-	; num_class    <- tcLookupClass numClassName
-	; is_str_class <- tcLookupClass isStringClassName
-	; let deflt_clss | ovl_str   = [num_class, is_str_class]
-			 | otherwise = [num_class]
+  = setSrcSpan locn                     $
+    addErrCtxt defaultDeclCtxt          $
+    do  { ovl_str <- xoptM Opt_OverloadedStrings
+        ; num_class    <- tcLookupClass numClassName
+        ; is_str_class <- tcLookupClass isStringClassName
+        ; let deflt_clss | ovl_str   = [num_class, is_str_class]
+                         | otherwise = [num_class]
 
-	; tau_tys <- mapM (tc_default_ty deflt_clss) mono_tys
-    
-	; return (Just tau_tys) }
+        ; tau_tys <- mapM (tc_default_ty deflt_clss) mono_tys
+
+        ; return (Just tau_tys) }
 
 tcDefaults decls@(L locn (DefaultDecl _) : _)
   = setSrcSpan locn $
@@ -70,22 +63,22 @@ tcDefaults decls@(L locn (DefaultDecl _) : _)
 
 
 tc_default_ty :: [Class] -> LHsType Name -> TcM Type
-tc_default_ty deflt_clss hs_ty 
- = do	{ ty <- tcHsSigType DefaultDeclCtxt hs_ty
-	; checkTc (isTauTy ty) (polyDefErr hs_ty)
+tc_default_ty deflt_clss hs_ty
+ = do   { ty <- tcHsSigType DefaultDeclCtxt hs_ty
+        ; checkTc (isTauTy ty) (polyDefErr hs_ty)
 
-	-- Check that the type is an instance of at least one of the deflt_clss
-	; oks <- mapM (check_instance ty) deflt_clss
-	; checkTc (or oks) (badDefaultTy ty deflt_clss)
-	; return ty }
+        -- Check that the type is an instance of at least one of the deflt_clss
+        ; oks <- mapM (check_instance ty) deflt_clss
+        ; checkTc (or oks) (badDefaultTy ty deflt_clss)
+        ; return ty }
 
 check_instance :: Type -> Class -> TcM Bool
   -- Check that ty is an instance of cls
   -- We only care about whether it worked or not; return a boolean
 check_instance ty cls
-  = do	{ (_, mb_res) <- tryTc (simplifyDefault [mkClassPred cls [ty]])
-	; return (isJust mb_res) }
-    
+  = do  { (_, mb_res) <- tryTc (simplifyDefault [mkClassPred cls [ty]])
+        ; return (isJust mb_res) }
+
 defaultDeclCtxt :: SDoc
 defaultDeclCtxt = ptext (sLit "When checking the types in a default declaration")
 
@@ -98,8 +91,8 @@ dupDefaultDeclErr (L _ (DefaultDecl _) : dup_things)
 dupDefaultDeclErr [] = panic "dupDefaultDeclErr []"
 
 polyDefErr :: LHsType Name -> SDoc
-polyDefErr ty 
-  = hang (ptext (sLit "Illegal polymorphic type in default declaration") <> colon) 2 (ppr ty) 
+polyDefErr ty
+  = hang (ptext (sLit "Illegal polymorphic type in default declaration") <> colon) 2 (ppr ty)
 
 badDefaultTy :: Type -> [Class] -> SDoc
 badDefaultTy ty deflt_clss

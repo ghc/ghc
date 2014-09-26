@@ -22,89 +22,82 @@
 --
 -- * 'Var.Var': see "Var#name_types"
 
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module OccName (
-	-- * The 'NameSpace' type
-	NameSpace, -- Abstract
+        -- * The 'NameSpace' type
+        NameSpace, -- Abstract
 
         nameSpacesRelated,
-	
-	-- ** Construction
-	-- $real_vs_source_data_constructors
-	tcName, clsName, tcClsName, dataName, varName, 
-	tvName, srcDataName,
 
-	-- ** Pretty Printing
-	pprNameSpace, pprNonVarNameSpace, pprNameSpaceBrief,
+        -- ** Construction
+        -- $real_vs_source_data_constructors
+        tcName, clsName, tcClsName, dataName, varName,
+        tvName, srcDataName,
 
-	-- * The 'OccName' type
-	OccName, 	-- Abstract, instance of Outputable
-	pprOccName, 
+        -- ** Pretty Printing
+        pprNameSpace, pprNonVarNameSpace, pprNameSpaceBrief,
 
-	-- ** Construction	
-	mkOccName, mkOccNameFS, 
-	mkVarOcc, mkVarOccFS,
-	mkDataOcc, mkDataOccFS,
-	mkTyVarOcc, mkTyVarOccFS,
-	mkTcOcc, mkTcOccFS,
-	mkClsOcc, mkClsOccFS,
+        -- * The 'OccName' type
+        OccName,        -- Abstract, instance of Outputable
+        pprOccName,
+
+        -- ** Construction
+        mkOccName, mkOccNameFS,
+        mkVarOcc, mkVarOccFS,
+        mkDataOcc, mkDataOccFS,
+        mkTyVarOcc, mkTyVarOccFS,
+        mkTcOcc, mkTcOccFS,
+        mkClsOcc, mkClsOccFS,
         mkDFunOcc,
-	setOccNameSpace,
+        setOccNameSpace,
         demoteOccName,
         HasOccName(..),
 
-	-- ** Derived 'OccName's
+        -- ** Derived 'OccName's
         isDerivedOccName,
-	mkDataConWrapperOcc, mkWorkerOcc, mkMatcherOcc, mkDefaultMethodOcc,
-        mkGenDefMethodOcc, 
-	mkDerivedTyConOcc, mkNewTyCoOcc, mkClassOpAuxOcc,
+        mkDataConWrapperOcc, mkWorkerOcc, mkMatcherOcc, mkDefaultMethodOcc,
+        mkGenDefMethodOcc,
+        mkDerivedTyConOcc, mkNewTyCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
-	mkClassDataConOcc, mkDictOcc, mkIPOcc,
-	mkSpecOcc, mkForeignExportOcc, mkRepEqOcc, mkGenOcc1, mkGenOcc2,
-	mkGenD, mkGenR, mkGen1R, mkGenRCo, mkGenC, mkGenS,
+        mkClassDataConOcc, mkDictOcc, mkIPOcc,
+        mkSpecOcc, mkForeignExportOcc, mkRepEqOcc, mkGenOcc1, mkGenOcc2,
+        mkGenD, mkGenR, mkGen1R, mkGenRCo, mkGenC, mkGenS,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
-	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
-	mkInstTyCoOcc, mkEqPredCoOcc,
+        mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
+        mkInstTyCoOcc, mkEqPredCoOcc,
         mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
         mkPDataTyConOcc,  mkPDataDataConOcc,
-	mkPDatasTyConOcc, mkPDatasDataConOcc,
-        mkPReprTyConOcc, 
+        mkPDatasTyConOcc, mkPDatasDataConOcc,
+        mkPReprTyConOcc,
         mkPADFunOcc,
 
-	-- ** Deconstruction
-	occNameFS, occNameString, occNameSpace, 
+        -- ** Deconstruction
+        occNameFS, occNameString, occNameSpace,
 
-	isVarOcc, isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
-	parenSymOcc, startsWithUnderscore, 
-	
-	isTcClsNameSpace, isTvNameSpace, isDataConNameSpace, isVarNameSpace, isValNameSpace,
+        isVarOcc, isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
+        parenSymOcc, startsWithUnderscore,
 
-	-- * The 'OccEnv' type
-	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
-	lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
-	occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
+        isTcClsNameSpace, isTvNameSpace, isDataConNameSpace, isVarNameSpace, isValNameSpace,
+
+        -- * The 'OccEnv' type
+        OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
+        lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
+        occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
         extendOccEnv_Acc, filterOccEnv, delListFromOccEnv, delFromOccEnv,
         alterOccEnv, pprOccEnv,
 
-	-- * The 'OccSet' type
-	OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet, 
-	extendOccSetList,
-	unionOccSets, unionManyOccSets, minusOccSet, elemOccSet, occSetElts, 
-	foldOccSet, isEmptyOccSet, intersectOccSet, intersectsOccSet,
-                  
-	-- * Tidying up
-	TidyOccEnv, emptyTidyOccEnv, tidyOccName, initTidyOccEnv,
+        -- * The 'OccSet' type
+        OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet,
+        extendOccSetList,
+        unionOccSets, unionManyOccSets, minusOccSet, elemOccSet, occSetElts,
+        foldOccSet, isEmptyOccSet, intersectOccSet, intersectsOccSet,
 
-	-- * Lexical characteristics of Haskell names
-	isLexCon, isLexVar, isLexId, isLexSym,
-	isLexConId, isLexConSym, isLexVarId, isLexVarSym,
-	startsVarSym, startsVarId, startsConSym, startsConId,
+        -- * Tidying up
+        TidyOccEnv, emptyTidyOccEnv, tidyOccName, initTidyOccEnv,
+
+        -- * Lexical characteristics of Haskell names
+        isLexCon, isLexVar, isLexId, isLexSym,
+        isLexConId, isLexConSym, isLexVarId, isLexVarSym,
+        startsVarSym, startsVarId, startsConSym, startsConId,
 
         -- FsEnv
         FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
@@ -123,9 +116,9 @@ import Data.Data
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
               FastStringEnv
-%*									*
+%*                                                                      *
 %************************************************************************
 
 FastStringEnv can't be in FastString because the env depends on UniqFM
@@ -146,29 +139,29 @@ mkFsEnv     = listToUFM
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Name space}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-data NameSpace = VarName	-- Variables, including "real" data constructors
-	       | DataName	-- "Source" data constructors 
-	       | TvName		-- Type variables
-	       | TcClsName	-- Type constructors and classes; Haskell has them
-				-- in the same name space for now.
-	       deriving( Eq, Ord )
+data NameSpace = VarName        -- Variables, including "real" data constructors
+               | DataName       -- "Source" data constructors
+               | TvName         -- Type variables
+               | TcClsName      -- Type constructors and classes; Haskell has them
+                                -- in the same name space for now.
+               deriving( Eq, Ord )
    {-! derive: Binary !-}
 
--- Note [Data Constructors]  
+-- Note [Data Constructors]
 -- see also: Note [Data Constructor Naming] in DataCon.lhs
 --
 -- $real_vs_source_data_constructors
 -- There are two forms of data constructor:
 --
---	[Source data constructors] The data constructors mentioned in Haskell source code
+--      [Source data constructors] The data constructors mentioned in Haskell source code
 --
---	[Real data constructors] The data constructors of the representation type, which may not be the same as the source type
+--      [Real data constructors] The data constructors of the representation type, which may not be the same as the source type
 --
 -- For example:
 --
@@ -185,13 +178,13 @@ tvName, varName            :: NameSpace
 
 -- Though type constructors and classes are in the same name space now,
 -- the NameSpace type is abstract, so we can easily separate them later
-tcName    = TcClsName		-- Type constructors
-clsName   = TcClsName		-- Classes
-tcClsName = TcClsName		-- Not sure which!
+tcName    = TcClsName           -- Type constructors
+clsName   = TcClsName           -- Classes
+tcClsName = TcClsName           -- Not sure which!
 
 dataName    = DataName
-srcDataName = DataName	-- Haskell-source data constructors should be
-			-- in the Data name space
+srcDataName = DataName  -- Haskell-source data constructors should be
+                        -- in the Data name space
 
 tvName      = TvName
 varName     = VarName
@@ -208,7 +201,7 @@ isTvNameSpace :: NameSpace -> Bool
 isTvNameSpace TvName = True
 isTvNameSpace _      = False
 
-isVarNameSpace :: NameSpace -> Bool	-- Variables or type variables, but not constructors
+isVarNameSpace :: NameSpace -> Bool     -- Variables or type variables, but not constructors
 isVarNameSpace TvName  = True
 isVarNameSpace VarName = True
 isVarNameSpace _       = False
@@ -246,13 +239,13 @@ demoteNameSpace TcClsName = Just DataName
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Name-pieces-datatypes]{The @OccName@ datatypes}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-data OccName = OccName 
+data OccName = OccName
     { occNameSpace  :: !NameSpace
     , occNameFS     :: !FastString
     }
@@ -265,9 +258,9 @@ instance Eq OccName where
     (OccName sp1 s1) == (OccName sp2 s2) = s1 == s2 && sp1 == sp2
 
 instance Ord OccName where
-	-- Compares lexicographically, *not* by Unique of the string
-    compare (OccName sp1 s1) (OccName sp2 s2) 
-	= (s1  `compare` s2) `thenCmp` (sp1 `compare` sp2)
+        -- Compares lexicographically, *not* by Unique of the string
+    compare (OccName sp1 s1) (OccName sp2 s2)
+        = (s1  `compare` s2) `thenCmp` (sp1 `compare` sp2)
 
 instance Data OccName where
   -- don't traverse?
@@ -281,11 +274,11 @@ instance HasOccName OccName where
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Printing}
-%*									*
+%*                                                                      *
 %************************************************************************
- 
+
 \begin{code}
 instance Outputable OccName where
     ppr = pprOccName
@@ -296,21 +289,21 @@ instance OutputableBndr OccName where
     pprPrefixOcc n = pprPrefixVar (isSymOcc n) (ppr n)
 
 pprOccName :: OccName -> SDoc
-pprOccName (OccName sp occ) 
+pprOccName (OccName sp occ)
   = getPprStyle $ \ sty ->
-    if codeStyle sty 
+    if codeStyle sty
     then ztext (zEncodeFS occ)
     else pp_occ <> pp_debug sty
   where
     pp_debug sty | debugStyle sty = braces (pprNameSpaceBrief sp)
-	         | otherwise      = empty
+                 | otherwise      = empty
 
     pp_occ = sdocWithDynFlags $ \dflags ->
              if gopt Opt_SuppressUniques dflags
              then text (strip_th_unique (unpackFS occ))
              else ftext occ
 
-	-- See Note [Suppressing uniques in OccNames]
+        -- See Note [Suppressing uniques in OccNames]
     strip_th_unique ('[' : c : _) | isAlphaNum c = []
     strip_th_unique (c : cs) = c : strip_th_unique cs
     strip_th_unique []       = []
@@ -323,9 +316,9 @@ Template Haskell that have been turned into a string in the OccName.
 See Note [Unique OccNames from Template Haskell] in Convert.hs
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Construction}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -393,9 +386,9 @@ class HasOccName name where
 
 
 %************************************************************************
-%*									*
-		Environments
-%*									*
+%*                                                                      *
+                Environments
+%*                                                                      *
 %************************************************************************
 
 OccEnvs are used mainly for the envts in ModIfaces.
@@ -403,11 +396,11 @@ OccEnvs are used mainly for the envts in ModIfaces.
 Note [The Unique of an OccName]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 They are efficient, because FastStrings have unique Int# keys.  We assume
-this key is less than 2^24, and indeed FastStrings are allocated keys 
+this key is less than 2^24, and indeed FastStrings are allocated keys
 sequentially starting at 0.
 
 So we can make a Unique using
-	mkUnique ns key  :: Unique
+        mkUnique ns key  :: Unique
 where 'ns' is a Char representing the name space.  This in turn makes it
 easy to build an OccEnv.
 
@@ -436,25 +429,25 @@ extendOccEnv_Acc :: (a->b->b) -> (a->b) -> OccEnv b -> OccName -> a -> OccEnv b
 plusOccEnv     :: OccEnv a -> OccEnv a -> OccEnv a
 plusOccEnv_C   :: (a->a->a) -> OccEnv a -> OccEnv a -> OccEnv a
 mapOccEnv      :: (a->b) -> OccEnv a -> OccEnv b
-delFromOccEnv 	   :: OccEnv a -> OccName -> OccEnv a
+delFromOccEnv      :: OccEnv a -> OccName -> OccEnv a
 delListFromOccEnv :: OccEnv a -> [OccName] -> OccEnv a
-filterOccEnv	   :: (elt -> Bool) -> OccEnv elt -> OccEnv elt
-alterOccEnv	   :: (Maybe elt -> Maybe elt) -> OccEnv elt -> OccName -> OccEnv elt
+filterOccEnv       :: (elt -> Bool) -> OccEnv elt -> OccEnv elt
+alterOccEnv        :: (Maybe elt -> Maybe elt) -> OccEnv elt -> OccName -> OccEnv elt
 
-emptyOccEnv  	 = A emptyUFM
-unitOccEnv x y = A $ unitUFM x y 
+emptyOccEnv      = A emptyUFM
+unitOccEnv x y = A $ unitUFM x y
 extendOccEnv (A x) y z = A $ addToUFM x y z
 extendOccEnvList (A x) l = A $ addListToUFM x l
 lookupOccEnv (A x) y = lookupUFM x y
 mkOccEnv     l    = A $ listToUFM l
-elemOccEnv x (A y) 	 = elemUFM x y
-foldOccEnv a b (A c)	 = foldUFM a b c 
-occEnvElts (A x)	 = eltsUFM x
-plusOccEnv (A x) (A y)	 = A $ plusUFM x y 
-plusOccEnv_C f (A x) (A y)	 = A $ plusUFM_C f x y 
+elemOccEnv x (A y)       = elemUFM x y
+foldOccEnv a b (A c)     = foldUFM a b c
+occEnvElts (A x)         = eltsUFM x
+plusOccEnv (A x) (A y)   = A $ plusUFM x y
+plusOccEnv_C f (A x) (A y)       = A $ plusUFM_C f x y
 extendOccEnv_C f (A x) y z   = A $ addToUFM_C f x y z
 extendOccEnv_Acc f g (A x) y z   = A $ addToUFM_Acc f g x y z
-mapOccEnv f (A x)	 = A $ mapUFM f x
+mapOccEnv f (A x)        = A $ mapUFM f x
 mkOccEnv_C comb l = A $ addListToUFM_C comb emptyUFM l
 delFromOccEnv (A x) y    = A $ delFromUFM x y
 delListFromOccEnv (A x) y  = A $ delListFromUFM x y
@@ -469,32 +462,32 @@ pprOccEnv ppr_elt (A env) = pprUniqFM ppr_elt env
 
 type OccSet = UniqSet OccName
 
-emptyOccSet	  :: OccSet
-unitOccSet	  :: OccName -> OccSet
+emptyOccSet       :: OccSet
+unitOccSet        :: OccName -> OccSet
 mkOccSet          :: [OccName] -> OccSet
 extendOccSet      :: OccSet -> OccName -> OccSet
 extendOccSetList  :: OccSet -> [OccName] -> OccSet
-unionOccSets	  :: OccSet -> OccSet -> OccSet
+unionOccSets      :: OccSet -> OccSet -> OccSet
 unionManyOccSets  :: [OccSet] -> OccSet
-minusOccSet 	  :: OccSet -> OccSet -> OccSet
-elemOccSet	  :: OccName -> OccSet -> Bool
-occSetElts	  :: OccSet -> [OccName]
-foldOccSet	  :: (OccName -> b -> b) -> b -> OccSet -> b
-isEmptyOccSet	  :: OccSet -> Bool
+minusOccSet       :: OccSet -> OccSet -> OccSet
+elemOccSet        :: OccName -> OccSet -> Bool
+occSetElts        :: OccSet -> [OccName]
+foldOccSet        :: (OccName -> b -> b) -> b -> OccSet -> b
+isEmptyOccSet     :: OccSet -> Bool
 intersectOccSet   :: OccSet -> OccSet -> OccSet
 intersectsOccSet  :: OccSet -> OccSet -> Bool
 
-emptyOccSet	  = emptyUniqSet
-unitOccSet	  = unitUniqSet
+emptyOccSet       = emptyUniqSet
+unitOccSet        = unitUniqSet
 mkOccSet          = mkUniqSet
-extendOccSet	  = addOneToUniqSet
+extendOccSet      = addOneToUniqSet
 extendOccSetList  = addListToUniqSet
 unionOccSets      = unionUniqSets
 unionManyOccSets  = unionManyUniqSets
-minusOccSet	  = minusUniqSet
+minusOccSet       = minusUniqSet
 elemOccSet        = elementOfUniqSet
 occSetElts        = uniqSetToList
-foldOccSet	  = foldUniqSet
+foldOccSet        = foldUniqSet
 isEmptyOccSet     = isEmptyUniqSet
 intersectOccSet   = intersectUniqSets
 intersectsOccSet s1 s2 = not (isEmptyOccSet (s1 `intersectOccSet` s2))
@@ -502,9 +495,9 @@ intersectsOccSet s1 s2 = not (isEmptyOccSet (s1 `intersectOccSet` s2))
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Predicates and taking them apart}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -525,7 +518,7 @@ isTvOcc _                  = False
 isTcOcc (OccName TcClsName _) = True
 isTcOcc _                     = False
 
--- | /Value/ 'OccNames's are those that are either in 
+-- | /Value/ 'OccNames's are those that are either in
 -- the variable or data constructor namespaces
 isValOcc :: OccName -> Bool
 isValOcc (OccName VarName  _) = True
@@ -542,7 +535,7 @@ isDataSymOcc (OccName DataName s) = isLexConSym s
 isDataSymOcc _                    = False
 -- Pretty inefficient!
 
--- | Test if the 'OccName' is that for any operator (whether 
+-- | Test if the 'OccName' is that for any operator (whether
 -- it is a data constructor or variable or whatever)
 isSymOcc :: OccName -> Bool
 isSymOcc (OccName DataName s)  = isLexConSym s
@@ -554,7 +547,7 @@ isSymOcc (OccName TvName s)    = isLexSym s
 parenSymOcc :: OccName -> SDoc -> SDoc
 -- ^ Wrap parens around an operator
 parenSymOcc occ doc | isSymOcc occ = parens doc
-		    | otherwise    = doc
+                    | otherwise    = doc
 \end{code}
 
 
@@ -563,39 +556,39 @@ startsWithUnderscore :: OccName -> Bool
 -- ^ Haskell 98 encourages compilers to suppress warnings about unsed
 -- names in a pattern if they start with @_@: this implements that test
 startsWithUnderscore occ = case occNameString occ of
-			     ('_' : _) -> True
-			     _other    -> False
+                             ('_' : _) -> True
+                             _other    -> False
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Making system names}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Here's our convention for splitting up the interface file name space:
 
-   d...		dictionary identifiers
-   		(local variables, so no name-clash worries)
+   d...         dictionary identifiers
+                (local variables, so no name-clash worries)
 
 All of these other OccNames contain a mixture of alphabetic
 and symbolic characters, and hence cannot possibly clash with
 a user-written type or function name
 
-   $f...	Dict-fun identifiers (from inst decls)
-   $dmop	Default method for 'op'
-   $pnC		n'th superclass selector for class C
-   $wf		Worker for functtoin 'f'
-   $sf..	Specialised version of f
-   T:C		Tycon for dictionary for class C
-   D:C		Data constructor for dictionary for class C
+   $f...        Dict-fun identifiers (from inst decls)
+   $dmop        Default method for 'op'
+   $pnC         n'th superclass selector for class C
+   $wf          Worker for functtoin 'f'
+   $sf..        Specialised version of f
+   T:C          Tycon for dictionary for class C
+   D:C          Data constructor for dictionary for class C
    NTCo:T       Coercion connecting newtype T with its representation type
    TFCo:R       Coercion connecting a data family to its respresentation type R
 
 In encoded form these appear as Zdfxxx etc
 
-	:...		keywords (export:, letrec: etc.)
+        :...            keywords (export:, letrec: etc.)
 --- I THINK THIS IS WRONG!
 
 This knowledge is encoded in the following functions.
@@ -604,15 +597,15 @@ This knowledge is encoded in the following functions.
 NB: The string must already be encoded!
 
 \begin{code}
-mk_deriv :: NameSpace 
-	 -> String		-- Distinguishes one sort of derived name from another
-	 -> String
-	 -> OccName
+mk_deriv :: NameSpace
+         -> String              -- Distinguishes one sort of derived name from another
+         -> String
+         -> OccName
 
 mk_deriv occ_sp sys_prefix str = mkOccName occ_sp (sys_prefix ++ str)
 
 isDerivedOccName :: OccName -> Bool
-isDerivedOccName occ = 
+isDerivedOccName occ =
    case occNameString occ of
      '$':c:_ | isAlphaNum c -> True
      ':':c:_ | isAlphaNum c -> True
@@ -622,10 +615,10 @@ isDerivedOccName occ =
 \begin{code}
 mkDataConWrapperOcc, mkWorkerOcc, mkMatcherOcc, mkDefaultMethodOcc,
         mkGenDefMethodOcc, mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
-	mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkRepEqOcc, mkGenOcc1, mkGenOcc2,
- 	mkGenD, mkGenR, mkGen1R, mkGenRCo,
-	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
-	mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
+        mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkRepEqOcc, mkGenOcc1, mkGenOcc2,
+        mkGenD, mkGenR, mkGen1R, mkGenRCo,
+        mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
+        mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc
    :: OccName -> OccName
 
@@ -636,17 +629,17 @@ mkMatcherOcc        = mk_simple_deriv varName  "$m"
 mkDefaultMethodOcc  = mk_simple_deriv varName  "$dm"
 mkGenDefMethodOcc   = mk_simple_deriv varName  "$gdm"
 mkClassOpAuxOcc     = mk_simple_deriv varName  "$c"
-mkDerivedTyConOcc   = mk_simple_deriv tcName   ":"	-- The : prefix makes sure it classifies as a tycon/datacon
-mkClassDataConOcc   = mk_simple_deriv dataName "D:"	-- We go straight to the "real" data con
-							-- for datacons from classes
-mkDictOcc	    = mk_simple_deriv varName  "$d"
-mkIPOcc		    = mk_simple_deriv varName  "$i"
-mkSpecOcc	    = mk_simple_deriv varName  "$s"
+mkDerivedTyConOcc   = mk_simple_deriv tcName   ":"      -- The : prefix makes sure it classifies as a tycon/datacon
+mkClassDataConOcc   = mk_simple_deriv dataName "D:"     -- We go straight to the "real" data con
+                                                        -- for datacons from classes
+mkDictOcc           = mk_simple_deriv varName  "$d"
+mkIPOcc             = mk_simple_deriv varName  "$i"
+mkSpecOcc           = mk_simple_deriv varName  "$s"
 mkForeignExportOcc  = mk_simple_deriv varName  "$f"
 mkRepEqOcc          = mk_simple_deriv tvName   "$r"      -- In RULES involving Coercible
-mkNewTyCoOcc        = mk_simple_deriv tcName   "NTCo:"	-- Coercion for newtypes
+mkNewTyCoOcc        = mk_simple_deriv tcName   "NTCo:"  -- Coercion for newtypes
 mkInstTyCoOcc       = mk_simple_deriv tcName   "TFCo:"   -- Coercion for type functions
-mkEqPredCoOcc	    = mk_simple_deriv tcName   "$co"
+mkEqPredCoOcc       = mk_simple_deriv tcName   "$co"
 
 -- used in derived instances
 mkCon2TagOcc        = mk_simple_deriv varName  "$con2tag_"
@@ -655,7 +648,7 @@ mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
 
 -- Generic derivable classes (old)
 mkGenOcc1           = mk_simple_deriv varName  "$gfrom"
-mkGenOcc2           = mk_simple_deriv varName  "$gto" 
+mkGenOcc2           = mk_simple_deriv varName  "$gto"
 
 -- Generic deriving mechanism (new)
 mkGenD         = mk_simple_deriv tcName "D1"
@@ -671,9 +664,9 @@ mkGenR   = mk_simple_deriv tcName "Rep_"
 mkGen1R  = mk_simple_deriv tcName "Rep1_"
 mkGenRCo = mk_simple_deriv tcName "CoRep_"
 
--- data T = MkT ... deriving( Data ) needs definitions for 
---	$tT   :: Data.Generics.Basics.DataType
---	$cMkT :: Data.Generics.Basics.Constr
+-- data T = MkT ... deriving( Data ) needs definitions for
+--      $tT   :: Data.Generics.Basics.DataType
+--      $cMkT :: Data.Generics.Basics.Constr
 mkDataTOcc = mk_simple_deriv varName  "$t"
 mkDataCOcc = mk_simple_deriv varName  "$c"
 
@@ -704,41 +697,41 @@ mk_simple_deriv_with sp px (Just with) occ = mk_deriv sp (px ++ with ++ "_") (oc
 -- Data constructor workers are made by setting the name space
 -- of the data constructor OccName (which should be a DataName)
 -- to VarName
-mkDataConWorkerOcc datacon_occ = setOccNameSpace varName datacon_occ 
+mkDataConWorkerOcc datacon_occ = setOccNameSpace varName datacon_occ
 \end{code}
 
 \begin{code}
-mkSuperDictSelOcc :: Int 	-- ^ Index of superclass, e.g. 3
-		  -> OccName 	-- ^ Class, e.g. @Ord@
-		  -> OccName	-- ^ Derived 'Occname', e.g. @$p3Ord@
+mkSuperDictSelOcc :: Int        -- ^ Index of superclass, e.g. 3
+                  -> OccName    -- ^ Class, e.g. @Ord@
+                  -> OccName    -- ^ Derived 'Occname', e.g. @$p3Ord@
 mkSuperDictSelOcc index cls_tc_occ
   = mk_deriv varName "$p" (show index ++ occNameString cls_tc_occ)
 
-mkLocalOcc :: Unique 		-- ^ Unique to combine with the 'OccName'
-	   -> OccName		-- ^ Local name, e.g. @sat@
-	   -> OccName		-- ^ Nice unique version, e.g. @$L23sat@
+mkLocalOcc :: Unique            -- ^ Unique to combine with the 'OccName'
+           -> OccName           -- ^ Local name, e.g. @sat@
+           -> OccName           -- ^ Nice unique version, e.g. @$L23sat@
 mkLocalOcc uniq occ
    = mk_deriv varName ("$L" ++ show uniq) (occNameString occ)
-	-- The Unique might print with characters 
-	-- that need encoding (e.g. 'z'!)
+        -- The Unique might print with characters
+        -- that need encoding (e.g. 'z'!)
 \end{code}
 
 \begin{code}
 -- | Derive a name for the representation type constructor of a
 -- @data@\/@newtype@ instance.
-mkInstTyTcOcc :: String 		-- ^ Family name, e.g. @Map@
+mkInstTyTcOcc :: String                 -- ^ Family name, e.g. @Map@
               -> OccSet                 -- ^ avoid these Occs
-	      -> OccName		-- ^ @R:Map@
+              -> OccName                -- ^ @R:Map@
 mkInstTyTcOcc str set =
   chooseUniqueOcc tcName ('R' : ':' : str) set
 \end{code}
 
 \begin{code}
-mkDFunOcc :: String		-- ^ Typically the class and type glommed together e.g. @OrdMaybe@.
-				-- Only used in debug mode, for extra clarity
-	  -> Bool		-- ^ Is this a hs-boot instance DFun?
+mkDFunOcc :: String             -- ^ Typically the class and type glommed together e.g. @OrdMaybe@.
+                                -- Only used in debug mode, for extra clarity
+          -> Bool               -- ^ Is this a hs-boot instance DFun?
           -> OccSet             -- ^ avoid these Occs
-	  -> OccName		-- ^ E.g. @$f3OrdMaybe@
+          -> OccName            -- ^ E.g. @$f3OrdMaybe@
 
 -- In hs-boot files we make dict funs like $fx7ClsTy, which get bound to the real
 -- thing when we compile the mother module. Reason: we don't know exactly
@@ -748,7 +741,7 @@ mkDFunOcc info_str is_boot set
   = chooseUniqueOcc VarName (prefix ++ info_str) set
   where
     prefix | is_boot   = "$fx"
-	   | otherwise = "$f"
+           | otherwise = "$f"
 \end{code}
 
 Sometimes we need to pick an OccName that has not already been used,
@@ -777,9 +770,9 @@ because overloaded constructors (blarg) generate methods too.
 And convert to VarName space
 
 e.g. a call to constructor MkFoo where
-	data (Ord a) => Foo a = MkFoo a
+        data (Ord a) => Foo a = MkFoo a
 
-If this is necessary, we do it by prefixing '$m'.  These 
+If this is necessary, we do it by prefixing '$m'.  These
 guys never show up in error messages.  What a hack.
 
 \begin{code}
@@ -790,9 +783,9 @@ mkMethodOcc occ                     = mk_simple_deriv varName "$m" occ
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Tidying them up}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Before we print chunks of code we like to rename it so that
@@ -802,7 +795,7 @@ OccName alone unless it accidentally clashes with one that is already
 in scope; if so, we tack on '1' at the end and try again, then '2', and
 so on till we find a unique one.
 
-There's a wrinkle for operators.  Consider '>>='.  We can't use '>>=1' 
+There's a wrinkle for operators.  Consider '>>='.  We can't use '>>=1'
 because that isn't a single lexeme.  So we encode it to 'lle' and *then*
 tack on the '1', if necessary.
 
@@ -814,7 +807,7 @@ type TidyOccEnv = UniqFM Int
            make sure that we don't re-use
 
 * Int, n = A plausible starting point for new guesses
-           There is no guarantee that "FSn" is available; 
+           There is no guarantee that "FSn" is available;
            you must look that up in the TidyOccEnv.  But
            it's a good place to start looking.
 
@@ -822,13 +815,13 @@ type TidyOccEnv = UniqFM Int
   with "foo".  Otherwise if we tidy twice we get silly names like foo23.
 
 \begin{code}
-type TidyOccEnv = UniqFM Int	-- The in-scope OccNames
+type TidyOccEnv = UniqFM Int    -- The in-scope OccNames
   -- See Note [TidyOccEnv]
 
 emptyTidyOccEnv :: TidyOccEnv
 emptyTidyOccEnv = emptyUFM
 
-initTidyOccEnv :: [OccName] -> TidyOccEnv	-- Initialise with names to avoid!
+initTidyOccEnv :: [OccName] -> TidyOccEnv       -- Initialise with names to avoid!
 initTidyOccEnv = foldl add emptyUFM
   where
     add env (OccName _ fs) = addToUFM env fs 1
@@ -836,13 +829,13 @@ initTidyOccEnv = foldl add emptyUFM
 tidyOccName :: TidyOccEnv -> OccName -> (TidyOccEnv, OccName)
 tidyOccName env occ@(OccName occ_sp fs)
   = case lookupUFM env fs of
-	Just n  -> find n
-	Nothing -> (addToUFM env fs 1, occ)
+        Just n  -> find n
+        Nothing -> (addToUFM env fs 1, occ)
   where
     base :: String  -- Drop trailing digits (see Note [TidyOccEnv])
     base = reverse (dropWhile isDigit (reverse (unpackFS fs)))
- 
-    find n 
+
+    find n
       = case lookupUFM env new_fs of
           Just n' -> find (n1 `max` n')
                      -- The max ensures that n increases, avoiding loops
@@ -857,9 +850,9 @@ tidyOccName env occ@(OccName occ_sp fs)
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Lexical categories}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 These functions test strings to see if they fit the lexical categories
@@ -886,21 +879,21 @@ isLexSym cs = isLexConSym cs || isLexVarSym cs
 
 -------------
 
-isLexConId cs				-- Prefix type or data constructors
-  | nullFS cs	       = False		-- 	e.g. "Foo", "[]", "(,)" 
+isLexConId cs                           -- Prefix type or data constructors
+  | nullFS cs          = False          --      e.g. "Foo", "[]", "(,)"
   | cs == (fsLit "[]") = True
-  | otherwise	       = startsConId (headFS cs)
+  | otherwise          = startsConId (headFS cs)
 
-isLexVarId cs				-- Ordinary prefix identifiers
-  | nullFS cs	      = False		-- 	e.g. "x", "_x"
+isLexVarId cs                           -- Ordinary prefix identifiers
+  | nullFS cs         = False           --      e.g. "x", "_x"
   | otherwise         = startsVarId (headFS cs)
 
-isLexConSym cs				-- Infix type or data constructors
-  | nullFS cs	       = False		--	e.g. ":-:", ":", "->"
+isLexConSym cs                          -- Infix type or data constructors
+  | nullFS cs          = False          --      e.g. ":-:", ":", "->"
   | cs == (fsLit "->") = True
-  | otherwise	       = startsConSym (headFS cs)
+  | otherwise          = startsConSym (headFS cs)
 
-isLexVarSym fs				-- Infix identifiers e.g. "+"
+isLexVarSym fs                          -- Infix identifiers e.g. "+"
   | fs == (fsLit "~R#") = True
   | otherwise
   = case (if nullFS fs then [] else unpackFS fs) of
@@ -911,9 +904,9 @@ isLexVarSym fs				-- Infix identifiers e.g. "+"
 -------------
 startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool
 startsVarSym c = isSymbolASCII c || (ord c > 0x7f && isSymbol c)  -- Infix Ids
-startsConSym c = c == ':'		-- Infix data constructors
-startsVarId c  = isLower c || c == '_'	-- Ordinary Ids
-startsConId c  = isUpper c || c == '('	-- Ordinary type constructors and data constructors
+startsConSym c = c == ':'               -- Infix data constructors
+startsVarId c  = isLower c || c == '_'  -- Ordinary Ids
+startsConId c  = isUpper c || c == '('  -- Ordinary type constructors and data constructors
 
 isSymbolASCII :: Char -> Bool
 isSymbolASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
@@ -923,36 +916,36 @@ isVarSymChar c = c == ':' || startsVarSym c
 \end{code}
 
 %************************************************************************
-%*									*
-		Binary instance
+%*                                                                      *
+                Binary instance
     Here rather than BinIface because OccName is abstract
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 instance Binary NameSpace where
     put_ bh VarName = do
-	    putByte bh 0
+            putByte bh 0
     put_ bh DataName = do
-	    putByte bh 1
+            putByte bh 1
     put_ bh TvName = do
-	    putByte bh 2
+            putByte bh 2
     put_ bh TcClsName = do
-	    putByte bh 3
+            putByte bh 3
     get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do return VarName
-	      1 -> do return DataName
-	      2 -> do return TvName
-	      _ -> do return TcClsName
+            h <- getByte bh
+            case h of
+              0 -> do return VarName
+              1 -> do return DataName
+              2 -> do return TvName
+              _ -> do return TcClsName
 
 instance Binary OccName where
     put_ bh (OccName aa ab) = do
-	    put_ bh aa
-	    put_ bh ab
+            put_ bh aa
+            put_ bh ab
     get bh = do
-	  aa <- get bh
-	  ab <- get bh
-	  return (OccName aa ab)
+          aa <- get bh
+          ab <- get bh
+          return (OccName aa ab)
 \end{code}
