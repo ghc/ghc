@@ -27,6 +27,36 @@ ToDo:
 
 * Check orientation (isFlattenTyVar) in canEqTyVarTyVar
 
+----------------------
+Outer given is rewritten by an inner given, then there must have been an inner given equality, hence the “given-eq” flag will be true anyway.
+
+Inner given rewritten by outer, retains its level (ie. The inner one)
+
+--------------------
+Try: rewrite wanted with wanted only for fuvs (not all meta-tyvars)
+
+But:   fuv ~ alpha[0]
+       alpha[0] ~ fuv’
+Now we don’t see that fuv ~ fuv’, which is a problem for injectivity detection.
+
+Conclusion: rewrite watneds with wanted for all untouchables.
+
+skol ~ untch, must re-orieint to untch ~ skol, so that we can use it to rewrite.
+
+
+--------------
+f :: [a] -> [b] -> blah
+f (e1 :: F Int) (e2 :: F Int)
+
+we get
+   F Int ~ fuv
+   fuv ~ [alpha]
+   fuv ~ [beta]
+
+We want: alpha := beta (which might unlock something else).  So rewriting wanted with wanted helps here.
+
+
+
 ----------------------------------------
 typecheck/TcTypeNatSimple
 

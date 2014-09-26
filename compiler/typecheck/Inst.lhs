@@ -504,7 +504,7 @@ addClsInstsErr herald ispecs
 tyVarsOfCt :: Ct -> TcTyVarSet
 tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })     = extendVarSet (tyVarsOfType xi) tv
 tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk }) = extendVarSet (tyVarsOfTypes tys) fsk
-tyVarsOfCt (CDictCan { cc_tyargs = tys }) 	         = tyVarsOfTypes tys
+tyVarsOfCt (CDictCan { cc_tyargs = tys })                = tyVarsOfTypes tys
 tyVarsOfCt (CIrredEvCan { cc_ev = ev })                  = tyVarsOfType (ctEvPred ev)
 tyVarsOfCt (CHoleCan { cc_ev = ev })                     = tyVarsOfType (ctEvPred ev)
 tyVarsOfCt (CNonCanonical { cc_ev = ev })                = tyVarsOfType (ctEvPred ev)

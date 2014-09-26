@@ -1888,7 +1888,6 @@ pprCtOrigin simple_origin
 
 ----------------
 pprCtO :: CtOrigin -> SDoc  -- Ones that are short one-liners
-pprCtO FlatSkolOrigin        = ptext (sLit "a given flatten-skolem")
 pprCtO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprCtO AppOrigin             = ptext (sLit "an application")
 pprCtO (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]

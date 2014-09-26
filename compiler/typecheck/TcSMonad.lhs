@@ -126,7 +126,6 @@ import Name
 import RdrName (RdrName, GlobalRdrEnv)
 import RnEnv (addUsedRdrNames)
 import Var
-import VarSet
 import VarEnv
 import VarSet
 import Outputable
