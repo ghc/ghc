@@ -1,5 +1,14 @@
 ToDo:
 
+* Float only CTyEqCans.   kind-incompatible things should be CNonCanonical,
+  so they won't float and generate a duplicate kind-unify message
+
+  Then we can stop disabling floating when there are insolubles,
+  and that will improve mc21 etc
+
+* Note [Do not add duplicate derived isols]
+  This mostly doesn't apply now, except for the fundeps
+
 * TcCanonical re-orients, so TcInteract should
   not do so.  (TwoWay, OneWay)
 
@@ -33,9 +42,9 @@ typecheck/TcTypeNatSimple
 Original constraint
   [W] x + y ~ x + alpha  (non-canonical)
 ==>
-  [W] x + y     ~ fmv1   (CFunEqCan)
-  [W] x + alpha ~ fmv2   (CFuneqCan)
-  [W] fmv1 ~ fmv2        (CTyEqCan)
+  [W] x + y     ~ fuv1   (CFunEqCan)
+  [W] x + alpha ~ fuv2   (CFuneqCan)
+  [W] fuv1 ~ fuv2        (CTyEqCan)
 
 (sigh)
 
@@ -68,19 +77,20 @@ Conclusion: unflatten before solving nested implications
 ----------------------------------------
 indexed_types/should_fail/T8227:
 
-   Inert: [W] fsk_aBh ~ s_aBk -> s_aBk
-          [W] s_aBk   ~ fsk_aBh
+   Inert: [W] fsk_aBh ~ fuv_aBk -> fuv_aBk
+          [W] fuv_aBk ~ fsk_aBh
 
           [G] Scalar fsk_aBg ~ fsk_aBh
           [G] V a ~ f_aBg
 
-   Worklist includes  [W] Scalar s_aBi ~ s_aBk
-   s_aBi, s_aBk are flatten unificaiton variables
+   Worklist includes  [W] Scalar fuv_aBi ~ fuv_aBk
+   fuv_aBi, fuv_aBk are flatten unificaiton variables
 
-   Work item: V fsk_aBh ~ s_aBi
+   Work item: [W] V fsk_aBh ~ fuv_aBi
 
 Note that the inert wanteds are cyclic, because we do not rewrite
 wanteds with wanteds.
+
 
 Then we go into a loop when normalise the work-item, because we
 use rewriteOrSame on the argument of V.
@@ -99,11 +109,13 @@ IndTypesPerfMerge is interesting
       [G] F a ~ fsk, fsk ~ a
 
     Now if we flatten we get
-      [W] alpha ~ ufsk, F alpha ~ ufsk, alpha ~ a
-    Now, processing the first one first, choosing alpha := ufsk
-      [W] F ufsk ~ ufsk, ufsk ~ a
-    And now we are stuck.  We must either *unify* ufsk := a, or
-    use the ufsk ~ a to rewrite F ufsk ~ ufsk, so we can make it
+      [W] alpha ~ fuv, F alpha ~ fuv, alpha ~ a
+
+    Now, processing the first one first, choosing alpha := fuv
+      [W] F fuv ~ fuv, fuv ~ a
+
+    And now we are stuck.  We must either *unify* fuv := a, or
+    use the fuv ~ a to rewrite F fuv ~ fuv, so we can make it
     meet up with the given F a ~ blah.
 
 Here is a somewhat similar case:
@@ -118,7 +130,7 @@ Here is a somewhat similar case:
 For foo we get
    [W] Eq (G a), G a ~ Bool
 Flattening
-   [W] G a ~ ufsk, Eq ufsk, ufsk ~ Bool
+   [W] G a ~ fuv, Eq fuv, fuv ~ Bool
 We can't simplify away the Eq Bool unless we substitute for 
 
 The new flattening story
@@ -219,24 +231,24 @@ The new flattening story
   Always solve given from wanted if poss.
 
 * [Firing rule: wanteds]
-    (work item) [W] x : F tys ~ ufsk
+    (work item) [W] x : F tys ~ fuv
     instantiate axiom: ax_co : F tys ~ rhs
 
-   Dischard ufsk:
-      ufsk := alpha
+   Dischard fuv:
+      fuv := alpha
       x := ax_co ; sym x2
       [W] x2 : alpha ~ rhs  (Non-canonical)
    discharging the work item. This is the way that usk's get
    unified; even though they are "untouchable".
 
-   NB: this deals with the case where ufsk appears in xi, which can
+   NB: this deals with the case where fuv appears in xi, which can
    happen; it just happens through the non-canonical stuff
 
    Possible short cut if rhs = G rhs_tys, 
    where G is a type function.  Then
       - Flatten rhs_tys (cos : rhs_tys ~ rhs_xis)
-      - Add G rhs_xis ~ ufsk to flat cache
-      - New wanted [W] x2 : G rhs_xis ~ ufsk
+      - Add G rhs_xis ~ fuv to flat cache
+      - New wanted [W] x2 : G rhs_xis ~ fuv
       - Discharge x := co ; G cos ; x2
 
 * [Firing rule: givens]
@@ -256,14 +268,14 @@ Floating
 Principle 1: do floating as if you un-flattened first
 
 For example:
-   [2] forall s.  () => (F alpha[1] s ~ ufsk, alpha[1] ~ Maybe ufsk)
+   [2] forall s.  () => (F alpha[1] s ~ fuv, alpha[1] ~ Maybe fuv)
    and axiom F (Maybe _) x = x
 
-Here we obviously cannot float (F alpha s ~ ufsk) since it mentions s,
-*and hence* cannot float alpha ~ Maybe ufsk
+Here we obviously cannot float (F alpha s ~ fuv) since it mentions s,
+*and hence* cannot float alpha ~ Maybe fuv
 
 BUT consider this:
-   [2] forall s.  () => (F alpha[1] t ~ ufsk, alpha[1] ~ Maybe ufsk)
+   [2] forall s.  () => (F alpha[1] t ~ fuv, alpha[1] ~ Maybe fuv)
    and axiom F (Maybe _) x = x
 
 Here we really *should* float both constraints, since they are
@@ -278,7 +290,7 @@ of floating is to make thse
 Algorithm.  Start with ([W] a[n] ~ xi)
             Look at free vars of xi
                - unification variable: promote if necessary
-               - ufsk: float if its CFunEqCan is floatable
+               - fuv: float if its CFunEqCan is floatable
                - skolem bound at this level: do not float
                - fsk: look at the free vars of its value
                       (in that case maybe promote a ~ F Int,

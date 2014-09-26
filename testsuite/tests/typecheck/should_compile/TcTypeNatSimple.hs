@@ -5,7 +5,6 @@ import Data.Proxy
 
 --------------------------------------------------------------------------------
 -- Test evaluation
-{-
 e1 :: Proxy (2 + 3) -> Proxy 5
 e1 = id
 
@@ -59,14 +58,13 @@ e17 = id
 
 e18 :: Proxy (a - 0) -> Proxy a
 e18 = id
--}
+
 --------------------------------------------------------------------------------
 -- Test interactions with inerts
 
 -- ti1 :: Proxy (x + y) -> Proxy x -> ()
 -- ti1 _ _ = ()
 
-{-
 ti2 :: Proxy (y + x) -> Proxy x -> ()
 ti2 _ _ = ()
 
@@ -92,9 +90,3 @@ ti8 _ _ = ()
 
 ti9 :: Proxy (y - x) -> Proxy x -> ()
 ti9 _ _ = ()
--}
-
-ti10 :: Proxy (x + 3) -> ()
-ti10 = error "urk"
-
-ti11 = ti10 (error "urk" :: Proxy 5)

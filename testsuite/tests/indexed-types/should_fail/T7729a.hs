@@ -26,3 +26,9 @@ instance MonadTrans Rand where
 instance MonadPrim m => MonadPrim (Rand m) where
   type BasePrimMonad (Rand m) = BasePrimMonad m
   liftPrim x = liftPrim (lift x)   -- This line changed from T7729
+
+{-
+  liftPrim :: BasePrimMonad (Rand m) a -> Rand m a
+            = BasePrimMonad m -> Rand m a
+
+-}  
