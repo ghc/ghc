@@ -42,11 +42,3 @@ void getProgEnvv(int *out_envc, char **out_envv[]) {
 void freeProgEnvv(int envc STG_UNUSED, char *envv[] STG_UNUSED) {
     /* nothing */
 }
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

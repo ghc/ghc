@@ -30,11 +30,3 @@ void    scavenge_capability_mut_Lists1 (Capability *cap);
 
 #endif /* SM_SCAV_H */
 
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

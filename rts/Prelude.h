@@ -144,11 +144,3 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define StablePtr_con_info        DLL_IMPORT_DATA_REF(base_GHCziStable_StablePtr_con_info)
 
 #endif /* PRELUDE_H */
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

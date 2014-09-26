@@ -1094,11 +1094,3 @@ void setIOManagerControlFd(nat cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
 #endif
 }
 #endif
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

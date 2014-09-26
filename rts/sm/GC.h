@@ -64,11 +64,3 @@ void releaseGCThreads (Capability *cap);
 #include "EndPrivate.h"
 
 #endif /* SM_GC_H */
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:
