@@ -5,23 +5,17 @@
 
 \begin{code}
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 module IfaceSyn (
         module IfaceType,
 
-        IfaceDecl(..), IfaceSynTyConRhs(..), IfaceClassOp(..), IfaceAT(..), 
+        IfaceDecl(..), IfaceSynTyConRhs(..), IfaceClassOp(..), IfaceAT(..),
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
         IfaceExpr(..), IfaceAlt, IfaceLetBndr(..),
         IfaceBinding(..), IfaceConAlt(..),
         IfaceIdInfo(..), IfaceIdDetails(..), IfaceUnfolding(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
-        IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..), 
+        IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
         IfaceBang(..), IfaceAxBranch(..),
         IfaceTyConParent(..),
 
@@ -82,9 +76,9 @@ type IfaceTopBndr = OccName
   -- It's convenient to have an OccName in the IfaceSyn, altough in each
   -- case the namespace is implied by the context. However, having an
   -- OccNames makes things like ifaceDeclImplicitBndrs and ifaceDeclFingerprints
-  -- very convenient. 
-  --   
-  -- We don't serialise the namespace onto the disk though; rather we 
+  -- very convenient.
+  --
+  -- We don't serialise the namespace onto the disk though; rather we
   -- drop it when serialising and add it back in when deserialising.
 
 data IfaceDecl
@@ -113,16 +107,16 @@ data IfaceDecl
                 ifSynKind :: IfaceKind,         -- Kind of the *rhs* (not of the tycon)
                 ifSynRhs  :: IfaceSynTyConRhs }
 
-  | IfaceClass { ifCtxt    :: IfaceContext,          	-- Context...
-                 ifName    :: IfaceTopBndr,          	-- Name of the class TyCon
-                 ifTyVars  :: [IfaceTvBndr],         	-- Type variables
-                 ifRoles   :: [Role],                	-- Roles
-                 ifFDs     :: [FunDep FastString],   	-- Functional dependencies
+  | IfaceClass { ifCtxt    :: IfaceContext,             -- Context...
+                 ifName    :: IfaceTopBndr,             -- Name of the class TyCon
+                 ifTyVars  :: [IfaceTvBndr],            -- Type variables
+                 ifRoles   :: [Role],                   -- Roles
+                 ifFDs     :: [FunDep FastString],      -- Functional dependencies
                  ifATs     :: [IfaceAT],                -- Associated type families
                  ifSigs    :: [IfaceClassOp],           -- Method signatures
                  ifMinDef  :: BooleanFormula IfLclName, -- Minimal complete definition
-                 ifRec     :: RecFlag           	-- Is newtype/datatype associated
-                                                	--   with the class recursive?
+                 ifRec     :: RecFlag                   -- Is newtype/datatype associated
+                                                        --   with the class recursive?
     }
 
   | IfaceAxiom { ifName       :: IfaceTopBndr,        -- Axiom name
@@ -320,9 +314,9 @@ has two major consequences
       instance Eq T where ....
    The instance (Eq T) is incorprated as part of T's fingerprint.
 
-   In constrast, orphans are all fingerprinted together in the 
-   mi_orph_hash field of the ModIface. 
-  
+   In constrast, orphans are all fingerprinted together in the
+   mi_orph_hash field of the ModIface.
+
    See MkIface.addFingerprints.
 
  * A module that contains orphans is called an "orphan module".  If
@@ -333,7 +327,7 @@ has two major consequences
    the orphan modules below us.
 
 Orphan-hood is computed when we generate an IfaceInst, IfaceRule, or
-IfaceFamInst respectively: 
+IfaceFamInst respectively:
 
  - If an instance is an orphan its ifInstOprh field is Nothing
    Otherwise ifInstOrph is (Just n) where n is the Name of a
@@ -347,7 +341,7 @@ Note [When exactly is an instance decl an orphan?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   (see MkIface.instanceToIfaceInst, which implements this)
 Roughly speaking, an instance is an orphan if its head (after the =>)
-mentions nothing defined in this module.  
+mentions nothing defined in this module.
 
 Functional dependencies complicate the situation though. Consider
 
@@ -375,7 +369,7 @@ More precisely, an instance is an orphan iff
   defined in this module.
 
 (Note that these conditions hold trivially if the class is locally
-defined.)  
+defined.)
 
 Note [Versioning of instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -491,12 +485,12 @@ data IfaceExpr
   | IfaceExt    IfExtName
   | IfaceType   IfaceType
   | IfaceCo     IfaceCoercion
-  | IfaceTuple 	TupleSort [IfaceExpr]	-- Saturated; type arguments omitted
-  | IfaceLam 	IfaceBndr IfaceExpr
-  | IfaceApp 	IfaceExpr IfaceExpr
-  | IfaceCase	IfaceExpr IfLclName [IfaceAlt]
+  | IfaceTuple  TupleSort [IfaceExpr]   -- Saturated; type arguments omitted
+  | IfaceLam    IfaceBndr IfaceExpr
+  | IfaceApp    IfaceExpr IfaceExpr
+  | IfaceCase   IfaceExpr IfLclName [IfaceAlt]
   | IfaceECase  IfaceExpr IfaceType     -- See Note [Empty case alternatives]
-  | IfaceLet	IfaceBinding  IfaceExpr
+  | IfaceLet    IfaceBinding  IfaceExpr
   | IfaceCast   IfaceExpr IfaceCoercion
   | IfaceLit    Literal
   | IfaceFCall  ForeignCall IfaceType
@@ -676,7 +670,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
 
     pp_roles
       | is_data_instance = Outputable.empty
-      | otherwise        = pprRoles (== Representational) (pprPrefixIfDeclBndr ss tycon) 
+      | otherwise        = pprRoles (== Representational) (pprPrefixIfDeclBndr ss tycon)
                                     tc_tyvars roles
             -- Don't display roles for data family instances (yet)
             -- See discussion on Trac #8672.
@@ -823,7 +817,7 @@ pprRec NonRecursive = Outputable.empty
 pprRec Recursive    = ptext (sLit "RecFlag: Recursive")
 
 pprInfixIfDeclBndr, pprPrefixIfDeclBndr :: ShowSub -> OccName -> SDoc
-pprInfixIfDeclBndr (ShowSub { ss_ppr_bndr = ppr_bndr }) occ 
+pprInfixIfDeclBndr (ShowSub { ss_ppr_bndr = ppr_bndr }) occ
   = pprInfixVar (isSymOcc occ) (ppr_bndr occ)
 pprPrefixIfDeclBndr (ShowSub { ss_ppr_bndr = ppr_bndr }) occ
   = parenSymOcc occ (ppr_bndr occ)
@@ -946,20 +940,20 @@ ppr_rough (Just tc) = ppr tc
 
 Note [Result type of a data family GADT]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider 
+Consider
    data family T a
    data instance T (p,q) where
       T1 :: T (Int, Maybe c)
       T2 :: T (Bool, q)
 
-The IfaceDecl actually looks like 
+The IfaceDecl actually looks like
 
    data TPr p q where
       T1 :: forall p q. forall c. (p~Int,q~Maybe c) => TPr p q
       T2 :: forall p q. (p~Bool) => TPr p q
 
 To reconstruct the result types for T1 and T2 that we
-want to pretty print, we substitute the eq-spec 
+want to pretty print, we substitute the eq-spec
 [p->Int, q->Maybe c] in the arg pattern (p,q) to give
    T (Int, Maybe c)
 Remember that in IfaceSyn, the TyCon and DataCon share the same
@@ -1002,21 +996,21 @@ pprIfaceExpr add_par i@(IfaceLam _ _)
     collect bs e              = (reverse bs, e)
 
 pprIfaceExpr add_par (IfaceECase scrut ty)
-  = add_par (sep [ ptext (sLit "case") <+> pprIfaceExpr noParens scrut 
+  = add_par (sep [ ptext (sLit "case") <+> pprIfaceExpr noParens scrut
                  , ptext (sLit "ret_ty") <+> pprParendIfaceType ty
                  , ptext (sLit "of {}") ])
 
 pprIfaceExpr add_par (IfaceCase scrut bndr [(con, bs, rhs)])
-  = add_par (sep [ptext (sLit "case") 
-			<+> pprIfaceExpr noParens scrut <+> ptext (sLit "of") 
-			<+> ppr bndr <+> char '{' <+> ppr_con_bs con bs <+> arrow,
-  		  pprIfaceExpr noParens rhs <+> char '}'])
+  = add_par (sep [ptext (sLit "case")
+                        <+> pprIfaceExpr noParens scrut <+> ptext (sLit "of")
+                        <+> ppr bndr <+> char '{' <+> ppr_con_bs con bs <+> arrow,
+                  pprIfaceExpr noParens rhs <+> char '}'])
 
 pprIfaceExpr add_par (IfaceCase scrut bndr alts)
-  = add_par (sep [ptext (sLit "case") 
-		 	<+> pprIfaceExpr noParens scrut <+> ptext (sLit "of") 
-			<+> ppr bndr <+> char '{',
-  		  nest 2 (sep (map ppr_alt alts)) <+> char '}'])
+  = add_par (sep [ptext (sLit "case")
+                        <+> pprIfaceExpr noParens scrut <+> ptext (sLit "of")
+                        <+> ppr bndr <+> char '{',
+                  nest 2 (sep (map ppr_alt alts)) <+> char '}'])
 
 pprIfaceExpr _       (IfaceCast expr co)
   = sep [pprParendIfaceExpr expr,
@@ -1392,7 +1386,7 @@ instance Binary IfaceDecl where
         put_ bh details
         put_ bh idinfo
 
-    put_ _ (IfaceForeign _ _) = 
+    put_ _ (IfaceForeign _ _) =
         error "Binary.put_(IfaceDecl): IfaceForeign"
 
     put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
@@ -1528,9 +1522,9 @@ instance Binary IfaceSynTyConRhs where
                             ; return (IfaceSynonymTyCon ty) } }
 
 instance Binary IfaceClassOp where
-    put_ bh (IfaceClassOp n def ty) = do 
+    put_ bh (IfaceClassOp n def ty) = do
         put_ bh (occNameFS n)
-        put_ bh def     
+        put_ bh def
         put_ bh ty
     get bh = do
         n   <- get bh
