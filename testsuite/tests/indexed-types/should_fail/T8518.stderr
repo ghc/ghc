@@ -1,3 +1,4 @@
+
 T8518.hs:14:18:
     Could not deduce (F c ~ Maybe (F c))
     from the context (Continuation c)
@@ -32,4 +33,3 @@ T8518.hs:17:78:
     In the expression: rpt (i - 1) c''
     In the expression:
       let c'' = fromJust (snd <$> (continue c' z' b')) in rpt (i - 1) c''
-

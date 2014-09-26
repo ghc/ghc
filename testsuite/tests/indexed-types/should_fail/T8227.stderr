@@ -1,13 +1,8 @@
+
 T8227.hs:16:44:
-    Couldn't match type ‘Scalar (V a)’
-                  with ‘Scalar (V a) -> Scalar (V a)’
-    Expected type: Scalar (V (Scalar (V a)))
+    Couldn't match type ‘Scalar t0’ with ‘Scalar t0 -> Scalar t0’
+    The type variable ‘t0’ is ambiguous
+    Expected type: Scalar (V (Scalar t0 -> Scalar t0))
       Actual type: Scalar (V a)
-    Relevant bindings include
-      seg :: a (bound at T8227.hs:16:21)
-      eps :: Scalar (V a) (bound at T8227.hs:16:17)
-      absoluteToParam :: Scalar (V a) -> a -> Scalar (V a)
-        (bound at T8227.hs:16:1)
     In the first argument of ‘arcLengthToParam’, namely ‘eps’
     In the expression: arcLengthToParam eps eps
-

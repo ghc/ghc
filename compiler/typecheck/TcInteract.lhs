@@ -522,9 +522,9 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
                  , Pair lhs_ty rhs_ty <- interact iargs (lookupFlattenTyVar eqs ifsk)
                  ]
        ; let imps = catMaybes impMbs
-       ; traceTcS "builtInCandidates: " $ vcat [ ptext (sLit "Candidates:") <+> ppr is
-                                               , ptext (sLit "improvements:") <+> ppr imps
-                                               , ptext (sLit "TvEqs:") <+> ppr eqs ]
+       ; traceTcS "builtInCandidates 1: " $ vcat [ ptext (sLit "Candidates:") <+> ppr is
+                                                 , ptext (sLit "improvements:") <+> ppr imps
+                                                 , ptext (sLit "TvEqs:") <+> ppr eqs ]
        ; unless (null imps) $ updWorkListTcS (extendWorkListEqs imps)
        ; return False }
 

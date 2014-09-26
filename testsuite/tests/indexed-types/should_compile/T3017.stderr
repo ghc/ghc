@@ -1,7 +1,7 @@
 TYPE SIGNATURES
   emptyL :: forall a. ListColl a
   test2 ::
-    forall c t t1. (Coll c, Num t1, Num t, Elem c ~ (t, t1)) => c -> c
+    forall c t t1. (Elem c ~ (t, t1), Coll c, Num t1, Num t) => c -> c
 TYPE CONSTRUCTORS
   class Coll c where
     type family Elem c :: * open
@@ -18,4 +18,3 @@ FAMILY INSTANCES
 Dependent modules: []
 Dependent packages: [base-4.8.0.0, ghc-prim-0.3.1.0,
                      integer-gmp-0.5.1.0]
-

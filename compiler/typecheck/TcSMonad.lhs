@@ -463,26 +463,6 @@ data InertSet
        }
 \end{code}
 
-Note [Given flatten-skolems]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we simplify the implication
-    forall b. C (F a) b => (C (F a) beta, blah)
-We'll flatten the givens, introducing a flatten-skolem, so the
-givens effectively look like
-    (C fsk b, F a ~ fsk)
-Then we simplify the wanteds, transforming (C (F a) beta) to (C fsk beta).
-Now, if we don't solve that wanted, we'll put it back into the residual
-implication.  But where is fsk bound?
-
-We solve this by recording the given flatten-skolems in the implication
-(the ic_fsks field), so it's as if we change the implication to
-    forall b, fsk. (C fsk b, F a ~ fsk) => (C fsk beta, blah)
-
-We don't need to explicitly record the (F a ~ fsk) constraint in the implication
-because we can recover it from inside the fsk TyVar itself.  But we do need
-to treat that (F a ~ fsk) as a new given.  See the fsk_bag stuff in
-TcInteract.solveInteractGiven.
-
 \begin{code}
 instance Outputable InertCans where
   ppr ics = vcat [ ptext (sLit "Equalities:")
@@ -680,9 +660,8 @@ setInertFunEqs :: FunEqMap Ct -> TcS ()
 setInertFunEqs funeqs 
   = updInertCans (\ic -> ic { inert_funeqs = funeqs })
 
-getInertUnsolved :: TcS ( Cts   -- Unsolved
-                        , Cts   -- Insoluble
-                        , FunEqMap Ct )  -- Given funeqs
+getInertUnsolved :: TcS ( Cts    -- Unsolved
+                        , Cts )  -- Insoluble
 -- Return (unsolved-wanteds, insolubles)
 -- Both consist of a mixture of Wanted and Derived
 getInertUnsolved
@@ -701,7 +680,7 @@ getInertUnsolved
                               unsolved_dicts `unionBags` unsolved_funeqs
 
       ; unsolved_flats <- wrapTcS (TcM.zonkCts unsolved_flats)
-      ; return ( unsolved_flats, iinsols, filterFunEqs isGivenCt ifuneqs ) }
+      ; return ( unsolved_flats, iinsols ) }
         -- It would be perfectly OK to zonk the insolubles too,
         -- but it'll happen anyway before error reporting
   where
@@ -1988,7 +1967,6 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                                                   , ic_skols  = skol_tvs
                                                   , ic_no_eqs = True
                                                   , ic_given  = []
-                                                  , ic_fsks   = emptyCts
                                                   , ic_wanted = wc
                                                   , ic_insol  = False
                                                   , ic_binds  = ev_binds_var

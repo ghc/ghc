@@ -309,7 +309,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                             -- If any meta-tyvar unifications take place (unlikely), we'll
                             -- pick that up later.
 
-                      ; (flats, _insols, _funeqs) <- runTcSWithEvBinds null_ev_binds_var $
+                      ; (flats, _insols) <- runTcSWithEvBinds null_ev_binds_var $
                         do { mapM_ (promoteAndDefaultTyVar untch gbl_tvs) meta_tvs
                                  -- See Note [Promote _and_ default when inferring]
                            ; _implics <- solveInteract quant_cand
@@ -376,7 +376,6 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        ; minimal_bound_ev_vars <- mapM TcM.newEvVar minimal_flat_preds
        ; let implic = Implic { ic_untch    = pushUntouchables untch
                              , ic_skols    = qtvs
-                             , ic_fsks     = emptyCts
                              , ic_no_eqs   = False
                              , ic_given    = minimal_bound_ev_vars
                              , ic_wanted   = wanted_transformed
@@ -694,17 +693,14 @@ solveFlats :: WantedConstraints -> TcS WantedConstraints
 -- Solve the wc_flat and wc_insol components of the WantedConstraints
 -- Do not affect the inerts
 solveFlats (WC { wc_flat = flats, wc_insol = insols, wc_impl = implics })
-  = do { (wc, given_funeqs) <- nestTcS $
-            do { let all_flats = flats `unionBags` filterBag (not . isDerivedCt) insols
+  = nestTcS $
+    do { let all_flats = flats `unionBags` filterBag (not . isDerivedCt) insols
                      -- See Note [Dropping derived constraints] in TcRnTypes for
                      -- why the insolubles may have derived constraints
-               ; implics_from_flats <- solveInteract all_flats
-               ; (unsolved_flats, insoluble_flats, given_funeqs) <- getInertUnsolved
-               ; return ( WC { wc_flat = unsolved_flats, wc_insol = insoluble_flats
-                             , wc_impl = implics `unionBags` implics_from_flats }
-                        , given_funeqs ) }
-       ; setInertFunEqs given_funeqs
-       ; return wc }
+       ; implics_from_flats <- solveInteract all_flats
+       ; (unsolved_flats, insoluble_flats) <- getInertUnsolved
+       ; return ( WC { wc_flat = unsolved_flats, wc_insol = insoluble_flats
+                     , wc_impl = implics `unionBags` implics_from_flats } ) }
 
 simpl_loop :: Int
            -> WantedConstraints
@@ -751,9 +747,9 @@ solveNestedImplications implics
 --       ; let thinner_inerts = prepareInertsForImplications inerts
 --                 -- See Note [Preparing inert set for implications]
 --
---       ; traceTcS "solveNestedImplications starting {" $
---         vcat [ text "original inerts = " <+> ppr inerts
---              , text "thinner_inerts  = " <+> ppr thinner_inerts ]
+           traceTcS "solveNestedImplications starting {" empty
+--           vcat [ text "original inerts = " <+> ppr inerts
+--                , text "thinner_inerts  = " <+> ppr thinner_inerts ]
 
        ; (floated_eqs, unsolved_implics)
            <- flatMapBagPairM solveImplication implics
@@ -1148,12 +1144,9 @@ floatEqualities :: [TcTyVar] -> Bool
 --
 -- Subtleties: Note [Float equalities from under a skolem binding]
 --             Note [Skolem escape]
-floatEqualities skols no_given_eqs
-                wanteds@(WC { wc_flat = flats, wc_insol = insols })
+floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
   | not no_given_eqs  -- There are some given equalities, so don't float
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
-  | not (isEmptyBag insols)
-  = return (emptyBag, wanteds)   -- Note [Do not float equalities if there are insolubles]
   | otherwise
   = do { outer_untch <- TcS.getUntouchables
        ; mapM_ (promoteTyVar outer_untch) (varSetElems (tyVarsOfCts float_eqs))
@@ -1165,22 +1158,26 @@ floatEqualities skols no_given_eqs
                                           , text "Ty binds =" <+> ppr ty_binds])
        ; return (float_eqs, wanteds { wc_flat = remaining_flats }) }
   where
+    skol_set = mkVarSet skols
     (float_eqs, remaining_flats) = partitionBag float_me flats
     float_me :: Ct -> Bool
-    float_me ct = isEqPred pred && skol_set `disjointVarSet` tyVarsOfType pred
+    float_me ct
+       | EqPred ty1 ty2 <- classifyPred pred
+       , skol_set `disjointVarSet` tyVarsOfType pred
+       , typeKind ty1 `eqKind` typeKind ty2  -- See Note [Do not float kind-incompatible equalities]
+       = True
+       | otherwise
+       = False
        where
          pred = ctPred ct
-    skol_set = mkVarSet skols
 \end{code}
 
-Note [Do not float equalities if there are insolubles]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Do not kind-incompatible equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have (t::* ~ s::*->*), we'll get a Derived insoluble equality.
 If we float the equality outwards, we'll get *another* Derived
 insoluble equality one level out, so the same error will be reported
-twice.  However, the equality is insoluble anyway, and when there are
-any insolubles we report only them, so there is no point in floating.
-
+twice.  So we refrain from floating such equalities
 
 Note [When does an implication have given equalities?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
