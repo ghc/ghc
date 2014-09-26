@@ -10,15 +10,9 @@ files for imported data types.
 
 \begin{code}
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 module TcTyDecls(
-        calcRecFlags, RecTyInfo(..), 
+        calcRecFlags, RecTyInfo(..),
         calcSynCycles, calcClassCycles,
         RoleAnnots, extractRoleAnnots, emptyRoleAnnots, lookupRoleAnnots
     ) where
@@ -149,7 +143,7 @@ and then *their* superclasses, and so on.  This set must be finite!
 It is OK for superclasses to be type synonyms for other classes, so
 must "look through" type synonyms. Eg
      type X a = C [a]
-     class X a => C a	-- No!  Recursive superclass!
+     class X a => C a   -- No!  Recursive superclass!
 
 We want definitions such as:
 
@@ -158,7 +152,7 @@ We want definitions such as:
 
 to be accepted, even though a naive acyclicity check would reject the
 program as having a cycle between D and its superclass.  Why? Because
-when we instantiate 
+when we instantiate
      D ty1
 we get the superclas
      C D ty1
@@ -173,8 +167,8 @@ Where expand is defined as follows:
 
 (1)  expand(a ty1 ... tyN) = expand(ty1) \union ... \union expand(tyN)
 
-(2)  expand(D ty1 ... tyN) = {D} 
-                             \union sup_D[ty1/x1, ..., tyP/xP] 
+(2)  expand(D ty1 ... tyN) = {D}
+                             \union sup_D[ty1/x1, ..., tyP/xP]
                              \union expand(ty(P+1)) ... \union expand(tyN)
            where (D x1 ... xM) is a class, P = min(M,N)
 
@@ -190,8 +184,8 @@ Furthermore, expand always looks through type synonyms.
 
 \begin{code}
 calcClassCycles :: Class -> [[TyCon]]
-calcClassCycles cls 
-  = nubBy eqAsCycle $ 
+calcClassCycles cls
+  = nubBy eqAsCycle $
     expandTheta (unitUniqSet cls) [classTyCon cls] (classSCTheta cls) []
   where
     -- The last TyCon in the cycle is always the same as the first
@@ -216,9 +210,9 @@ calcClassCycles cls
       , let (env, remainder) = papp (classTyVars cls) tys
             rest_tys = either (const []) id remainder
       = if cls `elementOfUniqSet` seen
-         then (reverse (classTyCon cls:path):) 
+         then (reverse (classTyCon cls:path):)
               . flip (foldr (expandType seen path)) tys
-         else expandTheta (addOneToUniqSet seen cls) (tc:path) 
+         else expandTheta (addOneToUniqSet seen cls) (tc:path)
                           (substTys (mkTopTvSubst env) (classSCTheta cls))
               . flip (foldr (expandType seen path)) rest_tys
 
@@ -228,7 +222,7 @@ calcClassCycles cls
       | Just (tvs, rhs) <- synTyConDefn_maybe tc
       , let (env, remainder) = papp tvs tys
             rest_tys = either (const []) id remainder
-      = expandType seen (tc:path) (substTy (mkTopTvSubst env) rhs) 
+      = expandType seen (tc:path) (substTy (mkTopTvSubst env) rhs)
         . flip (foldr (expandType seen path)) rest_tys
 
       -- For non-class, non-synonyms, just check the arguments
@@ -406,19 +400,19 @@ calcRecFlags boot_details is_boot mrole_env tyclss
 
     single_con_tycons = [ tc | tc <- all_tycons
                              , not (tyConName tc `elemNameSet` boot_name_set)
-                                 -- Remove the boot_name_set because they are 
+                                 -- Remove the boot_name_set because they are
                                  -- going to be loop breakers regardless.
                              , isSingleton (tyConDataCons tc) ]
         -- Both newtypes and data types, with exactly one data constructor
 
     (new_tycons, prod_tycons) = partition isNewTyCon single_con_tycons
         -- NB: we do *not* call isProductTyCon because that checks
-	--     for vanilla-ness of data constructors; and that depends
-	--     on empty existential type variables; and that is figured
-	--     out by tcResultType; which uses tcMatchTy; which uses
-	--     coreView; which calls coreExpandTyCon_maybe; which uses
-	--     the recursiveness of the TyCon.  Result... a black hole.
-	-- YUK YUK YUK
+        --     for vanilla-ness of data constructors; and that depends
+        --     on empty existential type variables; and that is figured
+        --     out by tcResultType; which uses tcMatchTy; which uses
+        --     coreView; which calls coreExpandTyCon_maybe; which uses
+        --     the recursiveness of the TyCon.  Result... a black hole.
+        -- YUK YUK YUK
 
         --------------- Newtypes ----------------------
     nt_loop_breakers = mkNameSet (findLoopBreakers nt_edges)
@@ -499,8 +493,8 @@ isPromotableTyCon rec_tycons tc
   =  isAlgTyCon tc    -- Only algebraic; not even synonyms
                      -- (we could reconsider the latter)
   && ok_kind (tyConKind tc)
-  && case algTyConRhs tc of 
-       DataTyCon { data_cons = cs } -> all ok_con cs 
+  && case algTyConRhs tc of
+       DataTyCon { data_cons = cs } -> all ok_con cs
        NewTyCon { data_con = c }    -> ok_con c
        AbstractTyCon {}             -> False
        DataFamilyTyCon {}           -> False
@@ -526,13 +520,13 @@ isPromotableType :: NameSet -> Type -> Bool
 isPromotableType rec_tcs con_arg_ty
   = go con_arg_ty
   where
-    go (TyConApp tc tys) =  tys `lengthIs` tyConArity tc 
-                         && (tyConName tc `elemNameSet` rec_tcs 
+    go (TyConApp tc tys) =  tys `lengthIs` tyConArity tc
+                         && (tyConName tc `elemNameSet` rec_tcs
                              || isJust (promotableTyCon_maybe tc))
                          && all go tys
-    go (FunTy arg res) 	 = go arg && go res
-    go (TyVarTy {})    	 = True
-    go _               	 = False
+    go (FunTy arg res)   = go arg && go res
+    go (TyVarTy {})      = True
+    go _                 = False
 \end{code}
 
 %************************************************************************
@@ -746,7 +740,7 @@ irDataCon :: Name -> DataCon -> RoleM ()
 irDataCon tc_name datacon
   = addRoleInferenceInfo tc_name univ_tvs $
     mapM_ (irType ex_var_set) (eqSpecPreds eq_spec ++ theta ++ arg_tys)
-      -- See Note [Role-checking data constructor arguments] 
+      -- See Note [Role-checking data constructor arguments]
   where
     (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig datacon
     ex_var_set = mkVarSet ex_tvs
@@ -823,7 +817,7 @@ instance Monad RoleM where
 
 runRoleM :: RoleEnv -> RoleM () -> (RoleEnv, Bool)
 runRoleM env thing = (env', update)
-  where RIS { role_env = env', update = update } = snd $ unRM thing Nothing state 
+  where RIS { role_env = env', update = update } = snd $ unRM thing Nothing state
         state = RIS { role_env  = env, update    = False }
 
 addRoleInferenceInfo :: Name -> [TyVar] -> RoleM a -> RoleM a
