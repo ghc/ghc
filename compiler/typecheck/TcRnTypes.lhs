@@ -1734,7 +1734,7 @@ pprSkolInfo (SigSkol (FunSigCtxt f) ty)
                                  2 (pprPrefixOcc f <+> dcolon <+> ppr ty)
 pprSkolInfo (SigSkol cx ty) = hang (pprUserTypeCtxt cx <> colon)
                                  2 (ppr ty)
-pprSkolInfo (IPSkol ips)    = ptext (sLit "the implicit-parameter bindings for")
+pprSkolInfo (IPSkol ips)    = ptext (sLit "the implicit-parameter binding") <> plural ips <+> ptext (sLit "for")
                               <+> pprWithCommas ppr ips
 pprSkolInfo (ClsSkol cls)   = ptext (sLit "the class declaration for") <+> quotes (ppr cls)
 pprSkolInfo InstSkol        = ptext (sLit "the instance declaration")
