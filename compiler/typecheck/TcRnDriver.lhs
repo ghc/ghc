@@ -100,11 +100,7 @@ import Maybes
 import Util
 import Bag
 
-#if __GLASGOW_HASKELL__ >= 709
-import Control.Monad hiding (empty)
-#else
 import Control.Monad
-#endif
 
 #include "HsVersions.h"
 \end{code}

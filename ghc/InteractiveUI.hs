@@ -63,7 +63,7 @@ import Util
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
 
-import Control.Monad as Monad hiding (empty)
+import Control.Monad as Monad
 
 import Control.Applicative hiding (empty)
 import Control.Monad.Trans.Class

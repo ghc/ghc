@@ -28,7 +28,8 @@
 module T4524 where
 
 import Data.Maybe ( mapMaybe )
-import Control.Monad (Alternative(..), MonadPlus(..), msum, ap, liftM )
+import Control.Applicative ( Alternative(..) )
+import Control.Monad ( MonadPlus(..), msum, ap, liftM )
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype FileName = FN FilePath deriving ( Eq, Ord )
