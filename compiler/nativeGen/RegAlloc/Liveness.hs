@@ -44,6 +44,7 @@ import PprCmm()
 
 import Digraph
 import DynFlags
+import MonadUtils
 import Outputable
 import Platform
 import UniqSet
