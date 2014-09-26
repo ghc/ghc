@@ -257,11 +257,10 @@ rnHsTyKi isType doc tupleTy@(HsTupleTy tup_con tys)
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi isType doc) tys
        ; return (HsTupleTy tup_con tys', fvs) }
 
--- Perhaps we should use a separate extension here?
 -- Ensure that a type-level integer is nonnegative (#8306, #8412)
 rnHsTyKi isType _ tyLit@(HsTyLit t)
   = do { data_kinds <- xoptM Opt_DataKinds
-       ; unless (data_kinds || isType) (addErr (dataKindsErr isType tyLit))
+       ; unless data_kinds (addErr (dataKindsErr isType tyLit))
        ; when (negLit t) (addErr negLitErr)
        ; return (HsTyLit t, emptyFVs) }
   where

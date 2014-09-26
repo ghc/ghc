@@ -20,7 +20,6 @@ module RdrHsSyn (
         splitCon, mkInlinePragma,
         splitPatSyn, toPatSynMatchGroup,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
-        mkTyLit,
         mkTyClD, mkInstD,
 
         cvBindGroup,
@@ -261,15 +260,6 @@ mkSpliceDecl lexpr@(L loc expr)
   where
     splice = mkHsSplice lexpr
 
-mkTyLit :: Located (HsTyLit) -> P (LHsType RdrName)
-mkTyLit l =
-  do allowed <- extension typeLiteralsEnabled
-     if allowed
-       then return (HsTyLit `fmap` l)
-       else parseErrorSDoc (getLoc l)
-              (text "Illegal literal in type (use DataKinds to enable):" <+>
-              ppr l)
-
 mkRoleAnnotDecl :: SrcSpan
                 -> Located RdrName                   -- type being annotated
                 -> [Located (Maybe FastString)]      -- roles
@@ -430,7 +420,7 @@ splitCon ty
                                         return (data_con, mk_rest ts)
    split (L l (HsTupleTy _ [])) [] = return (L l (getRdrName unitDataCon), PrefixCon [])
                                          -- See Note [Unit tuples] in HsTypes
-   split (L l _) _                 = parseErrorSDoc l (text "parse error in constructor in data/newtype declaration:" <+> ppr ty)
+   split (L l _) _                 = parseErrorSDoc l (text "Cannot parse data constructor in a data/newtype declaration:" <+> ppr ty)
 
    mk_rest [L _ (HsRecTy flds)] = RecCon flds
    mk_rest ts                   = PrefixCon ts

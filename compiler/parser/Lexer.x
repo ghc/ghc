@@ -65,7 +65,6 @@ module Lexer (
    getLexState, popLexState, pushLexState,
    extension, bangPatEnabled, datatypeContextsEnabled,
    traditionalRecordSyntaxEnabled,
-   typeLiteralsEnabled,
    explicitForallEnabled,
    inRulePrag,
    explicitNamespacesEnabled,
@@ -1950,7 +1949,6 @@ data ExtBits
   | NondecreasingIndentationBit
   | SafeHaskellBit
   | TraditionalRecordSyntaxBit
-  | TypeLiteralsBit
   | ExplicitNamespacesBit
   | LambdaCaseBit
   | BinaryLiteralsBit
@@ -2002,8 +2000,6 @@ sccProfilingOn :: ExtsBitmap -> Bool
 sccProfilingOn = xtest SccProfilingOnBit
 traditionalRecordSyntaxEnabled :: ExtsBitmap -> Bool
 traditionalRecordSyntaxEnabled = xtest TraditionalRecordSyntaxBit
-typeLiteralsEnabled :: ExtsBitmap -> Bool
-typeLiteralsEnabled = xtest TypeLiteralsBit
 
 explicitNamespacesEnabled :: ExtsBitmap -> Bool
 explicitNamespacesEnabled = xtest ExplicitNamespacesBit
@@ -2074,7 +2070,6 @@ mkPState flags buf loc =
                .|. NondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
                .|. SafeHaskellBit              `setBitIf` safeImportsOn                     flags
                .|. TraditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags
-               .|. TypeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
                .|. ExplicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
                .|. LambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
                .|. BinaryLiteralsBit           `setBitIf` xopt Opt_BinaryLiterals           flags
