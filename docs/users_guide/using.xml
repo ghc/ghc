@@ -2475,7 +2475,7 @@ _  = rhs3        -- No warning: lone wild-card pattern
             <indexterm><primary>unfolding, controlling</primary></indexterm>
           </term>
           <listitem>
-            <para>(Default: 45) Governs the maximum size that GHC will allow a
+            <para>(Default: 750) Governs the maximum size that GHC will allow a
             function unfolding to be. (An unfolding has a &ldquo;size&rdquo;
             that reflects the cost in terms of &ldquo;code bloat&rdquo; of
             expanding (aka inlining) that unfolding at a call site. A bigger
@@ -2502,12 +2502,12 @@ _  = rhs3        -- No warning: lone wild-card pattern
             <indexterm><primary>unfolding, controlling</primary></indexterm>
           </term>
           <listitem>
-            <para>(Default: 8) This is the magic cut-off figure for unfolding
+            <para>(Default: 60) This is the magic cut-off figure for unfolding
             (aka inlining): below this size, a function definition will be
             unfolded at the call-site, any bigger and it won't. The size
             computed for a function depends on two things: the actual size of
-            the expression minus any discounts that
-            apply (see <option>-funfolding-con-discount</option>).
+            the expression minus any discounts that apply depending on the
+            context into which the expression is to be inlined.
             </para>
 
             <para>The difference between this and
