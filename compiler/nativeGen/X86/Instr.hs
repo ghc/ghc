@@ -947,7 +947,7 @@ allocMoreStack _ _ top@(CmmData _ _) = return top
 allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
     let entries = entryBlocks proc
 
-    uniqs <- replicateM (length entries) getUniqueUs
+    uniqs <- replicateM (length entries) getUniqueM
 
     let
       delta = ((x + stackAlign - 1) `quot` stackAlign) * stackAlign -- round up

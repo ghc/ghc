@@ -255,7 +255,7 @@ runSAT :: UniqSupply -> SatM a -> a
 runSAT = initUs_
 
 newUnique :: SatM Unique
-newUnique = getUniqueUs
+newUnique = getUniqueM
 \end{code}
 
 

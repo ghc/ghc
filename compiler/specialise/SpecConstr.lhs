@@ -1584,7 +1584,7 @@ spec_one :: ScEnv
 -}
 
 spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
-  = do  { spec_uniq <- getUniqueUs
+  = do  { spec_uniq <- getUniqueM
         ; let spec_env   = extendScSubstList (extendScInScope env qvars)
                                              (arg_bndrs `zip` pats)
               fn_name    = idName fn
@@ -1860,7 +1860,7 @@ argToPat env in_scope val_env (Cast arg co) arg_occ
                 wildCardPat ty2
           else do
         { -- Make a wild-card pattern for the coercion
-          uniq <- getUniqueUs
+          uniq <- getUniqueM
         ; let co_name = mkSysTvName uniq (fsLit "sg")
               co_var  = mkCoVar co_name (mkCoercionType Representational ty1 ty2)
         ; return (interesting, Cast arg' (mkCoVarCo co_var)) } }
@@ -1941,7 +1941,7 @@ argToPat _env _in_scope _val_env arg _arg_occ
 
 wildCardPat :: Type -> UniqSM (Bool, CoreArg)
 wildCardPat ty
-  = do { uniq <- getUniqueUs
+  = do { uniq <- getUniqueM
        ; let id = mkSysLocal (fsLit "sc") uniq ty
        ; return (False, varToCoreExpr id) }
 

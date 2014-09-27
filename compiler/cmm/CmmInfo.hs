@@ -323,7 +323,7 @@ mkLivenessBits :: DynFlags -> Liveness -> UniqSM (CmmLit, [RawCmmDecl])
 
 mkLivenessBits dflags liveness
   | n_bits > mAX_SMALL_BITMAP_SIZE dflags -- does not fit in one word
-  = do { uniq <- getUniqueUs
+  = do { uniq <- getUniqueM
        ; let bitmap_lbl = mkBitmapLabel uniq
        ; return (CmmLabel bitmap_lbl,
                  [mkRODataLits bitmap_lbl lits]) }
@@ -398,7 +398,7 @@ mkProfLits _ (ProfilingInfo td cd)
 
 newStringLit :: [Word8] -> UniqSM (CmmLit, GenCmmDecl CmmStatics info stmt)
 newStringLit bytes
-  = do { uniq <- getUniqueUs
+  = do { uniq <- getUniqueM
        ; return (mkByteStringCLit uniq bytes) }
 
 

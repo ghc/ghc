@@ -104,7 +104,7 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
                         | entry `elem` infos -> infos
                         | otherwise          -> entry : infos
 
-    uniqs <- replicateM (length entries) getUniqueUs
+    uniqs <- replicateM (length entries) getUniqueM
 
     let
         delta = ((x + stackAlign - 1) `quot` stackAlign) * stackAlign -- round up

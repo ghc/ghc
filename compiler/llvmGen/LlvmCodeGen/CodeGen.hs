@@ -1636,7 +1636,7 @@ getHsFunc' name fty
 -- | Create a new local var
 mkLocalVar :: LlvmType -> LlvmM LlvmVar
 mkLocalVar ty = do
-    un <- runUs getUniqueUs
+    un <- runUs getUniqueM
     return $ LMLocalVar un ty
 
 

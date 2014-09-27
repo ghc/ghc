@@ -231,7 +231,7 @@ linearRegAlloc'
         -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
 
 linearRegAlloc' dflags initFreeRegs entry_ids block_live sccs
- = do   us      <- getUs
+ = do   us      <- getUniqueSupplyM
         let (_, stack, stats, blocks) =
                 runR dflags emptyBlockMap initFreeRegs emptyRegMap (emptyStackMap dflags) us
                     $ linearRA_SCCs entry_ids block_live [] sccs
