@@ -226,8 +226,8 @@ install _ todo = do
   return (CoreDoPluginPass "Say name" pass : todo)
 
 pass :: ModGuts -> CoreM ModGuts
-pass = do dflags &lt;- getDynFlags
-          bindsOnlyPass (mapM (printBind dflags))
+pass guts = do dflags &lt;- getDynFlags
+               bindsOnlyPass (mapM (printBind dflags)) guts
   where printBind :: DynFlags -> CoreBind -> CoreM CoreBind
         printBind dflags bndr@(NonRec b _) = do
           putMsgS $ "Non-recursive binding named " ++ showSDoc dflags (ppr b)
