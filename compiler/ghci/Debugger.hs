@@ -172,7 +172,7 @@ showTerm term = do
            txt_ <- withExtendedLinkEnv [(bname, val)]
                                        (GHC.compileExpr expr)
            let myprec = 10 -- application precedence. TODO Infix constructors
-           let txt = unsafeCoerce# txt_
+           let txt = unsafeCoerce# txt_ :: [a]
            if not (null txt) then
              return $ Just $ cparen (prec >= myprec && needsParens txt)
                                     (text txt)

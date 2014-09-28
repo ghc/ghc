@@ -6,6 +6,9 @@
 
 module ShouldCompile where
 
+import Data.OldList (null)
+import Prelude hiding (null)
+
 class HasEmpty a where
   isEmpty :: a -> Bool
 

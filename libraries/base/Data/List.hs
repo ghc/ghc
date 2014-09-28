@@ -213,4 +213,4 @@ import Data.Traversable
 import Data.OldList hiding ( all, and, any, concat, concatMap, elem, find,
                              foldl, foldl1, foldl', foldr, foldr1, mapAccumL,
                              mapAccumR, maximum, maximumBy, minimum, minimumBy,
-                             notElem, or, product, sum )
+                             length, notElem, null, or, product, sum )
