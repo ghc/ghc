@@ -66,6 +66,9 @@
     and `Data.Foldable`/`Data.Traversable` no longer lead to conflicting
     definitions. (#9586)
 
+  * Generalise `Control.Monad.{when,unless,guard}` from `Monad` to
+    `Applicative` and from `MonadPlus` to `Alternative` respectively.
+
   * New module `Data.OldList` containing only list-specialised versions of
     the functions from `Data.List` (in other words, `Data.OldList` corresponds
     to `base-4.7.0.1`'s `Data.List`)

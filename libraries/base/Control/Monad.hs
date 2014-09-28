@@ -85,11 +85,11 @@ import GHC.List ( zipWith, unzip, replicate )
 -- -----------------------------------------------------------------------------
 -- Functions mandated by the Prelude
 
--- | @'guard' b@ is @'return' ()@ if @b@ is 'True',
--- and 'mzero' if @b@ is 'False'.
+-- | @'guard' b@ is @'pure' ()@ if @b@ is 'True',
+-- and 'empty' if @b@ is 'False'.
 guard           :: (MonadPlus m) => Bool -> m ()
-guard True      =  return ()
-guard False     =  mzero
+guard True      =  pure ()
+guard False     =  empty
 
 -- | This generalizes the list-based 'filter' function.
 
@@ -186,11 +186,11 @@ replicateM_       :: (Monad m) => Int -> m a -> m ()
 replicateM_ n x   = sequence_ (replicate n x)
 
 -- | The reverse of 'when'.
-unless            :: (Monad m) => Bool -> m () -> m ()
+unless            :: (Applicative f) => Bool -> f () -> f ()
 {-# INLINEABLE unless #-}
 {-# SPECIALISE unless :: Bool -> IO () -> IO () #-}
 {-# SPECIALISE unless :: Bool -> Maybe () -> Maybe () #-}
-unless p s        =  if p then return () else s
+unless p s        =  if p then pure () else s
 
 infixl 4 <$!>
 
