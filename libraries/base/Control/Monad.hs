@@ -87,7 +87,7 @@ import GHC.List ( zipWith, unzip, replicate )
 
 -- | @'guard' b@ is @'pure' ()@ if @b@ is 'True',
 -- and 'empty' if @b@ is 'False'.
-guard           :: (MonadPlus m) => Bool -> m ()
+guard           :: (Alternative f) => Bool -> f ()
 guard True      =  pure ()
 guard False     =  empty
 
