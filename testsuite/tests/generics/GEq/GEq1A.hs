@@ -37,8 +37,7 @@ class GEq a where
 instance GEq Char   where geq = (==)
 instance GEq Int    where geq = (==)
 instance GEq Float  where geq = (==)
-{-
+
 -- Generic instances
 instance (GEq a) => GEq (Maybe a)
 instance (GEq a) => GEq [a]
--}

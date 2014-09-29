@@ -736,6 +736,7 @@ Class object.
 data DefMethSpec = NoDM        -- No default method
                  | VanillaDM   -- Default method given with polymorphic code
                  | GenericDM   -- Default method given with generic code
+  deriving Eq
 
 instance Outputable DefMethSpec where
   ppr NoDM      = empty

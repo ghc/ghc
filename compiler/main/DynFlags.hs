@@ -563,6 +563,7 @@ data ExtensionFlag
    | Opt_DeriveFoldable
    | Opt_DeriveGeneric            -- Allow deriving Generic/1
    | Opt_DefaultSignatures        -- Allow extra signatures for defmeths
+   | Opt_DerivingViaGenerics      -- Allow deriving classes via GHC.Generics
 
    | Opt_TypeSynonymInstances
    | Opt_FlexibleContexts
@@ -2948,6 +2949,14 @@ xFlags = [
   ( "RoleAnnotations",                  Opt_RoleAnnotations, nop ),
   ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, nop ),
   ( "StandaloneDeriving",               Opt_StandaloneDeriving, nop ),
+  ( "DeriveDataTypeable",               Opt_DeriveDataTypeable, nop ),
+  ( "AutoDeriveTypeable",               Opt_AutoDeriveTypeable, nop ),
+  ( "DeriveFunctor",                    Opt_DeriveFunctor, nop ),
+  ( "DeriveTraversable",                Opt_DeriveTraversable, nop ),
+  ( "DeriveFoldable",                   Opt_DeriveFoldable, nop ),
+  ( "DerivingViaGenerics",              Opt_DerivingViaGenerics, nop ),
+  ( "DeriveGeneric",                    Opt_DeriveGeneric, nop ),
+  ( "DefaultSignatures",                Opt_DefaultSignatures, nop ),
   ( "TemplateHaskell",                  Opt_TemplateHaskell,
                      checkTemplateHaskellOk ),
   ( "TraditionalRecordSyntax",          Opt_TraditionalRecordSyntax, nop ),

@@ -19,11 +19,15 @@ test('GenCannotDoRep1_6', normal, compile_fail, [''])
 test('GenCannotDoRep1_7', normal, compile_fail, [''])
 test('GenCannotDoRep1_8', normal, compile_fail, [''])
 
-test('T5884',           normal, compile, [''])
-test('GenNewtype',      normal, compile_and_run, [''])
+test('T5462Yes', normal, multimod_compile_and_run, ['T5462Yes', '-iGEq -iGEnum -iGFunctor'])
+test('T5462No1', extra_clean(['GFunctor/GFunctor.hi', 'GFunctor/GFunctor.o']), multimod_compile_fail, ['T5462No1', '-iGFunctor'])
+test('T5462No2', extra_clean(['GFunctor/GFunctor.hi', 'GFunctor/GFunctor.o']), multimod_compile_fail, ['T5462No2', '-iGFunctor'])
 
-test('GenDerivOutput1_0',  normal, compile, ['-dsuppress-uniques'])
-test('GenDerivOutput1_1',  normal, compile, ['-dsuppress-uniques'])
+test('T5884',      normal, compile, [''])
+test('GenNewtype', normal, compile_and_run, [''])
+
+test('GenDerivOutput1_0', normal, compile, ['-dsuppress-uniques'])
+test('GenDerivOutput1_1', normal, compile, ['-dsuppress-uniques'])
 
 test('T7878', extra_clean(['T7878A.o'     ,'T7878A.hi'
                           ,'T7878A.o-boot','T7878A.hi-boot'

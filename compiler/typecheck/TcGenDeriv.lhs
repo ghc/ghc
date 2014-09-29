@@ -17,6 +17,7 @@ This is where we do all the grimy bindings' generation.
 module TcGenDeriv (
         BagDerivStuff, DerivStuff(..),
 
+        canDeriveViaGenerics, 
         genDerivedBinds, 
         FFoldType(..), functorLikeTraverse,
         deepSubtypesContaining, foldDataConArgs,
@@ -65,8 +66,9 @@ import Bag
 import Fingerprint
 import TcEnv (InstInfo)
 
-import ListSetOps( assocMaybe )
-import Data.List ( partition, intersperse )
+import ListSetOps ( assocMaybe )
+import Data.List  ( partition, intersperse )
+import Data.Maybe ( isNothing )
 \end{code}
 
 \begin{code}
@@ -105,6 +107,11 @@ genDerivedBinds dflags fix_env clas loc tycon
   | Just gen_fn <- assocMaybe gen_list (getUnique clas)
   = gen_fn loc tycon
 
+  | isNothing (canDeriveViaGenerics dflags tycon clas)
+  -- Deriving via Generics simply means giving an empty instance, so no
+  -- bindings have to be generated.
+  = (emptyBag, emptyBag)
+
   | otherwise
   = pprPanic "genDerivStuff: bad derived class" (ppr clas)
   where
@@ -121,6 +128,26 @@ genDerivedBinds dflags fix_env clas loc tycon
                , (functorClassKey,     gen_Functor_binds)
                , (foldableClassKey,    gen_Foldable_binds)
                , (traversableClassKey, gen_Traversable_binds) ]
+
+-- We can derive a given class via Generics iff
+canDeriveViaGenerics :: DynFlags -> TyCon -> Class -> Maybe SDoc
+canDeriveViaGenerics dflags tycon clas =
+  let dfs          = map (defMethSpecOfDefMeth . snd) . classOpItems $ clas
+      b `orElse` s = if b then Nothing else Just (ptext (sLit s))
+      Just m  <> _ = Just m
+      Nothing <> n = n
+  in  -- 1) It is not a "standard" class (like Show, Functor, etc.)
+        (not (getUnique clas `elem` standardClassKeys) `orElse` "")
+      -- 2) Opt_DerivingViaGenerics is on
+     <> (xopt Opt_DerivingViaGenerics dflags `orElse` "Try enabling DerivingViaGenerics")
+      -- 3) It has no non-default methods
+     <> (all (/= NoDM) dfs `orElse` "There are methods without a default definition")
+      -- 4) It has at least one generic default method
+     <> (any (== GenericDM) dfs `orElse` "There must be at least one method with a default signature")
+      -- 5) It's not a newtype (that conflicts with GeneralizedNewtypeDeriving)
+     <> (not (isNewTyCon tycon) `orElse` "DerivingViaGenerics is not supported for newtypes")
+  -- Nothing: we can derive it via Generics
+  -- Just s:  we can't, reason s
 \end{code}
 
 %************************************************************************

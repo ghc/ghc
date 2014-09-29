@@ -1,0 +1,19 @@
+[1 of 2] Compiling GFunctor         ( GFunctor/GFunctor.hs, GFunctor/GFunctor.o )
+[2 of 2] Compiling T5462No2         ( T5462No2.hs, T5462No2.o )
+
+T5462No2.hs:23:42:
+    Can't make a derived instance of ‘GFunctor F’:
+      DerivingViaGenerics is not supported for newtypes
+    In the newtype declaration for ‘F’
+
+T5462No2.hs:25:23:
+    Can't make a derived instance of ‘C1 G’:
+      ‘C1’ is not a derivable class
+      There are methods without a default definition
+    In the data declaration for ‘G’
+
+T5462No2.hs:26:23:
+    Can't make a derived instance of ‘C2 H’:
+      ‘C2’ is not a derivable class
+      There must be at least one method with a default signature
+    In the data declaration for ‘H’
