@@ -11,6 +11,8 @@ ToDo:
 
 * TcCanonical re-orients, so TcInteract should
   not do so.  (TwoWay, OneWay)
+* Check orientation (isFlattenTyVar) in canEqTyVarTyVar
+
 
 * No need to zonk now we are unflattening
 
@@ -20,21 +22,9 @@ ToDo:
    They are all CFunEqCans, CTyEqCans
 
 * Update Note [Preparing inert set for implications]
-
-* indexed_types/should_compile/T3826
-
-* remove level from FlatSkol -- not needed now they always
-  come from current level
-
-* remove the (b) CFunEqCan in simpl_loop
-
-* remove fe_rewrite_same
-
 * remove/rewrite TcMType Note [Unflattening while zonking]
 
 * Consider individual data tpyes for CFunEqCan etc
-
-* Check orientation (isFlattenTyVar) in canEqTyVarTyVar
 
 ----------------------
 Outer given is rewritten by an inner given, then there must have been an inner given equality, hence the “given-eq” flag will be true anyway.
@@ -64,6 +54,28 @@ we get
 
 We want: alpha := beta (which might unlock something else).  So rewriting wanted with wanted helps here.
 
+
+
+----------------------------------------
+indexed-types/should_failt/T4179
+
+after solving
+  [W] fuv_1 ~ fuv_2
+  [W] A3 (FCon x)           ~ fuv_1    (CFunEqCan)
+  [W] A3 (x (aoa -> fuv_2)) ~ fuv_2    (CFunEqCan)
+
+----------------------------------------
+indexed-types/should_fail/T7729a
+
+a)  [W]   BasePrimMonad (Rand m) ~ m1
+b)  [W]   tt m1 ~ BasePrimMonad (Rand m)
+
+--->  process (b) first
+    BasePrimMonad (Ramd m) ~ fuv_atH
+    fuv_atH ~ tt m1
+  
+--->  now process (a)
+    m1 ~ s_atH ~ tt m1    -- An obscure occurs check
 
 
 ----------------------------------------
