@@ -51,7 +51,7 @@ module TcMType (
   zonkTcTyVarBndr, zonkTcType, zonkTcTypes, zonkTcThetaType,
 
   zonkTcKind, defaultKindVarToStar,
-  zonkEvVar, zonkWC, zonkFlats, zonkId, zonkCt, zonkCts, zonkSkolemInfo,
+  zonkEvVar, zonkWC, zonkFlats, zonkId, zonkCt, zonkSkolemInfo,
 
   tcGetGlobalTyVars,
   ) where
@@ -61,7 +61,6 @@ module TcMType (
 -- friends:
 import TypeRep
 import TcType
-import TcEvidence
 import Type
 import Class
 import Var
@@ -723,9 +722,7 @@ zonkTcPredType = zonkTcType
 
 \begin{code}
 zonkImplication :: Implication -> TcM (Bag Implication)
-zonkImplication implic@(Implic { ic_untch  = untch
-                               , ic_binds  = binds_var
-                               , ic_skols  = skols
+zonkImplication implic@(Implic { ic_skols  = skols
                                , ic_given  = given
                                , ic_wanted = wanted
                                , ic_info   = info })
@@ -733,7 +730,7 @@ zonkImplication implic@(Implic { ic_untch  = untch
                                                 -- as Trac #7230 showed
        ; given'  <- mapM zonkEvVar given
        ; info'   <- zonkSkolemInfo info
-       ; wanted' <- zonkWCRec binds_var untch wanted
+       ; wanted' <- zonkWCRec wanted
        ; if isEmptyWC wanted'
          then return emptyBag
          else return $ unitBag $
@@ -747,60 +744,15 @@ zonkEvVar var = do { ty' <- zonkTcType (varType var)
                    ; return (setVarType var ty') }
 
 
-zonkWC :: EvBindsVar -- May add new bindings for wanted family equalities in here
-       -> WantedConstraints -> TcM WantedConstraints
-zonkWC binds_var wc
-  = do { untch <- getUntouchables
-       ; zonkWCRec binds_var untch wc }
+zonkWC :: WantedConstraints -> TcM WantedConstraints
+zonkWC wc = zonkWCRec wc
 
-zonkWCRec :: EvBindsVar
-          -> Untouchables
-          -> WantedConstraints -> TcM WantedConstraints
-zonkWCRec binds_var untch (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
-  = do { flat'   <- zonkFlats binds_var untch flat
+zonkWCRec :: WantedConstraints -> TcM WantedConstraints
+zonkWCRec (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
+  = do { flat'   <- zonkFlats flat
        ; implic' <- flatMapBagM zonkImplication implic
-       ; insol'  <- zonkCts insol -- No need to do the more elaborate zonkFlats thing
+       ; insol'  <- zonkFlats insol
        ; return (WC { wc_flat = flat', wc_impl = implic', wc_insol = insol' }) }
-
-zonkFlats :: EvBindsVar -> Untouchables -> Cts -> TcM Cts
--- This zonks and unflattens a bunch of flat constraints
--- See Note [Unflattening while zonking]
-zonkFlats _binds_var _untch cts
-  = do { -- See Note [How to unflatten]
---         cts <- foldrBagM unflatten_one emptyCts cts
-       ; zonkCts cts }
-{-
-  where
-    unflatten_one orig_ct cts
-      = do { traceTc "unflatten {" (ppr orig_ct)
-           ; zct <- zonkCt orig_ct                -- First we need to fully zonk
-           ; mct <- try_zonk_fun_eq orig_ct zct   -- Then try to solve if family equation
-           ; traceTc "unflatten }" (ppr mct)
-           ; return $ maybe cts (`consBag` cts) mct }
-
-    try_zonk_fun_eq orig_ct zct   -- See Note [How to unflatten]
-      | EqPred ty_lhs ty_rhs <- classifyPredType (ctPred zct)
-          -- NB: zonking de-classifies the constraint,
-          --     so we can't look for CFunEqCan
-      , Just tv <- getTyVar_maybe ty_rhs
-      , ASSERT2( not (isFloatedTouchableMetaTyVar untch tv), ppr tv )
-        isTouchableMetaTyVar untch tv || isFlatSkolTyVar tv
-      , not (isSigTyVar tv) || isTyVarTy ty_lhs     -- Never unify a SigTyVar with a non-tyvar
-      , typeKind ty_lhs `tcIsSubKind` tyVarKind tv  -- c.f. TcInteract.trySpontaneousEqOneWay
-      , not (tv `elemVarSet` tyVarsOfType ty_lhs)   -- Do not construct an infinite type
-      = ASSERT2( case tcSplitTyConApp_maybe ty_lhs of { Just (tc,_) -> isSynFamilyTyCon tc; _ -> False }, ppr orig_ct )
-        do { writeMetaTyVar tv ty_lhs
-           ; let evterm = EvCoercion (mkTcNomReflCo ty_lhs)
-                 evvar  = ctev_evar (cc_ev zct)
-           ; when (isWantedCt orig_ct) $         -- Can be derived (Trac #8129)
-             addTcEvBind binds_var evvar evterm
-           ; traceTc "zonkFlats/unflattening" $
-             vcat [ text "zct = " <+> ppr zct,
-                    text "binds_var = " <+> ppr binds_var ]
-           ; return Nothing }
-      | otherwise
-      = return (Just zct)
--}
 \end{code}
 
 Note [Unflattening while zonking]
@@ -848,14 +800,13 @@ the information from later ones to earlier ones.  Eg
 
 
 \begin{code}
-zonkCts :: Cts -> TcM Cts
-zonkCts = mapBagM zonkCt'
+zonkFlats :: Cts -> TcM Cts
+zonkFlats cts = do { cts' <- mapBagM zonkCt' cts
+                   ; traceTc "zonkFlats done:" (ppr cts')
+                   ; return cts' }
 
 zonkCt' :: Ct -> TcM Ct
-zonkCt' ct = do { traceTc "zonkCt {" (ppr ct)
-                ; ct' <- zonkCt ct
-                ; traceTc "} zonkCt" (ppr ct)
-                ; return ct' }
+zonkCt' ct = zonkCt ct
 
 zonkCt :: Ct -> TcM Ct
 zonkCt ct@(CHoleCan { cc_ev = ev })
@@ -870,9 +821,7 @@ zonkCtEvidence ctev@(CtGiven { ctev_pred = pred })
   = do { pred' <- zonkTcType pred
        ; return (ctev { ctev_pred = pred'}) }
 zonkCtEvidence ctev@(CtWanted { ctev_pred = pred })
-  = do { traceTc "zonkCtEv: wanted {" (ppr pred) 
-       ; pred' <- zonkTcType pred
-       ; traceTc "zonkCtEv: wanted }" (ppr pred') 
+  = do { pred' <- zonkTcType pred
        ; return (ctev { ctev_pred = pred' }) }
 zonkCtEvidence ctev@(CtDerived { ctev_pred = pred })
   = do { pred' <- zonkTcType pred

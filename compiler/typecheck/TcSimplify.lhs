@@ -315,7 +315,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                            ; _implics <- solveInteract quant_cand
                            ; getInertUnsolved }
 
-                      ; flats' <- zonkFlats null_ev_binds_var untch $
+                      ; flats' <- zonkFlats $
                                   filterBag isWantedCt flats
                            -- The quant_cand were already fully zonked, so this zonkFlats
                            -- really only unflattens the flattening that solveInteract
@@ -549,7 +549,7 @@ simplifyRule name lhs_wanted rhs_wanted
          (resid_wanted, _) <- solveWantedsTcM (lhs_wanted `andWC` rhs_wanted)
                               -- Post: these are zonked and unflattened
 
-       ; zonked_lhs_flats <- zonkCts (wc_flat lhs_wanted)
+       ; zonked_lhs_flats <- zonkFlats (wc_flat lhs_wanted)
        ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs_flats
              quantify_me  -- Note [RULE quantification over equalities]
                | insolubleWC resid_wanted = quantify_insol
@@ -641,7 +641,7 @@ solveWantedsTcMWithEvBinds :: EvBindsVar
 solveWantedsTcMWithEvBinds ev_binds_var wc tcs_action
   = do { traceTc "solveWantedsTcMWithEvBinds" $ text "wanted=" <+> ppr wc
        ; wc2 <- runTcSWithEvBinds ev_binds_var (tcs_action wc)
-       ; zonkWC ev_binds_var wc2 }
+       ; zonkWC wc2 }
          -- See Note [Zonk after solving]
 
 solveWantedsTcM :: WantedConstraints -> TcM (WantedConstraints, Bag EvBind)
@@ -1163,8 +1163,13 @@ floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
     float_me :: Ct -> Bool
     float_me ct
        | EqPred ty1 ty2 <- classifyPredType pred
-       , skol_set `disjointVarSet` tyVarsOfType pred
-       , typeKind ty1 `tcEqKind` typeKind ty2  -- See Note [Do not float kind-incompatible equalities]
+       , Just tv1 <- tcGetTyVar_maybe ty1
+       , not (tv1 `elemVarSet` skol_set)
+       , isMetaTyVar tv1   -- Float out alpha ~ ty, 
+                           -- which might be unified outside
+       , tyVarsOfType ty2 `disjointVarSet` skol_set 
+       , tyVarKind tv1 `tcEqKind` typeKind ty2  
+              -- See Note [Do not float kind-incompatible equalities]
        = True
        | otherwise
        = False

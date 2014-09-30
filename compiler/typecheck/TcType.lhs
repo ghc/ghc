@@ -24,7 +24,8 @@ module TcType (
   TcTyVar, TcTyVarSet, TcKind, TcCoVar,
 
   -- Untouchables
-  Untouchables(..), noUntouchables, pushUntouchables, isTouchable, fskUntouchables,
+  Untouchables(..), noUntouchables, pushUntouchables, 
+  strictlyDeeperThan, sameDepthAs, fskUntouchables,
 
   --------------------------------
   -- MetaDetails
@@ -37,7 +38,7 @@ module TcType (
   isAmbiguousTyVar, metaTvRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   isTypeVar, isKindVar,
-  metaTyVarUntouchables, setMetaTyVarUntouchables,
+  metaTyVarUntouchables, setMetaTyVarUntouchables, metaTyVarUntouchables_maybe,
   isTouchableMetaTyVar, isTouchableOrUfsk,
   isFloatedTouchableMetaTyVar,
 
@@ -441,12 +442,12 @@ noUntouchables = Untouchables 1   -- 1 = outermost level
 pushUntouchables :: Untouchables -> Untouchables
 pushUntouchables (Untouchables us) = Untouchables (us+1)
 
-isFloatedTouchable :: Untouchables -> Untouchables -> Bool
-isFloatedTouchable (Untouchables ctxt_untch) (Untouchables tv_untch)
-  = ctxt_untch < tv_untch
+strictlyDeeperThan :: Untouchables -> Untouchables -> Bool
+strictlyDeeperThan (Untouchables tv_untch) (Untouchables ctxt_untch)
+  = tv_untch > ctxt_untch
 
-isTouchable :: Untouchables -> Untouchables -> Bool
-isTouchable (Untouchables ctxt_untch) (Untouchables tv_untch)
+sameDepthAs :: Untouchables -> Untouchables -> Bool
+sameDepthAs (Untouchables ctxt_untch) (Untouchables tv_untch)
   = ctxt_untch == tv_untch   -- NB: invariant ctxt_untch >= tv_untch
                              --     So <= would be equivalent
 
@@ -474,13 +475,13 @@ pprTcTyVarDetails (SkolemTv False) = ptext (sLit "sk")
 pprTcTyVarDetails (RuntimeUnk {})  = ptext (sLit "rt")
 pprTcTyVarDetails (FlatSkol {})    = ptext (sLit "fsk")
 pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_untch = untch })
-  = pp_info <> brackets (ppr untch)
+  = pp_info <> colon <> ppr untch
   where
     pp_info = case info of
                 PolyTv     -> ptext (sLit "poly")
                 TauTv      -> ptext (sLit "tau")
                 SigTv      -> ptext (sLit "sig")
-                FlatMetaTv -> ptext (sLit "fmv")
+                FlatMetaTv -> ptext (sLit "fuv")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
@@ -596,7 +597,7 @@ isTouchableOrUfsk ctxt_untch tv
                     ppr tv $$ ppr tv_untch $$ ppr ctxt_untch )
            case info of
              FlatMetaTv -> True
-             _          -> isTouchable ctxt_untch tv_untch
+             _          -> tv_untch `sameDepthAs` ctxt_untch
       _          -> False
 
 isTouchableMetaTyVar :: Untouchables -> TcTyVar -> Bool
@@ -606,14 +607,14 @@ isTouchableMetaTyVar ctxt_untch tv
       MetaTv { mtv_untch = tv_untch }
         -> ASSERT2( checkTouchableInvariant ctxt_untch tv_untch,
                     ppr tv $$ ppr tv_untch $$ ppr ctxt_untch )
-           isTouchable ctxt_untch tv_untch
+           tv_untch `sameDepthAs` ctxt_untch
       _ -> False
 
 isFloatedTouchableMetaTyVar :: Untouchables -> TcTyVar -> Bool
 isFloatedTouchableMetaTyVar ctxt_untch tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-      MetaTv { mtv_untch = tv_untch } -> isFloatedTouchable ctxt_untch tv_untch
+      MetaTv { mtv_untch = tv_untch } -> tv_untch `strictlyDeeperThan` ctxt_untch
       _ -> False
 
 isImmutableTyVar :: TyVar -> Bool
@@ -702,6 +703,13 @@ metaTyVarUntouchables tv
     case tcTyVarDetails tv of
       MetaTv { mtv_untch = untch } -> untch
       _ -> pprPanic "metaTyVarUntouchables" (ppr tv)
+
+metaTyVarUntouchables_maybe :: TcTyVar -> Maybe Untouchables
+metaTyVarUntouchables_maybe tv
+  = ASSERT( isTcTyVar tv )
+    case tcTyVarDetails tv of
+      MetaTv { mtv_untch = untch } -> Just untch
+      _                            -> Nothing
 
 setMetaTyVarUntouchables :: TcTyVar -> Untouchables -> TcTyVar
 setMetaTyVarUntouchables tv untch

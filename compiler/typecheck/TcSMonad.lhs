@@ -679,7 +679,7 @@ getInertUnsolved
             unsolved_flats  = unsolved_eqs   `unionBags` unsolved_irreds `unionBags`
                               unsolved_dicts `unionBags` unsolved_funeqs
 
-      ; unsolved_flats <- wrapTcS (TcM.zonkCts unsolved_flats)
+      ; unsolved_flats <- wrapTcS (TcM.zonkFlats unsolved_flats)
       ; return ( unsolved_flats, iinsols ) }
         -- It would be perfectly OK to zonk the insolubles too,
         -- but it'll happen anyway before error reporting

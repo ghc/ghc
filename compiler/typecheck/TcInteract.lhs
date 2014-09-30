@@ -263,7 +263,7 @@ interactWithInertsStage wi
   = do { inerts <- getTcSInerts
        ; let ics = inert_cans inerts
        ; stop <- case wi of
-             CTyEqCan    {} -> interactTyVarEq ics wi
+             CTyEqCan    {} -> do { interactTyVarEq ics wi; return True }
              CFunEqCan   {} -> interactFunEq   ics wi
              CIrredEvCan {} -> interactIrred   ics wi
              CDictCan    {} -> interactDict    ics wi
@@ -654,8 +654,8 @@ test when solving pairwise CFunEqCan.
 *********************************************************************************
 
 \begin{code}
-interactTyVarEq :: InertCans -> Ct -> TcS StopNowFlag
--- CTyEqCans are always consumed, returning Stop
+interactTyVarEq :: InertCans -> Ct -> TcS ()
+-- CTyEqCans are always consumed, hence () result
 interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs , cc_ev = ev })
   | (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
                              <- findTyEqs (inert_eqs inerts) tv
@@ -664,8 +664,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs , cc_ev 
   =  -- Inert:     a ~ b
      -- Work item: a ~ b
     do { when (isWanted ev) (setEvBind (ctev_evar ev) (ctEvTerm ev_i))
-       ; traceFireTcS workItem (ptext (sLit "Solved from inert"))
-       ; return True }
+       ; traceFireTcS workItem (ptext (sLit "Solved from inert")) }
 
   | Just tv_rhs <- getTyVar_maybe rhs
   , (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
@@ -674,39 +673,60 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs , cc_ev 
                          , rhs_i `tcEqType` mkTyVarTy tv ]
   =  -- Inert:     a ~ b
      -- Work item: b ~ a
-    do { when (isWanted ev) (setEvBind (ctev_evar ev)
-                                (EvCoercion (mkTcSymCo (ctEvCoercion ev_i))))
-       ; traceFireTcS workItem (ptext (sLit "Solved from inert (r)"))
-       ; return True }
+    do { when (isWanted ev) $
+              setEvBind (ctev_evar ev)
+                        (EvCoercion (mkTcSymCo (ctEvCoercion ev_i)))
+       ; traceFireTcS workItem (ptext (sLit "Solved from inert (r)")) }
 
   | otherwise
-  = do { mb_solved <- trySpontaneousSolve ev tv rhs
-       ; case mb_solved of
-           SPCantSolve   -- Includes givens
-              -> do { untch <- getUntouchables
-                    ; traceTcS "Can't solve tyvar equality"
-                          (vcat [ text "LHS:" <+> ppr tv <+> dcolon <+> ppr (tyVarKind tv)
-                                , ppWhen (isMetaTyVar tv) $
-                                  nest 4 (text "Untouchable level of" <+> ppr tv
-                                          <+> text "is" <+> ppr (metaTyVarUntouchables tv))
-                                , text "RHS:" <+> ppr rhs <+> dcolon <+> ppr (typeKind rhs)
-                                , text "Untouchables =" <+> ppr untch ])
-                    ; n_kicked <- kickOutRewritable ev tv
-                    ; traceFireTcS workItem $
-                      ptext (sLit "Kept as inert") <+> ppr_kicked n_kicked
-                    ; updInertCans (\ ics -> addInertCan ics workItem)
-                    ; return True }
+  = do { untch <- getUntouchables
+       ; if canSolveByUnification untch ev tv rhs
+         then do { solveByUnification ev tv rhs
+                 ; n_kicked <- kickOutRewritable givenFlavour tv
+                               -- givenFlavour because the tv := xi is given
+                 ; traceFireTcS workItem $
+                   ptext (sLit "Spontaneously solved") <+> ppr_kicked n_kicked }
 
-           SPSolved new_tv
-              -- Post: tv ~ xi is now in TyBinds, no need to put in inerts as well
-              -- see Note [Spontaneously solved in TyBinds]
-              -> do { n_kicked <- kickOutRewritable givenFlavour new_tv
-                                             -- givenFlavour because the tv := xi is given
-                    ; traceFireTcS workItem $
-                      ptext (sLit "Spontaneously solved") <+> ppr_kicked n_kicked
-                    ; return True } }
+         else do { traceTcS "Can't solve tyvar equality"
+                       (vcat [ text "LHS:" <+> ppr tv <+> dcolon <+> ppr (tyVarKind tv)
+                             , ppWhen (isMetaTyVar tv) $
+                               nest 4 (text "Untouchable level of" <+> ppr tv
+                                       <+> text "is" <+> ppr (metaTyVarUntouchables tv))
+                             , text "RHS:" <+> ppr rhs <+> dcolon <+> ppr (typeKind rhs)
+                             , text "Untouchables =" <+> ppr untch ])
+                 ; n_kicked <- kickOutRewritable ev tv
+                 ; traceFireTcS workItem $
+                   ptext (sLit "Kept as inert") <+> ppr_kicked n_kicked
+                 ; updInertCans (\ ics -> addInertCan ics workItem) } }
 
 interactTyVarEq _ wi = pprPanic "interactTyVarEq" (ppr wi)
+
+-- @trySpontaneousSolve wi@ solves equalities where one side is a
+-- touchable unification variable.
+-- Returns True <=> spontaneous solve happened
+canSolveByUnification :: Untouchables -> CtEvidence -> TcTyVar -> Xi -> Bool
+canSolveByUnification untch gw tv xi
+  | isGiven gw   -- See Note [Touchables and givens]
+  = False
+
+  | isTouchableMetaTyVar untch tv 
+  , not (isSigTyVar tv) || is_tyvar xi 
+  = True
+
+  | otherwise    -- Untouchable, or sig-tyvar with non-tyvar rhs
+  = False  
+  where
+    is_tyvar xi 
+      = case tcGetTyVar_maybe xi of
+          Nothing -> False
+          Just tv -> case tcTyVarDetails tv of
+                       MetaTv { mtv_info = info }
+                                   -> case info of
+                                        SigTv -> True
+                                        _     -> False
+                       SkolemTv {} -> True
+                       FlatSkol {} -> False
+                       RuntimeUnk  -> True
 
 givenFlavour :: CtEvidence
 -- Used just to pass to kickOutRewritable
@@ -898,73 +918,6 @@ equality (b ~ phi) in two cases
 
 See also Note [Detailed InertCans Invariants]
 
-\begin{code}
-data SPSolveResult = SPCantSolve
-                   | SPSolved TcTyVar
-                     -- We solved this /unification/ variable to some type using reflexivity
-
--- SPCantSolve means that we can't do the unification because e.g. the variable is untouchable
--- SPSolved workItem' gives us a new *given* to go on
-
--- @trySpontaneousSolve wi@ solves equalities where one side is a
--- touchable unification variable.
-trySpontaneousSolve :: CtEvidence -> TcTyVar -> Xi -> TcS SPSolveResult
-trySpontaneousSolve gw tv1 xi
-  | isGiven gw   -- See Note [Touchables and givens]
-  = return SPCantSolve
-
-  | Just tv2 <- tcGetTyVar_maybe xi
-  = do { tch1 <- isTouchableMetaTyVarTcS tv1
-       ; tch2 <- isTouchableMetaTyVarTcS tv2
-       ; case (tch1, tch2) of
-           (True,  True)  -> trySpontaneousEqTwoWay gw tv1 tv2
-           (True,  False) -> trySpontaneousEqOneWay gw tv1 xi
-           (False, True)  -> trySpontaneousEqOneWay gw tv2 (mkTyVarTy tv1)
-           _              -> return SPCantSolve }
-  | otherwise
-  = do { tch1 <- isTouchableMetaTyVarTcS tv1
-       ; if tch1 then trySpontaneousEqOneWay gw tv1 xi
-                 else return SPCantSolve }
-
-----------------
-trySpontaneousEqOneWay :: CtEvidence -> TcTyVar -> Xi -> TcS SPSolveResult
--- tv is a MetaTyVar, not untouchable
-trySpontaneousEqOneWay gw tv xi
-  | not (isSigTyVar tv) || is_tyvar xi
-  , typeKind xi `tcIsSubKind` tyVarKind tv
-  = solveWithIdentity gw tv xi
-  | otherwise -- Still can't solve, sig tyvar and non-variable rhs
-  = return SPCantSolve
-  where
-    is_tyvar xi 
-      = case tcGetTyVar_maybe xi of
-          Nothing -> False
-          Just tv -> case tcTyVarDetails tv of
-                       MetaTv { mtv_info = info }
-                                   -> case info of
-                                        SigTv -> True
-                                        _     -> False
-                       SkolemTv {} -> True
-                       FlatSkol {} -> False
-                       RuntimeUnk  -> True
-                       
-----------------
-trySpontaneousEqTwoWay :: CtEvidence -> TcTyVar -> TcTyVar -> TcS SPSolveResult
--- Both tyvars are *touchable* MetaTyvars so there is only a chance for kind error here
-
-trySpontaneousEqTwoWay gw tv1 tv2
-  | k1 `tcIsSubKind` k2 && nicer_to_update_tv2
-  = solveWithIdentity gw tv2 (mkTyVarTy tv1)
-  | k2 `tcIsSubKind` k1
-  = solveWithIdentity gw tv1 (mkTyVarTy tv2)
-  | otherwise
-  = return SPCantSolve
-  where
-    k1 = tyVarKind tv1
-    k2 = tyVarKind tv2
-    nicer_to_update_tv2 = isSigTyVar tv1 || isSystemName (Var.varName tv2)
-\end{code}
-
 Note [Avoid double unifications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The spontaneous solver has to return a given which mentions the unified unification
@@ -984,20 +937,23 @@ double unifications is the main reason we disallow touchable
 unification variables as RHS of type family equations: F xis ~ alpha.
 
 \begin{code}
-solveWithIdentity :: CtEvidence -> TcTyVar -> Xi -> TcS SPSolveResult
+solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS ()
 -- Solve with the identity coercion
 -- Precondition: kind(xi) is a sub-kind of kind(tv)
 -- Precondition: CtEvidence is Wanted or Derived
--- See [New Wanted Superclass Work] to see why solveWithIdentity
+-- See [New Wanted Superclass Work] to see why solveByUnification
 --     must work for Derived as well as Wanted
 -- Returns: workItem where
 --        workItem = the new Given constraint
 --
--- NB: No need for an occurs check here, because solveWithIdentity always
+-- NB: No need for an occurs check here, because solveByUnification always
 --     arises from a CTyEqCan, a *canonical* constraint.  Its invariants
 --     say that in (a ~ xi), the type variable a does not appear in xi.
 --     See TcRnTypes.Ct invariants.
-solveWithIdentity wd tv xi
+--
+-- Post: tv ~ xi is now in TyBinds, no need to put in inerts as well
+-- see Note [Spontaneously solved in TyBinds]
+solveByUnification wd tv xi
   = do { let tv_ty = mkTyVarTy tv
        ; traceTcS "Sneaky unification:" $
                        vcat [text "Unifies:" <+> ppr tv <+> ptext (sLit ":=") <+> ppr xi,
@@ -1011,12 +967,8 @@ solveWithIdentity wd tv xi
                -- cf TcUnify.uUnboundKVar
 
        ; setWantedTyBind tv xi'
-       ; let refl_evtm = EvCoercion (mkTcNomReflCo xi')
-
        ; when (isWanted wd) $
-              setEvBind (ctEvId wd) refl_evtm
-
-       ; return (SPSolved tv) }
+         setEvBind (ctEvId wd) (EvCoercion (mkTcNomReflCo xi')) }
 \end{code}
 
 
@@ -1844,13 +1796,15 @@ matchClassInst _ clas [ ty ] _
   -}
   makeDict evLit
     | Just (_, co_dict) <- tcInstNewTyCon_maybe (classTyCon clas) [ty]
+          -- co_dict :: KnownNat n ~ SNat n
     , [ meth ]   <- classMethods clas
     , Just tcRep <- tyConAppTyCon_maybe -- SNat
                       $ funResultTy         -- SNat n
                       $ dropForAlls         -- KnownNat n => SNat n
                       $ idType meth         -- forall n. KnownNat n => SNat n
     , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
-    = return (GenInst [] $ mkEvCast (EvLit evLit) (mkTcTransCo co_dict co_rep))
+          -- SNat n ~ Integer
+    = return (GenInst [] $ mkEvCast (EvLit evLit) (mkTcSymCo (mkTcTransCo co_dict co_rep)))
 
     | otherwise
     = panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
