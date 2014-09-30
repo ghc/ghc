@@ -1162,9 +1162,9 @@ floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
     (float_eqs, remaining_flats) = partitionBag float_me flats
     float_me :: Ct -> Bool
     float_me ct
-       | EqPred ty1 ty2 <- classifyPred pred
+       | EqPred ty1 ty2 <- classifyPredType pred
        , skol_set `disjointVarSet` tyVarsOfType pred
-       , typeKind ty1 `eqKind` typeKind ty2  -- See Note [Do not float kind-incompatible equalities]
+       , typeKind ty1 `tcEqKind` typeKind ty2  -- See Note [Do not float kind-incompatible equalities]
        = True
        | otherwise
        = False
