@@ -1,6 +1,6 @@
 
 NoMatchErr.hs:19:7:
-    Could not deduce (Memo d0 ~ Memo d)
+    Could not deduce (Memo d ~ Memo d0)
     from the context (Fun d)
       bound by the type signature for f :: Fun d => Memo d a -> Memo d a
       at NoMatchErr.hs:19:7-37

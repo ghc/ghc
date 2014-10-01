@@ -1,4 +1,4 @@
-T7865.expensive [InlPrag=NOINLINE]
-T7865.expensive =
-        case T7865.expensive sc of _ [Occ=Dead] { GHC.Types.I# x ->
-                (case T7865.expensive x of _ [Occ=Dead] { GHC.Types.I# x1 ->
+expensive [InlPrag=NOINLINE] :: Int -> Int
+expensive =
+        case expensive sc of _ [Occ=Dead] { GHC.Types.I# x ->
+                (case expensive x of _ [Occ=Dead] { GHC.Types.I# x1 ->
