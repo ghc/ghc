@@ -960,6 +960,8 @@ data Ct
   | CFunEqCan {  -- F xis ~ fsk
        -- Invariant: * isSynFamilyTyCon cc_fun
        --            * typeKind (F xis) `subKind` typeKind xi
+       --            * always Nominal role
+       --            * always Given or Watned, never Derived
        --       See Note [Kind orientation for CFunEqCan]
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function

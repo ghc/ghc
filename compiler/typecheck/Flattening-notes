@@ -1,5 +1,7 @@
 ToDo:
 
+* ctev_loc should have a decent name ctEvLoc
+
 * Float only CTyEqCans.   kind-incompatible things should be CNonCanonical,
   so they won't float and generate a duplicate kind-unify message
 

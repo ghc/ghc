@@ -28,6 +28,7 @@ module TcEvidence (
   mkTcAxiomRuleCo,
   tcCoercionKind, coVarsOfTcCo, isEqVar, mkTcCoVarCo,
   isTcReflCo, getTcCoVar_maybe,
+  tcLiftCoSubst, 
   tcCoercionRole, eqVarRole
   ) where
 #include "HsVersions.h"
@@ -339,6 +340,28 @@ coVarsOfTcCo tc_co
 
     get_bndrs :: Bag EvBind -> VarSet
     get_bndrs = foldrBag (\ (EvBind b _) bs -> extendVarSet bs b) emptyVarSet
+
+tcLiftCoSubst :: TcTyVar -> TcCoercion -> TcType -> TcCoercion
+-- Substitute the_tv -> the_co in the given type, at Nominal role
+-- Like Coercion.liftCoSubst, but for TcCoercion, and 
+-- specialised for Nominal role
+tcLiftCoSubst the_tv the_co ty
+ = ASSERT( tcCoercionRole the_co == Nominal )
+   go ty
+ where
+   go ty@(TyVarTy tv)
+     | tv == the_tv = the_co
+     | otherwise    = TcRefl Nominal ty
+   go ty@(LitTy {}) = TcRefl Nominal ty
+
+   go (AppTy ty1 ty2)   = mkTcAppCo         (go ty1) (go ty2)
+   go (FunTy ty1 ty2)   = mkTcFunCo Nominal (go ty1) (go ty2)
+   go (TyConApp tc tys) = mkTcTyConAppCo Nominal tc (map go tys)
+                          -- We are building a Nominal coercion, so the TyCon's
+                          -- args must all be Nominal coercions too, regardless
+                          -- of the TyCon's arg rules (c.f. Coercion.tyConRolesX)
+   go ty@(ForAllTy _ _) = pprPanic "tcLiftCoSubst" (ppr ty)
+     -- Substituting under a for-all is awkward
 \end{code}
 
 Pretty printing

@@ -687,21 +687,22 @@ getInertUnsolved
     unflatten_funeq :: DynFlags
                     -> Ct -> TcS Cts -> TcS Cts
     unflatten_funeq dflags (CFunEqCan { cc_fun = tc, cc_tyargs = xis
-                                      , cc_fsk = tv, cc_ev = ev }) rest
+                                      , cc_fsk = fsk, cc_ev = ev }) rest
       | isGiven ev -- tv should be a FlatSkol; zonking will eliminate it
       = rest
 
       | otherwise  -- A flatten meta-tv; we now fix its final
                    -- value, and then zonking will eliminate it
-      = do { unsolved <- rest
+      = ASSERT( isWanted ev )  -- CFunEqCans are never Derived
+        do { unsolved <- rest
            ; fn_app <- wrapTcS (TcM.zonkTcType (mkTyConApp tc xis))
-           ; case occurCheckExpand dflags tv fn_app of
+           ; case occurCheckExpand dflags fsk fn_app of
                OC_OK fn_app' 
                  ->    -- Normal case: unflatten
                     do { let evterm = EvCoercion (mkTcNomReflCo fn_app')
                              evvar  = ctev_evar ev
                        ; setEvBind evvar evterm
-                       ; wrapTcS (TcM.writeMetaTyVar tv fn_app')
+                       ; wrapTcS (TcM.writeMetaTyVar fsk fn_app')
                              -- Write directly into the mutable tyvar
                              -- Flatten meta-vars are born locally and 
                              -- die locally
@@ -709,9 +710,13 @@ getInertUnsolved
 
                _ ->    -- Occurs check; don't unflatten, instead turn it into a NonCanonical
                        -- Don't forget to get rid ofthe 
-                    do { tv_ty <- newFlexiTcSTy (tyVarKind tv)
-                       ; wrapTcS (TcM.writeMetaTyVar tv tv_ty)
-                       ; return (unsolved `extendCts` mkNonCanonical ev) } }
+                    do { tv_ty <- newFlexiTcSTy (tyVarKind fsk)
+                       ; let fn_app' = substTyWith [fsk] [tv_ty] fn_app
+                       ; wrapTcS (TcM.writeMetaTyVar fsk fn_app')
+                       ; new_ev <- newWantedEvVarNC (ctev_loc ev) (mkEqPred fn_app' tv_ty)
+                                   -- w' :: F tau[alpha] ~ alpha
+                       ; setEvBind (ctEvId ev) (EvCoercion (tcLiftCoSubst fsk (ctEvCoercion new_ev) fn_app))
+                       ; return (unsolved `extendCts` mkNonCanonical new_ev) } }
 
     unflatten_funeq _ other_ct _ 
       = pprPanic "unflatten_funeq" (ppr other_ct)
