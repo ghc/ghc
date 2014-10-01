@@ -499,10 +499,17 @@ traceOptTcRn flag doc = whenDOptM flag $ do
                         ; dumpTcRn real_doc }
 
 dumpTcRn :: SDoc -> TcRn ()
-dumpTcRn doc = do { dflags <- getDynFlags
-                  ; liftIO (debugTraceMsg dflags 0 doc) }
---                  ; rdr_env <- getGlobalRdrEnv
---                  ; liftIO (printInfoForUser dflags (mkPrintUnqualified dflags rdr_env) doc) }
+dumpTcRn doc
+  = do { dflags <- getDynFlags
+       ; rdr_env <- getGlobalRdrEnv
+       ; liftIO (logInfo dflags (mkDumpStyle (mkPrintUnqualified dflags rdr_env)) doc) }
+
+printForUserTcRn :: SDoc -> TcRn ()
+-- Like dumpTcRn, but for user consumption
+printForUserTcRn doc
+  = do { dflags <- getDynFlags
+       ; rdr_env <- getGlobalRdrEnv
+       ; liftIO (putMsgWith dflags (mkPrintUnqualified dflags rdr_env) doc) }
 
 debugDumpTcRn :: SDoc -> TcRn ()
 debugDumpTcRn doc | opt_NoDebugOutput = return ()
@@ -695,14 +702,6 @@ reportWarning warn
          errs_var <- getErrsVar ;
          (warns, errs) <- readTcRef errs_var ;
          writeTcRef errs_var (warns `snocBag` warn, errs) }
-
-dumpDerivingInfo :: SDoc -> TcM ()
-dumpDerivingInfo doc
-  = do { dflags <- getDynFlags
-       ; when (dopt Opt_D_dump_deriv dflags) $ do
-       { rdr_env <- getGlobalRdrEnv
-       ; let unqual = mkPrintUnqualified dflags rdr_env
-       ; liftIO (putMsgWith dflags unqual doc) } }
 \end{code}
 
 

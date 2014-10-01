@@ -76,9 +76,9 @@ core2core hsc_env guts
 
        ; let builtin_passes = getCoreToDo dflags
        ;
-       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod $
-                        do { all_passes <- addPluginPasses dflags builtin_passes
-                           ; runCorePasses all_passes guts }
+       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod print_unqual $
+                           do { all_passes <- addPluginPasses dflags builtin_passes
+                              ; runCorePasses all_passes guts }
 
 {--
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_core_pipeline
@@ -99,6 +99,7 @@ core2core hsc_env guts
     -- consume the ModGuts to find the module) but somewhat ugly because mg_module may
     -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
     -- would mean our cached value would go out of date.
+    print_unqual = mkPrintUnqualified dflags (mg_rdr_env guts)
 \end{code}
 
 
@@ -384,11 +385,9 @@ runCorePasses passes guts
     do_pass guts CoreDoNothing = return guts
     do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
     do_pass guts pass
-       = do { hsc_env <- getHscEnv
-            ; let dflags = hsc_dflags hsc_env
-            ; liftIO $ showPass dflags pass
+       = do { showPass pass
             ; guts' <- doCorePass pass guts
-            ; liftIO $ endPass hsc_env pass (mg_binds guts') (mg_rules guts')
+            ; endPass pass (mg_binds guts') (mg_rules guts')
             ; return guts' }
 
 doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
@@ -596,6 +595,7 @@ simplifyPgmIO :: CoreToDo
 simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
               hsc_env us hpt_rule_base
               guts@(ModGuts { mg_module = this_mod
+                            , mg_rdr_env = rdr_env
                             , mg_binds = binds, mg_rules = rules
                             , mg_fam_inst_env = fam_inst_env })
   = do { (termination_msg, it_count, counts_out, guts')
@@ -610,10 +610,11 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
         ; return (counts_out, guts')
     }
   where
-    dflags      = hsc_dflags hsc_env
-    dump_phase  = dumpSimplPhase dflags mode
-    simpl_env   = mkSimplEnv mode
-    active_rule = activeRule simpl_env
+    dflags       = hsc_dflags hsc_env
+    print_unqual = mkPrintUnqualified dflags rdr_env
+    dump_phase   = dumpSimplPhase dflags mode
+    simpl_env    = mkSimplEnv mode
+    active_rule  = activeRule simpl_env
 
     do_iteration :: UniqSupply
                  -> Int          -- Counts iterations
@@ -709,7 +710,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
 
                 -- Dump the result of this iteration
-           dump_end_iteration dflags iteration_no counts1 binds2 rules1 ;
+           dump_end_iteration dflags print_unqual iteration_no counts1 binds2 rules1 ;
            lintPassResult hsc_env pass binds2 ;
 
                 -- Loop
@@ -727,10 +728,10 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 simplifyPgmIO _ _ _ _ _ = panic "simplifyPgmIO"
 
 -------------------
-dump_end_iteration :: DynFlags -> Int
-             -> SimplCount -> CoreProgram -> [CoreRule] -> IO ()
-dump_end_iteration dflags iteration_no counts binds rules
-  = dumpPassResult dflags mb_flag hdr pp_counts binds rules
+dump_end_iteration :: DynFlags -> PrintUnqualified -> Int
+                   -> SimplCount -> CoreProgram -> [CoreRule] -> IO ()
+dump_end_iteration dflags print_unqual iteration_no counts binds rules
+  = dumpPassResult dflags print_unqual mb_flag hdr pp_counts binds rules
   where
     mb_flag | dopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_phases
             | otherwise                               = Nothing

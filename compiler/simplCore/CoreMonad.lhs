@@ -28,6 +28,7 @@ module CoreMonad (
     -- ** Reading from the monad
     getHscEnv, getRuleBase, getModule,
     getDynFlags, getOrigNameCache, getPackageFamInstEnv,
+    getPrintUnqualified,
 
     -- ** Writing to the monad
     addSimplCount,
@@ -43,7 +44,7 @@ module CoreMonad (
     getAnnotations, getFirstAnnotations,
 
     -- ** Debug output
-    showPass, endPass, dumpPassResult, lintPassResult,
+    showPass, showPassIO, endPass, endPassIO, dumpPassResult, lintPassResult,
     lintInteractiveExpr, dumpIfSet,
 
     -- ** Screen output
@@ -132,15 +133,28 @@ be, and it makes a conveneint place.  place for them.  They print out
 stuff before and after core passes, and do Core Lint when necessary.
 
 \begin{code}
-showPass :: DynFlags -> CoreToDo -> IO ()
-showPass dflags pass = Err.showPass dflags (showPpr dflags pass)
+showPass :: CoreToDo -> CoreM ()
+showPass pass = do { dflags <- getDynFlags
+                   ; liftIO $ showPassIO dflags pass }
 
-endPass :: HscEnv -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
-endPass hsc_env pass binds rules
-  = do { dumpPassResult dflags mb_flag (ppr pass) (pprPassDetails pass) binds rules
+showPassIO :: DynFlags -> CoreToDo -> IO ()
+showPassIO dflags pass = Err.showPass dflags (showPpr dflags pass)
+
+endPass :: CoreToDo -> CoreProgram -> [CoreRule] -> CoreM ()
+endPass pass binds rules
+  = do { hsc_env <- getHscEnv
+       ; print_unqual <- getPrintUnqualified
+       ; liftIO $ endPassIO hsc_env print_unqual pass binds rules }
+
+endPassIO :: HscEnv -> PrintUnqualified
+          -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
+-- Used by the IO-is CorePrep too
+endPassIO hsc_env print_unqual pass binds rules
+  = do { dumpPassResult dflags print_unqual mb_flag
+                        (ppr pass) (pprPassDetails pass) binds rules
        ; lintPassResult hsc_env pass binds }
   where
-    dflags = hsc_dflags hsc_env
+    dflags  = hsc_dflags hsc_env
     mb_flag = case coreDumpFlag pass of
                 Just flag | dopt flag dflags                    -> Just flag
                           | dopt Opt_D_verbose_core2core dflags -> Just flag
@@ -151,15 +165,16 @@ dumpIfSet dflags dump_me pass extra_info doc
   = Err.dumpIfSet dflags dump_me (showSDoc dflags (ppr pass <+> extra_info)) doc
 
 dumpPassResult :: DynFlags
-               -> Maybe DumpFlag                -- Just df => show details in a file whose
+               -> PrintUnqualified
+               -> Maybe DumpFlag        -- Just df => show details in a file whose
                                         --            name is specified by df
                -> SDoc                  -- Header
                -> SDoc                  -- Extra info to appear after header
                -> CoreProgram -> [CoreRule]
                -> IO ()
-dumpPassResult dflags mb_flag hdr extra_info binds rules
+dumpPassResult dflags unqual mb_flag hdr extra_info binds rules
   | Just flag <- mb_flag
-  = Err.dumpSDoc dflags flag (showSDoc dflags hdr) dump_doc
+  = Err.dumpSDoc dflags unqual flag (showSDoc dflags hdr) dump_doc
 
   | otherwise
   = Err.debugTraceMsg dflags 2 size_doc
@@ -781,6 +796,7 @@ data CoreReader = CoreReader {
         cr_hsc_env :: HscEnv,
         cr_rule_base :: RuleBase,
         cr_module :: Module,
+        cr_print_unqual :: PrintUnqualified,
 #ifdef GHCI
         cr_globals :: (MVar PersistentLinkerState, Bool)
 #else
@@ -854,9 +870,10 @@ runCoreM :: HscEnv
          -> RuleBase
          -> UniqSupply
          -> Module
+         -> PrintUnqualified
          -> CoreM a
          -> IO (a, SimplCount)
-runCoreM hsc_env rule_base us mod m = do
+runCoreM hsc_env rule_base us mod print_unqual m = do
         glbls <- saveLinkerGlobals
         liftM extract $ runIOEnv (reader glbls) $ unCoreM m state
   where
@@ -864,7 +881,8 @@ runCoreM hsc_env rule_base us mod m = do
             cr_hsc_env = hsc_env,
             cr_rule_base = rule_base,
             cr_module = mod,
-            cr_globals = glbls
+            cr_globals = glbls,
+            cr_print_unqual = print_unqual
         }
     state = CoreState {
             cs_uniq_supply = us
@@ -933,6 +951,9 @@ getHscEnv = read cr_hsc_env
 
 getRuleBase :: CoreM RuleBase
 getRuleBase = read cr_rule_base
+
+getPrintUnqualified :: CoreM PrintUnqualified
+getPrintUnqualified = read cr_print_unqual
 
 addSimplCount :: SimplCount -> CoreM ()
 addSimplCount count = write (CoreWriter { cw_simpl_count = count })

@@ -64,7 +64,7 @@ module Outputable (
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
         ifPprDebug, qualName, qualModule, qualPackage,
-        mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
+        mkErrStyle, defaultErrStyle, defaultDumpStyle, mkDumpStyle, defaultUserStyle,
         mkUserStyle, cmdlineParserStyle, Depth(..),
 
         -- * Error handling and debugging utilities
@@ -125,14 +125,15 @@ data PprStyle
                 -- Assumes printing tidied code: non-system names are
                 -- printed without uniques.
 
-  | PprCode CodeStyle
-                -- Print code; either C or assembler
-
-  | PprDump     -- For -ddump-foo; less verbose than PprDebug.
+  | PprDump PrintUnqualified
+                -- For -ddump-foo; less verbose than PprDebug, but more than PprUser
                 -- Does not assume tidied code: non-external names
                 -- are printed with uniques.
 
   | PprDebug    -- Full debugging output
+
+  | PprCode CodeStyle
+                -- Print code; either C or assembler
 
 data CodeStyle = CStyle         -- The format of labels differs for C and assembler
                | AsmStyle
@@ -221,7 +222,11 @@ defaultUserStyle = mkUserStyle neverQualify AllTheWay
  -- Print without qualifiers to reduce verbosity, unless -dppr-debug
 
 defaultDumpStyle |  opt_PprStyle_Debug = PprDebug
-                 |  otherwise          = PprDump
+                 |  otherwise          = PprDump neverQualify
+
+mkDumpStyle :: PrintUnqualified -> PprStyle
+mkDumpStyle print_unqual | opt_PprStyle_Debug = PprDebug
+                         | otherwise          = PprDump print_unqual
 
 defaultErrStyle :: DynFlags -> PprStyle
 -- Default style for error messages, when we don't know PrintUnqualified
@@ -324,15 +329,18 @@ sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 \begin{code}
 qualName :: PprStyle -> QueryQualifyName
 qualName (PprUser q _)  mod occ = queryQualifyName q mod occ
+qualName (PprDump q)    mod occ = queryQualifyName q mod occ
 qualName _other         mod _   = NameQual (moduleName mod)
 
 qualModule :: PprStyle -> QueryQualifyModule
 qualModule (PprUser q _)  m = queryQualifyModule q m
-qualModule _other                   _m = True
+qualModule (PprDump q)    m = queryQualifyModule q m
+qualModule _other        _m = True
 
 qualPackage :: PprStyle -> QueryQualifyPackage
 qualPackage (PprUser q _)  m = queryQualifyPackage q m
-qualPackage _other                   _m = True
+qualPackage (PprDump q)    m = queryQualifyPackage q m
+qualPackage _other        _m = True
 
 queryQual :: PprStyle -> PrintUnqualified
 queryQual s = QueryQualify (qualName s)
@@ -348,8 +356,8 @@ asmStyle (PprCode AsmStyle)  = True
 asmStyle _other              = False
 
 dumpStyle :: PprStyle -> Bool
-dumpStyle PprDump = True
-dumpStyle _other  = False
+dumpStyle (PprDump {}) = True
+dumpStyle _other       = False
 
 debugStyle :: PprStyle -> Bool
 debugStyle PprDebug = True
@@ -433,7 +441,7 @@ showSDocDebug dflags d = renderWithStyle dflags d PprDebug
 showSDocDumpOneLine :: DynFlags -> SDoc -> String
 showSDocDumpOneLine dflags d
  = Pretty.showDoc OneLineMode irrelevantNCols $
-   runSDoc d (initSDocContext dflags PprDump)
+   runSDoc d (initSDocContext dflags defaultDumpStyle)
 
 showPpr :: Outputable a => DynFlags -> a -> String
 showPpr dflags thing = showSDoc dflags (ppr thing)

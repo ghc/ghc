@@ -1768,7 +1768,7 @@ tcDump env
 
         -- Dump short output if -ddump-types or -ddump-tc
         when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
-             (dumpTcRn short_dump) ;
+             (printForUserTcRn short_dump) ;
 
         -- Dump bindings if -ddump-tc
         dumpOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump)
