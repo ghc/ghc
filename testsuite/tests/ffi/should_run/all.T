@@ -50,10 +50,10 @@ test('ffi008', [exit_code(1), omit_ways(['ghci'])], compile_and_run, [''])
 maybe_skip = normal
 opts = ''
 if config.platform.startswith('i386-'):
-   if config.compiler_type == 'ghc' and \
+    if config.compiler_type == 'ghc' and \
       version_ge(config.compiler_version, '6.13'):
-	opts = '-msse2'
-   else:
+        opts = '-msse2'
+    else:
         maybe_skip = only_ways(['ghci'])
 
 test('ffi009', [when(fast(), skip),
@@ -69,9 +69,9 @@ test('ffi011', normal, compile_and_run, [''])
 # it.
 
 if config.os == 'mingw32':
-	skip_if_not_windows = normal
+    skip_if_not_windows = normal
 else:
-	skip_if_not_windows = skip
+    skip_if_not_windows = skip
 
 test('ffi012', skip_if_not_windows, compile_and_run, [''])
 test('ffi013', normal, compile_and_run, [''])
