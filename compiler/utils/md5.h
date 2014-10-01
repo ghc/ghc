@@ -8,9 +8,9 @@ typedef HsWord32 word32;
 typedef HsWord8  byte;
 
 struct MD5Context {
-	word32 buf[4];
-	word32 bytes[2];
-	word32 in[16];
+        word32 buf[4];
+        word32 bytes[2];
+        word32 in[16];
 };
 
 void MD5Init(struct MD5Context *context);
