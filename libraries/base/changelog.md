@@ -73,6 +73,10 @@
     the functions from `Data.List` (in other words, `Data.OldList` corresponds
     to `base-4.7.0.1`'s `Data.List`)
 
+  * `foldr2` (together with `zip` and `zipWith`) is made a bit stricter in the
+    second argument, so that the fusion RULES for it do not change the
+    semantics. (#9596)
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3
