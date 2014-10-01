@@ -2316,8 +2316,8 @@ missingAlt env case_bndr _ cont
 prepareCaseCont :: SimplEnv
                 -> [InAlt] -> SimplCont
                 -> SimplM (SimplEnv,
-                           SimplCont,   -- Non-dupable part
-                           SimplCont)   -- Dupable part
+                           SimplCont,   -- Dupable part
+                           SimplCont)   -- Non-dupable part
 -- We are considering
 --     K[case _ of { p1 -> r1; ...; pn -> rn }]
 -- where K is some enclosing continuation for the case
