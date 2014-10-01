@@ -93,12 +93,14 @@ guard False     =  empty
 
 -- | This generalizes the list-based 'filter' function.
 
+{-# INLINE filterM #-}
 filterM          :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
-filterM _ []     =  return []
-filterM p (x:xs) =  do
-   flg <- p x
-   ys  <- filterM p xs
-   return (if flg then x:ys else ys)
+filterM p        = foldr go (return [])
+  where
+    go x r = do
+      flg <- p x
+      ys <- r
+      return (if flg then x:ys else ys)
 
 infixr 1 <=<, >=>
 
