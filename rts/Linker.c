@@ -1508,9 +1508,11 @@ static RtsSymbolVal rtsSyms[] = {
 
 /* -----------------------------------------------------------------------------
  * Insert symbols into hash tables, checking for duplicates.
+ *
+ * Returns: 0 on failure, nonzero on success
  */
 
-static void ghciInsertSymbolTable(
+static int ghciInsertSymbolTable(
    pathchar* obj_name,
    HashTable *table,
    char* key,
@@ -1526,20 +1528,22 @@ static void ghciInsertSymbolTable(
       pinfo->owner = owner;
       pinfo->weak = weak;
       insertStrHashTable(table, key, pinfo);
-      return;
-   } else if ((!pinfo->weak || pinfo->value) && weak) {
-     return; /* duplicate weak symbol, throw it away */
-   } else if (pinfo->weak) /* weak symbol is in the table */
+      return 1;
+   }
+   else if ((!pinfo->weak || pinfo->value) && weak)
+   {
+     return 1; /* duplicate weak symbol, throw it away */
+   }
+   else if (pinfo->weak) /* weak symbol is in the table */
    {
       /* override the weak definition with the non-weak one */
       pinfo->value = data;
       pinfo->owner = owner;
       pinfo->weak = HS_BOOL_FALSE;
-      return;
+      return 1;
    }
    debugBelch(
-      "\n\n"
-      "GHCi runtime linker: fatal error: I found a duplicate definition for symbol\n"
+      "GHC runtime linker: fatal error: I found a duplicate definition for symbol\n"
       "   %s\n"
       "whilst processing object file\n"
       "   %" PATH_FMT "\n"
@@ -1547,13 +1551,11 @@ static void ghciInsertSymbolTable(
       "   * Loading two different object files which export the same symbol\n"
       "   * Specifying the same object file twice on the GHCi command line\n"
       "   * An incorrect `package.conf' entry, causing some object to be\n"
-      "     loaded twice.\n"
-      "GHCi cannot safely continue in this situation.  Exiting now.  Sorry.\n"
-      "\n",
+      "     loaded twice.\n",
       (char*)key,
       obj_name
    );
-   stg_exit(1);
+   return 0;
 }
 
 static HsBool ghciLookupSymbolTable(HashTable *table,
@@ -1637,8 +1639,10 @@ initLinker_ (int retain_cafs)
 
     /* populate the symbol table with stuff from the RTS */
     for (sym = rtsSyms; sym->lbl != NULL; sym++) {
-        ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
-                               symhash, sym->lbl, sym->addr, HS_BOOL_FALSE, NULL);
+        if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
+                                    symhash, sym->lbl, sym->addr, HS_BOOL_FALSE, NULL)) {
+            barf("ghciInsertSymbolTable failed");
+        }
         IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
     }
 #   if defined(OBJFORMAT_MACHO) && defined(powerpc_HOST_ARCH)
@@ -1649,14 +1653,18 @@ initLinker_ (int retain_cafs)
        we cannot use NULL because we use it to mean nonexistent symbols. So we
        use an arbitrary (hopefully unique) address here.
     */
-    ghciInsertSymbolTable(WSTR("(GHCi special symbols)"),
-        symhash, "__dso_handle", (void *)0x12345687, HS_BOOL_FALSE, NULL);
+    if (! ghciInsertSymbolTable(WSTR("(GHCi special symbols)"),
+                                symhash, "__dso_handle", (void *)0x12345687, HS_BOOL_FALSE, NULL)) {
+        barf("ghciInsertSymbolTable failed");
+    }
 
     // Redurect newCAF to newDynCAF if retain_cafs is true.
-    ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"), symhash,
-                          MAYBE_LEADING_UNDERSCORE_STR("newCAF"),
-                          retain_cafs ? newDynCAF : newCAF,
-                          HS_BOOL_FALSE, NULL);
+    if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"), symhash,
+                                MAYBE_LEADING_UNDERSCORE_STR("newCAF"),
+                                retain_cafs ? newDynCAF : newCAF,
+                                HS_BOOL_FALSE, NULL)) {
+        barf("ghciInsertSymbolTable failed");
+    }
 
 #   if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 #   if defined(RTLD_DEFAULT)
@@ -1712,6 +1720,9 @@ exitLinker( void ) {
 #endif
    }
 #endif
+   if (linker_init_done == 1) {
+       freeHashTable(symhash, free);
+   }
 }
 
 /* -----------------------------------------------------------------------------
@@ -1994,11 +2005,12 @@ error:
 
 /* -----------------------------------------------------------------------------
  * insert a symbol in the hash table
+ *
+ * Returns: 0 on failure, nozero on success
  */
-void
-insertSymbol(pathchar* obj_name, char* key, void* data)
+HsInt insertSymbol(pathchar* obj_name, char* key, void* data)
 {
-  ghciInsertSymbolTable(obj_name, symhash, key, data, HS_BOOL_FALSE, NULL);
+    return ghciInsertSymbolTable(obj_name, symhash, key, data, HS_BOOL_FALSE, NULL);
 }
 
 /* -----------------------------------------------------------------------------
@@ -2131,12 +2143,15 @@ void ghci_enquire ( char* addr )
 #ifdef USE_MMAP
 #define ROUND_UP(x,size) ((x + size - 1) & ~(size - 1))
 
-static void *
-mmapForLinker (size_t bytes, nat flags, int fd)
+//
+// Returns NULL on failure.
+//
+static void * mmapForLinker (size_t bytes, nat flags, int fd)
 {
    void *map_addr = NULL;
    void *result;
-   int pagesize, size;
+   int pagesize;
+   StgWord size;
    static nat fixed = 0;
 
    IF_DEBUG(linker, debugBelch("mmapForLinker: start\n"));
@@ -2151,15 +2166,21 @@ mmap_again:
    }
 #endif
 
-   IF_DEBUG(linker, debugBelch("mmapForLinker: \tprotection %#0x\n", PROT_EXEC | PROT_READ | PROT_WRITE));
-   IF_DEBUG(linker, debugBelch("mmapForLinker: \tflags      %#0x\n", MAP_PRIVATE | TRY_MAP_32BIT | fixed | flags));
-   result = mmap(map_addr, size, PROT_EXEC|PROT_READ|PROT_WRITE,
-                    MAP_PRIVATE|TRY_MAP_32BIT|fixed|flags, fd, 0);
+   IF_DEBUG(linker,
+            debugBelch("mmapForLinker: \tprotection %#0x\n",
+                       PROT_EXEC | PROT_READ | PROT_WRITE));
+   IF_DEBUG(linker,
+            debugBelch("mmapForLinker: \tflags      %#0x\n",
+                       MAP_PRIVATE | TRY_MAP_32BIT | fixed | flags));
+
+   result = mmap(map_addr, size,
+                 PROT_EXEC|PROT_READ|PROT_WRITE,
+                 MAP_PRIVATE|TRY_MAP_32BIT|fixed|flags, fd, 0);
 
    if (result == MAP_FAILED) {
        sysErrorBelch("mmap %" FMT_Word " bytes at %p",(W_)size,map_addr);
        errorBelch("Try specifying an address with +RTS -xm<addr> -RTS");
-       stg_exit(EXIT_FAILURE);
+       return NULL;
    }
 
 #if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
@@ -2169,15 +2190,21 @@ mmap_again:
        } else {
            if ((W_)result > 0x80000000) {
                // oops, we were given memory over 2Gb
-#if defined(freebsd_HOST_OS)  || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS)
+               munmap(result,size);
+#if defined(freebsd_HOST_OS)  || \
+    defined(kfreebsdgnu_HOST_OS) || \
+    defined(dragonfly_HOST_OS)
                // Some platforms require MAP_FIXED.  This is normally
                // a bad idea, because MAP_FIXED will overwrite
                // existing mappings.
-               munmap(result,size);
                fixed = MAP_FIXED;
                goto mmap_again;
 #else
-               barf("loadObj: failed to mmap() memory below 2Gb; asked for %lu bytes at %p.  Try specifying an address with +RTS -xm<addr> -RTS", size, map_addr, result);
+               errorBelch("loadObj: failed to mmap() memory below 2Gb; "
+                          "asked for %lu bytes at %p. "
+                          "Try specifying an address with +RTS -xm<addr> -RTS",
+                          size, map_addr);
+               return NULL;
 #endif
            } else {
                // hmm, we were given memory somewhere else, but it's
@@ -2190,7 +2217,9 @@ mmap_again:
        if ((W_)result > 0x80000000) {
            // oops, we were given memory over 2Gb
            // ... try allocating memory somewhere else?;
-           debugTrace(DEBUG_linker,"MAP_32BIT didn't work; gave us %lu bytes at 0x%p", bytes, result);
+           debugTrace(DEBUG_linker,
+                      "MAP_32BIT didn't work; gave us %lu bytes at 0x%p",
+                      bytes, result);
            munmap(result, size);
 
            // Set a base address and try again... (guess: 1Gb)
@@ -2200,15 +2229,53 @@ mmap_again:
    }
 #endif
 
-   IF_DEBUG(linker, debugBelch("mmapForLinker: mapped %" FMT_Word " bytes starting at %p\n", (W_)size, result));
-   IF_DEBUG(linker, debugBelch("mmapForLinker: done\n"));
+   IF_DEBUG(linker,
+            debugBelch("mmapForLinker: mapped %" FMT_Word
+                       " bytes starting at %p\n", (W_)size, result));
+   IF_DEBUG(linker,
+            debugBelch("mmapForLinker: done\n"));
+
    return result;
 }
 #endif // USE_MMAP
 
+static void removeOcSymbols (ObjectCode *oc)
+{
+    if (oc->symbols == NULL) return;
 
+    /* Remove all the mappings for the symbols within this object..
+     */
+    int i;
+    for (i = 0; i < oc->n_symbols; i++) {
+        if (oc->symbols[i] != NULL) {
+            ghciRemoveSymbolTable(symhash, oc->symbols[i], oc);
+        }
+    }
+}
+
+/*
+ * freeObjectCode() releases all the pieces of an ObjectCode.  It is called by
+ * the GC when a previously unloaded ObjectCode has been determined to be
+ * unused, and when an error occurs during loadObj().
+ */
 void freeObjectCode (ObjectCode *oc)
 {
+    if (oc->symbols != NULL) {
+        stgFree(oc->symbols);
+        oc->symbols = NULL;
+    }
+
+    {
+        Section *s, *nexts;
+
+        for (s = oc->sections; s != NULL; s = nexts) {
+            nexts = s->next;
+            stgFree(s);
+        }
+    }
+
+    freeProddableBlocks(oc);
+
 #ifdef USE_MMAP
     int pagesize, size, r;
 
@@ -2222,7 +2289,7 @@ void freeObjectCode (ObjectCode *oc)
 
 #if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH)
 #if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
-    if (!USE_CONTIGUOUS_MMAP)
+    if (!USE_CONTIGUOUS_MMAP && oc->symbol_extras != NULL)
     {
         munmap(oc->symbol_extras,
                ROUND_UP(sizeof(SymbolExtra) * oc->n_symbol_extras, pagesize));
@@ -2273,7 +2340,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    ObjectCode* oc;
 
    IF_DEBUG(linker, debugBelch("mkOc: start\n"));
-   oc = stgMallocBytes(sizeof(ObjectCode), "loadArchive(oc)");
+   oc = stgMallocBytes(sizeof(ObjectCode), "mkOc(oc)");
 
 #  if defined(OBJFORMAT_ELF)
    oc->formatName = "ELF";
@@ -2302,6 +2369,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->sections          = NULL;
    oc->proddables        = NULL;
    oc->stable_ptrs       = NULL;
+   oc->symbol_extras     = NULL;
 
 #ifndef USE_MMAP
 #ifdef darwin_HOST_OS
@@ -2310,8 +2378,7 @@ mkOc( pathchar *path, char *image, int imageSize,
 #endif
 
    /* chain it onto the list of objects */
-   oc->next              = objects;
-   objects               = oc;
+   oc->next              = NULL;
 
    IF_DEBUG(linker, debugBelch("mkOc: done\n"));
    return oc;
@@ -2371,6 +2438,10 @@ loadArchive( pathchar *path )
     int misalignment;
 #endif
 #endif
+
+    /* TODO: don't call barf() on error, instead return an error code, freeing
+     * all resources correctly.  This function is pretty complex, so it needs
+     * to be refactored to make this practical. */
 
     initLinker();
 
@@ -2733,6 +2804,9 @@ loadArchive( pathchar *path )
                 stgFree(fileName);
                 fclose(f);
                 return 0;
+            } else {
+                oc->next = objects;
+                objects = oc;
             }
         }
         else if (isGnuIndex) {
@@ -2849,19 +2923,23 @@ loadObj( pathchar *path )
    /* coverity[toctou] */
    fd = open(path, O_RDONLY);
 #endif
-   if (fd == -1)
-      barf("loadObj: can't open `%s'", path);
+   if (fd == -1) {
+      errorBelch("loadObj: can't open `%s'", path);
+      return 0;
+   }
 
    image = mmapForLinker(fileSize, 0, fd);
-
    close(fd);
+   if (image == NULL) return 0;
 
 #else /* !USE_MMAP */
    /* load the image into memory */
    /* coverity[toctou] */
    f = pathopen(path, WSTR("rb"));
-   if (!f)
-       barf("loadObj: can't read `%" PATH_FMT "'", path);
+   if (!f) {
+       errorBelch("loadObj: can't read `%" PATH_FMT "'", path);
+       return 0;
+   }
 
 #   if defined(mingw32_HOST_OS)
         // TODO: We would like to use allocateExec here, but allocateExec
@@ -2871,6 +2949,10 @@ loadObj( pathchar *path )
        f, path, "itself",
 #endif
        fileSize);
+    if (image == NULL) {
+        fclose(f);
+        return 0;
+    }
 #   elif defined(darwin_HOST_OS)
     // In a Mach-O .o file, all sections can and will be misaligned
     // if the total size of the headers is not a multiple of the
@@ -2891,10 +2973,13 @@ loadObj( pathchar *path )
    {
        int n;
        n = fread ( image, 1, fileSize, f );
-       if (n != fileSize)
-           barf("loadObj: error whilst reading `%s'", path);
+       fclose(f);
+       if (n != fileSize) {
+           errorBelch("loadObj: error whilst reading `%" PATH_FMT "'", path);
+           stgFree(image);
+           return 0;
+       }
    }
-   fclose(f);
 #endif /* USE_MMAP */
 
    oc = mkOc(path, image, fileSize, NULL
@@ -2905,7 +2990,16 @@ loadObj( pathchar *path )
 #endif
             );
 
-   return loadOc(oc);
+   if (! loadOc(oc)) {
+       // failed; free everything we've allocated
+       removeOcSymbols(oc);
+       freeObjectCode(oc);
+       return 0;
+   }
+
+   oc->next = objects;
+   objects = oc;
+   return 1;
 }
 
 static HsInt
@@ -2913,6 +3007,21 @@ loadOc( ObjectCode* oc ) {
    int r;
 
    IF_DEBUG(linker, debugBelch("loadOc: start\n"));
+
+   /* verify the in-memory image */
+#  if defined(OBJFORMAT_ELF)
+   r = ocVerifyImage_ELF ( oc );
+#  elif defined(OBJFORMAT_PEi386)
+   r = ocVerifyImage_PEi386 ( oc );
+#  elif defined(OBJFORMAT_MACHO)
+   r = ocVerifyImage_MachO ( oc );
+#  else
+   barf("loadObj: no verify method");
+#  endif
+   if (!r) {
+       IF_DEBUG(linker, debugBelch("loadOc: ocVerifyImage_* failed\n"));
+       return r;
+   }
 
 #  if defined(OBJFORMAT_MACHO) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
    r = ocAllocateSymbolExtras_MachO ( oc );
@@ -2929,21 +3038,6 @@ loadOc( ObjectCode* oc ) {
 #  elif defined(OBJFORMAT_PEi386) && defined(x86_64_HOST_ARCH)
    ocAllocateSymbolExtras_PEi386 ( oc );
 #endif
-
-   /* verify the in-memory image */
-#  if defined(OBJFORMAT_ELF)
-   r = ocVerifyImage_ELF ( oc );
-#  elif defined(OBJFORMAT_PEi386)
-   r = ocVerifyImage_PEi386 ( oc );
-#  elif defined(OBJFORMAT_MACHO)
-   r = ocVerifyImage_MachO ( oc );
-#  else
-   barf("loadObj: no verify method");
-#  endif
-   if (!r) {
-       IF_DEBUG(linker, debugBelch("loadOc: ocVerifyImage_* failed\n"));
-       return r;
-   }
 
    /* build the symbol list for this image */
 #  if defined(OBJFORMAT_ELF)
@@ -3039,17 +3133,7 @@ unloadObj( pathchar *path )
 
         if (!pathcmp(oc->fileName,path)) {
 
-            /* Remove all the mappings for the symbols within this
-             * object..
-             */
-            {
-                int i;
-                for (i = 0; i < oc->n_symbols; i++) {
-                   if (oc->symbols[i] != NULL) {
-                       ghciRemoveSymbolTable(symhash, oc->symbols[i], oc);
-                   }
-                }
-            }
+            removeOcSymbols(oc);
 
             if (prev == NULL) {
                 objects = oc->next;
@@ -3058,23 +3142,6 @@ unloadObj( pathchar *path )
             }
             oc->next = unloaded_objects;
             unloaded_objects = oc;
-
-            // The data itself and a few other bits (oc->fileName,
-            // oc->archiveMemberName) are kept until freeObjectCode(),
-            // which is only called when it has been determined that
-            // it is safe to unload the object.
-            stgFree(oc->symbols);
-
-            {
-                Section *s, *nexts;
-
-                for (s = oc->sections; s != NULL; s = nexts) {
-                    nexts = s->next;
-                    stgFree(s);
-                }
-            }
-
-            freeProddableBlocks(oc);
 
             // Release any StablePtrs that were created when this
             // object module was initialized.
@@ -3242,13 +3309,16 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
                 oc->fileSize = n + (sizeof(SymbolExtra) * count);
                 oc->symbol_extras = (SymbolExtra *) (oc->image + n);
             }
-            else
+            else {
                 oc->symbol_extras = NULL;
+                return 0;
+            }
         }
         else
         {
             oc->symbol_extras = mmapForLinker(sizeof(SymbolExtra) * count,
                                           MAP_ANONYMOUS, -1);
+            if (oc->symbol_extras == NULL) return 0;
         }
     }
     else
@@ -3584,6 +3654,8 @@ typedef
 #define MYIMAGE_REL_I386_DIR32           0x0006
 #define MYIMAGE_REL_I386_REL32           0x0014
 
+static int verifyCOFFHeader ( COFF_header *hdr, pathchar *filename);
+
 /* We assume file pointer is right at the
    beginning of COFF object.
  */
@@ -3602,10 +3674,16 @@ allocateImageAndTrampolines (
    size_t n;
 
    n = fread ( &hdr, 1, sizeof_COFF_header, f );
-   if (n != sizeof( COFF_header ))
-       barf("getNumberOfSymbols: error whilst reading `%s' header in `%S'",
-             member_name, arch_name);
+   if (n != sizeof( COFF_header )) {
+       errorBelch("getNumberOfSymbols: error whilst reading `%s' header in `%S'",
+                  member_name, arch_name);
+       return NULL;
+   }
    fseek( f, -sizeof_COFF_header, SEEK_CUR );
+
+   if (!verifyCOFFHeader(&hdr, arch_name)) {
+       return 0;
+   }
 
    /* We get back 8-byte aligned memory (is that guaranteed?), but
       the offsets to the sections within the file are all 4 mod 8
@@ -3622,6 +3700,13 @@ allocateImageAndTrampolines (
    image = VirtualAlloc(NULL, size,
                         MEM_RESERVE | MEM_COMMIT,
                         PAGE_EXECUTE_READWRITE);
+
+   if (image == NULL) {
+       errorBelch("%" PATH_FMT ": failed to allocate memory for image",
+                  arch_name);
+       return NULL;
+   }
+
    return image + PEi386_IMAGE_OFFSET;
 }
 
@@ -3853,6 +3938,44 @@ lookupSymbolInDLLs ( UChar *lbl )
     return NULL;
 }
 
+static int
+verifyCOFFHeader (COFF_header *hdr, pathchar *fileName)
+{
+#if defined(i386_HOST_ARCH)
+   if (hdr->Machine != 0x14c) {
+      errorBelch("%" PATH_FMT ": Not x86 PEi386", fileName);
+      return 0;
+   }
+#elif defined(x86_64_HOST_ARCH)
+   if (hdr->Machine != 0x8664) {
+      errorBelch("%" PATH_FMT ": Not x86_64 PEi386", fileName);
+      return 0;
+   }
+#else
+   errorBelch("PEi386 not supported on this arch");
+#endif
+
+   if (hdr->SizeOfOptionalHeader != 0) {
+      errorBelch("%" PATH_FMT ": PEi386 with nonempty optional header",
+                 fileName);
+      return 0;
+   }
+   if ( /* (hdr->Characteristics & MYIMAGE_FILE_RELOCS_STRIPPED) || */
+        (hdr->Characteristics & MYIMAGE_FILE_EXECUTABLE_IMAGE) ||
+        (hdr->Characteristics & MYIMAGE_FILE_DLL) ||
+        (hdr->Characteristics & MYIMAGE_FILE_SYSTEM) ) {
+      errorBelch("%" PATH_FMT ": Not a PEi386 object file", fileName);
+      return 0;
+   }
+   if ( (hdr->Characteristics & MYIMAGE_FILE_BYTES_REVERSED_HI)
+        /* || !(hdr->Characteristics & MYIMAGE_FILE_32BIT_MACHINE) */ ) {
+      errorBelch("%" PATH_FMT ": Invalid PEi386 word size or endiannness: %d",
+                 fileName,
+                 (int)(hdr->Characteristics));
+      return 0;
+   }
+   return 1;
+}
 
 static int
 ocVerifyImage_PEi386 ( ObjectCode* oc )
@@ -3876,38 +3999,10 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    strtab = ((UChar*)symtab)
             + hdr->NumberOfSymbols * sizeof_COFF_symbol;
 
-#if defined(i386_HOST_ARCH)
-   if (hdr->Machine != 0x14c) {
-      errorBelch("%" PATH_FMT ": Not x86 PEi386", oc->fileName);
-      return 0;
+   if (!verifyCOFFHeader(hdr, oc->fileName)) {
+       return 0;
    }
-#elif defined(x86_64_HOST_ARCH)
-   if (hdr->Machine != 0x8664) {
-      errorBelch("%" PATH_FMT ": Not x86_64 PEi386", oc->fileName);
-      return 0;
-   }
-#else
-   errorBelch("PEi386 not supported on this arch");
-#endif
 
-   if (hdr->SizeOfOptionalHeader != 0) {
-      errorBelch("%" PATH_FMT ": PEi386 with nonempty optional header", oc->fileName);
-      return 0;
-   }
-   if ( /* (hdr->Characteristics & MYIMAGE_FILE_RELOCS_STRIPPED) || */
-        (hdr->Characteristics & MYIMAGE_FILE_EXECUTABLE_IMAGE) ||
-        (hdr->Characteristics & MYIMAGE_FILE_DLL) ||
-        (hdr->Characteristics & MYIMAGE_FILE_SYSTEM) ) {
-      errorBelch("%" PATH_FMT ": Not a PEi386 object file", oc->fileName);
-      return 0;
-   }
-   if ( (hdr->Characteristics & MYIMAGE_FILE_BYTES_REVERSED_HI)
-        /* || !(hdr->Characteristics & MYIMAGE_FILE_32BIT_MACHINE) */ ) {
-      errorBelch("%" PATH_FMT ": Invalid PEi386 word size or endiannness: %d",
-                 oc->fileName,
-                 (int)(hdr->Characteristics));
-      return 0;
-   }
    /* If the string table size is way crazy, this might indicate that
       there are more than 64k relocations, despite claims to the
       contrary.  Hence this test. */
@@ -4199,7 +4294,9 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       if (kind != SECTIONKIND_OTHER && end >= start) {
           if ((((size_t)(start)) % 4) != 0) {
-              barf("Misaligned section %s: %p", (char*)secname, start);
+              errorBelch("Misaligned section %s: %p", (char*)secname, start);
+              stgFree(secname);
+              return 0;
           }
 
          addSection(oc, kind, start, end);
@@ -4263,8 +4360,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          ASSERT(i >= 0 && i < oc->n_symbols);
          /* cstring_from_COFF_symbol_name always succeeds. */
          oc->symbols[i] = (char*)sname;
-         ghciInsertSymbolTable(oc->fileName, symhash, (char*)sname, addr,
-            HS_BOOL_FALSE, oc);
+         if (! ghciInsertSymbolTable(oc->fileName, symhash, (char*)sname, addr,
+                                     HS_BOOL_FALSE, oc)) {
+             return 0;
+         }
       } else {
 #        if 0
          debugBelch(
@@ -5150,8 +5249,11 @@ ocGetNames_ELF ( ObjectCode* oc )
       nent = shdr[i].sh_size / sizeof(Elf_Sym);
 
       oc->n_symbols = nent;
-      oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*),
+      oc->symbols = stgCallocBytes(oc->n_symbols, sizeof(char*),
                                    "ocGetNames_ELF(oc->symbols)");
+      // Note calloc: if we fail partway through initializing symbols, we need
+      // to undo the additions to the symbol table so far. We know which ones
+      // have been added by whether the entry is NULL or not.
 
       //TODO: we ignore local symbols anyway right? So we can use the
       //      shdr[i].sh_info to get the index of the first non-local symbol
@@ -5224,12 +5326,15 @@ ocGetNames_ELF ( ObjectCode* oc )
 
          if (ad != NULL) {
             ASSERT(nm != NULL);
-            oc->symbols[j] = nm;
             /* Acquire! */
             if (isLocal) {
                /* Ignore entirely. */
             } else {
-               ghciInsertSymbolTable(oc->fileName, symhash, nm, ad, isWeak, oc);
+                if (! ghciInsertSymbolTable(oc->fileName, symhash,
+                                            nm, ad, isWeak, oc)) {
+                    return 0;
+                }
+                oc->symbols[j] = nm;
             }
          } else {
             /* Skip. */
@@ -5323,6 +5428,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          } else {
             symbol = strtab + sym.st_name;
             S_tmp = lookupSymbol( symbol );
+            if (S_tmp == NULL) return 0;
             S = (Elf_Addr)S_tmp;
          }
          if (!S) {
@@ -5764,8 +5870,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                                                 -> jumpIsland;
               off = pltAddress + A - P;
 #else
-              barf("R_X86_64_PC32 relocation out of range: %s = %p\nRecompile %s with -fPIC.",
-                   symbol, off, oc->fileName );
+              errorBelch("R_X86_64_PC32 relocation out of range: %s = %p\nRecompile %s with -fPIC.",
+                         symbol, off, oc->fileName );
+              return 0;
 #endif
           }
           *(Elf64_Word *)P = (Elf64_Word)off;
@@ -5790,8 +5897,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                                                 -> jumpIsland;
               value = pltAddress + A;
 #else
-              barf("R_X86_64_32 relocation out of range: %s = %p\nRecompile %s with -fPIC.",
-                   symbol, value, oc->fileName );
+              errorBelch("R_X86_64_32 relocation out of range: %s = %p\nRecompile %s with -fPIC.",
+                         symbol, value, oc->fileName );
+              return 0;
 #endif
           }
           *(Elf64_Word *)P = (Elf64_Word)value;
@@ -5808,8 +5916,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                                                 -> jumpIsland;
               value = pltAddress + A;
 #else
-              barf("R_X86_64_32S relocation out of range: %s = %p\nRecompile %s with -fPIC.",
-                   symbol, value, oc->fileName );
+              errorBelch("R_X86_64_32S relocation out of range: %s = %p\nRecompile %s with -fPIC.",
+                         symbol, value, oc->fileName );
+              return 0;
 #endif
           }
           *(Elf64_Sword *)P = (Elf64_Sword)value;
@@ -6849,6 +6958,7 @@ ocGetNames_MachO(ObjectCode* oc)
         {
 #ifdef USE_MMAP
             char * zeroFillArea = mmapForLinker(sections[i].size, MAP_ANONYMOUS, -1);
+            if (zeroFillArea == NULL) return 0;
             memset(zeroFillArea, 0, sections[i].size);
 #else
             char * zeroFillArea = stgCallocBytes(1,sections[i].size,
