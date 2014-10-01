@@ -788,6 +788,9 @@ augment g xs = g (:) xs
 "foldr/single"  forall k z x. foldr k z [x] = k x z
 "foldr/nil"     forall k z.   foldr k z []  = z
 
+"foldr/cons/build" forall k z x (g::forall b. (a->b->b) -> b -> b) .
+                           foldr k z (x:build g) = k x (g k z)
+
 "augment/build" forall (g::forall b. (a->b->b) -> b -> b)
                        (h::forall b. (a->b->b) -> b -> b) .
                        augment g (build h) = build (\c n -> g c (h c n))
