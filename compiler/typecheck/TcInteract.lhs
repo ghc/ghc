@@ -20,7 +20,7 @@ import Var
 import TcType
 import PrelNames (knownNatClassName, knownSymbolClassName, ipClassNameKey )
 import TysWiredIn ( coercibleClass )
-import Id( idType, mkSysLocalM )
+import Id( idType )
 import Class
 import TyCon
 import DataCon
@@ -47,7 +47,7 @@ import VarEnv
 import Control.Monad( when, unless, forM )
 import Pair (Pair(..))
 import Unique( hasKey )
-import FastString ( sLit, fsLit )
+import FastString ( sLit )
 import DynFlags
 import Util
 \end{code}
@@ -1964,56 +1964,38 @@ getCoercibleInst loc ty1 ty2
          ; return $ GenInst [] ev_term }
 
     -- Coercible NT a                            (see case 3 in [Coercible Instances])
-    | Just (rep_tc, concTy, ntCo) <- tcInstNewTyConTF_maybe famenv ty1
+    | Just (rep_tc, conc_ty, nt_co) <- tcInstNewTyConTF_maybe famenv ty1
     , dataConsInScope rdr_env rep_tc -- Do not look at all tyConsOfTyCon
     = do { markDataConsAsUsed rdr_env rep_tc
-         ; ct_ev <- requestCoercible loc concTy ty2
-         ; local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred concTy ty2
-         ; let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
-               tcCo = TcLetCo binds (ntCo `mkTcTransCo` mkTcCoVarCo local_var)
-         ; return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo) }
+         ; (new_goals, residual_co) <- requestCoercible loc conc_ty ty2
+         ; let final_co = nt_co `mkTcTransCo` residual_co
+                          -- nt_co       :: ty1     ~R conc_ty
+                          -- residual_co :: conc_ty ~R ty2
+         ; return $ GenInst new_goals (EvCoercion final_co) }
 
     -- Coercible a NT                            (see case 3 in [Coercible Instances])
-    | Just (rep_tc, concTy, ntCo) <- tcInstNewTyConTF_maybe famenv ty2
+    | Just (rep_tc, conc_ty, nt_co) <- tcInstNewTyConTF_maybe famenv ty2
     , dataConsInScope rdr_env rep_tc -- Do not look at all tyConsOfTyCon
     = do { markDataConsAsUsed rdr_env rep_tc
-         ; ct_ev <- requestCoercible loc ty1 concTy
-         ; local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred ty1 concTy
-         ; let binds = EvBinds (unitBag (EvBind local_var (getEvTerm ct_ev)))
-               tcCo = TcLetCo binds $
-                         mkTcCoVarCo local_var `mkTcTransCo` mkTcSymCo ntCo
-         ; return $ GenInst (freshGoals [ct_ev]) (EvCoercion tcCo) }
+         ; (new_goals, residual_co) <- requestCoercible loc ty1 conc_ty
+         ; let final_co = residual_co `mkTcTransCo` mkTcSymCo nt_co
+         ; return $ GenInst new_goals (EvCoercion final_co) }
 
     -- Coercible (D ty1 ty2) (D ty1' ty2')       (see case 4 in [Coercible Instances])
-    | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1,
-      Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2,
-      tc1 == tc2,
-      nominalArgsAgree tc1 tyArgs1 tyArgs2
-    = do -- We want evidence for all type arguments of role R
-         arg_stuff <- forM (zip3 (tyConRoles tc1) tyArgs1 tyArgs2) $ \(r,ta1,ta2) ->
-           case r of Nominal -> do
-                          return
-                            ( Nothing
-                            , Nothing
-                            , mkTcNomReflCo ta1 {- == ta2, due to nominalArgsAgree -}
-                            )
-                     Representational -> do
-                          ct_ev <- requestCoercible loc ta1 ta2
-                          local_var <- mkSysLocalM (fsLit "coev") $ mkCoerciblePred ta1 ta2
-                          return
-                            ( freshGoal ct_ev
-                            , Just (EvBind local_var (getEvTerm ct_ev))
-                            , mkTcCoVarCo local_var
-                            )
-                     Phantom -> do
-                          return
-                            ( Nothing
-                            , Nothing
-                            , TcPhantomCo ta1 ta2)
-         let (arg_new, arg_binds, arg_cos) = unzip3 arg_stuff
-             binds = EvBinds (listToBag (catMaybes arg_binds))
-             tcCo = TcLetCo binds (mkTcTyConAppCo Representational tc1 arg_cos)
-         return $ GenInst (catMaybes arg_new) (EvCoercion tcCo)
+    | Just (tc1,tyArgs1) <- splitTyConApp_maybe ty1
+    , Just (tc2,tyArgs2) <- splitTyConApp_maybe ty2
+    , tc1 == tc2
+    , nominalArgsAgree tc1 tyArgs1 tyArgs2
+    = do { -- We want evidence for all type arguments of role R
+           arg_stuff <- forM (zip3 (tyConRoles tc1) tyArgs1 tyArgs2) $ \ (r,ta1,ta2) ->
+                        case r of
+                           Representational -> requestCoercible loc ta1 ta2
+                           Phantom          -> return ([], TcPhantomCo ta1 ta2)
+                           Nominal          -> return ([], mkTcNomReflCo ta1)
+                                               -- ta1 == ta2, due to nominalArgsAgree
+         ; let (new_goals_s, arg_cos) = unzip arg_stuff
+               final_co = mkTcTyConAppCo Representational tc1 arg_cos
+         ; return $ GenInst (concat new_goals_s) (EvCoercion final_co) }
 
     -- Cannot solve this one
     | otherwise
@@ -2041,12 +2023,18 @@ markDataConsAsUsed rdr_env tc = addUsedRdrNamesTcS
   , not (null gres)
   , Imported (imp_spec:_) <- [gre_prov (head gres)] ]
 
-requestCoercible :: CtLoc -> TcType -> TcType -> TcS MaybeNew
-requestCoercible loc ty1 ty2 =
-    ASSERT2( typeKind ty1 `tcEqKind` typeKind ty2, ppr ty1 <+> ppr ty2)
-    newWantedEvVarNonrec loc' (mkCoerciblePred ty1 ty2)
-  where loc' = bumpCtLocDepth CountConstraints loc
-
+requestCoercible :: CtLoc -> TcType -> TcType
+                 -> TcS ( [CtEvidence]      -- Fresh goals to solve
+                        , TcCoercion )      -- Coercion witnessing (Coercible t1 t2)
+requestCoercible loc ty1 ty2
+  = ASSERT2( typeKind ty1 `tcEqKind` typeKind ty2, ppr ty1 <+> ppr ty2)
+    do { mb_ev <- newWantedEvVarNonrec loc' (mkCoerciblePred ty1 ty2)
+       ; case mb_ev of
+           Fresh ev     -> return ( [ev], evTermCoercion (ctEvTerm ev) )
+           Cached ev_tm -> return ( [],   evTermCoercion ev_tm ) }
+           -- Evidence for a Coercible constraint is always a coercion t1 ~R t2
+  where
+     loc' = bumpCtLocDepth CountConstraints loc
 \end{code}
 
 Note [Coercible Instances]
