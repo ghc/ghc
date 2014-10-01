@@ -77,7 +77,7 @@
     second argument, so that the fusion RULES for it do not change the
     semantics. (#9596)
 
-  * `scanr` now takes part in list fusion (#9355)
+  * `scanr` and `mapAccumL` now take part in list fusion (#9355, #9502)
 
 ## 4.7.0.1  *Jul 2014*
 
