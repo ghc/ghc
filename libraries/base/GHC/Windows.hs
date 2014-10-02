@@ -69,6 +69,7 @@ import GHC.Base
 import GHC.IO
 import GHC.Num
 import System.IO.Error
+import Util
 
 import qualified Numeric
 
@@ -120,7 +121,7 @@ errCodeToIOError fn_name err_code = do
     -- XXX we should really do this directly.
     let errno = c_maperrno_func err_code
 
-    let msg' = reverse $ dropWhile isSpace $ reverse msg -- drop trailing \n
+    let msg' = dropWhileEndLE isSpace msg -- drop trailing \n
         ioerror = errnoToIOError fn_name errno Nothing Nothing
                     `ioeSetErrorString` msg'
     return ioerror

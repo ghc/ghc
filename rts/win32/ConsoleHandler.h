@@ -62,11 +62,3 @@ extern int rts_waitConsoleHandlerCompletion(void);
 #endif /* THREADED_RTS */
 
 #endif /* Win32_CONSOLEHANDLER_H */
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

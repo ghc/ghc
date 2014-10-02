@@ -188,7 +188,7 @@ int main(int argc, char *argv[]) {
     hRtsDll = GetNonNullModuleHandle(rtsDll);
 
     hs_main_p    = GetNonNullProcAddress(hRtsDll,  "hs_main");
-    main_p       = GetNonNullProcAddress(hProgDll, "ZCMain_main_closure");
+    main_p       = GetNonNullProcAddress(hProgDll, "ZCMain_main_static_closure");
     rts_config.rts_opts_enabled = rtsOpts;
     rts_config.rts_opts = NULL;
 

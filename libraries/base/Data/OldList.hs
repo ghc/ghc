@@ -481,10 +481,27 @@ mapAccumL :: (acc -> x -> (acc, y)) -- Function of elt of input list
           -> acc            -- Initial accumulator
           -> [x]            -- Input list
           -> (acc, [y])     -- Final accumulator and result list
+{-# NOINLINE [1] mapAccumL #-}
 mapAccumL _ s []        =  (s, [])
 mapAccumL f s (x:xs)    =  (s'',y:ys)
                            where (s', y ) = f s x
                                  (s'',ys) = mapAccumL f s' xs
+
+{-# RULES
+"mapAccumL" [~1] forall f s xs . mapAccumL f s xs = foldr (mapAccumLF f) pairWithNil xs s
+"mapAccumLList" [1] forall f s xs . foldr (mapAccumLF f) pairWithNil xs s = mapAccumL f s xs
+ #-}
+
+pairWithNil :: acc -> (acc, [y])
+{-# INLINE [0] pairWithNil #-}
+pairWithNil x = (x, [])
+
+mapAccumLF :: (acc -> x -> (acc, y)) -> x -> (acc -> (acc, [y])) -> acc -> (acc, [y])
+{-# INLINE [0] mapAccumLF #-}
+mapAccumLF f = \x r s -> let (s', y)   = f s x
+                             (s'', ys) = r s'
+                         in (s'', y:ys)
+
 
 -- | The 'mapAccumR' function behaves like a combination of 'map' and
 -- 'foldr'; it applies a function to each element of a list, passing

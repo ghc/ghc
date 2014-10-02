@@ -229,10 +229,28 @@ foldr1 _ []             =  errorEmptyList "foldr1"
 --
 -- > head (scanr f z xs) == foldr f z xs.
 
+{-# NOINLINE [1] scanr #-}
 scanr                   :: (a -> b -> b) -> b -> [a] -> [b]
 scanr _ q0 []           =  [q0]
 scanr f q0 (x:xs)       =  f x q : qs
                            where qs@(q:_) = scanr f q0 xs
+
+{-# INLINE [0] strictUncurryScanr #-}
+strictUncurryScanr :: (a -> b -> c) -> (a, b) -> c
+strictUncurryScanr f pair = case pair of
+                              (x, y) -> f x y
+
+{-# INLINE [0] scanrFB #-}
+scanrFB :: (a -> b -> b) -> (b -> c -> c) -> a -> (b, c) -> (b, c)
+scanrFB f c = \x (r, est) -> (f x r, r `c` est)
+
+{-# RULES
+"scanr" [~1] forall f q0 ls . scanr f q0 ls =
+  build (\c n -> strictUncurryScanr c (foldr (scanrFB f c) (q0,n) ls))
+"scanrList" [1] forall f q0 ls .
+               strictUncurryScanr (:) (foldr (scanrFB f (:)) (q0,[]) ls) =
+                 scanr f q0 ls
+ #-}
 
 -- | 'scanr1' is a variant of 'scanr' that has no starting value argument.
 
@@ -646,7 +664,7 @@ xs !! (I# n0) | isTrue# (n0 <# 0#) =  error "Prelude.(!!): negative index\n"
 foldr2 :: (a -> b -> c -> c) -> c -> [a] -> [b] -> c
 foldr2 k z = go
   where
-        go []    _ys     = z
+        go []    ys      = ys `seq` z -- see #9495 for the seq
         go _xs   []      = z
         go (x:xs) (y:ys) = k x y (go xs ys)
 {-# INLINE [0] foldr2 #-}
@@ -670,16 +688,6 @@ foldr2_right  k _z  y  r (x:xs) = k x y (r xs)
  #-}
 \end{code}
 
-The foldr2/right rule isn't exactly right, because it changes
-the strictness of foldr2 (and thereby zip)
-
-E.g. main = print (null (zip nonobviousNil (build undefined)))
-          where   nonobviousNil = f 3
-                  f n = if n == 0 then [] else f (n-1)
-
-I'm going to leave it though.
-
-
 Zips for larger tuples are in the List module.
 
 \begin{code}
@@ -687,10 +695,22 @@ Zips for larger tuples are in the List module.
 -- | 'zip' takes two lists and returns a list of corresponding pairs.
 -- If one input list is short, excess elements of the longer list are
 -- discarded.
+--
+-- NOTE: GHC's implementation of @zip@ deviates slightly from the
+-- standard. In particular, Haskell 98 and Haskell 2010 require that
+-- @zip [x1,x2,...,xn] (y1:y2:...:yn:_|_) = [(x1,y1),(x2,y2),...,(xn,yn)]@
+-- In GHC, however,
+-- @zip [x1,x2,...,xn] (y1:y2:...:yn:_|_) = (x1,y1):(x2,y2):...:(xn,yn):_|_@
+-- That is, you cannot use termination of the left list to avoid hitting
+-- bottom in the right list.
+
+-- This deviation is necessary to make fusion with 'build' in the right
+-- list preserve semantics.
 {-# NOINLINE [1] zip #-}
 zip :: [a] -> [b] -> [(a,b)]
+zip []     bs     = bs `seq` [] -- see #9495 for the seq
+zip _as    []     = []
 zip (a:as) (b:bs) = (a,b) : zip as bs
-zip _      _      = []
 
 {-# INLINE [0] zipFB #-}
 zipFB :: ((a, b) -> c -> d) -> a -> b -> c -> d
@@ -723,10 +743,23 @@ zip3 _      _      _      = []
 -- as the first argument, instead of a tupling function.
 -- For example, @'zipWith' (+)@ is applied to two lists to produce the
 -- list of corresponding sums.
+--
+-- NOTE: GHC's implementation of @zipWith@ deviates slightly from the
+-- standard. In particular, Haskell 98 and Haskell 2010 require that
+-- @zipWith (,) [x1,x2,...,xn] (y1:y2:...:yn:_|_) = [(x1,y1),(x2,y2),...,(xn,yn)]@
+-- In GHC, however,
+-- @zipWith (,) [x1,x2,...,xn] (y1:y2:...:yn:_|_) = (x1,y1):(x2,y2):...:(xn,yn):_|_@
+-- That is, you cannot use termination of the left list to avoid hitting
+-- bottom in the right list.
+
+-- This deviation is necessary to make fusion with 'build' in the right
+-- list preserve semantics.
+
 {-# NOINLINE [1] zipWith #-}
 zipWith :: (a->b->c) -> [a]->[b]->[c]
-zipWith f (a:as) (b:bs) = f a b : zipWith f as bs
-zipWith _ _      _      = []
+zipWith _f []     bs     = bs `seq` [] -- see #9495 for the seq
+zipWith _f _as    []     = []
+zipWith f  (a:as) (b:bs) = f a b : zipWith f as bs
 
 -- zipWithFB must have arity 2 since it gets two arguments in the "zipWith"
 -- rule; it might not get inlined otherwise

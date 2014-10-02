@@ -386,11 +386,11 @@ static void unpark_tso(Capability *cap, StgTSO *tso) {
     // future.
     lockTSO(tso);
     if (tso->why_blocked == BlockedOnSTM &&
-        tso->block_info.closure == &stg_STM_AWOKEN_closure) {
+        tso->block_info.closure == stg_STM_AWOKEN_closure) {
       TRACE("unpark_tso already woken up tso=%p", tso);
     } else if (tso -> why_blocked == BlockedOnSTM) {
       TRACE("unpark_tso on tso=%p", tso);
-      tso->block_info.closure = &stg_STM_AWOKEN_closure;
+      tso->block_info.closure = stg_STM_AWOKEN_closure;
       tryWakeupThread(cap,tso);
     } else {
       TRACE("spurious unpark_tso on tso=%p", tso);
@@ -1696,11 +1696,3 @@ void stmWriteTVar(Capability *cap,
 }
 
 /*......................................................................*/
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

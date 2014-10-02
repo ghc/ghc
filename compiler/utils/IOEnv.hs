@@ -44,9 +44,7 @@ import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
 import Control.Monad
 import MonadUtils
-#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Alternative(..))
-#endif
 
 ----------------------------------------------------------------------
 -- Defining the monad type

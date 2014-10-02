@@ -493,17 +493,17 @@ original default.
 (=<<)           :: Monad m => (a -> m b) -> m a -> m b
 f =<< x         = x >>= f
 
--- | Conditional execution of monadic expressions. For example,
+-- | Conditional execution of 'Applicative' expressions. For example,
 --
 -- > when debug (putStrLn "Debugging")
 --
 -- will output the string @Debugging@ if the Boolean value @debug@
 -- is 'True', and otherwise do nothing.
-when    :: (Monad m) => Bool -> m () -> m ()
+when      :: (Applicative f) => Bool -> f () -> f ()
 {-# INLINEABLE when #-}
 {-# SPECIALISE when :: Bool -> IO () -> IO () #-}
 {-# SPECIALISE when :: Bool -> Maybe () -> Maybe () #-}
-when p s                = if p then s else return ()
+when p s  = if p then s else pure ()
 
 -- | Evaluate each action in the sequence from left to right,
 -- and collect the results.
@@ -787,6 +787,9 @@ augment g xs = g (:) xs
 
 "foldr/single"  forall k z x. foldr k z [x] = k x z
 "foldr/nil"     forall k z.   foldr k z []  = z
+
+"foldr/cons/build" forall k z x (g::forall b. (a->b->b) -> b -> b) .
+                           foldr k z (x:build g) = k x (g k z)
 
 "augment/build" forall (g::forall b. (a->b->b) -> b -> b)
                        (h::forall b. (a->b->b) -> b -> b) .

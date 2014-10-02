@@ -86,11 +86,7 @@ import Maybes
 import Util
 
 import Control.Applicative ((<$>))
-#if __GLASGOW_HASKELL__ >= 709
-import Control.Monad hiding (empty, many)
-#else
 import Control.Monad
-#endif
 
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char

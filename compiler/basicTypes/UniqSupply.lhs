@@ -23,9 +23,6 @@ module UniqSupply (
         -- ** Operations on the monad
         initUs, initUs_,
         lazyThenUs, lazyMapUs,
-
-        -- ** Deprecated operations on 'UniqSM'
-        getUniqueUs, getUs,
   ) where
 
 import Unique

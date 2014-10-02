@@ -36,7 +36,7 @@
 #include "Timer.h"
 #include "Globals.h"
 #include "FileLock.h"
-void exitLinker( void );        // there is no Linker.h file to include
+#include "LinkerInternals.h"
 
 #if defined(PROFILING)
 # include "ProfHeap.h"
@@ -543,11 +543,3 @@ stg_exit(int n)
     (*exitFn)(n);
   exit(n);
 }
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

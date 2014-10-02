@@ -38,6 +38,7 @@ testsuite_only=0
 hpc=NO
 speed=NORMAL
 use_dph=0
+be_quiet=0
 
 while [ $# -gt 0 ]
 do
@@ -65,6 +66,9 @@ do
         ;;
     --dph)
         use_dph=1
+        ;;
+    --quiet)
+        be_quiet=1
         ;;
     --help)
         show_help
@@ -128,9 +132,17 @@ fi
 
 if type gmake > /dev/null 2> /dev/null
 then
-    make="gmake"
+    if [ $be_quiet -eq 1 ]; then
+        make="gmake -s"
+    else
+        make="gmake"
+    fi
 else
-    make="make"
+    if [ $be_quiet -eq 1 ]; then
+        make="make -s"
+    else
+        make="make"
+    fi
 fi
 
 if [ $testsuite_only -eq 0 ]; then
@@ -157,6 +169,11 @@ thisdir=`utils/ghc-pwd/dist-boot/ghc-pwd`
 echo "Validating=YES"       >  mk/are-validating.mk
 echo "ValidateSpeed=$speed" >> mk/are-validating.mk
 echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
+
+if [ $be_quiet -eq 1 ]; then
+    echo "V=0"              >> mk/are-validating.mk # Less gunk
+    echo "GhcHcOpts="       >> mk/are-validating.mk # Remove -Rghc-timing
+fi
 
 if [ $use_dph -eq 1 ]; then
     echo "BUILD_DPH=YES"    >> mk/are-validating.mk
@@ -221,7 +238,12 @@ FAST)
         ;;
 esac
 
-$make $MAKE_TEST_TARGET stage=2 $BINDIST THREADS=$threads 2>&1 | tee testlog
+verbosity=3
+if [ $be_quiet -eq 1 ]; then
+   verbosity=2
+fi
+
+$make $MAKE_TEST_TARGET stage=2 $BINDIST VERBOSE=$verbosity THREADS=$threads 2>&1 | tee testlog
 
 check_packages post-testsuite
 

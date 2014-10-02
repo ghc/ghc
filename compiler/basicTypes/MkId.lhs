@@ -576,7 +576,7 @@ mkDataConRep dflags fam_envs wrap_name data_con
 
 -------------------------
 newLocal :: Type -> UniqSM Var
-newLocal ty = do { uniq <- getUniqueUs
+newLocal ty = do { uniq <- getUniqueM
                  ; return (mkSysLocal (fsLit "dt") uniq ty) }
 
 -------------------------

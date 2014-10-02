@@ -13,11 +13,3 @@ RTS_PRIVATE void initTimer (void);
 RTS_PRIVATE void exitTimer (rtsBool wait);
 
 #endif /* TIMER_H */
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

@@ -65,11 +65,3 @@ void markSignalHandlers (evac_fn evac, void *user);
 #endif /* RTS_USER_SIGNALS */
 
 #endif /* RTSSIGNALS_H */
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

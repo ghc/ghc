@@ -149,6 +149,14 @@ class Foldable t where
     {-# INLINE toList #-}
     toList t = build (\ c n -> foldr c n t)
 
+    -- | Test whether the structure is empty.
+    null :: Foldable t => t a -> Bool
+    null = foldr (\_ _ -> False) True
+
+    -- | Returns the size/length of a finite structure as an 'Int'.
+    length :: Foldable t => t a -> Int
+    length = foldl' (\c _ -> c+1) 0
+
     -- | Does the element occur in the structure?
     elem :: (Foldable t, Eq a) => a -> t a -> Bool
     elem = any . (==)
@@ -186,8 +194,10 @@ instance Foldable [] where
     foldl1  = List.foldl1
     foldr   = List.foldr
     foldr1  = List.foldr1
+    length  = List.length
     maximum = List.maximum
     minimum = List.minimum
+    null    = List.null
     product = List.product
     sum     = List.sum
     toList  = id

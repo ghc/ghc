@@ -333,9 +333,9 @@ data CmmLabelInfo
   | CmmEntry                    -- ^ misc rts entry points,     suffix _entry
   | CmmRetInfo                  -- ^ misc rts ret info tables,  suffix _info
   | CmmRet                      -- ^ misc rts return points,    suffix _ret
-  | CmmData                     -- ^ misc rts data bits, eg CHARLIKE_closure
+  | CmmData                     -- ^ misc rts data bits
   | CmmCode                     -- ^ misc rts code
-  | CmmClosure                  -- ^ closures eg CHARLIKE_closure
+  | CmmClosure                  -- ^ misc rts closures,         suffix _closure
   | CmmPrimCall                 -- ^ a prim call to some hand written Cmm code
   deriving (Eq, Ord)
 
@@ -1084,7 +1084,7 @@ pprCLbl (CmmLabel _ fs CmmRet)
   = ftext fs <> ptext (sLit "_ret")
 
 pprCLbl (CmmLabel _ fs CmmClosure)
-  = ftext fs <> ptext (sLit "_closure")
+  = ftext fs <> ptext (sLit "_static_closure")
 
 pprCLbl (RtsLabel (RtsPrimOp primop))
   = ptext (sLit "stg_") <> ppr primop
@@ -1114,7 +1114,7 @@ pprCLbl (DeadStripPreventer {}) = panic "pprCLbl DeadStripPreventer"
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <>
                (case x of
-                       Closure          -> ptext (sLit "closure")
+                       Closure          -> ptext (sLit "static_closure")
                        SRT              -> ptext (sLit "srt")
                        InfoTable        -> ptext (sLit "info")
                        LocalInfoTable   -> ptext (sLit "info")

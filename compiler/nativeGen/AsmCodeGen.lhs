@@ -836,7 +836,7 @@ genMachCode
                 , [CLabel])
 
 genMachCode dflags this_mod cmmTopCodeGen cmm_top
-  = do  { initial_us <- getUs
+  = do  { initial_us <- getUniqueSupplyM
         ; let initial_st           = mkNatM_State initial_us 0 dflags this_mod
               (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
               final_delta          = natm_delta final_st

@@ -193,7 +193,7 @@ ioManagerDie (void)
 void
 ioManagerStartCap (Capability **cap)
 {
-    rts_evalIO(cap,&base_GHCziConcziIO_ensureIOManagerIsRunning_closure,NULL);
+    rts_evalIO(cap,ensureIOManagerIsRunning_closure,NULL);
 }
 
 void
@@ -473,7 +473,7 @@ startSignalHandlers(Capability *cap)
           RtsFlags.GcFlags.initialStkSize,
               rts_apply(cap,
                   rts_apply(cap,
-                      &base_GHCziConcziSignal_runHandlers_closure,
+                      runHandlers_closure,
                       rts_mkPtr(cap, info)),
                   rts_mkInt(cap, info->si_signo))));
   }
@@ -694,11 +694,3 @@ resetDefaultHandlers(void)
 }
 
 #endif /* RTS_USER_SIGNALS */
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

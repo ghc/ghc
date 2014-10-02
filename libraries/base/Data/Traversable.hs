@@ -46,7 +46,7 @@ module Data.Traversable (
     foldMapDefault,
     ) where
 
-import Control.Applicative ( Const(..), WrappedMonad(..) )
+import Control.Applicative ( Const(..) )
 import Data.Either ( Either(..) )
 import Data.Foldable ( Foldable )
 import Data.Functor
@@ -157,12 +157,12 @@ class (Functor t, Foldable t) => Traversable t where
     -- | Map each element of a structure to a monadic action, evaluate
     -- these actions from left to right, and collect the results.
     mapM :: Monad m => (a -> m b) -> t a -> m (t b)
-    mapM f = unwrapMonad . traverse (WrapMonad . f)
+    mapM = traverse
 
     -- | Evaluate each monadic action in the structure from left to right,
     -- and collect the results.
     sequence :: Monad m => t (m a) -> m (t a)
-    sequence = mapM id
+    sequence = sequenceA
     {-# MINIMAL traverse | sequenceA #-}
 
 -- instances for Prelude types

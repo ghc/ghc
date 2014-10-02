@@ -52,7 +52,9 @@ class Eq a where
   (GHC.Classes.==) :: a -> a -> GHC.Types.Bool
   (GHC.Classes./=) :: a -> a -> GHC.Types.Bool
 -- imported via Prelude, T
-Prelude.length :: [a] -> GHC.Types.Int
+Prelude.length ::
+  Data.Foldable.Foldable t =>
+  forall a. Data.Foldable.Foldable t => t a -> GHC.Types.Int
 -- imported via T
 data T.Integer
   = integer-gmp-0.5.1.0:GHC.Integer.Type.S# GHC.Prim.Int#

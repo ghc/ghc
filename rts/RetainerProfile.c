@@ -1748,7 +1748,7 @@ retainRoot(void *user STG_UNUSED, StgClosure **tl)
 
     c = UNTAG_CLOSURE(*tl);
     maybeInitRetainerSet(c);
-    if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
+    if (c != stg_END_TSO_QUEUE_closure && isRetainer(c)) {
 	retainClosure(c, c, getRetainerFrom(c));
     } else {
 	retainClosure(c, c, CCS_SYSTEM);
@@ -2286,11 +2286,3 @@ belongToHeap(StgPtr p)
 #endif /* DEBUG_RETAINER */
 
 #endif /* PROFILING */
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

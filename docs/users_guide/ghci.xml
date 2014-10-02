@@ -226,7 +226,7 @@ Ok, modules loaded: Main.
 </screen>
     <para>We can compile D, then load the whole program, like this:</para>
 <screen>
-Prelude> :! ghc -c D.hs
+Prelude> :! ghc -c -dynamic D.hs
 Prelude> :load A
 Compiling B                ( B.hs, interpreted )
 Compiling C                ( C.hs, interpreted )
@@ -240,6 +240,11 @@ Ok, modules loaded: A, B, C, D.
     it isn't necessary to compile <literal>D</literal>,
     because the source and everything it depends on
     is unchanged since the last compilation.</para>
+
+    <para>Note the <literal>-dynamic</literal> flag to GHC: GHCi uses
+    dynamically-linked object code (if you are on a platform that
+    supports it), and so in order to use compiled code with GHCi it
+    must be compiled for dynamic linking.</para>
 
     <para>At any time you can use the command
     <literal>:show modules</literal>

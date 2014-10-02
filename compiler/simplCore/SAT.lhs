@@ -139,15 +139,24 @@ pprStaticness NotStatic            = ptext (sLit "NS")
 
 
 mergeSATInfo :: SATInfo -> SATInfo -> SATInfo
-mergeSATInfo [] _  = []
-mergeSATInfo _  [] = []
-mergeSATInfo (NotStatic:statics) (_:apps) = NotStatic : mergeSATInfo statics apps
-mergeSATInfo (_:statics) (NotStatic:apps) = NotStatic : mergeSATInfo statics apps
-mergeSATInfo ((Static (VarApp v)):statics)  ((Static (VarApp v')):apps)  = (if v == v' then Static (VarApp v) else NotStatic) : mergeSATInfo statics apps
-mergeSATInfo ((Static (TypeApp t)):statics) ((Static (TypeApp t')):apps) = (if t `eqType` t' then Static (TypeApp t) else NotStatic) : mergeSATInfo statics apps
-mergeSATInfo ((Static (CoApp c)):statics) ((Static (CoApp c')):apps)     = (if c `coreEqCoercion` c' then Static (CoApp c) else NotStatic) : mergeSATInfo statics apps
-mergeSATInfo l  r  = pprPanic "mergeSATInfo" $ ptext (sLit "Left:") <> pprSATInfo l <> ptext (sLit ", ")
-                                            <> ptext (sLit "Right:") <> pprSATInfo r
+mergeSATInfo l r = zipWith mergeSA l r
+  where
+    mergeSA NotStatic _ = NotStatic
+    mergeSA _ NotStatic = NotStatic
+    mergeSA (Static (VarApp v)) (Static (VarApp v'))
+      | v == v'   = Static (VarApp v)
+      | otherwise = NotStatic
+    mergeSA (Static (TypeApp t)) (Static (TypeApp t'))
+      | t `eqType` t' = Static (TypeApp t)
+      | otherwise     = NotStatic
+    mergeSA (Static (CoApp c)) (Static (CoApp c'))
+      | c `coreEqCoercion` c' = Static (CoApp c)
+      | otherwise             = NotStatic
+    mergeSA _ _  = pprPanic "mergeSATInfo" $
+                          ptext (sLit "Left:")
+                       <> pprSATInfo l <> ptext (sLit ", ")
+                       <> ptext (sLit "Right:")
+                       <> pprSATInfo r
 
 mergeIdSATInfo :: IdSATInfo -> IdSATInfo -> IdSATInfo
 mergeIdSATInfo = plusUFM_C mergeSATInfo
@@ -255,7 +264,7 @@ runSAT :: UniqSupply -> SatM a -> a
 runSAT = initUs_
 
 newUnique :: SatM Unique
-newUnique = getUniqueUs
+newUnique = getUniqueM
 \end{code}
 
 

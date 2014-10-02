@@ -1044,8 +1044,8 @@ typedef struct _RtsSymbolVal {
 #define RTS_INTCHAR_SYMBOLS
 #else
 #define RTS_INTCHAR_SYMBOLS                             \
-      SymI_HasProto(stg_CHARLIKE_closure)               \
-      SymI_HasProto(stg_INTLIKE_closure)
+      SymI_HasProto(stg_CHARLIKE_static_closure)               \
+      SymI_HasProto(stg_INTLIKE_static_closure)
 #endif
 
 
@@ -7176,11 +7176,3 @@ machoGetMisalignment( FILE * f )
 #endif
 
 #endif
-
-// Local Variables:
-// mode: C
-// fill-column: 80
-// indent-tabs-mode: nil
-// c-basic-offset: 4
-// buffer-file-coding-system: utf-8-unix
-// End:

@@ -140,6 +140,16 @@ charEncodingTag =
     "<meta http-equiv=\"Content-Type\" " ++
           "content=\"text/html; " ++ "charset=" ++ show localeEncoding ++ "\">"
 
+-- Add characters to the left of a string until it is at least as
+-- large as requested.
+padLeft :: Int -> Char -> String -> String
+padLeft n c str = go n str
+  where
+    -- If the string is already long enough, stop traversing it.
+    go 0 _       = str
+    go k []      = replicate k c ++ str
+    go k (_:xs)  = go (k-1) xs
+
 genHtmlFromMod
   :: String
   -> Flags
@@ -210,8 +220,7 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
   content <- readFileFromPath (hpcError markup_plugin) origFile theHsPath
 
   let content' = markup tabStop info content
-  let show' = reverse . take 5 . (++ "       ") . reverse . show
-  let addLine n xs = "<span class=\"lineno\">" ++ show' n ++ " </span>" ++ xs
+  let addLine n xs = "<span class=\"lineno\">" ++ padLeft 5 ' ' (show n) ++ " </span>" ++ xs
   let addLines = unlines . map (uncurry addLine) . zip [1 :: Int ..] . lines
   let fileName = modName0 ++ ".hs.html"
   putStrLn $ "Writing: " ++ fileName
@@ -363,10 +372,14 @@ openTick (TopLevelDecl True 1)
 openTick (TopLevelDecl True n0)
          = "<span class=\"funcount\">-- entered " ++ showBigNum n0 ++ " times</span>" ++ openTopDecl
   where showBigNum n | n <= 9999 = show n
-                     | otherwise = showBigNum' (n `div` 1000) ++ "," ++ showWith (n `mod` 1000)
+                     | otherwise = case n `quotRem` 1000 of
+                                     (q, r) -> showBigNum' q ++ "," ++ showWith r
         showBigNum' n | n <= 999 = show n
-                      | otherwise = showBigNum' (n `div` 1000) ++ "," ++ showWith (n `mod` 1000)
-        showWith n = take 3 $ reverse $ ("000" ++) $ reverse $ show n
+                      | otherwise = case n `quotRem` 1000 of
+                                      (q, r) -> showBigNum' q ++ "," ++ showWith r
+        showWith n = padLeft 3 '0' $ show n
+
+
 
 closeTick :: String
 closeTick = "</span>"
@@ -462,7 +475,7 @@ instance Monoid ModuleSummary where
 
 writeFileUsing :: String -> String -> IO ()
 writeFileUsing filename text = do
-  let dest_dir = reverse . dropWhile (\ x -> x /= '/') . reverse $ filename
+  let dest_dir = dropWhileEndLE (\ x -> x /= '/') $ filename
 
 -- We need to check for the dest_dir each time, because we use sub-dirs for
 -- packages, and a single .tix file might contain information about

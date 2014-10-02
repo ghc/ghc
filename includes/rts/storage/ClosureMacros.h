@@ -187,11 +187,12 @@ INLINE_HEADER StgClosure *STATIC_LINK2(const StgInfoTable *info,
    INTLIKE and CHARLIKE closures.
    -------------------------------------------------------------------------- */
 
+// XXX update me for indirection
 INLINE_HEADER P_ CHARLIKE_CLOSURE(int n) {
-    return (P_)&stg_CHARLIKE_closure[(n)-MIN_CHARLIKE];
+    return (P_)&stg_CHARLIKE_static_closure[(n)-MIN_CHARLIKE];
 }
 INLINE_HEADER P_ INTLIKE_CLOSURE(int n) {
-    return (P_)&stg_INTLIKE_closure[(n)-MIN_INTLIKE];
+    return (P_)&stg_INTLIKE_static_closure[(n)-MIN_INTLIKE];
 }
 
 /* ----------------------------------------------------------------------------

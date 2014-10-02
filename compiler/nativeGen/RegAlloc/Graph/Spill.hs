@@ -67,7 +67,7 @@ regSpill platform code slotsFree regs
                                 $ zip (uniqSetToList regs) slots
 
                 -- Grab the unique supply from the monad.
-                us      <- getUs
+                us      <- getUniqueSupplyM
 
                 -- Run the spiller on all the blocks.
                 let (code', state')     =

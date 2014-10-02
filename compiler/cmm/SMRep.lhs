@@ -41,7 +41,7 @@ module SMRep (
 
         -- ** RTS closure types
         rtsClosureType, rET_SMALL, rET_BIG,
-        aRG_GEN, aRG_GEN_BIG,
+        aRG_GEN, aRG_GEN_BIG, cONSTR_NOCAF_STATIC,
 
         -- ** Arrays
         card, cardRoundUp, cardTableSizeB, cardTableSizeW,
@@ -473,11 +473,12 @@ rtsClosureType rep
       _ -> panic "rtsClosureType"
 
 -- We export these ones
-rET_SMALL, rET_BIG, aRG_GEN, aRG_GEN_BIG :: Int
+rET_SMALL, rET_BIG, aRG_GEN, aRG_GEN_BIG, cONSTR_NOCAF_STATIC :: Int
 rET_SMALL   = RET_SMALL
 rET_BIG     = RET_BIG
 aRG_GEN     = ARG_GEN
 aRG_GEN_BIG = ARG_GEN_BIG
+cONSTR_NOCAF_STATIC = CONSTR_NOCAF_STATIC
 \end{code}
 
 Note [Static NoCaf constructors]

@@ -4,9 +4,9 @@
 test('T4255', unless(compiler_profiled(), skip), compile_fail, ['-v0'])
 
 def f(name, opts):
-  opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
-  if (ghc_with_interpreter == 0):
-	opts.skip = 1
+    opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
+    if (ghc_with_interpreter == 0):
+        opts.skip = 1
 
 setTestOpts(f)
 setTestOpts(only_compiler_types(['ghc']))

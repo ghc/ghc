@@ -74,7 +74,7 @@ import "integer-gmp" __gmpz_export;
 
 import "integer-gmp" integer_cbits_decodeDouble;
 
-import "rts" stg_INTLIKE_closure;
+import "rts" stg_INTLIKE_static_closure;
 
 /* -----------------------------------------------------------------------------
    Arbitrary-precision Integer operations.
@@ -94,7 +94,7 @@ import "rts" stg_INTLIKE_closure;
    dummy value is needed, the 'ByteArray#' is not supposed to be
    accessed anyway, this is should be a tolerable hack.
  */
-#define DUMMY_BYTE_ARR (stg_INTLIKE_closure+1)
+#define DUMMY_BYTE_ARR (stg_INTLIKE_static_closure+1)
 
 /* set mpz_t from Int#/ByteArray# */
 #define MP_INT_SET_FROM_BA(mp_ptr,i,ba)                  \
