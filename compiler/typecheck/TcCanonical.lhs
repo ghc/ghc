@@ -458,10 +458,16 @@ data FlattenEnv
   = FE { fe_mode :: FlattenMode
        , fe_ev   :: CtEvidence }
 
-data FlattenMode
-  = FM_FlattenAll     -- Flatten all type functions
-  | FM_Avoid TcTyVar  -- Flatten type functions to avoid this type variable
-  | FM_SubstOnly      -- See Note [Flattening under a forall]
+data FlattenMode  -- Postcondition for all three: inert wrt the type substitution
+  = FM_FlattenAll          -- Postcondition: function-free
+
+  | FM_Avoid TcTyVar Bool  -- Postcondition:
+                           --  * tyvar is only mentioned in result under a rigid path
+                           --    e.g.   [a] is ok, but F a won't happen
+                           --  * If flat_top is True, top level is not a function application
+                           --   (but under type constructors is ok e.g. [F a])
+
+  | FM_SubstOnly           -- See Note [Flattening under a forall]
 
 -- Flatten a bunch of types all at once.
 flattenMany :: FlattenEnv -> [Type] -> TcS ([Xi], [TcCoercion])
@@ -522,11 +528,13 @@ flatten fmode (TyConApp tc tys)
 
   -- For * a normal data type application
   --     * data family application
-  --     * type synonym application whose RHS does not mention type families
-  --             See Note [Flattening synonyms]
   -- we just recursively flatten the arguments.
-  | otherwise
-  = flattenTyConApp fmode tc tys
+  | otherwise  -- Switch off the flat_top bit in FM_Avoid
+  , let fmode' = case fmode of
+                   FE { fe_mode = FM_Avoid tv _ }
+                     -> fmode { fe_mode = FM_Avoid tv False }
+                   _ -> fmode
+  = flattenTyConApp fmode' tc tys
 
 flatten fmode ty@(ForAllTy {})
 -- We allow for-alls when, but only when, no type function
@@ -605,11 +613,11 @@ flattenExactFamApp fmode tc tys
                           ; return ( mkTyConApp tc xis
                                    , mkTcTyConAppCo Nominal tc cos ) }
 
-       FM_Avoid tv -> do { (xis, cos) <- flattenMany fmode tys
-                         ; if tv `elemVarSet` tyVarsOfTypes xis
-                           then flattenExactFamApp_fully fmode tc tys
-                           else return ( mkTyConApp tc xis
-                                       , mkTcTyConAppCo Nominal tc cos ) }
+       FM_Avoid tv flat_top -> do { (xis, cos) <- flattenMany fmode tys
+                                  ; if flat_top || tv `elemVarSet` tyVarsOfTypes xis
+                                    then flattenExactFamApp_fully fmode tc tys
+                                    else return ( mkTyConApp tc xis
+                                                , mkTcTyConAppCo Nominal tc cos ) }
        FM_FlattenAll -> flattenExactFamApp_fully fmode tc tys
 
 flattenExactFamApp_fully fmode tc tys
@@ -1157,7 +1165,8 @@ canEqTyVar ev swapped tv1 ty2 ps_ty2              -- ev :: tv ~ s2
                                       Nothing     -> return Stop
                                       Just new_ev -> can_eq_nc new_ev ty1 ty1 ty2 ps_ty2 }
 
-           Left tv1' -> do { let fmode = FE { fe_ev = ev, fe_mode = FM_Avoid tv1' }
+           Left tv1' -> do { let fmode = FE { fe_ev = ev, fe_mode = FM_Avoid tv1' True }
+                                 -- Flatten the RHS less vigorously, to avoid gratuitous
                            ; (xi2, co2) <- flatten fmode ps_ty2 -- co2 :: xi2 ~ ps_ty2
                                            -- Use ps_ty2 to preserve type synonyms if poss
                            ; dflags <- getDynFlags
