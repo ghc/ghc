@@ -1,10 +1,17 @@
 {-# LANGUAGE Trustworthy            #-}
 {-# LANGUAGE CPP                    #-}
 {-# LANGUAGE NoImplicitPrelude      #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE TypeSynonymInstances   #-}
 {-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE MagicHash              #-}
 {-# LANGUAGE KindSignatures         #-}
 {-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE PolyKinds              #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE DeriveGeneric          #-}
 
@@ -548,12 +555,12 @@ module GHC.Generics  (
   , (:+:)(..), (:*:)(..), (:.:)(..)
 
   -- ** Synonyms for convenience
-  , Rec0, Par0, R, P
+  , Rec0, R
   , D1, C1, S1, D, C, S
 
   -- * Meta-information
   , Datatype(..), Constructor(..), Selector(..), NoSelector
-  , Fixity(..), Associativity(..), Arity(..), prec
+  , Fixity(..), Associativity(..) -- , Arity(..), prec
 
   -- * Generic type classes
   , Generic(..), Generic1(..)
@@ -561,6 +568,7 @@ module GHC.Generics  (
   ) where
 
 -- We use some base types
+import GHC.Integer ( Integer, integerToInt )
 import GHC.Types
 import Data.Maybe ( Maybe(..) )
 import Data.Either ( Either(..) )
@@ -569,7 +577,10 @@ import Data.Either ( Either(..) )
 import GHC.Classes ( Eq, Ord )
 import GHC.Read ( Read )
 import GHC.Show ( Show )
-import Data.Proxy
+
+-- Needed for metadata
+import Data.Proxy   ( Proxy(..), KProxy(..) )
+import GHC.TypeLits ( Nat, Symbol, KnownSymbol, KnownNat, symbolVal, natVal )
 
 --------------------------------------------------------------------------------
 -- Representation types
@@ -580,50 +591,44 @@ data V1 p
 
 -- | Unit: used for constructors without arguments
 data U1 p = U1
-  deriving (Eq, Ord, Read, Show, Generic)
+  -- deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Used for marking occurrences of the parameter
 newtype Par1 p = Par1 { unPar1 :: p }
-  deriving (Eq, Ord, Read, Show, Generic)
+  -- deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Recursive calls of kind * -> *
 newtype Rec1 f p = Rec1 { unRec1 :: f p }
-  deriving (Eq, Ord, Read, Show, Generic)
+  -- deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Constants, additional parameters and recursion of kind *
 newtype K1 i c p = K1 { unK1 :: c }
-  deriving (Eq, Ord, Read, Show, Generic)
+  -- deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Meta-information (constructor names, etc.)
-newtype M1 i c f p = M1 { unM1 :: f p }
-  deriving (Eq, Ord, Read, Show, Generic)
+newtype M1 i (c :: Meta) f p = M1 { unM1 :: f p }
+  -- deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Sums: encode choice between constructors
 infixr 5 :+:
 data (:+:) f g p = L1 (f p) | R1 (g p)
-  deriving (Eq, Ord, Read, Show, Generic)
+  -- deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Products: encode multiple arguments to constructors
 infixr 6 :*:
 data (:*:) f g p = f p :*: g p
-  deriving (Eq, Ord, Read, Show, Generic)
+  -- deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Composition of functors
 infixr 7 :.:
 newtype (:.:) f g p = Comp1 { unComp1 :: f (g p) }
-  deriving (Eq, Ord, Read, Show, Generic)
+  -- deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Tag for K1: recursion (of kind *)
 data R
--- | Tag for K1: parameters (other than the last)
-data P
 
 -- | Type synonym for encoding recursion (of kind *)
 type Rec0  = K1 R
--- | Type synonym for encoding parameters (other than the last)
-type Par0  = K1 P
-{-# DEPRECATED Par0 "'Par0' is no longer used; use 'Rec0' instead" #-} -- deprecated in 7.6
-{-# DEPRECATED P "'P' is no longer used; use 'R' instead" #-} -- deprecated in 7.6
 
 -- | Tag for M1: datatype
 data D
@@ -652,16 +657,11 @@ class Datatype d where
   isNewtype    :: t d (f :: * -> *) a -> Bool
   isNewtype _ = False
 
-
--- | Class for datatypes that represent records
-class Selector s where
-  -- | The name of the selector
-  selName :: t s (f :: * -> *) a -> [Char]
-
--- | Used for constructor fields without a name
-data NoSelector
-
-instance Selector NoSelector where selName _ = ""
+instance (KnownSymbol n, KnownSymbol m, SingI nt)
+    => Datatype (MetaData n m nt) where
+  datatypeName _ = symbolVal (Proxy :: Proxy n)
+  moduleName   _ = symbolVal (Proxy :: Proxy m)
+  isNewtype    _ = fromSing  (sing  :: Sing nt)
 
 -- | Class for datatypes that represent data constructors
 class Constructor c where
@@ -676,26 +676,44 @@ class Constructor c where
   conIsRecord :: t c (f :: * -> *) a -> Bool
   conIsRecord _ = False
 
+instance (KnownSymbol n, SingI f, SingI r) => Constructor (MetaCons n f r) where
+  conName     _ = symbolVal (Proxy :: Proxy n)
+  conFixity   _ = fromSing  (sing  :: Sing f)
+  conIsRecord _ = fromSing  (sing  :: Sing r)
 
--- | Datatype to represent the arity of a tuple.
-data Arity = NoArity | Arity Int
-  deriving (Eq, Show, Ord, Read, Generic)
 
 -- | Datatype to represent the fixity of a constructor. An infix
 -- | declaration directly corresponds to an application of 'Infix'.
 data Fixity = Prefix | Infix Associativity Int
-  deriving (Eq, Show, Ord, Read, Generic)
+  -- deriving (Eq, Show, Ord, Read, Generic)
+data FixityI = PrefixI | InfixI Associativity Nat
 
 -- | Get the precedence of a fixity value.
 prec :: Fixity -> Int
 prec Prefix      = 10
 prec (Infix _ n) = n
 
+
 -- | Datatype to represent the associativity of a constructor
 data Associativity = LeftAssociative
                    | RightAssociative
                    | NotAssociative
-  deriving (Eq, Show, Ord, Read, Generic)
+  -- deriving (Eq, Show, Ord, Read, Generic)
+
+-- | Class for datatypes that represent records
+class Selector s where
+  -- | The name of the selector
+  selName :: t s (f :: * -> *) a -> [Char]
+
+-- | Used for constructor fields without a name
+-- Deprecated in 7.9
+{-# DEPRECATED NoSelector "'NoSelector' is no longer used" #-}
+data NoSelector
+instance Selector NoSelector        where selName _ = ""
+
+instance Selector (MetaSel Nothing) where selName _ = ""
+instance (KnownSymbol s) => Selector (MetaSel (Just s)) where
+  selName _ = symbolVal (Proxy :: Proxy s)
 
 -- | Representable types of kind *.
 -- This class is derivable in GHC with the DeriveGeneric flag on.
@@ -718,10 +736,18 @@ class Generic1 f where
   -- | Convert from the representation to the datatype
   to1    :: (Rep1 f) a -> f a
 
+--------------------------------------------------------------------------------
+-- Meta-data
+--------------------------------------------------------------------------------
+
+data Meta = MetaData Symbol Symbol Bool
+          | MetaCons Symbol FixityI Bool
+          | MetaSel  (Maybe Symbol)
 
 --------------------------------------------------------------------------------
 -- Derived instances
 --------------------------------------------------------------------------------
+{-
 deriving instance Generic [a]
 deriving instance Generic (Maybe a)
 deriving instance Generic (Either a b)
@@ -744,11 +770,11 @@ deriving instance Generic1 ((,,,) a b c)
 deriving instance Generic1 ((,,,,) a b c d)
 deriving instance Generic1 ((,,,,,) a b c d e)
 deriving instance Generic1 ((,,,,,,) a b c d e f)
-
+-}
 --------------------------------------------------------------------------------
 -- Primitive representations
 --------------------------------------------------------------------------------
-
+{-
 -- Int
 data D_Int
 data C_Int
@@ -815,5 +841,99 @@ instance Generic Char where
   type Rep Char = D1 D_Char (C1 C_Char (S1 NoSelector (Rec0 Char)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
+-}
+-- deriving instance Generic (Proxy t)
 
-deriving instance Generic (Proxy t)
+
+--------------------------------------------------------------------------------
+-- Copied from the singletons package
+--------------------------------------------------------------------------------
+
+-- | Convenient synonym to refer to the kind of a type variable:
+-- @type KindOf (a :: k) = ('KProxy :: KProxy k)@
+type KindOf (a :: k) = ('KProxy :: KProxy k)
+
+-- | The singleton kind-indexed data family.
+data family Sing (a :: k)
+
+-- | A 'SingI' constraint is essentially an implicitly-passed singleton.
+-- If you need to satisfy this constraint with an explicit singleton, please
+-- see 'withSingI'.
+class SingI (a :: k) where
+  -- | Produce the singleton explicitly. You will likely need the @ScopedTypeVariables@
+  -- extension to use this method the way you want.
+  sing :: Sing a
+
+-- | The 'SingKind' class is essentially a /kind/ class. It classifies all kinds
+-- for which singletons are defined. The class supports converting between a singleton
+-- type and the base (unrefined) type which it is built from.
+class (kparam ~ 'KProxy) => SingKind (kparam :: KProxy k) where
+  -- | Get a base type from a proxy for the promoted kind. For example,
+  -- @DemoteRep ('KProxy :: KProxy Bool)@ will be the type @Bool@.
+  type DemoteRep kparam :: *
+
+  -- | Convert a singleton to its unrefined version.
+  fromSing :: Sing (a :: k) -> DemoteRep kparam
+
+  -- Convert an unrefined type to an existentially-quantified singleton type.
+  -- toSing   :: DemoteRep kparam -> SomeSing kparam
+
+-- | Convenient abbreviation for 'DemoteRep':
+-- @type Demote (a :: k) = DemoteRep ('KProxy :: KProxy k)@
+type Demote (a :: k) = DemoteRep ('KProxy :: KProxy k)
+
+-- | An /existentially-quantified/ singleton. This type is useful when you want a
+-- singleton type, but there is no way of knowing, at compile-time, what the type
+-- index will be. To make use of this type, you will generally have to use a
+-- pattern-match:
+--
+-- > foo :: Bool -> ...
+-- > foo b = case toSing b of
+-- >           SomeSing sb -> {- fancy dependently-typed code with sb -}
+--
+-- An example like the one above may be easier to write using 'withSomeSing'.
+data SomeSing (kproxy :: KProxy k) where
+  SomeSing :: Sing (a :: k) -> SomeSing ('KProxy :: KProxy k)
+
+-- Singleton booleans
+data instance Sing (a :: Bool) where
+  STrue  :: Sing True
+  SFalse :: Sing False
+
+instance SingI True  where sing = STrue
+instance SingI False where sing = SFalse
+
+instance SingKind ('KProxy :: KProxy Bool) where
+  type DemoteRep ('KProxy :: KProxy Bool) = Bool
+  fromSing STrue  = True
+  fromSing SFalse = False
+
+-- Singleton Fixity
+data instance Sing (a :: FixityI) where
+  SPrefix :: Sing PrefixI
+  SInfix  :: Sing a -> Integer -> Sing (InfixI a n)
+
+instance SingI PrefixI where sing = SPrefix
+instance (SingI a, KnownNat n) => SingI (InfixI a n) where
+  sing = SInfix (sing :: Sing a) (natVal (Proxy :: Proxy n))
+
+instance SingKind ('KProxy :: KProxy FixityI) where
+  type DemoteRep ('KProxy :: KProxy FixityI) = Fixity
+  fromSing SPrefix      = Prefix
+  fromSing (SInfix a n) = Infix (fromSing a) (I# (integerToInt n))
+
+-- Singleton Associativity
+data instance Sing (a :: Associativity) where
+  SLeftAssociative  :: Sing LeftAssociative
+  SRightAssociative :: Sing RightAssociative
+  SNotAssociative   :: Sing NotAssociative
+
+instance SingI LeftAssociative  where sing = SLeftAssociative
+instance SingI RightAssociative where sing = SRightAssociative
+instance SingI NotAssociative   where sing = SNotAssociative
+
+instance SingKind ('KProxy :: KProxy Associativity) where
+  type DemoteRep ('KProxy :: KProxy Associativity) = Associativity
+  fromSing SLeftAssociative  = LeftAssociative
+  fromSing SRightAssociative = RightAssociative
+  fromSing SNotAssociative   = NotAssociative

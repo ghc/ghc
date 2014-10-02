@@ -24,9 +24,10 @@ import DataCon
 import TyCon
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
-import Module           ( Module, moduleName, moduleNameString )
+import Module           ( Module, moduleName, moduleNameString, moduleNameFS )
 import IfaceEnv         ( newGlobalBinder )
 import Name      hiding ( varName )
+import NameEnv ( lookupNameEnv )
 import RdrName
 import BasicTypes
 import TysWiredIn
@@ -598,19 +599,38 @@ tc_mkRepTy gk_ tycon metaDts =
     times <- tcLookupTyCon prodTyConName
     comp  <- tcLookupTyCon compTyConName
 
+    md      <- tcLookupTyCon pMetaDataTyConName
+    mc      <- tcLookupTyCon pMetaConsTyConName
+    ms      <- tcLookupTyCon pMetaSelTyConName
+    pPrefix <- tcLookupTyCon pPrefixITyConName
+    pInfix  <- tcLookupTyCon pInfixITyConName
+    pLA     <- tcLookupTyCon pLeftAssociativeTyConName
+    pRA     <- tcLookupTyCon pRightAssociativeTyConName
+    pNA     <- tcLookupTyCon pNotAssociativeTyConName
+
+    justDC    <- tcLookupDataCon justDataConName
+    nothingDC <- tcLookupDataCon nothingDataConName
+
+    let pJust    = promoteDataCon justDC
+    let pNothing = promoteDataCon nothingDC
+
+    fix_env <- getFixityEnv
+
     let mkSum' a b = mkTyConApp plus  [a,b]
         mkProd a b = mkTyConApp times [a,b]
         mkComp a b = mkTyConApp comp  [a,b]
         mkRec0 a   = mkTyConApp rec0  [a]
         mkRec1 a   = mkTyConApp rec1  [a]
         mkPar1     = mkTyConTy  par1
-        mkD    a   = mkTyConApp d1    [metaDTyCon, sumP (tyConDataCons a)]
-        mkC  i d a = mkTyConApp c1    [d, prod i (dataConInstOrigArgTys a $ mkTyVarTys $ tyConTyVars tycon)
-                                                 (null (dataConFieldLabels a))]
+        mkD    a   = mkTyConApp d1 [ metaDataTy, sumP (tyConDataCons a) ]
+        mkC  i d a = mkTyConApp c1 [ metaConsTy a
+                                   , prod i (dataConInstOrigArgTys a
+                                            . mkTyVarTys . tyConTyVars $ tycon)
+                                          (dataConFieldLabels a)]
         -- This field has no label
-        mkS True  _ a = mkTyConApp s1 [mkTyConTy nS1, a]
+        mkS Nothing  _ a = mkTyConApp s1 [mkTyConApp ms [mkTyConTy pNothing], a]
         -- This field has a  label
-        mkS False d a = mkTyConApp s1 [d, a]
+        mkS (Just l) d a = mkTyConApp s1 [mkTyConApp ms [mkTyConApp pJust [selName l]], a]
 
         -- Sums and products are done in the same way for both Rep and Rep1
         sumP [] = mkTyConTy v1
@@ -618,17 +638,19 @@ tc_mkRepTy gk_ tycon metaDts =
                     foldBal mkSum' [ mkC i d a
                                    | (d,(a,i)) <- zip metaCTyCons (zip l [0..])]
         -- The Bool is True if this constructor has labelled fields
-        prod :: Int -> [Type] -> Bool -> Type
+        prod :: Int -> [Type] -> [FieldLabel] -> Type
         prod i [] _ = ASSERT(length metaSTyCons > i)
-                        ASSERT(length (metaSTyCons !! i) == 0)
-                          mkTyConTy u1
-        prod i l b  = ASSERT(length metaSTyCons > i)
-                        ASSERT(length l == length (metaSTyCons !! i))
-                          foldBal mkProd [ arg d t b
-                                         | (d,t) <- zip (metaSTyCons !! i) l ]
+                      ASSERT(length (metaSTyCons !! i) == 0)
+                        mkTyConTy u1
+        prod i l fl = ASSERT(length metaSTyCons > i)
+                      ASSERT(length l == length (metaSTyCons !! i))
+                      ASSERT(null fl || length fl >= i)
+                        foldBal mkProd [ arg d t (if null fl then Nothing
+                                                             else Just (fl !! i))
+                                       | (d,t) <- zip (metaSTyCons !! i) l ]
 
-        arg :: Type -> Type -> Bool -> Type
-        arg d t b = mkS b d $ case gk_ of
+        arg :: Type -> Type -> Maybe FieldLabel -> Type
+        arg d t fl = mkS fl d $ case gk_ of
             -- Here we previously used Par0 if t was a type variable, but we
             -- realized that we can't always guarantee that we are wrapping-up
             -- all type variables in Par0. So we decided to stop using Par0
@@ -646,6 +668,40 @@ tc_mkRepTy gk_ tycon metaDts =
         metaDTyCon  = mkTyConTy (metaD metaDts)
         metaCTyCons = map mkTyConTy (metaC metaDts)
         metaSTyCons = map (map mkTyConTy) (metaS metaDts)
+
+        tyConName_user = case tyConFamInst_maybe tycon of
+                           Just (ptycon, _) -> tyConName ptycon
+                           Nothing          -> tyConName tycon
+
+        dtName = mkStrLitTy . occNameFS . nameOccName $ tyConName_user
+        mdName = mkStrLitTy . moduleNameFS . moduleName . nameModule . tyConName
+               $ tycon
+        isNT   = mkTyConTy $ if isNewTyCon tycon
+                             then promotedTrueDataCon
+                             else promotedFalseDataCon
+
+        ctName = mkStrLitTy . occNameFS . nameOccName . dataConName
+        ctFix c = case myLookupFixity fix_env (dataConName c) of
+                    Just (Fixity n InfixL) -> buildFix n pLA
+                    Just (Fixity n InfixR) -> buildFix n pRA
+                    Just (Fixity n InfixN) -> buildFix n pNA
+                    Nothing                -> mkTyConTy pPrefix
+        buildFix n assoc = mkTyConApp pInfix [mkTyConApp assoc [mkNumLitTy (fromIntegral n)]]
+
+        myLookupFixity :: FixityEnv -> Name -> Maybe Fixity
+        myLookupFixity env n = case lookupNameEnv env n of
+                                 Just (FixItem _ fix) -> Just fix
+                                 Nothing              -> Nothing
+
+        isRec c = mkTyConTy $ if length (dataConFieldLabels c) > 0
+                              then promotedTrueDataCon
+                              else promotedFalseDataCon
+
+        selName = mkStrLitTy . occNameFS . nameOccName
+
+        metaDataTy   = mkTyConApp md [dtName, mdName, isNT]
+        metaConsTy c = mkTyConApp mc [ctName c, ctFix c, isRec c]
+        -- metaSelTy  s = mkTyConApp mc [ctName c, ctFix c, isRec c]
 
     return (mkD tycon)
 
