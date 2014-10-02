@@ -4,7 +4,7 @@ Simple14.hs:17:19:
       ‘z0’ is untouchable
         inside the constraints (Maybe m ~ Maybe n)
         bound by a type expected by the context:
-                   Maybe m ~ Maybe n => EQ_ z0 z0
+                   (Maybe m ~ Maybe n) => EQ_ z0 z0
         at Simple14.hs:17:12-33
       ‘m’ is a rigid type variable bound by
           the type signature for foo :: EQ_ (Maybe m) (Maybe n)

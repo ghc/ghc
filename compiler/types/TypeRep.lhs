@@ -536,10 +536,12 @@ pprTheta :: ThetaType -> SDoc
 pprTheta theta  = parens (sep (punctuate comma (map (ppr_type TopPrec) theta)))
 
 pprThetaArrowTy :: ThetaType -> SDoc
-pprThetaArrowTy []      = empty
-pprThetaArrowTy [pred]
-      | noParenPred pred = ppr_type TopPrec pred <+> darrow
-pprThetaArrowTy preds   = parens (fsep (punctuate comma (map (ppr_type TopPrec) preds)))
+pprThetaArrowTy []     = empty
+pprThetaArrowTy [pred] = ppr_type TyOpPrec pred <+> darrow
+                         -- TyOpPrec:  Num a     => a -> a  does not need parens
+                         --      bug   (a :~: b) => a -> b  currently does
+                         -- Trac # 9658
+pprThetaArrowTy preds  = parens (fsep (punctuate comma (map (ppr_type TopPrec) preds)))
                             <+> darrow
     -- Notice 'fsep' here rather that 'sep', so that
     -- type contexts don't get displayed in a giant column
