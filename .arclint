@@ -16,25 +16,33 @@
       "type": "text",
       "include": ["(\\.(l?hs(-boot)?|x|y\\.pp)(\\.in)?$)"],
       "severity": {
-        "5": "disabled"
+        "5": "disabled",
+        "2": "warning"
       }
     },
     "c": {
       "type": "text",
-      "include": ["(\\.(c|h)(\\.in)?$)"]
+      "include": ["(\\.(c|h)(\\.in)?$)"],
+      "severity": {
+        "2": "warning"
+      }
     },
     "text-xml": {
       "type": "text",
       "include": "(\\.xml$)",
       "severity": {
         "5": "disabled",
-        "3": "disabled"
+        "3": "disabled",
+        "2": "warning"
       }
     },
     "shell": {
       "type": "text",
       "include": [ "(\\.sh$)" ],
-      "text.max-line-length": 200
+      "text.max-line-length": 200,
+      "severity": {
+        "2": "warning"
+      }
     },
     "makefiles": {
       "type": "text",
