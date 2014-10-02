@@ -31,6 +31,7 @@ import Util
 import Maybes
 import TcMType
 import TcType
+import Var( mkTyVar )
 import Name
 import Control.Monad
 import Data.Map (Map)
@@ -56,7 +57,10 @@ newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcRnIf gbl lcl FamInst
 -- Called from the vectoriser monad too, hence the rather general type
 newFamInst flavor axiom@(CoAxiom { co_ax_branches = FirstBranch branch
                                  , co_ax_tc = fam_tc })
-  = do { (subst, tvs') <- tcInstSigTyVarsLoc loc tvs
+  | CoAxBranch { cab_tvs = tvs
+               , cab_lhs = lhs
+               , cab_rhs = rhs } <- branch
+  = do { (subst, tvs') <- instSkolTyVars mk_tv tvs
        ; return (FamInst { fi_fam      = fam_tc_name
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs
@@ -65,12 +69,9 @@ newFamInst flavor axiom@(CoAxiom { co_ax_branches = FirstBranch branch
                          , fi_rhs      = substTy  subst rhs
                          , fi_axiom    = axiom }) }
   where
+    mk_tv uniq old_name kind 
+       = mkTyVar (setNameUnique old_name uniq) kind
     fam_tc_name = tyConName fam_tc
-    CoAxBranch { cab_loc = loc
-               , cab_tvs = tvs
-               , cab_lhs = lhs
-               , cab_rhs = rhs } = branch
-
 \end{code}
 
 

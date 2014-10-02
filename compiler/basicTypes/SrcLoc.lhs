@@ -83,7 +83,6 @@ import Data.Bits
 import Data.Data
 import Data.List
 import Data.Ord
-import System.FilePath( normalise )
 \end{code}
 
 %************************************************************************
@@ -191,15 +190,19 @@ cmpRealSrcLoc (SrcLoc s1 l1 c1) (SrcLoc s2 l2 c2)
 
 instance Outputable RealSrcLoc where
     ppr (SrcLoc src_path src_line src_col)
-      = getPprStyle $ \ sty ->
-        if userStyle sty || debugStyle sty then
-            hcat [ pprFastFilePath src_path, char ':',
-                   int src_line,
-                   char ':', int src_col
-                 ]
-        else
-            hcat [text "{-# LINE ", int src_line, space,
-                  char '\"', pprFastFilePath src_path, text " #-}"]
+      = hcat [ pprFastFilePath src_path <> colon
+             , int src_line <> colon
+             , int src_col ]
+
+-- I don't know why there is this style-based difference
+--        if userStyle sty || debugStyle sty then
+--            hcat [ pprFastFilePath src_path, char ':',
+--                   int src_line,
+--                   char ':', int src_col
+--                 ]
+--        else
+--            hcat [text "{-# LINE ", int src_line, space,
+--                  char '\"', pprFastFilePath src_path, text " #-}"]
 
 instance Outputable SrcLoc where
     ppr (RealSrcLoc l) = ppr l
@@ -463,7 +466,7 @@ pprUserSpan show_path (RealSrcSpan s)   = pprUserRealSpan show_path s
 
 pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
 pprUserRealSpan show_path (SrcSpanOneLine src_path line start_col end_col)
-  = hcat [ ppWhen show_path (text (normalise (unpackFS src_path)) <> colon)
+  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
          , int line <> colon
          , int start_col
          , ppUnless (end_col - start_col <= 1) (char '-' <> int (end_col - 1)) ]
@@ -471,15 +474,15 @@ pprUserRealSpan show_path (SrcSpanOneLine src_path line start_col end_col)
             -- output the starting column number
 
 pprUserRealSpan show_path (SrcSpanMultiLine src_path sline scol eline ecol)
-  = hcat [ ppWhen show_path (text (normalise (unpackFS src_path)) <> colon)
+  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
          , parens (int sline <> comma <> int scol)
-         , char '-' 
+         , char '-'
          , parens (int eline <> comma <> int ecol') ]
- where 
+ where
    ecol' = if ecol == 0 then ecol else ecol - 1
 
 pprUserRealSpan show_path (SrcSpanPoint src_path line col)
-  = hcat [ ppWhen show_path (text (normalise (unpackFS src_path)) <> colon)
+  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
          , int line <> colon
          , int col ]
 \end{code}

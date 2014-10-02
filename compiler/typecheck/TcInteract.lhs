@@ -709,14 +709,15 @@ canSolveByUnification untch gw tv xi
   | isGiven gw   -- See Note [Touchables and givens]
   = False
 
-  | isTouchableMetaTyVar untch tv 
-  , not (isSigTyVar tv) || is_tyvar xi 
-  = True
+  | isTouchableMetaTyVar untch tv
+  = case metaTyVarInfo tv of
+      SigTv -> is_tyvar xi
+      _     -> True
 
-  | otherwise    -- Untouchable, or sig-tyvar with non-tyvar rhs
-  = False  
+  | otherwise    -- Untouchable
+  = False
   where
-    is_tyvar xi 
+    is_tyvar xi
       = case tcGetTyVar_maybe xi of
           Nothing -> False
           Just tv -> case tcTyVarDetails tv of
@@ -1391,7 +1392,7 @@ doTopReact inerts workItem
               -> doTopReactDict inerts fl cls xis
 
            CFunEqCan { cc_ev = fl, cc_fun = tc, cc_tyargs = args , cc_fsk = fsk }
-              -> doTopReactFunEq workItem fl tc args fsk
+              -> doTopReactFunEq fl tc args fsk
 
            _  -> -- Any other work item does not react with any top-level equations
                  return NoTopInt  }
@@ -1460,8 +1461,8 @@ doTopReactDict inerts fl cls xis
             ; return NoTopInt }
 
 --------------------
-doTopReactFunEq :: Ct -> CtEvidence -> TyCon -> [Xi] -> TcTyVar -> TcS TopInteractResult
-doTopReactFunEq _ct old_ev fam_tc args fsk
+doTopReactFunEq :: CtEvidence -> TyCon -> [Xi] -> TcTyVar -> TcS TopInteractResult
+doTopReactFunEq old_ev fam_tc args fsk
   = ASSERT(isSynFamilyTyCon fam_tc) -- No associated data families
                                     -- have reached this far
     -- Look up in top-level instances, or built-in axiom
@@ -1471,7 +1472,14 @@ doTopReactFunEq _ct old_ev fam_tc args fsk
            Just (ax_co, rhs_ty)
 
     -- Found a top-level instance
-    | isGiven old_ev
+
+    | Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
+    , isSynFamilyTyCon tc
+    , tc_args `lengthIs` tyConArity tc    -- Short-cut
+    -> shortCutReduction old_ev fsk ax_co tc tc_args
+         -- Try shortcut; see Note [Short cut for top-level reaction]
+
+    | isGiven old_ev  -- Not shortcut
     -> do { let final_co = mkTcSymCo (ctEvCoercion old_ev) `mkTcTransCo` ax_co
                 -- final_co :: fsk ~ rhs_ty
           ; new_ev <- newGivenEvVar deeper_loc (mkTcEqPred (mkTyVarTy fsk) rhs_ty,
@@ -1509,6 +1517,49 @@ doTopReactFunEq _ct old_ev fam_tc args fsk
            ; unless (null work) (updWorkListTcS (extendWorkListEqs work)) }
       | otherwise
       = return ()
+
+
+shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion
+                  -> TyCon -> [TcType] -> TcS TopInteractResult
+shortCutReduction old_ev fsk ax_co fam_tc tc_args
+  | isGiven old_ev
+  = do { (xis, cos) <- flattenMany (FE { fe_ev = old_ev, fe_mode = FM_FlattenAll }) tc_args
+               -- ax_co :: F args ~ G tc_args
+               -- cos   :: xis ~ tc_args
+               -- old_ev :: F args ~ fsk
+               -- G cos ; sym ax_co ; old_ev :: G xis ~ fsk
+
+       ; new_ev <- newGivenEvVar deeper_loc
+                         ( mkTcEqPred (mkTyConApp fam_tc xis) (mkTyVarTy fsk)
+                         , EvCoercion (mkTcTyConAppCo Nominal fam_tc cos
+                                        `mkTcTransCo` mkTcSymCo ax_co
+                                        `mkTcTransCo` ctEvCoercion old_ev) )
+
+       ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc, cc_tyargs = xis, cc_fsk = fsk }
+       ; updWorkListTcS (extendWorkListFunEq new_ct)
+       ; return $ SomeTopInt { tir_rule = "Fun/Top (given, shortcut)"
+                             , tir_new_item = Stop } }
+
+  | otherwise
+  = do { (xis, cos) <- flattenMany (FE { fe_ev = old_ev, fe_mode = FM_FlattenAll }) tc_args
+               -- ax_co :: F args ~ G tc_args
+               -- cos   :: xis ~ tc_args
+               -- G cos ; sym ax_co ; old_ev :: G xis ~ fsk
+               -- new_ev :: G xis ~ fsk
+               -- old_ev :: F args ~ fsk := ax_co ; sym (G cos) ; new_ev
+
+       ; new_ev <- newWantedEvVarNC loc (mkTcEqPred (mkTyConApp fam_tc xis) (mkTyVarTy fsk))
+       ; setEvBind (ctEvId old_ev)
+                   (EvCoercion (ax_co `mkTcTransCo` mkTcSymCo (mkTcTyConAppCo Nominal fam_tc cos)
+                                      `mkTcTransCo` ctEvCoercion new_ev))
+
+       ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc, cc_tyargs = xis, cc_fsk = fsk }
+       ; updWorkListTcS (extendWorkListFunEq new_ct)
+       ; return $ SomeTopInt { tir_rule = "Fun/Top (wanted, shortcut)"
+                             , tir_new_item = Stop } }
+  where
+    loc = ctev_loc old_ev
+    deeper_loc = bumpCtLocDepth CountTyFunApps loc
 
 dischargeUfsk :: TcTyVar -> TcType -> TcS ()
 -- Assign the final value to a unification flatten-skolem

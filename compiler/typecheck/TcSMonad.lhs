@@ -665,19 +665,20 @@ getInertUnsolved :: TcS ( Cts    -- Unsolved
 -- Return (unsolved-wanteds, insolubles)
 -- Both consist of a mixture of Wanted and Derived
 getInertUnsolved
- = do { IC { inert_eqs = ieqs, inert_funeqs = ifuneqs
+ = do { IC { inert_eqs = tv_eqs, inert_funeqs = fun_eqs
            , inert_irreds = iirreds, inert_dicts = idicts
            , inert_insols = iinsols } <- getInertCans
 
+      ; let unsolved_eqs = foldVarEnv add_if_unsolved_eq [] tv_eqs
       ; dflags <- getDynFlags
-      ; unsolved_funeqs
-          <- foldFunEqs (unflatten_funeq dflags) ifuneqs (return emptyCts)
+      ; (unsolved_eqs, unsolved_fun_eqs)
+          <- foldFunEqs (unflatten_funeq dflags) fun_eqs (return (unsolved_eqs, emptyCts))
 
       ; let unsolved_irreds = Bag.filterBag is_unsolved  iirreds
             unsolved_dicts  = foldDicts  add_if_unsolved idicts  emptyCts
-            unsolved_eqs    = foldVarEnv add_if_unsolveds emptyCts ieqs
-            unsolved_flats  = unsolved_eqs   `unionBags` unsolved_irreds `unionBags`
-                              unsolved_dicts `unionBags` unsolved_funeqs
+            unsolved_flats  = listToBag unsolved_eqs `unionBags`
+                              unsolved_irreds `unionBags`
+                              unsolved_dicts `unionBags` unsolved_fun_eqs
 
       ; unsolved_flats <- wrapTcS (TcM.zonkFlats unsolved_flats)
       ; return ( unsolved_flats, iinsols ) }
@@ -685,48 +686,72 @@ getInertUnsolved
         -- but it'll happen anyway before error reporting
   where
     unflatten_funeq :: DynFlags
-                    -> Ct -> TcS Cts -> TcS Cts
+                    -> Ct -> TcS ([Ct], Cts)
+                          -> TcS ([Ct], Cts)
     unflatten_funeq dflags (CFunEqCan { cc_fun = tc, cc_tyargs = xis
-                                      , cc_fsk = fsk, cc_ev = ev }) rest
+                                      , cc_fsk = fsk, cc_ev = ev }) do_rest
       | isGiven ev -- tv should be a FlatSkol; zonking will eliminate it
-      = rest
+      = do_rest
 
       | otherwise  -- A flatten meta-tv; we now fix its final
                    -- value, and then zonking will eliminate it
       = ASSERT( isWanted ev )  -- CFunEqCans are never Derived
-        do { unsolved <- rest
+        do { (tv_eqs, fun_eqs) <- do_rest
            ; fn_app <- wrapTcS (TcM.zonkTcType (mkTyConApp tc xis))
            ; case occurCheckExpand dflags fsk fn_app of
-               OC_OK fn_app' 
+               OC_OK fn_app'
                  ->    -- Normal case: unflatten
                     do { let evterm = EvCoercion (mkTcNomReflCo fn_app')
-                             evvar  = ctev_evar ev
+                             evvar  = ctEvId ev
                        ; setEvBind evvar evterm
                        ; wrapTcS (TcM.writeMetaTyVar fsk fn_app')
                              -- Write directly into the mutable tyvar
-                             -- Flatten meta-vars are born locally and 
-                             -- die locally
-                       ; return unsolved }
+                             -- Flatten meta-vars are born and die locally
+                       ; return (tv_eqs, fun_eqs) }
 
-               _ ->    -- Occurs check; don't unflatten, instead turn it into a NonCanonical
-                       -- Don't forget to get rid ofthe 
-                    do { tv_ty <- newFlexiTcSTy (tyVarKind fsk)
-                       ; let fn_app' = substTyWith [fsk] [tv_ty] fn_app
-                       ; wrapTcS (TcM.writeMetaTyVar fsk fn_app')
-                       ; new_ev <- newWantedEvVarNC (ctev_loc ev) (mkEqPred fn_app' tv_ty)
-                                   -- w' :: F tau[alpha] ~ alpha
-                       ; setEvBind (ctEvId ev) (EvCoercion (tcLiftCoSubst fsk (ctEvCoercion new_ev) fn_app))
-                       ; return (unsolved `extendCts` mkNonCanonical new_ev) } }
+               -- Occurs check; don't unflatten, instead turn it into a NonCanonical
+               _ | Just (ev1, rhs, new_tv_eqs) <- find_eq fsk tv_eqs
+                 -> do { wrapTcS (TcM.writeMetaTyVar fsk rhs)
+                       ; setEvBind (ctEvId ev1) (EvCoercion (mkTcNomReflCo rhs))
+                       ; return (new_tv_eqs, fun_eqs `extendCts` mkNonCanonical ev) }
 
+                 | otherwise
+                 -> do { tv_ty <- newFlexiTcSTy (tyVarKind fsk)
+                       ; wrapTcS (TcM.writeMetaTyVar fsk tv_ty)
+                       ; return (tv_eqs, fun_eqs `extendCts` mkNonCanonical ev) }
+          }
     unflatten_funeq _ other_ct _ 
       = pprPanic "unflatten_funeq" (ppr other_ct)
+
+    find_eq :: TcTyVar -> [Ct] -> Maybe (CtEvidence, TcType, [Ct])
+    -- (find_eq fsk eqs) finds an equality (fsk ~ ty) or (tv ~ fsk)
+     --                  in eqs, and returns the depleted eqs
+    find_eq _ [] = Nothing
+    find_eq fsk (ct : cts)
+      | CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs } <- ct
+      , tv == fsk
+      = Just (ev, rhs, cts)
+
+      | CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs } <- ct
+      , Just tv_r <- tcGetTyVar_maybe rhs
+      , tv_r == fsk
+      = Just (ev, mkTyVarTy tv, cts)
+
+      | Just (tv, rhs, cts') <- find_eq fsk cts
+      = Just (tv, rhs, ct:cts')
+
+      | otherwise
+      = Nothing
 
     add_if_unsolved :: Ct -> Cts -> Cts
     add_if_unsolved ct cts | is_unsolved ct = cts `extendCts` ct
                            | otherwise      = cts
 
-    add_if_unsolveds :: [Ct] -> Cts -> Cts
-    add_if_unsolveds eqs cts = foldr add_if_unsolved cts eqs
+    add_if_unsolved_eq :: [Ct] -> [Ct] -> [Ct]
+    add_if_unsolved_eq eqs cts
+       | (eq1:_) <- eqs
+       , is_unsolved eq1 = eqs ++ cts
+       | otherwise       = cts
 
     is_unsolved ct = not (isGivenCt ct)   -- Wanted or Derived
 
@@ -737,7 +762,7 @@ getInertGivens untch skol_tvs
   = do { is <- getTcSInerts
        ; let IC { inert_eqs = ieqs, inert_irreds = iirreds, inert_funeqs = funeqs }
                 = inert_cans is
-        
+
              has_given_eqs = foldrBag ((||) . ev_given_here . ctEvidence)  False iirreds
                           || foldVarEnv ((||) . eqs_given_here local_fsks) False ieqs
 

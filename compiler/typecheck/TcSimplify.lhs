@@ -18,7 +18,7 @@ import TcMType as TcM
 import TcType
 import TcSMonad as TcS
 import TcInteract
-import Kind     ( isKind, defaultKind_maybe )
+import Kind     ( isKind, isSubKind, defaultKind_maybe )
 import Inst
 import FunDeps  ( growThetaTyVars )
 import Type     ( classifyPredType, PredTree(..), getClassPredTys_maybe )
@@ -1165,10 +1165,10 @@ floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
        | EqPred ty1 ty2 <- classifyPredType pred
        , Just tv1 <- tcGetTyVar_maybe ty1
        , not (tv1 `elemVarSet` skol_set)
-       , isMetaTyVar tv1   -- Float out alpha ~ ty, 
+       , isMetaTyVar tv1   -- Float out alpha ~ ty,
                            -- which might be unified outside
-       , tyVarsOfType ty2 `disjointVarSet` skol_set 
-       , tyVarKind tv1 `tcEqKind` typeKind ty2  
+       , tyVarsOfType ty2 `disjointVarSet` skol_set
+       , typeKind ty2 `isSubKind` tyVarKind tv1
               -- See Note [Do not float kind-incompatible equalities]
        = True
        | otherwise

@@ -1,11 +1,6 @@
 
 GADTwrong1.hs:12:21:
-    Could not deduce (c ~ b)
-    from the context (() ~ Const c)
-      bound by a pattern with constructor
-                 T :: forall c. c -> T (Const c),
-               in a case alternative
-      at GADTwrong1.hs:12:14-16
+    Couldn't match expected type ‘b’ with actual type ‘c’
       ‘c’ is a rigid type variable bound by
           a pattern with constructor
             T :: forall c. c -> T (Const c),

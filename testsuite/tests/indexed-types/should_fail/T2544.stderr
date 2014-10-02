@@ -1,10 +1,8 @@
 
 T2544.hs:15:12:
-    Could not deduce (IxMap i1 ~ IxMap r)
-    from the context (Ix l, Ix r)
-      bound by the instance declaration at T2544.hs:13:10-37
+    Couldn't match type ‘IxMap i0’ with ‘IxMap l’
     NB: ‘IxMap’ is a type function, and may not be injective
-    The type variable ‘i1’ is ambiguous
+    The type variable ‘i0’ is ambiguous
     Expected type: IxMap (l :|: r) [Int]
       Actual type: BiApp (IxMap i0) (IxMap i1) [Int]
     Relevant bindings include

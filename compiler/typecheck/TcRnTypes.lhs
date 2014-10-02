@@ -932,9 +932,9 @@ type Cts = Bag Ct
 data Ct
   -- Atomic canonical constraints
   = CDictCan {  -- e.g.  Num xi
-      cc_ev :: CtEvidence,   -- See Note [Ct/evidence invariant]
+      cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       cc_class  :: Class,
-      cc_tyargs :: [Xi]
+      cc_tyargs :: [Xi]        -- cc_tyargs are function-free, hence Xi
     }
 
   | CIrredEvCan {  -- These stand for yet-unusable predicates
@@ -946,28 +946,40 @@ data Ct
         -- See Note [CIrredEvCan constraints]
     }
 
-  | CTyEqCan {  -- tv ~ xi      (recall xi means function free)
-       -- Invariant:
+  | CTyEqCan {  -- tv ~ rhs
+       -- Invariants:
        --   * tv not in tvs(xi)   (occurs check)
-       --   * typeKind xi `subKind` typeKind tv
+       --   * If tv is a TauTv, then rhs has no foralls
+       --       (this avoids substituting a forall for the tyvar in other types)
+       --   * typeKind ty `subKind` typeKind tv
        --       See Note [Kind orientation for CTyEqCan]
-       --   * We prefer unification variables on the left *JUST* for efficiency
-      cc_ev :: CtEvidence,    -- See Note [Ct/evidence invariant]
+       --   * rhs is not necessarily function-free,
+       --       but it has no top-level function.
+       --     E.g. a ~ [F b]  is fine
+       --     but  a ~ F b    is not
+       --   * If rhs is also a tv, then it is oriented to give best chance of
+       --     unification happening; eg if rhs is touchable then lhs is too
+      cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       cc_tyvar  :: TcTyVar,
-      cc_rhs    :: Xi
+      cc_rhs    :: TcType      -- Not necessarily function-free (hence not Xi)
+                               -- See invariants above
     }
 
   | CFunEqCan {  -- F xis ~ fsk
-       -- Invariant: * isSynFamilyTyCon cc_fun
-       --            * typeKind (F xis) `subKind` typeKind xi
-       --            * always Nominal role
-       --            * always Given or Watned, never Derived
-       --       See Note [Kind orientation for CFunEqCan]
+       -- Invariants:
+       --   * isSynFamilyTyCon cc_fun
+       --   * typeKind (F xis) = tyVarKind fsk
+       --   * always Nominal role
+       --   * always Given or Wanted, never Derived
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function
-      cc_tyargs :: [Xi],        -- Either under-saturated or exactly saturated
-      cc_fsk    :: TcTyVar      --    *never* over-saturated (because if so
-                                --    we should have decomposed)
+
+      cc_tyargs :: [Xi],        -- cc_tyargs are function-free (hence Xi)
+        -- Either under-saturated or exactly saturated
+        --    *never* over-saturated (because if so
+        --    we should have decomposed)
+
+      cc_fsk    :: TcTyVar
     }
 
   | CNonCanonical {        -- See Note [NonCanonical Semantics]
@@ -1000,31 +1012,6 @@ We can't require *equal* kinds, because
      * wanted constraints don't necessarily have identical kinds
                eg   alpha::? ~ Int
      * a solved wanted constraint becomes a given
-
-Note [Kind orientation for CFunEqCan]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For (F xis ~ rhs) we require that kind(lhs) is a subkind of kind(rhs).
-This really only maters when rhs is an Open type variable (since only type
-variables have Open kinds):
-   F ty ~ (a:Open)
-which can happen, say, from
-      f :: F a b
-      f = undefined   -- The a:Open comes from instantiating 'undefined'
-
-Note that the kind invariant is maintained by rewriting.
-Eg wanted1 rewrites wanted2; if both were compatible kinds before,
-   wanted2 will be afterwards.  Similarly givens.
-
-Caveat:
-  - Givens from higher-rank, such as:
-          type family T b :: * -> * -> *
-          type instance T Bool = (->)
-
-          f :: forall a. ((T a ~ (->)) => ...) -> a -> ...
-          flop = f (...) True
-     Whereas we would be able to apply the type instance, we would not be able to
-     use the given (T Bool ~ (->)) in the body of 'flop'
-
 
 Note [CIrredEvCan constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

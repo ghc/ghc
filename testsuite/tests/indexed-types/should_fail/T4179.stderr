@@ -1,12 +1,7 @@
 
 T4179.hs:26:16:
-    Could not deduce (A3 (x (A2 (FCon x) -> A3 (FCon x)))
-                      ~ A3 (FCon x))
-    from the context (Functor x, DoC (FCon x))
-      bound by the type signature for
-                 fCon :: (Functor x, DoC (FCon x)) =>
-                         Con x -> A2 (FCon x) -> A3 (FCon x)
-      at T4179.hs:25:9-72
+    Couldn't match type ‘A3 (x (A2 (FCon x) -> A3 (FCon x)))’
+                  with ‘A3 (FCon x)’
     NB: ‘A3’ is a type function, and may not be injective
     Expected type: x (A2 (FCon x) -> A3 (FCon x))
                    -> A2 (FCon x) -> A3 (FCon x)

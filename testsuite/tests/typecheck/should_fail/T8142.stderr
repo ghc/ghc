@@ -15,11 +15,7 @@ T8142.hs:6:18:
               h = (\ (_, b) -> ((outI . fmap h) b)) . out
 
 T8142.hs:6:57:
-    Could not deduce (Nu ((,) t) ~ f1 (Nu ((,) t)))
-    from the context (Functor f, Coinductive f)
-      bound by the type signature for
-                 tracer :: (Functor f, Coinductive f) => (c -> f c) -> c -> f c
-      at T8142.hs:5:11-64
+    Couldn't match type ‘Nu ((,) t)’ with ‘f1 (Nu ((,) t))’
     Expected type: Nu ((,) t) -> (t, f1 (Nu ((,) t)))
       Actual type: Nu ((,) t) -> (t, Nu ((,) t))
     Relevant bindings include

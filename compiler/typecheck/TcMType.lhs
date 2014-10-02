@@ -39,8 +39,10 @@ module TcMType (
   tcInstType,
   tcInstSkolTyVars, tcInstSuperSkolTyVars,tcInstSuperSkolTyVarsX,
   tcInstSigTyVarsLoc, tcInstSigTyVars,
-  tcInstSkolTyVar, tcInstSkolType,
+  tcInstSkolType,
   tcSkolDFunType, tcSuperSkolTyVars,
+
+  instSkolTyVars,
 
   --------------------------------
   -- Zonking
@@ -212,73 +214,64 @@ tcSuperSkolTyVar subst tv
     kind   = substTy subst (tyVarKind tv)
     new_tv = mkTcTyVar (tyVarName tv) kind superSkolemTv
 
-tcInstSkolTyVar :: SrcSpan -> Bool -> TvSubst -> TyVar
-                -> TcRnIf gbl lcl (TvSubst, TcTyVar)
--- Instantiate the tyvar, using
---      * the occ-name and kind of the supplied tyvar,
---      * the unique from the monad,
---      * the location either from the tyvar (skol_info = SigSkol)
---                     or from the monad (otherwise)
-tcInstSkolTyVar loc overlappable subst tyvar
-  = do  { uniq <- newUnique
-        ; let new_name = mkInternalName uniq occ loc
-              new_tv   = mkTcTyVar new_name kind (SkolemTv overlappable)
-        ; return (extendTvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
-  where
-    old_name = tyVarName tyvar
-    occ      = nameOccName old_name
-    kind     = substTy subst (tyVarKind tyvar)
-
--- Wrappers
--- we need to be able to do this from outside the TcM monad:
 tcInstSkolTyVars :: [TyVar] -> TcM (TvSubst, [TcTyVar])
-tcInstSkolTyVars = tcInstSkolTyVarsX (mkTopTvSubst [])
+tcInstSkolTyVars = tcInstSkolTyVars' False emptyTvSubst
 
 tcInstSuperSkolTyVars :: [TyVar] -> TcM [TcTyVar]
-tcInstSuperSkolTyVars = fmap snd . tcInstSkolTyVars' True  (mkTopTvSubst [])
+tcInstSuperSkolTyVars = fmap snd . tcInstSuperSkolTyVarsX emptyTvSubst
 
-tcInstSkolTyVarsX, tcInstSuperSkolTyVarsX
-  :: TvSubst -> [TyVar] -> TcM (TvSubst, [TcTyVar])
-tcInstSkolTyVarsX      subst = tcInstSkolTyVars' False subst
-tcInstSuperSkolTyVarsX subst = tcInstSkolTyVars' True  subst
+tcInstSuperSkolTyVarsX :: TvSubst -> [TyVar] -> TcM (TvSubst, [TcTyVar])
+tcInstSuperSkolTyVarsX subst = tcInstSkolTyVars' True subst
 
 tcInstSkolTyVars' :: Bool -> TvSubst -> [TyVar] -> TcM (TvSubst, [TcTyVar])
 -- Precondition: tyvars should be ordered (kind vars first)
 -- see Note [Kind substitution when instantiating]
 -- Get the location from the monad; this is a complete freshening operation
-tcInstSkolTyVars' isSuperSkol subst tvs
+tcInstSkolTyVars' overlappable subst tvs
   = do { loc <- getSrcSpanM
-       ; mapAccumLM (tcInstSkolTyVar loc isSuperSkol) subst tvs }
+       ; instSkolTyVarsX (mkTcSkolTyVar loc overlappable) subst tvs }
+
+mkTcSkolTyVar :: SrcSpan -> Bool -> Unique -> Name -> Kind -> TcTyVar
+mkTcSkolTyVar loc overlappable uniq old_name kind
+  = mkTcTyVar (mkInternalName uniq (getOccName old_name) loc)
+              kind
+              (SkolemTv overlappable)
 
 tcInstSigTyVarsLoc :: SrcSpan -> [TyVar] -> TcRnIf gbl lcl (TvSubst, [TcTyVar])
 -- We specify the location
-tcInstSigTyVarsLoc loc = mapAccumLM (tcInstSkolTyVar loc False) (mkTopTvSubst [])
+tcInstSigTyVarsLoc loc = instSkolTyVars (mkTcSkolTyVar loc False)
 
 tcInstSigTyVars :: [TyVar] -> TcRnIf gbl lcl (TvSubst, [TcTyVar])
 -- Get the location from the TyVar itself, not the monad
-tcInstSigTyVars = mapAccumLM inst_tv (mkTopTvSubst [])
+tcInstSigTyVars
+  = instSkolTyVars mk_tv
   where
-    inst_tv subst tv = tcInstSkolTyVar (getSrcSpan tv) False subst tv
+    mk_tv uniq old_name kind
+       = mkTcTyVar (setNameUnique old_name uniq) kind (SkolemTv False)
 
 tcInstSkolType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type with fresh skolem constants
 -- Binding location comes from the monad
 tcInstSkolType ty = tcInstType tcInstSkolTyVars ty
 
-newSigTyVar :: Name -> Kind -> TcM TcTyVar
-newSigTyVar name kind
-  = do { uniq <- newUnique
-       ; let name' = setNameUnique name uniq
-                      -- Use the same OccName so that the tidy-er
-                      -- doesn't gratuitously rename 'a' to 'a0' etc
-       ; details <- newMetaDetails SigTv
-       ; return (mkTcTyVar name' kind details) }
+------------------
+instSkolTyVars :: (Unique -> Name -> Kind -> TyVar)
+                -> [TyVar] -> TcRnIf gbl lcl (TvSubst, [TyVar])
+instSkolTyVars mk_tv = instSkolTyVarsX mk_tv emptyTvSubst
 
-newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
-newMetaDetails info
-  = do { ref <- newMutVar Flexi
-       ; untch <- getUntouchables
-       ; return (MetaTv { mtv_info = info, mtv_ref = ref, mtv_untch = untch }) }
+instSkolTyVarsX :: (Unique -> Name -> Kind -> TyVar)
+                -> TvSubst -> [TyVar] -> TcRnIf gbl lcl (TvSubst, [TyVar])
+instSkolTyVarsX mk_tv = mapAccumLM (instSkolTyVarX mk_tv)
+
+instSkolTyVarX :: (Unique -> Name -> Kind -> TyVar)
+               -> TvSubst -> TyVar -> TcRnIf gbl lcl (TvSubst, TyVar)
+instSkolTyVarX mk_tv subst tyvar
+  = do  { uniq <- newUnique
+        ; let new_tv = mk_tv uniq old_name kind
+        ; return (extendTvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
+  where
+    old_name = tyVarName tyvar
+    kind     = substTy subst (tyVarKind tyvar)
 \end{code}
 
 Note [Kind substitution when instantiating]
@@ -316,6 +309,21 @@ newMetaTyVar meta_info kind
                         SigTv      -> fsLit "a"
         ; details <- newMetaDetails meta_info
         ; return (mkTcTyVar name kind details) }
+
+newSigTyVar :: Name -> Kind -> TcM TcTyVar
+newSigTyVar name kind
+  = do { uniq <- newUnique
+       ; let name' = setNameUnique name uniq
+                      -- Use the same OccName so that the tidy-er
+                      -- doesn't gratuitously rename 'a' to 'a0' etc
+       ; details <- newMetaDetails SigTv
+       ; return (mkTcTyVar name' kind details) }
+
+newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
+newMetaDetails info
+  = do { ref <- newMutVar Flexi
+       ; untch <- getUntouchables
+       ; return (MetaTv { mtv_info = info, mtv_ref = ref, mtv_untch = untch }) }
 
 cloneMetaTyVar :: TcTyVar -> TcM TcTyVar
 cloneMetaTyVar tv
@@ -436,21 +444,15 @@ newPolyFlexiTyVarTy :: TcM TcType
 newPolyFlexiTyVarTy = do { tv <- newMetaTyVar PolyTv liftedTypeKind
                          ; return (TyVarTy tv) }
 
-tcInstTyVars :: [TKVar] -> TcM ([TcTyVar], [TcType], TvSubst)
+tcInstTyVars :: [TKVar] -> TcM (TvSubst, [TcTyVar])
 -- Instantiate with META type variables
 -- Note that this works for a sequence of kind and type
 -- variables.  Eg    [ (k:BOX), (a:k->k) ]
 --             Gives [ (k7:BOX), (a8:k7->k7) ]
-tcInstTyVars tyvars = tcInstTyVarsX emptyTvSubst tyvars
+tcInstTyVars tyvars = mapAccumLM tcInstTyVarX emptyTvSubst tyvars
     -- emptyTvSubst has an empty in-scope set, but that's fine here
     -- Since the tyvars are freshly made, they cannot possibly be
     -- captured by any existing for-alls.
-
-tcInstTyVarsX :: TvSubst -> [TKVar] -> TcM ([TcTyVar], [TcType], TvSubst)
--- The "X" part is because of extending the substitution
-tcInstTyVarsX subst tyvars =
-  do { (subst', tyvars') <- mapAccumLM tcInstTyVarX subst tyvars
-     ; return (tyvars', mkTyVarTys tyvars', subst') }
 
 tcInstTyVarX :: TvSubst -> TKVar -> TcM (TvSubst, TcTyVar)
 -- Make a new unification variable tyvar whose Name and Kind come from
