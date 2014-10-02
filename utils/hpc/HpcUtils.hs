@@ -3,10 +3,6 @@ module HpcUtils where
 import Trace.Hpc.Util
 import qualified Data.Map as Map
 
-dropWhileEndLE :: (a -> Bool) -> [a] -> [a]
--- Spec: dropWhileEndLE p = reverse . dropWhileEnd . reverse
-dropWhileEndLE p = foldr (\x r -> if null r && p x then [] else x:r) []
-
 -- turns \n into ' '
 -- | grab's the text behind a HpcPos; 
 grabHpcPos :: Map.Map Int String -> HpcPos -> String

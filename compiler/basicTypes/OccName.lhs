@@ -833,7 +833,7 @@ tidyOccName env occ@(OccName occ_sp fs)
         Nothing -> (addToUFM env fs 1, occ)
   where
     base :: String  -- Drop trailing digits (see Note [TidyOccEnv])
-    base = dropWhileEndLE isDigit (unpackFS fs)
+    base = reverse (dropWhile isDigit (reverse (unpackFS fs)))
 
     find n
       = case lookupUFM env new_fs of

@@ -23,8 +23,6 @@ module Util (
         mapAndUnzip, mapAndUnzip3, mapAccumL2,
         nOfThem, filterOut, partitionWith, splitEithers,
 
-        dropWhileEndLE,
-
         foldl1', foldl2, count, all2,
 
         lengthExceeds, lengthIs, lengthAtLeast,
@@ -595,18 +593,6 @@ dropTail n xs
     go _      _      = []  -- Stop when ys runs out
                            -- It'll always run out before xs does
 
--- dropWhile from the end of a list. This is similar to Data.List.dropWhileEnd,
--- but is lazy in the elements and strict in the spine. For reasonably short lists,
--- such as path names and typical lines of text, dropWhileEndLE is generally
--- faster than dropWhileEnd. Its advantage is magnified when the predicate is
--- expensive--using dropWhileEndLE isSpace to strip the space off a line of text
--- is generally much faster than using dropWhileEnd isSpace for that purpose.
--- Specification: dropWhileEndLE p = reverse . dropWhile p . reverse
--- Pay attention to the short-circuit (&&)! The order of its arguments is the only
--- difference between dropWhileEnd and dropWhileEndLE.
-dropWhileEndLE :: (a -> Bool) -> [a] -> [a]
-dropWhileEndLE p = foldr (\x r -> if null r && p x then [] else x:r) []
-
 snocView :: [a] -> Maybe ([a],a)
         -- Split off the last element
 snocView [] = Nothing
@@ -665,7 +651,7 @@ cmpList cmp (a:as) (b:bs)
 
 \begin{code}
 removeSpaces :: String -> String
-removeSpaces = dropWhileEndLE isSpace . dropWhile isSpace
+removeSpaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 \end{code}
 
 %************************************************************************
