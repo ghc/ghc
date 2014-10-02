@@ -1,6 +1,6 @@
 
 T8142.hs:6:18:
-    Couldn't match type ‘Nu f0’ with ‘Nu f’
+    Couldn't match type ‘Nu f’ with ‘Nu f0’
     NB: ‘Nu’ is a type function, and may not be injective
     The type variable ‘f0’ is ambiguous
     Expected type: Nu ((,) t) -> Nu f

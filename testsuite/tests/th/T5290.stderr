@@ -1,6 +1,8 @@
 T5290.hs:1:1: Splicing declarations
-    let n = mkName "T"
-    in return [DataD [] n [] [NormalC n [(Unpacked, ConT ''Int)]] []]
+    let n_apx = mkName "T"
+    in
+      return
+        [DataD [] n_apx [] [NormalC n_apx [(Unpacked, ConT ''Int)]] []]
   ======>
     T5290.hs:(7,4)-(8,67)
     data T = T {-# UNPACK #-} !Int

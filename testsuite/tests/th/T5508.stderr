@@ -1,7 +1,7 @@
 T5508.hs:(7,9)-(9,28): Splicing expression
-    do { let x = mkName "x"
-             v = return (LamE [VarP x] $ VarE x);
-         [| $v . id |]
-         pending(rn) [<splice, v>] }
+    do { let x_apx = mkName "x"
+             v_apy = return (LamE [VarP x_apx] $ VarE x_apx);
+         [| $v_apy . id |]
+         pending(rn) [<splice_a1TA, v_apy>] }
   ======>
     ((\ x -> x) . id)

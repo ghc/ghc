@@ -27,7 +27,7 @@ module ErrUtils (
         mkDumpDoc, dumpSDoc,
 
         --  * Messages during compilation
-        putMsg, putMsgWith,
+        putMsg, printInfoForUser, printOutputForUser,
         logInfo, logOutput,
         errorMsg,
         fatalErrorMsg, fatalErrorMsg', fatalErrorMsg'',
@@ -346,13 +346,6 @@ ifVerbose dflags val act
   | verbosity dflags >= val = act
   | otherwise               = return ()
 
-putMsg :: DynFlags -> MsgDoc -> IO ()
-putMsg dflags msg = logInfo dflags defaultUserStyle msg
-
-putMsgWith :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
-putMsgWith dflags print_unqual msg
-  = logInfo dflags (mkUserStyle print_unqual AllTheWay) msg
-
 errorMsg :: DynFlags -> MsgDoc -> IO ()
 errorMsg dflags msg
    = log_action dflags dflags SevError noSrcSpan (defaultErrStyle dflags) msg
@@ -381,6 +374,17 @@ debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
 debugTraceMsg dflags val msg = ifVerbose dflags val $
                                logInfo dflags defaultDumpStyle msg
 
+putMsg :: DynFlags -> MsgDoc -> IO ()
+putMsg dflags msg = logInfo dflags defaultUserStyle msg
+
+printInfoForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
+printInfoForUser dflags print_unqual msg
+  = logInfo dflags (mkUserStyle print_unqual AllTheWay) msg
+
+printOutputForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
+printOutputForUser dflags print_unqual msg
+  = logOutput dflags (mkUserStyle print_unqual AllTheWay) msg
+
 logInfo :: DynFlags -> PprStyle -> MsgDoc -> IO ()
 logInfo dflags sty msg = log_action dflags dflags SevInfo noSrcSpan sty msg
 
@@ -392,11 +396,11 @@ prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
 prettyPrintGhcErrors dflags
     = ghandle $ \e -> case e of
                       PprPanic str doc ->
-                          pprDebugAndThen dflags panic str doc
+                          pprDebugAndThen dflags panic (text str) doc
                       PprSorry str doc ->
-                          pprDebugAndThen dflags sorry str doc
+                          pprDebugAndThen dflags sorry (text str) doc
                       PprProgramError str doc ->
-                          pprDebugAndThen dflags pgmError str doc
+                          pprDebugAndThen dflags pgmError (text str) doc
                       _ ->
                           liftIO $ throwIO e
 \end{code}

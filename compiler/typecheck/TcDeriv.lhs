@@ -390,9 +390,9 @@ tcDeriving tycl_decls inst_decls deriv_decls
             renameDeriv is_boot (inst_infos ++ (bagToList extraInstances)) binds
 
         ; dflags <- getDynFlags
-        ; unless (isEmptyBag inst_info || not (dopt Opt_D_dump_deriv dflags)) $
-          printForUserTcRn   bliftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
-                   (ddump_deriving inst_info rn_binds newTyCons famInsts))
+        ; unless (isEmptyBag inst_info) $
+             liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
+                        (ddump_deriving inst_info rn_binds newTyCons famInsts))
 
         ; let all_tycons = map ATyCon (bagToList newTyCons)
         ; gbl_env <- tcExtendGlobalEnv all_tycons $

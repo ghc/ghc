@@ -483,20 +483,22 @@ traceIf      = traceOptIf Opt_D_dump_if_trace
 traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
 
-traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
-traceOptIf flag doc = whenDOptM flag $
-                          do dflags <- getDynFlags
-                             liftIO (printInfoForUser dflags alwaysQualify doc)
+traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()
+traceOptIf flag doc 
+  = whenDOptM flag $    -- No RdrEnv available, so qualify everything
+    do { dflags <- getDynFlags
+       ; liftIO (putMsg dflags doc) }
 
 traceOptTcRn :: DumpFlag -> SDoc -> TcRn ()
 -- Output the message, with current location if opt_PprStyle_Debug
-traceOptTcRn flag doc = whenDOptM flag $ do
-                        { loc  <- getSrcSpanM
-                        ; let real_doc
-                                | opt_PprStyle_Debug = mkLocMessage SevInfo loc doc
-                                | otherwise = doc   -- The full location is
-                                                    -- usually way too much
-                        ; dumpTcRn real_doc }
+traceOptTcRn flag doc 
+  = whenDOptM flag $
+    do { loc  <- getSrcSpanM
+       ; let real_doc
+               | opt_PprStyle_Debug = mkLocMessage SevInfo loc doc
+               | otherwise = doc   -- The full location is
+                                   -- usually way too much
+       ; dumpTcRn real_doc }
 
 dumpTcRn :: SDoc -> TcRn ()
 dumpTcRn doc
@@ -509,7 +511,7 @@ printForUserTcRn :: SDoc -> TcRn ()
 printForUserTcRn doc
   = do { dflags <- getDynFlags
        ; rdr_env <- getGlobalRdrEnv
-       ; liftIO (putMsgWith dflags (mkPrintUnqualified dflags rdr_env) doc) }
+       ; liftIO (printInfoForUser dflags (mkPrintUnqualified dflags rdr_env) doc) }
 
 debugDumpTcRn :: SDoc -> TcRn ()
 debugDumpTcRn doc | opt_NoDebugOutput = return ()

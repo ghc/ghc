@@ -29,6 +29,7 @@ import Kind
 import GHC
 import Outputable
 import PprTyThing
+import ErrUtils
 import MonadUtils
 import DynFlags
 import Exception
