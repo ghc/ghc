@@ -5,7 +5,7 @@ T7558.hs:8:4:
           the type signature for f :: T a a -> Bool at T7558.hs:7:6
     Inaccessible code in
       a pattern with constructor
-        MkT :: forall a b. a ~ Maybe b => a -> Maybe b -> T a b,
+        MkT :: forall a b. (a ~ Maybe b) => a -> Maybe b -> T a b,
       in an equation for ‘f’
     Relevant bindings include
       f :: T a a -> Bool (bound at T7558.hs:8:1)
