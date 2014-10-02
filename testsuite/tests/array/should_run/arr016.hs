@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, DatatypeContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
@@ -151,7 +151,7 @@ instance Show (a -> b) where { show _ = "<FN>" }
 
 ------------------------------------------------------------------------------
 
-data (Ix a) => Array a b = MkArray (a,a) (a -> b) deriving ()
+data Array a b = MkArray (a,a) (a -> b) deriving ()
 
 array       :: (Ix a) => (a,a) -> [(a,b)] -> Array a b
 array b ivs =
@@ -258,6 +258,10 @@ generate n rnd (Gen m) = m size rnd'
 
 instance Functor Gen where
   fmap f m = m >>= return . f
+
+instance Applicative Gen where
+  pure  = return
+  (<*>) = liftM2 id
 
 instance Monad Gen where
   return a    = Gen (\n r -> a)
