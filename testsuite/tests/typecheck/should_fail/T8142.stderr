@@ -1,8 +1,8 @@
 
 T8142.hs:6:18:
-    Couldn't match type ‘Nu f’ with ‘Nu f0’
+    Couldn't match type ‘Nu ((,) t0)’ with ‘Nu ((,) t)’
     NB: ‘Nu’ is a type function, and may not be injective
-    The type variable ‘f0’ is ambiguous
+    The type variable ‘t0’ is ambiguous
     Expected type: Nu ((,) t) -> Nu f
       Actual type: Nu ((,) t0) -> Nu f0
     When checking that ‘h’ has the inferred type

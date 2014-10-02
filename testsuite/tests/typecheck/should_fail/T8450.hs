@@ -6,3 +6,6 @@ runEffect = undefined
 
 run :: forall a. a
 run = runEffect $ (undefined :: Either a ())
+
+{-  Either a () ~ Either Bool alpha
+    a ~ alpha -}

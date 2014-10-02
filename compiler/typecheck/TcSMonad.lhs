@@ -660,19 +660,19 @@ setInertFunEqs :: FunEqMap Ct -> TcS ()
 setInertFunEqs funeqs 
   = updInertCans (\ic -> ic { inert_funeqs = funeqs })
 
-getInertUnsolved :: TcS ( Cts    -- Unsolved
-                        , Cts )  -- Insoluble
+getInertUnsolved :: TcS (Cts, Cts)  -- Insoluble
 -- Return (unsolved-wanteds, insolubles)
 -- Both consist of a mixture of Wanted and Derived
 getInertUnsolved
- = do { IC { inert_eqs = tv_eqs, inert_funeqs = fun_eqs
+ = do { inerts@IC { inert_eqs = tv_eqs, inert_funeqs = fun_eqs
            , inert_irreds = iirreds, inert_dicts = idicts
            , inert_insols = iinsols } <- getInertCans
 
       ; let unsolved_eqs = foldVarEnv add_if_unsolved_eq [] tv_eqs
       ; dflags <- getDynFlags
       ; (unsolved_eqs, unsolved_fun_eqs)
-          <- foldFunEqs (unflatten_funeq dflags) fun_eqs (return (unsolved_eqs, emptyCts))
+          <- foldFunEqs (unflatten_funeq dflags) fun_eqs 
+                        (return (unsolved_eqs, emptyCts))
 
       ; let unsolved_irreds = Bag.filterBag is_unsolved  iirreds
             unsolved_dicts  = foldDicts  add_if_unsolved idicts  emptyCts
@@ -681,6 +681,10 @@ getInertUnsolved
                               unsolved_dicts `unionBags` unsolved_fun_eqs
 
       ; unsolved_flats <- wrapTcS (TcM.zonkFlats unsolved_flats)
+      ; traceTcS "unflattening" $ braces $ vcat
+           [ ptext (sLit "Inerts = ") <+> ppr inerts
+           , ptext (sLit "Flats = ") <+> ppr unsolved_flats
+           , ptext (sLit "Insols = ") <+> ppr iinsols ]
       ; return ( unsolved_flats, iinsols ) }
         -- It would be perfectly OK to zonk the insolubles too,
         -- but it'll happen anyway before error reporting

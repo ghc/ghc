@@ -832,7 +832,10 @@ kick_out new_ev new_tv (IC { inert_eqs = tv_eqs
       =  (eqCanRewrite new_tv new_ev ev)  -- See Note [Delicate equality kick-out]
       && (new_tv == tv ||                    
           new_tv `elemVarSet` kind_vars ||       -- (1)
-          (not (eqCanRewrite tv ev new_ev) &&    -- (2)
+-- ToDO: I totally do not understand this "not eqCanRewrite" stuff.
+--       It seems quite wrong to me
+-- Omitting for now
+          (   -- not (eqCanRewrite tv ev new_ev) &&    -- (2)
            new_tv `elemVarSet` (extendVarSet (tyVarsOfType rhs) tv)))
       where
         kind_vars = tyVarsOfType (tyVarKind tv) `unionVarSet`
@@ -870,7 +873,6 @@ closeOverKinds to make sure we see k2.
 
 This is not pretty. Maybe (~) should have kind 
    (~) :: forall k1 k1. k1 -> k2 -> Constraint
-
 
 Note [Kick out insolubles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
