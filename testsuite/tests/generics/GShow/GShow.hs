@@ -3,8 +3,8 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE TypeOperators              #-}
-{-# LANGUAGE IncoherentInstances        #-} -- :-/
 {-# LANGUAGE DefaultSignatures          #-}
+{-# LANGUAGE PolyKinds                  #-}
 
 module GShow (
   -- * Generic show class
@@ -120,5 +120,5 @@ instance (GShow a) => GShow [a] where
                       (intersperse (showChar ',') (map (gshowsPrec 0) l))
                    . showChar ']'
 
-instance (GShow a) => GShow (Maybe a)
+instance (GShow a)          => GShow (Maybe a)
 instance (GShow a, GShow b) => GShow (a,b)

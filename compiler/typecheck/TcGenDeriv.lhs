@@ -87,7 +87,6 @@ data DerivStuff     -- Please add this auxiliary stuff
   = DerivAuxBind AuxBindSpec
 
   -- Generics
-  | DerivTyCon TyCon                   -- New data types
   | DerivFamInst FamInst               -- New type family instances
 
   -- New top-level auxiliary bindings
@@ -2018,7 +2017,6 @@ genAuxBindSpec loc (DerivMaxTag tycon)
 type SeparateBagsDerivStuff = -- AuxBinds and SYB bindings
                               ( Bag (LHsBind RdrName, LSig RdrName)
                                 -- Extra bindings (used by Generic only)
-                              , Bag TyCon   -- Extra top-level datatypes
                               , Bag (FamInst)           -- Extra family instances
                               , Bag (InstInfo RdrName)) -- Extra instances
 
@@ -2033,18 +2031,16 @@ genAuxBinds loc b = genAuxBinds' b2 where
 
   genAuxBinds' :: BagDerivStuff -> SeparateBagsDerivStuff
   genAuxBinds' = foldrBag f ( mapBag (genAuxBindSpec loc) (rm_dups b1)
-                            , emptyBag, emptyBag, emptyBag)
+                            , emptyBag, emptyBag)
   f :: DerivStuff -> SeparateBagsDerivStuff -> SeparateBagsDerivStuff
   f (DerivAuxBind _) = panic "genAuxBinds'" -- We have removed these before
   f (DerivHsBind  b) = add1 b
-  f (DerivTyCon   t) = add2 t
-  f (DerivFamInst t) = add3 t
-  f (DerivInst    i) = add4 i
+  f (DerivFamInst t) = add2 t
+  f (DerivInst    i) = add3 i
 
-  add1 x (a,b,c,d) = (x `consBag` a,b,c,d)
-  add2 x (a,b,c,d) = (a,x `consBag` b,c,d)
-  add3 x (a,b,c,d) = (a,b,x `consBag` c,d)
-  add4 x (a,b,c,d) = (a,b,c,x `consBag` d)
+  add1 x (a,b,c) = (x `consBag` a,b,c)
+  add2 x (a,b,c) = (a,x `consBag` b,c)
+  add3 x (a,b,c) = (a,b,x `consBag` c)
 
 mk_data_type_name :: TyCon -> RdrName   -- "$tT"
 mk_data_type_name tycon = mkAuxBinderName (tyConName tycon) mkDataTOcc
