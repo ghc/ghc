@@ -15,11 +15,11 @@ test('arith007', normal, compile_and_run, [''])
 ways = normal
 opts = ''
 if config.platform.startswith('i386-'):
-    if config.compiler_type == 'ghc' and \
+   if config.compiler_type == 'ghc' and \
       version_ge(config.compiler_version, '6.13'):
-        opts = '-msse2'
-    else:
-        ways = expect_fail_for(['optasm','threaded2','hpc','dyn','profasm'])
+	opts = '-msse2'
+   else:
+	ways = expect_fail_for(['optasm','threaded2','hpc','dyn','profasm'])
 
 test('arith008', ways, compile_and_run, [opts])
 
