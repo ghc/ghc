@@ -1,6 +1,6 @@
 def f(name, opts):
-  if (ghc_with_interpreter == 0):
-	opts.skip = 1
+    if (ghc_with_interpreter == 0):
+        opts.skip = 1
 
 setTestOpts(f)
 setTestOpts(when(compiler_lt('ghc', '7.1'), skip))
