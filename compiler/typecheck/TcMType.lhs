@@ -42,7 +42,7 @@ module TcMType (
   tcInstSkolType,
   tcSkolDFunType, tcSuperSkolTyVars,
 
-  instSkolTyVars,
+  instSkolTyVars, freshenTyVarBndrs,
 
   --------------------------------
   -- Zonking
@@ -253,6 +253,15 @@ tcInstSkolType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type with fresh skolem constants
 -- Binding location comes from the monad
 tcInstSkolType ty = tcInstType tcInstSkolTyVars ty
+
+------------------
+freshenTyVarBndrs :: [TyVar] -> TcRnIf gbl lcl (TvSubst, [TyVar])
+-- ^ Give fresh uniques to a bunch of TyVars, but they stay
+--   as TyVars, rather than becoming TcTyVars
+-- Used in FamInst.newFamInst, and Inst.newClsInst
+freshenTyVarBndrs = instSkolTyVars mk_tv
+  where
+    mk_tv uniq old_name kind = mkTyVar (setNameUnique old_name uniq) kind
 
 ------------------
 instSkolTyVars :: (Unique -> Name -> Kind -> TyVar)

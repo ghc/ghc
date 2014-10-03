@@ -15,6 +15,7 @@ module Inst (
 
        newOverloadedLit, mkOverLit,
 
+       newClsInst,
        tcGetInsts, tcGetInstEnvs, getOverlapFlag,
        tcExtendLocalInstEnv, instCallConstraints, newMethodFromName,
        tcSyntaxName,
@@ -44,6 +45,8 @@ import Type
 import Coercion ( Role(..) )
 import TcType
 import HscTypes
+import Class( Class )
+import MkId( mkDictFunId )
 import Id
 import Name
 import Var      ( EvVar, varType, setVarType )
@@ -382,18 +385,19 @@ syntaxNameCtxt name orig ty tidy_env
 %************************************************************************
 
 \begin{code}
-getOverlapFlag :: TcM OverlapFlag
-getOverlapFlag
+getOverlapFlag :: Maybe OverlapMode -> TcM OverlapFlag
+getOverlapFlag overlap_mode
   = do  { dflags <- getDynFlags
         ; let overlap_ok    = xopt Opt_OverlappingInstances dflags
               incoherent_ok = xopt Opt_IncoherentInstances  dflags
               use x = OverlapFlag { isSafeOverlap = safeLanguageOn dflags
                                   , overlapMode   = x }
-              overlap_flag | incoherent_ok = use Incoherent
-                           | overlap_ok    = use Overlaps
-                           | otherwise     = use NoOverlap
+              default_oflag | incoherent_ok = use Incoherent
+                            | overlap_ok    = use Overlaps
+                            | otherwise     = use NoOverlap
 
-        ; return overlap_flag }
+              final_oflag = setOverlapModeMaybe default_oflag overlap_mode
+        ; return final_oflag }
 
 tcGetInstEnvs :: TcM (InstEnv, InstEnv)
 -- Gets both the external-package inst-env
@@ -404,6 +408,20 @@ tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
 tcGetInsts :: TcM [ClsInst]
 -- Gets the local class instances.
 tcGetInsts = fmap tcg_insts getGblEnv
+
+newClsInst :: Maybe OverlapMode -> Name -> [TyVar] -> ThetaType
+           -> Class -> [Type] -> TcM ClsInst
+newClsInst overlap_mode dfun_name tvs theta clas tys
+  = do { (subst, tvs') <- freshenTyVarBndrs tvs
+             -- Be sure to freshen those type variables,
+             -- so they are sure not to appear in any lookup
+       ; let theta' = substTheta subst theta
+             tys'   = substTys subst tys
+             dfun   = mkDictFunId dfun_name tvs' theta' clas tys'
+                      -- We don't really need to substitute in the dfun's type,
+                      -- but it avoids gratuitous differences if we do so
+       ; oflag <- getOverlapFlag overlap_mode
+       ; return (mkLocalInstance dfun oflag tvs' clas tys') }
 
 tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
   -- Add new locally-defined instances
@@ -468,7 +486,11 @@ addLocalInst (home_ie, my_insts) ispec
            dupInstErr ispec (head dups)
 
          ; return (extendInstEnv home_ie' ispec, ispec:my_insts') }
+\end{code}
 
+Errors and tracing
+
+\begin{code}
 traceDFuns :: [ClsInst] -> TcRn ()
 traceDFuns ispecs
   = traceTc "Adding instances:" (vcat (map pp ispecs))

@@ -31,7 +31,6 @@ import Util
 import Maybes
 import TcMType
 import TcType
-import Var( mkTyVar )
 import Name
 import Control.Monad
 import Data.Map (Map)
@@ -60,18 +59,14 @@ newFamInst flavor axiom@(CoAxiom { co_ax_branches = FirstBranch branch
   | CoAxBranch { cab_tvs = tvs
                , cab_lhs = lhs
                , cab_rhs = rhs } <- branch
-  = do { (subst, tvs') <- instSkolTyVars mk_tv tvs
-       ; return (FamInst { fi_fam      = fam_tc_name
+  = do { (subst, tvs') <- freshenTyVarBndrs tvs
+       ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs
                          , fi_tvs      = tvs'
                          , fi_tys      = substTys subst lhs
                          , fi_rhs      = substTy  subst rhs
                          , fi_axiom    = axiom }) }
-  where
-    mk_tv uniq old_name kind 
-       = mkTyVar (setNameUnique old_name uniq) kind
-    fam_tc_name = tyConName fam_tc
 \end{code}
 
 
