@@ -7,6 +7,8 @@
  * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
+#include "ghcconfig.h"
+
 #include "Rts.h"
 #include "rts/Bytecodes.h"  /* for InstrPtr */
 
@@ -664,8 +666,16 @@ const char *lookupGHCName( void *addr )
    disabling this for now.
 */
 #ifdef USING_LIBBFD
-
-#include <bfd.h>
+#    define PACKAGE 1
+#    define PACKAGE_VERSION 1
+/* Those PACKAGE_* defines are workarounds for bfd:
+ *     https://sourceware.org/bugzilla/show_bug.cgi?id=14243
+ * ghc's build system filter PACKAGE_* values out specifically to avoid clashes
+ * with user's autoconf-based Cabal packages.
+ * It's a shame <bfd.h> checks for unrelated fields instead of actually used
+ * macros.
+ */
+#    include <bfd.h>
 
 /* Fairly ad-hoc piece of code that seems to filter out a lot of
  * rubbish like the obj-splitting symbols
@@ -733,7 +743,6 @@ extern void DEBUG_LoadSymbols( char *name )
         for( i = 0; i != number_of_symbols; ++i ) {
             symbol_info info;
             bfd_get_symbol_info(abfd,symbol_table[i],&info);
-            /*debugBelch("\t%c\t0x%x      \t%s\n",info.type,(nat)info.value,info.name); */
             if (isReal(info.type, info.name)) {
                 num_real_syms += 1;
             }
