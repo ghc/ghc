@@ -1223,6 +1223,7 @@ CLEAN_FILES += includes/GHCConstants.h
 CLEAN_FILES += includes/DerivedConstants.h
 CLEAN_FILES += includes/ghcautoconf.h
 CLEAN_FILES += includes/ghcplatform.h
+CLEAN_FILES += includes/ghcversion.h
 CLEAN_FILES += utils/ghc-pkg/Version.hs
 CLEAN_FILES += compiler/parser/Parser.y
 CLEAN_FILES += compiler/prelude/primops.txt

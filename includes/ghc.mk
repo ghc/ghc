@@ -16,6 +16,7 @@
 # XXX: these should go in includes/dist/build?
 includes_H_CONFIG   = includes/ghcautoconf.h
 includes_H_PLATFORM = includes/ghcplatform.h
+includes_H_VERSION  = includes/ghcversion.h
 
 #
 # All header files are in includes/{one of these subdirectories}
@@ -52,6 +53,34 @@ endif
 ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
 includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT
 endif
+
+
+$(includes_H_VERSION) : mk/project.mk | $$(dir $$@)/.
+	@echo "Creating $@..."
+	@echo "#ifndef __GHCVERSION_H__"  > $@
+	@echo "#define __GHCVERSION_H__" >> $@
+	@echo >> $@
+	@echo "#ifndef __GLASGOW_HASKELL__" >> $@
+	@echo "# define __GLASGOW_HASKELL__ $(ProjectVersionInt)" >> $@
+	@echo "#endif" >> $@
+	@echo >> $@
+	@if [ -n "$(ProjectPatchLevel1)" ]; then \
+	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ $(ProjectPatchLevel1)" >> $@; \
+	fi
+	@if [ -n "$(ProjectPatchLevel2)" ]; then \
+	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ $(ProjectPatchLevel2)" >> $@; \
+	fi
+	@echo >> $@
+	@echo '#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (\\'     >> $@
+	@echo '   ((ma)*100+(mi)) <  __GLASGOW_HASKELL__ || \\'            >> $@
+	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \\'            >> $@
+	@echo '          && (pl1) <  __GLASGOW_HASKELL_PATCHLEVEL1__ || \\'>> $@
+	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \\'            >> $@
+	@echo '          && (pl1) == __GLASGOW_HASKELL_PATCHLEVEL1__ \\'   >> $@
+	@echo '          && (pl2) <= __GLASGOW_HASKELL_PATCHLEVEL2__ )'    >> $@
+	@echo >> $@
+	@echo "#endif /* __GHCVERSION_H__ */"          >> $@
+	@echo "Done."
 
 ifneq "$(BINDIST)" "YES"
 
@@ -160,8 +189,8 @@ DERIVE_CONSTANTS_FLAGS += $(addprefix --gcc-flag$(space),$(includes_CC_OPTS) -fc
 DERIVE_CONSTANTS_FLAGS += --nm-program "$(NM)"
 
 ifneq "$(BINDIST)" "YES"
-$(includes_DERIVEDCONSTANTS):           $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_FILES) $$(rts_H_FILES)
-$(includes_GHCCONSTANTS_HASKELL_VALUE): $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_FILES) $$(rts_H_FILES)
+$(includes_DERIVEDCONSTANTS):           $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_VERSION) $$(includes_H_FILES) $$(rts_H_FILES)
+$(includes_GHCCONSTANTS_HASKELL_VALUE): $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_VERSION) $$(includes_H_FILES) $$(rts_H_FILES)
 
 $(includes_DERIVEDCONSTANTS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-header -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
@@ -183,10 +212,10 @@ endif
 # Install all header files
 
 $(eval $(call clean-target,includes,,\
-  $(includes_H_CONFIG) $(includes_H_PLATFORM)))
+  $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_H_VERSION)))
 
 $(eval $(call all-target,includes,\
-  $(includes_H_CONFIG) $(includes_H_PLATFORM) \
+  $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_H_VERSION) \
   $(includes_GHCCONSTANTS_HASKELL_TYPE) \
   $(includes_GHCCONSTANTS_HASKELL_VALUE) \
   $(includes_GHCCONSTANTS_HASKELL_WRAPPERS) \
@@ -202,5 +231,5 @@ install_includes :
 	    $(call INSTALL_DIR,"$(DESTDIR)$(ghcheaderdir)/$d") && \
 	    $(call INSTALL_HEADER,$(INSTALL_OPTS),includes/$d/*.h,"$(DESTDIR)$(ghcheaderdir)/$d/") && \
 	) true
-	$(call INSTALL_HEADER,$(INSTALL_OPTS),$(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_DERIVEDCONSTANTS),"$(DESTDIR)$(ghcheaderdir)/")
+	$(call INSTALL_HEADER,$(INSTALL_OPTS),$(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_H_VERSION) $(includes_DERIVEDCONSTANTS),"$(DESTDIR)$(ghcheaderdir)/")
 

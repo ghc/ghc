@@ -71,6 +71,10 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cProjectVersionInt    = "$(ProjectVersionInt)"'              >> $@
 	@echo 'cProjectPatchLevel    :: String'                             >> $@
 	@echo 'cProjectPatchLevel    = "$(ProjectPatchLevel)"'              >> $@
+	@echo 'cProjectPatchLevel1   :: String'                             >> $@
+	@echo 'cProjectPatchLevel1   = "$(ProjectPatchLevel1)"'             >> $@
+	@echo 'cProjectPatchLevel2   :: String'                             >> $@
+	@echo 'cProjectPatchLevel2   = "$(ProjectPatchLevel2)"'             >> $@
 	@echo 'cBooterVersion        :: String'                             >> $@
 	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $@
 	@echo 'cStage                :: String'                             >> $@
