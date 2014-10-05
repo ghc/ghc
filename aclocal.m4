@@ -1604,6 +1604,13 @@ AC_SUBST([ProjectVersionInt])
 # The project patchlevel is zero unless stated otherwise
 test -z "$ProjectPatchLevel" && ProjectPatchLevel=0
 
+# Save split version of ProjectPatchLevel
+ProjectPatchLevel1=`echo $ProjectPatchLevel | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1/'`
+ProjectPatchLevel2=`echo $ProjectPatchLevel | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3/'`
+
+AC_SUBST([ProjectPatchLevel1])
+AC_SUBST([ProjectPatchLevel2])
+
 # Remove dots from the patch level; this allows us to have versions like 6.4.1.20050508
 ProjectPatchLevel=`echo $ProjectPatchLevel | sed 's/\.//'`
 

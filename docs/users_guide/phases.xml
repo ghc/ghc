@@ -389,6 +389,85 @@ $ cat foo.hspp</screen>
 
       <varlistentry>
         <term>
+          <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;PATCHLEVEL1&lowbar;&lowbar;</constant>
+          <indexterm><primary><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;PATCHLEVEL1&lowbar;&lowbar;</constant></primary></indexterm>
+        </term>
+        <term>
+          <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;PATCHLEVEL2&lowbar;&lowbar;</constant>
+          <indexterm><primary><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;PATCHLEVEL2&lowbar;&lowbar;</constant></primary></indexterm>
+        </term>
+        <listitem>
+          <para>These macros are available starting with GHC 7.10.1.</para>
+
+          <para>For three-part GHC version numbers
+          <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.<replaceable>z</replaceable></literal>,
+          the value of
+          <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;PATCHLEVEL1&lowbar;&lowbar;</constant>
+          is the integer <replaceable>z</replaceable>.</para>
+
+          <para>For four-part GHC version numbers
+          <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.<replaceable>z</replaceable>.<replaceable>z'</replaceable></literal>,
+          the value of
+          <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;PATCHLEVEL1&lowbar;&lowbar;</constant>
+          is the integer <replaceable>z</replaceable> while the value of
+          <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;PATCHLEVEL2&lowbar;&lowbar;</constant>
+          is set to the integer <replaceable>z'</replaceable>.</para>
+
+          <para>These macros are provided for allowing finer
+          granularity than is provided by
+          <literal>__GLASGOW_HASKELL__</literal>. Usually, this should
+          not be necessary as it's expected for most APIs to remain
+          stable between patchlevel releases, but occasionally
+          internal API changes are necessary to fix bugs.  Also
+          conditional compilation on the patchlevel can be useful for
+          working around bugs in older releases.</para>
+
+          <para>NB. These macros are set when pre-processing both
+          Haskell source and C source, including the C source
+          generated from a Haskell module
+          (i.e. <filename>.hs</filename>, <filename>.lhs</filename>,
+          <filename>.c</filename> and <filename>.hc</filename>
+          files).</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <constant>MIN&lowbar;VERSION&lowbar;GLASGOW&lowbar;HASKELL(<replaceable>x</replaceable>,<replaceable>y</replaceable>,<replaceable>z</replaceable>,<replaceable>z'</replaceable>)</constant>
+          <indexterm><primary><constant>MIN&lowbar;VERSION&lowbar;GLASGOW&lowbar;HASKELL</constant></primary></indexterm>
+        </term>
+        <listitem>
+          <para>This macro is available starting with GHC 7.10.1.</para>
+
+          <para>This macro is provided for convenience to write CPP
+          conditionals testing whether the GHC version used is version
+          <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.<replaceable>z</replaceable>.<replaceable>z'</replaceable></literal>
+          or later.</para>
+
+          <para>If compatibility with Haskell compilers (including GHC
+          prior to version 7.10.1) which do not define
+          <literal>MIN_VERSION_GLASGOW_HASKELL</literal> is required,
+          the presence of the
+          <literal>MIN_VERSION_GLASGOW_HASKELL</literal> macro needs
+          to be ensured before it is called, e.g.:</para>
+
+<programlisting>&num;ifdef MIN_VERSION_GLASGOW_HASKELL
+&num;if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+/* code that applies only to GHC 7.10.2 or later */
+&num;endif
+&num;endif</programlisting>
+
+          <para>NB. This macro is set when pre-processing both
+          Haskell source and C source, including the C source
+          generated from a Haskell module
+          (i.e. <filename>.hs</filename>, <filename>.lhs</filename>,
+          <filename>.c</filename> and <filename>.hc</filename>
+          files).</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;LLVM&lowbar;&lowbar;</constant>
           <indexterm><primary><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;LLVM&lowbar;&lowbar;</constant></primary></indexterm>
         </term>
