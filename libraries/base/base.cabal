@@ -130,6 +130,7 @@ Library
         Data.Foldable
         Data.Function
         Data.Functor
+        Data.Functor.Identity
         Data.IORef
         Data.Int
         Data.Ix
