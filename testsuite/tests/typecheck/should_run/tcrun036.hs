@@ -21,6 +21,8 @@
 
 module Main where
 
+import Prelude hiding (traverse)
+
 class Catalog c where
   traverse :: c -> Viewer -> IO ()
 
