@@ -64,6 +64,8 @@ Collector: APPEL  HeapSize: 4,194,304 (bytes)
 
 > module Main where
 
+> import Prelude hiding (traverse)
+
 %============================================================
 %============================================================
 
