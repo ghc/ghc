@@ -49,7 +49,7 @@ module Name (
         nameUnique, setNameUnique,
         nameOccName, nameModule, nameModule_maybe,
         tidyNameOcc,
-        hashName, localiseName,
+        localiseName,
         mkLocalisedOccName,
 
         nameSrcLoc, nameSrcSpan, pprNameDefnLoc, pprDefinedAt,
@@ -349,11 +349,6 @@ mkLocalisedOccName this_mod mk_occ name = mk_occ origin (nameOccName name)
 %************************************************************************
 
 \begin{code}
-hashName :: Name -> Int         -- ToDo: should really be Word
-hashName name = getKey (nameUnique name) + 1
-        -- The +1 avoids keys with lots of zeros in the ls bits, which
-        -- interacts badly with the cheap and cheerful multiplication in
-        -- hashExpr
 
 cmpName :: Name -> Name -> Ordering
 cmpName n1 n2 = iBox (n_uniq n1) `compare` iBox (n_uniq n2)
