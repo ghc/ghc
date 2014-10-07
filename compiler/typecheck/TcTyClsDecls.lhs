@@ -1703,7 +1703,7 @@ checkFamFlag tc_name
   = do { idx_tys <- xoptM Opt_TypeFamilies
        ; checkTc idx_tys err_msg }
   where
-    err_msg = hang (ptext (sLit "Illegal family declaraion for") <+> quotes (ppr tc_name))
+    err_msg = hang (ptext (sLit "Illegal family declaration for") <+> quotes (ppr tc_name))
                  2 (ptext (sLit "Use TypeFamilies to allow indexed type families"))
 \end{code}
 
