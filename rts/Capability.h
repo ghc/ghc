@@ -98,6 +98,10 @@ struct Capability_ {
     // reset after we have executed the context switch.
     int interrupt;
 
+    // Total words allocated by this cap since rts start
+    // See [Note allocation accounting] in Storage.c
+    W_ total_allocated;
+
 #if defined(THREADED_RTS)
     // Worker Tasks waiting in the wings.  Singly-linked.
     Task *spare_workers;
@@ -131,8 +135,6 @@ struct Capability_ {
     int io_manager_control_wr_fd;
 #endif
 #endif
-    // Total words allocated by this cap since rts start
-    W_ total_allocated;
 
     // Per-capability STM-related data
     StgTVarWatchQueue *free_tvar_watch_queues;

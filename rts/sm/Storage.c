@@ -532,6 +532,7 @@ assignNurseriesToCapabilities (nat from, nat to)
 
     for (i = from; i < to; i++) {
         capabilities[i]->r.rCurrentNursery = nurseries[i].blocks;
+        newNurseryBlock(nurseries[i].blocks);
         capabilities[i]->r.rCurrentAlloc   = NULL;
     }
 }
@@ -551,17 +552,16 @@ allocNurseries (nat from, nat to)
 }
       
 void
-clearNursery (Capability *cap)
+clearNursery (Capability *cap USED_IF_DEBUG)
 {
+#ifdef DEBUG
     bdescr *bd;
-
     for (bd = nurseries[cap->no].blocks; bd; bd = bd->link) {
-        cap->total_allocated += (W_)(bd->free - bd->start);
-        bd->free = bd->start;
         ASSERT(bd->gen_no == 0);
         ASSERT(bd->gen == g0);
-        IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
+        IF_DEBUG(sanity, memset(bd->start, 0xaa, BLOCK_SIZE));
     }
+#endif
 }
 
 void
@@ -734,14 +734,16 @@ StgPtr allocate (Capability *cap, W_ n)
     bd = cap->r.rCurrentAlloc;
     if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
         
+        if (bd) finishedNurseryBlock(cap,bd);
+
         // The CurrentAlloc block is full, we need to find another
         // one.  First, we try taking the next block from the
         // nursery:
         bd = cap->r.rCurrentNursery->link;
         
-        if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
-            // The nursery is empty, or the next block is already
-            // full: allocate a fresh block (we can't fail here).
+        if (bd == NULL) {
+            // The nursery is empty: allocate a fresh block (we can't
+            // fail here).
             ACQUIRE_SM_LOCK;
             bd = allocBlock();
             cap->r.rNursery->n_blocks++;
@@ -752,6 +754,7 @@ StgPtr allocate (Capability *cap, W_ n)
             // pretty quickly now, because MAYBE_GC() will
             // notice that CurrentNursery->link is NULL.
         } else {
+            newNurseryBlock(bd);
             // we have a block in the nursery: take it and put
             // it at the *front* of the nursery list, and use it
             // to allocate() from.
@@ -846,9 +849,9 @@ allocatePinned (Capability *cap, W_ n)
         // next GC cycle these objects will be moved to
         // g0->large_objects.
         if (bd != NULL) {
-            dbl_link_onto(bd, &cap->pinned_object_blocks);
             // add it to the allocation stats when the block is full
-            cap->total_allocated += bd->free - bd->start;
+            finishedNurseryBlock(cap, bd);
+            dbl_link_onto(bd, &cap->pinned_object_blocks);
         }
 
         // We need to find another block.  We could just allocate one,
@@ -861,7 +864,7 @@ allocatePinned (Capability *cap, W_ n)
         // an *empty* block, because we're about to mark it as
         // BF_PINNED | BF_LARGE.
         bd = cap->r.rCurrentNursery->link;
-        if (bd == NULL || bd->free != bd->start) { // must be empty!
+        if (bd == NULL) { // must be empty!
             // The nursery is empty, or the next block is non-empty:
             // allocate a fresh block (we can't fail here).
 
@@ -878,6 +881,7 @@ allocatePinned (Capability *cap, W_ n)
             RELEASE_SM_LOCK;
             initBdescr(bd, g0, g0);
         } else {
+            newNurseryBlock(bd);
             // we have a block in the nursery: steal it
             cap->r.rCurrentNursery->link = bd->link;
             if (bd->link != NULL) {
@@ -1001,21 +1005,57 @@ dirty_MVAR(StgRegTable *reg, StgClosure *p)
  * -------------------------------------------------------------------------- */
 
 /* -----------------------------------------------------------------------------
- * updateNurseriesStats()
+ * [Note allocation accounting]
  *
- * Update the per-cap total_allocated numbers with an approximation of
- * the amount of memory used in each cap's nursery.
+ *   - When cap->r.rCurrentNusery moves to a new block in the nursery,
+ *     we add the size of the used portion of the previous block to
+ *     cap->total_allocated. (see finishedNurseryBlock())
  *
- * Since this update is also performed by clearNurseries() then we only
- * need this function for the final stats when the RTS is shutting down.
+ *   - When we start a GC, the allocated portion of CurrentNursery and
+ *     CurrentAlloc are added to cap->total_allocated. (see
+ *     updateNurseriesStats())
+ *
  * -------------------------------------------------------------------------- */
 
-void updateNurseriesStats (void)
+//
+// Calculate the total allocated memory since the start of the
+// program.  Also emits events reporting the per-cap allocation
+// totals.
+//
+StgWord
+calcTotalAllocated (void)
+{
+    W_ tot_alloc = 0;
+    W_ n;
+
+    for (n = 0; n < n_capabilities; n++) {
+        tot_alloc += capabilities[n]->total_allocated;
+
+        traceEventHeapAllocated(capabilities[n],
+                                CAPSET_HEAP_DEFAULT,
+                                capabilities[n]->total_allocated * sizeof(W_));
+    }
+
+    return tot_alloc;
+}
+
+//
+// Update the per-cap total_allocated numbers with an approximation of
+// the amount of memory used in each cap's nursery.
+//
+void
+updateNurseriesStats (void)
 {
     nat i;
+    bdescr *bd;
 
     for (i = 0; i < n_capabilities; i++) {
-        capabilities[i]->total_allocated += countOccupied(nurseries[i].blocks);
+        // The current nursery block and the current allocate block have not
+        // yet been accounted for in cap->total_allocated, so we add them here.
+        bd = capabilities[i]->r.rCurrentNursery;
+        if (bd) finishedNurseryBlock(capabilities[i], bd);
+        bd = capabilities[i]->r.rCurrentAlloc;
+        if (bd) finishedNurseryBlock(capabilities[i], bd);
     }
 }
 

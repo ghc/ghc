@@ -291,27 +291,8 @@ stat_startGC (Capability *cap, gc_thread *gct)
     {
         gct->gc_start_faults = getPageFaults();
     }
-}
 
-/* -----------------------------------------------------------------------------
- * Calculate the total allocated memory since the start of the
- * program.  Also emits events reporting the per-cap allocation
- * totals.
- * -------------------------------------------------------------------------- */
-
-static StgWord
-calcTotalAllocated(void)
-{
-    W_ tot_alloc = 0;
-    W_ n;
-    for (n = 0; n < n_capabilities; n++) {
-        tot_alloc += capabilities[n]->total_allocated;
-        traceEventHeapAllocated(capabilities[n],
-                                CAPSET_HEAP_DEFAULT,
-                                capabilities[n]->total_allocated * sizeof(W_));
-    }
-
-    return tot_alloc;
+    updateNurseriesStats();
 }
 
 /* -----------------------------------------------------------------------------

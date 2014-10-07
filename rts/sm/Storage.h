@@ -88,10 +88,30 @@ void     resizeNurseriesFixed ( W_ blocks );
 W_       countNurseryBlocks   ( void );
 
 /* -----------------------------------------------------------------------------
+   Allocation accounting
+
+   See [Note allocation accounting] in Storage.c
+   -------------------------------------------------------------------------- */
+
+//
+// Called when we are finished allocating into a block; account for the amount
+// allocated in cap->total_allocated.
+//
+INLINE_HEADER void finishedNurseryBlock (Capability *cap, bdescr *bd) {
+    cap->total_allocated += bd->free - bd->start;
+}
+
+INLINE_HEADER void newNurseryBlock (bdescr *bd) {
+    bd->free = bd->start;
+}
+
+void    updateNurseriesStats (void);
+StgWord calcTotalAllocated   (void);
+
+/* -----------------------------------------------------------------------------
    Stats 'n' DEBUG stuff
    -------------------------------------------------------------------------- */
 
-void  updateNurseriesStats (void);
 W_    countLargeAllocated  (void);
 W_    countOccupied        (bdescr *bd);
 W_    calcNeeded           (rtsBool force_major, W_ *blocks_needed);
