@@ -46,7 +46,7 @@ module Module
         wiredInPackageKeys,
 
         -- * The Module type
-        Module,
+        Module(Module),
         modulePackageKey, moduleName,
         pprModule,
         mkModule,
