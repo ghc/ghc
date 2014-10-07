@@ -9,19 +9,10 @@ import Control.Monad.ST
 import Control.Monad (when)
 import Data.STRef
 import GHC.ST
-#if __GLASGOW_HASKELL__ >= 503
 import Data.Array
 import Data.Char (ord)
 import Data.Array.Base (unsafeAt)
-#else
-import Array
-import Char (ord)
-#endif
-#if __GLASGOW_HASKELL__ >= 503
 import GHC.Exts
-#else
-import GlaExts
-#endif
 alex_base :: AlexAddr
 alex_base = AlexA# "\xf8\xff\xfd\xff\x02\x00\x4c\x00"#
 
@@ -185,19 +176,9 @@ data AlexAddr = AlexA# Addr#
 
 {-# INLINE alexIndexShortOffAddr #-}
 alexIndexShortOffAddr (AlexA# arr) off =
-#if __GLASGOW_HASKELL__ > 500
          narrow16Int# i
-#elif __GLASGOW_HASKELL__ == 500
-         intToInt16# i
-#else
-         (i `iShiftL#` 16#) `iShiftRA#` 16#
-#endif
   where
-#if __GLASGOW_HASKELL__ >= 503
          i = word2Int# ((high `uncheckedShiftL#` 8#) `or#` low)
-#else
-         i = word2Int# ((high `shiftL#` 8#) `or#` low)
-#endif
          high = int2Word# (ord# (indexCharOffAddr# arr (off' +# 1#)))
          low  = int2Word# (ord# (indexCharOffAddr# arr off'))
          off' = off *# 2#

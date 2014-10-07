@@ -345,19 +345,9 @@ happyDoAction i tk st
 
 
 indexShortOffAddr (HappyA# arr) off =
-#if __GLASGOW_HASKELL__ > 500
 	narrow16Int# i
-#elif __GLASGOW_HASKELL__ == 500
-	intToInt16# i
-#else
-	(i `iShiftL#` 16#) `iShiftRA#` 16#
-#endif
   where
-#if __GLASGOW_HASKELL__ >= 503
 	i = word2Int# ((high `uncheckedShiftL#` 8#) `or#` low)
-#else
-	i = word2Int# ((high `shiftL#` 8#) `or#` low)
-#endif
 	high = int2Word# (ord# (indexCharOffAddr# arr (off' +# 1#)))
 	low  = int2Word# (ord# (indexCharOffAddr# arr off'))
 	off' = off *# 2#
