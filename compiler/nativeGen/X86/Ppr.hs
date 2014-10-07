@@ -522,6 +522,13 @@ pprInstr (RELOAD slot reg)
         pprUserReg reg]
 -}
 
+-- Replace 'mov $0x0,%reg' by 'xor %reg,%reg', which is smaller and cheaper.
+-- The code generator catches most of these already, but not all.
+pprInstr (MOV size (OpImm (ImmInt 0)) dst@(OpReg _))
+  = pprInstr (XOR size' dst dst)
+  where size' = case size of
+          II64 -> II32          -- 32-bit version is equivalent, and smaller
+          _    -> size
 pprInstr (MOV size src dst)
   = pprSizeOpOp (sLit "mov") size src dst
 
@@ -582,6 +589,14 @@ pprInstr (SUB_CC size src dst)
    however, cannot be used to determine if the upper half of the
    result is non-zero."  So there.
 -}
+
+-- Use a 32-bit instruction when possible as it saves a byte.
+-- Notably, extracting the tag bits of a pointer has this form.
+-- TODO: we could save a byte in a subsequent CMP instruction too,
+-- but need something like a peephole pass for this
+pprInstr (AND II64 src@(OpImm (ImmInteger mask)) dst)
+  | 0 <= mask && mask < 0xffffffff
+    = pprInstr (AND II32 src dst)
 pprInstr (AND size src dst) = pprSizeOpOp (sLit "and") size src dst
 pprInstr (OR  size src dst) = pprSizeOpOp (sLit "or")  size src dst
 
@@ -618,7 +633,25 @@ pprInstr (CMP size src dst)
     is_float FF80       = True
     is_float _          = False
 
-pprInstr (TEST size src dst) = pprSizeOpOp (sLit "test")  size src dst
+pprInstr (TEST size src dst) = sdocWithPlatform $ \platform ->
+  let size' = case (src,dst) of
+        -- Match instructions like 'test $0x3,%esi' or 'test $0x7,%rbx'.
+        -- We can replace them by equivalent, but smaller instructions
+        -- by reducing the size of the immediate operand as far as possible.
+        -- (We could handle masks larger than a single byte too,
+        -- but it would complicate the code considerably
+        -- and tag checks are by far the most common case.)
+        (OpImm (ImmInteger mask), OpReg dstReg)
+          | 0 <= mask && mask < 256 -> minSizeOfReg platform dstReg
+        _ -> size
+  in pprSizeOpOp (sLit "test") size' src dst
+  where
+    minSizeOfReg platform (RegReal (RealRegSingle i))
+      | target32Bit platform && i <= 3        = II8  -- al, bl, cl, dl
+      | target32Bit platform && i <= 7        = II16 -- si, di, bp, sp
+      | not (target32Bit platform) && i <= 15 = II8  -- al .. r15b
+    minSizeOfReg _ _ = size                 -- other
+
 pprInstr (PUSH size op) = pprSizeOp (sLit "push") size op
 pprInstr (POP size op) = pprSizeOp (sLit "pop") size op
 
