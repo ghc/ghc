@@ -415,11 +415,10 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
   = do { (subst, tvs') <- freshenTyVarBndrs tvs
              -- Be sure to freshen those type variables,
              -- so they are sure not to appear in any lookup
-       ; let theta' = substTheta subst theta
-             tys'   = substTys subst tys
-             dfun   = mkDictFunId dfun_name tvs' theta' clas tys'
-                      -- We don't really need to substitute in the dfun's type,
-                      -- but it avoids gratuitous differences if we do so
+       ; let tys'   = substTys subst tys
+             dfun   = mkDictFunId dfun_name tvs theta clas tys
+                      -- We don't substitute in the dfun's type,
+                      -- because those tvs may scope over the bindings
        ; oflag <- getOverlapFlag overlap_mode
        ; return (mkLocalInstance dfun oflag tvs' clas tys') }
 
