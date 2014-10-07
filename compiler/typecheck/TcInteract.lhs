@@ -902,7 +902,10 @@ equality (b ~ phi) in two cases
     and can subsequently unify.
 
 (2) If the new tyvar appears in the RHS of the inert
-    AND the inert cannot rewrite the work item
+    AND the work item is strong enough to rewrite the inert
+
+    AND not (the inert can rewrite the work item)   <---------------------------------
+
           Work item:  [G] a ~ b
           Inert:      [W] b ~ [a]
     Now at this point the work item cannot be further rewritten by the
@@ -919,6 +922,8 @@ equality (b ~ phi) in two cases
     necessarily idemopotent.  See Note [Non-idempotent inert substitution]
     in TcCanonical.
 
+          Work item:  [G] a ~ Int
+          Inert:      [G] b ~ [a]
 See also Note [Detailed InertCans Invariants]
 
 Note [Avoid double unifications]
