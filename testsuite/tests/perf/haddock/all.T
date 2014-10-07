@@ -5,7 +5,7 @@
 test('haddock.base',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 7901230808,  5)
+          [(wordsize(64), 8322584616,  5)
             # 2012-08-14: 5920822352 (amd64/Linux)
             # 2012-09-20: 5829972376 (amd64/Linux)
             # 2012-10-08: 5902601224 (amd64/Linux)
@@ -20,6 +20,7 @@ test('haddock.base',
             # 2014-08-08: 7946284944 (x86_64/Linux - Haddock updates to attoparsec-0.12.1.0)
             # 2014-09-09: 8354439016 (x86_64/Linux - Applicative/Monad changes, according to Austin)
             # 2014-09-10: 7901230808 (x86_64/Linux - Applicative/Monad changes, according to Joachim)
+            # 2014-10-07: 8322584616 (x86_64/Linux)
           ,(platform('i386-unknown-mingw32'), 3746792812, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
             # 2013-11-13:                     3097751052 (x86/Windows, 64bit machine)
