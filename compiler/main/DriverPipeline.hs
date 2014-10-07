@@ -1089,6 +1089,8 @@ runPhase (RealPhase cc_phase) input_fn dflags
                 -- very weakly typed, being derived from C--.
                 ["-fno-strict-aliasing"]
 
+        ghcVersionH <- liftIO $ getGhcVersionPathName dflags
+
         let gcc_lang_opt | cc_phase `eqPhase` Ccpp    = "c++"
                          | cc_phase `eqPhase` Cobjc   = "objective-c"
                          | cc_phase `eqPhase` Cobjcpp = "objective-c++"
@@ -1138,7 +1140,9 @@ runPhase (RealPhase cc_phase) input_fn dflags
                        ++ verbFlags
                        ++ [ "-S" ]
                        ++ cc_opt
-                       ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
+                       ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt
+                          , "-include", ghcVersionH
+                          ]
                        ++ framework_paths
                        ++ split_opt
                        ++ include_paths
@@ -2092,6 +2096,13 @@ doCpp dflags raw input_fn output_fn = do
 
     backend_defs <- getBackendDefs dflags
 
+    -- Default CPP defines in Haskell source
+    ghcVersionH <- getGhcVersionPathName dflags
+    let hsSourceCppOpts =
+          [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt
+          , "-include", ghcVersionH
+          ]
+
     cpp_prog       (   map SysTools.Option verbFlags
                     ++ map SysTools.Option include_paths
                     ++ map SysTools.Option hsSourceCppOpts
@@ -2128,11 +2139,6 @@ getBackendDefs dflags | hscTarget dflags == HscLlvm = do
 
 getBackendDefs _ =
     return []
-
-hsSourceCppOpts :: [String]
--- Default CPP defines in Haskell source
-hsSourceCppOpts =
-        [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 
 -- ---------------------------------------------------------------------------
 -- join object files into a single relocatable object file, using ld -r
@@ -2212,6 +2218,16 @@ haveRtsOptsFlags dflags =
          isJust (rtsOpts dflags) || case rtsOptsEnabled dflags of
                                         RtsOptsSafeOnly -> False
                                         _ -> True
+
+-- | Find out path to @ghcversion.h@ file
+getGhcVersionPathName :: DynFlags -> IO FilePath
+getGhcVersionPathName dflags = do
+  dirs <- getPackageIncludePath dflags [rtsPackageKey]
+
+  found <- filterM doesFileExist (map (</> "ghcversion.h") dirs)
+  case found of
+      []    -> throwGhcExceptionIO (InstallationError ("ghcversion.h missing"))
+      (x:_) -> return x
 
 -- Note [-fPIC for assembler]
 -- When compiling .c source file GHC's driver pipeline basically

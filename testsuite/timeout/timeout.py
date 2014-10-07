@@ -21,7 +21,7 @@ try:
                     os.killpg(pid, signal.SIGKILL)
                 else:
                     return
-            except OSError as e:
+            except OSError, e:
                 if e.errno == errno.ECHILD:
                     return
                 else:

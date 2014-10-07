@@ -34,6 +34,10 @@ data Proxy t = Proxy
 -- There are no instances for this because it is intended at the kind level only
 data KProxy (t :: *) = KProxy
 
+-- It's common to use (undefined :: Proxy t) and (Proxy :: Proxy t)
+-- interchangeably, so all of these instances are hand-written to be
+-- lazy in Proxy arguments.
+
 instance Eq (Proxy s) where
   _ == _ = True
 

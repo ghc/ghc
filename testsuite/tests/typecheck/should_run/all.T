@@ -19,8 +19,8 @@ test('TcCoercible', when(compiler_lt('ghc', '7.7'), skip), compile_and_run, ['']
 # Skip everything else if fast is on
 
 def f(name, opts):
-    if config.fast:
-        opts.skip = 1
+  if config.fast:
+	opts.skip = 1
 setTestOpts(f)
 
 test('tcrun006', normal, compile_and_run, [''])

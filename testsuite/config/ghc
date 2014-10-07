@@ -148,17 +148,21 @@ config.way_rts_flags = {
 # Useful classes of ways that can be used with only_ways() and
 # expect_broken_for().
 
-prof_ways     = [x[0] for x in config.way_flags('dummy_name').items()
-                      if '-prof' in x[1]]
+prof_ways = map (lambda x: x[0], \
+                 filter(lambda x: '-prof' in x[1], \
+                        config.way_flags('dummy_name').items()))
 
-threaded_ways = [x[0] for x in config.way_flags('dummy_name').items()
-                      if '-threaded' in x[1] or 'ghci' == x[0]]
+threaded_ways = map (lambda x: x[0], \
+                 filter(lambda x: '-threaded' in x[1] or 'ghci' == x[0], \
+                        config.way_flags('dummy_name').items()))
 
-opt_ways      = [x[0] for x in config.way_flags('dummy_name').items()
-                      if '-O' in x[1]]
+opt_ways = map (lambda x: x[0], \
+                 filter(lambda x: '-O' in x[1], \
+                        config.way_flags('dummy_name').items()))
 
-llvm_ways     = [x[0] for x in config.way_flags('dummy_name').items()
-                      if '-fflvm' in x[1]]
+llvm_ways = map (lambda x: x[0], \
+                 filter(lambda x: '-fllvm' in x[1], \
+                        config.way_flags('dummy_name').items()))
 
 def get_compiler_info():
 # This should really not go through the shell
@@ -188,7 +192,7 @@ def get_compiler_info():
 
     if re.match(".*_p(_.*|$)", rtsInfoDict["RTS way"]):
         config.compiler_profiled = True
-        config.run_ways = [x for x in config.run_ways if x != 'ghci']
+        config.run_ways = filter(lambda x: x != 'ghci', config.run_ways)
     else:
         config.compiler_profiled = False
 

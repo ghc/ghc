@@ -2,8 +2,6 @@
 # (c) Simon Marlow 2002
 #
 
-from __future__ import print_function
-
 import sys
 import os
 import string
@@ -22,11 +20,6 @@ try:
     import subprocess
 except:
     pass
-
-PYTHON3 = sys.version_info >= (3, 0)
-if PYTHON3:
-    print("*** WARNING: running testsuite using Python 3.\n"
-          "*** Python 3 support is experimental. See Trac #9184.")
 
 from testutil import *
 from testglobals import *
@@ -59,12 +52,12 @@ opts, args = getopt.getopt(sys.argv[1:], "e:", long_options)
        
 for opt,arg in opts:
     if opt == '--config':
-        exec(open(arg).read())
+        execfile(arg)
 
     # -e is a string to execute from the command line.  For example:
     # testframe -e 'config.compiler=ghc-5.04'
     if opt == '-e':
-        exec(arg)
+        exec arg
 
     if opt == '--rootdir':
         config.rootdirs.append(arg)
@@ -90,9 +83,9 @@ for opt,arg in opts:
             sys.stderr.write("ERROR: requested way \'" +
                              arg + "\' does not exist\n")
             sys.exit(1)
-        config.other_ways = [w for w in config.other_ways if w != arg]
-        config.run_ways = [w for w in config.run_ways if w != arg]
-        config.compile_ways = [w for w in config.compile_ways if w != arg]
+        config.other_ways = filter(neq(arg), config.other_ways)
+        config.run_ways = filter(neq(arg), config.run_ways)
+        config.compile_ways = filter(neq(arg), config.compile_ways)
 
     if opt == '--threads':
         config.threads = int(arg)
@@ -124,17 +117,17 @@ if config.use_threads == 1:
     maj = int(re.sub('[^0-9].*', '', str(maj)))
     min = int(re.sub('[^0-9].*', '', str(min)))
     pat = int(re.sub('[^0-9].*', '', str(pat)))
-    if (maj, min) < (2, 6):
-        print("Python < 2.6 is not supported")
-        sys.exit(1)
+    if (maj, min, pat) < (2, 5, 2):
+        print "Warning: Ignoring request to use threads as python version < 2.5.2"
+        config.use_threads = 0
     # We also need to disable threads for python 2.7.2, because of
     # this bug: http://bugs.python.org/issue13817
     elif (maj, min, pat) == (2, 7, 2):
-        print("Warning: Ignoring request to use threads as python version is 2.7.2")
-        print("See http://bugs.python.org/issue13817 for details.")
+        print "Warning: Ignoring request to use threads as python version is 2.7.2"
+        print "See http://bugs.python.org/issue13817 for details."
         config.use_threads = 0
     if windows:
-        print("Warning: Ignoring request to use threads as running on Windows")
+        print "Warning: Ignoring request to use threads as running on Windows"
         config.use_threads = 0
 
 config.cygwin = False
@@ -189,10 +182,10 @@ else:
             h.close()
             if v != '':
                 os.environ['LC_ALL'] = v
-                print("setting LC_ALL to", v)
+                print "setting LC_ALL to", v
             else:
-                print('WARNING: No UTF8 locale found.')
-                print('You may get some spurious test failures.')
+                print 'WARNING: No UTF8 locale found.'
+                print 'You may get some spurious test failures.'
 
 # This has to come after arg parsing as the args can change the compiler
 get_compiler_info()
@@ -239,7 +232,7 @@ if config.use_threads:
 if config.timeout == -1:
     config.timeout = int(read_no_crs(config.top + '/timeout/calibrate.out'))
 
-print('Timeout is ' + str(config.timeout))
+print 'Timeout is ' + str(config.timeout)
 
 # -----------------------------------------------------------------------------
 # The main dude
@@ -249,44 +242,40 @@ if config.rootdirs == []:
 
 t_files = findTFiles(config.rootdirs)
 
-print('Found', len(t_files), '.T files...')
+print 'Found', len(t_files), '.T files...'
 
 t = getTestRun()
 
 # Avoid cmd.exe built-in 'date' command on Windows
 t.start_time = time.localtime()
 
-print('Beginning test run at', time.strftime("%c %Z",t.start_time))
+print 'Beginning test run at', time.strftime("%c %Z",t.start_time)
 
+# set stdout to unbuffered (is this the best way to do it?)
 sys.stdout.flush()
-if PYTHON3:
-    # in Python 3, we output text, which cannot be unbuffered
-    sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w")
-else:
-    # set stdout to unbuffered (is this the best way to do it?)
-    sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w", 0)
+sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w", 0)
 
 # First collect all the tests to be run
 for file in t_files:
     if_verbose(2, '====> Scanning %s' % file)
     newTestDir(os.path.dirname(file))
     try:
-        exec(open(file).read())
-    except Exception:
-        print('*** framework failure: found an error while executing ', file, ':')
+        execfile(file)
+    except:
+        print '*** framework failure: found an error while executing ', file, ':'
         t.n_framework_failures = t.n_framework_failures + 1
         traceback.print_exc()
 
 if config.list_broken:
     global brokens
-    print('')
-    print('Broken tests:')
-    print(' '.join(map (lambda bdn: '#' + str(bdn[0]) + '(' + bdn[1] + '/' + bdn[2] + ')', brokens)))
-    print('')
+    print ''
+    print 'Broken tests:'
+    print (' '.join(map (lambda (b, d, n) : '#' + str(b) + '(' + d + '/' + n + ')', brokens)))
+    print ''
 
     if t.n_framework_failures != 0:
-        print('WARNING:', str(t.n_framework_failures), 'framework failures!')
-        print('')
+        print 'WARNING:', str(t.n_framework_failures), 'framework failures!'
+        print ''
 else:
     # Now run all the tests
     if config.use_threads:

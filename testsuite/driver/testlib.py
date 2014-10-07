@@ -2,7 +2,8 @@
 # (c) Simon Marlow 2002
 #
 
-from __future__ import print_function
+# This allows us to use the "with X:" syntax with python 2.5:
+from __future__ import with_statement
 
 import shutil
 import sys
@@ -15,6 +16,7 @@ import time
 import datetime
 import copy
 import glob
+import types
 from math import ceil, trunc
 
 have_subprocess = False
@@ -22,17 +24,15 @@ try:
     import subprocess
     have_subprocess = True
 except:
-    print("Warning: subprocess not found, will fall back to spawnv")
+    print "Warning: subprocess not found, will fall back to spawnv"
 
+from string import join
 from testglobals import *
 from testutil import *
 
 if config.use_threads:
     import threading
-    try:
-        import thread
-    except ImportError: # Python 3
-        import _thread as thread
+    import thread
 
 global wantToStop
 wantToStop = False
@@ -99,7 +99,7 @@ def reqlib( lib ):
 have_lib = {}
 
 def _reqlib( name, opts, lib ):
-    if lib in have_lib:
+    if have_lib.has_key(lib):
         got_it = have_lib[lib]
     else:
         if have_subprocess:
@@ -284,7 +284,7 @@ def _stats_num_field( name, opts, field, expecteds ):
     if field in opts.stats_range_fields:
         framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
 
-    if type(expecteds) is list:
+    if type(expecteds) is types.ListType:
         for (b, expected, dev) in expecteds:
             if b:
                 opts.stats_range_fields[field] = (expected, dev)
@@ -512,10 +512,9 @@ def two_normalisers(f, g):
 # Function for composing two opt-fns together
 
 def executeSetups(fs, name, opts):
-    if type(fs) is list:
+    if type(fs) is types.ListType:
         # If we have a list of setups, then execute each one
-        for f in fs:
-            executeSetups(f, name, opts)
+        map (lambda f : executeSetups(f, name, opts), fs)
     else:
         # fs is a single function, so just apply it
         fs(name, opts)
@@ -626,7 +625,8 @@ def test_common_work (name, opts, func, args):
             all_ways = ['normal']
 
         # A test itself can request extra ways by setting opts.extra_ways
-        all_ways = all_ways + [way for way in opts.extra_ways if way not in all_ways]
+        all_ways = all_ways + filter(lambda way: way not in all_ways,
+                                     opts.extra_ways)
 
         t.total_test_cases = t.total_test_cases + len(all_ways)
 
@@ -639,7 +639,7 @@ def test_common_work (name, opts, func, args):
             and way not in getTestOpts().omit_ways
 
         # Which ways we are asked to skip
-        do_ways = list(filter (ok_way,all_ways))
+        do_ways = filter (ok_way,all_ways)
 
         # In fast mode, we skip all but one way
         if config.fast and len(do_ways) > 0:
@@ -658,8 +658,8 @@ def test_common_work (name, opts, func, args):
 
         if getTestOpts().cleanup != '' and (config.clean_only or do_ways != []):
             pretest_cleanup(name)
-            clean([name + suff for suff in [
-                       '', '.exe', '.exe.manifest', '.genscript',
+            clean(map (lambda suff: name + suff,
+                      ['', '.exe', '.exe.manifest', '.genscript',
                        '.stderr.normalised',        '.stdout.normalised',
                        '.run.stderr.normalised',    '.run.stdout.normalised',
                        '.comp.stderr.normalised',   '.comp.stdout.normalised',
@@ -667,13 +667,12 @@ def test_common_work (name, opts, func, args):
                        '.stats', '.comp.stats',
                        '.hi', '.o', '.prof', '.exe.prof', '.hc',
                        '_stub.h', '_stub.c', '_stub.o',
-                       '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']])
+                       '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
 
             if func == multi_compile or func == multi_compile_fail:
                     extra_mods = args[1]
-                    clean([replace_suffix(fx[0],'o') for fx in extra_mods])
-                    clean([replace_suffix(fx[0], 'hi') for fx in extra_mods])
-
+                    clean(map (lambda (f,x): replace_suffix(f, 'o'), extra_mods))
+                    clean(map (lambda (f,x): replace_suffix(f, 'hi'), extra_mods))
 
             clean(getTestOpts().clean_files)
 
@@ -713,7 +712,7 @@ def test_common_work (name, opts, func, args):
                         files_written_not_removed[name] = [f]
         except:
             pass
-    except Exception as e:
+    except Exception, e:
         framework_fail(name, 'runTest', 'Unhandled exception: ' + str(e))
 
 def clean(strs):
@@ -725,19 +724,19 @@ def clean_full_path(name):
         try:
             # Remove files...
             os.remove(name)
-        except OSError as e1:
+        except OSError, e1:
             try:
                 # ... and empty directories
                 os.rmdir(name)
-            except OSError as e2:
+            except OSError, e2:
                 # We don't want to fail here, but we do want to know
                 # what went wrong, so print out the exceptions.
                 # ENOENT isn't a problem, though, as we clean files
                 # that don't necessarily exist.
                 if e1.errno != errno.ENOENT:
-                    print(e1)
+                    print e1
                 if e2.errno != errno.ENOENT:
-                    print(e2)
+                    print e2
 
 def do_test(name, way, func, args):
     full_name = name + '(' + way + ')'
@@ -762,7 +761,7 @@ def do_test(name, way, func, args):
             framework_fail(name, way, 'pre-command exception')
 
         try:
-            result = func(*[name,way] + args)
+            result = apply(func, [name,way] + args)
         finally:
             if config.use_threads:
                 t.lock.acquire()
@@ -893,8 +892,7 @@ def run_command( name, way, cmd ):
 def ghci_script( name, way, script ):
     # filter out -fforce-recomp from compiler_always_flags, because we're
     # actually testing the recompilation behaviour in the GHCi tests.
-    flags = [f for f in getTestOpts().compiler_always_flags if f != '-fforce-recomp']
-
+    flags = filter(lambda f: f != '-fforce-recomp', getTestOpts().compiler_always_flags)
     flags.append(getTestOpts().extra_hc_opts)
     if getTestOpts().outputdir != None:
         flags.extend(["-outputdir", getTestOpts().outputdir])
@@ -902,10 +900,10 @@ def ghci_script( name, way, script ):
     # We pass HC and HC_OPTS as environment variables, so that the
     # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
     cmd = "HC='" + config.compiler + "' " + \
-          "HC_OPTS='" + ' '.join(flags) + "' " + \
+          "HC_OPTS='" + join(flags,' ') + "' " + \
           "'" + config.compiler + "'" + \
           ' --interactive -v0 -ignore-dot-ghci ' + \
-          ' '.join(flags)
+          join(flags,' ')
 
     getTestOpts().stdin = script
     return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
@@ -969,7 +967,7 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts ):
     return passed()
 
 def compile_cmp_asm( name, way, extra_hc_opts ):
-    print('Compile only, extra args = ', extra_hc_opts)
+    print 'Compile only, extra args = ', extra_hc_opts
     pretest_cleanup(name)
     result = simple_build( name + '.cmm', way, '-keep-s-files -O ' + extra_hc_opts, 0, '', 0, 0, 0)
 
@@ -1051,7 +1049,7 @@ def checkStats(name, way, stats_file, range_fields):
         for (field, (expected, dev)) in range_fields.items():
             m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
             if m == None:
-                print('Failed to find field: ', field)
+                print 'Failed to find field: ', field
                 result = failBecause('no such stats field')
             val = int(m.group(1))
 
@@ -1061,12 +1059,12 @@ def checkStats(name, way, stats_file, range_fields):
             deviation = round(((float(val) * 100)/ expected) - 100, 1)
 
             if val < lowerBound:
-                print(field, 'value is too low:')
-                print('(If this is because you have improved GHC, please')
-                print('update the test so that GHC doesn\'t regress again)')
+                print field, 'value is too low:'
+                print '(If this is because you have improved GHC, please'
+                print 'update the test so that GHC doesn\'t regress again)'
                 result = failBecause('stat too good')
             if val > upperBound:
-                print(field, 'value is too high:')
+                print field, 'value is too high:'
                 result = failBecause('stat not good enough')
 
             if val < lowerBound or val > upperBound or config.verbose >= 4:
@@ -1074,11 +1072,9 @@ def checkStats(name, way, stats_file, range_fields):
                 valLen = len(valStr)
                 expectedStr = str(expected)
                 expectedLen = len(expectedStr)
-                length = max(len(str(x)) for x in [expected, lowerBound, upperBound, val])
-
+                length = max(map (lambda x : len(str(x)), [expected, lowerBound, upperBound, val]))
                 def display(descr, val, extra):
-                    print(descr, str(val).rjust(length), extra)
-
+                    print descr, string.rjust(str(val), length), extra
                 display('    Expected    ' + full_name + ' ' + field + ':', expected, '+/-' + str(dev) + '%')
                 display('    Lower bound ' + full_name + ' ' + field + ':', lowerBound, '')
                 display('    Upper bound ' + full_name + ' ' + field + ':', upperBound, '')
@@ -1153,15 +1149,15 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 
     comp_flags = copy.copy(getTestOpts().compiler_always_flags)
     if noforce:
-        comp_flags = [f for f in comp_flags if f != '-fforce-recomp']
+        comp_flags = filter(lambda f: f != '-fforce-recomp', comp_flags)
     if getTestOpts().outputdir != None:
         comp_flags.extend(["-outputdir", getTestOpts().outputdir])
 
     cmd = 'cd ' + getTestOpts().testdir + " && " + cmd_prefix + "'" \
           + config.compiler + "' " \
-          + ' '.join(comp_flags) + ' ' \
+          + join(comp_flags,' ') + ' ' \
           + to_do + ' ' + srcname + ' ' \
-          + ' '.join(config.way_flags(name)[way]) + ' ' \
+          + join(config.way_flags(name)[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + opts.extra_hc_opts + ' ' \
           + '>' + errname + ' 2>&1'
@@ -1170,7 +1166,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 
     if result != 0 and not should_fail:
         actual_stderr = qualify(name, 'comp.stderr')
-        if_verbose(1,'Compile failed (status ' + repr(result) + ') errors were:')
+        if_verbose(1,'Compile failed (status ' + `result` + ') errors were:')
         if_verbose_dump(1,actual_stderr)
 
     # ToDo: if the sub-shell was killed by ^C, then exit
@@ -1254,7 +1250,7 @@ def simple_run( name, way, prog, args ):
 
     # check the exit code
     if exit_code != opts.exit_code:
-        print('Wrong exit code (expected', opts.exit_code, ', actual', exit_code, ')')
+        print 'Wrong exit code (expected', opts.exit_code, ', actual', exit_code, ')'
         dump_stdout(name)
         dump_stderr(name)
         return failBecause('bad exit code')
@@ -1286,7 +1282,7 @@ def rts_flags(way):
     if args == []:
         return ''
     else:
-        return '+RTS ' + ' '.join(args) + ' -RTS'
+        return '+RTS ' + join(args,' ') + ' -RTS'
 
 # -----------------------------------------------------------------------------
 # Run a program in the interpreter and check its output
@@ -1343,9 +1339,9 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
         flags.extend(["-outputdir", getTestOpts().outputdir])
 
     cmd = "'" + config.compiler + "' " \
-          + ' '.join(flags) + ' ' \
+          + join(flags,' ') + ' ' \
           + srcname + ' ' \
-          + ' '.join(config.way_flags(name)[way]) + ' ' \
+          + join(config.way_flags(name)[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts + ' ' \
           + '<' + scriptname +  ' 1>' + outname + ' 2>' + errname
@@ -1370,7 +1366,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     # check the exit code
     if exit_code != getTestOpts().exit_code:
-        print('Wrong exit code (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
+        print 'Wrong exit code (expected', getTestOpts().exit_code, ', actual', exit_code, ')'
         dump_stdout(name)
         dump_stderr(name)
         return failBecause('bad exit code')
@@ -1432,8 +1428,8 @@ def check_stdout_ok( name ):
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
-   print('Stdout:')
-   print(read_no_crs(qualify(name, 'run.stdout')))
+   print 'Stdout:'
+   print read_no_crs(qualify(name, 'run.stdout'))
 
 def check_stderr_ok( name ):
    if getTestOpts().with_namebase == None:
@@ -1455,8 +1451,8 @@ def check_stderr_ok( name ):
                           expected_stderr_file, actual_stderr_file)
 
 def dump_stderr( name ):
-   print("Stderr:")
-   print(read_no_crs(qualify(name, 'run.stderr')))
+   print "Stderr:"
+   print read_no_crs(qualify(name, 'run.stderr'))
 
 def read_no_crs(file):
     str = ''
@@ -1491,13 +1487,13 @@ def check_hp_ok(name):
                 if (gsResult == 0):
                     return (True)
                 else:
-                    print("hp2ps output for " + name + "is not valid PostScript")
+                    print "hp2ps output for " + name + "is not valid PostScript"
             else: return (True) # assume postscript is valid without ghostscript
         else:
-            print("hp2ps did not generate PostScript for " + name)
+            print "hp2ps did not generate PostScript for " + name
             return (False)
     else:
-        print("hp2ps error when processing heap profile for " + name)
+        print "hp2ps error when processing heap profile for " + name
         return(False)
 
 def check_prof_ok(name):
@@ -1505,11 +1501,11 @@ def check_prof_ok(name):
     prof_file = qualify(name,'prof')
 
     if not os.path.exists(prof_file):
-        print(prof_file + " does not exist")
+        print prof_file + " does not exist"
         return(False)
 
     if os.path.getsize(qualify(name,'prof')) == 0:
-        print(prof_file + " is empty")
+        print prof_file + " is empty"
         return(False)
 
     if getTestOpts().with_namebase == None:
@@ -1671,16 +1667,16 @@ def normalise_asm( str ):
     out = '\n'.join(out)
     return out
 
-def if_verbose( n, s ):
+def if_verbose( n, str ):
     if config.verbose >= n:
-        print(s)
+        print str
 
 def if_verbose_dump( n, f ):
     if config.verbose >= n:
         try:
-            print(open(f).read())
+            print open(f).read()
         except:
-            print('')
+            print ''
 
 def rawSystem(cmd_and_args):
     # We prefer subprocess.call to os.spawnv as the latter
@@ -1908,7 +1904,7 @@ def checkForFilesWrittenProblems(file):
     if len(files_written_not_removed) > 0:
         file.write("\n")
         file.write("\nSome files written but not removed:\n")
-        tests = list(files_written_not_removed.keys())
+        tests = files_written_not_removed.keys()
         tests.sort()
         for t in tests:
             for f in files_written_not_removed[t]:
@@ -1920,7 +1916,7 @@ def checkForFilesWrittenProblems(file):
     if len(bad_file_usages) > 0:
         file.write("\n")
         file.write("\nSome bad file usages:\n")
-        tests = list(bad_file_usages.keys())
+        tests = bad_file_usages.keys()
         tests.sort()
         for t in tests:
             for f in bad_file_usages[t]:
@@ -1935,7 +1931,7 @@ def genGSCmd(psfile):
 
 def gsNotWorking():
     global gs_working
-    print("GhostScript not available for hp2ps tests")
+    print "GhostScript not available for hp2ps tests"
 
 global gs_working
 gs_working = 0
@@ -1945,7 +1941,7 @@ if config.have_profiling:
     if resultGood == 0:
         resultBad = runCmdExitCode(genGSCmd(config.confdir + '/bad.ps'));
         if resultBad != 0:
-            print("GhostScript available for hp2ps tests")
+            print "GhostScript available for hp2ps tests"
             gs_working = 1;
         else:
             gsNotWorking();
@@ -2012,7 +2008,7 @@ def platform_wordsize_qualify( name, suff ):
              for vers in ['-' + config.compiler_maj_version, '']]
 
     dir = glob.glob(basepath + '*')
-    dir = [normalise_slashes_(d) for d in dir]
+    dir = map (lambda d: normalise_slashes_(d), dir)
 
     for (platformSpecific, f) in paths:
        if f in dir:
@@ -2045,14 +2041,19 @@ def pretest_cleanup(name):
    # not interested in the return code
 
 # -----------------------------------------------------------------------------
-# Return a list of all the files ending in '.T' below directories roots.
+# Return a list of all the files ending in '.T' below the directory dir.
 
 def findTFiles(roots):
-    return [os.path.join(path, filename)
-            for root in roots
-            for path, dirs, files in os.walk(root)
-            for filename in files
-            if filename.endswith('.T')]
+    return concat(map(findTFiles_,roots))
+
+def findTFiles_(path):
+    if os.path.isdir(path):
+        paths = map(lambda x, p=path: p + '/' + x, os.listdir(path))
+        return findTFiles(paths)
+    elif path[-2:] == '.T':
+        return [path]
+    else:
+        return []
 
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
@@ -2063,28 +2064,28 @@ def summary(t, file):
     printUnexpectedTests(file, [t.unexpected_passes, t.unexpected_failures])
     file.write('OVERALL SUMMARY for test run started at '
                + time.strftime("%c %Z", t.start_time) + '\n'
-               + str(datetime.timedelta(seconds=
-                    round(time.time() - time.mktime(t.start_time)))).rjust(8)
+               + string.rjust(str(datetime.timedelta(seconds=
+                    round(time.time() - time.mktime(t.start_time)))), 8)
                + ' spent to go through\n'
-               + repr(t.total_tests).rjust(8)
+               + string.rjust(`t.total_tests`, 8)
                + ' total tests, which gave rise to\n'
-               + repr(t.total_test_cases).rjust(8)
+               + string.rjust(`t.total_test_cases`, 8)
                + ' test cases, of which\n'
-               + repr(t.n_tests_skipped).rjust(8)
+               + string.rjust(`t.n_tests_skipped`, 8)
                + ' were skipped\n'
                + '\n'
-               + repr(t.n_missing_libs).rjust(8)
+               + string.rjust(`t.n_missing_libs`, 8)
                + ' had missing libraries\n'
-               + repr(t.n_expected_passes).rjust(8)
+               + string.rjust(`t.n_expected_passes`, 8)
                + ' expected passes\n'
-               + repr(t.n_expected_failures).rjust(8)
+               + string.rjust(`t.n_expected_failures`, 8)
                + ' expected failures\n'
                + '\n'
-               + repr(t.n_framework_failures).rjust(8)
+               + string.rjust(`t.n_framework_failures`, 8)
                + ' caused framework failures\n'
-               + repr(t.n_unexpected_passes).rjust(8)
+               + string.rjust(`t.n_unexpected_passes`, 8)
                + ' unexpected passes\n'
-               + repr(t.n_unexpected_failures).rjust(8)
+               + string.rjust(`t.n_unexpected_failures`, 8)
                + ' unexpected failures\n'
                + '\n')
 
@@ -2107,7 +2108,7 @@ def printUnexpectedTests(file, testInfoss):
     for testInfos in testInfoss:
         directories = testInfos.keys()
         for directory in directories:
-            tests = list(testInfos[directory].keys())
+            tests = testInfos[directory].keys()
             unexpected += tests
     if unexpected != []:
         file.write('Unexpected results from:\n')
@@ -2115,30 +2116,30 @@ def printUnexpectedTests(file, testInfoss):
         file.write('\n')
 
 def printPassingTestInfosSummary(file, testInfos):
-    directories = list(testInfos.keys())
+    directories = testInfos.keys()
     directories.sort()
-    maxDirLen = max(len(x) for x in directories)
+    maxDirLen = max(map ((lambda x : len(x)), directories))
     for directory in directories:
-        tests = list(testInfos[directory].keys())
+        tests = testInfos[directory].keys()
         tests.sort()
         for test in tests:
            file.write('   ' + directory.ljust(maxDirLen + 2) + test + \
-                      ' (' + ','.join(testInfos[directory][test]) + ')\n')
+                      ' (' + join(testInfos[directory][test],',') + ')\n')
     file.write('\n')
 
 def printFailingTestInfosSummary(file, testInfos):
-    directories = list(testInfos.keys())
+    directories = testInfos.keys()
     directories.sort()
-    maxDirLen = max(len(d) for d in directories)
+    maxDirLen = max(map ((lambda x : len(x)), directories))
     for directory in directories:
-        tests = list(testInfos[directory].keys())
+        tests = testInfos[directory].keys()
         tests.sort()
         for test in tests:
            reasons = testInfos[directory][test].keys()
            for reason in reasons:
                file.write('   ' + directory.ljust(maxDirLen + 2) + test + \
                           ' [' + reason + ']' + \
-                          ' (' + ','.join(testInfos[directory][test][reason]) + ')\n')
+                          ' (' + join(testInfos[directory][test][reason],',') + ')\n')
     file.write('\n')
 
 def getStdout(cmd):

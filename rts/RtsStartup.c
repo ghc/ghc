@@ -19,6 +19,7 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Prelude.h"
+#include "Printer.h"    /* DEBUG_LoadSymbols */
 #include "Schedule.h"   /* initScheduler */
 #include "Stats.h"      /* initStats */
 #include "STM.h"        /* initSTM */
@@ -161,6 +162,11 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
         setupRtsFlags(argc, *argv,
                       rts_config.rts_opts_enabled, rts_config.rts_opts, rts_config.rts_hs_main);
     }
+
+#ifdef DEBUG
+    /* load debugging symbols for current binary */
+    DEBUG_LoadSymbols((*argv)[0]);
+#endif /* DEBUG */
 
     /* Initialise the stats department, phase 1 */
     initStats1();

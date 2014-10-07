@@ -71,6 +71,10 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cProjectVersionInt    = "$(ProjectVersionInt)"'              >> $@
 	@echo 'cProjectPatchLevel    :: String'                             >> $@
 	@echo 'cProjectPatchLevel    = "$(ProjectPatchLevel)"'              >> $@
+	@echo 'cProjectPatchLevel1   :: String'                             >> $@
+	@echo 'cProjectPatchLevel1   = "$(ProjectPatchLevel1)"'             >> $@
+	@echo 'cProjectPatchLevel2   :: String'                             >> $@
+	@echo 'cProjectPatchLevel2   = "$(ProjectPatchLevel2)"'             >> $@
 	@echo 'cBooterVersion        :: String'                             >> $@
 	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $@
 	@echo 'cStage                :: String'                             >> $@
@@ -467,36 +471,15 @@ compiler_stage2_dll0_MODULES = \
 	BasicTypes \
 	BinIface \
 	Binary \
-	Bitmap \
-	BlockId \
 	BooleanFormula \
 	BreakArray \
 	BufWrite \
 	BuildTyCl \
-	ByteCodeAsm \
-	ByteCodeInstr \
-	ByteCodeItbls \
-	CLabel \
 	Class \
 	CmdLineParser \
-	Cmm \
-	CmmCallConv \
-	CmmExpr \
-	CmmInfo \
-	CmmMachOp \
-	CmmNode \
 	CmmType \
-	CmmUtils \
 	CoAxiom \
 	ConLike \
-	CodeGen.Platform \
-	CodeGen.Platform.ARM \
-	CodeGen.Platform.NoRegs \
-	CodeGen.Platform.PPC \
-	CodeGen.Platform.PPC_Darwin \
-	CodeGen.Platform.SPARC \
-	CodeGen.Platform.X86 \
-	CodeGen.Platform.X86_64 \
 	Coercion \
 	Config \
 	Constants \
@@ -520,7 +503,6 @@ compiler_stage2_dll0_MODULES = \
 	Exception \
 	ExtsCompat46 \
 	FamInstEnv \
-	FastBool \
 	FastFunctions \
 	FastMutInt \
 	FastString \
@@ -530,8 +512,6 @@ compiler_stage2_dll0_MODULES = \
 	FiniteMap \
 	ForeignCall \
 	Hooks \
-	Hoopl \
-	Hoopl.Dataflow \
 	HsBinds \
 	HsDecls \
 	HsDoc \
@@ -551,14 +531,12 @@ compiler_stage2_dll0_MODULES = \
 	IfaceSyn \
 	IfaceType \
 	InstEnv \
-	InteractiveEvalTypes \
 	Kind \
 	ListSetOps \
 	Literal \
 	LoadIface \
 	Maybes \
 	MkCore \
-	MkGraph \
 	MkId \
 	Module \
 	MonadUtils \
@@ -578,9 +556,6 @@ compiler_stage2_dll0_MODULES = \
 	PipelineMonad \
 	Platform \
 	PlatformConstants \
-	PprCmm \
-	PprCmmDecl \
-	PprCmmExpr \
 	PprCore \
 	PrelInfo \
 	PrelNames \
@@ -588,23 +563,10 @@ compiler_stage2_dll0_MODULES = \
 	Pretty \
 	PrimOp \
 	RdrName \
-	Reg \
-	RegClass \
 	Rules \
-	SMRep \
 	Serialized \
 	SrcLoc \
 	StaticFlags \
-	StgCmmArgRep \
-	StgCmmClosure \
-	StgCmmEnv \
-	StgCmmLayout \
-	StgCmmMonad \
-	StgCmmProf \
-	StgCmmTicky \
-	StgCmmUtils \
-	StgSyn \
-	Stream \
 	StringBuffer \
 	TcEvidence \
 	TcIface \
@@ -627,6 +589,54 @@ compiler_stage2_dll0_MODULES = \
 	Var \
 	VarEnv \
 	VarSet
+
+ifeq "$(GhcWithInterpreter)" "YES"
+# These files are reacheable from DynFlags
+# only by GHCi-enabled code (see #9552)
+compiler_stage2_dll0_MODULES += \
+	Bitmap \
+	BlockId \
+	ByteCodeAsm \
+	ByteCodeInstr \
+	ByteCodeItbls \
+	CLabel \
+	Cmm \
+	CmmCallConv \
+	CmmExpr \
+	CmmInfo \
+	CmmMachOp \
+	CmmNode \
+	CmmUtils \
+	CodeGen.Platform \
+	CodeGen.Platform.ARM \
+	CodeGen.Platform.NoRegs \
+	CodeGen.Platform.PPC \
+	CodeGen.Platform.PPC_Darwin \
+	CodeGen.Platform.SPARC \
+	CodeGen.Platform.X86 \
+	CodeGen.Platform.X86_64 \
+	FastBool \
+	Hoopl \
+	Hoopl.Dataflow \
+	InteractiveEvalTypes \
+	MkGraph \
+	PprCmm \
+	PprCmmDecl \
+	PprCmmExpr \
+	Reg \
+	RegClass \
+	SMRep \
+	StgCmmArgRep \
+	StgCmmClosure \
+	StgCmmEnv \
+	StgCmmLayout \
+	StgCmmMonad \
+	StgCmmProf \
+	StgCmmTicky \
+	StgCmmUtils \
+	StgSyn \
+	Stream
+endif
 
 compiler_stage2_dll0_HS_OBJS = \
     $(patsubst %,compiler/stage2/build/%.$(dyn_osuf),$(subst .,/,$(compiler_stage2_dll0_MODULES)))

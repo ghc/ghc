@@ -103,6 +103,7 @@ _darcs/
 /ghc/ghc-bin.cabal
 /includes/ghcautoconf.h
 /includes/ghcplatform.h
+/includes/ghcversion.h
 /index.html
 /inplace/
 /libffi/build/
