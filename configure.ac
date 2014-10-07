@@ -200,7 +200,7 @@ AC_MSG_CHECKING(whether bootstrap compiler is affected by bug 9439)
 echo "main = putStrLn \"%function\"" > conftestghc.hs
 
 # Check whether LLVM backend is default for this platform
-${WithGhc} conftestghc.hs 2>&1 >/dev/null
+"${WithGhc}" conftestghc.hs 2>&1 >/dev/null
 res=`./conftestghc`
 if test "x$res" == "x%object"
 then
@@ -217,7 +217,7 @@ fi
 
 # -fllvm is not the default, but set a flag so the Makefile can check
 # -for it in the build flags later on
-${WithGhc} -fforce-recomp -fllvm conftestghc.hs 2>&1 >/dev/null
+"${WithGhc}" -fforce-recomp -fllvm conftestghc.hs 2>&1 >/dev/null
 if test $? == 0
 then
     res=`./conftestghc`
