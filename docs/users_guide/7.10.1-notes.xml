@@ -101,7 +101,8 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO FIXME
+                    Added support for generating LINE pragma declarations
+                    (<xref linkend="line-pragma"/>).
                </para>
            </listitem>
        </itemizedlist>

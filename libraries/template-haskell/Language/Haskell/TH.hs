@@ -137,6 +137,7 @@ module Language.Haskell.TH(
     -- **** Pragmas
     ruleVar, typedRuleVar,
     pragInlD, pragSpecD, pragSpecInlD, pragSpecInstD, pragRuleD, pragAnnD,
+    pragLineD,
 
         -- * Pretty-printer
     Ppr(..), pprint, pprExp, pprLit, pprPat, pprParendType
