@@ -118,11 +118,83 @@ solveInteract cts
         do { sel <- selectNextWorkItem max_depth
            ; case sel of
               NoWorkRemaining     -- Done, successfuly (modulo frozen)
-                -> return ()
+                -> do more_work <- runTcPlugins
+                      when more_work (solve_loop max_depth)
+
               MaxDepthExceeded cnt ct -- Failure, depth exceeded
                 -> wrapErrTcS $ solverDepthErrorTcS cnt (ctEvidence ct)
               NextWorkItem ct     -- More work, loop around!
                 -> do { runSolverPipeline thePipeline ct; solve_loop max_depth } }
+
+
+-- | Try to make progress using type-checker plugings.
+-- Returns 'True' if we added some extra work to the work queue.
+runTcPlugins :: TcS Bool
+runTcPlugins =
+  do gblEnv <- getGblEnv
+     case tcg_tc_plugins gblEnv of
+       []      -> return False
+       plugins ->
+         do has_new_works <- mapM runPlugin plugins
+            return (or has_new_works)
+  where
+  runPlugin p =
+    do iSet <- getTcSInerts
+       let iCans    = inert_cans iSet
+           iEqs     = concat (varEnvElts (inert_eqs iCans))
+           iFunEqs  = funEqsToList (inert_funeqs iCans)
+           allCts   = iEqs ++ iFunEqs
+           (derived,other) = partition isDerivedCt allCts
+           (wanted,given)  = partition isWantedCt  other
+
+           -- We use this to remove some constraints.
+           -- 'survived' should be the sub-set of constraints that
+           -- remains inert.
+           restoreICans survived =
+             do let iCans1 = iCans { inert_eqs = emptyVarEnv
+                                   , inert_funeqs = emptyFunEqs }
+                    iCans2 = foldl addInertCan iCans1 derived
+                    iCans3 = foldl addInertCan iCans2 survived
+                setInertCans iCans3
+
+       result <- tcPluginIO $ tcPluginSolve p given wanted
+       case result of
+
+         TcPluginContradiction bad_cts ok_cts ->
+            do restoreICans ok_cts
+               mapM_ emitInsoluble bad_cts
+               return False
+
+         TcPluginNewWork new_cts ->
+            case removeKnownCts iCans new_cts of
+              [] -> return False
+              new_work ->
+                 do updWorkListTcS (extendWorkListCts new_work)
+                    return True
+
+         TcPluginSolved solved_cts other_cts ->
+            case solved_cts of
+              [] -> return False    -- Fast common case
+              _  -> do restoreICans other_cts
+                       let setEv (ev,ct) = setEvBind (ctev_evar (cc_ev ct)) ev
+                       mapM_ setEv solved_cts
+                       return False
+
+  removeKnownCts origIcans = filter (not . isKnownCt origIcans)
+  isKnownCt origIcans ct =
+    case ct of
+
+      CFunEqCan { cc_fun = f, cc_tyargs = ts } ->
+        case findFunEq (inert_funeqs origIcans) f ts of
+          Just _ -> True
+          _      -> False
+
+      CTyEqCan { cc_tyvar = x, cc_rhs = t } ->
+        not $ any (eqType t . cc_rhs) $ findTyEqs (inert_eqs origIcans) x
+
+      _ -> panic "TcPlugin returned not a TyEq or FunEq constraint"
+
+
 
 type WorkItem = Ct
 type SimplifierStage = WorkItem -> TcS StopOrContinue

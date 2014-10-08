@@ -77,6 +77,7 @@ module TcSMonad (
 
     findDict, findDictsByClass, addDict, addDictsByClass, delDict, partitionDicts,
 
+    emptyFunEqs, funEqsToList,
     findFunEq, findTyEqs, 
     findFunEqsByTyCon, findFunEqs, partitionFunEqs,
     sizeFunEqMap,
@@ -89,6 +90,8 @@ module TcSMonad (
     zonkTyVarsAndFV,
 
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
+
+    tcPluginIO,
 
     matchFam, 
     checkWellStagedDFun,
@@ -2012,4 +2015,16 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
         ; return $ EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs)
         }
 \end{code}
+
+
+External Type-checker Plugins
+-----------------------------
+
+\begin{code}
+-- | Execute an IO action needed by an external plugin.
+tcPluginIO :: IO a -> TcS a
+tcPluginIO m = TcS (\_ -> liftIO m)
+\end{code}
+
+
 
