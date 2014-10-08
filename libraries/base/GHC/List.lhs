@@ -400,11 +400,31 @@ cycle xs                = xs' where xs' = xs ++ xs'
 -- > takeWhile (< 0) [1,2,3] == []
 --
 
+{-# NOINLINE [1] takeWhile #-}
 takeWhile               :: (a -> Bool) -> [a] -> [a]
 takeWhile _ []          =  []
 takeWhile p (x:xs)
             | p x       =  x : takeWhile p xs
             | otherwise =  []
+
+{-# INLINE [0] takeWhileFB #-}
+takeWhileFB :: (a -> Bool) -> (a -> b -> b) -> b -> a -> b -> b
+takeWhileFB p c n = \x r -> if p x then x `c` r else n
+
+-- The takeWhileFB rule is similar to the filterFB rule. It works like this:
+-- takeWhileFB q (takeWhileFB p c n) n =
+-- \x r -> if q x then (takeWhileFB p c n) x r else n =
+-- \x r -> if q x then (\x' r' -> if p x' then x' `c` r' else n) x r else n =
+-- \x r -> if q x then (if p x then x `c` r else n) else n =
+-- \x r -> if q x && p x then x `c` r else n =
+-- takeWhileFB (\x -> q x && p x) c n
+{-# RULES
+"takeWhile"     [~1] forall p xs. takeWhile p xs =
+                                build (\c n -> foldr (takeWhileFB p c n) n xs)
+"takeWhileList" [1]  forall p.    foldr (takeWhileFB p (:) []) [] = takeWhile p
+"takeWhileFB"        forall c n p q. takeWhileFB q (takeWhileFB p c n) n =
+                        takeWhileFB (\x -> q x && p x) c n
+ #-}
 
 -- | 'dropWhile' @p xs@ returns the suffix remaining after 'takeWhile' @p xs@:
 --
