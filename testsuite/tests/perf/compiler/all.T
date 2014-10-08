@@ -171,7 +171,7 @@ test('T4801',
                            # expected value: 58 (amd64/OS X)
                            # 13/01/2014 - 70
            (wordsize(32), 30, 20),
-           (wordsize(64), 55, 20)]),
+           (wordsize(64), 62, 20)]),
             # prev:       50 (amd64/Linux)
             # 19/10/2012: 64 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
@@ -180,6 +180,7 @@ test('T4801',
             # 28/8/13:    60 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
             # 2014-09-10: 55 post-AMP-cleanup
+            # 2014-10-08: 62 (jumps between 55 and 71 observed -- GC tipping point?)
 
       compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 464872776, 5),
@@ -189,11 +190,12 @@ test('T4801',
            # prev:        185669232 (x86/OSX)
            # 2014-01-22:  211198056 (x86/Linux)
            # 2014-09-03:  185242032 (Windows laptop)
-           (wordsize(64), 362939272, 10)]),
+           (wordsize(64), 382056344, 10)]),
             # prev:       360243576 (amd64/Linux)
             # 19/10/2012: 447190832 (amd64/Linux) (-fPIC turned on)
             # 19/10/2012: 392409984 (amd64/Linux) (-fPIC turned off)
             # 2014-04-08: 362939272 (amd64/Linux) cumulation of various smaller improvements over recent commits
+            # 2014-10-08: 382056344 (amd64/Linux) stricter foldr2 488e95b
 
 ###################################
 # deactivated for now, as this metric became to volatile recently
