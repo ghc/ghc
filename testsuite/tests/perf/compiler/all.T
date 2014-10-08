@@ -404,7 +404,7 @@ test('T5321FD',
             #  (increase due to new codegen)
             # 2014-07-31: 211699816 (Windows) (-11%)
             #  (due to better optCoercion, 5e7406d9, #9233)
-           (wordsize(64), 426960992, 10)])
+           (wordsize(64), 410895536, 10)])
             # prev:       418306336
             # 29/08/2012: 492905640
             #  (increase due to new codegen)
@@ -416,6 +416,8 @@ test('T5321FD',
             #  (with -8%, still in range, hence cause not known)
             # 2014-07-17: 426960992 (-11% of previous value)
             #  (due to better optCoercion, 5e7406d9, #9233)
+            # 2014-10-08  410895536
+            #  (various changes; biggest improvements due to 949ad67 and FastString package ids)
       ],
       compile,[''])
 
@@ -446,14 +448,15 @@ test('T5837',
              # 40000000 (x86/Linux)
              # 2013-11-13: 45520936 (x86/Windows, 64bit machine)
              # 2041-09-03: 37096484 (Windows laptop, w/w for INLINABLE things
-           (wordsize(64), 73639840, 10)])
+           (wordsize(64), 75765728, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
              # 2013-09-18 90587232 amd64/Linux
              # 2013-11-21 86795752 amd64/Linux, GND via Coercible and counters
              #                                  for constraints solving
-             # 2041-08-29 73639840 amd64/Linux, w/w for INLINABLE things
+             # 2014-08-29 73639840 amd64/Linux, w/w for INLINABLE things
+             # 2014-10-08 73639840 amd64/Linux, Burning Bridges and other small changes
       ],
       compile_fail,['-ftype-function-depth=50'])
 
