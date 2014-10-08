@@ -75,7 +75,7 @@ module TcRnTypes(
         canRewrite, canRewriteOrSame,
 
         -- Constraint solver plugins
-        TcPlugin(..), TcSolveResult(..),
+        TcPlugin(..), TcPluginResult(..),
 
         -- Pretty printing
         pprEvVarTheta, pprWantedsWithLocs,
@@ -1935,11 +1935,30 @@ Constraint Solver Plugins
 \begin{code}
 
 data TcPlugin = TcPlugin
-  { tcPluginSolve :: [Ct] -> [Ct] -> IO ([TcSolveResult], [Ct])
+  { tcPluginSolve :: [Ct] -> [Ct] -> IO TcPluginResult
   , tcPluginStop  :: IO ()
+    -- ^ Exit the solver.
+    -- The solver should not be used after this is called.
   }
 
-data TcSolveResult = Stuck | Impossible | Simplified EvTerm
+
+data TcPluginResult
+  = TcPluginContradiction {- inconsistent -} [Ct]
+                          {- all others   -} [Ct]
+    {- ^ There is no model for the constraints.
+    The two lists partition the original constraints,
+    with the first one being the conflicting constraints,
+    and the second the other constraints. -}
+
+  | TcPluginNewWork [Ct]
+    -- ^ New work (facts that will hold in all models)
+
+  | TcPluginSolved {- solved -}       [(EvTerm,Ct)]
+                   {- not solved -}   [Ct]
+    -- ^ We managed to solve some of the constrints.
+    -- The solved constraints (with evidence) are in the first list.
+    -- The unsolved constraints are in the second one.
+
 
 \end{code}
 
