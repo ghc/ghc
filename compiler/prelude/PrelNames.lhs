@@ -341,6 +341,7 @@ basicKnownKeyNames
 
         -- Plugins
         , pluginTyConName
+        , tcPluginTyConName
 
         -- dotnet interop
         , objectTyConName, marshalObjectName, unmarshalObjectName
@@ -1197,6 +1198,11 @@ cORE_MONAD :: Module
 cORE_MONAD = mkThisGhcModule (fsLit "CoreMonad")
 pluginTyConName :: Name
 pluginTyConName = tcQual cORE_MONAD (fsLit "Plugin") pluginTyConKey
+
+tC_RN_TYPES:: Module
+tC_RN_TYPES = mkThisGhcModule (fsLit "TcRnTypes")
+tcPluginTyConName :: Name
+tcPluginTyConName = tcQual tC_RN_TYPES (fsLit "TcPlugin") tcPluginTyConKey
 \end{code}
 
 %************************************************************************
@@ -1448,8 +1454,9 @@ csel1CoercionTyConKey                   = mkPreludeTyConUnique 99
 csel2CoercionTyConKey                   = mkPreludeTyConUnique 100
 cselRCoercionTyConKey                   = mkPreludeTyConUnique 101
 
-pluginTyConKey :: Unique
+pluginTyConKey, tcPluginTyConKey :: Unique
 pluginTyConKey                          = mkPreludeTyConUnique 102
+tcPluginTyConKey                        = mkPreludeTyConUnique 103
 
 unknownTyConKey, unknown1TyConKey, unknown2TyConKey, unknown3TyConKey,
     opaqueTyConKey :: Unique

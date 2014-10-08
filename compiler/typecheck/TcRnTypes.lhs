@@ -16,7 +16,7 @@ For state that is global and should be returned at the end (e.g not part
 of the stack mechanism), you should use an TcRef (= IORef) to store them.
 
 \begin{code}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ExistentialQuantification #-}
 
 module TcRnTypes(
         TcRnIf, TcRn, TcM, RnM, IfM, IfL, IfG, -- The monad is opaque outside this module
@@ -73,6 +73,9 @@ module TcRnTypes(
         mkGivenLoc,
         isWanted, isGiven, isDerived,
         canRewrite, canRewriteOrSame,
+
+        -- Constraint solver plugins
+        TcPlugin(..), TcSolveResult(..),
 
         -- Pretty printing
         pprEvVarTheta, pprWantedsWithLocs,
@@ -348,9 +351,12 @@ data TcGblEnv
         tcg_main      :: Maybe Name,         -- ^ The Name of the main
                                              -- function, if this module is
                                              -- the main module.
-        tcg_safeInfer :: TcRef Bool          -- Has the typechecker
+        tcg_safeInfer :: TcRef Bool,         -- Has the typechecker
                                              -- inferred this module
                                              -- as -XSafe (Safe Haskell)
+
+        -- | A list of user-defined plugins for the constraint solver.
+        tcg_tc_plugins :: [TcPlugin]
     }
 
 instance ContainsModule TcGblEnv where
@@ -1917,3 +1923,23 @@ pprCtO HoleOrigin            = ptext (sLit "a use of") <+> quotes (ptext $ sLit 
 pprCtO ListOrigin            = ptext (sLit "an overloaded list")
 pprCtO _                     = panic "pprCtOrigin"
 \end{code}
+
+
+
+
+
+Constraint Solver Plugins
+-------------------------
+
+
+\begin{code}
+
+data TcPlugin = TcPlugin
+  { tcPluginSolve :: [Ct] -> [Ct] -> IO ([TcSolveResult], [Ct])
+  , tcPluginStop  :: IO ()
+  }
+
+data TcSolveResult = Stuck | Impossible | Simplified EvTerm
+
+\end{code}
+

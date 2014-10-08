@@ -72,7 +72,6 @@ import qualified Data.Map as Map
 
 \begin{code}
 
--- | Setup the initial typechecking environment
 initTc :: HscEnv
        -> HscSource
        -> Bool          -- True <=> retain renamed syntax trees
@@ -81,8 +80,22 @@ initTc :: HscEnv
        -> IO (Messages, Maybe r)
                 -- Nothing => error thrown by the thing inside
                 -- (error messages should have been printed already)
+initTc = initTcWithPlugins []
 
-initTc hsc_env hsc_src keep_rn_syntax mod do_this
+
+
+-- | Setup the initial typechecking environment
+initTcWithPlugins :: [TcPlugin]
+       -> HscEnv
+       -> HscSource
+       -> Bool          -- True <=> retain renamed syntax trees
+       -> Module
+       -> TcM r
+       -> IO (Messages, Maybe r)
+                -- Nothing => error thrown by the thing inside
+                -- (error messages should have been printed already)
+
+initTcWithPlugins tc_plugins hsc_env hsc_src keep_rn_syntax mod do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
         tvs_var      <- newIORef emptyVarSet ;
         keep_var     <- newIORef emptyNameSet ;
@@ -158,7 +171,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_hpc            = False,
                 tcg_main           = Nothing,
                 tcg_safeInfer      = infer_var,
-                tcg_dependent_files = dependent_files_var
+                tcg_dependent_files = dependent_files_var,
+                tcg_tc_plugins     = tc_plugins
              } ;
              lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
