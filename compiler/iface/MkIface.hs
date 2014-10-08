@@ -1324,9 +1324,20 @@ checkDependencies hsc_env summary iface
      find_res <- liftIO $ findImportedModule hsc_env mod pkg
      let reason = moduleNameString mod ++ " changed"
      case find_res of
-        Found _ mod
+        FoundModule h -> check_mod reason (fr_mod h)
+        FoundSigs hs _backing -> check_mods reason (map fr_mod hs)
+        _otherwise  -> return (RecompBecause reason)
+
+   check_mods _ [] = return UpToDate
+   check_mods reason (m:ms) = do
+        r <- check_mod reason m
+        case r of
+            UpToDate -> check_mods reason ms
+            _otherwise -> return r
+
+   check_mod reason mod
           | pkg == this_pkg
-           -> if moduleName mod `notElem` map fst prev_dep_mods
+            = if moduleName mod `notElem` map fst prev_dep_mods
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " not among previous dependencies"
@@ -1334,7 +1345,7 @@ checkDependencies hsc_env summary iface
                  else
                          return UpToDate
           | otherwise
-           -> if pkg `notElem` (map fst prev_dep_pkgs)
+            = if pkg `notElem` (map fst prev_dep_pkgs)
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " is from package " <> quotes (ppr pkg) <>
@@ -1343,7 +1354,6 @@ checkDependencies hsc_env summary iface
                  else
                          return UpToDate
            where pkg = modulePackageKey mod
-        _otherwise  -> return (RecompBecause reason)
 
 needInterface :: Module -> (ModIface -> IfG RecompileRequired)
               -> IfG RecompileRequired
