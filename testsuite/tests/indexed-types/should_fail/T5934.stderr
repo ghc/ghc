@@ -1,7 +1,6 @@
 
 T5934.hs:12:7:
-    Couldn't match type ‘Integer’
-                  with ‘(forall s. Gen (PrimState (ST s))) -> Int’
+    Couldn't match type ‘Integer’ with ‘(forall s. GenST s) -> Int’
     Expected type: Integer -> (forall s. GenST s) -> Int
       Actual type: Integer -> Integer
     In the expression: 0

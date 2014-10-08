@@ -44,7 +44,6 @@ import Class
 import Type
 import Kind( isKind )
 import ErrUtils
-import MkId
 import DataCon
 import Maybes
 import RdrName
@@ -370,16 +369,15 @@ tcDeriving tycl_decls inst_decls deriv_decls
         -- Generic1 should use the same TcGenGenerics.MetaTyCons)
         ; (commonAuxs, auxDerivStuff) <- commonAuxiliaries $ map forgetTheta early_specs
 
-        ; overlap_flag <- getOverlapFlag
         ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
-        ; insts1 <- mapM (genInst True overlap_flag commonAuxs) given_specs
+        ; insts1 <- mapM (genInst True commonAuxs) given_specs
 
         -- the stand-alone derived instances (@insts1@) are used when inferring
         -- the contexts for "deriving" clauses' instances (@infer_specs@)
         ; final_specs <- extendLocalInstEnv (map (iSpec . fstOf3) insts1) $
-                         inferInstanceContexts overlap_flag infer_specs
+                         inferInstanceContexts infer_specs
 
-        ; insts2 <- mapM (genInst False overlap_flag commonAuxs) final_specs
+        ; insts2 <- mapM (genInst False commonAuxs) final_specs
 
         ; let (inst_infos, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
@@ -391,8 +389,8 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
         ; dflags <- getDynFlags
         ; unless (isEmptyBag inst_info) $
-            liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
-                   (ddump_deriving inst_info rn_binds newTyCons famInsts))
+             liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
+                        (ddump_deriving inst_info rn_binds newTyCons famInsts))
 
         ; let all_tycons = map ATyCon (bagToList newTyCons)
         ; gbl_env <- tcExtendGlobalEnv all_tycons $
@@ -403,8 +401,8 @@ tcDeriving tycl_decls inst_decls deriv_decls
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) }
   where
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name
-                   -> Bag TyCon                 -- ^ Empty data constructors
-                   -> Bag (FamInst)             -- ^ Rep type family instances
+                   -> Bag TyCon               -- ^ Empty data constructors
+                   -> Bag FamInst             -- ^ Rep type family instances
                    -> SDoc
     ddump_deriving inst_infos extra_binds repMetaTys repFamInsts
       =    hang (ptext (sLit "Derived instances:"))
@@ -1769,11 +1767,11 @@ ordered by sorting on type varible, tv, (major key) and then class, k,
 \end{itemize}
 
 \begin{code}
-inferInstanceContexts :: OverlapFlag -> [DerivSpec ThetaOrigin] -> TcM [DerivSpec ThetaType]
+inferInstanceContexts :: [DerivSpec ThetaOrigin] -> TcM [DerivSpec ThetaType]
 
-inferInstanceContexts _ [] = return []
+inferInstanceContexts [] = return []
 
-inferInstanceContexts oflag infer_specs
+inferInstanceContexts infer_specs
   = do  { traceTc "inferInstanceContexts" $ vcat (map pprDerivSpec infer_specs)
         ; iterate_deriv 1 initial_solutions }
   where
@@ -1799,7 +1797,7 @@ inferInstanceContexts oflag infer_specs
       | otherwise
       = do {      -- Extend the inst info from the explicit instance decls
                   -- with the current set of solutions, and simplify each RHS
-             inst_specs <- zipWithM (mkInstance oflag) current_solns infer_specs
+             inst_specs <- zipWithM newDerivClsInst current_solns infer_specs
            ; new_solns <- checkNoErrs $
                           extendLocalInstEnv inst_specs $
                           mapM gen_soln infer_specs
@@ -1832,15 +1830,10 @@ inferInstanceContexts oflag infer_specs
         the_pred = mkClassPred clas inst_tys
 
 ------------------------------------------------------------------
-mkInstance :: OverlapFlag -> ThetaType -> DerivSpec theta -> TcM ClsInst
-mkInstance overlap_flag theta
-           (DS { ds_name = dfun_name
-               , ds_tvs = tvs, ds_cls = clas, ds_tys = tys })
-  = do { (subst, tvs') <- tcInstSkolTyVars tvs
-       ; return (mkLocalInstance dfun overlap_flag tvs' clas (substTys subst tys)) }
-  where
-    dfun = mkDictFunId dfun_name tvs theta clas tys
-
+newDerivClsInst :: ThetaType -> DerivSpec theta -> TcM ClsInst
+newDerivClsInst theta (DS { ds_name = dfun_name, ds_overlap = overlap_mode
+                          , ds_tvs = tvs, ds_cls = clas, ds_tys = tys })
+  = newClsInst overlap_mode dfun_name tvs theta clas tys
 
 extendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
 -- Add new locally-defined instances; don't bother to check
@@ -2055,17 +2048,15 @@ the renamer.  What a great hack!
 -- case of instances for indexed families.
 --
 genInst :: Bool             -- True <=> standalone deriving
-        -> OverlapFlag
         -> CommonAuxiliaries
-        -> DerivSpec ThetaType 
+        -> DerivSpec ThetaType
         -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
-genInst _standalone_deriv default_oflag comauxs
+genInst _standalone_deriv comauxs
         spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype, ds_tys = tys
-                 , ds_overlap = overlap_mode
                  , ds_name = dfun_name, ds_cls = clas, ds_loc = loc })
   | is_newtype   -- See Note [Bindings for Generalised Newtype Deriving]
-  = do { inst_spec <- mkInstance oflag theta spec
+  = do { inst_spec <- newDerivClsInst theta spec
        ; traceTc "genInst/is_newtype" (vcat [ppr loc, ppr clas, ppr tvs, ppr tys, ppr rhs_ty])
        ; return ( InstInfo
                     { iSpec   = inst_spec
@@ -2080,10 +2071,11 @@ genInst _standalone_deriv default_oflag comauxs
               -- See Note [Newtype deriving and unused constructors]
 
   | otherwise
-  = do { (meth_binds, deriv_stuff) <- genDerivStuff loc clas 
+  = do { (meth_binds, deriv_stuff) <- genDerivStuff loc clas
                                         dfun_name rep_tycon
                                         (lookup rep_tycon comauxs)
-       ; inst_spec <- mkInstance oflag theta spec
+       ; inst_spec <- newDerivClsInst theta spec
+       ; traceTc "newder" (ppr inst_spec)
        ; let inst_info = InstInfo { iSpec   = inst_spec
                                   , iBinds  = InstBindings
                                                 { ib_binds = meth_binds
@@ -2092,7 +2084,6 @@ genInst _standalone_deriv default_oflag comauxs
                                                 , ib_derived = True } }
        ; return ( inst_info, deriv_stuff, Nothing ) }
   where
-    oflag  = setOverlapModeMaybe default_oflag overlap_mode
     rhs_ty = newTyConInstRhs rep_tycon rep_tc_args
 
 genDerivStuff :: SrcSpan -> Class -> Name -> TyCon
@@ -2101,12 +2092,12 @@ genDerivStuff :: SrcSpan -> Class -> Name -> TyCon
 genDerivStuff loc clas dfun_name tycon comaux_maybe
   | let ck = classKey clas
   , ck `elem` [genClassKey, gen1ClassKey]   -- Special case because monadic
-  = let gk = if ck == genClassKey then Gen0 else Gen1 
+  = let gk = if ck == genClassKey then Gen0 else Gen1
         -- TODO NSF: correctly identify when we're building Both instead of One
         Just metaTyCons = comaux_maybe -- well-guarded by commonAuxiliaries and genInst
     in do
       (binds, faminst) <- gen_Generic_binds gk tycon metaTyCons (nameModule dfun_name)
-      return (binds, DerivFamInst faminst `consBag` emptyBag)
+      return (binds, unitBag (DerivFamInst faminst))
 
   | otherwise                      -- Non-monadic generators
   = do dflags <- getDynFlags

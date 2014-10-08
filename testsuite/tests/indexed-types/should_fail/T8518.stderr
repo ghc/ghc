@@ -1,29 +1,7 @@
 
-T8518.hs:14:18:
-    Could not deduce (F c ~ Maybe (F c))
-    from the context (Continuation c)
-      bound by the type signature for
-                 callCont :: Continuation c => c -> Z c -> B c -> Maybe (F c)
-      at T8518.hs:13:13-64
-    Relevant bindings include
-      b :: B c (bound at T8518.hs:14:14)
-      z :: Z c (bound at T8518.hs:14:12)
-      c :: c (bound at T8518.hs:14:10)
-      callCont :: c -> Z c -> B c -> Maybe (F c) (bound at T8518.hs:14:1)
-    In the expression: rpt (4 :: Int) c z b
-    In an equation for ‘callCont’:
-        callCont c z b
-          = rpt (4 :: Int) c z b
-          where
-              rpt 0 c' z' b' = fromJust (fst <$> (continue c' z' b'))
-              rpt i c' z' b' = let ... in rpt (i - 1) c''
-
 T8518.hs:17:78:
-    Could not deduce (F a1 ~ (Z a1 -> B a1 -> F a1))
-    from the context (Continuation c)
-      bound by the type signature for
-                 callCont :: Continuation c => c -> Z c -> B c -> Maybe (F c)
-      at T8518.hs:13:13-64
+    Couldn't match expected type ‘F a1’
+                with actual type ‘Z a1 -> B a1 -> F a1’
     Relevant bindings include
       c'' :: a1 (bound at T8518.hs:17:30)
       b' :: B a1 (bound at T8518.hs:17:21)

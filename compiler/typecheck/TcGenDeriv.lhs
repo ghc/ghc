@@ -85,7 +85,7 @@ data DerivStuff     -- Please add this auxiliary stuff
 
   -- Generics
   | DerivTyCon TyCon                   -- New data types
-  | DerivFamInst (FamInst)             -- New type family instances
+  | DerivFamInst FamInst               -- New type family instances
 
   -- New top-level auxiliary bindings
   | DerivHsBind (LHsBind RdrName, LSig RdrName) -- Also used for SYB

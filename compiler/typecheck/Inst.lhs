@@ -15,6 +15,7 @@ module Inst (
 
        newOverloadedLit, mkOverLit,
 
+       newClsInst,
        tcGetInsts, tcGetInstEnvs, getOverlapFlag,
        tcExtendLocalInstEnv, instCallConstraints, newMethodFromName,
        tcSyntaxName,
@@ -44,6 +45,8 @@ import Type
 import Coercion ( Role(..) )
 import TcType
 import HscTypes
+import Class( Class )
+import MkId( mkDictFunId )
 import Id
 import Name
 import Var      ( EvVar, varType, setVarType )
@@ -167,9 +170,14 @@ deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 
 deeplyInstantiate orig ty
   | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
-  = do { (_, tys, subst) <- tcInstTyVars tvs
+  = do { (subst, tvs') <- tcInstTyVars tvs
        ; ids1  <- newSysLocalIds (fsLit "di") (substTys subst arg_tys)
-       ; wrap1 <- instCall orig tys (substTheta subst theta)
+       ; let theta' = substTheta subst theta
+       ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
+       ; traceTc "Instantiating (deply)" (vcat [ ppr ty
+                                               , text "with" <+> ppr tvs'
+                                               , text "args:" <+> ppr ids1
+                                               , text "theta:" <+>  ppr theta' ])
        ; (wrap2, rho2) <- deeplyInstantiate orig (substTy subst rho)
        ; return (mkWpLams ids1
                     <.> wrap2
@@ -377,18 +385,19 @@ syntaxNameCtxt name orig ty tidy_env
 %************************************************************************
 
 \begin{code}
-getOverlapFlag :: TcM OverlapFlag
-getOverlapFlag
+getOverlapFlag :: Maybe OverlapMode -> TcM OverlapFlag
+getOverlapFlag overlap_mode
   = do  { dflags <- getDynFlags
         ; let overlap_ok    = xopt Opt_OverlappingInstances dflags
               incoherent_ok = xopt Opt_IncoherentInstances  dflags
               use x = OverlapFlag { isSafeOverlap = safeLanguageOn dflags
                                   , overlapMode   = x }
-              overlap_flag | incoherent_ok = use Incoherent
-                           | overlap_ok    = use Overlaps
-                           | otherwise     = use NoOverlap
+              default_oflag | incoherent_ok = use Incoherent
+                            | overlap_ok    = use Overlaps
+                            | otherwise     = use NoOverlap
 
-        ; return overlap_flag }
+              final_oflag = setOverlapModeMaybe default_oflag overlap_mode
+        ; return final_oflag }
 
 tcGetInstEnvs :: TcM (InstEnv, InstEnv)
 -- Gets both the external-package inst-env
@@ -399,6 +408,19 @@ tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
 tcGetInsts :: TcM [ClsInst]
 -- Gets the local class instances.
 tcGetInsts = fmap tcg_insts getGblEnv
+
+newClsInst :: Maybe OverlapMode -> Name -> [TyVar] -> ThetaType
+           -> Class -> [Type] -> TcM ClsInst
+newClsInst overlap_mode dfun_name tvs theta clas tys
+  = do { (subst, tvs') <- freshenTyVarBndrs tvs
+             -- Be sure to freshen those type variables,
+             -- so they are sure not to appear in any lookup
+       ; let tys'   = substTys subst tys
+             dfun   = mkDictFunId dfun_name tvs theta clas tys
+                      -- We don't substitute in the dfun's type,
+                      -- because those tvs may scope over the bindings
+       ; oflag <- getOverlapFlag overlap_mode
+       ; return (mkLocalInstance dfun oflag tvs' clas tys') }
 
 tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
   -- Add new locally-defined instances
@@ -463,7 +485,11 @@ addLocalInst (home_ie, my_insts) ispec
            dupInstErr ispec (head dups)
 
          ; return (extendInstEnv home_ie' ispec, ispec:my_insts') }
+\end{code}
 
+Errors and tracing
+
+\begin{code}
 traceDFuns :: [ClsInst] -> TcRn ()
 traceDFuns ispecs
   = traceTc "Adding instances:" (vcat (map pp ispecs))
@@ -502,13 +528,12 @@ addClsInstsErr herald ispecs
 \begin{code}
 ---------------- Getting free tyvars -------------------------
 tyVarsOfCt :: Ct -> TcTyVarSet
--- NB: the
-tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })    = extendVarSet (tyVarsOfType xi) tv
-tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_rhs = xi }) = tyVarsOfTypes (xi:tys)
-tyVarsOfCt (CDictCan { cc_tyargs = tys })               = tyVarsOfTypes tys
-tyVarsOfCt (CIrredEvCan { cc_ev = ev })                 = tyVarsOfType (ctEvPred ev)
-tyVarsOfCt (CHoleCan { cc_ev = ev })                    = tyVarsOfType (ctEvPred ev)
-tyVarsOfCt (CNonCanonical { cc_ev = ev })               = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })     = extendVarSet (tyVarsOfType xi) tv
+tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk }) = extendVarSet (tyVarsOfTypes tys) fsk
+tyVarsOfCt (CDictCan { cc_tyargs = tys })                = tyVarsOfTypes tys
+tyVarsOfCt (CIrredEvCan { cc_ev = ev })                  = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CHoleCan { cc_ev = ev })                     = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CNonCanonical { cc_ev = ev })                = tyVarsOfType (ctEvPred ev)
 
 tyVarsOfCts :: Cts -> TcTyVarSet
 tyVarsOfCts = foldrBag (unionVarSet . tyVarsOfCt) emptyVarSet
@@ -522,10 +547,10 @@ tyVarsOfWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
 
 tyVarsOfImplic :: Implication -> TyVarSet
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
-tyVarsOfImplic (Implic { ic_skols = skols, ic_fsks = fsks
-                             , ic_given = givens, ic_wanted = wanted })
+tyVarsOfImplic (Implic { ic_skols = skols
+                       , ic_given = givens, ic_wanted = wanted })
   = (tyVarsOfWC wanted `unionVarSet` tyVarsOfTypes (map evVarPred givens))
-    `delVarSetList` skols `delVarSetList` fsks
+    `delVarSetList` skols
 
 tyVarsOfBag :: (a -> TyVarSet) -> Bag a -> TyVarSet
 tyVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet

@@ -29,6 +29,7 @@ import CoreMonad
 import Outputable
 import FastString
 import MonadUtils
+import ErrUtils
 import Control.Monad       ( when, liftM, ap )
 \end{code}
 

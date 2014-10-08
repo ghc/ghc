@@ -138,7 +138,7 @@ mkBootModDetailsTc hsc_env
                   tcg_fam_insts = fam_insts
                 }
   = do  { let dflags = hsc_dflags hsc_env
-        ; showPass dflags CoreTidy
+        ; showPassIO dflags CoreTidy
 
         ; let { insts'      = map (tidyClsInstDFun globaliseAndTidyId) insts
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
@@ -299,6 +299,7 @@ RHSs, so that they print nicely in interfaces.
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_exports   = exports
+                              , mg_rdr_env   = rdr_env
                               , mg_tcs       = tcs
                               , mg_insts     = insts
                               , mg_fam_insts = fam_insts
@@ -316,8 +317,9 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
   = do  { let { dflags     = hsc_dflags hsc_env
               ; omit_prags = gopt Opt_OmitInterfacePragmas dflags
               ; expose_all = gopt Opt_ExposeAllUnfoldings  dflags
+              ; print_unqual = mkPrintUnqualified dflags rdr_env
               }
-        ; showPass dflags CoreTidy
+        ; showPassIO dflags CoreTidy
 
         ; let { type_env = typeEnvFromEntities [] tcs fam_insts
 
@@ -375,7 +377,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
               }
 
-        ; endPass hsc_env CoreTidy all_tidy_binds tidy_rules
+        ; endPassIO hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
 
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now

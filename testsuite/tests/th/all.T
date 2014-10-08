@@ -187,7 +187,7 @@ test('T5126', normal, compile, ['-v0'])
 test('T5217', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])
 test('T5037', normal, compile, ['-v0'])
 test('TH_unboxedSingleton', normal, compile, ['-v0'])
-test('T5290', normal, compile, ['-v0 -ddump-splices'])
+test('T5290', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T5362', normal, compile, ['-v0'])
 
 test('TH_unresolvedInfix',
@@ -211,7 +211,7 @@ test('T5452', normal, compile, ['-v0'])
 test('T5434', extra_clean(['T5434a.hi','T5434a.o']),
               multimod_compile,
               ['T5434','-v0 -Wall ' + config.ghc_th_way_flags])
-test('T5508', normal, compile, ['-v0 -ddump-splices'])
+test('T5508', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('TH_Depends',
      [extra_clean(['TH_Depends_External.o', 'TH_Depends_External.hi',
                    'TH_Depends_external.txt'])],
@@ -226,7 +226,7 @@ test('T5700', extra_clean(['T5700a.hi','T5700a.o']),
               ['T5700','-v0 -ddump-splices ' + config.ghc_th_way_flags])
 test('T5721', normal, compile, ['-v0'])
 
-test('TH_PromotedTuple', normal, compile, ['-v0 -ddump-splices'])
+test('TH_PromotedTuple', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('TH_PromotedList', normal, compile, ['-v0'])
 test('TH_Promoted1Tuple', normal, compile_fail, ['-v0'])
 test('TH_RichKinds', normal, compile, ['-v0'])

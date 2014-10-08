@@ -52,8 +52,6 @@ module DynFlags (
         dynFlagDependencies,
         tablesNextToCode, mkTablesNextToCode,
 
-        printOutputForUser, printInfoForUser,
-
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
 
@@ -1545,16 +1543,6 @@ newtype FlushErr = FlushErr (IO ())
 
 defaultFlushErr :: FlushErr
 defaultFlushErr = FlushErr $ hFlush stderr
-
-printOutputForUser :: DynFlags -> PrintUnqualified -> SDoc -> IO ()
-printOutputForUser = printSevForUser SevOutput
-
-printInfoForUser :: DynFlags -> PrintUnqualified -> SDoc -> IO ()
-printInfoForUser = printSevForUser SevInfo
-
-printSevForUser :: Severity -> DynFlags -> PrintUnqualified -> SDoc -> IO ()
-printSevForUser sev dflags unqual doc
-    = log_action dflags dflags sev noSrcSpan (mkUserStyle unqual AllTheWay) doc
 
 {-
 Note [Verbosity levels]

@@ -504,6 +504,7 @@ tc_mkRepFamInsts gk tycon metaDts mod =
                         (nameSrcSpan (tyConName tycon))
 
      ; let axiom = mkSingleCoAxiom rep_name tyvars fam_tc appT repTy
+     ; traceTc "tc_mkrep" (ppr fam_tc $$ ppr tyvars)
      ; newFamInst SynFamilyInst axiom  }
 
 --------------------------------------------------------------------------------

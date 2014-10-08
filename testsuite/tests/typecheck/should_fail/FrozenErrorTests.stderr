@@ -3,18 +3,18 @@ FrozenErrorTests.hs:12:12:
     Couldn't match type ‘Int’ with ‘Bool’
     Inaccessible code in
       a pattern with constructor
-        MkT3 :: forall a. (a ~ Bool) => T a,
+        MkT3 :: forall a. a ~ Bool => T a,
       in a case alternative
     In the pattern: MkT3
     In a case alternative: MkT3 -> ()
     In the expression: case x of { MkT3 -> () }
 
 FrozenErrorTests.hs:26:9:
-    Occurs check: cannot construct the infinite type: a ~ [a]
-    Expected type: [a]
-      Actual type: F a Bool
+    Occurs check: cannot construct the infinite type: t ~ [t]
+    Expected type: [t]
+      Actual type: F t Bool
     Relevant bindings include
-      test1 :: a (bound at FrozenErrorTests.hs:26:1)
+      test1 :: t (bound at FrozenErrorTests.hs:26:1)
     In the expression: goo1 False undefined
     In an equation for ‘test1’: test1 = goo1 False undefined
 

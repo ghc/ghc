@@ -39,7 +39,7 @@ import Rules
 import TysPrim (eqReprPrimTyCon)
 import TysWiredIn (coercibleTyCon )
 import BasicTypes       ( Activation(.. ) )
-import CoreMonad        ( endPass, CoreToDo(..) )
+import CoreMonad        ( endPassIO, CoreToDo(..) )
 import MkCore
 import FastString
 import ErrUtils
@@ -94,6 +94,7 @@ deSugar hsc_env
                             tcg_hpc          = other_hpc_info })
 
   = do { let dflags = hsc_dflags hsc_env
+             print_unqual = mkPrintUnqualified dflags rdr_env
         ; showPass dflags "Desugar"
 
         -- Desugar the program
@@ -147,14 +148,14 @@ deSugar hsc_env
 
 #ifdef DEBUG
           -- Debug only as pre-simple-optimisation program may be really big
-        ; endPass hsc_env CoreDesugar final_pgm rules_for_imps
+        ; endPassIO hsc_env print_unqual CoreDesugar final_pgm rules_for_imps
 #endif
         ; (ds_binds, ds_rules_for_imps, ds_vects)
             <- simpleOptPgm dflags mod final_pgm rules_for_imps vects0
                          -- The simpleOptPgm gets rid of type
                          -- bindings plus any stupid dead code
 
-        ; endPass hsc_env CoreDesugarOpt ds_binds ds_rules_for_imps
+        ; endPassIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
         ; deps <- mkDependencies tcg_env

@@ -2,7 +2,7 @@
 ==================== Tidy Core ====================
 Result size of Tidy Core = {terms: 36, types: 29, coercions: 0}
 
-T7360.$WFoo3 [InlPrag=INLINE] :: GHC.Types.Int -> T7360.Foo
+T7360.$WFoo3 [InlPrag=INLINE] :: Int -> Foo
 [GblId[DataConWrapper],
  Arity=1,
  Caf=NoCafRefs,
@@ -10,20 +10,20 @@ T7360.$WFoo3 [InlPrag=INLINE] :: GHC.Types.Int -> T7360.Foo
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
-         Tmpl= \ (dt [Occ=Once!] :: GHC.Types.Int) ->
+         Tmpl= \ (dt [Occ=Once!] :: Int) ->
                  case dt of _ [Occ=Dead] { GHC.Types.I# dt [Occ=Once] ->
                  T7360.Foo3 dt
                  }}]
 T7360.$WFoo3 =
-  \ (dt [Occ=Once!] :: GHC.Types.Int) ->
+  \ (dt [Occ=Once!] :: Int) ->
     case dt of _ [Occ=Dead] { GHC.Types.I# dt [Occ=Once] ->
     T7360.Foo3 dt
     }
 
-T7360.fun1 [InlPrag=NOINLINE] :: T7360.Foo -> ()
+fun1 [InlPrag=NOINLINE] :: Foo -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
-T7360.fun1 =
-  \ (x :: T7360.Foo) ->
+fun1 =
+  \ (x :: Foo) ->
     case x of _ [Occ=Dead] { __DEFAULT -> GHC.Tuple.() }
 
 T7360.fun4 :: ()
@@ -31,9 +31,9 @@ T7360.fun4 :: ()
  Str=DmdType,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
          WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
-T7360.fun4 = T7360.fun1 T7360.Foo1
+T7360.fun4 = fun1 T7360.Foo1
 
-T7360.fun3 :: GHC.Types.Int
+T7360.fun3 :: Int
 [GblId,
  Caf=NoCafRefs,
  Str=DmdType m,
@@ -41,7 +41,7 @@ T7360.fun3 :: GHC.Types.Int
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.fun3 = GHC.Types.I# 0
 
-T7360.fun2 :: forall a. [a] -> ((), GHC.Types.Int)
+fun2 :: forall a. [a] -> ((), Int)
 [GblId,
  Arity=1,
  Str=DmdType <L,1*U>m,
@@ -57,7 +57,7 @@ T7360.fun2 :: forall a. [a] -> ((), GHC.Types.Int)
                       GHC.Types.I# ww
                       }
                   })}]
-T7360.fun2 =
+fun2 =
   \ (@ a) (x :: [a]) ->
     (T7360.fun4,
      case x of wild {

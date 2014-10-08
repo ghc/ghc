@@ -1,10 +1,6 @@
 
 tcfail068.hs:14:9:
-    Could not deduce (s1 ~ s)
-    from the context (Constructed a)
-      bound by the type signature for
-                 itgen :: Constructed a => (Int, Int) -> a -> IndTree s a
-      at tcfail068.hs:11:10-55
+    Couldn't match type ‘s1’ with ‘s’
       ‘s1’ is a rigid type variable bound by
            a type expected by the context: GHC.ST.ST s1 (IndTree s a)
            at tcfail068.hs:13:9
@@ -22,12 +18,7 @@ tcfail068.hs:14:9:
     In the expression: runST (newSTArray ((1, 1), n) x)
 
 tcfail068.hs:19:21:
-    Could not deduce (s ~ s1)
-    from the context (Constructed a)
-      bound by the type signature for
-                 itiap :: Constructed a =>
-                          (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
-      at tcfail068.hs:16:10-75
+    Couldn't match type ‘s’ with ‘s1’
       ‘s’ is a rigid type variable bound by
           the type signature for
             itiap :: Constructed a =>
@@ -46,12 +37,7 @@ tcfail068.hs:19:21:
     In the first argument of ‘(>>=)’, namely ‘readSTArray arr i’
 
 tcfail068.hs:24:35:
-    Could not deduce (s ~ s1)
-    from the context (Constructed a)
-      bound by the type signature for
-                 itrap :: Constructed a =>
-                          ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
-      at tcfail068.hs:23:10-87
+    Couldn't match type ‘s’ with ‘s1’
       ‘s’ is a rigid type variable bound by
           the type signature for
             itrap :: Constructed a =>
@@ -75,18 +61,7 @@ tcfail068.hs:24:35:
     In the expression: runST (itrap' i k)
 
 tcfail068.hs:36:46:
-    Could not deduce (s ~ s1)
-    from the context (Constructed b)
-      bound by the type signature for
-                 itrapstate :: Constructed b =>
-                               ((Int, Int), (Int, Int))
-                               -> (a -> b -> (a, b))
-                               -> ((Int, Int) -> c -> a)
-                               -> (a -> c)
-                               -> c
-                               -> IndTree s b
-                               -> (c, IndTree s b)
-      at tcfail068.hs:(34,15)-(35,62)
+    Couldn't match type ‘s’ with ‘s1’
       ‘s’ is a rigid type variable bound by
           the type signature for
             itrapstate :: Constructed b =>

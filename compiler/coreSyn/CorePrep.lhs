@@ -21,7 +21,7 @@ import PrelNames
 import CoreUtils
 import CoreArity
 import CoreFVs
-import CoreMonad        ( endPass, CoreToDo(..) )
+import CoreMonad        ( endPassIO, CoreToDo(..) )
 import CoreSyn
 import CoreSubst
 import MkCore hiding( FloatBind(..) )   -- We use our own FloatBind here
@@ -172,7 +172,7 @@ corePrepPgm dflags hsc_env binds data_tycons = do
                       floats2 <- corePrepTopBinds initialCorePrepEnv implicit_binds
                       return (deFloatTop (floats1 `appendFloats` floats2))
 
-    endPass hsc_env CorePrep binds_out []
+    endPassIO hsc_env alwaysQualify CorePrep binds_out []
     return binds_out
 
 corePrepExpr :: DynFlags -> HscEnv -> CoreExpr -> IO CoreExpr

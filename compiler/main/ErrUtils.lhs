@@ -27,7 +27,8 @@ module ErrUtils (
         mkDumpDoc, dumpSDoc,
 
         --  * Messages during compilation
-        putMsg, putMsgWith,
+        putMsg, printInfoForUser, printOutputForUser,
+        logInfo, logOutput,
         errorMsg,
         fatalErrorMsg, fatalErrorMsg', fatalErrorMsg'',
         compilationProgressMsg,
@@ -237,7 +238,7 @@ dumpIfSet dflags flag hdr doc
 dumpIfSet_dyn :: DynFlags -> DumpFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
   | dopt flag dflags
-  = dumpSDoc dflags flag hdr doc
+  = dumpSDoc dflags alwaysQualify flag hdr doc
   | otherwise
   = return ()
 
@@ -254,12 +255,13 @@ mkDumpDoc hdr doc
 -- | Write out a dump.
 --      If --dump-to-file is set then this goes to a file.
 --      otherwise emit to stdout.
--- 
+--
 -- When hdr is empty, we print in a more compact format (no separators and
 -- blank lines)
-dumpSDoc :: DynFlags -> DumpFlag -> String -> SDoc -> IO ()
-dumpSDoc dflags flag hdr doc
+dumpSDoc :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
+dumpSDoc dflags print_unqual flag hdr doc
  = do let mFile = chooseDumpFile dflags flag
+          dump_style = mkDumpStyle print_unqual
       case mFile of
             Just fileName
                  -> do
@@ -278,7 +280,7 @@ dumpSDoc dflags flag hdr doc
                                              $$ blankLine
                                              $$ doc
                                         return $ mkDumpDoc hdr d
-                        defaultLogActionHPrintDoc dflags handle doc' defaultDumpStyle
+                        defaultLogActionHPrintDoc dflags handle doc' dump_style
                         hClose handle
 
             -- write the dump to stdout
@@ -286,7 +288,7 @@ dumpSDoc dflags flag hdr doc
               let (doc', severity)
                     | null hdr  = (doc, SevOutput)
                     | otherwise = (mkDumpDoc hdr doc, SevDump)
-              log_action dflags dflags severity noSrcSpan defaultDumpStyle doc'
+              log_action dflags dflags severity noSrcSpan dump_style doc'
 
 
 -- | Choose where to put a dump file based on DynFlags
@@ -340,18 +342,9 @@ ifVerbose dflags val act
   | verbosity dflags >= val = act
   | otherwise               = return ()
 
-putMsg :: DynFlags -> MsgDoc -> IO ()
-putMsg dflags msg = log_action dflags dflags SevInfo noSrcSpan defaultUserStyle msg
-
-putMsgWith :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
-putMsgWith dflags print_unqual msg
-  = log_action dflags dflags SevInfo noSrcSpan sty msg
-  where
-    sty = mkUserStyle print_unqual AllTheWay
-
 errorMsg :: DynFlags -> MsgDoc -> IO ()
-errorMsg dflags msg =
-    log_action dflags dflags SevError noSrcSpan (defaultErrStyle dflags) msg
+errorMsg dflags msg
+   = log_action dflags dflags SevError noSrcSpan (defaultErrStyle dflags) msg
 
 fatalErrorMsg :: DynFlags -> MsgDoc -> IO ()
 fatalErrorMsg dflags msg = fatalErrorMsg' (log_action dflags) dflags msg
@@ -365,25 +358,45 @@ fatalErrorMsg'' fm msg = fm msg
 
 compilationProgressMsg :: DynFlags -> String -> IO ()
 compilationProgressMsg dflags msg
-  = ifVerbose dflags 1 (log_action dflags dflags SevOutput noSrcSpan defaultUserStyle (text msg))
+  = ifVerbose dflags 1 $
+    logOutput dflags defaultUserStyle (text msg)
 
 showPass :: DynFlags -> String -> IO ()
 showPass dflags what
-  = ifVerbose dflags 2 (log_action dflags dflags SevInfo noSrcSpan defaultUserStyle (text "***" <+> text what <> colon))
+  = ifVerbose dflags 2 $
+    logInfo dflags defaultUserStyle (text "***" <+> text what <> colon)
 
 debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
-debugTraceMsg dflags val msg
-  = ifVerbose dflags val (log_action dflags dflags SevInfo noSrcSpan defaultDumpStyle msg)
+debugTraceMsg dflags val msg = ifVerbose dflags val $
+                               logInfo dflags defaultDumpStyle msg
+
+putMsg :: DynFlags -> MsgDoc -> IO ()
+putMsg dflags msg = logInfo dflags defaultUserStyle msg
+
+printInfoForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
+printInfoForUser dflags print_unqual msg
+  = logInfo dflags (mkUserStyle print_unqual AllTheWay) msg
+
+printOutputForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
+printOutputForUser dflags print_unqual msg
+  = logOutput dflags (mkUserStyle print_unqual AllTheWay) msg
+
+logInfo :: DynFlags -> PprStyle -> MsgDoc -> IO ()
+logInfo dflags sty msg = log_action dflags dflags SevInfo noSrcSpan sty msg
+
+logOutput :: DynFlags -> PprStyle -> MsgDoc -> IO ()
+-- Like logInfo but with SevOutput rather then SevInfo
+logOutput dflags sty msg = log_action dflags dflags SevOutput noSrcSpan sty msg
 
 prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
 prettyPrintGhcErrors dflags
     = ghandle $ \e -> case e of
                       PprPanic str doc ->
-                          pprDebugAndThen dflags panic str doc
+                          pprDebugAndThen dflags panic (text str) doc
                       PprSorry str doc ->
-                          pprDebugAndThen dflags sorry str doc
+                          pprDebugAndThen dflags sorry (text str) doc
                       PprProgramError str doc ->
-                          pprDebugAndThen dflags pgmError str doc
+                          pprDebugAndThen dflags pgmError (text str) doc
                       _ ->
                           liftIO $ throwIO e
 \end{code}

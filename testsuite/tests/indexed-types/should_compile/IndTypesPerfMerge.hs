@@ -41,6 +41,14 @@ class Mergeable a b where
     type MergerType a b
     merger :: a -> b -> MergerType a b
 
+{-
+merge ::
+    forall a b.
+    (Merger (MergerType a b), Mergeable a b,
+     UnmergedLeft (MergerType a b) ~ a,
+     UnmergedRight (MergerType a b) ~ b) =>
+    a -> b -> Merged (MergerType a b)
+-}
 merge x y = mkMerge (merger x y) x y
 
 data TakeRight a
