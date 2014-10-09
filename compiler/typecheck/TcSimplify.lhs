@@ -721,7 +721,8 @@ simpl_loop n wanteds@(WC { wc_flat = flats, wc_insol = insols, wc_impl = implics
     do {   -- Put floated_eqs into the current inert set before looping
          (unifs_happened, solve_flat_res) 
              <- reportUnifications $
-                solveFlats (WC { wc_flat = flats `unionBags` floated_eqs
+                solveFlats (WC { wc_flat = floated_eqs `unionBags` flats
+                                 -- Put floated_eqs first so they get solved first
                                , wc_insol = emptyBag, wc_impl = emptyBag })
 
        ; let new_wanteds = solve_flat_res `andWC`

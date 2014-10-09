@@ -2,7 +2,7 @@
 {-# LANGUAGE CPP #-}
 
 module TcCanonical(
-    canonicalize, StopOrContinue(..),
+    canonicalize, 
     flattenMany, FlattenEnv(..), FlattenMode(..)
  ) where
 
@@ -25,7 +25,6 @@ import Control.Monad    ( when )
 import DynFlags( DynFlags )
 import VarSet
 import TcSMonad
-import FastString
 
 import Util
 import BasicTypes
@@ -71,35 +70,6 @@ The net result is that a constraint coming out of the canonicalization
 phase cannot be rewritten any further from the inerts (but maybe /it/ can
 rewrite an inert or still interact with an inert in a further phase in the
 simplifier.
-
-\begin{code}
-
--- Informative results of canonicalization
-data StopOrContinue
-  = ContinueWith Ct   -- Either no canonicalization happened, or if some did
-                      -- happen, it is still safe to just keep going with this
-                      -- work item.
-  | Stop              -- Some canonicalization happened, extra work is now in
-                      -- the TcS WorkList.
-
-instance Outputable StopOrContinue where
-  ppr Stop             = ptext (sLit "Stop")
-  ppr (ContinueWith w) = ptext (sLit "ContinueWith") <+> ppr w
-
-
-continueWith :: Ct -> TcS StopOrContinue
-continueWith = return . ContinueWith
-
-andWhenContinue :: TcS StopOrContinue
-                -> (Ct -> TcS StopOrContinue)
-                -> TcS StopOrContinue
-andWhenContinue tcs1 tcs2
-  = do { r <- tcs1
-       ; case r of
-           Stop            -> return Stop
-           ContinueWith ct -> tcs2 ct }
-
-\end{code}
 
 Note [Caching for canonicals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -159,7 +129,7 @@ EvBinds, so we are again good.
 -- Top-level canonicalization
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-canonicalize :: Ct -> TcS StopOrContinue
+canonicalize :: Ct -> TcS (StopOrContinue Ct)
 canonicalize ct@(CNonCanonical { cc_ev = ev })
   = do { traceTcS "canonicalize (non-canonical)" (ppr ct)
        ; {-# SCC "canEvVar" #-}
@@ -188,7 +158,7 @@ canonicalize (CIrredEvCan { cc_ev = ev })
 canonicalize (CHoleCan { cc_ev = ev, cc_occ = occ })
   = canHole ev occ
 
-canEvNC :: CtEvidence -> TcS StopOrContinue
+canEvNC :: CtEvidence -> TcS (StopOrContinue Ct)
 -- Called only for non-canonical EvVars
 canEvNC ev
   = case classifyPredType (ctEvPred ev) of
@@ -206,13 +176,13 @@ canEvNC ev
 %************************************************************************
 
 \begin{code}
-canTuple :: CtEvidence -> [PredType] -> TcS StopOrContinue
+canTuple :: CtEvidence -> [PredType] -> TcS (StopOrContinue Ct)
 canTuple ev tys
   = do { traceTcS "can_pred" (text "TuplePred!")
        ; let xcomp = EvTupleMk
              xdecomp x = zipWith (\_ i -> EvTupleSel x i) tys [0..]
-       ; ctevs <- xCtEvidence ev (XEvTerm tys xcomp xdecomp)
-       ; canEvVarsCreated ctevs }
+       ; xCtEvidence ev (XEvTerm tys xcomp xdecomp)
+       ; stopWith ev "Decomposed tuple constraint" }
 \end{code}
 
 %************************************************************************
@@ -224,7 +194,7 @@ canTuple ev tys
 \begin{code}
 canClass, canClassNC
    :: CtEvidence
-   -> Class -> [Type] -> TcS StopOrContinue
+   -> Class -> [Type] -> TcS (StopOrContinue Ct)
 -- Precondition: EvVar is class evidence
 
 -- The canClassNC version is used on non-canonical constraints
@@ -241,16 +211,14 @@ canClass ev cls tys
        ; (xis, cos) <- flattenMany fmode tys
        ; let co = mkTcTyConAppCo Nominal (classTyCon cls) cos
              xi = mkClassPred cls xis
+             mk_ct new_ev = CDictCan { cc_ev = new_ev
+                                     , cc_tyargs = xis, cc_class = cls }
        ; mb <- rewriteEvidence ev xi co
        ; traceTcS "canClass" (vcat [ ppr ev <+> ppr cls <+> ppr tys
                                    , ppr xi, ppr mb ])
-       ; case mb of
-           Nothing -> return Stop
-           Just new_ev -> continueWith $
-                          CDictCan { cc_ev = new_ev
-                                   , cc_tyargs = xis, cc_class = cls } }
+       ; return (fmap mk_ct mb) }
 
-emitSuperclasses :: Ct -> TcS StopOrContinue
+emitSuperclasses :: Ct -> TcS (StopOrContinue Ct)
 emitSuperclasses ct@(CDictCan { cc_ev = ev , cc_tyargs = xis_new, cc_class = cls })
             -- Add superclasses of this one here, See Note [Adding superclasses].
             -- But only if we are not simplifying the LHS of a rule.
@@ -339,8 +307,7 @@ newSCWorkFromFlavored flavor cls xis
              xev = XEvTerm { ev_preds  =  sc_theta
                            , ev_comp   = panic "Can't compose for given!"
                            , ev_decomp = xev_decomp }
-       ; ctevs <- xCtEvidence flavor xev
-       ; emitWorkNC ctevs }
+       ; xCtEvidence flavor xev }
 
   | isEmptyVarSet (tyVarsOfTypes xis)
   = return () -- Wanteds with no variables yield no deriveds.
@@ -358,11 +325,11 @@ is_improvement_pty :: PredType -> Bool
 -- Either it's an equality, or has some functional dependency
 is_improvement_pty ty = go (classifyPredType ty)
   where
-    go (EqPred {})         = True
+    go (EqPred t1 t2)       = not (t1 `tcEqType` t2)
     go (ClassPred cls _tys) = not $ null fundeps
-      where (_,fundeps) = classTvsFds cls
-    go (TuplePred ts)      = any is_improvement_pty ts
-    go (IrredPred {})      = True -- Might have equalities after reduction?
+                            where (_,fundeps) = classTvsFds cls
+    go (TuplePred ts)       = any is_improvement_pty ts
+    go (IrredPred {})       = True -- Might have equalities after reduction?
 \end{code}
 
 
@@ -374,7 +341,7 @@ is_improvement_pty ty = go (classifyPredType ty)
 
 
 \begin{code}
-canIrred :: CtEvidence -> TcS StopOrContinue
+canIrred :: CtEvidence -> TcS (StopOrContinue Ct)
 -- Precondition: ty not a tuple and no other evidence form
 canIrred old_ev
   = do { let old_ty = ctEvPred old_ev
@@ -384,8 +351,8 @@ canIrred old_ev
        ; (xi,co) <- flatten fmode old_ty -- co :: xi ~ old_ty
        ; mb <- rewriteEvidence old_ev xi co
        ; case mb of {
-             Nothing     -> return Stop ;
-             Just new_ev ->
+             Stop ev s           -> return (Stop ev s) ;
+             ContinueWith new_ev ->
 
     do { -- Re-classify, in case flattening has improved its shape
        ; case classifyPredType (ctEvPred new_ev) of
@@ -395,16 +362,16 @@ canIrred old_ev
            _                 -> continueWith $
                                 CIrredEvCan { cc_ev = new_ev } } } }
 
-canHole :: CtEvidence -> OccName -> TcS StopOrContinue
+canHole :: CtEvidence -> OccName -> TcS (StopOrContinue Ct)
 canHole ev occ
   = do { let ty    = ctEvPred ev
              fmode = FE { fe_ev = ev, fe_mode = FM_SubstOnly }
        ; (xi,co) <- flatten fmode ty -- co :: xi ~ ty
        ; mb <- rewriteEvidence ev xi co
        ; case mb of
-             Just new_ev -> emitInsoluble (CHoleCan { cc_ev = new_ev, cc_occ = occ })
-             Nothing     -> return ()   -- Found a cached copy; won't happen
-       ; return Stop }
+           ContinueWith new_ev -> do { emitInsoluble (CHoleCan { cc_ev = new_ev, cc_occ = occ })
+                                     ; stopWith new_ev "Emit insoluble hole" }
+           Stop ev s -> return (Stop ev s) } -- Found a cached copy; won't happen
 \end{code}
 
 %************************************************************************
@@ -765,24 +732,14 @@ Insufficient (non-recursive) rewriting was the reason for #5668.
 %************************************************************************
 
 \begin{code}
-canEvVarsCreated :: [CtEvidence] -> TcS StopOrContinue
-canEvVarsCreated [] = return Stop
-    -- Add all but one to the work list
-    -- and return the first (if any) for futher processing
-canEvVarsCreated (ev : evs)
-  = do { emitWorkNC evs; canEvNC ev }
-          -- Note the "NC": these are fresh goals, not necessarily canonical
-
--------------------------
-canEqNC :: CtEvidence -> Type -> Type -> TcS StopOrContinue
+canEqNC :: CtEvidence -> Type -> Type -> TcS (StopOrContinue Ct)
 canEqNC ev ty1 ty2 = can_eq_nc ev ty1 ty1 ty2 ty2
-
 
 can_eq_nc, can_eq_nc' 
    :: CtEvidence 
    -> Type -> Type    -- LHS, after and before type-synonym expansion, resp 
    -> Type -> Type    -- RHS, after and before type-synonym expansion, resp 
-   -> TcS StopOrContinue
+   -> TcS (StopOrContinue Ct)
 
 can_eq_nc ev ty1 ps_ty1 ty2 ps_ty2
   = do { traceTcS "can_eq_nc" $ 
@@ -817,7 +774,7 @@ can_eq_nc' ev ty1@(LitTy l1) _ (LitTy l2) _
  | l1 == l2
   = do { when (isWanted ev) $
          setEvBind (ctev_evar ev) (EvCoercion (mkTcNomReflCo ty1))
-       ; return Stop }
+       ; stopWith ev "Equal LitTy" }
 
 -- Decomposable type constructor applications 
 -- Synonyms and type functions (which are not decomposable)
@@ -851,11 +808,11 @@ can_eq_nc' ev s1@(ForAllTy {}) _ s2@(ForAllTy {}) _
           do { traceTcS "Creating implication for polytype equality" $ ppr ev
              ; ev_term <- deferTcSForAllEq Nominal loc (tvs1,body1) (tvs2,body2)
              ; setEvBind orig_ev ev_term
-             ; return Stop } }
+             ; stopWith ev "Deferred polytype equality" } }
  | otherwise
  = do { traceTcS "Ommitting decomposition of given polytype equality" $
         pprEq s1 s2    -- See Note [Do not decompose given polytype equalities]
-      ; return Stop }
+      ; stopWith ev "Discard given polytype equality" }
 
 can_eq_nc' ev (AppTy s1 t1) ps_ty1 ty2 ps_ty2
   = can_eq_app ev NotSwapped s1 t1 ps_ty1 ty2 ps_ty2
@@ -870,7 +827,7 @@ can_eq_nc' ev _ ps_ty1 _ ps_ty2
 can_eq_fam_nc :: CtEvidence -> SwapFlag
               -> TyCon -> [TcType]
               -> TcType -> TcType
-              -> TcS StopOrContinue
+              -> TcS (StopOrContinue Ct)
 -- Canonicalise a non-canonical equality of form (F tys ~ ty)
 --   or the swapped version thereof
 -- Flatten both sides and go round again
@@ -879,15 +836,15 @@ can_eq_fam_nc ev swapped fn tys rhs ps_rhs
        ; (xi_lhs, co_lhs) <- flattenFamApp fmode fn tys
        ; mb_ct <- rewriteEqEvidence ev swapped xi_lhs rhs co_lhs (mkTcNomReflCo rhs)
        ; case mb_ct of
-           Nothing     -> return Stop
-           Just new_ev -> can_eq_nc new_ev xi_lhs xi_lhs rhs ps_rhs }
+           Stop ev s           -> return (Stop ev s)
+           ContinueWith new_ev -> can_eq_nc new_ev xi_lhs xi_lhs rhs ps_rhs }
 
 ------------
 can_eq_app, can_eq_flat_app
     :: CtEvidence -> SwapFlag
     -> Type -> Type -> Type  -- LHS (s1 t2), after and before type-synonym expansion, resp
     -> Type -> Type          -- RHS (ty2),   after and before type-synonym expansion, resp
-    -> TcS StopOrContinue
+    -> TcS (StopOrContinue Ct)
 -- See Note [Canonicalising type applications]
 can_eq_app ev swapped s1 t1 ps_ty1 ty2 ps_ty2
   =  do { traceTcS "can_eq_app 1" $
@@ -909,8 +866,8 @@ can_eq_app ev swapped s1 t1 ps_ty1 ty2 ps_ty2
                                      co1 (mkTcNomReflCo ps_ty2)
         ; traceTcS "can_eq_app 4" $ vcat [ ppr ev, ppr xi1, ppr co1 ]
         ; case mb_ct of
-           Nothing     -> return Stop
-           Just new_ev -> can_eq_nc new_ev xi1 xi1 ty2 ps_ty2 }}
+            Stop ev s           -> return (Stop ev s)
+            ContinueWith new_ev -> can_eq_nc new_ev xi1 xi1 ty2 ps_ty2 }}
 
 -- Preconditions: s1  is already flattened
 --                ty2 is not a type variable, so flattening
@@ -929,15 +886,15 @@ can_eq_flat_app ev swapped s1 t1 ps_ty1 ty2 ps_ty2
                  xevdecomp x = let xco = evTermCoercion x
                                in [ EvCoercion (mkTcLRCo CLeft xco)
                                   , EvCoercion (mkTcLRCo CRight xco)]
-           ; ctevs <- xCtEvidence ev (XEvTerm [mkTcEqPred s1 s2, mkTcEqPred t1 t2] xevcomp xevdecomp)
-           ; canEvVarsCreated ctevs }
+           ; xCtEvidence ev (XEvTerm [mkTcEqPred s1 s2, mkTcEqPred t1 t2] xevcomp xevdecomp)
+           ; stopWith ev "Decomposed AppTy" }
 
 
 ------------------------
 canDecomposableTyConApp :: CtEvidence
                         -> TyCon -> [TcType]
                         -> TyCon -> [TcType]
-                        -> TcS StopOrContinue
+                        -> TcS (StopOrContinue Ct)
 canDecomposableTyConApp ev tc1 tys1 tc2 tys2
   | tc1 /= tc2 || length tys1 /= length tys2
     -- Fail straight away for better error messages
@@ -948,16 +905,16 @@ canDecomposableTyConApp ev tc1 tys1 tc2 tys2
 
 canDecomposableTyConAppOK :: CtEvidence
                           -> TyCon -> [TcType] -> [TcType]
-                          -> TcS StopOrContinue
+                          -> TcS (StopOrContinue Ct)
 
 canDecomposableTyConAppOK ev tc1 tys1 tys2
   = do { let xcomp xs  = EvCoercion (mkTcTyConAppCo Nominal tc1 (map evTermCoercion xs))
              xdecomp x = zipWith (\_ i -> EvCoercion $ mkTcNthCo i (evTermCoercion x)) tys1 [0..]
              xev = XEvTerm (zipWith mkTcEqPred tys1 tys2) xcomp xdecomp
-       ; ctevs <- xCtEvidence ev xev
-       ; canEvVarsCreated ctevs }
+       ; xCtEvidence ev xev
+       ; stopWith ev "Decomposed TyConApp" }
 
-canEqFailure :: CtEvidence -> TcType -> TcType -> TcS StopOrContinue
+canEqFailure :: CtEvidence -> TcType -> TcType -> TcS (StopOrContinue Ct)
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqFailure ev ty1 ty2
   = do { let fmode = FE { fe_ev = ev, fe_mode = FM_SubstOnly }
@@ -965,9 +922,9 @@ canEqFailure ev ty1 ty2
        ; (s2, co2) <- flatten fmode ty2
        ; mb_ct <- rewriteEqEvidence ev NotSwapped s1 s2 co1 co2
        ; case mb_ct of
-           Just new_ev -> emitInsoluble (mkNonCanonical new_ev)
-           Nothing -> pprPanic "canEqFailure" (ppr ev $$ ppr ty1 $$ ppr ty2)
-       ; return Stop }
+           ContinueWith new_ev -> do { emitInsoluble (mkNonCanonical new_ev)
+                                     ; stopWith new_ev "Definitely not equal" }
+           Stop ev s -> pprPanic "canEqFailure" (s $$ ppr ev $$ ppr ty1 $$ ppr ty2) }
 \end{code}
 
 Note [Canonicalising type applications]
@@ -1123,7 +1080,7 @@ inert set is an idempotent subustitution...
 canCFunEqCan :: CtEvidence 
              -> TyCon -> [TcType]   -- LHS
              -> TcTyVar             -- RHS
-             -> TcS StopOrContinue
+             -> TcS (StopOrContinue Ct)
 -- ^ Canonicalise a CFunEqCan.  We know that 
 --     the arg types are already flat, 
 -- and the RHS is a fsk, which we must *not* substitute.
@@ -1139,8 +1096,8 @@ canCFunEqCan ev fn tys fsk
        ; mb_ev <- rewriteEqEvidence ev NotSwapped new_lhs fsk_ty 
                                     lhs_co (mkTcNomReflCo fsk_ty)
        ; case mb_ev of {
-           Nothing  -> return Stop ;
-           Just ev' -> 
+           Stop ev s        -> return (Stop ev s) ;
+           ContinueWith ev' -> 
 
     do { extendFlatCache fn tys' (ctEvCoercion ev', fsk)
        ; continueWith (CFunEqCan { cc_ev = ev', cc_fun = fn
@@ -1150,7 +1107,7 @@ canCFunEqCan ev fn tys fsk
 canEqTyVar :: CtEvidence -> SwapFlag
            -> TcTyVar 
            -> TcType -> TcType
-           -> TcS StopOrContinue
+           -> TcS (StopOrContinue Ct)
 -- A TyVar on LHS, but so far un-zonked
 canEqTyVar ev swapped tv1 ty2 ps_ty2              -- ev :: tv ~ s2
   = do { traceTcS "canEqTyVar" (ppr tv1 $$ ppr ty2 $$ ppr swapped)
@@ -1162,8 +1119,8 @@ canEqTyVar ev swapped tv1 ty2 ps_ty2              -- ev :: tv ~ s2
                                   ; traceTcS "canEqTyVar2" (vcat [ppr tv1, ppr ty2, ppr swapped, ppr ty1,
                                                                   ppUnless (isDerived ev) (ppr co1)])
                                   ; case mb of
-                                      Nothing     -> return Stop
-                                      Just new_ev -> can_eq_nc new_ev ty1 ty1 ty2 ps_ty2 }
+                                      Stop ev s           -> return (Stop ev s)
+                                      ContinueWith new_ev -> can_eq_nc new_ev ty1 ty1 ty2 ps_ty2 }
 
            Left tv1' -> do { let fmode = FE { fe_ev = ev, fe_mode = FM_Avoid tv1' True }
                                  -- Flatten the RHS less vigorously, to avoid gratuitous
@@ -1178,7 +1135,7 @@ canEqTyVar2 :: DynFlags
             -> TcTyVar      -- olhs
             -> TcType       -- nrhs
             -> TcCoercion   -- nrhs ~ orhs
-            -> TcS StopOrContinue
+            -> TcS (StopOrContinue Ct)
 -- LHS is an inert type variable, 
 -- and RHS is fully rewritten, but with type synonyms
 -- preserved as much as possible
@@ -1196,26 +1153,26 @@ canEqTyVar2 dflags ev swapped tv1 xi2 co2
        ; let k1 = tyVarKind tv1
              k2 = typeKind xi2'
        ; case mb of
-            Nothing     -> return Stop
-            Just new_ev | k2 `isSubKind` k1
-                        -- Establish CTyEqCan kind invariant
-                        -- Reorientation has done its best, but the kinds might
-                        -- simply be incompatible
-                        -> continueWith (CTyEqCan { cc_ev = new_ev
-                                                  , cc_tyvar  = tv1, cc_rhs = xi2' })
-                        | otherwise
-                        -> incompatibleKind new_ev xi1 k1 xi2' k2 }
+            Stop ev s -> return (Stop ev s)
+            ContinueWith new_ev 
+                | k2 `isSubKind` k1
+                -- Establish CTyEqCan kind invariant
+                -- Reorientation has done its best, but the kinds might
+                -- simply be incompatible
+                -> continueWith (CTyEqCan { cc_ev = new_ev
+                                          , cc_tyvar  = tv1, cc_rhs = xi2' })
+                | otherwise
+                -> incompatibleKind new_ev xi1 k1 xi2' k2 }
 
   | otherwise  -- Occurs check error
   = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 co1 co2
        ; case mb of
-           Nothing     -> return ()
-           Just new_ev -> emitInsoluble (mkNonCanonical new_ev)
-                          -- If we have a ~ [a], it is not canonical, and in particular
-                          -- we don't want to rewrite existing inerts with it, otherwise
-                          -- we'd risk divergence in the constraint solver
-       ; return Stop }
-
+           Stop ev s           -> return (Stop ev s)
+           ContinueWith new_ev -> do { emitInsoluble (mkNonCanonical new_ev)
+              -- If we have a ~ [a], it is not canonical, and in particular
+              -- we don't want to rewrite existing inerts with it, otherwise
+              -- we'd risk divergence in the constraint solver
+                                     ; stopWith new_ev "Occurs check" } }
   where
     xi1 = mkTyVarTy tv1
     co1 = mkTcNomReflCo xi1
@@ -1226,7 +1183,7 @@ canEqTyVarTyVar :: CtEvidence       -- tv1 ~ orhs (or orhs ~ tv1, if swapped)
                 -> SwapFlag
                 -> TcTyVar -> TcTyVar   -- tv2, tv2
                 -> TcCoercion       -- tv2 ~ orhs
-                -> TcS StopOrContinue
+                -> TcS (StopOrContinue Ct)
 -- Both LHS and RHS rewrote to a type variable,
 -- If swapped = NotSwapped, then
 --     rw_orhs = tv1, rw_olhs = orhs
@@ -1237,7 +1194,7 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
   = do { when (isWanted ev) $
          ASSERT( tcCoercionRole co2 == Nominal )
          setEvBind (ctev_evar ev) (EvCoercion (maybeSym swapped co2))
-       ; return Stop }  
+       ; stopWith ev "Equal tyvars" }  
 
   | k1 `tcEqKind` k2   = if swap_over then do_swap else no_swap
   | k1 `isSubKind` k2  = do_swap   -- Note [Kind orientation for CTyEqCan]
@@ -1247,25 +1204,21 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
     do_swap 
       = do { mb <- rewriteEqEvidence ev (flipSwap swapped) xi2 xi1
                                      co2 (mkTcNomReflCo xi1)
-           ; case mb of
-               Nothing  -> return Stop
-               Just ev' -> continueWith (CTyEqCan { cc_ev = ev'
-                                                  , cc_tyvar  = tv2, cc_rhs = xi1 }) }
+           ; let mk_ct ev' = CTyEqCan { cc_ev = ev', cc_tyvar = tv2, cc_rhs = xi1 }
+           ; return (fmap mk_ct mb) }
 
     no_swap 
       = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 
                                      (mkTcNomReflCo xi1) co2
-           ; case mb of
-               Nothing  -> return Stop
-               Just ev' -> continueWith (CTyEqCan { cc_ev = ev'
-                                                  , cc_tyvar = tv1, cc_rhs = xi2 }) }
+           ; let mk_ct ev' = CTyEqCan { cc_ev = ev', cc_tyvar = tv1, cc_rhs = xi2 }
+           ; return (fmap mk_ct mb) }
 
     incompat
       = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 
                                      (mkTcNomReflCo xi1) co2
            ; case mb of
-               Nothing  -> return Stop
-               Just ev' -> incompatibleKind ev' xi1 k1 xi2 k2 }
+               Stop ev s           -> return (Stop ev s)
+               ContinueWith ev' -> incompatibleKind ev' xi1 k1 xi2 k2 }
 
     xi1 = mkTyVarTy tv1
     xi2 = mkTyVarTy tv2
@@ -1300,7 +1253,7 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
 incompatibleKind :: CtEvidence         -- t1~t2
                  -> TcType -> TcKind
                  -> TcType -> TcKind   -- s1~s2, flattened and zonked
-                 -> TcS StopOrContinue
+                 -> TcS (StopOrContinue Ct)
 -- LHS and RHS have incompatible kinds, so emit an "irreducible" constraint
 --       CIrredEvCan (NOT CTyEqCan or CFunEqCan)
 -- for the type equality; and continue with the kind equality constraint.

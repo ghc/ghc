@@ -1,5 +1,7 @@
 ToDo:
 
+* get rid of getEvTerm?
+
 * ctev_loc should have a decent name ctEvLoc
 
 * Float only CTyEqCans.   kind-incompatible things should be CNonCanonical,

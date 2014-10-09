@@ -7,10 +7,9 @@ module TcSMonad (
        -- Canonical constraints, definition is now in TcRnTypes
 
     WorkList(..), isEmptyWorkList, emptyWorkList,
-    workListFromEq, workListFromNonEq, workListFromCt,
-    extendWorkListEq, extendWorkListFunEq,
+    extendWorkListFunEq,
     extendWorkListNonEq, extendWorkListCt,
-    extendWorkListCts, extendWorkListEqs, appendWorkList, selectWorkItem,
+    extendWorkListCts, appendWorkList, selectWorkItem,
     withWorkList, workListSize,
 
     updWorkListTcS, updWorkListTcS_return,
@@ -27,7 +26,7 @@ module TcSMonad (
     mkGivenLoc,
 
     TcS, runTcS, runTcSWithEvBinds, failTcS, panicTcS, traceTcS, -- Basic functionality
-    traceFireTcS, bumpStepCountTcS,
+    traceFireTcS, bumpStepCountTcS, csTraceTcS,
     tryTcS, nestTcS, nestImplicTcS, recoverTcS,
     wrapErrTcS, wrapWarnTcS,
 
@@ -41,7 +40,9 @@ module TcSMonad (
 
     setEvBind,
     XEvTerm(..),
-    MaybeNew (..), isFresh, freshGoal, freshGoals, getEvTerm, getEvTerms,
+    MaybeNew (..), isFresh, freshGoals, getEvTerm, getEvTerms,
+
+    StopOrContinue(..), continueWith, stopWith, andWhenContinue,
 
     xCtEvidence,        -- Transform a CtEvidence during a step
     rewriteEvidence,    -- Specialized version of xCtEvidence for coercions
@@ -194,7 +195,10 @@ data Deque a = DQ [a] [a]   -- Insert in RH field, remove from LH field
                             -- First to remove is at head of LH field
 
 instance Outputable a => Outputable (Deque a) where
-  ppr (DQ as bs) = ppr (as ++ reverse bs)   -- Show first one to come out at the start
+  ppr q = ppr (dequeList q)
+
+dequeList :: Deque a -> [a]
+dequeList (DQ as bs) = as ++ reverse bs  -- First one to come out at the start
 
 emptyDeque :: Deque a
 emptyDeque = DQ [] []
@@ -237,20 +241,12 @@ workListSize (WorkList { wl_eqs = eqs, wl_funeqs = funeqs, wl_rest = rest })
   = length eqs + dequeSize funeqs + length rest
 
 extendWorkListEq :: Ct -> WorkList -> WorkList
--- Extension by equality
-extendWorkListEq ct wl
-  | Just {} <- isCFunEqCan_maybe ct
-  = extendWorkListFunEq ct wl
-  | otherwise
+extendWorkListEq ct wl 
   = wl { wl_eqs = ct : wl_eqs wl }
 
 extendWorkListFunEq :: Ct -> WorkList -> WorkList
 extendWorkListFunEq ct wl
   = wl { wl_funeqs = insertDeque ct (wl_funeqs wl) }
-
-extendWorkListEqs :: [Ct] -> WorkList -> WorkList
--- Append a list of equalities
-extendWorkListEqs cts wl = foldr extendWorkListEq wl cts
 
 extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
@@ -260,8 +256,15 @@ extendWorkListNonEq ct wl
 extendWorkListCt :: Ct -> WorkList -> WorkList
 -- Agnostic
 extendWorkListCt ct wl
- | isEqPred (ctPred ct) = extendWorkListEq ct wl
- | otherwise = extendWorkListNonEq ct wl
+ = case classifyPredType (ctPred ct) of
+     EqPred ty1 _
+       | Just (tc,_) <- tcSplitTyConApp_maybe ty1
+       , isSynFamilyTyCon tc
+       -> extendWorkListFunEq ct wl
+       | otherwise
+       -> extendWorkListEq ct wl
+
+     _ -> extendWorkListNonEq ct wl
 
 extendWorkListCts :: [Ct] -> WorkList -> WorkList
 -- Agnostic
@@ -274,18 +277,6 @@ isEmptyWorkList wl
 emptyWorkList :: WorkList
 emptyWorkList = WorkList { wl_eqs  = [], wl_rest = [], wl_funeqs = emptyDeque }
 
-workListFromEq :: Ct -> WorkList
-workListFromEq ct = extendWorkListEq ct emptyWorkList
-
-workListFromNonEq :: Ct -> WorkList
-workListFromNonEq ct = extendWorkListNonEq ct emptyWorkList
-
-workListFromCt :: Ct -> WorkList
--- Agnostic
-workListFromCt ct | isEqPred (ctPred ct) = workListFromEq ct
-                  | otherwise            = workListFromNonEq ct
-
-
 selectWorkItem :: WorkList -> (Maybe Ct, WorkList)
 selectWorkItem wl@(WorkList { wl_eqs = eqs, wl_funeqs = feqs, wl_rest = rest })
   = case (eqs,feqs,rest) of
@@ -297,10 +288,15 @@ selectWorkItem wl@(WorkList { wl_eqs = eqs, wl_funeqs = feqs, wl_rest = rest })
 
 -- Pretty printing
 instance Outputable WorkList where
-  ppr wl = vcat [ text "WorkList (eqs)   = " <+> ppr (wl_eqs wl)
-                , text "WorkList (funeqs)= " <+> ppr (wl_funeqs wl)
-                , text "WorkList (rest)  = " <+> ppr (wl_rest wl)
-                ]
+  ppr (WorkList { wl_eqs = eqs, wl_funeqs = feqs, wl_rest = rest })
+   = text "WorkList" <+> (braces $
+     vcat [ ppUnless (null eqs) $ 
+            ptext (sLit "Eqs =") <+> vcat (map ppr eqs)
+          , ppUnless (isEmptyDeque feqs) $
+            ptext (sLit "Funeqs =") <+> vcat (map ppr (dequeList feqs))
+          , ppUnless (null rest) $
+            ptext (sLit "Eqs =") <+> vcat (map ppr rest)
+          ])
 \end{code}
 
 %************************************************************************
@@ -1140,17 +1136,29 @@ bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
                                     ; n <- TcM.readTcRef ref
                                     ; TcM.writeTcRef ref (n+1) }
 
-traceFireTcS :: Ct -> SDoc -> TcS ()
+csTraceTcS :: SDoc -> TcS ()
+csTraceTcS doc
+  = wrapTcS $ csTraceTcM 1 (return doc)
+
+traceFireTcS :: CtEvidence -> SDoc -> TcS ()
 -- Dump a rule-firing trace
-traceFireTcS ct doc
-  = TcS $ \env ->
-    do { dflags <- getDynFlags
-       ; when (dopt Opt_D_dump_cs_trace dflags && traceLevel dflags >= 1) $
+traceFireTcS ev doc
+  = TcS $ \env -> csTraceTcM 1 $
     do { n <- TcM.readTcRef (tcs_count env)
-       ; let msg = int n <> brackets (ppr (ctLocDepth (ctev_loc ev)))
-                   <+> ppr ev <> colon <+> doc
-       ; TcM.debugDumpTcRn msg } }
-  where ev = cc_ev ct
+       ; untch <- TcM.getUntouchables
+       ; return (hang (int n <> brackets (ptext (sLit "U:") <> ppr untch 
+                                          <> ppr (ctLocDepth (ctev_loc ev))) 
+                       <+> doc <> colon)
+                     4 (ppr ev)) } 
+
+csTraceTcM :: Int -> TcM SDoc -> TcM ()
+-- Constraint-solver tracing, -ddump-cs-trace
+csTraceTcM trace_level mk_doc
+  = do { dflags <- getDynFlags
+       ; when ((dopt Opt_D_dump_cs_trace dflags || dopt Opt_D_dump_tc_trace dflags)
+               && traceLevel dflags >= trace_level) $
+         do { msg <- mk_doc
+            ; TcM.debugDumpTcRn msg } }
 
 runTcS :: TcS a                -- What to run
        -> TcM (a, Bag EvBind)
@@ -1184,10 +1192,9 @@ runTcSWithEvBinds ev_binds_var tcs
        ; TcM.traceTc "Write TcS ty_binds into the meta type variables" (ppr ty_binds)
        ; mapM_ do_unification (varEnvElts ty_binds)
 
-       ; TcM.whenDOptM Opt_D_dump_cs_trace $
-         do { count <- TcM.readTcRef step_count
-            ; when (count > 0) $
-              TcM.debugDumpTcRn (ptext (sLit "Constraint solver steps =") <+> int count ) }
+       ; count <- TcM.readTcRef step_count
+       ; when (count > 0) $ 
+         csTraceTcM 0 $ return (ptext (sLit "Constraint solver steps =") <+> int count)
 
 #ifdef DEBUG
        ; ev_binds <- TcM.getTcEvBinds ev_binds_var
@@ -1639,10 +1646,6 @@ getEvTerm (Cached tm)  = tm
 getEvTerms :: [MaybeNew] -> [EvTerm]
 getEvTerms = map getEvTerm
 
-freshGoal :: MaybeNew -> Maybe CtEvidence
-freshGoal (Fresh ctev) = Just ctev
-freshGoal _ = Nothing
-
 freshGoals :: [MaybeNew] -> [CtEvidence]
 freshGoals mns = [ ctev | Fresh ctev <- mns ]
 
@@ -1781,13 +1784,21 @@ TcCanonical), and will do no harm.
 \begin{code}
 xCtEvidence :: CtEvidence            -- Original evidence
             -> XEvTerm               -- Instructions about how to manipulate evidence
-            -> TcS [CtEvidence]
+            -> TcS ()
+
+xCtEvidence (CtWanted { ctev_evar = evar, ctev_loc = loc })
+            (XEvTerm { ev_preds = ptys, ev_comp = comp_fn })
+  = do { new_evars <- mapM (newWantedEvVar loc) ptys
+       ; setEvBind evar (comp_fn (getEvTerms new_evars))
+       ; emitWorkNC (freshGoals new_evars) }
+         -- Note the "NC": these are fresh goals, not necessarily canonical
 
 xCtEvidence (CtGiven { ctev_evtm = tm, ctev_loc = loc })
             (XEvTerm { ev_preds = ptys, ev_decomp = decomp_fn })
   = ASSERT( equalLength ptys (decomp_fn tm) )
-    mapM (newGivenEvVar loc)     -- See Note [Bind new Givens immediately]
-         (filterOut bad_given_pred (ptys `zip` decomp_fn tm))
+    do { given_evs <- mapM (newGivenEvVar loc) $    -- See Note [Bind new Givens immediately]
+                      filterOut bad_given_pred (ptys `zip` decomp_fn tm)
+       ; emitWorkNC given_evs }
   where
     -- See Note [Do not create Given kind equalities]
     bad_given_pred (pred_ty, _)
@@ -1796,22 +1807,47 @@ xCtEvidence (CtGiven { ctev_evtm = tm, ctev_loc = loc })
       | otherwise
       = False
 
-xCtEvidence (CtWanted { ctev_evar = evar, ctev_loc = loc })
-            (XEvTerm { ev_preds = ptys, ev_comp = comp_fn })
-  = do { new_evars <- mapM (newWantedEvVar loc) ptys
-       ; setEvBind evar (comp_fn (getEvTerms new_evars))
-       ; return (freshGoals new_evars) }
-
 xCtEvidence (CtDerived { ctev_loc = loc })
             (XEvTerm { ev_preds = ptys })
   = do { ders <- mapM (newDerived loc) ptys
-       ; return (catMaybes ders) }
+       ; emitWorkNC (catMaybes ders) }
 
 -----------------------------
+data StopOrContinue a
+  = ContinueWith a    -- The constraint was not solved, although it may have
+                      --   been rewritten
+
+  | Stop CtEvidence   -- The (rewritten) constraint was solved
+         SDoc         -- Tells how it was solved
+                      -- Any new sub-goals have been put on the work list
+
+instance Functor StopOrContinue where
+  fmap f (ContinueWith x) = ContinueWith (f x)
+  fmap _ (Stop ev s)      = Stop ev s
+
+instance Outputable a => Outputable (StopOrContinue a) where
+  ppr (Stop ev s)      = ptext (sLit "Stop") <> parens s <+> ppr ev
+  ppr (ContinueWith w) = ptext (sLit "ContinueWith") <+> ppr w
+
+continueWith :: a -> TcS (StopOrContinue a)
+continueWith = return . ContinueWith
+
+stopWith :: CtEvidence -> String -> TcS (StopOrContinue a)
+stopWith ev s = return (Stop ev (text s))
+
+andWhenContinue :: TcS (StopOrContinue a)
+                -> (a -> TcS (StopOrContinue b))
+                -> TcS (StopOrContinue b)
+andWhenContinue tcs1 tcs2
+  = do { r <- tcs1
+       ; case r of
+           Stop ev s       -> return (Stop ev s)
+           ContinueWith ct -> tcs2 ct }
+
 rewriteEvidence :: CtEvidence   -- old evidence
                 -> TcPredType   -- new predicate
                 -> TcCoercion   -- Of type :: new predicate ~ <type of old evidence>
-                -> TcS (Maybe CtEvidence)
+                -> TcS (StopOrContinue CtEvidence)
 -- Returns Just new_ev iff either (i)  'co' is reflexivity
 --                             or (ii) 'co' is not reflexivity, and 'new_pred' not cached
 -- In either case, there is nothing new to do with new_ev
@@ -1846,7 +1882,7 @@ as well as in old_pred; that is important for good error messages.
  -}
 
 
-rewriteEvidence (CtDerived { ctev_loc = loc }) new_pred _co
+rewriteEvidence old_ev@(CtDerived { ctev_loc = loc }) new_pred _co
   = -- If derived, don't even look at the coercion.
     -- This is very important, DO NOT re-order the equations for
     -- rewriteEvidence to put the isTcReflCo test first!
@@ -1854,23 +1890,29 @@ rewriteEvidence (CtDerived { ctev_loc = loc }) new_pred _co
     -- was produced by flattening, may contain suspended calls to
     -- (ctEvTerm c), which fails for Derived constraints.
     -- (Getting this wrong caused Trac #7384.)
-    newDerived loc new_pred
+    do { mb <- newDerived loc new_pred
+       ; case mb of 
+           Just ev -> continueWith ev
+           Nothing -> stopWith old_ev "Cached derived" }
 
 rewriteEvidence old_ev new_pred co
   | isTcReflCo co -- See Note [Rewriting with Refl]
-  = return (Just (old_ev { ctev_pred = new_pred }))
+  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
 
 rewriteEvidence (CtGiven { ctev_evtm = old_tm , ctev_loc = loc }) new_pred co
   = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
-       ; return (Just new_ev) }
+       ; return (ContinueWith new_ev) }
   where
     new_tm = mkEvCast old_tm (mkTcSubCo (mkTcSymCo co))  -- mkEvCast optimises ReflCo
 
-rewriteEvidence (CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
+rewriteEvidence ev@(CtWanted { ctev_evar = evar, ctev_loc = loc }) new_pred co
   = do { new_evar <- newWantedEvVar loc new_pred
        ; MASSERT( tcCoercionRole co == Nominal )
-       ; setEvBind evar (mkEvCast (getEvTerm new_evar) (mkTcSubCo co))
-       ; return (freshGoal new_evar) }
+       ; case new_evar of
+            Fresh ev' -> do { setEvBind evar (mkEvCast (ctEvTerm ev') (mkTcSubCo co))
+                            ; continueWith ev' }
+            Cached tm -> do { setEvBind evar (mkEvCast tm (mkTcSubCo co))
+                            ; stopWith ev "Cached wanted" } }
 
 
 rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swapped)
@@ -1880,7 +1922,7 @@ rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swap
                                         -- Should be zonked, because we use typeKind on nlhs/nrhs
                   -> TcCoercion         -- lhs_co, of type :: nlhs ~ olhs
                   -> TcCoercion         -- rhs_co, of type :: nrhs ~ orhs
-                  -> TcS (Maybe CtEvidence)  -- Of type nlhs ~ nrhs
+                  -> TcS (StopOrContinue CtEvidence)  -- Of type nlhs ~ nrhs
 -- For (rewriteEqEvidence (Given g olhs orhs) False nlhs nrhs lhs_co rhs_co)
 -- we generate
 -- If not swapped
@@ -1898,19 +1940,22 @@ rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swap
 -- It's all a form of rewwriteEvidence, specialised for equalities
 rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
   | CtDerived { ctev_loc = loc } <- old_ev
-  = newDerived loc (mkTcEqPred nlhs nrhs)
+  = do { mb <- newDerived loc (mkTcEqPred nlhs nrhs)
+       ; case mb of 
+           Just new_ev -> continueWith new_ev
+           Nothing     -> stopWith old_ev "Cached derived" }
 
   | NotSwapped <- swapped
   , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
   , isTcReflCo rhs_co
-  = return (Just (old_ev { ctev_pred = new_pred }))
+  = return (ContinueWith (old_ev { ctev_pred = new_pred }))
 
   | CtGiven { ctev_evtm = old_tm , ctev_loc = loc } <- old_ev
   = do { let new_tm = EvCoercion (lhs_co 
                                   `mkTcTransCo` maybeSym swapped (evTermCoercion old_tm)
                                   `mkTcTransCo` mkTcSymCo rhs_co)
        ; new_ev <- newGivenEvVar loc (new_pred, new_tm)  -- See Note [Bind new Givens immediately]
-       ; return (Just new_ev) }
+       ; return (ContinueWith new_ev) }
 
   | CtWanted { ctev_evar = evar, ctev_loc = loc } <- old_ev
   = do { new_evar <- newWantedEvVarNC loc new_pred
@@ -1921,7 +1966,7 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
                   `mkTcTransCo` rhs_co
        ; setEvBind evar (EvCoercion co)
        ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
-       ; return (Just new_evar) }
+       ; return (ContinueWith new_evar) }
 
   | otherwise
   = panic "rewriteEvidence"
