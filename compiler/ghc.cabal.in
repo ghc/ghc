@@ -407,6 +407,7 @@ Library
         TcInteract
         TcCanonical
         TcSMonad
+        TcSTypes
         TcTypeNats
         TcSplice
         Class
