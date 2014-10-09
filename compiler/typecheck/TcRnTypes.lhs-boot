@@ -1,11 +1,11 @@
 \begin{code}
 module TcRnTypes where
 
-import IOEnv 
+import IOEnv
 
-type TcM a = TcRn a
-type TcRn a = TcRnIf TcGblEnv TcLclEnv a
-type TcRnIf a b c = IOEnv (Env a b) c
+type TcM = TcRn
+type TcRn = TcRnIf TcGblEnv TcLclEnv
+type TcRnIf a b = IOEnv (Env a b)
 
 data Env a b
 data TcGblEnv
