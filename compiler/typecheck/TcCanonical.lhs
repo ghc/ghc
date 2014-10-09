@@ -1226,8 +1226,9 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
     k2  = tyVarKind tv2
 
     swap_over
-      -- If tv1 is touchable, swap only if tv2 is also 
-      -- touchable and it's better to update the latter
+      -- If tv1 is touchable, swap only if tv2 is also
+      -- touchable and it's strictly better to update the latter
+      -- But see Note [Avoid unnecessary swaps]
       | Just lvl1 <- metaTyVarUntouchables_maybe tv1
       = case metaTyVarUntouchables_maybe tv2 of
           Nothing   -> False
@@ -1238,8 +1239,8 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
       -- If only one is a meta tyvar, put it on the left
       -- This is not because it'll be solved; but becuase
       -- the floating step looks for meta tyvars on the left
-      | isMetaTyVar tv2 = True 
-   
+      | isMetaTyVar tv2 = True
+
       -- So neither is a meta tyvar
 
       -- If only one is a flatten tyvar, put it on the left
@@ -1248,7 +1249,9 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
 
       | otherwise = False
 
-    nicer_to_update_tv2 = isSigTyVar tv1 || isSystemName (Var.varName tv2)
+    nicer_to_update_tv2
+      =  (isSigTyVar tv1                 && not (isSigTyVar tv2))
+      || (isSystemName (Var.varName tv2) && not (isSystemName (Var.varName tv1)))
 
 incompatibleKind :: CtEvidence         -- t1~t2
                  -> TcType -> TcKind
@@ -1278,6 +1281,19 @@ incompatibleKind new_ev s1 k1 s2 k2   -- See Note [Equalities with incompatible 
     loc = ctev_loc new_ev
     kind_co_loc = setCtLocOrigin loc (KindEqOrigin s1 s2 (ctLocOrigin loc))
 \end{code}
+
+Note [Avoid unnecessary swaps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we swap without actually improving matters, we can get an infnite loop.
+Consider
+    work item:  a ~ b
+   inert item:  b ~ c
+We canonicalise the work-time to (a ~ c).  If we then swap it before
+aeding to the inert set, we'll add (c ~ a), and therefore kick out the
+inert guy, so we get
+   new work item:  b ~ c
+   inert item:     c ~ a
+And now the cycle just repeats
 
 Note [Eliminate flat-skols]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

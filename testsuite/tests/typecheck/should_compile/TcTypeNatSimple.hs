@@ -3,6 +3,7 @@ module TcTypeNatSimple where
 import GHC.TypeLits
 import Data.Proxy
 
+{-
 --------------------------------------------------------------------------------
 -- Test evaluation
 e1 :: Proxy (2 + 3) -> Proxy 5
@@ -79,14 +80,16 @@ ti5 _ = ()
 
 ti6 :: Proxy (y ^ 2) -> ()
 ti6 _ = ()
-
+-}
 type family SomeFun (n :: Nat)
 
 ti7 :: (x <= y, y <= x) => Proxy (SomeFun x) -> Proxy y -> ()
 ti7 _ _ = ()
 
+{-
 ti8 :: Proxy (x - y) -> Proxy x -> ()
 ti8 _ _ = ()
 
 ti9 :: Proxy (y - x) -> Proxy x -> ()
 ti9 _ _ = ()
+-}

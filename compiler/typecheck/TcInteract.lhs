@@ -663,7 +663,8 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs , cc_ev 
                          , rhs_i `tcEqType` rhs ]
   =  -- Inert:     a ~ b
      -- Work item: a ~ b
-    do { when (isWanted ev) (setEvBind (ctev_evar ev) (ctEvTerm ev_i))
+    do { when (isWanted ev) $
+         setEvBind (ctev_evar ev) (ctEvTerm ev_i)
        ; stopWith ev "Solved from inert" }
 
   | Just tv_rhs <- getTyVar_maybe rhs
@@ -674,8 +675,8 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv, cc_rhs = rhs , cc_ev 
   =  -- Inert:     a ~ b
      -- Work item: b ~ a
     do { when (isWanted ev) $
-              setEvBind (ctev_evar ev)
-                        (EvCoercion (mkTcSymCo (ctEvCoercion ev_i)))
+         setEvBind (ctev_evar ev)
+                   (EvCoercion (mkTcSymCo (ctEvCoercion ev_i)))
        ; stopWith ev "Solved from inert (r)" }
 
   | otherwise
@@ -835,7 +836,7 @@ kick_out new_ev new_tv (IC { inert_eqs = tv_eqs
 -- ToDO: I totally do not understand this "not eqCanRewrite" stuff.
 --       It seems quite wrong to me
 -- Omitting for now
-          (   -- not (eqCanRewrite tv ev new_ev) &&    -- (2)
+          (not (eqCanRewrite tv ev new_ev) &&    -- (2)
            new_tv `elemVarSet` (extendVarSet (tyVarsOfType rhs) tv)))
       where
         kind_vars = tyVarsOfType (tyVarKind tv) `unionVarSet`
@@ -1412,7 +1413,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
                                           ; solve_from_instance wtvs ev_term }
                NoInstance -> try_fundeps_and_return }
    where
-     dict_id = ctEvId fl
+     dict_id = ASSERT( isWanted fl ) ctEvId fl
      pred = mkClassPred cls xis
      loc = ctev_loc fl
 
@@ -1459,6 +1460,7 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
                                      , cc_tyargs = args , cc_fsk = fsk })
   = ASSERT(isSynFamilyTyCon fam_tc) -- No associated data families
                                     -- have reached this far
+    ASSERT( not (isDerived old_ev) )   -- CFunEqCan is never Derived
     -- Look up in top-level instances, or built-in axiom
     do { match_res <- matchFam fam_tc args   -- See Note [MATCHING-SYNONYMS]
        ; case match_res of {
@@ -1544,7 +1546,8 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
        ; stopWith old_ev "Fun/Top (given, shortcut)" }
 
   | otherwise
-  = do { (xis, cos) <- flattenMany (FE { fe_ev = old_ev, fe_mode = FM_FlattenAll }) tc_args
+  = ASSERT( not (isDerived old_ev) )   -- Caller ensures this
+    do { (xis, cos) <- flattenMany (FE { fe_ev = old_ev, fe_mode = FM_FlattenAll }) tc_args
                -- ax_co :: F args ~ G tc_args
                -- cos   :: xis ~ tc_args
                -- G cos ; sym ax_co ; old_ev :: G xis ~ fsk

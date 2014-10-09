@@ -131,7 +131,6 @@ import VarEnv
 import VarSet
 import Outputable
 import Bag
-import MonadUtils
 import UniqSupply
 
 import FastString
@@ -147,6 +146,7 @@ import Pair ( pSnd )
 
 import TrieMap
 import Control.Monad( ap, when )
+import MonadUtils
 import Data.IORef
 
 #ifdef DEBUG
@@ -665,10 +665,12 @@ getInertUnsolved
            , inert_insols = iinsols } <- getInertCans
 
       ; let unsolved_eqs = foldVarEnv add_if_unsolved_eq [] tv_eqs
+      ; unsolved_eqs <- foldrM unflatten_eq [] unsolved_eqs
+           -- Unflatten  fuv ~ ty first, becuause they are
+           -- much more informative
       ; dflags <- getDynFlags
-      ; (unsolved_eqs, unsolved_fun_eqs)
-          <- foldFunEqs (unflatten_funeq dflags) fun_eqs 
-                        (return (unsolved_eqs, emptyCts))
+      ; unsolved_fun_eqs
+          <- foldFunEqs (unflatten_funeq dflags) fun_eqs (return emptyCts)
 
       ; let unsolved_irreds = Bag.filterBag is_unsolved  iirreds
             unsolved_dicts  = foldDicts  add_if_unsolved idicts  emptyCts
@@ -685,9 +687,7 @@ getInertUnsolved
         -- It would be perfectly OK to zonk the insolubles too,
         -- but it'll happen anyway before error reporting
   where
-    unflatten_funeq :: DynFlags
-                    -> Ct -> TcS ([Ct], Cts)
-                          -> TcS ([Ct], Cts)
+    unflatten_funeq :: DynFlags -> Ct -> TcS Cts -> TcS Cts
     unflatten_funeq dflags (CFunEqCan { cc_fun = tc, cc_tyargs = xis
                                       , cc_fsk = fsk, cc_ev = ev }) do_rest
       | isGiven ev -- tv should be a FlatSkol; zonking will eliminate it
@@ -696,8 +696,12 @@ getInertUnsolved
       | otherwise  -- A flatten meta-tv; we now fix its final
                    -- value, and then zonking will eliminate it
       = ASSERT( isWanted ev )  -- CFunEqCans are never Derived
-        do { (tv_eqs, fun_eqs) <- do_rest
-           ; fn_app <- wrapTcS (TcM.zonkTcType (mkTyConApp tc xis))
+        do { is_filled <- wrapTcS (TcM.isFilledMetaTyVar fsk)
+           ; if is_filled then
+               do { fun_eqs <- do_rest
+                  ; return (fun_eqs `extendCts` mkNonCanonical ev) }
+             else
+        do { fn_app <- wrapTcS (TcM.zonkTcType (mkTyConApp tc xis))
            ; case occurCheckExpand dflags fsk fn_app of
                OC_OK fn_app'
                  ->    -- Normal case: unflatten
@@ -707,41 +711,25 @@ getInertUnsolved
                        ; wrapTcS (TcM.writeMetaTyVar fsk fn_app')
                              -- Write directly into the mutable tyvar
                              -- Flatten meta-vars are born and die locally
-                       ; return (tv_eqs, fun_eqs) }
+                       ; do_rest }
 
                -- Occurs check; don't unflatten, instead turn it into a NonCanonical
-               _ | Just (ev1, rhs, new_tv_eqs) <- find_eq fsk tv_eqs
-                 -> do { wrapTcS (TcM.writeMetaTyVar fsk rhs)
-                       ; setEvBind (ctEvId ev1) (EvCoercion (mkTcNomReflCo rhs))
-                       ; return (new_tv_eqs, fun_eqs `extendCts` mkNonCanonical ev) }
-
-                 | otherwise
-                 -> do { tv_ty <- newFlexiTcSTy (tyVarKind fsk)
+               _ -> do { tv_ty <- newFlexiTcSTy (tyVarKind fsk)
                        ; wrapTcS (TcM.writeMetaTyVar fsk tv_ty)
-                       ; return (tv_eqs, fun_eqs `extendCts` mkNonCanonical ev) }
-          }
-    unflatten_funeq _ other_ct _ 
+                       ; fun_eqs <- do_rest
+                       ; return (fun_eqs `extendCts` mkNonCanonical ev) }
+          } }
+    unflatten_funeq _ other_ct _
       = pprPanic "unflatten_funeq" (ppr other_ct)
 
-    find_eq :: TcTyVar -> [Ct] -> Maybe (CtEvidence, TcType, [Ct])
-    -- (find_eq fsk eqs) finds an equality (fsk ~ ty) or (tv ~ fsk)
-     --                  in eqs, and returns the depleted eqs
-    find_eq _ [] = Nothing
-    find_eq fsk (ct : cts)
-      | CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs } <- ct
-      , tv == fsk
-      = Just (ev, rhs, cts)
-
-      | CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs } <- ct
-      , Just tv_r <- tcGetTyVar_maybe rhs
-      , tv_r == fsk
-      = Just (ev, mkTyVarTy tv, cts)
-
-      | Just (tv, rhs, cts') <- find_eq fsk cts
-      = Just (tv, rhs, ct:cts')
-
-      | otherwise
-      = Nothing
+    unflatten_eq :: Ct -> [Ct] -> TcS [Ct]
+    unflatten_eq (CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs }) rest
+      | isFmvTyVar tv
+      = do { when (isWanted ev) $
+             setEvBind (ctEvId ev) (EvCoercion (mkTcNomReflCo rhs))
+           ; wrapTcS (TcM.writeMetaTyVar tv rhs)
+           ; return rest }
+    unflatten_eq ct rest = return (ct:rest)
 
     add_if_unsolved :: Ct -> Cts -> Cts
     add_if_unsolved ct cts | is_unsolved ct = cts `extendCts` ct
