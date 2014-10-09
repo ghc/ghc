@@ -72,6 +72,23 @@ import qualified Data.Map as Map
 
 \begin{code}
 
+ 
+withPlugins :: DynFlags -> [(ModuleName,TcPlugin)] -> TcM a -> TcM a
+withPlugins _ [] m = m
+withPlugins dflags plugins m =
+  do (solvers,stops) <- unzip `fmap` mapM startPlugin plugins
+     res <- updGblEnv (\e -> e { tcg_tc_plugins = solvers }) m
+     sequence_ stops
+     return res
+  where
+  getOpts mod_name = [ opt | (m,opt) <- pluginModNameOpts dflags
+                           , m == mod_name ]
+  startPlugin (m,TcPlugin start solve stop) =
+    do s <- start (getOpts m)
+       return (solve s, stop s)
+
+
+
 initTc :: HscEnv
        -> HscSource
        -> Bool          -- True <=> retain renamed syntax trees
@@ -85,7 +102,7 @@ initTc = initTcWithPlugins []
 
 
 -- | Setup the initial typechecking environment
-initTcWithPlugins :: [TcPlugin]
+initTcWithPlugins :: [(ModuleName,TcPlugin)]
        -> HscEnv
        -> HscSource
        -> Bool          -- True <=> retain renamed syntax trees
@@ -172,7 +189,7 @@ initTcWithPlugins tc_plugins hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_main           = Nothing,
                 tcg_safeInfer      = infer_var,
                 tcg_dependent_files = dependent_files_var,
-                tcg_tc_plugins     = tc_plugins
+                tcg_tc_plugins     = []
              } ;
              lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
@@ -190,10 +207,12 @@ initTcWithPlugins tc_plugins hsc_env hsc_src keep_rn_syntax mod do_this
                 tcl_untch      = noUntouchables
              } ;
         } ;
+        let { dflags = hsc_dflags hsc_env };
 
         -- OK, here's the business end!
         maybe_res <- initTcRnIf 'a' hsc_env gbl_env lcl_env $
-                     do { r <- tryM do_this
+                     do { r <- tryM $ withPlugins dflags tc_plugins
+                                      do_this
                         ; case r of
                           Right res -> return (Just res)
                           Left _    -> return Nothing } ;
@@ -207,8 +226,7 @@ initTcWithPlugins tc_plugins hsc_env hsc_src keep_rn_syntax mod do_this
         -- Collect any error messages
         msgs <- readIORef errs_var ;
 
-        let { dflags = hsc_dflags hsc_env
-            ; final_res | errorsFound dflags msgs = Nothing
+        let { final_res | errorsFound dflags msgs = Nothing
                         | otherwise               = maybe_res } ;
 
         return (msgs, final_res)

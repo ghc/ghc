@@ -572,6 +572,7 @@ compiler_stage2_dll0_MODULES = \
 	TcIface \
 	TcRnMonad \
 	TcRnTypes \
+	TcSTypes \
 	TcType \
 	TcTypeNats \
 	TrieMap \

@@ -75,7 +75,7 @@ module TcRnTypes(
         eqCanRewrite, canRewriteOrSame,
 
         -- Constraint solver plugins
-        TcPlugin(..), TcPluginResult(..),
+        TcPlugin(..), TcPluginResult(..), TcPluginSolver,
 
         -- Pretty printing
         pprEvVarTheta, 
@@ -124,6 +124,7 @@ import ListSetOps
 import FastString
 
 import Data.Set (Set)
+import {-# SOURCE #-} TcSTypes(TcS)   -- for typechecker plugins
 
 #ifdef GHCI
 import Data.Map      ( Map )
@@ -356,7 +357,7 @@ data TcGblEnv
                                              -- as -XSafe (Safe Haskell)
 
         -- | A list of user-defined plugins for the constraint solver.
-        tcg_tc_plugins :: [TcPlugin]
+        tcg_tc_plugins :: [TcPluginSolver]
     }
 
 instance ContainsModule TcGblEnv where
@@ -1920,13 +1921,19 @@ Constraint Solver Plugins
 
 \begin{code}
 
-data TcPlugin = TcPlugin
-  { tcPluginSolve :: [Ct] -> [Ct] -> IO TcPluginResult
-  , tcPluginStop  :: IO ()
-    -- ^ Exit the solver.
-    -- The solver should not be used after this is called.
-  }
+type TcPluginSolver = [Ct] -> [Ct] -> TcS TcPluginResult
 
+data TcPlugin = forall s. TcPlugin
+  { tcPluginInit  :: [String] -> TcM s
+    -- ^ Initialize plugin, when entering type-checker.
+
+  , tcPluginSolve :: s -> TcPluginSolver
+    -- ^ Solve some constraints.
+    -- TODO: WRITE MORE DETAILS ON HOW THIS WORKS.
+
+  , tcPluginStop  :: s -> TcM ()
+   -- ^ Clean up after the plugin, when exiting the type-checker.
+  }
 
 data TcPluginResult
   = TcPluginContradiction {- inconsistent -} [Ct]

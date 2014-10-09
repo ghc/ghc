@@ -139,7 +139,6 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 
       ; res <- initTcWithPlugins tc_plugins hsc_env hsc_src save_rn_syntax this_mod $
         tcRnModuleTcRnM hsc_env hsc_src parsedModule pair
-      ; mapM_ tcPluginStop tc_plugins
       ; return res
       }
 
@@ -243,7 +242,7 @@ implicitPreludeWarn
 
 \begin{code}
 
-loadTcPlugins :: HscEnv -> IO [ TcPlugin ]
+loadTcPlugins :: HscEnv -> IO [ (ModuleName, TcPlugin) ]
 #ifndef GHCI
 loadTcPlugins _ = return []
 #else
@@ -251,8 +250,6 @@ loadTcPlugins hsc_env =
   mapM load [ m | (m, PluginTypeCheck) <- pluginModNames dflags ]
   where
   dflags    = hsc_dflags hsc_env
-
-  getOpts m = [ opt | (m1,opt) <- pluginModNameOpts dflags, m == m1 ]
 
   load mod_name =
     do let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "tcPlugin")
@@ -267,10 +264,7 @@ loadTcPlugins hsc_env =
          Just name ->
 
            do tcPluginTycon <- forceLoadTyCon hsc_env tcPluginTyConName
-              ioTyCon       <- forceLoadTyCon hsc_env ioTyConName
-
-              let ty = mkFunTy (mkListTy stringTy)
-                     $ mkTyConApp ioTyCon [ mkTyConTy tcPluginTycon ]
+              let ty = mkTyConTy tcPluginTycon
               mb_plugin <- getValueSafely hsc_env name ty
               case mb_plugin of
                 Nothing ->
@@ -279,7 +273,7 @@ loadTcPlugins hsc_env =
                         , ptext (sLit "did not have the type")
                         , ppr ty, ptext (sLit "as required")
                         ]
-                Just plugin -> plugin (getOpts mod_name)
+                Just plugin -> return (mod_name, plugin)
 #endif
 \end{code}
 
