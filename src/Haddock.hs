@@ -451,7 +451,7 @@ getPrologue dflags flags =
     [filename] -> withFile filename ReadMode $ \h -> do
       hSetEncoding h utf8
       str <- hGetContents h
-      return . Just $ parseParas dflags str
+      return . Just $! parseParas dflags str
     _ -> throwE "multiple -p/--prologue options"
 
 
