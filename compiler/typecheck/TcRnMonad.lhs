@@ -59,6 +59,8 @@ import Control.Monad
 
 #ifdef GHCI
 import qualified Data.Map as Map
+import {-# SOURCE #-} DynamicLoading ( forceLoadTyCon, getValueSafely
+                                     , lookupRdrNameInModuleForPlugins )
 #endif
 \end{code}
 
@@ -72,37 +74,9 @@ import qualified Data.Map as Map
 
 \begin{code}
 
- 
-withPlugins :: DynFlags -> [(ModuleName,TcPlugin)] -> TcM a -> TcM a
-withPlugins _ [] m = m
-withPlugins dflags plugins m =
-  do (solvers,stops) <- unzip `fmap` mapM startPlugin plugins
-     res <- updGblEnv (\e -> e { tcg_tc_plugins = solvers }) m
-     sequence_ stops
-     return res
-  where
-  getOpts mod_name = [ opt | (m,opt) <- pluginModNameOpts dflags
-                           , m == mod_name ]
-  startPlugin (m,TcPlugin start solve stop) =
-    do s <- start (getOpts m)
-       return (solve s, stop s)
-
-
-
-initTc :: HscEnv
-       -> HscSource
-       -> Bool          -- True <=> retain renamed syntax trees
-       -> Module
-       -> TcM r
-       -> IO (Messages, Maybe r)
-                -- Nothing => error thrown by the thing inside
-                -- (error messages should have been printed already)
-initTc = initTcWithPlugins []
-
-
 
 -- | Setup the initial typechecking environment
-initTcWithPlugins :: [(ModuleName,TcPlugin)]
+initTc :: Bool          -- True <=> load plugins
        -> HscEnv
        -> HscSource
        -> Bool          -- True <=> retain renamed syntax trees
@@ -112,7 +86,7 @@ initTcWithPlugins :: [(ModuleName,TcPlugin)]
                 -- Nothing => error thrown by the thing inside
                 -- (error messages should have been printed already)
 
-initTcWithPlugins tc_plugins hsc_env hsc_src keep_rn_syntax mod do_this
+initTc load_plugins hsc_env hsc_src keep_rn_syntax mod do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
         tvs_var      <- newIORef emptyVarSet ;
         keep_var     <- newIORef emptyNameSet ;
@@ -207,12 +181,12 @@ initTcWithPlugins tc_plugins hsc_env hsc_src keep_rn_syntax mod do_this
                 tcl_untch      = noUntouchables
              } ;
         } ;
-        let { dflags = hsc_dflags hsc_env };
 
         -- OK, here's the business end!
         maybe_res <- initTcRnIf 'a' hsc_env gbl_env lcl_env $
-                     do { r <- tryM $ withPlugins dflags tc_plugins
-                                      do_this
+                     do { r <- tryM $ if load_plugins
+                                         then withTcPlugins hsc_env do_this
+                                         else do_this
                         ; case r of
                           Right res -> return (Just res)
                           Left _    -> return Nothing } ;
@@ -226,7 +200,8 @@ initTcWithPlugins tc_plugins hsc_env hsc_src keep_rn_syntax mod do_this
         -- Collect any error messages
         msgs <- readIORef errs_var ;
 
-        let { final_res | errorsFound dflags msgs = Nothing
+        let { dflags = hsc_dflags hsc_env
+            ; final_res | errorsFound dflags msgs = Nothing
                         | otherwise               = maybe_res } ;
 
         return (msgs, final_res)
@@ -236,15 +211,23 @@ initTcWithPlugins tc_plugins hsc_env hsc_src keep_rn_syntax mod do_this
 initTcInteractive :: HscEnv -> TcM a -> IO (Messages, Maybe a)
 -- Initialise the type checker monad for use in GHCi
 initTcInteractive hsc_env thing_inside
-  = initTc hsc_env HsSrcFile False
+  = initTc True hsc_env HsSrcFile False
            (icInteractiveModule (hsc_IC hsc_env))
            thing_inside
+
+initTcDynamic :: HscEnv -> TcM a -> IO (Messages, Maybe a)
+-- ^ Initialise the type checker for use in in dynamic loading
+initTcDynamic hsc_env thing_inside
+  = initTc False hsc_env HsSrcFile False
+           (icInteractiveModule (hsc_IC hsc_env))
+           thing_inside
+
 
 initTcForLookup :: HscEnv -> TcM a -> IO a
 -- The thing_inside is just going to look up something
 -- in the environment, so we don't need much setup
 initTcForLookup hsc_env thing_inside
-    = do (msgs, m) <- initTc hsc_env HsSrcFile False
+    = do (msgs, m) <- initTc False hsc_env HsSrcFile False
                              (icInteractiveModule (hsc_IC hsc_env))  -- Irrelevant really
                              thing_inside
          case m of
@@ -1388,3 +1371,76 @@ asynchronous exception as a synchronous exception, and the exception will end
 up as the value of the unsafeInterleaveIO thunk (see #8006 for a detailed
 discussion).  We don't currently know a general solution to this problem, but
 we can use uninterruptibleMask_ to avoid the situation. 
+
+
+
+
+********************************************************************************
+
+Type Checker Plugins
+
+********************************************************************************
+
+
+\begin{code}
+withTcPlugins :: HscEnv -> TcM a -> TcM a
+withTcPlugins hsc_env m =
+  do plugins <- liftIO (loadTcPlugins hsc_env)
+     case plugins of
+       [] -> m  -- Common fast case
+       _  -> do (solvers,stops) <- unzip `fmap` mapM startPlugin plugins
+                res <- updGblEnv (\e -> e { tcg_tc_plugins = solvers }) m
+                mapM_ runTcPluginM stops
+                return res
+  where
+  startPlugin (TcPlugin start solve stop, opts) =
+    do s <- runTcPluginM (start opts)
+       return (solve s, stop s)
+
+-- | Perform some IO, typically to inetract with an extrnal tool.
+tcPluginIO :: IO a -> TcPluginM a
+tcPluginIO a = unsafeTcPluginTcM (liftIO a)
+
+-- | Output useful for debugging the compiler.
+tcPluginTrace :: String -> SDoc -> TcPluginM ()
+tcPluginTrace a b = unsafeTcPluginTcM (traceTc a b)
+
+
+loadTcPlugins :: HscEnv -> IO [ (TcPlugin, [String]) ]
+#ifndef GHCI
+loadTcPlugins _ = return []
+#else
+loadTcPlugins hsc_env =
+  mapM load [ m | (m, PluginTypeCheck) <- pluginModNames dflags ]
+  where
+  dflags    = hsc_dflags hsc_env
+  getOpts mod_name = [ opt | (m,opt) <- pluginModNameOpts dflags
+                           , m == mod_name ]
+  load mod_name =
+    do let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "tcPlugin")
+       mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name
+                                                            plugin_rdr_name
+       case mb_name of
+         Nothing ->
+             throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
+                       [ ptext (sLit "The module"), ppr mod_name
+                       , ptext (sLit "did not export the plugin name")
+                       , ppr plugin_rdr_name ])
+         Just name ->
+
+           do tcPluginTycon <- forceLoadTyCon hsc_env tcPluginTyConName
+              let ty = mkTyConTy tcPluginTycon
+              mb_plugin <- getValueSafely hsc_env name ty
+              case mb_plugin of
+                Nothing ->
+                    throwGhcExceptionIO $ CmdLineError $ showSDoc dflags $ hsep
+                        [ ptext (sLit "The value"), ppr name
+                        , ptext (sLit "did not have the type")
+                        , ppr ty, ptext (sLit "as required")
+                        ]
+                Just plugin -> return (plugin, getOpts mod_name)
+#endif
+
+
+\end{code}
+

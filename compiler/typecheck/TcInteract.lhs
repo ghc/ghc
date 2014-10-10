@@ -138,7 +138,7 @@ solveInteract cts
 
 
 -- | Try to make progress using type-checker plugings.
--- The plugin is provided with only with CTyEq and CFunEq constraints.
+-- The plugin is provided only with CTyEq and CFunEq constraints.
 runTcPlugin :: TcPluginSolver -> TcS ()
 runTcPlugin solver =
   do iSet <- getTcSInerts
@@ -159,7 +159,7 @@ runTcPlugin solver =
                   iCans3 = foldl addInertCan iCans2 survived
               setInertCans iCans3
 
-     result <- solver given wanted
+     result <- runTcPluginTcS (solver given wanted)
      case result of
 
        TcPluginContradiction bad_cts ok_cts ->

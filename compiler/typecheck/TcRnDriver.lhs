@@ -94,7 +94,6 @@ import MkId
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy, stringTy )
 import Panic
-import DynamicLoading
 #endif
 
 import FastString
@@ -135,9 +134,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                     Just (L mod_loc mod)  -- The normal case
                         -> (mkModule this_pkg mod, mod_loc) } ;
 
-      ; tc_plugins <- loadTcPlugins hsc_env
-
-      ; res <- initTcWithPlugins tc_plugins hsc_env hsc_src save_rn_syntax this_mod $
+      ; res <- initTc True hsc_env hsc_src save_rn_syntax this_mod $
         tcRnModuleTcRnM hsc_env hsc_src parsedModule pair
       ; return res
       }
@@ -238,44 +235,6 @@ implicitPreludeWarn
   = ptext (sLit "Module `Prelude' implicitly imported")
 \end{code}
 
-
-
-\begin{code}
-
-loadTcPlugins :: HscEnv -> IO [ (ModuleName, TcPlugin) ]
-#ifndef GHCI
-loadTcPlugins _ = return []
-#else
-loadTcPlugins hsc_env =
-  mapM load [ m | (m, PluginTypeCheck) <- pluginModNames dflags ]
-  where
-  dflags    = hsc_dflags hsc_env
-
-  load mod_name =
-    do let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "tcPlugin")
-       mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name
-                                                            plugin_rdr_name
-       case mb_name of
-         Nothing ->
-             throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
-                       [ ptext (sLit "The module"), ppr mod_name
-                       , ptext (sLit "did not export the plugin name")
-                       , ppr plugin_rdr_name ])
-         Just name ->
-
-           do tcPluginTycon <- forceLoadTyCon hsc_env tcPluginTyConName
-              let ty = mkTyConTy tcPluginTycon
-              mb_plugin <- getValueSafely hsc_env name ty
-              case mb_plugin of
-                Nothing ->
-                    throwGhcExceptionIO $ CmdLineError $ showSDoc dflags $ hsep
-                        [ ptext (sLit "The value"), ppr name
-                        , ptext (sLit "did not have the type")
-                        , ppr ty, ptext (sLit "as required")
-                        ]
-                Just plugin -> return (mod_name, plugin)
-#endif
-\end{code}
 
 
 %************************************************************************

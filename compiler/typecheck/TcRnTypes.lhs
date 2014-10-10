@@ -76,6 +76,7 @@ module TcRnTypes(
 
         -- Constraint solver plugins
         TcPlugin(..), TcPluginResult(..), TcPluginSolver,
+        TcPluginM, runTcPluginM, unsafeTcPluginTcM,
 
         -- Pretty printing
         pprEvVarTheta, 
@@ -124,7 +125,7 @@ import ListSetOps
 import FastString
 
 import Data.Set (Set)
-import {-# SOURCE #-} TcSTypes(TcS)   -- for typechecker plugins
+import Control.Monad (ap, liftM)
 
 #ifdef GHCI
 import Data.Map      ( Map )
@@ -1921,17 +1922,43 @@ Constraint Solver Plugins
 
 \begin{code}
 
-type TcPluginSolver = [Ct] -> [Ct] -> TcS TcPluginResult
+type TcPluginSolver = [Ct] -> [Ct] -> TcPluginM TcPluginResult
+
+newtype TcPluginM a = TcPluginM (TcM a)
+
+instance Functor     TcPluginM where
+  fmap = liftM
+
+instance Applicative TcPluginM where
+  pure  = return
+  (<*>) = ap
+
+instance Monad TcPluginM where
+  return x = TcPluginM (return x)
+  fail x   = TcPluginM (fail x)
+  TcPluginM m >>= k =
+    TcPluginM (do a <- m
+                  let TcPluginM m1 = k a
+                  m1)
+
+runTcPluginM :: TcPluginM a -> TcM a
+runTcPluginM (TcPluginM m) = m
+
+-- | This function provides an escape for direct access to
+-- the 'TcM` monad.  It should not be used lightly, and
+-- the provided 'TcPluginM' API should be favoured instead.
+unsafeTcPluginTcM :: TcM a -> TcPluginM a
+unsafeTcPluginTcM = TcPluginM
 
 data TcPlugin = forall s. TcPlugin
-  { tcPluginInit  :: [String] -> TcM s
+  { tcPluginInit  :: [String] -> TcPluginM s
     -- ^ Initialize plugin, when entering type-checker.
 
   , tcPluginSolve :: s -> TcPluginSolver
     -- ^ Solve some constraints.
     -- TODO: WRITE MORE DETAILS ON HOW THIS WORKS.
 
-  , tcPluginStop  :: s -> TcM ()
+  , tcPluginStop  :: s -> TcPluginM ()
    -- ^ Clean up after the plugin, when exiting the type-checker.
   }
 
