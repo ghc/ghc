@@ -1939,8 +1939,8 @@ data TcPluginResult
   = TcPluginContradiction {- inconsistent -} [Ct]
                           {- all others   -} [Ct]
 
-  | TcPluginOk {- solved, non-empty -} [(EvTerm,Ct)]
-               {- not solved -}   [Ct]
+  | TcPluginOk {- solved -}       [(EvTerm,Ct)]
+               {- all others -}   [Ct]
                {- new work -}     [Ct]
 
 \end{code}
