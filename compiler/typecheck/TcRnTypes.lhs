@@ -1938,20 +1938,10 @@ data TcPlugin = forall s. TcPlugin
 data TcPluginResult
   = TcPluginContradiction {- inconsistent -} [Ct]
                           {- all others   -} [Ct]
-    {- ^ There is no model for the constraints.
-    The two lists partition the original constraints,
-    with the first one being the conflicting constraints,
-    and the second the other constraints. -}
 
-  | TcPluginNewWork [Ct]
-    -- ^ New work (facts that will hold in all models)
-
-  | TcPluginSolved {- solved -}       [(EvTerm,Ct)]
-                   {- not solved -}   [Ct]
-    -- ^ We managed to solve some of the constrints.
-    -- The solved constraints (with evidence) are in the first list.
-    -- The unsolved constraints are in the second one.
-
+  | TcPluginOk {- solved, non-empty -} [(EvTerm,Ct)]
+               {- not solved -}   [Ct]
+               {- new work -}     [Ct]
 
 \end{code}
 

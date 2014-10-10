@@ -166,15 +166,14 @@ runTcPlugin solver =
           do restoreICans ok_cts
              mapM_ emitInsoluble bad_cts
 
-       TcPluginNewWork new_cts ->
-          updWorkListTcS (extendWorkListCts new_cts)
-
-       TcPluginSolved solved_cts other_cts ->
-          case solved_cts of
-            [] -> return ()  -- Fast common case
-            _  -> do restoreICans other_cts
-                     let setEv (ev,ct) = setEvBind (ctev_evar (cc_ev ct)) ev
-                     mapM_ setEv solved_cts
+       -- other_cts should include both givens and wanteds.
+       TcPluginOk solved_cts other_cts new_cts ->
+          do case solved_cts of
+               [] -> return ()  -- Fast common case
+               _  -> do restoreICans other_cts
+                        let setEv (ev,ct) = setEvBind (ctev_evar (cc_ev ct)) ev
+                        mapM_ setEv solved_cts
+             updWorkListTcS (extendWorkListCts new_cts)
 
 
 type WorkItem = Ct
