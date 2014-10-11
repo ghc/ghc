@@ -29,9 +29,7 @@ module GHC.Unicode (
     ) where
 
 import GHC.Base
-import GHC.Char
-import GHC.Real        (fromIntegral)
-import Foreign.C.Types (CInt(..))
+import GHC.Char        (chr)
 
 #include "HsBaseConfig.h"
 
@@ -76,7 +74,7 @@ isSpace c               =  c == ' '     ||
                            c == '\f'    ||
                            c == '\v'    ||
                            c == '\xa0'  ||
-                           iswspace (fromIntegral (ord c)) /= 0
+                           iswspace (ord c) /= 0
 
 -- | Selects upper-case or title-case alphabetic Unicode characters (letters).
 -- Title case is used by a small number of letter ligatures like the
@@ -132,48 +130,48 @@ toTitle                 :: Char -> Char
 
 -- Regardless of the O/S and Library, use the functions contained in WCsubst.c
 
-isAlpha    c = iswalpha (fromIntegral (ord c)) /= 0
-isAlphaNum c = iswalnum (fromIntegral (ord c)) /= 0
---isSpace    c = iswspace (fromIntegral (ord c)) /= 0
-isControl  c = iswcntrl (fromIntegral (ord c)) /= 0
-isPrint    c = iswprint (fromIntegral (ord c)) /= 0
-isUpper    c = iswupper (fromIntegral (ord c)) /= 0
-isLower    c = iswlower (fromIntegral (ord c)) /= 0
+isAlpha    c = iswalpha (ord c) /= 0
+isAlphaNum c = iswalnum (ord c) /= 0
+--isSpace    c = iswspace (ord c) /= 0
+isControl  c = iswcntrl (ord c) /= 0
+isPrint    c = iswprint (ord c) /= 0
+isUpper    c = iswupper (ord c) /= 0
+isLower    c = iswlower (ord c) /= 0
 
-toLower c = chr (fromIntegral (towlower (fromIntegral (ord c))))
-toUpper c = chr (fromIntegral (towupper (fromIntegral (ord c))))
-toTitle c = chr (fromIntegral (towtitle (fromIntegral (ord c))))
+toLower c = chr (towlower (ord c))
+toUpper c = chr (towupper (ord c))
+toTitle c = chr (towtitle (ord c))
 
 foreign import ccall unsafe "u_iswalpha"
-  iswalpha :: CInt -> CInt
+  iswalpha :: Int -> Int
 
 foreign import ccall unsafe "u_iswalnum"
-  iswalnum :: CInt -> CInt
+  iswalnum :: Int -> Int
 
 foreign import ccall unsafe "u_iswcntrl"
-  iswcntrl :: CInt -> CInt
+  iswcntrl :: Int -> Int
 
 foreign import ccall unsafe "u_iswspace"
-  iswspace :: CInt -> CInt
+  iswspace :: Int -> Int
 
 foreign import ccall unsafe "u_iswprint"
-  iswprint :: CInt -> CInt
+  iswprint :: Int -> Int
 
 foreign import ccall unsafe "u_iswlower"
-  iswlower :: CInt -> CInt
+  iswlower :: Int -> Int
 
 foreign import ccall unsafe "u_iswupper"
-  iswupper :: CInt -> CInt
+  iswupper :: Int -> Int
 
 foreign import ccall unsafe "u_towlower"
-  towlower :: CInt -> CInt
+  towlower :: Int -> Int
 
 foreign import ccall unsafe "u_towupper"
-  towupper :: CInt -> CInt
+  towupper :: Int -> Int
 
 foreign import ccall unsafe "u_towtitle"
-  towtitle :: CInt -> CInt
+  towtitle :: Int -> Int
 
 foreign import ccall unsafe "u_gencat"
-  wgencat :: CInt -> CInt
+  wgencat :: Int -> Int
 
