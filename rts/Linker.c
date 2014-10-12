@@ -2369,7 +2369,9 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->sections          = NULL;
    oc->proddables        = NULL;
    oc->stable_ptrs       = NULL;
+#if powerpc_HOST_ARCH || x86_64_HOST_ARCH || arm_HOST_ARCH
    oc->symbol_extras     = NULL;
+#endif
 
 #ifndef USE_MMAP
 #ifdef darwin_HOST_OS
