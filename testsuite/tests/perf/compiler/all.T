@@ -171,7 +171,7 @@ test('T4801',
                            # expected value: 58 (amd64/OS X)
                            # 13/01/2014 - 70
            (wordsize(32), 30, 20),
-           (wordsize(64), 55, 20)]),
+           (wordsize(64), 48, 20)]),
             # prev:       50 (amd64/Linux)
             # 19/10/2012: 64 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
