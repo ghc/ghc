@@ -605,6 +605,7 @@ genApply regstatus args =
       nest 4 (vcat [
        text "W_ info;",
        text "W_ arity;",
+       text "unwind Sp = Sp + WDS(" <> int (1+all_args_size) <> text ");",
 
 --    if fast == 1:
 --        print "static void *lbls[] ="

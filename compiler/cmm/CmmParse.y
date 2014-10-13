@@ -325,6 +325,7 @@ import Data.Maybe
         'case'          { L _ (CmmT_case) }
         'default'       { L _ (CmmT_default) }
         'push'          { L _ (CmmT_push) }
+        'unwind'        { L _ (CmmT_unwind) }
         'bits8'         { L _ (CmmT_bits8) }
         'bits16'        { L _ (CmmT_bits16) }
         'bits32'        { L _ (CmmT_bits32) }
@@ -634,6 +635,8 @@ stmt    :: { CmmParse () }
                 { pushStackFrame $3 $5 }
         | 'reserve' expr '=' lreg maybe_body
                 { reserveStackFrame $2 $4 $5 }
+        | 'unwind' GLOBALREG '=' expr
+                { $4 >>= code . emitUnwind $2 }
 
 foreignLabel     :: { CmmParse CmmExpr }
         : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 Nothing ForeignLabelInThisPackage IsFunction))) }

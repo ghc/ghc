@@ -58,6 +58,7 @@ import ghczmprim_GHCziTypes_True_closure;
 INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
     /* explicit stack */
 {
+    unwind Sp = Sp + WDS(1);
     CInt r;
 
     P_ ret;

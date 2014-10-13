@@ -794,8 +794,15 @@ manifestSp dflags stackmaps stack0 sp0 sp_high
     adj_pre_sp  = mapExpDeep (areaToSp dflags sp0            sp_high area_off)
     adj_post_sp = mapExpDeep (areaToSp dflags (sp0 - sp_off) sp_high area_off)
 
+    -- Add unwind pseudo-instructions to document Sp level for debugging
+    add_unwind_info block
+      | gopt Opt_Debug dflags = CmmUnwind Sp sp_unwind : block
+      | otherwise             = block
+    sp_unwind = CmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags)
+
     final_middle = maybeAddSpAdj dflags sp_off $
                    blockFromList $
+                   add_unwind_info $
                    map adj_pre_sp $
                    elimStackStores stack0 stackmaps area_off $
                    middle_pre

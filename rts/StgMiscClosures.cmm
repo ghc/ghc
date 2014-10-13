@@ -47,6 +47,7 @@ INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME,
 
 INFO_TABLE_RET (stg_restore_cccs, RET_SMALL, W_ info_ptr, W_ cccs)
 {
+    unwind Sp = Sp + WDS(2);
 #if defined(PROFILING)
     CCCS = Sp(1);
 #endif

@@ -92,6 +92,7 @@ hash_block block =
 
         hash_node :: CmmNode O x -> Word32
         hash_node n | dont_care n = 0 -- don't care
+        hash_node (CmmUnwind _ e) = hash_e e
         hash_node (CmmAssign r e) = hash_reg r + hash_e e
         hash_node (CmmStore e e') = hash_e e + hash_e e'
         hash_node (CmmUnsafeForeignCall t _ as) = hash_tgt t + hash_list hash_e as
