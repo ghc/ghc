@@ -492,3 +492,21 @@ test('T9020',
            # 2014-09-10:  785871680 post-AMP-cleanup
       ],
       compile,[''])
+
+test('T9675',
+     [ only_ways(['optasm']),
+       compiler_stats_num_field('max_bytes_used',
+          [(wordsize(64), 25822728, 15),
+          # 2014-10-13    25822728
+          ]),
+       compiler_stats_num_field('peak_megabytes_allocated',
+          [(wordsize(64), 62, 1),
+          # 2014-10-13    62
+          ]),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 601441240, 1)
+          # 2014-10-13    601441240
+          ]),
+      ],
+     compile,
+     [''])
