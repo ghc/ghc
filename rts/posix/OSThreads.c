@@ -135,7 +135,9 @@ createOSThread (OSThreadId* pId, char *name,
   int result = pthread_create(pId, NULL, (void *(*)(void *))startProc, param);
   if (!result) {
     pthread_detach(*pId);
+#if HAVE_PTHREAD_SETNAME_NP
     pthread_setname_np(*pId, name);
+#endif
   }
   return result;
 }

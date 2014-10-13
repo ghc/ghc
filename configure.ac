@@ -896,6 +896,22 @@ AC_TRY_LINK_FUNC(printf\$LDBLStub,
             [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
     ])
 
+dnl ** pthread_setname_np is a recent addition to glibc, and OS X has
+dnl    a different single-argument version.
+AC_CHECK_LIB(pthread, pthread_setname_np)
+AC_MSG_CHECKING(for pthread_setname_np)
+AC_TRY_LINK(
+[
+#define _GNU_SOURCE
+#include <pthread.h>
+],
+[pthread_setname_np(pthread_self(), "name");],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE([HAVE_PTHREAD_SETNAME_NP], [1],
+      [Define to 1 if you have the glibc version of pthread_setname_np]),
+    AC_MSG_RESULT(no)
+)
+
 dnl ** check for eventfd which is needed by the I/O manager
 AC_CHECK_HEADERS([sys/eventfd.h])
 AC_CHECK_FUNCS([eventfd])
