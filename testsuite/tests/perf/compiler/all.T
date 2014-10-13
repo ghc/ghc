@@ -499,16 +499,18 @@ test('T9020',
 test('T9675',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used',
-          [(wordsize(64), 18582472, 15),
+          [(wordsize(64), 22220552, 25),
           # 2014-10-13    29596552
           # 2014-10-13    26570896   seq the DmdEnv in seqDmdType as well
           # 2014-10-13    18582472   different machines giving different results..
+          # 2014-10-13    22220552   use the mean
           ]),
        compiler_stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 49, 4),
+          [(wordsize(64), 53, 15),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
           # 2014-10-13    49         different machines giving different results...
+          # 2014-10-13    53         use the mean
           ]),
        compiler_stats_num_field('bytes allocated',
           [(wordsize(64), 544489040, 10)
