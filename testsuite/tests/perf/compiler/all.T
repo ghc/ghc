@@ -171,7 +171,7 @@ test('T4801',
                            # expected value: 58 (amd64/OS X)
                            # 13/01/2014 - 70
            (wordsize(32), 30, 20),
-           (wordsize(64), 62, 20)]),
+           (wordsize(64), 55, 20)]),
             # prev:       50 (amd64/Linux)
             # 19/10/2012: 64 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
@@ -181,6 +181,7 @@ test('T4801',
             #                (^ REASON UNKNOWN!)
             # 2014-09-10: 55 post-AMP-cleanup
             # 2014-10-08: 62 (jumps between 55 and 71 observed -- GC tipping point?)
+            # 2014-10-13: 48 stricter seqDmdType
 
       compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 464872776, 5),
@@ -234,7 +235,7 @@ test('T3064',
             # expected value: 14 (x86/Linux 28-06-2012):
             # 2013-11-13:     18 (x86/Windows, 64bit machine)
             # 2014-01-22:     23 (x86/Linux)
-           (wordsize(64), 42, 20)]),
+           (wordsize(64), 38, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
@@ -244,6 +245,7 @@ test('T3064',
             #  depending on whether the old .hi file exists
             # (amd64/Linux) 2013-09-11: 37; better arity analysis (weird)
             # (amd64/Linux) (09/09/2014): 42, AMP changes (larger interfaces, more loading)
+            # (amd64/Linux) 2014-10-13: 38: Stricter seqDmdType
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 162457940, 10),
@@ -271,7 +273,7 @@ test('T3064',
             #(some date):  5511604
             # 2013-11-13:  7218200 (x86/Windows, 64bit machine)
             # 2014-04-04: 11202304 (x86/Windows, 64bit machine)
-           (wordsize(64), 18744992, 20)]),
+           (wordsize(64), 13251728, 20)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
             # (amd64/Linux)         (14/02/2013):  8687360
@@ -285,6 +287,7 @@ test('T3064',
             # (amd64/Linux)         (09/09/2014): 24357392, AMP changes (larger interfaces, more loading)
             # (amd64/Linux)         (14/09/2014): 16053888, BPP changes (more NoImplicitPrelude in base)
             # (amd64/Linux)         (19/09/2014): 18744992, unknown
+            # (amd64/Linux)         2014-10-13:   13251728, Stricter seqDmdType
 
        only_ways(['normal'])
       ],
@@ -496,14 +499,16 @@ test('T9020',
 test('T9675',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used',
-          [(wordsize(64), 26570896, 15),
+          [(wordsize(64), 18582472, 15),
           # 2014-10-13    29596552
           # 2014-10-13    26570896   seq the DmdEnv in seqDmdType as well
+          # 2014-10-13    18582472   different machines giving different results..
           ]),
        compiler_stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 58, 4),
+          [(wordsize(64), 49, 4),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
+          # 2014-10-13    49         different machines giving different results...
           ]),
        compiler_stats_num_field('bytes allocated',
           [(wordsize(64), 544489040, 10)
