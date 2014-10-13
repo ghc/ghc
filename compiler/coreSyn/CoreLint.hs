@@ -12,6 +12,7 @@ A ``lint'' pass to check for Core correctness
 module CoreLint ( 
     lintCoreBindings, lintUnfolding, 
     lintPassResult, lintInteractiveExpr, lintExpr,
+    lintAnnots,
 
     -- ** Debug output
     CoreLint.showPass, showPassIO, endPass, endPassIO, 
@@ -54,6 +55,7 @@ import FastString
 import Util
 import InstEnv     ( instanceDFunId )
 import OptCoercion ( checkAxInstCo )
+import UniqSupply
 
 import HscTypes
 import DynFlags
@@ -1688,3 +1690,65 @@ dupExtVars :: [[Name]] -> MsgDoc
 dupExtVars vars
   = hang (ptext (sLit "Duplicate top-level variables with the same qualified name"))
        2 (ppr vars)
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Annotation Linting}
+*                                                                      *
+************************************************************************
+-}
+
+-- | This checks whether a pass correctly looks through debug
+-- annotations (@SourceNote@). This works a bit different from other
+-- consistency checks: We check this by running the given task twice,
+-- noting all differences between the results.
+lintAnnots :: SDoc -> (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
+lintAnnots pname pass guts = do
+  -- Run the pass as we normally would
+  dflags <- getDynFlags
+  when (gopt Opt_DoAnnotationLinting dflags) $
+    liftIO $ Err.showPass dflags "Annotation linting - first run"
+  nguts <- pass guts
+  -- If appropriate re-run it without debug annotations to make sure
+  -- that they made no difference.
+  when (gopt Opt_DoAnnotationLinting dflags) $ do
+    liftIO $ Err.showPass dflags "Annotation linting - second run"
+    nguts' <- withoutAnnots pass guts
+    -- Finally compare the resulting bindings
+    liftIO $ Err.showPass dflags "Annotation linting - comparison"
+    let binds = flattenBinds $ mg_binds nguts
+        binds' = flattenBinds $ mg_binds nguts'
+        (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'
+    when (not (null diffs)) $ CoreMonad.putMsg $ vcat
+      [ lint_banner "warning" pname
+      , text "Core changes with annotations:"
+      , withPprStyle defaultDumpStyle $ nest 2 $ vcat diffs
+      ]
+  -- Return actual new guts
+  return nguts
+
+-- | Run the given pass without annotations. This means that we both
+-- remove the @Opt_Debug@ flag from the environment as well as all
+-- annotations from incoming modules.
+withoutAnnots :: (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
+withoutAnnots pass guts = do
+  -- Remove debug flag from environment.
+  dflags <- getDynFlags
+  let removeFlag env = env{hsc_dflags = gopt_unset dflags Opt_Debug}
+      withoutFlag corem =
+        liftIO =<< runCoreM <$> fmap removeFlag getHscEnv <*> getRuleBase <*>
+                                getUniqueSupplyM <*> getModule <*>
+                                getPrintUnqualified <*> pure corem
+  -- Nuke existing ticks in module.
+  -- TODO: Ticks in unfoldings. Maybe change unfolding so it removes
+  -- them in absence of @Opt_Debug@?
+  let nukeTicks = snd . stripTicks (not . tickishIsCode)
+      nukeAnnotsBind :: CoreBind -> CoreBind
+      nukeAnnotsBind bind = case bind of
+        Rec bs     -> Rec $ map (\(b,e) -> (b, nukeTicks e)) bs
+        NonRec b e -> NonRec b $ nukeTicks e
+      nukeAnnotsMod mg@ModGuts{mg_binds=binds}
+        = mg{mg_binds = map nukeAnnotsBind binds}
+  -- Perform pass with all changes applied
+  fmap fst $ withoutFlag $ pass (nukeAnnotsMod guts)

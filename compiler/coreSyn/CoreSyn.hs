@@ -951,6 +951,7 @@ data UnfoldingGuidance
                           -- (where there are the right number of arguments.)
 
   | UnfNever        -- The RHS is big, so don't inline it
+  deriving (Eq)
 
 {-
 Note [Historical note: unfoldings for wrappers]

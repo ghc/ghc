@@ -313,6 +313,7 @@ data GeneralFlag
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting
+   | Opt_DoAnnotationLinting
    | Opt_NoLlvmMangler                 -- hidden flag
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
@@ -2499,6 +2500,8 @@ dynamic_flags = [
       (NoArg (setGeneralFlag Opt_DoCmmLinting))
   , defGhcFlag "dasm-lint"
       (NoArg (setGeneralFlag Opt_DoAsmLinting))
+  , defGhcFlag "dannot-lint"
+      (NoArg (setGeneralFlag Opt_DoAnnotationLinting))
   , defGhcFlag "dshow-passes"            (NoArg (do forceRecompile
                                                     setVerbosity $ Just 2))
   , defGhcFlag "dfaststring-stats"

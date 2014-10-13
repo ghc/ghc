@@ -22,7 +22,8 @@ import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
 import CoreUtils        ( coreBindsSize, coreBindsStats, exprSize,
                           mkTicks, stripTicksTop )
-import CoreLint         ( showPass, endPass, lintPassResult, dumpPassResult )
+import CoreLint         ( showPass, endPass, lintPassResult, dumpPassResult,
+                          lintAnnots )
 import Simplify         ( simplTopBinds, simplExpr )
 import SimplUtils       ( simplEnvForGHCi, activeRule )
 import SimplEnv
@@ -343,7 +344,7 @@ runCorePasses passes guts
     do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
     do_pass guts pass
        = do { showPass pass
-            ; guts' <- doCorePass pass guts
+            ; guts' <- lintAnnots (ppr pass) (doCorePass pass) guts
             ; endPass pass (mg_binds guts') (mg_rules guts')
             ; return guts' }
 

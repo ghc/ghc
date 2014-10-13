@@ -161,6 +161,7 @@ data OneShotInfo
   | ProbOneShot   -- ^ The lambda is probably applied at most once
                   -- See Note [Computing one-shot info, and ProbOneShot] in OccurAnl
   | OneShotLam    -- ^ The lambda is applied at most once.
+  deriving (Eq)
 
 -- | It is always safe to assume that an 'Id' has no lambda-bound variable information
 noOneShotInfo :: OneShotInfo
@@ -631,6 +632,8 @@ data OccInfo
   -- marks whether it is only a loop breaker due to a reference in a rule
   | IAmALoopBreaker     -- Note [LoopBreaker OccInfo]
         !RulesOnly
+
+  deriving (Eq)
 
 type RulesOnly = Bool
 
