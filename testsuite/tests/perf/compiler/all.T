@@ -496,16 +496,16 @@ test('T9020',
 test('T9675',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used',
-          [(wordsize(64), 25822728, 15),
-          # 2014-10-13    25822728
+          [(wordsize(64), 29596552, 15),
+          # 2014-10-13    29596552
           ]),
        compiler_stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 62, 1),
-          # 2014-10-13    62
+          [(wordsize(64), 66, 4),
+          # 2014-10-13    66
           ]),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 601441240, 1)
-          # 2014-10-13    601441240
+          [(wordsize(64), 544489040, 10)
+          # 2014-10-13    544489040
           ]),
       ],
      compile,
