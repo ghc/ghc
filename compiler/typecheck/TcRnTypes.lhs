@@ -1000,7 +1000,7 @@ We can't require *equal* kinds, because
 Note [Kind orientation for CFunEqCan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For (F xis ~ rhs) we require that kind(lhs) is a subkind of kind(rhs).
-This reallly only maters when rhs is an Open type variable (since only type
+This really only maters when rhs is an Open type variable (since only type
 variables have Open kinds):
    F ty ~ (a:Open)
 which can happen, say, from

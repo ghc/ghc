@@ -1471,7 +1471,7 @@ So for the above example we generate:
 
   $cop2 = <blah>
 
-Note carefullly:
+Note carefully:
 
 * We *copy* any INLINE pragma from the default method $dmop1 to the
   instance $cop1.  Otherwise we'll just inline the former in the

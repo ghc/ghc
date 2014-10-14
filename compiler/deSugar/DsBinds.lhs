@@ -331,7 +331,7 @@ Notice (a) g has a different number of type variables to f, so we must
              variables of the particular RHS.  Tiresome.
 
 Why got to this trouble?  It's a common case, and it removes the
-quadratic-sized tuple desugaring.  Less clutter, hopefullly faster
+quadratic-sized tuple desugaring.  Less clutter, hopefully faster
 compilation, especially in a case where there are a *lot* of
 bindings.
 

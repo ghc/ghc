@@ -519,7 +519,7 @@ There is another wrinkle.  With TH and -XDataKinds, consider
 After splicing, but before renaming we get this:
    data Nat_77{tc} = Zero_78{d}
    data T_79{tc} = MkT_80{d} (Proxy 'Zero_78{tc})  |] )
-THe occurrence of 'Zero in the data type for T has the right unique,
+The occurrence of 'Zero in the data type for T has the right unique,
 but it has a TcClsName name-space in its OccName.  (This is set by
 the ctxt_ns argument of Convert.thRdrName.)  When we check that is
 in scope in the GlobalRdrEnv, we need to look up the DataName namespace

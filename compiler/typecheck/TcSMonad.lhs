@@ -396,7 +396,7 @@ Type-family equations, of form (ev : F tys ~ ty), live in four places
   * The inert_solved_funeqs.  These are all "solved" goals (see Note [Solved constraints]),
     the result of using a top-level type-family instance.
 
-  * THe inert_funeqs are un-solved but fully processed and in the InertCans.
+  * The inert_funeqs are un-solved but fully processed and in the InertCans.
 
 
 \begin{code}

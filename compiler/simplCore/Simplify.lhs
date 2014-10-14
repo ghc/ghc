@@ -316,7 +316,7 @@ Nota bene:
 
     2. It assumes that the binder type is lifted.
 
-    3. It does not check for pre-inline-unconditionallly;
+    3. It does not check for pre-inline-unconditionally;
        that should have been done already.
 
 \begin{code}
