@@ -297,6 +297,10 @@ initCapability( Capability *cap, nat i )
     cap->r.rCCCS = NULL;
 #endif
 
+    // cap->r.rCurrentTSO is charged for calls to allocate(), so we
+    // don't want it set when not running a Haskell thread.
+    cap->r.rCurrentTSO = NULL;
+
     traceCapCreate(cap);
     traceCapsetAssignCap(CAPSET_OSPROCESS_DEFAULT, i);
     traceCapsetAssignCap(CAPSET_CLOCKDOMAIN_DEFAULT, i);

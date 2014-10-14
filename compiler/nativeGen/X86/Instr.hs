@@ -196,6 +196,7 @@ data Instr
         | ADD         Size Operand Operand
         | ADC         Size Operand Operand
         | SUB         Size Operand Operand
+        | SBB         Size Operand Operand
 
         | MUL         Size Operand Operand
         | MUL2        Size Operand              -- %edx:%eax = operand * %rax
@@ -365,6 +366,7 @@ x86_regUsageOfInstr platform instr
     ADD    _ src dst    -> usageRM src dst
     ADC    _ src dst    -> usageRM src dst
     SUB    _ src dst    -> usageRM src dst
+    SBB    _ src dst    -> usageRM src dst
     IMUL   _ src dst    -> usageRM src dst
     IMUL2  _ src       -> mkRU (eax:use_R src []) [eax,edx]
     MUL    _ src dst    -> usageRM src dst
@@ -543,6 +545,7 @@ x86_patchRegsOfInstr instr env
     ADD  sz src dst     -> patch2 (ADD  sz) src dst
     ADC  sz src dst     -> patch2 (ADC  sz) src dst
     SUB  sz src dst     -> patch2 (SUB  sz) src dst
+    SBB  sz src dst     -> patch2 (SBB  sz) src dst
     IMUL sz src dst     -> patch2 (IMUL sz) src dst
     IMUL2 sz src        -> patch1 (IMUL2 sz) src
     MUL sz src dst      -> patch2 (MUL sz) src dst

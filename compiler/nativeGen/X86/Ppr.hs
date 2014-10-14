@@ -570,11 +570,10 @@ pprInstr (ADD size (OpImm (ImmInt (-1))) dst)
   = pprSizeOp (sLit "dec") size dst
 pprInstr (ADD size (OpImm (ImmInt 1)) dst)
   = pprSizeOp (sLit "inc") size dst
-pprInstr (ADD size src dst)
-  = pprSizeOpOp (sLit "add") size src dst
-pprInstr (ADC size src dst)
-  = pprSizeOpOp (sLit "adc") size src dst
+pprInstr (ADD size src dst) = pprSizeOpOp (sLit "add") size src dst
+pprInstr (ADC size src dst) = pprSizeOpOp (sLit "adc") size src dst
 pprInstr (SUB size src dst) = pprSizeOpOp (sLit "sub") size src dst
+pprInstr (SBB size src dst) = pprSizeOpOp (sLit "sbb") size src dst
 pprInstr (IMUL size op1 op2) = pprSizeOpOp (sLit "imul") size op1 op2
 
 pprInstr (ADD_CC size src dst)

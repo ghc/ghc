@@ -48,6 +48,7 @@ module Control.Exception (
         NestedAtomically(..),
         BlockedIndefinitelyOnMVar(..),
         BlockedIndefinitelyOnSTM(..),
+        AllocationLimitExceeded(..),
         Deadlock(..),
         NoMethodError(..),
         PatternMatchFail(..),
