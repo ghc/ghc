@@ -863,5 +863,6 @@ cgTick tick
        ; case tick of
            ProfNote   cc t p -> emitSetCCC cc t p
            HpcTick    m n    -> emit (mkTickBox dflags m n)
+           SourceNote s n    -> emitTick $ SourceNote s n
            _other            -> return () -- ignore
        }

@@ -102,6 +102,7 @@ stmtToInstrs :: CmmNode e x -> LlvmM StmtData
 stmtToInstrs stmt = case stmt of
 
     CmmComment _         -> return (nilOL, []) -- nuke comments
+    CmmTick    _         -> return (nilOL, [])
 
     CmmAssign reg src    -> genAssign reg src
     CmmStore addr src    -> genStore addr src

@@ -13,8 +13,10 @@ import Prelude hiding (iterate, succ, unzip, zip)
 
 import Hoopl hiding (ChangeFlag)
 import Data.Bits
+import Data.Maybe (fromJust)
 import qualified Data.List as List
 import Data.Word
+import qualified Data.Map as M
 import Outputable
 import UniqFM
 
@@ -37,7 +39,7 @@ my_trace = if False then pprTrace else \_ _ a -> a
 
 -- TODO: Use optimization fuel
 elimCommonBlocks :: CmmGraph -> CmmGraph
-elimCommonBlocks g = replaceLabels env g
+elimCommonBlocks g = replaceLabels env $ copyTicks env g
   where
      env = iterate hashed_blocks mapEmpty
      hashed_blocks = map (\b -> (hash_block b, b)) $ postorderDfs g
@@ -89,7 +91,7 @@ hash_block block =
         hash_lst m h = hash_node m + h `shiftL` 1
 
         hash_node :: CmmNode O x -> Word32
-        hash_node (CmmComment _) = 0 -- don't care
+        hash_node n | dont_care n = 0 -- don't care
         hash_node (CmmAssign r e) = hash_reg r + hash_e e
         hash_node (CmmStore e e') = hash_e e + hash_e e'
         hash_node (CmmUnsafeForeignCall t _ as) = hash_tgt t + hash_list hash_e as
@@ -98,6 +100,7 @@ hash_block block =
         hash_node (CmmCall e _ _ _ _ _) = hash_e e
         hash_node (CmmForeignCall t _ _ _ _ _ _) = hash_tgt t
         hash_node (CmmSwitch e _) = hash_e e
+        hash_node _ = error "hash_node: unknown Cmm node!"
 
         hash_reg :: CmmReg -> Word32
         hash_reg   (CmmLocal _) = 117
@@ -127,6 +130,13 @@ hash_block block =
         hash_list f = foldl (\z x -> f x + z) (0::Word32)
 
         cvt = fromInteger . toInteger
+
+-- | Ignore these node types for equality
+dont_care :: CmmNode O x -> Bool
+dont_care CmmComment {}  = True
+dont_care CmmTick {}     = True
+dont_care _other         = False
+
 -- Utilities: equality and substitution on the graph.
 
 -- Given a map ``subst'' from BlockID -> BlockID, we define equality.
@@ -143,7 +153,6 @@ lookupBid subst bid = case mapLookup bid subst of
 --
 eqMiddleWith :: (BlockId -> BlockId -> Bool)
              -> CmmNode O O -> CmmNode O O -> Bool
-eqMiddleWith _ (CmmComment _) (CmmComment _) = True
 eqMiddleWith eqBid (CmmAssign r1 e1) (CmmAssign r2 e2)
   = r1 == r2 && eqExprWith eqBid e1 e2
 eqMiddleWith eqBid (CmmStore l1 r1) (CmmStore l2 r2)
@@ -178,10 +187,12 @@ eqExprWith eqBid = eq
 -- IDs to block IDs.
 eqBlockBodyWith :: (BlockId -> BlockId -> Bool) -> CmmBlock -> CmmBlock -> Bool
 eqBlockBodyWith eqBid block block'
-  = and (zipWith (eqMiddleWith eqBid) (blockToList m) (blockToList m')) &&
+  = and (zipWith (eqMiddleWith eqBid) nodes nodes') &&
     eqLastWith eqBid l l'
   where (_,m,l)   = blockSplit block
+        nodes     = filter (not . dont_care) (blockToList m)
         (_,m',l') = blockSplit block'
+        nodes'    = filter (not . dont_care) (blockToList m')
 
 
 
@@ -202,3 +213,19 @@ eqMaybeWith :: (a -> b -> Bool) -> Maybe a -> Maybe b -> Bool
 eqMaybeWith eltEq (Just e) (Just e') = eltEq e e'
 eqMaybeWith _ Nothing Nothing = True
 eqMaybeWith _ _ _ = False
+
+-- | Given a block map, ensure that all "target" blocks are covered by
+-- the same ticks as the respective "source" blocks. This not only
+-- means copying ticks, but also adjusting tick scopes where
+-- necessary.
+copyTicks :: BlockEnv BlockId -> CmmGraph -> CmmGraph
+copyTicks env g
+  | mapNull env = g
+  | otherwise   = ofBlockMap (g_entry g) $ mapMap f blockMap
+  where blockMap = toBlockMap g
+        revEnv = mapFoldWithKey insertRev M.empty env
+        insertRev k x = M.insertWith (const (k:)) x [k]
+        f block = case M.lookup (entryLabel block) revEnv of
+          Nothing -> block
+          Just ls -> let findTicks l = blockTicks $ fromJust $ mapLookup l blockMap
+                     in annotateBlock (concatMap findTicks ls) block

@@ -20,6 +20,7 @@ module StgCmmMonad (
         emit, emitDecl, emitProc,
         emitProcWithConvention, emitProcWithStackFrame,
         emitOutOfLine, emitAssign, emitStore, emitComment,
+        emitTick,
 
         getCmm, aGraphToGraph,
         getCodeR, getCode, getHeapUsage,
@@ -682,6 +683,9 @@ emitComment s = emitCgStmt (CgStmt (CmmComment s))
 #else
 emitComment _ = return ()
 #endif
+
+emitTick :: CmmTickish -> FCode ()
+emitTick = emitCgStmt . CgStmt . CmmTick
 
 emitAssign :: CmmReg  -> CmmExpr -> FCode ()
 emitAssign l r = emitCgStmt (CgStmt (CmmAssign l r))

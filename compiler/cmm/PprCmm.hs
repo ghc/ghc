@@ -43,11 +43,13 @@ import BlockId ()
 import CLabel
 import Cmm
 import CmmUtils
+import DynFlags
 import FastString
 import Outputable
 import PprCmmDecl
 import PprCmmExpr
 import Util
+import PprCore ()
 
 import BasicTypes
 import Compiler.Hoopl
@@ -179,12 +181,17 @@ pprNode :: CmmNode e x -> SDoc
 pprNode node = pp_node <+> pp_debug
   where
     pp_node :: SDoc
-    pp_node = case node of
+    pp_node = sdocWithDynFlags $ \dflags -> case node of
       -- label:
       CmmEntry id -> ppr id <> colon
 
       -- // text
       CmmComment s -> text "//" <+> ftext s
+
+      -- //tick bla<...>
+      CmmTick t -> if gopt Opt_PprShowTicks dflags
+                   then ptext (sLit "//tick") <+> ppr t
+                   else empty
 
       -- reg = expr;
       CmmAssign reg expr -> ppr reg <+> equals <+> ppr expr <> semi
@@ -268,6 +275,7 @@ pprNode node = pp_node <+> pp_debug
       else case node of
              CmmEntry {}             -> empty -- Looks terrible with text "  // CmmEntry"
              CmmComment {}           -> empty -- Looks also terrible with text "  // CmmComment"
+             CmmTick {}              -> empty
              CmmAssign {}            -> text "  // CmmAssign"
              CmmStore {}             -> text "  // CmmStore"
              CmmUnsafeForeignCall {} -> text "  // CmmUnsafeForeignCall"

@@ -125,6 +125,7 @@ stmtToInstrs stmt = do
   dflags <- getDynFlags
   case stmt of
     CmmComment s   -> return (unitOL (COMMENT s))
+    CmmTick {}     -> return nilOL
 
     CmmAssign reg src
       | isFloatType ty -> assignReg_FltCode size reg src

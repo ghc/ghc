@@ -494,7 +494,6 @@ data Tickish id =
 
   deriving (Eq, Ord, Data, Typeable)
 
-
 -- | A "counting tick" (where tickishCounts is True) is one that
 -- counts evaluations in some way.  We cannot discard a counting tick,
 -- and the compiler should preserve the number of counting ticks as
