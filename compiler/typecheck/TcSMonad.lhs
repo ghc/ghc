@@ -145,7 +145,7 @@ import Maybes ( orElse, catMaybes, firstJusts )
 import Pair ( pSnd )
 
 import TrieMap
-import Control.Monad( ap, when )
+import Control.Monad( ap, when, unless )
 import MonadUtils
 import Data.IORef
 
@@ -664,84 +664,105 @@ getInertUnsolved
            , inert_irreds = iirreds, inert_dicts = idicts
            , inert_insols = iinsols } <- getInertCans
 
-      ; let unsolved_eqs = foldVarEnv add_if_unsolved_eq [] tv_eqs
-      ; unsolved_eqs <- foldrM unflatten_eq [] unsolved_eqs
-           -- Unflatten  fuv ~ ty first, becuause they are
-           -- much more informative
+      ; traceTcS "Unflattening" $ braces $ ppr inerts
       ; dflags <- getDynFlags
-      ; unsolved_fun_eqs
-          <- foldFunEqs (unflatten_funeq dflags) fun_eqs (return emptyCts)
+      ; untch  <- getUntouchables
 
-      ; let unsolved_irreds = Bag.filterBag is_unsolved  iirreds
-            unsolved_dicts  = foldDicts  add_if_unsolved idicts  emptyCts
-            unsolved_flats  = listToBag unsolved_eqs `unionBags`
-                              unsolved_irreds `unionBags`
-                              unsolved_dicts `unionBags` unsolved_fun_eqs
+      ; unsolved_fun_eqs <- foldFunEqs (unflatten_funeq dflags) fun_eqs (return [])
+      ; unsolved_irreds  <- foldrBagM  (unflatten_irred dflags untch) emptyCts iirreds
+      ; unsolved_fun_eqs <- mapM finalise_funeq unsolved_fun_eqs
 
-      ; unsolved_flats <- wrapTcS (TcM.zonkFlats unsolved_flats)
-      ; traceTcS "unflattening" $ braces $ vcat
-           [ ptext (sLit "Inerts = ") <+> ppr inerts
-           , ptext (sLit "Flats = ") <+> ppr unsolved_flats
+      ; let unsolved_eqs    = foldVarEnv add_if_unsolveds emptyCts tv_eqs
+            unsolved_dicts  = foldDicts  add_if_unsolved  idicts emptyCts
+
+            unsolved_flats  = unsolved_eqs      `unionBags`
+                              unsolved_irreds   `unionBags`
+                              unsolved_dicts    `unionBags` 
+                              listToBag unsolved_fun_eqs
+
+      ; traceTcS "Unflattening done" $ braces $ vcat
+           [ ptext (sLit "Flats = ") <+> ppr unsolved_flats
            , ptext (sLit "Insols = ") <+> ppr iinsols ]
       ; return ( unsolved_flats, iinsols ) }
-        -- It would be perfectly OK to zonk the insolubles too,
-        -- but it'll happen anyway before error reporting
   where
-    unflatten_funeq :: DynFlags -> Ct -> TcS Cts -> TcS Cts
-    unflatten_funeq dflags (CFunEqCan { cc_fun = tc, cc_tyargs = xis
-                                      , cc_fsk = fsk, cc_ev = ev }) do_rest
+    unflatten_funeq :: DynFlags -> Ct -> TcS [Ct] -> TcS [Ct]
+    unflatten_funeq dflags ct@(CFunEqCan { cc_fun = tc, cc_tyargs = xis
+                                         , cc_fsk = fsk, cc_ev = ev }) do_rest
       | isGiven ev -- tv should be a FlatSkol; zonking will eliminate it
       = do_rest
 
       | otherwise  -- A flatten meta-tv; we now fix its final
                    -- value, and then zonking will eliminate it
-      = ASSERT( isWanted ev )  -- CFunEqCans are never Derived
-        do { is_filled <- wrapTcS (TcM.isFilledMetaTyVar fsk)
-           ; if is_filled then
-               do { fun_eqs <- do_rest
-                  ; return (fun_eqs `extendCts` mkNonCanonical ev) }
-             else
-        do { fn_app <- wrapTcS (TcM.zonkTcType (mkTyConApp tc xis))
-           ; case occurCheckExpand dflags fsk fn_app of
-               OC_OK fn_app'
-                 ->    -- Normal case: unflatten
-                    do { let evterm = EvCoercion (mkTcNomReflCo fn_app')
-                             evvar  = ctEvId ev
-                       ; setEvBind evvar evterm
-                       ; wrapTcS (TcM.writeMetaTyVar fsk fn_app')
-                             -- Write directly into the mutable tyvar
-                             -- Flatten meta-vars are born and die locally
-                       ; do_rest }
-
-               -- Occurs check; don't unflatten, instead turn it into a NonCanonical
-               _ -> do { tv_ty <- newFlexiTcSTy (tyVarKind fsk)
-                       ; wrapTcS (TcM.writeMetaTyVar fsk tv_ty)
-                       ; fun_eqs <- do_rest
-                       ; return (fun_eqs `extendCts` mkNonCanonical ev) }
-          } }
+      = do { filled <- tryFill dflags fsk (mkTyConApp tc xis) ev
+           ; rest   <- do_rest
+           ; return (if filled then rest 
+                               else ct:rest) }
     unflatten_funeq _ other_ct _
       = pprPanic "unflatten_funeq" (ppr other_ct)
 
-    unflatten_eq :: Ct -> [Ct] -> TcS [Ct]
-    unflatten_eq (CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs }) rest
-      | isFmvTyVar tv
-      = do { when (isWanted ev) $
-             setEvBind (ctEvId ev) (EvCoercion (mkTcNomReflCo rhs))
-           ; wrapTcS (TcM.writeMetaTyVar tv rhs)
-           ; return rest }
-    unflatten_eq ct rest = return (ct:rest)
+    finalise_funeq :: Ct -> TcS Ct
+    finalise_funeq (CFunEqCan { cc_fsk = fsk, cc_ev = ev })
+      = do { is_filled <- wrapTcS (TcM.isFilledMetaTyVar fsk)
+           ; unless is_filled $
+             do { tv_ty <- newFlexiTcSTy (tyVarKind fsk)
+                ; wrapTcS (TcM.writeMetaTyVar fsk tv_ty) }
+           ; return (mkNonCanonical ev) }  
+    finalise_funeq ct = pprPanic "finalise_funeq" (ppr ct)
+                
+    unflatten_irred :: DynFlags -> Untouchables -> Ct -> Cts -> TcS Cts
+    unflatten_irred dflags untch ct@(CIrredEvCan { cc_ev = ev }) rest
+      | not (isWanted ev)   -- Discard givens
+      = return rest 
+
+      | EqPred ty1 ty2 <- classifyPredType (ctEvPred ev)
+      = do { lhs_elim <- try_fill ty1 ty2
+           ; if lhs_elim then return rest else
+        do { rhs_elim <- try_fill ty2 ty1
+           ; if rhs_elim then return rest else 
+             return (rest `extendCts` ct) } }
+
+      | otherwise 
+      = return (rest `extendCts` ct)
+      where
+        try_fill ty1 ty2
+          | Just tv1 <- tcGetTyVar_maybe ty1
+          , isTouchableOrFmv untch tv1
+          , typeKind ty1 `isSubKind` tyVarKind tv1
+          = tryFill dflags tv1 ty2 ev
+          | otherwise
+          = return False
+             
+    unflatten_irred _ _ ct _ = pprPanic "unflatten_irred" (ppr ct)
 
     add_if_unsolved :: Ct -> Cts -> Cts
     add_if_unsolved ct cts | is_unsolved ct = cts `extendCts` ct
                            | otherwise      = cts
 
-    add_if_unsolved_eq :: [Ct] -> [Ct] -> [Ct]
-    add_if_unsolved_eq eqs cts
-       | (eq1:_) <- eqs
-       , is_unsolved eq1 = eqs ++ cts
-       | otherwise       = cts
+    add_if_unsolveds :: [Ct] -> Cts -> Cts
+    add_if_unsolveds eqs cts = foldr add_if_unsolved cts eqs
 
     is_unsolved ct = not (isGivenCt ct)   -- Wanted or Derived
+
+tryFill :: DynFlags -> TcTyVar -> TcType -> CtEvidence -> TcS Bool
+-- (tryFill tv rhs ev) sees if 'tv' is an un-filled MetaTv
+-- If so, and if tv does not appear in 'rhs', set tv := rhs
+-- bind the evidence (which should be a CtWanted) to Refl<rhs>
+-- and return True.  Otherwise return False
+tryFill dflags tv rhs ev
+  = ASSERT( isWanted ev )  -- CFunEqCans are never Derived
+    do { is_filled <- wrapTcS (TcM.isFilledMetaTyVar tv)
+       ; if is_filled then return False else
+    do { rhs' <- wrapTcS (TcM.zonkTcType rhs)
+       ; case occurCheckExpand dflags tv rhs' of
+           OC_OK rhs''    -- Normal case: fill the tyvar
+             -> do { setEvBind (ctEvId ev) (EvCoercion (mkTcNomReflCo rhs''))
+                   ; wrapTcS (TcM.writeMetaTyVar tv rhs'')
+                         -- Write directly into the mutable tyvar
+                         -- Flatten meta-vars are born and die locally
+                   ; return True }
+
+           _ ->  -- Occurs check
+                 return False } }
 
 getInertGivens :: Untouchables     -- Untouchables of this implication
                -> [TcTyVar]        -- Skolems of this implication
@@ -785,6 +806,7 @@ getInertGivens untch skol_tvs
           FlatSkol {} -> not (tv `elemVarSet` local_fsks)
           _           -> False
 \end{code}
+
 
 Note [Let-bound skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~

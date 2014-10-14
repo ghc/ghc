@@ -30,6 +30,33 @@ ToDo:
 
 * Consider individual data tpyes for CFunEqCan etc
 
+-----------------
+Unflattening
+~~~~~~~~~~~~
+
+    [W] G a ~ Int
+    [W] F (G a) ~ G a
+
+do not want to end up with 
+    [W} F Int ~ Int
+because that might actually hold!  Better to end up with the two above
+unsolved constraints.  The flat form will be
+
+    G a ~ fuv1     (CFunEqCan)
+    F fuv1 ~ fuv2  (CFunEqCan)
+    fuv1 ~ Int     (CTyEqCan)
+    fuv1 ~ fuv2    (CTyEqCan)
+
+Flatten using the fun-eqs first.
+
+
+Another example:
+    [W] F a ~ alpha
+flattens to
+    [W] F a ~ fuv   (CFunEqCan)
+    [W] fuv ~ alpha (CTyEqCan)    
+We must solve both!
+
 ----------------------
 Outer given is rewritten by an inner given, then there must have been an inner given equality, hence the “given-eq” flag will be true anyway.
 
@@ -61,6 +88,57 @@ We want: alpha := beta (which might unlock something else).  So rewriting wanted
 
 
 ----------------------------------------
+indexed-types/should_compile/T44984
+
+  [W] H (F Bool) ~ H alpha
+  [W] alpha ~ F Bool
+-->
+  F Bool  ~ fuv0
+  H fuv0  ~ fuv1
+  H alpha ~ fuv2
+
+  fuv1 ~ fuv2
+  fuv0 ~ alpha
+
+flatten
+~~~~~~~
+  fuv0  := F Bool
+  fuv1  := H (F Bool)
+  fuv2  := H alpha
+  alpha := F Bool
+plus
+  fuv1 ~ fuv2
+
+But these two are equal under the above assumptions.
+Solve by Refl.
+
+
+--- under plan B, namely solve fuv1:=fuv2 eagerly ---
+  [W] H (F Bool) ~ H alpha
+  [W] alpha ~ F Bool
+-->
+  F Bool  ~ fuv0
+  H fuv0  ~ fuv1
+  H alpha ~ fuv2
+
+  fuv1 ~ fuv2
+  fuv0 ~ alpha
+-->
+  F Bool  ~ fuv0   
+  H fuv0  ~ fuv1
+  H alpha ~ fuv2    fuv2 := fuv1
+
+  fuv0 ~ alpha
+
+flatten
+  fuv0 := F Bool
+  fuv1 := H fuv0 = H (F Bool)
+  retain   H alpha ~ fuv2
+    because fuv2 has been filled
+  alpha := F Bool
+
+
+----------------------------
 indexed-types/should_failt/T4179
 
 after solving
@@ -123,6 +201,11 @@ Conclusion: unflatten before solving nested implications
 ----------------------------------------
 indexed_types/should_fail/T8227:
 
+Why using a different can-rewrite rule in CFunEqCan heads
+does not work.
+
+Assuming NOT rewriting wanteds with wanteds
+
    Inert: [W] fsk_aBh ~ fuv_aBk -> fuv_aBk
           [W] fuv_aBk ~ fsk_aBh
 
@@ -148,6 +231,9 @@ Conclusion: Don't make canRewrite context specific; instead use
 ----------------------------------------
 IndTypesPerfMerge is interesting
 
+From the ambiguity check for 
+  f :: (F a ~ a) => a
+we get:
       [G] F a ~ a
       [W] F alpha ~ alpha, alpha ~ a
 
@@ -178,6 +264,23 @@ For foo we get
 Flattening
    [W] G a ~ fuv, Eq fuv, fuv ~ Bool
 We can't simplify away the Eq Bool unless we substitute for 
+Maybe that doesn't matter: we would still be left with unsolved
+G a ~ Bool.
+
+--------------------------
+Trac #9318 has a very simple program leading to
+
+  [W] F Int ~ Int
+  [W] F Int ~ Bool
+
+We don't want to get "Error Int~Bool".  But if fuv's can rewrite
+wanteds, we will
+
+  [W] fuv ~ Int
+  [W] fuv ~ Bool
+--->
+  [W] Int ~ Bool
+
 
 The new flattening story
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -454,4 +557,25 @@ refl stuff.)
 
 
 
+
+-------------------------------
+Why is it right to treat fuv's differently to ordinary univ vars?
+
+  f :: forall a. a -> a -> Bool
+  g :: F Int -> F Int -> Bool
+
+Consider
+  f (x:Int) (y:Bool)
+This gives alpha~Int, alpha~Bool.  There is an inconsistency,
+but really only one error.  SherLoc may tell you which location
+is most likely, based on other occurrences of alpha.
+
+Consider
+  g (x:Int) (y:Bool)
+Here we get (F Int ~ Int, F Int ~ Bool), which flattens to
+  (fuv ~ Int, fuv ~ Bool)
+But there are really TWO separate errors.  We must not complain
+about Int~Bool.  Moreover these two errors could arise in entirely
+unrelated parts of the code.  (In the alpha case, there must be
+*some* connection (eg v:alpha in common envt).)
 

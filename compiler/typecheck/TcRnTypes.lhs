@@ -1457,7 +1457,7 @@ eqCanRewrite :: TcTyVar -> CtEvidence -> CtEvidence -> Bool
 -- See Note [canRewrite and canRewriteOrSame]
 eqCanRewrite _  (CtGiven {})   _              = True
 eqCanRewrite _  (CtWanted {})  (CtDerived {}) = True
-eqCanRewrite tv (CtWanted {})  (CtWanted {})  = isMetaTyVar tv
+eqCanRewrite tv (CtWanted {})  (CtWanted {})  = not (isFmvTyVar tv) && isMetaTyVar tv
 eqCanRewrite _  (CtDerived {}) (CtDerived {}) = True  -- Derived can't solve wanted/given
 eqCanRewrite _ _ _ = False             -- No evidence for a derived, anyway
 

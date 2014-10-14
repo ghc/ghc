@@ -39,7 +39,7 @@ module TcType (
   isFlexi, isIndirect, isRuntimeUnkSkol,
   isTypeVar, isKindVar,
   metaTyVarUntouchables, setMetaTyVarUntouchables, metaTyVarUntouchables_maybe,
-  isTouchableMetaTyVar, isTouchableOrUfsk,
+  isTouchableMetaTyVar, isTouchableOrFmv,
   isFloatedTouchableMetaTyVar,
 
   --------------------------------
@@ -588,8 +588,8 @@ exactTyVarsOfTypes = mapUnionVarSet exactTyVarsOfType
 %************************************************************************
 
 \begin{code}
-isTouchableOrUfsk :: Untouchables -> TcTyVar -> Bool
-isTouchableOrUfsk ctxt_untch tv
+isTouchableOrFmv :: Untouchables -> TcTyVar -> Bool
+isTouchableOrFmv ctxt_untch tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
       MetaTv { mtv_untch = tv_untch, mtv_info = info }

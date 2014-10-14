@@ -1155,6 +1155,9 @@ canEqTyVar2 dflags ev swapped tv1 xi2 co2
        ; case mb of
             Stop ev s -> return (Stop ev s)
             ContinueWith new_ev 
+                | isFmvTyVar tv1
+                -> continueWith (CIrredEvCan { cc_ev = new_ev })
+
                 | k2 `isSubKind` k1
                 -- Establish CTyEqCan kind invariant
                 -- Reorientation has done its best, but the kinds might
@@ -1196,34 +1199,37 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
          setEvBind (ctev_evar ev) (EvCoercion (maybeSym swapped co2))
        ; stopWith ev "Equal tyvars" }  
 
+  | isFmvTyVar tv1     = irred_fmv swapped            xi1 xi2 co1 co2
+  | isFmvTyVar tv1     = irred_fmv (flipSwap swapped) xi2 xi1 co2 co1
   | k1 `tcEqKind` k2   = if swap_over then do_swap else no_swap
   | k1 `isSubKind` k2  = do_swap   -- Note [Kind orientation for CTyEqCan]
   | k2 `isSubKind` k1  = no_swap
   | otherwise          = incompat
   where
-    do_swap 
-      = do { mb <- rewriteEqEvidence ev (flipSwap swapped) xi2 xi1
-                                     co2 (mkTcNomReflCo xi1)
-           ; let mk_ct ev' = CTyEqCan { cc_ev = ev', cc_tyvar = tv2, cc_rhs = xi1 }
+    no_swap = canon_eq swapped            tv1 xi1 xi2 co1 co2
+    do_swap = canon_eq (flipSwap swapped) tv2 xi2 xi1 co2 co1
+    canon_eq swapped tv1 xi1 xi2 co1 co2
+      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 co1 co2
+           ; let mk_ct ev' = CTyEqCan { cc_ev = ev', cc_tyvar = tv1, cc_rhs = xi2 }
            ; return (fmap mk_ct mb) }
 
-    no_swap 
-      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 
-                                     (mkTcNomReflCo xi1) co2
-           ; let mk_ct ev' = CTyEqCan { cc_ev = ev', cc_tyvar = tv1, cc_rhs = xi2 }
+    irred_fmv swapped xi1 xi2 co1 co2
+      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 co1 co2
+           ; let mk_ct ev' = CIrredEvCan { cc_ev = ev' }
            ; return (fmap mk_ct mb) }
 
     incompat
       = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 
                                      (mkTcNomReflCo xi1) co2
            ; case mb of
-               Stop ev s           -> return (Stop ev s)
+               Stop ev s        -> return (Stop ev s)
                ContinueWith ev' -> incompatibleKind ev' xi1 k1 xi2 k2 }
 
     xi1 = mkTyVarTy tv1
     xi2 = mkTyVarTy tv2
     k1  = tyVarKind tv1
     k2  = tyVarKind tv2
+    co1 = mkTcNomReflCo xi1
 
     swap_over
       -- If tv1 is touchable, swap only if tv2 is also
@@ -1236,6 +1242,7 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
                     | lvl1 `strictlyDeeperThan` lvl2 -> False
                     | otherwise                      -> nicer_to_update_tv2
 
+      -- So tv1 is not a meta tyvar
       -- If only one is a meta tyvar, put it on the left
       -- This is not because it'll be solved; but becuase
       -- the floating step looks for meta tyvars on the left

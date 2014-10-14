@@ -1486,7 +1486,7 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
     | not (fsk `elemVarSet` tyVarsOfType rhs_ty)
     -> do { dischargeUfsk fsk rhs_ty
           ; setEvBind (ctEvId old_ev) (EvCoercion ax_co)
-          ; traceTcS "doTopReactFunEq)" $ 
+          ; traceTcS "doTopReactFunEq" $ 
             vcat [ text "old_ev:" <+> ppr old_ev
                  , nest 2 (text ":=") <+> ppr ax_co ]
           ; stopWith old_ev "Fun/Top (wanted)" } 
