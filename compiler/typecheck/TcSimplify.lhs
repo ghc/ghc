@@ -309,22 +309,15 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                             -- If any meta-tyvar unifications take place (unlikely), we'll
                             -- pick that up later.
 
-                      ; (flats, _insols) <- runTcSWithEvBinds null_ev_binds_var $
-                        do { mapM_ (promoteAndDefaultTyVar untch gbl_tvs) meta_tvs
+                      ; WC { wc_flat = flats } <- runTcSWithEvBinds null_ev_binds_var $
+                           do { mapM_ (promoteAndDefaultTyVar untch gbl_tvs) meta_tvs
                                  -- See Note [Promote _and_ default when inferring]
-                           ; _implics <- solveInteract quant_cand
-                           ; getInertUnsolved }
+                              ; solveInteract quant_cand
+                              ; getInertUnsolved }
 
-                      ; flats' <- zonkFlats $
-                                  filterBag isWantedCt flats
-                           -- The quant_cand were already fully zonked, so this zonkFlats
-                           -- really only unflattens the flattening that solveInteract
-                           -- may have done (Trac #8889).  
-                           -- E.g. quant_cand = F a, where F :: * -> Constraint
-                           --      We'll flatten to   (alpha, F a ~ alpha)
-                           -- fail to make any further progress and must unflatten again 
-
-                      ; return (map ctPred $ bagToList flats') }
+                      ; return [ ctEvPred ev | ct <- bagToList flats
+                                             , let ev = ctEvidence ct
+                                             , isWanted ev ] }
 
        -- NB: quant_pred_candidates is already the fixpoint of any
        --     unifications that may have happened
@@ -697,10 +690,9 @@ solveFlats (WC { wc_flat = flats, wc_insol = insols, wc_impl = implics })
     do { let all_flats = flats `unionBags` filterBag (not . isDerivedCt) insols
                      -- See Note [Dropping derived constraints] in TcRnTypes for
                      -- why the insolubles may have derived constraints
-       ; implics_from_flats <- solveInteract all_flats
-       ; (unsolved_flats, insoluble_flats) <- getInertUnsolved
-       ; return ( WC { wc_flat = unsolved_flats, wc_insol = insoluble_flats
-                     , wc_impl = implics `unionBags` implics_from_flats } ) }
+       ; solveInteract all_flats
+       ; wc <- getInertUnsolved
+       ; return ( wc { wc_impl = implics `unionBags` wc_impl wc } ) }
 
 simpl_loop :: Int
            -> WantedConstraints
@@ -1134,11 +1126,17 @@ they carry evidence).
 
 \begin{code}
 floatEqualities :: [TcTyVar] -> Bool
-                -> WantedConstraints -> TcS (Cts, WantedConstraints)
+                -> WantedConstraints
+                -> TcS (Cts, WantedConstraints)
 -- Main idea: see Note [Float Equalities out of Implications]
 --
--- Post: The returned floated constraints (Cts) are only Wanted or Derived
--- and come from the input wanted ev vars or deriveds
+-- Precondition: the wc_flat of the incoming WantedConstraints are 
+--               fully zonked, so that we can see their free variables
+--
+-- Postcondition: The returned floated constraints (Cts) are only 
+--                Wanted or Derived and come from the input wanted 
+--                ev vars or deriveds
+--
 -- Also performs some unifications (via promoteTyVar), adding to
 -- monadically-carried ty_binds. These will be used when processing 
 -- floated_eqs later
@@ -1164,21 +1162,32 @@ floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
     float_me :: Ct -> Bool
     float_me ct
        | EqPred ty1 ty2 <- classifyPredType pred
-       , Just tv1 <- tcGetTyVar_maybe ty1
-       , not (tv1 `elemVarSet` skol_set)
-       , isMetaTyVar tv1   -- Float out alpha ~ ty,
-                           -- which might be unified outside
-       , tyVarsOfType ty2 `disjointVarSet` skol_set
-       , typeKind ty2 `isSubKind` tyVarKind tv1
-              -- See Note [Do not float kind-incompatible equalities]
+       , tyVarsOfType pred `disjointVarSet` skol_set
+       , useful_to_float ty1 ty2
        = True
        | otherwise
        = False
        where
          pred = ctPred ct
+
+      -- Float out alpha ~ ty, or ty ~ alpha
+      -- which might be unified outside
+      -- See Note [Do not float kind-incompatible equalities]
+    useful_to_float ty1 ty2
+      = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
+          (Just tv1, _) | isMetaTyVar tv1
+                        , k2 `isSubKind` k1
+                        -> True
+          (_, Just tv2) | isMetaTyVar tv2
+                        , k1 `isSubKind` k2
+                        -> True
+          _ -> False
+      where
+        k1 = typeKind ty1
+        k2 = typeKind ty2
 \end{code}
 
-Note [Do not kind-incompatible equalities]
+Note [Do not float kind-incompatible equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have (t::* ~ s::*->*), we'll get a Derived insoluble equality.
 If we float the equality outwards, we'll get *another* Derived
@@ -1427,11 +1436,7 @@ disambigGroup (default_ty:default_tys) group
        ; success <- tryTcS $ -- Why tryTcS? If this attempt fails, we want to
                              -- discard all side effects from the attempt
                     do { setWantedTyBind the_tv default_ty
-                       ; implics_from_defaulting <- solveInteract wanteds
-                       ; MASSERT(isEmptyBag implics_from_defaulting)
-                           -- I am not certain if any implications can be generated
-                           -- but I am letting this fail aggressively if this ever happens.
-
+                       ; solveInteract wanteds
                        ; checkAllSolved }
 
        ; if success then

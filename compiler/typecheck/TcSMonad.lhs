@@ -10,11 +10,10 @@ module TcSMonad (
     extendWorkListFunEq,
     extendWorkListNonEq, extendWorkListCt,
     extendWorkListCts, appendWorkList, selectWorkItem,
-    withWorkList, workListSize,
+    workListSize,
 
     updWorkListTcS, updWorkListTcS_return,
 
-    updTcSImplics, 
     updInertCans, updInertDicts, updInertIrreds, updInertFunEqs,
 
     Ct(..), Xi, tyVarsOfCt, tyVarsOfCts,
@@ -145,7 +144,7 @@ import Maybes ( orElse, catMaybes, firstJusts )
 import Pair ( pSnd )
 
 import TrieMap
-import Control.Monad( ap, when, unless )
+import Control.Monad( ap, when )
 import MonadUtils
 import Data.IORef
 
@@ -223,21 +222,25 @@ extractDeque (DQ [] bs)     = case reverse bs of
                                 [] -> panic "extractDeque"
 
 -- See Note [WorkList priorities]
-data WorkList = WorkList { wl_eqs    :: [Ct]
-                         , wl_funeqs :: Deque Ct
-                         , wl_rest   :: [Ct]
-                         }
-
+data WorkList 
+  = WL { wl_eqs     :: [Ct]
+       , wl_funeqs  :: Deque Ct
+       , wl_rest    :: [Ct]
+       , wl_implics :: Bag Implication  -- See Note [Residual implications]
+    }
 
 appendWorkList :: WorkList -> WorkList -> WorkList
-appendWorkList new_wl orig_wl
-   = WorkList { wl_eqs    = wl_eqs new_wl    ++            wl_eqs orig_wl
-              , wl_funeqs = wl_funeqs new_wl `appendDeque` wl_funeqs orig_wl
-              , wl_rest   = wl_rest new_wl   ++            wl_rest orig_wl }
+appendWorkList 
+    (WL { wl_eqs = eqs1, wl_funeqs = funeqs1, wl_rest = rest1, wl_implics = implics1 })
+    (WL { wl_eqs = eqs2, wl_funeqs = funeqs2, wl_rest = rest2, wl_implics = implics2 })
+   = WL { wl_eqs     = eqs1     ++            eqs2
+        , wl_funeqs  = funeqs1  `appendDeque` funeqs2
+        , wl_rest    = rest1    ++            rest2
+        , wl_implics = implics1 `unionBags`   implics2 }
 
 
 workListSize :: WorkList -> Int
-workListSize (WorkList { wl_eqs = eqs, wl_funeqs = funeqs, wl_rest = rest })
+workListSize (WL { wl_eqs = eqs, wl_funeqs = funeqs, wl_rest = rest })
   = length eqs + dequeSize funeqs + length rest
 
 extendWorkListEq :: Ct -> WorkList -> WorkList
@@ -252,6 +255,10 @@ extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
 extendWorkListNonEq ct wl
   = wl { wl_rest = ct : wl_rest wl }
+
+extendWorkListImplic :: Implication -> WorkList -> WorkList
+extendWorkListImplic implic wl
+  = wl { wl_implics = implic `consBag` wl_implics wl }
 
 extendWorkListCt :: Ct -> WorkList -> WorkList
 -- Agnostic
@@ -271,14 +278,16 @@ extendWorkListCts :: [Ct] -> WorkList -> WorkList
 extendWorkListCts cts wl = foldr extendWorkListCt wl cts
 
 isEmptyWorkList :: WorkList -> Bool
-isEmptyWorkList wl
-  = null (wl_eqs wl) &&  null (wl_rest wl) && isEmptyDeque (wl_funeqs wl)
+isEmptyWorkList (WL { wl_eqs = eqs, wl_funeqs = funeqs
+                    , wl_rest = rest, wl_implics = implics })
+  = null eqs && null rest && isEmptyDeque funeqs && isEmptyBag implics
 
 emptyWorkList :: WorkList
-emptyWorkList = WorkList { wl_eqs  = [], wl_rest = [], wl_funeqs = emptyDeque }
+emptyWorkList = WL { wl_eqs  = [], wl_rest = []
+                   , wl_funeqs = emptyDeque, wl_implics = emptyBag }
 
 selectWorkItem :: WorkList -> (Maybe Ct, WorkList)
-selectWorkItem wl@(WorkList { wl_eqs = eqs, wl_funeqs = feqs, wl_rest = rest })
+selectWorkItem wl@(WL { wl_eqs = eqs, wl_funeqs = feqs, wl_rest = rest })
   = case (eqs,feqs,rest) of
       (ct:cts,_,_)     -> (Just ct, wl { wl_eqs    = cts })
       (_,fun_eqs,_)    | Just (fun_eqs', ct) <- extractDeque fun_eqs
@@ -288,14 +297,17 @@ selectWorkItem wl@(WorkList { wl_eqs = eqs, wl_funeqs = feqs, wl_rest = rest })
 
 -- Pretty printing
 instance Outputable WorkList where
-  ppr (WorkList { wl_eqs = eqs, wl_funeqs = feqs, wl_rest = rest })
-   = text "WorkList" <+> (braces $
+  ppr (WL { wl_eqs = eqs, wl_funeqs = feqs
+          , wl_rest = rest, wl_implics = implics })
+   = text "WL" <+> (braces $
      vcat [ ppUnless (null eqs) $ 
             ptext (sLit "Eqs =") <+> vcat (map ppr eqs)
           , ppUnless (isEmptyDeque feqs) $
             ptext (sLit "Funeqs =") <+> vcat (map ppr (dequeList feqs))
           , ppUnless (null rest) $
             ptext (sLit "Eqs =") <+> vcat (map ppr rest)
+          , ppUnless (isEmptyBag implics) $
+            ptext (sLit "Implics =") <+> vcat (map ppr (bagToList implics))
           ])
 \end{code}
 
@@ -656,9 +668,7 @@ setInertFunEqs :: FunEqMap Ct -> TcS ()
 setInertFunEqs funeqs 
   = updInertCans (\ic -> ic { inert_funeqs = funeqs })
 
-getInertUnsolved :: TcS (Cts, Cts)  -- Insoluble
--- Return (unsolved-wanteds, insolubles)
--- Both consist of a mixture of Wanted and Derived
+getInertUnsolved :: TcS WantedConstraints
 getInertUnsolved
  = do { inerts@IC { inert_eqs = tv_eqs, inert_funeqs = fun_eqs
            , inert_irreds = iirreds, inert_dicts = idicts
@@ -667,23 +677,31 @@ getInertUnsolved
       ; traceTcS "Unflattening" $ braces $ ppr inerts
       ; dflags <- getDynFlags
       ; untch  <- getUntouchables
+      ; ev_binds <- getTcEvBinds
 
       ; unsolved_fun_eqs <- foldFunEqs (unflatten_funeq dflags) fun_eqs (return [])
       ; unsolved_irreds  <- foldrBagM  (unflatten_irred dflags untch) emptyCts iirreds
-      ; unsolved_fun_eqs <- mapM finalise_funeq unsolved_fun_eqs
+      ; traceTcS "Unflattening 1" $ ppr unsolved_fun_eqs
+      ; unsolved_fun_eqs <- wrapTcS $ foldrM (finalise_funeqs ev_binds) [] unsolved_fun_eqs
+      ; traceTcS "Unflattening 2" $ ppr unsolved_fun_eqs
 
       ; let unsolved_eqs    = foldVarEnv add_if_unsolveds emptyCts tv_eqs
             unsolved_dicts  = foldDicts  add_if_unsolved  idicts emptyCts
-
             unsolved_flats  = unsolved_eqs      `unionBags`
                               unsolved_irreds   `unionBags`
                               unsolved_dicts    `unionBags` 
                               listToBag unsolved_fun_eqs
 
-      ; traceTcS "Unflattening done" $ braces $ vcat
-           [ ptext (sLit "Flats = ") <+> ppr unsolved_flats
-           , ptext (sLit "Insols = ") <+> ppr iinsols ]
-      ; return ( unsolved_flats, iinsols ) }
+        -- Postcondition is that the wl_flats are zonked
+      ; zonked_flats <- wrapTcS $ TcM.zonkFlats unsolved_flats
+
+      ; wl_ref <- getTcSWorkListRef
+      ; wl     <- wrapTcS (TcM.readTcRef wl_ref)
+      ; let wc = WC { wc_flat  = zonked_flats
+                    , wc_insol = iinsols
+                    , wc_impl  = wl_implics wl } 
+      ; traceTcS "Unflattening done" $ ppr wc
+      ; return wc }
   where
     unflatten_funeq :: DynFlags -> Ct -> TcS [Ct] -> TcS [Ct]
     unflatten_funeq dflags ct@(CFunEqCan { cc_fun = tc, cc_tyargs = xis
@@ -700,14 +718,26 @@ getInertUnsolved
     unflatten_funeq _ other_ct _
       = pprPanic "unflatten_funeq" (ppr other_ct)
 
-    finalise_funeq :: Ct -> TcS Ct
-    finalise_funeq (CFunEqCan { cc_fsk = fsk, cc_ev = ev })
-      = do { is_filled <- wrapTcS (TcM.isFilledMetaTyVar fsk)
-           ; unless is_filled $
-             do { tv_ty <- newFlexiTcSTy (tyVarKind fsk)
-                ; wrapTcS (TcM.writeMetaTyVar fsk tv_ty) }
-           ; return (mkNonCanonical ev) }  
-    finalise_funeq ct = pprPanic "finalise_funeq" (ppr ct)
+    finalise_funeqs :: EvBindsVar -> Ct -> [Ct] -> TcM [Ct]
+    finalise_funeqs ev_binds 
+                    ct@(CFunEqCan { cc_fsk = fsk, cc_ev = ev
+                                  , cc_fun = tc, cc_tyargs = tys })
+                    rest
+      = do { TcM.traceTc "finalise_funeqs" (ppr ct)
+           ; is_filled <- TcM.isFilledMetaTyVar fsk
+           ; if is_filled
+             then do { lhs <- TcM.zonkTcType (mkTyConApp tc tys)
+                     ; rhs <- TcM.zonkTcTyVar fsk
+                     ; if lhs `tcEqType` rhs
+                       then do { TcM.addTcEvBind ev_binds 
+                                   (ctEvId ev) (EvCoercion (mkTcNomReflCo rhs))
+                               ; return rest }
+                       else do { TcM.traceTc "finalise_funeqs 2" (ppr ct) 
+                               ; return (mkNonCanonical ev : rest) } }
+             else do { tv_ty <- TcM.newFlexiTyVarTy (tyVarKind fsk)
+                     ; TcM.writeMetaTyVar fsk tv_ty
+                     ; return (mkNonCanonical ev : rest) } }
+    finalise_funeqs _ ct _ = pprPanic "finalise_funeq" (ppr ct)
                 
     unflatten_irred :: DynFlags -> Untouchables -> Ct -> Cts -> TcS Cts
     unflatten_irred dflags untch ct@(CIrredEvCan { cc_ev = ev }) rest
@@ -1080,13 +1110,7 @@ data TcSEnv
       tcs_count    :: IORef Int, -- Global step count
 
       tcs_inerts   :: IORef InertSet, -- Current inert set
-      tcs_worklist :: IORef WorkList, -- Current worklist
-
-      -- Residual implication constraints that are generated
-      -- while solving or canonicalising the current worklist.
-      -- Specifically, when canonicalising (forall a. t1 ~ forall a. t2)
-      -- from which we get the implication (forall a. t1 ~ t2)
-      tcs_implics  :: IORef (Bag Implication)
+      tcs_worklist :: IORef WorkList  -- Current worklist
     }
 \end{code}
 
@@ -1185,14 +1209,13 @@ runTcSWithEvBinds ev_binds_var tcs
   = do { ty_binds_var <- TcM.newTcRef (False, emptyVarEnv)
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef is
+       ; wl_var <- TcM.newTcRef emptyWorkList
 
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
                           , tcs_ty_binds = ty_binds_var
                           , tcs_count    = step_count
                           , tcs_inerts   = inert_var
-                          , tcs_worklist    = panic "runTcS: worklist"
-                          , tcs_implics     = panic "runTcS: implics" }
-                               -- NB: Both these are initialised by withWorkList
+                          , tcs_worklist = wl_var }
 
              -- Run the computation
        ; res <- unTcS tcs env
@@ -1245,14 +1268,12 @@ nestImplicTcS ref inner_untch (TcS thing_inside)
        ; let nest_inert = inerts { inert_flat_cache = emptyFunEqs }
                                    -- See Note [Do not inherit the flat cache]
        ; new_inert_var <- TcM.newTcRef nest_inert
+       ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = TcSEnv { tcs_ev_binds    = ref
                                , tcs_ty_binds    = ty_binds
                                , tcs_count       = count
                                , tcs_inerts      = new_inert_var
-                               , tcs_worklist    = panic "nestImplicTcS: worklist"
-                               , tcs_implics     = panic "nestImplicTcS: implics"
-                               -- NB: Both these are initialised by withWorkList
-                               }
+                               , tcs_worklist    = new_wl_var }
        ; res <- TcM.setUntouchables inner_untch $
                 thing_inside nest_env
 
@@ -1277,9 +1298,9 @@ nestTcS (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
     do { inerts <- TcM.readTcRef inerts_var
        ; new_inert_var <- TcM.newTcRef inerts
+       ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_inerts   = new_inert_var
-                            , tcs_worklist = panic "nestTcS: worklist"
-                            , tcs_implics  = panic "nestTcS: implics" }
+                            , tcs_worklist = new_wl_var }
        ; thing_inside nest_env }
 
 tryTcS :: TcS a -> TcS a
@@ -1293,12 +1314,11 @@ tryTcS (TcS thing_inside)
     do { is_var <- TcM.newTcRef emptyInert
        ; ty_binds_var <- TcM.newTcRef (False, emptyVarEnv)
        ; ev_binds_var <- TcM.newTcEvBinds
-
+       ; wl_var <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
                             , tcs_ty_binds = ty_binds_var
                             , tcs_inerts   = is_var
-                            , tcs_worklist = panic "tryTcS: worklist"
-                            , tcs_implics  = panic "tryTcS: implics" }
+                            , tcs_worklist = wl_var }
        ; thing_inside nest_env }
 
 -- Getters and setters of TcEnv fields
@@ -1335,29 +1355,6 @@ updWorkListTcS_return f
        ; wrapTcS (TcM.writeTcRef wl_var new_work)
        ; return res }
 
-withWorkList :: Cts -> TcS () -> TcS (Bag Implication)
--- Use 'thing_inside' to solve 'work_items', extending the
--- ambient InertSet, and returning any residual implications
--- (arising from polytype equalities)
--- We do this with fresh work list and residual-implications variables
-withWorkList work_items (TcS thing_inside)
-  = TcS $ \ tcs_env ->
-    do { let init_work_list = foldrBag extendWorkListCt emptyWorkList work_items
-       ; new_wl_var <- TcM.newTcRef init_work_list
-       ; new_implics_var <- TcM.newTcRef emptyBag
-       ; thing_inside (tcs_env { tcs_worklist = new_wl_var
-                               , tcs_implics = new_implics_var })
-       ; final_wl <- TcM.readTcRef new_wl_var
-       ; implics  <- TcM.readTcRef new_implics_var
-       ; ASSERT( isEmptyWorkList final_wl )
-         return implics }
-
-updTcSImplics :: (Bag Implication -> Bag Implication) -> TcS ()
-updTcSImplics f
- = do { impl_ref <- getTcSImplicsRef
-      ; wrapTcS $ do { implics <- TcM.readTcRef impl_ref
-                     ; TcM.writeTcRef impl_ref (f implics) } }
-
 emitWorkNC :: [CtEvidence] -> TcS ()
 emitWorkNC evs
   | null evs  
@@ -1379,9 +1376,6 @@ emitInsoluble ct
       where
         already_there = not (isWantedCt ct) && anyBag (tcEqType this_pred . ctPred) old_insols
              -- See Note [Do not add duplicate derived insolubles]
-
-getTcSImplicsRef :: TcS (IORef (Bag Implication))
-getTcSImplicsRef = TcS (return . tcs_implics)
 
 getTcEvBinds :: TcS EvBindsVar
 getTcEvBinds = TcS (return . tcs_ev_binds)
@@ -1408,8 +1402,11 @@ setWantedTyBind :: TcTyVar -> TcType -> TcS ()
 -- Add a type binding
 -- We never do this twice!
 setWantedTyBind tv ty
-  = ASSERT2( isMetaTyVar tv, ppr tv )
-    do { ref <- getTcSTyBinds
+  | ASSERT2( isMetaTyVar tv, ppr tv )
+    isFmvTyVar tv
+  = wrapTcS (TcM.writeMetaTyVar tv ty)
+  | otherwise
+  = do { ref <- getTcSTyBinds
        ; wrapTcS $
          do { (_dirty, ty_binds) <- TcM.readTcRef ref
             ; when debugIsOn $
@@ -1565,16 +1562,9 @@ newFlattenSkolem ctxt_ev fam_ty
         ; return (ev, fsk) }
 
   | otherwise        -- Make a wanted
-  = do { ufsk <- wrapTcS $
-                 do { uniq <- TcM.newUnique
-                    ; ref  <- TcM.newMutVar Flexi
-                    ; let details = MetaTv { mtv_info  = FlatMetaTv
-                                           , mtv_ref   = ref
-                                           , mtv_untch = fskUntouchables }
-                          name = TcM.mkTcTyVarName uniq (fsLit "s")
-                    ; return (mkTcTyVar name (typeKind fam_ty) details) }
-        ; ev <- newWantedEvVarNC loc (mkTcEqPred fam_ty (mkTyVarTy ufsk))
-        ; return (ev, ufsk) }
+  = do { fuv <- wrapTcS (TcM.newMetaTyVar FlatMetaTv (typeKind fam_ty))
+       ; ev <- newWantedEvVarNC loc (mkTcEqPred fam_ty (mkTyVarTy fuv))
+       ; return (ev, fuv) }
   where
     loc = ctev_loc ctxt_ev
    
@@ -2020,6 +2010,17 @@ matchFam tycon args
 
 \end{code}
 
+Note [Residual implications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The wl_implics in the WorkList are the residual implication
+constraints that are generated while solving or canonicalising the
+current worklist.  Specifically, when canonicalising
+   (forall a. t1 ~ forall a. t2) 
+from which we get the implication
+   (forall a. t1 ~ t2)
+See TcSMonad.deferTcSForAllEq
+
+
 \begin{code}
 -- Deferring forall equalities as implications
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2061,10 +2062,9 @@ deferTcSForAllEq role loc (tvs1,body1) (tvs2,body2)
                                                   , ic_binds  = ev_binds_var
                                                   , ic_env    = env
                                                   , ic_info   = skol_info }
-                               ; updTcSImplics (consBag imp)
+                               ; updWorkListTcS (extendWorkListImplic imp)
                                ; return (TcLetCo ev_binds new_co) }
 
-        ; return $ EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs)
-        }
+        ; return $ EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs) }
 \end{code}
 

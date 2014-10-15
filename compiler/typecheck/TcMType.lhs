@@ -314,7 +314,7 @@ newMetaTyVar meta_info kind
               s = case meta_info of
                         PolyTv     -> fsLit "s"
                         TauTv      -> fsLit "t"
-                        FlatMetaTv -> fsLit "fu"
+                        FlatMetaTv -> fsLit "fmv"
                         SigTv      -> fsLit "a"
         ; details <- newMetaDetails meta_info
         ; return (mkTcTyVar name kind details) }

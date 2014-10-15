@@ -1215,7 +1215,13 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
 
     irred_fmv swapped xi1 xi2 co1 co2
       = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 co1 co2
-           ; let mk_ct ev' = CIrredEvCan { cc_ev = ev' }
+           ; let mk_ct ev' 
+                  | Just tv <- tcGetTyVar_maybe xi2
+                  , isFlattenTyVar tv  -- fuv or fsk on the RHS
+                  , k1 `tcEqKind` k2   -- Better check for kind compatibility!
+                  = CTyEqCan { cc_ev = ev', cc_tyvar = tv1, cc_rhs = xi2 }
+                  | otherwise    -- Put it somewhere it can't rewrite anything
+                  = CIrredEvCan { cc_ev = ev' }
            ; return (fmap mk_ct mb) }
 
     incompat
