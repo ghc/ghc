@@ -21,11 +21,11 @@ Scalar (V a) ~ Scalar (V p0)
 Scalar (V a) ~ p0
 Scalar (V a) ~ Scalar (V p0) -> Scalar (V p0)
 
----> 
+--->
 Scalar (V a)  ~ fuv0
 Scalar (V p0) ~ fuv1
 fuv0 ~ fuv1
-fuv0 ~ p0      
+fuv0 ~ p0
 fuv0 ~ fuv1 -> fuv1
 
 ---> p0 := fuv0

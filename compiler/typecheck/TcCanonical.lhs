@@ -1155,9 +1155,6 @@ canEqTyVar2 dflags ev swapped tv1 xi2 co2
        ; case mb of
             Stop ev s -> return (Stop ev s)
             ContinueWith new_ev 
-                | isFmvTyVar tv1
-                -> continueWith (CIrredEvCan { cc_ev = new_ev })
-
                 | k2 `isSubKind` k1
                 -- Establish CTyEqCan kind invariant
                 -- Reorientation has done its best, but the kinds might
@@ -1185,7 +1182,7 @@ canEqTyVar2 dflags ev swapped tv1 xi2 co2
 canEqTyVarTyVar :: CtEvidence       -- tv1 ~ orhs (or orhs ~ tv1, if swapped)
                 -> SwapFlag
                 -> TcTyVar -> TcTyVar   -- tv2, tv2
-                -> TcCoercion       -- tv2 ~ orhs
+                -> TcCoercion           -- tv2 ~ orhs
                 -> TcS (StopOrContinue Ct)
 -- Both LHS and RHS rewrote to a type variable,
 -- If swapped = NotSwapped, then
@@ -1199,28 +1196,29 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
          setEvBind (ctev_evar ev) (EvCoercion (maybeSym swapped co2))
        ; stopWith ev "Equal tyvars" }
 
-  | isFmvTyVar tv1     = irred_fmv swapped            xi1 xi2 co1 co2
-  | isFmvTyVar tv1     = irred_fmv (flipSwap swapped) xi2 xi1 co2 co1
-  | k1 `tcEqKind` k2   = if swap_over then do_swap else no_swap
-  | k1 `isSubKind` k2  = do_swap   -- Note [Kind orientation for CTyEqCan]
-  | k2 `isSubKind` k1  = no_swap
-  | otherwise          = incompat
+  | incompat_kind   = incompat
+  | isFmvTyVar tv1  = do_fmv swapped            tv1 xi1 xi2 co1 co2
+  | isFmvTyVar tv2  = do_fmv (flipSwap swapped) tv2 xi2 xi1 co2 co1
+  | same_kind       = if swap_over then do_swap else no_swap
+  | k1_sub_k2       = do_swap   -- Note [Kind orientation for CTyEqCan]
+  | otherwise       = no_swap   -- k2_sub_k1
   where
     no_swap = canon_eq swapped            tv1 xi1 xi2 co1 co2
     do_swap = canon_eq (flipSwap swapped) tv2 xi2 xi1 co2 co1
+
+    do_fmv swapped tv1 xi1 xi2 co1 co2
+      = canon_eq swapped tv1 xi1 xi2 co1 co2
+--      | same_kind = canon_eq swapped tv1 xi1 xi2 co1 co2
+--      | otherwise  -- Presumably tv1 `subKind` tv2, which is the wrong way round
+--      = do { tv_ty <- newFlexiTcsTy (tyVarKind tv1)
+
     canon_eq swapped tv1 xi1 xi2 co1 co2
       = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 co1 co2
            ; let mk_ct ev' = CTyEqCan { cc_ev = ev', cc_tyvar = tv1, cc_rhs = xi2 }
            ; return (fmap mk_ct mb) }
 
-    irred_fmv swapped xi1 xi2 co1 co2
-      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 co1 co2
-           ; let mk_ct ev' = CIrredEvCan { cc_ev = ev' }
-           ; return (fmap mk_ct mb) }
-
     incompat
-      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2
-                                     (mkTcNomReflCo xi1) co2
+      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 (mkTcNomReflCo xi1) co2
            ; case mb of
                Stop ev s        -> return (Stop ev s)
                ContinueWith ev' -> incompatibleKind ev' xi1 k1 xi2 k2 }
@@ -1230,6 +1228,10 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
     k1  = tyVarKind tv1
     k2  = tyVarKind tv2
     co1 = mkTcNomReflCo xi1
+    k1_sub_k2     = k1 `isSubKind` k2
+    k2_sub_k1     = k2 `isSubKind` k1
+    same_kind     = k1_sub_k2 && k2_sub_k1
+    incompat_kind = not (k1_sub_k2 || k2_sub_k1)
 
     swap_over
       -- If tv1 is touchable, swap only if tv2 is also

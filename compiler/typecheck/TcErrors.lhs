@@ -989,7 +989,9 @@ mkDictErr ctxt cts
   = ASSERT( not (null cts) )
     do { inst_envs <- tcGetInstEnvs
        ; fam_envs  <- tcGetFamInstEnvs
-       ; lookups   <- mapM (lookup_cls_inst inst_envs) cts
+       ; let (ct1:_) = cts  -- ct1 just for its location
+             min_cts = elim_superclasses cts
+       ; lookups   <- mapM (lookup_cls_inst inst_envs) min_cts
        ; let (no_inst_cts, overlap_cts) = partition is_no_inst lookups
 
        -- Report definite no-instance errors,
@@ -1000,8 +1002,6 @@ mkDictErr ctxt cts
        ; (ctxt, err) <- mk_dict_err fam_envs ctxt (head (no_inst_cts ++ overlap_cts))
        ; mkErrorMsg ctxt ct1 err }
   where
-    ct1:_ = elim_superclasses cts
-
     no_givens = null (getUserGivens ctxt)
 
     is_no_inst (ct, (matches, unifiers, _))

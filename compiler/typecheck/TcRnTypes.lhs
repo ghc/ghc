@@ -1083,7 +1083,7 @@ comprehensible error.  Particularly:
 
  * Insoluble derived wanted equalities (e.g. [D] Int ~ Bool) may
    arise from functional dependency interactions.  We are careful
-   to keep a good CtOrigin on such constriants (FunDepOrigin1, FunDepOrigin2)
+   to keep a good CtOrigin on such constraints (FunDepOrigin1, FunDepOrigin2)
    so that we can produce a good error message (Trac #9612)
 
 Since we leave these Derived constraints in the residual WantedConstraints,

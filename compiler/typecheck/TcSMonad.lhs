@@ -677,11 +677,11 @@ getInertUnsolved
                   , inert_insols = iinsols } <- getInertCans
       ; traceTcS "Unflattening" $ braces $ ppr inerts
 
-      ; leftovers <- unflatten dflags untch funeqs irreds
+      ; leftovers <- unflatten dflags untch funeqs tv_eqs
 
-      ; let unsolved_eqs    = foldVarEnv add_if_unsolveds emptyCts tv_eqs
-            unsolved_dicts  = foldDicts  add_if_unsolved  idicts emptyCts
-            unsolved_flats  = unsolved_eqs      `unionBags`
+      ; let unsolved_irreds = Bag.filterBag is_unsolved irreds
+            unsolved_dicts  = foldDicts add_if_unsolved idicts emptyCts
+            unsolved_flats  = unsolved_irreds   `unionBags`
                               unsolved_dicts    `unionBags`
                               leftovers
 
@@ -700,33 +700,33 @@ getInertUnsolved
     add_if_unsolved ct cts | is_unsolved ct = ct `consCts` cts
                            | otherwise      = cts
 
-    add_if_unsolveds :: [Ct] -> Cts -> Cts
-    add_if_unsolveds eqs cts = foldr add_if_unsolved cts eqs
+--    add_if_unsolveds :: [Ct] -> Cts -> Cts
+--    add_if_unsolveds eqs cts = foldr add_if_unsolved cts eqs
 
     is_unsolved ct = not (isGivenCt ct)   -- Wanted or Derived
 
 ---------------
 unflatten :: DynFlags -> Untouchables
-          -> FunEqMap Ct -> Cts
+          -> FunEqMap Ct -> TyVarEnv EqualCtList
           -> TcS Cts
-unflatten dflags untch funeqs irreds
+unflatten dflags untch funeqs tv_eqs
  = do {   -- Step 1: unflatten the CFunEqCans, except if that causes an occurs check
         funeqs <- foldFunEqs unflatten_funeq funeqs (return [])
       ; traceTcS "Unflattening 1" $ braces (vcat (map ppr funeqs))
 
           -- Step 2: unify the irreds, if possible
-      ; irreds  <- foldrBagM  unflatten_irred emptyCts irreds
-      ; traceTcS "Unflattening 2" $ braces (vcat (map ppr (bagToList irreds)))
+      ; tv_eqs  <- foldrM unflatten_eq [] (foldVarEnv (++) [] tv_eqs)
+      ; traceTcS "Unflattening 2" $ braces (vcat (map ppr tv_eqs))
 
           -- Step 3: fill any remaining fmvs with fresh unification variables
       ; funeqs <- wrapTcS $ mapM finalise_funeq funeqs
       ; traceTcS "Unflattening 3" $ braces (vcat (map ppr funeqs))
 
           -- Step 4: remove any irreds that look like ty ~ ty
-      ; irreds <- foldrBagM finalise_irred emptyCts irreds
-      ; traceTcS "Unflattening 4" $ braces (vcat (map ppr (bagToList irreds)))
+      ; tv_eqs <- foldrM finalise_eq [] tv_eqs
+      ; traceTcS "Unflattening 4" $ braces (vcat (map ppr tv_eqs))
 
-      ; return (irreds `unionBags` listToBag funeqs) }
+      ; return (listToBag tv_eqs `unionBags` listToBag funeqs) }
   where
     ----------------
     unflatten_funeq :: Ct -> TcS [Ct] -> TcS [Ct]
@@ -755,38 +755,38 @@ unflatten dflags untch funeqs irreds
     finalise_funeq ct = pprPanic "finalise_funeq" (ppr ct)
 
     ----------------
-    unflatten_irred ::  Ct -> Cts -> TcS Cts
-    unflatten_irred ct@(CIrredEvCan { cc_ev = ev }) rest
-      | not (isWanted ev)   -- Discard givens
+    unflatten_eq ::  Ct -> [Ct] -> TcS [Ct]
+    unflatten_eq ct@(CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs }) rest
+      | isGiven ev   -- Discard givens
       = return rest
 
-      | EqPred ty1 ty2 <- classifyPredType (ctEvPred ev)
-      = do { lhs_elim <- try_fill ev ty1 ty2
+      | isFmvTyVar tv
+      = do { lhs_elim <- tryFill dflags tv rhs ev
            ; if lhs_elim then return rest else
-        do { rhs_elim <- try_fill ev ty2 ty1
+        do { rhs_elim <- try_fill ev rhs (mkTyVarTy tv)
            ; if rhs_elim then return rest else
-             return (ct `consCts` rest) } }
+             return (ct : rest) } }
 
       | otherwise
-      = return (ct `consCts` rest)
+      = return (ct : rest)
 
-    unflatten_irred ct _ = pprPanic "unflatten_irred" (ppr ct)
+    unflatten_eq ct _ = pprPanic "unflatten_irred" (ppr ct)
 
     ----------------
-    finalise_irred :: Ct -> Cts -> TcS Cts
-    finalise_irred (CIrredEvCan { cc_ev = ev }) rest
-      | EqPred ty1 ty2 <- classifyPredType (ctEvPred ev)
-      = do { is_refl <- wrapTcS $ do { ty1 <- TcM.zonkTcType ty1
-                                     ; ty2 <- TcM.zonkTcType ty2
+    finalise_eq :: Ct -> [Ct] -> TcS [Ct]
+    finalise_eq (CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs }) rest
+      | isFmvTyVar tv
+      = do { is_refl <- wrapTcS $ do { ty1 <- TcM.zonkTcTyVar tv
+                                     ; ty2 <- TcM.zonkTcType rhs
                                      ; return (ty1 `tcEqType` ty2) }
            ; if is_refl then do { when (isWanted ev) $
-                                  setEvBind (ctEvId ev) (EvCoercion $ mkTcNomReflCo ty1)
+                                  setEvBind (ctEvId ev) (EvCoercion $ mkTcNomReflCo rhs)
                                 ; return rest }
-                        else return (mkNonCanonical ev `consBag` rest) }
+                        else return (mkNonCanonical ev : rest) }
       | otherwise
-      = return (mkNonCanonical ev `consBag` rest)
+      = return (mkNonCanonical ev : rest)
 
-    finalise_irred ct _ = pprPanic "finalise_irred" (ppr ct)
+    finalise_eq ct _ = pprPanic "finalise_irred" (ppr ct)
 
     ----------------
     try_fill ev ty1 ty2
@@ -1614,12 +1614,19 @@ newFlattenSkolem ctxt_ev fam_ty
         ; return (ev, fsk) }
 
   | otherwise        -- Make a wanted
-  = do { fuv <- wrapTcS (TcM.newMetaTyVar FlatMetaTv (typeKind fam_ty))
+  = do { fuv <- wrapTcS $
+                 do { uniq <- TcM.newUnique
+                    ; ref  <- TcM.newMutVar Flexi
+                    ; let details = MetaTv { mtv_info  = FlatMetaTv
+                                           , mtv_ref   = ref
+                                           , mtv_untch = fskUntouchables }
+                          name = TcM.mkTcTyVarName uniq (fsLit "s")
+                    ; return (mkTcTyVar name (typeKind fam_ty) details) }
        ; ev <- newWantedEvVarNC loc (mkTcEqPred fam_ty (mkTyVarTy fuv))
        ; return (ev, fuv) }
   where
     loc = ctev_loc ctxt_ev
-   
+
 extendFlatCache :: TyCon -> [Type] -> (TcCoercion, TcTyVar) -> TcS ()
 extendFlatCache tc xi_args (co, fsk)
   = do { dflags <- getDynFlags

@@ -86,6 +86,37 @@ we get
 We want: alpha := beta (which might unlock something else).  So rewriting wanted with wanted helps here.
 
 
+-----------------------------------
+indexed-types/should_fail/T4093a
+
+Is this type ambiguous:  (Foo e ~ Maybe e) => Foo e
+
+ [G] Foo e ~ Maybe e
+ [W] Foo e ~ Foo ee
+ [W] Foo ee ~ Maybe ee)
+---
+ [G] Foo e ~ fsk
+ [G] fsk ~ Maybe e
+
+ [W] Foo e ~ fmv1
+ [W] Foo ee ~ fmv2
+ [W] fmv1 ~ fmv2
+ [W] fmv2 ~ Maybe ee
+
+--->   fmv1 := fsk
+ [W] Foo ee ~ fmv2
+ [W] fsk ~ fmv2
+ [W] fmv2 ~ Maybe ee
+
+--->
+ [W] Foo ee ~ fmv2
+ [W] fmv2 ~ Maybe e
+ [W] fmv2 ~ Maybe ee
+
+Now maybe we shuld get [D] e ~ ee, and then we'd solve it entirely.
+But if in a smilar situation we got [D] Int ~ Bool we'd be back
+to complaining about wanted/wanted interactions.  This must arise
+also for fundeps.
 
 ----------------------------------------
 indexed-types/should_compile/T44984
