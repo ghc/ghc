@@ -45,7 +45,7 @@ module TcRnTypes(
 
         -- Canonical constraints
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, dropDerivedWC,
-        singleCt, listToCts, ctsElts, extendCts, extendCtsList,
+        singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
@@ -1164,8 +1164,11 @@ listToCts = listToBag
 ctsElts :: Cts -> [Ct]
 ctsElts = bagToList
 
-extendCts :: Cts -> Ct -> Cts
-extendCts = snocBag
+consCts :: Ct -> Cts -> Cts
+consCts = consBag
+
+snocCts :: Cts -> Ct -> Cts
+snocCts = snocBag
 
 extendCtsList :: Cts -> [Ct] -> Cts
 extendCtsList cts xs | null xs   = cts

@@ -58,7 +58,7 @@ simplifyTop :: WantedConstraints -> TcM (Bag EvBind)
 -- in a degenerate implication, so we do that here instead
 simplifyTop wanteds
   = do { traceTc "simplifyTop {" $ text "wanted = " <+> ppr wanteds
-       ; ev_binds_var <- newTcEvBinds
+       ; ev_binds_var <- TcM.newTcEvBinds
        ; zonked_final_wc <- solveWantedsTcMWithEvBinds ev_binds_var wanteds simpl_top
        ; binds1 <- TcRnMonad.getTcEvBinds ev_binds_var
        ; traceTc "End simplifyTop }" empty
@@ -189,7 +189,7 @@ More details in Note [DefaultTyVar].
 simplifyAmbiguityCheck :: Type -> WantedConstraints -> TcM ()
 simplifyAmbiguityCheck ty wanteds
   = do { traceTc "simplifyAmbiguityCheck {" (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
-       ; ev_binds_var <- newTcEvBinds
+       ; ev_binds_var <- TcM.newTcEvBinds
        ; zonked_final_wc <- solveWantedsTcMWithEvBinds ev_binds_var wanteds simpl_top
        ; traceTc "End simplifyAmbiguityCheck }" empty
 
@@ -278,7 +278,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
               -- bindings, so we can't just revert to the input
               -- constraint.
 
-       ; ev_binds_var <- newTcEvBinds
+       ; ev_binds_var <- TcM.newTcEvBinds
        ; wanted_transformed_incl_derivs
                <- solveWantedsTcMWithEvBinds ev_binds_var wanteds solveWanteds
                   -- Post: wanted_transformed_incl_derivs are zonked
@@ -300,7 +300,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
               else do { let quant_cand = approximateWC wanted_transformed
                             meta_tvs   = filter isMetaTyVar (varSetElems (tyVarsOfCts quant_cand))
                       ; gbl_tvs <- tcGetGlobalTyVars
-                      ; null_ev_binds_var <- newTcEvBinds
+                      ; null_ev_binds_var <- TcM.newTcEvBinds
                             -- Miminise quant_cand.  We are not interested in any evidence
                             -- produced, because we are going to simplify wanted_transformed
                             -- again later. All we want here is the predicates over which to
@@ -643,7 +643,7 @@ solveWantedsTcM :: WantedConstraints -> TcM (WantedConstraints, Bag EvBind)
 -- Discards all Derived stuff in result
 -- Postcondition: fully zonked and unflattened constraints
 solveWantedsTcM wanted
-  = do { ev_binds_var <- newTcEvBinds
+  = do { ev_binds_var <- TcM.newTcEvBinds
        ; wanteds' <- solveWantedsTcMWithEvBinds ev_binds_var wanted solveWantedsAndDrop
        ; binds <- TcRnMonad.getTcEvBinds ev_binds_var
        ; return (wanteds', binds) }
@@ -652,7 +652,7 @@ solveWantedsAndDrop :: WantedConstraints -> TcS (WantedConstraints)
 -- Since solveWanteds returns the residual WantedConstraints,
 -- it should always be called within a runTcS or something similar,
 solveWantedsAndDrop wanted = do { wc <- solveWanteds wanted
-                                   ; return (dropDerivedWC wc) }
+                                ; return (dropDerivedWC wc) }
 
 solveWanteds :: WantedConstraints -> TcS WantedConstraints
 -- so that the inert set doesn't mindlessly propagate.
@@ -773,7 +773,7 @@ solveImplication imp@(Implic { ic_untch  = untch
 
          -- Solve the nested constraints
        ; (no_given_eqs, residual_wanted)
-            <- nestImplicTcS ev_binds untch $
+             <- nestImplicTcS ev_binds untch $
                do { solveInteractGiven (mkGivenLoc untch info env) givens
 
                   ; residual_wanted <- solveWanteds wanteds
@@ -1433,11 +1433,14 @@ disambigGroup []  _grp
   = return False
 disambigGroup (default_ty:default_tys) group
   = do { traceTcS "disambigGroup {" (ppr group $$ ppr default_ty)
-       ; success <- tryTcS $ -- Why tryTcS? If this attempt fails, we want to
-                             -- discard all side effects from the attempt
-                    do { setWantedTyBind the_tv default_ty
+       ; fake_ev_binds_var <- TcS.newTcEvBinds
+       ; given_ev_var      <- TcS.newEvVar (mkTcEqPred (mkTyVarTy the_tv) default_ty)
+       ; untch             <- TcS.getUntouchables
+       ; success <- nestImplicTcS fake_ev_binds_var (pushUntouchables untch) $
+                    do { solveInteractGiven loc [given_ev_var]
                        ; solveInteract wanteds
-                       ; checkAllSolved }
+                       ; residual_wanted <- getInertUnsolved
+                       ; return (isEmptyWC residual_wanted) }
 
        ; if success then
              -- Success: record the type variable binding, and return
@@ -1451,8 +1454,11 @@ disambigGroup (default_ty:default_tys) group
                            (ppr default_ty)
                 ; disambigGroup default_tys group } }
   where
-    ((_,_,the_tv):_) = group
     wanteds          = listToBag (map fstOf3 group)
+    ((_,_,the_tv):_) = group
+    loc = CtLoc { ctl_origin = GivenOrigin UnkSkol
+                , ctl_env = panic "disambigGroup:env"
+                , ctl_depth = initialSubGoalDepth }
 \end{code}
 
 Note [Avoiding spurious errors]

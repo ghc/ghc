@@ -1197,7 +1197,7 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
   = do { when (isWanted ev) $
          ASSERT( tcCoercionRole co2 == Nominal )
          setEvBind (ctev_evar ev) (EvCoercion (maybeSym swapped co2))
-       ; stopWith ev "Equal tyvars" }  
+       ; stopWith ev "Equal tyvars" }
 
   | isFmvTyVar tv1     = irred_fmv swapped            xi1 xi2 co1 co2
   | isFmvTyVar tv1     = irred_fmv (flipSwap swapped) xi2 xi1 co2 co1
@@ -1215,17 +1215,11 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
 
     irred_fmv swapped xi1 xi2 co1 co2
       = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 co1 co2
-           ; let mk_ct ev' 
-                  | Just tv <- tcGetTyVar_maybe xi2
-                  , isFlattenTyVar tv  -- fuv or fsk on the RHS
-                  , k1 `tcEqKind` k2   -- Better check for kind compatibility!
-                  = CTyEqCan { cc_ev = ev', cc_tyvar = tv1, cc_rhs = xi2 }
-                  | otherwise    -- Put it somewhere it can't rewrite anything
-                  = CIrredEvCan { cc_ev = ev' }
+           ; let mk_ct ev' = CIrredEvCan { cc_ev = ev' }
            ; return (fmap mk_ct mb) }
 
     incompat
-      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 
+      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2
                                      (mkTcNomReflCo xi1) co2
            ; case mb of
                Stop ev s        -> return (Stop ev s)
