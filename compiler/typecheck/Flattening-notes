@@ -13,22 +13,43 @@ ToDo:
 * Note [Do not add duplicate derived isols]
   This mostly doesn't apply now, except for the fundeps
 
-* TcCanonical re-orients, so TcInteract should
-  not do so.  (TwoWay, OneWay)
-* Check orientation (isFlattenTyVar) in canEqTyVarTyVar
-
-
 * No need to zonk now we are unflattening
 
 * TcInteract, Note [Efficient orientation]?
 
-* inert_funeqs, inert_eqs: keep only the CtEvidence. 
+* inert_funeqs, inert_eqs: keep only the CtEvidence.
    They are all CFunEqCans, CTyEqCans
 
 * Update Note [Preparing inert set for implications]
 * remove/rewrite TcMType Note [Unflattening while zonking]
 
 * Consider individual data tpyes for CFunEqCan etc
+
+Remaining errors
+============================
+Unexpected failures:
+   generics                      GenDerivOutput1_1 [stderr mismatch] (normal)
+
+ghcirun002: internal error: ASSERTION FAILED: file rts/Interpreter.c, line 773
+   ghci/should_run               ghcirun002 [bad exit code] (ghci)
+
+-package dependencies: array-0.5.0.1@array_GX4NwjS8xZkC2ZPtjgwhnz
++package dependencies: array-0.5.0.1 base-4.8.0.0
+   safeHaskell/check/pkg01       safePkg01 [bad stdout] (normal)
+
+openKind thing
+   indexed-types/should_compile  T4935 [exit code non-0] (normal)
+
+Derived equalities   fmv1 ~ Maybe a, fmv2 ~ Maybe b
+   indexed-types/should_fail     T4093a [stderr mismatch] (normal)
+
+Not sure
+   indexed-types/should_fail     ExtraTcsUntch [stderr mismatch] (normal)
+
+Order of finding iprovementsbui
+   typecheck/should_compile      TcTypeNatSimple [exit code non-0] (normal)
+
+
 
 -----------------
 Unflattening

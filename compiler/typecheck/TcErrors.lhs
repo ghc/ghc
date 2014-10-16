@@ -614,7 +614,7 @@ mkEqErr1 ctxt ct
                       ct is_oriented ty1 ty2 }
   where
     ev         = ctEvidence ct
-    loc        = ctev_loc ev
+    loc        = ctEvLoc ev
     (ty1, ty2) = getEqPredTys (ctEvPred ev)
 
     mk_given :: [Implication] -> (CtLoc, SDoc)
@@ -1469,7 +1469,7 @@ solverDepthErrorTcS cnt ev
              tidy_pred = tidyType tidy_env pred
        ; failWithTcM (tidy_env, hang (msg cnt) 2 (ppr tidy_pred)) }
   where
-    loc   = ctev_loc ev
+    loc   = ctEvLoc ev
     depth = ctLocDepth loc
     value = subGoalCounterValue cnt depth
     msg CountConstraints =

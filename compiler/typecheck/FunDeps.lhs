@@ -61,8 +61,9 @@ Notice that
 growThetaTyVars :: ThetaType -> TyVarSet -> TyVarSet
 -- See Note [Growing the tau-tvs using constraints]
 growThetaTyVars theta tvs
-  | null theta = tvs
-  | otherwise  = fixVarSet mk_next tvs
+  | null theta        = tvs
+  | isEmptyVarSet tvs = tvs
+  | otherwise         = fixVarSet mk_next tvs
   where
     mk_next tvs = foldr grow_one tvs theta
     grow_one pred tvs = growPredTyVars pred tvs `unionVarSet` tvs

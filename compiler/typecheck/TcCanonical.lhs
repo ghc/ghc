@@ -316,7 +316,7 @@ newSCWorkFromFlavored flavor cls xis
   | otherwise -- Wanted case, just add those SC that can lead to improvement.
   = do { let sc_rec_theta = transSuperClasses cls xis
              impr_theta   = filter is_improvement_pty sc_rec_theta
-             loc          = ctev_loc flavor
+             loc          = ctEvLoc flavor
        ; traceTcS "newSCWork/Derived" $ text "impr_theta =" <+> ppr impr_theta
        ; mb_der_evs <- mapM (newDerived loc) impr_theta
        ; emitWorkNC (catMaybes mb_der_evs) }
@@ -1287,7 +1287,7 @@ incompatibleKind new_ev s1 k1 s2 k2   -- See Note [Equalities with incompatible 
          -- Put the not-currently-soluble thing into the inert set
        ; continueWith (CIrredEvCan { cc_ev = new_ev }) }
   where
-    loc = ctev_loc new_ev
+    loc = ctEvLoc new_ev
     kind_co_loc = setCtLocOrigin loc (KindEqOrigin s1 s2 (ctLocOrigin loc))
 \end{code}
 

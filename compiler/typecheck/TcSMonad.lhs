@@ -796,36 +796,13 @@ unflatten dflags untch funeqs tv_eqs
       | otherwise
       = return False
 
-
-{-
-    finalise_funeqs :: Ct -> [Ct] -> TcM [Ct]
-    finalise_funeqs ct@(CFunEqCan { cc_fsk = fsk, cc_ev = ev
-                                  , cc_fun = tc, cc_tyargs = tys })
-                    rest
-      = do { TcM.traceTc "finalise_funeqs" (ppr ct)
-           ; is_filled <- TcM.isFilledMetaTyVar fsk
-           ; if is_filled
-             then do { lhs <- TcM.zonkTcType (mkTyConApp tc tys)
-                     ; rhs <- TcM.zonkTcTyVar fsk
-                     ; if lhs `tcEqType` rhs
-                       then do { TcM.addTcEvBind ev_binds
-                                   (ctEvId ev) (EvCoercion (mkTcNomReflCo rhs))
-                               ; return rest }
-                       else do { TcM.traceTc "finalise_funeqs 2" (ppr ct)
-                               ; return (mkNonCanonical ev : rest) } }
-             else do { tv_ty <- TcM.newFlexiTyVarTy (tyVarKind fsk)
-                     ; TcM.writeMetaTyVar fsk tv_ty
-                     ; return (mkNonCanonical ev : rest) } }
-    finalise_funeqs _ ct _ = pprPanic "finalise_funeq" (ppr ct)
--}
-
 tryFill :: DynFlags -> TcTyVar -> TcType -> CtEvidence -> TcS Bool
 -- (tryFill tv rhs ev) sees if 'tv' is an un-filled MetaTv
 -- If so, and if tv does not appear in 'rhs', set tv := rhs
 -- bind the evidence (which should be a CtWanted) to Refl<rhs>
 -- and return True.  Otherwise return False
 tryFill dflags tv rhs ev
-  = ASSERT( isWanted ev )  -- CFunEqCans are never Derived
+  = ASSERT2( not (isGiven ev), ppr ev )
     do { is_filled <- wrapTcS (TcM.isFilledMetaTyVar tv)
        ; if is_filled then return False else
     do { rhs' <- wrapTcS (TcM.zonkTcType rhs)
@@ -866,7 +843,7 @@ getInertGivens untch skol_tvs
     -- i.e. the current level
     ev_given_here ev
       =  isGiven ev
-      && untch == tcl_untch (ctl_env (ctev_loc ev))
+      && untch == tcl_untch (ctl_env (ctEvLoc ev))
 
     add_fsk :: Ct -> VarSet -> VarSet
     add_fsk ct fsks | CFunEqCan { cc_fsk = tv, cc_ev = ev } <- ct
@@ -1226,7 +1203,7 @@ traceFireTcS ev doc
     do { n <- TcM.readTcRef (tcs_count env)
        ; untch <- TcM.getUntouchables
        ; return (hang (int n <> brackets (ptext (sLit "U:") <> ppr untch 
-                                          <> ppr (ctLocDepth (ctev_loc ev))) 
+                                          <> ppr (ctLocDepth (ctEvLoc ev))) 
                        <+> doc <> colon)
                      4 (ppr ev)) } 
 
@@ -1624,7 +1601,7 @@ newFlattenSkolem ctxt_ev fam_ty
        ; ev <- newWantedEvVarNC loc (mkTcEqPred fam_ty (mkTyVarTy fuv))
        ; return (ev, fuv) }
   where
-    loc = ctev_loc ctxt_ev
+    loc = ctEvLoc ctxt_ev
 
 extendFlatCache :: TyCon -> [Type] -> (TcCoercion, TcTyVar) -> TcS ()
 extendFlatCache tc xi_args (co, fsk)

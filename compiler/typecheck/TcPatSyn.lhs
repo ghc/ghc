@@ -53,13 +53,14 @@ tcPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
        ; let (arg_names, is_infix) = case details of
                  PrefixPatSyn names      -> (map unLoc names, False)
                  InfixPatSyn name1 name2 -> (map unLoc [name1, name2], True)
-       ; ((lpat', args), wanted) <- captureConstraints       $
-                                    tcPat PatSyn lpat pat_ty $
-                                    mapM tcLookupId arg_names
+       ; (((lpat', args), untch), wanted) <- captureConstraints       $
+                                             captureUntouchables      $
+                                             tcPat PatSyn lpat pat_ty $
+                                             mapM tcLookupId arg_names
        ; let named_taus = (name, pat_ty):map (\arg -> (getName arg, varType arg)) args
 
        ; traceTc "tcPatSynDecl::wanted" (ppr named_taus $$ ppr wanted)
-       ; (qtvs, req_dicts, _mr_bites, ev_binds) <- simplifyInfer True False named_taus wanted
+       ; (qtvs, req_dicts, _mr_bites, ev_binds) <- simplifyInfer untch False named_taus wanted
 
        ; (ex_vars, prov_dicts) <- tcCollectEx lpat'
        ; let univ_tvs   = filter (not . (`elemVarSet` ex_vars)) qtvs

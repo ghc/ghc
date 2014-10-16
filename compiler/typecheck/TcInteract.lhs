@@ -507,7 +507,7 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
   = do { let is = findFunEqsByTyCon funeqs tc
        ; let interact = sfInteractInert ops args (lookupFlattenTyVar eqs fsk)
        ; impMbs <- sequence
-                 [ do mb <- newDerived (ctev_loc iev) (mkTcEqPred lhs_ty rhs_ty)
+                 [ do mb <- newDerived (ctEvLoc iev) (mkTcEqPred lhs_ty rhs_ty)
                       return (fmap mkNonCanonical mb)
                  | CFunEqCan { cc_tyargs = iargs
                              , cc_fsk = ifsk
@@ -717,6 +717,40 @@ canSolveByUnification untch gw tv xi
                        SkolemTv {} -> True
                        FlatSkol {} -> False
                        RuntimeUnk  -> True
+
+solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS ()
+-- Solve with the identity coercion
+-- Precondition: kind(xi) is a sub-kind of kind(tv)
+-- Precondition: CtEvidence is Wanted or Derived
+-- See [New Wanted Superclass Work] to see why solveByUnification
+--     must work for Derived as well as Wanted
+-- Returns: workItem where
+--        workItem = the new Given constraint
+--
+-- NB: No need for an occurs check here, because solveByUnification always
+--     arises from a CTyEqCan, a *canonical* constraint.  Its invariants
+--     say that in (a ~ xi), the type variable a does not appear in xi.
+--     See TcRnTypes.Ct invariants.
+--
+-- Post: tv ~ xi is now in TyBinds, no need to put in inerts as well
+-- see Note [Spontaneously solved in TyBinds]
+solveByUnification wd tv xi
+  = do { let tv_ty = mkTyVarTy tv
+       ; traceTcS "Sneaky unification:" $
+                       vcat [text "Unifies:" <+> ppr tv <+> ptext (sLit ":=") <+> ppr xi,
+                             text "Coercion:" <+> pprEq tv_ty xi,
+                             text "Left Kind is:" <+> ppr (typeKind tv_ty),
+                             text "Right Kind is:" <+> ppr (typeKind xi) ]
+
+       ; let xi' = defaultKind xi
+               -- We only instantiate kind unification variables
+               -- with simple kinds like *, not OpenKind or ArgKind
+               -- cf TcUnify.uUnboundKVar
+
+       ; setWantedTyBind tv xi'
+       ; when (isWanted wd) $
+         setEvBind (ctEvId wd) (EvCoercion (mkTcNomReflCo xi')) }
+
 
 givenFlavour :: CtEvidence
 -- Used just to pass to kickOutRewritable
@@ -932,41 +966,6 @@ enforce this at canonicalization]
 See also Note [No touchables as FunEq RHS] in TcSMonad; avoiding
 double unifications is the main reason we disallow touchable
 unification variables as RHS of type family equations: F xis ~ alpha.
-
-\begin{code}
-solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS ()
--- Solve with the identity coercion
--- Precondition: kind(xi) is a sub-kind of kind(tv)
--- Precondition: CtEvidence is Wanted or Derived
--- See [New Wanted Superclass Work] to see why solveByUnification
---     must work for Derived as well as Wanted
--- Returns: workItem where
---        workItem = the new Given constraint
---
--- NB: No need for an occurs check here, because solveByUnification always
---     arises from a CTyEqCan, a *canonical* constraint.  Its invariants
---     say that in (a ~ xi), the type variable a does not appear in xi.
---     See TcRnTypes.Ct invariants.
---
--- Post: tv ~ xi is now in TyBinds, no need to put in inerts as well
--- see Note [Spontaneously solved in TyBinds]
-solveByUnification wd tv xi
-  = do { let tv_ty = mkTyVarTy tv
-       ; traceTcS "Sneaky unification:" $
-                       vcat [text "Unifies:" <+> ppr tv <+> ptext (sLit ":=") <+> ppr xi,
-                             text "Coercion:" <+> pprEq tv_ty xi,
-                             text "Left Kind is:" <+> ppr (typeKind tv_ty),
-                             text "Right Kind is:" <+> ppr (typeKind xi) ]
-
-       ; let xi' = defaultKind xi
-               -- We only instantiate kind unification variables
-               -- with simple kinds like *, not OpenKind or ArgKind
-               -- cf TcUnify.uUnboundKVar
-
-       ; setWantedTyBind tv xi'
-       ; when (isWanted wd) $
-         setEvBind (ctEvId wd) (EvCoercion (mkTcNomReflCo xi')) }
-\end{code}
 
 
 
@@ -1390,7 +1389,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
   = try_fundeps_and_return
 
   | Just ev <- lookupSolvedDict inerts cls xis   -- Cached
-  , ctEvCheckDepth (ctLocDepth (ctev_loc fl)) ev
+  , ctEvCheckDepth (ctLocDepth loc) ev
   = do { setEvBind dict_id (ctEvTerm ev);
        ; stopWith fl "Dict/Top (cached)" }
 
@@ -1403,7 +1402,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
    where
      dict_id = ASSERT( isWanted fl ) ctEvId fl
      pred = mkClassPred cls xis
-     loc = ctev_loc fl
+     loc = ctEvLoc fl
 
      solve_from_instance :: [CtEvidence] -> EvTerm -> TcS (StopOrContinue Ct)
       -- Precondition: evidence term matches the predicate workItem
@@ -1496,7 +1495,7 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
               -- flattening, occurs-check, and ufsk := ufsk issues
           ; stopWith old_ev "Fun/Top (wanted)" } } }
   where
-    loc = ctev_loc old_ev
+    loc = ctEvLoc old_ev
     deeper_loc = bumpCtLocDepth CountTyFunApps loc
 
     try_improvement
@@ -1549,7 +1548,7 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
        ; updWorkListTcS (extendWorkListFunEq new_ct)
        ; stopWith old_ev "Fun/Top (wanted, shortcut)" }
   where
-    loc = ctev_loc old_ev
+    loc = ctEvLoc old_ev
     deeper_loc = bumpCtLocDepth CountTyFunApps loc
 
 dischargeFmv :: EvVar -> TcTyVar -> TcCoercion -> TcType -> TcS ()
