@@ -326,16 +326,16 @@ pprImm imm
 --      incase we store doubles in them.
 --
 pprSectionHeader :: Section -> SDoc
-pprSectionHeader seg
- = case seg of
-        Text                    -> ptext (sLit ".text\n\t.align 4")
-        Data                    -> ptext (sLit ".data\n\t.align 8")
-        ReadOnlyData            -> ptext (sLit ".text\n\t.align 8")
-        RelocatableReadOnlyData -> ptext (sLit ".text\n\t.align 8")
-        UninitialisedData       -> ptext (sLit ".bss\n\t.align 8")
-        ReadOnlyData16          -> ptext (sLit ".data\n\t.align 16")
-        StaticClosures          -> ptext (sLit ".section staticclosures,\"aw\"\n\t.align 8")
-        OtherSection _          -> panic "PprMach.pprSectionHeader: unknown section"
+pprSectionHeader seg = case seg of
+  Text              -> text ".text\n\t.align 4"
+  Data              -> text ".data\n\t.align 8"
+  ReadOnlyData      -> text ".text\n\t.align 8"
+  RelocatableReadOnlyData
+                    -> text ".text\n\t.align 8"
+  UninitialisedData -> text ".bss\n\t.align 8"
+  ReadOnlyData16    -> text ".data\n\t.align 16"
+  StaticClosures    -> text ".section staticclosures,\"aw\"\n\t.align 8"
+  OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
 
 
 -- | Pretty print a data item.
