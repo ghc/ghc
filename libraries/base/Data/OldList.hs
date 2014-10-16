@@ -787,9 +787,12 @@ inits                   = map toListSB . scanl' snocSB emptySB
 -- Note that 'tails' has the following strictness property:
 -- @tails _|_ = _|_ : _|_@
 tails                   :: [a] -> [[a]]
-tails xs                =  xs : case xs of
-                                  []      -> []
-                                  _ : xs' -> tails xs'
+{-# INLINABLE tails #-}
+tails lst               =  build (\c n ->
+  let tailsGo xs = xs `c` case xs of
+                             []      -> n
+                             _ : xs' -> tailsGo xs'
+  in tailsGo lst)
 
 -- | The 'subsequences' function returns the list of all subsequences of the argument.
 --
