@@ -3,9 +3,6 @@ module Main where
 
 import Control.Exception
 import Control.Concurrent
-#if __GLASGOW_HASKELL__ < 705
-import Prelude hiding (catch)
-#endif
 import System.Mem
 
 -- illustrates the BlockOnDeadMVar exception

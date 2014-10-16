@@ -413,6 +413,9 @@ pragAnnD target expr
       exp1 <- expr
       return $ PragmaD $ AnnP target exp1
 
+pragLineD :: Int -> String -> DecQ
+pragLineD line file = return $ PragmaD $ LineP line file
+
 familyNoKindD :: FamFlavour -> Name -> [TyVarBndr] -> DecQ
 familyNoKindD flav tc tvs = return $ FamilyD flav tc tvs Nothing
 

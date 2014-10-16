@@ -43,7 +43,7 @@ void initLinker (void);
 void initLinker_ (int retain_cafs);
 
 /* insert a symbol in the hash table */
-void insertSymbol(pathchar* obj_name, char* key, void* data);
+HsInt insertSymbol(pathchar* obj_name, char* key, void* data);
 
 /* lookup a symbol in the hash table */
 void *lookupSymbol( char *lbl );

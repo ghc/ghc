@@ -200,7 +200,7 @@ AC_MSG_CHECKING(whether bootstrap compiler is affected by bug 9439)
 echo "main = putStrLn \"%function\"" > conftestghc.hs
 
 # Check whether LLVM backend is default for this platform
-${WithGhc} conftestghc.hs 2>&1 >/dev/null
+"${WithGhc}" conftestghc.hs 2>&1 >/dev/null
 res=`./conftestghc`
 if test "x$res" == "x%object"
 then
@@ -217,7 +217,7 @@ fi
 
 # -fllvm is not the default, but set a flag so the Makefile can check
 # -for it in the build flags later on
-${WithGhc} -fforce-recomp -fllvm conftestghc.hs 2>&1 >/dev/null
+"${WithGhc}" -fforce-recomp -fllvm conftestghc.hs 2>&1 >/dev/null
 if test $? == 0
 then
     res=`./conftestghc`
@@ -895,6 +895,22 @@ AC_TRY_LINK_FUNC(printf\$LDBLStub,
         AC_DEFINE([HAVE_PRINTF_LDBLSTUB],[0],
             [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
     ])
+
+dnl ** pthread_setname_np is a recent addition to glibc, and OS X has
+dnl    a different single-argument version.
+AC_CHECK_LIB(pthread, pthread_setname_np)
+AC_MSG_CHECKING(for pthread_setname_np)
+AC_TRY_LINK(
+[
+#define _GNU_SOURCE
+#include <pthread.h>
+],
+[pthread_setname_np(pthread_self(), "name");],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE([HAVE_PTHREAD_SETNAME_NP], [1],
+      [Define to 1 if you have the glibc version of pthread_setname_np]),
+    AC_MSG_RESULT(no)
+)
 
 dnl ** check for eventfd which is needed by the I/O manager
 AC_CHECK_HEADERS([sys/eventfd.h])

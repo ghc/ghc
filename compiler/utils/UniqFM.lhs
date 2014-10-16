@@ -265,18 +265,11 @@ plusUFM (UFM x) (UFM y) = UFM (M.union y x)
 plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
 
 plusUFM_CD f (UFM xm) dx (UFM ym) dy
-{-
-The following implementation should be used as soon as we can expect
-containers-0.5; presumably from GHC 7.9 on:
     = UFM $ M.mergeWithKey
         (\_ x y -> Just (x `f` y))
         (M.map (\x -> x `f` dy))
         (M.map (\y -> dx `f` y))
         xm ym
--}
-    = UFM $ M.intersectionWith f xm ym
-        `M.union` M.map (\x -> x  `f` dy) xm
-        `M.union` M.map (\y -> dx `f`  y) ym
 minusUFM (UFM x) (UFM y) = UFM (M.difference x y)
 intersectUFM (UFM x) (UFM y) = UFM (M.intersection x y)
 intersectUFM_C f (UFM x) (UFM y) = UFM (M.intersectionWith f x y)

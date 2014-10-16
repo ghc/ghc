@@ -10500,6 +10500,11 @@ happen.
       42 in the original.  GHC will adjust its error messages to refer
       to the line/file named in the <literal>LINE</literal>
       pragma.</para>
+
+      <para><literal>LINE</literal> pragmas generated from Template Haskell set
+      the file and line position for the duration of the splice and are limited
+      to the splice. Note that because Template Haskell splices abstract syntax,
+      the file positions are not automatically advanced.</para>
     </sect2>
 
     <sect2 id="rules">

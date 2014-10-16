@@ -72,7 +72,7 @@ module Text.ParserCombinators.ReadP
   )
  where
 
-import {-# SOURCE #-} GHC.Unicode ( isSpace )
+import GHC.Unicode ( isSpace )
 import GHC.List ( replicate, null )
 import GHC.Base hiding ( many )
 

@@ -406,7 +406,6 @@ Type-family equations, of form (ev : F tys ~ ty), live in three places
 
   * THe inert_funeqs are un-solved but fully processed and in the InertCans.
 
-
 \begin{code}
 -- All Given (fully known) or Wanted or Derived
 -- See Note [Detailed InertCans Invariants] for more

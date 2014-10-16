@@ -56,7 +56,7 @@ libraries/binary             -           -                               https:/
 libraries/bytestring         -           -                               https://github.com/haskell/bytestring.git
 libraries/Cabal              -           -                               https://github.com/haskell/cabal.git
 libraries/containers         -           -                               https://github.com/haskell/containers.git
-libraries/deepseq            -           -                               -
+libraries/deepseq            -           -                               ssh://git@github.com/haskell/deepseq.git
 libraries/directory          -           -                               ssh://git@github.com/haskell/directory.git
 libraries/filepath           -           -                               ssh://git@github.com/haskell/filepath.git
 libraries/haskeline          -           -                               https://github.com/judah/haskeline.git

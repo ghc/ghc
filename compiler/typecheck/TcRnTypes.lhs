@@ -1013,6 +1013,31 @@ We can't require *equal* kinds, because
                eg   alpha::? ~ Int
      * a solved wanted constraint becomes a given
 
+Note [Kind orientation for CFunEqCan]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For (F xis ~ rhs) we require that kind(lhs) is a subkind of kind(rhs).
+This really only maters when rhs is an Open type variable (since only type
+variables have Open kinds):
+   F ty ~ (a:Open)
+which can happen, say, from
+      f :: F a b
+      f = undefined   -- The a:Open comes from instantiating 'undefined'
+
+Note that the kind invariant is maintained by rewriting.
+Eg wanted1 rewrites wanted2; if both were compatible kinds before,
+   wanted2 will be afterwards.  Similarly givens.
+
+Caveat:
+  - Givens from higher-rank, such as:
+          type family T b :: * -> * -> *
+          type instance T Bool = (->)
+
+          f :: forall a. ((T a ~ (->)) => ...) -> a -> ...
+          flop = f (...) True
+     Whereas we would be able to apply the type instance, we would not be able to
+     use the given (T Bool ~ (->)) in the body of 'flop'
+
+
 Note [CIrredEvCan constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 CIrredEvCan constraints are used for constraints that are "stuck"

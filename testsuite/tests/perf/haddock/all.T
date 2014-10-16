@@ -5,7 +5,7 @@
 test('haddock.base',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 7901230808,  5)
+          [(wordsize(64), 8322584616,  5)
             # 2012-08-14: 5920822352 (amd64/Linux)
             # 2012-09-20: 5829972376 (amd64/Linux)
             # 2012-10-08: 5902601224 (amd64/Linux)
@@ -20,6 +20,7 @@ test('haddock.base',
             # 2014-08-08: 7946284944 (x86_64/Linux - Haddock updates to attoparsec-0.12.1.0)
             # 2014-09-09: 8354439016 (x86_64/Linux - Applicative/Monad changes, according to Austin)
             # 2014-09-10: 7901230808 (x86_64/Linux - Applicative/Monad changes, according to Joachim)
+            # 2014-10-07: 8322584616 (x86_64/Linux)
           ,(platform('i386-unknown-mingw32'), 3746792812, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
             # 2013-11-13:                     3097751052 (x86/Windows, 64bit machine)
@@ -40,7 +41,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 5840893376, 5)
+          [(wordsize(64), 6019839624, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -57,6 +58,7 @@ test('haddock.Cabal',
             # 2014-09-09: 4660249216 (x86_64/Linux - Applicative/Monad changes according to Austin)
             # 2014-09-10: 4500376192 (x86_64/Linux - Applicative/Monad changes according to Joachim)
             # 2014-09-24: 5840893376 (x86_64/Linux - Cabal update)
+            # 2014-10-04: 6019839624 (x86_64/Linux - Burning Bridges, Cabal update)
 
           ,(platform('i386-unknown-mingw32'), 2052220292, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)

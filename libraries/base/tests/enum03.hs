@@ -2,9 +2,6 @@
 {-# LANGUAGE CPP #-}
 module Main(main) where
 
-#if __GLASGOW_HASKELL__ < 705
-import Prelude hiding (catch)
-#endif
 import Control.Exception
 import Data.Word
 import Data.Int
