@@ -3704,8 +3704,10 @@ allocateImageAndTrampolines (
                         PAGE_EXECUTE_READWRITE);
 
    if (image == NULL) {
-       errorBelch("%" PATH_FMT ": failed to allocate memory for image",
+/*       errorBelch("%" PATH_FMT ": failed to allocate memory for image",
                   arch_name);
+*/
+       errorBelch( "Failed to allocate memory for image (windows)" );
        return NULL;
    }
 

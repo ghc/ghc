@@ -34,7 +34,6 @@ import ConLike
 import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import Type( tidyOpenType )
-import FunDeps( growThetaTyVars )
 import TyCon
 import TcType
 import TysPrim

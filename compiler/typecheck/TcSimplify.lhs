@@ -2,7 +2,8 @@
 {-# LANGUAGE CPP #-}
 
 module TcSimplify(
-       simplifyInfer, quantifyPred,
+       simplifyInfer, 
+       quantifyPred, growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,
        simplifyRule, simplifyTop, simplifyInteractive,
@@ -20,9 +21,9 @@ import TcSMonad as TcS
 import TcInteract
 import Kind     ( isKind, isSubKind, defaultKind_maybe )
 import Inst
-import FunDeps  ( growThetaTyVars )
 import Type     ( classifyPredType, PredTree(..), getClassPredTys_maybe )
 import Class    ( Class )
+import Id       ( idType )
 import Var
 import Unique
 import VarSet
@@ -315,8 +316,7 @@ simplifyInfer rhs_untch apply_mr name_taus wanteds
                               runTcSWithEvBinds null_ev_binds_var $
                               do { mapM_ (promoteAndDefaultTyVar rhs_untch gbl_tvs) meta_tvs
                                      -- See Note [Promote _and_ default when inferring]
-                                 ; solveInteract quant_cand
-                                 ; getInertUnsolved }
+                                 ; solveFlatWanteds quant_cand }
 
                       ; return [ ctEvPred ev | ct <- bagToList flats
                                              , let ev = ctEvidence ct
@@ -332,24 +332,6 @@ simplifyInfer rhs_untch apply_mr name_taus wanteds
        ; runTcSWithEvBinds null_ev_binds_var $  -- runTcS just to get the types right :-(
          mapM_ (promoteTyVar outer_untch) (varSetElems (zonked_tau_tvs `intersectVarSet` mono_tvs))
 
-       ; traceTc "simplifyWithApprox" $
-         vcat [ ptext (sLit "quant_pred_candidates =") <+> ppr quant_pred_candidates
-              , ptext (sLit "zonked_tau_tvs=") <+> ppr zonked_tau_tvs
-              , ptext (sLit "mono_tvs=") <+> ppr mono_tvs
-              , ptext (sLit "bound =") <+> ppr bound
-              , ptext (sLit "mr_bites =") <+> ppr mr_bites
-              , ptext (sLit "qtvs =") <+> ppr qtvs ]
-
---       ; if null qtvs && null bound
---         then do { traceTc "} simplifyInfer/no implication needed" empty
---                 ; emitConstraints wanted_transformed
---                    -- Includes insolubles (if -fdefer-type-errors)
---                    -- as well as flats and implications
---                 ; return ([], [], mr_bites, TcEvBinds ev_binds_var) }
---         else do
-
---      {     -- Step 7) Emit an implication
-            -- See Trac #9633 for an instructive example 
        ; let minimal_flat_preds = mkMinimalBySCs bound
                   -- See Note [Minimize by Superclasses]
              skol_info = InferSkol [ (name, mkSigmaTy [] minimal_flat_preds ty)
@@ -371,25 +353,49 @@ simplifyInfer rhs_untch apply_mr name_taus wanteds
        ; emitImplication implic
 
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
-             vcat [ ptext (sLit "implic =") <+> ppr implic
-                       -- ic_skols, ic_given give rest of result
-                  , ptext (sLit "qtvs =") <+> ppr qtvs
-                  , ptext (sLit "spb =") <+> ppr quant_pred_candidates
-                  , ptext (sLit "bound =") <+> ppr bound ]
+         vcat [ ptext (sLit "quant_pred_candidates =") <+> ppr quant_pred_candidates
+              , ptext (sLit "zonked_tau_tvs=") <+> ppr zonked_tau_tvs
+              , ptext (sLit "mono_tvs=") <+> ppr mono_tvs
+              , ptext (sLit "bound =") <+> ppr bound
+              , ptext (sLit "minimal_bound =") <+> vcat [ ppr v <+> dcolon <+> ppr (idType v) 
+                                                        | v <- minimal_bound_ev_vars]
+              , ptext (sLit "mr_bites =") <+> ppr mr_bites
+              , ptext (sLit "qtvs =") <+> ppr qtvs
+              , ptext (sLit "implic =") <+> ppr implic ]
 
        ; return ( qtvs, minimal_bound_ev_vars
                 , mr_bites,  TcEvBinds ev_binds_var) } 
 
-------------------
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+                Quantification
+%*                                                                      *
+%************************************************************************
+
+Note [Growing the tau-tvs using constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(growThetaTyVars insts tvs) is the result of extending the set
+    of tyvars tvs using all conceivable links from pred
+
+E.g. tvs = {a}, preds = {H [a] b, K (b,Int) c, Eq e}
+Then growThetaTyVars preds tvs = {a,b,c}
+
+Notice that
+   growThetaTyVars is conservative       if v might be fixed by vs
+                                         => v `elem` grow(vs,C)
+
+\begin{code}
 decideQuantification :: Bool -> [PredType] -> TcTyVarSet
                      -> TcM ( TcTyVarSet      -- Do not quantify over these
                             , [TcTyVar]       -- Do quantify over these
                             , [PredType]      -- and these
                             , Bool )          -- Did the MR bite?
-decideQuantification apply_mr quant_pred_candidates zonked_tau_tvs
+decideQuantification apply_mr constraints zonked_tau_tvs
   | apply_mr     -- Apply the Monomorphism restriction
   = do { gbl_tvs <- tcGetGlobalTyVars
-       ; let constrained_tvs = tyVarsOfTypes quant_pred_candidates
+       ; let constrained_tvs = tyVarsOfTypes constraints
              mono_tvs = gbl_tvs `unionVarSet` constrained_tvs
              mr_bites = constrained_tvs `intersectsVarSet` zonked_tau_tvs
        ; qtvs <- quantifyTyVars mono_tvs zonked_tau_tvs
@@ -397,21 +403,36 @@ decideQuantification apply_mr quant_pred_candidates zonked_tau_tvs
 
   | otherwise
   = do { gbl_tvs <- tcGetGlobalTyVars
-       ; let (ips, non_ips) = partition isIPPred quant_pred_candidates
-                               -- Note [Inheriting implicit parameters]
-             mono_tvs   = growThetaTyVars (filter isEqPred non_ips) gbl_tvs
-             seed_tvs   = zonked_tau_tvs `unionVarSet` tyVarsOfTypes ips
-             poly_qtvs  = growThetaTyVars quant_pred_candidates seed_tvs
+       ; let mono_tvs   = growThetaTyVars (filter isEqPred constraints) gbl_tvs
+             poly_qtvs  = growThetaTyVars constraints zonked_tau_tvs
                           `minusVarSet` mono_tvs
-             theta      = filter (quantifyPred  poly_qtvs) quant_pred_candidates
+             theta      = filter (quantifyPred poly_qtvs) constraints
        ; qtvs <- quantifyTyVars mono_tvs poly_qtvs
        ; return (mono_tvs, qtvs, theta, False) }
+
+------------------
+growThetaTyVars :: ThetaType -> TyVarSet -> TyVarSet
+-- See Note [Growing the tau-tvs using constraints]
+growThetaTyVars theta tvs
+  | null theta             = tvs
+  | isEmptyVarSet seed_tvs = tvs
+  | otherwise              = fixVarSet mk_next seed_tvs
+  where
+    seed_tvs = tvs `unionVarSet` tyVarsOfTypes ips
+    (ips, non_ips) = partition isIPPred theta
+                         -- See note [Inheriting implicit parameters]
+    mk_next tvs = foldr grow_one tvs non_ips
+    grow_one pred tvs
+       | pred_tvs `intersectsVarSet` tvs = tvs `unionVarSet` pred_tvs
+       | otherwise                       = tvs
+       where
+         pred_tvs = tyVarsOfType pred
 
 ------------------
 quantifyPred :: TyVarSet           -- Quantifying over these
              -> PredType -> Bool   -- True <=> quantify over this wanted
 quantifyPred qtvs pred
-  | isIPPred pred = True
+  | isIPPred pred = True           -- See note [Inheriting implicit parameters]
   | otherwise     = tyVarsOfType pred `intersectsVarSet` qtvs
 \end{code}
 
@@ -710,8 +731,7 @@ solveFlats (WC { wc_flat = flats, wc_insol = insols, wc_impl = implics })
     do { let all_flats = flats `unionBags` filterBag (not . isDerivedCt) insols
                      -- See Note [Dropping derived constraints] in TcRnTypes for
                      -- why the insolubles may have derived constraints
-       ; solveInteract all_flats
-       ; wc <- getInertUnsolved
+       ; wc <- solveFlatWanteds all_flats
        ; return ( wc { wc_impl = implics `unionBags` wc_impl wc } ) }
 
 simpl_loop :: Int
@@ -794,7 +814,7 @@ solveImplication imp@(Implic { ic_untch  = untch
          -- Solve the nested constraints
        ; (no_given_eqs, residual_wanted)
              <- nestImplicTcS ev_binds untch $
-               do { solveInteractGiven (mkGivenLoc untch info env) givens
+               do { solveFlatGivens (mkGivenLoc untch info env) givens
 
                   ; residual_wanted <- solveWanteds wanteds
                         -- solveWanteds, *not* solveWantedsAndDrop, because
@@ -1061,13 +1081,11 @@ beta! Concrete example is in indexed_types/should_fail/ExtraTcsUntch.hs:
     data TEx where
       TEx :: a -> TEx
 
-
     f (x::beta) =
         let g1 :: forall b. b -> ()
             g1 _ = h [x]
             g2 z = case z of TEx y -> (h [[undefined]], op x [y])
         in (g1 '3', g2 undefined)
-
 
 
 Note [Solving Family Equations]
@@ -1259,7 +1277,7 @@ xCtEvidence and rewriteEvidence both do).  Example
 
 An alternative we considered was to
   * Accumulate the new inert equalities (in TcSMonad.addInertCan)
-  * In solveInteractGiven, check whether the evidence for the new
+  * In solveFlatGivens, check whether the evidence for the new
     equalities mentions any of the ic_givens of this implication.
 This seems like the Right Thing, but it's more code, and more work
 at runtime, so we are using the FlatSkolOrigin idea intead. It's less
@@ -1459,9 +1477,8 @@ disambigGroup (default_ty:default_tys) group
        ; given_ev_var      <- TcS.newEvVar (mkTcEqPred (mkTyVarTy the_tv) default_ty)
        ; untch             <- TcS.getUntouchables
        ; success <- nestImplicTcS fake_ev_binds_var (pushUntouchables untch) $
-                    do { solveInteractGiven loc [given_ev_var]
-                       ; solveInteract wanteds
-                       ; residual_wanted <- getInertUnsolved
+                    do { solveFlatGivens loc [given_ev_var]
+                       ; residual_wanted <- solveFlatWanteds wanteds
                        ; return (isEmptyWC residual_wanted) }
 
        ; if success then

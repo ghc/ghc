@@ -28,7 +28,6 @@ import TcSMonad
 
 import Util
 import BasicTypes
-import Maybes( catMaybes )
 \end{code}
 
 
@@ -318,8 +317,7 @@ newSCWorkFromFlavored flavor cls xis
              impr_theta   = filter is_improvement_pty sc_rec_theta
              loc          = ctEvLoc flavor
        ; traceTcS "newSCWork/Derived" $ text "impr_theta =" <+> ppr impr_theta
-       ; mb_der_evs <- mapM (newDerived loc) impr_theta
-       ; emitWorkNC (catMaybes mb_der_evs) }
+       ; mapM_ (emitNewDerived loc) impr_theta }
 
 is_improvement_pty :: PredType -> Bool
 -- Either it's an equality, or has some functional dependency
@@ -1279,10 +1277,7 @@ incompatibleKind new_ev s1 k1 s2 k2   -- See Note [Equalities with incompatible 
     do { traceTcS "canEqLeaf: incompatible kinds" (vcat [ppr k1, ppr k2])
 
          -- Create a derived kind-equality, and solve it
-       ; mw <- newDerived kind_co_loc (mkTcEqPred k1 k2)
-       ; case mw of
-           Nothing  -> return ()
-           Just kev -> emitWorkNC [kev]
+       ; emitNewDerived kind_co_loc (mkTcEqPred k1 k2)
 
          -- Put the not-currently-soluble thing into the inert set
        ; continueWith (CIrredEvCan { cc_ev = new_ev }) }

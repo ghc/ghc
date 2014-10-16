@@ -2,8 +2,8 @@
 {-# LANGUAGE CPP #-}
 
 module TcInteract (
-     solveInteractGiven,  -- Solves [EvVar],GivenLoc
-     solveInteract,       -- Solves Cts
+     solveFlatGivens,    -- Solves [EvVar],GivenLoc
+     solveFlatWanteds    -- Solves Cts
   ) where
 
 #include "HsVersions.h"
@@ -38,8 +38,6 @@ import TcErrors
 import TcSMonad
 import Bag
 
-import Control.Monad ( foldM )
-import Data.Maybe ( catMaybes )
 import Data.List( partition )
 
 import VarEnv
@@ -82,27 +80,32 @@ If in Step 1 no such element exists, we have exceeded our context-stack
 depth and will simply fail.
 
 \begin{code}
-solveInteractGiven :: CtLoc -> [EvVar] -> TcS ()
-solveInteractGiven loc givens
+solveFlatGivens :: CtLoc -> [EvVar] -> TcS ()
+solveFlatGivens loc givens
   | null givens  -- Shortcut for common case
   = return ()
   | otherwise
-  = solveInteract given_bag
+  = solveFlats given_bag
   where
     given_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_evtm = EvId ev_id
                                                      , ctev_pred = evVarPred ev_id
                                                      , ctev_loc = loc }
                           | ev_id <- givens ]
 
+solveFlatWanteds :: Cts -> TcS WantedConstraints
+solveFlatWanteds wanteds
+  = do { solveFlats wanteds
+       ; getInertUnsolved }
+
 -- The main solver loop implements Note [Basic Simplifier Plan]
 ---------------------------------------------------------------
-solveInteract :: Cts -> TcS ()
+solveFlats :: Cts -> TcS ()
 -- Returns the final InertSet in TcS
 -- Has no effect on work-list or residual-iplications
 -- The constraints are initially examined in left-to-right order
 
-solveInteract cts
-  = {-# SCC "solveInteract" #-}
+solveFlats cts
+  = {-# SCC "solveFlats" #-}
     do { dyn_flags <- getDynFlags
        ; updWorkListTcS (\wl -> foldrBag extendWorkListCt wl cts)
        ; solve_loop (maxSubGoalDepth dyn_flags) }
@@ -399,21 +402,13 @@ addFunDepWork work_ct inert_ct
   = do {  let fd_eqns :: [Equation CtLoc]
               fd_eqns = [ eqn { fd_loc = derived_loc }
                         | eqn <- improveFromAnother inert_pred work_pred ]
-       ; fd_work <- rewriteWithFunDeps fd_eqns
+       ; rewriteWithFunDeps fd_eqns
                 -- We don't really rewrite tys2, see below _rewritten_tys2, so that's ok
                 -- NB: We do create FDs for given to report insoluble equations that arise
                 -- from pairs of Givens, and also because of floating when we approximate
                 -- implications. The relevant test is: typecheck/should_fail/FDsFromGivens.hs
                 -- Also see Note [When improvement happens]
-
-       ; traceTcS "addFuNDepWork"
-                  (vcat [ text "inertItem =" <+> ppr inert_ct
-                        , text "workItem  =" <+> ppr work_ct
-                        , text "fundeps =" <+> ppr fd_work ])
-
-       ; case fd_work of
-           [] -> return ()
-           _  -> updWorkListTcS (extendWorkListCts fd_work)    }
+    }
   where
     work_pred  = ctPred work_ct
     inert_pred = ctPred inert_ct
@@ -504,21 +499,15 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
          ; stopWith ev "Work item rewrites inert" }
 
   | Just ops <- isBuiltInSynFamTyCon_maybe tc
-  = do { let is = findFunEqsByTyCon funeqs tc
+  = do { let matching_funeqs = findFunEqsByTyCon funeqs tc
        ; let interact = sfInteractInert ops args (lookupFlattenTyVar eqs fsk)
-       ; impMbs <- sequence
-                 [ do mb <- newDerived (ctEvLoc iev) (mkTcEqPred lhs_ty rhs_ty)
-                      return (fmap mkNonCanonical mb)
-                 | CFunEqCan { cc_tyargs = iargs
-                             , cc_fsk = ifsk
-                             , cc_ev = iev } <- is
-                 , Pair lhs_ty rhs_ty <- interact iargs (lookupFlattenTyVar eqs ifsk)
-                 ]
-       ; let imps = catMaybes impMbs
-       ; traceTcS "builtInCandidates 1: " $ vcat [ ptext (sLit "Candidates:") <+> ppr is
-                                                 , ptext (sLit "improvements:") <+> ppr imps
+             do_one (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk, cc_ev = iev })
+                = mapM_ (emitNewDerivedEq (ctEvLoc iev)) 
+                        (interact iargs (lookupFlattenTyVar eqs ifsk))
+             do_one ct = pprPanic "interactFunEq" (ppr ct)
+       ; mapM_ do_one matching_funeqs
+       ; traceTcS "builtInCandidates 1: " $ vcat [ ptext (sLit "Candidates:") <+> ppr matching_funeqs
                                                  , ptext (sLit "TvEqs:") <+> ppr eqs ]
-       ; unless (null imps) $ updWorkListTcS (extendWorkListCts imps)
        ; return (ContinueWith workItem) }
 
   | otherwise
@@ -1314,36 +1303,21 @@ To achieve this required some refactoring of FunDeps.lhs (nicer
 now!).
 
 \begin{code}
-rewriteWithFunDeps :: [Equation CtLoc] -> TcS [Ct]
+rewriteWithFunDeps :: [Equation CtLoc] -> TcS ()
 -- NB: The returned constraints are all Derived
 -- Post: returns no trivial equalities (identities) and all EvVars returned are fresh
 rewriteWithFunDeps eqn_pred_locs
- = do { fd_cts <- mapM instFunDepEqn eqn_pred_locs
-      ; return (concat fd_cts) }
+ = mapM_ instFunDepEqn eqn_pred_locs
 
-instFunDepEqn :: Equation CtLoc -> TcS [Ct]
+instFunDepEqn :: Equation CtLoc -> TcS ()
 -- Post: Returns the position index as well as the corresponding FunDep equality
 instFunDepEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = loc })
   = do { (subst, _) <- instFlexiTcS tvs  -- Takes account of kind substitution
-       ; foldM (do_one subst) [] eqs }
+       ; mapM_ (do_one subst) eqs }
   where
-    do_one subst ievs (FDEq { fd_ty_left = ty1, fd_ty_right = ty2 })
-       | tcEqType sty1 sty2
-       = return ievs -- Return no trivial equalities
-       | otherwise
-       = do { mb_eqv <- newDerived loc (mkTcEqPred sty1 sty2)
-            ; case mb_eqv of
-                 Just ev -> return (mkNonCanonical (ev {ctev_loc = loc}) : ievs)
-                 Nothing -> return ievs }
-                   -- We are eventually going to emit FD work back in the work list so
-                   -- it is important that we only return the /freshly created/ and not
-                   -- some existing equality!
-       where
-         sty1 = Type.substTy subst ty1
-         sty2 = Type.substTy subst ty2
+    do_one subst (FDEq { fd_ty_left = ty1, fd_ty_right = ty2 })
+       = emitNewDerivedEq loc (Pair (Type.substTy subst ty1) (Type.substTy subst ty2))
 \end{code}
-
-
 
 
 *********************************************************************************
@@ -1432,11 +1406,8 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
                   fd_eqns = [ fd { fd_loc = loc { ctl_origin = FunDepOrigin2 pred (ctl_origin loc)
                                                                              inst_pred inst_loc } }
                             | fd@(FDEqn { fd_loc = inst_loc, fd_pred1 = inst_pred })
-                                 <- improveFromInstEnv instEnvs pred ]
-            ; fd_work <- rewriteWithFunDeps fd_eqns
-            ; unless (null fd_work) $
-              do { traceTcS "Addig FD work" (ppr pred $$ vcat (map pprEquation fd_eqns) $$ ppr fd_work)
-                 ; updWorkListTcS (extendWorkListCts fd_work) }
+                            <- improveFromInstEnv instEnvs pred ]
+            ; rewriteWithFunDeps fd_eqns
             ; continueWith work_item }
 
 doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
@@ -1502,9 +1473,7 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
       | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
       = do { inert_eqs <- getInertEqs
            ; let eqns = sfInteractTop ops args (lookupFlattenTyVar inert_eqs fsk)
-           ; impsMb <- mapM (\(Pair x y) -> newDerived loc (mkTcEqPred x y)) eqns
-           ; let work = map mkNonCanonical (catMaybes impsMb)
-           ; unless (null work) (updWorkListTcS (extendWorkListCts work)) }
+           ; mapM_ (emitNewDerivedEq loc) eqns }
       | otherwise
       = return ()
 

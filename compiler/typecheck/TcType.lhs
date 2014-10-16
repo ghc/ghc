@@ -420,7 +420,7 @@ The same idea of only unifying touchables solves another problem.
 Suppose we had
    (F Int ~ uf[0])  /\  [1](forall a. C a => F Int ~ beta[1])
 In this example, beta is touchable inside the implication. The
-first solveInteract step leaves 'uf' un-unified. Then we move inside
+first solveFlatWanteds step leaves 'uf' un-unified. Then we move inside
 the implication where a new constraint
        uf  ~  beta
 emerges. If we (wrongly) spontaneously solved it to get uf := beta,

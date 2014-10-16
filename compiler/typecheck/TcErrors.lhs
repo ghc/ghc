@@ -1071,7 +1071,7 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
 
     add_to_ctxt_fixes has_ambig_tvs
       | not has_ambig_tvs && all_tyvars
-      , (orig:origs) <- mapMaybe get_good_orig (cec_encl ctxt)
+      , (orig:origs) <- usefulContext ctxt pred 
       = [sep [ ptext (sLit "add") <+> pprParendType pred
                <+> ptext (sLit "to the context of")
              , nest 2 $ ppr_skol orig $$
@@ -1081,11 +1081,6 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
 
     ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
     ppr_skol skol_info      = ppr skol_info
-
-        -- Do not suggest adding constraints to an *inferred* type signature!
-    get_good_orig ic = case ic_info ic of
-                         SigSkol (InfSigCtxt {}) _ -> Nothing
-                         origin                    -> Just origin
 
     no_inst_msg
       | clas == coercibleClass
@@ -1220,6 +1215,22 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
                     2 (sep [ ptext (sLit "of newtype") <+> quotes (pprSourceTyCon tc)
                            , ptext (sLit "is not in scope") ])
         | otherwise = Nothing
+
+usefulContext :: ReportErrCtxt -> TcPredType -> [SkolemInfo]
+usefulContext ctxt pred
+  = go (cec_encl ctxt)
+  where
+    pred_tvs = tyVarsOfType pred
+    go [] = []
+    go (ic : ics)
+       = case ic_info ic of
+               -- Do not suggest adding constraints to an *inferred* type signature!
+           SigSkol (InfSigCtxt {}) _ -> rest
+           info                      -> info : rest
+       where
+          -- Stop when the context binds a variable free in the predicate
+          rest | any (`elemVarSet` pred_tvs) (ic_skols ic) = []
+               | otherwise                                 = go ics
 
 show_fixes :: [SDoc] -> SDoc
 show_fixes []     = empty

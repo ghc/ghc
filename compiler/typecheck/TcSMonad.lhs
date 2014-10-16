@@ -49,7 +49,8 @@ module TcSMonad (
     maybeSym,
 
     newTcEvBinds, newWantedEvVar, newWantedEvVarNC, newWantedEvVarNonrec, 
-    newEvVar, newGivenEvVar, newDerived,
+    newEvVar, newGivenEvVar, newDerived, 
+    emitNewDerived, emitNewDerivedEq,
     instDFunConstraints,
 
        -- Creation of evidence variables
@@ -140,13 +141,13 @@ import TcRnTypes
 import BasicTypes
 import Unique
 import UniqFM
-import Maybes ( orElse, catMaybes, firstJusts )
-import Pair ( pSnd )
+import Maybes ( orElse, firstJusts )
 
 import TrieMap
 import Control.Monad( ap, when, unless )
 import MonadUtils
 import Data.IORef
+import Pair
 
 #ifdef DEBUG
 import Digraph
@@ -1734,14 +1735,33 @@ newWantedEvVar loc pty
                     ; traceTcS "newWantedEvVar/cache miss" $ ppr ctev
                     ; return (Fresh ctev) } }
 
+emitNewDerivedEq :: CtLoc -> Pair TcType -> TcS ()
+-- Create new Derived and put it in the work list
+emitNewDerivedEq loc (Pair ty1 ty2)
+  | ty1 `tcEqType` ty2   -- Quite common!
+  = return ()
+  | otherwise
+  = emitNewDerived loc (mkTcEqPred ty1 ty2)
+
+emitNewDerived :: CtLoc -> TcPredType -> TcS ()
+-- Create new Derived and put it in the work list
+emitNewDerived loc pred
+  = do { mb_ct <- lookupInInerts pred
+       ; case mb_ct of
+           Just {} -> return ()
+           Nothing -> do { traceTcS "Emitting [D]" (ppr der_ct)
+                         ; updWorkListTcS (extendWorkListCt der_ct) } }
+  where
+    der_ct = mkNonCanonical (CtDerived { ctev_pred = pred, ctev_loc = loc })
+
 newDerived :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Returns Nothing    if cached,
 --         Just pred  if not cached
-newDerived loc pty
-  = do { mb_ct <- lookupInInerts pty
+newDerived loc pred
+  = do { mb_ct <- lookupInInerts pred
        ; return (case mb_ct of
                     Just {} -> Nothing
-                    Nothing -> Just (CtDerived { ctev_pred = pty, ctev_loc = loc })) }
+                    Nothing -> Just (CtDerived { ctev_pred = pred, ctev_loc = loc })) }
 
 instDFunConstraints :: CtLoc -> TcThetaType -> TcS [MaybeNew]
 instDFunConstraints loc = mapM (newWantedEvVar loc)
@@ -1848,8 +1868,7 @@ xCtEvidence (CtGiven { ctev_evtm = tm, ctev_loc = loc })
 
 xCtEvidence (CtDerived { ctev_loc = loc })
             (XEvTerm { ev_preds = ptys })
-  = do { ders <- mapM (newDerived loc) ptys
-       ; emitWorkNC (catMaybes ders) }
+  = mapM_ (emitNewDerived loc) ptys
 
 -----------------------------
 data StopOrContinue a
