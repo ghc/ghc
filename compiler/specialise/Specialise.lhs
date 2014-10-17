@@ -1196,8 +1196,12 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                            Just this_mod  -- Specialising imoprted fn
                                -> ptext (sLit "SPEC/") <> ppr this_mod
 
-                rule_name = mkFastString $ showSDocDump dflags $
+                rule_name = mkFastString $ showSDocForUser dflags neverQualify $
                             herald <+> ppr fn <+> hsep (map ppr_call_key_ty call_ts)
+                            -- This name ends up in interface files, so use showSDocForUser,
+                            -- otherwise uniques end up there, making builds
+                            -- less deterministic (See #4012 comment:61 ff)
+
                 spec_env_rule = mkRule True {- Auto generated -} is_local
                                   rule_name
                                   inl_act       -- Note [Auto-specialisation and RULES]
