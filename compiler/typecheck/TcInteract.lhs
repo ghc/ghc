@@ -40,7 +40,7 @@ import Bag
 
 import Control.Monad ( foldM )
 import Data.Maybe ( catMaybes )
-import Data.List( partition )
+import Data.List( partition, foldl' )
 
 import VarEnv
 
@@ -143,38 +143,49 @@ runTcPlugin :: TcPluginSolver -> TcS ()
 runTcPlugin solver =
   do iSet <- getTcSInerts
      let iCans    = inert_cans iSet
-         iEqs     = concat (varEnvElts (inert_eqs iCans))
-         iFunEqs  = funEqsToList (inert_funeqs iCans)
-         allCts   = iEqs ++ iFunEqs
+         allCts   = foldDicts  (:) (inert_dicts iCans)
+                  $ foldFunEqs (:) (inert_funeqs iCans)
+                  $ concat (varEnvElts (inert_eqs iCans))
+
          (derived,other) = partition isDerivedCt allCts
          (wanted,given)  = partition isWantedCt  other
 
-         -- We use this to remove some constraints.
-         -- 'survived' should be the sub-set of constraints that
-         -- remains inert.
-         restoreICans survived =
-           do let iCans1 = iCans { inert_eqs = emptyVarEnv
-                                 , inert_funeqs = emptyFunEqs }
-                  iCans2 = foldl addInertCan iCans1 derived
-                  iCans3 = foldl addInertCan iCans2 survived
-              setInertCans iCans3
-
-     result <- runTcPluginTcS (solver given wanted)
+     result <- runTcPluginTcS (solver given derived wanted)
      case result of
 
-       TcPluginContradiction bad_cts ok_cts ->
-          do restoreICans ok_cts
+       TcPluginContradiction bad_cts ->
+          do setInertCans (removeInertCts iCans bad_cts)
              mapM_ emitInsoluble bad_cts
 
-       -- other_cts should include both givens and wanteds.
-       TcPluginOk solved_cts other_cts new_cts ->
-          do case solved_cts of
-               [] -> return ()  -- Fast common case
-               _  -> do restoreICans other_cts
-                        let setEv (ev,ct) = setEvBind (ctev_evar (cc_ev ct)) ev
-                        mapM_ setEv solved_cts
+       TcPluginOk solved_cts new_cts ->
+          do setInertCans (removeInertCts iCans (map snd solved_cts))
+             let setEv (ev,ct) = setEvBind (ctev_evar (cc_ev ct)) ev
+             mapM_ setEv solved_cts
              updWorkListTcS (extendWorkListCts new_cts)
+  where
+  removeInertCts :: InertCans -> [Ct] -> InertCans
+  removeInertCts = foldl' removeInertCt
 
+  -- Remove the constraint from the inert set.  We use this either when:
+  --   * a wanted constraint was solved, or
+  --   * some constraint was marked as insoluable, and so it will be
+  --     put right back into InertSet, but in the insoluable section.
+  removeInertCt :: InertCans -> Ct -> InertCans
+  removeInertCt is ct =
+    case ct of
+
+      CDictCan  { cc_class = cl, cc_tyargs = tys } ->
+        is { inert_dicts = delDict (inert_dicts is) cl tys }
+
+      CFunEqCan { cc_fun  = tf,  cc_tyargs = tys } ->
+        is { inert_funeqs = delFunEq (inert_funeqs is) tf tys }
+
+      CTyEqCan  { cc_tyvar = x,  cc_rhs    = ty  } ->
+        is { inert_eqs = delTyEq (inert_eqs is) x ty }
+
+      CIrredEvCan {}   -> panic "runTcPlugin/removeInert: CIrredEvCan"
+      CNonCanonical {} -> panic "runTcPlugin/removeInert: CNonCanonical"
+      CHoleCan {}      -> panic "runTcPlugin/removeInert: CHoleCan"
 
 type WorkItem = Ct
 type SimplifierStage = WorkItem -> TcS StopOrContinue

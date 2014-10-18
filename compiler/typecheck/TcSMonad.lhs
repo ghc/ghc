@@ -77,11 +77,15 @@ module TcSMonad (
     lookupSolvedDict, extendFlatCache,
 
     findDict, findDictsByClass, addDict, addDictsByClass, delDict, partitionDicts,
+    foldDicts,
 
     emptyFunEqs, funEqsToList,
     findFunEq, findTyEqs, 
     findFunEqsByTyCon, findFunEqs, partitionFunEqs,
     sizeFunEqMap,
+    foldFunEqs,
+    delFunEq,
+    delTyEq,
 
     instDFunType,                              -- Instantiation
     newFlexiTcSTy, instFlexiTcS, instFlexiTcSHelperTcS,
@@ -888,6 +892,11 @@ type TyEqMap a = TyVarEnv a
 
 findTyEqs :: TyEqMap EqualCtList -> TyVar -> EqualCtList
 findTyEqs m tv = lookupVarEnv m tv `orElse` []
+
+delTyEq :: TyEqMap EqualCtList -> TcTyVar -> TcType -> TyEqMap EqualCtList
+delTyEq m tv t = modifyVarEnv (filter (not . isThisOne)) m tv
+  where isThisOne (CTyEqCan { cc_rhs = t1 }) = eqType t t1
+        isThisOne _                          = False
 \end{code}
 
 
@@ -1041,6 +1050,9 @@ partitionFunEqs f m = foldTcAppMap k m (emptyBag, emptyFunEqs)
     k ct (yeses, noes)
       | f ct      = (yeses `snocBag` ct, noes)
       | otherwise = (yeses, insertFunEqCt noes ct)
+
+delFunEq :: FunEqMap a -> TyCon -> [Type] -> FunEqMap a
+delFunEq m tc tys = delTcApp m (getUnique tc) tys
 \end{code}
 
 

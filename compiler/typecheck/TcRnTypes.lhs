@@ -1922,7 +1922,10 @@ Constraint Solver Plugins
 
 \begin{code}
 
-type TcPluginSolver = [Ct] -> [Ct] -> TcPluginM TcPluginResult
+type TcPluginSolver = [Ct]    -- given
+                   -> [Ct]    -- derived
+                   -> [Ct]    -- wanted
+                   -> TcPluginM TcPluginResult
 
 newtype TcPluginM a = TcPluginM (TcM a)
 
@@ -1963,12 +1966,17 @@ data TcPlugin = forall s. TcPlugin
   }
 
 data TcPluginResult
-  = TcPluginContradiction {- inconsistent -} [Ct]
-                          {- all others   -} [Ct]
+  = TcPluginContradiction [Ct]
+    -- ^ The plugin found a contradiction.
+    -- The returned constraints are removed from the inert set,
+    -- and recorded as insoluable.
 
-  | TcPluginOk {- solved -}       [(EvTerm,Ct)]
-               {- all others -}   [Ct]
-               {- new work -}     [Ct]
+  | TcPluginOk [(EvTerm,Ct)] [Ct]
+    -- ^ The first field is for constraints that were solved.
+    -- These are removed from the inert set,
+    -- and the evidence for them is recorded.
+    -- The second field contains new work, that should be processed by
+    -- the constraint solver.
 
 \end{code}
 
