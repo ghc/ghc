@@ -50,6 +50,7 @@ import TcEnv
 import TcRules
 import TcForeign
 import TcInstDcls
+import TcFldInsts
 import TcIface
 import TcMType
 import MkIface
@@ -500,6 +501,11 @@ tcRnHsBootDecls decls
              <- tcTyClsInstDecls emptyModDetails tycl_decls inst_decls deriv_decls
         ; setGblEnv tcg_env     $ do {
 
+                -- Create overloaded record field instances
+        ; traceTc "Tc3a (boot)" empty
+        ; tcg_env <- makeOverloadedRecFldInsts tycl_decls inst_decls
+        ; setGblEnv tcg_env       $ do {
+
                 -- Typecheck value declarations
         ; traceTc "Tc5" empty
         ; val_ids <- tcHsBootSigs val_binds
@@ -519,7 +525,7 @@ tcRnHsBootDecls decls
               }
 
         ; setGlobalTypeEnv gbl_env type_env2
-   }}
+   }}}
    ; traceTc "boot" (ppr lie); return gbl_env }
 
 badBootDecl :: String -> Located decl -> TcM ()
@@ -765,7 +771,7 @@ checkBootTyCon tc1 tc2
       =  dataConName c1 == dataConName c2
       && dataConIsInfix c1 == dataConIsInfix c2
       && eqListBy eqHsBang (dataConStrictMarks c1) (dataConStrictMarks c2)
-      && dataConFieldLabels c1 == dataConFieldLabels c2
+      && map flSelector (dataConFieldLabels c1) == map flSelector (dataConFieldLabels c2)
       && eqType (dataConUserType c1) (dataConUserType c2)
 
     eqClosedFamilyAx (CoAxiom { co_ax_branches = branches1 })
@@ -877,6 +883,10 @@ tcTopSrcDecls boot_details
             <- tcTyClsInstDecls boot_details tycl_decls inst_decls deriv_decls ;
         setGblEnv tcg_env       $ do {
 
+                -- Create overloaded record field instances
+        traceTc "Tc3a" empty ;
+        tcg_env <- makeOverloadedRecFldInsts tycl_decls inst_decls ;
+        setGblEnv tcg_env       $ do {
 
                 -- Generate Applicative/Monad proposal (AMP) warnings
         traceTc "Tc3b" empty ;
@@ -948,7 +958,7 @@ tcTopSrcDecls boot_details
 
         addUsedRdrNames fo_rdr_names ;
         return (tcg_env', tcl_env)
-    }}}}}}
+    }}}}}}}
   where
     gre_to_rdr_name :: GlobalRdrElt -> [RdrName] -> [RdrName]
         -- For *imported* newtype data constructors, we want to
@@ -1164,8 +1174,8 @@ runTcInteractive hsc_env thing_inside
                                                (extendFamInstEnvList (tcg_fam_inst_env gbl_env)
                                                                      ic_finsts)
                                                home_fam_insts
-                         , tcg_field_env    = RecFields (mkNameEnv con_fields)
-                                                        (mkNameSet (concatMap snd con_fields))
+                         , tcg_axioms       = ic_axs
+                         , tcg_field_env    = mkNameEnv con_fields
                               -- setting tcg_field_env is necessary
                               -- to make RecordWildCards work (test: ghci049)
                          , tcg_fix_env      = ic_fix_env icxt
@@ -1180,6 +1190,7 @@ runTcInteractive hsc_env thing_inside
     icxt                  = hsc_IC hsc_env
     (ic_insts, ic_finsts) = ic_instances icxt
     ty_things             = ic_tythings icxt
+    ic_axs                = ic_axioms icxt
 
     type_env1 = mkTypeEnvWithImplicits ty_things
     type_env  = extendTypeEnvWithIds type_env1 (map instanceDFunId ic_insts)
@@ -1189,7 +1200,6 @@ runTcInteractive hsc_env thing_inside
     con_fields = [ (dataConName c, dataConFieldLabels c)
                  | ATyCon t <- ty_things
                  , c <- tyConDataCons t ]
-
 
 #ifdef GHCI
 -- | The returned [Id] is the list of new Ids bound by this statement. It can

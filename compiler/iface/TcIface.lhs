@@ -46,6 +46,7 @@ import TyCon
 import CoAxiom
 import ConLike
 import DataCon
+import FieldLabel
 import PrelNames
 import TysWiredIn
 import TysPrim          ( superKindTyConName )
@@ -70,6 +71,7 @@ import DynFlags
 import Util
 import FastString
 
+import Data.List
 import Control.Monad
 import qualified Data.Map as Map
 #if __GLASGOW_HASKELL__ < 709
@@ -640,15 +642,21 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
   = case if_cons of
         IfAbstractTyCon dis -> return (AbstractTyCon dis)
         IfDataFamTyCon  -> return DataFamilyTyCon
-        IfDataTyCon cons -> do  { data_cons <- mapM tc_con_decl cons
-                                ; return (mkDataTyConRhs data_cons) }
-        IfNewTyCon con   -> do  { data_con <- tc_con_decl con
-                                ; mkNewTyConRhs tycon_name tycon data_con }
+        IfDataTyCon cons is_overloaded fs -> do  { field_lbls <- mapM (tc_field_lbl is_overloaded) fs
+                                                 ; data_cons <- mapM (tc_con_decl field_lbls) cons
+                                                 ; return (mkDataTyConRhs data_cons) }
+        IfNewTyCon  con  is_overloaded fs -> do  { field_lbls <- mapM (tc_field_lbl is_overloaded) fs
+                                                 ; data_con <- (tc_con_decl field_lbls) con
+                                                 ; mkNewTyConRhs tycon_name tycon data_con }
   where
-    tc_con_decl (IfCon { ifConInfix = is_infix,
+    tc_field_lbl :: Bool -> FieldLabelString -> IfL FieldLabel
+    tc_field_lbl is_overloaded lbl = traverse lookupIfaceTop
+                                   $ mkFieldLabelOccs lbl (nameOccName tycon_name) is_overloaded
+
+    tc_con_decl field_lbls (IfCon { ifConInfix = is_infix,
                          ifConExTvs = ex_tvs,
                          ifConOcc = occ, ifConCtxt = ctxt, ifConEqSpec = spec,
-                         ifConArgTys = args, ifConFields = field_lbls,
+                         ifConArgTys = args, ifConFields = my_lbls,
                          ifConStricts = if_stricts})
      = -- Universally-quantified tyvars are shared with
        -- parent TyCon, and are alrady in scope
@@ -669,7 +677,13 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
                 ; return (eq_spec, theta, arg_tys, stricts) }
-        ; lbl_names <- mapM lookupIfaceTop field_lbls
+
+        -- Look up the field labels for this constructor; note that
+        -- they should be in the same order as my_lbls!
+        ; let my_field_lbls = map find_lbl my_lbls
+              find_lbl x = case find (\ fl -> nameOccName (flSelector fl) == x) field_lbls of
+                             Just fl -> fl
+                             Nothing -> error $ "find_lbl missing " ++ occNameString x
 
         -- Remember, tycon is the representation tycon
         ; let orig_res_ty = mkFamilyTyConApp tycon
@@ -677,7 +691,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
 
         ; con <- buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr name))
                        name is_infix
-                       stricts lbl_names
+                       stricts my_field_lbls
                        tc_tyvars ex_tyvars
                        eq_spec theta
                        arg_tys orig_res_ty tycon

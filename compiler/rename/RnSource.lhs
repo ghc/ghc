@@ -26,6 +26,7 @@ import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcAnnotations    ( annCtxt )
 import TcRnMonad
 
+import IfaceEnv
 import ForeignCall      ( CCallTarget(..) )
 import Module
 import HscTypes         ( Warnings(..), plusWarns )
@@ -35,6 +36,7 @@ import Name
 import NameSet
 import NameEnv
 import Avail
+import DataCon
 import Outputable
 import Bag
 import BasicTypes       ( RuleName )
@@ -45,6 +47,7 @@ import HscTypes         ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups )
 import Digraph          ( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
 import Util             ( mapSnd )
+import State
 
 import Control.Monad
 import Data.List( partition, sortBy )
@@ -75,10 +78,10 @@ Checks the @(..)@ etc constraints in the export list.
 -- does NOT assume that anything is in scope already
 rnSrcDecls :: [Name] -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 -- Rename a HsGroup; used for normal source files *and* hs-boot files
-rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
+rnSrcDecls extra_deps group0@(HsGroup { hs_valds   = val_decls,
                                        hs_splcds  = splice_decls,
                                        hs_tyclds  = tycl_decls,
-                                       hs_instds  = inst_decls,
+                                       hs_instds  = inst_decls0,
                                        hs_derivds = deriv_decls,
                                        hs_fixds   = fix_decls,
                                        hs_warnds  = warn_decls,
@@ -88,17 +91,23 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
                                        hs_ruleds  = rule_decls,
                                        hs_vects   = vect_decls,
                                        hs_docs    = docs })
+
  = do {
    -- (A) Process the fixity declarations, creating a mapping from
    --     FastStrings to FixItems.
    --     Also checks for duplcates.
    local_fix_env <- makeMiniFixityEnv fix_decls ;
 
-   -- (B) Bring top level binders (and their fixities) into scope,
+   -- (B) See Note [Assigning names to instance declarations]
+   inst_decls <- assignInstDeclNames inst_decls0 ;
+   let { group = group0 { hs_instds = inst_decls } } ;
+
+   -- (C) Bring top level binders (and their fixities) into scope,
    --     *except* for the value bindings, which get brought in below.
    --     However *do* include class ops, data constructors
-   --     And for hs-boot files *do* include the value signatures
-   (tc_envs, tc_bndrs) <- getLocalNonValBinders local_fix_env group ;
+   --     and for hs-boot files *do* include the value signatures.
+   (tc_envs, tc_bndrs, flds) <- getLocalNonValBinders local_fix_env group ;
+
    setEnvs tc_envs $ do {
 
    failIfErrsM ; -- No point in continuing if (say) we have duplicate declarations
@@ -107,7 +116,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    --     extend the record field env.
    --     This depends on the data constructors and field names being in
    --     scope from (B) above
-   inNewEnv (extendRecordFieldEnv tycl_decls inst_decls) $ \ _ -> do {
+   inNewEnv (extendRecordFieldEnv flds) $ \ _ -> do {
 
    -- (D) Rename the left-hand sides of the value bindings.
    --     This depends on everything from (B) being in scope,
@@ -186,7 +195,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
                              hs_vects  = rn_vect_decls,
                              hs_docs   = rn_docs } ;
 
-        tycl_bndrs = hsTyClDeclsBinders rn_tycl_decls rn_inst_decls ;
+        (tycl_bndrs, _) = hsTyClDeclsBinders rn_tycl_decls rn_inst_decls ;
         ford_bndrs = hsForeignDeclsBinders rn_foreign_decls ;
         other_def  = (Just (mkNameSet tycl_bndrs `unionNameSets` mkNameSet ford_bndrs), emptyNameSet) ;
         other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4,
@@ -222,6 +231,57 @@ addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
 rnList :: (a -> RnM (b, FreeVars)) -> [Located a] -> RnM ([Located b], FreeVars)
 rnList f xs = mapFvRn (wrapLocFstM f) xs
 \end{code}
+
+
+Note [Assigning names to instance declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Here we generate OccNames for the representation tycons of data
+families, and store them in the dfid_rep_tycon field of
+DataFamInstDecl.  This has to happen prior to getLocalNonValBinders,
+because we need them in order to bring overloaded record fields into
+scope.
+
+FIXME: it should be possible to do the same thing for ClsInstDecl and
+TyFamInstDecl, and hence get rid of the tcg_dfun_n mutable reference
+altogether (along with newDFunName and newFamInstTyConName).  However,
+this requires some refactoring of the uses in TcDeriv and TcGenGenerics.
+
+\begin{code}
+assignInstDeclNames :: [LInstDecl RdrName] -> RnM [LInstDecl RdrName]
+assignInstDeclNames ds = do
+    ref <- fmap tcg_dfun_n getGblEnv
+    occs <- readTcRef ref
+    let (ds', occs') = runState (traverse (traverse assignNamesInstDecl) ds) occs
+    writeTcRef ref occs'
+    return ds'
+
+assignNamesInstDecl :: InstDecl RdrName -> State OccSet (InstDecl RdrName)
+assignNamesInstDecl (ClsInstD     cid)  = ClsInstD     <$> assignNamesClsInstDecl     cid
+assignNamesInstDecl (DataFamInstD dfid) = DataFamInstD <$> assignNamesDataFamInstDecl dfid
+assignNamesInstDecl (TyFamInstD tfid)   = return $ TyFamInstD tfid
+
+assignNamesClsInstDecl :: ClsInstDecl RdrName -> State OccSet (ClsInstDecl RdrName)
+assignNamesClsInstDecl cid = do
+    datafam_insts <- traverse (traverse assignNamesDataFamInstDecl) (cid_datafam_insts cid)
+    return cid { cid_datafam_insts = datafam_insts }
+
+assignNamesDataFamInstDecl :: DataFamInstDecl RdrName -> State OccSet (DataFamInstDecl RdrName)
+assignNamesDataFamInstDecl dfid = do
+    occ <- assignOccName (mkInstTyTcOcc info_string)
+    return dfid { dfid_rep_tycon = mkRdrUnqual occ }
+  where
+    info_string = occNameString (rdrNameOcc $ unLoc $ dfid_tycon dfid)
+                    ++ concatMap (getDFunHsTypeKey . unLoc) (hswb_cts (dfid_pats dfid))
+
+assignOccName :: (OccSet -> OccName) -> State OccSet OccName
+assignOccName f = do
+  occs <- get
+  let occ = f occs
+  put (extendOccSet occs occ)
+  return occ
+\end{code}
+
 
 
 %*********************************************************
@@ -595,11 +655,15 @@ rnDataFamInstDecl :: Maybe (Name, [Name])
                   -> DataFamInstDecl RdrName
                   -> RnM (DataFamInstDecl Name, FreeVars)
 rnDataFamInstDecl mb_cls (DataFamInstDecl { dfid_tycon = tycon
+                                          , dfid_rep_tycon = rep_tycon
                                           , dfid_pats  = HsWB { hswb_cts = pats }
                                           , dfid_defn  = defn })
   = do { (tycon', pats', defn', fvs) <-
            rnFamInstDecl (TyDataCtx tycon) mb_cls tycon pats defn rnDataDefn
+       ; mod <- getModule
+       ; rep_tycon' <- newGlobalBinder mod (rdrNameOcc rep_tycon) (getLoc tycon)
        ; return (DataFamInstDecl { dfid_tycon = tycon'
+                                 , dfid_rep_tycon = rep_tycon'
                                  , dfid_pats  = pats'
                                  , dfid_defn  = defn'
                                  , dfid_fvs   = fvs }, fvs) }
@@ -1302,7 +1366,7 @@ rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
 
         ; bindHsTyVars doc Nothing free_kvs new_tvs $ \new_tyvars -> do
         { (new_context, fvs1) <- rnContext doc lcxt
-        ; (new_details, fvs2) <- rnConDeclDetails doc details
+        ; (new_details, fvs2) <- rnConDeclDetails (unLoc new_name) doc details
         ; (new_details', new_res_ty, fvs3) <- rnConResult doc (unLoc new_name) new_details res_ty
         ; return (decl { con_name = new_name, con_qvars = new_tyvars, con_cxt = new_context
                        , con_details = new_details', con_res = new_res_ty, con_doc = mb_doc' },
@@ -1342,20 +1406,21 @@ rnConResult doc con details (ResTyGADT ty)
                         | otherwise
                         -> return (PrefixCon arg_tys, ResTyGADT res_ty, fvs) }
 
-rnConDeclDetails :: HsDocContext
+rnConDeclDetails :: Name
+                 -> HsDocContext
                  -> HsConDetails (LHsType RdrName) [ConDeclField RdrName]
                  -> RnM (HsConDetails (LHsType Name) [ConDeclField Name], FreeVars)
-rnConDeclDetails doc (PrefixCon tys)
+rnConDeclDetails _ doc (PrefixCon tys)
   = do { (new_tys, fvs) <- rnLHsTypes doc tys
        ; return (PrefixCon new_tys, fvs) }
 
-rnConDeclDetails doc (InfixCon ty1 ty2)
+rnConDeclDetails _ doc (InfixCon ty1 ty2)
   = do { (new_ty1, fvs1) <- rnLHsType doc ty1
        ; (new_ty2, fvs2) <- rnLHsType doc ty2
        ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2) }
 
-rnConDeclDetails doc (RecCon fields)
-  = do  { (new_fields, fvs) <- rnConDeclFields doc fields
+rnConDeclDetails con doc (RecCon fields)
+  = do  { (new_fields, fvs) <- rnConDeclFields con doc fields
                 -- No need to check for duplicate fields
                 -- since that is done by RnNames.extendGlobalRdrEnvRn
         ; return (RecCon new_fields, fvs) }
@@ -1392,37 +1457,15 @@ For example:
 %*********************************************************
 
 Get the mapping from constructors to fields for this module.
-It's convenient to do this after the data type decls have been renamed
+This used to be complicated, but now all the work is done by
+RnNames.getLocalNonValBinders.
+
 \begin{code}
-extendRecordFieldEnv :: [TyClGroup RdrName] -> [LInstDecl RdrName] -> TcM TcGblEnv
-extendRecordFieldEnv tycl_decls inst_decls
+extendRecordFieldEnv :: [(Name, [FieldLabel])] -> TcM TcGblEnv
+extendRecordFieldEnv flds
   = do  { tcg_env <- getGblEnv
-        ; field_env' <- foldrM get_con (tcg_field_env tcg_env) all_data_cons
+        ; let field_env' = extendNameEnvList (tcg_field_env tcg_env) flds
         ; return (tcg_env { tcg_field_env = field_env' }) }
-  where
-    -- we want to lookup:
-    --  (a) a datatype constructor
-    --  (b) a record field
-    -- knowing that they're from this module.
-    -- lookupLocatedTopBndrRn does this, because it does a lookupGreLocalRn_maybe,
-    -- which keeps only the local ones.
-    lookup x = do { x' <- lookupLocatedTopBndrRn x
-                    ; return $ unLoc x'}
-
-    all_data_cons :: [ConDecl RdrName]
-    all_data_cons = [con | HsDataDefn { dd_cons = cons } <- all_ty_defs
-                         , L _ con <- cons ]
-    all_ty_defs = [ defn | L _ (DataDecl { tcdDataDefn = defn }) <- tyClGroupConcat tycl_decls ]
-               ++ map dfid_defn (instDeclDataFamInsts inst_decls)  -- Do not forget associated types!
-
-    get_con (ConDecl { con_name = con, con_details = RecCon flds })
-            (RecFields env fld_set)
-        = do { con' <- lookup con
-             ; flds' <- mapM lookup (map cd_fld_name flds)
-             ; let env'    = extendNameEnv env con' flds'
-                   fld_set' = addListToNameSet fld_set flds'
-             ; return $ (RecFields env' fld_set') }
-    get_con _ env = return env
 \end{code}
 
 %*********************************************************

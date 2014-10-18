@@ -725,6 +725,7 @@ evVarsOfTerms = mapUnionVarSet evVarsOfTerm
 \end{code}
 
 
+
 %************************************************************************
 %*                                                                      *
                   Pretty printing

@@ -1,0 +1,10 @@
+
+overloadedrecfldsfail05.hs:8:15:
+    Illegal type instance declaration for ‘FldTy’
+      (Use -XOverloadedRecordFields instead.)
+    In the type instance declaration for ‘FldTy’
+
+overloadedrecfldsfail05.hs:9:10:
+    Illegal instance declaration for ‘Has Person "fullName" String’
+      The class is abstract, manual instances are not permitted.
+    In the instance declaration for ‘Has Person "fullName" String’

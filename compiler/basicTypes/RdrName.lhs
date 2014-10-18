@@ -45,16 +45,17 @@ module RdrName (
 
         -- * Global mapping of 'RdrName' to 'GlobalRdrElt's
         GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
-        lookupGlobalRdrEnv, extendGlobalRdrEnv, 
+        lookupGlobalRdrEnv, extendGlobalRdrEnv, greOccName,
         pprGlobalRdrEnv, globalRdrEnvElts,
-        lookupGRE_RdrName, lookupGRE_Name, getGRE_NameQualifier_maybes,
+        lookupGRE_RdrName, lookupGRE_Name, lookupGRE_Field_Name, getGRE_NameQualifier_maybes,
         transformGREs, findLocalDupsRdrEnv, pickGREs,
 
         -- * GlobalRdrElts
         gresFromAvails, gresFromAvail,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
-        GlobalRdrElt(..), isLocalGRE, unQualOK, qualSpecOK, unQualSpecOK,
+        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, isOverloadedRecFldGRE, greLabel,
+        unQualOK, qualSpecOK, unQualSpecOK,
         Provenance(..), pprNameProvenance,
         Parent(..),
         ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
@@ -70,6 +71,7 @@ import NameSet
 import Maybes
 import SrcLoc
 import FastString
+import FieldLabel
 import Outputable
 import Unique
 import Util
@@ -431,25 +433,40 @@ data GlobalRdrElt
 
 -- | The children of a Name are the things that are abbreviated by the ".."
 --   notation in export lists.  See Note [Parents]
-data Parent = NoParent | ParentIs Name
-              deriving (Eq)
+data Parent = NoParent
+            | ParentIs  { par_is :: Name }
+            | FldParent { par_is :: Name, par_lbl :: Maybe FieldLabelString }
+              -- ^ See Note [Parents for record fields]
+            deriving (Eq)
 
 instance Outputable Parent where
-   ppr NoParent     = empty
-   ppr (ParentIs n) = ptext (sLit "parent:") <> ppr n
+   ppr NoParent        = empty
+   ppr (ParentIs n)    = ptext (sLit "parent:") <> ppr n
+   ppr (FldParent n f) = ptext (sLit "fldparent:")
+                             <> ppr n <> colon <> ppr f
 
 plusParent :: Parent -> Parent -> Parent
 -- See Note [Combining parents]
-plusParent (ParentIs n) p2 = hasParent n p2
-plusParent p1 (ParentIs n) = hasParent n p1
-plusParent _ _ = NoParent
+plusParent (ParentIs n)    p2 = hasParentIs n p2
+plusParent (FldParent n f) p2 = hasFldParent n f p2
+plusParent p1 (ParentIs n)    = hasParentIs n p1
+plusParent p1 (FldParent n f) = hasFldParent n f p1
+plusParent NoParent NoParent  = NoParent
 
-hasParent :: Name -> Parent -> Parent
+hasParentIs :: Name -> Parent -> Parent
 #ifdef DEBUG
-hasParent n (ParentIs n')
-  | n /= n' = pprPanic "hasParent" (ppr n <+> ppr n')  -- Parents should agree
+hasParentIs n (ParentIs n')
+  | n /= n' = pprPanic "hasParentIs" (ppr n <+> ppr n')  -- Parents should agree
 #endif
-hasParent n _  = ParentIs n
+hasParentIs n _  = ParentIs n
+
+hasFldParent :: Name -> Maybe FieldLabelString -> Parent -> Parent
+#ifdef DEBUG
+hasFldParent n f (FldParent n' f')
+  | n /= n' || f /= f'    -- Parents should agree
+    = pprPanic "hasFldParent" (ppr n <+> ppr f <+> ppr n' <+> ppr f')
+#endif
+hasFldParent n f _  = FldParent n f
 \end{code}
 
 Note [Parents]
@@ -464,6 +481,34 @@ Note [Parents]
 
   class C          Class operations
                    Associated type constructors
+
+
+Note [Parents for record fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For record fields, in addition to the Name of the type constructor
+(stored in par_is), we use FldParent to store the field label.  This
+extra information is used for identifying overloaded record fields
+during renaming.
+
+In a definition arising from a normal module (without
+-XOverloadedRecordFields), par_lbl will be Nothing, meaning that the
+field's label is the same as the OccName of the selector's Name.  The
+GlobalRdrEnv will contain an entry like this:
+
+    "x" |->  GRE x (FldParent T Nothing) LocalDef
+
+When -XOverloadedRecordFields is enabled for the module that contains
+T, the selector's Name will be mangled (see comments in FieldLabel).
+Thus we store the actual field label in par_lbl, and the GlobalRdrEnv
+entry looks like this:
+
+    "x" |->  GRE $sel:x:T (FldParent T (Just "x")) LocalDef
+
+Note that the OccName used when adding a GRE to the environment
+(greOccName) now depends on the parent field: for FldParent it is the
+field label, if present, rather than the selector name.
+
 
 Note [Combining parents]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -492,27 +537,36 @@ those.  For T that will mean we have
   one GRE with NoParent
 That's why plusParent picks the "best" case.
 
-
 \begin{code}
 -- | make a 'GlobalRdrEnv' where all the elements point to the same
 -- Provenance (useful for "hiding" imports, or imports with
 -- no details).
 gresFromAvails :: Provenance -> [AvailInfo] -> [GlobalRdrElt]
 gresFromAvails prov avails
-  = concatMap (gresFromAvail (const prov)) avails
+  = concatMap (gresFromAvail (const prov) prov) avails
 
-gresFromAvail :: (Name -> Provenance) -> AvailInfo -> [GlobalRdrElt]
-gresFromAvail prov_fn avail
-  = [ GRE {gre_name = n,
-           gre_par = mkParent n avail,
-           gre_prov = prov_fn n}
-    | n <- availNames avail ]
+gresFromAvail :: (Name -> Provenance) -> Provenance
+              -> AvailInfo -> [GlobalRdrElt]
+gresFromAvail prov_fn prov_fld avail = xs ++ ys
   where
+    parent _ (Avail _)                   = NoParent
+    parent n (AvailTC m _ _) | n == m    = NoParent
+                             | otherwise = ParentIs m
+
+    xs = map greFromFld (availFlds avail)
+    ys = map greFromNonFld (availNonFldNames avail)
+
+    greFromNonFld n = GRE { gre_name = n, gre_par = parent n avail, gre_prov = prov_fn n}
+
+    greFromFld (n, mb_lbl)
+      = GRE { gre_name = n
+            , gre_par  = FldParent (availName avail) mb_lbl
+            , gre_prov = prov_fld }
 
 mkParent :: Name -> AvailInfo -> Parent
-mkParent _ (Avail _)                 = NoParent
-mkParent n (AvailTC m _) | n == m    = NoParent
-                         | otherwise = ParentIs m
+mkParent _ (Avail _)                   = NoParent
+mkParent n (AvailTC m _ _) | n == m    = NoParent
+                           | otherwise = ParentIs m
 
 emptyGlobalRdrEnv :: GlobalRdrEnv
 emptyGlobalRdrEnv = emptyOccEnv
@@ -546,6 +600,10 @@ lookupGlobalRdrEnv env occ_name = case lookupOccEnv env occ_name of
                                   Nothing   -> []
                                   Just gres -> gres
 
+greOccName :: GlobalRdrElt -> OccName
+greOccName (GRE{gre_par = FldParent{par_lbl = Just lbl}}) = mkVarOccFS lbl
+greOccName gre                                            = nameOccName (gre_name gre)
+
 lookupGRE_RdrName :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
 lookupGRE_RdrName rdr_name env
   = case lookupOccEnv env (rdrNameOcc rdr_name) of
@@ -556,6 +614,14 @@ lookupGRE_Name :: GlobalRdrEnv -> Name -> [GlobalRdrElt]
 lookupGRE_Name env name
   = [ gre | gre <- lookupGlobalRdrEnv env (nameOccName name),
             gre_name gre == name ]
+
+lookupGRE_Field_Name :: GlobalRdrEnv -> Name -> FastString -> [GlobalRdrElt]
+-- Used when looking up record fields, where the selector name and
+-- field label are different: the GlobalRdrEnv is keyed on the label
+lookupGRE_Field_Name env sel_name lbl
+  = [ gre | gre <- lookupGlobalRdrEnv env (mkVarOccFS lbl),
+            gre_name gre == sel_name ]
+
 
 getGRE_NameQualifier_maybes :: GlobalRdrEnv -> Name -> [Maybe [ModuleName]]
 -- Returns all the qualifiers by which 'x' is in scope
@@ -570,6 +636,21 @@ getGRE_NameQualifier_maybes env
 isLocalGRE :: GlobalRdrElt -> Bool
 isLocalGRE (GRE {gre_prov = LocalDef}) = True
 isLocalGRE _                           = False
+
+isRecFldGRE :: GlobalRdrElt -> Bool
+isRecFldGRE (GRE {gre_par = FldParent{}}) = True
+isRecFldGRE _                             = False
+
+isOverloadedRecFldGRE :: GlobalRdrElt -> Bool
+isOverloadedRecFldGRE (GRE {gre_par = FldParent{par_lbl = Just _}})
+                        = True
+isOverloadedRecFldGRE _ = False
+
+-- Returns the field label of this GRE, if it has one
+greLabel :: GlobalRdrElt -> Maybe FieldLabelString
+greLabel (GRE{gre_par = FldParent{par_lbl = Just lbl}}) = Just lbl
+greLabel (GRE{gre_name = n, gre_par = FldParent{}})     = Just (occNameFS (nameOccName n))
+greLabel _                                              = Nothing
 
 unQualOK :: GlobalRdrElt -> Bool
 -- ^ Test if an unqualifed version of this thing would be in scope
@@ -650,7 +731,7 @@ mkGlobalRdrEnv gres
   = foldr add emptyGlobalRdrEnv gres
   where
     add gre env = extendOccEnv_Acc insertGRE singleton env
-                                   (nameOccName (gre_name gre))
+                                   (greOccName gre)
                                    gre
 
 insertGRE :: GlobalRdrElt -> [GlobalRdrElt] -> [GlobalRdrElt]
@@ -707,14 +788,23 @@ extendGlobalRdrEnv do_shadowing env avails
          -- don't shadow each other; that would conceal genuine errors
          -- E.g. in GHCi   data T = A | A
 
-    add_avail env avail = foldl (add_name avail) env (availNames avail)
+    add_avail env avail = foldl (add_fld_name avail)
+                               (foldl (add_name avail) env (availNonFldNames avail))
+                               (availFlds avail)
 
-    add_name avail env name
+    add_name avail env name = add_name' env name (nameOccName name) (mkParent name avail)
+
+    add_fld_name (AvailTC par_name _ _) env (name, mb_fld) =
+        add_name' env name lbl (FldParent par_name mb_fld)
+      where
+        lbl = maybe (nameOccName name) mkVarOccFS mb_fld
+    add_fld_name (Avail _) _ _ = error "Field made available without its parent"
+
+    add_name' env name occ par
        = extendOccEnv_Acc (:) singleton env occ gre
        where
-         occ = nameOccName name
          gre = GRE { gre_name = name
-                   , gre_par = mkParent name avail
+                   , gre_par = par
                    , gre_prov = LocalDef }
 
 shadow_name :: GlobalRdrEnv -> Name -> GlobalRdrEnv

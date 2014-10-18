@@ -1,0 +1,5 @@
+[1 of 2] Compiling OverloadedRecFldsFail04_A ( OverloadedRecFldsFail04_A.hs, OverloadedRecFldsFail04_A.o )
+[2 of 2] Compiling Main             ( overloadedrecfldsfail04.hs, overloadedrecfldsfail04.o )
+
+overloadedrecfldsfail04.hs:6:6:
+    Overloaded record field should not be qualified: ‘I.x’

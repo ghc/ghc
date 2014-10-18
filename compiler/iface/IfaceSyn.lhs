@@ -38,8 +38,9 @@ import IfaceType
 import PprCore()            -- Printing DFunArgs
 import Demand
 import Class
+import FieldLabel
 import NameSet
-import CoAxiom ( BranchIndex, Role )
+import CoAxiom ( BranchIndex )
 import Name
 import CostCentre
 import Literal
@@ -176,10 +177,16 @@ data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars  :: [IfaceTvBndr]
                                      -- See Note [Storing compatibility] in CoAxiom
 
 data IfaceConDecls
-  = IfAbstractTyCon Bool        -- c.f TyCon.AbstractTyCon
-  | IfDataFamTyCon              -- Data family
-  | IfDataTyCon [IfaceConDecl]  -- Data type decls
-  | IfNewTyCon  IfaceConDecl    -- Newtype decls
+  = IfAbstractTyCon Bool                          -- c.f TyCon.AbstractTyCon
+  | IfDataFamTyCon                                -- Data family
+  | IfDataTyCon [IfaceConDecl] Bool [FieldLabelString] -- Data type decls
+  | IfNewTyCon  IfaceConDecl   Bool [FieldLabelString] -- Newtype decls
+
+-- For IfDataTyCon and IfNewTyCon we store:
+--  * the data constructor(s);
+--  * a boolean indicating whether OverloadedRecordFields was enabled
+--    at the definition site; and
+--  * a list of field labels.
 
 data IfaceConDecl
   = IfCon {
@@ -386,8 +393,8 @@ See [http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoid
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
 visibleIfConDecls (IfAbstractTyCon {}) = []
 visibleIfConDecls IfDataFamTyCon       = []
-visibleIfConDecls (IfDataTyCon cs)     = cs
-visibleIfConDecls (IfNewTyCon c)       = [c]
+visibleIfConDecls (IfDataTyCon cs _ _) = cs
+visibleIfConDecls (IfNewTyCon c   _ _) = [c]
 \end{code}
 
 \begin{code}
@@ -406,8 +413,7 @@ ifaceDeclImplicitBndrs IfaceData {ifCons = IfAbstractTyCon {}}  = []
 
 -- Newtype
 ifaceDeclImplicitBndrs (IfaceData {ifName = tc_occ,
-                              ifCons = IfNewTyCon (
-                                        IfCon { ifConOcc = con_occ })})
+                              ifCons = IfNewTyCon (IfCon { ifConOcc = con_occ }) _ _})
   =   -- implicit newtype coercion
     (mkNewTyCoOcc tc_occ) : -- JPM: newtype coercions shouldn't be implicit
       -- data constructor and worker (newtypes don't have a wrapper)
@@ -415,7 +421,7 @@ ifaceDeclImplicitBndrs (IfaceData {ifName = tc_occ,
 
 
 ifaceDeclImplicitBndrs (IfaceData {ifName = _tc_occ,
-                              ifCons = IfDataTyCon cons })
+                              ifCons = IfDataTyCon cons _ _ })
   = -- for each data constructor in order,
     --    data constructor, worker, and (possibly) wrapper
     concatMap dc_occs cons
@@ -704,14 +710,13 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     pp_nd = case condecls of
               IfAbstractTyCon d -> ptext (sLit "abstract") <> ppShowIface ss (parens (ppr d))
               IfDataFamTyCon    -> ptext (sLit "data family")
-              IfDataTyCon _     -> ptext (sLit "data")
-              IfNewTyCon _      -> ptext (sLit "newtype")
+              IfDataTyCon{}     -> ptext (sLit "data")
+              IfNewTyCon{}      -> ptext (sLit "newtype")
 
     pp_extra = vcat [pprCType ctype, pprRec isrec, pp_prom]
 
     pp_prom | is_prom   = ptext (sLit "Promotable")
             | otherwise = Outputable.empty
-
 
 pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs, ifRec = isrec
                             , ifCtxt   = context, ifName  = clas
@@ -1183,9 +1188,9 @@ freeNamesIfClsSig :: IfaceClassOp -> NameSet
 freeNamesIfClsSig (IfaceClassOp _n _dm ty) = freeNamesIfType ty
 
 freeNamesIfConDecls :: IfaceConDecls -> NameSet
-freeNamesIfConDecls (IfDataTyCon c) = fnList freeNamesIfConDecl c
-freeNamesIfConDecls (IfNewTyCon c)  = freeNamesIfConDecl c
-freeNamesIfConDecls _               = emptyNameSet
+freeNamesIfConDecls (IfDataTyCon c _ _) = fnList freeNamesIfConDecl c
+freeNamesIfConDecls (IfNewTyCon  c _ _) = freeNamesIfConDecl c
+freeNamesIfConDecls _                   = emptyNameSet
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
 freeNamesIfConDecl c
@@ -1559,16 +1564,16 @@ instance Binary IfaceAxBranch where
 
 instance Binary IfaceConDecls where
     put_ bh (IfAbstractTyCon d) = putByte bh 0 >> put_ bh d
-    put_ bh IfDataFamTyCon     = putByte bh 1
-    put_ bh (IfDataTyCon cs)    = putByte bh 2 >> put_ bh cs
-    put_ bh (IfNewTyCon c)      = putByte bh 3 >> put_ bh c
+    put_ bh IfDataFamTyCon      = putByte bh 1
+    put_ bh (IfDataTyCon cs b fs) = putByte bh 2 >> put_ bh cs >> put_ bh b >> put_ bh fs
+    put_ bh (IfNewTyCon c b fs)   = putByte bh 3 >> put_ bh c >> put_ bh b >> put_ bh fs
     get bh = do
         h <- getByte bh
         case h of
             0 -> liftM IfAbstractTyCon $ get bh
             1 -> return IfDataFamTyCon
-            2 -> liftM IfDataTyCon $ get bh
-            _ -> liftM IfNewTyCon $ get bh
+            2 -> liftM3 IfDataTyCon (get bh) (get bh) (get bh)
+            _ -> liftM3 IfNewTyCon (get bh) (get bh) (get bh)
 
 instance Binary IfaceConDecl where
     put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9) = do

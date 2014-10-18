@@ -139,7 +139,7 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
                 pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
               = firstPat eqn1
     fields1 = case con1 of
-                RealDataCon dcon1 -> dataConFieldLabels dcon1
+                RealDataCon dcon1 -> map flSelector $ dataConFieldLabels dcon1
                 PatSynCon{}       -> []
 
     val_arg_tys = case con1 of
@@ -203,7 +203,7 @@ compatible_pats _                 _                 = True -- Prefix or infix co
 
 same_fields :: HsRecFields Id (LPat Id) -> HsRecFields Id (LPat Id) -> Bool
 same_fields flds1 flds2
-  = all2 (\f1 f2 -> unLoc (hsRecFieldId f1) == unLoc (hsRecFieldId f2))
+  = all2 (\f1 f2 -> hsRecFieldSel f1 == hsRecFieldSel f2)
          (rec_flds flds1) (rec_flds flds2)
 
 

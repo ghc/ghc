@@ -135,7 +135,8 @@ mkBootModDetailsTc hsc_env
                   tcg_tcs       = tcs,
                   tcg_patsyns   = pat_syns,
                   tcg_insts     = insts,
-                  tcg_fam_insts = fam_insts
+                  tcg_fam_insts = fam_insts,
+                  tcg_axioms    = axioms
                 }
   = do  { let dflags = hsc_dflags hsc_env
         ; showPass dflags CoreTidy
@@ -146,9 +147,10 @@ mkBootModDetailsTc hsc_env
               ; pat_syns'   = map (tidyPatSynIds   globaliseAndTidyId) pat_syns
               ; type_env2  = extendTypeEnvWithPatSyns pat_syns' type_env1
               ; dfun_ids    = map instanceDFunId insts'
-              ; type_env'  = extendTypeEnvWithIds type_env2 dfun_ids
+              ; type_env3  = extendTypeEnvWithIds type_env2 dfun_ids
+              ; type_env4  = extendTypeEnvList type_env3 (map ACoAxiom axioms)
               }
-        ; return (ModDetails { md_types     = type_env'
+        ; return (ModDetails { md_types     = type_env4
                              , md_insts     = insts'
                              , md_fam_insts = fam_insts
                              , md_rules     = []
@@ -302,6 +304,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_tcs       = tcs
                               , mg_insts     = insts
                               , mg_fam_insts = fam_insts
+                              , mg_axioms    = axioms
                               , mg_binds     = binds
                               , mg_patsyns   = patsyns
                               , mg_rules     = imp_rules
@@ -320,6 +323,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; showPass dflags CoreTidy
 
         ; let { type_env = typeEnvFromEntities [] tcs fam_insts
+                               `extendTypeEnvList` map ACoAxiom axioms
 
               ; implicit_binds
                   = concatMap getClassImplicitBinds (typeEnvClasses type_env) ++

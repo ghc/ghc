@@ -47,6 +47,7 @@ import TcIface
 import LoadIface
 import Finder
 import PrelNames
+import RnNames
 import RdrName
 import HscTypes
 import Bag

@@ -33,6 +33,7 @@ expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",
+                             "OverloadedRecordFields",
                              "JavaScriptFFI",
                              "PatternSynonyms"]
 

@@ -38,7 +38,7 @@ module Id (
 
         -- ** Taking an Id apart
         idName, idType, idUnique, idInfo, idDetails, idRepArity,
-        recordSelectorFieldLabel,
+        recordSelectorTyCon,
 
         -- ** Modifying an Id
         setIdName, setIdUnique, Id.setIdType, 
@@ -350,12 +350,12 @@ That is what is happening in, say tidy_insts in TidyPgm.
 %************************************************************************
 
 \begin{code}
--- | If the 'Id' is that for a record selector, extract the 'sel_tycon' and label. Panic otherwise
-recordSelectorFieldLabel :: Id -> (TyCon, FieldLabel)
-recordSelectorFieldLabel id
+-- | If the 'Id' is that for a record selector, extract the 'sel_tycon'. Panic otherwise.
+recordSelectorTyCon :: Id -> TyCon
+recordSelectorTyCon id
   = case Var.idDetails id of
-        RecSelId { sel_tycon = tycon } -> (tycon, idName id)
-        _ -> panic "recordSelectorFieldLabel"
+        RecSelId { sel_tycon = tycon } -> tycon
+        _ -> panic "recordSelectorTyCon"
 
 isRecordSelector        :: Id -> Bool
 isNaughtyRecordSelector :: Id -> Bool

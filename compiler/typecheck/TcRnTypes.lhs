@@ -28,7 +28,7 @@ module TcRnTypes(
         IfGblEnv(..), IfLclEnv(..),
 
         -- Ranamer types
-        ErrCtxt, RecFieldEnv(..),
+        ErrCtxt, RecFieldEnv,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
         WhereFrom(..), mkModDeps,
 
@@ -92,8 +92,9 @@ import TcEvidence
 import Type
 import Class    ( Class )
 import TyCon    ( TyCon )
+import CoAxiom
 import ConLike  ( ConLike(..) )
-import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
+import DataCon  ( DataCon, FieldLabel, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, patSynType )
 import TcType
 import Annotations
@@ -257,6 +258,7 @@ data TcGblEnv
 
         tcg_dus :: DefUses,   -- ^ What is defined in this module and what is used.
         tcg_used_rdrnames :: TcRef (Set RdrName),
+        tcg_used_selectors :: TcRef NameSet,
           -- See Note [Tracking unused binding and imports]
 
         tcg_keep :: TcRef NameSet,
@@ -334,8 +336,12 @@ data TcGblEnv
         tcg_warns     :: Warnings,          -- ...Warnings and deprecations
         tcg_anns      :: [Annotation],      -- ...Annotations
         tcg_tcs       :: [TyCon],           -- ...TyCons and Classes
+                                                  -- (for data families, includes both
+                                                  -- family tycons and instance tycons)
         tcg_insts     :: [ClsInst],         -- ...Instances
         tcg_fam_insts :: [FamInst],         -- ...Family instances
+        tcg_axioms    :: [CoAxiom Branched], -- ...Axioms without family instances
+                                                   -- See Note [Instance scoping for OverloadedRecordFields] in TcFldInsts
         tcg_rules     :: [LRuleDecl Id],    -- ...Rules
         tcg_fords     :: [LForeignDecl Id], -- ...Foreign import & exports
         tcg_vects     :: [LVectDecl Id],    -- ...Vectorisation declarations
@@ -356,13 +362,9 @@ data TcGblEnv
 instance ContainsModule TcGblEnv where
     extractModule env = tcg_mod env
 
-data RecFieldEnv
-  = RecFields (NameEnv [Name])  -- Maps a constructor name *in this module*
-                                -- to the fields for that constructor
-              NameSet           -- Set of all fields declared *in this module*;
-                                -- used to suppress name-shadowing complaints
-                                -- when using record wild cards
-                                -- E.g.  let fld = e in C {..}
+type RecFieldEnv = NameEnv [FieldLabel]
+        -- Maps a constructor name *in this module*
+        -- to the fields for that constructor.
         -- This is used when dealing with ".." notation in record
         -- construction and pattern matching.
         -- The FieldEnv deals *only* with constructors defined in *this*
@@ -372,7 +374,7 @@ data RecFieldEnv
 
 Note [Tracking unused binding and imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We gather two sorts of usage information
+We gather three sorts of usage information
  * tcg_dus (defs/uses)
       Records *defined* Names (local, top-level)
           and *used*    Names (local or imported)
@@ -391,6 +393,13 @@ We gather two sorts of usage information
       tell whether the reference was qualified or unqualified, which
       is esssential in deciding whether a particular import decl
       is unnecessary.  This info isn't present in Names.
+
+ * tcg_used_selectors
+      Records the Names of record selectors that are used during
+      typechecking (by the OverloadedRecordFields extension). These
+      may otherwise be missed from tcg_used_rdrnames as they need
+      not actually occur in the source text: they might be needed
+      only to satisfy a Has constraint, for example.
 
 
 %************************************************************************
@@ -1781,6 +1790,7 @@ data CtOrigin
 
   -- All the others are for *wanted* constraints
   | OccurrenceOf Name           -- Occurrence of an overloaded identifier
+  | OccurrenceOfRecSel RdrName  -- Occurrence of a record selector
   | AppOrigin                   -- An application of some kind
 
   | SpecPragOrigin Name         -- Specialisation pragma for identifier
@@ -1889,6 +1899,7 @@ pprCtOrigin simple_origin
 pprCtO :: CtOrigin -> SDoc  -- Ones that are short one-liners
 pprCtO FlatSkolOrigin        = ptext (sLit "a given flatten-skolem")
 pprCtO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
+pprCtO (OccurrenceOfRecSel name) = hsep [ptext (sLit "a use of the record selector"), quotes (ppr name)]
 pprCtO AppOrigin             = ptext (sLit "an application")
 pprCtO (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]
 pprCtO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]

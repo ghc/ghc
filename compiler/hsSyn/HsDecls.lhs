@@ -38,6 +38,7 @@ module HsDecls (
   DataFamInstDecl(..), LDataFamInstDecl, pprDataFamInstFlavour,
   TyFamEqn(..), TyFamInstEqn, LTyFamInstEqn, TyFamDefltEqn, LTyFamDefltEqn,
   LClsInstDecl, ClsInstDecl(..),
+  placeHolderRepTyCon,
 
   -- ** Standalone deriving declarations
   DerivDecl(..), LDerivDecl,
@@ -1017,13 +1018,17 @@ deriving instance (DataId name) => Data (TyFamInstDecl name)
 type LDataFamInstDecl name = Located (DataFamInstDecl name)
 data DataFamInstDecl name
   = DataFamInstDecl
-       { dfid_tycon :: Located name
-       , dfid_pats  :: HsTyPats name      -- LHS
-       , dfid_defn  :: HsDataDefn  name   -- RHS
-       , dfid_fvs   :: PostRn name NameSet } -- Rree vars for
-                                               -- dependency analysis
+       { dfid_tycon     :: Located name
+       , dfid_rep_tycon :: name  -- See Note [Assigning names to instance declarations] in RnSource
+       , dfid_pats      :: HsTyPats   name       -- LHS
+       , dfid_defn      :: HsDataDefn name       -- RHS
+       , dfid_fvs       :: PostRn name NameSet } -- Free vars for dependency analysis
   deriving( Typeable )
 deriving instance (DataId name) => Data (DataFamInstDecl name)
+
+placeHolderRepTyCon :: name
+-- Used for dfid_rep_tycon in DataFamInstDecl prior to the renamer
+placeHolderRepTyCon = panic "placeHolderRepTyCon"
 
 
 ----------------- Class instances -------------

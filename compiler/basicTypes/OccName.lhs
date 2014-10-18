@@ -69,6 +69,7 @@ module OccName (
         mkPDatasTyConOcc, mkPDatasDataConOcc,
         mkPReprTyConOcc,
         mkPADFunOcc,
+        mkRecFldSelOcc, mkRecFldDFunOcc, mkRecFldAxiomOcc,
 
         -- ** Deconstruction
         occNameFS, occNameString, occNameSpace,
@@ -109,33 +110,11 @@ import DynFlags
 import UniqFM
 import UniqSet
 import FastString
+import FastStringEnv
 import Outputable
 import Binary
 import Data.Char
 import Data.Data
-\end{code}
-
-%************************************************************************
-%*                                                                      *
-              FastStringEnv
-%*                                                                      *
-%************************************************************************
-
-FastStringEnv can't be in FastString because the env depends on UniqFM
-
-\begin{code}
-type FastStringEnv a = UniqFM a         -- Keyed by FastString
-
-
-emptyFsEnv  :: FastStringEnv a
-lookupFsEnv :: FastStringEnv a -> FastString -> Maybe a
-extendFsEnv :: FastStringEnv a -> FastString -> a -> FastStringEnv a
-mkFsEnv     :: [(FastString,a)] -> FastStringEnv a
-
-emptyFsEnv  = emptyUFM
-lookupFsEnv = lookupUFM
-extendFsEnv = addToUFM
-mkFsEnv     = listToUFM
 \end{code}
 
 %************************************************************************
@@ -687,6 +666,12 @@ mkPDatasTyConOcc   = mk_simple_deriv_with tcName   "VPs:"
 mkPDataDataConOcc  = mk_simple_deriv_with dataName "VPD:"
 mkPDatasDataConOcc = mk_simple_deriv_with dataName "VPDs:"
 
+-- Overloaded record field dfunids and axioms
+mkRecFldSelOcc, mkRecFldDFunOcc, mkRecFldAxiomOcc :: String -> OccName
+mkRecFldSelOcc   = mk_deriv varName "$sel"
+mkRecFldDFunOcc  = mk_deriv varName "$f"
+mkRecFldAxiomOcc = mkInstTyCoOcc . mkTcOcc
+
 mk_simple_deriv :: NameSpace -> String -> OccName -> OccName
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
 
@@ -743,6 +728,7 @@ mkDFunOcc info_str is_boot set
     prefix | is_boot   = "$fx"
            | otherwise = "$f"
 \end{code}
+
 
 Sometimes we need to pick an OccName that has not already been used,
 given a set of in-use OccNames.

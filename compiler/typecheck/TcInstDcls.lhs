@@ -682,6 +682,7 @@ tcDataFamInstDecl mb_clsinfo
     (L loc decl@(DataFamInstDecl
        { dfid_pats = pats
        , dfid_tycon = fam_tc_name
+       , dfid_rep_tycon = rep_tc_name
        , dfid_defn = defn@HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                                      , dd_ctxt = ctxt, dd_cons = cons } }))
   = setSrcSpan loc             $
@@ -711,7 +712,6 @@ tcDataFamInstDecl mb_clsinfo
        ; gadt_syntax <- dataDeclChecks (tyConName fam_tc) new_or_data stupid_theta cons
 
          -- Construct representation tycon
-       ; rep_tc_name <- newFamInstTyConName fam_tc_name pats'
        ; axiom_name  <- newImplicitBinder rep_tc_name mkInstTyCoOcc
        ; let orig_res_ty = mkTyConApp fam_tc pats'
 

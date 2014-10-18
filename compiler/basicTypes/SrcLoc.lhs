@@ -8,6 +8,7 @@
    -- Workaround for Trac #5252 crashes the bootstrap compiler without -O
    -- When the earliest compiler we want to boostrap with is
    -- GHC 7.2, we can make RealSrcLoc properly abstract
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 -- | This module contains types that relate to the positions of things
 -- in source files, and allow tagging of those things with locations
@@ -81,8 +82,10 @@ import FastString
 
 import Data.Bits
 import Data.Data
+import Data.Foldable
 import Data.List
 import Data.Ord
+import Data.Traversable
 import System.FilePath
 \end{code}
 
@@ -487,7 +490,7 @@ showUserRealSpan show_path (SrcSpanPoint src_path line col)
 \begin{code}
 -- | We attach SrcSpans to lots of things, so let's have a datatype for it.
 data GenLocated l e = L l e
-  deriving (Eq, Ord, Typeable, Data)
+  deriving (Eq, Ord, Typeable, Data, Functor, Foldable, Traversable)
 
 type Located e = GenLocated SrcSpan e
 type RealLocated e = GenLocated RealSrcSpan e
@@ -522,9 +525,6 @@ eqLocated a b = unLoc a == unLoc b
 -- | Tests the ordering of the two located things
 cmpLocated :: Ord a => Located a -> Located a -> Ordering
 cmpLocated a b = unLoc a `compare` unLoc b
-
-instance Functor (GenLocated l) where
-  fmap f (L l e) = L l (f e)
 
 instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
   ppr (L l e) = -- TODO: We can't do this since Located was refactored into
