@@ -80,6 +80,8 @@
   * `scanr`, `mapAccumL` and `filterM` now take part in list fusion (#9355,
     #9502, #9546)
 
+  * Remove deprecated `Data.OldTypeable` (#9639)
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3

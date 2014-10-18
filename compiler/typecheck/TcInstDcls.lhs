@@ -46,7 +46,7 @@ import VarSet
 import CoreUnfold ( mkDFunUnfolding )
 import CoreSyn    ( Expr(Var, Type), CoreExpr, mkTyApps, mkVarApps )
 import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName,
-                    oldTypeableClassNames, genericClassNames )
+                    genericClassNames )
 import Bag
 import BasicTypes
 import DynFlags
@@ -410,13 +410,11 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        -- performed. Derived instances are OK.
        ; dflags <- getDynFlags
        ; when (safeLanguageOn dflags) $ forM_ local_infos $ \x -> case x of
-             _ | typInstCheck x -> addErrAt (getSrcSpan $ iSpec x) (typInstErr x)
              _ | genInstCheck x -> addErrAt (getSrcSpan $ iSpec x) (genInstErr x)
              _ -> return ()
 
        -- As above but for Safe Inference mode.
        ; when (safeInferOn dflags) $ forM_ local_infos $ \x -> case x of
-             _ | typInstCheck x -> recordUnsafeInfer
              _ | genInstCheck x -> recordUnsafeInfer
              _ | overlapCheck x -> recordUnsafeInfer
              _ -> return ()
@@ -438,12 +436,6 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
             && not (isHsBoot (tcg_src env))
          then (i:typeableInsts, otherInsts)
          else (typeableInsts, i:otherInsts)
-
-    typInstCheck ty = is_cls_nm (iSpec ty) `elem` oldTypeableClassNames
-    typInstErr i = hang (ptext (sLit $ "Typeable instances can only be "
-                            ++ "derived in Safe Haskell.") $+$
-                         ptext (sLit "Replace the following instance:"))
-                     2 (pprInstanceHdr (iSpec i))
 
     overlapCheck ty = overlapMode (is_flag $ iSpec ty) `elem`
                         [Overlappable, Overlapping, Overlaps]
