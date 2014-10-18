@@ -69,6 +69,8 @@
   * Generalise `Control.Monad.{when,unless,guard}` from `Monad` to
     `Applicative` and from `MonadPlus` to `Alternative` respectively.
 
+  * Generalise `Control.Monad.{foldM,foldM_}` to `Foldable`
+
   * New module `Data.OldList` containing only list-specialised versions of
     the functions from `Data.List` (in other words, `Data.OldList` corresponds
     to `base-4.7.0.1`'s `Data.List`)
