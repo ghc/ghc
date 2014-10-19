@@ -169,8 +169,9 @@ test('T5549',
      [stats_num_field('bytes allocated',
                       [(wordsize(32), 3362958676, 5),
                     # expected value: 3362958676 (Windows)
-                       (wordsize(64), 6725846120, 5)]),
+                       (wordsize(64), 8193140752, 5)]),
                     # expected value: 6725846120 (amd64/Linux)
+                    #                 8193140752 (amd64/Linux) integer-gmp2
       only_ways(['normal'])
       ],
      compile_and_run,

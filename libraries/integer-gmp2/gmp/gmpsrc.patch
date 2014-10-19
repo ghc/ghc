@@ -1,0 +1,37 @@
+--- gmp-5.0.3/configure	2012-02-03 16:52:49.000000000 +0100
++++ gmpbuild/configure	2014-11-07 23:46:33.629758238 +0100
+@@ -3937,8 +3937,8 @@
+ #
+ cclist="gcc cc"
+ 
+-gcc_cflags="-O2 -pedantic"
+-gcc_64_cflags="-O2 -pedantic"
++gcc_cflags="-O2 -pedantic -fPIC"
++gcc_64_cflags="-O2 -pedantic -fPIC"
+ cc_cflags="-O"
+ cc_64_cflags="-O"
+ 
+--- gmp-5.0.3/memory.c	2012-02-03 16:52:49.000000000 +0100
++++ gmpbuild/memory.c	2014-11-07 23:54:20.734523242 +0100
+@@ -24,21 +24,10 @@
+ #include "gmp-impl.h"
+ 
+ 
+-/* Patched for GHC: */
+-void * stgAllocForGMP   (size_t size_in_bytes);
+-void * stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
+-void   stgDeallocForGMP (void *ptr, size_t size);
+-
+-void *  (*__gmp_allocate_func) __GMP_PROTO ((size_t)) = stgAllocForGMP;
+-void *  (*__gmp_reallocate_func) __GMP_PROTO ((void *, size_t, size_t))
+-     = stgReallocForGMP;
+-void    (*__gmp_free_func) __GMP_PROTO ((void *, size_t)) = stgDeallocForGMP;
+-/*
+ void *	(*__gmp_allocate_func) __GMP_PROTO ((size_t)) = __gmp_default_allocate;
+ void *	(*__gmp_reallocate_func) __GMP_PROTO ((void *, size_t, size_t))
+      = __gmp_default_reallocate;
+ void	(*__gmp_free_func) __GMP_PROTO ((void *, size_t)) = __gmp_default_free;
+-*/
+ 
+ 
+ /* Default allocation functions.  In case of failure to allocate/reallocate

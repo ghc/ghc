@@ -1123,7 +1123,8 @@ lookupIntegerSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
 lookupIntegerSDataConName dflags hsc_env = case cIntegerLibraryType of
     IntegerGMP -> guardIntegerUse dflags $ liftM Just $
                   initTcForLookup hsc_env (tcLookupDataCon integerSDataConName)
-
+    IntegerGMP2-> guardIntegerUse dflags $ liftM Just $
+                  initTcForLookup hsc_env (tcLookupDataCon integerSDataConName)
     IntegerSimple -> return Nothing
 
 -- | Helper for 'lookupMkIntegerName' and 'lookupIntegerSDataConName'

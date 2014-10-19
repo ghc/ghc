@@ -1685,7 +1685,7 @@ def normalise_errmsg( str ):
     # collisions, so we need to normalise that to just "ghc"
     str = re.sub('ghc-stage[123]', 'ghc', str)
     # Error messages simetimes contain integer implementation package
-    str = re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', str)
+    str = re.sub('integer-(gmp|gmp2|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', str)
     return str
 
 # normalise a .prof file, so that we can reasonably compare it against

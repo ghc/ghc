@@ -111,9 +111,9 @@ GHC_PRIM_LIB = $(shell $(LOCAL_GHC_PKG) field ghc-prim hs-libraries | sed 's/^[^
 # We need to get first library directory here in order to get rid of
 # system gmp library directory installation when ghc is configured
 # with --with-gmp-libraries=<dir> parameter
-INTEGER_GMP_DIR = $(shell $(LOCAL_GHC_PKG) field integer-gmp library-dirs \
+INTEGER_GMP_DIR = $(shell $(LOCAL_GHC_PKG) field integer-gmp2 library-dirs \
 	| sed 's/^[^:]*: *//' | head -1)
-INTEGER_GMP_LIB = $(shell $(LOCAL_GHC_PKG) field integer-gmp hs-libraries | sed 's/^.*: *//')
+INTEGER_GMP_LIB = $(shell $(LOCAL_GHC_PKG) field integer-gmp2 hs-libraries | sed 's/^.*: *//')
 
 BASE        = $(BASE_DIR)/lib$(BASE_LIB).a
 GHC_PRIM    = $(GHC_PRIM_DIR)/lib$(GHC_PRIM_LIB).a

@@ -4,7 +4,7 @@ test('space_leak_001',
      # Now it's: 3 (amd64/Linux)
      #           4 (x86/OS X)
      #           5 (x86/Linux)
-     [stats_num_field('peak_megabytes_allocated', (4, 1)),
+     [stats_num_field('peak_megabytes_allocated', (3, 1)),
       stats_num_field('max_bytes_used',
           [(wordsize(64), 440000, 15),
                         # 440224 (amd64/Linux)
@@ -14,7 +14,7 @@ test('space_leak_001',
            (wordsize(32), 405650, 10)]),
              # 2013-02-10 372072 (x86/OSX)
              # 2013-02-10 439228 (x86/OSX)
-      stats_num_field('bytes allocated', (9079316016, 1)),
+      stats_num_field('bytes allocated', (11315747416, 1)),
                         # expected value: 9079316016 (amd64/Linux)
                         #                 9331570416 (x86/Linux)
                         #                 9329073952 (x86/OS X)

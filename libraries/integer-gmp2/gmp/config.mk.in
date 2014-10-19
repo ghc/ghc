@@ -1,0 +1,11 @@
+ifeq "$(HaveLibGmp)" ""
+ HaveLibGmp = @HaveLibGmp@
+endif
+
+ifeq "$(HaveFrameworkGMP)" ""
+ HaveFrameworkGMP = @HaveFrameworkGMP@
+endif
+
+GMP_INCLUDE_DIRS = @GMP_INCLUDE_DIRS@
+GMP_LIB_DIRS = @GMP_LIB_DIRS@
+

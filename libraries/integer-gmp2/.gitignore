@@ -1,0 +1,13 @@
+/GNUmakefile
+/autom4te.cache/
+/config.log
+/config.status
+/configure
+/dist-install/
+/ghc.mk
+/gmp/config.mk
+/include/HsIntegerGmp2.h
+/integer-gmp2.buildinfo
+
+/gmp/gmp.h
+/gmp/gmpbuild

@@ -5,11 +5,14 @@ def f( name, opts ):
 def normaliseArrayPackage(str):
     return re.sub('array-[0-9]+(\.[0-9]+)*', 'array-<VERSION>', str)
 
+def normaliseIntegerPackage(str):
+    return re.sub('integer-(gmp|gmp2|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', str)
+
 def normaliseBytestringPackage(str):
     return re.sub('bytestring-[0-9]+(\.[0-9]+)*', 'bytestring-<VERSION>', str)
 
 def normaliseIntegerPackage(str):
-    return re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', str)
+    return re.sub('integer-(gmp|gmp2|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', str)
 
 def ignoreLdOutput(str):
     return re.sub('Creating library file: pdb.safePkg01/dist.build.libHSsafePkg01-1.0-ghc[0-9.]*.dll.a\n', '', str)
@@ -40,7 +43,8 @@ test('safePkg01',
       normalise_errmsg_fun(ignoreLdOutput),
       normalise_fun(
         normaliseArrayPackage,
-        normaliseBytestringPackage)],
+        normaliseBytestringPackage,
+        normaliseIntegerPackage)],
      run_command,
      ['$MAKE -s --no-print-directory safePkg01 ' + make_args])
 
