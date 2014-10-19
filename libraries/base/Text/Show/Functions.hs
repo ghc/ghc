@@ -21,8 +21,6 @@
 
 module Text.Show.Functions () where
 
-import Prelude
-
 instance Show (a -> b) where
 	showsPrec _ _ = showString "<function>"
 

@@ -91,7 +91,6 @@ module Text.Printf(
   IsChar(..)
 ) where
 
-import Prelude
 import Data.Char
 import Data.Int
 import Data.List

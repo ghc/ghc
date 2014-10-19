@@ -37,7 +37,6 @@ module Data.Fixed
     E12,Pico
 ) where
 
-import Prelude -- necessary to get dependencies right
 import Data.Typeable
 import Data.Data
 import GHC.Read

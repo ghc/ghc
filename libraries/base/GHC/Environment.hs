@@ -3,7 +3,6 @@
 
 module GHC.Environment (getFullArgs) where
 
-import Prelude
 import Foreign
 import Foreign.C
 

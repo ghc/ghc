@@ -104,8 +104,6 @@ module Control.Concurrent (
 
     ) where
 
-import Prelude
-
 import Control.Exception.Base as Exception
 
 import GHC.Exception

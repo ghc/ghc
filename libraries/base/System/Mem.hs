@@ -19,7 +19,6 @@ module System.Mem
        , performMajorGC
        , performMinorGC
        ) where
-import Prelude
 
 -- | Triggers an immediate garbage collection.
 performGC :: IO ()
