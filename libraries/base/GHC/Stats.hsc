@@ -1,4 +1,5 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -19,6 +20,9 @@ module GHC.Stats
 
 import Control.Monad
 import Data.Int
+import GHC.Base
+import GHC.Read ( Read )
+import GHC.Show ( Show )
 import GHC.IO.Exception
 import Foreign.Marshal.Alloc
 import Foreign.Storable

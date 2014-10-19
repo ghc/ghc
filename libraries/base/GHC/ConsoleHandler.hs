@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
 
@@ -20,6 +21,8 @@
 module GHC.ConsoleHandler
 #if !defined(mingw32_HOST_OS) && !defined(__HADDOCK__)
         where
+
+import GHC.Base ()  -- dummy dependency
 #else /* whole file */
         ( Handler(..)
         , installHandler
@@ -38,6 +41,7 @@ Note: this #include is inside a Haskell comment
       by GHC
 -}
 
+import GHC.Base
 import Foreign
 import Foreign.C
 import GHC.IO.FD

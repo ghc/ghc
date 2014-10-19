@@ -1,7 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
--- XXX -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
 
 -----------------------------------------------------------------------------
 -- |
@@ -23,20 +21,9 @@ module Data.Tuple
   , curry
   , uncurry
   , swap
-  )
-    where
+  ) where
 
-import GHC.Base
--- We need to depend on GHC.Base so that
--- a) so that we get GHC.Classes, GHC.Types
-
--- b) so that GHC.Base.inline is available, which is used
---    when expanding instance declarations
-
-import GHC.Tuple
--- We must import GHC.Tuple, to ensure sure that the
--- data constructors of `(,)' are in scope when we do
--- the standalone deriving instance for Eq (a,b) etc
+import GHC.Base ()      -- Note [Depend on GHC.Tuple]
 
 default ()              -- Double isn't available yet
 

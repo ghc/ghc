@@ -42,7 +42,6 @@ import GHC.Real
 import GHC.Read
 import GHC.Arr
 import GHC.Show
-import GHC.Float ()     -- for RealFrac methods
 
 ------------------------------------------------------------------------
 -- type Word8

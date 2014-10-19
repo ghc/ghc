@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
 
 module GHC.Constants where
@@ -6,3 +7,4 @@ module GHC.Constants where
 -- We probably want to include the constants in platformConstants somehow
 -- instead.
 
+import GHC.Base () -- dummy dependency
