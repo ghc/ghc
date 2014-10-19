@@ -380,7 +380,12 @@ integerPackageKey, primPackageKey,
   thPackageKey, dphSeqPackageKey, dphParPackageKey,
   mainPackageKey, thisGhcPackageKey, interactivePackageKey  :: PackageKey
 primPackageKey        = fsToPackageKey (fsLit "ghc-prim")
-integerPackageKey     = fsToPackageKey (fsLit cIntegerLibrary)
+integerPackageKey     = fsToPackageKey (fsLit n)
+  where
+    n = case cIntegerLibraryType of
+        IntegerGMP    -> "integer-gmp"
+        IntegerGMP2   -> "integer-gmp"
+        IntegerSimple -> "integer-simple"
 basePackageKey        = fsToPackageKey (fsLit "base")
 rtsPackageKey         = fsToPackageKey (fsLit "rts")
 thPackageKey          = fsToPackageKey (fsLit "template-haskell")

@@ -40,6 +40,7 @@ test('safePkg01',
       normalise_errmsg_fun(ignoreLdOutput),
       normalise_fun(
         normaliseArrayPackage,
+        normaliseIntegerPackage,
         normaliseBytestringPackage)],
      run_command,
      ['$MAKE -s --no-print-directory safePkg01 ' + make_args])

@@ -31,6 +31,7 @@
 #  - bin-package-db
 #  - ghc-prim
 #  - integer-gmp
+#  - integer-gmp2
 #  - integer-simple
 #  - template-haskell
 
@@ -41,6 +42,7 @@ $$(foreach hashline,libraries/bin-package-db#-#no-remote-repo#no-vcs        \
                     libraries/base#-#no-remote-repo#no-vcs                  \
                     libraries/ghc-prim#-#no-remote-repo#no-vcs              \
                     libraries/integer-gmp#-#no-remote-repo#no-vcs           \
+                    libraries/integer-gmp2#-#no-remote-repo#no-vcs          \
                     libraries/integer-simple#-#no-remote-repo#no-vcs        \
                     libraries/template-haskell#-#no-remote-repo#no-vcs      \
                     $$(shell grep '^libraries/' packages | sed 's/  */#/g'),\
