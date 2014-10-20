@@ -334,7 +334,6 @@ pprSectionHeader seg = case seg of
                     -> text ".text\n\t.align 8"
   UninitialisedData -> text ".bss\n\t.align 8"
   ReadOnlyData16    -> text ".data\n\t.align 16"
-  StaticClosures    -> text ".section staticclosures,\"aw\"\n\t.align 8"
   OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
 
 

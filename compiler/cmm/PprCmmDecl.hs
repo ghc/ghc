@@ -162,7 +162,6 @@ pprSection s = case s of
     RelocatableReadOnlyData
                       -> section <+> doubleQuotes (text "relreadonly")
     UninitialisedData -> section <+> doubleQuotes (text "uninitialised")
-    StaticClosures    -> section <+> doubleQuotes (text "staticclosures")
     OtherSection s'   -> section <+> doubleQuotes (text s')
  where
     section = ptext (sLit "section")

@@ -389,7 +389,6 @@ pprSectionHeader seg =
                         -> text ".const_data\n\t.align 2"
       UninitialisedData -> text ".data\n\t.align 2"
       ReadOnlyData16    -> text ".const\n\t.align 4"
-      StaticClosures    -> text ".section staticclosures,\"aw\"\n\t.align 2"
       OtherSection _    -> panic "X86.Ppr.pprSectionHeader: unknown section"
   | otherwise ->
      case seg of
@@ -400,7 +399,6 @@ pprSectionHeader seg =
                         -> text ".const_data\n\t.align 3"
       UninitialisedData -> text ".data\n\t.align 3"
       ReadOnlyData16    -> text ".const\n\t.align 4"
-      StaticClosures    -> text ".section staticclosures,\"aw\"\n\t.align 3"
       OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
  _
   | target32Bit platform ->
@@ -412,7 +410,6 @@ pprSectionHeader seg =
                         -> text ".section .data\n\t.align 4"
       UninitialisedData -> text ".section .bss\n\t.align 4"
       ReadOnlyData16    -> text ".section .rodata\n\t.align 16"
-      StaticClosures    -> text ".section staticclosures,\"aw\"\n\t.align 4"
       OtherSection _    -> panic "X86.Ppr.pprSectionHeader: unknown section"
   | otherwise ->
      case seg of
@@ -423,7 +420,6 @@ pprSectionHeader seg =
                         -> text ".section .data\n\t.align 8"
       UninitialisedData -> text ".section .bss\n\t.align 8"
       ReadOnlyData16    -> text ".section .rodata.cst16\n\t.align 16"
-      StaticClosures    -> text ".section staticclosures,\"aw\"\n\t.align 8"
       OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
 
 

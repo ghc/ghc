@@ -291,7 +291,6 @@ pprSectionHeader seg =
   ReadOnlyData16
    | osDarwin       -> text ".const\n\t.align 4"
    | otherwise      -> text ".section .rodata\n\t.align 4"
-  StaticClosures    -> text ".section staticclosures,\"aw\"\n\t.align 2"
   OtherSection _ ->
       panic "PprMach.pprSectionHeader: unknown section"
 
