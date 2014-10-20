@@ -31,7 +31,7 @@ import pthread_mutex_unlock;
 import base_ControlziExceptionziBase_nestedAtomically_static_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
-import ghczmprim_GHCziTypes_False_static_closure;
+import ghczmprim_GHCziTypes_False_closure;
 #if defined(USE_MINIINTERPRETER) || !defined(mingw32_HOST_OS)
 import sm_mutex;
 #endif
@@ -1171,7 +1171,7 @@ stg_atomicallyzh (P_ stm)
 
     /* Nested transactions are not allowed; raise an exception */
     if (old_trec != NO_TREC) {
-        jump stg_raisezh(STATIC_CLOSURE(base_ControlziExceptionziBase_nestedAtomically));
+        jump stg_raisezh(base_ControlziExceptionziBase_nestedAtomically_closure);
     }
 
     code = stm;
@@ -2342,13 +2342,13 @@ stg_getSparkzh ()
     W_ spark;
 
 #ifndef THREADED_RTS
-    return (0,STATIC_CLOSURE(ghczmprim_GHCziTypes_False));
+    return (0,ghczmprim_GHCziTypes_False_closure);
 #else
     (spark) = ccall findSpark(MyCapability());
     if (spark != 0) {
         return (1,spark);
     } else {
-        return (0,STATIC_CLOSURE(ghczmprim_GHCziTypes_False));
+        return (0,ghczmprim_GHCziTypes_False_closure);
     }
 #endif
 }

@@ -1600,7 +1600,7 @@ mkExtraObjToLinkIntoBinary dflags = do
    | gopt Opt_NoHsMain dflags = Outputable.empty
    | otherwise = vcat [
       text "#include \"Rts.h\"",
-      text "extern StgClosure ZCMain_main_static_closure;",
+      text "extern StgClosure ZCMain_main_closure;",
       text "int main(int argc, char *argv[])",
       char '{',
       text " RtsConfig __conf = defaultRtsConfig;",
@@ -1611,7 +1611,7 @@ mkExtraObjToLinkIntoBinary dflags = do
          Just opts -> ptext (sLit "    __conf.rts_opts= ") <>
                         text (show opts) <> semi,
       text " __conf.rts_hs_main = rtsTrue;",
-      text " return hs_main(argc,argv,&ZCMain_main_static_closure,__conf);",
+      text " return hs_main(argc,argv,&ZCMain_main_closure,__conf);",
       char '}',
       char '\n' -- final newline, to keep gcc happy
      ]

@@ -374,9 +374,9 @@ initInterpBuffering = do -- make sure these are linked
         -- ToDo: we should really look up these names properly, but
         -- it's a fiddle and not all the bits are exposed via the GHC
         -- interface.
-      mb_stdin_ptr  <- ObjLink.lookupSymbol "base_GHCziIOziHandleziFD_stdin_static_closure"
-      mb_stdout_ptr <- ObjLink.lookupSymbol "base_GHCziIOziHandleziFD_stdout_static_closure"
-      mb_stderr_ptr <- ObjLink.lookupSymbol "base_GHCziIOziHandleziFD_stderr_static_closure"
+      mb_stdin_ptr  <- ObjLink.lookupSymbol "base_GHCziIOziHandleziFD_stdin_closure"
+      mb_stdout_ptr <- ObjLink.lookupSymbol "base_GHCziIOziHandleziFD_stdout_closure"
+      mb_stderr_ptr <- ObjLink.lookupSymbol "base_GHCziIOziHandleziFD_stderr_closure"
 
       let f ref (Just ptr) = writeIORef ref ptr
           f _   Nothing    = panic "interactiveUI:setBuffering2"
