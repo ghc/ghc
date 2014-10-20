@@ -663,14 +663,6 @@ flattenTyVarOuter ctxt_ev tv
                          ; return (Right (ty, mkTcNomReflCo ty)) } ;
            Nothing ->
 
-    -- Try in ty_binds
-    do { ty_binds <- getTcSTyBindsMap
-       ; case lookupVarEnv ty_binds tv of {
-           Just (_tv,ty) -> do { traceTcS "Following bound tyvar" (ppr tv <+> equals <+> ppr ty)
-                               ; return (Right (ty, mkTcNomReflCo ty)) } ;
-                                 -- NB: ty_binds coercions are all ReflCo,
-           Nothing ->
-
     -- Try in the inert equalities
     do { ieqs <- getInertEqs
        ; case lookupVarEnv ieqs tv of
@@ -685,7 +677,7 @@ flattenTyVarOuter ctxt_ev tv
                     -- so ctEvCoercion is fine.
 
            _other -> flattenTyVarFinal ctxt_ev tv
-    } } } } }
+    } } }
 
 flattenTyVarFinal ctxt_ev tv
   = -- Done, but make sure the kind is zonked
@@ -1121,7 +1113,7 @@ canEqTyVar ev swapped tv1 ty2 ps_ty2              -- ev :: tv ~ s2
                                       ContinueWith new_ev -> can_eq_nc new_ev ty1 ty1 ty2 ps_ty2 }
 
            Left tv1' -> do { let fmode = FE { fe_ev = ev, fe_mode = FM_Avoid tv1' True }
-                                 -- Flatten the RHS less vigorously, to avoid gratuitous
+                                 -- Flatten the RHS less vigorously, to avoid gratuitous flattening
                            ; (xi2, co2) <- flatten fmode ps_ty2 -- co2 :: xi2 ~ ps_ty2
                                            -- Use ps_ty2 to preserve type synonyms if poss
                            ; dflags <- getDynFlags
@@ -1177,7 +1169,7 @@ canEqTyVar2 dflags ev swapped tv1 xi2 co2
 
 
 
-canEqTyVarTyVar :: CtEvidence       -- tv1 ~ orhs (or orhs ~ tv1, if swapped)
+canEqTyVarTyVar :: CtEvidence           -- tv1 ~ orhs (or orhs ~ tv1, if swapped)
                 -> SwapFlag
                 -> TcTyVar -> TcTyVar   -- tv2, tv2
                 -> TcCoercion           -- tv2 ~ orhs
@@ -1201,26 +1193,6 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
   | k1_sub_k2       = do_swap   -- Note [Kind orientation for CTyEqCan]
   | otherwise       = no_swap   -- k2_sub_k1
   where
-    no_swap = canon_eq swapped            tv1 xi1 xi2 co1 co2
-    do_swap = canon_eq (flipSwap swapped) tv2 xi2 xi1 co2 co1
-
-    do_fmv swapped tv1 xi1 xi2 co1 co2
-      = canon_eq swapped tv1 xi1 xi2 co1 co2
---      | same_kind = canon_eq swapped tv1 xi1 xi2 co1 co2
---      | otherwise  -- Presumably tv1 `subKind` tv2, which is the wrong way round
---      = do { tv_ty <- newFlexiTcsTy (tyVarKind tv1)
-
-    canon_eq swapped tv1 xi1 xi2 co1 co2
-      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 co1 co2
-           ; let mk_ct ev' = CTyEqCan { cc_ev = ev', cc_tyvar = tv1, cc_rhs = xi2 }
-           ; return (fmap mk_ct mb) }
-
-    incompat
-      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 (mkTcNomReflCo xi1) co2
-           ; case mb of
-               Stop ev s        -> return (Stop ev s)
-               ContinueWith ev' -> incompatibleKind ev' xi1 k1 xi2 k2 }
-
     xi1 = mkTyVarTy tv1
     xi2 = mkTyVarTy tv2
     k1  = tyVarKind tv1
@@ -1230,6 +1202,34 @@ canEqTyVarTyVar ev swapped tv1 tv2 co2
     k2_sub_k1     = k2 `isSubKind` k1
     same_kind     = k1_sub_k2 && k2_sub_k1
     incompat_kind = not (k1_sub_k2 || k2_sub_k1)
+
+    no_swap = canon_eq swapped            tv1 xi1 xi2 co1 co2
+    do_swap = canon_eq (flipSwap swapped) tv2 xi2 xi1 co2 co1
+
+    canon_eq swapped tv1 xi1 xi2 co1 co2
+        -- ev  : tv1 ~ orhs  (not swapped) or   orhs ~ tv1   (swapped)
+        -- co1 : xi1 ~ tv1
+        -- co2 : xi2 ~ tv2
+      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 co1 co2
+           ; let mk_ct ev' = CTyEqCan { cc_ev = ev', cc_tyvar = tv1, cc_rhs = xi2 }
+           ; return (fmap mk_ct mb) }
+
+    do_fmv swapped tv1 xi1 xi2 co1 co2
+      | same_kind 
+      = canon_eq swapped tv1 xi1 xi2 co1 co2
+      | otherwise  -- Presumably tv1 `subKind` tv2, which is the wrong way round
+      = ASSERT2( k1_sub_k2, ppr tv1 $$ ppr tv2 )
+        ASSERT2( isWanted ev, ppr ev )  -- Only wanteds have flatten meta-vars
+        do { tv_ty <- newFlexiTcSTy (tyVarKind tv1)
+           ; new_ev <- newWantedEvVarNC (ctEvLoc ev) (mkTcEqPred tv_ty xi2)
+           ; emitWorkNC [new_ev]
+           ; canon_eq swapped tv1 xi1 tv_ty co1 (ctEvCoercion new_ev `mkTcTransCo` co2) }
+
+    incompat
+      = do { mb <- rewriteEqEvidence ev swapped xi1 xi2 (mkTcNomReflCo xi1) co2
+           ; case mb of
+               Stop ev s        -> return (Stop ev s)
+               ContinueWith ev' -> incompatibleKind ev' xi1 k1 xi2 k2 }
 
     swap_over
       -- If tv1 is touchable, swap only if tv2 is also

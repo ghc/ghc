@@ -27,7 +27,6 @@ import Id       ( idType )
 import Var
 import Unique
 import VarSet
-import VarEnv
 import TcEvidence
 import Name
 import Bag
@@ -715,11 +714,9 @@ solveWanteds wanteds
        ; final_wanteds <- simpl_loop 1 solved_flats_wanteds
 
        ; bb <- getTcEvBindsMap
-       ; tb <- getTcSTyBindsMap
        ; traceTcS "solveWanteds }" $
                  vcat [ text "final wc =" <+> ppr final_wanteds
-                      , text "current evbinds  =" <+> ppr (evBindMapBinds bb)
-                      , text "current tybinds  =" <+> vcat (map ppr (varEnvElts tb)) ]
+                      , text "current evbinds  =" <+> ppr (evBindMapBinds bb) ]
 
        ; return final_wanteds }
 
@@ -1190,11 +1187,9 @@ floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
   = do { outer_untch <- TcS.getUntouchables
        ; mapM_ (promoteTyVar outer_untch) (varSetElems (tyVarsOfCts float_eqs))
              -- See Note [Promoting unification variables]
-       ; ty_binds <- getTcSTyBindsMap
        ; traceTcS "floatEqualities" (vcat [ text "Skols =" <+> ppr skols
                                           , text "Flats =" <+> ppr flats
-                                          , text "Floated eqs =" <+> ppr float_eqs
-                                          , text "Ty binds =" <+> ppr ty_binds])
+                                          , text "Floated eqs =" <+> ppr float_eqs ])
        ; return (float_eqs, wanteds { wc_flat = remaining_flats }) }
   where
     skol_set = mkVarSet skols

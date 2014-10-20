@@ -58,7 +58,7 @@ module TcSMonad (
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getTcEvBinds, getUntouchables,
-    getTcEvBindsMap, getTcSTyBindsMap,
+    getTcEvBindsMap, 
 
     lookupFlatCache, newFlattenSkolem,            -- Flatten skolems
 
@@ -1125,10 +1125,9 @@ data TcSEnv
   = TcSEnv {
       tcs_ev_binds    :: EvBindsVar,
 
-      tcs_ty_binds :: IORef (Bool, TyVarEnv (TcTyVar, TcType)),
-          -- Global type bindings for unification variables
-          -- See Note [Spontaneously solved in TyBinds] in TcInteract
-          -- The "dirty-flag" Bool is set True when we add a binding
+      tcs_unified :: IORef Bool,
+          -- The "dirty-flag" Bool is set True when 
+          -- we unify a unification variable
 
       tcs_count    :: IORef Int, -- Global step count
 
@@ -1229,24 +1228,19 @@ runTcSWithEvBinds :: EvBindsVar
                   -> TcS a
                   -> TcM a
 runTcSWithEvBinds ev_binds_var tcs
-  = do { ty_binds_var <- TcM.newTcRef (False, emptyVarEnv)
+  = do { unified_var <- TcM.newTcRef False
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef is
        ; wl_var <- TcM.newTcRef emptyWorkList
 
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
-                          , tcs_ty_binds = ty_binds_var
+                          , tcs_unified  = unified_var
                           , tcs_count    = step_count
                           , tcs_inerts   = inert_var
                           , tcs_worklist = wl_var }
 
              -- Run the computation
        ; res <- unTcS tcs env
-
-             -- Perform the type unifications required
-       ; (_, ty_binds) <- TcM.readTcRef ty_binds_var
-       ; TcM.traceTc "Write TcS ty_binds into the meta type variables" (ppr ty_binds)
-       ; mapM_ do_unification (varEnvElts ty_binds)
 
        ; count <- TcM.readTcRef step_count
        ; when (count > 0) $ 
@@ -1259,7 +1253,6 @@ runTcSWithEvBinds ev_binds_var tcs
 
        ; return res }
   where
-    do_unification (tv,ty) = TcM.writeMetaTyVar tv ty
     is = emptyInert
 
 #ifdef DEBUG
@@ -1284,7 +1277,7 @@ checkForCyclicBinds ev_binds
 
 nestImplicTcS :: EvBindsVar -> Untouchables -> TcS a -> TcS a
 nestImplicTcS ref inner_untch (TcS thing_inside)
-  = TcS $ \ TcSEnv { tcs_ty_binds = ty_binds
+  = TcS $ \ TcSEnv { tcs_unified = unified_var
                    , tcs_inerts = old_inert_var
                    , tcs_count = count } ->
     do { inerts <- TcM.readTcRef old_inert_var
@@ -1293,7 +1286,7 @@ nestImplicTcS ref inner_untch (TcS thing_inside)
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = TcSEnv { tcs_ev_binds    = ref
-                               , tcs_ty_binds    = ty_binds
+                               , tcs_unified     = unified_var
                                , tcs_count       = count
                                , tcs_inerts      = new_inert_var
                                , tcs_worklist    = new_wl_var }
@@ -1315,7 +1308,7 @@ recoverTcS (TcS recovery_code) (TcS thing_inside)
 
 nestTcS ::  TcS a -> TcS a
 -- Use the current untouchables, augmenting the current
--- evidence bindings, ty_binds, and solved caches
+-- evidence bindings, and solved caches
 -- But have no effect on the InertCans or insolubles
 nestTcS (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
@@ -1330,16 +1323,14 @@ tryTcS :: TcS a -> TcS a
 -- Like runTcS, but from within the TcS monad
 -- Completely fresh inerts and worklist, be careful!
 -- Moreover, we will simply throw away all the evidence generated.
--- We have a completely empty tcs_ty_binds too, so make sure the
--- input stuff is fully rewritten wrt any outer inerts
 tryTcS (TcS thing_inside)
   = TcS $ \env ->
     do { is_var <- TcM.newTcRef emptyInert
-       ; ty_binds_var <- TcM.newTcRef (False, emptyVarEnv)
+       ; unified_var <- TcM.newTcRef False
        ; ev_binds_var <- TcM.newTcEvBinds
        ; wl_var <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
-                            , tcs_ty_binds = ty_binds_var
+                            , tcs_unified  = unified_var
                             , tcs_inerts   = is_var
                             , tcs_worklist = wl_var }
        ; thing_inside nest_env }
@@ -1408,14 +1399,6 @@ getUntouchables = wrapTcS TcM.getUntouchables
 \end{code}
 
 \begin{code}
-getTcSTyBinds :: TcS (IORef (Bool, TyVarEnv (TcTyVar, TcType)))
-getTcSTyBinds = TcS (return . tcs_ty_binds)
-
-getTcSTyBindsMap :: TcS (TyVarEnv (TcTyVar, TcType))
-getTcSTyBindsMap = do { ref <- getTcSTyBinds
-                      ; wrapTcS $ do { (_, binds) <- TcM.readTcRef ref
-                                     ; return binds } }
-
 getTcEvBindsMap :: TcS EvBindMap
 getTcEvBindsMap
   = do { EvBindsVar ev_ref _ <- getTcEvBinds
@@ -1433,34 +1416,18 @@ setWantedTyBind tv ty
            -- Flatten meta-vars are born and die locally
 
   | otherwise
-  = do { ref <- getTcSTyBinds
-       ; wrapTcS $
-         do { (_dirty, ty_binds) <- TcM.readTcRef ref
-            ; when debugIsOn $
-                  TcM.checkErr (not (tv `elemVarEnv` ty_binds)) $
-                  vcat [ text "TERRIBLE ERROR: double set of meta type variable"
-                       , ppr tv <+> text ":=" <+> ppr ty
-                       , text "Old value =" <+> ppr (lookupVarEnv_NF ty_binds tv)]
-            ; TcM.traceTc "setWantedTyBind" (ppr tv <+> text ":=" <+> ppr ty)
-            ; TcM.writeMetaTyVar tv ty
-            ; TcM.writeTcRef ref (True, ty_binds) } }
---             ; TcM.writeTcRef ref (True, extendVarEnv ty_binds tv (tv,ty)) } }
+  = TcS $ \ env ->
+    do { TcM.traceTc "setWantedTyBind" (ppr tv <+> text ":=" <+> ppr ty)
+       ; TcM.writeMetaTyVar tv ty
+       ; TcM.writeTcRef (tcs_unified env) True }
 
 reportUnifications :: TcS a -> TcS (Bool, a)
-reportUnifications thing_inside
-  = do { ty_binds_var <- getTcSTyBinds
-       ; outer_dirty <- wrapTcS $
-            do { (outer_dirty, binds1) <- TcM.readTcRef ty_binds_var
-               ; TcM.writeTcRef ty_binds_var (False, binds1)
-               ; return outer_dirty }
-      ; res <- thing_inside
-      ; wrapTcS $
-        do { (inner_dirty, binds2) <- TcM.readTcRef ty_binds_var
-           ; if inner_dirty then
-                 return (True, res)
-             else
-                do { TcM.writeTcRef ty_binds_var (outer_dirty, binds2)
-                   ; return (False, res) } } }
+reportUnifications (TcS thing_inside)
+  = TcS $ \ env ->
+    do { inner_unified <- TcM.newTcRef False
+       ; res <- thing_inside (env { tcs_unified = inner_unified })
+       ; dirty <- TcM.readTcRef inner_unified
+       ; return (dirty, res) }
 \end{code}
 
 \begin{code}

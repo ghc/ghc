@@ -37,8 +37,10 @@ ghcirun002: internal error: ASSERTION FAILED: file rts/Interpreter.c, line 773
 +package dependencies: array-0.5.0.1 base-4.8.0.0
    safeHaskell/check/pkg01       safePkg01 [bad stdout] (normal)
 
-openKind thing
-   indexed-types/should_compile  T4935 [exit code non-0] (normal)
+
+Wierd looking pattern synonym thing
+   ghci/scripts                       T8776 [bad stdout] (ghci)
+   patsyn/should_fail                 mono [stderr mismatch] (normal)
 
 Derived equalities   fmv1 ~ Maybe a, fmv2 ~ Maybe b
    indexed-types/should_fail     T4093a [stderr mismatch] (normal)
@@ -46,7 +48,7 @@ Derived equalities   fmv1 ~ Maybe a, fmv2 ~ Maybe b
 Not sure
    indexed-types/should_fail     ExtraTcsUntch [stderr mismatch] (normal)
 
-Order of finding iprovementsbui
+Order of finding iprovements
    typecheck/should_compile      TcTypeNatSimple [exit code non-0] (normal)
 
 
