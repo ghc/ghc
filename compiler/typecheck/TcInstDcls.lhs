@@ -552,6 +552,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         ; let inst_info = InstInfo { iSpec  = ispec
                                    , iBinds = InstBindings
                                      { ib_binds = binds
+                                     , ib_tyvars = map Var.varName tyvars -- Scope over bindings
                                      , ib_pragmas = uprags
                                      , ib_extensions = []
                                      , ib_derived = False } }
@@ -822,7 +823,6 @@ So right here in tcInstDecls2 we must re-extend the type envt with
 the default method Ids replete with their INLINE pragmas.  Urk.
 
 \begin{code}
-
 tcInstDecl2 :: InstInfo Name -> TcM (LHsBinds Id)
             -- Returns a binding for the dfun
 tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
@@ -848,11 +848,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
 
         -- Typecheck the methods
        ; (meth_ids, meth_binds)
-           <- tcExtendTyVarEnv inst_tyvars $
-                -- The inst_tyvars scope over the 'where' part
-                -- Those tyvars are inside the dfun_id's type, which is a bit
-                -- bizarre, but OK so long as you realise it!
-              tcInstanceMethods dfun_id clas inst_tyvars dfun_ev_vars
+           <- tcInstanceMethods dfun_id clas inst_tyvars dfun_ev_vars
                                 inst_tys spec_inst_info
                                 op_items ibinds
 
@@ -1195,10 +1191,13 @@ tcInstanceMethods :: DFunId -> Class -> [TcTyVar]
 tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                   (spec_inst_prags, prag_fn)
                   op_items (InstBindings { ib_binds = binds
+                                         , ib_tyvars = lexical_tvs
                                          , ib_pragmas = sigs
                                          , ib_extensions = exts
                                          , ib_derived    = is_derived })
-  = do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
+  = tcExtendTyVarEnv2 (lexical_tvs `zip` tyvars) $
+       -- The lexical_tvs scope over the 'where' part
+    do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
        ; let hs_sig_fn = mkHsSigFun sigs
        ; checkMinimalDefinition
        ; set_exts exts $ mapAndUnzipM (tc_item hs_sig_fn) op_items }

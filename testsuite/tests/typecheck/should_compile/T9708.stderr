@@ -1,0 +1,17 @@
+
+T9708.hs:9:8:
+    Could not deduce (SomeFun x ~ SomeFun y)
+    from the context (x <= y, y <= x)
+      bound by the type signature for
+                 ti7 :: (x <= y, y <= x) => Proxy (SomeFun x) -> Proxy y -> ()
+      at T9708.hs:9:8-61
+    NB: ‘SomeFun’ is a type function, and may not be injective
+    Expected type: Proxy (SomeFun x) -> Proxy y -> ()
+      Actual type: Proxy (SomeFun y) -> Proxy y -> ()
+    In the ambiguity check for:
+      forall (x :: Nat) (y :: Nat).
+      (x <= y, y <= x) =>
+      Proxy (SomeFun x) -> Proxy y -> ()
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+    In the type signature for ‘ti7’:
+      ti7 :: (x <= y, y <= x) => Proxy (SomeFun x) -> Proxy y -> ()
