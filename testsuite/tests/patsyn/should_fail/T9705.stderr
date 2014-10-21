@@ -1,0 +1,4 @@
+
+T9705.hs:3:5:
+    Pattern synonyms not allowed in instance declarations
+      pattern P = ()

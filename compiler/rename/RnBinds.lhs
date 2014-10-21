@@ -698,6 +698,11 @@ rnMethodBind _ _ (L loc bind@(PatBind {})) = do
     addErrAt loc (methodBindErr bind)
     return (emptyBag, emptyFVs)
 
+-- Associated pattern synonyms are not implemented yet
+rnMethodBind _ _ (L loc bind@(PatSynBind {})) = do
+    addErrAt loc $ methodPatSynErr bind
+    return (emptyBag, emptyFVs)
+
 rnMethodBind _ _ b = pprPanic "rnMethodBind" (ppr b)
 \end{code}
 
@@ -1010,6 +1015,11 @@ defaultSigErr sig = vcat [ hang (ptext (sLit "Unexpected default signature:"))
 methodBindErr :: HsBindLR RdrName RdrName -> SDoc
 methodBindErr mbind
  =  hang (ptext (sLit "Pattern bindings (except simple variables) not allowed in instance declarations"))
+       2 (ppr mbind)
+
+methodPatSynErr :: HsBindLR RdrName RdrName -> SDoc
+methodPatSynErr mbind
+ =  hang (ptext (sLit "Pattern synonyms not allowed in instance declarations"))
        2 (ppr mbind)
 
 bindsInHsBootFile :: LHsBindsLR Name RdrName -> SDoc
