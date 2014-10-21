@@ -66,6 +66,12 @@
         <itemizedlist>
             <listitem>
                 <para>
+                    GHC has had its internal Unicode database for
+                    parsing updated to the Unicode 7.0 standard.
+                </para>
+           </listitem>
+            <listitem>
+                <para>
                     GHC now checks that all the language extensions required for
                     the inferred type signatures are explicitly enabled. This
                     means that if any of the type signatures inferred in your
