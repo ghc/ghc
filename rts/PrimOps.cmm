@@ -28,7 +28,7 @@
 import pthread_mutex_lock;
 import pthread_mutex_unlock;
 #endif
-import base_ControlziExceptionziBase_nestedAtomically_static_closure;
+import base_ControlziExceptionziBase_nestedAtomically_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
 import ghczmprim_GHCziTypes_False_closure;
