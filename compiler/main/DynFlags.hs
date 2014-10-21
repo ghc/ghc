@@ -3073,7 +3073,8 @@ standardWarnings
         Opt_WarnInlineRuleShadowing,
         Opt_WarnAlternativeLayoutRuleTransitional,
         Opt_WarnUnsupportedLlvmVersion,
-        Opt_WarnContextQuantification
+        Opt_WarnContextQuantification,
+        Opt_WarnTabs
       ]
 
 minusWOpts :: [WarningFlag]

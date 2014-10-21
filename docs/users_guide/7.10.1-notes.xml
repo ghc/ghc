@@ -87,6 +87,12 @@
                     <option>-XTypeFamilies</option>, <option>-XGADTs</option> or
                     <option>-XFlexibleContexts</option>).
                 </para>
+                <para>
+                    <option>-fwarn-tabs</option> warning flag is turned on by
+                    default with this release of GHC. It can be suppressed
+                    either by using <literal>GHC_OPTIONS</literal> pragma or by
+                    specifying <option>-fno-warn-tabs</option> flag.
+                </para>
            </listitem>
        </itemizedlist>
     </sect3>
