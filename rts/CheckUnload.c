@@ -92,91 +92,91 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd)
             continue;
         }
 
-	p = bd->start;
-	while (p < bd->free) {
-	    info = get_itbl((StgClosure *)p);
+        p = bd->start;
+        while (p < bd->free) {
+            info = get_itbl((StgClosure *)p);
             prim = rtsFalse;
 
-	    switch (info->type) {
+            switch (info->type) {
 
-	    case THUNK:
+            case THUNK:
                 size = thunk_sizeW_fromITBL(info);
-		break;
+                break;
 
-	    case THUNK_1_1:
-	    case THUNK_0_2:
-	    case THUNK_2_0:
-		size = sizeofW(StgThunkHeader) + 2;
-		break;
+            case THUNK_1_1:
+            case THUNK_0_2:
+            case THUNK_2_0:
+                size = sizeofW(StgThunkHeader) + 2;
+                break;
 
-	    case THUNK_1_0:
-	    case THUNK_0_1:
-	    case THUNK_SELECTOR:
-		size = sizeofW(StgThunkHeader) + 1;
-		break;
+            case THUNK_1_0:
+            case THUNK_0_1:
+            case THUNK_SELECTOR:
+                size = sizeofW(StgThunkHeader) + 1;
+                break;
 
-	    case CONSTR:
-	    case FUN:
+            case CONSTR:
+            case FUN:
             case FUN_1_0:
-	    case FUN_0_1:
-	    case FUN_1_1:
-	    case FUN_0_2:
-	    case FUN_2_0:
-	    case CONSTR_1_0:
-	    case CONSTR_0_1:
-	    case CONSTR_1_1:
-	    case CONSTR_0_2:
-	    case CONSTR_2_0:
-		size = sizeW_fromITBL(info);
-		break;
+            case FUN_0_1:
+            case FUN_1_1:
+            case FUN_0_2:
+            case FUN_2_0:
+            case CONSTR_1_0:
+            case CONSTR_0_1:
+            case CONSTR_1_1:
+            case CONSTR_0_2:
+            case CONSTR_2_0:
+                size = sizeW_fromITBL(info);
+                break;
 
-	    case IND_PERM:
-	    case BLACKHOLE:
-	    case BLOCKING_QUEUE:
+            case IND_PERM:
+            case BLACKHOLE:
+            case BLOCKING_QUEUE:
                 prim = rtsTrue;
                 size = sizeW_fromITBL(info);
-		break;
+                break;
 
             case IND:
-		// Special case/Delicate Hack: INDs don't normally
-		// appear, since we're doing this heap census right
-		// after GC.  However, GarbageCollect() also does
-		// resurrectThreads(), which can update some
-		// blackholes when it calls raiseAsync() on the
-		// resurrected threads.  So we know that any IND will
-		// be the size of a BLACKHOLE.
+                // Special case/Delicate Hack: INDs don't normally
+                // appear, since we're doing this heap census right
+                // after GC.  However, GarbageCollect() also does
+                // resurrectThreads(), which can update some
+                // blackholes when it calls raiseAsync() on the
+                // resurrected threads.  So we know that any IND will
+                // be the size of a BLACKHOLE.
                 prim = rtsTrue;
                 size = BLACKHOLE_sizeW();
-		break;
+                break;
 
-	    case BCO:
+            case BCO:
                 prim = rtsTrue;
-		size = bco_sizeW((StgBCO *)p);
-		break;
+                size = bco_sizeW((StgBCO *)p);
+                break;
 
             case MVAR_CLEAN:
             case MVAR_DIRTY:
             case TVAR:
             case WEAK:
-	    case PRIM:
-	    case MUT_PRIM:
-	    case MUT_VAR_CLEAN:
-	    case MUT_VAR_DIRTY:
-		prim = rtsTrue;
-		size = sizeW_fromITBL(info);
-		break;
+            case PRIM:
+            case MUT_PRIM:
+            case MUT_VAR_CLEAN:
+            case MUT_VAR_DIRTY:
+                prim = rtsTrue;
+                size = sizeW_fromITBL(info);
+                break;
 
-	    case AP:
+            case AP:
                 prim = rtsTrue;
                 size = ap_sizeW((StgAP *)p);
-		break;
+                break;
 
-	    case PAP:
+            case PAP:
                 prim = rtsTrue;
                 size = pap_sizeW((StgPAP *)p);
-		break;
+                break;
 
-	    case AP_STACK:
+            case AP_STACK:
             {
                 StgAP_STACK *ap = (StgAP_STACK *)p;
                 prim = rtsTrue;
@@ -186,31 +186,31 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd)
                 break;
             }
 
-	    case ARR_WORDS:
-		prim = rtsTrue;
-		size = arr_words_sizeW((StgArrWords*)p);
-		break;
-		
-	    case MUT_ARR_PTRS_CLEAN:
-	    case MUT_ARR_PTRS_DIRTY:
-	    case MUT_ARR_PTRS_FROZEN:
-	    case MUT_ARR_PTRS_FROZEN0:
-		prim = rtsTrue;
-		size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
-		break;
+            case ARR_WORDS:
+                prim = rtsTrue;
+                size = arr_words_sizeW((StgArrWords*)p);
+                break;
 
-	    case SMALL_MUT_ARR_PTRS_CLEAN:
-	    case SMALL_MUT_ARR_PTRS_DIRTY:
-	    case SMALL_MUT_ARR_PTRS_FROZEN:
-	    case SMALL_MUT_ARR_PTRS_FROZEN0:
-		prim = rtsTrue;
-		size = small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)p);
-		break;
-		
-	    case TSO:
-		prim = rtsTrue;
+            case MUT_ARR_PTRS_CLEAN:
+            case MUT_ARR_PTRS_DIRTY:
+            case MUT_ARR_PTRS_FROZEN:
+            case MUT_ARR_PTRS_FROZEN0:
+                prim = rtsTrue;
+                size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
+                break;
+
+            case SMALL_MUT_ARR_PTRS_CLEAN:
+            case SMALL_MUT_ARR_PTRS_DIRTY:
+            case SMALL_MUT_ARR_PTRS_FROZEN:
+            case SMALL_MUT_ARR_PTRS_FROZEN0:
+                prim = rtsTrue;
+                size = small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)p);
+                break;
+
+            case TSO:
+                prim = rtsTrue;
                 size = sizeofW(StgTSO);
-		break;
+                break;
 
             case STACK: {
                 StgStack *stack = (StgStack*)p;
@@ -218,24 +218,24 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd)
                 searchStackChunk(addrs, stack->sp,
                                  stack->stack + stack->stack_size);
                 size = stack_sizeW(stack);
-		break;
+                break;
             }
 
             case TREC_CHUNK:
-		prim = rtsTrue;
-		size = sizeofW(StgTRecChunk);
-		break;
+                prim = rtsTrue;
+                size = sizeofW(StgTRecChunk);
+                break;
 
-	    default:
-		barf("heapCensus, unknown object: %d", info->type);
-	    }
-	    
+            default:
+                barf("heapCensus, unknown object: %d", info->type);
+            }
+
             if (!prim) {
                 checkAddress(addrs,info);
             }
 
-	    p += size;
-	}
+            p += size;
+        }
     }
 }
 
