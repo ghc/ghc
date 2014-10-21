@@ -1441,12 +1441,52 @@ reifyTyVars tvs = mapM reify_tv $ filter isTypeVar tvs
         kind = tyVarKind tv
         name = reifyName tv
 
+\end{code}
+
+Note [Kind annotations on TyConApps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A poly-kinded tycon sometimes needs a kind annotation to be unambiguous.
+For example:
+
+   type family F a :: k
+   type instance F Int  = (Proxy :: * -> *)
+   type instance F Bool = (Proxy :: (* -> *) -> *)
+
+It's hard to figure out where these annotations should appear, so we do this:
+Suppose the tycon is applied to n arguments. We strip off the first n
+arguments of the tycon's kind. If there are any variables left in the result
+kind, we put on a kind annotation. But we must be slightly careful: it's
+possible that the tycon's kind will have fewer than n arguments, in the case
+that the concrete application instantiates a result kind variable with an
+arrow kind. So, if we run out of arguments, we conservatively put on a kind
+annotation anyway. This should be a rare case, indeed. Here is an example:
+
+   data T1 :: k1 -> k2 -> *
+   data T2 :: k1 -> k2 -> *
+
+   type family G (a :: k) :: k
+   type instance G T1 = T2
+
+   type instance F Char = (G T1 Bool :: (* -> *) -> *)   -- F from above
+
+Here G's kind is (forall k. k -> k), and the desugared RHS of that last
+instance of F is (G (* -> (* -> *) -> *) (T1 * (* -> *)) Bool). According to
+the algoritm above, there are 3 arguments to G so we should peel off 3
+arguments in G's kind. But G's kind has only two arguments. This is the
+rare special case, and we conservatively choose to put the annotation
+in.
+
+See #8953 and test th/T8953.
+
+\begin{code}
+
 reify_tc_app :: TyCon -> [TypeRep.Type] -> TcM TH.Type
 reify_tc_app tc tys
-  = do { tys' <- reifyTypes (removeKinds (tyConKind tc) tys)
-       ; return (mkThAppTs r_tc tys') }
+  = do { tys' <- reifyTypes (removeKinds tc_kind tys)
+       ; maybe_sig_t (mkThAppTs r_tc tys') }
   where
-    arity = tyConArity tc
+    arity   = tyConArity tc
+    tc_kind = tyConKind tc
     r_tc | isTupleTyCon tc            = if isPromotedDataCon tc
                                         then TH.PromotedTupleT arity
                                         else TH.TupleT arity
@@ -1455,6 +1495,32 @@ reify_tc_app tc tys
          | tc `hasKey` consDataConKey = TH.PromotedConsT
          | tc `hasKey` eqTyConKey     = TH.EqualityT
          | otherwise                  = TH.ConT (reifyName tc)
+
+    -- See Note [Kind annotations on TyConApps]
+    maybe_sig_t th_type
+      | needs_kind_sig
+      = do { let full_kind = typeKind (mkTyConApp tc tys)
+           ; th_full_kind <- reifyKind full_kind
+           ; return (TH.SigT th_type th_full_kind) }
+      | otherwise
+      = return th_type
+
+    needs_kind_sig
+      | Just result_ki <- peel_off_n_args tc_kind (length tys)
+      = not $ isEmptyVarSet $ kiVarsOfKind result_ki
+      | otherwise
+      = True
+
+    peel_off_n_args :: Kind -> Arity -> Maybe Kind
+    peel_off_n_args k 0 = Just k
+    peel_off_n_args k n
+      | Just (_, res_k) <- splitForAllTy_maybe k
+      = peel_off_n_args res_k (n-1)
+      | Just (_, res_k) <- splitFunTy_maybe k
+      = peel_off_n_args res_k (n-1)
+      | otherwise
+      = Nothing
+
     removeKinds :: Kind -> [TypeRep.Type] -> [TypeRep.Type]
     removeKinds (FunTy k1 k2) (h:t)
       | isSuperKind k1          = removeKinds k2 t
