@@ -277,12 +277,12 @@ findIndices      :: (a -> Bool) -> [a] -> [Int]
 #ifdef USE_REPORT_PRELUDE
 findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
 #else
--- Efficient definition
-findIndices p ls = loop 0# ls
-                 where
-                   loop _ [] = []
-                   loop n (x:xs) | p x       = I# n : loop (n +# 1#) xs
-                                 | otherwise = loop (n +# 1#) xs
+-- Efficient definition, adapted from Data.Sequence
+{-# INLINE findIndices #-}
+findIndices p ls = build $ \c n ->
+  let go x r k | p x       = I# k `c` r (k +# 1#)
+               | otherwise = r (k +# 1#)
+  in foldr go (\_ -> n) ls 0#
 #endif  /* USE_REPORT_PRELUDE */
 
 -- | The 'isPrefixOf' function takes two lists and returns 'True'
