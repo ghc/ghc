@@ -717,6 +717,14 @@ lookup  key ((x,y):xys)
 concatMap               :: (a -> [b]) -> [a] -> [b]
 concatMap f             =  foldr ((++) . f) []
 
+{-# NOINLINE [1] concatMap #-}
+
+{-# RULES
+"concatMap" forall f xs . concatMap f xs =
+    build (\c n -> foldr (\x b -> foldr c b (f x)) n xs)
+ #-}
+
+
 -- | Concatenate a list of lists.
 concat :: [[a]] -> [a]
 concat = foldr (++) []
