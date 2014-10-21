@@ -85,6 +85,7 @@ import SrcLoc
 import Util
 import Data.List        ( mapAccumL )
 import Unique
+import VarSet           ( isEmptyVarSet )
 import Data.Maybe
 import BasicTypes hiding( SuccessFlag(..) )
 import Maybes( MaybeErr(..) )
@@ -1021,12 +1022,12 @@ reifyInstances th_nm th_tys
                -> do { inst_envs <- tcGetInstEnvs
                      ; let (matches, unifies, _) = lookupInstEnv inst_envs cls tys
                      ; traceTc "reifyInstances1" (ppr matches)
-                     ; mapM reifyClassInstance (map fst matches ++ unifies) }
+                     ; reifyClassInstances cls (map fst matches ++ unifies) }
                | isOpenFamilyTyCon tc
                -> do { inst_envs <- tcGetFamInstEnvs
                      ; let matches = lookupFamInstEnv inst_envs tc tys
                      ; traceTc "reifyInstances2" (ppr matches)
-                     ; mapM (reifyFamilyInstance . fim_instance) matches }
+                     ; reifyFamilyInstances tc (map fim_instance matches) }
             _  -> bale_out (hang (ptext (sLit "reifyInstances:") <+> quotes (ppr ty))
                                2 (ptext (sLit "is not a class constraint or type family application"))) }
   where
@@ -1237,7 +1238,8 @@ reifyTyCon tc
        ; case flav' of
          { Left flav ->  -- open type/data family
              do { fam_envs <- tcGetFamInstEnvs
-                ; instances <- mapM reifyFamilyInstance (familyInstances fam_envs tc)
+                ; instances <- reifyFamilyInstances tc
+                                 (familyInstances fam_envs tc)
                 ; return (TH.FamilyI
                             (TH.FamilyD flav (reifyName tc) tvs' kind')
                             instances) }
@@ -1301,7 +1303,7 @@ reifyClass :: Class -> TcM TH.Info
 reifyClass cls
   = do  { cxt <- reifyCxt theta
         ; inst_envs <- tcGetInstEnvs
-        ; insts <- mapM reifyClassInstance (InstEnv.classInstances inst_envs cls)
+        ; insts <- reifyClassInstances cls (InstEnv.classInstances inst_envs cls)
         ; ops <- mapM reify_op op_stuff
         ; tvs' <- reifyTyVars tvs
         ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' ops
@@ -1313,11 +1315,47 @@ reifyClass cls
                           ; return (TH.SigD (reifyName op) ty) }
 
 ------------------------------
-reifyClassInstance :: ClsInst -> TcM TH.Dec
-reifyClassInstance i
+-- | Annotate (with TH.SigT) a type if the first parameter is True
+-- and if the type contains a free variable.
+-- This is used to annotate type patterns for poly-kinded tyvars in
+-- reifying class and type instances. See #8953 and th/T8953.
+annotThType :: Bool   -- True <=> annotate
+            -> TypeRep.Type -> TH.Type -> TcM TH.Type
+  -- tiny optimization: if the type is annotated, don't annotate again.
+annotThType _    _  th_ty@(TH.SigT {}) = return th_ty
+annotThType True ty th_ty
+  | not $ isEmptyVarSet $ tyVarsOfType ty
+  = do { let ki = typeKind ty
+       ; th_ki <- reifyKind ki
+       ; return (TH.SigT th_ty th_ki) }
+annotThType _    _ th_ty = return th_ty
+
+-- | For every *type* variable (not *kind* variable) in the input,
+-- report whether or not the tv is poly-kinded. This is used to eventually
+-- feed into 'annotThType'.
+mkIsPolyTvs :: [TyVar] -> [Bool]
+mkIsPolyTvs tvs = [ is_poly_tv tv | tv <- tvs
+                                  , not (isKindVar tv) ]
+  where
+    is_poly_tv tv = not $ isEmptyVarSet $ tyVarsOfType $ tyVarKind tv
+
+------------------------------
+reifyClassInstances :: Class -> [ClsInst] -> TcM [TH.Dec]
+reifyClassInstances cls insts
+  = mapM (reifyClassInstance (mkIsPolyTvs tvs)) insts
+  where
+    tvs = classTyVars cls
+
+reifyClassInstance :: [Bool]  -- True <=> the corresponding tv is poly-kinded
+                              -- this list contains flags only for *type*
+                              -- variables, not *kind* variables
+                   -> ClsInst -> TcM TH.Dec
+reifyClassInstance is_poly_tvs i
   = do { cxt <- reifyCxt (drop n_silent theta)
-       ; thtypes <- reifyTypes types
-       ; let head_ty = mkThAppTs (TH.ConT (reifyName cls)) thtypes
+       ; let types_only = filterOut isKind types
+       ; thtypes <- reifyTypes types_only
+       ; annot_thtypes <- zipWith3M annotThType is_poly_tvs types_only thtypes
+       ; let head_ty = mkThAppTs (TH.ConT (reifyName cls)) annot_thtypes
        ; return $ (TH.InstanceD cxt head_ty []) }
   where
      (_tvs, theta, cls, types) = tcSplitDFunTy (idType dfun)
@@ -1325,17 +1363,30 @@ reifyClassInstance i
      n_silent = dfunNSilent dfun
 
 ------------------------------
-reifyFamilyInstance :: FamInst -> TcM TH.Dec
-reifyFamilyInstance (FamInst { fi_flavor = flavor
-                             , fi_fam = fam
-                             , fi_tys = lhs
-                             , fi_rhs = rhs })
+reifyFamilyInstances :: TyCon -> [FamInst] -> TcM [TH.Dec]
+reifyFamilyInstances fam_tc fam_insts
+  = mapM (reifyFamilyInstance (mkIsPolyTvs fam_tvs)) fam_insts
+  where
+    fam_tvs = tyConTyVars fam_tc
+
+reifyFamilyInstance :: [Bool] -- True <=> the corresponding tv is poly-kinded
+                              -- this list contains flags only for *type*
+                              -- variables, not *kind* variables
+                    -> FamInst -> TcM TH.Dec
+reifyFamilyInstance is_poly_tvs (FamInst { fi_flavor = flavor
+                                         , fi_fam = fam
+                                         , fi_tys = lhs
+                                         , fi_rhs = rhs })
   = case flavor of
       SynFamilyInst ->
                -- remove kind patterns (#8884)
-        do { th_lhs <- reifyTypes (filter (not . isKind) lhs)
-           ; th_rhs <- reifyType  rhs
-           ; return (TH.TySynInstD (reifyName fam) (TH.TySynEqn th_lhs th_rhs)) }
+        do { let lhs_types_only = filterOut isKind lhs
+           ; th_lhs <- reifyTypes lhs_types_only
+           ; annot_th_lhs <- zipWith3M annotThType is_poly_tvs lhs_types_only
+                                                   th_lhs
+           ; th_rhs <- reifyType rhs
+           ; return (TH.TySynInstD (reifyName fam)
+                                   (TH.TySynEqn annot_th_lhs th_rhs)) }
 
       DataFamilyInst rep_tc ->
         do { let tvs = tyConTyVars rep_tc
@@ -1349,10 +1400,12 @@ reifyFamilyInstance (FamInst { fi_flavor = flavor
                  etad_tyvars            = dropList rep_tc_args tvs
                  eta_expanded_lhs = lhs `chkAppend` mkTyVarTys etad_tyvars
            ; cons <- mapM (reifyDataCon (mkTyVarTys tvs)) (tyConDataCons rep_tc)
-           ; th_tys <- reifyTypes (filter (not . isKind) eta_expanded_lhs)
+           ; let types_only = filterOut isKind eta_expanded_lhs
+           ; th_tys <- reifyTypes types_only
+           ; annot_th_tys <- zipWith3M annotThType is_poly_tvs types_only th_tys
            ; return (if isNewTyCon rep_tc
-                     then TH.NewtypeInstD [] fam' th_tys (head cons) []
-                     else TH.DataInstD    [] fam' th_tys cons        []) }
+                     then TH.NewtypeInstD [] fam' annot_th_tys (head cons) []
+                     else TH.DataInstD    [] fam' annot_th_tys cons        []) }
 
 ------------------------------
 reifyType :: TypeRep.Type -> TcM TH.Type
