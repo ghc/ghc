@@ -1433,9 +1433,10 @@ reifyTyVars :: [TyVar]
             -> TcM [TH.TyVarBndr]
 reifyTyVars tvs = mapM reify_tv $ filter isTypeVar tvs
   where
-    reify_tv tv | isLiftedTypeKind kind = return (TH.PlainTV  name)
-                | otherwise             = do kind' <- reifyKind kind
-                                             return (TH.KindedTV name kind')
+    -- even if the kind is *, we need to include a kind annotation,
+    -- in case a poly-kind would be inferred without the annotation.
+    -- See #8953 or test th/T8953
+    reify_tv tv = TH.KindedTV name <$> reifyKind kind
       where
         kind = tyVarKind tv
         name = reifyName tv
