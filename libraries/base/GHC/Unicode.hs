@@ -30,6 +30,8 @@ module GHC.Unicode (
 
 import GHC.Base
 import GHC.Char        (chr)
+import GHC.Real
+import GHC.Num
 
 #include "HsBaseConfig.h"
 
@@ -65,16 +67,16 @@ isPrint                 :: Char -> Bool
 -- characters @\\t@, @\\n@, @\\r@, @\\f@, @\\v@.
 isSpace                 :: Char -> Bool
 -- isSpace includes non-breaking space
--- Done with explicit equalities both for efficiency, and to avoid a tiresome
--- recursion with GHC.List elem
-isSpace c               =  c == ' '     ||
-                           c == '\t'    ||
-                           c == '\n'    ||
-                           c == '\r'    ||
-                           c == '\f'    ||
-                           c == '\v'    ||
-                           c == '\xa0'  ||
-                           iswspace (ord c) /= 0
+-- The magic 0x377 isn't really that magical. As of 2014, all the codepoints
+-- at or below 0x377 have been assigned, so we shouldn't have to worry about
+-- any new spaces appearing below there. It would probably be best to
+-- use branchless ||, but currently the eqLit transformation will undo that,
+-- so we'll do it like this until there's a way around that.
+isSpace c
+  | uc <= 0x377 = uc == 32 || uc - 0x9 <= 4 || uc == 0xa0
+  | otherwise = iswspace (ord c) /= 0
+  where
+    uc = fromIntegral (ord c) :: Word
 
 -- | Selects upper-case or title-case alphabetic Unicode characters (letters).
 -- Title case is used by a small number of letter ligatures like the
@@ -98,17 +100,23 @@ isAlphaNum              :: Char -> Bool
 
 -- | Selects ASCII digits, i.e. @\'0\'@..@\'9\'@.
 isDigit                 :: Char -> Bool
-isDigit c               =  c >= '0' && c <= '9'
+isDigit c               =  (fromIntegral (ord c - ord '0') :: Word) <= 9
+
+-- We use an addition and an unsigned comparison instead of two signed
+-- comparisons because it's usually faster and puts less strain on branch
+-- prediction. It likely also enables some CSE when combined with functions
+-- that follow up with an actual conversion.
 
 -- | Selects ASCII octal digits, i.e. @\'0\'@..@\'7\'@.
 isOctDigit              :: Char -> Bool
-isOctDigit c            =  c >= '0' && c <= '7'
+isOctDigit c            =  (fromIntegral (ord c - ord '0') :: Word) <= 7
 
 -- | Selects ASCII hexadecimal digits,
 -- i.e. @\'0\'@..@\'9\'@, @\'a\'@..@\'f\'@, @\'A\'@..@\'F\'@.
 isHexDigit              :: Char -> Bool
-isHexDigit c            =  isDigit c || c >= 'A' && c <= 'F' ||
-                                        c >= 'a' && c <= 'f'
+isHexDigit c            =  isDigit c ||
+                           (fromIntegral (ord c - ord 'A')::Word) <= 5 ||
+                           (fromIntegral (ord c - ord 'a')::Word) <= 5
 
 -- | Convert a letter to the corresponding upper-case letter, if any.
 -- Any other character is returned unchanged.
@@ -132,7 +140,6 @@ toTitle                 :: Char -> Char
 
 isAlpha    c = iswalpha (ord c) /= 0
 isAlphaNum c = iswalnum (ord c) /= 0
---isSpace    c = iswspace (ord c) /= 0
 isControl  c = iswcntrl (ord c) /= 0
 isPrint    c = iswprint (ord c) /= 0
 isUpper    c = iswupper (ord c) /= 0
