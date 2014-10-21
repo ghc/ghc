@@ -323,7 +323,6 @@
    -------------------------------------------------------------------------- */
 
 #include "rts/Constants.h"
-#include "rts/StaticClosures.h"
 #include "DerivedConstants.h"
 #include "rts/storage/ClosureTypes.h"
 #include "rts/storage/FunTypes.h"

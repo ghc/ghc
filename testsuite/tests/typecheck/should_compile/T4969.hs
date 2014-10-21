@@ -63,7 +63,7 @@ instance ToAbstract LetDef [ALetBinding] where
                                undefined
         where letToAbstract = do
                   localToAbstract lhsArgs $ \args ->
-                          foldM lambda undefined undefined
+                          foldM lambda undefined (undefined :: [a])
               lambda _ _ = do x <- freshNoName undefined
                               return undefined
               lambda _ _ = typeError $ NotAValidLetBinding d

@@ -155,14 +155,13 @@ pprStatic s = case s of
 --
 pprSection :: Section -> SDoc
 pprSection s = case s of
-    Text              -> section <+> doubleQuotes (ptext (sLit "text"))
-    Data              -> section <+> doubleQuotes (ptext (sLit "data"))
-    ReadOnlyData      -> section <+> doubleQuotes (ptext (sLit "readonly"))
-    ReadOnlyData16    -> section <+> doubleQuotes (ptext (sLit "readonly16"))
+    Text              -> section <+> doubleQuotes (text "text")
+    Data              -> section <+> doubleQuotes (text "data")
+    ReadOnlyData      -> section <+> doubleQuotes (text "readonly")
+    ReadOnlyData16    -> section <+> doubleQuotes (text "readonly16")
     RelocatableReadOnlyData
-                      -> section <+> doubleQuotes (ptext (sLit "relreadonly"))
-    UninitialisedData -> section <+> doubleQuotes (ptext (sLit "uninitialised"))
-    StaticClosures    -> section <+> doubleQuotes (ptext (sLit "staticclosures"))
+                      -> section <+> doubleQuotes (text "relreadonly")
+    UninitialisedData -> section <+> doubleQuotes (text "uninitialised")
     OtherSection s'   -> section <+> doubleQuotes (text s')
  where
     section = ptext (sLit "section")

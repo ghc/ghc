@@ -36,8 +36,6 @@ module Control.Monad.ST.Lazy.Imp (
         unsafeIOToST
     ) where
 
-import Prelude
-
 import Control.Monad.Fix
 
 import qualified Control.Monad.ST.Safe as ST

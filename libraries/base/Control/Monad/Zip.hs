@@ -17,7 +17,6 @@
 
 module Control.Monad.Zip where
 
-import Prelude
 import Control.Monad (liftM)
 
 -- | `MonadZip` type class. Minimal definition: `mzip` or `mzipWith`

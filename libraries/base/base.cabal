@@ -137,8 +137,6 @@ Library
         Data.Maybe
         Data.Monoid
         Data.OldList
-        Data.OldTypeable
-        Data.OldTypeable.Internal
         Data.Ord
         Data.Proxy
         Data.Ratio
@@ -300,7 +298,6 @@ Library
         WCsubst.h
         consUtils.h
         Typeable.h
-        OldTypeable.h
 
     -- OS Specific
     if os(windows)

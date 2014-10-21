@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 # Script to create and restore a git fingerprint of the ghc repositories.
 
+from __future__ import print_function
+
 from   datetime   import datetime
 from   optparse   import OptionParser
 import os
@@ -23,7 +25,7 @@ def create_action(opts):
   if len(fp) == 0:
     error("Got empty fingerprint from source: "+str(opts.source))
   if opts.output_file:
-    print "Writing fingerprint to: ", opts.output_file
+    print("Writing fingerprint to: ", opts.output_file)
   fp.write(opts.output)
 
 def restore_action(opts):
@@ -89,7 +91,7 @@ def restore(fp, branch_name=None):
   for (subdir, commit) in fp:
     if subdir != ".":
       cmd = checkout + [commit]
-      print "==", subdir, " ".join(cmd)
+      print("==", subdir, " ".join(cmd))
       if os.path.exists(subdir):
         rc = subprocess.call(cmd, cwd=subdir)
         if rc != 0:
@@ -184,7 +186,7 @@ def validate(opts, args, parser):
 
 def error(msg="fatal error", parser=None, exit=1):
   """Function that prints error message and exits"""
-  print "ERROR:", msg
+  print("ERROR:", msg)
   if parser:
     parser.print_help()
   sys.exit(exit)

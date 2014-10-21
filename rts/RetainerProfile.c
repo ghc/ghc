@@ -1748,7 +1748,7 @@ retainRoot(void *user STG_UNUSED, StgClosure **tl)
 
     c = UNTAG_CLOSURE(*tl);
     maybeInitRetainerSet(c);
-    if (c != stg_END_TSO_QUEUE_closure && isRetainer(c)) {
+    if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
 	retainClosure(c, c, getRetainerFrom(c));
     } else {
 	retainClosure(c, c, CCS_SYSTEM);

@@ -1338,8 +1338,16 @@ reifyFamilyInstance (FamInst { fi_flavor = flavor
       DataFamilyInst rep_tc ->
         do { let tvs = tyConTyVars rep_tc
                  fam' = reifyName fam
+
+                   -- eta-expand lhs types, because sometimes data/newtype
+                   -- instances are eta-reduced; See Trac #9692
+                   -- See Note [Eta reduction for data family axioms]
+                   -- in TcInstDcls
+                 (_rep_tc, rep_tc_args) = splitTyConApp rhs
+                 etad_tyvars            = dropList rep_tc_args tvs
+                 eta_expanded_lhs = lhs `chkAppend` mkTyVarTys etad_tyvars
            ; cons <- mapM (reifyDataCon (mkTyVarTys tvs)) (tyConDataCons rep_tc)
-           ; th_tys <- reifyTypes lhs
+           ; th_tys <- reifyTypes (filter (not . isKind) eta_expanded_lhs)
            ; return (if isNewTyCon rep_tc
                      then TH.NewtypeInstD [] fam' th_tys (head cons) []
                      else TH.DataInstD    [] fam' th_tys cons        []) }

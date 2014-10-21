@@ -1044,8 +1044,8 @@ typedef struct _RtsSymbolVal {
 #define RTS_INTCHAR_SYMBOLS
 #else
 #define RTS_INTCHAR_SYMBOLS                             \
-      SymI_HasProto(stg_CHARLIKE_static_closure)               \
-      SymI_HasProto(stg_INTLIKE_static_closure)
+      SymI_HasProto(stg_CHARLIKE_closure)               \
+      SymI_HasProto(stg_INTLIKE_closure)
 #endif
 
 
@@ -4262,7 +4262,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           0==strcmp(".rodata",(char*)secname))
          kind = SECTIONKIND_CODE_OR_RODATA;
       if (0==strcmp(".data",(char*)secname) ||
-          0==strcmp("staticclosures",(char*)secname) ||
           0==strcmp(".bss",(char*)secname))
          kind = SECTIONKIND_RWDATA;
       if (0==strcmp(".ctors", (char*)secname))

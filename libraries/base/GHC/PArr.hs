@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE ParallelArrays, MagicHash #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}

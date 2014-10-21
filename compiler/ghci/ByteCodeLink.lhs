@@ -203,7 +203,7 @@ lookupStaticPtr addr_of_label_string
 
 lookupPrimOp :: PrimOp -> IO HValue
 lookupPrimOp primop
-   = do let sym_to_find = primopToCLabel primop "static_closure"
+   = do let sym_to_find = primopToCLabel primop "closure"
         m <- lookupSymbol sym_to_find
         case m of
            Just (Ptr addr) -> case addrToAny# addr of
@@ -216,7 +216,7 @@ lookupName ce nm
         Just (_,aa) -> return aa
         Nothing
            -> ASSERT2(isExternalName nm, ppr nm)
-              do let sym_to_find = nameToCLabel nm "static_closure"
+              do let sym_to_find = nameToCLabel nm "closure"
                  m <- lookupSymbol sym_to_find
                  case m of
                     Just (Ptr addr) -> case addrToAny# addr of

@@ -24,8 +24,6 @@ module Data.STRef (
         modifySTRef'
  ) where
 
-import Prelude
-
 import GHC.ST
 import GHC.STRef
 

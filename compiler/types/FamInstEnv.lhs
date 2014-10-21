@@ -758,7 +758,7 @@ We handle data families and type families separately here:
  * For data family instances, though, we need to re-split for each
    instance, because the breakdown might be different for each
    instance.  Why?  Because of eta reduction; see Note [Eta reduction
-   for data family axioms]
+   for data family axioms] in TcInstDcls.
 
 \begin{code}
 

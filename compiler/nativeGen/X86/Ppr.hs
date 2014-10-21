@@ -376,51 +376,51 @@ pprAddr (AddrBaseIndex base index displacement)
 
 
 pprSectionHeader :: Section -> SDoc
-pprSectionHeader seg
- = sdocWithPlatform $ \platform ->
-   case platformOS platform of
-   OSDarwin
-    | target32Bit platform ->
-       case seg of
-           Text                    -> ptext (sLit ".text\n\t.align 2")
-           Data                    -> ptext (sLit ".data\n\t.align 2")
-           ReadOnlyData            -> ptext (sLit ".const\n.align 2")
-           RelocatableReadOnlyData -> ptext (sLit ".const_data\n.align 2")
-           UninitialisedData       -> ptext (sLit ".data\n\t.align 2")
-           ReadOnlyData16          -> ptext (sLit ".const\n.align 4")
-           StaticClosures          -> ptext (sLit ".section staticclosures,\"aw\"\n\t.align 2")
-           OtherSection _          -> panic "X86.Ppr.pprSectionHeader: unknown section"
-    | otherwise ->
-       case seg of
-           Text                    -> ptext (sLit ".text\n.align 3")
-           Data                    -> ptext (sLit ".data\n.align 3")
-           ReadOnlyData            -> ptext (sLit ".const\n.align 3")
-           RelocatableReadOnlyData -> ptext (sLit ".const_data\n.align 3")
-           UninitialisedData       -> ptext (sLit ".data\n\t.align 3")
-           ReadOnlyData16          -> ptext (sLit ".const\n.align 4")
-           StaticClosures          -> ptext (sLit ".section staticclosures,\"aw\"\n\t.align 3")
-           OtherSection _          -> panic "PprMach.pprSectionHeader: unknown section"
-   _
-    | target32Bit platform ->
-       case seg of
-           Text                    -> ptext (sLit ".text\n\t.align 4,0x90")
-           Data                    -> ptext (sLit ".data\n\t.align 4")
-           ReadOnlyData            -> ptext (sLit ".section .rodata\n\t.align 4")
-           RelocatableReadOnlyData -> ptext (sLit ".section .data\n\t.align 4")
-           UninitialisedData       -> ptext (sLit ".section .bss\n\t.align 4")
-           ReadOnlyData16          -> ptext (sLit ".section .rodata\n\t.align 16")
-           StaticClosures          -> ptext (sLit ".section staticclosures,\"aw\"\n\t.align 4")
-           OtherSection _          -> panic "X86.Ppr.pprSectionHeader: unknown section"
-    | otherwise ->
-       case seg of
-           Text                    -> ptext (sLit ".text\n\t.align 8")
-           Data                    -> ptext (sLit ".data\n\t.align 8")
-           ReadOnlyData            -> ptext (sLit ".section .rodata\n\t.align 8")
-           RelocatableReadOnlyData -> ptext (sLit ".section .data\n\t.align 8")
-           UninitialisedData       -> ptext (sLit ".section .bss\n\t.align 8")
-           ReadOnlyData16          -> ptext (sLit ".section .rodata.cst16\n\t.align 16")
-           StaticClosures          -> ptext (sLit ".section staticclosures,\"aw\"\n\t.align 8")
-           OtherSection _          -> panic "PprMach.pprSectionHeader: unknown section"
+pprSectionHeader seg =
+ sdocWithPlatform $ \platform ->
+ case platformOS platform of
+ OSDarwin
+  | target32Bit platform ->
+     case seg of
+      Text              -> text ".text\n\t.align 2"
+      Data              -> text ".data\n\t.align 2"
+      ReadOnlyData      -> text ".const\n\t.align 2"
+      RelocatableReadOnlyData
+                        -> text ".const_data\n\t.align 2"
+      UninitialisedData -> text ".data\n\t.align 2"
+      ReadOnlyData16    -> text ".const\n\t.align 4"
+      OtherSection _    -> panic "X86.Ppr.pprSectionHeader: unknown section"
+  | otherwise ->
+     case seg of
+      Text              -> text ".text\n\t.align 3"
+      Data              -> text ".data\n\t.align 3"
+      ReadOnlyData      -> text ".const\n\t.align 3"
+      RelocatableReadOnlyData
+                        -> text ".const_data\n\t.align 3"
+      UninitialisedData -> text ".data\n\t.align 3"
+      ReadOnlyData16    -> text ".const\n\t.align 4"
+      OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
+ _
+  | target32Bit platform ->
+     case seg of
+      Text              -> text ".text\n\t.align 4,0x90"
+      Data              -> text ".data\n\t.align 4"
+      ReadOnlyData      -> text ".section .rodata\n\t.align 4"
+      RelocatableReadOnlyData
+                        -> text ".section .data\n\t.align 4"
+      UninitialisedData -> text ".section .bss\n\t.align 4"
+      ReadOnlyData16    -> text ".section .rodata\n\t.align 16"
+      OtherSection _    -> panic "X86.Ppr.pprSectionHeader: unknown section"
+  | otherwise ->
+     case seg of
+      Text              -> text ".text\n\t.align 8"
+      Data              -> text ".data\n\t.align 8"
+      ReadOnlyData      -> text ".section .rodata\n\t.align 8"
+      RelocatableReadOnlyData
+                        -> text ".section .data\n\t.align 8"
+      UninitialisedData -> text ".section .bss\n\t.align 8"
+      ReadOnlyData16    -> text ".section .rodata.cst16\n\t.align 16"
+      OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
 
 
 
