@@ -30,6 +30,7 @@ Thumbs.db
 
 *.genscript
 *.stderr.normalised
+*.stderr-mingw32.normalised
 *.stderr-ghc.normalised
 *.stdout.normalised
 *.interp.stdout
@@ -53,9 +54,9 @@ tmp.d
 *.so
 *bindisttest_install___dir_bin_ghc.mk
 *bindisttest_install___dir_bin_ghc.exe.mk
-mk/ghcconfig_*_inplace_bin_ghc-stage1.mk
-mk/ghcconfig_*_inplace_bin_ghc-stage2.mk
-mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
+mk/ghcconfig*_inplace_bin_ghc-stage1.mk
+mk/ghcconfig*_inplace_bin_ghc-stage2.mk
+mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 *.imports
 
 # -----------------------------------------------------------------------------
