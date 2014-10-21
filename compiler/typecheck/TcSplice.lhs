@@ -523,14 +523,6 @@ tcTopSpliceExpr isTypedSplice tc_action
        ; zonkTopLExpr (mkHsDictLet (EvBinds const_binds) expr') }
 \end{code}
 
-Note [Renamer errors]
-~~~~~~~~~~~~~~~~~~~~~
-It's important to wrap renamer calls in checkNoErrs, because the
-renamer does not fail for out of scope variables etc. Instead it
-returns a bogus term/type, so that it can report more than one error.
-We don't want the type checker to see these bogus unbound variables.
-
-
 %************************************************************************
 %*                                                                      *
         Annotations
@@ -1005,12 +997,22 @@ reifyInstances th_nm th_tys
                  <+> ppr_th th_nm <+> sep (map ppr_th th_tys)) $
      do { loc <- getSrcSpanM
         ; rdr_ty <- cvt loc (mkThAppTs (TH.ConT th_nm) th_tys)
-        ; (rn_ty, _fvs) <- checkNoErrs $ rnLHsType doc rdr_ty   -- Rename  to HsType Name
-                         -- checkNoErrs: see Note [Renamer errors]
-        ; (ty, _kind)  <- tcLHsType rn_ty
-        ; ty <- zonkTcTypeToType emptyZonkEnv ty   -- Substitute out the meta type variables
-                                                   -- In particular, the type might have kind
-                                                   -- variables inside it (Trac #7477)
+          -- #9262 says to bring vars into scope, like in HsForAllTy case
+          -- of rnHsTyKi
+        ; let (kvs, tvs) = extractHsTyRdrTyVars rdr_ty
+              tv_bndrs   = userHsTyVarBndrs loc tvs
+              hs_tvbs    = mkHsQTvs tv_bndrs
+          -- Rename  to HsType Name
+        ; ((rn_tvbs, rn_ty), _fvs)
+            <- bindHsTyVars doc Nothing kvs hs_tvbs $ \ rn_tvbs ->
+               do { (rn_ty, fvs) <- rnLHsType doc rdr_ty
+                  ; return ((rn_tvbs, rn_ty), fvs) }
+        ; (ty, _kind) <- tcHsTyVarBndrs rn_tvbs $ \ _tvs ->
+                         tcLHsType rn_ty
+        ; ty <- zonkTcTypeToType emptyZonkEnv ty
+                -- Substitute out the meta type variables
+                -- In particular, the type might have kind
+                -- variables inside it (Trac #7477)
 
         ; traceTc "reifyInstances" (ppr ty $$ ppr (typeKind ty))
         ; case splitTyConApp_maybe ty of   -- This expands any type synonyms

@@ -87,6 +87,13 @@ which is a bit inconsistent -- but there are a lot of them.  We might
 thereby get some bogus unused-import warnings, but we won't crash the
 type checker.  Not very satisfactory really.
 
+Note [Renamer errors]
+~~~~~~~~~~~~~~~~~~~~~
+It's important to wrap renamer calls in checkNoErrs, because the
+renamer does not fail for out of scope variables etc. Instead it
+returns a bogus term/type, so that it can report more than one error.
+We don't want the type checker to see these bogus unbound variables.
+
 \begin{code}
 rnSpliceGen :: Bool                                     -- Typed splice?
             -> (HsSplice Name -> RnM (a, FreeVars))     -- Outside brackets, run splice
