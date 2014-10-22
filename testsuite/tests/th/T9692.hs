@@ -5,6 +5,7 @@ module T9692 where
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Ppr
+import System.IO
 
 class C a where
         data F a (b :: k) :: *
