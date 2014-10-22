@@ -14,4 +14,5 @@ instance C Int where
 
 $( do info <- qReify (mkName "F")
       runIO $ putStrLn $ pprint info
+      runIO $ hFlush stdout
       return [])
