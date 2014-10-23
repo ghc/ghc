@@ -55,7 +55,12 @@ scavengeTSO (StgTSO *tso)
 
     // update the pointer from the InCall.
     if (tso->bound != NULL) {
-        tso->bound->tso = tso;
+        // NB. We can't just set tso->bound->tso = tso, because this
+        // might be an invalid copy the TSO resulting from multiple
+        // threads evacuating the TSO simultaneously (see
+        // Evac.c:copy_tag()).  Calling evacuate() on this pointer
+        // will ensure that we update it to point to the correct copy.
+        evacuate((StgClosure **)&tso->bound->tso);
     }
 
     saved_eager = gct->eager_promotion;
