@@ -217,8 +217,9 @@ static int ocRunInit_PEi386     ( ObjectCode* oc );
 static void *lookupSymbolInDLLs ( unsigned char *lbl );
 static void zapTrailingAtSign   ( unsigned char *sym );
 static char *allocateImageAndTrampolines (
+   pathchar* arch_name, char* member_name,
 #if defined(x86_64_HOST_ARCH)
-   FILE* f, pathchar* arch_name, char* member_name,
+   FILE* f,
 #endif
    int size );
 #if defined(x86_64_HOST_ARCH)
@@ -2725,9 +2726,9 @@ loadArchive( pathchar *path )
 #elif defined(mingw32_HOST_OS)
         // TODO: We would like to use allocateExec here, but allocateExec
         //       cannot currently allocate blocks large enough.
-            image = allocateImageAndTrampolines(
+            image = allocateImageAndTrampolines(path, fileName,
 #if defined(x86_64_HOST_ARCH)
-               f, path, fileName,
+               f,
 #endif
                memberSize);
 #elif defined(darwin_HOST_OS)
@@ -2946,9 +2947,9 @@ loadObj( pathchar *path )
 #   if defined(mingw32_HOST_OS)
         // TODO: We would like to use allocateExec here, but allocateExec
         //       cannot currently allocate blocks large enough.
-    image = allocateImageAndTrampolines(
+    image = allocateImageAndTrampolines(path, "itself",
 #if defined(x86_64_HOST_ARCH)
-       f, path, "itself",
+       f,
 #endif
        fileSize);
     if (image == NULL) {
@@ -3663,8 +3664,9 @@ static int verifyCOFFHeader ( COFF_header *hdr, pathchar *filename);
  */
 static char *
 allocateImageAndTrampolines (
+   pathchar* arch_name, char* member_name,
 #if defined(x86_64_HOST_ARCH)
-   FILE* f, pathchar* arch_name, char* member_name,
+   FILE* f,
 #endif
    int size )
 {
