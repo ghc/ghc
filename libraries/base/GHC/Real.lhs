@@ -241,10 +241,10 @@ These 'numeric' enumerations come straight from the Report
 
 \begin{code}
 numericEnumFrom         :: (Fractional a) => a -> [a]
-numericEnumFrom n	=  n `seq` (n : numericEnumFrom (n + 1))
+numericEnumFrom n       =  n `seq` (n : numericEnumFrom (n + 1))
 
 numericEnumFromThen     :: (Fractional a) => a -> a -> [a]
-numericEnumFromThen n m	= n `seq` m `seq` (n : numericEnumFromThen m (m+m-n))
+numericEnumFromThen n m = n `seq` m `seq` (n : numericEnumFromThen m (m+m-n))
 
 numericEnumFromTo       :: (Ord a, Fractional a) => a -> a -> [a]
 numericEnumFromTo n m   = takeWhile (<= m + 1/2) (numericEnumFrom n)
