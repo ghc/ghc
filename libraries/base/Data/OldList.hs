@@ -522,9 +522,11 @@ pairWithNil x = (x, [])
 
 mapAccumLF :: (acc -> x -> (acc, y)) -> x -> (acc -> (acc, [y])) -> acc -> (acc, [y])
 {-# INLINE [0] mapAccumLF #-}
-mapAccumLF f = \x r s -> let (s', y)   = f s x
+mapAccumLF f = \x r -> oneShot (\s ->
+                         let (s', y)   = f s x
                              (s'', ys) = r s'
-                         in (s'', y:ys)
+                         in (s'', y:ys))
+  -- See Note [Left folds via right fold]
 
 
 -- | The 'mapAccumR' function behaves like a combination of 'map' and

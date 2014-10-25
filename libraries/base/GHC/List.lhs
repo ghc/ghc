@@ -187,10 +187,26 @@ filterFB c p x r | p x       = x `c` r
 foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl #-}
 foldl k z0 xs =
-  foldr (\(v::a) (fn::b->b) (z::b) -> fn (k z v)) (id :: b -> b) xs z0
--- Implementing foldl via foldr is only a good idea if the compiler can optimize
--- the resulting code (eta-expand the recursive "go"), so this needs
--- -fcall-arity! Also see #7994.
+  foldr (\(v::a) (fn::b->b) -> oneShot (\(z::b) -> fn (k z v))) (id :: b -> b) xs z0
+  -- See Note [Left folds via right fold]
+
+{-
+Note [Left folds via right fold]
+
+Implementing foldl et. al. via foldr is only a good idea if the compiler can
+optimize the resulting code (eta-expand the recursive "go"). See #7994.
+We hope that one of the two measure kick in:
+
+   * Call Arity (-fcall-arity, enabled by default) eta-expands it if it can see
+     all calls and determine that the arity is large.
+   * The oneShot annotation gives a hint to the regular arity analysis that
+     it may assume that the lambda is called at most once.
+     See [One-shot lambdas] in CoreArity and especially [Eta expanding thunks]
+     in CoreArity.
+
+The oneShot annotations used in this module are correct, as we only use them in
+argumets to foldr, where we know how the arguments are called.
+-}
 
 -- ----------------------------------------------------------------------------
 
@@ -198,11 +214,8 @@ foldl k z0 xs =
 foldl'           :: forall a b . (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl' #-}
 foldl' k z0 xs =
-  foldr (\(v::a) (fn::b->b) (z::b) -> z `seq` fn (k z v)) (id :: b -> b) xs z0
-
--- Implementing foldl' via foldr is only a good idea if the compiler can
--- optimize the resulting code (eta-expand the recursive "go"), so this needs
--- -fcall-arity!  Also see #7994
+  foldr (\(v::a) (fn::b->b) -> oneShot (\(z::b) -> z `seq` fn (k z v))) (id :: b -> b) xs z0
+  -- See Note [Left folds via right fold]
 
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
 -- and thus must be applied to non-empty lists.
@@ -258,7 +271,8 @@ scanl                   = scanlGo
 
 {-# INLINE [0] scanlFB #-}
 scanlFB :: (b -> a -> b) -> (b -> c -> c) -> a -> (b -> c) -> b -> c
-scanlFB f c = \b g x -> let b' = f x b in b' `c` g b'
+scanlFB f c = \b g -> oneShot (\x -> let b' = f x b in b' `c` g b')
+  -- See Note [Left folds via right fold]
 
 {-# INLINE [0] constScanl #-}
 constScanl :: a -> b -> a
@@ -295,7 +309,8 @@ scanl' = scanlGo'
 
 {-# INLINE [0] scanlFB' #-}
 scanlFB' :: (b -> a -> b) -> (b -> c -> c) -> a -> (b -> c) -> b -> c
-scanlFB' f c = \b g x -> let !b' = f x b in b' `c` g b'
+scanlFB' f c = \b g -> oneShot (\x -> let !b' = f x b in b' `c` g b')
+  -- See Note [Left folds via right fold]
 
 {-# INLINE [0] flipSeqScanl' #-}
 flipSeqScanl' :: a -> b -> a
