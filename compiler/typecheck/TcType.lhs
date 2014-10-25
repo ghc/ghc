@@ -1442,7 +1442,7 @@ isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty empty
 isFFIDynTy :: Type -> Type -> Validity
 -- The type in a foreign import dynamic must be Ptr, FunPtr, or a newtype of
 -- either, and the wrapped function type must be equal to the given type.
--- We assume that all types have been run through normalizeFfiType, so we don't
+-- We assume that all types have been run through normaliseFfiType, so we don't
 -- need to worry about expanding newtypes here.
 isFFIDynTy expected ty
     -- Note [Foreign import dynamic]
