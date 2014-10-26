@@ -2,6 +2,6 @@
 <no location info>:
     Could not find module ‘Control.Monad.Trans.State’
     Perhaps you meant
-      Control.Monad.Trans.State (from transformers-0.4.1.0@trans_GjLVjHaAO8fEGf8lChbngr)
-      Control.Monad.Trans.Class (from transformers-0.4.1.0@trans_GjLVjHaAO8fEGf8lChbngr)
-      Control.Monad.Trans.Cont (from transformers-0.4.1.0@trans_GjLVjHaAO8fEGf8lChbngr)
+      Control.Monad.Trans.State (from transformers-0.4.1.0@trans_5jw4w9yTgmZ89ByuixDAKP)
+      Control.Monad.Trans.Class (from transformers-0.4.1.0@trans_5jw4w9yTgmZ89ByuixDAKP)
+      Control.Monad.Trans.Cont (from transformers-0.4.1.0@trans_5jw4w9yTgmZ89ByuixDAKP)
