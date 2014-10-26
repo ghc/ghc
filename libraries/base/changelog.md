@@ -84,6 +84,9 @@
 
   * Remove deprecated `Data.OldTypeable` (#9639)
 
+  * New module `Data.Bifunctor` providing the `Bifunctor(bimap,first,second)`
+    class (previously defined in `bifunctors` package) (#9682)
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3
