@@ -267,27 +267,30 @@ test('T3064',
             # (amd64/Linux) (09/09/2014): 407416464, AMP changes (larger interfaces, more loading)
             # (amd64/Linux) (14/09/2014): 385145080, BPP changes (more NoImplicitPrelude in base)
 
-      compiler_stats_num_field('max_bytes_used',
-          [(wordsize(32), 11202304, 20),
-            # 2011-06-28:  2247016 (x86/Linux) (28/6/2011):
-            #(some date):  5511604
-            # 2013-11-13:  7218200 (x86/Windows, 64bit machine)
-            # 2014-04-04: 11202304 (x86/Windows, 64bit machine)
-           (wordsize(64), 13251728, 20)]),
-            # (amd64/Linux, intree) (28/06/2011):  4032024
-            # (amd64/Linux, intree) (07/02/2013):  9819288
-            # (amd64/Linux)         (14/02/2013):  8687360
-            # (amd64/Linux)         (18/02/2013):  9397488
-            # (amd64/Linux)         (02/08/2013): 10742536, increase from roles
-            # (amd64/Linux)         (19/08/2013): 9211816,  decrease apparently from better eta reduction
-            # (amd64/Linux)         (11/09/2013): 12000480, increase from AMP warnings
-            #                                     933cdf15a2d85229d3df04b437da31fdfbf4961f
-            # (amd64/Linux)         (22/11/2013): 16266992, GND via Coercible and counters for constraints solving
-            # (amd64/Linux)         (12/12/2013): 19821544, better One shot analysis
-            # (amd64/Linux)         (09/09/2014): 24357392, AMP changes (larger interfaces, more loading)
-            # (amd64/Linux)         (14/09/2014): 16053888, BPP changes (more NoImplicitPrelude in base)
-            # (amd64/Linux)         (19/09/2014): 18744992, unknown
-            # (amd64/Linux)         2014-10-13:   13251728, Stricter seqDmdType
+###################################
+# deactivated for now, as this metric became too volatile recently
+#
+#      compiler_stats_num_field('max_bytes_used',
+#          [(wordsize(32), 11202304, 20),
+#            # 2011-06-28:  2247016 (x86/Linux) (28/6/2011):
+#            #(some date):  5511604
+#            # 2013-11-13:  7218200 (x86/Windows, 64bit machine)
+#            # 2014-04-04: 11202304 (x86/Windows, 64bit machine)
+#           (wordsize(64), 13251728, 20)]),
+#            # (amd64/Linux, intree) (28/06/2011):  4032024
+#            # (amd64/Linux, intree) (07/02/2013):  9819288
+#            # (amd64/Linux)         (14/02/2013):  8687360
+#            # (amd64/Linux)         (18/02/2013):  9397488
+#            # (amd64/Linux)         (02/08/2013): 10742536, increase from roles
+#            # (amd64/Linux)         (19/08/2013): 9211816,  decrease apparently from better eta reduction
+#            # (amd64/Linux)         (11/09/2013): 12000480, increase from AMP warnings
+#            #                                     933cdf15a2d85229d3df04b437da31fdfbf4961f
+#            # (amd64/Linux)         (22/11/2013): 16266992, GND via Coercible and counters for constraints solving
+#            # (amd64/Linux)         (12/12/2013): 19821544, better One shot analysis
+#            # (amd64/Linux)         (09/09/2014): 24357392, AMP changes (larger interfaces, more loading)
+#            # (amd64/Linux)         (14/09/2014): 16053888, BPP changes (more NoImplicitPrelude in base)
+#            # (amd64/Linux)         (19/09/2014): 18744992, unknown
+#            # (amd64/Linux)         2014-10-13:   13251728, Stricter seqDmdType
 
        only_ways(['normal'])
       ],
