@@ -292,11 +292,34 @@ isPrefixOf [] _         =  True
 isPrefixOf _  []        =  False
 isPrefixOf (x:xs) (y:ys)=  x == y && isPrefixOf xs ys
 
--- | The 'isSuffixOf' function takes two lists and returns 'True'
--- iff the first list is a suffix of the second.
--- Both lists must be finite.
+-- | The 'isSuffixOf' function takes two lists and returns 'True' iff
+-- the first list is a suffix of the second. The second list must be
+-- finite.
 isSuffixOf              :: (Eq a) => [a] -> [a] -> Bool
-isSuffixOf x y          =  reverse x `isPrefixOf` reverse y
+ns `isSuffixOf` hs      = maybe False id $ do
+      delta <- dropLengthMaybe ns hs
+      return $ ns == dropLength delta hs
+      -- Since dropLengthMaybe ns hs succeeded, we know that (if hs is finite)
+      -- length ns + length delta = length hs
+      -- so dropping the length of delta from hs will yield a suffix exactly
+      -- the length of ns.
+
+-- A version of drop that drops the length of the first argument from the
+-- second argument. If xs is longer than ys, xs will not be traversed in its
+-- entirety.  dropLength is also generally faster than (drop . length)
+-- Both this and dropLengthMaybe could be written as folds over their first
+-- arguments, but this reduces clarity with no benefit to isSuffixOf.
+dropLength :: [a] -> [b] -> [b]
+dropLength [] y = y
+dropLength _ [] = []
+dropLength (_:x') (_:y') = dropLength x' y'
+
+-- A version of dropLength that returns Nothing if the second list runs out of
+-- elements before the first.
+dropLengthMaybe :: [a] -> [b] -> Maybe [b]
+dropLengthMaybe [] y = Just y
+dropLengthMaybe _ [] = Nothing
+dropLengthMaybe (_:x') (_:y') = dropLengthMaybe x' y'
 
 -- | The 'isInfixOf' function takes two lists and returns 'True'
 -- iff the first list is contained, wholly and intact,

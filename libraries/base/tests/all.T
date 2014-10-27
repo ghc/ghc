@@ -86,6 +86,7 @@ test('exceptionsrun002', 	normal, compile_and_run, [''])
 test('list001'	,	when(fast(), skip), compile_and_run, [''])
 test('list002', when(fast(), skip), compile_and_run, [''])
 test('list003', when(fast(), skip), compile_and_run, [''])
+test('isSuffixOf', normal, compile_and_run, [''])
 
 test('memo001',
      [extra_run_opts('+RTS -A10k -RTS'),
