@@ -2241,8 +2241,8 @@ getGhcVersionPathName dflags = do
 --   2. ${CC} -x assembler -c 'PIC_CFLAGS' source.S
 --
 -- Why do we need to pass 'PIC_CFLAGS' both to C compiler and assembler?
--- Because on some architectures (at least sparc32) assembler also choses
--- relocation type!
+-- Because on some architectures (at least sparc32) assembler also chooses
+-- the relocation type!
 -- Consider the following C module:
 --
 --     /* pic-sample.c */
