@@ -38,8 +38,6 @@ module System.Mem.StableName (
   eqStableName
   ) where
 
-import Prelude
-
 import Data.Typeable
 
 import GHC.IO           ( IO(..) )

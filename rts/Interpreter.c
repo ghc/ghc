@@ -879,7 +879,7 @@ run_BCO:
                   new_aps = (StgAP_STACK *) allocate(cap, AP_STACK_sizeW(size_words));
                   SET_HDR(new_aps,&stg_AP_STACK_info,CCS_SYSTEM); 
                   new_aps->size = size_words;
-                  new_aps->fun = stg_dummy_ret_closure;
+                  new_aps->fun = &stg_dummy_ret_closure; 
 
                   // fill in the payload of the AP_STACK 
                   new_aps->payload[0] = (StgClosure *)&stg_apply_interp_info;

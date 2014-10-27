@@ -1065,12 +1065,14 @@ newTcEvBinds = do { ref <- newTcRef emptyEvBindMap
 
 addTcEvBind :: EvBindsVar -> EvVar -> EvTerm -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
-addTcEvBind (EvBindsVar ev_ref _) var t
-  = do { bnds <- readTcRef ev_ref
-       ; writeTcRef ev_ref (extendEvBinds bnds var t) }
+addTcEvBind (EvBindsVar ev_ref _) ev_id ev_tm
+  = do { traceTc "addTcEvBind" $ vcat [ text "ev_id =" <+> ppr ev_id
+                                      , text "ev_tm =" <+> ppr ev_tm ]
+       ; bnds <- readTcRef ev_ref
+       ; writeTcRef ev_ref (extendEvBinds bnds ev_id ev_tm) }
 
 getTcEvBinds :: EvBindsVar -> TcM (Bag EvBind)
-getTcEvBinds (EvBindsVar ev_ref _) 
+getTcEvBinds (EvBindsVar ev_ref _)
   = do { bnds <- readTcRef ev_ref
        ; return (evBindMapBinds bnds) }
 

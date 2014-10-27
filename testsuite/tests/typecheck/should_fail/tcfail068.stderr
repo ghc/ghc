@@ -36,7 +36,7 @@ tcfail068.hs:19:21:
     In the first argument of ‘readSTArray’, namely ‘arr’
     In the first argument of ‘(>>=)’, namely ‘readSTArray arr i’
 
-tcfail068.hs:24:35:
+tcfail068.hs:24:36:
     Couldn't match type ‘s’ with ‘s1’
       ‘s’ is a rigid type variable bound by
           the type signature for

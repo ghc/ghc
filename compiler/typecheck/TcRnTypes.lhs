@@ -45,14 +45,14 @@ module TcRnTypes(
 
         -- Canonical constraints
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, dropDerivedWC,
-        singleCt, listToCts, ctsElts, extendCts, extendCtsList,
+        singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt,
         ctEvidence, ctLoc, ctPred,
         mkNonCanonical, mkNonCanonicalCt,
-        ctEvPred, ctEvTerm, ctEvCoercion, ctEvId, ctEvCheckDepth,
+        ctEvPred, ctEvLoc, ctEvTerm, ctEvCoercion, ctEvId, ctEvCheckDepth,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
@@ -1021,6 +1021,31 @@ We can't require *equal* kinds, because
                eg   alpha::? ~ Int
      * a solved wanted constraint becomes a given
 
+Note [Kind orientation for CFunEqCan]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For (F xis ~ rhs) we require that kind(lhs) is a subkind of kind(rhs).
+This really only maters when rhs is an Open type variable (since only type
+variables have Open kinds):
+   F ty ~ (a:Open)
+which can happen, say, from
+      f :: F a b
+      f = undefined   -- The a:Open comes from instantiating 'undefined'
+
+Note that the kind invariant is maintained by rewriting.
+Eg wanted1 rewrites wanted2; if both were compatible kinds before,
+   wanted2 will be afterwards.  Similarly givens.
+
+Caveat:
+  - Givens from higher-rank, such as:
+          type family T b :: * -> * -> *
+          type instance T Bool = (->)
+
+          f :: forall a. ((T a ~ (->)) => ...) -> a -> ...
+          flop = f (...) True
+     Whereas we would be able to apply the type instance, we would not be able to
+     use the given (T Bool ~ (->)) in the body of 'flop'
+
+
 Note [CIrredEvCan constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 CIrredEvCan constraints are used for constraints that are "stuck"
@@ -1061,7 +1086,7 @@ ctEvidence :: Ct -> CtEvidence
 ctEvidence = cc_ev
 
 ctLoc :: Ct -> CtLoc
-ctLoc = ctev_loc . cc_ev
+ctLoc = ctEvLoc . ctEvidence
 
 ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
@@ -1091,7 +1116,7 @@ comprehensible error.  Particularly:
 
  * Insoluble derived wanted equalities (e.g. [D] Int ~ Bool) may
    arise from functional dependency interactions.  We are careful
-   to keep a good CtOrigin on such constriants (FunDepOrigin1, FunDepOrigin2)
+   to keep a good CtOrigin on such constraints (FunDepOrigin1, FunDepOrigin2)
    so that we can produce a good error message (Trac #9612)
 
 Since we leave these Derived constraints in the residual WantedConstraints,
@@ -1172,8 +1197,11 @@ listToCts = listToBag
 ctsElts :: Cts -> [Ct]
 ctsElts = bagToList
 
-extendCts :: Cts -> Ct -> Cts
-extendCts = snocBag
+consCts :: Ct -> Cts -> Cts
+consCts = consBag
+
+snocCts :: Cts -> Ct -> Cts
+snocCts = snocBag
 
 extendCtsList :: Cts -> [Ct] -> Cts
 extendCtsList cts xs | null xs   = cts
@@ -1417,6 +1445,9 @@ ctEvPred :: CtEvidence -> TcPredType
 -- The predicate of a flavor
 ctEvPred = ctev_pred
 
+ctEvLoc :: CtEvidence -> CtLoc
+ctEvLoc = ctev_loc
+
 ctEvTerm :: CtEvidence -> EvTerm
 ctEvTerm (CtGiven   { ctev_evtm = tm }) = tm
 ctEvTerm (CtWanted  { ctev_evar = ev }) = EvId ev
@@ -1433,7 +1464,7 @@ ctEvCoercion ctev@(CtDerived {}) = pprPanic "ctEvCoercion: derived constraint ca
 -- | Checks whether the evidence can be used to solve a goal with the given minimum depth
 ctEvCheckDepth :: SubGoalDepth -> CtEvidence -> Bool
 ctEvCheckDepth _      (CtGiven {})   = True -- Given evidence has infinite depth
-ctEvCheckDepth min ev@(CtWanted {})  = min <= ctLocDepth (ctev_loc ev)
+ctEvCheckDepth min ev@(CtWanted {})  = min <= ctLocDepth (ctEvLoc ev)
 ctEvCheckDepth _   ev@(CtDerived {}) = pprPanic "ctEvCheckDepth: cannot consider derived evidence" (ppr ev)
 
 ctEvId :: CtEvidence -> TcId
@@ -1465,7 +1496,7 @@ eqCanRewrite :: TcTyVar -> CtEvidence -> CtEvidence -> Bool
 -- See Note [canRewrite and canRewriteOrSame]
 eqCanRewrite _  (CtGiven {})   _              = True
 eqCanRewrite _  (CtWanted {})  (CtDerived {}) = True
-eqCanRewrite tv (CtWanted {})  (CtWanted {})  = isMetaTyVar tv
+eqCanRewrite tv (CtWanted {})  (CtWanted {})  = not (isFmvTyVar tv) && isMetaTyVar tv
 eqCanRewrite _  (CtDerived {}) (CtDerived {}) = True  -- Derived can't solve wanted/given
 eqCanRewrite _ _ _ = False             -- No evidence for a derived, anyway
 

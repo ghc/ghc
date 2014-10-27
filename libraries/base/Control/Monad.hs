@@ -75,7 +75,7 @@ module Control.Monad
     , (<$!>)
     ) where
 
-import Data.Foldable ( sequence_, msum, mapM_, forM_ )
+import Data.Foldable ( Foldable, sequence_, msum, mapM_, foldlM, forM_ )
 import Data.Functor ( void )
 import Data.Traversable ( forM, mapM, sequence )
 
@@ -156,21 +156,22 @@ function' are not commutative.
 >         f am xm
 
 If right-to-left evaluation is required, the input list should be reversed.
+
+Note: 'foldM' is the same as 'foldlM'
 -}
 
-foldM             :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
+foldM          :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
 {-# INLINEABLE foldM #-}
 {-# SPECIALISE foldM :: (a -> b -> IO a) -> a -> [b] -> IO a #-}
 {-# SPECIALISE foldM :: (a -> b -> Maybe a) -> a -> [b] -> Maybe a #-}
-foldM _ a []      =  return a
-foldM f a (x:xs)  =  f a x >>= \fax -> foldM f fax xs
+foldM          = foldlM
 
 -- | Like 'foldM', but discards the result.
-foldM_            :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m ()
+foldM_         :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m ()
 {-# INLINEABLE foldM_ #-}
 {-# SPECIALISE foldM_ :: (a -> b -> IO a) -> a -> [b] -> IO () #-}
 {-# SPECIALISE foldM_ :: (a -> b -> Maybe a) -> a -> [b] -> Maybe () #-}
-foldM_ f a xs     = foldM f a xs >> return ()
+foldM_ f a xs  = foldlM f a xs >> return ()
 
 -- | @'replicateM' n act@ performs the action @n@ times,
 -- gathering the results.

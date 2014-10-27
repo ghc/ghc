@@ -39,14 +39,6 @@ test('SafeLang11',
      multimod_compile_and_run,
      ['SafeLang11', config.ghc_th_way_flags])
 test('SafeLang12', normal, multimod_compile_fail, ['SafeLang12', ''])
-test('SafeLang13',
-     extra_clean(['SafeLang13_A.o', 'SafeLang13_A.hi']),
-     multimod_compile_and_run,
-     ['SafeLang13', ''])
-test('SafeLang14',
-     extra_clean(['SafeLang14_A.o', 'SafeLang14_A.hi']),
-     multimod_compile_fail,
-     ['SafeLang14', '-XSafe'])
 test('SafeLang15',
      [exit_code(1),
       extra_clean(['SafeLang15_A.o', 'SafeLang15_A.hi'])],

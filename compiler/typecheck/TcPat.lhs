@@ -184,7 +184,7 @@ be a subset of the *quantified type variables* of the signatures, for two reason
 
 * With kind polymorphism a signature like
     f :: forall f a. f a -> f a
-  may actuallly give rise to
+  may actually give rise to
     f :: forall k. forall (f::k -> *) (a:k). f a -> f a
   So the sig_tvs will be [k,f,a], but only f,a are scoped.
   NB: the scoped ones are not necessarily the *inital* ones!

@@ -34,8 +34,6 @@ module Data.Complex
 
         )  where
 
-import Prelude
-
 import Data.Typeable
 import Data.Data (Data)
 

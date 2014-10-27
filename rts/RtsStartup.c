@@ -161,6 +161,11 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
         setFullProgArgv(*argc,*argv);
         setupRtsFlags(argc, *argv,
                       rts_config.rts_opts_enabled, rts_config.rts_opts, rts_config.rts_hs_main);
+
+#ifdef DEBUG
+        /* load debugging symbols for current binary */
+        DEBUG_LoadSymbols((*argv)[0]);
+#endif /* DEBUG */
     }
 
 #ifdef DEBUG

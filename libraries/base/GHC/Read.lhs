@@ -60,7 +60,7 @@ import Text.ParserCombinators.ReadPrec
 
 import Data.Maybe
 
-import {-# SOURCE #-} GHC.Unicode       ( isDigit )
+import GHC.Unicode       ( isDigit )
 import GHC.Num
 import GHC.Real
 import GHC.Float

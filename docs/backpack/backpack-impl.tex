@@ -690,8 +690,8 @@ actually depend on, which means less type equalities may hold.
 
 Currently, when we compile a Cabal
 package, Cabal goes ahead and resolves \verb|build-depends| entries with actual
-implementations, which we compile against.  A planned addition to the package key,
-independent of Backpack, is to record the transitive dependency tree selected
+implementations, which we compile against.  The package key,
+independently of Backpack, records the transitive dependency tree selected
 during this dependency resolution process, so that we can install \pname{libfoo-1.0}
 twice compiled against different versions of its dependencies.
 What is the relationship to this transitive dependency tree of \emph{packages},
@@ -727,9 +727,9 @@ PackageId, it's important to be careful about the length of these IDs,
 as they are used for exported linker symbols (e.g.
 \verb|base_TextziReadziLex_zdwvalDig_info|).  Very long symbol names
 hurt compile and link time, object file sizes, GHCi startup time,
-dynamic linking, and make gdb hard to use.  As such, we are going to
-do away with full package names and versions and instead use just a
-base-62 encoded hash, with the first five characters of the package
+dynamic linking, and make gdb hard to use.
+As such, we've done away with full package names and versions; instead,
+there is simply a base-62 encoded hash, with the first five characters of the package
 name for user-friendliness.
 
 \subsection{Package selection}
@@ -1110,16 +1110,16 @@ against (renamed) interface files.
     In-place register the package $\mathcal{K}$ in $db$
     \For{$B$ \textbf{in} $\vec{B}$}
         \Case{$p = p\texttt{.hs}$}
-        \State\Call{Exec}{\texttt{ghc -c} $p$\texttt{.hs} \texttt{-package-db} $db$ \texttt{-package-name} $\mathcal{K}$ $flags$}
+        \State\Call{Exec}{\texttt{ghc -c} $p$\texttt{.hs} \texttt{-package-db} $db$ \texttt{-this-package-key} $\mathcal{K}$ $flags$}
         \EndCase%
         \Case{$p$ $\cc$ $p$\texttt{.hsig}}
-            \State\Call{Exec}{\texttt{ghc -c} $p$\texttt{.hsig} \texttt{-package-db} $db$ \texttt{--sig-of} $H(p)$ $flags$}
+            \State\Call{Exec}{\texttt{ghc -c} $p$\texttt{.hsig} \texttt{-package-db} $db$ \texttt{-sig-of} $H(p)$ $flags$}
         \EndCase%
         \Case{$p = p'$}
             \State$flags\gets flags$ \texttt{-alias} $p$ $p'$
         \EndCase%
         \Case{\Cinc{$P'$} $\langle\vec{p_H\mapsto p_H'}, \vec{p\mapsto p'} \rangle$}
-            \State\textbf{let} $H'(p_H) = $ \Call{Exec}{\texttt{ghc --resolve-module} $p_H'$ \texttt{-package-db} $db$ $flags$}
+            \State\textbf{let} $H'(p_H) = $ \Call{ResolveModule}{$p_H'$}
             \State$\mathcal{K}'\gets$ \Call{Compile}{$P'$, $H'$, $db$}\Comment{}Nota bene: not $flags$
             \State$flags\gets flags$ \texttt{-package} $\mathcal{K}'$ $\langle\vec{p\mapsto p'}\rangle$
         \EndCase%
@@ -1215,8 +1215,9 @@ are two interface files available: one available locally, and one from \pname{p}
 Both of these interface files are \emph{forwarding} to the original implementation
 \pname{r} (more on this in the ``Compiling signatures'' file), so rather than
 reporting an ambiguous import, we instead have to merge the two interface files
-together and use the result as the interface for the module.  (This could be done
-on the fly, or we could generate merged interface files as we go along.)
+together. This is done by simulating multiple imports: one to each interface
+file. This works because GHC does not consider symbols with equal original names
+as conflicting.
 
 Note that we do not need to merge signatures with an implementation, in such
 cases, we should just use the implementation interface.  E.g.
@@ -1245,17 +1246,17 @@ $p$, this succeeds; otherwise, we apply the same conflict resolution algorithm.
 
 Signature compilation is triggered when we compile a signature file.
 This mode similar to how we process \verb|hs-boot| files, except
-we pass an extra flag \verb|--sig-of| which specifies what the
+we pass an extra flag \verb|-sig-of| which specifies what the
 identity of the actual implementation of the signature is (according to our $H$
 mapping).  This is guaranteed to exist, due to the linking
 restriction, although it may be in a partially registered package
-in $db$.  If the module is \emph{not} exposed under the name of the
-\texttt{hisig}file, we output an \texttt{hisig} file which, for all declarations the
+in $db$.  If the module is \emph{not} currently available under the same name of the
+\texttt{hsig} file, we output an \texttt{hi} file which, for all declarations the
 signature exposes, forwards their definitions to the original
 implementation file.  The intent is that any code in the current package
-which compiles against this signature will use this \texttt{hisig} file,
+which compiles against this signature will use this signature \texttt{hi} file,
 not the original one \texttt{hi} file.
-For example, the \texttt{hisig} file produced when compiling the starred interface
+For example, the \texttt{hi} file produced when compiling the starred interface
 points to the implementation in package \pname{q}.
 
 \begin{verbatim}
@@ -1267,7 +1268,7 @@ package q where
     include p
 \end{verbatim}
 
-\paragraph{Sometimes \texttt{hisig} is unnecessary}
+\paragraph{Sometimes \texttt{hi} is unnecessary}
 In the following package:
 
 \begin{verbatim}
@@ -1278,7 +1279,7 @@ package p where
 
 Paper Backpack specifies that we check the signature \m{P} against implementation
 \m{P}, but otherwise no changes are made (i.e., the signature does not narrow
-the implementation.) In this case, it is not necessary to generate an \texttt{hisig} file;
+the implementation.) In this case, it is not necessary to generate an \texttt{hi} file;
 the original interface file suffices.
 
 \paragraph{Multiple signatures}  As a simplification, we assume that there
@@ -1287,7 +1288,7 @@ us from expressing mutual recursion in signatures, but let's not worry
 about it for now.)
 
 \paragraph{Restricted recursive modules ala hs-boot}\label{sec:hs-boot-restrict}
-When we compile an \texttt{hsig} file without any \texttt{--sig-of} flag (because
+When we compile an \texttt{hsig} file without any \texttt{-sig-of} flag (because
 no implementation is known), we fall back to old-style GHC mutual recursion.
 Na\"\i vely, a shaping pass would be necessary;
 so we adopt an existing constraint that
@@ -1328,10 +1329,9 @@ no renaming are straightforward.
 
 First, we assume that we know \emph{a priori} what the holes of a
 package $p_H$ are (either by some sort of pre-pass, or explicit
-declaration.)  For each of their \emph{renamed targets} $p'_H$, we look
-up the module in the current $flags$ environment, retrieving the
-physical module identity by consulting GHC with the
-\texttt{--resolve-module} flag and storing it in $H'$.  (This can be done in batch.)
+declaration.)  For each of their \emph{renamed targets} $p'_H$, we determine
+what the original module associated with the $p'_H$ is, based off of
+the package database that we have been manipulating.
 For example:
 
 \begin{verbatim}
@@ -1344,7 +1344,8 @@ package q where
     include p (A as B)
 \end{verbatim}
 
-When computing the entry $H(\pname{A})$, we run the command \texttt{ghc --resolve-module} \pname{B}.
+When computing the entry $H(\pname{A})$, we determine what the original
+module for \pname{B} is.
 
 Next, we recursively call \textsc{Compile} with the computed $H'$.
 Note that the entries in $H$ may refer to modules which would not be
@@ -1369,7 +1370,7 @@ partially processed and so is in the inplace package database.)
 Furthermore, the interface file for \m{B} may refer to \pname{q}:\m{A},
 and thus we likewise need to know how to find its interface file.
 
-Note that the inplace package database is not expected to expose and
+Note that the inplace package database is not expected to expose intermediate
 packages. Otherwise, this example would improperly compile:
 
 \begin{verbatim}
@@ -1390,9 +1391,9 @@ modules we compile see its (appropriately thinned and renamed) modules, and like
 aliasing.
 
 \paragraph{Absence of an \texttt{hi} file}
-It is important that \texttt{--resolve-module} truly looks up the \emph{implementor}
+It is important that when we resolve a module, we look up the \emph{implementor}
 of a module, and not just a signature which is providing it at some name.
-Sometimes, a little extra work is necessary to compute this, for example:
+Sometimes, it can be a bit indirect, for example:
 
 \begin{verbatim}
 package p where
@@ -1414,6 +1415,8 @@ conclude when compiling the signature in \pname{p} that the implementation
 doesn't export enough identifiers to fulfill the signature (\texttt{y} is not
 available from just the signature in \pname{q}).  Instead, we have to look
 up the original implementor of \m{A} in \pname{r}, and use that in $H'$.
+If you maintain the invariant that you always know what the original implementor
+is of all modules in scope, it's easy enough to figure this out.
 
 \subsection{Commentary}
 
@@ -1737,6 +1740,12 @@ partway, intending to finish it later.  However, our compilation strategy
 for definite packages requires us to run this step using a \emph{different}
 choice of original names, so it's unclear how much work could actually be reused.
 
+\paragraph{Sources in sandboxes}  Another nice way to implement indefinite
+packages is to register them as source packages in a Cabal sandbox, and then
+teach Cabal how to build them multiple times in the compile process.  Perhaps
+the global package database should be extended with a directory of source
+packages in order to support indefinite packages.
+
 \section{Surface syntax}
 
 In the Backpack paper, a brand new module language is presented, with
@@ -1806,7 +1815,7 @@ named files):
 package: libfoo
 ...
 build-depends: base, libfoo (Foo, Bar as Baz)
-holes: A A2 -- deferred for now
+required-signatures: A A2 -- deferred for now
 exposed-modules: Foo B C
 aliases: A = A2
 other-modules: D

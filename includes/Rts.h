@@ -193,7 +193,6 @@ INLINE_HEADER Time fsecondsToTime (double t)
 
 /* Global constaints */
 #include "rts/Constants.h"
-#include "rts/StaticClosures.h"
 
 /* Profiling information */
 #include "rts/prof/CCS.h"

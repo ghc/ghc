@@ -42,9 +42,6 @@ test('UnsafeInfered05',
 test('UnsafeInfered06',
      [ extra_clean(['UnsafeInfered06_A.hi', 'UnsafeInfered06_A.o']) ],
      multimod_compile_fail, ['UnsafeInfered06', ''])
-test('UnsafeInfered07',
-     [ extra_clean(['UnsafeInfered07_A.hi', 'UnsafeInfered07_A.o']) ],
-     multimod_compile_fail, ['UnsafeInfered07', ''])
 test('UnsafeInfered08',
      [ extra_clean(['UnsafeInfered08_A.hi', 'UnsafeInfered08_A.o']) ],
      multimod_compile_fail, ['UnsafeInfered08', ''])

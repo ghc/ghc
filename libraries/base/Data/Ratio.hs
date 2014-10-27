@@ -24,8 +24,6 @@ module Data.Ratio
 
   ) where
 
-import Prelude
-
 import GHC.Real         -- The basic defns for Ratio
 
 -- -----------------------------------------------------------------------------

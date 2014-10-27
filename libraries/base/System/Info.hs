@@ -24,7 +24,6 @@ module System.Info
        compilerVersion
    ) where
 
-import Prelude
 import Data.Version
 
 -- | The version of 'compilerName' with which the program was compiled

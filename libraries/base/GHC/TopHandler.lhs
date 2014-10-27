@@ -5,7 +5,6 @@
            , MagicHash
            , UnboxedTuples
   #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -34,23 +33,22 @@ module GHC.TopHandler (
 
 import Control.Exception
 import Data.Maybe
-import Data.Dynamic (toDyn)
 
 import Foreign
 import Foreign.C
 import GHC.Base
 import GHC.Conc hiding (throwTo)
-import GHC.Num
 import GHC.Real
-import GHC.MVar
 import GHC.IO
 import GHC.IO.Handle.FD
 import GHC.IO.Handle
 import GHC.IO.Exception
 import GHC.Weak
-import Data.Typeable
+
 #if defined(mingw32_HOST_OS)
 import GHC.ConsoleHandler
+#else
+import Data.Dynamic (toDyn)
 #endif
 
 -- | 'runMainIO' is wrapped around 'Main.main' (or whatever main is

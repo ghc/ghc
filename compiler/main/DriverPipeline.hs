@@ -1595,26 +1595,26 @@ mkExtraObjToLinkIntoBinary dflags = do
 
    mkExtraObj dflags "c" (showSDoc dflags main)
 
-  where
-    main
-      | gopt Opt_NoHsMain dflags = Outputable.empty
-      | otherwise = vcat [
-             ptext (sLit "#include \"Rts.h\""),
-             ptext (sLit "extern StgClosure ZCMain_main_static_closure;"),
-             ptext (sLit "int main(int argc, char *argv[])"),
-             char '{',
-             ptext (sLit "    RtsConfig __conf = defaultRtsConfig;"),
-             ptext (sLit "    __conf.rts_opts_enabled = ")
-                 <> text (show (rtsOptsEnabled dflags)) <> semi,
-             case rtsOpts dflags of
-                Nothing   -> Outputable.empty
-                Just opts -> ptext (sLit "    __conf.rts_opts= ") <>
-                               text (show opts) <> semi,
-             ptext (sLit "    __conf.rts_hs_main = rtsTrue;"),
-             ptext (sLit "    return hs_main(argc, argv, &ZCMain_main_static_closure,__conf);"),
-             char '}',
-             char '\n' -- final newline, to keep gcc happy
-           ]
+ where
+  main
+   | gopt Opt_NoHsMain dflags = Outputable.empty
+   | otherwise = vcat [
+      text "#include \"Rts.h\"",
+      text "extern StgClosure ZCMain_main_closure;",
+      text "int main(int argc, char *argv[])",
+      char '{',
+      text " RtsConfig __conf = defaultRtsConfig;",
+      text " __conf.rts_opts_enabled = "
+          <> text (show (rtsOptsEnabled dflags)) <> semi,
+      case rtsOpts dflags of
+         Nothing   -> Outputable.empty
+         Just opts -> ptext (sLit "    __conf.rts_opts= ") <>
+                        text (show opts) <> semi,
+      text " __conf.rts_hs_main = rtsTrue;",
+      text " return hs_main(argc,argv,&ZCMain_main_closure,__conf);",
+      char '}',
+      char '\n' -- final newline, to keep gcc happy
+     ]
 
 -- Write out the link info section into a new assembly file. Previously
 -- this was included as inline assembly in the main.c file but this

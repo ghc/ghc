@@ -39,7 +39,6 @@ import GHC.Read
 import GHC.Arr
 import GHC.Word hiding (uncheckedShiftL64#, uncheckedShiftRL64#)
 import GHC.Show
-import GHC.Float ()     -- for RealFrac methods
 import Data.Typeable
 
 

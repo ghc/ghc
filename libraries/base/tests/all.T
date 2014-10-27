@@ -23,6 +23,7 @@ test('readInteger001', normal, compile_and_run, [''])
 test('readFixed001', normal, compile_and_run, [''])
 test('lex001', normal, compile_and_run, [''])
 test('take001', extra_run_opts('1'), compile_and_run, [''])
+test('inits', normal, compile_and_run, [''])
 test('genericNegative001', extra_run_opts('-1'), compile_and_run, [''])
 test('ix001', normal, compile_and_run, [''])
 

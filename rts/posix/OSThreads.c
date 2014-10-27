@@ -129,11 +129,16 @@ shutdownThread(void)
 }
 
 int
-createOSThread (OSThreadId* pId, OSThreadProc *startProc, void *param)
+createOSThread (OSThreadId* pId, char *name STG_UNUSED,
+                OSThreadProc *startProc, void *param)
 {
   int result = pthread_create(pId, NULL, (void *(*)(void *))startProc, param);
-  if(!result)
+  if (!result) {
     pthread_detach(*pId);
+#if HAVE_PTHREAD_SETNAME_NP
+    pthread_setname_np(*pId, name);
+#endif
+  }
   return result;
 }
 

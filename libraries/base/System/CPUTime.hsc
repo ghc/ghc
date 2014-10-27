@@ -24,8 +24,6 @@ module System.CPUTime
          cpuTimePrecision  -- :: Integer
         ) where
 
-import Prelude
-
 import Data.Ratio
 
 import Foreign.Safe

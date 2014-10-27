@@ -39,7 +39,6 @@ import HscTypes
 import Avail
 
 import Unify( tcUnifyTy )
-import Id( idType )
 import Class
 import Type
 import Kind( isKind )
@@ -56,7 +55,6 @@ import VarSet
 import PrelNames
 import SrcLoc
 import Util
-import ListSetOps
 import Outputable
 import FastString
 import Bag
@@ -477,21 +475,19 @@ renameDeriv is_boot inst_infos bagBinds
       inst_info@(InstInfo { iSpec = inst
                           , iBinds = InstBindings
                             { ib_binds = binds
+                            , ib_tyvars = tyvars
                             , ib_pragmas = sigs
-                            , ib_extensions = exts -- only for type-checking
+                            , ib_extensions = exts -- Only for type-checking
                             , ib_derived = sa } })
-        =       -- Bring the right type variables into
-                -- scope (yuk), and rename the method binds
-           ASSERT( null sigs )
-           bindLocalNamesFV (map Var.varName tyvars) $
+        =  ASSERT( null sigs )
+           bindLocalNamesFV tyvars $
            do { (rn_binds, fvs) <- rnMethodBinds (is_cls_nm inst) (\_ -> []) binds
               ; let binds' = InstBindings { ib_binds = rn_binds
-                                           , ib_pragmas = []
-                                           , ib_extensions = exts
-                                           , ib_derived = sa }
+                                          , ib_tyvars = tyvars
+                                          , ib_pragmas = []
+                                          , ib_extensions = exts
+                                          , ib_derived = sa }
               ; return (inst_info { iBinds = binds' }, fvs) }
-        where
-          (tyvars, _) = tcSplitForAllTys (idType (instanceDFunId inst))
 \end{code}
 
 Note [Newtype deriving and unused constructors]
@@ -879,13 +875,6 @@ mkEqnHelp :: Maybe OverlapMode
 -- Assumes that this declaration is well-kinded
 
 mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
-  | className cls `elem` oldTypeableClassNames
-  = do { dflags <- getDynFlags
-       ; case checkOldTypeableConditions (dflags, tycon, tc_args) of
-           NotValid err -> bale_out err
-           IsValid      -> mkOldTypeableEqn tvs cls tycon tc_args mtheta }
-
-  | otherwise
   = do {      -- Find the instance of a data family
               -- Note [Looking up family instances for deriving]
          fam_envs <- tcGetFamInstEnvs
@@ -1048,41 +1037,6 @@ mk_data_eqn overlap_mode tvs cls tycon tc_args rep_tc rep_tc_args mtheta
     inst_tys = [mkTyConApp tycon tc_args]
 
 ----------------------
-mkOldTypeableEqn :: [TyVar] -> Class
-                    -> TyCon -> [TcType] -> DerivContext
-                    -> TcM EarlyDerivSpec
--- The "old" (pre GHC 7.8 polykinded Typeable) deriving Typeable
--- used a horrid family of classes: Typeable, Typeable1, Typeable2, ... Typeable7
-mkOldTypeableEqn tvs cls tycon tc_args mtheta
-        -- The Typeable class is special in several ways
-        --        data T a b = ... deriving( Typeable )
-        -- gives
-        --        instance Typeable2 T where ...
-        -- Notice that:
-        -- 1. There are no constraints in the instance
-        -- 2. There are no type variables either
-        -- 3. The actual class we want to generate isn't necessarily
-        --      Typeable; it depends on the arity of the type
-  | isNothing mtheta    -- deriving on a data type decl
-  = do  { checkTc (cls `hasKey` oldTypeableClassKey)
-                  (ptext (sLit "Use deriving( Typeable ) on a data type declaration"))
-        ; real_cls <- tcLookupClass (oldTypeableClassNames `getNth` tyConArity tycon)
-                      -- See Note [Getting base classes]
-        ; mkOldTypeableEqn tvs real_cls tycon [] (Just []) }
-
-  | otherwise           -- standalone deriving
-  = do  { checkTc (null tc_args)
-                  (ptext (sLit "Derived Typeable instance must be of form (Typeable")
-                        <> int (tyConArity tycon) <+> ppr tycon <> rparen)
-        ; dfun_name <- new_dfun_name cls tycon
-        ; loc <- getSrcSpanM
-        ; return (GivenTheta $
-                  DS { ds_loc = loc, ds_name = dfun_name, ds_tvs = []
-                     , ds_cls = cls, ds_tys = [mkTyConApp tycon []]
-                     , ds_tc = tycon, ds_tc_args = []
-                     , ds_theta = mtheta `orElse` []
-                     , ds_overlap = Nothing -- Or, Just NoOverlap?
-                     , ds_newtype = False })  }
 
 mkPolyKindedTypeableEqn :: Class -> TyCon -> TcM [EarlyDerivSpec]
 -- We can arrive here from a 'deriving' clause
@@ -1240,9 +1194,6 @@ checkSideConditions dflags mtheta cls cls_tys rep_tc rep_tc_args
 classArgsErr :: Class -> [Type] -> SDoc
 classArgsErr cls cls_tys = quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "is not a class")
 
-checkOldTypeableConditions :: Condition
-checkOldTypeableConditions = checkFlag Opt_DeriveDataTypeable `andCond` cond_oldTypeableOK
-
 nonStdErr :: Class -> SDoc
 nonStdErr cls = quotes (ppr cls) <+> ptext (sLit "is not a derivable class")
 
@@ -1384,21 +1335,6 @@ cond_isProduct (_, rep_tc, _)
     why = quotes (pprSourceTyCon rep_tc) <+>
           ptext (sLit "must have precisely one constructor")
 
-cond_oldTypeableOK :: Condition
--- OK for kind-monomorphic Typeable class
--- Currently: (a) args all of kind *
---            (b) 7 or fewer args
-cond_oldTypeableOK (_, tc, _)
-  | tyConArity tc > 7 = NotValid too_many
-  | not (all (isSubOpenTypeKind . tyVarKind) (tyConTyVars tc))
-                      = NotValid bad_kind
-  | otherwise         = IsValid
-  where
-    too_many = quotes (pprSourceTyCon tc) <+>
-               ptext (sLit "must have 7 or fewer arguments")
-    bad_kind = quotes (pprSourceTyCon tc) <+>
-               ptext (sLit "must only have arguments of kind `*'")
-
 functorLikeClassKeys :: [Unique]
 functorLikeClassKeys = [functorClassKey, foldableClassKey, traversableClassKey]
 
@@ -1483,11 +1419,7 @@ non_coercible_class :: Class -> Bool
 non_coercible_class cls
   = classKey cls `elem` ([ readClassKey, showClassKey, dataClassKey
                          , genClassKey, gen1ClassKey, typeableClassKey
-                         , traversableClassKey ]
-                         ++ oldTypeableClassKeys)
-
-oldTypeableClassKeys :: [Unique]
-oldTypeableClassKeys = map getUnique oldTypeableClassNames
+                         , traversableClassKey ])
 
 new_dfun_name :: Class -> TyCon -> TcM Name
 new_dfun_name clas tycon        -- Just a simple wrapper
@@ -2062,6 +1994,7 @@ genInst _standalone_deriv comauxs
                     { iSpec   = inst_spec
                     , iBinds  = InstBindings
                         { ib_binds = gen_Newtype_binds loc clas tvs tys rhs_ty
+                        , ib_tyvars = map Var.varName tvs   -- Scope over bindings
                         , ib_pragmas = []
                         , ib_extensions = [ Opt_ImpredicativeTypes
                                           , Opt_RankNTypes ]
@@ -2079,6 +2012,7 @@ genInst _standalone_deriv comauxs
        ; let inst_info = InstInfo { iSpec   = inst_spec
                                   , iBinds  = InstBindings
                                                 { ib_binds = meth_binds
+                                                , ib_tyvars = map Var.varName tvs
                                                 , ib_pragmas = []
                                                 , ib_extensions = []
                                                 , ib_derived = True } }

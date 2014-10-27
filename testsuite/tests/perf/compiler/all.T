@@ -1,6 +1,6 @@
 def no_lint(name, opts):
    opts.compiler_always_flags = \
-       filter(lambda opt: opt != '-dcore-lint' and opt != '-dcmm-lint', opts.compiler_always_flags)
+       [opt for opt in opts.compiler_always_flags if opt != '-dcore-lint' and opt != '-dcmm-lint']
 
 setTestOpts(no_lint)
 
@@ -171,7 +171,7 @@ test('T4801',
                            # expected value: 58 (amd64/OS X)
                            # 13/01/2014 - 70
            (wordsize(32), 30, 20),
-           (wordsize(64), 55, 20)]),
+           (wordsize(64), 48, 20)]),
             # prev:       50 (amd64/Linux)
             # 19/10/2012: 64 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
@@ -180,6 +180,8 @@ test('T4801',
             # 28/8/13:    60 (amd64/Linux)
             #                (^ REASON UNKNOWN!)
             # 2014-09-10: 55 post-AMP-cleanup
+            # 2014-10-08: 62 (jumps between 55 and 71 observed -- GC tipping point?)
+            # 2014-10-13: 48 stricter seqDmdType
 
       compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 464872776, 5),
@@ -189,11 +191,12 @@ test('T4801',
            # prev:        185669232 (x86/OSX)
            # 2014-01-22:  211198056 (x86/Linux)
            # 2014-09-03:  185242032 (Windows laptop)
-           (wordsize(64), 362939272, 10)]),
+           (wordsize(64), 382056344, 10)]),
             # prev:       360243576 (amd64/Linux)
             # 19/10/2012: 447190832 (amd64/Linux) (-fPIC turned on)
             # 19/10/2012: 392409984 (amd64/Linux) (-fPIC turned off)
             # 2014-04-08: 362939272 (amd64/Linux) cumulation of various smaller improvements over recent commits
+            # 2014-10-08: 382056344 (amd64/Linux) stricter foldr2 488e95b
 
 ###################################
 # deactivated for now, as this metric became to volatile recently
@@ -232,7 +235,7 @@ test('T3064',
             # expected value: 14 (x86/Linux 28-06-2012):
             # 2013-11-13:     18 (x86/Windows, 64bit machine)
             # 2014-01-22:     23 (x86/Linux)
-           (wordsize(64), 42, 20)]),
+           (wordsize(64), 38, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
@@ -242,6 +245,7 @@ test('T3064',
             #  depending on whether the old .hi file exists
             # (amd64/Linux) 2013-09-11: 37; better arity analysis (weird)
             # (amd64/Linux) (09/09/2014): 42, AMP changes (larger interfaces, more loading)
+            # (amd64/Linux) 2014-10-13: 38: Stricter seqDmdType
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 162457940, 10),
@@ -269,7 +273,7 @@ test('T3064',
             #(some date):  5511604
             # 2013-11-13:  7218200 (x86/Windows, 64bit machine)
             # 2014-04-04: 11202304 (x86/Windows, 64bit machine)
-           (wordsize(64), 18744992, 20)]),
+           (wordsize(64), 13251728, 20)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
             # (amd64/Linux)         (14/02/2013):  8687360
@@ -283,6 +287,7 @@ test('T3064',
             # (amd64/Linux)         (09/09/2014): 24357392, AMP changes (larger interfaces, more loading)
             # (amd64/Linux)         (14/09/2014): 16053888, BPP changes (more NoImplicitPrelude in base)
             # (amd64/Linux)         (19/09/2014): 18744992, unknown
+            # (amd64/Linux)         2014-10-13:   13251728, Stricter seqDmdType
 
        only_ways(['normal'])
       ],
@@ -402,7 +407,7 @@ test('T5321FD',
             #  (increase due to new codegen)
             # 2014-07-31: 211699816 (Windows) (-11%)
             #  (due to better optCoercion, 5e7406d9, #9233)
-           (wordsize(64), 426960992, 10)])
+           (wordsize(64), 410895536, 10)])
             # prev:       418306336
             # 29/08/2012: 492905640
             #  (increase due to new codegen)
@@ -414,6 +419,8 @@ test('T5321FD',
             #  (with -8%, still in range, hence cause not known)
             # 2014-07-17: 426960992 (-11% of previous value)
             #  (due to better optCoercion, 5e7406d9, #9233)
+            # 2014-10-08  410895536
+            #  (various changes; biggest improvements due to 949ad67 and FastString package ids)
       ],
       compile,[''])
 
@@ -444,14 +451,15 @@ test('T5837',
              # 40000000 (x86/Linux)
              # 2013-11-13: 45520936 (x86/Windows, 64bit machine)
              # 2041-09-03: 37096484 (Windows laptop, w/w for INLINABLE things
-           (wordsize(64), 73639840, 10)])
+           (wordsize(64), 75765728, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
              # 2013-09-18 90587232 amd64/Linux
              # 2013-11-21 86795752 amd64/Linux, GND via Coercible and counters
              #                                  for constraints solving
-             # 2041-08-29 73639840 amd64/Linux, w/w for INLINABLE things
+             # 2014-08-29 73639840 amd64/Linux, w/w for INLINABLE things
+             # 2014-10-08 73639840 amd64/Linux, Burning Bridges and other small changes
       ],
       compile_fail,['-ftype-function-depth=50'])
 
@@ -487,3 +495,27 @@ test('T9020',
            # 2014-09-10:  785871680 post-AMP-cleanup
       ],
       compile,[''])
+
+test('T9675',
+     [ only_ways(['optasm']),
+       compiler_stats_num_field('max_bytes_used',
+          [(wordsize(64), 22220552, 25),
+          # 2014-10-13    29596552
+          # 2014-10-13    26570896   seq the DmdEnv in seqDmdType as well
+          # 2014-10-13    18582472   different machines giving different results..
+          # 2014-10-13    22220552   use the mean
+          ]),
+       compiler_stats_num_field('peak_megabytes_allocated',
+          [(wordsize(64), 53, 15),
+          # 2014-10-13    66
+          # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
+          # 2014-10-13    49         different machines giving different results...
+          # 2014-10-13    53         use the mean
+          ]),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 544489040, 10)
+          # 2014-10-13    544489040
+          ]),
+      ],
+     compile,
+     [''])

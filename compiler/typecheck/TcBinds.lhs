@@ -31,8 +31,9 @@ import TcPat
 import TcMType
 import PatSyn
 import ConLike
+import FamInstEnv( normaliseType )
+import FamInst( tcGetFamInstEnvs )
 import Type( tidyOpenType )
-import FunDeps( growThetaTyVars )
 import TyCon
 import TcType
 import TysPrim
@@ -591,14 +592,15 @@ tcPolyInfer
   -> [LHsBind Name]
   -> TcM (LHsBinds TcId, [TcId], TopLevelFlag)
 tcPolyInfer rec_tc prag_fn tc_sig_fn mono closed bind_list
-  = do { ((binds', mono_infos), wanted)
-             <- captureConstraints $
+  = do { (((binds', mono_infos), untch), wanted)
+             <- captureConstraints  $
+                captureUntouchables $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
 
        ; let name_taus = [(name, idType mono_id) | (name, _, mono_id) <- mono_infos]
        ; traceTc "simplifyInfer call" (ppr name_taus $$ ppr wanted)
        ; (qtvs, givens, mr_bites, ev_binds)
-                 <- simplifyInfer closed mono name_taus wanted
+                 <- simplifyInfer untch mono name_taus wanted
 
        ; theta   <- zonkTcThetaType (map evVarPred givens)
        ; exports <- checkNoErrs $ mapM (mkExport prag_fn qtvs theta) mono_infos
@@ -677,15 +679,20 @@ mkInferredPolyId :: Name -> [TyVar] -> TcThetaType -> TcType -> TcM Id
 -- the right type variables and theta to quantify over
 -- See Note [Validity of inferred types]
 mkInferredPolyId poly_name qtvs theta mono_ty
-  = addErrCtxtM (mk_bind_msg True False poly_name inferred_poly_ty) $
-    do { checkValidType (InfSigCtxt poly_name) inferred_poly_ty
-       ; return (mkLocalId poly_name inferred_poly_ty) }
-  where
-    my_tvs2 = closeOverKinds (growThetaTyVars theta (tyVarsOfType mono_ty))
+  = do { fam_envs <- tcGetFamInstEnvs
+
+       ; let (_co, norm_mono_ty) = normaliseType fam_envs Nominal mono_ty
+               -- Unification may not have normalised the type, so do it
+               -- here to make it as uncomplicated as possible.
+             my_tvs2 = closeOverKinds (growThetaTyVars theta (tyVarsOfType norm_mono_ty))
                   -- Include kind variables!  Trac #7916
-    my_tvs   = filter (`elemVarSet` my_tvs2) qtvs   -- Maintain original order
-    my_theta = filter (quantifyPred my_tvs2) theta
-    inferred_poly_ty = mkSigmaTy my_tvs my_theta mono_ty
+             my_tvs   = filter (`elemVarSet` my_tvs2) qtvs   -- Maintain original order
+             my_theta = filter (quantifyPred my_tvs2) theta
+             inferred_poly_ty = mkSigmaTy my_tvs my_theta norm_mono_ty
+
+       ; addErrCtxtM (mk_bind_msg True False poly_name inferred_poly_ty) $
+         checkValidType (InfSigCtxt poly_name) inferred_poly_ty
+       ; return (mkLocalId poly_name inferred_poly_ty) }
 
 mk_bind_msg :: Bool -> Bool -> Name -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
 mk_bind_msg inferred want_ambig poly_name poly_ty tidy_env

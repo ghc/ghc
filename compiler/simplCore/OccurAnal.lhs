@@ -1728,7 +1728,7 @@ binder-swap in OccAnal:
 
     Notice that because MkT is strict, x is marked "evaluated".  But to
     eliminate the last case, we must either make sure that x (as well as
-    x1) has unfolding MkT y1.  THe straightforward thing to do is to do
+    x1) has unfolding MkT y1.  The straightforward thing to do is to do
     the binder-swap.  So this whole note is a no-op.
 
 It's fixed by doing the binder-swap in OccAnal because we can do the

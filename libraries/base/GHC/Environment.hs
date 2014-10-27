@@ -1,11 +1,13 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
 
 module GHC.Environment (getFullArgs) where
 
-import Prelude
 import Foreign
 import Foreign.C
+import GHC.Base
+import GHC.Real ( fromIntegral )
 
 #ifdef mingw32_HOST_OS
 import GHC.IO (finally)
@@ -41,9 +43,8 @@ foreign import WINDOWS_CCONV unsafe "windows.h CommandLineToArgvW"
 foreign import WINDOWS_CCONV unsafe "Windows.h LocalFree"
     c_LocalFree :: Ptr a -> IO (Ptr a)
 #else
-import Control.Monad
-
 import GHC.IO.Encoding
+import GHC.Num
 import qualified GHC.Foreign as GHC
 
 getFullArgs :: IO [String]

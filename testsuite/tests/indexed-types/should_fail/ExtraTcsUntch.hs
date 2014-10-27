@@ -21,7 +21,9 @@ data TEx where
 f x = 
     let g1 :: forall b. b -> ()
         g1 _ = h [x]
+
         g2 z = case z of TEx y -> (h [[undefined]], op x [y])
+
     in (g1 '3', g2 undefined)
 
 
@@ -42,7 +44,9 @@ f x =
    
 {- Assume x:beta
    From g1 we get    (forall b.  F Int ~ [beta])
+
    From g2 we get    (forall c. 0 => F Int ~ [[alpha]] /\ C beta [c])
+    (g2 is not generalised; the forall comes from the TEx pattern)
 
 Floating we get
    F Int ~ [beta], F Int ~ [[alpha]], alpha ~ alpha', forall c. C beta [c]

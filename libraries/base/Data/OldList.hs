@@ -208,6 +208,7 @@ module Data.OldList
    ) where
 
 import Data.Maybe
+import Data.Bits        ( (.&.) )
 import Data.Char        ( isSpace )
 import Data.Ord         ( comparing )
 import Data.Tuple       ( fst, snd )
@@ -767,11 +768,16 @@ groupBy eq (x:xs)       =  (x:ys) : groupBy eq zs
 -- > inits "abc" == ["","a","ab","abc"]
 --
 -- Note that 'inits' has the following strictness property:
+-- @inits (xs ++ _|_) = inits xs ++ _|_@
+--
+-- In particular,
 -- @inits _|_ = [] : _|_@
 inits                   :: [a] -> [[a]]
-inits xs                =  [] : case xs of
-                                  []      -> []
-                                  x : xs' -> map (x :) (inits xs')
+inits                   = map toListSB . scanl' snocSB emptySB
+{-# NOINLINE inits #-}
+-- We do not allow inits to inline, because it plays havoc with Call Arity
+-- if it fuses with a consumer, and it would generally lead to serious
+-- loss of sharing if allowed to fuse with a producer.
 
 -- | The 'tails' function returns all final segments of the argument,
 -- longest first.  For example,
@@ -781,9 +787,12 @@ inits xs                =  [] : case xs of
 -- Note that 'tails' has the following strictness property:
 -- @tails _|_ = _|_ : _|_@
 tails                   :: [a] -> [[a]]
-tails xs                =  xs : case xs of
-                                  []      -> []
-                                  _ : xs' -> tails xs'
+{-# INLINABLE tails #-}
+tails lst               =  build (\c n ->
+  let tailsGo xs = xs `c` case xs of
+                             []      -> n
+                             _ : xs' -> tailsGo xs'
+  in tailsGo lst)
 
 -- | The 'subsequences' function returns the list of all subsequences of the argument.
 --
@@ -1130,3 +1139,51 @@ unwords []              =  ""
 unwords [w]             = w
 unwords (w:ws)          = w ++ ' ' : unwords ws
 #endif
+
+{- A "SnocBuilder" is a version of Chris Okasaki's banker's queue that supports
+toListSB instead of uncons. In single-threaded use, its performance
+characteristics are similar to John Hughes's functional difference lists, but
+likely somewhat worse. In heavily persistent settings, however, it does much
+better, because it takes advantage of sharing. The banker's queue guarantees
+(amortized) O(1) snoc and O(1) uncons, meaning that we can think of toListSB as
+an O(1) conversion to a list-like structure a constant factor slower than
+normal lists--we pay the O(n) cost incrementally as we consume the list. Using
+functional difference lists, on the other hand, we would have to pay the whole
+cost up front for each output list. -}
+
+{- We store a front list, a rear list, and the length of the queue.  Because we
+only snoc onto the queue and never uncons, we know it's time to rotate when the
+length of the queue plus 1 is a power of 2. Note that we rely on the value of
+the length field only for performance.  In the unlikely event of overflow, the
+performance will suffer but the semantics will remain correct.  -}
+
+data SnocBuilder a = SnocBuilder {-# UNPACK #-} !Word [a] [a]
+
+{- Smart constructor that rotates the builder when lp is one minus a power of
+2. Does not rotate very small builders because doing so is not worth the
+trouble. The lp < 255 test goes first because the power-of-2 test gives awful
+branch prediction for very small n (there are 5 powers of 2 between 1 and
+16). Putting the well-predicted lp < 255 test first avoids branching on the
+power-of-2 test until powers of 2 have become sufficiently rare to be predicted
+well. -}
+
+{-# INLINE sb #-}
+sb :: Word -> [a] -> [a] -> SnocBuilder a
+sb lp f r
+  | lp < 255 || (lp .&. (lp + 1)) /= 0 = SnocBuilder lp f r
+  | otherwise                          = SnocBuilder lp (f ++ reverse r) []
+
+-- The empty builder
+
+emptySB :: SnocBuilder a
+emptySB = SnocBuilder 0 [] []
+
+-- Add an element to the end of a queue.
+
+snocSB :: SnocBuilder a -> a -> SnocBuilder a
+snocSB (SnocBuilder lp f r) x = sb (lp + 1) f (x:r)
+
+-- Convert a builder to a list
+
+toListSB :: SnocBuilder a -> [a]
+toListSB (SnocBuilder _ f r) = f ++ reverse r

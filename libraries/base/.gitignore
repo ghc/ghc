@@ -2,6 +2,7 @@
 *.aux
 *.hi
 *.tix
+*.exe
 
 # Backup files
 *~

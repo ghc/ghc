@@ -34,8 +34,6 @@ module Control.Concurrent.Chan
         writeList2Chan,
    ) where
 
-import Prelude
-
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import Control.Concurrent.MVar
 import Control.Exception (mask_)

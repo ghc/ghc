@@ -195,9 +195,8 @@ tcInstType inst_tyvars ty
                             ; return (tyvars', theta, tau) }
 
 tcSkolDFunType :: Type -> TcM ([TcTyVar], TcThetaType, TcType)
--- Instantiate a type signature with skolem constants, but
--- do *not* give them fresh names, because we want the name to
--- be in the type environment: it is lexically scoped.
+-- Instantiate a type signature with skolem constants.
+-- We could give them fresh names, but no need to do so
 tcSkolDFunType ty = tcInstType (\tvs -> return (tcSuperSkolTyVars tvs)) ty
 
 tcSuperSkolTyVars :: [TyVar] -> (TvSubst, [TcTyVar])
@@ -314,7 +313,7 @@ newMetaTyVar meta_info kind
               s = case meta_info of
                         PolyTv     -> fsLit "s"
                         TauTv      -> fsLit "t"
-                        FlatMetaTv -> fsLit "fu"
+                        FlatMetaTv -> fsLit "fmv"
                         SigTv      -> fsLit "a"
         ; details <- newMetaDetails meta_info
         ; return (mkTcTyVar name kind details) }

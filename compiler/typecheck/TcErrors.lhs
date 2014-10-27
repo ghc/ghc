@@ -614,7 +614,7 @@ mkEqErr1 ctxt ct
                       ct is_oriented ty1 ty2 }
   where
     ev         = ctEvidence ct
-    loc        = ctev_loc ev
+    loc        = ctEvLoc ev
     (ty1, ty2) = getEqPredTys (ctEvPred ev)
 
     mk_given :: [Implication] -> (CtLoc, SDoc)
@@ -989,7 +989,9 @@ mkDictErr ctxt cts
   = ASSERT( not (null cts) )
     do { inst_envs <- tcGetInstEnvs
        ; fam_envs  <- tcGetFamInstEnvs
-       ; lookups   <- mapM (lookup_cls_inst inst_envs) cts
+       ; let (ct1:_) = cts  -- ct1 just for its location
+             min_cts = elim_superclasses cts
+       ; lookups   <- mapM (lookup_cls_inst inst_envs) min_cts
        ; let (no_inst_cts, overlap_cts) = partition is_no_inst lookups
 
        -- Report definite no-instance errors,
@@ -1000,8 +1002,6 @@ mkDictErr ctxt cts
        ; (ctxt, err) <- mk_dict_err fam_envs ctxt (head (no_inst_cts ++ overlap_cts))
        ; mkErrorMsg ctxt ct1 err }
   where
-    ct1:_ = elim_superclasses cts
-
     no_givens = null (getUserGivens ctxt)
 
     is_no_inst (ct, (matches, unifiers, _))
@@ -1071,7 +1071,7 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
 
     add_to_ctxt_fixes has_ambig_tvs
       | not has_ambig_tvs && all_tyvars
-      , (orig:origs) <- mapMaybe get_good_orig (cec_encl ctxt)
+      , (orig:origs) <- usefulContext ctxt pred 
       = [sep [ ptext (sLit "add") <+> pprParendType pred
                <+> ptext (sLit "to the context of")
              , nest 2 $ ppr_skol orig $$
@@ -1081,11 +1081,6 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
 
     ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
     ppr_skol skol_info      = ppr skol_info
-
-        -- Do not suggest adding constraints to an *inferred* type signature!
-    get_good_orig ic = case ic_info ic of
-                         SigSkol (InfSigCtxt {}) _ -> Nothing
-                         origin                    -> Just origin
 
     no_inst_msg
       | clas == coercibleClass
@@ -1220,6 +1215,22 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
                     2 (sep [ ptext (sLit "of newtype") <+> quotes (pprSourceTyCon tc)
                            , ptext (sLit "is not in scope") ])
         | otherwise = Nothing
+
+usefulContext :: ReportErrCtxt -> TcPredType -> [SkolemInfo]
+usefulContext ctxt pred
+  = go (cec_encl ctxt)
+  where
+    pred_tvs = tyVarsOfType pred
+    go [] = []
+    go (ic : ics)
+       = case ic_info ic of
+               -- Do not suggest adding constraints to an *inferred* type signature!
+           SigSkol (InfSigCtxt {}) _ -> rest
+           info                      -> info : rest
+       where
+          -- Stop when the context binds a variable free in the predicate
+          rest | any (`elemVarSet` pred_tvs) (ic_skols ic) = []
+               | otherwise                                 = go ics
 
 show_fixes :: [SDoc] -> SDoc
 show_fixes []     = empty
@@ -1469,7 +1480,7 @@ solverDepthErrorTcS cnt ev
              tidy_pred = tidyType tidy_env pred
        ; failWithTcM (tidy_env, hang (msg cnt) 2 (ppr tidy_pred)) }
   where
-    loc   = ctev_loc ev
+    loc   = ctEvLoc ev
     depth = ctLocDepth loc
     value = subGoalCounterValue cnt depth
     msg CountConstraints =

@@ -273,27 +273,26 @@ pprAddr (AddrRegImm r1 imm) = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
 
 
 pprSectionHeader :: Section -> SDoc
-pprSectionHeader seg
- = sdocWithPlatform $ \platform ->
-   let osDarwin = platformOS platform == OSDarwin
-   in   case seg of
-        Text                    -> ptext (sLit ".text\n.align 2")
-        Data                    -> ptext (sLit ".data\n.align 2")
-        ReadOnlyData
-         | osDarwin             -> ptext (sLit ".const\n.align 2")
-         | otherwise            -> ptext (sLit ".section .rodata\n\t.align 2")
-        RelocatableReadOnlyData
-         | osDarwin             -> ptext (sLit ".const_data\n.align 2")
-         | otherwise            -> ptext (sLit ".data\n\t.align 2")
-        UninitialisedData
-         | osDarwin             -> ptext (sLit ".const_data\n.align 2")
-         | otherwise            -> ptext (sLit ".section .bss\n\t.align 2")
-        ReadOnlyData16
-         | osDarwin             -> ptext (sLit ".const\n.align 4")
-         | otherwise            -> ptext (sLit ".section .rodata\n\t.align 4")
-        StaticClosures          -> ptext (sLit ".section staticclosures,\"aw\"\n\t.align 2")
-        OtherSection _          ->
-            panic "PprMach.pprSectionHeader: unknown section"
+pprSectionHeader seg =
+ sdocWithPlatform $ \platform ->
+ let osDarwin = platformOS platform == OSDarwin in
+ case seg of
+  Text              -> text ".text\n\t.align 2"
+  Data              -> text ".data\n\t.align 2"
+  ReadOnlyData
+   | osDarwin       -> text ".const\n\t.align 2"
+   | otherwise      -> text ".section .rodata\n\t.align 2"
+  RelocatableReadOnlyData
+   | osDarwin       -> text ".const_data\n\t.align 2"
+   | otherwise      -> text ".data\n\t.align 2"
+  UninitialisedData
+   | osDarwin       -> text ".const_data\n\t.align 2"
+   | otherwise      -> text ".section .bss\n\t.align 2"
+  ReadOnlyData16
+   | osDarwin       -> text ".const\n\t.align 4"
+   | otherwise      -> text ".section .rodata\n\t.align 4"
+  OtherSection _ ->
+      panic "PprMach.pprSectionHeader: unknown section"
 
 
 pprDataItem :: CmmLit -> SDoc

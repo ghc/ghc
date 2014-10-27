@@ -361,7 +361,8 @@ extendFamInstEnvList :: FamInstEnv -> [FamInst] -> FamInstEnv
 extendFamInstEnvList inst_env fis = foldl extendFamInstEnv inst_env fis
 
 extendFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
-extendFamInstEnv inst_env ins_item@(FamInst {fi_fam = cls_nm})
+extendFamInstEnv inst_env
+                 ins_item@(FamInst {fi_fam = cls_nm})
   = addToUFM_C add inst_env cls_nm (FamIE [ins_item])
   where
     add (FamIE items) _ = FamIE (ins_item:items)
@@ -757,7 +758,7 @@ We handle data families and type families separately here:
  * For data family instances, though, we need to re-split for each
    instance, because the breakdown might be different for each
    instance.  Why?  Because of eta reduction; see Note [Eta reduction
-   for data family axioms]
+   for data family axioms] in TcInstDcls.
 
 \begin{code}
 
@@ -790,7 +791,8 @@ but we also need to handle closed ones when normalising a type:
 
 \begin{code}
 reduceTyFamApp_maybe :: FamInstEnvs -> Role -> TyCon -> [Type] -> Maybe (Coercion, Type)
--- Attempt to do a *one-step* reduction of a type-family application
+-- Attempt to do a *one-step* reduction of a type-synonym-family application
+--    (i.e. is a no-op on data families)
 -- It first normalises the type arguments, wrt functions but *not* newtypes,
 -- to be sure that nested calls like
 --    F (G Int)
@@ -800,7 +802,7 @@ reduceTyFamApp_maybe :: FamInstEnvs -> Role -> TyCon -> [Type] -> Maybe (Coercio
 -- Works on both open and closed families
 
 reduceTyFamApp_maybe envs role tc tys
-  | isOpenFamilyTyCon tc
+  | isOpenSynFamilyTyCon tc
   , [FamInstMatch { fim_instance = fam_inst
                   , fim_tys =      inst_tys }] <- lookupFamInstEnv envs tc ntys
   = let ax     = famInstAxiom fam_inst
@@ -928,11 +930,16 @@ topNormaliseType_maybe env ty
 ---------------
 normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
 normaliseTcApp env role tc tys
+  | isTypeSynonymTyCon tc
+  , (co1, ntys) <- normaliseTcArgs env role tc tys
+  , Just (tenv, rhs, ntys') <- tcExpandTyCon_maybe tc ntys
+  , (co2, ninst_rhs) <- normaliseType env role (Type.substTy (mkTopTvSubst tenv) rhs)
+  = if isReflCo co2 then (co1,                 mkTyConApp tc ntys)
+                    else (co1 `mkTransCo` co2, mkAppTys ninst_rhs ntys')
+
   | Just (first_co, ty') <- reduceTyFamApp_maybe env role tc tys
-  = let    -- A reduction is possible
-        (rest_co,nty) = normaliseType env role ty'
-    in
-    (first_co `mkTransCo` rest_co, nty)
+  , (rest_co,nty) <- normaliseType env role ty'
+  = (first_co `mkTransCo` rest_co, nty)
 
   | otherwise   -- No unique matching family instance exists;
                 -- we do not do anything
@@ -959,9 +966,8 @@ normaliseType :: FamInstEnvs            -- environment with family instances
                                         -- co :: old-type ~ new_type
 -- Normalise the input type, by eliminating *all* type-function redexes
 -- Returns with Refl if nothing happens
+-- Try to not to disturb type syonyms if possible
 
-normaliseType env role ty
-  | Just ty' <- coreView ty = normaliseType env role ty'
 normaliseType env role (TyConApp tc tys)
   = normaliseTcApp env role tc tys
 normaliseType _env role ty@(LitTy {}) = (Refl role ty, ty)

@@ -4,7 +4,6 @@
            , UnboxedTuples
            , ScopedTypeVariables
   #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-deprecations #-}
 -- kludge for the Control.Concurrent.QSem, Control.Concurrent.QSemN
 -- and Control.Concurrent.SampleVar imports.
@@ -104,15 +103,11 @@ module Control.Concurrent (
 
     ) where
 
-import Prelude
-
 import Control.Exception.Base as Exception
 
-import GHC.Exception
 import GHC.Conc hiding (threadWaitRead, threadWaitWrite,
                         threadWaitReadSTM, threadWaitWriteSTM)
-import qualified GHC.Conc
-import GHC.IO           ( IO(..), unsafeInterleaveIO, unsafeUnmask )
+import GHC.IO           ( unsafeUnmask )
 import GHC.IORef        ( newIORef, readIORef, writeIORef )
 import GHC.Base
 
@@ -124,6 +119,8 @@ import Foreign.C.Types
 import Foreign.C
 import System.IO
 import Data.Functor ( void )
+#else
+import qualified GHC.Conc
 #endif
 
 import Control.Concurrent.MVar

@@ -39,7 +39,7 @@ module TcType (
   isFlexi, isIndirect, isRuntimeUnkSkol,
   isTypeVar, isKindVar,
   metaTyVarUntouchables, setMetaTyVarUntouchables, metaTyVarUntouchables_maybe,
-  isTouchableMetaTyVar, isTouchableOrUfsk,
+  isTouchableMetaTyVar, isTouchableOrFmv,
   isFloatedTouchableMetaTyVar,
 
   --------------------------------
@@ -420,7 +420,7 @@ The same idea of only unifying touchables solves another problem.
 Suppose we had
    (F Int ~ uf[0])  /\  [1](forall a. C a => F Int ~ beta[1])
 In this example, beta is touchable inside the implication. The
-first solveInteract step leaves 'uf' un-unified. Then we move inside
+first solveFlatWanteds step leaves 'uf' un-unified. Then we move inside
 the implication where a new constraint
        uf  ~  beta
 emerges. If we (wrongly) spontaneously solved it to get uf := beta,
@@ -588,8 +588,8 @@ exactTyVarsOfTypes = mapUnionVarSet exactTyVarsOfType
 %************************************************************************
 
 \begin{code}
-isTouchableOrUfsk :: Untouchables -> TcTyVar -> Bool
-isTouchableOrUfsk ctxt_untch tv
+isTouchableOrFmv :: Untouchables -> TcTyVar -> Bool
+isTouchableOrFmv ctxt_untch tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
       MetaTv { mtv_untch = tv_untch, mtv_info = info }

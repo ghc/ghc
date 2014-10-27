@@ -4,9 +4,9 @@
 test('T4255', unless(compiler_profiled(), skip), compile_fail, ['-v0'])
 
 def f(name, opts):
-  opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
-  if (ghc_with_interpreter == 0):
-	opts.skip = 1
+    opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
+    if (ghc_with_interpreter == 0):
+        opts.skip = 1
 
 setTestOpts(f)
 setTestOpts(only_compiler_types(['ghc']))
@@ -330,4 +330,4 @@ test('T8932', normal, compile_fail, ['-v0'])
 test('T8987', normal, compile_fail, ['-v0'])
 test('T7241', normal, compile_fail, ['-v0'])
 test('T9199', normal, compile, ['-v0'])
-
+test('T9692', normal, compile, ['-v0'])

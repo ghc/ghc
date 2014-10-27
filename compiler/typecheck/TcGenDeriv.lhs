@@ -102,9 +102,6 @@ data DerivStuff     -- Please add this auxiliary stuff
 genDerivedBinds :: DynFlags -> FixityEnv -> Class -> SrcSpan -> TyCon
                 -> (LHsBinds RdrName, BagDerivStuff)
 genDerivedBinds dflags fix_env clas loc tycon
-  | className clas `elem` oldTypeableClassNames
-  = gen_old_Typeable_binds dflags loc tycon
-
   | Just gen_fn <- assocMaybe gen_list (getUnique clas)
   = gen_fn loc tycon
 
@@ -1212,68 +1209,6 @@ getPrecedence get_fixity nm
           -- NB: the Report says that associativity is not taken
           --     into account for either Read or Show; hence we
           --     ignore associativity here
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
-\subsection{Typeable (old)}
-%*                                                                      *
-%************************************************************************
-
-From the data type
-
-        data T a b = ....
-
-we generate
-
-        instance Typeable2 T where
-                typeOf2 _ = mkTyConApp (mkTyCon <hash-high> <hash-low>
-                                                <pkg> <module> "T") []
-
-We are passed the Typeable2 class as well as T
-
-\begin{code}
-gen_old_Typeable_binds :: DynFlags -> SrcSpan -> TyCon 
-                       -> (LHsBinds RdrName, BagDerivStuff)
-gen_old_Typeable_binds dflags loc tycon
-  = ( unitBag $
-        mk_easy_FunBind loc
-                (old_mk_typeOf_RDR tycon)   -- Name of appropriate type0f function
-                [nlWildPat]
-                (nlHsApps oldMkTyConApp_RDR [tycon_rep, nlList []])
-    , emptyBag )
-  where
-    tycon_name = tyConName tycon
-    modl       = nameModule tycon_name
-    pkg        = modulePackageKey modl
-
-    modl_fs    = moduleNameFS (moduleName modl)
-    pkg_fs     = packageKeyFS pkg
-    name_fs    = occNameFS (nameOccName tycon_name)
-
-    tycon_rep = nlHsApps oldMkTyCon_RDR
-                    (map nlHsLit [int64 high,
-                                  int64 low,
-                                  HsString pkg_fs,
-                                  HsString modl_fs,
-                                  HsString name_fs])
-
-    hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, name_fs]
-    Fingerprint high low = fingerprintString hashThis
-
-    int64
-      | wORD_SIZE dflags == 4 = HsWord64Prim . fromIntegral
-      | otherwise             = HsWordPrim . fromIntegral
-
-
-old_mk_typeOf_RDR :: TyCon -> RdrName
--- Use the arity of the TyCon to make the right typeOfn function
-old_mk_typeOf_RDR tycon = varQual_RDR oLDTYPEABLE_INTERNAL (mkFastString ("typeOf" ++ suffix))
-                where
-                  arity = tyConArity tycon
-                  suffix | arity == 0 = ""
-                         | otherwise  = show arity
 \end{code}
 
 
