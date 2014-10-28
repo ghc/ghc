@@ -22,25 +22,21 @@ module GHC.List (
 
    map, (++), filter, concat,
    head, last, tail, init, uncons, null, length, (!!),
-   foldl, scanl, scanl1, scanl', foldr, foldr1, scanr, scanr1,
-   iterate, repeat, replicate, cycle,
-   take, drop, splitAt, takeWhile, dropWhile, span, break,
-   reverse, and, or,
+   foldl, foldl', foldl1, foldl1', scanl, scanl1, scanl', foldr, foldr1,
+   scanr, scanr1, iterate, repeat, replicate, cycle,
+   take, drop, sum, product, maximum, minimum, splitAt, takeWhile, dropWhile,
+   span, break, reverse, and, or,
    any, all, elem, notElem, lookup,
    concatMap,
    zip, zip3, zipWith, zipWith3, unzip, unzip3,
    errorEmptyList,
 
-#ifndef USE_REPORT_PRELUDE
-   -- non-standard, but hidden when creating the Prelude
-   -- export list.
-   takeUInt_append
-#endif
-
  ) where
 
 import Data.Maybe
 import GHC.Base
+import GHC.Num (Num(..))
+import GHC.Integer (Integer)
 
 infixl 9  !!
 infix  4 `elem`, `notElem`
@@ -121,23 +117,26 @@ null (_:_)              =  False
 -- the result type of which may be any kind of number.
 {-# NOINLINE [1] length #-}
 length                  :: [a] -> Int
-length l                =  lenAcc l 0#
+length xs               = lenAcc xs 0
 
-lenAcc :: [a] -> Int# -> Int
-lenAcc []     a# = I# a#
-lenAcc (_:xs) a# = lenAcc xs (a# +# 1#)
+lenAcc          :: [a] -> Int -> Int
+lenAcc []     n = n
+lenAcc (_:ys) n = lenAcc ys (n+1)
 
-incLen :: a -> (Int# -> Int) -> Int# -> Int
-incLen _ g x = g (x +# 1#)
-
--- These rules make length into a good consumer
--- Note that we use a higher-order-style use of foldr, so that
--- the accumulating parameter can be evaluated strictly
--- See Trac #876 for what goes wrong otherwise
 {-# RULES
-"length"     [~1] forall xs. length xs = foldr incLen I# xs 0#
-"lengthList" [1]  foldr incLen I# = lenAcc
+"length" [~1] forall xs . length xs = foldr lengthFB idLength xs 0
+"lengthList" [1] foldr lengthFB idLength = lenAcc
  #-}
+
+-- The lambda form turns out to be necessary to make this inline
+-- when we need it to and give good performance.
+{-# INLINE [0] lengthFB #-}
+lengthFB :: x -> (Int -> Int) -> Int -> Int
+lengthFB _ r = \ a -> a `seq` r (a + 1)
+
+{-# INLINE [0] idLength #-}
+idLength :: Int -> Int
+idLength = id
 
 -- | 'filter', applied to a predicate and a list, returns the list of
 -- those elements that satisfy the predicate; i.e.,
@@ -186,10 +185,47 @@ filterFB c p x r | p x       = x `c` r
 
 foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl #-}
-foldl k z0 xs = foldr (\(v::a) (fn::b->b) (z::b) -> fn (k z v)) (id :: b -> b) xs z0
+foldl k z0 xs =
+  foldr (\(v::a) (fn::b->b) (z::b) -> fn (k z v)) (id :: b -> b) xs z0
 -- Implementing foldl via foldr is only a good idea if the compiler can optimize
--- the resulting code (eta-expand the recursive "go"), so this needs -fcall-arity!
--- Also see #7994
+-- the resulting code (eta-expand the recursive "go"), so this needs
+-- -fcall-arity! Also see #7994.
+
+-- ----------------------------------------------------------------------------
+
+-- | A strict version of 'foldl'.
+foldl'           :: forall a b . (b -> a -> b) -> b -> [a] -> b
+{-# INLINE foldl' #-}
+foldl' k z0 xs =
+  foldr (\(v::a) (fn::b->b) (z::b) -> z `seq` fn (k z v)) (id :: b -> b) xs z0
+
+-- Implementing foldl' via foldr is only a good idea if the compiler can
+-- optimize the resulting code (eta-expand the recursive "go"), so this needs
+-- -fcall-arity!  Also see #7994
+
+-- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
+-- and thus must be applied to non-empty lists.
+foldl1                  :: (a -> a -> a) -> [a] -> a
+foldl1 f (x:xs)         =  foldl f x xs
+foldl1 _ []             =  errorEmptyList "foldl1"
+
+-- | A strict version of 'foldl1'
+foldl1'                  :: (a -> a -> a) -> [a] -> a
+foldl1' f (x:xs)         =  foldl' f x xs
+foldl1' _ []             =  errorEmptyList "foldl1'"
+
+-- -----------------------------------------------------------------------------
+-- List sum and product
+
+-- | The 'sum' function computes the sum of a finite list of numbers.
+sum                     :: (Num a) => [a] -> a
+{-# INLINE sum #-}
+sum                     =  foldl (+) 0
+
+-- | The 'product' function computes the product of a finite list of numbers.
+product                 :: (Num a) => [a] -> a
+{-# INLINE product #-}
+product                 =  foldl (*) 1
 
 -- | 'scanl' is similar to 'foldl', but returns a list of successive
 -- reduced values from the left:
@@ -309,7 +345,6 @@ foldr1 _ []             =  errorEmptyList "foldr1"
 -- Note that
 --
 -- > head (scanr f z xs) == foldr f z xs.
-
 {-# NOINLINE [1] scanr #-}
 scanr                   :: (a -> b -> b) -> b -> [a] -> [b]
 scanr _ q0 []           =  [q0]
@@ -334,12 +369,51 @@ scanrFB f c = \x (r, est) -> (f x r, r `c` est)
  #-}
 
 -- | 'scanr1' is a variant of 'scanr' that has no starting value argument.
-
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
 scanr1 _ []             =  []
 scanr1 _ [x]            =  [x]
 scanr1 f (x:xs)         =  f x q : qs
                            where qs@(q:_) = scanr1 f xs
+
+-- | 'maximum' returns the maximum value from a list,
+-- which must be non-empty, finite, and of an ordered type.
+-- It is a special case of 'Data.List.maximumBy', which allows the
+-- programmer to supply their own comparison function.
+maximum                 :: (Ord a) => [a] -> a
+{-# INLINE [1] maximum #-}
+maximum []              =  errorEmptyList "maximum"
+maximum xs              =  foldl1 max xs
+
+{-# RULES
+  "maximumInt"     maximum = (strictMaximum :: [Int]     -> Int);
+  "maximumInteger" maximum = (strictMaximum :: [Integer] -> Integer)
+ #-}
+
+-- We can't make the overloaded version of maximum strict without
+-- changing its semantics (max might not be strict), but we can for
+-- the version specialised to 'Int'.
+strictMaximum           :: (Ord a) => [a] -> a
+strictMaximum []        =  errorEmptyList "maximum"
+strictMaximum xs        =  foldl1' max xs
+
+-- | 'minimum' returns the minimum value from a list,
+-- which must be non-empty, finite, and of an ordered type.
+-- It is a special case of 'Data.List.minimumBy', which allows the
+-- programmer to supply their own comparison function.
+minimum                 :: (Ord a) => [a] -> a
+{-# INLINE [1] minimum #-}
+minimum []              =  errorEmptyList "minimum"
+minimum xs              =  foldl1 min xs
+
+{-# RULES
+  "minimumInt"     minimum = (strictMinimum :: [Int]     -> Int);
+  "minimumInteger" minimum = (strictMinimum :: [Integer] -> Integer)
+ #-}
+
+strictMinimum           :: (Ord a) => [a] -> a
+strictMinimum []        =  errorEmptyList "minimum"
+strictMinimum xs        =  foldl1' min xs
+
 
 -- | 'iterate' @f x@ returns an infinite list of repeated applications
 -- of @f@ to @x@:
@@ -390,7 +464,7 @@ replicate n x           =  take n (repeat x)
 -- on infinite lists.
 
 cycle                   :: [a] -> [a]
-cycle []                = error "Prelude.cycle: empty list"
+cycle []                = errorEmptyList "cycle"
 cycle xs                = xs' where xs' = xs ++ xs'
 
 -- | 'takeWhile', applied to a predicate @p@ and a list @xs@, returns the
@@ -489,7 +563,48 @@ splitAt                :: Int -> [a] -> ([a],[a])
 take n _      | n <= 0 =  []
 take _ []              =  []
 take n (x:xs)          =  x : take (n-1) xs
+#else
+-- We always want to inline this to take advantage of a known
+-- length argument sign.
+{-# INLINE take #-}
+take n xs | 0 < n     = unsafeTake n xs
+          | otherwise = []
 
+-- A version of take that takes the whole list if it's given an argument less
+-- than 1. This does the same thing as the fold version.
+{-# NOINLINE [1] unsafeTake #-}
+unsafeTake :: Int -> [a] -> [a]
+unsafeTake _  []     = []
+unsafeTake 1  (x: _) = [x]
+unsafeTake m  (x:xs) = x : unsafeTake (m - 1) xs
+
+{-# RULES
+"unsafeTake"     [~1] forall n xs . unsafeTake n xs =
+  build (\c nil -> foldr (takeFB c nil) (takeConst nil) xs n)
+"unsafeTakeList"  [1] forall n xs . foldr (takeFB (:) []) (takeConst []) xs n =
+  unsafeTake n xs
+ #-}
+
+{-# NOINLINE [0] takeConst #-}
+-- just a version of const that doesn't get inlined too early, so we
+-- can spot it in rules.
+takeConst :: a -> Int -> a
+takeConst x _ = x
+
+{-# INLINE [0] takeFB #-}
+takeFB :: (a -> b -> b) -> b -> a -> (Int -> b) -> Int -> b
+-- The \m accounts for the fact that takeFB is used in a higher-order
+-- way by takeFoldr, so it's better to inline.  A good example is
+--     take n (repeat x)
+-- for which we get excellent code... but only if we inline takeFB
+-- when given four arguments
+takeFB c n x xs
+  = \ m -> case m of
+            1 -> x `c` n
+            _ -> x `c` xs (m - 1)
+
+#endif
+#ifdef USE_REPORT_PRELUDE
 drop n xs     | n <= 0 =  xs
 drop _ []              =  []
 drop n (_:xs)          =  drop (n-1) xs
@@ -497,85 +612,28 @@ drop n (_:xs)          =  drop (n-1) xs
 splitAt n xs           =  (take n xs, drop n xs)
 
 #else /* hack away */
-{-# RULES
-"take"     [~1] forall n xs . take n xs = takeFoldr n xs
-"takeList"  [1] forall n xs . foldr (takeFB (:) []) (takeConst []) xs n = takeUInt n xs
- #-}
+{-# INLINE drop #-}
+drop n ls
+  | n <= 0     = ls
+  | otherwise  = unsafeDrop n ls
+  where
+    -- A version of drop that drops the whole list if given an argument
+    -- less than 1
+    unsafeDrop :: Int -> [a] -> [a]
+    unsafeDrop _ []     = []
+    unsafeDrop 1 (_:xs) = xs
+    unsafeDrop m (_:xs) = unsafeDrop (m - 1) xs
 
-{-# INLINE takeFoldr #-}
-takeFoldr :: Int -> [a] -> [a]
-takeFoldr (I# n#) xs
-  = build (\c nil -> if isTrue# (n# <=# 0#) then nil else
-                     foldr (takeFB c nil) (takeConst nil) xs n#)
-
-{-# NOINLINE [0] takeConst #-}
--- just a version of const that doesn't get inlined too early, so we
--- can spot it in rules.  Also we need a type sig due to the unboxed Int#.
-takeConst :: a -> Int# -> a
-takeConst x _ = x
-
-{-# INLINE [0] takeFB #-}
-takeFB :: (a -> b -> b) -> b -> a -> (Int# -> b) -> Int# -> b
--- The \m accounts for the fact that takeFB is used in a higher-order
--- way by takeFoldr, so it's better to inline.  A good example is
---     take n (repeat x)
--- for which we get excellent code... but only if we inline takeFB
--- when given four arguments
-takeFB c n x xs
-  = \ m -> if isTrue# (m <=# 1#)
-           then x `c` n
-           else x `c` xs (m -# 1#)
-
-{-# INLINE [0] take #-}
-take (I# n#) xs = takeUInt n# xs
-
--- The general code for take, below, checks n <= maxInt
--- No need to check for maxInt overflow when specialised
--- at type Int or Int# since the Int must be <= maxInt
-
-takeUInt :: Int# -> [b] -> [b]
-takeUInt n xs
-  | isTrue# (n >=# 0#) = take_unsafe_UInt n xs
-  | otherwise          = []
-
-take_unsafe_UInt :: Int# -> [b] -> [b]
-take_unsafe_UInt 0#  _  = []
-take_unsafe_UInt m   ls =
-  case ls of
-    []     -> []
-    (x:xs) -> x : take_unsafe_UInt (m -# 1#) xs
-
-takeUInt_append :: Int# -> [b] -> [b] -> [b]
-takeUInt_append n xs rs
-  | isTrue# (n >=# 0#) = take_unsafe_UInt_append n xs rs
-  | otherwise          = []
-
-take_unsafe_UInt_append :: Int# -> [b] -> [b] -> [b]
-take_unsafe_UInt_append 0#  _ rs  = rs
-take_unsafe_UInt_append m  ls rs  =
-  case ls of
-    []     -> rs
-    (x:xs) -> x : take_unsafe_UInt_append (m -# 1#) xs rs
-
-drop (I# n#) ls
-  | isTrue# (n# <# 0#) = ls
-  | otherwise          = drop# n# ls
+splitAt n ls
+  | n <= 0 = ([], ls)
+  | otherwise          = splitAt' n ls
     where
-        drop# :: Int# -> [a] -> [a]
-        drop# 0# xs      = xs
-        drop# _  xs@[]   = xs
-        drop# m# (_:xs)  = drop# (m# -# 1#) xs
-
-splitAt (I# n#) ls
-  | isTrue# (n# <# 0#) = ([], ls)
-  | otherwise          = splitAt# n# ls
-    where
-        splitAt# :: Int# -> [a] -> ([a], [a])
-        splitAt# 0# xs     = ([], xs)
-        splitAt# _  xs@[]  = (xs, xs)
-        splitAt# m# (x:xs) = (x:xs', xs'')
+        splitAt' :: Int -> [a] -> ([a], [a])
+        splitAt' _  []     = ([], [])
+        splitAt' 1  (x:xs) = ([x], xs)
+        splitAt' m  (x:xs) = (x:xs', xs'')
           where
-            (xs', xs'') = splitAt# (m# -# 1#) xs
+            (xs', xs'') = splitAt' (m - 1) xs
 
 #endif /* USE_REPORT_PRELUDE */
 
@@ -632,26 +690,31 @@ reverse l =  rev l []
 -- 'True', the list must be finite; 'False', however, results from a 'False'
 -- value at a finite index of a finite or infinite list.
 and                     :: [Bool] -> Bool
+#ifdef USE_REPORT_PRELUDE
+and                     =  foldr (&&) True
+#else
+and []          =  True
+and (x:xs)      =  x && and xs
+{-# NOINLINE [1] and #-}
+
+{-# RULES
+"and/build"     forall (g::forall b.(Bool->b->b)->b->b) .
+                and (build g) = g (&&) True
+ #-}
+#endif
 
 -- | 'or' returns the disjunction of a Boolean list.  For the result to be
 -- 'False', the list must be finite; 'True', however, results from a 'True'
 -- value at a finite index of a finite or infinite list.
 or                      :: [Bool] -> Bool
 #ifdef USE_REPORT_PRELUDE
-and                     =  foldr (&&) True
 or                      =  foldr (||) False
 #else
-and []          =  True
-and (x:xs)      =  x && and xs
 or []           =  False
 or (x:xs)       =  x || or xs
-
-{-# NOINLINE [1] and #-}
 {-# NOINLINE [1] or #-}
 
 {-# RULES
-"and/build"     forall (g::forall b.(Bool->b->b)->b->b) .
-                and (build g) = g (&&) True
 "or/build"      forall (g::forall b.(Bool->b->b)->b->b) .
                 or (build g) = g (||) False
  #-}
@@ -663,27 +726,34 @@ or (x:xs)       =  x || or xs
 -- value for the predicate applied to an element at a finite index of a finite or infinite list.
 any                     :: (a -> Bool) -> [a] -> Bool
 
+#ifdef USE_REPORT_PRELUDE
+any p                   =  or . map p
+#else
+any _ []        = False
+any p (x:xs)    = p x || any p xs
+
+{-# NOINLINE [1] any #-}
+
+{-# RULES
+"any/build"     forall p (g::forall b.(a->b->b)->b->b) .
+                any p (build g) = g ((||) . p) False
+ #-}
+#endif
+
 -- | Applied to a predicate and a list, 'all' determines if all elements
 -- of the list satisfy the predicate. For the result to be
 -- 'True', the list must be finite; 'False', however, results from a 'False'
 -- value for the predicate applied to an element at a finite index of a finite or infinite list.
 all                     :: (a -> Bool) -> [a] -> Bool
 #ifdef USE_REPORT_PRELUDE
-any p                   =  or . map p
 all p                   =  and . map p
 #else
-any _ []        = False
-any p (x:xs)    = p x || any p xs
-
 all _ []        =  True
 all p (x:xs)    =  p x && all p xs
 
-{-# NOINLINE [1] any #-}
 {-# NOINLINE [1] all #-}
 
 {-# RULES
-"any/build"     forall p (g::forall b.(a->b->b)->b->b) .
-                any p (build g) = g ((||) . p) False
 "all/build"     forall p (g::forall b.(a->b->b)->b->b) .
                 all p (build g) = g ((&&) . p) True
  #-}
@@ -691,20 +761,33 @@ all p (x:xs)    =  p x && all p xs
 
 -- | 'elem' is the list membership predicate, usually written in infix form,
 -- e.g., @x \`elem\` xs@.  For the result to be
--- 'False', the list must be finite; 'True', however, results from an element equal to @x@ found at a finite index of a finite or infinite list.
+-- 'False', the list must be finite; 'True', however, results from an element
+-- equal to @x@ found at a finite index of a finite or infinite list.
 elem                    :: (Eq a) => a -> [a] -> Bool
+#ifdef USE_REPORT_PRELUDE
+elem x                  =  any (== x)
+#else
+elem _ []       = False
+elem x (y:ys)   = x==y || elem x ys
+{-# NOINLINE [1] elem #-}
+{-# RULES
+"elem/build"    forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+   . elem x (build g) = g (\ y r -> (x == y) || r) False
+ #-}
+#endif
 
 -- | 'notElem' is the negation of 'elem'.
 notElem                 :: (Eq a) => a -> [a] -> Bool
 #ifdef USE_REPORT_PRELUDE
-elem x                  =  any (== x)
 notElem x               =  all (/= x)
 #else
-elem _ []       = False
-elem x (y:ys)   = x==y || elem x ys
-
 notElem _ []    =  True
 notElem x (y:ys)=  x /= y && notElem x ys
+{-# NOINLINE [1] notElem #-}
+{-# RULES
+"notElem/build" forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+   . notElem x (build g) = g (\ y r -> (x /= y) && r) True
+ #-}
 #endif
 
 -- | 'lookup' @key assocs@ looks up a key in an association list.
@@ -733,7 +816,8 @@ concat = foldr (++) []
 {-# NOINLINE [1] concat #-}
 
 {-# RULES
-  "concat" forall xs. concat xs = build (\c n -> foldr (\x y -> foldr c y x) n xs)
+  "concat" forall xs. concat xs =
+     build (\c n -> foldr (\x y -> foldr c y x) n xs)
 -- We don't bother to turn non-fusible applications of concat back into concat
  #-}
 
@@ -751,15 +835,23 @@ xs     !! n | n < 0 =  error "Prelude.!!: negative index"
 (x:_)  !! 0         =  x
 (_:xs) !! n         =  xs !! (n-1)
 #else
--- HBC version (stolen), then unboxified
-xs !! (I# n0) | isTrue# (n0 <# 0#) =  error "Prelude.(!!): negative index\n"
-              | otherwise          =  sub xs n0
-                         where
-                            sub :: [a] -> Int# -> a
-                            sub []     _ = error "Prelude.(!!): index too large\n"
-                            sub (y:ys) n = if isTrue# (n ==# 0#)
-                                           then y
-                                           else sub ys (n -# 1#)
+
+-- We don't really want the errors to inline with (!!).
+-- We may want to fuss around a bit with NOINLINE, and
+-- if so we should be careful not to trip up known-bottom
+-- optimizations.
+tooLarge :: Int -> a
+tooLarge _ = error (prel_list_str ++ "!!: index too large")
+
+negIndex :: a
+negIndex = error $ prel_list_str ++ "!!: negative index"
+
+{-# INLINABLE (!!) #-}
+xs !! n
+  | n < 0     = negIndex
+  | otherwise = foldr (\x r k -> case k of
+                                   0 -> x
+                                   _ -> r (k-1)) tooLarge xs n
 #endif
 \end{code}
 
