@@ -1093,9 +1093,12 @@ tcIfaceExpr (IfaceTuple boxity args)  = do
     con_id = dataConWorkId (tupleCon boxity arity)
 
 
-tcIfaceExpr (IfaceLam bndr body)
+tcIfaceExpr (IfaceLam (bndr, os) body)
   = bindIfaceBndr bndr $ \bndr' ->
-    Lam bndr' <$> tcIfaceExpr body
+    Lam (tcIfaceOneShot os bndr') <$> tcIfaceExpr body
+  where
+    tcIfaceOneShot IfaceOneShot b = setOneShotLambda b
+    tcIfaceOneShot _            b = b
 
 tcIfaceExpr (IfaceApp fun arg)
   = tcIfaceApps fun arg

@@ -482,7 +482,7 @@ data IfaceExpr
   | IfaceType   IfaceType
   | IfaceCo     IfaceCoercion
   | IfaceTuple  TupleSort [IfaceExpr]   -- Saturated; type arguments omitted
-  | IfaceLam    IfaceBndr IfaceExpr
+  | IfaceLam    IfaceLamBndr IfaceExpr
   | IfaceApp    IfaceExpr IfaceExpr
   | IfaceCase   IfaceExpr IfLclName [IfaceAlt]
   | IfaceECase  IfaceExpr IfaceType     -- See Note [Empty case alternatives]
@@ -981,7 +981,7 @@ pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
 pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (interpp'SP as)
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
-  = add_par (sep [char '\\' <+> sep (map ppr bndrs) <+> arrow,
+  = add_par (sep [char '\\' <+> sep (map pprIfaceLamBndr bndrs) <+> arrow,
                   pprIfaceExpr noParens body])
   where
     (bndrs,body) = collect [] i
@@ -1273,16 +1273,16 @@ freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
 freeNamesIfUnfold (IfDFunUnfold bs es)   = fnList freeNamesIfBndr bs &&& fnList freeNamesIfExpr es
 
 freeNamesIfExpr :: IfaceExpr -> NameSet
-freeNamesIfExpr (IfaceExt v)      = unitNameSet v
-freeNamesIfExpr (IfaceFCall _ ty) = freeNamesIfType ty
-freeNamesIfExpr (IfaceType ty)    = freeNamesIfType ty
-freeNamesIfExpr (IfaceCo co)      = freeNamesIfCoercion co
-freeNamesIfExpr (IfaceTuple _ as) = fnList freeNamesIfExpr as
-freeNamesIfExpr (IfaceLam b body) = freeNamesIfBndr b &&& freeNamesIfExpr body
-freeNamesIfExpr (IfaceApp f a)    = freeNamesIfExpr f &&& freeNamesIfExpr a
-freeNamesIfExpr (IfaceCast e co)  = freeNamesIfExpr e &&& freeNamesIfCoercion co
-freeNamesIfExpr (IfaceTick _ e)   = freeNamesIfExpr e
-freeNamesIfExpr (IfaceECase e ty) = freeNamesIfExpr e &&& freeNamesIfType ty
+freeNamesIfExpr (IfaceExt v)          = unitNameSet v
+freeNamesIfExpr (IfaceFCall _ ty)     = freeNamesIfType ty
+freeNamesIfExpr (IfaceType ty)        = freeNamesIfType ty
+freeNamesIfExpr (IfaceCo co)          = freeNamesIfCoercion co
+freeNamesIfExpr (IfaceTuple _ as)     = fnList freeNamesIfExpr as
+freeNamesIfExpr (IfaceLam (b,_) body) = freeNamesIfBndr b &&& freeNamesIfExpr body
+freeNamesIfExpr (IfaceApp f a)        = freeNamesIfExpr f &&& freeNamesIfExpr a
+freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCoercion co
+freeNamesIfExpr (IfaceTick _ e)       = freeNamesIfExpr e
+freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
 freeNamesIfExpr (IfaceCase s _ alts)
   = freeNamesIfExpr s &&& fnList fn_alt alts &&& fn_cons alts
   where
@@ -1741,9 +1741,10 @@ instance Binary IfaceExpr where
         putByte bh 3
         put_ bh ac
         put_ bh ad
-    put_ bh (IfaceLam ae af) = do
+    put_ bh (IfaceLam (ae, os) af) = do
         putByte bh 4
         put_ bh ae
+        put_ bh os
         put_ bh af
     put_ bh (IfaceApp ag ah) = do
         putByte bh 5
@@ -1793,8 +1794,9 @@ instance Binary IfaceExpr where
                     ad <- get bh
                     return (IfaceTuple ac ad)
             4 -> do ae <- get bh
+                    os <- get bh
                     af <- get bh
-                    return (IfaceLam ae af)
+                    return (IfaceLam (ae, os) af)
             5 -> do ag <- get bh
                     ah <- get bh
                     return (IfaceApp ag ah)
