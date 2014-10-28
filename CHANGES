@@ -1,3 +1,7 @@
+Changes in version 2.15.1
+
+ * Experimental collapsible header support (#335)
+
 Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)

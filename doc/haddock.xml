@@ -29,7 +29,7 @@
       <holder>Simon Marlow, David Waern</holder>
     </copyright>
     <abstract>
-      <para>This document describes Haddock version 2.15.0, a Haskell
+      <para>This document describes Haddock version 2.15.1, a Haskell
       documentation tool.</para>
     </abstract>
   </bookinfo>
@@ -2143,7 +2143,7 @@ This belongs to the list above!
 
 <programlisting>
 -- |
--- = Heading level 1 with some __bold__
+-- = Heading level 1 with some /emphasis/
 -- Something underneath the heading.
 --
 -- == /Subheading/
@@ -2167,6 +2167,25 @@ This belongs to the list above!
 --
 -- === Subsubheading
 -- >>> examples are only allowed at the start of paragraphs
+</programlisting>
+
+        <para>As of 2.15.1, there's experimental (read: subject to
+        change or get removed) support for collapsible headers: simply
+        wrap your existing header title in underscores, as per bold
+        syntax. The collapsible section will stretch until the end of
+        the comment or until a header of equal or smaller number of
+        <literal>=</literal>s.</para>
+
+<programlisting>
+-- |
+-- === __Examples:__
+-- >>> Some very long list of examples
+--
+-- ==== This still falls under the collapse
+-- Some specialised examples
+--
+-- === This is does not go into the collapsable section.
+-- More content.
 </programlisting>
 
       </section>
