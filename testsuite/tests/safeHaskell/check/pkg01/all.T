@@ -8,6 +8,9 @@ def normaliseArrayPackage(str):
 def normaliseBytestringPackage(str):
     return re.sub('bytestring-[0-9]+(\.[0-9]+)*', 'bytestring-<VERSION>', str)
 
+def normaliseArrayPackageKey(str):
+    return re.sub('array_[A-Za-z0-9]+', 'array_<HASH>', str)
+
 def ignoreLdOutput(str):
     return re.sub('Creating library file: pdb.safePkg01/dist.build.libHSsafePkg01-1.0-ghc[0-9.]*.dll.a\n', '', str)
 
@@ -35,7 +38,8 @@ make_args = 'VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn
 test('safePkg01',
      [clean_cmd('$MAKE -s --no-print-directory cleanPackageDatabase.safePkg01'),
       normalise_errmsg_fun(ignoreLdOutput),
-      normalise_fun(two_normalisers(normaliseArrayPackage,
+      normalise_fun(two_normalisers(two_normalisers(normaliseArrayPackage,
+                                                    normaliseArrayPackageKey),
                                     normaliseBytestringPackage))],
      run_command, 
      ['$MAKE -s --no-print-directory safePkg01 ' + make_args])

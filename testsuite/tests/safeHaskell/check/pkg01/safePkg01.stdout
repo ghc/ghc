@@ -29,17 +29,17 @@ trusted: safe
 require own pkg trusted: True
 
 M_SafePkg6
-package dependencies: array-0.5.0.1@array_GX4NwjS8xZkC2ZPtjgwhnz
+package dependencies: array-0.5.0.1@array_<HASH>
 trusted: trustworthy
 require own pkg trusted: False
 
 M_SafePkg7
-package dependencies: array-0.5.0.1@array_GX4NwjS8xZkC2ZPtjgwhnz
+package dependencies: array-0.5.0.1@array_<HASH>
 trusted: safe
 require own pkg trusted: False
 
 M_SafePkg8
-package dependencies: array-0.5.0.1@array_GX4NwjS8xZkC2ZPtjgwhnz
+package dependencies: array-0.5.0.1@array_<HASH>
 trusted: trustworthy
 require own pkg trusted: False
 
