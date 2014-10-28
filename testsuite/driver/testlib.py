@@ -506,7 +506,28 @@ def _normalise_errmsg_fun( name, opts, f ):
     opts.extra_errmsg_normaliser = f
 
 def two_normalisers(f, g):
+    """
+    See also `join_normalisers` for a n-ary version of `two_normalisers`
+    """
     return lambda x, f=f, g=g: f(g(x))
+
+def join_normalisers(*a):
+    """
+    Compose functions, e.g.
+
+       join_normalisers(f1,f2,f3)
+
+    is the same as
+
+       lambda x: f1(f2(f3(x)))
+    """
+
+    assert all(callable(f) for f in a)
+
+    fn = lambda x:x # identity function
+    for f in a:
+        fn = lambda x,f=f,fn=fn: fn(f(x))
+    return fn
 
 # ----
 # Function for composing two opt-fns together
@@ -1004,8 +1025,10 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
     (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
 
-    if not compare_outputs('stderr', \
-                           two_normalisers(two_normalisers(getTestOpts().extra_errmsg_normaliser, normalise_errmsg), normalise_whitespace), \
+    if not compare_outputs('stderr',
+                           join_normalisers(getTestOpts().extra_errmsg_normaliser,
+                                            normalise_errmsg,
+                                            normalise_whitespace),
                            expected_stderr_file, actual_stderr_file):
         return failBecause('stderr mismatch')
 
