@@ -352,7 +352,8 @@ iterate f x =  x : iterate f (f x)
 
 {-# NOINLINE [0] iterateFB #-}
 iterateFB :: (a -> b -> b) -> (a -> a) -> a -> b
-iterateFB c f x = x `c` iterateFB c f (f x)
+iterateFB c f x0 = go x0
+  where go x = x `c` go (f x)
 
 {-# RULES
 "iterate"    [~1] forall f x.   iterate f x = build (\c _n -> iterateFB c f x)
