@@ -658,6 +658,17 @@ ruleVar = return . RuleVar
 typedRuleVar :: Name -> TypeQ -> RuleBndrQ
 typedRuleVar n ty = ty >>= return . TypedRuleVar n
 
+-------------------------------------------------------------------------------
+-- *   AnnTarget
+valueAnnotation :: Name -> AnnTarget
+valueAnnotation = ValueAnnotation
+
+typeAnnotation :: Name -> AnnTarget
+typeAnnotation = TypeAnnotation
+
+moduleAnnotation :: AnnTarget
+moduleAnnotation = ModuleAnnotation
+
 --------------------------------------------------------------
 -- * Useful helper function
 

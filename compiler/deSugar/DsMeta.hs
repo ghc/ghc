@@ -147,7 +147,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                      ; _       <- mapM no_default_decl defds
                      ; for_ds  <- mapM repForD fords
                      ; _       <- mapM no_warn warnds
-                     ; _       <- mapM no_ann annds
+                     ; ann_ds  <- mapM repAnnD annds
                      ; rule_ds <- mapM repRuleD ruleds
                      ; _       <- mapM no_vect vects
                      ; _       <- mapM no_doc docs
@@ -155,7 +155,8 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         -- more needed
                      ;  return (de_loc $ sort_by_loc $
                                 val_ds ++ catMaybes tycl_ds ++ role_ds ++ fix_ds
-                                       ++ inst_ds ++ rule_ds ++ for_ds) }) ;
+                                       ++ inst_ds ++ rule_ds ++ for_ds
+                                       ++ ann_ds) }) ;
 
         decl_ty <- lookupType decQTyConName ;
         let { core_list = coreList' decl_ty decls } ;
@@ -175,8 +176,6 @@ repTopDs group@(HsGroup { hs_valds   = valds
     no_warn (L loc (Warning thing _))
       = notHandledL loc "WARNING and DEPRECATION pragmas" $
                     text "Pragma for declaration of" <+> ppr thing
-    no_ann (L loc decl)
-      = notHandledL loc "ANN pragmas" (ppr decl)
     no_vect (L loc decl)
       = notHandledL loc "Vectorisation pragmas" (ppr decl)
     no_doc (L loc _)
@@ -526,6 +525,23 @@ repRuleBndr (RuleBndrSig n (HsWB { hswb_cts = ty }))
   = do { MkC n'  <- lookupLBinder n
        ; MkC ty' <- repLTy ty
        ; rep2 typedRuleVarName [n', ty'] }
+
+repAnnD :: LAnnDecl Name -> DsM (SrcSpan, Core TH.DecQ)
+repAnnD (L loc (HsAnnotation ann_prov (L _ exp)))
+  = do { target <- repAnnProv ann_prov
+       ; exp'   <- repE exp
+       ; dec    <- repPragAnn target exp'
+       ; return (loc, dec) }
+
+repAnnProv :: AnnProvenance Name -> DsM (Core TH.AnnTarget)
+repAnnProv (ValueAnnProvenance n)
+  = do { MkC n' <- globalVar n  -- ANNs are allowed only at top-level
+       ; rep2 valueAnnotationName [ n' ] }
+repAnnProv (TypeAnnProvenance n)
+  = do { MkC n' <- globalVar n
+       ; rep2 typeAnnotationName [ n' ] }
+repAnnProv ModuleAnnProvenance
+  = rep2 moduleAnnotationName []
 
 ds_msg :: SDoc
 ds_msg = ptext (sLit "Cannot desugar this Template Haskell declaration:")
@@ -1748,6 +1764,9 @@ repPragRule :: Core String -> Core [TH.RuleBndrQ] -> Core TH.ExpQ
 repPragRule (MkC nm) (MkC bndrs) (MkC lhs) (MkC rhs) (MkC phases)
   = rep2 pragRuleDName [nm, bndrs, lhs, rhs, phases]
 
+repPragAnn :: Core TH.AnnTarget -> Core TH.ExpQ -> DsM (Core TH.DecQ)
+repPragAnn (MkC targ) (MkC e) = rep2 pragAnnDName [targ, e]
+
 repFamilyNoKind :: Core TH.FamFlavour -> Core TH.Name -> Core [TH.TyVarBndr]
                 -> DsM (Core TH.DecQ)
 repFamilyNoKind (MkC flav) (MkC nm) (MkC tvs)
@@ -2088,7 +2107,7 @@ templateHaskellNames = [
     funDName, valDName, dataDName, newtypeDName, tySynDName,
     classDName, instanceDName, sigDName, forImpDName,
     pragInlDName, pragSpecDName, pragSpecInlDName, pragSpecInstDName,
-    pragRuleDName,
+    pragRuleDName, pragAnnDName,
     familyNoKindDName, familyKindDName, dataInstDName, newtypeInstDName,
     tySynInstDName, closedTypeFamilyKindDName, closedTypeFamilyNoKindDName,
     infixLDName, infixRDName, infixNDName,
@@ -2138,6 +2157,8 @@ templateHaskellNames = [
     typeFamName, dataFamName,
     -- TySynEqn
     tySynEqnName,
+    -- AnnTarget
+    valueAnnotationName, typeAnnotationName, moduleAnnotationName,
 
     -- And the tycons
     qTyConName, nameTyConName, patTyConName, fieldPatTyConName, matchQTyConName,
@@ -2311,7 +2332,8 @@ parSName    = libFun (fsLit "parS")    parSIdKey
 -- data Dec = ...
 funDName, valDName, dataDName, newtypeDName, tySynDName, classDName,
     instanceDName, sigDName, forImpDName, pragInlDName, pragSpecDName,
-    pragSpecInlDName, pragSpecInstDName, pragRuleDName, familyNoKindDName,
+    pragSpecInlDName, pragSpecInstDName, pragRuleDName, pragAnnDName,
+    familyNoKindDName,
     familyKindDName, dataInstDName, newtypeInstDName, tySynInstDName,
     closedTypeFamilyKindDName, closedTypeFamilyNoKindDName,
     infixLDName, infixRDName, infixNDName, roleAnnotDName :: Name
@@ -2329,6 +2351,7 @@ pragSpecDName     = libFun (fsLit "pragSpecD")     pragSpecDIdKey
 pragSpecInlDName  = libFun (fsLit "pragSpecInlD")  pragSpecInlDIdKey
 pragSpecInstDName = libFun (fsLit "pragSpecInstD") pragSpecInstDIdKey
 pragRuleDName     = libFun (fsLit "pragRuleD")     pragRuleDIdKey
+pragAnnDName      = libFun (fsLit "pragAnnD")      pragAnnDIdKey
 familyNoKindDName = libFun (fsLit "familyNoKindD") familyNoKindDIdKey
 familyKindDName   = libFun (fsLit "familyKindD")   familyKindDIdKey
 dataInstDName     = libFun (fsLit "dataInstD")     dataInstDIdKey
@@ -2467,6 +2490,12 @@ dataFamName = libFun (fsLit "dataFam") dataFamIdKey
 -- data TySynEqn = ...
 tySynEqnName :: Name
 tySynEqnName = libFun (fsLit "tySynEqn") tySynEqnIdKey
+
+-- data AnnTarget = ...
+valueAnnotationName, typeAnnotationName, moduleAnnotationName :: Name
+valueAnnotationName  = libFun (fsLit "valueAnnotation")  valueAnnotationIdKey
+typeAnnotationName   = libFun (fsLit "typeAnnotation")   typeAnnotationIdKey
+moduleAnnotationName = libFun (fsLit "moduleAnnotation") moduleAnnotationIdKey
 
 matchQTyConName, clauseQTyConName, expQTyConName, stmtQTyConName,
     decQTyConName, conQTyConName, strictTypeQTyConName,
@@ -2667,7 +2696,7 @@ parSIdKey        = mkPreludeMiscIdUnique 323
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey,
     classDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey, pragInlDIdKey,
     pragSpecDIdKey, pragSpecInlDIdKey, pragSpecInstDIdKey, pragRuleDIdKey,
-    familyNoKindDIdKey, familyKindDIdKey,
+    pragAnnDIdKey, familyNoKindDIdKey, familyKindDIdKey,
     dataInstDIdKey, newtypeInstDIdKey, tySynInstDIdKey,
     closedTypeFamilyKindDIdKey, closedTypeFamilyNoKindDIdKey,
     infixLDIdKey, infixRDIdKey, infixNDIdKey, roleAnnotDIdKey :: Unique
@@ -2683,19 +2712,20 @@ forImpDIdKey                 = mkPreludeMiscIdUnique 338
 pragInlDIdKey                = mkPreludeMiscIdUnique 339
 pragSpecDIdKey               = mkPreludeMiscIdUnique 340
 pragSpecInlDIdKey            = mkPreludeMiscIdUnique 341
-pragSpecInstDIdKey           = mkPreludeMiscIdUnique 417
-pragRuleDIdKey               = mkPreludeMiscIdUnique 418
-familyNoKindDIdKey           = mkPreludeMiscIdUnique 342
-familyKindDIdKey             = mkPreludeMiscIdUnique 343
-dataInstDIdKey               = mkPreludeMiscIdUnique 344
-newtypeInstDIdKey            = mkPreludeMiscIdUnique 345
-tySynInstDIdKey              = mkPreludeMiscIdUnique 346
-closedTypeFamilyKindDIdKey   = mkPreludeMiscIdUnique 347
-closedTypeFamilyNoKindDIdKey = mkPreludeMiscIdUnique 348
-infixLDIdKey                 = mkPreludeMiscIdUnique 349
-infixRDIdKey                 = mkPreludeMiscIdUnique 350
-infixNDIdKey                 = mkPreludeMiscIdUnique 351
-roleAnnotDIdKey              = mkPreludeMiscIdUnique 352
+pragSpecInstDIdKey           = mkPreludeMiscIdUnique 342
+pragRuleDIdKey               = mkPreludeMiscIdUnique 343
+pragAnnDIdKey                = mkPreludeMiscIdUnique 344
+familyNoKindDIdKey           = mkPreludeMiscIdUnique 345
+familyKindDIdKey             = mkPreludeMiscIdUnique 346
+dataInstDIdKey               = mkPreludeMiscIdUnique 347
+newtypeInstDIdKey            = mkPreludeMiscIdUnique 348
+tySynInstDIdKey              = mkPreludeMiscIdUnique 349
+closedTypeFamilyKindDIdKey   = mkPreludeMiscIdUnique 350
+closedTypeFamilyNoKindDIdKey = mkPreludeMiscIdUnique 351
+infixLDIdKey                 = mkPreludeMiscIdUnique 352
+infixRDIdKey                 = mkPreludeMiscIdUnique 353
+infixNDIdKey                 = mkPreludeMiscIdUnique 354
+roleAnnotDIdKey              = mkPreludeMiscIdUnique 355
 
 -- type Cxt = ...
 cxtIdKey :: Unique
@@ -2828,3 +2858,9 @@ quoteTypeKey = mkPreludeMiscIdUnique 426
 ruleVarIdKey, typedRuleVarIdKey :: Unique
 ruleVarIdKey      = mkPreludeMiscIdUnique 427
 typedRuleVarIdKey = mkPreludeMiscIdUnique 428
+
+-- data AnnTarget = ...
+valueAnnotationIdKey, typeAnnotationIdKey, moduleAnnotationIdKey :: Unique
+valueAnnotationIdKey  = mkPreludeMiscIdUnique 429
+typeAnnotationIdKey   = mkPreludeMiscIdUnique 430
+moduleAnnotationIdKey = mkPreludeMiscIdUnique 431
