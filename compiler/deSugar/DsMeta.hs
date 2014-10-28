@@ -112,8 +112,20 @@ repTopP pat = do { ss <- mkGenSyms (collectPatBinders pat)
                  ; wrapGenSyms ss pat' }
 
 repTopDs :: HsGroup Name -> DsM (Core (TH.Q [TH.Dec]))
-repTopDs group
- = do { let { tv_bndrs = hsSigTvBinders (hs_valds group)
+repTopDs group@(HsGroup { hs_valds   = valds
+                        , hs_splcds  = splcds
+                        , hs_tyclds  = tyclds
+                        , hs_instds  = instds
+                        , hs_derivds = derivds
+                        , hs_fixds   = fixds
+                        , hs_defds   = defds
+                        , hs_fords   = fords
+                        , hs_warnds  = warnds
+                        , hs_annds   = annds
+                        , hs_ruleds  = ruleds
+                        , hs_vects   = vects
+                        , hs_docs    = docs })
+ = do { let { tv_bndrs = hsSigTvBinders valds
             ; bndrs = tv_bndrs ++ hsGroupBinders group } ;
         ss <- mkGenSyms bndrs ;
 
@@ -124,16 +136,24 @@ repTopDs group
         -- The other important reason is that the output must mention
         -- only "T", not "Foo:T" where Foo is the current module
 
-        decls <- addBinds ss (do {
-                        fix_ds  <- mapM repFixD (hs_fixds group) ;
-                        val_ds  <- rep_val_binds (hs_valds group) ;
-                        tycl_ds <- mapM repTyClD (tyClGroupConcat (hs_tyclds group)) ;
-                        role_ds <- mapM repRoleD (concatMap group_roles (hs_tyclds group)) ;
-                        inst_ds <- mapM repInstD (hs_instds group) ;
-                        rule_ds <- mapM repRuleD (hs_ruleds group) ;
-                        for_ds  <- mapM repForD  (hs_fords group) ;
+        decls <- addBinds ss (
+                  do { val_ds  <- rep_val_binds valds
+                     ; _       <- mapM no_splice splcds
+                     ; tycl_ds <- mapM repTyClD (tyClGroupConcat tyclds)
+                     ; role_ds <- mapM repRoleD (concatMap group_roles tyclds)
+                     ; inst_ds <- mapM repInstD instds
+                     ; _       <- mapM no_standalone_deriv derivds
+                     ; fix_ds  <- mapM repFixD fixds
+                     ; _       <- mapM no_default_decl defds
+                     ; for_ds  <- mapM repForD fords
+                     ; _       <- mapM no_warn warnds
+                     ; _       <- mapM no_ann annds
+                     ; rule_ds <- mapM repRuleD ruleds
+                     ; _       <- mapM no_vect vects
+                     ; _       <- mapM no_doc docs
+
                         -- more needed
-                        return (de_loc $ sort_by_loc $
+                     ;  return (de_loc $ sort_by_loc $
                                 val_ds ++ catMaybes tycl_ds ++ role_ds ++ fix_ds
                                        ++ inst_ds ++ rule_ds ++ for_ds) }) ;
 
@@ -145,7 +165,22 @@ repTopDs group
 
         wrapGenSyms ss q_decs
       }
-
+  where
+    no_splice (L loc _)
+      = notHandledL loc "Splices within declaration brackets" empty
+    no_standalone_deriv (L loc (DerivDecl { deriv_type = deriv_ty }))
+      = notHandledL loc "Standalone-deriving" (ppr deriv_ty)
+    no_default_decl (L loc decl)
+      = notHandledL loc "Default declarations" (ppr decl)
+    no_warn (L loc (Warning thing _))
+      = notHandledL loc "WARNING and DEPRECATION pragmas" $
+                    text "Pragma for declaration of" <+> ppr thing
+    no_ann (L loc decl)
+      = notHandledL loc "ANN pragmas" (ppr decl)
+    no_vect (L loc decl)
+      = notHandledL loc "Vectorisation pragmas" (ppr decl)
+    no_doc (L loc _)
+      = notHandledL loc "Haddock documentation" empty
 
 hsSigTvBinders :: HsValBinds Name -> [Name]
 -- See Note [Scoped type variables in bindings]
@@ -611,17 +646,16 @@ rep_sigs' sigs = do { sigs1 <- mapM rep_sig sigs ;
                      return (concat sigs1) }
 
 rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
-        -- Singleton => Ok
-        -- Empty     => Too hard, signature ignored
 rep_sig (L loc (TypeSig nms ty))      = mapM (rep_ty_sig loc ty) nms
-rep_sig (L _   (GenericSig nm _))     = failWithDs msg
-  where msg = vcat  [ ptext (sLit "Illegal default signature for") <+> quotes (ppr nm)
-                    , ptext (sLit "Default signatures are not supported by Template Haskell") ]
-
+rep_sig (L _   (PatSynSig {}))        = notHandled "Pattern type signatures" empty
+rep_sig (L _   (GenericSig nm _))     = notHandled "Default type signatures" msg
+  where msg = text "Illegal default signature for" <+> quotes (ppr nm)
+rep_sig d@(L _ (IdSig {}))            = pprPanic "rep_sig IdSig" (ppr d)
+rep_sig (L _   (FixSig {}))           = return [] -- fixity sigs at top level
 rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
 rep_sig (L loc (SpecSig nm ty ispec)) = rep_specialise nm ty ispec loc
 rep_sig (L loc (SpecInstSig ty))      = rep_specialiseInst ty loc
-rep_sig _                             = return []
+rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 
 rep_ty_sig :: SrcSpan -> LHsType Name -> Located Name
            -> DsM (SrcSpan, Core TH.DecQ)
@@ -1984,6 +2018,13 @@ coreVar :: Id -> Core TH.Name   -- The Id has type Name
 coreVar id = MkC (Var id)
 
 ----------------- Failure -----------------------
+notHandledL :: SrcSpan -> String -> SDoc -> DsM a
+notHandledL loc what doc
+  | isGoodSrcSpan loc
+  = putSrcSpanDs loc $ notHandled what doc
+  | otherwise
+  = notHandled what doc
+
 notHandled :: String -> SDoc -> DsM a
 notHandled what doc = failWithDs msg
   where
