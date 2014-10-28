@@ -41,10 +41,10 @@ make_args = 'VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn
 test('safePkg01',
      [clean_cmd('$MAKE -s --no-print-directory cleanPackageDatabase.safePkg01'),
       normalise_errmsg_fun(ignoreLdOutput),
-      normalise_fun(join_normalisers(
+      normalise_fun(
         normaliseArrayPackage,
         normaliseArrayPackageKey,
-        normaliseBytestringPackage))],
+        normaliseBytestringPackage)],
      run_command,
      ['$MAKE -s --no-print-directory safePkg01 ' + make_args])
 

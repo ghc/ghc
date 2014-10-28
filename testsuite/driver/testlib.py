@@ -16,6 +16,7 @@ import datetime
 import copy
 import glob
 from math import ceil, trunc
+import collections
 
 have_subprocess = False
 try:
@@ -493,39 +494,45 @@ def normalise_slashes( name, opts ):
 def normalise_exe( name, opts ):
     opts.extra_normaliser = normalise_exe_
 
-def normalise_fun( fun ):
-    return lambda name, opts, f=fun: _normalise_fun(name, opts, f)
+def normalise_fun( *fs ):
+    return lambda name, opts: _normalise_fun(name, opts, fs)
 
-def _normalise_fun( name, opts, f ):
-    opts.extra_normaliser = f
+def _normalise_fun( name, opts, *fs ):
+    opts.extra_normaliser = join_normalisers(fs)
 
-def normalise_errmsg_fun( fun ):
-    return lambda name, opts, f=fun: _normalise_errmsg_fun(name, opts, f)
+def normalise_errmsg_fun( *fs ):
+    return lambda name, opts: _normalise_errmsg_fun(name, opts, fs)
 
-def _normalise_errmsg_fun( name, opts, f ):
-    opts.extra_errmsg_normaliser = f
-
-def two_normalisers(f, g):
-    """
-    See also `join_normalisers` for a n-ary version of `two_normalisers`
-    """
-    return lambda x, f=f, g=g: f(g(x))
+def _normalise_errmsg_fun( name, opts, *fs ):
+    opts.extra_errmsg_normaliser = join_normalisers(fs)
 
 def join_normalisers(*a):
     """
-    Compose functions, e.g.
+    Compose functions, flattening sequences.
 
-       join_normalisers(f1,f2,f3)
+       join_normalisers(f1,[f2,f3],f4)
 
     is the same as
 
-       lambda x: f1(f2(f3(x)))
+       lambda x: f1(f2(f3(f4(x))))
     """
 
-    assert all(callable(f) for f in a)
+    def flatten(l):
+        """
+        Taken from http://stackoverflow.com/a/2158532/946226
+        """
+        for el in l:
+            if isinstance(el, collections.Iterable) and not isinstance(el, basestring):
+                for sub in flatten(el):
+                    yield sub
+            else:
+                yield el
+
+    a = flatten(a)
 
     fn = lambda x:x # identity function
     for f in a:
+        assert callable(f)
         fn = lambda x,f=f,fn=fn: fn(f(x))
     return fn
 
@@ -1055,7 +1062,7 @@ def compile_cmp_asm( name, way, extra_hc_opts ):
     (platform_specific, expected_asm_file) = platform_wordsize_qualify(namebase, 'asm')
     actual_asm_file = qualify(name, 's')
 
-    if not compare_outputs('asm', two_normalisers(normalise_errmsg, normalise_asm), \
+    if not compare_outputs('asm', join_normalisers(normalise_errmsg, normalise_asm), \
                            expected_asm_file, actual_asm_file):
         return failBecause('asm mismatch')
 
@@ -1492,14 +1499,14 @@ def check_stdout_ok( name ):
       else:
          return normalise_output(str)
 
-   two_norm = two_normalisers(norm, getTestOpts().extra_normaliser)
+   extra_norm = join_normalisers(norm, getTestOpts().extra_normaliser)
 
    check_stdout = getTestOpts().check_stdout
    if check_stdout:
-      return check_stdout(actual_stdout_file, two_norm)
+      return check_stdout(actual_stdout_file, extra_norm)
 
    return compare_outputs('stdout', \
-                          two_norm, \
+                          extra_norm, \
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
@@ -1522,7 +1529,7 @@ def check_stderr_ok( name ):
          return normalise_errmsg(str)
 
    return compare_outputs('stderr', \
-                          two_normalisers(norm, getTestOpts().extra_errmsg_normaliser), \
+                          join_normalisers(norm, getTestOpts().extra_errmsg_normaliser), \
                           expected_stderr_file, actual_stderr_file)
 
 def dump_stderr( name ):
@@ -1596,7 +1603,7 @@ def check_prof_ok(name):
         return True
     else:
         return compare_outputs('prof', \
-                               two_normalisers(normalise_whitespace,normalise_prof), \
+                               join_normalisers(normalise_whitespace,normalise_prof), \
                                expected_prof_file, prof_file)
 
 # Compare expected output to actual output, and optionally accept the
