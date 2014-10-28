@@ -31,6 +31,7 @@ import Text.XHtml hiding ( name, p, quote )
 import Data.Maybe (fromMaybe)
 
 import GHC
+import Name
 
 parHtmlMarkup :: Qualification -> Bool
               -> (Bool -> a -> Html) -> DocMarkup a Html
@@ -86,26 +87,108 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
         htmlPrompt = (thecode . toHtml $ ">>> ") ! [theclass "prompt"]
         htmlExpression = (strong . thecode . toHtml $ expression ++ "\n") ! [theclass "userinput"]
 
+-- | We use this intermediate type to transform the input 'Doc' tree
+-- in an arbitrary way before rendering, such as grouping some
+-- elements. This is effectivelly a hack to prevent the 'Doc' type
+-- from changing if it is possible to recover the layout information
+-- we won't need after the fact.
+data Hack a id =
+  UntouchedDoc (DocH a id)
+  | CollapsingHeader (Header (DocH a id)) (DocH a id) Int (Maybe String)
+  | HackAppend (Hack a id) (Hack a id)
+  deriving Eq
+
+-- | Group things under bold 'DocHeader's together.
+toHack :: Int -- ^ Counter for header IDs which serves to assign
+              -- unique identifiers within the comment scope
+       -> Maybe String
+       -- ^ It is not enough to have unique identifier within the
+       -- scope of the comment: if two different comments have the
+       -- same ID for headers, the collapse/expand behaviour will act
+       -- on them both. This serves to make each header a little bit
+       -- more unique. As we can't export things with the same names,
+       -- this should work more or less fine: it is in fact the
+       -- implicit assumption the collapse/expand mechanism makes for
+       -- things like ‘Instances’ boxes.
+       -> [DocH a id] -> Hack a id
+toHack _ _ [] = UntouchedDoc DocEmpty
+toHack _ _ [x] = UntouchedDoc x
+toHack n nm (DocHeader (Header l (DocBold x)):xs) =
+  let -- Header with dropped bold
+      h = Header l x
+      -- Predicate for takeWhile, grab everything including ‘smaller’
+      -- headers
+      p (DocHeader (Header l' _)) = l' > l
+      p _ = True
+      -- Stuff ‘under’ this header
+      r = takeWhile p xs
+      -- Everything else that didn't make it under
+      r' = drop (length r) xs
+      app y [] = y
+      app y ys = HackAppend y (toHack (n + 1) nm ys)
+  in case r of
+      -- No content under this header
+      [] -> CollapsingHeader h DocEmpty n nm `app` r'
+      -- We got something out, stitch it back together into one chunk
+      y:ys -> CollapsingHeader h (foldl DocAppend y ys) n nm `app` r'
+toHack n nm (x:xs) = HackAppend (UntouchedDoc x) (toHack n nm xs)
+
+-- | Remove ‘top-level’ 'DocAppend's turning them into a flat list.
+-- This lends itself much better to processing things in order user
+-- might look at them, such as in 'toHack'.
+flatten :: DocH a id -> [DocH a id]
+flatten (DocAppend x y) = flatten x ++ flatten y
+flatten x = [x]
+
+-- | Generate the markup needed for collapse to happen. For
+-- 'UntouchedDoc' and 'HackAppend' we do nothing more but
+-- extract/append the underlying 'Doc' and convert it to 'Html'. For
+-- 'CollapsingHeader', we attach extra info to the generated 'Html'
+-- that allows us to expand/collapse the content.
+hackMarkup :: DocMarkup id Html -> Hack (ModuleName, OccName) id -> Html
+hackMarkup fmt h = case h of
+  UntouchedDoc d -> markup fmt d
+  CollapsingHeader (Header lvl titl) par n nm ->
+    let id_ = makeAnchorId $ "ch:" ++ fromMaybe "noid:" nm ++ show n
+        col' = collapseControl id_ True "caption"
+        instTable = (thediv ! collapseSection id_ True [] <<)
+        lvs = zip [1 .. ] [h1, h2, h3, h4, h5, h6]
+        getHeader = fromMaybe caption (lookup lvl lvs)
+        subCation = getHeader ! col' << markup fmt titl
+    in (subCation +++) . instTable $ markup fmt par
+  HackAppend d d' -> markupAppend fmt (hackMarkup fmt d) (hackMarkup fmt d')
+
+-- | Goes through 'hackMarkup' to generate the 'Html' rather than
+-- skipping straight to 'markup': this allows us to employ XHtml
+-- specific hacks to the tree before first.
+markupHacked :: DocMarkup id Html
+             -> Maybe String
+             -> Doc id
+             -> Html
+markupHacked fmt n = hackMarkup fmt . toHack 0 n . flatten
 
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).  FIXME: Does this still apply?
-docToHtml :: Qualification -> Doc DocName -> Html
-docToHtml qual = markup fmt . cleanup
+docToHtml :: Maybe String -- ^ Name of the thing this doc is for. See
+                          -- comments on 'toHack' for details.
+          -> Qualification -> Doc DocName -> Html
+docToHtml n qual = markupHacked fmt n . cleanup
   where fmt = parHtmlMarkup qual True (ppDocName qual Raw)
 
 -- | Same as 'docToHtml' but it doesn't insert the 'anchor' element
 -- in links. This is used to generate the Contents box elements.
-docToHtmlNoAnchors :: Qualification -> Doc DocName -> Html
-docToHtmlNoAnchors qual = markup fmt . cleanup
+docToHtmlNoAnchors :: Maybe String -- ^ See 'toHack'
+                   -> Qualification -> Doc DocName -> Html
+docToHtmlNoAnchors n qual = markupHacked fmt n . cleanup
   where fmt = parHtmlMarkup qual False (ppDocName qual Raw)
 
 origDocToHtml :: Qualification -> Doc Name -> Html
-origDocToHtml qual = markup fmt . cleanup
+origDocToHtml qual = markupHacked fmt Nothing . cleanup
   where fmt = parHtmlMarkup qual True (const $ ppName Raw)
 
 
 rdrDocToHtml :: Qualification -> Doc RdrName -> Html
-rdrDocToHtml qual = markup fmt . cleanup
+rdrDocToHtml qual = markupHacked fmt Nothing . cleanup
   where fmt = parHtmlMarkup qual True (const ppRdrName)
 
 
@@ -116,12 +199,15 @@ docElement el content_ =
     else el ! [theclass "doc"] << content_
 
 
-docSection :: Qualification -> Documentation DocName -> Html
-docSection qual = maybe noHtml (docSection_ qual) . combineDocumentation
+docSection :: Maybe Name -- ^ Name of the thing this doc is for
+           -> Qualification -> Documentation DocName -> Html
+docSection n qual = maybe noHtml (docSection_ n qual) . combineDocumentation
 
 
-docSection_ :: Qualification -> Doc DocName -> Html
-docSection_ qual = (docElement thediv <<) . docToHtml qual
+docSection_ :: Maybe Name -- ^ Name of the thing this doc is for
+            -> Qualification -> Doc DocName -> Html
+docSection_ n qual =
+  (docElement thediv <<) . docToHtml (getOccString <$> n) qual
 
 
 cleanup :: Doc a -> Doc a

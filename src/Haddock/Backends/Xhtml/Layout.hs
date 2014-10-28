@@ -51,7 +51,6 @@ import Text.XHtml hiding ( name, title, p, quote )
 import FastString            ( unpackFS )
 import GHC
 
-
 --------------------------------------------------------------------------------
 -- * Sections of the document
 --------------------------------------------------------------------------------
@@ -134,7 +133,7 @@ subDlist qual decls = Just $ dlist << map subEntry decls +++ clearDiv
     subEntry (decl, mdoc, subs) =
       dterm ! [theclass "src"] << decl
       +++
-      docElement ddef << (fmap (docToHtml qual) mdoc +++ subs)
+      docElement ddef << (fmap (docToHtml Nothing qual) mdoc +++ subs)
 
     clearDiv = thediv ! [ theclass "clear" ] << noHtml
 
@@ -146,7 +145,7 @@ subTable qual decls = Just $ table << aboves (concatMap subRow decls)
     subRow (decl, mdoc, subs) =
       (td ! [theclass "src"] << decl
        <->
-       docElement td << fmap (docToHtml qual) mdoc)
+       docElement td << fmap (docToHtml Nothing qual) mdoc)
       : map (cell . (td <<)) subs
 
 
@@ -175,7 +174,9 @@ subEquations :: Qualification -> [SubDecl] -> Html
 subEquations qual = divSubDecls "equations" "Equations" . subTable qual
 
 
-subInstances :: Qualification -> String -> [SubDecl] -> Html
+subInstances :: Qualification
+             -> String -- ^ Class name, used for anchor generation
+             -> [SubDecl] -> Html
 subInstances qual nm = maybe noHtml wrap . instTable
   where
     wrap = (subSection <<) . (subCaption +++)

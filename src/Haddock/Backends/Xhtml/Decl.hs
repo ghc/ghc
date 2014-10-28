@@ -28,6 +28,7 @@ import Haddock.GhcUtils
 import Haddock.Types
 import Haddock.Doc (combineDocumentation)
 
+import           Control.Applicative
 import           Data.List             ( intersperse, sort )
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -89,7 +90,7 @@ ppPatSig summary links loc (doc, _argDocs) docname args typ prov req fixities
          splice unicode qual
   | summary = pref1
   | otherwise = topDeclElem links loc splice [docname] (pref1 <+> ppFixities fixities qual)
-                +++ docSection qual doc
+                +++ docSection Nothing qual doc
   where
     pref1 = hsep [ toHtml "pattern"
                  , pp_cxt prov
@@ -130,10 +131,11 @@ ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> [DocName] -> HsType DocName
                -> Splice -> Unicode -> Qualification -> Html
 ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep) splice unicode qual
   | summary = pref1
-  | Map.null argDocs = topDeclElem links loc splice docnames pref1 +++ docSection qual doc
+  | Map.null argDocs = topDeclElem links loc splice docnames pref1 +++ docSection curName qual doc
   | otherwise = topDeclElem links loc splice docnames pref2 +++
-      subArguments qual (do_args 0 sep typ) +++ docSection qual doc
+      subArguments qual (do_args 0 sep typ) +++ docSection curName qual doc
   where
+    curName = getName <$> listToMaybe docnames
     argDoc n = Map.lookup n argDocs
 
     do_largs n leader (L _ t) = do_args n leader t
@@ -263,7 +265,7 @@ ppTyFam :: Bool -> Bool -> LinksInfo -> [DocInstance DocName] ->
 ppTyFam summary associated links instances fixities loc doc decl splice unicode qual
 
   | summary   = ppTyFamHeader True associated decl unicode qual
-  | otherwise = header_ +++ docSection qual doc +++ instancesBit
+  | otherwise = header_ +++ docSection Nothing qual doc +++ instancesBit
 
   where
     docname = unLoc $ fdLName decl
@@ -439,7 +441,7 @@ ppClassDecl summary links instances fixities loc d subdocs
                         , tcdFDs = lfds, tcdSigs = lsigs, tcdATs = ats })
             splice unicode qual
   | summary = ppShortClassDecl summary links decl loc subdocs splice unicode qual
-  | otherwise = classheader +++ docSection qual d
+  | otherwise = classheader +++ docSection Nothing qual d
                   +++ minimalBit +++ atBit +++ methodBit +++ instancesBit
   where
     classheader
@@ -558,7 +560,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
            splice unicode qual
 
   | summary   = ppShortDataDecl summary False dataDecl unicode qual
-  | otherwise = header_ +++ docSection qual doc +++ constrBit +++ instancesBit
+  | otherwise = header_ +++ docSection Nothing qual doc +++ constrBit +++ instancesBit
 
   where
     docname   = tcdName dataDecl

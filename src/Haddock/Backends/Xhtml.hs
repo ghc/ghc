@@ -544,7 +544,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
 
     description | isNoHtml doc = doc
                 | otherwise    = divDescription $ sectionName << "Description" +++ doc
-                where doc = docSection qual (ifaceRnDoc iface)
+                where doc = docSection Nothing qual (ifaceRnDoc iface)
 
         -- omit the synopsis if there are no documentation annotations at all
     synopsis
@@ -592,7 +592,7 @@ processForMiniSynopsis mdl unicode qual ExportDecl { expItemDecl = L _loc decl0 
       map (ppNameMini Prefix mdl . nameOccName . getName . unLoc) lnames
     _ -> []
 processForMiniSynopsis _ _ qual (ExportGroup lvl _id txt) =
-  [groupTag lvl << docToHtml qual txt]
+  [groupTag lvl << docToHtml Nothing qual txt]
 processForMiniSynopsis _ _ _ _ = []
 
 
@@ -608,7 +608,6 @@ ppTyClBinderWithVarsMini mdl decl =
   let n = tcdName decl
       ns = tyvarNames $ tcdTyVars decl -- it's safe to use tcdTyVars, see code above
   in ppTypeApp n [] ns (\is_infix -> ppNameMini is_infix mdl . nameOccName . getName) ppTyName
-
 
 ppModuleContents :: Qualification -> [ExportItem DocName] -> Html
 ppModuleContents qual exports
@@ -627,10 +626,10 @@ ppModuleContents qual exports
     | lev <= n  = ( [], items )
     | otherwise = ( html:secs, rest2 )
     where
-        html = linkedAnchor (groupId id0)
-               << docToHtmlNoAnchors qual doc +++ mk_subsections ssecs
-        (ssecs, rest1) = process lev rest
-        (secs,  rest2) = process n   rest1
+      html = linkedAnchor (groupId id0)
+             << docToHtmlNoAnchors (Just id0) qual doc +++ mk_subsections ssecs
+      (ssecs, rest1) = process lev rest
+      (secs,  rest2) = process n   rest1
   process n (_ : rest) = process n rest
 
   mk_subsections [] = noHtml
@@ -652,7 +651,7 @@ processExport :: Bool -> LinksInfo -> Bool -> Qualification
               -> ExportItem DocName -> Maybe Html
 processExport _ _ _ _ ExportDecl { expItemDecl = L _ (InstD _) } = Nothing -- Hide empty instances
 processExport summary _ _ qual (ExportGroup lev id0 doc)
-  = nothingIf summary $ groupHeading lev id0 << docToHtml qual doc
+  = nothingIf summary $ groupHeading lev id0 << docToHtml (Just id0) qual doc
 processExport summary links unicode qual (ExportDecl decl doc subdocs insts fixities splice)
   = processDecl summary $ ppDecl summary links decl doc insts fixities subdocs splice unicode qual
 processExport summary _ _ qual (ExportNoDecl y [])
@@ -662,7 +661,7 @@ processExport summary _ _ qual (ExportNoDecl y subs)
       ppDocName qual Prefix True y
       +++ parenList (map (ppDocName qual Prefix True) subs)
 processExport summary _ _ qual (ExportDoc doc)
-  = nothingIf summary $ docSection_ qual doc
+  = nothingIf summary $ docSection_ Nothing qual doc
 processExport summary _ _ _ (ExportModule mdl)
   = processDeclOneLiner summary $ toHtml "module" <+> ppModule mdl
 
