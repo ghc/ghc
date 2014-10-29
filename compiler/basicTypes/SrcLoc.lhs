@@ -83,7 +83,6 @@ import Data.Bits
 import Data.Data
 import Data.List
 import Data.Ord
-import System.FilePath
 \end{code}
 
 %************************************************************************
@@ -191,15 +190,19 @@ cmpRealSrcLoc (SrcLoc s1 l1 c1) (SrcLoc s2 l2 c2)
 
 instance Outputable RealSrcLoc where
     ppr (SrcLoc src_path src_line src_col)
-      = getPprStyle $ \ sty ->
-        if userStyle sty || debugStyle sty then
-            hcat [ pprFastFilePath src_path, char ':',
-                   int src_line,
-                   char ':', int src_col
-                 ]
-        else
-            hcat [text "{-# LINE ", int src_line, space,
-                  char '\"', pprFastFilePath src_path, text " #-}"]
+      = hcat [ pprFastFilePath src_path <> colon
+             , int src_line <> colon
+             , int src_col ]
+
+-- I don't know why there is this style-based difference
+--        if userStyle sty || debugStyle sty then
+--            hcat [ pprFastFilePath src_path, char ':',
+--                   int src_line,
+--                   char ':', int src_col
+--                 ]
+--        else
+--            hcat [text "{-# LINE ", int src_line, space,
+--                  char '\"', pprFastFilePath src_path, text " #-}"]
 
 instance Outputable SrcLoc where
     ppr (RealSrcLoc l) = ppr l
@@ -432,50 +435,56 @@ instance Ord SrcSpan where
 
 
 instance Outputable RealSrcSpan where
-    ppr span
-      = getPprStyle $ \ sty ->
-        if userStyle sty || debugStyle sty then
-           text (showUserRealSpan True span)
-        else
-           hcat [text "{-# LINE ", int (srcSpanStartLine span), space,
-                 char '\"', pprFastFilePath $ srcSpanFile span, text " #-}"]
+    ppr span = pprUserRealSpan True span
+
+-- I don't know why there is this style-based difference
+--      = getPprStyle $ \ sty ->
+--        if userStyle sty || debugStyle sty then
+--           text (showUserRealSpan True span)
+--        else
+--           hcat [text "{-# LINE ", int (srcSpanStartLine span), space,
+--                 char '\"', pprFastFilePath $ srcSpanFile span, text " #-}"]
 
 instance Outputable SrcSpan where
-    ppr span
-      = getPprStyle $ \ sty ->
-        if userStyle sty || debugStyle sty then
-           pprUserSpan True span
-        else
-           case span of
-           UnhelpfulSpan _ -> panic "Outputable UnhelpfulSpan"
-           RealSrcSpan s -> ppr s
+    ppr span = pprUserSpan True span
+
+-- I don't know why there is this style-based difference
+--      = getPprStyle $ \ sty ->
+--        if userStyle sty || debugStyle sty then
+--           pprUserSpan True span
+--        else
+--           case span of
+--           UnhelpfulSpan _ -> panic "Outputable UnhelpfulSpan"
+--           RealSrcSpan s -> ppr s
+
+showUserSpan :: Bool -> SrcSpan -> String
+showUserSpan show_path span = showSDocSimple (pprUserSpan show_path span)
 
 pprUserSpan :: Bool -> SrcSpan -> SDoc
 pprUserSpan _         (UnhelpfulSpan s) = ftext s
-pprUserSpan show_path (RealSrcSpan s)   = text (showUserRealSpan show_path s)
+pprUserSpan show_path (RealSrcSpan s)   = pprUserRealSpan show_path s
 
-showUserSpan :: Bool -> SrcSpan -> String
-showUserSpan _         (UnhelpfulSpan s) = unpackFS s
-showUserSpan show_path (RealSrcSpan s)   = showUserRealSpan show_path s
-
-showUserRealSpan :: Bool -> RealSrcSpan -> String
-showUserRealSpan show_path (SrcSpanOneLine src_path line start_col end_col)
-  = (if show_path then normalise (unpackFS src_path) ++ ":" else "")
- ++ show line ++ ":" ++ show start_col
- ++ (if end_col - start_col <= 1 then "" else '-' : show (end_col - 1))
+pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
+pprUserRealSpan show_path (SrcSpanOneLine src_path line start_col end_col)
+  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
+         , int line <> colon
+         , int start_col
+         , ppUnless (end_col - start_col <= 1) (char '-' <> int (end_col - 1)) ]
             -- For single-character or point spans, we just
             -- output the starting column number
 
-showUserRealSpan show_path (SrcSpanMultiLine src_path sline scol eline ecol)
-  = (if show_path then normalise (unpackFS src_path) ++ ":" else "")
- ++ "(" ++ show sline ++ "," ++ show scol ++ ")"
- ++ "-"
- ++ "(" ++ show eline ++ "," ++ show ecol' ++ ")"
-    where ecol' = if ecol == 0 then ecol else ecol - 1
+pprUserRealSpan show_path (SrcSpanMultiLine src_path sline scol eline ecol)
+  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
+         , parens (int sline <> comma <> int scol)
+         , char '-'
+         , parens (int eline <> comma <> int ecol') ]
+ where
+   ecol' = if ecol == 0 then ecol else ecol - 1
 
-showUserRealSpan show_path (SrcSpanPoint src_path line col)
-  = (if show_path then normalise (unpackFS src_path) ++ ":" else "")
- ++ show line ++ ":" ++ show col
+pprUserRealSpan show_path (SrcSpanPoint src_path line col)
+  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
+         , int line <> colon
+         , int col ]
 \end{code}
 
 %************************************************************************
