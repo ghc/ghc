@@ -37,7 +37,7 @@ module TcMType (
   -- Instantiation
   tcInstTyVars, newSigTyVar,
   tcInstType,
-  tcInstSkolTyVars, tcInstSuperSkolTyVars,tcInstSuperSkolTyVarsX,
+  tcInstSkolTyVars, tcInstSuperSkolTyVarsX,
   tcInstSigTyVarsLoc, tcInstSigTyVars,
   tcInstSkolType,
   tcSkolDFunType, tcSuperSkolTyVars,
@@ -197,7 +197,7 @@ tcInstType inst_tyvars ty
 tcSkolDFunType :: Type -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type signature with skolem constants.
 -- We could give them fresh names, but no need to do so
-tcSkolDFunType ty = tcInstType (\tvs -> return (tcSuperSkolTyVars tvs)) ty
+tcSkolDFunType ty = tcInstType tcInstSuperSkolTyVars ty
 
 tcSuperSkolTyVars :: [TyVar] -> (TvSubst, [TcTyVar])
 -- Make skolem constants, but do *not* give them new names, as above
@@ -216,8 +216,8 @@ tcSuperSkolTyVar subst tv
 tcInstSkolTyVars :: [TyVar] -> TcM (TvSubst, [TcTyVar])
 tcInstSkolTyVars = tcInstSkolTyVars' False emptyTvSubst
 
-tcInstSuperSkolTyVars :: [TyVar] -> TcM [TcTyVar]
-tcInstSuperSkolTyVars = fmap snd . tcInstSuperSkolTyVarsX emptyTvSubst
+tcInstSuperSkolTyVars :: [TyVar] -> TcM (TvSubst, [TcTyVar])
+tcInstSuperSkolTyVars = tcInstSuperSkolTyVarsX emptyTvSubst
 
 tcInstSuperSkolTyVarsX :: TvSubst -> [TyVar] -> TcM (TvSubst, [TcTyVar])
 tcInstSuperSkolTyVarsX subst = tcInstSkolTyVars' True subst
