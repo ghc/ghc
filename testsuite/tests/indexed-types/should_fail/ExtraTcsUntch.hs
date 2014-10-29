@@ -48,14 +48,14 @@ f x =
    From g2 we get [W]   (forall c. 0 => F Int ~ [[alpha]] /\ C beta [c])
     (g2 is not generalised; the forall comes from the TEx pattern)
 
-Floating we get
-   F Int ~ [beta], F Int ~ [[alpha]], alpha ~ alpha', forall c. C beta [c]
+approximateWC then gives the candidate constraints to quantify
+   F Int ~ [beta], F Int ~ [[alpha']]
 
-=  { alpha := alpha' }
-   beta ~ [alpha'], F Int ~ [[alpha']], forall c. C beta [c]
+(alpha' is the promoted version of alpha)
 
-=  { beta := [alpha']
-   F Int ~ [[alpha']], forall c. C [alpha'] [c]
+Now decide inferred sig for f :: F Int ~ [beta] => beta -> blah
+since beta is mentioned in tau-type for f but alpha' is not
 
-=  F Int ~ [[alpha']], forall c. (C [alpha'] [c], alpha' ~ c)
+Perhaps this is a stupid constraint to generalise over (we don't
+generalise over (C Int).
 -}

@@ -170,7 +170,7 @@ test('T4981-V2', normal, compile, [''])
 test('T4981-V3', normal, compile, [''])
 
 test('T5002', normal, compile, [''])
-test('PushedInAsGivens', normal, compile, [''])
+test('PushedInAsGivens', normal, compile_fail, [''])
 
 # Superclass equalities
 test('T4338', normal, compile, [''])

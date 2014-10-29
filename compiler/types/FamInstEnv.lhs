@@ -790,19 +790,33 @@ The lookupFamInstEnv function does a nice job for *open* type families,
 but we also need to handle closed ones when normalising a type:
 
 \begin{code}
-reduceTyFamApp_maybe :: FamInstEnvs -> Role -> TyCon -> [Type] -> Maybe (Coercion, Type)
--- Attempt to do a *one-step* reduction of a type-synonym-family application
---    (i.e. is a no-op on data families)
+reduceTyFamApp_maybe :: FamInstEnvs
+                     -> Role              -- Desired role of result coercion
+                     -> TyCon -> [Type]
+                     -> Maybe (Coercion, Type)
+-- Attempt to do a *one-step* reduction of a type-family application
+--    but *not* newtypes
+-- Works on type-synonym families always; data-families only if
+--     the role we seek is representational
 -- It first normalises the type arguments, wrt functions but *not* newtypes,
--- to be sure that nested calls like
---    F (G Int)
--- are correctly reduced
+--    to be sure that nested calls like
+--       F (G Int)
+--    are correctly reduced
 --
 -- The TyCon can be oversaturated.
 -- Works on both open and closed families
 
 reduceTyFamApp_maybe envs role tc tys
-  | isOpenSynFamilyTyCon tc
+  | Phantom <- role
+  = Nothing
+
+  | case role of
+       Representational -> isOpenFamilyTyCon    tc
+       _                -> isOpenSynFamilyTyCon tc
+       -- If we seek a representational coercion
+       -- (e.g. the call in topNormaliseType_maybe) then we can
+       -- unwrap data families as well as type-synonym families;
+       -- otherwise only type-synonym families
   , [FamInstMatch { fim_instance = fam_inst
                   , fim_tys =      inst_tys }] <- lookupFamInstEnv envs tc ntys
   = let ax     = famInstAxiom fam_inst
@@ -929,6 +943,7 @@ topNormaliseType_maybe env ty
 
 ---------------
 normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
+-- See comments on normaliseType for the arguments of this function
 normaliseTcApp env role tc tys
   | isTypeSynonymTyCon tc
   , (co1, ntys) <- normaliseTcArgs env role tc tys
@@ -965,6 +980,7 @@ normaliseType :: FamInstEnvs            -- environment with family instances
               -> (Coercion, Type)       -- (coercion,new type), where
                                         -- co :: old-type ~ new_type
 -- Normalise the input type, by eliminating *all* type-function redexes
+-- but *not* newtypes (which are visible to the programmer)
 -- Returns with Refl if nothing happens
 -- Try to not to disturb type syonyms if possible
 

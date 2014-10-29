@@ -21,7 +21,8 @@ import TcSMonad as TcS
 import TcInteract
 import Kind     ( isKind, isSubKind, defaultKind_maybe )
 import Inst
-import Type     ( classifyPredType, PredTree(..), getClassPredTys_maybe )
+import Type     ( classifyPredType, isIPClass, PredTree(..), getClassPredTys_maybe )
+import TyCon    ( isSynFamilyTyCon )
 import Class    ( Class )
 import Id       ( idType )
 import Var
@@ -431,8 +432,22 @@ growThetaTyVars theta tvs
 quantifyPred :: TyVarSet           -- Quantifying over these
              -> PredType -> Bool   -- True <=> quantify over this wanted
 quantifyPred qtvs pred
-  | isIPPred pred = True           -- See note [Inheriting implicit parameters]
-  | otherwise     = tyVarsOfType pred `intersectsVarSet` qtvs
+  = case classifyPredType pred of
+      ClassPred cls tys
+         | isIPClass cls -> True  -- See note [Inheriting implicit parameters]
+         | otherwise     -> tyVarsOfTypes tys `intersectsVarSet` qtvs
+      EqPred ty1 ty2     -> quant_fun ty1 || quant_fun ty2
+      IrredPred ty       -> tyVarsOfType ty `intersectsVarSet` qtvs
+      TuplePred {}       -> False
+  where
+    -- Only quantify over (F tys ~ ty) if tys mentions a quantiifed variable
+    -- In particular, quanitifying over (F Int ~ ty) is a bit like quantifying
+    -- over (Eq Int); the instance should kick in right here
+    quant_fun ty
+      = case tcSplitTyConApp_maybe ty of
+          Just (tc, tys) | isSynFamilyTyCon tc
+                         -> tyVarsOfTypes tys `intersectsVarSet` qtvs
+          _ -> False
 \end{code}
 
 Note [Inheriting implicit parameters]

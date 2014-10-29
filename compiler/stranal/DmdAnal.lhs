@@ -1089,7 +1089,8 @@ extendSigsWithLam env id
 findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
 -- See Note [Trimming a demand to a type] in Demand.lhs
 findBndrDmd env arg_of_dfun dmd_ty id
-  = (dmd_ty', dmd')
+  = -- pprTrace "findBndrDmd" (vcat [ ppr id, ppr id_ty, ppr starting_dmd, ppr (findTypeShape fam_envs id_ty), ppr dmd' ])
+    (dmd_ty', dmd')
   where
     dmd' = zapDemand (ae_dflags env) $
            strictify $
