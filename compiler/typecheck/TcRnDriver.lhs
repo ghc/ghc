@@ -1645,11 +1645,12 @@ tcRnExpr hsc_env rdr_expr
         -- it might have a rank-2 type (e.g. :t runST)
     uniq <- newUnique ;
     let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
-    ((_tc_expr, res_ty), lie) <- captureConstraints $ 
-                                 tcInferRho rn_expr ;
+    (((_tc_expr, res_ty), untch), lie) <- captureConstraints  $
+                                          captureUntouchables $
+                                          tcInferRho rn_expr ;
     ((qtvs, dicts, _, _), lie_top) <- captureConstraints $
                                       {-# SCC "simplifyInfer" #-}
-                                      simplifyInfer True {- Free vars are closed -}
+                                      simplifyInfer untch
                                                     False {- No MR for now -}
                                                     [(fresh_it, res_ty)]
                                                     lie ;
