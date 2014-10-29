@@ -43,10 +43,7 @@ import Class
 import Var
 import VarEnv
 import VarSet
-import CoreUnfold ( mkDFunUnfolding )
-import CoreSyn    ( Expr(Var, Type), CoreExpr, mkTyApps, mkVarApps )
-import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName,
-                    genericClassNames )
+import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName, genericClassNames )
 import Bag
 import BasicTypes
 import DynFlags
@@ -883,26 +880,14 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
 
                 -- Do not inline the dfun; instead give it a magic DFunFunfolding
-                -- See Note [ClassOp/DFun selection]
-                -- See also note [Single-method classes]
-             (dfun_id_w_fun, dfun_spec_prags)
-                | isNewTyCon class_tc
-                = ( dfun_id `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
-                  , SpecPrags [] )   -- Newtype dfuns just inline unconditionally,
-                                     -- so don't attempt to specialise them
+             dfun_spec_prags
+                | isNewTyCon class_tc = SpecPrags []
+                    -- Newtype dfuns just inline unconditionally,
+                    -- so don't attempt to specialise them
                 | otherwise
-                = ( dfun_id `setIdUnfolding`  mkDFunUnfolding (inst_tyvars ++ dfun_ev_vars)
-                                                              dict_constr dfun_args
-                            `setInlinePragma` dfunInlinePragma
-                  , SpecPrags spec_inst_prags )
+                = SpecPrags spec_inst_prags
 
-             dfun_args :: [CoreExpr]
-             dfun_args = map Type inst_tys        ++
-                         map Var  sc_ev_vars      ++
-                         map mk_meth_app meth_ids
-             mk_meth_app meth_id = Var meth_id `mkTyApps` inst_tv_tys `mkVarApps` dfun_ev_vars
-
-             export = ABE { abe_wrap = idHsWrapper, abe_poly = dfun_id_w_fun
+             export = ABE { abe_wrap = idHsWrapper, abe_poly = dfun_id
                           , abe_mono = self_dict, abe_prags = dfun_spec_prags }
                           -- NB: see Note [SPECIALISE instance pragmas]
              main_bind = AbsBinds { abs_tvs = inst_tyvars
