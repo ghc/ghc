@@ -28,8 +28,8 @@ import TcRnMonad
 import TcEnv
 import TcValidity
 import TcHsSyn
+import TcSimplify( growThetaTyVars )
 import TcBinds( tcRecSelBinds )
-import FunDeps( growThetaTyVars )
 import TcTyDecls
 import TcClassDcl
 import TcHsType
