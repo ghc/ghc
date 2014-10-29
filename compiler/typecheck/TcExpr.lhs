@@ -698,7 +698,7 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
 
               mk_inst_ty :: TvSubst -> (TKVar, TcType) -> TcM (TvSubst, TcType)
               -- Deals with instantiation of kind variables
-              --   c.f. TcMType.tcInstTyVarsX
+              --   c.f. TcMType.tcInstTyVars
               mk_inst_ty subst (tv, result_inst_ty)
                 | is_fixed_tv tv   -- Same as result type
                 = return (extendTvSubst subst tv result_inst_ty, result_inst_ty)
@@ -706,7 +706,8 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
                 = do { new_ty <- newFlexiTyVarTy (TcType.substTy subst (tyVarKind tv))
                      ; return (extendTvSubst subst tv new_ty, new_ty) }
 
-        ; (_, result_inst_tys, result_subst) <- tcInstTyVars con1_tvs
+        ; (result_subst, con1_tvs') <- tcInstTyVars con1_tvs
+        ; let result_inst_tys = mkTyVarTys con1_tvs'
 
         ; (scrut_subst, scrut_inst_tys) <- mapAccumLM mk_inst_ty emptyTvSubst
                                                       (con1_tvs `zip` result_inst_tys)
@@ -734,7 +735,7 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
         -- Phew!
         ; return $ mkHsWrapCo co_res $
           RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
-                                   relevant_cons scrut_inst_tys result_inst_tys  }
+                    relevant_cons scrut_inst_tys result_inst_tys  }
   where
     upd_fld_names = hsRecFields rbinds
 
@@ -1111,11 +1112,12 @@ instantiateOuter orig id
   = return (HsVar id, tau)
 
   | otherwise
-  = do { (_, tys, subst) <- tcInstTyVars tvs
-       ; doStupidChecks id tys
-       ; let theta' = substTheta subst theta
-       ; traceTc "Instantiating" (ppr id <+> text "with" <+> (ppr tys $$ ppr theta'))
-       ; wrap <- instCall orig tys theta'
+  = do { (subst, tvs') <- tcInstTyVars tvs
+       ; let tys'   = mkTyVarTys tvs'
+             theta' = substTheta subst theta
+       ; doStupidChecks id tys'
+       ; traceTc "Instantiating" (ppr id <+> text "with" <+> (ppr tys' $$ ppr theta'))
+       ; wrap <- instCall orig tys' theta'
        ; return (mkHsWrap wrap (HsVar id), TcType.substTy subst tau) }
   where
     (tvs, theta, tau) = tcSplitSigmaTy (idType id)
