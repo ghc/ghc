@@ -840,7 +840,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
 
        ; dfun_ev_vars <- newEvVars dfun_theta
 
-       ; (sc_binds, sc_ev_vars) <- tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta'
+       ; sc_ev_vars <- tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta'
 
        -- Deal with 'SPECIALISE instance' pragmas
        -- See Note [SPECIALISE instance pragmas]
@@ -908,7 +908,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              main_bind = AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [export]
-                                  , abs_ev_binds = sc_binds
+                                  , abs_ev_binds = emptyTcEvBinds
                                   , abs_binds = unitBag dict_bind }
 
        ; return (unitBag (L loc main_bind) `unionBags`
@@ -920,22 +920,23 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
 
 ------------------------------
 tcSuperClasses :: DFunId -> [TcTyVar] -> [EvVar] -> TcThetaType
-               -> TcM (TcEvBinds, [EvVar])
+               -> TcM [EvVar]
 -- See Note [Silent superclass arguments]
 tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta
+  | null inst_tyvars && null dfun_ev_vars
+  = emitWanteds ScOrigin sc_theta
+
+  | otherwise
   = do {   -- Check that all superclasses can be deduced from
            -- the originally-specified dfun arguments
-       ; (sc_binds, sc_evs) <- checkConstraints InstSkol inst_tyvars orig_ev_vars $
-                               emitWanteds ScOrigin sc_theta
+       ; _ <- checkConstraints InstSkol inst_tyvars orig_ev_vars $
+              emitWanteds ScOrigin sc_theta
 
-       ; if null inst_tyvars && null dfun_ev_vars
-         then return (sc_binds,       sc_evs)
-         else return (emptyTcEvBinds, sc_lam_args) }
+       ; return (map (find dfun_ev_vars) sc_theta) }
   where
     n_silent     = dfunNSilent dfun_id
     orig_ev_vars = drop n_silent dfun_ev_vars
 
-    sc_lam_args = map (find dfun_ev_vars) sc_theta
     find [] pred
       = pprPanic "tcInstDecl2" (ppr dfun_id $$ ppr (idType dfun_id) $$ ppr pred)
     find (ev:evs) pred
