@@ -533,23 +533,29 @@ take n _      | n <= 0 =  []
 take _ []              =  []
 take n (x:xs)          =  x : take (n-1) xs
 #else
--- We always want to inline this to take advantage of a known
--- length argument sign.
-{-# INLINE take #-}
+
+{- We always want to inline this to take advantage of a known length argument
+sign. Note, however, that it's important for the RULES to grab take, rather
+than trying to INLINE take immediately and then letting the RULES grab
+unsafeTake. Presumably the latter approach doesn't grab it early enough; it led
+to an allocation regression in nofib/fft2. -}
+{-# INLINE [1] take #-}
 take n xs | 0 < n     = unsafeTake n xs
           | otherwise = []
 
 -- A version of take that takes the whole list if it's given an argument less
--- than 1. This does the same thing as the fold version.
+-- than 1.
 {-# NOINLINE [1] unsafeTake #-}
 unsafeTake :: Int -> [a] -> [a]
-unsafeTake _  []     = []
-unsafeTake 1  (x: _) = [x]
-unsafeTake m  (x:xs) = x : unsafeTake (m - 1) xs
+unsafeTake !_  []     = []
+unsafeTake 1   (x: _) = [x]
+unsafeTake m   (x:xs) = x : unsafeTake (m - 1) xs
 
 {-# RULES
-"unsafeTake"     [~1] forall n xs . unsafeTake n xs =
-  build (\c nil -> foldr (takeFB c nil) (flipSeqTake nil) xs n)
+"take"     [~1] forall n xs . take n xs =
+  build (\c nil -> if 0 < n
+                   then foldr (takeFB c nil) (flipSeqTake nil) xs n
+                   else nil)
 "unsafeTakeList"  [1] forall n xs . foldr (takeFB (:) []) (flipSeqTake []) xs n
                                         = unsafeTake n xs
  #-}
@@ -558,8 +564,8 @@ unsafeTake m  (x:xs) = x : unsafeTake (m - 1) xs
 -- Just flip seq, specialized to Int, but not inlined too early.
 -- It's important to force the numeric argument here, even though
 -- it's not used. Otherwise, take n [] doesn't force n. This is
--- bad for strictness analysis and unboxing, and leads to test suite
--- performance regressions.
+-- bad for strictness analysis and unboxing, and leads to increased
+-- allocation in T7257.
 flipSeqTake :: a -> Int -> a
 flipSeqTake x !_n = x
 
@@ -602,9 +608,9 @@ drop n ls
     -- A version of drop that drops the whole list if given an argument
     -- less than 1
     unsafeDrop :: Int -> [a] -> [a]
-    unsafeDrop _ []     = []
-    unsafeDrop 1 (_:xs) = xs
-    unsafeDrop m (_:xs) = unsafeDrop (m - 1) xs
+    unsafeDrop !_ []     = []
+    unsafeDrop 1  (_:xs) = xs
+    unsafeDrop m  (_:xs) = unsafeDrop (m - 1) xs
 #endif
 
 -- | 'splitAt' @n xs@ returns a tuple where first element is @xs@ prefix of

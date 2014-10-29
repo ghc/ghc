@@ -33,7 +33,7 @@ infixl 4 <$>
 
 -- | An infix synonym for 'fmap'.
 --
---   __Examples__:
+--   ==== __Examples__
 --
 --   Convert from a 'Maybe' 'Int' to a 'Maybe' 'String' using 'show':
 --
@@ -70,7 +70,7 @@ infixl 4 $>
 --
 --   /Since: 4.7.0.0/
 --
---   __Examples__:
+--   ==== __Examples__
 --
 --   Replace the contents of a 'Maybe' 'Int' with a constant 'String':
 --
@@ -103,7 +103,7 @@ infixl 4 $>
 -- | @'void' value@ discards or ignores the result of evaluation, such
 --   as the return value of an 'IO' action.
 --
---   __Examples__:
+--   ==== __Examples__
 --
 --   Replace the contents of a 'Maybe' 'Int' with unit:
 --

@@ -37,7 +37,7 @@ import GHC.Base
 --
 --   /Since: 4.7.0.0/
 --
---   __Examples__:
+--   ==== __Examples__
 --
 --   Basic usage:
 --
