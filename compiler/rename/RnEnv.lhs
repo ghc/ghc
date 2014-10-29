@@ -84,6 +84,64 @@ import Constants        ( mAX_TUPLE_SIZE )
 %*                                                      *
 %*********************************************************
 
+Note [Signature lazy interface loading]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+GHC's lazy interface loading can be a bit confusing, so this Note is an
+empirical description of what happens in one interesting case. When
+compiling a signature module against an its implementation, we do NOT
+load interface files associated with its names until after the type
+checking phase.  For example:
+
+    module ASig where
+        data T
+        f :: T -> T
+
+Suppose we compile this with -sig-of "A is ASig":
+
+    module B where
+        data T = T
+        f T = T
+
+    module A(module B) where
+        import B
+
+During type checking, we'll load A.hi because we need to know what the
+RdrEnv for the module is, but we DO NOT load the interface for B.hi!
+It's wholly unnecessary: our local definition 'data T' in ASig is all
+the information we need to finish type checking.  This is contrast to
+type checking of ordinary Haskell files, in which we would not have the
+local definition "data T" and would need to consult B.hi immediately.
+(Also, this situation never occurs for hs-boot files, since you're not
+allowed to reexport from another module.)
+
+After type checking, we then check that the types we provided are
+consistent with the backing implementation (in checkHiBootOrHsigIface).
+At this point, B.hi is loaded, because we need something to compare
+against.
+
+I discovered this behavior when trying to figure out why type class
+instances for Data.Map weren't in the EPS when I was type checking a
+test very much like ASig (sigof02dm): the associated interface hadn't
+been loaded yet!  (The larger issue is a moot point, since an instance
+declared in a signature can never be a duplicate.)
+
+This behavior might change in the future.  Consider this
+alternate module B:
+
+    module B where
+        {-# DEPRECATED T, f "Don't use" #-}
+        data T = T
+        f T = T
+
+One might conceivably want to report deprecation warnings when compiling
+ASig with -sig-of B, in which case we need to look at B.hi to find the
+deprecation warnings during renaming.  At the moment, you don't get any
+warning until you use the identifier further downstream.  This would
+require adjusting addUsedRdrName so that during signature compilation,
+we do not report deprecation warnings for LocalDef.  See also
+Note [Handling of deprecations]
+
 \begin{code}
 newTopSrcBinder :: Located RdrName -> RnM Name
 newTopSrcBinder (L loc rdr_name)
@@ -141,12 +199,36 @@ newTopSrcBinder (L loc rdr_name)
                 -- module name, we we get a confusing "M.T is not in scope" error later
 
         ; stage <- getStage
+        ; env <- getGblEnv
         ; if isBrackStage stage then
                 -- We are inside a TH bracket, so make an *Internal* name
                 -- See Note [Top-level Names in Template Haskell decl quotes] in RnNames
              do { uniq <- newUnique
                 ; return (mkInternalName uniq (rdrNameOcc rdr_name) loc) }
-          else
+          else case tcg_impl_rdr_env env of
+            Just gr ->
+                -- We're compiling --sig-of, so resolve with respect to this
+                -- module.
+                -- See Note [Signature parameters in TcGblEnv and DynFlags]
+             do { case lookupGlobalRdrEnv gr (rdrNameOcc rdr_name) of
+                    -- Be sure to override the loc so that we get accurate
+                    -- information later
+                    [GRE{ gre_name = n }] -> do
+                      -- NB: Just adding this line will not work:
+                      --    addUsedRdrName True gre rdr_name
+                      -- see Note [Signature lazy interface loading] for
+                      -- more details.
+                      return (setNameLoc n loc)
+                    _ -> do
+                      { -- NB: cannot use reportUnboundName rdr_name
+                        -- because it looks up in the wrong RdrEnv
+                        -- ToDo: more helpful error messages
+                      ; addErr (unknownNameErr (pprNonVarNameSpace
+                            (occNameSpace (rdrNameOcc rdr_name))) rdr_name)
+                      ; return (mkUnboundName rdr_name)
+                      }
+                }
+            Nothing ->
                 -- Normal case
              do { this_mod <- getModule
                 ; newGlobalBinder this_mod (rdrNameOcc rdr_name) loc } }
@@ -1604,13 +1686,17 @@ mapFvRnCPS f (x:xs) cont = f x             $ \ x' ->
 warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
 warnUnusedTopBinds gres
     = whenWOptM Opt_WarnUnusedBinds
-    $ do isBoot <- tcIsHsBoot
+    $ do env <- getGblEnv
+         let isBoot = tcg_src env == HsBootFile
          let noParent gre = case gre_par gre of
                             NoParent -> True
                             ParentIs _ -> False
              -- Don't warn about unused bindings with parents in
              -- .hs-boot files, as you are sometimes required to give
              -- unused bindings (trac #3449).
+             -- HOWEVER, in a signature file, you are never obligated to put a
+             -- definition in the main text.  Thus, if you define something
+             -- and forget to export it, we really DO want to warn.
              gres' = if isBoot then filter noParent gres
                                else                 gres
          warnUnusedGREs gres'

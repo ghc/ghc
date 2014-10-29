@@ -52,7 +52,7 @@ import BasicTypes
 import DynFlags
 import ErrUtils
 import FastString
-import HscTypes ( isHsBoot )
+import HscTypes ( isHsBootOrSig )
 import Id
 import MkId
 import Name
@@ -432,8 +432,9 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
             (typeableClassName == is_cls_nm (iSpec i))
             -- but not those that come from Data.Typeable.Internal
             && tcg_mod env /= tYPEABLE_INTERNAL
-            -- nor those from an .hs-boot file (deriving can't be used there)
-            && not (isHsBoot (tcg_src env))
+            -- nor those from an .hs-boot or .hsig file
+            -- (deriving can't be used there)
+            && not (isHsBootOrSig (tcg_src env))
          then (i:typeableInsts, otherInsts)
          else (typeableInsts, i:otherInsts)
 
@@ -511,7 +512,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                                   , cid_datafam_insts = adts }))
   = setSrcSpan loc                      $
     addErrCtxt (instDeclCtxt1 poly_ty)  $
-    do  { is_boot <- tcIsHsBoot
+    do  { is_boot <- tcIsHsBootOrSig
         ; checkTc (not is_boot || (isEmptyLHsBinds binds && null uprags))
                   badBootDeclErr
 
@@ -622,7 +623,7 @@ tcFamInstDeclCombined mb_clsinfo fam_tc_lname
          -- and can't (currently) be in an hs-boot file
        ; traceTc "tcFamInstDecl" (ppr fam_tc_lname)
        ; type_families <- xoptM Opt_TypeFamilies
-       ; is_boot <- tcIsHsBoot   -- Are we compiling an hs-boot file?
+       ; is_boot <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
        ; checkTc type_families $ badFamInstDecl fam_tc_lname
        ; checkTc (not is_boot) $ badBootFamInstDeclErr
 

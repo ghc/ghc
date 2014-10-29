@@ -90,6 +90,7 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	    $(LIBFFI_PATH_MANGLE) \
 	    cd build && \
 	    CC=$(CC_STAGE1) \
+	    CXX=$(CC_STAGE1) \
 	    LD=$(LD) \
 	    AR=$(AR_STAGE1) \
 	    NM=$(NM) \

@@ -66,6 +66,12 @@
         <itemizedlist>
             <listitem>
                 <para>
+                    GHC has had its internal Unicode database for
+                    parsing updated to the Unicode 7.0 standard.
+                </para>
+           </listitem>
+            <listitem>
+                <para>
                     GHC now checks that all the language extensions required for
                     the inferred type signatures are explicitly enabled. This
                     means that if any of the type signatures inferred in your
@@ -80,6 +86,12 @@
                     particular language extension (most likely
                     <option>-XTypeFamilies</option>, <option>-XGADTs</option> or
                     <option>-XFlexibleContexts</option>).
+                </para>
+                <para>
+                    <option>-fwarn-tabs</option> warning flag is turned on by
+                    default with this release of GHC. It can be suppressed
+                    either by using <literal>GHC_OPTIONS</literal> pragma or by
+                    specifying <option>-fno-warn-tabs</option> flag.
                 </para>
            </listitem>
        </itemizedlist>

@@ -18,6 +18,7 @@ module InstEnv (
 
         InstEnv, emptyInstEnv, extendInstEnv, deleteFromInstEnv, identicalInstHead, 
         extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv', lookupInstEnv, instEnvElts,
+        memberInstEnv,
         classInstances, orphNamesOfClsInst, instanceBindFun,
         instanceCantMatch, roughMatchTcs
     ) where
@@ -411,6 +412,13 @@ classInstances (pkg_ie, home_ie) cls
 -- Used in the implementation of ":info" in GHCi.
 orphNamesOfClsInst :: ClsInst -> NameSet
 orphNamesOfClsInst = orphNamesOfDFunHead . idType . instanceDFunId
+
+-- | Checks for an exact match of ClsInst in the instance environment.
+-- We use this when we do signature checking in TcRnDriver
+memberInstEnv :: InstEnv -> ClsInst -> Bool
+memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
+    maybe False (\(ClsIE items) -> any (identicalInstHead ins_item) items)
+          (lookupUFM inst_env cls_nm)
 
 extendInstEnvList :: InstEnv -> [ClsInst] -> InstEnv
 extendInstEnvList inst_env ispecs = foldl extendInstEnv inst_env ispecs

@@ -100,9 +100,9 @@ class (Ord a) => Ix a where
 
         -- Must specify one of index, unsafeIndex
 
-	-- 'index' is typically over-ridden in instances, with essentially
-	-- the same code, but using indexError instead of hopelessIndexError
-	-- Reason: we have 'Show' at the instances
+        -- 'index' is typically over-ridden in instances, with essentially
+        -- the same code, but using indexError instead of hopelessIndexError
+        -- Reason: we have 'Show' at the instances
     {-# INLINE index #-}  -- See Note [Inlining index]
     index b i | inRange b i = unsafeIndex b i
               | otherwise   = hopelessIndexError
@@ -529,7 +529,7 @@ safeRangeSize (l,u) = let r = rangeSize (l, u)
                                   else r
 
 -- Don't inline this error message everywhere!!
-negRange :: Int	  -- Uninformative, but Ix does not provide Show
+negRange :: Int   -- Uninformative, but Ix does not provide Show
 negRange = error "Negative range size"
 
 {-# INLINE[1] safeIndex #-}
@@ -537,7 +537,7 @@ negRange = error "Negative range size"
 -- Inline *after* (!) so the rules can fire
 -- Make sure it is strict in n
 safeIndex :: Ix i => (i, i) -> Int -> i -> Int
-safeIndex (l,u) n@(I# _) i 
+safeIndex (l,u) n@(I# _) i
   | (0 <= i') && (i' < n) = i'
   | otherwise             = badSafeIndex i' n
   where
@@ -633,9 +633,9 @@ adjust :: (e -> a -> e) -> MutableArray# s e -> (Int, a) -> STRep s b -> STRep s
 -- See NB on 'fill'
 adjust f marr# (I# i#, new) next
   = \s1# -> case readArray# marr# i# s1# of
-        	(# s2#, old #) ->
-        	    case writeArray# marr# i# (f old new) s2# of
-        	        s3# -> next s3#
+                (# s2#, old #) ->
+                    case writeArray# marr# i# (f old new) s2# of
+                        s3# -> next s3#
 
 -- | Constructs an array identical to the first argument except that it has
 -- been updated by the associations in the right argument.

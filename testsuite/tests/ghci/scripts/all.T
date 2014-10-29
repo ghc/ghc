@@ -1,5 +1,8 @@
 # coding=utf8
 
+def normaliseTransformersPackageKey(str):
+    return re.sub('trans_[A-Za-z0-9]+', 'trans_<HASH>', str)
+
 setTestOpts(when(compiler_profiled(), skip))
 
 test('ghci001', combined_output, ghci_script, ['ghci001.script'])
@@ -82,7 +85,7 @@ test('ghci056',
      ],
      ghci_script, ['ghci056.script'])
 
-test('ghci057', normal, ghci_script, ['ghci057.script'])
+test('ghci057', normal, ghci_script_without_flag('-fno-warn-tabs'), ['ghci057.script'])
 
 test('T2452', normal, ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
@@ -114,7 +117,11 @@ test('T5564', normal, ghci_script, ['T5564.script'])
 test('Defer02', normal, ghci_script, ['Defer02.script'])
 test('T5820', normal, ghci_script, ['T5820.script'])
 test('T5836', normal, ghci_script, ['T5836.script'])
-test('T5979', [reqlib('transformers'), normalise_slashes], ghci_script, ['T5979.script'])
+test('T5979',
+    [reqlib('transformers'),
+     normalise_slashes,
+     normalise_errmsg_fun(normaliseTransformersPackageKey)],
+    ghci_script, ['T5979.script'])
 test('T5975a',
      [pre_cmd('touch föøbàr1.hs'),
       clean_cmd('rm föøbàr1.hs')],

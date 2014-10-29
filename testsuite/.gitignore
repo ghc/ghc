@@ -30,6 +30,7 @@ Thumbs.db
 
 *.genscript
 *.stderr.normalised
+*.stderr-mingw32.normalised
 *.stderr-ghc.normalised
 *.stdout.normalised
 *.interp.stdout
@@ -53,9 +54,9 @@ tmp.d
 *.so
 *bindisttest_install___dir_bin_ghc.mk
 *bindisttest_install___dir_bin_ghc.exe.mk
-mk/ghcconfig_*_inplace_bin_ghc-stage1.mk
-mk/ghcconfig_*_inplace_bin_ghc-stage2.mk
-mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
+mk/ghcconfig*_inplace_bin_ghc-stage1.mk
+mk/ghcconfig*_inplace_bin_ghc-stage2.mk
+mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 *.imports
 
 # -----------------------------------------------------------------------------
@@ -592,8 +593,18 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/driver/recomp012/Main
 /tests/driver/recomp012/Main.hs
 /tests/driver/recomp012/MyBool.hs
+/tests/driver/recomp014/A.hs
+/tests/driver/recomp014/A1.hs
+/tests/driver/recomp014/B.hsig
+/tests/driver/recomp014/C.hs
+/tests/driver/recomp014/recomp014
 /tests/driver/rtsOpts
 /tests/driver/rtsopts002
+/tests/driver/sigof01/Main
+/tests/driver/sigof01/tmp_*
+/tests/driver/sigof02/tmp_*
+/tests/driver/sigof03/tmp_*
+/tests/driver/sigof04/containers
 /tests/driver/spacesInArgs
 /tests/driver/stub017/
 /tests/driver/stub028/

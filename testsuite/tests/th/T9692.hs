@@ -5,6 +5,7 @@ module T9692 where
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Ppr
+import System.IO
 
 class C a where
         data F a (b :: k) :: *
@@ -14,4 +15,5 @@ instance C Int where
 
 $( do info <- qReify (mkName "F")
       runIO $ putStrLn $ pprint info
+      runIO $ hFlush stdout
       return [])

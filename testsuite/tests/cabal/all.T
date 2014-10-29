@@ -36,8 +36,7 @@ test('ghcpkg05',
                     'local05a.package.conf.old',
                     'local05b.package.conf',
                     'local05b.package.conf.old']),
-       normalise_errmsg_fun(two_normalisers(normalise_haddock_junk,
-                                            normaliseDynlibNames))
+       normalise_errmsg_fun(normalise_haddock_junk, normaliseDynlibNames)
        ],
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg05'])

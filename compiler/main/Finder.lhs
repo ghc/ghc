@@ -247,6 +247,8 @@ findHomeModule hsc_env mod_name =
      source_exts =
       [ ("hs",   mkHomeModLocationSearched dflags mod_name "hs")
       , ("lhs",  mkHomeModLocationSearched dflags mod_name "lhs")
+      , ("hsig",  mkHomeModLocationSearched dflags mod_name "hsig")
+      , ("lhsig",  mkHomeModLocationSearched dflags mod_name "lhsig")
       ]
 
      hi_exts = [ (hisuf,                mkHiOnlyModLocation dflags hisuf)

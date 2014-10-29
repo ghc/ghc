@@ -167,3 +167,12 @@ libraries/template-haskell_dist-install_EXTRA_HC_OPTS += -fno-warn-inline-rule-s
 # We need -fno-warn-deprecated-flags to avoid failure with -Werror
 GhcLibHcOpts += -fno-warn-deprecated-flags
 GhcBootLibHcOpts += -fno-warn-deprecated-flags
+
+# The warning suppression flag below is a temporary kludge. While working with
+# modules that contain tabs, please de-tab them so this flag can be eventually
+# removed. See
+# http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+# for details
+#
+GhcLibHcOpts += -fno-warn-tabs
+utils/hsc2hs_dist-install_EXTRA_HC_OPTS += -fno-warn-tabs

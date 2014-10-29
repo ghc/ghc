@@ -631,7 +631,7 @@ hscCompileOneShot' hsc_env mod_summary src_changed
                     return HscNotGeneratingCode
                 _ ->
                     case ms_hsc_src mod_summary of
-                    HsBootFile ->
+                    t | isHsBootOrSig t ->
                         do (iface, changed, _) <- hscSimpleIface' tc_result mb_old_hash
                            liftIO $ hscWriteIface dflags iface changed mod_summary
                            return HscUpdateBoot

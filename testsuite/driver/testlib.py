@@ -16,6 +16,7 @@ import datetime
 import copy
 import glob
 from math import ceil, trunc
+import collections
 
 have_subprocess = False
 try:
@@ -493,20 +494,47 @@ def normalise_slashes( name, opts ):
 def normalise_exe( name, opts ):
     opts.extra_normaliser = normalise_exe_
 
-def normalise_fun( fun ):
-    return lambda name, opts, f=fun: _normalise_fun(name, opts, f)
+def normalise_fun( *fs ):
+    return lambda name, opts: _normalise_fun(name, opts, fs)
 
-def _normalise_fun( name, opts, f ):
-    opts.extra_normaliser = f
+def _normalise_fun( name, opts, *fs ):
+    opts.extra_normaliser = join_normalisers(fs)
 
-def normalise_errmsg_fun( fun ):
-    return lambda name, opts, f=fun: _normalise_errmsg_fun(name, opts, f)
+def normalise_errmsg_fun( *fs ):
+    return lambda name, opts: _normalise_errmsg_fun(name, opts, fs)
 
-def _normalise_errmsg_fun( name, opts, f ):
-    opts.extra_errmsg_normaliser = f
+def _normalise_errmsg_fun( name, opts, *fs ):
+    opts.extra_errmsg_normaliser = join_normalisers(fs)
 
-def two_normalisers(f, g):
-    return lambda x, f=f, g=g: f(g(x))
+def join_normalisers(*a):
+    """
+    Compose functions, flattening sequences.
+
+       join_normalisers(f1,[f2,f3],f4)
+
+    is the same as
+
+       lambda x: f1(f2(f3(f4(x))))
+    """
+
+    def flatten(l):
+        """
+        Taken from http://stackoverflow.com/a/2158532/946226
+        """
+        for el in l:
+            if isinstance(el, collections.Iterable) and not isinstance(el, basestring):
+                for sub in flatten(el):
+                    yield sub
+            else:
+                yield el
+
+    a = flatten(a)
+
+    fn = lambda x:x # identity function
+    for f in a:
+        assert callable(f)
+        fn = lambda x,f=f,fn=fn: fn(f(x))
+    return fn
 
 # ----
 # Function for composing two opt-fns together
@@ -890,11 +918,29 @@ def run_command( name, way, cmd ):
 # -----------------------------------------------------------------------------
 # GHCi tests
 
-def ghci_script( name, way, script ):
+def ghci_script_without_flag(flag):
+    def apply(name, way, script):
+        overrides = filter(lambda f: f != flag, getTestOpts().compiler_always_flags)
+        return ghci_script_override_default_flags(overrides)(name, way, script)
+
+    return apply
+
+def ghci_script_override_default_flags(overrides):
+    def apply(name, way, script):
+        return ghci_script(name, way, script, overrides)
+
+    return apply
+
+def ghci_script( name, way, script, override_flags = None ):
+    # Use overriden default flags when given
+    if override_flags:
+        default_flags = override_flags
+    else:
+        default_flags = getTestOpts().compiler_always_flags
+
     # filter out -fforce-recomp from compiler_always_flags, because we're
     # actually testing the recompilation behaviour in the GHCi tests.
-    flags = [f for f in getTestOpts().compiler_always_flags if f != '-fforce-recomp']
-
+    flags = [f for f in default_flags if f != '-fforce-recomp']
     flags.append(getTestOpts().extra_hc_opts)
     if getTestOpts().outputdir != None:
         flags.extend(["-outputdir", getTestOpts().outputdir])
@@ -912,6 +958,32 @@ def ghci_script( name, way, script ):
 
 # -----------------------------------------------------------------------------
 # Compile-only tests
+
+def compile_override_default_flags(overrides):
+    def apply(name, way, extra_opts):
+        return do_compile(name, way, 0, '', [], extra_opts, overrides)
+
+    return apply
+
+def compile_fail_override_default_flags(overrides):
+    def apply(name, way, extra_opts):
+        return do_compile(name, way, 1, '', [], extra_opts, overrides)
+
+    return apply
+
+def compile_without_flag(flag):
+    def apply(name, way, extra_opts):
+        overrides = filter(lambda f: f != flag, getTestOpts().compiler_always_flags)
+        return compile_override_default_flags(overrides)(name, way, extra_opts)
+
+    return apply
+
+def compile_fail_without_flag(flag):
+    def apply(name, way, extra_opts):
+        overrides = filter(lambda f: f != flag, getTestOpts().compiler_always_flags)
+        return compile_fail_override_default_flags(overrides)(name, way, extra_opts)
+
+    return apply
 
 def compile( name, way, extra_hc_opts ):
     return do_compile( name, way, 0, '', [], extra_hc_opts )
@@ -931,7 +1003,7 @@ def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
 def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
     return do_compile( name, way, 1, top_mod, extra_mods, extra_hc_opts)
 
-def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts ):
+def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, override_flags = None ):
     # print 'Compile only, extra args = ', extra_hc_opts
     pretest_cleanup(name)
 
@@ -943,7 +1015,7 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts ):
     force = 0
     if extra_mods:
        force = 1
-    result = simple_build( name, way, extra_hc_opts, should_fail, top_mod, 0, 1, force)
+    result = simple_build( name, way, extra_hc_opts, should_fail, top_mod, 0, 1, force, override_flags )
 
     if badResult(result):
         return result
@@ -960,8 +1032,10 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts ):
     (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
 
-    if not compare_outputs('stderr', \
-                           two_normalisers(two_normalisers(getTestOpts().extra_errmsg_normaliser, normalise_errmsg), normalise_whitespace), \
+    if not compare_outputs('stderr',
+                           join_normalisers(getTestOpts().extra_errmsg_normaliser,
+                                            normalise_errmsg,
+                                            normalise_whitespace),
                            expected_stderr_file, actual_stderr_file):
         return failBecause('stderr mismatch')
 
@@ -988,7 +1062,7 @@ def compile_cmp_asm( name, way, extra_hc_opts ):
     (platform_specific, expected_asm_file) = platform_wordsize_qualify(namebase, 'asm')
     actual_asm_file = qualify(name, 's')
 
-    if not compare_outputs('asm', two_normalisers(normalise_errmsg, normalise_asm), \
+    if not compare_outputs('asm', join_normalisers(normalise_errmsg, normalise_asm), \
                            expected_asm_file, actual_asm_file):
         return failBecause('asm mismatch')
 
@@ -1103,7 +1177,7 @@ def extras_build( way, extra_mods, extra_hc_opts ):
     return {'passFail' : 'pass', 'hc_opts' : extra_hc_opts}
 
 
-def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, noforce ):
+def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, noforce, override_flags = None ):
     opts = getTestOpts()
     errname = add_suffix(name, 'comp.stderr')
     rm_no_fail( qualify(errname, '') )
@@ -1151,7 +1225,11 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     else:
         cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
 
-    comp_flags = copy.copy(getTestOpts().compiler_always_flags)
+    if override_flags:
+        comp_flags = copy.copy(override_flags)
+    else:
+        comp_flags = copy.copy(getTestOpts().compiler_always_flags)
+
     if noforce:
         comp_flags = [f for f in comp_flags if f != '-fforce-recomp']
     if getTestOpts().outputdir != None:
@@ -1421,14 +1499,14 @@ def check_stdout_ok( name ):
       else:
          return normalise_output(str)
 
-   two_norm = two_normalisers(norm, getTestOpts().extra_normaliser)
+   extra_norm = join_normalisers(norm, getTestOpts().extra_normaliser)
 
    check_stdout = getTestOpts().check_stdout
    if check_stdout:
-      return check_stdout(actual_stdout_file, two_norm)
+      return check_stdout(actual_stdout_file, extra_norm)
 
    return compare_outputs('stdout', \
-                          two_norm, \
+                          extra_norm, \
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
@@ -1451,7 +1529,7 @@ def check_stderr_ok( name ):
          return normalise_errmsg(str)
 
    return compare_outputs('stderr', \
-                          two_normalisers(norm, getTestOpts().extra_errmsg_normaliser), \
+                          join_normalisers(norm, getTestOpts().extra_errmsg_normaliser), \
                           expected_stderr_file, actual_stderr_file)
 
 def dump_stderr( name ):
@@ -1525,7 +1603,7 @@ def check_prof_ok(name):
         return True
     else:
         return compare_outputs('prof', \
-                               two_normalisers(normalise_whitespace,normalise_prof), \
+                               join_normalisers(normalise_whitespace,normalise_prof), \
                                expected_prof_file, prof_file)
 
 # Compare expected output to actual output, and optionally accept the

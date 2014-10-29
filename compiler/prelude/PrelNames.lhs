@@ -125,6 +125,8 @@ import BasicTypes
 import Name
 import SrcLoc
 import FastString
+import Config ( cIntegerLibraryType, IntegerLibrary(..) )
+import Panic ( panic )
 \end{code}
 
 
@@ -356,7 +358,9 @@ basicKnownKeyNames
 
         -- GHCi Sandbox
         , ghciIoClassName, ghciStepIoMName
-    ]
+    ] ++ case cIntegerLibraryType of
+           IntegerGMP    -> [integerSDataConName]
+           IntegerSimple -> []
 
 genericTyConNames :: [Name]
 genericTyConNames = [
@@ -916,7 +920,7 @@ fromIntegerName   = varQual gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
 minusName         = varQual gHC_NUM (fsLit "-")           minusClassOpKey
 negateName        = varQual gHC_NUM (fsLit "negate")      negateClassOpKey
 
-integerTyConName, mkIntegerName,
+integerTyConName, mkIntegerName, integerSDataConName,
     integerToWord64Name, integerToInt64Name,
     word64ToIntegerName, int64ToIntegerName,
     plusIntegerName, timesIntegerName, smallIntegerName,
@@ -934,6 +938,10 @@ integerTyConName, mkIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName :: Name
 integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
+integerSDataConName   = conName gHC_INTEGER_TYPE (fsLit n)                   integerSDataConKey
+  where n = case cIntegerLibraryType of
+            IntegerGMP    -> "S#"
+            IntegerSimple -> panic "integerSDataConName evaluated for integer-simple"
 mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
 integerToWord64Name   = varQual gHC_INTEGER_TYPE (fsLit "integerToWord64")   integerToWord64IdKey
 integerToInt64Name    = varQual gHC_INTEGER_TYPE (fsLit "integerToInt64")    integerToInt64IdKey
@@ -1515,8 +1523,8 @@ unitTyConKey = mkTupleTyConUnique BoxedTuple 0
 
 \begin{code}
 charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
-    floatDataConKey, intDataConKey, nilDataConKey, ratioDataConKey,
-    stableNameDataConKey, trueDataConKey, wordDataConKey,
+    floatDataConKey, intDataConKey, integerSDataConKey, nilDataConKey,
+    ratioDataConKey, stableNameDataConKey, trueDataConKey, wordDataConKey,
     ioDataConKey, integerDataConKey, eqBoxDataConKey, coercibleDataConKey :: Unique
 charDataConKey                          = mkPreludeDataConUnique  1
 consDataConKey                          = mkPreludeDataConUnique  2
@@ -1524,6 +1532,7 @@ doubleDataConKey                        = mkPreludeDataConUnique  3
 falseDataConKey                         = mkPreludeDataConUnique  4
 floatDataConKey                         = mkPreludeDataConUnique  5
 intDataConKey                           = mkPreludeDataConUnique  6
+integerSDataConKey                      = mkPreludeDataConUnique  7
 nilDataConKey                           = mkPreludeDataConUnique 11
 ratioDataConKey                         = mkPreludeDataConUnique 12
 stableNameDataConKey                    = mkPreludeDataConUnique 14
@@ -1552,11 +1561,6 @@ ltDataConKey, eqDataConKey, gtDataConKey :: Unique
 ltDataConKey                            = mkPreludeDataConUnique 27
 eqDataConKey                            = mkPreludeDataConUnique 28
 gtDataConKey                            = mkPreludeDataConUnique 29
-
--- For integer-gmp only
-integerGmpSDataConKey, integerGmpJDataConKey :: Unique
-integerGmpSDataConKey                   = mkPreludeDataConUnique 30
-integerGmpJDataConKey                   = mkPreludeDataConUnique 31
 
 coercibleDataConKey                     = mkPreludeDataConUnique 32
 \end{code}

@@ -1,4 +1,5 @@
 #include "Rts.h"
+#include "MachDeps.h"
 
 static const unsigned char popcount_tab[] =
 {
@@ -51,7 +52,7 @@ hs_popcnt64(StgWord64 x)
       popcount_tab[(unsigned char)(x >> 56)];
 }
 
-#ifdef i386_HOST_ARCH
+#if WORD_SIZE_IN_BITS == 32
 
 extern StgWord hs_popcnt(StgWord x);
 StgWord
@@ -63,7 +64,7 @@ hs_popcnt(StgWord x)
       popcount_tab[(unsigned char)(x >> 24)];
 }
 
-#else
+#elif WORD_SIZE_IN_BITS == 64
 
 extern StgWord hs_popcnt(StgWord x);
 StgWord
@@ -78,5 +79,9 @@ hs_popcnt(StgWord x)
       popcount_tab[(unsigned char)(x >> 48)] +
       popcount_tab[(unsigned char)(x >> 56)];
 }
+
+#else
+
+#error Unknown machine word size
 
 #endif

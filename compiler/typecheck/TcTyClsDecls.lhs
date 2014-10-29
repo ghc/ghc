@@ -141,7 +141,7 @@ tcTyClGroup boot_details tyclds
        ; let role_annots = extractRoleAnnots tyclds
              decls = group_tyclds tyclds
        ; tyclss <- fixM $ \ rec_tyclss -> do
-           { is_boot <- tcIsHsBoot
+           { is_boot <- tcIsHsBootOrSig
            ; let rec_flags = calcRecFlags boot_details is_boot
                                           role_annots rec_tyclss
 
@@ -782,7 +782,7 @@ tcDataDefn rec_info tc_name tvs kind
        ; stupid_tc_theta <- tcHsContext ctxt
        ; stupid_theta    <- zonkTcTypeToTypes emptyZonkEnv stupid_tc_theta
        ; kind_signatures <- xoptM Opt_KindSignatures
-       ; is_boot         <- tcIsHsBoot  -- Are we compiling an hs-boot file?
+       ; is_boot         <- tcIsHsBootOrSig -- Are we compiling an hs-boot file?
 
              -- Check that we don't use kind signatures without Glasgow extensions
        ; case mb_ksig of
@@ -1143,7 +1143,7 @@ dataDeclChecks tc_name new_or_data stupid_theta cons
                 -- Check that there's at least one condecl,
          -- or else we're reading an hs-boot file, or -XEmptyDataDecls
        ; empty_data_decls <- xoptM Opt_EmptyDataDecls
-       ; is_boot <- tcIsHsBoot  -- Are we compiling an hs-boot file?
+       ; is_boot <- tcIsHsBootOrSig  -- Are we compiling an hs-boot file?
        ; checkTc (not (null cons) || empty_data_decls || is_boot)
                  (emptyConDeclsErr tc_name)
        ; return gadt_syntax }
@@ -1425,7 +1425,7 @@ checkValidTyCon tc
   = case syn_rhs of
     { ClosedSynFamilyTyCon ax      -> checkValidClosedCoAxiom ax
     ; AbstractClosedSynFamilyTyCon ->
-      do { hsBoot <- tcIsHsBoot
+      do { hsBoot <- tcIsHsBootOrSig
          ; checkTc hsBoot $
            ptext (sLit "You may omit the equations in a closed type family") $$
            ptext (sLit "only in a .hs-boot file") }
