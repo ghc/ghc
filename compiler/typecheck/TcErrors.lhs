@@ -606,6 +606,7 @@ mkEqErr1 ctxt ct
        ; (env1, tidy_orig) <- zonkTidyOrigin (cec_tidy ctxt) (ctLocOrigin loc)
        ; let (is_oriented, wanted_msg) = mk_wanted_extra tidy_orig
        ; dflags <- getDynFlags
+       ; traceTc "mkEqErr1" (ppr ct $$ pprCtOrigin (ctLocOrigin loc) $$ pprCtOrigin tidy_orig) 
        ; mkEqErr_help dflags (ctxt {cec_tidy = env1})
                       (wanted_msg $$ binds_msg)
                       ct is_oriented ty1 ty2 }
