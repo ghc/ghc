@@ -437,21 +437,15 @@ newPolyFlexiTyVarTy :: TcM TcType
 newPolyFlexiTyVarTy = do { tv <- newMetaTyVar PolyTv liftedTypeKind
                          ; return (TyVarTy tv) }
 
-tcInstTyVars :: [TKVar] -> TcM ([TcTyVar], [TcType], TvSubst)
+tcInstTyVars :: [TKVar] -> TcM (TvSubst, [TcTyVar])
 -- Instantiate with META type variables
 -- Note that this works for a sequence of kind and type
 -- variables.  Eg    [ (k:BOX), (a:k->k) ]
 --             Gives [ (k7:BOX), (a8:k7->k7) ]
-tcInstTyVars tyvars = tcInstTyVarsX emptyTvSubst tyvars
+tcInstTyVars tyvars = mapAccumLM tcInstTyVarX emptyTvSubst tyvars
     -- emptyTvSubst has an empty in-scope set, but that's fine here
     -- Since the tyvars are freshly made, they cannot possibly be
     -- captured by any existing for-alls.
-
-tcInstTyVarsX :: TvSubst -> [TKVar] -> TcM ([TcTyVar], [TcType], TvSubst)
--- The "X" part is because of extending the substitution
-tcInstTyVarsX subst tyvars =
-  do { (subst', tyvars') <- mapAccumLM tcInstTyVarX subst tyvars
-     ; return (tyvars', mkTyVarTys tyvars', subst') }
 
 tcInstTyVarX :: TvSubst -> TKVar -> TcM (TvSubst, TcTyVar)
 -- Make a new unification variable tyvar whose Name and Kind come from
