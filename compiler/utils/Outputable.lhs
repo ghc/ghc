@@ -41,7 +41,7 @@ module Outputable (
         -- * Converting 'SDoc' into strings and outputing it
         printForC, printForAsm, printForUser, printForUserPartWay,
         pprCode, mkCodeStyle,
-        showSDoc, showSDocOneLine,
+        showSDoc, showSDocSimple, showSDocOneLine,
         showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
         showSDocUnqual, showPpr,
         renderWithStyle,
@@ -64,7 +64,7 @@ module Outputable (
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
         ifPprDebug, qualName, qualModule, qualPackage,
-        mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
+        mkErrStyle, defaultErrStyle, defaultDumpStyle, mkDumpStyle, defaultUserStyle,
         mkUserStyle, cmdlineParserStyle, Depth(..),
 
         -- * Error handling and debugging utilities
@@ -125,14 +125,15 @@ data PprStyle
                 -- Assumes printing tidied code: non-system names are
                 -- printed without uniques.
 
-  | PprCode CodeStyle
-                -- Print code; either C or assembler
-
-  | PprDump     -- For -ddump-foo; less verbose than PprDebug.
+  | PprDump PrintUnqualified
+                -- For -ddump-foo; less verbose than PprDebug, but more than PprUser
                 -- Does not assume tidied code: non-external names
                 -- are printed with uniques.
 
   | PprDebug    -- Full debugging output
+
+  | PprCode CodeStyle
+                -- Print code; either C or assembler
 
 data CodeStyle = CStyle         -- The format of labels differs for C and assembler
                | AsmStyle
@@ -221,7 +222,11 @@ defaultUserStyle = mkUserStyle neverQualify AllTheWay
  -- Print without qualifiers to reduce verbosity, unless -dppr-debug
 
 defaultDumpStyle |  opt_PprStyle_Debug = PprDebug
-                 |  otherwise          = PprDump
+                 |  otherwise          = PprDump neverQualify
+
+mkDumpStyle :: PrintUnqualified -> PprStyle
+mkDumpStyle print_unqual | opt_PprStyle_Debug = PprDebug
+                         | otherwise          = PprDump print_unqual
 
 defaultErrStyle :: DynFlags -> PprStyle
 -- Default style for error messages, when we don't know PrintUnqualified
@@ -324,15 +329,18 @@ sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 \begin{code}
 qualName :: PprStyle -> QueryQualifyName
 qualName (PprUser q _)  mod occ = queryQualifyName q mod occ
+qualName (PprDump q)    mod occ = queryQualifyName q mod occ
 qualName _other         mod _   = NameQual (moduleName mod)
 
 qualModule :: PprStyle -> QueryQualifyModule
 qualModule (PprUser q _)  m = queryQualifyModule q m
-qualModule _other                   _m = True
+qualModule (PprDump q)    m = queryQualifyModule q m
+qualModule _other        _m = True
 
 qualPackage :: PprStyle -> QueryQualifyPackage
 qualPackage (PprUser q _)  m = queryQualifyPackage q m
-qualPackage _other                   _m = True
+qualPackage (PprDump q)    m = queryQualifyPackage q m
+qualPackage _other        _m = True
 
 queryQual :: PprStyle -> PrintUnqualified
 queryQual s = QueryQualify (qualName s)
@@ -348,8 +356,8 @@ asmStyle (PprCode AsmStyle)  = True
 asmStyle _other              = False
 
 dumpStyle :: PprStyle -> Bool
-dumpStyle PprDump = True
-dumpStyle _other  = False
+dumpStyle (PprDump {}) = True
+dumpStyle _other       = False
 
 debugStyle :: PprStyle -> Bool
 debugStyle PprDebug = True
@@ -402,6 +410,27 @@ mkCodeStyle = PprCode
 showSDoc :: DynFlags -> SDoc -> String
 showSDoc dflags sdoc = renderWithStyle dflags sdoc defaultUserStyle
 
+showSDocSimple :: SDoc -> String
+showSDocSimple sdoc = showSDoc unsafeGlobalDynFlags sdoc
+
+showPpr :: Outputable a => DynFlags -> a -> String
+showPpr dflags thing = showSDoc dflags (ppr thing)
+
+showSDocUnqual :: DynFlags -> SDoc -> String
+-- Only used by Haddock
+showSDocUnqual dflags sdoc = showSDoc dflags sdoc
+
+showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
+-- Allows caller to specify the PrintUnqualified to use
+showSDocForUser dflags unqual doc
+ = renderWithStyle dflags doc (mkUserStyle unqual AllTheWay)
+
+showSDocDump :: DynFlags -> SDoc -> String
+showSDocDump dflags d = renderWithStyle dflags d defaultDumpStyle
+
+showSDocDebug :: DynFlags -> SDoc -> String
+showSDocDebug dflags d = renderWithStyle dflags d PprDebug
+
 renderWithStyle :: DynFlags -> SDoc -> PprStyle -> String
 renderWithStyle dflags sdoc sty
   = Pretty.showDoc PageMode (pprCols dflags) $
@@ -415,28 +444,10 @@ showSDocOneLine dflags d
  = Pretty.showDoc OneLineMode (pprCols dflags) $
    runSDoc d (initSDocContext dflags defaultUserStyle)
 
-showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
-showSDocForUser dflags unqual doc
- = renderWithStyle dflags doc (mkUserStyle unqual AllTheWay)
-
-showSDocUnqual :: DynFlags -> SDoc -> String
--- Only used by Haddock
-showSDocUnqual dflags doc
- = renderWithStyle dflags doc (mkUserStyle neverQualify AllTheWay)
-
-showSDocDump :: DynFlags -> SDoc -> String
-showSDocDump dflags d = renderWithStyle dflags d defaultDumpStyle
-
-showSDocDebug :: DynFlags -> SDoc -> String
-showSDocDebug dflags d = renderWithStyle dflags d PprDebug
-
 showSDocDumpOneLine :: DynFlags -> SDoc -> String
 showSDocDumpOneLine dflags d
  = Pretty.showDoc OneLineMode irrelevantNCols $
-   runSDoc d (initSDocContext dflags PprDump)
-
-showPpr :: Outputable a => DynFlags -> a -> String
-showPpr dflags thing = showSDoc dflags (ppr thing)
+   runSDoc d (initSDocContext dflags defaultDumpStyle)
 
 irrelevantNCols :: Int
 -- Used for OneLineMode and LeftMode when number of cols isn't used
@@ -1000,7 +1011,7 @@ pprTrace :: String -> SDoc -> a -> a
 -- ^ If debug output is on, show some 'SDoc' on the screen
 pprTrace str doc x
    | opt_NoDebugOutput = x
-   | otherwise         = pprDebugAndThen unsafeGlobalDynFlags trace str doc x
+   | otherwise         = pprDebugAndThen unsafeGlobalDynFlags trace (text str) doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
@@ -1013,9 +1024,9 @@ warnPprTrace _     _     _     _    x | not debugIsOn     = x
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
-  = pprDebugAndThen unsafeGlobalDynFlags trace str msg x
+  = pprDebugAndThen unsafeGlobalDynFlags trace heading msg x
   where
-    str = showSDoc unsafeGlobalDynFlags (hsep [text "WARNING: file", text file <> comma, text "line", int line])
+    heading = hsep [text "WARNING: file", text file <> comma, text "line", int line]
 
 assertPprPanic :: String -> Int -> SDoc -> a
 -- ^ Panic with an assertation failure, recording the given file and line number.
@@ -1027,10 +1038,10 @@ assertPprPanic file line msg
                      , text "line", int line ]
               , msg ]
 
-pprDebugAndThen :: DynFlags -> (String -> a) -> String -> SDoc -> a
+pprDebugAndThen :: DynFlags -> (String -> a) -> SDoc -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg
  = cont (showSDocDump dflags doc)
  where
-     doc = sep [text heading, nest 4 pretty_msg]
+     doc = sep [heading, nest 2 pretty_msg]
 \end{code}
 

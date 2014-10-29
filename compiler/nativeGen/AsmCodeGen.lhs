@@ -316,8 +316,7 @@ finishNativeGen dflags ncgImpl bufh@(BufHandle _ _ h) (imports, prof)
                         $ [ Color.raGraph stat
                                 | stat@Color.RegAllocStatsStart{} <- stats]
 
-                dumpSDoc dflags Opt_D_dump_asm_stats "NCG stats"
-                        $ Color.pprStats stats graphGlobal
+                dump_stats (Color.pprStats stats graphGlobal)
 
                 dumpIfSet_dyn dflags
                         Opt_D_dump_asm_conflicts "Register conflict graph"
@@ -332,13 +331,14 @@ finishNativeGen dflags ncgImpl bufh@(BufHandle _ _ h) (imports, prof)
         -- dump global NCG stats for linear allocator
         (case concat $ catMaybes linearStats of
                 []      -> return ()
-                stats   -> dumpSDoc dflags Opt_D_dump_asm_stats "NCG stats"
-                                $ Linear.pprStats (concat native) stats)
+                stats   -> dump_stats (Linear.pprStats (concat native) stats))
 
         -- write out the imports
         Pretty.printDoc Pretty.LeftMode (pprCols dflags) h
                 $ withPprStyleDoc dflags (mkCodeStyle AsmStyle)
                 $ makeImportsDoc dflags (concat imports)
+  where
+    dump_stats = dumpSDoc dflags alwaysQualify Opt_D_dump_asm_stats "NCG stats"
 
 cmmNativeGenStream :: (Outputable statics, Outputable instr, Instruction instr)
               => DynFlags

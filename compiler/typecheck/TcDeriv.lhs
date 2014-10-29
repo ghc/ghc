@@ -390,8 +390,8 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
         ; dflags <- getDynFlags
         ; unless (isEmptyBag inst_info) $
-            liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
-                   (ddump_deriving inst_info rn_binds newTyCons famInsts))
+             liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
+                        (ddump_deriving inst_info rn_binds newTyCons famInsts))
 
         ; let all_tycons = map ATyCon (bagToList newTyCons)
         ; gbl_env <- tcExtendGlobalEnv all_tycons $
