@@ -723,10 +723,15 @@ iDFunId info = instanceDFunId (iSpec info)
 
 data InstBindings a
   = InstBindings
-      { ib_binds :: (LHsBinds a)  -- Bindings for the instance methods
-      , ib_pragmas :: [LSig a]    -- User pragmas recorded for generating
-                                  -- specialised instances
-      , ib_extensions :: [ExtensionFlag] -- any extra extensions that should
+      { ib_tyvars  :: [Name]        -- Names of the tyvars from the instance head
+                                    -- that are lexically in scope in the bindings
+
+      , ib_binds   :: (LHsBinds a)  -- Bindings for the instance methods
+
+      , ib_pragmas :: [LSig a]      -- User pragmas recorded for generating
+                                    -- specialised instances
+
+      , ib_extensions :: [ExtensionFlag] -- Any extra extensions that should
                                          -- be enabled when type-checking this
                                          -- instance; needed for
                                          -- GeneralizedNewtypeDeriving
