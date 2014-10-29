@@ -402,8 +402,8 @@ tcDeriving tycl_decls inst_decls deriv_decls
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) }
   where
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name
-                   -> Bag TyCon                 -- ^ Empty data constructors
-                   -> Bag (FamInst)             -- ^ Rep type family instances
+                   -> Bag TyCon               -- ^ Empty data constructors
+                   -> Bag FamInst             -- ^ Rep type family instances
                    -> SDoc
     ddump_deriving inst_infos extra_binds repMetaTys repFamInsts
       =    hang (ptext (sLit "Derived instances:"))
@@ -2036,12 +2036,12 @@ genDerivStuff :: SrcSpan -> Class -> Name -> TyCon
 genDerivStuff loc clas dfun_name tycon comaux_maybe
   | let ck = classKey clas
   , ck `elem` [genClassKey, gen1ClassKey]   -- Special case because monadic
-  = let gk = if ck == genClassKey then Gen0 else Gen1 
+  = let gk = if ck == genClassKey then Gen0 else Gen1
         -- TODO NSF: correctly identify when we're building Both instead of One
         Just metaTyCons = comaux_maybe -- well-guarded by commonAuxiliaries and genInst
     in do
       (binds, faminst) <- gen_Generic_binds gk tycon metaTyCons (nameModule dfun_name)
-      return (binds, DerivFamInst faminst `consBag` emptyBag)
+      return (binds, unitBag (DerivFamInst faminst))
 
   | otherwise                      -- Non-monadic generators
   = do dflags <- getDynFlags
