@@ -475,21 +475,19 @@ renameDeriv is_boot inst_infos bagBinds
       inst_info@(InstInfo { iSpec = inst
                           , iBinds = InstBindings
                             { ib_binds = binds
+                            , ib_tyvars = tyvars
                             , ib_pragmas = sigs
-                            , ib_extensions = exts -- only for type-checking
+                            , ib_extensions = exts -- Only for type-checking
                             , ib_derived = sa } })
-        =       -- Bring the right type variables into
-                -- scope (yuk), and rename the method binds
-           ASSERT( null sigs )
-           bindLocalNamesFV (map Var.varName tyvars) $
+        =  ASSERT( null sigs )
+           bindLocalNamesFV tyvars $
            do { (rn_binds, fvs) <- rnMethodBinds (is_cls_nm inst) (\_ -> []) binds
               ; let binds' = InstBindings { ib_binds = rn_binds
-                                           , ib_pragmas = []
-                                           , ib_extensions = exts
-                                           , ib_derived = sa }
+                                          , ib_tyvars = tyvars
+                                          , ib_pragmas = []
+                                          , ib_extensions = exts
+                                          , ib_derived = sa }
               ; return (inst_info { iBinds = binds' }, fvs) }
-        where
-          (tyvars, _) = tcSplitForAllTys (idType (instanceDFunId inst))
 \end{code}
 
 Note [Newtype deriving and unused constructors]
@@ -1995,6 +1993,7 @@ genInst comauxs
                     { iSpec   = inst_spec
                     , iBinds  = InstBindings
                         { ib_binds = gen_Newtype_binds loc clas tvs tys rhs_ty
+                        , ib_tyvars = map Var.varName tvs   -- Scope over bindings
                         , ib_pragmas = []
                         , ib_extensions = [ Opt_ImpredicativeTypes
                                           , Opt_RankNTypes ]
@@ -2012,6 +2011,7 @@ genInst comauxs
        ; let inst_info = InstInfo { iSpec   = inst_spec
                                   , iBinds  = InstBindings
                                                 { ib_binds = meth_binds
+                                                , ib_tyvars = map Var.varName tvs
                                                 , ib_pragmas = []
                                                 , ib_extensions = []
                                                 , ib_derived = True } }
