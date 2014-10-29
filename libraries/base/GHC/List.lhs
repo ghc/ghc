@@ -1,6 +1,7 @@
 \begin{code}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables, MagicHash #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -132,7 +133,7 @@ lenAcc (_:ys) n = lenAcc ys (n+1)
 -- when we need it to and give good performance.
 {-# INLINE [0] lengthFB #-}
 lengthFB :: x -> (Int -> Int) -> Int -> Int
-lengthFB _ r = \ a -> a `seq` r (a + 1)
+lengthFB _ r = \ !a -> r (a + 1)
 
 {-# INLINE [0] idLength #-}
 idLength :: Int -> Int
@@ -280,9 +281,9 @@ scanl'           :: (b -> a -> b) -> b -> [a] -> [b]
 scanl' = scanlGo'
   where
     scanlGo'           :: (b -> a -> b) -> b -> [a] -> [b]
-    scanlGo' f q ls    = q `seq` q : (case ls of
-                                []   -> []
-                                x:xs -> scanlGo' f (f q x) xs)
+    scanlGo' f !q ls    = q : (case ls of
+                            []   -> []
+                            x:xs -> scanlGo' f (f q x) xs)
 
 -- Note [scanl rewrite rules]
 {-# RULES
@@ -294,11 +295,11 @@ scanl' = scanlGo'
 
 {-# INLINE [0] scanlFB' #-}
 scanlFB' :: (b -> a -> b) -> (b -> c -> c) -> a -> (b -> c) -> b -> c
-scanlFB' f c = \b g x -> let b' = f x b in b' `seq` b' `c` g b'
+scanlFB' f c = \b g x -> let !b' = f x b in b' `c` g b'
 
 {-# INLINE [0] flipSeqScanl' #-}
 flipSeqScanl' :: a -> b -> a
-flipSeqScanl' = flip seq
+flipSeqScanl' a !_b = a
 
 {-
 Note [scanl rewrite rules]
@@ -527,38 +528,6 @@ dropWhile p xs@(x:xs')
 -- It is an instance of the more general 'Data.List.genericTake',
 -- in which @n@ may be of any integral type.
 take                   :: Int -> [a] -> [a]
-
--- | 'drop' @n xs@ returns the suffix of @xs@
--- after the first @n@ elements, or @[]@ if @n > 'length' xs@:
---
--- > drop 6 "Hello World!" == "World!"
--- > drop 3 [1,2,3,4,5] == [4,5]
--- > drop 3 [1,2] == []
--- > drop 3 [] == []
--- > drop (-1) [1,2] == [1,2]
--- > drop 0 [1,2] == [1,2]
---
--- It is an instance of the more general 'Data.List.genericDrop',
--- in which @n@ may be of any integral type.
-drop                   :: Int -> [a] -> [a]
-
--- | 'splitAt' @n xs@ returns a tuple where first element is @xs@ prefix of
--- length @n@ and second element is the remainder of the list:
---
--- > splitAt 6 "Hello World!" == ("Hello ","World!")
--- > splitAt 3 [1,2,3,4,5] == ([1,2,3],[4,5])
--- > splitAt 1 [1,2,3] == ([1],[2,3])
--- > splitAt 3 [1,2,3] == ([1,2,3],[])
--- > splitAt 4 [1,2,3] == ([1,2,3],[])
--- > splitAt 0 [1,2,3] == ([],[1,2,3])
--- > splitAt (-1) [1,2,3] == ([],[1,2,3])
---
--- It is equivalent to @('take' n xs, 'drop' n xs)@ when @n@ is not @_|_@
--- (@splitAt _|_ xs = _|_@).
--- 'splitAt' is an instance of the more general 'Data.List.genericSplitAt',
--- in which @n@ may be of any integral type.
-splitAt                :: Int -> [a] -> ([a],[a])
-
 #ifdef USE_REPORT_PRELUDE
 take n _      | n <= 0 =  []
 take _ []              =  []
@@ -580,16 +549,19 @@ unsafeTake m  (x:xs) = x : unsafeTake (m - 1) xs
 
 {-# RULES
 "unsafeTake"     [~1] forall n xs . unsafeTake n xs =
-  build (\c nil -> foldr (takeFB c nil) (takeConst nil) xs n)
-"unsafeTakeList"  [1] forall n xs . foldr (takeFB (:) []) (takeConst []) xs n =
-  unsafeTake n xs
+  build (\c nil -> foldr (takeFB c nil) (flipSeqTake nil) xs n)
+"unsafeTakeList"  [1] forall n xs . foldr (takeFB (:) []) (flipSeqTake []) xs n
+                                        = unsafeTake n xs
  #-}
 
-{-# NOINLINE [0] takeConst #-}
--- just a version of const that doesn't get inlined too early, so we
--- can spot it in rules.
-takeConst :: a -> Int -> a
-takeConst x _ = x
+{-# INLINE [0] flipSeqTake #-}
+-- Just flip seq, specialized to Int, but not inlined too early.
+-- It's important to force the numeric argument here, even though
+-- it's not used. Otherwise, take n [] doesn't force n. This is
+-- bad for strictness analysis and unboxing, and leads to test suite
+-- performance regressions.
+flipSeqTake :: a -> Int -> a
+flipSeqTake x !_n = x
 
 {-# INLINE [0] takeFB #-}
 takeFB :: (a -> b -> b) -> b -> a -> (Int -> b) -> Int -> b
@@ -602,15 +574,25 @@ takeFB c n x xs
   = \ m -> case m of
             1 -> x `c` n
             _ -> x `c` xs (m - 1)
-
 #endif
+
+-- | 'drop' @n xs@ returns the suffix of @xs@
+-- after the first @n@ elements, or @[]@ if @n > 'length' xs@:
+--
+-- > drop 6 "Hello World!" == "World!"
+-- > drop 3 [1,2,3,4,5] == [4,5]
+-- > drop 3 [1,2] == []
+-- > drop 3 [] == []
+-- > drop (-1) [1,2] == [1,2]
+-- > drop 0 [1,2] == [1,2]
+--
+-- It is an instance of the more general 'Data.List.genericDrop',
+-- in which @n@ may be of any integral type.
+drop                   :: Int -> [a] -> [a]
 #ifdef USE_REPORT_PRELUDE
 drop n xs     | n <= 0 =  xs
 drop _ []              =  []
 drop n (_:xs)          =  drop (n-1) xs
-
-splitAt n xs           =  (take n xs, drop n xs)
-
 #else /* hack away */
 {-# INLINE drop #-}
 drop n ls
@@ -623,7 +605,28 @@ drop n ls
     unsafeDrop _ []     = []
     unsafeDrop 1 (_:xs) = xs
     unsafeDrop m (_:xs) = unsafeDrop (m - 1) xs
+#endif
 
+-- | 'splitAt' @n xs@ returns a tuple where first element is @xs@ prefix of
+-- length @n@ and second element is the remainder of the list:
+--
+-- > splitAt 6 "Hello World!" == ("Hello ","World!")
+-- > splitAt 3 [1,2,3,4,5] == ([1,2,3],[4,5])
+-- > splitAt 1 [1,2,3] == ([1],[2,3])
+-- > splitAt 3 [1,2,3] == ([1,2,3],[])
+-- > splitAt 4 [1,2,3] == ([1,2,3],[])
+-- > splitAt 0 [1,2,3] == ([],[1,2,3])
+-- > splitAt (-1) [1,2,3] == ([],[1,2,3])
+--
+-- It is equivalent to @('take' n xs, 'drop' n xs)@ when @n@ is not @_|_@
+-- (@splitAt _|_ xs = _|_@).
+-- 'splitAt' is an instance of the more general 'Data.List.genericSplitAt',
+-- in which @n@ may be of any integral type.
+splitAt                :: Int -> [a] -> ([a],[a])
+
+#ifdef USE_REPORT_PRELUDE
+splitAt n xs           =  (take n xs, drop n xs)
+#else
 splitAt n ls
   | n <= 0 = ([], ls)
   | otherwise          = splitAt' n ls
@@ -634,7 +637,6 @@ splitAt n ls
         splitAt' m  (x:xs) = (x:xs', xs'')
           where
             (xs', xs'') = splitAt' (m - 1) xs
-
 #endif /* USE_REPORT_PRELUDE */
 
 -- | 'span', applied to a predicate @p@ and a list @xs@, returns a tuple where
@@ -866,7 +868,7 @@ xs !! n
 foldr2 :: (a -> b -> c -> c) -> c -> [a] -> [b] -> c
 foldr2 k z = go
   where
-        go []    ys      = ys `seq` z -- see #9495 for the seq
+        go []    !_ys    = z -- see #9495 for the !
         go _xs   []      = z
         go (x:xs) (y:ys) = k x y (go xs ys)
 {-# INLINE [0] foldr2 #-}
@@ -910,7 +912,7 @@ Zips for larger tuples are in the List module.
 -- list preserve semantics.
 {-# NOINLINE [1] zip #-}
 zip :: [a] -> [b] -> [(a,b)]
-zip []     bs     = bs `seq` [] -- see #9495 for the seq
+zip []     !_bs   = [] -- see #9495 for the !
 zip _as    []     = []
 zip (a:as) (b:bs) = (a,b) : zip as bs
 
@@ -959,7 +961,7 @@ zip3 _      _      _      = []
 
 {-# NOINLINE [1] zipWith #-}
 zipWith :: (a->b->c) -> [a]->[b]->[c]
-zipWith _f []     bs     = bs `seq` [] -- see #9495 for the seq
+zipWith _f []     !_bs   = [] -- see #9495 for the !
 zipWith _f _as    []     = []
 zipWith f  (a:as) (b:bs) = f a b : zipWith f as bs
 
