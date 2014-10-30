@@ -1968,18 +1968,19 @@ addDLL( pathchar *dll_name )
         point character (.) to indicate that the module name has no
         extension. */
 
-   buf = stgMallocBytes((pathlen(dll_name) + 10) * sizeof(wchar_t), "addDLL");
-   swprintf(buf, L"%s.DLL", dll_name);
+   size_t bufsize = pathlen(dll_name) + 10;
+   buf = stgMallocBytes(bufsize * sizeof(wchar_t), "addDLL");
+   snwprintf(buf, bufsize, L"%s.DLL", dll_name);
    instance = LoadLibraryW(buf);
    if (instance == NULL) {
        if (GetLastError() != ERROR_MOD_NOT_FOUND) goto error;
        // KAA: allow loading of drivers (like winspool.drv)
-       swprintf(buf, L"%s.DRV", dll_name);
+       snwprintf(buf, bufsize, L"%s.DRV", dll_name);
        instance = LoadLibraryW(buf);
        if (instance == NULL) {
            if (GetLastError() != ERROR_MOD_NOT_FOUND) goto error;
            // #1883: allow loading of unix-style libfoo.dll DLLs
-           swprintf(buf, L"lib%s.DLL", dll_name);
+           snwprintf(buf, bufsize, L"lib%s.DLL", dll_name);
            instance = LoadLibraryW(buf);
            if (instance == NULL) {
                goto error;
