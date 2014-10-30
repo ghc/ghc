@@ -1,14 +1,13 @@
-%
-% (c) The University of Glasgow, 2000-2006
-%
+--
+--  (c) The University of Glasgow 2002-2006
+--
 
 -- ---------------------------------------------------------------------------
 --      The dynamic linker for object code (.o .so .dll files)
 -- ---------------------------------------------------------------------------
 
-Primarily, this module consists of an interface to the C-land dynamic linker.
-
-\begin{code}
+-- | Primarily, this module consists of an interface to the C-land
+-- dynamic linker.
 module ObjLink (
    initObjLinker,        -- :: IO ()
    loadDLL,              -- :: String -> IO (Maybe String)
@@ -117,4 +116,3 @@ foreign import ccall unsafe "loadArchive"  c_loadArchive :: CFilePath -> IO Int
 foreign import ccall unsafe "loadObj"      c_loadObj :: CFilePath -> IO Int
 foreign import ccall unsafe "unloadObj"    c_unloadObj :: CFilePath -> IO Int
 foreign import ccall unsafe "resolveObjs"  c_resolveObjs :: IO Int
-\end{code}

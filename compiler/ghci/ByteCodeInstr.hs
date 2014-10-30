@@ -1,11 +1,10 @@
-%
-% (c) The University of Glasgow 2000-2006
-%
-ByteCodeInstrs: Bytecode instruction definitions
-
-\begin{code}
 {-# LANGUAGE CPP, MagicHash #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
+--
+--  (c) The University of Glasgow 2002-2006
+--
+
+-- | ByteCodeInstrs: Bytecode instruction definitions
 module ByteCodeInstr (
         BCInstr(..), ProtoBCO(..), bciStackUse, BreakInfo (..)
   ) where
@@ -326,4 +325,3 @@ bciStackUse SLIDE{}               = 0
 bciStackUse MKAP{}                = 0
 bciStackUse MKPAP{}               = 0
 bciStackUse PACK{}                = 1 -- worst case is PACK 0 words
-\end{code}

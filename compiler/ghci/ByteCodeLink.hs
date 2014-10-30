@@ -1,9 +1,3 @@
-%
-% (c) The University of Glasgow 2000-2006
-%
-ByteCodeLink: Bytecode assembler and linker
-
-\begin{code}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -11,7 +5,11 @@ ByteCodeLink: Bytecode assembler and linker
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
+--
+--  (c) The University of Glasgow 2002-2006
+--
 
+-- | ByteCodeLink: Bytecode assembler and linker
 module ByteCodeLink (
         ClosureEnv, emptyClosureEnv, extendClosureEnv,
         linkBCO, lookupStaticPtr, lookupName
@@ -46,16 +44,11 @@ import GHC.Arr          ( Array(..), STArray(..) )
 import GHC.IO           ( IO(..) )
 import GHC.Exts
 import GHC.Ptr          ( castPtr )
-\end{code}
 
+{-
+  Linking interpretables into something we can run
+-}
 
-%************************************************************************
-%*                                                                      *
-\subsection{Linking interpretables into something we can run}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
 type ClosureEnv = NameEnv (Name, HValue)
 
 emptyClosureEnv :: ClosureEnv
@@ -64,16 +57,11 @@ emptyClosureEnv = emptyNameEnv
 extendClosureEnv :: ClosureEnv -> [(Name,HValue)] -> ClosureEnv
 extendClosureEnv cl_env pairs
   = extendNameEnvList cl_env [ (n, (n,v)) | (n,v) <- pairs]
-\end{code}
 
+{-
+  Linking interpretables into something we can run
+-}
 
-%************************************************************************
-%*                                                                      *
-\subsection{Linking interpretables into something we can run}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
 {-
 data BCO# = BCO# ByteArray#             -- instrs   :: Array Word16#
                  ByteArray#             -- literals :: Array Word32#
@@ -280,5 +268,4 @@ primopToCLabel primop suffix = concat
     , zString (zEncodeFS (occNameFS (primOpOcc primop)))
     , '_':suffix
     ]
-\end{code}
 

@@ -1,13 +1,10 @@
-%
-% (c) The University of Glasgow 2002-2006
-%
-
-ByteCodeLink: Bytecode assembler and linker
-
-\begin{code}
 {-# LANGUAGE BangPatterns, CPP, MagicHash #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
+--
+--  (c) The University of Glasgow 2002-2006
+--
 
+-- | ByteCodeLink: Bytecode assembler and linker
 module ByteCodeAsm (
         assembleBCOs, assembleBCO,
 
@@ -556,4 +553,3 @@ mkLitPtr a
 
 iNTERP_STACK_CHECK_THRESH :: Int
 iNTERP_STACK_CHECK_THRESH = INTERP_STACK_CHECK_THRESH
-\end{code}

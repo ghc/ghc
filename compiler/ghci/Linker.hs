@@ -1,9 +1,9 @@
-%
-% (c) The University of Glasgow 2005-2012
-%
-\begin{code}
 {-# LANGUAGE CPP, NondecreasingIndentation #-}
 {-# OPTIONS_GHC -fno-cse #-}
+--
+--  (c) The University of Glasgow 2002-2006
+--
+
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 -- | The dynamic linker for GHCi.
@@ -11,7 +11,6 @@
 -- This module deals with the top-level issues of dynamic linking,
 -- calling the object-code linker and the byte-code linker where
 -- necessary.
-
 module Linker ( getHValue, showLinkerState,
                 linkExpr, linkDecls, unload, withExtendedLinkEnv,
                 extendLinkEnv, deleteFromLinkEnv,
@@ -67,15 +66,15 @@ import System.IO
 import System.Directory hiding (findFile)
 
 import Exception
-\end{code}
 
 
-%************************************************************************
-%*                                                                      *
+{- **********************************************************************
+
                         The Linker's state
-%*                                                                      *
-%************************************************************************
 
+  ********************************************************************* -}
+
+{-
 The persistent linker state *must* match the actual state of the
 C dynamic linker at all times, so we keep it in a private global variable.
 
@@ -85,8 +84,8 @@ library to side-effect the PLS and for those changes to be reflected here.
 
 The PersistentLinkerState maps Names to actual closures (for
 interpreted code only), for use during linking.
+-}
 
-\begin{code}
 GLOBAL_VAR_M(v_PersistentLinkerState, newMVar (panic "Dynamic linker not initialised"), MVar PersistentLinkerState)
 GLOBAL_VAR(v_InitLinkerDone, False, Bool) -- Set True when dynamic linker is initialised
 
@@ -237,16 +236,14 @@ showLinkerState dflags
                         text "Pkgs:" <+> ppr (pkgs_loaded pls),
                         text "Objs:" <+> ppr (objs_loaded pls),
                         text "BCOs:" <+> ppr (bcos_loaded pls)])
-\end{code}
 
 
-%************************************************************************
-%*                                                                      *
-\subsection{Initialisation}
-%*                                                                      *
-%************************************************************************
+{- **********************************************************************
 
-\begin{code}
+                        Initialisation
+
+  ********************************************************************* -}
+
 -- | Initialise the dynamic linker.  This entails
 --
 --  a) Calling the C initialisation procedure,
@@ -437,16 +434,14 @@ preloadLib dflags lib_paths framework_paths lib_spec
                                  then panic "Loading archives not supported"
                                  else loadArchive name
                              return True
-\end{code}
 
 
-%************************************************************************
-%*                                                                      *
-                Link a byte-code expression
-%*                                                                      *
-%************************************************************************
+{- **********************************************************************
 
-\begin{code}
+                        Link a byte-code expression
+
+  ********************************************************************* -}
+
 -- | Link a single expression, /including/ first linking packages and
 -- modules that this expression depends on.
 --
@@ -660,15 +655,14 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
             adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
             adjust_ul _ l@(BCOs {}) = return l
-\end{code}
 
 
-%************************************************************************
-%*                                                                      *
+{- **********************************************************************
+
               Loading a Decls statement
-%*                                                                      *
-%************************************************************************
-\begin{code}
+
+  ********************************************************************* -}
+
 linkDecls :: HscEnv -> SrcSpan -> CompiledByteCode -> IO () --[HValue]
 linkDecls hsc_env span (ByteCode unlinkedBCOs itblEnv) = do
     -- Initialise the linker (if it's not been done already)
@@ -705,17 +699,15 @@ linkDecls hsc_env span (ByteCode unlinkedBCOs itblEnv) = do
     -- their interface files, so getLinkDeps will fail
     -- All wired-in names are in the base package, which we link
     -- by default, so we can safely ignore them here.
-\end{code}
 
 
 
-%************************************************************************
-%*                                                                      *
+{- **********************************************************************
+
               Loading a single module
-%*                                                                      *
-%************************************************************************
 
-\begin{code}
+  ********************************************************************* -}
+
 linkModule :: HscEnv -> Module -> IO ()
 linkModule hsc_env mod = do
   initDynLinker (hsc_dflags hsc_env)
@@ -723,17 +715,15 @@ linkModule hsc_env mod = do
     (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [mod]
     if (failed ok) then throwGhcExceptionIO (ProgramError "could not link module")
       else return pls'
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{- **********************************************************************
+
                 Link some linkables
         The linkables may consist of a mixture of
         byte-code modules and object modules
-%*                                                                      *
-%************************************************************************
 
-\begin{code}
+  ********************************************************************* -}
+
 linkModules :: DynFlags -> PersistentLinkerState -> [Linkable]
             -> IO (PersistentLinkerState, SuccessFlag)
 linkModules dflags pls linkables
@@ -776,16 +766,14 @@ linkableInSet l objs_loaded =
   case findModuleLinkable_maybe objs_loaded (linkableModule l) of
         Nothing -> False
         Just m  -> linkableTime l == linkableTime m
-\end{code}
 
 
-%************************************************************************
-%*                                                                      *
-\subsection{The object-code linker}
-%*                                                                      *
-%************************************************************************
+{- **********************************************************************
 
-\begin{code}
+                The object-code linker
+
+  ********************************************************************* -}
+
 dynLinkObjs :: DynFlags -> PersistentLinkerState -> [Linkable]
             -> IO (PersistentLinkerState, SuccessFlag)
 dynLinkObjs dflags pls objs = do
@@ -850,15 +838,14 @@ rmDupLinkables already ls
     go already extras (l:ls)
         | linkableInSet l already = go already     extras     ls
         | otherwise               = go (l:already) (l:extras) ls
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-\subsection{The byte-code linker}
-%*                                                                      *
-%************************************************************************
+{- **********************************************************************
 
-\begin{code}
+                The byte-code linker
+
+  ********************************************************************* -}
+
+
 dynLinkBCOs :: DynFlags -> PersistentLinkerState -> [Linkable]
             -> IO PersistentLinkerState
 dynLinkBCOs dflags pls bcos = do
@@ -912,16 +899,13 @@ linkSomeBCOs dflags toplevs_only ie ce_in ul_bcos
                      extendClosureEnv ce_in ce_additions
         return (ce_out, hvals)
 
-\end{code}
 
+{- **********************************************************************
 
-%************************************************************************
-%*                                                                      *
                 Unload some object modules
-%*                                                                      *
-%************************************************************************
 
-\begin{code}
+  ********************************************************************* -}
+
 -- ---------------------------------------------------------------------------
 -- | Unloading old objects ready for a new compilation sweep.
 --
@@ -992,17 +976,13 @@ unload_wkr _ linkables pls
                 -- letting go of them (plus of course depopulating
                 -- the symbol table which is done in the main body)
            return False
-\end{code}
 
+{- **********************************************************************
 
-%************************************************************************
-%*                                                                      *
                 Loading packages
-%*                                                                      *
-%************************************************************************
 
+  ********************************************************************* -}
 
-\begin{code}
 data LibrarySpec
    = Object FilePath    -- Full path name of a .o file, including trailing .o
                         -- For dynamic objects only, try to find the object
@@ -1269,15 +1249,13 @@ loadFramework extraPaths rootname
      mk_fwk dir = dir </> (rootname ++ ".framework/" ++ rootname)
         -- sorry for the hardcoded paths, I hope they won't change anytime soon:
      defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{- **********************************************************************
+
                 Helper functions
-%*                                                                      *
-%************************************************************************
 
-\begin{code}
+  ********************************************************************* -}
+
 findFile :: (FilePath -> FilePath)      -- Maps a directory path to a file path
          -> [FilePath]                  -- Directories to look in
          -> IO (Maybe FilePath)         -- The first file path to match
@@ -1287,9 +1265,7 @@ findFile mk_file_path (dir : dirs)
        b <- doesFileExist file_path
        if b then return (Just file_path)
             else findFile mk_file_path dirs
-\end{code}
 
-\begin{code}
 maybePutStr :: DynFlags -> String -> IO ()
 maybePutStr dflags s
     = when (verbosity dflags > 1) $
@@ -1298,15 +1274,13 @@ maybePutStr dflags s
 
 maybePutStrLn :: DynFlags -> String -> IO ()
 maybePutStrLn dflags s = maybePutStr dflags (s ++ "\n")
-\end{code}
 
-%************************************************************************
-%*                                                                      *
+{- **********************************************************************
+
         Tunneling global variables into new instance of GHC library
-%*                                                                      *
-%************************************************************************
 
-\begin{code}
+  ********************************************************************* -}
+
 saveLinkerGlobals :: IO (MVar PersistentLinkerState, Bool)
 saveLinkerGlobals = liftM2 (,) (readIORef v_PersistentLinkerState) (readIORef v_InitLinkerDone)
 
@@ -1314,4 +1288,3 @@ restoreLinkerGlobals :: (MVar PersistentLinkerState, Bool) -> IO ()
 restoreLinkerGlobals (pls, ild) = do
     writeIORef v_PersistentLinkerState pls
     writeIORef v_InitLinkerDone ild
-\end{code}

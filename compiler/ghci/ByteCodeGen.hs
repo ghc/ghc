@@ -1,11 +1,9 @@
-%
-% (c) The University of Glasgow 2002-2006
-%
-
-ByteCodeGen: Generate bytecode from Core
-
-\begin{code}
 {-# LANGUAGE CPP, MagicHash #-}
+--
+--  (c) The University of Glasgow 2002-2006
+--
+
+-- | ByteCodeGen: Generate bytecode from Core
 module ByteCodeGen ( UnlinkedBCO, byteCodeGen, coreExprToBCOs ) where
 
 #include "HsVersions.h"
@@ -1688,4 +1686,3 @@ newId ty = do
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
-\end{code}

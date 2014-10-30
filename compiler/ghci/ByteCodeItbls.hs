@@ -1,12 +1,10 @@
-%
-% (c) The University of Glasgow 2000-2006
-%
-ByteCodeItbls: Generate infotables for interpreter-made bytecodes
-
-\begin{code}
 {-# LANGUAGE CPP, MagicHash #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
+--
+--  (c) The University of Glasgow 2002-2006
+--
 
+-- | ByteCodeItbls: Generate infotables for interpreter-made bytecodes
 module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls, peekItbl
                      , StgInfoTable(..)
                      ) where
@@ -33,15 +31,11 @@ import Foreign.C
 
 import GHC.Exts         ( Int(I#), addr2Int# )
 import GHC.Ptr          ( Ptr(..) )
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-\subsection{Manufacturing of info tables for DataCons}
-%*                                                                      *
-%************************************************************************
+{-
+  Manufacturing of info tables for DataCons
+-}
 
-\begin{code}
 newtype ItblPtr = ItblPtr (Ptr ()) deriving Show
 
 itblCode :: DynFlags -> ItblPtr -> Ptr ()
@@ -401,4 +395,3 @@ foreign import ccall unsafe "allocateExec"
 
 foreign import ccall unsafe "flushExec"
   _flushExec :: CUInt -> Ptr a -> IO ()
-\end{code}
