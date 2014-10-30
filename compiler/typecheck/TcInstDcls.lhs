@@ -61,7 +61,7 @@ import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 
 import Control.Monad
 import Maybes     ( isNothing, isJust, whenIsJust )
-import Data.List  ( mapAccumL )
+import Data.List  ( mapAccumL, partition )
 \end{code}
 
 Typechecking instance declarations is done in two passes. The first
@@ -378,7 +378,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
              local_infos' = concat local_infos_s
              -- Handwritten instances of the poly-kinded Typeable class are
              -- forbidden, so we handle those separately
-             (typeable_instances, local_infos) = splitTypeable env local_infos'
+             (typeable_instances, local_infos)
+                = partition (bad_typeable_instance env) local_infos'
 
        ; addClsInsts local_infos $
          addFamInsts fam_insts   $
@@ -400,7 +401,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                  else tcDeriving tycl_decls inst_decls deriv_decls
 
        -- Fail if there are any handwritten instance of poly-kinded Typeable
-       ; mapM_ (failWithTc . instMsg) typeable_instances
+       ; mapM_ typeable_err typeable_instances
 
        -- Check that if the module is compiled with -XSafe, there are no
        -- hand written instances of old Typeable as then unsafe casts could be
@@ -422,18 +423,14 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     }}
   where
     -- Separate the Typeable instances from the rest
-    splitTypeable _   []     = ([],[])
-    splitTypeable env (i:is) =
-      let (typeableInsts, otherInsts) = splitTypeable env is
-      in if -- We will filter out instances of Typeable
-            (typeableClassName == is_cls_nm (iSpec i))
-            -- but not those that come from Data.Typeable.Internal
-            && tcg_mod env /= tYPEABLE_INTERNAL
-            -- nor those from an .hs-boot or .hsig file
-            -- (deriving can't be used there)
-            && not (isHsBootOrSig (tcg_src env))
-         then (i:typeableInsts, otherInsts)
-         else (typeableInsts, i:otherInsts)
+    bad_typeable_instance env i
+      =       -- Class name is Typeable
+         typeableClassName == is_cls_nm (iSpec i)
+              -- but not those that come from Data.Typeable.Internal
+      && tcg_mod env /= tYPEABLE_INTERNAL
+              -- nor those from an .hs-boot or .hsig file
+              -- (deriving can't be used there)
+      && not (isHsBootOrSig (tcg_src env))
 
     overlapCheck ty = overlapMode (is_flag $ iSpec ty) `elem`
                         [Overlappable, Overlapping, Overlaps]
@@ -443,9 +440,18 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                          ptext (sLit "Replace the following instance:"))
                      2 (pprInstanceHdr (iSpec i))
 
-    instMsg i = hang (ptext (sLit $ "Typeable instances can only be derived; replace "
-                                 ++ "the following instance:"))
-                     2 (pprInstance (iSpec i))
+    typeable_err i
+      = setSrcSpan (getSrcSpan ispec) $
+        addErrTc $ hang (ptext (sLit "Typeable instances can only be derived"))
+                      2 (vcat [ ptext (sLit "Try") <+> quotes (ptext (sLit "deriving instance Typeable")
+                                                <+> pp_tc)
+                              , ptext (sLit "(requires StandaloneDeriving)") ])
+      where
+        ispec = iSpec i
+        pp_tc | [_kind, ty] <- is_tys ispec
+              , Just (tc,_) <- tcSplitTyConApp_maybe ty
+              = ppr tc
+              | otherwise = ptext (sLit "<tycon>")
 
 addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside
