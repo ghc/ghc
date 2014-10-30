@@ -2934,7 +2934,8 @@ listModuleLine modl line = do
 listAround :: MonadIO m => RealSrcSpan -> Bool -> InputT m ()
 listAround pan do_highlight = do
       contents <- liftIO $ BS.readFile (unpackFS file)
-      let ls  = BS.split '\n' contents
+      -- Drop carriage returns to avoid duplicates, see #9367.
+      let ls  = BS.split '\n' $ BS.filter (/= '\r') contents
           ls' = take (line2 - line1 + 1 + pad_before + pad_after) $
                         drop (line1 - 1 - pad_before) $ ls
           fst_line = max 1 (line1 - pad_before)

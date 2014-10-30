@@ -43,6 +43,10 @@ test('ghci024',
      when(fast(), skip),
      run_command,
      ['$MAKE -s --no-print-directory ghci024'])
+test('T9367',
+     when(fast() or config.os != 'mingw32', skip),
+     run_command,
+     ['$MAKE -s --no-print-directory T9367'])
 test('ghci025', normal, ghci_script, ['ghci025.script'])
 test('ghci026', normal, ghci_script, ['ghci026.script'])
 
