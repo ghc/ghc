@@ -13,15 +13,14 @@ $wxs =
     }
 end Rec }
 
-T3772.foo [InlPrag=NOINLINE] :: GHC.Types.Int -> ()
+foo [InlPrag=NOINLINE] :: Int -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U(U)>]
-T3772.foo =
-  \ (n :: GHC.Types.Int) ->
+foo =
+  \ (n :: Int) ->
     case n of _ [Occ=Dead] { GHC.Types.I# y ->
-    case GHC.Prim.tagToEnum# @ GHC.Types.Bool (GHC.Prim.<# 0 y)
-    of _ [Occ=Dead] {
-      GHC.Types.False -> GHC.Tuple.();
-      GHC.Types.True -> $wxs y
+    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# 0 y) of _ [Occ=Dead] {
+      False -> GHC.Tuple.();
+      True -> $wxs y
     }
     }
 

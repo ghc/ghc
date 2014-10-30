@@ -2,35 +2,35 @@
 ==================== Tidy Core ====================
 Result size of Tidy Core = {terms: 23, types: 16, coercions: 0}
 
-T9400.main :: GHC.Types.IO ()
+main :: IO ()
 [GblId, Str=DmdType]
-T9400.main =
-  GHC.Base.>>
-    @ GHC.Types.IO
+main =
+  >>
+    @ IO
     GHC.Base.$fMonadIO
     @ ()
     @ ()
-    (System.IO.putStrLn (GHC.CString.unpackCString# "c"#))
-    (GHC.Base.>>
-       @ GHC.Types.IO
+    (putStrLn (unpackCString# "c"#))
+    (>>
+       @ IO
        GHC.Base.$fMonadIO
        @ ()
        @ ()
-       (System.IO.putStrLn (GHC.CString.unpackCString# "x"#))
-       (GHC.Base.>>
-          @ GHC.Types.IO
+       (putStrLn (unpackCString# "x"#))
+       (>>
+          @ IO
           GHC.Base.$fMonadIO
           @ ()
           @ ()
-          (System.IO.putStrLn (GHC.CString.unpackCString# "z"#))
-          (GHC.Base.>>
-             @ GHC.Types.IO
+          (putStrLn (unpackCString# "z"#))
+          (>>
+             @ IO
              GHC.Base.$fMonadIO
              @ ()
              @ ()
-             (System.IO.putStrLn (GHC.CString.unpackCString# "efg"#))
+             (putStrLn (unpackCString# "efg"#))
              (Control.Exception.Base.patError
-                @ (GHC.Types.IO ()) "T9400.hs:(17,5)-(18,29)|case"#))))
+                @ (IO ()) "T9400.hs:(17,5)-(18,29)|case"#))))
 
 
 

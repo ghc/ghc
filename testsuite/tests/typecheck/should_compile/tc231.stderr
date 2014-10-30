@@ -12,7 +12,7 @@ TYPE CONSTRUCTORS
   class Zork s a b | a -> b where
     huh :: Q s a chain -> ST s ()
 COERCION AXIOMS
-  axiom ShouldCompile.NTCo:Zork ::
+  axiom NTCo:Zork ::
       Zork s a b = forall chain. Q s a chain -> ST s ()
 Dependent modules: []
 Dependent packages: [base-4.8.0.0, ghc-prim-0.3.1.0,

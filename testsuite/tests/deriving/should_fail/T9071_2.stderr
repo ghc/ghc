@@ -1,6 +1,6 @@
 
 T9071_2.hs:7:40:
-    No instance for (Functor Mu)
+    No instance for (Functor K1)
       arising from the first field of ‘F1’ (type ‘Mu (K1 a)’)
     Possible fix:
       use a standalone 'deriving instance' declaration,

@@ -1,8 +1,6 @@
 
 T2544.hs:15:18:
-    Could not deduce (IxMap i0 ~ IxMap l)
-    from the context (Ix l, Ix r)
-      bound by the instance declaration at T2544.hs:13:10-37
+    Couldn't match type ‘IxMap i0’ with ‘IxMap l’
     NB: ‘IxMap’ is a type function, and may not be injective
     The type variable ‘i0’ is ambiguous
     Expected type: IxMap l [Int]
@@ -13,9 +11,7 @@ T2544.hs:15:18:
     In the expression: BiApp empty empty
 
 T2544.hs:15:24:
-    Could not deduce (IxMap i1 ~ IxMap r)
-    from the context (Ix l, Ix r)
-      bound by the instance declaration at T2544.hs:13:10-37
+    Couldn't match type ‘IxMap i1’ with ‘IxMap r’
     NB: ‘IxMap’ is a type function, and may not be injective
     The type variable ‘i1’ is ambiguous
     Expected type: IxMap r [Int]

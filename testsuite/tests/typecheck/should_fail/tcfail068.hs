@@ -21,7 +21,7 @@ itiap i f arr =
 	return arr)
 
 itrap :: Constructed a => ((Int,Int),(Int,Int)) -> (a->a) -> IndTree s a -> IndTree s a
-itrap ((i,k),(j,l)) f arr = runST(itrap' i k)
+itrap ((i,k),(j,l)) f arr = runST (itrap' i k)
 	where
 	itrap' i k = if k > l then return arr
 		     else (itrapsnd i k >>

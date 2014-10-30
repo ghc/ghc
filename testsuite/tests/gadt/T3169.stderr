@@ -1,8 +1,6 @@
 
 T3169.hs:13:22:
-    Could not deduce (elt ~ Map b elt)
-    from the context (Key a, Key b)
-      bound by the instance declaration at T3169.hs:10:10-36
+    Couldn't match type ‘elt’ with ‘Map b elt’
       ‘elt’ is a rigid type variable bound by
             the type signature for
               lookup :: (a, b) -> Map (a, b) elt -> Maybe elt

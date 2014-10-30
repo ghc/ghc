@@ -17,25 +17,20 @@ INSTANCES
     -- Defined at T8958.hs:10:10
 Dependent modules: []
 Dependent packages: [base-4.8.0.0, ghc-prim-0.3.1.0,
-                     integer-<IMPL>-<VERSION>]
+                     integer-gmp-0.5.1.0]
 
 ==================== Typechecker ====================
 AbsBinds [a] []
   {Exports: [T8958.$fRepresentationala <= $dRepresentational
                <>]
-   Exported types: T8958.$fRepresentationala [InlPrag=[ALWAYS] CONLIKE]
+   Exported types: T8958.$fRepresentationala
                      :: forall a. Representational a
-                   [LclIdX[DFunId],
-                    Str=DmdType,
-                    Unf=DFun: \ (@ a) -> T8958.D:Representational TYPE a]
+                   [LclIdX[DFunId], Str=DmdType]
    Binds: $dRepresentational = T8958.D:Representational}
 AbsBinds [a] []
   {Exports: [T8958.$fNominala <= $dNominal
                <>]
-   Exported types: T8958.$fNominala [InlPrag=[ALWAYS] CONLIKE]
-                     :: forall a. Nominal a
-                   [LclIdX[DFunId],
-                    Str=DmdType,
-                    Unf=DFun: \ (@ a) -> T8958.D:Nominal TYPE a]
+   Exported types: T8958.$fNominala :: forall a. Nominal a
+                   [LclIdX[DFunId], Str=DmdType]
    Binds: $dNominal = T8958.D:Nominal}
 

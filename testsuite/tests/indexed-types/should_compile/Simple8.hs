@@ -8,7 +8,7 @@ type family F a
 -- works if one of the duplicates is removed.
 
 type instance F () = ()
-type instance F () = ()
+-- type instance F () = ()
 
 foo :: F () -> ()
 foo x = x

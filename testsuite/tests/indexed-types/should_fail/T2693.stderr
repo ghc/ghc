@@ -16,16 +16,16 @@ T2693.hs:11:7:
                  return () }
 
 T2693.hs:19:15:
-    Couldn't match expected type ‘(a2, b0)’ with actual type ‘TFn a3’
-    The type variables ‘a2’, ‘b0’, ‘a3’ are ambiguous
-    Relevant bindings include n :: a2 (bound at T2693.hs:19:7)
+    Couldn't match expected type ‘(a5, b0)’ with actual type ‘TFn a2’
+    The type variables ‘b0’, ‘a2’, ‘a5’ are ambiguous
+    Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
     In the first argument of ‘fst’, namely ‘x’
     In the first argument of ‘(+)’, namely ‘fst x’
 
 T2693.hs:19:23:
-    Couldn't match expected type ‘(a4, a2)’ with actual type ‘TFn a5’
-    The type variables ‘a2’, ‘a4’, ‘a5’ are ambiguous
-    Relevant bindings include n :: a2 (bound at T2693.hs:19:7)
+    Couldn't match expected type ‘(a3, a5)’ with actual type ‘TFn a4’
+    The type variables ‘a3’, ‘a4’, ‘a5’ are ambiguous
+    Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
     In the first argument of ‘snd’, namely ‘x’
     In the second argument of ‘(+)’, namely ‘snd x’
 

@@ -34,3 +34,44 @@ instance MonadTrans Rand where
 instance MonadPrim m => MonadPrim (Rand m) where
   type BasePrimMonad (Rand m) = BasePrimMonad m
   liftPrim x = liftPrim (lift x)   -- This line changed from T7729
+
+{-
+  liftPrim :: (MonadPrim m) => BasePrimMonad m a -> m a
+  lift :: MonadTrans t, Monad m => m a -> t m a
+
+  sig of liftPrim :: BasePrimMonad (Rand m) a -> Rand m a
+                   = BasePrimMonad m a -> Rand m a
+  
+  x :: BasePrimMonad (Rand m) a
+  lift @ t=tt @ m=m1
+  liftPrim @ m=m2 @ a=aa
+
+  forall m. (Monad m) => BasePrimMonad (Rand m) a ~ m1 a   -- x arg of lift
+
+                         tt m1 a    -- Result of lift
+                               ~ 
+                            BasePrimMonad m2 a   -- Arg of liftPrim
+
+                         Rand m a      -- expected type of RHS
+                             ~
+                             m2 a  -- Result of liftPrim
+    m = m_and
+    m1 = m_aql
+    m2 = m_aqf
+    tt = t_aqj
+
+---->
+     m2 := Rand m
+
+a)     BasePrimMonad (Rand m) ~ m1
+b)     tt m1 ~ BasePrimMonad (Rand m)
+
+--->  process (b) first
+    CFunEqCan   BasePrimMonad (Ramd m) ~ s_atH
+                s_atH ~ tt m1
+
+  
+--->  now process (a)
+    m1 ~ s_atH ~ tt m1    -- An obscure occurs check
+-}
+
