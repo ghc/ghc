@@ -1,0 +1,49 @@
+ToDo:
+
+* get rid of getEvTerm?
+
+* Float only CTyEqCans.   kind-incompatible things should be CNonCanonical,
+  so they won't float and generate a duplicate kind-unify message
+
+  Then we can stop disabling floating when there are insolubles,
+  and that will improve mc21 etc
+
+* Note [Do not add duplicate derived isols]
+  This mostly doesn't apply now, except for the fundeps
+
+* inert_funeqs, inert_eqs: keep only the CtEvidence.
+   They are all CFunEqCans, CTyEqCans
+
+* remove/rewrite TcMType Note [Unflattening while zonking]
+
+* Consider individual data tpyes for CFunEqCan etc
+
+Remaining errors
+============================
+Unexpected failures:
+   generics                      GenDerivOutput1_1 [stderr mismatch] (normal)
+
+ghcirun002: internal error: ASSERTION FAILED: file rts/Interpreter.c, line 773
+   ghci/should_run               ghcirun002 [bad exit code] (ghci)
+
+-package dependencies: array-0.5.0.1@array_GX4NwjS8xZkC2ZPtjgwhnz
++package dependencies: array-0.5.0.1 base-4.8.0.0
+   safeHaskell/check/pkg01       safePkg01 [bad stdout] (normal)
+
+
+Wierd looking pattern synonym thing
+   ghci/scripts                       T8776 [bad stdout] (ghci)
+   patsyn/should_fail                 mono [stderr mismatch] (normal)
+
+Derived equalities   fmv1 ~ Maybe a, fmv2 ~ Maybe b
+   indexed-types/should_fail     T4093a [stderr mismatch] (normal)
+
+Not sure
+   indexed-types/should_fail     ExtraTcsUntch [stderr mismatch] (normal)
+
+Order of finding iprovements
+   typecheck/should_compile      TcTypeNatSimple [exit code non-0] (normal)
+
+
+
+-----------------
