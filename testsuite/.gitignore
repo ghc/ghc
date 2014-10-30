@@ -29,10 +29,12 @@ Thumbs.db
 .hpc.*/
 
 *.genscript
+*.stdout.normalised
+*.stdout-mingw32.normalised
+*.stdout-ghc.normalised
 *.stderr.normalised
 *.stderr-mingw32.normalised
 *.stderr-ghc.normalised
-*.stdout.normalised
 *.interp.stdout
 *.interp.stderr
 *.run.stdout
