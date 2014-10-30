@@ -15,7 +15,10 @@ ifneq "$(GccIsClang)" "YES"
 # Debian doesn't turn -Werror=unused-but-set-variable on by default, so
 # we turn it on explicitly for consistency with other users
 ifeq "$(GccLT46)" "NO"
+# Never set the flag on Windows as the host gcc may be too old.
+ifneq "$(HostOS_CPP)" "mingw32"
 SRC_CC_WARNING_OPTS += -Werror=unused-but-set-variable
+endif
 # gcc 4.6 gives 3 warning for giveCapabilityToTask not being inlined
 SRC_CC_WARNING_OPTS += -Wno-error=inline
 endif
