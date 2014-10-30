@@ -3,6 +3,7 @@
 {-# LANGUAGE AutoDeriveTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
 
 -----------------------------------------------------------------------------

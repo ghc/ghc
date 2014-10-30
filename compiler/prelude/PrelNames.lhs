@@ -367,9 +367,9 @@ genericTyConNames = [
     cTyConName, sTyConName, rec0TyConName,
     d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
     repTyConName, rep1TyConName,
-    pPrefixITyConName, pInfixITyConName, pLeftAssociativeTyConName,
-    pRightAssociativeTyConName, pNotAssociativeTyConName,
-    pMetaDataTyConName, pMetaConsTyConName, pMetaSelTyConName
+    prefixIDataConName, infixIDataConName, leftAssociativeDataConName,
+    rightAssociativeDataConName, notAssociativeDataConName,
+    metaDataDataConName, metaConsDataConName, metaSelDataConName
   ]
 \end{code}
 
@@ -731,7 +731,6 @@ leftAssocDataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "LeftAssociative")
 rightAssocDataCon_RDR = dataQual_RDR gHC_GENERICS (fsLit "RightAssociative")
 notAssocDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "NotAssociative")
 
-
 fmap_RDR, pure_RDR, ap_RDR, foldable_foldr_RDR, foldMap_RDR,
     traverse_RDR, mempty_RDR, mappend_RDR :: RdrName
 fmap_RDR                = varQual_RDR gHC_BASE (fsLit "fmap")
@@ -788,9 +787,9 @@ leftDataConName   = conName dATA_EITHER (fsLit "Left")   leftDataConKey
 rightDataConName  = conName dATA_EITHER (fsLit "Right")  rightDataConKey
 
 maybeTyConName, justDataConName, nothingDataConName :: Name
-maybeTyConName      = tcQual  dATA_MAYBE (fsLit "Maybe")    maybeTyConKey
-justDataConName     = conName dATA_MAYBE (fsLit "Just")     justDataConKey
-nothingDataConName  = conName dATA_MAYBE (fsLit "Nothing")  nothingDataConKey
+maybeTyConName      = tcQual  gHC_BASE (fsLit "Maybe")    maybeTyConKey
+justDataConName     = conName gHC_BASE (fsLit "Just")     justDataConKey
+nothingDataConName  = conName gHC_BASE (fsLit "Nothing")  nothingDataConKey
 
 -- Generics (types)
 v1TyConName, u1TyConName, rec1TyConName, par1TyConName,
@@ -799,9 +798,9 @@ v1TyConName, u1TyConName, rec1TyConName, par1TyConName,
   cTyConName, sTyConName, rec0TyConName,
   d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
   repTyConName, rep1TyConName,
-  pPrefixITyConName, pInfixITyConName, pLeftAssociativeTyConName,
-  pRightAssociativeTyConName, pNotAssociativeTyConName,
-  pMetaDataTyConName, pMetaConsTyConName, pMetaSelTyConName :: Name
+  prefixIDataConName, infixIDataConName, leftAssociativeDataConName,
+  rightAssociativeDataConName, notAssociativeDataConName,
+  metaDataDataConName, metaConsDataConName, metaSelDataConName :: Name
 
 v1TyConName  = tcQual gHC_GENERICS (fsLit "V1") v1TyConKey
 u1TyConName  = tcQual gHC_GENERICS (fsLit "U1") u1TyConKey
@@ -828,15 +827,15 @@ noSelTyConName = tcQual gHC_GENERICS (fsLit "NoSelector") noSelTyConKey
 repTyConName  = tcQual gHC_GENERICS (fsLit "Rep")  repTyConKey
 rep1TyConName = tcQual gHC_GENERICS (fsLit "Rep1") rep1TyConKey
 
-pPrefixITyConName = tcQual gHC_GENERICS (fsLit "PrefixI")  pPrefixITyConKey
-pInfixITyConName  = tcQual gHC_GENERICS (fsLit "InfixI")   pInfixITyConKey
-pLeftAssociativeTyConName  = tcQual gHC_GENERICS (fsLit "LeftAssociative")   pLeftAssociativeTyConKey
-pRightAssociativeTyConName = tcQual gHC_GENERICS (fsLit "RightAssociative")  pRightAssociativeTyConKey
-pNotAssociativeTyConName   = tcQual gHC_GENERICS (fsLit "NotAssociative")    pNotAssociativeTyConKey
+prefixIDataConName = conName gHC_GENERICS (fsLit "PrefixI")  prefixIDataConKey
+infixIDataConName  = conName gHC_GENERICS (fsLit "InfixI")   infixIDataConKey
+leftAssociativeDataConName  = conName gHC_GENERICS (fsLit "LeftAssociative")   leftAssociativeDataConKey
+rightAssociativeDataConName = conName gHC_GENERICS (fsLit "RightAssociative")  rightAssociativeDataConKey
+notAssociativeDataConName   = conName gHC_GENERICS (fsLit "NotAssociative")    notAssociativeDataConKey
 
-pMetaDataTyConName = tcQual gHC_GENERICS (fsLit "MetaData") pMetaDataTyConKey
-pMetaConsTyConName = tcQual gHC_GENERICS (fsLit "MetaCons") pMetaConsTyConKey
-pMetaSelTyConName  = tcQual gHC_GENERICS (fsLit "MetaSel")  pMetaSelTyConKey
+metaDataDataConName = conName gHC_GENERICS (fsLit "MetaData") metaDataDataConKey
+metaConsDataConName = conName gHC_GENERICS (fsLit "MetaCons") metaConsDataConKey
+metaSelDataConName  = conName gHC_GENERICS (fsLit "MetaSel")  metaSelDataConKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringFoldrName,
@@ -1490,9 +1489,9 @@ v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
   cTyConKey, sTyConKey, rec0TyConKey,
   d1TyConKey, c1TyConKey, s1TyConKey, noSelTyConKey,
   repTyConKey, rep1TyConKey,
-  pPrefixITyConKey, pInfixITyConKey, pLeftAssociativeTyConKey,
-  pRightAssociativeTyConKey, pNotAssociativeTyConKey,
-  pMetaDataTyConKey, pMetaConsTyConKey, pMetaSelTyConKey :: Unique
+  prefixIDataConKey, infixIDataConKey, leftAssociativeDataConKey,
+  rightAssociativeDataConKey, notAssociativeDataConKey,
+  metaDataDataConKey, metaConsDataConKey, metaSelDataConKey :: Unique
 
 v1TyConKey    = mkPreludeTyConUnique 135
 u1TyConKey    = mkPreludeTyConUnique 136
@@ -1520,15 +1519,15 @@ noSelTyConKey = mkPreludeTyConUnique 154
 repTyConKey  = mkPreludeTyConUnique 155
 rep1TyConKey = mkPreludeTyConUnique 156
 
-pPrefixITyConKey          = mkPreludeTyConUnique 400
-pInfixITyConKey           = mkPreludeTyConUnique 401
-pLeftAssociativeTyConKey  = mkPreludeTyConUnique 402
-pRightAssociativeTyConKey = mkPreludeTyConUnique 403
-pNotAssociativeTyConKey   = mkPreludeTyConUnique 404
+prefixIDataConKey          = mkPreludeDataConUnique 35
+infixIDataConKey           = mkPreludeDataConUnique 36
+leftAssociativeDataConKey  = mkPreludeDataConUnique 37
+rightAssociativeDataConKey = mkPreludeDataConUnique 38
+notAssociativeDataConKey   = mkPreludeDataConUnique 39
 
-pMetaDataTyConKey   = mkPreludeTyConUnique 405
-pMetaConsTyConKey   = mkPreludeTyConUnique 406
-pMetaSelTyConKey    = mkPreludeTyConUnique 407
+metaDataDataConKey   = mkPreludeDataConUnique 40
+metaConsDataConKey   = mkPreludeDataConUnique 41
+metaSelDataConKey    = mkPreludeDataConUnique 42
 
 -- Type-level naturals
 typeNatKindConNameKey, typeSymbolKindConNameKey,

@@ -560,7 +560,8 @@ module GHC.Generics  (
 
   -- * Meta-information
   , Datatype(..), Constructor(..), Selector(..), NoSelector
-  , Fixity(..), Associativity(..) -- , Arity(..), prec
+  , Fixity(..), Associativity(..), prec -- Arity(..),
+  , Meta(..)
 
   -- * Generic type classes
   , Generic(..), Generic1(..)
@@ -587,42 +588,42 @@ import GHC.TypeLits ( Nat, Symbol, KnownSymbol, KnownNat, symbolVal, natVal )
 --------------------------------------------------------------------------------
 
 -- | Void: used for datatypes without constructors
-data V1 p
+data V1 (p :: *)
 
 -- | Unit: used for constructors without arguments
-data U1 p = U1
-  -- deriving (Eq, Ord, Read, Show, Generic)
+data U1 (p :: *) = U1
+  deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Used for marking occurrences of the parameter
 newtype Par1 p = Par1 { unPar1 :: p }
-  -- deriving (Eq, Ord, Read, Show, Generic)
+  deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Recursive calls of kind * -> *
-newtype Rec1 f p = Rec1 { unRec1 :: f p }
-  -- deriving (Eq, Ord, Read, Show, Generic)
+newtype Rec1 f (p :: *) = Rec1 { unRec1 :: f p }
+  deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Constants, additional parameters and recursion of kind *
-newtype K1 i c p = K1 { unK1 :: c }
-  -- deriving (Eq, Ord, Read, Show, Generic)
+newtype K1 (i :: *) c (p :: *) = K1 { unK1 :: c }
+  deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Meta-information (constructor names, etc.)
-newtype M1 i (c :: Meta) f p = M1 { unM1 :: f p }
-  -- deriving (Eq, Ord, Read, Show, Generic)
+newtype M1 (i :: *) (c :: Meta) f (p :: *) = M1 { unM1 :: f p }
+  deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Sums: encode choice between constructors
 infixr 5 :+:
-data (:+:) f g p = L1 (f p) | R1 (g p)
-  -- deriving (Eq, Ord, Read, Show, Generic)
+data (:+:) f g (p :: *) = L1 (f p) | R1 (g p)
+  deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Products: encode multiple arguments to constructors
 infixr 6 :*:
-data (:*:) f g p = f p :*: g p
-  -- deriving (Eq, Ord, Read, Show, Generic)
+data (:*:) f g (p :: *) = f p :*: g p
+  deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Composition of functors
 infixr 7 :.:
-newtype (:.:) f g p = Comp1 { unComp1 :: f (g p) }
-  -- deriving (Eq, Ord, Read, Show, Generic)
+newtype (:.:) f (g :: * -> *) (p :: *) = Comp1 { unComp1 :: f (g p) }
+  deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Tag for K1: recursion (of kind *)
 data R
@@ -711,8 +712,10 @@ class Selector s where
 data NoSelector
 instance Selector NoSelector        where selName _ = ""
 
-instance Selector (MetaSel Nothing) where selName _ = ""
-instance (KnownSymbol s) => Selector (MetaSel (Just s)) where
+-- instance Selector (MetaSel Nothing) where selName _ = ""
+-- instance (KnownSymbol s) => Selector (MetaSel (Just s)) where
+  -- selName _ = symbolVal (Proxy :: Proxy s)
+instance (KnownSymbol s) => Selector (MetaSel s) where
   selName _ = symbolVal (Proxy :: Proxy s)
 
 -- | Representable types of kind *.
@@ -742,12 +745,13 @@ class Generic1 f where
 
 data Meta = MetaData Symbol Symbol Bool
           | MetaCons Symbol FixityI Bool
-          | MetaSel  (Maybe Symbol)
+          -- | MetaSel  (Maybe Symbol)
+          | MetaSel  Symbol
 
 --------------------------------------------------------------------------------
 -- Derived instances
 --------------------------------------------------------------------------------
-{-
+
 deriving instance Generic [a]
 deriving instance Generic (Maybe a)
 deriving instance Generic (Either a b)
@@ -770,7 +774,7 @@ deriving instance Generic1 ((,,,) a b c)
 deriving instance Generic1 ((,,,,) a b c d)
 deriving instance Generic1 ((,,,,,) a b c d e)
 deriving instance Generic1 ((,,,,,,) a b c d e f)
--}
+
 --------------------------------------------------------------------------------
 -- Primitive representations
 --------------------------------------------------------------------------------
@@ -851,7 +855,7 @@ instance Generic Char where
 
 -- | Convenient synonym to refer to the kind of a type variable:
 -- @type KindOf (a :: k) = ('KProxy :: KProxy k)@
-type KindOf (a :: k) = ('KProxy :: KProxy k)
+-- type KindOf (a :: k) = ('KProxy :: KProxy k)
 
 -- | The singleton kind-indexed data family.
 data family Sing (a :: k)
@@ -880,7 +884,7 @@ class (kparam ~ 'KProxy) => SingKind (kparam :: KProxy k) where
 
 -- | Convenient abbreviation for 'DemoteRep':
 -- @type Demote (a :: k) = DemoteRep ('KProxy :: KProxy k)@
-type Demote (a :: k) = DemoteRep ('KProxy :: KProxy k)
+-- type Demote (a :: k) = DemoteRep ('KProxy :: KProxy k)
 
 -- | An /existentially-quantified/ singleton. This type is useful when you want a
 -- singleton type, but there is no way of knowing, at compile-time, what the type
@@ -892,8 +896,6 @@ type Demote (a :: k) = DemoteRep ('KProxy :: KProxy k)
 -- >           SomeSing sb -> {- fancy dependently-typed code with sb -}
 --
 -- An example like the one above may be easier to write using 'withSomeSing'.
-data SomeSing (kproxy :: KProxy k) where
-  SomeSing :: Sing (a :: k) -> SomeSing ('KProxy :: KProxy k)
 
 -- Singleton booleans
 data instance Sing (a :: Bool) where

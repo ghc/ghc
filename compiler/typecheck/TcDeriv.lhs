@@ -148,10 +148,6 @@ data EarlyDerivSpec = InferTheta (DerivSpec ThetaOrigin)
         -- GivenTheta ds => the exact context for the instance is supplied
         --                  by the programmer; it is ds_theta
 
-forgetTheta :: EarlyDerivSpec -> DerivSpec ()
-forgetTheta (InferTheta spec) = spec { ds_theta = () }
-forgetTheta (GivenTheta spec) = spec { ds_theta = () }
-
 earlyDSTyCon :: EarlyDerivSpec -> TyCon
 earlyDSTyCon (InferTheta spec) = ds_tc spec
 earlyDSTyCon (GivenTheta spec) = ds_tc spec
@@ -368,23 +364,23 @@ tcDeriving tycl_decls inst_decls deriv_decls
         -- for each type, determine the auxliary declarations that are common
         -- to multiple derivations involving that type (e.g. Generic and
         -- Generic1 should use the same TcGenGenerics.MetaTyCons)
-        ; (commonAuxs, auxDerivStuff) <- commonAuxiliaries $ map forgetTheta early_specs
+        -- ; (commonAuxs, auxDerivStuff) <- commonAuxiliaries $ map forgetTheta early_specs
 
         ; overlap_flag <- getOverlapFlag
         ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
-        ; insts1 <- mapM (genInst True overlap_flag commonAuxs) given_specs
+        ; insts1 <- mapM (genInst True overlap_flag) given_specs
 
         -- the stand-alone derived instances (@insts1@) are used when inferring
         -- the contexts for "deriving" clauses' instances (@infer_specs@)
         ; final_specs <- extendLocalInstEnv (map (iSpec . fstOf3) insts1) $
                          inferInstanceContexts overlap_flag infer_specs
 
-        ; insts2 <- mapM (genInst False overlap_flag commonAuxs) final_specs
+        ; insts2 <- mapM (genInst False overlap_flag) final_specs
 
         ; let (inst_infos, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
         ; let (binds, newTyCons, famInsts, extraInstances) =
-                genAuxBinds loc (unionManyBags (auxDerivStuff : deriv_stuff))
+                genAuxBinds loc (unionManyBags deriv_stuff)
 
         ; (inst_info, rn_binds, rn_dus) <-
             renameDeriv is_boot (inst_infos ++ (bagToList extraInstances)) binds
@@ -424,22 +420,6 @@ pprRepTy fi@(FamInst { fi_tys = lhs })
   = ptext (sLit "type") <+> ppr (mkTyConApp (famInstTyCon fi) lhs) <+>
       equals <+> ppr rhs
   where rhs = famInstRHS fi
-
--- As of 24 April 2012, this only shares MetaTyCons between derivations of
--- Generic and Generic1; thus the types and logic are quite simple.
-type CommonAuxiliary = MetaTyCons
-type CommonAuxiliaries = [(TyCon, CommonAuxiliary)] -- NSF what is a more efficient map type?
-
-commonAuxiliaries :: [DerivSpec ()] -> TcM (CommonAuxiliaries, BagDerivStuff)
-commonAuxiliaries = foldM snoc ([], emptyBag) where
-  snoc acc@(cas, stuff) (DS {ds_name = nm, ds_cls = cls, ds_tc = rep_tycon})
-    | getUnique cls `elem` [genClassKey, gen1ClassKey] =
-      extendComAux $ genGenericMetaTyCons rep_tycon (nameModule nm)
-    | otherwise = return acc
-   where extendComAux m -- don't run m if its already in the accumulator
-           | any ((rep_tycon ==) . fst) cas = return acc
-           | otherwise = do (ca, new_stuff) <- m
-                            return $ ((rep_tycon, ca) : cas, stuff `unionBags` new_stuff)
 
 renameDeriv :: Bool
             -> [InstInfo RdrName]
@@ -2056,10 +2036,9 @@ the renamer.  What a great hack!
 --
 genInst :: Bool             -- True <=> standalone deriving
         -> OverlapFlag
-        -> CommonAuxiliaries
         -> DerivSpec ThetaType 
         -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
-genInst _standalone_deriv default_oflag comauxs
+genInst _standalone_deriv default_oflag
         spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype, ds_tys = tys
                  , ds_overlap = overlap_mode
@@ -2082,7 +2061,6 @@ genInst _standalone_deriv default_oflag comauxs
   | otherwise
   = do { (meth_binds, deriv_stuff) <- genDerivStuff loc clas 
                                         dfun_name rep_tycon
-                                        (lookup rep_tycon comauxs)
        ; inst_spec <- mkInstance oflag theta spec
        ; let inst_info = InstInfo { iSpec   = inst_spec
                                   , iBinds  = InstBindings
@@ -2096,16 +2074,14 @@ genInst _standalone_deriv default_oflag comauxs
     rhs_ty = newTyConInstRhs rep_tycon rep_tc_args
 
 genDerivStuff :: SrcSpan -> Class -> Name -> TyCon
-              -> Maybe CommonAuxiliary
               -> TcM (LHsBinds RdrName, BagDerivStuff)
-genDerivStuff loc clas dfun_name tycon comaux_maybe
+genDerivStuff loc clas dfun_name tycon
   | let ck = classKey clas
   , ck `elem` [genClassKey, gen1ClassKey]   -- Special case because monadic
   = let gk = if ck == genClassKey then Gen0 else Gen1 
         -- TODO NSF: correctly identify when we're building Both instead of One
-        Just metaTyCons = comaux_maybe -- well-guarded by commonAuxiliaries and genInst
     in do
-      (binds, faminst) <- gen_Generic_binds gk tycon metaTyCons (nameModule dfun_name)
+      (binds, faminst) <- gen_Generic_binds gk tycon (nameModule dfun_name)
       return (binds, DerivFamInst faminst `consBag` emptyBag)
 
   | otherwise                      -- Non-monadic generators

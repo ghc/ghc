@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE IncoherentInstances        #-} -- :-/
 {-# LANGUAGE DefaultSignatures          #-}
+{-# LANGUAGE PolyKinds                  #-}
 
 module GShow (
   -- * Generic show class
