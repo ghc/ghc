@@ -52,7 +52,7 @@ module TcRnTypes(
         isGivenCt, isHoleCt,
         ctEvidence, ctLoc, ctPred,
         mkNonCanonical, mkNonCanonicalCt,
-        ctEvPred, ctEvTerm, ctEvId, ctEvCheckDepth,
+        ctEvPred, ctEvLoc, ctEvTerm, ctEvCoercion, ctEvId, ctEvCheckDepth,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
@@ -1114,7 +1114,7 @@ ctEvidence :: Ct -> CtEvidence
 ctEvidence = cc_ev
 
 ctLoc :: Ct -> CtLoc
-ctLoc = ctev_loc . cc_ev
+ctLoc = ctEvLoc . ctEvidence
 
 ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
@@ -1480,16 +1480,26 @@ ctEvPred :: CtEvidence -> TcPredType
 -- The predicate of a flavor
 ctEvPred = ctev_pred
 
+ctEvLoc :: CtEvidence -> CtLoc
+ctEvLoc = ctev_loc
+
 ctEvTerm :: CtEvidence -> EvTerm
 ctEvTerm (CtGiven   { ctev_evtm = tm }) = tm
 ctEvTerm (CtWanted  { ctev_evar = ev }) = EvId ev
 ctEvTerm ctev@(CtDerived {}) = pprPanic "ctEvTerm: derived constraint cannot have id"
                                       (ppr ctev)
 
+ctEvCoercion :: CtEvidence -> TcCoercion
+-- ctEvCoercion ev = evTermCoercion (ctEvTerm ev)
+ctEvCoercion (CtGiven   { ctev_evtm = tm }) = evTermCoercion tm
+ctEvCoercion (CtWanted  { ctev_evar = v })  = mkTcCoVarCo v
+ctEvCoercion ctev@(CtDerived {}) = pprPanic "ctEvCoercion: derived constraint cannot have id"
+                                      (ppr ctev)
+
 -- | Checks whether the evidence can be used to solve a goal with the given minimum depth
 ctEvCheckDepth :: SubGoalDepth -> CtEvidence -> Bool
 ctEvCheckDepth _      (CtGiven {})   = True -- Given evidence has infinite depth
-ctEvCheckDepth min ev@(CtWanted {})  = min <= ctLocDepth (ctev_loc ev)
+ctEvCheckDepth min ev@(CtWanted {})  = min <= ctLocDepth (ctEvLoc ev)
 ctEvCheckDepth _   ev@(CtDerived {}) = pprPanic "ctEvCheckDepth: cannot consider derived evidence" (ppr ev)
 
 ctEvId :: CtEvidence -> TcId
