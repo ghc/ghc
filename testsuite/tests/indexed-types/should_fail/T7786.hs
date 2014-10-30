@@ -17,7 +17,7 @@ data KeySegment = Numic Nat | Symic Symbol
 
 data instance Sing (n :: KeySegment) where
   Numic' :: Sing n -> Sing (Numic n)
-  Symic' :: Sing s -> Sing (Symic s)
+  Symic' :: Sing ss -> Sing (Symic ss)
 
 data instance Sing (k :: [KeySegment]) where
   Root' :: Sing ('[] :: [KeySegment])

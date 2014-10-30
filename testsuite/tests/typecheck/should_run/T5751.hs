@@ -18,7 +18,7 @@ instance (MonadIO m) => (XMLGenerator (IdentityT m)) where
     genElement _ = liftIO $ putStrLn "in genElement"
 
 main :: IO ()
-main = 
+main =
     do runIdentityT web
        putStrLn "done."
 

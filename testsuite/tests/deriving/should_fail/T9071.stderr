@@ -2,7 +2,7 @@
 [2 of 2] Compiling T9071            ( T9071.hs, T9071.o )
 
 T9071.hs:7:37:
-    No instance for (Functor K)
+    No instance for (Functor Mu)
       arising from the first field of ‘F’ (type ‘Mu (K a)’)
     Possible fix:
       use a standalone 'deriving instance' declaration,

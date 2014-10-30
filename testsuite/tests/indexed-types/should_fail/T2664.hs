@@ -29,3 +29,20 @@ instance (Connect a, Connect b) => Connect (a :*: b) where
 
         -- type error leads to stack overflow (even without UndecidableInstances!)
         return (O $ takeMVar v, E (pchoose Right v newPChan) (pchoose Left v newPChan))
+
+{- The last line gives rise to:
+
+  [G] (a :*: b) ~ Dual c
+  [G] c ~ Dual (a :*: b)
+-->
+  [G] c ~ Dual a :+: Dual b
+
+  [W] PChan c ~ PChan (Dual b :+: Dual a)
+--> decompose
+  [W] c ~ Dual b :+: Dual a
+--> subst
+  [W] Dual a :+: Dual b ~ Dual b :+: Dual a
+--> decompose
+  [W] Dual a ~ Dual b
+  [W] Dual b ~ Dual a
+-}
