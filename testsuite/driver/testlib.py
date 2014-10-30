@@ -920,7 +920,7 @@ def run_command( name, way, cmd ):
 
 def ghci_script_without_flag(flag):
     def apply(name, way, script):
-        overrides = filter(lambda f: f != flag, getTestOpts().compiler_always_flags)
+        overrides = [f for f in getTestOpts().compiler_always_flags if f != flag]
         return ghci_script_override_default_flags(overrides)(name, way, script)
 
     return apply
@@ -933,7 +933,7 @@ def ghci_script_override_default_flags(overrides):
 
 def ghci_script( name, way, script, override_flags = None ):
     # Use overriden default flags when given
-    if override_flags:
+    if override_flags is not None:
         default_flags = override_flags
     else:
         default_flags = getTestOpts().compiler_always_flags
@@ -973,14 +973,14 @@ def compile_fail_override_default_flags(overrides):
 
 def compile_without_flag(flag):
     def apply(name, way, extra_opts):
-        overrides = filter(lambda f: f != flag, getTestOpts().compiler_always_flags)
+        overrides = [f for f in getTestOpts().compiler_always_flags if f != flag]
         return compile_override_default_flags(overrides)(name, way, extra_opts)
 
     return apply
 
 def compile_fail_without_flag(flag):
     def apply(name, way, extra_opts):
-        overrides = filter(lambda f: f != flag, getTestOpts().compiler_always_flags)
+        overrides = [f for f in getTestOpts.compiler_always_flags if f != flag]
         return compile_fail_override_default_flags(overrides)(name, way, extra_opts)
 
     return apply
@@ -1225,7 +1225,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     else:
         cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
 
-    if override_flags:
+    if override_flags is not None:
         comp_flags = copy.copy(override_flags)
     else:
         comp_flags = copy.copy(getTestOpts().compiler_always_flags)
