@@ -2100,6 +2100,11 @@ doCpp dflags raw input_fn output_fn = do
 
     backend_defs <- getBackendDefs dflags
 
+#ifdef GHCI
+    let th_defs = [ "-D__GLASGOW_HASKELL_TH__=YES" ]
+#else
+    let th_defs = [ "-D__GLASGOW_HASKELL_TH__=NO" ]
+#endif
     -- Default CPP defines in Haskell source
     ghcVersionH <- getGhcVersionPathName dflags
     let hsSourceCppOpts =
@@ -2112,6 +2117,7 @@ doCpp dflags raw input_fn output_fn = do
                     ++ map SysTools.Option hsSourceCppOpts
                     ++ map SysTools.Option target_defs
                     ++ map SysTools.Option backend_defs
+                    ++ map SysTools.Option th_defs
                     ++ map SysTools.Option hscpp_opts
                     ++ map SysTools.Option sse_defs
                     ++ map SysTools.Option avx_defs
