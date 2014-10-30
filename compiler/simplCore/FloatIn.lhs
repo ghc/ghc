@@ -188,7 +188,7 @@ unlifted function arguments to be ok-for-speculation.
 
 Note [Floating in past a lambda group]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* We must be careful about floating inside inside a value lambda.
+* We must be careful about floating inside a value lambda.
   That risks losing laziness.
   The float-out pass might rescue us, but then again it might not.
 
