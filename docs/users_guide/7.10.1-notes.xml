@@ -66,12 +66,6 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    GHC has had its internal Unicode database for
-                    parsing updated to the Unicode 7.0 standard.
-                </para>
-           </listitem>
-            <listitem>
-                <para>
                     GHC now checks that all the language extensions required for
                     the inferred type signatures are explicitly enabled. This
                     means that if any of the type signatures inferred in your
@@ -211,6 +205,22 @@ echo "[]" > package.conf
                 <para>
                     Version number XXXXX (was 4.7.0.0)
                </para>
+           </listitem>
+            <listitem>
+                <para>
+                    GHC has had its internal Unicode database for
+                    parsing updated to the Unicode 7.0 standard.
+                </para>
+           </listitem>
+            <listitem>
+                <para>
+                    Attempting to access a portion of the result of
+                    <literal>System.IO.hGetContents</literal> that was not yet
+                    read when the handle was closed now throws an exception.
+                    Previously, a lazy read from a closed handle would simply
+                    end the result string, leading to silent or delayed
+                    failures.
+                </para>
            </listitem>
        </itemizedlist>
     </sect3>
