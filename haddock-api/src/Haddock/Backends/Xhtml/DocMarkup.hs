@@ -161,7 +161,7 @@ hackMarkup fmt' h' =
       CollapsingHeader (Header lvl titl) par n nm ->
         let id_ = makeAnchorId $ "ch:" ++ fromMaybe "noid:" nm ++ show n
             col' = collapseControl id_ True "caption"
-            instTable = (thediv ! collapseSection id_ True [] <<)
+            instTable = (thediv ! collapseSection id_ False [] <<)
             lvs = zip [1 .. ] [h1, h2, h3, h4, h5, h6]
             getHeader = fromMaybe caption (lookup lvl lvs)
             subCaption = getHeader ! col' << markup fmt titl
