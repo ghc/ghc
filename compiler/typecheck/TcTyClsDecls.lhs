@@ -325,9 +325,6 @@ kcTyClGroup (TyClGroup { group_tyclds = decls })
       = do { res <- generaliseFamDecl kind_env fam
            ; return [res] }
 
-      | ForeignType {} <- decl
-      = pprPanic "generaliseTCD" (ppr decl)
-
       | otherwise
       = do { res <- generalise kind_env (tcdName decl)
            ; return [res] }
@@ -397,9 +394,6 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
 
 getInitialKind (FamDecl { tcdFam = decl }) 
   = getFamDeclInitialKind decl
-
-getInitialKind (ForeignType { tcdLName = L _ name })
-  = return [(name, AThing liftedTypeKind)]
 
 getInitialKind decl@(SynDecl {}) 
   = pprPanic "getInitialKind" (ppr decl)
@@ -494,8 +488,6 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name, tcdTyVars = hs_tvs
     kc_sig (TypeSig _ op_ty)    = discardResult (tcHsLiftedType op_ty)
     kc_sig (GenericSig _ op_ty) = discardResult (tcHsLiftedType op_ty)
     kc_sig _                    = return ()
-
-kcTyClDecl (ForeignType {}) = return ()
 
 -- closed type families look at their equations, but other families don't
 -- do anything here
@@ -671,10 +663,6 @@ tcTyClDecl1 _parent rec_info
            ; case getTyVar_maybe ty of
                Just tv' -> return tv'
                Nothing  -> pprPanic "tc_fd_tyvar" (ppr name $$ ppr tv $$ ppr ty) }
-
-tcTyClDecl1 _ _
-  (ForeignType {tcdLName = L _ tc_name, tcdExtName = tc_ext_name})
-  = return [ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind)]
 \end{code}
 
 \begin{code}

@@ -1624,10 +1624,6 @@ tyConToIfaceDecl env tycon
                   ifPromotable = isJust (promotableTyCon_maybe tycon),
                   ifParent  = parent })
 
-  | isForeignTyCon tycon
-  = (env, IfaceForeign { ifName    = getOccName tycon,
-                         ifExtName = tyConExtName tycon })
-
   | otherwise  -- FunTyCon, PrimTyCon, promoted TyCon/DataCon
   -- For pretty printing purposes only.
   = ( env

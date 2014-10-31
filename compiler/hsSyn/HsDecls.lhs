@@ -456,12 +456,7 @@ type LTyClDecl name = Located (TyClDecl name)
 
 -- | A type or class declaration.
 data TyClDecl name
-  = ForeignType {
-                tcdLName    :: Located name,
-                tcdExtName  :: Maybe FastString
-    }
-
-  | -- | @type/data family T :: *->*@
+  = -- | @type/data family T :: *->*@
     FamDecl { tcdFam :: FamilyDecl name }
 
   | -- | @type@ declaration
@@ -606,7 +601,6 @@ tcdName :: TyClDecl name -> name
 tcdName = unLoc . tyClDeclLName
 
 tyClDeclTyVars :: OutputableBndr name => TyClDecl name -> LHsTyVarBndrs name
-tyClDeclTyVars decl@(ForeignType {}) = pprPanic "tyClDeclTyVars" (ppr decl)
 tyClDeclTyVars (FamDecl { tcdFam = FamilyDecl { fdTyVars = tvs } }) = tvs
 tyClDeclTyVars d = tcdTyVars d
 \end{code}
@@ -630,7 +624,6 @@ countTyClDecls decls
 -- | Does this declaration have a complete, user-supplied kind signature?
 -- See Note [Complete user-supplied kind signatures]
 hsDeclHasCusk :: TyClDecl name -> Bool
-hsDeclHasCusk (ForeignType {}) = True
 hsDeclHasCusk (FamDecl { tcdFam = fam_decl }) = famDeclHasCusk fam_decl
 hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
   = hsTvbAllKinded tyvars && rhs_annotated rhs
@@ -677,9 +670,6 @@ variables and its return type are annotated.
 \begin{code}
 instance OutputableBndr name
               => Outputable (TyClDecl name) where
-
-    ppr (ForeignType {tcdLName = ltycon})
-        = hsep [ptext (sLit "foreign import type dotnet"), ppr ltycon]
 
     ppr (FamDecl { tcdFam = decl }) = ppr decl
     ppr (SynDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdRhs = rhs })
@@ -756,7 +746,6 @@ pp_fam_inst_lhs thing (HsWB { hswb_cts = typats }) context -- explicit type patt
 pprTyClDeclFlavour :: TyClDecl a -> SDoc
 pprTyClDeclFlavour (ClassDecl {})   = ptext (sLit "class")
 pprTyClDeclFlavour (SynDecl {})     = ptext (sLit "type")
-pprTyClDeclFlavour (ForeignType {}) = ptext (sLit "foreign type")
 pprTyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
   = pprFlavour info
 pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })

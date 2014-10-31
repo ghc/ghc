@@ -125,10 +125,6 @@ data IfaceDecl
                  ifAxBranches :: [IfaceAxBranch] -- Branches
     }
 
-  | IfaceForeign { ifName :: IfaceTopBndr,           -- Needs expanding when we move
-                                                -- beyond .NET
-                   ifExtName :: Maybe FastString }
-
   | IfacePatSyn { ifName          :: IfaceTopBndr,           -- Name of the pattern synonym
                   ifPatIsInfix    :: Bool,
                   ifPatMatcher    :: IfExtName,
@@ -790,9 +786,6 @@ pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
          , ppShowIface ss (ppr details)
          , ppShowIface ss (ppr info) ]
 
-pprIfaceDecl _ (IfaceForeign {ifName = tycon})
-  = hsep [ptext (sLit "foreign import type dotnet"), ppr tycon]
-
 pprIfaceDecl _ (IfaceAxiom { ifName = name, ifTyCon = tycon
                            , ifAxBranches = branches })
   = hang (ptext (sLit "axiom") <+> ppr name <> dcolon)
@@ -1118,8 +1111,6 @@ freeNamesIfDecl (IfaceId _s t d i) =
   freeNamesIfType t &&&
   freeNamesIfIdInfo i &&&
   freeNamesIfIdDetails d
-freeNamesIfDecl IfaceForeign{} =
-  emptyNameSet
 freeNamesIfDecl d@IfaceData{} =
   freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfaceTyConParent (ifParent d) &&&
@@ -1385,9 +1376,6 @@ instance Binary IfaceDecl where
         put_ bh ty
         put_ bh details
         put_ bh idinfo
-
-    put_ _ (IfaceForeign _ _) =
-        error "Binary.put_(IfaceDecl): IfaceForeign"
 
     put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
         putByte bh 2

@@ -765,7 +765,6 @@ hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
 
 hsLTyClDeclBinders (L loc (FamDecl { tcdFam = FamilyDecl { fdLName = L _ name } }))
   = [L loc name]
-hsLTyClDeclBinders (L loc (ForeignType { tcdLName = L _ name })) = [L loc name]
 hsLTyClDeclBinders (L loc (SynDecl     { tcdLName = L _ name })) = [L loc name]
 hsLTyClDeclBinders (L loc (ClassDecl   { tcdLName = L _ cls_name
                                        , tcdSigs = sigs, tcdATs = ats }))

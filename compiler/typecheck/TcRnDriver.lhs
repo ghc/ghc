@@ -888,10 +888,6 @@ checkBootTyCon tc1 tc2
     eqListBy (eqPredX env) (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
     eqAlgRhs (algTyConRhs tc1) (algTyConRhs tc2)
 
-  | isForeignTyCon tc1 && isForeignTyCon tc2
-  = eqKind (tyConKind tc1) (tyConKind tc2) &&
-    tyConExtName tc1 == tyConExtName tc2
-
   | otherwise = False
   where
     roles1 = tyConRoles tc1

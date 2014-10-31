@@ -343,10 +343,6 @@ basicKnownKeyNames
         -- Plugins
         , pluginTyConName
 
-        -- dotnet interop
-        , objectTyConName, marshalObjectName, unmarshalObjectName
-        , marshalStringName, unmarshalStringName, checkDotnetResName
-
         -- Generics
         , genClassName, gen1ClassName
         , datatypeClassName, constructorClassName, selectorClassName
@@ -394,7 +390,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
-    dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
+    rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_IP :: Module
 
@@ -435,7 +431,6 @@ dYNAMIC         = mkBaseModule (fsLit "Data.Dynamic")
 tYPEABLE        = mkBaseModule (fsLit "Data.Typeable")
 tYPEABLE_INTERNAL = mkBaseModule (fsLit "Data.Typeable.Internal")
 gENERICS        = mkBaseModule (fsLit "Data.Data")
-dOTNET          = mkBaseModule (fsLit "GHC.Dotnet")
 rEAD_PREC       = mkBaseModule (fsLit "Text.ParserCombinators.ReadPrec")
 lEX             = mkBaseModule (fsLit "Text.Read.Lex")
 gHC_INT         = mkBaseModule (fsLit "GHC.Int")
@@ -1162,21 +1157,6 @@ knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolCl
 -- Implicit parameters
 ipClassName :: Name
 ipClassName         = clsQual gHC_IP (fsLit "IP")      ipClassNameKey
-
-
-
--- dotnet interop
-objectTyConName :: Name
-objectTyConName     = tcQual   dOTNET (fsLit "Object") objectTyConKey
-        -- objectTyConName was "wTcQual", but that's gone now, and
-        -- I can't see why it was wired in anyway...
-unmarshalObjectName, marshalObjectName, marshalStringName,
-    unmarshalStringName, checkDotnetResName :: Name
-unmarshalObjectName = varQual  dOTNET (fsLit "unmarshalObject") unmarshalObjectIdKey
-marshalObjectName   = varQual  dOTNET (fsLit "marshalObject") marshalObjectIdKey
-marshalStringName   = varQual  dOTNET (fsLit "marshalString") marshalStringIdKey
-unmarshalStringName = varQual  dOTNET (fsLit "unmarshalString") unmarshalStringIdKey
-checkDotnetResName  = varQual  dOTNET (fsLit "checkResult")     checkDotnetResNameIdKey
 
 -- plugins
 cORE_MONAD :: Module
