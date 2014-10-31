@@ -820,10 +820,16 @@ def do_test(name, way, func, args):
         elif passFail == 'fail':
             if getTestOpts().expect == 'pass' \
                and way not in getTestOpts().expect_fail_for:
-                if_verbose(1, '*** unexpected failure for %s' % full_name)
-                t.n_unexpected_failures = t.n_unexpected_failures + 1
                 reason = result['reason']
-                addFailingTestInfo(t.unexpected_failures, getTestOpts().testdir, name, reason, way)
+                tag = result.get('tag')
+                if tag == 'stat':
+                    if_verbose(1, '*** unexpected stat test failure for %s' % full_name)
+                    t.n_unexpected_stat_failures = t.n_unexpected_stat_failures + 1
+                    addFailingTestInfo(t.unexpected_stat_failures, getTestOpts().testdir, name, reason, way)
+                else:
+                    if_verbose(1, '*** unexpected failure for %s' % full_name)
+                    t.n_unexpected_failures = t.n_unexpected_failures + 1
+                    addFailingTestInfo(t.unexpected_failures, getTestOpts().testdir, name, reason, way)
             else:
                 if getTestOpts().expect == 'missing-lib':
                     t.n_missing_libs = t.n_missing_libs + 1
@@ -898,8 +904,8 @@ def badResult(result):
 def passed():
     return {'passFail': 'pass'}
 
-def failBecause(reason):
-    return {'passFail': 'fail', 'reason': reason}
+def failBecause(reason, tag=None):
+    return {'passFail': 'fail', 'reason': reason, 'tag': tag}
 
 # -----------------------------------------------------------------------------
 # Generic command tests
@@ -1138,10 +1144,10 @@ def checkStats(name, way, stats_file, range_fields):
                 print(field, 'value is too low:')
                 print('(If this is because you have improved GHC, please')
                 print('update the test so that GHC doesn\'t regress again)')
-                result = failBecause('stat too good')
+                result = failBecause('stat too good', tag='stat')
             if val > upperBound:
                 print(field, 'value is too high:')
-                result = failBecause('stat not good enough')
+                result = failBecause('stat not good enough', tag='stat')
 
             if val < lowerBound or val > upperBound or config.verbose >= 4:
                 valStr = str(val)
@@ -2146,7 +2152,7 @@ def findTFiles_(path):
 def summary(t, file):
 
     file.write('\n')
-    printUnexpectedTests(file, [t.unexpected_passes, t.unexpected_failures])
+    printUnexpectedTests(file, [t.unexpected_passes, t.unexpected_failures, t.unexpected_stat_failures])
     file.write('OVERALL SUMMARY for test run started at '
                + time.strftime("%c %Z", t.start_time) + '\n'
                + str(datetime.timedelta(seconds=
@@ -2172,6 +2178,8 @@ def summary(t, file):
                + ' unexpected passes\n'
                + repr(t.n_unexpected_failures).rjust(8)
                + ' unexpected failures\n'
+               + repr(t.n_unexpected_stat_failures).rjust(8)
+               + ' unexpected stat failures\n'
                + '\n')
 
     if t.n_unexpected_passes > 0:
@@ -2181,6 +2189,10 @@ def summary(t, file):
     if t.n_unexpected_failures > 0:
         file.write('Unexpected failures:\n')
         printFailingTestInfosSummary(file, t.unexpected_failures)
+
+    if t.n_unexpected_stat_failures > 0:
+        file.write('Unexpected stat failures:\n')
+        printFailingTestInfosSummary(file, t.unexpected_stat_failures)
 
     if config.check_files_written:
         checkForFilesWrittenProblems(file)
