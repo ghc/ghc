@@ -331,7 +331,7 @@ lvlExpr env expr@(_, AnnApp _ _) = do
 -- We don't split adjacent lambdas.  That is, given
 --      \x y -> (x+1,y)
 -- we don't float to give
---      \x -> let v = x+y in \y -> (v,y)
+--      \x -> let v = x+1 in \y -> (v,y)
 -- Why not?  Because partial applications are fairly rare, and splitting
 -- lambdas makes them more expensive.
 
