@@ -827,6 +827,7 @@ lvlLamBndrs env lvl bndrs
     is_major bndr = isId bndr && not (isProbablyOneShotLambda bndr)
        -- The "probably" part says "don't float things out of a
        -- probable one-shot lambda"
+       -- See Note [Computing one-shot info] in Demand.lhs
 
 
 lvlBndrs :: LevelEnv -> Level -> [CoreBndr] -> (LevelEnv, [LevelledBndr])
