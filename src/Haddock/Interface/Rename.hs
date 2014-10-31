@@ -298,10 +298,6 @@ renameLThing fn (L loc x) = return . L loc =<< fn x
 
 renameTyClD :: TyClDecl Name -> RnM (TyClDecl DocName)
 renameTyClD d = case d of
-  ForeignType lname b -> do
-    lname' <- renameL lname
-    return (ForeignType lname' b)
-
 --  TyFamily flav lname ltyvars kind tckind -> do
   FamDecl { tcdFam = decl } -> do
     decl' <- renameFamilyDecl decl
