@@ -150,8 +150,8 @@ hackMarkup fmt h = case h of
   UntouchedDoc d -> markup fmt d
   CollapsingHeader (Header lvl titl) par n nm ->
     let id_ = makeAnchorId $ "ch:" ++ fromMaybe "noid:" nm ++ show n
-        col' = collapseControl id_ True "caption"
-        instTable = (thediv ! collapseSection id_ True [] <<)
+        col' = collapseControl id_ False "caption"
+        instTable = (thediv ! collapseSection id_ False [] <<)
         lvs = zip [1 .. ] [h1, h2, h3, h4, h5, h6]
         getHeader = fromMaybe caption (lookup lvl lvs)
         subCation = getHeader ! col' << markup fmt titl
