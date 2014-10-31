@@ -1357,25 +1357,9 @@ since GADTs are not kind indexed.
 Validity checking is done once the mutually-recursive knot has been
 tied, so we can look at things freely.
 
-Note [Abort when superclass cycle is detected]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We must avoid doing the ambiguity check when there are already errors accumulated.
-This is because one of the errors may be a superclass cycle, and superclass cycles
-cause canonicalization to loop. Here is a representative example:
-
-  class D a => C a where
-    meth :: D a => ()
-  class C a => D a
-
-This fixes Trac #9415.
-
 \begin{code}
 checkClassCycleErrs :: Class -> TcM ()
-checkClassCycleErrs cls
-  = unless (null cls_cycles) $
-    do { mapM_ recClsErr cls_cycles
-       ; failM }  -- See Note [Abort when superclass cycle is detected]
-  where cls_cycles = calcClassCycles cls
+checkClassCycleErrs cls = mapM_ recClsErr (calcClassCycles cls)
 
 checkValidTyCl :: TyThing -> TcM ()
 checkValidTyCl thing
@@ -1628,8 +1612,11 @@ checkValidClass cls
           -- If there are superclass cycles, checkClassCycleErrs bails.
         ; checkClassCycleErrs cls
 
-        -- Check the class operations
-        ; mapM_ (check_op constrained_class_methods) op_stuff
+        -- Check the class operations.
+        -- But only if there have been no earlier errors
+        -- See Note [Abort when superclass cycle is detected]
+        ; whenNoErrs $
+          mapM_ (check_op constrained_class_methods) op_stuff
 
         -- Check the associated type defaults are well-formed and instantiated
         ; mapM_ check_at_defs at_stuff  }
@@ -1694,6 +1681,20 @@ checkFamFlag tc_name
     err_msg = hang (ptext (sLit "Illegal family declaration for") <+> quotes (ppr tc_name))
                  2 (ptext (sLit "Use TypeFamilies to allow indexed type families"))
 \end{code}
+
+Note [Abort when superclass cycle is detected]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must avoid doing the ambiguity check for the methods (in
+checkValidClass.check_op) when there are already errors accumulated.
+This is because one of the errors may be a superclass cycle, and
+superclass cycles cause canonicalization to loop. Here is a
+representative example:
+
+  class D a => C a where
+    meth :: D a => ()
+  class C a => D a
+
+This fixes Trac #9415, #9739
 
 %************************************************************************
 %*                                                                      *
