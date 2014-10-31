@@ -1,0 +1,10 @@
+
+T9739.hs:3:1:
+    Cycle in class declaration (via superclasses):
+      Class1 -> Class2 -> Class1
+    In the class declaration for ‘Class1’
+
+T9739.hs:6:1:
+    Cycle in class declaration (via superclasses):
+      Class2 -> Class1 -> Class2
+    In the class declaration for ‘Class2’
