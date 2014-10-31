@@ -1896,25 +1896,17 @@ addOptP   f = alterSettings (\s -> s { sOpt_P   = f : sOpt_P s})
 
 
 setDepMakefile :: FilePath -> DynFlags -> DynFlags
-setDepMakefile f d = d { depMakefile = deOptDep f }
+setDepMakefile f d = d { depMakefile = f }
 
 setDepIncludePkgDeps :: Bool -> DynFlags -> DynFlags
 setDepIncludePkgDeps b d = d { depIncludePkgDeps = b }
 
 addDepExcludeMod :: String -> DynFlags -> DynFlags
 addDepExcludeMod m d
-    = d { depExcludeMods = mkModuleName (deOptDep m) : depExcludeMods d }
+    = d { depExcludeMods = mkModuleName m : depExcludeMods d }
 
 addDepSuffix :: FilePath -> DynFlags -> DynFlags
-addDepSuffix s d = d { depSuffixes = deOptDep s : depSuffixes d }
-
--- XXX Legacy code:
--- We used to use "-optdep-flag -optdeparg", so for legacy applications
--- we need to strip the "-optdep" off of the arg
-deOptDep :: String -> String
-deOptDep x = case stripPrefix "-optdep" x of
-             Just rest -> rest
-             Nothing -> x
+addDepSuffix s d = d { depSuffixes = s : depSuffixes d }
 
 addCmdlineFramework f d = d{ cmdlineFrameworks = f : cmdlineFrameworks d}
 
@@ -2024,20 +2016,8 @@ parseDynamicFlagsFull :: MonadIO m
                   -> [Located String]              -- ^ arguments to parse
                   -> m (DynFlags, [Located String], [Located String])
 parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
-  -- XXX Legacy support code
-  -- We used to accept things like
-  --     optdep-f  -optdepdepend
-  --     optdep-f  -optdep depend
-  --     optdep -f -optdepdepend
-  --     optdep -f -optdep depend
-  -- but the spaces trip up proper argument handling. So get rid of them.
-  let f (L p "-optdep" : L _ x : xs) = (L p ("-optdep" ++ x)) : f xs
-      f (x : xs) = x : f xs
-      f xs = xs
-      args' = f args
-
   let ((leftover, errs, warns), dflags1)
-          = runCmdLine (processArgs activeFlags args') dflags0
+          = runCmdLine (processArgs activeFlags args) dflags0
   when (not (null errs)) $ liftIO $
       throwGhcExceptionIO $ errorsToGhcException errs
 
