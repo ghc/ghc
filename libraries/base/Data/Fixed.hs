@@ -1,7 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE AutoDeriveTypeable #-}
-{-# OPTIONS -Wall -fno-warn-unused-binds #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -37,7 +36,6 @@ module Data.Fixed
     E12,Pico
 ) where
 
-import Data.Typeable
 import Data.Data
 import GHC.Read
 import Text.ParserCombinators.ReadPrec
@@ -61,7 +59,7 @@ mod' n d = n - (fromInteger f) * d where
 
 -- | The type parameter should be an instance of 'HasResolution'.
 newtype Fixed a = MkFixed Integer -- ^ /Since: 4.7.0.0/
-        deriving (Eq,Ord,Typeable)
+        deriving (Eq,Ord)
 
 -- We do this because the automatically derived Data instance requires (Data a) context.
 -- Our manual instance has the more general (Typeable a) context.
@@ -166,50 +164,43 @@ convertFixed (Number n)
           e = ceiling (logBase 10 (fromInteger r) :: Double)
 convertFixed _ = pfail
 
-data E0 = E0
-     deriving (Typeable)
+data E0
 instance HasResolution E0 where
     resolution _ = 1
 -- | resolution of 1, this works the same as Integer
 type Uni = Fixed E0
 
-data E1 = E1
-     deriving (Typeable)
+data E1
 instance HasResolution E1 where
     resolution _ = 10
 -- | resolution of 10^-1 = .1
 type Deci = Fixed E1
 
-data E2 = E2
-     deriving (Typeable)
+data E2
 instance HasResolution E2 where
     resolution _ = 100
 -- | resolution of 10^-2 = .01, useful for many monetary currencies
 type Centi = Fixed E2
 
-data E3 = E3
-     deriving (Typeable)
+data E3
 instance HasResolution E3 where
     resolution _ = 1000
 -- | resolution of 10^-3 = .001
 type Milli = Fixed E3
 
-data E6 = E6
-     deriving (Typeable)
+data E6
 instance HasResolution E6 where
     resolution _ = 1000000
 -- | resolution of 10^-6 = .000001
 type Micro = Fixed E6
 
-data E9 = E9
-     deriving (Typeable)
+data E9
 instance HasResolution E9 where
     resolution _ = 1000000000
 -- | resolution of 10^-9 = .000000001
 type Nano = Fixed E9
 
-data E12 = E12
-     deriving (Typeable)
+data E12
 instance HasResolution E12 where
     resolution _ = 1000000000000
 -- | resolution of 10^-12 = .000000000001
