@@ -825,6 +825,9 @@ checkNoErrs main
             Just val -> return val
         }
 
+whenNoErrs :: TcM () -> TcM ()
+whenNoErrs thing = ifErrsM (return ()) thing
+
 ifErrsM :: TcRn r -> TcRn r -> TcRn r
 --      ifErrsM bale_out normal
 -- does 'bale_out' if there are errors in errors collection
