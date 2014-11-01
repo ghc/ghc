@@ -587,7 +587,6 @@ processForMiniSynopsis mdl unicode qual ExportDecl { expItemDecl = L _loc decl0 
         (DataDecl{})   -> [keyword "data" <+> b]
         (SynDecl{})    -> [keyword "type" <+> b]
         (ClassDecl {}) -> [keyword "class" <+> b]
-        _ -> []
     SigD (TypeSig lnames (L _ _)) ->
       map (ppNameMini Prefix mdl . nameOccName . getName . unLoc) lnames
     _ -> []
