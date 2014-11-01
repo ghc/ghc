@@ -210,9 +210,16 @@ picture = DocPic . makeLabeled Picture . decodeUtf8
 
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: Parser (DocH mod Identifier)
-paragraph = examples <|> skipSpace *> (list <|> birdtracks <|> codeblock
-                                       <|> property <|> header
-                                       <|> textParagraph)
+paragraph = examples <|> skipSpace *> (
+      unorderedList
+  <|> orderedList
+  <|> definitionList
+  <|> birdtracks
+  <|> codeblock
+  <|> property
+  <|> header
+  <|> textParagraph
+  )
 
 -- | Headers inside the comment denoted with @=@ signs, up to 6 levels
 -- deep.
@@ -233,20 +240,17 @@ header = do
 textParagraph :: Parser (DocH mod Identifier)
 textParagraph = docParagraph . parseString . intercalate "\n" <$> many1 nonEmptyLine
 
--- | List parser, called by 'paragraph'.
-list :: Parser (DocH mod Identifier)
-list = DocUnorderedList <$> unorderedList
-       <|> DocOrderedList <$> orderedList
-       <|> DocDefList <$> definitionList
-
 -- | Parses unordered (bullet) lists.
-unorderedList :: Parser [DocH mod Identifier]
-unorderedList = ("*" <|> "-") *> innerList unorderedList
+unorderedList :: Parser (DocH mod Identifier)
+unorderedList = DocUnorderedList <$> p
+  where
+    p = ("*" <|> "-") *> innerList p
 
 -- | Parses ordered lists (numbered or dashed).
-orderedList :: Parser [DocH mod Identifier]
-orderedList = (paren <|> dot) *> innerList orderedList
+orderedList :: Parser (DocH mod Identifier)
+orderedList = DocOrderedList <$> p
   where
+    p = (paren <|> dot) *> innerList p
     dot = (decimal :: Parser Int) <* "."
     paren = "(" *> decimal <* ")"
 
@@ -265,15 +269,17 @@ innerList item = do
     Right i -> contents : i
 
 -- | Parses definition lists.
-definitionList :: Parser [(DocH mod Identifier, DocH mod Identifier)]
-definitionList = do
-  label <- "[" *> (parseStringBS <$> takeWhile1 (`notElem` "]\n")) <* "]"
-  c <- takeLine
-  (cs, items) <- more definitionList
-  let contents = parseString . dropNLs . unlines $ c : cs
-  return $ case items of
-    Left p -> [(label, contents `docAppend` p)]
-    Right i -> (label, contents) : i
+definitionList :: Parser (DocH mod Identifier)
+definitionList = DocDefList <$> p
+  where
+    p = do
+      label <- "[" *> (parseStringBS <$> takeWhile1 (`notElem` "]\n")) <* "]"
+      c <- takeLine
+      (cs, items) <- more p
+      let contents = parseString . dropNLs . unlines $ c : cs
+      return $ case items of
+        Left x -> [(label, contents `docAppend` x)]
+        Right i -> (label, contents) : i
 
 -- | Drops all trailing newlines.
 dropNLs :: String -> String
