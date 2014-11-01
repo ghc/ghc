@@ -4,7 +4,7 @@ import Trace.Hpc.Util
 import qualified Data.Map as Map
 
 dropWhileEndLE :: (a -> Bool) -> [a] -> [a]
--- Spec: dropWhileEndLE p = reverse . dropWhileEnd . reverse
+-- Spec: dropWhileEndLE p = reverse . dropWhile p . reverse
 dropWhileEndLE p = foldr (\x r -> if null r && p x then [] else x:r) []
 
 -- turns \n into ' '
