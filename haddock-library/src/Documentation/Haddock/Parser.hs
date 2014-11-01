@@ -213,11 +213,11 @@ paragraph :: Parser (DocH mod Identifier)
 paragraph = examples <|> skipSpace *> (
       unorderedList
   <|> orderedList
-  <|> definitionList
   <|> birdtracks
   <|> codeblock
   <|> property
   <|> header
+  <|> definitionList
   <|> textParagraph
   )
 
