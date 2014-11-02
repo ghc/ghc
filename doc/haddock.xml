@@ -2078,22 +2078,42 @@ This belongs to the list above!
       <section>
         <title>URLs</title>
 
-        <para>A URL can be included in a documentation comment by
-        surrounding it in angle brackets:
-        <literal>&lt;...&gt;</literal>.  If the output format supports
-        it, the URL will be turned into a hyperlink when
-        rendered.</para>
+        <para>
+          A URL can be included in a documentation comment by surrounding it in
+          angle brackets, for example:
+        </para>
 
-        <para>The URL can be followed by an optional label:</para>
 <programlisting>
-&lt;http://example.com label&gt;
+&lt;http://example.com&gt;
 </programlisting>
-      <para>The label is then used as a descriptive text for the hyperlink, if the
-        output format supports it.</para>
 
-      <para>If Haddock sees something that looks like a URL (such as something starting with
-      <literal>http://</literal> or <literal>ssh://</literal>) where the URL markup is valid,
-      it will automatically make it a hyperlink.</para>
+        <para>
+          If the output format supports it, the URL will be turned into a
+          hyperlink when rendered.
+        </para>
+
+        <para>If Haddock sees something that looks like a URL (such as something starting with
+        <literal>http://</literal> or <literal>ssh://</literal>) where the URL markup is valid,
+        it will automatically make it a hyperlink.</para>
+      </section>
+
+      <section>
+        <title>Links</title>
+
+        <para>
+          Haddock supports Markdown syntax for inline links.  A link consists
+          of a link text and a URL.  The link text is enclosed in square
+          brackets and followed by the URL enclosed in regular parentheses, for
+          example:
+        </para>
+
+<programlisting>
+[some link](http://example.com)
+</programlisting>
+        <para>
+          The link text is used as a descriptive text for the URL, if the
+          output format supports it.
+        </para>
       </section>
 
       <section>
