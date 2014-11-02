@@ -1,5 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable #-}
-{-# LANGUAGE DeriveTraversable, StandaloneDeriving #-}
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 -- |
 -- Module      :  Documentation.Haddock.Types
@@ -24,12 +23,6 @@ instance Foldable Header where
 instance Traversable Header where
   traverse f (Header l a) = Header l `fmap` f a
 
-
-deriving instance Show a => Show (Header a)
-deriving instance (Show a, Show b) => Show (DocH a b)
-deriving instance Eq a => Eq (Header a)
-deriving instance (Eq a, Eq b) => Eq (DocH a b)
-
 data Hyperlink = Hyperlink
   { hyperlinkUrl   :: String
   , hyperlinkLabel :: Maybe String
@@ -44,7 +37,7 @@ data Picture = Picture
 data Header id = Header
   { headerLevel :: Int
   , headerTitle :: id
-  } deriving Functor
+  } deriving (Eq, Show, Functor)
 
 data Example = Example
   { exampleExpression :: String
@@ -73,4 +66,4 @@ data DocH mod id
   | DocProperty String
   | DocExamples [Example]
   | DocHeader (Header (DocH mod id))
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
