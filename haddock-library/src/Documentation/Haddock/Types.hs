@@ -17,17 +17,10 @@ module Documentation.Haddock.Types where
 import Data.Foldable
 import Data.Traversable
 
-instance Foldable Header where
-  foldMap f (Header _ a) = f a
-
-instance Traversable Header where
-  traverse f (Header l a) = Header l `fmap` f a
-
 data Hyperlink = Hyperlink
   { hyperlinkUrl   :: String
   , hyperlinkLabel :: Maybe String
   } deriving (Eq, Show)
-
 
 data Picture = Picture
   { pictureUri   :: String
@@ -37,7 +30,7 @@ data Picture = Picture
 data Header id = Header
   { headerLevel :: Int
   , headerTitle :: id
-  } deriving (Eq, Show, Functor)
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Example = Example
   { exampleExpression :: String
