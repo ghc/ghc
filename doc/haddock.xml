@@ -2038,9 +2038,9 @@ This belongs to the list above!
 <programlisting>
 -- | This is a definition list:
 --
---   [@foo@] The description of @foo@.
+--   [@foo@]: The description of @foo@.
 --
---   [@bar@] The description of @bar@.
+--   [@bar@]: The description of @bar@.
 </programlisting>
 
         <para>To produce output something like this:</para>
@@ -2061,13 +2061,8 @@ This belongs to the list above!
         </variablelist>
 
         <para>Each paragraph should be preceded by the
-        &ldquo;definition term&rdquo; enclosed in square brackets.
-        The square bracket characters have no special meaning outside
-        the beginning of a definition paragraph.  That is, if a
-        paragraph begins with a <literal>[</literal> character, then
-        it is assumed to be a definition paragraph, and the next
-        <literal>]</literal> character found will close the definition
-        term.  Other markup operators may be used freely within the
+        &ldquo;definition term&rdquo; enclosed in square brackets and followed by a colon.
+        Other markup operators may be used freely within the
         definition term. You can escape <literal>]</literal> with a backslash as usual.</para>
 
       <para>Same rules about nesting and no newline separation as for bulleted and numbered lists apply.

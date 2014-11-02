@@ -4,6 +4,10 @@ Changes in version 2.15.1
 
  * Add support for markdown links and images
 
+ * Allow an optional colon after the closing bracket of definition lists.
+   This is to disambiguate them from markdown links and will be require with a
+   future release.
+
 Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)

@@ -646,7 +646,7 @@ spec = do
 
 
       it "can nest definition lists" $ do
-        "[a] foo\n\n    [b] bar\n\n        [c] baz\n        qux" `shouldParseTo`
+        "[a]: foo\n\n    [b]: bar\n\n        [c]: baz\n        qux" `shouldParseTo`
           DocDefList [ ("a", "foo"
                              <> DocDefList [ ("b", "bar"
                                                    <> DocDefList [("c", "baz\nqux")])
@@ -661,7 +661,7 @@ spec = do
           <> DocOrderedList [ DocParagraph "baz" ]
 
       it "definition lists can come back to top level with a different list" $ do
-        "[foo] foov\n\n    [bar] barv\n\n1. baz" `shouldParseTo`
+        "[foo]: foov\n\n    [bar]: barv\n\n1. baz" `shouldParseTo`
           DocDefList [ ("foo", "foov"
                                <> DocDefList [ ("bar", "barv") ])
                      ]
@@ -809,9 +809,9 @@ spec = do
     context "when parsing definition lists" $ do
       it "parses a simple list" $ do
         unlines [
-            " [foo] one"
-          , " [bar] two"
-          , " [baz] three"
+            " [foo]: one"
+          , " [bar]: two"
+          , " [baz]: three"
           ]
         `shouldParseTo` DocDefList [
             ("foo", "one")
@@ -821,9 +821,9 @@ spec = do
 
       it "ignores empty lines between list items" $ do
         unlines [
-            "[foo] one"
+            "[foo]: one"
           , ""
-          , "[bar] two"
+          , "[bar]: two"
           ]
         `shouldParseTo` DocDefList [
             ("foo", "one")
@@ -831,13 +831,13 @@ spec = do
           ]
 
       it "accepts an empty list item" $ do
-        "[foo]" `shouldParseTo` DocDefList [("foo", DocEmpty)]
+        "[foo]:" `shouldParseTo` DocDefList [("foo", DocEmpty)]
 
       it "accepts multi-line list items" $ do
         unlines [
-            "[foo] point one"
+            "[foo]: point one"
           , "  more one"
-          , "[bar] point two"
+          , "[bar]: point two"
           , "more two"
           ]
         `shouldParseTo` DocDefList [
@@ -846,20 +846,32 @@ spec = do
           ]
 
       it "accepts markup in list items" $ do
-        "[foo] /foo/" `shouldParseTo` DocDefList [("foo", DocEmphasis "foo")]
+        "[foo]: /foo/" `shouldParseTo` DocDefList [("foo", DocEmphasis "foo")]
 
       it "accepts markup for the label" $ do
-        "[/foo/] bar" `shouldParseTo` DocDefList [(DocEmphasis "foo", "bar")]
+        "[/foo/]: bar" `shouldParseTo` DocDefList [(DocEmphasis "foo", "bar")]
 
       it "requires empty lines between list and other paragraphs" $ do
         unlines [
             "foo"
           , ""
-          , "[foo] bar"
+          , "[foo]: bar"
           , ""
           , "baz"
           ]
         `shouldParseTo` DocParagraph "foo" <> DocDefList [("foo", "bar")] <> DocParagraph "baz"
+
+      it "dose not require the colon (deprecated - this will be removed in a future release)" $ do
+        unlines [
+            " [foo] one"
+          , " [bar] two"
+          , " [baz] three"
+          ]
+        `shouldParseTo` DocDefList [
+            ("foo", "one")
+          , ("bar", "two")
+          , ("baz", "three")
+          ]
 
     context "when parsing consecutive paragraphs" $ do
       it "will not capture irrelevant consecutive lists" $ do
@@ -873,9 +885,9 @@ spec = do
                 , " "
                 , "   2. different bullet"
                 , "   "
-                , "   [cat] kitten"
+                , "   [cat]: kitten"
                 , "   "
-                , "   [pineapple] fruit"
+                , "   [pineapple]: fruit"
                 ] `shouldParseTo`
           DocUnorderedList [ DocParagraph "bullet"
                            , DocParagraph "different bullet"]

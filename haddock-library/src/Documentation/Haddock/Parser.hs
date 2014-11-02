@@ -294,7 +294,7 @@ definitionList :: Parser (DocH mod Identifier)
 definitionList = DocDefList <$> p
   where
     p = do
-      label <- "[" *> (parseStringBS <$> takeWhile1 (`notElem` "]\n")) <* "]"
+      label <- "[" *> (parseStringBS <$> takeWhile1 (`notElem` "]\n")) <* ("]" <* optional ":")
       c <- takeLine
       (cs, items) <- more p
       let contents = parseString . dropNLs . unlines $ c : cs
