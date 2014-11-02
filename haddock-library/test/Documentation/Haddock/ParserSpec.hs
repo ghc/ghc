@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
-{-# LANGUAGE IncoherentInstances, UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Documentation.Haddock.ParserSpec (main, spec) where

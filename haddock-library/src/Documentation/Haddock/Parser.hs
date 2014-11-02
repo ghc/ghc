@@ -1,8 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE IncoherentInstances #-}
 -- |
 -- Module      :  Documentation.Haddock.Parser
 -- Copyright   :  (c) Mateusz Kowalczyk 2013-2014,
