@@ -2118,17 +2118,20 @@ This belongs to the list above!
 
       <section>
         <title>Images</title>
+        <para>
+            Haddock supports Markdown syntax for inline images.  This resembles
+            the syntax for links, but starts with an exclamation mark.  An
+            example looks like this:
+        </para>
 
-        <para>An image can be included in a documentation comment by
-        surrounding it in double angle brackets:
-        <literal>&lt;&lt;...&gt;&gt;</literal>.  If the output format supports
-        it, the image will be rendered inside the documentation.</para>
-
-        <para>Title text can be included using an optional label:</para>
 <programlisting>
-&lt;&lt;pathtoimage.png title&gt;&gt;
+![image description](pathtoimage.png)
 </programlisting>
-
+        <para>
+          If the output format supports it, the image will be rendered inside
+          the documentation.  The image description is used as relpacement text
+          and/or image title.
+        </para>
       </section>
 
       <section>

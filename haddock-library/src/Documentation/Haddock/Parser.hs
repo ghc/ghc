@@ -102,7 +102,7 @@ parseStringBS = parse p
   where
     p :: Parser (DocH mod Identifier)
     p = docConcat <$> many (monospace <|> anchor <|> identifier <|> moduleName
-                            <|> picture <|> hyperlink <|> bold
+                            <|> picture <|> markdownImage <|> hyperlink <|> bold
                             <|> emphasis <|> encodedChar <|> string'
                             <|> skipSpecialChar)
 
@@ -208,6 +208,11 @@ moduleName = DocModule <$> (char '"' *> modid <* char '"')
 picture :: Parser (DocH mod a)
 picture = DocPic . makeLabeled Picture . decodeUtf8
           <$> disallowNewline ("<<" *> takeUntil ">>")
+
+markdownImage :: Parser (DocH mod a)
+markdownImage = fromHyperlink <$> ("!" *> linkParser)
+  where
+    fromHyperlink (Hyperlink url label) = DocPic (Picture url label)
 
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: Parser (DocH mod Identifier)
@@ -467,7 +472,10 @@ hyperlink = DocHyperlink . makeLabeled Hyperlink . decodeUtf8
             <|> markdownLink
 
 markdownLink :: Parser (DocH mod a)
-markdownLink = DocHyperlink <$> (flip Hyperlink <$> label <*> (whitespace *> url))
+markdownLink = DocHyperlink <$> linkParser
+
+linkParser :: Parser Hyperlink
+linkParser = flip Hyperlink <$> label <*> (whitespace *> url)
   where
     label :: Parser (Maybe String)
     label = Just . strip . decode <$> ("[" *> takeUntil "]")

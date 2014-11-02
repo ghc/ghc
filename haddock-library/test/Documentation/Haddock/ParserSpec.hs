@@ -183,24 +183,22 @@ spec = do
           "foo https://example.com/example bar" `shouldParseTo`
             "foo " <> hyperlink "https://example.com/example" Nothing <> " bar"
 
-    context "when parsing pictures" $ do
-      let picture :: String -> Maybe String -> Doc String
-          picture uri = DocPic . Picture uri
+    context "when parsing images" $ do
+      let image :: String -> Maybe String -> Doc String
+          image uri = DocPic . Picture uri
 
-      it "parses a simple picture" $ do
-        "<<baz>>" `shouldParseTo` picture "baz" Nothing
+      it "accepts markdown syntax for images" $ do
+        "![label](url)" `shouldParseTo` image "url" "label"
 
-      it "parses a picture with a title" $ do
-        "<<b a z>>" `shouldParseTo` picture "b" (Just "a z")
+      it "accepts Unicode" $ do
+        "![灼眼のシャナ](url)" `shouldParseTo` image "url" "灼眼のシャナ"
 
-      it "parses a picture with unicode" $ do
-        "<<灼眼のシャナ>>" `shouldParseTo` picture "灼眼のシャナ" Nothing
+      it "supports deprecated picture syntax" $ do
+        "<<baz>>" `shouldParseTo` image "baz" Nothing
 
-      it "allows for escaping of the closing tags" $ do
-        "<<ba\\>>z>>" `shouldParseTo` picture "ba>>z" Nothing
+      it "supports title for deprecated picture syntax" $ do
+        "<<b a z>>" `shouldParseTo` image "b" "a z"
 
-      it "doesn't allow for multi-line picture tags" $ do
-        "<<ba\nz aar>>" `shouldParseTo` "<<ba\nz aar>>"
 
     context "when parsing anchors" $ do
       it "parses a single word anchor" $ do
