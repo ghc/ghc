@@ -20,7 +20,7 @@ module Documentation.Haddock.Parser ( parseString, parseParas
 
 import           Control.Applicative
 import           Control.Arrow (first)
-import           Control.Monad (void, mfilter)
+import           Control.Monad
 import           Data.Attoparsec.ByteString.Char8 hiding (parse, take, endOfLine)
 import qualified Data.ByteString.Char8 as BS
 import           Data.Char (chr, isAsciiUpper)
@@ -444,11 +444,29 @@ codeblock =
           | isNewline && isSpace c = Just isNewline
           | otherwise = Just $ c == '\n'
 
--- | Parses links that were specifically marked as such.
 hyperlink :: Parser (DocH mod a)
 hyperlink = DocHyperlink . makeLabeled Hyperlink . decodeUtf8
               <$> disallowNewline ("<" *> takeUntil ">")
             <|> autoUrl
+            <|> markdownLink
+
+markdownLink :: Parser (DocH mod a)
+markdownLink = DocHyperlink <$> (flip Hyperlink <$> label <*> (whitespace *> url))
+  where
+    label :: Parser (Maybe String)
+    label = Just . strip . decode <$> ("[" *> takeUntil "]")
+
+    whitespace :: Parser ()
+    whitespace = skipHorizontalSpace <* optional ("\n" *> skipHorizontalSpace)
+
+    url :: Parser String
+    url = rejectWhitespace (decode <$> ("(" *> takeUntil ")"))
+
+    rejectWhitespace :: MonadPlus m => m String -> m String
+    rejectWhitespace = mfilter (all (not . isSpace))
+
+    decode :: BS.ByteString -> String
+    decode = removeEscapes . decodeUtf8
 
 -- | Looks for URL-like things to automatically hyperlink even if they
 -- weren't marked as links.

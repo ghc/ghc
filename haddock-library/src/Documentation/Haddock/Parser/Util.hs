@@ -14,6 +14,7 @@ module Documentation.Haddock.Parser.Util (
   unsnoc
 , strip
 , takeUntil
+, removeEscapes
 , makeLabeled
 , takeHorizontalSpace
 , skipHorizontalSpace
@@ -49,14 +50,15 @@ makeLabeled :: (String -> Maybe String -> a) -> String -> a
 makeLabeled f input = case break isSpace $ removeEscapes $ strip input of
   (uri, "")    -> f uri Nothing
   (uri, label) -> f uri (Just $ dropWhile isSpace label)
-  where
-    -- As we don't parse these any further, we don't do any processing to the
-    -- string so we at least remove escape character here. Perhaps we should
-    -- actually be parsing the label at the very least?
-    removeEscapes "" = ""
-    removeEscapes ('\\':'\\':xs) = '\\' : removeEscapes xs
-    removeEscapes ('\\':xs) = removeEscapes xs
-    removeEscapes (x:xs) = x : removeEscapes xs
+
+-- | Remove escapes from given string.
+--
+-- Only do this if you do not process (read: parse) the input any further.
+removeEscapes :: String -> String
+removeEscapes "" = ""
+removeEscapes ('\\':'\\':xs) = '\\' : removeEscapes xs
+removeEscapes ('\\':xs) = removeEscapes xs
+removeEscapes (x:xs) = x : removeEscapes xs
 
 takeUntil :: ByteString -> Parser ByteString
 takeUntil end_ = dropEnd <$> requireEnd (scan (False, end) p) >>= gotSome

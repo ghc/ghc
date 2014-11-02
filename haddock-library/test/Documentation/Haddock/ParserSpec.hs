@@ -114,6 +114,45 @@ spec = do
       it "doesn't allow for multi-line link tags" $ do
         "<ba\nz aar>" `shouldParseTo` "<ba\nz aar>"
 
+      context "when parsing markdown links" $ do
+        it "parses a simple link" $ do
+          "[some label](url)" `shouldParseTo`
+            hyperlink "url" "some label"
+
+        it "allows whitespace between label and URL" $ do
+          "[some label] \t (url)" `shouldParseTo`
+            hyperlink "url" "some label"
+
+        it "allows newlines in label" $ do
+          "[some\n\nlabel](url)" `shouldParseTo`
+            hyperlink "url" "some\n\nlabel"
+
+        it "allows escaping in label" $ do
+          "[some\\] label](url)" `shouldParseTo`
+            hyperlink "url" "some] label"
+
+        it "strips leading and trailing whitespace from label" $ do
+          "[  some label  ](url)" `shouldParseTo`
+            hyperlink "url" "some label"
+
+        it "rejects whitespace in URL" $ do
+          "[some label]( url)" `shouldParseTo`
+            "[some label]( url)"
+
+        context "when URL is on a separate line" $ do
+          it "allows URL to be on a separate line" $ do
+            "[some label]\n(url)" `shouldParseTo`
+              hyperlink "url" "some label"
+
+          it "allows leading whitespace" $ do
+            "[some label]\n  \t (url)" `shouldParseTo`
+              hyperlink "url" "some label"
+
+          it "rejects additional newlines" $ do
+            "[some label]\n\n(url)" `shouldParseTo`
+              "[some label]\n\n(url)"
+
+
       context "when autolinking URLs" $ do
         it "autolinks HTTP URLs" $ do
           "http://example.com/" `shouldParseTo` hyperlink "http://example.com/" Nothing
