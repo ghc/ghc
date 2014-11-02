@@ -1068,7 +1068,7 @@ methodBindErr mbind
 
 methodPatSynErr :: HsBindLR RdrName RdrName -> SDoc
 methodPatSynErr mbind
- =  hang (ptext (sLit "Pattern synonyms not allowed in instance declarations"))
+ =  hang (ptext (sLit "Pattern synonyms not allowed in class/instance declarations"))
        2 (ppr mbind)
 
 bindsInHsBootFile :: LHsBindsLR Name RdrName -> SDoc
