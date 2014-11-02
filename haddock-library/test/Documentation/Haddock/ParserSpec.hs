@@ -28,6 +28,9 @@ parseParas = Parse.toRegular . Parse.parseParas
 parseString :: String -> Doc String
 parseString = Parse.toRegular . Parse.parseString
 
+hyperlink :: String -> Maybe String -> Doc String
+hyperlink url = DocHyperlink . Hyperlink url
+
 main :: IO ()
 main = hspec spec
 
@@ -83,9 +86,6 @@ spec = do
           "don't use apostrophe's in the wrong place's"
 
     context "when parsing URLs" $ do
-      let hyperlink :: String -> Maybe String -> Doc String
-          hyperlink url = DocHyperlink . Hyperlink url
-
       it "parses a URL" $ do
         "<http://example.com/>" `shouldParseTo` hyperlink "http://example.com/" Nothing
 
@@ -386,6 +386,28 @@ spec = do
       context "when a pragraph only contains monospaced text" $ do
         it "turns it into a code block" $ do
           "@foo@" `shouldParseTo` DocCodeBlock "foo"
+
+      context "when a paragraph starts with a markdown link" $ do
+        it "correctly parses it as a text paragraph (not a definition list)" $ do
+          "[label](url)" `shouldParseTo`
+            DocParagraph (hyperlink "url" "label")
+
+        it "can be followed by an other paragraph" $ do
+          "[label](url)\n\nfoobar" `shouldParseTo`
+            DocParagraph (hyperlink "url" "label") <> DocParagraph "foobar"
+
+        context "when paragraph contains additional text" $ do
+          it "accepts more text after the link" $ do
+            "[label](url) foo bar baz" `shouldParseTo`
+              DocParagraph (hyperlink "url" "label" <> " foo bar baz")
+
+          it "accepts a newline right after the markdown link" $ do
+            "[label](url)\nfoo bar baz" `shouldParseTo`
+              DocParagraph (hyperlink "url" "label" <> " foo bar baz")
+
+          it "can be followed by an other paragraph" $ do
+            "[label](url)foo\n\nbar" `shouldParseTo`
+              DocParagraph (hyperlink "url" "label" <> "foo") <> DocParagraph "bar"
 
     context "when parsing birdtracks" $ do
       it "parses them as a code block" $ do

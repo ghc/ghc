@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 -- |
 -- Module      :  Documentation.Haddock.Parser
 -- Copyright   :  (c) Mateusz Kowalczyk 2013-2014,
@@ -217,8 +218,9 @@ paragraph = examples <|> skipSpace *> (
   <|> codeblock
   <|> property
   <|> header
+  <|> textParagraphThatStartsWithMarkdownLink
   <|> definitionList
-  <|> textParagraph
+  <|> docParagraph <$> textParagraph
   )
 
 -- | Headers inside the comment denoted with @=@ signs, up to 6 levels
@@ -238,7 +240,21 @@ header = do
   return $ DocHeader (Header (length delim) line) `docAppend` rest
 
 textParagraph :: Parser (DocH mod Identifier)
-textParagraph = docParagraph . parseString . intercalate "\n" <$> many1 nonEmptyLine
+textParagraph = parseString . intercalate "\n" <$> many1 nonEmptyLine
+
+textParagraphThatStartsWithMarkdownLink :: Parser (DocH mod Identifier)
+textParagraphThatStartsWithMarkdownLink = docParagraph <$> (docAppend <$> markdownLink <*> optionalTextParagraph)
+  where
+    optionalTextParagraph :: Parser (DocH mod Identifier)
+    optionalTextParagraph = (docAppend <$> whitespace <*> textParagraph) <|> pure DocEmpty
+
+    whitespace :: Parser (DocH mod a)
+    whitespace = DocString <$> (f <$> takeHorizontalSpace <*> optional "\n")
+      where
+        f :: BS.ByteString -> Maybe BS.ByteString -> String
+        f xs (fromMaybe "" -> x)
+          | BS.null (xs <> x) = ""
+          | otherwise = " "
 
 -- | Parses unordered (bullet) lists.
 unorderedList :: Parser (DocH mod Identifier)
