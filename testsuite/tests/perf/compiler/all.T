@@ -455,7 +455,7 @@ test('T5837',
              # 40000000 (x86/Linux)
              # 2013-11-13: 45520936 (x86/Windows, 64bit machine)
              # 2041-09-03: 37096484 (Windows laptop, w/w for INLINABLE things
-           (wordsize(64), 75765728, 10)])
+           (wordsize(64), 651924880, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -464,6 +464,8 @@ test('T5837',
              #                                  for constraints solving
              # 2014-08-29 73639840 amd64/Linux, w/w for INLINABLE things
              # 2014-10-08 73639840 amd64/Linux, Burning Bridges and other small changes
+             # 2014-11-02 651924880      Linux, Accept big regression;
+             #   See Note [An alternative story for the inert substitution] in TcFlatten
       ],
       compile_fail,['-ftype-function-depth=50'])
 
