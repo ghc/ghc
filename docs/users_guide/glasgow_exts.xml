@@ -11531,6 +11531,10 @@ allows control over inlining on a per-call-site basis.
 <ulink url="&libraryBaseLocation;/GHC-Exts.html#v%3Alazy"><literal>lazy</literal></ulink>
 restrains the strictness analyser.
 </para></listitem>
+<listitem><para>
+<ulink url="&libraryBaseLocation;/GHC-Exts.html#v%3AoneShot"><literal>oneShot</literal></ulink>
+gives a hint to the compiler about how often a function is being called.
+</para></listitem>
 </itemizedlist>
 </para>
 </sect1>
