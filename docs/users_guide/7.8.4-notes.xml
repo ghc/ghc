@@ -98,6 +98,12 @@
 	    #9705).
           </para>
        </listitem>
+       <listitem>
+          <para>
+	    A bug in the typechecker revolving around un-saturated
+	    type family applications has been fixed (issue #9433).
+          </para>
+       </listitem>
     </itemizedlist>
   </sect2>
 </sect1>
