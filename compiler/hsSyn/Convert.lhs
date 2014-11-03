@@ -172,7 +172,11 @@ cvtDec (TH.SigD nm typ)
         ; returnJustL $ Hs.SigD (TypeSig [nm'] ty') }
 
 cvtDec (TH.InfixD fx nm)
-  = do { nm' <- vNameL nm
+  -- fixity signatures are allowed for variables, constructors, and types
+  -- the renamer automatically looks for types during renaming, even when
+  -- the RdrName says it's a variable or a constructor. So, just assume
+  -- it's a variable or constructor and proceed.
+  = do { nm' <- vcNameL nm
        ; returnJustL (Hs.SigD (FixSig (FixitySig nm' (cvtFixity fx)))) }
 
 cvtDec (PragmaD prag)
@@ -521,7 +525,7 @@ cvtPragmaD (AnnP target exp)
            n' <- tconName n
            return (TypeAnnProvenance  n')
          ValueAnnotation n -> do
-           n' <- if isVarName n then vName n else cName n
+           n' <- vcName n
            return (ValueAnnProvenance n')
        ; returnJustL $ Hs.AnnD $ HsAnnotation target' exp'
        }
@@ -1071,15 +1075,20 @@ cvtFractionalLit r = FL { fl_text = show (fromRational r :: Double), fl_value = 
 --------------------------------------------------------------------
 
 -- variable names
-vNameL, cNameL, tconNameL :: TH.Name -> CvtM (Located RdrName)
-vName,  cName,  tName,  tconName  :: TH.Name -> CvtM RdrName
+vNameL, cNameL, vcNameL, tconNameL :: TH.Name -> CvtM (Located RdrName)
+vName,  cName,  vcName,  tName,  tconName  :: TH.Name -> CvtM RdrName
 
+-- Variable names
 vNameL n = wrapL (vName n)
 vName n = cvtName OccName.varName n
 
 -- Constructor function names; this is Haskell source, hence srcDataName
 cNameL n = wrapL (cName n)
 cName n = cvtName OccName.dataName n
+
+-- Variable *or* constructor names; check by looking at the first char
+vcNameL n = wrapL (vcName n)
+vcName n = if isVarName n then vName n else cName n
 
 -- Type variable names
 tName n = cvtName OccName.tvName n

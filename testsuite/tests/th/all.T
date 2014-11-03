@@ -336,5 +336,4 @@ test('T8953', normal, compile, ['-v0'])
 test('T9084', normal, compile_fail, ['-v0'])
 test('T9738', normal, compile, ['-v0'])
 test('T9081', normal, compile, ['-v0'])
-test('T9066', expect_broken(9066), compile, ['-v0'])
-
+test('T9066', normal, compile, ['-v0'])
