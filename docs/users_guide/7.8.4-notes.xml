@@ -13,7 +13,89 @@
     <itemizedlist>
        <listitem>
           <para>
-	    Lorem ipsum...
+	    A critical bug in the LLVM backend which would cause the
+	    compiler to generate incorrect code has been fixed (issue
+	    #9439).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    Several bugs in the code generator have been fixed for
+	    unregisterised platforms, such as 64bit PowerPC (issue
+	    #8819 and #8849).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug that could cause GHC's constructor specialization
+	    pass (enabled by default at <literal>-O2</literal>, or via
+	    <literal>-fspec-constr</literal>) to loop forever and
+	    consume large amounts of memory has been fixed (issue
+	    #8960).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug that would cause GHC to fail when attempting to
+	    determine GCC's version information in non-english locales
+	    has been fixed (issue #8825).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A minor bug that allowed GHC to seemingly import (but not
+	    use) private data constructors has been fixed (issue
+	    #9006).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug in the register allocator which would cause GHC to
+	    crash during compilation has been fixed (issue #9303).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug that caused the compiler to panic on some input C--
+	    code has been fixed (issue #9329).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A few various minor deadlocks in the runtime system when
+	    using <literal>forkProcess</literal> have been fixed.
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug which made blocked STM transactions
+	    non-interruptible has been fixed (issue #9379).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug in the compiler which broke pattern synonym imports
+	    across modules in Haddock has been fixed (issue #9417).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A minor bug in the code generator in which the
+	    <literal>popCnt16#</literal> did not zero-extend its
+	    result has been fixed (issue #9435).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A minor bug in the compiler which made error messages emit
+	    necessary parenthesis has been fixed (issue #9658).
+          </para>
+       </listitem>
+       <listitem>
+          <para>
+	    A bug which caused the compiler to panic on pattern
+	    synonyms inside a class declaration has been fixed (issue
+	    #9705).
           </para>
        </listitem>
     </itemizedlist>
