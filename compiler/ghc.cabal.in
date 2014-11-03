@@ -406,6 +406,7 @@ Library
         TcUnify
         TcInteract
         TcCanonical
+        TcFlatten
         TcSMonad
         TcTypeNats
         TcSplice
