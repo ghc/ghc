@@ -2,21 +2,12 @@ ToDo:
 
 * get rid of getEvTerm?
 
-* Float only CTyEqCans.   kind-incompatible things should be CNonCanonical,
-  so they won't float and generate a duplicate kind-unify message
-
-  Then we can stop disabling floating when there are insolubles,
-  and that will improve mc21 etc
-
-* Note [Do not add duplicate derived isols]
-  This mostly doesn't apply now, except for the fundeps
-
 * inert_funeqs, inert_eqs: keep only the CtEvidence.
    They are all CFunEqCans, CTyEqCans
 
-* remove/rewrite TcMType Note [Unflattening while zonking]
-
 * Consider individual data tpyes for CFunEqCan etc
+
+* Collapes CNonCanonical and CIrredCan
 
 Remaining errors
 ============================

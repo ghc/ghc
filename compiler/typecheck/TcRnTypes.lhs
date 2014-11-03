@@ -44,8 +44,8 @@ module TcRnTypes(
         ArrowCtxt(NoArrowCtxt), newArrowScope, escapeArrowScope,
 
         -- Canonical constraints
-        Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, dropDerivedWC,
-        singleCt, listToCts, ctsElts, extendCts, extendCtsList,
+        Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, pprCts,
+        singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
@@ -56,6 +56,7 @@ module TcRnTypes(
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
+        dropDerivedWC,
 
         Implication(..),
         SubGoalCounter(..),
@@ -72,10 +73,9 @@ module TcRnTypes(
         CtEvidence(..),
         mkGivenLoc,
         isWanted, isGiven, isDerived,
-        canRewrite, canRewriteOrSame,
 
         -- Pretty printing
-        pprEvVarTheta, pprWantedsWithLocs,
+        pprEvVarTheta, 
         pprEvVars, pprEvVarWithType,
         pprArising, pprArisingAt,
 
@@ -984,9 +984,9 @@ type Cts = Bag Ct
 data Ct
   -- Atomic canonical constraints
   = CDictCan {  -- e.g.  Num xi
-      cc_ev :: CtEvidence,   -- See Note [Ct/evidence invariant]
+      cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       cc_class  :: Class,
-      cc_tyargs :: [Xi]
+      cc_tyargs :: [Xi]        -- cc_tyargs are function-free, hence Xi
     }
 
   | CIrredEvCan {  -- These stand for yet-unusable predicates
@@ -998,26 +998,43 @@ data Ct
         -- See Note [CIrredEvCan constraints]
     }
 
-  | CTyEqCan {  -- tv ~ xi      (recall xi means function free)
-       -- Invariant:
+  | CTyEqCan {  -- tv ~ rhs
+       -- Invariants:
+       --   * See Note [Applying the inert substitution] in TcFlatten
        --   * tv not in tvs(xi)   (occurs check)
-       --   * typeKind xi `subKind` typeKind tv
+       --   * If tv is a TauTv, then rhs has no foralls
+       --       (this avoids substituting a forall for the tyvar in other types)
+       --   * typeKind ty `subKind` typeKind tv
        --       See Note [Kind orientation for CTyEqCan]
-       --   * We prefer unification variables on the left *JUST* for efficiency
-      cc_ev :: CtEvidence,    -- See Note [Ct/evidence invariant]
+       --   * rhs is not necessarily function-free,
+       --       but it has no top-level function.
+       --     E.g. a ~ [F b]  is fine
+       --     but  a ~ F b    is not
+       --   * If rhs is also a tv, then it is oriented to give best chance of
+       --     unification happening; eg if rhs is touchable then lhs is too
+      cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       cc_tyvar  :: TcTyVar,
-      cc_rhs    :: Xi
+      cc_rhs    :: TcType      -- Not necessarily function-free (hence not Xi)
+                               -- See invariants above
     }
 
-  | CFunEqCan {  -- F xis ~ xi
-       -- Invariant: * isSynFamilyTyCon cc_fun
-       --            * typeKind (F xis) `subKind` typeKind xi
-       --       See Note [Kind orientation for CFunEqCan]
+  | CFunEqCan {  -- F xis ~ fsk
+       -- Invariants:
+       --   * isSynFamilyTyCon cc_fun
+       --   * typeKind (F xis) = tyVarKind fsk
+       --   * always Nominal role
+       --   * always Given or Wanted, never Derived
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function
-      cc_tyargs :: [Xi],        -- Either under-saturated or exactly saturated
-      cc_rhs    :: Xi           --    *never* over-saturated (because if so
-                                --    we should have decomposed)
+
+      cc_tyargs :: [Xi],        -- cc_tyargs are function-free (hence Xi)
+        -- Either under-saturated or exactly saturated
+        --    *never* over-saturated (because if so
+        --    we should have decomposed)
+
+      cc_fsk    :: TcTyVar  -- [Given]  always a FlatSkol skolem
+                            -- [Wanted] always a FlatMetaTv unification variable
+        -- See Note [The flattening story] in TcFlatten
     }
 
   | CNonCanonical {        -- See Note [NonCanonical Semantics]
@@ -1033,11 +1050,13 @@ data Ct
 
 Note [Kind orientation for CTyEqCan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Given an equality  (t:* ~ s:Open), we absolutely want to re-orient it.
-We can't solve it by updating t:=s, ragardless of how touchable 't' is,
-because the kinds don't work.  Indeed we don't want to leave it with
-the orientation (t ~ s), because if that gets into the inert set we'll
-start replacing t's by s's, and that too is the wrong way round.
+Given an equality (t:* ~ s:Open), we can't solve it by updating t:=s,
+ragardless of how touchable 't' is, because the kinds don't work.
+
+Instead we absolutely must re-orient it. Reason: if that gets into the
+inert set we'll start replacing t's by s's, and that might make a
+kind-correct type into a kind error.  After re-orienting,
+we may be able to solve by updating s:=t.
 
 Hence in a CTyEqCan, (t:k1 ~ xi:k2) we require that k2 is a subkind of k1.
 
@@ -1144,7 +1163,7 @@ comprehensible error.  Particularly:
 
  * Insoluble derived wanted equalities (e.g. [D] Int ~ Bool) may
    arise from functional dependency interactions.  We are careful
-   to keep a good CtOrigin on such constriants (FunDepOrigin1, FunDepOrigin2)
+   to keep a good CtOrigin on such constraints (FunDepOrigin1, FunDepOrigin2)
    so that we can produce a good error message (Trac #9612)
 
 Since we leave these Derived constraints in the residual WantedConstraints,
@@ -1225,8 +1244,11 @@ listToCts = listToBag
 ctsElts :: Cts -> [Ct]
 ctsElts = bagToList
 
-extendCts :: Cts -> Ct -> Cts
-extendCts = snocBag
+consCts :: Ct -> Cts -> Cts
+consCts = consBag
+
+snocCts :: Cts -> Ct -> Cts
+snocCts = snocBag
 
 extendCtsList :: Cts -> [Ct] -> Cts
 extendCtsList cts xs | null xs   = cts
@@ -1240,6 +1262,9 @@ emptyCts = emptyBag
 
 isEmptyCts :: Cts -> Bool
 isEmptyCts = isEmptyBag
+
+pprCts :: Cts -> SDoc
+pprCts cts = vcat (map ppr (bagToList cts))
 \end{code}
 
 %************************************************************************
@@ -1303,15 +1328,15 @@ addInsols wc cts
 instance Outputable WantedConstraints where
   ppr (WC {wc_flat = f, wc_impl = i, wc_insol = n})
    = ptext (sLit "WC") <+> braces (vcat
-        [ if isEmptyBag f then empty else
-          ptext (sLit "wc_flat =")  <+> pprBag ppr f
-        , if isEmptyBag i then empty else
-          ptext (sLit "wc_impl =")  <+> pprBag ppr i
-        , if isEmptyBag n then empty else
-          ptext (sLit "wc_insol =") <+> pprBag ppr n ])
+        [ ppr_bag (ptext (sLit "wc_flat")) f
+        , ppr_bag (ptext (sLit "wc_insol")) n
+        , ppr_bag (ptext (sLit "wc_impl")) i ])
 
-pprBag :: (a -> SDoc) -> Bag a -> SDoc
-pprBag pp b = foldrBag (($$) . pp) empty b
+ppr_bag :: Outputable a => SDoc -> Bag a -> SDoc
+ppr_bag doc bag
+ | isEmptyBag bag = empty
+ | otherwise      = hang (doc <+> equals) 
+                       2 (foldrBag (($$) . ppr) empty bag)
 \end{code}
 
 
@@ -1335,10 +1360,6 @@ data Implication
                                  --   (order does not matter)
                                  -- See Invariant (GivenInv) in TcType
 
-      ic_fsks  :: [TcTyVar],     -- Extra flatten-skolems introduced by
-                                 -- by flattening the givens
-                                 -- See Note [Given flatten-skolems]
-
       ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
                                  -- False <=> ic_givens might have equalities
 
@@ -1354,19 +1375,19 @@ data Implication
     }
 
 instance Outputable Implication where
-  ppr (Implic { ic_untch = untch, ic_skols = skols, ic_fsks = fsks
+  ppr (Implic { ic_untch = untch, ic_skols = skols
               , ic_given = given, ic_no_eqs = no_eqs
-              , ic_wanted = wanted
+              , ic_wanted = wanted, ic_insol = insol
               , ic_binds = binds, ic_info = info })
-   = ptext (sLit "Implic") <+> braces
-     (sep [ ptext (sLit "Untouchables =") <+> ppr untch
-          , ptext (sLit "Skolems =") <+> pprTvBndrs skols
-          , ptext (sLit "Flatten-skolems =") <+> pprTvBndrs fsks
-          , ptext (sLit "No-eqs =") <+> ppr no_eqs
-          , ptext (sLit "Given =") <+> pprEvVars given
-          , ptext (sLit "Wanted =") <+> ppr wanted
-          , ptext (sLit "Binds =") <+> ppr binds
-          , pprSkolInfo info ])
+   = hang (ptext (sLit "Implic") <+> lbrace)
+        2 (sep [ ptext (sLit "Untouchables =") <+> ppr untch
+               , ptext (sLit "Skolems =") <+> pprTvBndrs skols
+               , ptext (sLit "No-eqs =") <+> ppr no_eqs
+               , ptext (sLit "Insol =") <+> ppr insol
+               , hang (ptext (sLit "Given ="))  2 (pprEvVars given)
+               , hang (ptext (sLit "Wanted =")) 2 (ppr wanted)
+               , ptext (sLit "Binds =") <+> ppr binds
+               , pprSkolInfo info ] <+> rbrace)
 \end{code}
 
 Note [Shadowing in a constraint]
@@ -1437,12 +1458,6 @@ pprEvVarTheta ev_vars = pprTheta (map evVarPred ev_vars)
 
 pprEvVarWithType :: EvVar -> SDoc
 pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
-
-pprWantedsWithLocs :: WantedConstraints -> SDoc
-pprWantedsWithLocs wcs
-  =  vcat [ pprBag ppr (wc_flat wcs)
-          , pprBag ppr (wc_impl wcs)
-          , pprBag ppr (wc_insol wcs) ]
 \end{code}
 
 %************************************************************************
@@ -1524,49 +1539,8 @@ isGiven _ = False
 isDerived :: CtEvidence -> Bool
 isDerived (CtDerived {}) = True
 isDerived _              = False
-
------------------------------------------
-canRewrite :: CtEvidence -> CtEvidence -> Bool
--- Very important function!
--- See Note [canRewrite and canRewriteOrSame]
-canRewrite (CtGiven {})   _              = True
-canRewrite (CtWanted {})  (CtDerived {}) = True
-canRewrite (CtDerived {}) (CtDerived {}) = True  -- Derived can't solve wanted/given
-canRewrite _ _ = False             -- No evidence for a derived, anyway
-
-canRewriteOrSame :: CtEvidence -> CtEvidence -> Bool
-canRewriteOrSame (CtGiven {})   _              = True
-canRewriteOrSame (CtWanted {})  (CtWanted {})  = True
-canRewriteOrSame (CtWanted {})  (CtDerived {}) = True
-canRewriteOrSame (CtDerived {}) (CtDerived {}) = True
-canRewriteOrSame _ _ = False
 \end{code}
 
-See Note [canRewrite and canRewriteOrSame]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(canRewrite ct1 ct2) holds if the constraint ct1 can be used to solve ct2.
-"To solve" means a reaction where the active parts of the two constraints match.
-   active(F xis ~ xi) = F xis
-   active(tv ~ xi)    = tv
-   active(D xis)      = D xis
-   active(IP nm ty)   = nm
-
-At the moment we don't allow Wanteds to rewrite Wanteds, because that can give
-rise to very confusing type error messages.  A good example is Trac #8450.
-Here's another
-   f :: a -> Bool
-   f x = ( [x,'c'], [x,True] ) `seq` True
-Here we get
-  [W] a ~ Char
-  [W] a ~ Bool
-but we do not want to complain about Bool ~ Char!
-
-NB:  either (a `canRewrite` b) or (b `canRewrite` a)
-         or a==b
-     must hold
-
-canRewriteOrSame is similar but returns True for Wanted/Wanted.
-See the call sites for explanations.
 
 %************************************************************************
 %*                                                                      *
@@ -1690,11 +1664,13 @@ data CtLoc = CtLoc { ctl_origin :: CtOrigin
   --    source location:  tcl_loc   :: SrcSpan
   --    context:          tcl_ctxt  :: [ErrCtxt]
   --    binder stack:     tcl_bndrs :: [TcIdBinders]
+  --    level:            tcl_untch :: Untouchables
 
-mkGivenLoc :: SkolemInfo -> TcLclEnv -> CtLoc
-mkGivenLoc skol_info env = CtLoc { ctl_origin = GivenOrigin skol_info
-                                 , ctl_env = env
-                                 , ctl_depth = initialSubGoalDepth }
+mkGivenLoc :: Untouchables -> SkolemInfo -> TcLclEnv -> CtLoc
+mkGivenLoc untch skol_info env 
+  = CtLoc { ctl_origin = GivenOrigin skol_info
+          , ctl_env    = env { tcl_untch = untch }
+          , ctl_depth  = initialSubGoalDepth }
 
 ctLocEnv :: CtLoc -> TcLclEnv
 ctLocEnv = ctl_env
@@ -1837,9 +1813,6 @@ pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "Unk
 \begin{code}
 data CtOrigin
   = GivenOrigin SkolemInfo
-  | FlatSkolOrigin              -- Flatten-skolems created for Givens
-                                -- Note [When does an implication have given equalities?]
-                                -- in TcSimplify
 
   -- All the others are for *wanted* constraints
   | OccurrenceOf Name           -- Occurrence of an overloaded identifier
@@ -1898,7 +1871,6 @@ data CtOrigin
   | UnboundOccurrenceOf RdrName
   | ListOrigin          -- An overloaded list
 
-
 ctoHerald :: SDoc
 ctoHerald = ptext (sLit "arising from")
 
@@ -1949,7 +1921,6 @@ pprCtOrigin simple_origin
 
 ----------------
 pprCtO :: CtOrigin -> SDoc  -- Ones that are short one-liners
-pprCtO FlatSkolOrigin        = ptext (sLit "a given flatten-skolem")
 pprCtO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprCtO AppOrigin             = ptext (sLit "an application")
 pprCtO (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]
