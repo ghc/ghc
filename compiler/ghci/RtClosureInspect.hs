@@ -596,7 +596,7 @@ liftTcM = id
 newVar :: Kind -> TR TcType
 newVar = liftTcM . newFlexiTyVarTy
 
-instTyVars :: [TyVar] -> TR ([TcTyVar], [TcType], TvSubst)
+instTyVars :: [TyVar] -> TR (TvSubst, [TcTyVar])
 -- Instantiate fresh mutable type variables from some TyVars
 -- This function preserves the print-name, which helps error messages
 instTyVars = liftTcM . tcInstTyVars
@@ -613,7 +613,7 @@ type RttiInstantiation = [(TcTyVar, TyVar)]
 --   mapping from new (instantiated) -to- old (skolem) type variables
 instScheme :: QuantifiedType -> TR (TcType, RttiInstantiation)
 instScheme (tvs, ty)
-  = liftTcM $ do { (tvs', _, subst) <- tcInstTyVars tvs
+  = liftTcM $ do { (subst, tvs') <- tcInstTyVars tvs
                  ; let rtti_inst = [(tv',tv) | (tv',tv) <- tvs' `zip` tvs]
                  ; return (substTy subst ty, rtti_inst) }
 
@@ -950,7 +950,7 @@ getDataConArgTys dc con_app_ty
   = do { let UnaryRep rep_con_app_ty = repType con_app_ty
        ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty
                    $$ ppr (tcSplitTyConApp_maybe rep_con_app_ty)))
-       ; (_, _, subst) <- instTyVars (univ_tvs ++ ex_tvs)
+       ; (subst, _) <- instTyVars (univ_tvs ++ ex_tvs)
        ; addConstraint rep_con_app_ty (substTy subst (dataConOrigResTy dc))
               -- See Note [Constructor arg types]
        ; let con_arg_tys = substTys subst (dataConRepArgTys dc)
@@ -1183,8 +1183,8 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
             | otherwise = do
                traceTR (text "(Upgrade) upgraded " <> ppr ty <>
                         text " in presence of newtype evidence " <> ppr new_tycon)
-               (_, vars, _) <- instTyVars (tyConTyVars new_tycon)
-               let ty' = mkTyConApp new_tycon vars
+               (_, vars) <- instTyVars (tyConTyVars new_tycon)
+               let ty' = mkTyConApp new_tycon (mkTyVarTys vars)
                    UnaryRep rep_ty = repType ty'
                _ <- liftTcM (unifyType ty rep_ty)
         -- assumes that reptype doesn't ^^^^ touch tyconApp args

@@ -12,13 +12,13 @@
 -- Module      :  GHC.Exception
 -- Copyright   :  (c) The University of Glasgow, 1998-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
 -- Exceptions and exception-handling functions.
--- 
+--
 -----------------------------------------------------------------------------
 
 module GHC.Exception
@@ -194,8 +194,8 @@ data ArithException
   deriving (Eq, Ord, Typeable)
 
 divZeroException, overflowException, ratioZeroDenomException  :: SomeException
-divZeroException  	= toException DivideByZero
-overflowException 	= toException Overflow
+divZeroException        = toException DivideByZero
+overflowException       = toException Overflow
 ratioZeroDenomException = toException RatioZeroDenominator
 
 instance Exception ArithException

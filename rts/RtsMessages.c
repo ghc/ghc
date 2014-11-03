@@ -51,7 +51,7 @@ vbarf(const char*s, va_list ap)
   stg_exit(EXIT_INTERNAL_ERROR); // just in case fatalInternalErrorFn() returns
 }
 
-void 
+void
 _assertFail(const char*filename, unsigned int linenum)
 {
     barf("ASSERTION FAILED: file %s, line %u\n", filename, linenum);
@@ -142,10 +142,10 @@ rtsFatalInternalErrorFn(const char *s, va_list ap)
      vsnprintf(message, BUFSIZE, s, ap);
 
      MessageBox(NULL /* hWnd */,
-	        message,
-	        title,
-	        MB_OK | MB_ICONERROR | MB_TASKMODAL
-	       );
+                message,
+                title,
+                MB_OK | MB_ICONERROR | MB_TASKMODAL
+               );
   }
   else
 #endif
@@ -180,9 +180,9 @@ rtsErrorMsgFn(const char *s, va_list ap)
      char buf[BUFSIZE];
      int r;
 
-	 r = vsnprintf(buf, BUFSIZE, s, ap);
-	 if (r > 0 && r < BUFSIZE) {
-		MessageBox(NULL /* hWnd */,
+         r = vsnprintf(buf, BUFSIZE, s, ap);
+         if (r > 0 && r < BUFSIZE) {
+                MessageBox(NULL /* hWnd */,
               buf,
               prog_name,
               MB_OK | MB_ICONERROR | MB_TASKMODAL
@@ -207,31 +207,31 @@ rtsSysErrorMsgFn(const char *s, va_list ap)
     char *syserr;
 
 #if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
-    FormatMessage( 
-	FORMAT_MESSAGE_ALLOCATE_BUFFER | 
-	FORMAT_MESSAGE_FROM_SYSTEM | 
-	FORMAT_MESSAGE_IGNORE_INSERTS,
-	NULL,
-	GetLastError(),
-	MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-	(LPTSTR) &syserr,
-	0,
-	NULL );
+    FormatMessage(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        GetLastError(),
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
+        (LPTSTR) &syserr,
+        0,
+        NULL );
 
     if (isGUIApp())
     {
-	char buf[BUFSIZE];
-	int r;
-	
-	r = vsnprintf(buf, BUFSIZE, s, ap);
-	if (r > 0 && r < BUFSIZE) {
-	    r = vsnprintf(buf+r, BUFSIZE-r, ": %s", syserr);
-	    MessageBox(NULL /* hWnd */,
-		       buf,
-		       prog_name,
-		       MB_OK | MB_ICONERROR | MB_TASKMODAL
-		);
-	}
+        char buf[BUFSIZE];
+        int r;
+
+        r = vsnprintf(buf, BUFSIZE, s, ap);
+        if (r > 0 && r < BUFSIZE) {
+            r = vsnprintf(buf+r, BUFSIZE-r, ": %s", syserr);
+            MessageBox(NULL /* hWnd */,
+                       buf,
+                       prog_name,
+                       MB_OK | MB_ICONERROR | MB_TASKMODAL
+                );
+        }
     }
     else
 #else
@@ -239,21 +239,21 @@ rtsSysErrorMsgFn(const char *s, va_list ap)
     // ToDo: use strerror_r() if available
 #endif
     {
-	/* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-	if (prog_argv != NULL && prog_name != NULL) {
-	    fprintf(stderr, "%s: ", prog_name);
-	}
-	vfprintf(stderr, s, ap);
-	if (syserr) {
+        /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+        if (prog_argv != NULL && prog_name != NULL) {
+            fprintf(stderr, "%s: ", prog_name);
+        }
+        vfprintf(stderr, s, ap);
+        if (syserr) {
 #if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
             // Win32 error messages have a terminating \n
-	    fprintf(stderr, ": %s", syserr);
+            fprintf(stderr, ": %s", syserr);
 #else
-	    fprintf(stderr, ": %s\n", syserr);
+            fprintf(stderr, ": %s\n", syserr);
 #endif
-	} else {
-	    fprintf(stderr, "\n");
-	}
+        } else {
+            fprintf(stderr, "\n");
+        }
     }
 
 #if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
@@ -268,10 +268,10 @@ rtsDebugMsgFn(const char *s, va_list ap)
   if (isGUIApp())
   {
      char buf[BUFSIZE];
-	 int r;
+         int r;
 
-	 r = vsnprintf(buf, BUFSIZE, s, ap);
-	 if (r > 0 && r < BUFSIZE) {
+         r = vsnprintf(buf, BUFSIZE, s, ap);
+         if (r > 0 && r < BUFSIZE) {
        OutputDebugString(buf);
      }
   }

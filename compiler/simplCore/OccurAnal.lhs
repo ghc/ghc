@@ -1380,13 +1380,13 @@ The occurrrence analyser propagates one-shot-lambda information in two situation
     Propagate one-shot info from the strictness signature of 'build' to
     the \cn
 
-  * Let-bindings:  eg   let f = \c. let ... in \n -> blah 
+  * Let-bindings:  eg   let f = \c. let ... in \n -> blah
                         in (build f, build f)
     Propagate one-shot info from the demanand-info on 'f' to the
     lambdas in its RHS (which may not be syntactically at the top)
 
 Some of this is done by the demand analyser, but this way it happens
-much earlier, taking advantage of the strictness signature of 
+much earlier, taking advantage of the strictness signature of
 imported functions.
 
 Note [Binders in case alternatives]
@@ -1728,7 +1728,7 @@ binder-swap in OccAnal:
 
     Notice that because MkT is strict, x is marked "evaluated".  But to
     eliminate the last case, we must either make sure that x (as well as
-    x1) has unfolding MkT y1.  THe straightforward thing to do is to do
+    x1) has unfolding MkT y1.  The straightforward thing to do is to do
     the binder-swap.  So this whole note is a no-op.
 
 It's fixed by doing the binder-swap in OccAnal because we can do the

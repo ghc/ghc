@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -ddump-types #-}
+{-# OPTIONS_GHC -ddump-types -dsuppress-module-prefixes #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts #-}
 
 -- See Trac #1456

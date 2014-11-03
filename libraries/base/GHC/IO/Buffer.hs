@@ -7,7 +7,7 @@
 -- Module      :  GHC.IO.Buffer
 -- Copyright   :  (c) The University of Glasgow 2008
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -179,11 +179,11 @@ charSize = 4
 -- of the file.
 data Buffer e
   = Buffer {
-	bufRaw   :: !(RawBuffer e),
+        bufRaw   :: !(RawBuffer e),
         bufState :: BufferState,
-	bufSize  :: !Int,          -- in elements, not bytes
-	bufL     :: !Int,          -- offset of first item in the buffer
-	bufR     :: !Int           -- offset of last item + 1
+        bufSize  :: !Int,          -- in elements, not bytes
+        bufL     :: !Int,          -- offset of first item in the buffer
+        bufR     :: !Int           -- offset of last item + 1
   }
 
 #ifdef CHARBUF_UTF16
@@ -237,7 +237,7 @@ bufferAdd :: Int -> Buffer e -> Buffer e
 bufferAdd i buf@Buffer{ bufR=w } = buf{ bufR=w+i }
 
 emptyBuffer :: RawBuffer e -> Int -> BufferState -> Buffer e
-emptyBuffer raw sz state = 
+emptyBuffer raw sz state =
   Buffer{ bufRaw=raw, bufState=state, bufR=0, bufL=0, bufSize=sz }
 
 newByteBuffer :: Int -> BufferState -> IO (Buffer Word8)
@@ -270,7 +270,7 @@ summaryBuffer buf = "buf" ++ show (bufSize buf) ++ "(" ++ show (bufL buf) ++ "-"
 --   * r <= w
 --   * if r == w, and the buffer is for reading, then r == 0 && w == 0
 --   * a write buffer is never full.  If an operation
---     fills up the buffer, it will always flush it before 
+--     fills up the buffer, it will always flush it before
 --     returning.
 --   * a read buffer may be full as a result of hLookAhead.  In normal
 --     operation, a read buffer always has at least one character of space.
@@ -278,10 +278,10 @@ summaryBuffer buf = "buf" ++ show (bufSize buf) ++ "(" ++ show (bufL buf) ++ "-"
 checkBuffer :: Buffer a -> IO ()
 checkBuffer buf@Buffer{ bufState = state, bufL=r, bufR=w, bufSize=size } = do
      check buf (
-      	size > 0
-      	&& r <= w
-      	&& w <= size
-      	&& ( r /= w || state == WriteBuffer || (r == 0 && w == 0) )
+        size > 0
+        && r <= w
+        && w <= size
+        && ( r /= w || state == WriteBuffer || (r == 0 && w == 0) )
         && ( state /= WriteBuffer || w < size ) -- write buffer is never full
       )
 

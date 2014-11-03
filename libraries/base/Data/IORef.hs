@@ -106,9 +106,9 @@ atomicModifyIORef = GHC.IORef.atomicModifyIORef
 -- /Since: 4.6.0.0/
 atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
 atomicModifyIORef' ref f = do
-    b <- atomicModifyIORef ref
-            (\x -> let (a, b) = f x
-                    in (a, a `seq` b))
+    b <- atomicModifyIORef ref $ \a ->
+            case f a of
+                v@(a',_) -> a' `seq` v
     b `seq` return b
 
 -- | Variant of 'writeIORef' with the \"barrier to reordering\" property that

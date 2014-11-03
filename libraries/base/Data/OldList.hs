@@ -208,6 +208,7 @@ module Data.OldList
    ) where
 
 import Data.Maybe
+import Data.Bits        ( (.&.) )
 import Data.Char        ( isSpace )
 import Data.Ord         ( comparing )
 import Data.Tuple       ( fst, snd )
@@ -276,12 +277,12 @@ findIndices      :: (a -> Bool) -> [a] -> [Int]
 #ifdef USE_REPORT_PRELUDE
 findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
 #else
--- Efficient definition
-findIndices p ls = loop 0# ls
-                 where
-                   loop _ [] = []
-                   loop n (x:xs) | p x       = I# n : loop (n +# 1#) xs
-                                 | otherwise = loop (n +# 1#) xs
+-- Efficient definition, adapted from Data.Sequence
+{-# INLINE findIndices #-}
+findIndices p ls = build $ \c n ->
+  let go x r k | p x       = I# k `c` r (k +# 1#)
+               | otherwise = r (k +# 1#)
+  in foldr go (\_ -> n) ls 0#
 #endif  /* USE_REPORT_PRELUDE */
 
 -- | The 'isPrefixOf' function takes two lists and returns 'True'
@@ -291,11 +292,34 @@ isPrefixOf [] _         =  True
 isPrefixOf _  []        =  False
 isPrefixOf (x:xs) (y:ys)=  x == y && isPrefixOf xs ys
 
--- | The 'isSuffixOf' function takes two lists and returns 'True'
--- iff the first list is a suffix of the second.
--- Both lists must be finite.
+-- | The 'isSuffixOf' function takes two lists and returns 'True' iff
+-- the first list is a suffix of the second. The second list must be
+-- finite.
 isSuffixOf              :: (Eq a) => [a] -> [a] -> Bool
-isSuffixOf x y          =  reverse x `isPrefixOf` reverse y
+ns `isSuffixOf` hs      = maybe False id $ do
+      delta <- dropLengthMaybe ns hs
+      return $ ns == dropLength delta hs
+      -- Since dropLengthMaybe ns hs succeeded, we know that (if hs is finite)
+      -- length ns + length delta = length hs
+      -- so dropping the length of delta from hs will yield a suffix exactly
+      -- the length of ns.
+
+-- A version of drop that drops the length of the first argument from the
+-- second argument. If xs is longer than ys, xs will not be traversed in its
+-- entirety.  dropLength is also generally faster than (drop . length)
+-- Both this and dropLengthMaybe could be written as folds over their first
+-- arguments, but this reduces clarity with no benefit to isSuffixOf.
+dropLength :: [a] -> [b] -> [b]
+dropLength [] y = y
+dropLength _ [] = []
+dropLength (_:x') (_:y') = dropLength x' y'
+
+-- A version of dropLength that returns Nothing if the second list runs out of
+-- elements before the first.
+dropLengthMaybe :: [a] -> [b] -> Maybe [b]
+dropLengthMaybe [] y = Just y
+dropLengthMaybe _ [] = Nothing
+dropLengthMaybe (_:x') (_:y') = dropLengthMaybe x' y'
 
 -- | The 'isInfixOf' function takes two lists and returns 'True'
 -- iff the first list is contained, wholly and intact,
@@ -535,45 +559,6 @@ insertBy cmp x ys@(y:ys')
      GT -> y : insertBy cmp x ys'
      _  -> x : ys
 
--- | 'maximum' returns the maximum value from a list,
--- which must be non-empty, finite, and of an ordered type.
--- It is a special case of 'Data.List.maximumBy', which allows the
--- programmer to supply their own comparison function.
-maximum                 :: (Ord a) => [a] -> a
-{-# INLINE [1] maximum #-}
-maximum []              =  errorEmptyList "maximum"
-maximum xs              =  foldl1 max xs
-
-{-# RULES
-  "maximumInt"     maximum = (strictMaximum :: [Int]     -> Int);
-  "maximumInteger" maximum = (strictMaximum :: [Integer] -> Integer)
- #-}
-
--- We can't make the overloaded version of maximum strict without
--- changing its semantics (max might not be strict), but we can for
--- the version specialised to 'Int'.
-strictMaximum           :: (Ord a) => [a] -> a
-strictMaximum []        =  errorEmptyList "maximum"
-strictMaximum xs        =  foldl1' max xs
-
--- | 'minimum' returns the minimum value from a list,
--- which must be non-empty, finite, and of an ordered type.
--- It is a special case of 'Data.List.minimumBy', which allows the
--- programmer to supply their own comparison function.
-minimum                 :: (Ord a) => [a] -> a
-{-# INLINE [1] minimum #-}
-minimum []              =  errorEmptyList "minimum"
-minimum xs              =  foldl1 min xs
-
-{-# RULES
-  "minimumInt"     minimum = (strictMinimum :: [Int]     -> Int);
-  "minimumInteger" minimum = (strictMinimum :: [Integer] -> Integer)
- #-}
-
-strictMinimum           :: (Ord a) => [a] -> a
-strictMinimum []        =  errorEmptyList "minimum"
-strictMinimum xs        =  foldl1' min xs
-
 -- | The 'maximumBy' function takes a comparison function and a list
 -- and returns the greatest element of the list by the comparison function.
 -- The list must be finite and non-empty.
@@ -767,11 +752,16 @@ groupBy eq (x:xs)       =  (x:ys) : groupBy eq zs
 -- > inits "abc" == ["","a","ab","abc"]
 --
 -- Note that 'inits' has the following strictness property:
+-- @inits (xs ++ _|_) = inits xs ++ _|_@
+--
+-- In particular,
 -- @inits _|_ = [] : _|_@
 inits                   :: [a] -> [[a]]
-inits xs                =  [] : case xs of
-                                  []      -> []
-                                  x : xs' -> map (x :) (inits xs')
+inits                   = map toListSB . scanl' snocSB emptySB
+{-# NOINLINE inits #-}
+-- We do not allow inits to inline, because it plays havoc with Call Arity
+-- if it fuses with a consumer, and it would generally lead to serious
+-- loss of sharing if allowed to fuse with a producer.
 
 -- | The 'tails' function returns all final segments of the argument,
 -- longest first.  For example,
@@ -781,9 +771,12 @@ inits xs                =  [] : case xs of
 -- Note that 'tails' has the following strictness property:
 -- @tails _|_ = _|_ : _|_@
 tails                   :: [a] -> [[a]]
-tails xs                =  xs : case xs of
-                                  []      -> []
-                                  _ : xs' -> tails xs'
+{-# INLINABLE tails #-}
+tails lst               =  build (\c n ->
+  let tailsGo xs = xs `c` case xs of
+                             []      -> n
+                             _ : xs' -> tailsGo xs'
+  in tailsGo lst)
 
 -- | The 'subsequences' function returns the list of all subsequences of the argument.
 --
@@ -1046,39 +1039,6 @@ unfoldr f b0 = build (\c n ->
   in go b0)
 
 -- -----------------------------------------------------------------------------
-
--- | A strict version of 'foldl'.
-foldl'           :: forall a b . (b -> a -> b) -> b -> [a] -> b
-foldl' k z0 xs = foldr (\(v::a) (fn::b->b) (z::b) -> z `seq` fn (k z v)) (id :: b -> b) xs z0
--- Implementing foldl' via foldr is only a good idea if the compiler can optimize
--- the resulting code (eta-expand the recursive "go"), so this needs -fcall-arity!
--- Also see #7994
-
--- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
--- and thus must be applied to non-empty lists.
-foldl1                  :: (a -> a -> a) -> [a] -> a
-foldl1 f (x:xs)         =  foldl f x xs
-foldl1 _ []             =  errorEmptyList "foldl1"
-
--- | A strict version of 'foldl1'
-foldl1'                  :: (a -> a -> a) -> [a] -> a
-foldl1' f (x:xs)         =  foldl' f x xs
-foldl1' _ []             =  errorEmptyList "foldl1'"
-
--- -----------------------------------------------------------------------------
--- List sum and product
-
--- | The 'sum' function computes the sum of a finite list of numbers.
-sum                     :: (Num a) => [a] -> a
--- | The 'product' function computes the product of a finite list of numbers.
-product                 :: (Num a) => [a] -> a
-
-{-# INLINE sum #-}
-sum                     =  foldl (+) 0
-{-# INLINE product #-}
-product                 =  foldl (*) 1
-
--- -----------------------------------------------------------------------------
 -- Functions on strings
 
 -- | 'lines' breaks a string up into a list of strings at newline
@@ -1130,3 +1090,51 @@ unwords []              =  ""
 unwords [w]             = w
 unwords (w:ws)          = w ++ ' ' : unwords ws
 #endif
+
+{- A "SnocBuilder" is a version of Chris Okasaki's banker's queue that supports
+toListSB instead of uncons. In single-threaded use, its performance
+characteristics are similar to John Hughes's functional difference lists, but
+likely somewhat worse. In heavily persistent settings, however, it does much
+better, because it takes advantage of sharing. The banker's queue guarantees
+(amortized) O(1) snoc and O(1) uncons, meaning that we can think of toListSB as
+an O(1) conversion to a list-like structure a constant factor slower than
+normal lists--we pay the O(n) cost incrementally as we consume the list. Using
+functional difference lists, on the other hand, we would have to pay the whole
+cost up front for each output list. -}
+
+{- We store a front list, a rear list, and the length of the queue.  Because we
+only snoc onto the queue and never uncons, we know it's time to rotate when the
+length of the queue plus 1 is a power of 2. Note that we rely on the value of
+the length field only for performance.  In the unlikely event of overflow, the
+performance will suffer but the semantics will remain correct.  -}
+
+data SnocBuilder a = SnocBuilder {-# UNPACK #-} !Word [a] [a]
+
+{- Smart constructor that rotates the builder when lp is one minus a power of
+2. Does not rotate very small builders because doing so is not worth the
+trouble. The lp < 255 test goes first because the power-of-2 test gives awful
+branch prediction for very small n (there are 5 powers of 2 between 1 and
+16). Putting the well-predicted lp < 255 test first avoids branching on the
+power-of-2 test until powers of 2 have become sufficiently rare to be predicted
+well. -}
+
+{-# INLINE sb #-}
+sb :: Word -> [a] -> [a] -> SnocBuilder a
+sb lp f r
+  | lp < 255 || (lp .&. (lp + 1)) /= 0 = SnocBuilder lp f r
+  | otherwise                          = SnocBuilder lp (f ++ reverse r) []
+
+-- The empty builder
+
+emptySB :: SnocBuilder a
+emptySB = SnocBuilder 0 [] []
+
+-- Add an element to the end of a queue.
+
+snocSB :: SnocBuilder a -> a -> SnocBuilder a
+snocSB (SnocBuilder lp f r) x = sb (lp + 1) f (x:r)
+
+-- Convert a builder to a list
+
+toListSB :: SnocBuilder a -> [a]
+toListSB (SnocBuilder _ f r) = f ++ reverse r

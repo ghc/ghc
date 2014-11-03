@@ -51,6 +51,7 @@ import Class
 import DataCon  ( dataConWorkId )
 import Name
 import MkId     ( seqId )
+import IdInfo   ( IdDetails(..) )
 import Var
 import VarSet
 import Rules
@@ -214,6 +215,9 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
   | is_default_method                 -- Default methods are *always* inlined
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
 
+  | DFunId _ is_newtype <- idDetails gbl_id
+  = (mk_dfun_w_stuff is_newtype, rhs)
+
   | otherwise
   = case inlinePragmaSpec inline_prag of
           EmptyInlineSpec -> (gbl_id, rhs)
@@ -236,6 +240,22 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
        | otherwise
        = pprTrace "makeCorePair: arity missing" (ppr gbl_id) $
          (gbl_id `setIdUnfolding` mkInlineUnfolding Nothing rhs, rhs)
+
+                -- See Note [ClassOp/DFun selection] in TcInstDcls
+                -- See Note [Single-method classes]  in TcInstDcls
+    mk_dfun_w_stuff is_newtype
+       | is_newtype 
+       = gbl_id `setIdUnfolding`  mkInlineUnfolding (Just 0) rhs
+                `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
+       | otherwise
+       = gbl_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dfun_constr dfun_args
+                `setInlinePragma` dfunInlinePragma
+    (dfun_bndrs, dfun_body) = collectBinders (simpleOptExpr rhs)
+    (dfun_con, dfun_args)   = collectArgs dfun_body
+    dfun_constr | Var id <- dfun_con
+                , DataConWorkId con <- idDetails id
+                = con
+                | otherwise = pprPanic "makeCorePair: dfun" (ppr rhs)
 
 
 dictArity :: [Var] -> Arity
@@ -331,7 +351,7 @@ Notice (a) g has a different number of type variables to f, so we must
              variables of the particular RHS.  Tiresome.
 
 Why got to this trouble?  It's a common case, and it removes the
-quadratic-sized tuple desugaring.  Less clutter, hopefullly faster
+quadratic-sized tuple desugaring.  Less clutter, hopefully faster
 compilation, especially in a case where there are a *lot* of
 bindings.
 

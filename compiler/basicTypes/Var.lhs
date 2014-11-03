@@ -206,16 +206,16 @@ After CoreTidy, top-level LocalIds are turned into GlobalIds
 
 \begin{code}
 instance Outputable Var where
-  ppr var = ppr (varName var) <+> ifPprDebug (brackets (ppr_debug var))
--- Printing the type on every occurrence is too much!
---            <+> if (not (gopt Opt_SuppressVarKinds dflags))
---                then ifPprDebug (text "::" <+> ppr (tyVarKind var) <+> text ")")
---                else empty
+  ppr var = ppr (varName var) <> getPprStyle (ppr_debug var)
 
-ppr_debug :: Var -> SDoc
-ppr_debug (TyVar {})                           = ptext (sLit "tv")
-ppr_debug (TcTyVar {tc_tv_details = d})        = pprTcTyVarDetails d
-ppr_debug (Id { idScope = s, id_details = d }) = ppr_id_scope s <> pprIdDetails d
+ppr_debug :: Var -> PprStyle -> SDoc
+ppr_debug (TyVar {}) sty 
+  | debugStyle sty = brackets (ptext (sLit "tv"))
+ppr_debug (TcTyVar {tc_tv_details = d}) sty
+  | dumpStyle sty || debugStyle sty = brackets (pprTcTyVarDetails d)
+ppr_debug (Id { idScope = s, id_details = d }) sty
+  | debugStyle sty = brackets (ppr_id_scope s <> pprIdDetails d)
+ppr_debug _ _ = empty
 
 ppr_id_scope :: IdScope -> SDoc
 ppr_id_scope GlobalId              = ptext (sLit "gid")

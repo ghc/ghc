@@ -22,8 +22,6 @@ module Data.Unique (
    hashUnique
  ) where
 
-import Prelude
-
 import System.IO.Unsafe (unsafePerformIO)
 
 import GHC.Base

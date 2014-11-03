@@ -173,7 +173,7 @@ rnTopBindsLHS fix_env binds
 rnTopBindsRHS :: NameSet -> HsValBindsLR Name RdrName
               -> RnM (HsValBinds Name, DefUses)
 rnTopBindsRHS bound_names binds
-  = do { is_boot <- tcIsHsBoot
+  = do { is_boot <- tcIsHsBootOrSig
        ; if is_boot
          then rnTopBindsBoot binds
          else rnValBindsRHS (TopSigCtxt bound_names False) binds }

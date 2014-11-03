@@ -9,7 +9,7 @@ Core pass to saturate constructors and PrimOps
 
 module CorePrep (
       corePrepPgm, corePrepExpr, cvtLitInteger,
-      lookupMkIntegerName,
+      lookupMkIntegerName, lookupIntegerSDataConName
   ) where
 
 #include "HsVersions.h"
@@ -21,7 +21,7 @@ import PrelNames
 import CoreUtils
 import CoreArity
 import CoreFVs
-import CoreMonad        ( endPass, CoreToDo(..) )
+import CoreMonad        ( endPassIO, CoreToDo(..) )
 import CoreSyn
 import CoreSubst
 import MkCore hiding( FloatBind(..) )   -- We use our own FloatBind here
@@ -172,7 +172,7 @@ corePrepPgm dflags hsc_env binds data_tycons = do
                       floats2 <- corePrepTopBinds initialCorePrepEnv implicit_binds
                       return (deFloatTop (floats1 `appendFloats` floats2))
 
-    endPass hsc_env CorePrep binds_out []
+    endPassIO hsc_env alwaysQualify CorePrep binds_out []
     return binds_out
 
 corePrepExpr :: DynFlags -> HscEnv -> CoreExpr -> IO CoreExpr
@@ -479,7 +479,8 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
 cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
 cpeRhsE env (Lit (LitInteger i _))
-    = cpeRhsE env (cvtLitInteger (cpe_dynFlags env) (getMkIntegerId env) i)
+    = cpeRhsE env (cvtLitInteger (cpe_dynFlags env) (getMkIntegerId env)
+                   (cpe_integerSDataCon env) i)
 cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
 
@@ -529,18 +530,17 @@ cpeRhsE env (Case scrut bndr ty alts)
             ; rhs' <- cpeBodyNF env2 rhs
             ; return (con, bs', rhs') }
 
-cvtLitInteger :: DynFlags -> Id -> Integer -> CoreExpr
+cvtLitInteger :: DynFlags -> Id -> Maybe DataCon -> Integer -> CoreExpr
 -- Here we convert a literal Integer to the low-level
 -- represenation. Exactly how we do this depends on the
 -- library that implements Integer.  If it's GMP we
 -- use the S# data constructor for small literals.
 -- See Note [Integer literals] in Literal
-cvtLitInteger dflags mk_integer i
-  | cIntegerLibraryType == IntegerGMP
-  , inIntRange dflags i       -- Special case for small integers in GMP
-    = mkConApp integerGmpSDataCon [Lit (mkMachInt dflags i)]
+cvtLitInteger dflags _ (Just sdatacon) i
+  | inIntRange dflags i -- Special case for small integers
+    = mkConApp sdatacon [Lit (mkMachInt dflags i)]
 
-  | otherwise
+cvtLitInteger dflags mk_integer _ i
     = mkApps (Var mk_integer) [isNonNegative, ints]
   where isNonNegative = if i < 0 then mkConApp falseDataCon []
                                  else mkConApp trueDataCon  []
@@ -1110,25 +1110,40 @@ allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
 data CorePrepEnv = CPE {
                        cpe_dynFlags    :: DynFlags,
                        cpe_env         :: (IdEnv Id), -- Clone local Ids
-                       cpe_mkIntegerId :: Id
+                       cpe_mkIntegerId :: Id,
+                       cpe_integerSDataCon :: Maybe DataCon
                    }
 
 lookupMkIntegerName :: DynFlags -> HscEnv -> IO Id
 lookupMkIntegerName dflags hsc_env
-    = if thisPackage dflags == primPackageKey
-      then return $ panic "Can't use Integer in ghc-prim"
-      else if thisPackage dflags == integerPackageKey
-      then return $ panic "Can't use Integer in integer"
-      else liftM tyThingId
-         $ initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
+    = guardIntegerUse dflags $ liftM tyThingId $
+      initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
+
+lookupIntegerSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
+lookupIntegerSDataConName dflags hsc_env = case cIntegerLibraryType of
+    IntegerGMP -> guardIntegerUse dflags $ liftM Just $
+                  initTcForLookup hsc_env (tcLookupDataCon integerSDataConName)
+
+    IntegerSimple -> return Nothing
+
+-- | Helper for 'lookupMkIntegerName' and 'lookupIntegerSDataConName'
+guardIntegerUse :: DynFlags -> IO a -> IO a
+guardIntegerUse dflags act
+  | thisPackage dflags == primPackageKey
+    = return $ panic "Can't use Integer in ghc-prim"
+  | thisPackage dflags == integerPackageKey
+    = return $ panic "Can't use Integer in integer-*"
+  | otherwise = act
 
 mkInitialCorePrepEnv :: DynFlags -> HscEnv -> IO CorePrepEnv
 mkInitialCorePrepEnv dflags hsc_env
     = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
+         integerSDataCon <- lookupIntegerSDataConName dflags hsc_env
          return $ CPE {
                       cpe_dynFlags = dflags,
                       cpe_env = emptyVarEnv,
-                      cpe_mkIntegerId = mkIntegerId
+                      cpe_mkIntegerId = mkIntegerId,
+                      cpe_integerSDataCon = integerSDataCon
                   }
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv

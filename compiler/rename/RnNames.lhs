@@ -10,6 +10,7 @@ module RnNames (
         rnImports, getLocalNonValBinders,
         rnExports, extendGlobalRdrEnvRn,
         gresFromAvails,
+        calculateAvails,
         reportUnusedNames,
         checkConName
     ) where
@@ -213,14 +214,7 @@ rnImportDecl this_mod
                   $+$ ptext (sLit $ "please enable Safe Haskell through either "
                                  ++ "Safe, Trustworthy or Unsafe"))
 
-    let imp_mod    = mi_module iface
-        warns      = mi_warns iface
-        orph_iface = mi_orphan iface
-        has_finsts = mi_finsts iface
-        deps       = mi_deps iface
-        trust      = getSafeMode $ mi_trust iface
-        trust_pkg  = mi_trust_pkg iface
-
+    let
         qual_mod_name = as_mod `orElse` imp_mod_name
         imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,
                                   is_dloc = loc, is_as = qual_mod_name }
@@ -230,63 +224,6 @@ rnImportDecl this_mod
 
     let gbl_env = mkGlobalRdrEnv (filterOut from_this_mod gres)
         from_this_mod gre = nameModule (gre_name gre) == this_mod
-        -- If the module exports anything defined in this module, just
-        -- ignore it.  Reason: otherwise it looks as if there are two
-        -- local definition sites for the thing, and an error gets
-        -- reported.  Easiest thing is just to filter them out up
-        -- front. This situation only arises if a module imports
-        -- itself, or another module that imported it.  (Necessarily,
-        -- this invoves a loop.)
-        --
-        -- We do this *after* filterImports, so that if you say
-        --      module A where
-        --         import B( AType )
-        --         type AType = ...
-        --
-        --      module B( AType ) where
-        --         import {-# SOURCE #-} A( AType )
-        --
-        -- then you won't get a 'B does not export AType' message.
-
-
-        -- Compute new transitive dependencies
-
-        orphans | orph_iface = ASSERT( not (imp_mod `elem` dep_orphs deps) )
-                               imp_mod : dep_orphs deps
-                | otherwise  = dep_orphs deps
-
-        finsts | has_finsts = ASSERT( not (imp_mod `elem` dep_finsts deps) )
-                              imp_mod : dep_finsts deps
-               | otherwise  = dep_finsts deps
-
-        pkg = modulePackageKey (mi_module iface)
-
-        -- Does this import mean we now require our own pkg
-        -- to be trusted? See Note [Trust Own Package]
-        ptrust = trust == Sf_Trustworthy || trust_pkg
-
-        (dependent_mods, dependent_pkgs, pkg_trust_req)
-           | pkg == thisPackage dflags =
-                -- Imported module is from the home package
-                -- Take its dependent modules and add imp_mod itself
-                -- Take its dependent packages unchanged
-                --
-                -- NB: (dep_mods deps) might include a hi-boot file
-                -- for the module being compiled, CM. Do *not* filter
-                -- this out (as we used to), because when we've
-                -- finished dealing with the direct imports we want to
-                -- know if any of them depended on CM.hi-boot, in
-                -- which case we should do the hi-boot consistency
-                -- check.  See LoadIface.loadHiBootInterface
-                ((imp_mod_name, want_boot) : dep_mods deps, dep_pkgs deps, ptrust)
-
-           | otherwise =
-                -- Imported module is from another package
-                -- Dump the dependent modules
-                -- Add the package imp_mod comes from to the dependent packages
-                ASSERT2( not (pkg `elem` (map fst $ dep_pkgs deps))
-                       , ppr pkg <+> ppr (dep_pkgs deps) )
-                ([], (pkg, False) : dep_pkgs deps, False)
 
         -- True <=> import M ()
         import_all = case imp_details of
@@ -298,29 +235,14 @@ rnImportDecl this_mod
                     || (not implicit && safeDirectImpsReq dflags)
                     || (implicit && safeImplicitImpsReq dflags)
 
-        imports   = ImportAvails {
-                        imp_mods       = unitModuleEnv imp_mod
-                                        [(qual_mod_name, import_all, loc, mod_safe')],
-                        imp_orphs      = orphans,
-                        imp_finsts     = finsts,
-                        imp_dep_mods   = mkModDeps dependent_mods,
-                        imp_dep_pkgs   = map fst $ dependent_pkgs,
-                        -- Add in the imported modules trusted package
-                        -- requirements. ONLY do this though if we import the
-                        -- module as a safe import.
-                        -- See Note [Tracking Trust Transitively]
-                        -- and Note [Trust Transitive Property]
-                        imp_trust_pkgs = if mod_safe'
-                                             then map fst $ filter snd dependent_pkgs
-                                             else [],
-                        -- Do we require our own pkg to be trusted?
-                        -- See Note [Trust Own Package]
-                        imp_trust_own_pkg = pkg_trust_req
-                   }
+    let imports
+          = (calculateAvails dflags iface mod_safe' want_boot) {
+                imp_mods = unitModuleEnv (mi_module iface)
+                            [(qual_mod_name, import_all, loc, mod_safe')] }
 
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
-       case warns of
+       case (mi_warns iface) of
           WarnAll txt -> addWarn $ moduleWarn imp_mod_name txt
           _           -> return ()
      )
@@ -329,6 +251,99 @@ rnImportDecl this_mod
                                    , ideclHiding = new_imp_details })
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
+
+-- | Calculate the 'ImportAvails' induced by an import of a particular
+-- interface, but without 'imp_mods'.
+calculateAvails :: DynFlags
+                -> ModIface
+                -> IsSafeImport
+                -> IsBootInterface
+                -> ImportAvails
+calculateAvails dflags iface mod_safe' want_boot =
+  let imp_mod    = mi_module iface
+      orph_iface = mi_orphan iface
+      has_finsts = mi_finsts iface
+      deps       = mi_deps iface
+      trust      = getSafeMode $ mi_trust iface
+      trust_pkg  = mi_trust_pkg iface
+
+      -- If the module exports anything defined in this module, just
+      -- ignore it.  Reason: otherwise it looks as if there are two
+      -- local definition sites for the thing, and an error gets
+      -- reported.  Easiest thing is just to filter them out up
+      -- front. This situation only arises if a module imports
+      -- itself, or another module that imported it.  (Necessarily,
+      -- this invoves a loop.)
+      --
+      -- We do this *after* filterImports, so that if you say
+      --      module A where
+      --         import B( AType )
+      --         type AType = ...
+      --
+      --      module B( AType ) where
+      --         import {-# SOURCE #-} A( AType )
+      --
+      -- then you won't get a 'B does not export AType' message.
+
+
+      -- Compute new transitive dependencies
+
+      orphans | orph_iface = ASSERT( not (imp_mod `elem` dep_orphs deps) )
+                             imp_mod : dep_orphs deps
+              | otherwise  = dep_orphs deps
+
+      finsts | has_finsts = ASSERT( not (imp_mod `elem` dep_finsts deps) )
+                            imp_mod : dep_finsts deps
+             | otherwise  = dep_finsts deps
+
+      pkg = modulePackageKey (mi_module iface)
+
+      -- Does this import mean we now require our own pkg
+      -- to be trusted? See Note [Trust Own Package]
+      ptrust = trust == Sf_Trustworthy || trust_pkg
+
+      (dependent_mods, dependent_pkgs, pkg_trust_req)
+         | pkg == thisPackage dflags =
+            -- Imported module is from the home package
+            -- Take its dependent modules and add imp_mod itself
+            -- Take its dependent packages unchanged
+            --
+            -- NB: (dep_mods deps) might include a hi-boot file
+            -- for the module being compiled, CM. Do *not* filter
+            -- this out (as we used to), because when we've
+            -- finished dealing with the direct imports we want to
+            -- know if any of them depended on CM.hi-boot, in
+            -- which case we should do the hi-boot consistency
+            -- check.  See LoadIface.loadHiBootInterface
+            ((moduleName imp_mod,want_boot):dep_mods deps,dep_pkgs deps,ptrust)
+
+         | otherwise =
+            -- Imported module is from another package
+            -- Dump the dependent modules
+            -- Add the package imp_mod comes from to the dependent packages
+            ASSERT2( not (pkg `elem` (map fst $ dep_pkgs deps))
+                   , ppr pkg <+> ppr (dep_pkgs deps) )
+            ([], (pkg, False) : dep_pkgs deps, False)
+
+  in ImportAvails {
+          imp_mods       = emptyModuleEnv, -- this gets filled in later
+          imp_orphs      = orphans,
+          imp_finsts     = finsts,
+          imp_dep_mods   = mkModDeps dependent_mods,
+          imp_dep_pkgs   = map fst $ dependent_pkgs,
+          -- Add in the imported modules trusted package
+          -- requirements. ONLY do this though if we import the
+          -- module as a safe import.
+          -- See Note [Tracking Trust Transitively]
+          -- and Note [Trust Transitive Property]
+          imp_trust_pkgs = if mod_safe'
+                               then map fst $ filter snd dependent_pkgs
+                               else [],
+          -- Do we require our own pkg to be trusted?
+          -- See Note [Trust Own Package]
+          imp_trust_own_pkg = pkg_trust_req
+     }
+
 
 warnRedundantSourceImport :: ModuleName -> SDoc
 warnRedundantSourceImport mod_name
@@ -489,7 +504,7 @@ getLocalNonValBinders fixity_env
           -- Finish off with value binders:
           --    foreign decls for an ordinary module
           --    type sigs in case of a hs-boot file only
-        ; is_boot <- tcIsHsBoot
+        ; is_boot <- tcIsHsBootOrSig
         ; let val_bndrs | is_boot   = hs_boot_sig_bndrs
                         | otherwise = for_hs_bndrs
         ; val_avails <- mapM new_simple val_bndrs

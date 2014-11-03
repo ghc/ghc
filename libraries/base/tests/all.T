@@ -23,6 +23,7 @@ test('readInteger001', normal, compile_and_run, [''])
 test('readFixed001', normal, compile_and_run, [''])
 test('lex001', normal, compile_and_run, [''])
 test('take001', extra_run_opts('1'), compile_and_run, [''])
+test('inits', normal, compile_and_run, [''])
 test('genericNegative001', extra_run_opts('-1'), compile_and_run, [''])
 test('ix001', normal, compile_and_run, [''])
 
@@ -85,6 +86,7 @@ test('exceptionsrun002', 	normal, compile_and_run, [''])
 test('list001'	,	when(fast(), skip), compile_and_run, [''])
 test('list002', when(fast(), skip), compile_and_run, [''])
 test('list003', when(fast(), skip), compile_and_run, [''])
+test('isSuffixOf', normal, compile_and_run, [''])
 
 test('memo001',
      [extra_run_opts('+RTS -A10k -RTS'),

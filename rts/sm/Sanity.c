@@ -9,7 +9,7 @@
  *    - All things that are supposed to be pointers look like pointers.
  *
  *    - Objects in text space are marked as static closures, those
- *	in the heap are dynamic.
+ *      in the heap are dynamic.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -48,9 +48,9 @@ checkSmallBitmap( StgPtr payload, StgWord bitmap, nat size )
     nat i;
 
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
-	if ((bitmap & 1) == 0) {
-	    checkClosureShallow((StgClosure *)payload[i]);
-	}
+        if ((bitmap & 1) == 0) {
+            checkClosureShallow((StgClosure *)payload[i]);
+        }
     }
 }
 
@@ -62,13 +62,13 @@ checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap, nat size )
 
     i = 0;
     for (bmp=0; i < size; bmp++) {
-	StgWord bitmap = large_bitmap->bitmap[bmp];
-	j = 0;
-	for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
-	    if ((bitmap & 1) == 0) {
-		checkClosureShallow((StgClosure *)payload[i]);
-	    }
-	}
+        StgWord bitmap = large_bitmap->bitmap[bmp];
+        j = 0;
+        for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
+            if ((bitmap & 1) == 0) {
+                checkClosureShallow((StgClosure *)payload[i]);
+            }
+        }
     }
 }
 
@@ -77,8 +77,8 @@ checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap, nat size )
  * used to avoid recursion between checking PAPs and checking stack
  * chunks.
  */
- 
-static void 
+
+static void
 checkClosureShallow( StgClosure* p )
 {
     StgClosure *q;
@@ -88,14 +88,14 @@ checkClosureShallow( StgClosure* p )
 
     /* Is it a static closure? */
     if (!HEAP_ALLOCED(q)) {
-	ASSERT(closure_STATIC(q));
+        ASSERT(closure_STATIC(q));
     } else {
-	ASSERT(!closure_STATIC(q));
+        ASSERT(!closure_STATIC(q));
     }
 }
 
 // check an individual stack object
-StgOffset 
+StgOffset
 checkStackFrame( StgPtr c )
 {
     nat size;
@@ -116,99 +116,99 @@ checkStackFrame( StgPtr c )
     case UNDERFLOW_FRAME:
     case STOP_FRAME:
     case RET_SMALL:
-	size = BITMAP_SIZE(info->i.layout.bitmap);
-	checkSmallBitmap((StgPtr)c + 1, 
-			 BITMAP_BITS(info->i.layout.bitmap), size);
-	return 1 + size;
+        size = BITMAP_SIZE(info->i.layout.bitmap);
+        checkSmallBitmap((StgPtr)c + 1,
+                         BITMAP_BITS(info->i.layout.bitmap), size);
+        return 1 + size;
 
     case RET_BCO: {
-	StgBCO *bco;
-	nat size;
-	bco = (StgBCO *)*(c+1);
-	size = BCO_BITMAP_SIZE(bco);
-	checkLargeBitmap((StgPtr)c + 2, BCO_BITMAP(bco), size);
-	return 2 + size;
+        StgBCO *bco;
+        nat size;
+        bco = (StgBCO *)*(c+1);
+        size = BCO_BITMAP_SIZE(bco);
+        checkLargeBitmap((StgPtr)c + 2, BCO_BITMAP(bco), size);
+        return 2 + size;
     }
 
     case RET_BIG: // large bitmap (> 32 entries)
-	size = GET_LARGE_BITMAP(&info->i)->size;
-	checkLargeBitmap((StgPtr)c + 1, GET_LARGE_BITMAP(&info->i), size);
-	return 1 + size;
+        size = GET_LARGE_BITMAP(&info->i)->size;
+        checkLargeBitmap((StgPtr)c + 1, GET_LARGE_BITMAP(&info->i), size);
+        return 1 + size;
 
     case RET_FUN:
     {
-	StgFunInfoTable *fun_info;
-	StgRetFun *ret_fun;
+        StgFunInfoTable *fun_info;
+        StgRetFun *ret_fun;
 
-	ret_fun = (StgRetFun *)c;
-	fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
-	size = ret_fun->size;
-	switch (fun_info->f.fun_type) {
-	case ARG_GEN:
-	    checkSmallBitmap((StgPtr)ret_fun->payload, 
-			     BITMAP_BITS(fun_info->f.b.bitmap), size);
-	    break;
-	case ARG_GEN_BIG:
-	    checkLargeBitmap((StgPtr)ret_fun->payload,
-			     GET_FUN_LARGE_BITMAP(fun_info), size);
-	    break;
-	default:
-	    checkSmallBitmap((StgPtr)ret_fun->payload,
-			     BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
-			     size);
-	    break;
-	}
-	return sizeofW(StgRetFun) + size;
+        ret_fun = (StgRetFun *)c;
+        fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
+        size = ret_fun->size;
+        switch (fun_info->f.fun_type) {
+        case ARG_GEN:
+            checkSmallBitmap((StgPtr)ret_fun->payload,
+                             BITMAP_BITS(fun_info->f.b.bitmap), size);
+            break;
+        case ARG_GEN_BIG:
+            checkLargeBitmap((StgPtr)ret_fun->payload,
+                             GET_FUN_LARGE_BITMAP(fun_info), size);
+            break;
+        default:
+            checkSmallBitmap((StgPtr)ret_fun->payload,
+                             BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
+                             size);
+            break;
+        }
+        return sizeofW(StgRetFun) + size;
     }
 
     default:
-	barf("checkStackFrame: weird activation record found on stack (%p %d).",c,info->i.type);
+        barf("checkStackFrame: weird activation record found on stack (%p %d).",c,info->i.type);
     }
 }
 
 // check sections of stack between update frames
-void 
+void
 checkStackChunk( StgPtr sp, StgPtr stack_end )
 {
     StgPtr p;
 
     p = sp;
     while (p < stack_end) {
-	p += checkStackFrame( p );
+        p += checkStackFrame( p );
     }
     // ASSERT( p == stack_end ); -- HWL
 }
 
 static void
 checkPAP (StgClosure *tagged_fun, StgClosure** payload, StgWord n_args)
-{ 
+{
     StgClosure *fun;
     StgFunInfoTable *fun_info;
-    
+
     fun = UNTAG_CLOSURE(tagged_fun);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(fun));
     fun_info = get_fun_itbl(fun);
-    
+
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	checkSmallBitmap( (StgPtr)payload, 
-			  BITMAP_BITS(fun_info->f.b.bitmap), n_args );
-	break;
+        checkSmallBitmap( (StgPtr)payload,
+                          BITMAP_BITS(fun_info->f.b.bitmap), n_args );
+        break;
     case ARG_GEN_BIG:
-	checkLargeBitmap( (StgPtr)payload, 
-			  GET_FUN_LARGE_BITMAP(fun_info), 
-			  n_args );
-	break;
+        checkLargeBitmap( (StgPtr)payload,
+                          GET_FUN_LARGE_BITMAP(fun_info),
+                          n_args );
+        break;
     case ARG_BCO:
-	checkLargeBitmap( (StgPtr)payload, 
-			  BCO_BITMAP(fun), 
-			  n_args );
-	break;
+        checkLargeBitmap( (StgPtr)payload,
+                          BCO_BITMAP(fun),
+                          n_args );
+        break;
     default:
-	checkSmallBitmap( (StgPtr)payload, 
-			  BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
-			  n_args );
-	break;
+        checkSmallBitmap( (StgPtr)payload,
+                          BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
+                          n_args );
+        break;
     }
 
     ASSERT(fun_info->f.arity > TAG_MASK ? GET_CLOSURE_TAG(tagged_fun) == 0
@@ -216,7 +216,7 @@ checkPAP (StgClosure *tagged_fun, StgClosure** payload, StgWord n_args)
 }
 
 
-StgOffset 
+StgOffset
 checkClosure( StgClosure* p )
 {
     const StgInfoTable *info;
@@ -226,9 +226,9 @@ checkClosure( StgClosure* p )
     p = UNTAG_CLOSURE(p);
     /* Is it a static closure (i.e. in the data segment)? */
     if (!HEAP_ALLOCED(p)) {
-	ASSERT(closure_STATIC(p));
+        ASSERT(closure_STATIC(p));
     } else {
-	ASSERT(!closure_STATIC(p));
+        ASSERT(!closure_STATIC(p));
     }
 
     info = p->header.info;
@@ -242,12 +242,12 @@ checkClosure( StgClosure* p )
 
     case MVAR_CLEAN:
     case MVAR_DIRTY:
-      { 
-	StgMVar *mvar = (StgMVar *)p;
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->head));
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->tail));
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->value));
-	return sizeofW(StgMVar);
+      {
+        StgMVar *mvar = (StgMVar *)p;
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->head));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->tail));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->value));
+        return sizeofW(StgMVar);
       }
 
     case THUNK:
@@ -257,11 +257,11 @@ checkClosure( StgClosure* p )
     case THUNK_0_2:
     case THUNK_2_0:
       {
-	nat i;
-	for (i = 0; i < info->layout.payload.ptrs; i++) {
-	  ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgThunk *)p)->payload[i]));
-	}
-	return thunk_sizeW_fromITBL(info);
+        nat i;
+        for (i = 0; i < info->layout.payload.ptrs; i++) {
+          ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgThunk *)p)->payload[i]));
+        }
+        return thunk_sizeW_fromITBL(info);
       }
 
     case FUN:
@@ -287,13 +287,13 @@ checkClosure( StgClosure* p )
     case CONSTR_NOCAF_STATIC:
     case THUNK_STATIC:
     case FUN_STATIC:
-	{
-	    nat i;
-	    for (i = 0; i < info->layout.payload.ptrs; i++) {
-		ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->payload[i]));
-	    }
-	    return sizeW_fromITBL(info);
-	}
+        {
+            nat i;
+            for (i = 0; i < info->layout.payload.ptrs; i++) {
+                ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->payload[i]));
+            }
+            return sizeW_fromITBL(info);
+        }
 
     case BLOCKING_QUEUE:
     {
@@ -304,9 +304,9 @@ checkClosure( StgClosure* p )
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(bq->bh));
 
         ASSERT(get_itbl((StgClosure *)(bq->owner))->type == TSO);
-        ASSERT(bq->queue == (MessageBlackHole*)END_TSO_QUEUE 
+        ASSERT(bq->queue == (MessageBlackHole*)END_TSO_QUEUE
                || bq->queue->header.info == &stg_MSG_BLACKHOLE_info);
-        ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE || 
+        ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE ||
                get_itbl((StgClosure *)(bq->link))->type == IND ||
                get_itbl((StgClosure *)(bq->link))->type == BLOCKING_QUEUE);
 
@@ -314,11 +314,11 @@ checkClosure( StgClosure* p )
     }
 
     case BCO: {
-	StgBCO *bco = (StgBCO *)p;
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->instrs));
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->literals));
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->ptrs));
-	return bco_sizeW(bco);
+        StgBCO *bco = (StgBCO *)p;
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->instrs));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->literals));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->ptrs));
+        return bco_sizeW(bco);
     }
 
     case IND_STATIC: /* (1, 0) closure */
@@ -330,28 +330,28 @@ checkClosure( StgClosure* p )
        * representative of the actual layout.
        */
       { StgWeak *w = (StgWeak *)p;
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->key));
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->value));
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->finalizer));
-	if (w->link) {
-	  ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->link));
-	}
-	return sizeW_fromITBL(info);
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->key));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->value));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->finalizer));
+        if (w->link) {
+          ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->link));
+        }
+        return sizeW_fromITBL(info);
       }
 
     case THUNK_SELECTOR:
-	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgSelector *)p)->selectee));
-	    return THUNK_SELECTOR_sizeW();
+            ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgSelector *)p)->selectee));
+            return THUNK_SELECTOR_sizeW();
 
     case IND:
-	{ 
-  	    /* we don't expect to see any of these after GC
-	     * but they might appear during execution
-	     */
-	    StgInd *ind = (StgInd *)p;
-	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(ind->indirectee));
-	    return sizeofW(StgInd);
-	}
+        {
+            /* we don't expect to see any of these after GC
+             * but they might appear during execution
+             */
+            StgInd *ind = (StgInd *)p;
+            ASSERT(LOOKS_LIKE_CLOSURE_PTR(ind->indirectee));
+            return sizeofW(StgInd);
+        }
 
     case RET_BCO:
     case RET_SMALL:
@@ -363,45 +363,45 @@ checkClosure( StgClosure* p )
     case ATOMICALLY_FRAME:
     case CATCH_RETRY_FRAME:
     case CATCH_STM_FRAME:
-	    barf("checkClosure: stack frame");
+            barf("checkClosure: stack frame");
 
     case AP:
     {
-	StgAP* ap = (StgAP *)p;
-	checkPAP (ap->fun, ap->payload, ap->n_args);
-	return ap_sizeW(ap);
+        StgAP* ap = (StgAP *)p;
+        checkPAP (ap->fun, ap->payload, ap->n_args);
+        return ap_sizeW(ap);
     }
 
     case PAP:
     {
-	StgPAP* pap = (StgPAP *)p;
-	checkPAP (pap->fun, pap->payload, pap->n_args);
-	return pap_sizeW(pap);
+        StgPAP* pap = (StgPAP *)p;
+        checkPAP (pap->fun, pap->payload, pap->n_args);
+        return pap_sizeW(pap);
     }
 
     case AP_STACK:
-    { 
-	StgAP_STACK *ap = (StgAP_STACK *)p;
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(ap->fun));
-	checkStackChunk((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size);
-	return ap_stack_sizeW(ap);
+    {
+        StgAP_STACK *ap = (StgAP_STACK *)p;
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(ap->fun));
+        checkStackChunk((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size);
+        return ap_stack_sizeW(ap);
     }
 
     case ARR_WORDS:
-	    return arr_words_sizeW((StgArrWords *)p);
+            return arr_words_sizeW((StgArrWords *)p);
 
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
-	{
-	    StgMutArrPtrs* a = (StgMutArrPtrs *)p;
-	    nat i;
-	    for (i = 0; i < a->ptrs; i++) {
-		ASSERT(LOOKS_LIKE_CLOSURE_PTR(a->payload[i]));
-	    }
-	    return mut_arr_ptrs_sizeW(a);
-	}
+        {
+            StgMutArrPtrs* a = (StgMutArrPtrs *)p;
+            nat i;
+            for (i = 0; i < a->ptrs; i++) {
+                ASSERT(LOOKS_LIKE_CLOSURE_PTR(a->payload[i]));
+            }
+            return mut_arr_ptrs_sizeW(a);
+        }
 
     case TSO:
         checkTSO((StgTSO *)p);
@@ -423,9 +423,9 @@ checkClosure( StgClosure* p )
         }
         return sizeofW(StgTRecChunk);
       }
-      
+
     default:
-	    barf("checkClosure (closure type %d)", info->type);
+            barf("checkClosure (closure type %d)", info->type);
     }
 }
 
@@ -451,12 +451,12 @@ void checkHeapChain (bdescr *bd)
                 /* This is the smallest size of closure that can live in the heap */
                 ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
                 p += size;
-	    
+
                 /* skip over slop */
                 while (p < bd->free &&
                        (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR(*p))) { p++; }
             }
-	}
+        }
     }
 }
 
@@ -505,7 +505,7 @@ checkTSO(StgTSO *tso)
 
     if (tso->what_next == ThreadKilled) {
       /* The garbage collector doesn't bother following any pointers
-       * from dead threads, so don't check sanity here.  
+       * from dead threads, so don't check sanity here.
        */
       return;
     }
@@ -520,10 +520,10 @@ checkTSO(StgTSO *tso)
 
     if (   tso->why_blocked == BlockedOnMVar
         || tso->why_blocked == BlockedOnMVarRead
-	|| tso->why_blocked == BlockedOnBlackHole
-	|| tso->why_blocked == BlockedOnMsgThrowTo
+        || tso->why_blocked == BlockedOnBlackHole
+        || tso->why_blocked == BlockedOnMsgThrowTo
         || tso->why_blocked == NotBlocked
-	) {
+        ) {
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->block_info.closure));
     }
 
@@ -546,7 +546,7 @@ checkGlobalTSOList (rtsBool checkTSOs)
   nat g;
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      for (tso=generations[g].threads; tso != END_TSO_QUEUE; 
+      for (tso=generations[g].threads; tso != END_TSO_QUEUE;
            tso = tso->global_link) {
           ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso));
           ASSERT(get_itbl((StgClosure *)tso)->type == TSO);
@@ -593,8 +593,8 @@ checkMutableList( bdescr *mut_bd, nat gen )
     StgClosure *p;
 
     for (bd = mut_bd; bd != NULL; bd = bd->link) {
-	for (q = bd->start; q < bd->free; q++) {
-	    p = (StgClosure *)*q;
+        for (q = bd->start; q < bd->free; q++) {
+            p = (StgClosure *)*q;
             ASSERT(!HEAP_ALLOCED(p) || Bdescr((P_)p)->gen_no == gen);
             checkClosure(p);
 
@@ -642,13 +642,13 @@ checkStaticObjects ( StgClosure* static_objects )
     info = get_itbl(p);
     switch (info->type) {
     case IND_STATIC:
-      { 
+      {
         StgClosure *indirectee = UNTAG_CLOSURE(((StgIndStatic *)p)->indirectee);
 
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(indirectee));
-	ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)indirectee->header.info));
-	p = *IND_STATIC_LINK((StgClosure *)p);
-	break;
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(indirectee));
+        ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)indirectee->header.info));
+        p = *IND_STATIC_LINK((StgClosure *)p);
+        break;
       }
 
     case THUNK_STATIC:
@@ -664,8 +664,8 @@ checkStaticObjects ( StgClosure* static_objects )
       break;
 
     default:
-      barf("checkStaticObjetcs: strange closure %p (%s)", 
-	   p, info_type(p));
+      barf("checkStaticObjetcs: strange closure %p (%s)",
+           p, info_type(p));
     }
   }
 }
@@ -681,14 +681,14 @@ checkNurserySanity (nursery *nursery)
     for (bd = nursery->blocks; bd != NULL; bd = bd->link) {
         ASSERT(bd->gen == g0);
         ASSERT(bd->u.back == prev);
-	prev = bd;
-	blocks += bd->blocks;
+        prev = bd;
+        blocks += bd->blocks;
     }
 
     ASSERT(blocks == nursery->n_blocks);
 }
 
-static void checkGeneration (generation *gen, 
+static void checkGeneration (generation *gen,
                              rtsBool after_major_gc USED_IF_THREADS)
 {
     nat n;
@@ -792,7 +792,7 @@ checkRunQueue(Capability *cap)
 {
     StgTSO *prev, *tso;
     prev = END_TSO_QUEUE;
-    for (tso = cap->run_queue_hd; tso != END_TSO_QUEUE; 
+    for (tso = cap->run_queue_hd; tso != END_TSO_QUEUE;
          prev = tso, tso = tso->_link) {
         ASSERT(prev == END_TSO_QUEUE || prev->_link == tso);
         ASSERT(tso->block_info.prev == prev);
@@ -828,8 +828,8 @@ genBlocks (generation *gen)
 {
     ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
-    return gen->n_blocks + gen->n_old_blocks + 
-	    countAllocdBlocks(gen->large_objects);
+    return gen->n_blocks + gen->n_old_blocks +
+            countAllocdBlocks(gen->large_objects);
 }
 
 void
@@ -885,7 +885,7 @@ memInventory (rtsBool show)
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       live_blocks += gen_blocks[g];
   }
-  live_blocks += nursery_blocks + 
+  live_blocks += nursery_blocks +
                + retainer_blocks + arena_blocks + exec_blocks;
 
 #define MB(n) (((double)(n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
@@ -894,7 +894,7 @@ memInventory (rtsBool show)
 
   if (show || leak)
   {
-      if (leak) { 
+      if (leak) {
           debugBelch("Memory leak detected:\n");
       } else {
           debugBelch("Memory inventory:\n");
@@ -916,7 +916,7 @@ memInventory (rtsBool show)
       debugBelch("  total        : %5" FMT_Word " blocks (%6.1lf MB)\n",
                  live_blocks + free_blocks, MB(live_blocks+free_blocks));
       if (leak) {
-          debugBelch("\n  in system    : %5" FMT_Word " blocks (%" FMT_Word " MB)\n", 
+          debugBelch("\n  in system    : %5" FMT_Word " blocks (%" FMT_Word " MB)\n",
                      (W_)(mblocks_allocated * BLOCKS_PER_MBLOCK), mblocks_allocated);
       }
   }

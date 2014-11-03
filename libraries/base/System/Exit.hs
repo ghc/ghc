@@ -23,7 +23,6 @@ module System.Exit
     , die
   ) where
 
-import Prelude
 import System.IO
 
 import GHC.IO

@@ -29,9 +29,9 @@ module GHC.Unicode (
     ) where
 
 import GHC.Base
-import GHC.Char
-import GHC.Real        (fromIntegral)
-import Foreign.C.Types (CInt(..))
+import GHC.Char        (chr)
+import GHC.Real
+import GHC.Num
 
 #include "HsBaseConfig.h"
 
@@ -67,16 +67,16 @@ isPrint                 :: Char -> Bool
 -- characters @\\t@, @\\n@, @\\r@, @\\f@, @\\v@.
 isSpace                 :: Char -> Bool
 -- isSpace includes non-breaking space
--- Done with explicit equalities both for efficiency, and to avoid a tiresome
--- recursion with GHC.List elem
-isSpace c               =  c == ' '     ||
-                           c == '\t'    ||
-                           c == '\n'    ||
-                           c == '\r'    ||
-                           c == '\f'    ||
-                           c == '\v'    ||
-                           c == '\xa0'  ||
-                           iswspace (fromIntegral (ord c)) /= 0
+-- The magic 0x377 isn't really that magical. As of 2014, all the codepoints
+-- at or below 0x377 have been assigned, so we shouldn't have to worry about
+-- any new spaces appearing below there. It would probably be best to
+-- use branchless ||, but currently the eqLit transformation will undo that,
+-- so we'll do it like this until there's a way around that.
+isSpace c
+  | uc <= 0x377 = uc == 32 || uc - 0x9 <= 4 || uc == 0xa0
+  | otherwise = iswspace (ord c) /= 0
+  where
+    uc = fromIntegral (ord c) :: Word
 
 -- | Selects upper-case or title-case alphabetic Unicode characters (letters).
 -- Title case is used by a small number of letter ligatures like the
@@ -100,17 +100,23 @@ isAlphaNum              :: Char -> Bool
 
 -- | Selects ASCII digits, i.e. @\'0\'@..@\'9\'@.
 isDigit                 :: Char -> Bool
-isDigit c               =  c >= '0' && c <= '9'
+isDigit c               =  (fromIntegral (ord c - ord '0') :: Word) <= 9
+
+-- We use an addition and an unsigned comparison instead of two signed
+-- comparisons because it's usually faster and puts less strain on branch
+-- prediction. It likely also enables some CSE when combined with functions
+-- that follow up with an actual conversion.
 
 -- | Selects ASCII octal digits, i.e. @\'0\'@..@\'7\'@.
 isOctDigit              :: Char -> Bool
-isOctDigit c            =  c >= '0' && c <= '7'
+isOctDigit c            =  (fromIntegral (ord c - ord '0') :: Word) <= 7
 
 -- | Selects ASCII hexadecimal digits,
 -- i.e. @\'0\'@..@\'9\'@, @\'a\'@..@\'f\'@, @\'A\'@..@\'F\'@.
 isHexDigit              :: Char -> Bool
-isHexDigit c            =  isDigit c || c >= 'A' && c <= 'F' ||
-                                        c >= 'a' && c <= 'f'
+isHexDigit c            =  isDigit c ||
+                           (fromIntegral (ord c - ord 'A')::Word) <= 5 ||
+                           (fromIntegral (ord c - ord 'a')::Word) <= 5
 
 -- | Convert a letter to the corresponding upper-case letter, if any.
 -- Any other character is returned unchanged.
@@ -132,48 +138,47 @@ toTitle                 :: Char -> Char
 
 -- Regardless of the O/S and Library, use the functions contained in WCsubst.c
 
-isAlpha    c = iswalpha (fromIntegral (ord c)) /= 0
-isAlphaNum c = iswalnum (fromIntegral (ord c)) /= 0
---isSpace    c = iswspace (fromIntegral (ord c)) /= 0
-isControl  c = iswcntrl (fromIntegral (ord c)) /= 0
-isPrint    c = iswprint (fromIntegral (ord c)) /= 0
-isUpper    c = iswupper (fromIntegral (ord c)) /= 0
-isLower    c = iswlower (fromIntegral (ord c)) /= 0
+isAlpha    c = iswalpha (ord c) /= 0
+isAlphaNum c = iswalnum (ord c) /= 0
+isControl  c = iswcntrl (ord c) /= 0
+isPrint    c = iswprint (ord c) /= 0
+isUpper    c = iswupper (ord c) /= 0
+isLower    c = iswlower (ord c) /= 0
 
-toLower c = chr (fromIntegral (towlower (fromIntegral (ord c))))
-toUpper c = chr (fromIntegral (towupper (fromIntegral (ord c))))
-toTitle c = chr (fromIntegral (towtitle (fromIntegral (ord c))))
+toLower c = chr (towlower (ord c))
+toUpper c = chr (towupper (ord c))
+toTitle c = chr (towtitle (ord c))
 
 foreign import ccall unsafe "u_iswalpha"
-  iswalpha :: CInt -> CInt
+  iswalpha :: Int -> Int
 
 foreign import ccall unsafe "u_iswalnum"
-  iswalnum :: CInt -> CInt
+  iswalnum :: Int -> Int
 
 foreign import ccall unsafe "u_iswcntrl"
-  iswcntrl :: CInt -> CInt
+  iswcntrl :: Int -> Int
 
 foreign import ccall unsafe "u_iswspace"
-  iswspace :: CInt -> CInt
+  iswspace :: Int -> Int
 
 foreign import ccall unsafe "u_iswprint"
-  iswprint :: CInt -> CInt
+  iswprint :: Int -> Int
 
 foreign import ccall unsafe "u_iswlower"
-  iswlower :: CInt -> CInt
+  iswlower :: Int -> Int
 
 foreign import ccall unsafe "u_iswupper"
-  iswupper :: CInt -> CInt
+  iswupper :: Int -> Int
 
 foreign import ccall unsafe "u_towlower"
-  towlower :: CInt -> CInt
+  towlower :: Int -> Int
 
 foreign import ccall unsafe "u_towupper"
-  towupper :: CInt -> CInt
+  towupper :: Int -> Int
 
 foreign import ccall unsafe "u_towtitle"
-  towtitle :: CInt -> CInt
+  towtitle :: Int -> Int
 
 foreign import ccall unsafe "u_gencat"
-  wgencat :: CInt -> CInt
+  wgencat :: Int -> Int
 

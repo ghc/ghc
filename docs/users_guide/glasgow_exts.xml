@@ -7121,7 +7121,7 @@ class (F a ~ b) => C a b where
 			type <literal>(Show a, Ord a)</literal> is of kind <literal>Constraint</literal>.
 		</listitem>
 		<listitem>
-			Anything whose form is not yet know, but the user has declared to have kind <literal>Constraint</literal>
+			Anything whose form is not yet known, but the user has declared to have kind <literal>Constraint</literal>
 			(for which they need to import it from <literal>GHC.Exts</literal>).  So for example
 			<literal>type Foo (f :: * -> Constraint) = forall b. f b => b -> b</literal> is allowed, as well as
 			examples involving type families:
@@ -10500,6 +10500,11 @@ happen.
       42 in the original.  GHC will adjust its error messages to refer
       to the line/file named in the <literal>LINE</literal>
       pragma.</para>
+
+      <para><literal>LINE</literal> pragmas generated from Template Haskell set
+      the file and line position for the duration of the splice and are limited
+      to the splice. Note that because Template Haskell splices abstract syntax,
+      the file positions are not automatically advanced.</para>
     </sect2>
 
     <sect2 id="rules">

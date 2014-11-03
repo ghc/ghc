@@ -155,9 +155,11 @@ type Alignment = Int -- align to next N-byte boundary (N must be a power of 2).
 -- This information may be useful in optimisation, as computations may
 -- safely be floated inside such a lambda without risk of duplicating
 -- work.
-data OneShotInfo = NoOneShotInfo -- ^ No information
-                 | ProbOneShot   -- ^ The lambda is probably applied at most once
-                 | OneShotLam    -- ^ The lambda is applied at most once.
+data OneShotInfo
+  = NoOneShotInfo -- ^ No information
+  | ProbOneShot   -- ^ The lambda is probably applied at most once
+                  -- See Note [Computing one-shot info, and ProbOneShot] in OccurAnl
+  | OneShotLam    -- ^ The lambda is applied at most once.
 
 -- | It is always safe to assume that an 'Id' has no lambda-bound variable information
 noOneShotInfo :: OneShotInfo

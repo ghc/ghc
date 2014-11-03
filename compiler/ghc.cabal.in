@@ -49,7 +49,7 @@ Library
                    process    >= 1   && < 1.3,
                    bytestring >= 0.9 && < 0.11,
                    time                 < 1.6,
-                   containers >= 0.1 && < 0.6,
+                   containers >= 0.5 && < 0.6,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.4,
                    hpc,
@@ -406,6 +406,7 @@ Library
         TcUnify
         TcInteract
         TcCanonical
+        TcFlatten
         TcSMonad
         TcTypeNats
         TcSplice

@@ -417,6 +417,8 @@ instance Ppr Pragma where
       where target1 ModuleAnnotation    = text "module"
             target1 (TypeAnnotation t)  = text "type" <+> ppr t
             target1 (ValueAnnotation v) = ppr v
+    ppr (LineP line file)
+       = text "{-# LINE" <+> int line <+> text (show file) <+> text "#-}"
 
 ------------------------------
 instance Ppr Inline where

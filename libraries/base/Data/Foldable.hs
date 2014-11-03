@@ -49,7 +49,7 @@ module Data.Foldable (
 import Data.Bool
 import Data.Either
 import Data.Eq
-import qualified Data.OldList as List
+import qualified GHC.List as List
 import Data.Maybe
 import Data.Monoid
 import Data.Ord

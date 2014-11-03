@@ -29,6 +29,8 @@ ProjectTags       =
 ProjectVersion    = @ProjectVersion@$(ProjectTags)
 ProjectVersionInt = @ProjectVersionInt@
 ProjectPatchLevel = @ProjectPatchLevel@
+ProjectPatchLevel1 = @ProjectPatchLevel1@
+ProjectPatchLevel2 = @ProjectPatchLevel2@
 
 ################################################################################
 #

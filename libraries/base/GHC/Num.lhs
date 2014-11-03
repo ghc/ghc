@@ -93,7 +93,7 @@ instance  Num Int  where
              | n `eqInt` 0 = 0
              | otherwise   = 1
 
-    {-# INLINE fromInteger #-}	 -- Just to be sure!
+    {-# INLINE fromInteger #-}   -- Just to be sure!
     fromInteger i = I# (integerToInt i)
 \end{code}
 

@@ -21,11 +21,13 @@
 
 module Main where
 
+import Prelude hiding (traverse)
+
 class Catalog c where
-  traverse :: c -> Viewer -> IO ()
+  mtraverse :: c -> Viewer -> IO ()
 
 instance Catalog Int where
-  traverse i v = viewShowable v i
+  mtraverse i v = viewShowable v i
 
 type View a = a -> IO ()
 
@@ -36,23 +38,23 @@ data Viewer = Viewer {
 
 printer :: Viewer
 --printer = Viewer {
---  viewCatalog = \x -> traverse x printer,
+--  viewCatalog = \x -> mtraverse x printer,
 --  viewShowable = putStrLn . show }
 printer = Viewer {
   viewCatalog = printCatalog,
   viewShowable = putStrLn . show }
 
 printCatalog :: forall c. Catalog c => View c
-printCatalog x = traverse x printer
+printCatalog x = mtraverse x printer
 
 data X = X {
     cat :: Int
   }
 
 instance Catalog X where
-  traverse x v = do
+  mtraverse x v = do
     viewCatalog v (cat x)
 
 main = do
   let x = X { cat = 20 }
-  traverse x printer
+  mtraverse x printer

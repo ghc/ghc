@@ -1,0 +1,5 @@
+
+T9687.hs:4:10:
+    Typeable instances can only be derived
+      Try ‘deriving instance Typeable (,,,,,,,)’
+      (requires StandaloneDeriving)

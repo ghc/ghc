@@ -12,13 +12,13 @@ class XMLGenerator m where
     genElement :: (Maybe String, String) -> m ()
 
 newtype IdentityT m a = IdentityT { runIdentityT :: m a }
-    deriving (Monad, MonadIO)
+    deriving (Functor, Applicative, Monad, MonadIO)
 
 instance (MonadIO m) => (XMLGenerator (IdentityT m)) where
     genElement _ = liftIO $ putStrLn "in genElement"
 
 main :: IO ()
-main = 
+main =
     do runIdentityT web
        putStrLn "done."
 

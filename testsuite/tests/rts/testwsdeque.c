@@ -149,7 +149,7 @@ int main(int argc, char*argv[])
     }
 
     for (n=0; n < THREADS; n++) {
-        createOSThread(&ids[n], thief, (void*)(StgWord)n);
+        createOSThread(&ids[n], "thief", thief, (void*)(StgWord)n);
     }
 
     for (n=0; n < SCRATCH_SIZE; n++) {

@@ -17,7 +17,7 @@
   </footnote> the language extensions that GHC provides.
   <indexterm><primary>FFI</primary><secondary>GHCi support</secondary></indexterm>
   <indexterm><primary>Foreign Function
-  Interface</primary><secondary>GHCi support</secondary></indexterm>.
+  Interface</primary><secondary>GHCi support</secondary></indexterm>
   GHCi also includes an interactive debugger (see <xref linkend="ghci-debugger"/>).</para>
 
   <sect1 id="ghci-introduction">

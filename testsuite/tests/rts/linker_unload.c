@@ -29,7 +29,9 @@ int main (int argc, char *argv[])
     testfun *f;
     int i, r;
 
-    hs_init(&argc, &argv);
+    RtsConfig conf = defaultRtsConfig;
+    conf.rts_opts_enabled = RtsOptsAll;
+    hs_init_ghc(&argc, &argv, conf);
 
     initLinker_(0);
 

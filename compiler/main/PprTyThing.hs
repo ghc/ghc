@@ -128,7 +128,7 @@ pprTyThingInContextLoc tyThing
 ------------------------
 ppr_ty_thing :: Bool -> [OccName] -> TyThing -> SDoc
 -- We pretty-print 'TyThing' via 'IfaceDecl'
--- See Note [Pretty-pringint TyThings]
+-- See Note [Pretty-printing TyThings]
 ppr_ty_thing hdr_only path ty_thing
   = pprIfaceDecl ss (tyThingToIfaceDecl ty_thing)
   where

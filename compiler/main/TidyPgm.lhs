@@ -121,6 +121,9 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
   code generator needs it. And to ensure that local names have
   distinct OccNames in case of object-file splitting
 
+* If this an hsig file, drop the instances altogether too (they'll
+  get pulled in by the implicit module import.
+
 \begin{code}
 -- This is Plan A: make a small type env when typechecking only,
 -- or when compiling a hs-boot file, or simply when not using -O
@@ -138,7 +141,7 @@ mkBootModDetailsTc hsc_env
                   tcg_fam_insts = fam_insts
                 }
   = do  { let dflags = hsc_dflags hsc_env
-        ; showPass dflags CoreTidy
+        ; showPassIO dflags CoreTidy
 
         ; let { insts'      = map (tidyClsInstDFun globaliseAndTidyId) insts
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
@@ -299,6 +302,7 @@ RHSs, so that they print nicely in interfaces.
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_exports   = exports
+                              , mg_rdr_env   = rdr_env
                               , mg_tcs       = tcs
                               , mg_insts     = insts
                               , mg_fam_insts = fam_insts
@@ -316,8 +320,9 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
   = do  { let { dflags     = hsc_dflags hsc_env
               ; omit_prags = gopt Opt_OmitInterfacePragmas dflags
               ; expose_all = gopt Opt_ExposeAllUnfoldings  dflags
+              ; print_unqual = mkPrintUnqualified dflags rdr_env
               }
-        ; showPass dflags CoreTidy
+        ; showPassIO dflags CoreTidy
 
         ; let { type_env = typeEnvFromEntities [] tcs fam_insts
 
@@ -375,7 +380,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
               }
 
-        ; endPass hsc_env CoreTidy all_tidy_binds tidy_rules
+        ; endPassIO hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
 
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
@@ -1110,7 +1115,8 @@ tidyTopBinds :: HscEnv
 
 tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
   = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
-       return $ tidy mkIntegerId init_env binds
+       integerSDataCon <- lookupIntegerSDataConName dflags hsc_env
+       return $ tidy mkIntegerId integerSDataCon init_env binds
   where
     dflags = hsc_dflags hsc_env
 
@@ -1118,32 +1124,37 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
 
     this_pkg = thisPackage dflags
 
-    tidy _           env []     = (env, [])
-    tidy mkIntegerId env (b:bs) = let (env1, b')  = tidyTopBind dflags this_pkg this_mod mkIntegerId unfold_env env b
-                                      (env2, bs') = tidy mkIntegerId env1 bs
-                                  in
-                                      (env2, b':bs')
+    tidy _           _                 env []     = (env, [])
+    tidy mkIntegerId integerSDataCon env (b:bs)
+        = let (env1, b')  = tidyTopBind dflags this_pkg this_mod
+                            mkIntegerId integerSDataCon unfold_env env b
+              (env2, bs') = tidy mkIntegerId integerSDataCon env1 bs
+          in  (env2, b':bs')
 
 ------------------------
 tidyTopBind  :: DynFlags
              -> PackageKey
              -> Module
              -> Id
+             -> Maybe DataCon
              -> UnfoldEnv
              -> TidyEnv
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind dflags this_pkg this_mod mkIntegerId unfold_env (occ_env,subst1) (NonRec bndr rhs)
+tidyTopBind dflags this_pkg this_mod mkIntegerId integerSDataCon unfold_env
+            (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    caf_info      = hasCafRefs dflags this_pkg this_mod (mkIntegerId, subst1) (idArity bndr) rhs
+    caf_info      = hasCafRefs dflags this_pkg this_mod
+                    (mkIntegerId, integerSDataCon, subst1) (idArity bndr) rhs
     (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 caf_info name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind dflags this_pkg this_mod mkIntegerId unfold_env (occ_env,subst1) (Rec prs)
+tidyTopBind dflags this_pkg this_mod mkIntegerId integerSDataCon unfold_env
+            (occ_env,subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
     prs' = [ tidyTopPair dflags show_unfold tidy_env2 caf_info name' (id,rhs)
@@ -1160,7 +1171,9 @@ tidyTopBind dflags this_pkg this_mod mkIntegerId unfold_env (occ_env,subst1) (Re
         -- the CafInfo for a recursive group says whether *any* rhs in
         -- the group may refer indirectly to a CAF (because then, they all do).
     caf_info
-        | or [ mayHaveCafRefs (hasCafRefs dflags this_pkg this_mod (mkIntegerId, subst1) (idArity bndr) rhs)
+        | or [ mayHaveCafRefs (hasCafRefs dflags this_pkg this_mod
+                               (mkIntegerId, integerSDataCon, subst1)
+                               (idArity bndr) rhs)
              | (bndr,rhs) <- prs ] = MayHaveCafRefs
         | otherwise                = NoCafRefs
 
@@ -1297,7 +1310,7 @@ CAF list to keep track of non-collectable CAFs.
 
 \begin{code}
 hasCafRefs :: DynFlags -> PackageKey -> Module
-           -> (Id, VarEnv Var) -> Arity -> CoreExpr
+           -> (Id, Maybe DataCon, VarEnv Var) -> Arity -> CoreExpr
            -> CafInfo
 hasCafRefs dflags this_pkg this_mod p arity expr
   | is_caf || mentions_cafs = MayHaveCafRefs
@@ -1313,7 +1326,7 @@ hasCafRefs dflags this_pkg this_mod p arity expr
   -- CorePrep later on, and we don't want to duplicate that
   -- knowledge in rhsIsStatic below.
 
-cafRefsE :: DynFlags -> (Id, VarEnv Id) -> Expr a -> FastBool
+cafRefsE :: DynFlags -> (Id, Maybe DataCon, VarEnv Id) -> Expr a -> FastBool
 cafRefsE _      p (Var id)            = cafRefsV p id
 cafRefsE dflags p (Lit lit)           = cafRefsL dflags p lit
 cafRefsE dflags p (App f a)           = fastOr (cafRefsE dflags p f) (cafRefsE dflags p) a
@@ -1325,19 +1338,20 @@ cafRefsE dflags p (Cast e _co)        = cafRefsE dflags p e
 cafRefsE _      _ (Type _)            = fastBool False
 cafRefsE _      _ (Coercion _)        = fastBool False
 
-cafRefsEs :: DynFlags -> (Id, VarEnv Id) -> [Expr a] -> FastBool
+cafRefsEs :: DynFlags -> (Id, Maybe DataCon, VarEnv Id) -> [Expr a] -> FastBool
 cafRefsEs _      _ []     = fastBool False
 cafRefsEs dflags p (e:es) = fastOr (cafRefsE dflags p e) (cafRefsEs dflags p) es
 
-cafRefsL :: DynFlags -> (Id, VarEnv Id) -> Literal -> FastBool
+cafRefsL :: DynFlags -> (Id, Maybe DataCon, VarEnv Id) -> Literal -> FastBool
 -- Don't forget that mk_integer id might have Caf refs!
 -- We first need to convert the Integer into its final form, to
 -- see whether mkInteger is used.
-cafRefsL dflags p@(mk_integer, _) (LitInteger i _) = cafRefsE dflags p (cvtLitInteger dflags mk_integer i)
+cafRefsL dflags p@(mk_integer, sdatacon, _) (LitInteger i _)
+    = cafRefsE dflags p (cvtLitInteger dflags mk_integer sdatacon i)
 cafRefsL _      _ _                         = fastBool False
 
-cafRefsV :: (Id, VarEnv Id) -> Id -> FastBool
-cafRefsV (_, p) id
+cafRefsV :: (Id, Maybe DataCon, VarEnv Id) -> Id -> FastBool
+cafRefsV (_, _, p) id
   | not (isLocalId id)            = fastBool (mayHaveCafRefs (idCafInfo id))
   | Just id' <- lookupVarEnv p id = fastBool (mayHaveCafRefs (idCafInfo id'))
   | otherwise                     = fastBool False

@@ -125,6 +125,8 @@ import BasicTypes
 import Name
 import SrcLoc
 import FastString
+import Config ( cIntegerLibraryType, IntegerLibrary(..) )
+import Panic ( panic )
 \end{code}
 
 
@@ -185,7 +187,6 @@ sharing a unique will be used.
 basicKnownKeyNames :: [Name]
 basicKnownKeyNames
  = genericTyConNames
- ++ oldTypeableClassNames
  ++ [   -- Type constructors (synonyms especially)
         ioTyConName, ioDataConName,
         runMainIOName,
@@ -357,7 +358,9 @@ basicKnownKeyNames
 
         -- GHCi Sandbox
         , ghciIoClassName, ghciStepIoMName
-    ]
+    ] ++ case cIntegerLibraryType of
+           IntegerGMP    -> [integerSDataConName]
+           IntegerSimple -> []
 
 genericTyConNames :: [Name]
 genericTyConNames = [
@@ -394,7 +397,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
-    tYPEABLE, tYPEABLE_INTERNAL, oLDTYPEABLE, oLDTYPEABLE_INTERNAL, gENERICS,
+    tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_IP :: Module
@@ -436,8 +439,6 @@ sYSTEM_IO       = mkBaseModule (fsLit "System.IO")
 dYNAMIC         = mkBaseModule (fsLit "Data.Dynamic")
 tYPEABLE        = mkBaseModule (fsLit "Data.Typeable")
 tYPEABLE_INTERNAL = mkBaseModule (fsLit "Data.Typeable.Internal")
-oLDTYPEABLE     = mkBaseModule (fsLit "Data.OldTypeable")
-oLDTYPEABLE_INTERNAL = mkBaseModule (fsLit "Data.OldTypeable.Internal")
 gENERICS        = mkBaseModule (fsLit "Data.Data")
 dOTNET          = mkBaseModule (fsLit "GHC.Dotnet")
 rEAD_PREC       = mkBaseModule (fsLit "Text.ParserCombinators.ReadPrec")
@@ -666,14 +667,10 @@ showString_RDR          = varQual_RDR gHC_SHOW (fsLit "showString")
 showSpace_RDR           = varQual_RDR gHC_SHOW (fsLit "showSpace")
 showParen_RDR           = varQual_RDR gHC_SHOW (fsLit "showParen")
 
-typeRep_RDR, mkTyCon_RDR, mkTyConApp_RDR,
-    oldTypeOf_RDR, oldMkTyCon_RDR, oldMkTyConApp_RDR :: RdrName
+typeRep_RDR, mkTyCon_RDR, mkTyConApp_RDR :: RdrName
 typeRep_RDR       = varQual_RDR tYPEABLE_INTERNAL    (fsLit "typeRep#")
 mkTyCon_RDR       = varQual_RDR tYPEABLE_INTERNAL    (fsLit "mkTyCon")
 mkTyConApp_RDR    = varQual_RDR tYPEABLE_INTERNAL    (fsLit "mkTyConApp")
-oldTypeOf_RDR     = varQual_RDR oLDTYPEABLE_INTERNAL (fsLit "typeOf")
-oldMkTyCon_RDR    = varQual_RDR oLDTYPEABLE_INTERNAL (fsLit "mkTyCon")
-oldMkTyConApp_RDR = varQual_RDR oLDTYPEABLE_INTERNAL (fsLit "mkTyConApp")
 
 undefined_RDR :: RdrName
 undefined_RDR = varQual_RDR gHC_ERR (fsLit "undefined")
@@ -943,7 +940,7 @@ fromIntegerName   = varQual gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
 minusName         = varQual gHC_NUM (fsLit "-")           minusClassOpKey
 negateName        = varQual gHC_NUM (fsLit "negate")      negateClassOpKey
 
-integerTyConName, mkIntegerName,
+integerTyConName, mkIntegerName, integerSDataConName,
     integerToWord64Name, integerToInt64Name,
     word64ToIntegerName, int64ToIntegerName,
     plusIntegerName, timesIntegerName, smallIntegerName,
@@ -961,6 +958,10 @@ integerTyConName, mkIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName :: Name
 integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
+integerSDataConName   = conName gHC_INTEGER_TYPE (fsLit n)                   integerSDataConKey
+  where n = case cIntegerLibraryType of
+            IntegerGMP    -> "S#"
+            IntegerSimple -> panic "integerSDataConName evaluated for integer-simple"
 mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
 integerToWord64Name   = varQual gHC_INTEGER_TYPE (fsLit "integerToWord64")   integerToWord64IdKey
 integerToInt64Name    = varQual gHC_INTEGER_TYPE (fsLit "integerToInt64")    integerToInt64IdKey
@@ -1036,24 +1037,9 @@ ixClassName :: Name
 ixClassName = clsQual gHC_ARR (fsLit "Ix") ixClassKey
 
 -- Class Typeable
-typeableClassName,
-    oldTypeableClassName, oldTypeable1ClassName, oldTypeable2ClassName,
-    oldTypeable3ClassName, oldTypeable4ClassName, oldTypeable5ClassName,
-    oldTypeable6ClassName, oldTypeable7ClassName :: Name
+typeableClassName :: Name
 typeableClassName     = clsQual tYPEABLE_INTERNAL    (fsLit "Typeable")  typeableClassKey
-oldTypeableClassName  = clsQual oLDTYPEABLE_INTERNAL (fsLit "Typeable")  oldTypeableClassKey
-oldTypeable1ClassName = clsQual oLDTYPEABLE_INTERNAL (fsLit "Typeable1") oldTypeable1ClassKey
-oldTypeable2ClassName = clsQual oLDTYPEABLE_INTERNAL (fsLit "Typeable2") oldTypeable2ClassKey
-oldTypeable3ClassName = clsQual oLDTYPEABLE_INTERNAL (fsLit "Typeable3") oldTypeable3ClassKey
-oldTypeable4ClassName = clsQual oLDTYPEABLE_INTERNAL (fsLit "Typeable4") oldTypeable4ClassKey
-oldTypeable5ClassName = clsQual oLDTYPEABLE_INTERNAL (fsLit "Typeable5") oldTypeable5ClassKey
-oldTypeable6ClassName = clsQual oLDTYPEABLE_INTERNAL (fsLit "Typeable6") oldTypeable6ClassKey
-oldTypeable7ClassName = clsQual oLDTYPEABLE_INTERNAL (fsLit "Typeable7") oldTypeable7ClassKey
 
-oldTypeableClassNames :: [Name]
-oldTypeableClassNames = [ oldTypeableClassName, oldTypeable1ClassName, oldTypeable2ClassName
-                        , oldTypeable3ClassName, oldTypeable4ClassName, oldTypeable5ClassName
-                        , oldTypeable6ClassName, oldTypeable7ClassName ]
 
 -- Class Data
 dataClassName :: Name
@@ -1322,18 +1308,6 @@ ghciIoClassKey = mkPreludeClassUnique 44
 
 ipClassNameKey :: Unique
 ipClassNameKey = mkPreludeClassUnique 45
-
-oldTypeableClassKey, oldTypeable1ClassKey, oldTypeable2ClassKey,
-    oldTypeable3ClassKey, oldTypeable4ClassKey, oldTypeable5ClassKey,
-    oldTypeable6ClassKey, oldTypeable7ClassKey :: Unique
-oldTypeableClassKey        = mkPreludeClassUnique 46
-oldTypeable1ClassKey       = mkPreludeClassUnique 47
-oldTypeable2ClassKey       = mkPreludeClassUnique 48
-oldTypeable3ClassKey       = mkPreludeClassUnique 49
-oldTypeable4ClassKey       = mkPreludeClassUnique 50
-oldTypeable5ClassKey       = mkPreludeClassUnique 51
-oldTypeable6ClassKey       = mkPreludeClassUnique 52
-oldTypeable7ClassKey       = mkPreludeClassUnique 53
 \end{code}
 
 %************************************************************************
@@ -1584,8 +1558,8 @@ unitTyConKey = mkTupleTyConUnique BoxedTuple 0
 
 \begin{code}
 charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
-    floatDataConKey, intDataConKey, nilDataConKey, ratioDataConKey,
-    stableNameDataConKey, trueDataConKey, wordDataConKey,
+    floatDataConKey, intDataConKey, integerSDataConKey, nilDataConKey,
+    ratioDataConKey, stableNameDataConKey, trueDataConKey, wordDataConKey,
     ioDataConKey, integerDataConKey, eqBoxDataConKey, coercibleDataConKey :: Unique
 charDataConKey                          = mkPreludeDataConUnique  1
 consDataConKey                          = mkPreludeDataConUnique  2
@@ -1593,6 +1567,7 @@ doubleDataConKey                        = mkPreludeDataConUnique  3
 falseDataConKey                         = mkPreludeDataConUnique  4
 floatDataConKey                         = mkPreludeDataConUnique  5
 intDataConKey                           = mkPreludeDataConUnique  6
+integerSDataConKey                      = mkPreludeDataConUnique  7
 nilDataConKey                           = mkPreludeDataConUnique 11
 ratioDataConKey                         = mkPreludeDataConUnique 12
 stableNameDataConKey                    = mkPreludeDataConUnique 14
@@ -1621,11 +1596,6 @@ ltDataConKey, eqDataConKey, gtDataConKey :: Unique
 ltDataConKey                            = mkPreludeDataConUnique 27
 eqDataConKey                            = mkPreludeDataConUnique 28
 gtDataConKey                            = mkPreludeDataConUnique 29
-
--- For integer-gmp only
-integerGmpSDataConKey, integerGmpJDataConKey :: Unique
-integerGmpSDataConKey                   = mkPreludeDataConUnique 30
-integerGmpJDataConKey                   = mkPreludeDataConUnique 31
 
 coercibleDataConKey                     = mkPreludeDataConUnique 32
 

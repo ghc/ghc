@@ -68,10 +68,14 @@ import GHC.Enum
 -- (i.e. @\'0\'@..@\'9\'@, @\'a\'@..@\'f\'@, @\'A\'@..@\'F\'@).
 digitToInt :: Char -> Int
 digitToInt c
- | isDigit c            =  ord c - ord '0'
- | c >= 'a' && c <= 'f' =  ord c - ord 'a' + 10
- | c >= 'A' && c <= 'F' =  ord c - ord 'A' + 10
- | otherwise            =  error ("Char.digitToInt: not a digit " ++ show c) -- sigh
+  | (fromIntegral dec::Word) <= 9 = dec
+  | (fromIntegral hexl::Word) <= 5 = hexl + 10
+  | (fromIntegral hexu::Word) <= 5 = hexu + 10
+  | otherwise = error ("Char.digitToInt: not a digit " ++ show c) -- sigh
+  where
+    dec = ord c - ord '0'
+    hexl = ord c - ord 'a'
+    hexu = ord c - ord 'A'
 
 -- | Unicode General Categories (column 2 of the UnicodeData table)
 -- in the order they are listed in the Unicode standard.

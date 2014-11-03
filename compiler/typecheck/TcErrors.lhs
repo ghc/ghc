@@ -40,6 +40,7 @@ import FastString
 import Outputable
 import SrcLoc
 import DynFlags
+import StaticFlags      ( opt_PprStyle_Debug )
 import ListSetOps       ( equivClasses )
 
 import Data.Maybe
@@ -424,14 +425,15 @@ mkErrorMsg ctxt ct msg
        ; err_info <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
        ; mkLongErrAt (tcl_loc tcl_env) msg err_info }
 
-type UserGiven = ([EvVar], SkolemInfo, SrcSpan)
+type UserGiven = ([EvVar], SkolemInfo, Bool, SrcSpan)
 
 getUserGivens :: ReportErrCtxt -> [UserGiven]
 -- One item for each enclosing implication
 getUserGivens (CEC {cec_encl = ctxt})
   = reverse $
-    [ (givens, info, tcl_loc env)
-    | Implic {ic_given = givens, ic_env = env, ic_info = info } <- ctxt
+    [ (givens, info, no_eqs, tcl_loc env)
+    | Implic { ic_given = givens, ic_env = env
+             , ic_no_eqs = no_eqs, ic_info = info } <- ctxt
     , not (null givens) ]
 \end{code}
 
@@ -606,12 +608,13 @@ mkEqErr1 ctxt ct
        ; (env1, tidy_orig) <- zonkTidyOrigin (cec_tidy ctxt) (ctLocOrigin loc)
        ; let (is_oriented, wanted_msg) = mk_wanted_extra tidy_orig
        ; dflags <- getDynFlags
+       ; traceTc "mkEqErr1" (ppr ct $$ pprCtOrigin (ctLocOrigin loc) $$ pprCtOrigin tidy_orig) 
        ; mkEqErr_help dflags (ctxt {cec_tidy = env1})
                       (wanted_msg $$ binds_msg)
                       ct is_oriented ty1 ty2 }
   where
     ev         = ctEvidence ct
-    loc        = ctev_loc ev
+    loc        = ctEvLoc ev
     (ty1, ty2) = getEqPredTys (ctEvPred ev)
 
     mk_given :: [Implication] -> (CtLoc, SDoc)
@@ -794,7 +797,8 @@ misMatchOrCND ctxt ct oriented ty1 ty2
   | otherwise
   = couldNotDeduce givens ([mkTcEqPred ty1 ty2], orig)
   where
-    givens = getUserGivens ctxt
+    givens = [ given | given@(_, _, no_eqs, _) <- getUserGivens ctxt, not no_eqs]
+             -- Keep only UserGivens that have some equalities
     orig   = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2 }
 
 couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin) -> SDoc
@@ -809,7 +813,7 @@ pp_givens givens
          (g:gs) ->      ppr_given (ptext (sLit "from the context")) g
                  : map (ppr_given (ptext (sLit "or from"))) gs
     where
-       ppr_given herald (gs, skol_info, loc)
+       ppr_given herald (gs, skol_info, _, loc)
            = hang (herald <+> pprEvVarTheta gs)
                 2 (sep [ ptext (sLit "bound by") <+> ppr skol_info
                        , ptext (sLit "at") <+> ppr loc])
@@ -985,7 +989,9 @@ mkDictErr ctxt cts
   = ASSERT( not (null cts) )
     do { inst_envs <- tcGetInstEnvs
        ; fam_envs  <- tcGetFamInstEnvs
-       ; lookups   <- mapM (lookup_cls_inst inst_envs) cts
+       ; let (ct1:_) = cts  -- ct1 just for its location
+             min_cts = elim_superclasses cts
+       ; lookups   <- mapM (lookup_cls_inst inst_envs) min_cts
        ; let (no_inst_cts, overlap_cts) = partition is_no_inst lookups
 
        -- Report definite no-instance errors,
@@ -996,8 +1002,6 @@ mkDictErr ctxt cts
        ; (ctxt, err) <- mk_dict_err fam_envs ctxt (head (no_inst_cts ++ overlap_cts))
        ; mkErrorMsg ctxt ct1 err }
   where
-    ct1:_ = elim_superclasses cts
-
     no_givens = null (getUserGivens ctxt)
 
     is_no_inst (ct, (matches, unifiers, _))
@@ -1067,7 +1071,7 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
 
     add_to_ctxt_fixes has_ambig_tvs
       | not has_ambig_tvs && all_tyvars
-      , (orig:origs) <- mapMaybe get_good_orig (cec_encl ctxt)
+      , (orig:origs) <- usefulContext ctxt pred 
       = [sep [ ptext (sLit "add") <+> pprParendType pred
                <+> ptext (sLit "to the context of")
              , nest 2 $ ppr_skol orig $$
@@ -1077,11 +1081,6 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
 
     ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
     ppr_skol skol_info      = ppr skol_info
-
-        -- Do not suggest adding constraints to an *inferred* type signature!
-    get_good_orig ic = case ic_info ic of
-                         SigSkol (InfSigCtxt {}) _ -> Nothing
-                         origin                    -> Just origin
 
     no_inst_msg
       | clas == coercibleClass
@@ -1139,7 +1138,7 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
             givens = getUserGivens ctxt
             matching_givens = mapMaybe matchable givens
 
-            matchable (evvars,skol_info,loc)
+            matchable (evvars,skol_info,_,loc)
               = case ev_vars_matching of
                      [] -> Nothing
                      _  -> Just $ hang (pprTheta ev_vars_matching)
@@ -1216,6 +1215,22 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
                     2 (sep [ ptext (sLit "of newtype") <+> quotes (pprSourceTyCon tc)
                            , ptext (sLit "is not in scope") ])
         | otherwise = Nothing
+
+usefulContext :: ReportErrCtxt -> TcPredType -> [SkolemInfo]
+usefulContext ctxt pred
+  = go (cec_encl ctxt)
+  where
+    pred_tvs = tyVarsOfType pred
+    go [] = []
+    go (ic : ics)
+       = case ic_info ic of
+               -- Do not suggest adding constraints to an *inferred* type signature!
+           SigSkol (InfSigCtxt {}) _ -> rest
+           info                      -> info : rest
+       where
+          -- Stop when the context binds a variable free in the predicate
+          rest | any (`elemVarSet` pred_tvs) (ic_skols ic) = []
+               | otherwise                                 = go ics
 
 show_fixes :: [SDoc] -> SDoc
 show_fixes []     = empty
@@ -1408,7 +1423,8 @@ relevantBindings want_filtering ctxt ct
                                  <+> ppr (getSrcLoc id)))]
                   new_seen = tvs_seen `unionVarSet` id_tvs
 
-            ; if (want_filtering && id_tvs `disjointVarSet` ct_tvs)
+            ; if (want_filtering && not opt_PprStyle_Debug 
+                                 && id_tvs `disjointVarSet` ct_tvs)
                        -- We want to filter out this binding anyway
                        -- so discard it silently
               then go tidy_env n_left tvs_seen docs discards tc_bndrs
@@ -1464,7 +1480,7 @@ solverDepthErrorTcS cnt ev
              tidy_pred = tidyType tidy_env pred
        ; failWithTcM (tidy_env, hang (msg cnt) 2 (ppr tidy_pred)) }
   where
-    loc   = ctev_loc ev
+    loc   = ctEvLoc ev
     depth = ctLocDepth loc
     value = subGoalCounterValue cnt depth
     msg CountConstraints =

@@ -6,7 +6,7 @@
  *
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
- * 
+ *
  *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
  *
  * ---------------------------------------------------------------------------*/
@@ -56,7 +56,7 @@
    pointer-tagging tag bits on each pointer during the
    threading/unthreading process.
 
-   Our solution is as follows: 
+   Our solution is as follows:
      - an info pointer (chain length zero) is identified by having tag 0
      - in a threaded chain of length > 0:
         - the pointer-tagging tag bits are attached to the info pointer
@@ -83,16 +83,16 @@ thread (StgClosure **p)
     // It doesn't look like a closure at the moment, because the info
     // ptr is possibly threaded:
     // ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
-    
-    if (HEAP_ALLOCED(q)) {
-	bd = Bdescr(q); 
 
-	if (bd->flags & BF_MARKED)
+    if (HEAP_ALLOCED(q)) {
+        bd = Bdescr(q);
+
+        if (bd->flags & BF_MARKED)
         {
             iptr = *q;
             switch (GET_CLOSURE_TAG((StgClosure *)iptr))
             {
-            case 0: 
+            case 0:
                 // this is the info pointer; we are creating a new chain.
                 // save the original tag at the end of the chain.
                 *p = (StgClosure *)((StgWord)iptr + GET_CLOSURE_TAG(q0));
@@ -157,11 +157,11 @@ STATIC_INLINE StgWord
 get_threaded_info( StgPtr p )
 {
     StgWord q;
-    
+
     q = (W_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
 
 loop:
-    switch (GET_CLOSURE_TAG((StgClosure *)q)) 
+    switch (GET_CLOSURE_TAG((StgClosure *)q))
     {
     case 0:
         ASSERT(LOOKS_LIKE_INFO_PTR(q));
@@ -186,7 +186,7 @@ STATIC_INLINE void
 move(StgPtr to, StgPtr from, StgWord size)
 {
     for(; size > 0; --size) {
-	*to++ = *from++;
+        *to++ = *from++;
     }
 }
 
@@ -196,29 +196,29 @@ thread_static( StgClosure* p )
   const StgInfoTable *info;
 
   // keep going until we've threaded all the objects on the linked
-  // list... 
+  // list...
   while (p != END_OF_STATIC_LIST) {
 
     info = get_itbl(p);
     switch (info->type) {
-      
+
     case IND_STATIC:
-	thread(&((StgInd *)p)->indirectee);
-	p = *IND_STATIC_LINK(p);
-	continue;
-      
+        thread(&((StgInd *)p)->indirectee);
+        p = *IND_STATIC_LINK(p);
+        continue;
+
     case THUNK_STATIC:
-	p = *THUNK_STATIC_LINK(p);
-	continue;
+        p = *THUNK_STATIC_LINK(p);
+        continue;
     case FUN_STATIC:
-	p = *FUN_STATIC_LINK(p);
-	continue;
+        p = *FUN_STATIC_LINK(p);
+        continue;
     case CONSTR_STATIC:
-	p = *STATIC_LINK(info,p);
-	continue;
-      
+        p = *STATIC_LINK(info,p);
+        continue;
+
     default:
-	barf("thread_static: strange closure %d", (int)(info->type));
+        barf("thread_static: strange closure %d", (int)(info->type));
     }
 
   }
@@ -233,17 +233,17 @@ thread_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, StgWord size )
     b = 0;
     bitmap = large_bitmap->bitmap[b];
     for (i = 0; i < size; ) {
-	if ((bitmap & 1) == 0) {
-	    thread((StgClosure **)p);
-	}
-	i++;
-	p++;
-	if (i % BITS_IN(W_) == 0) {
-	    b++;
-	    bitmap = large_bitmap->bitmap[b];
-	} else {
-	    bitmap = bitmap >> 1;
-	}
+        if ((bitmap & 1) == 0) {
+            thread((StgClosure **)p);
+        }
+        i++;
+        p++;
+        if (i % BITS_IN(W_) == 0) {
+            b++;
+            bitmap = large_bitmap->bitmap[b];
+        } else {
+            bitmap = bitmap >> 1;
+        }
     }
 }
 
@@ -271,20 +271,20 @@ thread_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
     p = (StgPtr)args;
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
-	size = BITMAP_SIZE(fun_info->f.b.bitmap);
-	goto small_bitmap;
+        bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
+        size = BITMAP_SIZE(fun_info->f.b.bitmap);
+        goto small_bitmap;
     case ARG_GEN_BIG:
-	size = GET_FUN_LARGE_BITMAP(fun_info)->size;
-	thread_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size);
-	p += size;
-	break;
+        size = GET_FUN_LARGE_BITMAP(fun_info)->size;
+        thread_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size);
+        p += size;
+        break;
     default:
-	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
-	size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
+        bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
+        size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
         p = thread_small_bitmap(p, size, bitmap);
-	break;
+        break;
     }
     return p;
 }
@@ -295,74 +295,74 @@ thread_stack(StgPtr p, StgPtr stack_end)
     const StgRetInfoTable* info;
     StgWord bitmap;
     StgWord size;
-    
+
     // highly similar to scavenge_stack, but we do pointer threading here.
-    
+
     while (p < stack_end) {
 
-	// *p must be the info pointer of an activation
-	// record.  All activation records have 'bitmap' style layout
-	// info.
-	//
-	info  = get_ret_itbl((StgClosure *)p);
-	
-	switch (info->i.type) {
-	    
+        // *p must be the info pointer of an activation
+        // record.  All activation records have 'bitmap' style layout
+        // info.
+        //
+        info  = get_ret_itbl((StgClosure *)p);
+
+        switch (info->i.type) {
+
             // small bitmap (<= 32 entries, or 64 on a 64-bit machine)
         case CATCH_RETRY_FRAME:
         case CATCH_STM_FRAME:
         case ATOMICALLY_FRAME:
-	case UPDATE_FRAME:
+        case UPDATE_FRAME:
         case UNDERFLOW_FRAME:
         case STOP_FRAME:
         case CATCH_FRAME:
-	case RET_SMALL:
-	    bitmap = BITMAP_BITS(info->i.layout.bitmap);
-	    size   = BITMAP_SIZE(info->i.layout.bitmap);
-	    p++;
-	    // NOTE: the payload starts immediately after the info-ptr, we
-	    // don't have an StgHeader in the same sense as a heap closure.
+        case RET_SMALL:
+            bitmap = BITMAP_BITS(info->i.layout.bitmap);
+            size   = BITMAP_SIZE(info->i.layout.bitmap);
+            p++;
+            // NOTE: the payload starts immediately after the info-ptr, we
+            // don't have an StgHeader in the same sense as a heap closure.
             p = thread_small_bitmap(p, size, bitmap);
-	    continue;
+            continue;
 
-	case RET_BCO: {
-	    StgBCO *bco;
-	    
-	    p++;
-	    bco = (StgBCO *)*p;
-	    thread((StgClosure **)p);
-	    p++;
-	    size = BCO_BITMAP_SIZE(bco);
-	    thread_large_bitmap(p, BCO_BITMAP(bco), size);
-	    p += size;
-	    continue;
-	}
+        case RET_BCO: {
+            StgBCO *bco;
 
-	    // large bitmap (> 32 entries, or 64 on a 64-bit machine) 
-	case RET_BIG:
-	    p++;
-	    size = GET_LARGE_BITMAP(&info->i)->size;
-	    thread_large_bitmap(p, GET_LARGE_BITMAP(&info->i), size);
-	    p += size;
-	    continue;
+            p++;
+            bco = (StgBCO *)*p;
+            thread((StgClosure **)p);
+            p++;
+            size = BCO_BITMAP_SIZE(bco);
+            thread_large_bitmap(p, BCO_BITMAP(bco), size);
+            p += size;
+            continue;
+        }
 
-	case RET_FUN:
-	{
-	    StgRetFun *ret_fun = (StgRetFun *)p;
-	    StgFunInfoTable *fun_info;
-	    
-	    fun_info = FUN_INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)
+            // large bitmap (> 32 entries, or 64 on a 64-bit machine)
+        case RET_BIG:
+            p++;
+            size = GET_LARGE_BITMAP(&info->i)->size;
+            thread_large_bitmap(p, GET_LARGE_BITMAP(&info->i), size);
+            p += size;
+            continue;
+
+        case RET_FUN:
+        {
+            StgRetFun *ret_fun = (StgRetFun *)p;
+            StgFunInfoTable *fun_info;
+
+            fun_info = FUN_INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)
                            get_threaded_info((StgPtr)ret_fun->fun)));
-	         // *before* threading it!
-	    thread(&ret_fun->fun);
-	    p = thread_arg_block(fun_info, ret_fun->payload);
-	    continue;
-	}
+                 // *before* threading it!
+            thread(&ret_fun->fun);
+            p = thread_arg_block(fun_info, ret_fun->payload);
+            continue;
+        }
 
-	default:
-	    barf("thread_stack: weird activation record found on stack: %d", 
-		 (int)(info->i.type));
-	}
+        default:
+            barf("thread_stack: weird activation record found on stack: %d",
+                 (int)(info->i.type));
+        }
     }
 }
 
@@ -381,21 +381,21 @@ thread_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
 
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
-	bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
-	goto small_bitmap;
+        bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
+        goto small_bitmap;
     case ARG_GEN_BIG:
-	thread_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size);
-	p += size;
-	break;
+        thread_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size);
+        p += size;
+        break;
     case ARG_BCO:
-	thread_large_bitmap((StgPtr)payload, BCO_BITMAP(fun), size);
-	p += size;
-	break;
+        thread_large_bitmap((StgPtr)payload, BCO_BITMAP(fun), size);
+        p += size;
+        break;
     default:
-	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
+        bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
         p = thread_small_bitmap(p, size, bitmap);
-	break;
+        break;
     }
 
     return p;
@@ -409,7 +409,7 @@ thread_PAP (StgPAP *pap)
     thread(&pap->fun);
     return p;
 }
-    
+
 STATIC_INLINE StgPtr
 thread_AP (StgAP *ap)
 {
@@ -417,7 +417,7 @@ thread_AP (StgAP *ap)
     p = thread_PAP_payload(ap->fun, ap->payload, ap->n_args);
     thread(&ap->fun);
     return p;
-}    
+}
 
 STATIC_INLINE StgPtr
 thread_AP_STACK (StgAP_STACK *ap)
@@ -435,15 +435,15 @@ thread_TSO (StgTSO *tso)
 
     if (   tso->why_blocked == BlockedOnMVar
         || tso->why_blocked == BlockedOnMVarRead
-	|| tso->why_blocked == BlockedOnBlackHole
-	|| tso->why_blocked == BlockedOnMsgThrowTo
+        || tso->why_blocked == BlockedOnBlackHole
+        || tso->why_blocked == BlockedOnMsgThrowTo
         || tso->why_blocked == NotBlocked
         ) {
-	thread_(&tso->block_info.closure);
+        thread_(&tso->block_info.closure);
     }
     thread_(&tso->blocked_exceptions);
     thread_(&tso->bq);
-    
+
     thread_(&tso->trec);
 
     thread_(&tso->stackobj);
@@ -469,14 +469,14 @@ update_fwd_large( bdescr *bd )
     switch (info->type) {
 
     case ARR_WORDS:
-      // nothing to follow 
+      // nothing to follow
       continue;
 
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
-      // follow everything 
+      // follow everything
       {
           StgMutArrPtrs *a;
 
@@ -491,7 +491,7 @@ update_fwd_large( bdescr *bd )
     case SMALL_MUT_ARR_PTRS_DIRTY:
     case SMALL_MUT_ARR_PTRS_FROZEN:
     case SMALL_MUT_ARR_PTRS_FROZEN0:
-      // follow everything 
+      // follow everything
       {
           StgSmallMutArrPtrs *a;
 
@@ -510,25 +510,25 @@ update_fwd_large( bdescr *bd )
     }
 
     case AP_STACK:
-	thread_AP_STACK((StgAP_STACK *)p);
-	continue;
+        thread_AP_STACK((StgAP_STACK *)p);
+        continue;
 
     case PAP:
-	thread_PAP((StgPAP *)p);
-	continue;
+        thread_PAP((StgPAP *)p);
+        continue;
 
     case TREC_CHUNK:
     {
         StgWord i;
         StgTRecChunk *tc = (StgTRecChunk *)p;
-	TRecEntry *e = &(tc -> entries[0]);
-	thread_(&tc->prev_chunk);
-	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
-	  thread_(&e->tvar);
-	  thread(&e->expected_value);
-	  thread(&e->new_value);
-	}
-	continue;
+        TRecEntry *e = &(tc -> entries[0]);
+        thread_(&tc->prev_chunk);
+        for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
+          thread_(&e->tvar);
+          thread(&e->expected_value);
+          thread(&e->new_value);
+        }
+        continue;
     }
 
     default:
@@ -543,66 +543,66 @@ thread_obj (StgInfoTable *info, StgPtr p)
 {
     switch (info->type) {
     case THUNK_0_1:
-	return p + sizeofW(StgThunk) + 1;
+        return p + sizeofW(StgThunk) + 1;
 
     case FUN_0_1:
     case CONSTR_0_1:
-	return p + sizeofW(StgHeader) + 1;
-	
+        return p + sizeofW(StgHeader) + 1;
+
     case FUN_1_0:
     case CONSTR_1_0:
-	thread(&((StgClosure *)p)->payload[0]);
-	return p + sizeofW(StgHeader) + 1;
-	
+        thread(&((StgClosure *)p)->payload[0]);
+        return p + sizeofW(StgHeader) + 1;
+
     case THUNK_1_0:
-	thread(&((StgThunk *)p)->payload[0]);
-	return p + sizeofW(StgThunk) + 1;
-	
+        thread(&((StgThunk *)p)->payload[0]);
+        return p + sizeofW(StgThunk) + 1;
+
     case THUNK_0_2:
-	return p + sizeofW(StgThunk) + 2;
+        return p + sizeofW(StgThunk) + 2;
 
     case FUN_0_2:
     case CONSTR_0_2:
-	return p + sizeofW(StgHeader) + 2;
-	
+        return p + sizeofW(StgHeader) + 2;
+
     case THUNK_1_1:
-	thread(&((StgThunk *)p)->payload[0]);
-	return p + sizeofW(StgThunk) + 2;
+        thread(&((StgThunk *)p)->payload[0]);
+        return p + sizeofW(StgThunk) + 2;
 
     case FUN_1_1:
     case CONSTR_1_1:
-	thread(&((StgClosure *)p)->payload[0]);
-	return p + sizeofW(StgHeader) + 2;
-	
+        thread(&((StgClosure *)p)->payload[0]);
+        return p + sizeofW(StgHeader) + 2;
+
     case THUNK_2_0:
-	thread(&((StgThunk *)p)->payload[0]);
-	thread(&((StgThunk *)p)->payload[1]);
-	return p + sizeofW(StgThunk) + 2;
+        thread(&((StgThunk *)p)->payload[0]);
+        thread(&((StgThunk *)p)->payload[1]);
+        return p + sizeofW(StgThunk) + 2;
 
     case FUN_2_0:
     case CONSTR_2_0:
-	thread(&((StgClosure *)p)->payload[0]);
-	thread(&((StgClosure *)p)->payload[1]);
-	return p + sizeofW(StgHeader) + 2;
-	
+        thread(&((StgClosure *)p)->payload[0]);
+        thread(&((StgClosure *)p)->payload[1]);
+        return p + sizeofW(StgHeader) + 2;
+
     case BCO: {
-	StgBCO *bco = (StgBCO *)p;
-	thread_(&bco->instrs);
-	thread_(&bco->literals);
-	thread_(&bco->ptrs);
-	return p + bco_sizeW(bco);
+        StgBCO *bco = (StgBCO *)p;
+        thread_(&bco->instrs);
+        thread_(&bco->literals);
+        thread_(&bco->ptrs);
+        return p + bco_sizeW(bco);
     }
 
     case THUNK:
     {
-	StgPtr end;
-	
-	end = (P_)((StgThunk *)p)->payload + 
-	    info->layout.payload.ptrs;
-	for (p = (P_)((StgThunk *)p)->payload; p < end; p++) {
-	    thread((StgClosure **)p);
-	}
-	return p + info->layout.payload.nptrs;
+        StgPtr end;
+
+        end = (P_)((StgThunk *)p)->payload +
+            info->layout.payload.ptrs;
+        for (p = (P_)((StgThunk *)p)->payload; p < end; p++) {
+            thread((StgClosure **)p);
+        }
+        return p + info->layout.payload.nptrs;
     }
 
     case FUN:
@@ -615,98 +615,98 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case BLACKHOLE:
     case BLOCKING_QUEUE:
     {
-	StgPtr end;
-	
-	end = (P_)((StgClosure *)p)->payload + 
-	    info->layout.payload.ptrs;
-	for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
-	    thread((StgClosure **)p);
-	}
-	return p + info->layout.payload.nptrs;
+        StgPtr end;
+
+        end = (P_)((StgClosure *)p)->payload +
+            info->layout.payload.ptrs;
+        for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
+            thread((StgClosure **)p);
+        }
+        return p + info->layout.payload.nptrs;
     }
-    
+
     case WEAK:
     {
-	StgWeak *w = (StgWeak *)p;
-	thread(&w->cfinalizers);
-	thread(&w->key);
-	thread(&w->value);
-	thread(&w->finalizer);
-	if (w->link != NULL) {
-	    thread_(&w->link);
-	}
-	return p + sizeofW(StgWeak);
+        StgWeak *w = (StgWeak *)p;
+        thread(&w->cfinalizers);
+        thread(&w->key);
+        thread(&w->value);
+        thread(&w->finalizer);
+        if (w->link != NULL) {
+            thread_(&w->link);
+        }
+        return p + sizeofW(StgWeak);
     }
-    
+
     case MVAR_CLEAN:
     case MVAR_DIRTY:
-    { 
-	StgMVar *mvar = (StgMVar *)p;
-	thread_(&mvar->head);
-	thread_(&mvar->tail);
-	thread(&mvar->value);
-	return p + sizeofW(StgMVar);
+    {
+        StgMVar *mvar = (StgMVar *)p;
+        thread_(&mvar->head);
+        thread_(&mvar->tail);
+        thread(&mvar->value);
+        return p + sizeofW(StgMVar);
     }
-    
+
     case IND:
     case IND_PERM:
-	thread(&((StgInd *)p)->indirectee);
-	return p + sizeofW(StgInd);
+        thread(&((StgInd *)p)->indirectee);
+        return p + sizeofW(StgInd);
 
     case THUNK_SELECTOR:
-    { 
-	StgSelector *s = (StgSelector *)p;
-	thread(&s->selectee);
-	return p + THUNK_SELECTOR_sizeW();
+    {
+        StgSelector *s = (StgSelector *)p;
+        thread(&s->selectee);
+        return p + THUNK_SELECTOR_sizeW();
     }
-    
+
     case AP_STACK:
-	return thread_AP_STACK((StgAP_STACK *)p);
-	
+        return thread_AP_STACK((StgAP_STACK *)p);
+
     case PAP:
-	return thread_PAP((StgPAP *)p);
+        return thread_PAP((StgPAP *)p);
 
     case AP:
-	return thread_AP((StgAP *)p);
-	
+        return thread_AP((StgAP *)p);
+
     case ARR_WORDS:
-	return p + arr_words_sizeW((StgArrWords *)p);
-	
+        return p + arr_words_sizeW((StgArrWords *)p);
+
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
-	// follow everything 
+        // follow everything
     {
         StgMutArrPtrs *a;
 
         a = (StgMutArrPtrs *)p;
-	for (p = (P_)a->payload; p < (P_)&a->payload[a->ptrs]; p++) {
-	    thread((StgClosure **)p);
-	}
+        for (p = (P_)a->payload; p < (P_)&a->payload[a->ptrs]; p++) {
+            thread((StgClosure **)p);
+        }
 
-	return (StgPtr)a + mut_arr_ptrs_sizeW(a);
+        return (StgPtr)a + mut_arr_ptrs_sizeW(a);
     }
 
     case SMALL_MUT_ARR_PTRS_CLEAN:
     case SMALL_MUT_ARR_PTRS_DIRTY:
     case SMALL_MUT_ARR_PTRS_FROZEN:
     case SMALL_MUT_ARR_PTRS_FROZEN0:
-	// follow everything 
+        // follow everything
     {
         StgSmallMutArrPtrs *a;
 
         a = (StgSmallMutArrPtrs *)p;
-	for (p = (P_)a->payload; p < (P_)&a->payload[a->ptrs]; p++) {
-	    thread((StgClosure **)p);
-	}
+        for (p = (P_)a->payload; p < (P_)&a->payload[a->ptrs]; p++) {
+            thread((StgClosure **)p);
+        }
 
-	return (StgPtr)a + small_mut_arr_ptrs_sizeW(a);
+        return (StgPtr)a + small_mut_arr_ptrs_sizeW(a);
     }
-    
+
     case TSO:
-	return thread_TSO((StgTSO *)p);
-    
+        return thread_TSO((StgTSO *)p);
+
     case STACK:
     {
         StgStack *stack = (StgStack*)p;
@@ -718,19 +718,19 @@ thread_obj (StgInfoTable *info, StgPtr p)
     {
         StgWord i;
         StgTRecChunk *tc = (StgTRecChunk *)p;
-	TRecEntry *e = &(tc -> entries[0]);
-	thread_(&tc->prev_chunk);
-	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
-	  thread_(&e->tvar);
-	  thread(&e->expected_value);
-	  thread(&e->new_value);
-	}
-	return p + sizeofW(StgTRecChunk);
+        TRecEntry *e = &(tc -> entries[0]);
+        thread_(&tc->prev_chunk);
+        for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
+          thread_(&e->tvar);
+          thread(&e->expected_value);
+          thread(&e->new_value);
+        }
+        return p + sizeofW(StgTRecChunk);
     }
 
     default:
-	barf("update_fwd: unknown/strange object  %d", (int)(info->type));
-	return NULL;
+        barf("update_fwd: unknown/strange object  %d", (int)(info->type));
+        return NULL;
     }
 }
 
@@ -745,16 +745,16 @@ update_fwd( bdescr *blocks )
 
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
-	p = bd->start;
+        p = bd->start;
 
-	// linearly scan the objects in this block
-	while (p < bd->free) {
-	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
-	    info = get_itbl((StgClosure *)p);
-	    p = thread_obj(info, p);
-	}
+        // linearly scan the objects in this block
+        while (p < bd->free) {
+            ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
+            info = get_itbl((StgClosure *)p);
+            p = thread_obj(info, p);
+        }
     }
-} 
+}
 
 static void
 update_fwd_compact( bdescr *blocks )
@@ -774,70 +774,70 @@ update_fwd_compact( bdescr *blocks )
 
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
-	p = bd->start;
+        p = bd->start;
 
-	while (p < bd->free ) {
+        while (p < bd->free ) {
 
-	    while ( p < bd->free && !is_marked(p,bd) ) {
-		p++;
-	    }
-	    if (p >= bd->free) {
-		break;
-	    }
+            while ( p < bd->free && !is_marked(p,bd) ) {
+                p++;
+            }
+            if (p >= bd->free) {
+                break;
+            }
 
 #if 0
     next:
-	m = * ((StgPtr)bd->u.bitmap + ((p - bd->start) / (BITS_IN(StgWord))));
-	m >>= ((p - bd->start) & (BITS_IN(StgWord) - 1));
+        m = * ((StgPtr)bd->u.bitmap + ((p - bd->start) / (BITS_IN(StgWord))));
+        m >>= ((p - bd->start) & (BITS_IN(StgWord) - 1));
 
-	while ( p < bd->free ) {
+        while ( p < bd->free ) {
 
-	    if ((m & 1) == 0) {
-		m >>= 1;
-		p++;
-		if (((StgWord)p & (sizeof(W_) * BITS_IN(StgWord))) == 0) {
-		    goto next;
-		} else {
-		    continue;
-		}
-	    }
+            if ((m & 1) == 0) {
+                m >>= 1;
+                p++;
+                if (((StgWord)p & (sizeof(W_) * BITS_IN(StgWord))) == 0) {
+                    goto next;
+                } else {
+                    continue;
+                }
+            }
 #endif
 
-	    // Problem: we need to know the destination for this cell
-	    // in order to unthread its info pointer.  But we can't
-	    // know the destination without the size, because we may
-	    // spill into the next block.  So we have to run down the 
-	    // threaded list and get the info ptr first.
+            // Problem: we need to know the destination for this cell
+            // in order to unthread its info pointer.  But we can't
+            // know the destination without the size, because we may
+            // spill into the next block.  So we have to run down the
+            // threaded list and get the info ptr first.
             //
             // ToDo: one possible avenue of attack is to use the fact
             // that if (p&BLOCK_MASK) >= (free&BLOCK_MASK), then we
             // definitely have enough room.  Also see bug #1147.
             iptr = get_threaded_info(p);
-	    info = INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)iptr));
+            info = INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)iptr));
 
-	    q = p;
+            q = p;
 
-	    p = thread_obj(info, p);
+            p = thread_obj(info, p);
 
-	    size = p - q;
-	    if (free + size > free_bd->start + BLOCK_SIZE_W) {
-		// set the next bit in the bitmap to indicate that
-		// this object needs to be pushed into the next
-		// block.  This saves us having to run down the
-		// threaded info pointer list twice during the next pass.
-		mark(q+1,bd);
-		free_bd = free_bd->link;
-		free = free_bd->start;
-	    } else {
-		ASSERT(!is_marked(q+1,bd));
-	    }
+            size = p - q;
+            if (free + size > free_bd->start + BLOCK_SIZE_W) {
+                // set the next bit in the bitmap to indicate that
+                // this object needs to be pushed into the next
+                // block.  This saves us having to run down the
+                // threaded info pointer list twice during the next pass.
+                mark(q+1,bd);
+                free_bd = free_bd->link;
+                free = free_bd->start;
+            } else {
+                ASSERT(!is_marked(q+1,bd));
+            }
 
-	    unthread(q,(StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
-	    free += size;
+            unthread(q,(StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
+            free += size;
 #if 0
-	    goto next;
+            goto next;
 #endif
-	}
+        }
     }
 }
 
@@ -860,71 +860,71 @@ update_bkwd_compact( generation *gen )
 
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
-	p = bd->start;
+        p = bd->start;
 
-	while (p < bd->free ) {
+        while (p < bd->free ) {
 
-	    while ( p < bd->free && !is_marked(p,bd) ) {
-		p++;
-	    }
-	    if (p >= bd->free) {
-		break;
-	    }
+            while ( p < bd->free && !is_marked(p,bd) ) {
+                p++;
+            }
+            if (p >= bd->free) {
+                break;
+            }
 
 #if 0
     next:
-	m = * ((StgPtr)bd->u.bitmap + ((p - bd->start) / (BITS_IN(StgWord))));
-	m >>= ((p - bd->start) & (BITS_IN(StgWord) - 1));
+        m = * ((StgPtr)bd->u.bitmap + ((p - bd->start) / (BITS_IN(StgWord))));
+        m >>= ((p - bd->start) & (BITS_IN(StgWord) - 1));
 
-	while ( p < bd->free ) {
+        while ( p < bd->free ) {
 
-	    if ((m & 1) == 0) {
-		m >>= 1;
-		p++;
-		if (((StgWord)p & (sizeof(W_) * BITS_IN(StgWord))) == 0) {
-		    goto next;
-		} else {
-		    continue;
-		}
-	    }
+            if ((m & 1) == 0) {
+                m >>= 1;
+                p++;
+                if (((StgWord)p & (sizeof(W_) * BITS_IN(StgWord))) == 0) {
+                    goto next;
+                } else {
+                    continue;
+                }
+            }
 #endif
 
-	    if (is_marked(p+1,bd)) {
-		// don't forget to update the free ptr in the block desc.
-		free_bd->free = free;
-		free_bd = free_bd->link;
-		free = free_bd->start;
-		free_blocks++;
-	    }
+            if (is_marked(p+1,bd)) {
+                // don't forget to update the free ptr in the block desc.
+                free_bd->free = free;
+                free_bd = free_bd->link;
+                free = free_bd->start;
+                free_blocks++;
+            }
 
             iptr = get_threaded_info(p);
-	    unthread(p, (StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
-	    ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)((StgClosure *)p)->header.info));
-	    info = get_itbl((StgClosure *)p);
-	    size = closure_sizeW_((StgClosure *)p,info);
+            unthread(p, (StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
+            ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)((StgClosure *)p)->header.info));
+            info = get_itbl((StgClosure *)p);
+            size = closure_sizeW_((StgClosure *)p,info);
 
-	    if (free != p) {
-		move(free,p,size);
-	    }
+            if (free != p) {
+                move(free,p,size);
+            }
 
-	    // relocate TSOs
+            // relocate TSOs
             if (info->type == STACK) {
                 move_STACK((StgStack *)p, (StgStack *)free);
-	    }
+            }
 
-	    free += size;
-	    p += size;
+            free += size;
+            p += size;
 #if 0
-	    goto next;
+            goto next;
 #endif
-	}
+        }
     }
 
     // free the remaining blocks and count what's left.
     free_bd->free = free;
     if (free_bd->link != NULL) {
-	freeChain(free_bd->link);
-	free_bd->link = NULL;
+        freeChain(free_bd->link);
+        free_bd->link = NULL;
     }
 
     return free_blocks;
@@ -976,16 +976,16 @@ compact(StgClosure *static_objects)
 
     // the task list
     {
-	Task *task;
+        Task *task;
         InCall *incall;
         for (task = all_tasks; task != NULL; task = task->all_next) {
-            for (incall = task->incall; incall != NULL; 
+            for (incall = task->incall; incall != NULL;
                  incall = incall->prev_stack) {
                 if (incall->tso) {
                     thread_(&incall->tso);
                 }
             }
-	}
+        }
     }
 
     // the static objects
@@ -1011,16 +1011,16 @@ compact(StgClosure *static_objects)
         if (g == RtsFlags.GcFlags.generations-1 && gen->old_blocks != NULL) {
             debugTrace(DEBUG_gc, "update_fwd:  %d (compact)", g);
             update_fwd_compact(gen->old_blocks);
-	}
+        }
     }
 
     // 3. update backward ptrs
     gen = oldest_gen;
     if (gen->old_blocks != NULL) {
-	blocks = update_bkwd_compact(gen);
-	debugTrace(DEBUG_gc, 
-		   "update_bkwd: %d (compact, old: %d blocks, now %d blocks)",
-		   gen->no, gen->n_old_blocks, blocks);
-	gen->n_old_blocks = blocks;
+        blocks = update_bkwd_compact(gen);
+        debugTrace(DEBUG_gc,
+                   "update_bkwd: %d (compact, old: %d blocks, now %d blocks)",
+                   gen->no, gen->n_old_blocks, blocks);
+        gen->n_old_blocks = blocks;
     }
 }

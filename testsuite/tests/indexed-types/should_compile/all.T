@@ -170,7 +170,7 @@ test('T4981-V2', normal, compile, [''])
 test('T4981-V3', normal, compile, [''])
 
 test('T5002', normal, compile, [''])
-test('PushedInAsGivens', normal, compile, [''])
+test('PushedInAsGivens', normal, compile_fail, [''])
 
 # Superclass equalities
 test('T4338', normal, compile, [''])
@@ -247,3 +247,5 @@ test('T9085', normal, compile, [''])
 test('T9316', normal, compile, [''])
 test('red-black-delete', normal, compile, [''])
 test('Sock', normal, compile, [''])
+test('T9211', normal, compile, [''])
+test('T9747', normal, compile, [''])

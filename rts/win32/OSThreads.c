@@ -98,7 +98,8 @@ shutdownThread()
 }
 
 int
-createOSThread (OSThreadId* pId, OSThreadProc *startProc, void *param)
+createOSThread (OSThreadId* pId, char *name STG_UNUSED,
+                OSThreadProc *startProc, void *param)
 {
     HANDLE h;
     h = CreateThread ( NULL,  /* default security attributes */

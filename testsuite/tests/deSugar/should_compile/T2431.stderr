@@ -2,7 +2,7 @@
 ==================== Tidy Core ====================
 Result size of Tidy Core = {terms: 8, types: 19, coercions: 1}
 
-T2431.$WRefl [InlPrag=INLINE] :: forall a. a T2431.:~: a
+T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
  Str=DmdType,
@@ -12,12 +12,9 @@ T2431.$WRefl [InlPrag=INLINE] :: forall a. a T2431.:~: a
          Tmpl= \ (@ a) -> T2431.Refl @ a @ a @~ <a>_N}]
 T2431.$WRefl = \ (@ a) -> T2431.Refl @ a @ a @~ <a>_N
 
-T2431.absurd
-  :: forall a. GHC.Types.Int T2431.:~: GHC.Types.Bool -> a
+absurd :: forall a. Int :~: Bool -> a
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <L,U>b]
-T2431.absurd =
-  \ (@ a) (x :: GHC.Types.Int T2431.:~: GHC.Types.Bool) ->
-    case x of _ [Occ=Dead] { }
+absurd = \ (@ a) (x :: Int :~: Bool) -> case x of _ [Occ=Dead] { }
 
 
 

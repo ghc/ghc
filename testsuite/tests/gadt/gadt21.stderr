@@ -7,12 +7,7 @@ gadt21.hs:21:60:
                in an equation for ‘withOrdDynExpr’
       at gadt21.hs:21:35-43
     Possible fix:
-      add (Ord a1) to the context of
-        the data constructor ‘TypeSet’
-        or the data constructor ‘DynExpr’
-        or the type signature for
-             withOrdDynExpr :: DynExpr
-                               -> (forall a. Ord a => Expr a -> b) -> Maybe b
+      add (Ord a1) to the context of the data constructor ‘TypeSet’
     In the first argument of ‘Just’, namely ‘(f e)’
     In the expression: Just (f e)
     In an equation for ‘withOrdDynExpr’:

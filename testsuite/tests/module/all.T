@@ -309,7 +309,7 @@ test('mod170', extra_clean(['Mod170_A.hi', 'Mod170_A.o']),
 
 
 test('mod171', extra_clean(['Mod171_A.hi', 'Mod171_A.o', 'Mod171_B.hi', 'Mod171_B.o']),
-     multimod_compile, ['mod171', '-v0 -Wall'])
+     multimod_compile, ['mod171', '-v0 -Wall -fno-warn-tabs'])
 
 
 test('mod172', extra_clean(['Mod172_B.hi', 'Mod172_B.o', 'Mod172_C.hi', 'Mod172_C.o']),

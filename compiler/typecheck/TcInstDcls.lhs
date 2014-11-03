@@ -43,16 +43,13 @@ import Class
 import Var
 import VarEnv
 import VarSet
-import CoreUnfold ( mkDFunUnfolding )
-import CoreSyn    ( Expr(Var, Type), CoreExpr, mkTyApps, mkVarApps )
-import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName,
-                    oldTypeableClassNames, genericClassNames )
+import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName, genericClassNames )
 import Bag
 import BasicTypes
 import DynFlags
 import ErrUtils
 import FastString
-import HscTypes ( isHsBoot )
+import HscTypes ( isHsBootOrSig )
 import Id
 import MkId
 import Name
@@ -64,7 +61,7 @@ import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 
 import Control.Monad
 import Maybes     ( isNothing, isJust, whenIsJust )
-import Data.List  ( mapAccumL )
+import Data.List  ( mapAccumL, partition )
 \end{code}
 
 Typechecking instance declarations is done in two passes. The first
@@ -381,7 +378,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
              local_infos' = concat local_infos_s
              -- Handwritten instances of the poly-kinded Typeable class are
              -- forbidden, so we handle those separately
-             (typeable_instances, local_infos) = splitTypeable env local_infos'
+             (typeable_instances, local_infos)
+                = partition (bad_typeable_instance env) local_infos'
 
        ; addClsInsts local_infos $
          addFamInsts fam_insts   $
@@ -403,20 +401,18 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                  else tcDeriving tycl_decls inst_decls deriv_decls
 
        -- Fail if there are any handwritten instance of poly-kinded Typeable
-       ; mapM_ (failWithTc . instMsg) typeable_instances
+       ; mapM_ typeable_err typeable_instances
 
        -- Check that if the module is compiled with -XSafe, there are no
        -- hand written instances of old Typeable as then unsafe casts could be
        -- performed. Derived instances are OK.
        ; dflags <- getDynFlags
        ; when (safeLanguageOn dflags) $ forM_ local_infos $ \x -> case x of
-             _ | typInstCheck x -> addErrAt (getSrcSpan $ iSpec x) (typInstErr x)
              _ | genInstCheck x -> addErrAt (getSrcSpan $ iSpec x) (genInstErr x)
              _ -> return ()
 
        -- As above but for Safe Inference mode.
        ; when (safeInferOn dflags) $ forM_ local_infos $ \x -> case x of
-             _ | typInstCheck x -> recordUnsafeInfer
              _ | genInstCheck x -> recordUnsafeInfer
              _ | overlapCheck x -> recordUnsafeInfer
              _ -> return ()
@@ -427,23 +423,14 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     }}
   where
     -- Separate the Typeable instances from the rest
-    splitTypeable _   []     = ([],[])
-    splitTypeable env (i:is) =
-      let (typeableInsts, otherInsts) = splitTypeable env is
-      in if -- We will filter out instances of Typeable
-            (typeableClassName == is_cls_nm (iSpec i))
-            -- but not those that come from Data.Typeable.Internal
-            && tcg_mod env /= tYPEABLE_INTERNAL
-            -- nor those from an .hs-boot file (deriving can't be used there)
-            && not (isHsBoot (tcg_src env))
-         then (i:typeableInsts, otherInsts)
-         else (typeableInsts, i:otherInsts)
-
-    typInstCheck ty = is_cls_nm (iSpec ty) `elem` oldTypeableClassNames
-    typInstErr i = hang (ptext (sLit $ "Typeable instances can only be "
-                            ++ "derived in Safe Haskell.") $+$
-                         ptext (sLit "Replace the following instance:"))
-                     2 (pprInstanceHdr (iSpec i))
+    bad_typeable_instance env i
+      =       -- Class name is Typeable
+         typeableClassName == is_cls_nm (iSpec i)
+              -- but not those that come from Data.Typeable.Internal
+      && tcg_mod env /= tYPEABLE_INTERNAL
+              -- nor those from an .hs-boot or .hsig file
+              -- (deriving can't be used there)
+      && not (isHsBootOrSig (tcg_src env))
 
     overlapCheck ty = overlapMode (is_flag $ iSpec ty) `elem`
                         [Overlappable, Overlapping, Overlaps]
@@ -453,9 +440,18 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                          ptext (sLit "Replace the following instance:"))
                      2 (pprInstanceHdr (iSpec i))
 
-    instMsg i = hang (ptext (sLit $ "Typeable instances can only be derived; replace "
-                                 ++ "the following instance:"))
-                     2 (pprInstance (iSpec i))
+    typeable_err i
+      = setSrcSpan (getSrcSpan ispec) $
+        addErrTc $ hang (ptext (sLit "Typeable instances can only be derived"))
+                      2 (vcat [ ptext (sLit "Try") <+> quotes (ptext (sLit "deriving instance Typeable")
+                                                <+> pp_tc)
+                              , ptext (sLit "(requires StandaloneDeriving)") ])
+      where
+        ispec = iSpec i
+        pp_tc | [_kind, ty] <- is_tys ispec
+              , Just (tc,_) <- tcSplitTyConApp_maybe ty
+              = ppr tc
+              | otherwise = ptext (sLit "<tycon>")
 
 addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside
@@ -519,7 +515,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                                   , cid_datafam_insts = adts }))
   = setSrcSpan loc                      $
     addErrCtxt (instDeclCtxt1 poly_ty)  $
-    do  { is_boot <- tcIsHsBoot
+    do  { is_boot <- tcIsHsBootOrSig
         ; checkTc (not is_boot || (isEmptyLHsBinds binds && null uprags))
                   badBootDeclErr
 
@@ -548,17 +544,11 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         ; dfun_name <- newDFunName clas inst_tys (getLoc poly_ty)
                 -- Dfun location is that of instance *header*
 
-        ; overlap_flag <-
-            do defaultOverlapFlag <- getOverlapFlag
-               return $ setOverlapModeMaybe defaultOverlapFlag overlap_mode
-        ; (subst, tyvars') <- tcInstSkolTyVars tyvars
-        ; let dfun      = mkDictFunId dfun_name tyvars theta clas inst_tys
-              ispec     = mkLocalInstance dfun overlap_flag tyvars' clas (substTys subst inst_tys)
-                            -- Be sure to freshen those type variables,
-                            -- so they are sure not to appear in any lookup
-              inst_info = InstInfo { iSpec  = ispec
+        ; ispec <- newClsInst overlap_mode dfun_name tyvars theta clas inst_tys
+        ; let inst_info = InstInfo { iSpec  = ispec
                                    , iBinds = InstBindings
                                      { ib_binds = binds
+                                     , ib_tyvars = map Var.varName tyvars -- Scope over bindings
                                      , ib_pragmas = uprags
                                      , ib_extensions = []
                                      , ib_derived = False } }
@@ -636,7 +626,7 @@ tcFamInstDeclCombined mb_clsinfo fam_tc_lname
          -- and can't (currently) be in an hs-boot file
        ; traceTc "tcFamInstDecl" (ppr fam_tc_lname)
        ; type_families <- xoptM Opt_TypeFamilies
-       ; is_boot <- tcIsHsBoot   -- Are we compiling an hs-boot file?
+       ; is_boot <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
        ; checkTc type_families $ badFamInstDecl fam_tc_lname
        ; checkTc (not is_boot) $ badBootFamInstDeclErr
 
@@ -829,7 +819,6 @@ So right here in tcInstDecls2 we must re-extend the type envt with
 the default method Ids replete with their INLINE pragmas.  Urk.
 
 \begin{code}
-
 tcInstDecl2 :: InstInfo Name -> TcM (LHsBinds Id)
             -- Returns a binding for the dfun
 tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
@@ -847,7 +836,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
 
        ; dfun_ev_vars <- newEvVars dfun_theta
 
-       ; (sc_binds, sc_ev_vars) <- tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta'
+       ; sc_ev_vars <- tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta'
 
        -- Deal with 'SPECIALISE instance' pragmas
        -- See Note [SPECIALISE instance pragmas]
@@ -855,11 +844,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
 
         -- Typecheck the methods
        ; (meth_ids, meth_binds)
-           <- tcExtendTyVarEnv inst_tyvars $
-                -- The inst_tyvars scope over the 'where' part
-                -- Those tyvars are inside the dfun_id's type, which is a bit
-                -- bizarre, but OK so long as you realise it!
-              tcInstanceMethods dfun_id clas inst_tyvars dfun_ev_vars
+           <- tcInstanceMethods dfun_id clas inst_tyvars dfun_ev_vars
                                 inst_tys spec_inst_info
                                 op_items ibinds
 
@@ -890,32 +875,20 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
 
                 -- Do not inline the dfun; instead give it a magic DFunFunfolding
-                -- See Note [ClassOp/DFun selection]
-                -- See also note [Single-method classes]
-             (dfun_id_w_fun, dfun_spec_prags)
-                | isNewTyCon class_tc
-                = ( dfun_id `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
-                  , SpecPrags [] )   -- Newtype dfuns just inline unconditionally,
-                                     -- so don't attempt to specialise them
+             dfun_spec_prags
+                | isNewTyCon class_tc = SpecPrags []
+                    -- Newtype dfuns just inline unconditionally,
+                    -- so don't attempt to specialise them
                 | otherwise
-                = ( dfun_id `setIdUnfolding`  mkDFunUnfolding (inst_tyvars ++ dfun_ev_vars)
-                                                              dict_constr dfun_args
-                            `setInlinePragma` dfunInlinePragma
-                  , SpecPrags spec_inst_prags )
+                = SpecPrags spec_inst_prags
 
-             dfun_args :: [CoreExpr]
-             dfun_args = map Type inst_tys        ++
-                         map Var  sc_ev_vars      ++
-                         map mk_meth_app meth_ids
-             mk_meth_app meth_id = Var meth_id `mkTyApps` inst_tv_tys `mkVarApps` dfun_ev_vars
-
-             export = ABE { abe_wrap = idHsWrapper, abe_poly = dfun_id_w_fun
+             export = ABE { abe_wrap = idHsWrapper, abe_poly = dfun_id
                           , abe_mono = self_dict, abe_prags = dfun_spec_prags }
                           -- NB: see Note [SPECIALISE instance pragmas]
              main_bind = AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [export]
-                                  , abs_ev_binds = sc_binds
+                                  , abs_ev_binds = emptyTcEvBinds
                                   , abs_binds = unitBag dict_bind }
 
        ; return (unitBag (L loc main_bind) `unionBags`
@@ -927,22 +900,23 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
 
 ------------------------------
 tcSuperClasses :: DFunId -> [TcTyVar] -> [EvVar] -> TcThetaType
-               -> TcM (TcEvBinds, [EvVar])
+               -> TcM [EvVar]
 -- See Note [Silent superclass arguments]
 tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta
+  | null inst_tyvars && null dfun_ev_vars
+  = emitWanteds ScOrigin sc_theta
+
+  | otherwise
   = do {   -- Check that all superclasses can be deduced from
            -- the originally-specified dfun arguments
-       ; (sc_binds, sc_evs) <- checkConstraints InstSkol inst_tyvars orig_ev_vars $
-                               emitWanteds ScOrigin sc_theta
+       ; _ <- checkConstraints InstSkol inst_tyvars orig_ev_vars $
+              emitWanteds ScOrigin sc_theta
 
-       ; if null inst_tyvars && null dfun_ev_vars
-         then return (sc_binds,       sc_evs)
-         else return (emptyTcEvBinds, sc_lam_args) }
+       ; return (map (find dfun_ev_vars) sc_theta) }
   where
     n_silent     = dfunNSilent dfun_id
     orig_ev_vars = drop n_silent dfun_ev_vars
 
-    sc_lam_args = map (find dfun_ev_vars) sc_theta
     find [] pred
       = pprPanic "tcInstDecl2" (ppr dfun_id $$ ppr (idType dfun_id) $$ ppr pred)
     find (ev:evs) pred
@@ -1203,10 +1177,13 @@ tcInstanceMethods :: DFunId -> Class -> [TcTyVar]
 tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                   (spec_inst_prags, prag_fn)
                   op_items (InstBindings { ib_binds = binds
+                                         , ib_tyvars = lexical_tvs
                                          , ib_pragmas = sigs
                                          , ib_extensions = exts
                                          , ib_derived    = is_derived })
-  = do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
+  = tcExtendTyVarEnv2 (lexical_tvs `zip` tyvars) $
+       -- The lexical_tvs scope over the 'where' part
+    do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
        ; let hs_sig_fn = mkHsSigFun sigs
        ; checkMinimalDefinition
        ; set_exts exts $ mapAndUnzipM (tc_item hs_sig_fn) op_items }
@@ -1471,7 +1448,7 @@ So for the above example we generate:
 
   $cop2 = <blah>
 
-Note carefullly:
+Note carefully:
 
 * We *copy* any INLINE pragma from the default method $dmop1 to the
   instance $cop1.  Otherwise we'll just inline the former in the

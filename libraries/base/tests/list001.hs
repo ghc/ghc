@@ -3,9 +3,6 @@ module Main where
 
 import Data.List
 import Control.Exception
-#if __GLASGOW_HASKELL__ < 705
-import Prelude hiding (catch)
-#endif
 
 -- This module briefly tests all the functions in PrelList and a few
 -- from List.

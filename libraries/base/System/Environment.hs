@@ -29,8 +29,6 @@ module System.Environment
       getEnvironment,
   ) where
 
-import Prelude
-
 import Foreign.Safe
 import Foreign.C
 import System.IO.Error (mkIOError)

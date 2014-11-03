@@ -146,9 +146,9 @@ if windows:
     h.close()
     if v.startswith("CYGWIN"):
         config.cygwin = True
-    elif v.startswith("MINGW"):
+    elif v.startswith("MINGW") or v.startswith("MSYS"):
 # msys gives "MINGW32"
-# msys2 gives "MINGW_NT-6.2"
+# msys2 gives "MINGW_NT-6.2" or "MSYS_NT-6.3"
         config.msys = True
     else:
         raise Exception("Can't detect Windows terminal type")
@@ -156,13 +156,11 @@ if windows:
 # Try to use UTF8
 if windows:
     import ctypes
-    if config.cygwin:
-        # Is this actually right? Which calling convention does it use?
-        # As of the time of writing, ctypes.windll doesn't exist in the
-        # cygwin python, anyway.
-        mydll = ctypes.cdll
-    else:
+    # Windows Python provides windll, mingw python provides cdll.
+    if hasattr(ctypes, 'windll'):
         mydll = ctypes.windll
+    else:
+        mydll = ctypes.cdll
 
     # This actually leaves the terminal in codepage 65001 (UTF8) even
     # after python terminates. We ought really remember the old codepage

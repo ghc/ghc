@@ -16,7 +16,7 @@ $(call trace, manual-package-config($1))
 $(call profStart, manual-package-config($1))
 
 $1/dist/package.conf.inplace : $1/package.conf.in $$$$(ghc-pkg_INPLACE) | $$$$(dir $$$$@)/.
-	$$(CPP) $$(RAWCPP_FLAGS) -P \
+	$$(CPP) -P \
 		-DTOP='"$$(TOP)"' \
 		$$($1_PACKAGE_CPP_OPTS) \
 		-x c $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) $$< -o $$@.raw
@@ -29,7 +29,7 @@ $1/dist/package.conf.inplace : $1/package.conf.in $$$$(ghc-pkg_INPLACE) | $$$$(d
 # "make install", so we declare it as phony
 .PHONY: $1/dist/package.conf.install
 $1/dist/package.conf.install: | $$$$(dir $$$$@)/.
-	$$(CPP) $$(RAWCPP_FLAGS) -P \
+	$$(CPP) -P \
 		-DINSTALLING \
 		-DLIB_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))"' \
 		-DINCLUDE_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))/include"' \

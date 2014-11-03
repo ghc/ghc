@@ -1321,6 +1321,7 @@ data Pragma = InlineP         Name Inline RuleMatch Phases
             | SpecialiseInstP Type
             | RuleP           String [RuleBndr] Exp Exp Phases
             | AnnP            AnnTarget Exp
+            | LineP           Int String
         deriving( Show, Eq, Data, Typeable )
 
 data Inline = NoInline

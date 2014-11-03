@@ -1,9 +1,6 @@
 
 tcfail131.hs:7:9:
-    Could not deduce (b ~ Integer)
-    from the context (Num b)
-      bound by the type signature for g :: Num b => b -> b
-      at tcfail131.hs:6:8-22
+    Couldn't match expected type ‘b’ with actual type ‘Integer’
       ‘b’ is a rigid type variable bound by
           the type signature for g :: Num b => b -> b at tcfail131.hs:6:8
     Relevant bindings include

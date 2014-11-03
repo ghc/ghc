@@ -528,7 +528,8 @@ can still be specialised by the type-class specialiser, something like
 
 BUT if f is strict in the Ord dictionary, we might unpack it, to get
    fw :: (a->a->Bool) -> [a] -> Int# -> a
-and the type-class specialiser can't specialise that.
+and the type-class specialiser can't specialise that.  An example is
+Trac #6056.
 
 Moreover, dictinoaries can have a lot of fields, so unpacking them can
 increase closure sizes.

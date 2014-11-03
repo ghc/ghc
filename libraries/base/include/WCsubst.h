@@ -3,22 +3,23 @@
 #define WCSUBST_INCL
 
 #include <stdlib.h>
+#include "HsFFI.h"
 
-int u_iswupper(int wc);
-int u_iswdigit(int wc);
-int u_iswalpha(int wc);
-int u_iswcntrl(int wc);
-int u_iswspace(int wc);
-int u_iswprint(int wc);
-int u_iswlower(int wc);
+HsInt u_iswupper(HsInt wc);
+HsInt u_iswdigit(HsInt wc);
+HsInt u_iswalpha(HsInt wc);
+HsInt u_iswcntrl(HsInt wc);
+HsInt u_iswspace(HsInt wc);
+HsInt u_iswprint(HsInt wc);
+HsInt u_iswlower(HsInt wc);
 
-int u_iswalnum(int wc);
+HsInt u_iswalnum(HsInt wc);
 
-int u_towlower(int wc);
-int u_towupper(int wc);
-int u_towtitle(int wc);
+HsInt u_towlower(HsInt wc);
+HsInt u_towupper(HsInt wc);
+HsInt u_towtitle(HsInt wc);
 
-int u_gencat(int wc);
+HsInt u_gencat(HsInt wc);
 
 #endif
 

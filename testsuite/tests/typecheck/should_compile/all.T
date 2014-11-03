@@ -357,6 +357,7 @@ test('tc262', normal, compile, [''])
 test('tc263',
     extra_clean(['Tc263_Help.o','Tc263_Help.hi']),
     multimod_compile, ['tc263','-v0'])
+test('tc264', normal, multimod_compile, ['tc264.hsig', '-sig-of base:Data.STRef'])
 
 test('GivenOverlapping', normal, compile, [''])
 test('GivenTypeSynonym', normal, compile, [''])
@@ -420,3 +421,4 @@ test('MutRec', normal, compile, [''])
 test('T8856', normal, compile, [''])
 test('T9117', normal, compile, [''])
 test('T9117_2', expect_broken('9117'), compile, [''])
+test('T9708', normal, compile_fail, [''])

@@ -1799,14 +1799,38 @@ genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src]
     size = if width == W8 then II16 else intSize width
     lbl = mkCmmCodeLabel primPackageKey (fsLit (clzLabel width))
 
-genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) dest_regs@[dst] args@[src]
+genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src]
   | is32Bit, width == W64 = do
-    -- Fallback to `hs_ctz64` on i386
-    targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
-    let target = ForeignTarget targetExpr (ForeignConvention CCallConv
-                                           [NoHint] [NoHint]
-                                           CmmMayReturn)
-    genCCall dflags is32Bit target dest_regs args
+      ChildCode64 vcode rlo <- iselExpr64 src
+      let rhi     = getHiVRegFromLo rlo
+          dst_r   = getRegisterReg platform False (CmmLocal dst)
+      lbl1 <- getBlockIdNat
+      lbl2 <- getBlockIdNat
+      tmp_r <- getNewRegNat size
+
+      -- The following instruction sequence corresponds to the pseudo-code
+      --
+      --  if (src) {
+      --    dst = src.lo32 ? BSF(src.lo32) : (BSF(src.hi32) + 32);
+      --  } else {
+      --    dst = 64;
+      --  }
+      return $ vcode `appOL` toOL
+               ([ MOV      II32 (OpReg rhi)         (OpReg tmp_r)
+                , OR       II32 (OpReg rlo)         (OpReg tmp_r)
+                , MOV      II32 (OpImm (ImmInt 64)) (OpReg dst_r)
+                , JXX EQQ    lbl2
+                , JXX ALWAYS lbl1
+
+                , NEWBLOCK   lbl1
+                , BSF     II32 (OpReg rhi)         dst_r
+                , ADD     II32 (OpImm (ImmInt 32)) (OpReg dst_r)
+                , BSF     II32 (OpReg rlo)         tmp_r
+                , CMOV NE II32 (OpReg tmp_r)       dst_r
+                , JXX ALWAYS lbl2
+
+                , NEWBLOCK   lbl2
+                ])
 
   | otherwise = do
     code_src <- getAnyReg src
@@ -1828,7 +1852,6 @@ genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) dest_regs@[dst] args@[src]
     bw = widthInBits width
     platform = targetPlatform dflags
     size = if width == W8 then II16 else intSize width
-    lbl = mkCmmCodeLabel primPackageKey (fsLit (ctzLabel width))
 
 genCCall dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args = do
     targetExpr <- cmmMakeDynamicReference dflags
@@ -2485,7 +2508,7 @@ outOfLineCmmOp mop res args
               MO_PopCnt _  -> fsLit "popcnt"
               MO_BSwap _   -> fsLit "bswap"
               MO_Clz w     -> fsLit $ clzLabel w
-              MO_Ctz w     -> fsLit $ ctzLabel w
+              MO_Ctz _     -> unsupported
 
               MO_AtomicRMW _ _ -> fsLit "atomicrmw"
               MO_AtomicRead _  -> fsLit "atomicread"

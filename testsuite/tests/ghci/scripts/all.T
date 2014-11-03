@@ -1,5 +1,8 @@
 # coding=utf8
 
+def normaliseTransformersPackageKey(str):
+    return re.sub('trans_[A-Za-z0-9]+', 'trans_<HASH>', str)
+
 setTestOpts(when(compiler_profiled(), skip))
 
 test('ghci001', combined_output, ghci_script, ['ghci001.script'])
@@ -40,6 +43,10 @@ test('ghci024',
      when(fast(), skip),
      run_command,
      ['$MAKE -s --no-print-directory ghci024'])
+test('T9367',
+     when(fast() or config.os != 'mingw32', skip),
+     run_command,
+     ['$MAKE -s --no-print-directory T9367'])
 test('ghci025', normal, ghci_script, ['ghci025.script'])
 test('ghci026', normal, ghci_script, ['ghci026.script'])
 
@@ -82,7 +89,7 @@ test('ghci056',
      ],
      ghci_script, ['ghci056.script'])
 
-test('ghci057', normal, ghci_script, ['ghci057.script'])
+test('ghci057', normal, ghci_script_without_flag('-fno-warn-tabs'), ['ghci057.script'])
 
 test('T2452', normal, ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
@@ -114,7 +121,11 @@ test('T5564', normal, ghci_script, ['T5564.script'])
 test('Defer02', normal, ghci_script, ['Defer02.script'])
 test('T5820', normal, ghci_script, ['T5820.script'])
 test('T5836', normal, ghci_script, ['T5836.script'])
-test('T5979', [reqlib('transformers'), normalise_slashes], ghci_script, ['T5979.script'])
+test('T5979',
+    [reqlib('transformers'),
+     normalise_slashes,
+     normalise_errmsg_fun(normaliseTransformersPackageKey)],
+    ghci_script, ['T5979.script'])
 test('T5975a',
      [pre_cmd('touch föøbàr1.hs'),
       clean_cmd('rm föøbàr1.hs')],
@@ -178,3 +189,4 @@ test('T8959b', expect_broken(8959), ghci_script, ['T8959b.script'])
 test('T9181', normal, ghci_script, ['T9181.script'])
 test('T9086b', normal, ghci_script, ['T9086b.script'])
 test('T9140', combined_output, ghci_script, ['T9140.script'])
+test('T9658', normal, ghci_script, ['T9658.script'])

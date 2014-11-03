@@ -98,7 +98,7 @@ cgTopRhsClosure dflags rec id ccs _ upd_flag args body =
          let closure_rep   = mkStaticClosureFields dflags
                                     indStaticInfoTable ccs MayHaveCafRefs
                                     [unLit (idInfoToAmode cg_info)]
-         emitStaticClosure closure_label closure_rep
+         emitDataLits closure_label closure_rep
          return ()
 
   gen_code dflags lf_info closure_label
@@ -113,7 +113,7 @@ cgTopRhsClosure dflags rec id ccs _ upd_flag args body =
               closure_rep   = mkStaticClosureFields dflags info_tbl ccs caffy []
 
                  -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
-        ; emitStaticClosure closure_label closure_rep
+        ; emitDataLits closure_label closure_rep
         ; let fv_details :: [(NonVoid Id, VirtualHpOffset)]
               (_, _, fv_details) = mkVirtHeapOffsets dflags (isLFThunk lf_info)
                                                (addIdReps [])

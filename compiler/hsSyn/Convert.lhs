@@ -41,6 +41,7 @@ import Control.Monad( unless, liftM, ap )
 import Control.Applicative (Applicative(..))
 #endif
 
+import Data.Maybe( catMaybes )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
 import GHC.Exts
@@ -49,7 +50,7 @@ import GHC.Exts
 --              The external interface
 
 convertToHsDecls :: SrcSpan -> [TH.Dec] -> Either MsgDoc [LHsDecl RdrName]
-convertToHsDecls loc ds = initCvt loc (mapM cvt_dec ds)
+convertToHsDecls loc ds = initCvt loc (fmap catMaybes (mapM cvt_dec ds))
   where
     cvt_dec d = wrapMsg "declaration" d (cvtDec d)
 
@@ -66,7 +67,7 @@ convertToHsType loc t
   = initCvt loc $ wrapMsg "type" t $ cvtType t
 
 -------------------------------------------------------------------
-newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either MsgDoc a }
+newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either MsgDoc (SrcSpan, a) }
         -- Push down the source location;
         -- Can fail, with a single error message
 
@@ -87,13 +88,13 @@ instance Applicative CvtM where
     (<*>) = ap
 
 instance Monad CvtM where
-  return x       = CvtM $ \_   -> Right x
+  return x       = CvtM $ \loc -> Right (loc,x)
   (CvtM m) >>= k = CvtM $ \loc -> case m loc of
                                   Left err -> Left err
-                                  Right v  -> unCvtM (k v) loc
+                                  Right (loc',v) -> unCvtM (k v) loc'
 
 initCvt :: SrcSpan -> CvtM a -> Either MsgDoc a
-initCvt loc (CvtM m) = m loc
+initCvt loc (CvtM m) = fmap snd (m loc)
 
 force :: a -> CvtM ()
 force a = a `seq` return ()
@@ -102,13 +103,19 @@ failWith :: MsgDoc -> CvtM a
 failWith m = CvtM (\_ -> Left m)
 
 getL :: CvtM SrcSpan
-getL = CvtM (\loc -> Right loc)
+getL = CvtM (\loc -> Right (loc,loc))
+
+setL :: SrcSpan -> CvtM ()
+setL loc = CvtM (\_ -> Right (loc, ()))
 
 returnL :: a -> CvtM (Located a)
-returnL x = CvtM (\loc -> Right (L loc x))
+returnL x = CvtM (\loc -> Right (loc, L loc x))
+
+returnJustL :: a -> CvtM (Maybe (Located a))
+returnJustL = fmap Just . returnL
 
 wrapParL :: (Located a -> a) -> a -> CvtM a
-wrapParL add_par x = CvtM (\loc -> Right (add_par (L loc x)))
+wrapParL add_par x = CvtM (\loc -> Right (loc, add_par (L loc x)))
 
 wrapMsg :: (Show a, TH.Ppr a) => String -> a -> CvtM b -> CvtM b
 -- E.g  wrapMsg "declaration" dec thing
@@ -127,21 +134,24 @@ wrapMsg what item (CvtM m)
 wrapL :: CvtM a -> CvtM (Located a)
 wrapL (CvtM m) = CvtM (\loc -> case m loc of
                                Left err -> Left err
-                               Right v  -> Right (L loc v))
+                               Right (loc',v) -> Right (loc',L loc v))
 
 -------------------------------------------------------------------
-cvtDec :: TH.Dec -> CvtM (LHsDecl RdrName)
+cvtDecs :: [TH.Dec] -> CvtM [LHsDecl RdrName]
+cvtDecs = fmap catMaybes . mapM cvtDec
+
+cvtDec :: TH.Dec -> CvtM (Maybe (LHsDecl RdrName))
 cvtDec (TH.ValD pat body ds)
   | TH.VarP s <- pat
   = do  { s' <- vNameL s
         ; cl' <- cvtClause (Clause [] body ds)
-        ; returnL $ Hs.ValD $ mkFunBind s' [cl'] }
+        ; returnJustL $ Hs.ValD $ mkFunBind s' [cl'] }
 
   | otherwise
   = do  { pat' <- cvtPat pat
         ; body' <- cvtGuard body
         ; ds' <- cvtLocalDecs (ptext (sLit "a where clause")) ds
-        ; returnL $ Hs.ValD $
+        ; returnJustL $ Hs.ValD $
           PatBind { pat_lhs = pat', pat_rhs = GRHSs body' ds'
                   , pat_rhs_ty = placeHolderType, bind_fvs = placeHolderNames
                   , pat_ticks = (Nothing,[]) } }
@@ -154,16 +164,16 @@ cvtDec (TH.FunD nm cls)
   | otherwise
   = do  { nm' <- vNameL nm
         ; cls' <- mapM cvtClause cls
-        ; returnL $ Hs.ValD $ mkFunBind nm' cls' }
+        ; returnJustL $ Hs.ValD $ mkFunBind nm' cls' }
 
 cvtDec (TH.SigD nm typ)
   = do  { nm' <- vNameL nm
         ; ty' <- cvtType typ
-        ; returnL $ Hs.SigD (TypeSig [nm'] ty') }
+        ; returnJustL $ Hs.SigD (TypeSig [nm'] ty') }
 
 cvtDec (TH.InfixD fx nm)
   = do { nm' <- vNameL nm
-       ; returnL (Hs.SigD (FixSig (FixitySig nm' (cvtFixity fx)))) }
+       ; returnJustL (Hs.SigD (FixSig (FixitySig nm' (cvtFixity fx)))) }
 
 cvtDec (PragmaD prag)
   = cvtPragmaD prag
@@ -171,9 +181,10 @@ cvtDec (PragmaD prag)
 cvtDec (TySynD tc tvs rhs)
   = do  { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
         ; rhs' <- cvtType rhs
-        ; returnL $ TyClD (SynDecl { tcdLName = tc'
-                                  , tcdTyVars = tvs', tcdFVs = placeHolderNames
-                                  , tcdRhs = rhs' }) }
+        ; returnJustL $ TyClD $
+          SynDecl { tcdLName = tc'
+                  , tcdTyVars = tvs', tcdFVs = placeHolderNames
+                  , tcdRhs = rhs' } }
 
 cvtDec (DataD ctxt tc tvs constrs derivs)
   = do  { (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
@@ -183,9 +194,9 @@ cvtDec (DataD ctxt tc tvs constrs derivs)
                                 , dd_ctxt = ctxt'
                                 , dd_kindSig = Nothing
                                 , dd_cons = cons', dd_derivs = derivs' }
-        ; returnL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
-                                    , tcdDataDefn = defn
-                                    , tcdFVs = placeHolderNames }) }
+        ; returnJustL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
+                                        , tcdDataDefn = defn
+                                        , tcdFVs = placeHolderNames }) }
 
 cvtDec (NewtypeD ctxt tc tvs constr derivs)
   = do  { (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
@@ -195,7 +206,7 @@ cvtDec (NewtypeD ctxt tc tvs constr derivs)
                                 , dd_ctxt = ctxt'
                                 , dd_kindSig = Nothing
                                 , dd_cons = [con'], dd_derivs = derivs' }
-        ; returnL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
+        ; returnJustL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
                                     , tcdDataDefn = defn
                                     , tcdFVs = placeHolderNames }) }
 
@@ -207,7 +218,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
             (failWith $ (ptext (sLit "Default data instance declarations are not allowed:"))
                    $$ (Outputable.ppr adts'))
         ; at_defs <- mapM cvt_at_def ats'
-        ; returnL $ TyClD $
+        ; returnJustL $ TyClD $
           ClassDecl { tcdCtxt = cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFDs = fds', tcdSigs = sigs', tcdMeths = binds'
                     , tcdATs = fams', tcdATDefs = at_defs, tcdDocs = []
@@ -228,16 +239,18 @@ cvtDec (InstanceD ctxt ty decs)
         ; ctxt' <- cvtContext ctxt
         ; L loc ty' <- cvtType ty
         ; let inst_ty' = L loc $ mkImplicitHsForAllTy ctxt' $ L loc ty'
-        ; returnL $ InstD (ClsInstD (ClsInstDecl inst_ty' binds' sigs' ats' adts' Nothing)) }
+        ; returnJustL $ InstD $ ClsInstD $
+          ClsInstDecl inst_ty' binds' sigs' ats' adts' Nothing }
 
 cvtDec (ForeignD ford)
   = do { ford' <- cvtForD ford
-       ; returnL $ ForD ford' }
+       ; returnJustL $ ForD ford' }
 
 cvtDec (FamilyD flav tc tvs kind)
   = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
        ; kind' <- cvtMaybeKind kind
-       ; returnL $ TyClD (FamDecl (FamilyDecl (cvtFamFlavour flav) tc' tvs' kind')) }
+       ; returnJustL $ TyClD $ FamDecl $
+         FamilyDecl (cvtFamFlavour flav) tc' tvs' kind' }
   where
     cvtFamFlavour TypeFam = OpenTypeFamily
     cvtFamFlavour DataFam = DataFamily
@@ -251,7 +264,7 @@ cvtDec (DataInstD ctxt tc tys constrs derivs)
                                , dd_kindSig = Nothing
                                , dd_cons = cons', dd_derivs = derivs' }
 
-       ; returnL $ InstD $ DataFamInstD
+       ; returnJustL $ InstD $ DataFamInstD
            { dfid_inst = DataFamInstDecl { dfid_tycon = tc', dfid_pats = typats'
                                          , dfid_defn = defn
                                          , dfid_fvs = placeHolderNames } }}
@@ -264,7 +277,7 @@ cvtDec (NewtypeInstD ctxt tc tys constr derivs)
                                , dd_ctxt = ctxt'
                                , dd_kindSig = Nothing
                                , dd_cons = [con'], dd_derivs = derivs' }
-       ; returnL $ InstD $ DataFamInstD
+       ; returnJustL $ InstD $ DataFamInstD
            { dfid_inst = DataFamInstDecl { dfid_tycon = tc', dfid_pats = typats'
                                          , dfid_defn = defn
                                          , dfid_fvs = placeHolderNames } }}
@@ -272,7 +285,7 @@ cvtDec (NewtypeInstD ctxt tc tys constr derivs)
 cvtDec (TySynInstD tc eqn)
   = do  { tc' <- tconNameL tc
         ; eqn' <- cvtTySynEqn tc' eqn
-        ; returnL $ InstD $ TyFamInstD
+        ; returnJustL $ InstD $ TyFamInstD
             { tfid_inst = TyFamInstDecl { tfid_eqn = eqn'
                                         , tfid_fvs = placeHolderNames } } }
 
@@ -281,14 +294,15 @@ cvtDec (ClosedTypeFamilyD tc tyvars mkind eqns)
   = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tyvars
        ; mkind' <- cvtMaybeKind mkind
        ; eqns' <- mapM (cvtTySynEqn tc') eqns
-       ; returnL $ TyClD (FamDecl (FamilyDecl (ClosedTypeFamily eqns') tc' tvs' mkind')) }
+       ; returnJustL $ TyClD $ FamDecl $
+         FamilyDecl (ClosedTypeFamily eqns') tc' tvs' mkind' }
   | otherwise
   = failWith (ptext (sLit "Illegal empty closed type family"))
 
 cvtDec (TH.RoleAnnotD tc roles)
   = do { tc' <- tconNameL tc
        ; let roles' = map (noLoc . cvtRole) roles
-       ; returnL $ Hs.RoleAnnotD (RoleAnnotDecl tc' roles') }
+       ; returnJustL $ Hs.RoleAnnotD (RoleAnnotDecl tc' roles') }
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)
 cvtTySynEqn tc (TySynEqn lhs rhs)
@@ -308,7 +322,7 @@ cvt_ci_decs :: MsgDoc -> [TH.Dec]
 -- Convert the declarations inside a class or instance decl
 -- ie signatures, bindings, and associated types
 cvt_ci_decs doc decs
-  = do  { decs' <- mapM cvtDec decs
+  = do  { decs' <- cvtDecs decs
         ; let (ats', bind_sig_decs') = partitionWith is_tyfam_inst decs'
         ; let (adts', no_ats')       = partitionWith is_datafam_inst bind_sig_decs'
         ; let (sigs', prob_binds')   = partitionWith is_sig no_ats'
@@ -462,7 +476,7 @@ cvt_conv TH.StdCall = StdCallConv
 --              Pragmas
 ------------------------------------------
 
-cvtPragmaD :: Pragma -> CvtM (LHsDecl RdrName)
+cvtPragmaD :: Pragma -> CvtM (Maybe (LHsDecl RdrName))
 cvtPragmaD (InlineP nm inline rm phases)
   = do { nm' <- vNameL nm
        ; let dflt = dfltActivation inline
@@ -470,7 +484,7 @@ cvtPragmaD (InlineP nm inline rm phases)
                                  , inl_rule   = cvtRuleMatch rm
                                  , inl_act    = cvtPhases phases dflt
                                  , inl_sat    = Nothing }
-       ; returnL $ Hs.SigD $ InlineSig nm' ip }
+       ; returnJustL $ Hs.SigD $ InlineSig nm' ip }
 
 cvtPragmaD (SpecialiseP nm ty inline phases)
   = do { nm' <- vNameL nm
@@ -482,11 +496,11 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
                                , inl_rule   = Hs.FunLike
                                , inl_act    = cvtPhases phases dflt
                                , inl_sat    = Nothing }
-       ; returnL $ Hs.SigD $ SpecSig nm' ty' ip }
+       ; returnJustL $ Hs.SigD $ SpecSig nm' ty' ip }
 
 cvtPragmaD (SpecialiseInstP ty)
   = do { ty' <- cvtType ty
-       ; returnL $ Hs.SigD $ SpecInstSig ty' }
+       ; returnJustL $ Hs.SigD $ SpecInstSig ty' }
 
 cvtPragmaD (RuleP nm bndrs lhs rhs phases)
   = do { let nm' = mkFastString nm
@@ -494,7 +508,7 @@ cvtPragmaD (RuleP nm bndrs lhs rhs phases)
        ; bndrs' <- mapM cvtRuleBndr bndrs
        ; lhs'   <- cvtl lhs
        ; rhs'   <- cvtl rhs
-       ; returnL $ Hs.RuleD $ HsRule nm' act bndrs'
+       ; returnJustL $ Hs.RuleD $ HsRule nm' act bndrs'
                                      lhs' placeHolderNames
                                      rhs' placeHolderNames
        }
@@ -509,7 +523,12 @@ cvtPragmaD (AnnP target exp)
          ValueAnnotation n -> do
            n' <- if isVarName n then vName n else cName n
            return (ValueAnnProvenance n')
-       ; returnL $ Hs.AnnD $ HsAnnotation target' exp'
+       ; returnJustL $ Hs.AnnD $ HsAnnotation target' exp'
+       }
+
+cvtPragmaD (LineP line file)
+  = do { setL (srcLocSpan (mkSrcLoc (fsLit file) line 1))
+       ; return Nothing
        }
 
 dfltActivation :: TH.Inline -> Activation
@@ -548,7 +567,7 @@ cvtLocalDecs doc ds
   | null ds
   = return EmptyLocalBinds
   | otherwise
-  = do { ds' <- mapM cvtDec ds
+  = do { ds' <- cvtDecs ds
        ; let (binds, prob_sigs) = partitionWith is_bind ds'
        ; let (sigs, bads) = partitionWith is_sig prob_sigs
        ; unless (null bads) (failWith (mkBadDecMsg doc bads))

@@ -9,8 +9,8 @@ class EP a where
   from :: a -> Result a
   to   :: Result a -> a
 
-{-# RULES "rule1"   forall x. to (from x) = x #-}
-{-# RULES "rule2"   forall x. from (to x) = x #-}
+-- {-# RULES "rule1"   forall x. to (from x) = x #-}
+-- {-# RULES "rule2"   forall x. from (to x) = x #-}
 
 foo :: EP a => a -> a
 -- This is typed in a way rather similarly to RULE rule1

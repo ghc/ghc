@@ -5,7 +5,7 @@
 -- Module      :  System.Mem.Weak
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  non-portable
@@ -16,9 +16,9 @@
 -- object.  A weak pointer can be de-referenced to find out
 -- whether the object it refers to is still alive or not, and if so
 -- to return the object itself.
--- 
+--
 -- Weak pointers are particularly useful for caches and memo tables.
--- To build a memo table, you build a data structure 
+-- To build a memo table, you build a data structure
 -- mapping from the function argument (the key) to its result (the
 -- value).  When you apply the function to a new argument you first
 -- check whether the key\/value pair is already in the memo table.
@@ -26,47 +26,47 @@
 -- key and value alive.  So the table should contain a weak pointer
 -- to the key, not an ordinary pointer.  The pointer to the value must
 -- not be weak, because the only reference to the value might indeed be
--- from the memo table.   
--- 
+-- from the memo table.
+--
 -- So it looks as if the memo table will keep all its values
 -- alive for ever.  One way to solve this is to purge the table
 -- occasionally, by deleting entries whose keys have died.
--- 
+--
 -- The weak pointers in this library
 -- support another approach, called /finalization/.
 -- When the key referred to by a weak pointer dies, the storage manager
 -- arranges to run a programmer-specified finalizer.  In the case of memo
 -- tables, for example, the finalizer could remove the key\/value pair
--- from the memo table.  
--- 
+-- from the memo table.
+--
 -- Another difficulty with the memo table is that the value of a
 -- key\/value pair might itself contain a pointer to the key.
 -- So the memo table keeps the value alive, which keeps the key alive,
 -- even though there may be no other references to the key so both should
--- die.  The weak pointers in this library provide a slight 
+-- die.  The weak pointers in this library provide a slight
 -- generalisation of the basic weak-pointer idea, in which each
 -- weak pointer actually contains both a key and a value.
 --
 -----------------------------------------------------------------------------
 
 module System.Mem.Weak (
-	-- * The @Weak@ type
-	Weak,	    		-- abstract
+        -- * The @Weak@ type
+        Weak,                   -- abstract
 
-	-- * The general interface
-	mkWeak,
-	deRefWeak,
-	finalize,
+        -- * The general interface
+        mkWeak,
+        deRefWeak,
+        finalize,
 
-	-- * Specialised versions
-	mkWeakPtr,
-	addFinalizer,
-	mkWeakPair,
-	-- replaceFinaliser
+        -- * Specialised versions
+        mkWeakPtr,
+        addFinalizer,
+        mkWeakPair,
+        -- replaceFinaliser
 
-	-- * A precise semantics
-	
-	-- $precise
+        -- * A precise semantics
+
+        -- $precise
    ) where
 
 import GHC.Weak

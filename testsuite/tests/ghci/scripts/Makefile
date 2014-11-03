@@ -39,3 +39,8 @@ ghci056_setup:
 T6106_prep:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make T6106_preproc
 
+.PHONY: T9367
+T9367:
+	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci                   < T9367.script > T9367-raw.run.stdout
+	cmp T9367-raw.run.stdout T9367-raw.stdout
+

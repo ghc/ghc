@@ -5,7 +5,6 @@
            , MagicHash
            , UnboxedTuples
   #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -13,7 +12,7 @@
 -- Module      :  GHC.TopHandler
 -- Copyright   :  (c) The University of Glasgow, 2001-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -34,35 +33,34 @@ module GHC.TopHandler (
 
 import Control.Exception
 import Data.Maybe
-import Data.Dynamic (toDyn)
 
 import Foreign
 import Foreign.C
 import GHC.Base
 import GHC.Conc hiding (throwTo)
-import GHC.Num
 import GHC.Real
-import GHC.MVar
 import GHC.IO
 import GHC.IO.Handle.FD
 import GHC.IO.Handle
 import GHC.IO.Exception
 import GHC.Weak
-import Data.Typeable
+
 #if defined(mingw32_HOST_OS)
 import GHC.ConsoleHandler
+#else
+import Data.Dynamic (toDyn)
 #endif
 
 -- | 'runMainIO' is wrapped around 'Main.main' (or whatever main is
 -- called in the program).  It catches otherwise uncaught exceptions,
 -- and also flushes stdout\/stderr before exiting.
 runMainIO :: IO a -> IO a
-runMainIO main = 
-    do 
+runMainIO main =
+    do
       main_thread_id <- myThreadId
       weak_tid <- mkWeakThreadId main_thread_id
       install_interrupt_handler $ do
-           m <- deRefWeak weak_tid 
+           m <- deRefWeak weak_tid
            case m of
                Nothing  -> return ()
                Just tid -> throwTo tid (toException UserInterrupt)
@@ -74,7 +72,7 @@ install_interrupt_handler :: IO () -> IO ()
 #ifdef mingw32_HOST_OS
 install_interrupt_handler handler = do
   _ <- GHC.ConsoleHandler.installHandler $
-     Catch $ \event -> 
+     Catch $ \event ->
         case event of
            ControlC -> handler
            Break    -> handler
@@ -95,10 +93,10 @@ install_interrupt_handler handler = do
 
 foreign import ccall unsafe
   stg_sig_install
-	:: CInt				-- sig no.
-	-> CInt				-- action code (STG_SIG_HAN etc.)
-	-> Ptr ()			-- (in, out) blocked
-	-> IO CInt			-- (ret) old action code
+        :: CInt                         -- sig no.
+        -> CInt                         -- action code (STG_SIG_HAN etc.)
+        -> Ptr ()                       -- (in, out) blocked
+        -> IO CInt                      -- (ret) old action code
 #endif
 
 -- | 'runIO' is wrapped around every @foreign export@ and @foreign
@@ -114,7 +112,7 @@ runIO main = catch main topHandler
 -- we don't shut down the system cleanly, we just exit.  This is
 -- useful in some cases, because the safe exit version will give other
 -- threads a chance to clean up first, which might shut down the
--- system in a different way.  For example, try 
+-- system in a different way.  For example, try
 --
 --   main = forkIO (runIO (exitWith (ExitFailure 1))) >> threadDelay 10000
 --
@@ -137,7 +135,7 @@ topHandler :: SomeException -> IO a
 topHandler err = catch (real_handler safeExit err) topHandler
 
 topHandlerFastExit :: SomeException -> IO a
-topHandlerFastExit err = 
+topHandlerFastExit err =
   catchException (real_handler fastExit err) topHandlerFastExit
 
 -- Make sure we handle errors while reporting the error!
@@ -167,7 +165,7 @@ real_handler exit se = do
                    | Errno ioe == ePIPE, hdl == stdout -> exit 0
                 _ -> do reportError se
                         exit 1
-           
+
 
 -- try to flush stdout/stderr, but don't worry if we fail
 -- (these handles might have errors, and we don't want to go into
@@ -206,7 +204,7 @@ foreign import ccall "shutdownHaskellAndSignal"
 #endif
 
 exitInterrupted :: IO a
-exitInterrupted = 
+exitInterrupted =
 #ifdef mingw32_HOST_OS
   safeExit 252
 #else

@@ -72,10 +72,10 @@ import LeaveCriticalSection;
  * will either increase the size of our stack, or raise an exception if
  * the stack is already too big.
  */
- 
-#define PRE_RETURN(why,what_next)			\
-  StgTSO_what_next(CurrentTSO) = what_next::I16;	\
-  StgRegTable_rRet(BaseReg) = why;           	        \
+
+#define PRE_RETURN(why,what_next)                       \
+  StgTSO_what_next(CurrentTSO) = what_next::I16;        \
+  StgRegTable_rRet(BaseReg) = why;                      \
   R1 = BaseReg;
 
 /* Remember that the return address is *removed* when returning to a
@@ -122,24 +122,24 @@ stg_gc_noregs
     jump stg_returnToSched [R1];
 }
 
-#define HP_GENERIC				\
+#define HP_GENERIC                              \
     PRE_RETURN(HeapOverflow, ThreadRunGHC)      \
     jump stg_returnToSched [R1];
 
-#define BLOCK_GENERIC				\
+#define BLOCK_GENERIC                           \
     PRE_RETURN(ThreadBlocked,  ThreadRunGHC)    \
     jump stg_returnToSched [R1];
 
-#define YIELD_GENERIC				\
+#define YIELD_GENERIC                           \
     PRE_RETURN(ThreadYielding, ThreadRunGHC)    \
     jump stg_returnToSched [R1];
 
-#define BLOCK_BUT_FIRST(c)			\
+#define BLOCK_BUT_FIRST(c)                      \
     PRE_RETURN(ThreadBlocked, ThreadRunGHC)     \
     R2 = c;                                     \
     jump stg_returnToSchedButFirst [R1,R2,R3];
 
-#define YIELD_TO_INTERPRETER			\
+#define YIELD_TO_INTERPRETER                    \
     PRE_RETURN(ThreadYielding, ThreadInterpret) \
     jump stg_returnToSchedNotPaused [R1];
 
@@ -356,7 +356,7 @@ stg_gc_pppp return (P_ arg1, P_ arg2, P_ arg3, P_ arg4)
    Generic function entry heap check code.
 
    At a function entry point, the arguments are as per the calling convention,
-   i.e. some in regs and some on the stack.  There may or may not be 
+   i.e. some in regs and some on the stack.  There may or may not be
    a pointer to the function closure in R1 - if there isn't, then the heap
    check failure code in the function will arrange to load it.
 
@@ -365,16 +365,16 @@ stg_gc_pppp return (P_ arg1, P_ arg2, P_ arg3, P_ arg4)
    registers and return to the scheduler.
 
    This code arranges the stack like this:
-	 
+
          |        ....         |
          |        args         |
-	 +---------------------+
+         +---------------------+
          |      f_closure      |
-	 +---------------------+
+         +---------------------+
          |        size         |
-	 +---------------------+
+         +---------------------+
          |   stg_gc_fun_info   |
-	 +---------------------+
+         +---------------------+
 
    The size is the number of words of arguments on the stack, and is cached
    in the frame in order to simplify stack walking: otherwise the size of
@@ -393,21 +393,21 @@ __stg_gc_fun /* explicit stack */
     // cache the size
     type = TO_W_(StgFunInfoExtra_fun_type(info));
     if (type == ARG_GEN) {
-	size = BITMAP_SIZE(StgFunInfoExtra_bitmap(info));
-    } else { 
-	if (type == ARG_GEN_BIG) {
+        size = BITMAP_SIZE(StgFunInfoExtra_bitmap(info));
+    } else {
+        if (type == ARG_GEN_BIG) {
 #ifdef TABLES_NEXT_TO_CODE
             // bitmap field holds an offset
             size = StgLargeBitmap_size( StgFunInfoExtra_bitmap(info)
                                         + %GET_ENTRY(UNTAG(R1)) /* ### */ );
 #else
-	    size = StgLargeBitmap_size( StgFunInfoExtra_bitmap(info) );
+            size = StgLargeBitmap_size( StgFunInfoExtra_bitmap(info) );
 #endif
-	} else {
-	    size = BITMAP_SIZE(W_[stg_arg_bitmaps + WDS(type)]);
-	}
+        } else {
+            size = BITMAP_SIZE(W_[stg_arg_bitmaps + WDS(type)]);
+        }
     }
-    
+
 #ifdef NO_ARG_REGS
     // we don't have to save any registers away
     Sp_adj(-3);
@@ -427,9 +427,9 @@ __stg_gc_fun /* explicit stack */
         Sp(0) = stg_gc_fun_info;
         // DEBUG_ONLY(foreign "C" debugBelch("stg_fun_gc_gen(ARG_GEN)"););
         jump stg_gc_noregs [];
-    } else { 
+    } else {
         jump W_[stg_stack_save_entries + WDS(type)] [*]; // all regs live
-	    // jumps to stg_gc_noregs after saving stuff
+            // jumps to stg_gc_noregs after saving stuff
     }
 #endif /* !NO_ARG_REGS */
 }
@@ -455,21 +455,21 @@ INFO_TABLE_RET ( stg_gc_fun, RET_FUN )
 #else
     W_ info;
     W_ type;
-    
+
     info = %GET_FUN_INFO(UNTAG(R1));
     type = TO_W_(StgFunInfoExtra_fun_type(info));
     if (type == ARG_GEN || type == ARG_GEN_BIG) {
         jump StgFunInfoExtra_slow_apply(info) [R1];
-    } else { 
-	if (type == ARG_BCO) {
-	    // cover this case just to be on the safe side
-	    Sp_adj(-2);
-	    Sp(1) = R1;
-	    Sp(0) = stg_apply_interp_info;
+    } else {
+        if (type == ARG_BCO) {
+            // cover this case just to be on the safe side
+            Sp_adj(-2);
+            Sp(1) = R1;
+            Sp(0) = stg_apply_interp_info;
             jump stg_yield_to_interpreter [];
-	} else {
+        } else {
             jump W_[stg_ap_stack_entries + WDS(type)] [R1];
-	}
+        }
     }
 #endif
 }
@@ -505,20 +505,20 @@ stg_block_noregs
  * takeMVar/putMVar-specific blocks
  *
  * Stack layout for a thread blocked in takeMVar/readMVar:
- *      
+ *
  *       ret. addr
  *       ptr to MVar   (R1)
  *       stg_block_takemvar_info (or stg_block_readmvar_info)
  *
  * Stack layout for a thread blocked in putMVar:
- *      
+ *
  *       ret. addr
  *       ptr to Value  (R2)
  *       ptr to MVar   (R1)
  *       stg_block_putmvar_info
  *
  * See PrimOps.hc for a description of the workings of take/putMVar.
- * 
+ *
  * -------------------------------------------------------------------------- */
 
 INFO_TABLE_RET ( stg_block_takemvar, RET_SMALL, W_ info_ptr, P_ mvar )

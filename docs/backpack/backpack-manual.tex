@@ -1,0 +1,432 @@
+\documentclass{article}
+
+\usepackage{color}
+\usepackage{fullpage}
+\usepackage{hyperref}
+
+\newcommand{\Red}[1]{{\color{red} #1}}
+
+\title{The Backpack Manual}
+
+\begin{document}
+
+\maketitle
+
+\paragraph{What is this?}  This is an in-depth technical specification of
+all of the new components associated with Backpack, a new module system
+for Haskell.  This is \emph{not} a tutorial, and it assumes you are
+familiar with the basic motivation and structure of Backpack.
+
+\paragraph{How to read this manual}  This manual is split into three
+sections, in dependency order.  The first section describes the new
+features added to GHC, e.g., new compilation flags and input formats.
+In principle, a user could take advantage of Backpack using just these
+features, without using Cabal or cabal-install; thus, we describe it
+first.  The next section describes the new features added to the library
+Cabal, and the last section describes how cabal-install drives the
+entire process.  A downside of this approach is that we start off by
+describing low-level GHC features which are quite dissimilar from the
+high-level Backpack interface, but we're not really trying to explain
+Backpack to complete new users.  \Red{Red indicates features which are
+not implemented yet.}
+
+\section{GHC}
+
+\subsection{Signatures}
+
+An \texttt{hsig} file represents a (type) signature for a Haskell
+module, containing type signatures, data declarations, type classes,
+type class instances, but not value definitions.\footnote{Signatures are
+the backbone of the Backpack module system.  A signature can be used to
+type-check client code which uses a module (without the module
+implementation), or to verify that an implementation upholds some
+signature (without a client implementation.)} The syntax of an
+\texttt{hsig} file is similar to an \texttt{hs-boot} file.  Here is an
+example of a module signature representing an abstract map type:
+
+\begin{verbatim}
+module Map where
+type role Map nominal representational
+data Map k v
+instance Functor (Map k)
+empty :: Map k a
+\end{verbatim}
+
+For entities that can be explicitly exported and imported, the
+export list of a module signature behaves in the same way as
+the export list for a normal module (e.g., if no list is provided,
+only entities defined in the signature are made available.)
+
+\begin{color}{red}
+However, type class instances and type family instances operate
+differently: an instance is \emph{only} exported if it is directly
+defined in the signature.  This is in contrast to the module behavior,
+where an instance is \emph{implicitly} brought into scope if it is
+imported in any way (even with an empty import list.)
+
+Even if an instance is ``hidden'' (i.e., not exported by a signature
+but in the implementation), we still take it into account when calculating
+conflicting instances (e.g., the soundness checks for type families).  Thus,
+some compilation errors may only occur when linking an implementation
+and user, even if they compiled individually fine against the signature
+in question.
+\end{color}
+
+An \texttt{hsig} file can either be type-checked or compiled against some
+\emph{backing implementation}, an \texttt{hs} module which provides all
+of the declarations that a signature advertises.
+
+\paragraph{Typechecking} A signature file can be type-checked in the same
+way as an ordinary Haskell file:
+
+\begin{verbatim}
+$ ghc -c Map.hsig -fno-code -fwrite-interface
+\end{verbatim}
+
+This procedure generates an interface file, which can be used to type
+check other modules which depend on the signature, even if no backing
+implementation is available.  By default, this generated interface file
+is given \emph{fresh} original names for everything in the signature.
+For example, if \texttt{data T} is defined in two signature files
+\texttt{A.hsig} and \texttt{B.hsig}, they would not be considered
+type-equal, and could not be used interconvertibly, even if they
+had the same structure.
+
+\begin{color}{red}
+To explicitly specify what original name should be assigned (e.g.,
+to make the previous example type-equal) the \texttt{-shape-of} flag
+can be used:
+
+\begin{verbatim}
+$ ghc -c Map.hsig -shape-of "Map is containers_KEY:Data.Map.Map" \
+    -fno-code -fwrite-interface
+\end{verbatim}
+
+\texttt{-shape-of} is comma separated list of \texttt{name is origname}
+entries, where \texttt{name} is an unqualified name and
+\texttt{origname} is an original name, of the form
+\texttt{package\_KEY:Module.name}, where \texttt{package\_KEY} is a
+package key identifying the origin of the identifier (or a fake
+identifier for a symbol whose provenance is not known).  Each instance
+of \texttt{origname} in the signature is instead assigned the original
+name \texttt{origname}, instead of the default original name.
+
+(ToDo: This interface will work pretty poorly with \texttt{--make})
+\end{color}
+
+\paragraph{Compiling} We can specify a backing implementation for
+a signature and compile the signature against it using the
+\texttt{-sig-of} flag:
+
+\begin{verbatim}
+$ ghc -c Map.hsig -sig-of "package_KEY:Module"
+\end{verbatim}
+
+The \texttt{-sig-of} flag takes as an argument a module, specified
+as a package key, a colon, and then the module name.  \Red{This module
+must be a proper, \texttt{exposed-module}, and not a reexport or
+signature.}
+
+Compilation of a signature entails two things.  First, a consistency
+check is performed between the signature and the backing
+implementation, ensuring that the implementation accurately implements
+all of the types in the signature.  For every declaration in the
+signature, there must be an equivalent one in the backing implementation
+with an identical type (this check is quite similar to the one used
+for \texttt{hs-boot}).  Second, an interface file is generated
+which reexports the set of identifiers from the backing
+implementation that were specified in the signature. A file which
+imports the signature will use this interface file.\footnote{This
+interface file is similar to a module which reexports identifiers
+from another module, except that we also record the backing implementation
+for the purpose of handling imports, described in the next section.}
+
+\begin{color}{red}
+ToDo: In what cases is a type class instance/type family instance reexported?
+Currently, type classes from the backing implementation leak through.
+We also need to fix \#9422.
+\end{color}
+
+\subsection{Extended format in the installed package database}\label{sec:pkgdb}
+
+After a set of Haskell modules has been compiled, they can be registered
+as a package in the \emph{installed package database} using
+\texttt{ghc-pkg}.  An entry in the installed package database specifies
+what modules and signatures from the package itself are available for
+import. It can also re-export modules and signatures from other
+packages.\footnote{Signature reexports are essential for creating
+signature packages in a modular way; module reexports are very useful
+for backwards-compatibility packages and also taking an package that has
+been instantiated multiple ways and giving its modules unique names.}
+
+There are three fields of an entry in the installed package database of note.
+
+\begin{color}{red}
+
+\paragraph{exposed-modules} A comma-separated list of
+module names which this package makes available for import, possibly with two extra, optional pieces of information
+about the module in question: what the \emph{original module/signature}
+is (\texttt{from MODULE})\footnote{Knowing the original module/signature
+makes it possible for GHC to directly load the interface file, without
+having to follow multiple hops in the package database.}, and what the
+\emph{backing implementation} is (\texttt{is MODULE})\footnote{Knowing
+the backing implementation makes it possible to tell if an import is
+unambiguous without having to load the interface file first.}.
+
+\begin{verbatim}
+exposed-modules:
+    A,                              # original module
+    B from ipid:B,                  # reexported module
+    C is ipid:CImpl,                # exposed signature
+    D from ipid:D is ipid:DImpl,    # reexported signature
+    D from ipid:D2 is ipid:DImpl    # duplicates can be OK
+\end{verbatim}
+
+If no reexports or signatures are used, the commas can be omitted
+(making this syntax backwards compatible with the original syntax.)
+
+ToDo: What is currently implemented is
+that \texttt{reexported-modules} has a seperate field, where the
+original module is always set and backing implementation is always empty.
+I came to this generalization when I found I needed to add support for
+signatures and reexported signatures.  An alternate design is just to
+have a separate list for every parameter: however, we end up with a lot
+of duplication in the validation and handling code GHC side.  I do like
+the parametric approach better, but since the original
+\texttt{exposed-modules} was space separated, there's not an easy way to
+extend the syntax in a backwards-compatible way.  The current proposal
+suggests we add the comma variant because it is unambiguous with the old
+syntax.
+\end{color}
+
+\paragraph{instantiated-with} A map from hole name to the \emph{original
+module} which instantiated the hole (i.e., what \texttt{-sig-of}
+parameters were used during compilation.)
+
+\paragraph{key} The \emph{package key} of a
+package, an opaque identifier identifying a package
+which serves as the basis for type identity and linker
+symbols.\footnote{Informally, you might think of a package as a package
+name and its version, e.g., \texttt{containers-0.9}; however, sometimes,
+it is necessary to distinguish between installed instances of a package
+with the same name and version which were compiled with different
+dependencies.} When files are compiled as part of a package, the
+package key must be specified using the \texttt{-this-package-key}
+flag.\footnote{The package key is different from an
+\emph{installed package ID}, which is a more fine-grained identifier for
+a package.  Identical installed package IDs imply identical package
+keys, but not vice versa.  However, within a single run of GHC, we
+enforce that package keys and (non-shadowed) installed package IDs are
+in one-to-one correspondence.}
+
+The package key is programatically generated by Cabal\footnote{In
+practice, a package key looks something like
+\texttt{conta\_GtvvBIboSRuDmyUQfSZoAx}.  In this document, we'll use
+\texttt{containers\_KEY} as a convenient shorthand to refer to some
+package key for the \texttt{containers} package.}. While GHC doesn't
+specify what the format of the package key is,  Cabal's must choose distinct package keys if
+any of the following fields in the installed package database are
+distinct:
+
+\begin{itemize}
+\item \texttt{name} (e.g., \texttt{containers})
+\item \texttt{version} (e.g., \texttt{0.8})
+\item \texttt{depends} (with respect to package keys)
+\item \texttt{instantiated-with} (with respect to package keys and module names)
+\end{itemize}
+
+\subsection{Module thinning and renaming}
+
+The command line flag \texttt{-package pkgname} causes all
+exposed modules of \texttt{pkgname} (from the installed package database) to become visible under their
+original names for imports.
+The \texttt{-package} flag and its variants (\texttt{-package-id} and
+\texttt{-package-key}) support ``thinning and renaming''
+annotations, which allows a user to selectively expose only certain
+modules from a package, possibly under different names.\footnote{This
+feature has utility both with and without Backpack.  The ability to
+rename modules makes it easier to deal with third-party packages which
+export conflicting module names; under Backpack, this situation becomes
+especially common when an indefinite package is instantiated multiple
+time with different dependencies.}
+
+Thinning and renaming can be applied
+using the extended syntax \verb|-package "pkgname (rns)"|, where \texttt{rns} is a comma separated list of
+module renamings \texttt{OldName as NewName}.  Bare module names are
+also accepted, where \texttt{Name} is shorthand for \texttt{Name as
+Name}.  A package exposed this way only causes modules (specified before
+the \texttt{as}) explicitly listed in the renamings to become visible
+under their new names (specified after the \texttt{as}).  For example,
+\verb|-package "containers (Data.Set, Data.Map as Map)"| makes
+\texttt{Data.Set} and \texttt{Map} (pointing to
+\texttt{Data.Map}) available for import.\footnote{See also Cabal files
+for a twist on this syntax.}
+
+When the \texttt{-hide-all-packages} flag is applied, uses of the
+\texttt{-package} flag are \emph{cumulative}; each argument is processed
+and its bindings added to the global module map.  For example,
+\verb|-hide-all-packages -package containers -package "containers (Data.Map as Map)"| brings both the default exposed modules of
+containers and a binding for \texttt{Map} into scope.\footnote{The
+previous behavior, and the current behavior when
+\texttt{-hide-all-packages} is not set, is for a second package flag for
+the same package name to override the first one.}\footnote{We defer
+discussion of what happens when a module name is bound multiple times until
+we have discussed signatures, which have interesting behavior on this front.}
+
+\subsection{Disambiguating imports}
+
+With module thinning and renaming, as well as the installed package
+database, it is possible for GHC to have multiple bindings for a single
+module name.  If the bindings are ambiguous, GHC will report an error
+when the user attempts to use the identifier.
+
+Define the \emph{true module} associated with a binding to be the
+backing implementation, if the binding is for a signature,\footnote{This
+implements signature merging, as otherwise, we would not necessarily
+expect original signatures to be equal} and the original module
+otherwise.  A binding is unambiguous if the true modules of all the
+bindings are equal.  Here is an example of an unambiguous set of exposed
+modules:
+
+\begin{verbatim}
+exposed-modules:
+    A from pkg:AImpl,
+    A is pkg:AImpl,
+    A from other-pkg:Sig is pkg:AImpl
+\end{verbatim}
+
+This mapping says that this package reexports \texttt{pkg:AImpl} as
+\texttt{A}, has an \texttt{A.hsig} which was compiled against
+\texttt{pkg:AImpl}, and reexports a signature from \texttt{other-pkg}
+which itself was compiled against \texttt{pkg:AImpl}.
+
+\paragraph{Typechecking}  \Red{When typechecking only, there is not
+necessarily a backing implementation associated with a signature.  In
+this case, even if the original names match up, we must perform an
+\emph{additional} check to ensure declarations have compatible types.}
+This check is not necessary during compilation, because \texttt{-sig-of}
+will ensure that the signatures are compatible with a common, unique
+backing implementation.
+
+\subsection{Indefinite external packages}
+
+\Red{Not implemented yet.}
+
+\section{Cabal}
+
+\subsection{Fields in the Cabal file}
+
+The Cabal file is a user-facing description of a package, which is
+converted into an \texttt{InstalledPackageInfo} during a Cabal build.
+Backpack extends the Cabal files with four new fields, all of which
+are only valid in the \texttt{library} section of a package:
+
+\paragraph{required-signatures}  A space-separated list of module names
+specifying internal signatures (in \texttt{hsig} files) of the package.
+\Red{Signatures specified in this field are not put in the \texttt{exposed-modules} field in the installed package database and
+are not available for external import}; however, in order for a package to be
+compiled, implementations for all of its signatures must be provided (so
+they are not completely \emph{hidden} in the same way \texttt{other-modules} are).
+
+\paragraph{exposed-signatures}  A space-separated list of module names
+specifying externally visible signatures (in \texttt{hsig} files) of the package.  It is
+represented in the installed package database as an \texttt{exposed-module} with a
+non-empty backing implementation (\texttt{Sig is Impl}). Signatures exposed in this way are
+available for external import.  In order for a package to be compiled,
+implementations for all exposed signatures must be provided.
+
+\paragraph{indefinite}  A package is \emph{indefinite} if it has any
+uninstantiated
+\texttt{required-signatures} or \texttt{exposed-signatures}, or it
+depends on an indefinite package without instantiating all of the holes
+of that package.  In principle, this parameter can be calculated
+by Cabal, but it serves a documentory purpose for packages which do not
+have any signatures themselves, but depend on packages which are indefinite.
+\Red{Actually, this field is in the top-level at the moment.}
+
+\paragraph{reexported-modules}  A comma-separated list of module or
+signature reexports.  It is represented in the installed package
+database as a module with a non-empty original module/signature: the
+original module is resolved by Cabal.  There are three valid syntactic
+forms:
+
+\begin{itemize}
+    \item \texttt{Orig}, which reexports any module with the
+    name \texttt{Orig} in the current scope (e.g.,
+    as specified by \texttt{build-depends}).
+
+    \item \texttt{Orig as New}, which reexports a module with
+    the name \texttt{Orig} in the current scope.  \texttt{Orig}
+    can be a home module and doesn't necessarily have to come
+    from \texttt{build-depends}.
+
+    \item \texttt{package:Orig as New}, which reexports a module
+    with name \texttt{Orig} from the specific source package \texttt{package}.
+\end{itemize}
+
+If multiple modules with the same name are in scope, we check
+if it is unambiguous (the same check used by GHC); if they are
+we reexport all of the modules; otherwise, we give an error.
+In this way, packages which reexport multiple signatures to the
+same name can be valid; a package may also reexport a signature
+onto a home \texttt{hsig} signature.
+
+\subsection{build-depends}
+
+This field has been extended with new syntax
+to provide the access to GHC's new thinning and renaming functionality
+and to have the ability to include an indefinite package \emph{multiple times}
+(with different instantiations for its holes).  Renaming is the
+\emph{primary} mechanism by which holes are instantiated in a mix-in module
+system, however, this instantiation only occurs when running \texttt{cabal-install}.
+
+Here is an example entry in \texttt{build-depends}:
+\verb|foo >= 0.8 (ASig as A1, B as B1; ASig as A2, ...)|.  This statement includes the
+package \texttt{foo} twice, once with \texttt{ASig} instantiated with
+\texttt{A1} and \texttt{B} renamed as \texttt{B1}, and once with
+\texttt{ASig} instantiated with \texttt{A2}, and all other modules
+imported with their original names.  Assuming that the key of the first
+instance of \texttt{foo} is \texttt{foo\_KEY1} and the key of the second instance
+is \texttt{foo\_KEY2}, and that \texttt{ASig} is an \texttt{exposed-signature}, then this \texttt{build-depends} would turn into
+these flags for GHC\@: \verb|-package-key "foo\_KEY1 (ASig as A1, B as B1)" -package-key "foo\_KEY2" -package-key "foo\_KEY2 (ASig as A2)"|
+
+Syntactically, the thinnings and renamings are placed inside a
+parenthetical after the package name and version constraints.
+Semicolons distinguish separate inclusions of the package, and the inner
+comma-separated lists indicate the thinning/renamings of the module.
+You can also write \verb|...|, which simply
+includes all of the default bindings from the package.
+\Red{This is not implemented. Should this only refer to modules which were not referred to already? Should it refer only to holes?}
+
+There are two remarks that should be made about separate instantiations of
+the package.  First, Cabal will automatically ``de-duplicate'' instances of
+the package which are equivalent: thus, \verb|foo (A; B)| is equivalent to
+\texttt{foo (A, B)} when \texttt{foo} is a definite package, or when the
+holes instantiation for each instance is equivalent.  Second, when merging
+two \texttt{build-depends} statements together (for example, due to
+a conditional section in a Cabal file), they are considered \emph{separate
+inclusions of a package.}
+
+\subsection{Setup flags}
+
+There is one new flag for the \texttt{Setup} script, which can be
+used to manually provide instantiations for holes in a package:
+\verb|--instantiate-with NAME=PKG:MOD|, which binds a module \verb|NAME|
+to the implementation \verb|MOD| provided by installed package ID \verb|PKG|.
+The flag can be specified multiply times to provide bindings for all
+signatures.  The module in question must be the \emph{original} module,
+not a re-export.
+
+
+
+\subsection{Metadata in the installed package database}
+
+Cabal records
+
+\texttt{instantiated-with}
+
+\section{cabal-install}
+
+\subsection{Indefinite package instantiation}
+
+\end{document}

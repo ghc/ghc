@@ -1155,8 +1155,12 @@ ensureArgs n d | n == depth = d
                 -- See [Nature of result demand]
 
 seqDmdType :: DmdType -> ()
-seqDmdType (DmdType _env ds res) = 
-  {- ??? env `seq` -} seqDemandList ds `seq` seqDmdResult res `seq` ()
+seqDmdType (DmdType env ds res) =
+  seqDmdEnv env `seq` seqDemandList ds `seq` seqDmdResult res `seq` ()
+
+seqDmdEnv :: DmdEnv -> ()
+seqDmdEnv env = seqDemandList (varEnvElts env)
+
 
 splitDmdTy :: DmdType -> (Demand, DmdType)
 -- Split off one function argument
@@ -1489,6 +1493,11 @@ newtype StrictSig = StrictSig DmdType
 instance Outputable StrictSig where
    ppr (StrictSig ty) = ppr ty
 
+-- Used for printing top-level strictness pragmas in interface files
+pprIfaceStrictSig :: StrictSig -> SDoc
+pprIfaceStrictSig (StrictSig (DmdType _ dmds res))
+  = hcat (map ppr dmds) <> ppr res
+
 mkStrictSig :: DmdType -> StrictSig
 mkStrictSig dmd_ty = StrictSig dmd_ty
 
@@ -1516,29 +1525,8 @@ botSig = StrictSig botDmdType
 cprProdSig :: Arity -> StrictSig
 cprProdSig arity = StrictSig (cprProdDmdType arity)
 
-argsOneShots :: StrictSig -> Arity -> [[OneShotInfo]]
-argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args
-  = go arg_ds
-  where
-    good_one_shot
-      | arg_ds `lengthExceeds` n_val_args = ProbOneShot
-      | otherwise                         = OneShotLam
-
-    go []               = []
-    go (arg_d : arg_ds) = argOneShots good_one_shot arg_d `cons` go arg_ds
-
-    cons [] [] = []
-    cons a  as = a:as
-
-argOneShots :: OneShotInfo -> JointDmd -> [OneShotInfo]
-argOneShots one_shot_info (JD { absd = usg })
-  = case usg of
-      Use _ arg_usg -> go arg_usg
-      _             -> []
-  where
-    go (UCall One  u) = one_shot_info : go u
-    go (UCall Many u) = NoOneShotInfo : go u
-    go _              = []
+seqStrictSig :: StrictSig -> ()
+seqStrictSig (StrictSig ty) = seqDmdType ty
 
 dmdTransformSig :: StrictSig -> CleanDemand -> DmdType
 -- (dmdTransformSig fun_sig dmd) considers a call to a function whose
@@ -1613,30 +1601,78 @@ you might do strictness analysis, but there is no inlining for the class op.
 This is weird, so I'm not worried about whether this optimises brilliantly; but
 it should not fall over.
 
-Note [Non-full application] 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+\begin{code}
+argsOneShots :: StrictSig -> Arity -> [[OneShotInfo]]
+-- See Note [Computing one-shot info, and ProbOneShot]
+argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args
+  = go arg_ds
+  where
+    unsaturated_call = arg_ds `lengthExceeds` n_val_args
+    good_one_shot
+      | unsaturated_call = ProbOneShot
+      | otherwise        = OneShotLam
+
+    go []               = []
+    go (arg_d : arg_ds) = argOneShots good_one_shot arg_d `cons` go arg_ds
+
+    -- Avoid list tail like [ [], [], [] ]
+    cons [] [] = []
+    cons a  as = a:as
+
+argOneShots :: OneShotInfo -> JointDmd -> [OneShotInfo]
+argOneShots one_shot_info (JD { absd = usg })
+  = case usg of
+      Use _ arg_usg -> go arg_usg
+      _             -> []
+  where
+    go (UCall One  u) = one_shot_info : go u
+    go (UCall Many u) = NoOneShotInfo : go u
+    go _              = []
+\end{code}
+
+Note [Computing one-shot info, and ProbOneShot]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a call
+    f (\pqr. e1) (\xyz. e2) e3
+where f has usage signature
+    C1(C(C1(U))) C1(U) U
+Then argsOneShots returns a [[OneShotInfo]] of
+    [[OneShot,NoOneShotInfo,OneShot],  [OneShot]]
+The occurrence analyser propagates this one-shot infor to the
+binders \pqr and \xyz; see Note [Use one-shot information] in OccurAnal.
+
+But suppose f was not saturated, so the call looks like
+    f (\pqr. e1) (\xyz. e2)
+The in principle this partial application might be shared, and
+the (\prq.e1) abstraction might be called more than once.  So
+we can't mark them OneShot. But instead we return
+    [[ProbOneShot,NoOneShotInfo,ProbOneShot],  [ProbOneShot]]
+The occurrence analyser propagates this to the \pqr and \xyz
+binders.
+
+How is it used?  Well, it's quite likely that the partial application
+of f is not shared, so the float-out pass (in SetLevels.lvlLamBndrs)
+does not float MFEs out of a ProbOneShot lambda.  That currently is
+the only way that ProbOneShot is used.
+
+
+\begin{code}
+-- appIsBottom returns true if an application to n args would diverge
+-- See Note [Unsaturated applications]
+appIsBottom :: StrictSig -> Int -> Bool
+appIsBottom (StrictSig (DmdType _ ds res)) n
+            | isBotRes res                      = not $ lengthExceeds ds n 
+appIsBottom _                                 _ = False
+\end{code}
+
+Note [Unsaturated applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If a function having bottom as its demand result is applied to a less
 number of arguments than its syntactic arity, we cannot say for sure
 that it is going to diverge. This is the reason why we use the
 function appIsBottom, which, given a strictness signature and a number
 of arguments, says conservatively if the function is going to diverge
 or not.
-
-\begin{code}
--- appIsBottom returns true if an application to n args would diverge
-appIsBottom :: StrictSig -> Int -> Bool
-appIsBottom (StrictSig (DmdType _ ds res)) n
-            | isBotRes res                      = not $ lengthExceeds ds n 
-appIsBottom _                                 _ = False
-
-seqStrictSig :: StrictSig -> ()
-seqStrictSig (StrictSig ty) = seqDmdType ty
-
--- Used for printing top-level strictness pragmas in interface files
-pprIfaceStrictSig :: StrictSig -> SDoc
-pprIfaceStrictSig (StrictSig (DmdType _ dmds res))
-  = hcat (map ppr dmds) <> ppr res
-\end{code}
 
 Zap absence or one-shot information, under control of flags
 

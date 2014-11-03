@@ -61,6 +61,4 @@ module Data.Ix
 
     ) where
 
--- import Prelude
-
 import GHC.Arr

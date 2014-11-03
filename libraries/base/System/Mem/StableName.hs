@@ -11,14 +11,14 @@
 -- Module      :  System.Mem.StableName
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
 -- Stable names are a way of performing fast (O(1)), not-quite-exact
 -- comparison between objects.
--- 
+--
 -- Stable names solve the following problem: suppose you want to build
 -- a hash table with Haskell objects as keys, but you want to use
 -- pointer equality for comparison; maybe because the keys are large
@@ -38,13 +38,11 @@ module System.Mem.StableName (
   eqStableName
   ) where
 
-import Prelude
-
 import Data.Typeable
 
 import GHC.IO           ( IO(..) )
-import GHC.Base		( Int(..), StableName#, makeStableName#
-			, eqStableName#, stableNameToInt# )
+import GHC.Base         ( Int(..), StableName#, makeStableName#
+                        , eqStableName#, stableNameToInt# )
 
 -----------------------------------------------------------------------------
 -- Stable Names
@@ -55,7 +53,7 @@ import GHC.Base		( Int(..), StableName#, makeStableName#
   Stable names have the following property:
 
   * If @sn1 :: StableName@ and @sn2 :: StableName@ and @sn1 == sn2@
-   then @sn1@ and @sn2@ were created by calls to @makeStableName@ on 
+   then @sn1@ and @sn2@ were created by calls to @makeStableName@ on
    the same object.
 
   The reverse is not necessarily true: if two stable names are not
@@ -84,7 +82,7 @@ data StableName a = StableName (StableName# a)
 -- the first argument is not evaluated by 'makeStableName'.
 makeStableName  :: a -> IO (StableName a)
 #if defined(__PARALLEL_HASKELL__)
-makeStableName a = 
+makeStableName a =
   error "makeStableName not implemented in parallel Haskell"
 #else
 makeStableName a = IO $ \ s ->
@@ -97,21 +95,21 @@ makeStableName a = IO $ \ s ->
 -- of 'hashStableName' makes a good hash key).
 hashStableName :: StableName a -> Int
 #if defined(__PARALLEL_HASKELL__)
-hashStableName (StableName sn) = 
+hashStableName (StableName sn) =
   error "hashStableName not implemented in parallel Haskell"
 #else
 hashStableName (StableName sn) = I# (stableNameToInt# sn)
 #endif
 
-instance Eq (StableName a) where 
+instance Eq (StableName a) where
 #if defined(__PARALLEL_HASKELL__)
-    (StableName sn1) == (StableName sn2) = 
+    (StableName sn1) == (StableName sn2) =
       error "eqStableName not implemented in parallel Haskell"
 #else
-    (StableName sn1) == (StableName sn2) = 
+    (StableName sn1) == (StableName sn2) =
        case eqStableName# sn1 sn2 of
-	 0# -> False
-	 _  -> True
+         0# -> False
+         _  -> True
 #endif
 
 -- | Equality on 'StableName' that does not require that the types of
@@ -121,8 +119,8 @@ instance Eq (StableName a) where
 eqStableName :: StableName a -> StableName b -> Bool
 eqStableName (StableName sn1) (StableName sn2) =
        case eqStableName# sn1 sn2 of
-	 0# -> False
-	 _  -> True
+         0# -> False
+         _  -> True
   -- Requested by Emil Axelsson on glasgow-haskell-users, who wants to
   -- use it for implementing observable sharing.
 

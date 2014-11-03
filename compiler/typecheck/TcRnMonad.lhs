@@ -104,6 +104,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
         th_state_var         <- newIORef Map.empty ;
 #endif /* GHCI */
         let {
+             dflags = hsc_dflags hsc_env ;
+
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
                 | keep_rn_syntax = Just empty_val
@@ -119,6 +121,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 
                 tcg_mod            = mod,
                 tcg_src            = hsc_src,
+                tcg_sig_of         = getSigOf dflags (moduleName mod),
+                tcg_impl_rdr_env   = Nothing,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
                 tcg_field_env      = RecFields emptyNameEnv emptyNameSet,
@@ -188,14 +192,12 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
         lie <- readIORef lie_var ;
         if isEmptyWC lie
            then return ()
-           else pprPanic "initTc: unsolved constraints"
-                         (pprWantedsWithLocs lie) ;
+           else pprPanic "initTc: unsolved constraints" (ppr lie) ;
 
         -- Collect any error messages
         msgs <- readIORef errs_var ;
 
-        let { dflags = hsc_dflags hsc_env
-            ; final_res | errorsFound dflags msgs = Nothing
+        let { final_res | errorsFound dflags msgs = Nothing
                         | otherwise               = maybe_res } ;
 
         return (msgs, final_res)
@@ -484,25 +486,35 @@ traceIf      = traceOptIf Opt_D_dump_if_trace
 traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
 
-traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
-traceOptIf flag doc = whenDOptM flag $
-                          do dflags <- getDynFlags
-                             liftIO (printInfoForUser dflags alwaysQualify doc)
+traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()
+traceOptIf flag doc 
+  = whenDOptM flag $    -- No RdrEnv available, so qualify everything
+    do { dflags <- getDynFlags
+       ; liftIO (putMsg dflags doc) }
 
 traceOptTcRn :: DumpFlag -> SDoc -> TcRn ()
 -- Output the message, with current location if opt_PprStyle_Debug
-traceOptTcRn flag doc = whenDOptM flag $ do
-                        { loc  <- getSrcSpanM
-                        ; let real_doc
-                                | opt_PprStyle_Debug = mkLocMessage SevInfo loc doc
-                                | otherwise = doc   -- The full location is
-                                                    -- usually way too much
-                        ; dumpTcRn real_doc }
+traceOptTcRn flag doc 
+  = whenDOptM flag $
+    do { loc  <- getSrcSpanM
+       ; let real_doc
+               | opt_PprStyle_Debug = mkLocMessage SevInfo loc doc
+               | otherwise = doc   -- The full location is
+                                   -- usually way too much
+       ; dumpTcRn real_doc }
 
 dumpTcRn :: SDoc -> TcRn ()
-dumpTcRn doc = do { rdr_env <- getGlobalRdrEnv
-                  ; dflags <- getDynFlags
-                  ; liftIO (printInfoForUser dflags (mkPrintUnqualified dflags rdr_env) doc) }
+dumpTcRn doc
+  = do { dflags <- getDynFlags
+       ; rdr_env <- getGlobalRdrEnv
+       ; liftIO (logInfo dflags (mkDumpStyle (mkPrintUnqualified dflags rdr_env)) doc) }
+
+printForUserTcRn :: SDoc -> TcRn ()
+-- Like dumpTcRn, but for user consumption
+printForUserTcRn doc
+  = do { dflags <- getDynFlags
+       ; rdr_env <- getGlobalRdrEnv
+       ; liftIO (printInfoForUser dflags (mkPrintUnqualified dflags rdr_env) doc) }
 
 debugDumpTcRn :: SDoc -> TcRn ()
 debugDumpTcRn doc | opt_NoDebugOutput = return ()
@@ -533,8 +545,8 @@ getGHCiMonad = do { hsc <- getTopEnv; return (ic_monad $ hsc_IC hsc) }
 getInteractivePrintName :: TcRn Name
 getInteractivePrintName = do { hsc <- getTopEnv; return (ic_int_print $ hsc_IC hsc) }
 
-tcIsHsBoot :: TcRn Bool
-tcIsHsBoot = do { env <- getGblEnv; return (isHsBoot (tcg_src env)) }
+tcIsHsBootOrSig :: TcRn Bool
+tcIsHsBootOrSig = do { env <- getGblEnv; return (isHsBootOrSig (tcg_src env)) }
 
 getGlobalRdrEnv :: TcRn GlobalRdrEnv
 getGlobalRdrEnv = do { env <- getGblEnv; return (tcg_rdr_env env) }
@@ -695,14 +707,6 @@ reportWarning warn
          errs_var <- getErrsVar ;
          (warns, errs) <- readTcRef errs_var ;
          writeTcRef errs_var (warns `snocBag` warn, errs) }
-
-dumpDerivingInfo :: SDoc -> TcM ()
-dumpDerivingInfo doc
-  = do { dflags <- getDynFlags
-       ; when (dopt Opt_D_dump_deriv dflags) $ do
-       { rdr_env <- getGlobalRdrEnv
-       ; let unqual = mkPrintUnqualified dflags rdr_env
-       ; liftIO (putMsgWith dflags unqual doc) } }
 \end{code}
 
 
@@ -820,6 +824,9 @@ checkNoErrs main
             Nothing  -> failM
             Just val -> return val
         }
+
+whenNoErrs :: TcM () -> TcM ()
+whenNoErrs thing = ifErrsM (return ()) thing
 
 ifErrsM :: TcRn r -> TcRn r -> TcRn r
 --      ifErrsM bale_out normal
@@ -1049,12 +1056,14 @@ newTcEvBinds = do { ref <- newTcRef emptyEvBindMap
 
 addTcEvBind :: EvBindsVar -> EvVar -> EvTerm -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
-addTcEvBind (EvBindsVar ev_ref _) var t
-  = do { bnds <- readTcRef ev_ref
-       ; writeTcRef ev_ref (extendEvBinds bnds var t) }
+addTcEvBind (EvBindsVar ev_ref _) ev_id ev_tm
+  = do { traceTc "addTcEvBind" $ vcat [ text "ev_id =" <+> ppr ev_id
+                                      , text "ev_tm =" <+> ppr ev_tm ]
+       ; bnds <- readTcRef ev_ref
+       ; writeTcRef ev_ref (extendEvBinds bnds ev_id ev_tm) }
 
 getTcEvBinds :: EvBindsVar -> TcM (Bag EvBind)
-getTcEvBinds (EvBindsVar ev_ref _) 
+getTcEvBinds (EvBindsVar ev_ref _)
   = do { bnds <- readTcRef ev_ref
        ; return (evBindMapBinds bnds) }
 

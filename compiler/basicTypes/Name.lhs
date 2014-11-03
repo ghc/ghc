@@ -48,8 +48,9 @@ module Name (
         -- ** Manipulating and deconstructing 'Name's
         nameUnique, setNameUnique,
         nameOccName, nameModule, nameModule_maybe,
+        setNameLoc,
         tidyNameOcc,
-        hashName, localiseName,
+        localiseName,
         mkLocalisedOccName,
 
         nameSrcLoc, nameSrcSpan, pprNameDefnLoc, pprDefinedAt,
@@ -317,6 +318,11 @@ mkFCallName uniq str = mkInternalName uniq (mkVarOcc str) noSrcSpan
 setNameUnique :: Name -> Unique -> Name
 setNameUnique name uniq = name {n_uniq = getKeyFastInt uniq}
 
+-- This is used for hsigs: we want to use the name of the originally exported
+-- entity, but edit the location to refer to the reexport site
+setNameLoc :: Name -> SrcSpan -> Name
+setNameLoc name loc = name {n_loc = loc}
+
 tidyNameOcc :: Name -> OccName -> Name
 -- We set the OccName of a Name when tidying
 -- In doing so, we change System --> Internal, so that when we print
@@ -349,11 +355,6 @@ mkLocalisedOccName this_mod mk_occ name = mk_occ origin (nameOccName name)
 %************************************************************************
 
 \begin{code}
-hashName :: Name -> Int         -- ToDo: should really be Word
-hashName name = getKey (nameUnique name) + 1
-        -- The +1 avoids keys with lots of zeros in the ls bits, which
-        -- interacts badly with the cheap and cheerful multiplication in
-        -- hashExpr
 
 cmpName :: Name -> Name -> Ordering
 cmpName n1 n2 = iBox (n_uniq n1) `compare` iBox (n_uniq n2)

@@ -200,7 +200,7 @@ AC_MSG_CHECKING(whether bootstrap compiler is affected by bug 9439)
 echo "main = putStrLn \"%function\"" > conftestghc.hs
 
 # Check whether LLVM backend is default for this platform
-${WithGhc} conftestghc.hs 2>&1 >/dev/null
+"${WithGhc}" conftestghc.hs 2>&1 >/dev/null
 res=`./conftestghc`
 if test "x$res" == "x%object"
 then
@@ -217,7 +217,7 @@ fi
 
 # -fllvm is not the default, but set a flag so the Makefile can check
 # -for it in the build flags later on
-${WithGhc} -fforce-recomp -fllvm conftestghc.hs 2>&1 >/dev/null
+"${WithGhc}" -fforce-recomp -fllvm conftestghc.hs 2>&1 >/dev/null
 if test $? == 0
 then
     res=`./conftestghc`
@@ -753,7 +753,7 @@ dnl    off_t, because it will affect the result of that test.
 AC_SYS_LARGEFILE
 
 dnl ** check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS([bfd.h ctype.h dirent.h dlfcn.h errno.h fcntl.h grp.h limits.h locale.h nlist.h pthread.h pwd.h signal.h sys/param.h sys/mman.h sys/resource.h sys/select.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/utsname.h sys/wait.h termios.h time.h utime.h windows.h winsock.h sched.h])
+AC_CHECK_HEADERS([ctype.h dirent.h dlfcn.h errno.h fcntl.h grp.h limits.h locale.h nlist.h pthread.h pwd.h signal.h sys/param.h sys/mman.h sys/resource.h sys/select.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/utsname.h sys/wait.h termios.h time.h utime.h windows.h winsock.h sched.h])
 
 dnl sys/cpuset.h needs sys/param.h to be included first on FreeBSD 9.1; #7708
 AC_CHECK_HEADERS([sys/cpuset.h], [], [],
@@ -846,10 +846,7 @@ then
   AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])
 fi
 
-dnl ** check whether this machine has BFD and libiberty installed (used for debugging)
-dnl    the order of these tests matters: bfd needs libiberty
-AC_CHECK_LIB(iberty, xmalloc)
-AC_CHECK_LIB(bfd,    bfd_uncompress_section_contents)
+FP_BFD_SUPPORT
 
 dnl ################################################################
 dnl Check for libraries
@@ -898,6 +895,22 @@ AC_TRY_LINK_FUNC(printf\$LDBLStub,
         AC_DEFINE([HAVE_PRINTF_LDBLSTUB],[0],
             [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
     ])
+
+dnl ** pthread_setname_np is a recent addition to glibc, and OS X has
+dnl    a different single-argument version.
+AC_CHECK_LIB(pthread, pthread_setname_np)
+AC_MSG_CHECKING(for pthread_setname_np)
+AC_TRY_LINK(
+[
+#define _GNU_SOURCE
+#include <pthread.h>
+],
+[pthread_setname_np(pthread_self(), "name");],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE([HAVE_PTHREAD_SETNAME_NP], [1],
+      [Define to 1 if you have the glibc version of pthread_setname_np]),
+    AC_MSG_RESULT(no)
+)
 
 dnl ** check for eventfd which is needed by the I/O manager
 AC_CHECK_HEADERS([sys/eventfd.h])

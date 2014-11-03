@@ -316,7 +316,7 @@ Nota bene:
 
     2. It assumes that the binder type is lifted.
 
-    3. It does not check for pre-inline-unconditionallly;
+    3. It does not check for pre-inline-unconditionally;
        that should have been done already.
 
 \begin{code}
@@ -1615,8 +1615,9 @@ tryRules env rules fn args call_cont
       | otherwise
       = return ()
 
-    log_rule dflags flag hdr details = liftIO . dumpSDoc dflags flag "" $
-      sep [text hdr, nest 4 details]
+    log_rule dflags flag hdr details
+      = liftIO . dumpSDoc dflags alwaysQualify flag "" $
+                   sep [text hdr, nest 4 details]
 \end{code}
 
 Note [Optimising tagToEnum#]

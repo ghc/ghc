@@ -36,6 +36,14 @@ endif
 # in nested Makefiles
 TEST_HC_OPTS = -fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-$(GhcPackageDbFlag) -rtsopts $(EXTRA_HC_OPTS)
 
+# The warning suppression flag below is a temporary kludge. While working with
+# tests that contain tabs, please de-tab them so this flag can be eventually
+# removed. See
+# http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+# for details
+#
+TEST_HC_OPTS += -fno-warn-tabs
+
 RUNTEST_OPTS =
 
 ifeq "$(filter $(TargetOS_CPP), cygwin32 mingw32)" ""

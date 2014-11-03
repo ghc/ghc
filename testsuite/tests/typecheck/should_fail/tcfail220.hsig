@@ -1,0 +1,5 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+module ShouldFail where
+
+data Bool a b c d = False
+data Maybe a b = Nothing
