@@ -536,6 +536,7 @@ compiler_stage2_dll0_MODULES = \
 	IfaceType \
 	InstEnv \
 	Kind \
+	Lexeme \
 	ListSetOps \
 	Literal \
 	LoadIface \

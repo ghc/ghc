@@ -161,6 +161,7 @@ Library
         Hooks
         Id
         IdInfo
+        Lexeme
         Literal
         Llvm
         Llvm.AbsSyn

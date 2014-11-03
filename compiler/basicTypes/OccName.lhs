@@ -94,11 +94,6 @@ module OccName (
         -- * Tidying up
         TidyOccEnv, emptyTidyOccEnv, tidyOccName, initTidyOccEnv,
 
-        -- * Lexical characteristics of Haskell names
-        isLexCon, isLexVar, isLexId, isLexSym,
-        isLexConId, isLexConSym, isLexVarId, isLexVarSym,
-        startsVarSym, startsVarId, startsConSym, startsConId,
-
         -- FsEnv
         FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
     ) where
@@ -110,6 +105,7 @@ import UniqFM
 import UniqSet
 import FastString
 import Outputable
+import Lexeme
 import Binary
 import Data.Char
 import Data.Data
@@ -847,72 +843,6 @@ tidyOccName env occ@(OccName occ_sp fs)
        where
          n1 = n+1
          new_fs = mkFastString (base ++ show n)
-\end{code}
-
-%************************************************************************
-%*                                                                      *
-\subsection{Lexical categories}
-%*                                                                      *
-%************************************************************************
-
-These functions test strings to see if they fit the lexical categories
-defined in the Haskell report.
-
-Note [Classification of generated names]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Some names generated for internal use can show up in debugging output,
-e.g.  when using -ddump-simpl. These generated names start with a $
-but should still be pretty-printed using prefix notation. We make sure
-this is the case in isLexVarSym by only classifying a name as a symbol
-if all its characters are symbols, not just its first one.
-
-\begin{code}
-isLexCon,   isLexVar,    isLexId,    isLexSym    :: FastString -> Bool
-isLexConId, isLexConSym, isLexVarId, isLexVarSym :: FastString -> Bool
-
-isLexCon cs = isLexConId  cs || isLexConSym cs
-isLexVar cs = isLexVarId  cs || isLexVarSym cs
-
-isLexId  cs = isLexConId  cs || isLexVarId  cs
-isLexSym cs = isLexConSym cs || isLexVarSym cs
-
--------------
-
-isLexConId cs                           -- Prefix type or data constructors
-  | nullFS cs          = False          --      e.g. "Foo", "[]", "(,)"
-  | cs == (fsLit "[]") = True
-  | otherwise          = startsConId (headFS cs)
-
-isLexVarId cs                           -- Ordinary prefix identifiers
-  | nullFS cs         = False           --      e.g. "x", "_x"
-  | otherwise         = startsVarId (headFS cs)
-
-isLexConSym cs                          -- Infix type or data constructors
-  | nullFS cs          = False          --      e.g. ":-:", ":", "->"
-  | cs == (fsLit "->") = True
-  | otherwise          = startsConSym (headFS cs)
-
-isLexVarSym fs                          -- Infix identifiers e.g. "+"
-  | fs == (fsLit "~R#") = True
-  | otherwise
-  = case (if nullFS fs then [] else unpackFS fs) of
-      [] -> False
-      (c:cs) -> startsVarSym c && all isVarSymChar cs
-        -- See Note [Classification of generated names]
-
--------------
-startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool
-startsVarSym c = isSymbolASCII c || (ord c > 0x7f && isSymbol c)  -- Infix Ids
-startsConSym c = c == ':'               -- Infix data constructors
-startsVarId c  = isLower c || c == '_'  -- Ordinary Ids
-startsConId c  = isUpper c || c == '('  -- Ordinary type constructors and data constructors
-
-isSymbolASCII :: Char -> Bool
-isSymbolASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
-
-isVarSymChar :: Char -> Bool
-isVarSymChar c = c == ':' || startsVarSym c
 \end{code}
 
 %************************************************************************

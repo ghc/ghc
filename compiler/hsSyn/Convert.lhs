@@ -30,6 +30,7 @@ import ForeignCall
 import Unique
 import ErrUtils
 import Bag
+import Lexeme
 import Util
 import FastString
 import Outputable
@@ -1122,14 +1123,11 @@ cvtName ctxt_ns (TH.Name occ flavour)
     occ_str = TH.occString occ
 
 okOcc :: OccName.NameSpace -> String -> Bool
-okOcc _  []      = False
-okOcc ns str@(c:_)
-  | OccName.isVarNameSpace ns     = startsVarId c || startsVarSym c
-  | OccName.isDataConNameSpace ns = startsConId c || startsConSym c || str == "[]"
-  | otherwise                     = startsConId c || startsConSym c ||
-                                    startsVarSym c || str == "[]" || str == "->"
-                                     -- allow type operators like "+"
-
+okOcc ns str
+  | OccName.isVarNameSpace ns     = okVarOcc str
+  | OccName.isDataConNameSpace ns = okConOcc str
+  | otherwise                     = okTcOcc  str
+            
 -- Determine the name space of a name in a type
 --
 isVarName :: TH.Name -> Bool

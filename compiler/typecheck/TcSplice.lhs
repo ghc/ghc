@@ -91,6 +91,7 @@ import BasicTypes hiding( SuccessFlag(..) )
 import Maybes( MaybeErr(..) )
 import DynFlags
 import Panic
+import Lexeme
 import FastString
 import Outputable
 import Control.Monad    ( when )

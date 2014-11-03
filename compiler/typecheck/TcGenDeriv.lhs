@@ -60,6 +60,7 @@ import Util
 import Var
 import MonadUtils
 import Outputable
+import Lexeme
 import FastString
 import Pair
 import Bag

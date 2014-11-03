@@ -115,6 +115,8 @@ import Ctype
 -- -----------------------------------------------------------------------------
 -- Alex "Character set macros"
 
+-- NB: The logic behind these definitions is also reflected in basicTypes/Lexeme.hs
+-- Any changes here should likely be reflected there.
 $unispace    = \x05 -- Trick Alex into handling Unicode. See alexGetByte.
 $nl          = [\n\r\f]
 $whitechar   = [$nl\v\ $unispace]
@@ -1802,6 +1804,10 @@ alexGetByte (AI loc s)
           -- character is encountered we output these values
           -- with the actual character value hidden in the state.
           | otherwise =
+                -- NB: The logic behind these definitions is also reflected
+                -- in basicTypes/Lexeme.hs
+                -- Any changes here should likely be reflected there.
+
                 case generalCategory c of
                   UppercaseLetter       -> upper
                   LowercaseLetter       -> lower
