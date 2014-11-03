@@ -702,12 +702,12 @@ ty_decl :: { LTyClDecl RdrName }
 
 inst_decl :: { LInstDecl RdrName }
         : 'instance' overlap_pragma inst_type where_inst
-                 { let (binds, sigs, _, ats, adts, _) = cvBindsAndSigs (unLoc $4) in
-                   let cid = ClsInstDecl { cid_poly_ty = $3, cid_binds = binds
-                                         , cid_sigs = sigs, cid_tyfam_insts = ats
-                                         , cid_overlap_mode = $2
-                                         , cid_datafam_insts = adts }
-                   in L (comb3 $1 $3 $4) (ClsInstD { cid_inst = cid }) }
+            {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (unLoc $4)
+                  ; let cid = ClsInstDecl { cid_poly_ty = $3, cid_binds = binds
+                                          , cid_sigs = sigs, cid_tyfam_insts = ats
+                                          , cid_overlap_mode = $2
+                                          , cid_datafam_insts = adts }
+                  ; return (L (comb3 $1 $3 $4) (ClsInstD { cid_inst = cid })) } }
 
            -- type instance declarations
         | 'type' 'instance' ty_fam_inst_eqn
@@ -986,7 +986,8 @@ decllist :: { Located (OrdList (LHsDecl RdrName)) }
 --
 binds   ::  { Located (HsLocalBinds RdrName) }          -- May have implicit parameters
                                                 -- No type declarations
-        : decllist                      { sL1 $1 (HsValBinds (cvBindGroup (unLoc $1))) }
+        : decllist                      {% do { val_binds <- cvBindGroup (unLoc $1)
+                                              ; return (sL1 $1 (HsValBinds val_binds)) } }
         | '{'            dbinds '}'     { sLL $1 $> (HsIPBinds (IPBinds (unLoc $2) emptyTcEvBinds)) }
         |     vocurly    dbinds close   { L (getLoc $2) (HsIPBinds (IPBinds (unLoc $2) emptyTcEvBinds)) }
 

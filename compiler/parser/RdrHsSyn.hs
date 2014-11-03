@@ -125,8 +125,8 @@ mkClassDecl :: SrcSpan
             -> P (LTyClDecl RdrName)
 
 mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
-  = do { let (binds, sigs, ats, at_insts, _, docs) = cvBindsAndSigs (unLoc where_cls)
-             cxt = fromMaybe (noLoc []) mcxt
+  = do { (binds, sigs, ats, at_insts, _, docs) <- cvBindsAndSigs (unLoc where_cls)
+       ; let cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams) <- checkTyClHdr tycl_hdr
        ; tyvars <- checkTyVarsP (ptext (sLit "class")) whereDots cls tparams
        ; at_defs <- mapM (eitherToP . mkATDefault) at_insts
@@ -304,36 +304,45 @@ cvTopDecls decls = go (fromOL decls)
     go (d : ds)             = d : go ds
 
 -- Declaration list may only contain value bindings and signatures.
-cvBindGroup :: OrdList (LHsDecl RdrName) -> HsValBinds RdrName
+cvBindGroup :: OrdList (LHsDecl RdrName) -> P (HsValBinds RdrName)
 cvBindGroup binding
-  = case cvBindsAndSigs binding of
-      (mbs, sigs, fam_ds, tfam_insts, dfam_insts, _)
-         -> ASSERT( null fam_ds && null tfam_insts && null dfam_insts)
-            ValBindsIn mbs sigs
+  = do { (mbs, sigs, fam_ds, tfam_insts, dfam_insts, _) <- cvBindsAndSigs binding
+       ; ASSERT( null fam_ds && null tfam_insts && null dfam_insts)
+         return $ ValBindsIn mbs sigs }
 
 cvBindsAndSigs :: OrdList (LHsDecl RdrName)
-  -> (LHsBinds RdrName, [LSig RdrName], [LFamilyDecl RdrName]
+  -> P (LHsBinds RdrName, [LSig RdrName], [LFamilyDecl RdrName]
           , [LTyFamInstDecl RdrName], [LDataFamInstDecl RdrName], [LDocDecl])
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
-cvBindsAndSigs  fb = go (fromOL fb)
+cvBindsAndSigs fb = go (fromOL fb)
   where
-    go []                  = (emptyBag, [], [], [], [], [])
-    go (L l (SigD s) : ds) = (bs, L l s : ss, ts, tfis, dfis, docs)
-                           where (bs, ss, ts, tfis, dfis, docs) = go ds
-    go (L l (ValD b) : ds) = (b' `consBag` bs, ss, ts, tfis, dfis, docs)
-                           where (b', ds')    = getMonoBind (L l b) ds
-                                 (bs, ss, ts, tfis, dfis, docs) = go ds'
-    go (L l (TyClD (FamDecl t)) : ds) = (bs, ss, L l t : ts, tfis, dfis, docs)
-                           where (bs, ss, ts, tfis, dfis, docs) = go ds
-    go (L l (InstD (TyFamInstD { tfid_inst = tfi })) : ds) = (bs, ss, ts, L l tfi : tfis, dfis, docs)
-                           where (bs, ss, ts, tfis, dfis, docs) = go ds
-    go (L l (InstD (DataFamInstD { dfid_inst = dfi })) : ds) = (bs, ss, ts, tfis, L l dfi : dfis, docs)
-                           where (bs, ss, ts, tfis, dfis, docs) = go ds
-    go (L l (DocD d) : ds) =  (bs, ss, ts, tfis, dfis, (L l d) : docs)
-                           where (bs, ss, ts, tfis, dfis, docs) = go ds
-    go (L _ d : _) = pprPanic "cvBindsAndSigs" (ppr d)
+    go []              = return (emptyBag, [], [], [], [], [])
+    go (L l (ValD b) : ds)
+      = do { (bs, ss, ts, tfis, dfis, docs) <- go ds'
+           ; return (b' `consBag` bs, ss, ts, tfis, dfis, docs) }
+      where
+        (b', ds') = getMonoBind (L l b) ds
+    go (L l decl : ds)
+      = do { (bs, ss, ts, tfis, dfis, docs) <- go ds
+           ; case decl of
+               SigD s
+                 -> return (bs, L l s : ss, ts, tfis, dfis, docs)
+               TyClD (FamDecl t)
+                 -> return (bs, ss, L l t : ts, tfis, dfis, docs)
+               InstD (TyFamInstD { tfid_inst = tfi })
+                 -> return (bs, ss, ts, L l tfi : tfis, dfis, docs)
+               InstD (DataFamInstD { dfid_inst = dfi })
+                 -> return (bs, ss, ts, tfis, L l dfi : dfis, docs)
+               DocD d
+                 -> return (bs, ss, ts, tfis, dfis, L l d : docs)
+               SpliceD d
+                 -> parseErrorSDoc l $
+                    hang (text "Declaration splices are allowed only" <+>
+                          text "at the top level:")
+                       2 (ppr d)
+               _ -> pprPanic "cvBindsAndSigs" (ppr decl) }
 
 -----------------------------------------------------------------------------
 -- Group function bindings into equation groups
