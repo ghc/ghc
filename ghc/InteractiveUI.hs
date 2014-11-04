@@ -1469,7 +1469,10 @@ setContextKeepingPackageModules keep_ctx trans_ctx = do
                    transient_ctx  = filterSubsumed new_rem_ctx trans_ctx }
   setGHCContextFromGHCiState
 
-
+-- | Filters a list of 'InteractiveImport', clearing out any home package
+-- imports so only imports from external packages are preserved.  ('IIModule'
+-- counts as a home package import, because we are only able to bring a
+-- full top-level into scope when the source is available.)
 keepPackageImports :: [InteractiveImport] -> GHCi [InteractiveImport]
 keepPackageImports = filterM is_pkg_import
   where
