@@ -10,6 +10,8 @@ Changes in version 2.15.1
 
  * Fix re-exports of built-in type families (#310)
 
+ * Fix parsing of infix identifiers such as ``elem``.
+
 Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)

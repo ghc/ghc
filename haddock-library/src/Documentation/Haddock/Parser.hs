@@ -507,25 +507,26 @@ autoUrl = mkLink <$> url
 -- deems to be valid in an identifier. Note that it simply blindly consumes
 -- characters and does no actual validation itself.
 parseValid :: Parser String
-parseValid = do
-  vs' <- many' $ utf8String "⋆" <|> return <$> idChar
-  let vs = concat vs'
-  c <- peekChar
-  case c of
-    Just '`' -> return vs
-    Just '\'' -> (\x -> vs ++ "'" ++ x) <$> ("'" *> parseValid)
-                 <|> return vs
-    _ -> fail "outofvalid"
+parseValid = p some
   where
     idChar = satisfy (`elem` "_.!#$%&*+/<=>?@\\|-~:^")
              <|> digit <|> letter_ascii
+    p p' = do
+      vs' <- p' $ utf8String "⋆" <|> return <$> idChar
+      let vs = concat vs'
+      c <- peekChar
+      case c of
+        Just '`' -> return vs
+        Just '\'' -> (\x -> vs ++ "'" ++ x) <$> ("'" *> p many')
+                     <|> return vs
+        _ -> fail "outofvalid"
 
 -- | Parses UTF8 strings from ByteString streams.
 utf8String :: String -> Parser String
 utf8String x = decodeUtf8 <$> string (encodeUtf8 x)
 
--- | Parses identifiers with help of 'parseValid'. Asks GHC for 'String' from the
--- string it deems valid.
+-- | Parses identifiers with help of 'parseValid'. Asks GHC for
+-- 'String' from the string it deems valid.
 identifier :: Parser (DocH mod Identifier)
 identifier = do
   o <- idDelim

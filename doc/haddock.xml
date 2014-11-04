@@ -1897,7 +1897,9 @@ module A where
         <para>Nothing special is needed to hyperlink identifiers which
         contain apostrophes themselves: to hyperlink
         <literal>foo'</literal> one would simply type
-        <literal>'foo''</literal>.</para>
+        <literal>'foo''</literal>. To hyperlink identifiers written in
+        infix form, simply put them in quotes as always:
+        <literal>'`elem`'</literal>.</para>
 
         <para>For compatibility with other systems, the following
         alternative form of markup is accepted<footnote><para>

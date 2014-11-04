@@ -85,6 +85,12 @@ spec = do
         " don't use apostrophe's in the wrong place's" `shouldParseTo`
           "don't use apostrophe's in the wrong place's"
 
+      it "doesn't parse empty identifiers" $ do
+        "``" `shouldParseTo` "``"
+
+      it "can parse infix identifiers" $ do
+        "``infix``" `shouldParseTo` "`" <> DocIdentifier "infix" <> "`"
+
     context "when parsing URLs" $ do
       it "parses a URL" $ do
         "<http://example.com/>" `shouldParseTo` hyperlink "http://example.com/" Nothing
