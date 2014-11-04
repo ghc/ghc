@@ -41,15 +41,15 @@ module Language.Haskell.TH(
         TExp, unType,
 
         -- * Names
-        Name, NameSpace,	-- Abstract
+        Name, NameSpace,        -- Abstract
         -- ** Constructing names
         mkName,         -- :: String -> Name
         newName,        -- :: String -> Q Name
         -- ** Deconstructing names
-        nameBase,	-- :: Name -> String
-        nameModule,	-- :: Name -> Maybe String
+        nameBase,       -- :: Name -> String
+        nameModule,     -- :: Name -> Maybe String
         -- ** Built-in names
-        tupleTypeName, tupleDataName,	-- Int -> Name
+        tupleTypeName, tupleDataName,   -- Int -> Name
         unboxedTupleTypeName, unboxedTupleDataName, -- :: Int -> Name
 
     -- * The algebraic data types

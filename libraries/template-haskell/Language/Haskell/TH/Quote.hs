@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 module Language.Haskell.TH.Quote(
-	QuasiQuoter(..),
+        QuasiQuoter(..),
         dataToQa, dataToExpQ, dataToPatQ,
         quoteFile
     ) where

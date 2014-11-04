@@ -171,7 +171,7 @@ patG ss = do { ss' <- sequence ss; return (PatG ss') }
 
 patGE :: [StmtQ] -> ExpQ -> Q (Guard, Exp)
 patGE ss e = do { ss' <- sequence ss;
-		  e'  <- e;
+                  e'  <- e;
                   return (PatG ss', e') }
 
 -------------------------------------------------------------------------------
