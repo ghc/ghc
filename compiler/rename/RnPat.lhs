@@ -440,10 +440,12 @@ rnPatAndThen mk (TuplePat pats boxed _)
        ; pats' <- rnLPatsAndThen mk pats
        ; return (TuplePat pats' boxed []) }
 
-rnPatAndThen _ (SplicePat splice)
-  = do { -- XXX How to deal with free variables?
-       ; (pat, _) <- liftCps $ rnSplicePat splice
-       ; return pat }
+rnPatAndThen mk (SplicePat splice)
+  = do { eith <- liftCpsFV $ rnSplicePat splice
+       ; case eith of   -- See Note [rnSplicePat] in RnSplice
+           Left not_yet_renamed -> rnPatAndThen mk not_yet_renamed
+           Right already_renamed -> return already_renamed } 
+    
 rnPatAndThen mk (QuasiQuotePat qq)
   = do { pat <- liftCps $ runQuasiQuotePat qq
          -- Wrap the result of the quasi-quoter in parens so that we don't

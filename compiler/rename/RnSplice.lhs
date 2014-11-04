@@ -206,13 +206,40 @@ rnSpliceType splice k
                                   }
             ; return (unLoc hs_ty3, fvs) }
 
-----------------------
-rnSplicePat :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
+\end{code}
+
+Note [rnSplicePat]
+~~~~~~~~~~~~~~~~~~
+Renaming a pattern splice is a bit tricky, because we need the variables
+bound in the pattern to be in scope in the RHS of the pattern. This scope
+management is effectively done by using continuation-passing style in
+RnPat, through the CpsRn monad. We don't wish to be in that monad here
+(it would create import cycles and generally conflict with renaming other
+splices), so we really want to return a (Pat RdrName) -- the result of
+running the splice -- which can then be further renamed in RnPat, in
+the CpsRn monad.
+
+The problem is that if we're renaming a splice within a bracket, we
+*don't* want to run the splice now. We really do just want to rename
+it to an HsSplice Name. Of course, then we can't know what variables
+are bound within the splice, so pattern splices within brackets aren't
+all that useful.
+
+In any case, when we're done in rnSplicePat, we'll either have a
+Pat RdrName (the result of running a top-level splice) or a Pat Name
+(the renamed nested splice). Thus, the awkward return type of
+rnSplicePat.
+
+\begin{code}
+
+-- | Rename a splice pattern. See Note [rnSplicePat]
+rnSplicePat :: HsSplice RdrName -> RnM ( Either (Pat RdrName) (Pat Name)
+                                       , FreeVars)
 rnSplicePat splice
   = rnSpliceGen False run_pat_splice pend_pat_splice splice
   where
     pend_pat_splice rn_splice@(HsSplice n e)
-      = (PendingRnPatSplice (PendSplice n e), SplicePat rn_splice)
+      = (PendingRnPatSplice (PendSplice n e), Right $ SplicePat rn_splice)
 
     run_pat_splice (HsSplice _ expr')
       = do { expr <- getHooked runRnSpliceHook return >>= ($ expr')
@@ -227,10 +254,7 @@ rnSplicePat splice
            ; pat <- runMetaP zonked_q_expr
            ; showSplice "pattern" expr (ppr pat)
 
-           ; (pat', fvs) <- checkNoErrs $
-                            rnPat ThPatSplice pat $ \pat' -> return (pat', emptyFVs)
-
-           ; return (unLoc pat', fvs) }
+           ; return (Left $ unLoc pat, emptyFVs) }
 
 ----------------------
 rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)
