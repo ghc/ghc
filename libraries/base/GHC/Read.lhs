@@ -100,8 +100,6 @@ readParen b g   =  if b then mandatory else optional
 
 -- | Parsing of 'String's, producing values.
 --
--- Minimal complete definition: 'readsPrec' (or, for GHC only, 'readPrec')
---
 -- Derived instances of 'Read' make the following assumptions, which
 -- derived instances of 'Text.Show.Show' obey:
 --
@@ -166,6 +164,8 @@ readParen b g   =  if b then mandatory else optional
 -- >         readListPrec = readListPrecDefault
 
 class Read a where
+  {-# MINIMAL readsPrec | readPrec #-}
+
   -- | attempts to parse a value from the front of the string, returning
   -- a list of (parsed value, remaining string) pairs.  If there is no
   -- successful parse, the returned list is empty.
@@ -204,7 +204,6 @@ class Read a where
   readList     = readPrec_to_S (list readPrec) 0
   readPrec     = readS_to_Prec readsPrec
   readListPrec = readS_to_Prec (\_ -> readList)
-  {-# MINIMAL readsPrec | readPrec #-}
 
 readListDefault :: Read a => ReadS [a]
 -- ^ A possible replacement definition for the 'readList' method (GHC only).

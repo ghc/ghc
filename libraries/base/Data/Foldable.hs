@@ -63,8 +63,6 @@ infix  4 `elem`, `notElem`
 
 -- | Data structures that can be folded.
 --
--- Minimal complete definition: 'foldMap' or 'foldr'.
---
 -- For example, given a data type
 --
 -- > data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a)

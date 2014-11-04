@@ -71,13 +71,12 @@ types of Haskell, the fixed size @Int@ types ('Int8', 'Int16',
 'Int32', 'Int64'), the fixed size @Word@ types ('Word8', 'Word16',
 'Word32', 'Word64'), 'StablePtr', all types from "Foreign.C.Types",
 as well as 'Ptr'.
-
-Minimal complete definition: 'sizeOf', 'alignment', one of 'peek',
-'peekElemOff' and 'peekByteOff', and one of 'poke', 'pokeElemOff' and
-'pokeByteOff'.
 -}
 
 class Storable a where
+   {-# MINIMAL sizeOf, alignment,
+               (peek | peekElemOff | peekByteOff),
+               (poke | pokeElemOff | pokeByteOff) #-}
 
    sizeOf      :: a -> Int
    -- ^ Computes the storage requirements (in bytes) of the argument.
@@ -146,10 +145,6 @@ class Storable a where
 
    peek ptr = peekElemOff ptr 0
    poke ptr = pokeElemOff ptr 0
-
-   {-# MINIMAL sizeOf, alignment,
-               (peek | peekElemOff | peekByteOff),
-               (poke | pokeElemOff | pokeByteOff) #-}
 
 -- System-dependent, but rather obvious instances
 

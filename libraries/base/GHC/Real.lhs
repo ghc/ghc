@@ -139,8 +139,6 @@ class  (Num a, Ord a) => Real a  where
     toRational          ::  a -> Rational
 
 -- | Integral numbers, supporting integer division.
---
--- Minimal complete definition: 'quotRem' and 'toInteger'
 class  (Real a, Enum a) => Integral a  where
     -- | integer division truncated toward zero
     quot                :: a -> a -> a
@@ -174,9 +172,9 @@ class  (Real a, Enum a) => Integral a  where
                            where qr@(q,r) = quotRem n d
 
 -- | Fractional numbers, supporting real division.
---
--- Minimal complete definition: 'fromRational' and ('recip' or @('/')@)
 class  (Num a) => Fractional a  where
+    {-# MINIMAL fromRational, (recip | (/)) #-}
+
     -- | fractional division
     (/)                 :: a -> a -> a
     -- | reciprocal fraction
@@ -191,11 +189,8 @@ class  (Num a) => Fractional a  where
     {-# INLINE (/) #-}
     recip x             =  1 / x
     x / y               = x * recip y
-    {-# MINIMAL fromRational, (recip | (/)) #-}
 
 -- | Extracting components of fractions.
---
--- Minimal complete definition: 'properFraction'
 class  (Real a, Fractional a) => RealFrac a  where
     -- | The function 'properFraction' takes a real fractional number @x@
     -- and returns a pair @(n,f)@ such that @x = n+f@, and:

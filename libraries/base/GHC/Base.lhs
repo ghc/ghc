@@ -231,8 +231,6 @@ data  Maybe a  =  Nothing | Just a
 -- The method names refer to the monoid of lists under concatenation,
 -- but there are many other instances.
 --
--- Minimal complete definition: 'mempty' and 'mappend'.
---
 -- Some types can be viewed as a monoid in more than one way,
 -- e.g. both addition and multiplication on numbers.
 -- In such cases we often define @newtype@s and make those instances
@@ -429,8 +427,6 @@ think of a monad as an /abstract datatype/ of actions.
 Haskell's @do@ expressions provide a convenient syntax for writing
 monadic expressions.
 
-Minimal complete definition: '>>=' and 'return'.
-
 Instances of 'Monad' should satisfy the following laws:
 
 > return a >>= k  ==  k a
@@ -616,8 +612,6 @@ instance  Monad Maybe  where
 infixl 3 <|>
 
 -- | A monoid on applicative functors.
---
--- Minimal complete definition: 'empty' and '<|>'.
 --
 -- If defined, 'some' and 'many' should be the least solutions
 -- of the equations:
