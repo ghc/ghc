@@ -187,6 +187,10 @@
                </para>
 
                <para>
+                 Pattern splices now work.
+               </para>
+
+               <para>
                  <literal>reifyInstances</literal> now treats unbound type
                  variables as univerally quantified, allowing lookup of, say,
                  the instance for <literal>Eq [a]</literal>.
@@ -222,6 +226,13 @@
                  signatures (written using <literal>default</literal> in
                  a class). This means an expansion to the <literal>Dec</literal>
                  type.
+               </para>
+
+               <para>
+                 Template Haskell is now more pedantic about splicing in
+                 bogus variable names, like those containing whitespace. If you
+                 use bogus names in your Template Haskell code, this may break
+                 your program.
                </para>
            </listitem>
        </itemizedlist>
