@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -36,7 +37,9 @@ module Data.Monoid (
         -- * Maybe wrappers
         -- $MaybeExamples
         First(..),
-        Last(..)
+        Last(..),
+        -- * 'Alternative' wrapper
+        Alt (..)
   ) where
 
 -- Push down the module in the dependency hierarchy.
@@ -102,7 +105,8 @@ newtype Sum a = Sum { getSum :: a }
 
 instance Num a => Monoid (Sum a) where
         mempty = Sum 0
-        Sum x `mappend` Sum y = Sum (x + y)
+        mappend = coerce ((+) :: a -> a -> a)
+--        Sum x `mappend` Sum y = Sum (x + y)
 
 -- | Monoid under multiplication.
 newtype Product a = Product { getProduct :: a }
@@ -110,7 +114,8 @@ newtype Product a = Product { getProduct :: a }
 
 instance Num a => Monoid (Product a) where
         mempty = Product 1
-        Product x `mappend` Product y = Product (x * y)
+        mappend = coerce ((*) :: a -> a -> a)
+--        Product x `mappend` Product y = Product (x * y)
 
 -- $MaybeExamples
 -- To implement @find@ or @findLast@ on any 'Foldable':
@@ -145,44 +150,41 @@ instance Num a => Monoid (Product a) where
 
 
 -- | Maybe monoid returning the leftmost non-Nothing value.
+--
+-- @'First' a@ is isomorphic to @'Alt' 'Maybe' a@, but precedes it
+-- historically.
 newtype First a = First { getFirst :: Maybe a }
-        deriving (Eq, Ord, Read, Show, Generic, Generic1)
+        deriving (Eq, Ord, Read, Show, Generic, Generic1,
+                  Functor, Applicative, Monad)
 
 instance Monoid (First a) where
         mempty = First Nothing
-        r@(First (Just _)) `mappend` _ = r
         First Nothing `mappend` r = r
-
-instance Functor First where
-        fmap f (First x) = First (fmap f x)
-
-instance Applicative First where
-        pure x = First (Just x)
-        First x <*> First y = First (x <*> y)
-
-instance Monad First where
-        return x = First (Just x)
-        First x >>= m = First (x >>= getFirst . m)
+        l `mappend` _             = l
 
 -- | Maybe monoid returning the rightmost non-Nothing value.
+--
+-- @'Last' a@ is isomorphic to @'Dual' ('First' a)@, and thus to
+-- @'Dual' ('Alt' 'Maybe' a)@
 newtype Last a = Last { getLast :: Maybe a }
-        deriving (Eq, Ord, Read, Show, Generic, Generic1)
+        deriving (Eq, Ord, Read, Show, Generic, Generic1,
+                  Functor, Applicative, Monad)
 
 instance Monoid (Last a) where
         mempty = Last Nothing
-        _ `mappend` r@(Last (Just _)) = r
-        r `mappend` Last Nothing = r
+        l `mappend` Last Nothing = l
+        _ `mappend` r            = r
 
-instance Functor Last where
-        fmap f (Last x) = Last (fmap f x)
+-- | Monoid under '<|>'.
+--
+-- /Since: 4.8.0.0/
+newtype Alt f a = Alt {getAlt :: f a}
+  deriving (Generic, Generic1, Read, Show, Eq, Ord, Num, Enum,
+            Monad, MonadPlus, Applicative, Alternative, Functor)
 
-instance Applicative Last where
-        pure x = Last (Just x)
-        Last x <*> Last y = Last (x <*> y)
-
-instance Monad Last where
-        return x = Last (Just x)
-        Last x >>= m = Last (x >>= getLast . m)
+instance forall f a . Alternative f => Monoid (Alt f a) where
+        mempty = Alt empty
+        mappend = coerce ((<|>) :: f a -> f a -> f a)
 
 {-
 {--------------------------------------------------------------------

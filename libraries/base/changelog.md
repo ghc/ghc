@@ -89,6 +89,8 @@
 
   * Update Unicode class definitions to Unicode version 7.0
 
+  * Add `Alt`, an `Alternative` wrapper, to `Data.Monoid`. (#9759)
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3
