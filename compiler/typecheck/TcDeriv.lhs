@@ -35,7 +35,6 @@ import RnNames( extendGlobalRdrEnvRn )
 import RnBinds
 import RnEnv
 import RnSource   ( addTcgDUs )
-import HscTypes
 import Avail
 
 import Unify( tcUnifyTy )
@@ -358,11 +357,6 @@ tcDeriving tycl_decls inst_decls deriv_decls
         ; early_specs <- makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
         ; traceTc "tcDeriving 1" (ppr early_specs)
 
-        -- for each type, determine the auxliary declarations that are common
-        -- to multiple derivations involving that type (e.g. Generic and
-        -- Generic1 should use the same TcGenGenerics.MetaTyCons)
-        -- ; (commonAuxs, auxDerivStuff) <- commonAuxiliaries $ map forgetTheta early_specs
-
         ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
         ; insts1 <- mapM genInst given_specs
 
@@ -375,7 +369,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
         ; let (inst_infos, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
-        ; let (binds, newTyCons, famInsts, extraInstances) =
+        ; let (binds, famInsts, extraInstances) =
                 genAuxBinds loc (unionManyBags deriv_stuff)
 
         ; (inst_info, rn_binds, rn_dus) <-
@@ -384,29 +378,22 @@ tcDeriving tycl_decls inst_decls deriv_decls
         ; dflags <- getDynFlags
         ; unless (isEmptyBag inst_info) $
              liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
-                        (ddump_deriving inst_info rn_binds newTyCons famInsts))
+                        (ddump_deriving inst_info rn_binds famInsts))
 
-        ; let all_tycons = map ATyCon (bagToList newTyCons)
-        ; gbl_env <- tcExtendGlobalEnv all_tycons $
-                     tcExtendGlobalEnvImplicit (concatMap implicitTyThings all_tycons) $
-                     tcExtendLocalFamInstEnv (bagToList famInsts) $
+        ; gbl_env <- tcExtendLocalFamInstEnv (bagToList famInsts) $
                      tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
         ; let all_dus = rn_dus `plusDU` usesOnly (mkFVs $ catMaybes maybe_fvs)
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) }
   where
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name
-                   -> Bag TyCon               -- ^ Empty data constructors
                    -> Bag FamInst             -- ^ Rep type family instances
                    -> SDoc
-    ddump_deriving inst_infos extra_binds repMetaTys repFamInsts
+    ddump_deriving inst_infos extra_binds repFamInsts
       =    hang (ptext (sLit "Derived instances:"))
               2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") (bagToList inst_infos))
                  $$ ppr extra_binds)
-        $$ hangP "Generic representation:" (
-              hangP "Generated datatypes for meta-information:"
-               (vcat (map ppr (bagToList repMetaTys)))
-           $$ hangP "Representation types:"
-                (vcat (map pprRepTy (bagToList repFamInsts))))
+        $$ hangP "GHC.Generics representation types:"
+             (vcat (map pprRepTy (bagToList repFamInsts)))
 
     hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
 

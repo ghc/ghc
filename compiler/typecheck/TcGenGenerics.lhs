@@ -514,11 +514,11 @@ tc_mkRepTy gk_ tycon =
                                           (dataConFieldLabels a)]
         -- This field has no label
         -- mkS Nothing  _ a = mkTyConApp s1 [mkTyConApp ms [mkTyConTy pNothing], a]
-        mkS Nothing  a = mkTyConApp s1 [{- typeKind msel, -} msel, a]
+        mkS Nothing  a = mkTyConApp s1 [msel, a]
           where msel = mkTyConApp ms [mkStrLitTy (mkFastString "")]
         -- This field has a  label
         -- mkS (Just l) _ a = mkTyConApp s1 [mkTyConApp ms [mkTyConApp pJust [selName l]], a]
-        mkS (Just l) a = mkTyConApp s1 [{- typeKind msel, -} msel, a]
+        mkS (Just l) a = mkTyConApp s1 [msel, a]
           where msel = mkTyConApp ms [selName l]
 
         -- Sums and products are done in the same way for both Rep and Rep1
@@ -581,7 +581,6 @@ tc_mkRepTy gk_ tycon =
         metaConsTy c = mkTyConApp mc [ctName c, ctFix c, isRec c]
         -- metaSelTy  s = mkTyConApp mc [ctName c, ctFix c, isRec c]
 
-    -- pprTrace "rep: " (ppr (metaDataTy, tycon, mkD tycon)) $
     return (mkD tycon)
 
 --------------------------------------------------------------------------------
@@ -676,10 +675,10 @@ genLR_E i n e
 --------------------------------------------------------------------------------
 
 -- Build a product expression
-mkProd_E :: GenericKind_DC      -- Generic or Generic1?
-         -> US              -- Base for unique names
+mkProd_E :: GenericKind_DC    -- Generic or Generic1?
+         -> US                -- Base for unique names
          -> [(RdrName, Type)] -- List of variables matched on the lhs and their types
-         -> LHsExpr RdrName -- Resulting product expression
+         -> LHsExpr RdrName   -- Resulting product expression
 mkProd_E _   _ []     = mkM1_E (nlHsVar u1DataCon_RDR)
 mkProd_E gk_ _ varTys = mkM1_E (foldBal prod appVars)
                      -- These M1s are meta-information for the constructor
