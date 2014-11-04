@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, DeriveDataTypeable, MagicHash, PolymorphicComponents, RoleAnnotations, UnboxedTuples #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, PolymorphicComponents,
+             RoleAnnotations #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -16,9 +17,7 @@
 
 module Language.Haskell.TH.Syntax where
 
-import GHC.Exts
-import Data.Data (Data(..), Typeable, mkConstr, mkDataType, constrIndex)
-import qualified Data.Data as Data
+import Data.Data (Data(..), Typeable )
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative( Applicative(..) )
 #endif
@@ -646,61 +645,23 @@ Names constructed using @newName@ and @mkName@ may be used in bindings
 (such as @let x = ...@ or @\x -> ...@), but names constructed using
 @lookupValueName@, @lookupTypeName@, @'f@, @''T@ may not.
 -}
-data Name = Name OccName NameFlavour deriving (Typeable, Data)
+data Name = Name OccName NameFlavour deriving (Typeable, Data, Eq)
+
+instance Ord Name where
+    -- check if unique is different before looking at strings
+  (Name o1 f1) `compare` (Name o2 f2) = (f1 `compare` f2)   `thenCmp`
+                                        (o1 `compare` o2)
 
 data NameFlavour
   = NameS           -- ^ An unqualified name; dynamically bound
   | NameQ ModName   -- ^ A qualified name; dynamically bound
-  | NameU Int#      -- ^ A unique local name
-  | NameL Int#      -- ^ Local name bound outside of the TH AST
+  | NameU !Int      -- ^ A unique local name
+  | NameL !Int      -- ^ Local name bound outside of the TH AST
   | NameG NameSpace PkgName ModName -- ^ Global name bound outside of the TH AST:
                 -- An original name (occurrences only, not binders)
                 -- Need the namespace too to be sure which
                 -- thing we are naming
-  deriving ( Typeable )
-
--- |
--- Although the NameFlavour type is abstract, the Data instance is not. The reason for this
--- is that currently we use Data to serialize values in annotations, and in order for that to
--- work for Template Haskell names introduced via the 'x syntax we need gunfold on NameFlavour
--- to work. Bleh!
---
--- The long term solution to this is to use the binary package for annotation serialization and
--- then remove this instance. However, to do _that_ we need to wait on binary to become stable, since
--- boot libraries cannot be upgraded separately from GHC itself.
---
--- This instance cannot be derived automatically due to bug #2701
-instance Data NameFlavour where
-     gfoldl _ z NameS          = z NameS
-     gfoldl k z (NameQ mn)     = z NameQ `k` mn
-     gfoldl k z (NameU i)      = z (\(I# i') -> NameU i') `k` (I# i)
-     gfoldl k z (NameL i)      = z (\(I# i') -> NameL i') `k` (I# i)
-     gfoldl k z (NameG ns p m) = z NameG `k` ns `k` p `k` m
-     gunfold k z c = case constrIndex c of
-         1 -> z NameS
-         2 -> k $ z NameQ
-         3 -> k $ z (\(I# i) -> NameU i)
-         4 -> k $ z (\(I# i) -> NameL i)
-         5 -> k $ k $ k $ z NameG
-         _ -> error "gunfold: NameFlavour"
-     toConstr NameS = con_NameS
-     toConstr (NameQ _) = con_NameQ
-     toConstr (NameU _) = con_NameU
-     toConstr (NameL _) = con_NameL
-     toConstr (NameG _ _ _) = con_NameG
-     dataTypeOf _ = ty_NameFlavour
-
-con_NameS, con_NameQ, con_NameU, con_NameL, con_NameG :: Data.Constr
-con_NameS = mkConstr ty_NameFlavour "NameS" [] Data.Prefix
-con_NameQ = mkConstr ty_NameFlavour "NameQ" [] Data.Prefix
-con_NameU = mkConstr ty_NameFlavour "NameU" [] Data.Prefix
-con_NameL = mkConstr ty_NameFlavour "NameL" [] Data.Prefix
-con_NameG = mkConstr ty_NameFlavour "NameG" [] Data.Prefix
-
-ty_NameFlavour :: Data.DataType
-ty_NameFlavour = mkDataType "Language.Haskell.TH.Syntax.NameFlavour"
-                            [con_NameS, con_NameQ, con_NameU,
-                             con_NameL, con_NameG]
+  deriving ( Typeable, Data, Eq, Ord )
 
 data NameSpace = VarName        -- ^ Variables
                | DataName       -- ^ Data constructors
@@ -789,11 +750,11 @@ mkName str
 
 -- | Only used internally
 mkNameU :: String -> Uniq -> Name
-mkNameU s (I# u) = Name (mkOccName s) (NameU u)
+mkNameU s u = Name (mkOccName s) (NameU u)
 
 -- | Only used internally
 mkNameL :: String -> Uniq -> Name
-mkNameL s (I# u) = Name (mkOccName s) (NameL u)
+mkNameL s u = Name (mkOccName s) (NameL u)
 
 -- | Used for 'x etc, but not available to the programmer
 mkNameG :: NameSpace -> String -> String -> String -> Name
@@ -804,45 +765,6 @@ mkNameG_v, mkNameG_tc, mkNameG_d :: String -> String -> String -> Name
 mkNameG_v  = mkNameG VarName
 mkNameG_tc = mkNameG TcClsName
 mkNameG_d  = mkNameG DataName
-
-instance Eq Name where
-  v1 == v2 = cmpEq (v1 `compare` v2)
-
-instance Ord Name where
-  (Name o1 f1) `compare` (Name o2 f2) = (f1 `compare` f2)   `thenCmp`
-                                        (o1 `compare` o2)
-
-instance Eq NameFlavour where
-  f1 == f2 = cmpEq (f1 `compare` f2)
-
-instance Ord NameFlavour where
-        -- NameS < NameQ < NameU < NameL < NameG
-  NameS `compare` NameS = EQ
-  NameS `compare` _     = LT
-
-  (NameQ _)  `compare` NameS      = GT
-  (NameQ m1) `compare` (NameQ m2) = m1 `compare` m2
-  (NameQ _)  `compare` _          = LT
-
-  (NameU _)  `compare` NameS      = GT
-  (NameU _)  `compare` (NameQ _)  = GT
-  (NameU u1) `compare` (NameU u2) | isTrue# (u1  <# u2) = LT
-                                  | isTrue# (u1 ==# u2) = EQ
-                                  | otherwise           = GT
-  (NameU _)  `compare` _     = LT
-
-  (NameL _)  `compare` NameS      = GT
-  (NameL _)  `compare` (NameQ _)  = GT
-  (NameL _)  `compare` (NameU _)  = GT
-  (NameL u1) `compare` (NameL u2) | isTrue# (u1  <# u2) = LT
-                                  | isTrue# (u1 ==# u2) = EQ
-                                  | otherwise           = GT
-  (NameL _)  `compare` _          = LT
-
-  (NameG ns1 p1 m1) `compare` (NameG ns2 p2 m2) = (ns1 `compare` ns2) `thenCmp`
-                                            (p1 `compare` p2) `thenCmp`
-                                            (m1 `compare` m2)
-  (NameG _ _ _)    `compare` _ = GT
 
 data NameIs = Alone | Applied | Infix
 
@@ -870,8 +792,8 @@ showName' ni nm
                     Name occ NameS         -> occString occ
                     Name occ (NameQ m)     -> modString m ++ "." ++ occString occ
                     Name occ (NameG _ _ m) -> modString m ++ "." ++ occString occ
-                    Name occ (NameU u)     -> occString occ ++ "_" ++ show (I# u)
-                    Name occ (NameL u)     -> occString occ ++ "_" ++ show (I# u)
+                    Name occ (NameU u)     -> occString occ ++ "_" ++ show u
+                    Name occ (NameL u)     -> occString occ ++ "_" ++ show u
 
         pnam = classify nms
 

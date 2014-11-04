@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, MagicHash #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- | Monadic front-end to Text.PrettyPrint
 
@@ -41,7 +41,6 @@ import qualified Text.PrettyPrint as HPJ
 import Control.Monad (liftM, liftM2, ap)
 import Language.Haskell.TH.Lib.Map ( Map )
 import qualified Language.Haskell.TH.Lib.Map as Map ( lookup, insert, empty )
-import GHC.Base (Int(..))
 
 infixl 6 <> 
 infixl 6 <+>
@@ -124,10 +123,10 @@ pprName = pprName' Alone
 
 pprName' :: NameIs -> Name -> Doc
 pprName' ni n@(Name o (NameU _))
- = PprM $ \s@(fm, i@(I# i'))
+ = PprM $ \s@(fm, i)
         -> let (n', s') = case Map.lookup n fm of
                          Just d -> (d, s)
-                         Nothing -> let n'' = Name o (NameU i')
+                         Nothing -> let n'' = Name o (NameU i)
                                     in (n'', (Map.insert n n'' fm, i + 1))
            in (HPJ.text $ showName' ni n', s')
 pprName' ni n = text $ showName' ni n
