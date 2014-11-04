@@ -312,6 +312,11 @@ cvtDec (TH.StandaloneDerivD cxt ty)
        ; let inst_ty' = L loc $ mkImplicitHsForAllTy cxt' $ L loc ty'
        ; returnJustL $ DerivD $
          DerivDecl { deriv_type = inst_ty', deriv_overlap_mode = Nothing } }
+
+cvtDec (TH.DefaultSigD nm typ)
+  = do { nm' <- vNameL nm
+       ; ty' <- cvtType typ
+       ; returnJustL $ Hs.SigD $ GenericSig [nm'] ty' }
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)
 cvtTySynEqn tc (TySynEqn lhs rhs)

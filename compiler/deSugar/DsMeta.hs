@@ -672,10 +672,9 @@ rep_sigs' sigs = do { sigs1 <- mapM rep_sig sigs ;
                      return (concat sigs1) }
 
 rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
-rep_sig (L loc (TypeSig nms ty))      = mapM (rep_ty_sig loc ty) nms
+rep_sig (L loc (TypeSig nms ty))      = mapM (rep_ty_sig sigDName loc ty) nms
 rep_sig (L _   (PatSynSig {}))        = notHandled "Pattern type signatures" empty
-rep_sig (L _   (GenericSig nm _))     = notHandled "Default type signatures" msg
-  where msg = text "Illegal default signature for" <+> quotes (ppr nm)
+rep_sig (L loc (GenericSig nms ty))   = mapM (rep_ty_sig defaultSigDName loc ty) nms
 rep_sig d@(L _ (IdSig {}))            = pprPanic "rep_sig IdSig" (ppr d)
 rep_sig (L _   (FixSig {}))           = return [] -- fixity sigs at top level
 rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
@@ -683,12 +682,12 @@ rep_sig (L loc (SpecSig nm ty ispec)) = rep_specialise nm ty ispec loc
 rep_sig (L loc (SpecInstSig ty))      = rep_specialiseInst ty loc
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 
-rep_ty_sig :: SrcSpan -> LHsType Name -> Located Name
+rep_ty_sig :: Name -> SrcSpan -> LHsType Name -> Located Name
            -> DsM (SrcSpan, Core TH.DecQ)
-rep_ty_sig loc (L _ ty) nm
+rep_ty_sig mk_sig loc (L _ ty) nm
   = do { nm1 <- lookupLOcc nm
        ; ty1 <- rep_ty ty
-       ; sig <- repProto nm1 ty1
+       ; sig <- repProto mk_sig nm1 ty1
        ; return (loc, sig) }
   where
     -- We must special-case the top-level explicit for-all of a TypeSig
@@ -702,7 +701,6 @@ rep_ty_sig loc (L _ ty) nm
            ; repTForall bndrs1 ctxt1 ty1 }
 
     rep_ty ty = repTy ty
-
 
 rep_inline :: Located Name
            -> InlinePragma      -- Never defaultInlinePragma
@@ -1820,8 +1818,8 @@ repRoleAnnotD (MkC n) (MkC roles) = rep2 roleAnnotDName [n, roles]
 repFunDep :: Core [TH.Name] -> Core [TH.Name] -> DsM (Core TH.FunDep)
 repFunDep (MkC xs) (MkC ys) = rep2 funDepName [xs, ys]
 
-repProto :: Core TH.Name -> Core TH.TypeQ -> DsM (Core TH.DecQ)
-repProto (MkC s) (MkC ty) = rep2 sigDName [s, ty]
+repProto :: Name -> Core TH.Name -> Core TH.TypeQ -> DsM (Core TH.DecQ)
+repProto mk_sig (MkC s) (MkC ty) = rep2 mk_sig [s, ty]
 
 repCtxt :: Core [TH.PredQ] -> DsM (Core TH.CxtQ)
 repCtxt (MkC tys) = rep2 cxtName [tys]
@@ -2120,7 +2118,7 @@ templateHaskellNames = [
     funDName, valDName, dataDName, newtypeDName, tySynDName,
     classDName, instanceDName, standaloneDerivDName, sigDName, forImpDName,
     pragInlDName, pragSpecDName, pragSpecInlDName, pragSpecInstDName,
-    pragRuleDName, pragAnnDName,
+    pragRuleDName, pragAnnDName, defaultSigDName,
     familyNoKindDName, familyKindDName, dataInstDName, newtypeInstDName,
     tySynInstDName, closedTypeFamilyKindDName, closedTypeFamilyNoKindDName,
     infixLDName, infixRDName, infixNDName,
@@ -2346,7 +2344,7 @@ parSName    = libFun (fsLit "parS")    parSIdKey
 funDName, valDName, dataDName, newtypeDName, tySynDName, classDName,
     instanceDName, sigDName, forImpDName, pragInlDName, pragSpecDName,
     pragSpecInlDName, pragSpecInstDName, pragRuleDName, pragAnnDName,
-    familyNoKindDName, standaloneDerivDName,
+    familyNoKindDName, standaloneDerivDName, defaultSigDName,
     familyKindDName, dataInstDName, newtypeInstDName, tySynInstDName,
     closedTypeFamilyKindDName, closedTypeFamilyNoKindDName,
     infixLDName, infixRDName, infixNDName, roleAnnotDName :: Name
@@ -2360,6 +2358,7 @@ instanceDName     = libFun (fsLit "instanceD")     instanceDIdKey
 standaloneDerivDName
                   = libFun (fsLit "standaloneDerivD") standaloneDerivDIdKey
 sigDName          = libFun (fsLit "sigD")          sigDIdKey
+defaultSigDName   = libFun (fsLit "defaultSigD")   defaultSigDIdKey
 forImpDName       = libFun (fsLit "forImpD")       forImpDIdKey
 pragInlDName      = libFun (fsLit "pragInlD")      pragInlDIdKey
 pragSpecDName     = libFun (fsLit "pragSpecD")     pragSpecDIdKey
@@ -2711,7 +2710,7 @@ parSIdKey        = mkPreludeMiscIdUnique 323
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey,
     classDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey, pragInlDIdKey,
     pragSpecDIdKey, pragSpecInlDIdKey, pragSpecInstDIdKey, pragRuleDIdKey,
-    pragAnnDIdKey, familyNoKindDIdKey, familyKindDIdKey,
+    pragAnnDIdKey, familyNoKindDIdKey, familyKindDIdKey, defaultSigDIdKey,
     dataInstDIdKey, newtypeInstDIdKey, tySynInstDIdKey, standaloneDerivDIdKey,
     closedTypeFamilyKindDIdKey, closedTypeFamilyNoKindDIdKey,
     infixLDIdKey, infixRDIdKey, infixNDIdKey, roleAnnotDIdKey :: Unique
@@ -2742,6 +2741,7 @@ infixRDIdKey                 = mkPreludeMiscIdUnique 353
 infixNDIdKey                 = mkPreludeMiscIdUnique 354
 roleAnnotDIdKey              = mkPreludeMiscIdUnique 355
 standaloneDerivDIdKey        = mkPreludeMiscIdUnique 356
+defaultSigDIdKey             = mkPreludeMiscIdUnique 357
 
 -- type Cxt = ...
 cxtIdKey :: Unique

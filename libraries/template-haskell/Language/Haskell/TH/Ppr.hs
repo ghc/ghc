@@ -330,6 +330,9 @@ ppr_dec _ (RoleAnnotD name roles)
 ppr_dec _ (StandaloneDerivD cxt ty)
   = hsep [ text "deriving instance", pprCxt cxt, ppr ty ]
 
+ppr_dec _ (DefaultSigD n ty)
+  = hsep [ text "default", pprPrefixOcc n, text "::", ppr ty ]
+
 ppr_data :: Doc -> Cxt -> Name -> Doc -> [Con] -> [Name] -> Doc
 ppr_data maybeInst ctxt t argsDoc cs decs
   = sep [text "data" <+> maybeInst

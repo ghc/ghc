@@ -466,6 +466,12 @@ standaloneDerivD ctxtq tyq =
     ty   <- tyq
     return $ StandaloneDerivD ctxt ty
 
+defaultSigD :: Name -> TypeQ -> DecQ
+defaultSigD n tyq =
+  do
+    ty <- tyq
+    return $ DefaultSigD n ty
+
 tySynEqn :: [TypeQ] -> TypeQ -> TySynEqnQ
 tySynEqn lhs rhs =
   do
