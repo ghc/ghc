@@ -620,8 +620,8 @@ hiDecl dflags t = do
       return Nothing
     Just x -> case tyThingToLHsDecl x of
       Left m -> liftErrMsg (tell [bugWarn m]) >> return Nothing
-      Right (m, t) -> liftErrMsg (tell $ map bugWarn m)
-                      >> return (Just $ noLoc t)
+      Right (m, t') -> liftErrMsg (tell $ map bugWarn m)
+                      >> return (Just $ noLoc t')
     where
       warnLine x = O.text "haddock-bug:" O.<+> O.text x O.<>
                    O.comma O.<+> O.quotes (O.ppr t) O.<+>

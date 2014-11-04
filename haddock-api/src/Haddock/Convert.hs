@@ -235,7 +235,6 @@ synifyTyCon coax tc
   use_gadt_syntax = any (not . isVanillaDataCon) (tyConDataCons tc)
   consRaw = map (synifyDataCon use_gadt_syntax) (tyConDataCons tc)
   cons = rights consRaw
-  dataConErrs = lefts consRaw
   -- "deriving" doesn't affect the signature, no need to specify any.
   alg_deriv = Nothing
   defn = HsDataDefn { dd_ND      = alg_nd
@@ -248,7 +247,7 @@ synifyTyCon coax tc
   [] -> return $
         DataDecl { tcdLName = name, tcdTyVars = tyvars, tcdDataDefn = defn
                  , tcdFVs = placeHolderNames }
-  ms -> Left $ unlines dataConErrs
+  dataConErrs -> Left $ unlines dataConErrs
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
 -- for any constructor that would be misrepresented by omitting its

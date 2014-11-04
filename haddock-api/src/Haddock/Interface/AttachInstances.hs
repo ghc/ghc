@@ -25,14 +25,13 @@ import Data.Function (on)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Bag (listToBag)
 import Class
 import DynFlags
 import ErrUtils
 import FamInstEnv
 import FastString
 import GHC
-import GhcMonad (withSession, logWarnings)
+import GhcMonad (withSession)
 import Id
 import InstEnv
 import MonadUtils (liftIO)
