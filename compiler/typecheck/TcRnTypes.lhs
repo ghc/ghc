@@ -590,7 +590,7 @@ pass it inwards.
 ---------------------------
 
 data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
-  = Splice      -- Top-level splicing
+  = Splice      -- Inside a top-level splice splice
                 -- This code will be run *at compile time*;
                 --   the result replaces the splice
                 -- Binding level = 0
@@ -609,7 +609,7 @@ data PendingStuff
 
   | RnPendingTyped                -- Renaming the inside of a *typed* bracket
 
-  | TcPending                     -- Typechecking the iniside of a typed bracket
+  | TcPending                     -- Typechecking the inside of a typed bracket
       (TcRef [PendingTcSplice])   --   Accumulate pending splices here
       (TcRef WantedConstraints)   --     and type constraints here
 

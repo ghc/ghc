@@ -1319,7 +1319,8 @@ checkCrossStageLifting id (Brack _ (TcPending ps_var lie_var))
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
-        ; writeMutVar ps_var ((idName id, nlHsApp (noLoc lift) (nlHsVar id)) : ps)
+        ; let pending_splice = PendSplice (idName id) (nlHsApp (noLoc lift) (nlHsVar id))
+        ; writeMutVar ps_var (pending_splice : ps)
 
         ; return () }
 

@@ -77,7 +77,7 @@ dsBracket :: HsBracket Name -> [PendingTcSplice] -> DsM CoreExpr
 dsBracket brack splices
   = dsExtendMetaEnv new_bit (do_brack brack)
   where
-    new_bit = mkNameEnv [(n, Splice (unLoc e)) | (n, e) <- splices]
+    new_bit = mkNameEnv [(n, Splice (unLoc e)) | PendSplice n e <- splices]
 
     do_brack (VarBr _ n) = do { MkC e1  <- lookupOcc n ; return e1 }
     do_brack (ExpBr e)   = do { MkC e1  <- repLE e     ; return e1 }

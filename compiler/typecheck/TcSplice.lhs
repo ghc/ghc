@@ -248,7 +248,11 @@ Note [Template Haskell state diagram]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here are the ThStages, s, their corresponding level numbers
 (the result of (thLevel s)), and their state transitions.
+The top level of the program is stage Comp:
 
+     Start here
+         |
+         V
       -----------     $      ------------   $
       |  Comp   | ---------> |  Splice  | -----|
       |   1     |            |    0     | <----|
@@ -378,16 +382,16 @@ tcBrackTy (TExpBr _)  = panic "tcUntypedBracket: Unexpected TExpBr"
 
 ---------------
 tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
-tcPendingSplice (PendingRnExpSplice (HsSplice n expr))
+tcPendingSplice (PendingRnExpSplice (PendSplice n expr))
   = do { res_ty <- tcMetaTy expQTyConName
        ; tc_pending_splice n expr res_ty }
-tcPendingSplice (PendingRnPatSplice (HsSplice n expr))
+tcPendingSplice (PendingRnPatSplice (PendSplice n expr))
   = do { res_ty <- tcMetaTy patQTyConName
        ; tc_pending_splice n expr res_ty }
-tcPendingSplice (PendingRnTypeSplice (HsSplice n expr))
+tcPendingSplice (PendingRnTypeSplice (PendSplice n expr))
   = do { res_ty <- tcMetaTy typeQTyConName
        ; tc_pending_splice n expr res_ty }
-tcPendingSplice (PendingRnDeclSplice (HsSplice n expr))
+tcPendingSplice (PendingRnDeclSplice (PendSplice n expr))
   = do { res_ty <- tcMetaTy decsQTyConName
        ; tc_pending_splice n expr res_ty }
 
@@ -400,7 +404,7 @@ tcPendingSplice (PendingRnCrossStageSplice n)
 tc_pending_splice :: Name -> LHsExpr Name -> TcRhoType -> TcM PendingTcSplice
 tc_pending_splice splice_name expr res_ty
   = do { expr' <- tcMonoExpr expr res_ty
-       ; return (splice_name, expr') }
+       ; return (PendSplice splice_name expr') }
 
 ---------------
 -- Takes a type tau and returns the type Q (TExp tau)
@@ -440,7 +444,7 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var) splice_name expr res_ty
        ; untypeq <- tcLookupId unTypeQName
        ; let expr'' = mkHsApp (nlHsTyApp untypeq [res_ty]) expr'
        ; ps <- readMutVar ps_var
-       ; writeMutVar ps_var ((splice_name, expr'') : ps)
+       ; writeMutVar ps_var (PendSplice splice_name expr'' : ps)
 
        -- The returned expression is ignored; it's in the pending splices
        ; return (panic "tcSpliceExpr") }
