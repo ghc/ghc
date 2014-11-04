@@ -288,7 +288,7 @@ void disassemble( StgBCO *bco )
 
    debugBelch("BCO\n" );
    pc = 0;
-   while (pc <= nbcs) {
+   while (pc < nbcs) {
       debugBelch("\t%2d:  ", pc );
       pc = disInstr ( bco, pc );
    }
@@ -312,7 +312,6 @@ void disassemble( StgBCO *bco )
    debugBelch("\n");
 
    debugBelch("\n");
-   ASSERT(pc == nbcs+1);
 }
 
 #endif /* DEBUG */
