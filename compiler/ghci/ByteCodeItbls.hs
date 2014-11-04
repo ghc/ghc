@@ -110,14 +110,10 @@ make_constr_itbls dflags cons
                                    then Just code'
                                    else Nothing
                         }
-           qNameCString <- newArray0 0 $ dataConIdentity dcon
-           let conInfoTbl = StgConInfoTable {
-                                 conDesc = qNameCString,
-                                 infoTable = itbl
-                            }
+
                -- Make a piece of code to jump to "entry_label".
                -- This is the only arch-dependent bit.
-           addrCon <- newExecConItbl dflags conInfoTbl
+           addrCon <- newExecConItbl dflags itbl (dataConIdentity dcon)
                     --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
                     --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     --putStrLn ("# nptrs of itbl is " ++ show nptrs_really)
@@ -273,12 +269,17 @@ sizeOfConItbl dflags conInfoTable
       = sum [ fieldSz conDesc conInfoTable
             , sizeOfItbl dflags (infoTable conInfoTable) ]
 
-pokeConItbl :: DynFlags -> Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
+pokeConItbl :: DynFlags -> Ptr StgConInfoTable -> Ptr StgConInfoTable
+            -> StgConInfoTable
             -> IO ()
 pokeConItbl dflags wr_ptr ex_ptr itbl
       = flip evalStateT (castPtr wr_ptr) $ do
-           when ghciTablesNextToCode $
-               store (conDesc itbl `minusPtr` (ex_ptr `plusPtr` conInfoTableSizeB dflags))
+           when ghciTablesNextToCode $ do
+               let con_desc = conDesc itbl `minusPtr`
+                      (ex_ptr `plusPtr` conInfoTableSizeB dflags)
+               store (fromIntegral con_desc :: Word32)
+               when (wORD_SIZE dflags == 8) $
+                  store (fromIntegral con_desc :: Word32)
            store' (sizeOfItbl dflags) (pokeItbl dflags) (infoTable itbl)
            unless ghciTablesNextToCode $ store (conDesc itbl)
 
@@ -380,13 +381,22 @@ load :: Storable a => PtrIO a
 load = do addr <- advance
           lift (peek addr)
 
-newExecConItbl :: DynFlags -> StgConInfoTable -> IO (FunPtr ())
-newExecConItbl dflags obj
+newExecConItbl :: DynFlags -> StgInfoTable -> [Word8] -> IO (FunPtr ())
+newExecConItbl dflags obj con_desc
    = alloca $ \pcode -> do
-        let sz = fromIntegral (sizeOfConItbl dflags obj)
-        wr_ptr <- _allocateExec sz pcode
+        let lcon_desc = length con_desc + 1{- null terminator -}
+            dummy_cinfo = StgConInfoTable { conDesc = nullPtr, infoTable = obj }
+            sz = fromIntegral (sizeOfConItbl dflags dummy_cinfo)
+               -- Note: we need to allocate the conDesc string next to the info
+               -- table, because on a 64-bit platform we reference this string
+               -- with a 32-bit offset relative to the info table, so if we
+               -- allocated the string separately it might be out of range.
+        wr_ptr <- _allocateExec (sz + fromIntegral lcon_desc) pcode
         ex_ptr <- peek pcode
-        pokeConItbl dflags wr_ptr ex_ptr obj
+        let cinfo = StgConInfoTable { conDesc = ex_ptr `plusPtr` fromIntegral sz
+                                    , infoTable = obj }
+        pokeConItbl dflags wr_ptr ex_ptr cinfo
+        pokeArray0 0 (castPtr wr_ptr `plusPtr` fromIntegral sz) con_desc
         _flushExec sz ex_ptr -- Cache flush (if needed)
         return (castPtrToFunPtr ex_ptr)
 
