@@ -957,12 +957,13 @@ lookupQualifiedNameGHCi dflags is_ghci rdr_name
     -- and respect hiddenness of modules/packages, hence loadSrcInterface.
     do { res <- loadSrcInterface_maybe doc mod False Nothing
        ; case res of
-           Succeeded iface
+           Succeeded ifaces
              | (n:ns) <- [ name
-                         | avail <- mi_exports iface
+                         | iface <- ifaces
+                         , avail <- mi_exports iface
                          , name  <- availNames avail
                          , nameOccName name == occ ]
-             -> ASSERT(null ns) return (Just n)
+             -> ASSERT(all (==n) ns) return (Just n)
 
            _ -> -- Either we couldn't load the interface, or
                 -- we could but we didn't find the name in it
