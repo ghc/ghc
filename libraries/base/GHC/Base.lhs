@@ -416,6 +416,12 @@ liftA2 f a b = (fmap f a) <*> b
 liftA3 :: Applicative f => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
 liftA3 f a b c = (fmap f a) <*> b <*> c
 
+-- | The 'join' function is the conventional monad join operator. It
+-- is used to remove one level of monadic structure, projecting its
+-- bound argument into the outer level.
+join              :: (Monad m) => m (m a) -> m a
+join x            =  x >>= id
+
 {- | The 'Monad' class defines the basic operations over a /monad/,
 a concept from a branch of mathematics known as /category theory/.
 From the perspective of a Haskell programmer, however, it is best to
@@ -438,13 +444,6 @@ Instances of both 'Monad' and 'Functor' should additionally satisfy the law:
 The instances of 'Monad' for lists, 'Data.Maybe.Maybe' and 'System.IO.IO'
 defined in the "Prelude" satisfy these laws.
 -}
-
--- | The 'join' function is the conventional monad join operator. It
--- is used to remove one level of monadic structure, projecting its
--- bound argument into the outer level.
-join              :: (Monad m) => m (m a) -> m a
-join x            =  x >>= id
-
 class Applicative m => Monad m where
     -- | Sequentially compose two actions, passing any value produced
     -- by the first as an argument to the second.
