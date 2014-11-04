@@ -28,33 +28,33 @@ module Data.Bool (
 
 import GHC.Base
 
--- | Case analysis for the 'Bool' type. @bool x y p@ evaluates to @x@
---   when @p@ is @False@, and evaluates to @y@ when @p@ is @True@.
+-- | Case analysis for the 'Bool' type. @'bool' x y p@ evaluates to @x@
+-- when @p@ is 'False', and evaluates to @y@ when @p@ is 'True'.
 --
---   This is equivalent to @if p then y else x@; that is, one can
---   think of it as an if-then-else construct with its arguments
---   reordered.
+-- This is equivalent to @if p then y else x@; that is, one can
+-- think of it as an if-then-else construct with its arguments
+-- reordered.
 --
---   /Since: 4.7.0.0/
+-- /Since: 4.7.0.0/
 --
---   ==== __Examples__
+-- ==== __Examples__
 --
---   Basic usage:
+-- Basic usage:
 --
---   >>> bool "foo" "bar" True
---   "bar"
---   >>> bool "foo" "bar" False
---   "foo"
+-- >>> bool "foo" "bar" True
+-- "bar"
+-- >>> bool "foo" "bar" False
+-- "foo"
 --
---   Confirm that @bool x y p@ and @if p then y else x@ are
---   equivalent:
+-- Confirm that @'bool' x y p@ and @if p then y else x@ are
+-- equivalent:
 --
---   >>> let p = True; x = "bar"; y = "foo"
---   >>> bool x y p == if p then y else x
---   True
---   >>> let p = False
---   >>> bool x y p == if p then y else x
---   True
+-- >>> let p = True; x = "bar"; y = "foo"
+-- >>> bool x y p == if p then y else x
+-- True
+-- >>> let p = False
+-- >>> bool x y p == if p then y else x
+-- True
 --
 bool :: a -> a -> Bool -> a
 bool f _ False = f

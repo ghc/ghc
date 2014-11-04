@@ -386,6 +386,7 @@ showMultiLineString str
   where
     go ch s = case break (== '\n') s of
                 (l, _:s'@(_:_)) -> (ch : showLitString l "\\n\\") : go '\\' s'
+                (l, "\n")       -> [ch : showLitString l "\\n\""]
                 (l, _)          -> [ch : showLitString l "\""]
 
 isDec :: Char -> Bool

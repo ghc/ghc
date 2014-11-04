@@ -69,7 +69,6 @@ Library
         NegativeLiterals
         NoImplicitPrelude
         NondecreasingIndentation
-        OverlappingInstances
         OverloadedStrings
         ParallelArrays
         PolyKinds
