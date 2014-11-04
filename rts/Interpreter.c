@@ -80,8 +80,14 @@
     SpLim = tso_SpLim(cap->r.rCurrentTSO);
 
 #define SAVE_STACK_POINTERS                     \
-    ASSERT(Sp > SpLim); \
     cap->r.rCurrentTSO->stackobj->sp = Sp
+
+// Note [Not true: ASSERT(Sp > SpLim)]
+//
+// SpLim has some headroom (RESERVED_STACK_WORDS) to allow for saving
+// any necessary state on the stack when returning to the scheduler
+// when a stack check fails..  The upshot of this is that Sp could be
+// less than SpLim both when leaving to return to the scheduler.
 
 #define RETURN_TO_SCHEDULER(todo,retcode)       \
    SAVE_STACK_POINTERS;                         \
