@@ -459,6 +459,13 @@ closedTypeFamilyKindD tc tvs kind eqns =
 roleAnnotD :: Name -> [Role] -> DecQ
 roleAnnotD name roles = return $ RoleAnnotD name roles
 
+standaloneDerivD :: CxtQ -> TypeQ -> DecQ
+standaloneDerivD ctxtq tyq =
+  do
+    ctxt <- ctxtq
+    ty   <- tyq
+    return $ StandaloneDerivD ctxt ty
+
 tySynEqn :: [TypeQ] -> TypeQ -> TySynEqnQ
 tySynEqn lhs rhs =
   do

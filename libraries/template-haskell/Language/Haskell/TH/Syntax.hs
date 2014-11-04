@@ -1215,6 +1215,7 @@ data Dec
       [TySynEqn]                  -- ^ @{ type family F a b :: * where ... }@
 
   | RoleAnnotD Name [Role]        -- ^ @{ type role T nominal representational }@
+  | StandaloneDerivD Cxt Type     -- ^ @{ deriving instance Ord a => Ord (Foo a) }@
   deriving( Show, Eq, Data, Typeable, Generic )
 
 -- | One equation of a type family instance or closed type family. The

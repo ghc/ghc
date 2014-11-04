@@ -327,6 +327,9 @@ ppr_dec _ (ClosedTypeFamilyD tc tvs mkind eqns)
 ppr_dec _ (RoleAnnotD name roles)
   = hsep [ text "type role", ppr name ] <+> hsep (map ppr roles)
 
+ppr_dec _ (StandaloneDerivD cxt ty)
+  = hsep [ text "deriving instance", pprCxt cxt, ppr ty ]
+
 ppr_data :: Doc -> Cxt -> Name -> Doc -> [Con] -> [Name] -> Doc
 ppr_data maybeInst ctxt t argsDoc cs decs
   = sep [text "data" <+> maybeInst

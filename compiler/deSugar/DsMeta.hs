@@ -137,26 +137,26 @@ repTopDs group@(HsGroup { hs_valds   = valds
         -- only "T", not "Foo:T" where Foo is the current module
 
         decls <- addBinds ss (
-                  do { val_ds  <- rep_val_binds valds
-                     ; _       <- mapM no_splice splcds
-                     ; tycl_ds <- mapM repTyClD (tyClGroupConcat tyclds)
-                     ; role_ds <- mapM repRoleD (concatMap group_roles tyclds)
-                     ; inst_ds <- mapM repInstD instds
-                     ; _       <- mapM no_standalone_deriv derivds
-                     ; fix_ds  <- mapM repFixD fixds
-                     ; _       <- mapM no_default_decl defds
-                     ; for_ds  <- mapM repForD fords
-                     ; _       <- mapM no_warn warnds
-                     ; ann_ds  <- mapM repAnnD annds
-                     ; rule_ds <- mapM repRuleD ruleds
-                     ; _       <- mapM no_vect vects
-                     ; _       <- mapM no_doc docs
+                  do { val_ds   <- rep_val_binds valds
+                     ; _        <- mapM no_splice splcds
+                     ; tycl_ds  <- mapM repTyClD (tyClGroupConcat tyclds)
+                     ; role_ds  <- mapM repRoleD (concatMap group_roles tyclds)
+                     ; inst_ds  <- mapM repInstD instds
+                     ; deriv_ds <- mapM repStandaloneDerivD derivds
+                     ; fix_ds   <- mapM repFixD fixds
+                     ; _        <- mapM no_default_decl defds
+                     ; for_ds   <- mapM repForD fords
+                     ; _        <- mapM no_warn warnds
+                     ; ann_ds   <- mapM repAnnD annds
+                     ; rule_ds  <- mapM repRuleD ruleds
+                     ; _        <- mapM no_vect vects
+                     ; _        <- mapM no_doc docs
 
                         -- more needed
                      ;  return (de_loc $ sort_by_loc $
                                 val_ds ++ catMaybes tycl_ds ++ role_ds ++ fix_ds
                                        ++ inst_ds ++ rule_ds ++ for_ds
-                                       ++ ann_ds) }) ;
+                                       ++ ann_ds ++ deriv_ds) }) ;
 
         decl_ty <- lookupType decQTyConName ;
         let { core_list = coreList' decl_ty decls } ;
@@ -169,8 +169,6 @@ repTopDs group@(HsGroup { hs_valds   = valds
   where
     no_splice (L loc _)
       = notHandledL loc "Splices within declaration brackets" empty
-    no_standalone_deriv (L loc (DerivDecl { deriv_type = deriv_ty }))
-      = notHandledL loc "Standalone-deriving" (ppr deriv_ty)
     no_default_decl (L loc decl)
       = notHandledL loc "Default declarations" (ppr decl)
     no_warn (L loc (Warning thing _))
@@ -421,6 +419,18 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
                ; repInst cxt1 inst_ty1 decls }
  where
    Just (tvs, cxt, cls, tys) = splitLHsInstDeclTy_maybe ty
+
+repStandaloneDerivD :: LDerivDecl Name -> DsM (SrcSpan, Core TH.DecQ)
+repStandaloneDerivD (L loc (DerivDecl { deriv_type = ty }))
+  = do { dec <- addTyVarBinds tvs $ \_ ->
+                do { cxt' <- repContext cxt
+                   ; cls_tcon <- repTy (HsTyVar (unLoc cls))
+                   ; cls_tys <- repLTys tys
+                   ; inst_ty <- repTapps cls_tcon cls_tys
+                   ; repDeriv cxt' inst_ty }
+       ; return (loc, dec) }
+  where
+    Just (tvs, cxt, cls, tys) = splitLHsInstDeclTy_maybe ty
 
 repTyFamInstD :: TyFamInstDecl Name -> DsM (Core TH.DecQ)
 repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
@@ -1741,6 +1751,9 @@ repClass :: Core TH.CxtQ -> Core TH.Name -> Core [TH.TyVarBndr]
 repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC fds) (MkC ds)
   = rep2 classDName [cxt, cls, tvs, fds, ds]
 
+repDeriv :: Core TH.CxtQ -> Core TH.TypeQ -> DsM (Core TH.DecQ)
+repDeriv (MkC cxt) (MkC ty) = rep2 standaloneDerivDName [cxt, ty]
+
 repPragInl :: Core TH.Name -> Core TH.Inline -> Core TH.RuleMatch
            -> Core TH.Phases -> DsM (Core TH.DecQ)
 repPragInl (MkC nm) (MkC inline) (MkC rm) (MkC phases)
@@ -2105,7 +2118,7 @@ templateHaskellNames = [
     bindSName, letSName, noBindSName, parSName,
     -- Dec
     funDName, valDName, dataDName, newtypeDName, tySynDName,
-    classDName, instanceDName, sigDName, forImpDName,
+    classDName, instanceDName, standaloneDerivDName, sigDName, forImpDName,
     pragInlDName, pragSpecDName, pragSpecInlDName, pragSpecInstDName,
     pragRuleDName, pragAnnDName,
     familyNoKindDName, familyKindDName, dataInstDName, newtypeInstDName,
@@ -2333,7 +2346,7 @@ parSName    = libFun (fsLit "parS")    parSIdKey
 funDName, valDName, dataDName, newtypeDName, tySynDName, classDName,
     instanceDName, sigDName, forImpDName, pragInlDName, pragSpecDName,
     pragSpecInlDName, pragSpecInstDName, pragRuleDName, pragAnnDName,
-    familyNoKindDName,
+    familyNoKindDName, standaloneDerivDName,
     familyKindDName, dataInstDName, newtypeInstDName, tySynInstDName,
     closedTypeFamilyKindDName, closedTypeFamilyNoKindDName,
     infixLDName, infixRDName, infixNDName, roleAnnotDName :: Name
@@ -2344,6 +2357,8 @@ newtypeDName      = libFun (fsLit "newtypeD")      newtypeDIdKey
 tySynDName        = libFun (fsLit "tySynD")        tySynDIdKey
 classDName        = libFun (fsLit "classD")        classDIdKey
 instanceDName     = libFun (fsLit "instanceD")     instanceDIdKey
+standaloneDerivDName
+                  = libFun (fsLit "standaloneDerivD") standaloneDerivDIdKey
 sigDName          = libFun (fsLit "sigD")          sigDIdKey
 forImpDName       = libFun (fsLit "forImpD")       forImpDIdKey
 pragInlDName      = libFun (fsLit "pragInlD")      pragInlDIdKey
@@ -2697,7 +2712,7 @@ funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey,
     classDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey, pragInlDIdKey,
     pragSpecDIdKey, pragSpecInlDIdKey, pragSpecInstDIdKey, pragRuleDIdKey,
     pragAnnDIdKey, familyNoKindDIdKey, familyKindDIdKey,
-    dataInstDIdKey, newtypeInstDIdKey, tySynInstDIdKey,
+    dataInstDIdKey, newtypeInstDIdKey, tySynInstDIdKey, standaloneDerivDIdKey,
     closedTypeFamilyKindDIdKey, closedTypeFamilyNoKindDIdKey,
     infixLDIdKey, infixRDIdKey, infixNDIdKey, roleAnnotDIdKey :: Unique
 funDIdKey                    = mkPreludeMiscIdUnique 330
@@ -2726,6 +2741,7 @@ infixLDIdKey                 = mkPreludeMiscIdUnique 352
 infixRDIdKey                 = mkPreludeMiscIdUnique 353
 infixNDIdKey                 = mkPreludeMiscIdUnique 354
 roleAnnotDIdKey              = mkPreludeMiscIdUnique 355
+standaloneDerivDIdKey        = mkPreludeMiscIdUnique 356
 
 -- type Cxt = ...
 cxtIdKey :: Unique

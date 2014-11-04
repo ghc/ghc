@@ -305,6 +305,13 @@ cvtDec (TH.RoleAnnotD tc roles)
   = do { tc' <- tconNameL tc
        ; let roles' = map (noLoc . cvtRole) roles
        ; returnJustL $ Hs.RoleAnnotD (RoleAnnotDecl tc' roles') }
+
+cvtDec (TH.StandaloneDerivD cxt ty)
+  = do { cxt' <- cvtContext cxt
+       ; L loc ty'  <- cvtType ty
+       ; let inst_ty' = L loc $ mkImplicitHsForAllTy cxt' $ L loc ty'
+       ; returnJustL $ DerivD $
+         DerivDecl { deriv_type = inst_ty', deriv_overlap_mode = Nothing } }
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)
 cvtTySynEqn tc (TySynEqn lhs rhs)

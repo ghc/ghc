@@ -124,7 +124,7 @@ module Language.Haskell.TH(
     -- **** Data
         valD, funD, tySynD, dataD, newtypeD,
     -- **** Class
-    classD, instanceD, sigD,
+    classD, instanceD, sigD, standaloneDerivD,
     -- **** Role annotations
     roleAnnotD,
     -- **** Type Family / Data Family
