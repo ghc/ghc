@@ -23,18 +23,18 @@
 -----------------------------------------------------------------------------
 
 module Data.Monoid (
-        -- * Monoid typeclass
+        -- * 'Monoid' typeclass
         Monoid(..),
         (<>),
         Dual(..),
         Endo(..),
-        -- * Bool wrappers
+        -- * 'Bool' wrappers
         All(..),
         Any(..),
-        -- * Num wrappers
+        -- * 'Num' wrappers
         Sum(..),
         Product(..),
-        -- * Maybe wrappers
+        -- * 'Maybe' wrappers
         -- $MaybeExamples
         First(..),
         Last(..),
@@ -67,7 +67,7 @@ infixr 6 <>
 
 -- Monoid instances.
 
--- | The dual of a monoid, obtained by swapping the arguments of 'mappend'.
+-- | The dual of a 'Monoid', obtained by swapping the arguments of 'mappend'.
 newtype Dual a = Dual { getDual :: a }
         deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1)
 
@@ -83,7 +83,7 @@ instance Monoid (Endo a) where
         mempty = Endo id
         Endo f `mappend` Endo g = Endo (f . g)
 
--- | Boolean monoid under conjunction.
+-- | Boolean monoid under conjunction ('&&').
 newtype All = All { getAll :: Bool }
         deriving (Eq, Ord, Read, Show, Bounded, Generic)
 
@@ -91,7 +91,7 @@ instance Monoid All where
         mempty = All True
         All x `mappend` All y = All (x && y)
 
--- | Boolean monoid under disjunction.
+-- | Boolean monoid under disjunction ('||').
 newtype Any = Any { getAny :: Bool }
         deriving (Eq, Ord, Read, Show, Bounded, Generic)
 
