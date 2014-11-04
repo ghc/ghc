@@ -136,6 +136,7 @@ synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
   | otherwise
   = error "synifyAxiom: closed/open family confusion"
 
+-- | Turn type constructors into type class declarations
 synifyTyCon :: Maybe (CoAxiom br) -> TyCon -> TyClDecl Name
 synifyTyCon coax tc
   | isFunTyCon tc || isPrimTyCon tc
@@ -163,10 +164,12 @@ synifyTyCon coax tc
   = case synTyConRhs_maybe tc of
       Just rhs ->
         let info = case rhs of
-                     OpenSynFamilyTyCon -> OpenTypeFamily
-                     ClosedSynFamilyTyCon (CoAxiom { co_ax_branches = branches }) ->
-                       ClosedTypeFamily (brListMap (noLoc . synifyAxBranch tc) branches)
-                     _ -> error "synifyTyCon: type/data family confusion"
+              OpenSynFamilyTyCon -> OpenTypeFamily
+              ClosedSynFamilyTyCon (CoAxiom { co_ax_branches = branches }) ->
+                ClosedTypeFamily (brListMap (noLoc . synifyAxBranch tc) branches)
+              BuiltInSynFamTyCon {} -> ClosedTypeFamily []
+              AbstractClosedSynFamilyTyCon {} -> ClosedTypeFamily []
+              _ -> error "synifyTyCon: type/data family confusion"
         in FamDecl (FamilyDecl { fdInfo = info
                                , fdLName = synifyName tc
                                , fdTyVars = synifyTyVars (tyConTyVars tc)
