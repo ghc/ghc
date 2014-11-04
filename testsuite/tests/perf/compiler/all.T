@@ -55,14 +55,15 @@ test('T1969',
              # 2009-12-31 6149572 (x86/Linux)
              # 2014-01-22 6429864 (x86/Linux)
              # 2014-06-29 5949188 (x86/Linux)
-           (wordsize(64), 9684256, 10)]),
+           (wordsize(64), 10000000, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
                # varies quite a lot with CLEANUP and BINDIST,
                # hence 10% range.
                # See Note [residency] to get an accurate view.
-             # 2014-09-14 9684256, 10 # try to lower it a bit more to match Phab's CI
+             # 2014-09-14  9684256, 10 # try to lower it a bit more to match Phab's CI
+             # 2014-11-03 10584344,    # ghcspeed reports higher numbers consistently
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
                                  #            215582916 (x86/Windows)
