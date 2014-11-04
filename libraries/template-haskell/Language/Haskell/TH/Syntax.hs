@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, PolymorphicComponents,
-             RoleAnnotations #-}
+             RoleAnnotations, DeriveGeneric #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -27,6 +27,7 @@ import Control.Monad (liftM)
 import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper )
 import Data.Word        ( Word8 )
+import GHC.Generics     ( Generic )
 
 -----------------------------------------------------
 --
@@ -524,17 +525,17 @@ rightName = mkNameG DataName "base" "Data.Either" "Right"
 -----------------------------------------------------
 
 newtype ModName = ModName String        -- Module name
- deriving (Show,Eq,Ord,Typeable,Data)
+ deriving (Show,Eq,Ord,Typeable,Data,Generic)
 
 newtype PkgName = PkgName String        -- package name
- deriving (Show,Eq,Ord,Typeable,Data)
+ deriving (Show,Eq,Ord,Typeable,Data,Generic)
 
 -- | Obtained from 'reifyModule' and 'thisModule'.
 data Module = Module PkgName ModName -- package qualified module name
- deriving (Show,Eq,Ord,Typeable,Data)
+ deriving (Show,Eq,Ord,Typeable,Data,Generic)
 
 newtype OccName = OccName String
- deriving (Show,Eq,Ord,Typeable,Data)
+ deriving (Show,Eq,Ord,Typeable,Data,Generic)
 
 mkModName :: String -> ModName
 mkModName s = ModName s
@@ -645,7 +646,7 @@ Names constructed using @newName@ and @mkName@ may be used in bindings
 (such as @let x = ...@ or @\x -> ...@), but names constructed using
 @lookupValueName@, @lookupTypeName@, @'f@, @''T@ may not.
 -}
-data Name = Name OccName NameFlavour deriving (Typeable, Data, Eq)
+data Name = Name OccName NameFlavour deriving (Typeable, Data, Eq, Generic)
 
 instance Ord Name where
     -- check if unique is different before looking at strings
@@ -661,13 +662,13 @@ data NameFlavour
                 -- An original name (occurrences only, not binders)
                 -- Need the namespace too to be sure which
                 -- thing we are naming
-  deriving ( Typeable, Data, Eq, Ord )
+  deriving ( Typeable, Data, Eq, Ord, Generic )
 
 data NameSpace = VarName        -- ^ Variables
                | DataName       -- ^ Data constructors
                | TcClsName      -- ^ Type constructors and classes; Haskell has them
                                 -- in the same name space for now.
-               deriving( Eq, Ord, Data, Typeable )
+               deriving( Eq, Ord, Data, Typeable, Generic )
 
 type Uniq = Int
 
@@ -937,13 +938,13 @@ data Info
   | TyVarI      -- Scoped type variable
         Name
         Type    -- What it is bound to
-  deriving( Show, Data, Typeable )
+  deriving( Show, Data, Typeable, Generic )
 
 -- | Obtained from 'reifyModule' in the 'Q' Monad.
 data ModuleInfo =
   -- | Contains the import list of the module.
   ModuleInfo [Module]
-  deriving( Show, Data, Typeable )
+  deriving( Show, Data, Typeable, Generic )
 
 {- |
 In 'ClassOpI' and 'DataConI', name of the parent class or type
@@ -967,9 +968,9 @@ type Unlifted = Bool
 type InstanceDec = Dec
 
 data Fixity          = Fixity Int FixityDirection
-    deriving( Eq, Show, Data, Typeable )
+    deriving( Eq, Show, Data, Typeable, Generic )
 data FixityDirection = InfixL | InfixR | InfixN
-    deriving( Eq, Show, Data, Typeable )
+    deriving( Eq, Show, Data, Typeable, Generic )
 
 -- | Highest allowed operator precedence for 'Fixity' constructor (answer: 9)
 maxPrecedence :: Int
@@ -1061,7 +1062,7 @@ data Lit = CharL Char
          | FloatPrimL Rational
          | DoublePrimL Rational
          | StringPrimL [Word8]  -- ^ A primitive C-style string, type Addr#
-    deriving( Show, Eq, Data, Typeable )
+    deriving( Show, Eq, Data, Typeable, Generic )
 
     -- We could add Int, Float, Double etc, as we do in HsLit,
     -- but that could complicate the
@@ -1089,15 +1090,15 @@ data Pat
   | ListP [ Pat ]                 -- ^ @{ [1,2,3] }@
   | SigP Pat Type                 -- ^ @{ p :: t }@
   | ViewP Exp Pat                 -- ^ @{ e -> p }@
-  deriving( Show, Eq, Data, Typeable )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 type FieldPat = (Name,Pat)
 
 data Match = Match Pat Body [Dec] -- ^ @case e of { pat -> body where decs }@
-    deriving( Show, Eq, Data, Typeable )
+    deriving( Show, Eq, Data, Typeable, Generic )
 data Clause = Clause [Pat] Body [Dec]
                                   -- ^ @f { p1 p2 = body where decs }@
-    deriving( Show, Eq, Data, Typeable )
+    deriving( Show, Eq, Data, Typeable, Generic )
 
 data Exp
   = VarE Name                          -- ^ @{ x }@
@@ -1144,7 +1145,7 @@ data Exp
   | SigE Exp Type                      -- ^ @{ e :: t }@
   | RecConE Name [FieldExp]            -- ^ @{ T { x = y, z = w } }@
   | RecUpdE Exp [FieldExp]             -- ^ @{ (f x) { z = w } }@
-  deriving( Show, Eq, Data, Typeable )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 type FieldExp = (Name,Exp)
 
@@ -1155,23 +1156,23 @@ data Body
                                  --      | e3 = e4 }
                                  -- where ds@
   | NormalB Exp              -- ^ @f p { = e } where ds@
-  deriving( Show, Eq, Data, Typeable )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 data Guard
   = NormalG Exp -- ^ @f x { | odd x } = x@
   | PatG [Stmt] -- ^ @f x { | Just y <- x, Just z <- y } = z@
-  deriving( Show, Eq, Data, Typeable )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 data Stmt
   = BindS Pat Exp
   | LetS [ Dec ]
   | NoBindS Exp
   | ParS [[Stmt]]
-  deriving( Show, Eq, Data, Typeable )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 data Range = FromR Exp | FromThenR Exp Exp
            | FromToR Exp Exp | FromThenToR Exp Exp Exp
-          deriving( Show, Eq, Data, Typeable )
+          deriving( Show, Eq, Data, Typeable, Generic )
 
 data Dec
   = FunD Name [Clause]            -- ^ @{ f p1 p2 = b where decs }@
@@ -1214,29 +1215,29 @@ data Dec
       [TySynEqn]                  -- ^ @{ type family F a b :: * where ... }@
 
   | RoleAnnotD Name [Role]        -- ^ @{ type role T nominal representational }@
-  deriving( Show, Eq, Data, Typeable )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 -- | One equation of a type family instance or closed type family. The
 -- arguments are the left-hand-side type patterns and the right-hand-side
 -- result.
 data TySynEqn = TySynEqn [Type] Type
-  deriving( Show, Eq, Data, Typeable )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 data FunDep = FunDep [Name] [Name]
-  deriving( Show, Eq, Data, Typeable )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 data FamFlavour = TypeFam | DataFam
-  deriving( Show, Eq, Data, Typeable )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 data Foreign = ImportF Callconv Safety String Name Type
              | ExportF Callconv        String Name Type
-         deriving( Show, Eq, Data, Typeable )
+         deriving( Show, Eq, Data, Typeable, Generic )
 
 data Callconv = CCall | StdCall
-          deriving( Show, Eq, Data, Typeable )
+          deriving( Show, Eq, Data, Typeable, Generic )
 
 data Safety = Unsafe | Safe | Interruptible
-        deriving( Show, Eq, Data, Typeable )
+        deriving( Show, Eq, Data, Typeable, Generic )
 
 data Pragma = InlineP         Name Inline RuleMatch Phases
             | SpecialiseP     Name Type (Maybe Inline) Phases
@@ -1244,30 +1245,30 @@ data Pragma = InlineP         Name Inline RuleMatch Phases
             | RuleP           String [RuleBndr] Exp Exp Phases
             | AnnP            AnnTarget Exp
             | LineP           Int String
-        deriving( Show, Eq, Data, Typeable )
+        deriving( Show, Eq, Data, Typeable, Generic )
 
 data Inline = NoInline
             | Inline
             | Inlinable
-            deriving (Show, Eq, Data, Typeable)
+            deriving (Show, Eq, Data, Typeable, Generic)
 
 data RuleMatch = ConLike
                | FunLike
-               deriving (Show, Eq, Data, Typeable)
+               deriving (Show, Eq, Data, Typeable, Generic)
 
 data Phases = AllPhases
             | FromPhase Int
             | BeforePhase Int
-            deriving (Show, Eq, Data, Typeable)
+            deriving (Show, Eq, Data, Typeable, Generic)
 
 data RuleBndr = RuleVar Name
               | TypedRuleVar Name Type
-              deriving (Show, Eq, Data, Typeable)
+              deriving (Show, Eq, Data, Typeable, Generic)
 
 data AnnTarget = ModuleAnnotation
                | TypeAnnotation Name
                | ValueAnnotation Name
-              deriving (Show, Eq, Data, Typeable)
+              deriving (Show, Eq, Data, Typeable, Generic)
 
 type Cxt = [Pred]                 -- ^ @(Eq a, Ord b)@
 
@@ -1277,13 +1278,13 @@ type Cxt = [Pred]                 -- ^ @(Eq a, Ord b)@
 type Pred = Type
 
 data Strict = IsStrict | NotStrict | Unpacked
-         deriving( Show, Eq, Data, Typeable )
+         deriving( Show, Eq, Data, Typeable, Generic )
 
 data Con = NormalC Name [StrictType]          -- ^ @C Int a@
          | RecC Name [VarStrictType]          -- ^ @C { v :: Int, w :: a }@
          | InfixC StrictType Name StrictType  -- ^ @Int :+ a@
          | ForallC [TyVarBndr] Cxt Con        -- ^ @forall a. Eq a => C [a]@
-         deriving( Show, Eq, Data, Typeable )
+         deriving( Show, Eq, Data, Typeable, Generic )
 
 type StrictType = (Strict, Type)
 type VarStrictType = (Name, Strict, Type)
@@ -1307,27 +1308,27 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
           | StarT                         -- ^ @*@
           | ConstraintT                   -- ^ @Constraint@
           | LitT TyLit                    -- ^ @0,1,2, etc.@
-      deriving( Show, Eq, Data, Typeable )
+      deriving( Show, Eq, Data, Typeable, Generic )
 
 data TyVarBndr = PlainTV  Name            -- ^ @a@
                | KindedTV Name Kind       -- ^ @(a :: k)@
-      deriving( Show, Eq, Data, Typeable )
+      deriving( Show, Eq, Data, Typeable, Generic )
 
 data TyLit = NumTyLit Integer             -- ^ @2@
            | StrTyLit String              -- ^ @"Hello"@
-  deriving ( Show, Eq, Data, Typeable )
+  deriving ( Show, Eq, Data, Typeable, Generic )
 
 -- | Role annotations
 data Role = NominalR            -- ^ @nominal@
           | RepresentationalR   -- ^ @representational@
           | PhantomR            -- ^ @phantom@
           | InferR              -- ^ @_@
-  deriving( Show, Eq, Data, Typeable )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 -- | Annotation target for reifyAnnotations
 data AnnLookup = AnnLookupModule Module
                | AnnLookupName Name
-               deriving( Show, Eq, Data, Typeable )
+               deriving( Show, Eq, Data, Typeable, Generic )
 
 -- | To avoid duplication between kinds and types, they
 -- are defined to be the same. Naturally, you would never
