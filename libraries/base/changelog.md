@@ -91,6 +91,8 @@
 
   * Add `Alt`, an `Alternative` wrapper, to `Data.Monoid`. (#9759)
 
+  * Add `isSubsequenceOf` to `Data.List` (#9767)
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3
