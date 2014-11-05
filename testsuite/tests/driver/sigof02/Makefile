@@ -72,4 +72,4 @@ sigof02dmt:
 	rm -rf tmp_sigof02dmt
 	mkdir tmp_sigof02dmt
 	# doesn't typecheck due to lack of alias
-	! '$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -outputdir tmp_sigof02dmt -fno-code -fwrite-interface --make Double.hs -o tmp_sigof02dm/Double
+	! '$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -outputdir tmp_sigof02dmt -fno-code -fwrite-interface --make Double.hs -o tmp_sigof02dmt/Double
