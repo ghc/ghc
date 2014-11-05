@@ -1568,7 +1568,6 @@ mkNewTypeEqn dflags overlap_mode tvs
             , ds_newtype = True }
   | otherwise
   = case checkSideConditions dflags mtheta cls cls_tys rep_tycon rep_tc_args of
-      CanDerive -> go_for_it    -- Use the standard H98 method
       DerivableClassError msg   -- Error with standard class
         | might_derive_via_coercible -> bale_out (msg $$ suggest_nd)
         | otherwise                  -> bale_out msg
@@ -1577,7 +1576,7 @@ mkNewTypeEqn dflags overlap_mode tvs
         | might_derive_via_coercible -> bale_out (non_std $$ suggest_nd) -- Try newtype deriving!
         | derivingViaGenerics        -> bale_out msg
         | otherwise                  -> bale_out non_std
-      DerivableViaGenerics           -> panicGenericsNewtype
+      _                              -> go_for_it -- CanDerive/DerivableViaGenerics
   where
         newtype_deriving    = xopt Opt_GeneralizedNewtypeDeriving dflags
         derivingViaGenerics = xopt Opt_DerivingViaGenerics        dflags
@@ -1586,8 +1585,8 @@ mkNewTypeEqn dflags overlap_mode tvs
 
         non_std    = nonStdErr cls
         suggest_nd = ptext (sLit "Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
-        panicGenericsNewtype = pprPanic "mkNewTypeEqn: DerivableViaGenerics"
-                                        (ppr (cls, rep_tycon))
+        -- panicGenericsNewtype = pprPanic "mkNewTypeEqn: DerivableViaGenerics"
+                                        -- (ppr (cls, rep_tycon))
 
         -- Here is the plan for newtype derivings.  We see
         --        newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)

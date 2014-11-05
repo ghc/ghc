@@ -69,6 +69,7 @@ import TcEnv (InstInfo)
 import ListSetOps ( assocMaybe )
 import Data.List  ( partition, intersperse )
 import Data.Maybe ( isNothing )
+import BooleanFormula ( isTrue )
 \end{code}
 
 \begin{code}
@@ -132,7 +133,7 @@ genDerivedBinds dflags fix_env clas loc tycon
 -- We can derive a given class via Generics iff
 canDeriveViaGenerics :: DynFlags -> TyCon -> Class -> Maybe SDoc
 canDeriveViaGenerics dflags tycon clas =
-  let dfs          = map (defMethSpecOfDefMeth . snd) . classOpItems $ clas
+  let _dfs         = map (defMethSpecOfDefMeth . snd) . classOpItems $ clas
       b `orElse` s = if b then Nothing else Just (ptext (sLit s))
       Just m  <> _ = Just m
       Nothing <> n = n
@@ -141,11 +142,14 @@ canDeriveViaGenerics dflags tycon clas =
       -- 2) Opt_DerivingViaGenerics is on
      <> (xopt Opt_DerivingViaGenerics dflags `orElse` "Try enabling DerivingViaGenerics")
       -- 3) It has no non-default methods
-     <> (all (/= NoDM) dfs `orElse` "There are methods without a default definition")
+     -- <> (all (/= NoDM) dfs `orElse` "There are methods without a default definition")
       -- 4) It has at least one generic default method
-     <> (any (== GenericDM) dfs `orElse` "There must be at least one method with a default signature")
-      -- 5) It's not a newtype (that conflicts with GeneralizedNewtypeDeriving)
-     <> (not (isNewTyCon tycon) `orElse` "DerivingViaGenerics is not supported for newtypes")
+     -- <> (any (== GenericDM) dfs `orElse` "There must be at least one method with a default signature")
+      -- 3/4) Its MINIMAL set is empty
+     <> (isTrue (classMinimalDef clas) `orElse` "because its MINIMAL set is not empty")
+      -- 5) It a newtype and GND is enabled
+     <> (not (isNewTyCon tycon && xopt Opt_GeneralizedNewtypeDeriving dflags)
+          `orElse` "I don't know whether to use DerivingViaGenerics or GeneralizedNewtypeDeriving")
   -- Nothing: we can derive it via Generics
   -- Just s:  we can't, reason s
 \end{code}
