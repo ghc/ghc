@@ -80,10 +80,6 @@ core2core hsc_env guts
                            do { all_passes <- addPluginPasses dflags builtin_passes
                               ; runCorePasses all_passes guts }
 
-{--
-       ; Err.dumpIfSet_dyn dflags Opt_D_dump_core_pipeline
-             "Plugin information" "" -- TODO FIXME: dump plugin info
---}
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
              "Grand total simplifier statistics"
              (pprSimplCount stats)

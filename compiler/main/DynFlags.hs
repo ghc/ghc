@@ -237,7 +237,6 @@ data DumpFlag
    | Opt_D_dump_occur_anal
    | Opt_D_dump_parsed
    | Opt_D_dump_rn
-   | Opt_D_dump_core_pipeline -- TODO FIXME: dump after simplifier stats
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
    | Opt_D_dump_spec
@@ -2360,7 +2359,6 @@ dynamic_flags = [
   , Flag "ddump-occur-anal"        (setDumpFlag Opt_D_dump_occur_anal)
   , Flag "ddump-parsed"            (setDumpFlag Opt_D_dump_parsed)
   , Flag "ddump-rn"                (setDumpFlag Opt_D_dump_rn)
-  , Flag "ddump-core-pipeline"     (setDumpFlag Opt_D_dump_core_pipeline)
   , Flag "ddump-simpl"             (setDumpFlag Opt_D_dump_simpl)
   , Flag "ddump-simpl-iterations"  (setDumpFlag Opt_D_dump_simpl_iterations)
   , Flag "ddump-spec"              (setDumpFlag Opt_D_dump_spec)

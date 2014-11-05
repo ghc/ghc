@@ -336,7 +336,7 @@ data CoreToDo           -- These are diff core-to-core passes,
 \begin{code}
 coreDumpFlag :: CoreToDo -> Maybe DumpFlag
 coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core
-coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_dump_core_pipeline
+coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_verbose_core2core
 coreDumpFlag CoreDoFloatInwards       = Just Opt_D_verbose_core2core
 coreDumpFlag (CoreDoFloatOutwards {}) = Just Opt_D_verbose_core2core
 coreDumpFlag CoreLiberateCase         = Just Opt_D_verbose_core2core

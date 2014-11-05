@@ -88,6 +88,12 @@
                     specifying <option>-fno-warn-tabs</option> flag.
                 </para>
            </listitem>
+           <listitem>
+             <para>
+               <option>-ddump-simpl-phases</option> and
+               <option>-ddump-core-pipeline</option> flags have been removed.
+             </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
