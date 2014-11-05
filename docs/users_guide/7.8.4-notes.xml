@@ -87,12 +87,6 @@
        </listitem>
        <listitem>
           <para>
-	    A minor bug in the compiler which made error messages emit
-	    necessary parenthesis has been fixed (issue #9658).
-          </para>
-       </listitem>
-       <listitem>
-          <para>
 	    A bug which caused the compiler to panic on pattern
 	    synonyms inside a class declaration has been fixed (issue
 	    #9705).
