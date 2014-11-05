@@ -104,6 +104,13 @@
 	    type family applications has been fixed (issue #9433).
           </para>
        </listitem>
+       <listitem>
+          <para>
+	    A bug in the IO manager that could cause deadlocks in
+	    combination with <literal>forkProcess</literal> has been
+	    fixed (issues #9377 and #9284).
+          </para>
+       </listitem>
     </itemizedlist>
   </sect2>
 </sect1>
