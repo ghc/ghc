@@ -337,17 +337,6 @@
 
       <varlistentry>
 	<term>
-          <option>-ddump-simpl-phases</option>:
-          <indexterm><primary><option>-ddump-simpl-phases</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Show the output of each run of the simplifier.  Used when even
-        <option>-dverbose-core2core</option> doesn't cut it.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
           <option>-ddump-simpl-iterations</option>:
           <indexterm><primary><option>-ddump-simpl-iterations</option></primary></indexterm>
         </term>

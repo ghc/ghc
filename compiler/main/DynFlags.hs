@@ -240,7 +240,6 @@ data DumpFlag
    | Opt_D_dump_core_pipeline -- TODO FIXME: dump after simplifier stats
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
-   | Opt_D_dump_simpl_phases
    | Opt_D_dump_spec
    | Opt_D_dump_prep
    | Opt_D_dump_stg
@@ -614,7 +613,6 @@ data DynFlags = DynFlags {
   optLevel              :: Int,         -- ^ Optimisation level
   simplPhases           :: Int,         -- ^ Number of simplifier phases
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
-  shouldDumpSimplPhase  :: Maybe String,
   ruleCheck             :: Maybe String,
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
@@ -1351,7 +1349,6 @@ defaultDynFlags mySettings =
         optLevel                = 0,
         simplPhases             = 2,
         maxSimplIterations      = 4,
-        shouldDumpSimplPhase    = Nothing,
         ruleCheck               = Nothing,
         maxRelevantBinds        = Just 6,
         simplTickFactor         = 100,
@@ -2366,7 +2363,6 @@ dynamic_flags = [
   , Flag "ddump-core-pipeline"     (setDumpFlag Opt_D_dump_core_pipeline)
   , Flag "ddump-simpl"             (setDumpFlag Opt_D_dump_simpl)
   , Flag "ddump-simpl-iterations"  (setDumpFlag Opt_D_dump_simpl_iterations)
-  , Flag "ddump-simpl-phases"      (OptPrefix setDumpSimplPhases)
   , Flag "ddump-spec"              (setDumpFlag Opt_D_dump_spec)
   , Flag "ddump-prep"              (setDumpFlag Opt_D_dump_prep)
   , Flag "ddump-stg"               (setDumpFlag Opt_D_dump_stg)
@@ -3334,15 +3330,10 @@ forceRecompile = do dfs <- liftEwM getCmdLineState
                     when (force_recomp dfs) (setGeneralFlag Opt_ForceRecomp)
         where
           force_recomp dfs = isOneShot (ghcMode dfs)
-setVerboseCore2Core :: DynP ()
-setVerboseCore2Core = do setDumpFlag' Opt_D_verbose_core2core
-                         upd (\dfs -> dfs { shouldDumpSimplPhase = Nothing })
 
-setDumpSimplPhases :: String -> DynP ()
-setDumpSimplPhases s = do forceRecompile
-                          upd (\dfs -> dfs { shouldDumpSimplPhase = Just spec })
-  where
-    spec = case s of { ('=' : s') -> s';  _ -> s }
+
+setVerboseCore2Core :: DynP ()
+setVerboseCore2Core = setDumpFlag' Opt_D_verbose_core2core
 
 setVerbosity :: Maybe Int -> DynP ()
 setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })

@@ -11,7 +11,7 @@ module CoreMonad (
     CoreToDo(..), runWhen, runMaybe,
     SimplifierMode(..),
     FloatOutSwitches(..),
-    dumpSimplPhase, pprPassDetails,
+    pprPassDetails,
 
     -- * Plugins
     PluginPass, Plugin(..), CommandLineOption,
@@ -94,7 +94,6 @@ import UniqSupply
 import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
 
-import Util ( split )
 import ListSetOps       ( runs )
 import Data.List
 import Data.Ord
@@ -336,7 +335,7 @@ data CoreToDo           -- These are diff core-to-core passes,
 
 \begin{code}
 coreDumpFlag :: CoreToDo -> Maybe DumpFlag
-coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_dump_simpl_phases
+coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core
 coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_dump_core_pipeline
 coreDumpFlag CoreDoFloatInwards       = Just Opt_D_verbose_core2core
 coreDumpFlag (CoreDoFloatOutwards {}) = Just Opt_D_verbose_core2core
@@ -354,10 +353,10 @@ coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
 coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
 coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
 
-coreDumpFlag CoreDoPrintCore         = Nothing
-coreDumpFlag (CoreDoRuleCheck {})    = Nothing
-coreDumpFlag CoreDoNothing           = Nothing
-coreDumpFlag (CoreDoPasses {})       = Nothing
+coreDumpFlag CoreDoPrintCore          = Nothing
+coreDumpFlag (CoreDoRuleCheck {})     = Nothing
+coreDumpFlag CoreDoNothing            = Nothing
+coreDumpFlag (CoreDoPasses {})        = Nothing
 
 instance Outputable CoreToDo where
   ppr (CoreDoSimplify _ _)     = ptext (sLit "Simplifier")
@@ -452,33 +451,6 @@ runMaybe :: Maybe a -> (a -> CoreToDo) -> CoreToDo
 runMaybe (Just x) f = f x
 runMaybe Nothing  _ = CoreDoNothing
 
-
-dumpSimplPhase :: DynFlags -> SimplifierMode -> Bool
-dumpSimplPhase dflags mode
-   | Just spec_string <- shouldDumpSimplPhase dflags
-   = match_spec spec_string
-   | otherwise
-   = dopt Opt_D_verbose_core2core dflags
-
-  where
-    match_spec :: String -> Bool
-    match_spec spec_string
-      = or $ map (and . map match . split ':')
-           $ split ',' spec_string
-
-    match :: String -> Bool
-    match "" = True
-    match s  = case reads s of
-                [(n,"")] -> phase_num  n
-                _        -> phase_name s
-
-    phase_num :: Int -> Bool
-    phase_num n = case sm_phase mode of
-                    Phase k -> n == k
-                    _       -> False
-
-    phase_name :: String -> Bool
-    phase_name s = s `elem` sm_names mode
 \end{code}
 
 

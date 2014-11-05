@@ -601,9 +601,11 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
   = do { (termination_msg, it_count, counts_out, guts')
            <- do_iteration us 1 [] binds rules
 
-        ; Err.dumpIfSet dflags (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
+        ; Err.dumpIfSet dflags (dopt Opt_D_verbose_core2core dflags &&
+                                dopt Opt_D_dump_simpl_stats  dflags)
                   "Simplifier statistics for following pass"
-                  (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
+                  (vcat [text termination_msg <+> text "after" <+> ppr it_count
+                                              <+> text "iterations",
                          blankLine,
                          pprSimplCount counts_out])
 
@@ -612,7 +614,6 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
   where
     dflags       = hsc_dflags hsc_env
     print_unqual = mkPrintUnqualified dflags rdr_env
-    dump_phase   = dumpSimplPhase dflags mode
     simpl_env    = mkSimplEnv mode
     active_rule  = activeRule simpl_env
 
@@ -733,7 +734,7 @@ dump_end_iteration :: DynFlags -> PrintUnqualified -> Int
 dump_end_iteration dflags print_unqual iteration_no counts binds rules
   = dumpPassResult dflags print_unqual mb_flag hdr pp_counts binds rules
   where
-    mb_flag | dopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_phases
+    mb_flag | dopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_iterations
             | otherwise                               = Nothing
             -- Show details if Opt_D_dump_simpl_iterations is on
 

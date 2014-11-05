@@ -2870,12 +2870,6 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-ddump-simpl-phases</option></entry>
-            <entry>Dump output from each simplifier phase</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-          <row>
             <entry><option>-ddump-simpl-iterations</option></entry>
             <entry>Dump output from each simplifier iteration</entry>
             <entry>dynamic</entry>
