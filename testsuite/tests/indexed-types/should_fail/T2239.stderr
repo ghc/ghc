@@ -16,8 +16,8 @@ T2239.hs:47:13:
 
 T2239.hs:50:13:
     Couldn't match type ‘Bool -> Bool’
-                  with ‘forall b1. (b1 ~ Bool) => b1 -> b1’
-    Expected type: (forall b1. (b1 ~ Bool) => b1 -> b1) -> b -> b
+                  with ‘forall b1. b1 ~ Bool => b1 -> b1’
+    Expected type: (forall b1. b1 ~ Bool => b1 -> b1) -> b -> b
       Actual type: (b -> b) -> b -> b
     In the expression:
         id ::
