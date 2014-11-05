@@ -197,10 +197,24 @@ import qualified Data.IntSet as IntSet
 
 import GHC.Foreign (withCString, peekCString)
 
+-- Note [Updating flag description in the User's Guide]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- If you modify anything in this file please make sure that your changes are
+-- described in the User's Guide. Usually at least two sections need to be
+-- updated:
+--
+--  * Flag Reference section in docs/users-guide/flags.xml lists all available
+--    flags together with a short description
+--
+--  * Flag description in docs/users_guide/using.xml provides a detailed
+--    explanation of flags' usage.
+
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
 data DumpFlag
+-- See Note [Updating flag description in the User's Guide]
 
    -- debugging flags
    = Opt_D_dump_cmm
@@ -276,6 +290,7 @@ data DumpFlag
 
 -- | Enumerates the simple on-or-off dynamic flags
 data GeneralFlag
+-- See Note [Updating flag description in the User's Guide]
 
    = Opt_DumpToFile                     -- ^ Append dump output to files instead of stdout.
    | Opt_D_faststring_stats
@@ -428,6 +443,7 @@ data GeneralFlag
    deriving (Eq, Show, Enum)
 
 data WarningFlag =
+-- See Note [Updating flag description in the User's Guide]
      Opt_WarnDuplicateExports
    | Opt_WarnDuplicateConstraints
    | Opt_WarnHiShadows
@@ -494,6 +510,7 @@ instance Outputable SafeHaskellMode where
     ppr = text . show
 
 data ExtensionFlag
+-- See Note [Updating flag description in the User's Guide]
    = Opt_Cpp
    | Opt_OverlappingInstances
    | Opt_UndecidableInstances
@@ -1335,10 +1352,11 @@ initDynFlags dflags = do
         rtccInfo      = refRtccInfo
         }
 
--- | The normal 'DynFlags'. Note that they is not suitable for use in this form
+-- | The normal 'DynFlags'. Note that they are not suitable for use in this form
 -- and must be fully initialized by 'GHC.runGhc' first.
 defaultDynFlags :: Settings -> DynFlags
 defaultDynFlags mySettings =
+-- See Note [Updating flag description in the User's Guide]
      DynFlags {
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
@@ -2143,6 +2161,7 @@ flagsPackage :: [Flag (CmdLineP DynFlags)]
 flagsPackage = package_flags
 
 --------------- The main flags themselves ------------------
+-- See Note [Updating flag description in the User's Guide]
 dynamic_flags :: [Flag (CmdLineP DynFlags)]
 dynamic_flags = [
     Flag "n"        (NoArg (addWarn "The -n flag is deprecated and no longer has any effect"))
@@ -2602,51 +2621,53 @@ nop _ = return ()
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fWarningFlags :: [FlagSpec WarningFlag]
 fWarningFlags = [
-  ( "warn-dodgy-foreign-imports",       Opt_WarnDodgyForeignImports, nop ),
+-- See Note [Updating flag description in the User's Guide]
+-- Please keep the list of flags below sorted alphabetically
+  ( "warn-alternative-layout-rule-transitional", Opt_WarnAlternativeLayoutRuleTransitional, nop ),
+  ( "warn-amp",                         Opt_WarnAMP,
+    \_ -> deprecate "it has no effect, and will be removed in GHC 7.12" ),
+  ( "warn-auto-orphans",                Opt_WarnAutoOrphans, nop ),
+  ( "warn-deprecations",                Opt_WarnWarningsDeprecations, nop ),
+  ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, nop ),
   ( "warn-dodgy-exports",               Opt_WarnDodgyExports, nop ),
+  ( "warn-dodgy-foreign-imports",       Opt_WarnDodgyForeignImports, nop ),
   ( "warn-dodgy-imports",               Opt_WarnDodgyImports, nop ),
-  ( "warn-overflowed-literals",         Opt_WarnOverflowedLiterals, nop ),
   ( "warn-empty-enumerations",          Opt_WarnEmptyEnumerations, nop ),
-  ( "warn-duplicate-exports",           Opt_WarnDuplicateExports, nop ),
+  ( "warn-context-quantification",      Opt_WarnContextQuantification, nop ),
   ( "warn-duplicate-constraints",       Opt_WarnDuplicateConstraints, nop ),
+  ( "warn-duplicate-exports",           Opt_WarnDuplicateExports, nop ),
   ( "warn-hi-shadowing",                Opt_WarnHiShadows, nop ),
   ( "warn-implicit-prelude",            Opt_WarnImplicitPrelude, nop ),
   ( "warn-incomplete-patterns",         Opt_WarnIncompletePatterns, nop ),
-  ( "warn-incomplete-uni-patterns",     Opt_WarnIncompleteUniPatterns, nop ),
   ( "warn-incomplete-record-updates",   Opt_WarnIncompletePatternsRecUpd, nop ),
+  ( "warn-incomplete-uni-patterns",     Opt_WarnIncompleteUniPatterns, nop ),
+  ( "warn-inline-rule-shadowing",       Opt_WarnInlineRuleShadowing, nop ),
+  ( "warn-identities",                  Opt_WarnIdentities, nop ),
   ( "warn-missing-fields",              Opt_WarnMissingFields, nop ),
   ( "warn-missing-import-lists",        Opt_WarnMissingImportList, nop ),
+  ( "warn-missing-local-sigs",          Opt_WarnMissingLocalSigs, nop ),
   ( "warn-missing-methods",             Opt_WarnMissingMethods, nop ),
   ( "warn-missing-signatures",          Opt_WarnMissingSigs, nop ),
-  ( "warn-missing-local-sigs",          Opt_WarnMissingLocalSigs, nop ),
-  ( "warn-name-shadowing",              Opt_WarnNameShadowing, nop ),
-  ( "warn-overlapping-patterns",        Opt_WarnOverlappingPatterns, nop ),
-  ( "warn-type-defaults",               Opt_WarnTypeDefaults, nop ),
   ( "warn-monomorphism-restriction",    Opt_WarnMonomorphism, nop ),
-  ( "warn-unused-binds",                Opt_WarnUnusedBinds, nop ),
-  ( "warn-unused-imports",              Opt_WarnUnusedImports, nop ),
-  ( "warn-unused-matches",              Opt_WarnUnusedMatches, nop ),
-  ( "warn-context-quantification",      Opt_WarnContextQuantification, nop ),
-  ( "warn-warnings-deprecations",       Opt_WarnWarningsDeprecations, nop ),
-  ( "warn-deprecations",                Opt_WarnWarningsDeprecations, nop ),
-  ( "warn-deprecated-flags",            Opt_WarnDeprecatedFlags, nop ),
-  ( "warn-amp",                         Opt_WarnAMP,
-    \_ -> deprecate "it has no effect, and will be removed in GHC 7.12" ),
+  ( "warn-name-shadowing",              Opt_WarnNameShadowing, nop ),
   ( "warn-orphans",                     Opt_WarnOrphans, nop ),
-  ( "warn-identities",                  Opt_WarnIdentities, nop ),
-  ( "warn-auto-orphans",                Opt_WarnAutoOrphans, nop ),
+  ( "warn-overflowed-literals",         Opt_WarnOverflowedLiterals, nop ),
+  ( "warn-overlapping-patterns",        Opt_WarnOverlappingPatterns, nop ),
+  ( "warn-pointless-pragmas",           Opt_WarnPointlessPragmas, nop ),
+  ( "warn-safe",                        Opt_WarnSafe, setWarnSafe ),
   ( "warn-tabs",                        Opt_WarnTabs, nop ),
+  ( "warn-type-defaults",               Opt_WarnTypeDefaults, nop ),
   ( "warn-typed-holes",                 Opt_WarnTypedHoles, nop ),
   ( "warn-unrecognised-pragmas",        Opt_WarnUnrecognisedPragmas, nop ),
-  ( "warn-unused-do-bind",              Opt_WarnUnusedDoBind, nop ),
-  ( "warn-wrong-do-bind",               Opt_WarnWrongDoBind, nop ),
-  ( "warn-alternative-layout-rule-transitional", Opt_WarnAlternativeLayoutRuleTransitional, nop ),
   ( "warn-unsafe",                      Opt_WarnUnsafe, setWarnUnsafe ),
-  ( "warn-safe",                        Opt_WarnSafe, setWarnSafe ),
-  ( "warn-pointless-pragmas",           Opt_WarnPointlessPragmas, nop ),
   ( "warn-unsupported-calling-conventions", Opt_WarnUnsupportedCallingConventions, nop ),
-  ( "warn-inline-rule-shadowing",       Opt_WarnInlineRuleShadowing, nop ),
-  ( "warn-unsupported-llvm-version",    Opt_WarnUnsupportedLlvmVersion, nop ) ]
+  ( "warn-unsupported-llvm-version",    Opt_WarnUnsupportedLlvmVersion, nop ),
+  ( "warn-unused-binds",                Opt_WarnUnusedBinds, nop ),
+  ( "warn-unused-do-bind",              Opt_WarnUnusedDoBind, nop ),
+  ( "warn-unused-imports",              Opt_WarnUnusedImports, nop ),
+  ( "warn-unused-matches",              Opt_WarnUnusedMatches, nop ),
+  ( "warn-warnings-deprecations",       Opt_WarnWarningsDeprecations, nop ),
+  ( "warn-wrong-do-bind",               Opt_WarnWrongDoBind, nop ) ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
 negatableFlags :: [FlagSpec GeneralFlag]
@@ -2656,94 +2677,99 @@ negatableFlags = [
 -- | These @-d\<blah\>@ flags can all be reversed with @-dno-\<blah\>@
 dFlags :: [FlagSpec GeneralFlag]
 dFlags = [
+-- See Note [Updating flag description in the User's Guide]
+-- Please keep the list of flags below sorted alphabetically
+  ( "ppr-case-as-let",                  Opt_PprCaseAsLet,               nop),
   ( "suppress-coercions",               Opt_SuppressCoercions,          nop),
-  ( "suppress-var-kinds",               Opt_SuppressVarKinds,           nop),
+  ( "suppress-idinfo",                  Opt_SuppressIdInfo,             nop),
   ( "suppress-module-prefixes",         Opt_SuppressModulePrefixes,     nop),
   ( "suppress-type-applications",       Opt_SuppressTypeApplications,   nop),
-  ( "suppress-idinfo",                  Opt_SuppressIdInfo,             nop),
   ( "suppress-type-signatures",         Opt_SuppressTypeSignatures,     nop),
   ( "suppress-uniques",                 Opt_SuppressUniques,            nop),
-  ( "ppr-case-as-let",                  Opt_PprCaseAsLet,               nop)]
+  ( "suppress-var-kinds",               Opt_SuppressVarKinds,           nop)]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [FlagSpec GeneralFlag]
 fFlags = [
-  ( "error-spans",                      Opt_ErrorSpans, nop ),
-  ( "print-explicit-foralls",           Opt_PrintExplicitForalls, nop ),
-  ( "print-explicit-kinds",             Opt_PrintExplicitKinds, nop ),
-  ( "call-arity",                       Opt_CallArity, nop ),
-  ( "strictness",                       Opt_Strictness, nop ),
-  ( "late-dmd-anal",                    Opt_LateDmdAnal, nop ),
-  ( "specialise",                       Opt_Specialise, nop ),
-  ( "specialise-aggressively",          Opt_SpecialiseAggressively, nop ),
-  ( "float-in",                         Opt_FloatIn, nop ),
-  ( "static-argument-transformation",   Opt_StaticArgumentTransformation, nop ),
-  ( "full-laziness",                    Opt_FullLaziness, nop ),
-  ( "liberate-case",                    Opt_LiberateCase, nop ),
-  ( "spec-constr",                      Opt_SpecConstr, nop ),
-  ( "cse",                              Opt_CSE, nop ),
-  ( "pedantic-bottoms",                 Opt_PedanticBottoms, nop ),
-  ( "ignore-interface-pragmas",         Opt_IgnoreInterfacePragmas, nop ),
-  ( "omit-interface-pragmas",           Opt_OmitInterfacePragmas, nop ),
-  ( "write-interface",                  Opt_WriteInterface, nop ),
-  ( "expose-all-unfoldings",            Opt_ExposeAllUnfoldings, nop ),
-  ( "do-lambda-eta-expansion",          Opt_DoLambdaEtaExpansion, nop ),
-  ( "ignore-asserts",                   Opt_IgnoreAsserts, nop ),
-  ( "do-eta-reduction",                 Opt_DoEtaReduction, nop ),
-  ( "case-merge",                       Opt_CaseMerge, nop ),
-  ( "unbox-strict-fields",              Opt_UnboxStrictFields, nop ),
-  ( "unbox-small-strict-fields",        Opt_UnboxSmallStrictFields, nop ),
-  ( "dicts-cheap",                      Opt_DictsCheap, nop ),
-  ( "excess-precision",                 Opt_ExcessPrecision, nop ),
-  ( "eager-blackholing",                Opt_EagerBlackHoling, nop ),
-  ( "print-bind-result",                Opt_PrintBindResult, nop ),
-  ( "force-recomp",                     Opt_ForceRecomp, nop ),
-  ( "hpc-no-auto",                      Opt_Hpc_No_Auto, nop ),
-  ( "rewrite-rules",                    Opt_EnableRewriteRules, useInstead "enable-rewrite-rules" ),
-  ( "enable-rewrite-rules",             Opt_EnableRewriteRules, nop ),
-  ( "break-on-exception",               Opt_BreakOnException, nop ),
+-- See Note [Updating flag description in the User's Guide]
+-- Please keep the list of flags below sorted alphabetically
   ( "break-on-error",                   Opt_BreakOnError, nop ),
-  ( "print-evld-with-show",             Opt_PrintEvldWithShow, nop ),
-  ( "print-bind-contents",              Opt_PrintBindContents, nop ),
-  ( "vectorise",                        Opt_Vectorise, nop ),
-  ( "vectorisation-avoidance",          Opt_VectorisationAvoidance, nop ),
-  ( "regs-graph",                       Opt_RegsGraph, nop ),
-  ( "regs-iterative",                   Opt_RegsIterative, nop ),
-  ( "llvm-tbaa",                        Opt_LlvmTBAA, nop), -- hidden flag
-  ( "llvm-pass-vectors-in-regs",        Opt_LlvmPassVectorsInRegisters, nop), -- hidden flag
-  ( "irrefutable-tuples",               Opt_IrrefutableTuples, nop ),
-  ( "cmm-sink",                         Opt_CmmSink, nop ),
-  ( "cmm-elim-common-blocks",           Opt_CmmElimCommonBlocks, nop ),
-  ( "omit-yields",                      Opt_OmitYields, nop ),
-  ( "simple-list-literals",             Opt_SimpleListLiterals, nop ),
-  ( "fun-to-thunk",                     Opt_FunToThunk, nop ),
-  ( "gen-manifest",                     Opt_GenManifest, nop ),
-  ( "embed-manifest",                   Opt_EmbedManifest, nop ),
-  ( "ext-core",                         Opt_EmitExternalCore,
-    \_ -> deprecate "it has no effect, and will be removed in GHC 7.12" ),
-  ( "shared-implib",                    Opt_SharedImplib, nop ),
-  ( "ghci-sandbox",                     Opt_GhciSandbox, nop ),
-  ( "ghci-history",                     Opt_GhciHistory, nop ),
-  ( "helpful-errors",                   Opt_HelpfulErrors, nop ),
-  ( "defer-type-errors",                Opt_DeferTypeErrors, nop ),
+  ( "break-on-exception",               Opt_BreakOnException, nop ),
   ( "building-cabal-package",           Opt_BuildingCabalPackage, nop ),
-  ( "implicit-import-qualified",        Opt_ImplicitImportQualified, nop ),
-  ( "prof-count-entries",               Opt_ProfCountEntries, nop ),
-  ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop ),
-  ( "hpc",                              Opt_Hpc, nop ),
-  ( "pre-inlining",                     Opt_SimplPreInlining, nop ),
-  ( "flat-cache",                       Opt_FlatCache, nop ),
-  ( "use-rpaths",                       Opt_RPath, nop ),
-  ( "kill-absence",                     Opt_KillAbsence, nop),
-  ( "kill-one-shot",                    Opt_KillOneShot, nop),
+  ( "call-arity",                       Opt_CallArity, nop ),
+  ( "case-merge",                       Opt_CaseMerge, nop ),
+  ( "cmm-elim-common-blocks",           Opt_CmmElimCommonBlocks, nop ),
+  ( "cmm-sink",                         Opt_CmmSink, nop ),
+  ( "cse",                              Opt_CSE, nop ),
+  ( "defer-type-errors",                Opt_DeferTypeErrors, nop ),
+  ( "dicts-cheap",                      Opt_DictsCheap, nop ),
   ( "dicts-strict",                     Opt_DictsStrict, nop ),
   ( "dmd-tx-dict-sel",                  Opt_DmdTxDictSel, nop ),
-  ( "loopification",                    Opt_Loopification, nop )
+  ( "do-eta-reduction",                 Opt_DoEtaReduction, nop ),
+  ( "do-lambda-eta-expansion",          Opt_DoLambdaEtaExpansion, nop ),
+  ( "eager-blackholing",                Opt_EagerBlackHoling, nop ),
+  ( "embed-manifest",                   Opt_EmbedManifest, nop ),
+  ( "enable-rewrite-rules",             Opt_EnableRewriteRules, nop ),
+  ( "error-spans",                      Opt_ErrorSpans, nop ),
+  ( "excess-precision",                 Opt_ExcessPrecision, nop ),
+  ( "expose-all-unfoldings",            Opt_ExposeAllUnfoldings, nop ),
+  ( "ext-core",                         Opt_EmitExternalCore,
+    \_ -> deprecate "it has no effect, and will be removed in GHC 7.12" ),
+  ( "flat-cache",                       Opt_FlatCache, nop ),
+  ( "float-in",                         Opt_FloatIn, nop ),
+  ( "force-recomp",                     Opt_ForceRecomp, nop ),
+  ( "full-laziness",                    Opt_FullLaziness, nop ),
+  ( "fun-to-thunk",                     Opt_FunToThunk, nop ),
+  ( "gen-manifest",                     Opt_GenManifest, nop ),
+  ( "ghci-history",                     Opt_GhciHistory, nop ),
+  ( "ghci-sandbox",                     Opt_GhciSandbox, nop ),
+  ( "helpful-errors",                   Opt_HelpfulErrors, nop ),
+  ( "hpc",                              Opt_Hpc, nop ),
+  ( "hpc-no-auto",                      Opt_Hpc_No_Auto, nop ),
+  ( "ignore-asserts",                   Opt_IgnoreAsserts, nop ),
+  ( "ignore-interface-pragmas",         Opt_IgnoreInterfacePragmas, nop ),
+  ( "implicit-import-qualified",        Opt_ImplicitImportQualified, nop ),
+  ( "irrefutable-tuples",               Opt_IrrefutableTuples, nop ),
+  ( "kill-absence",                     Opt_KillAbsence, nop),
+  ( "kill-one-shot",                    Opt_KillOneShot, nop),
+  ( "late-dmd-anal",                    Opt_LateDmdAnal, nop ),
+  ( "liberate-case",                    Opt_LiberateCase, nop ),
+  ( "llvm-pass-vectors-in-regs",        Opt_LlvmPassVectorsInRegisters, nop),
+  ( "llvm-tbaa",                        Opt_LlvmTBAA, nop),
+  ( "loopification",                    Opt_Loopification, nop ),
+  ( "omit-interface-pragmas",           Opt_OmitInterfacePragmas, nop ),
+  ( "omit-yields",                      Opt_OmitYields, nop ),
+  ( "pedantic-bottoms",                 Opt_PedanticBottoms, nop ),
+  ( "pre-inlining",                     Opt_SimplPreInlining, nop ),
+  ( "print-bind-contents",              Opt_PrintBindContents, nop ),
+  ( "print-bind-result",                Opt_PrintBindResult, nop ),
+  ( "print-evld-with-show",             Opt_PrintEvldWithShow, nop ),
+  ( "print-explicit-foralls",           Opt_PrintExplicitForalls, nop ),
+  ( "print-explicit-kinds",             Opt_PrintExplicitKinds, nop ),
+  ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop ),
+  ( "prof-count-entries",               Opt_ProfCountEntries, nop ),
+  ( "regs-graph",                       Opt_RegsGraph, nop ),
+  ( "regs-iterative",                   Opt_RegsIterative, nop ),
+  ( "rewrite-rules",                    Opt_EnableRewriteRules, useInstead "enable-rewrite-rules" ),
+  ( "shared-implib",                    Opt_SharedImplib, nop ),
+  ( "simple-list-literals",             Opt_SimpleListLiterals, nop ),
+  ( "spec-constr",                      Opt_SpecConstr, nop ),
+  ( "specialise",                       Opt_Specialise, nop ),
+  ( "specialise-aggressively",          Opt_SpecialiseAggressively, nop ),
+  ( "static-argument-transformation",   Opt_StaticArgumentTransformation, nop ),
+  ( "strictness",                       Opt_Strictness, nop ),
+  ( "use-rpaths",                       Opt_RPath, nop ),
+  ( "write-interface",                  Opt_WriteInterface, nop ),
+  ( "unbox-small-strict-fields",        Opt_UnboxSmallStrictFields, nop ),
+  ( "unbox-strict-fields",              Opt_UnboxStrictFields, nop ),
+  ( "vectorisation-avoidance",          Opt_VectorisationAvoidance, nop ),
+  ( "vectorise",                        Opt_Vectorise, nop )
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fLangFlags :: [FlagSpec ExtensionFlag]
 fLangFlags = [
+-- See Note [Updating flag description in the User's Guide]
   ( "th",                               Opt_TemplateHaskell,
     \on -> deprecatedForExtension "TemplateHaskell" on
         >> checkTemplateHaskellOk on ),
@@ -2809,135 +2835,136 @@ safeHaskellFlags = [mkF Sf_Unsafe, mkF Sf_Trustworthy, mkF Sf_Safe]
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [FlagSpec ExtensionFlag]
 xFlags = [
-  ( "CPP",                              Opt_Cpp, nop ),
-  ( "PostfixOperators",                 Opt_PostfixOperators, nop ),
-  ( "TupleSections",                    Opt_TupleSections, nop ),
-  ( "PatternGuards",                    Opt_PatternGuards, nop ),
-  ( "UnicodeSyntax",                    Opt_UnicodeSyntax, nop ),
-  ( "MagicHash",                        Opt_MagicHash, nop ),
-  ( "ExistentialQuantification",        Opt_ExistentialQuantification, nop ),
-  ( "KindSignatures",                   Opt_KindSignatures, nop ),
-  ( "RoleAnnotations",                  Opt_RoleAnnotations, nop ),
-  ( "EmptyDataDecls",                   Opt_EmptyDataDecls, nop ),
-  ( "ParallelListComp",                 Opt_ParallelListComp, nop ),
-  ( "TransformListComp",                Opt_TransformListComp, nop ),
-  ( "MonadComprehensions",              Opt_MonadComprehensions, nop),
-  ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, nop ),
-  ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, nop ),
-  ( "InterruptibleFFI",                 Opt_InterruptibleFFI, nop ),
-  ( "CApiFFI",                          Opt_CApiFFI, nop ),
-  ( "GHCForeignImportPrim",             Opt_GHCForeignImportPrim, nop ),
-  ( "JavaScriptFFI",                    Opt_JavaScriptFFI, nop ),
-  ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms, nop ),
-
-  ( "PolymorphicComponents",            Opt_RankNTypes, nop),
-  ( "Rank2Types",                       Opt_RankNTypes, nop),
-  ( "RankNTypes",                       Opt_RankNTypes, nop ),
-
-  ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop),
-  ( "TypeOperators",                    Opt_TypeOperators, nop ),
-  ( "ExplicitNamespaces",               Opt_ExplicitNamespaces, nop ),
-  ( "RecursiveDo",                      Opt_RecursiveDo, nop ),  -- Enables 'mdo' and 'rec'
-  ( "DoRec",                            Opt_RecursiveDo,
-     deprecatedForExtension "RecursiveDo" ),
-  ( "Arrows",                           Opt_Arrows, nop ),
-  ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
-  ( "TemplateHaskell",                  Opt_TemplateHaskell, checkTemplateHaskellOk ),
-  ( "QuasiQuotes",                      Opt_QuasiQuotes, nop ),
-  ( "ImplicitPrelude",                  Opt_ImplicitPrelude, nop ),
-  ( "RecordWildCards",                  Opt_RecordWildCards, nop ),
-  ( "NamedFieldPuns",                   Opt_RecordPuns, nop ),
-  ( "RecordPuns",                       Opt_RecordPuns,
-    deprecatedForExtension "NamedFieldPuns" ),
-  ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields, nop ),
-  ( "OverloadedStrings",                Opt_OverloadedStrings, nop ),
-  ( "NumDecimals",                      Opt_NumDecimals, nop),
-  ( "OverloadedLists",                  Opt_OverloadedLists, nop),
-  ( "GADTs",                            Opt_GADTs, nop ),
-  ( "GADTSyntax",                       Opt_GADTSyntax, nop ),
-  ( "ViewPatterns",                     Opt_ViewPatterns, nop ),
-  ( "TypeFamilies",                     Opt_TypeFamilies, nop ),
-  ( "BangPatterns",                     Opt_BangPatterns, nop ),
-  ( "MonomorphismRestriction",          Opt_MonomorphismRestriction, nop ),
-  ( "NPlusKPatterns",                   Opt_NPlusKPatterns, nop ),
-  ( "DoAndIfThenElse",                  Opt_DoAndIfThenElse, nop ),
-  ( "RebindableSyntax",                 Opt_RebindableSyntax, nop ),
-  ( "ConstraintKinds",                  Opt_ConstraintKinds, nop ),
-  ( "PolyKinds",                        Opt_PolyKinds, nop ),
-  ( "DataKinds",                        Opt_DataKinds, nop ),
-  ( "InstanceSigs",                     Opt_InstanceSigs, nop ),
-  ( "MonoPatBinds",                     Opt_MonoPatBinds,
-    \ turn_on -> when turn_on $ deprecate "Experimental feature now removed; has no effect" ),
-  ( "ExplicitForAll",                   Opt_ExplicitForAll, nop ),
+-- See Note [Updating flag description in the User's Guide]
+-- Please keep the list of flags below sorted alphabetically
+  ( "AllowAmbiguousTypes",              Opt_AllowAmbiguousTypes, nop),
   ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, nop ),
   ( "AlternativeLayoutRuleTransitional",Opt_AlternativeLayoutRuleTransitional, nop ),
-  ( "DatatypeContexts",                 Opt_DatatypeContexts,
-    \ turn_on -> when turn_on $ deprecate "It was widely considered a misfeature, and has been removed from the Haskell language." ),
-  ( "NondecreasingIndentation",         Opt_NondecreasingIndentation, nop ),
-  ( "RelaxedLayout",                    Opt_RelaxedLayout, nop ),
-  ( "TraditionalRecordSyntax",          Opt_TraditionalRecordSyntax, nop ),
-  ( "LambdaCase",                       Opt_LambdaCase, nop ),
-  ( "MultiWayIf",                       Opt_MultiWayIf, nop ),
-  ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),
-  ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec,
-    \ turn_on -> unless turn_on
-               $ deprecate "You can't turn off RelaxedPolyRec any more" ),
-  ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, nop ),
-  ( "ImplicitParams",                   Opt_ImplicitParams, nop ),
-  ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, nop ),
-  ( "AllowAmbiguousTypes",              Opt_AllowAmbiguousTypes, nop),
-
-  ( "PatternSignatures",                Opt_ScopedTypeVariables,
-    deprecatedForExtension "ScopedTypeVariables" ),
-
-  ( "UnboxedTuples",                    Opt_UnboxedTuples, nop ),
-  ( "StandaloneDeriving",               Opt_StandaloneDeriving, nop ),
-  ( "DeriveDataTypeable",               Opt_DeriveDataTypeable, nop ),
+  ( "Arrows",                           Opt_Arrows, nop ),
   ( "AutoDeriveTypeable",               Opt_AutoDeriveTypeable, nop ),
-  ( "DeriveFunctor",                    Opt_DeriveFunctor, nop ),
-  ( "DeriveTraversable",                Opt_DeriveTraversable, nop ),
-  ( "DeriveFoldable",                   Opt_DeriveFoldable, nop ),
-  ( "DeriveGeneric",                    Opt_DeriveGeneric, nop ),
+  ( "BangPatterns",                     Opt_BangPatterns, nop ),
+  ( "BinaryLiterals",                   Opt_BinaryLiterals, nop ),
+  ( "CApiFFI",                          Opt_CApiFFI, nop ),
+  ( "CPP",                              Opt_Cpp, nop ),
+  ( "ConstrainedClassMethods",          Opt_ConstrainedClassMethods, nop ),
+  ( "ConstraintKinds",                  Opt_ConstraintKinds, nop ),
+  ( "DataKinds",                        Opt_DataKinds, nop ),
+  ( "DatatypeContexts",                 Opt_DatatypeContexts,
+     \ turn_on -> when turn_on
+             $ deprecate $ "It was widely considered a misfeature, " ++
+                           "and has been removed from the Haskell language." ),
   ( "DefaultSignatures",                Opt_DefaultSignatures, nop ),
-  ( "TypeSynonymInstances",             Opt_TypeSynonymInstances, nop ),
+  ( "DeriveDataTypeable",               Opt_DeriveDataTypeable, nop ),
+  ( "DeriveFoldable",                   Opt_DeriveFoldable, nop ),
+  ( "DeriveFunctor",                    Opt_DeriveFunctor, nop ),
+  ( "DeriveGeneric",                    Opt_DeriveGeneric, nop ),
+  ( "DeriveTraversable",                Opt_DeriveTraversable, nop ),
+  ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields, nop ),
+  ( "DoAndIfThenElse",                  Opt_DoAndIfThenElse, nop ),
+  ( "DoRec",                            Opt_RecursiveDo,
+           deprecatedForExtension "RecursiveDo" ),
+  ( "EmptyCase",                        Opt_EmptyCase, nop ),
+  ( "EmptyDataDecls",                   Opt_EmptyDataDecls, nop ),
+  ( "ExistentialQuantification",        Opt_ExistentialQuantification, nop ),
+  ( "ExplicitForAll",                   Opt_ExplicitForAll, nop ),
+  ( "ExplicitNamespaces",               Opt_ExplicitNamespaces, nop ),
+  ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, nop ),
   ( "FlexibleContexts",                 Opt_FlexibleContexts, nop ),
   ( "FlexibleInstances",                Opt_FlexibleInstances, nop ),
-  ( "ConstrainedClassMethods",          Opt_ConstrainedClassMethods, nop ),
-  ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses, nop ),
-  ( "NullaryTypeClasses",               Opt_NullaryTypeClasses,
-    deprecatedForExtension "MultiParamTypeClasses" ),
+  ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, nop ),
   ( "FunctionalDependencies",           Opt_FunctionalDependencies, nop ),
-  ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, setGenDeriving ),
-  ( "OverlappingInstances",             Opt_OverlappingInstances,
-    \ turn_on -> when turn_on
-               $ deprecate "instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS" ),
-  ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
+  ( "GADTSyntax",                       Opt_GADTSyntax, nop ),
+  ( "GADTs",                            Opt_GADTs, nop ),
+  ( "GHCForeignImportPrim",             Opt_GHCForeignImportPrim, nop ),
+  ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving,
+                                setGenDeriving ),
+  ( "ImplicitParams",                   Opt_ImplicitParams, nop ),
+  ( "ImplicitPrelude",                  Opt_ImplicitPrelude, nop ),
+  ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop),
   ( "IncoherentInstances",              Opt_IncoherentInstances, nop ),
-  ( "PackageImports",                   Opt_PackageImports, nop ),
-  ( "BinaryLiterals",                   Opt_BinaryLiterals, nop ),
+  ( "InstanceSigs",                     Opt_InstanceSigs, nop ),
+  ( "InterruptibleFFI",                 Opt_InterruptibleFFI, nop ),
+  ( "JavaScriptFFI",                    Opt_JavaScriptFFI, nop ),
+  ( "KindSignatures",                   Opt_KindSignatures, nop ),
+  ( "LambdaCase",                       Opt_LambdaCase, nop ),
+  ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms, nop ),
+  ( "MagicHash",                        Opt_MagicHash, nop ),
+  ( "MonadComprehensions",              Opt_MonadComprehensions, nop),
+  ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),
+  ( "MonoPatBinds",                     Opt_MonoPatBinds,
+     \ turn_on -> when turn_on
+                $ deprecate "Experimental feature now removed; has no effect" ),
+  ( "MonomorphismRestriction",          Opt_MonomorphismRestriction, nop ),
+  ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses, nop ),
+  ( "MultiWayIf",                       Opt_MultiWayIf, nop ),
+  ( "NPlusKPatterns",                   Opt_NPlusKPatterns, nop ),
+  ( "NamedFieldPuns",                   Opt_RecordPuns, nop ),
   ( "NegativeLiterals",                 Opt_NegativeLiterals, nop ),
-  ( "EmptyCase",                        Opt_EmptyCase, nop ),
-  ( "PatternSynonyms",                  Opt_PatternSynonyms, nop )
+  ( "NondecreasingIndentation",         Opt_NondecreasingIndentation, nop ),
+  ( "NullaryTypeClasses",               Opt_NullaryTypeClasses,
+                        deprecatedForExtension "MultiParamTypeClasses" ),
+  ( "NumDecimals",                      Opt_NumDecimals, nop),
+  ( "OverlappingInstances",             Opt_OverlappingInstances,
+        \ turn_on -> when turn_on
+             $ deprecate "instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS" ),
+  ( "OverloadedLists",                  Opt_OverloadedLists, nop),
+  ( "OverloadedStrings",                Opt_OverloadedStrings, nop ),
+  ( "PackageImports",                   Opt_PackageImports, nop ),
+  ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
+  ( "ParallelListComp",                 Opt_ParallelListComp, nop ),
+  ( "PatternGuards",                    Opt_PatternGuards, nop ),
+  ( "PatternSignatures",                Opt_ScopedTypeVariables,
+                       deprecatedForExtension "ScopedTypeVariables" ),
+  ( "PatternSynonyms",                  Opt_PatternSynonyms, nop ),
+  ( "PolyKinds",                        Opt_PolyKinds, nop ),
+  ( "PolymorphicComponents",            Opt_RankNTypes, nop),
+  ( "PostfixOperators",                 Opt_PostfixOperators, nop ),
+  ( "QuasiQuotes",                      Opt_QuasiQuotes, nop ),
+  ( "Rank2Types",                       Opt_RankNTypes, nop),
+  ( "RankNTypes",                       Opt_RankNTypes, nop ),
+  ( "RebindableSyntax",                 Opt_RebindableSyntax, nop ),
+  ( "RecordPuns",                       Opt_RecordPuns,
+                deprecatedForExtension "NamedFieldPuns" ),
+  ( "RecordWildCards",                  Opt_RecordWildCards, nop ),
+  ( "RecursiveDo",                      Opt_RecursiveDo, nop ),
+  ( "RelaxedLayout",                    Opt_RelaxedLayout, nop ),
+  ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec,
+        \ turn_on -> unless turn_on
+                     $ deprecate "You can't turn off RelaxedPolyRec any more" ),
+  ( "RoleAnnotations",                  Opt_RoleAnnotations, nop ),
+  ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, nop ),
+  ( "StandaloneDeriving",               Opt_StandaloneDeriving, nop ),
+  ( "TemplateHaskell",                  Opt_TemplateHaskell,
+                     checkTemplateHaskellOk ),
+  ( "TraditionalRecordSyntax",          Opt_TraditionalRecordSyntax, nop ),
+  ( "TransformListComp",                Opt_TransformListComp, nop ),
+  ( "TupleSections",                    Opt_TupleSections, nop ),
+  ( "TypeFamilies",                     Opt_TypeFamilies, nop ),
+  ( "TypeOperators",                    Opt_TypeOperators, nop ),
+  ( "TypeSynonymInstances",             Opt_TypeSynonymInstances, nop ),
+  ( "UnboxedTuples",                    Opt_UnboxedTuples, nop ),
+  ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
+  ( "UnicodeSyntax",                    Opt_UnicodeSyntax, nop ),
+  ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, nop ),
+  ( "ViewPatterns",                     Opt_ViewPatterns, nop )
   ]
 
 defaultFlags :: Settings -> [GeneralFlag]
 defaultFlags settings
+-- See Note [Updating flag description in the User's Guide]
   = [ Opt_AutoLinkPackages,
-
-      Opt_SharedImplib,
-
-      Opt_OmitYields,
-
-      Opt_GenManifest,
       Opt_EmbedManifest,
-      Opt_PrintBindContents,
-      Opt_GhciSandbox,
-      Opt_GhciHistory,
-      Opt_HelpfulErrors,
-      Opt_ProfCountEntries,
-      Opt_SimplPreInlining,
       Opt_FlatCache,
-      Opt_RPath
+      Opt_GenManifest,
+      Opt_GhciHistory,
+      Opt_GhciSandbox,
+      Opt_HelpfulErrors,
+      Opt_OmitYields,
+      Opt_PrintBindContents,
+      Opt_ProfCountEntries,
+      Opt_RPath,
+      Opt_SharedImplib,
+      Opt_SimplPreInlining
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
@@ -2959,6 +2986,7 @@ default_PIC platform =
 
 impliedFlags :: [(ExtensionFlag, TurnOnFlag, ExtensionFlag)]
 impliedFlags
+-- See Note [Updating flag description in the User's Guide]
   = [ (Opt_RankNTypes,                turnOn, Opt_ExplicitForAll)
     , (Opt_ScopedTypeVariables,       turnOn, Opt_ExplicitForAll)
     , (Opt_LiberalTypeSynonyms,       turnOn, Opt_ExplicitForAll)
@@ -3004,58 +3032,71 @@ impliedFlags
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
   ]
 
+-- Note [Documenting optimisation flags]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- If you change the list of flags enabled for particular optimisation levels
+-- please remember to update the User's Guide. The relevant files are:
+--
+--  * docs/users_guide/flags.xml
+--  * docs/users_guide/using.xml
+--
+-- The first contains the Flag Refrence section, which breifly lists all
+-- available flags. The second contains a detailed description of the
+-- flags. Both places should contain information whether a flag is implied by
+-- -O0, -O or -O2.
+
 optLevelFlags :: [([Int], GeneralFlag)]
-optLevelFlags
-  = [ ([0],     Opt_IgnoreInterfacePragmas)
-    , ([0],     Opt_OmitInterfacePragmas)
-
-    , ([1,2],   Opt_IgnoreAsserts)
-    , ([1,2],   Opt_EnableRewriteRules)  -- Off for -O0; see Note [Scoping for Builtin rules]
-                                         --              in PrelRules
-    , ([1,2],   Opt_DoEtaReduction)
-    , ([1,2],   Opt_CaseMerge)
-    , ([1,2],   Opt_CallArity)
-    , ([1,2],   Opt_Strictness)
-    , ([1,2],   Opt_CSE)
-    , ([1,2],   Opt_FullLaziness)
-    , ([1,2],   Opt_Specialise)
-    , ([1,2],   Opt_FloatIn)
-    , ([1,2],   Opt_UnboxSmallStrictFields)
-
-    , ([2],     Opt_LiberateCase)
-    , ([2],     Opt_SpecConstr)
--- XXX disabled, see #7192
---    , ([2],     Opt_RegsGraph)
+optLevelFlags -- see Note [Documenting optimisation flags]
+  = [ ([0,1,2], Opt_DoLambdaEtaExpansion)
+    , ([0,1,2], Opt_DmdTxDictSel)
     , ([0,1,2], Opt_LlvmTBAA)
-    , ([1,2],   Opt_CmmSink)
-    , ([1,2],   Opt_CmmElimCommonBlocks)
-    , ([1,2],   Opt_Loopification)
-
-    , ([0,1,2],     Opt_DmdTxDictSel)
-
---     , ([2],     Opt_StaticArgumentTransformation)
--- Max writes: I think it's probably best not to enable SAT with -O2 for the
--- 6.10 release. The version of SAT in HEAD at the moment doesn't incorporate
--- several improvements to the heuristics, and I'm concerned that without
--- those changes SAT will interfere with some attempts to write "high
--- performance Haskell", as we saw in some posts on Haskell-Cafe earlier
--- this year. In particular, the version in HEAD lacks the tail call
--- criterion, so many things that look like reasonable loops will be
--- turned into functions with extra (unneccesary) thunk creation.
-
-    , ([0,1,2], Opt_DoLambdaEtaExpansion)
+    , ([0,1,2], Opt_VectorisationAvoidance)
                 -- This one is important for a tiresome reason:
                 -- we want to make sure that the bindings for data
                 -- constructors are eta-expanded.  This is probably
                 -- a good thing anyway, but it seems fragile.
-    , ([0,1,2], Opt_VectorisationAvoidance)
+
+    , ([0],     Opt_IgnoreInterfacePragmas)
+    , ([0],     Opt_OmitInterfacePragmas)
+
+    , ([1,2],   Opt_CallArity)
+    , ([1,2],   Opt_CaseMerge)
+    , ([1,2],   Opt_CmmElimCommonBlocks)
+    , ([1,2],   Opt_CmmSink)
+    , ([1,2],   Opt_CSE)
+    , ([1,2],   Opt_DoEtaReduction)
+    , ([1,2],   Opt_EnableRewriteRules)  -- Off for -O0; see Note [Scoping for Builtin rules]
+                                         --              in PrelRules
+    , ([1,2],   Opt_FloatIn)
+    , ([1,2],   Opt_FullLaziness)
+    , ([1,2],   Opt_IgnoreAsserts)
+    , ([1,2],   Opt_Loopification)
+    , ([1,2],   Opt_Specialise)
+    , ([1,2],   Opt_Strictness)
+    , ([1,2],   Opt_UnboxSmallStrictFields)
+
+    , ([2],     Opt_LiberateCase)
+    , ([2],     Opt_SpecConstr)
+--  , ([2],     Opt_RegsGraph)
+--   RegsGraph suffers performance regression. See #7679
+--  , ([2],     Opt_StaticArgumentTransformation)
+--   Static Argument Transformation needs investigation. See #9374
     ]
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
 
+-- Note [Documenting warning flags]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- If you change the list of warning enabled by default
+-- please remember to update the User's Guide. The relevant file is:
+--
+--  * docs/users_guide/using.xml
+
 standardWarnings :: [WarningFlag]
-standardWarnings
+standardWarnings -- see Note [Documenting warning flags]
     = [ Opt_WarnOverlappingPatterns,
         Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
@@ -3112,37 +3153,37 @@ disableGlasgowExts = do unSetGeneralFlag Opt_PrintExplicitForalls
 
 glasgowExtsFlags :: [ExtensionFlag]
 glasgowExtsFlags = [
-             Opt_ForeignFunctionInterface
-           , Opt_UnliftedFFITypes
-           , Opt_ImplicitParams
-           , Opt_ScopedTypeVariables
-           , Opt_UnboxedTuples
-           , Opt_TypeSynonymInstances
-           , Opt_StandaloneDeriving
+             Opt_ConstrainedClassMethods
            , Opt_DeriveDataTypeable
-           , Opt_DeriveFunctor
            , Opt_DeriveFoldable
-           , Opt_DeriveTraversable
+           , Opt_DeriveFunctor
            , Opt_DeriveGeneric
+           , Opt_DeriveTraversable
+           , Opt_EmptyDataDecls
+           , Opt_ExistentialQuantification
+           , Opt_ExplicitNamespaces
            , Opt_FlexibleContexts
            , Opt_FlexibleInstances
-           , Opt_ConstrainedClassMethods
-           , Opt_MultiParamTypeClasses
+           , Opt_ForeignFunctionInterface
            , Opt_FunctionalDependencies
-           , Opt_MagicHash
-           , Opt_ExistentialQuantification
-           , Opt_UnicodeSyntax
-           , Opt_PostfixOperators
-           , Opt_PatternGuards
-           , Opt_LiberalTypeSynonyms
-           , Opt_RankNTypes
-           , Opt_TypeOperators
-           , Opt_ExplicitNamespaces
-           , Opt_RecursiveDo
-           , Opt_ParallelListComp
-           , Opt_EmptyDataDecls
+           , Opt_GeneralizedNewtypeDeriving
+           , Opt_ImplicitParams
            , Opt_KindSignatures
-           , Opt_GeneralizedNewtypeDeriving ]
+           , Opt_LiberalTypeSynonyms
+           , Opt_MagicHash
+           , Opt_MultiParamTypeClasses
+           , Opt_ParallelListComp
+           , Opt_PatternGuards
+           , Opt_PostfixOperators
+           , Opt_RankNTypes
+           , Opt_RecursiveDo
+           , Opt_ScopedTypeVariables
+           , Opt_StandaloneDeriving
+           , Opt_TypeOperators
+           , Opt_TypeSynonymInstances
+           , Opt_UnboxedTuples
+           , Opt_UnicodeSyntax
+           , Opt_UnliftedFFITypes ]
 
 #ifdef GHCI
 -- Consult the RTS to find whether GHC itself has been built profiled

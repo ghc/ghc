@@ -56,13 +56,13 @@
           <row>
             <entry><option>-H</option><replaceable>size</replaceable></entry>
             <entry>Set the minimum heap size to <replaceable>size</replaceable></entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-Rghc-timing</option></entry>
             <entry>Summarise timing stats for GHC (same as <literal>+RTS -tstderr</literal>)</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
         </tbody>
@@ -216,7 +216,7 @@
           <row>
             <entry><option>-x</option> <replaceable>suffix</replaceable></entry>
             <entry>Override default behaviour for source files</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
         </tbody>
@@ -401,13 +401,13 @@
             <entry><option>-i</option><replaceable>dir1</replaceable>:<replaceable>dir2</replaceable>:...</entry>
             <entry>add <replaceable>dir</replaceable>,
               <replaceable>dir2</replaceable>, etc. to import path</entry>
-            <entry>static/<literal>:set</literal></entry>
+            <entry>dynamic/<literal>:set</literal></entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-i</option></entry>
             <entry>Empty the import directory list</entry>
-            <entry>static/<literal>:set</literal></entry>
+            <entry>dynamic/<literal>:set</literal></entry>
             <entry>-</entry>
           </row>
         </tbody>
@@ -518,16 +518,16 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-fbreak-on-exception</option></entry>
-            <entry><link linkend="ghci-debugger-exceptions">Break on any exception thrown</link></entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-break-on-exception</option></entry>
-          </row>
-          <row>
             <entry><option>-fbreak-on-error</option></entry>
             <entry><link linkend="ghci-debugger-exceptions">Break on uncaught exceptions and errors</link></entry>
             <entry>dynamic</entry>
             <entry><option>-fno-break-on-error</option></entry>
+          </row>
+          <row>
+            <entry><option>-fbreak-on-exception</option></entry>
+            <entry><link linkend="ghci-debugger-exceptions">Break on any exception thrown</link></entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-break-on-exception</option></entry>
           </row>
           <row>
             <entry><option>-fghci-hist-size=<replaceable>n</replaceable></option></entry>
@@ -592,67 +592,67 @@
           <row>
             <entry><option>-this-package-key</option> <replaceable>P</replaceable></entry>
             <entry>Compile to be part of package <replaceable>P</replaceable></entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-package</option> <replaceable>P</replaceable></entry>
             <entry>Expose package <replaceable>P</replaceable></entry>
-            <entry>static/<literal>:set</literal></entry>
+            <entry>dynamic/<literal>:set</literal></entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-hide-all-packages</option></entry>
             <entry>Hide all packages by default</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-hide-package</option> <replaceable>name</replaceable></entry>
             <entry>Hide package <replaceable>P</replaceable></entry>
-            <entry>static/<literal>:set</literal></entry>
+            <entry>dynamic/<literal>:set</literal></entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-ignore-package</option> <replaceable>name</replaceable></entry>
             <entry>Ignore package <replaceable>P</replaceable></entry>
-            <entry>static/<literal>:set</literal></entry>
+            <entry>dynamic/<literal>:set</literal></entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-package-db</option> <replaceable>file</replaceable></entry>
             <entry>Add <replaceable>file</replaceable> to the package db stack.</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-clear-package-db</option></entry>
             <entry>Clear the package db stack.</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-no-global-package-db</option></entry>
             <entry>Remove the global package db from the stack.</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-global-package-db</option></entry>
             <entry>Add the global package db to the stack.</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-no-user-package-db</option></entry>
             <entry>Remove the user's package db from the stack.</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-user-package-db</option></entry>
             <entry>Add the user's package db to the stack.</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
@@ -665,20 +665,20 @@
             <entry><option>-trust</option> <replaceable>P</replaceable></entry>
             <entry>Expose package <replaceable>P</replaceable> and set it to be
               trusted</entry>
-            <entry>static/<literal>:set</literal></entry>
+            <entry>dynamic/<literal>:set</literal></entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-distrust</option> <replaceable>P</replaceable></entry>
             <entry>Expose package <replaceable>P</replaceable> and set it to be
               distrusted</entry>
-            <entry>static/<literal>:set</literal></entry>
+            <entry>dynamic/<literal>:set</literal></entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-distrust-all</option> </entry>
             <entry>Distrust all packages by default</entry>
-            <entry>static/<literal>:set</literal></entry>
+            <entry>dynamic/<literal>:set</literal></entry>
             <entry>-</entry>
           </row>
         </tbody>
@@ -691,7 +691,8 @@
 
     <para>Language options can be enabled either by a command-line option
       <option>-Xblah</option>, or by a <literal>{-# LANGUAGE blah #-}</literal>
-      pragma in the file itself.  See <xref linkend="options-language"/></para>
+      pragma in the file itself.  See <xref linkend="options-language"/>. Some
+      options are enabled using <option>-f*</option> flags.</para>
 
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">
@@ -705,7 +706,7 @@
         </thead>
         <tbody>
           <row>
-            <entry><option>-fcontext-stack=N</option><replaceable>n</replaceable></entry>
+            <entry><option>-fcontext-stack=</option><replaceable>n</replaceable></entry>
             <entry>set the <link linkend="undecidable-instances">limit for type-class context reduction</link>. Default is 100.</entry>
             <entry>dynamic</entry>
             <entry></entry>
@@ -729,7 +730,7 @@
             <entry><option>-</option></entry>
           </row>
           <row>
-            <entry><option>-ftype-function-depth=N</option><replaceable>n</replaceable></entry>
+            <entry><option>-ftype-function-depth=</option><replaceable>n</replaceable></entry>
             <entry>set the <link linkend="type-families">limit for type function reductions</link>. Default is 200.</entry>
             <entry>dynamic</entry>
             <entry></entry>
@@ -1621,26 +1622,46 @@
         </thead>
         <tbody>
           <row>
+            <entry><option>-O0</option></entry>
+            <entry>Disable optimisations (default)</entry>
+            <entry>dynamic</entry>
             <entry><option>-O</option></entry>
-            <entry>Enable default optimisation (level 1)</entry>
+          </row>
+          <row>
+            <entry><option>-O</option> or <option>-O1</option></entry>
+            <entry>Enable level 1 optimisations</entry>
             <entry>dynamic</entry>
             <entry><option>-O0</option></entry>
           </row>
           <row>
-            <entry><option>-O</option><replaceable>n</replaceable></entry>
-            <entry>Set optimisation level <replaceable>n</replaceable></entry>
+            <entry><option>-O2</option></entry>
+            <entry>Enable level 2 optimisations</entry>
             <entry>dynamic</entry>
             <entry><option>-O0</option></entry>
+          </row>
+          <row>
+            <entry><option>-Odph</option></entry>
+            <entry>Enable level 2 optimisations, set <option>-fmax-simplifier-iterations=20</option>
+                   and <option>-fsimplifier-phases=3</option>.</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
           </row>
         </tbody>
       </tgroup>
     </informaltable>
 
+    <para>See <xref linkend="options-f-compact"/> for a list of optimisations enabled on level 1 and level 2.</para>
+
   </sect2>
   <sect2 id="options-f-compact">
     <title>Individual optimisations</title>
 
-    <para>These options are described in more detail in <xref linkend="options-f"/>.</para>
+    <para>These options are described in more detail in <xref linkend="options-f"/>.
+          If a flag is implied by <option>-O</option> then it is also implied by
+          <option>-O2</option> (unless flag description explicitly says otherwise).
+          If a flag is implied by <option>-O0</option> only then the flag is not
+          implied by <option>-O</option> and <option>-O2</option>.
+    </para>
 
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">
@@ -1654,6 +1675,13 @@
         </thead>
         <tbody>
           <row>
+            <entry><option>-fcall-arity</option></entry>
+            <entry>Enable call-arity optimisation. Implied by <option>-O</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-call-arity</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fcase-merge</option></entry>
             <entry>Enable case-merging. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
@@ -1661,17 +1689,55 @@
           </row>
 
           <row>
+            <entry><option>-fcmm-elim-common-blocks</option></entry>
+            <entry>Enable Cmm common block elimination. Implied by <option>-O</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-cmm-elim-common-blocks</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fcmm-sink</option></entry>
+            <entry>Enable Cmm sinking. Implied by <option>-O</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-cmm-sink</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fcpr-off</option></entry>
+            <entry>Switch off CPR analysis in the demand analyser.</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
             <entry><option>-fcse</option></entry>
-            <entry>Turn on common sub-expression elimination. Implied by <option>-O</option>.</entry>
+            <entry>Enable common sub-expression elimination. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-cse</option></entry>
           </row>
 
           <row>
+            <entry><option>-fdicts-cheap</option></entry>
+            <entry>Make dictionary-valued expressions seem cheap to the optimiser.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-dicts-cheap</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fdicts-strict</option></entry>
             <entry>Make dictionaries strict</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-fno-dicts-strict</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fdmd-tx-dict-sel</option>
+            </entry>
+            <entry>Use a special demand transformer for dictionary selectors.
+                   Always enabled by default.
+            </entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-dmd-tx-dict-sel</option></entry>
           </row>
 
           <row>
@@ -1683,7 +1749,7 @@
 
           <row>
             <entry><option>-fdo-lambda-eta-expansion</option></entry>
-            <entry>Enable lambda eta-reduction</entry>
+            <entry>Enable lambda eta-expansion. Always enabled by default.</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-do-lambda-eta-expansion</option></entry>
           </row>
@@ -1705,24 +1771,17 @@
           </row>
 
           <row>
-            <entry><option>-fvectorise</option></entry>
-            <entry>Enable vectorisation of nested data parallelism</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-vectorise</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-favoid-vect</option></entry>
-            <entry>Enable vectorisation avoidance (EXPERIMENTAL)</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-avoid-vect</option></entry>
-          </row>
-
-          <row>
             <entry><option>-fexcess-precision</option></entry>
             <entry>Enable excess intermediate precision</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-excess-precision</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fexpose-all-unfoldings</option></entry>
+            <entry>Expose all unfoldings, even for very large or recursive functions.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-expose-all-unfoldings</option></entry>
           </row>
 
           <row>
@@ -1750,23 +1809,16 @@
 
           <row>
             <entry><option>-fignore-asserts</option></entry>
-            <entry>Ignore assertions in the source</entry>
+            <entry>Ignore assertions in the source. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-ignore-asserts</option></entry>
           </row>
 
           <row>
             <entry><option>-fignore-interface-pragmas</option></entry>
-            <entry>Ignore pragmas in interface files</entry>
+            <entry>Ignore pragmas in interface files. Implied by <option>-O0</option> only.</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-ignore-interface-pragmas</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-floopification</option></entry>
-            <entry>Turn saturated self-recursive tail-calls into local jumps in the generated assembly.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-loopification</option></entry>
           </row>
 
           <row>
@@ -1786,186 +1838,37 @@
 
           <row>
             <entry><option>-fliberate-case-threshold</option>=<replaceable>n</replaceable></entry>
-            <entry>Set the size threshold for the liberate-case transformation to <replaceable>n</replaceable> (default: 200)</entry>
-            <entry>static</entry>
+            <entry>Set the size threshold for the liberate-case transformation to <replaceable>n</replaceable> (default: 2000)</entry>
+            <entry>dynamis</entry>
             <entry><option>-fno-liberate-case-threshold</option></entry>
           </row>
 
           <row>
-            <entry><option>-fmax-relevant-bindings=N</option></entry>
-            <entry>Set the maximum number of bindings to display in type error messages (default 6).</entry>
+            <entry><option>-fllvm-pass-vectors-in-regs</option>
+            </entry>
+            <entry>Attempt to pass SIMD vectors in registers for LLVM backend on 32-bit architectures. This is dangerous.
+                   See full description in <xref linkend="options-f"/> for details.
+            </entry>
             <entry>dynamic</entry>
-            <entry><option>-fno-max-relevant-bindings</option></entry>
+            <entry><option>-fno-llvm-pass-vectors-in-regs</option></entry>
           </row>
 
           <row>
-            <entry><option>-fmax-simplifier-iterations=N</option></entry>
-            <entry>Set the max iterations for the simplifier</entry>
+            <entry><option>-fllvm-tbaa</option>
+            </entry>
+            <entry>Enable type-based alias analysis for LLVM backend.
+                   Always enabled by default.
+            </entry>
             <entry>dynamic</entry>
-            <entry>-</entry>
+            <entry><option>-fno-llvm-tbaa</option></entry>
           </row>
 
           <row>
-            <entry><option>-fmax-worker-args=N</option></entry>
-            <entry>If a worker has that many arguments, none will be
-              unpacked anymore (default: 10)</entry>
+            <entry><option>-floopification</option></entry>
+            <entry>Turn saturated self-recursive tail-calls into local jumps in the generated assembly.
+                   Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-
-          <row>
-            <entry><option>-fno-opt-coercion</option></entry>
-            <entry>Turn off the coercion optimiser</entry>
-            <entry>static</entry>
-            <entry>-</entry>
-          </row>
-
-          <row>
-            <entry><option>-fno-pre-inlining</option></entry>
-            <entry>Turn off pre-inlining</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-
-          <row>
-            <entry><option>-fno-state-hack</option></entry>
-            <entry>Turn off the "state hack" whereby any lambda with a real-world state token
-              as argument is considered to be single-entry.  Hence OK to inline things inside it.</entry>
-            <entry>static</entry>
-            <entry>-</entry>
-          </row>
-
-          <row>
-            <entry><option>-fpedantic-bottoms</option></entry>
-            <entry>Make GHC be more precise about its treatment of bottom (but see also
-              <option>-fno-state-hack</option>). In particular, GHC will not
-              eta-expand through a case expression.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-pedantic-bottoms</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-fomit-interface-pragmas</option></entry>
-            <entry>Don't generate interface pragmas</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-omit-interface-pragmas</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-fsimplifier-phases</option></entry>
-            <entry>Set the number of phases for the simplifier (default 2).
-              Ignored with <option>-O0</option>.</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-
-          <row>
-            <entry><option>-fsimpl-tick-factor=<replaceable>n</replaceable></option></entry>
-            <entry>Set the percentage factor for simplifier ticks (default 100)</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-
-          <row>
-            <entry><option>-fspec-constr</option></entry>
-            <entry>Turn on the SpecConstr transformation. Implied by <option>-O2</option>.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-spec-constr</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-fspec-constr-threshold</option>=<replaceable>n</replaceable></entry>
-            <entry>Set the size threshold for the SpecConstr transformation to <replaceable>n</replaceable> (default: 200)</entry>
-            <entry>static</entry>
-            <entry><option>-fno-spec-constr-threshold</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-fspec-constr-count</option>=<replaceable>n</replaceable></entry>
-            <entry>Set to <replaceable>n</replaceable> (default: 3) the maximum number of
-              specialisations that will be created for any one function
-              by the SpecConstr transformation</entry>
-            <entry>static</entry>
-            <entry><option>-fno-spec-constr-count</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-fspecialise</option></entry>
-            <entry>Turn on specialisation of overloaded functions. Implied by <option>-O</option>.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-specialise</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-fstrictness</option></entry>
-            <entry>Turn on strictness analysis. Implied by <option>-O</option>.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-strictness</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-fstrictness=before</option>=<replaceable>n</replaceable></entry>
-            <entry>Run an additional strictness analysis before simplifier
-              phase <replaceable>n</replaceable></entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-
-          <row>
-            <entry><option>-fstatic-argument-transformation</option></entry>
-            <entry>Turn on the static argument transformation. Implied by <option>-O2</option>.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-static-argument-transformation</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-funbox-strict-fields</option></entry>
-            <entry>Flatten strict constructor fields</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-unbox-strict-fields</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-funbox-small-strict-fields</option></entry>
-            <entry>Flatten strict constructor fields with a
-              pointer-sized representation</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-unbox-small-strict-fields</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-funfolding-creation-threshold</option></entry>
-            <entry>Tweak unfolding settings</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-
-          <row>
-            <entry><option>-funfolding-fun-discount</option></entry>
-            <entry>Tweak unfolding settings</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-
-          <row>
-            <entry><option>-funfolding-dict-discount</option></entry>
-            <entry>Tweak unfolding settings</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-
-          <row>
-            <entry><option>-funfolding-keeness-factor</option></entry>
-            <entry>Tweak unfolding settings</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-
-          <row>
-            <entry><option>-funfolding-use-threshold</option></entry>
-            <entry>Tweak unfolding settings</entry>
-            <entry>dynamic</entry>
-            <entry>-</entry>
+            <entry><option>-fno-loopification</option></entry>
           </row>
 
           <row>
@@ -2005,6 +1908,221 @@
             <entry>-</entry>
           </row>
 
+          <row>
+            <entry><option>-fmax-relevant-binds=<replaceable>n</replaceable></option></entry>
+            <entry>Set the maximum number of bindings to display in type error messages (default 6).</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-max-relevant-bindings</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fmax-simplifier-iterations=<replaceable>n</replaceable></option></entry>
+            <entry>Set the max iterations for the simplifier (default 4).</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-fmax-worker-args=<replaceable>n</replaceable></option></entry>
+            <entry>If a worker has that many arguments, none will be
+              unpacked anymore (default: 10)</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-fno-opt-coercion</option></entry>
+            <entry>Turn off the coercion optimiser</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-fno-pre-inlining</option></entry>
+            <entry>Turn off pre-inlining</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-fno-state-hack</option></entry>
+            <entry>Turn off the "state hack" whereby any lambda with a real-world state token
+              as argument is considered to be single-entry.  Hence OK to inline things inside it.</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-fomit-interface-pragmas</option></entry>
+            <entry>Don't generate interface pragmas. Implied by <option>-O0</option> only.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-omit-interface-pragmas</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fomit-yields</option></entry>
+            <entry>Omit heap checks when no allocation is being performed.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-omit-yields</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fpedantic-bottoms</option></entry>
+            <entry>Make GHC be more precise about its treatment of bottom (but see also
+              <option>-fno-state-hack</option>). In particular, GHC will not
+              eta-expand through a case expression.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-pedantic-bottoms</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fregs-graph</option></entry>
+            <entry>Use the graph colouring register allocator for register allocation
+                   in the native code generator. Implied by <option>-O2</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-regs-graph</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fregs-iterative</option></entry>
+            <entry>Use the iterative coalescing graph colouring register allocator
+                   in the native code generator.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-regs-iterative</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fsimplifier-phases=<replaceable>n</replaceable></option></entry>
+            <entry>Set the number of phases for the simplifier (default 2).
+              Ignored with <option>-O0</option>.</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-fsimpl-tick-factor=<replaceable>n</replaceable></option></entry>
+            <entry>Set the percentage factor for simplifier ticks (default 100)</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-fspec-constr</option></entry>
+            <entry>Turn on the SpecConstr transformation. Implied by <option>-O2</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-spec-constr</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fspec-constr-count</option>=<replaceable>n</replaceable></entry>
+            <entry>Set to <replaceable>n</replaceable> (default: 3) the maximum number of
+              specialisations that will be created for any one function
+              by the SpecConstr transformation</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-spec-constr-count</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fspec-constr-threshold</option>=<replaceable>n</replaceable></entry>
+            <entry>Set the size threshold for the SpecConstr transformation
+                   to <replaceable>n</replaceable> (default: 2000)</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-spec-constr-threshold</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fspecialise</option></entry>
+            <entry>Turn on specialisation of overloaded functions. Implied by <option>-O</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-specialise</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fstatic-argument-transformation</option></entry>
+            <entry>Turn on the static argument transformation.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-static-argument-transformation</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fstrictness</option></entry>
+            <entry>Turn on strictness analysis. Implied by <option>-O</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-strictness</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fstrictness-before</option>=<replaceable>n</replaceable></entry>
+            <entry>Run an additional strictness analysis before simplifier
+              phase <replaceable>n</replaceable></entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-funbox-small-strict-fields</option></entry>
+            <entry>Flatten strict constructor fields with a
+              pointer-sized representation.  Implied by <option>-O</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-unbox-small-strict-fields</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-funbox-strict-fields</option></entry>
+            <entry>Flatten strict constructor fields</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-unbox-strict-fields</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-funfolding-creation-threshold=<replaceable>n</replaceable></option></entry>
+            <entry>Tweak unfolding settings. Default: 750</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-funfolding-dict-discount=<replaceable>n</replaceable></option></entry>
+            <entry>Tweak unfolding settings. Default: 30</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-funfolding-fun-discount=<replaceable>n</replaceable></option></entry>
+            <entry>Tweak unfolding settings. Default: 60</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-funfolding-keeness-factor=<replaceable>n</replaceable></option></entry>
+            <entry>Tweak unfolding settings. Default: 1.5</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-funfolding-use-threshold=<replaceable>n</replaceable></option></entry>
+            <entry>Tweak unfolding settings. Default: 60</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+
+          <row>
+            <entry><option>-fvectorisation-avoidance</option></entry>
+            <entry>Enable vectorisation avoidance. Always enabled by default.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-vectorisation-avoidance</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fvectorise</option></entry>
+            <entry>Enable vectorisation of nested data parallelism</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-vectorise</option></entry>
+          </row>
+
         </tbody>
       </tgroup>
     </informaltable>
@@ -2029,7 +2147,7 @@
           <row>
             <entry><option>-prof</option></entry>
             <entry>Turn on profiling</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
@@ -2068,7 +2186,7 @@
           <row>
             <entry><option>-ticky</option></entry>
             <entry><link linkend="ticky-ticky">Turn on ticky-ticky profiling</link></entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
         </tbody>
@@ -2284,32 +2402,32 @@
           <row>
             <entry><option>-dynamic</option></entry>
             <entry>Use dynamic Haskell libraries (if available)</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dynamic-too</option></entry>
             <entry>Build dynamic object files <emphasis>as well as</emphasis> static object files during compilation</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dyno</option></entry>
             <entry>Set the output path for the <emphasis>dynamically</emphasis> linked objects</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dynosuf</option></entry>
             <entry>Set the output suffix for dynamic object files</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dynload</option></entry>
             <entry>Selects one of a number of modes for finding shared
               libraries at runtime.</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
@@ -2388,25 +2506,25 @@
           <row>
             <entry><option>-static</option></entry>
             <entry>Use static Haskell libraries</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-threaded</option></entry>
             <entry>Use the threaded runtime</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-debug</option></entry>
             <entry>Use the debugging runtime</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-eventlog</option></entry>
             <entry>Enable runtime event tracing</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
@@ -2469,13 +2587,13 @@
           <row>
             <entry><option>-fplugin</option>=<replaceable>module</replaceable></entry>
             <entry>Load a plugin exported by a given module</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-fplugin-opt</option>=<replaceable>module:args</replaceable></entry>
             <entry>Give arguments to a plugin module; module must be specified with <option>-fplugin</option></entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
         </tbody>
@@ -2972,12 +3090,6 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-dppr-noprags</option></entry>
-            <entry>Don't output pragma info in dumps</entry>
-            <entry>static</entry>
-            <entry>-</entry>
-          </row>
-          <row>
             <entry><option>-dppr-user-length</option></entry>
             <entry>Set the depth for printing expressions in error msgs</entry>
             <entry>dynamic</entry>
@@ -3085,6 +3197,13 @@
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
+          <row>
+            <entry><option>-frule-check</option></entry>
+            <entry>Report sites with rules that could have fired but didn't.
+                   Takes a string argument.</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
         </tbody>
       </tgroup>
     </informaltable>
@@ -3113,25 +3232,13 @@
           <row>
             <entry><option>-fno-hi-version-check</option></entry>
             <entry>Don't complain about <literal>.hi</literal> file mismatches</entry>
-            <entry>static</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>-dno-black-holing</option></entry>
-            <entry>Turn off black holing (probably doesn't work)</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-fhistory-size</option></entry>
             <entry>Set simplification history size</entry>
             <entry>dynamic</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>-funregisterised</option></entry>
-            <entry><link linkend="unreg">Unregisterised</link> compilation (use <option>-unreg</option> instead)</entry>
-            <entry>static</entry>
             <entry>-</entry>
           </row>
           <row>

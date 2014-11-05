@@ -106,7 +106,7 @@ passFloatArgsInXmm dflags = case platformArch (targetPlatform dflags) of
 
 -- On X86_64, we always pass 128-bit-wide vectors in registers. On 32-bit X86
 -- and for all larger vector sizes on X86_64, LLVM's GHC calling convention
--- doesn't currently passing vectors in registers. The patch to update the GHC
+-- does not currently pass vectors in registers. The patch to update the GHC
 -- calling convention to support passing SIMD vectors in registers is small and
 -- well-contained, so it may make it into LLVM 3.4. The hidden
 -- -fllvm-pass-vectors-in-regs flag will generate LLVM code that attempts to

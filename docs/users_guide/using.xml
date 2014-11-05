@@ -2006,6 +2006,21 @@ _  = rhs3        -- No warning: lone wild-card pattern
             <option>-O</option>.</para>
           </listitem>
         </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-Odph</option>:
+            <indexterm><primary>-Odph</primary></indexterm>
+            <indexterm><primary>optimise</primary><secondary>DPH</secondary></indexterm>
+          </term>
+          <listitem>
+            <para>Enables all <option>-O2</option> optimisation, sets
+                  <option>-fmax-simplifier-iterations=20</option>
+                  and <option>-fsimplifier-phases=3</option>. Designed for use with
+                  <link linkend="dph">Data Parallel Haskell (DPH)</link>.</para>
+          </listitem>
+        </varlistentry>
+
       </variablelist>
 
       <para>We don't use a <option>-O*</option> flag for day-to-day
@@ -2026,38 +2041,14 @@ _  = rhs3        -- No warning: lone wild-card pattern
       <indexterm><primary>-fno-* options (GHC)</primary></indexterm>
 
       <para>These flags turn on and off individual optimisations.
-      They are normally set via the <option>-O</option> options
-      described above, and as such, you shouldn't need to set any of
-      them explicitly (indeed, doing so could lead to unexpected
-      results).  A flag <option>-fwombat</option> can be negated by 
-      saying <option>-fno-wombat</option>.  The flags below are off
-      by default, except where noted below.  See <xref linkend="options-f-compact"/> 
-      for a compact list.
+      Flags marked as <emphasis>Enabled by default</emphasis> are
+      enabled by <option>-O</option>, and as such you shouldn't
+      need to set any of them explicitly.  A flag <option>-fwombat</option>
+      can be negated by saying <option>-fno-wombat</option>.
+      See <xref linkend="options-f-compact"/> for a compact list.
      </para>
 
       <variablelist>
-        <varlistentry>
-          <term>
-            <option>-favoid-vect</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Part of <link linkend="dph">Data Parallel Haskell
-            (DPH)</link>.</para>
-
-            <para><emphasis>Off by default.</emphasis> Enable the
-            <emphasis>vectorisation</emphasis> avoidance optimisation. This
-            optimisation only works when used in combination with the
-            <option>-fvectorise</option> transformation.</para>
-
-            <para>While vectorisation of code using DPH is often a big win, it
-            can also produce worse results for some kinds of code. This
-            optimisation modifies the vectorisation transformation to try to
-            determine if a function would be better of unvectorised and if
-            so, do just that.</para>
-          </listitem>
-        </varlistentry>
-
         <varlistentry>
           <term>
             <option>-fcase-merge</option>
@@ -2078,6 +2069,56 @@ _  = rhs3        -- No warning: lone wild-card pattern
      Blue -> e2
      Green -> e2
 </programlisting>
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fcall-arity</option>
+            <indexterm><primary><option>-fcall-arity</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>.
+            </para>
+          </listitem>
+        </varlistentry>
+
+         <varlistentry>
+          <term>
+            <option>-fcmm-elim-common-blocks</option>
+            <indexterm><primary><option>-felim-common-blocks</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>.  Enables the common block
+            elimination optimisation in the code generator. This optimisation
+            attempts to find identical Cmm blocks and eliminate the duplicates.
+            </para>
+          </listitem>
+        </varlistentry>
+
+         <varlistentry>
+          <term>
+            <option>-fcmm-sink</option>
+            <indexterm><primary><option>-fcmm-sink</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>.  Enables the sinking pass
+            in the code generator. This optimisation
+            attempts to find identical Cmm blocks and eliminate the duplicates
+            attempts to move variable bindings closer to their usage sites. It
+            also inlines simple expressions like literals or registers.
+            </para>
+          </listitem>
+        </varlistentry>
+
+         <varlistentry>
+          <term>
+            <option>-fcpr-off</option>
+            <indexterm><primary><option>-fcpr-Off</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Switch off CPR analysis in the demand analyser.
             </para>
           </listitem>
         </varlistentry>
@@ -2109,12 +2150,25 @@ _  = rhs3        -- No warning: lone wild-card pattern
 
         <varlistentry>
           <term>
-            <option>-fdo-lambda-eta-expansion</option>
+            <option>-fdicts-strict</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para><emphasis>On by default.</emphasis>
-            Eta-expand let-bindings to increase their arity.
+            <para>Make dictionaries strict.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fdmd-tx-dict-sel</option>
+            <indexterm><primary><option>-fdmd-tx-dict-sel</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default for <option>-O0</option>, <option>-O</option>,
+                  <option>-O2</option>.</emphasis>
+            </para>
+            <para>Use a special demand transformer for dictionary selectors.
             </para>
           </listitem>
         </varlistentry>
@@ -2128,6 +2182,18 @@ _  = rhs3        -- No warning: lone wild-card pattern
             <para><emphasis>On by default.</emphasis>
             Eta-reduce lambda expressions, if doing so gets rid of a whole
             group of lambdas.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fdo-lambda-eta-expansion</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>
+            Eta-expand let-bindings to increase their arity.
             </para>
           </listitem>
         </varlistentry>
@@ -2260,12 +2326,12 @@ _  = rhs3        -- No warning: lone wild-card pattern
             <indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Causes GHC to ignore uses of the function
+            <para><emphasis>On by default.</emphasis>.
+            Causes GHC to ignore uses of the function
             <literal>Exception.assert</literal> in source code (in
             other words, rewriting <literal>Exception.assert p
             e</literal> to <literal>e</literal> (see <xref
-            linkend="assertions"/>).  This flag is turned on by
-            <option>-O</option>.
+            linkend="assertions"/>).
             </para>
           </listitem>
         </varlistentry>
@@ -2288,12 +2354,12 @@ _  = rhs3        -- No warning: lone wild-card pattern
             <indexterm><primary><option>-flate-dmd-anal</option></primary></indexterm>
           </term>
           <listitem>
-            <para><emphasis>Off by default.</emphasis>Run demand analysis
+            <para>Run demand analysis
             again, at the end of the simplification pipeline.  We found some opportunities
             for discovering strictness that were not visible earlier; and optimisations like
             <literal>-fspec-constr</literal> can create functions with unused arguments which
             are eliminated by late demand analysis.  Improvements are modest, but so is the
-            cost.  See notes on the <ulink href="http://ghc.haskell.org/trac/ghc/wiki/LateDmd">Trac wiki page</ulink>.
+            cost.  See notes on the <ulink url="http://ghc.haskell.org/trac/ghc/wiki/LateDmd">Trac wiki page</ulink>.
             </para>
             </listitem>
         </varlistentry>
@@ -2316,27 +2382,152 @@ _  = rhs3        -- No warning: lone wild-card pattern
 
         <varlistentry>
           <term>
-            <option>-fliberate-case-threshold=N</option>
+            <option>-fliberate-case-threshold=<replaceable>n</replaceable></option>
             <indexterm><primary><option>-fliberate-case-threshold</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Set the size threshold for the liberate-case transformation.
+            <para>Set the size threshold for the liberate-case transformation. Default: 2000
             </para>
           </listitem>
         </varlistentry>
 
         <varlistentry>
           <term>
-            <option>-fmax-relevant-bindings=N</option>
+            <option>-fllvm-pass-vectors-in-regs</option>
+            <indexterm><primary><option>-fllvm-pass-vectors-in-regs</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>On 32-bit machines it changes calling convention used with LLVM backend
+             to pass 128-bit vectors in SIMD registers. At the moment this does not work
+             because this is not supported by LLVM. We strongly suggest you don't use this flag.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fllvm-tbaa</option>
+            <indexterm><primary><option>-fllvm-tbaa</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default for <option>-O0</option>, <option>-O</option>,
+                  <option>-O2</option>.</emphasis>
+            </para>
+            <para>Enables type-based alias analysis for LLVM backend.
+                  At the moment this has limited usefullness since we pass
+                  very little information to LLVM.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-floopification</option>
+            <indexterm><primary><option>-floopification</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para><emphasis>On by default.</emphasis>
+            </para>
+            <para>When this optimisation is enabled the code generator will turn
+                  all self-recursive saturated tail calls into local jumps rather
+                  than function calls.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fmax-inline-alloc-size=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-fmax-inline-alloc-size</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Set the maximum size of inline array allocations to n bytes
+                 (default: 128). GHC will allocate non-pinned arrays of statically
+                 known size in the current nursery block if they're no bigger
+                 than n bytes, ignoring GC overheap. This value should be quite
+                 a bit smaller than the block size (typically: 4096).
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fmax-inline-memcpy-insn=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-fmax-inline-memcpy-insn</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Inline memcpy calls if they would generate no more than n pseudo instructions (default: 32).
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fmax-inline-memset-insns=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-fmax-inline-memset-insns</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Inline memset calls if they would generate no more than n pseudo instructions (default: 32).
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fmax-relevant-binds=<replaceable>n</replaceable></option>
             <indexterm><primary><option>-fmax-relevant-bindings</option></primary></indexterm>
           </term>
           <listitem>
             <para>The type checker sometimes displays a fragment of the type environment
                   in error messages, but only up to some maximum number, set by this flag.
-                  The default is 6.  Turning it off with <option>-fno-max-relevant-bindings</option> 
-                   gives an unlimited number. Syntactically top-level bindings are also 
-                   usually excluded (since they may be numerous), but 
+                  The default is 6.  Turning it off with <option>-fno-max-relevant-bindings</option>
+                   gives an unlimited number. Syntactically top-level bindings are also
+                   usually excluded (since they may be numerous), but
                    <option>-fno-max-relevant-bindings</option> includes them too.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fmax-simplifier-iterations=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-fmax-simplifier-iterations</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Sets the maximal number of iterations for the simplifier. Defult: 4.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fmax-worker-args=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-fmax-worker-args</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>If a worker has that many arguments, none will be unpacked anymore (default: 10)
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fno-opt-coercion</option>
+            <indexterm><primary><option>-fno-opt-coercion</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Turn off the coercion optimiser.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fno-pre-inlining</option>
+            <indexterm><primary><option>-fno-pre-inlining</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Turn off pre-inlining.
             </para>
           </listitem>
         </varlistentry>
@@ -2410,11 +2601,11 @@ _  = rhs3        -- No warning: lone wild-card pattern
         <varlistentry>
           <term>
             <option>-fregs-graph</option>
-            <indexterm><primary><option></option></primary></indexterm>
+            <indexterm><primary><option>-fregs-graph</option></primary></indexterm>
           </term>
           <listitem>
-            <para><emphasis>Off by default, but enabled by -O2. Only applies in
-              combination with the native code generator.</emphasis>
+            <para><emphasis>Off by default due to a performance regression bug.
+            Only applies in combination with the native code generator.</emphasis>
             Use the graph colouring register allocator for register allocation
             in the native code generator. By default, GHC uses a simpler,
             faster linear register allocator. The downside being that the
@@ -2426,15 +2617,26 @@ _  = rhs3        -- No warning: lone wild-card pattern
         <varlistentry>
           <term>
             <option>-fregs-iterative</option>
-            <indexterm><primary><option></option></primary></indexterm>
+            <indexterm><primary><option>-fregs-iterative</option></primary></indexterm>
           </term>
           <listitem>
             <para><emphasis>Off by default, only applies in combination with
               the native code generator.</emphasis>
             Use the iterative coalescing graph colouring register allocator for
             register allocation in the native code generator. This is the same
-            register allocator as the <option>-freg-graph</option> one but also
+            register allocator as the <option>-fregs-graph</option> one but also
             enables iterative coalescing during register allocation.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fsimplifier-phases=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-fsimplifier-phases</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Set the number of phases for the simplifier (default 2). Ignored with -O0.
             </para>
           </listitem>
         </varlistentry>
@@ -2464,77 +2666,6 @@ _  = rhs3        -- No warning: lone wild-card pattern
             detailed list.  Usually that identifies the loop quite
             accurately, because some numbers are very large.
             </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-funfolding-creation-threshold=<replaceable>n</replaceable></option>:
-            <indexterm><primary><option>-funfolding-creation-threshold</option></primary></indexterm>
-            <indexterm><primary>inlining, controlling</primary></indexterm>
-            <indexterm><primary>unfolding, controlling</primary></indexterm>
-          </term>
-          <listitem>
-            <para>(Default: 750) Governs the maximum size that GHC will allow a
-            function unfolding to be. (An unfolding has a &ldquo;size&rdquo;
-            that reflects the cost in terms of &ldquo;code bloat&rdquo; of
-            expanding (aka inlining) that unfolding at a call site. A bigger
-            function would be assigned a bigger cost.)
-            </para>
-
-            <para>Consequences: (a) nothing larger than this will be inlined
-            (unless it has an INLINE pragma); (b) nothing larger than this
-            will be spewed into an interface file.
-            </para>
-
-            <para>Increasing this figure is more likely to result in longer
-            compile times than faster code. The
-            <option>-funfolding-use-threshold</option> is more useful.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-funfolding-use-threshold=<replaceable>n</replaceable></option>
-            <indexterm><primary><option>-funfolding-use-threshold</option></primary></indexterm>
-            <indexterm><primary>inlining, controlling</primary></indexterm>
-            <indexterm><primary>unfolding, controlling</primary></indexterm>
-          </term>
-          <listitem>
-            <para>(Default: 60) This is the magic cut-off figure for unfolding
-            (aka inlining): below this size, a function definition will be
-            unfolded at the call-site, any bigger and it won't. The size
-            computed for a function depends on two things: the actual size of
-            the expression minus any discounts that apply depending on the
-            context into which the expression is to be inlined.
-            </para>
-
-            <para>The difference between this and
-            <option>-funfolding-creation-threshold</option> is that this one
-            determines if a function definition will be inlined <emphasis>at
-              a call site</emphasis>. The other option determines if a
-            function definition will be kept around at all for potential
-            inlining.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fvectorise</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Part of <link linkend="dph">Data Parallel Haskell
-            (DPH)</link>.</para>
-
-            <para><emphasis>Off by default.</emphasis> Enable the
-            <emphasis>vectorisation</emphasis> optimisation transformation. This
-            optimisation transforms the nested data parallelism code of programs
-            using DPH into flat data parallelism. Flat data parallel programs
-            should have better load balancing, enable SIMD parallelism and
-            friendlier cache behaviour.</para>
           </listitem>
         </varlistentry>
 
@@ -2622,6 +2753,30 @@ foldl f z (Stream step s _) = foldl_loop SPEC z s
 
         <varlistentry>
           <term>
+            <option>-fspec-constr-count=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-fspec-constr-count</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Set the maximum number of specialisations
+                  that will be created for any one function by the SpecConstr
+                  transformation (default: 3).
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fspec-constr-threshold=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-fspec-constr-threshold</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Set the size threshold for the SpecConstr transformation (default: 2000).
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
             <option>-fspecialise</option>
             <indexterm><primary><option>-fspecialise</option></primary></indexterm>
           </term>
@@ -2676,25 +2831,12 @@ foldl f z (Stream step s _) = foldl_loop SPEC z s
 
         <varlistentry>
           <term>
-            <option>-funbox-strict-fields</option>:
-            <indexterm><primary><option>-funbox-strict-fields</option></primary></indexterm>
-            <indexterm><primary>strict constructor fields</primary></indexterm>
-            <indexterm><primary>constructor fields, strict</primary></indexterm>
+            <option>-fstrictness-before=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-fstrictness-before</option></primary></indexterm>
           </term>
           <listitem>
-            <para>This option causes all constructor fields which are marked
-            strict (i.e. &ldquo;!&rdquo;) to be unpacked if possible. It is
-            equivalent to adding an <literal>UNPACK</literal> pragma to every
-            strict constructor field (see <xref linkend="unpack-pragma"/>).
+            <para>Run an additional strictness analysis before simplifier phase n.
             </para>
-
-            <para>This option is a bit of a sledgehammer: it might sometimes
-            make things worse. Selectively unboxing fields by using
-            <literal>UNPACK</literal> pragmas might be better. An alternative
-            is to use <option>-funbox-strict-fields</option> to turn on
-            unboxing by default but disable it for certain constructor
-            fields using the <literal>NOUNPACK</literal> pragma (see
-            <xref linkend="nounpack-pragma"/>).</para>
           </listitem>
         </varlistentry>
 
@@ -2743,6 +2885,162 @@ data D = D !C
             fields are unpacked on 32-bit platforms, even though they are
             technically larger than a pointer on those platforms.
             </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-funbox-strict-fields</option>:
+            <indexterm><primary><option>-funbox-strict-fields</option></primary></indexterm>
+            <indexterm><primary>strict constructor fields</primary></indexterm>
+            <indexterm><primary>constructor fields, strict</primary></indexterm>
+          </term>
+          <listitem>
+            <para>This option causes all constructor fields which are marked
+            strict (i.e. &ldquo;!&rdquo;) to be unpacked if possible. It is
+            equivalent to adding an <literal>UNPACK</literal> pragma to every
+            strict constructor field (see <xref linkend="unpack-pragma"/>).
+            </para>
+
+            <para>This option is a bit of a sledgehammer: it might sometimes
+            make things worse. Selectively unboxing fields by using
+            <literal>UNPACK</literal> pragmas might be better. An alternative
+            is to use <option>-funbox-strict-fields</option> to turn on
+            unboxing by default but disable it for certain constructor
+            fields using the <literal>NOUNPACK</literal> pragma (see
+            <xref linkend="nounpack-pragma"/>).</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-funfolding-creation-threshold=<replaceable>n</replaceable></option>:
+            <indexterm><primary><option>-funfolding-creation-threshold</option></primary></indexterm>
+            <indexterm><primary>inlining, controlling</primary></indexterm>
+            <indexterm><primary>unfolding, controlling</primary></indexterm>
+          </term>
+          <listitem>
+            <para>(Default: 750) Governs the maximum size that GHC will allow a
+            function unfolding to be. (An unfolding has a &ldquo;size&rdquo;
+            that reflects the cost in terms of &ldquo;code bloat&rdquo; of
+            expanding (aka inlining) that unfolding at a call site. A bigger
+            function would be assigned a bigger cost.)
+            </para>
+
+            <para>Consequences: (a) nothing larger than this will be inlined
+            (unless it has an INLINE pragma); (b) nothing larger than this
+            will be spewed into an interface file.
+            </para>
+
+            <para>Increasing this figure is more likely to result in longer
+            compile times than faster code. The
+            <option>-funfolding-use-threshold</option> is more useful.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-funfolding-dict-discount=<replaceable>n</replaceable></option>:
+            <indexterm><primary><option>-funfolding-dict-discount</option></primary></indexterm>
+            <indexterm><primary>inlining, controlling</primary></indexterm>
+            <indexterm><primary>unfolding, controlling</primary></indexterm>
+          </term>
+          <listitem>
+            <para>Default: 30
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-funfolding-fun-discount=<replaceable>n</replaceable></option>:
+            <indexterm><primary><option>-funfolding-fun-discount</option></primary></indexterm>
+            <indexterm><primary>inlining, controlling</primary></indexterm>
+            <indexterm><primary>unfolding, controlling</primary></indexterm>
+          </term>
+          <listitem>
+            <para>Default: 60
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-funfolding-keeness-factor=<replaceable>n</replaceable></option>:
+            <indexterm><primary><option>-funfolding-keeness-factor</option></primary></indexterm>
+            <indexterm><primary>inlining, controlling</primary></indexterm>
+            <indexterm><primary>unfolding, controlling</primary></indexterm>
+          </term>
+          <listitem>
+            <para>Default: 1.5
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-funfolding-use-threshold=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-funfolding-use-threshold</option></primary></indexterm>
+            <indexterm><primary>inlining, controlling</primary></indexterm>
+            <indexterm><primary>unfolding, controlling</primary></indexterm>
+          </term>
+          <listitem>
+            <para>(Default: 60) This is the magic cut-off figure for unfolding
+            (aka inlining): below this size, a function definition will be
+            unfolded at the call-site, any bigger and it won't. The size
+            computed for a function depends on two things: the actual size of
+            the expression minus any discounts that apply depending on the
+            context into which the expression is to be inlined.
+            </para>
+
+            <para>The difference between this and
+            <option>-funfolding-creation-threshold</option> is that this one
+            determines if a function definition will be inlined <emphasis>at
+              a call site</emphasis>. The other option determines if a
+            function definition will be kept around at all for potential
+            inlining.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fvectorisation-avoidance</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Part of <link linkend="dph">Data Parallel Haskell
+            (DPH)</link>.</para>
+
+            <para><emphasis>On by default.</emphasis> Enable the
+            <emphasis>vectorisation</emphasis> avoidance optimisation. This
+            optimisation only works when used in combination with the
+            <option>-fvectorise</option> transformation.</para>
+
+            <para>While vectorisation of code using DPH is often a big win, it
+            can also produce worse results for some kinds of code. This
+            optimisation modifies the vectorisation transformation to try to
+            determine if a function would be better of unvectorised and if
+            so, do just that.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fvectorise</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Part of <link linkend="dph">Data Parallel Haskell
+            (DPH)</link>.</para>
+
+            <para><emphasis>Off by default.</emphasis> Enable the
+            <emphasis>vectorisation</emphasis> optimisation transformation. This
+            optimisation transforms the nested data parallelism code of programs
+            using DPH into flat data parallelism. Flat data parallel programs
+            should have better load balancing, enable SIMD parallelism and
+            friendlier cache behaviour.</para>
           </listitem>
         </varlistentry>
 
