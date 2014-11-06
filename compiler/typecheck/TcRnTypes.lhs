@@ -1624,7 +1624,7 @@ subGoalDepthExceeded (SubGoalDepth mc mf) (SubGoalDepth c f)
 \end{code}
 
 Note [Preventing recursive dictionaries]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We have some classes where it is not very useful to build recursive
 dictionaries (Coercible, at the moment). So we need the constraint solver to
 prevent that. We conservatively ensure this property using the subgoal depth of
