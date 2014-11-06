@@ -1,6 +1,6 @@
 {-# LANGUAGE Rank2Types, TypeSynonymInstances, FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving #-}
-module Bug2 where
+module T3064 where
 import Control.Applicative
 
 newtype ReaderT r m a = ReaderT { runReaderT :: r -> m a }
