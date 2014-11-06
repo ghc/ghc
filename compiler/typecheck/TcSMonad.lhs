@@ -1165,8 +1165,9 @@ recoverTcS (TcS recovery_code) (TcS thing_inside)
 
 nestTcS ::  TcS a -> TcS a
 -- Use the current untouchables, augmenting the current
--- evidence bindings, and solved caches
--- But have no effect on the InertCans or insolubles
+-- evidence bindings, and solved dictionaries
+-- But have no effect on the InertCans, or on the inert_flat_cache
+--  (the latter because the thing inside a nestTcS does unflattening)
 nestTcS (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
     do { inerts <- TcM.readTcRef inerts_var
@@ -1174,7 +1175,14 @@ nestTcS (TcS thing_inside)
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_inerts   = new_inert_var
                             , tcs_worklist = new_wl_var }
-       ; thing_inside nest_env }
+
+       ; res <- thing_inside nest_env
+
+       ; new_inerts <- TcM.readTcRef new_inert_var
+       ; TcM.writeTcRef inerts_var  -- See Note [Propagate the solved dictionaries]
+                        (inerts { inert_solved_dicts = inert_solved_dicts new_inerts })
+
+       ; return res }
 
 tryTcS :: TcS a -> TcS a
 -- Like runTcS, but from within the TcS monad
@@ -1191,7 +1199,21 @@ tryTcS (TcS thing_inside)
                             , tcs_inerts   = is_var
                             , tcs_worklist = wl_var }
        ; thing_inside nest_env }
+\end{code}
 
+Note [Propagate the solved dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's really quite important that nestTcS does not discard the solved
+dictionaries from the thing_inside.
+Consider
+   Eq [a]
+   forall b. empty =>  Eq [a]
+We solve the flat (Eq [a]), under nestTcS, and then turn our attention to
+the implications.  It's definitely fine to use the solved dictionaries on
+the inner implications, and it can make a signficant performance difference
+if you do so.
+
+\begin{code}
 -- Getters and setters of TcEnv fields
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1364,6 +1386,7 @@ zonkTcTyVar tv = wrapTcS (TcM.zonkTcTyVar tv)
 zonkFlats :: Cts -> TcS Cts
 zonkFlats cts = wrapTcS (TcM.zonkFlats cts)
 \end{code}
+
 
 Note [Do not add duplicate derived insolubles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
