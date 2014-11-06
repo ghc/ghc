@@ -95,6 +95,7 @@ import TyCon    ( TyCon )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, patSynType )
+import TysWiredIn ( coercibleClass )
 import TcType
 import Annotations
 import InstEnv
@@ -1511,12 +1512,6 @@ ctEvCoercion (CtWanted  { ctev_evar = v })  = mkTcCoVarCo v
 ctEvCoercion ctev@(CtDerived {}) = pprPanic "ctEvCoercion: derived constraint cannot have id"
                                       (ppr ctev)
 
--- | Checks whether the evidence can be used to solve a goal with the given minimum depth
-ctEvCheckDepth :: SubGoalDepth -> CtEvidence -> Bool
-ctEvCheckDepth _      (CtGiven {})   = True -- Given evidence has infinite depth
-ctEvCheckDepth min ev@(CtWanted {})  = min <= ctLocDepth (ctEvLoc ev)
-ctEvCheckDepth _   ev@(CtDerived {}) = pprPanic "ctEvCheckDepth: cannot consider derived evidence" (ppr ev)
-
 ctEvId :: CtEvidence -> TcId
 ctEvId (CtWanted  { ctev_evar = ev }) = ev
 ctEvId ctev = pprPanic "ctEvId:" (ppr ctev)
@@ -1621,10 +1616,21 @@ subGoalDepthExceeded (SubGoalDepth mc mf) (SubGoalDepth c f)
         | c > mc    = Just CountConstraints
         | f > mf    = Just CountTyFunApps
         | otherwise = Nothing
+
+-- | Checks whether the evidence can be used to solve a goal with the given minimum depth
+-- See Note [Preventing recursive dictionaries]
+ctEvCheckDepth :: Class -> CtLoc -> CtEvidence -> Bool
+ctEvCheckDepth cls target ev
+  | isWanted ev
+  , cls == coercibleClass  -- The restriction applies only to Coercible
+  = ctLocDepth target <= ctLocDepth (ctEvLoc ev)
+  | otherwise = True
 \end{code}
 
 Note [Preventing recursive dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+NB: this will go away when we start treating Coercible as an equality.
+
 We have some classes where it is not very useful to build recursive
 dictionaries (Coercible, at the moment). So we need the constraint solver to
 prevent that. We conservatively ensure this property using the subgoal depth of
@@ -1637,12 +1643,11 @@ which initializes it to initialSubGoalDepth (i.e. 0); but when requesting a
 Coercible instance (requestCoercible in TcInteract), we bump the current depth
 by one and use that.
 
-There are two spots where wanted contraints attempted to be solved using
-existing constraints; doTopReactDict in TcInteract (in the general solver) and
-newWantedEvVarNonrec (only used by requestCoercible) in TcSMonad. Both use
-ctEvCheckDepth to make the check. That function ensures that a Given constraint
-can always be used to solve a goal (i.e. they are at depth infinity, for our
-purposes)
+There are two spots where wanted contraints attempted to be solved
+using existing constraints: lookupInertDict and lookupSolvedDict in
+TcSMonad.  Both use ctEvCheckDepth to make the check. That function
+ensures that a Given constraint can always be used to solve a goal
+(i.e. they are at depth infinity, for our purposes)
 
 
 %************************************************************************

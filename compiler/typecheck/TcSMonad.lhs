@@ -48,7 +48,7 @@ module TcSMonad (
     rewriteEqEvidence,  -- Yet more specialised, for equality coercions
     maybeSym,
 
-    newTcEvBinds, newWantedEvVar, newWantedEvVarNC, newWantedEvVarNonrec, 
+    newTcEvBinds, newWantedEvVar, newWantedEvVarNC, 
     newEvVar, newGivenEvVar, 
     emitNewDerived, emitNewDerivedEq,
     instDFunConstraints,
@@ -75,7 +75,7 @@ module TcSMonad (
     EqualCtList,
     lookupSolvedDict, extendFlatCache,
 
-    findDict, findDictsByClass, addDict, addDictsByClass, delDict, partitionDicts,
+    lookupInertDict, findDictsByClass, addDict, addDictsByClass, delDict, partitionDicts,
 
     findFunEq, findTyEqs, 
     findFunEqsByTyCon, findFunEqs, partitionFunEqs,
@@ -768,26 +768,34 @@ lookupFlatCache fam_tc tys
     lookup_flats flat_cache = findFunEq flat_cache fam_tc tys
 
 
-lookupInInerts :: TcPredType -> TcS (Maybe CtEvidence)
+lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet?
-lookupInInerts pty
-  = do { IS { inert_solved_dicts = solved_dicts
-            , inert_cans         = inert_cans }
-            <- getTcSInerts
+lookupInInerts loc pty
+  = do { inerts <- getTcSInerts
        ; return $ case (classifyPredType pty) of
            ClassPred cls tys
-              | Just ctev <- findDict solved_dicts cls tys
-              -> Just ctev
-              | Just ct <- findDict (inert_dicts inert_cans) cls tys
-              -> Just (ctEvidence ct)
+              | Just ev <- lookupSolvedDict inerts loc cls tys
+              -> Just ev
+              | otherwise
+              -> lookupInertDict (inert_cans inerts) loc cls tys
 
            _other -> Nothing -- NB: No caching for equalities, IPs, holes, or errors
       }
 
-lookupSolvedDict :: InertSet -> Class -> [Type] -> Maybe CtEvidence
+lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
+lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
+  = case findDict dicts cls tys of
+      Just ct | let ev = ctEvidence ct
+              , ctEvCheckDepth cls loc ev
+              -> Just ev
+      _       -> Nothing
+
+lookupSolvedDict :: InertSet -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
 -- Returns just if exactly this predicate type exists in the solved.
-lookupSolvedDict (IS { inert_solved_dicts = solved }) cls tys
-  = findDict solved cls tys
+lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
+  = case findDict solved cls tys of
+      Just ev | ctEvCheckDepth cls loc ev -> Just ev
+      _                                   -> Nothing
 \end{code}
 
 
@@ -1574,22 +1582,9 @@ newWantedEvVarNC loc pty
   = do { new_ev <- newEvVar pty
        ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc })}
 
--- | Variant of newWantedEvVar that has a lower bound on the depth of the result
---   (see Note [Preventing recursive dictionaries])
-newWantedEvVarNonrec :: CtLoc -> TcPredType -> TcS (CtEvidence, Freshness)
-newWantedEvVarNonrec loc pty
-  = do { mb_ct <- lookupInInerts pty
-       ; case mb_ct of
-            Just ctev | not (isDerived ctev) && ctEvCheckDepth (ctLocDepth loc) ctev
-                      -> do { traceTcS "newWantedEvVarNonrec/cache hit" $ ppr ctev
-                            ; return (ctev, Cached) }
-            _ -> do { ctev <- newWantedEvVarNC loc pty
-                    ; traceTcS "newWantedEvVarNonrec/cache miss" $ ppr ctev
-                    ; return (ctev, Fresh) } }
-
 newWantedEvVar :: CtLoc -> TcPredType -> TcS (CtEvidence, Freshness)
 newWantedEvVar loc pty
-  = do { mb_ct <- lookupInInerts pty
+  = do { mb_ct <- lookupInInerts loc pty
        ; case mb_ct of
             Just ctev | not (isDerived ctev)
                       -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev
@@ -1619,7 +1614,7 @@ newDerived :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Returns Nothing    if cached,
 --         Just pred  if not cached
 newDerived loc pred
-  = do { mb_ct <- lookupInInerts pred
+  = do { mb_ct <- lookupInInerts loc pred
        ; return (case mb_ct of
                     Just {} -> Nothing
                     Nothing -> Just (CtDerived { ctev_pred = pred, ctev_loc = loc })) }

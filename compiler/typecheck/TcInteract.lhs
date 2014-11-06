@@ -394,8 +394,7 @@ interactIrred _ wi = pprPanic "interactIrred" (ppr wi)
 \begin{code}
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
-  | Just ct_i <- findDict (inert_dicts inerts) cls tys
-  , let ctev_i = ctEvidence ct_i
+  | Just ctev_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
   = do { (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
        ; case inert_effect of
            IRKeep    -> return ()
@@ -1391,8 +1390,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
   | not (isWanted fl)   -- Never use instances for Given or Derived constraints
   = try_fundeps_and_return
 
-  | Just ev <- lookupSolvedDict inerts cls xis   -- Cached
-  , ctEvCheckDepth (ctLocDepth loc) ev
+  | Just ev <- lookupSolvedDict inerts loc cls xis   -- Cached
   = do { setEvBind dict_id (ctEvTerm ev);
        ; stopWith fl "Dict/Top (cached)" }
 
@@ -2037,7 +2035,7 @@ requestCoercible :: CtLoc -> TcType -> TcType
                         , TcCoercion )      -- Coercion witnessing (Coercible t1 t2)
 requestCoercible loc ty1 ty2
   = ASSERT2( typeKind ty1 `tcEqKind` typeKind ty2, ppr ty1 <+> ppr ty2)
-    do { (new_ev, freshness) <- newWantedEvVarNonrec loc' (mkCoerciblePred ty1 ty2)
+    do { (new_ev, freshness) <- newWantedEvVar loc' (mkCoerciblePred ty1 ty2)
        ; return ( case freshness of { Fresh -> [new_ev]; Cached -> [] }
                 , ctEvCoercion new_ev) }
            -- Evidence for a Coercible constraint is always a coercion t1 ~R t2
