@@ -90,7 +90,12 @@ test('T9379', normal, compile_and_run, [''])
 
 test('allocLimit1', exit_code(1), compile_and_run, [''])
 test('allocLimit2', normal, compile_and_run, [''])
-test('allocLimit3', exit_code(1), compile_and_run, [''])
+
+# The non-threaded RTS on Windows doesn't handle throwing exceptions at I/O
+# operations very well, and ends up duplicating the I/O, giving wrong results.
+test('allocLimit3', [ when(opsys('mingw32'), only_ways(threaded_ways)),
+                      exit_code(1) ], compile_and_run, [''])
+
 test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS') ],
                     compile_and_run, [''])
 
