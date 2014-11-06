@@ -293,8 +293,7 @@ test('T3064',
 #            # (amd64/Linux)         (19/09/2014): 18744992, unknown
 #            # (amd64/Linux)         2014-10-13:   13251728, Stricter seqDmdType
 
-       ### TEMPORARILY DISABLED due to https://ghc.haskell.org/trac/ghc/ticket/9771
-       only_ways([]) # only_ways(['normal'])
+       only_ways(['normal'])
       ],
      compile,
      [''])
