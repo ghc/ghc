@@ -180,32 +180,29 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 ------------------------------------------------------
 buildPatSyn :: Name -> Bool
             -> Id -> Maybe Id
-            -> [Type]
-            -> [TyVar] -> [TyVar]     -- Univ and ext
-            -> ThetaType -> ThetaType -- Prov and req
-            -> Type                  -- Result type
+            -> ([TyVar], ThetaType) -- ^ Univ and req
+            -> ([TyVar], ThetaType) -- ^ Ex and prov
+            -> [Type]               -- ^ Argument types
+            -> Type                 -- ^ Result type
             -> PatSyn
 buildPatSyn src_name declared_infix matcher wrapper
-            args univ_tvs ex_tvs prov_theta req_theta pat_ty
+            (univ_tvs, req_theta) (ex_tvs, prov_theta) arg_tys pat_ty
   = ASSERT((and [ univ_tvs == univ_tvs'
                 , ex_tvs == ex_tvs'
                 , pat_ty `eqType` pat_ty'
                 , prov_theta `eqTypes` prov_theta'
                 , req_theta `eqTypes` req_theta'
-                , args `eqTypes` args'
+                , arg_tys `eqTypes` arg_tys'
                 ]))
     mkPatSyn src_name declared_infix
-             args
-             univ_tvs ex_tvs
-             prov_theta req_theta
-             pat_ty
-             matcher
-             wrapper
+             (univ_tvs, req_theta) (ex_tvs, prov_theta)
+             arg_tys pat_ty
+             matcher wrapper
   where
     ((_:univ_tvs'), req_theta', tau) = tcSplitSigmaTy $ idType matcher
     ([pat_ty', cont_sigma, _], _) = tcSplitFunTys tau
     (ex_tvs', prov_theta', cont_tau) = tcSplitSigmaTy cont_sigma
-    (args', _) = tcSplitFunTys cont_tau
+    (arg_tys', _) = tcSplitFunTys cont_tau
 \end{code}
 
 

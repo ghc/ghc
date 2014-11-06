@@ -107,9 +107,9 @@ tcPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
 
        ; traceTc "tcPatSynDecl }" $ ppr name
        ; let patSyn = mkPatSyn name is_infix
+                        (univ_tvs, req_theta)
+                        (ex_tvs, prov_theta)
                         (map varType args)
-                        univ_tvs ex_tvs
-                        prov_theta req_theta
                         pat_ty
                         matcher_id wrapper_id
        ; return (patSyn, matcher_bind) }
