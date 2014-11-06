@@ -48,7 +48,7 @@ import Var
 import VarSet
 import VarEnv
 import TysWiredIn
-import TysPrim( intPrimTy )
+import TysPrim( intPrimTy, addrPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames
 import DynFlags
@@ -1063,34 +1063,54 @@ tcInferIdWithOrig :: CtOrigin -> Name -> TcM (HsExpr TcId, TcRhoType)
 -- Look up an occurrence of an Id, and instantiate it (deeply)
 
 tcInferIdWithOrig orig id_name
-  = do { id <- lookup_id
-       ; (id_expr, id_rho) <- instantiateOuter orig id
-       ; (wrap, rho) <- deeplyInstantiate orig id_rho
-       ; return (mkHsWrap wrap id_expr, rho) }
+  | id_name `hasKey` assertIdKey
+  = do { dflags <- getDynFlags
+       ; if gopt Opt_IgnoreAsserts dflags
+         then normal_case
+         else assert_case dflags }
+  | otherwise
+  = normal_case
   where
-    lookup_id :: TcM TcId
-    lookup_id
-       = do { thing <- tcLookup id_name
-            ; case thing of
-                 ATcId { tct_id = id }
-                   -> do { check_naughty id        -- Note [Local record selectors]
-                         ; checkThLocalId id
-                         ; return id }
+    normal_case
+      = do { id <- lookup_id id_name
+           ; (id_expr, id_rho) <- instantiateOuter orig id
+           ; (wrap, rho) <- deeplyInstantiate orig id_rho
+           ; return (mkHsWrap wrap id_expr, rho) }
 
-                 AGlobal (AnId id)
-                   -> do { check_naughty id; return id }
-                        -- A global cannot possibly be ill-staged
-                        -- nor does it need the 'lifting' treatment
-                        -- hence no checkTh stuff here
+    assert_case dflags  -- See Note [Adding the implicit parameter to 'assert']
+      = do { sloc <- getSrcSpanM
+           ; assert_error_id <- lookup_id assertErrorName
+           ; (id_expr, id_rho) <- instantiateOuter orig assert_error_id
+           ; case tcSplitFunTy_maybe id_rho of {
+               Nothing -> pprPanic "assert type" (ppr id_rho) ;
+               Just (arg_ty, res_ty) -> ASSERT( arg_ty `tcEqType` addrPrimTy )
+        do { return (HsApp (L sloc id_expr)
+                           (L sloc (srcSpanPrimLit dflags sloc)), res_ty) } } }
 
-                 AGlobal (AConLike cl) -> case cl of
-                     RealDataCon con -> return (dataConWrapId con)
-                     PatSynCon ps -> case patSynWrapper ps of
-                         Nothing -> failWithTc (bad_patsyn ps)
-                         Just id -> return id
+lookup_id :: Name -> TcM TcId
+lookup_id id_name
+ = do { thing <- tcLookup id_name
+      ; case thing of
+             ATcId { tct_id = id }
+               -> do { check_naughty id        -- Note [Local record selectors]
+                     ; checkThLocalId id
+                     ; return id }
 
-                 other -> failWithTc (bad_lookup other) }
+             AGlobal (AnId id)
+               -> do { check_naughty id; return id }
+                    -- A global cannot possibly be ill-staged
+                    -- nor does it need the 'lifting' treatment
+                    -- hence no checkTh stuff here
 
+             AGlobal (AConLike cl) -> case cl of
+                 RealDataCon con -> return (dataConWrapId con)
+                 PatSynCon ps -> case patSynWrapper ps of
+                     Nothing -> failWithTc (bad_patsyn ps)
+                     Just id -> return id
+
+             other -> failWithTc (bad_lookup other) }
+
+  where
     bad_lookup thing = ppr thing <+> ptext (sLit "used where a value identifer was expected")
 
     bad_patsyn name = ppr name <+>  ptext (sLit "used in an expression, but it's a non-bidirectional pattern synonym")
@@ -1098,6 +1118,10 @@ tcInferIdWithOrig orig id_name
     check_naughty id
       | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel id)
       | otherwise                  = return ()
+
+srcSpanPrimLit :: DynFlags -> SrcSpan -> HsExpr TcId
+srcSpanPrimLit dflags span
+    = HsLit (HsStringPrim (unsafeMkByteString (showSDocOneLine dflags (ppr span))))
 
 ------------------------
 instantiateOuter :: CtOrigin -> TcId -> TcM (HsExpr TcId, TcSigmaType)
@@ -1122,6 +1146,14 @@ instantiateOuter orig id
   where
     (tvs, theta, tau) = tcSplitSigmaTy (idType id)
 \end{code}
+
+Note [Adding the implicit parameter to 'assert']
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The typechecker transforms (assert e1 e2) to (assertError "Foo.hs:27"
+e1 e2).  This isn't really the Right Thing because there's no way to
+"undo" if you want to see the original source code in the typechecker
+output.  We'll have fix this in due course, when we care more about
+being able to reconstruct the exact original program.
 
 Note [Multiple instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
