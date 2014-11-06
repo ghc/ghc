@@ -626,7 +626,7 @@ flatten fmode (TyConApp tc tys)
   | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys
   , let expanded_ty = mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys'
   = case fe_mode fmode of
-      FM_FlattenAll | any isSynFamilyTyCon (tyConsOfType rhs)
+      FM_FlattenAll | anyNameEnv isSynFamilyTyCon (tyConsOfType rhs)
                    -> flatten fmode expanded_ty
                     | otherwise
                    -> flattenTyConApp fmode tc tys

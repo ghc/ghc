@@ -662,9 +662,9 @@ repType ty
 -- | All type constructors occurring in the type; looking through type
 --   synonyms, but not newtypes.
 --  When it finds a Class, it returns the class TyCon.
-tyConsOfType :: Type -> [TyCon]
+tyConsOfType :: Type -> NameEnv TyCon
 tyConsOfType ty
-  = nameEnvElts (go ty)
+  = go ty
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go ty | Just ty' <- tcView ty = go ty'
