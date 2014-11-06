@@ -608,7 +608,8 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
                 ; pat_ty     <- tcIfaceType pat_ty
                 ; arg_tys    <- mapM tcIfaceType args
                 ; return $ buildPatSyn name is_infix matcher wrapper
-                                       arg_tys univ_tvs ex_tvs prov_theta req_theta pat_ty }
+                                       (univ_tvs, req_theta) (ex_tvs, prov_theta)
+                                       arg_tys pat_ty }
        ; return $ AConLike . PatSynCon $ patsyn }}}
   where
      mk_doc n = ptext (sLit "Pattern synonym") <+> ppr n

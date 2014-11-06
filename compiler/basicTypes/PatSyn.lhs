@@ -127,9 +127,9 @@ data PatSyn
         psInfix       :: Bool,        -- True <=> declared infix
 
         psUnivTyVars  :: [TyVar],     -- Universially-quantified type variables
+        psReqTheta    :: ThetaType,   -- Required dictionaries
         psExTyVars    :: [TyVar],     -- Existentially-quantified type vars
         psProvTheta   :: ThetaType,   -- Provided dictionaries
-        psReqTheta    :: ThetaType,   -- Required dictionaries
         psOrigResTy   :: Type,        -- Mentions only psUnivTyVars
 
         -- See Note [Matchers and wrappers for pattern synonyms]
@@ -206,19 +206,20 @@ instance Data.Data PatSyn where
 \begin{code}
 -- | Build a new pattern synonym
 mkPatSyn :: Name
-         -> Bool       -- ^ Is the pattern synonym declared infix?
-         -> [Type]     -- ^ Original arguments
-         -> [TyVar]    -- ^ Universially-quantified type variables
-         -> [TyVar]    -- ^ Existentially-quantified type variables
-         -> ThetaType  -- ^ Wanted dicts
-         -> ThetaType  -- ^ Given dicts
-         -> Type       -- ^ Original result type
-         -> Id         -- ^ Name of matcher
-         -> Maybe Id   -- ^ Name of wrapper
+         -> Bool                 -- ^ Is the pattern synonym declared infix?
+         -> ([TyVar], ThetaType) -- ^ Universially-quantified type variables
+                                --   and required dicts
+         -> ([TyVar], ThetaType) -- ^ Existentially-quantified type variables
+                                --   and provided dicts
+         -> [Type]               -- ^ Original arguments
+         -> Type                 -- ^ Original result type
+         -> Id                   -- ^ Name of matcher
+         -> Maybe Id             -- ^ Name of wrapper
          -> PatSyn
-mkPatSyn name declared_infix orig_args
-         univ_tvs ex_tvs
-         prov_theta req_theta
+mkPatSyn name declared_infix
+         (univ_tvs, req_theta)
+         (ex_tvs, prov_theta)
+         orig_args
          orig_res_ty
          matcher wrapper
     = MkPatSyn {psName = name, psUnique = getUnique name,

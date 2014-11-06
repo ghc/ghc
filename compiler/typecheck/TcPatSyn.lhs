@@ -98,9 +98,9 @@ tcPatSynDecl lname@(L _ name) details lpat dir
 
        ; traceTc "tcPatSynDecl }" $ ppr name
        ; let patSyn = mkPatSyn name is_infix
+                        (univ_tvs, req_theta)
+                        (ex_tvs, prov_theta)
                         (map varType args)
-                        univ_tvs ex_tvs
-                        prov_theta req_theta
                         pat_ty
                         matcher_id (fmap fst m_wrapper)
        ; return (patSyn, binds) }
