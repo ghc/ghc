@@ -676,9 +676,11 @@ canEqTyVar ev swapped tv1 ty2 ps_ty2              -- ev :: tv ~ s2
                                Stop ev s           -> return (Stop ev s)
                                ContinueWith new_ev -> can_eq_nc new_ev ty1 ty1 ty2 ps_ty2 }
 
-           Left tv1' -> do { let fmode = FE { fe_ev = ev, fe_mode = FM_Avoid tv1' True }
+           Left tv1' -> do { -- FM_Avoid commented out: see Note [Lazy flattening] in TcFlatten
+                             -- let fmode = FE { fe_ev = ev, fe_mode = FM_Avoid tv1' True }
                                  -- Flatten the RHS less vigorously, to avoid gratuitous flattening
                                  -- True <=> xi2 should not itself be a type-function application
+                             let fmode = FE { fe_ev = ev, fe_mode = FM_FlattenAll }
                            ; (xi2, co2) <- flatten fmode ps_ty2 -- co2 :: xi2 ~ ps_ty2
                                            -- Use ps_ty2 to preserve type synonyms if poss
                            ; dflags <- getDynFlags

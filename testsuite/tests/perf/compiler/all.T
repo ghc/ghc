@@ -393,14 +393,14 @@ test('T5321Fun',
              # 2012-10-08: 344416344 x86/Linux
              #  (increase due to new codegen)
              # 2014-09-03: 299656164     (specialisation and inlining)
-            (wordsize(64), 601629032, 10)])
+            (wordsize(64), 541287000, 10)])
              # prev:       585521080
              # 29/08/2012: 713385808     #  (increase due to new codegen)
              # 15/05/2013: 628341952     #  (reason for decrease unknown)
              # 24/06/2013: 694019152     #  (reason for re-increase unknown)
              # 12/05/2014: 614409344     #  (specialisation and inlining changes)
              # 10/09/2014: 601629032     #  post-AMP-cleanp
-
+             # 06/11/2014: 541287000     #  Simon's flat-skol changes to the constraint solver
       ],
       compile,[''])
 
@@ -457,7 +457,7 @@ test('T5837',
              # 40000000 (x86/Linux)
              # 2013-11-13: 45520936 (x86/Windows, 64bit machine)
              # 2041-09-03: 37096484 (Windows laptop, w/w for INLINABLE things
-           (wordsize(64), 651924880, 10)])
+           (wordsize(64), 271028976, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -466,7 +466,7 @@ test('T5837',
              #                                  for constraints solving
              # 2014-08-29 73639840 amd64/Linux, w/w for INLINABLE things
              # 2014-10-08 73639840 amd64/Linux, Burning Bridges and other small changes
-             # 2014-11-02 651924880      Linux, Accept big regression;
+             # 2014-11-06 271028976       Linux, Accept big regression;
              #   See Note [An alternative story for the inert substitution] in TcFlatten
       ],
       compile_fail,['-ftype-function-depth=50'])
