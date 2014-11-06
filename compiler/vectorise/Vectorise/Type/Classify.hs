@@ -21,7 +21,7 @@ where
 import NameSet
 import UniqSet
 import UniqFM
-import DataCon hiding (tyConsOfTyCon)
+import DataCon
 import TyCon
 import TypeRep
 import Type hiding (tyConsOfType)
