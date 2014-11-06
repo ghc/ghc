@@ -12,7 +12,7 @@ module TcSMonad (
     extendWorkListCts, appendWorkList, selectWorkItem,
     workListSize,
 
-    updWorkListTcS, updWorkListTcS_return, getWorkListImplics,
+    updWorkListTcS, updWorkListTcS_return, 
 
     updInertCans, updInertDicts, updInertIrreds, updInertFunEqs,
 
@@ -49,7 +49,7 @@ module TcSMonad (
     maybeSym,
 
     newTcEvBinds, newWantedEvVar, newWantedEvVarNC, newWantedEvVarNonrec, 
-    newEvVar, newGivenEvVar, newDerived, 
+    newEvVar, newGivenEvVar, 
     emitNewDerived, emitNewDerivedEq,
     instDFunConstraints,
 
@@ -292,7 +292,7 @@ instance Outputable WorkList where
           , ppUnless (isEmptyDeque feqs) $
             ptext (sLit "Funeqs =") <+> vcat (map ppr (dequeList feqs))
           , ppUnless (null rest) $
-            ptext (sLit "Eqs =") <+> vcat (map ppr rest)
+            ptext (sLit "Non-eqs =") <+> vcat (map ppr rest)
           , ppUnless (isEmptyBag implics) $
             ptext (sLit "Implics =") <+> vcat (map ppr (bagToList implics))
           ])
@@ -440,20 +440,21 @@ data InertSet
 \begin{code}
 instance Outputable InertCans where
   ppr ics = vcat [ ptext (sLit "Equalities:")
-                   <+> vcat (map ppr (varEnvElts (inert_eqs ics)))
+                   <+> pprCts (foldVarEnv (\eqs rest -> listToBag eqs `andCts` rest)
+                                          emptyCts (inert_eqs ics))
                  , ptext (sLit "Type-function equalities:")
-                   <+> vcat (map ppr (funEqsToList (inert_funeqs ics)))
+                   <+> pprCts (funEqsToBag (inert_funeqs ics))
                  , ptext (sLit "Dictionaries:")
-                   <+> vcat (map ppr (Bag.bagToList $ dictsToBag (inert_dicts ics)))
+                   <+> pprCts (dictsToBag (inert_dicts ics))
                  , ptext (sLit "Irreds:")
-                   <+> vcat (map ppr (Bag.bagToList $ inert_irreds ics))
+                   <+> pprCts (inert_irreds ics)
                  , text "Insolubles =" <+> -- Clearly print frozen errors
                     braces (vcat (map ppr (Bag.bagToList $ inert_insols ics)))
                  ]
 
 instance Outputable InertSet where
   ppr is = vcat [ ppr $ inert_cans is
-                , text "Solved dicts"  <+> int (sizeDictMap (inert_solved_dicts is)) ]
+                , text "Solved dicts" <+> vcat (map ppr (bagToList (dictsToBag (inert_solved_dicts is)))) ]
 
 emptyInert :: InertSet
 emptyInert
@@ -605,7 +606,8 @@ getInertEqs :: TcS (TyVarEnv EqualCtList)
 getInertEqs = do { inert <- getTcSInerts
                  ; return (inert_eqs (inert_cans inert)) }
 
-getUnsolvedInerts :: TcS ( Cts     -- Tyvar eqs: a ~ ty
+getUnsolvedInerts :: TcS ( Bag Implication
+                         , Cts     -- Tyvar eqs: a ~ ty
                          , Cts     -- Fun eqs:   F a ~ ty
                          , Cts     -- Insoluble
                          , Cts )   -- All others
@@ -621,7 +623,9 @@ getUnsolvedInerts
             unsolved_dicts   = foldDicts add_if_unsolved idicts emptyCts
             others = unsolved_irreds `unionBags` unsolved_dicts
 
-      ; return ( unsolved_tv_eqs, unsolved_fun_eqs, insols, others) }
+      ; implics <- getWorkListImplics
+
+      ; return ( implics, unsolved_tv_eqs, unsolved_fun_eqs, insols, others) }
               -- Keep even the given insolubles
               -- so that we can report dead GADT pattern match branches
   where
@@ -856,8 +860,8 @@ type DictMap a = TcAppMap a
 emptyDictMap :: DictMap a
 emptyDictMap = emptyTcAppMap
 
-sizeDictMap :: DictMap a -> Int
-sizeDictMap m = foldDicts (\ _ x -> x+1) m 0
+-- sizeDictMap :: DictMap a -> Int
+-- sizeDictMap m = foldDicts (\ _ x -> x+1) m 0
 
 findDict :: DictMap a -> Class -> [Type] -> Maybe a
 findDict m cls tys = findTcApp m (getUnique cls) tys
@@ -916,8 +920,8 @@ findFunEq m tc tys = findTcApp m (getUnique tc) tys
 findFunEqs :: FunEqMap a -> TyCon -> [Type] -> Maybe a
 findFunEqs m tc tys = findTcApp m (getUnique tc) tys
 
-funEqsToList :: FunEqMap a -> [a]
-funEqsToList m = foldTcAppMap (:) m []
+funEqsToBag :: FunEqMap a -> Bag a
+funEqsToBag m = foldTcAppMap consBag m emptyBag
 
 findFunEqsByTyCon :: FunEqMap a -> TyCon -> [a]
 -- Get inert function equation constraints that have the given tycon
@@ -1582,13 +1586,11 @@ emitNewDerivedEq loc (Pair ty1 ty2)
 emitNewDerived :: CtLoc -> TcPredType -> TcS ()
 -- Create new Derived and put it in the work list
 emitNewDerived loc pred
-  = do { mb_ct <- lookupInInerts pred
-       ; case mb_ct of
-           Just {} -> return ()
-           Nothing -> do { traceTcS "Emitting [D]" (ppr der_ct)
-                         ; updWorkListTcS (extendWorkListCt der_ct) } }
-  where
-    der_ct = mkNonCanonical (CtDerived { ctev_pred = pred, ctev_loc = loc })
+  = do { mb_ev <- newDerived loc pred
+       ; case mb_ev of
+           Nothing -> return ()
+           Just ev -> do { traceTcS "Emitting [D]" (ppr ev)
+                         ; updWorkListTcS (extendWorkListCt (mkNonCanonical ev)) } }
 
 newDerived :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Returns Nothing    if cached,

@@ -128,8 +128,7 @@ solveFlatGivens loc givens
 solveFlatWanteds :: Cts -> TcS WantedConstraints
 solveFlatWanteds wanteds
   = do { solveFlats wanteds
-       ; unsolved_implics                  <- getWorkListImplics
-       ; (tv_eqs, fun_eqs, insols, others) <- getUnsolvedInerts
+       ; (implics, tv_eqs, fun_eqs, insols, others) <- getUnsolvedInerts
        ; unflattened_eqs <- unflatten tv_eqs fun_eqs
             -- See Note [Unflatten after solving the flat wanteds]
 
@@ -137,7 +136,7 @@ solveFlatWanteds wanteds
             -- Postcondition is that the wl_flats are zonked
        ; return (WC { wc_flat  = zonked
                     , wc_insol = insols
-                    , wc_impl  = unsolved_implics }) }
+                    , wc_impl  = implics }) }
 
 -- The main solver loop implements Note [Basic Simplifier Plan]
 ---------------------------------------------------------------
