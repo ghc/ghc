@@ -1121,7 +1121,7 @@ in the case when the argument is already known to be evaluated.
 \begin{code}
 {-# INLINE getTag #-}
 getTag :: a -> Int#
-getTag x = x `seq` dataToTag# x
+getTag !x = dataToTag# x
 \end{code}
 
 %*********************************************************
