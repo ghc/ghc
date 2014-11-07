@@ -412,19 +412,27 @@ tcRnModule' hsc_env sum save_rn_syntax mod = do
     -- end of the safe haskell line, how to respond to user?
     if not (safeHaskellOn dflags) || (safeInferOn dflags && not allSafeOK)
         -- if safe Haskell off or safe infer failed, mark unsafe
-        then markUnsafe tcg_res emptyBag
+        then markUnsafeInfer tcg_res emptyBag
 
         -- module (could be) safe, throw warning if needed
         else do
             tcg_res' <- hscCheckSafeImports tcg_res
             safe <- liftIO $ readIORef (tcg_safeInfer tcg_res')
-            when (safe && wopt Opt_WarnSafe dflags)
-                 (logWarnings $ unitBag $ mkPlainWarnMsg dflags
-                     (warnSafeOnLoc dflags) $ errSafe tcg_res')
+            when safe $ do
+              case wopt Opt_WarnSafe dflags of
+                True -> (logWarnings $ unitBag $ mkPlainWarnMsg dflags
+                       (warnSafeOnLoc dflags) $ errSafe tcg_res')
+                False | safeHaskell dflags == Sf_Trustworthy &&
+                        wopt Opt_WarnTrustworthySafe dflags ->
+                  (logWarnings $ unitBag $ mkPlainWarnMsg dflags
+                    (trustworthyOnLoc dflags) $ errTwthySafe tcg_res')
+                False -> return ()
             return tcg_res'
   where
     pprMod t  = ppr $ moduleName $ tcg_mod t
     errSafe t = quotes (pprMod t) <+> text "has been inferred as safe!"
+    errTwthySafe t = quotes (pprMod t)
+      <+> text "is marked as Trustworthy but has been inferred as safe!"
 
 -- | Convert a typechecked module to Core
 hscDesugar :: HscEnv -> ModSummary -> TcGblEnv -> IO ModGuts
@@ -762,6 +770,18 @@ hscFileFrontEnd mod_summary = do
 --     * For modules explicitly marked -XSafe, we throw the errors.
 --     * For unmarked modules (inference mode), we drop the errors
 --       and mark the module as being Unsafe.
+--
+-- It used to be that we only did safe inference on modules that had no Safe
+-- Haskell flags, but now we perform safe inference on all modules as we want
+-- to allow users to set the `--fwarn-safe`, `--fwarn-unsafe` and
+-- `--fwarn-trustworthy-safe` flags on Trustworthy and Unsafe modules so that a
+-- user can ensure their assumptions are correct and see reasons for why a
+-- module is safe or unsafe.
+--
+-- This is tricky as we must be careful when we should throw an error compared
+-- to just warnings. For checking safe imports we manage it as two steps. First
+-- we check any imports that are required to be safe, then we check all other
+-- imports to see if we can infer them to be safe.
 
 
 -- | Check that the safe imports of the module being compiled are valid.
@@ -772,21 +792,24 @@ hscCheckSafeImports :: TcGblEnv -> Hsc TcGblEnv
 hscCheckSafeImports tcg_env = do
     dflags   <- getDynFlags
     tcg_env' <- checkSafeImports dflags tcg_env
-    case safeLanguageOn dflags of
-        True -> do
-            -- XSafe: we nuke user written RULES
-            logWarnings $ warns dflags (tcg_rules tcg_env')
-            return tcg_env' { tcg_rules = [] }
-        False
-              -- SafeInferred: user defined RULES, so not safe
-            | safeInferOn dflags && not (null $ tcg_rules tcg_env')
-            -> markUnsafe tcg_env' $ warns dflags (tcg_rules tcg_env')
-
-              -- Trustworthy OR SafeInferred: with no RULES
-            | otherwise
-            -> return tcg_env'
+    checkRULES dflags tcg_env'
 
   where
+    checkRULES dflags tcg_env' = do
+      case safeLanguageOn dflags of
+          True -> do
+              -- XSafe: we nuke user written RULES
+              logWarnings $ warns dflags (tcg_rules tcg_env')
+              return tcg_env' { tcg_rules = [] }
+          False
+                -- SafeInferred: user defined RULES, so not safe
+              | safeInferOn dflags && not (null $ tcg_rules tcg_env')
+              -> markUnsafeInfer tcg_env' $ warns dflags (tcg_rules tcg_env')
+
+                -- Trustworthy OR SafeInferred: with no RULES
+              | otherwise
+              -> return tcg_env'
+
     warns dflags rules = listToBag $ map (warnRules dflags) rules
     warnRules dflags (L loc (HsRule n _ _ _ _ _ _)) =
         mkPlainWarnMsg dflags loc $
@@ -808,51 +831,55 @@ hscCheckSafeImports tcg_env = do
 checkSafeImports :: DynFlags -> TcGblEnv -> Hsc TcGblEnv
 checkSafeImports dflags tcg_env
     = do
+        imps <- mapM condense imports'
+        let (safeImps, regImps) = partition (\(_,_,s) -> s) imps
+
         -- We want to use the warning state specifically for detecting if safe
         -- inference has failed, so store and clear any existing warnings.
         oldErrs <- getWarnings
         clearWarnings
 
-        imps <- mapM condense imports'
-        pkgs <- mapM checkSafe imps
-
-        -- grab any safe haskell specific errors and restore old warnings
-        errs <- getWarnings
+        -- Check safe imports are correct
+        safePkgs <- mapM checkSafe safeImps
+        safeErrs <- getWarnings
         clearWarnings
+
+        -- Check non-safe imports are correct if inferring safety
+        -- See the Note [Safe Haskell Inference]
+        (infErrs, infPkgs) <- case (safeInferOn dflags) of
+          False -> return (emptyBag, [])
+          True -> do infPkgs <- mapM checkSafe regImps
+                     infErrs <- getWarnings
+                     clearWarnings
+                     return (infErrs, infPkgs)
+
+        -- restore old errors
         logWarnings oldErrs
 
-        -- See the Note [Safe Haskell Inference]
-        case (not $ isEmptyBag errs) of
+        case (isEmptyBag safeErrs) of
+          -- Failed safe check
+          False -> liftIO . throwIO . mkSrcErr $ safeErrs
 
-            -- We have errors!
-            True ->
-                -- did we fail safe inference or fail -XSafe?
-                case safeInferOn dflags of
-                    True  -> markUnsafe tcg_env errs
-                    False -> liftIO . throwIO . mkSrcErr $ errs
-
-            -- All good matey!
-            False -> do
-                when (packageTrustOn dflags) $ checkPkgTrust dflags pkg_reqs
-                -- add in trusted package requirements for this module
-                let new_trust = emptyImportAvails { imp_trust_pkgs = catMaybes pkgs }
-                return tcg_env { tcg_imports = imp_info `plusImportAvails` new_trust }
+          -- Passed safe check
+          True -> do
+            let infPassed = isEmptyBag infErrs
+            tcg_env' <- case (not infPassed) of
+              True  -> markUnsafeInfer tcg_env infErrs
+              False -> return tcg_env
+            when (packageTrustOn dflags) $ checkPkgTrust dflags pkgReqs
+            let newTrust = pkgTrustReqs safePkgs infPkgs infPassed
+            return tcg_env' { tcg_imports = impInfo `plusImportAvails` newTrust }
 
   where
-    imp_info = tcg_imports tcg_env     -- ImportAvails
-    imports  = imp_mods imp_info       -- ImportedMods
+    impInfo  = tcg_imports tcg_env     -- ImportAvails
+    imports  = imp_mods impInfo        -- ImportedMods
     imports' = moduleEnvToList imports -- (Module, [ImportedModsVal])
-    pkg_reqs = imp_trust_pkgs imp_info -- [PackageKey]
+    pkgReqs  = imp_trust_pkgs impInfo  -- [PackageKey]
 
     condense :: (Module, [ImportedModsVal]) -> Hsc (Module, SrcSpan, IsSafeImport)
     condense (_, [])   = panic "HscMain.condense: Pattern match failure!"
     condense (m, x:xs) = do (_,_,l,s) <- foldlM cond' x xs
-                            -- we turn all imports into safe ones when
-                            -- inference mode is on.
-                            let s' = if safeInferOn dflags &&
-                                        safeHaskell dflags == Sf_None
-                                        then True else s
-                            return (m, l, s')
+                            return (m, l, s)
 
     -- ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
@@ -865,8 +892,17 @@ checkSafeImports dflags tcg_env
         = return v1
 
     -- easier interface to work with
-    checkSafe (_, _, False) = return Nothing
-    checkSafe (m, l, True ) = fst `fmap` hscCheckSafe' dflags m l
+    checkSafe (m, l, _) = fst `fmap` hscCheckSafe' dflags m l
+
+    -- what pkg's to add to our trust requirements
+    pkgTrustReqs req inf infPassed | safeInferOn dflags
+                                  && safeHaskell dflags == Sf_None && infPassed
+                                   = emptyImportAvails {
+                                       imp_trust_pkgs = catMaybes req ++ catMaybes inf
+                                   }
+    pkgTrustReqs _   _ _ | safeHaskell dflags == Sf_Unsafe
+                         = emptyImportAvails
+    pkgTrustReqs req _ _ = emptyImportAvails { imp_trust_pkgs = catMaybes req }
 
 -- | Check that a module is safe to import.
 --
@@ -1000,11 +1036,16 @@ checkPkgTrust dflags pkgs =
 
 -- | Set module to unsafe and (potentially) wipe trust information.
 --
--- Make sure to call this method to set a module to inferred unsafe,
--- it should be a central and single failure method. We only wipe the trust
--- information when we aren't in a specific Safe Haskell mode.
-markUnsafe :: TcGblEnv -> WarningMessages -> Hsc TcGblEnv
-markUnsafe tcg_env whyUnsafe = do
+-- Make sure to call this method to set a module to inferred unsafe, it should
+-- be a central and single failure method. We only wipe the trust information
+-- when we aren't in a specific Safe Haskell mode.
+--
+-- While we only use this for recording that a module was inferred unsafe, we
+-- may call it on modules using Trustworthy or Unsafe flags so as to allow
+-- warning flags for safety to function correctly. See Note [Safe Haskell
+-- Inference].
+markUnsafeInfer :: TcGblEnv -> WarningMessages -> Hsc TcGblEnv
+markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
     when (wopt Opt_WarnUnsafe dflags)
