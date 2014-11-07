@@ -1,9 +1,9 @@
-o%
-% (c) The University of Glasgow, 1996-2003
+--
+--  (c) The University of Glasgow 2002-2006
+--
 
-Functions over HsSyn specialised to RdrName.
+-- Functions over HsSyn specialised to RdrName.
 
-\begin{code}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 
@@ -12,11 +12,11 @@ module RdrHsSyn (
         mkHsIntegral, mkHsFractional, mkHsIsString,
         mkHsDo, mkSpliceDecl,
         mkRoleAnnotDecl,
-        mkClassDecl, 
-        mkTyData, mkDataFamInst, 
+        mkClassDecl,
+        mkTyData, mkDataFamInst,
         mkTySynonym, mkTyFamInstEqn,
-        mkTyFamInst, 
-        mkFamDecl, 
+        mkTyFamInst,
+        mkFamDecl,
         splitCon, mkInlinePragma,
         splitPatSyn, toPatSynMatchGroup,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
@@ -62,7 +62,7 @@ module RdrHsSyn (
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
 import CoAxiom          ( Role, fsFromRole )
-import RdrName          ( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
+import RdrName          ( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc,
                           isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace,
                           rdrNameSpace )
 import OccName          ( tcClsName, isVarNameSpace )
@@ -94,26 +94,24 @@ import Data.Char
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 
 #include "HsVersions.h"
-\end{code}
 
 
-%************************************************************************
-%*                                                                      *
-\subsection{Construction functions for Rdr stuff}
-%*                                                                    *
-%************************************************************************
+{- **********************************************************************
 
-mkClassDecl builds a RdrClassDecl, filling in the names for tycon and datacon
-by deriving them from the name of the class.  We fill in the names for the
-tycon and datacon corresponding to the class, by deriving them from the
-name of the class itself.  This saves recording the names in the interface
-file (which would be equally good).
+  Construction functions for Rdr stuff
 
-Similarly for mkConDecl, mkClassOpSig and default-method names.
+  ********************************************************************* -}
 
-        *** See "THE NAMING STORY" in HsDecls ****
+-- | mkClassDecl builds a RdrClassDecl, filling in the names for tycon and
+-- datacon by deriving them from the name of the class.  We fill in the names
+-- for the tycon and datacon corresponding to the class, by deriving them
+-- from the name of the class itself.  This saves recording the names in the
+-- interface file (which would be equally good).
 
-\begin{code}
+-- Similarly for mkConDecl, mkClassOpSig and default-method names.
+
+--         *** See "THE NAMING STORY" in HsDecls ****
+
 mkTyClD :: LTyClDecl n -> LHsDecl n
 mkTyClD (L loc d) = L loc (TyClD d)
 
@@ -142,8 +140,8 @@ mkATDefault :: LTyFamInstDecl RdrName
 -- Take a type-family instance declaration and turn it into
 -- a type-family default equation for a class declaration
 -- We parse things as the former and use this function to convert to the latter
--- 
--- We use the Either monad because this also called 
+--
+-- We use the Either monad because this also called
 -- from Convert.hs
 mkATDefault (L loc (TyFamInstDecl { tfid_eqn = L _ e }))
       | TyFamEqn { tfe_tycon = tc, tfe_pats = pats, tfe_rhs = rhs } <- e
@@ -179,7 +177,7 @@ mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
   = do { checkDatatypeContext mcxt
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; return (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
-                            , dd_ctxt = cxt 
+                            , dd_ctxt = cxt
                             , dd_cons = data_cons
                             , dd_kindSig = ksig
                             , dd_derivs = maybe_deriv }) }
@@ -283,20 +281,18 @@ mkRoleAnnotDecl loc tycon roles
       -- will this last case ever happen??
     suggestions list = hang (text "Perhaps you meant one of these:")
                        2 (pprWithCommas (quotes . ppr) list)
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-\subsection[cvBinds-etc]{Converting to @HsBinds@, etc.}
-%*                                                                      *
-%************************************************************************
+{- **********************************************************************
 
-Function definitions are restructured here. Each is assumed to be recursive
-initially, and non recursive definitions are discovered by the dependency
-analyser.
+  #cvBinds-etc# Converting to @HsBinds@, etc.
+
+  ********************************************************************* -}
+
+-- | Function definitions are restructured here. Each is assumed to be recursive
+-- initially, and non recursive definitions are discovered by the dependency
+-- analyser.
 
 
-\begin{code}
 --  | Groups together bindings for a single function
 cvTopDecls :: OrdList (LHsDecl RdrName) -> [LHsDecl RdrName]
 cvTopDecls decls = go (fromOL decls)
@@ -311,7 +307,7 @@ cvTopDecls decls = go (fromOL decls)
 cvBindGroup :: OrdList (LHsDecl RdrName) -> HsValBinds RdrName
 cvBindGroup binding
   = case cvBindsAndSigs binding of
-      (mbs, sigs, fam_ds, tfam_insts, dfam_insts, _) 
+      (mbs, sigs, fam_ds, tfam_insts, dfam_insts, _)
          -> ASSERT( null fam_ds && null tfam_insts && null dfam_insts)
             ValBindsIn mbs sigs
 
@@ -384,16 +380,13 @@ has_args ((L _ (Match args _ _)) : _) = not (null args)
         -- no arguments.  This is necessary now that variable bindings
         -- with no arguments are now treated as FunBinds rather
         -- than pattern bindings (tests/rename/should_fail/rnfail002).
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-\subsection[PrefixToHS-utils]{Utilities for conversion}
-%*                                                                      *
-%************************************************************************
+{- **********************************************************************
 
+  #PrefixToHS-utils# Utilities for conversion
 
-\begin{code}
+  ********************************************************************* -}
+
 -----------------------------------------------------------------------------
 -- splitCon
 
@@ -541,57 +534,55 @@ tyConToDataCon loc tc
     extra | tc == forall_tv_RDR
           = text "Perhaps you intended to use ExistentialQuantification"
           | otherwise = empty
-\end{code}
 
-Note [Sorting out the result type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In a GADT declaration which is not a record, we put the whole constr
-type into the ResTyGADT for now; the renamer will unravel it once it
-has sorted out operator fixities. Consider for example
-     C :: a :*: b -> a :*: b -> a :+: b
-Initially this type will parse as
-      a :*: (b -> (a :*: (b -> (a :+: b))))
+-- | Note [Sorting out the result type]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In a GADT declaration which is not a record, we put the whole constr
+-- type into the ResTyGADT for now; the renamer will unravel it once it
+-- has sorted out operator fixities. Consider for example
+--      C :: a :*: b -> a :*: b -> a :+: b
+-- Initially this type will parse as
+--       a :*: (b -> (a :*: (b -> (a :+: b))))
 
-so it's hard to split up the arguments until we've done the precedence
-resolution (in the renamer) On the other hand, for a record
-        { x,y :: Int } -> a :*: b
-there is no doubt.  AND we need to sort records out so that
-we can bring x,y into scope.  So:
-   * For PrefixCon we keep all the args in the ResTyGADT
-   * For RecCon we do not
+-- so it's hard to split up the arguments until we've done the precedence
+-- resolution (in the renamer) On the other hand, for a record
+--         { x,y :: Int } -> a :*: b
+-- there is no doubt.  AND we need to sort records out so that
+-- we can bring x,y into scope.  So:
+--    * For PrefixCon we keep all the args in the ResTyGADT
+--    * For RecCon we do not
 
-\begin{code}
 checkTyVarsP :: SDoc -> SDoc -> Located RdrName -> [LHsType RdrName] -> P (LHsTyVarBndrs RdrName)
 -- Same as checkTyVars, but in the P monad
-checkTyVarsP pp_what equals_or_where tc tparms 
-  = eitherToP $ checkTyVars pp_what equals_or_where tc tparms 
+checkTyVarsP pp_what equals_or_where tc tparms
+  = eitherToP $ checkTyVars pp_what equals_or_where tc tparms
 
 eitherToP :: Either (SrcSpan, SDoc) a -> P a
 -- Adapts the Either monad to the P monad
 eitherToP (Left (loc, doc)) = parseErrorSDoc loc doc
 eitherToP (Right thing)     = return thing
-checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsType RdrName] 
+checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsType RdrName]
             -> Either (SrcSpan, SDoc) (LHsTyVarBndrs RdrName)
 -- Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature)
 -- We use the Either monad because it's also called (via mkATDefault) from
 -- Convert.hs
-checkTyVars pp_what equals_or_where tc tparms 
+checkTyVars pp_what equals_or_where tc tparms
   = do { tvs <- mapM chk tparms
        ; return (mkHsQTvs tvs) }
   where
-        
+
         -- Check that the name space is correct!
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
         | isRdrTyVar tv    = return (L l (KindedTyVar tv k))
     chk (L l (HsTyVar tv))
         | isRdrTyVar tv    = return (L l (UserTyVar tv))
     chk t@(L loc _)
-        = Left (loc, 
+        = Left (loc,
                 vcat [ ptext (sLit "Unexpected type") <+> quotes (ppr t)
                      , ptext (sLit "In the") <+> pp_what <+> ptext (sLit "declaration for") <+> quotes (ppr tc)
                      , vcat[ (ptext (sLit "A") <+> pp_what <+> ptext (sLit "declaration should have form"))
-                     , nest 2 (pp_what <+> ppr tc 
+                     , nest 2 (pp_what <+> ppr tc
                                        <+> hsep (map text (takeList tparms allNameStrings))
                                        <+> equals_or_where) ] ])
 
@@ -630,7 +621,7 @@ checkTyClHdr ty
   where
     goL (L l ty) acc = go l ty acc
 
-    go l (HsTyVar tc) acc 
+    go l (HsTyVar tc) acc
         | isRdrTc tc          = return (L l tc, acc)
     go _ (HsOpTy t1 (_, ltc@(L _ tc)) t2) acc
         | isRdrTc tc         = return (ltc, t1:t2:acc)
@@ -750,7 +741,7 @@ checkAPat msg loc e0 = do
    RecordCon c _ (HsRecFields fs dd)
                         -> do fs <- mapM (checkPatField msg) fs
                               return (ConPatIn c (RecCon (HsRecFields fs dd)))
-   HsSpliceE is_typed s | not is_typed 
+   HsSpliceE is_typed s | not is_typed
                         -> return (SplicePat s)
    HsQuasiQuoteE q      -> return (QuasiQuotePat q)
    _                    -> patFail msg loc e0
@@ -873,10 +864,8 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
           expr = text "if"   <+> ppr guardExpr <> pprOptSemi semiThen <+>
                  text "then" <+> ppr thenExpr  <> pprOptSemi semiElse <+>
                  text "else" <+> ppr elseExpr
-\end{code}
 
 
-\begin{code}
         -- The parser left-associates, so there should
         -- not be any OpApps inside the e's
 splitBang :: LHsExpr RdrName -> Maybe (LHsExpr RdrName, [LHsExpr RdrName])
@@ -968,25 +957,25 @@ locMap :: (SrcSpan -> a -> P b) -> Located a -> P (Located b)
 locMap f (L l a) = f l a >>= (\b -> return $ L l b)
 
 checkCmd :: SrcSpan -> HsExpr RdrName -> P (HsCmd RdrName)
-checkCmd _ (HsArrApp e1 e2 ptt haat b) = 
+checkCmd _ (HsArrApp e1 e2 ptt haat b) =
     return $ HsCmdArrApp e1 e2 ptt haat b
-checkCmd _ (HsArrForm e mf args) = 
+checkCmd _ (HsArrForm e mf args) =
     return $ HsCmdArrForm e mf args
-checkCmd _ (HsApp e1 e2) = 
+checkCmd _ (HsApp e1 e2) =
     checkCommand e1 >>= (\c -> return $ HsCmdApp c e2)
-checkCmd _ (HsLam mg) = 
+checkCmd _ (HsLam mg) =
     checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdLam mg')
-checkCmd _ (HsPar e) = 
+checkCmd _ (HsPar e) =
     checkCommand e >>= (\c -> return $ HsCmdPar c)
-checkCmd _ (HsCase e mg) = 
+checkCmd _ (HsCase e mg) =
     checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdCase e mg')
 checkCmd _ (HsIf cf ep et ee) = do
     pt <- checkCommand et
     pe <- checkCommand ee
     return $ HsCmdIf cf ep pt pe
-checkCmd _ (HsLet lb e) = 
+checkCmd _ (HsLet lb e) =
     checkCommand e >>= (\c -> return $ HsCmdLet lb c)
-checkCmd _ (HsDo DoExpr stmts ty) = 
+checkCmd _ (HsDo DoExpr stmts ty) =
     mapM checkCmdLStmt stmts >>= (\ss -> return $ HsCmdDo ss ty)
 
 checkCmd _ (OpApp eLeft op _fixity eRight) = do
@@ -1003,11 +992,11 @@ checkCmdLStmt :: ExprLStmt RdrName -> P (CmdLStmt RdrName)
 checkCmdLStmt = locMap checkCmdStmt
 
 checkCmdStmt :: SrcSpan -> ExprStmt RdrName -> P (CmdStmt RdrName)
-checkCmdStmt _ (LastStmt e r) = 
+checkCmdStmt _ (LastStmt e r) =
     checkCommand e >>= (\c -> return $ LastStmt c r)
-checkCmdStmt _ (BindStmt pat e b f) = 
+checkCmdStmt _ (BindStmt pat e b f) =
     checkCommand e >>= (\c -> return $ BindStmt pat c b f)
-checkCmdStmt _ (BodyStmt e t g ty) = 
+checkCmdStmt _ (BodyStmt e t g ty) =
     checkCommand e >>= (\c -> return $ BodyStmt c t g ty)
 checkCmdStmt _ (LetStmt bnds) = return $ LetStmt bnds
 checkCmdStmt _ stmt@(RecStmt { recS_stmts = stmts }) = do
@@ -1030,7 +1019,7 @@ checkCmdGRHSs (GRHSs grhss binds) = do
 
 checkCmdGRHS :: LGRHS RdrName (LHsExpr RdrName) -> P (LGRHS RdrName (LHsCmd RdrName))
 checkCmdGRHS = locMap $ const convert
-  where 
+  where
     convert (GRHS stmts e) = do
         c <- checkCommand e
 --        cmdStmts <- mapM checkCmdLStmt stmts
@@ -1040,7 +1029,7 @@ checkCmdGRHS = locMap $ const convert
 cmdFail :: SrcSpan -> HsExpr RdrName -> P a
 cmdFail loc e = parseErrorSDoc loc (text "Parse error in command:" <+> ppr e)
 cmdStmtFail :: SrcSpan -> Stmt RdrName (LHsExpr RdrName) -> P a
-cmdStmtFail loc e = parseErrorSDoc loc 
+cmdStmtFail loc e = parseErrorSDoc loc
                     (text "Parse error in command statement:" <+> ppr e)
 
 ---------------------------------------------------------------------------
@@ -1058,7 +1047,7 @@ mkRecConstrOrUpdate
         -> ([HsRecField RdrName (LHsExpr RdrName)], Bool)
         -> P (HsExpr RdrName)
 
-mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd) 
+mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd)
   | isRdrDataCon c
   = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd))
 mkRecConstrOrUpdate exp _ (fs,dd)
@@ -1069,7 +1058,7 @@ mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs True  = HsRecFields { rec_flds = fs, rec_dotdot = Just (length fs) }
 
 mkInlinePragma :: (InlineSpec, RuleMatchInfo) -> Maybe Activation -> InlinePragma
--- The (Maybe Activation) is because the user can omit 
+-- The (Maybe Activation) is because the user can omit
 -- the activation spec (and usually does)
 mkInlinePragma (inl, match_info) mb_act
   = InlinePragma { inl_inline = inl
@@ -1181,18 +1170,16 @@ mkExport cconv (L _ entity, v, ty) = return $
 --
 mkExtName :: RdrName -> CLabelString
 mkExtName rdrNm = mkFastString (occNameString (rdrNameOcc rdrNm))
-\end{code}
 
 --------------------------------------------------------------------------------
 -- Help with module system imports/exports
 
-\begin{code}
 data ImpExpSubSpec = ImpExpAbs | ImpExpAll | ImpExpList [ RdrName ]
 
 mkModuleImpExp :: RdrName -> ImpExpSubSpec -> IE RdrName
 mkModuleImpExp name subs =
   case subs of
-    ImpExpAbs 
+    ImpExpAbs
       | isVarNameSpace (rdrNameSpace name) -> IEVar       name
       | otherwise                          -> IEThingAbs  nameT
     ImpExpAll                              -> IEThingAll  nameT
@@ -1208,12 +1195,9 @@ mkTypeImpExp name =
        then return (fmap (`setRdrNameSpace` tcClsName) name)
        else parseErrorSDoc (getLoc name)
               (text "Illegal keyword 'type' (use ExplicitNamespaces to enable)")
-\end{code}
 
 -----------------------------------------------------------------------------
 -- Misc utils
 
-\begin{code}
 parseErrorSDoc :: SrcSpan -> SDoc -> P a
 parseErrorSDoc span s = failSpanMsgP span s
-\end{code}

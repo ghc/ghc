@@ -1,6 +1,4 @@
-Character classification
-
-\begin{code}
+-- Character classification
 {-# LANGUAGE CPP #-}
 module Ctype
         ( is_ident      -- Char# -> Bool
@@ -22,11 +20,9 @@ import Data.Int         ( Int32 )
 import Data.Bits        ( Bits((.&.)) )
 import Data.Char        ( ord, chr )
 import Panic
-\end{code}
 
-Bit masks
+-- Bit masks
 
-\begin{code}
 cIdent, cSymbol, cAny, cSpace, cLower, cUpper, cDigit :: Int
 cIdent  =  1
 cSymbol =  2
@@ -35,12 +31,10 @@ cSpace  =  8
 cLower  = 16
 cUpper  = 32
 cDigit  = 64
-\end{code}
 
-The predicates below look costly, but aren't, GHC+GCC do a great job
-at the big case below.
+-- | The predicates below look costly, but aren't, GHC+GCC do a great job
+-- at the big case below.
 
-\begin{code}
 {-# INLINE is_ctype #-}
 is_ctype :: Int -> Char -> Bool
 is_ctype mask c = (fromIntegral (charType c) .&. fromIntegral mask) /= (0::Int32)
@@ -55,11 +49,9 @@ is_lower  = is_ctype cLower
 is_upper  = is_ctype cUpper
 is_digit  = is_ctype cDigit
 is_alphanum = is_ctype (cLower+cUpper+cDigit)
-\end{code}
 
-Utils
+-- Utils
 
-\begin{code}
 hexDigit :: Char -> Int
 hexDigit c | is_decdigit c = ord c - ord '0'
            | otherwise     = ord (to_lower c) - ord 'a' + 10
@@ -87,12 +79,10 @@ to_lower :: Char -> Char
 to_lower c
   | c >=  'A' && c <= 'Z' = chr (ord c - (ord 'A' - ord 'a'))
   | otherwise = c
-\end{code}
 
-We really mean .|. instead of + below, but GHC currently doesn't do
-any constant folding with bitops. *sigh*
+-- | We really mean .|. instead of + below, but GHC currently doesn't do
+--  any constant folding with bitops. *sigh*
 
-\begin{code}
 charType :: Char -> Int
 charType c = case c of
    '\0'   -> 0                         -- \000
@@ -224,4 +214,3 @@ charType c = case c of
    '\126' -> cAny + cSymbol            -- ~
    '\127' -> 0                         -- \177
    _ -> panic ("charType: " ++ show c)
-\end{code}
