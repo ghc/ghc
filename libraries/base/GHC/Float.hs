@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
@@ -47,15 +46,11 @@ import GHC.Integer.Logarithms ( integerLogBase# )
 import GHC.Integer.Logarithms.Internals
 
 infixr 8  **
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Standard numeric classes}
-%*                                                      *
-%*********************************************************
+------------------------------------------------------------------------
+-- Standard numeric classes
+------------------------------------------------------------------------
 
-\begin{code}
 -- | Trigonometric and hyperbolic functions and related functions.
 class  (Fractional a) => Floating a  where
     pi                  :: a
@@ -183,16 +178,11 @@ class  (RealFrac a, Floating a) => RealFloat a  where
                           =  pi    -- must be after the previous test on zero y
       | x==0 && y==0      =  y     -- must be after the other double zero tests
       | otherwise         =  x + y -- x or y is a NaN, return a NaN (via +)
-\end{code}
 
+------------------------------------------------------------------------
+-- Float
+------------------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Type @Float@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance  Num Float  where
     (+)         x y     =  plusFloat x y
     (-)         x y     =  minusFloat x y
@@ -350,15 +340,11 @@ instance  RealFloat Float  where
 instance  Show Float  where
     showsPrec   x = showSignedFloat showFloat x
     showList = showList__ (showsPrec 0)
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Type @Double@}
-%*                                                      *
-%*********************************************************
+------------------------------------------------------------------------
+-- Double
+------------------------------------------------------------------------
 
-\begin{code}
 instance  Num Double  where
     (+)         x y     =  plusDouble x y
     (-)         x y     =  minusDouble x y
@@ -512,14 +498,13 @@ instance  RealFloat Double  where
 instance  Show Double  where
     showsPrec   x = showSignedFloat showFloat x
     showList = showList__ (showsPrec 0)
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{@Enum@ instances}
-%*                                                      *
-%*********************************************************
 
+------------------------------------------------------------------------
+-- Enum instances
+------------------------------------------------------------------------
+
+{-
 The @Enum@ instances for Floats and Doubles are slightly unusual.
 The @toEnum@ function truncates numbers to Int.  The definitions
 of @enumFrom@ and @enumFromThen@ allow floats to be used in arithmetic
@@ -532,8 +517,8 @@ methods for @enumFromTo@ and @enumFromThenTo@, as these rely on there being
 a `non-lossy' conversion to and from Ints. Instead we make use of the
 1.2 default methods (back in the days when Enum had Ord as a superclass)
 for these (@numericEnumFromTo@ and @numericEnumFromThenTo@ below.)
+-}
 
-\begin{code}
 instance  Enum Float  where
     succ x         = x + 1
     pred x         = x - 1
@@ -553,17 +538,11 @@ instance  Enum Double  where
     enumFromTo     =  numericEnumFromTo
     enumFromThen   =  numericEnumFromThen
     enumFromThenTo =  numericEnumFromThenTo
-\end{code}
 
+------------------------------------------------------------------------
+-- Printing floating point
+------------------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Printing floating point}
-%*                                                      *
-%*********************************************************
-
-
-\begin{code}
 -- | Show a signed 'RealFloat' value to full precision
 -- using standard decimal notation for arguments whose absolute value lies
 -- between @0.1@ and @9,999,999@, and scientific notation otherwise.
@@ -771,15 +750,11 @@ floatToDigits base x =
  in
  (map fromIntegral (reverse rds), k)
 
-\end{code}
+------------------------------------------------------------------------
+-- Converting from a Rational to a RealFloa
+------------------------------------------------------------------------
 
-
-%*********************************************************
-%*                                                      *
-\subsection{Converting from a Rational to a RealFloat
-%*                                                      *
-%*********************************************************
-
+{-
 [In response to a request for documentation of how fromRational works,
 Joe Fasel writes:] A quite reasonable request!  This code was added to
 the Prelude just before the 1.2 release, when Lennart, working with an
@@ -827,9 +802,9 @@ fromRat x = x'
                                         / fromInteger (denominator x))
 \end{pseudocode}
 
-Now, here's Lennart's code (which works)
+Now, here's Lennart's code (which works):
+-}
 
-\begin{code}
 -- | Converts a 'Rational' value into any type in class 'RealFloat'.
 {-# RULES
 "fromRat/Float"     fromRat = (fromRational :: Rational -> Float)
@@ -910,8 +885,7 @@ integerLogBase b i
    | b == 2    = I# (integerLog2# i)
    | otherwise = I# (integerLogBase# b i)
 
-\end{code}
-
+{-
 Unfortunately, the old conversion code was awfully slow due to
 a) a slow integer logarithm
 b) repeated calculation of gcd's
@@ -924,8 +898,8 @@ of division.
 The below is an adaption of fromRat' for the conversion to
 Float or Double exploiting the known floatRadix and avoiding
 divisions as much as possible.
+-}
 
-\begin{code}
 {-# SPECIALISE fromRat'' :: Int -> Int -> Integer -> Integer -> Float,
                             Int -> Int -> Integer -> Integer -> Double #-}
 fromRat'' :: RealFloat a => Int -> Int -> Integer -> Integer -> a
@@ -992,19 +966,14 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
                                         then q else q+1
                                 GT -> q+1
           in  encodeFloat rdq p'
-\end{code}
 
+------------------------------------------------------------------------
+-- Floating point numeric primops
+------------------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Floating point numeric primops}
-%*                                                      *
-%*********************************************************
+-- Definitions of the boxed PrimOps; these will be
+-- used in the case of partial applications, etc.
 
-Definitions of the boxed PrimOps; these will be
-used in the case of partial applications, etc.
-
-\begin{code}
 plusFloat, minusFloat, timesFloat, divideFloat :: Float -> Float -> Float
 plusFloat   (F# x) (F# y) = F# (plusFloat# x y)
 minusFloat  (F# x) (F# y) = F# (minusFloat# x y)
@@ -1087,9 +1056,7 @@ tanhDouble   (D# x) = D# (tanhDouble# x)
 
 powerDouble :: Double -> Double -> Double
 powerDouble  (D# x) (D# y) = D# (x **## y)
-\end{code}
 
-\begin{code}
 foreign import ccall unsafe "isFloatNaN" isFloatNaN :: Float -> Int
 foreign import ccall unsafe "isFloatInfinite" isFloatInfinite :: Float -> Int
 foreign import ccall unsafe "isFloatDenormalized" isFloatDenormalized :: Float -> Int
@@ -1101,15 +1068,10 @@ foreign import ccall unsafe "isDoubleInfinite" isDoubleInfinite :: Double -> Int
 foreign import ccall unsafe "isDoubleDenormalized" isDoubleDenormalized :: Double -> Int
 foreign import ccall unsafe "isDoubleNegativeZero" isDoubleNegativeZero :: Double -> Int
 foreign import ccall unsafe "isDoubleFinite" isDoubleFinite :: Double -> Int
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Coercion rules}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
+------------------------------------------------------------------------
+-- Coercion rules
+------------------------------------------------------------------------
 
 word2Double :: Word -> Double
 word2Double (W# w) = D# (word2Double# w)
@@ -1129,8 +1091,8 @@ word2Float (W# w) = F# (word2Float# w)
 "realToFrac/Int->Double"    realToFrac   = int2Double   -- See Note [realToFrac int-to-float]
 "realToFrac/Int->Float"     realToFrac   = int2Float    --      ..ditto
     #-}
-\end{code}
 
+{-
 Note [realToFrac int-to-float]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don found that the RULES for realToFrac/Int->Double and simliarly
@@ -1167,14 +1129,10 @@ with the native backend, and 0.143 seconds with the C backend.
 
 A few more details in Trac #2251, and the patch message
 "Add RULES for realToFrac from Int".
+-}
 
-%*********************************************************
-%*                                                      *
-\subsection{Utils}
-%*                                                      *
-%*********************************************************
+-- Utils
 
-\begin{code}
 showSignedFloat :: (RealFloat a)
   => (a -> ShowS)       -- ^ a function that can show unsigned values
   -> Int                -- ^ the precedence of the enclosing context
@@ -1184,13 +1142,12 @@ showSignedFloat showPos p x
    | x < 0 || isNegativeZero x
        = showParen (p > 6) (showChar '-' . showPos (-x))
    | otherwise = showPos x
-\end{code}
 
+{-
 We need to prevent over/underflow of the exponent in encodeFloat when
 called from scaleFloat, hence we clamp the scaling parameter.
 We must have a large enough range to cover the maximum difference of
 exponents returned by decodeFloat.
-\begin{code}
+-}
 clamp :: Int -> Int -> Int
 clamp bd k = max (-bd) (min bd k)
-\end{code}

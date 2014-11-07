@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, RankNTypes #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -7,7 +6,7 @@
 -- Module      :  GHC.ST
 -- Copyright   :  (c) The University of Glasgow, 1992-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -28,18 +27,10 @@ import GHC.Base
 import GHC.Show
 
 default ()
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{The @ST@ monad}
-%*                                                      *
-%*********************************************************
+-- The state-transformer monad proper.  By default the monad is strict;
+-- too many people got bitten by space leaks when it was lazy.
 
-The state-transformer monad proper.  By default the monad is strict;
-too many people got bitten by space leaks when it was lazy.
-
-\begin{code}
 -- | The strict state-transformer monad.
 -- A computation of type @'ST' s a@ transforms an internal state indexed
 -- by @s@, and returns a value of type @a@.
@@ -111,8 +102,8 @@ fixST k = ST $ \ s ->
 instance  Show (ST s a)  where
     showsPrec _ _  = showString "<<ST action>>"
     showList       = showList__ (showsPrec 0)
-\end{code}
 
+{-
 Definition of runST
 ~~~~~~~~~~~~~~~~~~~
 
@@ -144,8 +135,8 @@ f = let
         freezeArray# a s''
 \end{verbatim}
 All calls to @f@ will share a {\em single} array!  End SLPJ 95/04.
+-}
 
-\begin{code}
 {-# INLINE runST #-}
 -- The INLINE prevents runSTRep getting inlined in *this* module
 -- so that it is still visible when runST is inlined in an importing
@@ -171,4 +162,3 @@ runST st = runSTRep (case st of { ST st_rep -> st_rep })
 runSTRep :: (forall s. STRep s a) -> a
 runSTRep st_rep = case st_rep realWorld# of
                         (# _, r #) -> r
-\end{code}

@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, StandaloneDeriving, ScopedTypeVariables #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -8,7 +7,7 @@
 -- Module      :  GHC.Read
 -- Copyright   :  (c) The University of Glasgow, 1994-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -67,10 +66,8 @@ import GHC.Float
 import GHC.Show
 import GHC.Base
 import GHC.Arr
-\end{code}
 
 
-\begin{code}
 -- | @'readParen' 'True' p@ parses what @p@ parses, but surrounded with
 -- parentheses.
 --
@@ -85,18 +82,6 @@ readParen b g   =  if b then mandatory else optional
                                 (x,t)   <- optional s
                                 (")",u) <- lex t
                                 return (x,u)
-\end{code}
-
-
-%*********************************************************
-%*                                                      *
-\subsection{The @Read@ class}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
-------------------------------------------------------------------------
--- class Read
 
 -- | Parsing of 'String's, producing values.
 --
@@ -198,7 +183,7 @@ class Read a where
   -- The default definition uses 'readList'.  Instances that define 'readPrec'
   -- should also define 'readListPrec' as 'readListPrecDefault'.
   readListPrec :: ReadPrec [a]
-  
+
   -- default definitions
   readsPrec    = readPrec_to_S readPrec
   readList     = readPrec_to_S (list readPrec) 0
@@ -280,7 +265,7 @@ paren p = do expectP (L.Punc "(")
              return x
 
 parens :: ReadPrec a -> ReadPrec a
--- ^ @(parens p)@ parses \"P\", \"(P0)\", \"((P0))\", etc, 
+-- ^ @(parens p)@ parses \"P\", \"(P0)\", \"((P0))\", etc,
 --      where @p@ parses \"P\"  in the current precedence context
 --          and parses \"P0\" in precedence context zero
 parens p = optional
@@ -303,7 +288,7 @@ list readx =
          "]"           -> return []
          "," | started -> listNext
          _             -> pfail
-  
+
   listNext =
     do x  <- reset readx
        xs <- listRest True
@@ -322,16 +307,11 @@ choose sps = foldr ((+++) . try_one) pfail sps
                                     L.Ident s'  | s==s' -> p
                                     L.Symbol s' | s==s' -> p
                                     _other              -> pfail }
-\end{code}
 
+--------------------------------------------------------------
+-- Simple instances of Read
+--------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Simple instances of Read}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance Read Char where
   readPrec =
     parens
@@ -375,15 +355,12 @@ instance Read Ordering where
 
   readListPrec = readListPrecDefault
   readList     = readListDefault
-\end{code}
 
+--------------------------------------------------------------
+-- Structure instances of Read: Maybe, List etc
+--------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Structure instances of Read: Maybe, List etc}
-%*                                                      *
-%*********************************************************
-
+{-
 For structured instances of Read we start using the precedences.  The
 idea is then that 'parens (prec k p)' will fail immediately when trying
 to parse it in a context with a higher precedence level than k. But if
@@ -404,8 +381,8 @@ Note how step is used in for example the Maybe parser to increase the
 precedence beyond appPrec, so that basically only literals and
 parenthesis-like objects such as (...) and [...] can be an argument to
 'Just'.
+-}
 
-\begin{code}
 instance Read a => Read (Maybe a) where
   readPrec =
     parens
@@ -443,16 +420,11 @@ instance Read L.Lexeme where
   readPrec     = lexP
   readListPrec = readListPrecDefault
   readList     = readListDefault
-\end{code}
 
+--------------------------------------------------------------
+-- Numeric instances of Read
+--------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Numeric instances of Read}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 readNumber :: Num a => (L.Lexeme -> ReadPrec a) -> ReadPrec a
 -- Read a signed number
 readNumber convert =
@@ -517,16 +489,12 @@ instance (Integral a, Read a) => Read (Ratio a) where
 
   readListPrec = readListPrecDefault
   readList     = readListDefault
-\end{code}
 
 
-%*********************************************************
-%*                                                      *
-        Tuple instances of Read, up to size 15
-%*                                                      *
-%*********************************************************
+------------------------------------------------------------------------
+-- Tuple instances of Read, up to size 15
+------------------------------------------------------------------------
 
-\begin{code}
 instance Read () where
   readPrec =
     parens
@@ -572,8 +540,8 @@ read_tup8 = do  (a,b,c,d) <- read_tup4
 
 
 instance (Read a, Read b, Read c) => Read (a, b, c) where
-  readPrec = wrap_tup (do { (a,b) <- read_tup2; read_comma 
-                          ; c <- readPrec 
+  readPrec = wrap_tup (do { (a,b) <- read_tup2; read_comma
+                          ; c <- readPrec
                           ; return (a,b,c) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
@@ -680,5 +648,3 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
                           ; return (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
-\end{code}
-

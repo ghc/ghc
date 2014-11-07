@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables, MagicHash #-}
 {-# LANGUAGE BangPatterns #-}
@@ -41,15 +40,11 @@ import GHC.Integer (Integer)
 
 infixl 9  !!
 infix  4 `elem`, `notElem`
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{List-manipulation functions}
-%*                                                      *
-%*********************************************************
+--------------------------------------------------------------
+-- List-manipulation functions
+--------------------------------------------------------------
 
-\begin{code}
 -- | Extract the first element of a list, which must be non-empty.
 head                    :: [a] -> a
 head (x:_)              =  x
@@ -844,10 +839,6 @@ concat = foldr (++) []
 -- We don't bother to turn non-fusible applications of concat back into concat
  #-}
 
-\end{code}
-
-
-\begin{code}
 -- | List index (subscript) operator, starting from 0.
 -- It is an instance of the more general 'Data.List.genericIndex',
 -- which takes an index of any integral type.
@@ -876,16 +867,11 @@ xs !! n
                                    0 -> x
                                    _ -> r (k-1)) tooLarge xs n
 #endif
-\end{code}
 
+--------------------------------------------------------------
+-- The zip family
+--------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{The zip family}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 foldr2 :: (a -> b -> c -> c) -> c -> [a] -> [b] -> c
 foldr2 k z = go
   where
@@ -911,11 +897,10 @@ foldr2_right  k _z  y  r (x:xs) = k x y (r xs)
 "foldr2/right"  forall k z xs (g::forall b.(a->b->b)->b->b) .
                   foldr2 k z xs (build g) = g (foldr2_right k z) (\_ -> z) xs
  #-}
-\end{code}
 
-Zips for larger tuples are in the List module.
 
-\begin{code}
+-- Zips for larger tuples are in the List module.
+
 ----------------------------------------------
 -- | 'zip' takes two lists and returns a list of corresponding pairs.
 -- If one input list is short, excess elements of the longer list are
@@ -945,9 +930,7 @@ zipFB c = \x y r -> (x,y) `c` r
 "zip"      [~1] forall xs ys. zip xs ys = build (\c n -> foldr2 (zipFB c) n xs ys)
 "zipList"  [1]  foldr2 (zipFB (:)) []   = zip
  #-}
-\end{code}
 
-\begin{code}
 ----------------------------------------------
 -- | 'zip3' takes three lists and returns a list of triples, analogous to
 -- 'zip'.
@@ -956,13 +939,11 @@ zip3 :: [a] -> [b] -> [c] -> [(a,b,c)]
 -- zip3 =  zipWith3 (,,)
 zip3 (a:as) (b:bs) (c:cs) = (a,b,c) : zip3 as bs cs
 zip3 _      _      _      = []
-\end{code}
 
 
 -- The zipWith family generalises the zip family by zipping with the
 -- function given as the first argument, instead of a tupling function.
 
-\begin{code}
 ----------------------------------------------
 -- | 'zipWith' generalises 'zip' by zipping with the function given
 -- as the first argument, instead of a tupling function.
@@ -996,9 +977,7 @@ zipWithFB c f = \x y r -> (x `f` y) `c` r
 "zipWith"       [~1] forall f xs ys.    zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
 "zipWithList"   [1]  forall f.  foldr2 (zipWithFB (:) f) [] = zipWith f
   #-}
-\end{code}
 
-\begin{code}
 -- | The 'zipWith3' function takes a function which combines three
 -- elements, as well as three lists and returns a list of their point-wise
 -- combination, analogous to 'zipWith'.
@@ -1019,23 +998,17 @@ unzip3   :: [(a,b,c)] -> ([a],[b],[c])
 {-# INLINE unzip3 #-}
 unzip3   =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
                   ([],[],[])
-\end{code}
 
+--------------------------------------------------------------
+-- Error code
+--------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Error code}
-%*                                                      *
-%*********************************************************
+-- Common up near identical calls to `error' to reduce the number
+-- constant strings created when compiled:
 
-Common up near identical calls to `error' to reduce the number
-constant strings created when compiled:
-
-\begin{code}
 errorEmptyList :: String -> a
 errorEmptyList fun =
   error (prel_list_str ++ fun ++ ": empty list")
 
 prel_list_str :: String
 prel_list_str = "Prelude."
-\end{code}

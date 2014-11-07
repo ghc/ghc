@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Unsafe, DeriveDataTypeable #-}
 {-# LANGUAGE NoImplicitPrelude
            , MagicHash
@@ -11,7 +10,7 @@
 -- Module      :  GHC.Stable
 -- Copyright   :  (c) The University of Glasgow, 1992-2004
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  ffi@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -93,9 +92,9 @@ castStablePtrToPtr (StablePtr s) = Ptr (unsafeCoerce# s)
 
 -- |
 -- The inverse of 'castStablePtrToPtr', i.e., we have the identity
--- 
+--
 -- > sp == castPtrToStablePtr (castStablePtrToPtr sp)
--- 
+--
 -- for any stable pointer @sp@ on which 'freeStablePtr' has
 -- not been executed yet.  Moreover, 'castPtrToStablePtr' may
 -- only be applied to pointers that have been produced by
@@ -104,10 +103,8 @@ castStablePtrToPtr (StablePtr s) = Ptr (unsafeCoerce# s)
 castPtrToStablePtr :: Ptr () -> StablePtr a
 castPtrToStablePtr (Ptr a) = StablePtr (unsafeCoerce# a)
 
-instance Eq (StablePtr a) where 
+instance Eq (StablePtr a) where
     (StablePtr sp1) == (StablePtr sp2) =
         case eqStablePtr# sp1 sp2 of
            0# -> False
            _  -> True
-
-\end{code}

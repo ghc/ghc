@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -34,16 +33,7 @@ import GHC.Integer
 import GHC.Num
 import GHC.Show
 default ()              -- Double isn't available yet
-\end{code}
 
-
-%*********************************************************
-%*                                                      *
-\subsection{Class declarations}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 -- | The 'Bounded' class is used to name the upper and lower limits of a
 -- type.  'Ord' is not a superclass of 'Bounded' since types that are not
 -- totally ordered may also have upper and lower bounds.
@@ -125,9 +115,7 @@ boundedEnumFromThen n1 n2
   where
     i_n1 = fromEnum n1
     i_n2 = fromEnum n2
-\end{code}
 
-\begin{code}
 ------------------------------------------------------------------------
 -- Helper functions
 ------------------------------------------------------------------------
@@ -157,16 +145,11 @@ succError inst_ty =
 predError :: String -> a
 predError inst_ty =
     error $ "Enum.pred{" ++ inst_ty ++ "}: tried to take `pred' of minBound"
-\end{code}
 
+------------------------------------------------------------------------
+-- Tuples
+------------------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Tuples}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance Bounded () where
     minBound = ()
     maxBound = ()
@@ -183,9 +166,7 @@ instance Enum () where
     enumFromThen () ()  = let many = ():many in many
     enumFromTo () ()    = [()]
     enumFromThenTo () () () = let many = ():many in many
-\end{code}
 
-\begin{code}
 -- Report requires instances up to 15
 instance (Bounded a, Bounded b) => Bounded (a,b) where
    minBound = (minBound, minBound)
@@ -274,16 +255,11 @@ instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Boun
                minBound, minBound, minBound, minBound, minBound, minBound, minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
                maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
-\end{code}
 
+------------------------------------------------------------------------
+-- Bool
+------------------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Type @Bool@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance Bounded Bool where
   minBound = False
   maxBound = True
@@ -305,15 +281,11 @@ instance Enum Bool where
   -- Use defaults for the rest
   enumFrom     = boundedEnumFrom
   enumFromThen = boundedEnumFromThen
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Type @Ordering@}
-%*                                                      *
-%*********************************************************
+------------------------------------------------------------------------
+-- Ordering
+------------------------------------------------------------------------
 
-\begin{code}
 instance Bounded Ordering where
   minBound = LT
   maxBound = GT
@@ -339,15 +311,11 @@ instance Enum Ordering where
   -- Use defaults for the rest
   enumFrom     = boundedEnumFrom
   enumFromThen = boundedEnumFromThen
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Type @Char@}
-%*                                                      *
-%*********************************************************
+------------------------------------------------------------------------
+-- Char
+------------------------------------------------------------------------
 
-\begin{code}
 instance  Bounded Char  where
     minBound =  '\0'
     maxBound =  '\x10FFFF'
@@ -461,21 +429,19 @@ go_dn_char_list x0 delta lim
   where
     go_dn x | isTrue# (x <# lim) = []
             | otherwise          = C# (chr# x) : go_dn (x +# delta)
-\end{code}
 
 
-%*********************************************************
-%*                                                      *
-\subsection{Type @Int@}
-%*                                                      *
-%*********************************************************
+------------------------------------------------------------------------
+-- Int
+------------------------------------------------------------------------
 
+{-
 Be careful about these instances.
         (a) remember that you have to count down as well as up e.g. [13,12..0]
         (b) be careful of Int overflow
         (c) remember that Int is bounded, so [1..] terminates at maxInt
+-}
 
-\begin{code}
 instance  Bounded Int where
     minBound =  minInt
     maxBound =  maxInt
@@ -628,16 +594,12 @@ efdtIntDnFB c n x1 x2 y    -- Be careful about underflow!
                    go_dn x | isTrue# (x <# y') = I# x `c` n
                            | otherwise         = I# x `c` go_dn (x +# delta)
                in I# x1 `c` go_dn x2
-\end{code}
 
 
-%*********************************************************
-%*                                                      *
-\subsection{Type @Word@}
-%*                                                      *
-%*********************************************************
+------------------------------------------------------------------------
+-- Word
+------------------------------------------------------------------------
 
-\begin{code}
 instance Bounded Word where
     minBound = 0
 
@@ -685,16 +647,11 @@ integerToWordX i = W# (integerToWord i)
 
 wordToIntegerX :: Word -> Integer
 wordToIntegerX (W# x#) = wordToInteger x#
-\end{code}
 
+------------------------------------------------------------------------
+-- Integer
+------------------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{The @Integer@ instance for @Enum@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance  Enum Integer  where
     succ x               = x + 1
     pred x               = x - 1
@@ -772,5 +729,3 @@ dn_list x0 delta lim = go (x0 :: Integer)
                     where
                         go x | x < lim   = []
                              | otherwise = x : go (x+delta)
-\end{code}
-

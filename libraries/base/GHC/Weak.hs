@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude
            , BangPatterns
@@ -156,5 +155,3 @@ runFinalizerBatch (I# n) arr =
                         }}
    in
         go n
-
-\end{code}

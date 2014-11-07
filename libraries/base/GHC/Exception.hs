@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude
            , ExistentialQuantification
@@ -34,15 +33,7 @@ import Data.Typeable (Typeable, cast)
    -- loop: Data.Typeable -> GHC.Err -> GHC.Exception
 import GHC.Base
 import GHC.Show
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Exceptions}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 {- |
 The @SomeException@ type is the root of the exception type hierarchy.
 When an exception of type @e@ is thrown, behind the scenes it is
@@ -152,22 +143,12 @@ class (Typeable e, Show e) => Exception e where
 instance Exception SomeException where
     toException se = se
     fromException = Just
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Primitive throw}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 -- | Throw an exception.  Exceptions may be thrown from purely
 -- functional code, but may only be caught within the 'IO' monad.
 throw :: Exception e => e -> a
 throw e = raise# (toException e)
-\end{code}
 
-\begin{code}
 -- |This is thrown when the user calls 'error'. The @String@ is the
 -- argument given to 'error'.
 newtype ErrorCall = ErrorCall String
@@ -180,8 +161,6 @@ instance Show ErrorCall where
 
 errorCallException :: String -> SomeException
 errorCallException s = toException (ErrorCall s)
-
------
 
 -- |Arithmetic exceptions.
 data ArithException
@@ -207,4 +186,3 @@ instance Show ArithException where
   showsPrec _ DivideByZero    = showString "divide by zero"
   showsPrec _ Denormal        = showString "denormal"
   showsPrec _ RatioZeroDenominator = showString "Ratio has zero denominator"
-\end{code}

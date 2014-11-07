@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
@@ -52,16 +51,7 @@ import GHC.Show
 infixl 9  !, //
 
 default ()
-\end{code}
 
-
-%*********************************************************
-%*                                                      *
-\subsection{The @Ix@ class}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 -- | The 'Ix' class is used to map a contiguous subrange of values in
 -- a type onto integers.  It is used primarily for array indexing
 -- (see the array package).
@@ -116,8 +106,8 @@ class (Ord a) => Ix a where
         --     tuples.  E.g.  (1,2) <= (2,1) but the range is empty
 
     unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
-\end{code}
 
+{-
 Note that the following is NOT right
         rangeSize (l,h) | l <= h    = index b h + 1
                         | otherwise = 0
@@ -128,11 +118,6 @@ is nevertheless empty.  Consider
 Here l<h, but the second index ranges from 2..1 and
 hence is empty
 
-%*********************************************************
-%*                                                      *
-\subsection{Instances of @Ix@}
-%*                                                      *
-%*********************************************************
 
 Note [Inlining index]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -179,8 +164,8 @@ Note [Out-of-bounds error messages]
 The default method for 'index' generates hoplelessIndexError, because
 Ix doesn't have Show as a superclass.  For particular base types we
 can do better, so we override the default method for index.
+-}
 
-\begin{code}
 -- Abstract these errors from the relevant index functions so that
 -- the guts of the function will be small enough to inline.
 
@@ -369,15 +354,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
       inRange (l5,u5) i5
 
     -- Default method for index
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{The @Array@ types}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 -- | The type of immutable non-strict (boxed) arrays
 -- with indices in @i@ and elements in @e@.
 data Array i e
@@ -411,16 +388,10 @@ data STArray s i e
 instance Eq (STArray s i e) where
     STArray _ _ _ arr1# == STArray _ _ _ arr2# =
         isTrue# (sameMutableArray# arr1# arr2#)
-\end{code}
 
+----------------------------------------------------------------------
+-- Operations on immutable arrays
 
-%*********************************************************
-%*                                                      *
-\subsection{Operations on immutable arrays}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 {-# NOINLINE arrEleBottom #-}
 arrEleBottom :: a
 arrEleBottom = error "(Array.!): undefined array element"
@@ -718,16 +689,10 @@ cmpIntArray arr1@(Array l1 u1 n1 _) arr2@(Array l2 u2 n2 _) =
         other -> other
 
 {-# RULES "cmpArray/Int" cmpArray = cmpIntArray #-}
-\end{code}
 
+----------------------------------------------------------------------
+-- Array instances
 
-%*********************************************************
-%*                                                      *
-\subsection{Array instances}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance Ix i => Functor (Array i) where
     fmap = amap
 
@@ -747,15 +712,11 @@ instance (Ix a, Show a, Show b) => Show (Array a b) where
         -- Precedence of 'array' is the precedence of application
 
 -- The Read instance is in GHC.Read
-\end{code}
 
+----------------------------------------------------------------------
+-- Operations on mutable arrays
 
-%*********************************************************
-%*                                                      *
-\subsection{Operations on mutable arrays}
-%*                                                      *
-%*********************************************************
-
+{-
 Idle ADR question: What's the tradeoff here between flattening these
 datatypes into @STArray ix ix (MutableArray# s elt)@ and using
 it as is?  As I see it, the former uses slightly less heap and
@@ -768,8 +729,8 @@ Idle AJG answer: When I looked at the outputted code (though it was 2
 years ago) it seems like you often needed the tuple, and we build
 it frequently. Now we've got the overloading specialiser things
 might be different, though.
+-}
 
-\begin{code}
 {-# INLINE newSTArray #-}
 newSTArray :: Ix i => (i,i) -> e -> ST s (STArray s i e)
 newSTArray (l,u) initial = ST $ \s1# ->
@@ -805,16 +766,10 @@ unsafeWriteSTArray :: Ix i => STArray s i e -> Int -> e -> ST s ()
 unsafeWriteSTArray (STArray _ _ _ marr#) (I# i#) e = ST $ \s1# ->
     case writeArray# marr# i# e s1# of
         s2# -> (# s2#, () #)
-\end{code}
 
+----------------------------------------------------------------------
+-- Moving between mutable and immutable
 
-%*********************************************************
-%*                                                      *
-\subsection{Moving between mutable and immutable}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 freezeSTArray :: Ix i => STArray s i e -> ST s (Array i e)
 freezeSTArray (STArray l u n@(I# n#) marr#) = ST $ \s1# ->
     case newArray# n# arrEleBottom s1#  of { (# s2#, marr'# #) ->
@@ -849,4 +804,3 @@ unsafeThawSTArray :: Ix i => Array i e -> ST s (STArray s i e)
 unsafeThawSTArray (Array l u n arr#) = ST $ \s1# ->
     case unsafeThawArray# arr# s1#      of { (# s2#, marr# #) ->
     (# s2#, STArray l u n marr# #) }
-\end{code}

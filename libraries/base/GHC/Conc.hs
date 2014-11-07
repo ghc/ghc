@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
@@ -9,13 +8,13 @@
 -- Module      :  GHC.Conc
 -- Copyright   :  (c) The University of Glasgow, 1994-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
 -- Basic concurrency stuff.
--- 
+--
 -----------------------------------------------------------------------------
 
 -- No: #hide, because bits of this module are exposed by the stm package.
@@ -112,5 +111,3 @@ import GHC.Conc.Sync
 #ifndef mingw32_HOST_OS
 import GHC.Conc.Signal
 #endif
-
-\end{code}

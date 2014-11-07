@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -8,7 +7,7 @@
 -- Module      :  GHC.Storable
 -- Copyright   :  (c) The FFI task force, 2000-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  ffi@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -18,38 +17,38 @@
 -----------------------------------------------------------------------------
 
 module GHC.Storable
-        ( readWideCharOffPtr  
-        , readIntOffPtr       
-        , readWordOffPtr      
-        , readPtrOffPtr       
-        , readFunPtrOffPtr    
-        , readFloatOffPtr     
-        , readDoubleOffPtr    
-        , readStablePtrOffPtr 
-        , readInt8OffPtr      
-        , readInt16OffPtr     
-        , readInt32OffPtr     
-        , readInt64OffPtr     
-        , readWord8OffPtr     
-        , readWord16OffPtr    
-        , readWord32OffPtr    
-        , readWord64OffPtr    
-        , writeWideCharOffPtr 
-        , writeIntOffPtr      
-        , writeWordOffPtr     
-        , writePtrOffPtr      
-        , writeFunPtrOffPtr   
-        , writeFloatOffPtr    
-        , writeDoubleOffPtr   
+        ( readWideCharOffPtr
+        , readIntOffPtr
+        , readWordOffPtr
+        , readPtrOffPtr
+        , readFunPtrOffPtr
+        , readFloatOffPtr
+        , readDoubleOffPtr
+        , readStablePtrOffPtr
+        , readInt8OffPtr
+        , readInt16OffPtr
+        , readInt32OffPtr
+        , readInt64OffPtr
+        , readWord8OffPtr
+        , readWord16OffPtr
+        , readWord32OffPtr
+        , readWord64OffPtr
+        , writeWideCharOffPtr
+        , writeIntOffPtr
+        , writeWordOffPtr
+        , writePtrOffPtr
+        , writeFunPtrOffPtr
+        , writeFloatOffPtr
+        , writeDoubleOffPtr
         , writeStablePtrOffPtr
-        , writeInt8OffPtr     
-        , writeInt16OffPtr    
-        , writeInt32OffPtr    
-        , writeInt64OffPtr    
-        , writeWord8OffPtr    
-        , writeWord16OffPtr   
-        , writeWord32OffPtr   
-        , writeWord64OffPtr   
+        , writeInt8OffPtr
+        , writeInt16OffPtr
+        , writeInt32OffPtr
+        , writeInt64OffPtr
+        , writeWord8OffPtr
+        , writeWord16OffPtr
+        , writeWord32OffPtr
+        , writeWord64OffPtr
         ) where
 
 import GHC.Stable ( StablePtr(..) )
@@ -57,9 +56,6 @@ import GHC.Int
 import GHC.Word
 import GHC.Ptr
 import GHC.Base
-\end{code}
-
-\begin{code}
 
 readWideCharOffPtr  :: Ptr Char          -> Int -> IO Char
 readIntOffPtr       :: Ptr Int           -> Int -> IO Int
@@ -160,5 +156,3 @@ writeInt64OffPtr (Ptr a) (I# i) (I64# x)
   = IO $ \s -> case writeInt64OffAddr# a i x s     of s2 -> (# s2, () #)
 writeWord64OffPtr (Ptr a) (I# i) (W64# x)
   = IO $ \s -> case writeWord64OffAddr# a i x s    of s2 -> (# s2, () #)
-
-\end{code}

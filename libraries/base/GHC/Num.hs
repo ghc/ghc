@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -26,15 +25,7 @@ infixl 6  +, -
 
 default ()              -- Double isn't available yet,
                         -- and we shouldn't be using defaults anyway
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Standard numeric class}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 -- | Basic numeric class.
 class  Num a  where
     {-# MINIMAL (+), (*), abs, signum, fromInteger, (negate | (-)) #-}
@@ -71,16 +62,7 @@ class  Num a  where
 {-# INLINE subtract #-}
 subtract :: (Num a) => a -> a -> a
 subtract x y = y - x
-\end{code}
 
-
-%*********************************************************
-%*                                                      *
-\subsection{Instances for @Int@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance  Num Int  where
     I# x + I# y = I# (x +# y)
     I# x - I# y = I# (x -# y)
@@ -94,15 +76,7 @@ instance  Num Int  where
 
     {-# INLINE fromInteger #-}   -- Just to be sure!
     fromInteger i = I# (integerToInt i)
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Instances for @Word@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance Num Word where
     (W# x#) + (W# y#)      = W# (x# `plusWord#` y#)
     (W# x#) - (W# y#)      = W# (x# `minusWord#` y#)
@@ -112,15 +86,7 @@ instance Num Word where
     signum 0               = 0
     signum _               = 1
     fromInteger i          = W# (integerToWord i)
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{The @Integer@ instances for @Num@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance  Num Integer  where
     (+) = plusInteger
     (-) = minusInteger
@@ -130,5 +96,3 @@ instance  Num Integer  where
 
     abs = absInteger
     signum = signumInteger
-\end{code}
-

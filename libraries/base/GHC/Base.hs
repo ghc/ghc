@@ -1,5 +1,4 @@
-\section[GHC.Base]{Module @GHC.Base@}
-
+{-
 The overall structure of the GHC Prelude is a bit tricky.
 
   a) We want to avoid "orphan modules", i.e. ones with instance
@@ -60,8 +59,8 @@ GHC.Float       Classes: Floating, RealFloat
 
 
 Other Prelude modules are much easier with fewer complex dependencies.
+-}
 
-\begin{code}
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
@@ -127,8 +126,8 @@ infixr 0  $, $!
 infixl 4 <*>, <*, *>, <**>
 
 default ()              -- Double isn't available yet
-\end{code}
 
+{-
 Note [Depend on GHC.Integer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Integer type is special because TidyPgm uses
@@ -159,16 +158,10 @@ Similarly, tuple syntax (or ()) creates an implicit dependency on
 GHC.Tuple, so we use the same rule as for Integer --- see Note [Depend on
 GHC.Integer] --- to explain this to the build system.  We make GHC.Base
 depend on GHC.Tuple, and everything else depends on GHC.Base or Prelude.
+-}
 
-%*********************************************************
-%*                                                      *
-\subsection{DEBUGGING STUFF}
-%*  (for use when compiling GHC.Base itself doesn't work)
-%*                                                      *
-%*********************************************************
-
-\begin{code}
-{-
+#if 0
+-- for use when compiling GHC.Base itself doesn't work
 data  Bool  =  False | True
 data Ordering = LT | EQ | GT
 data Char = C# Char#
@@ -183,16 +176,7 @@ otherwise = True
 
 build = error "urk"
 foldr = error "urk"
--}
-
-\end{code}
-
-%*********************************************************
-%*                                                      *
-\subsection{The Maybe type}
-%*                                                      *
-%*********************************************************
-\begin{code}
+#endif
 
 -- | The 'Maybe' type encapsulates an optional value.  A value of type
 -- @'Maybe' a@ either contains a value of type @a@ (represented as @'Just' a@),
@@ -207,16 +191,6 @@ foldr = error "urk"
 data  Maybe a  =  Nothing | Just a
   deriving (Eq, Ord)
 
-\end{code}
-
-%*********************************************************
-%*                                                      *
-\subsection{Monoids}
-%*                                                      *
-%*********************************************************
-\begin{code}
-
--- ---------------------------------------------------------------------------
 -- | The class of monoids (types with an associative binary operation that
 -- has an identity).  Instances should satisfy the following laws:
 --
@@ -309,16 +283,8 @@ instance Monoid a => Monoid (Maybe a) where
 instance Monoid a => Applicative ((,) a) where
     pure x = (mempty, x)
     (u, f) <*> (v, x) = (u `mappend` v, f x)
-\end{code}
 
 
-%*********************************************************
-%*                                                      *
-\subsection{Monadic classes @Functor@, @Applicative@, @Monad@ }
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 {- | The 'Functor' class is used for types that can be mapped over.
 Instances of 'Functor' should satisfy the following laws:
 
@@ -696,16 +662,10 @@ class (Alternative m, Monad m) => MonadPlus m where
    mplus = (<|>)
 
 instance MonadPlus Maybe
-\end{code}
 
+----------------------------------------------
+-- The list type
 
-%*********************************************************
-%*                                                      *
-\subsection{The list type}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance Functor [] where
     fmap = map
 
@@ -724,16 +684,16 @@ instance Alternative [] where
     (<|>) = (++)
 
 instance MonadPlus []
-\end{code}
 
+{-
 A few list functions that appear here because they are used here.
 The rest of the prelude list functions are in GHC.List.
+-}
 
 ----------------------------------------------
 --      foldr/build/augment
 ----------------------------------------------
 
-\begin{code}
 -- | 'foldr', applied to a binary operator, a starting value (typically
 -- the right-identity of the operator), and a list, reduces the list
 -- using the binary operator, from right to left:
@@ -820,14 +780,11 @@ augment g xs = g (:) xs
 
 -- This rule is true, but not (I think) useful:
 --      augment g (augment h t) = augment (\cn -> g c (h c n)) t
-\end{code}
-
 
 ----------------------------------------------
 --              map
 ----------------------------------------------
 
-\begin{code}
 -- | 'map' @f xs@ is the list obtained by applying @f@ to each element
 -- of @xs@, i.e.,
 --
@@ -877,13 +834,11 @@ mapFB c f = \x ys -> c (f x) ys
 
 {-# RULES "map/coerce" [1] map coerce = coerce #-}
 
-\end{code}
-
 
 ----------------------------------------------
 --              append
 ----------------------------------------------
-\begin{code}
+
 -- | Append two lists, i.e.,
 --
 -- > [x1, ..., xm] ++ [y1, ..., yn] == [x1, ..., xm, y1, ..., yn]
@@ -902,16 +857,7 @@ mapFB c f = \x ys -> c (f x) ys
 "++"    [~1] forall xs ys. xs ++ ys = augment (\c n -> foldr c n xs) ys
   #-}
 
-\end{code}
 
-
-%*********************************************************
-%*                                                      *
-\subsection{Type @Bool@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 -- |'otherwise' is defined as the value 'True'.  It helps to make
 -- guards more readable.  eg.
 --
@@ -919,15 +865,11 @@ mapFB c f = \x ys -> c (f x) ys
 -- >      | otherwise = ...
 otherwise               :: Bool
 otherwise               =  True
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Type @Char@ and @String@}
-%*                                                      *
-%*********************************************************
+----------------------------------------------
+-- Type Char and String
+----------------------------------------------
 
-\begin{code}
 -- | A 'String' is a list of characters.  String constants in Haskell are values
 -- of type 'String'.
 --
@@ -939,11 +881,9 @@ unsafeChr (I# i#) = C# (chr# i#)
 -- | The 'Prelude.fromEnum' method restricted to the type 'Data.Char.Char'.
 ord :: Char -> Int
 ord (C# c#) = I# (ord# c#)
-\end{code}
 
-String equality is used when desugaring pattern-matches against strings.
-
-\begin{code}
+-- | This 'String' equality predicate is used when desugaring
+-- pattern-matches against strings.
 eqString :: String -> String -> Bool
 eqString []       []       = True
 eqString (c1:cs1) (c2:cs2) = c1 == c2 && cs1 `eqString` cs2
@@ -952,16 +892,12 @@ eqString _        _        = False
 {-# RULES "eqString" (==) = eqString #-}
 -- eqString also has a BuiltInRule in PrelRules.lhs:
 --      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
-\end{code}
 
 
-%*********************************************************
-%*                                                      *
-\subsection{Type @Int@}
-%*                                                      *
-%*********************************************************
+----------------------------------------------
+-- 'Int' related definitions
+----------------------------------------------
 
-\begin{code}
 maxInt, minInt :: Int
 
 {- Seems clumsy. Should perhaps put minInt and MaxInt directly into MachDeps.h -}
@@ -975,16 +911,11 @@ maxInt  = I# 0x7FFFFFFF#
 minInt  = I# (-0x8000000000000000#)
 maxInt  = I# 0x7FFFFFFFFFFFFFFF#
 #endif
-\end{code}
 
+----------------------------------------------
+-- The function type
+----------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{The function type}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 -- | Identity function.
 id                      :: a -> a
 id x                    =  x
@@ -1062,15 +993,11 @@ until p f = go
 -- (which is usually overloaded) to have the same type as the second.
 asTypeOf                :: a -> a -> a
 asTypeOf                =  const
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{@Functor@ and @Monad@ instances for @IO@}
-%*                                                      *
-%*********************************************************
+----------------------------------------------
+-- Functor/Applicative/Monad instances for IO
+----------------------------------------------
 
-\begin{code}
 instance  Functor IO where
    fmap f x = x >>= (return . f)
 
@@ -1098,14 +1025,8 @@ thenIO (IO m) k = IO $ \ s -> case m s of (# new_s, _ #) -> unIO k new_s
 
 unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
 unIO (IO a) = a
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{@getTag@}
-%*                                                      *
-%*********************************************************
-
+{- |
 Returns the 'tag' of a constructor application; this function is used
 by the deriving code for Eq, Ord and Enum.
 
@@ -1117,23 +1038,18 @@ dataToTag# can be an inline primop if it doesn't need to do any
 evaluation, and (b) we want to expose the evaluation to the
 simplifier, because it might be possible to eliminate the evaluation
 in the case when the argument is already known to be evaluated.
-
-\begin{code}
+-}
 {-# INLINE getTag #-}
 getTag :: a -> Int#
 getTag !x = dataToTag# x
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Numeric primops}
-%*                                                      *
-%*********************************************************
+----------------------------------------------
+-- Numeric primops
+----------------------------------------------
 
-Definitions of the boxed PrimOps; these will be
-used in the case of partial applications, etc.
+-- Definitions of the boxed PrimOps; these will be
+-- used in the case of partial applications, etc.
 
-\begin{code}
 {-# INLINE quotInt #-}
 {-# INLINE remInt #-}
 
@@ -1217,14 +1133,11 @@ a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
 --      unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
 
   #-}
-\end{code}
 
 
 #ifdef __HADDOCK__
-\begin{code}
 -- | A special argument for the 'Control.Monad.ST.ST' type constructor,
 -- indexing a state embedded in the 'Prelude.IO' monad by
 -- 'Control.Monad.ST.stToIO'.
 data RealWorld
-\end{code}
 #endif

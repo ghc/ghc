@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, RoleAnnotations #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -8,7 +7,7 @@
 -- Module      :  GHC.Ptr
 -- Copyright   :  (c) The FFI Task Force, 2000-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  ffi@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -42,7 +41,7 @@ import Numeric          ( showHex )
 -- pointer. And phantom is useful to implement castPtr (see #9163)
 
 -- redundant role annotation checks that this doesn't change
-type role Ptr phantom  
+type role Ptr phantom
 data Ptr a = Ptr Addr# deriving (Eq, Ord)
 -- ^ A value of type @'Ptr' a@ represents a pointer to an object, or an
 -- array of objects, which may be marshalled to or from Haskell values
@@ -78,7 +77,7 @@ alignPtr addr@(Ptr a) (I# i)
       n -> Ptr (plusAddr# a (i -# n)) }
 
 -- |Computes the offset required to get from the second to the first
--- argument.  We have 
+-- argument.  We have
 --
 -- > p2 == p1 `plusPtr` (p2 `minusPtr` p1)
 minusPtr :: Ptr a -> Ptr b -> Int
@@ -103,7 +102,7 @@ data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 --   'Data.Word.Word32', 'Data.Word.Word64', @'Ptr' a@, @'FunPtr' a@,
 --   @'Foreign.StablePtr.StablePtr' a@ or a renaming of any of these
 --   using @newtype@.
--- 
+--
 -- * the return type is either a marshallable foreign type or has the form
 --   @'IO' t@ where @t@ is a marshallable foreign type or @()@.
 --
@@ -129,7 +128,7 @@ data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 -- can define a /dynamic/ stub for the specific foreign type, e.g.
 --
 -- > type IntFunction = CInt -> IO ()
--- > foreign import ccall "dynamic" 
+-- > foreign import ccall "dynamic"
 -- >   mkFun :: FunPtr IntFunction -> IntFunction
 
 -- |The constant 'nullFunPtr' contains a
@@ -168,10 +167,8 @@ instance Show (Ptr a) where
    showsPrec _ (Ptr a) rs = pad_out (showHex (wordToInteger(int2Word#(addr2Int# a))) "")
      where
         -- want 0s prefixed to pad it out to a fixed length.
-       pad_out ls = 
+       pad_out ls =
           '0':'x':(replicate (2*SIZEOF_HSPTR - length ls) '0') ++ ls ++ rs
 
 instance Show (FunPtr a) where
    showsPrec p = showsPrec p . castFunPtrToPtr
-
-\end{code}

@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
@@ -221,5 +220,3 @@ foreign import ccall "Rts.h shutdownHaskellAndExit"
 useFastExit, useSafeExit :: CInt
 useFastExit = 1
 useSafeExit = 0
-
-\end{code}

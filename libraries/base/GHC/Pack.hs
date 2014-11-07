@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -8,7 +7,7 @@
 -- Module      :  GHC.Pack
 -- Copyright   :  (c) The University of Glasgow 1997-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -16,7 +15,7 @@
 -- This module provides a small set of low-level functions for packing
 -- and unpacking a chunk of bytes. Used by code emitted by the compiler
 -- plus the prelude libraries.
--- 
+--
 -- The programmer level view of packed strings is provided by a GHC
 -- system library PackedString.
 --
@@ -32,7 +31,7 @@ module GHC.Pack
         unpackNBytes#,
         unpackFoldrCString#,  -- (**)
         unpackAppendCString#,  -- (**)
-       ) 
+       )
         where
 
 import GHC.Base
@@ -61,7 +60,7 @@ packStringST str =
 
 packNBytesST :: Int -> [Char] -> ST s (ByteArray Int)
 packNBytesST (I# length#) str =
-  {- 
+  {-
    allocate an array that will hold the string
    (not forgetting the NUL byte at the end)
   -}
@@ -83,7 +82,7 @@ packNBytesST (I# length#) str =
 -- (Very :-) ``Specialised'' versions of some CharArray things...
 
 new_ps_array    :: Int# -> ST s (MutableByteArray s Int)
-write_ps_array  :: MutableByteArray s Int -> Int# -> Char# -> ST s () 
+write_ps_array  :: MutableByteArray s Int -> Int# -> Char# -> ST s ()
 freeze_ps_array :: MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
 
 new_ps_array size = ST $ \ s ->
@@ -100,4 +99,3 @@ write_ps_array (MutableByteArray _ _ barr#) n ch = ST $ \ s# ->
 freeze_ps_array (MutableByteArray _ _ arr#) len# = ST $ \ s# ->
     case unsafeFreezeByteArray# arr# s# of { (# s2#, frozen# #) ->
     (# s2#, ByteArray 0 (I# len#) frozen# #) }
-\end{code}

@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples, BangPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -37,19 +36,14 @@ infixl 7  %
 
 default ()              -- Double isn't available yet,
                         -- and we shouldn't be using defaults anyway
-\end{code}
 
+------------------------------------------------------------------------
+-- Divide by zero and arithmetic overflow
+------------------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-       Divide by zero and arithmetic overflow
-%*                                                      *
-%*********************************************************
+-- We put them here because they are needed relatively early
+-- in the libraries before the Exception type has been defined yet.
 
-We put them here because they are needed relatively early
-in the libraries before the Exception type has been defined yet.
-
-\begin{code}
 {-# NOINLINE divZeroError #-}
 divZeroError :: a
 divZeroError = raise# divZeroException
@@ -61,15 +55,11 @@ ratioZeroDenominatorError = raise# ratioZeroDenomException
 {-# NOINLINE overflowError #-}
 overflowError :: a
 overflowError = raise# overflowException
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{The @Ratio@ and @Rational@ types}
-%*                                                      *
-%*********************************************************
+--------------------------------------------------------------
+-- The Ratio and Rational types
+--------------------------------------------------------------
 
-\begin{code}
 -- | Rational numbers, with numerator and denominator of some 'Integral' type.
 data  Ratio a = !a :% !a  deriving (Eq)
 
@@ -88,10 +78,7 @@ notANumber = 0 :% 0
 
 -- Use :%, not % for Inf/NaN; the latter would
 -- immediately lead to a runtime error, because it normalises.
-\end{code}
 
-
-\begin{code}
 -- | Forms the ratio of two integral numbers.
 {-# SPECIALISE (%) :: Integer -> Integer -> Rational #-}
 (%)                     :: (Integral a) => a -> a -> Ratio a
@@ -105,35 +92,26 @@ numerator       :: (Integral a) => Ratio a -> a
 -- the numerator and denominator have no common factor and the denominator
 -- is positive.
 denominator     :: (Integral a) => Ratio a -> a
-\end{code}
 
-\tr{reduce} is a subsidiary function used only in this module .
-It normalises a ratio by dividing both numerator and denominator by
-their greatest common divisor.
 
-\begin{code}
+-- | 'reduce' is a subsidiary function used only in this module.
+-- It normalises a ratio by dividing both numerator and denominator by
+-- their greatest common divisor.
 reduce ::  (Integral a) => a -> a -> Ratio a
 {-# SPECIALISE reduce :: Integer -> Integer -> Rational #-}
 reduce _ 0              =  ratioZeroDenominatorError
 reduce x y              =  (x `quot` d) :% (y `quot` d)
                            where d = gcd x y
-\end{code}
 
-\begin{code}
 x % y                   =  reduce (x * signum y) (abs y)
 
 numerator   (x :% _)    =  x
 denominator (_ :% y)    =  y
-\end{code}
 
+--------------------------------------------------------------
+-- Standard numeric classes
+--------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Standard numeric classes}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 class  (Num a, Ord a) => Real a  where
     -- | the rational equivalent of its real argument with full precision
     toRational          ::  a -> Rational
@@ -229,12 +207,9 @@ class  (Real a, Fractional a) => RealFrac a  where
 
     floor x             =  if r < 0 then n - 1 else n
                            where (n,r) = properFraction x
-\end{code}
 
+-- These 'numeric' enumerations come straight from the Report
 
-These 'numeric' enumerations come straight from the Report
-
-\begin{code}
 numericEnumFrom         :: (Fractional a) => a -> [a]
 numericEnumFrom n       =  n `seq` (n : numericEnumFrom (n + 1))
 
@@ -251,16 +226,11 @@ numericEnumFromThenTo e1 e2 e3
                                  mid = (e2 - e1) / 2
                                  predicate | e2 >= e1  = (<= e3 + mid)
                                            | otherwise = (>= e3 + mid)
-\end{code}
 
+--------------------------------------------------------------
+-- Instances for Int
+--------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Instances for @Int@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance  Real Int  where
     toRational x        =  toInteger x :% 1
 
@@ -306,16 +276,11 @@ instance  Integral Int  where
        -- Note [Order of tests] in GHC.Int
      | b == (-1) && a == minBound = (overflowError, 0)
      | otherwise                  =  a `divModInt` b
-\end{code}
 
+--------------------------------------------------------------
+-- Instances for @Word@
+--------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Instances for @Word@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance Real Word where
     toRational x = toInteger x % 1
 
@@ -341,16 +306,11 @@ instance Integral Word where
         | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
         | otherwise             = divZeroError
     toInteger (W# x#)           = wordToInteger x#
-\end{code}
 
+--------------------------------------------------------------
+-- Instances for Integer
+--------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Instances for @Integer@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance  Real Integer  where
     toRational x        =  x :% 1
 
@@ -394,16 +354,11 @@ instance  Integral Integer where
     _ `quotRem` 0 = divZeroError
     n `quotRem` d = case n `quotRemInteger` d of
                       (# q, r #) -> (q, r)
-\end{code}
 
+--------------------------------------------------------------
+-- Instances for @Ratio@
+--------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Instances for @Ratio@}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 instance  (Integral a)  => Ord (Ratio a)  where
     {-# SPECIALIZE instance Ord Rational #-}
     (x:%y) <= (x':%y')  =  x * y' <= x' * y
@@ -461,16 +416,11 @@ instance  (Integral a)  => Enum (Ratio a)  where
     enumFromThen        =  numericEnumFromThen
     enumFromTo          =  numericEnumFromTo
     enumFromThenTo      =  numericEnumFromThenTo
-\end{code}
 
+--------------------------------------------------------------
+-- Coercions
+--------------------------------------------------------------
 
-%*********************************************************
-%*                                                      *
-\subsection{Coercions}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
 -- | general coercion from integral types
 {-# NOINLINE [1] fromIntegral #-}
 fromIntegral :: (Integral a, Num b) => a -> b
@@ -490,15 +440,11 @@ fromIntegral = fromInteger . toInteger
 realToFrac :: (Real a, Fractional b) => a -> b
 {-# NOINLINE [1] realToFrac #-}
 realToFrac = fromRational . toRational
-\end{code}
 
-%*********************************************************
-%*                                                      *
-\subsection{Overloaded numeric functions}
-%*                                                      *
-%*********************************************************
+--------------------------------------------------------------
+-- Overloaded numeric functions
+--------------------------------------------------------------
 
-\begin{code}
 -- | Converts a possibly-negative 'Real' value to a string.
 showSigned :: (Real a)
   => (a -> ShowS)       -- ^ a function that can show unsigned values
@@ -702,4 +648,3 @@ integralEnumFromTo n m = map fromInteger [toInteger n .. toInteger m]
 integralEnumFromThenTo :: Integral a => a -> a -> a -> [a]
 integralEnumFromThenTo n1 n2 m
   = map fromInteger [toInteger n1, toInteger n2 .. toInteger m]
-\end{code}

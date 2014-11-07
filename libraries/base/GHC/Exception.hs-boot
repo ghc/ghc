@@ -1,3 +1,7 @@
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+
+{-
 This SOURCE-imported hs-boot module cuts a big dependency loop:
 
          GHC.Exception
@@ -18,21 +22,13 @@ imports  {-# SOURCE #-} GHC.Exception
 However, GHC.Exceptions loop-breaking exports are all nice,
 well-behaved, non-bottom values.  The clients use 'raise#'
 to get a visibly-bottom value.
-
-\begin{code}
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-
----------------------------------------------------------------------------
---                  Ghc.Exception.hs-boot
----------------------------------------------------------------------------
+-}
 
 module GHC.Exception ( SomeException, errorCallException,
-                       divZeroException, overflowException, ratioZeroDenomException  
-    ) where 
+                       divZeroException, overflowException, ratioZeroDenomException
+    ) where
 import GHC.Types( Char )
 
 data SomeException
 divZeroException, overflowException, ratioZeroDenomException  :: SomeException
 errorCallException :: [Char] -> SomeException
-\end{code}
