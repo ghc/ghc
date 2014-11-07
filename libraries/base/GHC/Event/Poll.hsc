@@ -112,12 +112,17 @@ poll p mtout f = do
     -- expired) OR the full timeout has passed.
     c_pollLoop :: Ptr PollFd -> (#type nfds_t) -> Int -> IO CInt
     c_pollLoop ptr len tout
-        | tout <= maxPollTimeout = c_poll ptr len (fromIntegral tout)
+        | isShortTimeout = c_poll ptr len (fromIntegral tout)
         | otherwise = do
             result <- c_poll ptr len (fromIntegral maxPollTimeout)
             if result == 0
                then c_pollLoop ptr len (fromIntegral (tout - maxPollTimeout))
                else return result
+        where
+          -- maxPollTimeout is smaller than 0 IFF Int is smaller than CInt.
+          -- This means any possible Int input to poll can be safely directly
+          -- converted to CInt.
+          isShortTimeout = tout <= maxPollTimeout || maxPollTimeout < 0
 
     -- We need to account for 3 cases:
     --     1. Int and CInt are of equal size.
@@ -131,11 +136,10 @@ poll p mtout f = do
     -- c_pollLoop recursing if the provided timeout is larger.
     --
     -- In case 3, "fromIntegral (maxBound :: CInt) :: Int" will result in a
-    -- negative Int, max will thus return maxBound :: Int. Since poll doesn't
-    -- accept values bigger than maxBound :: Int and CInt is larger than Int,
-    -- there is no problem converting Int to CInt for the c_poll call.
+    -- negative Int. This will cause isShortTimeout to be true and result in
+    -- the timeout being directly converted to a CInt.
     maxPollTimeout :: Int
-    maxPollTimeout = max maxBound (fromIntegral (maxBound :: CInt))
+    maxPollTimeout = fromIntegral (maxBound :: CInt)
 
 fromTimeout :: E.Timeout -> Int
 fromTimeout E.Forever     = -1
