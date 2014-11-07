@@ -391,7 +391,9 @@ class Functor f => Applicative f where
 
     -- | Sequence actions, discarding the value of the first argument.
     (*>) :: f a -> f b -> f b
-    (*>) = liftA2 (const id)
+    a1 *> a2 = (id <$ a1) <*> a2
+    -- This is essentially the same as liftA2 (const id), but if the
+    -- Functor instance has an optimized (<$), we want to use that instead.
 
     -- | Sequence actions, discarding the value of the second argument.
     (<*) :: f a -> f b -> f a
@@ -405,14 +407,28 @@ class Functor f => Applicative f where
 -- This function may be used as a value for `fmap` in a `Functor` instance.
 liftA :: Applicative f => (a -> b) -> f a -> f b
 liftA f a = pure f <*> a
+-- Caution: since this may be used for `fmap`, we can't use the obvious
+-- definition of liftA = fmap.
 
 -- | Lift a binary function to actions.
 liftA2 :: Applicative f => (a -> b -> c) -> f a -> f b -> f c
-liftA2 f a b = (fmap f a) <*> b
+liftA2 f a b = fmap f a <*> b
 
 -- | Lift a ternary function to actions.
 liftA3 :: Applicative f => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
-liftA3 f a b c = (fmap f a) <*> b <*> c
+liftA3 f a b c = fmap f a <*> b <*> c
+
+
+{-# INLINEABLE liftA #-}
+{-# SPECIALISE liftA :: (a1->r) -> IO a1 -> IO r #-}
+{-# SPECIALISE liftA :: (a1->r) -> Maybe a1 -> Maybe r #-}
+{-# INLINEABLE liftA2 #-}
+{-# SPECIALISE liftA2 :: (a1->a2->r) -> IO a1 -> IO a2 -> IO r #-}
+{-# SPECIALISE liftA2 :: (a1->a2->r) -> Maybe a1 -> Maybe a2 -> Maybe r #-}
+{-# INLINEABLE liftA3 #-}
+{-# SPECIALISE liftA3 :: (a1->a2->a3->r) -> IO a1 -> IO a2 -> IO a3 -> IO r #-}
+{-# SPECIALISE liftA3 :: (a1->a2->a3->r) ->
+                                Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe r #-}
 
 -- | The 'join' function is the conventional monad join operator. It
 -- is used to remove one level of monadic structure, projecting its
@@ -429,13 +445,21 @@ monadic expressions.
 
 Instances of 'Monad' should satisfy the following laws:
 
-> return a >>= k  ==  k a
-> m >>= return  ==  m
-> m >>= (\x -> k x >>= h)  ==  (m >>= k) >>= h
+* @'return' a '>>=' k  =  k a@
+* @m '>>=' 'return'  =  m@
+* @m '>>=' (\x -> k x '>>=' h)  =  (m '>>=' k) '>>=' h@
 
-Instances of both 'Monad' and 'Functor' should additionally satisfy the law:
+Furthermore, the 'Monad' and 'Applicative' operations should relate as follows:
 
-> fmap f xs  ==  xs >>= return . f
+* @'pure' = 'return'@
+* @('<*>') = 'ap'@
+
+The above laws imply that
+
+* @'fmap' f xs  =  xs '>>=' 'return' . f@,
+* @('>>') = ('*>')
+
+and that 'pure' and ('<*>') satisfy the applicative functor laws.
 
 The instances of 'Monad' for lists, 'Data.Maybe.Maybe' and 'System.IO.IO'
 defined in the "Prelude" satisfy these laws.
@@ -569,7 +593,12 @@ is equivalent to
 -}
 
 ap                :: (Monad m) => m (a -> b) -> m a -> m b
-ap                =  liftM2 id
+ap m1 m2          = do { x1 <- m1; x2 <- m2; return (x1 x2) }
+-- Since many Applicative instances define (<*>) = ap, we
+-- cannot define ap = (<*>)
+{-# INLINEABLE ap #-}
+{-# SPECIALISE ap :: IO (a -> b) -> IO a -> IO b #-}
+{-# SPECIALISE ap :: Maybe (a -> b) -> Maybe a -> Maybe b #-}
 
 -- instances for Prelude types
 
@@ -593,15 +622,19 @@ instance  Functor Maybe  where
     fmap f (Just a)      = Just (f a)
 
 instance Applicative Maybe where
-    pure = return
-    (<*>) = ap
+    pure = Just
+
+    Just f  <*> m       = fmap f m
+    Nothing <*> _m      = Nothing
+
+    Just _m1 *> m2      = m2
+    Nothing  *> _m2     = Nothing
 
 instance  Monad Maybe  where
     (Just x) >>= k      = k x
     Nothing  >>= _      = Nothing
 
-    (Just _) >>  k      = k
-    Nothing  >>  _      = Nothing
+    (>>) = (*>)
 
     return              = Just
     fail _              = Nothing
@@ -662,11 +695,7 @@ class (Alternative m, Monad m) => MonadPlus m where
    mplus :: m a -> m a -> m a
    mplus = (<|>)
 
-instance MonadPlus Maybe where
-   mzero = Nothing
-
-   Nothing `mplus` ys  = ys
-   xs      `mplus` _ys = xs
+instance MonadPlus Maybe
 \end{code}
 
 
@@ -694,9 +723,7 @@ instance Alternative [] where
     empty = []
     (<|>) = (++)
 
-instance MonadPlus [] where
-   mzero = []
-   mplus = (++)
+instance MonadPlus []
 \end{code}
 
 A few list functions that appear here because they are used here.

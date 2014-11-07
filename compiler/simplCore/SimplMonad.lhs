@@ -103,8 +103,9 @@ instance Functor SimplM where
     fmap = liftM
 
 instance Applicative SimplM where
-    pure = return
+    pure  = returnSmpl
     (<*>) = ap
+    (*>)  = thenSmpl_
 
 instance Monad SimplM where
    (>>)   = thenSmpl_

@@ -1,6 +1,8 @@
 {-# LANGUAGE AutoDeriveTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
@@ -63,7 +65,7 @@ import GHC.Read (Read)
 import GHC.Show (Show)
 
 newtype Const a b = Const { getConst :: a }
-                  deriving (Generic, Generic1)
+                  deriving (Generic, Generic1, Monoid)
 
 instance Foldable (Const m) where
     foldMap _ _ = mempty
@@ -71,17 +73,17 @@ instance Foldable (Const m) where
 instance Functor (Const m) where
     fmap _ (Const v) = Const v
 
--- Added in base-4.7.0.0
-instance Monoid a => Monoid (Const a b) where
-    mempty = Const mempty
-    mappend (Const a) (Const b) = Const (mappend a b)
-
 instance Monoid m => Applicative (Const m) where
     pure _ = Const mempty
-    Const f <*> Const v = Const (f `mappend` v)
+    (<*>) = coerce (mappend :: m -> m -> m)
+-- This is pretty much the same as
+-- Const f <*> Const v = Const (f `mappend` v)
+-- but guarantees that mappend for Const a b will have the same arity
+-- as the one for a; it won't create a closure to raise the arity
+-- to 2.
 
 newtype WrappedMonad m a = WrapMonad { unwrapMonad :: m a }
-                         deriving (Generic, Generic1)
+                         deriving (Generic, Generic1, Monad)
 
 instance Monad m => Functor (WrappedMonad m) where
     fmap f (WrapMonad v) = WrapMonad (liftM f v)
@@ -89,11 +91,6 @@ instance Monad m => Functor (WrappedMonad m) where
 instance Monad m => Applicative (WrappedMonad m) where
     pure = WrapMonad . return
     WrapMonad f <*> WrapMonad v = WrapMonad (f `ap` v)
-
--- Added in base-4.7.0.0 (GHC Trac #8218)
-instance Monad m => Monad (WrappedMonad m) where
-    return = WrapMonad . return
-    a >>= f = WrapMonad (unwrapMonad a >>= unwrapMonad . f)
 
 instance MonadPlus m => Alternative (WrappedMonad m) where
     empty = WrapMonad mzero
@@ -118,10 +115,7 @@ instance (ArrowZero a, ArrowPlus a) => Alternative (WrappedArrow a b) where
 -- @f '<$>' 'ZipList' xs1 '<*>' ... '<*>' 'ZipList' xsn = 'ZipList' (zipWithn f xs1 ... xsn)@
 --
 newtype ZipList a = ZipList { getZipList :: [a] }
-                  deriving (Show, Eq, Ord, Read, Generic, Generic1)
-
-instance Functor ZipList where
-    fmap f (ZipList xs) = ZipList (map f xs)
+                  deriving (Show, Eq, Ord, Read, Functor, Generic, Generic1)
 
 instance Applicative ZipList where
     pure x = ZipList (repeat x)
