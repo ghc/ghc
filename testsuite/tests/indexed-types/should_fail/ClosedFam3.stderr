@@ -25,3 +25,4 @@ ClosedFam3.hs-boot:12:1:
                      Baz Int = Bool
     Boot file:   type family Baz (a :: k) :: * where
                      Baz * Int = Bool
+    The types have different kinds

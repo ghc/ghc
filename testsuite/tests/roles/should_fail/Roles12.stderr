@@ -5,3 +5,4 @@ Roles12.hs:5:1:
     Main module: type role T phantom
                  data T a
     Boot file:   abstract T a
+    The roles do not match. Roles default to ‘representational’ in boot files
