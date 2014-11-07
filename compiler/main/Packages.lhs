@@ -988,38 +988,34 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 -- -----------------------------------------------------------------------------
 -- | Makes the mapping from module to package info
 
--- | This function is generic; we instantiate it
-mkModuleToPkgConfGeneric
-  :: forall m e.
-     -- Empty map, e.g. the initial state of the output
-     m e
-     -- How to create an entry in the map based on the calculated information
-  -> (PackageKey -> ModuleName -> PackageConfig -> ModuleOrigin -> e)
-     -- How to override the origin of an entry (used for renaming)
-  -> (e -> ModuleOrigin -> e)
-     -- How to incorporate a list of entries into the map
-  -> (m e -> [(ModuleName, e)] -> m e)
-  -- The proper arguments
-  -> DynFlags
+mkModuleToPkgConfAll
+  :: DynFlags
   -> PackageConfigMap
   -> InstalledPackageIdMap
   -> VisibilityMap
-  -> m e
-mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
-                         dflags pkg_db ipid_map vis_map =
+  -> ModuleToPkgConfAll
+mkModuleToPkgConfAll dflags pkg_db ipid_map vis_map =
     foldl' extend_modmap emptyMap (eltsUFM pkg_db)
  where
+  emptyMap = Map.empty
+  sing pk m _ = Map.singleton (mkModule pk m)
+  addListTo = foldl' merge
+  merge m (k, v) = Map.insertWith (Map.unionWith mappend) k v m
+  setOrigins m os = fmap (const os) m
   extend_modmap modmap pkg = addListTo modmap theBindings
    where
-    theBindings :: [(ModuleName, e)]
+    theBindings :: [(ModuleName, Map Module ModuleOrigin)]
     theBindings | Just (b,rns,_) <- lookupUFM vis_map (packageConfigId pkg)
                               = newBindings b rns
                 | otherwise   = newBindings False []
 
-    newBindings :: Bool -> [(ModuleName, ModuleName)] -> [(ModuleName, e)]
+    newBindings :: Bool
+                -> [(ModuleName, ModuleName)]
+                -> [(ModuleName, Map Module ModuleOrigin)]
     newBindings e rns  = es e ++ hiddens ++ map rnBinding rns
 
-    rnBinding :: (ModuleName, ModuleName) -> (ModuleName, e)
+    rnBinding :: (ModuleName, ModuleName)
+              -> (ModuleName, Map Module ModuleOrigin)
     rnBinding (orig, new) = (new, setOrigins origEntry fromFlag)
      where origEntry = case lookupUFM esmap orig of
             Just r -> r
@@ -1027,7 +1023,7 @@ mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
                         (text "package flag: could not find module name" <+>
                             ppr orig <+> text "in package" <+> ppr pk)))
 
-    es :: Bool -> [(ModuleName, e)]
+    es :: Bool -> [(ModuleName, Map Module ModuleOrigin)]
     es e = do
      -- TODO: signature support
      ExposedModule m exposedReexport _exposedSignature <- exposed_mods
@@ -1040,7 +1036,7 @@ mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
             in (pk', m', pkg', fromReexportedModules e pkg')
      return (m, sing pk' m' pkg' origin')
 
-    esmap :: UniqFM e
+    esmap :: UniqFM (Map Module ModuleOrigin)
     esmap = listToUFM (es False) -- parameter here doesn't matter, orig will
                                  -- be overwritten
 
@@ -1051,22 +1047,6 @@ mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
 
     exposed_mods = exposedModules pkg
     hidden_mods = hiddenModules pkg
-
--- | This is a slow and complete map, which includes information about
--- everything, including hidden modules
-mkModuleToPkgConfAll
-  :: DynFlags
-  -> PackageConfigMap
-  -> InstalledPackageIdMap
-  -> VisibilityMap
-  -> ModuleToPkgConfAll
-mkModuleToPkgConfAll =
-  mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
-    where emptyMap = Map.empty
-          sing pk m _ = Map.singleton (mkModule pk m)
-          addListTo = foldl' merge
-          merge m (k, v) = Map.insertWith (Map.unionWith mappend) k v m
-          setOrigins m os = fmap (const os) m
 
 -- -----------------------------------------------------------------------------
 -- Extracting information from the packages in scope
