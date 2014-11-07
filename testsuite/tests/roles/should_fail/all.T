@@ -10,3 +10,4 @@ test('Roles12',
 test('T8773', normal, compile_fail, [''])
 test('T9204', extra_clean(['T9204.o-boot', 'T9204.hi-boot']),
               run_command, ['$MAKE --no-print-directory -s T9204'])
+test('RolesIArray', normal, compile_fail, [''])

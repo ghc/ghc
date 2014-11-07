@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, RoleAnnotations #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -384,6 +384,10 @@ data STArray s i e
                    (MutableArray# s e) -- The actual elements
         -- No Ix context for STArray.  They are stupid,
         -- and force an Ix context on the equality instance.
+
+-- Index types should have nominal role, because of Ix class. See also #9220.
+type role Array nominal representational
+type role STArray nominal nominal representational
 
 -- Just pointer equality on mutable arrays:
 instance Eq (STArray s i e) where

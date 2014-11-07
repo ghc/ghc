@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude, AutoDeriveTypeable #-}
+{-# LANGUAGE NoImplicitPrelude, AutoDeriveTypeable, RoleAnnotations #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -40,6 +40,9 @@ import Data.Typeable.Internal
 --
 
 newtype IOArray i e = IOArray (STArray RealWorld i e) deriving( Typeable )
+
+-- index type should have a nominal role due to Ix class. See also #9220.
+type role IOArray nominal representational
 
 -- explicit instance because Haddock can't figure out a derived one
 instance Eq (IOArray i e) where
