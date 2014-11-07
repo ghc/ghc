@@ -30,7 +30,7 @@
   <para>Concurrent Haskell is the name given to GHC's concurrency extension.
   It is enabled by default, so no special flags are required.
    The <ulink
-	      url="http://research.microsoft.com/copyright/accept.asp?path=/users/simonpj/papers/concurrent-haskell.ps.gz">
+	      url="https://www.haskell.org/ghc/docs/papers/concurrent-haskell.ps.gz">
 	      Concurrent Haskell paper</ulink> is still an excellent
 	      resource, as is <ulink
 	      url="http://research.microsoft.com/%7Esimonpj/papers/marktoberdorf/">Tackling
@@ -94,7 +94,7 @@ All these features are described in the papers mentioned earlier.
     (GPH) supports running Parallel Haskell
     programs on both clusters of machines, and single multiprocessors.  GPH is
     developed and distributed
-    separately from GHC (see <ulink url="http://www.cee.hw.ac.uk/~dsg/gph/">The
+    separately from GHC (see <ulink url="http://www.macs.hw.ac.uk/~dsg/gph/">The
       GPH Page</ulink>).  However, the current version of GPH is based on a much older
     version of GHC (4.06).</para>
 

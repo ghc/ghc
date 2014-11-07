@@ -3713,7 +3713,7 @@ These and many other examples are given in papers by Hongwei Xi, and
 Tim Sheard. There is a longer introduction
 <ulink url="http://www.haskell.org/haskellwiki/GADT">on the wiki</ulink>,
 and Ralf Hinze's
-<ulink url="http://www.informatik.uni-bonn.de/~ralf/publications/With.pdf">Fun with phantom types</ulink> also has a number of examples. Note that papers
+<ulink url="http://www.cs.ox.ac.uk/ralf.hinze/publications/With.pdf">Fun with phantom types</ulink> also has a number of examples. Note that papers
 may use different notation to that implemented in GHC.
 </para>
 <para>
@@ -9007,7 +9007,7 @@ The basic idea is to compile the program twice:</para>
 <para>Quasi-quotation allows patterns and expressions to be written using
 programmer-defined concrete syntax; the motivation behind the extension and
 several examples are documented in
-"<ulink url="http://www.eecs.harvard.edu/~mainland/ghc-quasiquoting/">Why It's
+"<ulink url="http://www.cs.tufts.edu/comp/150FP/archive/geoff-mainland/quasiquoting.pdf">Why It's
 Nice to be Quoted: Quasiquoting for Haskell</ulink>" (Proc Haskell Workshop
 2007). The example below shows how to write a quasiquoter for a simple
 expression language.</para>
@@ -9213,7 +9213,7 @@ Palgrave, 2003.
 
 <listitem>
 <para>
-&ldquo;<ulink url="http://www.cs.chalmers.se/~rjmh/afp-arrows.pdf">Programming with Arrows</ulink>&rdquo;,
+&ldquo;<ulink url="http://www.cse.chalmers.se/~rjmh/afp-arrows.pdf">Programming with Arrows</ulink>&rdquo;,
 John Hughes, in <citetitle>5th International Summer School on
 Advanced Functional Programming</citetitle>,
 <citetitle>Lecture Notes in Computer Science</citetitle> vol. 3622,
