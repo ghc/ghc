@@ -338,17 +338,7 @@ isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 -- It is a special case of 'nubBy', which allows the programmer to supply
 -- their own equality test.
 nub                     :: (Eq a) => [a] -> [a]
-#ifdef USE_REPORT_PRELUDE
 nub                     =  nubBy (==)
-#else
--- stolen from HBC
-nub l                   = nub' l []             -- '
-  where
-    nub' [] _           = []                    -- '
-    nub' (x:xs) ls                              -- '
-        | x `elem` ls   = nub' xs ls            -- '
-        | otherwise     = x : nub' xs (x:ls)    -- '
-#endif
 
 -- | The 'nubBy' function behaves just like 'nub', except it uses a
 -- user-supplied equality predicate instead of the overloaded '=='
@@ -358,6 +348,7 @@ nubBy                   :: (a -> a -> Bool) -> [a] -> [a]
 nubBy eq []             =  []
 nubBy eq (x:xs)         =  x : nubBy eq (filter (\ y -> not (eq x y)) xs)
 #else
+-- stolen from HBC
 nubBy eq l              = nubBy' l []
   where
     nubBy' [] _         = []
@@ -367,12 +358,14 @@ nubBy eq l              = nubBy' l []
 
 -- Not exported:
 -- Note that we keep the call to `eq` with arguments in the
--- same order as in the reference implementation
+-- same order as in the reference (prelude) implementation,
+-- and that this order is different from how `elem` calls (==).
+-- See #2528, #3280 and #7913.
 -- 'xs' is the list of things we've seen so far,
 -- 'y' is the potential new element
 elem_by :: (a -> a -> Bool) -> a -> [a] -> Bool
 elem_by _  _ []         =  False
-elem_by eq y (x:xs)     =  y `eq` x || elem_by eq y xs
+elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
 #endif
 
 
