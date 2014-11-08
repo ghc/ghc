@@ -1,0 +1,6 @@
+
+unboxed-bind.hs:10:11:
+    Pattern bindings containing unlifted types should use an outermost bang pattern:
+      P arg = x
+    In the expression: let P arg = x in arg
+    In an equation for ‘f’: f x = let P arg = x in arg
