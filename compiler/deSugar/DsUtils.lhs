@@ -348,13 +348,18 @@ mkPatSynCase var ty alt fail = do
     matcher <- dsLExpr $ mkLHsWrap wrapper $ nlHsTyApp matcher [ty]
     let MatchResult _ mkCont = match_result
     cont <- mkCoreLams bndrs <$> mkCont fail
-    return $ mkCoreAppsDs matcher [Var var, cont, fail]
+    return $ mkCoreAppsDs matcher [Var var, ensure_unstrict cont, make_unstrict fail]
   where
     MkCaseAlt{ alt_pat = psyn,
                alt_bndrs = bndrs,
                alt_wrapper = wrapper,
                alt_result = match_result} = alt
     matcher = patSynMatcher psyn
+
+    -- See Note [Matchers and wrappers for pattern synonyms] in PatSyns
+    -- on these extra Void# arguments
+    ensure_unstrict = if null (patSynArgs psyn) then make_unstrict else id
+    make_unstrict = Lam voidArgId
 
 mkDataConCase :: Id -> Type -> [CaseAlt DataCon] -> MatchResult
 mkDataConCase _   _  []            = panic "mkDataConCase: no alternatives"

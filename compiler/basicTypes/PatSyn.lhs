@@ -76,17 +76,22 @@ For each pattern synonym, we generate a single matcher function which
 implements the actual matching. For the above example, the matcher
 will have type:
 
-        $mP :: forall r t. (Eq t, Num t)
+        $mP :: forall (r :: ?) t. (Eq t, Num t)
             => T (Maybe t)
             -> (forall b. (Show (Maybe t), Ord b) => b -> r)
-            -> r
+            -> (Void# -> r)
             -> r
 
 with the following implementation:
 
         $mP @r @t $dEq $dNum scrut cont fail = case scrut of
             MkT @b $dShow $dOrd [x] (Just 42) -> cont @b $dShow $dOrd x
-            _                                 -> fail
+            _                                 -> fail Void#
+
+The extra Void# argument for the failure continuation is needed so that
+it is lazy even when the result type is unboxed. For the same reason,
+if the pattern has no arguments, an extra Void# argument is added
+to the success continuation as well.
 
 For *bidirectional* pattern synonyms, we also generate a single wrapper
 function which implements the pattern synonym in an expression
@@ -130,11 +135,19 @@ data PatSyn
 
         -- See Note [Matchers and wrappers for pattern synonyms]
         psMatcher     :: Id,
-             -- Matcher function, of type
-             --   forall r univ_tvs. req_theta
-             --                   => res_ty
-             --                   -> (forall ex_tvs. prov_theta -> arg_tys -> r)
-             --                   -> r -> r
+            -- Matcher function. If psArgs is empty, then it has type
+             --   forall (r :: ?) univ_tvs. req_theta
+             --                       => res_ty
+             --                       -> (forall ex_tvs. prov_theta -> Void# -> r)
+             --                       -> (Void# -> r)
+             --                       -> r
+             --
+             -- Otherwise:
+             --   forall (r :: ?) univ_tvs. req_theta
+             --                       => res_ty
+             --                       -> (forall ex_tvs. prov_theta -> arg_tys -> r)
+             --                       -> (Void# -> r)
+             --                       -> r
 
         psWrapper     :: Maybe Id
              -- Nothing  => uni-directional pattern synonym
