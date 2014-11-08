@@ -1534,7 +1534,7 @@ patSynToIfaceDecl :: PatSyn -> IfaceDecl
 patSynToIfaceDecl ps
   = IfacePatSyn { ifName          = getOccName . getName $ ps
                 , ifPatMatcher    = matcher
-                , ifPatWrapper    = wrapper
+                , ifPatWorker     = worker
                 , ifPatIsInfix    = patSynIsInfix ps
                 , ifPatUnivTvs    = toIfaceTvBndrs univ_tvs'
                 , ifPatExTvs      = toIfaceTvBndrs ex_tvs'
@@ -1549,7 +1549,7 @@ patSynToIfaceDecl ps
     (env2, ex_tvs')   = tidyTyVarBndrs env1 ex_tvs
 
     matcher = idName (patSynMatcher ps)
-    wrapper = fmap idName (patSynWrapper ps)
+    worker = fmap idName (patSynWorker ps)
 
 
 --------------------------

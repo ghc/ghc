@@ -574,6 +574,7 @@ compiler_stage2_dll0_MODULES = \
 	StringBuffer \
 	TcEvidence \
 	TcIface \
+	TcMType \
 	TcRnMonad \
 	TcRnTypes \
 	TcType \

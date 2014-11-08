@@ -7,13 +7,14 @@
 \begin{code}
 {-# LANGUAGE CPP #-}
 
-module TcPatSyn (tcPatSynDecl, tcPatSynWrapper) where
+module TcPatSyn (tcPatSynDecl, mkPatSynWrapperId, tcPatSynWorker) where
 
 import HsSyn
 import TcPat
 import TcRnMonad
 import TcEnv
 import TcMType
+import TcIface
 import TysPrim
 import Name
 import SrcLoc
@@ -37,6 +38,7 @@ import Bag
 import TcEvidence
 import BuildTyCl
 import TypeRep
+import Data.Maybe
 
 #include "HsVersions.h"
 \end{code}
@@ -48,7 +50,6 @@ tcPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
                   psb_def = lpat, psb_dir = dir }
   = do { traceTc "tcPatSynDecl {" $ ppr name $$ ppr lpat
        ; tcCheckPatSynPat lpat
-       ; 
 
        ; let (arg_names, is_infix) = case details of
                  PrefixPatSyn names      -> (map unLoc names, False)
@@ -78,6 +79,7 @@ tcPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
        ; req_theta  <- zonkTcThetaType req_theta
        ; pat_ty     <- zonkTcType pat_ty
        ; args       <- mapM zonkId args
+       ; let arg_tys = map varType args
 
        ; traceTc "tcPatSynDecl: ex" (ppr ex_tvs $$
                                      ppr prov_theta $$
@@ -87,7 +89,8 @@ tcPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
                                        ppr req_dicts $$
                                        ppr ev_binds)
 
-       ; let theta = prov_theta ++ req_theta
+       ; let qtvs = univ_tvs ++ ex_tvs
+       ; let theta = req_theta ++ prov_theta
 
        ; traceTc "tcPatSynDecl: type" (ppr name $$
                                        ppr univ_tvs $$
@@ -101,17 +104,19 @@ tcPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
                                          prov_theta req_theta
                                          pat_ty
 
-       ; wrapper_id <- if isBidirectional dir
-                       then fmap Just $ mkPatSynWrapperId lname args univ_tvs ex_tvs theta pat_ty
-                       else return Nothing
+       ; wrapper_ids <- if isBidirectional dir
+                        then fmap Just $ mkPatSynWrapperIds lname
+                                           qtvs theta
+                                           arg_tys pat_ty
+                        else return Nothing
 
        ; traceTc "tcPatSynDecl }" $ ppr name
        ; let patSyn = mkPatSyn name is_infix
                         (univ_tvs, req_theta)
                         (ex_tvs, prov_theta)
-                        (map varType args)
+                        arg_tys
                         pat_ty
-                        matcher_id wrapper_id
+                        matcher_id wrapper_ids
        ; return (patSyn, matcher_bind) }
 
 \end{code}
@@ -201,73 +206,69 @@ isBidirectional Unidirectional = False
 isBidirectional ImplicitBidirectional = True
 isBidirectional ExplicitBidirectional{} = True
 
-tcPatSynWrapper :: PatSynBind Name Name
+tcPatSynWorker :: PatSynBind Name Name
                 -> TcM (LHsBinds Id)
 -- See Note [Matchers and wrappers for pattern synonyms] in PatSyn
-tcPatSynWrapper PSB{ psb_id = L loc name, psb_def = lpat, psb_dir = dir, psb_args = details }
+tcPatSynWorker PSB{ psb_id = lname, psb_def = lpat, psb_dir = dir, psb_args = details }
   = case dir of
     Unidirectional -> return emptyBag
     ImplicitBidirectional ->
-        do { wrapper_id <- tcLookupPatSynWrapper name
-           ; lexpr <- case tcPatToExpr (mkNameSet args) lpat of
+        do { lexpr <- case tcPatToExpr (mkNameSet args) lpat of
                   Nothing -> cannotInvertPatSynErr lpat
                   Just lexpr -> return lexpr
            ; let wrapper_args = map (noLoc . VarPat) args
-                 wrapper_lname = L (getLoc lpat) (idName wrapper_id)
                  wrapper_match = mkMatch wrapper_args lexpr EmptyLocalBinds
-                 wrapper_bind = mkTopFunBind Generated wrapper_lname [wrapper_match]
-           ; mkPatSynWrapper wrapper_id wrapper_bind }
-    ExplicitBidirectional mg ->
-        do { wrapper_id <- tcLookupPatSynWrapper name
-           ; mkPatSynWrapper wrapper_id $
-               FunBind{ fun_id = L loc (idName wrapper_id)
-                      , fun_infix = False
-                      , fun_matches = mg
-                      , fun_co_fn = idHsWrapper
-                      , bind_fvs = placeHolderNamesTc
-                      , fun_tick = Nothing }}
+           ; mkPatSynWorker lname $ mkMatchGroupName Generated [wrapper_match] }
+    ExplicitBidirectional mg -> mkPatSynWorker lname mg
   where
     args = map unLoc $ case details of
         PrefixPatSyn args -> args
         InfixPatSyn arg1 arg2 -> [arg1, arg2]
 
-    tcLookupPatSynWrapper name
-      = do { patsyn <- tcLookupPatSyn name
-           ; case patSynWrapper patsyn of
-               Nothing -> panic "tcLookupPatSynWrapper"
-               Just wrapper_id -> return wrapper_id }
-
-mkPatSynWrapperId :: Located Name
-                  -> [Var] -> [TyVar] -> [TyVar] -> ThetaType -> Type
-                  -> TcM Id
-mkPatSynWrapperId (L _ name) args univ_tvs ex_tvs theta pat_ty
-  = do { let qtvs = univ_tvs ++ ex_tvs
-       ; (subst, wrapper_tvs) <- tcInstSkolTyVars qtvs
-       ; let wrapper_theta = substTheta subst theta
-             pat_ty' = substTy subst pat_ty
-             args' = map (\arg -> setVarType arg $ substTy subst (varType arg)) args
-             wrapper_tau = mkFunTys (map varType args') pat_ty'
-             wrapper_sigma = mkSigmaTy wrapper_tvs wrapper_theta wrapper_tau
-
-       ; wrapper_name <- newImplicitBinder name mkDataConWrapperOcc
-       ; return $ mkVanillaGlobal wrapper_name wrapper_sigma }
-
-mkPatSynWrapper :: Id
-                -> HsBind Name
-                -> TcM (LHsBinds Id)
-mkPatSynWrapper wrapper_id bind
-  = do { (wrapper_binds, _, _) <- tcPolyCheck NonRecursive (const []) sig (noLoc bind)
-       ; traceTc "tcPatSynDecl wrapper" $ ppr wrapper_binds
-       ; traceTc "tcPatSynDecl wrapper type" $ ppr (varType wrapper_id)
-       ; return wrapper_binds }
+mkPatSynWrapperIds :: Located Name
+                   -> [TyVar] -> ThetaType -> [Type] -> Type
+                   -> TcM (Id, Id)
+mkPatSynWrapperIds lname qtvs theta arg_tys pat_ty
+  = do { worker_id <- mkPatSynWorkerId lname mkDataConWorkerOcc qtvs theta worker_arg_tys pat_ty
+       ; wrapper_id <- mkPatSynWrapperId lname qtvs theta arg_tys pat_ty worker_id
+       ; return (wrapper_id, worker_id) }
   where
-    sig = TcSigInfo{ sig_id = wrapper_id
-                   , sig_tvs = map (\tv -> (Nothing, tv)) wrapper_tvs
-                   , sig_theta = wrapper_theta
-                   , sig_tau = wrapper_tau
-                   , sig_loc = noSrcSpan
-                   }
-    (wrapper_tvs, wrapper_theta, wrapper_tau) = tcSplitSigmaTy (idType wrapper_id)
+    worker_arg_tys | need_dummy_arg = [voidPrimTy]
+                   | otherwise = arg_tys
+    need_dummy_arg = null arg_tys && isUnLiftedType pat_ty
+
+mkPatSynWorker :: Located Name
+                -> MatchGroup Name (LHsExpr Name)
+                -> TcM (LHsBinds Id)
+mkPatSynWorker (L loc name) mg
+  = do { patsyn <- tcLookupPatSyn name
+       ; let worker_id = fromMaybe (panic "mkPatSynWrapper") $
+                         patSynWorker patsyn
+             need_dummy_arg = null (patSynArgs patsyn) && isUnLiftedType (patSynType patsyn)
+
+       ; let match_dummy = mkMatch [nlWildPatName] (noLoc $ HsLam mg) emptyLocalBinds
+             mg' | need_dummy_arg = mkMatchGroupName Generated [match_dummy]
+                 | otherwise = mg
+
+       ; let (worker_tvs, worker_theta, worker_tau) = tcSplitSigmaTy (idType worker_id)
+             bind = FunBind { fun_id = L loc (idName worker_id)
+                            , fun_infix = False
+                            , fun_matches = mg'
+                            , fun_co_fn = idHsWrapper
+                            , bind_fvs = placeHolderNamesTc
+                            , fun_tick = Nothing }
+
+             sig = TcSigInfo{ sig_id = worker_id
+                            , sig_tvs = map (\tv -> (Nothing, tv)) worker_tvs
+                            , sig_theta = worker_theta
+                            , sig_tau = worker_tau
+                            , sig_loc = noSrcSpan
+                            }
+
+       ; (worker_binds, _, _) <- tcPolyCheck NonRecursive (const []) sig (noLoc bind)
+       ; traceTc "tcPatSynDecl worker" $ ppr worker_binds
+       ; return worker_binds }
+  where
 
 \end{code}
 

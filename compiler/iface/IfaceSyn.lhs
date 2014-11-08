@@ -128,7 +128,7 @@ data IfaceDecl
   | IfacePatSyn { ifName          :: IfaceTopBndr,           -- Name of the pattern synonym
                   ifPatIsInfix    :: Bool,
                   ifPatMatcher    :: IfExtName,
-                  ifPatWrapper    :: Maybe IfExtName,
+                  ifPatWorker     :: Maybe IfExtName,
                   -- Everything below is redundant,
                   -- but needed to implement pprIfaceDecl
                   ifPatUnivTvs    :: [IfaceTvBndr],
@@ -759,15 +759,15 @@ pprIfaceDecl ss (IfaceSyn { ifName = tycon, ifTyVars = tyvars
         $$ ppShowIface ss (ptext (sLit "axiom") <+> ppr ax)
     pp_branches _ = Outputable.empty
 
-pprIfaceDecl _ (IfacePatSyn { ifName = name, ifPatWrapper = wrapper,
+pprIfaceDecl _ (IfacePatSyn { ifName = name, ifPatWorker = worker,
                               ifPatIsInfix = is_infix,
                               ifPatUnivTvs = _univ_tvs, ifPatExTvs = _ex_tvs,
                               ifPatProvCtxt = prov_ctxt, ifPatReqCtxt = req_ctxt,
                               ifPatArgs = args,
                               ifPatTy = ty })
-  = pprPatSynSig name has_wrap args' ty' (pprCtxt prov_ctxt) (pprCtxt req_ctxt)
+  = pprPatSynSig name is_bidirectional args' ty' (pprCtxt prov_ctxt) (pprCtxt req_ctxt)
   where
-    has_wrap = isJust wrapper
+    is_bidirectional = isJust worker
     args' = case (is_infix, args) of
         (True, [left_ty, right_ty]) ->
             InfixPatSyn (pprParendIfaceType left_ty) (pprParendIfaceType right_ty)
@@ -1131,7 +1131,7 @@ freeNamesIfDecl d@IfaceAxiom{} =
   fnList freeNamesIfAxBranch (ifAxBranches d)
 freeNamesIfDecl d@IfacePatSyn{} =
   unitNameSet (ifPatMatcher d) &&&
-  maybe emptyNameSet unitNameSet (ifPatWrapper d) &&&
+  maybe emptyNameSet unitNameSet (ifPatWorker d) &&&
   freeNamesIfTvBndrs (ifPatUnivTvs d) &&&
   freeNamesIfTvBndrs (ifPatExTvs d) &&&
   freeNamesIfContext (ifPatProvCtxt d) &&&
