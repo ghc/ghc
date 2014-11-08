@@ -22,7 +22,7 @@ module Documentation.Haddock.Parser.Util (
 
 import           Control.Applicative
 import           Control.Monad (mfilter)
-import           Data.Attoparsec.ByteString.Char8 hiding (parse, take, endOfLine)
+import           Documentation.Haddock.Parser.Monad
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import           Prelude hiding (takeWhile)

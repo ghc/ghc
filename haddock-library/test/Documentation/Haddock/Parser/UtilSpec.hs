@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Documentation.Haddock.Parser.UtilSpec (main, spec) where
 
-import Data.Attoparsec.ByteString.Char8
+import Documentation.Haddock.Parser.Monad
 import Documentation.Haddock.Parser.Util
 import Data.Either.Compat (isLeft)
 import Test.Hspec

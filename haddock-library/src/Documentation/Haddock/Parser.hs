@@ -22,13 +22,13 @@ module Documentation.Haddock.Parser ( parseString, parseParas
 import           Control.Applicative
 import           Control.Arrow (first)
 import           Control.Monad
-import           Data.Attoparsec.ByteString.Char8 hiding (parse, take, endOfLine)
 import qualified Data.ByteString.Char8 as BS
 import           Data.Char (chr, isAsciiUpper)
 import           Data.List (stripPrefix, intercalate, unfoldr)
 import           Data.Maybe (fromMaybe)
 import           Data.Monoid
 import           Documentation.Haddock.Doc
+import           Documentation.Haddock.Parser.Monad hiding (take, endOfLine)
 import           Documentation.Haddock.Parser.Util
 import           Documentation.Haddock.Types
 import           Documentation.Haddock.Utf8
