@@ -514,11 +514,10 @@ parseValid = p some
     p p' = do
       vs' <- p' $ utf8String "⋆" <|> return <$> idChar
       let vs = concat vs'
-      c <- peekChar
+      c <- peekChar'
       case c of
-        Just '`' -> return vs
-        Just '\'' -> (\x -> vs ++ "'" ++ x) <$> ("'" *> p many')
-                     <|> return vs
+        '`' -> return vs
+        '\'' -> (\x -> vs ++ "'" ++ x) <$> ("'" *> p many') <|> return vs
         _ -> fail "outofvalid"
 
 -- | Parses UTF8 strings from ByteString streams.
