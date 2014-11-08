@@ -1,4 +1,3 @@
-\begin{code}
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
@@ -118,15 +117,11 @@ import GHC.Show         ( Show(..), showString )
 import GHC.Weak
 
 infixr 0 `par`, `pseq`
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-\subsection{@ThreadId@, @par@, and @fork@}
-%*                                                                      *
-%************************************************************************
+-----------------------------------------------------------------------------
+-- 'ThreadId', 'par', and 'fork'
+-----------------------------------------------------------------------------
 
-\begin{code}
 data ThreadId = ThreadId ThreadId# deriving( Typeable )
 -- ToDo: data ThreadId = ThreadId (Weak ThreadId#)
 -- But since ThreadId# is unlifted, the Weak type must use open
@@ -528,19 +523,15 @@ mkWeakThreadId :: ThreadId -> IO (Weak ThreadId)
 mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
    case mkWeakNoFinalizer# t# t s of
       (# s1, w #) -> (# s1, Weak w #)
-\end{code}
 
 
-%************************************************************************
-%*                                                                      *
-\subsection[stm]{Transactional heap operations}
-%*                                                                      *
-%************************************************************************
+-----------------------------------------------------------------------------
+-- Transactional heap operations
+-----------------------------------------------------------------------------
 
-TVars are shared memory locations which support atomic memory
-transactions.
+-- TVars are shared memory locations which support atomic memory
+-- transactions.
 
-\begin{code}
 -- |A monad supporting atomic memory transactions.
 newtype STM a = STM (State# RealWorld -> (# State# RealWorld, a #))
                 deriving Typeable
@@ -733,11 +724,10 @@ writeTVar (TVar tvar#) val = STM $ \s1# ->
     case writeTVar# tvar# val s1# of
          s2# -> (# s2#, () #)
 
-\end{code}
+-----------------------------------------------------------------------------
+-- MVar utilities
+-----------------------------------------------------------------------------
 
-MVar utilities
-
-\begin{code}
 withMVar :: MVar a -> (a -> IO b) -> IO b
 withMVar m io =
   mask $ \restore -> do
@@ -755,15 +745,10 @@ modifyMVar_ m io =
             (\e -> do putMVar m a; throw e)
     putMVar m a'
     return ()
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-\subsection{Thread waiting}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+-----------------------------------------------------------------------------
+-- Thread waiting
+-----------------------------------------------------------------------------
 
 -- Machinery needed to ensureb that we only have one copy of certain
 -- CAFs in this module even when the base package is present twice, as
@@ -824,5 +809,3 @@ setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
 
 getUncaughtExceptionHandler :: IO (SomeException -> IO ())
 getUncaughtExceptionHandler = readIORef uncaughtExceptionHandler
-
-\end{code}
