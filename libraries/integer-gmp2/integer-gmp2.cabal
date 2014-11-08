@@ -17,6 +17,7 @@ extra-source-files:
     configure
     configure.ac
     gmp/config.mk.in
+    include/HsIntegerGmp2.h.in
     integer-gmp2.buildinfo.in
 
 extra-tmp-files:
@@ -48,6 +49,7 @@ library
   ghc-options: -this-package-key integer-gmp2 -Wall
   cc-options: -std=c99 -Wall
 
+  include-dirs: include
   c-sources:
     cbits/wrappers.c
 
