@@ -49,7 +49,7 @@ module Control.Applicative (
     optional,
     ) where
 
-import Control.Category
+import Control.Category hiding ((.), id)
 import Control.Arrow
 import Data.Maybe
 import Data.Tuple
@@ -58,7 +58,7 @@ import Data.Ord
 import Data.Foldable (Foldable(..))
 import Data.Functor ((<$>))
 
-import GHC.Base hiding ((.), id)
+import GHC.Base
 import GHC.Generics
 import GHC.List (repeat, zipWith)
 import GHC.Read (Read)
