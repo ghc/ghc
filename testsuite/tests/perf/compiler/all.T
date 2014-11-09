@@ -167,22 +167,24 @@ test('T3294',
 test('T4801',
      [ # expect_broken(5224),
        # temporarily unbroken (#5227)
-      compiler_stats_num_field('peak_megabytes_allocated',# Note [residency]
-          [(platform('x86_64-apple-darwin'), 70, 1),
-                           # expected value: 58 (amd64/OS X)
-                           # 13/01/2014 - 70
-           (wordsize(32), 30, 20),
-           (wordsize(64), 48, 20)]),
-            # prev:       50 (amd64/Linux)
-            # 19/10/2012: 64 (amd64/Linux)
-            #                (^ REASON UNKNOWN!)
-            # 12/11/2012: 49 (amd64/Linux)
-            #                (^ REASON UNKNOWN!)
-            # 28/8/13:    60 (amd64/Linux)
-            #                (^ REASON UNKNOWN!)
-            # 2014-09-10: 55 post-AMP-cleanup
-            # 2014-10-08: 62 (jumps between 55 and 71 observed -- GC tipping point?)
-            # 2014-10-13: 48 stricter seqDmdType
+###################################
+# deactivated for now, as this metric became to volatile recently
+#      compiler_stats_num_field('peak_megabytes_allocated',# Note [residency]
+#          [(platform('x86_64-apple-darwin'), 70, 1),
+#                           # expected value: 58 (amd64/OS X)
+#                           # 13/01/2014 - 70
+#           (wordsize(32), 30, 20),
+#           (wordsize(64), 48, 20)]),
+#            # prev:       50 (amd64/Linux)
+#            # 19/10/2012: 64 (amd64/Linux)
+#            #                (^ REASON UNKNOWN!)
+#            # 12/11/2012: 49 (amd64/Linux)
+#            #                (^ REASON UNKNOWN!)
+#            # 28/8/13:    60 (amd64/Linux)
+#            #                (^ REASON UNKNOWN!)
+#            # 2014-09-10: 55 post-AMP-cleanup
+#            # 2014-10-08: 62 (jumps between 55 and 71 observed -- GC tipping point?)
+#            # 2014-10-13: 48 stricter seqDmdType
 
       compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 464872776, 5),
