@@ -135,14 +135,14 @@ instance Eq BigNat where
 instance Ord BigNat where
     compare = compareBigNat
 
--- | Invariant: 'Jn#' and 'Jp#' are used iff value doesn't fit in 'SI#'
+-- | Invariant: 'Jn#' and 'Jp#' are used iff value doesn't fit in 'S#'
 --
 -- Useful properties resulting from the invariants:
 --
---  - @abs ('SI#' _) <= abs ('Jp#' _)@
---  - @abs ('SI#' _) <  abs ('Jn#' _)@
+--  - @abs ('S#' _) <= abs ('Jp#' _)@
+--  - @abs ('S#' _) <  abs ('Jn#' _)@
 --
-data Integer  = SI#                !Int#
+data Integer  = S#                !Int#
                 -- ^ iff value in @[minBound::'Int', maxBound::'Int']@ range
               | Jp# {-# UNPACK #-} !BigNat
                 -- ^ iff value in @]maxBound::'Int', +inf[@ range
@@ -176,7 +176,7 @@ mkInteger nonNegative is
   | nonNegative = f is
   | True        = negateInteger (f is)
   where
-    f [] = SI# 0#
+    f [] = S# 0#
     f (I# i : is') = smallInteger (i `andI#` 0x7fffffff#) `orInteger`
                          shiftLInteger (f is') 31#
 {-# CONSTANT_FOLDED mkInteger #-}
@@ -188,7 +188,7 @@ mkInteger nonNegative is
 -- This operation is mostly useful for test-suites and/or code which
 -- constructs 'Integer' values directly.
 isValidInteger# :: Integer -> Int#
-isValidInteger# (SI#  _) = 1#
+isValidInteger# (S#  _) = 1#
 isValidInteger# (Jp# bn)
     = isValidBigNat# bn `andI#` (bn `gtBigNatWord#` INT_MAXBOUND##)
 isValidInteger# (Jn# bn)
@@ -196,7 +196,7 @@ isValidInteger# (Jn# bn)
 
 -- | Should rather be called @intToInteger@
 smallInteger :: Int# -> Integer
-smallInteger i# = SI# i#
+smallInteger i# = S# i#
 {-# CONSTANT_FOLDED smallInteger #-}
 
 ----------------------------------------------------------------------------
@@ -207,7 +207,7 @@ int64ToInteger :: Int64# -> Integer
 int64ToInteger i
   | isTrue# (i `leInt64#` intToInt64#  0x7FFFFFFF#)
   , isTrue# (i `geInt64#` intToInt64# -0x80000000#)
-    = SI# (int64ToInt# i)
+    = S# (int64ToInt# i)
   | isTrue# (i `geInt64#` intToInt64# 0#)
     = Jp# (word64ToBigNat (int64ToWord64# i))
   | True
@@ -217,19 +217,19 @@ int64ToInteger i
 word64ToInteger :: Word64# -> Integer
 word64ToInteger w
   | isTrue# (w `leWord64#` wordToWord64# 0x7FFFFFFF##)
-    = SI# (int64ToInt# (word64ToInt64# w))
+    = S# (int64ToInt# (word64ToInt64# w))
   | True
     = Jp# (word64ToBigNat w)
 {-# CONSTANT_FOLDED word64ToInteger #-}
 
 integerToInt64 :: Integer -> Int64#
-integerToInt64 (SI# i#) = intToInt64# i#
+integerToInt64 (S# i#)  = intToInt64# i#
 integerToInt64 (Jp# bn) = word64ToInt64# (bigNatToWord64 bn)
 integerToInt64 (Jn# bn) = negateInt64# (word64ToInt64# (bigNatToWord64 bn))
 {-# CONSTANT_FOLDED integerToInt64 #-}
 
 integerToWord64 :: Integer -> Word64#
-integerToWord64 (SI# i#) = int64ToWord64# (intToInt64# i#)
+integerToWord64 (S# i#)  = int64ToWord64# (intToInt64# i#)
 integerToWord64 (Jp# bn) = bigNatToWord64 bn
 integerToWord64 (Jn# bn)
     = int64ToWord64# (negateInt64# (word64ToInt64# (bigNatToWord64 bn)))
@@ -258,7 +258,7 @@ bigNatToWord64 bn
 
 -- | Truncates 'Integer' to least-significant 'Int#'
 integerToInt :: Integer -> Int#
-integerToInt (SI# i#) = i#
+integerToInt (S# i#)  = i#
 integerToInt (Jp# bn) = bigNatToInt bn
 integerToInt (Jn# bn) = negateInt# (bigNatToInt bn)
 {-# CONSTANT_FOLDED integerToInt #-}
@@ -267,14 +267,14 @@ hashInteger :: Integer -> Int#
 hashInteger = integerToInt -- emulating what integer-{simple,gmp} already do
 
 integerToWord :: Integer -> Word#
-integerToWord (SI# i#) = int2Word# i#
+integerToWord (S# i#)  = int2Word# i#
 integerToWord (Jp# bn) = bigNatToWord bn
 integerToWord (Jn# bn) = int2Word# (negateInt# (bigNatToInt bn))
 {-# CONSTANT_FOLDED integerToWord #-}
 
 wordToInteger :: Word# -> Integer
 wordToInteger w#
-  | isTrue# (i# >=# 0#) = SI# i#
+  | isTrue# (i# >=# 0#) = S# i#
   | True                = Jp# (wordToBigNat w#)
   where
     i# = word2Int# w#
@@ -282,7 +282,7 @@ wordToInteger w#
 
 wordToNegInteger :: Word# -> Integer
 wordToNegInteger w#
-  | isTrue# (i# <=# 0#) = SI# i#
+  | isTrue# (i# <=# 0#) = S# i#
   | True                = Jn# (wordToBigNat w#)
   where
     i# = negateInt# (word2Int# w#)
@@ -290,16 +290,16 @@ wordToNegInteger w#
 -- we could almost auto-derive Ord if it wasn't for the Jn#-Jn# case
 compareInteger :: Integer -> Integer -> Ordering
 compareInteger (Jn# x)  (Jn# y) = compareBigNat y x
-compareInteger (SI# x)  (SI# y) = compareInt#   x y
+compareInteger (S#  x)  (S#  y) = compareInt#   x y
 compareInteger (Jp# x)  (Jp# y) = compareBigNat x y
 compareInteger (Jn# _)  _       = LT
-compareInteger (SI# _)  (Jp# _) = LT
-compareInteger (SI# _)  (Jn# _) = GT
+compareInteger (S#  _)  (Jp# _) = LT
+compareInteger (S#  _)  (Jn# _) = GT
 compareInteger (Jp# _)  _       = GT
 {-# CONSTANT_FOLDED compareInteger #-}
 
 isNegInteger# :: Integer -> Int#
-isNegInteger# (SI# i#) = i# <# 0#
+isNegInteger# (S# i#) = i# <# 0#
 isNegInteger# (Jp# _)  = 0#
 isNegInteger# (Jn# _)  = 1#
 
@@ -317,35 +317,35 @@ geInteger  x y = isTrue# (geInteger#  x y)
 
 eqInteger#, neqInteger#, leInteger#, ltInteger#, gtInteger#, geInteger#
   :: Integer -> Integer -> Int#
-eqInteger# (SI# x#) (SI# y#) = x# ==# y#
+eqInteger# (S# x#) (S# y#)   = x# ==# y#
 eqInteger# (Jn# x) (Jn# y)   = eqBigNat# x y
 eqInteger# (Jp# x) (Jp# y)   = eqBigNat# x y
 eqInteger# _       _         = 0#
 {-# CONSTANT_FOLDED eqInteger# #-}
 
-neqInteger# (SI# x#) (SI# y#) = x# /=# y#
-neqInteger# (Jn# x) (Jn# y)   = neqBigNat# x y
-neqInteger# (Jp# x) (Jp# y)   = neqBigNat# x y
-neqInteger# _       _         = 1#
+neqInteger# (S# x#) (S# y#)  = x# /=# y#
+neqInteger# (Jn# x) (Jn# y)  = neqBigNat# x y
+neqInteger# (Jp# x) (Jp# y)  = neqBigNat# x y
+neqInteger# _       _        = 1#
 {-# CONSTANT_FOLDED neqInteger# #-}
 
 
-gtInteger# (SI# x#) (SI# y#)     = x# ># y#
+gtInteger# (S# x#) (S# y#)   = x# ># y#
 gtInteger# x y | inline compareInteger x y == GT  = 1#
 gtInteger# _ _                                    = 0#
 {-# CONSTANT_FOLDED gtInteger# #-}
 
-leInteger# (SI# x#) (SI# y#)     = x# <=# y#
+leInteger# (S# x#) (S# y#)   = x# <=# y#
 leInteger# x y | inline compareInteger x y /= GT  = 1#
 leInteger# _ _                             = 0#
 {-# CONSTANT_FOLDED leInteger# #-}
 
-ltInteger# (SI# x#) (SI# y#)     = x# <# y#
+ltInteger# (S# x#) (S# y#)   = x# <# y#
 ltInteger# x y | inline compareInteger x y == LT  = 1#
 ltInteger# _ _                             = 0#
 {-# CONSTANT_FOLDED ltInteger# #-}
 
-geInteger# (SI# x#) (SI# y#)     = x# >=# y#
+geInteger# (S# x#) (S# y#)   = x# >=# y#
 geInteger# x y | inline compareInteger x y /= LT  = 1#
 geInteger# _ _                             = 0#
 {-# CONSTANT_FOLDED geInteger# #-}
@@ -353,32 +353,32 @@ geInteger# _ _                             = 0#
 -- | Compute absolute value of an 'Integer'
 absInteger :: Integer -> Integer
 absInteger (Jn# n)                       = Jp# n
-absInteger (SI# INT_MINBOUND#)           = Jp# (wordToBigNat ABS_INT_MINBOUND##)
-absInteger (SI# i#) | isTrue# (i# <# 0#) = SI# (negateInt# i#)
-absInteger i@(SI# _)                     = i
+absInteger (S# INT_MINBOUND#)            = Jp# (wordToBigNat ABS_INT_MINBOUND##)
+absInteger (S# i#) | isTrue# (i# <# 0#)  = S# (negateInt# i#)
+absInteger i@(S# _)                      = i
 absInteger i@(Jp# _)                     = i
 {-# CONSTANT_FOLDED absInteger #-}
 
 -- | Return @-1@, @0@, and @1@ depending on whether argument is
 -- negative, zero, or positive, respectively
 signumInteger :: Integer -> Integer
-signumInteger j = SI# (signumInteger# j)
+signumInteger j = S# (signumInteger# j)
 {-# CONSTANT_FOLDED signumInteger #-}
 
 -- | Return @-1#@, @0#@, and @1#@ depending on whether argument is
 -- negative, zero, or positive, respectively
 signumInteger# :: Integer -> Int#
 signumInteger# (Jn# _)  = -1#
-signumInteger# (SI# i#) = sgnI# i#
+signumInteger# (S# i#) = sgnI# i#
 signumInteger# (Jp# _ ) =  1#
 
 -- | Negate 'Integer'
 negateInteger :: Integer -> Integer
 negateInteger (Jn# n)      = Jp# n
-negateInteger (SI# INT_MINBOUND#) = Jp# (wordToBigNat ABS_INT_MINBOUND##)
-negateInteger (SI# i#)             = SI# (negateInt# i#)
+negateInteger (S# INT_MINBOUND#) = Jp# (wordToBigNat ABS_INT_MINBOUND##)
+negateInteger (S# i#)             = S# (negateInt# i#)
 negateInteger (Jp# bn)
-  | isTrue# (eqBigNatWord# bn ABS_INT_MINBOUND##) = SI# INT_MINBOUND#
+  | isTrue# (eqBigNatWord# bn ABS_INT_MINBOUND##) = S# INT_MINBOUND#
   | True                                        = Jn# bn
 {-# CONSTANT_FOLDED negateInteger #-}
 
@@ -390,31 +390,31 @@ negateInteger (Jp# bn)
 
 -- | Add two 'Integer's
 plusInteger :: Integer -> Integer -> Integer
-plusInteger x    (SI# 0#)  = x
-plusInteger (SI# 0#) y     = y
-plusInteger (SI# x#) (SI# y#)
+plusInteger x    (S# 0#)  = x
+plusInteger (S# 0#) y     = y
+plusInteger (S# x#) (S# y#)
   = case addIntC# x# y# of
-    (# z#, 0# #) -> SI# z#
+    (# z#, 0# #) -> S# z#
     (# 0#, _  #) -> Jn# (wordToBigNat2 1## 0##) -- 2*minBound::Int
     (# z#, _  #)
       | isTrue# (z# ># 0#) -> Jn# (wordToBigNat ( (int2Word# (negateInt# z#))))
       | True               -> Jp# (wordToBigNat ( (int2Word# z#)))
-plusInteger y@(SI# _) x = plusInteger x y
--- no SI# as first arg from here on
+plusInteger y@(S# _) x = plusInteger x y
+-- no S# as first arg from here on
 plusInteger (Jp# x) (Jp# y) = Jp# (plusBigNat x y)
 plusInteger (Jn# x) (Jn# y) = Jn# (plusBigNat x y)
-plusInteger (Jp# x) (SI# y#) -- edge-case: @(maxBound+1) + minBound == 0@
+plusInteger (Jp# x) (S# y#) -- edge-case: @(maxBound+1) + minBound == 0@
   | isTrue# (y# >=# 0#) = Jp# (plusBigNatWord x (int2Word# y#))
   | True                = bigNatToInteger (minusBigNatWord x (int2Word#
                                                               (negateInt# y#)))
-plusInteger (Jn# x) (SI# y#) -- edge-case: @(minBound-1) + maxBound == -2@
+plusInteger (Jn# x) (S# y#) -- edge-case: @(minBound-1) + maxBound == -2@
   | isTrue# (y# >=# 0#) = bigNatToNegInteger (minusBigNatWord x (int2Word# y#))
   | True                = Jn# (plusBigNatWord x (int2Word# (negateInt# y#)))
 plusInteger y@(Jn# _) x@(Jp# _) = plusInteger x y
 plusInteger (Jp# x) (Jn# y)
     = case compareBigNat x y of
       LT -> bigNatToNegInteger (minusBigNat y x)
-      EQ -> SI# 0#
+      EQ -> S# 0#
       GT -> bigNatToInteger (minusBigNat x y)
 {-# CONSTANT_FOLDED plusInteger #-}
 
@@ -426,35 +426,35 @@ minusInteger x y = inline plusInteger x (inline negateInteger y)
 
 -- | Multiply two 'Integer's
 timesInteger :: Integer -> Integer -> Integer
-timesInteger _       (SI# 0#) = SI# 0#
-timesInteger (SI# 0#) _       = SI# 0#
-timesInteger x       (SI# 1#) = x
-timesInteger (SI# 1#) y       = y
-timesInteger x       (SI# -1#) = negateInteger x
-timesInteger (SI# -1#) y       = negateInteger y
-timesInteger (SI# x#) (SI# y#)
+timesInteger _       (S# 0#) = S# 0#
+timesInteger (S# 0#) _       = S# 0#
+timesInteger x       (S# 1#) = x
+timesInteger (S# 1#) y       = y
+timesInteger x      (S# -1#) = negateInteger x
+timesInteger (S# -1#) y      = negateInteger y
+timesInteger (S# x#) (S# y#)
   = case mulIntMayOflo# x# y# of
-    0# -> SI# (x# *# y#)
+    0# -> S# (x# *# y#)
     _  -> timesInt2Integer x# y#
-timesInteger x@(SI# _) y = timesInteger y x
--- no SI# as first arg from here on
+timesInteger x@(S# _) y      = timesInteger y x
+-- no S# as first arg from here on
 timesInteger (Jp# x) (Jp# y) = Jp# (timesBigNat x y)
 timesInteger (Jp# x) (Jn# y) = Jn# (timesBigNat x y)
-timesInteger (Jp# x) (SI# y#)
+timesInteger (Jp# x) (S# y#)
   | isTrue# (y# >=# 0#) = Jp# (timesBigNatWord x (int2Word# y#))
   | True       = Jn# (timesBigNatWord x (int2Word# (negateInt# y#)))
 timesInteger (Jn# x) (Jn# y) = Jp# (timesBigNat x y)
 timesInteger (Jn# x) (Jp# y) = Jn# (timesBigNat x y)
-timesInteger (Jn# x) (SI# y#)
+timesInteger (Jn# x) (S# y#)
   | isTrue# (y# >=# 0#) = Jn# (timesBigNatWord x (int2Word# y#))
   | True       = Jp# (timesBigNatWord x (int2Word# (negateInt# y#)))
 {-# CONSTANT_FOLDED timesInteger #-}
 
 -- | Square 'Integer'
 sqrInteger :: Integer -> Integer
-sqrInteger (SI# INT_MINBOUND#) = timesInt2Integer INT_MINBOUND# INT_MINBOUND#
-sqrInteger (SI# j#) | isTrue# (absI# j# <=# SQRT_INT_MAXBOUND#) = SI# (j# *# j#)
-sqrInteger (SI# j#) = timesInt2Integer j# j#
+sqrInteger (S# INT_MINBOUND#) = timesInt2Integer INT_MINBOUND# INT_MINBOUND#
+sqrInteger (S# j#) | isTrue# (absI# j# <=# SQRT_INT_MAXBOUND#) = S# (j# *# j#)
+sqrInteger (S# j#) = timesInt2Integer j# j#
 sqrInteger (Jp# bn) = Jp# (sqrBigNat bn)
 sqrInteger (Jn# bn) = Jp# (sqrBigNat bn)
 
@@ -483,14 +483,14 @@ timesInt2Integer x# y# = case (# x# >=# 0#, y# >=# 0# #) of
 
 bigNatToInteger :: BigNat -> Integer
 bigNatToInteger bn
-  | isTrue# ((sizeofBigNat# bn ==# 1#) `andI#` (i# >=# 0#)) = SI# i#
+  | isTrue# ((sizeofBigNat# bn ==# 1#) `andI#` (i# >=# 0#)) = S# i#
   | True                                                    = Jp# bn
   where
     i# = word2Int# (bigNatToWord bn)
 
 bigNatToNegInteger :: BigNat -> Integer
 bigNatToNegInteger bn
-  | isTrue# ((sizeofBigNat# bn ==# 1#) `andI#` (i# <=# 0#)) = SI# i#
+  | isTrue# ((sizeofBigNat# bn ==# 1#) `andI#` (i# <=# 0#)) = S# i#
   | True                                                    = Jn# bn
   where
     i# = negateInt# (word2Int# (bigNatToWord bn))
@@ -498,7 +498,7 @@ bigNatToNegInteger bn
 -- | Count number of set bits. For negative arguments returns negative
 -- population count of negated argument.
 popCountInteger :: Integer -> Int#
-popCountInteger (SI# i#)
+popCountInteger (S# i#)
   | isTrue# (i# >=# 0#) = popCntI# i#
   | True                = negateInt# (popCntI# (negateInt# i#))
 popCountInteger (Jp# bn)  = popCountBigNat bn
@@ -509,14 +509,14 @@ popCountInteger (Jn# bn)  = negateInt# (popCountBigNat bn)
 -- for negative /n/ values.
 bitInteger :: Int# -> Integer
 bitInteger i#
-  | isTrue# (i# <# (GMP_LIMB_BITS# -# 1#)) = SI# (uncheckedIShiftL# 1# i#)
+  | isTrue# (i# <# (GMP_LIMB_BITS# -# 1#)) = S# (uncheckedIShiftL# 1# i#)
   | True = Jp# (bitBigNat i#)
 {-# CONSTANT_FOLDED bitInteger #-}
 
 -- | Test if /n/-th bit is set.
 testBitInteger :: Integer -> Int# -> Bool
 testBitInteger _  n# | isTrue# (n# <# 0#) = False
-testBitInteger (SI# i#) n#
+testBitInteger (S# i#) n#
   | isTrue# (n# <# GMP_LIMB_BITS#) = isTrue# (((uncheckedIShiftL# 1# n#)
                                                `andI#` i#) /=# 0#)
   | True                          = isTrue# (i# <# 0#)
@@ -526,7 +526,7 @@ testBitInteger (Jn# bn) n = testBitNegBigNat bn n
 
 -- | Bitwise @NOT@ operation
 complementInteger :: Integer -> Integer
-complementInteger (SI# i#) = SI# (notI# i#)
+complementInteger (S# i#) = S# (notI# i#)
 complementInteger (Jp# bn) = Jn# (plusBigNatWord  bn 1##)
 complementInteger (Jn# bn) = Jp# (minusBigNatWord bn 1##)
 {-# CONSTANT_FOLDED complementInteger #-}
@@ -536,8 +536,8 @@ complementInteger (Jn# bn) = Jp# (minusBigNatWord bn 1##)
 -- Even though the shift-amount is expressed as `Int#`, the result is
 -- undefined for negative shift-amounts.
 shiftRInteger :: Integer -> Int# -> Integer
-shiftRInteger x              0# = x
-shiftRInteger (SI# i#)  n# = SI# (iShiftRA# i# n#)
+shiftRInteger x        0# = x
+shiftRInteger (S# i#)  n# = S# (iShiftRA# i# n#)
   where
     iShiftRA# a b
       | isTrue# (b >=# WORD_SIZE_IN_BITS#) = (a <# 0#) *# (-1#)
@@ -545,7 +545,7 @@ shiftRInteger (SI# i#)  n# = SI# (iShiftRA# i# n#)
 shiftRInteger (Jp# bn) n# = bigNatToInteger (shiftRBigNat bn n#)
 shiftRInteger (Jn# bn) n#
     = case bigNatToNegInteger (shiftRNegBigNat bn n#) of
-        SI# 0# -> SI# -1#
+        S# 0# -> S# -1#
         r           -> r
 {-# CONSTANT_FOLDED shiftRInteger #-}
 
@@ -555,9 +555,9 @@ shiftRInteger (Jn# bn) n#
 -- undefined for negative shift-amounts.
 shiftLInteger :: Integer -> Int# -> Integer
 shiftLInteger x       0#  = x
-shiftLInteger (SI# 0#) _  = SI# 0#
-shiftLInteger (SI# 1#) n# = bitInteger n#
-shiftLInteger (SI# i#) n#
+shiftLInteger (S# 0#) _  = S# 0#
+shiftLInteger (S# 1#) n# = bitInteger n#
+shiftLInteger (S# i#) n#
   | isTrue# (i# >=# 0#)   = bigNatToInteger (shiftLBigNat
                                              (wordToBigNat (int2Word# i#)) n#)
   | True               = bigNatToNegInteger (shiftLBigNat
@@ -570,13 +570,13 @@ shiftLInteger (Jn# bn) n# = Jn# (shiftLBigNat bn n#)
 -- | Bitwise OR operation
 orInteger :: Integer -> Integer -> Integer
 -- short-cuts
-orInteger  (SI# 0#)    y          = y
-orInteger  x           (SI# 0#)   = x
-orInteger  (SI# -1#)    _         = SI# -1#
-orInteger  _           (SI# -1#)  = SI# -1#
+orInteger  (S# 0#)     y         = y
+orInteger  x           (S# 0#)   = x
+orInteger  (S# -1#)    _         = S# -1#
+orInteger  _           (S# -1#)  = S# -1#
 -- base-cases
-orInteger  (SI# x#)    (SI# y#)   = SI# (orI# x# y#)
-orInteger  (Jp# x)     (Jp# y)    = Jp# (orBigNat x y)
+orInteger  (S# x#)     (S# y#)   = S# (orI# x# y#)
+orInteger  (Jp# x)     (Jp# y)   = Jp# (orBigNat x y)
 orInteger  (Jn# x)     (Jn# y)
     = bigNatToNegInteger (plusBigNatWord (andBigNat
                                           (minusBigNatWord x 1##)
@@ -586,18 +586,18 @@ orInteger  (Jp# x)     (Jn# y)
     = bigNatToNegInteger (plusBigNatWord (andnBigNat (minusBigNatWord y 1##) x)
                                          1##)
 -- TODO/FIXpromotion-hack
-orInteger  x@(SI# _)   y          = orInteger (unsafePromote x) y
-orInteger  x           y {- SI# -}= orInteger x (unsafePromote y)
+orInteger  x@(S# _)   y          = orInteger (unsafePromote x) y
+orInteger  x           y {- S# -}= orInteger x (unsafePromote y)
 {-# CONSTANT_FOLDED orInteger #-}
 
 -- | Bitwise XOR operation
 xorInteger :: Integer -> Integer -> Integer
 -- short-cuts
-xorInteger (SI# 0#)    y          = y
-xorInteger x           (SI# 0#)   = x
--- TODO: (SI# -1) cases
+xorInteger (S# 0#)     y          = y
+xorInteger x           (S# 0#)    = x
+-- TODO: (S# -1) cases
 -- base-cases
-xorInteger (SI# x#)    (SI# y#)   = SI# (xorI# x# y#)
+xorInteger (S# x#)     (S# y#)    = S# (xorI# x# y#)
 xorInteger (Jp# x)     (Jp# y)    = bigNatToInteger (xorBigNat x y)
 xorInteger (Jn# x)     (Jn# y)
     = bigNatToInteger (xorBigNat (minusBigNatWord x 1##)
@@ -607,20 +607,20 @@ xorInteger (Jp# x)     (Jn# y)
     = bigNatToNegInteger (plusBigNatWord (xorBigNat x (minusBigNatWord y 1##))
                                          1##)
 -- TODO/FIXME promotion-hack
-xorInteger x@(SI# _)   y          = xorInteger (unsafePromote x) y
-xorInteger x           y {- SI# -}= xorInteger x (unsafePromote y)
+xorInteger x@(S# _)    y          = xorInteger (unsafePromote x) y
+xorInteger x           y {- S# -} = xorInteger x (unsafePromote y)
 {-# CONSTANT_FOLDED xorInteger #-}
 
 -- | Bitwise AND operation
 andInteger :: Integer -> Integer -> Integer
 -- short-cuts
-andInteger (SI# 0#)       _       = SI# 0#
-andInteger _           (SI# 0#)   = SI# 0#
-andInteger (SI# -1#)   y          = y
-andInteger x           (SI# -1#)  = x
+andInteger (S# 0#)       _       = S# 0#
+andInteger _           (S# 0#)   = S# 0#
+andInteger (S# -1#)   y          = y
+andInteger x           (S# -1#)  = x
 -- base-cases
-andInteger (SI# x#)    (SI# y#)   = SI# (andI# x# y#)
-andInteger (Jp# x)     (Jp# y)    = bigNatToInteger (andBigNat x y)
+andInteger (S# x#)     (S# y#)   = S# (andI# x# y#)
+andInteger (Jp# x)     (Jp# y)   = bigNatToInteger (andBigNat x y)
 andInteger (Jn# x)     (Jn# y)
     = bigNatToNegInteger (plusBigNatWord (orBigNat (minusBigNatWord x 1##)
                                                    (minusBigNatWord y 1##)) 1##)
@@ -628,13 +628,13 @@ andInteger x@(Jn# _)   y@(Jp# _)  = andInteger y x
 andInteger (Jp# x)     (Jn# y)
     = bigNatToInteger (andnBigNat x (minusBigNatWord y 1##))
 -- TODO/FIXME promotion-hack
-andInteger x@(SI# _)   y          = andInteger (unsafePromote x) y
-andInteger x           y {- SI# -}= andInteger x (unsafePromote y)
+andInteger x@(S# _)   y          = andInteger (unsafePromote x) y
+andInteger x           y {- S# -}= andInteger x (unsafePromote y)
 {-# CONSTANT_FOLDED andInteger #-}
 
 -- HACK warning! breaks invariant on purpose
 unsafePromote :: Integer -> Integer
-unsafePromote (SI# x#)
+unsafePromote (S# x#)
     | isTrue# (x# >=# 0#) = Jp# (wordToBigNat (int2Word# x#))
     | True                = Jn# (wordToBigNat (int2Word# (negateInt# x#)))
 unsafePromote x = x
@@ -644,12 +644,12 @@ unsafePromote x = x
 -- Divisor must be non-zero otherwise the GHC runtime will terminate
 -- with a division-by-zero fault.
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
-quotRemInteger n       (SI# 1#) = (# n, SI# 0# #)
-quotRemInteger n      (SI# -1#) = let !q = negateInteger n in (# q, (SI# 0#) #)
-quotRemInteger _       (SI# 0#) = (# SI# (quotInt# 0# 0#),SI# (remInt# 0# 0#) #)
-quotRemInteger (SI# 0#) _       = (# SI# 0#, SI# 0# #)
-quotRemInteger (SI# n#) (SI# d#) = case quotRemInt# n# d# of
-    (# q#, r# #) -> (# SI# q#, SI# r# #)
+quotRemInteger n       (S# 1#) = (# n, S# 0# #)
+quotRemInteger n      (S# -1#) = let !q = negateInteger n in (# q, (S# 0#) #)
+quotRemInteger _       (S# 0#) = (# S# (quotInt# 0# 0#),S# (remInt# 0# 0#) #)
+quotRemInteger (S# 0#) _       = (# S# 0#, S# 0# #)
+quotRemInteger (S# n#) (S# d#) = case quotRemInt# n# d# of
+    (# q#, r# #) -> (# S# q#, S# r# #)
 quotRemInteger (Jp# n)  (Jp# d)  = case quotRemBigNat n d of
     (# q, r #) -> (# bigNatToInteger q, bigNatToInteger r #)
 quotRemInteger (Jp# n)  (Jn# d)  = case quotRemBigNat n d of
@@ -658,35 +658,35 @@ quotRemInteger (Jn# n)  (Jn# d)  = case quotRemBigNat n d of
     (# q, r #) -> (# bigNatToInteger q, bigNatToNegInteger r #)
 quotRemInteger (Jn# n)  (Jp# d)  = case quotRemBigNat n d of
     (# q, r #) -> (# bigNatToNegInteger q, bigNatToNegInteger r #)
-quotRemInteger (Jp# n)  (SI# d#)
+quotRemInteger (Jp# n)  (S# d#)
   | isTrue# (d# >=# 0#) = case quotRemBigNatWord n (int2Word# d#) of
       (# q, r# #) -> (# bigNatToInteger q, wordToInteger r# #)
   | True               = case quotRemBigNatWord n (int2Word# (negateInt# d#)) of
       (# q, r# #) -> (# bigNatToNegInteger q, wordToInteger r# #)
-quotRemInteger (Jn# n)  (SI# d#)
+quotRemInteger (Jn# n)  (S# d#)
   | isTrue# (d# >=# 0#) = case quotRemBigNatWord n (int2Word# d#) of
       (# q, r# #) -> (# bigNatToNegInteger q, wordToNegInteger r# #)
   | True               = case quotRemBigNatWord n (int2Word# (negateInt# d#)) of
       (# q, r# #) -> (# bigNatToInteger q, wordToNegInteger r# #)
-quotRemInteger n@(SI# _) (Jn# _) = (# SI# 0#, n #) -- since @n < d@
-quotRemInteger n@(SI# n#) (Jp# d) -- need to account for (SI# minBound)
-    | isTrue# (n# ># 0#)                                    = (# SI# 0#, n #)
-    | isTrue# (gtBigNatWord# d (int2Word# (negateInt# n#))) = (# SI# 0#, n #)
-    | True {- abs(n) == d -}                          = (# SI# -1#, SI# 0# #)
+quotRemInteger n@(S# _) (Jn# _) = (# S# 0#, n #) -- since @n < d@
+quotRemInteger n@(S# n#) (Jp# d) -- need to account for (S# minBound)
+    | isTrue# (n# ># 0#)                                    = (# S# 0#, n #)
+    | isTrue# (gtBigNatWord# d (int2Word# (negateInt# n#))) = (# S# 0#, n #)
+    | True {- abs(n) == d -}                          = (# S# -1#, S# 0# #)
 {-# CONSTANT_FOLDED quotRemInteger #-}
 
 
 quotInteger :: Integer -> Integer -> Integer
-quotInteger n       (SI# 1#) = n
-quotInteger n      (SI# -1#) = negateInteger n
-quotInteger _       (SI# 0#) = SI# (quotInt# 0# 0#)
-quotInteger (SI# 0#) _       = SI# 0#
-quotInteger (SI# n#)  (SI# d#) = SI# (quotInt# n# d#)
-quotInteger (Jp# n)   (SI# d#)
+quotInteger n       (S# 1#) = n
+quotInteger n      (S# -1#) = negateInteger n
+quotInteger _       (S# 0#) = S# (quotInt# 0# 0#)
+quotInteger (S# 0#) _       = S# 0#
+quotInteger (S# n#)  (S# d#) = S# (quotInt# n# d#)
+quotInteger (Jp# n)   (S# d#)
   | isTrue# (d# >=# 0#) = bigNatToInteger    (quotBigNatWord n (int2Word# d#))
   | True                = bigNatToNegInteger (quotBigNatWord n
                                               (int2Word# (negateInt# d#)))
-quotInteger (Jn# n)   (SI# d#)
+quotInteger (Jn# n)   (S# d#)
   | isTrue# (d# >=# 0#) = bigNatToNegInteger (quotBigNatWord n (int2Word# d#))
   | True                = bigNatToInteger    (quotBigNatWord n
                                               (int2Word# (negateInt# d#)))
@@ -699,14 +699,14 @@ quotInteger n d = case inline quotRemInteger n d of (# q, _ #) -> q
 {-# CONSTANT_FOLDED quotInteger #-}
 
 remInteger :: Integer -> Integer -> Integer
-remInteger _        (SI# 1#) = SI# 0#
-remInteger _       (SI# -1#) = SI# 0#
-remInteger _        (SI# 0#) = SI# (remInt# 0# 0#)
-remInteger (SI# 0#) _        = SI# 0#
-remInteger (SI# n#) (SI# d#) = SI# (remInt# n# d#)
-remInteger (Jp# n)  (SI# d#)
+remInteger _        (S# 1#) = S# 0#
+remInteger _       (S# -1#) = S# 0#
+remInteger _        (S# 0#) = S# (remInt# 0# 0#)
+remInteger (S# 0#) _        = S# 0#
+remInteger (S# n#) (S# d#) = S# (remInt# n# d#)
+remInteger (Jp# n)  (S# d#)
     = wordToInteger    (remBigNatWord n (int2Word# (absI# d#)))
-remInteger (Jn# n)  (SI# d#)
+remInteger (Jn# n)  (S# d#)
     = wordToNegInteger (remBigNatWord n (int2Word# (absI# d#)))
 remInteger (Jp# n)  (Jp# d)  = bigNatToInteger    (remBigNat n d)
 remInteger (Jp# n)  (Jn# d)  = bigNatToInteger    (remBigNat n d)
@@ -723,7 +723,7 @@ remInteger n d = case inline quotRemInteger n d of (# _, r #) -> r
 divModInteger :: Integer -> Integer -> (# Integer, Integer #)
 divModInteger n d
   | isTrue# (signumInteger# r ==# negateInt# (signumInteger# d))
-     = let !q' = plusInteger q (SI# -1#) -- TODO: optimize
+     = let !q' = plusInteger q (S# -1#) -- TODO: optimize
            !r' = plusInteger r d
        in (# q', r' #)
   | True = qr
@@ -745,30 +745,30 @@ modInteger n d = case inline divModInteger n d of (# _, r #) -> r
 
 -- | Compute greatest common divisor.
 gcdInteger :: Integer -> Integer -> Integer
-gcdInteger (SI# 0#)        b = absInteger b
-gcdInteger a        (SI# 0#) = absInteger a
-gcdInteger (SI# 1#)        _ = SI# 1#
-gcdInteger (SI# -1#)       _ = SI# 1#
-gcdInteger _        (SI# 1#) = SI# 1#
-gcdInteger _       (SI# -1#) = SI# 1#
-gcdInteger (SI# a#) (SI# b#)
+gcdInteger (S# 0#)        b = absInteger b
+gcdInteger a        (S# 0#) = absInteger a
+gcdInteger (S# 1#)        _ = S# 1#
+gcdInteger (S# -1#)       _ = S# 1#
+gcdInteger _        (S# 1#) = S# 1#
+gcdInteger _       (S# -1#) = S# 1#
+gcdInteger (S# a#) (S# b#)
     = wordToInteger (gcdWord# (int2Word# (absI# a#)) (int2Word# (absI# b#)))
-gcdInteger a@(SI# _) b = gcdInteger b a
+gcdInteger a@(S# _) b = gcdInteger b a
 gcdInteger (Jn# a) b = gcdInteger (Jp# a) b
 gcdInteger (Jp# a) (Jp# b) = bigNatToInteger (gcdBigNat a b)
 gcdInteger (Jp# a) (Jn# b) = bigNatToInteger (gcdBigNat a b)
-gcdInteger (Jp# a) (SI# b#)
+gcdInteger (Jp# a) (S# b#)
     = wordToInteger (gcdBigNatWord a (int2Word# (absI# b#)))
 {-# CONSTANT_FOLDED gcdInteger #-}
 
 -- | Compute least common multiple.
 lcmInteger :: Integer -> Integer -> Integer
-lcmInteger (SI# 0#) _   = SI# 0#
-lcmInteger (SI# 1#)  b  = absInteger b
-lcmInteger (SI# -1#) b  = absInteger b
-lcmInteger _ (SI# 0#)   = SI# 0#
-lcmInteger a (SI# 1#)   = absInteger a
-lcmInteger a (SI# -1#)  = absInteger a
+lcmInteger (S# 0#) _   = S# 0#
+lcmInteger (S# 1#)  b  = absInteger b
+lcmInteger (S# -1#) b  = absInteger b
+lcmInteger _ (S# 0#)   = S# 0#
+lcmInteger a (S# 1#)   = absInteger a
+lcmInteger a (S# -1#)  = absInteger a
 lcmInteger a b = (aa `quotInteger` (aa `gcdInteger` ab)) `timesInteger` ab
   where
     aa = absInteger a
@@ -1253,10 +1253,10 @@ gcdBigNat x@(BN# x#) y@(BN# y#)
 -- Conversions to/from floating point
 
 decodeDoubleInteger :: Double# -> (# Integer, Int# #)
--- decodeDoubleInteger 0.0## = (# SI# 0#, 0# #)
+-- decodeDoubleInteger 0.0## = (# S# 0#, 0# #)
 #if WORD_SIZE_IN_BITS == 64
 decodeDoubleInteger x = case decodeDouble_Int64# x of
-                          (# m#, e# #) -> (# SI# m#, e# #)
+                          (# m#, e# #) -> (# S# m#, e# #)
 #elif WORD_SIZE_IN_BITS == 32
 decodeDoubleInteger x = case decodeDouble_Int64# x of
                           (# m#, e# #) -> (# int64ToInteger m#, e# #)
@@ -1268,8 +1268,8 @@ foreign import ccall unsafe "__int_encodeDouble"
   int_encodeDouble# :: Int# -> Int# -> Double#
 
 encodeDoubleInteger :: Integer -> Int# -> Double#
-encodeDoubleInteger (SI# m#) 0# = int2Double# m#
-encodeDoubleInteger (SI# m#) e# = int_encodeDouble# m# e#
+encodeDoubleInteger (S# m#) 0# = int2Double# m#
+encodeDoubleInteger (S# m#) e# = int_encodeDouble# m# e#
 encodeDoubleInteger (Jp# bn@(BN# bn#)) e#
     = c_mpn_get_d bn# (sizeofBigNat# bn) e#
 encodeDoubleInteger (Jn# bn@(BN# bn#)) e#
@@ -1281,7 +1281,7 @@ foreign import ccall unsafe "integer_gmp_mpn_get_d"
   c_mpn_get_d :: ByteArray# -> GmpSize# -> Int# -> Double#
 
 doubleFromInteger :: Integer -> Double#
-doubleFromInteger (SI# m#) = int2Double# m#
+doubleFromInteger (S# m#) = int2Double# m#
 doubleFromInteger (Jp# bn@(BN# bn#))
     = c_mpn_get_d bn# (sizeofBigNat# bn) 0#
 doubleFromInteger (Jn# bn@(BN# bn#))

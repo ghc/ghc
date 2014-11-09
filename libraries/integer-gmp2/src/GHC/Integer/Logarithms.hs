@@ -40,7 +40,7 @@ default ()
 --
 -- Note: Internally uses 'integerLog2#' for base 2
 integerLogBase# :: Integer -> Integer -> Int#
-integerLogBase# (SI# 2#) m = integerLog2# m
+integerLogBase# (S# 2#) m = integerLog2# m
 integerLogBase# b m = e'
   where
     (# _, e' #) = go b
@@ -57,7 +57,7 @@ integerLogBase# b m = e'
 --
 -- The argument must be strictly positive, that condition is /not/ checked.
 integerLog2# :: Integer -> Int#
-integerLog2# (SI# i#) = wordLog2# (int2Word# i#)
+integerLog2# (S# i#) = wordLog2# (int2Word# i#)
 integerLog2# (Jn#  _) = -1#
 integerLog2# (Jp# bn) = go (s -# 1#)
   where

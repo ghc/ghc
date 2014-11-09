@@ -49,7 +49,7 @@ default ()
 integerLog2IsPowerOf2# :: Integer -> (# Int#, Int# #)
 -- The power of 2 test is n&(n-1) == 0, thus powers of 2
 -- are indicated bythe second component being zero.
-integerLog2IsPowerOf2# (SI# i#) = case int2Word# i# of
+integerLog2IsPowerOf2# (S# i#) = case int2Word# i# of
       w -> (# wordLog2# w, word2Int# (w `and#` (w `minusWord#` 1##)) #)
 integerLog2IsPowerOf2# (Jn# _) = (# -1#, -1# #)
 -- Find the log2 as above, test whether that word is a power
@@ -84,7 +84,7 @@ integerLog2IsPowerOf2# (Jp# bn) = check (s -# 1#)
 -- 1# means we have a half-integer, round to even
 -- 2# means round up (away from zero)
 roundingMode# :: Integer -> Int# -> Int#
-roundingMode# (SI# i#) t =
+roundingMode# (S# i#) t =
     case int2Word# i# `and#` ((uncheckedShiftL# 2## t) `minusWord#` 1##) of
       k -> case uncheckedShiftL# 1## t of
             c -> if isTrue# (c `gtWord#` k)
