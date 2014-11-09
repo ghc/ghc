@@ -16,7 +16,7 @@
 -- The 'Integer' type.
 --
 -- This module exposes the /portable/ 'Integer' API.  See
--- "GHC.Integer.GMP.Internals" for the @integer-gmp2@-specific internal
+-- "GHC.Integer.GMP.Internals" for the @integer-gmp@-specific internal
 -- representation of 'Integer' as well as optimized GMP-specific
 -- operations.
 

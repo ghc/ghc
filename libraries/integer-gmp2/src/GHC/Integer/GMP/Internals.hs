@@ -23,7 +23,7 @@
 -- This modules provides access to the 'Integer' constructors and
 -- exposes some highly optimized GMP-operations.
 --
--- Note that since @integer-gmp2@ does not depend on `base`, error
+-- Note that since @integer-gmp@ does not depend on `base`, error
 -- reporting via exceptions, 'error', or 'undefined' is not
 -- available. Instead, the low-level functions will crash the runtime
 -- if called with invalid arguments.

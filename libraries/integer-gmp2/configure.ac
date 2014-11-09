@@ -77,7 +77,7 @@ AC_SUBST(HaveLibGmp)
 AC_SUBST(HaveFrameworkGMP)
 AC_SUBST(HaveSecurePowm)
 
-AC_CONFIG_FILES([integer-gmp2.buildinfo gmp/config.mk include/HsIntegerGmp2.h])
+AC_CONFIG_FILES([integer-gmp.buildinfo gmp/config.mk include/HsIntegerGmp.h])
 
 dnl--------------------------------------------------------------------
 dnl * Generate the header cbits/GmpDerivedConstants.h

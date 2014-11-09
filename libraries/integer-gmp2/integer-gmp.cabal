@@ -1,5 +1,5 @@
-name:                integer-gmp2
-version:             0.0.1.0
+name:                integer-gmp
+version:             1.0.0.0
 synopsis:            Integer library based on GMP
 license:             BSD3
 license-file:        LICENSE
@@ -17,16 +17,16 @@ extra-source-files:
     configure
     configure.ac
     gmp/config.mk.in
-    include/HsIntegerGmp2.h.in
-    integer-gmp2.buildinfo.in
+    include/HsIntegerGmp.h.in
+    integer-gmp.buildinfo.in
 
 extra-tmp-files:
     autom4te.cache
     config.log
     config.status
     gmp/config.mk
-    integer-gmp2.buildinfo
-    include/HsIntegerGmp2.h
+    integer-gmp.buildinfo
+    include/HsIntegerGmp.h
 
 library
   default-language:    Haskell2010
@@ -46,7 +46,7 @@ library
     UnliftedFFITypes
   build-depends:       ghc-prim
   hs-source-dirs:      src/
-  ghc-options: -this-package-key integer-gmp2 -Wall
+  ghc-options: -this-package-key integer-gmp -Wall
   cc-options: -std=c99 -Wall
 
   include-dirs: include

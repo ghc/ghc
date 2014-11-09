@@ -6,8 +6,8 @@
 /dist-install/
 /ghc.mk
 /gmp/config.mk
-/include/HsIntegerGmp2.h
-/integer-gmp2.buildinfo
+/include/HsIntegerGmp.h
+/integer-gmp.buildinfo
 
 /gmp/gmp.h
 /gmp/gmpbuild

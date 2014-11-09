@@ -418,11 +418,14 @@ generate directory distdir dll0Modules config_args
           transitiveDepNames = map (display . packageName) transitive_dep_ids
 
           libraryDirs = forDeps Installed.libraryDirs
+          -- temporary hack to support two in-tree versions of `integer-gmp`
+          isIntegerGmp2 = any ("integer-gmp2" `isInfixOf`) libraryDirs
           -- The mkLibraryRelDir function is a bit of a hack.
           -- Ideally it should be handled in the makefiles instead.
           mkLibraryRelDir "rts"   = "rts/dist/build"
           mkLibraryRelDir "ghc"   = "compiler/stage2/build"
           mkLibraryRelDir "Cabal" = "libraries/Cabal/Cabal/dist-install/build"
+          mkLibraryRelDir "integer-gmp" | isIntegerGmp2 = mkLibraryRelDir "integer-gmp2"
           mkLibraryRelDir l       = "libraries/" ++ l ++ "/dist-install/build"
           libraryRelDirs = map mkLibraryRelDir transitiveDepNames
       wrappedIncludeDirs <- wrap $ forDeps Installed.includeDirs
