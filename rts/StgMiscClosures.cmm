@@ -199,6 +199,8 @@ INFO_TABLE_FUN( stg_BCO, 4, 0, BCO, "BCO", "BCO", ARG_BCO )
 {
   /* entering a BCO means "apply it", same as a function */
   Sp_adj(-2);
+  // Skip the stack check; the interpreter will do one before using
+  // the stack anyway.
   Sp(1) = R1;
   Sp(0) = stg_apply_interp_info;
   jump stg_yield_to_interpreter [];

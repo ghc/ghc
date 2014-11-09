@@ -1,5 +1,16 @@
-{-# LANGUAGE Unsafe             #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE Unsafe #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -12,20 +23,6 @@
 -- construct a TyCon.
 --
 -----------------------------------------------------------------------------
-
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
-           , OverlappingInstances
-           , ScopedTypeVariables
-           , FlexibleInstances
-           , MagicHash
-           , KindSignatures
-           , PolyKinds
-           , ConstraintKinds
-           , DeriveDataTypeable
-           , DataKinds
-           , UndecidableInstances
-           , StandaloneDeriving #-}
 
 module Data.Typeable.Internal (
     Proxy (..),

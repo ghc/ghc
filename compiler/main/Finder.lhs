@@ -171,7 +171,12 @@ orIfNotFound this or_this = do
              _other -> return res2
     _other -> return res
 
-
+-- | Helper function for 'findHomeModule': this function wraps an IO action
+-- which would look up @mod_name@ in the file system (the home package),
+-- and first consults the 'hsc_FC' cache to see if the lookup has already
+-- been done.  Otherwise, do the lookup (with the IO action) and save
+-- the result in the finder cache and the module location cache (if it
+-- was successful.)
 homeSearchCache :: HscEnv -> ModuleName -> IO FindResult -> IO FindResult
 homeSearchCache hsc_env mod_name do_this = do
   m <- lookupFinderCache (hsc_FC hsc_env) mod_name
@@ -234,7 +239,22 @@ uncacheModule hsc_env mod = do
 -- -----------------------------------------------------------------------------
 --      The internal workers
 
--- | Search for a module in the home package only.
+-- | Implements the search for a module name in the home package only.  Calling
+-- this function directly is usually *not* what you want; currently, it's used
+-- as a building block for the following operations:
+--
+--  1. When you do a normal package lookup, we first check if the module
+--  is available in the home module, before looking it up in the package
+--  database.
+--
+--  2. When you have a package qualified import with package name "this",
+--  we shortcut to the home module.
+--
+--  3. When we look up an exact 'Module', if the package key associated with
+--  the module is the current home module do a look up in the home module.
+--
+--  4. Some special-case code in GHCi (ToDo: Figure out why that needs to
+--  call this.)
 findHomeModule :: HscEnv -> ModuleName -> IO FindResult
 findHomeModule hsc_env mod_name =
    homeSearchCache hsc_env mod_name $
@@ -247,6 +267,8 @@ findHomeModule hsc_env mod_name =
      source_exts =
       [ ("hs",   mkHomeModLocationSearched dflags mod_name "hs")
       , ("lhs",  mkHomeModLocationSearched dflags mod_name "lhs")
+      , ("hsig",  mkHomeModLocationSearched dflags mod_name "hsig")
+      , ("lhsig",  mkHomeModLocationSearched dflags mod_name "lhsig")
       ]
 
      hi_exts = [ (hisuf,                mkHiOnlyModLocation dflags hisuf)

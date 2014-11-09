@@ -79,17 +79,11 @@ rnExpr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 finishHsVar :: Name -> RnM (HsExpr Name, FreeVars)
 -- Separated from rnExpr because it's also used
 -- when renaming infix expressions
--- See Note [Adding the implicit parameter to 'assert']
 finishHsVar name
  = do { this_mod <- getModule
       ; when (nameIsLocalOrFrom this_mod name) $
         checkThLocalName name
-
-      ; ignore_asserts <- goptM Opt_IgnoreAsserts
-      ; if ignore_asserts || not (name `hasKey` assertIdKey)
-        then return (HsVar name, unitFV name)
-        else do { e <- mkAssertErrorExpr
-                ; return (e, unitFV name) } }
+      ; return (HsVar name, unitFV name) }
 
 rnExpr (HsVar v)
   = do { mb_name <- lookupOccRn_maybe v
@@ -1140,36 +1134,6 @@ segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
     used_later = defs `intersectNameSet` later_uses
                                 -- The ones needed after the RecStmt
 \end{code}
-
-%************************************************************************
-%*                                                                      *
-\subsubsection{Assertion utils}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-srcSpanPrimLit :: DynFlags -> SrcSpan -> HsExpr Name
-srcSpanPrimLit dflags span
-    = HsLit (HsStringPrim (unsafeMkByteString (showSDocOneLine dflags (ppr span))))
-
-mkAssertErrorExpr :: RnM (HsExpr Name)
--- Return an expression for (assertError "Foo.hs:27")
-mkAssertErrorExpr
-  = do sloc <- getSrcSpanM
-       dflags <- getDynFlags
-       return (HsApp (L sloc (HsVar assertErrorName))
-                     (L sloc (srcSpanPrimLit dflags sloc)))
-\end{code}
-
-Note [Adding the implicit parameter to 'assert']
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The renamer transforms (assert e1 e2) to (assert "Foo.hs:27" e1 e2).
-By doing this in the renamer we allow the typechecker to just see the
-expanded application and do the right thing. But it's not really
-the Right Thing because there's no way to "undo" if you want to see
-the original source code.  We'll have fix this in due course, when
-we care more about being able to reconstruct the exact original
-program.
 
 %************************************************************************
 %*                                                                      *

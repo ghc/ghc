@@ -49,7 +49,7 @@ module Data.Foldable (
 import Data.Bool
 import Data.Either
 import Data.Eq
-import qualified Data.OldList as List
+import qualified GHC.List as List
 import Data.Maybe
 import Data.Monoid
 import Data.Ord
@@ -62,8 +62,6 @@ import GHC.Num  ( Num(..) )
 infix  4 `elem`, `notElem`
 
 -- | Data structures that can be folded.
---
--- Minimal complete definition: 'foldMap' or 'foldr'.
 --
 -- For example, given a data type
 --
@@ -130,8 +128,9 @@ class Foldable t where
     foldr1 f xs = fromMaybe (error "foldr1: empty structure")
                     (foldr mf Nothing xs)
       where
-        mf x Nothing = Just x
-        mf x (Just y) = Just (f x y)
+        mf x m = Just (case m of
+                         Nothing -> x
+                         Just y  -> f x y)
 
     -- | A variant of 'foldl' that has no base case,
     -- and thus may only be applied to non-empty structures.
@@ -141,32 +140,33 @@ class Foldable t where
     foldl1 f xs = fromMaybe (error "foldl1: empty structure")
                     (foldl mf Nothing xs)
       where
-        mf Nothing y = Just y
-        mf (Just x) y = Just (f x y)
+        mf m y = Just (case m of
+                         Nothing -> y
+                         Just x  -> f x y)
 
     -- | List of elements of a structure.
-    toList :: Foldable t => t a -> [a]
+    toList :: t a -> [a]
     {-# INLINE toList #-}
     toList t = build (\ c n -> foldr c n t)
 
     -- | Test whether the structure is empty.
-    null :: Foldable t => t a -> Bool
+    null :: t a -> Bool
     null = foldr (\_ _ -> False) True
 
     -- | Returns the size/length of a finite structure as an 'Int'.
-    length :: Foldable t => t a -> Int
+    length :: t a -> Int
     length = foldl' (\c _ -> c+1) 0
 
     -- | Does the element occur in the structure?
-    elem :: (Foldable t, Eq a) => a -> t a -> Bool
+    elem :: Eq a => a -> t a -> Bool
     elem = any . (==)
 
     -- | The largest element of a non-empty structure.
-    maximum :: (Foldable t, Ord a) => t a -> a
+    maximum :: Ord a => t a -> a
     maximum = foldr1 max
 
     -- | The least element of a non-empty structure.
-    minimum :: (Foldable t, Ord a) => t a -> a
+    minimum :: Ord a => t a -> a
     minimum = foldr1 min
 
     -- | The 'sum' function computes the sum of the numbers of a structure.
@@ -175,7 +175,7 @@ class Foldable t where
 
     -- | The 'product' function computes the product of the numbers of a
     -- structure.
-    product :: (Foldable t, Num a) => t a -> a
+    product :: Num a => t a -> a
     product = getProduct . foldMap Product
 
 -- instances for Prelude types

@@ -45,6 +45,11 @@ test('SafeLang15',
      multimod_compile_and_run,
      ['SafeLang15', '-XSafe'])
 test('SafeLang16', normal, compile, [''])
+test('SafeLang17',
+     extra_clean(['SafeLang17_A.o', 'SafeLang17_A.hi',
+                  'SafeLang17_B.o', 'SafeLang17_B.hi']),
+     multimod_compile_fail,
+     ['SafeLang17', ''])
 
 # Test building a package, that trust values are set correctly
 # and can be changed correctly

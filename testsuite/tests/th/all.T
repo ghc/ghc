@@ -120,7 +120,7 @@ test('TH_dupdecl', normal, compile_fail, ['-v0'])
 test('TH_exn2', normal, compile_fail, ['-v0'])
 
 test('TH_recover', normal, compile_and_run, [''])
-test('TH_dataD1', normal, compile, ['-v0'])
+test('TH_dataD1', normal, compile_fail, ['-v0'])
 
 test('TH_ppr1', normal, compile_and_run, [''])
 
@@ -251,7 +251,7 @@ test('T5795', normal, compile_fail, ['-v0'])
 test('T6005', normal, compile, ['-v0'])
 test('T6005a', normal, compile, ['-v0'])
 test('T5737', normal, compile, ['-v0'])
-test('T6114', normal, compile_fail, ['-v0 -dsuppress-uniques'])
+test('T6114', normal, compile, ['-v0'])
 test('TH_StringPrimL', normal, compile_and_run, [''])
 test('T7064',
      extra_clean(['T7064a.hi', 'T7064a.o']),
@@ -329,5 +329,10 @@ test('T8954', normal, compile, ['-v0'])
 test('T8932', normal, compile_fail, ['-v0'])
 test('T8987', normal, compile_fail, ['-v0'])
 test('T7241', normal, compile_fail, ['-v0'])
+test('T9262', normal, compile, ['-v0'])
 test('T9199', normal, compile, ['-v0'])
 test('T9692', normal, compile, ['-v0'])
+test('T8953', normal, compile, ['-v0'])
+test('T9084', normal, compile_fail, ['-v0'])
+test('T9738', normal, compile, ['-v0'])
+test('T9081', normal, compile, ['-v0'])

@@ -662,9 +662,9 @@ repType ty
 -- | All type constructors occurring in the type; looking through type
 --   synonyms, but not newtypes.
 --  When it finds a Class, it returns the class TyCon.
-tyConsOfType :: Type -> [TyCon]
+tyConsOfType :: Type -> NameEnv TyCon
 tyConsOfType ty
-  = nameEnvElts (go ty)
+  = go ty
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go ty | Just ty' <- tcView ty = go ty'
@@ -1159,8 +1159,6 @@ isStrictType = isUnLiftedType
 \begin{code}
 isPrimitiveType :: Type -> Bool
 -- ^ Returns true of types that are opaque to Haskell.
--- Most of these are unlifted, but now that we interact with .NET, we
--- may have primtive (foreign-imported) types that are lifted
 isPrimitiveType ty = case splitTyConApp_maybe ty of
                         Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
                                               isPrimTyCon tc

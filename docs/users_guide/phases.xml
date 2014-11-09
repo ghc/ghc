@@ -468,6 +468,21 @@ $ cat foo.hspp</screen>
 
       <varlistentry>
         <term>
+          <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;TH&lowbar;&lowbar;</constant>
+          <indexterm><primary><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;TH&lowbar;&lowbar;</constant></primary></indexterm>
+        </term>
+        <listitem>
+          <para>
+          This is set to <literal>YES</literal> when the compiler supports Template Haskell, and to
+          <literal>NO</literal> when not. The latter is the case for a stage-1 compiler during bootstrapping, or
+          on architectures where the interpreter is not available.
+          </para>
+        </listitem>
+      </varlistentry>
+
+
+      <varlistentry>
+        <term>
           <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;LLVM&lowbar;&lowbar;</constant>
           <indexterm><primary><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;LLVM&lowbar;&lowbar;</constant></primary></indexterm>
         </term>

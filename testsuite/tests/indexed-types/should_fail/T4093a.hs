@@ -32,4 +32,8 @@ hang = Just ()
  [W] fmv2 ~ Maybe e
  [W] fmv2 ~ Maybe ee
 
+Now the question is whether we get a derived equality e ~ ee.  Currently
+we don't, but we easily could.  But then we'd need to be careful not to
+report insoluble Int ~ Bool if we had
+   F a ~ Int, F a ~ Bool
 -}

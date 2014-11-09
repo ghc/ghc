@@ -125,6 +125,7 @@ instance Applicative UniqSM where
     (USM f) <*> (USM x) = USM $ \us -> case f us of
                             (# ff, us' #)  -> case x us' of
                               (# xx, us'' #) -> (# ff xx, us'' #)
+    (*>) = thenUs_
 
 -- | Run the 'UniqSM' action, returning the final 'UniqSupply'
 initUs :: UniqSupply -> UniqSM a -> (a, UniqSupply)

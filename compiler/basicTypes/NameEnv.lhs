@@ -15,10 +15,10 @@ module NameEnv (
         emptyNameEnv, unitNameEnv, nameEnvElts, nameEnvUniqueElts,
         extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
         extendNameEnvList, extendNameEnvList_C,
-        foldNameEnv, filterNameEnv,
+        foldNameEnv, filterNameEnv, anyNameEnv,
         plusNameEnv, plusNameEnv_C, alterNameEnv,
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
-        elemNameEnv, mapNameEnv,
+        elemNameEnv, mapNameEnv, disjointNameEnv,
 
         -- ** Dependency analysis
         depAnal
@@ -88,7 +88,9 @@ lookupNameEnv      :: NameEnv a -> Name -> Maybe a
 lookupNameEnv_NF   :: NameEnv a -> Name -> a
 foldNameEnv        :: (a -> b -> b) -> b -> NameEnv a -> b
 filterNameEnv      :: (elt -> Bool) -> NameEnv elt -> NameEnv elt
+anyNameEnv         :: (elt -> Bool) -> NameEnv elt -> Bool
 mapNameEnv         :: (elt1 -> elt2) -> NameEnv elt1 -> NameEnv elt2
+disjointNameEnv    :: NameEnv a -> NameEnv a -> Bool
 
 nameEnvElts x         = eltsUFM x
 emptyNameEnv          = emptyUFM
@@ -110,6 +112,8 @@ extendNameEnvList_C x y z = addListToUFM_C x y z
 delFromNameEnv x y      = delFromUFM x y
 delListFromNameEnv x y  = delListFromUFM x y
 filterNameEnv x y       = filterUFM x y
+anyNameEnv f x          = foldUFM ((||) . f) False x
+disjointNameEnv x y     = isNullUFM (intersectUFM x y)
 
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
 \end{code}

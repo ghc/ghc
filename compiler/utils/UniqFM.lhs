@@ -72,7 +72,6 @@ import Outputable
 
 import Compiler.Hoopl   hiding (Unique)
 
-import Data.Function (on)
 import qualified Data.IntMap as M
 import qualified Data.IntSet as S
 import qualified Data.Foldable as Foldable
@@ -212,22 +211,9 @@ instance Monoid (UniqFM a) where
 %************************************************************************
 
 \begin{code}
-newtype UniqFM ele = UFM { unUFM :: M.IntMap ele }
-  deriving (Typeable,Data, Traversable.Traversable, Functor)
-
-instance Eq ele => Eq (UniqFM ele) where
-    (==) = (==) `on` unUFM
-
-{-
-instance Functor UniqFM where
-   fmap f = fmap f . unUFM
-
-instance Traversable.Traversable UniqFM where
-    traverse f = Traversable.traverse f . unUFM
--}
-
-instance Foldable.Foldable UniqFM where
-    foldMap f = Foldable.foldMap f . unUFM
+newtype UniqFM ele = UFM (M.IntMap ele)
+  deriving (Data, Eq, Foldable.Foldable, Functor, Traversable.Traversable,
+            Typeable)
 
 emptyUFM = UFM M.empty
 isNullUFM (UFM m) = M.null m

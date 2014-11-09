@@ -34,6 +34,7 @@ import Control.Monad (liftM)
 --   > munzip (mzip ma mb) = (ma, mb)
 --
 class Monad m => MonadZip m where
+    {-# MINIMAL mzip | mzipWith #-}
 
     mzip :: m a -> m b -> m (a,b)
     mzip = mzipWith (,)
@@ -46,7 +47,6 @@ class Monad m => MonadZip m where
     -- munzip is a member of the class because sometimes
     -- you can implement it more efficiently than the
     -- above default code.  See Trac #4370 comment by giorgidze
-    {-# MINIMAL mzip | mzipWith #-}
 
 instance MonadZip [] where
     mzip     = zip

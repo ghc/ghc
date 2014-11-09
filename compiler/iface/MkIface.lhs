@@ -191,7 +191,8 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
           used_th <- readIORef tc_splice_used
           dep_files <- (readIORef dependent_files)
           mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod (isHsBoot hsc_src) used_names used_th deps rdr_env
+                   this_mod (hsc_src == HsBootFile) used_names
+                   used_th deps rdr_env
                    fix_env warns hpc_info (imp_mods imports)
                    (imp_trust_own_pkg imports) dep_files safe_mode mod_details
 
@@ -279,9 +280,11 @@ mkIface_ hsc_env maybe_old_fingerprint
         iface_vect_info = flattenVectInfo vect_info
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
+        sig_of = getSigOf dflags (moduleName this_mod)
 
         intermediate_iface = ModIface {
               mi_module      = this_mod,
+              mi_sig_of      = sig_of,
               mi_boot        = is_boot,
               mi_deps        = deps,
               mi_usages      = usages,
@@ -1259,6 +1262,9 @@ checkVersions hsc_env mod_summary iface
 
        ; recomp <- checkFlagHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; if getSigOf (hsc_dflags hsc_env) (moduleName (mi_module iface))
+                /= mi_sig_of iface
+            then return (RecompBecause "sig-of changed", Nothing) else do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Just iface) else do {
 
@@ -1278,7 +1284,7 @@ checkVersions hsc_env mod_summary iface
        ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
        ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
        ; return (recomp, Just iface)
-    }}}
+    }}}}
   where
     this_pkg = thisPackage (hsc_dflags hsc_env)
     -- This is a bit of a hack really
@@ -1617,10 +1623,6 @@ tyConToIfaceDecl env tycon
                   ifGadtSyntax = isGadtSyntaxTyCon tycon,
                   ifPromotable = isJust (promotableTyCon_maybe tycon),
                   ifParent  = parent })
-
-  | isForeignTyCon tycon
-  = (env, IfaceForeign { ifName    = getOccName tycon,
-                         ifExtName = tyConExtName tycon })
 
   | otherwise  -- FunTyCon, PrimTyCon, promoted TyCon/DataCon
   -- For pretty printing purposes only.
@@ -1976,7 +1978,7 @@ toIfaceExpr (Var v)         = toIfaceVar v
 toIfaceExpr (Lit l)         = IfaceLit l
 toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
 toIfaceExpr (Coercion co)   = IfaceCo   (toIfaceCoercion co)
-toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x) (toIfaceExpr b)
+toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x, toIfaceOneShot x) (toIfaceExpr b)
 toIfaceExpr (App f a)       = toIfaceApp f [a]
 toIfaceExpr (Case s x ty as)
   | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
@@ -1986,6 +1988,13 @@ toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
 toIfaceExpr (Tick t e) 
   | Just t' <- toIfaceTickish t = IfaceTick t' (toIfaceExpr e) 
   | otherwise                   = toIfaceExpr e
+
+toIfaceOneShot :: Id -> IfaceOneShot
+toIfaceOneShot id | isId id
+                  , OneShotLam <- oneShotInfo (idInfo id)
+                  = IfaceOneShot
+                  | otherwise
+                  = IfaceNoOneShot
 
 ---------------------
 toIfaceTickish :: Tickish Id -> Maybe IfaceTickish

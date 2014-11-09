@@ -525,7 +525,7 @@ if s1 matches
 checkFunDeps :: (InstEnv, InstEnv) -> ClsInst
              -> Maybe [ClsInst] -- Nothing  <=> ok
                                 -- Just dfs <=> conflict with dfs
--- Check wheher adding DFunId would break functional-dependency constraints
+-- Check whether adding DFunId would break functional-dependency constraints
 -- Used only for instance decls defined in the module being compiled
 checkFunDeps inst_envs ispec
   | null bad_fundeps = Nothing

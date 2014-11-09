@@ -76,17 +76,22 @@ For each pattern synonym, we generate a single matcher function which
 implements the actual matching. For the above example, the matcher
 will have type:
 
-        $mP :: forall r t. (Eq t, Num t)
+        $mP :: forall (r :: ?) t. (Eq t, Num t)
             => T (Maybe t)
             -> (forall b. (Show (Maybe t), Ord b) => b -> r)
-            -> r
+            -> (Void# -> r)
             -> r
 
 with the following implementation:
 
         $mP @r @t $dEq $dNum scrut cont fail = case scrut of
             MkT @b $dShow $dOrd [x] (Just 42) -> cont @b $dShow $dOrd x
-            _                                 -> fail
+            _                                 -> fail Void#
+
+The extra Void# argument for the failure continuation is needed so that
+it is lazy even when the result type is unboxed. For the same reason,
+if the pattern has no arguments, an extra Void# argument is added
+to the success continuation as well.
 
 For *bidirectional* pattern synonyms, we also generate a single wrapper
 function which implements the pattern synonym in an expression
@@ -123,18 +128,26 @@ data PatSyn
         psInfix       :: Bool,        -- True <=> declared infix
 
         psUnivTyVars  :: [TyVar],     -- Universially-quantified type variables
+        psReqTheta    :: ThetaType,   -- Required dictionaries
         psExTyVars    :: [TyVar],     -- Existentially-quantified type vars
         psProvTheta   :: ThetaType,   -- Provided dictionaries
-        psReqTheta    :: ThetaType,   -- Required dictionaries
         psOrigResTy   :: Type,        -- Mentions only psUnivTyVars
 
         -- See Note [Matchers and wrappers for pattern synonyms]
         psMatcher     :: Id,
-             -- Matcher function, of type
-             --   forall r univ_tvs. req_theta
-             --                   => res_ty
-             --                   -> (forall ex_tvs. prov_theta -> arg_tys -> r)
-             --                   -> r -> r
+            -- Matcher function. If psArgs is empty, then it has type
+             --   forall (r :: ?) univ_tvs. req_theta
+             --                       => res_ty
+             --                       -> (forall ex_tvs. prov_theta -> Void# -> r)
+             --                       -> (Void# -> r)
+             --                       -> r
+             --
+             -- Otherwise:
+             --   forall (r :: ?) univ_tvs. req_theta
+             --                       => res_ty
+             --                       -> (forall ex_tvs. prov_theta -> arg_tys -> r)
+             --                       -> (Void# -> r)
+             --                       -> r
 
         psWrapper     :: Maybe Id
              -- Nothing  => uni-directional pattern synonym
@@ -194,19 +207,20 @@ instance Data.Data PatSyn where
 \begin{code}
 -- | Build a new pattern synonym
 mkPatSyn :: Name
-         -> Bool       -- ^ Is the pattern synonym declared infix?
-         -> [Type]     -- ^ Original arguments
-         -> [TyVar]    -- ^ Universially-quantified type variables
-         -> [TyVar]    -- ^ Existentially-quantified type variables
-         -> ThetaType  -- ^ Wanted dicts
-         -> ThetaType  -- ^ Given dicts
-         -> Type       -- ^ Original result type
-         -> Id         -- ^ Name of matcher
-         -> Maybe Id   -- ^ Name of wrapper
+         -> Bool                 -- ^ Is the pattern synonym declared infix?
+         -> ([TyVar], ThetaType) -- ^ Universially-quantified type variables
+                                --   and required dicts
+         -> ([TyVar], ThetaType) -- ^ Existentially-quantified type variables
+                                --   and provided dicts
+         -> [Type]               -- ^ Original arguments
+         -> Type                 -- ^ Original result type
+         -> Id                   -- ^ Name of matcher
+         -> Maybe Id             -- ^ Name of wrapper
          -> PatSyn
-mkPatSyn name declared_infix orig_args
-         univ_tvs ex_tvs
-         prov_theta req_theta
+mkPatSyn name declared_infix
+         (univ_tvs, req_theta)
+         (ex_tvs, prov_theta)
+         orig_args
          orig_res_ty
          matcher wrapper
     = MkPatSyn {psName = name, psUnique = getUnique name,

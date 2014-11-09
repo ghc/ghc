@@ -10,6 +10,7 @@ module TcInteract (
 
 import BasicTypes ()
 import TcCanonical
+import TcFlatten
 import VarSet
 import Type
 import Unify
@@ -38,8 +39,6 @@ import TcErrors
 import TcSMonad
 import Bag
 
-import Control.Monad ( foldM )
-import Data.Maybe ( catMaybes )
 import Data.List( partition, foldl' )
 
 import VarEnv
@@ -81,23 +80,63 @@ Note [Basic Simplifier Plan]
 If in Step 1 no such element exists, we have exceeded our context-stack
 depth and will simply fail.
 
+Note [Unflatten after solving the flat wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We unflatten after solving the wc_flats of an implication, and before attempting
+to float. This means that
+
+ * The fsk/fmv flatten-skolems only survive during solveFlats.  We don't
+   need to worry about then across successive passes over the constraint tree.
+   (E.g. we don't need the old ic_fsk field of an implication.
+
+ * When floating an equality outwards, we don't need to worry about floating its
+   associated flattening constraints.
+
+ * Another tricky case becomes easy: Trac #4935
+       type instance F True a b = a
+       type instance F False a b = b
+
+       [w] F c a b ~ gamma
+       (c ~ True) => a ~ gamma
+       (c ~ False) => b ~ gamma
+
+   Obviously this is soluble with gamma := F c a b, and unflattening
+   will do exactly that after solving the flat constraints and before
+   attempting the implications.  Before, when we were not unflattening,
+   we had to push Wanted funeqs in as new givens.  Yuk!
+
+   Another example that becomes easy: indexed_types/should_fail/T7786
+      [W] BuriedUnder sub k Empty ~ fsk
+      [W] Intersect fsk inv ~ s
+      [w] xxx[1] ~ s
+      [W] forall[2] . (xxx[1] ~ Empty)
+                   => Intersect (BuriedUnder sub k Empty) inv ~ Empty
+
+
 \begin{code}
 solveFlatGivens :: CtLoc -> [EvVar] -> TcS ()
 solveFlatGivens loc givens
   | null givens  -- Shortcut for common case
   = return ()
   | otherwise
-  = solveFlats given_bag
+  = solveFlats (listToBag (map mk_given_ct givens))
   where
-    given_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_evtm = EvId ev_id
-                                                     , ctev_pred = evVarPred ev_id
-                                                     , ctev_loc = loc }
-                          | ev_id <- givens ]
+    mk_given_ct ev_id = mkNonCanonical (CtGiven { ctev_evtm = EvId ev_id
+                                                , ctev_pred = evVarPred ev_id
+                                                , ctev_loc  = loc })
 
 solveFlatWanteds :: Cts -> TcS WantedConstraints
 solveFlatWanteds wanteds
   = do { solveFlats wanteds
-       ; getInertUnsolved }
+       ; (implics, tv_eqs, fun_eqs, insols, others) <- getUnsolvedInerts
+       ; unflattened_eqs <- unflatten tv_eqs fun_eqs
+            -- See Note [Unflatten after solving the flat wanteds]
+
+       ; zonked <- zonkFlats (others `andCts` unflattened_eqs)
+            -- Postcondition is that the wl_flats are zonked
+       ; return (WC { wc_flat  = zonked
+                    , wc_insol = insols
+                    , wc_impl  = implics }) }
 
 -- The main solver loop implements Note [Basic Simplifier Plan]
 ---------------------------------------------------------------
@@ -419,8 +458,7 @@ interactIrred _ wi = pprPanic "interactIrred" (ppr wi)
 \begin{code}
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
-  | Just ct_i <- findDict (inert_dicts inerts) cls tys
-  , let ctev_i = ctEvidence ct_i
+  | Just ctev_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
   = do { (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
        ; case inert_effect of
            IRKeep    -> return ()
@@ -840,22 +878,22 @@ kickOutRewritable :: CtEvidence   -- Flavour of the equality that is
                   -> TcTyVar      -- The new equality is tv ~ ty
                   -> TcS Int
 kickOutRewritable new_ev new_tv
+  | not (new_ev `eqCanRewrite` new_ev)
+  = return 0  -- If new_ev can't rewrite itself, it can't rewrite
+              -- anything else, so no need to kick out anything
+              -- This is a common case: wanteds can't rewrite wanteds
+
+  | otherwise
   = do { ics <- getInertCans
-       ; if isWanted new_ev && 
-            new_tv `elemVarEnv` inert_eqs ics  
-         then          -- Fast path: there is at least one equality
-            return 0   --  for tv, so kick-out will do nothing
-          
-         else
-    do { let (kicked_out, ics') = kick_out new_ev new_tv ics
+       ; let (kicked_out, ics') = kick_out new_ev new_tv ics
        ; setInertCans ics'
        ; updWorkListTcS (appendWorkList kicked_out)
 
-       ; unless (isEmptyWorkList kicked_out) $ 
-         csTraceTcS $ 
+       ; unless (isEmptyWorkList kicked_out) $
+         csTraceTcS $
          hang (ptext (sLit "Kick out, tv =") <+> ppr new_tv)
             2 (ppr kicked_out)
-       ; return (workListSize kicked_out) } }
+       ; return (workListSize kicked_out) }
 
 kick_out :: CtEvidence -> TcTyVar -> InertCans -> (WorkList, InertCans)
 kick_out new_ev new_tv (IC { inert_eqs = tv_eqs
@@ -889,37 +927,23 @@ kick_out new_ev new_tv (IC { inert_eqs = tv_eqs
       -- Kick out even insolubles; see Note [Kick out insolubles]
 
     kick_out_ct :: Ct -> Bool
-    kick_out_ct ct =  eqCanRewrite new_tv new_ev (ctEvidence ct)
+    kick_out_ct ct =  eqCanRewrite new_ev (ctEvidence ct)
                    && new_tv `elemVarSet` tyVarsOfCt ct
          -- See Note [Kicking out inert constraints]
 
     kick_out_irred :: Ct -> Bool
-    kick_out_irred ct =  eqCanRewrite new_tv new_ev (ctEvidence ct)
+    kick_out_irred ct =  eqCanRewrite new_ev (ctEvidence ct)
                       && new_tv `elemVarSet` closeOverKinds (tyVarsOfCt ct)
           -- See Note [Kicking out Irreds]
 
-    kick_out_eqs :: EqualCtList -> ([Ct], TyVarEnv EqualCtList) 
+    kick_out_eqs :: EqualCtList -> ([Ct], TyVarEnv EqualCtList)
                  -> ([Ct], TyVarEnv EqualCtList)
     kick_out_eqs eqs (acc_out, acc_in)
       = (eqs_out ++ acc_out, case eqs_in of
                                []      -> acc_in
                                (eq1:_) -> extendVarEnv acc_in (cc_tyvar eq1) eqs_in)
       where
-        (eqs_out, eqs_in) = partition kick_out_eq eqs
-
-
-    kick_out_eq :: Ct -> Bool
-    kick_out_eq (CTyEqCan { cc_tyvar = tv, cc_rhs = rhs, cc_ev = ev })
-      =  (eqCanRewrite new_tv new_ev ev)  -- See Note [Delicate equality kick-out]
-      && (new_tv == tv ||                    
-          new_tv `elemVarSet` kind_vars ||       -- (1)
-          (not (eqCanRewrite tv ev new_ev) &&    -- (2)
-           new_tv `elemVarSet` (extendVarSet (tyVarsOfType rhs) tv)))
-      where
-        kind_vars = tyVarsOfType (tyVarKind tv) `unionVarSet`
-                    tyVarsOfType (typeKind rhs)
-
-    kick_out_eq other_ct = pprPanic "kick_out_eq" (ppr other_ct)
+        (eqs_out, eqs_in) = partition kick_out_ct eqs
 \end{code}
 
 Note [Kicking out inert constraints]
@@ -963,12 +987,16 @@ outer type constructors match.
 
 Note [Delicate equality kick-out]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When adding an equality (a ~ xi), we kick out an inert type-variable
-equality (b ~ phi) in two cases
+When adding an work-item CTyEqCan (a ~ xi), we kick out an inert
+CTyEqCan (b ~ phi) when
+
+  a) the work item can rewrite the inert item
+
+AND one of the following hold
 
 (0) If the new tyvar is the same as the old one
       Work item: [G] a ~ blah
-      Inert:     [W} a ~ foo
+      Inert:     [W] a ~ foo
     A particular case is when flatten-skolems get their value we must propagate
 
 (1) If the new tyvar appears in the kind vars of the LHS or RHS of
@@ -980,8 +1008,6 @@ equality (b ~ phi) in two cases
     and can subsequently unify.
 
 (2) If the new tyvar appears in the RHS of the inert
-    AND the work item is strong enough to rewrite the inert
-
     AND not (the inert can rewrite the work item)   <---------------------------------
 
           Work item:  [G] a ~ b
@@ -998,7 +1024,7 @@ equality (b ~ phi) in two cases
          Inert:     [W] b ~ [a]
     No need to kick out the inert, beause the inert substitution is not
     necessarily idemopotent.  See Note [Non-idempotent inert substitution]
-    in TcCanonical.
+    in TcFlatten.
 
           Work item:  [G] a ~ Int
           Inert:      [G] b ~ [a]
@@ -1428,8 +1454,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
   | not (isWanted fl)   -- Never use instances for Given or Derived constraints
   = try_fundeps_and_return
 
-  | Just ev <- lookupSolvedDict inerts cls xis   -- Cached
-  , ctEvCheckDepth (ctLocDepth loc) ev
+  | Just ev <- lookupSolvedDict inerts loc cls xis   -- Cached
   = do { setEvBind dict_id (ctEvTerm ev);
        ; stopWith fl "Dict/Top (cached)" }
 
@@ -1955,7 +1980,7 @@ matchClassInst inerts clas tys loc
             { evc_vars <- instDFunConstraints loc theta
             ; let new_ev_vars = freshGoals evc_vars
                       -- new_ev_vars are only the real new variables that can be emitted
-                  dfun_app = EvDFunApp dfun_id tys (getEvTerms evc_vars)
+                  dfun_app = EvDFunApp dfun_id tys (map (ctEvTerm . fst) evc_vars)
             ; return $ GenInst new_ev_vars dfun_app } }
 
      givens_for_this_clas :: Cts
@@ -2074,10 +2099,9 @@ requestCoercible :: CtLoc -> TcType -> TcType
                         , TcCoercion )      -- Coercion witnessing (Coercible t1 t2)
 requestCoercible loc ty1 ty2
   = ASSERT2( typeKind ty1 `tcEqKind` typeKind ty2, ppr ty1 <+> ppr ty2)
-    do { mb_ev <- newWantedEvVarNonrec loc' (mkCoerciblePred ty1 ty2)
-       ; case mb_ev of
-           Fresh ev     -> return ( [ev], evTermCoercion (ctEvTerm ev) )
-           Cached ev_tm -> return ( [],   evTermCoercion ev_tm ) }
+    do { (new_ev, freshness) <- newWantedEvVar loc' (mkCoerciblePred ty1 ty2)
+       ; return ( case freshness of { Fresh -> [new_ev]; Cached -> [] }
+                , ctEvCoercion new_ev) }
            -- Evidence for a Coercible constraint is always a coercion t1 ~R t2
   where
      loc' = bumpCtLocDepth CountConstraints loc

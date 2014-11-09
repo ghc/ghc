@@ -125,10 +125,6 @@ data IfaceDecl
                  ifAxBranches :: [IfaceAxBranch] -- Branches
     }
 
-  | IfaceForeign { ifName :: IfaceTopBndr,           -- Needs expanding when we move
-                                                -- beyond .NET
-                   ifExtName :: Maybe FastString }
-
   | IfacePatSyn { ifName          :: IfaceTopBndr,           -- Name of the pattern synonym
                   ifPatIsInfix    :: Bool,
                   ifPatMatcher    :: IfExtName,
@@ -486,7 +482,7 @@ data IfaceExpr
   | IfaceType   IfaceType
   | IfaceCo     IfaceCoercion
   | IfaceTuple  TupleSort [IfaceExpr]   -- Saturated; type arguments omitted
-  | IfaceLam    IfaceBndr IfaceExpr
+  | IfaceLam    IfaceLamBndr IfaceExpr
   | IfaceApp    IfaceExpr IfaceExpr
   | IfaceCase   IfaceExpr IfLclName [IfaceAlt]
   | IfaceECase  IfaceExpr IfaceType     -- See Note [Empty case alternatives]
@@ -790,9 +786,6 @@ pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
          , ppShowIface ss (ppr details)
          , ppShowIface ss (ppr info) ]
 
-pprIfaceDecl _ (IfaceForeign {ifName = tycon})
-  = hsep [ptext (sLit "foreign import type dotnet"), ppr tycon]
-
 pprIfaceDecl _ (IfaceAxiom { ifName = name, ifTyCon = tycon
                            , ifAxBranches = branches })
   = hang (ptext (sLit "axiom") <+> ppr name <> dcolon)
@@ -988,7 +981,7 @@ pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
 pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (interpp'SP as)
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
-  = add_par (sep [char '\\' <+> sep (map ppr bndrs) <+> arrow,
+  = add_par (sep [char '\\' <+> sep (map pprIfaceLamBndr bndrs) <+> arrow,
                   pprIfaceExpr noParens body])
   where
     (bndrs,body) = collect [] i
@@ -1118,8 +1111,6 @@ freeNamesIfDecl (IfaceId _s t d i) =
   freeNamesIfType t &&&
   freeNamesIfIdInfo i &&&
   freeNamesIfIdDetails d
-freeNamesIfDecl IfaceForeign{} =
-  emptyNameSet
 freeNamesIfDecl d@IfaceData{} =
   freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfaceTyConParent (ifParent d) &&&
@@ -1282,16 +1273,16 @@ freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
 freeNamesIfUnfold (IfDFunUnfold bs es)   = fnList freeNamesIfBndr bs &&& fnList freeNamesIfExpr es
 
 freeNamesIfExpr :: IfaceExpr -> NameSet
-freeNamesIfExpr (IfaceExt v)      = unitNameSet v
-freeNamesIfExpr (IfaceFCall _ ty) = freeNamesIfType ty
-freeNamesIfExpr (IfaceType ty)    = freeNamesIfType ty
-freeNamesIfExpr (IfaceCo co)      = freeNamesIfCoercion co
-freeNamesIfExpr (IfaceTuple _ as) = fnList freeNamesIfExpr as
-freeNamesIfExpr (IfaceLam b body) = freeNamesIfBndr b &&& freeNamesIfExpr body
-freeNamesIfExpr (IfaceApp f a)    = freeNamesIfExpr f &&& freeNamesIfExpr a
-freeNamesIfExpr (IfaceCast e co)  = freeNamesIfExpr e &&& freeNamesIfCoercion co
-freeNamesIfExpr (IfaceTick _ e)   = freeNamesIfExpr e
-freeNamesIfExpr (IfaceECase e ty) = freeNamesIfExpr e &&& freeNamesIfType ty
+freeNamesIfExpr (IfaceExt v)          = unitNameSet v
+freeNamesIfExpr (IfaceFCall _ ty)     = freeNamesIfType ty
+freeNamesIfExpr (IfaceType ty)        = freeNamesIfType ty
+freeNamesIfExpr (IfaceCo co)          = freeNamesIfCoercion co
+freeNamesIfExpr (IfaceTuple _ as)     = fnList freeNamesIfExpr as
+freeNamesIfExpr (IfaceLam (b,_) body) = freeNamesIfBndr b &&& freeNamesIfExpr body
+freeNamesIfExpr (IfaceApp f a)        = freeNamesIfExpr f &&& freeNamesIfExpr a
+freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCoercion co
+freeNamesIfExpr (IfaceTick _ e)       = freeNamesIfExpr e
+freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
 freeNamesIfExpr (IfaceCase s _ alts)
   = freeNamesIfExpr s &&& fnList fn_alt alts &&& fn_cons alts
   where
@@ -1385,9 +1376,6 @@ instance Binary IfaceDecl where
         put_ bh ty
         put_ bh details
         put_ bh idinfo
-
-    put_ _ (IfaceForeign _ _) =
-        error "Binary.put_(IfaceDecl): IfaceForeign"
 
     put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
         putByte bh 2
@@ -1753,9 +1741,10 @@ instance Binary IfaceExpr where
         putByte bh 3
         put_ bh ac
         put_ bh ad
-    put_ bh (IfaceLam ae af) = do
+    put_ bh (IfaceLam (ae, os) af) = do
         putByte bh 4
         put_ bh ae
+        put_ bh os
         put_ bh af
     put_ bh (IfaceApp ag ah) = do
         putByte bh 5
@@ -1805,8 +1794,9 @@ instance Binary IfaceExpr where
                     ad <- get bh
                     return (IfaceTuple ac ad)
             4 -> do ae <- get bh
+                    os <- get bh
                     af <- get bh
-                    return (IfaceLam ae af)
+                    return (IfaceLam (ae, os) af)
             5 -> do ag <- get bh
                     ah <- get bh
                     return (IfaceApp ag ah)

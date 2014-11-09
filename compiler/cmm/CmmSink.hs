@@ -10,6 +10,7 @@ import CmmLive
 import CmmUtils
 import Hoopl
 import CodeGen.Platform
+import Platform (isARM, platformArch)
 
 import DynFlags
 import UniqFM
@@ -235,8 +236,10 @@ isSmall _ = False
 isTrivial :: DynFlags -> CmmExpr -> Bool
 isTrivial _ (CmmReg (CmmLocal _)) = True
 isTrivial dflags (CmmReg (CmmGlobal r)) = -- see Note [Inline GlobalRegs?]
-   isJust (globalRegMaybe (targetPlatform dflags) r)
-   -- GlobalRegs that are loads from BaseReg are not trivial
+  if isARM (platformArch (targetPlatform dflags))
+  then True -- CodeGen.Platform.ARM does not have globalRegMaybe
+  else isJust (globalRegMaybe (targetPlatform dflags) r)
+  -- GlobalRegs that are loads from BaseReg are not trivial
 isTrivial _ (CmmLit _) = True
 isTrivial _ _          = False
 

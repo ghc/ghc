@@ -61,8 +61,6 @@ import qualified GHC.List as List ( foldr )
 -- | Functors representing data structures that can be traversed from
 -- left to right.
 --
--- Minimal complete definition: 'traverse' or 'sequenceA'.
---
 -- A definition of 'traverse' must satisfy the following laws:
 --
 -- [/naturality/]
@@ -144,6 +142,8 @@ import qualified GHC.List as List ( foldr )
 --    ('foldMapDefault').
 --
 class (Functor t, Foldable t) => Traversable t where
+    {-# MINIMAL traverse | sequenceA #-}
+
     -- | Map each element of a structure to an action, evaluate
     -- these actions from left to right, and collect the results.
     traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
@@ -163,7 +163,6 @@ class (Functor t, Foldable t) => Traversable t where
     -- and collect the results.
     sequence :: Monad m => t (m a) -> m (t a)
     sequence = sequenceA
-    {-# MINIMAL traverse | sequenceA #-}
 
 -- instances for Prelude types
 

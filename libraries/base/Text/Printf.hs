@@ -246,7 +246,7 @@ import System.IO
 -- * Haskell 'printf' will place a zero after a decimal point when
 --   possible.
 --
--- Examples:
+-- ==== __Examples__
 --
 -- >   > printf "%d\n" (23::Int)
 -- >   23

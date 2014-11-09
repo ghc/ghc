@@ -44,7 +44,7 @@ module TcRnTypes(
         ArrowCtxt(NoArrowCtxt), newArrowScope, escapeArrowScope,
 
         -- Canonical constraints
-        Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, dropDerivedWC,
+        Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_maybe,
@@ -56,6 +56,7 @@ module TcRnTypes(
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
+        dropDerivedWC,
 
         Implication(..),
         SubGoalCounter(..),
@@ -72,7 +73,6 @@ module TcRnTypes(
         CtEvidence(..),
         mkGivenLoc,
         isWanted, isGiven, isDerived,
-        eqCanRewrite, canRewriteOrSame,
 
         -- Constraint solver plugins
         TcPlugin(..), TcPluginResult(..), TcPluginSolver,
@@ -99,6 +99,7 @@ import TyCon    ( TyCon )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, patSynType )
+import TysWiredIn ( coercibleClass )
 import TcType
 import Annotations
 import InstEnv
@@ -218,6 +219,11 @@ data TcGblEnv
         tcg_mod     :: Module,         -- ^ Module being compiled
         tcg_src     :: HscSource,
           -- ^ What kind of module (regular Haskell, hs-boot, ext-core)
+        tcg_sig_of  :: Maybe Module,
+          -- ^ Are we being compiled as a signature of an implementation?
+        tcg_impl_rdr_env :: Maybe GlobalRdrEnv,
+          -- ^ Environment used only during -sig-of for resolving top level
+          -- bindings.  See Note [Signature parameters in TcGblEnv and DynFlags]
 
         tcg_rdr_env :: GlobalRdrEnv,   -- ^ Top level envt; used during renaming
         tcg_default :: Maybe [Type],
@@ -360,6 +366,53 @@ data TcGblEnv
         -- | A list of user-defined plugins for the constraint solver.
         tcg_tc_plugins :: [TcPluginSolver]
     }
+
+-- Note [Signature parameters in TcGblEnv and DynFlags]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- When compiling signature files, we need to know which implementation
+-- we've actually linked against the signature.  There are three seemingly
+-- redundant places where this information is stored: in DynFlags, there
+-- is sigOf, and in TcGblEnv, there is tcg_sig_of and tcg_impl_rdr_env.
+-- Here's the difference between each of them:
+--
+-- * DynFlags.sigOf is global per invocation of GHC.  If we are compiling
+--   with --make, there may be multiple signature files being compiled; in
+--   which case this parameter is a map from local module name to implementing
+--   Module.
+--
+-- * HscEnv.tcg_sig_of is global per the compilation of a single file, so
+--   it is simply the result of looking up tcg_mod in the DynFlags.sigOf
+--   parameter.  It's setup in TcRnMonad.initTc.  This prevents us
+--   from having to repeatedly do a lookup in DynFlags.sigOf.
+--
+-- * HscEnv.tcg_impl_rdr_env is a RdrEnv that lets us look up names
+--   according to the sig-of module.  It's setup in TcRnDriver.tcRnSignature.
+--   Here is an example showing why we need this map:
+--
+--  module A where
+--      a = True
+--
+--  module ASig where
+--      import B
+--      a :: Bool
+--
+--  module B where
+--      b = False
+--
+-- When we compile ASig --sig-of main:A, the default
+-- global RdrEnv (tcg_rdr_env) has an entry for b, but not for a
+-- (we never imported A).  So we have to look in a different environment
+-- to actually get the original name.
+--
+-- By the way, why do we need to do the lookup; can't we just use A:a
+-- as the name directly?  Well, if A is reexporting the entity from another
+-- module, then the original name needs to be the real original name:
+--
+--  module C where
+--      a = True
+--
+--  module A(a) where
+--      import C
 
 instance ContainsModule TcGblEnv where
     extractModule env = tcg_mod env
@@ -546,7 +599,7 @@ pass it inwards.
 ---------------------------
 
 data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
-  = Splice      -- Top-level splicing
+  = Splice      -- Inside a top-level splice splice
                 -- This code will be run *at compile time*;
                 --   the result replaces the splice
                 -- Binding level = 0
@@ -565,7 +618,7 @@ data PendingStuff
 
   | RnPendingTyped                -- Renaming the inside of a *typed* bracket
 
-  | TcPending                     -- Typechecking the iniside of a typed bracket
+  | TcPending                     -- Typechecking the inside of a typed bracket
       (TcRef [PendingTcSplice])   --   Accumulate pending splices here
       (TcRef WantedConstraints)   --     and type constraints here
 
@@ -956,6 +1009,7 @@ data Ct
 
   | CTyEqCan {  -- tv ~ rhs
        -- Invariants:
+       --   * See Note [Applying the inert substitution] in TcFlatten
        --   * tv not in tvs(xi)   (occurs check)
        --   * If tv is a TauTv, then rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
@@ -987,7 +1041,9 @@ data Ct
         --    *never* over-saturated (because if so
         --    we should have decomposed)
 
-      cc_fsk    :: TcTyVar
+      cc_fsk    :: TcTyVar  -- [Given]  always a FlatSkol skolem
+                            -- [Wanted] always a FlatMetaTv unification variable
+        -- See Note [The flattening story] in TcFlatten
     }
 
   | CNonCanonical {        -- See Note [NonCanonical Semantics]
@@ -1215,6 +1271,9 @@ emptyCts = emptyBag
 
 isEmptyCts :: Cts -> Bool
 isEmptyCts = isEmptyBag
+
+pprCts :: Cts -> SDoc
+pprCts cts = vcat (map ppr (bagToList cts))
 \end{code}
 
 %************************************************************************
@@ -1461,12 +1520,6 @@ ctEvCoercion (CtWanted  { ctev_evar = v })  = mkTcCoVarCo v
 ctEvCoercion ctev@(CtDerived {}) = pprPanic "ctEvCoercion: derived constraint cannot have id"
                                       (ppr ctev)
 
--- | Checks whether the evidence can be used to solve a goal with the given minimum depth
-ctEvCheckDepth :: SubGoalDepth -> CtEvidence -> Bool
-ctEvCheckDepth _      (CtGiven {})   = True -- Given evidence has infinite depth
-ctEvCheckDepth min ev@(CtWanted {})  = min <= ctLocDepth (ctEvLoc ev)
-ctEvCheckDepth _   ev@(CtDerived {}) = pprPanic "ctEvCheckDepth: cannot consider derived evidence" (ppr ev)
-
 ctEvId :: CtEvidence -> TcId
 ctEvId (CtWanted  { ctev_evar = ev }) = ev
 ctEvId ctev = pprPanic "ctEvId:" (ppr ctev)
@@ -1489,50 +1542,8 @@ isGiven _ = False
 isDerived :: CtEvidence -> Bool
 isDerived (CtDerived {}) = True
 isDerived _              = False
-
------------------------------------------
-eqCanRewrite :: TcTyVar -> CtEvidence -> CtEvidence -> Bool
--- Very important function!
--- See Note [canRewrite and canRewriteOrSame]
-eqCanRewrite _  (CtGiven {})   _              = True
-eqCanRewrite _  (CtWanted {})  (CtDerived {}) = True
-eqCanRewrite tv (CtWanted {})  (CtWanted {})  = not (isFmvTyVar tv) && isMetaTyVar tv
-eqCanRewrite _  (CtDerived {}) (CtDerived {}) = True  -- Derived can't solve wanted/given
-eqCanRewrite _ _ _ = False             -- No evidence for a derived, anyway
-
-canRewriteOrSame :: CtEvidence -> CtEvidence -> Bool
-canRewriteOrSame (CtGiven {})   _              = True
-canRewriteOrSame (CtWanted {})  (CtWanted {})  = True
-canRewriteOrSame (CtWanted {})  (CtDerived {}) = True
-canRewriteOrSame (CtDerived {}) (CtDerived {}) = True
-canRewriteOrSame _ _ = False
 \end{code}
 
-See Note [canRewrite and canRewriteOrSame]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(canRewrite ct1 ct2) holds if the constraint ct1 can be used to solve ct2.
-"To solve" means a reaction where the active parts of the two constraints match.
-   active(F xis ~ xi) = F xis
-   active(tv ~ xi)    = tv
-   active(D xis)      = D xis
-   active(IP nm ty)   = nm
-
-At the moment we don't allow Wanteds to rewrite Wanteds, because that can give
-rise to very confusing type error messages.  A good example is Trac #8450.
-Here's another
-   f :: a -> Bool
-   f x = ( [x,'c'], [x,True] ) `seq` True
-Here we get
-  [W] a ~ Char
-  [W] a ~ Bool
-but we do not want to complain about Bool ~ Char!
-
-NB:  either (a `canRewrite` b) or (b `canRewrite` a)
-         or a==b
-     must hold
-
-canRewriteOrSame is similar but returns True for Wanted/Wanted.
-See the call sites for explanations.
 
 %************************************************************************
 %*                                                                      *
@@ -1613,9 +1624,20 @@ subGoalDepthExceeded (SubGoalDepth mc mf) (SubGoalDepth c f)
         | c > mc    = Just CountConstraints
         | f > mf    = Just CountTyFunApps
         | otherwise = Nothing
+
+-- | Checks whether the evidence can be used to solve a goal with the given minimum depth
+-- See Note [Preventing recursive dictionaries]
+ctEvCheckDepth :: Class -> CtLoc -> CtEvidence -> Bool
+ctEvCheckDepth cls target ev
+  | isWanted ev
+  , cls == coercibleClass  -- The restriction applies only to Coercible
+  = ctLocDepth target <= ctLocDepth (ctEvLoc ev)
+  | otherwise = True
 \end{code}
 
 Note [Preventing recursive dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+NB: this will go away when we start treating Coercible as an equality.
 
 We have some classes where it is not very useful to build recursive
 dictionaries (Coercible, at the moment). So we need the constraint solver to
@@ -1629,12 +1651,11 @@ which initializes it to initialSubGoalDepth (i.e. 0); but when requesting a
 Coercible instance (requestCoercible in TcInteract), we bump the current depth
 by one and use that.
 
-There are two spots where wanted contraints attempted to be solved using
-existing constraints; doTopReactDict in TcInteract (in the general solver) and
-newWantedEvVarNonrec (only used by requestCoercible) in TcSMonad. Both use
-ctEvCheckDepth to make the check. That function ensures that a Given constraint
-can always be used to solve a goal (i.e. they are at depth infinity, for our
-purposes)
+There are two spots where wanted contraints attempted to be solved
+using existing constraints: lookupInertDict and lookupSolvedDict in
+TcSMonad.  Both use ctEvCheckDepth to make the check. That function
+ensures that a Given constraint can always be used to solve a goal
+(i.e. they are at depth infinity, for our purposes)
 
 
 %************************************************************************

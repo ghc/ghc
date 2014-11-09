@@ -70,7 +70,7 @@ stg_PAP_apply /* no args => explicit stack */
   // We have a hand-rolled stack check fragment here, because none of
   // the canned ones suit this situation.
   //
-  if ((Sp - WDS(Words)) < SpLim) {
+  if (Sp - (WDS(Words) + 2/* see ARG_BCO below */) < SpLim) {
       // there is a return address in R2 in the event of a
       // stack check failure.  The various stg_apply functions arrange
       // this before calling stg_PAP_entry.
@@ -168,7 +168,9 @@ INFO_TABLE(stg_AP,/*special layout*/0,0,AP,"AP","AP")
    * closure, in which case we must enter the blackhole on return rather
    * than continuing to evaluate the now-defunct closure.
    */
-  STK_CHK_ENTER(WDS(Words) + SIZEOF_StgUpdateFrame, R1);
+  STK_CHK_ENTER(WDS(Words) +
+                SIZEOF_StgUpdateFrame +
+                2/* see ARG_BCO below */, R1);
 
   PUSH_UPD_FRAME(Sp - SIZEOF_StgUpdateFrame, R1);
   Sp = Sp - SIZEOF_StgUpdateFrame - WDS(Words);
@@ -239,7 +241,8 @@ INFO_TABLE(stg_AP_NOUPD,/*special layout*/0,0,AP,"AP_NOUPD","AP_NOUPD")
    * closure, in which case we must enter the blackhole on return rather
    * than continuing to evaluate the now-defunct closure.
    */
-  STK_CHK_ENTER(WDS(Words), R1);
+  STK_CHK_ENTER(WDS(Words) +
+                2/* see ARG_BCO below */, R1);
   Sp = Sp - WDS(Words);
 
   TICK_ENT_AP();

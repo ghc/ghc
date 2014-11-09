@@ -53,8 +53,8 @@ fun2 :: forall a. [a] -> ((), Int)
                   case x of wild {
                     [] -> T7360.fun3;
                     : _ [Occ=Dead] _ [Occ=Dead] ->
-                      case GHC.List.$wlenAcc @ a wild 0 of ww { __DEFAULT ->
-                      GHC.Types.I# ww
+                      case GHC.List.$wlenAcc @ a wild 0 of ww2 { __DEFAULT ->
+                      GHC.Types.I# ww2
                       }
                   })}]
 fun2 =
@@ -63,8 +63,8 @@ fun2 =
      case x of wild {
        [] -> T7360.fun3;
        : ds ds1 ->
-         case GHC.List.$wlenAcc @ a wild 0 of ww { __DEFAULT ->
-         GHC.Types.I# ww
+         case GHC.List.$wlenAcc @ a wild 0 of ww2 { __DEFAULT ->
+         GHC.Types.I# ww2
          }
      })
 

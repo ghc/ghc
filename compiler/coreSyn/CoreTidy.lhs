@@ -153,6 +153,8 @@ tidyIdBndr env@(tidy_env, var_env) id
         -- Note [Tidy IdInfo]
         new_info = vanillaIdInfo `setOccInfo` occInfo old_info
                                  `setUnfoldingInfo` new_unf
+                                  -- see Note [Preserve OneShotInfo]
+                                 `setOneShotInfo` oneShotInfo old_info
         old_info = idInfo id
         old_unf  = unfoldingInfo old_info
         new_unf | isEvaldUnfolding old_unf = evaldUnfolding
@@ -255,6 +257,17 @@ preserve the evaluated-ness on 'y' in tidyBndr.
 
 (Another alternative would be to tidy unboxed lets into cases,
 but that seems more indirect and surprising.)
+
+Note [Preserve OneShotInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We keep the OneShotInfo because we want it to propagate into the interface.
+Not all OneShotInfo is determined by a compiler analysis; some is added by a
+call of GHC.Exts.oneShot, which is then discarded before the end of of the
+optimisation pipeline, leaving only the OneShotInfo on the lambda. Hence we
+must preserve this info in inlinings.
+
+This applies to lambda binders only, hence it is stored in IfaceLamBndr.
 
 
 \begin{code}

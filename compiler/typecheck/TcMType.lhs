@@ -37,7 +37,7 @@ module TcMType (
   -- Instantiation
   tcInstTyVars, newSigTyVar,
   tcInstType,
-  tcInstSkolTyVars, tcInstSuperSkolTyVars,tcInstSuperSkolTyVarsX,
+  tcInstSkolTyVars, tcInstSuperSkolTyVarsX,
   tcInstSigTyVarsLoc, tcInstSigTyVars,
   tcInstSkolType,
   tcSkolDFunType, tcSuperSkolTyVars,
@@ -197,7 +197,7 @@ tcInstType inst_tyvars ty
 tcSkolDFunType :: Type -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type signature with skolem constants.
 -- We could give them fresh names, but no need to do so
-tcSkolDFunType ty = tcInstType (\tvs -> return (tcSuperSkolTyVars tvs)) ty
+tcSkolDFunType ty = tcInstType tcInstSuperSkolTyVars ty
 
 tcSuperSkolTyVars :: [TyVar] -> (TvSubst, [TcTyVar])
 -- Make skolem constants, but do *not* give them new names, as above
@@ -216,8 +216,8 @@ tcSuperSkolTyVar subst tv
 tcInstSkolTyVars :: [TyVar] -> TcM (TvSubst, [TcTyVar])
 tcInstSkolTyVars = tcInstSkolTyVars' False emptyTvSubst
 
-tcInstSuperSkolTyVars :: [TyVar] -> TcM [TcTyVar]
-tcInstSuperSkolTyVars = fmap snd . tcInstSuperSkolTyVarsX emptyTvSubst
+tcInstSuperSkolTyVars :: [TyVar] -> TcM (TvSubst, [TcTyVar])
+tcInstSuperSkolTyVars = tcInstSuperSkolTyVarsX emptyTvSubst
 
 tcInstSuperSkolTyVarsX :: TvSubst -> [TyVar] -> TcM (TvSubst, [TcTyVar])
 tcInstSuperSkolTyVarsX subst = tcInstSkolTyVars' True subst
@@ -667,7 +667,7 @@ a \/\a in the final result but all the occurrences of a will be zonked to ()
 
 %************************************************************************
 %*                                                                      *
-              Zonking
+              Zonking types
 %*                                                                      *
 %************************************************************************
 
@@ -685,8 +685,6 @@ tcGetGlobalTyVars
        ; return gbl_tvs' }
   where
 \end{code}
-
------------------  Type variables
 
 \begin{code}
 zonkTcTypeAndFV :: TcType -> TcM TyVarSet
@@ -728,7 +726,11 @@ zonkTcPredType :: TcPredType -> TcM TcPredType
 zonkTcPredType = zonkTcType
 \end{code}
 
----------------  Constraints
+%************************************************************************
+%*                                                                      *
+              Zonking constraints
+%*                                                                      *
+%************************************************************************
 
 \begin{code}
 zonkImplication :: Implication -> TcM (Bag Implication)
@@ -764,50 +766,6 @@ zonkWCRec (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
        ; insol'  <- zonkFlats insol
        ; return (WC { wc_flat = flat', wc_impl = implic', wc_insol = insol' }) }
 \end{code}
-
-Note [Unflattening while zonking]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A bunch of wanted constraints could contain wanted equations of the form
-(F taus ~ alpha) where alpha is either an ordinary unification variable, or
-a flatten unification variable.
-
-These are ordinary wanted constraints and can/should be solved by
-ordinary unification alpha := F taus. However the constraint solving
-algorithm does not do that, as their 'inert' form is F taus ~ alpha.
-
-Hence, we need an extra step to 'unflatten' these equations by
-performing unification. This unification, if it happens at the end of
-constraint solving, cannot produce any more interactions in the
-constraint solver so it is safe to do it as the very very last step.
-
-We choose therefore to do it during zonking, in the function
-zonkFlats. This is in analogy to the zonking of given "flatten skolems"
-which are eliminated in favor of the underlying type that they are
-equal to.
-
-Note that, because we now have to affect *evidence* while zonking
-(setting some evidence binds to identities), we have to pass to the
-zonkWC function an evidence variable to collect all the extra
-variables.
-
-Note [How to unflatten]
-~~~~~~~~~~~~~~~~~~~~~~~
-How do we unflatten during zonking.  Consider a bunch of flat constraints.
-Consider them one by one.  For each such constraint C
-  * Zonk C (to apply current substitution)
-  * If C is of form F tys ~ alpha,
-       where alpha is touchable
-       and   alpha is not mentioned in tys
-    then unify alpha := F tys
-         and discard C
-
-After processing all the flat constraints, zonk them again to propagate
-the information from later ones to earlier ones.  Eg
-  Start:  (F alpha ~ beta, G Int ~ alpha)
-  Then we get beta := F alpha
-              alpha := G Int
-  but we must apply the second unification to the first constraint.
-
 
 \begin{code}
 zonkFlats :: Cts -> TcM Cts

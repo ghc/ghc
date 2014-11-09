@@ -277,8 +277,9 @@ data TcTyVarDetails
                   --          when looking up instances
                   -- See Note [Binding when looking up instances] in InstEnv
 
-  | FlatSkol      -- A flatten-skolem
-       TcType
+  | FlatSkol      -- A flatten-skolem.  It stands for the TcType, and zonking
+       TcType     -- will replace it by that type.
+                  -- See Note [The flattening story] in TcFlatten
 
   | RuntimeUnk    -- Stands for an as-yet-unknown type in the GHCi
                   -- interactive context
@@ -306,8 +307,6 @@ data MetaInfo
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls
 
-   | FlatMetaTv    -- A flatten meta-tyvar
-
    | PolyTv        -- Like TauTv, but can unify with a sigma-type
 
    | SigTv         -- A variant of TauTv, except that it should not be
@@ -316,6 +315,10 @@ data MetaInfo
                    --      see Note [Signature skolems]
                    --      The MetaDetails, if filled in, will
                    --      always be another SigTv or a SkolemTv
+
+   | FlatMetaTv    -- A flatten meta-tyvar
+                   -- It is a meta-tyvar, but it is always untouchable, with level 0
+                   -- See Note [The flattening story] in TcFlatten
 
 -------------------------------------
 -- UserTypeCtxt describes the origin of the polymorphic type
@@ -1480,7 +1483,7 @@ isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty empty
 isFFIDynTy :: Type -> Type -> Validity
 -- The type in a foreign import dynamic must be Ptr, FunPtr, or a newtype of
 -- either, and the wrapped function type must be equal to the given type.
--- We assume that all types have been run through normalizeFfiType, so we don't
+-- We assume that all types have been run through normaliseFfiType, so we don't
 -- need to worry about expanding newtypes here.
 isFFIDynTy expected ty
     -- Note [Foreign import dynamic]

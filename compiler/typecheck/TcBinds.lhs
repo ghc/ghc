@@ -20,7 +20,7 @@ import {-# SOURCE #-} TcPatSyn ( tcPatSynDecl, tcPatSynWrapper )
 
 import DynFlags
 import HsSyn
-import HscTypes( isHsBoot )
+import HscTypes( isHsBootOrSig )
 import TcRnMonad
 import TcEnv
 import TcUnify
@@ -184,7 +184,7 @@ tcRecSelBinds (ValBindsOut binds sigs)
   = tcExtendGlobalValEnv [sel_id | L _ (IdSig sel_id) <- sigs] $
     do { (rec_sel_binds, tcg_env) <- discardWarnings (tcValBinds TopLevel binds sigs getGblEnv)
        ; let tcg_env' 
-              | isHsBoot (tcg_src tcg_env) = tcg_env
+              | isHsBootOrSig (tcg_src tcg_env) = tcg_env
               | otherwise = tcg_env { tcg_binds = foldr (unionBags . snd)
                                                         (tcg_binds tcg_env)
                                                         rec_sel_binds }
@@ -682,10 +682,15 @@ mkInferredPolyId poly_name qtvs theta mono_ty
   = do { fam_envs <- tcGetFamInstEnvs
 
        ; let (_co, norm_mono_ty) = normaliseType fam_envs Nominal mono_ty
-               -- Unification may not have normalised the type, so do it
+               -- Unification may not have normalised the type,
+               -- (see Note [Lazy flattening] in TcFlatten) so do it
                -- here to make it as uncomplicated as possible.
+               -- Example: f :: [F Int] -> Bool
+               -- should be rewritten to f :: [Char] -> Bool, if possible
+
              my_tvs2 = closeOverKinds (growThetaTyVars theta (tyVarsOfType norm_mono_ty))
                   -- Include kind variables!  Trac #7916
+
              my_tvs   = filter (`elemVarSet` my_tvs2) qtvs   -- Maintain original order
              my_theta = filter (quantifyPred my_tvs2) theta
              inferred_poly_ty = mkSigmaTy my_tvs my_theta norm_mono_ty

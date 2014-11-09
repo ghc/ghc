@@ -106,6 +106,7 @@ module Data.List
    , isPrefixOf
    , isSuffixOf
    , isInfixOf
+   , isSubsequenceOf
 
    -- * Searching lists
 
@@ -214,3 +215,26 @@ import Data.OldList hiding ( all, and, any, concat, concatMap, elem, find,
                              foldl, foldl1, foldl', foldr, foldr1, mapAccumL,
                              mapAccumR, maximum, maximumBy, minimum, minimumBy,
                              length, notElem, null, or, product, sum )
+
+import GHC.Base ( Bool(..), Eq((==)), otherwise )
+
+-- | The 'isSubsequenceOf' function takes two lists and returns 'True' if the
+-- first list is a subsequence of the second list.
+--
+-- @'isSubsequenceOf' x y@ is equivalent to @'elem' x ('subsequences' y)@.
+--
+-- /Since: 4.8.0.0/
+--
+-- ==== __Examples__
+--
+-- >>> isSubsequenceOf "GHC" "The Glorious Haskell Compiler"
+-- True
+-- >>> isSubsequenceOf ['a','d'..'z'] ['a'..'z']
+-- True
+-- >>> isSubsequenceOf [1..10] [10,9..0]
+-- False
+isSubsequenceOf :: (Eq a) => [a] -> [a] -> Bool
+isSubsequenceOf []    _                    = True
+isSubsequenceOf _     []                   = False
+isSubsequenceOf a@(x:a') (y:b) | x == y    = isSubsequenceOf a' b
+                               | otherwise = isSubsequenceOf a b

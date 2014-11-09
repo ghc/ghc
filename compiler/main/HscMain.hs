@@ -631,7 +631,7 @@ hscCompileOneShot' hsc_env mod_summary src_changed
                     return HscNotGeneratingCode
                 _ ->
                     case ms_hsc_src mod_summary of
-                    HsBootFile ->
+                    t | isHsBootOrSig t ->
                         do (iface, changed, _) <- hscSimpleIface' tc_result mb_old_hash
                            liftIO $ hscWriteIface dflags iface changed mod_summary
                            return HscUpdateBoot
@@ -1025,13 +1025,21 @@ markUnsafe tcg_env whyUnsafe = do
     whyUnsafe' df = vcat [ quotes pprMod <+> text "has been inferred as unsafe!"
                          , text "Reason:"
                          , nest 4 $ (vcat $ badFlags df) $+$
-                                    (vcat $ pprErrMsgBagWithLoc whyUnsafe)
+                                    (vcat $ pprErrMsgBagWithLoc whyUnsafe) $+$
+                                    (vcat $ badInsts $ tcg_insts tcg_env)
                          ]
     badFlags df   = concat $ map (badFlag df) unsafeFlagsForInfer
     badFlag df (str,loc,on,_)
         | on df     = [mkLocMessage SevOutput (loc df) $
                             text str <+> text "is not allowed in Safe Haskell"]
         | otherwise = []
+    badInsts insts = concat $ map badInst insts
+    badInst ins | overlapMode (is_flag ins) /= NoOverlap
+                = [mkLocMessage SevOutput (nameSrcSpan $ getName $ is_dfun ins) $
+                      ppr (overlapMode $ is_flag ins) <+>
+                      text "overlap mode isn't allowed in Safe Haskell"]
+                | otherwise = []
+
 
 -- | Figure out the final correct safe haskell mode
 hscGetSafeMode :: TcGblEnv -> Hsc SafeHaskellMode

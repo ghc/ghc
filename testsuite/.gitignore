@@ -29,9 +29,12 @@ Thumbs.db
 .hpc.*/
 
 *.genscript
-*.stderr.normalised
-*.stderr-ghc.normalised
 *.stdout.normalised
+*.stdout-mingw32.normalised
+*.stdout-ghc.normalised
+*.stderr.normalised
+*.stderr-mingw32.normalised
+*.stderr-ghc.normalised
 *.interp.stdout
 *.interp.stderr
 *.run.stdout
@@ -53,9 +56,9 @@ tmp.d
 *.so
 *bindisttest_install___dir_bin_ghc.mk
 *bindisttest_install___dir_bin_ghc.exe.mk
-mk/ghcconfig_*_inplace_bin_ghc-stage1.mk
-mk/ghcconfig_*_inplace_bin_ghc-stage2.mk
-mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
+mk/ghcconfig*_inplace_bin_ghc-stage1.mk
+mk/ghcconfig*_inplace_bin_ghc-stage2.mk
+mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 *.imports
 
 # -----------------------------------------------------------------------------
@@ -592,8 +595,18 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/driver/recomp012/Main
 /tests/driver/recomp012/Main.hs
 /tests/driver/recomp012/MyBool.hs
+/tests/driver/recomp014/A.hs
+/tests/driver/recomp014/A1.hs
+/tests/driver/recomp014/B.hsig
+/tests/driver/recomp014/C.hs
+/tests/driver/recomp014/recomp014
 /tests/driver/rtsOpts
 /tests/driver/rtsopts002
+/tests/driver/sigof01/Main
+/tests/driver/sigof01/tmp_*
+/tests/driver/sigof02/tmp_*
+/tests/driver/sigof03/tmp_*
+/tests/driver/sigof04/containers
 /tests/driver/spacesInArgs
 /tests/driver/stub017/
 /tests/driver/stub028/
@@ -1084,6 +1097,7 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/patsyn/should_run/ex-prov
 /tests/patsyn/should_run/ex-prov-run
 /tests/patsyn/should_run/match
+/tests/patsyn/should_run/match-unboxed
 /tests/perf/compiler/T1969.comp.stats
 /tests/perf/compiler/T3064.comp.stats
 /tests/perf/compiler/T3294.comp.stats
@@ -1355,6 +1369,7 @@ mk/ghcconfig_*_inplace_bin_ghc-stage2.exe.mk
 /tests/safeHaskell/safeLanguage/SafeLang13
 /tests/safeHaskell/safeLanguage/SafeLang15
 /tests/safeHaskell/unsafeLibs/BadImport02
+/tests/simplCore/prog003/simplCore.oneShot
 /tests/simplCore/should_compile/T3055.simpl
 /tests/simplCore/should_compile/T4138.simpl
 /tests/simplCore/should_compile/T7702plugin/pkg.T7702/

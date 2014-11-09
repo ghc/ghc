@@ -68,19 +68,16 @@ infixl 5 .|.
 
 {-# DEPRECATED bitSize "Use 'bitSizeMaybe' or 'finiteBitSize' instead" #-} -- deprecated in 7.8
 
-{-|
-The 'Bits' class defines bitwise operations over integral types.
-
-* Bits are numbered from 0 with bit 0 being the least
-  significant bit.
-
-Minimal complete definition: '.&.', '.|.', 'xor', 'complement',
-('shift' or ('shiftL' and 'shiftR')), ('rotate' or ('rotateL' and 'rotateR')),
-'bitSize', 'isSigned', 'testBit', 'bit', and 'popCount'.  The latter three can
-be implemented using `testBitDefault', 'bitDefault', and 'popCountDefault', if
-@a@ is also an instance of 'Num'.
--}
+-- | The 'Bits' class defines bitwise operations over integral types.
+--
+-- * Bits are numbered from 0 with bit 0 being the least
+--   significant bit.
 class Eq a => Bits a where
+    {-# MINIMAL (.&.), (.|.), xor, complement,
+                (shift | (shiftL, shiftR)),
+                (rotate | (rotateL, rotateR)),
+                bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+
     -- | Bitwise \"and\"
     (.&.) :: a -> a -> a
 
@@ -155,6 +152,9 @@ class Eq a => Bits a where
 
     -- | @bit /i/@ is a value with the @/i/@th bit set and all other bits clear.
     --
+    -- Can be implemented using `bitDefault' if @a@ is also an
+    -- instance of 'Num'.
+    --
     -- See also 'zeroBits'.
     bit               :: Int -> a
 
@@ -168,6 +168,9 @@ class Eq a => Bits a where
     complementBit     :: a -> Int -> a
 
     -- | Return 'True' if the @n@th bit of the argument is 1
+    --
+    -- Can be implemented using `testBitDefault' if @a@ is also an
+    -- instance of 'Num'.
     testBit           :: a -> Int -> Bool
 
     {-| Return the number of bits in the type of the argument.  The actual
@@ -268,13 +271,11 @@ class Eq a => Bits a where
     {-| Return the number of set bits in the argument.  This number is
         known as the population count or the Hamming weight.
 
+        Can be implemented using `popCountDefault' if @a@ is also an
+        instance of 'Num'.
+
         /Since: 4.5.0.0/ -}
     popCount          :: a -> Int
-
-    {-# MINIMAL (.&.), (.|.), xor, complement,
-                (shift | (shiftL, shiftR)),
-                (rotate | (rotateL, rotateR)),
-                bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
 
 -- |The 'FiniteBits' class denotes types with a finite, fixed number of bits.
 --

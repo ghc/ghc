@@ -43,16 +43,13 @@ import Class
 import Var
 import VarEnv
 import VarSet
-import CoreUnfold ( mkDFunUnfolding )
-import CoreSyn    ( Expr(Var, Type), CoreExpr, mkTyApps, mkVarApps )
-import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName,
-                    genericClassNames )
+import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName, genericClassNames )
 import Bag
 import BasicTypes
 import DynFlags
 import ErrUtils
 import FastString
-import HscTypes ( isHsBoot )
+import HscTypes ( isHsBootOrSig )
 import Id
 import MkId
 import Name
@@ -64,7 +61,7 @@ import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 
 import Control.Monad
 import Maybes     ( isNothing, isJust, whenIsJust )
-import Data.List  ( mapAccumL )
+import Data.List  ( mapAccumL, partition )
 \end{code}
 
 Typechecking instance declarations is done in two passes. The first
@@ -381,7 +378,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
              local_infos' = concat local_infos_s
              -- Handwritten instances of the poly-kinded Typeable class are
              -- forbidden, so we handle those separately
-             (typeable_instances, local_infos) = splitTypeable env local_infos'
+             (typeable_instances, local_infos)
+                = partition (bad_typeable_instance env) local_infos'
 
        ; addClsInsts local_infos $
          addFamInsts fam_insts   $
@@ -403,7 +401,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                  else tcDeriving tycl_decls inst_decls deriv_decls
 
        -- Fail if there are any handwritten instance of poly-kinded Typeable
-       ; mapM_ (failWithTc . instMsg) typeable_instances
+       ; mapM_ typeable_err typeable_instances
 
        -- Check that if the module is compiled with -XSafe, there are no
        -- hand written instances of old Typeable as then unsafe casts could be
@@ -425,29 +423,34 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     }}
   where
     -- Separate the Typeable instances from the rest
-    splitTypeable _   []     = ([],[])
-    splitTypeable env (i:is) =
-      let (typeableInsts, otherInsts) = splitTypeable env is
-      in if -- We will filter out instances of Typeable
-            (typeableClassName == is_cls_nm (iSpec i))
-            -- but not those that come from Data.Typeable.Internal
-            && tcg_mod env /= tYPEABLE_INTERNAL
-            -- nor those from an .hs-boot file (deriving can't be used there)
-            && not (isHsBoot (tcg_src env))
-         then (i:typeableInsts, otherInsts)
-         else (typeableInsts, i:otherInsts)
+    bad_typeable_instance env i
+      =       -- Class name is Typeable
+         typeableClassName == is_cls_nm (iSpec i)
+              -- but not those that come from Data.Typeable.Internal
+      && tcg_mod env /= tYPEABLE_INTERNAL
+              -- nor those from an .hs-boot or .hsig file
+              -- (deriving can't be used there)
+      && not (isHsBootOrSig (tcg_src env))
 
-    overlapCheck ty = overlapMode (is_flag $ iSpec ty) `elem`
-                        [Overlappable, Overlapping, Overlaps]
+    overlapCheck ty = overlapMode (is_flag $ iSpec ty) /= NoOverlap
     genInstCheck ty = is_cls_nm (iSpec ty) `elem` genericClassNames
     genInstErr i = hang (ptext (sLit $ "Generic instances can only be "
                             ++ "derived in Safe Haskell.") $+$
                          ptext (sLit "Replace the following instance:"))
                      2 (pprInstanceHdr (iSpec i))
 
-    instMsg i = hang (ptext (sLit $ "Typeable instances can only be derived; replace "
-                                 ++ "the following instance:"))
-                     2 (pprInstance (iSpec i))
+    typeable_err i
+      = setSrcSpan (getSrcSpan ispec) $
+        addErrTc $ hang (ptext (sLit "Typeable instances can only be derived"))
+                      2 (vcat [ ptext (sLit "Try") <+> quotes (ptext (sLit "deriving instance Typeable")
+                                                <+> pp_tc)
+                              , ptext (sLit "(requires StandaloneDeriving)") ])
+      where
+        ispec = iSpec i
+        pp_tc | [_kind, ty] <- is_tys ispec
+              , Just (tc,_) <- tcSplitTyConApp_maybe ty
+              = ppr tc
+              | otherwise = ptext (sLit "<tycon>")
 
 addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside
@@ -511,7 +514,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                                   , cid_datafam_insts = adts }))
   = setSrcSpan loc                      $
     addErrCtxt (instDeclCtxt1 poly_ty)  $
-    do  { is_boot <- tcIsHsBoot
+    do  { is_boot <- tcIsHsBootOrSig
         ; checkTc (not is_boot || (isEmptyLHsBinds binds && null uprags))
                   badBootDeclErr
 
@@ -622,7 +625,7 @@ tcFamInstDeclCombined mb_clsinfo fam_tc_lname
          -- and can't (currently) be in an hs-boot file
        ; traceTc "tcFamInstDecl" (ppr fam_tc_lname)
        ; type_families <- xoptM Opt_TypeFamilies
-       ; is_boot <- tcIsHsBoot   -- Are we compiling an hs-boot file?
+       ; is_boot <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
        ; checkTc type_families $ badFamInstDecl fam_tc_lname
        ; checkTc (not is_boot) $ badBootFamInstDeclErr
 
@@ -871,22 +874,12 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
 
                 -- Do not inline the dfun; instead give it a magic DFunFunfolding
-             (_dfun_id_w_fun, dfun_spec_prags)
-                | isNewTyCon class_tc
-                = ( dfun_id `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
-                  , SpecPrags [] )   -- Newtype dfuns just inline unconditionally,
-                                     -- so don't attempt to specialise them
+             dfun_spec_prags
+                | isNewTyCon class_tc = SpecPrags []
+                    -- Newtype dfuns just inline unconditionally,
+                    -- so don't attempt to specialise them
                 | otherwise
-                = ( dfun_id `setIdUnfolding`  mkDFunUnfolding (inst_tyvars ++ dfun_ev_vars)
-                                                              dict_constr dfun_args
-                            `setInlinePragma` dfunInlinePragma
-                  , SpecPrags spec_inst_prags )
-
-             dfun_args :: [CoreExpr]
-             dfun_args = map Type inst_tys        ++
-                         map Var  sc_ev_vars      ++
-                         map mk_meth_app meth_ids
-             mk_meth_app meth_id = Var meth_id `mkTyApps` inst_tv_tys `mkVarApps` dfun_ev_vars
+                = SpecPrags spec_inst_prags
 
              export = ABE { abe_wrap = idHsWrapper, abe_poly = dfun_id
                           , abe_mono = self_dict, abe_prags = dfun_spec_prags }

@@ -1,20 +1,9 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude
-           , OverlappingInstances
-           , ScopedTypeVariables
-           , FlexibleInstances
-           , TypeOperators
-           , PolyKinds
-           , GADTs
-           , MagicHash
-  #-}
-{-# OPTIONS_GHC -funbox-strict-fields #-}
-
--- The -XOverlappingInstances flag allows the user to over-ride
--- the instances for Typeable given here.  In particular, we provide an instance
---      instance ... => Typeable (s a) 
--- But a user might want to say
---      instance ... => Typeable (MyType a b)
+{-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
 -- |

@@ -21,7 +21,8 @@ import TcSMonad as TcS
 import TcInteract
 import Kind     ( isKind, isSubKind, defaultKind_maybe )
 import Inst
-import Type     ( classifyPredType, PredTree(..), getClassPredTys_maybe )
+import Type     ( classifyPredType, isIPClass, PredTree(..), getClassPredTys_maybe )
+import TyCon    ( isSynFamilyTyCon )
 import Class    ( Class )
 import Id       ( idType )
 import Var
@@ -237,6 +238,25 @@ simplifyDefault theta
 *                                                                                 *
 ***********************************************************************************
 
+Note [Inferring the type of a let-bound variable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f x = rhs
+
+To infer f's type we do the following:
+ * Gather the constraints for the RHS with ambient level *one more than*
+   the current one.  This is done by the call
+        captureConstraints (captureUntouchables (tcMonoBinds...))
+   in TcBinds.tcPolyInfer
+
+ * Call simplifyInfer to simplify the constraints and decide what to
+   quantify over. We pass in the level used for the RHS constraints,
+   here called rhs_untch.
+
+This ensures that the implication constraint we generate, if any,
+has a strictly-increased level compared to the ambient level outside
+the let binding.
+
 \begin{code}
 simplifyInfer :: Untouchables          -- Used when generating the constraints
               -> Bool                  -- Apply monomorphism restriction
@@ -373,17 +393,26 @@ simplifyInfer rhs_untch apply_mr name_taus wanteds
 %*                                                                      *
 %************************************************************************
 
-Note [Growing the tau-tvs using constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(growThetaTyVars insts tvs) is the result of extending the set
-    of tyvars tvs using all conceivable links from pred
+Note [Deciding quantification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the monomorphism restriction does not apply, then we quantify as follows:
+  * Take the global tyvars, and "grow" them using the equality constraints
+    E.g.  if x:alpha is in the environment, and alpha ~ [beta] (which can
+          happen because alpha is untouchable here) then do not quantify over
+          beta
+    These are the mono_tvs
 
-E.g. tvs = {a}, preds = {H [a] b, K (b,Int) c, Eq e}
-Then growThetaTyVars preds tvs = {a,b,c}
+  * Take the free vars of the tau-type (zonked_tau_tvs) and "grow" them
+    using all the constraints, but knocking out the mono_tvs
 
-Notice that
-   growThetaTyVars is conservative       if v might be fixed by vs
-                                         => v `elem` grow(vs,C)
+    The result is poly_qtvs, which we will quantify over.
+
+  * Filter the constraints using quantifyPred and the poly_qtvs
+
+If the MR does apply, mono_tvs includes all the constrained tyvars,
+and the quantified constraints are empty.
+
+
 
 \begin{code}
 decideQuantification :: Bool -> [PredType] -> TcTyVarSet
@@ -391,6 +420,7 @@ decideQuantification :: Bool -> [PredType] -> TcTyVarSet
                             , [TcTyVar]       -- Do quantify over these
                             , [PredType]      -- and these
                             , Bool )          -- Did the MR bite?
+-- See Note [Deciding quantification]
 decideQuantification apply_mr constraints zonked_tau_tvs
   | apply_mr     -- Apply the Monomorphism restriction
   = do { gbl_tvs <- tcGetGlobalTyVars
@@ -410,6 +440,27 @@ decideQuantification apply_mr constraints zonked_tau_tvs
        ; return (mono_tvs, qtvs, theta, False) }
 
 ------------------
+quantifyPred :: TyVarSet           -- Quantifying over these
+             -> PredType -> Bool   -- True <=> quantify over this wanted
+quantifyPred qtvs pred
+  = case classifyPredType pred of
+      ClassPred cls tys
+         | isIPClass cls -> True  -- See note [Inheriting implicit parameters]
+         | otherwise     -> tyVarsOfTypes tys `intersectsVarSet` qtvs
+      EqPred ty1 ty2     -> quant_fun ty1 || quant_fun ty2
+      IrredPred ty       -> tyVarsOfType ty `intersectsVarSet` qtvs
+      TuplePred {}       -> False
+  where
+    -- Only quantify over (F tys ~ ty) if tys mentions a quantifed variable
+    -- In particular, quanitifying over (F Int ~ ty) is a bit like quantifying
+    -- over (Eq Int); the instance should kick in right here
+    quant_fun ty
+      = case tcSplitTyConApp_maybe ty of
+          Just (tc, tys) | isSynFamilyTyCon tc
+                         -> tyVarsOfTypes tys `intersectsVarSet` qtvs
+          _ -> False
+
+------------------
 growThetaTyVars :: ThetaType -> TyVarSet -> TyVarSet
 -- See Note [Growing the tau-tvs using constraints]
 growThetaTyVars theta tvs
@@ -426,14 +477,19 @@ growThetaTyVars theta tvs
        | otherwise                       = tvs
        where
          pred_tvs = tyVarsOfType pred
-
-------------------
-quantifyPred :: TyVarSet           -- Quantifying over these
-             -> PredType -> Bool   -- True <=> quantify over this wanted
-quantifyPred qtvs pred
-  | isIPPred pred = True           -- See note [Inheriting implicit parameters]
-  | otherwise     = tyVarsOfType pred `intersectsVarSet` qtvs
 \end{code}
+
+Note [Growing the tau-tvs using constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(growThetaTyVars insts tvs) is the result of extending the set
+    of tyvars tvs using all conceivable links from pred
+
+E.g. tvs = {a}, preds = {H [a] b, K (b,Int) c, Eq e}
+Then growThetaTyVars preds tvs = {a,b,c}
+
+Notice that
+   growThetaTyVars is conservative       if v might be fixed by vs
+                                         => v `elem` grow(vs,C)
 
 Note [Inheriting implicit parameters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -582,7 +638,7 @@ simplifyRule name lhs_wanted rhs_wanted
          (resid_wanted, _) <- solveWantedsTcM (lhs_wanted `andWC` rhs_wanted)
                               -- Post: these are zonked and unflattened
 
-       ; zonked_lhs_flats <- zonkFlats (wc_flat lhs_wanted)
+       ; zonked_lhs_flats <- TcM.zonkFlats (wc_flat lhs_wanted)
        ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs_flats
              quantify_me  -- Note [RULE quantification over equalities]
                | insolubleWC resid_wanted = quantify_insol
@@ -818,7 +874,7 @@ solveImplication imp@(Implic { ic_untch  = untch
                         -- we want to retain derived equalities so we can float
                         -- them out in floatEqualities
 
-                  ; no_eqs <- getInertGivens untch skols
+                  ; no_eqs <- getNoGivenEqs untch skols
 
                   ; return (no_eqs, residual_wanted) }
 
@@ -1194,16 +1250,16 @@ floatEqualities skols no_given_eqs wanteds@(WC { wc_flat = flats })
   where
     skol_set = mkVarSet skols
     (float_eqs, remaining_flats) = partitionBag float_me flats
+
     float_me :: Ct -> Bool
-    float_me ct
-       | EqPred ty1 ty2 <- classifyPredType pred
+    float_me ct   -- The constraint is un-flattened and de-cannonicalised
+       | let pred = ctPred ct
+       , EqPred ty1 ty2 <- classifyPredType pred
        , tyVarsOfType pred `disjointVarSet` skol_set
        , useful_to_float ty1 ty2
        = True
        | otherwise
        = False
-       where
-         pred = ctPred ct
 
       -- Float out alpha ~ ty, or ty ~ alpha
       -- which might be unified outside
@@ -1229,55 +1285,6 @@ If we float the equality outwards, we'll get *another* Derived
 insoluble equality one level out, so the same error will be reported
 twice.  So we refrain from floating such equalities
 
-Note [When does an implication have given equalities?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     NB: This note is mainly referred to from TcSMonad
-         but it relates to floating equalities, so I've
-         left it here
-
-Consider an implication
-   beta => alpha ~ Int
-where beta is a unification variable that has already been unified
-to () in an outer scope.  Then we can float the (alpha ~ Int) out
-just fine. So when deciding whether the givens contain an equality,
-we should canonicalise first, rather than just looking at the original
-givens (Trac #8644).
-
-This is the entire reason for the inert_no_eqs field in InertCans.
-We initialise it to False before processing the Givens of an implication;
-and set it to True when adding an inert equality in addInertCan.
-
-However, when flattening givens, we generate given equalities like
-  <F [a]> : F [a] ~ f,
-with Refl evidence, and we *don't* want those to count as an equality
-in the givens!  After all, the entire flattening business is just an
-internal matter, and the evidence does not mention any of the 'givens'
-of this implication.
-
-So we set the flag to False when adding an equality
-(TcSMonad.addInertCan) whose evidence whose CtOrigin is
-FlatSkolOrigin; see TcSMonad.isFlatSkolEv.  Note that we may transform
-the original flat-skol equality before adding it to the inerts, so
-it's important that the transformation preserves origin (which
-xCtEvidence and rewriteEvidence both do).  Example
-     instance F [a] = Maybe a
-     implication: C (F [a]) => blah
-  We flatten (C (F [a])) to C fsk, with <F [a]> : F [a] ~ fsk
-  Then we reduce the F [a] LHS, giving
-       g22 = ax7 ; <F [a]>
-       g22 : Maybe a ~ fsk
-  And before adding g22 we'll re-orient it to an ordinary tyvar
-  equality.  None of this should count as "adding a given equality".
-  This really happens (Trac #8651).
-
-An alternative we considered was to
-  * Accumulate the new inert equalities (in TcSMonad.addInertCan)
-  * In solveFlatGivens, check whether the evidence for the new
-    equalities mentions any of the ic_givens of this implication.
-This seems like the Right Thing, but it's more code, and more work
-at runtime, so we are using the FlatSkolOrigin idea intead. It's less
-obvious that it works, but I think it does, and it's simple and efficient.
-
 Note [Float equalities from under a skolem binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Which of the flat equalities can we float out?  Obviously, only
@@ -1291,66 +1298,15 @@ we left with the constraint
    [2] forall a. a ~ gamma'[1]
 which is insoluble because gamma became untouchable.
 
-Solution: only promote a constraint if its free variables cannot
-possibly be connected with the skolems.  Procedurally, start with
-the skolems and "grow" that set as follows:
-  * For each flat equality F ts ~ s, or tv ~ s,
-    if the current set intersects with the LHS of the equality,
-       add the free vars of the RHS, and vice versa
-That gives us a grown skolem set.  Now float an equality if its free
-vars don't intersect the grown skolem set.
+Solution: float only constraints that stand a jolly good chance of
+being soluble simply by being floated, namely ones of form
+      a ~ ty
+where 'a' is a currently-untouchable unification variable, but may
+become touchable by being floated (perhaps by more than one level).
 
-This seems very ad hoc (sigh).  But here are some tricky edge cases:
-
-a)    [2]forall a. (F a delta[1] ~ beta[2],   delta[1] ~ Maybe beta[2])
-b1)   [2]forall a. (F a ty ~ beta[2],         G beta[2] ~ gamma[2])
-b2)   [2]forall a. (a ~ beta[2],              G beta[2] ~ gamma[2])
-c)    [2]forall a. (F a ty ~ beta[2],         delta[1] ~ Maybe beta[2])
-d)    [2]forall a. (gamma[1] ~ Tree beta[2],  F ty ~ beta[2])
-
-In (a) we *must* float out the second equality,
-       else we can't solve at all (Trac #7804).
-
-In (b1, b2) we *must not* float out the second equality.
-       It will ultimately be solved (by flattening) in situ, but if we float
-       it we'll promote beta,gamma, and render the first equality insoluble.
-
-       Trac #9316 was an example of (b2).  You may wonder why (a ~ beta[2]) isn't
-       solved; in #9316 it wasn't solved because (a:*) and (beta:kappa[1]), so the
-       equality was kind-mismatched, and hence was a CIrredEvCan.  There was
-       another equality alongside, (kappa[1] ~ *).  We must first float *that*
-       one out and *then* we can solve (a ~ beta).
-
-In (c) it would be OK to float the second equality but better not to.
-       If we flatten we see (delta[1] ~ Maybe (F a ty)), which is a
-       skolem-escape problem.  If we float the second equality we'll
-       end up with (F a ty ~ beta'[1]), which is a less explicable error.
-
-In (d) we must float the first equality, so that we can unify gamma.
-       But that promotes beta, so we must float the second equality too,
-       Trac #7196 exhibits this case
-
-Some notes
-
-* When "growing", do not simply take the free vars of the predicate!
-  Example    [2]forall a.  (a:* ~ beta[2]:kappa[1]), (kappa[1] ~ *)
-  We must float the second, and we must not float the first.
-  But the first actually looks like ((~) kappa a beta), so if we just
-  look at its free variables we'll see {a,kappa,beta), and that might
-  make us think kappa should be in the grown skol set.
-
-  (In any case, the kind argument for a kind-mis-matched equality like
-   this one doesn't really make sense anyway.)
-
-  That's why we use classifyPred when growing.
-
-* Previously we tried to "grow" the skol_set with *all* the
-  constraints (not just equalities), to get all the tyvars that could
-  *conceivably* unify with the skolems, but that was far too
-  conservative (Trac #7804). Example: this should be fine:
-    f :: (forall a. a -> Proxy x -> Proxy (F x)) -> Int
-    f = error "Urk" :: (forall a. a -> Proxy x -> Proxy (F x)) -> Int
-
+We had a very complicated rule previously, but this is nice and
+simple.  (To see the notes, look at this Note in a version of
+TcSimplify prior to Oct 2014).
 
 Note [Skolem escape]
 ~~~~~~~~~~~~~~~~~~~~

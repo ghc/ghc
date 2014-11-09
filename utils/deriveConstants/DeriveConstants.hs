@@ -643,7 +643,10 @@ getWanted verbose tmpdir gccProgram gccFlags nmProgram
              oFile = tmpdir </> "tmp.o"
          writeFile cFile cStuff
          execute verbose gccProgram (gccFlags ++ ["-c", cFile, "-o", oFile])
-         xs <- readProcess nmProgram ["-P", oFile] ""
+         xs <- case os of
+                 "openbsd" -> readProcess "/usr/bin/objdump" ["--syms", oFile] ""
+                 _         -> readProcess nmProgram ["-P", oFile] ""
+
          let ls = lines xs
              ms = map parseNmLine ls
              m = Map.fromList $ catMaybes ms
@@ -723,6 +726,7 @@ getWanted verbose tmpdir gccProgram gccFlags nmProgram
                 ('_' : n) : "C" : s : _ -> mkP n s
                 n : "C" : s : _ -> mkP n s
                 [n, "D", _, s] -> mkP n s
+                [s, "O", "*COM*", _, n] -> mkP n s
                 _ -> Nothing
               where mkP r s = case (stripPrefix prefix r, readHex s) of
                         (Just name, [(size, "")]) -> Just (name, size)

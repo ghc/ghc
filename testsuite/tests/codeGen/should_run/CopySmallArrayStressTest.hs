@@ -361,7 +361,7 @@ cloneMArraySlow !marr !off n =
 -- Utilities for simplifying RNG passing
 
 newtype Rng s a = Rng { unRng :: StateT StdGen (ST s) a }
-                deriving Monad
+                deriving (Functor, Applicative, Monad)
 
 -- Same as 'randomR', but using the RNG state kept in the 'Rng' monad.
 rnd :: Random a => (a, a) -> Rng s a

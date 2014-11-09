@@ -937,10 +937,6 @@ rnTyClDecls extra_deps tycl_ds
 
 rnTyClDecl :: TyClDecl RdrName
            -> RnM (TyClDecl Name, FreeVars)
-rnTyClDecl (ForeignType {tcdLName = name, tcdExtName = ext_name})
-  = do { name' <- lookupLocatedTopBndrRn name
-       ; return (ForeignType {tcdLName = name', tcdExtName = ext_name},
-                 emptyFVs) }
 
 -- All flavours of type family declarations ("type family", "newtype family",
 -- and "data family"), both top level and (for an associated type)

@@ -217,8 +217,9 @@ static int ocRunInit_PEi386     ( ObjectCode* oc );
 static void *lookupSymbolInDLLs ( unsigned char *lbl );
 static void zapTrailingAtSign   ( unsigned char *sym );
 static char *allocateImageAndTrampolines (
+   pathchar* arch_name, char* member_name,
 #if defined(x86_64_HOST_ARCH)
-   FILE* f, pathchar* arch_name, char* member_name,
+   FILE* f,
 #endif
    int size );
 #if defined(x86_64_HOST_ARCH)
@@ -1967,18 +1968,19 @@ addDLL( pathchar *dll_name )
         point character (.) to indicate that the module name has no
         extension. */
 
-   buf = stgMallocBytes((pathlen(dll_name) + 10) * sizeof(wchar_t), "addDLL");
-   swprintf(buf, L"%s.DLL", dll_name);
+   size_t bufsize = pathlen(dll_name) + 10;
+   buf = stgMallocBytes(bufsize * sizeof(wchar_t), "addDLL");
+   snwprintf(buf, bufsize, L"%s.DLL", dll_name);
    instance = LoadLibraryW(buf);
    if (instance == NULL) {
        if (GetLastError() != ERROR_MOD_NOT_FOUND) goto error;
        // KAA: allow loading of drivers (like winspool.drv)
-       swprintf(buf, L"%s.DRV", dll_name);
+       snwprintf(buf, bufsize, L"%s.DRV", dll_name);
        instance = LoadLibraryW(buf);
        if (instance == NULL) {
            if (GetLastError() != ERROR_MOD_NOT_FOUND) goto error;
            // #1883: allow loading of unix-style libfoo.dll DLLs
-           swprintf(buf, L"lib%s.DLL", dll_name);
+           snwprintf(buf, bufsize, L"lib%s.DLL", dll_name);
            instance = LoadLibraryW(buf);
            if (instance == NULL) {
                goto error;
@@ -2725,9 +2727,9 @@ loadArchive( pathchar *path )
 #elif defined(mingw32_HOST_OS)
         // TODO: We would like to use allocateExec here, but allocateExec
         //       cannot currently allocate blocks large enough.
-            image = allocateImageAndTrampolines(
+            image = allocateImageAndTrampolines(path, fileName,
 #if defined(x86_64_HOST_ARCH)
-               f, path, fileName,
+               f,
 #endif
                memberSize);
 #elif defined(darwin_HOST_OS)
@@ -2946,9 +2948,9 @@ loadObj( pathchar *path )
 #   if defined(mingw32_HOST_OS)
         // TODO: We would like to use allocateExec here, but allocateExec
         //       cannot currently allocate blocks large enough.
-    image = allocateImageAndTrampolines(
+    image = allocateImageAndTrampolines(path, "itself",
 #if defined(x86_64_HOST_ARCH)
-       f, path, "itself",
+       f,
 #endif
        fileSize);
     if (image == NULL) {
@@ -3663,8 +3665,9 @@ static int verifyCOFFHeader ( COFF_header *hdr, pathchar *filename);
  */
 static char *
 allocateImageAndTrampolines (
+   pathchar* arch_name, char* member_name,
 #if defined(x86_64_HOST_ARCH)
-   FILE* f, pathchar* arch_name, char* member_name,
+   FILE* f,
 #endif
    int size )
 {
@@ -3704,10 +3707,8 @@ allocateImageAndTrampolines (
                         PAGE_EXECUTE_READWRITE);
 
    if (image == NULL) {
-/*       errorBelch("%" PATH_FMT ": failed to allocate memory for image",
-                  arch_name);
-*/
-       errorBelch( "Failed to allocate memory for image (windows)" );
+       errorBelch("%" PATH_FMT ": failed to allocate memory for image for %s",
+                  arch_name, member_name);
        return NULL;
    }
 

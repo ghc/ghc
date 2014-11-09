@@ -143,6 +143,8 @@ class TestRun:
        self.unexpected_passes = {}
        self.n_unexpected_failures = 0
        self.unexpected_failures = {}
+       self.n_unexpected_stat_failures = 0
+       self.unexpected_stat_failures = {}
        
 global t
 t = TestRun()

@@ -29,9 +29,6 @@ module TysWiredIn (
         charTyCon, charDataCon, charTyCon_RDR,
         charTy, stringTy, charTyConName,
 
-        -- integer-gmp only:
-        integerGmpSDataCon,
-
         -- * Double
         doubleTyCon, doubleDataCon, doubleTy, doubleTyConName,
 
@@ -106,7 +103,6 @@ import Unique           ( incrUnique, mkTupleTyConUnique,
 import Data.Array
 import FastString
 import Outputable
-import Config
 import Util
 import BooleanFormula   ( mkAnd )
 
@@ -160,9 +156,6 @@ wiredInTyCons = [ unitTyCon     -- Not treated like other tuples, because
               , typeNatKindCon
               , typeSymbolKindCon
               ]
-           ++ (case cIntegerLibraryType of
-               IntegerGMP -> [integerTyCon]
-               _ -> [])
 \end{code}
 
 \begin{code}
@@ -216,15 +209,6 @@ doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#")     
 typeNatKindConName, typeSymbolKindConName :: Name
 typeNatKindConName    = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "Nat")    typeNatKindConNameKey    typeNatKindCon
 typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "Symbol") typeSymbolKindConNameKey typeSymbolKindCon
-
--- For integer-gmp only:
-integerRealTyConName :: Name
-integerRealTyConName    = case cIntegerLibraryType of
-                          IntegerGMP -> mkWiredInTyConName   UserSyntax gHC_INTEGER_TYPE (fsLit "Integer") integerTyConKey integerTyCon
-                          _ ->          panic "integerRealTyConName evaluated, but not integer-gmp"
-integerGmpSDataConName, integerGmpJDataConName :: Name
-integerGmpSDataConName = mkWiredInDataConName UserSyntax gHC_INTEGER_TYPE (fsLit "S#") integerGmpSDataConKey integerGmpSDataCon
-integerGmpJDataConName = mkWiredInDataConName UserSyntax gHC_INTEGER_TYPE (fsLit "J#") integerGmpJDataConKey integerGmpJDataCon
 
 parrTyConName, parrDataConName :: Name
 parrTyConName   = mkWiredInTyConName   BuiltInSyntax
@@ -568,28 +552,6 @@ charDataCon = pcDataCon charDataConName [] [charPrimTy] charTyCon
 
 stringTy :: Type
 stringTy = mkListTy charTy -- convenience only
-\end{code}
-
-\begin{code}
-integerTyCon :: TyCon
-integerTyCon = case cIntegerLibraryType of
-               IntegerGMP ->
-                   pcNonRecDataTyCon integerRealTyConName Nothing []
-                                     [integerGmpSDataCon, integerGmpJDataCon]
-               _ ->
-                   panic "Evaluated integerTyCon, but not using IntegerGMP"
-
-integerGmpSDataCon :: DataCon
-integerGmpSDataCon = pcDataCon integerGmpSDataConName []
-                               [intPrimTy]
-                               integerTyCon
-
--- integerGmpJDataCon isn't exported, but we need to define it to fill
--- out integerTyCon
-integerGmpJDataCon :: DataCon
-integerGmpJDataCon = pcDataCon integerGmpJDataConName []
-                               [intPrimTy, byteArrayPrimTy]
-                               integerTyCon
 \end{code}
 
 \begin{code}

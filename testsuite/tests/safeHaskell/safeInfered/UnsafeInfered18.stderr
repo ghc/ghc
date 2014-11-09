@@ -1,0 +1,11 @@
+
+UnsafeInfered18.hs:3:14: Warning:
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+UnsafeInfered18.hs:1:16: Warning:
+    ‘UnsafeInfered18’ has been inferred as unsafe!
+    Reason:
+        UnsafeInfered18.hs:3:14:
+            -XOverlappingInstances is not allowed in Safe Haskell
+        UnsafeInfered18.hs:9:10:
+            [overlap ok] overlap mode isn't allowed in Safe Haskell

@@ -359,7 +359,7 @@ endif
 # Packages to build
 # The lists of packages that we *actually* going to build in each stage:
 #
-#  $(PACKAGES_STAGE0) 
+#  $(PACKAGES_STAGE0)
 #  $(PACKAGES_STAGE1)
 #  $(PACKAGES_STAGE2)
 #
@@ -630,7 +630,7 @@ BUILD_DIRS += includes
 BUILD_DIRS += rts
 
 ifneq "$(BINDIST)" "YES"
-BUILD_DIRS += bindisttest 
+BUILD_DIRS += bindisttest
 BUILD_DIRS += utils/genapply
 endif
 
@@ -696,10 +696,10 @@ stage1_libs : $(ALL_STAGE1_LIBS)
 
 # ----------------------------------------------
 # Per-package compiler flags
-# 
-# If you want to add per-package compiler flags, this 
+#
+# If you want to add per-package compiler flags, this
 # is the place to do it.  Do it like this for package <pkg>
-#   
+#
 #   libraries/<pkg>_dist-boot_HC_OPTS += -Wwarn
 #   libraries/<pkg>_dist-install_HC_OPTS += -Wwarn
 
@@ -1140,7 +1140,7 @@ sdist-ghc-prep :
 	$(call sdist_ghc_file,compiler,stage2,cmm,,CmmLex,x)
 	$(call sdist_ghc_file,compiler,stage2,cmm,,CmmParse,y)
 	$(call sdist_ghc_file,compiler,stage2,parser,,Lexer,x)
-	$(call sdist_ghc_file,compiler,stage2,parser,,Parser,y.pp)
+	$(call sdist_ghc_file,compiler,stage2,parser,,Parser,y)
 	$(call sdist_ghc_file,utils/hpc,dist-install,,,HpcParser,y)
 	$(call sdist_ghc_file,utils/genprimopcode,dist,,,Lexer,x)
 	$(call sdist_ghc_file,utils/genprimopcode,dist,,,Parser,y)
@@ -1225,7 +1225,6 @@ CLEAN_FILES += includes/ghcautoconf.h
 CLEAN_FILES += includes/ghcplatform.h
 CLEAN_FILES += includes/ghcversion.h
 CLEAN_FILES += utils/ghc-pkg/Version.hs
-CLEAN_FILES += compiler/parser/Parser.y
 CLEAN_FILES += compiler/prelude/primops.txt
 CLEAN_FILES += $(wildcard compiler/primop*incl)
 

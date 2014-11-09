@@ -33,7 +33,7 @@ Note [Call Arity: The goal]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The goal of this analysis is to find out if we can eta-expand a local function,
-based on how it is being called. The motivating example is code this this,
+based on how it is being called. The motivating example is this code,
 which comes up when we implement foldl using foldr, and do list fusion:
 
     let go = \x -> let d = case ... of
@@ -46,7 +46,7 @@ If we do not eta-expand `go` to have arity 2, we are going to allocate a lot of
 partial function applications, which would be bad.
 
 The function `go` has a type of arity two, but only one lambda is manifest.
-Further more, an analysis that only looks at the RHS of go cannot be sufficient
+Furthermore, an analysis that only looks at the RHS of go cannot be sufficient
 to eta-expand go: If `go` is ever called with one argument (and the result used
 multiple times), we would be doing the work in `...` multiple times.
 

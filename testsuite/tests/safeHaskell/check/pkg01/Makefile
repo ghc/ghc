@@ -36,6 +36,7 @@ mkPackageDatabase.%:
 
 safePkg01_GHC_PKG = '$(GHC_PKG)' --no-user-package-db -f pdb.safePkg01/local.db
 
+SHOW_IFACE=-dppr-cols999 --show-iface
 safePkg01:
 	'$(MAKE)' mkPackageDatabase.safePkg01
 
@@ -43,28 +44,28 @@ safePkg01:
 	$(safePkg01_GHC_PKG) field safePkg01-1.0 trusted
 	echo
 	echo 'M_SafePkg'
-	'$(TEST_HC)' --show-iface pdb.safePkg01/dist/build/M_SafePkg.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' $(SHOW_IFACE) pdb.safePkg01/dist/build/M_SafePkg.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg2'
-	'$(TEST_HC)' --show-iface pdb.safePkg01/dist/build/M_SafePkg2.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' $(SHOW_IFACE) pdb.safePkg01/dist/build/M_SafePkg2.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg3'
-	'$(TEST_HC)' --show-iface pdb.safePkg01/dist/build/M_SafePkg3.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' $(SHOW_IFACE) pdb.safePkg01/dist/build/M_SafePkg3.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg4'
-	'$(TEST_HC)' --show-iface pdb.safePkg01/dist/build/M_SafePkg4.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' $(SHOW_IFACE) pdb.safePkg01/dist/build/M_SafePkg4.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg5'
-	'$(TEST_HC)' --show-iface pdb.safePkg01/dist/build/M_SafePkg5.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' $(SHOW_IFACE) pdb.safePkg01/dist/build/M_SafePkg5.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg6'
-	'$(TEST_HC)' --show-iface pdb.safePkg01/dist/build/M_SafePkg6.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' $(SHOW_IFACE) pdb.safePkg01/dist/build/M_SafePkg6.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg7'
-	'$(TEST_HC)' --show-iface pdb.safePkg01/dist/build/M_SafePkg7.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' $(SHOW_IFACE) pdb.safePkg01/dist/build/M_SafePkg7.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg8'
-	'$(TEST_HC)' --show-iface pdb.safePkg01/dist/build/M_SafePkg8.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' $(SHOW_IFACE) pdb.safePkg01/dist/build/M_SafePkg8.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'Testing setting trust'
 	$(safePkg01_GHC_PKG) trust    safePkg01-1.0

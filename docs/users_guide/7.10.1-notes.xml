@@ -82,6 +82,20 @@
                     <option>-XFlexibleContexts</option>).
                 </para>
            </listitem>
+           <listitem>
+                <para>
+                    <option>-fwarn-tabs</option> warning flag is turned on by
+                    default with this release of GHC. It can be suppressed
+                    either by using <literal>GHC_OPTIONS</literal> pragma or by
+                    specifying <option>-fno-warn-tabs</option> flag.
+                </para>
+           </listitem>
+           <listitem>
+             <para>
+               <option>-ddump-simpl-phases</option> and
+               <option>-ddump-core-pipeline</option> flags have been removed.
+             </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -103,6 +117,34 @@
                 <para>
                     Added support for generating LINE pragma declarations
                     (<xref linkend="line-pragma"/>).
+               </para>
+
+               <para>
+                    The type <literal>Pred</literal> (which stores a type
+                    constraint) is now a synonym for <literal>Type</literal>,
+                    in order to work with the <literal>ConstraintKinds</literal>
+                    extension. This is a breaking change and may require
+                    some rewriting of Template Haskell code.
+               </para>
+
+               <para>
+                 <literal>reifyInstances</literal> now treats unbound type
+                 variables as univerally quantified, allowing lookup of, say,
+                 the instance for <literal>Eq [a]</literal>.
+               </para>
+
+               <para>
+                 More kind annotations appear in reified types, in order to
+                 disambiguate types that would otherwise be ambiguous in the
+                 presence of <literal>PolyKinds</literal>. In particular, all
+                 reified <literal>TyVarBndr</literal>s are now
+                 <literal>KindedTV</literal>s. (This does not affect Template
+                 Haskell quotations, just calls to <literal>reify</literal>.)
+               </para>
+
+               <para>
+                 Various features unsupported in quotations were previously
+                 silently ignored. These now cause errors.
                </para>
            </listitem>
        </itemizedlist>
@@ -199,6 +241,22 @@ echo "[]" > package.conf
                 <para>
                     Version number XXXXX (was 4.7.0.0)
                </para>
+           </listitem>
+            <listitem>
+                <para>
+                    GHC has had its internal Unicode database for
+                    parsing updated to the Unicode 7.0 standard.
+                </para>
+           </listitem>
+            <listitem>
+                <para>
+                    Attempting to access a portion of the result of
+                    <literal>System.IO.hGetContents</literal> that was not yet
+                    read when the handle was closed now throws an exception.
+                    Previously, a lazy read from a closed handle would simply
+                    end the result string, leading to silent or delayed
+                    failures.
+                </para>
            </listitem>
        </itemizedlist>
     </sect3>

@@ -115,6 +115,7 @@ staticFlags = unsafePerformIO $ do
 -- is a prefix flag (i.e. HasArg, Prefix, OptPrefix, AnySuffix) will override
 -- flags further down the list with the same prefix.
 
+-- see Note [Updating flag description in the User's Guide] in DynFlags
 flagsStatic :: [Flag IO]
 flagsStatic = [
   ------ Debugging ----------------------------------------------------
@@ -137,6 +138,7 @@ isStaticFlag :: String -> Bool
 isStaticFlag f = f `elem` flagsStaticNames
 
 
+-- see Note [Updating flag description in the User's Guide] in DynFlags
 flagsStaticNames :: [String]
 flagsStaticNames = [
     "fno-state-hack",
@@ -149,7 +151,7 @@ flagsStaticNames = [
 -- the existing flags do nothing other than control debugging and some low-level
 -- optimizer phases, so for the most part this is OK.
 --
--- See GHC issue #8267: http://ghc.haskell.org/trac/ghc/ticket/8276#comment:37
+-- See GHC issue #8276: http://ghc.haskell.org/trac/ghc/ticket/8276#comment:37
 discardStaticFlags :: [String] -> [String]
 discardStaticFlags = filter (\x -> x `notElem` flags)
   where flags = [ "-fno-state-hack"
@@ -186,6 +188,8 @@ lookUp :: FastString -> Bool
 lookUp sw = sw `elem` packed_static_opts
 
 -- debugging options
+
+-- see Note [Updating flag description in the User's Guide] in DynFlags
 
 opt_PprStyle_Debug :: Bool
 opt_PprStyle_Debug = lookUp  (fsLit "-dppr-debug")

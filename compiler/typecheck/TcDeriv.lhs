@@ -356,7 +356,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
                  ; return (g, emptyBag, emptyValBindsOut)}) $
     do  {       -- Fish the "deriving"-related information out of the TcEnv
                 -- And make the necessary "equations".
-          is_boot <- tcIsHsBoot
+          is_boot <- tcIsHsBootOrSig
         ; traceTc "tcDeriving" (ppr is_boot)
 
         ; early_specs <- makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
@@ -368,14 +368,14 @@ tcDeriving tycl_decls inst_decls deriv_decls
         ; (commonAuxs, auxDerivStuff) <- commonAuxiliaries $ map forgetTheta early_specs
 
         ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
-        ; insts1 <- mapM (genInst True commonAuxs) given_specs
+        ; insts1 <- mapM (genInst commonAuxs) given_specs
 
         -- the stand-alone derived instances (@insts1@) are used when inferring
         -- the contexts for "deriving" clauses' instances (@infer_specs@)
         ; final_specs <- extendLocalInstEnv (map (iSpec . fstOf3) insts1) $
                          inferInstanceContexts infer_specs
 
-        ; insts2 <- mapM (genInst False commonAuxs) final_specs
+        ; insts2 <- mapM (genInst commonAuxs) final_specs
 
         ; let (inst_infos, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
@@ -1979,11 +1979,10 @@ the renamer.  What a great hack!
 -- Representation tycons differ from the tycon in the instance signature in
 -- case of instances for indexed families.
 --
-genInst :: Bool             -- True <=> standalone deriving
-        -> CommonAuxiliaries
+genInst :: CommonAuxiliaries
         -> DerivSpec ThetaType
         -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
-genInst _standalone_deriv comauxs
+genInst comauxs
         spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype, ds_tys = tys
                  , ds_name = dfun_name, ds_cls = clas, ds_loc = loc })

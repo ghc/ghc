@@ -74,32 +74,43 @@ module Lexer (
    lexTokenStream
   ) where
 
-import Bag
-import ErrUtils
-import Outputable
-import StringBuffer
-import FastString
-import SrcLoc
-import UniqFM
-import DynFlags
-import Module
-import Ctype
-import BasicTypes       ( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..) )
-import Util             ( readRational )
-
+-- base
 import Control.Applicative
 import Control.Monad
 import Data.Bits
-import Data.ByteString (ByteString)
 import Data.Char
 import Data.List
 import Data.Maybe
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.Ratio
 import Data.Word
-}
 
+-- bytestring
+import Data.ByteString (ByteString)
+
+-- containers
+import Data.Map (Map)
+import qualified Data.Map as Map
+
+-- compiler/utils
+import Bag
+import Outputable
+import StringBuffer
+import FastString
+import UniqFM
+import Util             ( readRational )
+
+-- compiler/main
+import ErrUtils
+import DynFlags
+
+-- compiler/basicTypes
+import SrcLoc
+import Module
+import BasicTypes       ( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..) )
+
+-- compiler/parser
+import Ctype
+}
 
 -- -----------------------------------------------------------------------------
 -- Alex "Character set macros"

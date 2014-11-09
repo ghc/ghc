@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team 1998-2005
  *
- * Prototypes for functions in Schedule.c 
+ * Prototypes for functions in Schedule.c
  * (RTS internal scheduler interface)
  *
  * -------------------------------------------------------------------------*/
@@ -34,7 +34,7 @@ void scheduleThread (Capability *cap, StgTSO *tso);
 void scheduleThreadOn(Capability *cap, StgWord cpu, StgTSO *tso);
 
 /* wakeUpRts()
- * 
+ *
  * Causes an OS thread to wake up and run the scheduler, if necessary.
  */
 #if defined(THREADED_RTS)
@@ -60,7 +60,7 @@ void scheduleWorker (Capability *cap, Task *task);
 
 extern volatile StgWord sched_state;
 
-/* 
+/*
  * flag that tracks whether we have done any execution in this time
  * slice, and controls the disabling of the interval timer.
  *
@@ -136,10 +136,10 @@ appendToRunQueue (Capability *cap, StgTSO *tso)
 {
     ASSERT(tso->_link == END_TSO_QUEUE);
     if (cap->run_queue_hd == END_TSO_QUEUE) {
-	cap->run_queue_hd = tso;
+        cap->run_queue_hd = tso;
         tso->block_info.prev = END_TSO_QUEUE;
     } else {
-	setTSOLink(cap, cap->run_queue_tl, tso);
+        setTSOLink(cap, cap->run_queue_tl, tso);
         setTSOPrev(cap, tso, cap->run_queue_tl);
     }
     cap->run_queue_tl = tso;
@@ -161,7 +161,7 @@ pushOnRunQueue (Capability *cap, StgTSO *tso)
     }
     cap->run_queue_hd = tso;
     if (cap->run_queue_tl == END_TSO_QUEUE) {
-	cap->run_queue_tl = tso;
+        cap->run_queue_tl = tso;
     }
 }
 
@@ -169,7 +169,7 @@ pushOnRunQueue (Capability *cap, StgTSO *tso)
  */
 INLINE_HEADER StgTSO *
 popRunQueue (Capability *cap)
-{ 
+{
     StgTSO *t = cap->run_queue_hd;
     ASSERT(t != END_TSO_QUEUE);
     cap->run_queue_hd = t->_link;
@@ -178,7 +178,7 @@ popRunQueue (Capability *cap)
     }
     t->_link = END_TSO_QUEUE; // no write barrier req'd
     if (cap->run_queue_hd == END_TSO_QUEUE) {
-	cap->run_queue_tl = END_TSO_QUEUE;
+        cap->run_queue_tl = END_TSO_QUEUE;
     }
     return t;
 }
@@ -200,9 +200,9 @@ appendToBlockedQueue(StgTSO *tso)
 {
     ASSERT(tso->_link == END_TSO_QUEUE);
     if (blocked_queue_hd == END_TSO_QUEUE) {
-	blocked_queue_hd = tso;
+        blocked_queue_hd = tso;
     } else {
-	setTSOLink(&MainCapability, blocked_queue_tl, tso);
+        setTSOLink(&MainCapability, blocked_queue_tl, tso);
     }
     blocked_queue_tl = tso;
 }
@@ -248,7 +248,7 @@ emptyThreadQueues(Capability *cap)
 {
     return emptyRunQueue(cap)
 #if !defined(THREADED_RTS)
-	&& EMPTY_BLOCKED_QUEUE() && EMPTY_SLEEPING_QUEUE()
+        && EMPTY_BLOCKED_QUEUE() && EMPTY_SLEEPING_QUEUE()
 #endif
     ;
 }
@@ -258,4 +258,3 @@ emptyThreadQueues(Capability *cap)
 #include "EndPrivate.h"
 
 #endif /* SCHEDULE_H */
-

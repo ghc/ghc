@@ -141,7 +141,7 @@ tcTyClGroup boot_details tyclds
        ; let role_annots = extractRoleAnnots tyclds
              decls = group_tyclds tyclds
        ; tyclss <- fixM $ \ rec_tyclss -> do
-           { is_boot <- tcIsHsBoot
+           { is_boot <- tcIsHsBootOrSig
            ; let rec_flags = calcRecFlags boot_details is_boot
                                           role_annots rec_tyclss
 
@@ -325,9 +325,6 @@ kcTyClGroup (TyClGroup { group_tyclds = decls })
       = do { res <- generaliseFamDecl kind_env fam
            ; return [res] }
 
-      | ForeignType {} <- decl
-      = pprPanic "generaliseTCD" (ppr decl)
-
       | otherwise
       = do { res <- generalise kind_env (tcdName decl)
            ; return [res] }
@@ -397,9 +394,6 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
 
 getInitialKind (FamDecl { tcdFam = decl }) 
   = getFamDeclInitialKind decl
-
-getInitialKind (ForeignType { tcdLName = L _ name })
-  = return [(name, AThing liftedTypeKind)]
 
 getInitialKind decl@(SynDecl {}) 
   = pprPanic "getInitialKind" (ppr decl)
@@ -494,8 +488,6 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name, tcdTyVars = hs_tvs
     kc_sig (TypeSig _ op_ty)    = discardResult (tcHsLiftedType op_ty)
     kc_sig (GenericSig _ op_ty) = discardResult (tcHsLiftedType op_ty)
     kc_sig _                    = return ()
-
-kcTyClDecl (ForeignType {}) = return ()
 
 -- closed type families look at their equations, but other families don't
 -- do anything here
@@ -671,10 +663,6 @@ tcTyClDecl1 _parent rec_info
            ; case getTyVar_maybe ty of
                Just tv' -> return tv'
                Nothing  -> pprPanic "tc_fd_tyvar" (ppr name $$ ppr tv $$ ppr ty) }
-
-tcTyClDecl1 _ _
-  (ForeignType {tcdLName = L _ tc_name, tcdExtName = tc_ext_name})
-  = return [ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind)]
 \end{code}
 
 \begin{code}
@@ -782,7 +770,7 @@ tcDataDefn rec_info tc_name tvs kind
        ; stupid_tc_theta <- tcHsContext ctxt
        ; stupid_theta    <- zonkTcTypeToTypes emptyZonkEnv stupid_tc_theta
        ; kind_signatures <- xoptM Opt_KindSignatures
-       ; is_boot         <- tcIsHsBoot  -- Are we compiling an hs-boot file?
+       ; is_boot         <- tcIsHsBootOrSig -- Are we compiling an hs-boot file?
 
              -- Check that we don't use kind signatures without Glasgow extensions
        ; case mb_ksig of
@@ -1143,7 +1131,7 @@ dataDeclChecks tc_name new_or_data stupid_theta cons
                 -- Check that there's at least one condecl,
          -- or else we're reading an hs-boot file, or -XEmptyDataDecls
        ; empty_data_decls <- xoptM Opt_EmptyDataDecls
-       ; is_boot <- tcIsHsBoot  -- Are we compiling an hs-boot file?
+       ; is_boot <- tcIsHsBootOrSig  -- Are we compiling an hs-boot file?
        ; checkTc (not (null cons) || empty_data_decls || is_boot)
                  (emptyConDeclsErr tc_name)
        ; return gadt_syntax }
@@ -1369,25 +1357,9 @@ since GADTs are not kind indexed.
 Validity checking is done once the mutually-recursive knot has been
 tied, so we can look at things freely.
 
-Note [Abort when superclass cycle is detected]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We must avoid doing the ambiguity check when there are already errors accumulated.
-This is because one of the errors may be a superclass cycle, and superclass cycles
-cause canonicalization to loop. Here is a representative example:
-
-  class D a => C a where
-    meth :: D a => ()
-  class C a => D a
-
-This fixes Trac #9415.
-
 \begin{code}
 checkClassCycleErrs :: Class -> TcM ()
-checkClassCycleErrs cls
-  = unless (null cls_cycles) $
-    do { mapM_ recClsErr cls_cycles
-       ; failM }  -- See Note [Abort when superclass cycle is detected]
-  where cls_cycles = calcClassCycles cls
+checkClassCycleErrs cls = mapM_ recClsErr (calcClassCycles cls)
 
 checkValidTyCl :: TyThing -> TcM ()
 checkValidTyCl thing
@@ -1425,7 +1397,7 @@ checkValidTyCon tc
   = case syn_rhs of
     { ClosedSynFamilyTyCon ax      -> checkValidClosedCoAxiom ax
     ; AbstractClosedSynFamilyTyCon ->
-      do { hsBoot <- tcIsHsBoot
+      do { hsBoot <- tcIsHsBootOrSig
          ; checkTc hsBoot $
            ptext (sLit "You may omit the equations in a closed type family") $$
            ptext (sLit "only in a .hs-boot file") }
@@ -1640,8 +1612,11 @@ checkValidClass cls
           -- If there are superclass cycles, checkClassCycleErrs bails.
         ; checkClassCycleErrs cls
 
-        -- Check the class operations
-        ; mapM_ (check_op constrained_class_methods) op_stuff
+        -- Check the class operations.
+        -- But only if there have been no earlier errors
+        -- See Note [Abort when superclass cycle is detected]
+        ; whenNoErrs $
+          mapM_ (check_op constrained_class_methods) op_stuff
 
         -- Check the associated type defaults are well-formed and instantiated
         ; mapM_ check_at_defs at_stuff  }
@@ -1706,6 +1681,20 @@ checkFamFlag tc_name
     err_msg = hang (ptext (sLit "Illegal family declaration for") <+> quotes (ppr tc_name))
                  2 (ptext (sLit "Use TypeFamilies to allow indexed type families"))
 \end{code}
+
+Note [Abort when superclass cycle is detected]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must avoid doing the ambiguity check for the methods (in
+checkValidClass.check_op) when there are already errors accumulated.
+This is because one of the errors may be a superclass cycle, and
+superclass cycles cause canonicalization to loop. Here is a
+representative example:
+
+  class D a => C a where
+    meth :: D a => ()
+  class C a => D a
+
+This fixes Trac #9415, #9739
 
 %************************************************************************
 %*                                                                      *

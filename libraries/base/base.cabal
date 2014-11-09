@@ -69,7 +69,6 @@ Library
         NegativeLiterals
         NoImplicitPrelude
         NondecreasingIndentation
-        OverlappingInstances
         OverloadedStrings
         ParallelArrays
         PolyKinds
@@ -117,6 +116,7 @@ Library
         Control.Monad.ST.Strict
         Control.Monad.ST.Unsafe
         Control.Monad.Zip
+        Data.Bifunctor
         Data.Bits
         Data.Bool
         Data.Char

@@ -1,0 +1,9 @@
+
+UnsafeInfered17.hs:1:16: Warning:
+    ‘UnsafeInfered17’ has been inferred as unsafe!
+    Reason:
+        UnsafeInfered17.hs:8:29:
+            [incoherent] overlap mode isn't allowed in Safe Haskell
+
+<no location info>: 
+Failing due to -Werror.

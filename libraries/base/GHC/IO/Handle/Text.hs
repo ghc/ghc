@@ -389,8 +389,11 @@ lazyRead handle =
    unsafeInterleaveIO $
         withHandle "hGetContents" handle $ \ handle_ -> do
         case haType handle_ of
-          ClosedHandle     -> return (handle_, "")
           SemiClosedHandle -> lazyReadBuffered handle handle_
+          ClosedHandle
+            -> ioException
+                  (IOError (Just handle) IllegalOperation "hGetContents"
+                        "delayed read on closed handle" Nothing Nothing)
           _ -> ioException
                   (IOError (Just handle) IllegalOperation "hGetContents"
                         "illegal handle type" Nothing Nothing)

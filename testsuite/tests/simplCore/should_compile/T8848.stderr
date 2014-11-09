@@ -11,18 +11,17 @@ Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
 Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
-Rule fired: Class op fmap
+Rule fired: Class op <$
 Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
 Rule fired: Class op <*>
 Rule fired: SPEC/T8848 liftA2 _ _ _ @ (Shape 'Z)
 Rule fired: Class op $p1Applicative
-Rule fired: Class op fmap
+Rule fired: Class op <$
 Rule fired: Class op <*>
-Rule fired: SPEC/T8848 liftA2 _ _ _ @ (Shape 'Z)
 Rule fired: Class op $p1Applicative
-Rule fired: Class op fmap
+Rule fired: Class op <$
 Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap

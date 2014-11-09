@@ -55,14 +55,15 @@ test('T1969',
              # 2009-12-31 6149572 (x86/Linux)
              # 2014-01-22 6429864 (x86/Linux)
              # 2014-06-29 5949188 (x86/Linux)
-           (wordsize(64), 9684256, 10)]),
+           (wordsize(64), 10000000, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
                # varies quite a lot with CLEANUP and BINDIST,
                # hence 10% range.
                # See Note [residency] to get an accurate view.
-             # 2014-09-14 9684256, 10 # try to lower it a bit more to match Phab's CI
+             # 2014-09-14  9684256, 10 # try to lower it a bit more to match Phab's CI
+             # 2014-11-03 10584344,    # ghcspeed reports higher numbers consistently
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
                                  #            215582916 (x86/Windows)
@@ -267,27 +268,30 @@ test('T3064',
             # (amd64/Linux) (09/09/2014): 407416464, AMP changes (larger interfaces, more loading)
             # (amd64/Linux) (14/09/2014): 385145080, BPP changes (more NoImplicitPrelude in base)
 
-      compiler_stats_num_field('max_bytes_used',
-          [(wordsize(32), 11202304, 20),
-            # 2011-06-28:  2247016 (x86/Linux) (28/6/2011):
-            #(some date):  5511604
-            # 2013-11-13:  7218200 (x86/Windows, 64bit machine)
-            # 2014-04-04: 11202304 (x86/Windows, 64bit machine)
-           (wordsize(64), 13251728, 20)]),
-            # (amd64/Linux, intree) (28/06/2011):  4032024
-            # (amd64/Linux, intree) (07/02/2013):  9819288
-            # (amd64/Linux)         (14/02/2013):  8687360
-            # (amd64/Linux)         (18/02/2013):  9397488
-            # (amd64/Linux)         (02/08/2013): 10742536, increase from roles
-            # (amd64/Linux)         (19/08/2013): 9211816,  decrease apparently from better eta reduction
-            # (amd64/Linux)         (11/09/2013): 12000480, increase from AMP warnings
-            #                                     933cdf15a2d85229d3df04b437da31fdfbf4961f
-            # (amd64/Linux)         (22/11/2013): 16266992, GND via Coercible and counters for constraints solving
-            # (amd64/Linux)         (12/12/2013): 19821544, better One shot analysis
-            # (amd64/Linux)         (09/09/2014): 24357392, AMP changes (larger interfaces, more loading)
-            # (amd64/Linux)         (14/09/2014): 16053888, BPP changes (more NoImplicitPrelude in base)
-            # (amd64/Linux)         (19/09/2014): 18744992, unknown
-            # (amd64/Linux)         2014-10-13:   13251728, Stricter seqDmdType
+###################################
+# deactivated for now, as this metric became too volatile recently
+#
+#      compiler_stats_num_field('max_bytes_used',
+#          [(wordsize(32), 11202304, 20),
+#            # 2011-06-28:  2247016 (x86/Linux) (28/6/2011):
+#            #(some date):  5511604
+#            # 2013-11-13:  7218200 (x86/Windows, 64bit machine)
+#            # 2014-04-04: 11202304 (x86/Windows, 64bit machine)
+#           (wordsize(64), 13251728, 20)]),
+#            # (amd64/Linux, intree) (28/06/2011):  4032024
+#            # (amd64/Linux, intree) (07/02/2013):  9819288
+#            # (amd64/Linux)         (14/02/2013):  8687360
+#            # (amd64/Linux)         (18/02/2013):  9397488
+#            # (amd64/Linux)         (02/08/2013): 10742536, increase from roles
+#            # (amd64/Linux)         (19/08/2013): 9211816,  decrease apparently from better eta reduction
+#            # (amd64/Linux)         (11/09/2013): 12000480, increase from AMP warnings
+#            #                                     933cdf15a2d85229d3df04b437da31fdfbf4961f
+#            # (amd64/Linux)         (22/11/2013): 16266992, GND via Coercible and counters for constraints solving
+#            # (amd64/Linux)         (12/12/2013): 19821544, better One shot analysis
+#            # (amd64/Linux)         (09/09/2014): 24357392, AMP changes (larger interfaces, more loading)
+#            # (amd64/Linux)         (14/09/2014): 16053888, BPP changes (more NoImplicitPrelude in base)
+#            # (amd64/Linux)         (19/09/2014): 18744992, unknown
+#            # (amd64/Linux)         2014-10-13:   13251728, Stricter seqDmdType
 
        only_ways(['normal'])
       ],
@@ -329,11 +333,12 @@ test('T5631',
           [(wordsize(32), 346389856, 10),
         # expected value: 392904228 (x86/Linux)
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
-           (wordsize(64), 739704712, 5)]),
+           (wordsize(64), 776121120, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
         # 2014-09-09:     739704712 (amd64/Linux) AMP changes
+        # 2014-11-04:     776121120 (amd64/Linux) new-flatten-skolems
        only_ways(['normal'])
       ],
      compile,
@@ -387,14 +392,14 @@ test('T5321Fun',
              # 2012-10-08: 344416344 x86/Linux
              #  (increase due to new codegen)
              # 2014-09-03: 299656164     (specialisation and inlining)
-            (wordsize(64), 601629032, 10)])
+            (wordsize(64), 541287000, 10)])
              # prev:       585521080
              # 29/08/2012: 713385808     #  (increase due to new codegen)
              # 15/05/2013: 628341952     #  (reason for decrease unknown)
              # 24/06/2013: 694019152     #  (reason for re-increase unknown)
              # 12/05/2014: 614409344     #  (specialisation and inlining changes)
              # 10/09/2014: 601629032     #  post-AMP-cleanp
-
+             # 06/11/2014: 541287000     #  Simon's flat-skol changes to the constraint solver
       ],
       compile,[''])
 
@@ -451,7 +456,7 @@ test('T5837',
              # 40000000 (x86/Linux)
              # 2013-11-13: 45520936 (x86/Windows, 64bit machine)
              # 2041-09-03: 37096484 (Windows laptop, w/w for INLINABLE things
-           (wordsize(64), 75765728, 10)])
+           (wordsize(64), 271028976, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -460,6 +465,8 @@ test('T5837',
              #                                  for constraints solving
              # 2014-08-29 73639840 amd64/Linux, w/w for INLINABLE things
              # 2014-10-08 73639840 amd64/Linux, Burning Bridges and other small changes
+             # 2014-11-06 271028976       Linux, Accept big regression;
+             #   See Note [An alternative story for the inert substitution] in TcFlatten
       ],
       compile_fail,['-ftype-function-depth=50'])
 
@@ -489,10 +496,11 @@ test('T9020',
           [(wordsize(32), 343005716, 10),
            # Original:    381360728
            # 2014-07-31:  343005716 (Windows) (general round of updates)
-           (wordsize(64), 785871680, 10)])
+           (wordsize(64), 680162056, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
+           # 2014-11-03:  680162056 Further Applicative and Monad adjustments
       ],
       compile,[''])
 

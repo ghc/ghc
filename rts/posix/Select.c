@@ -295,9 +295,32 @@ awaitEvent(rtsBool wait)
           tv.tv_usec = 0;
           ptv = &tv;
       } else if (sleeping_queue != END_TSO_QUEUE) {
+          /* SUSv2 allows implementations to have an implementation defined
+           * maximum timeout for select(2). The standard requires
+           * implementations to silently truncate values exceeding this maximum
+           * to the maximum. Unfortunately, OSX and the BSD don't comply with
+           * SUSv2, instead opting to return EINVAL for values exceeding a
+           * timeout of 1e8.
+           *
+           * Select returning an error crashes the runtime in a bad way. To
+           * play it safe we truncate any timeout to 31 days, as SUSv2 requires
+           * any implementations maximum timeout to be larger than this.
+           *
+           * Truncating the timeout is not an issue, because if nothing
+           * interesting happens when the timeout expires, we'll see that the
+           * thread still wants to be blocked longer and simply block on a new
+           * iteration of select(2).
+           */
+          const time_t max_seconds = 2678400; // 31 * 24 * 60 * 60
+
           Time min = LowResTimeToTime(sleeping_queue->block_info.target - now);
           tv.tv_sec  = TimeToSeconds(min);
-          tv.tv_usec = TimeToUS(min) % 1000000;
+          if (tv.tv_sec < max_seconds) {
+              tv.tv_usec = TimeToUS(min) % 1000000;
+          } else {
+              tv.tv_sec = max_seconds;
+              tv.tv_usec = 0;
+          }
           ptv = &tv;
       } else {
           ptv = NULL;

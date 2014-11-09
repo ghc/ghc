@@ -282,6 +282,9 @@ mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar op)) (error "mkOpApp:fixity") e2
 mkHsSplice :: LHsExpr RdrName -> HsSplice RdrName
 mkHsSplice e = HsSplice unqualSplice e
 
+unqualSplice :: RdrName
+unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
+
 mkHsSpliceE :: LHsExpr RdrName -> HsExpr RdrName
 mkHsSpliceE e = HsSpliceE False (mkHsSplice e)
 
@@ -290,11 +293,6 @@ mkHsSpliceTE e = HsSpliceE True (mkHsSplice e)
 
 mkHsSpliceTy :: LHsExpr RdrName -> HsType RdrName
 mkHsSpliceTy e = HsSpliceTy (mkHsSplice e) placeHolderKind
-
-unqualSplice :: RdrName
-unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
-                -- A name (uniquified later) to
-                -- identify the splice
 
 mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsQuasiQuote RdrName
 mkHsQuasiQuote quoter span quote = HsQuasiQuote quoter span quote
@@ -765,7 +763,6 @@ hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
 
 hsLTyClDeclBinders (L loc (FamDecl { tcdFam = FamilyDecl { fdLName = L _ name } }))
   = [L loc name]
-hsLTyClDeclBinders (L loc (ForeignType { tcdLName = L _ name })) = [L loc name]
 hsLTyClDeclBinders (L loc (SynDecl     { tcdLName = L _ name })) = [L loc name]
 hsLTyClDeclBinders (L loc (ClassDecl   { tcdLName = L _ cls_name
                                        , tcdSigs = sigs, tcdATs = ats }))

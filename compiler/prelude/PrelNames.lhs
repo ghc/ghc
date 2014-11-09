@@ -125,6 +125,8 @@ import BasicTypes
 import Name
 import SrcLoc
 import FastString
+import Config ( cIntegerLibraryType, IntegerLibrary(..) )
+import Panic ( panic )
 \end{code}
 
 
@@ -342,10 +344,6 @@ basicKnownKeyNames
         , pluginTyConName
         , tcPluginTyConName
 
-        -- dotnet interop
-        , objectTyConName, marshalObjectName, unmarshalObjectName
-        , marshalStringName, unmarshalStringName, checkDotnetResName
-
         -- Generics
         , genClassName, gen1ClassName
         , datatypeClassName, constructorClassName, selectorClassName
@@ -357,7 +355,9 @@ basicKnownKeyNames
 
         -- GHCi Sandbox
         , ghciIoClassName, ghciStepIoMName
-    ]
+    ] ++ case cIntegerLibraryType of
+           IntegerGMP    -> [integerSDataConName]
+           IntegerSimple -> []
 
 genericTyConNames :: [Name]
 genericTyConNames = [
@@ -391,7 +391,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
-    dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
+    rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_IP :: Module
 
@@ -432,7 +432,6 @@ dYNAMIC         = mkBaseModule (fsLit "Data.Dynamic")
 tYPEABLE        = mkBaseModule (fsLit "Data.Typeable")
 tYPEABLE_INTERNAL = mkBaseModule (fsLit "Data.Typeable.Internal")
 gENERICS        = mkBaseModule (fsLit "Data.Data")
-dOTNET          = mkBaseModule (fsLit "GHC.Dotnet")
 rEAD_PREC       = mkBaseModule (fsLit "Text.ParserCombinators.ReadPrec")
 lEX             = mkBaseModule (fsLit "Text.Read.Lex")
 gHC_INT         = mkBaseModule (fsLit "GHC.Int")
@@ -917,7 +916,7 @@ fromIntegerName   = varQual gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
 minusName         = varQual gHC_NUM (fsLit "-")           minusClassOpKey
 negateName        = varQual gHC_NUM (fsLit "negate")      negateClassOpKey
 
-integerTyConName, mkIntegerName,
+integerTyConName, mkIntegerName, integerSDataConName,
     integerToWord64Name, integerToInt64Name,
     word64ToIntegerName, int64ToIntegerName,
     plusIntegerName, timesIntegerName, smallIntegerName,
@@ -935,6 +934,10 @@ integerTyConName, mkIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName :: Name
 integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
+integerSDataConName   = conName gHC_INTEGER_TYPE (fsLit n)                   integerSDataConKey
+  where n = case cIntegerLibraryType of
+            IntegerGMP    -> "S#"
+            IntegerSimple -> panic "integerSDataConName evaluated for integer-simple"
 mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
 integerToWord64Name   = varQual gHC_INTEGER_TYPE (fsLit "integerToWord64")   integerToWord64IdKey
 integerToInt64Name    = varQual gHC_INTEGER_TYPE (fsLit "integerToInt64")    integerToInt64IdKey
@@ -1155,21 +1158,6 @@ knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolCl
 -- Implicit parameters
 ipClassName :: Name
 ipClassName         = clsQual gHC_IP (fsLit "IP")      ipClassNameKey
-
-
-
--- dotnet interop
-objectTyConName :: Name
-objectTyConName     = tcQual   dOTNET (fsLit "Object") objectTyConKey
-        -- objectTyConName was "wTcQual", but that's gone now, and
-        -- I can't see why it was wired in anyway...
-unmarshalObjectName, marshalObjectName, marshalStringName,
-    unmarshalStringName, checkDotnetResName :: Name
-unmarshalObjectName = varQual  dOTNET (fsLit "unmarshalObject") unmarshalObjectIdKey
-marshalObjectName   = varQual  dOTNET (fsLit "marshalObject") marshalObjectIdKey
-marshalStringName   = varQual  dOTNET (fsLit "marshalString") marshalStringIdKey
-unmarshalStringName = varQual  dOTNET (fsLit "unmarshalString") unmarshalStringIdKey
-checkDotnetResName  = varQual  dOTNET (fsLit "checkResult")     checkDotnetResNameIdKey
 
 -- plugins
 cORE_MONAD :: Module
@@ -1522,8 +1510,8 @@ unitTyConKey = mkTupleTyConUnique BoxedTuple 0
 
 \begin{code}
 charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
-    floatDataConKey, intDataConKey, nilDataConKey, ratioDataConKey,
-    stableNameDataConKey, trueDataConKey, wordDataConKey,
+    floatDataConKey, intDataConKey, integerSDataConKey, nilDataConKey,
+    ratioDataConKey, stableNameDataConKey, trueDataConKey, wordDataConKey,
     ioDataConKey, integerDataConKey, eqBoxDataConKey, coercibleDataConKey :: Unique
 charDataConKey                          = mkPreludeDataConUnique  1
 consDataConKey                          = mkPreludeDataConUnique  2
@@ -1531,6 +1519,7 @@ doubleDataConKey                        = mkPreludeDataConUnique  3
 falseDataConKey                         = mkPreludeDataConUnique  4
 floatDataConKey                         = mkPreludeDataConUnique  5
 intDataConKey                           = mkPreludeDataConUnique  6
+integerSDataConKey                      = mkPreludeDataConUnique  7
 nilDataConKey                           = mkPreludeDataConUnique 11
 ratioDataConKey                         = mkPreludeDataConUnique 12
 stableNameDataConKey                    = mkPreludeDataConUnique 14
@@ -1559,11 +1548,6 @@ ltDataConKey, eqDataConKey, gtDataConKey :: Unique
 ltDataConKey                            = mkPreludeDataConUnique 27
 eqDataConKey                            = mkPreludeDataConUnique 28
 gtDataConKey                            = mkPreludeDataConUnique 29
-
--- For integer-gmp only
-integerGmpSDataConKey, integerGmpJDataConKey :: Unique
-integerGmpSDataConKey                   = mkPreludeDataConUnique 30
-integerGmpJDataConKey                   = mkPreludeDataConUnique 31
 
 coercibleDataConKey                     = mkPreludeDataConUnique 32
 \end{code}
@@ -1689,10 +1673,11 @@ rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101
 runMainKey                    = mkPreludeMiscIdUnique 102
 
-thenIOIdKey, lazyIdKey, assertErrorIdKey :: Unique
+thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey :: Unique
 thenIOIdKey                   = mkPreludeMiscIdUnique 103
 lazyIdKey                     = mkPreludeMiscIdUnique 104
 assertErrorIdKey              = mkPreludeMiscIdUnique 105
+oneShotKey                    = mkPreludeMiscIdUnique 106
 
 breakpointIdKey, breakpointCondIdKey, breakpointAutoIdKey,
     breakpointJumpIdKey, breakpointCondJumpIdKey,

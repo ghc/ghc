@@ -400,8 +400,8 @@ GarbageCollect (nat collect_gen,
       // must be last...  invariant is that everything is fully
       // scavenged at this point.
       if (traverseWeakPtrList()) { // returns rtsTrue if evaced something
-	  inc_running();
-	  continue;
+          inc_running();
+          continue;
       }
 
       // If we get to here, there's really nothing left to do.
@@ -500,11 +500,11 @@ GarbageCollect (nat collect_gen,
         for (n = 0; n < n_capabilities; n++) {
             mut_list_size += countOccupied(capabilities[n]->mut_lists[g]);
         }
-	copied +=  mut_list_size;
+        copied +=  mut_list_size;
 
-	debugTrace(DEBUG_gc,
-		   "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d ATOMIC_INVARIANTs, %d INVARIANT_CHECK_QUEUEs, %d others)",
-		   (unsigned long)(mut_list_size * sizeof(W_)),
+        debugTrace(DEBUG_gc,
+                   "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d ATOMIC_INVARIANTs, %d INVARIANT_CHECK_QUEUEs, %d others)",
+                   (unsigned long)(mut_list_size * sizeof(W_)),
                    mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS,
                    mutlist_TVAR, mutlist_TVAR_WATCH_QUEUE,
                    mutlist_TREC_CHUNK, mutlist_TREC_HEADER,
@@ -519,10 +519,10 @@ GarbageCollect (nat collect_gen,
     // for generations we collected...
     if (g <= N) {
 
-	/* free old memory and shift to-space into from-space for all
-	 * the collected steps (except the allocation area).  These
-	 * freed blocks will probaby be quickly recycled.
-	 */
+        /* free old memory and shift to-space into from-space for all
+         * the collected steps (except the allocation area).  These
+         * freed blocks will probaby be quickly recycled.
+         */
         if (gen->mark)
         {
             // tack the new blocks on the end of the existing blocks
@@ -592,18 +592,18 @@ GarbageCollect (nat collect_gen,
     }
     else // for generations > N
     {
-	/* For older generations, we need to append the
-	 * scavenged_large_object list (i.e. large objects that have been
-	 * promoted during this GC) to the large_object list for that step.
-	 */
-	for (bd = gen->scavenged_large_objects; bd; bd = next) {
+        /* For older generations, we need to append the
+         * scavenged_large_object list (i.e. large objects that have been
+         * promoted during this GC) to the large_object list for that step.
+         */
+        for (bd = gen->scavenged_large_objects; bd; bd = next) {
             next = bd->link;
             dbl_link_onto(bd, &gen->large_objects);
             gen->n_large_words += bd->free - bd->start;
         }
 
-	// add the new blocks we promoted during this GC
-	gen->n_large_blocks += gen->n_scavenged_large_blocks;
+        // add the new blocks we promoted during this GC
+        gen->n_large_blocks += gen->n_scavenged_large_blocks;
     }
 
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
@@ -894,13 +894,13 @@ freeGcThreads (void)
     if (gc_threads != NULL) {
 #if defined(THREADED_RTS)
         nat i;
-	for (i = 0; i < n_capabilities; i++) {
+        for (i = 0; i < n_capabilities; i++) {
             for (g = 0; g < RtsFlags.GcFlags.generations; g++)
             {
                 freeWSDeque(gc_threads[i]->gens[g].todo_q);
             }
             stgFree (gc_threads[i]);
-	}
+        }
         stgFree (gc_threads);
 #else
         for (g = 0; g < RtsFlags.GcFlags.generations; g++)
@@ -947,7 +947,7 @@ any_work (void)
 
     // scavenge objects in compacted generation
     if (mark_stack_bd != NULL && !mark_stack_empty()) {
-	return rtsTrue;
+        return rtsTrue;
     }
 
     // Check for global work in any step.  We don't need to check for
@@ -1161,7 +1161,7 @@ wakeup_gc_threads (nat me USED_IF_THREADS)
         debugTrace(DEBUG_gc, "waking up gc thread %d", i);
         if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY) barf("wakeup_gc_threads");
 
-	gc_threads[i]->wakeup = GC_THREAD_RUNNING;
+        gc_threads[i]->wakeup = GC_THREAD_RUNNING;
         ACQUIRE_SPIN_LOCK(&gc_threads[i]->mut_spin);
         RELEASE_SPIN_LOCK(&gc_threads[i]->gc_spin);
     }
@@ -1227,7 +1227,7 @@ prepare_collected_gen (generation *gen)
         for (i = 0; i < n_capabilities; i++) {
             freeChain(capabilities[i]->mut_lists[g]);
             capabilities[i]->mut_lists[g] = allocBlock();
-	}
+        }
     }
 
     gen = &generations[g];
@@ -1522,7 +1522,7 @@ resize_generations (void)
         const W_ max  = RtsFlags.GcFlags.maxHeapSize;
         const W_ gens = RtsFlags.GcFlags.generations;
 
-	// live in the oldest generations
+        // live in the oldest generations
         if (oldest_gen->live_estimate != 0) {
             words = oldest_gen->live_estimate;
         } else {
@@ -1531,9 +1531,9 @@ resize_generations (void)
         live = (words + BLOCK_SIZE_W - 1) / BLOCK_SIZE_W +
             oldest_gen->n_large_blocks;
 
-	// default max size for all generations except zero
-	size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
-		       RtsFlags.GcFlags.minOldGenSize);
+        // default max size for all generations except zero
+        size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
+                       RtsFlags.GcFlags.minOldGenSize);
 
         if (RtsFlags.GcFlags.heapSizeSuggestionAuto) {
             if (max > 0) {
@@ -1543,65 +1543,65 @@ resize_generations (void)
             }
         }
 
-	// minimum size for generation zero
-	min_alloc = stg_max((RtsFlags.GcFlags.pcFreeHeap * max) / 200,
-			    RtsFlags.GcFlags.minAllocAreaSize);
+        // minimum size for generation zero
+        min_alloc = stg_max((RtsFlags.GcFlags.pcFreeHeap * max) / 200,
+                            RtsFlags.GcFlags.minAllocAreaSize);
 
-	// Auto-enable compaction when the residency reaches a
-	// certain percentage of the maximum heap size (default: 30%).
-	if (RtsFlags.GcFlags.compact ||
+        // Auto-enable compaction when the residency reaches a
+        // certain percentage of the maximum heap size (default: 30%).
+        if (RtsFlags.GcFlags.compact ||
             (max > 0 &&
              oldest_gen->n_blocks >
              (RtsFlags.GcFlags.compactThreshold * max) / 100)) {
-	    oldest_gen->mark = 1;
-	    oldest_gen->compact = 1;
-//	  debugBelch("compaction: on\n", live);
-	} else {
-	    oldest_gen->mark = 0;
-	    oldest_gen->compact = 0;
-//	  debugBelch("compaction: off\n", live);
-	}
-
-        if (RtsFlags.GcFlags.sweep) {
-	    oldest_gen->mark = 1;
+            oldest_gen->mark = 1;
+            oldest_gen->compact = 1;
+//        debugBelch("compaction: on\n", live);
+        } else {
+            oldest_gen->mark = 0;
+            oldest_gen->compact = 0;
+//        debugBelch("compaction: off\n", live);
         }
 
-	// if we're going to go over the maximum heap size, reduce the
-	// size of the generations accordingly.  The calculation is
-	// different if compaction is turned on, because we don't need
-	// to double the space required to collect the old generation.
-	if (max != 0) {
+        if (RtsFlags.GcFlags.sweep) {
+            oldest_gen->mark = 1;
+        }
 
-	    // this test is necessary to ensure that the calculations
-	    // below don't have any negative results - we're working
-	    // with unsigned values here.
-	    if (max < min_alloc) {
-		heapOverflow();
-	    }
+        // if we're going to go over the maximum heap size, reduce the
+        // size of the generations accordingly.  The calculation is
+        // different if compaction is turned on, because we don't need
+        // to double the space required to collect the old generation.
+        if (max != 0) {
 
-	    if (oldest_gen->compact) {
-		if ( (size + (size - 1) * (gens - 2) * 2) + min_alloc > max ) {
-		    size = (max - min_alloc) / ((gens - 1) * 2 - 1);
-		}
-	    } else {
-		if ( (size * (gens - 1) * 2) + min_alloc > max ) {
-		    size = (max - min_alloc) / ((gens - 1) * 2);
-		}
-	    }
+            // this test is necessary to ensure that the calculations
+            // below don't have any negative results - we're working
+            // with unsigned values here.
+            if (max < min_alloc) {
+                heapOverflow();
+            }
 
-	    if (size < live) {
-		heapOverflow();
-	    }
-	}
+            if (oldest_gen->compact) {
+                if ( (size + (size - 1) * (gens - 2) * 2) + min_alloc > max ) {
+                    size = (max - min_alloc) / ((gens - 1) * 2 - 1);
+                }
+            } else {
+                if ( (size * (gens - 1) * 2) + min_alloc > max ) {
+                    size = (max - min_alloc) / ((gens - 1) * 2);
+                }
+            }
+
+            if (size < live) {
+                heapOverflow();
+            }
+        }
 
 #if 0
-	debugBelch("live: %d, min_alloc: %d, size : %d, max = %d\n", live,
-		   min_alloc, size, max);
+        debugBelch("live: %d, min_alloc: %d, size : %d, max = %d\n", live,
+                   min_alloc, size, max);
 #endif
 
-	for (g = 0; g < gens; g++) {
-	    generations[g].max_blocks = size;
-	}
+        for (g = 0; g < gens; g++) {
+            generations[g].max_blocks = size;
+        }
     }
 }
 
@@ -1619,107 +1619,107 @@ resize_nursery (void)
     {   // Two-space collector:
         W_ blocks;
 
-	/* set up a new nursery.  Allocate a nursery size based on a
-	 * function of the amount of live data (by default a factor of 2)
-	 * Use the blocks from the old nursery if possible, freeing up any
-	 * left over blocks.
-	 *
-	 * If we get near the maximum heap size, then adjust our nursery
-	 * size accordingly.  If the nursery is the same size as the live
-	 * data (L), then we need 3L bytes.  We can reduce the size of the
-	 * nursery to bring the required memory down near 2L bytes.
-	 *
-	 * A normal 2-space collector would need 4L bytes to give the same
-	 * performance we get from 3L bytes, reducing to the same
-	 * performance at 2L bytes.
-	 */
-	blocks = generations[0].n_blocks;
+        /* set up a new nursery.  Allocate a nursery size based on a
+         * function of the amount of live data (by default a factor of 2)
+         * Use the blocks from the old nursery if possible, freeing up any
+         * left over blocks.
+         *
+         * If we get near the maximum heap size, then adjust our nursery
+         * size accordingly.  If the nursery is the same size as the live
+         * data (L), then we need 3L bytes.  We can reduce the size of the
+         * nursery to bring the required memory down near 2L bytes.
+         *
+         * A normal 2-space collector would need 4L bytes to give the same
+         * performance we get from 3L bytes, reducing to the same
+         * performance at 2L bytes.
+         */
+        blocks = generations[0].n_blocks;
 
-	if ( RtsFlags.GcFlags.maxHeapSize != 0 &&
-	     blocks * RtsFlags.GcFlags.oldGenFactor * 2 >
-	     RtsFlags.GcFlags.maxHeapSize )
-	{
-	    long adjusted_blocks;  // signed on purpose
-	    int pc_free;
+        if ( RtsFlags.GcFlags.maxHeapSize != 0 &&
+             blocks * RtsFlags.GcFlags.oldGenFactor * 2 >
+             RtsFlags.GcFlags.maxHeapSize )
+        {
+            long adjusted_blocks;  // signed on purpose
+            int pc_free;
 
-	    adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
+            adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
 
-	    debugTrace(DEBUG_gc, "near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %ld",
-		       RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks);
+            debugTrace(DEBUG_gc, "near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %ld",
+                       RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks);
 
-	    pc_free = adjusted_blocks * 100 / RtsFlags.GcFlags.maxHeapSize;
-	    if (pc_free < RtsFlags.GcFlags.pcFreeHeap) /* might even * be < 0 */
-	    {
-		heapOverflow();
-	    }
-	    blocks = adjusted_blocks;
-	}
-	else
-	{
-	    blocks *= RtsFlags.GcFlags.oldGenFactor;
-	    if (blocks < min_nursery)
-	    {
-		blocks = min_nursery;
-	    }
-	}
-	resizeNurseries(blocks);
+            pc_free = adjusted_blocks * 100 / RtsFlags.GcFlags.maxHeapSize;
+            if (pc_free < RtsFlags.GcFlags.pcFreeHeap) /* might even * be < 0 */
+            {
+                heapOverflow();
+            }
+            blocks = adjusted_blocks;
+        }
+        else
+        {
+            blocks *= RtsFlags.GcFlags.oldGenFactor;
+            if (blocks < min_nursery)
+            {
+                blocks = min_nursery;
+            }
+        }
+        resizeNurseries(blocks);
     }
     else  // Generational collector
     {
-	/*
-	 * If the user has given us a suggested heap size, adjust our
-	 * allocation area to make best use of the memory available.
-	 */
-	if (RtsFlags.GcFlags.heapSizeSuggestion)
-	{
-	    long blocks;
+        /*
+         * If the user has given us a suggested heap size, adjust our
+         * allocation area to make best use of the memory available.
+         */
+        if (RtsFlags.GcFlags.heapSizeSuggestion)
+        {
+            long blocks;
             StgWord needed;
 
             calcNeeded(rtsFalse, &needed); // approx blocks needed at next GC
 
-	    /* Guess how much will be live in generation 0 step 0 next time.
-	     * A good approximation is obtained by finding the
-	     * percentage of g0 that was live at the last minor GC.
-	     *
-	     * We have an accurate figure for the amount of copied data in
-	     * 'copied', but we must convert this to a number of blocks, with
-	     * a small adjustment for estimated slop at the end of a block
-	     * (- 10 words).
-	     */
-	    if (N == 0)
-	    {
-		g0_pcnt_kept = ((copied / (BLOCK_SIZE_W - 10)) * 100)
-		    / countNurseryBlocks();
-	    }
+            /* Guess how much will be live in generation 0 step 0 next time.
+             * A good approximation is obtained by finding the
+             * percentage of g0 that was live at the last minor GC.
+             *
+             * We have an accurate figure for the amount of copied data in
+             * 'copied', but we must convert this to a number of blocks, with
+             * a small adjustment for estimated slop at the end of a block
+             * (- 10 words).
+             */
+            if (N == 0)
+            {
+                g0_pcnt_kept = ((copied / (BLOCK_SIZE_W - 10)) * 100)
+                    / countNurseryBlocks();
+            }
 
-	    /* Estimate a size for the allocation area based on the
-	     * information available.  We might end up going slightly under
-	     * or over the suggested heap size, but we should be pretty
-	     * close on average.
-	     *
-	     * Formula:            suggested - needed
+            /* Estimate a size for the allocation area based on the
+             * information available.  We might end up going slightly under
+             * or over the suggested heap size, but we should be pretty
+             * close on average.
+             *
+             * Formula:            suggested - needed
              *                ----------------------------
-	     *                    1 + g0_pcnt_kept/100
-	     *
-	     * where 'needed' is the amount of memory needed at the next
-	     * collection for collecting all gens except g0.
-	     */
-	    blocks =
-		(((long)RtsFlags.GcFlags.heapSizeSuggestion - (long)needed) * 100) /
-		(100 + (long)g0_pcnt_kept);
+             *                    1 + g0_pcnt_kept/100
+             *
+             * where 'needed' is the amount of memory needed at the next
+             * collection for collecting all gens except g0.
+             */
+            blocks =
+                (((long)RtsFlags.GcFlags.heapSizeSuggestion - (long)needed) * 100) /
+                (100 + (long)g0_pcnt_kept);
 
-	    if (blocks < (long)min_nursery) {
-		blocks = min_nursery;
-	    }
+            if (blocks < (long)min_nursery) {
+                blocks = min_nursery;
+            }
 
             resizeNurseries((W_)blocks);
-	}
-	else
-	{
-	    // we might have added extra large blocks to the nursery, so
-	    // resize back to minAllocAreaSize again.
-	    resizeNurseriesFixed(RtsFlags.GcFlags.minAllocAreaSize);
-	}
+        }
+        else
+        {
+            // we might have added extra large blocks to the nursery, so
+            // resize back to minAllocAreaSize again.
+            resizeNurseriesFixed(RtsFlags.GcFlags.minAllocAreaSize);
+        }
     }
 }
 
