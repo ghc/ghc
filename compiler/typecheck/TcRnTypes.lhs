@@ -16,7 +16,7 @@ For state that is global and should be returned at the end (e.g not part
 of the stack mechanism), you should use an TcRef (= IORef) to store them.
 
 \begin{code}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ExistentialQuantification #-}
 
 module TcRnTypes(
         TcRnIf, TcRn, TcM, RnM, IfM, IfL, IfG, -- The monad is opaque outside this module
@@ -74,6 +74,10 @@ module TcRnTypes(
         mkGivenLoc,
         isWanted, isGiven, isDerived,
 
+        -- Constraint solver plugins
+        TcPlugin(..), TcPluginResult(..), TcPluginSolver,
+        TcPluginM, runTcPluginM, unsafeTcPluginTcM,
+
         -- Pretty printing
         pprEvVarTheta, 
         pprEvVars, pprEvVarWithType,
@@ -122,6 +126,7 @@ import ListSetOps
 import FastString
 
 import Data.Set (Set)
+import Control.Monad (ap, liftM)
 
 #ifdef GHCI
 import Data.Map      ( Map )
@@ -354,9 +359,12 @@ data TcGblEnv
         tcg_main      :: Maybe Name,         -- ^ The Name of the main
                                              -- function, if this module is
                                              -- the main module.
-        tcg_safeInfer :: TcRef Bool          -- Has the typechecker
+        tcg_safeInfer :: TcRef Bool,         -- Has the typechecker
                                              -- inferred this module
                                              -- as -XSafe (Safe Haskell)
+
+        -- | A list of user-defined plugins for the constraint solver.
+        tcg_tc_plugins :: [TcPluginSolver]
     }
 
 -- Note [Signature parameters in TcGblEnv and DynFlags]
@@ -1955,3 +1963,72 @@ pprCtO HoleOrigin            = ptext (sLit "a use of") <+> quotes (ptext $ sLit 
 pprCtO ListOrigin            = ptext (sLit "an overloaded list")
 pprCtO _                     = panic "pprCtOrigin"
 \end{code}
+
+
+
+
+
+Constraint Solver Plugins
+-------------------------
+
+
+\begin{code}
+
+type TcPluginSolver = [Ct]    -- given
+                   -> [Ct]    -- derived
+                   -> [Ct]    -- wanted
+                   -> TcPluginM TcPluginResult
+
+newtype TcPluginM a = TcPluginM (TcM a)
+
+instance Functor     TcPluginM where
+  fmap = liftM
+
+instance Applicative TcPluginM where
+  pure  = return
+  (<*>) = ap
+
+instance Monad TcPluginM where
+  return x = TcPluginM (return x)
+  fail x   = TcPluginM (fail x)
+  TcPluginM m >>= k =
+    TcPluginM (do a <- m
+                  let TcPluginM m1 = k a
+                  m1)
+
+runTcPluginM :: TcPluginM a -> TcM a
+runTcPluginM (TcPluginM m) = m
+
+-- | This function provides an escape for direct access to
+-- the 'TcM` monad.  It should not be used lightly, and
+-- the provided 'TcPluginM' API should be favoured instead.
+unsafeTcPluginTcM :: TcM a -> TcPluginM a
+unsafeTcPluginTcM = TcPluginM
+
+data TcPlugin = forall s. TcPlugin
+  { tcPluginInit  :: [String] -> TcPluginM s
+    -- ^ Initialize plugin, when entering type-checker.
+
+  , tcPluginSolve :: s -> TcPluginSolver
+    -- ^ Solve some constraints.
+    -- TODO: WRITE MORE DETAILS ON HOW THIS WORKS.
+
+  , tcPluginStop  :: s -> TcPluginM ()
+   -- ^ Clean up after the plugin, when exiting the type-checker.
+  }
+
+data TcPluginResult
+  = TcPluginContradiction [Ct]
+    -- ^ The plugin found a contradiction.
+    -- The returned constraints are removed from the inert set,
+    -- and recorded as insoluable.
+
+  | TcPluginOk [(EvTerm,Ct)] [Ct]
+    -- ^ The first field is for constraints that were solved.
+    -- These are removed from the inert set,
+    -- and the evidence for them is recorded.
+    -- The second field contains new work, that should be processed by
+    -- the constraint solver.
+
+\end{code}
+

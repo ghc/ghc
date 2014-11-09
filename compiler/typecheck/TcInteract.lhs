@@ -39,7 +39,7 @@ import TcErrors
 import TcSMonad
 import Bag
 
-import Data.List( partition )
+import Data.List( partition, foldl' )
 
 import VarEnv
 
@@ -149,18 +149,81 @@ solveFlats cts
   = {-# SCC "solveFlats" #-}
     do { dyn_flags <- getDynFlags
        ; updWorkListTcS (\wl -> foldrBag extendWorkListCt wl cts)
-       ; solve_loop (maxSubGoalDepth dyn_flags) }
+       ; solve_loop False (maxSubGoalDepth dyn_flags) }
   where
-    solve_loop max_depth
+    solve_loop inertsModified max_depth
       = {-# SCC "solve_loop" #-}
         do { sel <- selectNextWorkItem max_depth
            ; case sel of
-              NoWorkRemaining     -- Done, successfuly (modulo frozen)
-                -> return ()
+
+              NoWorkRemaining
+                | inertsModified ->
+                    do gblEnv <- getGblEnv
+                       mapM_ runTcPlugin (tcg_tc_plugins gblEnv)
+                       solve_loop False max_depth
+
+                -- Done, successfuly (modulo frozen)
+                | otherwise -> return ()
+
+
               MaxDepthExceeded cnt ct -- Failure, depth exceeded
                 -> wrapErrTcS $ solverDepthErrorTcS cnt (ctEvidence ct)
+
               NextWorkItem ct     -- More work, loop around!
-                -> do { runSolverPipeline thePipeline ct; solve_loop max_depth } }
+                -> do { changes <- runSolverPipeline thePipeline ct
+                      ; let newMod = changes || inertsModified
+                      ; newMod `seq` solve_loop newMod max_depth } }
+
+
+-- | Try to make progress using type-checker plugings.
+-- The plugin is provided only with CTyEq and CFunEq constraints.
+runTcPlugin :: TcPluginSolver -> TcS ()
+runTcPlugin solver =
+  do iSet <- getTcSInerts
+     let iCans    = inert_cans iSet
+         allCts   = foldDicts  (:) (inert_dicts iCans)
+                  $ foldFunEqs (:) (inert_funeqs iCans)
+                  $ concat (varEnvElts (inert_eqs iCans))
+
+         (derived,other) = partition isDerivedCt allCts
+         (wanted,given)  = partition isWantedCt  other
+
+     result <- runTcPluginTcS (solver given derived wanted)
+     case result of
+
+       TcPluginContradiction bad_cts ->
+          do setInertCans (removeInertCts iCans bad_cts)
+             mapM_ emitInsoluble bad_cts
+
+       TcPluginOk solved_cts new_cts ->
+          do setInertCans (removeInertCts iCans (map snd solved_cts))
+             let setEv (ev,ct) = setEvBind (ctev_evar (cc_ev ct)) ev
+             mapM_ setEv solved_cts
+             updWorkListTcS (extendWorkListCts new_cts)
+  where
+  removeInertCts :: InertCans -> [Ct] -> InertCans
+  removeInertCts = foldl' removeInertCt
+
+  -- Remove the constraint from the inert set.  We use this either when:
+  --   * a wanted constraint was solved, or
+  --   * some constraint was marked as insoluable, and so it will be
+  --     put right back into InertSet, but in the insoluable section.
+  removeInertCt :: InertCans -> Ct -> InertCans
+  removeInertCt is ct =
+    case ct of
+
+      CDictCan  { cc_class = cl, cc_tyargs = tys } ->
+        is { inert_dicts = delDict (inert_dicts is) cl tys }
+
+      CFunEqCan { cc_fun  = tf,  cc_tyargs = tys } ->
+        is { inert_funeqs = delFunEq (inert_funeqs is) tf tys }
+
+      CTyEqCan  { cc_tyvar = x,  cc_rhs    = ty  } ->
+        is { inert_eqs = delTyEq (inert_eqs is) x ty }
+
+      CIrredEvCan {}   -> panic "runTcPlugin/removeInert: CIrredEvCan"
+      CNonCanonical {} -> panic "runTcPlugin/removeInert: CNonCanonical"
+      CHoleCan {}      -> panic "runTcPlugin/removeInert: CHoleCan"
 
 type WorkItem = Ct
 type SimplifierStage = WorkItem -> TcS (StopOrContinue Ct)
@@ -191,7 +254,7 @@ selectNextWorkItem max_depth
 
 runSolverPipeline :: [(String,SimplifierStage)] -- The pipeline
                   -> WorkItem                   -- The work item
-                  -> TcS ()
+                  -> TcS Bool                   -- Did we modify the inert set
 -- Run this item down the pipeline, leaving behind new work and inerts
 runSolverPipeline pipeline workItem
   = do { initial_is <- getTcSInerts
@@ -207,13 +270,14 @@ runSolverPipeline pipeline workItem
            Stop ev s       -> do { traceFireTcS ev s
                                  ; traceTcS "End solver pipeline (discharged) }"
                                        (ptext (sLit "inerts =") <+> ppr final_is)
-                                 ; return () }
+                                 ; return False }
            ContinueWith ct -> do { traceFireTcS (ctEvidence ct) (ptext (sLit "Kept as inert"))
                                  ; traceTcS "End solver pipeline (not discharged) }" $
                                        vcat [ ptext (sLit "final_item =") <+> ppr ct
                                             , pprTvBndrs (varSetElems $ tyVarsOfCt ct)
                                             , ptext (sLit "inerts     =") <+> ppr final_is]
-                                 ; insertInertItemTcS ct }
+                                 ; insertInertItemTcS ct
+                                 ; return True }
        }
   where run_pipeline :: [(String,SimplifierStage)] -> StopOrContinue Ct 
                      -> TcS (StopOrContinue Ct)

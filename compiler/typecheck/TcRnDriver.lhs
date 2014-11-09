@@ -134,8 +134,10 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                     Just (L mod_loc mod)  -- The normal case
                         -> (mkModule this_pkg mod, mod_loc) } ;
 
-      ; initTc hsc_env hsc_src save_rn_syntax this_mod $
-        tcRnModuleTcRnM hsc_env hsc_src parsedModule pair }
+      ; res <- initTc True hsc_env hsc_src save_rn_syntax this_mod $
+        tcRnModuleTcRnM hsc_env hsc_src parsedModule pair
+      ; return res
+      }
 
 -- To be called at the beginning of renaming hsig files.
 -- If we're processing a signature, load up the RdrEnv
@@ -369,6 +371,7 @@ implicitPreludeWarn :: SDoc
 implicitPreludeWarn
   = ptext (sLit "Module `Prelude' implicitly imported")
 \end{code}
+
 
 
 %************************************************************************

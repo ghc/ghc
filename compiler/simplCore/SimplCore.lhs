@@ -338,7 +338,8 @@ addPluginPasses dflags builtin_passes
 
 loadPlugins :: HscEnv -> IO [(ModuleName, Plugin)]
 loadPlugins hsc_env
-  = do { let to_load = pluginModNames (hsc_dflags hsc_env)
+  = do { let to_load = [ m | (m,PluginCore2Core) <-
+                                    pluginModNames (hsc_dflags hsc_env) ]
        ; plugins <- mapM (loadPlugin hsc_env) to_load
        ; return $ to_load `zip` plugins }
 

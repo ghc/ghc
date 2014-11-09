@@ -26,6 +26,7 @@ module DynFlags (
         PlatformConstants(..),
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
         ProfAuto(..),
+        PluginType(..),
         glasgowExtsFlags,
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset,
@@ -616,6 +617,8 @@ getSigOf dflags n =
         SigOf m -> Just m
         SigOfMap m -> Map.lookup n m
 
+data PluginType = PluginCore2Core | PluginTypeCheck
+
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
 data DynFlags = DynFlags {
@@ -718,8 +721,8 @@ data DynFlags = DynFlags {
   hpcDir                :: String,      -- ^ Path to store the .mix files
 
   -- Plugins
-  pluginModNames        :: [ModuleName],
-  pluginModNameOpts     :: [(ModuleName,String)],
+  pluginModNames        :: [(ModuleName, PluginType)],
+  pluginModNameOpts     :: [(ModuleName, String)],
 
   -- GHC API hooks
   hooks                 :: Hooks,
@@ -1728,7 +1731,7 @@ setLanguage l = upd (`lang_set` Just l)
 
 -- | Some modules have dependencies on others through the DynFlags rather than textual imports
 dynFlagDependencies :: DynFlags -> [ModuleName]
-dynFlagDependencies = pluginModNames
+dynFlagDependencies = map fst . pluginModNames
 
 -- | Is the -fpackage-trust mode on
 packageTrustOn :: DynFlags -> Bool
@@ -1879,8 +1882,9 @@ parseSigOf str = case filter ((=="").snd) (readP_to_S parse str) of
 setSigOf :: String -> DynFlags -> DynFlags
 setSigOf s d = d { sigOf = parseSigOf s }
 
-addPluginModuleName :: String -> DynFlags -> DynFlags
-addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }
+addPluginModuleName :: PluginType -> String -> DynFlags -> DynFlags
+addPluginModuleName pty name d =
+  d { pluginModNames = (mkModuleName name, pty) : (pluginModNames d) }
 
 addPluginModuleNameOption :: String -> DynFlags -> DynFlags
 addPluginModuleNameOption optflag d = d { pluginModNameOpts = (mkModuleName m, option) : (pluginModNameOpts d) }
@@ -2454,8 +2458,9 @@ dynamic_flags = [
   , Flag "w"      (NoArg (upd (\dfs -> dfs {warningFlags = IntSet.empty})))
 
         ------ Plugin flags ------------------------------------------------
-  , Flag "fplugin-opt" (hasArg addPluginModuleNameOption)
-  , Flag "fplugin"     (hasArg addPluginModuleName)
+  , Flag "fplugin-opt"    (hasArg addPluginModuleNameOption)
+  , Flag "fplugin"        (hasArg (addPluginModuleName PluginCore2Core))
+  , Flag "ftc-plugin"     (hasArg (addPluginModuleName PluginTypeCheck))
 
         ------ Optimisation flags ------------------------------------------
   , Flag "O"      (noArgM (setOptLevel 1))
