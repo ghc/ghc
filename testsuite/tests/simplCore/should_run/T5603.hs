@@ -4,7 +4,7 @@
 module Main (main) where
 
 import GHC.Base
-import GHC.Integer.GMP2.Internals
+import GHC.Integer.GMP.Internals
 
 main :: IO ()
 main = (encodeDouble 0 :: Double) `seq` return ()

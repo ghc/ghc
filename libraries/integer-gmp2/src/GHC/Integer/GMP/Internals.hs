@@ -12,7 +12,7 @@
 #include "MachDeps.h"
 
 -- |
--- Module      :  GHC.Integer.GMP2.Internals
+-- Module      :  GHC.Integer.GMP.Internals
 -- Copyright   :  (c) Herbert Valerio Riedel 2014
 -- License     :  BSD3
 --
@@ -31,7 +31,7 @@
 -- See also
 -- <https://ghc.haskell.org/trac/ghc/wiki/Commentary/Libraries/Integer GHC Commentary: Libraries/Integer>.
 
-module GHC.Integer.GMP2.Internals
+module GHC.Integer.GMP.Internals
     ( -- * The 'Integer' type
       Integer(..)
     , isValidInteger#

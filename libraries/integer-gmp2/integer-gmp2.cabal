@@ -58,7 +58,7 @@ library
     GHC.Integer.Logarithms
     GHC.Integer.Logarithms.Internals
 
-    GHC.Integer.GMP2.Internals
+    GHC.Integer.GMP.Internals
 
   other-modules:
     GHC.Integer.Type

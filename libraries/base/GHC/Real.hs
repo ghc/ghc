@@ -27,10 +27,8 @@ import GHC.Show
 import {-# SOURCE #-} GHC.Exception( divZeroException, overflowException, ratioZeroDenomException )
 
 #ifdef OPTIMISE_INTEGER_GCD_LCM
-# if defined(MIN_VERSION_integer_gmp)
+# if defined(MIN_VERSION_integer_gmp) || defined(MIN_VERSION_integer_gmp2)
 import GHC.Integer.GMP.Internals
-# elif defined(MIN_VERSION_integer_gmp2)
-import GHC.Integer.GMP2.Internals
 # else
 #  error unsupported OPTIMISE_INTEGER_GCD_LCM configuration
 # endif
