@@ -49,9 +49,6 @@ ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include libraries/integer-gmp2/gmp/config.mk
 endif
 
-libraries/integer-gmp2_dist-install_EXTRA_CC_OPTS += -Ilibraries/integer-gmp2/mkGmpDerivedConstants/dist
-libraries/integer-gmp2_dist-install_EXTRA_HC_OPTS += -Ilibraries/integer-gmp2/mkGmpDerivedConstants/dist
-
 gmp_CC_OPTS += $(addprefix -I,$(GMP_INCLUDE_DIRS))
 gmp_CC_OPTS += $(addprefix -L,$(GMP_LIB_DIRS))
 
@@ -78,14 +75,11 @@ HaveFrameworkGMP = NO
 endif
 endif
 
-$(libraries/integer-gmp2_dist-install_depfile_c_asm): $$(GmpDerivedConstants_HEADER)
-
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
 $(libraries/integer-gmp2_dist-install_depfile_c_asm): libraries/integer-gmp2/gmp/gmp.h
 
 gmp_CC_OPTS += -Ilibraries/integer-gmp2/gmp
-gmp_CC_OPTS += -Ilibraries/integer-gmp2/mkGmpDerivedConstants/dist
 
 libraries/integer-gmp2_dist-install_EXTRA_OBJS += libraries/integer-gmp2/gmp/objs/*.o
 
