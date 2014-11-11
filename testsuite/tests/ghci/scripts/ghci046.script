@@ -12,8 +12,8 @@ type instance OR HTrue  HTrue  = HTrue
 type instance OR HTrue  HFalse = HTrue
 type instance OR HFalse HTrue  = HTrue
 type instance OR HFalse HFalse = HFalse
-:t undefined :: AND HTrue HTrue
-:t undefined :: AND (OR HFalse HTrue) (OR HTrue HFalse)
+:kind! AND HTrue HTrue
+:kind! AND (OR HFalse HTrue) (OR HTrue HFalse)
 let t = undefined :: AND HTrue HTrue
 let f = undefined :: AND HTrue HFalse
 type instance AND HTrue  HTrue  = HFalse
