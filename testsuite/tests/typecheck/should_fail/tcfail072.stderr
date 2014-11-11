@@ -8,8 +8,9 @@ tcfail072.hs:23:13:
     The type variable ‘p0’ is ambiguous
     Note: there are several potential instances:
       instance Ord a => Ord (Maybe a) -- Defined in ‘GHC.Base’
-      instance Ord () -- Defined in ‘GHC.Classes’
-      instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
+      instance Ord Ordering -- Defined in ‘GHC.Classes’
+      instance Ord integer-gmp-1.0.0.0:GHC.Integer.Type.BigNat
+        -- Defined in ‘integer-gmp-1.0.0.0:GHC.Integer.Type’
       ...plus 23 others
     In the expression: g A
     In an equation for ‘g’: g (B _ _) = g A

@@ -4,9 +4,9 @@ tcfail008.hs:3:5:
     The type variable ‘a0’ is ambiguous
     Relevant bindings include o :: [a0] (bound at tcfail008.hs:3:1)
     Note: there are several potential instances:
+      instance Num Integer -- Defined in ‘GHC.Num’
       instance Num Double -- Defined in ‘GHC.Float’
       instance Num Float -- Defined in ‘GHC.Float’
-      instance Num Int -- Defined in ‘GHC.Num’
       ...plus two others
     In the first argument of ‘(:)’, namely ‘1’
     In the expression: 1 : 2

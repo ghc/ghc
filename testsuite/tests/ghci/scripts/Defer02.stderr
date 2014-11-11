@@ -69,9 +69,9 @@
     No instance for (Num a1) arising from the literal ‘23’
     The type variable ‘a1’ is ambiguous
     Note: there are several potential instances:
+      instance Num Integer -- Defined in ‘GHC.Num’
       instance Num Double -- Defined in ‘GHC.Float’
       instance Num Float -- Defined in ‘GHC.Float’
-      instance Num Int -- Defined in ‘GHC.Num’
       ...plus two others
     In the first argument of ‘myOp’, namely ‘23’
     In the expression: myOp 23

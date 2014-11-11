@@ -6,9 +6,9 @@ T7857.hs:8:11:
       at T7857.hs:8:1-21
     The type variable ‘r0’ is ambiguous
     Note: there are several potential instances:
-      instance [safe] (PrintfArg a, PrintfType r) => PrintfType (a -> r)
-        -- Defined in ‘Text.Printf’
       instance [safe] (a ~ ()) => PrintfType (IO a)
+        -- Defined in ‘Text.Printf’
+      instance [safe] (PrintfArg a, PrintfType r) => PrintfType (a -> r)
         -- Defined in ‘Text.Printf’
       instance [safe] IsChar c => PrintfType [c]
         -- Defined in ‘Text.Printf’

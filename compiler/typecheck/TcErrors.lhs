@@ -44,7 +44,7 @@ import StaticFlags      ( opt_PprStyle_Debug )
 import ListSetOps       ( equivClasses )
 
 import Data.Maybe
-import Data.List        ( partition, mapAccumL, zip4, nub )
+import Data.List        ( partition, mapAccumL, zip4, nub, sortBy )
 \end{code}
 
 %************************************************************************
@@ -1062,7 +1062,7 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
         hang (if isSingleton unifiers
               then ptext (sLit "Note: there is a potential instance available:")
               else ptext (sLit "Note: there are several potential instances:"))
-           2 (ppr_insts unifiers)
+           2 (ppr_insts (sortBy fuzzyClsInstCmp unifiers))
 
     -- Report "potential instances" only when the constraint arises
     -- directly from the user's use of an overloaded function

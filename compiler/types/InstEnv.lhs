@@ -15,6 +15,7 @@ module InstEnv (
         ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
         instanceHead, instanceSig, mkLocalInstance, mkImportedInstance,
         instanceDFunId, tidyClsInstDFun, instanceRoughTcs,
+        fuzzyClsInstCmp,
 
         InstEnv, emptyInstEnv, extendInstEnv, deleteFromInstEnv, identicalInstHead, 
         extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv', lookupInstEnv, instEnvElts,
@@ -42,6 +43,9 @@ import Id
 import FastString
 import Data.Data        ( Data, Typeable )
 import Data.Maybe       ( isJust, isNothing )
+#if __GLASGOW_HASKELL__ < 709
+import Data.Monoid
+#endif
 \end{code}
 
 
@@ -76,6 +80,18 @@ data ClsInst
                                         -- the decl of BasicTypes.OverlapFlag
     }
   deriving (Data, Typeable)
+
+-- | A fuzzy comparison function for class instances, intended for sorting
+-- instances before displaying them to the user.
+fuzzyClsInstCmp :: ClsInst -> ClsInst -> Ordering
+fuzzyClsInstCmp x y =
+    stableNameCmp (is_cls_nm x) (is_cls_nm y) `mappend`
+    mconcat (map cmp (zip (is_tcs x) (is_tcs y)))
+  where
+    cmp (Nothing, Nothing) = EQ
+    cmp (Nothing, Just _) = LT
+    cmp (Just _, Nothing) = GT
+    cmp (Just x, Just y) = stableNameCmp x y
 \end{code}
 
 Note [Template tyvars are fresh]

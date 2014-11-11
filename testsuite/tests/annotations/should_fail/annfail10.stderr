@@ -3,12 +3,14 @@ annfail10.hs:9:1:
     No instance for (Data.Data.Data a0) arising from an annotation
     The type variable ‘a0’ is ambiguous
     Note: there are several potential instances:
-      instance Data.Data.Data () -- Defined in ‘Data.Data’
       instance (Data.Data.Data a, Data.Data.Data b) =>
-               Data.Data.Data (a, b)
+               Data.Data.Data (Either a b)
         -- Defined in ‘Data.Data’
-      instance (Data.Data.Data a, Data.Data.Data b, Data.Data.Data c) =>
-               Data.Data.Data (a, b, c)
+      instance Data.Data.Data t => Data.Data.Data (Data.Proxy.Proxy t)
+        -- Defined in ‘Data.Data’
+      instance (GHC.Types.Coercible a b, Data.Data.Data a,
+                Data.Data.Data b) =>
+               Data.Data.Data (Data.Type.Coercion.Coercion a b)
         -- Defined in ‘Data.Data’
       ...plus 31 others
     In the annotation: {-# ANN f 1 #-}
@@ -17,8 +19,8 @@ annfail10.hs:9:11:
     No instance for (Num a0) arising from the literal ‘1’
     The type variable ‘a0’ is ambiguous
     Note: there are several potential instances:
-      instance Num Double -- Defined in ‘GHC.Float’
-      instance Num Float -- Defined in ‘GHC.Float’
-      instance Num Int -- Defined in ‘GHC.Num’
+      instance Num GHC.Int.Int16 -- Defined in ‘GHC.Int’
+      instance Num GHC.Int.Int32 -- Defined in ‘GHC.Int’
+      instance Num GHC.Int.Int64 -- Defined in ‘GHC.Int’
       ...plus 11 others
     In the annotation: {-# ANN f 1 #-}
