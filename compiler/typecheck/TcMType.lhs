@@ -19,12 +19,12 @@ module TcMType (
   newFlexiTyVar,
   newFlexiTyVarTy,              -- Kind -> TcM TcType
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
-  newPolyFlexiTyVarTy,
+  newReturnTyVar,
   newMetaKindVar, newMetaKindVars,
   mkTcTyVarName, cloneMetaTyVar,
 
   newMetaTyVar, readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
-  newMetaDetails, isFilledMetaTyVar, isFlexiMetaTyVar,
+  newMetaDetails, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
   --------------------------------
   -- Creating new evidence variables
@@ -311,7 +311,7 @@ newMetaTyVar meta_info kind
   = do  { uniq <- newUnique
         ; let name = mkTcTyVarName uniq s
               s = case meta_info of
-                        PolyTv     -> fsLit "s"
+                        ReturnTv   -> fsLit "r"
                         TauTv      -> fsLit "t"
                         FlatMetaTv -> fsLit "fmv"
                         SigTv      -> fsLit "a"
@@ -363,9 +363,9 @@ isFilledMetaTyVar tv
         ; return (isIndirect details) }
   | otherwise = return False
 
-isFlexiMetaTyVar :: TyVar -> TcM Bool
+isUnfilledMetaTyVar :: TyVar -> TcM Bool
 -- True of a un-filled-in (Flexi) meta type variable
-isFlexiMetaTyVar tv
+isUnfilledMetaTyVar tv
   | not (isTcTyVar tv) = return False
   | MetaTv { mtv_ref = ref } <- tcTyVarDetails tv
   = do  { details <- readMutVar ref
@@ -448,9 +448,8 @@ newFlexiTyVarTy kind = do
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
 newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
 
-newPolyFlexiTyVarTy :: TcM TcType
-newPolyFlexiTyVarTy = do { tv <- newMetaTyVar PolyTv liftedTypeKind
-                         ; return (TyVarTy tv) }
+newReturnTyVar :: Kind -> TcM TcTyVar
+newReturnTyVar kind = newMetaTyVar ReturnTv kind
 
 tcInstTyVars :: [TKVar] -> TcM (TvSubst, [TcTyVar])
 -- Instantiate with META type variables

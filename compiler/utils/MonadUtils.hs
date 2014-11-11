@@ -21,6 +21,7 @@ module MonadUtils
         , anyM, allM
         , foldlM, foldlM_, foldrM
         , maybeMapM
+        , whenM
         ) where
 
 -------------------------------------------------------------------------------
@@ -149,3 +150,8 @@ foldrM k z (x:xs) = do { r <- foldrM k z xs; k x r }
 maybeMapM :: Monad m => (a -> m b) -> (Maybe a -> m (Maybe b))
 maybeMapM _ Nothing  = return Nothing
 maybeMapM m (Just x) = liftM Just $ m x
+
+-- | Monadic version of @when@, taking the condition in the monad
+whenM :: Monad m => m Bool -> m () -> m ()
+whenM mb thing = do { b <- mb
+                    ; when b thing }

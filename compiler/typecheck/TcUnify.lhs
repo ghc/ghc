@@ -46,6 +46,7 @@ import TyCon
 import TysWiredIn
 import Var
 import VarEnv
+import VarSet
 import ErrUtils
 import DynFlags
 import BasicTypes
@@ -338,10 +339,19 @@ tcSubType origin ctxt ty_actual ty_expected
                       PatSigOrigin -> TypeEqOrigin { uo_actual = ty2, uo_expected = ty1 }
                       _other       -> TypeEqOrigin { uo_actual = ty1, uo_expected = ty2 }
 
+-- | Infer a type using a type "checking" function by passing in a ReturnTv,
+-- which can unify with *anything*. See also Note [ReturnTv] in TcType
 tcInfer :: (TcType -> TcM a) -> TcM (a, TcType)
-tcInfer tc_infer = do { ty  <- newFlexiTyVarTy openTypeKind
-                      ; res <- tc_infer ty
-                      ; return (res, ty) }
+tcInfer tc_check
+  = do { tv  <- newReturnTyVar openTypeKind
+       ; let ty = mkTyVarTy tv
+       ; res <- tc_check ty
+       ; whenM (isUnfilledMetaTyVar tv) $  -- checking was uninformative
+         do { traceTc "Defaulting an un-filled ReturnTv to a TauTv" empty
+            ; tau_ty <- newFlexiTyVarTy openTypeKind
+            ; writeMetaTyVar tv tau_ty }
+       ; return (res, ty) }
+  where
 
 -----------------
 tcWrapResult :: HsExpr TcId -> TcRhoType -> TcRhoType -> TcM (HsExpr TcId)
@@ -844,7 +854,7 @@ nicer_to_update_tv1 tv1 _     _     = isSystemName (Var.varName tv1)
 ----------------
 checkTauTvUpdate :: DynFlags -> TcTyVar -> TcType -> TcM (Maybe TcType)
 --    (checkTauTvUpdate tv ty)
--- We are about to update the TauTv/PolyTv tv with ty.
+-- We are about to update the TauTv/ReturnTv tv with ty.
 -- Check (a) that tv doesn't occur in ty (occurs check)
 --       (b) that kind(ty) is a sub-kind of kind(tv)
 --
@@ -873,6 +883,9 @@ checkTauTvUpdate dflags tv ty
        ; case sub_k of
            Nothing           -> return Nothing
            Just LT           -> return Nothing
+           _  | is_return_tv -> if tv `elemVarSet` tyVarsOfType ty
+                                then return Nothing
+                                else return (Just ty1)
            _  | defer_me ty1   -- Quick test
               -> -- Failed quick test so try harder
                  case occurCheckExpand dflags tv ty1 of
@@ -882,11 +895,12 @@ checkTauTvUpdate dflags tv ty
               | otherwise   -> return (Just ty1) }
   where
     info = ASSERT2( isMetaTyVar tv, ppr tv ) metaTyVarInfo tv
+      -- See Note [ReturnTv] in TcType
+    is_return_tv = case info of { ReturnTv -> True; _ -> False }
 
     impredicative = xopt Opt_ImpredicativeTypes dflags
                  || isOpenTypeKind (tyVarKind tv)
                        -- Note [OpenTypeKind accepts foralls]
-                 || case info of { PolyTv -> True;  _ -> False }
 
     defer_me :: TcType -> Bool
     -- Checks for (a) occurrence of tv
@@ -916,7 +930,6 @@ But 'error' has an OpenTypeKind type variable, precisely so that
 we can instantiate it with Int#.  So we also allow such type variables
 to be instantiate with foralls.  It's a bit of a hack, but seems
 straightforward.
-
 
 Note [Conservative unification check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
