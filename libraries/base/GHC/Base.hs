@@ -225,8 +225,32 @@ class Monoid a where
         mconcat = foldr mappend mempty
 
 instance Monoid [a] where
+        {-# INLINE mempty #-}
         mempty  = []
+        {-# INLINE mappend #-}
         mappend = (++)
+        {-# INLINE mconcat #-}
+        mconcat xss = [x | xs <- xss, x <- xs]
+-- See Note: [List comprehensions and inlining]
+
+{-
+Note: [List comprehensions and inlining]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The list monad operations are traditionally described in terms of concatMap:
+
+xs >>= f = concatMap f xs
+
+Similarly, mconcat for lists is just concat. Here in Base, however, we don't
+have concatMap, and we'll refrain from adding it here so it won't have to be
+hidden in imports. Instead, we use GHC's list comprehension desugaring
+mechanism to define mconcat and the Applicative and Monad instances for lists.
+We mark them INLINE because the inliner is not generally too keen to inline
+build forms such as the ones these desugar to without our insistence.  Defining
+these using list comprehensions instead of foldr has an additional potential
+benefit, as described in compiler/deSugar/DsListComp.lhs: if optimizations
+needed to make foldr/build forms efficient are turned off, we'll get reasonably
+efficient translations anyway.
+-}
 
 instance Monoid b => Monoid (a -> b) where
         mempty _ = mempty
@@ -501,7 +525,9 @@ sequence ms = foldr k (return []) ms
 -- | @'mapM' f@ is equivalent to @'sequence' . 'map' f@.
 mapM :: Monad m => (a -> m b) -> [a] -> m [b]
 {-# INLINE mapM #-}
-mapM f as       =  sequence (map f as)
+mapM f as = foldr k (return []) as
+            where
+              k a r = do { x <- f a; xs <- r; return (x:xs) }
 
 -- | Promote a function to a monad.
 liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
@@ -667,16 +693,27 @@ instance MonadPlus Maybe
 -- The list type
 
 instance Functor [] where
+    {-# INLINE fmap #-}
     fmap = map
 
+-- See Note: [List comprehensions and inlining]
 instance Applicative [] where
-    pure = return
-    (<*>) = ap
+    {-# INLINE pure #-}
+    pure x    = [x]
+    {-# INLINE (<*>) #-}
+    fs <*> xs = [f x | f <- fs, x <- xs]
+    {-# INLINE (*>) #-}
+    xs *> ys  = [y | _ <- xs, y <- ys]
 
-instance  Monad []  where
-    m >>= k             = foldr ((++) . k) [] m
-    m >> k              = foldr ((++) . (\ _ -> k)) [] m
+-- See Note: [List comprehensions and inlining]
+instance Monad []  where
+    {-# INLINE (>>=) #-}
+    xs >>= f             = [y | x <- xs, y <- f x]
+    {-# INLINE (>>) #-}
+    (>>) = (*>)
+    {-# INLINE return #-}
     return x            = [x]
+    {-# INLINE fail #-}
     fail _              = []
 
 instance Alternative [] where
