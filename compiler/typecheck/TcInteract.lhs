@@ -1087,56 +1087,69 @@ Consider generating the superclasses of the instance declaration
          instance Foo a => Foo [a]
 
 So our problem is this
-    d0 :_g Foo t
-    d1 :_w Data Maybe [t]
+    [G] d0 : Foo t
+    [W] d1 : Data Maybe [t]   -- Desired superclass
 
 We may add the given in the inert set, along with its superclasses
 [assuming we don't fail because there is a matching instance, see
  topReactionsStage, given case ]
   Inert:
-    d0 :_g Foo t
+    [G] d0 : Foo t
+    [G] d01 : Data Maybe t   -- Superclass of d0
   WorkList
-    d01 :_g Data Maybe t  -- d2 := EvDictSuperClass d0 0
-    d1 :_w Data Maybe [t]
-Then d2 can readily enter the inert, and we also do solving of the wanted
-  Inert:
-    d0 :_g Foo t
-    d1 :_s Data Maybe [t]           d1 := dfunData2 d2 d3
-  WorkList
-    d2 :_w Sat (Maybe [t])
-    d3 :_w Data Maybe t
-    d01 :_g Data Maybe t
-Now, we may simplify d2 more:
-  Inert:
-      d0 :_g Foo t
-      d1 :_s Data Maybe [t]           d1 := dfunData2 d2 d3
-      d1 :_g Data Maybe [t]
-      d2 :_g Sat (Maybe [t])          d2 := dfunSat d4
-  WorkList:
-      d3 :_w Data Maybe t
-      d4 :_w Foo [t]
-      d01 :_g Data Maybe t
+    [W] d1 : Data Maybe [t]
 
-Now, we can just solve d3.
-  Inert
-      d0 :_g Foo t
-      d1 :_s Data Maybe [t]           d1 := dfunData2 d2 d3
-      d2 :_g Sat (Maybe [t])          d2 := dfunSat d4
+Solve d1 using instance dfunData2; d1 := dfunData2 d2 d3
+  Inert:
+    [G] d0 : Foo t
+    [G] d01 : Data Maybe t   -- Superclass of d0
+  Solved:
+        d1 : Data Maybe [t]
   WorkList
-      d4 :_w Foo [t]
-      d01 :_g Data Maybe t
-And now we can simplify d4 again, but since it has superclasses we *add* them to the worklist:
-  Inert
-      d0 :_g Foo t
-      d1 :_s Data Maybe [t]           d1 := dfunData2 d2 d3
-      d2 :_g Sat (Maybe [t])          d2 := dfunSat d4
-      d4 :_g Foo [t]                  d4 := dfunFoo2 d5
+    [W] d2 : Sat (Maybe [t])
+    [W] d3 : Data Maybe t
+
+Now, we may simplify d2 using dfunSat; d2 := dfunSat d4
+  Inert:
+    [G] d0 : Foo t
+    [G] d01 : Data Maybe t   -- Superclass of d0
+  Solved:
+        d1 : Data Maybe [t]
+        d2 : Sat (Maybe [t])
   WorkList:
-      d5 :_w Foo t
-      d6 :_g Data Maybe [t]           d6 := EvDictSuperClass d4 0
-      d01 :_g Data Maybe t
-Now, d5 can be solved! (and its superclass enter scope)
+    [W] d3 : Data Maybe t
+    [W] d4 : Foo [t]
+
+Now, we can just solve d3 from d01; d3 := d01
   Inert
+    [G] d0 : Foo t
+    [G] d01 : Data Maybe t   -- Superclass of d0
+  Solved:
+        d1 : Data Maybe [t]
+        d2 : Sat (Maybe [t])
+  WorkList
+    [W] d4 : Foo [t]
+
+Now, solve d4 using dfunFoo2;  d4 := dfunFoo2 d5
+  Inert
+    [G] d0 : Foo t
+    [G] d01 : Data Maybe t   -- Superclass of d0
+  Solved:
+        d1 : Data Maybe [t]
+        d2 : Sat (Maybe [t])
+        d4 : Foo [t]
+  WorkList:
+    [W] d5 : Foo t
+
+Now, d5 can be solved! d5 := d0
+
+Result
+   d1 := dfunData2 d2 d3
+   d2 := dfunSat d4
+   d3 := d01
+   d4 := dfunFoo2 d5
+   d5 := d0
+
       d0 :_g Foo t
       d1 :_s Data Maybe [t]           d1 := dfunData2 d2 d3
       d2 :_g Sat (Maybe [t])          d2 := dfunSat d4
