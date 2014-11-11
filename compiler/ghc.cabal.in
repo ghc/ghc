@@ -317,6 +317,7 @@ Library
         PackageConfig
         Packages
         PlatformConstants
+        Plugins
         PprTyThing
         StaticFlags
         SysTools

@@ -26,6 +26,7 @@ import SimplUtils       ( simplEnvForGHCi, activeRule )
 import SimplEnv
 import SimplMonad
 import CoreMonad
+import Plugins
 import qualified ErrUtils as Err
 import FloatIn          ( floatInwards )
 import FloatOut         ( floatOutwards )
@@ -52,13 +53,7 @@ import Outputable
 import Control.Monad
 
 #ifdef GHCI
-import Type             ( mkTyConTy )
-import RdrName          ( mkRdrQual )
-import OccName          ( mkVarOcc )
-import PrelNames        ( pluginTyConName )
-import DynamicLoading   ( forceLoadTyCon, lookupRdrNameInModuleForPlugins, getValueSafely )
-import Module           ( ModuleName )
-import Panic
+import DynamicLoading   ( loadPlugins )
 #endif
 \end{code}
 
@@ -335,36 +330,6 @@ addPluginPasses dflags builtin_passes
        where
          options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
-
-loadPlugins :: HscEnv -> IO [(ModuleName, Plugin)]
-loadPlugins hsc_env
-  = do { let to_load = [ m | (m,PluginCore2Core) <-
-                                    pluginModNames (hsc_dflags hsc_env) ]
-       ; plugins <- mapM (loadPlugin hsc_env) to_load
-       ; return $ to_load `zip` plugins }
-
-loadPlugin :: HscEnv -> ModuleName -> IO Plugin
-loadPlugin hsc_env mod_name
-  = do { let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "plugin")
-             dflags = hsc_dflags hsc_env
-       ; mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name plugin_rdr_name
-       ; case mb_name of {
-            Nothing ->
-                throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
-                          [ ptext (sLit "The module"), ppr mod_name
-                          , ptext (sLit "did not export the plugin name")
-                          , ppr plugin_rdr_name ]) ;
-            Just name ->
-
-     do { plugin_tycon <- forceLoadTyCon hsc_env pluginTyConName
-        ; mb_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
-        ; case mb_plugin of
-            Nothing ->
-                throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
-                          [ ptext (sLit "The value"), ppr name
-                          , ptext (sLit "did not have the type")
-                          , ppr pluginTyConName, ptext (sLit "as required")])
-            Just plugin -> return plugin } } }
 #endif
 \end{code}
 

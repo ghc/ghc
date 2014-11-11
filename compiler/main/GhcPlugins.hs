@@ -8,9 +8,9 @@
 -- Particularly interesting modules for plugin writers include
 -- "CoreSyn" and "CoreMonad".
 module GhcPlugins(
-        module CoreMonad,
+        module Plugins,
         module RdrName, module OccName, module Name, module Var, module Id, module IdInfo,
-        module CoreSyn, module Literal, module DataCon, 
+        module CoreMonad, module CoreSyn, module Literal, module DataCon,
         module CoreUtils, module MkCore, module CoreFVs, module CoreSubst,
         module Rules, module Annotations,
         module DynFlags, module Packages,
@@ -23,7 +23,7 @@ module GhcPlugins(
     ) where
 
 -- Plugin stuff itself
-import CoreMonad
+import Plugins
 
 -- Variable naming
 import RdrName
@@ -34,6 +34,7 @@ import Id       hiding  ( lazySetIdInfo, setIdExported, setIdNotExported {- all 
 import IdInfo
 
 -- Core
+import CoreMonad
 import CoreSyn
 import Literal
 import DataCon
