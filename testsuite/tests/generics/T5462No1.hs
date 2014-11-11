@@ -6,6 +6,8 @@
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE UndecidableInstances   #-}
 
+-- DerivingViaGenerics not enabled
+
 module T5462No1 where
 
 import GHC.Generics hiding (C, C1, D)
@@ -18,7 +20,7 @@ class C2 a where
   c2 :: a -> Int
   c2 _ = 0
 
-newtype F a = F1 a
+newtype F a = F1 [a]
   deriving (Show, Eq, Generic, Generic1, GFunctor)
 
 data G = G1 deriving (C1)

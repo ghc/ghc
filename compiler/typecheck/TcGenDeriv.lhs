@@ -130,27 +130,22 @@ genDerivedBinds dflags fix_env clas loc tycon
                , (foldableClassKey,    gen_Foldable_binds)
                , (traversableClassKey, gen_Traversable_binds) ]
 
--- We can derive a given class via Generics iff
+-- We can derive a given class for a given tycon via Generics iff
 canDeriveViaGenerics :: DynFlags -> TyCon -> Class -> Maybe SDoc
 canDeriveViaGenerics dflags tycon clas =
-  let _dfs         = map (defMethSpecOfDefMeth . snd) . classOpItems $ clas
-      b `orElse` s = if b then Nothing else Just (ptext (sLit s))
+  let b `orElse` s = if b then Nothing else Just (ptext (sLit s))
       Just m  <> _ = Just m
       Nothing <> n = n
-  in  -- 1) It is not a "standard" class (like Show, Functor, etc.)
+  in  -- 1) The class is not a "standard" class (like Show, Functor, etc.)
         (not (getUnique clas `elem` standardClassKeys) `orElse` "")
       -- 2) Opt_DerivingViaGenerics is on
      <> (xopt Opt_DerivingViaGenerics dflags `orElse` "Try enabling DerivingViaGenerics")
-      -- 3) It has no non-default methods
-     -- <> (all (/= NoDM) dfs `orElse` "There are methods without a default definition")
-      -- 4) It has at least one generic default method
-     -- <> (any (== GenericDM) dfs `orElse` "There must be at least one method with a default signature")
-      -- 3/4) Its MINIMAL set is empty
+      -- 3) The MINIMAL set of the class is empty
      <> (isTrue (classMinimalDef clas) `orElse` "because its MINIMAL set is not empty")
-      -- 5) It a newtype and GND is enabled
+      -- 4) It's not the case that the tycon is a newtype and GND is enabled
      <> (not (isNewTyCon tycon && xopt Opt_GeneralizedNewtypeDeriving dflags)
-          `orElse` "I don't know whether to use DerivingViaGenerics or GeneralizedNewtypeDeriving")
-  -- Nothing: we can derive it via Generics
+          `orElse` "Both DerivingViaGenerics and GeneralizedNewtypeDeriving are enabled")
+  -- Nothing: we can (try to) derive it via Generics
   -- Just s:  we can't, reason s
 \end{code}
 

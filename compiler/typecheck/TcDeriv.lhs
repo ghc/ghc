@@ -1545,7 +1545,8 @@ mkNewTypeEqn dflags overlap_mode tvs
              cls cls_tys tycon tc_args rep_tycon rep_tc_args mtheta
 -- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
   | ASSERT( length cls_tys + 1 == classArity cls )
-    might_derive_via_coercible && (newtype_deriving || std_class_via_coercible cls)
+    might_derive_via_coercible && ((newtype_deriving && not derivingViaGenerics)
+                                  || std_class_via_coercible cls)
   = do traceTc "newtype deriving:" (ppr tycon <+> ppr rep_tys <+> ppr all_preds)
        dfun_name <- new_dfun_name cls tycon
        loc <- getSrcSpanM
@@ -1568,20 +1569,30 @@ mkNewTypeEqn dflags overlap_mode tvs
             , ds_newtype = True }
   | otherwise
   = case checkSideConditions dflags mtheta cls cls_tys rep_tycon rep_tc_args of
-      DerivableClassError msg   -- Error with standard class
+      -- Error with standard class
+      DerivableClassError msg
         | might_derive_via_coercible -> bale_out (msg $$ suggest_nd)
         | otherwise                  -> bale_out msg
-      NonDerivableClass msg     -- Must use newtype deriving
-        | newtype_deriving           -> bale_out cant_derive_err  -- Too hard, even with newtype deriving
-        | might_derive_via_coercible -> bale_out (non_std $$ suggest_nd) -- Try newtype deriving!
+      -- Must use newtype deriving or DerivingViaGenerics
+      NonDerivableClass msg
+        -- Don't know whether to use DerivingViaGenerics or GeneralizedNewtypeDeriving
+        | newtype_deriving && derivingViaGenerics -> bale_out' False msg
+        -- Too hard, even with newtype deriving
+        | newtype_deriving           -> bale_out cant_derive_err
+        -- Try newtype deriving!
+        | might_derive_via_coercible -> bale_out (non_std $$ suggest_nd)
+        -- The MINIMAL set is not empty
         | derivingViaGenerics        -> bale_out msg
         | otherwise                  -> bale_out non_std
-      _                              -> go_for_it -- CanDerive/DerivableViaGenerics
+      -- CanDerive/DerivableViaGenerics
+      _                              -> go_for_it
   where
         newtype_deriving    = xopt Opt_GeneralizedNewtypeDeriving dflags
         derivingViaGenerics = xopt Opt_DerivingViaGenerics        dflags
-        go_for_it        = mk_data_eqn overlap_mode tvs cls tycon tc_args rep_tycon rep_tc_args mtheta
-        bale_out msg     = failWithTc (derivingThingErr newtype_deriving cls cls_tys inst_ty msg)
+        go_for_it       = mk_data_eqn overlap_mode tvs cls tycon tc_args
+                            rep_tycon rep_tc_args mtheta
+        bale_out    = bale_out' newtype_deriving
+        bale_out' b = failWithTc . derivingThingErr b cls cls_tys inst_ty
 
         non_std    = nonStdErr cls
         suggest_nd = ptext (sLit "Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension")

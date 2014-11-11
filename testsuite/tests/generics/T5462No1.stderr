@@ -1,18 +1,19 @@
 [1 of 2] Compiling GFunctor         ( GFunctor/GFunctor.hs, GFunctor/GFunctor.o )
 [2 of 2] Compiling T5462No1         ( T5462No1.hs, T5462No1.o )
 
-T5462No1.hs:22:42:
+T5462No1.hs:24:42:
     Can't make a derived instance of ‘GFunctor F’:
       ‘GFunctor’ is not a derivable class
+      Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
     In the newtype declaration for ‘F’
 
-T5462No1.hs:24:23:
+T5462No1.hs:26:23:
     Can't make a derived instance of ‘C1 G’:
       ‘C1’ is not a derivable class
       Try enabling DerivingViaGenerics
     In the data declaration for ‘G’
 
-T5462No1.hs:25:23:
+T5462No1.hs:27:23:
     Can't make a derived instance of ‘C2 H’:
       ‘C2’ is not a derivable class
       Try enabling DerivingViaGenerics
