@@ -95,9 +95,8 @@ import RnExpr
 import MkId
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
-import DynamicLoading ( forceLoadTyCon, getValueSafely
-                      , lookupRdrNameInModuleForPlugins )
-import Panic ( throwGhcExceptionIO, GhcException(CmdLineError) )
+import DynamicLoading ( loadPlugins )
+import Plugins ( tcPlugin )
 #endif
 import TidyPgm    ( mkBootModDetailsTc )
 
@@ -2032,8 +2031,8 @@ withTcPlugins hsc_env m =
                 mapM_ runTcPluginM stops
                 return res
   where
-  startPlugin (TcPlugin start solve stop, opts) =
-    do s <- runTcPluginM (start opts)
+  startPlugin (TcPlugin start solve stop) =
+    do s <- runTcPluginM start
        return (solve s, stop s)
 
 -- | Perform some IO, typically to interact with an external tool.
@@ -2045,38 +2044,12 @@ tcPluginTrace :: String -> SDoc -> TcPluginM ()
 tcPluginTrace a b = unsafeTcPluginTcM (traceTc a b)
 
 
-loadTcPlugins :: HscEnv -> IO [ (TcPlugin, [String]) ]
+loadTcPlugins :: HscEnv -> IO [TcPlugin]
 #ifndef GHCI
 loadTcPlugins _ = return []
 #else
 loadTcPlugins hsc_env =
-  mapM load [ m | (m, PluginTypeCheck) <- pluginModNames dflags ]
-  where
-  dflags    = hsc_dflags hsc_env
-  getOpts mod_name = [ opt | (m,opt) <- pluginModNameOpts dflags
-                           , m == mod_name ]
-  load mod_name =
-    do let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "tcPlugin")
-       mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name
-                                                            plugin_rdr_name
-       case mb_name of
-         Nothing ->
-             throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
-                       [ ptext (sLit "The module"), ppr mod_name
-                       , ptext (sLit "did not export the plugin name")
-                       , ppr plugin_rdr_name ])
-         Just name ->
-
-           do tcPluginTycon <- forceLoadTyCon hsc_env tcPluginTyConName
-              let ty = mkTyConTy tcPluginTycon
-              mb_plugin <- getValueSafely hsc_env name ty
-              case mb_plugin of
-                Nothing ->
-                    throwGhcExceptionIO $ CmdLineError $ showSDoc dflags $ hsep
-                        [ ptext (sLit "The value"), ppr name
-                        , ptext (sLit "did not have the type")
-                        , ppr ty, ptext (sLit "as required")
-                        ]
-                Just plugin -> return (plugin, getOpts mod_name)
+ do named_plugins <- loadPlugins hsc_env
+    return $ catMaybes $ map (\ (_, plug, opts) -> tcPlugin plug opts) named_plugins
 #endif
 \end{code}

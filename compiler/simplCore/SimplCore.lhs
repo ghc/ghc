@@ -325,11 +325,8 @@ addPluginPasses dflags builtin_passes
        ; named_plugins <- liftIO (loadPlugins hsc_env)
        ; foldM query_plug builtin_passes named_plugins }
   where
-    query_plug todos (mod_nm, plug)
+    query_plug todos (mod_nm, plug, options)
        = installCoreToDos plug options todos
-       where
-         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
-                            , opt_mod_nm == mod_nm ]
 #endif
 \end{code}
 

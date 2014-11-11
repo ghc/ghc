@@ -33,7 +33,7 @@ import RdrName          ( RdrName, Provenance(..), ImportSpec(..), ImpDeclSpec(.
 import OccName          ( mkVarOcc )
 import RnNames          ( gresFromAvails )
 import DynFlags
-import Plugins          ( Plugin )
+import Plugins          ( Plugin, CommandLineOption )
 import PrelNames        ( pluginTyConName )
 
 import HscTypes
@@ -55,12 +55,18 @@ import Data.Maybe        ( mapMaybe )
 import GHC.Exts          ( unsafeCoerce# )
 
 
-loadPlugins :: HscEnv -> IO [(ModuleName, Plugin)]
+loadPlugins :: HscEnv -> IO [(ModuleName, Plugin, [CommandLineOption])]
 loadPlugins hsc_env
-  = do { let to_load = [ m | (m,PluginCore2Core) <-
-                                    pluginModNames (hsc_dflags hsc_env) ]
-       ; plugins <- mapM (loadPlugin hsc_env) to_load
-       ; return $ to_load `zip` plugins }
+  = do { plugins <- mapM (loadPlugin hsc_env) to_load
+       ; return $ map attachOptions $ to_load `zip` plugins }
+  where
+    dflags  = hsc_dflags hsc_env
+    to_load = pluginModNames dflags
+
+    attachOptions (mod_nm, plug) = (mod_nm, plug, options)
+      where
+        options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
+                            , opt_mod_nm == mod_nm ]
 
 loadPlugin :: HscEnv -> ModuleName -> IO Plugin
 loadPlugin hsc_env mod_name

@@ -2006,7 +2006,7 @@ unsafeTcPluginTcM :: TcM a -> TcPluginM a
 unsafeTcPluginTcM = TcPluginM
 
 data TcPlugin = forall s. TcPlugin
-  { tcPluginInit  :: [String] -> TcPluginM s
+  { tcPluginInit  :: TcPluginM s
     -- ^ Initialize plugin, when entering type-checker.
 
   , tcPluginSolve :: s -> TcPluginSolver

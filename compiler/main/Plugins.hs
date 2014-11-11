@@ -4,6 +4,7 @@ module Plugins (
     ) where
 
 import CoreMonad ( CoreToDo, CoreM )
+import TcRnTypes ( TcPlugin )
 
 
 -- | Command line options gathered from the -PModule.Name:stuff syntax are given to you as this type
@@ -21,6 +22,8 @@ data Plugin = Plugin {
                 -- This is called as the Core pipeline is built for every module
                 --  being compiled, and plugins get the opportunity to modify
                 -- the pipeline in a nondeterministic order.
+      , tcPlugin :: [CommandLineOption] -> Maybe TcPlugin
+                -- ^ A type-checker plugin (TODO document)
      }
 
 -- | Default plugin: does nothing at all! For compatability reasons you should base all your
@@ -28,4 +31,5 @@ data Plugin = Plugin {
 defaultPlugin :: Plugin
 defaultPlugin = Plugin {
         installCoreToDos = const return
+      , tcPlugin         = const Nothing
     }
