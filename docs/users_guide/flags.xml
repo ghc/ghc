@@ -2522,6 +2522,13 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-ticky</option></entry>
+            <entry>For linking, this simply implies <option>-debug</option>;
+            see <xref linkend="ticky-ticky"/>.</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-eventlog</option></entry>
             <entry>Enable runtime event tracing</entry>
             <entry>dynamic</entry>

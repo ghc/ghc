@@ -1442,8 +1442,7 @@ $ ./a.out +RTS --info
           <literal>-threaded</literal> option) and <literal>rts_p</literal>
           (profiling runtime, i.e. linked using the <literal>-prof</literal>
           option). Other variants include <literal>debug</literal>
-          (linked using <literal>-debug</literal>),
-          <literal>t</literal> (ticky-ticky profiling) and
+          (linked using <literal>-debug</literal>), and
           <literal>dyn</literal> (the RTS is
           linked in dynamically, i.e. a shared library, rather than statically
           linked into the executable itself). These can be combined,
