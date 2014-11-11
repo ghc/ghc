@@ -20,7 +20,9 @@ module TcRnDriver (
         tcRnLookupName,
         tcRnGetInfo,
         tcRnModule, tcRnModuleTcRnM,
-        tcTopSrcDecls
+        tcTopSrcDecls,
+
+        tcPluginIO, tcPluginTrace
     ) where
 
 #ifdef GHCI
@@ -93,6 +95,9 @@ import RnExpr
 import MkId
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
+import DynamicLoading ( forceLoadTyCon, getValueSafely
+                      , lookupRdrNameInModuleForPlugins )
+import Panic ( throwGhcExceptionIO, GhcException(CmdLineError) )
 #endif
 import TidyPgm    ( mkBootModDetailsTc )
 
@@ -134,7 +139,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                     Just (L mod_loc mod)  -- The normal case
                         -> (mkModule this_pkg mod, mod_loc) } ;
 
-      ; res <- initTc True hsc_env hsc_src save_rn_syntax this_mod $
+      ; res <- initTc hsc_env hsc_src save_rn_syntax this_mod $ withTcPlugins hsc_env $
         tcRnModuleTcRnM hsc_env hsc_src parsedModule pair
       ; return res
       }
@@ -1297,7 +1302,7 @@ runTcInteractive :: HscEnv -> TcRn a -> IO (Messages, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
 runTcInteractive hsc_env thing_inside
-  = initTcInteractive hsc_env $
+  = initTcInteractive hsc_env $ withTcPlugins hsc_env $
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
                  , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
@@ -2006,4 +2011,72 @@ ppr_tydecls tycons
   = vcat (map ppr_tycon (sortBy (comparing getOccName) tycons))
   where
     ppr_tycon tycon = vcat [ ppr (tyThingToIfaceDecl (ATyCon tycon)) ]
+\end{code}
+
+
+********************************************************************************
+
+Type Checker Plugins
+
+********************************************************************************
+
+
+\begin{code}
+withTcPlugins :: HscEnv -> TcM a -> TcM a
+withTcPlugins hsc_env m =
+  do plugins <- liftIO (loadTcPlugins hsc_env)
+     case plugins of
+       [] -> m  -- Common fast case
+       _  -> do (solvers,stops) <- unzip `fmap` mapM startPlugin plugins
+                res <- updGblEnv (\e -> e { tcg_tc_plugins = solvers }) m
+                mapM_ runTcPluginM stops
+                return res
+  where
+  startPlugin (TcPlugin start solve stop, opts) =
+    do s <- runTcPluginM (start opts)
+       return (solve s, stop s)
+
+-- | Perform some IO, typically to interact with an external tool.
+tcPluginIO :: IO a -> TcPluginM a
+tcPluginIO a = unsafeTcPluginTcM (liftIO a)
+
+-- | Output useful for debugging the compiler.
+tcPluginTrace :: String -> SDoc -> TcPluginM ()
+tcPluginTrace a b = unsafeTcPluginTcM (traceTc a b)
+
+
+loadTcPlugins :: HscEnv -> IO [ (TcPlugin, [String]) ]
+#ifndef GHCI
+loadTcPlugins _ = return []
+#else
+loadTcPlugins hsc_env =
+  mapM load [ m | (m, PluginTypeCheck) <- pluginModNames dflags ]
+  where
+  dflags    = hsc_dflags hsc_env
+  getOpts mod_name = [ opt | (m,opt) <- pluginModNameOpts dflags
+                           , m == mod_name ]
+  load mod_name =
+    do let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "tcPlugin")
+       mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name
+                                                            plugin_rdr_name
+       case mb_name of
+         Nothing ->
+             throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
+                       [ ptext (sLit "The module"), ppr mod_name
+                       , ptext (sLit "did not export the plugin name")
+                       , ppr plugin_rdr_name ])
+         Just name ->
+
+           do tcPluginTycon <- forceLoadTyCon hsc_env tcPluginTyConName
+              let ty = mkTyConTy tcPluginTycon
+              mb_plugin <- getValueSafely hsc_env name ty
+              case mb_plugin of
+                Nothing ->
+                    throwGhcExceptionIO $ CmdLineError $ showSDoc dflags $ hsep
+                        [ ptext (sLit "The value"), ppr name
+                        , ptext (sLit "did not have the type")
+                        , ppr ty, ptext (sLit "as required")
+                        ]
+                Just plugin -> return (plugin, getOpts mod_name)
+#endif
 \end{code}

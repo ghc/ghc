@@ -598,7 +598,6 @@ compiler_stage2_dll0_MODULES += \
 	ByteCodeAsm \
 	ByteCodeInstr \
 	ByteCodeItbls \
-	ByteCodeLink \
 	CLabel \
 	Cmm \
 	CmmCallConv \
@@ -615,22 +614,16 @@ compiler_stage2_dll0_MODULES += \
 	CodeGen.Platform.SPARC \
 	CodeGen.Platform.X86 \
 	CodeGen.Platform.X86_64 \
-	DynamicLoading \
 	FastBool \
 	Hoopl \
 	Hoopl.Dataflow \
 	InteractiveEvalTypes \
-	Linker \
 	MkGraph \
-	ObjLink \
 	PprCmm \
 	PprCmmDecl \
 	PprCmmExpr \
 	Reg \
 	RegClass \
-	RnEnv \
-	RnHsDoc \
-	RnNames \
 	SMRep \
 	StgCmmArgRep \
 	StgCmmClosure \
@@ -641,10 +634,7 @@ compiler_stage2_dll0_MODULES += \
 	StgCmmTicky \
 	StgCmmUtils \
 	StgSyn \
-	Stream \
-	SysTools \
-	TcEnv \
-	TcMType
+	Stream
 endif
 
 compiler_stage2_dll0_HS_OBJS = \

@@ -570,7 +570,7 @@ runTR_maybe :: HscEnv -> TR a -> IO (Maybe a)
 runTR_maybe hsc_env thing_inside
   -- When we initialize the type checker we do not load any pluguns.
   -- Is that OK?
-  = do { (_errs, res) <- initTc False hsc_env HsSrcFile False
+  = do { (_errs, res) <- initTc hsc_env HsSrcFile False
                                 (icInteractiveModule (hsc_IC hsc_env))
                                 thing_inside
        ; return res }
