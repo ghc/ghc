@@ -46,12 +46,14 @@ import MkCore
 import DynFlags
 import CostCentre
 import Id
+import Unique
 import Module
 import VarSet
 import VarEnv
 import ConLike
 import DataCon
 import TysWiredIn
+import PrelNames ( seqIdKey )
 import BasicTypes
 import Maybes
 import SrcLoc
@@ -191,7 +193,12 @@ dsLExpr (L loc e) = putSrcSpanDs loc $ dsExpr e
 dsExpr :: HsExpr Id -> DsM CoreExpr
 dsExpr (HsPar e)              = dsLExpr e
 dsExpr (ExprWithTySigOut e _) = dsLExpr e
-dsExpr (HsVar var)            = return (varToCoreExpr var)   -- See Note [Desugaring vars]
+dsExpr (HsVar var)            -- See Note [Unfolding while desugaring]
+  | unfold_var = return $ unfoldingTemplate unfolding
+  | otherwise  = return (varToCoreExpr var)   -- See Note [Desugaring vars]
+  where
+    unfold_var = isCompulsoryUnfolding unfolding && not (var `hasKey` seqIdKey)
+    unfolding = idUnfolding var
 dsExpr (HsIPVar _)            = panic "dsExpr: HsIPVar"
 dsExpr (HsLit lit)            = dsLit lit
 dsExpr (HsOverLit lit)        = dsOverLit lit
@@ -219,6 +226,19 @@ dsExpr (HsApp fun arg)
 
 dsExpr (HsUnboundVar _) = panic "dsExpr: HsUnboundVar"
 \end{code}
+
+Note [Unfolding while desugaring]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Variables with compulsory unfolding must be substituted at desugaring
+time. This is needed to preserve the let/app invariant in cases where
+the unfolding changes whether wrapping in a case is needed.
+Suppose we have a call like this:
+    I# x
+where 'x' has an unfolding like this:
+    f void#
+In this case, 'mkCoreAppDs' needs to see 'f void#', not 'x', to be
+able to do the right thing.
+
 
 Note [Desugaring vars]
 ~~~~~~~~~~~~~~~~~~~~~~
