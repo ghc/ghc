@@ -47,6 +47,10 @@
 // We need _BSD_SOURCE so that math.h defines things like gamma
 // on Linux
 # define _BSD_SOURCE
+
+// '_BSD_SOURCE' is deprecated since glibc-2.20
+// in favour of '_DEFAULT_SOURCE'
+# define _DEFAULT_SOURCE
 #endif
 
 #if IN_STG_CODE == 0 || defined(llvm_CC_FLAVOR)
