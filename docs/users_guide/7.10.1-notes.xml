@@ -200,6 +200,19 @@
                     <literal>Lift</literal> instances were added for
                     <literal>()</literal> and <literal>Ratio</literal>.
                </para>
+
+               <para>
+                 All Template Haskell datatypes now have
+                 <literal>Generic</literal> instances.
+               </para>
+
+               <para>
+                 Two new declaration forms are now supported:
+                 standalone-deriving declarations and generic method
+                 signatures (written using <literal>default</literal> in
+                 a class). This means an expansion to the <literal>Dec</literal>
+                 type.
+               </para>
            </listitem>
        </itemizedlist>
     </sect3>
