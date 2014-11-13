@@ -1,6 +1,5 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
-{-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -30,6 +29,8 @@ module GHC.Arr (
         newSTArray, boundsSTArray,
         readSTArray, writeSTArray,
         freezeSTArray, thawSTArray,
+        foldlElems, foldlElems', foldl1Elems,
+        foldrElems, foldrElems', foldr1Elems,
 
         -- * Unsafe operations
         fill, done,
@@ -556,6 +557,62 @@ indices (Array l u _ _) = range (l,u)
 elems :: Ix i => Array i e -> [e]
 elems arr@(Array _ _ n _) =
     [unsafeAt arr i | i <- [0 .. n - 1]]
+
+-- | A right fold over the elements
+{-# INLINABLE foldrElems #-}
+foldrElems :: Ix i => (a -> b -> b) -> b -> Array i a -> b
+foldrElems f b0 = \ arr@(Array _ _ n _) ->
+  let
+    go i | i == n    = b0
+         | otherwise = f (unsafeAt arr i) (go (i+1))
+  in go 0
+
+-- | A left fold over the elements
+{-# INLINABLE foldlElems #-}
+foldlElems :: Ix i => (b -> a -> b) -> b -> Array i a -> b
+foldlElems f b0 = \ arr@(Array _ _ n _) ->
+  let
+    go i | i == (-1) = b0
+         | otherwise = f (go (i-1)) (unsafeAt arr i)
+  in go (n-1)
+
+-- | A strict right fold over the elements
+{-# INLINABLE foldrElems' #-}
+foldrElems' :: Ix i => (a -> b -> b) -> b -> Array i a -> b
+foldrElems' f b0 = \ arr@(Array _ _ n _) ->
+  let
+    go i a | i == (-1) = a
+           | otherwise = go (i-1) (f (unsafeAt arr i) $! a)
+  in go (n-1) b0
+
+-- | A strict left fold over the elements
+{-# INLINABLE foldlElems' #-}
+foldlElems' :: Ix i => (b -> a -> b) -> b -> Array i a -> b
+foldlElems' f b0 = \ arr@(Array _ _ n _) ->
+  let
+    go i a | i == n    = a
+           | otherwise = go (i+1) (a `seq` f a (unsafeAt arr i))
+  in go 0 b0
+
+-- | A left fold over the elements with no starting value
+{-# INLINABLE foldl1Elems #-}
+foldl1Elems :: Ix i => (a -> a -> a) -> Array i a -> a
+foldl1Elems f = \ arr@(Array _ _ n _) ->
+  let
+    go i | i == 0    = unsafeAt arr 0
+         | otherwise = f (go (i-1)) (unsafeAt arr i)
+  in
+    if n == 0 then error "foldl1: empty Array" else go (n-1)
+
+-- | A right fold over the elements with no starting value
+{-# INLINABLE foldr1Elems #-}
+foldr1Elems :: Ix i => (a -> a -> a) -> Array i a -> a
+foldr1Elems f = \ arr@(Array _ _ n _) ->
+  let
+    go i | i == n-1  = unsafeAt arr i
+         | otherwise = f (unsafeAt arr i) (go (i + 1))
+  in
+    if n == 0 then error "foldr1: empty Array" else go 0
 
 -- | The list of associations of an array in index order.
 {-# INLINE assocs #-}
