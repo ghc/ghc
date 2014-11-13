@@ -754,6 +754,7 @@ groupBy eq (x:xs)       =  (x:ys) : groupBy eq zs
 inits                   :: [a] -> [[a]]
 inits                   = map toListSB . scanl' snocSB emptySB
 {-# NOINLINE inits #-}
+
 -- We do not allow inits to inline, because it plays havoc with Call Arity
 -- if it fuses with a consumer, and it would generally lead to serious
 -- loss of sharing if allowed to fuse with a producer.
@@ -1066,11 +1067,25 @@ unlines (l:ls) = l ++ '\n' : unlines ls
 -- | 'words' breaks a string up into a list of words, which were delimited
 -- by white space.
 words                   :: String -> [String]
+{-# NOINLINE [1] words #-}
 words s                 =  case dropWhile {-partain:Char.-}isSpace s of
                                 "" -> []
                                 s' -> w : words s''
                                       where (w, s'') =
                                              break {-partain:Char.-}isSpace s'
+
+{-# RULES
+"words" [~1] forall s . words s = build (\c n -> wordsFB c n s)
+"wordsList" [1] wordsFB (:) [] = words
+ #-}
+wordsFB :: ([Char] -> b -> b) -> b -> String -> b
+{-# NOINLINE [0] wordsFB #-}
+wordsFB c n = go
+  where
+    go s = case dropWhile isSpace s of
+             "" -> n
+             s' -> w `c` go s''
+                   where (w, s'') = break isSpace s'
 
 -- | 'unwords' is an inverse operation to 'words'.
 -- It joins words with separating spaces.
@@ -1079,11 +1094,35 @@ unwords                 :: [String] -> String
 unwords []              =  ""
 unwords ws              =  foldr1 (\w s -> w ++ ' ':s) ws
 #else
--- HBC version (stolen)
--- here's a more efficient version
+-- Here's a lazier version that can get the last element of a
+-- _|_-terminated list.
+{-# NOINLINE [1] unwords #-}
 unwords []              =  ""
-unwords [w]             = w
-unwords (w:ws)          = w ++ ' ' : unwords ws
+unwords (w:ws)          = w ++ go ws
+  where
+    go []     = ""
+    go (v:vs) = ' ' : (v ++ go vs)
+
+-- In general, the foldr-based version is probably slightly worse
+-- than the HBC version, because it adds an extra space and then takes
+-- it back off again. But when it fuses, it reduces allocation. How much
+-- depends entirely on the average word length--it's most effective when
+-- the words are on the short side.
+{-# RULES
+"unwords" [~1] forall ws .
+   unwords ws = tailUnwords (foldr unwordsFB "" ws)
+"unwordsList" [1] forall ws .
+   tailUnwords (foldr unwordsFB "" ws) = unwords ws
+ #-}
+
+{-# INLINE [0] tailUnwords #-}
+tailUnwords           :: String -> String
+tailUnwords []        = []
+tailUnwords (_:xs)    = xs
+
+{-# INLINE [0] unwordsFB #-}
+unwordsFB               :: String -> String -> String
+unwordsFB w r           = ' ' : w ++ r
 #endif
 
 {- A "SnocBuilder" is a version of Chris Okasaki's banker's queue that supports
