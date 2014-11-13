@@ -14,6 +14,15 @@
 #include "HsFFI.h"
 #include "MachDeps.h"
 
+// GMP 4.x compatibility
+#if !defined(__GNU_MP_VERSION)
+# error __GNU_MP_VERSION not defined
+#elif __GNU_MP_VERSION < 4
+# error need GMP 4.0 or later
+#elif __GNU_MP_VERSION < 5
+typedef unsigned long int mp_bitcnt_t;
+#endif
+
 #if (GMP_NUMB_BITS) != (GMP_LIMB_BITS)
 # error GMP_NUMB_BITS != GMP_LIMB_BITS not supported
 #endif
