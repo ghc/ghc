@@ -518,9 +518,8 @@ when p s  = if p then s else pure ()
 -- and collect the results.
 sequence :: Monad m => [m a] -> m [a]
 {-# INLINE sequence #-}
-sequence ms = foldr k (return []) ms
-            where
-              k m m' = do { x <- m; xs <- m'; return (x:xs) }
+sequence = mapM id
+-- Note: [sequence and mapM]
 
 -- | @'mapM' f@ is equivalent to @'sequence' . 'map' f@.
 mapM :: Monad m => (a -> m b) -> [a] -> m [b]
@@ -528,6 +527,23 @@ mapM :: Monad m => (a -> m b) -> [a] -> m [b]
 mapM f as = foldr k (return []) as
             where
               k a r = do { x <- f a; xs <- r; return (x:xs) }
+
+{-
+Note: [sequence and mapM]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Originally, we defined
+
+mapM f = sequence . map f
+
+This relied on list fusion to produce efficient code for mapM, and led to
+excessive allocation in cryptarithm2. Defining
+
+sequence = mapM id
+
+relies only on inlining a tiny function (id) and beta reduction, which tends to
+be a more reliable aspect of simplification. Indeed, this does not lead to
+similar problems in nofib.
+-}
 
 -- | Promote a function to a monad.
 liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
