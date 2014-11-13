@@ -76,6 +76,7 @@ test('Mixed03', normal, compile_fail, [''])
 # Trustworthy Safe modules
 test('TrustworthySafe01', normal, compile, [''])
 test('TrustworthySafe02', normal, compile, [''])
+test('TrustworthySafe03', normal, compile, [''])
 test('TrustworthySafe04', normal, compile, [''])
 
 # Check -fwarn-unsafe works
