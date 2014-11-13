@@ -91,6 +91,36 @@
                 </para>
            </listitem>
            <listitem>
+                <para>
+                    A new warning flag, <option>-fwarn-trustworthy-safe</option>
+                    has been added and is turned on with
+                    <option>-Wall</option>. It warns when a module that is
+                    compiled with <option>-XTrustworthy</option> is actually
+                    infered as an <option>-XSafe</option> module. This lets the
+                    module author know that they can tighten their Safe Haskell
+                    bounds if desired.
+                </para>
+           </listitem>
+           <listitem>
+                <para>
+                    The <option>-fwarn-safe</option> and
+                    <option>-fwarn-unsafe</option> that warn if a module was
+                    infered as Safe or Unsafe have been improved to work with
+                    all Safe Haskell module types. Previously, they only worked
+                    for unmarked modules where the compiler was infering the
+                    modules Safe Haskell type. They now work even for modules
+                    marked as <option>-XTrustworthy</option> or
+                    <option>-XUnsafe</option>. This is useful either to have
+                    GHC check your assumptions, or to generate a list of
+                    reasons easily why a module is regarded as Unsafe.
+                </para>
+                <para>
+                    For many use cases, the new
+                    <option>-fwarn-trustworthy-safe</option> flag is better
+                    suited than either of these two.
+                </para>
+           </listitem>
+           <listitem>
              <para>
                <option>-ddump-simpl-phases</option> and
                <option>-ddump-core-pipeline</option> flags have been removed.

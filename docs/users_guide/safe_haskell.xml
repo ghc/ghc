@@ -705,7 +705,7 @@
       </varlistentry>
     </variablelist>
 
-    And two warning flags:
+    And three warning flags:
 
     <variablelist>
       <varlistentry>
@@ -723,6 +723,15 @@
           to be safe. Should be used to check the safety status of modules
           when using safe inference.
         </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>-fwarn-trustworthy-safe</term>
+        <indexterm><primary>-fwarn-trustworthy-safe</primary></indexterm>
+        <listitem>Issue a warning if the module being compiled is marked as
+          <option>-XTrustworthy</option> but it could instead be marked as
+          <option>-XSafe</option>, a more informative bound. Can be used to
+          detect once a Safe Haskell bound can be improved as dependencies are
+          updated.</listitem>
       </varlistentry>
     </variablelist>
   </sect2>
