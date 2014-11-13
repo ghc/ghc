@@ -864,9 +864,8 @@ mapFB c f = \x ys -> c (f x) ys
 "mapFB"     forall c f g.       mapFB (mapFB c f) g     = mapFB c (f.g)
   #-}
 
--- There's also a rule for Map and Data.Coerce. See "Safe Coercions",
--- section 6.4:
---
+-- See Breitner, Eisenberg, Peyton Jones, and Weirich, "Safe Zero-cost
+-- Coercions for Haskell", section 6.5:
 --   http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf
 
 {-# RULES "map/coerce" [1] map coerce = coerce #-}
