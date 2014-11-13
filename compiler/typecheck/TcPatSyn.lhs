@@ -37,7 +37,6 @@ import Data.Monoid
 import Bag
 import TcEvidence
 import BuildTyCl
-import TypeRep
 import Data.Maybe
 
 #include "HsVersions.h"
@@ -139,7 +138,7 @@ tcPatSynMatcher (L loc name) lpat args univ_tvs ex_tvs ev_binds prov_dicts req_d
               ; let tv_name = mkInternalName uniq (mkTyVarOcc "r") loc
               ; return $ mkTcTyVar tv_name openTypeKind (SkolemTv False) }
        ; matcher_name <- newImplicitBinder name mkMatcherOcc
-       ; let res_ty = TyVarTy res_tv
+       ; let res_ty = mkTyVarTy res_tv
              cont_args = if null args then [voidPrimId] else args
              cont_ty = mkSigmaTy ex_tvs prov_theta $
                        mkFunTys (map varType cont_args) res_ty
@@ -154,7 +153,8 @@ tcPatSynMatcher (L loc name) lpat args univ_tvs ex_tvs ev_binds prov_dicts req_d
 
        ; scrutinee <- mkId "scrut" pat_ty
        ; cont <- mkId "cont" cont_ty
-       ; let cont' = nlHsApps cont $ map nlHsVar (ex_tvs ++ prov_dicts ++ cont_args)
+       ; let cont' = nlHsTyApps cont (map mkTyVarTy ex_tvs) $
+                     map nlHsVar (prov_dicts ++ cont_args)
        ; fail <- mkId "fail" fail_ty
        ; let fail' = nlHsApps fail [nlHsVar voidPrimId]
 
