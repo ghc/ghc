@@ -704,10 +704,44 @@ unsafeAccum f arr ies = runST (do
     STArray l u n marr# <- thawSTArray arr
     ST (foldr (adjust f marr#) (done l u n marr#) ies))
 
-{-# INLINE amap #-}
+{-# INLINE [1] amap #-}
 amap :: Ix i => (a -> b) -> Array i a -> Array i b
-amap f arr@(Array l u n _) =
-    unsafeArray' (l,u) n [(i, f (unsafeAt arr i)) | i <- [0 .. n - 1]]
+amap f arr@(Array l u n@(I# n#) _) = runST (ST $ \s1# ->
+    case newArray# n# arrEleBottom s1# of
+        (# s2#, marr# #) ->
+          let go i s#
+                | i == n    = done l u n marr# s#
+                | otherwise = fill marr# (i, f (unsafeAt arr i)) (go (i+1)) s#
+          in go 0 s2# )
+
+{-
+amap was originally defined like this:
+
+ amap f arr@(Array l u n _) =
+     unsafeArray' (l,u) n [(i, f (unsafeAt arr i)) | i <- [0 .. n - 1]]
+
+There are two problems:
+
+1. The enumFromTo implementation produces (spurious) code for the impossible
+case of n<0 that ends up duplicating the array freezing code.
+
+2. This implementation relies on list fusion for efficiency. In order to
+implement the amap/coerce rule, we need to delay inlining amap until simplifier
+phase 1, which is when the eftIntList rule kicks in and makes that impossible.
+-}
+
+
+-- See Breitner, Eisenberg, Peyton Jones, and Weirich, "Safe Zero-cost
+-- Coercions for Haskell", section 6.5:
+--   http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf
+{-# RULES
+"amap/coerce" amap coerce = coerce
+ #-}
+
+-- Second functor law:
+{-# RULES
+"amap/amap" forall f g a . amap f (amap g a) = amap (f . g) a
+ #-}
 
 -- | 'ixmap' allows for transformations on array indices.
 -- It may be thought of as providing function composition on the right
