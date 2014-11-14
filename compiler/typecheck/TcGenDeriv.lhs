@@ -17,7 +17,7 @@ This is where we do all the grimy bindings' generation.
 module TcGenDeriv (
         BagDerivStuff, DerivStuff(..),
 
-        canDeriveViaGenerics, 
+        canDeriveAnyClass, 
         genDerivedBinds, 
         FFoldType(..), functorLikeTraverse,
         deepSubtypesContaining, foldDataConArgs,
@@ -69,7 +69,6 @@ import TcEnv (InstInfo)
 import ListSetOps ( assocMaybe )
 import Data.List  ( partition, intersperse )
 import Data.Maybe ( isNothing )
-import BooleanFormula ( isTrue )
 \end{code}
 
 \begin{code}
@@ -108,8 +107,8 @@ genDerivedBinds dflags fix_env clas loc tycon
   | Just gen_fn <- assocMaybe gen_list (getUnique clas)
   = gen_fn loc tycon
 
-  | isNothing (canDeriveViaGenerics dflags tycon clas)
-  -- Deriving via Generics simply means giving an empty instance, so no
+  | isNothing (canDeriveAnyClass dflags tycon clas)
+  -- Deriving any class simply means giving an empty instance, so no
   -- bindings have to be generated.
   = (emptyBag, emptyBag)
 
@@ -131,20 +130,15 @@ genDerivedBinds dflags fix_env clas loc tycon
                , (traversableClassKey, gen_Traversable_binds) ]
 
 -- We can derive a given class for a given tycon via Generics iff
-canDeriveViaGenerics :: DynFlags -> TyCon -> Class -> Maybe SDoc
-canDeriveViaGenerics dflags tycon clas =
+canDeriveAnyClass :: DynFlags -> TyCon -> Class -> Maybe SDoc
+canDeriveAnyClass dflags _tycon clas =
   let b `orElse` s = if b then Nothing else Just (ptext (sLit s))
       Just m  <> _ = Just m
       Nothing <> n = n
   in  -- 1) The class is not a "standard" class (like Show, Functor, etc.)
         (not (getUnique clas `elem` standardClassKeys) `orElse` "")
-      -- 2) Opt_DerivingViaGenerics is on
-     <> (xopt Opt_DerivingViaGenerics dflags `orElse` "Try enabling DerivingViaGenerics")
-      -- 3) The MINIMAL set of the class is empty
-     <> (isTrue (classMinimalDef clas) `orElse` "because its MINIMAL set is not empty")
-      -- 4) It's not the case that the tycon is a newtype and GND is enabled
-     <> (not (isNewTyCon tycon && xopt Opt_GeneralizedNewtypeDeriving dflags)
-          `orElse` "Both DerivingViaGenerics and GeneralizedNewtypeDeriving are enabled")
+      -- 2) Opt_DeriveAnyClass is on
+     <> (xopt Opt_DeriveAnyClass dflags `orElse` "Try enabling DeriveAnyClass")
   -- Nothing: we can (try to) derive it via Generics
   -- Just s:  we can't, reason s
 \end{code}

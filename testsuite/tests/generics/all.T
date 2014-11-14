@@ -19,9 +19,9 @@ test('GenCannotDoRep1_6', normal, compile_fail, [''])
 test('GenCannotDoRep1_7', normal, compile_fail, [''])
 test('GenCannotDoRep1_8', normal, compile_fail, [''])
 
-test('T5462Yes', normal, multimod_compile_and_run, ['T5462Yes', '-iGEq -iGEnum -iGFunctor'])
+test('T5462Yes1', normal, multimod_compile_and_run, ['T5462Yes1', '-iGEq -iGEnum -iGFunctor'])
+test('T5462Yes2', normal, multimod_compile_and_run, ['T5462Yes2', '-iGFunctor'])
 test('T5462No1', normal, multimod_compile_fail, ['T5462No1', '-iGFunctor'])
-test('T5462No2', normal, multimod_compile_fail, ['T5462No2', '-iGFunctor'])
 
 test('T5884',      normal, compile, [''])
 test('GenNewtype', normal, compile_and_run, [''])

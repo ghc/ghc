@@ -6,7 +6,7 @@
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE UndecidableInstances   #-}
 
--- DerivingViaGenerics not enabled
+-- DeriveAnyClass not enabled
 
 module T5462No1 where
 
