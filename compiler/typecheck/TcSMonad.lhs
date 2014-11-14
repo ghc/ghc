@@ -14,7 +14,7 @@ module TcSMonad (
 
     updWorkListTcS, updWorkListTcS_return,
 
-    updInertCans, updInertDicts, updInertIrreds, updInertFunEqs,
+    updInertTcS, updInertCans, updInertDicts, updInertIrreds, updInertFunEqs,
 
     Ct(..), Xi, tyVarsOfCt, tyVarsOfCts,
     emitInsoluble, emitWorkNC,

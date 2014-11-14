@@ -1974,7 +1974,8 @@ Constraint Solver Plugins
 
 \begin{code}
 
-type TcPluginSolver = [Ct]    -- given
+type TcPluginSolver = Bool
+                   -> [Ct]    -- given
                    -> [Ct]    -- derived
                    -> [Ct]    -- wanted
                    -> TcPluginM TcPluginResult
