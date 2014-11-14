@@ -26,7 +26,6 @@ import SimplUtils       ( simplEnvForGHCi, activeRule )
 import SimplEnv
 import SimplMonad
 import CoreMonad
-import Plugins
 import qualified ErrUtils as Err
 import FloatIn          ( floatInwards )
 import FloatOut         ( floatOutwards )
@@ -54,6 +53,7 @@ import Control.Monad
 
 #ifdef GHCI
 import DynamicLoading   ( loadPlugins )
+import Plugins          ( installCoreToDos )
 #endif
 \end{code}
 
@@ -72,7 +72,7 @@ core2core hsc_env guts
        ; let builtin_passes = getCoreToDo dflags
        ;
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod print_unqual $
-                           do { all_passes <- addPluginPasses dflags builtin_passes
+                           do { all_passes <- addPluginPasses builtin_passes
                               ; runCorePasses all_passes guts }
 
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
@@ -316,17 +316,16 @@ getCoreToDo dflags
 Loading plugins
 
 \begin{code}
-addPluginPasses :: DynFlags -> [CoreToDo] -> CoreM [CoreToDo]
+addPluginPasses :: [CoreToDo] -> CoreM [CoreToDo]
 #ifndef GHCI
-addPluginPasses _ builtin_passes = return builtin_passes
+addPluginPasses builtin_passes = return builtin_passes
 #else
-addPluginPasses dflags builtin_passes
+addPluginPasses builtin_passes
   = do { hsc_env <- getHscEnv
        ; named_plugins <- liftIO (loadPlugins hsc_env)
        ; foldM query_plug builtin_passes named_plugins }
   where
-    query_plug todos (mod_nm, plug, options)
-       = installCoreToDos plug options todos
+    query_plug todos (_, plug, options) = installCoreToDos plug options todos
 #endif
 \end{code}
 
