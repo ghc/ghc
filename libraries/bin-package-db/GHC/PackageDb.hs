@@ -37,7 +37,8 @@
 --
 module GHC.PackageDb (
        InstalledPackageInfo(..),
-       ModuleExport(..),
+       ExposedModule(..),
+       OriginalModule(..),
        BinaryStringRep(..),
        emptyInstalledPackageInfo,
        readPackageDbForGhc,
@@ -86,25 +87,57 @@ data InstalledPackageInfo instpkgid srcpkgid srcpkgname pkgkey modulename
        includeDirs        :: [FilePath],
        haddockInterfaces  :: [FilePath],
        haddockHTMLs       :: [FilePath],
-       exposedModules     :: [modulename],
+       exposedModules     :: [ExposedModule instpkgid modulename],
        hiddenModules      :: [modulename],
-       reexportedModules  :: [ModuleExport instpkgid modulename],
        exposed            :: Bool,
        trusted            :: Bool
+     }
+  deriving (Eq, Show)
+
+-- | An original module is a fully-qualified module name (installed package ID
+-- plus module name) representing where a module was *originally* defined
+-- (i.e., the 'exposedReexport' field of the original ExposedModule entry should
+-- be 'Nothing').  Invariant: an OriginalModule never points to a reexport.
+data OriginalModule instpkgid modulename
+   = OriginalModule {
+       originalPackageId :: instpkgid,
+       originalModuleName :: modulename
+     }
+  deriving (Eq, Show)
+
+-- | Represents a module name which is exported by a package, stored in the
+-- 'exposedModules' field.  A module export may be a reexport (in which
+-- case 'exposedReexport' is filled in with the original source of the module),
+-- and may be a signature (in which case 'exposedSignature is filled in with
+-- what the signature was compiled against).  Thus:
+--
+--  * @ExposedModule n Nothing Nothing@ represents an exposed module @n@ which
+--    was defined in this package.
+--
+--  * @ExposedModule n (Just o) Nothing@ represents a reexported module @n@
+--    which was originally defined in @o@.
+--
+--  * @ExposedModule n Nothing (Just s)@ represents an exposed signature @n@
+--    which was compiled against the implementation @s@.
+--
+--  * @ExposedModule n (Just o) (Just s)@ represents a reexported signature
+--    which was originally defined in @o@ and was compiled against the
+--    implementation @s@.
+--
+-- We use two 'Maybe' data types instead of an ADT with four branches or
+-- four fields because this representation allows us to treat
+-- reexports/signatures uniformly.
+data ExposedModule instpkgid modulename
+   = ExposedModule {
+       exposedName      :: modulename,
+       exposedReexport  :: Maybe (OriginalModule instpkgid modulename),
+       exposedSignature :: Maybe (OriginalModule instpkgid modulename)
      }
   deriving (Eq, Show)
 
 class BinaryStringRep a where
   fromStringRep :: BS.ByteString -> a
   toStringRep   :: a -> BS.ByteString
-
-data ModuleExport instpkgid modulename
-   = ModuleExport {
-       exportModuleName         :: modulename,
-       exportOriginalPackageId  :: instpkgid,
-       exportOriginalModuleName :: modulename
-     }
-  deriving (Eq, Show)
 
 emptyInstalledPackageInfo :: (BinaryStringRep a, BinaryStringRep b,
                               BinaryStringRep c, BinaryStringRep d)
@@ -132,7 +165,6 @@ emptyInstalledPackageInfo =
        haddockHTMLs       = [],
        exposedModules     = [],
        hiddenModules      = [],
-       reexportedModules  = [],
        exposed            = False,
        trusted            = False
   }
@@ -288,7 +320,7 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
          ldOptions ccOptions
          includes includeDirs
          haddockInterfaces haddockHTMLs
-         exposedModules hiddenModules reexportedModules
+         exposedModules hiddenModules
          exposed trusted) = do
     put (toStringRep installedPackageId)
     put (toStringRep sourcePackageId)
@@ -309,9 +341,8 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
     put includeDirs
     put haddockInterfaces
     put haddockHTMLs
-    put (map toStringRep exposedModules)
+    put exposedModules
     put (map toStringRep hiddenModules)
-    put reexportedModules
     put exposed
     put trusted
 
@@ -337,7 +368,6 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
     haddockHTMLs       <- get
     exposedModules     <- get
     hiddenModules      <- get
-    reexportedModules  <- get
     exposed            <- get
     trusted            <- get
     return (InstalledPackageInfo
@@ -352,9 +382,8 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
               ldOptions ccOptions
               includes includeDirs
               haddockInterfaces haddockHTMLs
-              (map fromStringRep exposedModules)
+              exposedModules
               (map fromStringRep hiddenModules)
-              reexportedModules
               exposed trusted)
 
 instance Binary Version where
@@ -367,15 +396,26 @@ instance Binary Version where
     return (Version a b)
 
 instance (BinaryStringRep a, BinaryStringRep b) =>
-         Binary (ModuleExport a b) where
-  put (ModuleExport a b c) = do
-    put (toStringRep a)
-    put (toStringRep b)
-    put (toStringRep c)
+         Binary (OriginalModule a b) where
+  put (OriginalModule originalPackageId originalModuleName) = do
+    put (toStringRep originalPackageId)
+    put (toStringRep originalModuleName)
   get = do
-    a <- get
-    b <- get
-    c <- get
-    return (ModuleExport (fromStringRep a)
-                         (fromStringRep b)
-                         (fromStringRep c))
+    originalPackageId <- get
+    originalModuleName <- get
+    return (OriginalModule (fromStringRep originalPackageId)
+                           (fromStringRep originalModuleName))
+
+instance (BinaryStringRep a, BinaryStringRep b) =>
+         Binary (ExposedModule a b) where
+  put (ExposedModule exposedName exposedReexport exposedSignature) = do
+    put (toStringRep exposedName)
+    put exposedReexport
+    put exposedSignature
+  get = do
+    exposedName <- get
+    exposedReexport <- get
+    exposedSignature <- get
+    return (ExposedModule (fromStringRep exposedName)
+                          exposedReexport
+                          exposedSignature)

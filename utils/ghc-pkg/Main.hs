@@ -1020,27 +1020,16 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.includeDirs        = includeDirs pkg,
        GhcPkg.haddockInterfaces  = haddockInterfaces pkg,
        GhcPkg.haddockHTMLs       = haddockHTMLs pkg,
-       GhcPkg.exposedModules     = exposedModules pkg,
+       GhcPkg.exposedModules     = map convertExposed (exposedModules pkg),
        GhcPkg.hiddenModules      = hiddenModules pkg,
-       GhcPkg.reexportedModules  = map convertModuleReexport
-                                       (reexportedModules pkg),
        GhcPkg.exposed            = exposed pkg,
        GhcPkg.trusted            = trusted pkg
     }
-  where
-    convertModuleReexport :: ModuleReexport
-                          -> GhcPkg.ModuleExport String ModuleName
-    convertModuleReexport
-        ModuleReexport {
-          moduleReexportName            = m,
-          moduleReexportDefiningPackage = ipid',
-          moduleReexportDefiningName    = m'
-        }
-      = GhcPkg.ModuleExport {
-          exportModuleName         = m,
-          exportOriginalPackageId  = display ipid',
-          exportOriginalModuleName = m'
-        }
+  where convertExposed (ExposedModule n reexport sig) =
+            GhcPkg.ExposedModule n (fmap convertOriginal reexport)
+                                   (fmap convertOriginal sig)
+        convertOriginal (OriginalModule ipid m) =
+            GhcPkg.OriginalModule (display ipid) m
 
 instance GhcPkg.BinaryStringRep ModuleName where
   fromStringRep = ModuleName.fromString . fromUTF8 . BS.unpack
@@ -1521,8 +1510,8 @@ checkPackageConfig pkg verbosity db_stack auto_ghci_libs
   mapM_ (checkFile   True "haddock-interfaces") (haddockInterfaces pkg)
   mapM_ (checkDirURL True "haddock-html")       (haddockHTMLs pkg)
   checkDuplicateModules pkg
-  checkModuleFiles pkg
-  checkModuleReexports db_stack pkg
+  checkExposedModules db_stack pkg
+  checkOtherModules pkg
   mapM_ (checkHSLib verbosity (libraryDirs pkg) auto_ghci_libs) (hsLibraries pkg)
   -- ToDo: check these somehow?
   --    extra_libraries :: [String],
@@ -1656,11 +1645,27 @@ doesFileExistOnPath filenames paths = go fullFilenames
         go ((p, fp) : xs) = do b <- doesFileExist fp
                                if b then return (Just p) else go xs
 
-checkModuleFiles :: InstalledPackageInfo -> Validate ()
-checkModuleFiles pkg = do
-  mapM_ findModule (exposedModules pkg ++ hiddenModules pkg)
+-- | Perform validation checks (module file existence checks) on the
+-- @hidden-modules@ field.
+checkOtherModules :: InstalledPackageInfo -> Validate ()
+checkOtherModules pkg = mapM_ (checkModuleFile pkg) (hiddenModules pkg)
+
+-- | Perform validation checks (module file existence checks and module
+-- reexport checks) on the @exposed-modules@ field.
+checkExposedModules :: PackageDBStack -> InstalledPackageInfo -> Validate ()
+checkExposedModules db_stack pkg =
+  mapM_ checkExposedModule (exposedModules pkg)
   where
-    findModule modl =
+    checkExposedModule (ExposedModule modl reexport _sig) = do
+      let checkOriginal = checkModuleFile pkg modl
+          checkReexport = checkOriginalModule "module reexport" db_stack pkg
+      maybe checkOriginal checkReexport reexport
+
+-- | Validates the existence of an appropriate @hi@ file associated with
+-- a module.  Used for both @hidden-modules@ and @exposed-modules@ which
+-- are not reexports.
+checkModuleFile :: InstalledPackageInfo -> ModuleName -> Validate ()
+checkModuleFile pkg modl =
       -- there's no interface file for GHC.Prim
       unless (modl == ModuleName.fromString "GHC.Prim") $ do
       let files = [ ModuleName.toFilePath modl <.> extension
@@ -1669,6 +1674,11 @@ checkModuleFiles pkg = do
       when (isNothing m) $
          verror ForceFiles ("cannot find any of " ++ show files)
 
+-- | Validates that @exposed-modules@ and @hidden-modules@ do not have duplicate
+-- entries.
+-- ToDo: this needs updating for signatures: signatures can validly show up
+-- multiple times in the @exposed-modules@ list as long as their backing
+-- implementations agree.
 checkDuplicateModules :: InstalledPackageInfo -> Validate ()
 checkDuplicateModules pkg
   | null dups = return ()
@@ -1676,42 +1686,57 @@ checkDuplicateModules pkg
                                      unwords (map display dups))
   where
     dups = [ m | (m:_:_) <- group (sort mods) ]
-    mods = exposedModules pkg ++ hiddenModules pkg
-        ++ map moduleReexportName (reexportedModules pkg)
+    mods = map exposedName (exposedModules pkg) ++ hiddenModules pkg
 
-checkModuleReexports :: PackageDBStack -> InstalledPackageInfo -> Validate ()
-checkModuleReexports db_stack pkg =
-    mapM_ checkReexport (reexportedModules pkg)
-  where
-    all_pkgs = allPackagesInStack db_stack
-    ipix     = PackageIndex.fromList all_pkgs
-
-    checkReexport ModuleReexport {
-      moduleReexportDefiningPackage = definingPkgId,
-      moduleReexportDefiningName    = definingModule
-    } = case if definingPkgId == installedPackageId pkg
-                then Just pkg
-                else PackageIndex.lookupInstalledPackageId ipix definingPkgId of
-          Nothing
-           -> verror ForceAll ("module re-export refers to a non-existent " ++
+-- | Validates an original module entry, either the origin of a module reexport
+-- or the backing implementation of a signature, by checking that it exists,
+-- really is an original definition, and is accessible from the dependencies of
+-- the package.
+-- ToDo: If the original module in question is a backing signature
+-- implementation, then we should also check that the original module in
+-- question is NOT a signature (however, if it is a reexport, then it's fine
+-- for the original module to be a signature.)
+checkOriginalModule :: String
+                    -> PackageDBStack
+                    -> InstalledPackageInfo
+                    -> OriginalModule
+                    -> Validate ()
+checkOriginalModule fieldName db_stack pkg
+    (OriginalModule definingPkgId definingModule) =
+  let mpkg = if definingPkgId == installedPackageId pkg
+              then Just pkg
+              else PackageIndex.lookupInstalledPackageId ipix definingPkgId
+  in case mpkg of
+      Nothing
+           -> verror ForceAll (fieldName ++ " refers to a non-existent " ++
                                "defining package: " ++
                                        display definingPkgId)
 
-          Just definingPkg
-            | not (isIndirectDependency definingPkgId)
-           -> verror ForceAll ("module re-export refers to a defining  " ++
+      Just definingPkg
+        | not (isIndirectDependency definingPkgId)
+           -> verror ForceAll (fieldName ++ " refers to a defining  " ++
                                "package that is not a direct (or indirect) " ++
                                "dependency of this package: " ++
                                        display definingPkgId)
 
-            | definingModule `notElem` exposedModules definingPkg
-           -> verror ForceAll ("module (self) re-export refers to a module " ++
+        | otherwise
+        -> case find ((==definingModule).exposedName)
+                     (exposedModules definingPkg) of
+            Nothing ->
+              verror ForceAll (fieldName ++ " refers to a module " ++
                                display definingModule ++ " " ++
-                               "that is not defined and exposed in the " ++
+                               "that is not exposed in the " ++
                                "defining package " ++ display definingPkgId)
+            Just (ExposedModule {exposedReexport = Just _} ) ->
+              verror ForceAll (fieldName ++ " refers to a module " ++
+                               display definingModule ++ " " ++
+                               "that is reexported but not defined in the " ++
+                               "defining package " ++ display definingPkgId)
+            _ -> return ()
 
-            | otherwise
-           -> return ()
+  where
+    all_pkgs = allPackagesInStack db_stack
+    ipix     = PackageIndex.fromList all_pkgs
 
     isIndirectDependency pkgid = fromMaybe False $ do
       thispkg  <- graphVertex (installedPackageId pkg)

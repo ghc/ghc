@@ -75,6 +75,25 @@ instance Outputable SourcePackageId where
 instance Outputable PackageName where
   ppr (PackageName str) = ftext str
 
+-- | Pretty-print an 'ExposedModule' in the same format used by the textual
+-- installed package database.
+pprExposedModule :: (Outputable a, Outputable b) => ExposedModule a b -> SDoc
+pprExposedModule (ExposedModule exposedName exposedReexport exposedSignature) =
+    sep [ ppr exposedName
+        , case exposedReexport of
+            Just m -> sep [text "from", pprOriginalModule m]
+            Nothing -> empty
+        , case exposedSignature of
+            Just m -> sep [text "is", pprOriginalModule m]
+            Nothing -> empty
+        ]
+
+-- | Pretty-print an 'OriginalModule' in the same format used by the textual
+-- installed package database.
+pprOriginalModule :: (Outputable a, Outputable b) => OriginalModule a b -> SDoc
+pprOriginalModule (OriginalModule originalPackageId originalModuleName) =
+    ppr originalPackageId <> char ':' <> ppr originalModuleName
+
 defaultPackageConfig :: PackageConfig
 defaultPackageConfig = emptyInstalledPackageInfo
 
@@ -101,9 +120,11 @@ pprPackageConfig InstalledPackageInfo {..} =
       field "id"                   (ppr installedPackageId),
       field "key"                  (ppr packageKey),
       field "exposed"              (ppr exposed),
-      field "exposed-modules"      (fsep (map ppr exposedModules)),
+      field "exposed-modules"
+        (if all isExposedModule exposedModules
+           then fsep (map pprExposedModule exposedModules)
+           else pprWithCommas pprExposedModule exposedModules),
       field "hidden-modules"       (fsep (map ppr hiddenModules)),
-      field "reexported-modules"   (fsep (map ppr haddockHTMLs)),
       field "trusted"              (ppr trusted),
       field "import-dirs"          (fsep (map text importDirs)),
       field "library-dirs"         (fsep (map text libraryDirs)),
@@ -122,6 +143,8 @@ pprPackageConfig InstalledPackageInfo {..} =
     ]
   where
     field name body = text name <> colon <+> nest 4 body
+    isExposedModule (ExposedModule _ Nothing Nothing) = True
+    isExposedModule _ = False
 
 
 -- -----------------------------------------------------------------------------

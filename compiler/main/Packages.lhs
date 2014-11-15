@@ -35,7 +35,6 @@ module Packages (
 
         collectIncludeDirs, collectLibraryPaths, collectLinkOpts,
         packageHsLibs,
-        ModuleExport(..),
 
         -- * Utils
         packageKeyPackageIdString,
@@ -1047,16 +1046,17 @@ mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
                             ppr orig <+> text "in package" <+> ppr pk)))
 
     es :: Bool -> [(ModuleName, e)]
-    es e =
-     [(m, sing pk  m  pkg  (fromExposedModules e)) | m <- exposed_mods] ++
-     [(m, sing pk' m' pkg' (fromReexportedModules e pkg))
-     | ModuleExport {
-         exportModuleName         = m,
-         exportOriginalPackageId  = ipid',
-         exportOriginalModuleName = m'
-       } <- reexported_mods
-     , let pk' = expectJust "mkModuleToPkgConf" (Map.lookup ipid' ipid_map)
-           pkg' = pkg_lookup pk' ]
+    es e = do
+     -- TODO: signature support
+     ExposedModule m exposedReexport _exposedSignature <- exposed_mods
+     let (pk', m', pkg', origin') =
+          case exposedReexport of
+           Nothing -> (pk, m, pkg, fromExposedModules e)
+           Just (OriginalModule ipid' m') ->
+            let pk' = expectJust "mkModuleToPkgConf" (Map.lookup ipid' ipid_map)
+                pkg' = pkg_lookup pk'
+            in (pk', m', pkg', fromReexportedModules e pkg')
+     return (m, sing pk' m' pkg' origin')
 
     esmap :: UniqFM e
     esmap = listToUFM (es False) -- parameter here doesn't matter, orig will
@@ -1068,7 +1068,6 @@ mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
     pkg_lookup = expectJust "mkModuleToPkgConf" . lookupPackage' pkg_db
 
     exposed_mods = exposedModules pkg
-    reexported_mods = reexportedModules pkg
     hidden_mods = hiddenModules pkg
 
 -- | This is a quick and efficient module map, which only contains an entry

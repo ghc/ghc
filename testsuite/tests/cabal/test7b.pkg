@@ -12,8 +12,6 @@ description: A Test Package
 category: none
 author: simonmar@microsoft.com
 exposed: True
-reexported-modules: testpkg-1.2.3.4-XXX:A as F1, testpkg7a-1.0-XXX:A as F2,
-    testpkg7a-1.0-XXX:A1 as F3, testpkg7a-1.0-XXX:E as F4,
-    testpkg7a-1.0-XXX:E as E, testpkg7a-1.0-XXX:E2 as E3
+exposed-modules: F1 from testpkg-1.2.3.4-XXX:A, F2 from testpkg7a-1.0-XXX:A, F3 from testpkg7a-1.0-XXX:A1, F4 from testpkg7a-1.0-XXX:E, E from testpkg7a-1.0-XXX:E, E3 from testpkg7a-1.0-XXX:E2
 hs-libraries: testpkg7b-1.0
 depends: testpkg-1.2.3.4-XXX, testpkg7a-1.0-XXX
