@@ -660,9 +660,9 @@ quotRemInteger (Jn# n)  (Jp# d)  = case quotRemBigNat n d of
     (# q, r #) -> (# bigNatToNegInteger q, bigNatToNegInteger r #)
 quotRemInteger (Jp# n)  (S# d#)
   | isTrue# (d# >=# 0#) = case quotRemBigNatWord n (int2Word# d#) of
-      (# q, r# #) -> (# bigNatToInteger q, wordToInteger r# #)
+      (# q, r# #) -> (# bigNatToInteger q, inline wordToInteger r# #)
   | True               = case quotRemBigNatWord n (int2Word# (negateInt# d#)) of
-      (# q, r# #) -> (# bigNatToNegInteger q, wordToInteger r# #)
+      (# q, r# #) -> (# bigNatToNegInteger q, inline wordToInteger r# #)
 quotRemInteger (Jn# n)  (S# d#)
   | isTrue# (d# >=# 0#) = case quotRemBigNatWord n (int2Word# d#) of
       (# q, r# #) -> (# bigNatToNegInteger q, wordToNegInteger r# #)
