@@ -220,7 +220,7 @@ docWith :: Outputable o => DynFlags -> String -> Maybe (Doc o) -> [String]
 docWith _ [] Nothing = []
 docWith dflags header d
   = ("":) $ zipWith (++) ("-- | " : repeat "--   ") $
-    [header | header /= ""] ++ ["" | header /= "" && isJust d] ++
+    lines header ++ ["" | header /= "" && isJust d] ++
     maybe [] (showTags . markup (markupTag dflags)) d
 
 
