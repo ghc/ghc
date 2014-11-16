@@ -331,7 +331,7 @@ moreContent :: Monoid a => Parser a
             -> Parser ([String], Either (DocH mod Identifier) a)
 moreContent item = first . (:) <$> nonEmptyLine <*> more item
 
--- | Runs the 'parseParas' parser on an indented paragraph.
+-- | Parses an indented paragraph.
 -- The indentation is 4 spaces.
 indentedParagraphs :: Parser (DocH mod Identifier)
 indentedParagraphs = parseParas . concat <$> dropFrontOfPara "    "
