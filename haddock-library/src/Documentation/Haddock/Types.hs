@@ -17,6 +17,8 @@ module Documentation.Haddock.Types where
 import Data.Foldable
 import Data.Traversable
 
+type Version = [Int]
+
 data Hyperlink = Hyperlink
   { hyperlinkUrl   :: String
   , hyperlinkLabel :: Maybe String

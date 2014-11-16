@@ -78,7 +78,7 @@ overIdentifier f d = g d
     g (DocExamples x) = DocExamples x
     g (DocHeader (Header l x)) = DocHeader . Header l $ g x
 
-parse :: Parser a -> BS.ByteString -> a
+parse :: Parser a -> BS.ByteString -> (ParserState, a)
 parse p = either err id . parseOnly (p <* endOfInput)
   where
     err = error . ("Haddock.Parser.parse: " ++)
@@ -86,11 +86,19 @@ parse p = either err id . parseOnly (p <* endOfInput)
 -- | Main entry point to the parser. Appends the newline character
 -- to the input string.
 parseParas :: String -- ^ String to parse
-           -> DocH mod Identifier
-parseParas = parse (p <* skipSpace) . encodeUtf8 . (++ "\n")
+           -> (Maybe Version, DocH mod Identifier)
+parseParas input = case parseParasState input of
+  (state, a) -> (parserStateSince state, a)
+
+parseParasState :: String -> (ParserState, DocH mod Identifier)
+parseParasState = parse (p <* skipSpace) . encodeUtf8 . (++ "\n")
   where
     p :: Parser (DocH mod Identifier)
     p = docConcat <$> paragraph `sepBy` many (skipHorizontalSpace *> "\n")
+
+parseParagraphs :: String -> Parser (DocH mod Identifier)
+parseParagraphs input = case parseParasState input of
+  (state, a) -> setParserState state >> return a
 
 -- | Parse a text paragraph. Actually just a wrapper over 'parseStringBS' which
 -- drops leading whitespace and encodes the string to UTF8 first.
@@ -98,7 +106,7 @@ parseString :: String -> DocH mod Identifier
 parseString = parseStringBS . encodeUtf8 . dropWhile isSpace
 
 parseStringBS :: BS.ByteString -> DocH mod Identifier
-parseStringBS = parse p
+parseStringBS = snd . parse p
   where
     p :: Parser (DocH mod Identifier)
     p = docConcat <$> many (monospace <|> anchor <|> identifier <|> moduleName
@@ -217,7 +225,8 @@ markdownImage = fromHyperlink <$> ("!" *> linkParser)
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: Parser (DocH mod Identifier)
 paragraph = examples <|> skipSpace *> (
-      unorderedList
+      since
+  <|> unorderedList
   <|> orderedList
   <|> birdtracks
   <|> codeblock
@@ -227,6 +236,11 @@ paragraph = examples <|> skipSpace *> (
   <|> definitionList
   <|> docParagraph <$> textParagraph
   )
+
+since :: Parser (DocH mod a)
+since = ("@since " *> version <* skipHorizontalSpace <* endOfLine) >>= setSince >> return DocEmpty
+  where
+    version = decimal `sepBy1'` "."
 
 -- | Headers inside the comment denoted with @=@ signs, up to 6 levels
 -- deep.
@@ -334,7 +348,7 @@ moreContent item = first . (:) <$> nonEmptyLine <*> more item
 -- | Parses an indented paragraph.
 -- The indentation is 4 spaces.
 indentedParagraphs :: Parser (DocH mod Identifier)
-indentedParagraphs = parseParas . concat <$> dropFrontOfPara "    "
+indentedParagraphs = (concat <$> dropFrontOfPara "    ") >>= parseParagraphs
 
 -- | Grab as many fully indented paragraphs as we can.
 dropFrontOfPara :: Parser BS.ByteString -> Parser [String]

@@ -21,9 +21,10 @@ library
   default-language:     Haskell2010
 
   build-depends:
-    base >= 4.3 && < 4.8,
-    bytestring,
-    deepseq
+      base >= 4.3 && < 4.8
+    , bytestring
+    , transformers
+    , deepseq
 
   hs-source-dirs:       src, vendor/attoparsec-0.12.1.1
   ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
@@ -68,10 +69,12 @@ test-suite spec
 
   build-depends:
       base
+    , bytestring
+    , transformers
+    , deepseq
+
     , base-compat
     , hspec
-    , bytestring
-    , deepseq
     , QuickCheck == 2.*
 
 source-repository head

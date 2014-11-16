@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies #-}
 module Documentation.Haddock.Parser.Monad (
   module Documentation.Haddock.Parser.Monad
 , Attoparsec.isDigit
@@ -34,17 +34,38 @@ import           Data.String
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.Attoparsec.ByteString.Char8 as Attoparsec
+import           Control.Monad.Trans.State
+import qualified Control.Monad.Trans.Class as Trans
 import           Data.Word
 import           Data.Bits
+import           Data.Tuple
 
-newtype Parser a = Parser (Attoparsec.Parser a)
-  deriving (Functor, Applicative, Alternative, Monad, MonadPlus, IsString)
+import           Documentation.Haddock.Types (Version)
 
-parseOnly :: Parser a -> ByteString -> Either String a
-parseOnly (Parser p) = Attoparsec.parseOnly p
+data ParserState = ParserState {
+  parserStateSince :: Maybe Version
+} deriving (Eq, Show)
+
+initialParserState :: ParserState
+initialParserState = ParserState Nothing
+
+newtype Parser a = Parser (StateT ParserState Attoparsec.Parser a)
+  deriving (Functor, Applicative, Alternative, Monad, MonadPlus)
+
+instance (a ~ ByteString) => IsString (Parser a) where
+  fromString = lift . fromString
+
+parseOnly :: Parser a -> ByteString -> Either String (ParserState, a)
+parseOnly (Parser p) = fmap swap . Attoparsec.parseOnly (runStateT p initialParserState)
 
 lift :: Attoparsec.Parser a -> Parser a
-lift = Parser
+lift = Parser . Trans.lift
+
+setParserState :: ParserState -> Parser ()
+setParserState = Parser . put
+
+setSince :: Version -> Parser ()
+setSince since = Parser $ modify (\st -> st {parserStateSince = Just since})
 
 char :: Char -> Parser Char
 char = lift . Attoparsec.char
