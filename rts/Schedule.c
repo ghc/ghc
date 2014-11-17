@@ -2233,6 +2233,9 @@ suspendThread (StgRegTable *reg, rtsBool interruptible)
   task->incall->suspended_tso = tso;
   task->incall->suspended_cap = cap;
 
+  // Otherwise allocate() will write to invalid memory.
+  cap->r.rCurrentTSO = NULL
+
   ACQUIRE_LOCK(&cap->lock);
 
   suspendTask(cap,task);

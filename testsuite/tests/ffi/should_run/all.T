@@ -209,3 +209,7 @@ test('T8083',
      compile_and_run,
      ['T8083_c.c'])
 
+test('ffi023', [ omit_ways(['ghci']),
+                extra_clean(['ffi023_c.o']),
+                extra_run_opts('1000 4') ],
+              compile_and_run, ['ffi023_c.c'])
