@@ -139,10 +139,10 @@ solveFlatWanteds wanteds
        ; zonked <- zonkFlats (others `andCts` unflattened_eqs)
             -- Postcondition is that the wl_flats are zonked
 
-       ; (wanteds', rerun) <- runTcPluginsWanted zonked
+       ; (wanteds', insols', rerun) <- runTcPluginsWanted zonked
        ; if rerun then updInertTcS prepareInertsForImplications >> solveFlatWanteds wanteds'
                   else return (WC { wc_flat  = wanteds'
-                                  , wc_insol = insols
+                                  , wc_insol = insols' `unionBags` insols
                                   , wc_impl  = implics }) }
 
 
@@ -244,26 +244,27 @@ runTcPluginsGiven = do
         eqCt c c'  = ctEvPred (ctEvidence c) `eqType` ctEvPred (ctEvidence c')
 
 -- | Given a bag of (flattened, zonked) wanteds, invoke the plugins on
--- them and produce an updated bag of wanteds.  If the boolean is
--- 'True', these should be fed back into the main solver.
-runTcPluginsWanted :: Cts -> TcS (Cts, Bool)
+-- them and produce an updated bag of wanteds and a bag of fresh
+-- insolubles.  If the boolean is 'True', the wanteds should be fed
+-- back into the main solver.
+runTcPluginsWanted :: Cts -> TcS (Cts, Cts, Bool)
 runTcPluginsWanted zonked_wanteds = do
     gblEnv <- getGblEnv
     (given,derived,_) <- fmap splitInertCans getInertCans
-    foldM (f given derived) (zonked_wanteds, False) (tcg_tc_plugins gblEnv)
+    foldM (f given derived) (zonked_wanteds, emptyBag, False) (tcg_tc_plugins gblEnv)
   where
-    f :: [Ct] -> [Ct] -> (Cts, Bool) -> TcPluginSolver -> TcS (Cts, Bool)
-    f given derived (wanteds, rerun) solver = do
+    f :: [Ct] -> [Ct] -> (Cts, Cts, Bool) -> TcPluginSolver -> TcS (Cts, Cts, Bool)
+    f given derived (wanteds, insols, rerun) solver = do
       result <- runTcPluginTcS (solver given derived (bagToList wanteds))
       case result of
-        TcPluginContradiction bad_cts -> do mapM_ emitInsoluble bad_cts
-                                            return (discard bad_cts wanteds, rerun)
-        TcPluginOk [] []              -> return (wanteds, rerun)
+        TcPluginContradiction bad_cts -> return (discard bad_cts wanteds, listToBag bad_cts `unionBags` insols, rerun)
+        TcPluginOk [] []              -> return (wanteds, insols, rerun)
         TcPluginOk solved_cts new_cts -> do
              mapM_ setEv solved_cts
              let new_facts = [ct | ct <- new_cts, not (any (eqCt ct) (given ++ derived ++ bagToList wanteds))]
              updWorkListTcS (extendWorkListCts new_facts)
              return ( discard (map snd solved_cts) wanteds
+                    , insols
                     , rerun || notNull new_facts)
       where
         discard cs = filterBag (\ c -> not $ any (eqCt c) cs)
