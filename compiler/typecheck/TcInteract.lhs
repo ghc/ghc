@@ -39,7 +39,7 @@ import TcErrors
 import TcSMonad
 import Bag
 
-import Data.List( partition )
+import Data.List( partition, foldl', deleteFirstsBy )
 
 import VarEnv
 
@@ -125,8 +125,8 @@ solveFlatGivens loc givens
                                                 , ctev_pred = evVarPred ev_id
                                                 , ctev_loc  = loc })
     go givens = do { solveFlats givens
-                   ; (upd_givens, rerun) <- runTcPluginsGiven givens
-                   ; when rerun (go upd_givens)
+                   ; new_givens <- runTcPluginsGiven
+                   ; when (notNull new_givens) (go (listToBag new_givens))
                    }
 
 solveFlatWanteds :: Cts -> TcS WantedConstraints
@@ -189,30 +189,63 @@ setEv (ev,ct) = case ctEvidence ct of
                   CtWanted {ctev_evar = evar} -> setEvBind evar ev
                   _                           -> return ()
 
-runTcPluginsGiven :: Cts -> TcS (Cts, Bool)
-runTcPluginsGiven givens = do
+removeInertCts :: [Ct] -> InertCans -> InertCans
+removeInertCts cts icans = foldl' removeInertCt icans cts
+
+-- Remove the constraint from the inert set.  We use this either when:
+--   * a wanted constraint was solved, or
+--   * some constraint was marked as insoluable, and so it will be
+--     put right back into InertSet, but in the insoluable section.
+removeInertCt :: InertCans -> Ct -> InertCans
+removeInertCt is ct =
+  case ct of
+
+    CDictCan  { cc_class = cl, cc_tyargs = tys } ->
+      is { inert_dicts = delDict (inert_dicts is) cl tys }
+
+    CFunEqCan { cc_fun  = tf,  cc_tyargs = tys } ->
+      is { inert_funeqs = delFunEq (inert_funeqs is) tf tys }
+
+    CTyEqCan  { cc_tyvar = x,  cc_rhs    = ty  } ->
+      is { inert_eqs = delTyEq (inert_eqs is) x ty }
+
+    CIrredEvCan {}   -> panic "runTcPlugin/removeInert: CIrredEvCan"
+    CNonCanonical {} -> panic "runTcPlugin/removeInert: CNonCanonical"
+    CHoleCan {}      -> panic "runTcPlugin/removeInert: CHoleCan"
+
+
+-- | Extract the (inert) givens and invoke the plugins on them,
+-- removing solved givens from the inert set and emitting unsolvable
+-- constraints as we go.  Return new work produced by all the plugins,
+-- so that 'solveFlatGivens' can feed it back into the main solver.
+--
+-- It is slightly unfortunate that this doesn't quite line up with
+-- 'runTcPluginsWanted'...
+runTcPluginsGiven :: TcS [Ct]
+runTcPluginsGiven = do
     gblEnv <- getGblEnv
-    foldM f (givens, False) (tcg_tc_plugins gblEnv)
+    (givens,_,_) <- fmap splitInertCans getInertCans
+    fmap snd $ foldM f (givens, []) (tcg_tc_plugins gblEnv)
   where
-    f :: (Cts, Bool) -> TcPluginSolver -> TcS (Cts, Bool)
-    f (givens, rerun) solver = do
-      result <- runTcPluginTcS (solver (bagToList givens) [] [])
+    f :: ([Ct], [Ct]) -> TcPluginSolver -> TcS ([Ct], [Ct])
+    f (old_givens, new_givens) solver = do
+      result <- runTcPluginTcS (solver old_givens [] [])
       case result of
         TcPluginContradiction bad_cts -> do
           mapM_ emitInsoluble bad_cts
-          return (discard bad_cts givens, rerun)
-        TcPluginOk [] []              -> return (givens, rerun)
-        TcPluginOk [] new_cts         -> do
-          let new_facts = [ct | ct <- new_cts, not (any (eqCt ct) (bagToList givens))]
-          updWorkListTcS (extendWorkListCts new_facts)
-          return ( unionBags givens (listToBag new_facts)
-                 , rerun || notNull new_facts)
-        TcPluginOk _solved_cts _new_cts ->
-          panic "runTcPluginsGiven: plugin solved a given constraint"
+          return (discard bad_cts old_givens, new_givens)
+        TcPluginOk solved_cts new_cts -> do
+          updInertCans (removeInertCts $ map snd solved_cts)
+          let new_facts = [ct | ct <- new_cts, not (any (eqCt ct) old_givens)]
+          return ( discard (map snd solved_cts) old_givens
+                 , new_facts ++ new_givens)
       where
-        discard cs = filterBag (\ c -> not $ any (eqCt c) cs)
+        discard ys xs = deleteFirstsBy eqCt xs ys
         eqCt c c'  = ctEvPred (ctEvidence c) `eqType` ctEvPred (ctEvidence c')
 
+-- | Given a bag of (flattened, zonked) wanteds, invoke the plugins on
+-- them and produce an updated bag of wanteds.  If the boolean is
+-- 'True', these should be fed back into the main solver.
 runTcPluginsWanted :: Cts -> TcS (Cts, Bool)
 runTcPluginsWanted zonked_wanteds = do
     gblEnv <- getGblEnv
