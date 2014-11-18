@@ -482,6 +482,7 @@ data WarningFlag =
    | Opt_WarnAlternativeLayoutRuleTransitional
    | Opt_WarnUnsafe
    | Opt_WarnSafe
+   | Opt_WarnTrustworthySafe
    | Opt_WarnPointlessPragmas
    | Opt_WarnUnsupportedCallingConventions
    | Opt_WarnUnsupportedLlvmVersion
@@ -778,6 +779,7 @@ data DynFlags = DynFlags {
   pkgTrustOnLoc         :: SrcSpan,
   warnSafeOnLoc         :: SrcSpan,
   warnUnsafeOnLoc       :: SrcSpan,
+  trustworthyOnLoc      :: SrcSpan,
   -- Don't change this without updating extensionFlags:
   extensions            :: [OnOff ExtensionFlag],
   -- extensionFlags should always be equal to
@@ -1466,6 +1468,7 @@ defaultDynFlags mySettings =
         pkgTrustOnLoc = noSrcSpan,
         warnSafeOnLoc = noSrcSpan,
         warnUnsafeOnLoc = noSrcSpan,
+        trustworthyOnLoc = noSrcSpan,
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
 
@@ -1758,11 +1761,15 @@ setSafeHaskell s = updM f
     where f dfs = do
               let sf = safeHaskell dfs
               safeM <- combineSafeFlags sf s
-              return $ case (s == Sf_Safe || s == Sf_Unsafe) of
-                True  -> dfs { safeHaskell = safeM, safeInfer = False }
+              case s of
+                Sf_Safe -> return $ dfs { safeHaskell = safeM, safeInfer = False }
                 -- leave safe inferrence on in Trustworthy mode so we can warn
                 -- if it could have been inferred safe.
-                False -> dfs { safeHaskell = safeM }
+                Sf_Trustworthy -> do
+                  l <- getCurLoc
+                  return $ dfs { safeHaskell = safeM, trustworthyOnLoc = l }
+                -- leave safe inference on in Unsafe mode as well.
+                _ -> return $ dfs { safeHaskell = safeM }
 
 -- | Are all direct imports required to be safe for this Safe Haskell mode?
 -- Direct imports are when the code explicitly imports a module
@@ -2663,6 +2670,7 @@ fWarningFlags = [
   ( "warn-overlapping-patterns",        Opt_WarnOverlappingPatterns, nop ),
   ( "warn-pointless-pragmas",           Opt_WarnPointlessPragmas, nop ),
   ( "warn-safe",                        Opt_WarnSafe, setWarnSafe ),
+  ( "warn-trustworthy-safe",            Opt_WarnTrustworthySafe, nop ),
   ( "warn-tabs",                        Opt_WarnTabs, nop ),
   ( "warn-type-defaults",               Opt_WarnTypeDefaults, nop ),
   ( "warn-typed-holes",                 Opt_WarnTypedHoles, nop ),

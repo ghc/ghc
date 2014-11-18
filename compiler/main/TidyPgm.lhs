@@ -421,7 +421,7 @@ lookup_aux_id :: TypeEnv -> Var -> Id
 lookup_aux_id type_env id
   = case lookupTypeEnv type_env (idName id) of
         Just (AnId id') -> id'
-        _other          -> pprPanic "lookup_axu_id" (ppr id)
+        _other          -> pprPanic "lookup_aux_id" (ppr id)
 \end{code}
 
 

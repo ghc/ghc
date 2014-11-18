@@ -171,7 +171,7 @@ patG ss = do { ss' <- sequence ss; return (PatG ss') }
 
 patGE :: [StmtQ] -> ExpQ -> Q (Guard, Exp)
 patGE ss e = do { ss' <- sequence ss;
-		  e'  <- e;
+                  e'  <- e;
                   return (PatG ss', e') }
 
 -------------------------------------------------------------------------------
@@ -458,6 +458,19 @@ closedTypeFamilyKindD tc tvs kind eqns =
 
 roleAnnotD :: Name -> [Role] -> DecQ
 roleAnnotD name roles = return $ RoleAnnotD name roles
+
+standaloneDerivD :: CxtQ -> TypeQ -> DecQ
+standaloneDerivD ctxtq tyq =
+  do
+    ctxt <- ctxtq
+    ty   <- tyq
+    return $ StandaloneDerivD ctxt ty
+
+defaultSigD :: Name -> TypeQ -> DecQ
+defaultSigD n tyq =
+  do
+    ty <- tyq
+    return $ DefaultSigD n ty
 
 tySynEqn :: [TypeQ] -> TypeQ -> TySynEqnQ
 tySynEqn lhs rhs =

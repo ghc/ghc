@@ -99,11 +99,11 @@ data RealSrcLoc
   = SrcLoc      FastString              -- A precise location (file name)
                 {-# UNPACK #-} !Int     -- line number, begins at 1
                 {-# UNPACK #-} !Int     -- column number, begins at 1
-  deriving Show
 
 data SrcLoc
   = RealSrcLoc {-# UNPACK #-}!RealSrcLoc
   | UnhelpfulLoc FastString     -- Just a general indication
+  deriving Show
 \end{code}
 
 %************************************************************************
@@ -259,8 +259,7 @@ data RealSrcSpan
           srcSpanLine     :: {-# UNPACK #-} !Int,
           srcSpanCol      :: {-# UNPACK #-} !Int
         }
-  deriving (Eq, Typeable, Show) -- Show is used by Lexer.x, because we
-                                -- derive Show for Token
+  deriving (Eq, Typeable)
 
 data SrcSpan =
     RealSrcSpan !RealSrcSpan
@@ -432,6 +431,21 @@ instance Ord SrcSpan where
   a `compare` b =
      (srcSpanStart a `compare` srcSpanStart b) `thenCmp`
      (srcSpanEnd   a `compare` srcSpanEnd   b)
+
+instance Show RealSrcLoc where
+  show (SrcLoc filename row col)
+      = "SrcLoc " ++ show filename ++ " " ++ show row ++ " " ++ show col
+
+-- Show is used by Lexer.x, because we derive Show for Token
+instance Show RealSrcSpan where
+  show (SrcSpanOneLine file l sc ec)
+    = "SrcSpanOneLine " ++ show file ++ " "
+                        ++ intercalate " " (map show [l,sc,ec])
+  show (SrcSpanMultiLine file sl sc el ec)
+    = "SrcSpanMultiLine " ++ show file ++ " "
+                          ++ intercalate " " (map show [sl,sc,el,ec])
+  show (SrcSpanPoint file l c)
+    = "SrcSpanPoint " ++ show file ++ " " ++ intercalate " " (map show [l,c])
 
 
 instance Outputable RealSrcSpan where

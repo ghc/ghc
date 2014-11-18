@@ -44,6 +44,18 @@ source-repository head
 
 Flag integer-simple
     Description: Use integer-simple
+    Manual: True
+    Default: False
+
+Flag integer-gmp
+    Description: Use integer-gmp
+    Manual: True
+    Default: False
+
+Flag integer-gmp2
+    Description: Use integer-gmp2
+    Manual: True
+    Default: False
 
 Library
     default-language: Haskell2010
@@ -90,8 +102,13 @@ Library
     build-depends: rts == 1.0.*, ghc-prim >= 0.3.1 && < 0.4
     if flag(integer-simple)
         build-depends: integer-simple >= 0.1.1 && < 0.2
-    else
+
+    if flag(integer-gmp)
         build-depends: integer-gmp >= 0.5.1 && < 0.6
+        cpp-options: -DOPTIMISE_INTEGER_GCD_LCM
+
+    if flag(integer-gmp2)
+        build-depends: integer-gmp >= 1.0 && < 1.1
         cpp-options: -DOPTIMISE_INTEGER_GCD_LCM
 
     exposed-modules:
@@ -130,6 +147,7 @@ Library
         Data.Foldable
         Data.Function
         Data.Functor
+        Data.Functor.Identity
         Data.IORef
         Data.Int
         Data.Ix

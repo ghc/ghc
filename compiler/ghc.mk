@@ -53,8 +53,10 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo                                                               >> $@
 	@echo '#include "ghc_boot_platform.h"'                              >> $@
 	@echo                                                               >> $@
-	@echo 'data IntegerLibrary = IntegerGMP | IntegerSimple'            >> $@
-	@echo '    deriving Eq'                                             >> $@
+	@echo 'data IntegerLibrary = IntegerGMP'                            >> $@
+	@echo '                    | IntegerGMP2'                           >> $@
+	@echo '                    | IntegerSimple'                         >> $@
+	@echo '                    deriving Eq'                             >> $@
 	@echo                                                               >> $@
 	@echo 'cBuildPlatformString :: String'                              >> $@
 	@echo 'cBuildPlatformString = BuildPlatform_NAME'                   >> $@
@@ -84,6 +86,8 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cIntegerLibraryType   :: IntegerLibrary'                     >> $@
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
 	@echo 'cIntegerLibraryType   = IntegerGMP'                          >> $@
+else ifeq "$(INTEGER_LIBRARY)" "integer-gmp2"
+	@echo 'cIntegerLibraryType   = IntegerGMP2'                         >> $@
 else ifeq "$(INTEGER_LIBRARY)" "integer-simple"
 	@echo 'cIntegerLibraryType   = IntegerSimple'                       >> $@
 else ifneq "$(CLEANING)" "YES"
@@ -570,6 +574,7 @@ compiler_stage2_dll0_MODULES = \
 	StringBuffer \
 	TcEvidence \
 	TcIface \
+	TcMType \
 	TcRnMonad \
 	TcRnTypes \
 	TcType \

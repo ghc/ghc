@@ -7,3 +7,7 @@ include $(TOP)/mk/test.mk
 Roles12:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Roles12.hs-boot
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -c Roles12.hs
+
+T9204:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T9204.hs-boot
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -c T9204.hs

@@ -51,6 +51,8 @@ test('SafeLang17',
      multimod_compile_fail,
      ['SafeLang17', ''])
 
+test('SafeLang18', normal, compile, [''])
+
 # Test building a package, that trust values are set correctly
 # and can be changed correctly
 #test('SafeRecomp01',

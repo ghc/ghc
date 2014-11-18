@@ -275,8 +275,8 @@ defFullHelpText =
   "   :list                       show the source code around current breakpoint\n" ++
   "   :list <identifier>          show the source code for <identifier>\n" ++
   "   :list [<module>] <line>     show the source code around line number <line>\n" ++
-  "   :print [<name> ...]         prints a value without forcing its computation\n" ++
-  "   :sprint [<name> ...]        simplifed version of :print\n" ++
+  "   :print [<name> ...]         show a value without forcing its computation\n" ++
+  "   :sprint [<name> ...]        simplified version of :print\n" ++
   "   :step                       single-step after stopping at a breakpoint\n"++
   "   :step <expr>                single-step into <expr>\n"++
   "   :steplocal                  single-step within the current top-level binding\n"++

@@ -157,9 +157,9 @@ if [ $no_clean -eq 0 ]; then
     fi
 
     if [ $use_dph -eq 1 ]; then
-        /usr/bin/perl -w boot --validate --required-tag=dph
+        perl -w boot --validate --required-tag=dph
     else
-        /usr/bin/perl -w boot --validate
+        perl -w boot --validate
     fi
     ./configure --prefix="$INSTDIR" $config_args
 fi
@@ -299,4 +299,3 @@ Please fix them before pushing/sending patches.
 EOF
     exit 1
 fi
-

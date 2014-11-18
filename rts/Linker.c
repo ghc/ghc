@@ -1264,6 +1264,10 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(rtsSupportsBoundThreads)                            \
       SymI_HasProto(rts_isProfiled)                                     \
       SymI_HasProto(rts_isDynamic)                                      \
+      SymI_HasProto(rts_getThreadAllocationCounter)                     \
+      SymI_HasProto(rts_setThreadAllocationCounter)                     \
+      SymI_HasProto(rts_enableThreadAllocationLimit)                    \
+      SymI_HasProto(rts_disableThreadAllocationLimit)                   \
       SymI_HasProto(setProgArgv)                                        \
       SymI_HasProto(startupHaskell)                                     \
       SymI_HasProto(shutdownHaskell)                                    \

@@ -52,9 +52,9 @@ instance Ppr Info where
     ppr (FamilyI d is) = ppr d $$ vcat (map ppr is)
     ppr (PrimTyConI name arity is_unlifted)
       = text "Primitive"
-	<+> (if is_unlifted then text "unlifted" else empty)
-	<+> text "type constructor" <+> quotes (ppr name)
-	<+> parens (text "arity" <+> int arity)
+        <+> (if is_unlifted then text "unlifted" else empty)
+        <+> text "type constructor" <+> quotes (ppr name)
+        <+> parens (text "arity" <+> int arity)
     ppr (ClassOpI v ty cls fix)
       = text "Class op from" <+> ppr cls <> colon <+>
         vcat [ppr_sig v ty, pprFixity v fix]
@@ -327,11 +327,17 @@ ppr_dec _ (ClosedTypeFamilyD tc tvs mkind eqns)
 ppr_dec _ (RoleAnnotD name roles)
   = hsep [ text "type role", ppr name ] <+> hsep (map ppr roles)
 
+ppr_dec _ (StandaloneDerivD cxt ty)
+  = hsep [ text "deriving instance", pprCxt cxt, ppr ty ]
+
+ppr_dec _ (DefaultSigD n ty)
+  = hsep [ text "default", pprPrefixOcc n, text "::", ppr ty ]
+
 ppr_data :: Doc -> Cxt -> Name -> Doc -> [Con] -> [Name] -> Doc
 ppr_data maybeInst ctxt t argsDoc cs decs
   = sep [text "data" <+> maybeInst
-    	    <+> pprCxt ctxt
-    	    <+> ppr t <+> argsDoc,
+            <+> pprCxt ctxt
+            <+> ppr t <+> argsDoc,
          nest nestDepth (sep (pref $ map ppr cs)),
          if null decs
            then empty
@@ -346,14 +352,14 @@ ppr_data maybeInst ctxt t argsDoc cs decs
 ppr_newtype :: Doc -> Cxt -> Name -> Doc -> Con -> [Name] -> Doc
 ppr_newtype maybeInst ctxt t argsDoc c decs
   = sep [text "newtype" <+> maybeInst
-    	    <+> pprCxt ctxt
-    	    <+> ppr t <+> argsDoc,
+            <+> pprCxt ctxt
+            <+> ppr t <+> argsDoc,
          nest 2 (char '=' <+> ppr c),
          if null decs
-       	   then empty
-       	   else nest nestDepth
-       	        $ text "deriving"
-       	          <+> parens (hsep $ punctuate comma $ map ppr decs)]
+           then empty
+           else nest nestDepth
+                $ text "deriving"
+                  <+> parens (hsep $ punctuate comma $ map ppr decs)]
 
 ppr_tySyn :: Doc -> Name -> Doc -> Type -> Doc
 ppr_tySyn maybeInst t argsDoc rhs
@@ -507,7 +513,7 @@ pprTyApp (PromotedTupleT n, args)
  | length args == n = quoteParens (sep (punctuate comma (map ppr args)))
 pprTyApp (fun, args) = pprParendType fun <+> sep (map pprParendType args)
 
-pprFunArgType :: Type -> Doc	-- Should really use a precedence argument
+pprFunArgType :: Type -> Doc    -- Should really use a precedence argument
 -- Everything except forall and (->) binds more tightly than (->)
 pprFunArgType ty@(ForallT {})                 = parens (ppr ty)
 pprFunArgType ty@((ArrowT `AppT` _) `AppT` _) = parens (ppr ty)

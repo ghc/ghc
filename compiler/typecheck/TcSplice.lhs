@@ -1308,15 +1308,22 @@ reifyClass cls
   = do  { cxt <- reifyCxt theta
         ; inst_envs <- tcGetInstEnvs
         ; insts <- reifyClassInstances cls (InstEnv.classInstances inst_envs cls)
-        ; ops <- mapM reify_op op_stuff
+        ; ops <- concatMapM reify_op op_stuff
         ; tvs' <- reifyTyVars tvs
         ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' ops
         ; return (TH.ClassI dec insts ) }
   where
     (tvs, fds, theta, _, _, op_stuff) = classExtraBigSig cls
     fds' = map reifyFunDep fds
-    reify_op (op, _) = do { ty <- reifyType (idType op)
-                          ; return (TH.SigD (reifyName op) ty) }
+    reify_op (op, def_meth)
+      = do { ty <- reifyType (idType op)
+           ; let nm' = reifyName op
+           ; case def_meth of
+                GenDefMeth gdm_nm ->
+                  do { gdm_id <- tcLookupId gdm_nm
+                     ; gdm_ty <- reifyType (idType gdm_id)
+                     ; return [TH.SigD nm' ty, TH.DefaultSigD nm' gdm_ty] }
+                _ -> return [TH.SigD nm' ty] }
 
 ------------------------------
 -- | Annotate (with TH.SigT) a type if the first parameter is True

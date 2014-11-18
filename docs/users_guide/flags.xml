@@ -1565,7 +1565,10 @@
             <entry><option>-fwarn-unsafe</option></entry>
             <entry>warn if the module being compiled is regarded to be unsafe.
               Should be used to check the safety status of modules when using safe
-              inference.</entry>
+              inference. Works on all module types, even those using explicit
+              <link linkend="safe-haskell">Safe Haskell</link> modes (such as
+              <option>-XTrustworthy</option>) and so can be used to have the
+              compiler check any assumptions made.</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-warn-unsafe</option></entry>
           </row>
@@ -1574,7 +1577,21 @@
             <entry><option>-fwarn-safe</option></entry>
             <entry>warn if the module being compiled is regarded to be safe.
               Should be used to check the safety status of modules when using safe
-              inference.</entry>
+              inference. Works on all module types, even those using explicit
+              <link linkend="safe-haskell">Safe Haskell</link> modes (such as
+              <option>-XTrustworthy</option>) and so can be used to have the
+              compiler check any assumptions made.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-safe</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fwarn-trustworthy-safe</option></entry>
+            <entry>warn if the module being compiled is marked as
+              <option>-XTrustworthy</option> but it could instead be marked as
+              <option>-XSafe</option>, a more informative bound. Can be used to
+              detect once a Safe Haskell bound can be improved as dependencies
+              are updated.</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-warn-safe</option></entry>
           </row>
@@ -2518,6 +2535,13 @@
           <row>
             <entry><option>-debug</option></entry>
             <entry>Use the debugging runtime</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-ticky</option></entry>
+            <entry>For linking, this simply implies <option>-debug</option>;
+            see <xref linkend="ticky-ticky"/>.</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>

@@ -179,7 +179,7 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 
 ------------------------------------------------------
 buildPatSyn :: Name -> Bool
-            -> Id -> Maybe Id
+            -> Id -> Maybe (Id, Id)
             -> ([TyVar], ThetaType) -- ^ Univ and req
             -> ([TyVar], ThetaType) -- ^ Ex and prov
             -> [Type]               -- ^ Argument types

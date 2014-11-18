@@ -5,9 +5,11 @@ tcfail220.hsig:4:1:
     and its hsig file
     Main module: data Bool = False | GHC.Types.True
     Hsig file:  data Bool a b c d = False
+    The types have different kinds
 
 tcfail220.hsig:5:1:
     Type constructor ‘Maybe’ has conflicting definitions in the module
     and its hsig file
     Main module: data Maybe a = Nothing | GHC.Base.Just a
     Hsig file:  data Maybe a b = Nothing
+    The types have different kinds

@@ -40,6 +40,7 @@ test('safePkg01',
       normalise_errmsg_fun(ignoreLdOutput),
       normalise_fun(
         normaliseArrayPackage,
+        normaliseIntegerPackage,
         normaliseBytestringPackage)],
      run_command,
      ['$MAKE -s --no-print-directory safePkg01 ' + make_args])
@@ -49,6 +50,15 @@ test('ImpSafe01', normal, compile_fail, ['-fpackage-trust -distrust base'])
 
 # Succeed since we don't enable package trust
 test('ImpSafe02', normal, compile, ['-distrust base'])
+
+# Fail since we don't trust base of bytestring
+test('ImpSafe03', normal, multi_compile_fail,
+  ['ImpSafe03 -trust base -distrust bytestring', [
+   ('ImpSafe03_A.hs', ' -trust base -trust bytestring')
+  ], '-fpackage-trust' ])
+
+# Fail same as ImpSafe01 but testing with -XTrustworthy now
+test('ImpSafe04', normal, compile_fail, ['-fpackage-trust -distrust base'])
 
 test('ImpSafeOnly01',
      [pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly01 ' + make_args),
@@ -94,7 +104,7 @@ test('ImpSafeOnly07',
       clean_cmd('$MAKE -s --no-print-directory cleanPackageDatabase.ImpSafeOnly07'),
       normalise_errmsg_fun(normaliseBytestringPackage)],
      compile_fail,
-     ['-fpackage-trust -package-db pdb.ImpSafeOnly07/local.db -trust safePkg01'])
+     ['-fpackage-trust -package-db pdb.ImpSafeOnly07/local.db -trust safePkg01 -distrust bytestring'])
 test('ImpSafeOnly08',
      [pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly08 ' + make_args),
       clean_cmd('$MAKE -s --no-print-directory cleanPackageDatabase.ImpSafeOnly08'),

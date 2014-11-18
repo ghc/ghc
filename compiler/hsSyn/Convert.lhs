@@ -6,7 +6,6 @@
 This module converts Template Haskell syntax into HsSyn
 
 \begin{code}
-{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE CPP #-}
 
 module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
@@ -44,7 +43,6 @@ import Control.Applicative (Applicative(..))
 import Data.Maybe( catMaybes )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
-import GHC.Exts
 
 -------------------------------------------------------------------
 --              The external interface
@@ -172,7 +170,11 @@ cvtDec (TH.SigD nm typ)
         ; returnJustL $ Hs.SigD (TypeSig [nm'] ty') }
 
 cvtDec (TH.InfixD fx nm)
-  = do { nm' <- vNameL nm
+  -- fixity signatures are allowed for variables, constructors, and types
+  -- the renamer automatically looks for types during renaming, even when
+  -- the RdrName says it's a variable or a constructor. So, just assume
+  -- it's a variable or constructor and proceed.
+  = do { nm' <- vcNameL nm
        ; returnJustL (Hs.SigD (FixSig (FixitySig nm' (cvtFixity fx)))) }
 
 cvtDec (PragmaD prag)
@@ -303,6 +305,18 @@ cvtDec (TH.RoleAnnotD tc roles)
   = do { tc' <- tconNameL tc
        ; let roles' = map (noLoc . cvtRole) roles
        ; returnJustL $ Hs.RoleAnnotD (RoleAnnotDecl tc' roles') }
+
+cvtDec (TH.StandaloneDerivD cxt ty)
+  = do { cxt' <- cvtContext cxt
+       ; L loc ty'  <- cvtType ty
+       ; let inst_ty' = L loc $ mkImplicitHsForAllTy cxt' $ L loc ty'
+       ; returnJustL $ DerivD $
+         DerivDecl { deriv_type = inst_ty', deriv_overlap_mode = Nothing } }
+
+cvtDec (TH.DefaultSigD nm typ)
+  = do { nm' <- vNameL nm
+       ; ty' <- cvtType typ
+       ; returnJustL $ Hs.SigD $ GenericSig [nm'] ty' }
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)
 cvtTySynEqn tc (TySynEqn lhs rhs)
@@ -521,7 +535,7 @@ cvtPragmaD (AnnP target exp)
            n' <- tconName n
            return (TypeAnnProvenance  n')
          ValueAnnotation n -> do
-           n' <- if isVarName n then vName n else cName n
+           n' <- vcName n
            return (ValueAnnProvenance n')
        ; returnJustL $ Hs.AnnD $ HsAnnotation target' exp'
        }
@@ -1071,15 +1085,20 @@ cvtFractionalLit r = FL { fl_text = show (fromRational r :: Double), fl_value = 
 --------------------------------------------------------------------
 
 -- variable names
-vNameL, cNameL, tconNameL :: TH.Name -> CvtM (Located RdrName)
-vName,  cName,  tName,  tconName  :: TH.Name -> CvtM RdrName
+vNameL, cNameL, vcNameL, tconNameL :: TH.Name -> CvtM (Located RdrName)
+vName,  cName,  vcName,  tName,  tconName  :: TH.Name -> CvtM RdrName
 
+-- Variable names
 vNameL n = wrapL (vName n)
 vName n = cvtName OccName.varName n
 
 -- Constructor function names; this is Haskell source, hence srcDataName
 cNameL n = wrapL (cName n)
 cName n = cvtName OccName.dataName n
+
+-- Variable *or* constructor names; check by looking at the first char
+vcNameL n = wrapL (vcName n)
+vcName n = if isVarName n then vName n else cName n
 
 -- Type variable names
 tName n = cvtName OccName.tvName n
@@ -1181,8 +1200,8 @@ mk_mod mod = mkModuleName (TH.modString mod)
 mk_pkg :: TH.PkgName -> PackageKey
 mk_pkg pkg = stringToPackageKey (TH.pkgString pkg)
 
-mk_uniq :: Int# -> Unique
-mk_uniq u = mkUniqueGrimily (I# u)
+mk_uniq :: Int -> Unique
+mk_uniq u = mkUniqueGrimily u
 \end{code}
 
 Note [Binders in Template Haskell]

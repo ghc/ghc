@@ -1,44 +1,66 @@
 # see 'man git-shortlog' for more details
 # formats: Proper Name [<proper@email.xx> [Commit Name]] <commit@email.xx>
 #
+Aaron Tomb              <atomb@galois.com>                  <atomb@soe.ucsc.edu>
 Alastair Reid           <alastair@reid-consulting-uk.ltd.uk> areid <unknown>
 Alastair Reid           <alastair@reid-consulting-uk.ltd.uk> reid <unknown>
 Alexey Rodriguez        <mrchebas@gmail.com>
 Alexey Rodriguez        <mrchebas@gmail.com>                mrchebas@gmail.com <unknown>
+Andrew Farmer           <afarmer@ittc.ku.edu>               <anfarmer@ku.edu>
 Andrew Pimlott          <andrew.pimlott.ctr@metnet.navy.mil> andrew.pimlott.ctr@metnet.navy.mil <unknown>
 Andrew Tolmach          <apt@cs.pdx.edu>                    apt <unknown>
 André Santos            <alms@di.ufpe.br>                   andre <unknown>
 Andy Adams-Moran        <andy.adamsmoran@gmail.com>         moran <unknown>
-Andy Gill               <andy@galois.com>                   andy@galois.com <unknown>
-Andy Gill               <andy@galois.com>                   andy@unsafeperformio.com <unknown>
+Andy Gill               <andygill@ku.edu>                   <andy@galois.com>
 Andy Gill               <andygill@ku.edu>                   andy <unknown>
+Andy Gill               <andygill@ku.edu>                   andy@galois.com <unknown>
+Andy Gill               <andygill@ku.edu>                   andy@unsafeperformio.com <unknown>
 Andy Gill               <andygill@ku.edu>                   andygill@ku.edu <unknown>
 Audrey Tang             <audreyt@audreyt.org>               audreyt@audreyt.org <unknown>
+Austin Seipp            <austin@well-typed.com>             <as@hacks.yi.org>
+Austin Seipp            <austin@well-typed.com>             <as@nijoruj.org>
+Austin Seipp            <austin@well-typed.com>             <aseipp@pobox.com>
+Austin Seipp            <austin@well-typed.com>             <mad.one@gmail.com>
 Bas van Dijk            <v.dijk.bas@gmail.com>              basvandijk@home.nl <unknown>
 Bas van Dijk            <v.dijk.bas@gmail.com>              v.dijk.bas@gmail.com <unknown>
 Ben Gamari              <bgamari.foss@gmail.com>            <ben@panda.(none)>
+Ben Gamari              <bgamari.foss@gmail.com>            <ben@panda1.milkyway>
+Ben Lippmeier           <benl@ouroborus.net>
+Ben Lippmeier           <benl@ouroborus.net>                <Ben.Lippmeier@anu.edu.au>
 Ben Lippmeier           <benl@ouroborus.net>                Ben.Lippmeier.anu.edu.au <unknown>
 Ben Lippmeier           <benl@ouroborus.net>                Ben.Lippmeier@anu.edu.au <unknown>
 Ben Lippmeier           <benl@ouroborus.net>                benl@cse.unsw.edu.au <unknown>
 Ben Lippmeier           <benl@ouroborus.net>                benl@ouroborus.net <unknown>
 Bernie Pope             <bjpop@csse.unimelb.edu.au>         bjpop@csse.unimelb.edu.au <unknown>
+Björn Bringert          <bjorn@bringert.net>
 Björn Bringert          <bjorn@bringert.net>                bjorn@bringert.net <unknown>
 Björn Bringert          <bjorn@bringert.net>                bringert@cs.chalmers.se <unknown>
 Boris Lykah             <lykahb@gmail.com>                  lykahb@gmail.com <unknown>
+Brent Yorgey            <byorgey@gmail.com>                 <byorgey@LVN513-12.cis.upenn.edu>
+Brian Smith             <brianlsmith@gmail.com>
 Brian Smith             <brianlsmith@gmail.com>             brianlsmith@gmail.com <unknown>
+Cain Norris             <ghc@cainnorris.net>                ghc@cainnorris.net <unknown>
 Chris Rodrigues         <red5_2@hotmail.com>                red5_2@hotmail.com <unknown>
 Chris Smith             <cdsmith@twu.net>                   cdsmith@twu.net <unknown>
 Christoph Bauer         <ich@christoph-bauer.net>           ich@christoph-bauer.net <unknown>
+Claus Reinke            <claus.reinke@talk21.com>
 Claus Reinke            <claus.reinke@talk21.com>           claus.reinke@talk21.com <unknown>
+Colin McQuillan         <m.niloc@gmail.com>
 Colin McQuillan         <m.niloc@gmail.com>                 m.niloc@gmail.com <unknown>
+Colin Watson            <cjwatson@debian.org>               <cjwatson@canonical.com>
 Daan Leijen             <daan@microsoft.com>                daan <unknown>
+Daniel Fischer          <daniel.is.fischer@googlemail.com>  <daniel.is.fischer@web.de>
 Daniel Franke           <df@dfranke.us>                     df@dfranke.us <unknown>
 Daniel Rogers           <daniel@phasevelocity.org>          daniel@phasevelocity.org <unknown>
+David Feuer             <david.feuer@gmail.com>             <David.Feuer@gmail.com>
 David M Peixotto        <dmp@rice.edu>                      dmp@rice.edu <unknown>
+David Terei             <code@davidterei.com>               <davidterei@gmail.com>
+David Waern             <davve@dtek.chalmers.se>
+David Waern             <davve@dtek.chalmers.se>            <david.waern@gmail.com>
 David Waern             <davve@dtek.chalmers.se>            <waern@ubuntu.(none)>
 David Waern             <davve@dtek.chalmers.se>            davve@dtek.chalmers.se <unknown>
+Dimitrios Vytiniotis    <dimitris@microsoft.com>
 Dimitrios Vytiniotis    <dimitris@microsoft.com>            <dimitris@MSRC-1361792.europe.corp.microsoft.com>
-Dimitrios Vytiniotis    <dimitris@microsoft.com>            <dimitris@microsoft.com>
 Dimitrios Vytiniotis    <dimitris@microsoft.com>            dimitris@microsoft.com <unknown>
 Don Stewart             <dons@galois.com>                   <dons@cse.unsw.edu.au>
 Don Stewart             <dons@galois.com>                   dons <unknown>
@@ -46,93 +68,139 @@ Don Stewart             <dons@galois.com>                   dons@cse.unsw.edu.au
 Don Syme                <dsyme@microsoft.com>               dsyme <unknown>
 Donnie Jones            <donnie@darthik.com>                donnie@darthik.com <unknown>
 Duncan Coutts           <duncan@well-typed.com>             <duncan.coutts@worc.ox.ac.uk>
+Duncan Coutts           <duncan@well-typed.com>             <duncan@community.haskell.org>
 Duncan Coutts           <duncan@well-typed.com>             <duncan@haskell.org>
+Edward Z. Yang          <ezyang@cs.stanford.edu>            <ezyang@mit.edu>
 Evan Hauck              <khyperia@live.com>
+Gabor Pali              <pali.gabor@gmail.com>              <pgj@FreeBSD.org>
 Gabriele Keller         <keller@cse.unsw.edu.au>            keller <unknown>
 Gabriele Keller         <keller@cse.unsw.edu.au>            keller@.cse.unsw.edu.au <unknown>
 Gabriele Keller         <keller@cse.unsw.edu.au>            keller@cse.unsw.edu.au <unknown>
-Geoffrey Mainland       <mainland@eecs.harvard.edu>         mainland@eecs.harvard.edu <unknown>
+Geoffrey Mainland       <mainland@cs.drexel.edu>            <gmainlan@microsoft.com>
+Geoffrey Mainland       <mainland@cs.drexel.edu>            <mainland@apeiron.net>
+Geoffrey Mainland       <mainland@cs.drexel.edu>            mainland@eecs.harvard.edu <unknown>
+Gergő Érdi              <gergo@erdi.hu>
+Gregory Wright          <gwright@antiope.com>
 Gregory Wright          <gwright@antiope.com>               gwright@antiope.com <unknown>
 Gábor Lehel             <illissius@gmail.com>               illissius@gmail.com <unknown>
 Hans-Wolfgang Loidl     <hwloidl@macs.hw.ac.uk>             hwloidl <unknown>
+Heinrich Hördegen       <hoerdegen@energiefluss.info>
+Howard B. Golden        <howard_b_golden@yahoo.com>
 Howard B. Golden        <howard_b_golden@yahoo.com>         howard_b_golden@yahoo.com <unknown>
+Ian Lynagh              <igloo@earth.li>                    <ian@.(none)>
+Ian Lynagh              <igloo@earth.li>                    <ian@well-typed.com>
 Ian Lynagh              <igloo@earth.li>                    igloo <unknown>
-Ian Lynagh              <igloo@earth.li>                    unknown <ian@.(none)>
 Iavor S. Diatchki       <iavor.diatchki@gmail.com>          <diatchki@Perun.(none)>
+Iavor S. Diatchki       <iavor.diatchki@gmail.com>          <diatchki@galois.com>
 Iavor S. Diatchki       <iavor.diatchki@gmail.com>          iavor.diatchki@gmail.com <unknown>
 Isaac Potoczny-Jones    <ijones@syntaxpolice.org>           ijones@syntaxpolice.org <unknown>
+Jean-Philippe Bernardy  <jeanphilippe.bernardy@gmail.com>   jeanphilippe.bernardy@gmail.com <unknown>
 Jeff Lewis              <jeff@galconn.com>                  lewie <unknown>
+Joachim Breitner        <mail@joachim-breitner.de>          <breitner@kit.edu>
 Jochem Berndsen         <jochemberndsen@dse.nl>             jochemberndsen@dse.nl <unknown>
 John Dias               <dias@cs.tufts.edu>                 dias@cs.tufts.edu <unknown>
 John Dias               <dias@cs.tufts.edu>                 dias@eecs.harvard.edu <unknown>
 John Dias               <dias@cs.tufts.edu>                 dias@eecs.tufts.edu <unknown>
 John McCall             <rjmccall@gmail.com>                rjmccall@gmail.com <unknown>
-Jose Pedro Magalhaes    <jpm@cs.uu.nl>                      <jpm@cs.uu.nl>
+Jon Fairbairn           <jon.fairbairn@cl.cam.ac.uk>        jon.fairbairn@cl.cam.ac.uk <unknown>
+Jose Pedro Magalhaes    <jpm@cs.ox.ac.uk>                   <jpm@cs.uu.nl>
+Jose Pedro Magalhaes    <jpm@cs.ox.ac.uk>                   jpm@cs.uu.nl <unknown>
 Josef Svenningsson      <josef.svenningsson@gmail.com>      josefs <unknown>
-Jost Berthold           <berthold@mathematik.uni-marburg.de> berthold@mathematik.uni-marburg.de <unknown>
+Jost Berthold           <jb.diku@gmail.com>                 <berthold@mathematik.uni-marburg.de>
+Jost Berthold           <jb.diku@gmail.com>                 berthold@mathematik.uni-marburg.de <unknown>
 Juan J. Quintela        <quintela@fi.udc.es>                quintela <unknown>
 Judah Jacobson          <judah.jacobson@gmail.com>          judah.jacobson@gmail.com <unknown>
 Julian Seward           <jseward@acm.org>                   sewardj <unknown>
+Karel Gardas            <karel.gardas@centrum.cz>           <karel.gardas@centrumcz>
+Karel Gardas            <karel.gardas@centrum.cz>           <kgardas@objectsecurity.com>
 Keith Wansbrough        <keith.wansbrough@cl.cam.ac.uk>     keithw <unknown>
 Keith Wansbrough        <keith.wansbrough@cl.cam.ac.uk>     kw <unknown>
 Keith Wansbrough        <keith.wansbrough@cl.cam.ac.uk>     kw217 <unknown>
 Ken Shan                <ken@digitas.harvard.edu>           ken <unknown>
+Kevin G Donnelly        <kevind@bu.edu>                     <kevind@bu.edu>
 Kevin G Donnelly        <kevind@bu.edu>                     kevind@bu.edu <unknown>
 Kevin Glynn             <glynn@info.ucl.ac.be>              kglynn <unknown>
 Krasimir Angelov        <kr.angelov@gmail.com>              kr.angelov@gmail.com <unknown>
 Krasimir Angelov        <kr.angelov@gmail.com>              krasimir <unknown>
+Lennart Augustsson      <lennart@augustsson.net>
 Lennart Augustsson      <lennart@augustsson.net>            lennart.augustsson@credit-suisse.com <unknown>
 Lennart Augustsson      <lennart@augustsson.net>            lennart@augustsson.net <unknown>
+Lennart Kolmodin        <kolmodin@gmail.com>                <kolmodin@dtek.chalmers.se>
+Lennart Kolmodin        <kolmodin@gmail.com>                <kolmodin@google.com>
 Levent Erkök            <erkokl@gmail.com>                  erkok <unknown>
+Luke Iannini            <lukexipd@gmail.com>                <lukexi@me.com>
 Malcolm Wallace         <Malcolm.Wallace@cs.york.ac.uk>     Malcolm.Wallace@cs.york.ac.uk <unknown>
+Malcolm Wallace         <Malcolm.Wallace@cs.york.ac.uk>     Malcolm.Wallace@me.com <unknown>
 Malcolm Wallace         <Malcolm.Wallace@cs.york.ac.uk>     malcolm <unknown>
 Manuel M T Chakravarty  <chak@cse.unsw.edu.au>              chak <unknown>
 Marc Weber              <marco-oweber@gmx.de>               marco-oweber@gmx.de <unknown>
 Marcin 'Qrczak' Kowalczyk <qrczak@knm.org.pl>               qrczak <unknown>
+Marco Túlio Gontijo e Silva <marcot@marcot.eti.br>          <marcot@debian.org>
 Matt Chapman            <matthewc@cse.unsw.edu.au>          matthewc <unknown>
 Matthias Kilian         <kili@outback.escape.de>            kili@outback.escape.de <unknown>
+Michael D. Adams        <t-madams@microsoft.com>            <adamsmd@cs.indiana.edu>
 Michael Weber           <michaelw@debian.org>               michaelw <unknown>
 Mike Thomas             <mthomas@gil.com.au>                mthomas <unknown>
+Mikolaj Konarski        <mikolaj@well-typed.com>            <mikolaj.konarski@gmail.com>
+Nathan Huesken          <nathan.huesken@posteo.de>
 Neil Mitchell           <ndmitchell@gmail.com>              <http://www.cs.york.ac.uk/~ndm/>
 Neil Mitchell           <ndmitchell@gmail.com>              Neil Mitchell <unknown>
 Nicholas Nethercote     <njn25@cam.ac.uk>                   njn <unknown>
 Norman Ramsey           <nr@eecs.harvard.edu>               nr@eecs.harvard.edu <unknown>
 PHO                     <pho@cielonegro.org>                pho@cielonegro.org <unknown>
+Pepe Iborra             <mnislaih@gmail.com>
+Pepe Iborra             <mnislaih@gmail.com>                <pepeiborra@gmail.com>
+Pepe Iborra             <mnislaih@gmail.com>                mnislaih@gmail.com <unknown>
 Pepe Iborra             <mnislaih@gmail.com>                pepe <unknown>
-Pepe Iborra             <pepeiborra@gmail.com>              pepeiborra@gmail.com <unknown>
+Pepe Iborra             <mnislaih@gmail.com>                pepeiborra@gmail.com <unknown>
 Peter Jonsson           <t-peterj@microsoft.com>            t-peterj@microsoft.com <unknown>
+Peter Trommler          <ptrommler@acm.org>                 <ptrommler@scm.org>
 Peter Wortmann          <scpmw@leeds.ac.uk>                 <peter@grayson-heights-pc028-118.student-halls.leeds.ac.uk>
 Peter Wortmann          <scpmw@leeds.ac.uk>                 scpmw@leeds.ac.uk <unknown>
 Reuben Thomas           <rrt@sc3d.org>                      rrt <unknown>
+Richard Eisenberg       <eir@cis.upenn.edu>                 <eir@seas.upenn.edu>
 Roman Leshchinskiy      <rl@cse.unsw.edu.au>                rl@cse.unsw.edu.au <unknown>
 Ross Paterson           <ross@soi.city.ac.uk>               ross <unknown>
 Ryan Lortie             <desrt@desrt.ca>                    desrt <unknown>
+Sam Anklesaria          <amsay@amsay.net>
 Sam Anklesaria          <amsay@amsay.net>                   amsay@amsay.net <unknown>
 Sean Seefried           <sean.seefried@gmail.com>           sseefried <unknown>
+Sergei Trofimovich      <slyfox@gentoo.org>                 <slyfox at gentoo.org>
+Sergei Trofimovich      <slyfox@gentoo.org>                 <slyfox@community.haskell.org>
+Sergei Trofimovich      <slyfox@gentoo.org>                 <slyfox@inbox.ru>
 Shae Matijs Erisson     <shae@ScannedInAvian.com>           shae@ScannedInAvian.com <unknown>
 Sigbjorn Finne          <sof@galois.com>                    sof <unknown>
 Sigbjorn Finne          <sof@galois.com>                    sof@galois.com <unknown>
+Simon Hengel            <sol@typeful.net>                   <simon.hengel@wiktory.org>
 Simon Marlow            <marlowsd@gmail.com>                <simonmar-work@simonmar-laptop.(none)>
 Simon Marlow            <marlowsd@gmail.com>                <simonmar@microsoft.com>
 Simon Marlow            <marlowsd@gmail.com>                <simonmarhaskell@gmail.com>
 Simon Marlow            <marlowsd@gmail.com>                simonm <unknown>
 Simon Marlow            <marlowsd@gmail.com>                simonmar <unknown>
 Simon Marlow            <marlowsd@gmail.com>                simonmar@microsoft.com <unknown>
+Simon Peyton Jones      <simonpj@microsoft.com>
 Simon Peyton Jones      <simonpj@microsoft.com>             <simonpj@.europe.corp.microsoft.com>
 Simon Peyton Jones      <simonpj@microsoft.com>             <simonpj@MSRC-4971295.europe.corp.microsoft.com>
 Simon Peyton Jones      <simonpj@microsoft.com>             <simonpj@cam-04-unx.europe.corp.microsoft.com>
-Simon Peyton Jones      <simonpj@microsoft.com>             <simonpj@microsoft.com>
+Simon Peyton Jones      <simonpj@microsoft.com>             <simonpj@microsof.com>
 Simon Peyton Jones      <simonpj@microsoft.com>             <simonpj@static.144-76-175-55.clients.your-server.de>
 Simon Peyton Jones      <simonpj@microsoft.com>             simonpj <unknown>
+Simon Peyton Jones      <simonpj@microsoft.com>             simonpj@microsoft <unknown>
 Simon Peyton Jones      <simonpj@microsoft.com>             simonpj@microsoft.com <unknown>
+Spencer Janssen         <spencer@well-typed.com>            <sjanssen@cse.unl.edu>
+Stephen Blackheath      <stephen@blacksapphire.com>         <docks.cattlemen.stephen@blacksapphire.com>
+Stephen Blackheath      <stephen@blacksapphire.com>         <effusively.proffer.stephen@blacksapphire.com>
+Stephen Blackheath      <stephen@blacksapphire.com>         <oversensitive.pastors.stephen@blacksapphire.com>
 Sven Panne              <sven.panne@aedion.de>              panne <unknown>
 Sven Panne              <sven.panne@aedion.de>              sven.panne@aedion.de <unknown>
 Sébastien Carlier       <sebc@posse42.net>                  sebc <unknown>
 Thorkil Naur            <naur@post11.tele.dk>               naur@post11.tele.dk <unknown>
+Tim Harris              <tharris@microsoft.com>
 Tim Harris              <tharris@microsoft.com>             tharris <unknown>
 Tim Harris              <tharris@microsoft.com>             tharris@microsoft.com <unknown>
 Tobias Gedell           <d99getob@dtek.chalmers.se>         tgedell <unknown>
 Tom Schrijvers          <tom.schrijvers@cs.kuleuven.be>     tom.schrijvers@cs.kuleuven.be <unknown>
+Volker Stolz            <stolz@i2.informatik.rwth-aachen.de>
 Volker Stolz            <stolz@i2.informatik.rwth-aachen.de> stolz <unknown>
 Will Partain            <partain@dcs.gla.ac.uk>             partain <unknown>
 Wolfgang Thaller        <wolfgang.thaller@gmx.net>          wolfgang <unknown>

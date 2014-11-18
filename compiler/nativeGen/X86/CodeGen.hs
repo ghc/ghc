@@ -391,6 +391,21 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
                        ADC II32 (OpReg r2hi) (OpReg rhi) ]
    return (ChildCode64 code rlo)
 
+iselExpr64 (CmmMachOp (MO_Sub _) [e1,e2]) = do
+   ChildCode64 code1 r1lo <- iselExpr64 e1
+   ChildCode64 code2 r2lo <- iselExpr64 e2
+   (rlo,rhi) <- getNewRegPairNat II32
+   let
+        r1hi = getHiVRegFromLo r1lo
+        r2hi = getHiVRegFromLo r2lo
+        code =  code1 `appOL`
+                code2 `appOL`
+                toOL [ MOV II32 (OpReg r1lo) (OpReg rlo),
+                       SUB II32 (OpReg r2lo) (OpReg rlo),
+                       MOV II32 (OpReg r1hi) (OpReg rhi),
+                       SBB II32 (OpReg r2hi) (OpReg rhi) ]
+   return (ChildCode64 code rlo)
+
 iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr]) = do
      fn <- getAnyReg expr
      r_dst_lo <-  getNewRegNat II32
@@ -1272,24 +1287,23 @@ getCondCode (CmmMachOp mop [x, y])
       MO_F_Lt W64 -> condFltCode LTT x y
       MO_F_Le W64 -> condFltCode LE  x y
 
-      MO_Eq _     -> condIntCode EQQ x y
-      MO_Ne _     -> condIntCode NE  x y
-
-      MO_S_Gt _   -> condIntCode GTT x y
-      MO_S_Ge _   -> condIntCode GE  x y
-      MO_S_Lt _   -> condIntCode LTT x y
-      MO_S_Le _   -> condIntCode LE  x y
-
-      MO_U_Gt _ -> condIntCode GU  x y
-      MO_U_Ge _ -> condIntCode GEU x y
-      MO_U_Lt _ -> condIntCode LU  x y
-      MO_U_Le _ -> condIntCode LEU x y
-
-      _other -> pprPanic "getCondCode(x86,x86_64)" (ppr (CmmMachOp mop [x,y]))
+      _ -> condIntCode (machOpToCond mop) x y
 
 getCondCode other = pprPanic "getCondCode(2)(x86,x86_64)" (ppr other)
 
-
+machOpToCond :: MachOp -> Cond
+machOpToCond mo = case mo of
+  MO_Eq _   -> EQQ
+  MO_Ne _   -> NE
+  MO_S_Gt _ -> GTT
+  MO_S_Ge _ -> GE
+  MO_S_Lt _ -> LTT
+  MO_S_Le _ -> LE
+  MO_U_Gt _ -> GU
+  MO_U_Ge _ -> GEU
+  MO_U_Lt _ -> LU
+  MO_U_Le _ -> LEU
+  _other -> pprPanic "machOpToCond" (pprMachOp mo)
 
 
 -- @cond(Int|Flt)Code@: Turn a boolean expression into a condition, to be
@@ -1538,7 +1552,31 @@ genCondJump
     -> CmmExpr      -- the condition on which to branch
     -> NatM InstrBlock
 
-genCondJump id bool = do
+genCondJump id expr = do
+  is32Bit <- is32BitPlatform
+  genCondJump' is32Bit id expr
+
+genCondJump' :: Bool -> BlockId -> CmmExpr -> NatM InstrBlock
+
+-- 64-bit integer comparisons on 32-bit
+genCondJump' is32Bit true (CmmMachOp mop [e1,e2])
+  | is32Bit, Just W64 <- maybeIntComparison mop = do
+  ChildCode64 code1 r1_lo <- iselExpr64 e1
+  ChildCode64 code2 r2_lo <- iselExpr64 e2
+  let r1_hi = getHiVRegFromLo r1_lo
+      r2_hi = getHiVRegFromLo r2_lo
+      cond = machOpToCond mop
+      Just cond' = maybeFlipCond cond
+  false <- getBlockIdNat
+  return $ code1 `appOL` code2 `appOL` toOL [
+    CMP II32 (OpReg r2_hi) (OpReg r1_hi),
+    JXX cond true,
+    JXX cond' false,
+    CMP II32 (OpReg r2_lo) (OpReg r1_lo),
+    JXX cond true,
+    NEWBLOCK false ]
+
+genCondJump' _ id bool = do
   CondCode is_float cond cond_code <- getCondCode bool
   use_sse2 <- sse2Enabled
   if not is_float || not use_sse2
@@ -1568,7 +1606,6 @@ genCondJump id bool = do
                   NEWBLOCK lbl
                 ]
         return (cond_code `appOL` code)
-
 
 -- -----------------------------------------------------------------------------
 --  Generating C calls

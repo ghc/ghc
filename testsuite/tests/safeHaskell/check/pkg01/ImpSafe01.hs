@@ -1,6 +1,6 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-module ImpSafe ( MyWord ) where
+module ImpSafe01 ( MyWord ) where
 
 -- While Data.Word is safe it imports trustworthy
 -- modules in base, hence base needs to be trusted.

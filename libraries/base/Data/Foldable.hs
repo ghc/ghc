@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
@@ -55,7 +56,10 @@ import Data.Monoid
 import Data.Ord
 import Data.Proxy
 
-import GHC.Arr  ( Array(..), Ix(..), elems )
+import GHC.Arr  ( Array(..), Ix(..), elems, numElements,
+                  foldlElems, foldrElems,
+                  foldlElems', foldrElems',
+                  foldl1Elems, foldr1Elems)
 import GHC.Base hiding ( foldr )
 import GHC.Num  ( Num(..) )
 
@@ -82,6 +86,29 @@ infix  4 `elem`, `notElem`
 -- >    foldr f z (Leaf x) = f x z
 -- >    foldr f z (Node l k r) = foldr f (f k (foldr f z r)) l
 --
+-- @Foldable@ instances are expected to satisfy the following laws:
+--
+-- > foldr f z t = appEndo (foldMap (Endo . f) t ) z
+--
+-- > foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
+--
+-- > fold = foldMap id
+--
+-- @sum@, @product@, @maximum@, and @minimum@ should all be essentially
+-- equivalent to @foldMap@ forms, such as
+--
+-- > sum = getSum . foldMap Sum
+--
+-- but may be less defined.
+--
+-- If the type is also a 'Functor' instance, it should satisfy
+--
+-- > foldMap f = fold . fmap f
+--
+-- which implies that
+--
+-- > foldMap f . fmap g = foldMap (f . g)
+
 class Foldable t where
     {-# MINIMAL foldMap | foldr #-}
 
@@ -98,7 +125,7 @@ class Foldable t where
     --
     -- @'foldr' f z = 'Prelude.foldr' f z . 'toList'@
     foldr :: (a -> b -> b) -> b -> t a -> b
-    foldr f z t = appEndo (foldMap (Endo . f) t) z
+    foldr f z t = appEndo (foldMap (Endo #. f) t) z
 
     -- | Right-associative fold of a structure,
     -- but with strict application of the operator.
@@ -111,6 +138,8 @@ class Foldable t where
     -- @'foldl' f z = 'Prelude.foldl' f z . 'toList'@
     foldl :: (b -> a -> b) -> b -> t a -> b
     foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
+    -- There's no point mucking around with coercions here,
+    -- because flip forces us to build a new function anyway.
 
     -- | Left-associative fold of a structure.
     -- but with strict application of the operator.
@@ -144,16 +173,20 @@ class Foldable t where
                          Nothing -> y
                          Just x  -> f x y)
 
-    -- | List of elements of a structure.
+    -- | List of elements of a structure, from left to right.
     toList :: t a -> [a]
     {-# INLINE toList #-}
     toList t = build (\ c n -> foldr c n t)
 
-    -- | Test whether the structure is empty.
+    -- | Test whether the structure is empty. The default implementation is
+    -- optimized for structures that are similar to cons-lists, because there
+    -- is no general way to do better.
     null :: t a -> Bool
     null = foldr (\_ _ -> False) True
 
-    -- | Returns the size/length of a finite structure as an 'Int'.
+    -- | Returns the size/length of a finite structure as an 'Int'.  The
+    -- default implementation is optimized for structures that are similar to
+    -- cons-lists, because there is no general way to do better.
     length :: t a -> Int
     length = foldl' (\c _ -> c+1) 0
 
@@ -162,21 +195,23 @@ class Foldable t where
     elem = any . (==)
 
     -- | The largest element of a non-empty structure.
-    maximum :: Ord a => t a -> a
-    maximum = foldr1 max
+    maximum :: forall a . Ord a => t a -> a
+    maximum = fromMaybe (error "maximum: empty structure") .
+       getMax . foldMap (Max #. (Just :: a -> Maybe a))
 
     -- | The least element of a non-empty structure.
-    minimum :: Ord a => t a -> a
-    minimum = foldr1 min
+    minimum :: forall a . Ord a => t a -> a
+    minimum = fromMaybe (error "minimum: empty structure") .
+       getMin . foldMap (Min #. (Just :: a -> Maybe a))
 
     -- | The 'sum' function computes the sum of the numbers of a structure.
     sum :: Num a => t a -> a
-    sum = getSum . foldMap Sum
+    sum = getSum #. foldMap Sum
 
     -- | The 'product' function computes the product of the numbers of a
     -- structure.
     product :: Num a => t a -> a
-    product = getProduct . foldMap Product
+    product = getProduct #. foldMap Product
 
 -- instances for Prelude types
 
@@ -209,16 +244,26 @@ instance Foldable (Either a) where
     foldr _ z (Left _) = z
     foldr f z (Right y) = f y z
 
+    length (Left _)  = 0
+    length (Right _) = 1
+
+    null             = isLeft
+
 instance Foldable ((,) a) where
     foldMap f (_, y) = f y
 
     foldr f z (_, y) = f y z
 
 instance Ix i => Foldable (Array i) where
-    foldr f z = List.foldr f z . elems
-    foldl f z = List.foldl f z . elems
-    foldr1 f = List.foldr1 f . elems
-    foldl1 f = List.foldl1 f . elems
+    foldr = foldrElems
+    foldl = foldlElems
+    foldl' = foldlElems'
+    foldr' = foldrElems'
+    foldl1 = foldl1Elems
+    foldr1 = foldr1Elems
+    toList = elems
+    length = numElements
+    null a = numElements a == 0
 
 instance Foldable Proxy where
     foldMap _ _ = mempty
@@ -230,9 +275,41 @@ instance Foldable Proxy where
     foldl _ z _ = z
     {-# INLINE foldl #-}
     foldl1 _ _ = error "foldl1: Proxy"
-    {-# INLINE foldl1 #-}
     foldr1 _ _ = error "foldr1: Proxy"
-    {-# INLINE foldr1 #-}
+    length _   = 0
+    null _     = True
+    elem _ _   = False
+    sum _      = 0
+    product _  = 1
+
+-- We don't export Max and Min because, as Edward Kmett pointed out to me,
+-- there are two reasonable ways to define them. One way is to use Maybe, as we
+-- do here; the other way is to impose a Bounded constraint on the Monoid
+-- instance. We may eventually want to add both versions, but we don't want to
+-- trample on anyone's toes by imposing Max = MaxMaybe.
+
+newtype Max a = Max {getMax :: Maybe a}
+newtype Min a = Min {getMin :: Maybe a}
+
+instance Ord a => Monoid (Max a) where
+  mempty = Max Nothing
+
+  {-# INLINE mappend #-}
+  m `mappend` Max Nothing = m
+  Max Nothing `mappend` n = n
+  (Max m@(Just x)) `mappend` (Max n@(Just y))
+    | x >= y    = Max m
+    | otherwise = Max n
+
+instance Ord a => Monoid (Min a) where
+  mempty = Min Nothing
+
+  {-# INLINE mappend #-}
+  m `mappend` Min Nothing = m
+  Min Nothing `mappend` n = n
+  (Min m@(Just x)) `mappend` (Min n@(Just y))
+    | x <= y    = Min m
+    | otherwise = Min n
 
 -- | Monadic fold over the elements of a structure,
 -- associating to the right, i.e. from right to left.
@@ -257,11 +334,13 @@ for_ :: (Foldable t, Applicative f) => t a -> (a -> f b) -> f ()
 for_ = flip traverse_
 
 -- | Map each element of a structure to a monadic action, evaluate
--- these actions from left to right, and ignore the results.
+-- these actions from left to right, and ignore the results. As of
+-- base 4.8.0.0, 'mapM_' is just 'traverse_', specialized to 'Monad'.
 mapM_ :: (Foldable t, Monad m) => (a -> m b) -> t a -> m ()
-mapM_ f = foldr ((>>) . f) (return ())
+mapM_ f= foldr ((>>) . f) (return ())
 
--- | 'forM_' is 'mapM_' with its arguments flipped.
+-- | 'forM_' is 'mapM_' with its arguments flipped. As of base
+-- 4.8.0.0, 'forM_' is just 'for_', specialized to 'Monad'.
 forM_ :: (Foldable t, Monad m) => t a -> (a -> m b) -> m ()
 {-# INLINE forM_ #-}
 forM_ = flip mapM_
@@ -272,7 +351,8 @@ sequenceA_ :: (Foldable t, Applicative f) => t (f a) -> f ()
 sequenceA_ = foldr (*>) (pure ())
 
 -- | Evaluate each monadic action in the structure from left to right,
--- and ignore the results.
+-- and ignore the results. As of base 4.8.0.0, 'sequence_' is just
+-- 'sequenceA_', specialized to 'Monad'.
 sequence_ :: (Foldable t, Monad m) => t (m a) -> m ()
 sequence_ = foldr (>>) (return ())
 
@@ -282,40 +362,43 @@ asum :: (Foldable t, Alternative f) => t (f a) -> f a
 asum = foldr (<|>) empty
 
 -- | The sum of a collection of actions, generalizing 'concat'.
+-- As of base 4.8.0.0, 'msum' is just 'asum', specialized to 'MonadPlus'.
 msum :: (Foldable t, MonadPlus m) => t (m a) -> m a
 {-# INLINE msum #-}
-msum = foldr mplus mzero
-
--- These use foldr rather than foldMap to avoid repeated concatenation.
+msum = asum
 
 -- | The concatenation of all the elements of a container of lists.
 concat :: Foldable t => t [a] -> [a]
-concat = fold
+concat xs = build (\c n -> foldr (\x y -> foldr c y x) n xs)
+{-# INLINE concat #-}
 
 -- | Map a function over all the elements of a container and concatenate
 -- the resulting lists.
 concatMap :: Foldable t => (a -> [b]) -> t a -> [b]
-concatMap = foldMap
+concatMap f xs = build (\c n -> foldr (\x b -> foldr c b (f x)) n xs)
+{-# INLINE concatMap #-}
+
+-- These use foldr rather than foldMap to avoid repeated concatenation.
 
 -- | 'and' returns the conjunction of a container of Bools.  For the
 -- result to be 'True', the container must be finite; 'False', however,
 -- results from a 'False' value finitely far from the left end.
 and :: Foldable t => t Bool -> Bool
-and = getAll . foldMap All
+and = getAll #. foldMap All
 
 -- | 'or' returns the disjunction of a container of Bools.  For the
 -- result to be 'False', the container must be finite; 'True', however,
 -- results from a 'True' value finitely far from the left end.
 or :: Foldable t => t Bool -> Bool
-or = getAny . foldMap Any
+or = getAny #. foldMap Any
 
 -- | Determines whether any element of the structure satisfies the predicate.
 any :: Foldable t => (a -> Bool) -> t a -> Bool
-any p = getAny . foldMap (Any . p)
+any p = getAny #. foldMap (Any #. p)
 
 -- | Determines whether all elements of the structure satisfy the predicate.
 all :: Foldable t => (a -> Bool) -> t a -> Bool
-all p = getAll . foldMap (All . p)
+all p = getAll #. foldMap (All #. p)
 
 -- | The largest element of a non-empty structure with respect to the
 -- given comparison function.
@@ -341,5 +424,36 @@ notElem x = not . elem x
 -- the leftmost element of the structure matching the predicate, or
 -- 'Nothing' if there is no such element.
 find :: Foldable t => (a -> Bool) -> t a -> Maybe a
-find p = listToMaybe . concatMap (\ x -> if p x then [x] else [])
+find p = getFirst . foldMap (\ x -> First (if p x then Just x else Nothing))
 
+-- See Note [Function coercion]
+(#.) :: Coercible b c => (b -> c) -> (a -> b) -> (a -> c)
+(#.) _f = coerce
+{-# INLINE (#.) #-}
+
+{-
+Note [Function coercion]
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Several functions here use (#.) instead of (.) to avoid potential efficiency
+problems relating to #7542. The problem, in a nutshell:
+
+If N is a newtype constructor, then N x will always have the same
+representation as x (something similar applies for a newtype deconstructor).
+However, if f is a function,
+
+N . f = \x -> N (f x)
+
+This looks almost the same as f, but the eta expansion lifts it--the lhs could
+be _|_, but the rhs never is. This can lead to very inefficient code.  Thus we
+steal a technique from Shachaf and Edward Kmett and adapt it to the current
+(rather clean) setting. Instead of using  N . f,  we use  N .## f, which is
+just
+
+coerce f `asTypeOf` (N . f)
+
+That is, we just *pretend* that f has the right type, and thanks to the safety
+of coerce, the type checker guarantees that nothing really goes wrong. We still
+have to be a bit careful, though: remember that #. completely ignores the
+*value* of its left operand.
+-}

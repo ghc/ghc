@@ -81,32 +81,6 @@ data State = Created
 -- | A priority search queue, with timeouts as priorities.
 type TimeoutQueue = Q.PSQ TimeoutCallback
 
-{-
-Instead of directly modifying the 'TimeoutQueue' in
-e.g. 'registerTimeout' we keep a list of edits to perform, in the form
-of a chain of function closures, and have the I/O manager thread
-perform the edits later.  This exist to address the following GC
-problem:
-
-Since e.g. 'registerTimeout' doesn't force the evaluation of the
-thunks inside the 'emTimeouts' IORef a number of thunks build up
-inside the IORef.  If the I/O manager thread doesn't evaluate these
-thunks soon enough they'll get promoted to the old generation and
-become roots for all subsequent minor GCs.
-
-When the thunks eventually get evaluated they will each create a new
-intermediate 'TimeoutQueue' that immediately becomes garbage.  Since
-the thunks serve as roots until the next major GC these intermediate
-'TimeoutQueue's will get copied unnecessarily in the next minor GC,
-increasing GC time.  This problem is known as "floating garbage".
-
-Keeping a list of edits doesn't stop this from happening but makes the
-amount of data that gets copied smaller.
-
-TODO: Evaluate the content of the IORef to WHNF on each insert once
-this bug is resolved: http://ghc.haskell.org/trac/ghc/ticket/3838
--}
-
 -- | An edit to apply to a 'TimeoutQueue'.
 type TimeoutEdit = TimeoutQueue -> TimeoutQueue
 

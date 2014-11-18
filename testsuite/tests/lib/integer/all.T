@@ -1,7 +1,8 @@
 test('integerBits', normal, compile_and_run, [''])
 test('integerConversions', normal, compile_and_run, [''])
+## 'integerGmpInternals' disabled till the extra primitives are re-implemented
 # skip ghci as it doesn't support unboxed tuples
-test('integerGmpInternals', [reqlib('integer-gmp'), omit_ways('ghci')], compile_and_run, [''])
+# test('integerGmpInternals', [reqlib('integer-gmp'), omit_ways('ghci')], compile_and_run, [''])
 test('integerConstantFolding',
      [ extra_clean(['integerConstantFolding.simpl'])
      , when(compiler_debugged(), expect_broken(8525))],

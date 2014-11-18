@@ -1,35 +1,35 @@
-{-# LANGUAGE FlexibleInstances, MagicHash #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- | Monadic front-end to Text.PrettyPrint
 
 module Language.Haskell.TH.PprLib (
 
-	-- * The document type
+        -- * The document type
         Doc,            -- Abstract, instance of Show
         PprM,
 
-	-- * Primitive Documents
+        -- * Primitive Documents
         empty,
         semi, comma, colon, space, equals, arrow,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace,
 
-	-- * Converting values into documents
+        -- * Converting values into documents
         text, char, ptext,
         int, integer, float, double, rational,
 
-	-- * Wrapping documents in delimiters
+        -- * Wrapping documents in delimiters
         parens, brackets, braces, quotes, doubleQuotes,
 
-	-- * Combining documents
+        -- * Combining documents
         (<>), (<+>), hcat, hsep, 
         ($$), ($+$), vcat, 
         sep, cat, 
         fsep, fcat, 
-	nest,
+        nest,
         hang, punctuate,
         
-	-- * Predicates on documents
-	isEmpty,
+        -- * Predicates on documents
+        isEmpty,
 
     to_HPJ_Doc, pprName, pprName'
   ) where
@@ -41,7 +41,6 @@ import qualified Text.PrettyPrint as HPJ
 import Control.Monad (liftM, liftM2, ap)
 import Language.Haskell.TH.Lib.Map ( Map )
 import qualified Language.Haskell.TH.Lib.Map as Map ( lookup, insert, empty )
-import GHC.Base (Int(..))
 
 infixl 6 <> 
 infixl 6 <+>
@@ -57,23 +56,23 @@ instance Show Doc where
 
 isEmpty :: Doc    -> PprM Bool;  -- ^ Returns 'True' if the document is empty
 
-empty   :: Doc;			-- ^ An empty document
-semi	:: Doc;			-- ^ A ';' character
-comma	:: Doc;			-- ^ A ',' character
-colon	:: Doc;			-- ^ A ':' character
-space	:: Doc;			-- ^ A space character
-equals	:: Doc;			-- ^ A '=' character
-arrow	:: Doc;			-- ^ A "->" string
-lparen	:: Doc;			-- ^ A '(' character
-rparen	:: Doc;			-- ^ A ')' character
-lbrack	:: Doc;			-- ^ A '[' character
-rbrack	:: Doc;			-- ^ A ']' character
-lbrace	:: Doc;			-- ^ A '{' character
-rbrace	:: Doc;			-- ^ A '}' character
+empty   :: Doc;                 -- ^ An empty document
+semi    :: Doc;                 -- ^ A ';' character
+comma   :: Doc;                 -- ^ A ',' character
+colon   :: Doc;                 -- ^ A ':' character
+space   :: Doc;                 -- ^ A space character
+equals  :: Doc;                 -- ^ A '=' character
+arrow   :: Doc;                 -- ^ A "->" string
+lparen  :: Doc;                 -- ^ A '(' character
+rparen  :: Doc;                 -- ^ A ')' character
+lbrack  :: Doc;                 -- ^ A '[' character
+rbrack  :: Doc;                 -- ^ A ']' character
+lbrace  :: Doc;                 -- ^ A '{' character
+rbrace  :: Doc;                 -- ^ A '}' character
 
-text	 :: String   -> Doc
-ptext	 :: String   -> Doc
-char 	 :: Char     -> Doc
+text     :: String   -> Doc
+ptext    :: String   -> Doc
+char     :: Char     -> Doc
 int      :: Int      -> Doc
 integer  :: Integer  -> Doc
 float    :: Float    -> Doc
@@ -81,11 +80,11 @@ double   :: Double   -> Doc
 rational :: Rational -> Doc
 
 
-parens       :: Doc -> Doc; 	-- ^ Wrap document in @(...)@
-brackets     :: Doc -> Doc;  	-- ^ Wrap document in @[...]@
-braces	     :: Doc -> Doc;   	-- ^ Wrap document in @{...}@
-quotes	     :: Doc -> Doc;	-- ^ Wrap document in @\'...\'@
-doubleQuotes :: Doc -> Doc;	-- ^ Wrap document in @\"...\"@
+parens       :: Doc -> Doc;     -- ^ Wrap document in @(...)@
+brackets     :: Doc -> Doc;     -- ^ Wrap document in @[...]@
+braces       :: Doc -> Doc;     -- ^ Wrap document in @{...}@
+quotes       :: Doc -> Doc;     -- ^ Wrap document in @\'...\'@
+doubleQuotes :: Doc -> Doc;     -- ^ Wrap document in @\"...\"@
 
 -- Combining @Doc@ values
 
@@ -96,7 +95,7 @@ hsep   :: [Doc] -> Doc;          -- ^List version of '<+>'
 
 ($$)   :: Doc -> Doc -> Doc;     -- ^Above; if there is no
                                 -- overlap it \"dovetails\" the two
-($+$)   :: Doc -> Doc -> Doc;	 -- ^Above, without dovetailing.
+($+$)   :: Doc -> Doc -> Doc;    -- ^Above, without dovetailing.
 vcat   :: [Doc] -> Doc;          -- ^List version of '$$'
 
 cat    :: [Doc] -> Doc;          -- ^ Either hcat or vcat
@@ -109,7 +108,7 @@ nest   :: Int -> Doc -> Doc;     -- ^ Nested
 
 -- GHC-specific ones.
 
-hang :: Doc -> Int -> Doc -> Doc;	-- ^ @hang d1 n d2 = sep [d1, nest n d2]@
+hang :: Doc -> Int -> Doc -> Doc;       -- ^ @hang d1 n d2 = sep [d1, nest n d2]@
 punctuate :: Doc -> [Doc] -> [Doc];      -- ^ @punctuate p [d1, ... dn] = [d1 \<> p, d2 \<> p, ... dn-1 \<> p, dn]@
 
 
@@ -124,10 +123,10 @@ pprName = pprName' Alone
 
 pprName' :: NameIs -> Name -> Doc
 pprName' ni n@(Name o (NameU _))
- = PprM $ \s@(fm, i@(I# i'))
+ = PprM $ \s@(fm, i)
         -> let (n', s') = case Map.lookup n fm of
                          Just d -> (d, s)
-                         Nothing -> let n'' = Name o (NameU i')
+                         Nothing -> let n'' = Name o (NameU i)
                                     in (n'', (Map.insert n n'' fm, i + 1))
            in (HPJ.text $ showName' ni n', s')
 pprName' ni n = text $ showName' ni n
@@ -141,7 +140,7 @@ instance Show Name where
 data Name = Name OccName NameFlavour
 
 data NameFlavour
-  | NameU Int#			-- A unique local name
+  | NameU Int#                  -- A unique local name
 -}
 
 to_HPJ_Doc :: Doc -> HPJ.Doc

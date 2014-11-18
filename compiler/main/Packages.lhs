@@ -35,7 +35,6 @@ module Packages (
 
         collectIncludeDirs, collectLibraryPaths, collectLinkOpts,
         packageHsLibs,
-        ModuleExport(..),
 
         -- * Utils
         packageKeyPackageIdString,
@@ -211,17 +210,6 @@ originEmpty :: ModuleOrigin -> Bool
 originEmpty (ModOrigin Nothing [] [] False) = True
 originEmpty _ = False
 
--- | When we do a plain lookup (e.g. for an import), initially, all we want
--- to know is if we can find it or not (and if we do and it's a reexport,
--- what the real name is).  If the find fails, we'll want to investigate more
--- to give a good error message.
-data SimpleModuleConf =
-    SModConf Module PackageConfig ModuleOrigin
-  | SModConfAmbiguous
-
--- | 'UniqFM' map from 'ModuleName'
-type ModuleNameMap = UniqFM
-
 -- | 'UniqFM' map from 'PackageKey'
 type PackageKeyMap = UniqFM
 
@@ -252,10 +240,6 @@ data PackageState = PackageState {
   -- should be in reverse dependency order; that is, a package
   -- is always mentioned before the packages it depends on.
   preloadPackages      :: [PackageKey],
-
-  -- | This is a simplified map from 'ModuleName' to original 'Module' and
-  -- package configuration providing it.
-  moduleToPkgConf       :: ModuleNameMap SimpleModuleConf,
 
   -- | This is a full map from 'ModuleName' to all modules which may possibly
   -- be providing it.  These providers may be hidden (but we'll still want
@@ -997,7 +981,6 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   let pstate = PackageState{
     preloadPackages     = dep_preload,
     pkgIdMap            = pkg_db,
-    moduleToPkgConf     = mkModuleToPkgConf dflags pkg_db ipid_map vis_map,
     moduleToPkgConfAll  = mkModuleToPkgConfAll dflags pkg_db ipid_map vis_map,
     installedPackageIdMap = ipid_map
     }
@@ -1047,16 +1030,17 @@ mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
                             ppr orig <+> text "in package" <+> ppr pk)))
 
     es :: Bool -> [(ModuleName, e)]
-    es e =
-     [(m, sing pk  m  pkg  (fromExposedModules e)) | m <- exposed_mods] ++
-     [(m, sing pk' m' pkg' (fromReexportedModules e pkg))
-     | ModuleExport {
-         exportModuleName         = m,
-         exportOriginalPackageId  = ipid',
-         exportOriginalModuleName = m'
-       } <- reexported_mods
-     , let pk' = expectJust "mkModuleToPkgConf" (Map.lookup ipid' ipid_map)
-           pkg' = pkg_lookup pk' ]
+    es e = do
+     -- TODO: signature support
+     ExposedModule m exposedReexport _exposedSignature <- exposed_mods
+     let (pk', m', pkg', origin') =
+          case exposedReexport of
+           Nothing -> (pk, m, pkg, fromExposedModules e)
+           Just (OriginalModule ipid' m') ->
+            let pk' = expectJust "mkModuleToPkgConf" (Map.lookup ipid' ipid_map)
+                pkg' = pkg_lookup pk'
+            in (pk', m', pkg', fromReexportedModules e pkg')
+     return (m, sing pk' m' pkg' origin')
 
     esmap :: UniqFM e
     esmap = listToUFM (es False) -- parameter here doesn't matter, orig will
@@ -1068,31 +1052,7 @@ mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
     pkg_lookup = expectJust "mkModuleToPkgConf" . lookupPackage' pkg_db
 
     exposed_mods = exposedModules pkg
-    reexported_mods = reexportedModules pkg
     hidden_mods = hiddenModules pkg
-
--- | This is a quick and efficient module map, which only contains an entry
--- if it is specified unambiguously.
-mkModuleToPkgConf
-  :: DynFlags
-  -> PackageConfigMap
-  -> InstalledPackageIdMap
-  -> VisibilityMap
-  -> ModuleNameMap SimpleModuleConf
-mkModuleToPkgConf =
-  mkModuleToPkgConfGeneric emptyMap sing setOrigins addListTo
-    where emptyMap = emptyUFM
-          sing pk m pkg = SModConf (mkModule pk m) pkg
-          -- NB: don't put hidden entries in the map, they're not valid!
-          addListTo m xs = addListToUFM_C merge m (filter isVisible xs)
-          isVisible (_, SModConf _ _ o) = originVisible o
-          isVisible (_, SModConfAmbiguous) = False
-          merge (SModConf m pkg o) (SModConf m' _ o')
-              | m == m' = SModConf m pkg (o `mappend` o')
-              | otherwise = SModConfAmbiguous
-          merge _ _ = SModConfAmbiguous
-          setOrigins (SModConf m pkg _) os = SModConf m pkg os
-          setOrigins SModConfAmbiguous _ = SModConfAmbiguous
 
 -- | This is a slow and complete map, which includes information about
 -- everything, including hidden modules
@@ -1241,17 +1201,11 @@ lookupModuleWithSuggestions :: DynFlags
                             -> Maybe FastString
                             -> LookupResult
 lookupModuleWithSuggestions dflags m mb_pn
-  = case lookupUFM (moduleToPkgConf pkg_state) m of
-     Just (SModConf m pkg o) | matches mb_pn pkg o ->
-        ASSERT( originVisible o ) LookupFound m pkg
-     _ -> case Map.lookup m (moduleToPkgConfAll pkg_state) of
+  = case Map.lookup m (moduleToPkgConfAll pkg_state) of
         Nothing -> LookupNotFound suggestions
         Just xs ->
           case foldl' classify ([],[],[]) (Map.toList xs) of
             ([], [], []) -> LookupNotFound suggestions
-            -- NB: Yes, we have to check this case too, since package qualified
-            -- imports could cause the main lookup to fail due to ambiguity,
-            -- but the second lookup to succeed.
             (_, _, [(m, _)])             -> LookupFound m (mod_pkg m)
             (_, _, exposed@(_:_))        -> LookupMultiple exposed
             (hidden_pkg, hidden_mod, []) -> LookupHidden hidden_pkg hidden_mod
@@ -1268,9 +1222,6 @@ lookupModuleWithSuggestions dflags m mb_pn
     pkg_lookup = expectJust "lookupModuleWithSuggestions" . lookupPackage dflags
     pkg_state = pkgState dflags
     mod_pkg = pkg_lookup . modulePackageKey
-
-    matches Nothing _ _ = True -- shortcut for efficiency
-    matches mb_pn pkg o = originVisible (filterOrigin mb_pn pkg o)
 
     -- Filters out origins which are not associated with the given package
     -- qualifier.  No-op if there is no package qualifier.  Test if this

@@ -357,6 +357,7 @@ basicKnownKeyNames
         , ghciIoClassName, ghciStepIoMName
     ] ++ case cIntegerLibraryType of
            IntegerGMP    -> [integerSDataConName]
+           IntegerGMP2   -> [integerSDataConName]
            IntegerSimple -> []
 
 genericTyConNames :: [Name]
@@ -937,6 +938,7 @@ integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           int
 integerSDataConName   = conName gHC_INTEGER_TYPE (fsLit n)                   integerSDataConKey
   where n = case cIntegerLibraryType of
             IntegerGMP    -> "S#"
+            IntegerGMP2   -> "S#"
             IntegerSimple -> panic "integerSDataConName evaluated for integer-simple"
 mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
 integerToWord64Name   = varQual gHC_INTEGER_TYPE (fsLit "integerToWord64")   integerToWord64IdKey

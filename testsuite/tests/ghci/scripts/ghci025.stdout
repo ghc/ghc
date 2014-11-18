@@ -56,9 +56,9 @@ Prelude.length ::
   Data.Foldable.Foldable t => forall a. t a -> GHC.Types.Int
 -- imported via T
 data T.Integer
-  = integer-gmp-0.5.1.0:GHC.Integer.Type.S# GHC.Prim.Int#
-  | integer-gmp-0.5.1.0:GHC.Integer.Type.J# GHC.Prim.Int#
-                                            GHC.Prim.ByteArray#
+  = integer-gmp-1.0.0.0:GHC.Integer.Type.S# !GHC.Prim.Int#
+  | integer-gmp-1.0.0.0:GHC.Integer.Type.Jp# {-# UNPACK #-}integer-gmp-1.0.0.0:GHC.Integer.Type.BigNat
+  | integer-gmp-1.0.0.0:GHC.Integer.Type.Jn# {-# UNPACK #-}integer-gmp-1.0.0.0:GHC.Integer.Type.BigNat
 T.length :: Data.ByteString.Internal.ByteString -> GHC.Types.Int
 :browse! T
 -- defined locally

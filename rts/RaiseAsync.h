@@ -28,6 +28,10 @@ void throwToSingleThreaded_ (Capability *cap,
                              StgClosure *exception,
                              rtsBool stop_at_atomically);
 
+void throwToSelf (Capability *cap,
+                  StgTSO *tso,
+                  StgClosure *exception);
+
 void suspendComputation (Capability *cap,
                          StgTSO *tso,
                          StgUpdateFrame *stop_here);

@@ -148,7 +148,11 @@ import qualified Language.Haskell.TH as TH
 The monad itself has to be defined here, because it is mentioned by ErrCtxt
 
 \begin{code}
+-- | Type alias for 'IORef'; the convention is we'll use this for mutable
+-- bits of data in 'TcGblEnv' which are updated during typechecking and
+-- returned at the end.
 type TcRef a     = IORef a
+-- ToDo: when should I refer to it as a 'TcId' instead of an 'Id'?
 type TcId        = Id
 type TcIdSet     = IdSet
 
@@ -158,9 +162,19 @@ type IfM lcl  = TcRnIf IfGblEnv lcl         -- Iface stuff
 
 type IfG  = IfM ()                          -- Top level
 type IfL  = IfM IfLclEnv                    -- Nested
+
+-- | Type-checking and renaming monad: the main monad that most type-checking
+-- takes place in.  The global environment is 'TcGblEnv', which tracks
+-- all of the top-level type-checking information we've accumulated while
+-- checking a module, while the local environment is 'TcLclEnv', which
+-- tracks local information as we move inside expressions.
 type TcRn = TcRnIf TcGblEnv TcLclEnv
-type RnM  = TcRn            -- Historical
-type TcM  = TcRn            -- Historical
+
+-- | Historical "renaming monad" (now it's just 'TcRn').
+type RnM  = TcRn
+
+-- | Historical "type-checking monad" (now it's just 'TcRn').
+type TcM  = TcRn
 \end{code}
 
 Representation of type bindings to uninstantiated meta variables used during
@@ -208,12 +222,11 @@ instance ContainsDynFlags (Env gbl lcl) where
 instance ContainsModule gbl => ContainsModule (Env gbl lcl) where
     extractModule env = extractModule (env_gbl env)
 
--- TcGblEnv describes the top-level of the module at the
+-- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
 -- It is this structure that is handed on to the desugarer
 -- For state that needs to be updated during the typechecking
--- phase and returned at end, use a TcRef (= IORef).
-
+-- phase and returned at end, use a 'TcRef' (= 'IORef').
 data TcGblEnv
   = TcGblEnv {
         tcg_mod     :: Module,         -- ^ Module being compiled
@@ -502,8 +515,8 @@ data IfLclEnv
 %*                                                                      *
 %************************************************************************
 
-The Global-Env/Local-Env story
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [The Global-Env/Local-Env story]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 During type checking, we keep in the tcg_type_env
         * All types and classes
         * All Ids derived from types and classes (constructors, selectors)

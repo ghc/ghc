@@ -1251,6 +1251,9 @@ mkIfLclEnv mod loc = IfLclEnv { if_mod     = mod,
                                 if_tv_env  = emptyUFM,
                                 if_id_env  = emptyUFM }
 
+-- | Run an 'IfG' (top-level interface monad) computation inside an existing
+-- 'TcRn' (typecheck-renaming monad) computation by initializing an 'IfGblEnv'
+-- based on 'TcGblEnv'.
 initIfaceTcRn :: IfG a -> TcRn a
 initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv

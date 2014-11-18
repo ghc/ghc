@@ -14,7 +14,8 @@ module TcIface (
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceVectInfo, tcIfaceAnnotations,
         tcIfaceExpr,    -- Desired by HERMIT (Trac #7683)
-        tcIfaceGlobal
+        tcIfaceGlobal,
+        mkPatSynWrapperId, mkPatSynWorkerId -- Have to be here to avoid circular import
  ) where
 
 #include "HsVersions.h"
@@ -27,7 +28,8 @@ import BuildTyCl
 import TcRnMonad
 import TcType
 import Type
-import Coercion
+import TcMType
+import Coercion hiding (substTy)
 import TypeRep
 import HscTypes
 import Annotations
@@ -37,7 +39,7 @@ import CoreSyn
 import CoreUtils
 import CoreUnfold
 import CoreLint
-import MkCore                       ( castBottomExpr )
+import MkCore
 import Id
 import MkId
 import IdInfo
@@ -75,6 +77,7 @@ import qualified Data.Map as Map
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable ( traverse )
 #endif
+import Data.Traversable ( for )
 \end{code}
 
 This module takes
@@ -181,9 +184,9 @@ We need to make sure that we have at least *read* the interface files
 for any module with an instance decl or RULE that we might want.
 
 * If the instance decl is an orphan, we have a whole separate mechanism
-  (loadOprhanModules)
+  (loadOrphanModules)
 
-* If the instance decl not an orphan, then the act of looking at the
+* If the instance decl is not an orphan, then the act of looking at the
   TyCon or Class will force in the defining module for the
   TyCon/Class, and hence the instance decl
 
@@ -582,7 +585,7 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
 
 tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
                               , ifPatMatcher = matcher_name
-                              , ifPatWrapper = wrapper_name
+                              , ifPatWorker = worker_name
                               , ifPatIsInfix = is_infix
                               , ifPatUnivTvs = univ_tvs
                               , ifPatExTvs = ex_tvs
@@ -593,10 +596,7 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
   = do { name <- lookupIfaceTop occ_name
        ; traceIf (ptext (sLit "tc_iface_decl") <+> ppr name)
        ; matcher <- tcExt "Matcher" matcher_name
-       ; wrapper <- case wrapper_name of
-                        Nothing -> return Nothing
-                        Just wn -> do { wid <- tcExt "Wrapper" wn
-                                      ; return (Just wid) }
+       ; worker <- traverse (tcExt "Worker") worker_name
        ; bindIfaceTyVars univ_tvs $ \univ_tvs -> do
        { bindIfaceTyVars ex_tvs $ \ex_tvs -> do
        { patsyn <- forkM (mk_doc name) $
@@ -604,6 +604,14 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
                 ; req_theta  <- tcIfaceCtxt req_ctxt
                 ; pat_ty     <- tcIfaceType pat_ty
                 ; arg_tys    <- mapM tcIfaceType args
+                ; wrapper    <- for worker $ \worker_id -> do
+                    { wrapper_id <- mkPatSynWrapperId (noLoc name)
+                                      (univ_tvs ++ ex_tvs)
+                                      (req_theta ++ prov_theta)
+                                      arg_tys pat_ty
+                                      worker_id
+                    ; return (wrapper_id, worker_id)
+                    }
                 ; return $ buildPatSyn name is_infix matcher wrapper
                                        (univ_tvs, req_theta) (ex_tvs, prov_theta)
                                        arg_tys pat_ty }
@@ -1519,4 +1527,42 @@ bindIfaceTyVars_AT (b@(tv_occ,_) : bs) thing_inside
        ; bind_b $ \b' ->
          bindIfaceTyVars_AT bs $ \bs' ->
          thing_inside (b':bs') }
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+                PatSyn wrapper/worker helpers
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+-- These are here (and not in TcPatSyn) just to avoid circular imports.
+
+mkPatSynWrapperId :: Located Name
+                  -> [TyVar] -> ThetaType -> [Type] -> Type
+                  -> Id
+                  -> TcRnIf gbl lcl Id
+mkPatSynWrapperId name qtvs theta arg_tys pat_ty worker_id
+  | need_dummy_arg = do
+      { wrapper_id <- mkPatSynWorkerId name mkDataConWrapperOcc qtvs theta arg_tys pat_ty
+      ; let unfolding = mkCoreApp (Var worker_id) (Var voidPrimId)
+            wrapper_id' = setIdUnfolding wrapper_id $ mkCompulsoryUnfolding unfolding
+      ; return wrapper_id' }
+  | otherwise = return worker_id -- No indirection needed
+  where
+    need_dummy_arg = null arg_tys && isUnLiftedType pat_ty
+
+mkPatSynWorkerId :: Located Name -> (OccName -> OccName)
+                 -> [TyVar] -> ThetaType -> [Type] -> Type
+                 -> TcRnIf gbl loc Id
+mkPatSynWorkerId (L loc name) mk_occ_name qtvs theta arg_tys pat_ty
+  = do { worker_name <- newImplicitBinder name mk_occ_name
+       ; (subst, worker_tvs) <- tcInstSigTyVarsLoc loc qtvs
+       ; let worker_theta = substTheta subst theta
+             pat_ty' = substTy subst pat_ty
+             arg_tys' = map (substTy subst) arg_tys
+             worker_tau = mkFunTys arg_tys' pat_ty'
+             -- TODO: just substitute worker_sigma...
+             worker_sigma = mkSigmaTy worker_tvs worker_theta worker_tau
+       ; return $ mkVanillaGlobal worker_name worker_sigma }
 \end{code}

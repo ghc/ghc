@@ -124,15 +124,8 @@ tcInferRho expr = addErrCtxt (exprCtxt expr) (tcInferRhoNC expr)
 
 tcInferRhoNC (L loc expr)
   = setSrcSpan loc $
-    do { (expr', rho) <- tcInfExpr expr
+    do { (expr', rho) <- tcInfer (tcExpr expr)
        ; return (L loc expr', rho) }
-
-tcInfExpr :: HsExpr Name -> TcM (HsExpr TcId, TcRhoType)
-tcInfExpr (HsVar f)     = tcInferId f
-tcInfExpr (HsPar e)     = do { (e', ty) <- tcInferRhoNC e
-                             ; return (HsPar e', ty) }
-tcInfExpr (HsApp e1 e2) = tcInferApp e1 [e2]
-tcInfExpr e             = tcInfer (tcExpr e)
 
 tcHole :: OccName -> TcRhoType -> TcM (HsExpr TcId)
 tcHole occ res_ty
@@ -326,13 +319,15 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
        -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
        --    (which gives a seg fault)
        -- We do this by unifying with a MetaTv; but of course
-       -- it must allow foralls in the type it unifies with (hence PolyTv)!
+       -- it must allow foralls in the type it unifies with (hence ReturnTv)!
        --
        -- The result type can have any kind (Trac #8739),
        -- so we can just use res_ty
 
        -- ($) :: forall (a:*) (b:Open). (a->b) -> a -> b
-       ; a_ty <- newPolyFlexiTyVarTy
+       ; a_tv <- newReturnTyVar liftedTypeKind
+       ; let a_ty = mkTyVarTy a_tv
+
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
 
        ; co_a   <- unifyType arg2_ty   a_ty      -- arg2 ~ a
@@ -935,23 +930,6 @@ tcApp fun args res_ty
 mk_app_msg :: LHsExpr Name -> SDoc
 mk_app_msg fun = sep [ ptext (sLit "The function") <+> quotes (ppr fun)
                      , ptext (sLit "is applied to")]
-
-----------------
-tcInferApp :: LHsExpr Name -> [LHsExpr Name] -- Function and args
-           -> TcM (HsExpr TcId, TcRhoType) -- Translated fun and args
-
-tcInferApp (L _ (HsPar e))     args = tcInferApp e args
-tcInferApp (L _ (HsApp e1 e2)) args = tcInferApp e1 (e2:args)
-tcInferApp fun args
-  = -- Very like the tcApp version, except that there is
-    -- no expected result type passed in
-    do  { (fun1, fun_tau) <- tcInferFun fun
-        ; (co_fun, expected_arg_tys, actual_res_ty)
-              <- matchExpectedFunTys (mk_app_msg fun) (length args) fun_tau
-        ; args1 <- tcArgs fun args expected_arg_tys
-        ; let fun2 = mkLHsWrapCo co_fun fun1
-              app  = foldl mkHsApp fun2 args1
-        ; return (unLoc app, actual_res_ty) }
 
 ----------------
 tcInferFun :: LHsExpr Name -> TcM (LHsExpr TcId, TcRhoType)

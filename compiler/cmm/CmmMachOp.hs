@@ -3,7 +3,7 @@
 module CmmMachOp
     ( MachOp(..)
     , pprMachOp, isCommutableMachOp, isAssociativeMachOp
-    , isComparisonMachOp, machOpResultType
+    , isComparisonMachOp, maybeIntComparison, machOpResultType
     , machOpArgReps, maybeInvertComparison
 
     -- MachOp builders
@@ -11,9 +11,11 @@ module CmmMachOp
     , mo_wordSRem, mo_wordSNeg, mo_wordUQuot, mo_wordURem
     , mo_wordSGe, mo_wordSLe, mo_wordSGt, mo_wordSLt, mo_wordUGe
     , mo_wordULe, mo_wordUGt, mo_wordULt
-    , mo_wordAnd, mo_wordOr, mo_wordXor, mo_wordNot, mo_wordShl, mo_wordSShr, mo_wordUShr
+    , mo_wordAnd, mo_wordOr, mo_wordXor, mo_wordNot
+    , mo_wordShl, mo_wordSShr, mo_wordUShr
     , mo_u_8To32, mo_s_8To32, mo_u_16To32, mo_s_16To32
-    , mo_u_8ToWord, mo_s_8ToWord, mo_u_16ToWord, mo_s_16ToWord, mo_u_32ToWord, mo_s_32ToWord
+    , mo_u_8ToWord, mo_s_8ToWord, mo_u_16ToWord, mo_s_16ToWord
+    , mo_u_32ToWord, mo_s_32ToWord
     , mo_32To8, mo_32To16, mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
 
     -- CallishMachOp
@@ -260,6 +262,7 @@ isAssociativeMachOp mop =
         MO_Xor {} -> True
         _other    -> False
 
+
 -- ----------------------------------------------------------------------------
 -- isComparisonMachOp
 
@@ -289,6 +292,25 @@ isComparisonMachOp mop =
     MO_F_Gt {} -> True
     MO_F_Lt {} -> True
     _other     -> False
+
+{- |
+Returns @Just w@ if the operation is an integer comparison with width
+@w@, or @Nothing@ otherwise.
+-}
+maybeIntComparison :: MachOp -> Maybe Width
+maybeIntComparison mop =
+  case mop of
+    MO_Eq   w  -> Just w
+    MO_Ne   w  -> Just w
+    MO_S_Ge w  -> Just w
+    MO_S_Le w  -> Just w
+    MO_S_Gt w  -> Just w
+    MO_S_Lt w  -> Just w
+    MO_U_Ge w  -> Just w
+    MO_U_Le w  -> Just w
+    MO_U_Gt w  -> Just w
+    MO_U_Lt w  -> Just w
+    _ -> Nothing
 
 -- -----------------------------------------------------------------------------
 -- Inverting conditions

@@ -225,8 +225,32 @@ class Monoid a where
         mconcat = foldr mappend mempty
 
 instance Monoid [a] where
+        {-# INLINE mempty #-}
         mempty  = []
+        {-# INLINE mappend #-}
         mappend = (++)
+        {-# INLINE mconcat #-}
+        mconcat xss = [x | xs <- xss, x <- xs]
+-- See Note: [List comprehensions and inlining]
+
+{-
+Note: [List comprehensions and inlining]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The list monad operations are traditionally described in terms of concatMap:
+
+xs >>= f = concatMap f xs
+
+Similarly, mconcat for lists is just concat. Here in Base, however, we don't
+have concatMap, and we'll refrain from adding it here so it won't have to be
+hidden in imports. Instead, we use GHC's list comprehension desugaring
+mechanism to define mconcat and the Applicative and Monad instances for lists.
+We mark them INLINE because the inliner is not generally too keen to inline
+build forms such as the ones these desugar to without our insistence.  Defining
+these using list comprehensions instead of foldr has an additional potential
+benefit, as described in compiler/deSugar/DsListComp.lhs: if optimizations
+needed to make foldr/build forms efficient are turned off, we'll get reasonably
+efficient translations anyway.
+-}
 
 instance Monoid b => Monoid (a -> b) where
         mempty _ = mempty
@@ -494,14 +518,32 @@ when p s  = if p then s else pure ()
 -- and collect the results.
 sequence :: Monad m => [m a] -> m [a]
 {-# INLINE sequence #-}
-sequence ms = foldr k (return []) ms
-            where
-              k m m' = do { x <- m; xs <- m'; return (x:xs) }
+sequence = mapM id
+-- Note: [sequence and mapM]
 
 -- | @'mapM' f@ is equivalent to @'sequence' . 'map' f@.
 mapM :: Monad m => (a -> m b) -> [a] -> m [b]
 {-# INLINE mapM #-}
-mapM f as       =  sequence (map f as)
+mapM f as = foldr k (return []) as
+            where
+              k a r = do { x <- f a; xs <- r; return (x:xs) }
+
+{-
+Note: [sequence and mapM]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Originally, we defined
+
+mapM f = sequence . map f
+
+This relied on list fusion to produce efficient code for mapM, and led to
+excessive allocation in cryptarithm2. Defining
+
+sequence = mapM id
+
+relies only on inlining a tiny function (id) and beta reduction, which tends to
+be a more reliable aspect of simplification. Indeed, this does not lead to
+similar problems in nofib.
+-}
 
 -- | Promote a function to a monad.
 liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
@@ -667,16 +709,27 @@ instance MonadPlus Maybe
 -- The list type
 
 instance Functor [] where
+    {-# INLINE fmap #-}
     fmap = map
 
+-- See Note: [List comprehensions and inlining]
 instance Applicative [] where
-    pure = return
-    (<*>) = ap
+    {-# INLINE pure #-}
+    pure x    = [x]
+    {-# INLINE (<*>) #-}
+    fs <*> xs = [f x | f <- fs, x <- xs]
+    {-# INLINE (*>) #-}
+    xs *> ys  = [y | _ <- xs, y <- ys]
 
-instance  Monad []  where
-    m >>= k             = foldr ((++) . k) [] m
-    m >> k              = foldr ((++) . (\ _ -> k)) [] m
+-- See Note: [List comprehensions and inlining]
+instance Monad []  where
+    {-# INLINE (>>=) #-}
+    xs >>= f             = [y | x <- xs, y <- f x]
+    {-# INLINE (>>) #-}
+    (>>) = (*>)
+    {-# INLINE return #-}
     return x            = [x]
+    {-# INLINE fail #-}
     fail _              = []
 
 instance Alternative [] where
@@ -827,9 +880,8 @@ mapFB c f = \x ys -> c (f x) ys
 "mapFB"     forall c f g.       mapFB (mapFB c f) g     = mapFB c (f.g)
   #-}
 
--- There's also a rule for Map and Data.Coerce. See "Safe Coercions",
--- section 6.4:
---
+-- See Breitner, Eisenberg, Peyton Jones, and Weirich, "Safe Zero-cost
+-- Coercions for Haskell", section 6.5:
 --   http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf
 
 {-# RULES "map/coerce" [1] map coerce = coerce #-}
@@ -977,7 +1029,10 @@ flip f x y              =  f y x
 ($)                     :: (a -> b) -> a -> b
 f $ x                   =  f x
 
--- | Strict (call-by-value) application, defined in terms of 'seq'.
+-- | Strict (call-by-value) application operator. It takes a function and an
+-- argument, evaluates the argument to weak head normal form (WHNF), then calls
+-- the function with that value.
+
 ($!)                    :: (a -> b) -> a -> b
 f $! x                  = let !vx = x in f vx  -- see #2273
 

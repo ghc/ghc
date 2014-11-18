@@ -137,26 +137,26 @@ repTopDs group@(HsGroup { hs_valds   = valds
         -- only "T", not "Foo:T" where Foo is the current module
 
         decls <- addBinds ss (
-                  do { val_ds  <- rep_val_binds valds
-                     ; _       <- mapM no_splice splcds
-                     ; tycl_ds <- mapM repTyClD (tyClGroupConcat tyclds)
-                     ; role_ds <- mapM repRoleD (concatMap group_roles tyclds)
-                     ; inst_ds <- mapM repInstD instds
-                     ; _       <- mapM no_standalone_deriv derivds
-                     ; fix_ds  <- mapM repFixD fixds
-                     ; _       <- mapM no_default_decl defds
-                     ; for_ds  <- mapM repForD fords
-                     ; _       <- mapM no_warn warnds
-                     ; ann_ds  <- mapM repAnnD annds
-                     ; rule_ds <- mapM repRuleD ruleds
-                     ; _       <- mapM no_vect vects
-                     ; _       <- mapM no_doc docs
+                  do { val_ds   <- rep_val_binds valds
+                     ; _        <- mapM no_splice splcds
+                     ; tycl_ds  <- mapM repTyClD (tyClGroupConcat tyclds)
+                     ; role_ds  <- mapM repRoleD (concatMap group_roles tyclds)
+                     ; inst_ds  <- mapM repInstD instds
+                     ; deriv_ds <- mapM repStandaloneDerivD derivds
+                     ; fix_ds   <- mapM repFixD fixds
+                     ; _        <- mapM no_default_decl defds
+                     ; for_ds   <- mapM repForD fords
+                     ; _        <- mapM no_warn warnds
+                     ; ann_ds   <- mapM repAnnD annds
+                     ; rule_ds  <- mapM repRuleD ruleds
+                     ; _        <- mapM no_vect vects
+                     ; _        <- mapM no_doc docs
 
                         -- more needed
                      ;  return (de_loc $ sort_by_loc $
                                 val_ds ++ catMaybes tycl_ds ++ role_ds ++ fix_ds
                                        ++ inst_ds ++ rule_ds ++ for_ds
-                                       ++ ann_ds) }) ;
+                                       ++ ann_ds ++ deriv_ds) }) ;
 
         decl_ty <- lookupType decQTyConName ;
         let { core_list = coreList' decl_ty decls } ;
@@ -169,8 +169,6 @@ repTopDs group@(HsGroup { hs_valds   = valds
   where
     no_splice (L loc _)
       = notHandledL loc "Splices within declaration brackets" empty
-    no_standalone_deriv (L loc (DerivDecl { deriv_type = deriv_ty }))
-      = notHandledL loc "Standalone-deriving" (ppr deriv_ty)
     no_default_decl (L loc decl)
       = notHandledL loc "Default declarations" (ppr decl)
     no_warn (L loc (Warning thing _))
@@ -422,6 +420,18 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
  where
    Just (tvs, cxt, cls, tys) = splitLHsInstDeclTy_maybe ty
 
+repStandaloneDerivD :: LDerivDecl Name -> DsM (SrcSpan, Core TH.DecQ)
+repStandaloneDerivD (L loc (DerivDecl { deriv_type = ty }))
+  = do { dec <- addTyVarBinds tvs $ \_ ->
+                do { cxt' <- repContext cxt
+                   ; cls_tcon <- repTy (HsTyVar (unLoc cls))
+                   ; cls_tys <- repLTys tys
+                   ; inst_ty <- repTapps cls_tcon cls_tys
+                   ; repDeriv cxt' inst_ty }
+       ; return (loc, dec) }
+  where
+    Just (tvs, cxt, cls, tys) = splitLHsInstDeclTy_maybe ty
+
 repTyFamInstD :: TyFamInstDecl Name -> DsM (Core TH.DecQ)
 repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
   = do { let tc_name = tyFamInstDeclLName decl
@@ -662,10 +672,9 @@ rep_sigs' sigs = do { sigs1 <- mapM rep_sig sigs ;
                      return (concat sigs1) }
 
 rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
-rep_sig (L loc (TypeSig nms ty))      = mapM (rep_ty_sig loc ty) nms
+rep_sig (L loc (TypeSig nms ty))      = mapM (rep_ty_sig sigDName loc ty) nms
 rep_sig (L _   (PatSynSig {}))        = notHandled "Pattern type signatures" empty
-rep_sig (L _   (GenericSig nm _))     = notHandled "Default type signatures" msg
-  where msg = text "Illegal default signature for" <+> quotes (ppr nm)
+rep_sig (L loc (GenericSig nms ty))   = mapM (rep_ty_sig defaultSigDName loc ty) nms
 rep_sig d@(L _ (IdSig {}))            = pprPanic "rep_sig IdSig" (ppr d)
 rep_sig (L _   (FixSig {}))           = return [] -- fixity sigs at top level
 rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
@@ -673,12 +682,12 @@ rep_sig (L loc (SpecSig nm ty ispec)) = rep_specialise nm ty ispec loc
 rep_sig (L loc (SpecInstSig ty))      = rep_specialiseInst ty loc
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 
-rep_ty_sig :: SrcSpan -> LHsType Name -> Located Name
+rep_ty_sig :: Name -> SrcSpan -> LHsType Name -> Located Name
            -> DsM (SrcSpan, Core TH.DecQ)
-rep_ty_sig loc (L _ ty) nm
+rep_ty_sig mk_sig loc (L _ ty) nm
   = do { nm1 <- lookupLOcc nm
        ; ty1 <- rep_ty ty
-       ; sig <- repProto nm1 ty1
+       ; sig <- repProto mk_sig nm1 ty1
        ; return (loc, sig) }
   where
     -- We must special-case the top-level explicit for-all of a TypeSig
@@ -692,7 +701,6 @@ rep_ty_sig loc (L _ ty) nm
            ; repTForall bndrs1 ctxt1 ty1 }
 
     rep_ty ty = repTy ty
-
 
 rep_inline :: Located Name
            -> InlinePragma      -- Never defaultInlinePragma
@@ -1741,6 +1749,9 @@ repClass :: Core TH.CxtQ -> Core TH.Name -> Core [TH.TyVarBndr]
 repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC fds) (MkC ds)
   = rep2 classDName [cxt, cls, tvs, fds, ds]
 
+repDeriv :: Core TH.CxtQ -> Core TH.TypeQ -> DsM (Core TH.DecQ)
+repDeriv (MkC cxt) (MkC ty) = rep2 standaloneDerivDName [cxt, ty]
+
 repPragInl :: Core TH.Name -> Core TH.Inline -> Core TH.RuleMatch
            -> Core TH.Phases -> DsM (Core TH.DecQ)
 repPragInl (MkC nm) (MkC inline) (MkC rm) (MkC phases)
@@ -1807,8 +1818,8 @@ repRoleAnnotD (MkC n) (MkC roles) = rep2 roleAnnotDName [n, roles]
 repFunDep :: Core [TH.Name] -> Core [TH.Name] -> DsM (Core TH.FunDep)
 repFunDep (MkC xs) (MkC ys) = rep2 funDepName [xs, ys]
 
-repProto :: Core TH.Name -> Core TH.TypeQ -> DsM (Core TH.DecQ)
-repProto (MkC s) (MkC ty) = rep2 sigDName [s, ty]
+repProto :: Name -> Core TH.Name -> Core TH.TypeQ -> DsM (Core TH.DecQ)
+repProto mk_sig (MkC s) (MkC ty) = rep2 mk_sig [s, ty]
 
 repCtxt :: Core [TH.PredQ] -> DsM (Core TH.CxtQ)
 repCtxt (MkC tys) = rep2 cxtName [tys]
@@ -2105,9 +2116,9 @@ templateHaskellNames = [
     bindSName, letSName, noBindSName, parSName,
     -- Dec
     funDName, valDName, dataDName, newtypeDName, tySynDName,
-    classDName, instanceDName, sigDName, forImpDName,
+    classDName, instanceDName, standaloneDerivDName, sigDName, forImpDName,
     pragInlDName, pragSpecDName, pragSpecInlDName, pragSpecInstDName,
-    pragRuleDName, pragAnnDName,
+    pragRuleDName, pragAnnDName, defaultSigDName,
     familyNoKindDName, familyKindDName, dataInstDName, newtypeInstDName,
     tySynInstDName, closedTypeFamilyKindDName, closedTypeFamilyNoKindDName,
     infixLDName, infixRDName, infixNDName,
@@ -2333,7 +2344,7 @@ parSName    = libFun (fsLit "parS")    parSIdKey
 funDName, valDName, dataDName, newtypeDName, tySynDName, classDName,
     instanceDName, sigDName, forImpDName, pragInlDName, pragSpecDName,
     pragSpecInlDName, pragSpecInstDName, pragRuleDName, pragAnnDName,
-    familyNoKindDName,
+    familyNoKindDName, standaloneDerivDName, defaultSigDName,
     familyKindDName, dataInstDName, newtypeInstDName, tySynInstDName,
     closedTypeFamilyKindDName, closedTypeFamilyNoKindDName,
     infixLDName, infixRDName, infixNDName, roleAnnotDName :: Name
@@ -2344,7 +2355,10 @@ newtypeDName      = libFun (fsLit "newtypeD")      newtypeDIdKey
 tySynDName        = libFun (fsLit "tySynD")        tySynDIdKey
 classDName        = libFun (fsLit "classD")        classDIdKey
 instanceDName     = libFun (fsLit "instanceD")     instanceDIdKey
+standaloneDerivDName
+                  = libFun (fsLit "standaloneDerivD") standaloneDerivDIdKey
 sigDName          = libFun (fsLit "sigD")          sigDIdKey
+defaultSigDName   = libFun (fsLit "defaultSigD")   defaultSigDIdKey
 forImpDName       = libFun (fsLit "forImpD")       forImpDIdKey
 pragInlDName      = libFun (fsLit "pragInlD")      pragInlDIdKey
 pragSpecDName     = libFun (fsLit "pragSpecD")     pragSpecDIdKey
@@ -2696,8 +2710,8 @@ parSIdKey        = mkPreludeMiscIdUnique 323
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey,
     classDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey, pragInlDIdKey,
     pragSpecDIdKey, pragSpecInlDIdKey, pragSpecInstDIdKey, pragRuleDIdKey,
-    pragAnnDIdKey, familyNoKindDIdKey, familyKindDIdKey,
-    dataInstDIdKey, newtypeInstDIdKey, tySynInstDIdKey,
+    pragAnnDIdKey, familyNoKindDIdKey, familyKindDIdKey, defaultSigDIdKey,
+    dataInstDIdKey, newtypeInstDIdKey, tySynInstDIdKey, standaloneDerivDIdKey,
     closedTypeFamilyKindDIdKey, closedTypeFamilyNoKindDIdKey,
     infixLDIdKey, infixRDIdKey, infixNDIdKey, roleAnnotDIdKey :: Unique
 funDIdKey                    = mkPreludeMiscIdUnique 330
@@ -2726,6 +2740,8 @@ infixLDIdKey                 = mkPreludeMiscIdUnique 352
 infixRDIdKey                 = mkPreludeMiscIdUnique 353
 infixNDIdKey                 = mkPreludeMiscIdUnique 354
 roleAnnotDIdKey              = mkPreludeMiscIdUnique 355
+standaloneDerivDIdKey        = mkPreludeMiscIdUnique 356
+defaultSigDIdKey             = mkPreludeMiscIdUnique 357
 
 -- type Cxt = ...
 cxtIdKey :: Unique

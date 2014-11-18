@@ -601,6 +601,9 @@ goals.  But to be honest I'm not absolutely certain, so I am leaving
 FM_Avoid in the code base.  What I'm removing is the unique place
 where it is *used*, namely in TcCanonical.canEqTyVar.
 
+See also Note [Conservative unification check] in TcUnify, which gives
+other examples where lazy flattening caused problems.
+
 Bottom line: FM_Avoid is unused for now (Nov 14).
 Note: T5321Fun got faster when I disabled FM_Avoid
       T5837 did too, but it's pathalogical anyway

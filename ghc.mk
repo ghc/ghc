@@ -590,7 +590,9 @@ libraries/ghc-prim_dist-install_EXTRA_HADDOCK_SRCS = libraries/ghc-prim/dist-ins
 
 ifneq "$(CLEANING)" "YES"
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
-libraries/base_dist-install_CONFIGURE_OPTS += --flags=-integer-simple
+libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-gmp
+else ifeq "$(INTEGER_LIBRARY)" "integer-gmp2"
+libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-gmp2
 else ifeq "$(INTEGER_LIBRARY)" "integer-simple"
 libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-simple
 else
@@ -655,6 +657,12 @@ BUILD_DIRS += libraries/integer-gmp/mkGmpDerivedConstants
 else ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
 BUILD_DIRS += libraries/integer-gmp/gmp
 BUILD_DIRS += libraries/integer-gmp/mkGmpDerivedConstants
+endif
+
+ifeq "$(INTEGER_LIBRARY)" "integer-gmp2"
+BUILD_DIRS += libraries/integer-gmp2/gmp
+else ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
+BUILD_DIRS += libraries/integer-gmp2/gmp
 endif
 
 BUILD_DIRS += utils/haddock
@@ -1212,6 +1220,7 @@ sdist_%:
 CLEAN_FILES += libraries/bootstrapping.conf
 CLEAN_FILES += libraries/integer-gmp/cbits/GmpDerivedConstants.h
 CLEAN_FILES += libraries/integer-gmp/include/HsIntegerGmp.h
+CLEAN_FILES += libraries/integer-gmp2/include/HsIntegerGmp.h
 CLEAN_FILES += libraries/base/include/EventConfig.h
 CLEAN_FILES += mk/config.mk.old
 CLEAN_FILES += mk/project.mk.old

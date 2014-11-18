@@ -1771,7 +1771,7 @@ Options:
 
     <para>Because ticky-ticky profiling requires a certain familiarity
     with GHC internals, we have moved the documentation to the
-    wiki. Take a look at its <ulink
+    GHC developers wiki. Take a look at its <ulink
     url="http://ghc.haskell.org/trac/ghc/wiki/Commentary/Profiling">overview
     of the profiling options</ulink>, which includeds a link to the
     ticky-ticky profiling page.</para>

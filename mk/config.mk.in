@@ -230,7 +230,7 @@ ExtraMakefileSanityChecks = NO
 # Options for Libraries
 
 # Which directory (in libraries/) contains the integer library?
-INTEGER_LIBRARY=integer-gmp
+INTEGER_LIBRARY=integer-gmp2
 
 # We build the libraries at least the "vanilla" way (way "v")
 GhcLibWays = v

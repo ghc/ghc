@@ -157,9 +157,14 @@ setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace ns occ)
 setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace ns occ)
 setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
-setRdrNameSpace (Exact n)    ns = ASSERT( isExternalName n )
-                                  Orig (nameModule n)
-                                       (setOccNameSpace ns (nameOccName n))
+setRdrNameSpace (Exact n)    ns
+  | isExternalName n
+  = Orig (nameModule n) occ
+  | otherwise   -- This can happen when quoting and then splicing a fixity
+                -- declaration for a type
+  = Exact $ mkSystemNameAt (nameUnique n) occ (nameSrcSpan n)
+  where
+    occ = setOccNameSpace ns (nameOccName n)
 
 -- demoteRdrName lowers the NameSpace of RdrName.
 -- see Note [Demotion] in OccName
