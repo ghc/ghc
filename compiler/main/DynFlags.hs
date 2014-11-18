@@ -719,7 +719,7 @@ data DynFlags = DynFlags {
 
   -- Plugins
   pluginModNames        :: [ModuleName],
-  pluginModNameOpts     :: [(ModuleName, String)],
+  pluginModNameOpts     :: [(ModuleName,String)],
 
   -- GHC API hooks
   hooks                 :: Hooks,
@@ -1880,8 +1880,7 @@ setSigOf :: String -> DynFlags -> DynFlags
 setSigOf s d = d { sigOf = parseSigOf s }
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
-addPluginModuleName name d =
-  d { pluginModNames = mkModuleName name : pluginModNames d }
+addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }
 
 addPluginModuleNameOption :: String -> DynFlags -> DynFlags
 addPluginModuleNameOption optflag d = d { pluginModNameOpts = (mkModuleName m, option) : (pluginModNameOpts d) }
@@ -2455,8 +2454,8 @@ dynamic_flags = [
   , Flag "w"      (NoArg (upd (\dfs -> dfs {warningFlags = IntSet.empty})))
 
         ------ Plugin flags ------------------------------------------------
-  , Flag "fplugin-opt"    (hasArg addPluginModuleNameOption)
-  , Flag "fplugin"        (hasArg addPluginModuleName)
+  , Flag "fplugin-opt" (hasArg addPluginModuleNameOption)
+  , Flag "fplugin"     (hasArg addPluginModuleName)
 
         ------ Optimisation flags ------------------------------------------
   , Flag "O"      (noArgM (setOptLevel 1))

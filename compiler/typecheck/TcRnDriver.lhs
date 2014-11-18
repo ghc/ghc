@@ -377,7 +377,6 @@ implicitPreludeWarn
 \end{code}
 
 
-
 %************************************************************************
 %*                                                                      *
                 Import declarations

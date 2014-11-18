@@ -72,7 +72,6 @@ import qualified Data.Map as Map
 
 \begin{code}
 
-
 -- | Setup the initial typechecking environment
 initTc :: HscEnv
        -> HscSource
@@ -207,21 +206,11 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 
 
 initTcInteractive :: HscEnv -> TcM a -> IO (Messages, Maybe a)
--- ^ Initialise the type checker monad for use in GHCi; the
--- thing_inside is responsible for loading plugins
+-- Initialise the type checker monad for use in GHCi
 initTcInteractive hsc_env thing_inside
   = initTc hsc_env HsSrcFile False
            (icInteractiveModule (hsc_IC hsc_env))
            thing_inside
-
-initTcDynamic :: HscEnv -> TcM a -> IO (Messages, Maybe a)
--- ^ Initialise the type checker for use in in dynamic loading; note
--- that plugins will not be loaded
-initTcDynamic hsc_env thing_inside
-  = initTc hsc_env HsSrcFile False
-           (icInteractiveModule (hsc_IC hsc_env))
-           thing_inside
-
 
 initTcForLookup :: HscEnv -> TcM a -> IO a
 -- The thing_inside is just going to look up something

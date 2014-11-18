@@ -25,7 +25,7 @@ module DynamicLoading (
 import Linker           ( linkModule, getHValue )
 import SrcLoc           ( noSrcSpan )
 import Finder           ( findImportedModule, cannotFindModule )
-import TcRnMonad        ( initTcDynamic, initIfaceTcRn )
+import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
 import LoadIface        ( loadPluginInterface )
 import RdrName          ( RdrName, Provenance(..), ImportSpec(..), ImpDeclSpec(..)
                         , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
@@ -96,7 +96,7 @@ loadPlugin hsc_env mod_name
 -- for debugging (@-ddump-if-trace@) only: it is shown as the reason why the module is being loaded.
 forceLoadModuleInterfaces :: HscEnv -> SDoc -> [Module] -> IO ()
 forceLoadModuleInterfaces hsc_env doc modules
-    = (initTcDynamic hsc_env $
+    = (initTcInteractive hsc_env $
        initIfaceTcRn $
        mapM_ (loadPluginInterface doc) modules) 
       >> return ()
@@ -198,7 +198,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module
-            (_, mb_iface) <- initTcDynamic hsc_env $
+            (_, mb_iface) <- initTcInteractive hsc_env $
                              initIfaceTcRn $
                              loadPluginInterface doc mod
             case mb_iface of
