@@ -741,7 +741,10 @@ getLinkerInfo' :: DynFlags -> IO LinkerInfo
 getLinkerInfo' dflags = do
   let platform = targetPlatform dflags
       os = platformOS platform
-      (pgm,_) = pgm_l dflags
+      (pgm,args0) = pgm_l dflags
+      args1     = map Option (getOpts dflags opt_l)
+      args2     = args0 ++ args1
+      args3     = filter notNull (map showOpt args2)
 
       -- Try to grab the info from the process output.
       parseLinkerInfo stdo _stde _exitc
@@ -792,7 +795,7 @@ getLinkerInfo' dflags = do
                  -- In practice, we use the compiler as the linker here. Pass
                  -- -Wl,--version to get linker version info.
                  (exitc, stdo, stde) <- readProcessEnvWithExitCode pgm
-                                        ["-Wl,--version"]
+                                        (["-Wl,--version"] ++ args3)
                                         en_locale_env
                  -- Split the output by lines to make certain kinds
                  -- of processing easier. In particular, 'clang' and 'gcc'
