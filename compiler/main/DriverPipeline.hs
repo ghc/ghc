@@ -1404,6 +1404,11 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                         
     output_fn <- phaseOutputFilename next_phase
 
+    -- AVX can cause LLVM 3.2 to generate a C-like frame pointer
+    -- prelude, see #9391
+    when (ver == 32 && isAvxEnabled dflags) $ liftIO $ errorMsg dflags $ text
+      "Note: LLVM 3.2 has known problems with AVX instructions (see trac #9391)"
+
     liftIO $ SysTools.runLlvmLlc dflags
                 ([ SysTools.Option (llvmOpts !! opt_lvl),
                     SysTools.Option $ "-relocation-model=" ++ rmodel,
@@ -1413,7 +1418,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                 ++ map SysTools.Option fpOpts
                 ++ map SysTools.Option abiOpts
                 ++ map SysTools.Option sseOpts
-                ++ map SysTools.Option avxOpts
+                ++ map SysTools.Option (avxOpts ver)
                 ++ map SysTools.Option avx512Opts
                 ++ map SysTools.Option stackAlignOpts)
 
@@ -1449,10 +1454,11 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                 | isSseEnabled dflags    = ["-mattr=+sse"]
                 | otherwise              = []
 
-        avxOpts | isAvx512fEnabled dflags = ["-mattr=+avx512f"]
-                | isAvx2Enabled dflags    = ["-mattr=+avx2"]
-                | isAvxEnabled dflags     = ["-mattr=+avx"]
-                | otherwise               = []
+        avxOpts ver | isAvx512fEnabled dflags = ["-mattr=+avx512f"]
+                    | isAvx2Enabled dflags    = ["-mattr=+avx2"]
+                    | isAvxEnabled dflags     = ["-mattr=+avx"]
+                    | ver == 32               = ["-mattr=-avx"] -- see #9391
+                    | otherwise               = []
 
         avx512Opts =
           [ "-mattr=+avx512cd" | isAvx512cdEnabled dflags ] ++
