@@ -468,12 +468,6 @@ done l u n@(I# _) marr#
   = \s1# -> case unsafeFreezeArray# marr# s1# of
               (# s2#, arr# #) -> (# s2#, Array l u n arr# #)
 
--- This is inefficient and I'm not sure why:
--- listArray (l,u) es = unsafeArray (l,u) (zip [0 .. rangeSize (l,u) - 1] es)
--- The code below is better. It still doesn't enable foldr/build
--- transformation on the list of elements; I guess it's impossible
--- using mechanisms currently available.
-
 -- | Construct an array from a pair of bounds and a list of values in
 -- index order.
 {-# INLINE listArray #-}
@@ -481,13 +475,17 @@ listArray :: Ix i => (i,i) -> [e] -> Array i e
 listArray (l,u) es = runST (ST $ \s1# ->
     case safeRangeSize (l,u)            of { n@(I# n#) ->
     case newArray# n# arrEleBottom s1#  of { (# s2#, marr# #) ->
-    let fillFromList i# xs s3# | isTrue# (i# ==# n#) = s3#
-                               | otherwise = case xs of
-            []   -> s3#
-            y:ys -> case writeArray# marr# i# y s3# of { s4# ->
-                    fillFromList (i# +# 1#) ys s4# } in
-    case fillFromList 0# es s2#         of { s3# ->
-    done l u n marr# s3# }}})
+      let
+        go y r = \ i# s3# ->
+            case writeArray# marr# i# y s3# of
+              s4# -> if (isTrue# (i# ==# n# -# 1#))
+                     then s4#
+                     else r (i# +# 1#) s4#
+      in
+        done l u n marr# (
+          if n == 0
+          then s2#
+          else foldr go (\_ s# -> s#) es 0# s2#)}})
 
 -- | The value at the given index in an array.
 {-# INLINE (!) #-}
