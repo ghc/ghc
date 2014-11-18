@@ -398,12 +398,16 @@ f cback =
 
 foreign import "&f_helper" f_helper :: FunPtr (StablePtr Fun -> Fun)
 
--- and the helper in C:
+-- and the helper in C: (approximately; see `mkFExportCBits` below)
 
 f_helper(StablePtr s, HsBool b, HsInt i)
 {
-        rts_evalIO(rts_apply(rts_apply(deRefStablePtr(s),
+        Capability *cap;
+        cap = rts_lock();
+        rts_evalIO(&cap,
+                   rts_apply(rts_apply(deRefStablePtr(s),
                                        rts_mkBool(b)), rts_mkInt(i)));
+        rts_unlock(cap);
 }
 \end{verbatim}
 
