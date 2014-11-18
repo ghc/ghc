@@ -923,10 +923,11 @@ GHC.ST.runST :: (forall s. GHC.ST.ST s a) -> a
 <listitem><para>If any of the quantified type variables has a kind
 that mentions a kind variable, e.g.
 <screen>
-ghci> :i Data.Coerce.coerce
-coerce ::
-  forall (k :: BOX) (a :: k) (b :: k). Coercible a b => a -> b
-     -- Defined in GHC.Prim
+ghci> :i Data.Type.Equality.sym
+Data.Type.Equality.sym ::
+  forall (k :: BOX) (a :: k) (b :: k).
+  (a Data.Type.Equality.:~: b) -> b Data.Type.Equality.:~: a
+        -- Defined in Data.Type.Equality
 </screen>
 </para></listitem>
 </itemizedlist>
