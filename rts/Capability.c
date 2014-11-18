@@ -709,21 +709,26 @@ void waitForCapability (Capability **pCap, Task *task)
     Capability *cap = *pCap;
 
     if (cap == NULL) {
-        // Try last_free_capability first
-        cap = last_free_capability;
-        if (cap->running_task) {
-            nat i;
-            // otherwise, search for a free capability
-            cap = NULL;
-            for (i = 0; i < n_capabilities; i++) {
-                if (!capabilities[i]->running_task) {
-                    cap = capabilities[i];
-                    break;
+        if (task->preferred_capability != -1) {
+            cap = capabilities[task->preferred_capability %
+                               enabled_capabilities];
+        } else {
+            // Try last_free_capability first
+            cap = last_free_capability;
+            if (cap->running_task) {
+                nat i;
+                // otherwise, search for a free capability
+                cap = NULL;
+                for (i = 0; i < n_capabilities; i++) {
+                    if (!capabilities[i]->running_task) {
+                        cap = capabilities[i];
+                        break;
+                    }
                 }
-            }
-            if (cap == NULL) {
-                // Can't find a free one, use last_free_capability.
-                cap = last_free_capability;
+                if (cap == NULL) {
+                    // Can't find a free one, use last_free_capability.
+                    cap = last_free_capability;
+                }
             }
         }
 

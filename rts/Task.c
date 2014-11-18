@@ -213,6 +213,7 @@ newTask (rtsBool worker)
     task->n_spare_incalls = 0;
     task->spare_incalls = NULL;
     task->incall        = NULL;
+    task->preferred_capability = -1;
 
 #if defined(THREADED_RTS)
     initCondition(&task->cond);
@@ -487,6 +488,14 @@ interruptWorkerTask (Task *task)
 }
 
 #endif /* THREADED_RTS */
+
+void
+setInCallCapability (int preferred_capability)
+{
+    Task *task = allocTask();
+    task->preferred_capability = preferred_capability;
+}
+
 
 #ifdef DEBUG
 

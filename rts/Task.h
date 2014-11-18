@@ -151,6 +151,9 @@ typedef struct Task_ {
     // So that we can detect when a finalizer illegally calls back into Haskell
     rtsBool running_finalizers;
 
+    // if >= 0, this Capability will be used for in-calls
+    int preferred_capability;
+
     // Links tasks on the returning_tasks queue of a Capability, and
     // on spare_workers.
     struct Task_ *next;

@@ -172,6 +172,15 @@ void rts_unlock (Capability *token);
 // when there is no current capability.
 Capability *rts_unsafeGetMyCapability (void);
 
+// Specify the Capability that the current OS thread should run on when it calls
+// into Haskell.  The actual capability will be calculated as the supplied
+// value modulo the number of enabled Capabilities.
+//
+// Note that the thread may still be migrated by the RTS scheduler, but that
+// will only happen if there are multiple threads running on one Capability and
+// another Capability is free.
+void setInCallCapability (int preferred_capability);
+
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
    ------------------------------------------------------------------------- */
