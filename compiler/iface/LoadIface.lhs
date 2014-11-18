@@ -92,7 +92,7 @@ loadSrcInterface doc mod want_boot maybe_pkg
            Failed err      -> failWithTc err
            Succeeded iface -> return iface }
 
--- | Like loadSrcInterface, but returns a MaybeErr
+-- | Like 'loadSrcInterface', but returns a 'MaybeErr'.
 loadSrcInterface_maybe :: SDoc
                        -> ModuleName
                        -> IsBootInterface     -- {-# SOURCE #-} ?
@@ -111,7 +111,10 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
            err         -> return (Failed (cannotFindInterface (hsc_dflags hsc_env) mod err)) }
 
--- | Load interface for a module.
+-- | Load interface directly for a fully qualified 'Module'.  (This is a fairly
+-- rare operation, but in particular it is used to load orphan modules
+-- in order to pull their instances into the global package table and to
+-- handle some operations in GHCi).
 loadModuleInterface :: SDoc -> Module -> TcM ModIface
 loadModuleInterface doc mod = initIfaceTcRn (loadSysInterface doc mod)
 

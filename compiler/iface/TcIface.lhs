@@ -184,9 +184,9 @@ We need to make sure that we have at least *read* the interface files
 for any module with an instance decl or RULE that we might want.
 
 * If the instance decl is an orphan, we have a whole separate mechanism
-  (loadOprhanModules)
+  (loadOrphanModules)
 
-* If the instance decl not an orphan, then the act of looking at the
+* If the instance decl is not an orphan, then the act of looking at the
   TyCon or Class will force in the defining module for the
   TyCon/Class, and hence the instance decl
 

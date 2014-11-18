@@ -221,7 +221,7 @@ initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
         }
   where
     -- Extend the global environment with a 'GlobalRdrEnv' containing the exported entities of
-    --   * 'Data.Array.Parallel'      iff '-XParallalArrays' specified (see also 'checkLoadDAP').
+    --   * 'Data.Array.Parallel'      iff '-XParallelArrays' specified (see also 'checkLoadDAP').
     --   * 'Data.Array.Parallel.Prim' iff '-fvectorise' specified.
     loadDAP thing_inside
       = do { dapEnv  <- loadOneModule dATA_ARRAY_PARALLEL_NAME      checkLoadDAP          paErr
