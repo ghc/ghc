@@ -377,9 +377,16 @@ runIO :: IO a -> Q a
 runIO m = Q (qRunIO m)
 
 -- | Record external files that runIO is using (dependent upon).
--- The compiler can then recognize that it should re-compile the file using this TH when the external file changes.
--- Note that ghc -M will still not know about these dependencies - it does not execute TH.
+-- The compiler can then recognize that it should re-compile the Haskell file
+-- when an external file changes.
+--
 -- Expects an absolute file path.
+--
+-- Notes:
+--
+--   * ghc -M does not know about these dependencies - it does not execute TH.
+--
+--   * The dependency is based on file content, not a modification time
 addDependentFile :: FilePath -> Q ()
 addDependentFile fp = Q (qAddDependentFile fp)
 
