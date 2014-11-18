@@ -60,7 +60,7 @@ module HscTypes (
 
         -- * Interfaces
         ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
-        emptyIfaceWarnCache, 
+        emptyIfaceWarnCache,
 
         -- * Fixity
         FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -75,7 +75,7 @@ module HscTypes (
         TypeEnv, lookupType, lookupTypeHscEnv, mkTypeEnv, emptyTypeEnv,
         typeEnvFromEntities, mkTypeEnvWithImplicits,
         extendTypeEnv, extendTypeEnvList,
-        extendTypeEnvWithIds, 
+        extendTypeEnvWithIds,
         lookupTypeEnv,
         typeEnvElts, typeEnvTyCons, typeEnvIds, typeEnvPatSyns,
         typeEnvDataCons, typeEnvCoAxioms, typeEnvClasses,
@@ -1109,7 +1109,7 @@ appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
 
 Note [The interactive package]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Type, class, and value declarations at the command prompt are treated 
+Type, class, and value declarations at the command prompt are treated
 as if they were defined in modules
    interactive:Ghci1
    interactive:Ghci2
@@ -1153,8 +1153,8 @@ The details are a bit tricky though:
  * So how do we arrange that declarations at the command prompt get
    to be in the 'interactive' package?  Simply by setting the tcg_mod
    field of the TcGblEnv to "interactive:Ghci1".  This is done by the
-   call to initTc in initTcInteractive, initTcForLookup, which in 
-   turn get the module from it 'icInteractiveModule' field of the 
+   call to initTc in initTcInteractive, initTcForLookup, which in
+   turn get the module from it 'icInteractiveModule' field of the
    interactive context.
 
    The 'thisPackage' field stays as 'main' (or whatever -this-package-key says.
@@ -1192,7 +1192,7 @@ The Ids bound by previous Stmts in GHCi are currently
 
 However note that TyCons, Classes, and even Ids bound by other top-level
 declarations in GHCi (eg foreign import, record selectors) currently get
-External Names, with Ghci9 (or 8, or 7, etc) as the module name. 
+External Names, with Ghci9 (or 8, or 7, etc) as the module name.
 
 
 Note [ic_tythings]
@@ -1201,7 +1201,7 @@ The ic_tythings field contains
   * The TyThings declared by the user at the command prompt
     (eg Ids, TyCons, Classes)
 
-  * The user-visible Ids that arise from such things, which 
+  * The user-visible Ids that arise from such things, which
     *don't* come from 'implicitTyThings', notably:
        - record selectors
        - class ops
@@ -1312,7 +1312,7 @@ emptyInteractiveContext dflags
        ic_cwd        = Nothing }
 
 icInteractiveModule :: InteractiveContext -> Module
-icInteractiveModule (InteractiveContext { ic_mod_index = index }) 
+icInteractiveModule (InteractiveContext { ic_mod_index = index })
   = mkInteractiveModule index
 
 -- | This function returns the list of visible TyThings (useful for
