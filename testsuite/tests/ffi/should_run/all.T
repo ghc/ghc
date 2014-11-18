@@ -211,5 +211,9 @@ test('T8083',
 
 test('ffi023', [ omit_ways(['ghci']),
                 extra_clean(['ffi023_c.o']),
-                extra_run_opts('1000 4') ],
+                extra_run_opts('1000 4'),
+                pre_cmd('$MAKE -s --no-print-directory ffi023_setup') ],
+                # The ffi023_setup hack is to ensure that we generate
+                # ffi023_stub.h before compiling ffi023_c.c, which
+                # needs it.
               compile_and_run, ['ffi023_c.c'])

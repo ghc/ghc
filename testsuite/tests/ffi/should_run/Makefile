@@ -20,6 +20,9 @@ T5402_setup :
 T5594_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5594.hs
 
+ffi023_setup :
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c ffi023.hs
+
 .PHONY: Capi_Ctype_001
 Capi_Ctype_001:
 	'$(HSC2HS)' Capi_Ctype_A_001.hsc
