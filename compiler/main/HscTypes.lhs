@@ -2514,6 +2514,16 @@ instance Outputable VectInfo where
              , ptext (sLit "parallel tycons :") <+> ppr (vectInfoParallelTyCons info)
              ]
 
+instance Outputable IfaceVectInfo where
+  ppr info = vcat
+             [ ptext (sLit "variables       :") <+> ppr (ifaceVectInfoVar            info)
+             , ptext (sLit "tycons          :") <+> ppr (ifaceVectInfoTyCon          info)
+             , ptext (sLit "tycons reuse    :") <+> ppr (ifaceVectInfoTyConReuse     info)
+             , ptext (sLit "parallel vars   :") <+> ppr (ifaceVectInfoParallelVars   info)
+             , ptext (sLit "parallel tycons :") <+> ppr (ifaceVectInfoParallelTyCons info)
+             ]
+
+
 instance Binary IfaceVectInfo where
     put_ bh (IfaceVectInfo a1 a2 a3 a4 a5) = do
         put_ bh a1
