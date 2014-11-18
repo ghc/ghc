@@ -1023,6 +1023,7 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.haddockHTMLs       = haddockHTMLs pkg,
        GhcPkg.exposedModules     = map convertExposed (exposedModules pkg),
        GhcPkg.hiddenModules      = hiddenModules pkg,
+       GhcPkg.instantiatedWith   = map convertInst (instantiatedWith pkg),
        GhcPkg.exposed            = exposed pkg,
        GhcPkg.trusted            = trusted pkg
     }
@@ -1031,6 +1032,7 @@ convertPackageInfoToCacheFormat pkg =
                                    (fmap convertOriginal sig)
         convertOriginal (OriginalModule ipid m) =
             GhcPkg.OriginalModule (display ipid) m
+        convertInst (m, o) = (m, convertOriginal o)
 
 instance GhcPkg.BinaryStringRep ModuleName where
   fromStringRep = ModuleName.fromString . fromUTF8 . BS.unpack

@@ -47,7 +47,7 @@
     "makefiles": {
       "type": "text",
       "include": [ "(Makefile$)", "(\\.mk$)" ],
-      "text.max-line-length": 200,
+      "text.max-line-length": 400,
       "severity": {
         "2": "disabled"
       }

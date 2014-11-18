@@ -243,9 +243,9 @@ ghcpkg07:
 	@rm -rf $(PKGCONF07)
 	$(LOCAL_GHC_PKG07) init $(PKGCONF07)
 	$(LOCAL_GHC_PKG07) register --force test.pkg 2>/dev/null
-	$(LOCAL_GHC_PKG07) register --force test7a.pkg 2>/dev/null
+	$(LOCAL_GHC_PKG07) register --force test7a.pkg 2>&1 | grep "module" || :
 	$(LOCAL_GHC_PKG07) field testpkg7a exposed-modules
-	$(LOCAL_GHC_PKG07) register --force test7b.pkg 2>/dev/null
+	$(LOCAL_GHC_PKG07) register --force test7b.pkg 2>&1 | grep "module" || :
 	$(LOCAL_GHC_PKG07) field testpkg7b exposed-modules
 
 recache_reexport:

@@ -1,0 +1,5 @@
+[1 of 1] Compiling Main             ( Main.hs, Main.o )
+Linking Main ...
+False
+[(0,"foo"),(6,"foo")]
+fromList [(0,"foo"),(6,"foo")]

@@ -89,6 +89,7 @@ data InstalledPackageInfo instpkgid srcpkgid srcpkgname pkgkey modulename
        haddockHTMLs       :: [FilePath],
        exposedModules     :: [ExposedModule instpkgid modulename],
        hiddenModules      :: [modulename],
+       instantiatedWith   :: [(modulename,OriginalModule instpkgid modulename)],
        exposed            :: Bool,
        trusted            :: Bool
      }
@@ -165,6 +166,7 @@ emptyInstalledPackageInfo =
        haddockHTMLs       = [],
        exposedModules     = [],
        hiddenModules      = [],
+       instantiatedWith   = [],
        exposed            = False,
        trusted            = False
   }
@@ -320,7 +322,7 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
          ldOptions ccOptions
          includes includeDirs
          haddockInterfaces haddockHTMLs
-         exposedModules hiddenModules
+         exposedModules hiddenModules instantiatedWith
          exposed trusted) = do
     put (toStringRep installedPackageId)
     put (toStringRep sourcePackageId)
@@ -343,6 +345,7 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
     put haddockHTMLs
     put exposedModules
     put (map toStringRep hiddenModules)
+    put (map (\(k,v) -> (toStringRep k, v)) instantiatedWith)
     put exposed
     put trusted
 
@@ -368,6 +371,7 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
     haddockHTMLs       <- get
     exposedModules     <- get
     hiddenModules      <- get
+    instantiatedWith   <- get
     exposed            <- get
     trusted            <- get
     return (InstalledPackageInfo
@@ -384,6 +388,7 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
               haddockInterfaces haddockHTMLs
               exposedModules
               (map fromStringRep hiddenModules)
+              (map (\(k,v) -> (fromStringRep k, v)) instantiatedWith)
               exposed trusted)
 
 instance Binary Version where
