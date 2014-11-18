@@ -288,3 +288,164 @@ integer_gmp_mpn_tdiv_r (mp_limb_t r[],
     mpn_tdiv_qr(q, r, 0, n, nn, d, dn);
   }
 }
+
+
+/* Wraps GMP's 'mpz_sizeinbase()' function */
+HsWord
+integer_gmp_mpn_sizeinbase(const mp_limb_t s[], const mp_size_t sn,
+                           const HsInt base)
+{
+  assert (2 <= base && base <= 256);
+
+  if (!sn) return 1;
+
+  const mpz_t zs = {{
+      ._mp_alloc = sn,
+      ._mp_size  = sn,
+      ._mp_d = (mp_limb_t*)s
+    }};
+
+  return mpz_sizeinbase(zs, base);
+}
+
+/* Single-limb version of 'integer_gmp_mpn_sizeinbase()' */
+HsWord
+integer_gmp_mpn_sizeinbase1(const mp_limb_t s, const HsInt base)
+{
+  return s ? integer_gmp_mpn_sizeinbase(&s, 1, base) : 1;
+}
+
+/* Wrapper around GMP's 'mpz_export()' function */
+HsWord
+integer_gmp_mpn_export(const mp_limb_t s[], const mp_size_t sn,
+                       void *destptr, HsInt destofs, HsInt msbf)
+{
+  /* TODO: implement w/o GMP, c.f. 'integer_gmp_mpn_import()' */
+  assert (msbf == 0 || msbf == 1);
+
+  if (!sn || (sn == 1 && !s[0]))
+    return 0;
+
+  const mpz_t zs = {{
+      ._mp_alloc = sn,
+      ._mp_size  = sn,
+      ._mp_d = (mp_limb_t*)s
+    }};
+
+  size_t written = 0;
+
+  // mpz_export (void *rop, size_t *countp, int order, size_t size, int endian,
+  //             size_t nails, const mpz_t op)
+  (void) mpz_export(((char *)destptr)+destofs, &written, !msbf ? -1 : 1,
+                    /* size */ 1, /* endian */ 0, /* nails */ 0, zs);
+
+  return written;
+}
+
+/* Single-limb version of 'integer_gmp_mpn_export()' */
+HsWord
+integer_gmp_mpn_export1(const mp_limb_t s,
+                        void *destptr, const HsInt destofs, const HsInt msbf)
+{
+  /* TODO: implement w/o GMP */
+  return integer_gmp_mpn_export(&s, 1, destptr, destofs, msbf);
+}
+
+/* Import single limb from memory location
+ *
+ * We can't use GMP's 'mpz_import()'
+ */
+inline HsWord
+integer_gmp_mpn_import1(const uint8_t *srcptr, const HsWord srcofs,
+                        const HsWord srclen, const HsInt msbf)
+{
+  assert (msbf == 0 || msbf == 1);
+  assert (srclen <= SIZEOF_HSWORD);
+
+  srcptr += srcofs;
+
+  HsWord result = 0;
+
+  if (msbf)
+    for (unsigned i = 0; i < srclen; ++i)
+      result |= (HsWord)srcptr[i] << ((srclen-i-1)*8);
+  else // lsbf
+    for (unsigned i = 0; i < srclen; ++i)
+      result |= (HsWord)srcptr[i] << (i*8);
+
+  return result;
+}
+
+/* import into mp_limb_t[] from memory location */
+void
+integer_gmp_mpn_import(mp_limb_t * restrict r, const uint8_t * restrict srcptr,
+                       const HsWord srcofs, const HsWord srclen,
+                       const HsInt msbf)
+{
+  assert (msbf == 0 || msbf == 1);
+
+  srcptr += srcofs;
+
+  const unsigned  limb_cnt_rem = srclen % SIZEOF_HSWORD;
+  const mp_size_t limb_cnt     = srclen / SIZEOF_HSWORD;
+
+  if (msbf) {
+    if (limb_cnt_rem) { // partial limb
+      r[limb_cnt] = integer_gmp_mpn_import1(srcptr, 0, limb_cnt_rem, 1);
+      srcptr += limb_cnt_rem;
+    }
+
+    for (unsigned ri = 0; ri < limb_cnt; ++ri) {
+      r[limb_cnt-ri-1] = integer_gmp_mpn_import1(srcptr, 0, SIZEOF_HSWORD, 1);
+      srcptr += SIZEOF_HSWORD;
+    }
+  } else { // lsbf
+    for (unsigned ri = 0; ri < limb_cnt; ++ri) {
+      r[ri] = integer_gmp_mpn_import1(srcptr, 0, SIZEOF_HSWORD, 0);
+      srcptr += SIZEOF_HSWORD;
+    }
+
+    if (limb_cnt_rem) // partial limb
+      r[limb_cnt] = integer_gmp_mpn_import1(srcptr, 0, limb_cnt_rem, 0);
+  }
+}
+
+/* Scan for first non-zero byte starting at srcptr[srcofs], ending at
+ * srcptr[srcofs+srclen-1];
+ *
+ * If no non-zero byte found, returns srcofs+srclen; otherwise returns
+ * index of srcptr where first non-zero byte was found.
+ */
+HsWord
+integer_gmp_scan_nzbyte(const uint8_t *srcptr,
+                        const HsWord srcofs, const HsWord srclen)
+{
+  // TODO: consider implementing this function in Haskell-land
+  srcptr += srcofs;
+
+  for (unsigned i = 0; i < srclen; ++i)
+    if (srcptr[i])
+      return srcofs+i;
+
+  return srcofs+srclen;
+}
+
+/* Reverse scan for non-zero byte
+ * starting at srcptr[srcofs+srclen-1], ending at srcptr[srcofs].
+ *
+ * Returns new length srclen1 such that srcptr[srcofs+i] == 0 for
+ * srclen1 <= i < srclen.
+ */
+HsWord
+integer_gmp_rscan_nzbyte(const uint8_t *srcptr,
+                         const HsWord srcofs, const HsWord srclen)
+{
+  // TODO: consider implementing this function in Haskell-land
+  srcptr += srcofs;
+
+  for (unsigned i = srclen; i > 0; --i)
+    if (srcptr[i-1])
+      return i;
+
+  return 0;
+}

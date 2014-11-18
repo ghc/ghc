@@ -1559,6 +1559,105 @@ byteArrayToBigNat# ba# n0#
       | isTrue# (neWord# (indexWordArray# ba# i#) 0##) = i# +# 1#
       | True                                           = fmssl (i# -# 1#)
 
+-- | Read 'Integer' (without sign) from memory location at @/addr/@ in
+-- base-256 representation.
+--
+-- @'importIntegerFromAddr' /addr/ /size/ /msbf/@
+--
+-- See description of 'importIntegerFromByteArray' for more details.
+--
+-- /Since: 1.0.0.0/
+importIntegerFromAddr :: Addr# -> Word# -> Int# -> IO Integer
+importIntegerFromAddr addr len msbf = IO $ do
+    bn <- liftIO (importBigNatFromAddr addr len msbf)
+    return (bigNatToInteger bn)
+
+-- | Version of 'importIntegerFromAddr' constructing a 'BigNat'
+importBigNatFromAddr :: Addr# -> Word# -> Int# -> IO BigNat
+importBigNatFromAddr _ 0## _ = IO (\s -> (# s, zeroBigNat #))
+importBigNatFromAddr addr len0 1# = IO $ do -- MSBF
+    W# ofs <- liftIO (c_scan_nzbyte_addr addr 0## len0)
+    let len = len0 `minusWord#` ofs
+        addr' = addr `plusAddr#` (word2Int# ofs)
+    importBigNatFromAddr# addr' len 1#
+importBigNatFromAddr addr len0 _ = IO $ do -- LSBF
+    W# len <- liftIO (c_rscan_nzbyte_addr addr 0## len0)
+    importBigNatFromAddr# addr len 0#
+
+foreign import ccall unsafe "integer_gmp_scan_nzbyte"
+    c_scan_nzbyte_addr :: Addr# -> Word# -> Word# -> IO Word
+
+foreign import ccall unsafe "integer_gmp_rscan_nzbyte"
+    c_rscan_nzbyte_addr :: Addr# -> Word# -> Word# -> IO Word
+
+-- | Helper for 'importBigNatFromAddr'
+importBigNatFromAddr# :: Addr# -> Word# -> Int# -> S RealWorld BigNat
+importBigNatFromAddr# _ 0## _ = return zeroBigNat
+importBigNatFromAddr# addr len msbf = do
+    mbn@(MBN# mba#) <- newBigNat# n#
+    () <- liftIO (c_mpn_import_addr mba# addr 0## len msbf)
+    unsafeFreezeBigNat# mbn
+  where
+    -- n = ceiling(len / SIZEOF_HSWORD), i.e. number of limbs required
+    n# = (word2Int# len +# (SIZEOF_HSWORD# -# 1#)) `quotInt#` SIZEOF_HSWORD#
+
+foreign import ccall unsafe "integer_gmp_mpn_import"
+    c_mpn_import_addr :: MutableByteArray# RealWorld -> Addr# -> Word# -> Word#
+                      -> Int# -> IO ()
+
+-- | Read 'Integer' (without sign) from byte-array in base-256 representation.
+--
+-- The call
+--
+-- @'importIntegerFromByteArray' /ba/ /offset/ /size/ /msbf/@
+--
+-- reads
+--
+-- * @/size/@ bytes from the 'ByteArray#' @/ba/@ starting at @/offset/@
+--
+-- * with most significant byte first if @/msbf/@ is @1#@ or least
+--   significant byte first if @/msbf/@ is @0#@, and
+--
+-- * returns a new 'Integer'
+--
+-- /Since: 1.0.0.0/
+importIntegerFromByteArray :: ByteArray# -> Word# -> Word# -> Int# -> Integer
+importIntegerFromByteArray ba ofs len msbf
+    = bigNatToInteger (importBigNatFromByteArray ba ofs len msbf)
+
+-- | Version of 'importIntegerFromByteArray' constructing a 'BigNat'
+importBigNatFromByteArray :: ByteArray# -> Word# -> Word# -> Int# -> BigNat
+importBigNatFromByteArray _  _    0##  _  = zeroBigNat
+importBigNatFromByteArray ba ofs0 len0 1# = runS $ do -- MSBF
+    W# ofs <- liftIO (c_scan_nzbyte_bytearray ba ofs0 len0)
+    let len = (len0 `plusWord#` ofs0) `minusWord#` ofs
+    importBigNatFromByteArray# ba ofs len 1#
+importBigNatFromByteArray ba ofs  len0 _  = runS $ do -- LSBF
+    W# len <- liftIO (c_rscan_nzbyte_bytearray ba ofs len0)
+    importBigNatFromByteArray# ba ofs len 0#
+
+foreign import ccall unsafe "integer_gmp_scan_nzbyte"
+    c_scan_nzbyte_bytearray :: ByteArray# -> Word# -> Word# -> IO Word
+
+foreign import ccall unsafe "integer_gmp_rscan_nzbyte"
+    c_rscan_nzbyte_bytearray :: ByteArray# -> Word# -> Word# -> IO Word
+
+-- | Helper for 'importBigNatFromByteArray'
+importBigNatFromByteArray# :: ByteArray# -> Word# -> Word# -> Int#
+                           -> S RealWorld BigNat
+importBigNatFromByteArray# _ _ 0## _ = return zeroBigNat
+importBigNatFromByteArray# ba ofs len msbf = do
+    mbn@(MBN# mba#) <- newBigNat# n#
+    () <- liftIO (c_mpn_import_bytearray mba# ba ofs len msbf)
+    unsafeFreezeBigNat# mbn
+  where
+    -- n = ceiling(len / SIZEOF_HSWORD), i.e. number of limbs required
+    n# = (word2Int# len +# (SIZEOF_HSWORD# -# 1#)) `quotInt#` SIZEOF_HSWORD#
+
+foreign import ccall unsafe "integer_gmp_mpn_import"
+    c_mpn_import_bytearray :: MutableByteArray# RealWorld -> ByteArray# -> Word#
+                           -> Word# -> Int# -> IO ()
+
 -- | Test whether all internal invariants are satisfied by 'BigNat' value
 --
 -- Returns @1#@ if valid, @0#@ otherwise.

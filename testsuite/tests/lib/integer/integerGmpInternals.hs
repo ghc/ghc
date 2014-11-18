@@ -9,7 +9,7 @@ import Control.Monad
 
 import GHC.Word
 import GHC.Base
-import GHC.Integer.GMP.Internals (Integer(S#,J#))
+import GHC.Integer.GMP.Internals (Integer(S#,Jp#,Jn#))
 import qualified GHC.Integer.GMP.Internals as I
 
 gcdExtInteger :: Integer -> Integer -> (Integer, Integer)
@@ -19,18 +19,16 @@ powInteger :: Integer -> Word -> Integer
 powInteger b (W# w#) = I.powInteger b w#
 
 exportInteger :: Integer -> MutableByteArray# RealWorld -> Word# -> Int# -> IO Word
-exportInteger i mba o e = IO $ \s -> case I.exportIntegerToMutableByteArray i mba o e s of
-                                         (# s', l #) -> (# s', W# l #)
+exportInteger = I.exportIntegerToMutableByteArray
 
 exportIntegerAddr :: Integer -> Addr# -> Int# -> IO Word
-exportIntegerAddr i a e = IO $ \s -> case I.exportIntegerToAddr i a e s of
-                                         (# s', l #) -> (# s', W# l #)
+exportIntegerAddr = I.exportIntegerToAddr
 
+importInteger :: ByteArray# -> Word# -> Word# -> Int# -> Integer
 importInteger = I.importIntegerFromByteArray
 
 importIntegerAddr :: Addr# -> Word# -> Int# -> IO Integer
-importIntegerAddr a l e = IO $ \s -> case I.importIntegerFromAddr a l e s of
-                                         (# s', i #) -> (# s', i #)
+importIntegerAddr a l e = I.importIntegerFromAddr a l e
 
 {- Reference implementation for 'powModInteger'
 
@@ -109,41 +107,41 @@ main = do
         let a = byteArrayContents# (unsafeCoerce# mba)
 
         print =<< importIntegerAddr a 0## 1#
-        print =<< importIntegerAddr a 0## -1#
+        print =<< importIntegerAddr a 0## 0#
 
-        print =<< importIntegerAddr (plusAddr# a 22#)  1## 1#
-        print =<< importIntegerAddr (plusAddr# a 97#) 1## -1#
+        print =<< importIntegerAddr (plusAddr# a 22#) 1## 1#
+        print =<< importIntegerAddr (plusAddr# a 97#) 1## 0#
 
         print =<< importIntegerAddr a 23## 1#
-        print =<< importIntegerAddr a 23## -1#
+        print =<< importIntegerAddr a 23## 0#
 
         -- no-op
         print =<< exportIntegerAddr 0 (plusAddr# a 0#) 1#
 
         -- write into array
-        print =<< exportIntegerAddr b (plusAddr# a 5#) 1#
-        print =<< exportIntegerAddr e (plusAddr# a 50#) -1#
+        print =<< exportIntegerAddr b (plusAddr# a  5#) 1#
+        print =<< exportIntegerAddr e (plusAddr# a 50#) 0#
 
         print =<< exportInteger m mba 85## 1#
-        print =<< exportInteger m mba 105## -1#
+        print =<< exportInteger m mba 105## 0#
 
         print =<< importIntegerAddr (plusAddr# a 85#)  17## 1#
-        print =<< importIntegerAddr (plusAddr# a 105#) 17## -1#
+        print =<< importIntegerAddr (plusAddr# a 105#) 17## 0#
 
         -- read back full array
         print =<< importIntegerAddr a 128## 1#
-        print =<< importIntegerAddr a 128## -1#
+        print =<< importIntegerAddr a 128## 0#
 
         freezeByteArray mba
 
     print $ importInteger ba 0## 0## 1#
-    print $ importInteger ba 0## 0## -1#
+    print $ importInteger ba 0## 0## 0#
 
     print $ importInteger ba 5## 29## 1#
-    print $ importInteger ba 50## 29## -1#
+    print $ importInteger ba 50## 29## 0#
 
     print $ importInteger ba 0## 128## 1#
-    print $ importInteger ba 0## 128## -1#
+    print $ importInteger ba 0## 128## 0#
 
     return ()
   where
