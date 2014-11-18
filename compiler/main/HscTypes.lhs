@@ -1494,7 +1494,7 @@ mkQualModule dflags mod
 -- with a package key if the package ID would be ambiguous.
 mkQualPackage :: DynFlags -> QueryQualifyPackage
 mkQualPackage dflags pkg_key
-     | pkg_key == mainPackageKey
+     | pkg_key == mainPackageKey || pkg_key == interactivePackageKey
         -- Skip the lookup if it's main, since it won't be in the package
         -- database!
      = False
