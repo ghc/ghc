@@ -1,0 +1,6 @@
+
+T9201.hs:6:17:
+    The first argument of ‘f’ should have kind ‘x1’,
+      but ‘a’ has kind ‘y1’
+    In the type ‘d a (f a)’
+    In the class declaration for ‘MonoidalCCC’
