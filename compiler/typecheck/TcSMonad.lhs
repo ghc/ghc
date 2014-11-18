@@ -379,8 +379,6 @@ Type-family equations, of form (ev : F tys ~ ty), live in three places
 data InertCans
   = IC { inert_eqs :: TyVarEnv EqualCtList
               -- All CTyEqCans; index is the LHS tyvar
-              -- Some Refl equalities are also in tcs_ty_binds
-              -- see Note [Spontaneously solved in TyBinds] in TcInteract
 
        , inert_funeqs :: FunEqMap Ct
               -- All CFunEqCans; index is the whole family head type.

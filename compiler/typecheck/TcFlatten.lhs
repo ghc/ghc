@@ -813,9 +813,10 @@ flattenExactFamApp_fully fmode tc tys
 \begin{code}
 flattenTyVar :: FlattenEnv -> TcTyVar -> TcS (Xi, TcCoercion)
 -- "Flattening" a type variable means to apply the substitution to it
--- The substitution is actually the union of the substitution in the TyBinds
--- for the unification variables that have been unified already with the inert
--- equalities, see Note [Spontaneously solved in TyBinds] in TcInteract.
+-- The substitution is actually the union of 
+--     * the unifications that have taken place (either before the 
+--       solver started, or in TcInteract.solveByUnification)
+--     * the CTyEqCans held in the inert set
 --
 -- Postcondition: co : xi ~ tv
 flattenTyVar fmode tv

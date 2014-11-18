@@ -761,8 +761,8 @@ solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS ()
 --     say that in (a ~ xi), the type variable a does not appear in xi.
 --     See TcRnTypes.Ct invariants.
 --
--- Post: tv ~ xi is now in TyBinds, no need to put in inerts as well
--- see Note [Spontaneously solved in TyBinds]
+-- Post: tv is unified (by side effect) with xi; 
+--       we often write tv := xi
 solveByUnification wd tv xi
   = do { let tv_ty = mkTyVarTy tv
        ; traceTcS "Sneaky unification:" $
@@ -792,21 +792,6 @@ ppr_kicked :: Int -> SDoc
 ppr_kicked 0 = empty
 ppr_kicked n = parens (int n <+> ptext (sLit "kicked out"))
 \end{code}
-
-Note [Spontaneously solved in TyBinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we encounter a constraint ([W] alpha ~ tau) which can be spontaneously solved,
-we record the equality on the TyBinds of the TcSMonad. In the past, we used to also
-add a /given/ version of the constraint ([G] alpha ~ tau) to the inert
-canonicals -- and potentially kick out other equalities that mention alpha.
-
-Then, the flattener only had to look in the inert equalities during flattening of a
-type (TcCanonical.flattenTyVar).
-
-However it is a bit silly to record these equalities /both/ in the inerts AND the
-TyBinds, so we have now eliminated spontaneously solved equalities from the inerts,
-and only record them in the TyBinds of the TcS monad. The flattener is now consulting
-these binds /and/ the inerts for potentially unsolved or other given equalities.
 
 \begin{code}
 kickOutRewritable :: CtEvidence   -- Flavour of the equality that is
