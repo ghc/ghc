@@ -569,6 +569,11 @@ T703:
 	"$(TEST_HC)" $(TEST_HC_OPTS) --make T703.hs -v0
 	! readelf -W -l T703 2>/dev/null | grep 'GNU_STACK' | grep -q 'RWE'
 
+.PHONY: T2182
+T2182:
+	! "$(TEST_HC)" $(TEST_HC_OPTS) --make T2182_A.hs T2182.hs -v0
+	! "$(TEST_HC)" $(TEST_HC_OPTS) --make T2182.hs T2182_A.hs -v0
+
 .PHONY: write_interface_oneshot
 write_interface_oneshot:
 	$(RM) -rf write_interface_oneshot/A011.hi

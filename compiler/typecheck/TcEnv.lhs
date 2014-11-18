@@ -226,9 +226,11 @@ tcLookupInstance cls tys
         extractTyVar _            = panic "TcEnv.tcLookupInstance: extractTyVar"
 
     -- NB: duplicated to prevent circular dependence on Inst
-    tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
-                       ; return (eps_inst_env eps, tcg_inst_env env) 
-                       }
+    tcGetInstEnvs = do { eps <- getEps
+                       ; env <- getGblEnv
+                       ; return (InstEnvs (eps_inst_env eps)
+                                          (tcg_inst_env env)
+                                          (tcg_visible_orphan_mods env)) }
 \end{code}
 
 \begin{code}

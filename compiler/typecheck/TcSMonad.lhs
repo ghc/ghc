@@ -1350,7 +1350,7 @@ getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
 -- Just get some environments needed for instance looking up and matching
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-getInstEnvs :: TcS (InstEnv, InstEnv)
+getInstEnvs :: TcS InstEnvs
 getInstEnvs = wrapTcS $ Inst.tcGetInstEnvs
 
 getFamInstEnvs :: TcS (FamInstEnv, FamInstEnv)

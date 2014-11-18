@@ -60,6 +60,13 @@ T5095.hs:9:11:
         -- Defined in ‘integer-gmp-1.0.0.0:GHC.Integer.Type’
       instance Eq Integer
         -- Defined in ‘integer-gmp-1.0.0.0:GHC.Integer.Type’
+      instance forall (k :: BOX) (s :: k). Eq (Data.Proxy.Proxy s)
+        -- Defined in ‘Data.Proxy’
+      instance (Eq a, Eq b) => Eq (Either a b)
+        -- Defined in ‘Data.Either’
+      instance (GHC.Arr.Ix i, Eq e) => Eq (GHC.Arr.Array i e)
+        -- Defined in ‘GHC.Arr’
+      instance Eq (GHC.Arr.STArray s i e) -- Defined in ‘GHC.Arr’
     (The choice depends on the instantiation of ‘a’
      To pick the first instance above, use IncoherentInstances
      when compiling the other instance declarations)

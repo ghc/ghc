@@ -17,15 +17,19 @@ module InstEnv (
         instanceDFunId, tidyClsInstDFun, instanceRoughTcs,
         fuzzyClsInstCmp,
 
-        InstEnv, emptyInstEnv, extendInstEnv, deleteFromInstEnv, identicalInstHead, 
+        IsOrphan(..), isOrphan, notOrphan,
+
+        InstEnvs(..), InstEnv,
+        emptyInstEnv, extendInstEnv, deleteFromInstEnv, identicalInstHead,
         extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv', lookupInstEnv, instEnvElts,
-        memberInstEnv,
+        memberInstEnv, instIsVisible,
         classInstances, orphNamesOfClsInst, instanceBindFun,
         instanceCantMatch, roughMatchTcs
     ) where
 
 #include "HsVersions.h"
 
+import Module
 import Class
 import Var
 import VarSet
@@ -40,6 +44,7 @@ import BasicTypes
 import UniqFM
 import Util
 import Id
+import Binary
 import FastString
 import Data.Data        ( Data, Typeable )
 import Data.Maybe       ( isJust, isNothing )
@@ -56,6 +61,35 @@ import Data.Monoid
 %************************************************************************
 
 \begin{code}
+
+-- | Is this instance an orphan?  If it is not an orphan, contains an 'OccName'
+-- witnessing the instance's non-orphanhood.
+data IsOrphan = IsOrphan | NotOrphan OccName
+    deriving (Data, Typeable)
+
+-- | Returns true if 'IsOrphan' is orphan.
+isOrphan :: IsOrphan -> Bool
+isOrphan IsOrphan = True
+isOrphan _ = False
+
+-- | Returns true if 'IsOrphan' is not an orphan.
+notOrphan :: IsOrphan -> Bool
+notOrphan NotOrphan{} = True
+notOrphan _ = False
+
+instance Binary IsOrphan where
+    put_ bh IsOrphan = putByte bh 0
+    put_ bh (NotOrphan n) = do
+        putByte bh 1
+        put_ bh n
+    get bh = do
+        h <- getByte bh
+        case h of
+            0 -> return IsOrphan
+            _ -> do
+                n <- get bh
+                return $ NotOrphan n
+
 data ClsInst 
   = ClsInst {   -- Used for "rough matching"; see Note [Rough-match field]
                 -- INVARIANT: is_tcs = roughMatchTcs is_tys
@@ -78,6 +112,7 @@ data ClsInst
 
              , is_flag :: OverlapFlag   -- See detailed comments with
                                         -- the decl of BasicTypes.OverlapFlag
+             , is_orphan :: IsOrphan
     }
   deriving (Data, Typeable)
 
@@ -211,22 +246,59 @@ mkLocalInstance :: DFunId -> OverlapFlag
                 -> [TyVar] -> Class -> [Type]
                 -> ClsInst
 -- Used for local instances, where we can safely pull on the DFunId
-mkLocalInstance dfun oflag tvs cls tys
+-- TODO: what is the difference between source_tvs and tvs?
+mkLocalInstance dfun oflag source_tvs cls tys
   = ClsInst { is_flag = oflag, is_dfun = dfun
-            , is_tvs = tvs
-            , is_cls = cls, is_cls_nm = className cls
-            , is_tys = tys, is_tcs = roughMatchTcs tys }
+            , is_tvs = source_tvs
+            , is_cls = cls, is_cls_nm = cls_name
+            , is_tys = tys, is_tcs = roughMatchTcs tys
+            , is_orphan = orph
+            }
+  where
+    cls_name = className cls
+    dfun_name = idName dfun
+    this_mod = ASSERT( isExternalName dfun_name ) nameModule dfun_name
+    is_local name = nameIsLocalOrFrom this_mod name
 
-mkImportedInstance :: Name -> [Maybe Name]
-                   -> DFunId -> OverlapFlag -> ClsInst
+        -- Compute orphanhood.  See Note [Orphans] in IfaceSyn
+    (tvs, fds) = classTvsFds cls
+    arg_names = [filterNameSet is_local (orphNamesOfType ty) | ty <- tys]
+
+    -- See Note [When exactly is an instance decl an orphan?] in IfaceSyn
+    orph | is_local cls_name = NotOrphan (nameOccName cls_name)
+         | all notOrphan mb_ns  = ASSERT( not (null mb_ns) ) head mb_ns
+         | otherwise         = IsOrphan
+
+    notOrphan NotOrphan{} = True
+    notOrphan _ = False
+
+    mb_ns :: [IsOrphan]    -- One for each fundep; a locally-defined name
+                           -- that is not in the "determined" arguments
+    mb_ns | null fds   = [choose_one arg_names]
+          | otherwise  = map do_one fds
+    do_one (_ltvs, rtvs) = choose_one [ns | (tv,ns) <- tvs `zip` arg_names
+                                          , not (tv `elem` rtvs)]
+
+    choose_one :: [NameSet] -> IsOrphan
+    choose_one nss = case nameSetElems (unionNameSets nss) of
+                        []      -> IsOrphan
+                        (n : _) -> NotOrphan (nameOccName n)
+
+mkImportedInstance :: Name
+                   -> [Maybe Name]
+                   -> DFunId
+                   -> OverlapFlag
+                   -> IsOrphan
+                   -> ClsInst
 -- Used for imported instances, where we get the rough-match stuff
 -- from the interface file
 -- The bound tyvars of the dfun are guaranteed fresh, because
 -- the dfun has been typechecked out of the same interface file
-mkImportedInstance cls_nm mb_tcs dfun oflag
+mkImportedInstance cls_nm mb_tcs dfun oflag orphan
   = ClsInst { is_flag = oflag, is_dfun = dfun
             , is_tvs = tvs, is_tys = tys
-            , is_cls_nm = cls_nm, is_cls = cls, is_tcs = mb_tcs }
+            , is_cls_nm = cls_nm, is_cls = cls, is_tcs = mb_tcs
+            , is_orphan = orphan }
   where
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
 
@@ -390,6 +462,16 @@ or, to put it another way, we have
 ---------------------------------------------------
 type InstEnv = UniqFM ClsInstEnv        -- Maps Class to instances for that class
 
+-- | 'InstEnvs' represents the combination of the global type class instance
+-- environment, the local type class instance environment, and the set of
+-- transitively reachable orphan modules (according to what modules have been
+-- directly imported) used to test orphan instance visibility.
+data InstEnvs = InstEnvs {
+        ie_global  :: InstEnv,
+        ie_local   :: InstEnv,
+        ie_visible :: VisibleOrphanModules
+    }
+
 newtype ClsInstEnv 
   = ClsIE [ClsInst]    -- The instances for a particular class, in any order
 
@@ -411,9 +493,21 @@ emptyInstEnv = emptyUFM
 instEnvElts :: InstEnv -> [ClsInst]
 instEnvElts ie = [elt | ClsIE elts <- eltsUFM ie, elt <- elts]
 
-classInstances :: (InstEnv,InstEnv) -> Class -> [ClsInst]
-classInstances (pkg_ie, home_ie) cls 
-  = get home_ie ++ get pkg_ie
+-- | Test if an instance is visible, by checking that its origin module
+-- is in 'VisibleOrphanModules'.
+instIsVisible :: VisibleOrphanModules -> ClsInst -> Bool
+instIsVisible vis_mods ispec
+  -- NB: Instances from the interactive package always are visible. We can't
+  -- add interactive modules to the set since we keep creating new ones
+  -- as a GHCi session progresses.
+  | isInteractiveModule mod = True
+  | IsOrphan <- is_orphan ispec = mod `elemModuleSet` vis_mods
+  | otherwise = True
+  where mod = nameModule (idName (is_dfun ispec))
+
+classInstances :: InstEnvs -> Class -> [ClsInst]
+classInstances (InstEnvs pkg_ie home_ie vis_mods) cls
+  = filter (instIsVisible vis_mods) (get home_ie ++ get pkg_ie)
   where
     get env = case lookupUFM env cls of
                 Just (ClsIE insts) -> insts
@@ -555,7 +649,7 @@ where the 'Nothing' indicates that 'b' can be freely instantiated.
 -- one instance and the match may not contain any flexi type variables.  If the lookup is unsuccessful,
 -- yield 'Left errorMessage'.
 --
-lookupUniqueInstEnv :: (InstEnv, InstEnv) 
+lookupUniqueInstEnv :: InstEnvs
                     -> Class -> [Type]
                     -> Either MsgDoc (ClsInst, [Type])
 lookupUniqueInstEnv instEnv cls tys
@@ -570,6 +664,7 @@ lookupUniqueInstEnv instEnv cls tys
       _other -> Left $ ptext (sLit "instance not found") <+> (ppr $ mkTyConApp (classTyCon cls) tys)
 
 lookupInstEnv' :: InstEnv          -- InstEnv to look in
+               -> VisibleOrphanModules   -- But filter against this
                -> Class -> [Type]  -- What we are looking for
                -> ([InstMatch],    -- Successful matches
                    [ClsInst])     -- These don't match but do unify
@@ -583,7 +678,7 @@ lookupInstEnv' :: InstEnv          -- InstEnv to look in
 -- but Foo [Int] is a unifier.  This gives the caller a better chance of
 -- giving a suitable error message
 
-lookupInstEnv' ie cls tys
+lookupInstEnv' ie vis_mods cls tys
   = lookup ie
   where
     rough_tcs  = roughMatchTcs tys
@@ -597,6 +692,8 @@ lookupInstEnv' ie cls tys
     find ms us [] = (ms, us)
     find ms us (item@(ClsInst { is_tcs = mb_tcs, is_tvs = tpl_tvs
                               , is_tys = tpl_tys, is_flag = oflag }) : rest)
+      | not (instIsVisible vis_mods item)
+      = find ms us rest
         -- Fast check for no match, uses the "rough match" fields
       | instanceCantMatch rough_tcs mb_tcs
       = find ms us rest
@@ -632,15 +729,15 @@ lookupInstEnv' ie cls tys
 
 ---------------
 -- This is the common way to call this function.
-lookupInstEnv :: (InstEnv, InstEnv)     -- External and home package inst-env
+lookupInstEnv :: InstEnvs     -- External and home package inst-env
               -> Class -> [Type]   -- What we are looking for
               -> ClsInstLookupResult
 -- ^ See Note [Rules for instance lookup]
-lookupInstEnv (pkg_ie, home_ie) cls tys
+lookupInstEnv (InstEnvs pkg_ie home_ie vis_mods) cls tys
   = (final_matches, final_unifs, safe_fail)
   where
-    (home_matches, home_unifs) = lookupInstEnv' home_ie cls tys
-    (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  cls tys
+    (home_matches, home_unifs) = lookupInstEnv' home_ie vis_mods cls tys
+    (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  vis_mods cls tys
     all_matches = home_matches ++ pkg_matches
     all_unifs   = home_unifs   ++ pkg_unifs
     pruned_matches = foldr insert_overlapping [] all_matches

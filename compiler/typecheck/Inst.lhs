@@ -398,11 +398,14 @@ getOverlapFlag overlap_mode
               final_oflag = setOverlapModeMaybe default_oflag overlap_mode
         ; return final_oflag }
 
-tcGetInstEnvs :: TcM (InstEnv, InstEnv)
+tcGetInstEnvs :: TcM InstEnvs
 -- Gets both the external-package inst-env
 -- and the home-pkg inst env (includes module being compiled)
-tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
-                     return (eps_inst_env eps, tcg_inst_env env) }
+tcGetInstEnvs = do { eps <- getEps
+                   ; env <- getGblEnv
+                   ; return (InstEnvs (eps_inst_env eps)
+                                      (tcg_inst_env env)
+                                      (tcg_visible_orphan_mods env))}
 
 tcGetInsts :: TcM [ClsInst]
 -- Gets the local class instances.
@@ -482,7 +485,9 @@ addLocalInst (home_ie, my_insts) ispec
                global_ie
                     | isJust (tcg_sig_of tcg_env) = emptyInstEnv
                     | otherwise = eps_inst_env eps
-               inst_envs       = (global_ie, home_ie')
+               inst_envs       = InstEnvs global_ie
+                                          home_ie'
+                                          (tcg_visible_orphan_mods tcg_env)
                (matches, _, _) = lookupInstEnv inst_envs cls tys
                dups            = filter (identicalInstHead ispec) (map fst matches)
 

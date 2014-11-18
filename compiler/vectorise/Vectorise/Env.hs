@@ -123,7 +123,7 @@ data GlobalEnv
         , global_pr_funs              :: NameEnv Var
           -- ^Mapping from TyCons to their PR dfuns.
 
-        , global_inst_env             :: (InstEnv, InstEnv)
+        , global_inst_env             :: InstEnvs
           -- ^External package inst-env & home-package inst-env for class instances.
 
         , global_fam_inst_env         :: FamInstEnvs
@@ -139,7 +139,12 @@ data GlobalEnv
 -- to the global table, so that we can query scalarness during vectorisation, and especially, when
 -- vectorising the scalar entities' definitions themselves.
 --
-initGlobalEnv :: Bool -> VectInfo -> [CoreVect] -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
+initGlobalEnv :: Bool
+              -> VectInfo
+              -> [CoreVect]
+              -> InstEnvs
+              -> FamInstEnvs
+              -> GlobalEnv
 initGlobalEnv vectAvoid info vectDecls instEnvs famInstEnvs
   = GlobalEnv 
   { global_vect_avoid           = vectAvoid

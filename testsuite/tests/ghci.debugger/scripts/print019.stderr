@@ -5,8 +5,12 @@
     Use :print or :force to determine these types
     Relevant bindings include it :: a1 (bound at <interactive>:11:1)
     Note: there are several potential instances:
-      instance Show TyCon -- Defined in ‘Data.Typeable.Internal’
-      instance Show TypeRep -- Defined in ‘Data.Typeable.Internal’
-      instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
-      ...plus 30 others
+      instance forall (k :: BOX) (s :: k). Show (Proxy s)
+        -- Defined in ‘Data.Proxy’
+      instance forall (k :: BOX) (a :: k) (b :: k).
+               Show (Data.Type.Coercion.Coercion a b)
+        -- Defined in ‘Data.Type.Coercion’
+      instance forall (k :: BOX) (a :: k) (b :: k). Show (a :~: b)
+        -- Defined in ‘Data.Type.Equality’
+      ...plus 47 others
     In a stmt of an interactive GHCi command: print it

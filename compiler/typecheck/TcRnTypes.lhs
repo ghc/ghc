@@ -269,6 +269,11 @@ data TcGblEnv
         tcg_fam_inst_env :: FamInstEnv, -- ^ Ditto for family instances
         tcg_ann_env      :: AnnEnv,     -- ^ And for annotations
 
+        tcg_visible_orphan_mods :: ModuleSet,
+          -- ^ The set of orphan modules which transitively reachable from
+          -- direct imports.  We use this to figure out if an orphan instance
+          -- in the global InstEnv should be considered visible.
+
                 -- Now a bunch of things about this module that are simply
                 -- accumulated, but never consulted until the end.
                 -- Nevertheless, it's convenient to accumulate them along

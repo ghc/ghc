@@ -203,7 +203,7 @@ pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
   = vcat [ptext (sLit "forall") <+> braces (pprWithCommas ppr qtvs),
           nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2 | (FDEq _ t1 t2) <- pairs])]
 
-improveFromInstEnv :: (InstEnv,InstEnv)
+improveFromInstEnv :: InstEnvs
                    -> PredType
                    -> [Equation SrcSpan] -- Needs to be an Equation because
                                          -- of quantified variables
@@ -522,7 +522,7 @@ if s1 matches
 
 
 \begin{code}
-checkFunDeps :: (InstEnv, InstEnv) -> ClsInst
+checkFunDeps :: InstEnvs -> ClsInst
              -> Maybe [ClsInst] -- Nothing  <=> ok
                                 -- Just dfs <=> conflict with dfs
 -- Check whether adding DFunId would break functional-dependency constraints

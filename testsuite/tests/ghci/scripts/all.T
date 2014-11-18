@@ -99,6 +99,8 @@ test('T1914',
      ghci_script,
      ['T1914.script'])
 
+test('T2182ghci', normal, ghci_script, ['T2182ghci.script'])
+test('T2182ghci2', [extra_hc_opts("-XNoImplicitPrelude")], ghci_script, ['T2182ghci2.script'])
 test('T2976', normal, ghci_script, ['T2976.script'])
 test('T2816', normal, ghci_script, ['T2816.script'])
 test('T789', normal, ghci_script, ['T789.script'])

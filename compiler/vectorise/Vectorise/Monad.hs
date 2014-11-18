@@ -42,6 +42,7 @@ import Id
 import Name
 import ErrUtils
 import Outputable
+import Module
 
 
 -- |Run a vectorisation computation.
@@ -85,7 +86,9 @@ initV hsc_env guts info thing_inside
                -- set up class and type family envrionments
            ; eps <- liftIO $ hscEPS hsc_env
            ; let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
-                 instEnvs    = (eps_inst_env     eps, mg_inst_env     guts)
+                 instEnvs    = InstEnvs (eps_inst_env     eps)
+                                        (mg_inst_env     guts)
+                                        (mkModuleSet (dep_orphs (mg_deps guts)))
                  builtin_pas = initClassDicts instEnvs (paClass builtins)  -- grab all 'PA' and..
                  builtin_prs = initClassDicts instEnvs (prClass builtins)  -- ..'PR' class instances
 
@@ -114,7 +117,7 @@ initV hsc_env guts info thing_inside
     -- instance dfun for that type constructor and class.  (DPH class instances cannot overlap in
     -- head constructors.)
     --
-    initClassDicts :: (InstEnv, InstEnv) -> Class -> [(Name, Var)]
+    initClassDicts :: InstEnvs -> Class -> [(Name, Var)]
     initClassDicts insts cls = map find $ classInstances insts cls
       where
         find i | [Just tc] <- instanceRoughTcs i = (tc, instanceDFunId i)

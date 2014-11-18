@@ -735,11 +735,12 @@ look at it.
 \begin{code}
 tcIfaceInst :: IfaceClsInst -> IfL ClsInst
 tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag
-                          , ifInstCls = cls, ifInstTys = mb_tcs })
+                          , ifInstCls = cls, ifInstTys = mb_tcs
+                          , ifInstOrph = orph })
   = do { dfun <- forkM (ptext (sLit "Dict fun") <+> ppr dfun_occ) $
                  tcIfaceExtId dfun_occ
        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
-       ; return (mkImportedInstance cls mb_tcs' dfun oflag) }
+       ; return (mkImportedInstance cls mb_tcs' dfun oflag orph) }
 
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs

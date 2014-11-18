@@ -1,0 +1,28 @@
+
+T2182.hs:5:5:
+    No instance for (Show (t1 -> t1))
+      (maybe you haven't applied enough arguments to a function?)
+      arising from a use of ‘show’
+    In the expression: show (\ x -> x)
+    In an equation for ‘y’: y = show (\ x -> x)
+
+T2182.hs:6:15:
+    No instance for (Eq (t0 -> t0))
+      (maybe you haven't applied enough arguments to a function?)
+      arising from a use of ‘==’
+    In the expression: (\ x -> x) == (\ y -> y)
+    In an equation for ‘z’: z = (\ x -> x) == (\ y -> y)
+
+T2182.hs:5:5:
+    No instance for (Show (t1 -> t1))
+      (maybe you haven't applied enough arguments to a function?)
+      arising from a use of ‘show’
+    In the expression: show (\ x -> x)
+    In an equation for ‘y’: y = show (\ x -> x)
+
+T2182.hs:6:15:
+    No instance for (Eq (t0 -> t0))
+      (maybe you haven't applied enough arguments to a function?)
+      arising from a use of ‘==’
+    In the expression: (\ x -> x) == (\ y -> y)
+    In an equation for ‘z’: z = (\ x -> x) == (\ y -> y)

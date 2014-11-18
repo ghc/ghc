@@ -339,10 +339,10 @@ mkIface_ hsc_env maybe_old_fingerprint
         unqual = mkPrintUnqualified dflags rdr_env
         inst_warns = listToBag [ instOrphWarn dflags unqual d
                                | (d,i) <- insts `zip` iface_insts
-                               , isNothing (ifInstOrph i) ]
+                               , isOrphan (ifInstOrph i) ]
         rule_warns = listToBag [ ruleOrphWarn dflags unqual this_mod r
                                | r <- iface_rules
-                               , isNothing (ifRuleOrph r)
+                               , isOrphan (ifRuleOrph r)
                                , if ifRuleAuto r then warn_auto_orphs
                                                  else warn_orphs ]
 
@@ -934,17 +934,16 @@ ruleOrphWarn dflags unqual mod rule
 --      (a) an OccEnv for ones that are not orphans,
 --          mapping the local OccName to a list of its decls
 --      (b) a list of orphan decls
-mkOrphMap :: (decl -> Maybe OccName)    -- (Just occ) for a non-orphan decl, keyed by occ
-                                        -- Nothing for an orphan decl
-          -> [decl]                     -- Sorted into canonical order
-          -> (OccEnv [decl],            -- Non-orphan decls associated with their key;
-                                        --      each sublist in canonical order
-              [decl])                   -- Orphan decls; in canonical order
+mkOrphMap :: (decl -> IsOrphan) -- Extract orphan status from decl
+          -> [decl]             -- Sorted into canonical order
+          -> (OccEnv [decl],    -- Non-orphan decls associated with their key;
+                                --      each sublist in canonical order
+              [decl])           -- Orphan decls; in canonical order
 mkOrphMap get_key decls
   = foldl go (emptyOccEnv, []) decls
   where
     go (non_orphs, orphs) d
-        | Just occ <- get_key d
+        | NotOrphan occ <- get_key d
         = (extendOccEnv_Acc (:) singleton non_orphs occ d, orphs)
         | otherwise = (non_orphs, d:orphs)
 \end{code}
@@ -1797,7 +1796,8 @@ getFS x = occNameFS (getOccName x)
 instanceToIfaceInst :: ClsInst -> IfaceClsInst
 instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
                              , is_cls_nm = cls_name, is_cls = cls
-                             , is_tys = tys, is_tcs = mb_tcs })
+                             , is_tcs = mb_tcs
+                             , is_orphan = orph })
   = ASSERT( cls_name == className cls )
     IfaceClsInst { ifDFun    = dfun_name,
                 ifOFlag   = oflag,
@@ -1809,29 +1809,7 @@ instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
     do_rough (Just n) = Just (toIfaceTyCon_name n)
 
     dfun_name = idName dfun_id
-    mod       = ASSERT( isExternalName dfun_name ) nameModule dfun_name
-    is_local name = nameIsLocalOrFrom mod name
 
-        -- Compute orphanhood.  See Note [Orphans] in IfaceSyn
-    (tvs, fds) = classTvsFds cls
-    arg_names = [filterNameSet is_local (orphNamesOfType ty) | ty <- tys]
-
-    -- See Note [When exactly is an instance decl an orphan?] in IfaceSyn
-    orph | is_local cls_name = Just (nameOccName cls_name)
-         | all isJust mb_ns  = ASSERT( not (null mb_ns) ) head mb_ns
-         | otherwise         = Nothing
-
-    mb_ns :: [Maybe OccName]    -- One for each fundep; a locally-defined name
-                                -- that is not in the "determined" arguments
-    mb_ns | null fds   = [choose_one arg_names]
-          | otherwise  = map do_one fds
-    do_one (_ltvs, rtvs) = choose_one [ns | (tv,ns) <- tvs `zip` arg_names
-                                          , not (tv `elem` rtvs)]
-
-    choose_one :: [NameSet] -> Maybe OccName
-    choose_one nss = case nameSetElems (unionNameSets nss) of
-                        []      -> Nothing
-                        (n : _) -> Just (nameOccName n)
 
 --------------------------
 famInstToIfaceFamInst :: FamInst -> IfaceFamInst
@@ -1854,14 +1832,14 @@ famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
     lhs_names = filterNameSet is_local (orphNamesOfCoCon axiom)
 
     orph | is_local fam_decl
-         = Just (nameOccName fam_decl)
+         = NotOrphan (nameOccName fam_decl)
 
          | not (isEmptyNameSet lhs_names)
-         = Just (nameOccName (head (nameSetElems lhs_names)))
+         = NotOrphan (nameOccName (head (nameSetElems lhs_names)))
 
 
          | otherwise
-         = Nothing
+         = IsOrphan
 
 --------------------------
 toIfaceLetBndr :: Id -> IfaceLetBndr
@@ -1976,14 +1954,15 @@ coreRuleToIfaceRule mod rule@(Rule { ru_name = name, ru_fn = fn,
     lhs_names = nameSetElems (ruleLhsOrphNames rule)
 
     orph = case filter (nameIsLocalOrFrom mod) lhs_names of
-                        (n : _) -> Just (nameOccName n)
-                        []      -> Nothing
+                        (n : _) -> NotOrphan (nameOccName n)
+                        []      -> IsOrphan
 
 bogusIfaceRule :: Name -> IfaceRule
 bogusIfaceRule id_name
   = IfaceRule { ifRuleName = fsLit "bogus", ifActivation = NeverActive,
         ifRuleBndrs = [], ifRuleHead = id_name, ifRuleArgs = [],
-        ifRuleRhs = IfaceExt id_name, ifRuleOrph = Nothing, ifRuleAuto = True }
+        ifRuleRhs = IfaceExt id_name, ifRuleOrph = IsOrphan,
+        ifRuleAuto = True }
 
 ---------------------
 toIfaceExpr :: CoreExpr -> IfaceExpr

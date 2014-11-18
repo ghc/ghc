@@ -1971,9 +1971,13 @@ data Dependencies
                         -- (Safe Haskell). See Note [RnNames . Tracking Trust Transitively]
 
          , dep_orphs  :: [Module]
-                        -- ^ Orphan modules (whether home or external pkg),
-                        -- *not* including family instance orphans as they
-                        -- are anyway included in 'dep_finsts'
+                        -- ^ Transitive closure of orphan modules (whether
+                        -- home or external pkg).
+                        --
+                        -- (Possible optimization: don't include family
+                        -- instance orphans as they are anyway included in
+                        -- 'dep_finsts'.  But then be careful about code
+                        -- which relies on dep_orphs having the complete list!)
 
          , dep_finsts :: [Module]
                         -- ^ Modules that contain family instances (whether the

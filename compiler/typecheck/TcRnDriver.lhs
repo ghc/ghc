@@ -419,6 +419,9 @@ tcRnImports hsc_env import_decls
               tcg_rdr_env      = tcg_rdr_env gbl `plusGlobalRdrEnv` rdr_env,
               tcg_imports      = tcg_imports gbl `plusImportAvails` imports,
               tcg_rn_imports   = rn_imports,
+              tcg_visible_orphan_mods = foldl extendModuleSet
+                                              (tcg_visible_orphan_mods gbl)
+                                              (imp_orphs imports),
               tcg_inst_env     = extendInstEnvList (tcg_inst_env gbl) home_insts,
               tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl)
                                                       home_fam_insts,
@@ -1404,6 +1407,14 @@ runTcInteractive hsc_env thing_inside
                       vcat (map ppr [ local_gres | gres <- occEnvElts (ic_rn_gbl_env icxt)
                                                  , let local_gres = filter isLocalGRE gres
                                                  , not (null local_gres) ]) ]
+       ; let getOrphans m = fmap (concatMap (\iface -> mi_module iface
+                                                 : dep_orphs (mi_deps iface)))
+                                 (loadSrcInterface (text "runTcInteractive") m
+                                                   False Nothing)
+       ; ic_visible_mods <- fmap concat . forM (ic_imports icxt) $ \i ->
+            case i of
+                IIModule n -> getOrphans n
+                IIDecl i -> getOrphans (unLoc (ideclName i))
        ; gbl_env <- getGblEnv
        ; let gbl_env' = gbl_env {
                            tcg_rdr_env      = ic_rn_gbl_env icxt
@@ -1422,7 +1433,13 @@ runTcInteractive hsc_env thing_inside
                               -- setting tcg_field_env is necessary
                               -- to make RecordWildCards work (test: ghci049)
                          , tcg_fix_env      = ic_fix_env icxt
-                         , tcg_default      = ic_default icxt }
+                         , tcg_default      = ic_default icxt
+                         , tcg_visible_orphan_mods = mkModuleSet ic_visible_mods
+                              -- I guess there's a risk ic_imports will be
+                              -- desynchronized with the true RdrEnv; probably
+                              -- should insert some ASSERTs somehow.
+                              -- TODO: Cache this
+                         }
 
        ; setGblEnv gbl_env' $
          tcExtendGhciIdEnv ty_things $   -- See Note [Initialising the type environment for GHCi]
@@ -1957,7 +1974,7 @@ tcRnGetInfo hsc_env name
 
 lookupInsts :: TyThing -> TcM ([ClsInst],[FamInst])
 lookupInsts (ATyCon tc)
-  = do  { (pkg_ie, home_ie) <- tcGetInstEnvs
+  = do  { InstEnvs pkg_ie home_ie vis_mods <- tcGetInstEnvs
         ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
                 -- Load all instances for all classes that are
                 -- in the type environment (which are all the ones
@@ -1968,6 +1985,7 @@ lookupInsts (ATyCon tc)
         ; let cls_insts =
                  [ ispec        -- Search all
                  | ispec <- instEnvElts home_ie ++ instEnvElts pkg_ie
+                 , instIsVisible vis_mods ispec
                  , tc_name `elemNameSet` orphNamesOfClsInst ispec ]
         ; let fam_insts =
                  [ fispec

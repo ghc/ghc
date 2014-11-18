@@ -132,6 +132,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_inst_env       = emptyInstEnv,
                 tcg_fam_inst_env   = emptyFamInstEnv,
                 tcg_ann_env        = emptyAnnEnv,
+                tcg_visible_orphan_mods = mkModuleSet [mod],
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
                 tcg_exports        = [],
@@ -1307,7 +1308,9 @@ mkIfLclEnv mod loc = IfLclEnv { if_mod     = mod,
 initIfaceTcRn :: IfG a -> TcRn a
 initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv
-        ; let { if_env = IfGblEnv { if_rec_types = Just (tcg_mod tcg_env, get_type_env) }
+        ; let { if_env = IfGblEnv {
+                            if_rec_types = Just (tcg_mod tcg_env, get_type_env)
+                         }
               ; get_type_env = readTcRef (tcg_type_env_var tcg_env) }
         ; setEnvs (if_env, ()) thing_inside }
 
@@ -1327,7 +1330,9 @@ initIfaceTc :: ModIface
 -- No type envt from the current module, but we do know the module dependencies
 initIfaceTc iface do_this
  = do   { tc_env_var <- newTcRef emptyTypeEnv
-        ; let { gbl_env = IfGblEnv { if_rec_types = Just (mod, readTcRef tc_env_var) } ;
+        ; let { gbl_env = IfGblEnv {
+                            if_rec_types = Just (mod, readTcRef tc_env_var)
+                          } ;
               ; if_lenv = mkIfLclEnv mod doc
            }
         ; setEnvs (gbl_env, if_lenv) (do_this tc_env_var)

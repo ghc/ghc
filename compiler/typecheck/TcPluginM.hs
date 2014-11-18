@@ -101,7 +101,7 @@ getTopEnv = unsafeTcPluginTcM TcRnMonad.getTopEnv
 getEnvs :: TcPluginM (TcGblEnv, TcLclEnv)
 getEnvs = unsafeTcPluginTcM TcRnMonad.getEnvs
 
-getInstEnvs :: TcPluginM (InstEnv, InstEnv)
+getInstEnvs :: TcPluginM InstEnvs
 getInstEnvs = unsafeTcPluginTcM Inst.tcGetInstEnvs
 
 getFamInstEnvs :: TcPluginM (FamInstEnv, FamInstEnv)

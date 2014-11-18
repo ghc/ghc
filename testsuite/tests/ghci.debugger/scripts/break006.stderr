@@ -5,10 +5,13 @@
     Use :print or :force to determine these types
     Relevant bindings include it :: t1 (bound at <interactive>:6:1)
     Note: there are several potential instances:
-      instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
-      instance Show Ordering -- Defined in ‘GHC.Show’
-      instance Show Integer -- Defined in ‘GHC.Show’
-      ...plus 22 others
+      instance (Show a, Show b) => Show (Either a b)
+        -- Defined in ‘Data.Either’
+      instance forall (k :: BOX) (s :: k). Show (Data.Proxy.Proxy s)
+        -- Defined in ‘Data.Proxy’
+      instance (GHC.Arr.Ix a, Show a, Show b) => Show (GHC.Arr.Array a b)
+        -- Defined in ‘GHC.Arr’
+      ...plus 25 others
     In a stmt of an interactive GHCi command: print it
 
 <interactive>:8:1:
@@ -17,8 +20,11 @@
     Use :print or :force to determine these types
     Relevant bindings include it :: t1 (bound at <interactive>:8:1)
     Note: there are several potential instances:
-      instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
-      instance Show Ordering -- Defined in ‘GHC.Show’
-      instance Show Integer -- Defined in ‘GHC.Show’
-      ...plus 22 others
+      instance (Show a, Show b) => Show (Either a b)
+        -- Defined in ‘Data.Either’
+      instance forall (k :: BOX) (s :: k). Show (Data.Proxy.Proxy s)
+        -- Defined in ‘Data.Proxy’
+      instance (GHC.Arr.Ix a, Show a, Show b) => Show (GHC.Arr.Array a b)
+        -- Defined in ‘GHC.Arr’
+      ...plus 25 others
     In a stmt of an interactive GHCi command: print it

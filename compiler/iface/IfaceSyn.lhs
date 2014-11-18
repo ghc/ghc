@@ -56,6 +56,7 @@ import HsBinds
 import TyCon (Role (..))
 import StaticFlags (opt_PprStyle_Debug)
 import Util( filterOut )
+import InstEnv
 
 import Control.Monad
 import System.IO.Unsafe
@@ -213,7 +214,7 @@ data IfaceClsInst
                    ifInstTys  :: [Maybe IfaceTyCon],       -- the defn of ClsInst
                    ifDFun     :: IfExtName,                -- The dfun
                    ifOFlag    :: OverlapFlag,              -- Overlap flag
-                   ifInstOrph :: Maybe OccName }           -- See Note [Orphans]
+                   ifInstOrph :: IsOrphan }                -- See Note [Orphans]
         -- There's always a separate IfaceDecl for the DFun, which gives
         -- its IdInfo with its full type and version number.
         -- The instance declarations taken together have a version number,
@@ -227,7 +228,7 @@ data IfaceFamInst
   = IfaceFamInst { ifFamInstFam      :: IfExtName            -- Family name
                  , ifFamInstTys      :: [Maybe IfaceTyCon]   -- See above
                  , ifFamInstAxiom    :: IfExtName            -- The axiom
-                 , ifFamInstOrph     :: Maybe OccName        -- Just like IfaceClsInst
+                 , ifFamInstOrph     :: IsOrphan       -- Just like IfaceClsInst
                  }
 
 data IfaceRule
@@ -239,7 +240,7 @@ data IfaceRule
         ifRuleArgs   :: [IfaceExpr],    -- Args of LHS
         ifRuleRhs    :: IfaceExpr,
         ifRuleAuto   :: Bool,
-        ifRuleOrph   :: Maybe OccName   -- Just like IfaceClsInst
+        ifRuleOrph   :: IsOrphan   -- Just like IfaceClsInst
     }
 
 data IfaceAnnotation
