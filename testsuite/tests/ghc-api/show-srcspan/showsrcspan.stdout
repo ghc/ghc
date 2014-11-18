@@ -1,0 +1,7 @@
+"RealSrcLoc SrcLoc \"filename\" 1 3"
+"RealSrcLoc SrcLoc \"filename\" 1 5"
+"UnhelpfulLoc \"bad loc\""
+"RealSrcSpan SrcSpanPoint \"filename\" 1 3"
+"RealSrcSpan SrcSpanOneLine \"filename\" 1 3 5"
+"RealSrcSpan SrcSpanMultiLine \"filename\" 1 5 10 1"
+"UnhelpfulSpan \"bad span\""
