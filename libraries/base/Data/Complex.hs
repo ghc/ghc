@@ -138,22 +138,6 @@ instance  (RealFloat a) => Floating (Complex a) where
                       where expx = exp x
     log z          =  log (magnitude z) :+ phase z
 
-    x ** y = case (x,y) of
-      (_ , (0:+0))   ->  1 :+ 0
-      ((0:+0), (re:+_))
-        | re > 0     ->  0 :+ 0
-        | re < 0     ->  inf :+ 0
-        | otherwise  ->  nan :+ nan
-      ((re:+im), y)
-        | (isInfinite re || isInfinite im) -> case y of
-          (exp_re:+_) | exp_re > 0  -> inf :+ 0
-                      | exp_re < 0  -> 0 :+ 0
-                      | otherwise   -> nan :+ nan
-      (x, y)         ->  exp (log x * y)
-      where
-        inf = 1/0
-        nan = 0/0
-
     sqrt (0:+0)    =  0
     sqrt z@(x:+y)  =  u :+ (if y < 0 then -v else v)
                       where (u,v) = if x < 0 then (v',u') else (u',v')
