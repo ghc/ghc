@@ -176,6 +176,11 @@
                  Various features unsupported in quotations were previously
                  silently ignored. These now cause errors.
                </para>
+
+                <para>
+                    <literal>Lift</literal> instances were added for
+                    <literal>()</literal> and <literal>Ratio</literal>.
+               </para>
            </listitem>
        </itemizedlist>
     </sect3>

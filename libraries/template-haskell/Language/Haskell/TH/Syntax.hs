@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, PolymorphicComponents,
-             RoleAnnotations, DeriveGeneric #-}
+             RoleAnnotations, DeriveGeneric, TypeSynonymInstances,
+             FlexibleInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -454,7 +455,10 @@ instance Lift Integer where
   lift x = return (LitE (IntegerL x))
 
 instance Lift Int where
-  lift x= return (LitE (IntegerL (fromIntegral x)))
+  lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Lift Rational where
+  lift x = return (LitE (RationalL x))
 
 instance Lift Char where
   lift x = return (LitE (CharL x))
@@ -477,6 +481,9 @@ instance Lift a => Lift [a] where
 liftString :: String -> Q Exp
 -- Used in TcExpr to short-circuit the lifting for strings
 liftString s = return (LitE (StringL s))
+
+instance Lift () where
+  lift () = return (ConE (tupleDataName 0))
 
 instance (Lift a, Lift b) => Lift (a, b) where
   lift (a, b)
