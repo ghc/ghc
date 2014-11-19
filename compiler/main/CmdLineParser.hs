@@ -191,8 +191,9 @@ processOneArg opt_kind rest arg args
                                     []               -> missingArgErr dash_arg
                                     (L _ arg1:args1) -> Right (f arg1, args1)
 
+        -- See Trac #9776
         SepArg f -> case args of
-                        []               -> unknownFlagErr dash_arg
+                        []               -> missingArgErr dash_arg
                         (L _ arg1:args1) -> Right (f arg1, args1)
 
         Prefix f | notNull rest_no_eq -> Right (f rest_no_eq, args)

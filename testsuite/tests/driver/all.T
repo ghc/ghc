@@ -406,3 +406,6 @@ test('T9050', normal, build_T9050, [])
 
 test('write_interface_oneshot', normal, run_command, ['$MAKE -s --no-print-directory write_interface_oneshot'])
 test('write_interface_make', normal, run_command, ['$MAKE -s --no-print-directory write_interface_make'])
+
+test('T9776', normal, compile_fail, ['-frule-check'])
+
