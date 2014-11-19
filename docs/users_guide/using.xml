@@ -246,6 +246,13 @@ module X where
       </varlistentry>
 
       <varlistentry>
+        <term><filename>.hspp</filename></term>
+        <listitem>
+          <para>A file created by the preprocessor.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
         <term><filename>.hi</filename></term>
         <listitem>
           <para>A Haskell interface file, probably
@@ -383,7 +390,7 @@ module X where
         <term>
           <cmdsynopsis>
             <command>ghc -E</command>
-            <command>ghc -c</command>
+            <command>ghc -C</command>
             <command>ghc -S</command>
             <command>ghc -c</command>
           </cmdsynopsis>
@@ -395,10 +402,7 @@ module X where
         <listitem>
           <para>This is the traditional batch-compiler mode, in which
           GHC can compile source files one at a time, or link objects
-          together into an executable.  This mode also applies if
-          there is no other mode flag specified on the command line,
-          in which case it means that the specified files should be
-          compiled and then linked to form a program. See <xref
+          together into an executable. See <xref
           linkend="options-order"/>.</para>
         </listitem>
       </varlistentry>
@@ -617,6 +621,11 @@ ghc Main.hs
       given on the command line and GHC will include them when linking
       the executable.</para>
 
+      <para>For backward compatibility with existing make scripts, when
+      used in combination with <option>-c</option>, the linking phase
+      is omitted (same as <option>--make</option>
+      <option>-no-link</option>).</para>
+
       <para>Note that GHC can only follow dependencies if it has the
       source file available, so if your program includes a module for
       which there is no source file, even if you have an object and an
@@ -764,6 +773,10 @@ ghc -c Foo.hs
       <para>Note: The option <option>-E</option><indexterm><primary>-E
       option</primary></indexterm> runs just the pre-processing passes
       of the compiler, dumping the result in a file.</para>
+
+      <para>Note: The option <option>-C</option> is only available when
+      GHC is built in unregisterised mode. See <xref linkend="unreg"/>
+      for more details.</para>
 
       <sect3 id="overriding-suffixes">
         <title>Overriding the default behaviour for a file</title>

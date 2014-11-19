@@ -209,8 +209,8 @@
           </row>
           <row>
             <entry><option>-c</option></entry>
-            <entry>Do not link</entry>
-            <entry>dynamic</entry>
+            <entry>Stop after generating object (<literal>.o</literal>) file</entry>
+            <entry>mode</entry>
             <entry>-</entry>
           </row>
           <row>
