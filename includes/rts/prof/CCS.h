@@ -210,32 +210,32 @@ extern CostCentreStack * RTS_VAR(CCS_LIST);         // registered CCS list
  * Declaring Cost Centres & Cost Centre Stacks.
  * -------------------------------------------------------------------------- */
 
-# define CC_DECLARE(cc_ident,name,mod,loc,caf,is_local) \
-     is_local CostCentre cc_ident[1]                    \
-       = {{ ccID       : 0,                             \
-            label      : name,                          \
-            module     : mod,                           \
-            srcloc     : loc,                           \
-            time_ticks : 0,                             \
-            mem_alloc  : 0,                             \
-            link       : 0,                             \
-            is_caf     : caf                            \
+# define CC_DECLARE(cc_ident,name,mod,loc,caf,is_local)  \
+     is_local CostCentre cc_ident[1]                     \
+       = {{ .ccID       = 0,                             \
+            .label      = name,                          \
+            .module     = mod,                           \
+            .srcloc     = loc,                           \
+            .time_ticks = 0,                             \
+            .mem_alloc  = 0,                             \
+            .link       = 0,                             \
+            .is_caf     = caf                            \
          }};
 
-# define CCS_DECLARE(ccs_ident,cc_ident,is_local)       \
-     is_local CostCentreStack ccs_ident[1]              \
-       = {{ ccsID               : 0,                    \
-            cc                  : cc_ident,             \
-            prevStack           : NULL,                 \
-            indexTable          : NULL,                 \
-            root                : NULL,                 \
-            depth               : 0,                    \
-            selected            : 0,                    \
-            scc_count           : 0,                    \
-            time_ticks          : 0,                    \
-            mem_alloc           : 0,                    \
-            inherited_ticks     : 0,                    \
-            inherited_alloc     : 0                     \
+# define CCS_DECLARE(ccs_ident,cc_ident,is_local)        \
+     is_local CostCentreStack ccs_ident[1]               \
+       = {{ .ccsID               = 0,                    \
+            .cc                  = cc_ident,             \
+            .prevStack           = NULL,                 \
+            .indexTable          = NULL,                 \
+            .root                = NULL,                 \
+            .depth               = 0,                    \
+            .selected            = 0,                    \
+            .scc_count           = 0,                    \
+            .time_ticks          = 0,                    \
+            .mem_alloc           = 0,                    \
+            .inherited_ticks     = 0,                    \
+            .inherited_alloc     = 0                     \
        }};
 
 /* -----------------------------------------------------------------------------

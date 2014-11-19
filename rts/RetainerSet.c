@@ -40,11 +40,11 @@ static int nextId;              // id of next retainer set
  * from growing too large.
  * -------------------------------------------------------------------------- */
 RetainerSet rs_MANY = {
-    num : 0,
-    hashKey : 0,
-    link : NULL,
-    id : 1,
-    element : {}
+    .num     = 0,
+    .hashKey = 0,
+    .link    = NULL,
+    .id      = 1,
+    .element = {}
 };
 
 /* -----------------------------------------------------------------------------
