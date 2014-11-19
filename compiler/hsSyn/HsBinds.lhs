@@ -14,6 +14,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 module HsBinds where
 
@@ -41,8 +42,8 @@ import BooleanFormula (BooleanFormula)
 import Data.Data hiding ( Fixity )
 import Data.List
 import Data.Ord
-#if __GLASGOW_HASKELL__ < 709
 import Data.Foldable ( Foldable(..) )
+#if __GLASGOW_HASKELL__ < 709
 import Data.Traversable ( Traversable(..) )
 import Data.Monoid ( mappend )
 import Control.Applicative hiding (empty)
@@ -806,6 +807,24 @@ instance Functor HsPatSynDetails where
 instance Foldable HsPatSynDetails where
     foldMap f (InfixPatSyn left right) = f left `mappend` f right
     foldMap f (PrefixPatSyn args) = foldMap f args
+
+    foldl1 f (InfixPatSyn left right) = left `f` right
+    foldl1 f (PrefixPatSyn args) = Data.List.foldl1 f args
+
+    foldr1 f (InfixPatSyn left right) = left `f` right
+    foldr1 f (PrefixPatSyn args) = Data.List.foldr1 f args
+
+-- TODO: After a few more versions, we should probably use these.
+#if __GLASGOW_HASKELL__ >= 709
+    length (InfixPatSyn _ _) = 2
+    length (PrefixPatSyn args) = Data.List.length args
+
+    null (InfixPatSyn _ _) = False
+    null (PrefixPatSyn args) = Data.List.null args
+
+    toList (InfixPatSyn left right) = [left, right]
+    toList (PrefixPatSyn args) = args
+#endif
 
 instance Traversable HsPatSynDetails where
     traverse f (InfixPatSyn left right) = InfixPatSyn <$> f left <*> f right
