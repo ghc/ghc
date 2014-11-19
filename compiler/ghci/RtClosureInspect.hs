@@ -573,6 +573,7 @@ runTR_maybe hsc_env thing_inside
                                 thing_inside
        ; return res }
 
+-- | Term Reconstruction trace
 traceTR :: SDoc -> TR ()
 traceTR = liftTcM . traceOptTcRn Opt_D_dump_rtti
 

@@ -1471,7 +1471,7 @@ tcRnStmt hsc_env rdr_stmt
 
 -------------------------------------------------- -}
 
-    dumpOptTcRn Opt_D_dump_tc
+    traceOptTcRn Opt_D_dump_tc
         (vcat [text "Bound Ids" <+> pprWithCommas ppr global_ids,
                text "Typechecked expr" <+> ppr zonked_expr]) ;
 
@@ -1994,7 +1994,7 @@ loadUnqualIfaces hsc_env ictxt
 \begin{code}
 rnDump :: SDoc -> TcRn ()
 -- Dump, with a banner, if -ddump-rn
-rnDump doc = do { dumpOptTcRn Opt_D_dump_rn (mkDumpDoc "Renamer" doc) }
+rnDump doc = do { traceOptTcRn Opt_D_dump_rn (mkDumpDoc "Renamer" doc) }
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
@@ -2005,7 +2005,7 @@ tcDump env
              (printForUserTcRn short_dump) ;
 
         -- Dump bindings if -ddump-tc
-        dumpOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump)
+        traceOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump)
    }
   where
     short_dump = pprTcGblEnv env

@@ -126,6 +126,16 @@
                <option>-ddump-core-pipeline</option> flags have been removed.
              </para>
            </listitem>
+           <listitem>
+                <para>
+                    Many more options have learned to respect the <option>-ddump-to-file</option>.
+                    For example you can use <option>-ddump-to-file</option> with <option>-ddump-splices</option>
+                    to produce a <option>.dump-splices file</option>
+                    for each file that uses Template Haskell.
+                    This should be much easier to understand on a larger project
+                    than having everything being dumped to stdout.
+                </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 

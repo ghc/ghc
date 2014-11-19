@@ -23,7 +23,7 @@ module ErrUtils (
 
         ghcExit,
         doIfSet, doIfSet_dyn,
-        dumpIfSet, dumpIfSet_dyn,
+        dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_printer,
         mkDumpDoc, dumpSDoc,
 
         --  * Messages during compilation
@@ -235,12 +235,23 @@ dumpIfSet dflags flag hdr doc
   | not flag   = return ()
   | otherwise  = log_action dflags dflags SevDump noSrcSpan defaultDumpStyle (mkDumpDoc hdr doc)
 
+-- | a wrapper around 'dumpSDoc'.
+-- First check whether the dump flag is set
+-- Do nothing if it is unset
 dumpIfSet_dyn :: DynFlags -> DumpFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
-  | dopt flag dflags
-  = dumpSDoc dflags alwaysQualify flag hdr doc
-  | otherwise
-  = return ()
+  = when (dopt flag dflags) $ dumpSDoc dflags alwaysQualify flag hdr doc
+
+-- | a wrapper around 'dumpSDoc'.
+-- First check whether the dump flag is set
+-- Do nothing if it is unset
+--
+-- Unlike 'dumpIfSet_dyn',
+-- has a printer argument but no header argument
+dumpIfSet_dyn_printer :: PrintUnqualified
+                      -> DynFlags -> DumpFlag -> SDoc -> IO ()
+dumpIfSet_dyn_printer printer dflags flag doc
+  = when (dopt flag dflags) $ dumpSDoc dflags printer flag "" doc
 
 mkDumpDoc :: String -> SDoc -> SDoc
 mkDumpDoc hdr doc
