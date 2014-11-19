@@ -236,7 +236,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
        DoInteractive          -> ghciUI srcs Nothing
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
-       DoAbiHash              -> abiHash srcs
+       DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showPackages dflags6
 
   liftIO $ dumpFinalStats dflags6
@@ -798,7 +798,13 @@ the package chagnes, so during registration Cabal calls ghc --abi-hash
 to get a hash of the package's ABI.
 -}
 
-abiHash :: [(String, Maybe Phase)] -> Ghc ()
+-- | Print ABI hash of input modules.
+--
+-- The resulting hash is the MD5 of the GHC version used (Trac #5328,
+-- see 'hiVersion') and of the existing ABI hash from each module (see
+-- 'mi_mod_hash').
+abiHash :: [String] -- ^ List of module names
+        -> Ghc ()
 abiHash strs = do
   hsc_env <- getSession
   let dflags = hsc_dflags hsc_env
@@ -813,7 +819,7 @@ abiHash strs = do
            _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $
                           cannotFindInterface dflags modname r
 
-  mods <- mapM find_it (map fst strs)
+  mods <- mapM find_it strs
 
   let get_iface modl = loadUserInterface False (text "abiHash") modl
   ifaces <- initIfaceCheck hsc_env $ mapM get_iface mods
