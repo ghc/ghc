@@ -124,15 +124,11 @@ more_handlers(int sig)
 
 // Here's the pipe into which we will send our signals
 static int io_manager_wakeup_fd = -1;
-static int timer_manager_control_wr_fd = -1;
+static int io_manager_control_fd = -1;
 
 #define IO_MANAGER_WAKEUP 0xff
 #define IO_MANAGER_DIE    0xfe
 #define IO_MANAGER_SYNC   0xfd
-
-void setTimerManagerControlFd(int fd) {
-    timer_manager_control_wr_fd = fd;
-}
 
 void
 setIOManagerWakeupFd (int fd)
@@ -142,9 +138,14 @@ setIOManagerWakeupFd (int fd)
     io_manager_wakeup_fd = fd;
 }
 
-/* -----------------------------------------------------------------------------
- * Wake up at least one IO or timer manager HS thread.
- * -------------------------------------------------------------------------- */
+void
+setIOManagerControlFd (int fd)
+{
+    // only called when THREADED_RTS, but unconditionally
+    // compiled here because GHC.Event.Control depends on it.
+    io_manager_control_fd = fd;
+}
+
 void
 ioManagerWakeup (void)
 {
@@ -166,24 +167,14 @@ ioManagerWakeup (void)
 void
 ioManagerDie (void)
 {
-    StgWord8 byte = (StgWord8)IO_MANAGER_DIE;
-    nat i;
-    int fd;
     int r;
-
-    if (0 <= timer_manager_control_wr_fd) {
-        r = write(timer_manager_control_wr_fd, &byte, 1);
+    // Ask the IO Manager thread to exit
+    if (io_manager_control_fd >= 0) {
+	StgWord8 byte = (StgWord8)IO_MANAGER_DIE;
+	r = write(io_manager_control_fd, &byte, 1);
         if (r == -1) { sysErrorBelch("ioManagerDie: write"); }
-        timer_manager_control_wr_fd = -1;
-    }
-
-    for (i=0; i < n_capabilities; i++) {
-        fd = capabilities[i]->io_manager_control_wr_fd;
-        if (0 <= fd) {
-            r = write(fd, &byte, 1);
-            if (r == -1) { sysErrorBelch("ioManagerDie: write"); }
-            capabilities[i]->io_manager_control_wr_fd = -1;
-        }
+        io_manager_control_fd = -1;
+        io_manager_wakeup_fd = -1;
     }
 }
 
@@ -198,10 +189,10 @@ ioManagerStart (void)
 {
     // Make sure the IO manager thread is running
     Capability *cap;
-    if (timer_manager_control_wr_fd < 0 || io_manager_wakeup_fd < 0) {
-        cap = rts_lock();
+    if (io_manager_control_fd < 0 || io_manager_wakeup_fd < 0) {
+	cap = rts_lock();
         ioManagerStartCap(&cap);
-        rts_unlock(cap);
+	rts_unlock(cap);
     }
 }
 #endif
@@ -229,37 +220,26 @@ generic_handler(int sig USED_IF_THREADS,
 {
 #if defined(THREADED_RTS)
 
-    StgWord8 buf[sizeof(siginfo_t) + 1];
-    int r;
-
-    buf[0] = sig;
-    if (info == NULL) {
-        // info may be NULL on Solaris (see #3790)
-        memset(buf+1, 0, sizeof(siginfo_t));
-    } else {
-        memcpy(buf+1, info, sizeof(siginfo_t));
-    }
-
-    if (0 <= timer_manager_control_wr_fd)
+    if (io_manager_control_fd != -1)
     {
-        r = write(timer_manager_control_wr_fd, buf, sizeof(siginfo_t)+1);
-        if (r == -1 && errno == EAGAIN) {
+        StgWord8 buf[sizeof(siginfo_t) + 1];
+        int r;
+
+        buf[0] = sig;
+
+	if (info == NULL) {
+	    // info may be NULL on Solaris (see #3790)
+	    memset(buf+1, 0, sizeof(siginfo_t));
+	} else {
+	    memcpy(buf+1, info, sizeof(siginfo_t));
+	}
+
+	r = write(io_manager_control_fd, buf, sizeof(siginfo_t)+1);
+        if (r == -1 && errno == EAGAIN)
+        {
             errorBelch("lost signal due to full pipe: %d\n", sig);
         }
     }
-
-    nat i;
-    int fd;
-    for (i=0; i < n_capabilities; i++) {
-        fd = capabilities[i]->io_manager_control_wr_fd;
-        if (0 <= fd) {
-            r = write(fd, buf, sizeof(siginfo_t)+1);
-            if (r == -1 && errno == EAGAIN) {
-                errorBelch("lost signal due to full pipe: %d\n", sig);
-            }
-        }
-    }
-
     // If the IO manager hasn't told us what the FD of the write end
     // of its pipe is, there's not much we can do here, so just ignore
     // the signal..
