@@ -166,6 +166,8 @@ __decodeDouble_2Int (I_ *man_sign, W_ *man_high, W_ *man_low, I_ *exp, StgDouble
 StgInt
 __decodeDouble_Int64 (StgInt64 *const mantissa, const StgDouble dbl)
 {
+#if 0
+    // We can't use this yet as-is, see ticket #9810
     if (dbl) {
         int exp = 0;
         *mantissa = (StgInt64)scalbn(frexp(dbl, &exp), DBL_MANT_DIG);
@@ -174,6 +176,17 @@ __decodeDouble_Int64 (StgInt64 *const mantissa, const StgDouble dbl)
         *mantissa = 0;
         return 0;
     }
+#else
+    I_ man_sign = 0;
+    W_ man_high = 0, man_low = 0;
+    I_ exp = 0;
+
+    __decodeDouble_2Int (&man_sign, &man_high, &man_low, &exp, dbl);
+
+    *mantissa = ((((StgInt64)man_high << 32) | (StgInt64)man_low)
+                 * (StgInt64)man_sign);
+    return exp;
+#endif
 }
 
 /* Convenient union types for checking the layout of IEEE 754 types -
