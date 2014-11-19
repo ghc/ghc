@@ -878,6 +878,7 @@ data Loc
         , loc_module   :: String
         , loc_start    :: CharPos
         , loc_end      :: CharPos }
+   deriving( Show, Eq, Data, Typeable, Generic )
 
 type CharPos = (Int, Int)       -- ^ Line and character position
 
@@ -952,13 +953,13 @@ data Info
   | TyVarI      -- Scoped type variable
         Name
         Type    -- What it is bound to
-  deriving( Show, Data, Typeable, Generic )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 -- | Obtained from 'reifyModule' in the 'Q' Monad.
 data ModuleInfo =
   -- | Contains the import list of the module.
   ModuleInfo [Module]
-  deriving( Show, Data, Typeable, Generic )
+  deriving( Show, Eq, Data, Typeable, Generic )
 
 {- |
 In 'ClassOpI' and 'DataConI', name of the parent class or type
