@@ -124,7 +124,7 @@ primOpRules nm ISllOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 Bits.shiftL)
                                                , rightIdentityDynFlags zeroi ]
 primOpRules nm ISraOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 Bits.shiftR)
                                                , rightIdentityDynFlags zeroi ]
-primOpRules nm ISrlOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 shiftRightLogical)
+primOpRules nm ISrlOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2' shiftRightLogical)
                                                , rightIdentityDynFlags zeroi ]
 
 -- Word operations
@@ -150,7 +150,7 @@ primOpRules nm XorOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
                                                , equalArgs >> retLit zerow ]
 primOpRules nm NotOp       = mkPrimOpRule nm 1 [ unaryLit complementOp
                                                , inversePrimOp NotOp ]
-primOpRules nm SllOp       = mkPrimOpRule nm 2 [ wordShiftRule Bits.shiftL ]
+primOpRules nm SllOp       = mkPrimOpRule nm 2 [ wordShiftRule (const Bits.shiftL) ]
 primOpRules nm SrlOp       = mkPrimOpRule nm 2 [ wordShiftRule shiftRightLogical ]
 
 -- coercions
@@ -363,15 +363,24 @@ complementOp _      _            = Nothing
 intOp2 :: (Integral a, Integral b)
        => (a -> b -> Integer)
        -> DynFlags -> Literal -> Literal -> Maybe CoreExpr
-intOp2 op dflags (MachInt i1) (MachInt i2) = intResult dflags (fromInteger i1 `op` fromInteger i2)
-intOp2 _  _      _            _            = Nothing  -- Could find LitLit
+intOp2 = intOp2' . const
 
-shiftRightLogical :: Integer -> Int -> Integer
+intOp2' :: (Integral a, Integral b)
+        => (DynFlags -> a -> b -> Integer)
+        -> DynFlags -> Literal -> Literal -> Maybe CoreExpr
+intOp2' op dflags (MachInt i1) (MachInt i2) =
+  let o = op dflags
+  in  intResult dflags (fromInteger i1 `o` fromInteger i2)
+intOp2' _  _      _            _            = Nothing  -- Could find LitLit
+
+shiftRightLogical :: DynFlags -> Integer -> Int -> Integer
 -- Shift right, putting zeros in rather than sign-propagating as Bits.shiftR would do
 -- Do this by converting to Word and back.  Obviously this won't work for big
 -- values, but its ok as we use it here
-shiftRightLogical x n = fromIntegral (fromInteger x `shiftR` n :: Word)
-
+shiftRightLogical dflags x n
+  | wordSizeInBits dflags == 32 = fromIntegral (fromInteger x `shiftR` n :: Word32)
+  | wordSizeInBits dflags == 64 = fromIntegral (fromInteger x `shiftR` n :: Word64)
+  | otherwise = panic "shiftRightLogical: unsupported word size"
 
 --------------------------
 retLit :: (DynFlags -> Literal) -> RuleM CoreExpr
@@ -385,8 +394,8 @@ wordOp2 op dflags (MachWord w1) (MachWord w2)
     = wordResult dflags (fromInteger w1 `op` fromInteger w2)
 wordOp2 _ _ _ _ = Nothing  -- Could find LitLit
 
-wordShiftRule :: (Integer -> Int -> Integer) -> RuleM CoreExpr
-                 -- Shifts take an Int; hence second arg of op is Int
+wordShiftRule :: (DynFlags -> Integer -> Int -> Integer) -> RuleM CoreExpr
+                 -- Shifts take an Int; hence third arg of op is Int
 -- See Note [Guarding against silly shifts]
 wordShiftRule shift_op
   = do { dflags <- getDynFlags
@@ -398,7 +407,8 @@ wordShiftRule shift_op
              -> return (mkRuntimeErrorApp rUNTIME_ERROR_ID wordPrimTy 
                                         ("Bad shift length" ++ show shift_len))
            Lit (MachWord x)
-             -> liftMaybe $ wordResult dflags (x `shift_op` fromInteger shift_len) 
+             -> let op = shift_op dflags
+                in  liftMaybe $ wordResult dflags (x `op` fromInteger shift_len)
                     -- Do the shift at type Integer, but shift length is Int
            _ -> mzero }
 
@@ -650,13 +660,13 @@ liftLitDynFlags f = do
   return $ Lit (f dflags lit)
 
 removeOp32 :: RuleM CoreExpr
-#if WORD_SIZE_IN_BITS == 32
 removeOp32 = do
-  [e] <- getArgs
-  return e
-#else
-removeOp32 = mzero
-#endif
+  dflags <- getDynFlags
+  if wordSizeInBits dflags == 32
+  then do
+    [e] <- getArgs
+    return e
+  else mzero
 
 getArgs :: RuleM [CoreExpr]
 getArgs = RuleM $ \_ _ args -> Just args
