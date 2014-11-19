@@ -63,7 +63,7 @@ import Paths_haddock_api (getDataDir)
 
 import GHC hiding (verbosity)
 import Config
-import DynFlags hiding (verbosity)
+import DynFlags hiding (projectVersion, verbosity)
 import StaticFlags (discardStaticFlags)
 import Panic (handleGhcException)
 import Module
