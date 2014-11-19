@@ -334,13 +334,10 @@ readPackageConfigs dflags = do
   let base_conf_refs = case e_pkg_path of
         Left _ -> system_conf_refs
         Right path
-         | null (last cs)
-         -> map PkgConfFile (init cs) ++ system_conf_refs
+         | not (null path) && isSearchPathSeparator (last path)
+         -> map PkgConfFile (splitSearchPath (init path)) ++ system_conf_refs
          | otherwise
-         -> map PkgConfFile cs
-         where cs = parseSearchPath path
-         -- if the path ends in a separator (eg. "/foo/bar:")
-         -- then we tack on the system paths.
+         -> map PkgConfFile (splitSearchPath path)
 
   let conf_refs = reverse (extraPkgConfs dflags base_conf_refs)
   -- later packages shadow earlier ones.  extraPkgConfs

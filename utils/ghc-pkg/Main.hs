@@ -600,9 +600,10 @@ getPkgDatabases verbosity modify use_user use_cache expand_vars my_flags = do
         case e_pkg_path of
                 Left  _ -> sys_databases
                 Right path
-                  | last cs == ""  -> init cs ++ sys_databases
-                  | otherwise      -> cs
-                  where cs = parseSearchPath path
+                  | not (null path) && isSearchPathSeparator (last path)
+                  -> splitSearchPath (init path) ++ sys_databases
+                  | otherwise
+                  -> splitSearchPath path
 
         -- The "global" database is always the one at the bottom of the stack.
         -- This is the database we modify by default.
@@ -2005,26 +2006,6 @@ openNewFile dir template = do
   -- we must use this version because the version below opens the file
   -- in binary mode.
   openTempFileWithDefaultPermissions dir template
-
--- | The function splits the given string to substrings
--- using 'isSearchPathSeparator'.
-parseSearchPath :: String -> [FilePath]
-parseSearchPath path = split path
-  where
-    split :: String -> [String]
-    split s =
-      case rest' of
-        []     -> [chunk]
-        _:rest -> chunk : split rest
-      where
-        chunk =
-          case chunk' of
-#ifdef mingw32_HOST_OS
-            ('\"':xs@(_:_)) | last xs == '\"' -> init xs
-#endif
-            _                                 -> chunk'
-
-        (chunk', rest') = break isSearchPathSeparator s
 
 readUTF8File :: FilePath -> IO String
 readUTF8File file = do

@@ -89,7 +89,6 @@ module Util (
         Suffix,
         splitLongestPrefix,
         escapeSpaces,
-        parseSearchPath,
         Direction(..), reslash,
         makeRelativeTo,
 
@@ -1004,26 +1003,6 @@ type Suffix = String
 --------------------------------------------------------------
 -- * Search path
 --------------------------------------------------------------
-
--- | The function splits the given string to substrings
--- using the 'searchPathSeparator'.
-parseSearchPath :: String -> [FilePath]
-parseSearchPath path = split path
-  where
-    split :: String -> [String]
-    split s =
-      case rest' of
-        []     -> [chunk]
-        _:rest -> chunk : split rest
-      where
-        chunk =
-          case chunk' of
-#ifdef mingw32_HOST_OS
-            ('\"':xs@(_:_)) | last xs == '\"' -> init xs
-#endif
-            _                                 -> chunk'
-
-        (chunk', rest') = break isSearchPathSeparator s
 
 data Direction = Forwards | Backwards
 
