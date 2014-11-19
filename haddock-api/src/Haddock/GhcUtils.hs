@@ -26,6 +26,7 @@ import Data.Traversable
 import Exception
 import Outputable
 import Name
+import Lexeme
 import Packages
 import Module
 import RdrName (GlobalRdrEnv)
