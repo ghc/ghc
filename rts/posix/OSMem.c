@@ -32,7 +32,7 @@
 
 #include <errno.h>
 
-#if darwin_HOST_OS
+#if darwin_HOST_OS || ios_HOST_OS
 #include <mach/mach.h>
 #include <mach/vm_map.h>
 #include <sys/sysctl.h>

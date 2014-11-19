@@ -585,6 +585,8 @@
 
 #define REG_D1          d12
 #define REG_D2          d13
+#define REG_D3          d14
+#define REG_D4          d15
 
 #else
 

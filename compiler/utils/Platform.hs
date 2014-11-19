@@ -61,6 +61,7 @@ data Arch
 
 isARM :: Arch -> Bool
 isARM (ArchARM {}) = True
+isARM ArchARM64    = True
 isARM _ = False
 
 -- | Operating systems that the native code generator knows about.

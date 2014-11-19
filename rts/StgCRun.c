@@ -756,22 +756,28 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
     __asm__ volatile (
         /*
          * save callee-saves registers on behalf of the STG code.
+         * floating point registers only need the bottom 64 bits preserved.
+         * x16 and x17 are ip0 and ip1, but we can't refer to them by that name with clang.
          */
+        "stp fp,  lr,  [sp, #-16]!\n\t"
+        "mov fp, sp\n\t"
+        "stp x16, x17, [sp, #-16]!\n\t"
         "stp x19, x20, [sp, #-16]!\n\t"
         "stp x21, x22, [sp, #-16]!\n\t"
         "stp x23, x24, [sp, #-16]!\n\t"
         "stp x25, x26, [sp, #-16]!\n\t"
         "stp x27, x28, [sp, #-16]!\n\t" 
-        "stp ip0, ip1, [sp, #-16]!\n\t"
-        "str lr, [sp, #-8]!\n\t"
+        "stp d8,  d9,  [sp, #-16]!\n\t"
+        "stp d10, d11, [sp, #-16]!\n\t"
+        "stp d12, d13, [sp, #-16]!\n\t"
+        "stp d14, d15, [sp, #-16]!\n\t"
 
         /*
          * allocate some space for Stg machine's temporary storage.
          * Note: RESERVER_C_STACK_BYTES has to be a round number here or
          * the assembler can't assemble it.
          */
-        "str lr, [sp, %3]"
-        /* "sub sp, sp, %3\n\t" */
+        "sub sp, sp, %3\n\t"
         /*
          * Set BaseReg
          */
@@ -779,16 +785,17 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         /*
          * Jump to function argument.
          */
-        "bx %1\n\t"
+        "br %1\n\t"
 
         ".globl " STG_RETURN "\n\t"
+#if !defined(ios_HOST_OS)
         ".type " STG_RETURN ", %%function\n"
+#endif
         STG_RETURN ":\n\t"
         /*
          * Free the space we allocated
          */
-        "ldr lr, [sp], %3\n\t"
-        /* "add sp, sp, %3\n\t" */
+        "add sp, sp, %3\n\t"
         /*
          * Return the new register table, taking it from Stg's R1 (ARM64's R22).
          */
@@ -796,18 +803,23 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         /*
          * restore callee-saves registers.
          */
-        "ldr lr, [sp], #8\n\t"
-        "ldp ip0, ip1, [sp], #16\n\t"
+
+        "ldp d14, d15, [sp], #16\n\t"
+        "ldp d12, d13, [sp], #16\n\t"
+        "ldp d10, d11, [sp], #16\n\t"
+        "ldp d8,  d9,  [sp], #16\n\t"
         "ldp x27, x28, [sp], #16\n\t"
         "ldp x25, x26, [sp], #16\n\t"
         "ldp x23, x24, [sp], #16\n\t"
         "ldp x21, x22, [sp], #16\n\t"
         "ldp x19, x20, [sp], #16\n\t"
+        "ldp x16, x17, [sp], #16\n\t"
+        "ldp fp,  lr,  [sp], #16\n\t"
 
       : "=r" (r)
       : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES)
         : "%x19", "%x20", "%x21", "%x22", "%x23", "%x24", "%x25", "%x26", "%x27", "%x28",
-          "%ip0", "%ip1", "%lr"
+          "%x16", "%x17", "%lr"
     );
     return r;
 }

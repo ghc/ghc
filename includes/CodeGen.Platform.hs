@@ -99,7 +99,12 @@ import Reg
 # define zmm14 70
 # define zmm15 71
 
-#elif MACHREGS_powerpc
+-- Note: these are only needed for ARM/ARM64 because globalRegMaybe is now used in CmmSink.hs.
+-- Since it's only used to check 'isJust', the actual values don't matter, thus
+-- I'm not sure if these are the correct numberings.
+-- Normally, the register names are just stringified as part of the REG() macro
+
+#elif MACHREGS_powerpc || MACHREGS_arm || MACHREGS_aarch64
 
 # define r0 0
 # define r1 1
@@ -133,6 +138,76 @@ import Reg
 # define r29 29
 # define r30 30
 # define r31 31
+
+-- See note above. These aren't actually used for anything except satisfying the compiler for globalRegMaybe
+-- so I'm unsure if they're the correct numberings, should they ever be attempted to be used in the NCG. 
+#if MACHREGS_aarch64 || MACHREGS_arm
+# define s0 32
+# define s1 33
+# define s2 34
+# define s3 35
+# define s4 36
+# define s5 37
+# define s6 38
+# define s7 39
+# define s8 40
+# define s9 41
+# define s10 42
+# define s11 43
+# define s12 44
+# define s13 45
+# define s14 46
+# define s15 47
+# define s16 48
+# define s17 49
+# define s18 50
+# define s19 51
+# define s20 52
+# define s21 53
+# define s22 54
+# define s23 55
+# define s24 56
+# define s25 57
+# define s26 58
+# define s27 59
+# define s28 60
+# define s29 61
+# define s30 62
+# define s31 63
+
+# define d0 32
+# define d1 33
+# define d2 34
+# define d3 35
+# define d4 36
+# define d5 37
+# define d6 38
+# define d7 39
+# define d8 40
+# define d9 41
+# define d10 42
+# define d11 43
+# define d12 44
+# define d13 45
+# define d14 46
+# define d15 47
+# define d16 48
+# define d17 49
+# define d18 50
+# define d19 51
+# define d20 52
+# define d21 53
+# define d22 54
+# define d23 55
+# define d24 56
+# define d25 57
+# define d26 58
+# define d27 59
+# define d28 60
+# define d29 61
+# define d30 62
+# define d31 63
+#endif
 
 # if MACHREGS_darwin
 #  define f0  32
@@ -557,7 +632,7 @@ haveRegBase = False
 -- in a real machine register, otherwise returns @'Just' reg@, where
 -- reg is the machine register it is stored in.
 globalRegMaybe :: GlobalReg -> Maybe RealReg
-#if MACHREGS_i386 || MACHREGS_x86_64 || MACHREGS_sparc || MACHREGS_powerpc
+#if MACHREGS_i386 || MACHREGS_x86_64 || MACHREGS_sparc || MACHREGS_powerpc || MACHREGS_arm || MACHREGS_aarch64
 # ifdef REG_Base
 globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
 # endif

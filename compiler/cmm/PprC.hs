@@ -1088,6 +1088,7 @@ cLoad expr rep
           bewareLoadStoreAlignment ArchMipseb   = True
           bewareLoadStoreAlignment ArchMipsel   = True
           bewareLoadStoreAlignment (ArchARM {}) = True
+          bewareLoadStoreAlignment ArchARM64    = True
           -- Pessimistically assume that they will also cause problems
           -- on unknown arches
           bewareLoadStoreAlignment ArchUnknown  = True

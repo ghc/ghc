@@ -9,6 +9,7 @@ import Platform
 import Reg
 
 import qualified CodeGen.Platform.ARM        as ARM
+import qualified CodeGen.Platform.ARM64      as ARM64
 import qualified CodeGen.Platform.PPC        as PPC
 import qualified CodeGen.Platform.PPC_Darwin as PPC_Darwin
 import qualified CodeGen.Platform.SPARC      as SPARC
@@ -28,6 +29,7 @@ callerSaves platform
    ArchX86_64 -> X86_64.callerSaves
    ArchSPARC  -> SPARC.callerSaves
    ArchARM {} -> ARM.callerSaves
+   ArchARM64  -> ARM64.callerSaves
    arch
     | arch `elem` [ArchPPC, ArchPPC_64] ->
        case platformOS platform of
@@ -50,6 +52,7 @@ activeStgRegs platform
    ArchX86_64 -> X86_64.activeStgRegs
    ArchSPARC  -> SPARC.activeStgRegs
    ArchARM {} -> ARM.activeStgRegs
+   ArchARM64  -> ARM64.activeStgRegs
    arch
     | arch `elem` [ArchPPC, ArchPPC_64] ->
        case platformOS platform of
@@ -67,6 +70,7 @@ haveRegBase platform
    ArchX86_64 -> X86_64.haveRegBase
    ArchSPARC  -> SPARC.haveRegBase
    ArchARM {} -> ARM.haveRegBase
+   ArchARM64  -> ARM64.haveRegBase
    arch
     | arch `elem` [ArchPPC, ArchPPC_64] ->
        case platformOS platform of
@@ -84,6 +88,7 @@ globalRegMaybe platform
    ArchX86_64 -> X86_64.globalRegMaybe
    ArchSPARC  -> SPARC.globalRegMaybe
    ArchARM {} -> ARM.globalRegMaybe
+   ArchARM64  -> ARM64.globalRegMaybe
    arch
     | arch `elem` [ArchPPC, ArchPPC_64] ->
        case platformOS platform of
@@ -101,6 +106,7 @@ freeReg platform
    ArchX86_64 -> X86_64.freeReg
    ArchSPARC  -> SPARC.freeReg
    ArchARM {} -> ARM.freeReg
+   ArchARM64  -> ARM64.freeReg
    arch
     | arch `elem` [ArchPPC, ArchPPC_64] ->
        case platformOS platform of

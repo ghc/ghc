@@ -80,7 +80,7 @@ ppLlvmGlobal (LMGlobal var@(LMGlobalVar _ _ link x a c) dat) =
         const_link = case c of
           Global   -> ppr link <+> text "global"
           Constant -> ppr link <+> text "constant"
-          Alias    -> text "alias" <+> ppr link
+          Alias    -> ppr link <+> text "alias"
 
     in ppAssignment var $ const_link <+> rhs <> sect <> align
        $+$ newLine

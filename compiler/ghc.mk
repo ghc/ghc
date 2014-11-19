@@ -614,6 +614,7 @@ compiler_stage2_dll0_MODULES += \
 	CmmUtils \
 	CodeGen.Platform \
 	CodeGen.Platform.ARM \
+	CodeGen.Platform.ARM64 \
 	CodeGen.Platform.NoRegs \
 	CodeGen.Platform.PPC \
 	CodeGen.Platform.PPC_Darwin \
