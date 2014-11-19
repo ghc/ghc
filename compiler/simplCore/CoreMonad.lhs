@@ -776,10 +776,11 @@ data CoreReader = CoreReader {
 #endif
 }
 
-data CoreWriter = CoreWriter {
-        cw_simpl_count :: !SimplCount
-        -- Making this strict fixes a nasty space leak
-        -- See Trac #7702
+-- Note: CoreWriter used to be defined with data, rather than newtype.  If it
+-- is defined that way again, the cw_simpl_count field, at least, must be
+-- strict to avoid a space leak (Trac #7702).
+newtype CoreWriter = CoreWriter {
+        cw_simpl_count :: SimplCount
 }
 
 emptyWriter :: DynFlags -> CoreWriter
@@ -808,12 +809,14 @@ instance Monad CoreM where
     mx >>= f = CoreM $ \s -> do
             (x, s', w1) <- unCoreM mx s
             (y, s'', w2) <- unCoreM (f x) s'
-            let w = w1 `plusWriter` w2 -- forcing w before returning avoids a space leak (Trac #7702)
+            let w = w1 `plusWriter` w2
             return $ seq w (y, s'', w)
-
+            -- forcing w before building the tuple avoids a space leak
+            -- (Trac #7702)
 instance A.Applicative CoreM where
     pure = return
     (<*>) = ap
+    (*>) = (>>)
 
 instance MonadPlus IO => A.Alternative CoreM where
     empty = mzero
@@ -986,8 +989,8 @@ on Windows. On Windows the GHC library tends to export more than 65536 symbols
 (see #5292) which overflows the limit of what we can export from the EXE and
 causes breakage.
 
-(Note that if the GHC exeecutable was dynamically linked this wouldn't be a problem,
-because we could share the GHC library it links to.)
+(Note that if the GHC executable was dynamically linked this wouldn't be a
+problem, because we could share the GHC library it links to.)
 
 We are going to try 2. instead. Unfortunately, this means that every plugin
 will have to say `reinitializeGlobals` before it does anything, but never mind.
