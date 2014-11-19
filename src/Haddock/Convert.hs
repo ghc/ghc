@@ -117,7 +117,7 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
 
 synifyAxiom :: CoAxiom br -> HsDecl Name
 synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
-  | isOpenSynFamilyTyCon tc
+  | isOpenTypeFamilyTyCon tc
   , Just branch <- coAxiomSingleBranch_maybe ax
   = InstD (TyFamInstD (TyFamInstDecl { tfid_eqn = noLoc $ synifyAxBranch tc branch
                                      , tfid_fvs = placeHolderNamesTc }))
@@ -152,8 +152,8 @@ synifyTyCon coax tc
                                       , dd_derivs = Nothing }
            , tcdFVs = placeHolderNamesTc }
 
-  | isSynFamilyTyCon tc 
-  = case synTyConRhs_maybe tc of
+  | isTypeFamilyTyCon tc
+  = case famTyConFlav_maybe tc of
       Just rhs ->
         let info = case rhs of
                      OpenSynFamilyTyCon -> OpenTypeFamily
@@ -173,14 +173,11 @@ synifyTyCon coax tc
           FamDecl (FamilyDecl DataFamily (synifyName tc) (synifyTyVars (tyConTyVars tc))
                               Nothing) --always kind '*'
         _ -> error "synifyTyCon: impossible open data type?"
-  | isSynTyCon tc
-  = case synTyConRhs_maybe tc of
-        Just (SynonymTyCon ty) ->
-          SynDecl { tcdLName = synifyName tc
-                  , tcdTyVars = synifyTyVars (tyConTyVars tc)
-                  , tcdRhs = synifyType WithinType ty
-                  , tcdFVs = placeHolderNamesTc }
-        _ -> error "synifyTyCon: impossible synTyCon"
+  | Just ty <- synTyConRhs_maybe tc
+  =  SynDecl { tcdLName = synifyName tc
+             , tcdTyVars = synifyTyVars (tyConTyVars tc)
+             , tcdRhs = synifyType WithinType ty
+             , tcdFVs = placeHolderNamesTc }
   | otherwise =
   -- (closed) newtype and data
   let
