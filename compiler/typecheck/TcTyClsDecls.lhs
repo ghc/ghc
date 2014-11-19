@@ -672,8 +672,7 @@ tcFamDecl1 parent
   = tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
   { traceTc "open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
-  ; let roles = map (const Nominal) tvs'
-  ; tycon <- buildSynTyCon tc_name tvs' roles OpenSynFamilyTyCon kind parent
+  ; tycon <- buildFamilyTyCon tc_name tvs' OpenSynFamilyTyCon kind parent
   ; return [ATyCon tycon] }
 
 tcFamDecl1 parent
@@ -717,8 +716,7 @@ tcFamDecl1 parent
        ; let syn_rhs = if null eqns
                        then AbstractClosedSynFamilyTyCon
                        else ClosedSynFamilyTyCon co_ax
-             roles   = map (const Nominal) tvs'
-       ; tycon <- buildSynTyCon tc_name tvs' roles syn_rhs kind parent
+       ; tycon <- buildFamilyTyCon tc_name tvs' syn_rhs kind parent
 
        ; let result = if null eqns
                       then [ATyCon tycon]
@@ -752,8 +750,7 @@ tcTySynRhs rec_info tc_name tvs kind hs_ty
        ; rhs_ty <- tcCheckLHsType hs_ty kind
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
        ; let roles = rti_roles rec_info tc_name
-       ; tycon <- buildSynTyCon tc_name tvs roles (SynonymTyCon rhs_ty)
-                                kind NoParentTyCon
+       ; tycon <- buildSynonymTyCon tc_name tvs roles rhs_ty kind
        ; return [ATyCon tycon] }
 
 tcDataDefn :: RecTyInfo -> Name
@@ -873,7 +870,7 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
     tcAddFamInstCtxt (ptext (sLit "default type instance")) tc_name $
     tcTyClTyVars tc_name hs_tvs $ \ tvs rhs_kind ->
     do { traceTc "tcDefaultAssocDecl" (ppr tc_name)
-       ; checkTc (isSynFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
+       ; checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
        ; let (fam_name, fam_pat_arity, _) = famTyConShape fam_tc
        ; ASSERT( fam_name == tc_name )
          checkTc (length (hsQTvBndrs hs_tvs) == fam_pat_arity)
@@ -1394,7 +1391,10 @@ checkValidTyCon tc
   = checkValidClass cl
 
   | Just syn_rhs <- synTyConRhs_maybe tc
-  = case syn_rhs of
+  = checkValidType syn_ctxt syn_rhs
+
+  | Just fam_flav <- famTyConFlav_maybe tc
+  = case fam_flav of
     { ClosedSynFamilyTyCon ax      -> checkValidClosedCoAxiom ax
     ; AbstractClosedSynFamilyTyCon ->
       do { hsBoot <- tcIsHsBootOrSig
@@ -1402,7 +1402,6 @@ checkValidTyCon tc
            ptext (sLit "You may omit the equations in a closed type family") $$
            ptext (sLit "only in a .hs-boot file") }
     ; OpenSynFamilyTyCon           -> return ()
-    ; SynonymTyCon ty              -> checkValidType syn_ctxt ty
     ; BuiltInSynFamTyCon _         -> return () }
 
   | otherwise
@@ -1763,7 +1762,7 @@ checkValidRoles tc
   | isAlgTyCon tc
     -- tyConDataCons returns an empty list for data families
   = mapM_ check_dc_roles (tyConDataCons tc)
-  | Just (SynonymTyCon rhs) <- synTyConRhs_maybe tc
+  | Just rhs <- synTyConRhs_maybe tc
   = check_ty_roles (zipVarEnv (tyConTyVars tc) (tyConRoles tc)) Representational rhs
   | otherwise
   = return ()
@@ -2175,8 +2174,8 @@ wrongKindOfFamily family
   = ptext (sLit "Wrong category of family instance; declaration was for a")
     <+> kindOfFamily
   where
-    kindOfFamily | isSynTyCon family = ptext (sLit "type synonym")
-                 | isAlgTyCon family = ptext (sLit "data type")
+    kindOfFamily | isTypeSynonymTyCon family = text "type synonym"
+                 | isAlgTyCon         family = text "data type"
                  | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
 
 wrongNumberOfParmsErr :: Arity -> SDoc
@@ -2234,7 +2233,7 @@ addTyThingCtxt thing
     flav = case thing of
              ATyCon tc
                 | isClassTyCon tc       -> ptext (sLit "class")
-                | isSynFamilyTyCon tc   -> ptext (sLit "type family")
+                | isTypeFamilyTyCon tc  -> ptext (sLit "type family")
                 | isDataFamilyTyCon tc  -> ptext (sLit "data family")
                 | isTypeSynonymTyCon tc -> ptext (sLit "type")
                 | isNewTyCon tc         -> ptext (sLit "newtype")

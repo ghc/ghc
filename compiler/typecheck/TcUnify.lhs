@@ -612,9 +612,9 @@ uType origin orig_ty1 orig_ty2
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)
     go ty1@(TyConApp tc1 _) ty2
-      | isSynFamilyTyCon tc1 = uType_defer origin ty1 ty2
+      | isTypeFamilyTyCon tc1 = uType_defer origin ty1 ty2
     go ty1 ty2@(TyConApp tc2 _)
-      | isSynFamilyTyCon tc2 = uType_defer origin ty1 ty2
+      | isTypeFamilyTyCon tc2 = uType_defer origin ty1 ty2
 
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       -- See Note [Mismatched type lists and application decomposition]
@@ -908,7 +908,7 @@ checkTauTvUpdate dflags tv ty
     -- See Note [Conservative unification check]
     defer_me (LitTy {})        = False
     defer_me (TyVarTy tv')     = tv == tv'
-    defer_me (TyConApp tc tys) = isSynFamilyTyCon tc || any defer_me tys
+    defer_me (TyConApp tc tys) = isTypeFamilyTyCon tc || any defer_me tys
     defer_me (FunTy arg res)   = defer_me arg || defer_me res
     defer_me (AppTy fun arg)   = defer_me fun || defer_me arg
     defer_me (ForAllTy _ ty)   = not impredicative || defer_me ty

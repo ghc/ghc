@@ -287,7 +287,7 @@ isRigidOrSkol ty
 
 isTyFun_maybe :: Type -> Maybe TyCon
 isTyFun_maybe ty = case tcSplitTyConApp_maybe ty of
-                      Just (tc,_) | isSynFamilyTyCon tc -> Just tc
+                      Just (tc,_) | isTypeFamilyTyCon tc -> Just tc
                       _ -> Nothing
 
 
@@ -1274,7 +1274,7 @@ quickFlattenTy (FunTy ty1 ty2) = do { fy1 <- quickFlattenTy ty1
                                     ; fy2 <- quickFlattenTy ty2
                                     ; return (FunTy fy1 fy2) }
 quickFlattenTy (TyConApp tc tys)
-    | not (isSynFamilyTyCon tc)
+    | not (isTypeFamilyTyCon tc)
     = do { fys <- mapM quickFlattenTy tys
          ; return (TyConApp tc fys) }
     | otherwise

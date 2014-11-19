@@ -7,7 +7,8 @@
 {-# LANGUAGE CPP #-}
 
 module BuildTyCl (
-        buildSynTyCon,
+        buildSynonymTyCon,
+        buildFamilyTyCon,
         buildAlgTyCon,
         buildDataCon,
         buildPatSyn,
@@ -45,13 +46,22 @@ import Outputable
 
 \begin{code}
 ------------------------------------------------------
-buildSynTyCon :: Name -> [TyVar] -> [Role]
-              -> SynTyConRhs
-              -> Kind                   -- ^ Kind of the RHS
-              -> TyConParent
-              -> TcRnIf m n TyCon
-buildSynTyCon tc_name tvs roles rhs rhs_kind parent
-  = return (mkSynTyCon tc_name kind tvs roles rhs parent)
+buildSynonymTyCon :: Name -> [TyVar] -> [Role]
+                  -> Type
+                  -> Kind                   -- ^ Kind of the RHS
+                  -> TcRnIf m n TyCon
+buildSynonymTyCon tc_name tvs roles rhs rhs_kind
+  = return (mkSynonymTyCon tc_name kind tvs roles rhs)
+  where kind = mkPiKinds tvs rhs_kind
+
+
+buildFamilyTyCon :: Name -> [TyVar]
+                 -> FamTyConFlav
+                 -> Kind                   -- ^ Kind of the RHS
+                 -> TyConParent
+                 -> TcRnIf m n TyCon
+buildFamilyTyCon tc_name tvs rhs rhs_kind parent
+  = return (mkFamilyTyCon tc_name kind tvs rhs parent)
   where kind = mkPiKinds tvs rhs_kind
 
 

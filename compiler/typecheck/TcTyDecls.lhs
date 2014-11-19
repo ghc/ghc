@@ -709,7 +709,7 @@ irTyCon tc
          mapM_ (irType emptyVarSet) (tyConStupidTheta tc)  -- See #8958
        ; mapM_ (irDataCon tc_name) (visibleDataCons $ algTyConRhs tc) }}
 
-  | Just (SynonymTyCon ty) <- synTyConRhs_maybe tc
+  | Just ty <- synTyConRhs_maybe tc
   = addRoleInferenceInfo tc_name (tyConTyVars tc) $
     irType emptyVarSet ty
 

@@ -1481,7 +1481,7 @@ reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
 
 reifyFamFlavour :: TyCon -> TcM (Either TH.FamFlavour [TH.TySynEqn])
 reifyFamFlavour tc
-  | isOpenSynFamilyTyCon tc = return $ Left TH.TypeFam
+  | isOpenTypeFamilyTyCon tc = return $ Left TH.TypeFam
   | isDataFamilyTyCon    tc = return $ Left TH.DataFam
 
     -- this doesn't really handle abstract closed families, but let's not worry

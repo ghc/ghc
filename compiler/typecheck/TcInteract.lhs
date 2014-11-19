@@ -1571,8 +1571,8 @@ doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 doTopReactFunEq :: Ct -> TcS (StopOrContinue Ct)
 doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
                                      , cc_tyargs = args , cc_fsk = fsk })
-  = ASSERT(isSynFamilyTyCon fam_tc) -- No associated data families
-                                    -- have reached this far
+  = ASSERT(isTypeFamilyTyCon fam_tc) -- No associated data families
+                                     -- have reached this far
     ASSERT( not (isDerived old_ev) )   -- CFunEqCan is never Derived
     -- Look up in top-level instances, or built-in axiom
     do { match_res <- matchFam fam_tc args   -- See Note [MATCHING-SYNONYMS]
@@ -1583,7 +1583,7 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
     -- Found a top-level instance
 
     | Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
-    , isSynFamilyTyCon tc
+    , isTypeFamilyTyCon tc
     , tc_args `lengthIs` tyConArity tc    -- Short-cut
     -> shortCutReduction old_ev fsk ax_co tc tc_args
          -- Try shortcut; see Note [Short cut for top-level reaction]

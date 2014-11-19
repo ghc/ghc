@@ -934,18 +934,22 @@ checkBootTyCon tc1 tc2
   , Just syn_rhs2 <- synTyConRhs_maybe tc2
   , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
-    let eqSynRhs OpenSynFamilyTyCon OpenSynFamilyTyCon = True
-        eqSynRhs AbstractClosedSynFamilyTyCon (ClosedSynFamilyTyCon {}) = True
-        eqSynRhs (ClosedSynFamilyTyCon {}) AbstractClosedSynFamilyTyCon = True
-        eqSynRhs (ClosedSynFamilyTyCon ax1) (ClosedSynFamilyTyCon ax2)
+    check (roles1 == roles2) roles_msg `andThenCheck`
+    check (eqTypeX env syn_rhs1 syn_rhs2) empty   -- nothing interesting to say
+
+  | Just fam_flav1 <- famTyConFlav_maybe tc1
+  , Just fam_flav2 <- famTyConFlav_maybe tc2
+  = ASSERT(tc1 == tc2)
+    let eqFamFlav OpenSynFamilyTyCon OpenSynFamilyTyCon = True
+        eqFamFlav AbstractClosedSynFamilyTyCon (ClosedSynFamilyTyCon {}) = True
+        eqFamFlav (ClosedSynFamilyTyCon {}) AbstractClosedSynFamilyTyCon = True
+        eqFamFlav (ClosedSynFamilyTyCon ax1) (ClosedSynFamilyTyCon ax2)
             = eqClosedFamilyAx ax1 ax2
-        eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
-            = eqTypeX env t1 t2
-        eqSynRhs (BuiltInSynFamTyCon _) (BuiltInSynFamTyCon _) = tc1 == tc2
-        eqSynRhs _ _ = False
+        eqFamFlav (BuiltInSynFamTyCon _) (BuiltInSynFamTyCon _) = tc1 == tc2
+        eqFamFlav _ _ = False
     in
     check (roles1 == roles2) roles_msg `andThenCheck`
-    check (eqSynRhs syn_rhs1 syn_rhs2) empty   -- nothing interesting to say
+    check (eqFamFlav fam_flav1 fam_flav2) empty   -- nothing interesting to say
 
   | isAlgTyCon tc1 && isAlgTyCon tc2
   , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)

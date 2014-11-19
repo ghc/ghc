@@ -427,7 +427,7 @@ checkFunApp fun_ty arg_tys msg
         else cfa False (newTyConInstRhs tc tc_args) arg_tys
 
       | Just tc <- tyConAppTyCon_maybe fun_ty
-      , not (isSynFamilyTyCon tc)       -- Definite error
+      , not (isTypeFamilyTyCon tc)      -- Definite error
       = (Nothing, Just msg)             -- Too many args
 
       | otherwise

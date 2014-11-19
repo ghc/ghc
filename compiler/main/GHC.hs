@@ -156,10 +156,12 @@ module GHC (
         recordSelectorFieldLabel,
 
         -- ** Type constructors
-        TyCon, 
+        TyCon,
         tyConTyVars, tyConDataCons, tyConArity,
-        isClassTyCon, isSynTyCon, isNewTyCon, isPrimTyCon, isFunTyCon,
-        isFamilyTyCon, isOpenFamilyTyCon, tyConClass_maybe,
+        isClassTyCon, isTypeSynonymTyCon, isTypeFamilyTyCon, isNewTyCon,
+        isPrimTyCon, isFunTyCon,
+        isFamilyTyCon, isOpenFamilyTyCon, isOpenTypeFamilyTyCon,
+        tyConClass_maybe,
         synTyConRhs_maybe, synTyConDefn_maybe, synTyConResKind,
 
         -- ** Type variables

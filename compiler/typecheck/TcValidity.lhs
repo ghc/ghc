@@ -294,7 +294,8 @@ check_type ctxt rank (AppTy ty1 ty2)
         ; check_arg_type ctxt rank ty2 }
 
 check_type ctxt rank ty@(TyConApp tc tys)
-  | isSynTyCon tc          = check_syn_tc_app ctxt rank ty tc tys
+  | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
+  = check_syn_tc_app ctxt rank ty tc tys
   | isUnboxedTupleTyCon tc = check_ubx_tuple  ctxt      ty    tys
   | otherwise              = mapM_ (check_arg_type ctxt rank) tys
 
@@ -303,7 +304,7 @@ check_type _ _ (LitTy {}) = return ()
 check_type _ _ ty = pprPanic "check_type" (ppr ty)
 
 ----------------------------------------
-check_syn_tc_app :: UserTypeCtxt -> Rank -> KindOrType 
+check_syn_tc_app :: UserTypeCtxt -> Rank -> KindOrType
                  -> TyCon -> [KindOrType] -> TcM ()
 -- Used for type synonyms and type synonym families,
 -- which must be saturated, 
@@ -318,7 +319,7 @@ check_syn_tc_app ctxt rank ty tc tys
        --      f :: Foo a b -> ...
   = do  { -- See Note [Liberal type synonyms]
         ; liberal <- xoptM Opt_LiberalTypeSynonyms
-        ; if not liberal || isSynFamilyTyCon tc then
+        ; if not liberal || isTypeFamilyTyCon tc then
                 -- For H98 and synonym families, do check the type args
                 mapM_ check_arg tys
 
@@ -334,12 +335,12 @@ check_syn_tc_app ctxt rank ty tc tys
   | otherwise
   = failWithTc (arityErr flavour (tyConName tc) tc_arity n_args)
   where
-    flavour | isSynFamilyTyCon tc = "Type family" 
-            | otherwise           = "Type synonym"
+    flavour | isTypeFamilyTyCon tc = "Type family"
+            | otherwise            = "Type synonym"
     n_args = length tys
     tc_arity  = tyConArity tc
-    check_arg | isSynFamilyTyCon tc = check_arg_type  ctxt rank
-              | otherwise           = check_mono_type ctxt synArgMonoType
+    check_arg | isTypeFamilyTyCon tc = check_arg_type  ctxt rank
+              | otherwise            = check_mono_type ctxt synArgMonoType
          
 ----------------------------------------
 check_ubx_tuple :: UserTypeCtxt -> KindOrType 

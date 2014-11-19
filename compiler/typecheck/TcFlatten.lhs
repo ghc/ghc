@@ -654,7 +654,7 @@ flatten fmode (TyConApp tc tys)
   | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys
   , let expanded_ty = mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys'
   = case fe_mode fmode of
-      FM_FlattenAll | anyNameEnv isSynFamilyTyCon (tyConsOfType rhs)
+      FM_FlattenAll | anyNameEnv isTypeFamilyTyCon (tyConsOfType rhs)
                    -> flatten fmode expanded_ty
                     | otherwise
                    -> flattenTyConApp fmode tc tys
@@ -663,7 +663,7 @@ flatten fmode (TyConApp tc tys)
   -- Otherwise, it's a type function application, and we have to
   -- flatten it away as well, and generate a new given equality constraint
   -- between the application and a newly generated flattening skolem variable.
-  | isSynFamilyTyCon tc
+  | isTypeFamilyTyCon tc
   = flattenFamApp fmode tc tys
 
   -- For * a normal data type application

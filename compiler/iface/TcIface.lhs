@@ -487,28 +487,41 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
            ; lhs_tys <- tcIfaceTcArgs arg_tys
            ; return (FamInstTyCon ax_unbr fam_tc lhs_tys) }
 
-tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
-                                  ifRoles = roles,
-                                  ifSynRhs = mb_rhs_ty,
-                                  ifSynKind = kind })
+tc_iface_decl _ _ (IfaceSynonym {ifName = occ_name, ifTyVars = tv_bndrs,
+                                      ifRoles = roles,
+                                      ifSynRhs = rhs_ty,
+                                      ifSynKind = kind })
    = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
      { tc_name  <- lookupIfaceTop occ_name
      ; rhs_kind <- tcIfaceKind kind     -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $
-                   tc_syn_rhs mb_rhs_ty
-     ; tycon    <- buildSynTyCon tc_name tyvars roles rhs rhs_kind parent
+                   tcIfaceType rhs_ty
+     ; tycon    <- buildSynonymTyCon tc_name tyvars roles rhs rhs_kind
      ; return (ATyCon tycon) }
    where
-     mk_doc n = ptext (sLit "Type syonym") <+> ppr n
-     tc_syn_rhs IfaceOpenSynFamilyTyCon   = return OpenSynFamilyTyCon
-     tc_syn_rhs (IfaceClosedSynFamilyTyCon ax_name _)
+     mk_doc n = ptext (sLit "Type synonym") <+> ppr n
+
+tc_iface_decl parent _ (IfaceFamily {ifName = occ_name, ifTyVars = tv_bndrs,
+                                     ifFamFlav = fam_flav,
+                                     ifFamKind = kind })
+   = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
+     { tc_name  <- lookupIfaceTop occ_name
+     ; rhs_kind <- tcIfaceKind kind     -- Note [Synonym kind loop]
+     ; rhs      <- forkM (mk_doc tc_name) $
+                   tc_fam_flav fam_flav
+     ; tycon    <- buildFamilyTyCon tc_name tyvars rhs rhs_kind parent
+     ; return (ATyCon tycon) }
+   where
+     mk_doc n = ptext (sLit "Type synonym") <+> ppr n
+     tc_fam_flav IfaceOpenSynFamilyTyCon   = return OpenSynFamilyTyCon
+     tc_fam_flav (IfaceClosedSynFamilyTyCon ax_name _)
        = do { ax <- tcIfaceCoAxiom ax_name
             ; return (ClosedSynFamilyTyCon ax) }
-     tc_syn_rhs IfaceAbstractClosedSynFamilyTyCon = return AbstractClosedSynFamilyTyCon
-     tc_syn_rhs (IfaceSynonymTyCon ty)    = do { rhs_ty <- tcIfaceType ty
-                                               ; return (SynonymTyCon rhs_ty) }
-     tc_syn_rhs IfaceBuiltInSynFamTyCon   = pprPanic "tc_iface_decl"
-                                               (ptext (sLit "IfaceBuiltInSynFamTyCon in interface file"))
+     tc_fam_flav IfaceAbstractClosedSynFamilyTyCon
+         = return AbstractClosedSynFamilyTyCon
+     tc_fam_flav IfaceBuiltInSynFamTyCon
+         = pprPanic "tc_iface_decl"
+                    (text "IfaceBuiltInSynFamTyCon in interface file")
 
 tc_iface_decl _parent ignore_prags
             (IfaceClass {ifCtxt = rdr_ctxt, ifName = tc_occ,

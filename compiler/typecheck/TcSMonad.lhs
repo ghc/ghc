@@ -256,7 +256,7 @@ extendWorkListCt ct wl
  = case classifyPredType (ctPred ct) of
      EqPred ty1 _
        | Just (tc,_) <- tcSplitTyConApp_maybe ty1
-       , isSynFamilyTyCon tc
+       , isTypeFamilyTyCon tc
        -> extendWorkListFunEq ct wl
        | otherwise
        -> extendWorkListEq ct wl
@@ -1939,7 +1939,7 @@ maybeSym NotSwapped co = co
 matchFam :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
 -- Given (F tys) return (ty, co), where co :: F tys ~ ty
 matchFam tycon args
-  | isOpenSynFamilyTyCon tycon
+  | isOpenTypeFamilyTyCon tycon
   = do { fam_envs <- getFamInstEnvs
        ; let mb_match = tcLookupFamInst fam_envs tycon args
        ; traceTcS "lookupFamInst" $

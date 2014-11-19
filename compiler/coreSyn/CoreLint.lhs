@@ -729,9 +729,8 @@ lintType ty@(TyConApp tc tys)
   | Just ty' <- coreView ty
   = lintType ty'   -- Expand type synonyms, so that we do not bogusly complain
                    --  about un-saturated type synonyms
-                   -- 
 
-  | isUnLiftedTyCon tc || isSynTyCon tc
+  | isUnLiftedTyCon tc || isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
        -- See Note [The kind invariant] in TypeRep
        -- Also type synonyms and type families
   , length tys < tyConArity tc

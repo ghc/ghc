@@ -67,7 +67,6 @@ module TcType (
   isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
-  isSynFamilyTyConApp,
   isPredTy, isTyVarClassPred,
 
   ---------------------------------
@@ -554,7 +553,7 @@ tcTyFamInsts ty
   | Just exp_ty <- tcView ty    = tcTyFamInsts exp_ty
 tcTyFamInsts (TyVarTy _)        = []
 tcTyFamInsts (TyConApp tc tys)
-  | isSynFamilyTyCon tc         = [(tc, tys)]
+  | isTypeFamilyTyCon tc        = [(tc, tys)]
   | otherwise                   = concat (map tcTyFamInsts tys)
 tcTyFamInsts (LitTy {})         = []
 tcTyFamInsts (FunTy ty1 ty2)    = tcTyFamInsts ty1 ++ tcTyFamInsts ty2
@@ -1356,17 +1355,6 @@ is_tc uniq ty = case tcSplitTyConApp_maybe ty of
                         Just (tc, _) -> uniq == getUnique tc
                         Nothing      -> False
 \end{code}
-
-\begin{code}
--- NB: Currently used in places where we have already expanded type synonyms;
---     hence no 'coreView'.  This could, however, be changed without breaking
---     any code.
-isSynFamilyTyConApp :: TcTauType -> Bool
-isSynFamilyTyConApp (TyConApp tc tys) = isSynFamilyTyCon tc &&
-                                      length tys == tyConArity tc
-isSynFamilyTyConApp _other            = False
-\end{code}
-
 
 %************************************************************************
 %*                                                                      *

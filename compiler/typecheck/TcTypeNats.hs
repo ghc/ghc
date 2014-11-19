@@ -15,7 +15,7 @@ module TcTypeNats
 import Type
 import Pair
 import TcType     ( TcType, tcEqType )
-import TyCon      ( TyCon, SynTyConRhs(..), mkSynTyCon, TyConParent(..)  )
+import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon, TyConParent(..)  )
 import Coercion   ( Role(..) )
 import TcRnTypes  ( Xi )
 import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..) )
@@ -104,10 +104,9 @@ typeNatExpTyCon = mkTypeNatFunTyCon2 name
 
 typeNatLeqTyCon :: TyCon
 typeNatLeqTyCon =
-  mkSynTyCon name
+  mkFamilyTyCon name
     (mkArrowKinds [ typeNatKind, typeNatKind ] boolKind)
     (take 2 $ tyVarList typeNatKind)
-    [Nominal,Nominal]
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
 
@@ -122,10 +121,9 @@ typeNatLeqTyCon =
 
 typeNatCmpTyCon :: TyCon
 typeNatCmpTyCon =
-  mkSynTyCon name
+  mkFamilyTyCon name
     (mkArrowKinds [ typeNatKind, typeNatKind ] orderingKind)
     (take 2 $ tyVarList typeNatKind)
-    [Nominal,Nominal]
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
 
@@ -140,10 +138,9 @@ typeNatCmpTyCon =
 
 typeSymbolCmpTyCon :: TyCon
 typeSymbolCmpTyCon =
-  mkSynTyCon name
+  mkFamilyTyCon name
     (mkArrowKinds [ typeSymbolKind, typeSymbolKind ] orderingKind)
     (take 2 $ tyVarList typeSymbolKind)
-    [Nominal,Nominal]
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
 
@@ -163,10 +160,9 @@ typeSymbolCmpTyCon =
 -- Make a binary built-in constructor of kind: Nat -> Nat -> Nat
 mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon2 op tcb =
-  mkSynTyCon op
+  mkFamilyTyCon op
     (mkArrowKinds [ typeNatKind, typeNatKind ] typeNatKind)
     (take 2 $ tyVarList typeNatKind)
-    [Nominal,Nominal]
     (BuiltInSynFamTyCon tcb)
     NoParentTyCon
 

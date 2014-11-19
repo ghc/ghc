@@ -22,7 +22,7 @@ import TcInteract
 import Kind     ( isKind, isSubKind, defaultKind_maybe )
 import Inst
 import Type     ( classifyPredType, isIPClass, PredTree(..), getClassPredTys_maybe )
-import TyCon    ( isSynFamilyTyCon )
+import TyCon    ( isTypeFamilyTyCon )
 import Class    ( Class )
 import Id       ( idType )
 import Var
@@ -456,7 +456,7 @@ quantifyPred qtvs pred
     -- over (Eq Int); the instance should kick in right here
     quant_fun ty
       = case tcSplitTyConApp_maybe ty of
-          Just (tc, tys) | isSynFamilyTyCon tc
+          Just (tc, tys) | isTypeFamilyTyCon tc
                          -> tyVarsOfTypes tys `intersectsVarSet` qtvs
           _ -> False
 

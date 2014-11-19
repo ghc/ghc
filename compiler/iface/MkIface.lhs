@@ -756,7 +756,9 @@ data IfaceDeclExtras
        [AnnPayload]             -- Annotations of the type itself
        [IfaceIdExtras]          -- For each class method: fixity, RULES and annotations
 
-  | IfaceSynExtras   Fixity [IfaceInstABI] [AnnPayload]
+  | IfaceSynonymExtras Fixity [AnnPayload]
+
+  | IfaceFamilyExtras   Fixity [IfaceInstABI] [AnnPayload]
 
   | IfaceOtherDeclExtras
 
@@ -790,7 +792,9 @@ freeNamesDeclExtras (IfaceDataExtras  _ insts _ subs)
   = unionManyNameSets (mkNameSet insts : map freeNamesIdExtras subs)
 freeNamesDeclExtras (IfaceClassExtras _ insts _ subs)
   = unionManyNameSets (mkNameSet insts : map freeNamesIdExtras subs)
-freeNamesDeclExtras (IfaceSynExtras _ insts _)
+freeNamesDeclExtras (IfaceSynonymExtras _ _)
+  = emptyNameSet
+freeNamesDeclExtras (IfaceFamilyExtras _ insts _)
   = mkNameSet insts
 freeNamesDeclExtras IfaceOtherDeclExtras
   = emptyNameSet
@@ -801,7 +805,8 @@ freeNamesIdExtras (IdExtras _ rules _) = unionManyNameSets (map freeNamesIfRule 
 instance Outputable IfaceDeclExtras where
   ppr IfaceOtherDeclExtras       = Outputable.empty
   ppr (IfaceIdExtras  extras)    = ppr_id_extras extras
-  ppr (IfaceSynExtras fix finsts anns) = vcat [ppr fix, ppr finsts, ppr anns]
+  ppr (IfaceSynonymExtras fix anns) = vcat [ppr fix, ppr anns]
+  ppr (IfaceFamilyExtras fix finsts anns) = vcat [ppr fix, ppr finsts, ppr anns]
   ppr (IfaceDataExtras fix insts anns stuff) = vcat [ppr fix, ppr_insts insts, ppr anns,
                                                 ppr_id_extras_s stuff]
   ppr (IfaceClassExtras fix insts anns stuff) = vcat [ppr fix, ppr_insts insts, ppr anns,
@@ -825,9 +830,11 @@ instance Binary IfaceDeclExtras where
    putByte bh 2; put_ bh fix; put_ bh insts; put_ bh anns; put_ bh cons
   put_ bh (IfaceClassExtras fix insts anns methods) = do
    putByte bh 3; put_ bh fix; put_ bh insts; put_ bh anns; put_ bh methods
-  put_ bh (IfaceSynExtras fix finsts anns) = do
-   putByte bh 4; put_ bh fix; put_ bh finsts; put_ bh anns
-  put_ bh IfaceOtherDeclExtras = putByte bh 5
+  put_ bh (IfaceSynonymExtras fix anns) = do
+   putByte bh 4; put_ bh fix; put_ bh anns
+  put_ bh (IfaceFamilyExtras fix finsts anns) = do
+   putByte bh 5; put_ bh fix; put_ bh finsts; put_ bh anns
+  put_ bh IfaceOtherDeclExtras = putByte bh 6
 
 instance Binary IfaceIdExtras where
   get _bh = panic "no get for IfaceIdExtras"
@@ -858,7 +865,9 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env decl
                            -- as well as instances of the class (Trac #5147)
                         (ann_fn n)
                         [id_extras op | IfaceClassOp op _ _ <- sigs]
-      IfaceSyn{} -> IfaceSynExtras (fix_fn n)
+      IfaceSynonym{} -> IfaceSynonymExtras (fix_fn n)
+                                           (ann_fn n)
+      IfaceFamily{} -> IfaceFamilyExtras (fix_fn n)
                         (map ifFamInstAxiom (lookupOccEnvL fi_env n))
                         (ann_fn n)
       _other -> IfaceOtherDeclExtras
@@ -1605,11 +1614,20 @@ tyConToIfaceDecl env tycon
 
   | Just syn_rhs <- synTyConRhs_maybe tycon
   = ( tc_env1
-    , IfaceSyn {  ifName    = getOccName tycon,
-                  ifTyVars  = if_tc_tyvars,
-                  ifRoles   = tyConRoles tycon,
-                  ifSynRhs  = to_ifsyn_rhs syn_rhs,
-                  ifSynKind = tidyToIfaceType tc_env1 (synTyConResKind tycon) })
+    , IfaceSynonym { ifName    = getOccName tycon,
+                     ifTyVars  = if_tc_tyvars,
+                     ifRoles   = tyConRoles tycon,
+                     ifSynRhs  = if_syn_type syn_rhs,
+                     ifSynKind = tidyToIfaceType tc_env1 (synTyConResKind tycon)
+                   })
+
+  | Just fam_flav <- famTyConFlav_maybe tycon
+  = ( tc_env1
+    , IfaceFamily { ifName    = getOccName tycon,
+                    ifTyVars  = if_tc_tyvars,
+                    ifFamFlav = to_if_fam_flav fam_flav,
+                    ifFamKind = tidyToIfaceType tc_env1 (synTyConResKind tycon)
+                  })
 
   | isAlgTyCon tycon
   = ( tc_env1
@@ -1640,6 +1658,7 @@ tyConToIfaceDecl env tycon
   where
     (tc_env1, tc_tyvars) = tidyTyClTyVarBndrs env (tyConTyVars tycon)
     if_tc_tyvars = toIfaceTvBndrs tc_tyvars
+    if_syn_type ty = tidyToIfaceType tc_env1 ty
 
     funAndPrimTyVars = toIfaceTvBndrs $ take (tyConArity tycon) alphaTyVars
 
@@ -1649,18 +1668,15 @@ tyConToIfaceDecl env tycon
                                                    (tidyToIfaceTcArgs tc_env1 tc ty)
                Nothing           -> IfNoParent
 
-    to_ifsyn_rhs OpenSynFamilyTyCon        = IfaceOpenSynFamilyTyCon
-    to_ifsyn_rhs (ClosedSynFamilyTyCon ax) = IfaceClosedSynFamilyTyCon axn ibr
+    to_if_fam_flav OpenSynFamilyTyCon        = IfaceOpenSynFamilyTyCon
+    to_if_fam_flav (ClosedSynFamilyTyCon ax) = IfaceClosedSynFamilyTyCon axn ibr
       where defs = fromBranchList $ coAxiomBranches ax
             ibr  = map (coAxBranchToIfaceBranch' tycon) defs
             axn  = coAxiomName ax
-    to_ifsyn_rhs AbstractClosedSynFamilyTyCon
+    to_if_fam_flav AbstractClosedSynFamilyTyCon
       = IfaceAbstractClosedSynFamilyTyCon
 
-    to_ifsyn_rhs (SynonymTyCon ty)
-      = IfaceSynonymTyCon (tidyToIfaceType tc_env1 ty)
-
-    to_ifsyn_rhs (BuiltInSynFamTyCon {})
+    to_if_fam_flav (BuiltInSynFamTyCon {})
       = IfaceBuiltInSynFamTyCon
 
 

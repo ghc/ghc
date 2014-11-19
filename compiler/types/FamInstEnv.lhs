@@ -709,7 +709,7 @@ lookup_fam_inst_env' match_fun ie fam match_tys
     -- Deal with over-saturation
     -- See Note [Over-saturated matches]
     split_tys tpl_tys
-      | isSynFamilyTyCon fam
+      | isTypeFamilyTyCon fam
       = pre_rough_split_tys
 
       | otherwise
@@ -812,7 +812,7 @@ reduceTyFamApp_maybe envs role tc tys
 
   | case role of
        Representational -> isOpenFamilyTyCon    tc
-       _                -> isOpenSynFamilyTyCon tc
+       _                -> isOpenTypeFamilyTyCon tc
        -- If we seek a representational coercion
        -- (e.g. the call in topNormaliseType_maybe) then we can
        -- unwrap data families as well as type-synonym families;

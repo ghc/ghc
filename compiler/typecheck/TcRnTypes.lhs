@@ -1042,7 +1042,7 @@ data Ct
 
   | CFunEqCan {  -- F xis ~ fsk
        -- Invariants:
-       --   * isSynFamilyTyCon cc_fun
+       --   * isTypeFamilyTyCon cc_fun
        --   * typeKind (F xis) = tyVarKind fsk
        --   * always Nominal role
        --   * always Given or Wanted, never Derived

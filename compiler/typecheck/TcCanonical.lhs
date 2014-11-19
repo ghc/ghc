@@ -399,9 +399,9 @@ can_eq_nc' ev ty1 ps_ty1 ty2 ps_ty2
 -- so that  tv ~ F ty gets flattened
 -- Otherwise  F a ~ F a  might not get solved!
 can_eq_nc' ev (TyConApp fn1 tys1) _ ty2 ps_ty2
-  | isSynFamilyTyCon fn1 = can_eq_fam_nc ev NotSwapped fn1 tys1 ty2 ps_ty2
+  | isTypeFamilyTyCon fn1 = can_eq_fam_nc ev NotSwapped fn1 tys1 ty2 ps_ty2
 can_eq_nc' ev ty1 ps_ty1 (TyConApp fn2 tys2) _
-  | isSynFamilyTyCon fn2 = can_eq_fam_nc ev IsSwapped fn2 tys2 ty1 ps_ty1
+  | isTypeFamilyTyCon fn2 = can_eq_fam_nc ev IsSwapped fn2 tys2 ty1 ps_ty1
 
 -- Type variable on LHS or RHS are next
 can_eq_nc' ev (TyVarTy tv1) _ ty2 ps_ty2

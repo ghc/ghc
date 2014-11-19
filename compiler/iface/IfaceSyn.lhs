@@ -9,7 +9,7 @@
 module IfaceSyn (
         module IfaceType,
 
-        IfaceDecl(..), IfaceSynTyConRhs(..), IfaceClassOp(..), IfaceAT(..),
+        IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassOp(..), IfaceAT(..),
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
         IfaceExpr(..), IfaceAlt, IfaceLetBndr(..),
         IfaceBinding(..), IfaceConAlt(..),
@@ -101,11 +101,18 @@ data IfaceDecl
                                                  -- or data/newtype family instance
     }
 
-  | IfaceSyn  { ifName    :: IfaceTopBndr,           -- Type constructor
-                ifTyVars  :: [IfaceTvBndr],     -- Type variables
-                ifRoles   :: [Role],            -- Roles
-                ifSynKind :: IfaceKind,         -- Kind of the *rhs* (not of the tycon)
-                ifSynRhs  :: IfaceSynTyConRhs }
+  | IfaceSynonym { ifName    :: IfaceTopBndr,      -- Type constructor
+                   ifTyVars  :: [IfaceTvBndr],     -- Type variables
+                   ifRoles   :: [Role],            -- Roles
+                   ifSynKind :: IfaceKind,         -- Kind of the *rhs* (not of
+                                                   -- the tycon)
+                   ifSynRhs  :: IfaceType }
+
+  | IfaceFamily  { ifName    :: IfaceTopBndr,      -- Type constructor
+                   ifTyVars  :: [IfaceTvBndr],     -- Type variables
+                   ifFamKind :: IfaceKind,         -- Kind of the *rhs* (not of
+                                                   -- the tycon)
+                   ifFamFlav :: IfaceFamTyConFlav }
 
   | IfaceClass { ifCtxt    :: IfaceContext,             -- Context...
                  ifName    :: IfaceTopBndr,             -- Name of the class TyCon
@@ -145,12 +152,11 @@ data IfaceTyConParent
                    IfaceTyCon
                    IfaceTcArgs
 
-data IfaceSynTyConRhs
+data IfaceFamTyConFlav
   = IfaceOpenSynFamilyTyCon
   | IfaceClosedSynFamilyTyCon IfExtName       -- name of associated axiom
                               [IfaceAxBranch] -- for pretty printing purposes only
   | IfaceAbstractClosedSynFamilyTyCon
-  | IfaceSynonymTyCon IfaceType
   | IfaceBuiltInSynFamTyCon -- for pretty printing purposes only
 
 data IfaceClassOp = IfaceClassOp IfaceTopBndr DefMethSpec IfaceType
@@ -734,16 +740,16 @@ pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs, ifRec = isrec
         | showSub ss sg = Just $  pprIfaceClassOp ss sg
         | otherwise     = Nothing
 
-pprIfaceDecl ss (IfaceSyn { ifName   = tc
-                          , ifTyVars = tv
-                          , ifSynRhs = IfaceSynonymTyCon mono_ty })
+pprIfaceDecl ss (IfaceSynonym { ifName   = tc
+                              , ifTyVars = tv
+                              , ifSynRhs = mono_ty })
   = hang (ptext (sLit "type") <+> pprIfaceDeclHead [] ss tc tv <+> equals)
        2 (sep [pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau])
   where
     (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
 
-pprIfaceDecl ss (IfaceSyn { ifName = tycon, ifTyVars = tyvars
-                          , ifSynRhs = rhs, ifSynKind = kind })
+pprIfaceDecl ss (IfaceFamily { ifName = tycon, ifTyVars = tyvars
+                             , ifFamFlav = rhs, ifFamKind = kind })
   = vcat [ hang (text "type family" <+> pprIfaceDeclHead [] ss tycon tyvars <+> dcolon)
               2 (ppr kind <+> ppShowRhs ss (pp_rhs rhs))
          , ppShowRhs ss (nest 2 (pp_branches rhs)) ]
@@ -1111,10 +1117,15 @@ freeNamesIfDecl d@IfaceData{} =
   freeNamesIfaceTyConParent (ifParent d) &&&
   freeNamesIfContext (ifCtxt d) &&&
   freeNamesIfConDecls (ifCons d)
-freeNamesIfDecl d@IfaceSyn{} =
+freeNamesIfDecl d@IfaceSynonym{} =
   freeNamesIfTvBndrs (ifTyVars d) &&&
-  freeNamesIfSynRhs (ifSynRhs d) &&&
+  freeNamesIfType (ifSynRhs d) &&&
   freeNamesIfKind (ifSynKind d) -- IA0_NOTE: because of promotion, we
+                                -- return names in the kind signature
+freeNamesIfDecl d@IfaceFamily{} =
+  freeNamesIfTvBndrs (ifTyVars d) &&&
+  freeNamesIfFamFlav (ifFamFlav d) &&&
+  freeNamesIfKind (ifFamKind d) -- IA0_NOTE: because of promotion, we
                                 -- return names in the kind signature
 freeNamesIfDecl d@IfaceClass{} =
   freeNamesIfTvBndrs (ifTyVars d) &&&
@@ -1147,13 +1158,12 @@ freeNamesIfIdDetails (IfRecSelId tc _) = freeNamesIfTc tc
 freeNamesIfIdDetails _                 = emptyNameSet
 
 -- All other changes are handled via the version info on the tycon
-freeNamesIfSynRhs :: IfaceSynTyConRhs -> NameSet
-freeNamesIfSynRhs (IfaceSynonymTyCon ty)            = freeNamesIfType ty
-freeNamesIfSynRhs IfaceOpenSynFamilyTyCon           = emptyNameSet
-freeNamesIfSynRhs (IfaceClosedSynFamilyTyCon ax br)
+freeNamesIfFamFlav :: IfaceFamTyConFlav -> NameSet
+freeNamesIfFamFlav IfaceOpenSynFamilyTyCon           = emptyNameSet
+freeNamesIfFamFlav (IfaceClosedSynFamilyTyCon ax br)
   = unitNameSet ax &&& fnList freeNamesIfAxBranch br
-freeNamesIfSynRhs IfaceAbstractClosedSynFamilyTyCon = emptyNameSet
-freeNamesIfSynRhs IfaceBuiltInSynFamTyCon = emptyNameSet
+freeNamesIfFamFlav IfaceAbstractClosedSynFamilyTyCon = emptyNameSet
+freeNamesIfFamFlav IfaceBuiltInSynFamTyCon = emptyNameSet
 
 freeNamesIfContext :: IfaceContext -> NameSet
 freeNamesIfContext = fnList freeNamesIfType
@@ -1385,7 +1395,7 @@ instance Binary IfaceDecl where
         put_ bh a9
         put_ bh a10
 
-    put_ bh (IfaceSyn a1 a2 a3 a4 a5) = do
+    put_ bh (IfaceSynonym a1 a2 a3 a4 a5) = do
         putByte bh 3
         put_ bh (occNameFS a1)
         put_ bh a2
@@ -1393,8 +1403,15 @@ instance Binary IfaceDecl where
         put_ bh a4
         put_ bh a5
 
-    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
+    put_ bh (IfaceFamily a1 a2 a3 a4) = do
         putByte bh 4
+        put_ bh (occNameFS a1)
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
+
+    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
+        putByte bh 5
         put_ bh a1
         put_ bh (occNameFS a2)
         put_ bh a3
@@ -1406,14 +1423,14 @@ instance Binary IfaceDecl where
         put_ bh a9
 
     put_ bh (IfaceAxiom a1 a2 a3 a4) = do
-        putByte bh 5
+        putByte bh 6
         put_ bh (occNameFS a1)
         put_ bh a2
         put_ bh a3
         put_ bh a4
 
     put_ bh (IfacePatSyn name a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
-        putByte bh 6
+        putByte bh 7
         put_ bh (occNameFS name)
         put_ bh a2
         put_ bh a3
@@ -1453,8 +1470,14 @@ instance Binary IfaceDecl where
                     a4 <- get bh
                     a5 <- get bh
                     occ <- return $! mkTcOccFS a1
-                    return (IfaceSyn occ a2 a3 a4 a5)
+                    return (IfaceSynonym occ a2 a3 a4 a5)
             4 -> do a1 <- get bh
+                    a2 <- get bh
+                    a3 <- get bh
+                    a4 <- get bh
+                    occ <- return $! mkTcOccFS a1
+                    return (IfaceFamily occ a2 a3 a4)
+            5 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
@@ -1465,13 +1488,13 @@ instance Binary IfaceDecl where
                     a9 <- get bh
                     occ <- return $! mkClsOccFS a2
                     return (IfaceClass a1 occ a3 a4 a5 a6 a7 a8 a9)
-            5 -> do a1 <- get bh
+            6 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
                     occ <- return $! mkTcOccFS a1
                     return (IfaceAxiom occ a2 a3 a4)
-            6 -> do a1 <- get bh
+            7 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
@@ -1485,12 +1508,11 @@ instance Binary IfaceDecl where
                     return (IfacePatSyn occ a2 a3 a4 a5 a6 a7 a8 a9 a10)
             _ -> panic (unwords ["Unknown IfaceDecl tag:", show h])
 
-instance Binary IfaceSynTyConRhs where
+instance Binary IfaceFamTyConFlav where
     put_ bh IfaceOpenSynFamilyTyCon           = putByte bh 0
     put_ bh (IfaceClosedSynFamilyTyCon ax br) = putByte bh 1 >> put_ bh ax
                                                              >> put_ bh br
     put_ bh IfaceAbstractClosedSynFamilyTyCon = putByte bh 2
-    put_ bh (IfaceSynonymTyCon ty)            = putByte bh 3 >> put_ bh ty
     put_ _ IfaceBuiltInSynFamTyCon
         = pprPanic "Cannot serialize IfaceBuiltInSynFamTyCon, used for pretty-printing only" Outputable.empty
 
@@ -1500,9 +1522,7 @@ instance Binary IfaceSynTyConRhs where
                     1 -> do { ax <- get bh
                             ; br <- get bh
                             ; return (IfaceClosedSynFamilyTyCon ax br) }
-                    2 -> return IfaceAbstractClosedSynFamilyTyCon
-                    _ -> do { ty <- get bh
-                            ; return (IfaceSynonymTyCon ty) } }
+                    _ -> return IfaceAbstractClosedSynFamilyTyCon }
 
 instance Binary IfaceClassOp where
     put_ bh (IfaceClassOp n def ty) = do
