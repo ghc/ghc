@@ -1,6 +1,9 @@
 # see 'man git-shortlog' for more details
 # formats: Proper Name [<proper@email.xx> [Commit Name]] <commit@email.xx>
 #
+# Show result: git shortlog -sne
+# Should be empty list: git shortlog -se | cut -f2 | cut -d'<' -f1 | uniq -d
+
 Aaron Tomb              <atomb@galois.com>                  <atomb@soe.ucsc.edu>
 Alastair Reid           <alastair@reid-consulting-uk.ltd.uk> areid <unknown>
 Alastair Reid           <alastair@reid-consulting-uk.ltd.uk> reid <unknown>
@@ -16,6 +19,7 @@ Andy Gill               <andygill@ku.edu>                   andy <unknown>
 Andy Gill               <andygill@ku.edu>                   andy@galois.com <unknown>
 Andy Gill               <andygill@ku.edu>                   andy@unsafeperformio.com <unknown>
 Andy Gill               <andygill@ku.edu>                   andygill@ku.edu <unknown>
+Anton Nikishaev         <anton.nik@gmail.com>               a <unknown> # Ticket #1344.
 Audrey Tang             <audreyt@audreyt.org>               audreyt@audreyt.org <unknown>
 Austin Seipp            <austin@well-typed.com>             <as@hacks.yi.org>
 Austin Seipp            <austin@well-typed.com>             <as@nijoruj.org>
@@ -23,6 +27,7 @@ Austin Seipp            <austin@well-typed.com>             <aseipp@pobox.com>
 Austin Seipp            <austin@well-typed.com>             <mad.one@gmail.com>
 Bas van Dijk            <v.dijk.bas@gmail.com>              basvandijk@home.nl <unknown>
 Bas van Dijk            <v.dijk.bas@gmail.com>              v.dijk.bas@gmail.com <unknown>
+Ben Chan                <usrbincc@yahoo.com>                # See Note [usrbincc].
 Ben Gamari              <bgamari.foss@gmail.com>            <ben@panda.(none)>
 Ben Gamari              <bgamari.foss@gmail.com>            <ben@panda1.milkyway>
 Ben Lippmeier           <benl@ouroborus.net>
@@ -40,6 +45,7 @@ Brent Yorgey            <byorgey@gmail.com>                 <byorgey@LVN513-12.c
 Brian Smith             <brianlsmith@gmail.com>
 Brian Smith             <brianlsmith@gmail.com>             brianlsmith@gmail.com <unknown>
 Cain Norris             <ghc@cainnorris.net>                ghc@cainnorris.net <unknown>
+Chris Catalfo           <foxnorth@gmail.com>                # https://github.com/ccatalfo
 Chris Rodrigues         <red5_2@hotmail.com>                red5_2@hotmail.com <unknown>
 Chris Smith             <cdsmith@twu.net>                   cdsmith@twu.net <unknown>
 Christoph Bauer         <ich@christoph-bauer.net>           ich@christoph-bauer.net <unknown>
@@ -48,13 +54,21 @@ Claus Reinke            <claus.reinke@talk21.com>           claus.reinke@talk21.
 Colin McQuillan         <m.niloc@gmail.com>
 Colin McQuillan         <m.niloc@gmail.com>                 m.niloc@gmail.com <unknown>
 Colin Watson            <cjwatson@debian.org>               <cjwatson@canonical.com>
+Csernik Flaviu Andrei   <fcsernik@gmail.com>                # https://github.com/archblob
 Daan Leijen             <daan@microsoft.com>                daan <unknown>
+Dan Licata              <drl@cs.cmu.edu>                    # Commit 6a05ec.
+Dana N. Xu              <na.xu@inria.fr>                    <nx200@cad> # TODO. Doesn't work (weird char?).
+Dana N. Xu              <na.xu@inria.fr>                    <nx200@cam.ac.uk> # "Static Contract Checking for Haskell".
+Dana N. Xu              <na.xu@inria.fr>                    nx <unknown>
 Daniel Fischer          <daniel.is.fischer@googlemail.com>  <daniel.is.fischer@web.de>
 Daniel Franke           <df@dfranke.us>                     df@dfranke.us <unknown>
 Daniel Rogers           <daniel@phasevelocity.org>          daniel@phasevelocity.org <unknown>
 David Feuer             <david.feuer@gmail.com>             <David.Feuer@gmail.com>
+David Himmelstrup       <lemmih@gmail.com>                  # http://www.haskellers.com/user/Lemmih
 David M Peixotto        <dmp@rice.edu>                      dmp@rice.edu <unknown>
+David Terei             <code@davidterei.com>               <davidt@davidt-vm-32.scs.stanford.edu> # Ticket #5785.
 David Terei             <code@davidterei.com>               <davidterei@gmail.com>
+David Turner            <dnt@dcs.gla.ac.uk>                 dnt <unknown> # Same domain as Will Partain, who mentions "(from dnt)"
 David Waern             <davve@dtek.chalmers.se>
 David Waern             <davve@dtek.chalmers.se>            <david.waern@gmail.com>
 David Waern             <davve@dtek.chalmers.se>            <waern@ubuntu.(none)>
@@ -79,6 +93,7 @@ Gabriele Keller         <keller@cse.unsw.edu.au>            keller@cse.unsw.edu.
 Geoffrey Mainland       <mainland@cs.drexel.edu>            <gmainlan@microsoft.com>
 Geoffrey Mainland       <mainland@cs.drexel.edu>            <mainland@apeiron.net>
 Geoffrey Mainland       <mainland@cs.drexel.edu>            mainland@eecs.harvard.edu <unknown>
+Geoffrey Washburn       <geoffw@cis.upenn.edu>              geoffw <unknown> # See Note [geoffw]
 Gergő Érdi              <gergo@erdi.hu>
 Gregory Wright          <gwright@antiope.com>
 Gregory Wright          <gwright@antiope.com>               gwright@antiope.com <unknown>
@@ -92,10 +107,14 @@ Ian Lynagh              <igloo@earth.li>                    <ian@well-typed.com>
 Ian Lynagh              <igloo@earth.li>                    igloo <unknown>
 Iavor S. Diatchki       <iavor.diatchki@gmail.com>          <diatchki@Perun.(none)>
 Iavor S. Diatchki       <iavor.diatchki@gmail.com>          <diatchki@galois.com>
+Iavor S. Diatchki       <iavor.diatchki@gmail.com>          diatchki <unknown>
 Iavor S. Diatchki       <iavor.diatchki@gmail.com>          iavor.diatchki@gmail.com <unknown>
+Isaac Potoczny-Jones    <ijones@syntaxpolice.org>           ijones <unknown>
 Isaac Potoczny-Jones    <ijones@syntaxpolice.org>           ijones@syntaxpolice.org <unknown>
 Jean-Philippe Bernardy  <jeanphilippe.bernardy@gmail.com>   jeanphilippe.bernardy@gmail.com <unknown>
+Jean-Philippe Bernardy  <jeanphilippe.bernardy@gmail.com>   jpbernardy <unknown>
 Jeff Lewis              <jeff@galconn.com>                  lewie <unknown>
+Jim Apple               <jbapple@gmail.com>                 unknown <unknown> # Tickets #2533 and #4193.
 Joachim Breitner        <mail@joachim-breitner.de>          <breitner@kit.edu>
 Jochem Berndsen         <jochemberndsen@dse.nl>             jochemberndsen@dse.nl <unknown>
 John Dias               <dias@cs.tufts.edu>                 dias@cs.tufts.edu <unknown>
@@ -128,6 +147,7 @@ Lennart Augustsson      <lennart@augustsson.net>            lennart@augustsson.n
 Lennart Kolmodin        <kolmodin@gmail.com>                <kolmodin@dtek.chalmers.se>
 Lennart Kolmodin        <kolmodin@gmail.com>                <kolmodin@google.com>
 Levent Erkök            <erkokl@gmail.com>                  erkok <unknown>
+Louis Zhuang            <y.zhuang5@lse.ac.uk>               y.zhuang5@lse.ac.uk <unknown> # See Note [zhuang]
 Luke Iannini            <lukexipd@gmail.com>                <lukexi@me.com>
 Malcolm Wallace         <Malcolm.Wallace@cs.york.ac.uk>     Malcolm.Wallace@cs.york.ac.uk <unknown>
 Malcolm Wallace         <Malcolm.Wallace@cs.york.ac.uk>     Malcolm.Wallace@me.com <unknown>
@@ -146,8 +166,10 @@ Nathan Huesken          <nathan.huesken@posteo.de>
 Neil Mitchell           <ndmitchell@gmail.com>              <http://www.cs.york.ac.uk/~ndm/>
 Neil Mitchell           <ndmitchell@gmail.com>              Neil Mitchell <unknown>
 Nicholas Nethercote     <njn25@cam.ac.uk>                   njn <unknown>
+Niklas Larsson          <niklas@mm.st>                      # Commit 664063.
 Norman Ramsey           <nr@eecs.harvard.edu>               nr@eecs.harvard.edu <unknown>
-PHO                     <pho@cielonegro.org>                pho@cielonegro.org <unknown>
+Orphi                   <MathematicalOrchid@hotmail.com>    # Uses this name online.
+PHO                     <pho@cielonegro.org>                pho@cielonegro.org <unknown> # Uses this name online.
 Pepe Iborra             <mnislaih@gmail.com>
 Pepe Iborra             <mnislaih@gmail.com>                <pepeiborra@gmail.com>
 Pepe Iborra             <mnislaih@gmail.com>                mnislaih@gmail.com <unknown>
@@ -157,8 +179,11 @@ Peter Jonsson           <t-peterj@microsoft.com>            t-peterj@microsoft.c
 Peter Trommler          <ptrommler@acm.org>                 <ptrommler@scm.org>
 Peter Wortmann          <scpmw@leeds.ac.uk>                 <peter@grayson-heights-pc028-118.student-halls.leeds.ac.uk>
 Peter Wortmann          <scpmw@leeds.ac.uk>                 scpmw@leeds.ac.uk <unknown>
+Ralf Laemmel            <softlang@uni-koblenz.de>           ralf <unknown> # https://ghc.haskell.org/trac/ghc/wiki/TeamGHC
+Ravi Nanavati           <ravi@bluespec.com>                 # Commit 70c044.
 Reuben Thomas           <rrt@sc3d.org>                      rrt <unknown>
 Richard Eisenberg       <eir@cis.upenn.edu>                 <eir@seas.upenn.edu>
+Rob Ennals              <rob@ennals.org>                    rje <unknown> # SPJ's student (rje33@cam.ac.uk)
 Roman Leshchinskiy      <rl@cse.unsw.edu.au>                rl@cse.unsw.edu.au <unknown>
 Ross Paterson           <ross@soi.city.ac.uk>               ross <unknown>
 Ryan Lortie             <desrt@desrt.ca>                    desrt <unknown>
@@ -178,6 +203,7 @@ Simon Marlow            <marlowsd@gmail.com>                <simonmarhaskell@gma
 Simon Marlow            <marlowsd@gmail.com>                simonm <unknown>
 Simon Marlow            <marlowsd@gmail.com>                simonmar <unknown>
 Simon Marlow            <marlowsd@gmail.com>                simonmar@microsoft.com <unknown>
+Simon Marlow            <marlowsd@gmail.com>                uid245 <unknown> # See Note [uid245]
 Simon Peyton Jones      <simonpj@microsoft.com>
 Simon Peyton Jones      <simonpj@microsoft.com>             <simonpj@.europe.corp.microsoft.com>
 Simon Peyton Jones      <simonpj@microsoft.com>             <simonpj@MSRC-4971295.europe.corp.microsoft.com>
@@ -191,18 +217,49 @@ Spencer Janssen         <spencer@well-typed.com>            <sjanssen@cse.unl.ed
 Stephen Blackheath      <stephen@blacksapphire.com>         <docks.cattlemen.stephen@blacksapphire.com>
 Stephen Blackheath      <stephen@blacksapphire.com>         <effusively.proffer.stephen@blacksapphire.com>
 Stephen Blackheath      <stephen@blacksapphire.com>         <oversensitive.pastors.stephen@blacksapphire.com>
+Sungwoo Park            <gla@postech.ac.kr>                 gla <unknown> # https://ghc.haskell.org/trac/ghc/wiki/TeamGHC
 Sven Panne              <sven.panne@aedion.de>              panne <unknown>
 Sven Panne              <sven.panne@aedion.de>              sven.panne@aedion.de <unknown>
 Sébastien Carlier       <sebc@posse42.net>                  sebc <unknown>
 Thorkil Naur            <naur@post11.tele.dk>               naur@post11.tele.dk <unknown>
+Tim Chevalier           <chevalier@alum.wellesley.edu>
+Tim Chevalier           <chevalier@alum.wellesley.edu>      <t-kirstc@microsoft.com>
+Tim Chevalier           <chevalier@alum.wellesley.edu>      krc <unknown> # Ticket #670.
 Tim Harris              <tharris@microsoft.com>
 Tim Harris              <tharris@microsoft.com>             tharris <unknown>
 Tim Harris              <tharris@microsoft.com>             tharris@microsoft.com <unknown>
 Tobias Gedell           <d99getob@dtek.chalmers.se>         tgedell <unknown>
 Tom Schrijvers          <tom.schrijvers@cs.kuleuven.be>     tom.schrijvers@cs.kuleuven.be <unknown>
+Umut Acar               <umut@cs.cmu.edu>                   umuta <unknown> # POPL 2002 paper Adaptive Functional Programming
+Vitaly Bragilevsky      <bravit111@gmail.com>
 Volker Stolz            <stolz@i2.informatik.rwth-aachen.de>
 Volker Stolz            <stolz@i2.informatik.rwth-aachen.de> stolz <unknown>
 Will Partain            <partain@dcs.gla.ac.uk>             partain <unknown>
 Wolfgang Thaller        <wolfgang.thaller@gmx.net>          wolfgang <unknown>
 Wolfgang Thaller        <wolfgang.thaller@gmx.net>          wolfgang.thaller@gmx.net <unknown>
+Yorick Laupa            <yo.eight@gmail.com>                # https://github.com/yoeight
+Yuri de Wit             <admin@rodlogic.net>                # Commit 37d64a.
+gwern                   <gwern0@gmail.com>                  gwern0@gmail.com <unknown> # Uses this name online.
+shelarcy                <shelarcy@gmail.com>                # Uses this name online.
+Ömer Sinan Ağacan       <omeragacan@gmail.com>              # https://github.com/osa1
+
+# Note [geoffw]
+# From GHC wiki: "Geoff Washburn made the first implementation of GADTs in GHC"
+# Other possibilities (but not such a direct connection with GHC):
+#  * Geoff W. Hamilton
+#    FP Researcher
+#  * Geoff Wozniak <wozniak@csd.uwo.ca>
+#    PhD student, OCaml, "Dynamic ADTs"
+#
+# Note [uid245]
+# Circumstantial evidence only:
+# * Commit fafe43, "Avoid divide by zero", by simonm.
+# * Subsequent commit fd40a1, "avoid another divide by zero", by uid245.
+# * Three commits later 15e6ea, "urk, extra parenthesis crept in", by simonm. Same file section.
+#
+# Note [usrbincc]
+# https://github.com/thlorenz/node-traceur/commit/59f97feae23763c456b70bb129dbe04004e9fe04
+#
+# Note [zhuang]
+# http://comments.gmane.org/gmane.comp.lang.haskell.cvs.ghc/33473
 #EOF
