@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# Script to suppress annoying warnings from libtool (without suppressing any other interesting output)
+libtool $@ 2>&1 | sed -e "/has no symbols/D" | sed -e "/due to use of basename, truncation and blank padding/D"
