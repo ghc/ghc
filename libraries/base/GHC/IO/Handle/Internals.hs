@@ -74,7 +74,7 @@ import GHC.IORef
 import GHC.MVar
 import Data.Typeable
 import Data.Maybe
-import Foreign.Safe
+import Foreign
 import System.Posix.Internals hiding (FD)
 
 import Foreign.C

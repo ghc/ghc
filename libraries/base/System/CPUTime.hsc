@@ -26,7 +26,7 @@ module System.CPUTime
 
 import Data.Ratio
 
-import Foreign.Safe
+import Foreign
 import Foreign.C
 
 -- For struct rusage

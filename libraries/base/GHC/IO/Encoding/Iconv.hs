@@ -33,7 +33,7 @@ module GHC.IO.Encoding.Iconv (
 import GHC.Base () -- For build ordering
 #else
 
-import Foreign.Safe
+import Foreign
 import Foreign.C
 import Data.Maybe
 import GHC.Base

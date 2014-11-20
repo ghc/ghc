@@ -57,7 +57,11 @@ import System.IO.Unsafe         ( unsafePerformIO )
 
 import GHC.Exts
 
+#if __GLASGOW_HASKELL__ >= 709
+import Foreign
+#else
 import Foreign.Safe
+#endif
 
 -- -----------------------------------------------------------------------------
 -- The StringBuffer type

@@ -118,7 +118,11 @@ import Data.List        ( elemIndex )
 
 import GHC.IO           ( IO(..), unsafeDupablePerformIO )
 
+#if __GLASGOW_HASKELL__ >= 709
+import Foreign
+#else
 import Foreign.Safe
+#endif
 
 #if STAGE >= 2
 import GHC.Conc.Sync    (sharedCAF)

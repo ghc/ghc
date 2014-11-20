@@ -17,7 +17,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Foreign.Marshal.Safe
+module Foreign.Marshal.Safe {-# DEPRECATED "Safe is now the default, please use Foreign.Marshal instead" #-}
         (
          -- | The module "Foreign.Marshal.Safe" re-exports the other modules in the
          -- @Foreign.Marshal@ hierarchy:

@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------

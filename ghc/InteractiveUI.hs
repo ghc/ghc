@@ -81,7 +81,11 @@ import Data.Maybe
 import Exception hiding (catch)
 
 import Foreign.C
+#if __GLASGOW_HASKELL__ >= 709
+import Foreign
+#else
 import Foreign.Safe
+#endif
 
 import System.Directory
 import System.Environment

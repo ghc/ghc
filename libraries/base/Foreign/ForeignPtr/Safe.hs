@@ -19,7 +19,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Foreign.ForeignPtr.Safe (
+module Foreign.ForeignPtr.Safe {-# DEPRECATED "Safe is now the default, please use Foreign.ForeignPtr instead" #-} (
         -- * Finalised data pointers
           ForeignPtr
         , FinalizerPtr

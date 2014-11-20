@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
@@ -43,5 +43,5 @@ module Foreign.ForeignPtr (
         , mallocForeignPtrArray0
     ) where
 
-import Foreign.ForeignPtr.Safe
+import Foreign.ForeignPtr.Imp
 

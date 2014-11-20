@@ -18,23 +18,23 @@
 --
 -----------------------------------------------------------------------------
 
-module Foreign.Safe
+module Foreign.Safe {-# DEPRECATED "Safe is now the default, please use Foreign instead" #-}
         ( module Data.Bits
         , module Data.Int
         , module Data.Word
         , module Foreign.Ptr
-        , module Foreign.ForeignPtr.Safe
+        , module Foreign.ForeignPtr
         , module Foreign.StablePtr
         , module Foreign.Storable
-        , module Foreign.Marshal.Safe
+        , module Foreign.Marshal
         ) where
 
 import Data.Bits
 import Data.Int
 import Data.Word
 import Foreign.Ptr
-import Foreign.ForeignPtr.Safe
+import Foreign.ForeignPtr
 import Foreign.StablePtr
 import Foreign.Storable
-import Foreign.Marshal.Safe
+import Foreign.Marshal
 

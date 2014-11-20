@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
@@ -17,10 +17,18 @@
 
 module Foreign.Marshal
         (
-         -- | The module "Foreign.Marshal" re-exports the safe content in the
-         -- @Foreign.Marshal@ hierarchy:
-          module Foreign.Marshal.Safe
+         -- | The module "Foreign.Marshal.Safe" re-exports the other modules in the
+         -- @Foreign.Marshal@ hierarchy (except for @Foreign.Marshal.Unsafe@):
+          module Foreign.Marshal.Alloc
+        , module Foreign.Marshal.Array
+        , module Foreign.Marshal.Error
+        , module Foreign.Marshal.Pool
+        , module Foreign.Marshal.Utils
         ) where
 
-import Foreign.Marshal.Safe
+import Foreign.Marshal.Alloc
+import Foreign.Marshal.Array
+import Foreign.Marshal.Error
+import Foreign.Marshal.Pool
+import Foreign.Marshal.Utils
 

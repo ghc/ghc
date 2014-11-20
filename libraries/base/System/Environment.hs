@@ -29,7 +29,7 @@ module System.Environment
       getEnvironment,
   ) where
 
-import Foreign.Safe
+import Foreign
 import Foreign.C
 import System.IO.Error (mkIOError)
 import Control.Exception.Base (bracket, throwIO)

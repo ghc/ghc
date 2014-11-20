@@ -83,7 +83,11 @@ import Data.Dynamic
 import Data.Either
 import Data.List (find)
 import Control.Monad
+#if __GLASGOW_HASKELL__ >= 709
+import Foreign
+#else
 import Foreign.Safe
+#endif
 import Foreign.C
 import GHC.Exts
 import Data.Array
