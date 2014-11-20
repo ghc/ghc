@@ -598,7 +598,6 @@ rnPatSynBind _sig_fn bind@(PSB { psb_id = L _ name
 {-
 Note [Pattern synonym wrappers don't yield dependencies]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When renaming a pattern synonym that has an explicit wrapper,
 references in the wrapper definition should not be used when
 calculating dependencies. For example, consider the following pattern

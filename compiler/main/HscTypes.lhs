@@ -1573,7 +1573,7 @@ implicitConLikeThings (RealDataCon dc)
 implicitConLikeThings (PatSynCon {})
   = []  -- Pattern synonyms have no implicit Ids; the wrapper and matcher
         -- are not "implicit"; they are simply new top-level bindings,
-        -- and they have their own declaration in an interface fiel
+        -- and they have their own declaration in an interface file
 
 implicitClassThings :: Class -> [TyThing]
 implicitClassThings cl
