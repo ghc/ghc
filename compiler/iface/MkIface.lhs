@@ -1098,7 +1098,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
 
 \begin{code}
 mkIfaceAnnotation :: Annotation -> IfaceAnnotation
-mkIfaceAnnotation (Annotation { ann_target = target, ann_value = payload }) 
+mkIfaceAnnotation (Annotation { ann_target = target, ann_value = payload })
   = IfaceAnnotation {
         ifAnnotatedTarget = fmap nameOccName target,
         ifAnnotatedValue = payload
@@ -2001,8 +2001,8 @@ toIfaceExpr (Case s x ty as)
   | otherwise               = IfaceCase (toIfaceExpr s) (getFS x) (map toIfaceAlt as)
 toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
 toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
-toIfaceExpr (Tick t e) 
-  | Just t' <- toIfaceTickish t = IfaceTick t' (toIfaceExpr e) 
+toIfaceExpr (Tick t e)
+  | Just t' <- toIfaceTickish t = IfaceTick t' (toIfaceExpr e)
   | otherwise                   = toIfaceExpr e
 
 toIfaceOneShot :: Id -> IfaceOneShot
@@ -2016,8 +2016,8 @@ toIfaceOneShot id | isId id
 toIfaceTickish :: Tickish Id -> Maybe IfaceTickish
 toIfaceTickish (ProfNote cc tick push) = Just (IfaceSCC cc tick push)
 toIfaceTickish (HpcTick modl ix)       = Just (IfaceHpcTick modl ix)
-toIfaceTickish (Breakpoint {})         = Nothing 
-   -- Ignore breakpoints, since they are relevant only to GHCi, and 
+toIfaceTickish (Breakpoint {})         = Nothing
+   -- Ignore breakpoints, since they are relevant only to GHCi, and
    -- should not be serialised (Trac #8333)
 
 ---------------------

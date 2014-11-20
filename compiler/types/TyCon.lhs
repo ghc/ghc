@@ -60,7 +60,7 @@ module TyCon(
         tyConUnique,
         tyConTyVars,
         tyConCType, tyConCType_maybe,
-        tyConDataCons, tyConDataCons_maybe, 
+        tyConDataCons, tyConDataCons_maybe,
         tyConSingleDataCon_maybe, tyConSingleAlgDataCon_maybe,
         tyConFamilySize,
         tyConStupidTheta,
@@ -71,7 +71,7 @@ module TyCon(
         tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
         synTyConDefn_maybe, synTyConRhs_maybe, famTyConFlav_maybe,
         algTyConRhs,
-        newTyConRhs, newTyConEtadArity, newTyConEtadRhs, 
+        newTyConRhs, newTyConEtadArity, newTyConEtadRhs,
         unwrapNewTyCon_maybe, unwrapNewTyConEtad_maybe,
         tupleTyConBoxity, tupleTyConSort, tupleTyConArity,
 
@@ -726,8 +726,8 @@ data FamTyConFlav
 
 Note [Closed type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-* In an open type family you can add new instances later.  This is the 
-  usual case.  
+* In an open type family you can add new instances later.  This is the
+  usual case.
 
 * In a closed type family you can only put equations where the family
   is defined.
@@ -738,7 +738,7 @@ Note [Promoted data constructors]
 A data constructor can be promoted to become a type constructor,
 via the PromotedTyCon alternative in TyCon.
 
-* Only data constructors with  
+* Only data constructors with
      (a) no kind polymorphism
      (b) no constraints in its type (eg GADTs)
   are promoted.  Existentials are ok; see Trac #7347.
@@ -882,7 +882,7 @@ Roughly in order of "includes more information":
    other value.
 
     data CmmType = CmmType CmmCat Width
-    
+
     data CmmCat     -- "Category" (not exported)
        = GcPtrCat   -- GC pointer
        | BitsCat    -- Non-pointer
@@ -1043,8 +1043,8 @@ mkAlgTyCon name kind tyvars roles cType stupid rhs parent is_rec gadt_syn prom_t
 -- | Simpler specialization of 'mkAlgTyCon' for classes
 mkClassTyCon :: Name -> Kind -> [TyVar] -> [Role] -> AlgTyConRhs -> Class -> RecFlag -> TyCon
 mkClassTyCon name kind tyvars roles rhs clas is_rec
-  = mkAlgTyCon name kind tyvars roles Nothing [] rhs (ClassTyCon clas) 
-               is_rec False 
+  = mkAlgTyCon name kind tyvars roles Nothing [] rhs (ClassTyCon clas)
+               is_rec False
                Nothing    -- Class TyCons are not pormoted
 
 mkTupleTyCon :: Name
@@ -1264,7 +1264,7 @@ isProductTyCon _                = False
 
 
 isDataProductTyCon_maybe :: TyCon -> Maybe DataCon
--- True of datatypes (not newtypes) with 
+-- True of datatypes (not newtypes) with
 --   one, vanilla, data constructor
 isDataProductTyCon_maybe (AlgTyCon { algTcRhs = DataTyCon { data_cons = cons } })
   | [con] <- cons         -- Singleton
@@ -1729,7 +1729,7 @@ instance Outputable TyCon where
 
 pprPromotionQuote :: TyCon -> SDoc
 pprPromotionQuote (PromotedDataCon {}) = char '\''   -- Quote promoted DataCons in types
-pprPromotionQuote (PromotedTyCon {})   = ifPprDebug (char '\'') 
+pprPromotionQuote (PromotedTyCon {})   = ifPprDebug (char '\'')
 pprPromotionQuote _                    = empty       -- However, we don't quote TyCons in kinds
                                                      -- e.g.   type family T a :: Bool -> *
                                                      -- cf Trac #5952.  Except with -dppr-debug
@@ -1775,7 +1775,7 @@ twice at the outer level.
 So, when expanding, we keep track of when we've seen a recursive
 newtype at outermost level; and bale out if we see it again.
 
-We sometimes want to do the same for product types, so that the 
+We sometimes want to do the same for product types, so that the
 strictness analyser doesn't unbox infinitely deeply.
 
 The function that manages this is checkRecTc.
@@ -1783,7 +1783,7 @@ The function that manages this is checkRecTc.
 \begin{code}
 newtype RecTcChecker = RC NameSet
 
-initRecTc :: RecTcChecker 
+initRecTc :: RecTcChecker
 initRecTc = RC emptyNameSet
 
 checkRecTc :: RecTcChecker -> TyCon -> Maybe RecTcChecker

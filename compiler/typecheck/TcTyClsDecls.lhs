@@ -392,10 +392,10 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
                          | L _ con <- cons ]
        ; return (main_pr : inner_prs) }
 
-getInitialKind (FamDecl { tcdFam = decl }) 
+getInitialKind (FamDecl { tcdFam = decl })
   = getFamDeclInitialKind decl
 
-getInitialKind decl@(SynDecl {}) 
+getInitialKind decl@(SynDecl {})
   = pprPanic "getInitialKind" (ppr decl)
 
 ---------------------------------
@@ -690,8 +690,8 @@ tcFamDecl1 parent
 
          -- Process the equations, creating CoAxBranches
        ; tc_kind <- kcLookupKind tc_name
-       ; let fam_tc_shape = (tc_name, length (hsQTvBndrs tvs), tc_kind) 
-     
+       ; let fam_tc_shape = (tc_name, length (hsQTvBndrs tvs), tc_kind)
+
        ; branches <- mapM (tcTyFamInstEqn fam_tc_shape) eqns
 
          -- we need the tycon that we will be creating, but it's in scope.
@@ -860,7 +860,7 @@ tcDefaultAssocDecl _ []
   = return Nothing  -- No default declaration
 
 tcDefaultAssocDecl _ (d1:_:_)
-  = failWithTc (ptext (sLit "More than one default declaration for") 
+  = failWithTc (ptext (sLit "More than one default declaration for")
                 <+> ppr (tfe_tycon (unLoc d1)))
 
 tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
@@ -901,7 +901,7 @@ tcTyFamInstEqn fam_tc_shape@(fam_tc_name,_,_)
   = setSrcSpan loc $
     tcFamTyPats fam_tc_shape pats (discardResult . (tcCheckLHsType hs_ty)) $
        \tvs' pats' res_kind ->
-    do { checkTc (fam_tc_name == eqn_tc_name) 
+    do { checkTc (fam_tc_name == eqn_tc_name)
                  (wrongTyFamName fam_tc_name eqn_tc_name)
        ; rhs_ty <- tcCheckLHsType hs_ty res_kind
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
@@ -1585,7 +1585,7 @@ checkNewDataCon con
     }
   where
     (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig con
-    check_con what msg 
+    check_con what msg
        = checkTc what (msg $$ ppr con <+> dcolon <+> ppr (dataConUserType con))
 
 -------------------------------
@@ -1666,7 +1666,7 @@ checkValidClass cls
 
     check_at_defs (ATI fam_tc _)
       = do { traceTc "check-at" (ppr fam_tc $$ ppr (tyConTyVars fam_tc) $$ ppr tyvars)
-           ; checkTc (any (`elem` tyvars) (tyConTyVars fam_tc)) 
+           ; checkTc (any (`elem` tyvars) (tyConTyVars fam_tc))
                      (noClassTyVarErr cls (ptext (sLit "associated type") <+> quotes (ppr fam_tc))) }
 
 checkFamFlag :: Name -> TcM ()
@@ -1739,7 +1739,7 @@ checkValidRoleAnnots role_annots thing
                           || (not $ isClassTyCon tc)
                           || (all (== Nominal) type_roles))
                           incoherentRoles
-                  
+
                 ; lint <- goptM Opt_DoCoreLinting
                 ; when lint $ checkValidRoles tc }
 
@@ -2249,5 +2249,5 @@ addRoleAnnotCtxt :: Name -> TcM a -> TcM a
 addRoleAnnotCtxt name
   = addErrCtxt $
     text "while checking a role annotation for" <+> quotes (ppr name)
-    
+
 \end{code}
