@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -30,5 +30,5 @@ module Control.Monad.ST.Lazy (
         stToIO,
     ) where
 
-import Control.Monad.ST.Lazy.Safe
+import Control.Monad.ST.Lazy.Imp
 

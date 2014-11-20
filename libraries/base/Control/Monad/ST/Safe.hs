@@ -18,7 +18,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Control.Monad.ST.Safe (
+module Control.Monad.ST.Safe {-# DEPRECATED "Safe is now the default, please use Control.Monad.ST instead" #-} (
         -- * The 'ST' Monad
         ST,             -- abstract
         runST,

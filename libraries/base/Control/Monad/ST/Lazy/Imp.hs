@@ -38,7 +38,7 @@ module Control.Monad.ST.Lazy.Imp (
 
 import Control.Monad.Fix
 
-import qualified Control.Monad.ST.Safe as ST
+import qualified Control.Monad.ST as ST
 import qualified Control.Monad.ST.Unsafe as ST
 
 import qualified GHC.ST as GHC.ST

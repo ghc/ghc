@@ -23,7 +23,7 @@ module Data.STRef.Lazy (
         modifySTRef
  ) where
 
-import Control.Monad.ST.Lazy.Safe
+import Control.Monad.ST.Lazy
 import qualified Data.STRef as ST
 
 newSTRef    :: a -> ST s (ST.STRef s a)

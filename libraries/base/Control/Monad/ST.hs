@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -31,5 +31,5 @@ module Control.Monad.ST (
         stToIO,
     ) where
 
-import Control.Monad.ST.Safe
+import Control.Monad.ST.Imp
 

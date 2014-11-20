@@ -18,7 +18,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Control.Monad.ST.Lazy.Safe (
+module Control.Monad.ST.Lazy.Safe {-# DEPRECATED "Safe is now the default, please use Control.Monad.ST.Lazy instead" #-} (
         -- * The 'ST' monad
         ST,
         runST,
