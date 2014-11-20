@@ -1577,6 +1577,37 @@ exp10 :: { LHsExpr RdrName }
                                                     -- hdaume: core annotation
         | fexp                                  { $1 }
 
+        -- parsing error messages go below here
+        | '\\' apat apats opt_asig '->'              {% parseErrorSDoc (combineLocs $1 $5) $ text
+                                                        "parse error in lambda: no expression after '->'"
+                                                     }
+        | '\\'                                       {% parseErrorSDoc (getLoc $1) $ text
+                                                        "parse error: naked lambda expression '\'"
+                                                     }
+        | 'let' binds 'in'                           {% parseErrorSDoc (combineLocs $1 $2) $ text
+                                                        "parse error in let binding: missing expression after 'in'"
+                                                     }
+        | 'let' binds                                {% parseErrorSDoc (combineLocs $1 $2) $ text
+                                                        "parse error in let binding: missing required 'in'"
+                                                     }
+        | 'let'                                      {% parseErrorSDoc (getLoc $1) $ text
+                                                        "parse error: naked let binding"
+                                                     }
+        | 'if' exp optSemi 'then' exp optSemi 'else' {% hintIf (combineLocs $1 $5) "else clause empty" }
+        | 'if' exp optSemi 'then' exp optSemi        {% hintIf (combineLocs $1 $5) "missing required else clause" }
+        | 'if' exp optSemi 'then'                    {% hintIf (combineLocs $1 $2) "then clause empty" }
+        | 'if' exp optSemi                           {% hintIf (combineLocs $1 $2) "missing required then and else clauses" }
+        | 'if'                                       {% hintIf (getLoc $1) "naked if statement" }
+        | 'case' exp 'of'                            {% parseErrorSDoc (combineLocs $1 $2) $ text
+                                                        "parse error in case statement: missing list after '->'"
+                                                     }
+        | 'case' exp                                 {% parseErrorSDoc (combineLocs $1 $2) $ text
+                                                        "parse error in case statement: missing required 'of'"
+                                                     }
+        | 'case'                                     {% parseErrorSDoc (getLoc $1) $ text
+                                                        "parse error: naked case statement"
+                                                     }
+
 optSemi :: { Bool }
         : ';'         { True }
         | {- empty -} { False }
@@ -2376,6 +2407,14 @@ hintMultiWayIf span = do
   mwiEnabled <- liftM ((Opt_MultiWayIf `xopt`) . dflags) getPState
   unless mwiEnabled $ parseErrorSDoc span $
     text "Multi-way if-expressions need MultiWayIf turned on"
+
+-- Hint about if usage for beginners
+hintIf :: SrcSpan -> String -> P (LHsExpr RdrName)
+hintIf span msg = do
+  mwiEnabled <- liftM ((Opt_MultiWayIf `xopt`) . dflags) getPState
+  if mwiEnabled
+    then parseErrorSDoc span $ text $ "parse error in if statement"
+    else parseErrorSDoc span $ text $ "parse error in if statement: "++msg
 
 -- Hint about explicit-forall, assuming UnicodeSyntax is on
 hintExplicitForall :: SrcSpan -> P ()
