@@ -70,14 +70,6 @@
 	path = libraries/filepath
 	url = ../packages/filepath.git
 	ignore = none
-[submodule "libraries/haskell98"]
-	path = libraries/haskell98
-	url = ../packages/haskell98.git
-	ignore = none
-[submodule "libraries/haskell2010"]
-	path = libraries/haskell2010
-	url = ../packages/haskell2010.git
-	ignore = none
 [submodule "libraries/hoopl"]
 	path = libraries/hoopl
 	url = ../packages/hoopl.git
@@ -85,14 +77,6 @@
 [submodule "libraries/hpc"]
 	path = libraries/hpc
 	url = ../packages/hpc.git
-	ignore = none
-[submodule "libraries/old-locale"]
-	path = libraries/old-locale
-	url = ../packages/old-locale.git
-	ignore = none
-[submodule "libraries/old-time"]
-	path = libraries/old-time
-	url = ../packages/old-time.git
 	ignore = none
 [submodule "libraries/process"]
 	path = libraries/process
