@@ -401,15 +401,13 @@ renameSig sig = case sig of
     lnames' <- mapM renameL lnames
     ltype' <- renameLType ltype
     return (TypeSig lnames' ltype')
-  PatSynSig lname args ltype lreq lprov -> do
+  PatSynSig lname (flag, qtvs) lreq lprov lty -> do
     lname' <- renameL lname
-    args' <- case args of
-        PrefixPatSyn largs -> PrefixPatSyn <$> mapM renameLType largs
-        InfixPatSyn lleft lright -> InfixPatSyn <$> renameLType lleft <*> renameLType lright
-    ltype' <- renameLType ltype
+    qtvs' <- renameLTyVarBndrs qtvs
     lreq' <- renameLContext lreq
     lprov' <- renameLContext lprov
-    return $ PatSynSig lname' args' ltype' lreq' lprov'
+    lty' <- renameLType lty
+    return $ PatSynSig lname' (flag, qtvs') lreq' lprov' lty'
   FixSig (FixitySig lname fixity) -> do
     lname' <- renameL lname
     return $ FixSig (FixitySig lname' fixity)

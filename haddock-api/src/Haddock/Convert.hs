@@ -16,7 +16,6 @@ module Haddock.Convert where
 -- Some other functions turned out to be useful for converting
 -- instance heads, which aren't TyThings, so just export everything.
 
-
 import Bag ( emptyBag )
 import BasicTypes ( TupleSort(..) )
 import Class
@@ -36,12 +35,13 @@ import PrelNames (ipClassName)
 import SrcLoc ( Located, noLoc, unLoc )
 import TcType ( tcSplitSigmaTy )
 import TyCon
-import Type(isStrLitTy)
+import Type (isStrLitTy, mkFunTys)
 import TypeRep
 import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName, eqTyCon )
 import Unique ( getUnique )
 import Var
+
 
 
 -- the main function here! yay!
@@ -98,21 +98,14 @@ tyThingToLHsDecl t = case t of
     (synifyType ImplicitizeForAll (dataConUserType dc)))
 
   AConLike (PatSynCon ps) ->
-#if MIN_VERSION_ghc(7,8,3)
-      let (_, _, req_theta, prov_theta, _, res_ty) = patSynSig ps
-#else
-      let (_, _, (req_theta, prov_theta)) = patSynSig ps
-#endif
+      let (univ_tvs, ex_tvs, req_theta, prov_theta, arg_tys, res_ty) = patSynSig ps
+          qtvs = univ_tvs ++ ex_tvs
+          ty = mkFunTys arg_tys res_ty
       in allOK . SigD $ PatSynSig (synifyName ps)
-#if MIN_VERSION_ghc(7,8,3)
-                          (fmap (synifyType WithinType) (patSynTyDetails ps))
-                          (synifyType WithinType res_ty)
-#else
-                          (fmap (synifyType WithinType) (patSynTyDetails ps))
-                          (synifyType WithinType (patSynType ps))
-#endif
+                          (Implicit, synifyTyVars qtvs)
                           (synifyCtx req_theta)
                           (synifyCtx prov_theta)
+                          (synifyType WithinType ty)
   where
     withErrs e x = return (e, x)
     allOK x = return (mempty, x)
