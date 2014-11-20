@@ -9,7 +9,8 @@ TcPat: Typechecking patterns
 {-# LANGUAGE CPP, RankNTypes #-}
 
 module TcPat ( tcLetPat, TcSigFun, TcPragFun
-             , TcSigInfo(..), findScopedTyVars
+             , TcSigInfo(..), TcPatSynInfo(..)
+             , findScopedTyVars
              , LetBndrSpec(..), addInlinePrags, warnPrags
              , tcPat, tcPats, newNoSigLetBndr
              , addDataConStupidTheta, badFieldCon, polyPatSig ) where
@@ -152,6 +153,17 @@ data TcSigInfo
 
         sig_loc    :: SrcSpan       -- The location of the signature
     }
+  | TcPatSynInfo TcPatSynInfo
+
+data TcPatSynInfo
+  = TPSI {
+        patsig_name  :: Name,
+        patsig_tau   :: TcSigmaType,
+        patsig_ex    :: [TcTyVar],
+        patsig_prov  :: TcThetaType,
+        patsig_univ  :: [TcTyVar],
+        patsig_req   :: TcThetaType
+    }
 
 findScopedTyVars  -- See Note [Binding scoped type variables]
   :: LHsType Name             -- The HsType
@@ -171,10 +183,19 @@ findScopedTyVars hs_ty sig_ty inst_tvs
     scoped_names = mkNameSet (hsExplicitTvs hs_ty)
     (sig_tvs,_)  = tcSplitForAllTys sig_ty
 
+instance NamedThing TcSigInfo where
+    getName TcSigInfo{ sig_id = id } = idName id
+    getName (TcPatSynInfo tpsi) = patsig_name tpsi
+
 instance Outputable TcSigInfo where
     ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau})
         = ppr id <+> dcolon <+> vcat [ pprSigmaType (mkSigmaTy (map snd tyvars) theta tau)
                                      , ppr (map fst tyvars) ]
+    ppr (TcPatSynInfo tpsi) = text "TcPatSynInfo" <+> ppr tpsi
+
+instance Outputable TcPatSynInfo where
+    ppr (TPSI{ patsig_name = name}) = ppr name
+
 \end{code}
 
 Note [Binding scoped type variables]

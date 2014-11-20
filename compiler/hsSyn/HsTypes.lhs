@@ -43,7 +43,8 @@ module HsTypes (
         splitHsAppTys, hsTyGetAppHead_maybe, mkHsAppTys, mkHsOpTy,
 
         -- Printing
-        pprParendHsType, pprHsForAll, pprHsContext, pprHsContextNoArrow, 
+        pprParendHsType, pprHsForAll,
+        pprHsContext, pprHsContextNoArrow, pprHsContextMaybe
     ) where
 
 import {-# SOURCE #-} HsExpr ( HsSplice, pprUntypedSplice )
@@ -63,6 +64,7 @@ import Outputable
 import FastString
 
 import Data.Data hiding ( Fixity )
+import Data.Maybe ( fromMaybe )
 \end{code}
 
 
@@ -604,13 +606,15 @@ pprHsForAll exp qtvs cxt
     forall_part = forAllLit <+> ppr qtvs <> dot
 
 pprHsContext :: (OutputableBndr name) => HsContext name -> SDoc
-pprHsContext []  = empty
-pprHsContext cxt = pprHsContextNoArrow cxt <+> darrow
+pprHsContext = maybe empty (<+> darrow) . pprHsContextMaybe
 
 pprHsContextNoArrow :: (OutputableBndr name) => HsContext name -> SDoc
-pprHsContextNoArrow []         = empty
-pprHsContextNoArrow [L _ pred] = ppr_mono_ty FunPrec pred
-pprHsContextNoArrow cxt        = parens (interpp'SP cxt)
+pprHsContextNoArrow = fromMaybe empty . pprHsContextMaybe
+
+pprHsContextMaybe :: (OutputableBndr name) => HsContext name -> Maybe SDoc
+pprHsContextMaybe []         = Nothing
+pprHsContextMaybe [L _ pred] = Just $ ppr_mono_ty FunPrec pred
+pprHsContextMaybe cxt        = Just $ parens (interpp'SP cxt)
 
 pprConDeclFields :: OutputableBndr name => [ConDeclField name] -> SDoc
 pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))

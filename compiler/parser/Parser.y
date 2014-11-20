@@ -866,28 +866,46 @@ role : VARID             { sL1 $1 $ Just $ getVARID $1 }
 
 -- Glasgow extension: pattern synonyms
 pattern_synonym_decl :: { LHsDecl RdrName }
-        : 'pattern' pat '=' pat
-            {% do { (name, args) <- splitPatSyn $2
-                  ; return $ sLL $1 $> . ValD $ mkPatSynBind name args $4 ImplicitBidirectional
-                  }}
-        | 'pattern' pat '<-' pat
-            {% do { (name, args) <- splitPatSyn $2
-                  ; return $ sLL $1 $> . ValD $ mkPatSynBind name args $4 Unidirectional
-                  }}
-        | 'pattern' pat '<-' pat where_decls
-            {% do { (name, args) <- splitPatSyn $2
-                  ; mg <- toPatSynMatchGroup name $5
+        : 'pattern' pattern_synonym_lhs '=' pat
+            { let (name, args) = $2
+              in sLL $1 $> . ValD $ mkPatSynBind name args $4 ImplicitBidirectional }
+        | 'pattern' pattern_synonym_lhs '<-' pat
+            { let (name, args) = $2
+              in sLL $1 $> . ValD $ mkPatSynBind name args $4 Unidirectional }
+        | 'pattern' pattern_synonym_lhs '<-' pat where_decls
+            {% do { let (name, args) = $2
+                  ; mg <- mkPatSynMatchGroup name $5
                   ; return $ sLL $1 $> . ValD $
-                    mkPatSynBind name args $4 (ExplicitBidirectional mg)
-                  }}
+                    mkPatSynBind name args $4 (ExplicitBidirectional mg) }}
+
+pattern_synonym_lhs :: { (Located RdrName, HsPatSynDetails (Located RdrName)) }
+        : con vars0 { ($1, PrefixPatSyn $2) }
+        | varid consym varid { ($2, InfixPatSyn $1 $3) }
+
+vars0 :: { [Located RdrName] }
+        : {- empty -}                 { [] }
+        | varid vars0                 { $1 : $2 }
 
 where_decls :: { Located (OrdList (LHsDecl RdrName)) }
         : 'where' '{' decls '}'       { $3 }
         | 'where' vocurly decls close { $3 }
 
-vars0 :: { [Located RdrName] }
-        : {- empty -}                 { [] }
-        | varid vars0                 { $1 : $2 }
+pattern_synonym_sig :: { LSig RdrName }
+        : 'pattern' con '::' ptype
+            { let (flag, qtvs, prov, req, ty) = unLoc $4
+              in sLL $1 $> $ PatSynSig $2 (flag, mkHsQTvs qtvs) prov req ty }
+
+ptype :: { Located (HsExplicitFlag, [LHsTyVarBndr RdrName], LHsContext RdrName, LHsContext RdrName, LHsType RdrName) }
+        : 'forall' tv_bndrs '.' ptype
+            {% do { hintExplicitForall (getLoc $1)
+                  ; let (_, qtvs', prov, req, ty) = unLoc $4
+                  ; return $ sLL $1 $> (Explicit, $2 ++ qtvs', prov, req ,ty) }}
+        | context '=>' context '=>' type
+            { sLL $1 $> (Implicit, [], $1, $3, $5) }
+        | context '=>' type
+            { sLL $1 $> (Implicit, [], $1, noLoc [], $3) }
+        | type
+            { sL1 $1 (Implicit, [], noLoc [], noLoc [], $1) }
 
 -----------------------------------------------------------------------------
 -- Nested declarations
@@ -1496,6 +1514,7 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
                                 { sLL $1 $> $ toOL [ sLL $1 $> $ SigD (TypeSig ($1 : reverse (unLoc $3)) $5) ] }
         | infix prec ops        { sLL $1 $> $ toOL [ sLL $1 $> $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
                                              | n <- unLoc $3 ] }
+        | pattern_synonym_sig   { sLL $1 $> $ unitOL $ sLL $1 $> . SigD . unLoc $ $1 }
         | '{-# INLINE' activation qvar '#-}'
                 { sLL $1 $> $ unitOL (sLL $1 $> $ SigD (InlineSig $3 (mkInlinePragma (getINLINE $1) $2))) }
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'

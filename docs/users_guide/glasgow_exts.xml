@@ -1081,7 +1081,7 @@ would bring into scope the data constructor <literal>Just</literal> from the
   it is assigned a <emphasis>pattern type</emphasis> of the form
 </para>
 <programlisting>
-  pattern CProv => P t1 t2 ... tN :: CReq => t
+  pattern P :: CProv => CReq => t1 -> t2 -> ... -> tN -> t
 </programlisting>
 <para>
   where <replaceable>CProv</replaceable> and
@@ -1114,7 +1114,7 @@ pattern ExNumPat x = MkT 42 x
 </programlisting>
 
 <para>
-the pattern type of <literal>ExNumPat</literal> is
+the inferred pattern type of <literal>ExNumPat</literal> is
 </para>
 
 <programlisting>
@@ -1145,6 +1145,17 @@ pattern (Show b) => ExNumPat b :: (Num a, Eq a) => T a
   ExNumPat :: (Show b, Num a, Eq a) => b -> T t
 </programlisting>
 </sect3>
+
+<para>
+  Pattern synonyms can also be given a type signature in the source
+  program, e.g.:
+</para>
+
+<programlisting>
+  -- Inferred type would be 'a -> [a]'
+  pattern SinglePair :: (a, a) -> [(a, a)]
+  pattern SinglePair x = [x]
+</programlisting>
 
 <sect3><title>Matching of pattern synonyms</title>
 

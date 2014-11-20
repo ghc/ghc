@@ -30,7 +30,7 @@ import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 import HsSyn
 import TcRnMonad
 import TcEvidence     ( emptyTcEvBinds )
-import RnTypes        ( bindSigTyVarsFV, rnHsSigType, rnLHsType, checkPrecMatch, rnContext )
+import RnTypes
 import RnPat
 import RnNames
 import RnEnv
@@ -841,23 +841,29 @@ renameSig ctxt sig@(MinimalSig bf)
   = do new_bf <- traverse (lookupSigOccRn ctxt sig) bf
        return (MinimalSig new_bf, emptyFVs)
 
-renameSig ctxt sig@(PatSynSig v args ty prov req)
-  = do  v' <- lookupSigOccRn ctxt sig v
-        let doc = quotes (ppr v)
-            rn_type = rnHsSigType doc
-        (ty', fvs1) <- rn_type ty
-        (args', fvs2) <- case args of
-            PrefixPatSyn tys ->
-                do (tys, fvs) <- unzip <$> mapM rn_type tys
-                   return (PrefixPatSyn tys, plusFVs fvs)
-            InfixPatSyn left right ->
-                do (left', fvs1) <- rn_type left
-                   (right', fvs2) <- rn_type right
-                   return (InfixPatSyn left' right', fvs1 `plusFV` fvs2)
-        (prov', fvs3) <- rnContext (TypeSigCtx doc) prov
-        (req', fvs4) <- rnContext (TypeSigCtx doc) req
-        let fvs = plusFVs [fvs1, fvs2, fvs3, fvs4]
-        return (PatSynSig v' args' ty' prov' req', fvs)
+renameSig ctxt sig@(PatSynSig v (flag, qtvs) prov req ty)
+  = do  { v' <- lookupSigOccRn ctxt sig v
+        ; let doc = TypeSigCtx $ quotes (ppr v)
+        ; loc <- getSrcSpanM
+
+        ; let (tv_kvs, mentioned) = extractHsTysRdrTyVars (ty:unLoc prov ++ unLoc req)
+        ; tv_bndrs <- case flag of
+            Implicit ->
+                return $ mkHsQTvs . userHsTyVarBndrs loc $ mentioned
+            Explicit ->
+                do { let heading = ptext (sLit "In the pattern synonym type signature")
+                                   <+> quotes (ppr sig)
+                   ; warnUnusedForAlls (heading $$ docOfHsDocContext doc) qtvs mentioned
+                   ; return qtvs }
+            Qualified -> panic "renameSig: Qualified"
+
+        ; bindHsTyVars doc Nothing tv_kvs tv_bndrs $ \ tyvars -> do
+        { (prov', fvs1) <- rnContext doc prov
+        ; (req', fvs2) <- rnContext doc req
+        ; (ty', fvs3) <- rnLHsType doc ty
+
+        ; let fvs = plusFVs [fvs1, fvs2, fvs3]
+        ; return (PatSynSig v' (flag, tyvars) prov' req' ty', fvs) }}
 
 ppr_sig_bndrs :: [Located RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)

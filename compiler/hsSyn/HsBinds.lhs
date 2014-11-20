@@ -569,12 +569,12 @@ data Sig name
     TypeSig [Located name] (LHsType name)
 
       -- | A pattern synonym type signature
-      -- @pattern (Eq b) => P a b :: (Num a) => T a
+      -- @pattern type forall b. (Eq b) => P a b :: forall a. (Num a) => T a
   | PatSynSig (Located name)
-              (HsPatSynDetails (LHsType name))
-              (LHsType name)    -- Type
+              (HsExplicitFlag, LHsTyVarBndrs name)
               (LHsContext name) -- Provided context
-              (LHsContext name) -- Required contex
+              (LHsContext name) -- Required context
+              (LHsType name)
 
         -- | A type signature for a default method inside a class
         --
@@ -731,34 +731,23 @@ ppr_sig (SpecSig var ty inl)      = pragBrackets (pprSpec (unLoc var) (ppr ty) i
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig ty)          = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 ppr_sig (MinimalSig bf)           = pragBrackets (pprMinimalSig bf)
-ppr_sig (PatSynSig name arg_tys ty prov req)
-  = pprPatSynSig (unLoc name) False args (ppr ty) (pprCtx prov) (pprCtx req)
+ppr_sig (PatSynSig name (flag, qtvs) (L _ prov) (L _ req) ty)
+  = pprPatSynSig (unLoc name) False -- TODO: is_bindir
+                 (pprHsForAll flag qtvs (noLoc []))
+                 (pprHsContextMaybe prov) (pprHsContextMaybe req)
+                 (ppr ty)
+
+pprPatSynSig :: (OutputableBndr name)
+             => name -> Bool -> SDoc -> Maybe SDoc -> Maybe SDoc -> SDoc -> SDoc
+pprPatSynSig ident _is_bidir tvs prov req ty
+  = ptext (sLit "pattern") <+> pprPrefixOcc ident <+> dcolon <+>
+    tvs <+> context <+> ty
   where
-    args = fmap ppr arg_tys
-
-    pprCtx lctx = case unLoc lctx of
-        [] -> Nothing
-        ctx -> Just (pprHsContextNoArrow ctx)
-
-pprPatSynSig :: (OutputableBndr a)
-             => a -> Bool -> HsPatSynDetails SDoc -> SDoc -> Maybe SDoc -> Maybe SDoc -> SDoc
-pprPatSynSig ident is_bidir args rhs_ty prov_theta req_theta
-  = sep [ ptext (sLit "pattern")
-        , thetaOpt prov_theta, name_and_args
-        , colon
-        , thetaOpt req_theta, rhs_ty
-        ]
-  where
-    name_and_args = case args of
-        PrefixPatSyn arg_tys ->
-            pprPrefixOcc ident <+> sep arg_tys
-        InfixPatSyn left_ty right_ty ->
-            left_ty <+> pprInfixOcc ident <+> right_ty
-
-    -- TODO: support explicit foralls
-    thetaOpt = maybe empty (<+> darrow)
-
-    colon = if is_bidir then dcolon else dcolon -- TODO
+    context = case (prov, req) of
+        (Nothing, Nothing)    -> empty
+        (Nothing, Just req)   -> parens empty <+> darrow <+> req <+> darrow
+        (Just prov, Nothing)  -> prov <+> darrow
+        (Just prov, Just req) -> prov <+> darrow <+> req <+> darrow
 
 instance OutputableBndr name => Outputable (FixitySig name) where
   ppr (FixitySig name fixity) = sep [ppr fixity, pprInfixOcc (unLoc name)]

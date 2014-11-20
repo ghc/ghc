@@ -6,9 +6,14 @@ import Id        ( Id )
 import HsSyn     ( PatSynBind, LHsBinds )
 import TcRnTypes ( TcM )
 import PatSyn    ( PatSyn )
+import TcPat     ( TcPatSynInfo )
 
-tcPatSynDecl :: PatSynBind Name Name
-             -> TcM (PatSyn, LHsBinds Id)
+tcInferPatSynDecl :: PatSynBind Name Name
+                  -> TcM (PatSyn, LHsBinds Id)
+
+tcCheckPatSynDecl :: PatSynBind Name Name
+                  -> TcPatSynInfo
+                  -> TcM (PatSyn, LHsBinds Id)
 
 tcPatSynWorker :: PatSynBind Name Name
                -> TcM (LHsBinds Id)

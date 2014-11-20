@@ -238,7 +238,9 @@ tcInstanceMethodBody :: SkolemInfo -> [TcTyVar] -> [EvVar]
 tcInstanceMethodBody skol_info tyvars dfun_ev_vars
                      meth_id local_meth_sig
                      specs (L loc bind)
-  = do  { let local_meth_id = sig_id local_meth_sig
+  = do  { let local_meth_id = case local_meth_sig of
+                  TcSigInfo{ sig_id = meth_id } -> meth_id
+                  _ -> pprPanic "tcInstanceMethodBody" (ppr local_meth_sig)
               lm_bind = L loc (bind { fun_id = L loc (idName local_meth_id) })
                              -- Substitute the local_meth_name for the binder
                              -- NB: the binding is always a FunBind
