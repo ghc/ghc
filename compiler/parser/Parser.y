@@ -86,6 +86,18 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataC
 
 {-
 -----------------------------------------------------------------------------
+20 Nov 2014
+
+Conflicts: 60 shift/reduce
+           12 reduce/reduce
+
+-----------------------------------------------------------------------------
+25 June 2014
+
+Conflicts: 47 shift/reduce
+           1 reduce/reduce
+
+-----------------------------------------------------------------------------
 12 October 2012
 
 Conflicts: 43 shift/reduce
