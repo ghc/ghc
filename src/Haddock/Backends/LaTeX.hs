@@ -293,8 +293,8 @@ ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs _fixities = case decl of
 -- Family instances happen via FamInst now
   TyClD d@(ClassDecl {})         -> ppClassDecl instances loc doc subdocs d unicode
   SigD (TypeSig lnames (L _ t))  -> ppFunSig loc (doc, fnArgsDoc) (map unLoc lnames) t unicode
-  SigD (PatSynSig lname args ty prov req) ->
-      ppLPatSig loc (doc, fnArgsDoc) lname args ty prov req unicode
+  SigD (PatSynSig lname qtvs prov req ty) ->
+      ppLPatSig loc (doc, fnArgsDoc) lname qtvs prov req ty unicode
   ForD d                         -> ppFor loc (doc, fnArgsDoc) d unicode
   InstD _                        -> empty
   _                              -> error "declaration not supported by ppDecl"
@@ -350,32 +350,28 @@ ppFunSig loc doc docnames typ unicode =
    names = map getName docnames
 
 ppLPatSig :: SrcSpan -> DocForDecl DocName -> Located DocName
-          -> HsPatSynDetails (LHsType DocName) -> LHsType DocName
+          -> (HsExplicitFlag, LHsTyVarBndrs DocName)
           -> LHsContext DocName -> LHsContext DocName
+          -> LHsType DocName
           -> Bool -> LaTeX
-ppLPatSig loc doc docname args typ prov req unicode =
-    ppPatSig loc doc (unLoc docname) (fmap unLoc args) (unLoc typ) (unLoc prov) (unLoc req) unicode
-
-ppPatSig :: SrcSpan -> DocForDecl DocName -> DocName
-          -> HsPatSynDetails (HsType DocName) -> HsType DocName
-          -> HsContext DocName -> HsContext DocName
-          -> Bool -> LaTeX
-ppPatSig _loc (doc, _argDocs) docname args typ prov req unicode = declWithDoc pref1 (documentationToLaTeX doc)
+ppLPatSig _loc (doc, _argDocs) (L _ name) (expl, qtvs) lprov lreq (L _ ty) unicode
+  = declWithDoc pref1 (documentationToLaTeX doc)
   where
     pref1 = hsep [ keyword "pattern"
-                 , pp_ctx prov
-                 , pp_head
+                 , ppDocBinder name
                  , dcolon unicode
-                 , pp_ctx req
-                 , ppType unicode typ
+                 , ppLTyVarBndrs expl qtvs unicode
+                 , ctx
+                 , ppType unicode ty
                  ]
 
-    pp_head = case args of
-        PrefixPatSyn typs -> hsep $ ppDocBinder docname : map pp_type typs
-        InfixPatSyn left right -> hsep [pp_type left, ppDocBinderInfix docname, pp_type right]
+    ctx = case (ppLContextMaybe lprov unicode, ppLContextMaybe lreq unicode) of
+        (Nothing,   Nothing)  -> empty
+        (Nothing,   Just req) -> parens empty <+> darr <+> req <+> darr
+        (Just prov, Nothing)  -> prov <+> darr
+        (Just prov, Just req) -> prov <+> darr <+> req <+> darr
 
-    pp_type = ppParendType unicode
-    pp_ctx ctx = ppContext ctx unicode
+    darr = darrow unicode
 
 ppTypeOrFunSig :: SrcSpan -> [DocName] -> HsType DocName
                -> DocForDecl DocName -> (LaTeX, LaTeX, LaTeX)
@@ -786,15 +782,21 @@ ppLContext, ppLContextNoArrow :: Located (HsContext DocName) -> Bool -> LaTeX
 ppLContext        = ppContext        . unLoc
 ppLContextNoArrow = ppContextNoArrow . unLoc
 
+ppLContextMaybe :: Located (HsContext DocName) -> Bool -> Maybe LaTeX
+ppLContextMaybe = ppContextNoLocsMaybe . map unLoc . unLoc
+
+ppContextNoLocsMaybe :: [HsType DocName] -> Bool -> Maybe LaTeX
+ppContextNoLocsMaybe [] _ = Nothing
+ppContextNoLocsMaybe cxt unicode = Just $ pp_hs_context cxt unicode
 
 ppContextNoArrow :: HsContext DocName -> Bool -> LaTeX
-ppContextNoArrow []  _ = empty
-ppContextNoArrow cxt unicode = pp_hs_context (map unLoc cxt) unicode
+ppContextNoArrow cxt unicode = fromMaybe empty $
+                               ppContextNoLocsMaybe (map unLoc cxt) unicode
 
 
 ppContextNoLocs :: [HsType DocName] -> Bool -> LaTeX
-ppContextNoLocs []  _ = empty
-ppContextNoLocs cxt unicode = pp_hs_context cxt unicode <+> darrow unicode
+ppContextNoLocs cxt unicode = maybe empty (<+> darrow unicode) $
+                              ppContextNoLocsMaybe cxt unicode
 
 
 ppContext :: HsContext DocName -> Bool -> LaTeX
@@ -869,14 +871,16 @@ ppKind unicode ki = ppr_mono_ty pREC_TOP ki unicode
 
 ppForAll :: HsExplicitFlag -> LHsTyVarBndrs DocName
          -> Located (HsContext DocName) -> Bool -> LaTeX
-ppForAll expl tvs cxt unicode
-  | show_forall = forall_part <+> ppLContext cxt unicode
-  | otherwise   = ppLContext cxt unicode
+ppForAll expl tvs cxt unicode = ppLTyVarBndrs expl tvs unicode <+> ppLContext cxt unicode
+
+ppLTyVarBndrs :: HsExplicitFlag -> LHsTyVarBndrs DocName
+              -> Bool -> LaTeX
+ppLTyVarBndrs expl tvs unicode
+  | show_forall = hsep (forallSymbol unicode : ppTyVars tvs) <> dot
+  | otherwise   = empty
   where
     show_forall = not (null (hsQTvBndrs tvs)) && is_explicit
     is_explicit = case expl of {Explicit -> True; Implicit -> False; Qualified -> False}
-    forall_part = hsep (forallSymbol unicode : ppTyVars tvs) <> dot
-
 
 ppr_mono_lty :: Int -> LHsType DocName -> Bool -> LaTeX
 ppr_mono_lty ctxt_prec ty unicode = ppr_mono_ty ctxt_prec (unLoc ty) unicode
@@ -954,11 +958,6 @@ ppBinder n
   | isInfixName n = parens $ ppOccName n
   | otherwise     = ppOccName n
 
-ppBinderInfix :: OccName -> LaTeX
-ppBinderInfix n
-  | isInfixName n = ppOccName n
-  | otherwise     = quotes $ ppOccName n
-
 isInfixName :: OccName -> Bool
 isInfixName n = isVarSym n || isConSym n
 
@@ -996,9 +995,6 @@ ppLDocName (L _ d) = ppDocName d
 
 ppDocBinder :: DocName -> LaTeX
 ppDocBinder = ppBinder . nameOccName . getName
-
-ppDocBinderInfix :: DocName -> LaTeX
-ppDocBinderInfix = ppBinderInfix . nameOccName . getName
 
 
 ppName :: Name -> LaTeX

@@ -32,7 +32,6 @@ import           Control.Applicative
 import           Data.List             ( intersperse, sort )
 import qualified Data.Map as Map
 import           Data.Maybe
-import           Data.Monoid           ( mempty )
 import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC
@@ -49,8 +48,8 @@ ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances fixities subdocs spl
   TyClD d@(SynDecl {})      -> ppTySyn summ links fixities loc (mbDoc, fnArgsDoc) d splice unicode qual
   TyClD d@(ClassDecl {})    -> ppClassDecl summ links instances fixities loc mbDoc subdocs d splice unicode qual
   SigD (TypeSig lnames lty) -> ppLFunSig summ links loc (mbDoc, fnArgsDoc) lnames lty fixities splice unicode qual
-  SigD (PatSynSig lname args ty prov req) ->
-      ppLPatSig summ links loc (mbDoc, fnArgsDoc) lname args ty prov req fixities splice unicode qual
+  SigD (PatSynSig lname qtvs prov req ty) ->
+      ppLPatSig summ links loc (mbDoc, fnArgsDoc) lname qtvs prov req ty fixities splice unicode qual
   ForD d                         -> ppFor summ links loc (mbDoc, fnArgsDoc) d fixities splice unicode qual
   InstD _                        -> noHtml
   _                              -> error "declaration not supported by ppDecl"
@@ -74,39 +73,32 @@ ppFunSig summary links loc doc docnames typ fixities splice unicode qual =
 
 ppLPatSig :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName ->
              Located DocName ->
-             HsPatSynDetails (LHsType DocName) -> LHsType DocName ->
-             LHsContext DocName -> LHsContext DocName -> [(DocName, Fixity)] ->
+             (HsExplicitFlag, LHsTyVarBndrs DocName) ->
+             LHsContext DocName -> LHsContext DocName ->
+             LHsType DocName ->
+             [(DocName, Fixity)] ->
              Splice -> Unicode -> Qualification -> Html
-ppLPatSig summary links loc doc lname args typ prov req fixities splice unicode qual =
-    ppPatSig summary links loc doc (unLoc lname) (fmap unLoc args) (unLoc typ)
-             (unLoc prov) (unLoc req) fixities splice unicode qual
-
-ppPatSig :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName ->
-            DocName ->
-            HsPatSynDetails (HsType DocName) -> HsType DocName ->
-            HsContext DocName -> HsContext DocName -> [(DocName, Fixity)] ->
-            Splice -> Unicode -> Qualification -> Html
-ppPatSig summary links loc (doc, _argDocs) docname args typ prov req fixities
-         splice unicode qual
+ppLPatSig summary links loc (doc, _argDocs) (L _ name) (expl, qtvs) lprov lreq typ fixities splice unicode qual
   | summary = pref1
-  | otherwise = topDeclElem links loc splice [docname] (pref1 <+> ppFixities fixities qual)
+  | otherwise = topDeclElem links loc splice [name] (pref1 <+> ppFixities fixities qual)
                 +++ docSection Nothing qual doc
   where
     pref1 = hsep [ toHtml "pattern"
-                 , pp_cxt prov
-                 , pp_head
+                 , ppBinder summary occname
                  , dcolon unicode
-                 , pp_cxt req
-                 , ppType unicode qual typ
+                 , ppLTyVarBndrs expl qtvs unicode qual
+                 , cxt
+                 , ppLType unicode qual typ
                  ]
-    pp_head = case args of
-        PrefixPatSyn typs -> hsep $ ppBinder summary occname : map pp_type typs
-        InfixPatSyn left right -> hsep [pp_type left, ppBinderInfix summary occname, pp_type right]
 
-    pp_cxt cxt = ppContext cxt unicode qual
-    pp_type = ppParendType unicode qual
+    cxt = case (ppLContextMaybe lprov unicode qual, ppLContextMaybe lreq unicode qual) of
+        (Nothing,   Nothing)  -> noHtml
+        (Nothing,   Just req) -> parens noHtml <+> darr <+> req <+> darr
+        (Just prov, Nothing)  -> prov <+> darr
+        (Just prov, Just req) -> prov <+> darr <+> req <+> darr
 
-    occname = nameOccName . getName $ docname
+    darr = darrow unicode
+    occname = nameOccName . getName $ name
 
 ppSigLike :: Bool -> LinksInfo -> SrcSpan -> Html -> DocForDecl DocName ->
              [DocName] -> [(DocName, Fixity)] -> (HsType DocName, Html) ->
@@ -357,16 +349,22 @@ ppLContext        = ppContext        . unLoc
 ppLContextNoArrow = ppContextNoArrow . unLoc
 
 
+ppLContextMaybe :: Located (HsContext DocName) -> Unicode -> Qualification -> Maybe Html
+ppLContextMaybe = ppContextNoLocsMaybe . map unLoc . unLoc
+
 ppContextNoArrow :: HsContext DocName -> Unicode -> Qualification -> Html
-ppContextNoArrow []  _       _     = noHtml
-ppContextNoArrow cxt unicode qual = ppHsContext (map unLoc cxt) unicode qual
+ppContextNoArrow cxt unicode qual = fromMaybe noHtml $
+                                    ppContextNoLocsMaybe (map unLoc cxt) unicode qual
 
 
 ppContextNoLocs :: [HsType DocName] -> Unicode -> Qualification -> Html
-ppContextNoLocs []  _       _     = noHtml
-ppContextNoLocs cxt unicode qual = ppHsContext cxt unicode qual
-    <+> darrow unicode
+ppContextNoLocs cxt unicode qual = maybe noHtml (<+> darrow unicode) $
+                                   ppContextNoLocsMaybe cxt unicode qual
 
+
+ppContextNoLocsMaybe :: [HsType DocName] -> Unicode -> Qualification -> Maybe Html
+ppContextNoLocsMaybe []  _       _    = Nothing
+ppContextNoLocsMaybe cxt unicode qual = Just $ ppHsContext cxt unicode qual
 
 ppContext :: HsContext DocName -> Unicode -> Qualification -> Html
 ppContext cxt unicode qual = ppContextNoLocs (map unLoc cxt) unicode qual
@@ -811,12 +809,19 @@ ppKind unicode qual ki = ppr_mono_ty pREC_TOP ki unicode qual
 ppForAll :: HsExplicitFlag -> LHsTyVarBndrs DocName
          -> Located (HsContext DocName) -> Unicode -> Qualification -> Html
 ppForAll expl tvs cxt unicode qual
-  | show_forall = forall_part <+> ppLContext cxt unicode qual
-  | otherwise   = ppLContext cxt unicode qual
+  = forall_part <+> ppLContext cxt unicode qual
+  where
+    forall_part = ppLTyVarBndrs expl tvs unicode qual
+
+ppLTyVarBndrs :: HsExplicitFlag -> LHsTyVarBndrs DocName
+              -> Unicode -> Qualification
+              -> Html
+ppLTyVarBndrs expl tvs unicode _qual
+  | show_forall = hsep (forallSymbol unicode : ppTyVars tvs) +++ dot
+  | otherwise   = noHtml
   where
     show_forall = not (null (hsQTvBndrs tvs)) && is_explicit
     is_explicit = case expl of {Explicit -> True; Implicit -> False; Qualified -> False}
-    forall_part = hsep (forallSymbol unicode : ppTyVars tvs) +++ dot
 
 
 ppr_mono_lty :: Int -> LHsType DocName -> Unicode -> Qualification -> Html

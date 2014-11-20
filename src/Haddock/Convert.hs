@@ -20,7 +20,7 @@ module Haddock.Convert where
 import HsSyn
 import TcType ( tcSplitSigmaTy )
 import TypeRep
-import Type(isStrLitTy)
+import Type ( isStrLitTy, mkFunTys )
 import Kind ( splitKindFunTys, synTyConResKind, isKind )
 import Name
 import Var
@@ -94,12 +94,14 @@ tyThingToLHsDecl t = noLoc $ case t of
     (synifyType ImplicitizeForAll (dataConUserType dc)))
 
   AConLike (PatSynCon ps) ->
-      let (_, _, req_theta, prov_theta, _, res_ty) = patSynSig ps
+      let (univ_tvs, ex_tvs, req_theta, prov_theta, arg_tys, res_ty) = patSynSig ps
+          qtvs = univ_tvs ++ ex_tvs
+          ty = mkFunTys arg_tys res_ty
       in SigD $ PatSynSig (synifyName ps)
-                          (fmap (synifyType WithinType) (patSynTyDetails ps))
-                          (synifyType WithinType res_ty)
+                          (Implicit, synifyTyVars qtvs)
                           (synifyCtx req_theta)
                           (synifyCtx prov_theta)
+                          (synifyType WithinType ty)
 
 synifyAxBranch :: TyCon -> CoAxBranch -> TyFamInstEqn Name
 synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })

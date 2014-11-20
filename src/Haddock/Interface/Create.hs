@@ -340,8 +340,8 @@ typeDocs d =
   let docs = go 0 in
   case d of
     SigD (TypeSig _ ty) -> docs (unLoc ty)
-    SigD (PatSynSig _ arg_tys ty req prov) ->
-        let allTys = ty : concat [ F.toList arg_tys, unLoc req, unLoc prov ]
+    SigD (PatSynSig _ _ req prov ty) ->
+        let allTys = ty : concat [ unLoc req, unLoc prov ]
         in F.foldMap (docs . unLoc) allTys
     ForD (ForeignImport _ ty _ _) -> docs (unLoc ty)
     TyClD (SynDecl { tcdRhs = ty }) -> docs (unLoc ty)
