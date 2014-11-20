@@ -1,5 +1,6 @@
-{-# LANGUAGE Unsafe, DeriveDataTypeable #-}
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude
+           , DeriveDataTypeable
            , MagicHash
            , UnboxedTuples
   #-}

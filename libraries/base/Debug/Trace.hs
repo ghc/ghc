@@ -1,7 +1,7 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE Unsafe #-}
 
 -----------------------------------------------------------------------------
 -- |

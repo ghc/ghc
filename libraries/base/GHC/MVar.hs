@@ -1,5 +1,5 @@
-{-# LANGUAGE Unsafe, AutoDeriveTypeable #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, AutoDeriveTypeable #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
 

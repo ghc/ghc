@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples, AutoDeriveTypeable #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples,
+             AutoDeriveTypeable #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
 

@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+
 module GHC.Fingerprint (
         fingerprintString,
         fingerprintFingerprints

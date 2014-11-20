@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+
 -- ----------------------------------------------------------------------------
 --
 --  (c) The University of Glasgow 2006

@@ -1,6 +1,6 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE MagicHash, UnboxedTuples, AutoDeriveTypeable, TypeFamilies, MultiParamTypeClasses, FlexibleInstances #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE MagicHash, UnboxedTuples, AutoDeriveTypeable, TypeFamilies,
+             MultiParamTypeClasses, FlexibleInstances, NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |

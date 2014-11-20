@@ -1,8 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude
-           , MagicHash
-           , UnboxedTuples
-  #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 -- |

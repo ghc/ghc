@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude, Trustworthy #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 
 -----------------------------------------------------------------------------

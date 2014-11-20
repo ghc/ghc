@@ -1,7 +1,7 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |

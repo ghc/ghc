@@ -1,4 +1,5 @@
-{-# LANGUAGE BangPatterns, NoImplicitPrelude, RecordWildCards, Trustworthy #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE BangPatterns, NoImplicitPrelude, RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 module GHC.Event.IntTable

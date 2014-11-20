@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables, BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |

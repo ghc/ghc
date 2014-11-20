@@ -1,6 +1,6 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE AutoDeriveTypeable #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |

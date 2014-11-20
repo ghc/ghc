@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving, NoImplicitPrelude #-}
+
 module GHC.Event.Unique
     (
       UniqueSource
