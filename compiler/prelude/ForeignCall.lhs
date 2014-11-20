@@ -156,6 +156,7 @@ platforms.
 See: http://www.programmersheaven.com/2/Calling-conventions
 
 \begin{code}
+-- any changes here should be replicated in  the CallConv type in template haskell
 data CCallConv = CCallConv | CApiConv | StdCallConv | PrimCallConv | JavaScriptCallConv
   deriving (Eq, Data, Typeable)
   {-! derive: Binary !-}

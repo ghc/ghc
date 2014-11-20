@@ -638,9 +638,12 @@ inferR            = InferR
 -------------------------------------------------------------------------------
 -- *   Callconv
 
-cCall, stdCall :: Callconv
-cCall = CCall
-stdCall = StdCall
+cCall, stdCall, cApi, prim, javaScript :: Callconv
+cCall      = CCall
+stdCall    = StdCall
+cApi       = CApi
+prim       = Prim
+javaScript = JavaScript
 
 -------------------------------------------------------------------------------
 -- *   Safety

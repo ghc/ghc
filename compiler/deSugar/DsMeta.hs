@@ -488,9 +488,11 @@ repForD (L loc (ForeignImport name typ _ (CImport cc s mch cis)))
 repForD decl = notHandled "Foreign declaration" (ppr decl)
 
 repCCallConv :: CCallConv -> DsM (Core TH.Callconv)
-repCCallConv CCallConv = rep2 cCallName []
-repCCallConv StdCallConv = rep2 stdCallName []
-repCCallConv callConv    = notHandled "repCCallConv" (ppr callConv)
+repCCallConv CCallConv          = rep2 cCallName []
+repCCallConv StdCallConv        = rep2 stdCallName []
+repCCallConv CApiConv           = rep2 cApiCallName []
+repCCallConv PrimCallConv       = rep2 primCallName []
+repCCallConv JavaScriptCallConv = rep2 javaScriptCallName []
 
 repSafety :: Safety -> DsM (Core TH.Safety)
 repSafety PlayRisky = rep2 unsafeName []
@@ -2147,7 +2149,7 @@ templateHaskellNames = [
     varKName, conKName, tupleKName, arrowKName, listKName, appKName,
     starKName, constraintKName,
     -- Callconv
-    cCallName, stdCallName,
+    cCallName, stdCallName, cApiCallName, primCallName, javaScriptCallName,
     -- Safety
     unsafeName,
     safeName,
@@ -2456,9 +2458,12 @@ starKName       = libFun (fsLit "starK")        starKIdKey
 constraintKName = libFun (fsLit "constraintK")  constraintKIdKey
 
 -- data Callconv = ...
-cCallName, stdCallName :: Name
+cCallName, stdCallName, cApiCallName, primCallName, javaScriptCallName :: Name
 cCallName = libFun (fsLit "cCall") cCallIdKey
 stdCallName = libFun (fsLit "stdCall") stdCallIdKey
+cApiCallName = libFun (fsLit "cApi") cApiCallIdKey
+primCallName = libFun (fsLit "prim") primCallIdKey
+javaScriptCallName = libFun (fsLit "javaScript") javaScriptCallIdKey
 
 -- data Safety = ...
 unsafeName, safeName, interruptibleName :: Name
@@ -2819,15 +2824,19 @@ starKIdKey        = mkPreludeMiscIdUnique 410
 constraintKIdKey  = mkPreludeMiscIdUnique 411
 
 -- data Callconv = ...
-cCallIdKey, stdCallIdKey :: Unique
-cCallIdKey      = mkPreludeMiscIdUnique 412
-stdCallIdKey    = mkPreludeMiscIdUnique 413
+cCallIdKey, stdCallIdKey, cApiCallIdKey, primCallIdKey,
+  javaScriptCallIdKey :: Unique
+cCallIdKey          = mkPreludeMiscIdUnique 420
+stdCallIdKey        = mkPreludeMiscIdUnique 421
+cApiCallIdKey       = mkPreludeMiscIdUnique 422
+primCallIdKey       = mkPreludeMiscIdUnique 423
+javaScriptCallIdKey = mkPreludeMiscIdUnique 424
 
 -- data Safety = ...
 unsafeIdKey, safeIdKey, interruptibleIdKey :: Unique
-unsafeIdKey        = mkPreludeMiscIdUnique 414
-safeIdKey          = mkPreludeMiscIdUnique 415
-interruptibleIdKey = mkPreludeMiscIdUnique 416
+unsafeIdKey        = mkPreludeMiscIdUnique 430
+safeIdKey          = mkPreludeMiscIdUnique 431
+interruptibleIdKey = mkPreludeMiscIdUnique 432
 
 -- data Inline = ...
 noInlineDataConKey, inlineDataConKey, inlinableDataConKey :: Unique
@@ -2852,31 +2861,31 @@ tExpDataConKey = mkPreludeDataConUnique 48
 
 -- data FunDep = ...
 funDepIdKey :: Unique
-funDepIdKey = mkPreludeMiscIdUnique 419
+funDepIdKey = mkPreludeMiscIdUnique 440
 
 -- data FamFlavour = ...
 typeFamIdKey, dataFamIdKey :: Unique
-typeFamIdKey = mkPreludeMiscIdUnique 420
-dataFamIdKey = mkPreludeMiscIdUnique 421
+typeFamIdKey = mkPreludeMiscIdUnique 450
+dataFamIdKey = mkPreludeMiscIdUnique 451
 
 -- data TySynEqn = ...
 tySynEqnIdKey :: Unique
-tySynEqnIdKey = mkPreludeMiscIdUnique 422
+tySynEqnIdKey = mkPreludeMiscIdUnique 460
 
 -- quasiquoting
 quoteExpKey, quotePatKey, quoteDecKey, quoteTypeKey :: Unique
-quoteExpKey  = mkPreludeMiscIdUnique 423
-quotePatKey  = mkPreludeMiscIdUnique 424
-quoteDecKey  = mkPreludeMiscIdUnique 425
-quoteTypeKey = mkPreludeMiscIdUnique 426
+quoteExpKey  = mkPreludeMiscIdUnique 470
+quotePatKey  = mkPreludeMiscIdUnique 471
+quoteDecKey  = mkPreludeMiscIdUnique 472
+quoteTypeKey = mkPreludeMiscIdUnique 473
 
 -- data RuleBndr = ...
 ruleVarIdKey, typedRuleVarIdKey :: Unique
-ruleVarIdKey      = mkPreludeMiscIdUnique 427
-typedRuleVarIdKey = mkPreludeMiscIdUnique 428
+ruleVarIdKey      = mkPreludeMiscIdUnique 480
+typedRuleVarIdKey = mkPreludeMiscIdUnique 481
 
 -- data AnnTarget = ...
 valueAnnotationIdKey, typeAnnotationIdKey, moduleAnnotationIdKey :: Unique
-valueAnnotationIdKey  = mkPreludeMiscIdUnique 429
-typeAnnotationIdKey   = mkPreludeMiscIdUnique 430
-moduleAnnotationIdKey = mkPreludeMiscIdUnique 431
+valueAnnotationIdKey  = mkPreludeMiscIdUnique 490
+typeAnnotationIdKey   = mkPreludeMiscIdUnique 491
+moduleAnnotationIdKey = mkPreludeMiscIdUnique 492

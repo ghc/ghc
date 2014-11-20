@@ -133,7 +133,8 @@ module Language.Haskell.TH(
     newtypeInstD, tySynInstD,
     typeFam, dataFam, tySynEqn,
     -- **** Foreign Function Interface (FFI)
-    cCall, stdCall, unsafe, safe, forImpD,
+    cCall, stdCall, cApi, prim, javaScript,
+    unsafe, safe, forImpD,
     -- **** Pragmas
     ruleVar, typedRuleVar,
     pragInlD, pragSpecD, pragSpecInlD, pragSpecInstD, pragRuleD, pragAnnD,

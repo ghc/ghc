@@ -483,8 +483,11 @@ cvtForD (ExportF callconv as nm ty)
         ; return $ ForeignExport nm' ty' noForeignExportCoercionYet e }
 
 cvt_conv :: TH.Callconv -> CCallConv
-cvt_conv TH.CCall   = CCallConv
-cvt_conv TH.StdCall = StdCallConv
+cvt_conv TH.CCall      = CCallConv
+cvt_conv TH.StdCall    = StdCallConv
+cvt_conv TH.CApi       = CApiConv
+cvt_conv TH.Prim       = PrimCallConv
+cvt_conv TH.JavaScript = JavaScriptCallConv
 
 ------------------------------------------
 --              Pragmas
