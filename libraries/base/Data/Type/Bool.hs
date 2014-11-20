@@ -1,3 +1,4 @@
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE TypeFamilies, TypeOperators, DataKinds, NoImplicitPrelude,
              PolyKinds #-}
 

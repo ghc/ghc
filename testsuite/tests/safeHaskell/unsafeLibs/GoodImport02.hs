@@ -1,11 +1,11 @@
 {-# LANGUAGE Safe #-}
--- | Import safe versions of unsafe modules from prelude
+-- | Import (now safe by default) modules.
 module Main where
 
-import Control.Monad.ST.Safe
-import Control.Monad.ST.Lazy.Safe
-import Foreign.ForeignPtr.Safe
-import Foreign.Safe
+import Control.Monad.ST
+import Control.Monad.ST.Lazy
+import Foreign.ForeignPtr
+import Foreign
 
 f :: Int
 f = 2

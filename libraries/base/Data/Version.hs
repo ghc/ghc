@@ -1,6 +1,6 @@
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE AutoDeriveTypeable #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -34,12 +34,15 @@ module Data.Version (
         showVersion, parseVersion,
   ) where
 
+import Control.Monad    ( Monad(..), liftM )
+import Data.Bool        ( (&&) )
 import Data.Char        ( isDigit, isAlphaNum )
 import Data.Eq
+import Data.Int         ( Int )
 import Data.List
 import Data.Ord
+import Data.String      ( String )
 import Data.Typeable    ( Typeable )
-import GHC.Base         ( ($), (&&), Monad(..), String, Int, liftM )
 import GHC.Read
 import GHC.Show
 import Text.ParserCombinators.ReadP
@@ -113,6 +116,6 @@ showVersion (Version branch tags)
 -- | A parser for versions in the format produced by 'showVersion'.
 --
 parseVersion :: ReadP Version
-parseVersion = do branch <- sepBy1 (liftM read $ munch1 isDigit) (char '.')
+parseVersion = do branch <- sepBy1 (liftM read (munch1 isDigit)) (char '.')
                   tags   <- many (char '-' >> munch1 isAlphaNum)
                   return Version{versionBranch=branch, versionTags=tags}

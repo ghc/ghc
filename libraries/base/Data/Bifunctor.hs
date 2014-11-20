@@ -1,5 +1,5 @@
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -18,8 +18,6 @@ module Data.Bifunctor
   ) where
 
 import Control.Applicative  ( Const(..) )
-import Data.Either          ( Either(..) )
-import GHC.Base             ( (.), id )
 
 -- | Formally, the class 'Bifunctor' represents a bifunctor
 -- from @Hask@ -> @Hask@.

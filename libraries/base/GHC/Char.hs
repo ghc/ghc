@@ -1,4 +1,4 @@
-
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 
 module GHC.Char (chr) where

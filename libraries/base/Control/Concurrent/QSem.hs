@@ -1,4 +1,4 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE AutoDeriveTypeable, BangPatterns #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 

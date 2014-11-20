@@ -1,4 +1,4 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE AutoDeriveTypeable, StandaloneDeriving #-}
 
