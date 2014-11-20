@@ -20,7 +20,7 @@ module TcRnDriver (
         tcRnLookupName,
         tcRnGetInfo,
         tcRnModule, tcRnModuleTcRnM,
-        tcTopSrcDecls
+        tcTopSrcDecls,
     ) where
 
 #ifdef GHCI
@@ -93,6 +93,8 @@ import RnExpr
 import MkId
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
+import DynamicLoading ( loadPlugins )
+import Plugins ( tcPlugin )
 #endif
 import TidyPgm    ( mkBootModDetailsTc )
 
@@ -134,8 +136,11 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                     Just (L mod_loc mod)  -- The normal case
                         -> (mkModule this_pkg mod, mod_loc) } ;
 
-      ; initTc hsc_env hsc_src save_rn_syntax this_mod $
-        tcRnModuleTcRnM hsc_env hsc_src parsedModule pair }
+      ; res <- initTc hsc_env hsc_src save_rn_syntax this_mod $
+               withTcPlugins hsc_env $
+        tcRnModuleTcRnM hsc_env hsc_src parsedModule pair
+      ; return res
+      }
 
 -- To be called at the beginning of renaming hsig files.
 -- If we're processing a signature, load up the RdrEnv
@@ -1380,7 +1385,7 @@ runTcInteractive :: HscEnv -> TcRn a -> IO (Messages, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
 runTcInteractive hsc_env thing_inside
-  = initTcInteractive hsc_env $
+  = initTcInteractive hsc_env $ withTcPlugins hsc_env $
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
                  , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
@@ -2089,4 +2094,39 @@ ppr_tydecls tycons
   = vcat (map ppr_tycon (sortBy (comparing getOccName) tycons))
   where
     ppr_tycon tycon = vcat [ ppr (tyThingToIfaceDecl (ATyCon tycon)) ]
+\end{code}
+
+
+********************************************************************************
+
+Type Checker Plugins
+
+********************************************************************************
+
+
+\begin{code}
+withTcPlugins :: HscEnv -> TcM a -> TcM a
+withTcPlugins hsc_env m =
+  do plugins <- liftIO (loadTcPlugins hsc_env)
+     case plugins of
+       [] -> m  -- Common fast case
+       _  -> do (solvers,stops) <- unzip `fmap` mapM startPlugin plugins
+                res <- updGblEnv (\e -> e { tcg_tc_plugins = solvers }) m
+                mapM_ runTcPluginM stops
+                return res
+  where
+  startPlugin (TcPlugin start solve stop) =
+    do s <- runTcPluginM start
+       return (solve s, stop s)
+
+loadTcPlugins :: HscEnv -> IO [TcPlugin]
+#ifndef GHCI
+loadTcPlugins _ = return []
+#else
+loadTcPlugins hsc_env =
+ do named_plugins <- loadPlugins hsc_env
+    return $ catMaybes $ map load_plugin named_plugins
+  where
+    load_plugin (_, plug, opts) = tcPlugin plug opts
+#endif
 \end{code}

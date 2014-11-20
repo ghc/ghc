@@ -1161,10 +1161,10 @@ ipClassName :: Name
 ipClassName         = clsQual gHC_IP (fsLit "IP")      ipClassNameKey
 
 -- plugins
-cORE_MONAD :: Module
-cORE_MONAD = mkThisGhcModule (fsLit "CoreMonad")
+pLUGINS :: Module
+pLUGINS = mkThisGhcModule (fsLit "Plugins")
 pluginTyConName :: Name
-pluginTyConName = tcQual cORE_MONAD (fsLit "Plugin") pluginTyConKey
+pluginTyConName = tcQual pLUGINS (fsLit "Plugin") pluginTyConKey
 \end{code}
 
 %************************************************************************

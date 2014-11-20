@@ -52,13 +52,8 @@ import Outputable
 import Control.Monad
 
 #ifdef GHCI
-import Type             ( mkTyConTy )
-import RdrName          ( mkRdrQual )
-import OccName          ( mkVarOcc )
-import PrelNames        ( pluginTyConName )
-import DynamicLoading   ( forceLoadTyCon, lookupRdrNameInModuleForPlugins, getValueSafely )
-import Module           ( ModuleName )
-import Panic
+import DynamicLoading   ( loadPlugins )
+import Plugins          ( installCoreToDos )
 #endif
 \end{code}
 
@@ -77,7 +72,7 @@ core2core hsc_env guts
        ; let builtin_passes = getCoreToDo dflags
        ;
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod print_unqual $
-                           do { all_passes <- addPluginPasses dflags builtin_passes
+                           do { all_passes <- addPluginPasses builtin_passes
                               ; runCorePasses all_passes guts }
 
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
@@ -321,49 +316,16 @@ getCoreToDo dflags
 Loading plugins
 
 \begin{code}
-addPluginPasses :: DynFlags -> [CoreToDo] -> CoreM [CoreToDo]
+addPluginPasses :: [CoreToDo] -> CoreM [CoreToDo]
 #ifndef GHCI
-addPluginPasses _ builtin_passes = return builtin_passes
+addPluginPasses builtin_passes = return builtin_passes
 #else
-addPluginPasses dflags builtin_passes
+addPluginPasses builtin_passes
   = do { hsc_env <- getHscEnv
        ; named_plugins <- liftIO (loadPlugins hsc_env)
        ; foldM query_plug builtin_passes named_plugins }
   where
-    query_plug todos (mod_nm, plug)
-       = installCoreToDos plug options todos
-       where
-         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
-                            , opt_mod_nm == mod_nm ]
-
-loadPlugins :: HscEnv -> IO [(ModuleName, Plugin)]
-loadPlugins hsc_env
-  = do { let to_load = pluginModNames (hsc_dflags hsc_env)
-       ; plugins <- mapM (loadPlugin hsc_env) to_load
-       ; return $ to_load `zip` plugins }
-
-loadPlugin :: HscEnv -> ModuleName -> IO Plugin
-loadPlugin hsc_env mod_name
-  = do { let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "plugin")
-             dflags = hsc_dflags hsc_env
-       ; mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name plugin_rdr_name
-       ; case mb_name of {
-            Nothing ->
-                throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
-                          [ ptext (sLit "The module"), ppr mod_name
-                          , ptext (sLit "did not export the plugin name")
-                          , ppr plugin_rdr_name ]) ;
-            Just name ->
-
-     do { plugin_tycon <- forceLoadTyCon hsc_env pluginTyConName
-        ; mb_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
-        ; case mb_plugin of
-            Nothing ->
-                throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
-                          [ ptext (sLit "The value"), ppr name
-                          , ptext (sLit "did not have the type")
-                          , ppr pluginTyConName, ptext (sLit "as required")])
-            Just plugin -> return plugin } } }
+    query_plug todos (_, plug, options) = installCoreToDos plug options todos
 #endif
 \end{code}
 

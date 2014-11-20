@@ -3,6 +3,9 @@
 -- | Dynamically lookup up values from modules and loading them.
 module DynamicLoading (
 #ifdef GHCI
+        -- * Loading plugins
+        loadPlugins,
+
         -- * Force loading information
         forceLoadModuleInterfaces,
         forceLoadNameModuleInterface,
@@ -25,13 +28,17 @@ import Finder           ( findImportedModule, cannotFindModule )
 import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
 import LoadIface        ( loadPluginInterface )
 import RdrName          ( RdrName, Provenance(..), ImportSpec(..), ImpDeclSpec(..)
-                        , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName, gre_name )
+                        , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
+                        , gre_name, mkRdrQual )
+import OccName          ( mkVarOcc )
 import RnNames          ( gresFromAvails )
 import DynFlags
+import Plugins          ( Plugin, CommandLineOption )
+import PrelNames        ( pluginTyConName )
 
 import HscTypes
 import BasicTypes       ( HValue )
-import TypeRep          ( pprTyThingCategory )
+import TypeRep          ( mkTyConTy, pprTyThingCategory )
 import Type             ( Type, eqType )
 import TyCon            ( TyCon )
 import Name             ( Name, nameModule_maybe )
@@ -46,6 +53,44 @@ import Hooks
 
 import Data.Maybe        ( mapMaybe )
 import GHC.Exts          ( unsafeCoerce# )
+
+
+loadPlugins :: HscEnv -> IO [(ModuleName, Plugin, [CommandLineOption])]
+loadPlugins hsc_env
+  = do { plugins <- mapM (loadPlugin hsc_env) to_load
+       ; return $ map attachOptions $ to_load `zip` plugins }
+  where
+    dflags  = hsc_dflags hsc_env
+    to_load = pluginModNames dflags
+
+    attachOptions (mod_nm, plug) = (mod_nm, plug, options)
+      where
+        options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
+                            , opt_mod_nm == mod_nm ]
+
+loadPlugin :: HscEnv -> ModuleName -> IO Plugin
+loadPlugin hsc_env mod_name
+  = do { let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "plugin")
+             dflags = hsc_dflags hsc_env
+       ; mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name
+                        plugin_rdr_name
+       ; case mb_name of {
+            Nothing ->
+                throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
+                          [ ptext (sLit "The module"), ppr mod_name
+                          , ptext (sLit "did not export the plugin name")
+                          , ppr plugin_rdr_name ]) ;
+            Just name ->
+
+     do { plugin_tycon <- forceLoadTyCon hsc_env pluginTyConName
+        ; mb_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
+        ; case mb_plugin of
+            Nothing ->
+                throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
+                          [ ptext (sLit "The value"), ppr name
+                          , ptext (sLit "did not have the type")
+                          , ppr pluginTyConName, ptext (sLit "as required")])
+            Just plugin -> return plugin } } }
 
 
 -- | Force the interfaces for the given modules to be loaded. The 'SDoc' parameter is used

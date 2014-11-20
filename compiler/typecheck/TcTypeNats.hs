@@ -2,6 +2,14 @@ module TcTypeNats
   ( typeNatTyCons
   , typeNatCoAxiomRules
   , BuiltInSynFamily(..)
+
+  , typeNatAddTyCon
+  , typeNatMulTyCon
+  , typeNatExpTyCon
+  , typeNatLeqTyCon
+  , typeNatSubTyCon
+  , typeNatCmpTyCon
+  , typeSymbolCmpTyCon
   ) where
 
 import Type

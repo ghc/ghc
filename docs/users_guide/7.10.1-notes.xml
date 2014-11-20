@@ -136,6 +136,15 @@
                     than having everything being dumped to stdout.
                 </para>
            </listitem>
+           <listitem>
+             <para>
+               Compiler plugins (with the <option>-fplugin</option>
+               flag) may now modify the behaviour of the constraint
+               solver, to add new functionality to GHC's
+               typechecker. See <xref linkend="typechecker-plugins"/>
+               for more details.
+             </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 

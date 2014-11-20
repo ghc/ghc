@@ -12,9 +12,9 @@ module TcSMonad (
     extendWorkListCts, appendWorkList, selectWorkItem,
     workListSize,
 
-    updWorkListTcS, updWorkListTcS_return, 
+    updWorkListTcS, updWorkListTcS_return,
 
-    updInertCans, updInertDicts, updInertIrreds, updInertFunEqs,
+    updInertTcS, updInertCans, updInertDicts, updInertIrreds, updInertFunEqs,
 
     Ct(..), Xi, tyVarsOfCt, tyVarsOfCts,
     emitInsoluble, emitWorkNC,
@@ -28,6 +28,7 @@ module TcSMonad (
     traceFireTcS, bumpStepCountTcS, csTraceTcS,
     tryTcS, nestTcS, nestImplicTcS, recoverTcS,
     wrapErrTcS, wrapWarnTcS,
+    runTcPluginTcS,
 
     -- Getting and setting the flattening cache
     addSolvedDict, 
@@ -70,6 +71,7 @@ module TcSMonad (
     getNoGivenEqs, setInertCans, getInertEqs, getInertCans,
     emptyInert, getTcSInerts, setTcSInerts, 
     getUnsolvedInerts, checkAllSolved,
+    splitInertCans, removeInertCts,
     prepareInertsForImplications,
     addInertCan, insertInertItemTcS, insertFunEq,
     EqualCtList,
@@ -77,7 +79,7 @@ module TcSMonad (
 
     lookupInertDict, findDictsByClass, addDict, addDictsByClass, delDict, partitionDicts,
 
-    findFunEq, findTyEqs, 
+    findFunEq, findTyEqs,
     findFunEqsByTyCon, findFunEqs, partitionFunEqs,
     sizeFunEqMap,
 
@@ -147,6 +149,7 @@ import TrieMap
 import Control.Monad( ap, when, unless )
 import MonadUtils
 import Data.IORef
+import Data.List ( partition, foldl' )
 import Pair
 
 #ifdef DEBUG
@@ -734,6 +737,40 @@ b) 'a' will have been completely substituted out in the inert set,
 For an example, see Trac #9211.
 
 \begin{code}
+splitInertCans :: InertCans -> ([Ct], [Ct], [Ct])
+-- ^ Extract the (given, derived, wanted) inert constraints
+splitInertCans iCans = (given,derived,wanted)
+  where
+    allCts   = foldDicts  (:) (inert_dicts iCans)
+             $ foldFunEqs (:) (inert_funeqs iCans)
+             $ concat (varEnvElts (inert_eqs iCans))
+
+    (derived,other) = partition isDerivedCt allCts
+    (wanted,given)  = partition isWantedCt  other
+
+removeInertCts :: [Ct] -> InertCans -> InertCans
+-- ^ Remove inert constraints from the 'InertCans', for use when a
+-- typechecker plugin wishes to discard a given.
+removeInertCts cts icans = foldl' removeInertCt icans cts
+
+removeInertCt :: InertCans -> Ct -> InertCans
+removeInertCt is ct =
+  case ct of
+
+    CDictCan  { cc_class = cl, cc_tyargs = tys } ->
+      is { inert_dicts = delDict (inert_dicts is) cl tys }
+
+    CFunEqCan { cc_fun  = tf,  cc_tyargs = tys } ->
+      is { inert_funeqs = delFunEq (inert_funeqs is) tf tys }
+
+    CTyEqCan  { cc_tyvar = x,  cc_rhs    = ty  } ->
+      is { inert_eqs = delTyEq (inert_eqs is) x ty }
+
+    CIrredEvCan {}   -> panic "removeInertCt: CIrredEvCan"
+    CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
+    CHoleCan {}      -> panic "removeInertCt: CHoleCan"
+
+
 checkAllSolved :: TcS Bool
 -- True if there are no unsolved wanteds
 -- Ignore Derived for this purpose, unless in insolubles
@@ -808,6 +845,11 @@ type TyEqMap a = TyVarEnv a
 
 findTyEqs :: TyEqMap EqualCtList -> TyVar -> EqualCtList
 findTyEqs m tv = lookupVarEnv m tv `orElse` []
+
+delTyEq :: TyEqMap EqualCtList -> TcTyVar -> TcType -> TyEqMap EqualCtList
+delTyEq m tv t = modifyVarEnv (filter (not . isThisOne)) m tv
+  where isThisOne (CTyEqCan { cc_rhs = t1 }) = eqType t t1
+        isThisOne _                          = False
 \end{code}
 
 
@@ -961,6 +1003,9 @@ partitionFunEqs f m = foldTcAppMap k m (emptyBag, emptyFunEqs)
     k ct (yeses, noes)
       | f ct      = (yeses `snocBag` ct, noes)
       | otherwise = (yeses, insertFunEqCt noes ct)
+
+delFunEq :: FunEqMap a -> TyCon -> [Type] -> FunEqMap a
+delFunEq m tc tys = delTcApp m (getUnique tc) tys
 \end{code}
 
 
@@ -1043,6 +1088,9 @@ panicTcS doc = pprPanic "TcCanonical" doc
 
 traceTcS :: String -> SDoc -> TcS ()
 traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
+
+runTcPluginTcS :: TcPluginM a -> TcS a
+runTcPluginTcS = wrapTcS . runTcPluginM
 
 instance HasDynFlags TcS where
     getDynFlags = wrapTcS getDynFlags
