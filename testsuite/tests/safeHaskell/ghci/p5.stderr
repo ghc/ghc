@@ -1,7 +1,7 @@
-don't know how to reverse -XSafe
+Some flags have not been recognized: -XNoSafe
 ghc-stage2: <no location info>: Incompatible Safe Haskell flags! (Safe, Trustworthy)
 Usage: For basic information, try the `--help' option.
-don't know how to reverse -XTrustworthy
+Some flags have not been recognized: -XNoTrustworthy
 ghc-stage2: <no location info>: Incompatible Safe Haskell flags! (Safe, Unsafe)
 Usage: For basic information, try the `--help' option.
-don't know how to reverse -XUnsafe
+Some flags have not been recognized: -XNoUnsafe

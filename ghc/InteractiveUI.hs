@@ -2182,6 +2182,7 @@ unsetOptions str
            ]
 
          no_flag ('-':'f':rest) = return ("-fno-" ++ rest)
+         no_flag ('-':'X':rest) = return ("-XNo" ++ rest)
          no_flag f = throwGhcException (ProgramError ("don't know how to reverse " ++ f))
 
      in if (not (null rest3))
