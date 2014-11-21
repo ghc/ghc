@@ -1,0 +1,4 @@
+
+T8149.hs:5:1: Warning:
+    The import of ‘WriterT’
+    from module ‘Control.Monad.Trans.Writer’ is redundant
