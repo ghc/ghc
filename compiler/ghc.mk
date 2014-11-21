@@ -537,6 +537,7 @@ compiler_stage2_dll0_MODULES = \
 	InstEnv \
 	Kind \
 	Lexeme \
+	ApiAnnotation \
 	ListSetOps \
 	Literal \
 	LoadIface \
@@ -599,6 +600,7 @@ ifeq "$(GhcWithInterpreter)" "YES"
 # These files are reacheable from DynFlags
 # only by GHCi-enabled code (see #9552)
 compiler_stage2_dll0_MODULES += \
+	ApiAnnotation \
 	Bitmap \
 	BlockId \
 	ByteCodeAsm \

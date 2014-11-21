@@ -43,6 +43,7 @@
 {
 -- XXX The above flags turn off warnings in the generated code:
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
@@ -71,7 +72,8 @@ module Lexer (
    patternSynonymsEnabled,
    sccProfilingOn, hpcEnabled,
    addWarning,
-   lexTokenStream
+   lexTokenStream,
+   addAnnotation
   ) where
 
 -- base
@@ -90,6 +92,10 @@ import Data.ByteString (ByteString)
 -- containers
 import Data.Map (Map)
 import qualified Data.Map as Map
+
+-- data/typeable
+import Data.Data
+import Data.Typeable
 
 -- compiler/utils
 import Bag
@@ -110,6 +116,8 @@ import BasicTypes       ( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..) )
 
 -- compiler/parser
 import Ctype
+
+import ApiAnnotation
 }
 
 -- -----------------------------------------------------------------------------
@@ -687,6 +695,9 @@ data Token
 
   deriving Show
 
+instance Outputable Token where
+  ppr x = text (show x)
+
 -- the bitmap provided as the third component indicates whether the
 -- corresponding extension keyword is valid under the extension options
 -- provided to the compiler; if the extension corresponding to *any* of the
@@ -952,15 +963,16 @@ lineCommentToken span buf len = do
   using regular expressions.
 -}
 nested_comment :: P (RealLocated Token) -> Action
-nested_comment cont span _str _len = do
+nested_comment cont span buf len = do
   input <- getInput
-  go "" (1::Int) input
+  go (reverse $ drop 2 $ lexemeToString buf len) (1::Int) input
   where
-    go commentAcc 0 input = do setInput input
-                               b <- extension rawTokenStreamEnabled
-                               if b
-                                 then docCommentEnd input commentAcc ITblockComment _str span
-                                 else cont
+    go commentAcc 0 input = do
+      setInput input
+      b <- extension rawTokenStreamEnabled
+      if b
+        then docCommentEnd input commentAcc ITblockComment buf span
+        else cont
     go commentAcc n input = case alexGetChar' input of
       Nothing -> errBrace input span
       Just ('-',input) -> case alexGetChar' input of
@@ -1675,7 +1687,15 @@ data PState = PState {
         alr_expecting_ocurly :: Maybe ALRLayout,
         -- Have we just had the '}' for a let block? If so, than an 'in'
         -- token doesn't need to close anything:
-        alr_justClosedExplicitLetBlock :: Bool
+        alr_justClosedExplicitLetBlock :: Bool,
+
+        -- The next three are used to implement Annotations giving the
+        -- locations of 'noise' tokens in the source, so that users of
+        -- the GHC API can do source to source conversions.
+        -- See note [Api annotations] in ApiAnnotation.hs
+        annotations :: [(ApiAnnKey,[SrcSpan])],
+        comment_q :: [Located AnnotationComment],
+        annotations_comments :: [(SrcSpan,[Located AnnotationComment])]
      }
         -- last_loc and last_len are used when generating error messages,
         -- and in pushCurrentContext only.  Sigh, if only Happy passed the
@@ -2057,7 +2077,10 @@ mkPState flags buf loc =
       alr_last_loc = alrInitialLoc (fsLit "<no file>"),
       alr_context = [],
       alr_expecting_ocurly = Nothing,
-      alr_justClosedExplicitLetBlock = False
+      alr_justClosedExplicitLetBlock = False,
+      annotations = [],
+      comment_q = [],
+      annotations_comments = []
     }
     where
       bitmap =     FfiBit                      `setBitIf` xopt Opt_ForeignFunctionInterface flags
@@ -2175,13 +2198,24 @@ lexError str = do
 -- This is the top-level function: called from the parser each time a
 -- new token is to be read from the input.
 
-lexer :: (Located Token -> P a) -> P a
-lexer cont = do
+lexer :: Bool -> (Located Token -> P a) -> P a
+lexer queueComments cont = do
   alr <- extension alternativeLayoutRule
   let lexTokenFun = if alr then lexTokenAlr else lexToken
   (L span tok) <- lexTokenFun
   --trace ("token: " ++ show tok) $ do
-  cont (L (RealSrcSpan span) tok)
+
+  case tok of
+    ITeof -> addAnnotationOnly noSrcSpan AnnEofPos (RealSrcSpan span)
+    _ -> return ()
+
+  if (queueComments && isDocComment tok)
+    then queueComment (L (RealSrcSpan span) tok)
+    else return ()
+
+  if (queueComments && isComment tok)
+    then queueComment (L (RealSrcSpan span) tok) >> lexer queueComments cont
+    else cont (L (RealSrcSpan span) tok)
 
 lexTokenAlr :: P (RealLocated Token)
 lexTokenAlr = do mPending <- popPendingImplicitToken
@@ -2446,7 +2480,7 @@ lexTokenStream buf loc dflags = unP go initState
     where dflags' = gopt_set (gopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream
           initState = mkPState dflags' buf loc
           go = do
-            ltok <- lexer return
+            ltok <- lexer False return
             case ltok of
               L _ ITeof -> return []
               _ -> liftM (ltok:) go
@@ -2522,4 +2556,71 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
                                               "constructorlike" -> "conlike"
                                               _ -> prag'
                           canon_ws s = unwords (map canonical (words s))
+
+
+
+{-
+%************************************************************************
+%*                                                                      *
+        Helper functions for generating annotations in the parser
+%*                                                                      *
+%************************************************************************
+-}
+
+addAnnotation :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
+addAnnotation l a v = do
+  addAnnotationOnly l a v
+  allocateComments l
+
+addAnnotationOnly :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
+addAnnotationOnly l a v = P $ \s -> POk s {
+  annotations = ((l,a), [v]) : annotations s
+  } ()
+
+queueComment :: Located Token -> P()
+queueComment c = P $ \s -> POk s {
+  comment_q = commentToAnnotation c : comment_q s
+  } ()
+
+-- | Go through the @comment_q@ in @PState@ and remove all comments
+-- that belong within the given span
+allocateComments :: SrcSpan -> P ()
+allocateComments ss = P $ \s ->
+  let
+    (before,rest)  = break (\(L l _) -> isSubspanOf l ss) (comment_q s)
+    (middle,after) = break (\(L l _) -> not (isSubspanOf l ss)) rest
+    comment_q' = before ++ after
+    newAnns = if null middle then []
+                             else [(ss,middle)]
+  in
+    POk s {
+       comment_q = comment_q'
+     , annotations_comments = newAnns ++ (annotations_comments s)
+     } ()
+
+commentToAnnotation :: Located Token -> Located AnnotationComment
+commentToAnnotation (L l (ITdocCommentNext s))  = L l (AnnDocCommentNext s)
+commentToAnnotation (L l (ITdocCommentPrev s))  = L l (AnnDocCommentPrev s)
+commentToAnnotation (L l (ITdocCommentNamed s)) = L l (AnnDocCommentNamed s)
+commentToAnnotation (L l (ITdocSection n s))    = L l (AnnDocSection n s)
+commentToAnnotation (L l (ITdocOptions s))      = L l (AnnDocOptions s)
+commentToAnnotation (L l (ITdocOptionsOld s))   = L l (AnnDocOptionsOld s)
+commentToAnnotation (L l (ITlineComment s))     = L l (AnnLineComment s)
+commentToAnnotation (L l (ITblockComment s))    = L l (AnnBlockComment s)
+
+-- ---------------------------------------------------------------------
+
+isComment :: Token -> Bool
+isComment (ITlineComment     _)   = True
+isComment (ITblockComment    _)   = True
+isComment _ = False
+
+isDocComment :: Token -> Bool
+isDocComment (ITdocCommentNext  _)   = True
+isDocComment (ITdocCommentPrev  _)   = True
+isDocComment (ITdocCommentNamed _)   = True
+isDocComment (ITdocSection      _ _) = True
+isDocComment (ITdocOptions      _)   = True
+isDocComment (ITdocOptionsOld   _)   = True
+isDocComment _ = False
 }

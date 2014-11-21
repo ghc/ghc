@@ -52,6 +52,8 @@ import Data.Data hiding (Fixity)
 -- * Expressions proper
 
 type LHsExpr id = Located (HsExpr id)
+  -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
+  --   in a list
 
 -------------------------
 -- | PostTcExpr is an evidence expression attached to the syntax tree by the
@@ -132,9 +134,15 @@ data HsExpr id
   | HsLit     HsLit                     -- ^ Simple (non-overloaded) literals
 
   | HsLam     (MatchGroup id (LHsExpr id)) -- ^ Lambda abstraction. Currently always a single match
+       --
+       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
+       --       'ApiAnnotation.AnnRarrow',
 
   | HsLamCase (PostTc id Type) (MatchGroup id (LHsExpr id)) -- ^ Lambda-case
-
+       --
+       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
+       --           'ApiAnnotation.AnnCase','ApiAnnotation.AnnOpen',
+       --           'ApiAnnotation.AnnClose'
   | HsApp     (LHsExpr id) (LHsExpr id) -- ^ Application
 
   -- | Operator applications:
@@ -149,10 +157,18 @@ data HsExpr id
                 (LHsExpr id)    -- right operand
 
   -- | Negation operator. Contains the negated expression and the name
-  -- of 'negate'              
-  | NegApp      (LHsExpr id) 
-                (SyntaxExpr id) 
+  -- of 'negate'
+  --
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnMinus'
+  | NegApp      (LHsExpr id)
+                (SyntaxExpr id)
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --             'ApiAnnotation.AnnClose'
+  --   - Note: if 'ApiAnnotation.AnnVal' is present this is actually an
+  --           inactive 'HsSCC'
+  --   - Note: if multiple 'ApiAnnotation.AnnVal' are
+  --            present this is actually an inactive 'HsTickPragma'
   | HsPar       (LHsExpr id)    -- ^ Parenthesised expr; see Note [Parens in HsSyn]
 
   | SectionL    (LHsExpr id)    -- operand; see Note [Sections in HsSyn]
@@ -161,13 +177,23 @@ data HsExpr id
                 (LHsExpr id)    -- operand
 
   -- | Used for explicit tuples and sections thereof
+  --
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --         'ApiAnnotation.AnnClose'
   | ExplicitTuple
         [LHsTupArg id]
         Boxity
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnCase',
+  --       'ApiAnnotation.AnnOf','ApiAnnotation.AnnOpen',
+  --       'ApiAnnotation.AnnClose'
   | HsCase      (LHsExpr id)
                 (MatchGroup id (LHsExpr id))
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf',
+  --       'ApiAnnotation.AnnSemi',
+  --       'ApiAnnotation.AnnThen','ApiAnnotation.AnnSemi2',
+  --       'ApiAnnotation.AnnElse',
   | HsIf        (Maybe (SyntaxExpr id)) -- cond function
                                         -- Nothing => use the built-in 'if'
                                         -- See Note [Rebindable if]
@@ -176,12 +202,23 @@ data HsExpr id
                 (LHsExpr id)    --  else part
 
   -- | Multi-way if
+  --
+  -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf'
+  --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
   | HsMultiIf   (PostTc id Type) [LGRHS id (LHsExpr id)]
 
   -- | let(rec)
-  | HsLet       (HsLocalBinds id) 
+  --
+  -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet',
+  --       'ApiAnnotation.AnnIn','ApiAnnotation.AnnOpen',
+  --       'ApiAnnotation.AnnClose'
+  | HsLet       (HsLocalBinds id)
                 (LHsExpr  id)
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDo',
+  --             'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnSemi',
+  --             'ApiAnnotation.AnnVbar',
+  --             'ApiAnnotation.AnnClose'
   | HsDo        (HsStmtContext Name) -- The parameterisation is unimportant
                                      -- because in this context we never use
                                      -- the PatGuard or ParStmt variant
@@ -189,23 +226,37 @@ data HsExpr id
                 (PostTc id Type)     -- Type of the whole expression
 
   -- | Syntactic list: [a,b,c,...]
+  --
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --              'ApiAnnotation.AnnClose'
   | ExplicitList
                 (PostTc id Type)        -- Gives type of components of list
                 (Maybe (SyntaxExpr id)) -- For OverloadedLists, the fromListN witness
                 [LHsExpr id]
 
   -- | Syntactic parallel array: [:e1, ..., en:]
+  --
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --              'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnComma',
+  --              'ApiAnnotation.AnnVbar'
+  --              'ApiAnnotation.AnnClose'
   | ExplicitPArr
                 (PostTc id Type)   -- type of elements of the parallel array
                 [LHsExpr id]
 
   -- | Record construction
+  --
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose'
   | RecordCon   (Located id)       -- The constructor.  After type checking
                                    -- it's the dataConWrapId of the constructor
                 PostTcExpr         -- Data con Id applied to type args
                 (HsRecordBinds id)
 
   -- | Record update
+  --
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose'
   | RecordUpd   (LHsExpr id)
                 (HsRecordBinds id)
 --              (HsMatchGroup Id)  -- Filled in by the type checker to be
@@ -218,8 +269,10 @@ data HsExpr id
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 
-  -- | Expression with an explicit type signature. @e :: type@  
-  | ExprWithTySig                       
+  -- | Expression with an explicit type signature. @e :: type@
+  --
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
+  | ExprWithTySig
                 (LHsExpr id)
                 (LHsType id)
 
@@ -229,7 +282,11 @@ data HsExpr id
                                         -- round-tripping purposes
 
   -- | Arithmetic sequence
-  | ArithSeq                            
+  --
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --              'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnComma',
+  --              'ApiAnnotation.AnnClose'
+  | ArithSeq
                 PostTcExpr
                 (Maybe (SyntaxExpr id))   -- For OverloadedLists, the fromList witness
                 (ArithSeqInfo id)
@@ -239,15 +296,22 @@ data HsExpr id
                 PostTcExpr              -- [:e1..e2:] or [:e1, e2..e3:]
                 (ArithSeqInfo id)
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose'
   | HsSCC       FastString              -- "set cost centre" SCC pragma
                 (LHsExpr id)            -- expr whose cost is to be measured
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose'
   | HsCoreAnn   FastString              -- hdaume: core annotation
                 (LHsExpr id)
 
   -----------------------------------------------------------
   -- MetaHaskell Extensions
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --         'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
+  --         'ApiAnnotation.AnnClose'
   | HsBracket    (HsBracket id)
 
     -- See Note [Pending Splices]
@@ -262,6 +326,8 @@ data HsExpr id
       [PendingTcSplice]    -- _typechecked_ splices to be
                            -- pasted back in by the desugarer
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --         'ApiAnnotation.AnnClose'
   | HsSpliceE    Bool                   -- True <=> typed splice
                  (HsSplice id)          -- False <=> untyped
 
@@ -272,6 +338,9 @@ data HsExpr id
   -- Arrow notation extension
 
   -- | @proc@ notation for Arrows
+  --
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnProc',
+  --          'ApiAnnotation.AnnRarrow'
   | HsProc      (LPat id)               -- arrow abstraction, proc
                 (LHsCmdTop id)          -- body of the abstraction
                                         -- always has an empty stack
@@ -280,6 +349,10 @@ data HsExpr id
   -- The following are commands, not expressions proper
   -- They are only used in the parsing stage and are removed
   --    immediately in parser.RdrHsSyn.checkCommand
+
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.Annlarrowtail',
+  --          'ApiAnnotation.Annrarrowtail','ApiAnnotation.AnnLarrowtail',
+  --          'ApiAnnotation.AnnRarrowtail'
   | HsArrApp             -- Arrow tail, or arrow application (f -< arg)
         (LHsExpr id)     -- arrow expression, f
         (LHsExpr id)     -- input expression, arg
@@ -289,6 +362,8 @@ data HsExpr id
         Bool             -- True => right-to-left (f -< arg)
                          -- False => left-to-right (arg >- f)
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --         'ApiAnnotation.AnnClose'
   | HsArrForm            -- Command formation,  (| e cmd1 .. cmdn |)
         (LHsExpr id)     -- the operator
                          -- after type-checking, a type abstraction to be
@@ -309,6 +384,14 @@ data HsExpr id
      Int                                -- module-local tick number for False
      (LHsExpr id)                       -- sub-expression
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --       'ApiAnnotation.AnnOpen',
+  --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnVal2',
+  --       'ApiAnnotation.AnnColon','ApiAnnotation.AnnVal3',
+  --       'ApiAnnotation.AnnMinus',
+  --       'ApiAnnotation.AnnVal4','ApiAnnotation.AnnColon2',
+  --       'ApiAnnotation.AnnVal5',
+  --       'ApiAnnotation.AnnClose'
   | HsTickPragma                        -- A pragma introduced tick
      (FastString,(Int,Int),(Int,Int))   -- external span for this tick
      (LHsExpr id)
@@ -319,12 +402,15 @@ data HsExpr id
 
   | EWildPat                 -- wildcard
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
   | EAsPat      (Located id) -- as pattern
                 (LHsExpr id)
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
   | EViewPat    (LHsExpr id) -- view pattern
                 (LHsExpr id)
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
   | ELazyPat    (LHsExpr id) -- ~ pattern
 
   | HsType      (LHsType id) -- Explicit type argument; e.g  f {| Int |} x y
@@ -342,6 +428,7 @@ deriving instance (DataId id) => Data (HsExpr id)
 --  (,a,) is represented by  ExplicitTuple [Missing ty1, Present a, Missing ty3]
 --  Which in turn stands for (\x:ty1 \y:ty2. (x,a,y))
 type LHsTupArg id = Located (HsTupArg id)
+-- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma'
 data HsTupArg id
   = Present (LHsExpr id)     -- ^ The argument
   | Missing (PostTc id Type) -- ^ The argument is missing, but this is its type
@@ -878,7 +965,8 @@ data MatchGroup id body
 deriving instance (Data body,DataId id) => Data (MatchGroup id body)
 
 type LMatch id body = Located (Match id body)
-
+-- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when in a
+--   list
 data Match id body
   = Match
         [LPat id]               -- The patterns
@@ -902,6 +990,11 @@ hsLMatchPats :: LMatch id body -> [LPat id]
 hsLMatchPats (L _ (Match pats _ _)) = pats
 
 -- | GRHSs are used both for pattern bindings and for Matches
+--
+--  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnVbar',
+--        'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
+--        'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
+--        'ApiAnnotation.AnnRarrow','ApiAnnotation.AnnSemi'
 data GRHSs id body
   = GRHSs {
       grhssGRHSs :: [LGRHS id body],       -- ^ Guarded RHSs
@@ -1016,6 +1109,11 @@ type GhciStmt   id = Stmt  id (LHsExpr id)
 
 -- The SyntaxExprs in here are used *only* for do-notation and monad
 -- comprehensions, which have rebindable syntax. Otherwise they are unused.
+-- | API Annotations when in qualifier lists or guards
+--  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnVbar',
+--         'ApiAnnotation.AnnComma','ApiAnnotation.AnnThen',
+--         'ApiAnnotation.AnnBy','ApiAnnotation.AnnBy',
+--         'ApiAnnotation.AnnGroup','ApiAnnotation.AnnUsing'
 data StmtLR idL idR body -- body should always be (LHs**** idR)
   = LastStmt  -- Always the last Stmt in ListComp, MonadComp, PArrComp,
               -- and (after the renamer) DoExpr, MDoExpr
@@ -1025,6 +1123,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
                                   -- For ListComp, PArrComp, we use the baked-in 'return'
                                   -- For DoExpr, MDoExpr, we don't appply a 'return' at all
                                   -- See Note [Monad Comprehensions]
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLarrow'
   | BindStmt (LPat idL)
              body
              (SyntaxExpr idR) -- The (>>=) operator; see Note [The type of bind]
@@ -1038,6 +1137,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
                                -- See notes [Monad Comprehensions]
              (PostTc idR Type) -- Element type of the RHS (used for arrows)
 
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet'
   | LetStmt  (HsLocalBindsLR idL idR)
 
   -- ParStmts only occur in a list/monad comprehension
@@ -1067,6 +1167,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
     }                                 -- See Note [Monad Comprehensions]
 
   -- Recursive statement (see Note [How RecStmt works] below)
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRec'
   | RecStmt
      { recS_stmts :: [LStmtLR idL idR body]
 

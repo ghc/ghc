@@ -72,6 +72,10 @@ data HsModule name
         --
         --  - @Just [...]@: as you would expect...
         --
+        --
+        --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
+        --                                   ,'ApiAnnotation.AnnClose'
+        --
       hsmodImports :: [LImportDecl name],
         -- ^ We snaffle interesting stuff out of the imported interfaces early
         -- on, adding that info to TyDecls/etc; so this list is often empty,
@@ -80,9 +84,26 @@ data HsModule name
         -- ^ Type, class, value, and interface signature decls
       hsmodDeprecMessage :: Maybe (Located WarningTxt),
         -- ^ reason\/explanation for warning/deprecation of this module
+        --
+        --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
+        --                                   ,'ApiAnnotation.AnnClose'
+        --
       hsmodHaddockModHeader :: Maybe LHsDocString
         -- ^ Haddock module info and description, unparsed
-   } deriving (Typeable)
+        --
+        --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
+        --                                   ,'ApiAnnotation.AnnClose'
+        --
+   }
+     -- ^ 'ApiAnnotation.AnnKeywordId's
+     --
+     --  - 'ApiAnnotation.AnnModule','ApiAnnotation.AnnWhere'
+     --
+     --  - 'ApiAnnotation.AnnOpen','ApiAnnotation.AnnSemi',
+     --    'ApiAnnotation.AnnClose' for explicit braces and semi around
+     --    hsmodImports,hsmodDecls if this style is used.
+     --
+      deriving (Typeable)
 deriving instance (DataId name) => Data (HsModule name)
 \end{code}
 

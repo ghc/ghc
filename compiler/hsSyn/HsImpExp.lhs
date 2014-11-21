@@ -30,6 +30,10 @@ import Data.Data
 One per \tr{import} declaration in a module.
 \begin{code}
 type LImportDecl name = Located (ImportDecl name)
+        -- ^ When in a list this may have
+        --
+        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
+        --
 
 -- | A single Haskell @import@ declaration.
 data ImportDecl name
@@ -42,8 +46,23 @@ data ImportDecl name
       ideclImplicit  :: Bool,               -- ^ True => implicit import (of Prelude)
       ideclAs        :: Maybe ModuleName,   -- ^ as Module
       ideclHiding    :: Maybe (Bool, Located [LIE name])
+    }
                                             -- ^ (True => hiding, names)
-    } deriving (Data, Typeable)
+     --
+     --  'ApiAnnotation.AnnKeywordId's
+     --
+     --  - 'ApiAnnotation.AnnImport'
+     --
+     --  - 'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnClose' for ideclSource
+     --
+     --  - 'ApiAnnotation.AnnSafe','ApiAnnotation.AnnQualified',
+     --    'ApiAnnotation.AnnPackageName','ApiAnnotation.AnnAs',
+     --
+     --  - 'ApiAnnotation.AnnHiding','ApiAnnotation.AnnOpen',
+     --    'ApiAnnotation.AnnClose' attached
+     --     to location in ideclHiding
+
+       deriving (Data, Typeable)
 
 simpleImportDecl :: ModuleName -> ImportDecl name
 simpleImportDecl mn = ImportDecl {
@@ -102,15 +121,34 @@ instance (OutputableBndr name, HasOccName name) => Outputable (ImportDecl name) 
 
 \begin{code}
 type LIE name = Located (IE name)
+        -- ^ When in a list this may have
+        --
+        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma'
+        --
 
 -- | Imported or exported entity.
 data IE name
   = IEVar       (Located name)
+        -- ^ - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
+        --                                     'ApiAnnotation.AnnType'
   | IEThingAbs           name      -- ^ Class/Type (can't tell)
+        --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
+        --                                     'ApiAnnotation.AnnType'
   | IEThingAll  (Located name)     -- ^ Class/Type plus all methods/constructors
+        --
+        -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',
+        --       'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose',
+        --                                 'ApiAnnotation.AnnType'
+
   | IEThingWith (Located name) [Located name]
                  -- ^ Class/Type plus some methods/constructors
+        -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',
+        --                                   'ApiAnnotation.AnnClose',
+        --                                   'ApiAnnotation.AnnComma',
+        --                                   'ApiAnnotation.AnnType'
   | IEModuleContents  (Located ModuleName) -- ^ (Export Only)
+        --
+        -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnModule'
   | IEGroup             Int HsDocString  -- ^ Doc section heading
   | IEDoc               HsDocString      -- ^ Some documentation
   | IEDocNamed          String           -- ^ Reference to named doc

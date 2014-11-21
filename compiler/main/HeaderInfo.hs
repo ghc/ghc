@@ -163,7 +163,7 @@ lazyGetToks dflags filename handle = do
 
   lazyLexBuf :: Handle -> PState -> Bool -> Int -> IO [Located Token]
   lazyLexBuf handle state eof size = do
-    case unP (lexer return) state of
+    case unP (lexer False return) state of
       POk state' t -> do
         -- pprTrace "lazyLexBuf" (text (show (buffer state'))) (return ())
         if atEnd (buffer state') && not eof
@@ -197,7 +197,7 @@ getToks dflags filename buf = lexAll (pragState dflags buf loc)
  where
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
-  lexAll state = case unP (lexer return) state of
+  lexAll state = case unP (lexer False return) state of
                    POk _      t@(L _ ITeof) -> [t]
                    POk state' t -> t : lexAll state'
                    _ -> [L (RealSrcSpan (last_loc state)) ITeof]

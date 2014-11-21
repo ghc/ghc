@@ -145,6 +145,7 @@ import Id
 import IdInfo           ( IdDetails(..) )
 import Type
 
+import ApiAnnotation    ( ApiAnns )
 import Annotations      ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import Class
 import TyCon
@@ -2604,12 +2605,14 @@ instance Binary IfaceTrustInfo where
 \begin{code}
 data HsParsedModule = HsParsedModule {
     hpm_module    :: Located (HsModule RdrName),
-    hpm_src_files :: [FilePath]
+    hpm_src_files :: [FilePath],
        -- ^ extra source files (e.g. from #includes).  The lexer collects
        -- these from '# <file> <line>' pragmas, which the C preprocessor
        -- leaves behind.  These files and their timestamps are stored in
        -- the .hi file, so that we can force recompilation if any of
        -- them change (#3589)
+    hpm_annotations :: ApiAnns
+    -- See note [Api annotations] in ApiAnnotation.hs
   }
 \end{code}
 

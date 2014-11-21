@@ -61,6 +61,7 @@ type OutPat id = LPat id        -- No 'In' constructors
 
 type LPat id = Located (Pat id)
 
+-- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
 data Pat id
   =     ------------ Simple patterns ---------------
     WildPat     (PostTc id Type)        -- Wild card
@@ -217,6 +218,7 @@ data HsRecFields id arg         -- A bunch of record fields
 --                     and the remainder being 'filled in' implicitly
 
 type LHsRecField id arg = Located (HsRecField id arg)
+-- |  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
 data HsRecField id arg = HsRecField {
         hsRecFieldId  :: Located id,
         hsRecFieldArg :: arg,           -- Filled in by renamer

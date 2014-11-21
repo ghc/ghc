@@ -130,10 +130,10 @@ mkSimpleMatch pats rhs
                 (pat:_) -> combineSrcSpans (getLoc pat) (getLoc rhs)
 
 unguardedGRHSs :: Located (body id) -> GRHSs id (Located (body id))
-unguardedGRHSs rhs = GRHSs (unguardedRHS rhs) emptyLocalBinds
+unguardedGRHSs rhs@(L loc _) = GRHSs (unguardedRHS loc rhs) emptyLocalBinds
 
-unguardedRHS :: Located (body id) -> [LGRHS id (Located (body id))]
-unguardedRHS rhs@(L loc _) = [L loc (GRHS [] rhs)]
+unguardedRHS :: SrcSpan -> Located (body id) -> [LGRHS id (Located (body id))]
+unguardedRHS loc rhs = [L loc (GRHS [] rhs)]
 
 mkMatchGroup :: Origin -> [LMatch RdrName (Located (body RdrName))]
              -> MatchGroup RdrName (Located (body RdrName))
@@ -570,7 +570,7 @@ mk_easy_FunBind loc fun pats expr
 mkMatch :: [LPat id] -> LHsExpr id -> HsLocalBinds id -> LMatch id (LHsExpr id)
 mkMatch pats expr binds
   = noLoc (Match (map paren pats) Nothing
-                 (GRHSs (unguardedRHS expr) binds))
+                 (GRHSs (unguardedRHS noSrcSpan expr) binds))
   where
     paren lp@(L l p) | hsPatNeedsParens p = L l (ParPat lp)
                      | otherwise          = lp

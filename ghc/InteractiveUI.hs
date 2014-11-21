@@ -864,7 +864,7 @@ checkInputForLayout stmt getStmt = do
              eof <- Lexer.nextIsEOF
              if eof
                then Lexer.activeContext
-               else Lexer.lexer return >> goToEnd
+               else Lexer.lexer False return >> goToEnd
 
 enqueueCommands :: [String] -> GHCi ()
 enqueueCommands cmds = do

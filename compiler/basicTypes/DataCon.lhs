@@ -246,6 +246,9 @@ Note that (Foo a) might not be an instance of Ord.
 
 \begin{code}
 -- | A data constructor
+--
+-- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+--             'ApiAnnotation.AnnClose','ApiAnnotation.AnnComma'
 data DataCon
   = MkData {
         dcName    :: Name,      -- This is the name of the *source data con*
