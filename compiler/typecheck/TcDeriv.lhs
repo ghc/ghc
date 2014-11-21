@@ -1438,7 +1438,7 @@ checkFlag flag (dflags, _, _)
   where
     why = ptext (sLit "You need ") <> text flag_str
           <+> ptext (sLit "to derive an instance for this class")
-    flag_str = case [ s | (s, f, _) <- xFlags, f==flag ] of
+    flag_str = case [ flagSpecName f | f <- xFlags , flagSpecFlag f == flag ] of
                  [s]   -> s
                  other -> pprPanic "checkFlag" (ppr other)
 

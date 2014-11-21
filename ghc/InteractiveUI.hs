@@ -2021,11 +2021,13 @@ showDynFlags show_all dflags = do
      text "warning settings:" $$
          nest 2 (vcat (map (setting wopt) DynFlags.fWarningFlags))
   where
-        setting test (str, f, _)
+        setting test flag
           | quiet     = empty
-          | is_on     = fstr str
-          | otherwise = fnostr str
-          where is_on = test f dflags
+          | is_on     = fstr name
+          | otherwise = fnostr name
+          where name = flagSpecName flag
+                f = flagSpecFlag flag
+                is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
         default_dflags = defaultDynFlags (settings dflags)
@@ -2033,7 +2035,7 @@ showDynFlags show_all dflags = do
         fstr   str = text "-f"    <> text str
         fnostr str = text "-fno-" <> text str
 
-        (ghciFlags,others)  = partition (\(_, f, _) -> f `elem` flgs)
+        (ghciFlags,others)  = partition (\f -> flagSpecFlag f `elem` flgs)
                                         DynFlags.fFlags
         flgs = [ Opt_PrintExplicitForalls
                , Opt_PrintExplicitKinds
@@ -2382,11 +2384,13 @@ showLanguages' show_all dflags =
           nest 2 (vcat (map (setting xopt) DynFlags.xFlags))
      ]
   where
-   setting test (str, f, _)
+   setting test flag
           | quiet     = empty
-          | is_on     = text "-X" <> text str
-          | otherwise = text "-XNo" <> text str
-          where is_on = test f dflags
+          | is_on     = text "-X" <> text name
+          | otherwise = text "-XNo" <> text name
+          where name = flagSpecName flag
+                f = flagSpecFlag flag
+                is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
    default_dflags =

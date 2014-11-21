@@ -119,17 +119,17 @@ staticFlags = unsafePerformIO $ do
 flagsStatic :: [Flag IO]
 flagsStatic = [
   ------ Debugging ----------------------------------------------------
-    Flag "dppr-debug"       (PassFlag addOptEwM)
-  , Flag "dno-debug-output" (PassFlag addOptEwM)
+    defFlag "dppr-debug"       (PassFlag addOptEwM)
+  , defFlag "dno-debug-output" (PassFlag addOptEwM)
   -- rest of the debugging flags are dynamic
 
   ------ Compiler flags -----------------------------------------------
   -- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
-  , Flag "fno-"
+  , defFlag "fno-"
          (PrefixPred (\s -> isStaticFlag ("f"++s)) (\s -> removeOptEwM ("-f"++s)))
 
   -- Pass all remaining "-f<blah>" options to hsc
-  , Flag "f" (AnySuffixPred isStaticFlag addOptEwM)
+  , defFlag "f" (AnySuffixPred isStaticFlag addOptEwM)
   ]
 
 

@@ -107,10 +107,10 @@ main = do
     case mode of
         Left preStartupMode ->
             do case preStartupMode of
-                   ShowSupportedExtensions -> showSupportedExtensions
-                   ShowVersion             -> showVersion
-                   ShowNumVersion          -> putStrLn cProjectVersion
-                   ShowOptions             -> showOptions
+                   ShowSupportedExtensions   -> showSupportedExtensions
+                   ShowVersion               -> showVersion
+                   ShowNumVersion            -> putStrLn cProjectVersion
+                   ShowOptions isInteractive -> showOptions isInteractive
         Right postStartupMode ->
             -- start our GHC session
             GHC.runGhc mbMinusB $ do
@@ -378,16 +378,16 @@ type Mode = Either PreStartupMode PostStartupMode
 type PostStartupMode = Either PreLoadMode PostLoadMode
 
 data PreStartupMode
-  = ShowVersion             -- ghc -V/--version
-  | ShowNumVersion          -- ghc --numeric-version
-  | ShowSupportedExtensions -- ghc --supported-extensions
-  | ShowOptions             -- ghc --show-options
+  = ShowVersion                          -- ghc -V/--version
+  | ShowNumVersion                       -- ghc --numeric-version
+  | ShowSupportedExtensions              -- ghc --supported-extensions
+  | ShowOptions Bool {- isInteractive -} -- ghc --show-options
 
 showVersionMode, showNumVersionMode, showSupportedExtensionsMode, showOptionsMode :: Mode
 showVersionMode             = mkPreStartupMode ShowVersion
 showNumVersionMode          = mkPreStartupMode ShowNumVersion
 showSupportedExtensionsMode = mkPreStartupMode ShowSupportedExtensions
-showOptionsMode             = mkPreStartupMode ShowOptions
+showOptionsMode             = mkPreStartupMode (ShowOptions False)
 
 mkPreStartupMode :: PreStartupMode -> Mode
 mkPreStartupMode = Left
@@ -528,18 +528,18 @@ type ModeM = CmdLineP (Maybe (Mode, String), [String], [Located String])
 mode_flags :: [Flag ModeM]
 mode_flags =
   [  ------- help / version ----------------------------------------------
-    Flag "?"                     (PassFlag (setMode showGhcUsageMode))
-  , Flag "-help"                 (PassFlag (setMode showGhcUsageMode))
-  , Flag "V"                     (PassFlag (setMode showVersionMode))
-  , Flag "-version"              (PassFlag (setMode showVersionMode))
-  , Flag "-numeric-version"      (PassFlag (setMode showNumVersionMode))
-  , Flag "-info"                 (PassFlag (setMode showInfoMode))
-  , Flag "-show-options"         (PassFlag (setMode showOptionsMode))
-  , Flag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
-  , Flag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
-  , Flag "-show-packages"        (PassFlag (setMode showPackagesMode))
+    defFlag "?"                     (PassFlag (setMode showGhcUsageMode))
+  , defFlag "-help"                 (PassFlag (setMode showGhcUsageMode))
+  , defFlag "V"                     (PassFlag (setMode showVersionMode))
+  , defFlag "-version"              (PassFlag (setMode showVersionMode))
+  , defFlag "-numeric-version"      (PassFlag (setMode showNumVersionMode))
+  , defFlag "-info"                 (PassFlag (setMode showInfoMode))
+  , defFlag "-show-options"         (PassFlag (setMode showOptionsMode))
+  , defFlag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
+  , defFlag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
+  , defFlag "-show-packages"        (PassFlag (setMode showPackagesMode))
   ] ++
-  [ Flag k'                      (PassFlag (setMode (printSetting k)))
+  [ defFlag k'                      (PassFlag (setMode (printSetting k)))
   | k <- ["Project version",
           "Booter version",
           "Stage",
@@ -565,20 +565,20 @@ mode_flags =
         replaceSpace c   = c
   ] ++
       ------- interfaces ----------------------------------------------------
-  [ Flag "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
+  [ defFlag "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
                                                "--show-iface"))
 
       ------- primary modes ------------------------------------------------
-  , Flag "c"            (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
-                                            addFlag "-no-link" f))
-  , Flag "M"            (PassFlag (setMode doMkDependHSMode))
-  , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
-  , Flag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
-  , Flag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
-  , Flag "-make"        (PassFlag (setMode doMakeMode))
-  , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
-  , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
-  , Flag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
+  , defFlag "c"            (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
+                                               addFlag "-no-link" f))
+  , defFlag "M"            (PassFlag (setMode doMkDependHSMode))
+  , defFlag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
+  , defFlag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
+  , defFlag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
+  , defFlag "-make"        (PassFlag (setMode doMakeMode))
+  , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
+  , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
+  , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
   ]
 
 setMode :: Mode -> String -> EwM ModeM ()
@@ -612,6 +612,14 @@ setMode newMode newFlag = liftEwM $ do
                          errs)
                     -- Saying e.g. --interactive --interactive is OK
                     _ | oldFlag == newFlag -> ((oldMode, oldFlag), errs)
+
+                    -- --interactive and --show-options are used together
+                    (Right (Right DoInteractive), Left (ShowOptions _)) ->
+                      ((Left (ShowOptions True),
+                        "--interactive --show-options"), errs)
+                    (Left (ShowOptions _), (Right (Right DoInteractive))) ->
+                      ((Left (ShowOptions True),
+                        "--show-options --interactive"), errs)
                     -- Otherwise, complain
                     _ -> let err = flagMismatchErr oldFlag newFlag
                          in ((oldMode, oldFlag), err : errs)
@@ -711,20 +719,19 @@ showSupportedExtensions = mapM_ putStrLn supportedLanguagesAndExtensions
 showVersion :: IO ()
 showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
 
-showOptions :: IO ()
-showOptions = putStr (unlines availableOptions)
+showOptions :: Bool -> IO ()
+showOptions isInteractive = putStr (unlines availableOptions)
     where
-      availableOptions     = map ((:) '-') $
-                             getFlagNames mode_flags   ++
-                             getFlagNames flagsDynamic ++
-                             (filterUnwantedStatic . getFlagNames $ flagsStatic) ++
-                             flagsStaticNames
-      getFlagNames opts         = map getFlagName opts
-      getFlagName (Flag name _) = name
+      availableOptions = map ('-':) $
+                           getFlagNames mode_flags ++
+                           flagsForCompletion isInteractive ++
+                           (filterUnwantedStatic . getFlagNames $ flagsStatic) ++
+                           flagsStaticNames
+      getFlagNames opts         = map flagName opts
       -- this is a hack to get rid of two unwanted entries that get listed
       -- as static flags. Hopefully this hack will disappear one day together
       -- with static flags
-      filterUnwantedStatic      = filter (\x -> not (x `elem` ["f", "fno-"]))
+      filterUnwantedStatic      = filter (`notElem`["f", "fno-"])
 
 showGhcUsage :: DynFlags -> IO ()
 showGhcUsage = showUsage False
