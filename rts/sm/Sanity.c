@@ -765,8 +765,11 @@ findMemoryLeak (void)
         markBlocks(generations[g].large_objects);
     }
 
-    for (i = 0; i < n_capabilities; i++) {
+    for (i = 0; i < n_nurseries; i++) {
         markBlocks(nurseries[i].blocks);
+    }
+
+    for (i = 0; i < n_capabilities; i++) {
         markBlocks(capabilities[i]->pinned_object_block);
     }
 
@@ -856,9 +859,11 @@ memInventory (rtsBool show)
   }
 
   nursery_blocks = 0;
-  for (i = 0; i < n_capabilities; i++) {
+  for (i = 0; i < n_nurseries; i++) {
       ASSERT(countBlocks(nurseries[i].blocks) == nurseries[i].n_blocks);
       nursery_blocks += nurseries[i].n_blocks;
+  }
+  for (i = 0; i < n_capabilities; i++) {
       if (capabilities[i]->pinned_object_block != NULL) {
           nursery_blocks += capabilities[i]->pinned_object_block->blocks;
       }

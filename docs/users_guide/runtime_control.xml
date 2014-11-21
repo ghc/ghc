@@ -365,6 +365,42 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
       </varlistentry>
 
       <varlistentry>
+        <term>
+          <option>-n</option><replaceable>size</replaceable>
+          <indexterm><primary><option>-n</option></primary><secondary>RTS option</secondary></indexterm>
+          <indexterm><primary>allocation area, chunk size</primary></indexterm>
+        </term>
+	<listitem>
+          <para>&lsqb;Default: 0, Example:
+          <literal>-n4m</literal>&rsqb; When set to a non-zero value,
+          this option divides the allocation area (<option>-A</option>
+          value) into chunks of the specified size.  During execution,
+          when a processor exhausts its current chunk, it is given
+          another chunk from the pool until the pool is exhausted, at
+          which point a collection is triggered.</para>
+
+          <para>This option is only useful when running in parallel
+          (<option>-N2</option> or greater).  It allows the processor
+          cores to make better use of the available allocation area,
+          even when cores are allocating at different rates.  Without
+          <option>-n</option>, each core gets a fixed-size allocation
+          area specified by the <option>-A</option>, and the first
+          core to exhaust its allocation area triggers a GC across all
+          the cores.  This can result in a collection happening when
+          the allocation areas of some cores are only partially full,
+          so the purpose of the <option>-n</option> is to allow cores
+          that are allocating faster to get more of the allocation
+          area.  This means less frequent GC, leading a lower GC
+          overhead for the same heap size.</para>
+
+          <para>This is particularly useful in conjunction with larger
+          <option>-A</option> values, for example <option>-A64m
+          -n4m</option> is a useful combination on larger core counts
+          (8+).</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term>
           <option>-c</option>
           <indexterm><primary><option>-c</option></primary><secondary>RTS option</secondary></indexterm>

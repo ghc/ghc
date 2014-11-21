@@ -41,6 +41,7 @@ typedef struct _GC_FLAGS {
 
     nat	    maxHeapSize;        /* in *blocks* */
     nat     minAllocAreaSize;   /* in *blocks* */
+    nat     nurseryChunkSize;   /* in *blocks* */
     nat     minOldGenSize;      /* in *blocks* */
     nat     heapSizeSuggestion; /* in *blocks* */
     rtsBool heapSizeSuggestionAuto;

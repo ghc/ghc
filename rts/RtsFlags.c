@@ -108,6 +108,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.stkChunkBufferSize = (1 * 1024) / sizeof(W_);
 
     RtsFlags.GcFlags.minAllocAreaSize   = (512 * 1024)        / BLOCK_SIZE;
+    RtsFlags.GcFlags.nurseryChunkSize   = 0;
     RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE;
     RtsFlags.GcFlags.maxHeapSize        = 0;    /* off by default */
     RtsFlags.GcFlags.heapSizeSuggestion = 0;    /* none */
@@ -735,8 +736,16 @@ error = rtsTrue;
                   break;
               case 'A':
                   OPTION_UNSAFE;
+                  // minimum two blocks in the nursery, so that we have one to
+                  // grab for allocate().
                   RtsFlags.GcFlags.minAllocAreaSize
-                      = decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_INT_MAX)
+                      = decodeSize(rts_argv[arg], 2, 2*BLOCK_SIZE, HS_INT_MAX)
+                           / BLOCK_SIZE;
+                  break;
+            case 'n':
+                  OPTION_UNSAFE;
+                  RtsFlags.GcFlags.nurseryChunkSize
+                      = decodeSize(rts_argv[arg], 2, 2*BLOCK_SIZE, HS_INT_MAX)
                            / BLOCK_SIZE;
                   break;
 

@@ -55,6 +55,8 @@ generation *g0          = NULL; /* generation 0, for convenience */
 generation *oldest_gen  = NULL; /* oldest generation, for convenience */
 
 nursery *nurseries = NULL;     /* array of nurseries, size == n_capabilities */
+nat n_nurseries;
+volatile StgWord next_nursery = 0;
 
 #ifdef THREADED_RTS
 /*
@@ -65,6 +67,7 @@ Mutex sm_mutex;
 #endif
 
 static void allocNurseries (nat from, nat to);
+static void assignNurseriesToCapabilities (nat from, nat to);
 
 static void
 initGeneration (generation *gen, int g)
@@ -190,6 +193,7 @@ initStorage (void)
 
   N = 0;
 
+  next_nursery = 0;
   storageAddCapabilities(0, n_capabilities);
 
   IF_DEBUG(gc, statDescribeGens());
@@ -206,13 +210,22 @@ initStorage (void)
 
 void storageAddCapabilities (nat from, nat to)
 {
-    nat n, g, i;
+    nat n, g, i, new_n_nurseries;
+
+    if (RtsFlags.GcFlags.nurseryChunkSize == 0) {
+        new_n_nurseries = to;
+    } else {
+        memcount total_alloc = to * RtsFlags.GcFlags.minAllocAreaSize;
+        new_n_nurseries =
+            stg_max(to, total_alloc / RtsFlags.GcFlags.nurseryChunkSize);
+    }
 
     if (from > 0) {
-        nurseries = stgReallocBytes(nurseries, to * sizeof(struct nursery_),
+        nurseries = stgReallocBytes(nurseries,
+                                    new_n_nurseries * sizeof(struct nursery_),
                                     "storageAddCapabilities");
     } else {
-        nurseries = stgMallocBytes(to * sizeof(struct nursery_),
+        nurseries = stgMallocBytes(new_n_nurseries * sizeof(struct nursery_),
                                    "storageAddCapabilities");
     }
 
@@ -228,7 +241,15 @@ void storageAddCapabilities (nat from, nat to)
      * don't want it to be a big one.  This vague idea is borne out by
      * rigorous experimental evidence.
      */
-    allocNurseries(from, to);
+    allocNurseries(n_nurseries, new_n_nurseries);
+    n_nurseries = new_n_nurseries;
+
+    /*
+     * Assign each of the new capabilities a nursery.  Remember to start from
+     * next_nursery, because we may have already consumed some of the earlier
+     * nurseries.
+     */
+    assignNurseriesToCapabilities(from,to);
 
     // allocate a block for each mut list
     for (n = from; n < to; n++) {
@@ -525,15 +546,26 @@ allocNursery (bdescr *tail, W_ blocks)
     return &bd[0];
 }
 
+STATIC_INLINE void
+assignNurseryToCapability (Capability *cap, nat n)
+{
+    cap->r.rNursery = &nurseries[n];
+    cap->r.rCurrentNursery = nurseries[n].blocks;
+    newNurseryBlock(nurseries[n].blocks);
+    cap->r.rCurrentAlloc   = NULL;
+}
+
+/*
+ * Give each Capability a nursery from the pool. No need to do atomic increments
+ * here, everything must be stopped to call this function.
+ */
 static void
 assignNurseriesToCapabilities (nat from, nat to)
 {
     nat i;
 
     for (i = from; i < to; i++) {
-        capabilities[i]->r.rCurrentNursery = nurseries[i].blocks;
-        newNurseryBlock(nurseries[i].blocks);
-        capabilities[i]->r.rCurrentAlloc   = NULL;
+        assignNurseryToCapability(capabilities[i], next_nursery++);
     }
 }
 
@@ -541,33 +573,37 @@ static void
 allocNurseries (nat from, nat to)
 { 
     nat i;
+    memcount n_blocks;
+
+    if (RtsFlags.GcFlags.nurseryChunkSize) {
+        n_blocks = RtsFlags.GcFlags.nurseryChunkSize;
+    } else {
+        n_blocks = RtsFlags.GcFlags.minAllocAreaSize;
+    }
 
     for (i = from; i < to; i++) {
-        nurseries[i].blocks =
-            allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
-        nurseries[i].n_blocks =
-            RtsFlags.GcFlags.minAllocAreaSize;
+        nurseries[i].blocks = allocNursery(NULL, n_blocks);
+        nurseries[i].n_blocks = n_blocks;
     }
-    assignNurseriesToCapabilities(from, to);
 }
       
 void
-clearNursery (Capability *cap USED_IF_DEBUG)
-{
-#ifdef DEBUG
-    bdescr *bd;
-    for (bd = nurseries[cap->no].blocks; bd; bd = bd->link) {
-        ASSERT(bd->gen_no == 0);
-        ASSERT(bd->gen == g0);
-        IF_DEBUG(sanity, memset(bd->start, 0xaa, BLOCK_SIZE));
-    }
-#endif
-}
-
-void
 resetNurseries (void)
 {
+    next_nursery = 0;
     assignNurseriesToCapabilities(0, n_capabilities);
+
+#ifdef DEBUG
+    bdescr *bd;
+    nat n;
+    for (n = 0; n < n_nurseries; n++) {
+        for (bd = nurseries[n].blocks; bd; bd = bd->link) {
+            ASSERT(bd->gen_no == 0);
+            ASSERT(bd->gen == g0);
+            IF_DEBUG(sanity, memset(bd->start, 0xaa, BLOCK_SIZE));
+        }
+    }
+#endif
 }
 
 W_
@@ -576,7 +612,7 @@ countNurseryBlocks (void)
     nat i;
     W_ blocks = 0;
 
-    for (i = 0; i < n_capabilities; i++) {
+    for (i = 0; i < n_nurseries; i++) {
         blocks += nurseries[i].n_blocks;
     }
     return blocks;
@@ -625,13 +661,28 @@ resizeNursery (nursery *nursery, W_ blocks)
 // 
 // Resize each of the nurseries to the specified size.
 //
-void
-resizeNurseriesFixed (W_ blocks)
+static void
+resizeNurseriesEach (W_ blocks)
 {
     nat i;
-    for (i = 0; i < n_capabilities; i++) {
+
+    for (i = 0; i < n_nurseries; i++) {
         resizeNursery(&nurseries[i], blocks);
     }
+}
+
+void
+resizeNurseriesFixed (void)
+{
+    nat blocks;
+
+    if (RtsFlags.GcFlags.nurseryChunkSize) {
+        blocks = RtsFlags.GcFlags.nurseryChunkSize;
+    } else {
+        blocks = RtsFlags.GcFlags.minAllocAreaSize;
+    }
+
+    resizeNurseriesEach(blocks);
 }
 
 // 
@@ -642,9 +693,19 @@ resizeNurseries (W_ blocks)
 {
     // If there are multiple nurseries, then we just divide the number
     // of available blocks between them.
-    resizeNurseriesFixed(blocks / n_capabilities);
+    resizeNurseriesEach(blocks / n_nurseries);
 }
 
+rtsBool
+getNewNursery (Capability *cap)
+{
+    StgWord i = atomic_inc(&next_nursery, 1) - 1;
+    if (i >= n_nurseries) {
+        return rtsFalse;
+    }
+    assignNurseryToCapability(cap, i);
+    return rtsTrue;
+}
 
 /* -----------------------------------------------------------------------------
    move_STACK is called to update the TSO structure after it has been

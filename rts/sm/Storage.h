@@ -80,12 +80,14 @@ void dirty_TVAR(Capability *cap, StgTVar *p);
    -------------------------------------------------------------------------- */
 
 extern nursery *nurseries;
+extern nat n_nurseries;
 
 void     resetNurseries       ( void );
 void     clearNursery         ( Capability *cap );
 void     resizeNurseries      ( W_ blocks );
-void     resizeNurseriesFixed ( W_ blocks );
+void     resizeNurseriesFixed ( void );
 W_       countNurseryBlocks   ( void );
+rtsBool  getNewNursery        ( Capability *cap );
 
 /* -----------------------------------------------------------------------------
    Allocation accounting

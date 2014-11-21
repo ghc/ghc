@@ -1169,6 +1169,12 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
         }
     }
 
+    if (getNewNursery(cap)) {
+        debugTrace(DEBUG_sched, "thread %ld got a new nursery", t->id);
+        pushOnRunQueue(cap,t);
+        return rtsFalse;
+    }
+
     if (cap->r.rHpLim == NULL || cap->context_switch) {
         // Sometimes we miss a context switch, e.g. when calling
         // primitives in a tight loop, MAYBE_GC() doesn't check the
