@@ -297,7 +297,7 @@ tcRnModuleTcRnM hsc_env hsc_src
                          Just txt -> tcg_env { tcg_warns = WarnAll txt } 
                          Nothing  -> tcg_env 
             } ;
- 
+
         setGblEnv tcg_env1 $ do {
 
                 -- Load the hi-boot interface for this module, if any
@@ -310,13 +310,18 @@ tcRnModuleTcRnM hsc_env hsc_src
                 -- look for a hi-boot file
         boot_iface <- tcHiBootIface hsc_src this_mod ;
 
+        let { exports_occs =
+                 maybe emptyBag (listToBag . map (rdrNameOcc . ieName . unLoc))
+                       export_ies
+            } ;
+
                 -- Rename and type check the declarations
         traceRn (text "rn1a") ;
         tcg_env <- if isHsBootOrSig hsc_src then
                         tcRnHsBootDecls hsc_src local_decls
                    else
                         {-# SCC "tcRnSrcDecls" #-}
-                        tcRnSrcDecls boot_iface local_decls ;
+                        tcRnSrcDecls boot_iface exports_occs local_decls ;
         setGblEnv tcg_env               $ do {
 
                 -- Process the export list
@@ -450,10 +455,10 @@ tcRnImports hsc_env import_decls
 %************************************************************************
 
 \begin{code}
-tcRnSrcDecls :: ModDetails -> [LHsDecl RdrName] -> TcM TcGblEnv
+tcRnSrcDecls :: ModDetails -> Bag OccName -> [LHsDecl RdrName] -> TcM TcGblEnv
         -- Returns the variables free in the decls
         -- Reason: solely to report unused imports and bindings
-tcRnSrcDecls boot_iface decls
+tcRnSrcDecls boot_iface exports decls
  = do {         -- Do all the declarations
         ((tcg_env, tcl_env), lie) <- captureConstraints $ tc_rn_src_decls boot_iface decls ;
       ; traceTc "Tc8" empty ;
@@ -497,7 +502,8 @@ tcRnSrcDecls boot_iface decls
 
         (bind_ids, ev_binds', binds', fords', imp_specs', rules', vects')
             <- {-# SCC "zonkTopDecls" #-}
-               zonkTopDecls all_ev_binds binds sig_ns rules vects imp_specs fords ;
+               zonkTopDecls all_ev_binds binds exports sig_ns rules vects
+                            imp_specs fords ;
 
         let { final_type_env = extendTypeEnvWithIds type_env bind_ids
             ; tcg_env' = tcg_env { tcg_binds    = binds',
@@ -1837,7 +1843,8 @@ tcRnDeclsi hsc_env local_decls =
         all_ev_binds = cur_ev_binds `unionBags` new_ev_binds
 
     (bind_ids, ev_binds', binds', fords', imp_specs', rules', vects')
-        <- zonkTopDecls all_ev_binds binds sig_ns rules vects imp_specs fords
+        <- zonkTopDecls all_ev_binds binds emptyBag sig_ns rules vects
+                        imp_specs fords
 
     let --global_ids = map globaliseAndTidyId bind_ids
         final_type_env = extendTypeEnvWithIds type_env bind_ids --global_ids

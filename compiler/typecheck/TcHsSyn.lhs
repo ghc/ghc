@@ -300,7 +300,7 @@ zonkTopLExpr :: LHsExpr TcId -> TcM (LHsExpr Id)
 zonkTopLExpr e = zonkLExpr emptyZonkEnv e
 
 zonkTopDecls :: Bag EvBind
-             -> LHsBinds TcId -> NameSet
+             -> LHsBinds TcId -> Bag OccName -> NameSet
              -> [LRuleDecl TcId] -> [LVectDecl TcId] -> [LTcSpecPrag] -> [LForeignDecl TcId]
              -> TcM ([Id],
                      Bag EvBind,
@@ -309,14 +309,17 @@ zonkTopDecls :: Bag EvBind
                      [LTcSpecPrag],
                      [LRuleDecl    Id],
                      [LVectDecl    Id])
-zonkTopDecls ev_binds binds sig_ns rules vects imp_specs fords
+zonkTopDecls ev_binds binds exports sig_ns rules vects imp_specs fords
   = do  { (env1, ev_binds') <- zonkEvBinds emptyZonkEnv ev_binds
 
          -- Warn about missing signatures
          -- Do this only when we we have a type to offer
         ; warn_missing_sigs <- woptM Opt_WarnMissingSigs
-        ; let sig_warn | warn_missing_sigs = topSigWarn sig_ns
-                       | otherwise         = noSigWarn
+        ; warn_only_exported <- woptM Opt_WarnMissingExportedSigs
+        ; let sig_warn
+                | warn_only_exported = topSigWarnIfExported exports sig_ns
+                | warn_missing_sigs  = topSigWarn sig_ns
+                | otherwise          = noSigWarn
 
         ; (env2, binds') <- zonkRecMonoBinds env1 sig_warn binds
                         -- Top level is implicitly recursive
@@ -376,6 +379,17 @@ type SigWarn = Bool -> [Id] -> TcM ()
 
 noSigWarn :: SigWarn
 noSigWarn _ _ = return ()
+
+topSigWarnIfExported :: Bag OccName -> NameSet -> SigWarn
+topSigWarnIfExported exported sig_ns _ ids
+  = mapM_ (topSigWarnIdIfExported exported sig_ns) ids
+
+topSigWarnIdIfExported :: Bag OccName -> NameSet -> Id -> TcM ()
+topSigWarnIdIfExported exported sig_ns id
+  | getOccName id `elemBag` exported
+  = topSigWarnId sig_ns id
+  | otherwise
+  = return ()
 
 topSigWarn :: NameSet -> SigWarn
 topSigWarn sig_ns _ ids = mapM_ (topSigWarnId sig_ns) ids

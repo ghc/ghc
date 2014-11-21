@@ -1470,6 +1470,13 @@
           </row>
 
           <row>
+            <entry><option>-fwarn-missing-exported-sigs</option></entry>
+            <entry>warn about top-level functions without signatures, only if they are exported. takes precedence over -fwarn-missing-signatures</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-missing-exported-sigs</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fwarn-missing-local-sigs</option></entry>
             <entry>warn about polymorphic local bindings without signatures</entry>
             <entry>dynamic</entry>

@@ -1611,6 +1611,21 @@ module M where
       </varlistentry>
 
       <varlistentry>
+        <term><option>-fwarn-missing-exported-sigs</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-missing-exported-sigs</option></primary></indexterm>
+          <indexterm><primary>type signatures, missing</primary></indexterm>
+
+          <para>If you would like GHC to check that every exported top-level
+          function/value has a type signature, but not check unexported values, use the
+          <option>-fwarn-missing-exported-sigs</option> option.  This option
+          takes precedence over <option>-fwarn-missing-signatures</option>.
+          As part of the warning GHC also reports the inferred type.  The
+          option is off by default.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
         <term><option>-fwarn-missing-local-sigs</option>:</term>
         <listitem>
           <indexterm><primary><option>-fwarn-missing-local-sigs</option></primary></indexterm>

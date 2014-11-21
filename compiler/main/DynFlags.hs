@@ -488,6 +488,7 @@ data WarningFlag =
    | Opt_WarnUnsupportedLlvmVersion
    | Opt_WarnInlineRuleShadowing
    | Opt_WarnTypedHoles
+   | Opt_WarnMissingExportedSigs
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -2664,6 +2665,7 @@ fWarningFlags = [
   ( "warn-missing-local-sigs",          Opt_WarnMissingLocalSigs, nop ),
   ( "warn-missing-methods",             Opt_WarnMissingMethods, nop ),
   ( "warn-missing-signatures",          Opt_WarnMissingSigs, nop ),
+  ( "warn-missing-exported-sigs",       Opt_WarnMissingExportedSigs, nop ),
   ( "warn-monomorphism-restriction",    Opt_WarnMonomorphism, nop ),
   ( "warn-name-shadowing",              Opt_WarnNameShadowing, nop ),
   ( "warn-orphans",                     Opt_WarnOrphans, nop ),
