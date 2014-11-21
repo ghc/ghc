@@ -175,7 +175,7 @@ cvtDec (TH.InfixD fx nm)
   -- the RdrName says it's a variable or a constructor. So, just assume
   -- it's a variable or constructor and proceed.
   = do { nm' <- vcNameL nm
-       ; returnJustL (Hs.SigD (FixSig (FixitySig nm' (cvtFixity fx)))) }
+       ; returnJustL (Hs.SigD (FixSig (FixitySig [nm'] (cvtFixity fx)))) }
 
 cvtDec (PragmaD prag)
   = cvtPragmaD prag
@@ -207,7 +207,8 @@ cvtDec (NewtypeD ctxt tc tvs constr derivs)
         ; let defn = HsDataDefn { dd_ND = NewType, dd_cType = Nothing
                                 , dd_ctxt = ctxt'
                                 , dd_kindSig = Nothing
-                                , dd_cons = [con'], dd_derivs = derivs' }
+                                , dd_cons = [con']
+                                , dd_derivs = derivs' }
         ; returnJustL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
                                     , tcdDataDefn = defn
                                     , tcdFVs = placeHolderNames }) }
@@ -415,7 +416,8 @@ cvtConstr (RecC c varstrtys)
   = do  { c'    <- cNameL c
         ; cxt'  <- returnL []
         ; args' <- mapM cvt_id_arg varstrtys
-        ; returnL $ mkSimpleConDecl c' noExistentials cxt' (RecCon args') }
+        ; returnL $ mkSimpleConDecl c' noExistentials cxt'
+                                   (RecCon args') }
 
 cvtConstr (InfixC st1 c st2)
   = do  { c' <- cNameL c
@@ -436,16 +438,18 @@ cvt_arg (NotStrict, ty) = cvtType ty
 cvt_arg (IsStrict,  ty) = do { ty' <- cvtType ty; returnL $ HsBangTy (HsUserBang Nothing     True) ty' }
 cvt_arg (Unpacked,  ty) = do { ty' <- cvtType ty; returnL $ HsBangTy (HsUserBang (Just True) True) ty' }
 
-cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (ConDeclField RdrName)
+cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (LConDeclField RdrName)
 cvt_id_arg (i, str, ty)
   = do  { i' <- vNameL i
         ; ty' <- cvt_arg (str,ty)
-        ; return (ConDeclField { cd_fld_name = i', cd_fld_type =  ty', cd_fld_doc = Nothing}) }
+        ; return $ noLoc (ConDeclField { cd_fld_names = [i']
+                                       , cd_fld_type =  ty'
+                                       , cd_fld_doc = Nothing}) }
 
-cvtDerivs :: [TH.Name] -> CvtM (Maybe [LHsType RdrName])
+cvtDerivs :: [TH.Name] -> CvtM (Maybe (Located [LHsType RdrName]))
 cvtDerivs [] = return Nothing
 cvtDerivs cs = do { cs' <- mapM cvt_one cs
-                  ; return (Just cs') }
+                  ; return (Just (noLoc cs')) }
         where
           cvt_one c = do { c' <- tconName c
                          ; returnL $ HsTyVar c' }
@@ -462,8 +466,9 @@ noExistentials = []
 
 cvtForD :: Foreign -> CvtM (ForeignDecl RdrName)
 cvtForD (ImportF callconv safety from nm ty)
-  | Just impspec <- parseCImport (cvt_conv callconv) safety'
-                                 (mkFastString (TH.nameBase nm)) from
+  | Just impspec <- parseCImport (noLoc (cvt_conv callconv)) (noLoc safety')
+                                 (mkFastString (TH.nameBase nm))
+                                 from (noLoc (mkFastString from))
   = do { nm' <- vNameL nm
        ; ty' <- cvtType ty
        ; return (ForeignImport nm' ty' noForeignImportCoercionYet impspec)
@@ -479,7 +484,9 @@ cvtForD (ImportF callconv safety from nm ty)
 cvtForD (ExportF callconv as nm ty)
   = do  { nm' <- vNameL nm
         ; ty' <- cvtType ty
-        ; let e = CExport (CExportStatic (mkFastString as) (cvt_conv callconv))
+        ; let e = CExport (noLoc (CExportStatic (mkFastString as)
+                                                (cvt_conv callconv)))
+                                                (noLoc (mkFastString as))
         ; return $ ForeignExport nm' ty' noForeignExportCoercionYet e }
 
 cvt_conv :: TH.Callconv -> CCallConv
@@ -513,7 +520,7 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
                                , inl_rule   = Hs.FunLike
                                , inl_act    = cvtPhases phases dflt
                                , inl_sat    = Nothing }
-       ; returnJustL $ Hs.SigD $ SpecSig nm' ty' ip }
+       ; returnJustL $ Hs.SigD $ SpecSig nm' [ty'] ip }
 
 cvtPragmaD (SpecialiseInstP ty)
   = do { ty' <- cvtType ty
@@ -525,7 +532,7 @@ cvtPragmaD (RuleP nm bndrs lhs rhs phases)
        ; bndrs' <- mapM cvtRuleBndr bndrs
        ; lhs'   <- cvtl lhs
        ; rhs'   <- cvtl rhs
-       ; returnJustL $ Hs.RuleD $ HsRule nm' act bndrs'
+       ; returnJustL $ Hs.RuleD $ HsRule (noLoc nm') act bndrs'
                                      lhs' placeHolderNames
                                      rhs' placeHolderNames
        }
@@ -566,14 +573,14 @@ cvtPhases AllPhases       dflt = dflt
 cvtPhases (FromPhase i)   _    = ActiveAfter i
 cvtPhases (BeforePhase i) _    = ActiveBefore i
 
-cvtRuleBndr :: TH.RuleBndr -> CvtM (Hs.RuleBndr RdrName)
+cvtRuleBndr :: TH.RuleBndr -> CvtM (Hs.LRuleBndr RdrName)
 cvtRuleBndr (RuleVar n)
   = do { n' <- vNameL n
-       ; return $ Hs.RuleBndr n' }
+       ; return $ noLoc $ Hs.RuleBndr n' }
 cvtRuleBndr (TypedRuleVar n ty)
   = do { n'  <- vNameL n
        ; ty' <- cvtType ty
-       ; return $ Hs.RuleBndrSig n' $ mkHsWithBndrs ty' }
+       ; return $ noLoc $ Hs.RuleBndrSig n' $ mkHsWithBndrs ty' }
 
 ---------------------------------------------------
 --              Declarations
@@ -621,8 +628,12 @@ cvtl e = wrapL (cvt e)
     cvt (TupE [e])     = do { e' <- cvtl e; return $ HsPar e' }
                                  -- Note [Dropping constructors]
                                  -- Singleton tuples treated like nothing (just parens)
-    cvt (TupE es)      = do { es' <- mapM cvtl es; return $ ExplicitTuple (map Present es') Boxed }
-    cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es; return $ ExplicitTuple (map Present es') Unboxed }
+    cvt (TupE es)      = do { es' <- mapM cvtl es
+                            ; return $ ExplicitTuple (map (noLoc . Present) es')
+                                                      Boxed }
+    cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es
+                                   ; return $ ExplicitTuple
+                                           (map (noLoc . Present) es') Unboxed }
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
                             ; return $ HsIf (Just noSyntaxExpr) x' y' z' }
     cvt (MultiIfE alts)
@@ -693,10 +704,11 @@ and the above expression would be reassociated to
 which we don't want.
 -}
 
-cvtFld :: (TH.Name, TH.Exp) -> CvtM (HsRecField RdrName (LHsExpr RdrName))
+cvtFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecField RdrName (LHsExpr RdrName))
 cvtFld (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
-        ; return (HsRecField { hsRecFieldId = v', hsRecFieldArg = e', hsRecPun = False}) }
+        ; return (noLoc $ HsRecField { hsRecFieldId = v', hsRecFieldArg = e'
+                                     , hsRecPun = False}) }
 
 cvtDD :: Range -> CvtM (ArithSeqInfo RdrName)
 cvtDD (FromR x)           = do { x' <- cvtl x; return $ From x' }
@@ -906,10 +918,11 @@ cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
                             ; return $ ViewPat e' p' placeHolderType }
 
-cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (HsRecField RdrName (LPat RdrName))
+cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
   = do  { s' <- vNameL s; p' <- cvtPat p
-        ; return (HsRecField { hsRecFieldId = s', hsRecFieldArg = p', hsRecPun = False}) }
+        ; return (noLoc $ HsRecField { hsRecFieldId = s', hsRecFieldArg = p'
+                                     , hsRecPun = False}) }
 
 {- | @cvtOpAppP x op y@ converts @op@ and @y@ and produces the operator application @x `op` y@.
 The produced tree of infix patterns will be left-biased, provided @x@ is.

@@ -651,8 +651,10 @@ zonkExpr env (ExplicitTuple tup_args boxed)
   = do { new_tup_args <- mapM zonk_tup_arg tup_args
        ; return (ExplicitTuple new_tup_args boxed) }
   where
-    zonk_tup_arg (Present e) = do { e' <- zonkLExpr env e; return (Present e') }
-    zonk_tup_arg (Missing t) = do { t' <- zonkTcTypeToType env t; return (Missing t') }
+    zonk_tup_arg (L l (Present e)) = do { e' <- zonkLExpr env e
+                                        ; return (L l (Present e')) }
+    zonk_tup_arg (L l (Missing t)) = do { t' <- zonkTcTypeToType env t
+                                        ; return (L l (Missing t')) }
 
 zonkExpr env (HsCase expr ms)
   = do new_expr <- zonkLExpr env expr
@@ -980,10 +982,11 @@ zonkRecFields env (HsRecFields flds dd)
   = do  { flds' <- mapM zonk_rbind flds
         ; return (HsRecFields flds' dd) }
   where
-    zonk_rbind fld
+    zonk_rbind (L l fld)
       = do { new_id   <- wrapLocM (zonkIdBndr env) (hsRecFieldId fld)
            ; new_expr <- zonkLExpr env (hsRecFieldArg fld)
-           ; return (fld { hsRecFieldId = new_id, hsRecFieldArg = new_expr }) }
+           ; return (L l (fld { hsRecFieldId = new_id
+                              , hsRecFieldArg = new_expr })) }
 
 -------------------------------------------------------------------------
 mapIPNameTc :: (a -> TcM b) -> Either HsIPName a -> TcM (Either HsIPName b)
@@ -1123,8 +1126,9 @@ zonkConStuff env (InfixCon p1 p2)
         ; return (env', InfixCon p1' p2') }
 
 zonkConStuff env (RecCon (HsRecFields rpats dd))
-  = do  { (env', pats') <- zonkPats env (map hsRecFieldArg rpats)
-        ; let rpats' = zipWith (\rp p' -> rp { hsRecFieldArg = p' }) rpats pats'
+  = do  { (env', pats') <- zonkPats env (map (hsRecFieldArg . unLoc) rpats)
+        ; let rpats' = zipWith (\(L l rp) p' -> L l (rp { hsRecFieldArg = p' }))
+                               rpats pats'
         ; return (env', RecCon (HsRecFields rpats' dd)) }
         -- Field selectors have declared types; hence no zonking
 
@@ -1171,18 +1175,18 @@ zonkRule env (HsRule name act (vars{-::[RuleBndr TcId]-}) lhs fv_lhs rhs fv_rhs)
 
        ; unbound_tkvs <- readMutVar unbound_tkv_set
 
-       ; let final_bndrs :: [RuleBndr Var]
-             final_bndrs = map (RuleBndr . noLoc)
+       ; let final_bndrs :: [LRuleBndr Var]
+             final_bndrs = map (noLoc . RuleBndr . noLoc)
                                (varSetElemsKvsFirst unbound_tkvs)
                            ++ new_bndrs
 
        ; return $
          HsRule name act final_bndrs new_lhs fv_lhs new_rhs fv_rhs }
   where
-   zonk_bndr env (RuleBndr (L loc v))
+   zonk_bndr env (L l (RuleBndr (L loc v)))
       = do { (env', v') <- zonk_it env v
-           ; return (env', RuleBndr (L loc v')) }
-   zonk_bndr _ (RuleBndrSig {}) = panic "zonk_bndr RuleBndrSig"
+           ; return (env', L l (RuleBndr (L loc v'))) }
+   zonk_bndr _ (L _ (RuleBndrSig {})) = panic "zonk_bndr RuleBndrSig"
 
    zonk_it env v
      | isId v     = do { v' <- zonkIdBndr env v

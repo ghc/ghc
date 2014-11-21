@@ -416,7 +416,7 @@ types on the tuple.
 mkLHsTupleExpr :: [LHsExpr a] -> LHsExpr a
 -- Makes a pre-typechecker boxed tuple, deals with 1 case
 mkLHsTupleExpr [e] = e
-mkLHsTupleExpr es  = noLoc $ ExplicitTuple (map Present es) Boxed
+mkLHsTupleExpr es  = noLoc $ ExplicitTuple (map (noLoc . Present) es) Boxed
 
 mkLHsVarTuple :: [a] -> LHsExpr a
 mkLHsVarTuple ids  = mkLHsTupleExpr (map nlHsVar ids)
@@ -792,7 +792,8 @@ hsDataFamInstBinders (DataFamInstDecl { dfid_defn = defn })
 -------------------
 -- the SrcLoc returned are for the whole declarations, not just the names
 hsDataDefnBinders :: Eq name => HsDataDefn name -> [Located name]
-hsDataDefnBinders (HsDataDefn { dd_cons = cons }) = hsConDeclsBinders cons
+hsDataDefnBinders (HsDataDefn { dd_cons = cons })
+  = hsConDeclsBinders cons
   -- See Note [Binders in family instances]
 
 -------------------
@@ -809,12 +810,12 @@ hsConDeclsBinders cons = go id cons
           case r of
              -- remove only the first occurrence of any seen field in order to
              -- avoid circumventing detection of duplicate fields (#9156)
-             L loc (ConDecl { con_name = L _ name , con_details = RecCon flds }) ->
-               (L loc name) : r' ++ go remSeen' rs
-                  where r' = remSeen (map cd_fld_name flds)
+             L loc (ConDecl { con_names = names, con_details = RecCon flds }) ->
+               (map (L loc . unLoc) names) ++ r' ++ go remSeen' rs
+                  where r' = remSeen (concatMap (cd_fld_names . unLoc) flds)
                         remSeen' = foldr (.) remSeen [deleteBy ((==) `on` unLoc) v | v <- r']
-             L loc (ConDecl { con_name = L _ name }) ->
-                (L loc name) : go remSeen rs
+             L loc (ConDecl { con_names = names }) ->
+                (map (L loc . unLoc) names) ++ go remSeen rs
 
 \end{code}
 
@@ -898,7 +899,8 @@ lPatImplicits = hs_lpat
     details (RecCon fs)      = hs_lpats explicit `unionNameSets` mkNameSet (collectPatsBinders implicit)
       where (explicit, implicit) = partitionEithers [if pat_explicit then Left pat else Right pat
                                                     | (i, fld) <- [0..] `zip` rec_flds fs
-                                                    , let pat = hsRecFieldArg fld
+                                                    , let pat = hsRecFieldArg
+                                                                     (unLoc fld)
                                                           pat_explicit = maybe True (i<) (rec_dotdot fs)]
     details (InfixCon p1 p2) = hs_lpat p1 `unionNameSets` hs_lpat p2
 \end{code}

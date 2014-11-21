@@ -298,12 +298,12 @@ dsExpr (SectionR op expr) = do
             Lam x_id (mkCoreAppsDs core_op [Var x_id, Var y_id]))
 
 dsExpr (ExplicitTuple tup_args boxity)
-  = do { let go (lam_vars, args) (Missing ty)
+  = do { let go (lam_vars, args) (L _ (Missing ty))
                     -- For every missing expression, we need
                     -- another lambda in the desugaring.
                = do { lam_var <- newSysLocalDs ty
                     ; return (lam_var : lam_vars, Var lam_var : args) }
-             go (lam_vars, args) (Present expr)
+             go (lam_vars, args) (L _ (Present expr))
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExpr expr
@@ -515,15 +515,15 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }
   where
-    ds_field :: HsRecField Id (LHsExpr Id) -> DsM (Name, Id, CoreExpr)
+    ds_field :: LHsRecField Id (LHsExpr Id) -> DsM (Name, Id, CoreExpr)
       -- Clone the Id in the HsRecField, because its Name is that
       -- of the record selector, and we must not make that a lcoal binder
       -- else we shadow other uses of the record selector
       -- Hence 'lcl_id'.  Cf Trac #2735
-    ds_field rec_field = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
-                            ; let fld_id = unLoc (hsRecFieldId rec_field)
-                            ; lcl_id <- newSysLocalDs (idType fld_id)
-                            ; return (idName fld_id, lcl_id, rhs) }
+    ds_field (L _ rec_field) = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
+                                  ; let fld_id = unLoc (hsRecFieldId rec_field)
+                                  ; lcl_id <- newSysLocalDs (idType fld_id)
+                                  ; return (idName fld_id, lcl_id, rhs) }
 
     add_field_binds [] expr = expr
     add_field_binds ((_,b,r):bs) expr = bindNonRec b r (add_field_binds bs expr)
@@ -633,9 +633,9 @@ dsExpr (HsType        {})  = panic "dsExpr:HsType"
 dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
 
 
-findField :: [HsRecField Id arg] -> Name -> [arg]
+findField :: [LHsRecField Id arg] -> Name -> [arg]
 findField rbinds lbl 
-  = [rhs | HsRecField { hsRecFieldId = id, hsRecFieldArg = rhs } <- rbinds 
+  = [rhs | L _ (HsRecField { hsRecFieldId = id, hsRecFieldArg = rhs }) <- rbinds
          , lbl == idName (unLoc id) ]
 \end{code}
 

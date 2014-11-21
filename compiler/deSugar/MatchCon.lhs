@@ -187,8 +187,8 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
       = arg_vars
       where
         fld_var_env = mkNameEnv $ zipEqual "get_arg_vars" fields1 arg_vars
-        lookup_fld rpat = lookupNameEnv_NF fld_var_env
-                                           (idName (unLoc (hsRecFieldId rpat)))
+        lookup_fld (L _ rpat) = lookupNameEnv_NF fld_var_env
+                                            (idName (unLoc (hsRecFieldId rpat)))
     select_arg_vars _ [] = panic "matchOneCon/select_arg_vars []"
 matchOneConLike _ _ [] = panic "matchOneCon []"
 
@@ -203,7 +203,8 @@ compatible_pats _                 _                 = True -- Prefix or infix co
 
 same_fields :: HsRecFields Id (LPat Id) -> HsRecFields Id (LPat Id) -> Bool
 same_fields flds1 flds2
-  = all2 (\f1 f2 -> unLoc (hsRecFieldId f1) == unLoc (hsRecFieldId f2))
+  = all2 (\(L _ f1) (L _ f2)
+                          -> unLoc (hsRecFieldId f1) == unLoc (hsRecFieldId f2))
          (rec_flds flds1) (rec_flds flds2)
 
 
@@ -224,7 +225,7 @@ conArgPats  arg_tys (RecCon (HsRecFields { rec_flds = rpats }))
   | null rpats = map WildPat arg_tys
         -- Important special case for C {}, which can be used for a
         -- datacon that isn't declared to have fields at all
-  | otherwise  = map (unLoc . hsRecFieldArg) rpats
+  | otherwise  = map (unLoc . hsRecFieldArg . unLoc) rpats
 \end{code}
 
 Note [Record patterns]

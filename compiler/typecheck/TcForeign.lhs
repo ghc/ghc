@@ -263,16 +263,16 @@ tcFImport d = pprPanic "tcFImport" (ppr d)
 \begin{code}
 tcCheckFIType :: [Type] -> Type -> ForeignImport -> TcM ForeignImport
 
-tcCheckFIType arg_tys res_ty (CImport cconv safety mh l@(CLabel _))
+tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh l@(CLabel _) src)
   -- Foreign import label
   = do checkCg checkCOrAsmOrLlvmOrInterp
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
        check (isFFILabelTy (mkFunTys arg_tys res_ty)) (illegalForeignTyErr Outputable.empty)
        cconv' <- checkCConv cconv
-       return (CImport cconv' safety mh l)
+       return (CImport (L lc cconv') safety mh l src)
 
-tcCheckFIType arg_tys res_ty (CImport cconv safety mh CWrapper) = do
+tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh CWrapper src) = do
         -- Foreign wrapper (former f.e.d.)
         -- The type must be of the form ft -> IO (FunPtr ft), where ft is a valid
         -- foreign type.  For legacy reasons ft -> IO (Ptr ft) is accepted, too.
@@ -286,9 +286,10 @@ tcCheckFIType arg_tys res_ty (CImport cconv safety mh CWrapper) = do
                   where
                      (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         _ -> addErrTc (illegalForeignTyErr Outputable.empty (ptext (sLit "One argument expected")))
-    return (CImport cconv' safety mh CWrapper)
+    return (CImport (L lc cconv') safety mh CWrapper src)
 
-tcCheckFIType arg_tys res_ty idecl@(CImport cconv safety mh (CFunction target))
+tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
+                                            (CFunction target) src)
   | isDynamicTarget target = do -- Foreign import dynamic
       checkCg checkCOrAsmOrLlvmOrInterp
       cconv' <- checkCConv cconv
@@ -302,7 +303,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport cconv safety mh (CFunction target))
                 (illegalForeignTyErr argument)
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
           checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
-      return $ CImport cconv' safety mh (CFunction target)
+      return $ CImport (L lc cconv') (L ls safety) mh (CFunction target) src
   | cconv == PrimCallConv = do
       dflags <- getDynFlags
       checkTc (xopt Opt_GHCForeignImportPrim dflags)
@@ -328,7 +329,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport cconv safety mh (CFunction target))
            | not (null arg_tys) ->
               addErrTc (text "`value' imports cannot have function types")
           _ -> return ()
-      return $ CImport cconv' safety mh (CFunction target)
+      return $ CImport (L lc cconv') (L ls safety) mh (CFunction target) src
 
 
 -- This makes a convenient place to check
@@ -402,13 +403,13 @@ tcFExport d = pprPanic "tcFExport" (ppr d)
 
 \begin{code}
 tcCheckFEType :: Type -> ForeignExport -> TcM ForeignExport
-tcCheckFEType sig_ty (CExport (CExportStatic str cconv)) = do
+tcCheckFEType sig_ty (CExport (L l (CExportStatic str cconv)) src) = do
     checkCg checkCOrAsmOrLlvm
     checkTc (isCLabelString str) (badCName str)
     cconv' <- checkCConv cconv
     checkForeignArgs isFFIExternalTy arg_tys
     checkForeignRes nonIOok noCheckSafe isFFIExportResultTy res_ty
-    return (CExport (CExportStatic str cconv'))
+    return (CExport (L l (CExportStatic str cconv')) src)
   where
       -- Drop the foralls before inspecting n
       -- the structure of the foreign type.

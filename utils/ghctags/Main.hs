@@ -307,7 +307,7 @@ boundThings modname lbinding =
                _ -> error "boundThings"
         conArgs (PrefixCon ps) tl = foldr patThings tl ps
         conArgs (RecCon (HsRecFields { rec_flds = flds })) tl
-             = foldr (\f tl' -> patThings (hsRecFieldArg f) tl') tl flds
+             = foldr (\(L _ f) tl' -> patThings (hsRecFieldArg f) tl') tl flds
         conArgs (InfixCon p1 p2) tl = patThings p1 $ patThings p2 tl
 
 

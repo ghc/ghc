@@ -110,13 +110,11 @@ data R
   =  This is the 'C1' record constructor, with the following fields:
     C1 {p :: Int  This comment applies to the 'p' field,
         q :: forall a. a -> a  This comment applies to the 'q' field,
-        r :: Int  This comment applies to both 'r' and 's',
-        s :: Int  This comment applies to both 'r' and 's'} |
+        r, s :: Int  This comment applies to both 'r' and 's'} |
      This is the 'C2' record constructor, also with some fields:
     C2 {t :: T1
              -> (T2 Int Int) -> (T3 Bool Bool) -> (T4 Float Float) -> T5 () (),
-        u :: Int,
-        v :: Int}
+        u, v :: Int}
 <document comment>
 data R1
   =  This is the 'C3' record constructor

@@ -166,8 +166,9 @@ untidy_con :: HsConPatDetails Name -> HsConPatDetails Name
 untidy_con (PrefixCon pats) = PrefixCon (map untidy_pars pats)
 untidy_con (InfixCon p1 p2) = InfixCon  (untidy_pars p1) (untidy_pars p2)
 untidy_con (RecCon (HsRecFields flds dd))
-  = RecCon (HsRecFields [ fld { hsRecFieldArg = untidy_pars (hsRecFieldArg fld) }
-                        | fld <- flds ] dd)
+  = RecCon (HsRecFields [ L l (fld { hsRecFieldArg
+                                            = untidy_pars (hsRecFieldArg fld) })
+                        | L l fld <- flds ] dd)
 
 pars :: NeedPars -> WarningPat -> Pat Name
 pars True p = ParPat p
@@ -765,7 +766,8 @@ tidy_con con (RecCon (HsRecFields fs _))
     field_pats = case con of
         RealDataCon dc -> map (\ f -> (f, nlWildPatId)) (dataConFieldLabels dc)
         PatSynCon{}    -> panic "Check.tidy_con: pattern synonym with record syntax"
-    all_pats = foldr (\(HsRecField id p _) acc -> insertNm (getName (unLoc id)) p acc)
+    all_pats = foldr (\(L _ (HsRecField id p _)) acc
+                                         -> insertNm (getName (unLoc id)) p acc)
                      field_pats fs
 
     insertNm nm p [] = [(nm,p)]

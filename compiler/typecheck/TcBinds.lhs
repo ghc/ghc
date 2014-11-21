@@ -824,7 +824,8 @@ tcSpecPrags :: Id -> [LSig Name]
 tcSpecPrags poly_id prag_sigs
   = do { traceTc "tcSpecPrags" (ppr poly_id <+> ppr spec_sigs)
        ; unless (null bad_sigs) warn_discarded_sigs
-       ; mapAndRecoverM (wrapLocM (tcSpec poly_id)) spec_sigs }
+       ; pss <- mapAndRecoverM (wrapLocM (tcSpec poly_id)) spec_sigs
+       ; return $ concatMap (\(L l ps) -> map (L l) ps) pss }
   where
     spec_sigs = filter isSpecLSig prag_sigs
     bad_sigs  = filter is_bad_sig prag_sigs
@@ -835,21 +836,21 @@ tcSpecPrags poly_id prag_sigs
 
 
 --------------
-tcSpec :: TcId -> Sig Name -> TcM TcSpecPrag
-tcSpec poly_id prag@(SpecSig fun_name hs_ty inl)
+tcSpec :: TcId -> Sig Name -> TcM [TcSpecPrag]
+tcSpec poly_id prag@(SpecSig fun_name hs_tys inl)
   -- The Name fun_name in the SpecSig may not be the same as that of the poly_id
   -- Example: SPECIALISE for a class method: the Name in the SpecSig is
   --          for the selector Id, but the poly_id is something like $cop
   -- However we want to use fun_name in the error message, since that is
   -- what the user wrote (Trac #8537)
   = addErrCtxt (spec_ctxt prag) $
-    do  { spec_ty <- tcHsSigType sig_ctxt hs_ty
+    do  { spec_tys <- mapM (tcHsSigType sig_ctxt) hs_tys
         ; warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl))
                  (ptext (sLit "SPECIALISE pragma for non-overloaded function")
                   <+> quotes (ppr fun_name))
                   -- Note [SPECIALISE pragmas]
-        ; wrap <- tcSubType origin sig_ctxt (idType poly_id) spec_ty
-        ; return (SpecPrag poly_id wrap inl) }
+        ; wraps <- mapM (tcSubType origin sig_ctxt (idType poly_id)) spec_tys
+        ; return [ (SpecPrag poly_id wrap inl) | wrap <- wraps ] }
   where
     name      = idName poly_id
     poly_ty   = idType poly_id
@@ -867,10 +868,12 @@ tcImpPrags prags
        ; dflags <- getDynFlags
        ; if (not_specialising dflags) then
             return []
-         else
-            mapAndRecoverM (wrapLocM tcImpSpec)
-            [L loc (name,prag) | (L loc prag@(SpecSig (L _ name) _ _)) <- prags
-                               , not (nameIsLocalOrFrom this_mod name) ] }
+         else do
+            { pss <- mapAndRecoverM (wrapLocM tcImpSpec)
+                     [L loc (name,prag)
+                               | (L loc prag@(SpecSig (L _ name) _ _)) <- prags
+                               , not (nameIsLocalOrFrom this_mod name) ]
+            ; return $ concatMap (\(L l ps) -> map (L l) ps) pss } }
   where
     -- Ignore SPECIALISE pragmas for imported things
     -- when we aren't specialising, or when we aren't generating
@@ -883,7 +886,7 @@ tcImpPrags prags
                       HscInterpreted -> True
                       _other         -> False
 
-tcImpSpec :: (Name, Sig Name) -> TcM TcSpecPrag
+tcImpSpec :: (Name, Sig Name) -> TcM [TcSpecPrag]
 tcImpSpec (name, prag)
  = do { id <- tcLookupId name
       ; unless (isAnyInlinePragma (idInlinePragma id))

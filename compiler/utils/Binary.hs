@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 {-# OPTIONS_GHC -O -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
@@ -67,6 +69,7 @@ import UniqFM
 import FastMutInt
 import Fingerprint
 import BasicTypes
+import SrcLoc
 
 import Foreign
 import Data.Array
@@ -892,3 +895,38 @@ instance Binary WarningTxt where
               _ -> do d <- get bh
                       return (DeprecatedTxt d)
 
+instance Binary a => Binary (GenLocated SrcSpan a) where
+    put_ bh (L l x) = do
+            put_ bh l
+            put_ bh x
+
+    get bh = do
+            l <- get bh
+            x <- get bh
+            return (L l x)
+
+instance Binary SrcSpan where
+  put_ bh (RealSrcSpan ss) = do
+          putByte bh 0
+          put_ bh (srcSpanFile ss)
+          put_ bh (srcSpanStartLine ss)
+          put_ bh (srcSpanStartCol ss)
+          put_ bh (srcSpanEndLine ss)
+          put_ bh (srcSpanEndCol ss)
+
+  put_ bh (UnhelpfulSpan s) = do
+          putByte bh 1
+          put_ bh s
+
+  get bh = do
+          h <- getByte bh
+          case h of
+            0 -> do f <- get bh
+                    sl <- get bh
+                    sc <- get bh
+                    el <- get bh
+                    ec <- get bh
+                    return (mkSrcSpan (mkSrcLoc f sl sc)
+                                      (mkSrcLoc f el ec))
+            _ -> do s <- get bh
+                    return (UnhelpfulSpan s)

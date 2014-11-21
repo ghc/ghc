@@ -81,7 +81,8 @@ getImports dflags buf filename source_filename = do
                                        ord_idecls
 
                 implicit_prelude = xopt Opt_ImplicitPrelude dflags
-                implicit_imports = mkPrelImports (unLoc mod) main_loc implicit_prelude imps
+                implicit_imports = mkPrelImports (unLoc mod) main_loc
+                                                 implicit_prelude imps
               in
               return (src_idecls, implicit_imports ++ ordinary_imps, mod)
 

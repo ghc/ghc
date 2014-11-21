@@ -241,8 +241,10 @@ rnExpr (ExplicitTuple tup_args boxity)
        ; (tup_args', fvs) <- mapAndUnzipM rnTupArg tup_args
        ; return (ExplicitTuple tup_args' boxity, plusFVs fvs) }
   where
-    rnTupArg (Present e) = do { (e',fvs) <- rnLExpr e; return (Present e', fvs) }
-    rnTupArg (Missing _) = return (Missing placeHolderType, emptyFVs)
+    rnTupArg (L l (Present e)) = do { (e',fvs) <- rnLExpr e
+                                    ; return (L l (Present e'), fvs) }
+    rnTupArg (L l (Missing _)) = return (L l (Missing placeHolderType)
+                                        , emptyFVs)
 
 rnExpr (RecordCon con_id _ rbinds)
   = do  { conname <- lookupLocatedOccRn con_id
@@ -372,8 +374,8 @@ rnHsRecBinds ctxt rec_binds@(HsRecFields { rec_dotdot = dd })
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd },
                  fvs `plusFV` plusFVs fvss) }
   where
-    rn_field fld = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
-                      ; return (fld { hsRecFieldArg = arg' }, fvs) }
+    rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
+                            ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 \end{code}
 
 
@@ -1288,7 +1290,7 @@ okPArrStmt dflags _ stmt
        LastStmt {}  -> emptyInvalid  -- Should not happen (dealt with by checkLastStmt)
 
 ---------
-checkTupleSection :: [HsTupArg RdrName] -> RnM ()
+checkTupleSection :: [LHsTupArg RdrName] -> RnM ()
 checkTupleSection args
   = do  { tuple_section <- xoptM Opt_TupleSections
         ; checkErr (all tupArgPresent args || tuple_section) msg }
