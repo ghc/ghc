@@ -203,6 +203,9 @@ matchNameMaker ctxt = LamMk report_unused
     -- i.e. when you type 'x <- e' at the GHCi prompt
     report_unused = case ctxt of
                       StmtCtxt GhciStmtCtxt -> False
+                      -- also, don't warn in pattern quotes, as there
+                      -- is no RHS where the variables can be used!
+                      ThPatQuote            -> False
                       _                     -> True
 
 rnHsSigCps :: HsWithBndrs RdrName (LHsType RdrName)
