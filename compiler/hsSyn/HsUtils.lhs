@@ -196,9 +196,9 @@ mkParPat lp@(L loc p) | hsPatNeedsParens p = L loc (ParPat lp)
 -- These are the bits of syntax that contain rebindable names
 -- See RnEnv.lookupSyntaxName
 
-mkHsIntegral   :: Integer -> PostTc RdrName Type -> HsOverLit RdrName
+mkHsIntegral   :: String -> Integer -> PostTc RdrName Type -> HsOverLit RdrName
 mkHsFractional :: FractionalLit -> PostTc RdrName Type -> HsOverLit RdrName
-mkHsIsString   :: FastString -> PostTc RdrName Type -> HsOverLit RdrName
+mkHsIsString :: String -> FastString -> PostTc RdrName Type -> HsOverLit RdrName
 mkHsDo         :: HsStmtContext Name -> [ExprLStmt RdrName] -> HsExpr RdrName
 mkHsComp       :: HsStmtContext Name -> [ExprLStmt RdrName] -> LHsExpr RdrName
                -> HsExpr RdrName
@@ -217,9 +217,9 @@ emptyRecStmtId   :: StmtLR Id   Id      bodyR
 mkRecStmt    :: [LStmtLR idL RdrName bodyR] -> StmtLR idL RdrName bodyR
 
 
-mkHsIntegral   i       = OverLit (HsIntegral   i)  noRebindableInfo noSyntaxExpr
-mkHsFractional f       = OverLit (HsFractional f)  noRebindableInfo noSyntaxExpr
-mkHsIsString   s       = OverLit (HsIsString   s)  noRebindableInfo noSyntaxExpr
+mkHsIntegral src i  = OverLit (HsIntegral   src i) noRebindableInfo noSyntaxExpr
+mkHsFractional   f  = OverLit (HsFractional     f) noRebindableInfo noSyntaxExpr
+mkHsIsString src s  = OverLit (HsIsString   src s) noRebindableInfo noSyntaxExpr
 
 noRebindableInfo :: PlaceHolder
 noRebindableInfo = PlaceHolder -- Just another placeholder;
@@ -306,7 +306,7 @@ unqualQuasiQuote = mkRdrUnqual (mkVarOccFS (fsLit "quasiquote"))
                 -- identify the quasi-quote
 
 mkHsString :: String -> HsLit
-mkHsString s = HsString (mkFastString s)
+mkHsString s = HsString s (mkFastString s)
 
 -------------
 userHsTyVarBndrs :: SrcSpan -> [name] -> [Located (HsTyVarBndr name)]
@@ -338,7 +338,7 @@ nlHsApp :: LHsExpr id -> LHsExpr id -> LHsExpr id
 nlHsApp f x = noLoc (HsApp f x)
 
 nlHsIntLit :: Integer -> LHsExpr id
-nlHsIntLit n = noLoc (HsLit (HsInt n))
+nlHsIntLit n = noLoc (HsLit (HsInt (show n) n))
 
 nlHsApps :: id -> [LHsExpr id] -> LHsExpr id
 nlHsApps f xs = foldl nlHsApp (nlHsVar f) xs

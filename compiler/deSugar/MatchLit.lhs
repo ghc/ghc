@@ -75,20 +75,20 @@ See also below where we look for @DictApps@ for \tr{plusInt}, etc.
 
 \begin{code}
 dsLit :: HsLit -> DsM CoreExpr
-dsLit (HsStringPrim s) = return (Lit (MachStr s))
-dsLit (HsCharPrim   c) = return (Lit (MachChar c))
-dsLit (HsIntPrim    i) = return (Lit (MachInt i))
-dsLit (HsWordPrim   w) = return (Lit (MachWord w))
-dsLit (HsInt64Prim  i) = return (Lit (MachInt64 i))
-dsLit (HsWord64Prim w) = return (Lit (MachWord64 w))
-dsLit (HsFloatPrim  f) = return (Lit (MachFloat (fl_value f)))
-dsLit (HsDoublePrim d) = return (Lit (MachDouble (fl_value d)))
+dsLit (HsStringPrim _ s) = return (Lit (MachStr s))
+dsLit (HsCharPrim   _ c) = return (Lit (MachChar c))
+dsLit (HsIntPrim    _ i) = return (Lit (MachInt i))
+dsLit (HsWordPrim   _ w) = return (Lit (MachWord w))
+dsLit (HsInt64Prim  _ i) = return (Lit (MachInt64 i))
+dsLit (HsWord64Prim _ w) = return (Lit (MachWord64 w))
+dsLit (HsFloatPrim    f) = return (Lit (MachFloat (fl_value f)))
+dsLit (HsDoublePrim   d) = return (Lit (MachDouble (fl_value d)))
 
-dsLit (HsChar c)       = return (mkCharExpr c)
-dsLit (HsString str)   = mkStringExprFS str
-dsLit (HsInteger i _)  = mkIntegerExpr i
-dsLit (HsInt i)        = do dflags <- getDynFlags
-                            return (mkIntExpr dflags i)
+dsLit (HsChar _ c)       = return (mkCharExpr c)
+dsLit (HsString _ str)   = mkStringExprFS str
+dsLit (HsInteger _ i _)  = mkIntegerExpr i
+dsLit (HsInt _ i)        = do dflags <- getDynFlags
+                              return (mkIntExpr dflags i)
 
 dsLit (HsRat r ty) = do
    num   <- mkIntegerExpr (numerator (fl_value r))
@@ -244,7 +244,7 @@ getLHsIntegralLit (L _ (HsOverLit over_lit)) = getIntegralLit over_lit
 getLHsIntegralLit _ = Nothing
 
 getIntegralLit :: HsOverLit Id -> Maybe (Integer, Name)
-getIntegralLit (OverLit { ol_val = HsIntegral i, ol_type = ty })
+getIntegralLit (OverLit { ol_val = HsIntegral _ i, ol_type = ty })
   | Just tc <- tyConAppTyCon_maybe ty
   = Just (i, tyConName tc)
 getIntegralLit _ = Nothing
@@ -264,10 +264,11 @@ tidyLitPat :: HsLit -> Pat Id
 --      HsDoublePrim, HsStringPrim, HsString
 --  * HsInteger, HsRat, HsInt can't show up in LitPats
 --  * We get rid of HsChar right here
-tidyLitPat (HsChar c) = unLoc (mkCharLitPat c)
-tidyLitPat (HsString s)
+tidyLitPat (HsChar src c) = unLoc (mkCharLitPat src c)
+tidyLitPat (HsString src s)
   | lengthFS s <= 1     -- Short string literals only
-  = unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon [mkCharLitPat c, pat] [charTy])
+  = unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon
+                                             [mkCharLitPat src c, pat] [charTy])
                   (mkNilPat charTy) (unpackFS s)
         -- The stringTy is the type of the whole pattern, not
         -- the type to instantiate (:) or [] with!
@@ -293,32 +294,36 @@ tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _
         --     which might be ok if we hvae 'instance IsString Int'
         --
 
-  | isIntTy ty,    Just int_lit <- mb_int_lit = mk_con_pat intDataCon    (HsIntPrim    int_lit)
-  | isWordTy ty,   Just int_lit <- mb_int_lit = mk_con_pat wordDataCon   (HsWordPrim   int_lit)
+  | isIntTy ty,    Just int_lit <- mb_int_lit
+                            = mk_con_pat intDataCon    (HsIntPrim    "" int_lit)
+  | isWordTy ty,   Just int_lit <- mb_int_lit
+                            = mk_con_pat wordDataCon   (HsWordPrim   "" int_lit)
   | isFloatTy ty,  Just rat_lit <- mb_rat_lit = mk_con_pat floatDataCon  (HsFloatPrim  rat_lit)
   | isDoubleTy ty, Just rat_lit <- mb_rat_lit = mk_con_pat doubleDataCon (HsDoublePrim rat_lit)
-  | isStringTy ty, Just str_lit <- mb_str_lit = tidy_lit_pat (HsString str_lit)
+  | isStringTy ty, Just str_lit <- mb_str_lit
+                            = tidy_lit_pat (HsString "" str_lit)
   where
     mk_con_pat :: DataCon -> HsLit -> Pat Id
     mk_con_pat con lit = unLoc (mkPrefixConPat con [noLoc $ LitPat lit] [])
 
     mb_int_lit :: Maybe Integer
     mb_int_lit = case (mb_neg, val) of
-                   (Nothing, HsIntegral i) -> Just i
-                   (Just _,  HsIntegral i) -> Just (-i)
+                   (Nothing, HsIntegral _ i) -> Just i
+                   (Just _,  HsIntegral _ i) -> Just (-i)
                    _ -> Nothing
 
     mb_rat_lit :: Maybe FractionalLit
     mb_rat_lit = case (mb_neg, val) of
-                   (Nothing, HsIntegral   i) -> Just (integralFractionalLit (fromInteger i))
-                   (Just _,  HsIntegral   i) -> Just (integralFractionalLit (fromInteger (-i)))
-                   (Nothing, HsFractional f) -> Just f
-                   (Just _, HsFractional f)  -> Just (negateFractionalLit f)
-                   _ -> Nothing
+       (Nothing, HsIntegral _ i) -> Just (integralFractionalLit (fromInteger i))
+       (Just _,  HsIntegral _ i) -> Just (integralFractionalLit
+                                                             (fromInteger (-i)))
+       (Nothing, HsFractional f) -> Just f
+       (Just _, HsFractional f)  -> Just (negateFractionalLit f)
+       _ -> Nothing
 
     mb_str_lit :: Maybe FastString
     mb_str_lit = case (mb_neg, val) of
-                   (Nothing, HsIsString s) -> Just s
+                   (Nothing, HsIsString _ s) -> Just s
                    _ -> Nothing
 
 tidyNPat _ over_lit mb_neg eq
@@ -381,16 +386,16 @@ hsLitKey :: DynFlags -> HsLit -> Literal
 --      (and doesn't for strings)
 -- It only works for primitive types and strings;
 -- others have been removed by tidy
-hsLitKey dflags (HsIntPrim     i) = mkMachInt  dflags i
-hsLitKey dflags (HsWordPrim    w) = mkMachWord dflags w
-hsLitKey _      (HsInt64Prim   i) = mkMachInt64  i
-hsLitKey _      (HsWord64Prim  w) = mkMachWord64 w
-hsLitKey _      (HsCharPrim    c) = MachChar   c
-hsLitKey _      (HsStringPrim  s) = MachStr    s
-hsLitKey _      (HsFloatPrim   f) = MachFloat  (fl_value f)
-hsLitKey _      (HsDoublePrim  d) = MachDouble (fl_value d)
-hsLitKey _      (HsString s)      = MachStr    (fastStringToByteString s)
-hsLitKey _      l                 = pprPanic "hsLitKey" (ppr l)
+hsLitKey dflags (HsIntPrim    _ i) = mkMachInt  dflags i
+hsLitKey dflags (HsWordPrim   _ w) = mkMachWord dflags w
+hsLitKey _      (HsInt64Prim  _ i) = mkMachInt64  i
+hsLitKey _      (HsWord64Prim _ w) = mkMachWord64 w
+hsLitKey _      (HsCharPrim   _ c) = MachChar   c
+hsLitKey _      (HsStringPrim _ s) = MachStr    s
+hsLitKey _      (HsFloatPrim    f) = MachFloat  (fl_value f)
+hsLitKey _      (HsDoublePrim   d) = MachDouble (fl_value d)
+hsLitKey _      (HsString _ s)     = MachStr    (fastStringToByteString s)
+hsLitKey _      l                  = pprPanic "hsLitKey" (ppr l)
 
 ---------------------------
 hsOverLitKey :: OutputableBndr a => HsOverLit a -> Bool -> Literal
@@ -399,11 +404,12 @@ hsOverLitKey (OverLit { ol_val = l }) neg = litValKey l neg
 
 ---------------------------
 litValKey :: OverLitVal -> Bool -> Literal
-litValKey (HsIntegral i)   False = MachInt i
-litValKey (HsIntegral i)   True  = MachInt (-i)
+litValKey (HsIntegral _ i) False = MachInt i
+litValKey (HsIntegral _ i) True  = MachInt (-i)
 litValKey (HsFractional r) False = MachFloat (fl_value r)
 litValKey (HsFractional r) True  = MachFloat (negate (fl_value r))
-litValKey (HsIsString s)   neg   = ASSERT( not neg) MachStr (fastStringToByteString s)
+litValKey (HsIsString _ s) neg   = ASSERT( not neg) MachStr
+                                                      (fastStringToByteString s)
 \end{code}
 
 %************************************************************************

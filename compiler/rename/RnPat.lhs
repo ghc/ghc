@@ -374,10 +374,11 @@ rnPatAndThen mk (SigPatIn pat sig)
        ; return (SigPatIn pat' sig') }
        
 rnPatAndThen mk (LitPat lit)
-  | HsString s <- lit
+  | HsString src s <- lit
   = do { ovlStr <- liftCps (xoptM Opt_OverloadedStrings)
        ; if ovlStr 
-         then rnPatAndThen mk (mkNPat (mkHsIsString s placeHolderType) Nothing)
+         then rnPatAndThen mk (mkNPat (mkHsIsString src s placeHolderType)
+                                      Nothing)
          else normal_lit }
   | otherwise = normal_lit
   where
@@ -701,14 +702,14 @@ are made available.
 
 \begin{code}
 rnLit :: HsLit -> RnM ()
-rnLit (HsChar c) = checkErr (inCharRange c) (bogusCharError c)
+rnLit (HsChar _ c) = checkErr (inCharRange c) (bogusCharError c)
 rnLit _ = return ()
 
 -- Turn a Fractional-looking literal which happens to be an integer into an
 -- Integer-looking literal.
 generalizeOverLitVal :: OverLitVal -> OverLitVal
-generalizeOverLitVal (HsFractional (FL {fl_value=val}))
-    | denominator val == 1 = HsIntegral (numerator val)
+generalizeOverLitVal (HsFractional (FL {fl_text=src,fl_value=val}))
+    | denominator val == 1 = HsIntegral src (numerator val)
 generalizeOverLitVal lit = lit
 
 rnOverLit :: HsOverLit t -> RnM (HsOverLit Name, FreeVars)

@@ -366,15 +366,15 @@ incorrect.
 
  IPDUPVARID     { L _ (ITdupipvarid   _) }              -- GHC extension
 
- CHAR           { L _ (ITchar     _) }
- STRING         { L _ (ITstring   _) }
- INTEGER        { L _ (ITinteger  _) }
+ CHAR           { L _ (ITchar   _ _) }
+ STRING         { L _ (ITstring _ _) }
+ INTEGER        { L _ (ITinteger _ _) }
  RATIONAL       { L _ (ITrational _) }
 
- PRIMCHAR       { L _ (ITprimchar   _) }
- PRIMSTRING     { L _ (ITprimstring _) }
- PRIMINTEGER    { L _ (ITprimint    _) }
- PRIMWORD       { L _ (ITprimword  _) }
+ PRIMCHAR       { L _ (ITprimchar   _ _) }
+ PRIMSTRING     { L _ (ITprimstring _ _) }
+ PRIMINTEGER    { L _ (ITprimint    _ _) }
+ PRIMWORD       { L _ (ITprimword   _ _) }
  PRIMFLOAT      { L _ (ITprimfloat  _) }
  PRIMDOUBLE     { L _ (ITprimdouble _) }
 
@@ -2014,11 +2014,11 @@ aexp2   :: { LHsExpr RdrName }
         | literal                       { sL1 $1 (HsLit   $! unLoc $1) }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
 -- into HsOverLit when -foverloaded-strings is on.
---      | STRING     { sL (getLoc $1) (HsOverLit $! mkHsIsString
---                                        (getSTRING $1) placeHolderType) }
-        | INTEGER    { sL (getLoc $1) (HsOverLit $! mkHsIntegral
-                                          (getINTEGER $1) placeHolderType) }
-        | RATIONAL   { sL (getLoc $1) (HsOverLit $! mkHsFractional
+--      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
+--                                       (getSTRING $1) placeHolderType) }
+        | INTEGER   { sL (getLoc $1) (HsOverLit $! mkHsIntegral (getINTEGERs $1)
+                                         (getINTEGER $1) placeHolderType) }
+        | RATIONAL  { sL (getLoc $1) (HsOverLit $! mkHsFractional
                                           (getRATIONAL $1) placeHolderType) }
 
         -- N.B.: sections get parsed by these next two productions.
@@ -2729,14 +2729,19 @@ consym :: { Located RdrName }
 -- Literals
 
 literal :: { Located HsLit }
-        : CHAR                  { sL1 $1 $ HsChar       $ getCHAR $1 }
-        | STRING                { sL1 $1 $ HsString     $ getSTRING $1 }
-        | PRIMINTEGER           { sL1 $1 $ HsIntPrim    $ getPRIMINTEGER $1 }
-        | PRIMWORD              { sL1 $1 $ HsWordPrim    $ getPRIMWORD $1 }
-        | PRIMCHAR              { sL1 $1 $ HsCharPrim   $ getPRIMCHAR $1 }
-        | PRIMSTRING            { sL1 $1 $ HsStringPrim $ getPRIMSTRING $1 }
-        | PRIMFLOAT             { sL1 $1 $ HsFloatPrim  $ getPRIMFLOAT $1 }
-        | PRIMDOUBLE            { sL1 $1 $ HsDoublePrim $ getPRIMDOUBLE $1 }
+        : CHAR              { sL1 $1 $ HsChar       (getCHARs $1) $ getCHAR $1 }
+        | STRING            { sL1 $1 $ HsString     (getSTRINGs $1)
+                                                   $ getSTRING $1 }
+        | PRIMINTEGER       { sL1 $1 $ HsIntPrim    (getPRIMINTEGERs $1)
+                                                   $ getPRIMINTEGER $1 }
+        | PRIMWORD          { sL1 $1 $ HsWordPrim   (getPRIMWORDs $1)
+                                                   $ getPRIMWORD $1 }
+        | PRIMCHAR          { sL1 $1 $ HsCharPrim   (getPRIMCHARs $1)
+                                                   $ getPRIMCHAR $1 }
+        | PRIMSTRING        { sL1 $1 $ HsStringPrim (getPRIMSTRINGs $1)
+                                                   $ getPRIMSTRING $1 }
+        | PRIMFLOAT         { sL1 $1 $ HsFloatPrim  $ getPRIMFLOAT $1 }
+        | PRIMDOUBLE        { sL1 $1 $ HsDoublePrim $ getPRIMDOUBLE $1 }
 
 -----------------------------------------------------------------------------
 -- Layout
@@ -2806,15 +2811,15 @@ getQCONSYM      (L _ (ITqconsym  x)) = x
 getPREFIXQVARSYM (L _ (ITprefixqvarsym  x)) = x
 getPREFIXQCONSYM (L _ (ITprefixqconsym  x)) = x
 getIPDUPVARID   (L _ (ITdupipvarid   x)) = x
-getCHAR         (L _ (ITchar     x)) = x
-getSTRING       (L _ (ITstring   x)) = x
-getINTEGER      (L _ (ITinteger  x)) = x
+getCHAR         (L _ (ITchar   _ x)) = x
+getSTRING       (L _ (ITstring _ x)) = x
+getINTEGER      (L _ (ITinteger _ x)) = x
 getRATIONAL     (L _ (ITrational x)) = x
-getPRIMCHAR     (L _ (ITprimchar   x)) = x
-getPRIMSTRING   (L _ (ITprimstring x)) = x
-getPRIMINTEGER  (L _ (ITprimint    x)) = x
-getPRIMWORD     (L _ (ITprimword x)) = x
-getPRIMFLOAT    (L _ (ITprimfloat  x)) = x
+getPRIMCHAR     (L _ (ITprimchar _ x)) = x
+getPRIMSTRING   (L _ (ITprimstring _ x)) = x
+getPRIMINTEGER  (L _ (ITprimint  _ x)) = x
+getPRIMWORD     (L _ (ITprimword _ x)) = x
+getPRIMFLOAT    (L _ (ITprimfloat x)) = x
 getPRIMDOUBLE   (L _ (ITprimdouble x)) = x
 getTH_ID_SPLICE (L _ (ITidEscape x)) = x
 getTH_ID_TY_SPLICE (L _ (ITidTyEscape x)) = x
@@ -2826,6 +2831,16 @@ getDOCNEXT (L _ (ITdocCommentNext x)) = x
 getDOCPREV (L _ (ITdocCommentPrev x)) = x
 getDOCNAMED (L _ (ITdocCommentNamed x)) = x
 getDOCSECTION (L _ (ITdocSection n x)) = (n, x)
+
+getCHARs        (L _ (ITchar       src _)) = src
+getSTRINGs      (L _ (ITstring     src _)) = src
+getINTEGERs     (L _ (ITinteger    src _)) = src
+getPRIMCHARs    (L _ (ITprimchar   src _)) = src
+getPRIMSTRINGs  (L _ (ITprimstring src _)) = src
+getPRIMINTEGERs (L _ (ITprimint    src _)) = src
+getPRIMWORDs    (L _ (ITprimword   src _)) = src
+
+
 
 getSCC :: Located Token -> P FastString
 getSCC lt = do let s = getSTRING lt

@@ -56,7 +56,7 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Lexer (
-   Token(..), lexer, pragState, mkPState, PState(..),
+   Token(..), SourceText, lexer, pragState, mkPState, PState(..),
    P(..), ParseResult(..), getSrcLoc,
    getPState, getDynFlags, withThisPackage,
    failLocMsgP, failSpanMsgP, srcParseFail,
@@ -506,6 +506,9 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- Alex "Haskell code fragment bottom"
 
 {
+
+type SourceText = String -- Note [literal source text] in HsLit
+
 -- -----------------------------------------------------------------------------
 -- The token type
 
@@ -636,15 +639,15 @@ data Token
 
   | ITdupipvarid   FastString   -- GHC extension: implicit param: ?x
 
-  | ITchar       Char
-  | ITstring     FastString
-  | ITinteger    Integer
+  | ITchar       SourceText Char        -- Note [literal source text] in HsLit
+  | ITstring     SourceText FastString  -- Note [literal source text] in HsLit
+  | ITinteger    SourceText Integer     -- Note [literal source text] in HsLit
   | ITrational   FractionalLit
 
-  | ITprimchar   Char
-  | ITprimstring ByteString
-  | ITprimint    Integer
-  | ITprimword   Integer
+  | ITprimchar   SourceText Char        -- Note [literal source text] in HsLit
+  | ITprimstring SourceText ByteString  -- Note [literal source text] in HsLit
+  | ITprimint    SourceText Integer     -- Note [literal source text] in HsLit
+  | ITprimword   SourceText Integer     -- Note [literal source text] in HsLit
   | ITprimfloat  FractionalLit
   | ITprimdouble FractionalLit
 
@@ -1157,13 +1160,14 @@ sym con span buf len =
     !fs = lexemeToFastString buf len
 
 -- Variations on the integral numeric literal.
-tok_integral :: (Integer -> Token)
+tok_integral :: (String -> Integer -> Token)
              -> (Integer -> Integer)
              -> Int -> Int
              -> (Integer, (Char -> Int))
              -> Action
 tok_integral itint transint transbuf translen (radix,char_to_int) span buf len
- = return $ L span $ itint $! transint $ parseUnsignedInteger
+ = return $ L span $ itint (lexemeToString buf len)
+       $! transint $ parseUnsignedInteger
        (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
 
 -- some conveniences for use with tok_integral
@@ -1345,10 +1349,16 @@ lex_string_prag mkTok span _buf _len
 -- This stuff is horrible.  I hates it.
 
 lex_string_tok :: Action
-lex_string_tok span _buf _len = do
+lex_string_tok span buf _len = do
   tok <- lex_string ""
   end <- getSrcLoc
-  return (L (mkRealSrcSpan (realSrcSpanStart span) end) tok)
+  (AI end bufEnd) <- getInput
+  let
+    tok' = case tok of
+            ITprimstring _ bs -> ITprimstring src bs
+            ITstring _ s -> ITstring src s
+    src = lexemeToString buf (cur bufEnd - cur buf)
+  return (L (mkRealSrcSpan (realSrcSpanStart span) end) tok')
 
 lex_string :: String -> P Token
 lex_string s = do
@@ -1368,11 +1378,11 @@ lex_string s = do
                    if any (> '\xFF') s
                     then failMsgP "primitive string literal must contain only characters <= \'\\xFF\'"
                     else let bs = unsafeMkByteString (reverse s)
-                         in return (ITprimstring bs)
+                         in return (ITprimstring "" bs)
               _other ->
-                return (ITstring (mkFastString (reverse s)))
+                return (ITstring "" (mkFastString (reverse s)))
           else
-                return (ITstring (mkFastString (reverse s)))
+                return (ITstring "" (mkFastString (reverse s)))
 
     Just ('\\',i)
         | Just ('&',i) <- next -> do
@@ -1406,7 +1416,7 @@ lex_char_tok :: Action
 -- but WITHOUT CONSUMING the x or T part  (the parser does that).
 -- So we have to do two characters of lookahead: when we see 'x we need to
 -- see if there's a trailing quote
-lex_char_tok span _buf _len = do        -- We've seen '
+lex_char_tok span buf _len = do        -- We've seen '
    i1 <- getInput       -- Look ahead to first character
    let loc = realSrcSpanStart span
    case alexGetChar' i1 of
@@ -1421,7 +1431,7 @@ lex_char_tok span _buf _len = do        -- We've seen '
                   lit_ch <- lex_escape
                   i3 <- getInput
                   mc <- getCharOrFail i3 -- Trailing quote
-                  if mc == '\'' then finish_char_tok loc lit_ch
+                  if mc == '\'' then finish_char_tok buf loc lit_ch
                                 else lit_error i3
 
         Just (c, i2@(AI _end2 _))
@@ -1433,27 +1443,28 @@ lex_char_tok span _buf _len = do        -- We've seen '
            case alexGetChar' i2 of      -- Look ahead one more character
                 Just ('\'', i3) -> do   -- We've seen 'x'
                         setInput i3
-                        finish_char_tok loc c
+                        finish_char_tok buf loc c
                 _other -> do            -- We've seen 'x not followed by quote
                                         -- (including the possibility of EOF)
                                         -- If TH is on, just parse the quote only
                         let (AI end _) = i1
                         return (L (mkRealSrcSpan loc end) ITsimpleQuote)
 
-finish_char_tok :: RealSrcLoc -> Char -> P (RealLocated Token)
-finish_char_tok loc ch  -- We've already seen the closing quote
+finish_char_tok :: StringBuffer -> RealSrcLoc -> Char -> P (RealLocated Token)
+finish_char_tok buf loc ch  -- We've already seen the closing quote
                         -- Just need to check for trailing #
   = do  magicHash <- extension magicHashEnabled
-        i@(AI end _) <- getInput
+        i@(AI end bufEnd) <- getInput
+        let src = lexemeToString buf (cur bufEnd - cur buf)
         if magicHash then do
                 case alexGetChar' i of
                         Just ('#',i@(AI end _)) -> do
-                                setInput i
-                                return (L (mkRealSrcSpan loc end) (ITprimchar ch))
+                          setInput i
+                          return (L (mkRealSrcSpan loc end) (ITprimchar src ch))
                         _other ->
-                                return (L (mkRealSrcSpan loc end) (ITchar ch))
+                          return (L (mkRealSrcSpan loc end) (ITchar src ch))
             else do
-                   return (L (mkRealSrcSpan loc end) (ITchar ch))
+                   return (L (mkRealSrcSpan loc end) (ITchar src ch))
 
 isAny :: Char -> Bool
 isAny c | c > '\x7f' = isPrint c

@@ -344,8 +344,9 @@ mkPrefixConPat dc pats tys
 mkNilPat :: Type -> OutPat id
 mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 
-mkCharLitPat :: Char -> OutPat id
-mkCharLitPat c = mkPrefixConPat charDataCon [noLoc $ LitPat (HsCharPrim c)] []
+mkCharLitPat :: String -> Char -> OutPat id
+mkCharLitPat src c = mkPrefixConPat charDataCon
+                                    [noLoc $ LitPat (HsCharPrim src c)] []
 \end{code}
 
 

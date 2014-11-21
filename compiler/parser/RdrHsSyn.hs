@@ -125,8 +125,8 @@ mkClassDecl :: SrcSpan
             -> P (LTyClDecl RdrName)
 
 mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
-  = do { let (binds, sigs, ats, at_insts, _, docs) = cvBindsAndSigs where_cls
-             cxt = fromMaybe (noLoc []) mcxt
+  = do { (binds, sigs, ats, at_insts, _, docs) <- cvBindsAndSigs where_cls
+       ; let cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams) <- checkTyClHdr tycl_hdr
        ; tyvars <- checkTyVarsP (ptext (sLit "class")) whereDots cls tparams
        ; at_defs <- mapM (eitherToP . mkATDefault) at_insts

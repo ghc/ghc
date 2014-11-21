@@ -103,10 +103,10 @@ rnExpr (HsVar v)
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)
 
-rnExpr (HsLit lit@(HsString s))
+rnExpr (HsLit lit@(HsString src s))
   = do { opt_OverloadedStrings <- xoptM Opt_OverloadedStrings
        ; if opt_OverloadedStrings then
-            rnExpr (HsOverLit (mkHsIsString s placeHolderType))
+            rnExpr (HsOverLit (mkHsIsString src s placeHolderType))
          else do {
             ; rnLit lit
             ; return (HsLit lit, emptyFVs) } }

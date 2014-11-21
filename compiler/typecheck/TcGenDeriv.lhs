@@ -467,7 +467,7 @@ gen_Ord_binds loc tycon
                                  , mkSimpleHsAlt nlWildPat (gtResult op) ]
       where
         tag     = get_tag data_con
-        tag_lit = noLoc (HsLit (HsIntPrim (toInteger tag)))
+        tag_lit = noLoc (HsLit (HsIntPrim "" (toInteger tag)))
 
     mkInnerEqAlt :: OrdOp -> DataCon -> LMatch RdrName (LHsExpr RdrName)
     -- First argument 'a' known to be built with K
@@ -630,7 +630,7 @@ gen_Enum_binds loc tycon
              (illegal_Expr "pred" occ_nm "tried to take `pred' of first tag in enumeration")
              (nlHsApp (nlHsVar (tag2con_RDR tycon))
                            (nlHsApps plus_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
-                                               nlHsLit (HsInt (-1))]))
+                                               nlHsLit (HsInt "-1" (-1))]))
 
     to_enum
       = mk_easy_FunBind loc toEnum_RDR [a_Pat] $
@@ -1138,7 +1138,8 @@ gen_Show_binds get_fixity loc tycon
          ([nlWildPat, con_pat], mk_showString_app op_con_str)
       | otherwise   =
          ([a_Pat, con_pat],
-          showParen_Expr (nlHsPar (genOpApp a_Expr ge_RDR (nlHsLit (HsInt con_prec_plus_one))))
+          showParen_Expr (nlHsPar (genOpApp a_Expr ge_RDR
+                                        (nlHsLit (HsInt "" con_prec_plus_one))))
                          (nlHsPar (nested_compose_Expr show_thingies)))
         where
              data_con_RDR  = getRdrName data_con
@@ -1188,8 +1189,9 @@ gen_Show_binds get_fixity loc tycon
                 -- Generates (showsPrec p x) for argument x, but it also boxes
                 -- the argument first if necessary.  Note that this prints unboxed
                 -- things without any '#' decorations; could change that if need be
-             show_arg b arg_ty = nlHsApps showsPrec_RDR [nlHsLit (HsInt arg_prec),
-                                                         box_if_necy "Show" tycon (nlHsVar b) arg_ty]
+             show_arg b arg_ty = nlHsApps showsPrec_RDR
+                                    [nlHsLit (HsInt "" arg_prec),
+                                    box_if_necy "Show" tycon (nlHsVar b) arg_ty]
 
                 -- Fixity stuff
              is_infix = dataConIsInfix data_con
@@ -1271,16 +1273,16 @@ gen_Typeable_binds dflags loc tycon
     tycon_rep = nlHsApps mkTyCon_RDR
                     (map nlHsLit [int64 high,
                                   int64 low,
-                                  HsString pkg_fs,
-                                  HsString modl_fs,
-                                  HsString name_fs])
+                                  HsString "" pkg_fs,
+                                  HsString "" modl_fs,
+                                  HsString "" name_fs])
 
     hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, name_fs]
     Fingerprint high low = fingerprintString hashThis
 
     int64
-      | wORD_SIZE dflags == 4 = HsWord64Prim . fromIntegral
-      | otherwise             = HsWordPrim . fromIntegral
+      | wORD_SIZE dflags == 4 = HsWord64Prim "" . fromIntegral
+      | otherwise             = HsWordPrim "" . fromIntegral
 \end{code}
 
 
@@ -1403,7 +1405,8 @@ gen_Data_binds dflags loc tycon
     mk_unfold_pat dc    -- Last one is a wild-pat, to avoid
                         -- redundant test, and annoying warning
       | tag-fIRST_TAG == n_cons-1 = nlWildPat   -- Last constructor
-      | otherwise = nlConPat intDataCon_RDR [nlLitPat (HsIntPrim (toInteger tag))]
+      | otherwise = nlConPat intDataCon_RDR
+                             [nlLitPat (HsIntPrim "" (toInteger tag))]
       where
         tag = dataConTag dc
 
@@ -1988,7 +1991,8 @@ genAuxBindSpec loc (DerivCon2Tag tycon)
 
     mk_eqn :: DataCon -> ([LPat RdrName], LHsExpr RdrName)
     mk_eqn con = ([nlWildConPat con],
-                  nlHsLit (HsIntPrim (toInteger ((dataConTag con) - fIRST_TAG))))
+                  nlHsLit (HsIntPrim ""
+                                    (toInteger ((dataConTag con) - fIRST_TAG))))
 
 genAuxBindSpec loc (DerivTag2Con tycon)
   = (mk_FunBind loc rdr_name
@@ -2007,7 +2011,7 @@ genAuxBindSpec loc (DerivMaxTag tycon)
   where
     rdr_name = maxtag_RDR tycon
     sig_ty = HsCoreTy intTy
-    rhs = nlHsApp (nlHsVar intDataCon_RDR) (nlHsLit (HsIntPrim max_tag))
+    rhs = nlHsApp (nlHsVar intDataCon_RDR) (nlHsLit (HsIntPrim "" max_tag))
     max_tag =  case (tyConDataCons tycon) of
                  data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 

@@ -24,6 +24,7 @@ import Type       ( Type )
 import Outputable
 import FastString
 import PlaceHolder ( PostTc,PostRn,DataId )
+import Lexer       ( SourceText )
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
@@ -41,20 +42,21 @@ import Data.Data hiding ( Fixity )
 
 
 \begin{code}
+-- Note [literal source text] for SourceText fields in the following
 data HsLit
-  = HsChar          Char               -- Character
-  | HsCharPrim      Char               -- Unboxed character
-  | HsString        FastString         -- String
-  | HsStringPrim    ByteString         -- Packed bytes
-  | HsInt           Integer            -- Genuinely an Int; arises from
+  = HsChar          SourceText Char        -- Character
+  | HsCharPrim      SourceText Char        -- Unboxed character
+  | HsString        SourceText FastString  -- String
+  | HsStringPrim    SourceText ByteString  -- Packed bytes
+  | HsInt           SourceText Integer     -- Genuinely an Int; arises from
                                        --     TcGenDeriv, and from TRANSLATION
-  | HsIntPrim       Integer            -- literal Int#
-  | HsWordPrim      Integer            -- literal Word#
-  | HsInt64Prim     Integer            -- literal Int64#
-  | HsWord64Prim    Integer            -- literal Word64#
-  | HsInteger       Integer  Type      -- Genuinely an integer; arises only from
-                                       --   TRANSLATION (overloaded literals are
-                                       --   done with HsOverLit)
+  | HsIntPrim       SourceText Integer     -- literal Int#
+  | HsWordPrim      SourceText Integer     -- literal Word#
+  | HsInt64Prim     SourceText Integer     -- literal Int64#
+  | HsWord64Prim    SourceText Integer     -- literal Word64#
+  | HsInteger       SourceText Integer Type -- Genuinely an integer; arises only
+                                          --   from TRANSLATION (overloaded
+                                          --   literals are done with HsOverLit)
   | HsRat           FractionalLit Type -- Genuinely a rational; arises only from
                                        --   TRANSLATION (overloaded literals are
                                        --   done with HsOverLit)
@@ -63,20 +65,20 @@ data HsLit
   deriving (Data, Typeable)
 
 instance Eq HsLit where
-  (HsChar x1)       == (HsChar x2)       = x1==x2
-  (HsCharPrim x1)   == (HsCharPrim x2)   = x1==x2
-  (HsString x1)     == (HsString x2)     = x1==x2
-  (HsStringPrim x1) == (HsStringPrim x2) = x1==x2
-  (HsInt x1)        == (HsInt x2)        = x1==x2
-  (HsIntPrim x1)    == (HsIntPrim x2)    = x1==x2
-  (HsWordPrim x1)   == (HsWordPrim x2)   = x1==x2
-  (HsInt64Prim x1)  == (HsInt64Prim x2)  = x1==x2
-  (HsWord64Prim x1) == (HsWord64Prim x2) = x1==x2
-  (HsInteger x1 _)  == (HsInteger x2 _)  = x1==x2
-  (HsRat x1 _)      == (HsRat x2 _)      = x1==x2
-  (HsFloatPrim x1)  == (HsFloatPrim x2)  = x1==x2
-  (HsDoublePrim x1) == (HsDoublePrim x2) = x1==x2
-  _                 == _                 = False
+  (HsChar _ x1)       == (HsChar _ x2)       = x1==x2
+  (HsCharPrim _ x1)   == (HsCharPrim _ x2)   = x1==x2
+  (HsString _ x1)     == (HsString _ x2)     = x1==x2
+  (HsStringPrim _ x1) == (HsStringPrim _ x2) = x1==x2
+  (HsInt _ x1)        == (HsInt _ x2)        = x1==x2
+  (HsIntPrim _ x1)    == (HsIntPrim _ x2)    = x1==x2
+  (HsWordPrim _ x1)   == (HsWordPrim _ x2)   = x1==x2
+  (HsInt64Prim _ x1)  == (HsInt64Prim _ x2)  = x1==x2
+  (HsWord64Prim _ x1) == (HsWord64Prim _ x2) = x1==x2
+  (HsInteger _ x1 _)  == (HsInteger _ x2 _)  = x1==x2
+  (HsRat x1 _)        == (HsRat x2 _)        = x1==x2
+  (HsFloatPrim x1)    == (HsFloatPrim x2)    = x1==x2
+  (HsDoublePrim x1)   == (HsDoublePrim x2)   = x1==x2
+  _                   == _                   = False
 
 data HsOverLit id       -- An overloaded literal
   = OverLit {
@@ -87,15 +89,46 @@ data HsOverLit id       -- An overloaded literal
   deriving (Typeable)
 deriving instance (DataId id) => Data (HsOverLit id)
 
+-- Note [literal source text] for SourceText fields in the following
 data OverLitVal
-  = HsIntegral   !Integer       -- Integer-looking literals;
-  | HsFractional !FractionalLit -- Frac-looking literals
-  | HsIsString   !FastString    -- String-looking literals
+  = HsIntegral   !SourceText !Integer    -- Integer-looking literals;
+  | HsFractional !FractionalLit          -- Frac-looking literals
+  | HsIsString   !SourceText !FastString -- String-looking literals
   deriving (Data, Typeable)
 
 overLitType :: HsOverLit a -> PostTc a Type
 overLitType = ol_type
 \end{code}
+
+Note [literal source text]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The lexer/parser converts literals from their original source text
+versions to an appropriate internal representation. This is a problem
+for tools doing source to source conversions, so the original source
+text is stored in literals where this can occur.
+
+Motivating examples for HsLit
+
+  HsChar          '\n', '\x20`
+  HsCharPrim      '\x41`#
+  HsString        "\x20\x41" == " A"
+  HsStringPrim    "\x20"#
+  HsInt           001
+  HsIntPrim       002#
+  HsWordPrim      003##
+  HsInt64Prim     004##
+  HsWord64Prim    005##
+  HsInteger       006
+
+For OverLitVal
+
+  HsIntegral      003,0x001
+  HsIsString      "\x41nd"
+
+
+
+
 
 Note [ol_rebindable]
 ~~~~~~~~~~~~~~~~~~~~
@@ -132,42 +165,42 @@ instance Eq (HsOverLit id) where
   (OverLit {ol_val = val1}) == (OverLit {ol_val=val2}) = val1 == val2
 
 instance Eq OverLitVal where
-  (HsIntegral i1)   == (HsIntegral i2)   = i1 == i2
-  (HsFractional f1) == (HsFractional f2) = f1 == f2
-  (HsIsString s1)   == (HsIsString s2)   = s1 == s2
-  _                 == _                 = False
+  (HsIntegral _ i1)   == (HsIntegral _ i2)   = i1 == i2
+  (HsFractional f1)   == (HsFractional f2)   = f1 == f2
+  (HsIsString _ s1)   == (HsIsString _ s2)   = s1 == s2
+  _                   == _                   = False
 
 instance Ord (HsOverLit id) where
   compare (OverLit {ol_val=val1}) (OverLit {ol_val=val2}) = val1 `compare` val2
 
 instance Ord OverLitVal where
-  compare (HsIntegral i1)   (HsIntegral i2)   = i1 `compare` i2
-  compare (HsIntegral _)    (HsFractional _)  = LT
-  compare (HsIntegral _)    (HsIsString _)    = LT
-  compare (HsFractional f1) (HsFractional f2) = f1 `compare` f2
-  compare (HsFractional _)  (HsIntegral _)    = GT
-  compare (HsFractional _)  (HsIsString _)    = LT
-  compare (HsIsString s1)   (HsIsString s2)   = s1 `compare` s2
-  compare (HsIsString _)    (HsIntegral _)    = GT
-  compare (HsIsString _)    (HsFractional _)  = GT
+  compare (HsIntegral _ i1)   (HsIntegral _ i2)   = i1 `compare` i2
+  compare (HsIntegral _ _)    (HsFractional _)    = LT
+  compare (HsIntegral _ _)    (HsIsString _ _)    = LT
+  compare (HsFractional f1)   (HsFractional f2)   = f1 `compare` f2
+  compare (HsFractional _)    (HsIntegral _ _)    = GT
+  compare (HsFractional _)    (HsIsString _ _)    = LT
+  compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `compare` s2
+  compare (HsIsString _ _)    (HsIntegral _ _)    = GT
+  compare (HsIsString _ _)    (HsFractional _)    = GT
 \end{code}
 
 \begin{code}
 instance Outputable HsLit where
         -- Use "show" because it puts in appropriate escapes
-    ppr (HsChar c)       = pprHsChar c
-    ppr (HsCharPrim c)   = pprHsChar c <> char '#'
-    ppr (HsString s)     = pprHsString s
-    ppr (HsStringPrim s) = pprHsBytes s <> char '#'
-    ppr (HsInt i)        = integer i
-    ppr (HsInteger i _)  = integer i
-    ppr (HsRat f _)      = ppr f
-    ppr (HsFloatPrim f)  = ppr f <> char '#'
-    ppr (HsDoublePrim d) = ppr d <> text "##"
-    ppr (HsIntPrim i)    = integer i  <> char '#'
-    ppr (HsWordPrim w)   = integer w  <> text "##"
-    ppr (HsInt64Prim i)  = integer i  <> text "L#"
-    ppr (HsWord64Prim w) = integer w  <> text "L##"
+    ppr (HsChar _ c)       = pprHsChar c
+    ppr (HsCharPrim _ c)   = pprHsChar c <> char '#'
+    ppr (HsString _ s)     = pprHsString s
+    ppr (HsStringPrim _ s) = pprHsBytes s <> char '#'
+    ppr (HsInt _ i)        = integer i
+    ppr (HsInteger _ i _)  = integer i
+    ppr (HsRat f _)        = ppr f
+    ppr (HsFloatPrim f)    = ppr f <> char '#'
+    ppr (HsDoublePrim d)   = ppr d <> text "##"
+    ppr (HsIntPrim _ i)    = integer i  <> char '#'
+    ppr (HsWordPrim _ w)   = integer w  <> text "##"
+    ppr (HsInt64Prim _ i)  = integer i  <> text "L#"
+    ppr (HsWord64Prim _ w) = integer w  <> text "L##"
 
 -- in debug mode, print the expression that it's resolved to, too
 instance OutputableBndr id => Outputable (HsOverLit id) where
@@ -175,7 +208,7 @@ instance OutputableBndr id => Outputable (HsOverLit id) where
         = ppr val <+> (ifPprDebug (parens (pprExpr witness)))
 
 instance Outputable OverLitVal where
-  ppr (HsIntegral i)   = integer i
-  ppr (HsFractional f) = ppr f
-  ppr (HsIsString s)   = pprHsString s
+  ppr (HsIntegral _ i)   = integer i
+  ppr (HsFractional f)   = ppr f
+  ppr (HsIsString _ s)   = pprHsString s
 \end{code}

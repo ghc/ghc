@@ -175,8 +175,8 @@ pars True p = ParPat p
 pars _    p = unLoc p
 
 untidy_lit :: HsLit -> HsLit
-untidy_lit (HsCharPrim c) = HsChar c
-untidy_lit lit            = lit
+untidy_lit (HsCharPrim src c) = HsChar src c
+untidy_lit lit                = lit
 \end{code}
 
 This equation is the same that check, the only difference is that the
@@ -459,9 +459,12 @@ get_lit :: Pat id -> Maybe HsLit
 -- It doesn't matter which one, because they will only be compared
 -- with other HsLits gotten in the same way
 get_lit (LitPat lit)                                      = Just lit
-get_lit (NPat (OverLit { ol_val = HsIntegral i})    mb _) = Just (HsIntPrim   (mb_neg negate              mb i))
-get_lit (NPat (OverLit { ol_val = HsFractional f }) mb _) = Just (HsFloatPrim (mb_neg negateFractionalLit mb f))
-get_lit (NPat (OverLit { ol_val = HsIsString s })   _  _) = Just (HsStringPrim (fastStringToByteString s))
+get_lit (NPat (OverLit { ol_val = HsIntegral src i})    mb _)
+                        = Just (HsIntPrim src (mb_neg negate              mb i))
+get_lit (NPat (OverLit { ol_val = HsFractional f }) mb _)
+                        = Just (HsFloatPrim (mb_neg negateFractionalLit mb f))
+get_lit (NPat (OverLit { ol_val = HsIsString src s })   _  _)
+                        = Just (HsStringPrim src (fastStringToByteString s))
 get_lit _                                                 = Nothing
 
 mb_neg :: (a -> a) -> Maybe b -> a -> a
@@ -743,8 +746,9 @@ tidy_lit_pat :: HsLit -> Pat Id
 -- Unpack string patterns fully, so we can see when they
 -- overlap with each other, or even explicit lists of Chars.
 tidy_lit_pat lit
-  | HsString s <- lit
-  = unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon [mkCharLitPat c, pat] [charTy])
+  | HsString src s <- lit
+  = unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon
+                                             [mkCharLitPat src c, pat] [charTy])
                   (mkPrefixConPat nilDataCon [] [charTy]) (unpackFS s)
   | otherwise
   = tidyLitPat lit

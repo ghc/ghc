@@ -1,0 +1,12 @@
+HsIntegral [0003] 3
+HsString [] "noSyntaxExpr"
+HsIntegral [0x04] 4
+HsString [] "noSyntaxExpr"
+HsString ["\x20"] " "
+HsChar ['\x20'] ' '
+HsString [] "noSyntaxExpr"
+HsCharPrim ['\x41'] 'A'
+HsIntPrim [0004#] 4
+HsWordPrim [005##] 5
+HsIntegral [1] 1
+HsString [] "noSyntaxExpr"

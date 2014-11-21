@@ -101,29 +101,30 @@ conLikeResTy (RealDataCon con) tys = mkTyConApp (dataConTyCon con) tys
 conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 
 hsLitType :: HsLit -> TcType
-hsLitType (HsChar _)       = charTy
-hsLitType (HsCharPrim _)   = charPrimTy
-hsLitType (HsString _)     = stringTy
-hsLitType (HsStringPrim _) = addrPrimTy
-hsLitType (HsInt _)        = intTy
-hsLitType (HsIntPrim _)    = intPrimTy
-hsLitType (HsWordPrim _)   = wordPrimTy
-hsLitType (HsInt64Prim _)  = int64PrimTy
-hsLitType (HsWord64Prim _) = word64PrimTy
-hsLitType (HsInteger _ ty) = ty
-hsLitType (HsRat _ ty)     = ty
-hsLitType (HsFloatPrim _)  = floatPrimTy
-hsLitType (HsDoublePrim _) = doublePrimTy
+hsLitType (HsChar _ _)       = charTy
+hsLitType (HsCharPrim _ _)   = charPrimTy
+hsLitType (HsString _ _)     = stringTy
+hsLitType (HsStringPrim _ _) = addrPrimTy
+hsLitType (HsInt _ _)        = intTy
+hsLitType (HsIntPrim _ _)    = intPrimTy
+hsLitType (HsWordPrim _ _)   = wordPrimTy
+hsLitType (HsInt64Prim _ _)  = int64PrimTy
+hsLitType (HsWord64Prim _ _) = word64PrimTy
+hsLitType (HsInteger _ _ ty) = ty
+hsLitType (HsRat _ ty)       = ty
+hsLitType (HsFloatPrim _)    = floatPrimTy
+hsLitType (HsDoublePrim _)   = doublePrimTy
 \end{code}
 
 Overloaded literals. Here mainly because it uses isIntTy etc
 
 \begin{code}
 shortCutLit :: DynFlags -> OverLitVal -> TcType -> Maybe (HsExpr TcId)
-shortCutLit dflags (HsIntegral i) ty
-  | isIntTy ty  && inIntRange  dflags i = Just (HsLit (HsInt i))
-  | isWordTy ty && inWordRange dflags i = Just (mkLit wordDataCon (HsWordPrim i))
-  | isIntegerTy ty = Just (HsLit (HsInteger i ty))
+shortCutLit dflags (HsIntegral src i) ty
+  | isIntTy ty  && inIntRange  dflags i = Just (HsLit (HsInt src i))
+  | isWordTy ty && inWordRange dflags i
+                                   = Just (mkLit wordDataCon (HsWordPrim src i))
+  | isIntegerTy ty = Just (HsLit (HsInteger src i ty))
   | otherwise = shortCutLit dflags (HsFractional (integralFractionalLit i)) ty
         -- The 'otherwise' case is important
         -- Consider (3 :: Float).  Syntactically it looks like an IntLit,
@@ -136,8 +137,8 @@ shortCutLit _ (HsFractional f) ty
   | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim f))
   | otherwise     = Nothing
 
-shortCutLit _ (HsIsString s) ty
-  | isStringTy ty = Just (HsLit (HsString s))
+shortCutLit _ (HsIsString src s) ty
+  | isStringTy ty = Just (HsLit (HsString src s))
   | otherwise     = Nothing
 
 mkLit :: DataCon -> HsLit -> HsExpr Id

@@ -1120,7 +1120,8 @@ tc_infer_id orig id_name
 
 srcSpanPrimLit :: DynFlags -> SrcSpan -> HsExpr TcId
 srcSpanPrimLit dflags span
-    = HsLit (HsStringPrim (unsafeMkByteString (showSDocOneLine dflags (ppr span))))
+    = HsLit (HsStringPrim "" (unsafeMkByteString
+                             (showSDocOneLine dflags (ppr span))))
 \end{code}
 
 Note [Adding the implicit parameter to 'assert']

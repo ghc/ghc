@@ -1973,11 +1973,11 @@ repKConstraint = rep2 constraintKName []
 repLiteral :: HsLit -> DsM (Core TH.Lit)
 repLiteral lit
   = do lit' <- case lit of
-                   HsIntPrim i    -> mk_integer i
-                   HsWordPrim w   -> mk_integer w
-                   HsInt i        -> mk_integer i
-                   HsFloatPrim r  -> mk_rational r
-                   HsDoublePrim r -> mk_rational r
+                   HsIntPrim _ i    -> mk_integer i
+                   HsWordPrim _ w   -> mk_integer w
+                   HsInt _ i        -> mk_integer i
+                   HsFloatPrim r    -> mk_rational r
+                   HsDoublePrim r   -> mk_rational r
                    _ -> return lit
        lit_expr <- dsLit lit'
        case mb_lit_name of
@@ -1985,25 +1985,25 @@ repLiteral lit
           Nothing -> notHandled "Exotic literal" (ppr lit)
   where
     mb_lit_name = case lit of
-                 HsInteger _ _  -> Just integerLName
-                 HsInt     _    -> Just integerLName
-                 HsIntPrim _    -> Just intPrimLName
-                 HsWordPrim _   -> Just wordPrimLName
-                 HsFloatPrim _  -> Just floatPrimLName
-                 HsDoublePrim _ -> Just doublePrimLName
-                 HsChar _       -> Just charLName
-                 HsString _     -> Just stringLName
-                 HsRat _ _      -> Just rationalLName
-                 _              -> Nothing
+                 HsInteger _ _ _  -> Just integerLName
+                 HsInt     _ _    -> Just integerLName
+                 HsIntPrim _ _    -> Just intPrimLName
+                 HsWordPrim _ _   -> Just wordPrimLName
+                 HsFloatPrim _    -> Just floatPrimLName
+                 HsDoublePrim _   -> Just doublePrimLName
+                 HsChar _ _       -> Just charLName
+                 HsString _ _     -> Just stringLName
+                 HsRat _ _        -> Just rationalLName
+                 _                -> Nothing
 
 mk_integer :: Integer -> DsM HsLit
 mk_integer  i = do integer_ty <- lookupType integerTyConName
-                   return $ HsInteger i integer_ty
+                   return $ HsInteger "" i integer_ty
 mk_rational :: FractionalLit -> DsM HsLit
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat r rat_ty
 mk_string :: FastString -> DsM HsLit
-mk_string s = return $ HsString s
+mk_string s = return $ HsString "" s
 
 repOverloadedLiteral :: HsOverLit Name -> DsM (Core TH.Lit)
 repOverloadedLiteral (OverLit { ol_val = val})
@@ -2013,9 +2013,9 @@ repOverloadedLiteral (OverLit { ol_val = val})
         -- and rationalL is sucked in when any TH stuff is used
 
 mk_lit :: OverLitVal -> DsM HsLit
-mk_lit (HsIntegral i)   = mk_integer  i
-mk_lit (HsFractional f) = mk_rational f
-mk_lit (HsIsString s)   = mk_string   s
+mk_lit (HsIntegral _ i)   = mk_integer  i
+mk_lit (HsFractional f)   = mk_rational f
+mk_lit (HsIsString _ s)   = mk_string   s
 
 --------------- Miscellaneous -------------------
 

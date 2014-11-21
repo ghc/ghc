@@ -311,7 +311,8 @@ tcRnModuleTcRnM hsc_env hsc_src
         boot_iface <- tcHiBootIface hsc_src this_mod ;
 
         let { exports_occs =
-                 maybe emptyBag (listToBag . map (rdrNameOcc . ieName . unLoc))
+                 maybe emptyBag
+                       (listToBag . map (rdrNameOcc . ieName . unLoc) . unLoc)
                        export_ies
             } ;
 

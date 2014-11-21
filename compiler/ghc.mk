@@ -623,11 +623,13 @@ compiler_stage2_dll0_MODULES += \
 	CodeGen.Platform.SPARC \
 	CodeGen.Platform.X86 \
 	CodeGen.Platform.X86_64 \
+	Ctype \
 	FastBool \
 	Hoopl \
 	Hoopl.Dataflow \
 	InteractiveEvalTypes \
 	MkGraph \
+	Lexer \
 	PprCmm \
 	PprCmmDecl \
 	PprCmmExpr \
