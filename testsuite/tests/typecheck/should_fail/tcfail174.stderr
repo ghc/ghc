@@ -10,7 +10,7 @@ tcfail174.hs:13:14:
       because type variable ‘a1’ would escape its scope
     This (rigid, skolem) type variable is bound by
       the type forall a2. a2 -> a2
-      at tcfail174.hs:13:14
+      at tcfail174.hs:13:1-14
     Expected type: Capture (forall x. x -> a)
       Actual type: Capture (forall a. a -> a)
     Relevant bindings include
@@ -21,7 +21,7 @@ tcfail174.hs:13:14:
 tcfail174.hs:16:14:
     Couldn't match type ‘a’ with ‘b’
       ‘a’ is a rigid type variable bound by
-          the type forall a1. a1 -> a1 at tcfail174.hs:16:14
+          the type forall a1. a1 -> a1 at tcfail174.hs:1:1
       ‘b’ is a rigid type variable bound by
           the type signature for h2 :: Capture b at tcfail174.hs:15:7
     Expected type: Capture (forall x. x -> b)

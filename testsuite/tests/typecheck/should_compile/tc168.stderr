@@ -1,7 +1,6 @@
 
 tc168.hs:17:1:
     Could not deduce (C a1 (a, b0))
-      arising from the ambiguity check for ‘g’
     from the context (C a1 (a, b))
       bound by the inferred type for ‘g’: C a1 (a, b) => a1 -> a
       at tc168.hs:17:1-16

@@ -5,7 +5,8 @@ T4093a.hs:7:9:
       bound by the type signature for hang :: (Foo e ~ Maybe e) => Foo e
       at T4093a.hs:7:9-34
     The type variable ‘e0’ is ambiguous
-    In the ambiguity check for: forall e. (Foo e ~ Maybe e) => Foo e
+    In the ambiguity check for the type signature for ‘hang’:
+      hang :: forall e. (Foo e ~ Maybe e) => Foo e
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     In the type signature for ‘hang’:
       hang :: (Foo e ~ Maybe e) => Foo e

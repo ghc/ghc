@@ -4,6 +4,7 @@ module Simple14 where
 
 data EQ_ x y = EQ_
 
+-- Nov 2014: actually eqE has an ambiguous type
 eqE :: EQ_ x y -> (x~y => EQ_ z z) -> p
 eqE = error "eqE"
 

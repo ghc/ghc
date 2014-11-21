@@ -1,6 +1,6 @@
 
 tcfail189.hs:10:31:
-    Couldn't match type ‘[a0]’ with ‘a -> Integer’
+    Couldn't match type ‘[a0]’ with ‘[a] -> [[a]]’
     Expected type: (a -> Integer) -> [a] -> [[a]]
       Actual type: [a0] -> [a0]
     Possible cause: ‘take’ is applied to too many arguments

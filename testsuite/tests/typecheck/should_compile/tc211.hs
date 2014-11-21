@@ -1,5 +1,8 @@
 {-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags -XScopedTypeVariables -XGADTs #-}
 
+-- Nov 2014: impredicative types are very dodgy so I am
+--           FAR from confident that these tests give the right errors
+
 -- Here are a bunch of tests for impredicative polymorphism
 -- mainly written by Dimitrios
 

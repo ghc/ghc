@@ -1,11 +1,12 @@
 
 T5691.hs:14:9:
     Couldn't match type ‘p’ with ‘PrintRuleInterp’
-    Expected type: PrintRuleInterp a
-      Actual type: p a
+    Expected type: p a
+      Actual type: PrintRuleInterp a
+    When checking that the pattern signature: p a
+      fits the type of its context: PrintRuleInterp a
     In the pattern: f :: p a
     In an equation for ‘test’: test (f :: p a) = MkPRI $ printRule_ f
-    In the instance declaration for ‘Test PrintRuleInterp’
 
 T5691.hs:15:24:
     Couldn't match type ‘p’ with ‘PrintRuleInterp’

@@ -15,7 +15,7 @@ T9171.hs:10:20:
     NB: ‘GetParam’ is a type function, and may not be injective
     The kind variable ‘k0’ is ambiguous
     Use -fprint-explicit-kinds to see the kind arguments
-    In the ambiguity check for:
+    In the ambiguity check for an expression type signature:
       forall (k :: BOX). GetParam Base (GetParam Base Int)
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     In an expression type signature: GetParam Base (GetParam Base Int)
