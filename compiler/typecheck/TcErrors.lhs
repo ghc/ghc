@@ -1503,39 +1503,3 @@ solverDepthErrorTcS cnt ev
              , ptext (sLit "Use -ftype-function-depth=N to increase stack size to N") ]
 \end{code}
 
-%************************************************************************
-%*                                                                      *
-                 Tidying
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-zonkTidyTcType :: TidyEnv -> TcType -> TcM (TidyEnv, TcType)
-zonkTidyTcType env ty = do { ty' <- zonkTcType ty
-                           ; return (tidyOpenType env ty') }
-
-zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
-zonkTidyOrigin env (GivenOrigin skol_info)
-  = do { skol_info1 <- zonkSkolemInfo skol_info
-       ; let (env1, skol_info2) = tidySkolemInfo env skol_info1
-       ; return (env1, GivenOrigin skol_info2) }
-zonkTidyOrigin env (TypeEqOrigin { uo_actual = act, uo_expected = exp })
-  = do { (env1, act') <- zonkTidyTcType env  act
-       ; (env2, exp') <- zonkTidyTcType env1 exp
-       ; return ( env2, TypeEqOrigin { uo_actual = act', uo_expected = exp' }) }
-zonkTidyOrigin env (KindEqOrigin ty1 ty2 orig)
-  = do { (env1, ty1') <- zonkTidyTcType env  ty1
-       ; (env2, ty2') <- zonkTidyTcType env1 ty2
-       ; (env3, orig') <- zonkTidyOrigin env2 orig
-       ; return (env3, KindEqOrigin ty1' ty2' orig') }
-zonkTidyOrigin env (FunDepOrigin1 p1 l1 p2 l2)
-  = do { (env1, p1') <- zonkTidyTcType env  p1
-       ; (env2, p2') <- zonkTidyTcType env1 p2
-       ; return (env2, FunDepOrigin1 p1' l1 p2' l2) }
-zonkTidyOrigin env (FunDepOrigin2 p1 o1 p2 l2)
-  = do { (env1, p1') <- zonkTidyTcType env  p1
-       ; (env2, p2') <- zonkTidyTcType env1 p2
-       ; (env3, o1') <- zonkTidyOrigin env2 o1
-       ; return (env3, FunDepOrigin2 p1' o1' p2' l2) }
-zonkTidyOrigin env orig = return (env, orig)
-\end{code}

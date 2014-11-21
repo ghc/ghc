@@ -45,8 +45,9 @@ module TcMType (
   instSkolTyVars, freshenTyVarBndrs,
 
   --------------------------------
-  -- Zonking
-  zonkTcPredType,
+  -- Zonking and tidying
+  zonkTcPredType, zonkTidyTcType, zonkTidyOrigin,
+  tidyEvVar, tidyCt, tidySkolemInfo,
   skolemiseUnboundMetaTyVar,
   zonkTcTyVar, zonkTcTyVars, zonkTyVarsAndFV, zonkTcTypeAndFV,
   zonkQuantifiedTyVar, quantifyTyVars,
@@ -66,6 +67,7 @@ import TcType
 import Type
 import Class
 import Var
+import VarEnv
 
 -- others:
 import TcRnMonad        -- TcType, amongst others
@@ -902,3 +904,87 @@ zonkTcKind k = zonkTcType k
 
 
 
+%************************************************************************
+%*                                                                      *
+                 Tidying
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+zonkTidyTcType :: TidyEnv -> TcType -> TcM (TidyEnv, TcType)
+zonkTidyTcType env ty = do { ty' <- zonkTcType ty
+                           ; return (tidyOpenType env ty') }
+
+zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
+zonkTidyOrigin env (GivenOrigin skol_info)
+  = do { skol_info1 <- zonkSkolemInfo skol_info
+       ; let (env1, skol_info2) = tidySkolemInfo env skol_info1
+       ; return (env1, GivenOrigin skol_info2) }
+zonkTidyOrigin env (TypeEqOrigin { uo_actual = act, uo_expected = exp })
+  = do { (env1, act') <- zonkTidyTcType env  act
+       ; (env2, exp') <- zonkTidyTcType env1 exp
+       ; return ( env2, TypeEqOrigin { uo_actual = act', uo_expected = exp' }) }
+zonkTidyOrigin env (KindEqOrigin ty1 ty2 orig)
+  = do { (env1, ty1') <- zonkTidyTcType env  ty1
+       ; (env2, ty2') <- zonkTidyTcType env1 ty2
+       ; (env3, orig') <- zonkTidyOrigin env2 orig
+       ; return (env3, KindEqOrigin ty1' ty2' orig') }
+zonkTidyOrigin env (FunDepOrigin1 p1 l1 p2 l2)
+  = do { (env1, p1') <- zonkTidyTcType env  p1
+       ; (env2, p2') <- zonkTidyTcType env1 p2
+       ; return (env2, FunDepOrigin1 p1' l1 p2' l2) }
+zonkTidyOrigin env (FunDepOrigin2 p1 o1 p2 l2)
+  = do { (env1, p1') <- zonkTidyTcType env  p1
+       ; (env2, p2') <- zonkTidyTcType env1 p2
+       ; (env3, o1') <- zonkTidyOrigin env2 o1
+       ; return (env3, FunDepOrigin2 p1' o1' p2' l2) }
+zonkTidyOrigin env orig = return (env, orig)
+
+----------------
+tidyCt :: TidyEnv -> Ct -> Ct
+-- Used only in error reporting
+-- Also converts it to non-canonical
+tidyCt env ct
+  = case ct of
+     CHoleCan { cc_ev = ev }
+       -> ct { cc_ev = tidy_ev env ev }
+     _ -> mkNonCanonical (tidy_ev env (ctEvidence ct))
+  where
+    tidy_ev :: TidyEnv -> CtEvidence -> CtEvidence
+     -- NB: we do not tidy the ctev_evtm/var field because we don't
+     --     show it in error messages
+    tidy_ev env ctev@(CtGiven { ctev_pred = pred })
+      = ctev { ctev_pred = tidyType env pred }
+    tidy_ev env ctev@(CtWanted { ctev_pred = pred })
+      = ctev { ctev_pred = tidyType env pred }
+    tidy_ev env ctev@(CtDerived { ctev_pred = pred })
+      = ctev { ctev_pred = tidyType env pred }
+
+----------------
+tidyEvVar :: TidyEnv -> EvVar -> EvVar
+tidyEvVar env var = setVarType var (tidyType env (varType var))
+
+----------------
+tidySkolemInfo :: TidyEnv -> SkolemInfo -> (TidyEnv, SkolemInfo)
+tidySkolemInfo env (SigSkol cx ty)
+  = (env', SigSkol cx ty')
+  where
+    (env', ty') = tidyOpenType env ty
+
+tidySkolemInfo env (InferSkol ids)
+  = (env', InferSkol ids')
+  where
+    (env', ids') = mapAccumL do_one env ids
+    do_one env (name, ty) = (env', (name, ty'))
+       where
+         (env', ty') = tidyOpenType env ty
+
+tidySkolemInfo env (UnifyForAllSkol skol_tvs ty)
+  = (env1, UnifyForAllSkol skol_tvs' ty')
+  where
+    env1 = tidyFreeTyVars env (tyVarsOfType ty `delVarSetList` skol_tvs)
+    (env2, skol_tvs') = tidyTyVarBndrs env1 skol_tvs
+    ty'               = tidyType env2 ty
+
+tidySkolemInfo env info = (env, info)
+\end{code}
