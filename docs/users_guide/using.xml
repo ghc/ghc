@@ -2422,35 +2422,6 @@ _  = rhs3        -- No warning: lone wild-card pattern
 
         <varlistentry>
           <term>
-            <option>-fllvm-pass-vectors-in-regs</option>
-            <indexterm><primary><option>-fllvm-pass-vectors-in-regs</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>On 32-bit machines it changes calling convention used with LLVM backend
-             to pass 128-bit vectors in SIMD registers. At the moment this does not work
-             because this is not supported by LLVM. We strongly suggest you don't use this flag.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fllvm-tbaa</option>
-            <indexterm><primary><option>-fllvm-tbaa</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>On by default for <option>-O0</option>, <option>-O</option>,
-                  <option>-O2</option>.</emphasis>
-            </para>
-            <para>Enables type-based alias analysis for LLVM backend.
-                  At the moment this has limited usefullness since we pass
-                  very little information to LLVM.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
             <option>-floopification</option>
             <indexterm><primary><option>-floopification</option></primary></indexterm>
           </term>

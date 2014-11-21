@@ -13,9 +13,9 @@
 
 module CmdLineParser
     (
-      processArgs, OptKind(..),
+      processArgs, OptKind(..), GhcFlagMode(..),
       CmdLineP(..), getCmdLineState, putCmdLineState,
-      Flag(..),
+      Flag(..), defFlag, defGhcFlag, defGhciFlag, defHiddenFlag,
       errorsToGhcException,
 
       EwM, addErr, addWarn, getArg, getCurLoc, liftEwM, deprecate
@@ -42,9 +42,29 @@ import Control.Applicative (Applicative(..))
 --------------------------------------------------------
 
 data Flag m = Flag
-    {   flagName    :: String,   -- Flag, without the leading "-"
-        flagOptKind :: OptKind m -- What to do if we see it
+    {   flagName    :: String,     -- Flag, without the leading "-"
+        flagOptKind :: OptKind m,  -- What to do if we see it
+        flagGhcMode :: GhcFlagMode    -- Which modes this flag affects
     }
+
+defFlag :: String -> OptKind m -> Flag m
+defFlag name optKind = Flag name optKind AllModes
+
+defGhcFlag :: String -> OptKind m -> Flag m
+defGhcFlag name optKind = Flag name optKind OnlyGhc
+
+defGhciFlag :: String -> OptKind m -> Flag m
+defGhciFlag name optKind = Flag name optKind OnlyGhci
+
+defHiddenFlag :: String -> OptKind m -> Flag m
+defHiddenFlag name optKind = Flag name optKind HiddenFlag
+
+-- | GHC flag modes describing when a flag has an effect.
+data GhcFlagMode
+    = OnlyGhc  -- ^ The flag only affects the non-interactive GHC
+    | OnlyGhci -- ^ The flag only affects the interactive GHC
+    | AllModes -- ^ The flag affects multiple ghc modes
+    | HiddenFlag -- ^ This flag should not be seen in cli completion
 
 data OptKind m                             -- Suppose the flag is -f
     = NoArg     (EwM m ())                 -- -f all by itself

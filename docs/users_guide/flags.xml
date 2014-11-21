@@ -1875,26 +1875,6 @@
           </row>
 
           <row>
-            <entry><option>-fllvm-pass-vectors-in-regs</option>
-            </entry>
-            <entry>Attempt to pass SIMD vectors in registers for LLVM backend on 32-bit architectures. This is dangerous.
-                   See full description in <xref linkend="options-f"/> for details.
-            </entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-llvm-pass-vectors-in-regs</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-fllvm-tbaa</option>
-            </entry>
-            <entry>Enable type-based alias analysis for LLVM backend.
-                   Always enabled by default.
-            </entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-llvm-tbaa</option></entry>
-          </row>
-
-          <row>
             <entry><option>-floopification</option></entry>
             <entry>Turn saturated self-recursive tail-calls into local jumps in the generated assembly.
                    Implied by <option>-O</option>.</entry>
