@@ -89,6 +89,7 @@ module BasicTypes(
 
 import FastString
 import Outputable
+import SrcLoc ( Located,unLoc )
 
 import Data.Data hiding (Fixity)
 import Data.Function (on)
@@ -263,14 +264,14 @@ initialVersion = 1
 
 \begin{code}
 -- reason/explanation from a WARNING or DEPRECATED pragma
-data WarningTxt = WarningTxt [FastString]
-                | DeprecatedTxt [FastString]
+data WarningTxt = WarningTxt [Located FastString]
+                | DeprecatedTxt [Located FastString]
     deriving (Eq, Data, Typeable)
 
 instance Outputable WarningTxt where
-    ppr (WarningTxt    ws) = doubleQuotes (vcat (map ftext ws))
+    ppr (WarningTxt    ws) = doubleQuotes (vcat (map (ftext . unLoc) ws))
     ppr (DeprecatedTxt ds) = text "Deprecated:" <+>
-                             doubleQuotes (vcat (map ftext ds))
+                             doubleQuotes (vcat (map (ftext . unLoc) ds))
 \end{code}
 
 %************************************************************************

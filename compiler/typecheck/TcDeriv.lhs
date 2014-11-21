@@ -577,8 +577,8 @@ deriveTyDecl (L _ decl@(DataDecl { tcdLName = L _ tc_name
              tys  = mkTyVarTys tvs
 
        ; case preds of
-           Just preds' -> concatMapM (deriveTyData False tvs tc tys) preds'
-           Nothing     -> return [] }
+          Just (L _ preds') -> concatMapM (deriveTyData False tvs tc tys) preds'
+          Nothing           -> return [] }
 
 deriveTyDecl _ = return []
 
@@ -592,8 +592,10 @@ deriveInstDecl (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fam
 
 ------------------------------------------------------------------
 deriveFamInst :: DataFamInstDecl Name -> TcM [EarlyDerivSpec]
-deriveFamInst decl@(DataFamInstDecl { dfid_tycon = L _ tc_name, dfid_pats = pats
-                                    , dfid_defn = defn@(HsDataDefn { dd_derivs = Just preds }) })
+deriveFamInst decl@(DataFamInstDecl
+                       { dfid_tycon = L _ tc_name, dfid_pats = pats
+                       , dfid_defn
+                         = defn@(HsDataDefn { dd_derivs = Just (L _ preds) }) })
   = tcAddDataFamInstCtxt decl $
     do { fam_tc <- tcLookupTyCon tc_name
        ; tcFamTyPats (famTyConShape fam_tc) pats (kcDataDefn defn) $
@@ -659,7 +661,8 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
                     ; mkPolyKindedTypeableEqn cls tc }
 
               | isAlgTyCon tc  -- All other classes
-              -> do { spec <- mkEqnHelp overlap_mode tvs cls cls_tys tc tc_args (Just theta)
+              -> do { spec <- mkEqnHelp (fmap unLoc overlap_mode)
+                                        tvs cls cls_tys tc tc_args (Just theta)
                     ; return [spec] }
 
            _  -> -- Complain about functions, primitive types, etc,

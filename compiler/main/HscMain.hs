@@ -813,7 +813,7 @@ hscCheckSafeImports tcg_env = do
     warns dflags rules = listToBag $ map (warnRules dflags) rules
     warnRules dflags (L loc (HsRule n _ _ _ _ _ _)) =
         mkPlainWarnMsg dflags loc $
-            text "Rule \"" <> ftext n <> text "\" ignored" $+$
+            text "Rule \"" <> ftext (unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
 
 -- | Validate that safe imported modules are actually safe.  For modules in the
@@ -1519,7 +1519,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
     (L _ (HsModule{hsmodImports=is})) <-
        hscParseThing parseModule str
     case is of
-        [i] -> return (unLoc i)
+        [L _ i] -> return i
         _ -> liftIO $ throwOneError $
                  mkPlainErrMsg (hsc_dflags hsc_env) noSrcSpan $
                      ptext (sLit "parse error in import declaration")

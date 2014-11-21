@@ -965,11 +965,12 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
   = do  { (rpats', res) <- tcMultiple tc_field rpats penv thing_inside
         ; return (RecCon (HsRecFields rpats' dd), res) }
   where
-    tc_field :: Checker (HsRecField FieldLabel (LPat Name)) (HsRecField TcId (LPat TcId))
-    tc_field (HsRecField field_lbl pat pun) penv thing_inside
+    tc_field :: Checker (LHsRecField FieldLabel (LPat Name))
+                        (LHsRecField TcId (LPat TcId))
+    tc_field (L l (HsRecField field_lbl pat pun)) penv thing_inside
       = do { (sel_id, pat_ty) <- wrapLocFstM find_field_ty field_lbl
            ; (pat', res) <- tcConArg (pat, pat_ty) penv thing_inside
-           ; return (HsRecField sel_id pat' pun, res) }
+           ; return (L l (HsRecField sel_id pat' pun), res) }
 
     find_field_ty :: FieldLabel -> TcM (Id, TcType)
     find_field_ty field_lbl

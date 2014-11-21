@@ -107,7 +107,8 @@ dsForeigns' fos = do
       traceIf (text "fi end" <+> ppr id)
       return (h, c, [], bs)
 
-   do_decl (ForeignExport (L _ id) _ co (CExport (CExportStatic ext_nm cconv))) = do
+   do_decl (ForeignExport (L _ id) _ co
+                          (CExport (L _ (CExportStatic ext_nm cconv)) _)) = do
       (h, c, _, _) <- dsFExport id co ext_nm cconv False
       return (h, c, [id], [])
 \end{code}
@@ -142,8 +143,8 @@ dsFImport :: Id
           -> Coercion
           -> ForeignImport
           -> DsM ([Binding], SDoc, SDoc)
-dsFImport id co (CImport cconv safety mHeader spec) = do
-    (ids, h, c) <- dsCImport id co spec cconv safety mHeader
+dsFImport id co (CImport cconv safety mHeader spec _) = do
+    (ids, h, c) <- dsCImport id co spec (unLoc cconv) (unLoc safety) mHeader
     return (ids, h, c)
 
 dsCImport :: Id

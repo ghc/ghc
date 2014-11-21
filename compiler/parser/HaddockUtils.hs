@@ -9,12 +9,14 @@ import Control.Monad
 -- -----------------------------------------------------------------------------
 -- Adding documentation to record fields (used in parsing).
 
-addFieldDoc :: ConDeclField a -> Maybe LHsDocString -> ConDeclField a
-addFieldDoc fld doc = fld { cd_fld_doc = cd_fld_doc fld `mplus` doc }
+addFieldDoc :: LConDeclField a -> Maybe LHsDocString -> LConDeclField a
+addFieldDoc (L l fld) doc
+  = L l (fld { cd_fld_doc = cd_fld_doc fld `mplus` doc })
 
-addFieldDocs :: [ConDeclField a] -> Maybe LHsDocString -> [ConDeclField a]
+addFieldDocs :: [LConDeclField a] -> Maybe LHsDocString -> [LConDeclField a]
 addFieldDocs [] _ = []
 addFieldDocs (x:xs) doc = addFieldDoc x doc : xs
+
 
 addConDoc :: LConDecl a -> Maybe LHsDocString -> LConDecl a
 addConDoc decl    Nothing = decl

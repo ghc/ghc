@@ -509,7 +509,7 @@ tcPatToExpr args = go
            ; return $ ExplicitList ptt (fmap snd reb) exprs }
     go1   (TuplePat pats box _)
       = do { exprs <- mapM go pats
-           ; return (ExplicitTuple (map Present exprs) box)
+           ; return (ExplicitTuple (map (noLoc . Present) exprs) box)
            }
     go1   (LitPat lit)             = return $ HsLit lit
     go1   (NPat n Nothing _)       = return $ HsOverLit n
@@ -558,7 +558,7 @@ tcCollectEx = return . go
     goConDetails (RecCon HsRecFields{ rec_flds = flds })
       = mconcat . map goRecFd $ flds
 
-    goRecFd :: HsRecField Id (LPat Id) -> (TyVarSet, [EvVar])
-    goRecFd HsRecField{ hsRecFieldArg = p } = go p
+    goRecFd :: LHsRecField Id (LPat Id) -> (TyVarSet, [EvVar])
+    goRecFd (L _ HsRecField{ hsRecFieldArg = p }) = go p
 
 \end{code}

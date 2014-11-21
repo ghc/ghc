@@ -349,7 +349,7 @@ Reason
 dsRule :: LRuleDecl Id -> DsM (Maybe CoreRule)
 dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
   = putSrcSpanDs loc $
-    do  { let bndrs' = [var | RuleBndr (L _ var) <- vars]
+    do  { let bndrs' = [var | L _ (RuleBndr (L _ var)) <- vars]
 
         ; lhs' <- unsetGOptM Opt_EnableRewriteRules $
                   unsetWOptM Opt_WarnIdentities $
@@ -373,7 +373,8 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
               fn_name   = idName fn_id
               final_rhs = simpleOptExpr rhs''    -- De-crap it
               rule      = mkRule False {- Not auto -} is_local
-                                 name act fn_name final_bndrs args final_rhs
+                                 (unLoc name) act fn_name final_bndrs args
+                                 final_rhs
 
               inline_shadows_rule   -- Function can be inlined before rule fires
                 | wopt Opt_WarnInlineRuleShadowing dflags
@@ -390,7 +391,8 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
                 | otherwise = False
 
         ; when inline_shadows_rule $
-          warnDs (vcat [ hang (ptext (sLit "Rule") <+> doubleQuotes (ftext name)
+          warnDs (vcat [ hang (ptext (sLit "Rule")
+                               <+> doubleQuotes (ftext $ unLoc name)
                                <+> ptext (sLit "may never fire"))
                             2 (ptext (sLit "because") <+> quotes (ppr fn_id)
                                <+> ptext (sLit "might inline first"))

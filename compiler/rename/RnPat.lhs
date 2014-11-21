@@ -491,9 +491,9 @@ rnHsRecPatsAndThen mk (L _ con) hs_rec_fields@(HsRecFields { rec_dotdot = dd })
        ; flds' <- mapM rn_field (flds `zip` [1..])
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where 
-    rn_field (fld, n') = do { arg' <- rnLPatAndThen (nested_mk dd mk n') 
-                                                    (hsRecFieldArg fld)
-                            ; return (fld { hsRecFieldArg = arg' }) }
+    rn_field (L l fld, n') = do { arg' <- rnLPatAndThen (nested_mk dd mk n')
+                                                        (hsRecFieldArg fld)
+                                ; return (L l (fld { hsRecFieldArg = arg' })) }
 
         -- Suppress unused-match reporting for fields introduced by ".."
     nested_mk Nothing  mk                    _  = mk
@@ -519,7 +519,7 @@ rnHsRecFields
        HsRecFieldContext
     -> (RdrName -> arg) -- When punning, use this to build a new field
     -> HsRecFields RdrName (Located arg)
-    -> RnM ([HsRecField Name (Located arg)], FreeVars)
+    -> RnM ([LHsRecField Name (Located arg)], FreeVars)
 
 -- This surprisingly complicated pass
 --   a) looks up the field name (possibly using disambiguation)
@@ -560,23 +560,23 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
             Nothing  -> ptext (sLit "constructor field name")
             Just con -> ptext (sLit "field of constructor") <+> quotes (ppr con)
 
-    rn_fld pun_ok parent (HsRecField { hsRecFieldId = fld
-                                     , hsRecFieldArg = arg
-                                     , hsRecPun = pun })
+    rn_fld pun_ok parent (L l (HsRecField { hsRecFieldId = fld
+                                          , hsRecFieldArg = arg
+                                          , hsRecPun = pun }))
       = do { fld'@(L loc fld_nm) <- wrapLocM (lookupSubBndrOcc True parent doc) fld
            ; arg' <- if pun 
                      then do { checkErr pun_ok (badPun fld)
                              ; return (L loc (mk_arg (mkRdrUnqual (nameOccName fld_nm)))) }
                      else return arg
-           ; return (HsRecField { hsRecFieldId = fld'
-                                , hsRecFieldArg = arg'
-                                , hsRecPun = pun }) }
+           ; return (L l (HsRecField { hsRecFieldId = fld'
+                                     , hsRecFieldArg = arg'
+                                     , hsRecPun = pun })) }
 
     rn_dotdot :: Maybe Int      -- See Note [DotDot fields] in HsPat
               -> Maybe Name     -- The constructor (Nothing for an update
                                 --    or out of scope constructor)
-              -> [HsRecField Name (Located arg)]   -- Explicit fields
-              -> RnM [HsRecField Name (Located arg)]   -- Filled in .. fields
+              -> [LHsRecField Name (Located arg)] -- Explicit fields
+              -> RnM [LHsRecField Name (Located arg)]   -- Filled in .. fields
     rn_dotdot Nothing _mb_con _flds     -- No ".." at all
       = return []
     rn_dotdot (Just {}) Nothing _flds   -- ".." on record update
@@ -619,10 +619,10 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                     _other           -> True ] 
 
            ; addUsedRdrNames (map greRdrName dot_dot_gres)
-           ; return [ HsRecField
+           ; return [ L loc (HsRecField
                         { hsRecFieldId  = L loc fld
                         , hsRecFieldArg = L loc (mk_arg arg_rdr)
-                        , hsRecPun      = False }
+                        , hsRecPun      = False })
                     | gre <- dot_dot_gres
                     , let fld     = gre_name gre
                           arg_rdr = mkRdrUnqual (nameOccName fld) ] }
@@ -654,8 +654,8 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
         -- Each list in dup_fields is non-empty
     (_, dup_flds) = removeDups compare (getFieldIds flds)
 
-getFieldIds :: [HsRecField id arg] -> [id]
-getFieldIds flds = map (unLoc . hsRecFieldId) flds
+getFieldIds :: [LHsRecField id arg] -> [id]
+getFieldIds flds = map (unLoc . hsRecFieldId . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> SDoc
 needFlagDotDot ctxt = vcat [ptext (sLit "Illegal `..' in record") <+> pprRFC ctxt,

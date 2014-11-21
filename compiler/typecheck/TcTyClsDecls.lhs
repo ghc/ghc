@@ -378,18 +378,20 @@ getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs =
        ; return (main_pr : inner_prs) }
 
 getInitialKind decl@(DataDecl { tcdLName = L _ name
-                                , tcdTyVars = ktvs
-                                , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
-                                                           , dd_cons = cons } })
-  = do { (decl_kind, _) <-
+                              , tcdTyVars = ktvs
+                              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
+                                                         , dd_cons = cons' } })
+  = let cons = cons' -- AZ list monad coming
+    in
+     do { (decl_kind, _) <-
            kcHsTyVarBndrs (hsDeclHasCusk decl) ktvs $
            do { res_k <- case m_sig of
                            Just ksig -> tcLHsKind ksig
                            Nothing   -> return liftedTypeKind
               ; return (res_k, ()) }
        ; let main_pr = (name, AThing decl_kind)
-             inner_prs = [ (unLoc (con_name con), APromotionErr RecDataConPE)
-                         | L _ con <- cons ]
+             inner_prs = [ (unLoc con, APromotionErr RecDataConPE)
+                         | L _ con' <- cons, con <- con_names con' ]
        ; return (main_pr : inner_prs) }
 
 getInitialKind (FamDecl { tcdFam = decl })
@@ -501,10 +503,10 @@ kcTyClDecl (FamDecl {})    = return ()
 
 -------------------
 kcConDecl :: ConDecl Name -> TcM ()
-kcConDecl (ConDecl { con_name = name, con_qvars = ex_tvs
+kcConDecl (ConDecl { con_names = names, con_qvars = ex_tvs
                    , con_cxt = ex_ctxt, con_details = details
                    , con_res = res })
-  = addErrCtxt (dataConCtxt name) $
+  = addErrCtxt (dataConCtxtName names) $
          -- the 'False' says that the existentials don't have a CUSK, as the
          -- concept doesn't really apply here. We just need to bring the variables
          -- into scope!
@@ -760,8 +762,9 @@ tcDataDefn :: RecTyInfo -> Name
 tcDataDefn rec_info tc_name tvs kind
          (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                      , dd_ctxt = ctxt, dd_kindSig = mb_ksig
-                     , dd_cons = cons })
-  = do { extra_tvs <- tcDataKindSig kind
+                     , dd_cons = cons' })
+ = let cons = cons' -- AZ List monad coming
+   in do { extra_tvs <- tcDataKindSig kind
        ; let final_tvs  = tvs ++ extra_tvs
              roles      = rti_roles rec_info tc_name
        ; stupid_tc_theta <- tcHsContext ctxt
@@ -789,7 +792,8 @@ tcDataDefn rec_info tc_name tvs kind
                    DataType -> return (mkDataTyConRhs data_cons)
                    NewType  -> ASSERT( not (null data_cons) )
                                     mkNewTyConRhs tc_name tycon (head data_cons)
-             ; return (buildAlgTyCon tc_name final_tvs roles cType stupid_theta tc_rhs
+             ; return (buildAlgTyCon tc_name final_tvs roles (fmap unLoc cType)
+                                     stupid_theta tc_rhs
                                      (rti_is_rec rec_info tc_name)
                                      (rti_promotable rec_info)
                                      gadt_syntax NoParentTyCon) }
@@ -1144,29 +1148,31 @@ consUseGadtSyntax _                                             = False
 tcConDecls :: NewOrData -> TyCon -> ([TyVar], Type)
            -> [LConDecl Name] -> TcM [DataCon]
 tcConDecls new_or_data rep_tycon (tmpl_tvs, res_tmpl) cons
-  = mapM (addLocM  $ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl) cons
+  = concatMapM (addLocM  $ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl)
+               cons
 
 tcConDecl :: NewOrData
           -> TyCon             -- Representation tycon
           -> [TyVar] -> Type   -- Return type template (with its template tyvars)
                                --    (tvs, T tys), where T is the family TyCon
           -> ConDecl Name
-          -> TcM DataCon
+          -> TcM [DataCon]
 
 tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
-          (ConDecl { con_name = name
+          (ConDecl { con_names = names
                    , con_qvars = hs_tvs, con_cxt = hs_ctxt
                    , con_details = hs_details, con_res = hs_res_ty })
-  = addErrCtxt (dataConCtxt name) $
-    do { traceTc "tcConDecl 1" (ppr name)
-       ; (ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts)
+  = addErrCtxt (dataConCtxtName names) $
+    do { traceTc "tcConDecl 1" (ppr names)
+       ; (ctxt, arg_tys, res_ty, field_lbls, stricts)
            <- tcHsTyVarBndrs hs_tvs $ \ _ ->
               do { ctxt    <- tcHsContext hs_ctxt
                  ; details <- tcConArgs new_or_data hs_details
                  ; res_ty  <- tcConRes hs_res_ty
-                 ; let (is_infix, field_lbls, btys) = details
-                       (arg_tys, stricts)           = unzip btys
-                 ; return (ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) }
+                 ; let (field_lbls, btys) = details
+                       (arg_tys, stricts) = unzip btys
+                 ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
+                 }
 
              -- Generalise the kind variables (returning quantified TcKindVars)
              -- and quantify the type variables (substituting their kinds)
@@ -1189,29 +1195,60 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
        ; let (univ_tvs, ex_tvs, eq_preds, res_ty') = rejigConRes tmpl_tvs res_tmpl qtkvs res_ty
 
        ; fam_envs <- tcGetFamInstEnvs
-       ; buildDataCon fam_envs (unLoc name) is_infix
-                      stricts field_lbls
-                      univ_tvs ex_tvs eq_preds ctxt arg_tys
-                      res_ty' rep_tycon
-                -- NB:  we put data_tc, the type constructor gotten from the
-                --      constructor type signature into the data constructor;
-                --      that way checkValidDataCon can complain if it's wrong.
+       ; let
+           buildOneDataCon (L _ name) = do
+             { is_infix <- tcConIsInfix name hs_details res_ty
+             ; buildDataCon fam_envs name is_infix
+                            stricts field_lbls
+                            univ_tvs ex_tvs eq_preds ctxt arg_tys
+                            res_ty' rep_tycon
+                  -- NB:  we put data_tc, the type constructor gotten from the
+                  --      constructor type signature into the data constructor;
+                  --      that way checkValidDataCon can complain if it's wrong.
+             }
+       ; mapM buildOneDataCon names
        }
 
-tcConArgs :: NewOrData -> HsConDeclDetails Name -> TcM (Bool, [Name], [(TcType, HsBang)])
+
+tcConIsInfix :: Name
+             -> HsConDetails (LHsType Name) [LConDeclField Name]
+             -> ResType Type
+             -> TcM Bool
+tcConIsInfix _   details ResTyH98
+  = case details of
+           InfixCon {}  -> return True
+           _            -> return False
+tcConIsInfix con details (ResTyGADT _)
+  = case details of
+           InfixCon {}  -> return True
+           RecCon {}    -> return False
+           PrefixCon arg_tys           -- See Note [Infix GADT cons]
+               | isSymOcc (getOccName con)
+               , [_ty1,_ty2] <- arg_tys
+                  -> do { fix_env <- getFixityEnv
+                        ; return (con `elemNameEnv` fix_env) }
+               | otherwise -> return False
+
+
+
+tcConArgs :: NewOrData -> HsConDeclDetails Name
+          -> TcM ([Name], [(TcType, HsBang)])
 tcConArgs new_or_data (PrefixCon btys)
   = do { btys' <- mapM (tcConArg new_or_data) btys
-       ; return (False, [], btys') }
+       ; return ([], btys') }
 tcConArgs new_or_data (InfixCon bty1 bty2)
   = do { bty1' <- tcConArg new_or_data bty1
        ; bty2' <- tcConArg new_or_data bty2
-       ; return (True, [], [bty1', bty2']) }
+       ; return ([], [bty1', bty2']) }
 tcConArgs new_or_data (RecCon fields)
   = do { btys' <- mapM (tcConArg new_or_data) btys
-       ; return (False, field_names, btys') }
+       ; return (field_names, btys') }
   where
-    field_names = map (unLoc . cd_fld_name) fields
-    btys        = map cd_fld_type fields
+    -- We need a one-to-one mapping from field_names to btys
+    combined = map (\(L _ f) -> (cd_fld_names f,cd_fld_type f)) fields
+    explode (ns,ty) = zip (map unLoc ns) (repeat ty)
+    exploded = concatMap explode combined
+    (field_names,btys) = unzip exploded
 
 tcConArg :: NewOrData -> LHsType Name -> TcM (TcType, HsBang)
 tcConArg new_or_data bty
@@ -1226,6 +1263,20 @@ tcConRes (ResTyGADT res_ty) = do { res_ty' <- tcHsLiftedType res_ty
                                  ; return (ResTyGADT res_ty') }
 
 \end{code}
+
+Note [Infix GADT constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not currently have syntax to declare an infix constructor in GADT syntax,
+but it makes a (small) difference to the Show instance.  So as a slightly
+ad-hoc solution, we regard a GADT data constructor as infix if
+  a) it is an operator symbol
+  b) it has two arguments
+  c) there is a fixity declaration for it
+For example:
+   infix 6 (:--:)
+   data T a where
+     (:--:) :: t1 -> t2 -> T Int
+
 
 Note [Checking GADT return types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1905,9 +1956,9 @@ mkRecSelBind (tycon, sel_name)
                                  (L loc (HsVar field_var))
     mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
-    rec_field  = HsRecField { hsRecFieldId = sel_lname
-                            , hsRecFieldArg = L loc (VarPat field_var)
-                            , hsRecPun = False }
+    rec_field  = noLoc (HsRecField { hsRecFieldId = sel_lname
+                                   , hsRecFieldArg = L loc (VarPat field_var)
+                                   , hsRecPun = False })
     sel_lname = L loc sel_name
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
 
@@ -2072,6 +2123,12 @@ fieldTypeMisMatch :: Name -> DataCon -> DataCon -> SDoc
 fieldTypeMisMatch field_name con1 con2
   = sep [ptext (sLit "Constructors") <+> ppr con1 <+> ptext (sLit "and") <+> ppr con2,
          ptext (sLit "give different types for field"), quotes (ppr field_name)]
+
+dataConCtxtName :: [Located Name] -> SDoc
+dataConCtxtName [con]
+   = ptext (sLit "In the definition of data constructor") <+> quotes (ppr con)
+dataConCtxtName con
+   = ptext (sLit "In the definition of data constructors") <+> interpp'SP con
 
 dataConCtxt :: Outputable a => a -> SDoc
 dataConCtxt con = ptext (sLit "In the definition of data constructor") <+> quotes (ppr con)

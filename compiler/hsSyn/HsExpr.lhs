@@ -161,8 +161,8 @@ data HsExpr id
                 (LHsExpr id)    -- operand
 
   -- | Used for explicit tuples and sections thereof
-  | ExplicitTuple               
-        [HsTupArg id]
+  | ExplicitTuple
+        [LHsTupArg id]
         Boxity
 
   | HsCase      (LHsExpr id)
@@ -339,17 +339,18 @@ data HsExpr id
 deriving instance (DataId id) => Data (HsExpr id)
 
 -- | HsTupArg is used for tuple sections
---  (,a,) is represented by  ExplicitTuple [Mising ty1, Present a, Missing ty3]
+--  (,a,) is represented by  ExplicitTuple [Missing ty1, Present a, Missing ty3]
 --  Which in turn stands for (\x:ty1 \y:ty2. (x,a,y))
+type LHsTupArg id = Located (HsTupArg id)
 data HsTupArg id
   = Present (LHsExpr id)     -- ^ The argument
   | Missing (PostTc id Type) -- ^ The argument is missing, but this is its type
   deriving (Typeable)
 deriving instance (DataId id) => Data (HsTupArg id)
 
-tupArgPresent :: HsTupArg id -> Bool
-tupArgPresent (Present {}) = True
-tupArgPresent (Missing {}) = False
+tupArgPresent :: LHsTupArg id -> Bool
+tupArgPresent (L _ (Present {})) = True
+tupArgPresent (L _ (Missing {})) = False
 \end{code}
 
 Note [Parens in HsSyn]
@@ -477,7 +478,8 @@ ppr_expr (SectionR op expr)
     pp_infixly v = sep [pprInfixOcc v, pp_expr]
 
 ppr_expr (ExplicitTuple exprs boxity)
-  = tupleParens (boxityNormalTupleSort boxity) (fcat (ppr_tup_args exprs))
+  = tupleParens (boxityNormalTupleSort boxity)
+                (fcat (ppr_tup_args $ map unLoc exprs))
   where
     ppr_tup_args []               = []
     ppr_tup_args (Present e : es) = (ppr_lexpr e <> punc es) : ppr_tup_args es

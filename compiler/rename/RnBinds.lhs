@@ -385,9 +385,13 @@ rnLocalValBindsAndThen bs _ = pprPanic "rnLocalValBindsAndThen" (ppr bs)
 
 makeMiniFixityEnv :: [LFixitySig RdrName] -> RnM MiniFixityEnv
 
-makeMiniFixityEnv decls = foldlM add_one emptyFsEnv decls
+makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
  where
-   add_one env (L loc (FixitySig (L name_loc name) fixity)) = do
+   add_one_sig env (L loc (FixitySig names fixity)) =
+     foldlM add_one env [ (loc,name_loc,name,fixity)
+                        | L name_loc name <- names ]
+
+   add_one env (loc, name_loc, name,fixity) = do
      { -- this fixity decl is a duplicate iff
        -- the ReaderName's OccName's FastString is already in the env
        -- (we only need to check the local fix_env because
@@ -821,20 +825,25 @@ renameSig _ (SpecInstSig ty)
 -- so, in the top-level case (when mb_names is Nothing)
 -- we use lookupOccRn.  If there's both an imported and a local 'f'
 -- then the SPECIALISE pragma is ambiguous, unlike all other signatures
-renameSig ctxt sig@(SpecSig v ty inl)
+renameSig ctxt sig@(SpecSig v tys inl)
   = do  { new_v <- case ctxt of
                      TopSigCtxt {} -> lookupLocatedOccRn v
                      _             -> lookupSigOccRn ctxt sig v
-        ; (new_ty, fvs) <- rnHsSigType (quotes (ppr v)) ty
+        -- ; (new_ty, fvs) <- rnHsSigType (quotes (ppr v)) ty
+        ; (new_ty, fvs) <- foldM do_one ([],emptyFVs) tys
         ; return (SpecSig new_v new_ty inl, fvs) }
+  where
+    do_one (tys,fvs) ty
+      = do { (new_ty, fvs_ty) <- rnHsSigType (quotes (ppr v)) ty
+           ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
 renameSig ctxt sig@(InlineSig v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
         ; return (InlineSig new_v s, emptyFVs) }
 
-renameSig ctxt sig@(FixSig (FixitySig v f))
-  = do  { new_v <- lookupSigOccRn ctxt sig v
-        ; return (FixSig (FixitySig new_v f), emptyFVs) }
+renameSig ctxt sig@(FixSig (FixitySig vs f))
+  = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
+        ; return (FixSig (FixitySig new_vs f), emptyFVs) }
 
 renameSig ctxt sig@(MinimalSig bf)
   = do new_bf <- traverse (lookupSigOccRn ctxt sig) bf
@@ -912,7 +921,7 @@ findDupSigs :: [LSig RdrName] -> [[(Located RdrName, Sig RdrName)]]
 findDupSigs sigs
   = findDupsEq matching_sig (concatMap (expand_sig . unLoc) sigs)
   where
-    expand_sig sig@(FixSig (FixitySig n _)) = [(n,sig)]
+    expand_sig sig@(FixSig (FixitySig ns _)) = zip ns (repeat sig)
     expand_sig sig@(InlineSig n _)          = [(n,sig)]
     expand_sig sig@(TypeSig  ns _)   = [(n,sig) | n <- ns]
     expand_sig sig@(GenericSig ns _) = [(n,sig) | n <- ns]

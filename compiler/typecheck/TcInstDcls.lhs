@@ -543,7 +543,8 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         ; dfun_name <- newDFunName clas inst_tys (getLoc poly_ty)
                 -- Dfun location is that of instance *header*
 
-        ; ispec <- newClsInst overlap_mode dfun_name tyvars theta clas inst_tys
+        ; ispec <- newClsInst (fmap unLoc overlap_mode) dfun_name tyvars theta
+                              clas inst_tys
         ; let inst_info = InstInfo { iSpec  = ispec
                                    , iBinds = InstBindings
                                      { ib_binds = binds
@@ -706,7 +707,7 @@ tcDataFamInstDecl mb_clsinfo
 
        ; (rep_tc, fam_inst) <- fixM $ \ ~(rec_rep_tc, _) ->
            do { data_cons <- tcConDecls new_or_data rec_rep_tc
-                                       (tvs', orig_res_ty) cons
+                                        (tvs', orig_res_ty) cons
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)
                      NewType  -> ASSERT( not (null data_cons) )
@@ -717,7 +718,9 @@ tcDataFamInstDecl mb_clsinfo
                                                (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
                     parent   = FamInstTyCon axiom fam_tc pats'
                     roles    = map (const Nominal) tvs'
-                    rep_tc   = buildAlgTyCon rep_tc_name tvs' roles cType stupid_theta tc_rhs
+                    rep_tc   = buildAlgTyCon rep_tc_name tvs' roles
+                                             (fmap unLoc cType) stupid_theta
+                                             tc_rhs
                                              Recursive
                                              False      -- No promotable to the kind level
                                              gadt_syntax parent

@@ -30,7 +30,7 @@ module HsTypes (
         LBangType, BangType, HsBang(..), 
         getBangType, getBangStrictness, 
 
-        ConDeclField(..), pprConDeclFields,
+        ConDeclField(..), LConDeclField, pprConDeclFields,
         
         mkHsQTvs, hsQTvBndrs, isHsKindedTyVar, hsTvbAllKinded,
         mkExplicitHsForAllTy, mkImplicitHsForAllTy, mkQualifiedHsForAllTy,
@@ -258,18 +258,18 @@ data HsType name
   | HsDocTy             (LHsType name) LHsDocString -- A documented type
 
   | HsBangTy    HsBang (LHsType name)   -- Bang-style type annotations 
-  | HsRecTy [ConDeclField name]         -- Only in data type declarations
+  | HsRecTy     [LConDeclField name]    -- Only in data type declarations
 
   | HsCoreTy Type       -- An escape hatch for tunnelling a *closed* 
                         -- Core Type through HsSyn.  
 
   | HsExplicitListTy       -- A promoted explicit list
         (PostTc name Kind) -- See Note [Promoted lists and tuples]
-        [LHsType name]   
-                         
+        [LHsType name]
+
   | HsExplicitTupleTy      -- A promoted explicit tuple
         [PostTc name Kind] -- See Note [Promoted lists and tuples]
-        [LHsType name]   
+        [LHsType name]
 
   | HsTyLit HsTyLit      -- A promoted numeric literal.
 
@@ -398,10 +398,11 @@ data HsTupleSort = HsUnboxedTuple
 
 data HsExplicitFlag = Qualified | Implicit | Explicit deriving (Data, Typeable)
 
+type LConDeclField name = Located (ConDeclField name)
 data ConDeclField name  -- Record fields have Haddoc docs on them
-  = ConDeclField { cd_fld_name :: Located name,
-                   cd_fld_type :: LBangType name, 
-                   cd_fld_doc  :: Maybe LHsDocString }
+  = ConDeclField { cd_fld_names :: [Located name],
+                   cd_fld_type  :: LBangType name,
+                   cd_fld_doc   :: Maybe LHsDocString }
   deriving (Typeable)
 deriving instance (DataId name) => Data (ConDeclField name)
 
@@ -616,12 +617,14 @@ pprHsContextMaybe []         = Nothing
 pprHsContextMaybe [L _ pred] = Just $ ppr_mono_ty FunPrec pred
 pprHsContextMaybe cxt        = Just $ parens (interpp'SP cxt)
 
-pprConDeclFields :: OutputableBndr name => [ConDeclField name] -> SDoc
+pprConDeclFields :: OutputableBndr name => [LConDeclField name] -> SDoc
 pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where
-    ppr_fld (ConDeclField { cd_fld_name = n, cd_fld_type = ty, 
-                            cd_fld_doc = doc })
-        = ppr n <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
+    ppr_fld (L _ (ConDeclField { cd_fld_names = ns, cd_fld_type = ty,
+                                 cd_fld_doc = doc }))
+        = ppr_names ns <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
+    ppr_names [n] = ppr n
+    ppr_names ns = sep (punctuate comma (map ppr ns))
 \end{code}
 
 Note [Printing KindedTyVars]

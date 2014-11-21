@@ -18,7 +18,7 @@ module HsPat (
 
         HsConDetails(..),
         HsConPatDetails, hsConPatArgs,
-        HsRecFields(..), HsRecField(..), hsRecFields,
+        HsRecFields(..), HsRecField(..), LHsRecField, hsRecFields,
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
@@ -187,7 +187,7 @@ type HsConPatDetails id = HsConDetails (LPat id) (HsRecFields id (LPat id))
 
 hsConPatArgs :: HsConPatDetails id -> [LPat id]
 hsConPatArgs (PrefixCon ps)   = ps
-hsConPatArgs (RecCon fs)      = map hsRecFieldArg (rec_flds fs)
+hsConPatArgs (RecCon fs)      = map (hsRecFieldArg . unLoc) (rec_flds fs)
 hsConPatArgs (InfixCon p1 p2) = [p1,p2]
 \end{code}
 
@@ -198,7 +198,7 @@ However HsRecFields is used only for patterns and expressions
 data HsRecFields id arg         -- A bunch of record fields
                                 --      { x = 3, y = True }
         -- Used for both expressions and patterns
-  = HsRecFields { rec_flds   :: [HsRecField id arg],
+  = HsRecFields { rec_flds   :: [LHsRecField id arg],
                   rec_dotdot :: Maybe Int }  -- Note [DotDot fields]
   deriving (Data, Typeable)
 
@@ -216,6 +216,7 @@ data HsRecFields id arg         -- A bunch of record fields
 --                     the first 'n' being the user-written ones
 --                     and the remainder being 'filled in' implicitly
 
+type LHsRecField id arg = Located (HsRecField id arg)
 data HsRecField id arg = HsRecField {
         hsRecFieldId  :: Located id,
         hsRecFieldArg :: arg,           -- Filled in by renamer
@@ -235,7 +236,7 @@ data HsRecField id arg = HsRecField {
 --    T { A.x } means T { A.x = x }
 
 hsRecFields :: HsRecFields id arg -> [id]
-hsRecFields rbinds = map (unLoc . hsRecFieldId) (rec_flds rbinds)
+hsRecFields rbinds = map (unLoc . hsRecFieldId . unLoc) (rec_flds rbinds)
 \end{code}
 
 %************************************************************************

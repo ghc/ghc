@@ -536,16 +536,17 @@ but it seems tiresome to do so.
 %*********************************************************
 
 \begin{code}
-rnConDeclFields :: HsDocContext -> [ConDeclField RdrName]
-                -> RnM ([ConDeclField Name], FreeVars)
+rnConDeclFields :: HsDocContext -> [LConDeclField RdrName]
+                -> RnM ([LConDeclField Name], FreeVars)
 rnConDeclFields doc fields = mapFvRn (rnField doc) fields
 
-rnField :: HsDocContext -> ConDeclField RdrName -> RnM (ConDeclField Name, FreeVars)
-rnField doc (ConDeclField name ty haddock_doc)
-  = do { new_name <- lookupLocatedTopBndrRn name
+rnField :: HsDocContext -> LConDeclField RdrName
+        -> RnM (LConDeclField Name, FreeVars)
+rnField doc (L l (ConDeclField names ty haddock_doc))
+  = do { new_names <- mapM lookupLocatedTopBndrRn names
        ; (new_ty, fvs) <- rnLHsType doc ty
        ; new_haddock_doc <- rnMbLHsDoc haddock_doc
-       ; return (ConDeclField new_name new_ty new_haddock_doc, fvs) }
+       ; return (L l (ConDeclField new_names new_ty new_haddock_doc), fvs) }
 
 rnContext :: HsDocContext -> LHsContext RdrName -> RnM (LHsContext Name, FreeVars)
 rnContext doc (L loc cxt)
@@ -958,7 +959,7 @@ extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
                                     , dd_cons = cons, dd_derivs = derivs })
   = fst $ extract_lctxt ctxt $
           extract_mb extract_lkind ksig $
-          extract_mb extract_ltys derivs $
+          extract_mb (extract_ltys . unLoc) derivs $
           foldr (extract_con . unLoc) ([],[]) cons
   where
     extract_con (ConDecl { con_res = ResTyGADT {} }) acc = acc
@@ -989,7 +990,8 @@ extract_lty (L _ ty) acc
   = case ty of
       HsTyVar tv                -> extract_tv tv acc
       HsBangTy _ ty             -> extract_lty ty acc
-      HsRecTy flds              -> foldr (extract_lty . cd_fld_type) acc flds
+      HsRecTy flds              -> foldr (extract_lty . cd_fld_type . unLoc) acc
+                                         flds
       HsAppTy ty1 ty2           -> extract_lty ty1 (extract_lty ty2 acc)
       HsListTy ty               -> extract_lty ty acc
       HsPArrTy ty               -> extract_lty ty acc

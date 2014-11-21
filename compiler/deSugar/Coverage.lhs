@@ -593,9 +593,10 @@ addTickHsExpr (HsUnboundVar {}) = panic "addTickHsExpr.HsUnboundVar"
 -- Others dhould never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
 
-addTickTupArg :: HsTupArg Id -> TM (HsTupArg Id)
-addTickTupArg (Present e)  = do { e' <- addTickLHsExpr e; return (Present e') }
-addTickTupArg (Missing ty) = return (Missing ty)
+addTickTupArg :: LHsTupArg Id -> TM (LHsTupArg Id)
+addTickTupArg (L l (Present e))  = do { e' <- addTickLHsExpr e
+                                      ; return (L l (Present e')) }
+addTickTupArg (L l (Missing ty)) = return (L l (Missing ty))
 
 addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup Id (LHsExpr Id) -> TM (MatchGroup Id (LHsExpr Id))
 addTickMatchGroup is_lam mg@(MG { mg_alts = matches }) = do
@@ -891,9 +892,9 @@ addTickHsRecordBinds (HsRecFields fields dd)
   = do  { fields' <- mapM process fields
         ; return (HsRecFields fields' dd) }
   where
-    process (HsRecField ids expr doc)
+    process (L l (HsRecField ids expr doc))
         = do { expr' <- addTickLHsExpr expr
-             ; return (HsRecField ids expr' doc) }
+             ; return (L l (HsRecField ids expr' doc)) }
 
 addTickArithSeqInfo :: ArithSeqInfo Id -> TM (ArithSeqInfo Id)
 addTickArithSeqInfo (From e1) =
