@@ -102,6 +102,8 @@
   * Add `scanl'`, a strictly accumulating version of `scanl`, to `Data.List`
     and `Data.OldList`. (#9368)
 
+  * Add `fillBytes` to `Foreign.Marshal.Utils`.
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3
