@@ -127,7 +127,6 @@
              </para>
            </listitem>
            <listitem>
-<<<<<<< HEAD
                 <para>
                     Many more options have learned to respect the <option>-ddump-to-file</option>.
                     For example you can use <option>-ddump-to-file</option> with <option>-ddump-splices</option>
@@ -144,7 +143,9 @@
                solver, to add new functionality to GHC's
                typechecker. See <xref linkend="typechecker-plugins"/>
                for more details.
-=======
+             </para>
+           </listitem>
+           <listitem>
              <para>
                A new warning flag, <option>-fwarn-missing-exported-sigs</option>
                has been added. The behavior is similar to
@@ -152,7 +153,6 @@
                flag exported values. This flag takes precedence over
                <option>-fwarn-missing-signatures</option> so it can be used
                in conjunction with <option>-Wall</option>.
->>>>>>> 0551cf1... Add flag `-fwarn-missing-exported-sigs`
              </para>
            </listitem>
        </itemizedlist>
