@@ -328,34 +328,8 @@ The InertCans represents a collection of constraints with the following properti
     to the CTyEqCan equalities (modulo canRewrite of course;
     eg a wanted cannot rewrite a given)
 
-  * CTyEqCan equalities _do_not_ form an idempotent substitution, but
-    they are guaranteed to not have any occurs errors. Additional notes:
-
-       - The lack of idempotence of the inert substitution implies
-         that we must make sure that when we rewrite a constraint we
-         apply the substitution /recursively/ to the types
-         involved. Currently the one AND ONLY way in the whole
-         constraint solver that we rewrite types and constraints wrt
-         to the inert substitution is TcFlatten/flattenTyVar.
-
-       - In the past we did try to have the inert substitution as
-         idempotent as possible but this would only be true for
-         constraints of the same flavor, so in total the inert
-         substitution could not be idempotent, due to flavor-related
-         issued.  Note [Non-idempotent inert substitution] in TcFlatten
-         explains what is going on.
-
-       - Whenever a constraint ends up in the worklist we do
-         recursively apply exhaustively the inert substitution to it
-         to check for occurs errors.  But if an equality is already in
-         the inert set and we can guarantee that adding a new equality
-         will not cause the first equality to have an occurs check
-         then we do not rewrite the inert equality.  This happens in
-         TcInteract, rewriteInertEqsFromInertEq.
-
-         See Note [Delicate equality kick-out] to see which inert
-         equalities can safely stay in the inert set and which must be
-         kicked out to be rewritten and re-checked for occurs errors.
+  * CTyEqCan equalities: see Note [Applying the inert substitution]
+                         in TcFlatten
 
 Note [Type family equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -925,6 +925,9 @@ In effect they become Givens, implemented via the side-effected substitution.
 
 Note [An alternative story for the inert substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(This entire note is just background, left here in case we ever want
+ to return the the previousl state of affairs)
+
 We used (GHC 7.8) to have this story for the inert substitution inert_eqs
 
  * 'a' is not in fvs(ty)
@@ -1012,8 +1015,8 @@ Note [eqCanRewrite]
 tv ~ ty) can be used to rewrite ct2.
 
 The EqCanRewrite Property:
-  * For any a,b in {G,W,D}  if   a canRewrite b
-                            then a canRewrite a
+  * For any a,b in {G,W,D}  if   a eqCanRewrite b
+                            then a eqCanRewrite a
   This is what guarantees that canonicalisation will terminate.
   See Note [Applying the inert substitution]
 
