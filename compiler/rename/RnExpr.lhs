@@ -88,8 +88,7 @@ finishHsVar name
 rnExpr (HsVar v)
   = do { mb_name <- lookupOccRn_maybe v
        ; case mb_name of {
-           Nothing -> do { opt_TypeHoles <- woptM Opt_WarnTypedHoles
-                         ; if opt_TypeHoles && startsWithUnderscore (rdrNameOcc v)
+           Nothing -> do { if startsWithUnderscore (rdrNameOcc v)
                            then return (HsUnboundVar v, emptyFVs)
                            else do { n <- reportUnboundName v; finishHsVar n } } ;
            Just name
@@ -300,11 +299,7 @@ Since all the symbols are reservedops we can simply reject them.
 We return a (bogus) EWildPat in each case.
 
 \begin{code}
-rnExpr e@EWildPat      = do { holes <- woptM Opt_WarnTypedHoles
-                            ; if holes
-                                then return (hsHoleExpr, emptyFVs)
-                                else patSynErr e
-                            }
+rnExpr EWildPat        = return (hsHoleExpr, emptyFVs)
 rnExpr e@(EAsPat {})   = patSynErr e
 rnExpr e@(EViewPat {}) = patSynErr e
 rnExpr e@(ELazyPat {}) = patSynErr e

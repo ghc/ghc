@@ -1,0 +1,7 @@
+T9497a-run: T9497a-run.hs:2:8:
+    Found hole ‘_main’ with type: IO ()
+    Relevant bindings include
+      main :: IO () (bound at T9497a-run.hs:2:1)
+    In the expression: _main
+    In an equation for ‘main’: main = _main
+(deferred type error)

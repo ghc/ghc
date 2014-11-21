@@ -1,0 +1,6 @@
+
+T9497a.hs:2:8: Warning:
+    Found hole ‘_main’ with type: IO ()
+    Relevant bindings include main :: IO () (bound at T9497a.hs:2:1)
+    In the expression: _main
+    In an equation for ‘main’: main = _main

@@ -1881,7 +1881,7 @@ simplifyDeriv pred tvs theta
                          where p = ctPred ct
 
        -- If we are deferring type errors, simply ignore any insoluble
-       -- constraints.  Tney'll come up again when we typecheck the
+       -- constraints.  They'll come up again when we typecheck the
        -- generated instance declaration
        ; defer <- goptM Opt_DeferTypeErrors
        ; unless defer (reportAllUnsolved (residual_wanted { wc_flat = bad }))

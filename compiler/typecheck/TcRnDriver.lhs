@@ -1535,7 +1535,7 @@ runPlans [p]    = p
 runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
 
 -- | Typecheck (and 'lift') a stmt entered by the user in GHCi into the
--- GHCi 'environemnt'.
+-- GHCi 'environment'.
 --
 -- By 'lift' and 'environment we mean that the code is changed to
 -- execute properly in an IO monad. See Note [Interactively-bound Ids

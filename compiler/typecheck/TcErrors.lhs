@@ -43,6 +43,7 @@ import DynFlags
 import StaticFlags      ( opt_PprStyle_Debug )
 import ListSetOps       ( equivClasses )
 
+import Control.Monad    ( when )
 import Data.Maybe
 import Data.List        ( partition, mapAccumL, zip4, nub, sortBy )
 \end{code}
@@ -98,22 +99,29 @@ compilation. The errors are turned into warnings in `reportUnsolved`.
 reportUnsolved :: WantedConstraints -> TcM (Bag EvBind)
 reportUnsolved wanted
   = do { binds_var <- newTcEvBinds
-       ; defer <- goptM Opt_DeferTypeErrors
-       ; report_unsolved (Just binds_var) defer wanted
+       ; defer_errors <- goptM Opt_DeferTypeErrors
+       ; defer_holes <- goptM Opt_DeferTypedHoles
+       ; warn_holes <- woptM Opt_WarnTypedHoles
+       ; report_unsolved (Just binds_var) defer_errors defer_holes
+             warn_holes wanted
        ; getTcEvBinds binds_var }
 
 reportAllUnsolved :: WantedConstraints -> TcM ()
 -- Report all unsolved goals, even if -fdefer-type-errors is on
 -- See Note [Deferring coercion errors to runtime]
-reportAllUnsolved wanted = report_unsolved Nothing False wanted
+reportAllUnsolved wanted = do
+    warn_holes <- woptM Opt_WarnTypedHoles
+    report_unsolved Nothing False False warn_holes wanted
 
 report_unsolved :: Maybe EvBindsVar  -- cec_binds
-                -> Bool              -- cec_defer
+                -> Bool              -- cec_defer_type_errors
+                -> Bool              -- cec_defer_holes
+                -> Bool              -- cec_warn_holes
                 -> WantedConstraints -> TcM ()
 -- Important precondition:
 -- WantedConstraints are fully zonked and unflattened, that is,
 -- zonkWC has already been applied to these constraints.
-report_unsolved mb_binds_var defer wanted
+report_unsolved mb_binds_var defer_errors defer_holes  warn_holes wanted
   | isEmptyWC wanted
   = return ()
   | otherwise
@@ -127,7 +135,9 @@ report_unsolved mb_binds_var defer wanted
              free_tvs = tyVarsOfWC wanted
              err_ctxt = CEC { cec_encl  = []
                             , cec_tidy  = tidy_env
-                            , cec_defer    = defer
+                            , cec_defer_type_errors = defer_errors
+                            , cec_defer_holes = defer_holes
+                            , cec_warn_holes = warn_holes
                             , cec_suppress = False -- See Note [Suppressing error messages]
                             , cec_binds    = mb_binds_var }
 
@@ -152,8 +162,16 @@ data ReportErrCtxt
                          --              into warnings, and emit evidence bindings
                          --              into 'ev' for unsolved constraints
 
-          , cec_defer :: Bool       -- True <=> -fdefer-type-errors
-                                    -- Irrelevant if cec_binds = Nothing
+          , cec_defer_type_errors :: Bool -- True <=> -fdefer-type-errors
+                                          -- Defer type errors until runtime
+                                          -- Irrelevant if cec_binds = Nothing
+
+          , cec_defer_holes :: Bool     -- True <=> -fdefer-typed-holes
+                                        -- Turn typed holes into runtime errors
+                                        -- Irrelevant if cec_binds = Nothing
+
+          , cec_warn_holes :: Bool  -- True <=> -fwarn-typed-holes
+                                    -- Controls whether holes produce warnings
           , cec_suppress :: Bool    -- True <=> More important errors have occurred,
                                     --          so create bindings if need be, but
                                     --          don't issue any more errors/warnings
@@ -231,7 +249,7 @@ reportFlats ctxt flats    -- Here 'flats' includes insolble goals
         -- Like Int ~ Bool (incl nullary TyCons)
         -- or  Int ~ t a   (AppTy on one side)
         ("Utterly wrong",  utterly_wrong,   True, mkGroupReporter mkEqErr)
-      , ("Holes",          is_hole,         True, mkUniReporter mkHoleError)
+      , ("Holes",          is_hole,         True, mkHoleReporter mkHoleError)
 
         -- Report equalities of form (a~ty).  They are usually
         -- skolem-equalities, and they cause confusing knock-on
@@ -318,13 +336,13 @@ mkSkolReporter ctxt cts
            (EqPred ty1 _, EqPred ty2 _) -> ty1 `cmpType` ty2
            _ -> pprPanic "mkSkolReporter" (ppr ct1 $$ ppr ct2)
 
-mkUniReporter :: (ReportErrCtxt -> Ct -> TcM ErrMsg) -> Reporter
+mkHoleReporter :: (ReportErrCtxt -> Ct -> TcM ErrMsg) -> Reporter
 -- Reports errors one at a time
-mkUniReporter mk_err ctxt
+mkHoleReporter mk_err ctxt
   = mapM_ $ \ct ->
     do { err <- mk_err ctxt ct
-       ; maybeReportError ctxt err
-       ; maybeAddDeferredBinding ctxt err ct }
+       ; maybeReportHoleError ctxt err
+       ; maybeAddDeferredHoleBinding ctxt err ct }
 
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
                              -- Make error message for a group
@@ -345,22 +363,30 @@ reportGroup mk_err ctxt cts
                -- Add deferred bindings for all
                -- But see Note [Always warn with -fdefer-type-errors]
 
+maybeReportHoleError :: ReportErrCtxt -> ErrMsg -> TcM ()
+maybeReportHoleError ctxt err
+  | cec_defer_holes ctxt
+  = when (cec_warn_holes ctxt)
+            (reportWarning (makeIntoWarning err))
+  | otherwise
+  = reportError err
+
 maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
 -- Report the error and/or make a deferred binding for it
 maybeReportError ctxt err
-  | cec_defer ctxt  -- See Note [Always warn with -fdefer-type-errors]
+  -- See Note [Always warn with -fdefer-type-errors]
+  | cec_defer_type_errors ctxt
   = reportWarning (makeIntoWarning err)
   | cec_suppress ctxt
   = return ()
   | otherwise
   = reportError err
 
-maybeAddDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
+addDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
-maybeAddDeferredBinding ctxt err ct
+addDeferredBinding ctxt err ct
   | CtWanted { ctev_pred = pred, ctev_evar = ev_id } <- ctEvidence ct
     -- Only add deferred bindings for Wanted constraints
-  , isHoleCt ct || cec_defer ctxt  -- And it's a hole or we have -fdefer-type-errors
   , Just ev_binds_var <- cec_binds ctxt  -- We have somewhere to put the bindings
   = do { dflags <- getDynFlags
        ; let err_msg = pprLocErrMsg err
@@ -372,6 +398,20 @@ maybeAddDeferredBinding ctxt err ct
 
   | otherwise   -- Do not set any evidence for Given/Derived
   = return ()
+
+maybeAddDeferredHoleBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
+maybeAddDeferredHoleBinding ctxt err ct
+    | cec_defer_holes ctxt
+    = addDeferredBinding ctxt err ct
+    | otherwise
+    = return ()
+
+maybeAddDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
+maybeAddDeferredBinding ctxt err ct
+    | cec_defer_type_errors ctxt
+    = addDeferredBinding ctxt err ct
+    | otherwise
+    = return ()
 
 tryReporters :: [ReporterSpec] -> Reporter -> Reporter
 -- Use the first reporter in the list whose predicate says True

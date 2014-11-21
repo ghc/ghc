@@ -3,7 +3,7 @@
 <indexterm><primary>language, GHC</primary></indexterm>
 <indexterm><primary>extensions, GHC</primary></indexterm>
 As with all known Haskell systems, GHC implements some extensions to
-the language.  They can all be enabled or disabled by commandline flags
+the language.  They can all be enabled or disabled by command line flags
 or language pragmas. By default GHC understands the most recent Haskell
 version it supports, plus a handful of extensions.
 </para>
@@ -8423,31 +8423,37 @@ with <option>-XNoMonoLocalBinds</option> but type inference becomes less predica
 <sect1 id="typed-holes">
 <title>Typed Holes</title>
 
-<para>Typed hole support is enabled with the option
-<option>-fwarn-typed-holes</option>, which is enabled by default.</para>
-
 <para>
-This option allows special placeholders, written with a leading underscore (e.g. "<literal>_</literal>",
-"<literal>_foo</literal>", "<literal>_bar</literal>"), to be used as an expression.
-During compilation these holes will generate an error message describing what type is expected there,
-information about the origin of any free type variables, and a list of local bindings
-that might help fill the hole with actual code.
+Typed holes are a feature of GHC that allows special placeholders written with
+a leading underscore (e.g., "<literal>_</literal>", "<literal>_foo</literal>",
+"<literal>_bar</literal>"), to be used as expressions. During compilation these
+holes will generate an error message that describes which type is expected at
+the hole's location, information about the origin of any free type variables,
+and a list of local bindings that might help fill the hole with actual code.
+Typed holes are always enabled in GHC.
 </para>
 
 <para>
-The goal of the typed holes warning is not to change the type system, but to help with writing Haskell
-code. Typed holes can be used to obtain extra information from the type checker, which might otherwise be hard
-to get.
-Normally, using GHCi, users can inspect the (inferred) type signatures of all top-level bindings.
-However, this method is less convenient with terms which are not defined on top-level or
-inside complex expressions. Holes allow to check the type of the term you're about to write.
+The goal of typed holes is to help with writing Haskell code rather than to
+change the type system. Typed holes can be used to obtain extra information
+from the type checker, which might otherwise be hard to get. Normally, using
+GHCi, users can inspect the (inferred) type signatures of all top-level
+bindings. However, this method is less convenient with terms that are not
+defined on top-level or inside complex expressions. Holes allow the user to
+check the type of the term they are about to write.
 </para>
 
 <para>
-Holes work together well with <link linkend="defer-type-errors">deferring type errors to runtime</link>:
-with <literal>-fdefer-type-errors</literal>, the error from a hole is also deferred, effctively making the hole
-typecheck just like <literal>undefined</literal>, but with the added benefit that it will show its warning message
-if it gets evaluated. This way, other parts of the code can still be executed and tested.
+To run and test a piece of code containing holes, use the
+<literal>-fdefer-typed-holes</literal> flag. This flag defers errors
+produced by typed holes and converts them into warnings. The result is that
+typed hole errors are converted into warnings (controlled by
+<literal>-fwarn-typed-holes</literal>). The result is that a hole will behave
+like <literal>undefined</literal>, but with the added benefits that it shows a
+warning at compile time and will show another warning message if it gets
+evaluated. This behaviour follows that of the
+<literal>-fdefer-type-errors</literal> option, which implies
+<literal>-fdefer-typed-holes</literal>. See <xref linkend="defer-type-errors"/>.
 </para>
 
 <para>
@@ -8556,6 +8562,15 @@ main = print "b"
     The flag <literal>-fdefer-type-errors</literal> controls whether type
     errors are deferred to runtime. Type errors will still be emitted as
     warnings, but will not prevent compilation.
+  </para>
+  <para>
+    This flag implies the <literal>-fdefer-typed-holes</literal> flag,
+    which enables this behaviour for <link linkend="typed-holes">typed holes
+    </link>. Should you so wish, it is possible to enable
+    <literal>-fdefer-type-errors</literal> without enabling
+    <literal>-fdefer-typed-holes</literal>, by explicitly specifying
+    <literal>-fno-defer-typed-holes</literal> on the commandline after the
+    <literal>-fdefer-type-errors</literal> flag.
   </para>
   <para>
     At runtime, whenever a term containing a type error would need to be

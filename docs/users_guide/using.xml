@@ -1131,14 +1131,11 @@ test.hs:(5,4)-(6,7):
           <indexterm><primary><option>-fwarn-typed-holes</option></primary>
           </indexterm>
           <indexterm><primary>warnings</primary></indexterm>
-            <para>When the compiler encounters an unbound local
-            variable prefixed with <literal>_</literal>, or encounters
-            the literal <literal>_</literal> on the right-hand side of
-            an expression, the error message for the unbound term
-            includes the type it needs to type check. It works
-            particularly well with <link
-            linkend="defer-type-errors">deferred type errors</link>.
-            See <xref linkend="typed-holes"/></para>
+          <para>
+              Determines whether the compiler reports typed holes warnings. Has
+              no effect unless typed holes errors are deferred until runtime.
+              See <xref linkend="typed-holes"/> and <xref linkend="defer-type-errors"/>
+            </para>
 
             <para>This warning is on by default.</para>
         </listitem>
@@ -1156,6 +1153,27 @@ test.hs:(5,4)-(6,7):
             runtime, if you use a value that depends on a type error, you 
             get a runtime error; but you can run any type-correct parts of your code 
             just fine.  See <xref linkend="defer-type-errors"/></para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fdefer-typed-holes</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fdefer-typed-holes</option></primary>
+          </indexterm>
+          <indexterm><primary>warnings</primary></indexterm>
+          <para>
+              Defer typed holes errors until runtime. This will turn the errors
+              produced by <link linked="typed-holes">typed holes</link> into
+              warnings. Using a value that depends on a typed hole produces a
+              runtime error, the same as <option>-fdefer-type-errors</option>
+              (which implies this option). See <xref linkend="typed-holes"/>
+              and <xref linkend="defer-type-errors"/>.
+          </para>
+          <para>
+              Implied by <option>-fdefer-type-errors</option>. See also
+              <option>-fwarn-typed-holes</option>.
+          </para>
         </listitem>
       </varlistentry>
 

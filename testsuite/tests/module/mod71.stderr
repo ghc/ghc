@@ -1,2 +1,11 @@
 
-mod71.hs:4:9: Pattern syntax in expression context: _
+mod71.hs:4:9:
+    Found hole ‘_’ with type: t1
+    Where: ‘t1’ is a rigid type variable bound by
+                the inferred type of f :: (t1 -> a -> t) -> t at mod71.hs:4:1
+    Relevant bindings include
+      x :: t1 -> a -> t (bound at mod71.hs:4:3)
+      f :: (t1 -> a -> t) -> t (bound at mod71.hs:4:1)
+    In the first argument of ‘x’, namely ‘_’
+    In the expression: x _ 1
+    In an equation for ‘f’: f x = x _ 1

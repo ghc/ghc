@@ -1363,9 +1363,26 @@
 
           <row>
             <entry><option>-fdefer-type-errors</option></entry>
-            <entry>Defer as many type errors as possible until runtime.</entry>
+            <entry>
+                Turn type errors into warnings, <link linkend="defer-type-errors">
+                deferring the error until runtime</link>. Implies
+                <option>-fdefer-typed-holes</option>.
+            </entry>
             <entry>dynamic</entry>
             <entry><option>-fno-defer-type-errors</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fdefer-typed-holes</option></entry>
+            <entry>
+                Convert <link linkend="typed-holes">typed hole</link> errors
+                into warnings, <link linkend="defer-type-errors">deferring the
+                error until runtime</link>. Implied by
+                <option>-fdefer-type-errors</option>. See also
+                <option>-fwarn-typed-holes</option>.
+            </entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-defer-typed-holes</option></entry>
           </row>
 
           <row>
@@ -1626,7 +1643,11 @@
 
           <row>
             <entry><option>-fwarn-typed-holes</option></entry>
-            <entry>Enable <link linkend="typed-holes">holes</link> in expressions.</entry>
+            <entry>
+                Report warnings when <link linkend="typed-holes">typed hole</link>
+                errors are <link linkend="defer-type-errors">deferred until
+                runtime</link>. See <option>-fdefer-typed-holes</option>.
+            </entry>
             <entry>dynamic</entry>
             <entry><option>-fno-warn-typed-holes</option></entry>
           </row>
