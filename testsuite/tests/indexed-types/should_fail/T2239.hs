@@ -42,10 +42,26 @@ simpleFD = id :: (forall b. MyEq b Bool => b->b)
 
 simpleTF = id :: (forall b. b~Bool => b->b)
 
--- These two both involve impredicative instantiation,
--- and should fail (in the same way)
+-- Actually these two do not involve impredicative instantiation,
+-- so they now succeed
 complexFD = id :: (forall b. MyEq b Bool => b->b)
-               -> (forall b. MyEq b Bool => b->b)
+               -> (forall c. MyEq c Bool => c->c)
 
 complexTF = id :: (forall b. b~Bool => b->b)
-               -> (forall b. b~Bool => b->b)
+               -> (forall c. c~Bool => c->c)
+
+{- For exmaple, here is how the subsumption check works for complexTF
+   when type-checking the expression
+      (id :: (forall b. b~Bool => b->b) -> (forall c. c~Bool => c->c))
+
+   First, deeply skolemise the type sig, (level 3) before calling
+   tcExpr on 'id'.  Then instantiate id's type:
+
+      b~Bool |-3  alpha[3] -> alpha <= (forall c. c~Bool => c->c) -> b -> b
+
+   Now decompose the ->
+
+      b~Bool |-3  alpha[3] ~ b->b,  (forall c. c~Bool => c->c) <= a
+
+   And this is perfectly soluble.  alpha is touchable; and c is instantiated.
+-}
