@@ -759,11 +759,8 @@ uType origin orig_ty1 orig_ty2
       = ASSERT( isDecomposableTyCon tc1 )
         go_app (TyConApp tc1 ts1') t1' s2 t2
 
-    go ty1 ty2
-      | tcIsForAllTy ty1 || tcIsForAllTy ty2
-      = unifySigmaTy origin ty1 ty2
-
         -- Anything else fails
+        -- E.g. unifying for-all types, which is relative unusual
     go ty1 ty2 = uType_defer origin ty1 ty2 -- failWithMisMatch origin
 
     ------------------
@@ -771,27 +768,6 @@ uType origin orig_ty1 orig_ty2
       = do { co_s <- uType origin s1 s2  -- See Note [Unifying AppTy]
            ; co_t <- uType origin t1 t2
            ; return $ mkTcAppCo co_s co_t }
-
-unifySigmaTy :: CtOrigin -> TcType -> TcType -> TcM TcCoercion
-unifySigmaTy origin ty1 ty2
-  = do { let (tvs1, body1) = tcSplitForAllTys ty1
-             (tvs2, body2) = tcSplitForAllTys ty2
-
-       ; defer_or_continue (not (equalLength tvs1 tvs2)) $ do {
-         (subst1, skol_tvs) <- tcInstSkolTyVars tvs1
-                  -- Get location from monad, not from tvs1
-       ; let tys      = mkTyVarTys skol_tvs
-             phi1     = Type.substTy subst1                   body1
-             phi2     = Type.substTy (zipTopTvSubst tvs2 tys) body2
-             skol_info = UnifyForAllSkol skol_tvs phi1
-
-       ; (ev_binds, co) <- checkConstraints skol_info skol_tvs [] $
-                           uType origin phi1 phi2
-
-       ; return (foldr mkTcForAllCo (TcLetCo ev_binds co) skol_tvs) } }
-  where
-    defer_or_continue True  _ = uType_defer origin ty1 ty2
-    defer_or_continue False m = m
 \end{code}
 
 Note [Care with type applications]
