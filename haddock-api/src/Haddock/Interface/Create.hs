@@ -194,8 +194,8 @@ moduleWarning dflags gre (WarnAll w) = Just $ parseWarning dflags gre w
 
 parseWarning :: DynFlags -> GlobalRdrEnv -> WarningTxt -> Doc Name
 parseWarning dflags gre w = force $ case w of
-  DeprecatedTxt msg -> format "Deprecated: " (concatFS msg)
-  WarningTxt    msg -> format "Warning: "    (concatFS msg)
+  DeprecatedTxt msg -> format "Deprecated: " (concatFS $ map unLoc msg)
+  WarningTxt    msg -> format "Warning: "    (concatFS $ map unLoc msg)
   where
     format x xs = DocWarning . DocParagraph . DocAppend (DocString x)
                   . processDocString dflags gre $ HsDocString xs
@@ -331,11 +331,12 @@ subordinates instMap decl = case decl of
     dataSubs dd = constrs ++ fields
       where
         cons = map unL $ (dd_cons dd)
-        constrs = [ (unL $ con_name c, maybeToList $ fmap unL $ con_doc c, M.empty)
-                  | c <- cons ]
+        constrs = [ (unL cname, maybeToList $ fmap unL $ con_doc c, M.empty)
+                  | c <- cons, cname <- con_names c ]
         fields  = [ (unL n, maybeToList $ fmap unL doc, M.empty)
                   | RecCon flds <- map con_details cons
-                  , ConDeclField n _ doc <- flds ]
+                  , L _ (ConDeclField ns _ doc) <- flds
+                  , n <- ns ]
 
 -- | Extract function argument docs from inside types.
 typeDocs :: HsDecl Name -> Map Int HsDocString
@@ -381,7 +382,8 @@ topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 -- | Extract a map of fixity declarations only
 mkFixMap :: HsGroup Name -> FixMap
 mkFixMap group_ = M.fromList [ (n,f)
-                             | L _ (FixitySig (L _ n) f) <- hs_fixds group_ ]
+                             | L _ (FixitySig ns f) <- hs_fixds group_,
+                               L _ n <- ns ]
 
 
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
@@ -501,11 +503,11 @@ mkExportItems
     Nothing -> fullModuleContents dflags warnings gre maps fixMap splices decls
     Just exports -> liftM concat $ mapM lookupExport exports
   where
-    lookupExport (IEVar x)             = declWith x
-    lookupExport (IEThingAbs t)        = declWith t
-    lookupExport (IEThingAll t)        = declWith t
-    lookupExport (IEThingWith t _)     = declWith t
-    lookupExport (IEModuleContents m)  =
+    lookupExport (IEVar (L _ x))         = declWith x
+    lookupExport (IEThingAbs t)          = declWith t
+    lookupExport (IEThingAll (L _ t))    = declWith t
+    lookupExport (IEThingWith (L _ t) _) = declWith t
+    lookupExport (IEModuleContents (L _ m)) =
       moduleExports thisMod m dflags warnings gre exportedNames decls modMap instIfaceMap maps fixMap splices
     lookupExport (IEGroup lev docStr)  = return $
       return . ExportGroup lev "" $ processDocString dflags gre docStr
@@ -791,7 +793,8 @@ extractDecl name mdl decl
       InstD (ClsInstD ClsInstDecl { cid_datafam_insts = insts }) ->
         let matches = [ d | L _ d <- insts
                           , L _ ConDecl { con_details = RecCon rec } <- dd_cons (dfid_defn d)
-                          , ConDeclField { cd_fld_name = L _ n } <- rec
+                          , ConDeclField { cd_fld_names = ns } <- map unLoc rec
+                          , L _ n <- ns
                           , n == name
                       ]
         in case matches of
@@ -823,11 +826,11 @@ extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
 
 extractRecSel nm mdl t tvs (L _ con : rest) =
   case con_details con of
-    RecCon fields | (ConDeclField n ty _ : _) <- matching_fields fields ->
+    RecCon fields | ((n,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
       L (getLoc n) (TypeSig [noLoc nm] (noLoc (HsFunTy data_ty (getBangType ty))))
     _ -> extractRecSel nm mdl t tvs rest
  where
-  matching_fields flds = [ f | f@(ConDeclField n _ _) <- flds, unLoc n == nm ]
+  matching_fields flds = [ (n,f) | f@(L _ (ConDeclField ns _ _)) <- flds, n <- ns, unLoc n == nm ]
   data_ty
     | ResTyGADT ty <- con_res con = ty
     | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar t)) tvs
