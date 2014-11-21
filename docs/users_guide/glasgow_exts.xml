@@ -8785,25 +8785,54 @@ h z = z-1
 
 	    <listitem>
 	      <para>
-		Binders are lexically scoped. For example, consider the
-		following code, where a value <literal>g</literal> of type
-		<literal>Bool -> Q Pat</literal> is in scope, having been
-		imported from another module
-<programlisting>
-y :: Int
-y = 7
+		Outermost pattern splices may bind variables. By "outermost" here, we refer to
+		a pattern splice that occurs outside of any quotation brackets. For example,
 
-f :: Int -> Int -> Int
-f n = \ $(g True) -> y+n
+<programlisting>
+mkPat :: Bool -> Q Pat
+mkPat True  = [p| (x, y) |]
+mkPat False = [p| (y, x) |]
+
+-- in another module:
+foo :: (Char, String) -> String
+foo $(mkPat True) = x : y
+
+bar :: (String, Char) -> String
+bar $(mkPat False) = x : y
 </programlisting>
-                The <literal>y</literal> in the right-hand side of
-                <literal>f</literal> refers to the top-level <literal>y =
-                7</literal>, even if the pattern splice <literal>$(g
-                n)</literal> also generates a binder <literal>y</literal>.
+	      </para>
+	    </listitem>
+
+
+	    <listitem>
+	      <para>
+		Nested pattern splices do <emphasis>not</emphasis> bind variables.
+		By "nested" here, we refer to a pattern splice occurring within a
+		quotation bracket. Continuing the example from the last bullet:
+
+<programlisting>
+baz :: Bool -> Q Exp
+baz b = [| quux $(mkPat b) = x + y |]
+</programlisting>
+
+                would fail with <literal>x</literal> and <literal>y</literal>
+		being out of scope.
 	      </para>
 
 	      <para>
-		Note that a pattern quasiquoter <emphasis>may</emphasis>
+		The difference in treatment of outermost and nested pattern splices is
+		because outermost splices are run at compile time. GHC can then use
+		the result of running the splice when analyzing the expressions within
+		the pattern's scope. Nested splices, on the other hand, are <emphasis>not</emphasis>
+		run at compile time; they are run when the bracket is spliced in, sometime later.
+		Since nested pattern splices may refer to local variables, there is no way for GHC
+		to know, at splice compile time, what variables are bound, so it binds none.
+	      </para>
+	    </listitem>
+
+	    <listitem>
+	      <para>
+		A pattern quasiquoter <emphasis>may</emphasis>
 		generate binders that scope over the right-hand side of a
 		definition because these binders are in scope lexically. For
 		example, given a quasiquoter <literal>haskell</literal> that
