@@ -96,6 +96,7 @@ import Data.Int
 import Data.List
 import Data.Word
 import Numeric
+import Numeric.Natural
 import System.IO
 
 -------------------
@@ -366,6 +367,10 @@ instance PrintfArg Word64 where
 
 instance PrintfArg Integer where
     formatArg = formatInteger
+    parseFormat = parseIntFormat
+
+instance PrintfArg Natural where
+    formatArg = formatInteger . toInteger
     parseFormat = parseIntFormat
 
 instance PrintfArg Float where

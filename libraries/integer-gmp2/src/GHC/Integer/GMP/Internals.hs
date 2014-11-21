@@ -71,6 +71,7 @@ module GHC.Integer.GMP.Internals
     , byteArrayToBigNat#
     , wordToBigNat
     , wordToBigNat2
+    , bigNatToInt
     , bigNatToWord
     , indexBigNat#
 

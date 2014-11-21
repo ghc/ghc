@@ -835,6 +835,7 @@ eqBigNatWord# bn w#
 bigNatToWord :: BigNat -> Word#
 bigNatToWord bn = indexBigNat# bn 0#
 
+-- | Equivalent to @'word2Int#' . 'bigNatToWord'@
 bigNatToInt :: BigNat -> Int#
 bigNatToInt (BN# ba#) = indexIntArray# ba# 0#
 
