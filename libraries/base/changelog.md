@@ -83,6 +83,9 @@
   * New module `Data.Bifunctor` providing the `Bifunctor(bimap,first,second)`
     class (previously defined in `bifunctors` package) (#9682)
 
+  * New module `Data.Void` providing the canonical uninhabited type `Void`
+    (previously defined in `void` package) (#9814)
+
   * Update Unicode class definitions to Unicode version 7.0
 
   * Add `Alt`, an `Alternative` wrapper, to `Data.Monoid`. (#9759)

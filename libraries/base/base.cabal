@@ -170,6 +170,7 @@ Library
         Data.Typeable.Internal
         Data.Unique
         Data.Version
+        Data.Void
         Data.Word
         Debug.Trace
         Foreign
