@@ -3,25 +3,26 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Test2 where
 
 class C a b | b -> a
 
 data A = A
-data X = X
+data X a = X
 data Y = Y
 
 type family TF b
 
-f :: (forall b. (C a b, TF b ~ Y) => b) -> X
+f :: (forall b. (C a b, TF b ~ Y) => b) -> X a
 f _ = undefined
 
 u :: (C A b, TF b ~ Y) => b
 u = undefined
 
-v :: X
-v = (f :: (forall b. (C A b, TF b ~ Y) => b) -> X) u -- This line causes an error (see below)
+v :: X A
+v = (f :: (forall b. (C A b, TF b ~ Y) => b) -> X A) u -- This line causes an error (see below)
 
 {-
 GHC 7.6.1-rc1 (7.6.0.20120810) rejects this code with the following error message.
