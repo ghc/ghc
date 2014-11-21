@@ -415,9 +415,9 @@ handleLastNode dflags procpoints liveness cont_info stackmaps
        return $ lastCall cont_lbl (wORD_SIZE dflags) ret_args ret_off
             -- one word of args: the return address
 
-    CmmBranch{..}     ->  handleBranches
-    CmmCondBranch{..} ->  handleBranches
-    CmmSwitch{..}     ->  handleBranches
+    CmmBranch {}     ->  handleBranches
+    CmmCondBranch {} ->  handleBranches
+    CmmSwitch {}     ->  handleBranches
 
   where
      -- Calls and ForeignCalls are handled the same way:

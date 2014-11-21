@@ -516,7 +516,7 @@ rnHsRecFields
     -> HsRecFields RdrName (Located arg)
     -> RnM ([HsRecField Name (Located arg)], FreeVars)
 
--- This supprisingly complicated pass
+-- This surprisingly complicated pass
 --   a) looks up the field name (possibly using disambiguation)
 --   b) fills in puns and dot-dot stuff
 -- When we we've finished, we've renamed the LHS, but not the RHS,
@@ -576,7 +576,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
       = return []
     rn_dotdot (Just {}) Nothing _flds   -- ".." on record update
       = do { case ctxt of
-                HsRecFieldUpd -> addErr badDotDot
+                HsRecFieldUpd -> addErr badDotDotUpd
                 _             -> return ()
            ; return [] }
     rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
@@ -586,6 +586,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs
            ; con_fields <- lookupConstructorFields con
+           ; when (null con_fields) (addErr (badDotDotCon con))
            ; let present_flds = getFieldIds flds
                  parent_tc = find_tycon rdr_env con
 
@@ -655,8 +656,13 @@ needFlagDotDot :: HsRecFieldContext -> SDoc
 needFlagDotDot ctxt = vcat [ptext (sLit "Illegal `..' in record") <+> pprRFC ctxt,
                             ptext (sLit "Use RecordWildCards to permit this")]
 
-badDotDot :: SDoc
-badDotDot = ptext (sLit "You cannot use `..' in a record update")
+badDotDotCon :: Name -> SDoc
+badDotDotCon con
+  = vcat [ ptext (sLit "Illegal `..' notation for constructor") <+> quotes (ppr con)
+         , nest 2 (ptext (sLit "The constructor has no labelled fields")) ]
+
+badDotDotUpd :: SDoc
+badDotDotUpd = ptext (sLit "You cannot use `..' in a record update")
 
 emptyUpdateErr :: SDoc
 emptyUpdateErr = ptext (sLit "Empty record update")

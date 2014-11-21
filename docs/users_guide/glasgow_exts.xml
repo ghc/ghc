@@ -2337,7 +2337,7 @@ More details:
 <itemizedlist>
 <listitem><para>
 Record wildcards in patterns can be mixed with other patterns, including puns
-(<xref linkend="record-puns"/>); for example, in a pattern <literal>C {a
+(<xref linkend="record-puns"/>); for example, in a pattern <literal>(C {a
 = 1, b, ..})</literal>.  Additionally, record wildcards can be used
 wherever record patterns occur, including in <literal>let</literal>
 bindings and at the top-level.  For example, the top-level binding
@@ -2403,6 +2403,18 @@ omitting <literal>b</literal> since the record field is not in scope,
 and omitting <literal>c</literal> since the variable <literal>c</literal>
 is not in scope (apart from the binding of the
 record selector <literal>c</literal>, of course).
+</para></listitem>
+
+<listitem><para>
+Record wildcards cannot be used (a) in a record update construct, and (b) for data
+constructors that are not declared with record fields.  For example:
+<programlisting>
+f x = x { v=True, .. }   -- Illegal (a)
+
+data T = MkT Int Bool
+g = MkT { .. }           -- Illegal (b)
+h (MkT { .. }) = True    -- Illegal (b)
+</programlisting>
 </para></listitem>
 </itemizedlist>
 </para>
