@@ -1,7 +1,7 @@
 module T7963a where
 
 import Prelude ()
-import Data.OldList
+import GHC.List
 
 unlines = concat
 

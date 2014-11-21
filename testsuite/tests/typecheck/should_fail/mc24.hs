@@ -3,9 +3,9 @@
 
 {-# OPTIONS_GHC -XMonadComprehensions -XTransformListComp #-}
 module ShouldFail where
-import Data.OldList
+import GHC.List
 
-foo = [ Data.OldList.length x
+foo = [ GHC.List.length x
       | x <- [1..10]
       , then group by x using take 2
       ]

@@ -3,11 +3,11 @@
 {-# OPTIONS_GHC -XMonadComprehensions -XTransformListComp #-}
 module ShouldFail where
 import GHC.Exts( the )
-import Data.OldList
+import GHC.List
 
 data Unorderable = Gnorf | Pinky | Brain
 
-foo = [ Data.OldList.length x
+foo = [ GHC.List.length x
       | x <- [Gnorf, Brain]
       , then group using take 5
       ]

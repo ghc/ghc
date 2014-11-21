@@ -3,7 +3,7 @@
 
 module T7360 where
 
-import Data.OldList as L
+import GHC.List as L
 
 data Foo = Foo1 | Foo2 | Foo3 !Int
     

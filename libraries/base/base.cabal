@@ -154,7 +154,6 @@ Library
         Data.List
         Data.Maybe
         Data.Monoid
-        Data.OldList
         Data.Ord
         Data.Proxy
         Data.Ratio
@@ -292,6 +291,7 @@ Library
     other-modules:
         Control.Monad.ST.Imp
         Control.Monad.ST.Lazy.Imp
+        Data.OldList
         Foreign.ForeignPtr.Imp
         System.Environment.ExecutablePath
 

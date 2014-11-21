@@ -6,7 +6,7 @@
 
 module ShouldCompile where
 
-import Data.OldList (null)
+import GHC.List (null)
 import Prelude hiding (null)
 
 class HasEmpty a where

@@ -71,10 +71,6 @@
 
   * Generalise `Control.Monad.{foldM,foldM_}` to `Foldable`
 
-  * New module `Data.OldList` containing only list-specialised versions of
-    the functions from `Data.List` (in other words, `Data.OldList` corresponds
-    to `base-4.7.0.1`'s `Data.List`)
-
   * `foldr2` (together with `zip` and `zipWith`) is made a bit stricter in the
     second argument, so that the fusion RULES for it do not change the
     semantics. (#9596)

@@ -16,7 +16,7 @@ import Control.DeepSeq
 #if __GLASGOW_HASKELL__ < 709
 import qualified Data.List as L
 #else
-import qualified Data.OldList as L
+import qualified GHC.List as L
 #endif
 
 data BadElementException = BadFirst | BadLast deriving (Show, Typeable, Eq)
