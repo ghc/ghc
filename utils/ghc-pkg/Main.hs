@@ -493,7 +493,7 @@ readPackageArg False str = Id `fmap` readGlobPkgId str
 
 -- globVersion means "all versions"
 globVersion :: Version
-globVersion = Version{ versionBranch=[], versionTags=["*"] }
+globVersion = Version [] ["*"]
 
 -- -----------------------------------------------------------------------------
 -- Package databases

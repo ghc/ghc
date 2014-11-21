@@ -1,10 +1,10 @@
 
 T5892a.hs:12:8: Warning:
-    Fields of ‘Version’ not initialised: Data.Version.versionTags
-    In the expression: Version {..}
-    In the expression: let versionBranch = [] in Version {..}
+    Fields of ‘Node’ not initialised: Data.Tree.subForest
+    In the expression: Node {..}
+    In the expression: let rootLabel = [] in Node {..}
     In an equation for ‘foo’:
-        foo (Version {..}) = let versionBranch = ... in Version {..}
+        foo (Node {..}) = let rootLabel = ... in Node {..}
 
 <no location info>: 
 Failing due to -Werror.

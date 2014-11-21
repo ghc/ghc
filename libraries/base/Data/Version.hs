@@ -92,6 +92,8 @@ data Version =
                 -- on the entity that this version applies to.
         }
   deriving (Read,Show,Typeable)
+{-# DEPRECATED versionTags "See GHC ticket #2496" #-}
+-- TODO. Remove all references to versionTags in GHC 7.12 release.
 
 instance Eq Version where
   v1 == v2  =  versionBranch v1 == versionBranch v2

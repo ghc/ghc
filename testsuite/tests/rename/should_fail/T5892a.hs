@@ -3,10 +3,10 @@
 
 module T5892a where
 
-import Data.Version ( Version( Version, versionBranch ))
--- Not importing its field: versionTags
+import Data.Tree ( Tree( Node, rootLabel ))
+-- Not importing field 'subForest'
 
-foo :: Version -> Version
-foo (Version {..}) -- Pattern match does not bind versionTags 
-  = let versionBranch = []
-    in Version {..}   -- Hence warning here
+foo :: Tree [Int] -> Tree [Int]
+foo (Node {..}) -- Pattern match does not bind 'subForest'
+  = let rootLabel = []
+    in Node {..}   -- Hence warning here

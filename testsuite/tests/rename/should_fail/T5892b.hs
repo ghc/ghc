@@ -1,11 +1,11 @@
 {-# LANGUAGE RecordWildCards #-}
 module T5892b where
 
-import Data.Version ( Version( Version, versionBranch ))
--- Not importing its field: versionTags
+import Data.Tree ( Tree( Node, rootLabel ))
+-- Not importing field 'subForest'
 
-Version{..} = Version [] []
--- Binds versionBranch only
+Node{..} = Node [] []
+-- Binds 'rootLabel' only
 
-foo = T5892b.versionBranch
-bar = T5892b.versionTags
+foo = T5892b.rootLabel
+bar = T5892b.subForest

@@ -29,7 +29,7 @@ import Data.Version
 -- | The version of 'compilerName' with which the program was compiled
 -- or is being interpreted.
 compilerVersion :: Version
-compilerVersion = Version {versionBranch=[major, minor], versionTags=[]}
+compilerVersion = Version [major, minor] []
   where (major, minor) = compilerVersionRaw `divMod` 100
 
 #include "ghcplatform.h"
