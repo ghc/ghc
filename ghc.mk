@@ -398,7 +398,6 @@ PACKAGES_STAGE1 += array
 PACKAGES_STAGE1 += deepseq
 PACKAGES_STAGE1 += bytestring
 PACKAGES_STAGE1 += containers
-PACKAGES_STAGE1 += old-locale
 
 ifeq "$(Windows_Host)" "YES"
 PACKAGES_STAGE1 += Win32
@@ -418,12 +417,6 @@ PACKAGES_STAGE1 += Cabal/Cabal
 PACKAGES_STAGE1 += bin-package-db
 PACKAGES_STAGE1 += hoopl
 PACKAGES_STAGE1 += transformers
-
-ifneq "$(CrossCompiling)" "YES"
-PACKAGES_STAGE2 += old-time
-PACKAGES_STAGE2 += haskell98
-PACKAGES_STAGE2 += haskell2010
-endif
 
 ifeq "$(HADDOCK_DOCS)" "YES"
 PACKAGES_STAGE1 += xhtml
@@ -1324,7 +1317,6 @@ distclean : clean
 	$(call removeFiles,libraries/process/include/HsProcessConfig.h)
 	$(call removeFiles,libraries/unix/include/HsUnixConfig.h)
 	$(call removeFiles,libraries/time/include/HsTimeConfig.h)
-	$(call removeFiles,libraries/old-time/include/HsTimeConfig.h)
 
 # The library configure scripts also like creating autom4te.cache
 # directories, so clean them all up.
@@ -1353,7 +1345,6 @@ maintainer-clean : distclean
 	$(call removeFiles,libraries/process/include/HsProcessConfig.h.in)
 	$(call removeFiles,libraries/unix/include/HsUnixConfig.h.in)
 	$(call removeFiles,libraries/time/include/HsTimeConfig.h.in)
-	$(call removeFiles,libraries/old-time/include/HsTimeConfig.h.in)
 
 .PHONY: all_libraries
 

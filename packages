@@ -60,12 +60,8 @@ libraries/deepseq            -           -                               ssh://g
 libraries/directory          -           -                               ssh://git@github.com/haskell/directory.git
 libraries/filepath           -           -                               ssh://git@github.com/haskell/filepath.git
 libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
-libraries/haskell98          -           -                               -
-libraries/haskell2010        -           -                               -
 libraries/hoopl              -           -                               -
 libraries/hpc                -           -                               -
-libraries/old-locale         -           -                               -
-libraries/old-time           -           -                               -
 libraries/pretty             -           -                               https://github.com/haskell/pretty.git
 libraries/process            -           -                               ssh://git@github.com/haskell/process.git
 libraries/terminfo           -           -                               https://github.com/judah/terminfo.git
