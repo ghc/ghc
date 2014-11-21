@@ -31,8 +31,9 @@ module LlvmCodeGen.Base (
         llvmPtrBits, mkLlvmFunc, tysToParams,
 
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
-        getGlobalPtr, generateAliases,
+        getGlobalPtr, generateExternDecls,
 
+        aliasify,
     ) where
 
 #include "HsVersions.h"
@@ -191,7 +192,7 @@ minSupportLlvmVersion :: LlvmVersion
 minSupportLlvmVersion = 28
 
 maxSupportLlvmVersion :: LlvmVersion
-maxSupportLlvmVersion = 34
+maxSupportLlvmVersion = 35
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling
@@ -383,7 +384,7 @@ ghcInternalFunctions = do
     mk "newSpark" (llvmWord dflags) [i8Ptr, i8Ptr]
   where
     mk n ret args = do
-      let n' = fsLit n
+      let n' = fsLit n `appendFS` fsLit "$def"
           decl = LlvmFunctionDecl n' ExternallyVisible CC_Ccc ret
                                  FixedArgs (tysToParams args) Nothing
       renderLlvm $ ppLlvmFunctionDecl decl
@@ -443,33 +444,58 @@ getGlobalPtr llvmLbl = do
   let mkGlbVar lbl ty = LMGlobalVar lbl (LMPointer ty) Private Nothing Nothing
   case m_ty of
     -- Directly reference if we have seen it already
-    Just ty -> return $ mkGlbVar llvmLbl ty Global
+    Just ty -> return $ mkGlbVar (llvmLbl `appendFS` fsLit "$def") ty Global
     -- Otherwise use a forward alias of it
     Nothing -> do
       saveAlias llvmLbl
-      return $ mkGlbVar (llvmLbl `appendFS` fsLit "$alias") i8 Alias
+      return $ mkGlbVar llvmLbl i8 Alias
 
 -- | Generate definitions for aliases forward-referenced by @getGlobalPtr@.
 --
 -- Must be called at a point where we are sure that no new global definitions
 -- will be generated anymore!
-generateAliases :: LlvmM ([LMGlobal], [LlvmType])
-generateAliases = do
+generateExternDecls :: LlvmM ([LMGlobal], [LlvmType])
+generateExternDecls = do
   delayed <- fmap uniqSetToList $ getEnv envAliases
   defss <- flip mapM delayed $ \lbl -> do
-    let var      ty = LMGlobalVar lbl (LMPointer ty) External Nothing Nothing Global
-        aliasLbl    = lbl `appendFS` fsLit "$alias"
-        aliasVar    = LMGlobalVar aliasLbl i8Ptr Private Nothing Nothing Alias
-    -- If we have a definition, set the alias value using a
-    -- cost. Otherwise, declare it as an undefined external symbol.
     m_ty <- funLookup lbl
     case m_ty of
-      Just ty -> return [LMGlobal aliasVar $ Just $ LMBitc (LMStaticPointer (var ty)) i8Ptr]
-      Nothing -> return [LMGlobal (var i8) Nothing,
-                         LMGlobal aliasVar $ Just $ LMStaticPointer (var i8) ]
+      -- If we have a definition we've already emitted the proper aliases
+      -- when the symbol itself was emitted by @aliasify@
+      Just _ -> return []
+
+      -- If we don't have a definition this is an external symbol and we
+      -- need to emit a declaration
+      Nothing ->
+        let var = LMGlobalVar lbl i8Ptr External Nothing Nothing Global
+        in return [LMGlobal var Nothing]
+
   -- Reset forward list
   modifyEnv $ \env -> env { envAliases = emptyUniqSet }
   return (concat defss, [])
+
+-- | Here we take a global variable definition, rename it with a
+-- @$def@ suffix, and generate the appropriate alias.
+aliasify :: LMGlobal -> LlvmM [LMGlobal]
+aliasify (LMGlobal var val) = do
+    let i8Ptr = LMPointer (LMInt 8)
+        LMGlobalVar lbl ty link sect align const = var
+
+        defLbl = lbl `appendFS` fsLit "$def"
+        defVar = LMGlobalVar defLbl ty Internal sect align const
+
+        defPtrVar = LMGlobalVar defLbl (LMPointer ty) link Nothing Nothing const
+        aliasVar = LMGlobalVar lbl (LMPointer i8Ptr) link Nothing Nothing Alias
+        aliasVal = LMBitc (LMStaticPointer defPtrVar) i8Ptr
+
+    -- we need to mark the $def symbols as used so LLVM doesn't forget which
+    -- section they need to go in. This will vanish once we switch away from
+    -- mangling sections for TNTC.
+    markUsedVar defVar
+
+    return [ LMGlobal defVar val
+           , LMGlobal aliasVar (Just aliasVal)
+           ]
 
 -- Note [Llvm Forward References]
 --
@@ -483,6 +509,51 @@ generateAliases = do
 -- these kind of situations, which we later tell LLVM to be either
 -- references to their actual local definitions (involving a cast) or
 -- an external reference. This obviously only works for pointers.
+--
+-- In particular when we encounter a reference to a symbol in a chunk of
+-- C-- there are three possible scenarios,
+--
+--   1. We have already seen a definition for the referenced symbol. This
+--      means we already know its type.
+--
+--   2. We have not yet seen a definition but we will find one later in this
+--      compilation unit. Since we want to be a good consumer of the
+--      C-- streamed to us from upstream, we don't know the type of the
+--      symbol at the time when we must emit the reference.
+--
+--   3. We have not yet seen a definition nor will we find one in this
+--      compilation unit. In this case the reference refers to an
+--      external symbol for which we do not know the type.
+--
+-- Let's consider case (2) for a moment: say we see a reference to
+-- the symbol @fooBar@ for which we have not seen a definition. As we
+-- do not know the symbol's type, we assume it is of type @i8*@ and emit
+-- the appropriate casts in @getSymbolPtr@. Later on, when we
+-- encounter the definition of @fooBar@ we emit it but with a modified
+-- name, @fooBar$def@ (which we'll call the definition symbol), to
+-- since we have already had to assume that the symbol @fooBar@
+-- is of type @i8*@. We then emit @fooBar@ itself as an alias
+-- of @fooBar$def@ with appropriate casts. This all happens in
+-- @aliasify@.
+--
+-- Case (3) is quite similar to (2): References are emitted assuming
+-- the referenced symbol is of type @i8*@. When we arrive at the end of
+-- the compilation unit and realize that the symbol is external, we emit
+-- an LLVM @external global@ declaration for the symbol @fooBar@
+-- (handled in @generateExternDecls@). This takes advantage of the
+-- fact that the aliases produced by @aliasify@ for exported symbols
+-- have external linkage and can therefore be used as normal symbols.
+--
+-- Historical note: As of release 3.5 LLVM does not allow aliases to
+-- refer to declarations. This the reason why aliases are produced at the
+-- point of definition instead of the point of usage, as was previously
+-- done. See #9142 for details.
+--
+-- Finally, case (1) is trival. As we already have a definition for
+-- and therefore know the type of the referenced symbol, we can do
+-- away with casting the alias to the desired type in @getSymbolPtr@
+-- and instead just emit a reference to the definition symbol directly.
+-- This is the @Just@ case in @getSymbolPtr@.
 
 -- ----------------------------------------------------------------------------
 -- * Misc
@@ -491,4 +562,3 @@ generateAliases = do
 -- | Error function
 panic :: String -> a
 panic s = Outp.panic $ "LlvmCodeGen.Base." ++ s
-

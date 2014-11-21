@@ -271,7 +271,8 @@ pVarLift (LMLitVar    _          ) = error $ "Can't lower a literal type!"
 -- constructors can be lowered.
 pLower :: LlvmType -> LlvmType
 pLower (LMPointer x) = x
-pLower x  = error $ showSDoc undefined (ppr x) ++ " is a unlowerable type, need a pointer"
+pLower x  = pprPanic "llvmGen(pLower)"
+            $ ppr x <+> text " is a unlowerable type, need a pointer"
 
 -- | Lower a variable of 'LMPointer' type.
 pVarLower :: LlvmVar -> LlvmVar
