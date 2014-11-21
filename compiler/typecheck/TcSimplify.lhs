@@ -344,12 +344,13 @@ simplifyInfer rhs_untch apply_mr name_taus wanteds
        -- NB: quant_pred_candidates is already the fixpoint of any
        --     unifications that may have happened
 
-       ; zonked_tau_tvs <- TcM.zonkTyVarsAndFV (tyVarsOfTypes (map snd name_taus))
-       ; (mono_tvs, qtvs, bound, mr_bites) <- decideQuantification apply_mr quant_pred_candidates zonked_tau_tvs
+       ; zonked_taus <- mapM (TcM.zonkTcType . snd) name_taus
+       ; let zonked_tau_tvs = tyVarsOfTypes zonked_taus
+       ; (promote_tvs, qtvs, bound, mr_bites) <- decideQuantification apply_mr quant_pred_candidates zonked_tau_tvs
 
        ; outer_untch <- TcRnMonad.getUntouchables
        ; runTcSWithEvBinds null_ev_binds_var $  -- runTcS just to get the types right :-(
-         mapM_ (promoteTyVar outer_untch) (varSetElems (zonked_tau_tvs `intersectVarSet` mono_tvs))
+         mapM_ (promoteTyVar outer_untch) (varSetElems promote_tvs)
 
        ; let minimal_flat_preds = mkMinimalBySCs bound
                   -- See Note [Minimize by Superclasses]
@@ -373,8 +374,9 @@ simplifyInfer rhs_untch apply_mr name_taus wanteds
 
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
          vcat [ ptext (sLit "quant_pred_candidates =") <+> ppr quant_pred_candidates
+              , ptext (sLit "zonked_taus") <+> ppr zonked_taus
               , ptext (sLit "zonked_tau_tvs=") <+> ppr zonked_tau_tvs
-              , ptext (sLit "mono_tvs=") <+> ppr mono_tvs
+              , ptext (sLit "promote_tvs=") <+> ppr promote_tvs
               , ptext (sLit "bound =") <+> ppr bound
               , ptext (sLit "minimal_bound =") <+> vcat [ ppr v <+> dcolon <+> ppr (idType v) 
                                                         | v <- minimal_bound_ev_vars]
@@ -416,7 +418,7 @@ and the quantified constraints are empty.
 
 \begin{code}
 decideQuantification :: Bool -> [PredType] -> TcTyVarSet
-                     -> TcM ( TcTyVarSet      -- Do not quantify over these
+                     -> TcM ( TcTyVarSet      -- Promote these
                             , [TcTyVar]       -- Do quantify over these
                             , [PredType]      -- and these
                             , Bool )          -- Did the MR bite?
@@ -424,20 +426,25 @@ decideQuantification :: Bool -> [PredType] -> TcTyVarSet
 decideQuantification apply_mr constraints zonked_tau_tvs
   | apply_mr     -- Apply the Monomorphism restriction
   = do { gbl_tvs <- tcGetGlobalTyVars
-       ; let constrained_tvs = tyVarsOfTypes constraints
-             mono_tvs = gbl_tvs `unionVarSet` constrained_tvs
+       ; let mono_tvs = gbl_tvs `unionVarSet` constrained_tvs
              mr_bites = constrained_tvs `intersectsVarSet` zonked_tau_tvs
+             promote_tvs = constrained_tvs `unionVarSet` (zonked_tau_tvs `intersectVarSet` gbl_tvs)
        ; qtvs <- quantifyTyVars mono_tvs zonked_tau_tvs
-       ; return (mono_tvs, qtvs, [], mr_bites) }
+       ; traceTc "decideQuantification 1" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs, ppr qtvs])
+       ; return (promote_tvs, qtvs, [], mr_bites) }
 
   | otherwise
   = do { gbl_tvs <- tcGetGlobalTyVars
-       ; let mono_tvs   = growThetaTyVars (filter isEqPred constraints) gbl_tvs
-             poly_qtvs  = growThetaTyVars constraints zonked_tau_tvs
-                          `minusVarSet` mono_tvs
-             theta      = filter (quantifyPred poly_qtvs) constraints
+       ; let mono_tvs    = growThetaTyVars (filter isEqPred constraints) gbl_tvs
+             poly_qtvs   = growThetaTyVars constraints zonked_tau_tvs
+                           `minusVarSet` mono_tvs
+             theta       = filter (quantifyPred poly_qtvs) constraints
+             promote_tvs = mono_tvs `intersectVarSet` (constrained_tvs `unionVarSet` zonked_tau_tvs)
        ; qtvs <- quantifyTyVars mono_tvs poly_qtvs
-       ; return (mono_tvs, qtvs, theta, False) }
+       ; traceTc "decideQuantification 2" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs, ppr poly_qtvs, ppr qtvs, ppr theta])
+       ; return (promote_tvs, qtvs, theta, False) }
+  where
+    constrained_tvs = tyVarsOfTypes constraints
 
 ------------------
 quantifyPred :: TyVarSet           -- Quantifying over these
