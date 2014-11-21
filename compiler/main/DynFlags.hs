@@ -564,6 +564,7 @@ data ExtensionFlag
    | Opt_DeriveFoldable
    | Opt_DeriveGeneric            -- Allow deriving Generic/1
    | Opt_DefaultSignatures        -- Allow extra signatures for defmeths
+   | Opt_DeriveAnyClass           -- Allow deriving any class
 
    | Opt_TypeSynonymInstances
    | Opt_FlexibleContexts
@@ -2873,6 +2874,7 @@ xFlags = [
              $ deprecate $ "It was widely considered a misfeature, " ++
                            "and has been removed from the Haskell language." ),
   ( "DefaultSignatures",                Opt_DefaultSignatures, nop ),
+  ( "DeriveAnyClass",                   Opt_DeriveAnyClass, nop ),
   ( "DeriveDataTypeable",               Opt_DeriveDataTypeable, nop ),
   ( "DeriveFoldable",                   Opt_DeriveFoldable, nop ),
   ( "DeriveFunctor",                    Opt_DeriveFunctor, nop ),

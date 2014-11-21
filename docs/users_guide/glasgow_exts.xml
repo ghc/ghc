@@ -456,10 +456,10 @@ Indeed, the bindings can even be recursive.
       </para>
 
       <para>
-      This can make a difference when the positive and negative range of 
-      a numeric data type don't match up.  For example, 
+      This can make a difference when the positive and negative range of
+      a numeric data type don't match up.  For example,
       in 8-bit arithmetic -128 is representable, but +128 is not.
-      So <literal>negate (fromInteger 128)</literal> will elicit an 
+      So <literal>negate (fromInteger 128)</literal> will elicit an
       unexpected integer-literal-overflow message.
       </para>
    </sect2>
@@ -998,7 +998,7 @@ synonym using the following syntax:
 
 <para>
 The syntax and semantics of pattern synonyms are elaborated in the
-following subsections.  
+following subsections.
 See the <ulink
 url="http://ghc.haskell.org/trac/ghc/wiki/PatternSynonyms">Wiki
 page</ulink> for more details.
@@ -2533,10 +2533,10 @@ import safe qualified Network.Socket as NS
 <sect3 id="explicit-namespaces">
 <title>Explicit namespaces in import/export</title>
 
-<para> In an import or export list, such as 
+<para> In an import or export list, such as
 <programlisting>
   module M( f, (++) ) where ...
-    import N( f, (++) ) 
+    import N( f, (++) )
     ...
 </programlisting>
 the entities <literal>f</literal> and <literal>(++)</literal> are <emphasis>values</emphasis>.
@@ -2545,12 +2545,12 @@ to declare <literal>(++)</literal> as a <emphasis>type constructor</emphasis>.  
 case, how would you export or import it?
 </para>
 <para>
-The <option>-XExplicitNamespaces</option> extension allows you to prefix the name of 
-a type constructor in an import or export list with "<literal>type</literal>" to 
+The <option>-XExplicitNamespaces</option> extension allows you to prefix the name of
+a type constructor in an import or export list with "<literal>type</literal>" to
 disambiguate this case, thus:
 <programlisting>
   module M( f, type (++) ) where ...
-    import N( f, type (++) ) 
+    import N( f, type (++) )
     ...
   module N( f, type (++) ) where
     data family a ++ b = L a | R b
@@ -2854,11 +2854,11 @@ allow you to write them infix.
 The language <option>-XTypeOperators</option> changes this behaviour:
 <itemizedlist>
 <listitem><para>
-Operator symbols become type <emphasis>constructors</emphasis> rather than 
+Operator symbols become type <emphasis>constructors</emphasis> rather than
 type <emphasis>variables</emphasis>.
 </para></listitem>
 <listitem><para>
-Operator symbols in types can be written infix, both in definitions and uses. 
+Operator symbols in types can be written infix, both in definitions and uses.
 for example:
 <programlisting>
 data a + b = Plus a b
@@ -2867,8 +2867,8 @@ type Foo = Int + Bool
 </para></listitem>
 <listitem><para>
 There is now some potential ambiguity in import and export lists; for example
-if you write <literal>import M( (+) )</literal> do you mean the 
-<emphasis>function</emphasis> <literal>(+)</literal> or the 
+if you write <literal>import M( (+) )</literal> do you mean the
+<emphasis>function</emphasis> <literal>(+)</literal> or the
 <emphasis>type constructor</emphasis> <literal>(+)</literal>?
 The default is the former, but with <option>-XExplicitNamespaces</option> (which is implied
 by <option>-XExplicitTypeOperators</option>) GHC allows you to specify the latter
@@ -3973,7 +3973,7 @@ defined in <literal>GHC.Base</literal>.
 
 <listitem><para> With <option>-XDeriveDataTypeable</option>, you can derive instances of
 the class <literal>Data</literal>,
-defined in <literal>Data.Data</literal>.  See <xref linkend="deriving-typeable"/> for 
+defined in <literal>Data.Data</literal>.  See <xref linkend="deriving-typeable"/> for
 deriving <literal>Typeable</literal>.
 </para></listitem>
 
@@ -3985,7 +3985,7 @@ defined in <literal>Data.Foldable</literal>.
 <listitem><para> With <option>-XDeriveTraversable</option>, you can derive instances of
 the class <literal>Traversable</literal>,
 defined in <literal>Data.Traversable</literal>. Since the <literal>Traversable</literal>
-instance dictates the instances of <literal>Functor</literal> and 
+instance dictates the instances of <literal>Functor</literal> and
 <literal>Foldable</literal>, you'll probably want to derive them too, so
 <option>-XDeriveTraversable</option> implies
 <option>-XDeriveFunctor</option> and <option>-XDeriveFoldable</option>.
@@ -4017,9 +4017,9 @@ programmer cannot subert the type system by writing bogus instances.
 </para></listitem>
 
 <listitem><para>
-With <option>-XDeriveDataTypeable</option> 
+With <option>-XDeriveDataTypeable</option>
 GHC allows you to derive instances of <literal>Typeable</literal> for data types or newtypes,
-using a <literal>deriving</literal> clause, or using 
+using a <literal>deriving</literal> clause, or using
 a standalone deriving declaration (<xref linkend="stand-alone-deriving"/>).
 </para></listitem>
 
@@ -4044,7 +4044,7 @@ a <literal>Typeable</literal> instance for a type class.
 
 <listitem><para>
 The flag <option>-XAutoDeriveTypeable</option> triggers the generation
-of derived <literal>Typeable</literal> instances for every datatype, data family, 
+of derived <literal>Typeable</literal> instances for every datatype, data family,
 and type class declaration in the module it is used, unless a manually-specified one is
 already provided.
 This flag implies <option>-XDeriveDataTypeable</option>.
@@ -4185,7 +4185,7 @@ A derived instance is derived only for declarations of these forms (after expans
 where
  <itemizedlist>
 <listitem><para>
-<literal>v1..vn</literal> are type variables, and <literal>t</literal>, 
+<literal>v1..vn</literal> are type variables, and <literal>t</literal>,
 <literal>s1..sk</literal>, <literal>t1..tj</literal> are types.
 </para></listitem>
 <listitem><para>
@@ -4263,6 +4263,25 @@ the standard method is used or the one described here.)
 </para>
 </sect3>
 </sect2>
+
+<sect2 id="derive-any-class">
+<title>Deriving any other class</title>
+
+<para>
+With <option>-XDeriveAnyClass</option> you can derive any other class. The
+compiler will simply generate an empty instance. The instance context will be
+generated according to the same rules used when deriving <literal>Eq</literal>.
+This is mostly useful in classes whose <link linkend="minimal-pragma">minimal
+set</link> is empty, and especially when writing
+<link linkend="generic-programming">generic functions</link>.
+
+In case you try to derive some class on a newtype, and
+<option>-XGeneralizedNewtypeDeriving</option> is also on,
+<option>-XDeriveAnyClass</option> takes precedence.
+</para>
+
+</sect2>
+
 </sect1>
 
 
@@ -5144,7 +5163,7 @@ These rules make it possible for a library author to design a library that relie
 overlapping instances without the client having to know.
 </para>
 <para>
-Errors are reported <emphasis>lazily</emphasis> (when attempting to solve a constraint), rather than <emphasis>eagerly</emphasis> 
+Errors are reported <emphasis>lazily</emphasis> (when attempting to solve a constraint), rather than <emphasis>eagerly</emphasis>
 (when the instances themselves are defined).  Consider, for example
 <programlisting>
   instance C Int  b where ..
@@ -6128,7 +6147,7 @@ instance Eq (Elem [e]) => Collects [e] where
 </para></listitem>
 <listitem><para>
      The instance for an associated type can be omitted in class instances.  In that case,
-     unless there is a default instance (see <xref linkend="assoc-decl-defs"/>), 
+     unless there is a default instance (see <xref linkend="assoc-decl-defs"/>),
      the corresponding instance type is not inhabited;
 	i.e., only diverging expressions, such
 	as <literal>undefined</literal>, can assume the type.
@@ -7235,13 +7254,13 @@ restriction on class declarations (<xref linkend="superclass-rules"/>) and insta
 
 <para>
 Each user-written type signature is subjected to an
-<emphasis>ambiguity check</emphasis>.  
+<emphasis>ambiguity check</emphasis>.
 The ambiguity check rejects functions that can never be called; for example:
 <programlisting>
    f :: C a => Int
 </programlisting>
 The idea is there can be no legal calls to <literal>f</literal> because every call will
-give rise to an ambiguous constraint.  
+give rise to an ambiguous constraint.
 Indeed, the <emphasis>only</emphasis> purpose of the
 ambiguity check is to report functions that cannot possibly be called.
 We could soundly omit the
@@ -7253,7 +7272,7 @@ delaying ambiguity errors to call sites.  Indeed, the language extension
 Ambiguity can be subtle.  Consider this example which uses functional dependencies:
 <programlisting>
    class D a b | a -> b where ..
-   h :: D Int b => Int 
+   h :: D Int b => Int
 </programlisting>
 The <literal>Int</literal> may well fix <literal>b</literal> at the call site, so that signature should
 not be rejected.  Moreover, the dependencies might be hidden. Consider
@@ -7268,12 +7287,12 @@ Here <literal>h</literal>'s type looks ambiguous in <literal>b</literal>, but he
    ...(h [True])...
 </programlisting>
 That gives rise to a <literal>(X [Bool] beta)</literal> constraint, and using the
-instance means we need <literal>(D Bool beta)</literal> and that 
+instance means we need <literal>(D Bool beta)</literal> and that
 fixes <literal>beta</literal> via <literal>D</literal>'s
 fundep!
 </para>
 <para>
-Behind all these special cases there is a simple guiding principle. 
+Behind all these special cases there is a simple guiding principle.
 Consider
 <programlisting>
   f :: <replaceable>type</replaceable>
@@ -7283,7 +7302,7 @@ Consider
   g = f
 </programlisting>
 You would think that the definition of <literal>g</literal> would surely typecheck!
-After all <literal>f</literal> has exactly the same type, and <literal>g=f</literal>. 
+After all <literal>f</literal> has exactly the same type, and <literal>g=f</literal>.
 But in fact <literal>f</literal>'s type
 is instantiated and the instantiated constraints are solved against
 the constraints bound by <literal>g</literal>'s signature.  So, in the case an ambiguous type, solving will fail.
@@ -7337,7 +7356,7 @@ GHC used to impose some more restrictive and less principled conditions
 on type signatures. For type type
 <literal>forall tv1..tvn (c1, ...,cn) => type</literal>
 GHC used to require (a) that each universally quantified type variable
-<literal>tvi</literal> must be "reachable" from <literal>type</literal>, 
+<literal>tvi</literal> must be "reachable" from <literal>type</literal>,
 and (b) that every constraint <literal>ci</literal> mentions at least one of the
 universally quantified type variables <literal>tvi</literal>.
 These ad-hoc restrictions are completely subsumed by the new ambiguity check.
@@ -8350,9 +8369,9 @@ using the following rules:
 
   <listitem><para>
   A binding group is <emphasis>fully generalised</emphasis> if and only if
-    <itemizedlist> 
+    <itemizedlist>
     <listitem><para>each of its free variables is either imported or closed, and</para></listitem>
-    <listitem><para>the binding is not affected by the monomorphism restriction 
+    <listitem><para>the binding is not affected by the monomorphism restriction
         (<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.5">Haskell Report, Section 4.5.5</ulink>)</para></listitem>
     </itemizedlist>
   </para></listitem>
@@ -8751,7 +8770,7 @@ h z = z-1
 </programlisting>
             This abbreviation makes top-level declaration slices quieter and less intimidating.
 	    </para></listitem>
-	    
+
 	    <listitem>
 	      <para>
 		Binders are lexically scoped. For example, consider the
@@ -10191,11 +10210,11 @@ mindef ::= name
       A comma denotes conjunction, i.e. both sides are required.
       Conjunction binds stronger than disjunction.</para>
       <para>
-      If no MINIMAL pragma is given in the class declaration, it is just as if 
+      If no MINIMAL pragma is given in the class declaration, it is just as if
       a pragma <literal>{-# MINIMAL op1, op2, ..., opn #-}</literal> was given, where
-      the <literal>opi</literal> are the methods 
-      (a) that lack a default method in the class declaration, and 
-      (b) whose name that does not start with an underscore  
+      the <literal>opi</literal> are the methods
+      (a) that lack a default method in the class declaration, and
+      (b) whose name that does not start with an underscore
       (c.f. <option>-fwarn-missing-methods</option>, <xref linkend="options-sanity"/>).
       </para>
       <para>This warning can be turned off with the flag <option>-fno-warn-missing-methods</option>.</para>
@@ -11569,8 +11588,9 @@ general <link linkend="generic-programming">support for generic programming</lin
 
 <para>
 Using a combination of <option>-XDeriveGeneric</option>
-(<xref linkend="deriving-typeable"/>) and
+(<xref linkend="deriving-typeable"/>),
 <option>-XDefaultSignatures</option> (<xref linkend="class-default-signatures"/>),
+and <option>-XDeriveAnyClass</option> (<xref linkend="derive-any-class"/>),
 you can easily do datatype-generic
 programming using the <literal>GHC.Generics</literal> framework. This section
 gives a very brief overview of how to do it.
@@ -11745,6 +11765,10 @@ instance (Serialize a) => Serialize (UserTree a)
 
 The default method for <literal>put</literal> is then used, corresponding to the
 generic implementation of serialization.
+
+If you are using <option>-XDeriveAnyClass</option>, the same instance is
+generated by simply attaching a <literal>deriving Serialize</literal> clause
+to the <literal>UserTree</literal> datatype declaration.
 
 For more examples of generic functions please refer to the
 <ulink url="http://hackage.haskell.org/package/generic-deriving">generic-deriving</ulink>

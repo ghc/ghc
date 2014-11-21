@@ -806,6 +806,13 @@
             <entry><option>-XNoDefaultSignatures</option></entry>
           </row>
           <row>
+            <entry><option>-XDeriveAnyClass</option></entry>
+            <entry>Enable <link linkend="derive-any-class">deriving for any
+                   class</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoDeriveAnyClass</option></entry>
+          </row>
+          <row>
             <entry><option>-XDeriveDataTypeable</option></entry>
             <entry>Enable <link linkend="deriving-typeable">deriving for the Data and Typeable classes</link>.
               Implied by <option>-XAutoDeriveTypeable</option>.</entry>

@@ -17,7 +17,8 @@ This is where we do all the grimy bindings' generation.
 module TcGenDeriv (
         BagDerivStuff, DerivStuff(..),
 
-        genDerivedBinds, 
+        canDeriveAnyClass,
+        genDerivedBinds,
         FFoldType(..), functorLikeTraverse,
         deepSubtypesContaining, foldDataConArgs,
         mkCoerceClassMethEqn,
@@ -65,8 +66,9 @@ import Bag
 import Fingerprint
 import TcEnv (InstInfo)
 
-import ListSetOps( assocMaybe )
-import Data.List ( partition, intersperse )
+import ListSetOps ( assocMaybe )
+import Data.List  ( partition, intersperse )
+import Data.Maybe ( isNothing )
 \end{code}
 
 \begin{code}
@@ -106,7 +108,12 @@ genDerivedBinds dflags fix_env clas loc tycon
   = gen_fn loc tycon
 
   | otherwise
-  = pprPanic "genDerivStuff: bad derived class" (ppr clas)
+  -- Deriving any class simply means giving an empty instance, so no
+  -- bindings have to be generated.
+  = ASSERT2( isNothing (canDeriveAnyClass dflags tycon clas)
+           , ppr "genDerivStuff: bad derived class" <+> ppr clas )
+    (emptyBag, emptyBag)
+
   where
     gen_list :: [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff))]
     gen_list = [ (eqClassKey,          gen_Eq_binds)
@@ -121,6 +128,20 @@ genDerivedBinds dflags fix_env clas loc tycon
                , (functorClassKey,     gen_Functor_binds)
                , (foldableClassKey,    gen_Foldable_binds)
                , (traversableClassKey, gen_Traversable_binds) ]
+
+
+-- Nothing: we can (try to) derive it via Generics
+-- Just s:  we can't, reason s
+canDeriveAnyClass :: DynFlags -> TyCon -> Class -> Maybe SDoc
+canDeriveAnyClass dflags _tycon clas =
+  let b `orElse` s = if b then Nothing else Just (ptext (sLit s))
+      Just m  <> _ = Just m
+      Nothing <> n = n
+  -- We can derive a given class for a given tycon via Generics iff
+  in  -- 1) The class is not a "standard" class (like Show, Functor, etc.)
+        (not (getUnique clas `elem` standardClassKeys) `orElse` "")
+      -- 2) Opt_DeriveAnyClass is on
+     <> (xopt Opt_DeriveAnyClass dflags `orElse` "Try enabling DeriveAnyClass")
 \end{code}
 
 %************************************************************************
@@ -1231,7 +1252,7 @@ we generate
 We are passed the Typeable2 class as well as T
 
 \begin{code}
-gen_Typeable_binds :: DynFlags -> SrcSpan -> TyCon 
+gen_Typeable_binds :: DynFlags -> SrcSpan -> TyCon
                    -> (LHsBinds RdrName, BagDerivStuff)
 gen_Typeable_binds dflags loc tycon
   = ( unitBag $ mk_easy_FunBind loc typeRep_RDR [nlWildPat]
