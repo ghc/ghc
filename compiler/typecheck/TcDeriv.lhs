@@ -1172,30 +1172,34 @@ Specifically, we use TcGenDeriv.box_if_necy to box the Int# into an Int
 
 Note [Deriving any class]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Currently, you can use a deriving clause, or standalone-deriving declaration,
-only for:
-  *  a built-in class like Eq or Show, for which GHC knows how to generate
-     the instance code
-  * a newtype, via the "newtype-deriving" mechanism.
+Classic uses of a deriving clause, or a standalone-deriving declaration, are
+for:
+  * a built-in class like Eq or Show, for which GHC knows how to generate
+    the instance code
+  * a newtype, via the mechanism enabled by GeneralizedNewtypeDeriving
 
-However, with GHC.Generics we can write this:
+The DeriveAnyClass extension adds a third way to derive instances, based on
+empty instance declarations.
+
+The canonical use case is in combination with GHC.Generics and default method
+signatures. These allow us have have instance declarations be empty, but still
+useful, e.g.
 
   data T a = ...blah..blah... deriving( Generic )
   instance C a => C (T a)  -- No 'where' clause
 
-where C is some "random" user-defined class. Usually, an instance decl with no
-'where' clause would be pretty useless, but now that we have default method
-signatures, in conjunction with deriving( Generic ), the instance can be useful.
+where C is some "random" user-defined class.
 
-That in turn leads to a desire to say
+This boilerplate code can be replaced by the more compact
 
   data T a = ...blah..blah... deriving( Generic, C )
 
-which is even more compact. That is what DeriveAnyClass implements. This is
-not restricted to Generics; any class can be derived, simply giving rise to
-an empty instance.
+if DeriveAnyClass is enabled.
 
-The only thing left to answer is how to determine the context (in case of
+This is not restricted to Generics; any class can be derived, simply giving
+rise to an empty instance.
+
+Unfortunately, it is not clear how to determine the context (in case of
 standard deriving; in standalone deriving, the user provides the context).
 GHC uses the same heuristic for figuring out the class context that it uses for
 Eq in the case of *-kinded classes, and for Functor in the case of
