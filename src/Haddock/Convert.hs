@@ -253,8 +253,8 @@ synifyDataCon use_gadt_syntax dc = noLoc $
             -- HsNoBang never appears, it's implied instead.
           )
           arg_tys (dataConStrictMarks dc)
-  field_tys = zipWith (\field synTy -> ConDeclField
-                                           (synifyName field) synTy Nothing)
+  field_tys = zipWith (\field synTy -> noLoc $ ConDeclField
+                                               [synifyName field] synTy Nothing)
                 (dataConFieldLabels dc) linear_tys
   hs_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
           (True,True) -> error "synifyDataCon: contradiction!"
@@ -267,7 +267,7 @@ synifyDataCon use_gadt_syntax dc = noLoc $
               then ResTyGADT (synifyType WithinType res_ty)
               else ResTyH98
  -- finally we get synifyDataCon's result!
- in ConDecl name Implicit{-we don't know nor care-}
+ in ConDecl [name] Implicit{-we don't know nor care-}
       qvars ctx hs_arg_tys hs_res_ty Nothing
       False --we don't want any "deprecated GADT syntax" warnings!
 

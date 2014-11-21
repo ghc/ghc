@@ -26,6 +26,7 @@ import OccName
 import Name                 ( nameOccName )
 import RdrName              ( rdrNameOcc )
 import FastString           ( unpackFS, unpackLitString, zString )
+import Outputable           ( panic)
 
 import qualified Data.Map as Map
 import System.Directory
@@ -631,19 +632,19 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
   ResTyH98 -> case con_details con of
 
     PrefixCon args ->
-      decltt (hsep ((header_ unicode <+> ppBinder occ) :
+      decltt (hsep ((header_ unicode <+> ppOcc) :
                  map (ppLParendType unicode) args))
       <-> rDoc mbDoc <+> nl
 
     RecCon fields ->
-      (decltt (header_ unicode <+> ppBinder occ)
+      (decltt (header_ unicode <+> ppOcc)
         <-> rDoc mbDoc <+> nl)
       $$
       doRecordFields fields
 
     InfixCon arg1 arg2 ->
       decltt (hsep [ header_ unicode <+> ppLParendType unicode arg1,
-                 ppBinder occ,
+                 ppOcc,
                  ppLParendType unicode arg2 ])
       <-> rDoc mbDoc <+> nl
 
@@ -657,33 +658,40 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
 
  where
     doRecordFields fields =
-        vcat (map (ppSideBySideField subdocs unicode) fields)
+        vcat (map (ppSideBySideField subdocs unicode) (map unLoc fields))
 
-    doGADTCon args resTy = decltt (ppBinder occ <+> dcolon unicode <+> hsep [
+    doGADTCon args resTy = decltt (ppOcc <+> dcolon unicode <+> hsep [
                                ppForAll forall ltvs (con_cxt con) unicode,
                                ppLType unicode (foldr mkFunTy resTy args) ]
                             ) <-> rDoc mbDoc
 
 
     header_ = ppConstrHdr forall tyVars context
-    occ     = nameOccName . getName . unLoc . con_name $ con
+    occ     = map (nameOccName . getName . unLoc) $ con_names con
+    ppOcc   = case occ of
+      [one] -> ppBinder one
+      _     -> cat (punctuate comma (map ppBinder occ))
     ltvs    = con_qvars con
     tyVars  = tyvarNames (con_qvars con)
     context = unLoc (con_cxt con)
     forall  = con_explicit con
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
     -- or also because we want Haddock to do the doc-parsing, not GHC.
-    mbDoc = lookup (unLoc $ con_name con) subdocs >>= combineDocumentation . fst
+    mbDoc = case con_names con of
+              [] -> panic "empty con_names"
+              (cn:_) -> lookup (unLoc cn) subdocs >>=
+                        combineDocumentation . fst
     mkFunTy a b = noLoc (HsFunTy a b)
 
 
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocName ->  LaTeX
-ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
-  decltt (ppBinder (nameOccName . getName $ name)
+ppSideBySideField subdocs unicode (ConDeclField names ltype _) =
+  decltt (cat (punctuate comma (map (ppBinder . nameOccName . getName . unL) names))
     <+> dcolon unicode <+> ppLType unicode ltype) <-> rDoc mbDoc
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
-    mbDoc = lookup name subdocs >>= combineDocumentation . fst
+    -- Where there is more than one name, they all have the same documentation
+    mbDoc = lookup (unL $ head names) subdocs >>= combineDocumentation . fst
 
 -- {-
 -- ppHsFullConstr :: HsConDecl -> LaTeX

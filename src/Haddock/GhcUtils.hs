@@ -100,7 +100,10 @@ filterLSigNames p (L loc sig) = L loc <$> (filterSigNames p sig)
 filterSigNames :: (name -> Bool) -> Sig name -> Maybe (Sig name)
 filterSigNames p orig@(SpecSig n _ _)          = ifTrueJust (p $ unLoc n) orig
 filterSigNames p orig@(InlineSig n _)          = ifTrueJust (p $ unLoc n) orig
-filterSigNames p orig@(FixSig (FixitySig n _)) = ifTrueJust (p $ unLoc n) orig
+filterSigNames p (FixSig (FixitySig ns ty)) =
+  case filter (p . unLoc) ns of
+    []       -> Nothing
+    filtered -> Just (FixSig (FixitySig filtered ty))
 filterSigNames _ orig@(MinimalSig _)           = Just orig
 filterSigNames p (TypeSig ns ty)               =
   case filter (p . unLoc) ns of
@@ -116,12 +119,12 @@ sigName :: LSig name -> [name]
 sigName (L _ sig) = sigNameNoLoc sig
 
 sigNameNoLoc :: Sig name -> [name]
-sigNameNoLoc (TypeSig   ns _)         = map unLoc ns
-sigNameNoLoc (PatSynSig n _ _ _ _)    = [unLoc n]
-sigNameNoLoc (SpecSig   n _ _)        = [unLoc n]
-sigNameNoLoc (InlineSig n _)          = [unLoc n]
-sigNameNoLoc (FixSig (FixitySig n _)) = [unLoc n]
-sigNameNoLoc _                        = []
+sigNameNoLoc (TypeSig   ns _)          = map unLoc ns
+sigNameNoLoc (PatSynSig n _ _ _ _)     = [unLoc n]
+sigNameNoLoc (SpecSig   n _ _)         = [unLoc n]
+sigNameNoLoc (InlineSig n _)           = [unLoc n]
+sigNameNoLoc (FixSig (FixitySig ns _)) = map unLoc ns
+sigNameNoLoc _                         = []
 
 
 isTyClD :: HsDecl a -> Bool
@@ -195,11 +198,6 @@ instance Traversable (GenLocated l) where
 instance NamedThing (TyClDecl Name) where
   getName = tcdName
 
-
-instance NamedThing (ConDecl Name) where
-  getName = unL . con_name
-
-
 -------------------------------------------------------------------------------
 -- * Subordinates
 -------------------------------------------------------------------------------
@@ -212,13 +210,13 @@ class Parent a where
 instance Parent (ConDecl Name) where
   children con =
     case con_details con of
-      RecCon fields -> map (unL . cd_fld_name) fields
+      RecCon fields -> map unL $ concatMap (cd_fld_names . unL) fields
       _             -> []
-
 
 instance Parent (TyClDecl Name) where
   children d
-    | isDataDecl  d = map (unL . con_name . unL) . dd_cons . tcdDataDefn $ d
+    | isDataDecl  d = map unL $ concatMap (con_names . unL)
+                              $ (dd_cons . tcdDataDefn) $ d
     | isClassDecl d =
         map (unL . fdLName . unL) (tcdATs d) ++
         [ unL n | L _ (TypeSig ns _) <- tcdSigs d, n <- ns ]
@@ -230,11 +228,14 @@ family :: (NamedThing a, Parent a) => a -> (Name, [Name])
 family = getName &&& children
 
 
+familyConDecl :: ConDecl Name -> [(Name, [Name])]
+familyConDecl d = zip (map unL (con_names d)) (repeat $ children d)
+
 -- | A mapping from the parent (main-binder) to its children and from each
 -- child to its grand-children, recursively.
 families :: TyClDecl Name -> [(Name, [Name])]
 families d
-  | isDataDecl  d = family d : map (family . unL) (dd_cons (tcdDataDefn d))
+  | isDataDecl  d = family d : concatMap (familyConDecl . unL) (dd_cons (tcdDataDefn d))
   | isClassDecl d = [family d]
   | otherwise     = []
 
