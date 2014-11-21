@@ -1066,8 +1066,8 @@ mk_dict_err fam_envs ctxt (ct, (matches, unifiers, safe_haskell))
 
     -- Report "potential instances" only when the constraint arises
     -- directly from the user's use of an overloaded function
-    want_potential (AmbigOrigin {})   = False
-    want_potential _                  = True
+    want_potential (TypeEqOrigin {}) = False
+    want_potential _                 = True
 
     add_to_ctxt_fixes has_ambig_tvs
       | not has_ambig_tvs && all_tyvars

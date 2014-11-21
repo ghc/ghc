@@ -1141,12 +1141,10 @@ Note that
 tcSpecInst :: Id -> Sig Name -> TcM TcSpecPrag
 tcSpecInst dfun_id prag@(SpecInstSig hs_ty)
   = addErrCtxt (spec_ctxt prag) $
-    do  { let name = idName dfun_id
-        ; (tyvars, theta, clas, tys) <- tcHsInstHead SpecInstCtxt hs_ty
+    do  { (tyvars, theta, clas, tys) <- tcHsInstHead SpecInstCtxt hs_ty
         ; let (_, spec_dfun_ty) = mkDictFunTy tyvars theta clas tys
 
-        ; co_fn <- tcSubType (SpecPragOrigin name) SpecInstCtxt
-                             (idType dfun_id) spec_dfun_ty
+        ; co_fn <- tcSubType SpecInstCtxt (idType dfun_id) spec_dfun_ty
         ; return (SpecPrag dfun_id co_fn defaultInlinePragma) }
   where
     spec_ctxt prag = hang (ptext (sLit "In the SPECIALISE pragma")) 2 (ppr prag)

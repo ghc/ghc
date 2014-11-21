@@ -161,7 +161,7 @@ tcHsSigType, tcHsSigTypeNC :: UserTypeCtxt -> LHsType Name -> TcM Type
   --     HsForAllTy in hs_ty occur *first* in the returned type.
   --     See Note [Scoped] with TcSigInfo
 tcHsSigType ctxt hs_ty
-  = addErrCtxt (pprHsSigCtxt ctxt hs_ty) $
+  = addErrCtxt (pprSigCtxt ctxt empty (ppr hs_ty)) $
     tcHsSigTypeNC ctxt hs_ty
 
 tcHsSigTypeNC ctxt (L loc hs_ty)
@@ -1240,7 +1240,7 @@ tcHsPatSigType :: UserTypeCtxt
 -- (c) RULE forall bndrs  e.g. forall (x::Int). f x = x
 
 tcHsPatSigType ctxt (HsWB { hswb_cts = hs_ty, hswb_kvs = sig_kvs, hswb_tvs = sig_tvs })
-  = addErrCtxt (pprHsSigCtxt ctxt hs_ty) $
+  = addErrCtxt (pprSigCtxt ctxt empty (ppr hs_ty)) $
     do  { kvs <- mapM new_kv sig_kvs
         ; tvs <- mapM new_tv sig_tvs
         ; let ktv_binds = (sig_kvs `zip` kvs) ++ (sig_tvs `zip` tvs)
@@ -1259,7 +1259,7 @@ tcHsPatSigType ctxt (HsWB { hswb_cts = hs_ty, hswb_kvs = sig_kvs, hswb_tvs = sig
           RuleSigCtxt {} -> return (mkTcTyVar name kind (SkolemTv False))
           _              -> newSigTyVar name kind  -- See Note [Unifying SigTvs]
 
-tcPatSig :: UserTypeCtxt
+tcPatSig :: Bool                    -- True <=> pattern binding
          -> HsWithBndrs Name (LHsType Name)
          -> TcSigmaType
          -> TcM (TcType,            -- The type to use for "inside" the signature
@@ -1267,15 +1267,16 @@ tcPatSig :: UserTypeCtxt
                                     -- the scoped type variables
                  HsWrapper)         -- Coercion due to unification with actual ty
                                     -- Of shape:  res_ty ~ sig_ty
-tcPatSig ctxt sig res_ty
-  = do  { (sig_ty, sig_tvs) <- tcHsPatSigType ctxt sig
+tcPatSig in_pat_bind sig res_ty
+  = do  { (sig_ty, sig_tvs) <- tcHsPatSigType PatSigCtxt sig
         -- sig_tvs are the type variables free in 'sig',
         -- and not already in scope. These are the ones
         -- that should be brought into scope
 
         ; if null sig_tvs then do {
                 -- Just do the subsumption check and return
-                  wrap <- tcSubType PatSigOrigin ctxt res_ty sig_ty
+                  wrap <- addErrCtxtM (mk_msg sig_ty) $
+                          tcSubType_NC PatSigCtxt res_ty sig_ty
                 ; return (sig_ty, [], wrap)
         } else do
                 -- Type signature binds at least one scoped type variable
@@ -1283,10 +1284,7 @@ tcPatSig ctxt sig res_ty
                 -- A pattern binding cannot bind scoped type variables
                 -- It is more convenient to make the test here
                 -- than in the renamer
-        { let in_pat_bind = case ctxt of
-                                BindPatSigCtxt -> True
-                                _              -> False
-        ; when in_pat_bind (addErr (patBindSigErr sig_tvs))
+        { when in_pat_bind (addErr (patBindSigErr sig_tvs))
 
                 -- Check that all newly-in-scope tyvars are in fact
                 -- constrained by the pattern.  This catches tiresome
@@ -1300,11 +1298,21 @@ tcPatSig ctxt sig res_ty
         ; checkTc (null bad_tvs) (badPatSigTvs sig_ty bad_tvs)
 
         -- Now do a subsumption check of the pattern signature against res_ty
-        ; wrap <- tcSubType PatSigOrigin ctxt res_ty sig_ty
+        ; wrap <- addErrCtxtM (mk_msg sig_ty) $
+                  tcSubType_NC PatSigCtxt res_ty sig_ty
 
         -- Phew!
         ; return (sig_ty, sig_tvs, wrap)
         } }
+  where
+    mk_msg sig_ty tidy_env
+       = do { (tidy_env, sig_ty) <- zonkTidyTcType tidy_env sig_ty
+            ; (tidy_env, res_ty) <- zonkTidyTcType tidy_env res_ty
+            ; let msg = vcat [ hang (ptext (sLit "When checking that the pattern signature:"))
+                                  4 (ppr sig_ty)
+                             , nest 2 (hang (ptext (sLit "fits the type of its context:"))
+                                          2 (ppr res_ty)) ]
+            ; return (tidy_env, msg) }
 
 patBindSigErr :: [(Name, TcTyVar)] -> SDoc
 patBindSigErr sig_tvs
@@ -1628,17 +1636,6 @@ promotionErr name err
 %************************************************************************
 
 \begin{code}
-pprHsSigCtxt :: UserTypeCtxt -> LHsType Name -> SDoc
-pprHsSigCtxt ctxt hs_ty = sep [ ptext (sLit "In") <+> pprUserTypeCtxt ctxt <> colon,
-                                 nest 2 (pp_sig ctxt) ]
-  where
-    pp_sig (FunSigCtxt n)  = pp_n_colon n
-    pp_sig (ConArgCtxt n)  = pp_n_colon n
-    pp_sig (ForSigCtxt n)  = pp_n_colon n
-    pp_sig _               = ppr (unLoc hs_ty)
-
-    pp_n_colon n = pprPrefixOcc n <+> dcolon <+> ppr (unLoc hs_ty)
-
 badPatSigTvs :: TcType -> [TyVar] -> SDoc
 badPatSigTvs sig_ty bad_tvs
   = vcat [ fsep [ptext (sLit "The type variable") <> plural bad_tvs,

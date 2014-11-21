@@ -820,12 +820,17 @@ dsHsWrapper WpHole            e = return e
 dsHsWrapper (WpTyApp ty)      e = return $ App e (Type ty)
 dsHsWrapper (WpLet ev_binds)  e = do bs <- dsTcEvBinds ev_binds
                                      return (mkCoreLets bs e)
-dsHsWrapper (WpCompose c1 c2) e = dsHsWrapper c1 =<< dsHsWrapper c2 e
+dsHsWrapper (WpCompose c1 c2) e = do { e1 <- dsHsWrapper c2 e
+                                     ; dsHsWrapper c1 e1 }
+dsHsWrapper (WpFun c1 c2 t1 _) e = do { x <- newSysLocalDs t1
+                                      ; e1 <- dsHsWrapper c1 (Var x)
+                                      ; e2 <- dsHsWrapper c2 (e `mkCoreAppDs` e1)
+                                      ; return (Lam x e2) }
 dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
                                   dsTcCoercion co (mkCast e)
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e
 dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
-dsHsWrapper (WpEvApp evtrm)   e = liftM (App e) (dsEvTerm evtrm)
+dsHsWrapper (WpEvApp    tm)   e = liftM (App e) (dsEvTerm tm)
 
 --------------------------------------
 dsTcEvBinds :: TcEvBinds -> DsM [CoreBind]

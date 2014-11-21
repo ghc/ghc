@@ -129,9 +129,9 @@ data LetBndrSpec
 makeLazy :: PatEnv -> PatEnv
 makeLazy penv = penv { pe_lazy = True }
 
-patSigCtxt :: PatEnv -> UserTypeCtxt
-patSigCtxt (PE { pe_ctxt = LetPat {} }) = BindPatSigCtxt
-patSigCtxt (PE { pe_ctxt = LamPat {} }) = LamPatSigCtxt
+inPatBind :: PatEnv -> Bool
+inPatBind (PE { pe_ctxt = LetPat {} }) = True
+inPatBind (PE { pe_ctxt = LamPat {} }) = False
 
 ---------------
 type TcPragFun = Name -> [LSig Name]
@@ -505,7 +505,7 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
 tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
-  = do  { (inner_ty, tv_binds, wrap) <- tcPatSig (patSigCtxt penv) sig_ty pat_ty
+  = do  { (inner_ty, tv_binds, wrap) <- tcPatSig (inPatBind penv) sig_ty pat_ty
         ; (pat', res) <- tcExtendTyVarEnv2 tv_binds $
                          tc_lpat pat inner_ty penv thing_inside
 

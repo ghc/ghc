@@ -29,7 +29,7 @@ module TcType (
 
   --------------------------------
   -- MetaDetails
-  UserTypeCtxt(..), pprUserTypeCtxt,
+  UserTypeCtxt(..), pprUserTypeCtxt, pprSigCtxt,
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
   MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
@@ -63,7 +63,7 @@ module TcType (
   -- Again, newtypes are opaque
   eqType, eqTypes, eqPred, cmpType, cmpTypes, cmpPred, eqTypeX,
   pickyEqType, tcEqType, tcEqKind,
-  isSigmaTy, isOverloadedTy,
+  isSigmaTy, isRhoTy, isOverloadedTy,
   isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
@@ -232,11 +232,19 @@ type TcType = Type      -- A TcType can have mutable type variables
 type TcPredType     = PredType
 type TcThetaType    = ThetaType
 type TcSigmaType    = TcType
-type TcRhoType      = TcType
+type TcRhoType      = TcType  -- Note [TcRhoType]
 type TcTauType      = TcType
 type TcKind         = Kind
 type TcTyVarSet     = TyVarSet
 \end{code}
+
+Note [TcRhoType]
+~~~~~~~~~~~~~~~~
+A TcRhoType has no foralls or contexts at the top, or to the right of an arrow
+  YES    (forall a. a->a) -> Int
+  NO     forall a. a ->  Int
+  NO     Eq a => a -> a
+  NO     Int -> forall a. a -> Int
 
 
 %************************************************************************
@@ -361,10 +369,9 @@ data UserTypeCtxt
   | ExprSigCtxt         -- Expression type signature
   | ConArgCtxt Name     -- Data constructor argument
   | TySynCtxt Name      -- RHS of a type synonym decl
-  | LamPatSigCtxt               -- Type sig in lambda pattern
-                        --      f (x::t) = ...
-  | BindPatSigCtxt      -- Type sig in pattern binding pattern
-                        --      (x::t, y) = e
+  | PatSigCtxt          -- Type sig in pattern
+                        --   eg  f (x::t) = ...
+                        --   or  (x::t, y) = e
   | RuleSigCtxt Name    -- LHS of a RULE forall
                         --    RULE "foo" forall (x :: a -> a). f (Just x) = ...
   | ResSigCtxt          -- Result type sig
@@ -511,7 +518,7 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_untch = untch })
   = pp_info <> colon <> ppr untch
   where
     pp_info = case info of
-                ReturnTv   -> ptext (sLit "return")
+                ReturnTv   -> ptext (sLit "ret")
                 TauTv      -> ptext (sLit "tau")
                 SigTv      -> ptext (sLit "sig")
                 FlatMetaTv -> ptext (sLit "fuv")
@@ -524,8 +531,7 @@ pprUserTypeCtxt ExprSigCtxt       = ptext (sLit "an expression type signature")
 pprUserTypeCtxt (ConArgCtxt c)    = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
 pprUserTypeCtxt (TySynCtxt c)     = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
 pprUserTypeCtxt ThBrackCtxt       = ptext (sLit "a Template Haskell quotation [t|...|]")
-pprUserTypeCtxt LamPatSigCtxt     = ptext (sLit "a pattern type signature")
-pprUserTypeCtxt BindPatSigCtxt    = ptext (sLit "a pattern type signature")
+pprUserTypeCtxt PatSigCtxt        = ptext (sLit "a pattern type signature")
 pprUserTypeCtxt ResSigCtxt        = ptext (sLit "a result type signature")
 pprUserTypeCtxt (ForSigCtxt n)    = ptext (sLit "the foreign declaration for") <+> quotes (ppr n)
 pprUserTypeCtxt DefaultDeclCtxt   = ptext (sLit "a type in a `default' declaration")
@@ -536,6 +542,22 @@ pprUserTypeCtxt GhciCtxt          = ptext (sLit "a type in a GHCi command")
 pprUserTypeCtxt (ClassSCCtxt c)   = ptext (sLit "the super-classes of class") <+> quotes (ppr c)
 pprUserTypeCtxt SigmaCtxt         = ptext (sLit "the context of a polymorphic type")
 pprUserTypeCtxt (DataTyCtxt tc)   = ptext (sLit "the context of the data type declaration for") <+> quotes (ppr tc)
+
+pprSigCtxt :: UserTypeCtxt -> SDoc -> SDoc -> SDoc
+-- (pprSigCtxt ctxt <extra> <type>)
+-- prints    In <extra> the type signature for 'f':
+--              f :: <type>
+-- The <extra> is either empty or "the ambiguity check for"
+pprSigCtxt ctxt extra pp_ty
+  = sep [ ptext (sLit "In") <+> extra <+> pprUserTypeCtxt ctxt <> colon
+        , nest 2 (pp_sig ctxt) ]
+  where
+    pp_sig (FunSigCtxt n)  = pp_n_colon n
+    pp_sig (ConArgCtxt n)  = pp_n_colon n
+    pp_sig (ForSigCtxt n)  = pp_n_colon n
+    pp_sig _               = pp_ty
+
+    pp_n_colon n = pprPrefixOcc n <+> dcolon <+> pp_ty
 \end{code}
 
 
@@ -1310,16 +1332,22 @@ immSuperClasses cls tys
 %*                                                                      *
 %************************************************************************
 
-isSigmaTy returns true of any qualified type.  It doesn't *necessarily* have
-any foralls.  E.g.
-        f :: (?x::Int) => Int -> Int
 
 \begin{code}
-isSigmaTy :: Type -> Bool
+isSigmaTy :: TcType -> Bool
+-- isSigmaTy returns true of any qualified type.  It doesn't
+-- *necessarily* have any foralls.  E.g
+--        f :: (?x::Int) => Int -> Int
 isSigmaTy ty | Just ty' <- tcView ty = isSigmaTy ty'
 isSigmaTy (ForAllTy _ _) = True
 isSigmaTy (FunTy a _)    = isPredTy a
 isSigmaTy _              = False
+
+isRhoTy :: TcType -> Bool   -- True of TcRhoTypes; see Note [TcRhoType]
+isRhoTy ty | Just ty' <- tcView ty = isRhoTy ty'
+isRhoTy (ForAllTy {}) = False
+isRhoTy (FunTy a r)   = not (isPredTy a) && isRhoTy r
+isRhoTy _             = True
 
 isOverloadedTy :: Type -> Bool
 -- Yes for a type of a function that might require evidence-passing

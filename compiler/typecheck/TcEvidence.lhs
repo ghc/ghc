@@ -10,7 +10,7 @@ module TcEvidence (
   -- HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpLams, mkWpLet, mkWpCast,
-  idHsWrapper, isIdHsWrapper, pprHsWrapper,
+  mkWpFun, idHsWrapper, isIdHsWrapper, pprHsWrapper,
 
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -141,6 +141,9 @@ mkTcReflCo = TcRefl
 
 mkTcNomReflCo :: TcType -> TcCoercion
 mkTcNomReflCo = TcRefl Nominal
+
+mkTcRepReflCo :: TcType -> TcCoercion
+mkTcRepReflCo = TcRefl Representational
 
 mkTcFunCo :: Role -> TcCoercion -> TcCoercion -> TcCoercion
 mkTcFunCo role co1 co2 = mkTcTyConAppCo role funTyCon [co1, co2]
@@ -441,14 +444,22 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
+  | WpFun HsWrapper HsWrapper TcType TcType
+       -- (WpFun wrap1 wrap2 t1 t2)[e] = \(x:t1). wrap2[ e wrap1[x] ] :: t2
+       -- So note that if  wrap1 :: exp_arg <= act_arg
+       --                  wrap2 :: act_res <= exp_res
+       --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) <= (exp_arg -> exp_res)
+       -- This isn't the same as for mkTcFunCo, but it has to be this way
+       -- because we can't use 'sym' to flip around these HsWrappers
+
   | WpCast TcCoercion         -- A cast:  [] `cast` co
                               -- Guaranteed not the identity coercion
                               -- At role Representational
 
         -- Evidence abstraction and application
         -- (both dictionaries and coercions)
-  | WpEvLam EvVar               -- \d. []       the 'd' is an evidence variable
-  | WpEvApp EvTerm              -- [] d         the 'd' is evidence for a constraint
+  | WpEvLam  EvVar               -- \d. []       the 'd' is an evidence variable
+  | WpEvApp  EvTerm              -- [] d         the 'd' is evidence for a constraint
 
         -- Kind and Type abstraction and application
   | WpTyLam TyVar       -- \a. []  the 'a' is a type/kind variable (not coercion var)
@@ -465,9 +476,18 @@ WpHole <.> c = c
 c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
+mkWpFun :: HsWrapper -> HsWrapper -> TcType -> TcType -> HsWrapper
+mkWpFun WpHole       WpHole       _  _  = WpHole 
+mkWpFun WpHole       (WpCast co2) t1 _  = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
+mkWpFun (WpCast co1) WpHole       _  t2 = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
+mkWpFun (WpCast co1) (WpCast co2) _  _  = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
+mkWpFun co1          co2          t1 t2 = WpFun co1 co2 t1 t2
+
 mkWpCast :: TcCoercion -> HsWrapper
-mkWpCast co = ASSERT2(tcCoercionRole co == Representational, ppr co)
-              WpCast co
+mkWpCast co 
+  | isTcReflCo co = WpHole
+  | otherwise     = ASSERT2(tcCoercionRole co == Representational, ppr co)
+                    WpCast co
 
 mkWpTyApps :: [Type] -> HsWrapper
 mkWpTyApps tys = mk_co_app_fn WpTyApp tys
@@ -746,13 +766,15 @@ pprHsWrapper doc wrap
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
+    help it (WpFun f1 f2 t1 _) = add_parens $ ptext (sLit "\\(x") <> dcolon <> ppr t1 <> ptext (sLit ").") <+> 
+                                              help (\_ -> it True <+> help (\_ -> ptext (sLit "x")) f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (ptext (sLit "|>")
                                               <+> pprParendTcCo co)]
-    help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]
-    help it (WpTyApp ty)  = no_parens  $ sep [it True, ptext (sLit "@") <+> pprParendType ty]
-    help it (WpEvLam id)  = add_parens $ sep [ ptext (sLit "\\") <> pp_bndr id, it False]
-    help it (WpTyLam tv)  = add_parens $ sep [ptext (sLit "/\\") <> pp_bndr tv, it False]
-    help it (WpLet binds) = add_parens $ sep [ptext (sLit "let") <+> braces (ppr binds), it False]
+    help it (WpEvApp id)    = no_parens  $ sep [it True, nest 2 (ppr id)]
+    help it (WpTyApp ty)    = no_parens  $ sep [it True, ptext (sLit "@") <+> pprParendType ty]
+    help it (WpEvLam id)    = add_parens $ sep [ ptext (sLit "\\") <> pp_bndr id, it False]
+    help it (WpTyLam tv)    = add_parens $ sep [ptext (sLit "/\\") <> pp_bndr tv, it False]
+    help it (WpLet binds)   = add_parens $ sep [ptext (sLit "let") <+> braces (ppr binds), it False]
 
     pp_bndr v = pprBndr LambdaBind v <> dot
 

@@ -23,8 +23,6 @@ module Inst (
        -- Simple functions over evidence variables
        tyVarsOfWC, tyVarsOfBag,
        tyVarsOfCt, tyVarsOfCts,
-
-       tidyEvVar, tidyCt, tidySkolemInfo
     ) where
 
 #include "HsVersions.h"
@@ -49,7 +47,7 @@ import Class( Class )
 import MkId( mkDictFunId )
 import Id
 import Name
-import Var      ( EvVar, varType, setVarType )
+import Var      ( EvVar )
 import VarEnv
 import VarSet
 import PrelNames
@@ -59,7 +57,6 @@ import Bag
 import Util
 import Outputable
 import Control.Monad( unless )
-import Data.List( mapAccumL )
 import Data.Maybe( isJust )
 \end{code}
 
@@ -175,10 +172,11 @@ deeplyInstantiate orig ty
        ; ids1  <- newSysLocalIds (fsLit "di") (substTys subst arg_tys)
        ; let theta' = substTheta subst theta
        ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
-       ; traceTc "Instantiating (deply)" (vcat [ ppr ty
-                                               , text "with" <+> ppr tvs'
-                                               , text "args:" <+> ppr ids1
-                                               , text "theta:" <+>  ppr theta' ])
+       ; traceTc "Instantiating (deeply)" (vcat [ text "origin" <+> pprCtOrigin orig
+                                                , text "type" <+> ppr ty
+                                                , text "with" <+> ppr tvs'
+                                                , text "args:" <+> ppr ids1
+                                                , text "theta:" <+>  ppr theta' ])
        ; (wrap2, rho2) <- deeplyInstantiate orig (substTy subst rho)
        ; return (mkWpLams ids1
                     <.> wrap2

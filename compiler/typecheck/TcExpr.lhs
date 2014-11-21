@@ -914,15 +914,17 @@ tcApp fun args res_ty
         -- Typecheck the result, thereby propagating
         -- info (if any) from result into the argument types
         -- Both actual_res_ty and res_ty are deeply skolemised
-        ; co_res <- addErrCtxtM (funResCtxt True (unLoc fun) actual_res_ty res_ty) $
-                    unifyType actual_res_ty res_ty
+        -- Rather like tcWrapResult, but (perhaps for historical reasons)
+        -- we do this before typechecking the arguments
+        ; wrap_res <- addErrCtxtM (funResCtxt True (unLoc fun) actual_res_ty res_ty) $
+                      tcSubTypeDS_NC GenSigCtxt actual_res_ty res_ty
 
         -- Typecheck the arguments
         ; args1 <- tcArgs fun args expected_arg_tys
 
         -- Assemble the result
         ; let fun2 = mkLHsWrapCo co_fun fun1
-              app  = mkLHsWrapCo co_res (foldl mkHsApp fun2 args1)
+              app  = mkLHsWrap wrap_res (foldl mkHsApp fun2 args1)
 
         ; return (unLoc app) }
 

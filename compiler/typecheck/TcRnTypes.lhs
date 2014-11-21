@@ -1861,7 +1861,6 @@ data CtOrigin
   | PArrSeqOrigin  (ArithSeqInfo Name) -- [:x..y:] and [:x,y..z:]
   | SectionOrigin
   | TupleOrigin                        -- (..,..)
-  | AmbigOrigin UserTypeCtxt    -- Will be FunSigCtxt, InstDeclCtxt, or SpecInstCtxt
   | ExprSigOrigin       -- e :: ty
   | PatSigOrigin        -- p :: ty
   | PatOrigin           -- Instantiating a polytyped pattern at a constructor
@@ -1929,13 +1928,6 @@ pprCtOrigin (DerivOriginDC dc n)
        2 (parens (ptext (sLit "type") <+> quotes (ppr ty)))
   where
     ty = dataConOrigArgTys dc !! (n-1)
-
-pprCtOrigin (AmbigOrigin ctxt)
-  = ctoHerald <+> ptext (sLit "the ambiguity check for")
-    <+> case ctxt of
-           FunSigCtxt name -> quotes (ppr name)
-           InfSigCtxt name -> quotes (ppr name)
-           _               -> pprUserTypeCtxt ctxt
 
 pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
   = hang (ctoHerald <+> ptext (sLit "the coercion of the method") <+> quotes (ppr meth))

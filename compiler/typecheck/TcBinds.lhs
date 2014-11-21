@@ -669,7 +669,7 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
         -- See Note [Impedence matching]
         ; (wrap, wanted) <- addErrCtxtM (mk_bind_msg inferred True poly_name (idType poly_id)) $
                             captureConstraints $
-                            tcSubType origin sig_ctxt sel_poly_ty (idType poly_id)
+                            tcSubType_NC sig_ctxt sel_poly_ty (idType poly_id)
         ; ev_binds <- simplifyTop wanted
 
         ; return (ABE { abe_wrap = mkWpLet (EvBinds ev_binds) <.> wrap
@@ -679,7 +679,6 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
   where
     inferred = isNothing mb_sig
     prag_sigs = prag_fn poly_name
-    origin    = AmbigOrigin sig_ctxt
     sig_ctxt  = InfSigCtxt poly_name
 
 mkInferredPolyId :: Name -> [TyVar] -> TcThetaType -> TcType -> TcM Id
@@ -705,20 +704,21 @@ mkInferredPolyId poly_name qtvs theta mono_ty
 
        ; addErrCtxtM (mk_bind_msg True False poly_name inferred_poly_ty) $
          checkValidType (InfSigCtxt poly_name) inferred_poly_ty
+
        ; return (mkLocalId poly_name inferred_poly_ty) }
 
 mk_bind_msg :: Bool -> Bool -> Name -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
 mk_bind_msg inferred want_ambig poly_name poly_ty tidy_env
- = return (tidy_env', msg)
+ = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env poly_ty
+      ; return (tidy_env', mk_msg tidy_ty) }
  where
-   msg = vcat [ ptext (sLit "When checking that") <+> quotes (ppr poly_name)
-                <+> ptext (sLit "has the") <+> what <+> ptext (sLit "type")
-              , nest 2 (ppr poly_name <+> dcolon <+> ppr tidy_ty)
-              , ppWhen want_ambig $
-                ptext (sLit "Probable cause: the inferred type is ambiguous") ]
+   mk_msg ty = vcat [ ptext (sLit "When checking that") <+> quotes (ppr poly_name)
+                      <+> ptext (sLit "has the") <+> what <+> ptext (sLit "type")
+                    , nest 2 (ppr poly_name <+> dcolon <+> ppr ty)
+                    , ppWhen want_ambig $
+                      ptext (sLit "Probable cause: the inferred type is ambiguous") ]
    what | inferred  = ptext (sLit "inferred")
         | otherwise = ptext (sLit "specified")
-   (tidy_env', tidy_ty) = tidyOpenType tidy_env poly_ty
 \end{code}
 
 Note [Validity of inferred types]
@@ -846,12 +846,11 @@ tcSpec poly_id prag@(SpecSig fun_name hs_ty inl)
                  (ptext (sLit "SPECIALISE pragma for non-overloaded function")
                   <+> quotes (ppr fun_name))
                   -- Note [SPECIALISE pragmas]
-        ; wrap <- tcSubType origin sig_ctxt (idType poly_id) spec_ty
+        ; wrap <- tcSubType sig_ctxt (idType poly_id) spec_ty
         ; return (SpecPrag poly_id wrap inl) }
   where
     name      = idName poly_id
     poly_ty   = idType poly_id
-    origin    = SpecPragOrigin name
     sig_ctxt  = FunSigCtxt name
     spec_ctxt prag = hang (ptext (sLit "In the SPECIALISE pragma")) 2 (ppr prag)
 
@@ -1326,7 +1325,7 @@ tcTySig (L loc (PatSynSig (L _ name) (_, qtvs) prov req ty))
 
        ; qtvs' <- mapM zonkQuantifiedTyVar qtvs'
 
-       ; let (_, pat_ty) = splitFunTys ty'
+       ; let (_, pat_ty) = tcSplitFunTys ty'
              univ_set = tyVarsOfType pat_ty
              (univ_tvs, ex_tvs) = partition (`elemVarSet` univ_set) qtvs'
 
