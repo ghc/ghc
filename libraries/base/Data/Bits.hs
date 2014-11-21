@@ -47,7 +47,8 @@ module Data.Bits (
 
   bitDefault,
   testBitDefault,
-  popCountDefault
+  popCountDefault,
+  toIntegralSized
  ) where
 
 -- Defines the @Bits@ class containing bit-based operations.
@@ -60,6 +61,7 @@ import Data.Maybe
 import GHC.Enum
 import GHC.Num
 import GHC.Base
+import GHC.Real
 
 infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`
 infixl 7 .&.
@@ -520,6 +522,82 @@ instance Bits Integer where
    bitSize _  = error "Data.Bits.bitSize(Integer)"
    isSigned _ = True
 
+-----------------------------------------------------------------------------
+
+-- | Attempt to convert an 'Integral' type @a@ to an 'Integral' type @b@ using
+-- the size of the types as measured by 'Bits' methods.
+--
+-- A simpler version of this function is:
+--
+-- > toIntegral :: (Integral a, Integral b) => a -> Maybe b
+-- > toIntegral x
+-- >   | toInteger x == y = Just (fromInteger y)
+-- >   | otherwise        = Nothing
+-- >   where
+-- >     y = toInteger x
+--
+-- This version requires going through 'Integer', which can be inefficient.
+-- However, @toIntegralSized@ is optimized to allow GHC to statically determine
+-- the relative type sizes (as measured by 'bitSizeMaybe' and 'isSigned') and
+-- avoid going through 'Integer' for many types. (The implementation uses
+-- 'fromIntegral', which is itself optimized with rules for @base@ types but may
+-- go through 'Integer' for some type pairs.)
+--
+-- /Since: 4.8.0.0/
+
+toIntegralSized :: (Integral a, Integral b, Bits a, Bits b) => a -> Maybe b
+toIntegralSized x                 -- See Note [toIntegralSized optimization]
+  | maybe True (<= x) yMinBound
+  , maybe True (x <=) yMaxBound = Just y
+  | otherwise                   = Nothing
+  where
+    y = fromIntegral x
+
+    xWidth = bitSizeMaybe x
+    yWidth = bitSizeMaybe y
+
+    yMinBound
+      | isBitSubType x y = Nothing
+      | isSigned x, not (isSigned y) = Just 0
+      | isSigned x, isSigned y
+      , Just yW <- yWidth = Just (negate $ bit (yW-1)) -- Assumes sub-type
+      | otherwise = Nothing
+
+    yMaxBound
+      | isBitSubType x y = Nothing
+      | isSigned x, not (isSigned y)
+      , Just xW <- xWidth, Just yW <- yWidth
+      , xW <= yW+1 = Nothing -- Max bound beyond a's domain
+      | Just yW <- yWidth = if isSigned y
+                            then Just (bit (yW-1)-1)
+                            else Just (bit yW-1)
+      | otherwise = Nothing
+{-# INLINEABLE toIntegralSized #-}
+
+-- | 'True' if the size of @a@ is @<=@ the size of @b@, where size is measured
+-- by 'bitSizeMaybe' and 'isSigned'.
+isBitSubType :: (Bits a, Bits b) => a -> b -> Bool
+isBitSubType x y
+  -- Reflexive
+  | xWidth == yWidth, xSigned == ySigned = True
+
+  -- Every integer is a subset of 'Integer'
+  | ySigned, Nothing == yWidth                  = True
+  | not xSigned, not ySigned, Nothing == yWidth = True
+
+  -- Sub-type relations between fixed-with types
+  | xSigned == ySigned,   Just xW <- xWidth, Just yW <- yWidth = xW <= yW
+  | not xSigned, ySigned, Just xW <- xWidth, Just yW <- yWidth = xW <  yW
+
+  | otherwise = False
+  where
+    xWidth  = bitSizeMaybe x
+    xSigned = isSigned     x
+
+    yWidth  = bitSizeMaybe y
+    ySigned = isSigned     y
+{-# INLINE isBitSubType #-}
+
 {-      Note [Constant folding for rotate]
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The INLINE on the Int instance of rotate enables it to be constant
@@ -544,3 +622,28 @@ own to enable constant folding; for example 'shift':
            10000000 -> ww_sOb
          }
 -}
+
+-- Note [toIntegralSized optimization]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The code in 'toIntegralSized' relies on GHC optimizing away statically
+-- decidable branches.
+--
+-- If both integral types are statically known, GHC will be able optimize the
+-- code significantly (for @-O1@ and better).
+--
+-- For instance (as of GHC 7.8.1) the following definitions:
+--
+-- > w16_to_i32 = toIntegralSized :: Word16 -> Maybe Int32
+-- >
+-- > i16_to_w16 = toIntegralSized :: Int16 -> Maybe Word16
+--
+-- are translated into the following (simplified) /GHC Core/ language:
+--
+-- > w16_to_i32 = \x -> Just (case x of _ { W16# x# -> I32# (word2Int# x#) })
+-- >
+-- > i16_to_w16 = \x -> case eta of _
+-- >   { I16# b1 -> case tagToEnum# (<=# 0 b1) of _
+-- >       { False -> Nothing
+-- >       ; True -> Just (W16# (narrow16Word# (int2Word# b1)))
+-- >       }
+-- >   }
