@@ -41,6 +41,7 @@ module TcType (
   metaTyVarUntouchables, setMetaTyVarUntouchables, metaTyVarUntouchables_maybe,
   isTouchableMetaTyVar, isTouchableOrFmv,
   isFloatedTouchableMetaTyVar,
+  canUnifyWithPolyType,
 
   --------------------------------
   -- Builders
@@ -1202,16 +1203,7 @@ occurCheckExpand dflags tv ty
   where
     details = ASSERT2( isTcTyVar tv, ppr tv ) tcTyVarDetails tv
 
-    impredicative
-      = case details of
-          MetaTv { mtv_info = ReturnTv } -> True
-          MetaTv { mtv_info = SigTv }    -> False
-          MetaTv { mtv_info = TauTv }    -> xopt Opt_ImpredicativeTypes dflags
-                                         || isOpenTypeKind (tyVarKind tv)
-                                          -- Note [OpenTypeKind accepts foralls]
-                                          -- in TcUnify
-          _other                         -> True
-          -- We can have non-meta tyvars in given constraints
+    impredicative = canUnifyWithPolyType dflags details (tyVarKind tv)
 
     -- Check 'ty' is a tyvar, or can be expanded into one
     go_sig_tv ty@(TyVarTy {})            = OC_OK ty
@@ -1259,7 +1251,35 @@ occurCheckExpand dflags tv ty
           bad | Just ty' <- tcView ty -> go ty'
               | otherwise             -> bad
                       -- Failing that, try to expand a synonym
+
+canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> TcKind -> Bool
+canUnifyWithPolyType dflags details kind
+  = case details of
+      MetaTv { mtv_info = ReturnTv } -> True      -- See Note [ReturnTv]
+      MetaTv { mtv_info = SigTv }    -> False
+      MetaTv { mtv_info = TauTv }    -> xopt Opt_ImpredicativeTypes dflags
+                                     || isOpenTypeKind kind
+                                          -- Note [OpenTypeKind accepts foralls]
+      _other                         -> True
+          -- We can have non-meta tyvars in given constraints
 \end{code}
+
+Note [OpenTypeKind accepts foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is a common paradigm:
+   foo :: (forall a. a -> a) -> Int
+   foo = error "urk"
+To make this work we need to instantiate 'error' with a polytype.
+A similar case is
+   bar :: Bool -> (forall a. a->a) -> Int
+   bar True = \x. (x 3)
+   bar False = error "urk"
+Here we need to instantiate 'error' with a polytype.
+
+But 'error' has an OpenTypeKind type variable, precisely so that
+we can instantiate it with Int#.  So we also allow such type variables
+to be instantiate with foralls.  It's a bit of a hack, but seems
+straightforward.
 
 %************************************************************************
 %*                                                                      *

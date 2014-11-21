@@ -1011,13 +1011,10 @@ checkTauTvUpdate dflags tv ty
                    _ -> return Nothing
               | otherwise   -> return (Just ty1) }
   where
-    info = ASSERT2( isMetaTyVar tv, ppr tv ) metaTyVarInfo tv
-      -- See Note [ReturnTv] in TcType
+    details = ASSERT2( isMetaTyVar tv, ppr tv ) tcTyVarDetails tv
+    info         = mtv_info details
     is_return_tv = case info of { ReturnTv -> True; _ -> False }
-
-    impredicative = xopt Opt_ImpredicativeTypes dflags
-                 || isOpenTypeKind (tyVarKind tv)
-                       -- Note [OpenTypeKind accepts foralls]
+    impredicative = canUnifyWithPolyType dflags details (tyVarKind tv)
 
     defer_me :: TcType -> Bool
     -- Checks for (a) occurrence of tv
@@ -1030,23 +1027,6 @@ checkTauTvUpdate dflags tv ty
     defer_me (AppTy fun arg)   = defer_me fun || defer_me arg
     defer_me (ForAllTy _ ty)   = not impredicative || defer_me ty
 \end{code}
-
-Note [OpenTypeKind accepts foralls]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here is a common paradigm:
-   foo :: (forall a. a -> a) -> Int
-   foo = error "urk"
-To make this work we need to instantiate 'error' with a polytype.
-A similar case is
-   bar :: Bool -> (forall a. a->a) -> Int
-   bar True = \x. (x 3)
-   bar False = error "urk"
-Here we need to instantiate 'error' with a polytype.
-
-But 'error' has an OpenTypeKind type variable, precisely so that
-we can instantiate it with Int#.  So we also allow such type variables
-to be instantiate with foralls.  It's a bit of a hack, but seems
-straightforward.
 
 Note [Conservative unification check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
