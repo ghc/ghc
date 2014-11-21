@@ -11,6 +11,10 @@ module Packages (
         -- * Reading the package config, and processing cmdline args
         PackageState(preloadPackages),
         initPackages,
+        readPackageConfigs,
+        getPackageConfRefs,
+        resolvePackageConfig,
+        readPackageConfig,
 
         -- * Querying the package config
         lookupPackage,
@@ -328,6 +332,12 @@ initPackages dflags = do
 
 readPackageConfigs :: DynFlags -> IO [PackageConfig]
 readPackageConfigs dflags = do
+  conf_refs <- getPackageConfRefs dflags
+  confs     <- liftM catMaybes $ mapM (resolvePackageConfig dflags) conf_refs
+  liftM concat $ mapM (readPackageConfig dflags) confs
+
+getPackageConfRefs :: DynFlags -> IO [PkgConfRef]
+getPackageConfRefs dflags = do
   let system_conf_refs = [UserPkgConf, GlobalPkgConf]
 
   e_pkg_path <- tryIO (getEnv "GHC_PACKAGE_PATH")
@@ -339,13 +349,10 @@ readPackageConfigs dflags = do
          | otherwise
          -> map PkgConfFile (splitSearchPath path)
 
-  let conf_refs = reverse (extraPkgConfs dflags base_conf_refs)
+  return $ reverse (extraPkgConfs dflags base_conf_refs)
   -- later packages shadow earlier ones.  extraPkgConfs
   -- is in the opposite order to the flags on the
   -- command line.
-  confs <- liftM catMaybes $ mapM (resolvePackageConfig dflags) conf_refs
-
-  liftM concat $ mapM (readPackageConfig dflags) confs
 
 resolvePackageConfig :: DynFlags -> PkgConfRef -> IO (Maybe FilePath)
 resolvePackageConfig dflags GlobalPkgConf = return $ Just (systemPackageConfig dflags)
