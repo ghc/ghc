@@ -65,6 +65,7 @@ module Data.OldList
 
    -- ** Scans
    , scanl
+   , scanl'
    , scanl1
    , scanr
    , scanr1
