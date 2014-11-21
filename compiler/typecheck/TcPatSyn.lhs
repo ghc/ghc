@@ -7,14 +7,15 @@
 \begin{code}
 {-# LANGUAGE CPP #-}
 
-module TcPatSyn (tcInferPatSynDecl, tcCheckPatSynDecl, mkPatSynWrapperId, tcPatSynWorker) where
+module TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl
+                , tcPatSynBuilderBind, tcPatSynBuilderOcc
+  ) where
 
 import HsSyn
 import TcPat
 import TcRnMonad
 import TcEnv
 import TcMType
-import TcIface
 import TysPrim
 import Name
 import SrcLoc
@@ -46,6 +47,12 @@ import Control.Monad (forM)
 
 #include "HsVersions.h"
 \end{code}
+
+%************************************************************************
+%*                                                                      *
+                    Type checking a pattern synonym
+%*                                                                      *
+%************************************************************************
 
 \begin{code}
 tcInferPatSynDecl :: PatSynBind Name Name
@@ -168,6 +175,8 @@ wrongNumberOfParmsErr ty_arity
   = ptext (sLit "Number of pattern synonym arguments doesn't match type; expected")
     <+> ppr ty_arity
 
+-------------------------
+-- Shared by both tcInferPatSyn and tcCheckPatSyn
 tc_patsyn_finish :: Located Name
                  -> HsPatSynDir Name
                  -> Bool
@@ -188,16 +197,15 @@ tc_patsyn_finish lname dir is_infix lpat'
                                          wrapped_args
                                          pat_ty
 
-       ; wrapper_ids <- if isBidirectional dir
-                        then fmap Just $ mkPatSynWrapperIds lname qtvs theta arg_tys pat_ty
-                        else return Nothing
+       ; builder_id <- mkPatSynBuilderId dir lname qtvs theta arg_tys pat_ty
 
        ; let patSyn = mkPatSyn (unLoc lname) is_infix
                         (univ_tvs, req_theta)
                         (ex_tvs, prov_theta)
                         arg_tys
                         pat_ty
-                        matcher_id wrapper_ids
+                        matcher_id builder_id
+
        ; return (patSyn, matcher_bind) }
   where
     qtvs = univ_tvs ++ ex_tvs
@@ -206,6 +214,12 @@ tc_patsyn_finish lname dir is_infix lpat'
 \end{code}
 
 
+%************************************************************************
+%*                                                                      *
+         Constructing the "matcher" Id and its binding
+%*                                                                      *
+%************************************************************************
+
 \begin{code}
 tcPatSynMatcher :: Located Name
                 -> LPat Id
@@ -213,45 +227,43 @@ tcPatSynMatcher :: Located Name
                 -> ([TcTyVar], [TcType], ThetaType, TcEvBinds, [EvVar])
                 -> [(Var, HsWrapper)]
                 -> TcType
-                -> TcM (Id, LHsBinds Id)
--- See Note [Matchers and wrappers for pattern synonyms] in PatSyn
+                -> TcM ((Id, Bool), LHsBinds Id)
+-- See Note [Matchers and builders for pattern synonyms] in PatSyn
 tcPatSynMatcher (L loc name) lpat
                 (univ_tvs, req_theta, req_ev_binds, req_dicts)
                 (ex_tvs, ex_tys, prov_theta, prov_ev_binds, prov_dicts)
                 wrapped_args pat_ty
-  = do { res_tv <- do
-              { uniq <- newUnique
-              ; let tv_name = mkInternalName uniq (mkTyVarOcc "r") loc
-              ; return $ mkTcTyVar tv_name openTypeKind (SkolemTv False) }
-       ; let res_ty = mkTyVarTy res_tv
-
-       ; let (cont_arg_tys, cont_args)
-               | null wrapped_args = ([voidPrimTy], [nlHsVar voidPrimId])
-               | otherwise = unzip [ (varType arg, mkLHsWrap wrap $ nlHsVar arg)
-                                   | (arg, wrap) <- wrapped_args
-                                   ]
+  = do { uniq <- newUnique
+       ; let tv_name = mkInternalName uniq (mkTyVarOcc "r") loc
+             res_tv  = mkTcTyVar tv_name openTypeKind (SkolemTv False)
+             is_unlifted = null wrapped_args && null prov_dicts
+             res_ty = mkTyVarTy res_tv
+             (cont_arg_tys, cont_args)
+               | is_unlifted = ([voidPrimTy], [nlHsVar voidPrimId])
+               | otherwise   = unzip [ (varType arg, mkLHsWrap wrap $ nlHsVar arg)
+                                     | (arg, wrap) <- wrapped_args
+                                     ]
              cont_ty = mkSigmaTy ex_tvs prov_theta $
                        mkFunTys cont_arg_tys res_ty
 
-       ; let fail_ty = mkFunTy voidPrimTy res_ty
+             fail_ty = mkFunTy voidPrimTy res_ty
 
        ; matcher_name <- newImplicitBinder name mkMatcherOcc
-       ; let matcher_tau = mkFunTys [pat_ty, cont_ty, fail_ty] res_ty
+       ; scrutinee    <- newSysLocalId (fsLit "scrut") pat_ty
+       ; cont         <- newSysLocalId (fsLit "cont")  cont_ty
+       ; fail         <- newSysLocalId (fsLit "fail")  fail_ty
+
+       ; let matcher_tau   = mkFunTys [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkSigmaTy (res_tv:univ_tvs) req_theta matcher_tau
-             matcher_id = mkVanillaGlobal matcher_name matcher_sigma
+             matcher_id    = mkVanillaGlobal matcher_name matcher_sigma
 
-       ; traceTc "tcPatSynMatcher" (ppr name $$ ppr (idType matcher_id))
-       ; let matcher_lid = L loc matcher_id
+             cont_dicts = map nlHsVar prov_dicts
+             cont' = mkLHsWrap (mkWpLet prov_ev_binds) $
+                     nlHsTyApps cont ex_tys (cont_dicts ++ cont_args)
 
-       ; scrutinee <- mkId "scrut" pat_ty
-       ; cont <- mkId "cont" cont_ty
-       ; let cont_dicts = map nlHsVar prov_dicts
-       ; let cont' = nlHsTyApps cont ex_tys $ cont_dicts ++ cont_args
-       ; cont' <- return $ mkLHsWrap (mkWpLet prov_ev_binds) cont'
-       ; fail <- mkId "fail" fail_ty
-       ; let fail' = nlHsApps fail [nlHsVar voidPrimId]
+             fail' = nlHsApps fail [nlHsVar voidPrimId]
 
-       ; let args = map nlVarPat [scrutinee, cont, fail]
+             args = map nlVarPat [scrutinee, cont, fail]
              lwpat = noLoc $ WildPat pat_ty
              cases = if isIrrefutableHsPat lpat
                      then [mkSimpleHsAlt lpat  cont']
@@ -272,7 +284,6 @@ tcPatSynMatcher (L loc name) lpat
                        , mg_res_ty = res_ty
                        , mg_origin = Generated
                        }
-
              match = mkMatch [] (mkHsLams (res_tv:univ_tvs) req_dicts body') EmptyLocalBinds
              mg = MG{ mg_alts = [match]
                     , mg_arg_tys = []
@@ -280,7 +291,7 @@ tcPatSynMatcher (L loc name) lpat
                     , mg_origin = Generated
                     }
 
-       ; let bind = FunBind{ fun_id = matcher_lid
+       ; let bind = FunBind{ fun_id = L loc matcher_id
                            , fun_infix = False
                            , fun_matches = mg
                            , fun_co_fn = idHsWrapper
@@ -288,60 +299,63 @@ tcPatSynMatcher (L loc name) lpat
                            , fun_tick = Nothing }
              matcher_bind = unitBag (noLoc bind)
 
+       ; traceTc "tcPatSynMatcher" (ppr name $$ ppr (idType matcher_id))
        ; traceTc "tcPatSynMatcher" (ppr matcher_bind)
 
-       ; return (matcher_id, matcher_bind) }
+       ; return ((matcher_id, is_unlifted), matcher_bind) }
+
+
+isUnidirectional :: HsPatSynDir a -> Bool
+isUnidirectional Unidirectional          = True
+isUnidirectional ImplicitBidirectional   = False
+isUnidirectional ExplicitBidirectional{} = False
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+         Constructing the "builder" Id
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+mkPatSynBuilderId :: HsPatSynDir a -> Located Name
+                  -> [TyVar] -> ThetaType -> [Type] -> Type
+                  -> TcM (Maybe (Id, Bool))
+mkPatSynBuilderId dir  (L _ name) qtvs theta arg_tys pat_ty
+  | isUnidirectional dir
+  = return Nothing
+  | otherwise
+  = do { builder_name <- newImplicitBinder name mkDataConWorkerOcc
+       ; let builder_sigma = mkSigmaTy qtvs theta (mkFunTys builder_arg_tys pat_ty)
+             builder_id    = mkVanillaGlobal builder_name builder_sigma
+       ; return (Just (builder_id, need_dummy_arg)) }
   where
-    mkId s ty = mkSysLocalM (fsLit s) ty
+    builder_arg_tys | need_dummy_arg = [voidPrimTy]
+                    | otherwise = arg_tys
+    need_dummy_arg = isUnLiftedType pat_ty && null arg_tys && null theta
 
-isBidirectional :: HsPatSynDir a -> Bool
-isBidirectional Unidirectional = False
-isBidirectional ImplicitBidirectional = True
-isBidirectional ExplicitBidirectional{} = True
+tcPatSynBuilderBind :: PatSynBind Name Name
+                    -> TcM (LHsBinds Id)
+-- See Note [Matchers and builders for pattern synonyms] in PatSyn
+tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
+                       , psb_dir = dir, psb_args = details }
+  | isUnidirectional dir
+  = return emptyBag
 
-tcPatSynWorker :: PatSynBind Name Name
-                -> TcM (LHsBinds Id)
--- See Note [Matchers and wrappers for pattern synonyms] in PatSyn
-tcPatSynWorker PSB{ psb_id = lname, psb_def = lpat, psb_dir = dir, psb_args = details }
-  = case dir of
-    Unidirectional -> return emptyBag
-    ImplicitBidirectional ->
-        do { lexpr <- case tcPatToExpr (mkNameSet args) lpat of
-                  Nothing -> cannotInvertPatSynErr lpat
-                  Just lexpr -> return lexpr
-           ; let wrapper_args = map (noLoc . VarPat) args
-                 wrapper_match = mkMatch wrapper_args lexpr EmptyLocalBinds
-           ; mkPatSynWorker lname $ mkMatchGroupName Generated [wrapper_match] }
-    ExplicitBidirectional mg -> mkPatSynWorker lname mg
-  where
-    args = map unLoc $ case details of
-        PrefixPatSyn args -> args
-        InfixPatSyn arg1 arg2 -> [arg1, arg2]
+  | isNothing mb_match_group       -- Can't invert the pattern
+  = setSrcSpan (getLoc lpat) $ failWithTc $
+    hang (ptext (sLit "Right-hand side of bidirectional pattern synonym cannot be used as an expression"))
+       2 (ppr lpat)
 
-mkPatSynWrapperIds :: Located Name
-                   -> [TyVar] -> ThetaType -> [Type] -> Type
-                   -> TcM (Id, Id)
-mkPatSynWrapperIds lname qtvs theta arg_tys pat_ty
-  = do { worker_id <- mkPatSynWorkerId lname mkDataConWorkerOcc qtvs theta worker_arg_tys pat_ty
-       ; wrapper_id <- mkPatSynWrapperId lname qtvs theta arg_tys pat_ty worker_id
-       ; return (wrapper_id, worker_id) }
-  where
-    worker_arg_tys | need_dummy_arg = [voidPrimTy]
-                   | otherwise = arg_tys
-    need_dummy_arg = null arg_tys && isUnLiftedType pat_ty
-
-mkPatSynWorker :: Located Name
-                -> MatchGroup Name (LHsExpr Name)
-                -> TcM (LHsBinds Id)
-mkPatSynWorker (L loc name) mg
+  | otherwise
   = do { patsyn <- tcLookupPatSyn name
-       ; let worker_id = fromMaybe (panic "mkPatSynWrapper") $
-                         patSynWorker patsyn
-             need_dummy_arg = null (patSynArgs patsyn) && isUnLiftedType (patSynType patsyn)
+       ; let (worker_id, need_dummy_arg) = fromMaybe (panic "mkPatSynWrapper") $
+                                           patSynBuilder patsyn
 
        ; let match_dummy = mkMatch [nlWildPatName] (noLoc $ HsLam mg) emptyLocalBinds
              mg' | need_dummy_arg = mkMatchGroupName Generated [match_dummy]
-                 | otherwise = mg
+                 | otherwise      = mg
 
        ; let (worker_tvs, worker_theta, worker_tau) = tcSplitSigmaTy (idType worker_id)
              bind = FunBind { fun_id = L loc (idName worker_id)
@@ -362,8 +376,48 @@ mkPatSynWorker (L loc name) mg
        ; traceTc "tcPatSynDecl worker" $ ppr worker_binds
        ; return worker_binds }
   where
+    Just mg = mb_match_group
+    mb_match_group = case dir of
+                        Unidirectional           -> Nothing
+                        ExplicitBidirectional mg -> Just mg
+                        ImplicitBidirectional    -> fmap mk_mg (tcPatToExpr args lpat)
 
+    mk_mg :: LHsExpr Name -> MatchGroup Name (LHsExpr Name)
+    mk_mg body = mkMatchGroupName Generated [wrapper_match]
+               where
+                 wrapper_args  = [L loc (VarPat n) | L loc n <- args]
+                 wrapper_match = mkMatch wrapper_args body EmptyLocalBinds
+
+    args = case details of
+              PrefixPatSyn args -> args
+              InfixPatSyn arg1 arg2 -> [arg1, arg2]
+
+tcPatSynBuilderOcc :: CtOrigin -> PatSyn -> TcM (HsExpr TcId, TcRhoType)
+-- The result type should be fully instantiated
+tcPatSynBuilderOcc orig ps
+  | Just (builder_id, add_void_arg) <- builder
+  = do { (wrap, rho) <- deeplyInstantiate orig (idType builder_id)
+       ; let inst_fun = mkHsWrap wrap (HsVar builder_id)
+       ; if add_void_arg
+         then return ( HsApp (noLoc inst_fun) (nlHsVar voidPrimId)
+                     , tcFunResultTy rho )
+         else return ( inst_fun, rho ) }
+
+  | otherwise  -- Unidirectional
+  = failWithTc $
+    ptext (sLit "non-bidirectional pattern synonym")
+    <+> quotes (ppr name) <+> ptext (sLit "used in an expression")
+  where
+    name    = patSynName ps
+    builder = patSynBuilder ps
 \end{code}
+
+
+%************************************************************************
+%*                                                                      *
+         Helper functions
+%*                                                                      *
+%************************************************************************
 
 Note [As-patterns in pattern synonym definitions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -428,15 +482,16 @@ nPlusKPatInPatSynErr pat
     hang (ptext (sLit "Pattern synonym definition cannot contain n+k-pattern:"))
        2 (ppr pat)
 
-tcPatToExpr :: NameSet -> LPat Name -> Maybe (LHsExpr Name)
-tcPatToExpr lhsVars = go
+tcPatToExpr :: [Located Name] -> LPat Name -> Maybe (LHsExpr Name)
+tcPatToExpr args = go
   where
+    lhsVars = mkNameSet (map unLoc args)
+
     go :: LPat Name -> Maybe (LHsExpr Name)
     go (L loc (ConPatIn conName info))
-      = do
-          { let con = L loc (HsVar (unLoc conName))
-          ; exprs <- mapM go (hsConPatArgs info)
-          ; return $ foldl (\x y -> L loc (HsApp x y)) con exprs }
+      = do { let con = L loc (HsVar (unLoc conName))
+           ; exprs <- mapM go (hsConPatArgs info)
+           ; return $ foldl (\x y -> L loc (HsApp x y)) con exprs }
     go (L loc p) = fmap (L loc) $ go1 p
 
     go1 :: Pat Name -> Maybe (HsExpr Name)
@@ -466,12 +521,6 @@ tcPatToExpr lhsVars = go
     go1   (SigPatOut{})            = panic "SigPatOut in output of renamer"
     go1   (CoPat{})                = panic "CoPat in output of renamer"
     go1   _                        = Nothing
-
-cannotInvertPatSynErr :: OutputableBndr name => LPat name -> TcM a
-cannotInvertPatSynErr (L loc pat)
-  = setSrcSpan loc $ failWithTc $
-    hang (ptext (sLit "Right-hand side of bidirectional pattern synonym cannot be used as an expression"))
-       2 (ppr pat)
 
 -- Walk the whole pattern and for all ConPatOuts, collect the
 -- existentially-bound type variables and evidence binding variables.

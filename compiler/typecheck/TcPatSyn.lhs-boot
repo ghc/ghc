@@ -15,6 +15,6 @@ tcCheckPatSynDecl :: PatSynBind Name Name
                   -> TcPatSynInfo
                   -> TcM (PatSyn, LHsBinds Id)
 
-tcPatSynWorker :: PatSynBind Name Name
-               -> TcM (LHsBinds Id)
+tcPatSynBuilderBind :: PatSynBind Name Name
+                    -> TcM (LHsBinds Id)
 \end{code}

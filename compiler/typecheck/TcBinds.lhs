@@ -16,8 +16,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
 
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
-import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl, tcPatSynWorker )
-
+import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl, tcPatSynBuilderBind )
 import DynFlags
 import HsSyn
 import HscTypes( isHsBootOrSig )
@@ -29,11 +28,9 @@ import TcEvidence
 import TcHsType
 import TcPat
 import TcMType
-import PatSyn
 import ConLike
 import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
-import Type( tidyOpenType, splitFunTys )
 import TyCon
 import TcType
 import TysPrim
@@ -321,7 +318,7 @@ tcValBinds top_lvl binds sigs thing_inside
             { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
                    { thing <- thing_inside
                      -- See Note [Pattern synonym wrappers don't yield dependencies]
-                   ; patsyn_workers <- mapM tcPatSynWorker patsyns
+                   ; patsyn_workers <- mapM tcPatSynBuilderBind patsyns
                    ; let extra_binds = [ (NonRecursive, worker) | worker <- patsyn_workers ]
                    ; return (extra_binds, thing) }
              ; return (binds' ++ extra_binds', thing) }}
@@ -423,11 +420,12 @@ tc_single :: forall thing.
 tc_single _top_lvl sig_fn _prag_fn (L _ (PatSynBind psb@PSB{ psb_id = L _ name })) thing_inside
   = do { (pat_syn, aux_binds) <- tc_pat_syn_decl
        ; let tything = AConLike (PatSynCon pat_syn)
-             implicit_ids = (patSynMatcher pat_syn) :
-                            (maybeToList (patSynWorker pat_syn))
+-- SLPJ: Why is this necessary?
+--             implicit_ids = patSynMatcher pat_syn :
+--                            maybeToList (patSynWorker pat_syn)
 
        ; thing <- tcExtendGlobalEnv [tything] $
-                  tcExtendGlobalEnvImplicit (map AnId implicit_ids) $
+--                  tcExtendGlobalEnvImplicit (map AnId implicit_ids) $
                   thing_inside
        ; return (aux_binds, thing)
        }
