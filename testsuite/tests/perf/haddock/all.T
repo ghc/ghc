@@ -79,7 +79,7 @@ test('haddock.Cabal',
 test('haddock.compiler',
      [unless(in_tree_compiler(), skip)
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 30353349160, 10)
+          [(wordsize(64), 33562468736, 10)
             # 2012-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
@@ -87,6 +87,7 @@ test('haddock.compiler',
             # 2014-07-17: 29809571376 (amd64/Linux) general round of updates
             # 2012-11-27: 28708374824 (amd64/Linux)
             # 2014-09-10: 30353349160 (amd64/Linux) post-AMP cleanup
+            # 2014-11-22: 33562468736 (amd64/Linux)
           ,(platform('i386-unknown-mingw32'), 14328363592, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)
             # 2013-02-10:                     14925262356 (x86/Windows)
