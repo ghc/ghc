@@ -332,7 +332,7 @@ instance Bits Natural where
     rotateR = shiftR
 
     popCount (NatS# w)  = popCount (W# w)
-    popCount (NatJ# bn) = popCount (Jp# bn)
+    popCount (NatJ# bn) = I# (popCountBigNat bn)
 
     zeroBits = NatS# 0##
 
