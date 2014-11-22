@@ -158,7 +158,7 @@ instance Read Natural where
 
 instance Num Natural where
     fromInteger (S# i#) | I# i# >= 0  = NatS# (int2Word# i#)
-    fromInteger (Jp# bn#)             = NatJ# bn#
+    fromInteger (Jp# bn)              = bigNatToNatural bn
     fromInteger _                     = throw Underflow
 
     (+) = plusNatural
