@@ -117,6 +117,8 @@
 
   * Add `Storable a => Storable (Complex a)` instance (#9826)
 
+  * New module `GHC.RTS.Flags` that provides accessors to runtime flags.
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3

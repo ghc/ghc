@@ -253,6 +253,7 @@ Library
         GHC.Ptr
         GHC.Read
         GHC.Real
+        GHC.RTS.Flags
         GHC.ST
         GHC.STRef
         GHC.Show
@@ -309,6 +310,7 @@ Library
         cbits/inputReady.c
         cbits/md5.c
         cbits/primFloat.c
+        cbits/rts.c
         cbits/sysconf.c
 
     include-dirs: include
