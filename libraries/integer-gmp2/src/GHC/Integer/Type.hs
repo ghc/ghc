@@ -777,10 +777,17 @@ lcmInteger a b = (aa `quotInteger` (aa `gcdInteger` ab)) `timesInteger` ab
 
 -- | Compute greatest common divisor.
 --
--- Warning: result may become negative if (at least) one argument is 'minBound'
+-- __Warning__: result may become negative if (at least) one argument
+-- is 'minBound'
 gcdInt :: Int# -> Int# -> Int#
 gcdInt x# y#
     = word2Int# (gcdWord# (int2Word# (absI# x#)) (int2Word# (absI# y#)))
+
+-- | Compute greatest common divisor.
+--
+-- /Since: 1.0.0.0/
+gcdWord :: Word# -> Word# -> Word#
+gcdWord = gcdWord#
 
 ----------------------------------------------------------------------------
 -- BigNat operations

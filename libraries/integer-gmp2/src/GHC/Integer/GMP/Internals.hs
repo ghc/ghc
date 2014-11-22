@@ -118,6 +118,7 @@ module GHC.Integer.GMP.Internals
 
       -- * Miscellaneous GMP-provided operations
     , gcdInt
+    , gcdWord
 
       -- * Import/export functions
       -- ** Compute size of serialisation
