@@ -35,6 +35,7 @@ module GHC.Natural
       -- (i.e. which constructors are available) depends on the
       -- 'Integer' backend used!
       Natural(..)
+    , isValidNatural
       -- * Conversions
     , wordToNatural
     , naturalToWordMaybe
@@ -86,6 +87,17 @@ data Natural = NatS#                 GmpLimb# -- ^ in @[0, maxBound::Word]@
                                               -- 'NatS#' constructor.
              deriving (Eq,Ord) -- NB: Order of constructors *must*
                                -- coincide with 'Ord' relation
+
+-- | Test whether all internal invariants are satisfied by 'Natural' value
+--
+-- This operation is mostly useful for test-suites and/or code which
+-- constructs 'Integer' values directly.
+--
+-- /Since: 4.8.0.0/
+isValidNatural :: Natural -> Bool
+isValidNatural (NatS# _)  = True
+isValidNatural (NatJ# bn) = isTrue# (isValidBigNat# bn)
+                            && I# (sizeofBigNat# bn) > 0
 
 {-# RULES
 "fromIntegral/Natural->Natural"  fromIntegral = id :: Natural -> Natural
@@ -396,6 +408,15 @@ naturalToInt (NatJ# bn) = I# (bigNatToInt bn)
 -- /Since: 4.8.0.0/
 newtype Natural = Natural Integer -- ^ __Invariant__: non-negative 'Integer'
                 deriving (Eq,Ord,Ix)
+
+-- | Test whether all internal invariants are satisfied by 'Natural' value
+--
+-- This operation is mostly useful for test-suites and/or code which
+-- constructs 'Integer' values directly.
+--
+-- /Since: 4.8.0.0/
+isValidNatural :: Natural -> Bool
+isValidNatural (Natural i) = i >= 0
 
 instance Read Natural where
     readsPrec d = map (\(n, s) -> (Natural n, s))
