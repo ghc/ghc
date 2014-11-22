@@ -177,6 +177,33 @@ instance Real Natural where
     toRational (NatS# w)  = toRational (W# w)
     toRational (NatJ# bn) = toRational (Jp# bn)
 
+#if OPTIMISE_INTEGER_GCD_LCM
+{-# RULES
+"gcd/Natural->Natural->Natural" gcd = gcdNatural
+"lcm/Natural->Natural->Natural" lcm = lcmNatural
+  #-}
+
+-- | Compute greatest common divisor.
+gcdNatural :: Natural -> Natural -> Natural
+gcdNatural (NatS# 0##) y       = y
+gcdNatural x       (NatS# 0##) = x
+gcdNatural (NatS# 1##) _       = (NatS# 1##)
+gcdNatural _       (NatS# 1##) = (NatS# 1##)
+gcdNatural (NatJ# x) (NatJ# y) = bigNatToNatural (gcdBigNat x y)
+gcdNatural (NatJ# x) (NatS# y) = NatS# (gcdBigNatWord x y)
+gcdNatural (NatS# x) (NatJ# y) = NatS# (gcdBigNatWord y x)
+gcdNatural (NatS# x) (NatS# y) = NatS# (gcdWord x y)
+
+-- | compute least common multiplier.
+lcmNatural :: Natural -> Natural -> Natural
+lcmNatural (NatS# 0##) _ = (NatS# 0##)
+lcmNatural _ (NatS# 0##) = (NatS# 0##)
+lcmNatural (NatS# 1##) y = y
+lcmNatural x (NatS# 1##) = x
+lcmNatural x y           = (x `quot` (gcdNatural x y)) * y
+
+#endif
+
 instance Enum Natural where
     succ n = n `plusNatural`  NatS# 1##
     pred n = n `minusNatural` NatS# 1##
