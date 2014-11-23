@@ -76,7 +76,7 @@ then
         AC_MSG_ERROR([Unable to get value of __GNU_MP_VERSION_MINOR]))
     AC_COMPUTE_INT(GhcGmpVerPl, __GNU_MP_VERSION_PATCHLEVEL, [#include <gmp.h>],
         AC_MSG_ERROR([Unable to get value of __GNU_MP_VERSION_PATCHLEVEL]))
-    AC_MSG_RESULT([$GhcGmpVerMJ.$GhcGmpVerMI.$GhcGmpVerPL])
+    AC_MSG_RESULT([$GhcGmpVerMj.$GhcGmpVerMi.$GhcGmpVerPl])
 
 else
     AC_MSG_RESULT([yes])
