@@ -113,6 +113,10 @@
     representing non-negative arbitrary-precision integers.  The `GHC.Natural`
     module exposes additional GHC-specific primitives. (#9818)
 
+  * Add `(Storable a, Integeral a) => Storable (Ratio a)` instance (#9826)
+
+  * Add `Storable a => Storable (Complex a)` instance (#9826)
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3

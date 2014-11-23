@@ -208,6 +208,19 @@ STORABLE(Int32,SIZEOF_INT32,ALIGNMENT_INT32,
 STORABLE(Int64,SIZEOF_INT64,ALIGNMENT_INT64,
          readInt64OffPtr,writeInt64OffPtr)
 
+instance (Storable a, Integral a) => Storable (Ratio a) where
+    sizeOf _    = 2 * sizeOf (undefined :: a)
+    alignment _ = alignment (undefined :: a )
+    peek p           = do
+                        q <- return $ castPtr p
+                        r <- peek q
+                        i <- peekElemOff q 1
+                        return (r % i)
+    poke p (r :% i)  = do
+                        q <-return $  (castPtr p)
+                        poke q r
+                        pokeElemOff q 1 i
+
 -- XXX: here to avoid orphan instance in GHC.Fingerprint
 instance Storable Fingerprint where
   sizeOf _ = 16

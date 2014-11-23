@@ -36,6 +36,8 @@ module Data.Complex
 
 import Data.Typeable
 import Data.Data (Data)
+import Foreign (Storable, castPtr, peek, poke, pokeElemOff, peekElemOff, sizeOf,
+                alignment)
 
 infix  6  :+
 
@@ -171,3 +173,16 @@ instance  (RealFloat a) => Floating (Complex a) where
     asinh z        =  log (z + sqrt (1+z*z))
     acosh z        =  log (z + (z+1) * sqrt ((z-1)/(z+1)))
     atanh z        =  0.5 * log ((1.0+z) / (1.0-z))
+
+instance Storable a => Storable (Complex a) where
+    sizeOf a       = 2 * sizeOf (realPart a)
+    alignment a    = alignment (realPart a)
+    peek p           = do
+                        q <- return $ castPtr p
+                        r <- peek q
+                        i <- peekElemOff q 1
+                        return (r :+ i)
+    poke p (r :+ i)  = do
+                        q <-return $  (castPtr p)
+                        poke q r
+                        pokeElemOff q 1 i
