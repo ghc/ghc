@@ -20,6 +20,7 @@ GMP_DIR := $(patsubst libraries/integer-gmp/gmp/tarball/%-nodoc-patched.tar.bz2,
 
 ifneq "$(NO_CLEAN_GMP)" "YES"
 $(eval $(call clean-target,gmp,,\
+  libraries/integer-gmp2/include/ghc-gmp.h \
   libraries/integer-gmp2/gmp/config.mk \
   libraries/integer-gmp2/gmp/libgmp.a \
   libraries/integer-gmp2/gmp/gmp.h \
@@ -75,14 +76,24 @@ HaveFrameworkGMP = NO
 endif
 endif
 
+UseIntreeGmp = NO
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
+UseIntreeGmp = YES
+endif
+endif
+
+ifeq "$(UseIntreeGmp)" "YES"
 $(libraries/integer-gmp2_dist-install_depfile_c_asm): libraries/integer-gmp2/gmp/gmp.h
 
 gmp_CC_OPTS += -Ilibraries/integer-gmp2/gmp
 
 libraries/integer-gmp2_dist-install_EXTRA_OBJS += libraries/integer-gmp2/gmp/objs/*.o
-endif
+else
+$(libraries/integer-gmp2_dist-install_depfile_c_asm): libraries/integer-gmp2/include/ghc-gmp.h
+
+libraries/integer-gmp2/include/ghc-gmp.h: libraries/integer-gmp2/gmp/ghc-gmp.h
+	$(CP) $< $@
 endif
 
 libraries/integer-gmp2_dist-install_EXTRA_CC_OPTS += $(gmp_CC_OPTS)
@@ -116,6 +127,7 @@ libraries/integer-gmp2/gmp/libgmp.a libraries/integer-gmp2/gmp/gmp.h:
 	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp2/gmp/gmpbuild MAKEFLAGS=
 	$(CP) libraries/integer-gmp2/gmp/gmpbuild/gmp.h libraries/integer-gmp2/gmp/
+	$(CP) libraries/integer-gmp2/gmp/gmpbuild/gmp.h libraries/integer-gmp2/include/ghc-gmp.h
 	$(CP) libraries/integer-gmp2/gmp/gmpbuild/.libs/libgmp.a libraries/integer-gmp2/gmp/
 	$(MKDIRHIER) libraries/integer-gmp2/gmp/objs
 	cd libraries/integer-gmp2/gmp/objs && $(AR_STAGE1) x ../libgmp.a

@@ -2,4 +2,4 @@ include-dirs: @GMP_INCLUDE_DIRS@
 extra-lib-dirs: @GMP_LIB_DIRS@
 extra-libraries: @GMP_LIBS@
 frameworks: @GMP_FRAMEWORK@
-install-includes: HsIntegerGmp.h
+install-includes: HsIntegerGmp.h ghc-gmp.h
