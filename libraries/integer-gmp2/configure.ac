@@ -1,4 +1,5 @@
-AC_INIT([Haskell integer (GMP)], [0.1], [libraries@haskell.org], [integer])
+AC_INIT([Haskell integer (GMP)], [1.0], [libraries@haskell.org], [integer])
+AC_PREREQ(2.52)
 
 # Safety check: Ensure that we are in the correct source directory.
 AC_CONFIG_SRCDIR([cbits/wrappers.c])
@@ -60,10 +61,35 @@ then
         LOOK_FOR_GMP_FRAMEWORK
     fi
 fi
+
+AC_MSG_CHECKING([whether to use in-tree GMP])
 if test "$HaveFrameworkGMP" = "YES" || test "$HaveLibGmp" = "YES"
 then
+    AC_MSG_RESULT([no])
+    UseIntreeGmp=0
     AC_CHECK_HEADER([gmp.h], , [AC_MSG_ERROR([Cannot find gmp.h])])
+
+    AC_MSG_CHECKING([GMP version])
+    AC_COMPUTE_INT(GhcGmpVerMj, __GNU_MP_VERSION, [#include <gmp.h>],
+        AC_MSG_ERROR([Unable to get value of __GNU_MP_VERSION]))
+    AC_COMPUTE_INT(GhcGmpVerMi, __GNU_MP_VERSION_MINOR, [#include <gmp.h>],
+        AC_MSG_ERROR([Unable to get value of __GNU_MP_VERSION_MINOR]))
+    AC_COMPUTE_INT(GhcGmpVerPl, __GNU_MP_VERSION_PATCHLEVEL, [#include <gmp.h>],
+        AC_MSG_ERROR([Unable to get value of __GNU_MP_VERSION_PATCHLEVEL]))
+    AC_MSG_RESULT([$GhcGmpVerMJ.$GhcGmpVerMI.$GhcGmpVerPL])
+
+else
+    AC_MSG_RESULT([yes])
+    UseIntreeGmp=1
+    HaveSecurePowm=1
+
+    AC_MSG_CHECKING([GMP version])
+    GhcGmpVerMj=5
+    GhcGmpVerMi=0
+    GhcGmpVerPl=4
+    AC_MSG_RESULT([$GhcGmpVerMj.$GhcGmpVerMi.$GhcGmpVerPl])
 fi
+
 
 dnl--------------------------------------------------------------------
 dnl * Make sure we got some form of gmp
@@ -76,11 +102,15 @@ AC_SUBST(GMP_FRAMEWORK)
 AC_SUBST(HaveLibGmp)
 AC_SUBST(HaveFrameworkGMP)
 AC_SUBST(HaveSecurePowm)
+AC_SUBST(UseIntreeGmp)
+AC_SUBST(GhcGmpVerMj)
+AC_SUBST(GhcGmpVerMi)
+AC_SUBST(GhcGmpVerPl)
 
 AC_CONFIG_FILES([integer-gmp.buildinfo gmp/config.mk include/HsIntegerGmp.h])
 
 dnl--------------------------------------------------------------------
-dnl * Generate the header cbits/GmpDerivedConstants.h
+dnl * Generate output files
 dnl--------------------------------------------------------------------
 
 AC_OUTPUT
