@@ -23,7 +23,7 @@ module Data.Functor
       void,
     ) where
 
-import GHC.Base ( Functor(..), const, flip )
+import GHC.Base ( Functor(..), flip )
 
 -- $setup
 -- Allow the use of Prelude in doctests.
@@ -140,4 +140,4 @@ infixl 4 $>
 -- 2
 --
 void :: Functor f => f a -> f ()
-void = fmap (const ())
+void x = () <$ x
