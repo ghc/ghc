@@ -544,7 +544,7 @@ exp_doc :: { OrdList (LIE RdrName) }
    -- They are built in syntax, always available
 export  :: { OrdList (LIE RdrName) }
         : qcname_ext export_subspec  {% amsu (sLL $1 $> (mkModuleImpExp $1
-                                                           (snd $ unLoc $2)))
+                                                    (snd $ unLoc $2)))
                                              (fst $ unLoc $2) }
         |  'module' modid            {% amsu (sLL $1 $> (IEModuleContents $2))
                                              [mj AnnModule $1] }
@@ -565,9 +565,9 @@ qcnames :: { [Located RdrName] }     -- A reversed list
 
 qcname_ext :: { Located RdrName }       -- Variable or data constructor
                                         -- or tagged type constructor
-        :  qcname                       { $1 }
-        |  'type' qcname                {% am (mkTypeImpExp (sLL $1 $> (unLoc $2)))
-                                              (AnnType, $1) }
+        :  qcname                   {% ams $1 [mj AnnVal $1] }
+        |  'type' qcname            {% amms (mkTypeImpExp (sLL $1 $> (unLoc $2)))
+                                            [mj AnnType $1,mj AnnVal $2] }
 
 -- Cannot pull into qcname_ext, as qcname is also used in expression.
 qcname  :: { Located RdrName }  -- Variable or data constructor
@@ -598,7 +598,7 @@ importdecl :: { LImportDecl RdrName }
                              , ideclAs = unLoc (snd $7)
                              , ideclHiding = unLoc $8 })
                    ((mj AnnImport $1 : fst $2 ++ fst $3 ++ fst $4
-                                    ++ fst $7) ++ (fst $5)) }
+                                    ++ fst $5 ++ fst $7)) }
 
 maybe_src :: { ([AddAnn],IsBootInterface) }
         : '{-# SOURCE' '#-}'           { ([mo $1,mc $2],True) }
@@ -618,9 +618,9 @@ optqualified :: { ([AddAnn],Bool) }
         | {- empty -}                           { ([],False) }
 
 maybeas :: { ([AddAnn],Located (Maybe ModuleName)) }
-        : 'as' modid                            { ([mj AnnAs $1]
-                                                  ,sLL $1 $> (Just (unLoc $2))) }
-        | {- empty -}                           { ([],noLoc Nothing) }
+        : 'as' modid                           { ([mj AnnAs $1,mj AnnVal $2]
+                                                 ,sLL $1 $> (Just (unLoc $2))) }
+        | {- empty -}                          { ([],noLoc Nothing) }
 
 maybeimpspec :: { Located (Maybe (Bool, Located [LIE RdrName])) }
         : impspec                  { L (gl $1) (Just (unLoc $1)) }

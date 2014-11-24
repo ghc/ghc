@@ -39,16 +39,16 @@ type LImportDecl name = Located (ImportDecl name)
 data ImportDecl name
   = ImportDecl {
       ideclName      :: Located ModuleName, -- ^ Module name.
-      ideclPkgQual   :: Maybe FastString,   -- ^ Package qualifier.
-      ideclSource    :: Bool,               -- ^ True <=> {-# SOURCE #-} import
+      ideclPkgQual   :: Maybe FastString,  -- ^ Package qualifier.
+      ideclSource    :: Bool,              -- ^ True <=> {-\# SOURCE \#-} import
       ideclSafe      :: Bool,               -- ^ True => safe import
       ideclQualified :: Bool,               -- ^ True => qualified
       ideclImplicit  :: Bool,               -- ^ True => implicit import (of Prelude)
       ideclAs        :: Maybe ModuleName,   -- ^ as Module
       ideclHiding    :: Maybe (Bool, Located [LIE name])
-    }
                                             -- ^ (True => hiding, names)
-     --
+    }
+     -- ^
      --  'ApiAnnotation.AnnKeywordId's
      --
      --  - 'ApiAnnotation.AnnImport'
@@ -57,6 +57,7 @@ data ImportDecl name
      --
      --  - 'ApiAnnotation.AnnSafe','ApiAnnotation.AnnQualified',
      --    'ApiAnnotation.AnnPackageName','ApiAnnotation.AnnAs',
+     --    'ApiAnnotation.AnnVal'
      --
      --  - 'ApiAnnotation.AnnHiding','ApiAnnotation.AnnOpen',
      --    'ApiAnnotation.AnnClose' attached
@@ -130,10 +131,10 @@ type LIE name = Located (IE name)
 data IE name
   = IEVar       (Located name)
         -- ^ - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
-        --                                     'ApiAnnotation.AnnType'
+        --             'ApiAnnotation.AnnType'
   | IEThingAbs           name      -- ^ Class/Type (can't tell)
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
-        --                                     'ApiAnnotation.AnnType'
+        --             'ApiAnnotation.AnnType','ApiAnnotation.AnnVal'
   | IEThingAll  (Located name)     -- ^ Class/Type plus all methods/constructors
         --
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',

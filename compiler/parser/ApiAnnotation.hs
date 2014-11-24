@@ -229,6 +229,8 @@ data AnnotationComment =
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in Lexer.x and bringing it in here would create a loop
 
+instance Outputable AnnotationComment where
+  ppr x = text (show x)
 
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
 --             'ApiAnnotation.AnnClose','ApiAnnotation.AnnComma',

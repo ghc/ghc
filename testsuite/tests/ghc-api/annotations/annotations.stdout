@@ -13,11 +13,15 @@
 
 (AK AnnotationLet.hs:1:22-26 AnnOpen = [AnnotationLet.hs:1:22])
 
+(AK AnnotationLet.hs:1:23-25 AnnVal = [AnnotationLet.hs:1:23-25])
+
 (AK AnnotationLet.hs:4:1-32 AnnAs = [AnnotationLet.hs:4:28-29])
 
 (AK AnnotationLet.hs:4:1-32 AnnImport = [AnnotationLet.hs:4:1-6])
 
 (AK AnnotationLet.hs:4:1-32 AnnQualified = [AnnotationLet.hs:4:8-16])
+
+(AK AnnotationLet.hs:4:1-32 AnnVal = [AnnotationLet.hs:4:31-32])
 
 (AK AnnotationLet.hs:(6,1)-(10,12) AnnEqual = [AnnotationLet.hs:6:5])
 

@@ -25,11 +25,15 @@
 
 (AK AnnotationTuple.hs:2:24-28 AnnOpen = [AnnotationTuple.hs:2:24])
 
+(AK AnnotationTuple.hs:2:25-27 AnnVal = [AnnotationTuple.hs:2:25-27])
+
 (AK AnnotationTuple.hs:5:1-32 AnnAs = [AnnotationTuple.hs:5:28-29])
 
 (AK AnnotationTuple.hs:5:1-32 AnnImport = [AnnotationTuple.hs:5:1-6])
 
 (AK AnnotationTuple.hs:5:1-32 AnnQualified = [AnnotationTuple.hs:5:8-16])
+
+(AK AnnotationTuple.hs:5:1-32 AnnVal = [AnnotationTuple.hs:5:31-32])
 
 (AK AnnotationTuple.hs:(7,1)-(10,14) AnnEqual = [AnnotationTuple.hs:7:5])
 
