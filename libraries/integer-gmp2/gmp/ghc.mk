@@ -113,8 +113,8 @@ libraries/integer-gmp2/gmp/libgmp.a libraries/integer-gmp2/gmp/gmp.h:
 	$(RM) -rf libraries/integer-gmp2/gmp/$(GMP_DIR) libraries/integer-gmp2/gmp/gmpbuild libraries/integer-gmp2/gmp/objs
 	cat $(GMP_TARBALL) | $(BZIP2_CMD) -d | { cd libraries/integer-gmp2/gmp && $(TAR_CMD) -xf - ; }
 	mv libraries/integer-gmp2/gmp/$(GMP_DIR) libraries/integer-gmp2/gmp/gmpbuild
-	cd libraries/integer-gmp2/gmp && patch -p0 < gmpsrc.patch
-	cat libraries/integer-gmp/gmp/tarball/gmp-5.0.4.patch | { cd libraries/integer-gmp2/gmp/gmpbuild && patch -p1 ; }
+	cd libraries/integer-gmp2/gmp && $(PATCH_CMD) -p0 < gmpsrc.patch
+	cat libraries/integer-gmp/gmp/tarball/gmp-5.0.4.patch | { cd libraries/integer-gmp2/gmp/gmpbuild && $(PATCH_CMD) -p1 ; }
 	chmod +x libraries/integer-gmp2/gmp/ln
 
 	# Their cmd invocation only works on msys. On cygwin it starts
