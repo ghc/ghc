@@ -102,6 +102,8 @@ instance Show Deadlock where
 -- |This thread has exceeded its allocation limit.  See
 -- 'GHC.Conc.setAllocationCounter' and
 -- 'GHC.Conc.enableAllocationLimit'.
+--
+-- /Since: 4.8.0.0/
 data AllocationLimitExceeded = AllocationLimitExceeded
     deriving Typeable
 

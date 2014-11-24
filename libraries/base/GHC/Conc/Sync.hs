@@ -193,6 +193,7 @@ instance Ord ThreadId where
 --
 -- Allocation accounting is accurate only to about 4Kbytes.
 --
+-- /Since: 4.8.0.0/
 setAllocationCounter :: Int64 -> IO ()
 setAllocationCounter i = do
   ThreadId t <- myThreadId
@@ -200,6 +201,8 @@ setAllocationCounter i = do
 
 -- | Return the current value of the allocation counter for the
 -- current thread.
+--
+-- /Since: 4.8.0.0/
 getAllocationCounter :: IO Int64
 getAllocationCounter = do
   ThreadId t <- myThreadId
@@ -224,12 +227,15 @@ getAllocationCounter = do
 -- Compared to using timeouts, allocation limits don't count time
 -- spent blocked or in foreign calls.
 --
+-- /Since: 4.8.0.0/
 enableAllocationLimit :: IO ()
 enableAllocationLimit = do
   ThreadId t <- myThreadId
   rts_enableThreadAllocationLimit t
 
 -- | Disable allocation limit processing for the current thread.
+--
+-- /Since: 4.8.0.0/
 disableAllocationLimit :: IO ()
 disableAllocationLimit = do
   ThreadId t <- myThreadId

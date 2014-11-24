@@ -119,6 +119,15 @@
 
   * New module `GHC.RTS.Flags` that provides accessors to runtime flags.
 
+  * Expose functions for per-thread allocation counters and limits in `GHC.Conc`
+
+        disableAllocationLimit :: IO ()
+        enableAllocationLimit :: IO ()
+        getAllocationCounter :: IO Int64
+        setAllocationCounter :: Int64 -> IO ()
+
+    together with a new exception `AllocationLimitExceeded`.
+
 ## 4.7.0.1  *Jul 2014*
 
   * Bundled with GHC 7.8.3
