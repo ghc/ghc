@@ -3214,7 +3214,8 @@ minusWallOpts
         Opt_WarnMissingSigs,
         Opt_WarnHiShadows,
         Opt_WarnOrphans,
-        Opt_WarnUnusedDoBind
+        Opt_WarnUnusedDoBind,
+        Opt_WarnTrustworthySafe
       ]
 
 enableGlasgowExts :: DynP ()

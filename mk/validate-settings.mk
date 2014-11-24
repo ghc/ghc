@@ -169,7 +169,9 @@ libraries/array_dist-install_EXTRA_HC_OPTS += -fno-warn-warnings-deprecations
 # Turn of trustworthy-safe warning
 libraries/base_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
 libraries/ghc-prim_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
+libraries/process_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
 libraries/unix_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
+libraries/Win32_dist-install_EXTRA_HC_OPTS += -fno-warn-trustworthy-safe
 
 # Temporarely disable inline rule shadowing warning
 libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-inline-rule-shadowing
