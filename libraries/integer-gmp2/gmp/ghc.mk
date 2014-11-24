@@ -84,7 +84,10 @@ endif
 endif
 
 ifeq "$(UseIntreeGmp)" "YES"
-$(libraries/integer-gmp2_dist-install_depfile_c_asm): libraries/integer-gmp2/gmp/gmp.h
+$(libraries/integer-gmp2_dist-install_depfile_c_asm): libraries/integer-gmp2/gmp/gmp.h libraries/integer-gmp2/include/ghc-gmp.h
+
+libraries/integer-gmp2/include/ghc-gmp.h: libraries/integer-gmp2/gmp/gmp.h
+	$(CP) $< $@
 
 gmp_CC_OPTS += -Ilibraries/integer-gmp2/gmp
 
@@ -128,7 +131,6 @@ libraries/integer-gmp2/gmp/libgmp.a libraries/integer-gmp2/gmp/gmp.h:
 	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp2/gmp/gmpbuild MAKEFLAGS=
 	$(CP) libraries/integer-gmp2/gmp/gmpbuild/gmp.h libraries/integer-gmp2/gmp/
-	$(CP) libraries/integer-gmp2/gmp/gmpbuild/gmp.h libraries/integer-gmp2/include/ghc-gmp.h
 	$(CP) libraries/integer-gmp2/gmp/gmpbuild/.libs/libgmp.a libraries/integer-gmp2/gmp/
 	$(MKDIRHIER) libraries/integer-gmp2/gmp/objs
 	cd libraries/integer-gmp2/gmp/objs && $(AR_STAGE1) x ../libgmp.a
