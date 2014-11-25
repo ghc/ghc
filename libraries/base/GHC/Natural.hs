@@ -67,6 +67,7 @@ import GHC.Enum
 import GHC.List
 
 import Data.Bits
+import Data.Data
 
 default ()
 
@@ -588,3 +589,16 @@ naturalToWordMaybe (Natural i)
   where
     maxw = toInteger (maxBound :: Word)
 #endif
+
+-- This follows the same style as the other integral 'Data' instances
+-- defined in "Data.Data"
+naturalType :: DataType
+naturalType = mkIntType "Numeric.Natural.Natural"
+
+instance Data Natural where
+  toConstr x = mkIntegralConstr naturalType x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Natural"
+  dataTypeOf _ = naturalType
