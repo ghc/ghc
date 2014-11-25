@@ -323,6 +323,26 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
          </para>
        </listitem>
      </varlistentry>
+
+     <varlistentry>
+       <term><option>-xq<replaceable>size</replaceable></option>
+       <indexterm><primary><option>-xq</option></primary><secondary>RTS
+       option</secondary></indexterm></term>
+       <listitem>
+         <para>
+           &lsqb;Default: 100k&rsqb; This option relates to allocation
+           limits; for more about this see <ulink
+           url="&libraryBaseLocation;/GHC-Conc.html#v%3AenableAllocationLimit"><literal>enableAllocationLimit</literal></ulink>.
+           When a thread hits its allocation limit, the RTS throws an
+           exception to the thread, and the thread gets an additional
+           quota of allocation before the exception is raised again,
+           the idea being so that the thread can execute its exception
+           handlers.  The <option>-xq</option> controls the size of
+           this additional quota.
+         </para>
+       </listitem>
+     </varlistentry>
+
     </variablelist>
   </sect2>
 
