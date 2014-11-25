@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -22,8 +22,6 @@ module BufWrite (
         bPutLitString,
         bFlush,
   ) where
-
-#include "HsVersions.h"
 
 import FastString
 import FastTypes
@@ -53,12 +51,8 @@ newBufHandle hdl = do
 buf_size :: Int
 buf_size = 8192
 
-#define STRICT2(f) f a b | a `seq` b `seq` False = undefined
-#define STRICT3(f) f a b c | a `seq` b `seq` c `seq` False = undefined
-
 bPutChar :: BufHandle -> Char -> IO ()
-STRICT2(bPutChar)
-bPutChar b@(BufHandle buf r hdl) c = do
+bPutChar b@(BufHandle buf r hdl) !c = do
   i <- readFastMutInt r
   if (i >= buf_size)
         then do hPutBuf hdl buf buf_size
@@ -68,8 +62,7 @@ bPutChar b@(BufHandle buf r hdl) c = do
                 writeFastMutInt r (i+1)
 
 bPutStr :: BufHandle -> String -> IO ()
-STRICT2(bPutStr)
-bPutStr (BufHandle buf r hdl) str = do
+bPutStr (BufHandle buf r hdl) !str = do
   i <- readFastMutInt r
   loop str i
   where loop _ i | i `seq` False = undefined
@@ -124,10 +117,3 @@ bFlush (BufHandle buf r hdl) = do
   when (i > 0) $ hPutBuf hdl buf i
   free buf
   return ()
-
-#if 0
-myPutBuf s hdl buf i =
-  modifyIOError (\e -> ioeSetErrorString e (ioeGetErrorString e ++ ':':s ++ " (" ++ show buf ++ "," ++ show i ++ ")")) $
-
-  hPutBuf hdl buf i
-#endif

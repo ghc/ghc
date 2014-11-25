@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -O #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
@@ -28,7 +28,6 @@ module Encoding (
         zDecodeString
   ) where
 
-#include "HsVersions.h"
 import Foreign
 import Data.Char
 import Numeric
@@ -169,16 +168,14 @@ utf8EncodeChar c ptr =
 
 utf8EncodeString :: Ptr Word8 -> String -> IO ()
 utf8EncodeString ptr str = go ptr str
-  where STRICT2(go)
-        go _   []     = return ()
+  where go !_   []     = return ()
         go ptr (c:cs) = do
           ptr' <- utf8EncodeChar c ptr
           go ptr' cs
 
 utf8EncodedLength :: String -> Int
 utf8EncodedLength str = go 0 str
-  where STRICT2(go)
-        go n [] = n
+  where go !n [] = n
         go n (c:cs)
           | ord c > 0 && ord c <= 0x007f = go (n+1) cs
           | ord c <= 0x07ff = go (n+2) cs
