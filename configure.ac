@@ -199,7 +199,7 @@ echo "main = putStrLn \"%function\"" > conftestghc.hs
 # Check whether LLVM backend is default for this platform
 ${WithGhc} conftestghc.hs 2>&1 >/dev/null
 res=`./conftestghc`
-if test "x$res" == "x%object"
+if test "x$res" = "x%object"
 then
     AC_MSG_RESULT(yes)
     echo "Buggy bootstrap compiler"
@@ -215,14 +215,14 @@ fi
 # -fllvm is not the default, but set a flag so the Makefile can check
 # -for it in the build flags later on
 ${WithGhc} -fforce-recomp -fllvm conftestghc.hs 2>&1 >/dev/null
-if test $? == 0
+if test $? = 0
 then
     res=`./conftestghc`
-    if test "x$res" == "x%object"
+    if test "x$res" = "x%object"
     then
         AC_MSG_RESULT(yes)
         GHC_LLVM_AFFECTED_BY_9439=1
-    elif test "x$res" == "x%function"
+    elif test "x$res" = "x%function"
     then
         AC_MSG_RESULT(no)
         GHC_LLVM_AFFECTED_BY_9439=0
