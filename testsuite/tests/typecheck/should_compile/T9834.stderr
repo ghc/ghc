@@ -1,0 +1,71 @@
+
+T9834.hs:23:10: Warning:
+    Couldn't match type ‘p’ with ‘(->) (p a0)’
+      ‘p’ is a rigid type variable bound by
+          the class declaration for ‘ApplicativeFix’ at T9834.hs:21:39
+    Expected type: (forall (q :: * -> *).
+                    Applicative q =>
+                    Comp p q a -> Comp p q a)
+                   -> p a
+      Actual type: (forall (q :: * -> *).
+                    Applicative q =>
+                    Nat (Comp p q) (Comp p q))
+                   -> p a0 -> p a0
+    Relevant bindings include
+      afix :: (forall (q :: * -> *).
+               Applicative q =>
+               Comp p q a -> Comp p q a)
+              -> p a
+        (bound at T9834.hs:23:3)
+    In the expression: wrapIdComp
+    In an equation for ‘afix’: afix = wrapIdComp
+
+T9834.hs:23:10: Warning:
+    Couldn't match type ‘a’ with ‘p a0’
+      ‘a’ is a rigid type variable bound by
+          the type signature for
+            afix :: (forall (q :: * -> *).
+                     Applicative q =>
+                     Comp p q a -> Comp p q a)
+                    -> p a
+          at T9834.hs:22:11
+    Expected type: (forall (q :: * -> *).
+                    Applicative q =>
+                    Comp p q a -> Comp p q a)
+                   -> p a
+      Actual type: (forall (q :: * -> *).
+                    Applicative q =>
+                    Nat (Comp p q) (Comp p q))
+                   -> p a0 -> p a0
+    Relevant bindings include
+      afix :: (forall (q :: * -> *).
+               Applicative q =>
+               Comp p q a -> Comp p q a)
+              -> p a
+        (bound at T9834.hs:23:3)
+    In the expression: wrapIdComp
+    In an equation for ‘afix’: afix = wrapIdComp
+
+T9834.hs:23:10: Warning:
+    Couldn't match type ‘a’ with ‘a1’
+      ‘a’ is a rigid type variable bound by
+          the type signature for
+            afix :: (forall (q :: * -> *).
+                     Applicative q =>
+                     Comp p q a -> Comp p q a)
+                    -> p a
+          at T9834.hs:22:11
+      ‘a1’ is a rigid type variable bound by
+           a type expected by the context:
+             Applicative q => Comp p q a1 -> Comp p q a1
+           at T9834.hs:23:10
+    Expected type: Comp p q a1 -> Comp p q a1
+      Actual type: Comp p q a -> Comp p q a
+    Relevant bindings include
+      afix :: (forall (q :: * -> *).
+               Applicative q =>
+               Comp p q a -> Comp p q a)
+              -> p a
+        (bound at T9834.hs:23:3)
+    In the expression: wrapIdComp
+    In an equation for ‘afix’: afix = wrapIdComp
