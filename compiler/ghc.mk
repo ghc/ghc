@@ -67,6 +67,8 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo                                                               >> $@
 	@echo 'cProjectName          :: String'                             >> $@
 	@echo 'cProjectName          = "$(ProjectName)"'                    >> $@
+	@echo 'cProjectGitCommitId   :: String'				    >> $@
+	@echo 'cProjectGitCommitId   = "$(ProjectGitCommitId)"'		    >> $@
 	@echo 'cProjectVersion       :: String'                             >> $@
 	@echo 'cProjectVersion       = "$(ProjectVersion)"'                 >> $@
 	@echo 'cProjectVersionInt    :: String'                             >> $@

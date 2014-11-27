@@ -1581,11 +1581,29 @@ if test "$RELEASE" = "NO"; then
         dnl less likely to go wrong.
         PACKAGE_VERSION=${PACKAGE_VERSION}.`date +%Y%m%d`
     fi
+
+    AC_MSG_CHECKING([for GHC Git commit id])
+    if test -d .git; then
+        git_commit_id=`git rev-parse HEAD`
+        if test -n "$git_commit_id" 2>&1 >/dev/null; then true; else
+            AC_MSG_ERROR([failed to detect revision: check that git is in your path])
+        fi
+        PACKAGE_GIT_COMMIT_ID=$git_commit_id
+        AC_MSG_RESULT(inferred $PACKAGE_GIT_COMMIT_ID)
+    elif test -f GIT_COMMIT_ID; then
+        PACKAGE_GIT_COMMIT_ID=`cat GIT_COMMIT_ID`
+        AC_MSG_RESULT(given $PACKAGE_GIT_COMMIT_ID)
+    else
+        AC_MSG_WARN([cannot determine snapshot revision: no .git directory and no 'GIT_COMMIT_ID' file])
+        PACKAGE_GIT_COMMIT_ID="0000000000000000000000000000000000000000"
+    fi
+
 fi
 
 # Some renamings
 AC_SUBST([ProjectName], [$PACKAGE_NAME])
 AC_SUBST([ProjectVersion], [$PACKAGE_VERSION])
+AC_SUBST([ProjectGitCommitId], [$PACKAGE_GIT_COMMIT_ID])
 
 # Split PACKAGE_VERSION into (possibly empty) parts
 VERSION_MAJOR=`echo $PACKAGE_VERSION | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1'/`

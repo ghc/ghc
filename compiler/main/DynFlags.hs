@@ -3781,6 +3781,7 @@ compilerInfo dflags
       -- key)
     : rawSettings dflags
    ++ [("Project version",             cProjectVersion),
+       ("Project Git commit id",       cProjectGitCommitId),
        ("Booter version",              cBooterVersion),
        ("Stage",                       cStage),
        ("Build platform",              cBuildPlatformString),

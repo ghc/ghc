@@ -1109,13 +1109,27 @@ SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
 SRC_DIST_GHC_FILES += \
     configure.ac config.guess config.sub configure \
     aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
-    settings.in VERSION \
+    settings.in VERSION GIT_COMMIT_ID \
     boot packages ghc.mk
 
 VERSION :
 	echo $(ProjectVersion) >VERSION
 
-sdist : VERSION
+.PHONY: GIT_COMMIT_ID
+GIT_COMMIT_ID:
+	@if test -d .git && test "`git rev-parse HEAD`" != "$(ProjectGitCommitId)"; then \
+	   echo "******************************************************************************"; \
+	   echo "Stale ProjectGitCommitId (=$(ProjectGitCommitId)) detected!"; \
+           echo "'git rev-parse HEAD' says: `git rev-parse HEAD`"; \
+	   echo "Please re-run './configure' before creating source-distribution"; \
+	   echo "******************************************************************************"; \
+	   exit 1; \
+	fi
+	@if test -f $@ && test "`cat $@`" = "$(ProjectGitCommitId)"; \
+	then echo "$@ needs no update"; \
+	else echo "update $@ ($(ProjectGitCommitId))"; echo -n "$(ProjectGitCommitId)" > $@; fi
+
+sdist : VERSION GIT_COMMIT_ID
 
 # Use:
 #     $(call sdist_ghc_file,compiler,stage2,cmm,Foo/Bar,CmmLex,x)

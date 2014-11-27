@@ -31,6 +31,7 @@ ProjectVersionInt = @ProjectVersionInt@
 ProjectPatchLevel = @ProjectPatchLevel@
 ProjectPatchLevel1 = @ProjectPatchLevel1@
 ProjectPatchLevel2 = @ProjectPatchLevel2@
+ProjectGitCommitId = @ProjectGitCommitId@
 
 ################################################################################
 #

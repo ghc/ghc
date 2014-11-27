@@ -541,6 +541,7 @@ mode_flags =
   ] ++
   [ defFlag k'                      (PassFlag (setMode (printSetting k)))
   | k <- ["Project version",
+          "Project Git commit id",
           "Booter version",
           "Stage",
           "Build platform",
