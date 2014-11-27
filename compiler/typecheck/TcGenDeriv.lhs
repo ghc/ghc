@@ -37,7 +37,6 @@ import DataCon
 import Name
 
 import DynFlags
-import HscTypes
 import PrelInfo
 import FamInstEnv( FamInst )
 import MkCore ( eRROR_ID )
@@ -102,7 +101,7 @@ data DerivStuff     -- Please add this auxiliary stuff
 %************************************************************************
 
 \begin{code}
-genDerivedBinds :: DynFlags -> FixityEnv -> Class -> SrcSpan -> TyCon
+genDerivedBinds :: DynFlags -> (Name -> Fixity) -> Class -> SrcSpan -> TyCon
                 -> (LHsBinds RdrName, BagDerivStuff)
 genDerivedBinds dflags fix_env clas loc tycon
   | Just gen_fn <- assocMaybe gen_list (getUnique clas)
@@ -951,7 +950,7 @@ These instances are also useful for Read (Either Int Emp), where
 we want to be able to parse (Left 3) just fine.
 
 \begin{code}
-gen_Read_binds :: FixityEnv -> SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
+gen_Read_binds :: (Name -> Fixity) -> SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 
 gen_Read_binds get_fixity loc tycon
   = (listToBag [read_prec, default_readlist, default_readlistprec], emptyBag)
@@ -1120,7 +1119,7 @@ Example
                     -- the most tightly-binding operator
 
 \begin{code}
-gen_Show_binds :: FixityEnv -> SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
+gen_Show_binds :: (Name -> Fixity) -> SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 
 gen_Show_binds get_fixity loc tycon
   = (listToBag [shows_prec, show_list], emptyBag)
@@ -1216,7 +1215,7 @@ mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString st
 \end{code}
 
 \begin{code}
-getPrec :: Bool -> FixityEnv -> Name -> Integer
+getPrec :: Bool -> (Name -> Fixity) -> Name -> Integer
 getPrec is_infix get_fixity nm
   | not is_infix   = appPrecedence
   | otherwise      = getPrecedence get_fixity nm
@@ -1226,9 +1225,9 @@ appPrecedence = fromIntegral maxPrecedence + 1
   -- One more than the precedence of the most
   -- tightly-binding operator
 
-getPrecedence :: FixityEnv -> Name -> Integer
+getPrecedence :: (Name -> Fixity) -> Name -> Integer
 getPrecedence get_fixity nm
-   = case lookupFixity get_fixity nm of
+   = case get_fixity nm of
         Fixity x _assoc -> fromIntegral x
           -- NB: the Report says that associativity is not taken
           --     into account for either Read or Show; hence we

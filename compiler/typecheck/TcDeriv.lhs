@@ -30,6 +30,8 @@ import FamInstEnv
 import TcHsType
 import TcMType
 import TcSimplify
+import LoadIface( loadInterfaceForName )
+import Module( getModule, isInteractiveModule )
 
 import RnNames( extendGlobalRdrEnvRn )
 import RnBinds
@@ -2091,9 +2093,26 @@ genDerivStuff loc clas dfun_name tycon comaux_maybe
       return (binds, unitBag (DerivFamInst faminst))
 
   | otherwise                      -- Non-monadic generators
-  = do dflags <- getDynFlags
-       fix_env <- getFixityEnv
-       return (genDerivedBinds dflags fix_env clas loc tycon)
+  = do { dflags <- getDynFlags
+       ; fix_env <- getDataConFixityFun tycon
+       ; return (genDerivedBinds dflags fix_env clas loc tycon) }
+
+getDataConFixityFun :: TyCon -> TcM (Name -> Fixity)
+-- If the TyCon is locally defined, we want the local fixity env;
+-- but if it is imported (which happens for standalone deriving)
+-- we need to get the fixity env from the interface file
+-- c.f. RnEnv.lookupFixity, and Trac #9830
+getDataConFixityFun tc
+  = do { this_mod <- getModule
+       ; if nameIsLocalOrFrom this_mod name || isInteractiveModule (nameModule name)
+         then do { fix_env <- getFixityEnv
+                 ; return (lookupFixity fix_env) }
+         else do { iface <- loadInterfaceForName doc name
+                            -- Should already be loaded!
+                 ; return (mi_fix_fn iface . nameOccName) } }
+  where
+    name = tyConName tc
+    doc = ptext (sLit "Data con fixities for") <+> ppr name
 \end{code}
 
 Note [Bindings for Generalised Newtype Deriving]
