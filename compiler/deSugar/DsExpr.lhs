@@ -489,8 +489,11 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
         -- so that everything works when we are doing fancy unboxing on the
         -- constructor aguments.
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
-        ; ([discrim_var], matching_code) 
-                <- matchWrapper RecUpd (MG { mg_alts = alts, mg_arg_tys = [in_ty], mg_res_ty = out_ty, mg_origin = Generated })
+        ; ([discrim_var], matching_code)
+                <- matchWrapper RecUpd (MG { mg_alts = alts, mg_arg_tys = [in_ty]
+                                           , mg_res_ty = out_ty, mg_origin = FromSource })
+                                           -- FromSource is not strictly right, but we
+                                           -- want incomplete pattern-match warnings
 
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }

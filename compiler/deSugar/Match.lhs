@@ -79,7 +79,7 @@ matchCheck_really dflags ctx@(DsMatchContext hs_ctx _) vars ty qs
        ; match vars ty qs }
   where
     (pats, eqns_shadow) = check qs
-    incomplete = incomplete_flag hs_ctx && (notNull pats)
+    incomplete = incomplete_flag hs_ctx && notNull pats
     shadow     = wopt Opt_WarnOverlappingPatterns dflags
               && notNull eqns_shadow
 
