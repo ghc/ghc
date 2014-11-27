@@ -54,7 +54,7 @@ rnSpliceType e _ = failTH e "Template Haskell type splice"
 rnSpliceExpr :: Bool -> HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
 rnSpliceExpr _ e = failTH e "Template Haskell splice"
 
-rnSplicePat :: HsSplice RdrName -> RnM (Pat Name, FreeVars)
+rnSplicePat :: HsSplice RdrName -> RnM (Either (Pat RdrName) (Pat Name), FreeVars)
 rnSplicePat e = failTH e "Template Haskell pattern splice"
 
 rnSpliceDecl :: SpliceDecl RdrName -> RnM (SpliceDecl Name, FreeVars)

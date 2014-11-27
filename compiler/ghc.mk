@@ -472,6 +472,7 @@ compiler_stage3_SplitObjs = NO
 compiler_stage2_dll0_START_MODULE = DynFlags
 compiler_stage2_dll0_MODULES = \
 	Annotations \
+	ApiAnnotation \
 	Avail \
 	Bag \
 	BasicTypes \
@@ -498,6 +499,7 @@ compiler_stage2_dll0_MODULES = \
 	CoreUnfold \
 	CoreUtils \
 	CostCentre \
+	Ctype \
 	DataCon \
 	Demand \
 	Digraph \
@@ -539,7 +541,7 @@ compiler_stage2_dll0_MODULES = \
 	InstEnv \
 	Kind \
 	Lexeme \
-	ApiAnnotation \
+	Lexer \
 	ListSetOps \
 	Literal \
 	LoadIface \
@@ -602,7 +604,6 @@ ifeq "$(GhcWithInterpreter)" "YES"
 # These files are reacheable from DynFlags
 # only by GHCi-enabled code (see #9552)
 compiler_stage2_dll0_MODULES += \
-	ApiAnnotation \
 	Bitmap \
 	BlockId \
 	ByteCodeAsm \
@@ -625,13 +626,11 @@ compiler_stage2_dll0_MODULES += \
 	CodeGen.Platform.SPARC \
 	CodeGen.Platform.X86 \
 	CodeGen.Platform.X86_64 \
-	Ctype \
 	FastBool \
 	Hoopl \
 	Hoopl.Dataflow \
 	InteractiveEvalTypes \
 	MkGraph \
-	Lexer \
 	PprCmm \
 	PprCmmDecl \
 	PprCmmExpr \
