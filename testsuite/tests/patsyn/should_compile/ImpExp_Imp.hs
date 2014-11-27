@@ -1,6 +1,6 @@
 module ShouldFail where
 
-import T8961a
+import ImpExp_Exp
 
 single :: [a] -> Maybe a
 single (Single x) = Just x

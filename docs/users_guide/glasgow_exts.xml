@@ -877,8 +877,8 @@ y)</literal> will not be coalesced.
 
 <para>
 Pattern synonyms are enabled by the flag
-<literal>-XPatternSynonyms</literal>, which is required for both
-defining them <emphasis>and</emphasis> using them.  More information
+<literal>-XPatternSynonyms</literal>, which is required for defining
+them, but <emphasis>not</emphasis> for using them.  More information
 and examples of view patterns can be found on the <ulink
 url="http://ghc.haskell.org/trac/ghc/wiki/PatternSynonyms">Wiki
 page</ulink>.
