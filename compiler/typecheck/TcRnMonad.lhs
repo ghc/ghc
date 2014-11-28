@@ -475,54 +475,47 @@ updTcRef = updMutVar
 
 \begin{code}
 traceTc :: String -> SDoc -> TcRn ()
-traceTc = traceTcN 1
+traceTc herald doc = traceTcN 1 (hang (text herald) 2 doc)
 
 -- | Typechecker trace
-traceTcN :: Int -> String -> SDoc -> TcRn ()
-traceTcN level herald doc
-    = do dflags <- getDynFlags
-         when (level <= traceLevel dflags && not opt_NoDebugOutput) $
-             traceOptTcRn Opt_D_dump_tc_trace $
-                 hang (text herald) 2 doc
+traceTcN :: Int -> SDoc -> TcRn ()
+traceTcN level doc
+    = do { dflags <- getDynFlags
+         ; when (level <= traceLevel dflags) $
+           traceOptTcRn Opt_D_dump_tc_trace doc }
 
-traceRn, traceSplice :: SDoc -> TcRn ()
-traceRn      = traceOptTcRn Opt_D_dump_rn_trace -- Renamer Trace
-traceSplice  = traceOptTcRn Opt_D_dump_splices  -- Template Haskell
+traceRn :: SDoc -> TcRn ()
+traceRn doc = traceOptTcRn Opt_D_dump_rn_trace doc
 
-traceIf, traceHiDiffs :: SDoc -> TcRnIf m n ()
-traceIf      = traceOptIf Opt_D_dump_if_trace
-traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
-
-
-traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()
-traceOptIf flag doc 
-  = whenDOptM flag $    -- No RdrEnv available, so qualify everything
-    do { dflags <- getDynFlags
-       ; liftIO (putMsg dflags doc) }
+traceSplice :: SDoc -> TcRn ()
+traceSplice doc = traceOptTcRn Opt_D_dump_splices doc
 
 -- | Output a doc if the given 'DumpFlag' is set.
 --
 -- By default this logs to stdout
 -- However, if the `-ddump-to-file` flag is set,
 -- then this will dump output to a file
-
--- just a wrapper for 'dumpIfSet_dyn_printer'
 --
--- does not check opt_NoDebugOutput;
--- caller is responsible for than when appropriate
+-- Just a wrapper for 'dumpSDoc'
 traceOptTcRn :: DumpFlag -> SDoc -> TcRn ()
 traceOptTcRn flag doc
   = do { dflags <- getDynFlags
-       -- Checking the dynamic flag here is redundant when the flag is set
-       -- But it avoids extra work when the flag is unset.
-       ; when (dopt flag dflags) $ do {
-           ; real_doc <- prettyDoc doc
-           ; printer <- getPrintUnqualified dflags
-           ; liftIO $ dumpIfSet_dyn_printer printer dflags flag real_doc
-           }
-       }
+       ; when (dopt flag dflags) (traceTcRn flag doc)
+    }
+
+traceTcRn :: DumpFlag -> SDoc -> TcRn ()
+-- ^ Unconditionally dump some trace output
+--
+-- The DumpFlag is used only to set the output filename
+-- for --dump-to-file, not to decide whether or not to output
+-- That part is done by the caller
+traceTcRn flag doc
+  = do { real_doc <- prettyDoc doc
+       ; dflags   <- getDynFlags
+       ; printer  <- getPrintUnqualified dflags
+       ; liftIO $ dumpSDoc dflags printer flag "" real_doc  }
   where
-    -- add current location if opt_PprStyle_Debug
+    -- Add current location if opt_PprStyle_Debug
     prettyDoc :: SDoc -> TcRn SDoc
     prettyDoc doc = if opt_PprStyle_Debug
        then do { loc  <- getSrcSpanM; return $ mkLocMessage SevOutput loc doc }
@@ -544,9 +537,25 @@ printForUserTcRn doc
 -- | Typechecker debug
 debugDumpTcRn :: SDoc -> TcRn ()
 debugDumpTcRn doc = unless opt_NoDebugOutput $
-  traceOptTcRn Opt_D_dump_tc doc
+                    traceOptTcRn Opt_D_dump_tc doc
 \end{code}
 
+traceIf and traceHiDiffs work in the TcRnIf monad, where no RdrEnv is
+available.  Alas, they behave inconsistently with the other stuff;
+e.g. are unaffected by -dump-to-file.
+
+\begin{code}
+traceIf, traceHiDiffs :: SDoc -> TcRnIf m n ()
+traceIf      = traceOptIf Opt_D_dump_if_trace
+traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
+
+
+traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()
+traceOptIf flag doc
+  = whenDOptM flag $    -- No RdrEnv available, so qualify everything
+    do { dflags <- getDynFlags
+       ; liftIO (putMsg dflags doc) }
+\end{code}
 
 %************************************************************************
 %*                                                                      *

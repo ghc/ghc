@@ -1096,10 +1096,10 @@ csTraceTcM :: Int -> TcM SDoc -> TcM ()
 -- Constraint-solver tracing, -ddump-cs-trace
 csTraceTcM trace_level mk_doc
   = do { dflags <- getDynFlags
-       ; when ((dopt Opt_D_dump_cs_trace dflags || dopt Opt_D_dump_tc_trace dflags)
-               && traceLevel dflags >= trace_level) $
+       ; when (  (dopt Opt_D_dump_cs_trace dflags || dopt Opt_D_dump_tc_trace dflags)
+              && trace_level <= traceLevel dflags ) $
          do { msg <- mk_doc
-            ; TcM.debugDumpTcRn msg } }
+            ; TcM.traceTcRn Opt_D_dump_cs_trace msg } }
 
 runTcS :: TcS a                -- What to run
        -> TcM (a, Bag EvBind)

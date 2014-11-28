@@ -269,6 +269,9 @@ mkDumpDoc hdr doc
 --
 -- When hdr is empty, we print in a more compact format (no separators and
 -- blank lines)
+--
+-- The DumpFlag is used only to choose the filename to use if --dump-to-file is
+-- used; it is not used to decide whether to dump the output
 dumpSDoc :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
 dumpSDoc dflags print_unqual flag hdr doc
  = do let mFile = chooseDumpFile dflags flag
