@@ -1684,6 +1684,23 @@ isValidBigNat# (BN# ba#)
 
     (# szq#, szr# #) = quotRemInt# sz# GMP_LIMB_BYTES#
 
+-- | Version of 'nextPrimeInteger' operating on 'BigNat's
+--
+-- /Since: 1.0.0.0/
+nextPrimeBigNat :: BigNat -> BigNat
+nextPrimeBigNat bn@(BN# ba#) = runS $ do
+    mbn@(MBN# mba#) <- newBigNat# n#
+    (W# c#) <- liftIO (nextPrime# mba# ba# n#)
+    case c# of
+        0## -> unsafeFreezeBigNat# mbn
+        _   -> unsafeSnocFreezeBigNat# mbn c#
+  where
+    n# = sizeofBigNat# bn
+
+foreign import ccall unsafe "integer_gmp_next_prime"
+  nextPrime# :: MutableByteArray# RealWorld -> ByteArray# -> GmpSize#
+                -> IO GmpLimb
+
 ----------------------------------------------------------------------------
 -- monadic combinators for low-level state threading
 

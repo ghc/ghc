@@ -474,3 +474,61 @@ integer_gmp_test_prime1(const mp_limb_t limb, const HsInt rep)
 
   return integer_gmp_test_prime(&limb, 1, rep);
 }
+
+/* wrapper around mpz_nextprime()
+ *
+ * Stores next prime (relative to {sp,sn}) in {rp,sn}.
+ * Return value is most significant limb of {rp,sn+1}.
+ */
+mp_limb_t
+integer_gmp_next_prime(mp_limb_t rp[], const mp_limb_t sp[],
+                       const mp_size_t sn)
+{
+  if (!sn) return 2;
+
+  const mpz_t op = {{
+      ._mp_alloc = sn,
+      ._mp_size  = sn,
+      ._mp_d = (mp_limb_t*)sp
+    }};
+
+  mpz_t rop;
+  mpz_init (rop);
+  mpz_nextprime (rop, op);
+
+  const mp_size_t rn = rop[0]._mp_size;
+
+  // copy result into {rp,sn} buffer
+  assert (rn == sn || rn == sn+1);
+  memcpy(rp, rop[0]._mp_d, sn*sizeof(mp_limb_t));
+  const mp_limb_t result = rn>sn ? rop[0]._mp_d[sn] : 0;
+
+  mpz_clear (rop);
+
+  return result;
+}
+
+/* wrapper around mpz_nextprime()
+ *
+ * returns next prime modulo 2^GMP_LIMB_BITS
+ */
+mp_limb_t
+integer_gmp_next_prime1(const mp_limb_t limb)
+{
+  if (limb < 2) return 2;
+
+  const mpz_t op = {{
+      ._mp_alloc = 1,
+      ._mp_size  = 1,
+      ._mp_d = (mp_limb_t*)(&limb)
+    }};
+
+  mpz_t rop;
+  mpz_init (rop);
+  mpz_nextprime (rop, op);
+  assert (rop[0]._mp_size > 0);
+  const mp_limb_t result = rop[0]._mp_d[0];
+  mpz_clear (rop);
+
+  return result;
+}

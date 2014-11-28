@@ -125,6 +125,10 @@ module GHC.Integer.GMP.Internals
     , testPrimeBigNat
     , testPrimeWord#
 
+    , nextPrimeInteger
+    , nextPrimeBigNat
+    , nextPrimeWord#
+
       -- * Import/export functions
       -- ** Compute size of serialisation
     , sizeInBaseBigNat
@@ -323,3 +327,26 @@ foreign import ccall unsafe "integer_gmp_test_prime"
 -- /Since: 1.0.0.0/
 foreign import ccall unsafe "integer_gmp_test_prime1"
   testPrimeWord# :: GmpLimb# -> Int# -> Int#
+
+
+-- | Compute next prime greater than @/n/@ probalistically.
+--
+-- According to the GMP documentation, the underlying function
+-- @mpz_nextprime()@ \"uses a probabilistic algorithm to identify
+-- primes. For practical purposes it's adequate, the chance of a
+-- composite passing will be extremely small.\"
+--
+-- /Since: 0.5.1.0/
+{-# NOINLINE nextPrimeInteger #-}
+nextPrimeInteger :: Integer -> Integer
+nextPrimeInteger (S# i#)
+  | isTrue# (i# ># 1#)    = wordToInteger (nextPrimeWord# (int2Word# i#))
+  | True                  = S# 2#
+nextPrimeInteger (Jp# bn) = Jp# (nextPrimeBigNat bn)
+nextPrimeInteger (Jn# _)  = S# 2#
+
+-- | Version of 'nextPrimeInteger' operating on 'Word#'s
+--
+-- /Since: 1.0.0.0/
+foreign import ccall unsafe "integer_gmp_next_prime1"
+  nextPrimeWord# :: GmpLimb# -> GmpLimb#
