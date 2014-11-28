@@ -424,7 +424,7 @@ plusHsValBinds _ _
 getTypeSigNames :: HsValBinds a -> NameSet
 -- Get the names that have a user type sig
 getTypeSigNames (ValBindsOut _ sigs)
-  = mkNameSet [unLoc n | L _ (TypeSig names _) <- sigs, n <- names]
+  = mkNameSet [unLoc n | L _ (TypeSig names _ _) <- sigs, n <- names]
 getTypeSigNames _
   = panic "HsBinds.getTypeSigNames"
 \end{code}
@@ -586,10 +586,17 @@ type LSig name = Located (Sig name)
 data Sig name
   =   -- | An ordinary type signature
       -- @f :: Num a => a -> a@
+      -- After renaming, this list of Names contains the named and unnamed
+      -- wildcards brought into scope by this signature. For a signature
+      -- @_ -> _a -> Bool@, the renamer will give the unnamed wildcard @_@
+      -- a freshly generated name, e.g. @_w@. @_w@ and the named wildcard @_a@
+      -- are then both replaced with fresh meta vars in the type. Their names
+      -- are stored in the type signature that brought them into scope, in
+      -- this third field to be more specific.
       --
       --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon',
       --          'ApiAnnotation.AnnComma'
-    TypeSig [Located name] (LHsType name)
+    TypeSig [Located name] (LHsType name) (PostRn name [Name])
 
       -- | A pattern synonym type signature
       -- @pattern type forall b. (Eq b) => P a b :: forall a. (Num a) => T a
@@ -765,7 +772,7 @@ instance (OutputableBndr name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
 ppr_sig :: OutputableBndr name => Sig name -> SDoc
-ppr_sig (TypeSig vars ty)         = pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (TypeSig vars ty _wcs)    = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (GenericSig vars ty)      = ptext (sLit "default") <+> pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (IdSig id)                = pprVarSig [id] (ppr (varType id))
 ppr_sig (FixSig fix_sig)          = ppr fix_sig

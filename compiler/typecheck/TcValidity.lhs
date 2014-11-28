@@ -923,8 +923,8 @@ checkValidInstance ctxt hs_type ty
 
         -- The location of the "head" of the instance
     head_loc = case hs_type of
-                 L _ (HsForAllTy _ _ _ (L loc _)) -> loc
-                 L loc _                          -> loc
+                 L _ (HsForAllTy _ _ _ _ (L loc _)) -> loc
+                 L loc _                            -> loc
 \end{code}
 
 Note [Paterson conditions]

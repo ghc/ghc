@@ -1,0 +1,4 @@
+
+WildcardInADT1.hs:4:26:
+    A constructor cannot have a partial type:
+    Foo (Either _ a)

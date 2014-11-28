@@ -340,9 +340,11 @@ instance Outputable MetaDetails where
   ppr (Indirect ty) = ptext (sLit "Indirect") <+> ppr ty
 
 data MetaInfo
-   = TauTv         -- This MetaTv is an ordinary unification variable
+   = TauTv Bool    -- This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
-                   -- never contains any ForAlls
+                   -- never contains any ForAlls.
+                   -- The boolean is true when the meta var originates
+                   -- from a wildcard.
 
    | ReturnTv      -- Can unify with *anything*. Used to convert a
                    -- type "checking" algorithm into a type inference algorithm.
@@ -519,10 +521,11 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_untch = untch })
   = pp_info <> colon <> ppr untch
   where
     pp_info = case info of
-                ReturnTv   -> ptext (sLit "ret")
-                TauTv      -> ptext (sLit "tau")
-                SigTv      -> ptext (sLit "sig")
-                FlatMetaTv -> ptext (sLit "fuv")
+                ReturnTv    -> ptext (sLit "ret")
+                TauTv True  -> ptext (sLit "tau")
+                TauTv False -> ptext (sLit "twc")
+                SigTv       -> ptext (sLit "sig")
+                FlatMetaTv  -> ptext (sLit "fuv")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
@@ -1257,7 +1260,7 @@ canUnifyWithPolyType dflags details kind
   = case details of
       MetaTv { mtv_info = ReturnTv } -> True      -- See Note [ReturnTv]
       MetaTv { mtv_info = SigTv }    -> False
-      MetaTv { mtv_info = TauTv }    -> xopt Opt_ImpredicativeTypes dflags
+      MetaTv { mtv_info = TauTv _ }  -> xopt Opt_ImpredicativeTypes dflags
                                      || isOpenTypeKind kind
                                           -- Note [OpenTypeKind accepts foralls]
       _other                         -> True

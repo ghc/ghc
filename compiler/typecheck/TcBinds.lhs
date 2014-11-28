@@ -31,6 +31,7 @@ import TcMType
 import ConLike
 import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
+import Type( pprSigmaTypeExtraCts )
 import TyCon
 import TcType
 import TysPrim
@@ -198,7 +199,7 @@ tcHsBootSigs (ValBindsOut binds sigs)
   = do  { checkTc (null binds) badBootDeclErr
         ; concat <$> mapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
   where
-    tc_boot_sig (TypeSig lnames ty) = mapM f lnames
+    tc_boot_sig (TypeSig lnames ty _) = mapM f lnames
       where
         f (L _ name) = do  { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
                            ; return (mkVanillaGlobal name sigma_ty) }
@@ -305,16 +306,16 @@ tcValBinds :: TopLevelFlag
 
 tcValBinds top_lvl binds sigs thing_inside
   = do  {  -- Typecheck the signature
-        ; (poly_ids, sig_fn) <- tcExtendKindEnv2 patsyn_placeholder_kinds $
-                                     -- See Note [Placeholder PatSyn kinds]
-                                tcTySigs sigs
+        ; (poly_ids, sig_fn, nwc_tvs) <- tcExtendKindEnv2 patsyn_placeholder_kinds $
+                                         -- See Note [Placeholder PatSyn kinds]
+                                         tcTySigs sigs
 
         ; let prag_fn = mkPragFun sigs (foldr (unionBags . snd) emptyBag binds)
 
                 -- Extend the envt right away with all
                 -- the Ids declared with type signatures
-                -- Use tcExtendIdEnv2 to avoid extending the TcIdBinder stack
-        ; tcExtendIdEnv2 [(idName id, id) | id <- poly_ids] $ do
+                -- Use tcExtendIdEnv3 to avoid extending the TcIdBinder stack
+        ; tcExtendIdEnv3 [(idName id, id) | id <- poly_ids] (mkVarSet nwc_tvs) $ do
             { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
                    { thing <- thing_inside
                      -- See Note [Pattern synonym wrappers don't yield dependencies]
@@ -442,6 +443,11 @@ tc_single top_lvl sig_fn prag_fn lbind thing_inside
        ; thing <- tcExtendLetEnv top_lvl closed ids thing_inside
        ; return (binds1, thing) }
 
+-- | No signature or a partial signature
+noCompleteSig :: Maybe TcSigInfo -> Bool
+noCompleteSig Nothing    = True
+noCompleteSig (Just sig) = isPartialSig sig
+
 ------------------------
 mkEdges :: TcSigFun -> LHsBinds Name
         -> [(LHsBind Name, BKey, [BKey])]
@@ -455,7 +461,7 @@ mkEdges sig_fn binds
     ]
   where
     no_sig :: Name -> Bool
-    no_sig n = isNothing (sig_fn n)
+    no_sig n = noCompleteSig (sig_fn n)
 
     keyd_binds = bagToList binds `zip` [0::BKey ..]
 
@@ -558,16 +564,17 @@ tcPolyCheck :: RecFlag       -- Whether it's recursive after breaking
 --   it has a signature,
 tcPolyCheck rec_tc prag_fn
             sig@(TcSigInfo { sig_id = poly_id, sig_tvs = tvs_w_scoped
-                           , sig_theta = theta, sig_tau = tau, sig_loc = loc })
+                           , sig_nwcs = sig_nwcs, sig_theta = theta
+                           , sig_tau = tau, sig_loc = loc })
             bind
-  = do { ev_vars <- newEvVars theta
+  = ASSERT( null sig_nwcs ) -- We should be in tcPolyInfer if there are wildcards
+    do { ev_vars <- newEvVars theta
        ; let skol_info = SigSkol (FunSigCtxt (idName poly_id)) (mkPhiTy theta tau)
              prag_sigs = prag_fn (idName poly_id)
              tvs = map snd tvs_w_scoped
        ; (ev_binds, (binds', [mono_info]))
             <- setSrcSpan loc $
                checkConstraints skol_info tvs ev_vars $
-               tcExtendTyVarEnv2 [(n,tv) | (Just n, tv) <- tvs_w_scoped] $
                tcMonoBinds rec_tc (\_ -> Just sig) LetLclBndr [bind]
 
        ; spec_prags <- tcSpecPrags poly_id prag_sigs
@@ -609,8 +616,10 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono closed bind_list
        ; (qtvs, givens, mr_bites, ev_binds)
                  <- simplifyInfer untch mono name_taus wanted
 
-       ; theta   <- zonkTcThetaType (map evVarPred givens)
-       ; exports <- checkNoErrs $ mapM (mkExport prag_fn qtvs theta) mono_infos
+       ; inferred_theta  <- zonkTcThetaType (map evVarPred givens)
+       ; exports <- checkNoErrs $ mapM (mkExport prag_fn qtvs inferred_theta)
+                                       mono_infos
+
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
              final_closed | closed && not mr_bites = TopLevel
@@ -643,22 +652,26 @@ mkExport :: PragFun
 
 -- Pre-condition: the qtvs and theta are already zonked
 
-mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
+mkExport prag_fn qtvs inferred_theta (poly_name, mb_sig, mono_id)
   = do  { mono_ty <- zonkTcType (idType mono_id)
 
         ; poly_id <- case mb_sig of
-                       Just TcSigInfo{ sig_id = id } -> return id
-                       Just _ -> panic "mkExport"
-                       Nothing  -> mkInferredPolyId poly_name qtvs theta mono_ty
+              Nothing -> mkInferredPolyId poly_name qtvs inferred_theta mono_ty
+              Just (TcPatSynInfo _) -> panic "mkExport"
+              Just sig | isPartialSig sig
+                       -> do { final_theta <- completeTheta inferred_theta sig
+                             ; mkInferredPolyId poly_name qtvs final_theta mono_ty }
+                       | otherwise
+                       -> return (sig_id sig)
 
         -- NB: poly_id has a zonked type
         ; poly_id <- addInlinePrags poly_id prag_sigs
         ; spec_prags <- tcSpecPrags poly_id prag_sigs
                 -- tcPrags requires a zonked poly_id
 
-        ; let sel_poly_ty = mkSigmaTy qtvs theta mono_ty
+        ; let sel_poly_ty = mkSigmaTy qtvs inferred_theta mono_ty
         ; traceTc "mkExport: check sig"
-                  (ppr poly_name $$ ppr sel_poly_ty $$ ppr (idType poly_id))
+                  (vcat [ ppr poly_name, ppr sel_poly_ty, ppr (idType poly_id) ])
 
         -- Perform the impedence-matching and ambiguity check
         -- right away.  If it fails, we want to fail now (and recover
@@ -719,6 +732,45 @@ mk_bind_msg inferred want_ambig poly_name poly_ty tidy_env
                       ptext (sLit "Probable cause: the inferred type is ambiguous") ]
    what | inferred  = ptext (sLit "inferred")
         | otherwise = ptext (sLit "specified")
+
+
+-- | Report the inferred constraints for an extra-constraints wildcard/hole as
+-- an error message, unless the PartialTypeSignatures flag is enabled. In this
+-- case, the extra inferred constraints are accepted without complaining.
+-- Returns the annotated constraints combined with the inferred constraints.
+completeTheta :: TcThetaType -> TcSigInfo -> TcM TcThetaType
+completeTheta _ (TcPatSynInfo _)
+  = panic "Extra-constraints wildcard not supported in a pattern signature"
+completeTheta inferred_theta
+              sig@(TcSigInfo { sig_id = poly_id
+                             , sig_extra_cts = mb_extra_cts
+                             , sig_theta = annotated_theta })
+  | Just loc <- mb_extra_cts
+  = do { annotated_theta <- zonkTcThetaType annotated_theta
+       ; let inferred_diff = minusList inferred_theta annotated_theta
+             final_theta   = annotated_theta ++ inferred_diff
+       ; partial_sigs      <- xoptM Opt_PartialTypeSignatures
+       ; warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
+       ; msg <- mkLongErrAt loc (mk_msg inferred_diff partial_sigs) empty
+       ; case partial_sigs of
+           True | warn_partial_sigs -> reportWarning $ makeIntoWarning msg
+                | otherwise         -> return ()
+           False                    -> reportError msg
+       ; return final_theta }
+
+  | otherwise
+  = zonkTcThetaType annotated_theta
+    -- No extra-constraints wildcard means no extra constraints will be added
+    -- to the context, so just return the possibly empty (zonked)
+    -- annotated_theta.
+  where
+    pts_hint = text "To use the inferred type, enable PartialTypeSignatures"
+    mk_msg inferred_diff suppress_hint
+       = vcat [ hang ((text "Found hole") <+> quotes (char '_'))
+                   2 (text "with inferred constraints:")
+                      <+> pprTheta inferred_diff
+              , if suppress_hint then empty else pts_hint
+              , typeSigCtxt (idName poly_id) sig ]
 \end{code}
 
 Note [Validity of inferred types]
@@ -1110,7 +1162,8 @@ tcMonoBinds _ sig_fn no_gen binds
 
         -- Bring the monomorphic Ids, into scope for the RHSs
         ; let mono_info  = getMonoBindInfo tc_binds
-              rhs_id_env = [(name,mono_id) | (name, Nothing, mono_id) <- mono_info]
+              rhs_id_env = [(name, mono_id) | (name, mb_sig, mono_id) <- mono_info
+                                            , noCompleteSig mb_sig ]
                     -- A monomorphic binding for each term variable that lacks
                     -- a type sig.  (Ones with a sig are already in scope.)
 
@@ -1153,12 +1206,15 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matc
                          -- sense to have a *polymorphic* function Id at this point
     do  { mono_name <- newLocalName name
         ; let mono_id = mkLocalId mono_name (sig_tau sig)
+        ; addErrCtxt (typeSigCtxt name sig) $
+          emitWildcardHoleConstraints (sig_nwcs sig)
         ; return (TcFunBind (name, Just sig, mono_id) nm_loc inf matches) }
   | otherwise
   = do  { mono_ty <- newFlexiTyVarTy openTypeKind
         ; mono_id <- newNoSigLetBndr no_gen name mono_ty
         ; return (TcFunBind (name, Nothing, mono_id) nm_loc inf matches) }
 
+-- TODOT: emit Hole Constraints for wildcards
 tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = do  { let tc_pat exp_ty = tcLetPat sig_fn no_gen pat exp_ty $
                               mapM lookup_info (collectPatBinders pat)
@@ -1183,8 +1239,9 @@ tcRhs :: TcMonoBind -> TcM (HsBind TcId)
 -- we *don't* bring any scoped type variables into scope
 -- Wny not?  They are not completely rigid.
 -- That's why we have the special case for a single FunBind in tcMonoBinds
-tcRhs (TcFunBind (_,_,mono_id) loc inf matches)
+tcRhs (TcFunBind (_, mb_sig, mono_id) loc inf matches)
   = tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel] $
+    tcExtendTyVarEnv2 tvsAndNwcs $
             -- NotTopLevel: it's a monomorphic binding
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
         ; (co_fn, matches') <- tcMatchesFun (idName mono_id) inf
@@ -1194,6 +1251,9 @@ tcRhs (TcFunBind (_,_,mono_id) loc inf matches)
                           , fun_co_fn = co_fn
                           , bind_fvs = placeHolderNamesTc
                           , fun_tick = Nothing }) }
+    where
+      tvsAndNwcs = maybe [] (\sig -> [(n, tv) | (Just n, tv) <- sig_tvs sig]
+                                     ++ sig_nwcs sig) mb_sig
 
 tcRhs (TcPatBind infos pat' grhss pat_ty)
   = tcExtendIdBndrs [ TcIdBndr mono_id NotTopLevel | (_,_,mono_id) <- infos ] $
@@ -1301,23 +1361,31 @@ is wrong (eg at the top level of the module),
 which is over-conservative
 
 \begin{code}
-tcTySigs :: [LSig Name] -> TcM ([TcId], TcSigFun)
+tcTySigs :: [LSig Name] -> TcM ([TcId], TcSigFun, [TcTyVar])
 tcTySigs hs_sigs
   = checkNoErrs $   -- See Note [Fail eagerly on bad signatures]
-    do { ty_sigs_s<- mapAndRecoverM tcTySig hs_sigs
+    do { (ty_sigs_s, tyvarsl) <- unzip <$> mapAndRecoverM tcTySig hs_sigs
        ; let ty_sigs = concat ty_sigs_s
              poly_ids = [id | TcSigInfo{ sig_id = id } <- ty_sigs]
              env = mkNameEnv [(getName sig, sig) | sig <- ty_sigs]
-       ; return (poly_ids, lookupNameEnv env) }
+       ; return (poly_ids, lookupNameEnv env, concat tyvarsl) }
 
-tcTySig :: LSig Name -> TcM [TcSigInfo]
+tcTySig :: LSig Name -> TcM ([TcSigInfo], [TcTyVar])
 tcTySig (L loc (IdSig id))
   = do { sig <- instTcTySigFromId loc id
-       ; return [sig] }
-tcTySig (L loc (TypeSig names@(L _ name1 : _) hs_ty))
+       ; return ([sig], []) }
+tcTySig (L loc (TypeSig names@(L _ name1 : _) hs_ty wcs))
   = setSrcSpan loc $
-    do { sigma_ty <- tcHsSigType (FunSigCtxt name1) hs_ty
-       ; mapM (instTcTySig hs_ty sigma_ty) (map unLoc names) }
+    pushUntouchablesM $
+    do { nwc_tvs <- mapM newWildcardVarMetaKind wcs      -- Generate fresh meta vars for the wildcards
+       ; sigma_ty <- tcExtendTyVarEnv nwc_tvs $ tcHsSigType (FunSigCtxt name1) hs_ty
+       ; sigs <- mapM (instTcTySig hs_ty sigma_ty (extra_cts hs_ty) (zip wcs nwc_tvs))
+                      (map unLoc names)
+       ; return (sigs, nwc_tvs) }
+  where
+     extra_cts (L _ (HsForAllTy _ extra _ _ _)) = extra
+     extra_cts _ = Nothing
+
 tcTySig (L loc (PatSynSig (L _ name) (_, qtvs) prov req ty))
   = setSrcSpan loc $
     do { traceTc "tcTySig {" $ ppr name $$ ppr qtvs $$ ppr prov $$ ppr req $$ ppr ty
@@ -1340,8 +1408,8 @@ tcTySig (L loc (PatSynSig (L _ name) (_, qtvs) prov req ty))
                           patsig_univ = univ_tvs,
                           patsig_prov = prov',
                           patsig_req = req' }
-       ; return [TcPatSynInfo tpsi] }}
-tcTySig _ = return []
+       ; return ([TcPatSynInfo tpsi], []) }}
+tcTySig _ = return ([], [])
 
 instTcTySigFromId :: SrcSpan -> Id -> TcM TcSigInfo
 instTcTySigFromId loc id
@@ -1349,21 +1417,28 @@ instTcTySigFromId loc id
                                          (idType id)
        ; return (TcSigInfo { sig_id = id, sig_loc = loc
                            , sig_tvs = [(Nothing, tv) | tv <- tvs]
-                           , sig_theta = theta, sig_tau = tau }) }
-  where
+                           , sig_nwcs = []
+                           , sig_theta = theta, sig_tau = tau
+                           , sig_extra_cts = Nothing
+                           , sig_partial = False }) }
     -- Hack: in an instance decl we use the selector id as
     -- the template; but we do *not* want the SrcSpan on the Name of
     -- those type variables to refer to the class decl, rather to
     -- the instance decl
 
 instTcTySig :: LHsType Name -> TcType    -- HsType and corresponding TcType
-            -> Name -> TcM TcSigInfo
-instTcTySig hs_ty@(L loc _) sigma_ty name
+            -> Maybe SrcSpan             -- Just loc <=> an extra-constraints
+                                         -- wildcard is present at location loc.
+            -> [(Name, TcTyVar)] -> Name -> TcM TcSigInfo
+instTcTySig hs_ty@(L loc _) sigma_ty extra_cts nwcs name
   = do { (inst_tvs, theta, tau) <- tcInstType tcInstSigTyVars sigma_ty
        ; return (TcSigInfo { sig_id = mkLocalId name sigma_ty
                            , sig_loc = loc
                            , sig_tvs = findScopedTyVars hs_ty sigma_ty inst_tvs
-                           , sig_theta = theta, sig_tau = tau }) }
+                           , sig_nwcs = nwcs
+                           , sig_theta = theta, sig_tau = tau
+                           , sig_extra_cts = extra_cts
+                           , sig_partial = isJust extra_cts || not (null nwcs) }) }
 
 -------------------------------
 data GeneralisationPlan
@@ -1434,14 +1509,15 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
     mono_local_binds = xopt Opt_MonoLocalBinds dflags
                     && not closed_flag
 
-    no_sig n = isNothing (sig_fn n)
+    no_sig n = noCompleteSig (sig_fn n)
 
     -- With OutsideIn, all nested bindings are monomorphic
     -- except a single function binding with a signature
     one_funbind_with_sig [lbind@(L _ (FunBind { fun_id = v }))]
       = case sig_fn (unLoc v) of
         Nothing -> Nothing
-        Just sig -> Just (lbind, sig)
+        Just sig | isPartialSig sig -> Nothing
+        Just sig | otherwise        -> Just (lbind, sig)
     one_funbind_with_sig _
       = Nothing
 
@@ -1549,4 +1625,15 @@ Note [Binding scoped type variables]
 patMonoBindsCtxt :: (OutputableBndr id, Outputable body) => LPat id -> GRHSs Name body -> SDoc
 patMonoBindsCtxt pat grhss
   = hang (ptext (sLit "In a pattern binding:")) 2 (pprPatBind pat grhss)
+
+typeSigCtxt :: Name -> TcSigInfo -> SDoc
+typeSigCtxt _    (TcPatSynInfo _)
+  = panic "Should only be called with a TcSigInfo"
+typeSigCtxt name (TcSigInfo { sig_id = _id, sig_tvs = tvs
+                            , sig_theta = theta, sig_tau = tau
+                            , sig_extra_cts = extra_cts })
+  = sep [ text "In" <+> pprUserTypeCtxt (FunSigCtxt name) <> colon
+        , nest 2 (pprSigmaTypeExtraCts (isJust extra_cts)
+                  (mkSigmaTy (map snd tvs) theta tau)) ]
+
 \end{code}

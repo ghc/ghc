@@ -1178,6 +1178,24 @@ test.hs:(5,4)-(6,7):
       </varlistentry>
 
       <varlistentry>
+        <term><option>-fwarn-partial-type-signatures</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-partial-type-signatures</option></primary>
+          </indexterm>
+          <indexterm><primary>warnings</primary></indexterm>
+          <para>
+              Determines whether the compiler reports holes in partial type
+              signatures as warnings. Has no effect unless
+              <option>-XPartialTypeSignatures</option> is enabled, which
+              controls whether errors should be generated for holes in types
+              or not. See <xref linkend="partial-type-signatures"/>.
+            </para>
+
+            <para>This warning is on by default.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
         <term><option>-fhelpful-errors</option>:</term>
         <listitem>
           <indexterm><primary><option>-fhelpful-errors</option></primary>

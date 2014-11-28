@@ -133,7 +133,8 @@ tcHole occ res_ty
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
       ; loc <- getCtLoc HoleOrigin
-      ; let can = CHoleCan { cc_ev = CtWanted ty ev loc, cc_occ = occ }
+      ; let can = CHoleCan { cc_ev = CtWanted ty ev loc, cc_occ = occ
+                           , cc_hole = ExprHole }
       ; emitInsoluble can
       ; tcWrapResult (HsVar ev) ty res_ty }
 \end{code}
@@ -212,9 +213,10 @@ tcExpr e@(HsLamCase _ matches) res_ty
                   , ptext (sLit "requires")]
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
-tcExpr (ExprWithTySig expr sig_ty) res_ty
- = do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
-
+tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
+ = do { nwc_tvs <- mapM newWildcardVarMetaKind wcs
+      ; tcExtendTyVarEnv nwc_tvs $ do {
+        sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
       ; (gen_fn, expr')
             <- tcGen ExprSigCtxt sig_tc_ty $ \ skol_tvs res_ty ->
 
@@ -228,7 +230,9 @@ tcExpr (ExprWithTySig expr sig_ty) res_ty
       ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty
 
       ; (inst_wrap, rho) <- deeplyInstantiate ExprSigOrigin sig_tc_ty
-      ; tcWrapResult (mkHsWrap inst_wrap inner_expr) rho res_ty }
+      ; addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
+        emitWildcardHoleConstraints (zip wcs nwc_tvs)
+      ; tcWrapResult (mkHsWrap inst_wrap inner_expr) rho res_ty } }
 
 tcExpr (HsType ty) _
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)

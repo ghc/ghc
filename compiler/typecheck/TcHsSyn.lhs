@@ -718,7 +718,7 @@ zonkExpr env (ExprWithTySigOut e ty)
   = do { e' <- zonkLExpr env e
        ; return (ExprWithTySigOut e' ty) }
 
-zonkExpr _ (ExprWithTySig _ _) = panic "zonkExpr env:ExprWithTySig"
+zonkExpr _ (ExprWithTySig _ _ _) = panic "zonkExpr env:ExprWithTySig"
 
 zonkExpr env (ArithSeq expr wit info)
   = do new_expr <- zonkExpr env expr

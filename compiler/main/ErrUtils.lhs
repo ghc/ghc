@@ -14,7 +14,7 @@ module ErrUtils (
         Messages, ErrorMessages, WarningMessages,
         errMsgSpan, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
         mkLocMessage, pprMessageBag, pprErrMsgBag, pprErrMsgBagWithLoc,
-        pprLocErrMsg, makeIntoWarning,
+        pprLocErrMsg, makeIntoWarning, isWarning,
 
         errorsFound, emptyMessages, isEmptyMessages,
         mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
@@ -137,6 +137,10 @@ mkLocMessage severity locn msg
 makeIntoWarning :: ErrMsg -> ErrMsg
 makeIntoWarning err = err { errMsgSeverity = SevWarning }
 
+isWarning :: ErrMsg -> Bool
+isWarning err
+  | SevWarning <- errMsgSeverity err = True
+  | otherwise                        = False
 -- -----------------------------------------------------------------------------
 -- Collecting up messages for later ordering and printing.
 

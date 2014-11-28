@@ -21,7 +21,8 @@ module RnTypes (
         warnContextQuantification, warnUnusedForAlls,
         bindSigTyVarsFV, bindHsTyVars, rnHsBndrSig,
         extractHsTyRdrTyVars, extractHsTysRdrTyVars,
-        extractRdrKindSigVars, extractDataDefnKindVars, filterInScope
+        extractRdrKindSigVars, extractDataDefnKindVars,
+        extractWildcards, filterInScope
   ) where
 
 import {-# SOURCE #-} TcSplice( runQuasiQuoteType )
@@ -45,7 +46,7 @@ import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
 import Outputable
 import FastString
 import Maybes
-import Data.List        ( nub )
+import Data.List        ( nub, nubBy )
 import Control.Monad    ( unless, when )
 
 #include "HsVersions.h"
@@ -133,7 +134,7 @@ rnHsKind = rnHsTyKi False
 
 rnHsTyKi :: Bool -> HsDocContext -> HsType RdrName -> RnM (HsType Name, FreeVars)
 
-rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty)
+rnHsTyKi isType doc (HsForAllTy Implicit extra _ lctxt@(L _ ctxt) ty)
   = ASSERT( isType ) do
         -- Implicit quantifiction in source code (no kinds on tyvars)
         -- Given the signature  C => T  we universally quantify
@@ -154,9 +155,9 @@ rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty)
            --   class C a where { op :: a -> a }
         tyvar_bndrs = userHsTyVarBndrs loc forall_tvs
 
-    rnForAll doc Implicit forall_kvs (mkHsQTvs tyvar_bndrs) lctxt ty
+    rnForAll doc Implicit extra forall_kvs (mkHsQTvs tyvar_bndrs) lctxt ty
 
-rnHsTyKi isType doc fulltype@(HsForAllTy Qualified _ lctxt@(L _ ctxt) ty)
+rnHsTyKi isType doc fulltype@(HsForAllTy Qualified extra _ lctxt@(L _ ctxt) ty)
   = ASSERT( isType ) do
     rdr_env <- getLocalRdrEnv
     loc <- getSrcSpanM
@@ -168,9 +169,9 @@ rnHsTyKi isType doc fulltype@(HsForAllTy Qualified _ lctxt@(L _ ctxt) ty)
 
     -- See Note [Context quantification]
     warnContextQuantification (in_type_doc $$ docOfHsDocContext doc) tyvar_bndrs
-    rnForAll doc Implicit forall_kvs (mkHsQTvs tyvar_bndrs) lctxt ty
+    rnForAll doc Implicit extra forall_kvs (mkHsQTvs tyvar_bndrs) lctxt ty
 
-rnHsTyKi isType doc ty@(HsForAllTy Explicit forall_tyvars lctxt@(L _ ctxt) tau)
+rnHsTyKi isType doc ty@(HsForAllTy Explicit extra forall_tyvars lctxt@(L _ ctxt) tau)
   = ASSERT( isType ) do {      -- Explicit quantification.
          -- Check that the forall'd tyvars are actually
          -- mentioned in the type, and produce a warning if not
@@ -178,7 +179,7 @@ rnHsTyKi isType doc ty@(HsForAllTy Explicit forall_tyvars lctxt@(L _ ctxt) tau)
              in_type_doc = ptext (sLit "In the type") <+> quotes (ppr ty)
        ; warnUnusedForAlls (in_type_doc $$ docOfHsDocContext doc) forall_tyvars mentioned
 
-       ; rnForAll doc Explicit kvs forall_tyvars lctxt tau }
+       ; rnForAll doc Explicit extra kvs forall_tyvars lctxt tau }
 
 rnHsTyKi isType _ (HsTyVar rdr_name)
   = do { name <- rnTyVar isType rdr_name
@@ -324,6 +325,14 @@ rnHsTyKi isType doc ty@(HsExplicitTupleTy kis tys)
        ; (tys', fvs) <- rnLHsTypes doc tys
        ; return (HsExplicitTupleTy kis tys', fvs) }
 
+rnHsTyKi _ _ HsWildcardTy = panic "rnHsTyKi HsWildcardTy"
+                            -- Should be replaced by a HsNamedWildcardTy
+
+rnHsTyKi isType _doc (HsNamedWildcardTy rdr_name)
+  = ASSERT( isType )
+    do { name <- rnTyVar isType rdr_name
+       ; return (HsNamedWildcardTy name, unitFV name) }
+
 --------------
 rnTyVar :: Bool -> RdrName -> RnM Name
 rnTyVar is_type rdr_name
@@ -340,16 +349,17 @@ rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
 \begin{code}
 rnForAll :: HsDocContext -> HsExplicitFlag
-         -> [RdrName]                -- Kind variables
+         -> Maybe SrcSpan           -- Location of an extra-constraints wildcard
+         -> [RdrName]               -- Kind variables
          -> LHsTyVarBndrs RdrName   -- Type variables
          -> LHsContext RdrName -> LHsType RdrName
          -> RnM (HsType Name, FreeVars)
 
-rnForAll doc exp kvs forall_tyvars ctxt ty
-  | null kvs, null (hsQTvBndrs forall_tyvars), null (unLoc ctxt)
+rnForAll doc exp extra kvs forall_tyvars ctxt ty
+  | null kvs, null (hsQTvBndrs forall_tyvars), null (unLoc ctxt), isNothing extra
   = rnHsType doc (unLoc ty)
         -- One reason for this case is that a type like Int#
-        -- starts off as (HsForAllTy Nothing [] Int), in case
+        -- starts off as (HsForAllTy Implicit Nothing [] Int), in case
         -- there is some quantification.  Now that we have quantified
         -- and discovered there are no type variables, it's nicer to turn
         -- it into plain Int.  If it were Int# instead of Int, we'd actually
@@ -360,7 +370,7 @@ rnForAll doc exp kvs forall_tyvars ctxt ty
   = bindHsTyVars doc Nothing kvs forall_tyvars $ \ new_tyvars ->
     do { (new_ctxt, fvs1) <- rnContext doc ctxt
        ; (new_ty, fvs2) <- rnLHsType doc ty
-       ; return (HsForAllTy exp new_tyvars new_ctxt new_ty, fvs1 `plusFV` fvs2) }
+       ; return (HsForAllTy exp extra new_tyvars new_ctxt new_ty, fvs1 `plusFV` fvs2) }
         -- Retain the same implicit/explicit flag as before
         -- so that we can later print it correctly
 
@@ -462,10 +472,13 @@ rnHsBndrSig doc (HsWB { hswb_cts = ty@(L loc _) }) thing_inside
                                                , not (tv `elemLocalRdrEnv` name_env) ]
        ; kv_names <- newLocalBndrsRn [L loc kv | kv <- kv_bndrs
                                                , not (kv `elemLocalRdrEnv` name_env) ]
+       ; (wcs, ty') <- extractWildcards ty
        ; bindLocalNamesFV kv_names $
          bindLocalNamesFV tv_names $
-    do { (ty', fvs1) <- rnLHsType doc ty
-       ; (res, fvs2) <- thing_inside (HsWB { hswb_cts = ty', hswb_kvs = kv_names, hswb_tvs = tv_names })
+         bindLocatedLocalsFV wcs $ \wcs_new ->
+    do { (ty'', fvs1) <- rnLHsType doc ty'
+       ; (res, fvs2) <- thing_inside (HsWB { hswb_cts = ty'', hswb_kvs = kv_names,
+                                             hswb_tvs = tv_names, hswb_wcs = wcs_new })
        ; return (res, fvs1 `plusFV` fvs2) } }
 
 overlappingKindVars :: HsDocContext -> [RdrName] -> SDoc
@@ -985,9 +998,13 @@ extract_lty (L _ ty) acc
       HsTyLit _                 -> acc
       HsWrapTy _ _              -> panic "extract_lty"
       HsKindSig ty ki           -> extract_lty ty (extract_lkind ki acc)
-      HsForAllTy _ tvs cx ty    -> extract_hs_tv_bndrs tvs acc $
+      HsForAllTy _ _ tvs cx ty  -> extract_hs_tv_bndrs tvs acc $
                                    extract_lctxt cx   $
                                    extract_lty ty ([],[])
+      -- We deal with these to in a later stage, because they need to be
+      -- replaced by fresh HsTyVars.
+      HsWildcardTy              -> acc
+      HsNamedWildcardTy _       -> acc
 
 extract_hs_tv_bndrs :: LHsTyVarBndrs RdrName -> FreeKiTyVars
                     -> FreeKiTyVars -> FreeKiTyVars
@@ -1008,4 +1025,62 @@ extract_tv :: RdrName -> FreeKiTyVars -> FreeKiTyVars
 extract_tv tv acc
   | isRdrTyVar tv = case acc of (kvs,tvs) -> (kvs, tv : tvs)
   | otherwise     = acc
+
+-- | Replace all unnamed wildcards in the given type with named wildcards.
+-- These names are freshly generated, based on "_". Return a tuple of the
+-- named wildcards that weren't already in scope (amongst them the named
+-- wildcards the unnamed ones were converted into), and the type in which the
+-- unnamed wildcards are replaced by named wildcards.
+extractWildcards :: LHsType RdrName -> RnM ([Located RdrName], LHsType RdrName)
+extractWildcards ty
+  = do { (nwcs, awcs, ty') <- go ty
+       ; rdr_env <- getLocalRdrEnv
+       -- Filter out named wildcards that are already in scope
+       ; let nwcs' = nubBy eqLocated $ filterOut (flip (elemLocalRdrEnv . unLoc) rdr_env) nwcs
+       ; return (nwcs' ++ awcs, ty') }
+  where
+    go orig@(L l ty) = case ty of
+      (HsForAllTy exp extra bndrs (L locCxt cxt) ty) ->
+        do (nwcs1, awcs1, cxt') <- extList cxt
+           (nwcs2, awcs2, ty')  <- go ty
+           return (nwcs1 ++ nwcs2, awcs1 ++ awcs2,
+                   L l (HsForAllTy exp extra bndrs (L locCxt cxt') ty'))
+      (HsAppTy ty1 ty2)           -> go2 HsAppTy ty1 ty2
+      (HsFunTy ty1 ty2)           -> go2 HsFunTy ty1 ty2
+      (HsListTy ty)               -> go1 HsListTy ty
+      (HsPArrTy ty)               -> go1 HsPArrTy ty
+      (HsTupleTy con tys)         -> goList (HsTupleTy con) tys
+      (HsOpTy ty1 op ty2)         -> go2 (\t1 t2 -> HsOpTy t1 op t2) ty1 ty2
+      (HsParTy ty)                -> go1 HsParTy ty
+      (HsIParamTy n ty)           -> go1 (HsIParamTy n) ty
+      (HsEqTy ty1 ty2)            -> go2 HsEqTy ty1 ty2
+      (HsKindSig ty kind)         -> go2 HsKindSig ty kind
+      (HsDocTy ty doc)            -> go1 (flip HsDocTy doc) ty
+      (HsBangTy b ty)             -> go1 (HsBangTy b) ty
+      (HsExplicitListTy ptk tys)  -> goList (HsExplicitListTy ptk) tys
+      (HsExplicitTupleTy ptk tys) -> goList (HsExplicitTupleTy ptk) tys
+      HsWildcardTy                -> do
+        uniq <- newUnique
+        let name = mkInternalName uniq (mkTyVarOcc "_") l
+            rdrName = nameRdrName name
+        return ([], [L l rdrName], L l $ HsNamedWildcardTy rdrName)
+      (HsNamedWildcardTy name)    -> return ([L l name], [], orig)
+      -- HsQuasiQuoteTy, HsSpliceTy, HsRecTy, HsCoreTy, HsTyLit, HsWrapTy
+      _                           -> return ([], [], orig)
+      where
+        go1 f t = do (nwcs, awcs, t') <- go t
+                     return (nwcs, awcs, L l $ f t')
+        go2 f t1 t2 =
+          do (nwcs1, awcs1, t1') <- go t1
+             (nwcs2, awcs2, t2') <- go t2
+             return (nwcs1 ++ nwcs2, awcs1 ++ awcs2, L l $ f t1' t2')
+        extList l = do rec_res <- mapM go l
+                       let (nwcs, awcs, tys') =
+                             foldr (\(nwcs, awcs, ty) (nwcss, awcss, tys) ->
+                                     (nwcs ++ nwcss, awcs ++ awcss, ty : tys))
+                                   ([], [], []) rec_res
+                       return (nwcs, awcs, tys')
+        goList f tys = do (nwcs, awcs, tys') <- extList tys
+                          return (nwcs, awcs, L l $ f tys')
+
 \end{code}

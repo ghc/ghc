@@ -1,0 +1,4 @@
+
+WildcardInDeriving.hs:5:22:
+    Wildcard not allowed
+    In the deriving items: (_)

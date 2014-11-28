@@ -1,0 +1,5 @@
+
+UnnamedConstraintWildcard1.hs:4:13:
+    Invalid partial type signature:
+    Show _ => a -> String
+    Wildcards are not allowed within the constraints

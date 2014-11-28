@@ -49,7 +49,7 @@ module TcRnTypes(
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
-        isGivenCt, isHoleCt,
+        isGivenCt, isHoleCt, isTypedHoleCt,
         ctEvidence, ctLoc, ctPred,
         mkNonCanonical, mkNonCanonicalCt,
         ctEvPred, ctEvLoc, ctEvTerm, ctEvCoercion, ctEvId, ctEvCheckDepth,
@@ -64,7 +64,7 @@ module TcRnTypes(
         bumpSubGoalDepth, subGoalCounterValue, subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocOrigin,
         ctLocDepth, bumpCtLocDepth,
-        setCtLocOrigin, setCtLocEnv,
+        setCtLocOrigin, setCtLocEnv, setCtLocSpan,
         CtOrigin(..), pprCtOrigin,
         pushErrCtxt, pushErrCtxtSameOrigin,
 
@@ -84,7 +84,7 @@ module TcRnTypes(
         pprArising, pprArisingAt,
 
         -- Misc other types
-        TcId, TcIdSet, TcTyVarBind(..), TcTyVarBinds
+        TcId, TcIdSet, TcTyVarBind(..), TcTyVarBinds, HoleSort(..)
 
   ) where
 
@@ -1065,9 +1065,15 @@ data Ct
 
   | CHoleCan {             -- Treated as an "insoluble" constraint
                            -- See Note [Insoluble constraints]
-      cc_ev  :: CtEvidence,
-      cc_occ :: OccName    -- The name of this hole
+      cc_ev   :: CtEvidence,
+      cc_occ  :: OccName,   -- The name of this hole
+      cc_hole :: HoleSort   -- The sort of this hole (expr, type, ...)
     }
+
+-- | Used to indicate which sort of hole we have.
+data HoleSort = ExprHole  -- ^ A hole in an expression (TypedHoles)
+              | TypeHole  -- ^ A hole in a type (PartialTypeSignatures)
+
 \end{code}
 
 Note [Kind orientation for CTyEqCan]
@@ -1239,6 +1245,9 @@ isHoleCt:: Ct -> Bool
 isHoleCt (CHoleCan {}) = True
 isHoleCt _ = False
 
+isTypedHoleCt :: Ct -> Bool
+isTypedHoleCt (CHoleCan { cc_hole = ExprHole }) = True
+isTypedHoleCt _ = False
 \end{code}
 
 \begin{code}
@@ -1323,7 +1332,10 @@ isEmptyWC (WC { wc_flat = f, wc_impl = i, wc_insol = n })
 
 insolubleWC :: WantedConstraints -> Bool
 -- True if there are any insoluble constraints in the wanted bag
-insolubleWC wc = not (isEmptyBag (wc_insol wc))
+insolubleWC wc = not (isEmptyBag (filterBag isTypedHoleCt (wc_insol wc)))
+-- TODOT actually, a wildcard constraint (CHoleCan originating from a wildcard
+-- in a partial type signature) is not insulible.
+-- insolubleWC wc = not (isEmptyBag (wc_insol wc))
                || anyBag ic_insol (wc_impl wc)
 
 andWC :: WantedConstraints -> WantedConstraints -> WantedConstraints
@@ -1709,6 +1721,9 @@ ctLocOrigin = ctl_origin
 
 ctLocSpan :: CtLoc -> SrcSpan
 ctLocSpan (CtLoc { ctl_env = lcl}) = tcl_loc lcl
+
+setCtLocSpan :: CtLoc -> SrcSpan -> CtLoc
+setCtLocSpan ctl@(CtLoc { ctl_env = lcl }) loc = setCtLocEnv ctl (lcl { tcl_loc = loc })
 
 bumpCtLocDepth :: SubGoalCounter -> CtLoc -> CtLoc
 bumpCtLocDepth cnt loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDepth cnt d }

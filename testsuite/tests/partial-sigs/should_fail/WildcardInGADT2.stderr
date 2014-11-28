@@ -1,0 +1,4 @@
+
+WildcardInGADT2.hs:5:17:
+    A constructor cannot have a partial type:
+    (Eq a, _) => Maybe a -> Foo a

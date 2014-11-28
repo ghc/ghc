@@ -57,7 +57,7 @@ import Outputable
 
 -- compiler/basicTypes
 import RdrName
-import OccName          ( varName, dataName, tcClsName, tvName )
+import OccName          ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
 import DataCon          ( DataCon, dataConName )
 import SrcLoc
 import Module
@@ -667,9 +667,10 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | inst_decl                             { unitOL (sL1 $1 (InstD (unLoc $1))) }
         | stand_alone_deriving                  { unitOL (sLL $1 $> (DerivD (unLoc $1))) }
         | role_annot                            { unitOL (sL1 $1 (RoleAnnotD (unLoc $1))) }
-        | 'default' '(' comma_types0 ')'    {% amsu (sLL $1 $> $ DefD (DefaultDecl $3))
-                                                    [mj AnnDefault $1
-                                                    ,mo $2,mc $4] }
+        | 'default' '(' comma_types0 ')'    {% do { def <- checkValidDefaults $3
+                                                  ; amsu (sLL $1 $> (DefD def))
+                                                         [mj AnnDefault $1
+                                                         ,mo $2,mc $4] }}
         | 'foreign' fdecl                       {% amsu (sLL $1 $> (unLoc $2))
                                                         [mj AnnForeign $1] }
         | '{-# DEPRECATED' deprecations '#-}'   { $2 } -- ++AZ++ TODO
@@ -772,6 +773,8 @@ inst_decl :: { LInstDecl RdrName }
                                      , cid_sigs = sigs, cid_tyfam_insts = ats
                                      , cid_overlap_mode = $2
                                      , cid_datafam_insts = adts }
+             ; let err = text "In instance head:" <+> ppr $3
+             ; checkNoPartialType err $3
              ; ams (L (comb3 $1 $3 $4) (ClsInstD { cid_inst = cid }))
                    (mj AnnInstance $1 : (fst $ unLoc $4)) } }
 
@@ -1009,8 +1012,10 @@ where_decls :: { Located ([AddAnn]
                                           ,$3) }
 pattern_synonym_sig :: { LSig RdrName }
         : 'pattern' con '::' ptype
-            { let (flag, qtvs, prov, req, ty) = unLoc $4
-              in sLL $1 $> $ PatSynSig $2 (flag, mkHsQTvs qtvs) prov req ty }
+            {% do { let (flag, qtvs, prov, req, ty) = unLoc $4
+                  ; let sig = PatSynSig $2 (flag, mkHsQTvs qtvs) prov req ty
+                  ; checkValidPatSynSig sig
+                  ; return $ sLL $1 $> $ sig } }
 
 ptype :: { Located (HsExplicitFlag, [LHsTyVarBndr RdrName], LHsContext RdrName, LHsContext RdrName, LHsType RdrName) }
         : 'forall' tv_bndrs '.' ptype
@@ -1035,13 +1040,13 @@ decl_cls  : at_decl_cls                 { sLL $1 $> (unitOL $1) }
 
           -- A 'default' signature used with the generic-programming extension
           | 'default' infixexp '::' sigtypedoc
-                    {% do { (TypeSig l ty) <- checkValSig $2 $4
+                    {% do { (TypeSig l ty _) <- checkValSig $2 $4
                           ; ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (GenericSig l ty)))
                                 [mj AnnDefault $1,mj AnnDcolon $3] } }
 
           -- A 'default' signature used with the generic-programming extension
           | 'default' infixexp '::' sigtypedoc
-                    {% do { (TypeSig l ty) <- checkValSig $2 $4
+                    {% do { (TypeSig l ty _) <- checkValSig $2 $4
                           ; ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (GenericSig l ty)))
                                 [mj AnnDefault $1,mj AnnDcolon $3] } }
 
@@ -1419,7 +1424,12 @@ btype :: { LHsType RdrName }
 
 atype :: { LHsType RdrName }
         : ntgtycon                       { sL1 $1 (HsTyVar (unLoc $1)) }      -- Not including unit tuples
-        | tyvar                          { sL1 $1 (HsTyVar (unLoc $1)) }      -- (See Note [Unit tuples])
+        | tyvar                          {% do { nwc <- namedWildcardsEnabled -- (See Note [Unit tuples])
+                                               ; let tv@(Unqual name) = unLoc $1
+                                               ; return $ if (startsWithUnderscore name && nwc)
+                                                          then (sL1 $1 (HsNamedWildcardTy tv))
+                                                          else (sL1 $1 (HsTyVar tv)) } }
+
         | strict_mark atype              {% ams (sLL $1 $> (HsBangTy (snd $ unLoc $1) $2))
                                                 (fst $ unLoc $1) }  -- Constructor sigs only
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
@@ -1461,6 +1471,7 @@ atype :: { LHsType RdrName }
                                                  [mo $1, mj AnnComma $3,mc $5] }
         | INTEGER                     { sLL $1 $> $ HsTyLit $ HsNumTy $ getINTEGER $1 }
         | STRING                      { sLL $1 $> $ HsTyLit $ HsStrTy $ getSTRING  $1 }
+        | '_'                         { sL1 $1 $ HsWildcardTy }
 
 -- An inst_type is what occurs in the head of an instance decl
 --      e.g.  (Foo a, Gaz b) => Wibble a b
@@ -1606,8 +1617,9 @@ gadt_constrs :: { Located [LConDecl RdrName] }
 gadt_constr :: { LConDecl RdrName }
                    -- Returns a list because of:   C,D :: ty
         : con_list '::' sigtype
-                {%ams (sLL $1 $> $ mkGadtDecl (unLoc $1) $3)
-                      [mj AnnDcolon $2] }
+                {% do { gadtDecl <- mkGadtDecl (unLoc $1) $3
+                      ; ams (sLL $1 $> $ gadtDecl)
+                            [mj AnnDcolon $2] } }
 
                 -- Deprecated syntax for GADT record declarations
         | oqtycon '{' fielddecls '}' '::' sigtype
@@ -1779,13 +1791,16 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
         :
         -- See Note [Declaration/signature overlap] for why we need infixexp here
           infixexp '::' sigtypedoc
-                        {% do s <- checkValSig $1 $3
+                        {% do ty <- checkPartialTypeSignature $3
+                        ; s <- checkValSig $1 ty
                         ; _ <- ams (sLL $1 $> ()) [mj AnnDcolon $2]
                         ; return (sLL $1 $> $ unitOL (sLL $1 $> $ SigD s)) }
 
         | var ',' sig_vars '::' sigtypedoc
-           {% ams (sLL $1 $> $ toOL [ sLL $1 $> $ SigD (TypeSig ($1:reverse (unLoc $3)) $5) ])
-                  [mj AnnComma $2,mj AnnDcolon $4] }
+           {% do { ty <- checkPartialTypeSignature $5
+                 ; let sig = TypeSig ($1 : reverse (unLoc $3)) ty PlaceHolder
+                 ; ams (sLL $1 $> $ toOL [ sLL $1 $> $ SigD sig ])
+                       [mj AnnComma $2,mj AnnDcolon $4] } }
 
         | infix prec ops
               { sLL $1 $> $ toOL [ sLL $1 $> $ SigD
@@ -1847,7 +1862,7 @@ quasiquote :: { Located (HsQuasiQuote RdrName) }
                             in sL (getLoc $1) (mkHsQuasiQuote quoterId (RealSrcSpan quoteSpan) quote) }
 
 exp   :: { LHsExpr RdrName }
-        : infixexp '::' sigtype {% ams (sLL $1 $> $ ExprWithTySig $1 $3)
+        : infixexp '::' sigtype {% ams (sLL $1 $> $ ExprWithTySig $1 $3 PlaceHolder)
                                        [mj AnnDcolon $2] }
         | infixexp '-<' exp     {% ams (sLL $1 $> $ HsArrApp $1 $3 placeHolderType
                                                         HsFirstOrderApp True)
@@ -2912,6 +2927,9 @@ hintExplicitForall span = do
       , text "Perhaps you intended to use RankNTypes or a similar language"
       , text "extension to enable explicit-forall syntax: \x2200 <tvs>. <type>"
       ]
+
+namedWildcardsEnabled :: P Bool
+namedWildcardsEnabled = liftM ((Opt_NamedWildcards `xopt`) . dflags) getPState
 
 {-
 %************************************************************************

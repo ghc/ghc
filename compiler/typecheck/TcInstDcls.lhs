@@ -928,7 +928,7 @@ mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
         ; local_meth_sig <- case lookupHsSig sig_fn sel_name of
             Just hs_ty  -- There is a signature in the instance declaration
                -> do { sig_ty <- check_inst_sig hs_ty
-                     ; instTcTySig hs_ty sig_ty local_meth_name }
+                     ; instTcTySig hs_ty sig_ty Nothing [] local_meth_name }
 
             Nothing     -- No type signature
                -> do { loc <- getSrcSpanM
@@ -1476,8 +1476,8 @@ Note carefully:
 instDeclCtxt1 :: LHsType Name -> SDoc
 instDeclCtxt1 hs_inst_ty
   = inst_decl_ctxt (case unLoc hs_inst_ty of
-                        HsForAllTy _ _ _ (L _ ty') -> ppr ty'
-                        _                          -> ppr hs_inst_ty)     -- Don't expect this
+                        HsForAllTy _ _ _ _ (L _ ty') -> ppr ty'
+                        _                            -> ppr hs_inst_ty)     -- Don't expect this
 instDeclCtxt2 :: Type -> SDoc
 instDeclCtxt2 dfun_ty
   = inst_decl_ctxt (ppr (mkClassPred cls tys))

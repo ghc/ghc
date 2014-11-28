@@ -27,7 +27,7 @@ module TcEnv(
         tcExtendKindEnv, tcExtendKindEnv2,
         tcExtendTyVarEnv, tcExtendTyVarEnv2, 
         tcExtendLetEnv,
-        tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
+        tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, tcExtendIdEnv3,
         tcExtendIdBndrs, tcExtendGhciIdEnv,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds, 
@@ -442,7 +442,7 @@ tcExtendGhciIdEnv :: [TyThing] -> TcM a -> TcM a
 -- Used to bind Ids for GHCi identifiers bound earlier in the user interaction
 -- See Note [Initialising the type environment for GHCi]
 tcExtendGhciIdEnv ids thing_inside
-  = do { lcl_env <- tcExtendLocalTypeEnv tc_ty_things
+  = do { lcl_env <- tcExtendLocalTypeEnv tc_ty_things emptyVarSet
        ; setLclEnv lcl_env thing_inside }
   where
     tc_ty_things =  [ (name, ATcId { tct_id     = id
@@ -480,17 +480,29 @@ tcExtendIdEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
 -- The tct_closed flag really doesn't matter
 -- Invariant: the TcIds are fully zonked (see tcExtendIdEnv above)
 tcExtendIdEnv2 names_w_ids thing_inside
+  = tcExtendIdEnv3 names_w_ids emptyVarSet thing_inside
+
+-- | 'tcExtendIdEnv2', but don't bind the 'TcId's in the 'TyVarSet' argument.
+tcExtendIdEnv3 :: [(Name,TcId)] -> TyVarSet -> TcM a -> TcM a
+-- Invariant: the TcIds are fully zonked (see tcExtendIdEnv above)
+tcExtendIdEnv3 names_w_ids not_actually_free thing_inside
   = do  { stage <- getStage
-        ; tc_extend_local_env (NotTopLevel, thLevel stage)
-                              [ (name, ATcId { tct_id = id 
+        ; tc_extend_local_env2 (NotTopLevel, thLevel stage)
+                              [ (name, ATcId { tct_id = id
                                              , tct_closed = NotTopLevel })
-                              | (name,id) <- names_w_ids] $
+                              | (name,id) <- names_w_ids] not_actually_free $
           thing_inside }
 
 tcExtendIdBndrs :: [TcIdBinder] -> TcM a -> TcM a
 tcExtendIdBndrs bndrs = updLclEnv (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
 
 tc_extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, TcTyThing)] -> TcM a -> TcM a
+tc_extend_local_env thlvl extra_env thing_inside =
+  tc_extend_local_env2 thlvl extra_env emptyVarSet thing_inside
+
+tc_extend_local_env2 :: (TopLevelFlag, ThLevel) -> [(Name, TcTyThing)]
+                     -> TyVarSet -> TcM a -> TcM a
+tc_extend_local_env2 thlvl extra_env not_actually_free thing_inside
 -- Precondition: the argument list extra_env has TcTyThings
 --               that ATcId or ATyVar, but nothing else
 --
@@ -501,9 +513,11 @@ tc_extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, TcTyThing)] -> TcM a -
 --          in the types, because instantiation does not look through such things
 --      (c) The call to tyVarsOfTypes is ok without looking through refs
 
-tc_extend_local_env thlvl extra_env thing_inside
+-- The second argument of type TyVarSet is a set of type variables
+-- that are bound together with extra_env and should not be regarded
+-- as free in the types of extra_env.
   = do  { traceTc "env2" (ppr extra_env)
-        ; env1 <- tcExtendLocalTypeEnv extra_env
+        ; env1 <- tcExtendLocalTypeEnv extra_env not_actually_free
         ; let env2 = extend_local_env thlvl extra_env env1
         ; setLclEnv env2 thing_inside }
   where
@@ -520,8 +534,8 @@ tc_extend_local_env thlvl extra_env thing_inside
             , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
                                  [(n, thlvl) | (n, ATcId {}) <- pairs] }
 
-tcExtendLocalTypeEnv :: [(Name, TcTyThing)] -> TcM TcLclEnv
-tcExtendLocalTypeEnv tc_ty_things
+tcExtendLocalTypeEnv :: [(Name, TcTyThing)] -> TyVarSet -> TcM TcLclEnv
+tcExtendLocalTypeEnv tc_ty_things not_actually_free
   | isEmptyVarSet extra_tvs
   = do { lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) <- getLclEnv
        ; return (lcl_env { tcl_env = extendNameEnvList lcl_type_env tc_ty_things } ) }
@@ -532,13 +546,14 @@ tcExtendLocalTypeEnv tc_ty_things
        ; return (lcl_env { tcl_tyvars = new_g_var
                          , tcl_env = extendNameEnvList lcl_type_env tc_ty_things } ) }
   where
-    extra_tvs = foldr get_tvs emptyVarSet tc_ty_things
+    extra_tvs = foldr get_tvs emptyVarSet tc_ty_things `minusVarSet` not_actually_free
 
     get_tvs (_, ATcId { tct_id = id, tct_closed = closed }) tvs
       = case closed of
-          TopLevel    -> ASSERT2( isEmptyVarSet (tyVarsOfType (idType id)), ppr id $$ ppr (idType id) )
+          TopLevel    -> ASSERT2( isEmptyVarSet id_tvs, ppr id $$ ppr (idType id) )
                          tvs
-          NotTopLevel -> tvs `unionVarSet` tyVarsOfType (idType id)
+          NotTopLevel -> tvs `unionVarSet` id_tvs
+        where id_tvs = tyVarsOfType (idType id)
 
     get_tvs (_, ATyVar _ tv) tvs          -- See Note [Global TyVars]
       = tvs `unionVarSet` tyVarsOfType (tyVarKind tv) `extendVarSet` tv

@@ -1163,6 +1163,13 @@ captureUntouchables thing_inside
                 thing_inside
        ; return (res, untch') }
 
+pushUntouchablesM :: TcM a -> TcM a
+pushUntouchablesM thing_inside
+  = do { env <- getLclEnv
+       ; let untch' = pushUntouchables (tcl_untch env)
+       ; setLclEnv (env { tcl_untch = untch' })
+                   thing_inside }
+
 getUntouchables :: TcM Untouchables
 getUntouchables = do { env <- getLclEnv
                      ; return (tcl_untch env) }
@@ -1194,6 +1201,18 @@ traceTcConstraints msg
        ; lie     <- readTcRef lie_var
        ; traceTc (msg ++ ": LIE:") (ppr lie)
        }
+
+emitWildcardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
+emitWildcardHoleConstraints wcs
+  = do { ctLoc <- getCtLoc HoleOrigin
+       ; forM_ wcs $ \(name, tv) -> do {
+       ; let ctLoc' = setCtLocSpan ctLoc (nameSrcSpan name)
+             ty     = mkTyVarTy tv
+             ev     = mkLocalId name ty
+             can    = CHoleCan { cc_ev   = CtWanted ty ev ctLoc'
+                               , cc_occ  = occName name
+                               , cc_hole = TypeHole }
+       ; emitInsoluble can } }
 \end{code}
 
 

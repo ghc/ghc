@@ -1,0 +1,4 @@
+
+WildcardInInstanceHead.hs:7:14:
+    Wildcard not allowed
+    In instance head: Foo _

@@ -10,7 +10,7 @@ TcPat: Typechecking patterns
 
 module TcPat ( tcLetPat, TcSigFun, TcPragFun
              , TcSigInfo(..), TcPatSynInfo(..)
-             , findScopedTyVars
+             , findScopedTyVars, isPartialSig
              , LetBndrSpec(..), addInlinePrags, warnPrags
              , tcPat, tcPats, newNoSigLetBndr
              , addDataConStupidTheta, badFieldCon, polyPatSig ) where
@@ -146,12 +146,25 @@ data TcSigInfo
                            -- Just n <=> this skolem is lexically in scope with name n
                            -- See Note [Binding scoped type variables]
 
+        sig_nwcs   :: [(Name, TcTyVar)],
+                           -- Instantiated wildcard variables
+
         sig_theta  :: TcThetaType,  -- Instantiated theta
+
+        sig_extra_cts :: Maybe SrcSpan, -- Just loc <=> An extra-constraints
+                                        -- wildcard was present. Any extra
+                                        -- constraints inferred during
+                                        -- type-checking will be added to the
+                                        -- partial type signature. Stores the
+                                        -- location of the wildcard.
 
         sig_tau    :: TcSigmaType,  -- Instantiated tau
                                     -- See Note [sig_tau may be polymorphic]
 
-        sig_loc    :: SrcSpan       -- The location of the signature
+        sig_loc    :: SrcSpan,      -- The location of the signature
+
+        sig_partial :: Bool         -- True <=> a partial type signature
+                                    -- containing wildcards
     }
   | TcPatSynInfo TcPatSynInfo
 
@@ -188,7 +201,7 @@ instance NamedThing TcSigInfo where
     getName (TcPatSynInfo tpsi) = patsig_name tpsi
 
 instance Outputable TcSigInfo where
-    ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau})
+    ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau })
         = ppr id <+> dcolon <+> vcat [ pprSigmaType (mkSigmaTy (map snd tyvars) theta tau)
                                      , ppr (map fst tyvars) ]
     ppr (TcPatSynInfo tpsi) = text "TcPatSynInfo" <+> ppr tpsi
@@ -196,6 +209,8 @@ instance Outputable TcSigInfo where
 instance Outputable TcPatSynInfo where
     ppr (TPSI{ patsig_name = name}) = ppr name
 
+isPartialSig :: TcSigInfo -> Bool
+isPartialSig = sig_partial
 \end{code}
 
 Note [Binding scoped type variables]
@@ -505,10 +520,10 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
 tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
-  = do  { (inner_ty, tv_binds, wrap) <- tcPatSig (inPatBind penv) sig_ty pat_ty
-        ; (pat', res) <- tcExtendTyVarEnv2 tv_binds $
+  = do  { (inner_ty, tv_binds, nwc_binds, wrap) <- tcPatSig (inPatBind penv)
+                                                            sig_ty pat_ty
+        ; (pat', res) <- tcExtendTyVarEnv2 (tv_binds ++ nwc_binds) $
                          tc_lpat pat inner_ty penv thing_inside
-
         ; return (mkHsWrapPat wrap (SigPatOut pat' inner_ty) pat_ty, res) }
 
 ------------------------

@@ -1,0 +1,4 @@
+
+WildcardInDefault.hs:4:10:
+    Wildcard not allowed
+    In declaration: default (_)

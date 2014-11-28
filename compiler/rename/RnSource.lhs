@@ -559,7 +559,8 @@ rnFamInstDecl doc mb_cls tycon pats payload rnPayload
 
        ; let all_fvs = fvs `addOneFV` unLoc tycon'
        ; return (tycon',
-                 HsWB { hswb_cts = pats', hswb_kvs = kv_names, hswb_tvs = tv_names },
+                 HsWB { hswb_cts = pats', hswb_kvs = kv_names,
+                        hswb_tvs = tv_names, hswb_wcs = [] },
                  payload',
                  all_fvs) }
              -- type instance => use, hence addOneFV
@@ -1035,7 +1036,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls,
 
         -- Check the signatures
         -- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
-        ; let sig_rdr_names_w_locs = [op | L _ (TypeSig ops _) <- sigs, op <- ops]
+        ; let sig_rdr_names_w_locs = [op | L _ (TypeSig ops _ _) <- sigs, op <- ops]
         ; checkDupRdrNames sig_rdr_names_w_locs
                 -- Typechecker is responsible for checking that we only
                 -- give default-method bindings for things in this class.

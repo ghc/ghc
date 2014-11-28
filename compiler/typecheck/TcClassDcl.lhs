@@ -113,7 +113,7 @@ tcClassSigs clas sigs def_methods
        ; traceTc "tcClassSigs 2" (ppr clas)
        ; return (op_info, gen_dm_env) }
   where
-    vanilla_sigs = [L loc (nm,ty) | L loc (TypeSig    nm ty) <- sigs]
+    vanilla_sigs = [L loc (nm,ty) | L loc (TypeSig    nm ty _) <- sigs]
     gen_sigs     = [L loc (nm,ty) | L loc (GenericSig nm ty) <- sigs]
     dm_bind_names :: [Name]     -- These ones have a value binding in the class decl
     dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
@@ -219,7 +219,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn (sel_id, dm_info)
                  hs_ty       = lookupHsSig hs_sig_fn sel_name
                                `orElse` pprPanic "tc_dm" (ppr sel_name)
 
-           ; local_dm_sig <- instTcTySig hs_ty local_dm_ty local_dm_name
+           ; local_dm_sig <- instTcTySig hs_ty local_dm_ty Nothing [] local_dm_name
            ; warnTc (not (null spec_prags))
                     (ptext (sLit "Ignoring SPECIALISE pragmas on default method")
                      <+> quotes (ppr sel_name))
@@ -314,7 +314,7 @@ emptyHsSigs = emptyNameEnv
 
 mkHsSigFun :: [LSig Name] -> HsSigFun
 mkHsSigFun sigs = mkNameEnv [(n, hs_ty)
-                            | L _ (TypeSig ns hs_ty) <- sigs
+                            | L _ (TypeSig ns hs_ty _) <- sigs
                             , L _ n <- ns ]
 
 lookupHsSig :: HsSigFun -> Name -> Maybe (LHsType Name)

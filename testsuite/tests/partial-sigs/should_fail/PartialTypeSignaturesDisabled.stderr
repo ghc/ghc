@@ -1,0 +1,10 @@
+
+PartialTypeSignaturesDisabled.hs:4:8:
+    Found hole ‘_’ with type: Bool
+    To use the inferred type, enable PartialTypeSignatures
+    In the type signature for ‘foo’: _ -> _
+
+PartialTypeSignaturesDisabled.hs:4:13:
+    Found hole ‘_’ with type: Bool
+    To use the inferred type, enable PartialTypeSignatures
+    In the type signature for ‘foo’: _ -> _

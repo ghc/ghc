@@ -1699,12 +1699,12 @@ getGhciStepIO = do
         ioM    = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
         stepTy :: LHsType Name    -- Renamed, so needs all binders in place
-        stepTy = noLoc $ HsForAllTy Implicit
+        stepTy = noLoc $ HsForAllTy Implicit Nothing
                             (HsQTvs { hsq_tvs = [noLoc (UserTyVar a_tv)]
                                     , hsq_kvs = [] })
                             (noLoc [])
                             (nlHsFunTy ghciM ioM)
-        step   = noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy
+        step   = noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy []
     return step
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)

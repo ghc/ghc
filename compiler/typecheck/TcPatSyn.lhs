@@ -370,6 +370,9 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
                             , sig_theta = worker_theta
                             , sig_tau = worker_tau
                             , sig_loc = noSrcSpan
+                            , sig_extra_cts = Nothing
+                            , sig_partial = False
+                            , sig_nwcs = []
                             }
 
        ; (worker_binds, _, _) <- tcPolyCheck NonRecursive (const []) sig (noLoc bind)
@@ -514,9 +517,9 @@ tcPatToExpr args = go
     go1   (LitPat lit)             = return $ HsLit lit
     go1   (NPat n Nothing _)       = return $ HsOverLit n
     go1   (NPat n (Just neg) _)    = return $ noLoc neg `HsApp` noLoc (HsOverLit n)
-    go1   (SigPatIn pat (HsWB ty _ _))
+    go1   (SigPatIn pat (HsWB ty _ _ wcs))
       = do { expr <- go pat
-           ; return $ ExprWithTySig expr ty }
+           ; return $ ExprWithTySig expr ty wcs }
     go1   (ConPatOut{})            = panic "ConPatOut in output of renamer"
     go1   (SigPatOut{})            = panic "SigPatOut in output of renamer"
     go1   (CoPat{})                = panic "CoPat in output of renamer"

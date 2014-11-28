@@ -1552,7 +1552,7 @@ instFlexiTcS tvs = wrapTcS (mapAccumLM inst_one emptyTvSubst tvs)
 instFlexiTcSHelper :: Name -> Kind -> TcM TcType
 instFlexiTcSHelper tvname kind
   = do { uniq <- TcM.newUnique
-       ; details <- TcM.newMetaDetails TauTv
+       ; details <- TcM.newMetaDetails (TauTv False)
        ; let name = setNameUnique tvname uniq
        ; return (mkTyVarTy (mkTcTyVar name kind details)) }
 

@@ -1,0 +1,4 @@
+
+WildcardInADT2.hs:4:34:
+    A constructor cannot have a partial type:
+    Foo {get :: Either _ a}

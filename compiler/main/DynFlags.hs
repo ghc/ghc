@@ -503,6 +503,7 @@ data WarningFlag =
    | Opt_WarnUnsupportedLlvmVersion
    | Opt_WarnInlineRuleShadowing
    | Opt_WarnTypedHoles
+   | Opt_WarnPartialTypeSignatures
    | Opt_WarnMissingExportedSigs
    deriving (Eq, Show, Enum)
 
@@ -621,6 +622,8 @@ data ExtensionFlag
    | Opt_NegativeLiterals
    | Opt_EmptyCase
    | Opt_PatternSynonyms
+   | Opt_PartialTypeSignatures
+   | Opt_NamedWildcards
    deriving (Eq, Enum, Show)
 
 data SigOf = NotSigOf
@@ -2724,6 +2727,7 @@ fWarningFlags = [
   flagSpec ( "warn-tabs",                        Opt_WarnTabs, nop ),
   flagSpec ( "warn-type-defaults",               Opt_WarnTypeDefaults, nop ),
   flagSpec ( "warn-typed-holes",                 Opt_WarnTypedHoles, nop ),
+  flagSpec ( "warn-partial-type-signatures",     Opt_WarnPartialTypeSignatures, nop ),
   flagSpec ( "warn-unrecognised-pragmas",        Opt_WarnUnrecognisedPragmas, nop ),
   flagSpec ( "warn-unsafe",                      Opt_WarnUnsafe, setWarnUnsafe ),
   flagSpec ( "warn-unsupported-calling-conventions", Opt_WarnUnsupportedCallingConventions, nop ),
@@ -2972,6 +2976,7 @@ xFlags = [
   flagSpec ( "MultiWayIf",                       Opt_MultiWayIf, nop ),
   flagSpec ( "NPlusKPatterns",                   Opt_NPlusKPatterns, nop ),
   flagSpec ( "NamedFieldPuns",                   Opt_RecordPuns, nop ),
+  flagSpec ( "NamedWildcards",                   Opt_NamedWildcards, nop ),
   flagSpec ( "NegativeLiterals",                 Opt_NegativeLiterals, nop ),
   flagSpec ( "NondecreasingIndentation",         Opt_NondecreasingIndentation, nop ),
   flagSpec ( "NullaryTypeClasses",               Opt_NullaryTypeClasses,
@@ -2983,6 +2988,7 @@ xFlags = [
   flagSpec ( "PackageImports",                   Opt_PackageImports, nop ),
   flagSpec ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
   flagSpec ( "ParallelListComp",                 Opt_ParallelListComp, nop ),
+  flagSpec ( "PartialTypeSignatures",            Opt_PartialTypeSignatures, nop ),
   flagSpec ( "PatternGuards",                    Opt_PatternGuards, nop ),
   flagSpec ( "PatternSignatures",                Opt_ScopedTypeVariables,
                                 deprecatedForExtension "ScopedTypeVariables" ),
@@ -3175,6 +3181,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
         Opt_WarnTypedHoles,
+        Opt_WarnPartialTypeSignatures,
         Opt_WarnUnrecognisedPragmas,
         Opt_WarnPointlessPragmas,
         Opt_WarnDuplicateConstraints,

@@ -168,7 +168,7 @@ cvtDec (TH.FunD nm cls)
 cvtDec (TH.SigD nm typ)
   = do  { nm' <- vNameL nm
         ; ty' <- cvtType typ
-        ; returnJustL $ Hs.SigD (TypeSig [nm'] ty') }
+        ; returnJustL $ Hs.SigD (TypeSig [nm'] ty' PlaceHolder) }
 
 cvtDec (TH.InfixD fx nm)
   -- fixity signatures are allowed for variables, constructors, and types
@@ -681,7 +681,7 @@ cvtl e = wrapL (cvt e)
 
     cvt (ParensE e)      = do { e' <- cvtl e; return $ HsPar e' }
     cvt (SigE e t)       = do { e' <- cvtl e; t' <- cvtType t
-                              ; return $ ExprWithTySig e' t' }
+                              ; return $ ExprWithTySig e' t' PlaceHolder }
     cvt (RecConE c flds) = do { c' <- cNameL c
                               ; flds' <- mapM cvtFld flds
                               ; return $ RecordCon c' noPostTcExpr (HsRecFields flds' Nothing)}

@@ -257,11 +257,13 @@ rnExpr (RecordUpd expr rbinds _ _ _)
         ; return (RecordUpd expr' rbinds' [] [] [],
                   fvExpr `plusFV` fvRbinds) }
 
-rnExpr (ExprWithTySig expr pty)
-  = do  { (pty', fvTy) <- rnLHsType ExprWithTySigCtx pty
-        ; (expr', fvExpr) <- bindSigTyVarsFV (hsExplicitTvs pty') $
+rnExpr (ExprWithTySig expr pty PlaceHolder)
+  = do  { (wcs, pty') <- extractWildcards pty
+        ; bindLocatedLocalsFV wcs $ \wcs_new -> do {
+          (pty'', fvTy) <- rnLHsType ExprWithTySigCtx pty'
+        ; (expr', fvExpr) <- bindSigTyVarsFV (hsExplicitTvs pty'') $
                              rnLExpr expr
-        ; return (ExprWithTySig expr' pty', fvExpr `plusFV` fvTy) }
+        ; return (ExprWithTySig expr' pty'' wcs_new, fvExpr `plusFV` fvTy) } }
 
 rnExpr (HsIf _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p

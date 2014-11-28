@@ -132,7 +132,7 @@ module Type (
         pprTvBndr, pprTvBndrs, pprForAll, pprUserForAll, pprSigmaType,
         pprTheta, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprSourceTyCon,
-        TyPrec(..), maybeParen,
+        TyPrec(..), maybeParen, pprSigmaTypeExtraCts,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -1205,6 +1205,9 @@ eqType :: Type -> Type -> Bool
 -- Watch out for horrible hack: See Note [Comparison with OpenTypeKind]
 eqType t1 t2 = isEqual $ cmpType t1 t2
 
+instance Eq Type where
+  (==) = eqType
+
 eqTypeX :: RnEnv2 -> Type -> Type -> Bool
 eqTypeX env t1 t2 = isEqual $ cmpTypeX env t1 t2
 
@@ -1631,7 +1634,7 @@ For the description of subkinding in GHC, see
 
 \begin{code}
 type MetaKindVar = TyVar  -- invariant: MetaKindVar will always be a
-                          -- TcTyVar with details MetaTv TauTv ...
+                          -- TcTyVar with details MetaTv (TauTv ...) ...
 -- meta kind var constructors and functions are in TcType
 
 type SimpleKind = Kind

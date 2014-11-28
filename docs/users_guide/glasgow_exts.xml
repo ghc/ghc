@@ -8530,6 +8530,293 @@ This ensures that an unbound identifier is never reported with a too polymorphic
 </para>
 
 </sect1>
+<!-- ==================== Partial Type Signatures =================  -->
+
+<sect1 id="partial-type-signatures">
+<title>Partial Type Signatures</title>
+
+<para>
+A partial type signature is a type signature containing special placeholders
+written with a leading underscore (e.g., "<literal>_</literal>",
+"<literal>_foo</literal>", "<literal>_bar</literal>") called
+<emphasis>wildcards</emphasis>. Partial type signatures are to type signatures
+what <xref linkend="typed-holes"/> are to expressions. During compilation these
+wildcards or holes will generate an error message that describes which type
+was inferred at the hole's location, and information about the origin of any
+free type variables. GHC reports such error messages by default.</para>
+
+<para>
+Unlike <xref linkend="typed-holes"/>, which make the program incomplete and
+will generate errors when they are evaluated, this needn't be the case for
+holes in type signatures. The type checker is capable (in most cases) of
+type-checking a binding with or without a type signature. A partial type
+signature bridges the gap between the two extremes, the programmer can choose
+which parts of a type to annotate and which to leave over to the type-checker
+to infer.
+</para>
+
+<para>
+By default, the type-checker will report an error message for each hole in a
+partial type signature, informing the programmer of the inferred type. When
+the <option>-XPartialTypeSignatures</option> flag is enabled, the type-checker
+will accept the inferred type for each hole, generating warnings instead of
+errors. Additionally, these warnings can be silenced with the
+<option>-fno-warn-partial-type-signatures</option> flag.
+</para>
+
+<sect2 id="pts-syntax">
+<title>Syntax</title>
+
+<para>
+A (partial) type signature has the following form: <literal>forall a b .. .
+(C1, C2, ..) => tau</literal>. It consists of three parts:
+</para>
+
+<itemizedlist>
+    <listitem>The type variables: <literal>a b ..</literal></listitem>
+    <listitem>The constraints: <literal>(C1, C2, ..)</literal></listitem>
+    <listitem>The (mono)type: <literal>tau</literal></listitem>
+</itemizedlist>
+
+<para>
+We distinguish three kinds of wildcards.
+</para>
+
+<sect3 id="type-wildcards">
+<title>Type Wildcards</title>
+<para>
+Wildcards occurring within the monotype (tau) part of the type signature are
+<emphasis>type wildcards</emphasis> ("type" is often omitted as this is the
+default kind of wildcard). Type wildcards can be instantiated to any monotype
+like <literal>Bool</literal> or <literal>Maybe [Bool]</literal>, including
+functions and higher-kinded types like <literal>(Int -> Bool)</literal> or
+<literal>Maybe</literal>.
+</para>
+<programlisting>
+not' :: Bool -> _
+not' x = not x
+-- Inferred: Bool -> Bool
+
+maybools :: _
+maybools = Just [True]
+-- Inferred: Maybe [Bool]
+
+just1 :: _ Int
+just1 = Just 1
+-- Inferred: Maybe Int
+
+filterInt :: _ -> _ -> [Int]
+filterInt = filter -- has type forall a. (a -> Bool) -> [a] -> [a]
+-- Inferred: (Int -> Bool) -> [Int] -> [Int]
+</programlisting>
+
+<para>
+For instance, the first wildcard in the type signature <literal>not'</literal>
+would produce the following error message:
+</para>
+<programlisting>
+Test.hs:4:17:
+    Found hole &lsquo;_&rsquo; with type: Bool
+    To use the inferred type, enable PartialTypeSignatures
+    In the type signature for &lsquo;not'&rsquo;: Bool -> _
+</programlisting>
+
+<para>
+When a wildcard is not instantiated to a monotype, it will be generalised
+over, i.e. replaced by a fresh type variable (of which the name will often
+start with <literal>w_</literal>), e.g.
+</para>
+<programlisting>
+foo :: _ -> _
+foo x = x
+-- Inferred: forall w_. w_ -> w_
+
+filter' :: _
+filter' = filter -- has type forall a. (a -> Bool) -> [a] -> [a]
+-- Inferred: (a -> Bool) -> [a] -> [a]
+</programlisting>
+</sect3>
+
+<sect3 id="named-wildcards">
+<title>Named Wildcards</title>
+<para>
+Type wildcards can also be named by giving the underscore an identifier as
+suffix, i.e. <literal>_a</literal>. These are called <emphasis>named
+wildcards</emphasis>. All occurrences of the same named wildcard within one
+type signature will unify to the same type. For example:
+</para>
+<programlisting>
+f :: _x -> _x
+f ('c', y) = ('d', error "Urk")
+-- Inferred: forall t. (Char, t) -> (Char, t)
+</programlisting>
+
+<para>
+The named wildcard forces the argument and result types to be the same.
+Lacking a signature, GHC would have inferred <literal>forall a b. (Char, a) ->
+(Char, b)</literal>. A named wildcard can be mentioned in constraints,
+provided it also occurs in the monotype part of the type signature to make
+sure that it unifies with something:
+</para>
+
+<programlisting>
+somethingShowable :: Show _x => _x -> _
+somethingShowable x = show x
+-- Inferred type: Show w_x => w_x -> String
+
+somethingShowable' :: Show _x => _x -> _
+somethingShowable' x = show (not x)
+-- Inferred type: Bool -> String
+</programlisting>
+
+<para>
+Besides an extra-constraints wildcard (see <xref
+linkend="extra-constraints-wildcard"/>), only named wildcards can occur in the
+constraints, e.g. the <literal>_x</literal> in <literal>Show _x</literal>.
+</para>
+
+<para>
+Named wildcards <emphasis>should not be confused with type
+variables</emphasis>. Even though syntactically similar, named wildcards can
+unify with monotypes as well as be generalised over (and behave as type
+variables).</para>
+
+<para>
+In the first example above, <literal>_x</literal> is generalised over (and is
+effectively replaced by a fresh type variable <literal>w_x</literal>). In the
+second example, <literal>_x</literal> is unified with the
+<literal>Bool</literal> type, and as <literal>Bool</literal> implements the
+<literal>Show</literal> type class, the constraint <literal>Show
+Bool</literal> can be simplified away.
+</para>
+
+<para>
+By default, GHC (as the Haskell 2010 standard prescribes) parses identifiers
+starting with an underscore in a type as type variables. To treat them as
+named wildcards, the <option>-XNamedWildcards</option> flag should be enabled.
+The example below demonstrated the effect.
+</para>
+
+<programlisting>
+foo :: _a -> _a
+foo _ = False
+</programlisting>
+
+<para>
+Compiling this program without enabling <option>-XNamedWildcards</option>
+produces the following error message complaining about the type variable
+<literal>_a</literal> no matching the actual type <literal>Bool</literal>.
+</para>
+
+<programlisting>
+Test.hs:5:9:
+    Couldn't match expected type &lsquo;_a&rsquo; with actual type &lsquo;Bool&rsquo;
+      &lsquo;_a&rsquo; is a rigid type variable bound by
+           the type signature for foo :: _a -> _a at Test.hs:4:8
+    Relevant bindings include foo :: _a -> _a (bound at Test.hs:4:1)
+    In the expression: False
+    In an equation for &lsquo;foo&rsquo;: foo _ = False
+</programlisting>
+
+<para>
+Compiling this program with <option>-XNamedWildcards</option> enabled produces
+the following error message reporting the inferred type of the named wildcard
+<literal>_a</literal>.
+</para>
+
+<programlisting>
+Test.hs:4:8: Warning:
+    Found hole &lsquo;_a&rsquo; with type: Bool
+    In the type signature for &lsquo;foo&rsquo;: _a -> _a
+</programlisting>
+</sect3>
+
+<sect3 id="extra-constraints-wildcard">
+<title>Extra-Constraints Wildcard</title>
+
+<para>
+The third kind of wildcard is the <emphasis>extra-constraints
+wildcard</emphasis>. The presence of an extra-constraints wildcard indicates
+that an arbitrary number of extra constraints may be inferred during type
+checking and will be added to the type signature. In the example below, the
+extra-constraints wildcard is used to infer three extra constraints.
+</para>
+
+<programlisting>
+arbitCs :: _ => a -> String
+arbitCs x = show (succ x) ++ show (x == x)
+-- Inferred:
+--   forall a. (Enum a, Eq a, Show a) => a -> String
+-- Error:
+Test.hs:5:12:
+    Found hole &lsquo;_&rsquo; with inferred constraints: (Enum a, Eq a, Show a)
+    To use the inferred type, enable PartialTypeSignatures
+    In the type signature for &lsquo;arbitCs&rsquo;: _ => a -> String
+</programlisting>
+
+<para>
+An extra-constraints wildcard shouldn't prevent the programmer from already
+listing the constraints he knows or wants to annotate, e.g.
+</para>
+
+<programlisting>
+-- Also a correct partial type signature:
+arbitCs' :: (Enum a, _) => a -> String
+arbitCs' x = arbitCs x
+-- Inferred:
+--   forall a. (Enum a, Show a, Eq a) => a -> String
+-- Error:
+Test.hs:9:22:
+    Found hole &lsquo;_&rsquo; with inferred constraints: (Eq a, Show a)
+    To use the inferred type, enable PartialTypeSignatures
+    In the type signature for &lsquo;arbitCs'&rsquo;: (Enum a, _) => a -> String
+</programlisting>
+
+<para>
+An extra-constraints wildcard can also lead to zero extra constraints to be
+inferred, e.g.
+</para>
+
+<programlisting>
+noCs :: _ => String
+noCs = "noCs"
+-- Inferred: String
+-- Error:
+Test.hs:13:9:
+    Found hole &lsquo;_&rsquo; with inferred constraints: ()
+    To use the inferred type, enable PartialTypeSignatures
+    In the type signature for &lsquo;noCs&rsquo;: _ => String
+</programlisting>
+
+<para>
+As a single extra-constraints wildcard is enough to infer any number of
+constraints, only one is allowed in a type signature and it should come last
+in the list of constraints.
+</para>
+
+<para>
+Extra-constraints wildcards cannot be named.
+</para>
+
+</sect3>
+</sect2>
+
+<sect2 id="pts-where">
+<title>Where can they occur?</title>
+
+<para>
+Partial type signatures are allowed for bindings, pattern and expression signatures.
+In all other contexts, e.g. type class or type family declarations, they are disallowed.
+In the following example a wildcard is used in each of the three possible contexts.
+</para>
+<programlisting>
+{-# LANGUAGE ScopedTypeVariables #-}
+foo :: _
+foo (x :: _) = (x :: _)
+-- Inferred: forall w_. w_ -> w_
+</programlisting>
+</sect2>
+</sect1>
 <!-- ==================== Deferring type errors =================  -->
 
 <sect1 id="defer-type-errors">

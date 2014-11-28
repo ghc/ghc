@@ -1,0 +1,54 @@
+
+TidyClash2.hs:4:21:
+    Found hole ‘_’ with type: w_1
+    Where: ‘w_1’ is a rigid type variable bound by
+                 the inferred type of barry :: w_1 -> w_2 -> w_ at TidyClash2.hs:5:1
+    To use the inferred type, enable PartialTypeSignatures
+    In the type signature for ‘barry’: _ -> _ -> w_
+
+TidyClash2.hs:4:26:
+    Found hole ‘_’ with type: w_2
+    Where: ‘w_2’ is a rigid type variable bound by
+                 the inferred type of barry :: w_1 -> w_2 -> w_ at TidyClash2.hs:5:1
+    To use the inferred type, enable PartialTypeSignatures
+    In the type signature for ‘barry’: _ -> _ -> w_
+
+TidyClash2.hs:5:13:
+    Found hole ‘_’ with type: w_1
+    Where: ‘w_1’ is a rigid type variable bound by
+                 the inferred type of barry :: w_1 -> w_2 -> w_ at TidyClash2.hs:5:1
+    To use the inferred type, enable PartialTypeSignatures
+    Relevant bindings include
+      barry :: w_1 -> w_2 -> w_ (bound at TidyClash2.hs:5:1)
+    In a pattern type signature: _
+    In the pattern: x :: _
+    In an equation for ‘barry’:
+        barry (x :: _) (y :: _) = undefined :: _
+
+TidyClash2.hs:5:22:
+    Found hole ‘_’ with type: w_2
+    Where: ‘w_2’ is a rigid type variable bound by
+                 the inferred type of barry :: w_1 -> w_2 -> w_ at TidyClash2.hs:5:1
+    To use the inferred type, enable PartialTypeSignatures
+    Relevant bindings include
+      x :: w_1 (bound at TidyClash2.hs:5:8)
+      barry :: w_1 -> w_2 -> w_ (bound at TidyClash2.hs:5:1)
+    In a pattern type signature: _
+    In the pattern: y :: _
+    In an equation for ‘barry’:
+        barry (x :: _) (y :: _) = undefined :: _
+
+TidyClash2.hs:5:40:
+    Found hole ‘_’ with type: w_
+    Where: ‘w_’ is a rigid type variable bound by
+                the inferred type of barry :: w_1 -> w_2 -> w_
+                at TidyClash2.hs:4:17
+    To use the inferred type, enable PartialTypeSignatures
+    Relevant bindings include
+      y :: w_2 (bound at TidyClash2.hs:5:17)
+      x :: w_1 (bound at TidyClash2.hs:5:8)
+      barry :: w_1 -> w_2 -> w_ (bound at TidyClash2.hs:5:1)
+    In an expression type signature: _
+    In the expression: undefined :: _
+    In an equation for ‘barry’:
+        barry (x :: _) (y :: _) = undefined :: _

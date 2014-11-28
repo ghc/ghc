@@ -1,0 +1,18 @@
+TYPE SIGNATURES
+  isMeltdown :: forall param1 param2. NukeMonad param1 param2 Bool
+  unlessMeltdown ::
+    forall param1 param2.
+    NukeMonad param1 param2 () -> NukeMonad param1 param2 ()
+TYPE CONSTRUCTORS
+  type role NukeMonad phantom phantom phantom
+  data NukeMonad a b c
+    Promotable
+COERCION AXIOMS
+INSTANCES
+  instance Functor (NukeMonad a b) -- Defined at Meltdown.hs:8:10
+  instance Applicative (NukeMonad a b)
+    -- Defined at Meltdown.hs:11:10
+  instance Monad (NukeMonad a b) -- Defined at Meltdown.hs:15:10
+Dependent modules: []
+Dependent packages: [base-4.8.0.0, ghc-prim-0.3.1.0,
+                     integer-gmp-1.0.0.0]

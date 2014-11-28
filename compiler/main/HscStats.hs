@@ -106,7 +106,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     count_sigs sigs = sum5 (map sig_info sigs)
 
     sig_info (FixSig _)       = (1,0,0,0,0)
-    sig_info (TypeSig _ _)    = (0,1,0,0,0)
+    sig_info (TypeSig _ _ _)  = (0,1,0,0,0)
     sig_info (SpecSig _ _ _)  = (0,0,1,0,0)
     sig_info (InlineSig _ _)  = (0,0,0,1,0)
     sig_info (GenericSig _ _) = (0,0,0,0,1)

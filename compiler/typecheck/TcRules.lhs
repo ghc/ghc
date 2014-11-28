@@ -208,7 +208,7 @@ tcRuleBndrs (L _ (RuleBndrSig (L _ name) rn_ty) : rule_bndrs)
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --              a::*, x :: a->a
   = do  { let ctxt = RuleSigCtxt name
-        ; (id_ty, tv_prs) <- tcHsPatSigType ctxt rn_ty
+        ; (id_ty, tv_prs, _) <- tcHsPatSigType ctxt rn_ty
         ; let id  = mkLocalId name id_ty
               tvs = map snd tv_prs
                     -- tcHsPatSigType returns (Name,TyVar) pairs

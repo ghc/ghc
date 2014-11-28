@@ -1056,6 +1056,12 @@
             <entry><option>-XNoNamedFieldPuns</option></entry>
           </row>
           <row>
+            <entry><option>-XNamedWildcards</option></entry>
+            <entry>Enable <link linkend="named-wildcards">named wildcards</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoNamedWildcards</option></entry>
+          </row>
+          <row>
             <entry><option>-XNegativeLiterals</option></entry>
             <entry>Enable support for <link linkend="negative-literals">negative literals</link>.</entry>
             <entry>dynamic</entry>
@@ -1118,6 +1124,12 @@
               Implied by <option>-XParallelArrays</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoParallelListComp</option></entry>
+          </row>
+          <row>
+            <entry><option>-XPartialTypeSignatures</option></entry>
+            <entry>Enable <link linkend="partial-type-signatures">partial type signatures</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoPartialTypeSignatures</option></entry>
           </row>
           <row>
             <entry><option>-XPatternGuards</option></entry>
@@ -1650,6 +1662,19 @@
             </entry>
             <entry>dynamic</entry>
             <entry><option>-fno-warn-typed-holes</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fwarn-partial-type-signatures</option></entry>
+            <entry>
+              warn about holes in partial type signatures when
+              <option>-XPartialTypesignatures</option> is enabled. Not
+              applicable when <option>-XPartialTypesignatures</option> is not
+              enabled, in which case errors are generated for such holes.
+              See <xref linkend="partial-type-signatures"/>.
+            </entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-partial-type-signatures</option></entry>
           </row>
 
         </tbody>

@@ -48,8 +48,12 @@ module RdrHsSyn (
         checkCommand,         -- LHsExpr RdrName -> P (LHsCmd RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSig,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
+        checkPartialTypeSignature,
+        checkNoPartialType,
+        checkValidPatSynSig,
         checkDoAndIfThenElse,
         checkRecordSyntax,
+        checkValidDefaults,
         parseErrorSDoc,
 
         -- Help with processing exports
@@ -92,6 +96,8 @@ import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
 
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
+import Data.List       ( partition )
+import qualified Data.Set as Set ( fromList, difference, member )
 
 #include "HsVersions.h"
 
@@ -128,6 +134,8 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
   = do { (binds, sigs, ats, at_insts, _, docs) <- cvBindsAndSigs where_cls
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams) <- checkTyClHdr tycl_hdr
+       -- Partial type signatures are not allowed in a class definition
+       ; checkNoPartialSigs sigs cls
        ; tyvars <- checkTyVarsP (ptext (sLit "class")) whereDots cls tparams
        ; at_defs <- mapM (eitherToP . mkATDefault) at_insts
        ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, tcdTyVars = tyvars,
@@ -149,6 +157,104 @@ mkATDefault (L loc (TyFamInstDecl { tfid_eqn = L _ e }))
            ; return (L loc (TyFamEqn { tfe_tycon = tc
                                      , tfe_pats = tvs
                                      , tfe_rhs = rhs })) }
+
+-- | Check that none of the given type signatures of the class definition
+-- ('Located RdrName') are partial type signatures. An error will be reported
+-- for each wildcard found in a (partial) type signature. We do this check
+-- because we want the signatures in a class definition to be fully specified.
+checkNoPartialSigs :: [LSig RdrName] -> Located RdrName -> P ()
+checkNoPartialSigs sigs cls_name =
+  sequence_ [ whenIsJust mb_loc $ \loc -> parseErrorSDoc loc $ err sig
+            | L _ sig@(TypeSig _ ty _) <- sigs
+            , let mb_loc = maybeLocation $ findWildcards ty ]
+  where err sig =
+          vcat [ text "The type signature of a class method cannot be partial:"
+               , ppr sig
+               , text "In the class declaration for " <> quotes (ppr cls_name) ]
+
+-- | Check that none of the given constructors contain a wildcard (like in a
+-- partial type signature). An error will be reported for each wildcard found
+-- in a (partial) constructor definition. We do this check because we want the
+-- type of a constructor to be fully specified.
+checkNoPartialCon :: [LConDecl RdrName] -> P ()
+checkNoPartialCon con_decls =
+  sequence_ [ whenIsJust mb_loc $ \loc -> parseErrorSDoc loc $ err cd
+            | L _ cd@(ConDecl { con_cxt = cxt, con_res = res,
+                                con_details = details }) <- con_decls
+            , let mb_loc = maybeLocation $
+                           concatMap findWildcards (unLoc cxt) ++
+                           containsWildcardRes res ++
+                           concatMap findWildcards
+                           (hsConDeclArgTys details) ]
+  where err con_decl = text "A constructor cannot have a partial type:" $$
+                       ppr con_decl
+        containsWildcardRes (ResTyGADT ty) = findWildcards ty
+        containsWildcardRes ResTyH98 = notFound
+
+-- | Check that the given type does not contain wildcards, and is thus not a
+-- partial type. If it contains wildcards, report an error with the given
+-- message.
+checkNoPartialType :: SDoc -> LHsType RdrName -> P ()
+checkNoPartialType context_msg ty =
+  whenFound (findWildcards ty) $ \loc -> parseErrorSDoc loc err
+  where err = text "Wildcard not allowed" $$ context_msg
+
+-- | Represent wildcards found in a type. Used for reporting errors for types
+-- that mustn't contain wildcards.
+data FoundWildcard = Found      { location :: SrcSpan }
+                   | FoundNamed { location :: SrcSpan, _name :: RdrName }
+
+-- | Indicate that no wildcards were found.
+notFound :: [FoundWildcard]
+notFound = []
+
+-- | Call the function (second argument), accepting the location of the
+-- wildcard, on the first wildcard that was found, if any.
+whenFound :: [FoundWildcard] -> (SrcSpan -> P ()) -> P ()
+whenFound (Found loc:_)        f = f loc
+whenFound (FoundNamed loc _:_) f = f loc
+whenFound _                    _ = return ()
+
+-- | Extract the location of the first wildcard, if any.
+maybeLocation :: [FoundWildcard] -> Maybe SrcSpan
+maybeLocation fws = location <$> listToMaybe fws
+
+-- | Extract the named wildcards from the wildcards that were found.
+namedWildcards :: [FoundWildcard] -> [RdrName]
+namedWildcards fws = [name | FoundNamed _ name <- fws]
+
+-- | Split the found wildcards into a list of found unnamed wildcard and found
+-- named wildcards.
+splitUnnamedNamed :: [FoundWildcard] -> ([FoundWildcard], [FoundWildcard])
+splitUnnamedNamed = partition (\f -> case f of { Found _ -> True ; _ -> False})
+
+-- | Return a list of the wildcards found while traversing the given type.
+findWildcards :: LHsType RdrName -> [FoundWildcard]
+findWildcards (L l ty) = case ty of
+    (HsForAllTy _ xtr _ (L _ ctxt) x) -> (map Found $ maybeToList xtr) ++
+                                         concatMap go ctxt ++ go x
+    (HsAppTy x y)            -> go x ++ go y
+    (HsFunTy x y)            -> go x ++ go y
+    (HsListTy x)             -> go x
+    (HsPArrTy x)             -> go x
+    (HsTupleTy _ xs)         -> concatMap go xs
+    (HsOpTy x _ y)           -> go x ++ go y
+    (HsParTy x)              -> go x
+    (HsIParamTy _ x)         -> go x
+    (HsEqTy x y)             -> go x ++ go y
+    (HsKindSig x y)          -> go x ++ go y
+    (HsDocTy x _)            -> go x
+    (HsBangTy _ x)           -> go x
+    (HsRecTy xs)             ->
+      concatMap (go . getBangType . cd_fld_type . unLoc) xs
+    (HsExplicitListTy _ xs)  -> concatMap go xs
+    (HsExplicitTupleTy _ xs) -> concatMap go xs
+    (HsWrapTy _ x)           -> go (noLoc x)
+    HsWildcardTy             -> [Found l]
+    (HsNamedWildcardTy n)    -> [FoundNamed l n]
+    -- HsTyVar, HsQuasiQuoteTy, HsSpliceTy, HsCoreTy, HsTyLit
+    _                        -> notFound
+  where go = findWildcards
 
 mkTyData :: SrcSpan
          -> NewOrData
@@ -175,12 +281,18 @@ mkDataDefn :: NewOrData
            -> P (HsDataDefn RdrName)
 mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
   = do { checkDatatypeContext mcxt
+       ; checkNoPartialCon data_cons
+       ; whenIsJust maybe_deriv $
+         \(L _ deriv) -> mapM_ (checkNoPartialType (errDeriv deriv)) deriv
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; return (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                             , dd_ctxt = cxt
                             , dd_cons = data_cons
                             , dd_kindSig = ksig
                             , dd_derivs = maybe_deriv }) }
+    where errDeriv deriv = text "In the deriving items:" <+>
+                           pprHsContextNoArrow deriv
+
 
 mkTySynonym :: SrcSpan
             -> LHsType RdrName  -- LHS
@@ -189,6 +301,9 @@ mkTySynonym :: SrcSpan
 mkTySynonym loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; tyvars <- checkTyVarsP (ptext (sLit "type")) equalsDots tc tparams
+       ; let err = text "In type synonym" <+> quotes (ppr tc) <>
+                   colon <+> ppr rhs
+       ; checkNoPartialType err rhs
        ; return (L loc (SynDecl { tcdLName = tc, tcdTyVars = tyvars
                                 , tcdRhs = rhs, tcdFVs = placeHolderNames })) }
 
@@ -197,6 +312,11 @@ mkTyFamInstEqn :: LHsType RdrName
                -> P (TyFamInstEqn RdrName)
 mkTyFamInstEqn lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
+       ; let err xhs = hang (text "In type family instance equation of" <+>
+                             quotes (ppr tc) <> colon)
+                       2 (ppr xhs)
+       ; checkNoPartialType (err lhs) lhs
+       ; checkNoPartialType (err rhs) rhs
        ; return (TyFamEqn { tfe_tycon = tc
                           , tfe_pats  = mkHsWithBndrs tparams
                           , tfe_rhs   = rhs }) }
@@ -491,13 +611,17 @@ mkSimpleConDecl name qvars cxt details
 
 mkGadtDecl :: [Located RdrName]
            -> LHsType RdrName     -- Always a HsForAllTy
-           -> ConDecl RdrName
+           -> P (ConDecl RdrName)
 -- We allow C,D :: ty
 -- and expand it as if it had been
 --    C :: ty; D :: ty
 -- (Just like type signatures in general.)
-mkGadtDecl names (L _ (HsForAllTy imp qvars cxt tau))
-  = mk_gadt_con names
+mkGadtDecl _ ty@(L _ (HsForAllTy _ (Just l) _ _ _))
+  = parseErrorSDoc l $
+    text "A constructor cannot have a partial type:" $$
+    ppr ty
+mkGadtDecl names (L _ (HsForAllTy imp Nothing qvars cxt tau))
+  = return $ mk_gadt_con names
   where
     (details, res_ty)           -- See Note [Sorting out the result type]
       = case tau of
@@ -591,6 +715,8 @@ checkDatatypeContext (Just (L loc c))
              parseErrorSDoc loc
                  (text "Illegal datatype context (use DatatypeContexts):" <+>
                   pprHsContext c)
+         mapM_ (checkNoPartialType err) c
+      where err = text "In the context:" <+> pprHsContextNoArrow c
 
 checkRecordSyntax :: Outputable a => Located a -> P (Located a)
 checkRecordSyntax lr@(L loc r)
@@ -695,16 +821,17 @@ checkAPat msg loc e0 = do
    ELazyPat e         -> checkLPat msg e >>= (return . LazyPat)
    EAsPat n e         -> checkLPat msg e >>= (return . AsPat n)
    -- view pattern is well-formed if the pattern is
-   EViewPat expr patE -> checkLPat msg patE >>=
+   EViewPat expr patE  -> checkLPat msg patE >>=
                             (return . (\p -> ViewPat expr p placeHolderType))
-   ExprWithTySig e t  -> do e <- checkLPat msg e
-                            -- Pattern signatures are parsed as sigtypes,
-                            -- but they aren't explicit forall points.  Hence
-                            -- we have to remove the implicit forall here.
-                            let t' = case t of
-                                       L _ (HsForAllTy Implicit _ (L _ []) ty) -> ty
-                                       other -> other
-                            return (SigPatIn e (mkHsWithBndrs t'))
+   ExprWithTySig e t _ -> do e <- checkLPat msg e
+                             -- Pattern signatures are parsed as sigtypes,
+                             -- but they aren't explicit forall points.  Hence
+                             -- we have to remove the implicit forall here.
+                             let t' = case t of
+                                        L _ (HsForAllTy Implicit _ _
+                                             (L _ []) ty) -> ty
+                                        other -> other
+                             return (SigPatIn e (mkHsWithBndrs t'))
 
    -- n+k patterns
    OpApp (L nloc (HsVar n)) (L _ (HsVar plus)) _
@@ -771,7 +898,8 @@ checkValDef :: SDoc
 
 checkValDef msg lhs (Just sig) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
-  = checkPatBind msg (L (combineLocs lhs sig) (ExprWithTySig lhs sig)) grhss
+  = checkPatBind msg (L (combineLocs lhs sig)
+                        (ExprWithTySig lhs sig PlaceHolder)) grhss
 
 checkValDef msg lhs opt_sig g@(L l (_,grhss))
   = do  { mb_fun <- isFunLhs lhs
@@ -817,7 +945,7 @@ checkValSig
         -> P (Sig RdrName)
 checkValSig (L l (HsVar v)) ty
   | isUnqual v && not (isDataOcc (rdrNameOcc v))
-  = return (TypeSig [L l v] ty)
+  = return (TypeSig [L l v] ty PlaceHolder)
 checkValSig lhs@(L l _) ty
   = parseErrorSDoc l ((text "Invalid type signature:" <+>
                        ppr lhs <+> text "::" <+> ppr ty)
@@ -837,6 +965,145 @@ checkValSig lhs@(L l _) ty
 
     foreign_RDR = mkUnqual varName (fsLit "foreign")
     default_RDR = mkUnqual varName (fsLit "default")
+
+
+-- | Check that the default declarations do not contain wildcards in their
+-- types, which we do not want as the types in the default declarations must
+-- be fully specified.
+checkValidDefaults :: [LHsType RdrName] -> P (DefaultDecl RdrName)
+checkValidDefaults tys = mapM_ (checkNoPartialType err) tys >> return ret
+  where ret = DefaultDecl tys
+        err = text "In declaration:" <+> ppr ret
+
+-- | Check that the pattern synonym type signature does not contain wildcards.
+checkValidPatSynSig :: Sig RdrName -> P (Sig RdrName)
+checkValidPatSynSig psig@(PatSynSig _ _ prov req ty)
+  = mapM_ (checkNoPartialType err) (unLoc prov ++ unLoc req ++ [ty])
+    >> return psig
+  where err = hang (text "In pattern synonym type signature: ")
+                   2 (ppr psig)
+checkValidPatSynSig sig = return sig
+-- Should only be called with a pattern synonym type signature
+
+-- | Check the validity of a partial type signature. We check the following
+-- things:
+--
+-- * There should only be one extra-constraints wildcard in the type
+-- signature, i.e. the @_@ in @_ => a -> String@.
+-- This would be invalid: @(Eq a, _) => a -> (Num a, _) => a -> Bool@.
+-- Extra-constraints wildcards are only allowed in the top-level context.
+--
+-- * Named extra-constraints wildcards aren't allowed,
+-- e.g. invalid: @(Show a, _x) => a -> String@.
+--
+-- * There is only one extra-constraints wildcard in the context and it must
+-- come last, e.g. invalid: @(_, Show a) => a -> String@
+-- or @(_, Show a, _) => a -> String@.
+--
+-- * There should be no unnamed wildcards in the context.
+--
+-- * Named wildcards occurring in the context must also occur in the monotype.
+--
+-- An error is reported when an invalid wildcard is found.
+checkPartialTypeSignature :: LHsType RdrName -> P (LHsType RdrName)
+checkPartialTypeSignature fullTy = case fullTy of
+
+  (L l (HsForAllTy flag extra bndrs (L lc ctxtP) ty)) -> do
+    -- Remove parens around types in the context
+    let ctxt = map ignoreParens ctxtP
+    -- Check that the type doesn't contain any more extra-constraints wildcards
+    checkNoExtraConstraintsWildcard ty
+    -- Named extra-constraints wildcards aren't allowed
+    whenIsJust (firstMatch isNamedWildcardTy ctxt) $
+      \(L l _) -> err hintNamed l fullTy
+    -- There should be no more (extra-constraints) wildcards in the context.
+    -- If there was one at the end of the context, it is by now already
+    -- removed from the context and stored in the @extra@ field of the
+    -- 'HsForAllTy' by 'HsTypes.mkHsForAllTy'.
+    whenIsJust (firstMatch isWildcardTy ctxt) $
+      \(L l _) -> err hintLast l fullTy
+    -- Find all wildcards in the context and the monotype, then divide
+    -- them in unnamed and named wildcards
+    let (unnamedInCtxt, namedInCtxt) = splitUnnamedNamed $
+                                       concatMap findWildcards ctxt
+        (_            , namedInTy)   = splitUnnamedNamed $
+                                       findWildcards ty
+    -- Unnamed wildcards aren't allowed in the context
+    case unnamedInCtxt of
+      (Found lc : _) -> err hintUnnamedConstraint lc fullTy
+      _              -> return ()
+    -- Calculcate the set of named wildcards in the context that aren't in the
+    -- monotype (tau)
+    let namedWildcardsNotInTau = Set.fromList (namedWildcards namedInCtxt)
+                                 `Set.difference`
+                                 Set.fromList (namedWildcards namedInTy)
+    -- Search for the first named wildcard that we encountered in the
+    -- context that isn't present in the monotype (we lose the order
+    -- in which they occur when using the Set directly).
+    case filter (\(FoundNamed _ name) -> Set.member name namedWildcardsNotInTau)
+                namedInCtxt of
+      (FoundNamed lc name:_) -> err (hintNamedNotInMonotype name) lc fullTy
+      _                      -> return ()
+
+    -- Return the checked type
+    return $ L l (HsForAllTy flag extra bndrs (L lc ctxtP) ty)
+
+
+  ty -> do
+    checkNoExtraConstraintsWildcard ty
+    return ty
+
+  where
+    ignoreParens (L _ (HsParTy ty)) = ty
+    ignoreParens ty                 = ty
+
+    firstMatch :: (HsType a -> Bool) -> HsContext a -> Maybe (LHsType a)
+    firstMatch pred ctxt = listToMaybe (filter (pred . unLoc) ctxt)
+
+    err hintSDoc lc ty = parseErrorSDoc lc $
+                         text "Invalid partial type signature:" $$
+                         ppr ty $$ hintSDoc
+    hintLast    = sep [ text "An extra-constraints wildcard is only allowed"
+                      , text "at the end of the constraints" ]
+    hintNamed   = text "A named wildcard cannot occur as a constraint"
+    hintNested  = sep [ text "An extra-constraints wildcard is only allowed"
+                      , text "at the top-level of the signature" ]
+    hintUnnamedConstraint
+      = text "Wildcards are not allowed within the constraints"
+    hintNamedNotInMonotype name
+      = sep [ text "The named wildcard" <+> quotes (ppr name) <+>
+              text "is only allowed in the constraints"
+            , text "when it also occurs in the (mono)type" ]
+
+    checkNoExtraConstraintsWildcard (L _ ty) = go ty
+      where
+        -- Report nested (named) extra-constraints wildcards
+        go' = go . unLoc
+        go (HsAppTy x y)            = go' x >> go' y
+        go (HsFunTy x y)            = go' x >> go' y
+        go (HsListTy x)             = go' x
+        go (HsPArrTy x)             = go' x
+        go (HsTupleTy _ xs)         = mapM_ go' xs
+        go (HsOpTy x _ y)           = go' x >> go' y
+        go (HsParTy x)              = go' x
+        go (HsIParamTy _ x)         = go' x
+        go (HsEqTy x y)             = go' x >> go' y
+        go (HsKindSig x y)          = go' x >> go' y
+        go (HsDocTy x _)            = go' x
+        go (HsBangTy _ x)           = go' x
+        go (HsRecTy xs)             = mapM_ (go' . getBangType . cd_fld_type . unLoc) xs
+        go (HsExplicitListTy _ xs)  = mapM_ go' xs
+        go (HsExplicitTupleTy _ xs) = mapM_ go' xs
+        go (HsWrapTy _ x)           = go' (noLoc x)
+        go (HsForAllTy _ (Just l) _ _ _) = err hintNested l ty
+        go (HsForAllTy _ Nothing  _ (L _ ctxt) x)
+          | Just (L l _) <- firstMatch isWildcardTy      ctxt
+          = err hintNested l ty
+          | Just (L l _) <- firstMatch isNamedWildcardTy ctxt
+          = err hintNamed l ty
+          | otherwise               = go' x
+        go _                        = return ()
+
 
 checkDoAndIfThenElse :: LHsExpr RdrName
                      -> Bool
@@ -1077,6 +1344,11 @@ mkImport :: Located CCallConv
          -> (Located FastString, Located RdrName, LHsType RdrName)
          -> P (HsDecl RdrName)
 mkImport (L lc cconv) (L ls safety) (L loc entity, v, ty)
+  | Just loc <- maybeLocation $ findWildcards ty
+    = parseErrorSDoc loc $
+      text "Wildcard not allowed" $$
+      text "In foreign import declaration" <+>
+      quotes (ppr v) $$ ppr ty
   | cconv == PrimCallConv                      = do
   let funcTarget = CFunction (StaticTarget entity Nothing True)
       importSpec = CImport (L lc PrimCallConv) (L ls safety) Nothing funcTarget
@@ -1154,9 +1426,11 @@ parseCImport cconv safety nm str sourceText =
 mkExport :: Located CCallConv
          -> (Located FastString, Located RdrName, LHsType RdrName)
          -> P (HsDecl RdrName)
-mkExport (L lc cconv) (L le entity, v, ty) = return $
-  ForD (ForeignExport v ty noForeignExportCoercionYet
-                   (CExport (L lc (CExportStatic entity' cconv)) (L le entity)))
+mkExport (L lc cconv) (L le entity, v, ty) = do
+  checkNoPartialType (ptext (sLit "In foreign export declaration") <+>
+                      quotes (ppr v) $$ ppr ty) ty
+  return $ ForD (ForeignExport v ty noForeignExportCoercionYet
+                 (CExport (L lc (CExportStatic entity' cconv)) (L le entity)))
   where
     entity' | nullFS entity = mkExtName (unLoc v)
             | otherwise     = entity
