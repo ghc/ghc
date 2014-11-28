@@ -299,6 +299,7 @@ data DumpFlag
    | Opt_D_dump_mod_map
    | Opt_D_dump_view_pattern_commoning
    | Opt_D_verbose_core2core
+   | Opt_D_dump_debug
 
    deriving (Eq, Show, Enum)
 
@@ -2508,6 +2509,7 @@ dynamic_flags = [
       (NoArg (setGeneralFlag Opt_D_faststring_stats))
   , defGhcFlag "dno-llvm-mangler"
       (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
+  , defGhcFlag "ddump-debug"             (setDumpFlag Opt_D_dump_debug)
 
         ------ Machine dependant (-m<blah>) stuff ---------------------------
 

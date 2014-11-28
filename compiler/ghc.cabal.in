@@ -156,6 +156,7 @@ Library
         DataCon
         PatSyn
         Demand
+        Debug
         Exception
         GhcMonad
         Hooks
