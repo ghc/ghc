@@ -504,31 +504,6 @@ dataKindsErr is_type thing
          | otherwise = ptext (sLit "kind")
 \end{code}
 
-Note [Renaming associated types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Check that the RHS of the decl mentions only type variables
-bound on the LHS.  For example, this is not ok
-   class C a b where
-      type F a x :: *
-   instance C (p,q) r where
-      type F (p,q) x = (x, r)   -- BAD: mentions 'r'
-c.f. Trac #5515
-
-What makes it tricky is that the *kind* variable from the class *are*
-in scope (Trac #5862):
-    class Category (x :: k -> k -> *) where
-      type Ob x :: k -> Constraint
-      id :: Ob x a => x a a
-      (.) :: (Ob x a, Ob x b, Ob x c) => x b c -> x a b -> x a c
-Here 'k' is in scope in the kind signature even though it's not
-explicitly mentioned on the LHS of the type Ob declaration.
-
-We could force you to mention k explicitly, thus
-    class Category (x :: k -> k -> *) where
-      type Ob (x :: k -> k -> *) :: k -> Constraint
-but it seems tiresome to do so.
-
-
 %*********************************************************
 %*                                                      *
 \subsection{Contexts and predicates}

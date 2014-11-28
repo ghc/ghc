@@ -1,6 +1,4 @@
 
-T7938.hs:12:16:
-    Expected kind ‘*’, but ‘KP’ has kind ‘KProxy k2’
-    In the type ‘(KP :: KProxy k2)’
-    In the type instance declaration for ‘Bar’
-    In the instance declaration for ‘Foo (a :: k1) (b :: k2)’
+T7938.hs:12:3:
+    The RHS of an associated type declaration mentions ‘k2’
+      All such variables must be bound on the LHS

@@ -525,8 +525,8 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
 
         -- Next, process any associated types.
         ; traceTc "tcLocalInstDecl" (ppr poly_ty)
-        ; tyfam_insts0 <- tcExtendTyVarEnv tyvars $
-                          mapAndRecoverM (tcAssocTyDecl clas mini_env) ats
+        ; tyfam_insts0  <- tcExtendTyVarEnv tyvars $
+                           mapAndRecoverM (tcTyFamInstDecl mb_info) ats
         ; datafam_insts <- tcExtendTyVarEnv tyvars $
                            mapAndRecoverM (tcDataFamInstDecl mb_info) adts
 
@@ -595,16 +595,6 @@ tcATDefault inst_subst defined_ats (ATI fam_tc defs)
       = (extendTvSubst subst tc_tv ty', ty')
       where
         ty' = mkTyVarTy (updateTyVarKind (substTy subst) tc_tv)
-
-
---------------
-tcAssocTyDecl :: Class                   -- Class of associated type
-              -> VarEnv Type             -- Instantiation of class TyVars
-              -> LTyFamInstDecl Name
-              -> TcM (FamInst)
-tcAssocTyDecl clas mini_env ldecl
-  = do { fam_inst <- tcTyFamInstDecl (Just (clas, mini_env)) ldecl
-       ; return fam_inst }
 \end{code}
 
 %************************************************************************

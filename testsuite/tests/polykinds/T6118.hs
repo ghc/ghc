@@ -17,7 +17,7 @@ instance SingE (a :: Nat) where
   type Demote a = Nat
 
 instance SingE (a :: Maybe k) where
-  type Demote a = Maybe (Demote (Any :: k))
+  type Demote (a :: Maybe k) = Maybe (Demote (Any :: k))
 
 instance SingE (a :: List k) where
   type Demote (a :: List k) = List (Demote (Any :: k))

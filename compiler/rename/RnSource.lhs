@@ -545,10 +545,13 @@ rnFamInstDecl doc mb_cls tycon pats payload rnPayload
                     ; (payload', rhs_fvs) <- rnPayload doc payload
 
                          -- See Note [Renaming associated types]
-                    ; let bad_tvs = case mb_cls of
-                                      Nothing          -> []
-                                      Just (_,cls_tvs) -> filter is_bad cls_tvs
-                          is_bad tv = not (tv `elem` tv_names) && tv `elemNameSet` rhs_fvs
+                    ; let lhs_names = mkNameSet kv_names `unionNameSets` mkNameSet tv_names
+                          bad_tvs = case mb_cls of
+                                      Nothing           -> []
+                                      Just (_,cls_tkvs) -> filter is_bad cls_tkvs
+
+                          is_bad cls_tkv = cls_tkv `elemNameSet` rhs_fvs
+                                        && not (cls_tkv `elemNameSet` lhs_names)
 
                     ; unless (null bad_tvs) (badAssocRhs bad_tvs)
                     ; return ((pats', payload'), rhs_fvs `plusFV` pat_fvs) }
@@ -635,18 +638,45 @@ rnATInstDecls :: (Maybe (Name, [Name]) ->    -- The function that renames
 rnATInstDecls rnFun cls hs_tvs at_insts
   = rnList (rnFun (Just (cls, tv_ns))) at_insts
   where
-    tv_ns = hsLTyVarNames hs_tvs
-    -- Type variable binders (but NOT kind variables)
-    -- See Note [Renaming associated types] in RnTypes
+    tv_ns = hsLKiTyVarNames hs_tvs
+    -- See Note [Renaming associated types]
 \end{code}
 
-For the method bindings in class and instance decls, we extend the
-type variable environment iff -fglasgow-exts
+Note [Renaming associated types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check that the RHS of the decl mentions only type variables
+bound on the LHS.  For example, this is not ok
+   class C a b where
+      type F a x :: *
+   instance C (p,q) r where
+      type F (p,q) x = (x, r)   -- BAD: mentions 'r'
+c.f. Trac #5515
+
+The same thing applies to kind variables, of course (Trac #7938, #9574):
+   class Funct f where
+      type Codomain f :: *
+   instance Funct ('KProxy :: KProxy o) where
+      type Codomain 'KProxy = NatTr (Proxy :: o -> *)
+Here 'o' is mentioned on the RHS of the Codomain function, but
+not on the LHS.
+
+All this applies only for *instance* declarations.  In *class*
+declarations there is no RHS to worry about, and the class variables
+can all be in scope (Trac #5862):
+    class Category (x :: k -> k -> *) where
+      type Ob x :: k -> Constraint
+      id :: Ob x a => x a a
+      (.) :: (Ob x a, Ob x b, Ob x c) => x b c -> x a b -> x a c
+Here 'k' is in scope in the kind signature, just like 'x'.
+
 
 \begin{code}
 extendTyVarEnvForMethodBinds :: [Name]
                              -> RnM (LHsBinds Name, FreeVars)
                              -> RnM (LHsBinds Name, FreeVars)
+-- For the method bindings in class and instance decls, we extend
+-- the type variable environment iff -XScopedTypeVariables
+
 extendTyVarEnvForMethodBinds ktv_names thing_inside
   = do  { scoped_tvs <- xoptM Opt_ScopedTypeVariables
         ; if scoped_tvs then
@@ -991,7 +1021,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls,
              { (context', cxt_fvs) <- rnContext cls_doc context
              ; fds'  <- rnFds fds
                          -- The fundeps have no free variables
-             ; (ats',     fv_ats)     <- rnATDecls cls' ats
+             ; (ats',   fv_ats) <- rnATDecls cls' ats
              ; (sigs', sig_fvs) <- renameSigs (ClsDeclCtxt cls') sigs
              ; let fvs = cxt_fvs     `plusFV`
                          sig_fvs     `plusFV`
@@ -1260,8 +1290,7 @@ modules), we get better error messages, too.
 ---------------
 badAssocRhs :: [Name] -> RnM ()
 badAssocRhs ns
-  = addErr (hang (ptext (sLit "The RHS of an associated type declaration mentions type variable")
-                  <> plural ns
+  = addErr (hang (ptext (sLit "The RHS of an associated type declaration mentions")
                   <+> pprWithCommas (quotes . ppr) ns)
                2 (ptext (sLit "All such variables must be bound on the LHS")))
 
