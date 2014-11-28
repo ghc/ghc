@@ -26,7 +26,7 @@ module HsPat (
         isStrictLPat, hsPatNeedsParens,
         isIrrefutableHsPat,
 
-        pprParendLPat
+        pprParendLPat, pprConArgs
     ) where
 
 import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprUntypedSplice)

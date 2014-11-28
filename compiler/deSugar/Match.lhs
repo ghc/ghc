@@ -35,6 +35,7 @@ import PatSyn
 import MatchCon
 import MatchLit
 import Type
+import TyCon( isNewTyCon )
 import TysWiredIn
 import ListSetOps
 import SrcLoc
@@ -292,9 +293,9 @@ match [] ty eqns
 
 match vars@(v:_) ty eqns    -- Eqns *can* be empty
   = do  { dflags <- getDynFlags
-        ;       -- Tidy the first pattern, generating
+                -- Tidy the first pattern, generating
                 -- auxiliary bindings if necessary
-          (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
+        ; (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
 
                 -- Group the equations and match each group in turn
         ; let grouped = groupEquations dflags tidy_eqns
@@ -588,13 +589,6 @@ tidy1 _ non_interesting_pat
 --------------------
 tidy_bang_pat :: Id -> SrcSpan -> Pat Id -> DsM (DsWrapper, Pat Id)
 
--- Discard bang around strict pattern
-tidy_bang_pat v _ p@(ListPat {})   = tidy1 v p
-tidy_bang_pat v _ p@(TuplePat {})  = tidy1 v p
-tidy_bang_pat v _ p@(PArrPat {})   = tidy1 v p
-tidy_bang_pat v _ p@(ConPatOut {}) = tidy1 v p
-tidy_bang_pat v _ p@(LitPat {})    = tidy1 v p
-
 -- Discard par/sig under a bang
 tidy_bang_pat v _ (ParPat (L l p))      = tidy_bang_pat v l p
 tidy_bang_pat v _ (SigPatOut (L l p) _) = tidy_bang_pat v l p
@@ -604,14 +598,63 @@ tidy_bang_pat v _ (SigPatOut (L l p) _) = tidy_bang_pat v l p
 tidy_bang_pat v l (AsPat v' p)  = tidy1 v (AsPat v' (L l (BangPat p)))
 tidy_bang_pat v l (CoPat w p t) = tidy1 v (CoPat w (BangPat (L l p)) t)
 
+-- Discard bang around strict pattern
+tidy_bang_pat v _ p@(LitPat {})    = tidy1 v p
+tidy_bang_pat v _ p@(ListPat {})   = tidy1 v p
+tidy_bang_pat v _ p@(TuplePat {})  = tidy1 v p
+tidy_bang_pat v _ p@(PArrPat {})   = tidy1 v p
+
+-- Data/newtype constructors
+tidy_bang_pat v l p@(ConPatOut { pat_con = L _ (RealDataCon dc), pat_args = args })
+  | isNewTyCon (dataConTyCon dc)   -- Newtypes: push bang inwards (Trac #9844)
+  = tidy1 v (p { pat_args = push_bang_into_newtype_arg l args })
+  | otherwise                      -- Data types: discard the bang
+  = tidy1 v p
+
+-------------------
 -- Default case, leave the bang there:
--- VarPat, LazyPat, WildPat, ViewPat, NPat, NPlusKPat
+--    VarPat,
+--    LazyPat,
+--    WildPat,
+--    ViewPat,
+--    pattern synonyms (ConPatOut with PatSynCon)
+--    NPat,
+--    NPlusKPat
+--
 -- For LazyPat, remember that it's semantically like a VarPat
 --  i.e.  !(~p) is not like ~p, or p!  (Trac #8952)
+--
+-- NB: SigPatIn, ConPatIn should not happen
 
 tidy_bang_pat _ l p = return (idDsWrapper, BangPat (L l p))
-  -- NB: SigPatIn, ConPatIn should not happen
+
+-------------------
+push_bang_into_newtype_arg :: SrcSpan -> HsConPatDetails Id -> HsConPatDetails Id
+-- See Note [Bang patterns and newtypes]
+-- We are transforming   !(N p)   into   (N !p)
+push_bang_into_newtype_arg l (PrefixCon (arg:args))
+  = ASSERT( null args) 
+    PrefixCon [L l (BangPat arg)]
+push_bang_into_newtype_arg l (RecCon rf)
+  | HsRecFields { rec_flds = L lf fld : flds } <- rf
+  , HsRecField { hsRecFieldArg = arg } <- fld
+  = ASSERT( null flds)
+    RecCon (rf { rec_flds = [L lf (fld { hsRecFieldArg = L l (BangPat arg) })] })
+push_bang_into_newtype_arg _ cd
+  = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
 \end{code}
+
+Note [Bang patterns and newtypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For the pattern  !(Just pat)  we can discard the bang, because
+the pattern is strict anyway. But for !(N pat), where
+  newtype NT = N Int
+we definitely can't discard the bang.  Trac #9844.
+
+So what we do is to push the bang inwards, in the hope that it will
+get discarded there.  So we transform
+   !(N pat)   into    (N !pat)
+
 
 \noindent
 {\bf Previous @matchTwiddled@ stuff:}
