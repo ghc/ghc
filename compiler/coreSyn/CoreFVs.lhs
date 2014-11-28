@@ -234,7 +234,7 @@ tickish_fvs _ = noVars
 ruleLhsOrphNames :: CoreRule -> NameSet
 ruleLhsOrphNames (BuiltinRule { ru_fn = fn }) = unitNameSet fn
 ruleLhsOrphNames (Rule { ru_fn = fn, ru_args = tpl_args })
-  = addOneToNameSet (exprsOrphNames tpl_args) fn
+  = extendNameSet (exprsOrphNames tpl_args) fn
                 -- No need to delete bndrs, because
                 -- exprsOrphNames finds only External names
 
@@ -254,20 +254,20 @@ exprOrphNames e
     go (Lit _)              = emptyNameSet
     go (Type ty)            = orphNamesOfType ty        -- Don't need free tyvars
     go (Coercion co)        = orphNamesOfCo co
-    go (App e1 e2)          = go e1 `unionNameSets` go e2
+    go (App e1 e2)          = go e1 `unionNameSet` go e2
     go (Lam v e)            = go e `delFromNameSet` idName v
     go (Tick _ e)         = go e
-    go (Cast e co)          = go e `unionNameSets` orphNamesOfCo co
-    go (Let (NonRec _ r) e) = go e `unionNameSets` go r
-    go (Let (Rec prs) e)    = exprsOrphNames (map snd prs) `unionNameSets` go e
-    go (Case e _ ty as)     = go e `unionNameSets` orphNamesOfType ty
-                              `unionNameSets` unionManyNameSets (map go_alt as)
+    go (Cast e co)          = go e `unionNameSet` orphNamesOfCo co
+    go (Let (NonRec _ r) e) = go e `unionNameSet` go r
+    go (Let (Rec prs) e)    = exprsOrphNames (map snd prs) `unionNameSet` go e
+    go (Case e _ ty as)     = go e `unionNameSet` orphNamesOfType ty
+                              `unionNameSet` unionNameSets (map go_alt as)
 
     go_alt (_,_,r) = go r
 
 -- | Finds the free /external/ names of several expressions: see 'exprOrphNames' for details
 exprsOrphNames :: [CoreExpr] -> NameSet
-exprsOrphNames es = foldr (unionNameSets . exprOrphNames) emptyNameSet es
+exprsOrphNames es = foldr (unionNameSet . exprOrphNames) emptyNameSet es
 \end{code}
 
 %************************************************************************

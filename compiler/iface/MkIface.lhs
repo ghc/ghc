@@ -395,7 +395,7 @@ mkIface_ hsc_env maybe_old_fingerprint
        , ifaceVectInfoTyCon          = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t /= t_v]
        , ifaceVectInfoTyConReuse     = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t == t_v]
        , ifaceVectInfoParallelVars   = [Var.varName v | v <- varSetElems vParallelVars]
-       , ifaceVectInfoParallelTyCons = nameSetToList vParallelTyCons
+       , ifaceVectInfoParallelTyCons = nameSetElems vParallelTyCons
        }
 
 -----------------------------
@@ -464,7 +464,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
        name_module n = ASSERT2( isExternalName n, ppr n ) nameModule n
        localOccs = map (getUnique . getParent . getOccName)
                         . filter ((== this_mod) . name_module)
-                        . nameSetToList
+                        . nameSetElems
           where getParent occ = lookupOccEnv parent_map occ `orElse` occ
 
         -- maps OccNames to their parents in the current module.
@@ -783,15 +783,15 @@ cmp_abiNames abi1 abi2 = ifName (abiDecl abi1) `compare`
 
 freeNamesDeclABI :: IfaceDeclABI -> NameSet
 freeNamesDeclABI (_mod, decl, extras) =
-  freeNamesIfDecl decl `unionNameSets` freeNamesDeclExtras extras
+  freeNamesIfDecl decl `unionNameSet` freeNamesDeclExtras extras
 
 freeNamesDeclExtras :: IfaceDeclExtras -> NameSet
 freeNamesDeclExtras (IfaceIdExtras id_extras)
   = freeNamesIdExtras id_extras
 freeNamesDeclExtras (IfaceDataExtras  _ insts _ subs)
-  = unionManyNameSets (mkNameSet insts : map freeNamesIdExtras subs)
+  = unionNameSets (mkNameSet insts : map freeNamesIdExtras subs)
 freeNamesDeclExtras (IfaceClassExtras _ insts _ subs)
-  = unionManyNameSets (mkNameSet insts : map freeNamesIdExtras subs)
+  = unionNameSets (mkNameSet insts : map freeNamesIdExtras subs)
 freeNamesDeclExtras (IfaceSynonymExtras _ _)
   = emptyNameSet
 freeNamesDeclExtras (IfaceFamilyExtras _ insts _)
@@ -800,7 +800,7 @@ freeNamesDeclExtras IfaceOtherDeclExtras
   = emptyNameSet
 
 freeNamesIdExtras :: IfaceIdExtras -> NameSet
-freeNamesIdExtras (IdExtras _ rules _) = unionManyNameSets (map freeNamesIfRule rules)
+freeNamesIdExtras (IdExtras _ rules _) = unionNameSets (map freeNamesIfRule rules)
 
 instance Outputable IfaceDeclExtras where
   ppr IfaceOtherDeclExtras       = Outputable.empty
@@ -1829,7 +1829,7 @@ instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
                                           , not (tv `elem` rtvs)]
 
     choose_one :: [NameSet] -> Maybe OccName
-    choose_one nss = case nameSetToList (unionManyNameSets nss) of
+    choose_one nss = case nameSetElems (unionNameSets nss) of
                         []      -> Nothing
                         (n : _) -> Just (nameOccName n)
 
@@ -1857,7 +1857,7 @@ famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
          = Just (nameOccName fam_decl)
 
          | not (isEmptyNameSet lhs_names)
-         = Just (nameOccName (head (nameSetToList lhs_names)))
+         = Just (nameOccName (head (nameSetElems lhs_names)))
 
 
          | otherwise
@@ -1973,7 +1973,7 @@ coreRuleToIfaceRule mod rule@(Rule { ru_name = name, ru_fn = fn,
         -- Compute orphanhood.  See Note [Orphans] in IfaceSyn
         -- A rule is an orphan only if none of the variables
         -- mentioned on its left-hand side are locally defined
-    lhs_names = nameSetToList (ruleLhsOrphNames rule)
+    lhs_names = nameSetElems (ruleLhsOrphNames rule)
 
     orph = case filter (nameIsLocalOrFrom mod) lhs_names of
                         (n : _) -> Just (nameOccName n)

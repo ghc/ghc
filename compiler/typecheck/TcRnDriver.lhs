@@ -1190,7 +1190,7 @@ tcTopSrcDecls boot_details
                 -- Extend the GblEnv with the (as yet un-zonked)
                 -- bindings, rules, foreign decls
             ; tcg_env' = tcg_env { tcg_binds   = tcg_binds tcg_env `unionBags` all_binds
-                                 , tcg_sigs    = tcg_sigs tcg_env `unionNameSets` sig_names
+                                 , tcg_sigs    = tcg_sigs tcg_env `unionNameSet` sig_names
                                  , tcg_rules   = tcg_rules tcg_env ++ rules
                                  , tcg_vects   = tcg_vects tcg_env ++ vects
                                  , tcg_anns    = tcg_anns tcg_env ++ annotations

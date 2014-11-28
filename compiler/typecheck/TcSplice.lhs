@@ -944,7 +944,7 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
       bindName :: RdrName -> TcM ()
       bindName (Exact n)
         = do { th_topnames_var <- fmap tcg_th_topnames getGblEnv
-             ; updTcRef th_topnames_var (\ns -> addOneToNameSet ns n)
+             ; updTcRef th_topnames_var (\ns -> extendNameSet ns n)
              }
 
       bindName name =

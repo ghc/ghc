@@ -247,7 +247,7 @@ addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
    -- to add the local Ids to the set of exported Names so that we know to
    -- tick the right bindings.
    add_exports env =
-     env{ exports = exports env `addListToNameSet`
+     env{ exports = exports env `extendNameSetList`
                       [ idName mid
                       | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
                       , idName pid `elemNameSet` (exports env) ] }

@@ -1792,7 +1792,7 @@ checkRecTc :: RecTcChecker -> TyCon -> Maybe RecTcChecker
 checkRecTc (RC rec_nts) tc
   | not (isRecursiveTyCon tc)     = Just (RC rec_nts)
   | tc_name `elemNameSet` rec_nts = Nothing
-  | otherwise                     = Just (RC (addOneToNameSet rec_nts tc_name))
+  | otherwise                     = Just (RC (extendNameSet rec_nts tc_name))
   where
     tc_name = tyConName tc
 \end{code}

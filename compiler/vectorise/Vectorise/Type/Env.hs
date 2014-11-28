@@ -217,7 +217,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
            -- Furthermore, 'par_tcs' are those type constructors (converted or not) whose
            -- definition, directly or indirectly, depends on parallel arrays. Finally, 'drop_tcs'
            -- are all type constructors that cannot be vectorised.
-       ; parallelTyCons <- (`addListToNameSet` map (tyConName . fst) vectTyConsWithRHS) <$>
+       ; parallelTyCons <- (`extendNameSetList` map (tyConName . fst) vectTyConsWithRHS) <$>
                              globalParallelTyCons
        ; let maybeVectoriseTyCons = filter notVectSpecialTyCon tycons ++ impVectTyCons
              (conv_tcs, keep_tcs, par_tcs, drop_tcs)

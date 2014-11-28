@@ -343,7 +343,7 @@ instance Outputable LocalRdrEnv where
   ppr (LRE {lre_env = env, lre_in_scope = ns})
     = hang (ptext (sLit "LocalRdrEnv {"))
          2 (vcat [ ptext (sLit "env =") <+> pprOccEnv ppr_elt env
-                 , ptext (sLit "in_scope =") <+> braces (pprWithCommas ppr (nameSetToList ns))
+                 , ptext (sLit "in_scope =") <+> braces (pprWithCommas ppr (nameSetElems ns))
                  ] <+> char '}')
     where
       ppr_elt name = parens (ppr (getUnique (nameOccName name))) <+> ppr name
@@ -357,13 +357,13 @@ extendLocalRdrEnv :: LocalRdrEnv -> Name -> LocalRdrEnv
 extendLocalRdrEnv (LRE { lre_env = env, lre_in_scope = ns }) name
   = WARN( isExternalName name, ppr name )
     LRE { lre_env      = extendOccEnv env (nameOccName name) name
-        , lre_in_scope = addOneToNameSet ns name }
+        , lre_in_scope = extendNameSet ns name }
 
 extendLocalRdrEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
 extendLocalRdrEnvList (LRE { lre_env = env, lre_in_scope = ns }) names
   = WARN( any isExternalName names, ppr names )
     LRE { lre_env = extendOccEnvList env [(nameOccName n, n) | n <- names]
-        , lre_in_scope = addListToNameSet ns names }
+        , lre_in_scope = extendNameSetList ns names }
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
 lookupLocalRdrEnv (LRE { lre_env = env }) (Unqual occ) = lookupOccEnv env occ

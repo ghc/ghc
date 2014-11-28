@@ -1214,7 +1214,7 @@ keepAlive :: Name -> TcRn ()     -- Record the name in the keep-alive set
 keepAlive name
   = do { env <- getGblEnv
        ; traceRn (ptext (sLit "keep alive") <+> ppr name)
-       ; updTcRef (tcg_keep env) (`addOneToNameSet` name) }
+       ; updTcRef (tcg_keep env) (`extendNameSet` name) }
 
 getStage :: TcM ThStage
 getStage = do { env <- getLclEnv; return (tcl_th_ctxt env) }

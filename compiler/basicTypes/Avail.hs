@@ -56,7 +56,7 @@ stableAvailCmp (AvailTC {})   (Avail {})     = GT
 
 availsToNameSet :: [AvailInfo] -> NameSet
 availsToNameSet avails = foldr add emptyNameSet avails
-      where add avail set = addListToNameSet set (availNames avail)
+      where add avail set = extendNameSetList set (availNames avail)
 
 availsToNameEnv :: [AvailInfo] -> NameEnv AvailInfo
 availsToNameEnv avails = foldr add emptyNameEnv avails

@@ -99,7 +99,7 @@ bcoFreeNames bco
   = bco_refs bco `minusNameSet` mkNameSet [unlinkedBCOName bco]
   where
     bco_refs (UnlinkedBCO _ _ _ _ nonptrs ptrs)
-        = unionManyNameSets (
+        = unionNameSets (
              mkNameSet [ n | BCOPtrName n <- ssElts ptrs ] :
              mkNameSet [ n | BCONPtrItbl n <- ssElts nonptrs ] :
              map bco_refs [ bco | BCOPtrBCO bco <- ssElts ptrs ]

@@ -191,5 +191,5 @@ addGlobalParallelTyCon :: TyCon -> VM ()
 addGlobalParallelTyCon tycon
   = do { traceVt "addGlobalParallelTyCon" (ppr tycon)
        ; updGEnv $ \env -> 
-           env{global_parallel_tycons = addOneToNameSet (global_parallel_tycons env) (tyConName tycon)}
+           env{global_parallel_tycons = extendNameSet (global_parallel_tycons env) (tyConName tycon)}
        }

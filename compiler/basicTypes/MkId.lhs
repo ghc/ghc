@@ -713,7 +713,7 @@ isUnpackableType fam_envs ty
       =  not (tc_name `elemNameSet` tcs)
       && case tyConSingleAlgDataCon_maybe tc of
             Just con | isVanillaDataCon con
-                    -> ok_con_args (tcs `addOneToNameSet` getName tc) con
+                    -> ok_con_args (tcs `extendNameSet` getName tc) con
             _ -> True
       | otherwise
       = True

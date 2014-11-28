@@ -1335,7 +1335,7 @@ freeNamesIfaceTyConParent (IfDataInstance ax tc tys)
 
 -- helpers
 (&&&) :: NameSet -> NameSet -> NameSet
-(&&&) = unionNameSets
+(&&&) = unionNameSet
 
 fnList :: (a -> NameSet) -> [a] -> NameSet
 fnList f = foldr (&&&) emptyNameSet . map f

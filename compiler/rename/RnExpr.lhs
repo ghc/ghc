@@ -394,7 +394,7 @@ rnCmdTop = wrapLocFstM rnCmdTop'
   rnCmdTop' (HsCmdTop cmd _ _ _)
    = do { (cmd', fvCmd) <- rnLCmd cmd
         ; let cmd_names = [arrAName, composeAName, firstAName] ++
-                          nameSetToList (methodNamesCmd (unLoc cmd'))
+                          nameSetElems (methodNamesCmd (unLoc cmd'))
         -- Generate the rebindable syntax for the monad
         ; (cmd_names', cmd_fvs) <- lookupSyntaxNames cmd_names
 
@@ -686,7 +686,7 @@ rnStmt ctxt rnBody (L _ (RecStmt { recS_stmts = rec_stmts })) thing_inside
         -- (This set may not be empty, because we're in a recursive
         -- context.)
         ; rnRecStmtsAndThen rnBody rec_stmts   $ \ segs -> do
-        { let bndrs = nameSetToList $ foldr (unionNameSets . (\(ds,_,_,_) -> ds))
+        { let bndrs = nameSetElems $ foldr (unionNameSet . (\(ds,_,_,_) -> ds))
                                             emptyNameSet segs
         ; (thing, fvs_later) <- thing_inside bndrs
         ; let (rec_stmts', fvs) = segmentRecStmts ctxt empty_rec_stmt segs fvs_later
@@ -850,7 +850,7 @@ rnRecStmtsAndThen rnBody s cont
           -- (C) do the right-hand-sides and thing-inside
         { segs <- rn_rec_stmts rnBody bound_names new_lhs_and_fv
         ; (res, fvs) <- cont segs
-        ; warnUnusedLocalBinds bound_names (fvs `unionNameSets` implicit_uses)
+        ; warnUnusedLocalBinds bound_names (fvs `unionNameSet` implicit_uses)
         ; return (res, fvs) }}
 
 -- get all the fixity decls in any Let stmt
@@ -1001,8 +1001,8 @@ segmentRecStmts ctxt empty_rec_stmt segs fvs_later
   | otherwise
   = ([ L (getLoc (head ss)) $
        empty_rec_stmt { recS_stmts = ss
-                      , recS_later_ids = nameSetToList (defs `intersectNameSet` fvs_later)
-                      , recS_rec_ids   = nameSetToList (defs `intersectNameSet` uses) }]
+                      , recS_later_ids = nameSetElems (defs `intersectNameSet` fvs_later)
+                      , recS_rec_ids   = nameSetElems (defs `intersectNameSet` uses) }]
     , uses `plusFV` fvs_later)
 
   where
@@ -1034,8 +1034,8 @@ addFwdRefs segs
         = (new_seg : segs, all_defs)
         where
           new_seg = (defs, uses, new_fwds, stmts)
-          all_defs = later_defs `unionNameSets` defs
-          new_fwds = fwds `unionNameSets` (uses `intersectNameSet` later_defs)
+          all_defs = later_defs `unionNameSet` defs
+          new_fwds = fwds `unionNameSet` (uses `intersectNameSet` later_defs)
                 -- Add the downstream fwd refs here
 \end{code}
 
@@ -1125,8 +1125,8 @@ segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
     new_stmt | non_rec   = head ss
              | otherwise = L (getLoc (head ss)) rec_stmt
     rec_stmt = empty_rec_stmt { recS_stmts     = ss
-                              , recS_later_ids = nameSetToList used_later
-                              , recS_rec_ids   = nameSetToList fwds }
+                              , recS_later_ids = nameSetElems used_later
+                              , recS_rec_ids   = nameSetElems fwds }
     non_rec    = isSingleton ss && isEmptyNameSet fwds
     used_later = defs `intersectNameSet` later_uses
                                 -- The ones needed after the RecStmt

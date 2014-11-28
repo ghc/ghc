@@ -1437,7 +1437,7 @@ end of the compiler.
 
 \begin{code}
 orphNamesOfTyCon :: TyCon -> NameSet
-orphNamesOfTyCon tycon = unitNameSet (getName tycon) `unionNameSets` case tyConClass_maybe tycon of
+orphNamesOfTyCon tycon = unitNameSet (getName tycon) `unionNameSet` case tyConClass_maybe tycon of
     Nothing  -> emptyNameSet
     Just cls -> unitNameSet (getName cls)
 
@@ -1447,15 +1447,15 @@ orphNamesOfType ty | Just ty' <- tcView ty = orphNamesOfType ty'
 orphNamesOfType (TyVarTy _)          = emptyNameSet
 orphNamesOfType (LitTy {})           = emptyNameSet
 orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
-                                       `unionNameSets` orphNamesOfTypes tys
+                                       `unionNameSet` orphNamesOfTypes tys
 orphNamesOfType (FunTy arg res)      = orphNamesOfTyCon funTyCon   -- NB!  See Trac #8535
-                                       `unionNameSets` orphNamesOfType arg
-                                       `unionNameSets` orphNamesOfType res
-orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSets` orphNamesOfType arg
+                                       `unionNameSet` orphNamesOfType arg
+                                       `unionNameSet` orphNamesOfType res
+orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
 orphNamesOfType (ForAllTy _ ty)      = orphNamesOfType ty
 
 orphNamesOfThings :: (a -> NameSet) -> [a] -> NameSet
-orphNamesOfThings f = foldr (unionNameSets . f) emptyNameSet
+orphNamesOfThings f = foldr (unionNameSet . f) emptyNameSet
 
 orphNamesOfTypes :: [Type] -> NameSet
 orphNamesOfTypes = orphNamesOfThings orphNamesOfType
@@ -1473,19 +1473,19 @@ orphNamesOfDFunHead dfun_ty
 
 orphNamesOfCo :: Coercion -> NameSet
 orphNamesOfCo (Refl _ ty)           = orphNamesOfType ty
-orphNamesOfCo (TyConAppCo _ tc cos) = unitNameSet (getName tc) `unionNameSets` orphNamesOfCos cos
-orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSets` orphNamesOfCo co2
+orphNamesOfCo (TyConAppCo _ tc cos) = unitNameSet (getName tc) `unionNameSet` orphNamesOfCos cos
+orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
 orphNamesOfCo (ForAllCo _ co)       = orphNamesOfCo co
 orphNamesOfCo (CoVarCo _)           = emptyNameSet
-orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSets` orphNamesOfCos cos
-orphNamesOfCo (UnivCo _ ty1 ty2)    = orphNamesOfType ty1 `unionNameSets` orphNamesOfType ty2
+orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSet` orphNamesOfCos cos
+orphNamesOfCo (UnivCo _ ty1 ty2)    = orphNamesOfType ty1 `unionNameSet` orphNamesOfType ty2
 orphNamesOfCo (SymCo co)            = orphNamesOfCo co
-orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSets` orphNamesOfCo co2
+orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
 orphNamesOfCo (NthCo _ co)          = orphNamesOfCo co
 orphNamesOfCo (LRCo  _ co)          = orphNamesOfCo co
-orphNamesOfCo (InstCo co ty)        = orphNamesOfCo co `unionNameSets` orphNamesOfType ty
+orphNamesOfCo (InstCo co ty)        = orphNamesOfCo co `unionNameSet` orphNamesOfType ty
 orphNamesOfCo (SubCo co)            = orphNamesOfCo co
-orphNamesOfCo (AxiomRuleCo _ ts cs) = orphNamesOfTypes ts `unionNameSets`
+orphNamesOfCo (AxiomRuleCo _ ts cs) = orphNamesOfTypes ts `unionNameSet`
                                       orphNamesOfCos cs
 
 orphNamesOfCos :: [Coercion] -> NameSet
@@ -1493,14 +1493,14 @@ orphNamesOfCos = orphNamesOfThings orphNamesOfCo
 
 orphNamesOfCoCon :: CoAxiom br -> NameSet
 orphNamesOfCoCon (CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
-  = orphNamesOfTyCon tc `unionNameSets` orphNamesOfCoAxBranches branches
+  = orphNamesOfTyCon tc `unionNameSet` orphNamesOfCoAxBranches branches
 
 orphNamesOfCoAxBranches :: BranchList CoAxBranch br -> NameSet
-orphNamesOfCoAxBranches = brListFoldr (unionNameSets . orphNamesOfCoAxBranch) emptyNameSet
+orphNamesOfCoAxBranches = brListFoldr (unionNameSet . orphNamesOfCoAxBranch) emptyNameSet
 
 orphNamesOfCoAxBranch :: CoAxBranch -> NameSet
 orphNamesOfCoAxBranch (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
-  = orphNamesOfTypes lhs `unionNameSets` orphNamesOfType rhs
+  = orphNamesOfTypes lhs `unionNameSet` orphNamesOfType rhs
 \end{code}
 
 

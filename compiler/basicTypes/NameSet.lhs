@@ -10,8 +10,8 @@ module NameSet (
         NameSet,
 
         -- ** Manipulating these sets
-        emptyNameSet, unitNameSet, mkNameSet, unionNameSets, unionManyNameSets,
-        minusNameSet, elemNameSet, nameSetToList, addOneToNameSet, addListToNameSet,
+        emptyNameSet, unitNameSet, mkNameSet, unionNameSet, unionNameSets,
+        minusNameSet, elemNameSet, nameSetElems, extendNameSet, extendNameSetList,
         delFromNameSet, delListFromNameSet, isEmptyNameSet, foldNameSet, filterNameSet,
         intersectsNameSet, intersectNameSet,
 
@@ -47,14 +47,14 @@ type NameSet = UniqSet Name
 
 emptyNameSet       :: NameSet
 unitNameSet        :: Name -> NameSet
-addListToNameSet   :: NameSet -> [Name] -> NameSet
-addOneToNameSet    :: NameSet -> Name -> NameSet
+extendNameSetList   :: NameSet -> [Name] -> NameSet
+extendNameSet    :: NameSet -> Name -> NameSet
 mkNameSet          :: [Name] -> NameSet
-unionNameSets      :: NameSet -> NameSet -> NameSet
-unionManyNameSets  :: [NameSet] -> NameSet
+unionNameSet      :: NameSet -> NameSet -> NameSet
+unionNameSets  :: [NameSet] -> NameSet
 minusNameSet       :: NameSet -> NameSet -> NameSet
 elemNameSet        :: Name -> NameSet -> Bool
-nameSetToList      :: NameSet -> [Name]
+nameSetElems      :: NameSet -> [Name]
 isEmptyNameSet     :: NameSet -> Bool
 delFromNameSet     :: NameSet -> Name -> NameSet
 delListFromNameSet :: NameSet -> [Name] -> NameSet
@@ -69,13 +69,13 @@ isEmptyNameSet    = isEmptyUniqSet
 emptyNameSet      = emptyUniqSet
 unitNameSet       = unitUniqSet
 mkNameSet         = mkUniqSet
-addListToNameSet  = addListToUniqSet
-addOneToNameSet   = addOneToUniqSet
-unionNameSets     = unionUniqSets
-unionManyNameSets = unionManyUniqSets
+extendNameSetList  = addListToUniqSet
+extendNameSet   = addOneToUniqSet
+unionNameSet     = unionUniqSets
+unionNameSets = unionManyUniqSets
 minusNameSet      = minusUniqSet
 elemNameSet       = elementOfUniqSet
-nameSetToList     = uniqSetToList
+nameSetElems     = uniqSetToList
 delFromNameSet    = delOneFromUniqSet
 foldNameSet       = foldUniqSet
 filterNameSet     = filterUniqSet
@@ -110,10 +110,10 @@ delFVs   :: [Name] -> FreeVars -> FreeVars
 isEmptyFVs :: NameSet -> Bool
 isEmptyFVs  = isEmptyNameSet
 emptyFVs    = emptyNameSet
-plusFVs     = unionManyNameSets
-plusFV      = unionNameSets
+plusFVs     = unionNameSets
+plusFV      = unionNameSet
 mkFVs       = mkNameSet
-addOneFV    = addOneToNameSet
+addOneFV    = extendNameSet
 unitFV      = unitNameSet
 delFV n s   = delFromNameSet s n
 delFVs ns s = delListFromNameSet s ns
@@ -162,21 +162,21 @@ duDefs :: DefUses -> Defs
 duDefs dus = foldr get emptyNameSet dus
   where
     get (Nothing, _u1) d2 = d2
-    get (Just d1, _u1) d2 = d1 `unionNameSets` d2
+    get (Just d1, _u1) d2 = d1 `unionNameSet` d2
 
 allUses :: DefUses -> Uses
 -- ^ Just like 'duUses', but 'Defs' are not eliminated from the 'Uses' returned
 allUses dus = foldr get emptyNameSet dus
   where
-    get (_d1, u1) u2 = u1 `unionNameSets` u2
+    get (_d1, u1) u2 = u1 `unionNameSet` u2
 
 duUses :: DefUses -> Uses
 -- ^ Collect all 'Uses', regardless of whether the group is itself used,
 -- but remove 'Defs' on the way
 duUses dus = foldr get emptyNameSet dus
   where
-    get (Nothing,   rhs_uses) uses = rhs_uses `unionNameSets` uses
-    get (Just defs, rhs_uses) uses = (rhs_uses `unionNameSets` uses)
+    get (Nothing,   rhs_uses) uses = rhs_uses `unionNameSet` uses
+    get (Just defs, rhs_uses) uses = (rhs_uses `unionNameSet` uses)
                                      `minusNameSet` defs
 
 findUses :: DefUses -> Uses -> Uses
@@ -187,13 +187,13 @@ findUses dus uses
   = foldr get uses dus
   where
     get (Nothing, rhs_uses) uses
-        = rhs_uses `unionNameSets` uses
+        = rhs_uses `unionNameSet` uses
     get (Just defs, rhs_uses) uses
         | defs `intersectsNameSet` uses         -- Used
-        || any (startsWithUnderscore . nameOccName) (nameSetToList defs)
+        || any (startsWithUnderscore . nameOccName) (nameSetElems defs)
                 -- At least one starts with an "_",
                 -- so treat the group as used
-        = rhs_uses `unionNameSets` uses
+        = rhs_uses `unionNameSet` uses
         | otherwise     -- No def is used
         = uses
 \end{code}

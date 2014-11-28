@@ -518,7 +518,7 @@ getLocalNonValBinders fixity_env
         ; val_avails <- mapM new_simple val_bndrs
 
         ; let avails    = nti_avails ++ val_avails
-              new_bndrs = availsToNameSet avails `unionNameSets`
+              new_bndrs = availsToNameSet avails `unionNameSet`
                           availsToNameSet tc_avails
         ; traceRn (text "getLocalNonValBinders 2" <+> ppr avails)
         ; envs <- extendGlobalRdrEnvRn avails fixity_env
@@ -1390,7 +1390,7 @@ findImportUsage imports rdr_env rdrs
     import_usage = foldr (extendImportMap rdr_env) Map.empty rdrs
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
-      = (decl, nubAvails used_avails, nameSetToList unused_imps)
+      = (decl, nubAvails used_avails, nameSetElems unused_imps)
       where
         used_avails = Map.lookup (srcSpanEnd loc) import_usage `orElse` []
                       -- srcSpanEnd: see Note [The ImportMap]
@@ -1413,11 +1413,11 @@ findImportUsage imports rdr_env rdrs
 
         add_unused_name n acc
           | n `elemNameSet` used_names = acc
-          | otherwise                  = acc `addOneToNameSet` n
+          | otherwise                  = acc `extendNameSet` n
         add_unused_all n acc
           | n `elemNameSet` used_names   = acc
           | n `elemNameSet` used_parents = acc
-          | otherwise                    = acc `addOneToNameSet` n
+          | otherwise                    = acc `extendNameSet` n
         add_unused_with p ns acc
           | all (`elemNameSet` acc1) ns = add_unused_name p acc1
           | otherwise = acc1

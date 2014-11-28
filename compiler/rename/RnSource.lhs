@@ -116,7 +116,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
    -- bind the LHSes (and their fixities) in the global rdr environment
    let { val_binders = collectHsValBinders new_lhs ;
-         all_bndrs   = addListToNameSet tc_bndrs val_binders ;
+         all_bndrs   = extendNameSetList tc_bndrs val_binders ;
          val_avails  = map Avail val_binders  } ;
    traceRn (text "rnSrcDecls" <+> ppr val_avails) ;
    (tcg_env, tcl_env) <- extendGlobalRdrEnvRn val_avails local_fix_env ;
@@ -188,7 +188,7 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
 
         tycl_bndrs = hsTyClDeclsBinders rn_tycl_decls rn_inst_decls ;
         ford_bndrs = hsForeignDeclsBinders rn_foreign_decls ;
-        other_def  = (Just (mkNameSet tycl_bndrs `unionNameSets` mkNameSet ford_bndrs), emptyNameSet) ;
+        other_def  = (Just (mkNameSet tycl_bndrs `unionNameSet` mkNameSet ford_bndrs), emptyNameSet) ;
         other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4,
                               src_fvs5, src_fvs6, src_fvs7, src_fvs8,
                               src_fvs9] ;
@@ -545,7 +545,7 @@ rnFamInstDecl doc mb_cls tycon pats payload rnPayload
                     ; (payload', rhs_fvs) <- rnPayload doc payload
 
                          -- See Note [Renaming associated types]
-                    ; let lhs_names = mkNameSet kv_names `unionNameSets` mkNameSet tv_names
+                    ; let lhs_names = mkNameSet kv_names `unionNameSet` mkNameSet tv_names
                           bad_tvs = case mb_cls of
                                       Nothing           -> []
                                       Just (_,cls_tkvs) -> filter is_bad cls_tkvs
@@ -938,7 +938,7 @@ rnTyClDecls extra_deps tycl_ds
        ; thisPkg  <- fmap thisPackage getDynFlags
        ; let add_boot_deps :: FreeVars -> FreeVars
              -- See Note [Extra dependencies from .hs-boot files]
-             add_boot_deps fvs | any (isInPackage thisPkg) (nameSetToList fvs)
+             add_boot_deps fvs | any (isInPackage thisPkg) (nameSetElems fvs)
                                = fvs `plusFV` mkFVs extra_deps
                                | otherwise
                                = fvs
@@ -1213,7 +1213,7 @@ depAnalTyClDecls :: [(LTyClDecl Name, FreeVars)] -> [SCC (LTyClDecl Name)]
 depAnalTyClDecls ds_w_fvs
   = stronglyConnCompFromEdgedVertices edges
   where
-    edges = [ (d, tcdName (unLoc d), map get_parent (nameSetToList fvs))
+    edges = [ (d, tcdName (unLoc d), map get_parent (nameSetElems fvs))
             | (d, fvs) <- ds_w_fvs ]
 
     -- We also need to consider data constructor names since
@@ -1435,7 +1435,7 @@ extendRecordFieldEnv tycl_decls inst_decls
              ; flds' <- mapM lookup (concatMap (cd_fld_names . unLoc) flds)
              ; let env'    = foldl (\e c -> extendNameEnv e c flds') env cons'
 
-                   fld_set' = addListToNameSet fld_set flds'
+                   fld_set' = extendNameSetList fld_set flds'
              ; return $ (RecFields env' fld_set') }
     get_con _ env = return env
 \end{code}

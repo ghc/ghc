@@ -353,7 +353,7 @@ familyInstances (pkg_fie, home_fie) fam
 orphNamesOfFamInst :: FamInst -> NameSet
 orphNamesOfFamInst fam_inst
   = orphNamesOfTypes (concat (brListMap cab_lhs (coAxiomBranches axiom)))
-    `addOneToNameSet` getName (coAxiomTyCon axiom)
+    `extendNameSet` getName (coAxiomTyCon axiom)
   where
     axiom = fi_axiom fam_inst
 

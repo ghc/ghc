@@ -844,7 +844,7 @@ lStmtsImplicits :: [LStmtLR Name idR (Located (body idR))] -> NameSet
 lStmtsImplicits = hs_lstmts
   where
     hs_lstmts :: [LStmtLR Name idR (Located (body idR))] -> NameSet
-    hs_lstmts = foldr (\stmt rest -> unionNameSets (hs_stmt (unLoc stmt)) rest) emptyNameSet
+    hs_lstmts = foldr (\stmt rest -> unionNameSet (hs_stmt (unLoc stmt)) rest) emptyNameSet
 
     hs_stmt (BindStmt pat _ _ _) = lPatImplicits pat
     hs_stmt (LetStmt binds)      = hs_local_binds binds
@@ -860,12 +860,12 @@ lStmtsImplicits = hs_lstmts
 
 hsValBindsImplicits :: HsValBindsLR Name idR -> NameSet
 hsValBindsImplicits (ValBindsOut binds _)
-  = foldr (unionNameSets . lhsBindsImplicits . snd) emptyNameSet binds
+  = foldr (unionNameSet . lhsBindsImplicits . snd) emptyNameSet binds
 hsValBindsImplicits (ValBindsIn binds _)
   = lhsBindsImplicits binds
 
 lhsBindsImplicits :: LHsBindsLR Name idR -> NameSet
-lhsBindsImplicits = foldBag unionNameSets (lhs_bind . unLoc) emptyNameSet
+lhsBindsImplicits = foldBag unionNameSet (lhs_bind . unLoc) emptyNameSet
   where
     lhs_bind (PatBind { pat_lhs = lpat }) = lPatImplicits lpat
     lhs_bind _ = emptyNameSet
@@ -875,7 +875,7 @@ lPatImplicits = hs_lpat
   where
     hs_lpat (L _ pat) = hs_pat pat
 
-    hs_lpats = foldr (\pat rest -> hs_lpat pat `unionNameSets` rest) emptyNameSet
+    hs_lpats = foldr (\pat rest -> hs_lpat pat `unionNameSet` rest) emptyNameSet
 
     hs_pat (LazyPat pat)       = hs_lpat pat
     hs_pat (BangPat pat)       = hs_lpat pat
@@ -896,11 +896,11 @@ lPatImplicits = hs_lpat
     hs_pat _ = emptyNameSet
 
     details (PrefixCon ps)   = hs_lpats ps
-    details (RecCon fs)      = hs_lpats explicit `unionNameSets` mkNameSet (collectPatsBinders implicit)
+    details (RecCon fs)      = hs_lpats explicit `unionNameSet` mkNameSet (collectPatsBinders implicit)
       where (explicit, implicit) = partitionEithers [if pat_explicit then Left pat else Right pat
                                                     | (i, fld) <- [0..] `zip` rec_flds fs
                                                     , let pat = hsRecFieldArg
                                                                      (unLoc fld)
                                                           pat_explicit = maybe True (i<) (rec_dotdot fs)]
-    details (InfixCon p1 p2) = hs_lpat p1 `unionNameSets` hs_lpat p2
+    details (InfixCon p1 p2) = hs_lpat p1 `unionNameSet` hs_lpat p2
 \end{code}

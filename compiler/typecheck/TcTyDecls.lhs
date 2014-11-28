@@ -117,7 +117,7 @@ synTyConsOfType ty
 
 \begin{code}
 mkSynEdges :: [LTyClDecl Name] -> [(LTyClDecl Name, Name, [Name])]
-mkSynEdges syn_decls = [ (ldecl, name, nameSetToList fvs)
+mkSynEdges syn_decls = [ (ldecl, name, nameSetElems fvs)
                        | ldecl@(L _ (SynDecl { tcdLName = L _ name
                                              , tcdFVs = fvs })) <- syn_decls ]
 
@@ -383,8 +383,8 @@ calcRecFlags boot_details is_boot mrole_env tyclss
              | otherwise                 = NonRecursive
 
     boot_name_set = availsToNameSet (md_exports boot_details)
-    rec_names = boot_name_set     `unionNameSets`
-                nt_loop_breakers  `unionNameSets`
+    rec_names = boot_name_set     `unionNameSet`
+                nt_loop_breakers  `unionNameSet`
                 prod_loop_breakers
 
 

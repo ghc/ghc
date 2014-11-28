@@ -348,7 +348,7 @@ rnLocalValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
               -- wildcards (#4404)
               implicit_uses = hsValBindsImplicits binds'
         ; warnUnusedLocalBinds bound_names
-                                      (real_uses `unionNameSets` implicit_uses)
+                                      (real_uses `unionNameSet` implicit_uses)
 
         ; let
             -- The variables "used" in the val binds are:
@@ -637,7 +637,7 @@ depAnalBinds binds_w_dus
   = (map get_binds sccs, map get_du sccs)
   where
     sccs = depAnal (\(_, defs, _) -> defs)
-                   (\(_, _, uses) -> nameSetToList uses)
+                   (\(_, _, uses) -> nameSetElems uses)
                    (bagToList binds_w_dus)
 
     get_binds (AcyclicSCC (bind, _, _)) = (NonRecursive, unitBag bind)
@@ -647,7 +647,7 @@ depAnalBinds binds_w_dus
     get_du (CyclicSCC  binds_w_dus)      = (Just defs, uses)
         where
           defs = mkNameSet [b | (_,bs,_) <- binds_w_dus, b <- bs]
-          uses = unionManyNameSets [u | (_,_,u) <- binds_w_dus]
+          uses = unionNameSets [u | (_,_,u) <- binds_w_dus]
 
 ---------------------
 -- Bind the top-level forall'd type variables in the sigs.

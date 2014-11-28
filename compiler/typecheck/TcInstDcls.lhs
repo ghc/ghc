@@ -533,7 +533,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         -- Check for missing associated types and build them
         -- from their defaults (if available)
         ; let defined_ats = mkNameSet (map (tyFamInstDeclName . unLoc) ats)
-                            `unionNameSets`
+                            `unionNameSet`
                             mkNameSet (map (unLoc . dfid_tycon . unLoc) adts)
         ; tyfam_insts1 <- mapM (tcATDefault mini_subst defined_ats)
                                (classATItems clas)

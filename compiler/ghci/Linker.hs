@@ -473,7 +473,7 @@ linkExpr hsc_env span root_ul_bco
    ; return (pls, root_hval)
    }}}
    where
-     free_names = nameSetToList (bcoFreeNames root_ul_bco)
+     free_names = nameSetElems (bcoFreeNames root_ul_bco)
 
      needed_mods :: [Module]
      needed_mods = [ nameModule n | n <- free_names,
@@ -688,7 +688,7 @@ linkDecls hsc_env span (ByteCode unlinkedBCOs itblEnv) = do
                      itbl_env    = ie }
     return (pls2, ()) --hvals)
   where
-    free_names =  concatMap (nameSetToList . bcoFreeNames) unlinkedBCOs
+    free_names =  concatMap (nameSetElems . bcoFreeNames) unlinkedBCOs
 
     needed_mods :: [Module]
     needed_mods = [ nameModule n | n <- free_names,

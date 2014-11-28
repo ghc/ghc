@@ -449,7 +449,7 @@ mkEdges :: TcSigFun -> LHsBinds Name
 type BKey  = Int -- Just number off the bindings
 
 mkEdges sig_fn binds
-  = [ (bind, key, [key | n <- nameSetToList (bind_fvs (unLoc bind)),
+  = [ (bind, key, [key | n <- nameSetElems (bind_fvs (unLoc bind)),
                          Just key <- [lookupNameEnv key_map n], no_sig n ])
     | (bind, key) <- keyd_binds
     ]

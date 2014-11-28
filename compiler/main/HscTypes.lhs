@@ -2494,7 +2494,7 @@ plusVectInfo vi1 vi2 =
            (vectInfoTyCon          vi1 `plusNameEnv`   vectInfoTyCon          vi2)
            (vectInfoDataCon        vi1 `plusNameEnv`   vectInfoDataCon        vi2)
            (vectInfoParallelVars   vi1 `unionVarSet`   vectInfoParallelVars   vi2)
-           (vectInfoParallelTyCons vi1 `unionNameSets` vectInfoParallelTyCons vi2)
+           (vectInfoParallelTyCons vi1 `unionNameSet` vectInfoParallelTyCons vi2)
 
 concatVectInfo :: [VectInfo] -> VectInfo
 concatVectInfo = foldr plusVectInfo noVectInfo
