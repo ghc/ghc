@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, UnboxedTuples #-}
+{-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples #-}
 
 module Main (main) where
 
@@ -12,11 +12,58 @@ import GHC.Base
 import GHC.Integer.GMP.Internals (Integer(S#,Jp#,Jn#))
 import qualified GHC.Integer.GMP.Internals as I
 
-gcdExtInteger :: Integer -> Integer -> (Integer, Integer)
-gcdExtInteger a b = case I.gcdExtInteger a b of (# a, b #) -> (a,b)
+-- NOTE: Some of the following operations were provided with
+-- integer-gmp-0.5.1, but were not ported to integer-gmp-1.0.0 (yet);
+-- so we use naive reference-implementations instead for the meantime
+-- in order to keep the reference-output untouched.
 
+-- FIXME: Lacks GMP2 version
+-- stolen from `arithmoi` package
+recipModInteger :: Integer -> Integer -> Integer
+recipModInteger k 0 = if k == 1 || k == (-1) then k else 0
+recipModInteger k m = case gcdExtInteger k' m' of
+                  (1, u) -> if u < 0 then m' + u else u
+                  _      -> 0
+  where
+    m' = abs m
+    k' | k >= m' || k < 0   = k `mod` m'
+       | otherwise          = k
+
+-- FIXME: Lacks GMP2 version
+gcdExtInteger :: Integer -> Integer -> (Integer, Integer)
+gcdExtInteger a b = (d, u) -- stolen from `arithmoi` package
+  where
+    (d, x, y) = eGCD 0 1 1 0 (abs a) (abs b)
+    u | a < 0     = negate x
+      | otherwise = x
+    v | b < 0     = negate y
+      | otherwise = y
+    eGCD !n1 o1 !n2 o2 r s
+      | s == 0    = (r, o1, o2)
+      | otherwise = case r `quotRem` s of
+                      (q, t) -> eGCD (o1 - q*n1) n1 (o2 - q*n2) n2 s t
+
+-- FIXME: Lacks GMP2 version
+powModSecInteger :: Integer -> Integer -> Integer -> Integer
+powModSecInteger = powModInteger
+
+-- FIXME: Lacks GMP2 version
+powModInteger :: Integer -> Integer -> Integer -> Integer
+powModInteger b0 e0 m
+  | e0 >= 0    = go b0 e0 1
+  | otherwise  = error "non-neg exponent required"
+  where
+    go !b e !r
+      | odd e     = go b' e' (r*b `mod` m)
+      | e == 0    = r
+      | otherwise = go b' e' r
+      where
+        b' = b*b `mod` m
+        e' = e   `unsafeShiftR` 1 -- slightly faster than "e `div` 2"
+
+-- FIXME: Lacks GMP2 version
 powInteger :: Integer -> Word -> Integer
-powInteger b (W# w#) = I.powInteger b w#
+powInteger x e = x^e
 
 exportInteger :: Integer -> MutableByteArray# RealWorld -> Word# -> Int# -> IO Word
 exportInteger = I.exportIntegerToMutableByteArray
@@ -29,23 +76,6 @@ importInteger = I.importIntegerFromByteArray
 
 importIntegerAddr :: Addr# -> Word# -> Int# -> IO Integer
 importIntegerAddr a l e = I.importIntegerFromAddr a l e
-
-{- Reference implementation for 'powModInteger'
-
-powModIntegerHs :: Integer -> Integer -> Integer -> Integer
-powModIntegerHs b0 e0 m
-  | e0 >= 0    = go b0 e0 1
-  | otherwise  = error "non-neg exponent required"
-  where
-    go !b e !r
-      | odd e     = go b' e' (r*b `mod` m)
-      | e == 0    = r
-      | otherwise = go b' e' r
-      where
-        b' = b*b `mod` m
-        e' = e   `unsafeShiftR` 1 -- slightly faster than "e `div` 2"
-
--}
 
 -- helpers
 data MBA = MBA { unMBA :: !(MutableByteArray# RealWorld) }
@@ -78,9 +108,9 @@ freezeByteArray arr = IO $ \s -> case unsafeFreezeByteArray# arr s of (# s, arr 
 ----------------------------------------------------------------------------
 main :: IO ()
 main = do
-    print $ I.powModInteger b e m
-    print $ I.powModInteger b e (m-1)
-    print $ I.powModSecInteger b e (m-1)
+    print $ powModInteger b e m
+    print $ powModInteger b e (m-1)
+    print $ powModSecInteger b e (m-1)
     print $ gcdExtInteger b e
     print $ gcdExtInteger e b
     print $ gcdExtInteger x y
@@ -88,7 +118,7 @@ main = do
     print $ powInteger 12345 0
     print $ powInteger 12345 1
     print $ powInteger 12345 30
-    print $ [ (x,i) | x <- [0..71], let i = I.recipModInteger x (2*3*11*11*17*17), i /= 0 ]
+    print $ [ (x,i) | x <- [0..71], let i = recipModInteger x (2*3*11*11*17*17), i /= 0 ]
     print $ I.nextPrimeInteger b
     print $ I.nextPrimeInteger e
     print $ [ k | k <- [ 0 .. 200 ], S# (I.testPrimeInteger k 25#) `elem` [1,2] ]
