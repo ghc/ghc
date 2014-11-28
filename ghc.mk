@@ -1112,8 +1112,11 @@ SRC_DIST_GHC_FILES += \
     settings.in VERSION GIT_COMMIT_ID \
     boot packages ghc.mk
 
-VERSION :
-	echo $(ProjectVersion) >VERSION
+.PHONY: VERSION
+VERSION:
+	@if test -f $@ && test "`cat $@`" = "$(ProjectVersion)"; \
+	then echo "$@ needs no update"; \
+	else echo "update $@ ($(ProjectVersion))"; echo "$(ProjectVersion)" > $@; fi
 
 .PHONY: GIT_COMMIT_ID
 GIT_COMMIT_ID:
@@ -1129,7 +1132,7 @@ GIT_COMMIT_ID:
 	then echo "$@ needs no update"; \
 	else echo "update $@ ($(ProjectGitCommitId))"; echo -n "$(ProjectGitCommitId)" > $@; fi
 
-sdist : VERSION GIT_COMMIT_ID
+sdist-ghc-prep : VERSION GIT_COMMIT_ID
 
 # Use:
 #     $(call sdist_ghc_file,compiler,stage2,cmm,Foo/Bar,CmmLex,x)
