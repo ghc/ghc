@@ -449,3 +449,28 @@ integer_gmp_rscan_nzbyte(const uint8_t *srcptr,
 
   return 0;
 }
+
+/* wrapper around mpz_probab_prime_p */
+HsInt
+integer_gmp_test_prime(const mp_limb_t s[], const mp_size_t sn, const HsInt rep)
+{
+  if (!sn) return 0;
+
+  const mpz_t sz = {{
+      ._mp_alloc = sn,
+      ._mp_size  = sn,
+      ._mp_d = (mp_limb_t*)s
+    }};
+
+  // int mpz_probab_prime_p (const mpz_t n, int reps)
+  return mpz_probab_prime_p(sz, rep);
+}
+
+/* wrapper around mpz_probab_prime_p */
+HsInt
+integer_gmp_test_prime1(const mp_limb_t limb, const HsInt rep)
+{
+  if (!limb) return 0;
+
+  return integer_gmp_test_prime(&limb, 1, rep);
+}

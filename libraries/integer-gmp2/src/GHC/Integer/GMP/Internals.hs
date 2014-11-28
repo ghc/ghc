@@ -120,6 +120,11 @@ module GHC.Integer.GMP.Internals
     , gcdInt
     , gcdWord
 
+      -- * Primality tests
+    , testPrimeInteger
+    , testPrimeBigNat
+    , testPrimeWord#
+
       -- * Import/export functions
       -- ** Compute size of serialisation
     , sizeInBaseBigNat
@@ -280,3 +285,41 @@ exportWordToMutableByteArray (W# w#) = c_mpn_export1ToMutableByteArray# w#
 foreign import ccall unsafe "integer_gmp_mpn_export1"
   c_mpn_export1ToMutableByteArray# :: GmpLimb# -> MutableByteArray# RealWorld
                                    -> Word# -> Int# -> IO Word
+
+
+-- | Probalistic Miller-Rabin primality test.
+--
+-- \"@'testPrimeInteger' /n/ /k/@\" determines whether @/n/@ is prime
+-- and returns one of the following results:
+--
+-- * @2#@ is returned if @/n/@ is definitely prime,
+--
+-- * @1#@ if @/n/@ is a /probable prime/, or
+--
+-- * @0#@ if @/n/@ is definitely not a prime.
+--
+-- The @/k/@ argument controls how many test rounds are performed for
+-- determining a /probable prime/. For more details, see
+-- <http://gmplib.org/manual/Number-Theoretic-Functions.html#index-mpz_005fprobab_005fprime_005fp-360 GMP documentation for `mpz_probab_prime_p()`>.
+--
+-- /Since: 0.5.1.0/
+{-# NOINLINE testPrimeInteger #-}
+testPrimeInteger :: Integer -> Int# -> Int#
+testPrimeInteger (S# i#) = testPrimeWord# (int2Word# (absI# i#))
+testPrimeInteger (Jp# n) = testPrimeBigNat n
+testPrimeInteger (Jn# n) = testPrimeBigNat n
+
+-- | Version of 'testPrimeInteger' operating on 'BigNat's
+--
+-- /Since: 1.0.0.0/
+testPrimeBigNat :: BigNat -> Int# -> Int#
+testPrimeBigNat bn@(BN# ba#) = c_integer_gmp_test_prime# ba# (sizeofBigNat# bn)
+
+foreign import ccall unsafe "integer_gmp_test_prime"
+  c_integer_gmp_test_prime# :: ByteArray# -> GmpSize# -> Int# -> Int#
+
+-- | Version of 'testPrimeInteger' operating on 'Word#'s
+--
+-- /Since: 1.0.0.0/
+foreign import ccall unsafe "integer_gmp_test_prime1"
+  testPrimeWord# :: GmpLimb# -> Int# -> Int#
