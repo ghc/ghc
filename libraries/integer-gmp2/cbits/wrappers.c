@@ -36,6 +36,10 @@ typedef unsigned long int mp_bitcnt_t;
 # error (SIZEOF_HSWORD*8) != WORD_SIZE_IN_BITS
 #endif
 
+// Turn a (const) {xp,xn} pair into static initializer
+#define CONST_MPZ_INIT(xp,xn) \
+  {{ ._mp_alloc = 0, ._mp_size  = (xn), ._mp_d = (mp_limb_t*)(xp) }}
+
 /* Perform arithmetic right shift on MPNs (multi-precision naturals)
  *
  * pre-conditions:
@@ -132,7 +136,8 @@ integer_gmp_mpn_lshift (mp_limb_t rp[], const mp_limb_t sp[],
   }
 }
 
-/*
+/* Convert bignum to a `double`, truncating if necessary
+ * (i.e. rounding towards zero).
  *
  * sign of mp_size_t argument controls sign of converted double
  */
@@ -146,17 +151,13 @@ integer_gmp_mpn_get_d (const mp_limb_t sp[], const mp_size_t sn,
   if (sn == 1 && sp[0] == 0)
     return 0.0;
 
-  __mpz_struct const mpz = {
-    ._mp_alloc = abs(sn),
-    ._mp_size  = sn,
-    ._mp_d = (mp_limb_t*)sp
-  };
+  const mpz_t mpz = CONST_MPZ_INIT(sp, sn);
 
   if (!exponent)
-    return mpz_get_d(&mpz);
+    return mpz_get_d(mpz);
 
   long e = 0;
-  double d = mpz_get_d_2exp (&e, &mpz);
+  double d = mpz_get_d_2exp (&e, mpz);
 
   // TODO: over/underflow handling?
   return ldexp(d, e+exponent);
@@ -212,17 +213,8 @@ integer_gmp_mpn_gcd(mp_limb_t r[],
     // the cost of a few additional temporary buffer allocations in
     // C-land.
 
-    const mpz_t op1 = {{
-      ._mp_alloc = xn,
-      ._mp_size  = xn,
-      ._mp_d = (mp_limb_t*)x0
-      }};
-
-    const mpz_t op2 = {{
-      ._mp_alloc = yn,
-      ._mp_size  = yn,
-      ._mp_d = (mp_limb_t*)y0
-      }};
+    const mpz_t op1 = CONST_MPZ_INIT(x0, xn);
+    const mpz_t op2 = CONST_MPZ_INIT(y0, yn);
 
     mpz_t rop;
     mpz_init (rop);
@@ -299,11 +291,7 @@ integer_gmp_mpn_sizeinbase(const mp_limb_t s[], const mp_size_t sn,
 
   if (!sn) return 1;
 
-  const mpz_t zs = {{
-      ._mp_alloc = sn,
-      ._mp_size  = sn,
-      ._mp_d = (mp_limb_t*)s
-    }};
+  const mpz_t zs = CONST_MPZ_INIT(s, sn);
 
   return mpz_sizeinbase(zs, base);
 }
@@ -326,11 +314,7 @@ integer_gmp_mpn_export(const mp_limb_t s[], const mp_size_t sn,
   if (!sn || (sn == 1 && !s[0]))
     return 0;
 
-  const mpz_t zs = {{
-      ._mp_alloc = sn,
-      ._mp_size  = sn,
-      ._mp_d = (mp_limb_t*)s
-    }};
+  const mpz_t zs = CONST_MPZ_INIT(s, sn);
 
   size_t written = 0;
 
