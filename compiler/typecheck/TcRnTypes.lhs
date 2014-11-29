@@ -49,7 +49,7 @@ module TcRnTypes(
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
-        isGivenCt, isHoleCt, isTypedHoleCt,
+        isGivenCt, isHoleCt, isTypedHoleCt, isPartialTypeSigCt,
         ctEvidence, ctLoc, ctPred,
         mkNonCanonical, mkNonCanonicalCt,
         ctEvPred, ctEvLoc, ctEvTerm, ctEvCoercion, ctEvId, ctEvCheckDepth,
@@ -1248,6 +1248,10 @@ isHoleCt _ = False
 isTypedHoleCt :: Ct -> Bool
 isTypedHoleCt (CHoleCan { cc_hole = ExprHole }) = True
 isTypedHoleCt _ = False
+
+isPartialTypeSigCt :: Ct -> Bool
+isPartialTypeSigCt (CHoleCan { cc_hole = TypeHole }) = True
+isPartialTypeSigCt _ = False
 \end{code}
 
 \begin{code}
@@ -1331,11 +1335,11 @@ isEmptyWC (WC { wc_flat = f, wc_impl = i, wc_insol = n })
   = isEmptyBag f && isEmptyBag i && isEmptyBag n
 
 insolubleWC :: WantedConstraints -> Bool
--- True if there are any insoluble constraints in the wanted bag
-insolubleWC wc = not (isEmptyBag (filterBag isTypedHoleCt (wc_insol wc)))
--- TODOT actually, a wildcard constraint (CHoleCan originating from a wildcard
--- in a partial type signature) is not insulible.
--- insolubleWC wc = not (isEmptyBag (wc_insol wc))
+-- True if there are any insoluble constraints in the wanted bag. Ignore
+-- constraints arising from PartialTypeSignatures to solve as much of the
+-- constraints as possible before reporting the holes.
+insolubleWC wc = not (isEmptyBag (filterBag (not . isPartialTypeSigCt)
+                                  (wc_insol wc)))
                || anyBag ic_insol (wc_impl wc)
 
 andWC :: WantedConstraints -> WantedConstraints -> WantedConstraints
