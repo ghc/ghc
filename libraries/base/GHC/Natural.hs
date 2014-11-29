@@ -41,6 +41,8 @@ module GHC.Natural
     , naturalToWordMaybe
       -- * Checked subtraction
     , minusNaturalMaybe
+      -- * Modular arithmetic
+    , powModNatural
     ) where
 
 #include "MachDeps.h"
@@ -410,6 +412,10 @@ bigNatToNatural bn
   | isTrue# (isNullBigNat# bn)        = throw Underflow
   | otherwise                         = NatJ# bn
 
+naturalToBigNat :: Natural -> BigNat
+naturalToBigNat (NatS# w#) = wordToBigNat w#
+naturalToBigNat (NatJ# bn) = bn
+
 -- | Convert 'Int' to 'Natural'.
 -- Throws 'Underflow' when passed a negative 'Int'.
 intToNatural :: Int -> Natural
@@ -602,3 +608,37 @@ instance Data Natural where
                     _ -> error $ "Data.Data.gunfold: Constructor " ++ show c
                                  ++ " is not of type Natural"
   dataTypeOf _ = naturalType
+
+-- | \"@'powModNatural' /b/ /e/ /m/@\" computes base @/b/@ raised to
+-- exponent @/e/@ modulo @/m/@.
+--
+-- /Since: 4.8.0.0/
+powModNatural :: Natural -> Natural -> Natural -> Natural
+#if HAVE_GMP_BIGNAT
+powModNatural _           _           (NatS# 0##) = throw DivideByZero
+powModNatural _           _           (NatS# 1##) = NatS# 0##
+powModNatural _           (NatS# 0##) _           = NatS# 1##
+powModNatural (NatS# 0##) _           _           = NatS# 0##
+powModNatural (NatS# 1##) _           _           = NatS# 1##
+powModNatural (NatS# b)   (NatS# e)   (NatS# m)   = NatS# (powModWord b e m)
+powModNatural b           e           (NatS# m)
+  = NatS# (powModBigNatWord (naturalToBigNat b) (naturalToBigNat e) m)
+powModNatural b           e           (NatJ# m)
+  = bigNatToNatural (powModBigNat (naturalToBigNat b) (naturalToBigNat e) m)
+#else
+-- Portable reference fallback implementation
+powModNatural _ _ 0 = throw DivideByZero
+powModNatural _ _ 1 = 0
+powModNatural _ 0 _ = 1
+powModNatural 0 _ _ = 0
+powModNatural 1 _ _ = 1
+powModNatural b0 e0 m = go b0 e0 1
+  where
+    go !b e !r
+      | odd e     = go b' e' (r*b `mod` m)
+      | e == 0    = r
+      | otherwise = go b' e' r
+      where
+        b' = b*b `mod` m
+        e' = e   `unsafeShiftR` 1 -- slightly faster than "e `div` 2"
+#endif
