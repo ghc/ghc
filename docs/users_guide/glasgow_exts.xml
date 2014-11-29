@@ -1037,7 +1037,7 @@ bidirectional. The syntax for unidirectional pattern synonyms is:
   it is assigned a <emphasis>pattern type</emphasis> of the form
 </para>
 <programlisting>
-  pattern CProv => P t1 t2 ... tN :: CReq => t
+  pattern P :: CProv => CReq => t1 -> t2 -> ... -> tN -> t
 </programlisting>
 <para>
   where <replaceable>CProv</replaceable> and
@@ -1074,7 +1074,7 @@ the pattern type of <literal>ExNumPat</literal> is
 </para>
 
 <programlisting>
-pattern (Show b) => ExNumPat b :: (Num a, Eq a) => T a
+pattern ExNumPat :: (Show b) => (Num a, Eq a) => b -> T a
 </programlisting>
 
 <para>

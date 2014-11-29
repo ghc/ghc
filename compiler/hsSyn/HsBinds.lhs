@@ -704,34 +704,31 @@ ppr_sig (SpecSig var ty inl)      = pragBrackets (pprSpec (unLoc var) (ppr ty) i
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig ty)          = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 ppr_sig (MinimalSig bf)           = pragBrackets (pprMinimalSig bf)
-ppr_sig (PatSynSig name arg_tys ty prov req)
-  = pprPatSynSig (unLoc name) False args (ppr ty) (pprCtx prov) (pprCtx req)
+ppr_sig (PatSynSig name args pat_ty prov req)
+  = pprPatSynSig (unLoc name) empty
+                 (pprCtx prov) (pprCtx req)
+                 (ppr ty)
   where
-    args = fmap ppr arg_tys
+    arg_tys = case args of
+        PrefixPatSyn arg_tys -> arg_tys
+        InfixPatSyn left_ty right_ty -> [left_ty, right_ty]
+    ty = Data.List.foldr (\t1 t2 -> noLoc (HsFunTy t1 t2)) pat_ty arg_tys
 
     pprCtx lctx = case unLoc lctx of
         [] -> Nothing
         ctx -> Just (pprHsContextNoArrow ctx)
 
-pprPatSynSig :: (OutputableBndr a)
-             => a -> Bool -> HsPatSynDetails SDoc -> SDoc -> Maybe SDoc -> Maybe SDoc -> SDoc
-pprPatSynSig ident is_bidir args rhs_ty prov_theta req_theta
-  = sep [ ptext (sLit "pattern")
-        , thetaOpt prov_theta, name_and_args
-        , colon
-        , thetaOpt req_theta, rhs_ty
-        ]
+pprPatSynSig :: (OutputableBndr name)
+             => name -> SDoc -> Maybe SDoc -> Maybe SDoc -> SDoc -> SDoc
+pprPatSynSig ident tvs prov req ty
+  = ptext (sLit "pattern") <+> pprPrefixOcc ident <+> dcolon <+>
+    tvs <+> context <+> ty
   where
-    name_and_args = case args of
-        PrefixPatSyn arg_tys ->
-            pprPrefixOcc ident <+> sep arg_tys
-        InfixPatSyn left_ty right_ty ->
-            left_ty <+> pprInfixOcc ident <+> right_ty
-
-    -- TODO: support explicit foralls
-    thetaOpt = maybe empty (<+> darrow)
-
-    colon = if is_bidir then dcolon else dcolon -- TODO
+    context = case (prov, req) of
+        (Nothing, Nothing)    -> empty
+        (Nothing, Just req)   -> parens empty <+> darrow <+> req <+> darrow
+        (Just prov, Nothing)  -> prov <+> darrow
+        (Just prov, Just req) -> prov <+> darrow <+> req <+> darrow
 
 instance OutputableBndr name => Outputable (FixitySig name) where
   ppr (FixitySig name fixity) = sep [ppr fixity, pprInfixOcc (unLoc name)]

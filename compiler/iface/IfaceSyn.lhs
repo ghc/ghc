@@ -1104,22 +1104,15 @@ pprIfaceDecl (IfaceAxiom {ifName = name, ifTyCon = tycon, ifAxBranches = branche
   = hang (ptext (sLit "axiom") <+> ppr name <> dcolon)
        2 (vcat $ map (pprAxBranch $ Just tycon) branches)
 
-pprIfaceDecl (IfacePatSyn { ifName = name, ifPatWrapper = wrapper,
+pprIfaceDecl (IfacePatSyn { ifName = name, ifPatWrapper = _wrapper,
                             ifPatIsInfix = is_infix,
                             ifPatUnivTvs = _univ_tvs, ifPatExTvs = _ex_tvs,
                             ifPatProvCtxt = prov_ctxt, ifPatReqCtxt = req_ctxt,
-                            ifPatArgs = args,
-                            ifPatTy = ty })
-  = pprPatSynSig name has_wrap args' ty' (pprCtxt prov_ctxt) (pprCtxt req_ctxt)
+                            ifPatArgs = arg_tys,
+                            ifPatTy = pat_ty })
+  = pprPatSynSig name empty (pprCtxt prov_ctxt) (pprCtxt req_ctxt) (pprIfaceType ty)
   where
-    has_wrap = isJust wrapper
-    args' = case (is_infix, args) of
-        (True, [left_ty, right_ty]) ->
-            InfixPatSyn (pprParendIfaceType left_ty) (pprParendIfaceType right_ty)
-        (_, tys) ->
-            PrefixPatSyn (map pprParendIfaceType tys)
-
-    ty' = pprParendIfaceType ty
+    ty = foldr IfaceFunTy pat_ty arg_tys
 
     pprCtxt [] = Nothing
     pprCtxt ctxt = Just $ pprIfaceContext ctxt
