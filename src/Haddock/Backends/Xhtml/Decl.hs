@@ -83,7 +83,7 @@ ppLPatSig summary links loc (doc, _argDocs) (L _ name) (expl, qtvs) lprov lreq t
   | otherwise = topDeclElem links loc splice [name] (pref1 <+> ppFixities fixities qual)
                 +++ docSection Nothing qual doc
   where
-    pref1 = hsep [ toHtml "pattern"
+    pref1 = hsep [ keyword "pattern"
                  , ppBinder summary occname
                  , dcolon unicode
                  , ppLTyVarBndrs expl qtvs unicode qual
