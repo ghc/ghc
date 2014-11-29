@@ -1,3 +1,12 @@
+/*
+ * `integer-gmp` GMP FFI wrappers
+ *
+ * Copyright (c) 2014, Herbert Valerio Riedel <hvr@gnu.org>
+ *
+ * BSD3 licensed, see ../LICENSE file for details
+ *
+ */
+
 #define _ISOC99_SOURCE
 
 #include <assert.h>
@@ -39,6 +48,13 @@ typedef unsigned long int mp_bitcnt_t;
 // Turn a (const) {xp,xn} pair into static initializer
 #define CONST_MPZ_INIT(xp,xn) \
   {{ ._mp_alloc = 0, ._mp_size  = (xn), ._mp_d = (mp_limb_t*)(xp) }}
+
+// Test if {sp,sn} represents a zero value
+static inline int
+mp_limb_zero_p(const mp_limb_t sp[], mp_size_t sn)
+{
+  return !sn || ((sn == 1 || sn == -1) && !sp[0]);
+}
 
 /* Perform arithmetic right shift on MPNs (multi-precision naturals)
  *
@@ -145,10 +161,7 @@ HsDouble
 integer_gmp_mpn_get_d (const mp_limb_t sp[], const mp_size_t sn,
                        const HsInt exponent)
 {
-  if (sn == 0)
-    return 0.0; // should not happen
-
-  if (sn == 1 && sp[0] == 0)
+  if (mp_limb_zero_p(sp, sn))
     return 0.0;
 
   const mpz_t mpz = CONST_MPZ_INIT(sp, sn);
@@ -289,7 +302,7 @@ integer_gmp_mpn_sizeinbase(const mp_limb_t s[], const mp_size_t sn,
 {
   assert (2 <= base && base <= 256);
 
-  if (!sn) return 1;
+  if (mp_limb_zero_p(s,sn)) return 1;
 
   const mpz_t zs = CONST_MPZ_INIT(s, sn);
 
@@ -311,8 +324,7 @@ integer_gmp_mpn_export(const mp_limb_t s[], const mp_size_t sn,
   /* TODO: implement w/o GMP, c.f. 'integer_gmp_mpn_import()' */
   assert (msbf == 0 || msbf == 1);
 
-  if (!sn || (sn == 1 && !s[0]))
-    return 0;
+  if (mp_limb_zero_p(s,sn)) return 0;
 
   const mpz_t zs = CONST_MPZ_INIT(s, sn);
 
@@ -438,13 +450,9 @@ integer_gmp_rscan_nzbyte(const uint8_t *srcptr,
 HsInt
 integer_gmp_test_prime(const mp_limb_t s[], const mp_size_t sn, const HsInt rep)
 {
-  if (!sn) return 0;
+  if (mp_limb_zero_p(s,sn)) return 0;
 
-  const mpz_t sz = {{
-      ._mp_alloc = sn,
-      ._mp_size  = sn,
-      ._mp_d = (mp_limb_t*)s
-    }};
+  const mpz_t sz = CONST_MPZ_INIT(s, sn);
 
   // int mpz_probab_prime_p (const mpz_t n, int reps)
   return mpz_probab_prime_p(sz, rep);
@@ -468,13 +476,15 @@ mp_limb_t
 integer_gmp_next_prime(mp_limb_t rp[], const mp_limb_t sp[],
                        const mp_size_t sn)
 {
-  if (!sn) return 2;
+  assert (sn>=0);
 
-  const mpz_t op = {{
-      ._mp_alloc = sn,
-      ._mp_size  = sn,
-      ._mp_d = (mp_limb_t*)sp
-    }};
+  if (!sn) return 2;
+  if (sn == 1 && sp[0] < 2) {
+    rp[0] = 2;
+    return 0;
+  }
+
+  const mpz_t op = CONST_MPZ_INIT(sp, sn);
 
   mpz_t rop;
   mpz_init (rop);
@@ -501,11 +511,7 @@ integer_gmp_next_prime1(const mp_limb_t limb)
 {
   if (limb < 2) return 2;
 
-  const mpz_t op = {{
-      ._mp_alloc = 1,
-      ._mp_size  = 1,
-      ._mp_d = (mp_limb_t*)(&limb)
-    }};
+  const mpz_t op = CONST_MPZ_INIT(&limb, 1);
 
   mpz_t rop;
   mpz_init (rop);
