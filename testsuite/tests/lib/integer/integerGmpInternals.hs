@@ -22,17 +22,7 @@ recipModInteger = I.recipModInteger
 
 -- FIXME: Lacks GMP2 version
 gcdExtInteger :: Integer -> Integer -> (Integer, Integer)
-gcdExtInteger a b = (d, u) -- stolen from `arithmoi` package
-  where
-    (d, x, y) = eGCD 0 1 1 0 (abs a) (abs b)
-    u | a < 0     = negate x
-      | otherwise = x
-    v | b < 0     = negate y
-      | otherwise = y
-    eGCD !n1 o1 !n2 o2 r s
-      | s == 0    = (r, o1, o2)
-      | otherwise = case r `quotRem` s of
-                      (q, t) -> eGCD (o1 - q*n1) n1 (o2 - q*n2) n2 s t
+gcdExtInteger a b = case I.gcdExtInteger a b of (# g, s #) -> (g, s)
 
 -- FIXME: Lacks GMP2 version
 powModSecInteger :: Integer -> Integer -> Integer -> Integer

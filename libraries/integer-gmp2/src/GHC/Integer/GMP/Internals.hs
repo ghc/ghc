@@ -44,6 +44,7 @@ module GHC.Integer.GMP.Internals
     , bitInteger
     , popCountInteger
     , gcdInteger
+    , gcdExtInteger
     , lcmInteger
     , sqrInteger
     , powModInteger

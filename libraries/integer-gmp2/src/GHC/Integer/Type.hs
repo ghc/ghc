@@ -1256,6 +1256,45 @@ gcdBigNat x@(BN# x#) y@(BN# y#)
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
 
+-- | Extended euclidean algorithm.
+--
+-- For @/a/@ and @/b/@, compute their greatest common divisor @/g/@
+-- and the coefficient @/s/@ satisfying @/a//s/ + /b//t/ = /g/@.
+--
+-- /Since: 0.5.1.0/
+{-# NOINLINE gcdExtInteger #-}
+gcdExtInteger :: Integer -> Integer -> (# Integer, Integer #)
+gcdExtInteger a b = case gcdExtSBigNat a' b' of
+    (# g, s #) -> let !g' = bigNatToInteger  g
+                      !s' = sBigNatToInteger s
+                  in (# g', s' #)
+  where
+    a' = integerToSBigNat a
+    b' = integerToSBigNat b
+
+-- internal helper
+gcdExtSBigNat :: SBigNat -> SBigNat -> (# BigNat, SBigNat #)
+gcdExtSBigNat x y = case runS go of (g,s) -> (# g, s #)
+  where
+    go = do
+        g@(MBN# g#) <- newBigNat# gn0#
+        s@(MBN# s#) <- newBigNat# (absI# xn#)
+        I# ssn_# <- liftIO (integer_gmp_gcdext# s# g# x# xn# y# yn#)
+        let ssn# = narrowGmpSize# ssn_#
+            sn#  = absI# ssn#
+        s' <- unsafeShrinkFreezeBigNat# s sn#
+        g' <- unsafeRenormFreezeBigNat# g
+        case ssn# >=# 0# of
+            0# -> return ( g', NegBN s' )
+            _  -> return ( g', PosBN s' )
+
+    !(BN# x#) = absSBigNat x
+    !(BN# y#) = absSBigNat y
+    xn# = ssizeofSBigNat# x
+    yn# = ssizeofSBigNat# y
+
+    gn0# = minI# (absI# xn#) (absI# yn#)
+
 ----------------------------------------------------------------------------
 -- modular exponentiation
 
@@ -1445,6 +1484,11 @@ foreign import ccall unsafe "integer_gmp_mpn_gcd_1"
 foreign import ccall unsafe "integer_gmp_mpn_gcd"
   c_mpn_gcd# :: MutableByteArray# s -> ByteArray# -> GmpSize#
                 -> ByteArray# -> GmpSize# -> IO GmpSize
+
+foreign import ccall unsafe "integer_gmp_gcdext"
+  integer_gmp_gcdext# :: MutableByteArray# s -> MutableByteArray# s
+                         -> ByteArray# -> GmpSize#
+                         -> ByteArray# -> GmpSize# -> IO GmpSize
 
 -- mp_limb_t mpn_add_1 (mp_limb_t *rp, const mp_limb_t *s1p, mp_size_t n,
 --                      mp_limb_t s2limb)
@@ -1952,3 +1996,7 @@ sgnI# x# = (x# ># 0#) -# (x# <# 0#)
 
 cmpI# :: Int# -> Int# -> Int#
 cmpI# x# y# = (x# ># y#) -# (x# <# y#)
+
+minI# :: Int# -> Int# -> Int#
+minI# x# y# | isTrue# (x# <=# y#) = x#
+            | True                = y#

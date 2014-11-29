@@ -56,6 +56,24 @@ mp_limb_zero_p(const mp_limb_t sp[], mp_size_t sn)
   return !sn || ((sn == 1 || sn == -1) && !sp[0]);
 }
 
+static inline mp_size_t
+mp_size_abs(const mp_size_t x)
+{
+  return x>=0 ? x : -x;
+}
+
+static inline mp_size_t
+mp_size_min(const mp_size_t x, const mp_size_t y)
+{
+  return x<y ? x : y;
+}
+
+static inline mp_size_t
+mp_size_minabs(const mp_size_t x, const mp_size_t y)
+{
+  return mp_size_min(mp_size_abs(x), mp_size_abs(y));
+}
+
 /* Perform arithmetic right shift on MPNs (multi-precision naturals)
  *
  * pre-conditions:
@@ -247,6 +265,54 @@ integer_gmp_mpn_gcd(mp_limb_t r[],
 
     return rn;
   }
+}
+
+/* wraps mpz_gcdext()
+ *
+ * Set g to the greatest common divisor of x and y, and in addition
+ * set s and t to coefficients satisfying x*s + y*t = g.
+ *
+ * The {gp,gn} array is zero-padded (as otherwise 'gn' can't be
+ * reconstructed).
+ *
+ * g must have space for exactly gn=min(xn,yn) limbs.
+ * s must have space for at least xn limbs.
+ *
+ * return value: signed 'sn' of {sp,sn}
+ */
+mp_size_t
+integer_gmp_gcdext(mp_limb_t s0[], mp_limb_t g0[],
+                   const mp_limb_t x0[], const mp_size_t xn,
+                   const mp_limb_t y0[], const mp_size_t yn)
+{
+  const mp_size_t gn0 = mp_size_minabs(xn, yn);
+  const mpz_t x = CONST_MPZ_INIT(x0, mp_limb_zero_p(x0,xn) ? 0 : xn);
+  const mpz_t y = CONST_MPZ_INIT(y0, mp_limb_zero_p(y0,yn) ? 0 : yn);
+
+  mpz_t g, s;
+  mpz_init (g);
+  mpz_init (s);
+
+  mpz_gcdext (g, s, NULL, x, y);
+
+  const mp_size_t gn = g[0]._mp_size;
+  assert(0 <= gn && gn <= gn0);
+  memset(g0, 0, gn0*sizeof(mp_limb_t));
+  memcpy(g0, g[0]._mp_d, gn*sizeof(mp_limb_t));
+  mpz_clear (g);
+
+  const mp_size_t ssn = s[0]._mp_size;
+  const mp_size_t sn  = mp_size_abs(ssn);
+  assert(sn <= xn);
+  memcpy(s0, s[0]._mp_d, sn*sizeof(mp_limb_t));
+  mpz_clear (s);
+
+  if (!sn) {
+    s0[0] = 0;
+    return 1;
+  }
+
+  return ssn;
 }
 
 /* Truncating (i.e. rounded towards zero) integer division-quotient of MPN */
