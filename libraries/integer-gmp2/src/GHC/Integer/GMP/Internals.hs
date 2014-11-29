@@ -47,6 +47,7 @@ module GHC.Integer.GMP.Internals
     , lcmInteger
     , sqrInteger
     , powModInteger
+    , recipModInteger
 
       -- ** Additional conversion operations to 'Integer'
     , wordToNegInteger
@@ -98,6 +99,8 @@ module GHC.Integer.GMP.Internals
     , powModBigNat
     , powModBigNatWord
 
+    , recipModBigNat
+
       -- ** 'BigNat' logic operations
     , shiftRBigNat
     , shiftLBigNat
@@ -124,6 +127,7 @@ module GHC.Integer.GMP.Internals
     , gcdInt
     , gcdWord
     , powModWord
+    , recipModWord
 
       -- * Primality tests
     , testPrimeInteger

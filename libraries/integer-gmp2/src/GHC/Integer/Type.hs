@@ -1340,6 +1340,53 @@ foreign import ccall unsafe "integer_gmp_powm1"
   integer_gmp_powm1# :: ByteArray# -> GmpSize# -> ByteArray# -> GmpSize#
                         -> GmpLimb# -> GmpLimb#
 
+
+-- | \"@'recipModInteger' /x/ /m/@\" computes the inverse of @/x/@ modulo @/m/@. If
+-- the inverse exists, the return value @/y/@ will satisfy @0 < /y/ <
+-- abs(/m/)@, otherwise the result is @0@.
+--
+-- /Since: 0.5.1.0/
+{-# NOINLINE recipModInteger #-}
+recipModInteger :: Integer -> Integer -> Integer
+recipModInteger (S# x#) (S# m#)
+  | isTrue# (x# >=# 0#)
+  = wordToInteger (recipModWord (int2Word# x#) (int2Word# (absI# m#)))
+recipModInteger x m = bigNatToInteger (recipModSBigNat x' m')
+  where
+    x' = integerToSBigNat x
+    m' = absSBigNat (integerToSBigNat m)
+
+-- | Version of 'recipModInteger' operating on 'BigNat's
+--
+-- /Since: 1.0.0.0/
+recipModBigNat :: BigNat -> BigNat -> BigNat
+recipModBigNat x m = inline recipModSBigNat (PosBN x) m
+
+-- | Version of 'recipModInteger' operating on 'Word#'s
+--
+-- /Since: 1.0.0.0/
+foreign import ccall unsafe "integer_gmp_invert_word"
+  recipModWord :: GmpLimb# -> GmpLimb# -> GmpLimb#
+
+-- internal non-exported helper
+recipModSBigNat :: SBigNat -> BigNat -> BigNat
+recipModSBigNat x m@(BN# m#) = runS $ do
+    r@(MBN# r#) <- newBigNat# mn#
+    I# rn_# <- liftIO (integer_gmp_invert# r# x# xn# m# mn#)
+    let rn# = narrowGmpSize# rn_#
+    case rn# ==# mn# of
+        0# -> unsafeShrinkFreezeBigNat# r rn#
+        _  -> unsafeFreezeBigNat# r
+  where
+    !(BN# x#) = absSBigNat x
+    xn# = ssizeofSBigNat# x
+    mn# = sizeofBigNat# m
+
+foreign import ccall unsafe "integer_gmp_invert"
+  integer_gmp_invert# :: MutableByteArray# RealWorld
+                         -> ByteArray# -> GmpSize#
+                         -> ByteArray# -> GmpSize# -> IO GmpSize
+
 ----------------------------------------------------------------------------
 -- Conversions to/from floating point
 

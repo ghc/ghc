@@ -17,17 +17,8 @@ import qualified GHC.Integer.GMP.Internals as I
 -- so we use naive reference-implementations instead for the meantime
 -- in order to keep the reference-output untouched.
 
--- FIXME: Lacks GMP2 version
--- stolen from `arithmoi` package
 recipModInteger :: Integer -> Integer -> Integer
-recipModInteger k 0 = if k == 1 || k == (-1) then k else 0
-recipModInteger k m = case gcdExtInteger k' m' of
-                  (1, u) -> if u < 0 then m' + u else u
-                  _      -> 0
-  where
-    m' = abs m
-    k' | k >= m' || k < 0   = k `mod` m'
-       | otherwise          = k
+recipModInteger = I.recipModInteger
 
 -- FIXME: Lacks GMP2 version
 gcdExtInteger :: Integer -> Integer -> (Integer, Integer)

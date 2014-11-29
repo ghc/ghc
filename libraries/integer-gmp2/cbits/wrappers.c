@@ -611,3 +611,75 @@ integer_gmp_powm_word(const mp_limb_t b0, // base
 {
   return integer_gmp_powm1(&b0, !!b0, &e0, !!e0, m0);
 }
+
+
+/* wrapper around mpz_invert()
+ *
+ * Store '(1/X) mod abs(M)' in {rp,rn}
+ *
+ * rp must have allocated mn limbs; This function's return value is
+ * the actual number rn (0 < rn <= mn) of limbs written to the rp limb-array.
+ *
+ * Returns 0 if inverse does not exist.
+ */
+mp_size_t
+integer_gmp_invert(mp_limb_t rp[], // result
+                   const mp_limb_t xp[], const mp_size_t xn, // base
+                   const mp_limb_t mp[], const mp_size_t mn) // mod
+{
+  if (mp_limb_zero_p(xp,xn)
+      || mp_limb_zero_p(mp,mn)
+      || ((mn == 1 || mn == -1) && mp[0] == 1)) {
+    rp[0] = 0;
+    return 1;
+  }
+
+  const mpz_t x = CONST_MPZ_INIT(xp, xn);
+  const mpz_t m = CONST_MPZ_INIT(mp, mn);
+
+  mpz_t r;
+  mpz_init (r);
+
+  const int inv_exists = mpz_invert(r, x, m);
+
+  const mp_size_t rn = inv_exists ? r[0]._mp_size : 0;
+
+  if (rn) {
+    assert(0 < rn && rn <= mn);
+    memcpy(rp, r[0]._mp_d, rn*sizeof(mp_limb_t));
+  }
+
+  mpz_clear (r);
+
+  if (!rn) {
+    rp[0] = 0;
+    return 1;
+  }
+
+  return rn;
+}
+
+
+/* Version of integer_gmp_invert() operating on single limbs */
+mp_limb_t
+integer_gmp_invert_word(const mp_limb_t x0, const mp_limb_t m0)
+{
+  if (!x0 || m0<=1) return 0;
+  if (x0 == 1) return 1;
+
+  const mpz_t x = CONST_MPZ_INIT(&x0, 1);
+  const mpz_t m = CONST_MPZ_INIT(&m0, 1);
+
+  mpz_t r;
+  mpz_init (r);
+
+  const int inv_exists = mpz_invert(r, x, m);
+  const mp_size_t rn = inv_exists ? r[0]._mp_size : 0;
+
+  assert (rn == 0 || rn == 1);
+  const mp_limb_t r0 = rn ? r[0]._mp_d[0] : 0;
+
+  mpz_clear (r);
+
+  return r0;
+}
