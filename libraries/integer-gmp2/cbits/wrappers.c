@@ -522,3 +522,92 @@ integer_gmp_next_prime1(const mp_limb_t limb)
 
   return result;
 }
+
+/* wrapper around mpz_powm()
+ *
+ * Store '(B^E) mod M' in {rp,rn}
+ *
+ * rp must have allocated mn limbs; This function's return value is
+ * the actual number rn (0 < rn <= mn) of limbs written to the rp limb-array.
+ *
+ * bn and en are allowed to be negative to denote negative numbers
+ */
+mp_size_t
+integer_gmp_powm(mp_limb_t rp[], // result
+                 const mp_limb_t bp[], const mp_size_t bn, // base
+                 const mp_limb_t ep[], const mp_size_t en, // exponent
+                 const mp_limb_t mp[], const mp_size_t mn) // mod
+{
+  assert(!mp_limb_zero_p(mp,mn));
+
+  if ((mn == 1 || mn == -1) && mp[0] == 1) {
+    rp[0] = 0;
+    return 1;
+  }
+
+  if (mp_limb_zero_p(ep,en)) {
+    rp[0] = 1;
+    return 1;
+  }
+
+  const mpz_t b = CONST_MPZ_INIT(bp, mp_limb_zero_p(bp,bn) ? 0 : bn);
+  const mpz_t e = CONST_MPZ_INIT(ep, mp_limb_zero_p(ep,en) ? 0 : en);
+  const mpz_t m = CONST_MPZ_INIT(mp, mn);
+
+  mpz_t r;
+  mpz_init (r);
+
+  mpz_powm(r, b, e, m);
+
+  const mp_size_t rn = r[0]._mp_size;
+
+  if (rn) {
+    assert(0 < rn && rn <= mn);
+    memcpy(rp, r[0]._mp_d, rn*sizeof(mp_limb_t));
+  }
+
+  mpz_clear (r);
+
+  if (!rn) {
+    rp[0] = 0;
+    return 1;
+  }
+
+  return rn;
+}
+
+/* version of integer_gmp_powm() for single-limb moduli */
+mp_limb_t
+integer_gmp_powm1(const mp_limb_t bp[], const mp_size_t bn, // base
+                  const mp_limb_t ep[], const mp_size_t en, // exponent
+                  const mp_limb_t m0) // mod
+{
+  assert(m0);
+
+  if (m0==1) return 0;
+  if (mp_limb_zero_p(ep,en)) return 1;
+
+  const mpz_t b = CONST_MPZ_INIT(bp, mp_limb_zero_p(bp,bn) ? 0 : bn);
+  const mpz_t e = CONST_MPZ_INIT(ep, en);
+  const mpz_t m = CONST_MPZ_INIT(&m0, !!m0);
+
+  mpz_t r;
+  mpz_init (r);
+  mpz_powm(r, b, e, m);
+
+  assert(r[0]._mp_size == 0 || r[0]._mp_size == 1);
+  const mp_limb_t result = r[0]._mp_size ? r[0]._mp_d[0] : 0;
+
+  mpz_clear (r);
+
+  return result;
+}
+
+/* version of integer_gmp_powm() for single-limb arguments */
+mp_limb_t
+integer_gmp_powm_word(const mp_limb_t b0, // base
+                      const mp_limb_t e0, // exponent
+                      const mp_limb_t m0) // mod
+{
+  return integer_gmp_powm1(&b0, !!b0, &e0, !!e0, m0);
+}

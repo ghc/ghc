@@ -47,19 +47,8 @@ gcdExtInteger a b = (d, u) -- stolen from `arithmoi` package
 powModSecInteger :: Integer -> Integer -> Integer -> Integer
 powModSecInteger = powModInteger
 
--- FIXME: Lacks GMP2 version
 powModInteger :: Integer -> Integer -> Integer -> Integer
-powModInteger b0 e0 m
-  | e0 >= 0    = go b0 e0 1
-  | otherwise  = error "non-neg exponent required"
-  where
-    go !b e !r
-      | odd e     = go b' e' (r*b `mod` m)
-      | e == 0    = r
-      | otherwise = go b' e' r
-      where
-        b' = b*b `mod` m
-        e' = e   `unsafeShiftR` 1 -- slightly faster than "e `div` 2"
+powModInteger = I.powModInteger
 
 -- FIXME: Lacks GMP2 version
 powInteger :: Integer -> Word -> Integer

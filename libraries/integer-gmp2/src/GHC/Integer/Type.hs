@@ -1256,6 +1256,89 @@ gcdBigNat x@(BN# x#) y@(BN# y#)
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
 
+----------------------------------------------------------------------------
+-- modular exponentiation
+
+-- | \"@'powModInteger' /b/ /e/ /m/@\" computes base @/b/@ raised to
+-- exponent @/e/@ modulo @abs(/m/)@.
+--
+-- Negative exponents are supported if an inverse modulo @/m/@
+-- exists.
+--
+-- __Warning__: It's advised to avoid calling this primitive with
+-- negative exponents unless it is guaranteed the inverse exists, as
+-- failure to do so will likely cause program abortion due to a
+-- divide-by-zero fault. See also 'recipModInteger'.
+--
+-- Future versions of @integer_gmp@ may not support negative @/e/@
+-- values anymore.
+--
+-- /Since: 0.5.1.0/
+{-# NOINLINE powModInteger #-}
+powModInteger :: Integer -> Integer -> Integer -> Integer
+powModInteger (S# b#) (S# e#) (S# m#)
+  | isTrue# (b# >=# 0#), isTrue# (e# >=# 0#)
+  = wordToInteger (powModWord (int2Word# b#) (int2Word# e#)
+                              (int2Word# (absI# m#)))
+powModInteger b e m = case m of
+    (S# m#) -> wordToInteger (powModSBigNatWord b' e' (int2Word# (absI# m#)))
+    (Jp# m') -> bigNatToInteger (powModSBigNat b' e' m')
+    (Jn# m') -> bigNatToInteger (powModSBigNat b' e' m')
+  where
+    b' = integerToSBigNat b
+    e' = integerToSBigNat e
+
+-- | Version of 'powModInteger' operating on 'BigNat's
+--
+-- /Since: 1.0.0.0/
+powModBigNat :: BigNat -> BigNat -> BigNat -> BigNat
+powModBigNat b e m = inline powModSBigNat (PosBN b) (PosBN e) m
+
+-- | Version of 'powModInteger' for 'Word#'-sized moduli
+--
+-- /Since: 1.0.0.0/
+powModBigNatWord :: BigNat -> BigNat -> GmpLimb# -> GmpLimb#
+powModBigNatWord b e m# = inline powModSBigNatWord (PosBN b) (PosBN e) m#
+
+-- | Version of 'powModInteger' operating on 'Word#'s
+--
+-- /Since: 1.0.0.0/
+foreign import ccall unsafe "integer_gmp_powm_word"
+  powModWord :: GmpLimb# -> GmpLimb# -> GmpLimb# -> GmpLimb#
+
+-- internal non-exported helper
+powModSBigNat :: SBigNat -> SBigNat -> BigNat -> BigNat
+powModSBigNat b e m@(BN# m#) = runS $ do
+    r@(MBN# r#) <- newBigNat# mn#
+    I# rn_# <- liftIO (integer_gmp_powm# r# b# bn# e# en# m# mn#)
+    let rn# = narrowGmpSize# rn_#
+    case rn# ==# mn# of
+        0# -> unsafeShrinkFreezeBigNat# r rn#
+        _  -> unsafeFreezeBigNat# r
+  where
+    !(BN# b#) = absSBigNat b
+    !(BN# e#) = absSBigNat e
+    bn# = ssizeofSBigNat# b
+    en# = ssizeofSBigNat# e
+    mn# = sizeofBigNat# m
+
+foreign import ccall unsafe "integer_gmp_powm"
+  integer_gmp_powm# :: MutableByteArray# RealWorld
+                       -> ByteArray# -> GmpSize# -> ByteArray# -> GmpSize#
+                       -> ByteArray# -> GmpSize# -> IO GmpSize
+
+-- internal non-exported helper
+powModSBigNatWord :: SBigNat -> SBigNat -> GmpLimb# -> GmpLimb#
+powModSBigNatWord b e m# = integer_gmp_powm1# b# bn# e# en# m#
+  where
+    !(BN# b#) = absSBigNat b
+    !(BN# e#) = absSBigNat e
+    bn# = ssizeofSBigNat# b
+    en# = ssizeofSBigNat# e
+
+foreign import ccall unsafe "integer_gmp_powm1"
+  integer_gmp_powm1# :: ByteArray# -> GmpSize# -> ByteArray# -> GmpSize#
+                        -> GmpLimb# -> GmpLimb#
 
 ----------------------------------------------------------------------------
 -- Conversions to/from floating point
@@ -1742,6 +1825,43 @@ runS m = lazy (case m realWorld# of (# _, r #) -> r)
 -- stupid hack
 fail :: [Char] -> S s a
 fail s = return (raise# s)
+
+----------------------------------------------------------------------------
+
+-- | Internal helper type for "signed" 'BigNat's
+--
+-- This is a useful abstraction for operations which support negative
+-- mp_size_t arguments.
+data SBigNat = NegBN !BigNat | PosBN !BigNat
+
+-- | Absolute value of 'SBigNat'
+absSBigNat :: SBigNat -> BigNat
+absSBigNat (NegBN bn) = bn
+absSBigNat (PosBN bn) = bn
+
+-- | /Signed/ limb count. Negative sizes denote negative integers
+ssizeofSBigNat# :: SBigNat -> GmpSize#
+ssizeofSBigNat# (NegBN bn) = negateInt# (sizeofBigNat# bn)
+ssizeofSBigNat# (PosBN bn) = sizeofBigNat# bn
+
+-- | Construct 'SBigNat' from 'Int#' value
+intToSBigNat# :: Int# -> SBigNat
+intToSBigNat# 0#     = PosBN zeroBigNat
+intToSBigNat# 1#     = PosBN oneBigNat
+intToSBigNat# (-1#)  = NegBN oneBigNat
+intToSBigNat# i# | isTrue# (i# ># 0#) = PosBN (wordToBigNat (int2Word# i#))
+                 | True   = PosBN (wordToBigNat (int2Word# (negateInt# i#)))
+
+-- | Convert 'Integer' into 'SBigNat'
+integerToSBigNat :: Integer -> SBigNat
+integerToSBigNat (S#  i#) = intToSBigNat# i#
+integerToSBigNat (Jp# bn) = PosBN bn
+integerToSBigNat (Jn# bn) = NegBN bn
+
+-- | Convert 'SBigNat' into 'Integer'
+sBigNatToInteger :: SBigNat -> Integer
+sBigNatToInteger (NegBN bn) = bigNatToNegInteger bn
+sBigNatToInteger (PosBN bn) = bigNatToInteger bn
 
 ----------------------------------------------------------------------------
 -- misc helpers, some of these should rather be primitives exported by ghc-prim
