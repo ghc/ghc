@@ -1,0 +1,43 @@
+========================================
+Glasgow Haskell Compiler Bash Completion
+========================================
+
+Depending on how you've installed GHC, there are different ways to turn
+on the bash completion.  With a bit of luck, your OS distribution has already
+setup everything and it's already working!  But since you're reading this file,
+we assume that was not the case. Read on!
+
+
+Option 1: Using your OS distribution's tools
+--------------------------------------------
+
+This should work if you installed GHC using the package manager of your *nix
+distribution.  You need the 'bash-completion' package from your package manager
+(likely already installed), and something like this in your ~/.bashrc file;
+
+    if [ -f /usr/share/bash-completion/bash_completion ]; then
+      . /usr/share/bash-completion/bash_completion
+    elif [ -f /etc/bash_completion ]; then
+      . /etc/bash_completion
+    fi
+
+When you installed GHC using your OS distribution's package manager it should
+have copied the bash completion file to the right directory.
+Open a new terminal and try it out!
+
+
+Option 2: Without OS distribution support
+-----------------------------------------
+
+Maybe your OS distribution doesn't support GHC's bash completion, maybe
+you've installed your own build of GHC.  In either case, you can still have
+bash completion!  You can even use GHC's bash completion without the
+'bash-completion' package. Here are the steps;
+
+ 1) Copy the ghc.bash file somewhere (eg. ~/ghc.bash) or use it directly from
+    the source directory.
+ 2) Add the following to your ~/.bashrc;
+
+      source ~/ghc.bash
+
+That's it!
