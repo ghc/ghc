@@ -35,17 +35,17 @@
 
 (AK AnnotationLet.hs:7:9-15 AnnFunId = [AnnotationLet.hs:7:9])
 
+(AK AnnotationLet.hs:7:9-15 AnnSemi = [AnnotationLet.hs:8:9])
+
 (AK AnnotationLet.hs:8:9-15 AnnEqual = [AnnotationLet.hs:8:13])
 
 (AK AnnotationLet.hs:8:9-15 AnnFunId = [AnnotationLet.hs:8:9])
 
-(AK AnnotationLet.hs:8:9-15 AnnSemi = [AnnotationLet.hs:8:9])
+(AK AnnotationLet.hs:8:9-15 AnnSemi = [AnnotationLet.hs:9:9])
 
 (AK AnnotationLet.hs:9:9-13 AnnEqual = [AnnotationLet.hs:9:11])
 
 (AK AnnotationLet.hs:9:9-13 AnnFunId = [AnnotationLet.hs:9:9])
-
-(AK AnnotationLet.hs:9:9-13 AnnSemi = [AnnotationLet.hs:9:9])
 
 (AK <no location info> AnnEofPos = [AnnotationLet.hs:13:1])
 ]

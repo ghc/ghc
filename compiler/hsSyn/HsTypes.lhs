@@ -17,6 +17,7 @@ HsTypes: Abstract syntax: user-defined types
 
 module HsTypes (
         HsType(..), LHsType, HsKind, LHsKind,
+        HsTyOp,LHsTyOp,
         HsTyVarBndr(..), LHsTyVarBndr, 
         LHsTyVarBndrs(..),
         HsWithBndrs(..),
@@ -247,6 +248,7 @@ data HsType name
 
   | HsFunTy             (LHsType name)   -- function type
                         (LHsType name)
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
 
   | HsListTy            (LHsType name)  -- Element type
 

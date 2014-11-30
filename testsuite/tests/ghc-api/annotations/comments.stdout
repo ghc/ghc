@@ -1,11 +1,12 @@
 [
+( CommentsTest.hs:9:1-33 =
+[(CommentsTest.hs:9:1-33,AnnDocCommentNext " The function @foo@ does blah")])
+
 ( CommentsTest.hs:(10,7)-(13,14) =
 [(CommentsTest.hs:12:15-24,AnnLineComment "-- value 2")])
 
 ( <no location info> =
-[(CommentsTest.hs:9:1-33,AnnDocCommentNext " The function @foo@ does blah"),
-
-(CommentsTest.hs:(3,1)-(5,2),AnnBlockComment "\nAn opening comment\n"),
+[(CommentsTest.hs:(3,1)-(5,2),AnnBlockComment "\nAn opening comment\n"),
 
 (CommentsTest.hs:1:1-31,AnnBlockComment "# LANGUAGE DeriveFoldable #")])
 ]

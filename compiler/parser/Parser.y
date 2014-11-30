@@ -235,6 +235,21 @@ only symptom will be that the SrcSpans of your syntax will be
 incorrect.
 
 -- -----------------------------------------------------------------------------
+-- API Annotations
+
+A lot of the productions are now cluttered with calls to
+aa,am,ams,amms etc.
+
+These are helper functions to make sure that the locations of the
+various keywords such as do / let / in are captured for use by tools
+that want to do source to source conversions, such as refactorers or
+structured editors.
+
+The helper functions are defined at the bottom of this file.
+
+See https://ghc.haskell.org/trac/ghc/wiki/GhcAstAnnotations for some background.
+
+-- -----------------------------------------------------------------------------
 
 -}
 
@@ -581,7 +596,7 @@ qcname  :: { Located RdrName }  -- Variable or data constructor
 -- whereas topdecls must contain at least one topdecl.
 
 importdecls :: { [LImportDecl RdrName] }
-        : importdecls ';' importdecl  {% (aa $3 (AnnSemi, $2)) >>
+        : importdecls ';' importdecl  {% (asl $1 $2 $3) >>
                                          return ($3 : $1) }
         | importdecls ';'        {% addAnnotation (gl $ head $1) AnnSemi (gl $2)
               -- AZ: can $1 above ever be [] due to the {- empty -} production?
@@ -637,9 +652,10 @@ impspec :: { Located (Bool, Located [LIE RdrName]) }
 -----------------------------------------------------------------------------
 -- Fixity Declarations
 
-prec    :: { Int }
-        : {- empty -}           { 9 }
-        | INTEGER               {% checkPrecP (sL1 $1 (fromInteger (getINTEGER $1))) }
+prec    :: { Located Int }
+        : {- empty -}           { noLoc 9 }
+        | INTEGER
+                 {% checkPrecP (sL1 $1 (fromInteger (getINTEGER $1))) }
 
 infix   :: { Located FixityDirection }
         : 'infix'                               { sL1 $1 InfixN  }
@@ -655,7 +671,7 @@ ops     :: { Located (OrdList (Located RdrName)) }
 -- Top-Level Declarations
 
 topdecls :: { OrdList (LHsDecl RdrName) }
-        : topdecls ';' topdecl        {% addAnnotation (oll $3) AnnSemi (gl $2)
+        : topdecls ';' topdecl        {% addAnnotation (oll $1) AnnSemi (gl $2)
                                          >> return ($1 `appOL` $3) }
         | topdecls ';'                {% addAnnotation (oll $1) AnnSemi (gl $2)
                                          >> return $1 }
@@ -831,7 +847,7 @@ ty_fam_inst_eqn_list :: { Located ([AddAnn],[LTyFamInstEqn RdrName]) }
 
 ty_fam_inst_eqns :: { Located [LTyFamInstEqn RdrName] }
         : ty_fam_inst_eqns ';' ty_fam_inst_eqn
-                                      {% addAnnotation (gl $3) AnnSemi (gl $2)
+                                      {% asl (unLoc $1) $2 $3
                                          >> return (sLL $1 $> ($3 : unLoc $1)) }
         | ty_fam_inst_eqns ';'        {% addAnnotation (gl $1) AnnSemi (gl $2)
                                          >> return (sLL $1 $>  (unLoc $1)) }
@@ -1012,22 +1028,28 @@ where_decls :: { Located ([AddAnn]
                                           ,$3) }
 pattern_synonym_sig :: { LSig RdrName }
         : 'pattern' con '::' ptype
-            {% do { let (flag, qtvs, prov, req, ty) = unLoc $4
+            {% do { let (flag, qtvs, prov, req, ty) = snd $ unLoc $4
                   ; let sig = PatSynSig $2 (flag, mkHsQTvs qtvs) prov req ty
                   ; checkValidPatSynSig sig
-                  ; return $ sLL $1 $> $ sig } }
+                  ; ams (sLL $1 $> $ sig)
+                        (mj AnnPattern $1:mj AnnDcolon $3:(fst $ unLoc $4)) } }
 
-ptype :: { Located (HsExplicitFlag, [LHsTyVarBndr RdrName], LHsContext RdrName, LHsContext RdrName, LHsType RdrName) }
+ptype :: { Located ([AddAnn]
+                  ,( HsExplicitFlag, [LHsTyVarBndr RdrName], LHsContext RdrName
+                   , LHsContext RdrName, LHsType RdrName)) }
         : 'forall' tv_bndrs '.' ptype
             {% do { hintExplicitForall (getLoc $1)
-                  ; let (_, qtvs', prov, req, ty) = unLoc $4
-                  ; return $ sLL $1 $> (Explicit, $2 ++ qtvs', prov, req ,ty) }}
+                  ; let (_, qtvs', prov, req, ty) = snd $ unLoc $4
+                  ; return $ sLL $1 $>
+                                ((mj AnnForall $1:mj AnnDot $3:(fst $ unLoc $4))
+                                ,(Explicit, $2 ++ qtvs', prov, req ,ty)) }}
         | context '=>' context '=>' type
-            { sLL $1 $> (Implicit, [], $1, $3, $5) }
+            { sLL $1 $> ([mj AnnDarrow $2,mj AnnDarrow $4]
+                        ,(Implicit, [], $1, $3, $5)) }
         | context '=>' type
-            { sLL $1 $> (Implicit, [], $1, noLoc [], $3) }
+            { sLL $1 $> ([mj AnnDarrow $2],(Implicit, [], $1, noLoc [], $3)) }
         | type
-            { sL1 $1 (Implicit, [], noLoc [], noLoc [], $1) }
+            { sL1 $1 ([],(Implicit, [], noLoc [], noLoc [], $1)) }
 
 -----------------------------------------------------------------------------
 -- Nested declarations
@@ -1051,10 +1073,10 @@ decl_cls  : at_decl_cls                 { sLL $1 $> (unitOL $1) }
                                 [mj AnnDefault $1,mj AnnDcolon $3] } }
 
 decls_cls :: { Located (OrdList (LHsDecl RdrName)) }    -- Reversed
-          : decls_cls ';' decl_cls      {% addAnnotation (gl $3) AnnSemi (gl $2)
+          : decls_cls ';' decl_cls      {% addAnnotation (oll (unLoc $1)) AnnSemi (gl $2)
                                            >> return (sLL $1 $> ((unLoc $1) `appOL`
                                                                     unLoc $3)) }
-          | decls_cls ';'               {% addAnnotation (gl $1) AnnSemi (gl $2)
+          | decls_cls ';'               {% addAnnotation (oll (unLoc $1)) AnnSemi (gl $2)
                                            >> return (sLL $1 $>  (unLoc $1)) }
           | decl_cls                    { $1 }
           | {- empty -}                 { noLoc nilOL }
@@ -1083,10 +1105,10 @@ decl_inst  : at_decl_inst               { sLL $1 $> (unitOL (sL1 $1 (InstD (unLo
            | decl                       { $1 }
 
 decls_inst :: { Located (OrdList (LHsDecl RdrName)) }   -- Reversed
-           : decls_inst ';' decl_inst   {% addAnnotation (gl $3) AnnSemi (gl $2)
+           : decls_inst ';' decl_inst   {% addAnnotation (oll $ unLoc $1) AnnSemi (gl $2)
                                            >> return
                                             (sLL $1 $> ((unLoc $1) `appOL` unLoc $3)) }
-           | decls_inst ';'             {% addAnnotation (gl $1) AnnSemi (gl $2)
+           | decls_inst ';'             {% addAnnotation (oll $ unLoc $1) AnnSemi (gl $2)
                                            >> return (sLL $1 $> (unLoc $1)) }
            | decl_inst                  { $1 }
            | {- empty -}                { noLoc nilOL }
@@ -1110,14 +1132,14 @@ where_inst :: { Located ([AddAnn]
 -- Declarations in binding groups other than classes and instances
 --
 decls   :: { Located (OrdList (LHsDecl RdrName)) }
-        : decls ';' decl                {% addAnnotation (gl $3) AnnSemi (gl $2)
+        : decls ';' decl                {% addAnnotation (oll $ unLoc $1) AnnSemi (gl $2)
                                            >> return (
                                           let { this = unLoc $3;
                                     rest = unLoc $1;
                                     these = rest `appOL` this }
                               in rest `seq` this `seq` these `seq`
                                     sLL $1 $> these) }
-        | decls ';'                     {% addAnnotation (gl $1) AnnSemi (gl $2)
+        | decls ';'                     {% addAnnotation (oll $ unLoc $1) AnnSemi (gl $2)
                                            >> return (sLL $1 $> (unLoc $1)) }
         | decl                          { $1 }
         | {- empty -}                   { noLoc nilOL }
@@ -1156,7 +1178,7 @@ wherebinds :: { Located ([AddAnn],HsLocalBinds RdrName) }
 -- Transformation Rules
 
 rules   :: { OrdList (LHsDecl RdrName) }
-        :  rules ';' rule              {% addAnnotation (gl $3) AnnSemi (gl $2)
+        :  rules ';' rule              {% addAnnotation (oll $1) AnnSemi (gl $2)
                                           >> return ($1 `snocOL` $3) }
         |  rules ';'                   {% addAnnotation (oll $1) AnnSemi (gl $2)
                                           >> return $1 }
@@ -1203,7 +1225,7 @@ rule_var :: { LRuleBndr RdrName }
 -- Warnings and deprecations (c.f. rules)
 
 warnings :: { OrdList (LHsDecl RdrName) }
-        : warnings ';' warning         {% addAnnotation (oll $3) AnnSemi (gl $2)
+        : warnings ';' warning         {% addAnnotation (oll $1) AnnSemi (gl $2)
                                           >> return ($1 `appOL` $3) }
         | warnings ';'                 {% addAnnotation (oll $1) AnnSemi (gl $2)
                                           >> return $1 }
@@ -1218,7 +1240,7 @@ warning :: { OrdList (LHsDecl RdrName) }
 
 deprecations :: { OrdList (LHsDecl RdrName) }
         : deprecations ';' deprecation
-                                       {% addAnnotation (oll $3) AnnSemi (gl $2)
+                                       {% addAnnotation (oll $1) AnnSemi (gl $2)
                                           >> return ($1 `appOL` $3) }
         | deprecations ';'             {% addAnnotation (oll $1) AnnSemi (gl $2)
                                           >> return $1 }
@@ -1346,7 +1368,7 @@ ctype   :: { LHsType RdrName }
                                                                          $1 $3)
                                               [mj AnnDarrow $2] }
         | ipvar '::' type               {% ams (sLL $1 $> (HsIParamTy (unLoc $1) $3))
-                                               [mj AnnDcolon $2] }
+                                               [mj AnnVal $1,mj AnnDcolon $2] }
         | type                          { $1 }
 
 ----------------------
@@ -1803,8 +1825,10 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
                        [mj AnnComma $2,mj AnnDcolon $4] } }
 
         | infix prec ops
-              { sLL $1 $> $ toOL [ sLL $1 $> $ SigD
-                     (FixSig (FixitySig (fromOL $ unLoc $3) (Fixity $2 (unLoc $1)))) ] }
+              {% ams (sLL $1 $> $ toOL [ sLL $1 $> $ SigD
+                        (FixSig (FixitySig (fromOL $ unLoc $3)
+                                (Fixity (unLoc $2) (unLoc $1)))) ])
+                     [mj AnnInfix $1,mj AnnVal $2] }
 
         | pattern_synonym_sig   { sLL $1 $> $ unitOL $ sLL $1 $> . SigD . unLoc $ $1 }
 
@@ -1813,8 +1837,6 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
                                      (mkInlinePragma (getINLINE $1) (snd $2)))))
                        (mo $1:mc $4:fst $2) }
 
-        -- AZ TODO: adjust hsSyn so all the SpecSig from a single SPECIALISE
-        --          pragma is kept together
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% ams (
                  let inl_prag = mkInlinePragma (EmptyInlineSpec, FunLike) (snd $2)
@@ -2961,6 +2983,7 @@ aa :: Located a -> (AnnKeywordId,Located c) -> P (Located a)
 aa a@(L l _) (b,s) = addAnnotation l b (gl s) >> return a
 
 -- |Add an annotation to a located element resulting from a monadic action
+am :: P (Located a) -> (AnnKeywordId, Located b) -> P (Located a)
 am a (b,s) = do
   av@(L l _) <- a
   addAnnotation l b (gl s)
@@ -2984,6 +3007,7 @@ amsu :: Located a -> [AddAnn] -> P (OrdList (Located a))
 amsu a@(L l _) bs = (mapM_ (\a -> a l) bs) >> return (unitOL a)
 
 -- |Synonyms for AddAnn versions of AnnOpen and AnnClose
+mo,mc :: Located Token -> SrcSpan -> P ()
 mo ll = mj AnnOpen ll
 mc ll = mj AnnClose ll
 
@@ -2993,9 +3017,13 @@ mcommas :: [SrcSpan] -> [AddAnn]
 mcommas ss = map (\s -> mj AnnComma (L s ())) ss
 
 -- |Add the annotation to an AST element wrapped in a Just
+ajl :: Located (Maybe (Located a)) -> AnnKeywordId -> SrcSpan
+ -> P (Located (Maybe (Located a)))
 ajl a@(L _ (Just (L l _))) b s = addAnnotation l b s >> return a
 
 -- |Add all [AddAnn] to an AST element wrapped in a Just
+aljs :: Located (Maybe (Located a)) -> [AddAnn]
+  -> P (Located (Maybe (Located a)))
 aljs a@(L _ (Just (L l _))) bs = (mapM_ (\a -> a l) bs) >> return a
 
 -- |Add all [AddAnn] to an AST element wrapped in a Just
@@ -3006,4 +3034,11 @@ oll :: OrdList (Located a) -> SrcSpan
 oll l = case fromOL l of
          [] -> noSrcSpan
          xs -> getLoc (last xs)
+
+-- |Add a semicolon annotation in the right place in a list. If the
+-- leading list is empty, add it to the tail
+asl :: [Located a] -> Located b -> Located a -> P()
+asl [] (L ls _) (L l _) = addAnnotation l                  AnnSemi ls
+asl (x:_xs) (L ls _) _x = addAnnotation (getLoc x) AnnSemi ls
+
 }

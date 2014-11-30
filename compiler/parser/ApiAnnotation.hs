@@ -176,6 +176,7 @@ data AnnKeywordId
     | AnnIf
     | AnnImport
     | AnnIn
+    | AnnInfix -- ^ 'infix' or 'infixl' or 'infixr'
     | AnnInstance
     | AnnLam
     | AnnLarrow     -- ^ '<-'

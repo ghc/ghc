@@ -585,7 +585,9 @@ type LSig name = Located (Sig name)
 -- | Signatures and pragmas
 data Sig name
   =   -- | An ordinary type signature
-      -- @f :: Num a => a -> a@
+      --
+      -- > f :: Num a => a -> a
+      --
       -- After renaming, this list of Names contains the named and unnamed
       -- wildcards brought into scope by this signature. For a signature
       -- @_ -> _a -> Bool@, the renamer will give the unnamed wildcard @_@
@@ -599,7 +601,12 @@ data Sig name
     TypeSig [Located name] (LHsType name) (PostRn name [Name])
 
       -- | A pattern synonym type signature
-      -- @pattern type forall b. (Eq b) => P a b :: forall a. (Num a) => T a
+      --
+      -- > pattern Single :: () => (Show a) => a -> [a]
+      --
+      --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
+      --           'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnForall'
+      --           'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
   | PatSynSig (Located name)
               (HsExplicitFlag, LHsTyVarBndrs name)
               (LHsContext name) -- Provided context
@@ -610,6 +617,8 @@ data Sig name
         --
         -- > default eq :: (Representable0 a, GEq (Rep0 a)) => a -> a -> Bool
         --
+        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDefault',
+        --           'ApiAnnotation.AnnDcolon'
   | GenericSig [Located name] (LHsType name)
 
         -- | A type signature in generated code, notably the code
@@ -617,16 +626,15 @@ data Sig name
         -- the desired Id itself, replete with its name, type
         -- and IdDetails.  Otherwise it's just like a type
         -- signature: there should be an accompanying binding
-        --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDefault',
-        --           'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnDotdot'
-
   | IdSig Id
 
         -- | An ordinary fixity declaration
         --
         -- >     infixl 8 ***
         --
+        --
+        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnInfix',
+        --           'ApiAnnotation.AnnVal'
   | FixSig (FixitySig name)
 
         -- | An inline pragma
