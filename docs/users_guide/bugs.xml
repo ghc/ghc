@@ -584,17 +584,6 @@ Loading package javavm ... linking ... WARNING: Overflown relocation field (# re
       your package into two or more .o's, along the lines of
       how the "base" package does it.</para>
       </listitem>
-
-      <listitem>
-        <para>
-          GHCi does not keep careful track of what instance
-          declarations are 'in scope' if they come from other
-          packages.  Instead, all instance declarations that GHC has
-          seen in other packages are all available at the prompt,
-          whether or not the instance really ought to be in visible
-          given the current set of modules in scope.
-        </para>
-      </listitem>
     </itemizedlist>
   </sect2>
   </sect1>
