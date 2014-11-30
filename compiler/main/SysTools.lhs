@@ -1468,6 +1468,7 @@ linkDynLib dflags0 o_files dep_packages
                         in  package_hs_libs ++ extra_libs ++ other_flags
 
         -- probably _stub.o files
+        -- and last temporary shared object file
     let extra_ld_inputs = ldInputs dflags
 
     case os of
@@ -1585,8 +1586,8 @@ linkDynLib dflags0 o_files dep_packages
                     -- Set the library soname. We use -h rather than -soname as
                     -- Solaris 10 doesn't support the latter:
                  ++ [ Option ("-Wl,-h," ++ takeFileName output_fn) ]
-                 ++ map Option lib_path_opts
                  ++ extra_ld_inputs
+                 ++ map Option lib_path_opts
                  ++ map Option pkg_lib_path_opts
                  ++ map Option pkg_link_opts
               )
