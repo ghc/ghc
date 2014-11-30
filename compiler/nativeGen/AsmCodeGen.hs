@@ -6,7 +6,6 @@
 --
 -- -----------------------------------------------------------------------------
 
-\begin{code}
 {-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, UnboxedTuples #-}
 
 module AsmCodeGen ( nativeCodeGen ) where
@@ -1039,6 +1038,3 @@ cmmExprNative referenceKind expr = do
 
         other
            -> return other
-
-\end{code}
-
